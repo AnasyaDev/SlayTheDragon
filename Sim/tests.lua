@@ -211,7 +211,7 @@ test("Pénitence sous Expiation : 2 Absorption par coup", function()
   Combat.play(c, 1)
   Combat.play(c, 1, 1)
   eq(c.player.block, 4 + 6)
-  eq(c.enemies[1].hp, 88)
+  eq(c.enemies[1].hp, 85)
 end)
 
 test("Étourdi : l'ennemi perd son tour ; les boss y sont immunisés", function()
@@ -224,13 +224,15 @@ test("Étourdi : l'ennemi perd son tour ; les boss y sont immunisés", function(
   eq(b.enemies[1].st.stunned, nil)
 end)
 
-test("Forme d'ombre : +2 aux cartes d'ombre, cartes sacrées interdites", function()
-  local c = setup({ "shadowform", "mind_flay", "smite" })
+test("Forme d'ombre : +2 dégâts et +2 Douleur aux cartes d'ombre, rien sur le sacré", function()
+  local c = setup({ "shadowform", "mind_flay", "smite", "sw_pain" })
+  c.player.mana = 5
   Combat.play(c, 1)
-  local ok, why = Combat.canPlay(c, handIndex(c, "smite"))
-  eq(ok, false); eq(why, "forbidden")
+  eq(Combat.cost(c, c.hand[handIndex(c, "smite")]), 1)
   Combat.play(c, handIndex(c, "mind_flay"), 1)
   eq(c.enemies[1].hp, 94)
+  Combat.play(c, handIndex(c, "sw_pain"), 1)
+  eq(c.enemies[1].st.pain, 7)
 end)
 
 test("Esprit de rédemption : reste à 1 PV, tour suivant gratuit", function()
@@ -262,7 +264,7 @@ end)
 test("VanCleef appelle deux sbires à 50 % ; sa mort termine le combat", function()
   local c = setup({ "smite" }, { "vancleef" })
   local v = c.enemies[1]
-  v.hp = 58
+  v.hp = math.floor(v.maxHp / 2) + 3
   Combat.play(c, 1, 1)
   eq(#c.enemies, 3)
   v.hp = 1
@@ -398,7 +400,7 @@ test("Pierre à aiguiser : +1 par coup d'attaque seulement", function()
   Combat.play(c, 1, 1)
   eq(c.enemies[1].hp, 93)
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 93 - 15)
+  eq(c.enemies[1].hp, 93 - 18)
 end)
 
 test("Coup qui interrompt : coupe l'incantation s'il fait perdre des PV", function()
