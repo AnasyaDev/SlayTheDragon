@@ -28,7 +28,7 @@ end
 E.gnoll = {
   name = "Gnoll Rivepatte", hp = { 19, 22 },
   moves = {
-    bite = { name = "Morsure", intent = "attack", actions = { { "attack", 8, interrupts = true } } },
+    bite = { name = "Morsure", intent = "attack", actions = { { "attack", 8 } } },
     rend = { name = "Lacération", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
@@ -115,14 +115,15 @@ E.defias_henchman = {
 }
 
 E.vancleef = {
-  name = "Edwin VanCleef", hp = 100, boss = true,
+  name = "Edwin VanCleef", hp = 92, boss = true,
   moves = {
     combo = { name = "Enchaînement", intent = "attack",
-      actions = { { "attack", 9, times = 2 }, { "debuff", "armor_broken", 1 } } },
-    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 20, interrupts = true } } },
+      actions = { { "attack", 11, times = 2 }, { "debuff", "armor_broken", 1 } } },
+    kick = { name = "Coup de pied", intent = "attack", actions = { { "attack", 9, interrupts = true } } },
+    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 25 } } },
     guard = { name = "Parade", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 3 } } },
   },
-  pattern = { "combo", "strike", "guard" },
+  pattern = { "combo", "kick", "strike", "guard" },
   onDamaged = function(c, e, loss)
     if not e.mem.summoned and e.hp <= e.maxHp / 2 then
       e.mem.summoned = true
