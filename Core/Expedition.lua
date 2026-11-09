@@ -795,6 +795,12 @@ local COMMON = {
 
 function X.act(exp, a)
   if exp.phase == "done" then return false, "terminée" end
+  -- Combat déjà tranché mais pas encore conclu (état rechargé, effet externe) : n'importe
+  -- quelle action le conclut, et rien d'autre.
+  if exp.phase == "combat" and exp.combat.result then
+    endFight(exp)
+    return true
+  end
   local verb = a and a[1]
   local ph = H[exp.phase]
   local h = (ph and ph[verb]) or COMMON[verb]
