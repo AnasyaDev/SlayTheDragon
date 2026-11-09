@@ -598,6 +598,9 @@ check("infobulle de carte", #tt >= 2, #tt)
 tt = H.hover(V().drawPile)
 check("infobulle de la pioche", #tt >= 1, #tt)
 check("journal alimenté", #V().log._lines >= 1)
+tt = H.hover(UI().info)
+check("infobulle du deck dans le bandeau", #tt >= 2 and tt[1]:find("Deck", 1, true), tt[1])
+check("bandeau PV / or / étape", (UI().info.text._text or ""):find("PV", 1, true), UI().info.text._text)
 
 print("U5  carte injouable : raison affichée, rien ne bouge")
 local saveMana = c.player.mana

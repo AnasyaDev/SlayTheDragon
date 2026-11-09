@@ -720,7 +720,7 @@ function V:RunQueue()
   if not item then self.playing = false return end
   self.playing = true
   item.fn()
-  W.after(item.delay * W.pace(), function() V:RunQueue() end)
+  W.delay(item.delay * W.pace(), function() V:RunQueue() end)
 end
 
 function V:OnEvents(evs)
@@ -784,9 +784,9 @@ function V:QueueEvent(ev)
       if not m then return end
       W.anim(m, A.death)
       m.dead = true
-      W.after(1.2 * W.pace(), function() if m.dead and m.SetAnimation then m:SetAnimation(A.dead) end end)
+      W.delay(1.2 * W.pace(), function() if m.dead and m.SetAnimation then m:SetAnimation(A.dead) end end)
       if ev.unit ~= "player" then
-        W.after(1.6 * W.pace(), function()
+        W.delay(1.6 * W.pace(), function()
           local s = self_.slotOf[ev.unit]
           if s then s.dying = false end
           if self_.c then self_:RenderEnemies() end

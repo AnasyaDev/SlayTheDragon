@@ -81,7 +81,7 @@ local handlers = {}
 
 function handlers.ADDON_LOADED(name)
   if name ~= addonName then return end
-  Persist.load()
+  Persist.init()
   local ok, err = pcall(Controller.restore)
   if not ok then
     -- Dernier rempart : une sauvegarde qui fait planter la reprise est archivée, pas rejouée.

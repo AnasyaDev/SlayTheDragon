@@ -79,7 +79,7 @@ function Persist.migrate(db)
 end
 
 -- Lit (et normalise) la base globale ; à appeler à ADDON_LOADED.
-function Persist.load()
+function Persist.init()
   local db = Persist.migrate(_G.SlayTheDragonDB)
   _G.SlayTheDragonDB = db
   Persist.db = db
@@ -87,12 +87,12 @@ function Persist.load()
 end
 
 function Persist.options()
-  return (Persist.db or Persist.load()).options
+  return (Persist.db or Persist.init()).options
 end
 
 -- Copie l'état vivant dans la base. live = nil efface l'expédition en cours.
 function Persist.store(live)
-  local db = Persist.db or Persist.load()
+  local db = Persist.db or Persist.init()
   db.current = live and U.copy(live) or nil
   db.meta.saves = (db.meta.saves or 0) + 1
   if type(time) == "function" then db.meta.savedAt = time() end
@@ -100,13 +100,13 @@ end
 
 -- Copie de l'état sauvegardé, à reprendre comme état vivant.
 function Persist.restore()
-  local db = Persist.db or Persist.load()
+  local db = Persist.db or Persist.init()
   if type(db.current) ~= "table" then return nil end
   return U.copy(db.current)
 end
 
 function Persist.archive(entry)
-  local db = Persist.db or Persist.load()
+  local db = Persist.db or Persist.init()
   local j = db.journal
   j[#j + 1] = entry
   while #j > Persist.JOURNAL_MAX do table.remove(j, 1) end

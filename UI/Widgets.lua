@@ -18,7 +18,7 @@ local WHITE = "Interface\\Buttons\\WHITE8X8"
 -- Temps et vitesse
 ---------------------------------------------------------------------------
 
-function W.after(sec, fn)
+function W.delay(sec, fn)
   if C_Timer and C_Timer.After then C_Timer.After(sec, fn) else fn() end
 end
 
@@ -463,14 +463,14 @@ function W.float(anchor, text, r, g, b, dy, dur)
   if not f then
     f = CreateFrame("Frame", nil, UIParent)
     f:SetSize(160, 20)
-    f:SetFrameStrata("TOOLTIP")
+    f:SetFrameStrata("DIALOG")
     f.fs = W.text(f, "GameFontNormalLarge", 16)
     f.fs:SetPoint("CENTER")
     floatPool[#floatPool + 1] = f
   end
   f.busy = true
   f:SetParent(anchor)
-  f:SetFrameStrata("TOOLTIP")
+  f:SetFrameStrata("DIALOG")
   f:ClearAllPoints()
   f:SetPoint("CENTER", anchor, "CENTER", 0, dy or 0)
   f.fs:SetText(text)
@@ -504,7 +504,7 @@ function W.anim(model, anim, hold)
   model.animToken = (model.animToken or 0) + 1
   local token = model.animToken
   if hold then
-    W.after(hold, function()
+    W.delay(hold, function()
       if model.animToken == token and not model.dead then model:SetAnimation(Art.anim.stand) end
     end)
   end
@@ -534,7 +534,7 @@ function W.setCreature(model, enemyId, fallbackTex)
     if hasModel(model) then return end
     if stage == 1 and art.display and art.creature then
       model:SetDisplayInfo(art.display)
-      W.after(0.6, function() check(2) end)
+      W.delay(0.6, function() check(2) end)
       return
     end
     W.missing["model:" .. enemyId] = true
@@ -543,5 +543,5 @@ function W.setCreature(model, enemyId, fallbackTex)
       fallbackTex:Show()
     end
   end
-  W.after(0.6, function() check(1) end)
+  W.delay(0.6, function() check(1) end)
 end

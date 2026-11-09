@@ -90,6 +90,16 @@ function UI.build()
       counts[d.name] = counts[d.name] + 1
     end
     for i = 1, #order do tt:AddLine(counts[order[i]] .. " × " .. order[i], 1, 1, 1) end
+    local relics = r.relics or {}
+    if #relics > 0 then
+      tt:AddLine(" ")
+      tt:AddLine("Bibelots", 1, 0.82, 0)
+      for i = 1, #relics do
+        local def = ns.Relics[relics[i]]
+        tt:AddLine(def and def.name or tostring(relics[i]), 0.6, 0.8, 1)
+        if def and def.text then tt:AddLine(def.text, 0.85, 0.85, 0.85, true) end
+      end
+    end
   end, "ANCHOR_BOTTOM")
   UI.info = info
 
@@ -137,7 +147,7 @@ function UI.flash(msg)
   err:Show()
   UI.flashToken = (UI.flashToken or 0) + 1
   local token = UI.flashToken
-  W.after(1.6, function() if UI.flashToken == token then err:Hide() end end)
+  W.delay(1.6, function() if UI.flashToken == token then err:Hide() end end)
 end
 
 ---------------------------------------------------------------------------
@@ -285,9 +295,9 @@ function UI.buildOptions()
   t:SetText("Options")
 
   local checks = {}
-  local function check(label, key, y, after)
+  local function check(label, key, y, onSet)
     local c = W.check(p, label, function() return opts()[key] end,
-      function(v) opts()[key] = v if after then after(v) end end)
+      function(v) opts()[key] = v if onSet then onSet(v) end end)
     c:SetPoint("TOPLEFT", 14, y)
     checks[#checks + 1] = c
     return c
@@ -337,7 +347,7 @@ function UI.buildOptions()
     else
       self.armed = true
       self:SetText("Confirmer l'abandon ?")
-      W.after(3, function() if self.armed then self.armed = false self:SetText("Abandonner l'expédition") end end)
+      W.delay(3, function() if self.armed then self.armed = false self:SetText("Abandonner l'expédition") end end)
     end
   end)
   UI.abandonButton = ab
