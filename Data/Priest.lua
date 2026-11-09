@@ -246,9 +246,9 @@ card("sw_death", {
 
 card("psychic_scream", {
   rep = 2, name = "Cri psychique", cost = 1, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
-  cooldown = 2, effects = { { "apply", "demoralized", 1, all = true }, { "demence", 1 } },
-  text = "Tous les ennemis sont Démoralisés ce tour-ci. +1 Démence. Recharge 2.",
-  up = { cost = 0, text = "Tous les ennemis sont Démoralisés ce tour-ci. +1 Démence. Recharge 2." },
+  cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "demence", 1 } },
+  text = "Tous les ennemis sont Démoralisés 2 tours. +1 Démence. Recharge 3.",
+  up = { cost = 0, text = "Tous les ennemis sont Démoralisés 2 tours. +1 Démence. Recharge 3." },
 })
 
 local function spendDemence(c, ctx)

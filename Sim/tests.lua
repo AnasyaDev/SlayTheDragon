@@ -501,7 +501,7 @@ test("Cri psychique et Incandescence : effets de zone", function()
   eq(c.enemies[2].st.demoralized, num("psychic_scream", 1, 3)); eq(c.enemies[2].st.pain, num("mind_sear", 1, 3))
   Combat.endTurn(c)
   eq(c.player.hp, 60 - 7 - 7, "coups réduits de 25 %")
-  eq(c.enemies[2].st.demoralized, nil, "Démoralisé 1 posé à ton tour ne dure que ce tour-ci")
+  eq(c.enemies[2].st.demoralized, 1, "Démoralisé 2 posé à ton tour dure encore le tour suivant")
 end)
 
 test("cartes Consumées : Rénovation quitte le combat", function()
