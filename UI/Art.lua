@@ -78,7 +78,42 @@ Art.statuses = {
   stunned      = { spell = 853,   icon = I .. "Spell_Holy_SealOfMight" },
   halved       = { spell = 33206, icon = I .. "Spell_Holy_PainSupression" },
   force        = { spell = 6673,  icon = I .. "Ability_Warrior_BattleShout" },
+  necrotic     = { icon = I .. "spell_deathknight_necroticplague" }, -- affixe Nécrotique (vérifié MCP)
 }
+
+-- Affixes mythiques (chemins vérifiés par wow_icon_search) -------------------------
+Art.keystone = { icon = I .. "inv_relics_hourglass" }
+Art.affixes = {
+  fortified  = { icon = I .. "ability_toughness" },
+  tyrannical = { icon = I .. "achievement_boss_archaedas" },
+  bolstering = { spell = 6673, icon = I .. "Ability_Warrior_BattleShout" },
+  necrotic   = { icon = I .. "spell_deathknight_necroticplague" },
+  famine     = { icon = I .. "inv_misc_food_15" },
+}
+
+-- Bibelots et potions (piste A) : une entrée par id quand la liste existera ;
+-- en attendant, repli par rareté (chemins vérifiés par wow_icon_search).
+Art.relics = {}
+Art.relicFallback = {
+  common   = { icon = I .. "inv_jewelry_talisman_07" },
+  uncommon = { icon = I .. "inv_jewelry_talisman_07" },
+  rare     = { icon = I .. "inv_jewelry_talisman_07" },
+  boss     = { icon = I .. "inv_jewelry_talisman_07" },
+}
+Art.potions = {}
+Art.potionFallback = { icon = I .. "inv_potion_51" }
+Art.emptySlot = { icon = "Interface\\Buttons\\UI-EmptySlot" }
+
+function Art.relic(id)
+  local e = Art.relics[id]
+  if e then return e end
+  local r = ns.Relics and ns.Relics[id]
+  return Art.relicFallback[r and r.rarity or "common"] or Art.relicFallback.common
+end
+
+function Art.potion(id)
+  return Art.potions[id] or Art.potionFallback
+end
 
 -- Intentions -----------------------------------------------------------------
 Art.intents = {
@@ -114,6 +149,7 @@ Art.ui = {
     boss     = { icon = I .. "INV_Misc_Head_Dragon_01" },
     campfire = { icon = I .. "Spell_Fire_Fire" },
     shop     = { icon = I .. "INV_Misc_Bag_10" },
+    merchant = { icon = I .. "INV_Misc_Bag_10" },
     event    = { icon = I .. "INV_Misc_Note_02" },
     chest    = { icon = I .. "INV_Box_02" },
   },

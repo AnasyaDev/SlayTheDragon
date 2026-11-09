@@ -81,13 +81,18 @@ local handlers = {}
 
 function handlers.ADDON_LOADED(name)
   if name ~= addonName then return end
-  Persist.init()
+  local _, note = Persist.init()
   local ok, err = pcall(Controller.restore)
   if not ok then
-    -- Dernier rempart : une sauvegarde qui fait planter la reprise est archivée, pas rejouée.
-    Persist.archive({ result = "abandon", reason = "erreur à la reprise : " .. tostring(err) })
-    Persist.store(nil)
-    Controller.live = nil
+    -- Dernier rempart : une expédition qui fait planter la reprise part en quarantaine
+    -- (Core/Save.lua), elle n'est ni rejouée ni effacée.
+    ns.Save.quarantine(Persist.db, "erreur à la reprise : " .. tostring(err))
+    Controller.restoreNote = "erreur à la reprise"
+  end
+  if note == "plus récente" then
+    UI.say("sauvegarde d'une version plus récente de l'addon : elle n'est pas modifiée, rien ne sera enregistré.")
+  elseif note and note:find("quarantaine", 1, true) then
+    UI.say("l'expédition sauvegardée était illisible ; elle a été mise de côté (" .. note .. ").")
   end
   F.loaded = true
 end
@@ -102,8 +107,10 @@ function handlers.PLAYER_ENTERING_WORLD()
 end
 
 function handlers.PLAYER_LOGOUT()
-  -- L'état est déjà recopié après chaque action ; on le réécrit par sécurité.
-  if F.loaded then Controller.persist() end
+  -- L'expédition est modifiée sur place : rien à recopier. On vide seulement le journal
+  -- d'animations du combat en cours pour garder la sauvegarde petite.
+  local exp = F.loaded and Controller.exp()
+  if exp and exp.combat then exp.combat.events = {} end
 end
 
 function handlers.PLAYER_REGEN_DISABLED()
