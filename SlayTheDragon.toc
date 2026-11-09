@@ -3,6 +3,7 @@
 ## Notes: Deckbuilder roguelike à jouer pendant les vols.
 ## Author: AnasyaDev
 ## Version: 0.1.0-dev
+## IconTexture: Interface\Icons\INV_Misc_Book_09
 ## SavedVariables: SlayTheDragonDB
 
 Core\Init.lua
@@ -14,3 +15,12 @@ Core\Effects.lua
 Core\Rewards.lua
 Data\Priest.lua
 Data\Act1.lua
+UI\Art.lua
+UI\DemoExpedition.lua
+UI\Persist.lua
+UI\Controller.lua
+UI\Widgets.lua
+UI\Main.lua
+UI\CombatView.lua
+UI\Screens.lua
+UI\Flight.lua
