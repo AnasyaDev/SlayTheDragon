@@ -380,13 +380,13 @@ test("Tabard de Hurlevent : 5 Absorption au premier tour seulement", function()
   eq(c.player.block, 0)
 end)
 
-test("Bandeau de VanCleef : 6 cartes par tour, 1 mana de moins au premier tour", function()
+test("Bandeau de VanCleef : 4 mana par tour, ennemis Force 2", function()
   local deck = {}
   for i = 1, 14 do deck[i] = { id = "smite", up = false } end
   local c = Combat.new({ seed = 1, hp = 60, deck = deck, encounter = { "test_hitter" }, relics = { "vancleef_bandana" } })
-  eq(#c.hand, 6); eq(c.player.mana, 2)
+  eq(#c.hand, 5); eq(c.player.mana, 4); eq(c.enemies[1].st.force, 2)
   Combat.endTurn(c)
-  eq(c.player.mana, 3)
+  eq(c.player.mana, 4); eq(c.player.hp, 48)
 end)
 
 test("Insigne : retire les états négatifs une fois par combat", function()

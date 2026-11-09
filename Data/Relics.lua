@@ -65,11 +65,14 @@ relic("stormwind_tabard", {
 -- Bibelot de boss de l'acte 1 : fort, avec une contrepartie.
 relic("vancleef_bandana", {
   name = "Bandeau rouge de VanCleef", rarity = "boss", tier = 0,
-  text = "Pioche 1 carte de plus à chaque tour. Au premier tour de chaque combat, tu as 1 mana de moins.",
+  text = "+1 mana à chacun de tes tours. Au début de chaque combat, les ennemis gagnent 2 Force.",
   hooks = {
-    drawPerTurn = function(c, src, v) return v + 1 end,
-    onTurnStart = function(c, src)
-      if c.round == 1 then c.player.mana = c.player.mana - 1 end
+    maxMana = function(c, src, v) return v + 1 end,
+    onCombatStart = function(c, src)
+      for i = 1, #c.enemies do
+        local e = c.enemies[i]
+        if not e.dead then Combat.applyStatus(c, e, "force", 2) end
+      end
     end,
   },
 })
