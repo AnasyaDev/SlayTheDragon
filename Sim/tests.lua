@@ -471,11 +471,11 @@ test("Apothéose : les incantations coûtent 1 de moins", function()
   eq(Combat.cost(c, c.hand[2]), 1)
 end)
 
-test("Extase : +2 à chaque gain d'Absorption", function()
+test("Extase : +1 à chaque gain d'Absorption", function()
   local c = setup({ "rapture", "inner_fire" })
   Combat.play(c, 1)
   Combat.play(c, 1)
-  eq(c.player.block, 7)
+  eq(c.player.block, num("inner_fire", 1) + 1)
 end)
 
 test("Guérison de l'ombre : soigne puis Douleur sur soi", function()

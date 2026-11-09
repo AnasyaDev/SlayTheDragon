@@ -138,9 +138,9 @@ end
 
 card("rapture", {
   rep = 2, name = "Extase", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
-  power = true, effects = {}, hooks = raptureHooks(2),
-  text = "Pouvoir. Chaque gain d'Absorption te donne 2 de plus.",
-  up = { hooks = raptureHooks(3), text = "Pouvoir. Chaque gain d'Absorption te donne 3 de plus." },
+  power = true, effects = {}, hooks = raptureHooks(1),
+  text = "Pouvoir. Chaque gain d'Absorption te donne 1 de plus.",
+  up = { hooks = raptureHooks(2), text = "Pouvoir. Chaque gain d'Absorption te donne 2 de plus." },
 })
 
 -- Ombre -----------------------------------------------------------------------
@@ -275,9 +275,9 @@ card("void_eruption", {
 
 card("holy_fire", {
   rep = 0, name = "Flammes sacrées", cost = 2, type = "attack", school = "holy", rarity = "common", path = "holy",
-  target = "enemy", cast = true, effects = { { "damage", 27 }, { "apply", "pain", 4 } },
-  text = "Incantation. Inflige 27 et Douleur 4.",
-  up = { effects = { { "damage", 34 }, { "apply", "pain", 5 } }, text = "Incantation. Inflige 34 et Douleur 5." },
+  target = "enemy", cast = true, effects = { { "damage", 24 }, { "apply", "pain", 3 } },
+  text = "Incantation. Inflige 24 et Douleur 3.",
+  up = { effects = { { "damage", 31 }, { "apply", "pain", 4 } }, text = "Incantation. Inflige 31 et Douleur 4." },
 })
 
 card("holy_nova", {
@@ -290,13 +290,13 @@ card("holy_nova", {
 
 card("chastise", {
   rep = 0, name = "Mot sacré : Châtier", cost = 1, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  target = "enemy", cooldown = 3, effects = { { "damage", 5 }, { "apply", "stunned", 1 } },
-  text = "Inflige 5. Étourdi 1. Recharge 3.",
-  up = { cooldown = 2, effects = { { "damage", 8 }, { "apply", "stunned", 1 } }, text = "Inflige 8. Étourdi 1. Recharge 2." },
+  target = "enemy", cooldown = 3, effects = { { "damage", 7 }, { "apply", "stunned", 1 } },
+  text = "Inflige 7. Étourdi 1. Recharge 3.",
+  up = { cooldown = 2, effects = { { "damage", 10 }, { "apply", "stunned", 1 } }, text = "Inflige 10. Étourdi 1. Recharge 2." },
 })
 
 card("greater_heal", {
-  rep = 0, name = "Soins supérieurs", cost = 2, type = "skill", school = "holy", rarity = "uncommon", path = "holy",
+  rep = 0, name = "Soins supérieurs", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "holy",
   cast = true, exhaust = true, effects = { { "heal", 12 } },
   text = "Incantation. Soigne 12. Consumée.",
   up = { effects = { { "heal", 16 } }, text = "Incantation. Soigne 16. Consumée." },
@@ -361,10 +361,10 @@ local apotheosisHooks = {
 }
 
 card("apotheosis", {
-  rep = 2, name = "Apothéose", cost = 3, type = "power", school = "holy", rarity = "rare", path = "holy",
+  rep = 2, name = "Apothéose", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {}, hooks = apotheosisHooks,
   text = "Pouvoir. +1 mana à chacun de tes tours. Tes incantations coûtent 1 mana de moins.",
-  up = { cost = 2, text = "Pouvoir. +1 mana à chacun de tes tours. Tes incantations coûtent 1 mana de moins." },
+  up = { cost = 1, text = "Pouvoir. +1 mana à chacun de tes tours. Tes incantations coûtent 1 mana de moins." },
 })
 
 -- Classe ------------------------------------------------------------------------
