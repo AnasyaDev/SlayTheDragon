@@ -1,0 +1,200 @@
+-- Bots joueurs pour la simulation.
+--   random     : joue des cartes jouables au hasard jusqu'à ne plus pouvoir.
+--   greedy     : à chaque pas, la carte dont le résultat (tour ennemi compris) est le meilleur.
+--   heuristic  : explore les suites de coups du tour (avec élimination des doublons),
+--                simule le tour ennemi au bout de chacune, garde la meilleure.
+-- Interface : local bot = Bots.new(nom, rng) ; bot:act(c) -> { "play", idx, tIdx } | { "end" }
+return function(ns)
+  local Combat, Card, Rng = ns.Combat, ns.Card, ns.Rng
+  local Bots = {}
+
+  -- Évaluation d'un état après le tour ennemi. Poids grossiers, à régler.
+  local W = { hp = 10, enemyHp = 4, enemyAlive = 30, demence = 1.5, atonement = 4,
+    regen = 3, power = 25, castRisk = 0.85 }
+  Bots.W = W
+
+  -- Valeur attendue d'une incantation en cours (résolue au prochain tour).
+  function Bots.castValue(c)
+    local p = c.player
+    local d = Card.def(p.cast.card)
+    local alive = 0
+    for i = 1, #c.enemies do if not c.enemies[i].dead then alive = alive + 1 end end
+    local v = 0
+    for i = 1, #d.effects do
+      local e = d.effects[i]
+      if e[1] == "damage" then
+        v = v + e[2] * (e.times or 1) * (e.all and alive or 1) * W.enemyHp
+      elseif e[1] == "heal" then
+        v = v + math.min(e[2], p.maxHp - p.hp) * W.hp
+      elseif e[1] == "apply" and e[2] == "pain" then
+        v = v + e[3] * (e[3] + 1) / 2 * 0.8 * W.enemyHp
+      elseif e[1] == "absorb" then
+        v = v + e[2] * W.hp * 0.5
+      end
+    end
+    return v * W.castRisk
+  end
+
+  local function evaluate(c)
+    if c.result == "lost" then return -1e9 end
+    local p = c.player
+    if c.result == "won" then return 1e6 + p.hp * 100 end
+    local s = p.hp * W.hp
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      if not e.dead then
+        local pain = e.st.pain or 0
+        local painDmg = pain * (pain + 1) / 2
+        local ehp = e.hp - painDmg * 0.8
+        if ehp < 0 then ehp = 0 end
+        s = s - (ehp + e.block * 0.5) * W.enemyHp - W.enemyAlive
+        if (e.st.stunned or 0) > 0 then s = s + 15 end
+      end
+    end
+    local regen = p.st.regen or 0
+    s = s + p.demence * W.demence + (p.st.atonement or 0) * W.atonement
+      + regen * (regen + 1) / 2 * W.regen * 0.3 + #p.powers * W.power
+    if p.cast then s = s + Bots.castValue(c) end
+    return s
+  end
+  Bots.evaluate = evaluate
+
+  -- Score d'une fin de tour : on joue le tour ennemi sur une copie.
+  local function leafScore(s)
+    if s.result then return evaluate(s) end
+    local t = Combat.clone(s)
+    Combat.endPlayerTurn(t)
+    if not t.result then Combat.enemyPhase(t) end
+    return evaluate(t)
+  end
+  Bots.leafScore = leafScore
+
+  local function stateKey(c)
+    local p = c.player
+    local parts = { p.mana, p.hp, p.block, p.demence, p.cast and p.cast.card.id or "-",
+      p.st.atonement or 0, p.st.halved or 0, p.st.regen or 0, #p.powers, #c.cooldown, #c.exhaust }
+    local ids = {}
+    for i = 1, #c.hand do
+      local h = c.hand[i]
+      ids[i] = h.up and (h.id .. "+") or h.id
+    end
+    table.sort(ids)
+    parts[#parts + 1] = table.concat(ids, ",")
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      parts[#parts + 1] = e.dead and "x" or (e.hp .. ":" .. e.block .. ":" .. (e.st.pain or 0) .. ":"
+        .. (e.st.armor_broken or 0) .. ":" .. (e.st.stunned or 0) .. ":" .. (e.interrupted and 1 or 0))
+    end
+    parts[#parts + 1] = c.result or ""
+    return table.concat(parts, "|")
+  end
+
+  local function actionRef(c, a)
+    local inst = c.hand[a[1]]
+    return { uid = inst.uid, target = a[2] and c.enemies[a[2]].uid }
+  end
+
+  local function resolveRef(c, ref)
+    local idx
+    for i = 1, #c.hand do
+      if c.hand[i].uid == ref.uid then idx = i break end
+    end
+    if not idx or not Combat.canPlay(c, idx) then return nil end
+    local tIdx
+    if ref.target then
+      local e, j = Combat.enemyByUid(c, ref.target)
+      if not e or e.dead then return nil end
+      tIdx = j
+    elseif Combat.needsTarget(c.hand[idx]) then
+      return nil
+    end
+    return { "play", idx, tIdx }
+  end
+
+  -- Recherche en profondeur des suites de coups du tour.
+  function Bots.planTurn(c, cap)
+    cap = cap or 400
+    local best, bestSeq = -math.huge, {}
+    local nodes = 0
+    local seen = {}
+    local seq = {}
+    local function dfs(s)
+      nodes = nodes + 1
+      local sc = leafScore(s)
+      if sc > best then
+        best = sc
+        bestSeq = {}
+        for i = 1, #seq do bestSeq[i] = seq[i] end
+      end
+      if s.result or nodes >= cap then return end
+      local acts = Combat.legalPlays(s)
+      local tried = {}
+      for i = 1, #acts do
+        local a = acts[i]
+        local inst = s.hand[a[1]]
+        local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0)
+        if not tried[key] then
+          tried[key] = true
+          local t = Combat.clone(s)
+          Combat.play(t, a[1], a[2])
+          local k = stateKey(t)
+          if not seen[k] then
+            seen[k] = true
+            seq[#seq + 1] = actionRef(s, a)
+            dfs(t)
+            seq[#seq] = nil
+          end
+          if nodes >= cap then return end
+        end
+      end
+    end
+    dfs(c)
+    return bestSeq, nodes
+  end
+
+  local BotMT = {}
+  BotMT.__index = BotMT
+
+  function Bots.new(kind, rng, opts)
+    return setmetatable({ kind = kind, rng = rng, opts = opts or {}, plan = nil, planRound = -1 }, BotMT)
+  end
+
+  function BotMT:act(c)
+    if self.kind == "random" then
+      local acts = Combat.legalPlays(c)
+      if #acts == 0 then return { "end" } end
+      local a = Rng.pick(self.rng, acts)
+      return { "play", a[1], a[2] }
+    elseif self.kind == "greedy" then
+      local acts = Combat.legalPlays(c)
+      local best, bestA = leafScore(c), nil
+      for i = 1, #acts do
+        local t = Combat.clone(c)
+        Combat.play(t, acts[i][1], acts[i][2])
+        local sc = leafScore(t)
+        if sc > best then best, bestA = sc, acts[i] end
+      end
+      if not bestA then return { "end" } end
+      return { "play", bestA[1], bestA[2] }
+    else
+      for _ = 1, 2 do
+        if self.planRound ~= c.round or not self.plan then
+          self.plan = Bots.planTurn(c, self.opts.cap)
+          self.planRound = c.round
+          self.planPos = 1
+        end
+        local ref = self.plan[self.planPos]
+        if not ref then return { "end" } end
+        local a = resolveRef(c, ref)
+        if a then
+          self.planPos = self.planPos + 1
+          return a
+        end
+        self.plan = nil -- le plan ne colle plus (pioche imprévue...) : on replanifie
+      end
+      return { "end" }
+    end
+  end
+
+  return Bots
+end

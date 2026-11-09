@@ -1,0 +1,16 @@
+## Interface: 16001
+## Title: Slay the Dragon
+## Notes: Deckbuilder roguelike à jouer pendant les vols.
+## Author: AnasyaDev
+## Version: 0.1.0-dev
+## SavedVariables: SlayTheDragonDB
+
+Core\Init.lua
+Core\Rng.lua
+Core\Card.lua
+Core\Statuses.lua
+Core\Combat.lua
+Core\Effects.lua
+Core\Rewards.lua
+Data\Priest.lua
+Data\Act1.lua
