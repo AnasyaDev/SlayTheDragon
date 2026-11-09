@@ -267,6 +267,7 @@ local function startAct(exp, act)
   exp.act = act
   exp.map = Map.generate(exp.rng.map, act)
   exp.node = nil
+  exp.path = {} -- nœuds visités dans l'acte, dans l'ordre (chemin parcouru, pour l'affichage)
   exp.floor = 0
   exp.combatsInAct = 0
   exp.phase = "map"
@@ -531,6 +532,8 @@ end
 local function enterNode(exp, id)
   local node = exp.map.nodes[id]
   exp.node = id
+  exp.path = exp.path or {}
+  exp.path[#exp.path + 1] = id
   exp.floor = node.floor
   exp.nodeCleared = false
   local v = exp.stats.visits

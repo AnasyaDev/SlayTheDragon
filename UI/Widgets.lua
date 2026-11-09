@@ -224,7 +224,8 @@ function W.addStatusLines(tt, id, n)
   local suffix = ""
   if n and n > 0 then suffix = s and s.duration and (" (" .. n .. " tour" .. (n > 1 and "s" or "") .. ")")
     or (" " .. n) end
-  tt:AddLine(name .. suffix, s and s.debuff and 1 or 0.4, s and s.debuff and 0.35 or 0.9, s and s.debuff and 0.35 or 0.4)
+  local bad = s and (s.debuff or s.affix)
+  tt:AddLine(name .. suffix, bad and 1 or 0.4, bad and 0.35 or 0.9, bad and 0.35 or 0.4)
   wrap(tt, text)
 end
 
@@ -281,6 +282,110 @@ function W.fillCardTooltip(tt, id, up, extra)
     tt:AddLine(" ")
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
   end
+end
+
+-- Bibelot, potion, or ou affixe : nom, effet, détail facultatif.
+function W.fillItemTooltip(tt, kind, id, extra)
+  if kind == "relic" then
+    local r = ns.Relics[id]
+    tt:AddLine(r and r.name or tostring(id), 0.6, 0.8, 1)
+    tt:AddLine("Bibelot", 0.7, 0.7, 0.7)
+    if r and r.text then wrap(tt, r.text) end
+  elseif kind == "potion" then
+    local p = ns.Potions[id]
+    tt:AddLine(p and p.name or tostring(id), 0.5, 1, 0.5)
+    tt:AddLine("Potion" .. ((p and p.target) and " · se lance sur un ennemi" or ""), 0.7, 0.7, 0.7)
+    if p and p.text then wrap(tt, p.text) end
+  elseif kind == "affix" then
+    local a = ns.Affixes and ns.Affixes[id]
+    gold(tt, a and a.name or tostring(id))
+    if a and a.text then wrap(tt, a.text) end
+  else
+    gold(tt, extra and extra.title or "")
+  end
+  if extra and extra.text and kind ~= "relic" and kind ~= "potion" and kind ~= "affix" then wrap(tt, extra.text) end
+  if extra and extra.hint then wrap(tt, extra.hint, 0.7, 0.7, 0.7) end
+  if extra and extra.reason then wrap(tt, extra.reason, 1, 0.3, 0.3) end
+end
+
+function W.itemEntry(kind, id)
+  if kind == "relic" then return Art.relic(id) end
+  if kind == "potion" then return Art.potion(id) end
+  if kind == "affix" then return Art.affixes[id] end
+  if kind == "gold" then return Art.ui.gold end
+  return nil
+end
+
+-- Petit bouton carré à icône (bibelot, potion, affixe) ; info = { kind, id, ... } pour l'infobulle.
+function W.iconButton(parent, size)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(size, size)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon:SetAllPoints()
+  b.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  b.count = W.text(b, "NumberFontNormal", 10)
+  b.count:SetPoint("BOTTOMRIGHT", 2, -2)
+  W.tooltip(b, function(tt, self)
+    local info = self.info
+    if not info then return end
+    W.fillItemTooltip(tt, info.kind, info.id, info)
+  end, "ANCHOR_BOTTOM")
+  b.SetItem = function(self, kind, id, info)
+    self.info = info or {}
+    self.info.kind = kind or self.info.kind
+    self.info.id = id
+    if kind and (id or kind == "gold" or kind == "keystone") then
+      local entry = kind == "keystone" and Art.keystone or W.itemEntry(kind, id)
+      W.setIcon(self.icon, entry, kind .. ":" .. tostring(id))
+      self.icon:SetDesaturated(false)
+    else
+      W.setIcon(self.icon, Art.emptySlot, "ui:emptySlot")
+    end
+  end
+  return b
+end
+
+-- Barre de réputation : bar = { label, levelName, cur, size, detail, hint } (UI/Controller.lua).
+function W.repBar(parent, w)
+  local f = CreateFrame("StatusBar", nil, parent)
+  f:SetSize(w, 16)
+  f:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
+  f:SetStatusBarColor(0.0, 0.6, 0.1)
+  f:SetMinMaxValues(0, 1)
+  f:SetValue(0)
+  f:EnableMouse(true)
+  local bg = f:CreateTexture(nil, "BACKGROUND")
+  bg:SetAllPoints()
+  bg:SetColorTexture(0, 0, 0, 0.6)
+  f.label = W.text(f, "GameFontNormal")
+  f.label:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 0, 3)
+  f.value = W.text(f, "GameFontHighlightSmall")
+  f.value:SetPoint("CENTER")
+  f.detail = W.text(f, "GameFontDisableSmall")
+  f.detail:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 0, -3)
+  W.tooltip(f, function(tt, self)
+    local b = self.bar
+    if not b then return end
+    gold(tt, b.label)
+    tt:AddLine(b.levelName .. (b.size and (" : " .. b.cur .. " / " .. b.size) or " (palier maximal)"), 1, 1, 1)
+    if b.hint then wrap(tt, b.hint, 0.8, 0.8, 0.8) end
+  end, "ANCHOR_TOP")
+  f.Set = function(self, b)
+    self.bar = b
+    self.label:SetText(b.label)
+    if b.size then
+      self:SetMinMaxValues(0, b.size)
+      self:SetValue(b.cur)
+      self.value:SetText(b.levelName .. "  " .. b.cur .. " / " .. b.size)
+    else
+      self:SetMinMaxValues(0, 1)
+      self:SetValue(1)
+      self.value:SetText(b.levelName)
+    end
+    self.detail:SetText(b.detail or "")
+  end
+  return f
 end
 
 ---------------------------------------------------------------------------

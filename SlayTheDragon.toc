@@ -21,7 +21,6 @@ Data\Priest.lua
 Data\Act1.lua
 Data\Events.lua
 UI\Art.lua
-UI\DemoExpedition.lua
 UI\Persist.lua
 UI\Controller.lua
 UI\Widgets.lua

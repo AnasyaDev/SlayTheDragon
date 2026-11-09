@@ -367,6 +367,7 @@ function H.boot(db)
   _G.UnitName = function() return "Testeur" end
   _G.GetCursorPosition = function() return H.cursor[1], H.cursor[2] end
   _G.IsShiftKeyDown = function() return false end
+  _G.date = function(fmt) return os.date(fmt, 1762000000 + math.floor(H.now)) end
   _G.SlayTheDragonDB = db and deepcopy(db) or nil
 
   local ns = {}
@@ -381,6 +382,8 @@ function H.boot(db)
   toc:close()
   H.ns = ns
   ns.Bots = dofile(root .. "/Sim/bots.lua")(ns)
+  ns.Run = dofile(root .. "/Sim/run.lua")(ns)
+  H.setup(ns)
   H.fire("ADDON_LOADED", "OtherAddon", false)
   H.fire("ADDON_LOADED", ADDON, false)
   H.fire("PLAYER_LOGIN")
@@ -435,6 +438,50 @@ function H.hover(obj)
   return lines
 end
 
+
+---------------------------------------------------------------------------
+-- Contenu de test : bibelots et potions (registres vides tant que la piste A n'a pas fusionné)
+---------------------------------------------------------------------------
+
+function H.setup(ns)
+  local R, P = ns.Relics, ns.Potions
+  R.ui_test_charm = { name = "Breloque d'essai", text = "Bibelot du harnais (sans effet).", rarity = "common", tier = 0 }
+  R.ui_test_idol = { name = "Idole d'essai", text = "Bibelot du harnais (sans effet).", rarity = "uncommon", tier = 0 }
+  R.ui_test_lens = { name = "Loupe d'essai", text = "Bibelot du harnais (sans effet).", rarity = "rare", tier = 0 }
+  R.ui_test_trophy = { name = "Trophée d'essai", text = "Bibelot de boss du harnais.", rarity = "boss", tier = 0 }
+  R.ui_test_symbol = { name = "Symbole d'essai", text = "Bibelot de classe du harnais.", rarity = "rare", tier = 0,
+    class = "priest" }
+  P.ui_test_heal = { name = "Potion de soins d'essai", text = "Rends 10 PV.", rarity = "common", tier = 0, effects = {} }
+  P.ui_test_bomb = { name = "Bombe d'essai", text = "Inflige 10 dégâts à un ennemi.", rarity = "common", tier = 0,
+    target = true, effects = {} }
+  H.potionStub = false
+  if not ns.Combat.usePotion then
+    -- Pas encore de potions dans le moteur : doublure minimale pour exercer l'interface.
+    H.potionStub = true
+    local new = ns.Combat.new
+    ns.Combat.new = function(opts)
+      local c = new(opts)
+      if opts.potions and not c.player.potions then c.player.potions = deepcopy(opts.potions) end
+      return c
+    end
+    ns.Combat.usePotion = function(c, slot, t)
+      local pots = c.player.potions
+      local id = pots and pots[slot]
+      if not id then return false, "potion" end
+      if c.result then return false, "over" end
+      local e
+      if P[id] and P[id].target then
+        e = c.enemies[t or 0]
+        if not e or e.dead then return false, "target" end
+      end
+      pots[slot] = false
+      if id == "ui_test_heal" then ns.Combat.heal(c, c.player, 10)
+      elseif e then ns.Combat.dealDamage(c, c.player, e, 10) end
+      return true
+    end
+  end
+end
+
 ---------------------------------------------------------------------------
 -- Pilotage
 ---------------------------------------------------------------------------
@@ -442,6 +489,7 @@ end
 local function UI() return H.ns.UI end
 local function C() return H.ns.Controller end
 local function V() return H.ns.UI.screens.combat end
+local function EXP() return H.ns.Controller.exp() end
 
 local function shown() return _G.SlayTheDragonFrame and _G.SlayTheDragonFrame._shown end
 
@@ -449,11 +497,25 @@ local function currentKind()
   return UI().step and UI().step.kind
 end
 
-local function chooseOptionByClick(id)
+local function button(id)
   local s = UI().current
   local b = s.optionButtons and s.optionButtons[id]
   assert(b, "bouton introuvable pour l'option " .. tostring(id) .. " sur l'écran " .. tostring(currentKind()))
-  H.click(b)
+  return b
+end
+
+local function clickOption(id) H.click(button(id)) end
+
+local function option(id)
+  for _, o in ipairs(UI().step.options or {}) do
+    if o.id == id then return o end
+  end
+  return nil
+end
+
+local function enemySlot(t)
+  for _, s in pairs(V().slotOf) do if s.enemyIndex == t then return s end end
+  error("emplacement de la cible introuvable")
 end
 
 -- Un coup du bot, exécuté par l'interface : clic carte puis clic cible (ou second clic),
@@ -463,6 +525,11 @@ local function playAction(bot)
   local c = C().combat()
   local a = bot:act(c)
   local v = V()
+  if a[1] == "potion" then
+    H.click(UI().potionSlots[a[2]])
+    if a[3] then H.click(enemySlot(a[3])) end
+    return "potion"
+  end
   if a[1] ~= "play" then
     if playStyle % 2 == 0 then H.click(v.endTurn) else H.key("SPACE") end
     playStyle = playStyle + 1
@@ -475,14 +542,7 @@ local function playAction(bot)
   local needs = C().handInfo(idx).needsTarget
   if style == 0 then
     H.click(card)
-    if needs then
-      local slot
-      for _, s in pairs(v.slotOf) do if s.enemyIndex == t then slot = s end end
-      assert(slot, "emplacement de la cible introuvable")
-      H.click(slot)
-    else
-      H.click(card)
-    end
+    if needs then H.click(enemySlot(t)) else H.click(card) end
   elseif style == 1 then
     H.key(idx == 10 and "0" or tostring(idx))
     if needs then
@@ -494,7 +554,7 @@ local function playAction(bot)
     run(card, "OnDragStart")
     local slot
     if needs then
-      for _, s in pairs(v.slotOf) do if s.enemyIndex == t then slot = s end end
+      slot = enemySlot(t)
       slot._mouseOver = true
     else
       v.bf._mouseOver = true
@@ -507,34 +567,157 @@ local function playAction(bot)
   return "play"
 end
 
--- Joue jusqu'à la fin du combat en cours (ou maxActions). Renvoie le résultat.
-local function fightUntil(bot, stopFn, maxActions)
-  H.actions = 0
+local function newBot()
+  local exp = EXP()
+  local seed = (exp and exp.fight and exp.fight.seed) or 1
+  return H.ns.Bots.new("heuristic", H.ns.Rng.stream(seed, "uibot"), { cap = 3000 })
+end
+
+-- Joue jusqu'à la fin du combat en cours, ou jusqu'à stopFn(). Renvoie le résultat (ou nil).
+local function fightUntil(stopFn, maxActions)
+  H.actions = H.actions or 0
+  local bot = newBot()
   for _ = 1, maxActions or 400 do
-    if C().live.over then return C().live.over end
+    if C().over() then return C().over() end
     if stopFn and stopFn() then return nil end
     local before = C().combat().round
     local kind = playAction(bot)
     H.actions = H.actions + 1
     H.advance(0.5)
-    if kind == "play" and C().combat() and C().combat().round ~= before then
-      -- un coup ne doit jamais faire changer de tour
+    if kind == "play" and C().combat() and C().combat().round ~= before and not C().over() then
       error("le tour a changé sur un coup")
     end
   end
-  return C().live.over
+  return C().over()
+end
+
+local function rating(id)
+  if id == "smite" then return 2.5 elseif id == "inner_fire" then return 2 end
+  return H.ns.Run.RATING[id] or 3
+end
+
+-- Chemin visé : passe par un marchand, une rencontre et un feu de camp, le moins d'élites possible.
+local function planPath(exp)
+  local best, bestScore
+  H.ns.Map.eachPath(exp.map, function(path)
+    local has, elites, ids = {}, 0, {}
+    for i, n in ipairs(path) do
+      has[n.kind] = true
+      ids[i] = n.id
+      if n.kind == "elite" then elites = elites + 1 end
+    end
+    local score = (has.merchant and 100 or 0) + (has.event and 50 or 0) + (has.campfire and 50 or 0) - elites * 10
+    if not bestScore or score > bestScore then best, bestScore = ids, score end
+  end)
+  return best
+end
+
+-- Une décision hors combat, prise en cliquant sur le bouton correspondant.
+local function decide(state)
+  local step = UI().step
+  local k = step.kind
+  local exp = EXP()
+  if k == "map" then
+    local target
+    for _, id in ipairs(state.plan or {}) do
+      local o = option("path:" .. id)
+      if o and not o.disabled then target = o.id end
+    end
+    target = target or step.options[1].id
+    -- une fois sur deux au clavier (1..3 = étapes accessibles de gauche à droite)
+    local idx
+    for i, o in ipairs(step.options) do if o.id == target then idx = i end end
+    if state.mapStyle and idx then H.key(tostring(idx)) else clickOption(target) end
+    state.mapStyle = not state.mapStyle
+  elseif k == "reward" then
+    local best, bestR
+    for _, o in ipairs(step.options) do
+      if o.card and not o.disabled and (not bestR or rating(o.card.id) > bestR) then best, bestR = o, rating(o.card.id) end
+    end
+    local tp = option("takePotion")
+    if best then clickOption(best.id)
+    elseif tp and not tp.disabled then clickOption("takePotion")
+    else clickOption("leave") end
+  elseif k == "campfire" then
+    state.seen.campfire = true
+    local up = option("ui:upgrade")
+    if exp.hp / exp.maxHp < 0.5 or up.disabled then clickOption("rest") else clickOption("ui:upgrade") end
+  elseif k == "deck" then
+    local best, bestV
+    local upgrading = C().ui.view == "upgrade"
+    for _, o in ipairs(step.options) do
+      if o.card and not o.disabled then
+        local v = upgrading and rating(o.card.id) or -rating(o.card.id)
+        if not bestV or v > bestV then best, bestV = o, v end
+      end
+    end
+    if best then clickOption(best.id) else clickOption("ui:back") end
+    state.removed = state.removed or not upgrading
+  elseif k == "merchant" then
+    state.seen.merchant = true
+    local pick
+    for _, o in ipairs(step.options) do
+      if not pick and o.item and o.item.kind == "relic" and not o.disabled then pick = o.id end
+    end
+    local rm = option("ui:remove")
+    if not pick and not state.removed and not rm.disabled and #exp.deck > 8 then pick = "ui:remove" end
+    if not pick then
+      for _, o in ipairs(step.options) do
+        if not pick and o.card and not o.disabled and rating(o.card.id) >= 6 then pick = o.id end
+      end
+    end
+    if not pick then
+      for _, o in ipairs(step.options) do
+        if not pick and o.item and o.item.kind == "potion" and not o.disabled then pick = o.id end
+      end
+    end
+    clickOption(pick or "leave")
+  elseif k == "event" then
+    state.seen.event = true
+    local pick
+    for _, o in ipairs(step.options) do
+      local fight = (o.text or ""):find("Combat", 1, true)
+      if not pick and not o.disabled and (not fight or exp.hp / exp.maxHp > 0.6) then pick = o.id end
+    end
+    clickOption(pick or step.options[#step.options].id)
+  elseif k == "select" then
+    local first
+    for _, o in ipairs(step.options) do if o.card and not first then first = o.id end end
+    clickOption(first or "skipSelect")
+  elseif k == "startRelic" then
+    clickOption(step.options[1].id)
+  else
+    error("écran inattendu : " .. tostring(k))
+  end
+end
+
+-- Aller-retour de sauvegarde : copie « disque », nouveau client, reprise identique.
+local function reloadRoundTrip(label)
+  local ok, why = plainData(_G.SlayTheDragonDB, nil, "SlayTheDragonDB")
+  check(label .. " : la sauvegarde ne contient que des données simples", ok, why)
+  local vok, errs = H.ns.Save.validate(_G.SlayTheDragonDB)
+  check(label .. " : Save.validate accepte la sauvegarde", vok, errs and table.concat(errs, "; "))
+  local snap = C().snapshot()
+  local db = deepcopy(_G.SlayTheDragonDB)
+  check(label .. " : la sauvegarde EST l'état vivant", deepeq(db.current, snap))
+  H.boot(db)
+  check(label .. " : reprise identique", deepeq(C().snapshot(), snap), select(2, deepeq(C().snapshot(), snap)))
+  H.slash("")
+  return snap
 end
 
 ---------------------------------------------------------------------------
 -- Scénario
 ---------------------------------------------------------------------------
 
-local SEED = tonumber(arg and arg[1]) or 4242
+local SEED = tonumber(arg and arg[1]) or 1 -- graine 1 : victoire, donc clé +1 exercée
 
 print("U1  chargement de tous les fichiers du TOC et premier lancement")
 local ns = H.boot(nil)
-check("SlayTheDragonDB créée au format courant", _G.SlayTheDragonDB and _G.SlayTheDragonDB.version == ns.Persist.VERSION)
-check("aucune expédition au départ", C().live == nil)
+check("SlayTheDragonDB créée par Save au format courant", _G.SlayTheDragonDB and _G.SlayTheDragonDB.version == ns.Save.VERSION
+  and type(_G.SlayTheDragonDB.meta.classes) == "table")
+check("options de l'interface dans la sauvegarde", _G.SlayTheDragonDB.options and _G.SlayTheDragonDB.options.autoOpen == true)
+check("aucune expédition au départ", EXP() == nil)
 check("fenêtre pas encore créée", _G.SlayTheDragonFrame == nil)
 check("bouton de minimap créé", _G.SlayTheDragonMinimapButton ~= nil and _G.SlayTheDragonMinimapButton._shown)
 local tt = H.hover(_G.SlayTheDragonMinimapButton)
@@ -561,7 +744,7 @@ H.click(UI().scalePlus)
 check("échelle +5 %", math.abs(_G.SlayTheDragonFrame._scale - 1.05) < 1e-9, _G.SlayTheDragonFrame._scale)
 H.click(UI().scaleMinus)
 H.click(UI().speedPlus)
-check("vitesse ×1.25", ns.Persist.options().speed == 1.25, ns.Persist.options().speed)
+check("vitesse ×1.25 enregistrée dans SlayTheDragonDB.options", _G.SlayTheDragonDB.options.speed == 1.25)
 H.click(UI().speedMinus)
 local autoOpen = UI().optionChecks[1]
 autoOpen:SetChecked(false) H.click(autoOpen)
@@ -571,101 +754,336 @@ check("recocher", ns.Persist.options().autoOpen == true)
 H.key("ESCAPE")
 check("Échap ferme d'abord les options", not UI().optionsFrame._shown and shown())
 
-print("U4  nouvelle expédition, carte du parcours, premier combat")
+print("U4  accueil : classe, clé verrouillée, départ")
+local st = UI().step
+check("bouton de classe Prêtre sélectionné", option("class:priest") and option("class:priest").selected)
+check("clé +0 sélectionnée par défaut", option("key:0").selected and st.key == 0)
+check("clé +1 verrouillée, avec raison", option("key:1").disabled and (option("key:1").reason or ""):find("+0", 1, true))
+H.click(button("key:1"))
+check("clic sur une clé verrouillée : message", UI().err._shown and (UI().err._text or ""):find("Gagne", 1, true), UI().err._text)
+tt = H.hover(button("key:2"))
+check("infobulle d'une clé : affixes", table.concat(tt, " "):find("Tyrannique", 1, true), table.concat(tt, " | "))
+check("potions et bibelots masqués sans expédition", not UI().potionSlots[1]._shown)
 ns.Controller.makeSeed = function() return SEED end
-chooseOptionByClick("new")
-check("une expédition démarre", C().live ~= nil and C().live.seed == SEED)
+clickOption("go")
+local exp = EXP()
+check("expédition démarrée par Save.start", exp ~= nil and exp.seed == SEED and exp.key == 0 and exp.class == "priest")
+check("db.current est l'expédition", _G.SlayTheDragonDB.current == exp)
+
+print("U5  carte de parcours ramifiée")
 check("écran carte", currentKind() == "map", currentKind())
-check("nœuds affichés", #UI().current.step.nodes == #ns.DemoExpedition.SEQUENCE)
-H.click(UI().current.optionButtons["node:1"])
-check("écran de combat", currentKind() == "combat", currentKind())
-local c = C().combat()
-check("combat créé avec événements non silencieux", c and c.quiet == false)
-check("main affichée (5 cartes)", V().cards[5]._shown and not V().cards[6]._shown)
-check("modèle du joueur", V().playerModel._model == "unit:player")
-local nslots = 0
-for _, s in pairs(V().slotOf) do
-  nslots = nslots + 1
-  if not s.model._model then check("modèle ennemi chargé", false, s.model.enemyId) end
+st = UI().step
+check("tous les nœuds de l'acte affichés", #st.nodes == #exp.map.nodes, #st.nodes)
+local avail = 0
+for _, n in ipairs(st.nodes) do if n.state == "available" then avail = avail + 1 end end
+check("nœuds accessibles = Map.nextNodes", avail == #ns.Map.nextNodes(exp.map, nil) and #st.options == avail)
+local boss
+for _, n in ipairs(st.nodes) do if n.kind == "boss" then boss = n end end
+check("boss à droite, icône de boss", boss and boss.x > 0.9 and button(boss.id).icon._texture ~= ns.Art.QUESTION)
+H.click(button(boss.id))
+check("nœud inaccessible : refus", EXP().node == nil and UI().err._text == "Étape inaccessible.", UI().err._text)
+local lineCount = 0
+for _, l in ipairs(UI().current.lines) do if l._shown then lineCount = lineCount + 1 end end
+check("liens tracés", lineCount >= #exp.map.nodes - 1, lineCount)
+check("trois emplacements de potion vides dans le bandeau", UI().potionSlots[3]._shown
+  and UI().potionSlots[1].icon._texture == ns.Art.emptySlot.icon)
+check("pas de clé mythique affichée à +0", not UI().keystone._shown)
+
+print("U6  expédition complète par l'interface (clics, touches, glisser-déposer)")
+local state = { plan = planPath(exp), seen = {} }
+local nCombats, combatReloaded, rewardReloaded = 0, false, false
+local guard = 0
+local finished = false
+H.actions = 0
+while guard < 400 do
+  guard = guard + 1
+  local k = currentKind()
+  if k == "combat" then
+    if C().over() then
+      if guard % 2 == 0 then H.click(V().banner.button) else H.key("SPACE") end
+    else
+      nCombats = nCombats + 1
+      check("combat " .. nCombats .. " : main affichée", V().cards[1]._shown)
+      if not combatReloaded then
+        check("modèle du joueur", V().playerModel._model == "unit:player")
+        local firstSlot = select(2, next(V().slotOf))
+        check("intention affichée", firstSlot.intent._shown and (firstSlot.intent.text._text or "") ~= "")
+        tt = H.hover(firstSlot.intent)
+        check("infobulle d'intention", #tt >= 2, #tt)
+        tt = H.hover(V().cards[1])
+        check("infobulle de carte", #tt >= 2, #tt)
+        tt = H.hover(UI().info)
+        check("infobulle du deck dans le bandeau", #tt >= 2 and tt[1]:find("Deck", 1, true), tt[1])
+        -- Carte injouable : raison, rien ne bouge.
+        local c = C().combat()
+        local saveMana = c.player.mana
+        c.player.mana = 0
+        V():Render()
+        local handBefore = #c.hand
+        H.click(V().cards[1])
+        check("carte injouable : « Pas assez de mana. »", UI().err._text == "Pas assez de mana.", UI().err._text)
+        check("carte non jouée", #c.hand == handBefore)
+        c.player.mana = saveMana
+        V():Render()
+        fightUntil(function() return C().combat().round >= 2 and #C().combat().hand > 0 end, 100)
+        if not C().over() then
+          combatReloaded = true
+          check("journal d'animations vidé dans la sauvegarde", #_G.SlayTheDragonDB.current.combat.events == 0)
+          local snap = reloadRoundTrip("combat en cours")
+          check("reprise sur l'écran de combat", currentKind() == "combat", currentKind())
+          local hand = #C().combat().hand
+          check("même main à l'écran", V().cards[hand]._shown and not (V().cards[hand + 1] and V().cards[hand + 1]._shown))
+          local a = H.ns.Combat.clone(C().combat())
+          local b2 = H.ns.Combat.clone(snap.combat)
+          H.ns.Combat.endTurn(a) H.ns.Combat.endTurn(b2)
+          check("le tirage suivant est identique après reprise", deepeq(a.hand, b2.hand) and a.round == b2.round)
+        end
+      end
+      local r = fightUntil(nil, 600)
+      check("combat " .. nCombats .. " terminé", r ~= nil, r)
+      check("bandeau de fin affiché", V().banner._shown)
+      check("Fin du tour désactivé", V().endTurn._enabled == false)
+    end
+  elseif k == "reward" and not rewardReloaded then
+    rewardReloaded = true
+    local r = EXP().reward
+    check("récompense : or affiché dans le butin", UI().current.loot._shown and #UI().step.loot >= 1)
+    check("récompense : trois cartes", #UI().current.cardOptions == #r.cards and #r.cards == 3, #r.cards)
+    local cards = deepcopy(r.cards)
+    reloadRoundTrip("écran de récompense")
+    check("reprise sur la récompense, mêmes cartes", currentKind() == "reward" and deepeq(EXP().reward.cards, cards))
+    local deckN = #EXP().deck
+    H.key("1")
+    check("touche 1 prend la première carte", #EXP().deck == deckN + 1 and EXP().reward.cardsDone, #EXP().deck)
+    check("texte « Carte ajoutée »", (UI().step.text or ""):find("Carte ajoutée", 1, true), UI().step.text)
+  elseif k == "end" then
+    finished = true
+    break
+  else
+    decide(state)
+  end
+  H.advance(0.3)
 end
-check("un emplacement par ennemi vivant", nslots == #C().aliveTargets(), nslots)
-local firstSlot = select(2, next(V().slotOf))
-check("intention affichée", firstSlot.intent._shown and (firstSlot.intent.text._text or "") ~= "", firstSlot.intent.text._text)
-tt = H.hover(firstSlot.intent)
-check("infobulle d'intention", #tt >= 2, #tt)
-tt = H.hover(V().cards[1])
-check("infobulle de carte", #tt >= 2, #tt)
-tt = H.hover(V().drawPile)
-check("infobulle de la pioche", #tt >= 1, #tt)
-check("journal alimenté", #V().log._lines >= 1)
-tt = H.hover(UI().info)
-check("infobulle du deck dans le bandeau", #tt >= 2 and tt[1]:find("Deck", 1, true), tt[1])
-check("bandeau PV / or / étape", (UI().info.text._text or ""):find("PV", 1, true), UI().info.text._text)
-
-print("U5  carte injouable : raison affichée, rien ne bouge")
-local saveMana = c.player.mana
-c.player.mana = 0
-V():Render()
-local handBefore = #c.hand
-H.click(V().cards[1])
-check("raison « Pas assez de mana. »", UI().err._shown and UI().err._text == "Pas assez de mana.", UI().err._text)
-check("carte non jouée", #c.hand == handBefore)
-check("carte grisée", V().cards[1].shade._shown)
-c.player.mana = saveMana
-V():Render()
-
-print("U6  combat complet par clics, touches et glisser-déposer")
-local bot = ns.Bots.new("heuristic", ns.Rng.stream(SEED, "uibot"), { cap = 3000 })
-local savesBefore = _G.SlayTheDragonDB.meta.saves
-local r1 = fightUntil(bot, nil, 400)
-check("le combat se termine", r1 ~= nil, r1)
-check("sauvegarde réécrite à chaque action (" .. H.actions .. " actions)",
-  _G.SlayTheDragonDB.meta.saves - savesBefore >= H.actions, _G.SlayTheDragonDB.meta.saves - savesBefore)
+check("bilan de fin d'expédition atteint", finished, currentKind())
+check("sauvegarde rechargée en plein combat", combatReloaded)
+check("sauvegarde rechargée sur une récompense", rewardReloaded)
+check("marchand traversé", state.seen.merchant)
+check("rencontre traversée", state.seen.event)
+check("feu de camp traversé", state.seen.campfire)
 check("animations jouées", #H.anims > 0, #H.anims)
-check("bandeau de fin affiché", V().banner._shown)
-check("le bouton Fin du tour est désactivé", V().endTurn._enabled == false)
-
-print("U7  victoire -> récompense (tirage fixé par la sauvegarde)")
-if r1 == "won" then
-  H.click(V().banner.button)
-  check("écran de récompense", currentKind() == "reward", currentKind())
-  local choices = deepcopy(C().live.run.node.choices)
-  local db = deepcopy(_G.SlayTheDragonDB)
-  ns = H.boot(db)
-  check("reprise sur la récompense", C().live and C().live.run.phase == "reward")
-  check("mêmes cartes proposées après rechargement", deepeq(choices, C().live.run.node.choices))
-  H.slash("")
-  check("écran de récompense rouvert", currentKind() == "reward", currentKind())
-  local deckN = #C().live.run.deck
-  H.key("1")
-  check("touche 1 prend la première carte", #C().live.run.deck == deckN + 1 and currentKind() == "map", currentKind())
-else
-  check("victoire attendue avec la graine " .. SEED, false, r1)
+local step = UI().step
+local won = step.won
+do
+  local e = _G.SlayTheDragonDB.journal[#_G.SlayTheDragonDB.journal] or {}
+  print("      (résultat : " .. (won and "victoire" or "défaite") .. ", étape " .. tostring(e.floor) .. ", "
+    .. nCombats .. " combats, " .. H.actions .. " actions" .. (e.killedBy and (", vaincu par " .. e.killedBy) or "") .. ")")
 end
 
-print("U8  aller-retour de sauvegarde en plein combat")
-H.click(UI().current.optionButtons["node:2"])
-bot = ns.Bots.new("heuristic", ns.Rng.stream(SEED + 1, "uibot"), { cap = 3000 })
-fightUntil(bot, function() return C().combat().round >= 2 and #C().combat().hand > 0 end, 100)
-c = C().combat()
-check("combat en cours au tour 2+", c and c.round >= 2 and not C().live.over, c and c.round)
-local ok, why = plainData(_G.SlayTheDragonDB, nil, "SlayTheDragonDB")
-check("la sauvegarde ne contient que des données simples", ok, why)
-local snap = C().snapshot()
-local db = deepcopy(_G.SlayTheDragonDB)
-check("la sauvegarde égale l'état vivant", deepeq(db.current, snap))
-ns = H.boot(db)
-check("reprise : état identique (tour, main, PV ennemis, hasard)", deepeq(C().snapshot(), snap), select(2, deepeq(C().snapshot(), snap)))
-H.slash("")
-check("reprise affichée sur l'écran de combat", currentKind() == "combat", currentKind())
-check("même main à l'écran", V().cards[#C().combat().hand]._shown and not V().cards[#C().combat().hand + 1]._shown)
--- Même suite de coups des deux côtés => même résultat (le hasard est dans l'état).
-local a = ns.Combat.clone(C().combat())
-local b2 = ns.Combat.clone(snap.combat)
-ns.Combat.endTurn(a) ns.Combat.endTurn(b2)
-check("le tirage suivant est identique après reprise", deepeq(a.hand, b2.hand) and a.round == b2.round)
+print("U7  bilan : Save.finish, réputation, journal, clé suivante")
+local db = _G.SlayTheDragonDB
+check("expédition archivée (db.current = nil)", db.current == nil)
+check("une entrée au journal", #db.journal == 1 and db.journal[1].date ~= nil)
+check("réputation gagnée", db.meta.classes.priest.rep > 0 and db.meta.league == db.meta.classes.priest.rep)
+check("texte du bilan : réputation", (step.text or ""):find("réputation", 1, true), step.text)
+check("barres de réputation affichées", UI().current.bars[1]._shown and UI().current.bars[2]._shown)
+tt = H.hover(UI().current.bars[1])
+check("infobulle d'une barre : palier", #tt >= 2, #tt)
+if won then
+  check("victoire : clé +1 débloquée", db.meta.classes.priest.keyMax == 1 and (step.text or ""):find("+1", 1, true))
+else
+  check("défaite : pas de nouvelle clé", db.meta.classes.priest.keyMax == 0)
+end
+clickOption("ui:meta")
+check("écran méta", currentKind() == "meta", currentKind())
+check("méta : barres classe et Ligue", UI().current.bars[1]._shown and UI().current.bars[2]._shown
+  and UI().current.bars[2].label._text == "Ligue des explorateurs")
+check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Prêtre", 1, true),
+  UI().current.journal[1]._text)
+check("méta : clés ouvertes", (UI().current.bars[1].detail._text or ""):find("Clés ouvertes", 1, true))
+clickOption("ui:back")
+check("retour au bilan", currentKind() == "end", currentKind())
+clickOption("ui:new")
+check("accueil", currentKind() == "start", currentKind())
+local keyMax = db.meta.classes.priest.keyMax
+check("clé par défaut = la plus haute ouverte", UI().step.key == keyMax and option("key:" .. keyMax).selected)
+check("dernière expédition rappelée", (UI().step.text or ""):find("Dernière expédition", 1, true))
+ns = H.ns
+ns.Controller.makeSeed = function() return SEED + 1 end
+H.key("ENTER")
+exp = EXP()
+check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
+if keyMax > 0 then
+  check("clé mythique dans le bandeau", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
+  tt = H.hover(UI().keystone)
+  check("infobulle de la clé : affixes", table.concat(tt, " "):find("Fortifié", 1, true), table.concat(tt, " | "))
+  check("affixes sur la carte", (UI().step.text or ""):find("Fortifié", 1, true)
+    and UI().current.affixRow.icons[2]._shown)
+end
 
-print("U9  vol : ouverture au décollage, fermeture à l'atterrissage, masquage en combat")
+print("U8  potions et bibelots : bandeau, défausse, boire en combat")
+exp.potions = { "ui_test_heal", "ui_test_bomb", false }
+exp.relics[#exp.relics + 1] = "ui_test_charm"
+UI().refresh()
+check("bibelot dans le bandeau", UI().relicIcons[UI().RELICS_SHOWN]._shown)
+tt = H.hover(UI().relicIcons[UI().RELICS_SHOWN])
+check("infobulle du bibelot : nom et texte", tt[1] == "Breloque d'essai" and table.concat(tt, " "):find("sans effet", 1, true),
+  table.concat(tt, " | "))
+tt = H.hover(UI().potionSlots[1])
+check("infobulle de potion", tt[1] == "Potion de soins d'essai", tt[1])
+H.click(UI().potionSlots[1])
+check("hors combat : on ne boit pas", UI().err._text == "Les potions se boivent en combat.", UI().err._text)
+exp.potions[3] = "ui_test_heal"
+H.click(UI().potionSlots[3], "RightButton")
+check("premier clic droit : confirmation demandée", exp.potions[3] == "ui_test_heal" and (UI().err._text or ""):find("jeter", 1, true))
+H.click(UI().potionSlots[3], "RightButton")
+check("second clic droit : potion jetée (discardPotion)", exp.potions[3] == false)
+-- Entrer dans un combat
+local first = exp.map.start[1]
+exp.map.nodes[first].kind = "combat"
+clickOption("path:" .. first)
+check("combat engagé", currentKind() == "combat", currentKind())
+local c = C().combat()
+local pots = C().potions()
+check("potions transmises au combat", pots and pots[1] == "ui_test_heal" and pots[2] == "ui_test_bomb")
+c.player.hp = c.player.hp - 20
+local hpBefore = c.player.hp
+H.click(UI().potionSlots[1])
+check("potion bue : emplacement vidé", C().potions()[1] == false)
+if H.potionStub then check("effet de la potion (doublure)", c.player.hp == hpBefore + 10, c.player.hp) end
+H.click(UI().potionSlots[2])
+check("potion à cible : choix de la cible demandé", V().potionSlot == 2 and (UI().err._text or ""):find("cible", 1, true))
+local t = C().aliveTargets()[1]
+local ehp = c.enemies[t].hp
+H.click(enemySlot(t))
+check("potion lancée sur l'ennemi", C().potions()[2] == false and V().potionSlot == nil)
+if H.potionStub then check("dégâts de la bombe (doublure)", c.enemies[t].hp == ehp - 10 or c.enemies[t].dead) end
+check("journal d'animations vidé", #c.events == 0)
+local r = fightUntil(nil, 600)
+check("combat avec potions terminé", r ~= nil)
+if r == "won" then
+  H.click(V().banner.button)
+  local held, gained = 0, (EXP().reward and EXP().reward.potionTaken) and 1 or 0
+  for _, p in ipairs(EXP().potions) do if p then held = held + 1 end end
+  check("potions bues absentes de l'expédition", held == gained, held)
+end
+
+print("U9  marchand complet : cartes, bibelots, potions, retrait au prix croissant")
+local function freshRun(seed, kind, meta)
+  H.boot(meta and { version = 1, meta = meta } or nil)
+  H.slash("")
+  H.ns.Controller.makeSeed = function() return seed end
+  clickOption("go")
+  local e = EXP()
+  if kind then
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = kind
+    e.gold = 500
+    clickOption("path:" .. id)
+  end
+  return e
+end
+exp = freshRun(SEED + 2, "merchant")
+ns = H.ns
+check("écran marchand", currentKind() == "merchant", currentKind())
+local s = UI().current
+check("cinq cartes à prix", #s.cardOptions == 5 and s.cards[5]._shown and (s.cards[1].tag._text or ""):find("po", 1, true))
+local relicOpt, potionOpt
+for _, o in ipairs(UI().step.options) do
+  if o.item and o.item.kind == "relic" and not relicOpt then relicOpt = o end
+  if o.item and o.item.kind == "potion" and not potionOpt then potionOpt = o end
+end
+check("bibelots en vente (registre de test)", relicOpt ~= nil and button(relicOpt.id).icon._shown)
+check("potions en vente", potionOpt ~= nil)
+tt = H.hover(button(relicOpt.id))
+check("infobulle d'un bibelot en vente : prix", table.concat(tt, " "):find(relicOpt.price .. " po", 1, true), table.concat(tt, " | "))
+local gold = exp.gold
+clickOption(relicOpt.id)
+check("bibelot acheté", exp.relics[#exp.relics] == relicOpt.item.id and exp.gold == gold - relicOpt.price)
+check("bibelot marqué vendu", option(relicOpt.id).sold and option(relicOpt.id).disabled)
+gold = exp.gold
+clickOption(potionOpt.id)
+check("potion achetée dans un emplacement", exp.potions[1] == potionOpt.item.id and exp.gold == gold - potionOpt.price)
+local price1 = option("ui:remove").price
+clickOption("ui:remove")
+check("écran de retrait (grille du deck)", currentKind() == "deck" and #UI().current.cardOptions == #exp.deck)
+local deckN = #exp.deck
+H.key("1")
+check("carte retirée, retour chez le marchand", #exp.deck == deckN - 1 and currentKind() == "merchant", currentKind())
+check("prix du retrait croissant", option("ui:remove").price == price1 + ns.Expedition.REMOVE_STEP, option("ui:remove").price)
+clickOption("ui:remove")
+clickOption("ui:back")
+check("retour sans retirer", currentKind() == "merchant" and #exp.deck == deckN - 1)
+exp.gold = 0
+UI().refresh()
+check("trop pauvre : carte grisée avec raison du moteur", UI().step.options[1].disabled
+  and UI().step.options[1].reason == "Pas assez d'or.", UI().step.options[1].reason)
+H.click(UI().current.cards[1])
+check("clic sur un article trop cher : message", UI().err._text == "Pas assez d'or.", UI().err._text)
+clickOption("leave")
+check("départ : retour à la carte", currentKind() == "map", currentKind())
+
+print("U10 feu de camp : repos chiffré, amélioration avec aperçu")
+exp = freshRun(SEED + 3, "campfire")
+ns = H.ns
+check("écran feu de camp", currentKind() == "campfire", currentKind())
+exp.hp = 20
+UI().refresh()
+local heal = math.floor(exp.maxHp * ns.Expedition.REST_FRACTION)
+check("repos : PV rendus calculés par le moteur", option("rest").text == "Rends " .. heal .. " PV.", option("rest").text)
+clickOption("ui:upgrade")
+check("grille d'amélioration", currentKind() == "deck" and #UI().current.cardOptions >= 1)
+tt = H.hover(UI().current.cards[1])
+check("aperçu « Après amélioration »", table.concat(tt, " "):find("Après amélioration", 1, true), table.concat(tt, " | "))
+local cardId = UI().current.cardOptions[1].id
+H.click(UI().current.cards[1])
+local idx = tonumber(cardId:match("%d+"))
+check("carte améliorée, retour à la carte", exp.deck[idx].up == true and currentKind() == "map", currentKind())
+
+print("U11 rencontre : texte, choix, résultat")
+exp = freshRun(SEED + 4, "event")
+ns = H.ns
+check("écran de rencontre", currentKind() == "event", currentKind())
+local ev = exp.event.id and ns.Events[exp.event.id]
+if ev then
+  check("texte de la rencontre", UI().step.text == ev.text)
+  check("un bouton par choix", #UI().step.options == #ev.choices)
+  local pick
+  for i, o in ipairs(UI().step.options) do
+    if not pick and not o.disabled and not (o.text or ""):find("Combat", 1, true) then pick = i end
+  end
+  H.key(tostring(pick))
+  local k = currentKind()
+  check("choix appliqué (résultat, sélection ou récompense)", exp.event.chosen == pick
+    and (k == "event" or k == "select" or k == "reward"), k)
+  if k == "event" then
+    check("texte après coup", UI().step.text == ev.choices[pick].after, UI().step.text)
+    H.key("ENTER")
+  elseif k == "select" then
+    clickOption("skipSelect")
+  else
+    clickOption("leave")
+  end
+  check("retour à la carte", currentKind() == "map", currentKind())
+else
+  check("rencontre vide : continuer", option("leave") ~= nil)
+end
+
+print("U12 Révéré : bibelot de classe au départ ; abandon")
+exp = freshRun(SEED + 5, nil, { league = 0, runs = 3,
+  classes = { priest = { rep = 1100, runs = 3, wins = 0, keyMax = 0, bestKey = -1 } } })
+check("phase de bibelot de départ", currentKind() == "startRelic", currentKind())
+check("bibelot de classe proposé avec icône", option("startRelic:1") and button("startRelic:1").icon._shown)
+clickOption("startRelic:1")
+check("bibelot de départ pris", exp.relics[1] == "ui_test_symbol" and currentKind() == "map")
+UI().toggleOptions()
+H.click(UI().abandonButton)
+check("abandon : confirmation demandée", EXP() ~= nil)
+H.click(UI().abandonButton)
+check("abandon : bilan", currentKind() == "end" and UI().step.result == "abandoned" and EXP() == nil, currentKind())
+check("abandon au journal", _G.SlayTheDragonDB.journal[#_G.SlayTheDragonDB.journal].result == "abandoned")
+
+print("U13 vol : ouverture au décollage, fermeture à l'atterrissage, masquage en combat")
+exp = freshRun(SEED, "combat")
 H.key("ESCAPE")
 check("fermée avant le vol", not shown())
 H.taxi = true
@@ -691,124 +1109,73 @@ check("décollage repéré par le seul sondage (sans événement)", shown())
 H.taxi = false
 H.advance(3)
 check("atterrissage repéré par le sondage", not shown())
-ns.Persist.options().autoOpen = false
+H.ns.Persist.options().autoOpen = false
 H.taxi = true
 H.fire("PLAYER_CONTROL_LOST")
 H.advance(1)
 check("option désactivée : pas d'ouverture", not shown())
-ns.Persist.options().autoOpen = true
+H.ns.Persist.options().autoOpen = true
 H.taxi = false
 H.advance(3)
--- Rechargement de l'interface en plein vol : ouverture au chargement.
 db = deepcopy(_G.SlayTheDragonDB)
-H.badPaths = {}
-ns = H.boot(db) -- au chargement on est au sol ; le vol est déjà en cours à l'entrée dans le monde
+H.boot(db)
 H.taxi = true
 H.fire("PLAYER_ENTERING_WORLD", false, true)
 H.advance(0.5)
-check("/reload en vol : fenêtre ouverte", shown())
+check("/reload en vol : fenêtre ouverte sur le combat", shown() and currentKind() == "combat")
 H.taxi = false
 H.advance(3)
+H.fire("PLAYER_LOGOUT")
+check("déconnexion : journal d'animations vidé", #_G.SlayTheDragonDB.current.combat.events == 0)
 
-print("U10 fin de l'expédition par l'interface")
+print("U14 sauvegardes abîmées, anciennes ou futures")
+local devDb = { version = 1, meta = { saves = 4 }, current = { provider = "demo", seed = 1, run = {} },
+  journal = { { result = "abandon", floor = 2, seed = 1 } }, options = { scale = 1.2 } }
+H.boot(devDb)
+db = _G.SlayTheDragonDB
+check("ancienne sauvegarde de l'interface : options gardées", H.ns.Persist.options().scale == 1.2
+  and H.ns.Persist.options().autoOpen == true)
+check("ancienne expédition en quarantaine, méta réparée", db.current == nil and #db.quarantine == 1
+  and type(db.meta.classes) == "table")
 H.slash("")
-local guard = 0
-local finalKind
-while guard < 60 do
-  guard = guard + 1
-  local k = currentKind()
-  if k == "combat" then
-    bot = ns.Bots.new("heuristic", ns.Rng.stream(SEED + guard, "uibot"), { cap = 3000 })
-    local r = fightUntil(bot, nil, 400)
-    check("combat " .. guard .. " terminé", r ~= nil)
-    H.key("SPACE")
-  elseif k == "map" then
-    H.key("ENTER")
-  elseif k == "reward" then
-    H.click(UI().current.optionButtons["card:1"])
-  elseif k == "choice" then
-    -- feu de camp : améliorer si possible, sinon se reposer
-    local up = UI().current.optionButtons["upgrade"]
-    if up and not up.option.disabled then H.click(up) else H.click(UI().current.optionButtons["rest"]) end
-  elseif k == "deck" then
-    H.click(UI().current.optionButtons[UI().current.cardOptions[1].id])
-  elseif k == "shop" then
-    local s = UI().current
-    local bought = false
-    for _, o in ipairs(s.cardOptions) do
-      if not o.disabled then H.click(s.optionButtons[o.id]) bought = true break end
-    end
-    if not bought then H.click(s.optionButtons["leave"]) end
-  elseif k == "end" then
-    finalKind = k
-    break
-  else
-    error("écran inattendu : " .. tostring(k))
-  end
-  H.advance(0.3)
-end
-check("bilan de fin d'expédition atteint", finalKind == "end", currentKind())
-local won = UI().step.won
-print("      (résultat : " .. (won and "victoire" or "défaite") .. ", étape " .. C().live.run.floor .. ")")
-H.click(UI().current.optionButtons["new"])
-check("nouvelle expédition et journal archivé", C().live and #_G.SlayTheDragonDB.journal >= 1)
+check("accueil malgré un journal ancien", currentKind() == "start" and (UI().step.text or ""):find("Dernière", 1, true))
+H.ns.Controller.makeSeed = function() return 77 end
+clickOption("go")
+local good = deepcopy(_G.SlayTheDragonDB)
+local bad = deepcopy(good)
+bad.current.deck[1].id = "carte_disparue"
+H.boot(bad)
+check("carte inconnue : Save met l'expédition en quarantaine", EXP() == nil and #_G.SlayTheDragonDB.quarantine == 2)
+bad = deepcopy(good)
+bad.current.relics[1] = "bibelot_disparu"
+H.boot(bad)
+check("bibelot inconnu : l'interface met l'expédition en quarantaine", EXP() == nil
+  and (_G.SlayTheDragonDB.quarantine[2].reason or ""):find("bibelot", 1, true))
+H.slash("")
+check("message de mise de côté à l'accueil", (UI().step.text or ""):find("mise de côté", 1, true))
+local future = { version = 99, current = { x = 1 }, meta = { odd = true } }
+H.boot(future)
+check("version future : pas touchée", _G.SlayTheDragonDB.version == 99 and _G.SlayTheDragonDB.current.x == 1
+  and _G.SlayTheDragonDB.meta.odd == true)
+check("version future : jeu en lecture seule", H.ns.Persist.readOnly and EXP() == nil)
+H.slash("")
+clickOption("go")
+check("version future : la session joue sans écrire", EXP() ~= nil and _G.SlayTheDragonDB.current.x == 1)
+H.boot("n'importe quoi")
+check("base illisible remplacée", type(_G.SlayTheDragonDB) == "table" and _G.SlayTheDragonDB.version == H.ns.Save.VERSION)
 
-print("U11 marchand et retrait de carte (écran grille à prix)")
-do
-  local P = ns.DemoExpedition
-  local run = C().live.run
-  run.gold = 500
-  run.floor = 5
-  run.phase = "map"
-  C().choose("node:6")
-  check("écran marchand", currentKind() == "shop", currentKind())
-  local s = UI().current
-  local o = s.cardOptions[1]
-  local deckN = #run.deck
-  H.click(s.optionButtons[o.id])
-  check("achat : carte ajoutée et or retiré", #run.deck == deckN + 1 and run.gold == 500 - o.price)
-  check("carte marquée vendue", UI().current.cardOptions[1].sold == true)
-  H.click(UI().current.optionButtons["remove"])
-  check("écran de retrait (grille de cartes)", currentKind() == "deck", currentKind())
-  local before = #run.deck
-  H.key("1")
-  check("carte retirée", #run.deck == before - 1 and currentKind() == "shop", currentKind())
-  check("retrait unique", UI().current.optionButtons["remove"].option.disabled == true)
-  H.click(UI().current.optionButtons["leave"])
-  check("départ : retour à la carte", currentKind() == "map", currentKind())
-  assert(P)
-end
-
-print("U12 sauvegardes abîmées ou anciennes")
-ns = H.boot({ options = { scale = 1.2 } })
-check("base sans version : options gardées", _G.SlayTheDragonDB.version == ns.Persist.VERSION
-  and ns.Persist.options().scale == 1.2 and ns.Persist.options().autoOpen == true)
-local bad = deepcopy(db)
-bad.current.run.deck[1].id = "carte_disparue"
-ns = H.boot(bad)
-check("carte inconnue : expédition archivée, pas d'erreur", C().live == nil
-  and _G.SlayTheDragonDB.journal[#_G.SlayTheDragonDB.journal].result == "abandon")
-ns = H.boot({ version = 99, current = { x = 1 } })
-check("version future mise de côté", _G.SlayTheDragonDB.version == ns.Persist.VERSION
-  and _G.SlayTheDragonDB.meta.future and _G.SlayTheDragonDB.current == nil)
-ns = H.boot("n'importe quoi")
-check("base illisible remplacée", type(_G.SlayTheDragonDB) == "table" and _G.SlayTheDragonDB.version == ns.Persist.VERSION)
-
-print("U13 art manquant : repli et rapport /slay art")
+print("U15 art manquant : repli et rapport /slay art")
 H.badSpells = { [585] = true }
 H.badPaths = { ["Interface\\Icons\\Spell_Holy_HolySmite"] = true }
 H.badCreatures = { [639] = true, [117] = true }
-ns = H.boot(nil)
-H.slash("")
-chooseOptionByClick("new")
-H.key("ENTER")
+freshRun(SEED, "combat")
 H.advance(2)
 local smite
 for i = 1, 10 do
   local card = V().cards[i]
   if card._shown and card.cardId == "smite" then smite = card end
 end
-check("icône introuvable -> point d'interrogation", smite and smite.icon._texture == ns.Art.QUESTION,
+check("icône introuvable -> point d'interrogation", smite and smite.icon._texture == H.ns.Art.QUESTION,
   smite and smite.icon._texture)
 H.slash("modeles")
 H.advance(2)
@@ -827,7 +1194,7 @@ local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
 check("/slay art liste l'icône et le modèle manquants", said:find("card:smite", 1, true) and said:find("model:gnoll", 1, true), said)
 H.badSpells, H.badPaths, H.badCreatures = nil, {}, {}
 
-print("U14 méthodes d'API inconnues appelées")
+print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end
 table.sort(names)

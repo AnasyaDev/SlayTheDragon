@@ -581,6 +581,55 @@ test("Save.new / validate / migrate (nil, table vide, champs inconnus gardés)",
   eq(n.version, Save.VERSION + 1)
 end)
 
+test("migrate : options de l'interface gardées, méta incomplète réparée", function()
+  -- Sauvegarde de développement de l'interface (piste C) : version 1, méta sans réputation,
+  -- état d'expédition d'un ancien format, options de l'interface.
+  local dev = { version = 1, meta = { saves = 12, savedAt = 99 },
+    current = { provider = "demo", seed = 3, run = {} }, journal = { { result = "abandon", floor = 2 } },
+    options = { scale = 1.2, autoOpen = false, minimap = { hide = true, angle = 90 }, point = { "CENTER", "CENTER", 4, 5 } } }
+  local m = Save.migrate(dev)
+  eq(m.options.scale, 1.2)
+  eq(m.options.autoOpen, false)
+  eq(m.options.minimap.angle, 90)
+  eq(m.options.point[3], 4)
+  eq(m.meta.league, 0)
+  eq(type(m.meta.classes), "table")
+  eq(m.meta.saves, 12, "champs inconnus de la méta gardés")
+  eq(m.current, nil)
+  eq(#m.quarantine, 1)
+  eq(m.quarantine[1].state.provider, "demo")
+  eq(#m.journal, 1)
+  assert(Save.validate(m))
+  local again = reload(m)
+  Save.migrate(again)
+  eq(serialize(again), serialize(m), "migration idempotente")
+  -- quarantaine demandée par l'interface
+  local db = Save.new()
+  db.options = { speed = 2 }
+  assert(Save.start(db, { seed = 3 }))
+  assert(Save.quarantine(db, "combat illisible"))
+  eq(db.current, nil)
+  eq(db.quarantine[1].reason, "combat illisible")
+  eq(Save.quarantine(db, "x"), false)
+  eq(db.options.speed, 2)
+end)
+
+test("chemin parcouru : exp.path suit les nœuds visités de l'acte", function()
+  local exp = newExp({ seed = 8 })
+  eq(#exp.path, 0)
+  local id = exp.map.start[1]
+  exp.map.nodes[id].kind = "campfire"
+  assert(X.act(exp, { "path", id }))
+  eq(exp.path[1], id)
+  assert(X.act(exp, { "leave" }))
+  local nx = Map.nextNodes(exp.map, exp.node)[1]
+  exp.map.nodes[nx].kind = "campfire"
+  assert(X.act(exp, { "path", nx }))
+  eq(#exp.path, 2)
+  eq(exp.path[2], nx)
+  assert(Save.isPlain(exp))
+end)
+
 test("migration : expédition illisible mise en quarantaine, pas effacée", function()
   local db = Save.new()
   db.current = { version = X.VERSION, phase = "bogus" }

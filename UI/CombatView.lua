@@ -1,5 +1,6 @@
 -- Écran de combat : héros à gauche, 1 à 5 ennemis à droite, main en éventail en bas.
--- N'applique aucune règle : lit l'état du moteur (ns.Combat) et passe par ns.Controller.
+-- N'applique aucune règle : lit l'état du moteur (ns.Combat) et passe par ns.Controller
+-- (donc par Expedition.act : coups, fin de tour, potions).
 local _, ns = ...
 if not CreateFrame then return end -- hors du jeu (Sim/load.lua) : pas d'interface
 
@@ -442,6 +443,7 @@ function V:Show(step)
   if self.c ~= c then
     self.c = c
     self.selected = nil
+    self.potionSlot = nil
     self.kbTarget = nil
     self.queue = {}
     self.slotOf = {}
@@ -596,7 +598,7 @@ end
 function V:RenderTargets()
   if not self.c then return end
   local info = self:SelectedInfo()
-  local targeting = info and info.needsTarget
+  local targeting = (info and info.needsTarget) or self.potionSlot ~= nil
   local kb = self:KbTarget()
   for _, s in pairs(self.slotOf) do
     local e = self.c.enemies[s.enemyIndex]
@@ -681,7 +683,7 @@ function V:RenderHand()
 end
 
 function V:RenderBanner()
-  local over = Controller.live and Controller.live.over
+  local over = Controller.over()
   if over then
     self.banner.text:SetText(over == "won" and "|cff40ff40Victoire !|r" or "|cffff4040Défaite…|r")
     self.banner.button:SetText(over == "won" and "Continuer" or "Voir le bilan")
@@ -836,6 +838,7 @@ end
 function V:Select(i)
   local info = Controller.handInfo(i)
   if not info then return end
+  self.potionSlot = nil
   if not info.playable then UI.flash(Controller.reasonText(info.why)) return end
   self.selected = i
   self:RenderHand()
@@ -844,6 +847,7 @@ end
 
 function V:Deselect()
   self.selected = nil
+  self.potionSlot = nil
   self:RenderHand()
   self:RenderTargets()
 end
@@ -874,14 +878,15 @@ end
 function V:ClickCard(i, button)
   if self.justDragged and now() - self.justDragged < 0.15 then return end
   if button == "RightButton" then self:Deselect() return end
-  if Controller.live.over then return end
+  if Controller.over() then return end
   if self.selected == i then self:Confirm() else self:Select(i) end
 end
 
 function V:ClickEnemy(slot, button)
   if button == "RightButton" then self:Deselect() return end
   local e = self.c and self.c.enemies[slot.enemyIndex]
-  if not e or e.dead or Controller.live.over then return end
+  if not e or e.dead or Controller.over() then return end
+  if self.potionSlot then return self:DrinkPotion(self.potionSlot, slot.enemyIndex) end
   local info = self:SelectedInfo()
   if info and info.needsTarget then
     self:Play(self.selected, slot.enemyIndex)
@@ -891,6 +896,25 @@ function V:ClickEnemy(slot, button)
   end
 end
 
+-- Potion à cible (bandeau) : la prochaine cible cliquée la reçoit ; Entrée vise la cible clavier.
+function V:SelectPotion(slot)
+  self.selected = nil
+  self.potionSlot = slot
+  self:RenderHand()
+  self:RenderTargets()
+  UI.flash("Choisis une cible pour la potion.")
+end
+
+function V:DrinkPotion(slot, target)
+  self.potionSlot = nil
+  local ok, why = Controller.usePotion(slot, target)
+  if not ok then
+    UI.flash(Controller.reasonText(why))
+    self:Render()
+  end
+  return ok
+end
+
 function V:ClickField(button)
   if button == "RightButton" then self:Deselect() return end
   local info = self:SelectedInfo()
@@ -898,7 +922,7 @@ function V:ClickField(button)
 end
 
 function V:EndTurn()
-  if Controller.live and Controller.live.over then Controller.finishCombat() return end
+  if Controller.over() then Controller.finishCombat() return end
   self.selected = nil
   Controller.endTurn()
 end
@@ -916,7 +940,7 @@ end
 
 function V:StartDrag(card)
   local info = Controller.handInfo(card.index)
-  if not info or not info.playable or Controller.live.over then return end
+  if not info or not info.playable or Controller.over() then return end
   if GameTooltip then GameTooltip:Hide() end
   self.selected = card.index
   self.dragging = card
@@ -956,7 +980,7 @@ end
 function V:HandleKey(key)
   local c = self.c
   if not c then return false end
-  if Controller.live.over then
+  if Controller.over() then
     if key == "SPACE" or key == "ENTER" then Controller.finishCombat() return true end
     return UI.keyIndex(key) ~= nil
   end
@@ -973,7 +997,12 @@ function V:HandleKey(key)
     self:EndTurn()
     return true
   elseif key == "ENTER" then
-    self:Confirm()
+    if self.potionSlot then
+      local t = self:KbTarget()
+      if t then self:DrinkPotion(self.potionSlot, t) end
+    else
+      self:Confirm()
+    end
     return true
   end
   return false

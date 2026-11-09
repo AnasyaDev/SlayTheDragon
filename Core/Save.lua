@@ -22,9 +22,11 @@ end
 ---------------------------------------------------------------------------
 Save.MIGRATIONS = {}
 
--- 0 -> 1 : table sans numéro de version (SavedVariables vide, ou sauvegarde de développement
--- avec seulement une partie des champs). On complète sans rien retirer.
-Save.MIGRATIONS[0] = function(db)
+-- Complète les champs indispensables sans rien retirer (idempotent). Sert de migration
+-- 0 -> 1 et répare aussi une sauvegarde déjà numérotée dont la méta est incomplète
+-- (sauvegarde de développement de l'interface, par exemple). Les champs inconnus,
+-- comme db.options (réglages de l'interface), sont gardés tels quels.
+function Save.normalize(db)
   if type(db.meta) ~= "table" then db.meta = ns.Meta.new() end
   local m = db.meta
   m.league = tonumber(m.league) or 0
@@ -34,11 +36,24 @@ Save.MIGRATIONS[0] = function(db)
   if type(db.quarantine) ~= "table" then db.quarantine = {} end
 end
 
+-- 0 -> 1 : table sans numéro de version (SavedVariables vide, ou sauvegarde de développement
+-- avec seulement une partie des champs).
+Save.MIGRATIONS[0] = Save.normalize
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
 local function quarantine(db, state, reason)
   db.quarantine[#db.quarantine + 1] = { reason = reason, state = state }
+end
+
+-- Met l'expédition en cours de côté (illisible pour l'interface, erreur à la reprise…).
+function Save.quarantine(db, reason)
+  local exp = db.current
+  if exp == nil then return false end
+  db.current = nil
+  quarantine(db, exp, reason)
+  return true
 end
 
 -- Met la sauvegarde au format courant. Accepte nil (première connexion).
@@ -57,6 +72,7 @@ function Save.migrate(db)
     db.version = v
     note = "migrée"
   end
+  Save.normalize(db)
   local exp = db.current
   if exp ~= nil then
     if type(exp) ~= "table" then

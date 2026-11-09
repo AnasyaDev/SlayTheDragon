@@ -73,7 +73,7 @@ function UI.build()
   UI.title = title
 
   local info = CreateFrame("Frame", nil, f)
-  info:SetSize(420, 18)
+  info:SetSize(330, 18)
   info:SetPoint("LEFT", title, "RIGHT", 18, 0)
   info.text = W.text(info, "GameFontHighlight")
   info.text:SetPoint("LEFT")
@@ -109,6 +109,31 @@ function UI.build()
   local gear = W.button(f, "Options", 80, 22, function() UI.toggleOptions() end)
   gear:SetPoint("RIGHT", close, "LEFT", -4, 0)
   UI.gear = gear
+
+  -- Potions (3 emplacements), bibelots et clé mythique, à droite du bandeau.
+  UI.potionSlots = {}
+  for i = 1, 3 do
+    local b = W.iconButton(f, 22)
+    b:SetPoint("RIGHT", gear, "LEFT", -8 - (3 - i) * 25, 0)
+    b.slot = i
+    b:SetScript("OnClick", function(self, button) UI.clickPotion(self, button) end)
+    UI.potionSlots[i] = b
+  end
+  UI.RELICS_SHOWN = 6
+  UI.relicIcons = {}
+  for i = 1, UI.RELICS_SHOWN do
+    local b = W.iconButton(f, 20)
+    b:SetPoint("RIGHT", UI.potionSlots[1], "LEFT", -10 - (UI.RELICS_SHOWN - i) * 22, 0)
+    b:Hide()
+    UI.relicIcons[i] = b
+  end
+  local more = W.text(f, "GameFontHighlightSmall")
+  more:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -2, 0)
+  UI.relicMore = more
+  local ks = W.iconButton(f, 22)
+  ks:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -22, 0)
+  ks:Hide()
+  UI.keystone = ks
 
   local content = CreateFrame("Frame", nil, f)
   content:SetPoint("TOPLEFT", 12, -36)
@@ -154,13 +179,83 @@ end
 -- Affichage des étapes
 ---------------------------------------------------------------------------
 
+local function affixText(r)
+  local lines = {}
+  for i = 1, #(r.affixes or {}) do
+    local a = ns.Affixes[r.affixes[i]]
+    if a then lines[#lines + 1] = a.name .. " : " .. a.text end
+  end
+  return table.concat(lines, "\n")
+end
+
 function UI.refreshInfo()
   local r = Controller.runInfo()
+  local potions = Controller.potions()
+  for i = 1, #UI.potionSlots do
+    local b = UI.potionSlots[i]
+    local id = potions and potions[i]
+    if r then
+      if id then
+        b:SetItem("potion", id, { hint = Controller.inCombat() and "Clic : boire."
+          or "Se boit en combat. Clic droit (deux fois) : jeter." })
+      else
+        b:SetItem(nil, nil, { kind = "empty", title = "Emplacement de potion vide" })
+      end
+      b:Show()
+    else
+      b:Hide()
+    end
+  end
+  local relics = r and r.relics or {}
+  -- calés à droite : le dernier bibelot obtenu touche les potions
+  for i = 1, UI.RELICS_SHOWN do
+    local b = UI.relicIcons[i]
+    local id = relics[#relics - (UI.RELICS_SHOWN - i)]
+    if id then b:SetItem("relic", id) b:Show() else b:Hide() end
+  end
+  UI.relicMore:SetText(#relics > UI.RELICS_SHOWN and ("+" .. (#relics - UI.RELICS_SHOWN)) or "")
+  if r and (r.key or 0) > 0 then
+    UI.keystone:SetItem("keystone", r.key, { title = "Clé mythique +" .. r.key, text = affixText(r) })
+    UI.keystone.count:SetText("+" .. r.key)
+    UI.keystone:Show()
+  else
+    UI.keystone:Hide()
+  end
   if not r then UI.info.text:SetText("") return end
   local t = "|cffff5050" .. r.hp .. "/" .. r.maxHp .. " PV|r   |cffffd700" .. r.gold .. " po|r   "
     .. #r.deck .. " cartes"
-  if r.steps then t = t .. "   étape " .. math.max(r.floor or 0, 1) .. "/" .. r.steps end
+  if r.floors then t = t .. "   étape " .. math.max(r.floor or 0, 1) .. "/" .. r.floors end
   UI.info.text:SetText(t)
+end
+
+-- Clic sur un emplacement de potion : boire en combat (cible au clic suivant si besoin),
+-- jeter hors combat par deux clics droits.
+function UI.clickPotion(b, button)
+  local potions = Controller.potions()
+  local id = potions and potions[b.slot]
+  if not id then return end
+  local def = ns.Potions[id]
+  local name = def and def.name or tostring(id)
+  if button == "RightButton" then
+    if Controller.inCombat() then UI.flash("On ne jette pas une potion en plein combat.") return end
+    if b.armed then
+      b.armed = false
+      local ok, why = Controller.discardPotion(b.slot)
+      if not ok then UI.flash(Controller.reasonText(why)) end
+    else
+      b.armed = true
+      UI.flash("Clic droit à nouveau pour jeter " .. name .. ".")
+      W.delay(3, function() b.armed = false end)
+    end
+    return
+  end
+  if not Controller.inCombat() then UI.flash("Les potions se boivent en combat.") return end
+  if def and def.target then
+    UI.screens.combat:SelectPotion(b.slot)
+  else
+    local ok, why = Controller.usePotion(b.slot)
+    if not ok then UI.flash(Controller.reasonText(why)) end
+  end
 end
 
 function UI.refresh()
@@ -338,7 +433,7 @@ function UI.buildOptions()
   local ab = W.button(p, "Abandonner l'expédition", 200, 24)
   ab:SetPoint("BOTTOMLEFT", 14, 44)
   ab:SetScript("OnClick", function(self)
-    if not Controller.live then UI.flash("Aucune expédition en cours.") return end
+    if not Controller.exp() then UI.flash("Aucune expédition en cours.") return end
     if self.armed then
       self.armed = false
       self:SetText("Abandonner l'expédition")
