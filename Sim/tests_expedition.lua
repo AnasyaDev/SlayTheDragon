@@ -502,10 +502,11 @@ test("Fortifié et Tyrannique : PV et dégâts", function()
 end)
 
 test("Galvanisant : la mort d'un ennemi renforce les autres", function()
-  local c = fightWith({ "bolstering" }, { "test_dummy", "test_dummy" })
+  local c = fightWith({ "bolstering" }, { "test_dummy", "test_dummy", "vancleef" })
   c.enemies[1].hp = 1
   Combat.dealDamage(c, c.player, c.enemies[1], 5)
-  eq(c.enemies[2].st.force, 2)
+  eq(c.enemies[2].st.force, Meta.AFFIX.bolstering.force)
+  eq(c.enemies[3].st.force, nil, "les boss ne sont pas galvanisés")
 end)
 
 test("Nécrotique : chaque coup reçu réduit les soins de 10 %", function()

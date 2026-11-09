@@ -61,7 +61,7 @@ return function(ns)
       return -3.0
     end
     if kind == "campfire" then return hpRatio < 0.5 and 3.0 or 1.0 end
-    if kind == "merchant" then return gold >= math.min(removePrice, 80) and 1.5 or 0.2 end
+    if kind == "merchant" then return gold >= math.min(removePrice, 60) and 1.6 or 0.4 end
     if kind == "event" then return 1.2 end
     if kind == "chest" then return 2.0 end
     return 0
