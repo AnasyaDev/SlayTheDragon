@@ -505,6 +505,43 @@ test("cartes Consumées : Rénovation quitte le combat", function()
   eq(#c.exhaust, 1); eq(c.player.st.regen, num("renew", 1, 3))
 end)
 
+test("Mystique : Guette coupe l'incantation, sinon frappe", function()
+  local c = setup({ "holy_fire", "smite" }, { "mystic" })
+  eq(c.enemies[1].intent, "watch", "incantation en main")
+  Combat.play(c, 1, 1)
+  Combat.endTurn(c)
+  eq(c.player.hp, 60, "sort coupé, pas de coup")
+  eq(c.player.cast, nil)
+  local d = setup({ "holy_fire", "smite" }, { "mystic" })
+  Combat.endTurn(d)
+  eq(d.player.hp, 57, "rien à couper : 3 dégâts")
+end)
+
+test("VanCleef : le Coup de pied coupe, la Frappe mortelle non", function()
+  local mv = ns.Enemies.vancleef.moves
+  eq(mv.kick.actions[1].interrupts, true)
+  eq(mv.strike.actions[1].interrupts, nil)
+end)
+
+test("Fouet mental : pioche 1 et +2 Démence si la cible a Douleur", function()
+  local c = setup({ "sw_pain", "mind_flay" }, { "test_dummy" }, { "smite", "smite" })
+  Combat.play(c, 1, 1)
+  local before = #c.hand
+  Combat.play(c, 1, 1)
+  eq(#c.hand, before, "une carte jouée, une piochée")
+  eq(c.player.demence, 3)
+end)
+
+test("Apothéose : une carte de plus par tour ; Forme d'ombre : +2 Démence", function()
+  local c = setup({ "apotheosis", "shadowform" }, { "test_dummy" }, { "smite", "smite", "smite", "smite", "smite",
+    "smite", "smite", "smite" })
+  Combat.play(c, 1)
+  Combat.play(c, 1)
+  eq(c.player.demence, 2)
+  Combat.endTurn(c)
+  eq(#c.hand, 6)
+end)
+
 test("clone indépendant de l'original", function()
   local c = setup({ "smite", "smite" })
   local t = Combat.clone(c)
