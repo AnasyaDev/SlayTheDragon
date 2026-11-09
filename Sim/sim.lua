@@ -3,6 +3,8 @@
 --         [force=penance,mind_blast] [save=rapport.lua] [compare=ancien.lua]
 --   bot  : random | greedy | heuristic        pick : rated | random | skip
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
+--   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
+--     avec key=N (clé mythique) et meta=start|exalted (pool de déblocages)
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 local opts = {}
@@ -47,7 +49,9 @@ local function deserialize(s) return assert(loadstring("return " .. s))() end
 local function newAgg()
   return { runs = 0, wins = 0, floors = {}, hpEndWin = 0, elapsed = 0,
     enc = {}, cards = {}, kinds = {},
-    castsStarted = 0, castsInterrupted = 0, enemyCasts = 0, enemyCastsInterrupted = 0 }
+    castsStarted = 0, castsInterrupted = 0, enemyCasts = 0, enemyCastsInterrupted = 0,
+    goldEarned = 0, goldSpent = 0, goldEnd = 0, rep = 0, cleared = 0, removed = 0, upgraded = 0,
+    visits = {}, relics = {} }
 end
 
 local function addRecord(agg, rec)
@@ -57,6 +61,17 @@ local function addRecord(agg, rec)
     agg.hpEndWin = agg.hpEndWin + rec.hp
   end
   agg.floors[rec.floor] = (agg.floors[rec.floor] or 0) + (rec.won and 0 or 1)
+  if rec.visits then
+    agg.goldEarned = agg.goldEarned + rec.goldEarned
+    agg.goldSpent = agg.goldSpent + rec.goldSpent
+    agg.goldEnd = agg.goldEnd + rec.gold
+    agg.rep = agg.rep + rec.rep
+    agg.cleared = agg.cleared + rec.cleared
+    agg.removed = agg.removed + rec.removed
+    agg.upgraded = agg.upgraded + rec.upgraded
+    for k, n in pairs(rec.visits) do agg.visits[k] = (agg.visits[k] or 0) + n end
+    for _, id in ipairs(rec.relics) do agg.relics[id] = (agg.relics[id] or 0) + 1 end
+  end
   for _, cb in ipairs(rec.combats) do
     local e = agg.enc[cb.encounter]
     if not e then
@@ -129,8 +144,15 @@ local function runRange(from, to)
   local ns = dofile(root .. "/Sim/load.lua")(root)
   local agg = newAgg()
   for i = from, to do
-    local rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
-      pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400) })
+    local rec
+    if opts.runner == "expedition" then
+      rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
+        pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
+        meta = opts.meta or "start" })
+    else
+      rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
+        pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400) })
+    end
     addRecord(agg, rec)
   end
   return agg
@@ -234,6 +256,22 @@ local function report(a, title)
       pct(cs.inDeckWins, cs.inDeck), pct(winsWithout, without), pct(cs.played, cs.drawn), pct(cs.unplayed, cs.drawn)))
   end
   out("")
+  if opts.runner == "expedition" then
+    out(("Expédition : clé +%d, déblocages %s"):format(tonumber(opts.key or 0), opts.meta or "start"))
+    out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Réputation moyenne : %.1f   Étapes franchies : %.2f")
+      :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.rep / a.runs, a.cleared / a.runs))
+    out(("Cartes retirées : %.2f   améliorées : %.2f par expédition"):format(a.removed / a.runs, a.upgraded / a.runs))
+    local vs = {}
+    for _, k in ipairs({ "combat", "elite", "campfire", "merchant", "event", "chest", "boss" }) do
+      vs[#vs + 1] = ("%s %.2f"):format(k, (a.visits[k] or 0) / a.runs)
+    end
+    out("Visites par expédition : " .. table.concat(vs, ", "))
+    local rs = {}
+    for id, n in pairs(a.relics) do rs[#rs + 1] = ("%s %.2f"):format(id, n / a.runs) end
+    table.sort(rs)
+    if #rs > 0 then out("Bibelots en fin d'expédition : " .. table.concat(rs, ", ")) end
+    out("")
+  end
   out(("Incantations du joueur : %d, interrompues : %s"):format(a.castsStarted, pct(a.castsInterrupted, a.castsStarted)))
   out(("Sorts ennemis : %d, interrompus par le joueur : %s"):format(a.enemyCasts, pct(a.enemyCastsInterrupted, a.enemyCasts)))
   out(("Durée : %d s (CPU du parent %.1f s)"):format(elapsed, os.clock() - clock0))

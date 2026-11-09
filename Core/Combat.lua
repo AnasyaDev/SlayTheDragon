@@ -71,6 +71,14 @@ function Combat.modify(c, name, v, a, b, d)
     local h = r and r.hooks and r.hooks[name]
     if h then v = h(c, relics[i], v, a, b, d) end
   end
+  local affixes = c.affixes -- affixes mythiques (ns.Affixes), mêmes crochets
+  if affixes then
+    for i = 1, #affixes do
+      local af = ns.Affixes[affixes[i]]
+      local h = af and af.hooks and af.hooks[name]
+      if h then v = h(c, affixes[i], v, a, b, d) end
+    end
+  end
   return v
 end
 
@@ -88,6 +96,14 @@ function Combat.fire(c, name, a, b, d)
     local r = ns.Relics[relics[i]]
     local h = r and r.hooks and r.hooks[name]
     if h and h(c, relics[i], a, b, d) then return true end
+  end
+  local affixes = c.affixes
+  if affixes then
+    for i = 1, #affixes do
+      local af = ns.Affixes[affixes[i]]
+      local h = af and af.hooks and af.hooks[name]
+      if h and h(c, affixes[i], a, b, d) then return true end
+    end
   end
   return false
 end
@@ -155,7 +171,8 @@ function Combat.calcDamage(c, src, dst, base, cardDef)
   local dmg = base
   if src then
     dmg = dmg + (src.st.force or 0)
-    if src.side == "player" then dmg = Combat.modify(c, "damage", dmg, dst, cardDef) end
+    if src.side == "player" then dmg = Combat.modify(c, "damage", dmg, dst, cardDef)
+    else dmg = Combat.modify(c, "enemyDamage", dmg, src, dst) end
     if (src.st.demoralized or 0) > 0 then dmg = floor(dmg * 0.75) end
   end
   if dst then
@@ -184,6 +201,8 @@ function Combat.dealDamage(c, src, dst, amount, pierce)
   elseif loss > 0 and dst.side == "enemy" then
     local def = ns.Enemies[dst.id]
     if def.onDamaged then def.onDamaged(c, dst, loss) end
+  elseif loss > 0 and src and dst.side == "player" then
+    Combat.fire(c, "onPlayerHit", src, loss)
   end
   return loss, absorbed
 end
@@ -268,6 +287,7 @@ function Combat.kill(c, unit)
       if od.onAllyDeath then od.onAllyDeath(c, o, unit) end
     end
   end
+  Combat.fire(c, "onEnemyDeath", unit)
   checkVictory(c)
 end
 
@@ -281,6 +301,7 @@ function Combat.spawn(c, id)
   if not def then error("ennemi inconnu : " .. tostring(id)) end
   local hp = def.hp
   if type(hp) == "table" then hp = Rng.int(c.rng.ai, hp[1], hp[2]) end
+  hp = Combat.modify(c, "enemyHp", hp, def)
   local e = {
     side = "enemy", uid = c.nextUid, id = id,
     hp = hp, maxHp = hp, block = 0, st = {}, fresh = {}, mem = {},
@@ -679,7 +700,8 @@ function Combat.newStats()
 end
 
 -- opts : seed, hp, maxHp, deck = { {id=, up=}, ... }, encounter = { idEnnemi, ... },
---        relics = { id, ... }, stats = bool, quiet = bool
+--        relics = { id, ... }, stats = bool, quiet = bool,
+--        affixes = { id de ns.Affixes, ... } (clés mythiques)
 function Combat.new(opts)
   local seed = opts.seed or 1
   local c = {
@@ -696,6 +718,7 @@ function Combat.new(opts)
     },
     draw = {}, hand = {}, discard = {}, exhaust = {}, cooldown = {},
     enemies = {}, relics = U.copyArr(opts.relics or {}), relicState = {},
+    affixes = U.copyArr(opts.affixes or {}),
     stats = opts.stats and Combat.newStats() or nil,
   }
   for i = 1, #opts.deck do

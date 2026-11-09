@@ -17,5 +17,6 @@ return function(root)
   -- Modules réservés à la simulation.
   ns.Bots = dofile(root .. "/Sim/bots.lua")(ns)
   ns.Run = dofile(root .. "/Sim/run.lua")(ns)
+  ns.SimExpedition = dofile(root .. "/Sim/expedition.lua")(ns)
   return ns
 end

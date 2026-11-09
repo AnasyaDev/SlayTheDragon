@@ -13,8 +13,13 @@ Core\Statuses.lua
 Core\Combat.lua
 Core\Effects.lua
 Core\Rewards.lua
+Core\Map.lua
+Core\Meta.lua
+Core\Expedition.lua
+Core\Save.lua
 Data\Priest.lua
 Data\Act1.lua
+Data\Events.lua
 UI\Art.lua
 UI\DemoExpedition.lua
 UI\Persist.lua
