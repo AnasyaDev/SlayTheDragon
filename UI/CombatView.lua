@@ -260,7 +260,7 @@ function V:Build(parent)
 
   -- Journal discret ----------------------------------------------------------
   local log = W.create("ScrollingMessageFrame", nil, bf)
-  log:SetPoint("TOPLEFT", ENEMY_X, -252)
+  log:SetPoint("TOPLEFT", ENEMY_X, -262)
   log:SetPoint("BOTTOMRIGHT", -4, 2)
   log:SetFontObject(GameFontHighlightSmall)
   log:SetJustifyH("LEFT")
@@ -670,7 +670,7 @@ function V:RenderHand()
         key = keyLabel(i), reason = not info.playable and Controller.reasonText(info.why) or nil })
       local d = i - (n + 1) / 2
       card.baseX = x0 + (i - 1) * spacing
-      card.baseY = -16 - d * d * 1.6
+      card.baseY = -10 - d * d * 0.7
       self:PlaceCard(card)
       card:Show()
     else
