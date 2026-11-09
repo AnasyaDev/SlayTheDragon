@@ -6,6 +6,7 @@
 --   rep=0..2 : cartes débloquées (réputation de classe ; défaut : toutes)
 --   tier=0..3 : bibelots/potions débloqués (Ligue des explorateurs ; défaut : tous)
 --   relics=id,id : bibelots dès le départ        loot=0 : ni bibelot ni potion gagnés
+--   nointerrupt=1 : monde témoin où les ennemis n'interrompent jamais
 --   sweep=cards [only=id,id] : mesure chaque carte de la réserve, ajoutée de force au deck de départ,
 --                 contre la même série sans elle (mêmes graines) ; sweep=relics de même.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
@@ -154,6 +155,15 @@ end
 ---------------------------------------------------------------------------
 local function runRange(from, to)
   local ns = dofile(root .. "/Sim/load.lua")(root)
+  if opts.nointerrupt == "1" then
+    -- Monde témoin sans interruption ennemie : mesure le poids des interruptions.
+    for _, def in pairs(ns.Enemies) do
+      for _, mv in pairs(def.moves) do
+        for _, a in ipairs(mv.actions) do a.interrupts = nil end
+      end
+    end
+    ns.Combat.interruptPlayer = function() end
+  end
   local agg = newAgg()
   for i = from, to do
     local rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
