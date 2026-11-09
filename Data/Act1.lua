@@ -120,7 +120,7 @@ E.vancleef = {
     combo = { name = "Enchaînement", intent = "attack",
       actions = { { "attack", 11, times = 2 }, { "debuff", "armor_broken", 1 } } },
     kick = { name = "Coup de pied", intent = "attack", actions = { { "attack", 9, interrupts = true } } },
-    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 25 } } },
+    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 23 } } },
     guard = { name = "Parade", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 3 } } },
   },
   pattern = { "combo", "kick", "strike", "guard" },
