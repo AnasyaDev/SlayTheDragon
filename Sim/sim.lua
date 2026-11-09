@@ -6,7 +6,7 @@
 --   rep=0..2 : cartes débloquées (réputation de classe ; défaut : toutes)
 --   tier=0..3 : bibelots/potions débloqués (Ligue des explorateurs ; défaut : tous)
 --   relics=id,id : bibelots dès le départ        loot=0 : ni bibelot ni potion gagnés
---   sweep=cards : mesure chaque carte de la réserve, ajoutée de force au deck de départ,
+--   sweep=cards [only=id,id] : mesure chaque carte de la réserve, ajoutée de force au deck de départ,
 --                 contre la même série sans elle (mêmes graines) ; sweep=relics de même.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
@@ -220,6 +220,14 @@ if opts.sweep then
     for id in pairs(ns.Relics) do list[#list + 1] = id end
   else
     list = ns.Rewards.cardPool("priest", tonumber(opts.rep))
+  end
+  if opts.only then
+    -- only=id,id : ne mesure que ces éléments.
+    local keep = {}
+    for _, id in ipairs(idList(opts.only)) do keep[id] = true end
+    local l2 = {}
+    for _, id in ipairs(list) do if keep[id] then l2[#l2 + 1] = id end end
+    list = l2
   end
   table.sort(list, function(x, y)
     local dx = opts.sweep == "relics" and ns.Relics[x] or ns.Cards[x]
