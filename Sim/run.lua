@@ -1,14 +1,18 @@
 -- Expédition simulée (version 0 : acte 1 linéaire, sans marchand ni rencontres).
--- Run.play(opts) -> enregistrement { won, floor, hp, deck, combats = {...} }
+-- Run.play(opts) -> enregistrement { won, floor, hp, deck, relics, combats = {...} }
 -- opts : seed, bot ("random"|"greedy"|"heuristic"), class, pick ("rated"|"random"|"skip"),
---        force = { idCarte, ... } ajoutées au deck de départ, cap (nœuds de recherche),
---        sequence (liste d'étapes), maxRounds.
+--        force = { idCarte, ... } ajoutées au deck de départ, relics = { idBibelot, ... } au départ,
+--        rep (palier de réputation de classe : 0..2, nil = toutes les cartes),
+--        tier (palier de la Ligue des explorateurs : 0..3, nil = tout), loot (false = ni
+--        bibelot ni potion gagnés), cap (nœuds de recherche), sequence (liste d'étapes), maxRounds.
 return function(ns)
-  local Combat, Card, Rng, Rewards, Bots = ns.Combat, ns.Card, ns.Rng, ns.Rewards, ns.Bots
+  local Combat, Rng, Rewards, Bots = ns.Combat, ns.Rng, ns.Rewards, ns.Bots
   local Run = {}
 
   Run.SEQUENCE_ACT1 = { "easy", "easy", "normal", "campfire", "elite", "normal", "campfire", "boss" }
   Run.REST_FRACTION = 0.30
+  -- Chance qu'un combat gagné (hors boss) laisse une potion, si un emplacement est libre.
+  Run.POTION_DROP = 0.4
 
   -- Valeur grossière des cartes pour la politique de choix « rated ».
   Run.RATING = {
@@ -42,10 +46,23 @@ return function(ns)
     return best
   end
 
-  local function fight(run, opts, encounter, kind, combatSeed)
+  -- Applique un crochet d'expédition des bibelots (gold, restHeal...).
+  local function runHook(run, name, v)
+    for i = 1, #run.relics do
+      local r = ns.Relics[run.relics[i]]
+      local h = r and r.run and r.run[name]
+      if h then v = h(run, v) end
+    end
+    return v
+  end
+  Run.runHook = runHook
+
+  local function fight(run, opts, encounter, kind, combatSeed, last)
     local c = Combat.new({ seed = combatSeed, hp = run.hp, maxHp = run.maxHp, deck = run.deck,
-      encounter = encounter, relics = run.relics, stats = true, quiet = opts.quiet ~= false })
-    local bot = Bots.new(opts.bot or "heuristic", Rng.stream(combatSeed, "bot"), { cap = opts.cap })
+      encounter = encounter, relics = run.relics, potions = run.potions, charges = run.charges,
+      stats = true, quiet = opts.quiet ~= false })
+    local bot = Bots.new(opts.bot or "heuristic", Rng.stream(combatSeed, "bot"),
+      { cap = opts.cap, potionKeep = last and 0 or 1 })
     local maxRounds = opts.maxRounds or 40
     local steps = 0
     while not c.result do
@@ -59,6 +76,9 @@ return function(ns)
       if a[1] == "play" then
         local ok = Combat.play(c, a[2], a[3])
         if not ok then Combat.endTurn(c) end
+      elseif a[1] == "potion" then
+        local ok = Combat.usePotion(c, a[2], a[3])
+        if not ok then Combat.endTurn(c) end
       else
         Combat.endTurn(c)
       end
@@ -71,29 +91,44 @@ return function(ns)
       castsStarted = c.stats.castsStarted, castsInterrupted = c.stats.castsInterrupted,
       enemyCasts = c.stats.enemyCasts, enemyCastsInterrupted = c.stats.enemyCastsInterrupted,
       played = c.stats.played, drawn = c.stats.drawn, unplayed = c.stats.unplayed,
+      potions = c.stats.potions,
     }
     run.hp = math.max(c.player.hp, 0)
+    run.potions = c.player.potions
+    run.charges = c.charges
     return rec
+  end
+
+  local function freeSlot(run)
+    for i = 1, Combat.POTION_SLOTS do
+      if not run.potions[i] then return i end
+    end
+    return nil
   end
 
   function Run.play(opts)
     local seed = opts.seed or 1
     local class = ns.Classes[opts.class or "priest"]
-    local run = { hp = class.hp, maxHp = class.hp, deck = {}, relics = {} }
+    local run = { hp = class.hp, maxHp = class.hp, deck = {}, relics = {}, potions = {}, charges = {} }
+    for i = 1, Combat.POTION_SLOTS do run.potions[i] = false end
     for i = 1, #class.deck do run.deck[#run.deck + 1] = { id = class.deck[i], up = false } end
     for i = 1, #(opts.force or {}) do run.deck[#run.deck + 1] = { id = opts.force[i], up = false } end
+    for i = 1, #(opts.relics or {}) do run.relics[#run.relics + 1] = opts.relics[i] end
     local rngMap = Rng.stream(seed, "map")
     local rngLoot = Rng.stream(seed, "loot")
+    local rngTreasure = Rng.stream(seed, "treasure")
     local pools = ns.Encounters.act1
     local lastEnc = {}
-    local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
+    local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {}, relicsGained = {} }
     local sequence = opts.sequence or Run.SEQUENCE_ACT1
+    local loot = opts.loot ~= false
     for floor = 1, #sequence do
       local step = sequence[floor]
       record.floor = floor
       if step == "campfire" then
         if run.hp < run.maxHp * 0.5 then
-          run.hp = math.min(run.maxHp, run.hp + math.floor(run.maxHp * Run.REST_FRACTION))
+          local heal = runHook(run, "restHeal", math.floor(run.maxHp * Run.REST_FRACTION))
+          run.hp = math.min(run.maxHp, run.hp + heal)
           record.picks[#record.picks + 1] = "rest"
         else
           local i = upgradeTarget(run.deck)
@@ -110,19 +145,38 @@ return function(ns)
           if enc ~= lastEnc[step] then break end
         end
         lastEnc[step] = enc
-        local rec = fight(run, opts, enc, step, seed * 100 + floor)
+        local rec = fight(run, opts, enc, step, seed * 100 + floor, floor == #sequence)
         record.combats[#record.combats + 1] = rec
         if not rec.won then
           record.hp = 0
           record.deck = run.deck
+          record.relics = run.relics
           return record
         end
         if step ~= "boss" then
-          local choices = Rewards.cardChoices(rngLoot, opts.class or "priest", 3)
+          local choices = Rewards.cardChoices(rngLoot, opts.class or "priest", 3, nil, opts.rep)
           local pick = pickCard(opts, rngLoot, choices)
           if pick then
             run.deck[#run.deck + 1] = { id = pick, up = false }
             record.picks[#record.picks + 1] = pick
+          end
+          if loot then
+            -- Tirages sur un flux à part : les choix de cartes restent identiques avec ou sans butin.
+            if step == "elite" then
+              local owned = {}
+              for i = 1, #run.relics do owned[run.relics[i]] = true end
+              local r = Rewards.relicChoices(rngTreasure, 1, { maxTier = opts.tier, exclude = owned })[1]
+              if r then
+                run.relics[#run.relics + 1] = r
+                record.relicsGained[#record.relicsGained + 1] = r
+                if ns.Relics[r].run and ns.Relics[r].run.onPickup then ns.Relics[r].run.onPickup(run) end
+              end
+            end
+            local roll = Rng.float(rngTreasure)
+            local slot = freeSlot(run)
+            if slot and roll < Run.POTION_DROP then
+              run.potions[slot] = Rewards.randomPotion(rngTreasure, opts.tier)
+            end
           end
         end
       end
@@ -130,6 +184,7 @@ return function(ns)
     record.won = true
     record.hp = run.hp
     record.deck = run.deck
+    record.relics = run.relics
     return record
   end
 
