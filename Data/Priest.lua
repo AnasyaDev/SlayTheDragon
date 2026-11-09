@@ -156,9 +156,9 @@ end
 
 card("mind_flay", {
   rep = 0, name = "Fouet mental", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", effects = { { "fn", flayBonus }, { "damage", 6 } },
-  text = "Inflige 6. Si la cible a Douleur : +2 Démence et pioche 1.",
-  up = { effects = { { "fn", flayBonus }, { "damage", 9 } }, text = "Inflige 9. Si la cible a Douleur : +2 Démence et pioche 1." },
+  target = "enemy", effects = { { "fn", flayBonus }, { "damage", 7 } },
+  text = "Inflige 7. Si la cible a Douleur : +2 Démence et pioche 1.",
+  up = { effects = { { "fn", flayBonus }, { "damage", 10 } }, text = "Inflige 10. Si la cible a Douleur : +2 Démence et pioche 1." },
 })
 
 card("mind_blast", {
@@ -218,10 +218,10 @@ card("silence", {
 
 card("vampiric_touch", {
   rep = 0, name = "Toucher vampirique", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 2, self = true }, { "demence", 1 } },
-  text = "Douleur 3. Récupération 2. +1 Démence.",
-  up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 3, self = true }, { "demence", 1 } },
-    text = "Douleur 5. Récupération 3. +1 Démence." },
+  target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 1, self = true }, { "demence", 1 } },
+  text = "Douleur 3. Récupération 1. +1 Démence.",
+  up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "demence", 1 } },
+    text = "Douleur 5. Récupération 2. +1 Démence." },
 })
 
 card("mind_sear", {
@@ -303,7 +303,7 @@ card("greater_heal", {
 })
 
 card("spirit_of_redemption", {
-  rep = 0, name = "Esprit de rédemption", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
+  rep = 0, name = "Esprit de rédemption", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {},
   hooks = {
     preventDeath = function(c, power)
@@ -317,7 +317,7 @@ card("spirit_of_redemption", {
     end,
   },
   text = "Pouvoir. Une fois par combat, à 0 PV, tu restes à 1 PV, gagnes Récupération 6 et ton tour suivant est gratuit.",
-  up = { cost = 1,
+  up = { cost = 0,
     text = "Pouvoir. Une fois par combat, à 0 PV, tu restes à 1 PV, gagnes Récupération 6 et ton tour suivant est gratuit." },
 })
 
@@ -344,10 +344,10 @@ card("flash_heal", {
 })
 
 card("empyreal_blaze", {
-  rep = 2, name = "Embrasement empyréen", cost = 3, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  target = "enemy", cast = true, effects = { { "damage", 30 }, { "apply", "armor_broken", 2 } },
-  text = "Incantation. Inflige 30. Armure fracassée 2 tours.",
-  up = { effects = { { "damage", 40 }, { "apply", "armor_broken", 2 } }, text = "Incantation. Inflige 40. Armure fracassée 2 tours." },
+  rep = 2, name = "Embrasement empyréen", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
+  target = "enemy", cast = true, effects = { { "damage", 22 }, { "apply", "armor_broken", 2 } },
+  text = "Incantation. Inflige 22. Armure fracassée 2 tours.",
+  up = { effects = { { "damage", 30 }, { "apply", "armor_broken", 2 } }, text = "Incantation. Inflige 30. Armure fracassée 2 tours." },
 })
 
 local function apotheosisHooks(draw)
