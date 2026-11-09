@@ -16,7 +16,7 @@ return function(ns)
 
   -- Évaluation d'un état après le tour ennemi. Poids grossiers, à régler.
   local W = { hp = 10, enemyHp = 4, enemyAlive = 30, demence = 1.5, atonement = 4,
-    regen = 3, power = 25, castRisk = 0.95 }
+    regen = 0.5, power = 25, castRisk = 0.95 }
   Bots.W = W
 
   -- Valeur de garder une potion pour plus tard (unités de W : 10 = 1 PV). Une potion n'est
@@ -70,7 +70,7 @@ return function(ns)
     end,
     spirit_of_redemption = function(c)
       local miss = 1 - c.player.hp / c.player.maxHp
-      return 10 + 150 * miss * miss
+      return 25 + 150 * miss * miss
     end,
   }
 
@@ -100,7 +100,7 @@ return function(ns)
       elseif e[1] == "apply" and e[2] == "pain" then
         v = v + e[3] * (e[3] + 1) / 2 * 0.8 * W.enemyHp
       elseif e[1] == "apply" and e[2] == "regen" then
-        v = v + e[3] * (e[3] + 1) / 2 * W.regen * 0.3
+        v = v + math.min(e[3] * (e[3] + 1) / 2, p.maxHp - p.hp) * W.hp * W.regen
       elseif e[1] == "absorb" then
         v = v + e[2] * W.hp * 0.5
       end
@@ -120,14 +120,20 @@ return function(ns)
         local painDmg = pain * (pain + 1) / 2
         local ehp = e.hp - painDmg * 0.8
         if ehp < 0 then ehp = 0 end
-        s = s - (ehp + e.block * 0.5) * W.enemyHp - W.enemyAlive
+        if e.minion then
+          -- Les sbires fuient à la mort du chef : les compter plein faisait refuser au bot
+          -- de passer le seuil d'invocation (VanCleef à 50 %) pendant que le boss se renforçait.
+          s = s - (ehp + e.block * 0.5) * W.enemyHp * 0.5 - W.enemyAlive * 0.3
+        else
+          s = s - (ehp + e.block * 0.5) * W.enemyHp - W.enemyAlive
+        end
         if (e.st.stunned or 0) > 0 then s = s + 15 end
       end
     end
     local regen = p.st.regen or 0
     local selfPain = p.st.pain or 0
     s = s + p.demence * W.demence + (p.st.atonement or 0) * W.atonement
-      + regen * (regen + 1) / 2 * W.regen * 0.3 + powersValue(c)
+      + math.min(regen * (regen + 1) / 2, p.maxHp - p.hp) * W.hp * W.regen + powersValue(c)
       - selfPain * (selfPain + 1) / 2 * W.hp * 0.8
     if p.cast then s = s + Bots.castValue(c) end
     return s
