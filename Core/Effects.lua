@@ -39,9 +39,15 @@ Effects.absorb = function(c, ctx, e)
 end
 
 -- { "apply", état, n, all = bool, self = bool }
+-- Crochet modify "apply" (c, src, n, état, cible, défCarte) : ajuste la valeur posée sur un ennemi.
 Effects.apply = function(c, ctx, e)
   local targets = targetsOf(c, ctx, e)
-  for i = 1, #targets do Combat.applyStatus(c, targets[i], e[2], e[3]) end
+  for i = 1, #targets do
+    local t = targets[i]
+    local n = e[3]
+    if t.side == "enemy" then n = Combat.modify(c, "apply", n, e[2], t, ctx.def) end
+    Combat.applyStatus(c, t, e[2], n)
+  end
 end
 
 -- { "heal", n }
