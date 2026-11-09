@@ -26,6 +26,9 @@ ns.Enemies.test_caster = { name = "Lanceur", hp = 100,
   moves = { bolt = { name = "Trait", intent = "cast", cast = true, actions = { { "attack", 20 } } } }, pattern = { "bolt" } }
 ns.Enemies.test_watcher = { name = "Guetteur", hp = 100,
   moves = { watch = { name = "Guette", intent = "watch", actions = { { "interrupt" } } } }, pattern = { "watch" } }
+ns.Enemies.test_pusher = { name = "Cogneur vif", hp = 100,
+  moves = { kick = { name = "Coup de pied", intent = "attack", actions = { { "attack", 10, interrupts = true } } } },
+  pattern = { "kick" } }
 ns.Enemies.test_boss = { name = "Boss", hp = 100, boss = true,
   moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
 
@@ -36,10 +39,12 @@ local function deckOf(...)
 end
 
 -- Combat dont la main de départ est exactement `hand` (le reste en pioche).
-local function setup(hand, encounter, extra)
+local function setup(hand, encounter, extra, more)
   local deck = deckOf(unpack(hand))
   for _, id in ipairs(extra or {}) do deck[#deck + 1] = { id = id, up = false } end
-  local c = Combat.new({ seed = 7, hp = 60, maxHp = 60, deck = deck, encounter = encounter or { "test_dummy" } })
+  local o = { seed = 7, hp = 60, maxHp = 60, deck = deck, encounter = encounter or { "test_dummy" } }
+  for k, v in pairs(more or {}) do o[k] = v end
+  local c = Combat.new(o)
   -- remet la main dans l'ordre demandé
   local all = {}
   for _, x in ipairs(c.hand) do all[#all + 1] = x end
@@ -263,6 +268,229 @@ test("VanCleef appelle deux sbires à 50 % ; sa mort termine le combat", functio
   v.hp = 1
   Combat.dealDamage(c, c.player, v, 5)
   eq(c.result, "won")
+end)
+
+-- Contenu ajouté : réputation, bibelots, potions --------------------------------
+
+test("cartes : rep 0/1/2 = 20/5/5 hors départ ; aucune carte de départ n'a de rep", function()
+  local n = { [0] = 0, [1] = 0, [2] = 0 }
+  for id, d in pairs(ns.Cards) do
+    if d.rarity == "basic" then
+      assert(d.rep == nil, id)
+    else
+      assert(d.rep == 0 or d.rep == 1 or d.rep == 2, id .. " : rep")
+      n[d.rep] = n[d.rep] + 1
+    end
+  end
+  eq(n[0], 20, "Neutre"); eq(n[1], 5, "Amical"); eq(n[2], 5, "Honoré")
+end)
+
+test("récompenses filtrées par réputation de classe", function()
+  local rng = Rng.new(5)
+  for _ = 1, 200 do
+    local ch = ns.Rewards.cardChoices(rng, "priest", 3, nil, 0)
+    eq(#ch, 3)
+    for _, id in ipairs(ch) do eq(ns.Cards[id].rep, 0, id) end
+  end
+  eq(#ns.Rewards.cardPool("priest", 1), 25)
+  eq(#ns.Rewards.cardPool("priest"), 30)
+end)
+
+test("bibelots et potions respectent le contrat", function()
+  local nr, np = 0, 0
+  for id, r in pairs(ns.Relics) do
+    nr = nr + 1
+    assert(r.name and r.text and r.hooks, id)
+    assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
+    assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id)
+  end
+  for id, p in pairs(ns.Potions) do
+    np = np + 1
+    assert(p.name and p.text and p.rarity and p.effects and type(p.tier) == "number", id)
+    for _, e in ipairs(p.effects) do assert(ns.Effects[e[1]], id .. " : " .. e[1]) end
+  end
+  eq(nr, 10, "bibelots"); eq(np, 5, "potions")
+  eq(#ns.Rewards.relicPool({ maxTier = 0 }), 4, "bibelots neutres hors boss")
+  eq(#ns.Rewards.relicPool({ boss = true }), 1, "bibelots de boss")
+  local ch = ns.Rewards.relicChoices(Rng.new(3), 2, { maxTier = 3, exclude = { hearthstone = true } })
+  eq(#ch, 2)
+  for _, id in ipairs(ch) do assert(id ~= "hearthstone" and ns.Relics[id].rarity ~= "boss", id) end
+  assert(ns.Potions[ns.Rewards.randomPotion(Rng.new(1), 0)].tier == 0)
+end)
+
+test("potion : bue sans mana, emplacement vidé, état relisible", function()
+  local c = setup({ "smite" }, { "test_dummy" }, nil, { potions = { "healing_potion", false, "mana_potion" } })
+  eq(#c.player.potions, 3)
+  c.player.hp = 30
+  eq(Combat.canUsePotion(c, 2), false, "emplacement vide")
+  assert(Combat.usePotion(c, 1))
+  eq(c.player.hp, 45); eq(c.player.mana, 3, "aucun mana dépensé")
+  eq(c.player.potions[1], false)
+  eq(Combat.usePotion(c, 1), false, "déjà bue")
+  assert(Combat.usePotion(c, 3))
+  eq(c.player.mana, 5)
+  eq(c.stats == nil, true)
+end)
+
+test("potion ciblée : il faut une cible vivante ; clone indépendant", function()
+  local c = setup({}, { "test_dummy" }, nil, { potions = { "liquid_fire" } })
+  eq(Combat.canUsePotion(c, 1), false, "sans cible")
+  eq(#Combat.legalPotions(c), 1)
+  local t = Combat.clone(c)
+  assert(Combat.usePotion(t, 1, 1))
+  eq(t.enemies[1].hp, 90); eq(t.enemies[1].st.pain, 3)
+  eq(c.player.potions[1], "liquid_fire", "l'original garde sa potion")
+end)
+
+test("Pierre de foyer : fuite une fois par expédition, jamais contre un boss", function()
+  local c = setup({}, { "test_dummy" })
+  eq(Combat.canFlee(c), false, "sans bibelot")
+  c = setup({}, { "test_dummy" }, nil, { relics = { "hearthstone" } })
+  assert(Combat.flee(c))
+  eq(c.result, "fled"); eq(c.charges.hearthstone_used, true)
+  local d = setup({}, { "test_dummy" }, nil, { relics = { "hearthstone" }, charges = c.charges })
+  eq(Combat.canFlee(d), false, "déjà utilisée")
+  local b = setup({}, { "test_boss" }, nil, { relics = { "hearthstone" } })
+  eq(Combat.canFlee(b), false, "boss")
+end)
+
+test("Bandage en lin : soigne 5 à la victoire", function()
+  local c = setup({ "smite" }, { "test_dummy" }, nil, { relics = { "linen_bandage" } })
+  c.player.hp = 40
+  c.enemies[1].hp = 3
+  Combat.play(c, 1, 1)
+  eq(c.result, "won"); eq(c.player.hp, 45)
+end)
+
+test("Tabard de Hurlevent : 8 Absorption au premier tour seulement", function()
+  local c = setup({}, { "test_dummy" }, nil, { relics = { "stormwind_tabard" } })
+  eq(c.player.block, 8)
+  Combat.endTurn(c)
+  eq(c.player.block, 0)
+end)
+
+test("Bandeau de VanCleef : 6 cartes par tour, ennemis Force 1", function()
+  local deck = {}
+  for i = 1, 12 do deck[i] = { id = "smite", up = false } end
+  local c = Combat.new({ seed = 1, hp = 60, deck = deck, encounter = { "test_hitter" }, relics = { "vancleef_bandana" } })
+  eq(#c.hand, 6)
+  eq(c.enemies[1].st.force, 1)
+  Combat.endTurn(c)
+  eq(c.player.hp, 49)
+end)
+
+test("Insigne : retire les états négatifs une fois par combat", function()
+  local c = setup({}, { "test_dummy" }, nil, { relics = { "faction_insignia" } })
+  c.phase = "enemy"
+  Combat.applyStatus(c, c.player, "armor_broken", 2)
+  c.phase = "player"
+  Combat.endTurn(c)
+  eq(c.player.st.armor_broken, nil, "retirée")
+  c.phase = "enemy"
+  Combat.applyStatus(c, c.player, "demoralized", 2)
+  c.phase = "player"
+  Combat.endTurn(c)
+  eq(c.player.st.demoralized, 2, "pas une deuxième fois")
+end)
+
+test("Pierre à aiguiser : +1 par coup d'attaque seulement", function()
+  local c = setup({ "smite", "penance", "sw_pain" }, { "test_dummy" }, nil, { relics = { "sharpening_stone" } })
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 93)
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 93 - 15)
+end)
+
+test("Coup qui interrompt : coupe l'incantation s'il fait perdre des PV", function()
+  local c = setup({ "holy_fire" }, { "test_pusher" })
+  Combat.play(c, 1, 1)
+  Combat.endTurn(c)
+  eq(c.player.cast, nil); eq(c.enemies[1].hp, 100, "sort perdu")
+  local d = setup({ "holy_fire", "pw_shield" }, { "test_pusher" })
+  Combat.play(d, 1, 1)
+  d.player.block = 10
+  Combat.endTurn(d)
+  eq(d.enemies[1].hp, 84, "absorbé : le sort passe")
+  eq(Combat.intentInfo(d, d.enemies[1]).interrupts, true)
+end)
+
+test("Talisman de concentration : la première interruption est sans effet", function()
+  local c = setup({ "holy_fire" }, { "test_watcher" }, nil, { relics = { "focus_talisman" } })
+  Combat.play(c, 1, 1)
+  Combat.endTurn(c)
+  eq(c.enemies[1].hp, 84)
+end)
+
+test("Rubis de mana : 4 mana et une carte de plus au premier tour", function()
+  local deck = {}
+  for i = 1, 12 do deck[i] = { id = "smite", up = false } end
+  local c = Combat.new({ seed = 1, hp = 60, deck = deck, encounter = { "test_dummy" }, relics = { "mana_ruby" } })
+  eq(c.player.mana, 4); eq(#c.hand, 6)
+  Combat.endTurn(c)
+  eq(c.player.mana, 3); eq(#c.hand, 5)
+end)
+
+test("Réconfort : +1 mana sous Expiation", function()
+  local c = setup({ "radiance", "solace" })
+  Combat.play(c, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.mana, 2); eq(c.enemies[1].hp, 94)
+end)
+
+test("Mot de l'ombre : Mort : double sous la moitié des PV", function()
+  local c = setup({ "sw_death", "sw_death" })
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 94)
+  c.enemies[1].hp = 50
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 38)
+end)
+
+test("Éruption du Vide : 4 + 3 par Démence dépensée", function()
+  local c = setup({ "void_eruption" })
+  eq(Combat.canPlay(c, 1), false)
+  c.player.demence = 4
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 100 - 16); eq(c.player.demence, 0)
+end)
+
+test("Apothéose : les incantations coûtent 1 de moins", function()
+  local c = setup({ "apotheosis", "holy_fire", "smite" })
+  Combat.play(c, 1)
+  eq(Combat.cost(c, c.hand[1]), 1)
+  eq(Combat.cost(c, c.hand[2]), 1)
+end)
+
+test("Extase : +2 à chaque gain d'Absorption", function()
+  local c = setup({ "rapture", "inner_fire" })
+  Combat.play(c, 1)
+  Combat.play(c, 1)
+  eq(c.player.block, 7)
+end)
+
+test("Guérison de l'ombre : soigne puis Douleur sur soi", function()
+  local c = setup({ "shadow_mend" })
+  c.player.hp = 30
+  Combat.play(c, 1)
+  eq(c.player.hp, 40); eq(c.player.st.pain, 2); eq(c.player.demence, 1)
+  Combat.endTurn(c)
+  eq(c.player.hp, 38)
+end)
+
+test("Halo : incantation qui touche tous les ennemis", function()
+  local c = setup({ "halo" }, { "test_dummy", "test_dummy" })
+  Combat.play(c, 1)
+  Combat.endTurn(c)
+  eq(c.enemies[1].hp, 92); eq(c.enemies[2].hp, 92); eq(c.player.st.regen, 3)
+end)
+
+test("Cri psychique et Incandescence : effets de zone", function()
+  local c = setup({ "psychic_scream", "mind_sear" }, { "test_hitter", "test_hitter" })
+  Combat.play(c, 1)
+  Combat.play(c, 1)
+  eq(c.enemies[2].st.demoralized, 2); eq(c.enemies[2].st.pain, 3)
+  Combat.endTurn(c)
+  eq(c.player.hp, 60 - 7 - 7)
 end)
 
 test("clone indépendant de l'original", function()
