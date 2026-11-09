@@ -65,7 +65,7 @@ Meta.AFFIX_ORDER = { "fortified", "tyrannical", "bolstering", "necrotic", "famin
 -- 3 000 expéditions) pour perdre environ 5 points de victoire par niveau. Le boss est le
 -- seul vrai verrou de l'acte 1 : +20 % sur VanCleef coûtait 57 points, d'où un bonus de
 -- boss plus faible et des boss exclus de Galvanisant (comme en jeu). À re-mesurer quand
--- l'équilibrage des combats change (build/tune.lua, docs/expedition.md).
+-- l'équilibrage des combats change (Sim/sim.lua runner=expedition key=N, docs/expedition.md).
 Meta.AFFIX = {
   fortified = { hp = 0.20 },                      -- ennemis normaux : PV
   tyrannical = { eliteHp = 0.20, eliteDamage = 0.20, bossHp = 0.07, bossDamage = 0 },

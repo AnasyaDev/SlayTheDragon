@@ -227,8 +227,25 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
 
 `luajit Sim/sim.lua runs=3000 jobs=16 runner=expedition key=N meta=start|exalted`
 
-MESURES
+| Clé | Victoires | Écart | PV perdus contre le boss | Réputation moyenne |
+| --- | --- | --- | --- | --- |
+| +0 | 82,1 % | | 46,3 | 117,9 |
+| +1 | 77,9 % | −4,2 | 49,0 | 116,2 |
+| +2 | 73,0 % | −4,9 | 51,3 | 114,2 |
+| +3 | 70,0 % | −3,0 | 51,7 | 112,8 |
+| +4 | 65,7 % | −4,3 | 50,6 | 111,1 |
+| +5 | 60,3 % | −5,4 | 49,4 | 108,9 |
+
+Intervalle de confiance ≈ ±1,5 point. Avec les +20 % du GDD appliqués aussi au boss et
+Galvanisant +2 sur tout le monde, la clé +2 tombait à 22 % et la +3 à 9 % : un palier infranchissable.
+
+Clé +0 : or gagné 167 par expédition (départ 50 compris), dépensé 32, restant 185 ; 0,38 carte
+retirée, 1,6 améliorée. Visites par expédition : combat 3,03, élite 1,26, feu de camp 1,00,
+marchand 0,41, rencontre 1,08, coffre 0,22, boss 1. L'or dort faute de bibelots et de potions à
+acheter (registres encore vides) et parce que le marchand n'est que sur ≈ 40 % des chemins.
 
 Aujourd'hui, `meta=start` et `meta=exalted` donnent les mêmes chiffres : aucune carte n'a encore de
-champ `rep` et aucun bibelot ou potion n'existe. À re-mesurer après la fusion de la piste A
-(`bash build/sweep.sh` dans un worktree, ou les commandes ci-dessus), puis recaler `Meta.AFFIX`.
+champ `rep` et aucun bibelot ou potion n'existe. Le combat reste l'affaire du boss (normaux et
+élites ≈ 100 %) : le taux global (82 %) dépasse la cible de 40 à 60 %, c'est l'équilibrage des
+combats (piste A). À re-mesurer après la fusion de la piste A avec les commandes ci-dessus, puis
+recaler `Meta.AFFIX` (et `Meta.LEVELS` si la réputation moyenne change beaucoup).
