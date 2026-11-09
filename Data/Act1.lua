@@ -28,7 +28,7 @@ end
 E.gnoll = {
   name = "Gnoll Rivepatte", hp = { 19, 22 },
   moves = {
-    bite = { name = "Morsure", intent = "attack", actions = { { "attack", 7, interrupts = true } } },
+    bite = { name = "Morsure", intent = "attack", actions = { { "attack", 8, interrupts = true } } },
     rend = { name = "Lacération", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
@@ -40,7 +40,7 @@ E.mystic = {
     watch = { name = "Guette", intent = "watch", text = "Coupe ton incantation ; sinon, t'inflige 3.",
       actions = { { "fn", watchOrZap(3) } } },
     mend = { name = "Soins", intent = "heal", actions = { { "heal_ally", 6 } } },
-    zap = { name = "Horion", intent = "attack", actions = { { "attack", 4 } } },
+    zap = { name = "Horion", intent = "attack", actions = { { "attack", 5 } } },
   },
   ai = function(c, e, rng)
     for i = 1, #c.hand do
@@ -91,7 +91,7 @@ E.harvest_golem = {
   moves = {
     harden = { name = "Blindage", intent = "defend", actions = { { "block", 12 } } },
     smash = { name = "Écrasement", intent = "attack", actions = { { "attack", 19, interrupts = true } } },
-    reap = { name = "Moisson", intent = "attack", actions = { { "attack", 7, times = 3 } } },
+    reap = { name = "Moisson", intent = "attack", actions = { { "attack", 8, times = 3 } } },
   },
   pattern = { "harden", "smash", "reap" },
 }
@@ -100,7 +100,7 @@ E.rhahkzor = {
   name = "Rhahk'Zor", hp = 75, elite = true,
   moves = {
     roar = { name = "Rugissement", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "demoralized", 2 } } },
-    slam = { name = "Fracas", intent = "attack", actions = { { "attack", 17, interrupts = true } } },
+    slam = { name = "Fracas", intent = "attack", actions = { { "attack", 18, interrupts = true } } },
     punch = { name = "Coup de poing", intent = "attack", actions = { { "attack", 12 } } },
   },
   pattern = { "roar", "slam", "punch", "slam" },
@@ -115,12 +115,12 @@ E.defias_henchman = {
 }
 
 E.vancleef = {
-  name = "Edwin VanCleef", hp = 86, boss = true,
+  name = "Edwin VanCleef", hp = 100, boss = true,
   moves = {
     combo = { name = "Enchaînement", intent = "attack",
-      actions = { { "attack", 8, times = 2 }, { "debuff", "armor_broken", 1 } } },
-    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 17, interrupts = true } } },
-    guard = { name = "Parade", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
+      actions = { { "attack", 9, times = 2 }, { "debuff", "armor_broken", 1 } } },
+    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 20, interrupts = true } } },
+    guard = { name = "Parade", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 3 } } },
   },
   pattern = { "combo", "strike", "guard" },
   onDamaged = function(c, e, loss)
