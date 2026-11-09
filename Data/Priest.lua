@@ -63,14 +63,14 @@ end
 
 card("penance", {
   rep = 0, name = "Pénitence", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "discipline",
-  target = "enemy", effects = { { "damage", 4, times = 3, onHit = penanceHit } },
-  text = "Inflige 4 trois fois. Sous Expiation, chaque coup donne aussi 2 Absorption.",
-  up = { effects = { { "damage", 5, times = 3, onHit = penanceHit } },
-    text = "Inflige 5 trois fois. Sous Expiation, chaque coup donne aussi 2 Absorption." },
+  target = "enemy", effects = { { "damage", 5, times = 3, onHit = penanceHit } },
+  text = "Inflige 5 trois fois. Sous Expiation, chaque coup donne aussi 2 Absorption.",
+  up = { effects = { { "damage", 6, times = 3, onHit = penanceHit } },
+    text = "Inflige 6 trois fois. Sous Expiation, chaque coup donne aussi 2 Absorption." },
 })
 
 card("pain_suppression", {
-  rep = 0, name = "Suppression de la douleur", cost = 2, type = "skill", school = "holy", rarity = "rare", path = "discipline",
+  rep = 0, name = "Suppression de la douleur", cost = 1, type = "skill", school = "holy", rarity = "rare", path = "discipline",
   cooldown = 3, effects = { { "apply", "halved", 1, self = true } },
   text = "Dégâts subis divisés par deux jusqu'à ton prochain tour. Recharge 3.",
   up = { cooldown = 2, text = "Dégâts subis divisés par deux jusqu'à ton prochain tour. Recharge 2." },
@@ -135,10 +135,10 @@ local function raptureHooks(bonus)
 end
 
 card("rapture", {
-  rep = 2, name = "Extase", cost = 2, type = "power", school = "holy", rarity = "rare", path = "discipline",
+  rep = 2, name = "Extase", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
   power = true, effects = {}, hooks = raptureHooks(2),
   text = "Pouvoir. Chaque gain d'Absorption te donne 2 de plus.",
-  up = { cost = 1, text = "Pouvoir. Chaque gain d'Absorption te donne 2 de plus." },
+  up = { hooks = raptureHooks(3), text = "Pouvoir. Chaque gain d'Absorption te donne 3 de plus." },
 })
 
 -- Ombre -----------------------------------------------------------------------
@@ -182,14 +182,18 @@ card("devouring_plague", {
   up = { cost = 0, text = "Dépense toute ta Démence : Douleur égale au double." },
 })
 
+-- Forme d'ombre : l'interdiction des cartes sacrées (version d'origine), puis un surcoût
+-- d'1 mana, rendaient la carte injouable avec un deck de départ presque tout sacré
+-- (voir docs/equilibrage.md). Elle ne fait plus que renforcer l'ombre.
 local function shadowformHooks(bonus)
   return {
     damage = function(c, power, v, dst, cardDef)
       if cardDef and cardDef.school == "shadow" then return v + bonus end
       return v
     end,
-    allow = function(c, power, cardDef)
-      return cardDef.school ~= "holy"
+    apply = function(c, power, n, id, target, cardDef)
+      if id == "pain" and cardDef and cardDef.school == "shadow" then return n + bonus end
+      return n
     end,
   }
 end
@@ -197,8 +201,8 @@ end
 card("shadowform", {
   rep = 0, name = "Forme d'ombre", cost = 2, type = "power", school = "shadow", rarity = "rare", path = "shadow",
   power = true, effects = {}, hooks = shadowformHooks(2),
-  text = "Pouvoir. Tes cartes d'ombre infligent 2 de plus ; tu ne peux plus jouer de cartes sacrées.",
-  up = { cost = 1, text = "Pouvoir. Tes cartes d'ombre infligent 2 de plus ; tu ne peux plus jouer de cartes sacrées." },
+  text = "Pouvoir. Tes cartes d'ombre infligent 2 de plus et posent 2 Douleur de plus.",
+  up = { cost = 1, text = "Pouvoir. Tes cartes d'ombre infligent 2 de plus et posent 2 Douleur de plus." },
 })
 
 card("silence", {
@@ -255,7 +259,7 @@ local function eruptionBonus(c, ctx, t)
 end
 
 card("void_eruption", {
-  rep = 2, name = "Éruption du Vide", cost = 2, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
+  rep = 2, name = "Éruption du Vide", cost = 1, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
   target = "enemy", perDemence = 3, effects = { { "fn", spendDemence }, { "damage", 4, bonus = eruptionBonus } },
   canPlay = function(c) return c.player.demence > 0 end,
   text = "Dépense toute ta Démence : inflige 4, plus 3 par point dépensé.",
@@ -294,7 +298,7 @@ card("greater_heal", {
 })
 
 card("spirit_of_redemption", {
-  rep = 0, name = "Esprit de rédemption", cost = 3, type = "power", school = "holy", rarity = "rare", path = "holy",
+  rep = 0, name = "Esprit de rédemption", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {},
   hooks = {
     preventDeath = function(c, power)
@@ -307,7 +311,7 @@ card("spirit_of_redemption", {
     end,
   },
   text = "Pouvoir. Une fois par combat, à 0 PV, tu restes à 1 PV et ton tour suivant est gratuit.",
-  up = { cost = 2, text = "Pouvoir. Une fois par combat, à 0 PV, tu restes à 1 PV et ton tour suivant est gratuit." },
+  up = { cost = 1, text = "Pouvoir. Une fois par combat, à 0 PV, tu restes à 1 PV et ton tour suivant est gratuit." },
 })
 
 card("renew", {
@@ -340,7 +344,7 @@ card("empyreal_blaze", {
 })
 
 card("apotheosis", {
-  rep = 2, name = "Apothéose", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
+  rep = 2, name = "Apothéose", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {},
   hooks = {
     cost = function(c, power, v, cardDef)
@@ -349,7 +353,7 @@ card("apotheosis", {
     end,
   },
   text = "Pouvoir. Tes incantations coûtent 1 mana de moins.",
-  up = { cost = 1, text = "Pouvoir. Tes incantations coûtent 1 mana de moins." },
+  up = { cost = 0, text = "Pouvoir. Tes incantations coûtent 1 mana de moins." },
 })
 
 -- Classe ------------------------------------------------------------------------
