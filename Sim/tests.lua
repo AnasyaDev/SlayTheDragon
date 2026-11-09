@@ -227,15 +227,15 @@ test("Étourdi : l'ennemi perd son tour ; les boss y sont immunisés", function(
   eq(b.enemies[1].st.stunned, nil)
 end)
 
-test("Forme d'ombre : +2 dégâts et +2 Douleur aux cartes d'ombre, rien sur le sacré", function()
+test("Forme d'ombre : +3 dégâts et +3 Douleur aux cartes d'ombre, rien sur le sacré", function()
   local c = setup({ "shadowform", "mind_flay", "smite", "sw_pain" })
   c.player.mana = 5
   Combat.play(c, 1)
   eq(Combat.cost(c, c.hand[handIndex(c, "smite")]), 1)
   Combat.play(c, handIndex(c, "mind_flay"), 1)
-  eq(c.enemies[1].hp, 100 - num("mind_flay", 2) - 2)
+  eq(c.enemies[1].hp, 100 - num("mind_flay", 2) - 3)
   Combat.play(c, handIndex(c, "sw_pain"), 1)
-  eq(c.enemies[1].st.pain, num("sw_pain", 1, 3) + 2)
+  eq(c.enemies[1].st.pain, num("sw_pain", 1, 3) + 3)
 end)
 
 test("Esprit de rédemption : reste à 1 PV, tour suivant gratuit", function()
@@ -537,14 +537,16 @@ test("Fouet mental : pioche 1 et +2 Démence si la cible a Douleur", function()
   eq(c.player.demence, 3)
 end)
 
-test("Apothéose : une carte de plus par tour ; Forme d'ombre : +2 Démence", function()
-  local c = setup({ "apotheosis", "shadowform" }, { "test_dummy" }, { "smite", "smite", "smite", "smite", "smite",
-    "smite", "smite", "smite" })
+test("Apothéose : +1 mana par tour ; Forme d'ombre : +2 Démence", function()
+  local c = setup({ "apotheosis", "shadowform", "holy_fire" }, { "test_dummy" }, { "smite", "smite", "smite", "smite",
+    "smite", "smite", "smite", "smite" })
+  c.player.mana = 4
   Combat.play(c, 1)
   Combat.play(c, 1)
   eq(c.player.demence, 2)
+  eq(Combat.cost(c, c.hand[handIndex(c, "holy_fire")]), 1)
   Combat.endTurn(c)
-  eq(#c.hand, 6)
+  eq(c.player.mana, 4)
 end)
 
 test("clone indépendant de l'original", function()

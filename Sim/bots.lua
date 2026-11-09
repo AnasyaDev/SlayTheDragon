@@ -59,7 +59,7 @@ return function(ns)
       return 10 + 9 * sh * 5 * W.enemyHp
     end,
     apotheosis = function(c)
-      return 3 * 5 * W.enemyHp + 9 * deckShare(c, function(d) return d.cast end) * 5 * W.enemyHp
+      return 3 * 6 * W.enemyHp + 9 * deckShare(c, function(d) return d.cast end) * 5 * W.enemyHp
     end,
     rapture = function(c)
       local share = deckShare(c, function(d)

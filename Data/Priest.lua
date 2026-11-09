@@ -85,10 +85,10 @@ end
 
 card("solace", {
   rep = 0, name = "Mot de pouvoir : Réconfort", cost = 1, type = "attack", school = "holy", rarity = "common", path = "discipline",
-  target = "enemy", effects = { { "fn", solaceMana }, { "damage", 7 }, { "apply", "atonement", 1, self = true } },
-  text = "Inflige 7. Sous Expiation : +1 mana. Expiation 1 tour.",
-  up = { effects = { { "fn", solaceMana }, { "damage", 10 }, { "apply", "atonement", 1, self = true } },
-    text = "Inflige 10. Sous Expiation : +1 mana. Expiation 1 tour." },
+  target = "enemy", effects = { { "fn", solaceMana }, { "damage", 5 }, { "apply", "atonement", 1, self = true } },
+  text = "Inflige 5. Sous Expiation : +1 mana. Expiation 1 tour.",
+  up = { effects = { { "fn", solaceMana }, { "damage", 8 }, { "apply", "atonement", 1, self = true } },
+    text = "Inflige 8. Sous Expiation : +1 mana. Expiation 1 tour." },
 })
 
 card("angelic_feather", {
@@ -109,10 +109,10 @@ card("luminous_barrier", {
 card("schism", {
   rep = 0, name = "Schisme", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "discipline",
   target = "enemy",
-  effects = { { "damage", 4 }, { "apply", "armor_broken", 2 }, { "apply", "atonement", 1, self = true } },
-  text = "Inflige 4. La cible a Armure fracassée 2 tours. Expiation 1 tour.",
-  up = { effects = { { "damage", 7 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 2, self = true } },
-    text = "Inflige 7. La cible a Armure fracassée 3 tours. Expiation 2 tours." },
+  effects = { { "damage", 3 }, { "apply", "armor_broken", 2 }, { "apply", "atonement", 1, self = true } },
+  text = "Inflige 3. La cible a Armure fracassée 2 tours. Expiation 1 tour.",
+  up = { effects = { { "damage", 6 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 2, self = true } },
+    text = "Inflige 6. La cible a Armure fracassée 3 tours. Expiation 2 tours." },
 })
 
 card("shadow_mend", {
@@ -137,10 +137,10 @@ local function raptureHooks(bonus)
 end
 
 card("rapture", {
-  rep = 2, name = "Extase", cost = 2, type = "power", school = "holy", rarity = "rare", path = "discipline",
+  rep = 2, name = "Extase", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
   power = true, effects = {}, hooks = raptureHooks(2),
   text = "Pouvoir. Chaque gain d'Absorption te donne 2 de plus.",
-  up = { cost = 1, text = "Pouvoir. Chaque gain d'Absorption te donne 2 de plus." },
+  up = { hooks = raptureHooks(3), text = "Pouvoir. Chaque gain d'Absorption te donne 3 de plus." },
 })
 
 -- Ombre -----------------------------------------------------------------------
@@ -156,16 +156,16 @@ end
 
 card("mind_flay", {
   rep = 0, name = "Fouet mental", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", effects = { { "fn", flayBonus }, { "damage", 7 } },
-  text = "Inflige 7. Si la cible a Douleur : +2 Démence et pioche 1.",
-  up = { effects = { { "fn", flayBonus }, { "damage", 10 } }, text = "Inflige 10. Si la cible a Douleur : +2 Démence et pioche 1." },
+  target = "enemy", effects = { { "fn", flayBonus }, { "damage", 8 } },
+  text = "Inflige 8. Si la cible a Douleur : +2 Démence et pioche 1.",
+  up = { effects = { { "fn", flayBonus }, { "damage", 11 } }, text = "Inflige 11. Si la cible a Douleur : +2 Démence et pioche 1." },
 })
 
 card("mind_blast", {
   rep = 0, name = "Attaque mentale", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", cooldown = 1, effects = { { "damage", 9 }, { "demence", 2 } },
-  text = "Inflige 9. +2 Démence. Recharge 1.",
-  up = { effects = { { "damage", 12 }, { "demence", 2 } }, text = "Inflige 12. +2 Démence. Recharge 1." },
+  target = "enemy", cooldown = 1, effects = { { "damage", 10 }, { "demence", 2 } },
+  text = "Inflige 10. +2 Démence. Recharge 1.",
+  up = { effects = { { "damage", 13 }, { "demence", 2 } }, text = "Inflige 13. +2 Démence. Recharge 1." },
 })
 
 local function plague(c, ctx)
@@ -173,16 +173,16 @@ local function plague(c, ctx)
   c.player.demence = 0
   Combat.log(c, { t = "demence", n = -n, total = 0 })
   if n > 0 and ctx.target and not ctx.target.dead then
-    Combat.applyStatus(c, ctx.target, "pain", 2 * n)
+    Combat.applyStatus(c, ctx.target, "pain", (ctx.def.plagueMult or 2) * n)
   end
 end
 
 card("devouring_plague", {
-  rep = 0, name = "Peste dévorante", cost = 1, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
-  target = "enemy", effects = { { "fn", plague } },
+  rep = 0, name = "Peste dévorante", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
+  target = "enemy", plagueMult = 2, effects = { { "fn", plague } },
   canPlay = function(c) return c.player.demence > 0 end,
   text = "Dépense toute ta Démence : Douleur égale au double.",
-  up = { cost = 0, text = "Dépense toute ta Démence : Douleur égale au double." },
+  up = { plagueMult = 3, text = "Dépense toute ta Démence : Douleur égale au triple." },
 })
 
 -- Forme d'ombre : l'interdiction des cartes sacrées (version d'origine), puis un surcoût
@@ -203,10 +203,10 @@ end
 
 card("shadowform", {
   rep = 0, name = "Forme d'ombre", cost = 1, type = "power", school = "shadow", rarity = "rare", path = "shadow",
-  power = true, effects = { { "demence", 2 } }, hooks = shadowformHooks(2),
-  text = "Pouvoir. +2 Démence. Tes cartes d'ombre infligent 2 de plus et posent 2 Douleur de plus.",
-  up = { hooks = shadowformHooks(3),
-    text = "Pouvoir. +2 Démence. Tes cartes d'ombre infligent 3 de plus et posent 3 Douleur de plus." },
+  power = true, effects = { { "demence", 2 } }, hooks = shadowformHooks(3),
+  text = "Pouvoir. +2 Démence. Tes cartes d'ombre infligent 3 de plus et posent 3 Douleur de plus.",
+  up = { hooks = shadowformHooks(4),
+    text = "Pouvoir. +2 Démence. Tes cartes d'ombre infligent 4 de plus et posent 4 Douleur de plus." },
 })
 
 card("silence", {
@@ -275,9 +275,9 @@ card("void_eruption", {
 
 card("holy_fire", {
   rep = 0, name = "Flammes sacrées", cost = 2, type = "attack", school = "holy", rarity = "common", path = "holy",
-  target = "enemy", cast = true, effects = { { "damage", 24 }, { "apply", "pain", 3 } },
-  text = "Incantation. Inflige 24 et Douleur 3.",
-  up = { effects = { { "damage", 31 }, { "apply", "pain", 4 } }, text = "Incantation. Inflige 31 et Douleur 4." },
+  target = "enemy", cast = true, effects = { { "damage", 27 }, { "apply", "pain", 4 } },
+  text = "Incantation. Inflige 27 et Douleur 4.",
+  up = { effects = { { "damage", 34 }, { "apply", "pain", 5 } }, text = "Incantation. Inflige 34 et Douleur 5." },
 })
 
 card("holy_nova", {
@@ -323,24 +323,24 @@ card("spirit_of_redemption", {
 
 card("renew", {
   rep = 0, name = "Rénovation", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
-  exhaust = true, effects = { { "apply", "regen", 4, self = true } },
-  text = "Récupération 4. Consumée.",
-  up = { effects = { { "apply", "regen", 6, self = true } }, text = "Récupération 6. Consumée." },
+  exhaust = true, effects = { { "apply", "regen", 3, self = true } },
+  text = "Récupération 3. Consumée.",
+  up = { effects = { { "apply", "regen", 5, self = true } }, text = "Récupération 5. Consumée." },
 })
 
 card("halo", {
   rep = 0, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  cast = true, effects = { { "damage", 13, all = true }, { "apply", "regen", 3, self = true } },
-  text = "Incantation. Inflige 13 à tous les ennemis. Récupération 3.",
-  up = { effects = { { "damage", 17, all = true }, { "apply", "regen", 4, self = true } },
-    text = "Incantation. Inflige 17 à tous les ennemis. Récupération 4." },
+  cast = true, effects = { { "damage", 15, all = true }, { "apply", "regen", 3, self = true } },
+  text = "Incantation. Inflige 15 à tous les ennemis. Récupération 3.",
+  up = { effects = { { "damage", 19, all = true }, { "apply", "regen", 4, self = true } },
+    text = "Incantation. Inflige 19 à tous les ennemis. Récupération 4." },
 })
 
 card("flash_heal", {
   rep = 1, name = "Soins rapides", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
-  exhaust = true, effects = { { "heal", 6 }, { "draw", 1 } },
-  text = "Soigne 6. Pioche 1. Consumée.",
-  up = { effects = { { "heal", 9 }, { "draw", 1 } }, text = "Soigne 9. Pioche 1. Consumée." },
+  exhaust = true, effects = { { "heal", 7 }, { "draw", 1 } },
+  text = "Soigne 7. Pioche 1. Consumée.",
+  up = { effects = { { "heal", 10 }, { "draw", 1 } }, text = "Soigne 10. Pioche 1. Consumée." },
 })
 
 card("empyreal_blaze", {
@@ -350,21 +350,21 @@ card("empyreal_blaze", {
   up = { effects = { { "damage", 36 }, { "apply", "armor_broken", 2 } }, text = "Incantation. Inflige 36. Armure fracassée 2 tours." },
 })
 
-local function apotheosisHooks(draw)
-  return {
-    cost = function(c, power, v, cardDef)
-      if cardDef.cast then return v - 1 end
-      return v
-    end,
-    drawPerTurn = function(c, power, v) return v + draw end,
-  }
-end
+-- Apothéose : une pioche en plus ne valait rien (3 mana pour 5 cartes à 1 mana : la main
+-- déborde déjà) ; elle donne du mana.
+local apotheosisHooks = {
+  cost = function(c, power, v, cardDef)
+    if cardDef.cast then return v - 1 end
+    return v
+  end,
+  maxMana = function(c, power, v) return v + 1 end,
+}
 
 card("apotheosis", {
-  rep = 2, name = "Apothéose", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
-  power = true, effects = {}, hooks = apotheosisHooks(1),
-  text = "Pouvoir. Pioche 1 carte de plus à chaque tour. Tes incantations coûtent 1 mana de moins.",
-  up = { cost = 0, text = "Pouvoir. Pioche 1 carte de plus à chaque tour. Tes incantations coûtent 1 mana de moins." },
+  rep = 2, name = "Apothéose", cost = 3, type = "power", school = "holy", rarity = "rare", path = "holy",
+  power = true, effects = {}, hooks = apotheosisHooks,
+  text = "Pouvoir. +1 mana à chacun de tes tours. Tes incantations coûtent 1 mana de moins.",
+  up = { cost = 2, text = "Pouvoir. +1 mana à chacun de tes tours. Tes incantations coûtent 1 mana de moins." },
 })
 
 -- Classe ------------------------------------------------------------------------
