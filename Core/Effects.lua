@@ -13,14 +13,17 @@ local function targetsOf(c, ctx, e)
   return {}
 end
 
--- { "damage", n, times = k, all = bool, onHit = function(c, ctx, cible) }
+-- { "damage", n, times = k, all = bool, onHit = function(c, ctx, cible),
+--   bonus = function(c, ctx, cible) -> dégâts de base en plus }
 Effects.damage = function(c, ctx, e)
   for _ = 1, (e.times or 1) do
     local targets = targetsOf(c, ctx, e)
     if #targets == 0 then return end
     for i = 1, #targets do
       local t = targets[i]
-      local dmg = Combat.calcDamage(c, c.player, t, e[2], ctx.def)
+      local base = e[2]
+      if e.bonus then base = base + e.bonus(c, ctx, t) end
+      local dmg = Combat.calcDamage(c, c.player, t, base, ctx.def)
       Combat.dealDamage(c, c.player, t, dmg)
       ctx.dealt = true
       ctx.hits = ctx.hits + 1
@@ -71,6 +74,11 @@ Effects.interrupt = function(c, ctx, e)
     t.interrupted = true
     Combat.log(c, { t = "interrupt", src = "player", dst = t.uid, move = t.intent })
   end
+end
+
+-- { "cleanse" } : retire tous tes états négatifs.
+Effects.cleanse = function(c, ctx, e)
+  Combat.cleanse(c, c.player)
 end
 
 -- { "fn", function(c, ctx) } : effet sur mesure.
