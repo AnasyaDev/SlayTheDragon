@@ -620,13 +620,15 @@ end
 -- Potions et fuite
 ---------------------------------------------------------------------------
 -- Une potion se boit pendant son tour, sans mana. c.player.potions[slot] = id | false.
+-- Échecs : false, "over" (pas ton tour / combat fini), "potion" (emplacement vide ou
+-- potion inconnue), "target" (cible absente ou morte).
 
 function Combat.canUsePotion(c, slot, tIdx)
-  if c.phase ~= "player" or c.result then return false, "phase" end
+  if c.phase ~= "player" or c.result then return false, "over" end
   local id = c.player.potions[slot]
-  if not id then return false, "empty" end
+  if not id then return false, "potion" end
   local def = ns.Potions[id]
-  if not def then return false, "unknown" end
+  if not def then return false, "potion" end
   if def.target then
     local t = c.enemies[tIdx or 0]
     if not t or t.dead then return false, "target" end
