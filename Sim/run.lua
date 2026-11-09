@@ -6,7 +6,7 @@
 --        tier (palier de la Ligue des explorateurs : 0..3, nil = tout), loot (false = ni
 --        bibelot ni potion gagnés), cap (nœuds de recherche), sequence (liste d'étapes), maxRounds.
 return function(ns)
-  local Combat, Rng, Rewards, Bots = ns.Combat, ns.Rng, ns.Rewards, ns.Bots
+  local Combat, Card, Rng, Rewards, Bots = ns.Combat, ns.Card, ns.Rng, ns.Rewards, ns.Bots
   local Run = {}
 
   Run.SEQUENCE_ACT1 = { "easy", "easy", "normal", "campfire", "elite", "normal", "campfire", "boss" }
@@ -57,6 +57,29 @@ return function(ns)
   end
   Run.runHook = runHook
 
+  -- Un ennemi annonce-t-il une interruption (Guette, ou coup qui interrompt) ?
+  -- Renvoie "watch" (coupe à coup sûr), "push" (coup qui coupe s'il passe l'Absorption) ou nil.
+  local function castThreat(c)
+    local push = false
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      if not e.dead and (e.st.stunned or 0) == 0 then
+        local info = Combat.intentInfo(c, e)
+        if info.kind == "watch" then return "watch" end
+        if info.interrupts then push = true end
+      end
+    end
+    return push and "push" or nil
+  end
+
+  local function canCast(c)
+    if c.player.cast then return false end
+    for i = 1, #c.hand do
+      if Card.def(c.hand[i]).cast and Combat.canPlay(c, i) then return true end
+    end
+    return false
+  end
+
   local function fight(run, opts, encounter, kind, combatSeed, last)
     local c = Combat.new({ seed = combatSeed, hp = run.hp, maxHp = run.maxHp, deck = run.deck,
       encounter = encounter, relics = run.relics, potions = run.potions, charges = run.charges,
@@ -65,13 +88,40 @@ return function(ns)
       { cap = opts.cap, potionKeep = last and 0 or 1 })
     local maxRounds = opts.maxRounds or 40
     local steps = 0
+    -- Tours où une incantation était jouable : sous menace d'interruption ou non,
+    -- et combien de fois le bot a incanté quand même.
+    local cs = { threatTurns = 0, threatCasts = 0, freeTurns = 0, freeCasts = 0,
+      watchTurns = 0, watchCasts = 0, pushTurns = 0, pushCasts = 0 }
+    local turnRound, turnCastable, turnThreat, turnCasts = -1, false, nil, 0
+    local function closeTurn()
+      if turnRound >= 0 and turnCastable then
+        local casted = c.stats.castsStarted > turnCasts
+        if turnThreat then
+          cs.threatTurns = cs.threatTurns + 1
+          if casted then cs.threatCasts = cs.threatCasts + 1 end
+          local k = turnThreat
+          cs[k .. "Turns"] = cs[k .. "Turns"] + 1
+          if casted then cs[k .. "Casts"] = cs[k .. "Casts"] + 1 end
+        else
+          cs.freeTurns = cs.freeTurns + 1
+          if casted then cs.freeCasts = cs.freeCasts + 1 end
+        end
+      end
+      turnRound = -1
+    end
     while not c.result do
       if c.round > maxRounds then
         c.result = "lost"
         c.stalled = true
         break
       end
+      if turnRound ~= c.round then
+        closeTurn()
+        turnRound, turnCastable, turnThreat = c.round, canCast(c), castThreat(c)
+        turnCasts = c.stats.castsStarted
+      end
       local a = bot:act(c)
+      if a[1] == "end" then closeTurn() end
       steps = steps + 1
       if a[1] == "play" then
         local ok = Combat.play(c, a[2], a[3])
@@ -91,7 +141,7 @@ return function(ns)
       castsStarted = c.stats.castsStarted, castsInterrupted = c.stats.castsInterrupted,
       enemyCasts = c.stats.enemyCasts, enemyCastsInterrupted = c.stats.enemyCastsInterrupted,
       played = c.stats.played, drawn = c.stats.drawn, unplayed = c.stats.unplayed,
-      potions = c.stats.potions,
+      potions = c.stats.potions, castStats = cs,
     }
     run.hp = math.max(c.player.hp, 0)
     run.potions = c.player.potions

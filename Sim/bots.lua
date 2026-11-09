@@ -16,7 +16,7 @@ return function(ns)
 
   -- Évaluation d'un état après le tour ennemi. Poids grossiers, à régler.
   local W = { hp = 10, enemyHp = 4, enemyAlive = 30, demence = 1.5, atonement = 4,
-    regen = 3, power = 25, castRisk = 0.85 }
+    regen = 3, power = 25, castRisk = 0.95 }
   Bots.W = W
 
   -- Valeur de garder une potion pour plus tard (unités de W : 10 = 1 PV). Une potion n'est
@@ -32,6 +32,56 @@ return function(ns)
       if pots[i] then v = v + (Bots.POTION_KEEP[pots[i]] or 60) end
     end
     return v * Bots.potionKeep
+  end
+
+  -- Part des cartes du combat qui vérifient pred (main, pioche, défausse, recharges, consumées).
+  local function deckShare(c, pred)
+    local n, k = 0, 0
+    local function scan(list)
+      for i = 1, #list do
+        n = n + 1
+        if pred(Card.def(list[i])) then k = k + 1 end
+      end
+    end
+    scan(c.hand); scan(c.draw); scan(c.discard); scan(c.exhaust)
+    for i = 1, #c.cooldown do
+      n = n + 1
+      if pred(Card.def(c.cooldown[i].card)) then k = k + 1 end
+    end
+    if n == 0 then return 0 end
+    return k / n
+  end
+
+  -- Valeur d'un pouvoir en jeu (défaut W.power) : environ 3 tours restants × 3 cartes par tour.
+  Bots.POWER_VALUE = {
+    shadowform = function(c)
+      local sh = deckShare(c, function(d) return d.school == "shadow" end)
+      return 10 + 9 * sh * 5 * W.enemyHp
+    end,
+    apotheosis = function(c)
+      return 10 + 9 * deckShare(c, function(d) return d.cast end) * 5 * W.enemyHp
+    end,
+    rapture = function(c)
+      local share = deckShare(c, function(d)
+        for i = 1, #d.effects do if d.effects[i][1] == "absorb" then return true end end
+        return false
+      end)
+      return 10 + 9 * share * 2 * W.hp
+    end,
+    spirit_of_redemption = function(c)
+      local miss = 1 - c.player.hp / c.player.maxHp
+      return 10 + 120 * miss * miss
+    end,
+  }
+
+  local function powersValue(c)
+    local v = 0
+    local powers = c.player.powers
+    for i = 1, #powers do
+      local f = Bots.POWER_VALUE[powers[i].id]
+      v = v + (f and f(c) or W.power)
+    end
+    return v
   end
 
   -- Valeur attendue d'une incantation en cours (résolue au prochain tour).
@@ -77,7 +127,7 @@ return function(ns)
     local regen = p.st.regen or 0
     local selfPain = p.st.pain or 0
     s = s + p.demence * W.demence + (p.st.atonement or 0) * W.atonement
-      + regen * (regen + 1) / 2 * W.regen * 0.3 + #p.powers * W.power
+      + regen * (regen + 1) / 2 * W.regen * 0.3 + powersValue(c)
       - selfPain * (selfPain + 1) / 2 * W.hp * 0.8
     if p.cast then s = s + Bots.castValue(c) end
     return s

@@ -87,6 +87,10 @@ local function addRecord(agg, rec)
     agg.castsInterrupted = agg.castsInterrupted + cb.castsInterrupted
     agg.enemyCasts = agg.enemyCasts + cb.enemyCasts
     agg.enemyCastsInterrupted = agg.enemyCastsInterrupted + cb.enemyCastsInterrupted
+    for key, n in pairs(cb.castStats or {}) do
+      agg.castStats = agg.castStats or {}
+      agg.castStats[key] = (agg.castStats[key] or 0) + n
+    end
     k.castsStarted = (k.castsStarted or 0) + cb.castsStarted
     k.castsInterrupted = (k.castsInterrupted or 0) + cb.castsInterrupted
     for id, n in pairs(cb.potions or {}) do
@@ -362,6 +366,12 @@ local function report(a, title)
   end
   out("")
   out(("Incantations du joueur : %d, interrompues : %s"):format(a.castsStarted, pct(a.castsInterrupted, a.castsStarted)))
+  local cst = a.castStats or {}
+  out(("Tours avec une incantation jouable : sous menace d'interruption %d (incanté quand même %s), "
+    .. "sans menace %d (incanté %s)"):format(cst.threatTurns or 0, pct(cst.threatCasts or 0, cst.threatTurns or 0),
+    cst.freeTurns or 0, pct(cst.freeCasts or 0, cst.freeTurns or 0)))
+  out(("  dont Guette %d (incanté %s), coup qui interrompt %d (incanté %s)"):format(cst.watchTurns or 0,
+    pct(cst.watchCasts or 0, cst.watchTurns or 0), cst.pushTurns or 0, pct(cst.pushCasts or 0, cst.pushTurns or 0)))
   out(("Sorts ennemis : %d, interrompus par le joueur : %s"):format(a.enemyCasts, pct(a.enemyCastsInterrupted, a.enemyCasts)))
   out(("Durée : %d s (CPU du parent %.1f s)"):format(elapsed, os.clock() - clock0))
   return table.concat(lines, "\n")
