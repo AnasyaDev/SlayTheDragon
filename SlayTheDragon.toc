@@ -19,6 +19,8 @@ Core\Expedition.lua
 Core\Save.lua
 Data\Priest.lua
 Data\Act1.lua
+Data\Relics.lua
+Data\Potions.lua
 Data\Events.lua
 UI\Art.lua
 UI\Persist.lua

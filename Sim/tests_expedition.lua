@@ -269,7 +269,7 @@ test("marchand : achats, retrait au prix croissant, emplacements de potion", fun
   local s = exp.shop
   eq(#s.cards, 5)
   eq(#s.relics, 3)
-  eq(#s.potions, 2, "deux potions de test distinctes")
+  eq(#s.potions, 3, "trois potions (registre réel + potions de test)")
   exp.gold = 1000
   local price = s.cards[1].price
   assert(X.act(exp, { "buyCard", 1 }))

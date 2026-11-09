@@ -13,14 +13,17 @@ local function targetsOf(c, ctx, e)
   return {}
 end
 
--- { "damage", n, times = k, all = bool, onHit = function(c, ctx, cible) }
+-- { "damage", n, times = k, all = bool, onHit = function(c, ctx, cible),
+--   bonus = function(c, ctx, cible) -> dégâts de base en plus }
 Effects.damage = function(c, ctx, e)
   for _ = 1, (e.times or 1) do
     local targets = targetsOf(c, ctx, e)
     if #targets == 0 then return end
     for i = 1, #targets do
       local t = targets[i]
-      local dmg = Combat.calcDamage(c, c.player, t, e[2], ctx.def)
+      local base = e[2]
+      if e.bonus then base = base + e.bonus(c, ctx, t) end
+      local dmg = Combat.calcDamage(c, c.player, t, base, ctx.def)
       Combat.dealDamage(c, c.player, t, dmg)
       ctx.dealt = true
       ctx.hits = ctx.hits + 1
@@ -36,9 +39,15 @@ Effects.absorb = function(c, ctx, e)
 end
 
 -- { "apply", état, n, all = bool, self = bool }
+-- Crochet modify "apply" (c, src, n, état, cible, défCarte) : ajuste la valeur posée sur un ennemi.
 Effects.apply = function(c, ctx, e)
   local targets = targetsOf(c, ctx, e)
-  for i = 1, #targets do Combat.applyStatus(c, targets[i], e[2], e[3]) end
+  for i = 1, #targets do
+    local t = targets[i]
+    local n = e[3]
+    if t.side == "enemy" then n = Combat.modify(c, "apply", n, e[2], t, ctx.def) end
+    Combat.applyStatus(c, t, e[2], n)
+  end
 end
 
 -- { "heal", n }
@@ -71,6 +80,11 @@ Effects.interrupt = function(c, ctx, e)
     t.interrupted = true
     Combat.log(c, { t = "interrupt", src = "player", dst = t.uid, move = t.intent })
   end
+end
+
+-- { "cleanse" } : retire tous tes états négatifs.
+Effects.cleanse = function(c, ctx, e)
+  Combat.cleanse(c, c.player)
 end
 
 -- { "fn", function(c, ctx) } : effet sur mesure.

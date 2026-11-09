@@ -19,6 +19,7 @@ Combat.DRAW_PER_TURN = 5
 Combat.BASE_MANA = 3
 Combat.MAX_ENEMIES = 5
 Combat.ATONEMENT_HEAL = 2
+Combat.POTION_SLOTS = 3
 
 ---------------------------------------------------------------------------
 -- Journal d'événements (animations de l'interface, métriques)
@@ -129,6 +130,29 @@ function Combat.applyStatus(c, unit, id, n)
   unit.st[id] = v
   if def.duration and c.phase == "enemy" and v then unit.fresh[id] = true end
   log(c, { t = "status", unit = uref(unit), id = id, n = n, total = v or 0 })
+end
+
+-- Vrai si l'unité porte au moins un état négatif.
+function Combat.hasDebuff(unit)
+  for id in pairs(unit.st) do
+    if ns.Statuses[id].debuff then return true end
+  end
+  return false
+end
+
+-- Retire tous les états négatifs de l'unité ; renvoie le nombre d'états retirés.
+function Combat.cleanse(c, unit)
+  local ids = {}
+  for id in pairs(unit.st) do
+    if ns.Statuses[id].debuff then ids[#ids + 1] = id end
+  end
+  table.sort(ids)
+  for i = 1, #ids do
+    unit.st[ids[i]] = nil
+    unit.fresh[ids[i]] = nil
+  end
+  if #ids > 0 then log(c, { t = "cleanse", unit = uref(unit), n = #ids }) end
+  return #ids
 end
 
 local function tickPeriodic(c, unit)
@@ -257,6 +281,7 @@ local function checkVictory(c)
     end
   end
   c.result = "won"
+  Combat.fire(c, "onVictory")
   log(c, { t = "result", result = "won" })
 end
 
@@ -350,6 +375,7 @@ function Combat.intentInfo(c, e)
     if a[1] == "attack" then
       info.damage = Combat.calcDamage(c, e, c.player, a[2])
       info.times = a.times or 1
+      if a.interrupts then info.interrupts = true end
     end
   end
   return info
@@ -367,11 +393,17 @@ end
 local function interruptPlayer(c, by)
   local cast = c.player.cast
   if not cast then return end
+  if Combat.fire(c, "preventInterrupt", by) then
+    log(c, { t = "interrupt_prevented", src = uref(by), dst = "player", card = cast.card.id })
+    return
+  end
   c.player.cast = nil
   c.discard[#c.discard + 1] = cast.card
   stat(c, "castsInterrupted")
   log(c, { t = "interrupt", src = uref(by), dst = "player", card = cast.card.id })
 end
+
+Combat.interruptPlayer = interruptPlayer
 
 local function executeMove(c, e)
   local def = ns.Enemies[e.id]
@@ -393,8 +425,10 @@ local function executeMove(c, e)
     if k == "attack" then
       for _ = 1, (a.times or 1) do
         local dmg = Combat.calcDamage(c, e, p, a[2])
-        Combat.dealDamage(c, e, p, dmg)
+        local loss = Combat.dealDamage(c, e, p, dmg)
         if c.result or e.dead then break end
+        -- Coup qui interrompt : coupe l'incantation s'il fait perdre des PV.
+        if a.interrupts and loss > 0 then interruptPlayer(c, e) end
       end
     elseif k == "block" then
       Combat.gainBlock(c, e, a[2])
@@ -604,6 +638,88 @@ local function resolveCast(c)
 end
 
 ---------------------------------------------------------------------------
+-- Potions et fuite
+---------------------------------------------------------------------------
+-- Une potion se boit pendant son tour, sans mana. c.player.potions[slot] = id | false.
+-- Échecs : false, "over" (pas ton tour / combat fini), "potion" (emplacement vide ou
+-- potion inconnue), "target" (cible absente ou morte).
+
+function Combat.canUsePotion(c, slot, tIdx)
+  if c.phase ~= "player" or c.result then return false, "over" end
+  local id = c.player.potions[slot]
+  if not id then return false, "potion" end
+  local def = ns.Potions[id]
+  if not def then return false, "potion" end
+  if def.target then
+    local t = c.enemies[tIdx or 0]
+    if not t or t.dead then return false, "target" end
+  end
+  return true
+end
+
+-- Potions buvables : liste de { emplacement, indexCible|nil }, une seule entrée
+-- par potion distincte (deux potions identiques donnent le même résultat).
+function Combat.legalPotions(c)
+  local list, seen = {}, {}
+  if c.phase ~= "player" or c.result then return list end
+  local pots = c.player.potions
+  for slot = 1, #pots do
+    local id = pots[slot]
+    local def = id and ns.Potions[id]
+    if def and not seen[id] then
+      seen[id] = true
+      if def.target then
+        for j = 1, #c.enemies do
+          if not c.enemies[j].dead then list[#list + 1] = { slot, j } end
+        end
+      else
+        list[#list + 1] = { slot }
+      end
+    end
+  end
+  return list
+end
+
+function Combat.usePotion(c, slot, tIdx)
+  local ok, why = Combat.canUsePotion(c, slot, tIdx)
+  if not ok then return false, why end
+  local id = c.player.potions[slot]
+  local def = ns.Potions[id]
+  local target = def.target and c.enemies[tIdx] or nil
+  c.player.potions[slot] = false
+  statById(c, "potions", id)
+  log(c, { t = "potion", id = id, slot = slot, target = target and target.uid })
+  local ctx = { potion = id, def = def, target = target, dealt = false, hits = 0 }
+  for i = 1, #def.effects do
+    local e = def.effects[i]
+    local h = ns.Effects[e[1]]
+    if not h then error(id .. " : effet inconnu " .. tostring(e[1])) end
+    h(c, ctx, e)
+    if c.result then break end
+  end
+  if not c.result then Combat.fire(c, "onPotion", id, ctx) end
+  return true
+end
+
+-- Fuite (Pierre de foyer...) : jamais contre un boss ; un bibelot doit l'autoriser
+-- (crochet modify "canFlee"). Résultat "fled" : ni victoire ni défaite, sans récompense.
+function Combat.canFlee(c)
+  if c.phase ~= "player" or c.result then return false end
+  for i = 1, #c.enemies do
+    if c.enemies[i].boss and not c.enemies[i].dead then return false end
+  end
+  return Combat.modify(c, "canFlee", false) and true or false
+end
+
+function Combat.flee(c)
+  if not Combat.canFlee(c) then return false end
+  Combat.fire(c, "onFlee")
+  c.result = "fled"
+  log(c, { t = "result", result = "fled" })
+  return true
+end
+
+---------------------------------------------------------------------------
 -- Tours
 ---------------------------------------------------------------------------
 
@@ -696,12 +812,13 @@ end
 
 function Combat.newStats()
   return { turns = 0, hpLost = 0, healed = 0, castsStarted = 0, castsInterrupted = 0,
-    enemyCasts = 0, enemyCastsInterrupted = 0, played = {}, drawn = {}, unplayed = {} }
+    enemyCasts = 0, enemyCastsInterrupted = 0, played = {}, drawn = {}, unplayed = {}, potions = {} }
 end
 
 -- opts : seed, hp, maxHp, deck = { {id=, up=}, ... }, encounter = { idEnnemi, ... },
---        relics = { id, ... }, stats = bool, quiet = bool,
---        affixes = { id de ns.Affixes, ... } (clés mythiques)
+--        relics = { id, ... }, potions = { id|false, ... } (POTION_SLOTS emplacements),
+--        charges = { clé = valeur } (état de bibelots propre à l'expédition, relu après le combat),
+--        affixes = { id de ns.Affixes, ... } (clés mythiques), stats = bool, quiet = bool
 function Combat.new(opts)
   local seed = opts.seed or 1
   local c = {
@@ -715,12 +832,16 @@ function Combat.new(opts)
     player = {
       side = "player", hp = opts.hp, maxHp = opts.maxHp or opts.hp, block = 0,
       st = {}, fresh = {}, mana = 0, demence = 0, powers = {}, cast = nil, flags = {},
+      potions = {},
     },
     draw = {}, hand = {}, discard = {}, exhaust = {}, cooldown = {},
     enemies = {}, relics = U.copyArr(opts.relics or {}), relicState = {},
     affixes = U.copyArr(opts.affixes or {}),
+    charges = U.copyMap(opts.charges or {}),
     stats = opts.stats and Combat.newStats() or nil,
   }
+  local potions = opts.potions or {}
+  for i = 1, Combat.POTION_SLOTS do c.player.potions[i] = potions[i] or false end
   for i = 1, #opts.deck do
     local card = opts.deck[i]
     c.draw[#c.draw + 1] = Card.new(card.id, card.up, c.nextUid)
@@ -742,6 +863,7 @@ local function copyUnit(u)
   if u.mem then r.mem = copyMap(u.mem) end
   if u.flags then r.flags = copyMap(u.flags) end
   if u.powers then r.powers = copyArr(u.powers) end
+  if u.potions then r.potions = copyArr(u.potions) end
   return r
 end
 
@@ -753,6 +875,7 @@ function Combat.clone(c)
   n.quiet = true
   n.stats = nil
   n.relicState = copyMap(c.relicState)
+  n.charges = copyMap(c.charges)
   n.rng = { draw = copyMap(c.rng.draw), ai = copyMap(c.rng.ai), misc = copyMap(c.rng.misc) }
   n.player = copyUnit(c.player)
   n.hand = copyArr(c.hand)
