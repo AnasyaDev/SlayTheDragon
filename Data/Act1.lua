@@ -12,26 +12,23 @@ local _, ns = ...
 local Combat, Card = ns.Combat, ns.Card
 local E = ns.Enemies
 
--- Guette : coupe l'incantation du joueur ; s'il n'y en a pas, soigne l'allié le plus blessé.
-local function watchOrMend(n)
+-- Guette : coupe l'incantation du joueur ; s'il n'y en a pas, lui inflige n.
+-- (Une version qui soignait un allié à la place rendait le Mystique trop fort contre un
+-- deck d'incantations : il guette à chaque tour où tu as une incantation en main.)
+local function watchOrZap(n)
   return function(c, e)
     if c.player.cast then
       Combat.interruptPlayer(c, e)
       return
     end
-    local best, gap = nil, 0
-    for i = 1, #c.enemies do
-      local o = c.enemies[i]
-      if not o.dead and o.maxHp - o.hp > gap then best, gap = o, o.maxHp - o.hp end
-    end
-    if best then Combat.heal(c, best, n) end
+    Combat.dealDamage(c, e, c.player, Combat.calcDamage(c, e, c.player, n))
   end
 end
 
 E.gnoll = {
   name = "Gnoll Rivepatte", hp = { 19, 22 },
   moves = {
-    bite = { name = "Morsure", intent = "attack", actions = { { "attack", 7 } } },
+    bite = { name = "Morsure", intent = "attack", actions = { { "attack", 7, interrupts = true } } },
     rend = { name = "Lacération", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
@@ -40,7 +37,8 @@ E.gnoll = {
 E.mystic = {
   name = "Mystique Rivepatte", hp = { 15, 17 },
   moves = {
-    watch = { name = "Guette", intent = "watch", actions = { { "fn", watchOrMend(4) } } },
+    watch = { name = "Guette", intent = "watch", text = "Coupe ton incantation ; sinon, t'inflige 3.",
+      actions = { { "fn", watchOrZap(3) } } },
     mend = { name = "Soins", intent = "heal", actions = { { "heal_ally", 6 } } },
     zap = { name = "Horion", intent = "attack", actions = { { "attack", 4 } } },
   },
@@ -83,7 +81,7 @@ E.sorcerer = {
   name = "Sorcier défias", hp = { 18, 21 },
   moves = {
     fireball = { name = "Boule de feu", intent = "cast", cast = true, actions = { { "attack", 16 } } },
-    shards = { name = "Éclats", intent = "attack", actions = { { "attack", 4 } } },
+    shards = { name = "Éclats de givre", intent = "attack", actions = { { "attack", 4, interrupts = true } } },
   },
   pattern = { "fireball", "shards" }, randomStart = true,
 }
@@ -92,7 +90,7 @@ E.harvest_golem = {
   name = "Golem moissonneur", hp = 72, elite = true,
   moves = {
     harden = { name = "Blindage", intent = "defend", actions = { { "block", 12 } } },
-    smash = { name = "Écrasement", intent = "attack", actions = { { "attack", 19 } } },
+    smash = { name = "Écrasement", intent = "attack", actions = { { "attack", 19, interrupts = true } } },
     reap = { name = "Moisson", intent = "attack", actions = { { "attack", 7, times = 3 } } },
   },
   pattern = { "harden", "smash", "reap" },
@@ -101,9 +99,9 @@ E.harvest_golem = {
 E.rhahkzor = {
   name = "Rhahk'Zor", hp = 75, elite = true,
   moves = {
-    roar = { name = "Rugissement", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "demoralized", 2 } } },
+    roar = { name = "Rugissement", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "demoralized", 2 } } },
     slam = { name = "Fracas", intent = "attack", actions = { { "attack", 17, interrupts = true } } },
-    punch = { name = "Coup de poing", intent = "attack", actions = { { "attack", 11 } } },
+    punch = { name = "Coup de poing", intent = "attack", actions = { { "attack", 12 } } },
   },
   pattern = { "roar", "slam", "punch", "slam" },
 }
@@ -120,8 +118,8 @@ E.vancleef = {
   name = "Edwin VanCleef", hp = 86, boss = true,
   moves = {
     combo = { name = "Enchaînement", intent = "attack",
-      actions = { { "attack", 7, times = 2 }, { "debuff", "armor_broken", 1 } } },
-    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 16, interrupts = true } } },
+      actions = { { "attack", 8, times = 2 }, { "debuff", "armor_broken", 1 } } },
+    strike = { name = "Frappe mortelle", intent = "attack", actions = { { "attack", 17, interrupts = true } } },
     guard = { name = "Parade", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
   },
   pattern = { "combo", "strike", "guard" },
