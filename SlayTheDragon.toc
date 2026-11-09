@@ -14,3 +14,5 @@ Core\Effects.lua
 Core\Rewards.lua
 Data\Priest.lua
 Data\Act1.lua
+Data\Relics.lua
+Data\Potions.lua
