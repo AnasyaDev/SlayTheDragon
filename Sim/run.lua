@@ -14,11 +14,16 @@ return function(ns)
   -- Chance qu'un combat gagné (hors boss) laisse une potion, si un emplacement est libre.
   Run.POTION_DROP = 0.4
 
-  -- Valeur grossière des cartes pour la politique de choix « rated ».
+  -- Valeur grossière des cartes pour la politique de choix « rated », tirée des balayages
+  -- (sweep=cards) : à peu près 5 + écart de victoires / 2.
   Run.RATING = {
-    penance = 8, mind_blast = 7, chastise = 7, radiance = 6, holy_nova = 6, holy_fire = 6,
-    pain_suppression = 6, shadowform = 5, mind_flay = 5, devouring_plague = 4, silence = 4,
-    greater_heal = 5, spirit_of_redemption = 4,
+    vampiric_touch = 7, angelic_feather = 6, flash_heal = 6, solace = 6, luminous_barrier = 6,
+    mind_sear = 6, radiance = 5, holy_nova = 5, shadow_mend = 5, renew = 5, mind_blast = 5,
+    holy_fire = 5, mind_flay = 4,
+    schism = 6, psychic_scream = 6, silence = 5, evangelism = 5, greater_heal = 5, chastise = 5,
+    penance = 5, devouring_plague = 4, sw_death = 4, halo = 4, empyreal_blaze = 4,
+    rapture = 7, pain_suppression = 7, shadowform = 5, apotheosis = 5, void_eruption = 4,
+    spirit_of_redemption = 4,
   }
 
   local function rating(id) return Run.RATING[id] or 3 end
