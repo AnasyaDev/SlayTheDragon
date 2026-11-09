@@ -60,6 +60,9 @@ local function setup(hand, encounter, extra, more)
   return c
 end
 
+-- Valeur du i-ème effet d'une carte (j = position dans l'effet, 2 par défaut).
+local function num(id, i, j) return Card.defById(id).effects[i][j or 2] end
+
 local function handIndex(c, id)
   for i, x in ipairs(c.hand) do if x.id == id then return i end end
 end
@@ -167,8 +170,8 @@ test("Incantation : payée maintenant, résolue au début du tour suivant", func
   eq(e.hp, 100, "pas encore")
   assert(c.player.cast)
   Combat.endTurn(c)
-  eq(e.hp, 84, "16 au tour suivant")
-  eq(e.st.pain, 3)
+  eq(e.hp, 100 - num("holy_fire", 1), "dégâts au tour suivant")
+  eq(e.st.pain, num("holy_fire", 2, 3))
 end)
 
 test("une seule incantation à la fois", function()
@@ -211,7 +214,7 @@ test("Pénitence sous Expiation : 2 Absorption par coup", function()
   Combat.play(c, 1)
   Combat.play(c, 1, 1)
   eq(c.player.block, 4 + 6)
-  eq(c.enemies[1].hp, 85)
+  eq(c.enemies[1].hp, 100 - 3 * num("penance", 1))
 end)
 
 test("Étourdi : l'ennemi perd son tour ; les boss y sont immunisés", function()
@@ -230,9 +233,9 @@ test("Forme d'ombre : +2 dégâts et +2 Douleur aux cartes d'ombre, rien sur le 
   Combat.play(c, 1)
   eq(Combat.cost(c, c.hand[handIndex(c, "smite")]), 1)
   Combat.play(c, handIndex(c, "mind_flay"), 1)
-  eq(c.enemies[1].hp, 94)
+  eq(c.enemies[1].hp, 100 - num("mind_flay", 2) - 2)
   Combat.play(c, handIndex(c, "sw_pain"), 1)
-  eq(c.enemies[1].st.pain, 7)
+  eq(c.enemies[1].st.pain, num("sw_pain", 1, 3) + 2)
 end)
 
 test("Esprit de rédemption : reste à 1 PV, tour suivant gratuit", function()
@@ -241,7 +244,7 @@ test("Esprit de rédemption : reste à 1 PV, tour suivant gratuit", function()
   c.player.hp = 5
   Combat.endTurn(c)
   eq(c.result, nil)
-  eq(c.player.hp, 1)
+  eq(c.player.hp, 1 + 6, "1 PV, puis Récupération 6 au début du tour")
   eq(Combat.cost(c, c.hand[1]), 0)
 end)
 
@@ -400,7 +403,7 @@ test("Pierre à aiguiser : +1 par coup d'attaque seulement", function()
   Combat.play(c, 1, 1)
   eq(c.enemies[1].hp, 93)
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 93 - 18)
+  eq(c.enemies[1].hp, 93 - 3 * (num("penance", 1) + 1))
 end)
 
 test("Coup qui interrompt : coupe l'incantation s'il fait perdre des PV", function()
@@ -412,7 +415,7 @@ test("Coup qui interrompt : coupe l'incantation s'il fait perdre des PV", functi
   Combat.play(d, 1, 1)
   d.player.block = 10
   Combat.endTurn(d)
-  eq(d.enemies[1].hp, 84, "absorbé : le sort passe")
+  eq(d.enemies[1].hp, 100 - num("holy_fire", 1), "absorbé : le sort passe")
   eq(Combat.intentInfo(d, d.enemies[1]).interrupts, true)
 end)
 
@@ -420,7 +423,7 @@ test("Talisman de concentration : la première interruption est sans effet", fun
   local c = setup({ "holy_fire" }, { "test_watcher" }, nil, { relics = { "focus_talisman" } })
   Combat.play(c, 1, 1)
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 84)
+  eq(c.enemies[1].hp, 100 - num("holy_fire", 1))
 end)
 
 test("Rubis de mana : 4 mana et une carte de plus au premier tour", function()
@@ -436,7 +439,7 @@ test("Réconfort : +1 mana sous Expiation", function()
   local c = setup({ "radiance", "solace" })
   Combat.play(c, 1)
   Combat.play(c, 1, 1)
-  eq(c.player.mana, 2); eq(c.enemies[1].hp, 94)
+  eq(c.player.mana, 2); eq(c.enemies[1].hp, 100 - num("solace", 2))
 end)
 
 test("Mot de l'ombre : Mort : double sous la moitié des PV", function()
@@ -448,12 +451,12 @@ test("Mot de l'ombre : Mort : double sous la moitié des PV", function()
   eq(c.enemies[1].hp, 38)
 end)
 
-test("Éruption du Vide : 4 + 3 par Démence dépensée", function()
+test("Éruption du Vide : base + bonus par Démence dépensée", function()
   local c = setup({ "void_eruption" })
   eq(Combat.canPlay(c, 1), false)
   c.player.demence = 4
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 100 - 16); eq(c.player.demence, 0)
+  eq(c.enemies[1].hp, 100 - num("void_eruption", 2) - 4 * Card.defById("void_eruption").perDemence); eq(c.player.demence, 0)
 end)
 
 test("Apothéose : les incantations coûtent 1 de moins", function()
@@ -483,7 +486,7 @@ test("Halo : incantation qui touche tous les ennemis", function()
   local c = setup({ "halo" }, { "test_dummy", "test_dummy" })
   Combat.play(c, 1)
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 92); eq(c.enemies[2].hp, 92); eq(c.player.st.regen, 3)
+  eq(c.enemies[1].hp, 100 - num("halo", 1)); eq(c.enemies[2].hp, 100 - num("halo", 1)); eq(c.player.st.regen, num("halo", 2, 3))
 end)
 
 test("Cri psychique et Incandescence : effets de zone", function()
