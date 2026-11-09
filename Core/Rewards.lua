@@ -6,14 +6,25 @@ local Rewards = {}
 ns.Rewards = Rewards
 
 Rewards.RARITY_WEIGHT = { common = 60, uncommon = 33, rare = 7 }
+Rewards.RELIC_WEIGHT = { common = 50, uncommon = 35, rare = 15 }
+Rewards.POTION_WEIGHT = { common = 65, uncommon = 25, rare = 10 }
 
--- n cartes distinctes de la classe, tirées par rareté.
-function Rewards.cardChoices(rng, class, n, weights)
-  weights = weights or Rewards.RARITY_WEIGHT
+-- Cartes de la classe débloquées au palier de réputation maxRep (nil = toutes).
+function Rewards.cardPool(class, maxRep)
   local pool = Card.pool(class)
+  if maxRep == nil then return pool end
+  local list = {}
+  for i = 1, #pool do
+    if (ns.Cards[pool[i]].rep or 0) <= maxRep then list[#list + 1] = pool[i] end
+  end
+  return list
+end
+
+-- n éléments distincts de pool (liste d'ids), tirés d'abord par rareté.
+local function pickByRarity(rng, pool, n, rarityOf, weights)
   local byRarity = {}
   for i = 1, #pool do
-    local r = ns.Cards[pool[i]].rarity
+    local r = rarityOf(pool[i])
     byRarity[r] = byRarity[r] or {}
     table.insert(byRarity[r], pool[i])
   end
@@ -35,4 +46,57 @@ function Rewards.cardChoices(rng, class, n, weights)
     end
   end
   return picked
+end
+
+-- n cartes distinctes de la classe, tirées par rareté. maxRep : palier de réputation
+-- de classe atteint (0 Neutre, 1 Amical, 2 Honoré ; nil = toutes les cartes).
+function Rewards.cardChoices(rng, class, n, weights, maxRep)
+  return pickByRarity(rng, Rewards.cardPool(class, maxRep), n,
+    function(id) return ns.Cards[id].rarity end, weights or Rewards.RARITY_WEIGHT)
+end
+
+-- Ids triés des bibelots débloqués au palier maxTier de la Ligue des explorateurs.
+-- opts : { maxTier = n (nil = tous), boss = bool (bibelots de boss seulement, sinon exclus),
+--          exclude = { [id] = true } (déjà possédés) }
+function Rewards.relicPool(opts)
+  opts = opts or {}
+  local list = {}
+  for id, r in pairs(ns.Relics) do
+    local isBoss = r.rarity == "boss"
+    if (opts.maxTier == nil or (r.tier or 0) <= opts.maxTier) and (isBoss == (opts.boss or false))
+        and not (opts.exclude and opts.exclude[id]) then
+      list[#list + 1] = id
+    end
+  end
+  table.sort(list)
+  return list
+end
+
+-- n bibelots distincts (moins si la réserve est épuisée).
+function Rewards.relicChoices(rng, n, opts)
+  local pool = Rewards.relicPool(opts)
+  if opts and opts.boss then
+    local picked = {}
+    Rng.shuffle(rng, pool)
+    for i = 1, math.min(n, #pool) do picked[i] = pool[i] end
+    return picked
+  end
+  return pickByRarity(rng, pool, n, function(id) return ns.Relics[id].rarity end, Rewards.RELIC_WEIGHT)
+end
+
+-- Ids triés des potions débloquées au palier maxTier (nil = toutes).
+function Rewards.potionPool(maxTier)
+  local list = {}
+  for id, p in pairs(ns.Potions) do
+    if maxTier == nil or (p.tier or 0) <= maxTier then list[#list + 1] = id end
+  end
+  table.sort(list)
+  return list
+end
+
+-- Une potion au hasard, pondérée par rareté.
+function Rewards.randomPotion(rng, maxTier)
+  local pool = Rewards.potionPool(maxTier)
+  if #pool == 0 then return nil end
+  return pickByRarity(rng, pool, 1, function(id) return ns.Potions[id].rarity end, Rewards.POTION_WEIGHT)[1]
 end
