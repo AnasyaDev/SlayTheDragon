@@ -317,6 +317,10 @@ test("bibelots et potions respectent le contrat", function()
   eq(nr, 10, "bibelots"); eq(np, 5, "potions")
   eq(#ns.Rewards.relicPool({ maxTier = 0 }), 4, "bibelots neutres hors boss")
   eq(#ns.Rewards.relicPool({ boss = true }), 1, "bibelots de boss")
+  ns.Relics.test_class = { name = "x", text = "x", rarity = "rare", tier = 0, class = "priest", hooks = {} }
+  ns.Relics.test_nopool = { name = "x", text = "x", rarity = "common", tier = 0, noPool = true, hooks = {} }
+  eq(#ns.Rewards.relicPool({ maxTier = 0 }), 4, "bibelots de classe et noPool exclus des tirages")
+  ns.Relics.test_class, ns.Relics.test_nopool = nil, nil
   local ch = ns.Rewards.relicChoices(Rng.new(3), 2, { maxTier = 3, exclude = { hearthstone = true } })
   eq(#ch, 2)
   for _, id in ipairs(ch) do assert(id ~= "hearthstone" and ns.Relics[id].rarity ~= "boss", id) end
@@ -331,7 +335,8 @@ test("potion : bue sans mana, emplacement vidé, état relisible", function()
   assert(Combat.usePotion(c, 1))
   eq(c.player.hp, 45); eq(c.player.mana, 3, "aucun mana dépensé")
   eq(c.player.potions[1], false)
-  eq(Combat.usePotion(c, 1), false, "déjà bue")
+  local ok, why = Combat.usePotion(c, 1)
+  eq(ok, false, "déjà bue"); eq(why, "potion")
   assert(Combat.usePotion(c, 3))
   eq(c.player.mana, 5)
   eq(c.stats == nil, true)
@@ -339,7 +344,8 @@ end)
 
 test("potion ciblée : il faut une cible vivante ; clone indépendant", function()
   local c = setup({}, { "test_dummy" }, nil, { potions = { "liquid_fire" } })
-  eq(Combat.canUsePotion(c, 1), false, "sans cible")
+  local ok, why = Combat.canUsePotion(c, 1)
+  eq(ok, false, "sans cible"); eq(why, "target")
   eq(#Combat.legalPotions(c), 1)
   local t = Combat.clone(c)
   assert(Combat.usePotion(t, 1, 1))
@@ -359,29 +365,28 @@ test("Pierre de foyer : fuite une fois par expédition, jamais contre un boss", 
   eq(Combat.canFlee(b), false, "boss")
 end)
 
-test("Bandage en lin : soigne 5 à la victoire", function()
+test("Bandage en lin : soigne 3 à la victoire", function()
   local c = setup({ "smite" }, { "test_dummy" }, nil, { relics = { "linen_bandage" } })
   c.player.hp = 40
   c.enemies[1].hp = 3
   Combat.play(c, 1, 1)
-  eq(c.result, "won"); eq(c.player.hp, 45)
+  eq(c.result, "won"); eq(c.player.hp, 43)
 end)
 
-test("Tabard de Hurlevent : 8 Absorption au premier tour seulement", function()
+test("Tabard de Hurlevent : 5 Absorption au premier tour seulement", function()
   local c = setup({}, { "test_dummy" }, nil, { relics = { "stormwind_tabard" } })
-  eq(c.player.block, 8)
+  eq(c.player.block, 5)
   Combat.endTurn(c)
   eq(c.player.block, 0)
 end)
 
-test("Bandeau de VanCleef : 6 cartes par tour, ennemis Force 1", function()
+test("Bandeau de VanCleef : 6 cartes par tour, 1 mana de moins au premier tour", function()
   local deck = {}
-  for i = 1, 12 do deck[i] = { id = "smite", up = false } end
+  for i = 1, 14 do deck[i] = { id = "smite", up = false } end
   local c = Combat.new({ seed = 1, hp = 60, deck = deck, encounter = { "test_hitter" }, relics = { "vancleef_bandana" } })
-  eq(#c.hand, 6)
-  eq(c.enemies[1].st.force, 1)
+  eq(#c.hand, 6); eq(c.player.mana, 2)
   Combat.endTurn(c)
-  eq(c.player.hp, 49)
+  eq(c.player.mana, 3)
 end)
 
 test("Insigne : retire les états négatifs une fois par combat", function()
@@ -426,13 +431,13 @@ test("Talisman de concentration : la première interruption est sans effet", fun
   eq(c.enemies[1].hp, 100 - num("holy_fire", 1))
 end)
 
-test("Rubis de mana : 4 mana et une carte de plus au premier tour", function()
+test("Rubis de mana : 4 mana au premier tour seulement", function()
   local deck = {}
   for i = 1, 12 do deck[i] = { id = "smite", up = false } end
   local c = Combat.new({ seed = 1, hp = 60, deck = deck, encounter = { "test_dummy" }, relics = { "mana_ruby" } })
-  eq(c.player.mana, 4); eq(#c.hand, 6)
+  eq(c.player.mana, 4)
   Combat.endTurn(c)
-  eq(c.player.mana, 3); eq(#c.hand, 5)
+  eq(c.player.mana, 3)
 end)
 
 test("Réconfort : +1 mana sous Expiation", function()

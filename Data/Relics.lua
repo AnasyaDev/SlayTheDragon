@@ -44,20 +44,20 @@ relic("defias_purse", {
 
 relic("linen_bandage", {
   name = "Bandage en lin", rarity = "common", tier = 0,
-  text = "À la fin de chaque combat gagné, soigne 5 PV.",
+  text = "À la fin de chaque combat gagné, soigne 3 PV.",
   hooks = {
     onVictory = function(c, src)
-      Combat.heal(c, c.player, 5)
+      Combat.heal(c, c.player, 3)
     end,
   },
 })
 
 relic("stormwind_tabard", {
   name = "Tabard de Hurlevent", rarity = "common", tier = 0,
-  text = "Au premier tour de chaque combat, gagne 8 Absorption.",
+  text = "Au premier tour de chaque combat, gagne 5 Absorption.",
   hooks = {
     onTurnStart = function(c, src)
-      if c.round == 1 then Combat.gainBlock(c, c.player, 8) end
+      if c.round == 1 then Combat.gainBlock(c, c.player, 5) end
     end,
   },
 })
@@ -65,14 +65,11 @@ relic("stormwind_tabard", {
 -- Bibelot de boss de l'acte 1 : fort, avec une contrepartie.
 relic("vancleef_bandana", {
   name = "Bandeau rouge de VanCleef", rarity = "boss", tier = 0,
-  text = "Pioche 1 carte de plus à chaque tour. Au début de chaque combat, les ennemis gagnent 1 Force.",
+  text = "Pioche 1 carte de plus à chaque tour. Au premier tour de chaque combat, tu as 1 mana de moins.",
   hooks = {
     drawPerTurn = function(c, src, v) return v + 1 end,
-    onCombatStart = function(c, src)
-      for i = 1, #c.enemies do
-        local e = c.enemies[i]
-        if not e.dead then Combat.applyStatus(c, e, "force", 1) end
-      end
+    onTurnStart = function(c, src)
+      if c.round == 1 then c.player.mana = c.player.mana - 1 end
     end,
   },
 })
@@ -130,12 +127,11 @@ relic("camp_kettle", {
 
 relic("mana_ruby", {
   name = "Rubis de mana", rarity = "rare", tier = 3,
-  text = "Au premier tour de chaque combat, +1 mana et pioche 1 carte.",
+  text = "Au premier tour de chaque combat, +1 mana.",
   hooks = {
     onTurnStart = function(c, src)
       if c.round == 1 then
         c.player.mana = c.player.mana + 1
-        Combat.drawCards(c, 1)
       end
     end,
   },
