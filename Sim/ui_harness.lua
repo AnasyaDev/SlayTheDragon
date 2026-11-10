@@ -2023,10 +2023,10 @@ do
     and Skin.tex.card_ribbon_flat == nil)
   card:SetCard("mind_blast", false, { cost = 1, playable = true })
   check("Ombre : corps violet ; mot-clé dans la plaque du bas", tex(card.bg) == ROOT .. Skin.tex.card_body_violet.file
-    and card.plate._shown and (card.plateText._text or ""):find("Recharge", 1, true) and not card.gem._shown)
+    and card.plate.shown and (card.plateText._text or ""):find("Recharge", 1, true) and not card.gem._shown)
   card:SetCard("inner_fire", false, { cost = 1, playable = true })
   check("protection : corps bleu ; carte de base sans gemme ni plaque", tex(card.bg) == ROOT .. Skin.tex.card_body_blue.file
-    and not card.gem._shown and not card.plate._shown)
+    and not card.gem._shown and not card.plate.shown)
   card:SetCard("smite", false, { cost = 1, playable = true })
   check("départ : corps doré", tex(card.bg) == ROOT .. Skin.tex.card_body_gold.file)
   card:SetCard("smite", false, { cost = 3, playable = false, reason = "Pas assez de mana." })
@@ -2326,6 +2326,11 @@ do
     { key = "", opts = { playable = true } },
     { key = " (injouable)", opts = { playable = false, reason = "Pas assez de mana." } },
   }
+  -- toutes les raisons d'une carte injouable en combat (les plus longues passent sur deux lignes)
+  for _, why in ipairs({ "phase", "unplayable", "casting", "forbidden", "condition", "target", "over" }) do
+    variants[#variants + 1] = { key = " (" .. why .. ")", opts = { playable = false, reason = ns.Controller.reasonText(why) } }
+  end
+  local reasonDist = {}
   local cases = 0
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
@@ -2358,10 +2363,24 @@ do
             if not ok2 then bad[#bad + 1] = ("%s : ligne %d sous la gemme en %s"):format(label, k, where2) end
           end
         end
-        if card.plate._shown and bottom > SC.pieces.card_plate[2] * CW then bad[#bad + 1] = label .. " : sur la plaque du bas" end
+        if card.plate.shown and bottom > SC.pieces.card_plate[2] * CW then bad[#bad + 1] = label .. " : sur la plaque du bas" end
         if card.reasonPlate and card.reasonPlate._shown then
           local rp = card.reasonPlate._points[1]
           if bottom > -rp[5] - card.reasonPlate._h / 2 then bad[#bad + 1] = label .. " : sous la plaque de raison" end
+          -- raison : dans sa plaque (marges de 6 unités), plaque dans la largeur du corps, au-dessus de
+          -- la plaque des mots-clés
+          local p, rt = card.reasonPlate, card.reasonPlate.text
+          local rl = splitLines(rt._text)
+          local rw = 0
+          for _, l in ipairs(rl) do rw = math.max(rw, H.textWidth(rt, l, rt._fontSize)) end
+          if rw > p._w - 12 + 0.01 or p._w > CW + 0.01 or rt:IsTruncated() or rt:GetNumLines() ~= #rl
+            or #rl > 2 or rt:GetStringHeight() > p._h - 2 then
+            bad[#bad + 1] = ("%s : raison « %s » hors de sa plaque"):format(label, tostring(rt._text))
+          end
+          if card.plate.shown and -rp[5] + p._h / 2 > card.plate.box.inT - 1 then
+            bad[#bad + 1] = label .. " : plaque de raison sur le texte des mots-clés"
+          end
+          reasonDist[rt._text:gsub("\n", " / ")] = rt._fontSize
         end
         if vi == 1 then
           bodyDist[size] = (bodyDist[size] or 0) + 1
@@ -2384,6 +2403,79 @@ do
       end
     end
   end
+  -- plaque du bas : texte dans la zone utile (intérieur sombre moins les marges), plaque visible
+  -- (devant le corps, alpha, taille), dans la largeur du corps ; toutes les cartes et combinaisons
+  do
+    local P = W.CARD_PLATE
+    local plateTex = readTGA(Skin.tex.card_plate.file)
+    -- les constantes mesurées correspondent aux pixels : intérieur opaque et sombre (zone du texte,
+    -- marges comprises, hors arrondi des coins du bas)
+    local u = SC.pieces.card_plate[4] * CW / P.texH
+    local okTex = true
+    for y = P.inT, P.inB - 4 do
+      for x = P.inL + math.floor(P.margin / u), P.inR - math.floor(P.margin / u) do
+        local r, g, b, a = plateTex(x, y)
+        if a < 250 or r + g + b > 450 then okTex = false end -- (paillettes de l'ardoise tolérées)
+      end
+    end
+    check("plaque du bas : zone utile mesurée sur Media/card_plate.tga (intérieur sombre, marges comprises)", okTex)
+    local plateBad, combos, wide = {}, {}, {}
+    local function checkPlate(label)
+      local pl, fs = card.plate, card.plateText
+      if not pl.shown then return end
+      local box = pl.box
+      local size = fs._fontSize
+      local tw = H.textWidth(fs, fs._text, size)
+      local pt = fs._points[1]
+      local cx, cy = pt[4], -pt[5]
+      if tw > box.textW + 0.01 or math.abs(cx - box.cx) > 0.01 then
+        plateBad[#plateBad + 1] = ("%s : « %s » (%.1f) plus large que la zone (%.1f)"):format(label, fs._text, tw, box.textW)
+      end
+      if cy - size * LH / 2 < box.inT - 0.5 or cy + size * LH / 2 > box.inB + 0.5 then
+        plateBad[#plateBad + 1] = label .. " : texte hors de la hauteur de l'intérieur"
+      end
+      if fs:IsTruncated() or fs:GetNumLines() ~= 1 then plateBad[#plateBad + 1] = label .. " : texte recoupé" end
+      if box.x < -0.01 or box.x + box.w > CW + 0.01 then plateBad[#plateBad + 1] = label .. " : plaque plus large que le corps" end
+      for _, t in ipairs(pl.parts) do
+        local a = t._calls.SetAlpha and t._calls.SetAlpha[1] or 1
+        if not t._shown or a < 1 or t._w <= 0 or t._h <= 0 or (t._sub or 0) <= (card.bg._sub or 0)
+          or t._layer ~= card.bg._layer then
+          plateBad[#plateBad + 1] = label .. " : plaque invisible (caché, alpha, taille nulle ou derrière le corps)"
+          break
+        end
+      end
+      local l, m, r = pl.parts[1], pl.parts[2], pl.parts[3]
+      if math.abs(l._w + m._w + r._w - box.w) > 0.01 or math.abs(l._h - box.h) > 0.01 then
+        plateBad[#plateBad + 1] = label .. " : tranches mal posées"
+      end
+      if box.inT < 163 then plateBad[#plateBad + 1] = label .. " : intérieur de la plaque sous le corps" end
+      combos[fs._text] = combos[fs._text] or label
+      if card.plateFit.wide then wide[fs._text] = ("%s (plaque %.0f, taille %s)"):format(label, box.w, tostring(size)) end
+    end
+    for _, id in ipairs(ids) do
+      for _, up in ipairs({ false, true }) do
+        for _, var in ipairs(variants) do
+          card:SetCard(id, up, var.opts)
+          checkPlate(id .. (up and "+" or "") .. var.key)
+        end
+      end
+    end
+    -- cas extrême (toutes les marques) : plaque au plus large, texte abrégé, jamais hors de la plaque
+    ns.Cards.ui_test_all = { name = "Essai", type = "power", cast = true, cooldown = 4, exhaust = true, retain = true,
+      cost = 1, text = "Essai.", rarity = "common", actions = {} }
+    card:SetCard("ui_test_all", false, { playable = true })
+    checkPlate("toutes les marques (essai)")
+    local extreme = card.plateText._text
+    ns.Cards.ui_test_all = nil
+    check(("plaque du bas : %d combinaisons réelles et un cas extrême, texte dans la zone utile, plaque visible devant le corps")
+      :format((function() local n = 0 for _ in pairs(combos) do n = n + 1 end return n - 1 end)()),
+      #plateBad == 0, table.concat(plateBad, "\n        "))
+    local wl = {}
+    for t, l in pairs(wide) do if l:sub(1, 6) ~= "toutes" then wl[#wl + 1] = "« " .. t .. " » " .. l end end
+    table.sort(wl)
+    print("      plaque élargie : " .. (#wl > 0 and table.concat(wl, ", ") or "aucune"))
+    print("      cas extrême : « " .. tostring(extreme) .. " »")
+  end
   local function dist(t)
     local ks, out = {}, {}
     for k in pairs(t) do ks[#ks + 1] = k end
@@ -2393,6 +2485,12 @@ do
   end
   check(("%d cartes × base/améliorée × jouable/injouable (%d cas) : texte dans l'ardoise, marges comprises ; nom dans le ruban")
     :format(#ids, cases), #bad == 0, table.concat(bad, "\n        "))
+  do
+    local rl = {}
+    for t, sz in pairs(reasonDist) do rl[#rl + 1] = "« " .. t .. " » " .. sz end
+    table.sort(rl)
+    print("      raisons : " .. table.concat(rl, ", "))
+  end
   print("      texte, cartes par taille : " .. dist(bodyDist))
   print("      nom, cartes par taille : " .. dist(nameDist))
   print("      texte sous le plancher (" .. W.BODY_SIZES[#W.BODY_SIZES] .. ") : "

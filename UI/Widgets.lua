@@ -1683,6 +1683,135 @@ function W.refreshCards()
   end
 end
 
+-- Plaque du bas (mots-clés) : Media/card_plate.tga en trois tranches (bords gauche et droit à
+-- l'échelle de la hauteur, milieu étiré : la plaque s'élargit sans déformer ses coins), posée DEVANT
+-- le corps (derrière, l'ombre portée du corps la masquait presque entière), à la place que lui donne
+-- le PSD (son liseré du haut mord d'une unité sur le bas opaque du corps). Mesures sur la texture
+-- (zone utile 256 × 89 px) : intérieur sombre x 20 à 234, y 20 à 70 ; coins arrondis du bas dans
+-- les 48 px de chaque bord. Zone du texte = intérieur moins PLATE.margin de chaque côté.
+local PLATE = { texW = 256, texH = 89, capPx = 48, inL = 20, inR = 234, inT = 20, inB = 70, margin = 3 }
+W.CARD_PLATE = PLATE
+-- Paliers du texte de la plaque : 8 = plancher lisible ; au plancher, la plaque s'élargit (jusqu'à la
+-- largeur du corps) ; au-delà, secours 7,5 / 7, puis mots-clés abrégés (W.PLATE_SHORT).
+W.PLATE_SIZES = { 9, 8.5, 8 }
+W.PLATE_UNDER = { 7.5, 7 }
+W.PLATE_SHORT = { Incantation = "Incant.", ["Consumée"] = "Cons.", ["Conservée"] = "Conserv.",
+  Pouvoir = "Pouv.", Recharge = "Rech." }
+
+-- Géométrie de la plaque (unités de la carte, origine au coin haut gauche du corps) pour une largeur
+-- totale w : position, bords, intérieur, zone du texte.
+function W.cardPlateBox(w)
+  local CW = W.CARD_W
+  local r = SC.pieces.card_plate
+  local h = r[4] * CW
+  local u = h / PLATE.texH                       -- unités par pixel de texture (bords à l'échelle)
+  w = w or r[3] * CW
+  local x0, y0 = (CW - w) / 2, r[2] * CW
+  local inL, inR = x0 + PLATE.inL * u, x0 + w - (PLATE.texW - PLATE.inR) * u
+  local inT, inB = y0 + PLATE.inT * u, y0 + PLATE.inB * u
+  return { x = x0, y = y0, w = w, h = h, cap = PLATE.capPx * u, inL = inL, inR = inR, inT = inT, inB = inB,
+    textW = inR - inL - 2 * PLATE.margin, cx = (inL + inR) / 2, cy = (inT + inB) / 2 }
+end
+
+-- Trois tranches de la plaque du bas (groupe : couleur, désaturation, visibilité d'un bloc).
+local function cardPlate(face)
+  local e = TEX.card_plate
+  local o = setmetatable({ parts = {} }, Group)
+  local a = PLATE.capPx / PLATE.texW
+  local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
+  for k = 1, 3 do
+    local t = face:CreateTexture(nil, "BACKGROUND", nil, -5)
+    t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
+    t:SetTexCoord(cuts[k][1] * e.tc[2], cuts[k][2] * e.tc[2], 0, e.tc[4])
+    o.parts[k] = t
+  end
+  -- pose les tranches pour une largeur totale w (unités), par rapport au corps org
+  o.Layout = function(self, org, w)
+    local box = W.cardPlateBox(w)
+    self.box = box
+    local l, m, r = self.parts[1], self.parts[2], self.parts[3]
+    for _, t in ipairs(self.parts) do t:ClearAllPoints() end
+    l:SetPoint("TOPLEFT", org, "TOPLEFT", box.x, -box.y)
+    l:SetSize(box.cap, box.h)
+    m:SetPoint("TOPLEFT", org, "TOPLEFT", box.x + box.cap, -box.y)
+    m:SetSize(box.w - 2 * box.cap, box.h)
+    r:SetPoint("TOPLEFT", org, "TOPLEFT", box.x + box.w - box.cap, -box.y)
+    r:SetSize(box.cap, box.h)
+  end
+  return o
+end
+
+-- Pose les mots-clés sur la plaque : premier palier qui tient dans la zone utile à la largeur de
+-- repos ; sinon plaque élargie au plancher ; sinon secours plus petits à la largeur du corps ; sinon
+-- mots-clés abrégés. Mesure par le client (GetUnboundedStringWidth), vérification (IsTruncated).
+local function fitPlate(b, pills)
+  local fs = b.plateText
+  local CW = W.CARD_W
+  local base = SC.pieces.card_plate[3] * CW
+  local baseText = W.cardPlateBox(base).textW
+  local extra = base - baseText                  -- largeur de plaque hors zone de texte
+  local maxW = CW                                -- plaque au plus large : largeur du corps
+  local function width(t, s)
+    W.setSize(fs, s)
+    fs:SetWidth(0)
+    fs:SetText(t)
+    return (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
+  end
+  local text = table.concat(pills, " · ")
+  local fit
+  for _, s in ipairs(W.PLATE_SIZES) do
+    local sw = width(text, s)
+    if sw > 0 and sw <= baseText then fit = { size = s, w = base, text = text } break end
+  end
+  if not fit then
+    local s = W.PLATE_SIZES[#W.PLATE_SIZES]
+    local sw = width(text, s)
+    if sw + extra <= maxW then fit = { size = s, w = max(base, sw + extra), text = text, wide = true } end
+  end
+  if not fit then
+    local short = {}
+    for i, pl in ipairs(pills) do
+      local head, tail = pl:match("^(%S+)(.*)$")
+      short[i] = (W.PLATE_SHORT[head] or head) .. tail
+    end
+    for _, t in ipairs({ text, table.concat(short, " · ") }) do
+      for _, s in ipairs(W.PLATE_UNDER) do
+        local sw = width(t, s)
+        if sw + extra <= maxW then
+          fit = { size = s, w = max(base, sw + extra), text = t, wide = true, under = true, short = t ~= text }
+          break
+        end
+      end
+      if fit then break end
+    end
+  end
+  if not fit then
+    -- même abrégés, trop de mots-clés : les premiers qui tiennent, suivis de « … » (signalé)
+    local s = W.PLATE_UNDER[#W.PLATE_UNDER]
+    local keep = {}
+    for i, pl in ipairs(pills) do
+      local head, tail = pl:match("^(%S+)(.*)$")
+      keep[i] = (W.PLATE_SHORT[head] or head) .. tail
+    end
+    local t
+    repeat
+      keep[#keep] = nil
+      t = table.concat(keep, " · ") .. (#keep > 0 and " …" or "…")
+    until #keep == 0 or width(t, s) + extra <= maxW
+    fit = { size = s, w = maxW, text = t, wide = true, under = true, short = true, cut = true }
+  end
+  b.plate:Layout(b.bg, fit.w)
+  local box = b.plate.box
+  W.setSize(fs, fit.size)
+  fs:SetText(fit.text)
+  fs:ClearAllPoints()
+  fs:SetPoint("CENTER", b.bg, "TOPLEFT", box.cx, -box.cy)
+  fs:SetWidth(box.textW + 1)
+  if fit.ok == nil then fit.ok = not (fs.IsTruncated and fs:IsTruncated()) end
+  b.plateFit = fit
+  return fit
+end
+
 -- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin.
 local function cardPlaque(b, key, w, h)
   local p = b[key]
@@ -1704,7 +1833,63 @@ end
 -- que le survol anime (W.hoverable). Réglages par écran : b.hoverScale, b.hoverLift (unités de la
 -- carte, vers le haut) ; b.baseLevel / b.upLevel : niveau au repos et au survol (passage devant).
 -- Plaque rouge de raison (carte injouable) : à cheval sur le bas du panneau, sous la zone du texte.
-local REASON_Y, REASON_H = 1.24, 20
+local REASON_Y, REASON_H = 1.225, 20
+-- Texte de la raison : paliers 11 à 8 (plancher) dans la largeur de repos (0,84 du corps, 6 unités
+-- de marge de chaque côté) ; au plancher, la plaque s'élargit jusqu'à la largeur du corps ; au-delà,
+-- deux lignes coupées au mot le plus près du milieu, la plaque grandit vers le haut (son bas reste
+-- au-dessus de la plaque des mots-clés).
+W.REASON_SIZES = { 11, 10, 9, 8 }
+local REASON_PAD = 6
+
+-- Pose la raison dans sa plaque p ; renvoie la hauteur de la plaque.
+local function fitReason(p, text)
+  local CW = W.CARD_W
+  local fs = p.text
+  local baseW = 0.84 * CW
+  local function width(t, s)
+    W.setSize(fs, s)
+    fs:SetWordWrap(false)
+    fs:SetWidth(0)
+    fs:SetText(t)
+    return (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
+  end
+  local w, t, size, lines = baseW, text, nil, 1
+  for _, s in ipairs(W.REASON_SIZES) do
+    if width(text, s) <= baseW - 2 * REASON_PAD then size = s break end
+  end
+  if not size then
+    size = W.REASON_SIZES[#W.REASON_SIZES]
+    local sw = width(text, size)
+    if sw + 2 * REASON_PAD <= CW then
+      w = sw + 2 * REASON_PAD
+    else
+      local words = {}
+      for word in text:gmatch("%S+") do words[#words + 1] = word end
+      local best, bestW
+      for k = 1, #words - 1 do
+        local a = table.concat(words, " ", 1, k)
+        local b = table.concat(words, " ", k + 1)
+        local m = max(width(a, size), width(b, size))
+        if not bestW or m < bestW then best, bestW = { a, b }, m end
+      end
+      if best then
+        t, lines = best[1] .. "\n" .. best[2], 2
+        w = min(CW, max(baseW, bestW + 2 * REASON_PAD))
+      else
+        w = CW
+      end
+    end
+  end
+  W.setSize(fs, size)
+  fs:SetWordWrap(lines > 1)
+  fs:SetWidth(w - 2 * REASON_PAD + 1)
+  fs:SetText(t)
+  local h = REASON_H
+  if lines > 1 then h = max(REASON_H, (fs:GetStringHeight() or 2 * size * 1.5) + 6) end
+  p:SetSize(w, h)
+  p.fit = { size = size, lines = lines, w = w, h = h }
+  return h
+end
 -- Marge du visuel autour du corps (fraction de la largeur) : contient le halo (0,215), la languette
 -- de coût, le ruban, la plaque du bas et l'étiquette de prix (jusqu'à 0,29 sous le corps).
 local CARD_MARGIN = 0.3
@@ -1730,8 +1915,8 @@ function W.card(parent)
   b.halo:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
   b.halo:SetAlpha(0)
   b.halo:Hide()
-  b.plate = W.skin(face, "card_plate", "BACKGROUND", -7)
-  place(b.plate, org, P.card_plate)
+  b.plate = cardPlate(face)
+  b.plate:Layout(org)
   -- médaillon : anneau, icône masquée, verre
   b.ring = W.skin(face, "medal_ring", "BORDER", 0)
   place(b.ring, org, P.medal_ring)
@@ -1768,6 +1953,7 @@ function W.card(parent)
   b.plateText = W.label(face, "bold", 8.5, C.text, "OVERLAY")
   b.plateText:SetPoint("CENTER", org, "TOPLEFT", SC.plateText.cx * CW, -SC.plateText.cy * CW)
   b.plateText:SetWordWrap(false)
+  b.plateText:SetJustifyH("CENTER")
   b.kind = b.plateText -- compatibilité
 
   -- opts : cost, playable, reason, manaShort, price, sold, tooPoor, preview, showUp
@@ -1789,7 +1975,11 @@ function W.card(parent)
     -- texte : zone utile du panneau, relevée au-dessus de la plaque de raison si elle y mord
     local text = W.cardBody(d, base)
     local bottom = TZ.bottom * CW
-    if dim and opts.reason then bottom = min(bottom, REASON_Y * CW - REASON_H / 2 - 1) end
+    local reasonH
+    if dim and opts.reason then
+      reasonH = fitReason(cardPlaque(self, "reasonPlate", 0.84 * CW, REASON_H), opts.reason)
+      bottom = min(bottom, REASON_Y * CW + REASON_H / 2 - reasonH - 1)
+    end
     local fit = fitBody(self, text, bottom)
     if fit.font and not self._refit then
       -- police pas encore chargée : nouvelle mise en page un peu plus tard
@@ -1802,7 +1992,7 @@ function W.card(parent)
     -- plaque du bas : mots-clés
     local pills = W.cardPills(d)
     if #pills > 0 then
-      W.fitText(self.plateText, table.concat(pills, " · "), 9, SC.plateText.w * CW, 6.5)
+      fitPlate(self, pills)
       self.plate:Show()
       self.plateText:Show()
     else
@@ -1838,12 +2028,13 @@ function W.card(parent)
     local dc = dim and C.textDim or C.textSoft
     self.body:SetTextColor(dc[1], dc[2], dc[3])
     if dim and opts.reason then
-      local p = cardPlaque(self, "reasonPlate", 0.84 * CW, REASON_H)
+      local p = self.reasonPlate
       p.plaque:SetFill({ 1, 0.47, 0.43 })
       p.plaque:SetRim(Art.rim.red)
-      W.fitText(p.text, opts.reason, 11, 0.84 * CW - 12, 7)
       p:ClearAllPoints()
-      p:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, -REASON_Y * CW)
+      -- bas de la plaque fixe (au-dessus de la plaque des mots-clés) : une raison sur deux lignes
+      -- la fait grandir vers le haut
+      p:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, -(REASON_Y * CW + REASON_H / 2 - reasonH / 2))
       p:Show()
     elseif self.reasonPlate then
       self.reasonPlate:Hide()
