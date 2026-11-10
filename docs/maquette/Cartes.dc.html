@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Anatomie des cartes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya+Sans:wght@400;500;700&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1040px; height: 620px; box-sizing: border-box; background: #3a2618; font-family: 'Alegreya Sans', sans-serif; color: #f3e6c8; padding: 28px 36px; display: flex; flex-direction: column; gap: 22px">
+
+<div style="display: flex; gap: 40px; align-items: flex-start">
+
+<!-- Commune -->
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+<div style="position: relative; width: 210px; height: 300px; background: #efe0bd; border: 5px solid #e8e2d0; border-radius: 14px; box-sizing: border-box; color: #2b1c10; padding: 14px 14px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="position: absolute; left: -14px; top: -14px; width: 48px; height: 48px; border-radius: 50%; background: #2f6fc0; border: 3px solid #cfe5ff; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; display: flex; align-items: center; justify-content: center">1</span>
+<span style="font-family: 'Cinzel', serif; font-size: 19px; font-weight: 700">Châtiment</span>
+<span style="width: 104px; height: 104px; border-radius: 50%; background: #c9a227; border: 5px solid #6b4a22; box-sizing: border-box"></span>
+<span style="font-size: 13px; font-weight: 700; color: #6b4a22">Sort · Départ</span>
+<span style="font-size: 17px; text-align: center; line-height: 20px">Inflige <b>6</b>.</span>
+</div>
+<span style="font-size: 14px; font-weight: 700">Commune : liseré blanc</span>
+</div>
+
+<!-- Peu commune -->
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+<div style="position: relative; width: 210px; height: 300px; background: #efe0bd; border: 5px solid #3fae4a; border-radius: 14px; box-sizing: border-box; color: #2b1c10; padding: 14px 14px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="position: absolute; left: -14px; top: -14px; width: 48px; height: 48px; border-radius: 50%; background: #2f6fc0; border: 3px solid #cfe5ff; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; display: flex; align-items: center; justify-content: center">2</span>
+<span style="font-family: 'Cinzel', serif; font-size: 19px; font-weight: 700">Flammes sacrées</span>
+<span style="width: 104px; height: 104px; border-radius: 50%; background: #e2863b; border: 5px solid #6b4a22; box-sizing: border-box"></span>
+<span style="font-size: 13px; font-weight: 700; color: #8a4a12">Sort · Sacré</span>
+<span style="font-size: 16px; text-align: center; line-height: 19px">Inflige <b>16</b> et <b>Douleur 3</b>.</span>
+<span style="font-size: 13px; font-weight: 700; background: #2b1c10; color: #f3e6c8; border-radius: 10px; padding: 2px 10px">Incantation</span>
+</div>
+<span style="font-size: 14px; font-weight: 700">Peu commune : liseré vert</span>
+</div>
+
+<!-- Rare -->
+<div style="display: flex; flex-direction: column; align-items: center; gap: 10px">
+<div style="position: relative; width: 210px; height: 300px; background: #efe0bd; border: 5px solid #3b82d6; border-radius: 14px; box-sizing: border-box; color: #2b1c10; padding: 14px 14px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 8px">
+<span style="position: absolute; left: -14px; top: -14px; width: 48px; height: 48px; border-radius: 50%; background: #2f6fc0; border: 3px solid #cfe5ff; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 26px; display: flex; align-items: center; justify-content: center">2</span>
+<span style="font-family: 'Cinzel', serif; font-size: 19px; font-weight: 700">Forme d'ombre</span>
+<span style="width: 104px; height: 104px; border-radius: 50%; background: #7b4bb3; border: 5px solid #3a2358; box-sizing: border-box"></span>
+<span style="font-size: 13px; font-weight: 700; color: #4f2a82">Pouvoir · Ombre</span>
+<span style="font-size: 15px; text-align: center; line-height: 18px">Tes cartes d'ombre infligent <b>2</b> de plus. Plus de cartes sacrées.</span>
+</div>
+<span style="font-size: 14px; font-weight: 700">Rare : liseré bleu</span>
+</div>
+
+<!-- Légende -->
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 19px">
+<span style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: 700; color: #f0c75e">Ce que montre une carte</span>
+<span><b>Gemme bleue</b> : le coût en mana. Elle vire au rouge si tu n'as pas assez.</span>
+<span><b>Médaillon</b> : l'icône du sort dans le jeu, cerclée à la couleur de sa voie.</span>
+<span><b>Ligne de type</b> : Sort ou Pouvoir, puis Discipline, Ombre ou Sacré.</span>
+<span><b>Texte</b> : les chiffres en gras tiennent compte des bonus en cours.</span>
+<span><b>Pastilles</b> : Incantation, Recharge, Consumée, Conservée.</span>
+</div>
+</div>
+
+<!-- États en main -->
+<div style="display: flex; gap: 26px; align-items: flex-end">
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="position: relative; width: 124px; height: 176px; background: #f6e9c9; border: 3px solid #e8e2d0; border-radius: 9px; box-sizing: border-box; color: #2b1c10; padding: 8px 8px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; box-shadow: 0 0 0 3px #f0c75e">
+<span style="position: absolute; left: -9px; top: -9px; width: 30px; height: 30px; border-radius: 50%; background: #2f6fc0; border: 2px solid #cfe5ff; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center">1</span>
+<span style="font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700">Châtiment</span>
+<span style="width: 58px; height: 58px; border-radius: 50%; background: #c9a227; border: 3px solid #6b4a22; box-sizing: border-box"></span>
+<span style="font-size: 13px; text-align: center; line-height: 15px">Inflige <b>6</b>.</span>
+</div>
+<span style="font-size: 13px; font-weight: 700">Survolée : halo doré</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="position: relative; width: 124px; height: 176px; background: #b8ab8c; border: 3px solid #e8e2d0; border-radius: 9px; box-sizing: border-box; color: #2b1c10; padding: 8px 8px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 4px">
+<span style="position: absolute; left: -9px; top: -9px; width: 30px; height: 30px; border-radius: 50%; background: #7a2a1e; border: 2px solid #f0b3a6; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center">2</span>
+<span style="font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700">Pénitence</span>
+<span style="width: 58px; height: 58px; border-radius: 50%; background: #9c9070; border: 3px solid #6b4a22; box-sizing: border-box"></span>
+<span style="font-size: 12px; font-weight: 700; background: #7a2a1e; color: #ffffff; border-radius: 9px; padding: 1px 8px">Mana insuffisant</span>
+</div>
+<span style="font-size: 13px; font-weight: 700">Injouable : ternie, raison écrite</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="position: relative; width: 124px; height: 176px; background: #efe0bd; border: 3px solid #e8e2d0; border-radius: 9px; box-sizing: border-box; color: #2b1c10; padding: 8px 8px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 4px">
+<span style="position: absolute; left: -9px; top: -9px; width: 30px; height: 30px; border-radius: 50%; background: #2f6fc0; border: 2px solid #cfe5ff; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center">1</span>
+<span style="font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700; color: #1f6b2a">Châtiment+</span>
+<span style="width: 58px; height: 58px; border-radius: 50%; background: #c9a227; border: 3px solid #6b4a22; box-sizing: border-box"></span>
+<span style="font-size: 13px; text-align: center; line-height: 15px">Inflige <b style="color: #1f6b2a">9</b>.</span>
+</div>
+<span style="font-size: 13px; font-weight: 700">Améliorée : nom et chiffre verts</span>
+</div>
+
+<div style="display: flex; flex-direction: column; align-items: center; gap: 8px">
+<div style="position: relative; width: 124px; height: 176px; background: #efe0bd; border: 3px solid #e8e2d0; border-radius: 9px; box-sizing: border-box; color: #2b1c10; padding: 8px 8px 0 8px; display: flex; flex-direction: column; align-items: center; gap: 4px">
+<span style="position: absolute; left: -9px; top: -9px; width: 30px; height: 30px; border-radius: 50%; background: #2f6fc0; border: 2px solid #cfe5ff; box-sizing: border-box; color: #ffffff; font-family: 'Cinzel', serif; font-weight: 700; font-size: 17px; display: flex; align-items: center; justify-content: center">1</span>
+<span style="font-family: 'Cinzel', serif; font-size: 12px; font-weight: 700; text-align: center">Mot de pouvoir : Bouclier</span>
+<span style="width: 50px; height: 50px; border-radius: 50%; background: #7fb6e8; border: 3px solid #2f5f8a; box-sizing: border-box"></span>
+<span style="font-size: 12px; text-align: center; line-height: 14px">Gagne <b>8</b> Absorption.</span>
+<span style="font-size: 12px; font-weight: 700; background: #2b1c10; color: #f3e6c8; border-radius: 9px; padding: 1px 8px">Recharge 2</span>
+</div>
+<span style="font-size: 13px; font-weight: 700">À recharge : pastille en bas</span>
+</div>
+
+<div style="flex-grow: 1; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 19px; align-self: center">
+<span style="font-family: 'Cinzel', serif; font-size: 18px; font-weight: 700; color: #f0c75e">En main</span>
+<span>La carte survolée monte, grossit et passe devant les autres.</span>
+<span>Les cartes restent droites : elles suivent un arc sans pivoter.</span>
+</div>
+</div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1040,"height":620}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
