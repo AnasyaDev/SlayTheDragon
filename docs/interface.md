@@ -127,12 +127,21 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   Mesures par le client : `GetStringWidth` / `GetStringHeight` d'un texte de mesure (même police), puis
   vérification sur la carte (`GetNumLines`, `IsTruncated`, `GetStringHeight`) — un échec fait descendre
   d'un palier. Mises en page gardées en cache (texte, taille, bas de zone).
-- **Paliers** : texte 8 / 7,5 / 7 (plancher lisible), secours 6,5 / 6 signalé (`card.bodyFit.under`) ;
-  nom 10 / 8,5 / 7, secours 6,5 / 6 (`card.nameFit`), une ligne dans la bande du ruban moins 4 unités de
-  chaque côté. Répartition (harnais U22, métriques de Baloo Chettan 2) : texte 8 → 55 cartes (base et
-  améliorées comptées à part, 68 en tout), 7,5 → 5, 7 → 6, sous le plancher : Esprit de rédemption (et +)
-  à 6 ; nom 10 → 42, 8,5 → 10, 7 → 12, sous le plancher (6,5) : Suppression de la douleur+, Mot de
-  pouvoir : Radiance+, Mot de pouvoir : Réconfort et Réconfort+. Textes à raccourcir côté `Data/`.
+- **Paliers** (retour du troisième essai : « texte trop petit ») : chaque carte prend le plus grand
+  palier qui tient dans la zone utile (inchangée, marges comprises) : texte 10 / 9,5 / 9 / 8,5 / 8 / 7,5 / 7
+  (plancher lisible), secours 6,5 / 6 signalé (`card.bodyFit.under`) ; nom 11 / 10 / 9 / 8 / 7, secours
+  6,5 / 6 (`card.nameFit`), une ligne dans la bande du ruban moins 4 unités de chaque côté. Coupure : le
+  moins de lignes possible, chaque ligne remplie de haut en bas tant que la suite tient dans les lignes
+  restantes (le glouton d'avant finissait parfois en moins de lignes que prévu, puis le bloc recentré
+  sortait du biseau : Embrasement empyréen restait à 8) ; mots insécables (`W.cardWords`) : « : » avec le
+  mot d'avant, un nombre qui finit la phrase (« Pioche 1. ») avec le mot d'avant, un nombre seul avec le
+  mot d'après (« 12 Absorption », « +1 Démence », « 2 tours »). Répartition (harnais U22, métriques de
+  Baloo Chettan 2, 68 cartes base et améliorées) : texte 10 → 34, 9,5 → 2, 9 → 10, 8,5 → 3, 8 → 17, 7 → 2
+  (Esprit de rédemption et +), soit 49 à 8,5 ou plus (35 avant raccourcis) ; avant : 8 → 55, 7,5 → 5,
+  7 → 6, 6 → 2. Nom 11 → 44, 10 → 8, 9 → 6, 8 → 4, 7 → 5, sous le plancher : Suppression de la douleur+
+  (6,5). La largeur de Baloo et le biseau limitent la troisième ligne : un texte de trois lignes dont la
+  dernière dépasse ~59 unités reste à 8 ; textes raccourcis dans `Data/Priest.lua` (règles et chiffres
+  inchangés). Noms abrégés : « MdP : » (Mot de pouvoir) et « MdlO : » (Mot de l'ombre).
 - **Plaque du bas** (mots-clés) : `Media/card_plate.tga` en trois tranches (bords à l'échelle de la
   hauteur, milieu étiré : élargie sans déformer ses coins), **devant** le corps (derrière, l'ombre portée
   du corps la masquait : on n'en voyait qu'un liseré), à la place du PSD (liseré du haut à cheval sur le
@@ -146,32 +155,54 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   texte des mots-clés. Raison aux paliers 11 à 8 dans 0,84 du corps (6 unités de marge) ; au plancher,
   plaque élargie jusqu'à la largeur du corps ; au-delà, deux lignes équilibrées, la plaque grandit vers le
   haut et la zone du texte de la carte remonte d'autant (« Une incantation / est déjà en cours. »).
-- **Zoom net** (`W.faceApply`, mode `net` par défaut) : pendant le mouvement (0,12 s), l'échelle passe
-  par une animation `Scale` d'un `AnimationGroup` posé sur le visuel `face`, textes en
-  `SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)` (mise en page figée, glyphes étirés
-  — invisible à cette vitesse) ; à l'arrivée, dans le même pas de l'`OnUpdate` partagé, l'échelle
-  d'arrivée devient l'échelle **réelle** du visuel (`SetScale`) et l'animation est coupée (`Stop`) : le
-  client redessine les polices à la vraie taille, le texte de la carte survolée est net. Avant (mode
-  `anim`), l'échelle d'arrivée restait tenue par l'animation (long délai de fin) : texte étiré, baveux,
-  tant que la carte était survolée. L'animation est toujours relative à l'échelle réelle du moment et part
-  du facteur 1 (première image identique avec ou sans animation, aucun saut si le client n'applique
-  l'animation qu'à l'image suivante) ; elle tient son état d'arrivée (délai de fin) jusqu'à la bascule,
-  pour qu'aucune image ne la montre retombée à 1 avant le `SetScale`. Sortie : depuis l'échelle réelle
-  agrandie, étirement vers 1 / échelle, puis échelle réelle 1 posée à la fin. Une cible qui change en route
-  relance l'animation depuis le facteur courant (réversible, y compris au pas même de la bascule). La
-  position (levée, écart des voisines) reste pilotée par l'`OnUpdate`, décalages divisés par l'échelle
-  réelle ; la zone de survol ne bouge pas. Mise en page inchangée à la bascule : retours à la ligne
-  explicites, largeurs et ancrages en unités du visuel, et **tous les textes en `SetSmoothScaling`**
-  (hauteur de police non arrondie au pixel, comme les barres d'info de Blizzard : la taille rendue est
-  exactement proportionnelle à l'échelle ; le texte de mesure des cartes aussi). Vols de cartes
-  (`W.fly`) : échelle réelle de départ, étirement pendant le vol, échelle réelle d'arrivée posée à
-  l'atterrissage (carte posée nette). `/slay zoom` bascule entre `net` et `lisse` (échelle réelle à chaque
-  image, pour comparer) ; `/slay zoom net|lisse` ; l'ancienne valeur sauvegardée `anim` (et `/slay zoom
-  anim`) retombe sur `net`. Écartée : dessiner les textes à la taille agrandie dans un cadre d'échelle
-  de repos < 1 (glyphes réduits au repos) — la carte au repos, la plus souvent lue (la main entière),
-  serait alors un rendu réduit sans mipmaps (crénelé), il faudrait tenir une animation sur chaque carte,
-  bouton et plaque en permanence (arrêtée dès qu'un cadre est caché : texte géant au retour), et le
-  problème de netteté passerait du survol au repos.
+- **Zoom** (`W.faceApply`, trois modes, `/slay zoom` : net → fluide → lisse ; `/slay zoom net|fluide|lisse` ;
+  `/slay zoom lent` : survols au ralenti ×8, diagnostic en jeu). Commun : mise en page indépendante de
+  l'échelle (retours à la ligne explicites, largeurs et ancrages en unités du visuel, **tous les textes en
+  `SetSmoothScaling`** : hauteur de police non arrondie, taille rendue exactement proportionnelle), position
+  (levée, écart des voisines) pilotée par l'`OnUpdate` partagé, décalages divisés par l'échelle réelle,
+  zone de survol immobile ; textures sans accrochage au pixel (`W.noSnap` : `SetSnapToPixelGrid(false)`,
+  `SetTexelSnappingBias(0)`, comme les neuf tranches de Blizzard, aux points de création : `W.skin`,
+  `W.nine`, `W.plaque`, `W.goldPill`, `W.hex`, `W.medallionOn`, pièces de `W.card` ; les FontString n'ont
+  pas ces méthodes — `SimpleTextureBaseAPI` —, d'où le test d'existence).
+  - **net** (défaut, préféré par le joueur pour la fluidité) : pendant le mouvement (0,12 s), animation
+    `Scale` d'un `AnimationGroup` sur le visuel `face`, textes en `SetScaleAnimationMode(Vertex)` ; à
+    l'arrivée, dans le même pas, échelle d'arrivée posée comme échelle **réelle** (`SetScale`) et
+    animation coupée (`Stop`) : texte redessiné net. L'animation part du facteur 1 et tient son état
+    d'arrivée (délai de fin) jusqu'à la bascule ; cible changée en route : relance depuis le facteur
+    courant. Retour du joueur : « fluide mais les éléments sautent à l'arrivée ». Causes possibles d'un
+    saut à la bascule, et ce qui est fait : (1) **cadres enfants du visuel** — si une animation `Scale` ne
+    porte que sur les régions du cadre animé (non vérifiable hors jeu ; cohérent avec la capture d'avant
+    où ruban et plaque ne suivaient pas), un cadre enfant ne grossit qu'à la bascule, d'un coup : la plaque
+    de raison et l'étiquette de prix des cartes (`p`, cadre d'ancrage seulement) et le médaillon des jetons
+    d'état (`W.medallionOn` sur le visuel) sont maintenant des **régions du visuel** ; le harnais (U26)
+    vérifie qu'aucun visuel survolable n'a de cadre enfant dessiné et, sous cette hypothèse prudente,
+    qu'image par image (4 ms) le pas de la bascule n'ajoute aucun déplacement au mouvement ; (2)
+    **accrochage au pixel** des textures (recalées sur la grille de pixels à la nouvelle échelle réelle,
+    alors que l'animation ne l'est pas) : coupé (`W.noSnap`) ; (3) **polices redessinées** à la nouvelle
+    taille (crénage et lissage d'une autre taille de pixels) : inhérent au mode net, aucune animation ne
+    peut le lisser ; c'est ce que supprime le mode fluide. Ce qui saute encore se verra au ralenti
+    (`/slay zoom lent`).
+  - **fluide** (option de comparaison) : l'échelle **réelle** du visuel vaut en permanence l'échelle
+    survolée (`hoverScale`) : polices rasterisées une fois, à la taille qu'on lit ; au repos, une animation
+    `Scale` tenue (délai de fin de 24 h) réduit le visuel d'un facteur 1 / `hoverScale` ; le survol anime ce
+    facteur vers 1, la sortie le ramène à 1 / `hoverScale` ; ni `SetScale` ni `Stop` pendant un survol.
+    Repos identique au mode net (harnais : mêmes rectangles affichés à ±0,01 ; carte agrandie : mêmes
+    rectangles qu'en net à l'arrivée). Armement à l'image suivant `W.hoverable` (après la construction du
+    widget : une région créée sous un visuel dont l'animation joue est mal dessinée, voir « Écran doré ») ;
+    avant, repos sans animation à l'échelle réelle 1, identique à l'œil ; créations tardives sous un
+    visuel armé (plaques de raison et de prix) par `W.faceBuild` (animation coupée le temps de la
+    création puis relancée au même facteur, dans le même appel). Un cadre caché arrête ses animations :
+    l'`OnShow` du visuel repose l'état avant la première image. `W.setHover` change échelle et levée de
+    survol (récompense, grilles, marchand, deck, plaques de réponse, étapes du parcours) et repose
+    l'échelle réelle tout de suite plutôt qu'au survol suivant. Vols (`W.fly`) : échelle réelle du cadre
+    fixée à max(départ, arrivée) pendant tout le vol (polices à la plus grande taille, jamais étirées),
+    taille animée par le facteur tenu du visuel ; pioche (0,3 → 1) : arrivée exactement dans l'état de
+    repos, rien ne change à l'atterrissage. Coûts à surveiller en jeu : une animation tenue sur chaque
+    visuel survolable affiché (cartes, boutons, jetons…), et un texte au repos rendu réduit (×0,86 en main)
+    — à comparer en netteté avec le mode net.
+  - **lisse** : échelle réelle à chaque image (15 images/s en jeu : re-rasterisation des polices).
+  - Persistance : `options.zoom` (`net` par défaut ; `fluide` ou `lisse` enregistrés gardés ; ancienne
+    valeur `anim` ou inconnue → `net`), `options.zoomSlow`.
 - **Carte d'un seul bloc** : le visuel d'une carte (`face`) est agrandi de 0,3 de la largeur de chaque
   côté (`W.CARD_MARGIN`) pour contenir halo, languette de coût, ruban, plaques et étiquette de prix ;
   toutes les pièces et tous les textes sont posés par rapport au corps (`b.bg`, centré sur le visuel).
@@ -669,7 +700,7 @@ frame (seules des textures pivotent), aucun `loadstring`.
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (287 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (473 vérifications, graine 1)
 lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
                                                #   (aperçus de Media copiés dans build/snap/media)
 for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
@@ -702,7 +733,7 @@ bulle d'intention ; mana) ; **textes des cartes** (U22 : les 34 cartes, de base 
 et injouables avec leur plaque de raison : chaque ligne posée, marges comprises, sur les pixels sombres
 de `Media/card_panel.tga` et hors de la gemme, au-dessus des plaques ; nom dans la bande opaque de
 `Media/card_ribbon.tga` ; aucune recoupe par le client ; répartition par palier et cartes sous le
-plancher affichées ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; `/slay zoom net|lisse`, ancienne valeur `anim`) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus). Le faux client mesure les textes avec les
+plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom net (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; cycle `/slay zoom`, ancienne valeur `anim`) ; zoom fluide et saut du mode net (U26 : sauvegarde ; repos identique au net à ±0,01 sur 99 régions ; survol sans `SetScale`, arrivée identique au net ; sortie ; cible changée en route ; fenêtre cachée puis remontrée ; carte jamais montrée ; plaques créées après l'armement ; vols ; écrans construits en fluide sans région née sous une animation ; aucun cadre enfant dessiné sous un visuel ; bascule du mode net sans déplacement ajouté ; carte survolée de la main dans la fenêtre à toutes les places ; noms abrégés) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus). Le faux client mesure les textes avec les
 avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne de 1,47 cadratin (hhea),
 retours explicites puis par mots, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
@@ -728,7 +759,7 @@ En tout premier (peau « Mechanized Magic ») :
    lesquels (une capture suffit).
 2. **Police** : Baloo Chettan 2 partout (lettres rondes, accents corrects) ; si tout est en Friz Quadrata,
    la police ne se charge pas.
-3. **Cartes** : nettes au repos et au survol (×1,16 en main, ×1,17 en récompense) ; icône ronde bien dans
+3. **Cartes** : nettes au repos et au survol (×1,16 en main, ×1,17 en récompense) ; texte plus grand (le plus grand palier qui tient : 10 sur les textes courts) et noms « MdP : … » / « MdlO : … » ; icône ronde bien dans
    l'anneau ; nom horizontal centré sur le ruban, jamais hors de la bande ; texte du panneau centré, avec
    de l'air tout autour (côtés, haut sous la gemme, bas biseauté) même sur Forme d'ombre, Pénitence,
    Esprit de rédemption, chiffres blancs (verts une fois
@@ -754,7 +785,11 @@ Ensuite (retours du premier essai) :
    (ruban, languette de coût, plaque du bas et halo grossissent avec le corps, pendant le mouvement comme
    à l'arrivée) ; **une fois agrandie, le texte est net** (aussi net qu'au repos, pas baveux) et **rien ne
    saute ni ne clignote au moment où elle arrive** (bascule vers la vraie taille) ; comparer avec
-   `/slay zoom` → `lisse`, puis `/slay zoom net`, et dire lequel garder ; **premier survol** de chaque
+   `/slay zoom fluide` (taille animée sans redessiner les textes : rien ne doit sauter à l'arrivée ; texte
+   au repos aussi net qu'en net ?), `/slay zoom lisse`, puis `/slay zoom net` ; en net, `/slay zoom lent`
+   (ralenti ×8) et dire quels éléments sautent encore à l'arrivée (texte seul ? textures ? une pièce
+   précise ?) et s'ils grossissent pendant le mouvement ; dire quel mode garder et si les images par
+   seconde baissent en fluide (animation tenue sur chaque élément survolable) ; **premier survol** de chaque
    élément après un `/reload` (plaques de réponse d'une rencontre, boutons, butin) : aucun aplat doré
    sur l'écran ; les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
    redescendre sans à-coup ; aucun clignotement en bord de carte ; on peut monter le curseur sur la
