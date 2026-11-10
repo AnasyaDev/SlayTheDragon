@@ -971,7 +971,8 @@ local function buttonPaint(self, h)
     self.gold:SetVertexColor(k, k, k)
     self.plaqueGlow(h)
   else
-    self.plaque:SetFill((self.fillK or 1) * (1 + 0.25 * h))
+    local k = self.fillK or 1
+    if type(k) == "table" then self.plaque:SetFill(mul(k, 1 + 0.25 * h)) else self.plaque:SetFill(k * (1 + 0.25 * h)) end
   end
 end
 
