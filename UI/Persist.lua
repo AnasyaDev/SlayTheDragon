@@ -14,7 +14,7 @@ ns.Persist = Persist
 Persist.DEFAULT_OPTIONS = {
   autoOpen = true,     -- ouvrir au décollage
   autoClose = true,    -- fermer à l'atterrissage
-  scale = 1.0,
+  scale = 1.15,
   speed = 1.0,         -- multiplicateur de vitesse des animations
   fast = false,        -- mode rapide : animations quasi instantanées
   decor = true,        -- décor illustré (illustrations validées seulement) ; faux = toujours peint
