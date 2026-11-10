@@ -40,7 +40,7 @@ local function heroFigure(f)
   return fig
 end
 
--- Tas du deck sur le plateau (nombre de cartes ; infobulle = contenu).
+-- Tas du deck sur le plateau (nombre de cartes ; infobulle = contenu ; clic = consulter le deck).
 local function deckPile(f)
   local back = CreateFrame("Frame", nil, f)
   at(back, f, 68, 476, 72, 100)
@@ -48,13 +48,23 @@ local function deckPile(f)
   local mid = CreateFrame("Frame", nil, f)
   at(mid, f, 64, 472, 72, 100)
   W.roundRect(mid, "BACKGROUND", -8, 8, 0):SetColor(C.woodDark)
-  local p = CreateFrame("Frame", nil, f)
+  local p = CreateFrame("Button", nil, f)
   at(p, f, 60, 468, 72, 100)
-  p:EnableMouse(true)
-  p.shape = W.shape(p, 8, C.gold, C.wood, 3, -6)
-  p.count = W.label(p, "title", 28, C.creamLight)
+  p:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(p)
+  p.shape = W.shape(face, 8, C.gold, C.wood, 3, -6)
+  p.count = W.label(face, "title", 28, C.creamLight)
   p.count:SetPoint("CENTER")
-  W.tooltip(p, function(tt) UI.fillDeckTooltip(tt) end, "ANCHOR_RIGHT")
+  W.hoverable(p, { scale = 1.06, lift = 6 })
+  p:SetScript("OnClick", function(_, button)
+    if button == "RightButton" then return end
+    W.sound("click")
+    UI.toggleDeckView("deck")
+  end)
+  W.tooltip(p, function(tt)
+    UI.fillDeckTooltip(tt)
+    tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
+  end, "ANCHOR_RIGHT")
   p.Sync = function(self)
     local r = Controller.runInfo()
     self.count:SetText(r and #r.deck or "")
@@ -67,17 +77,18 @@ local function plaque(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(300, 124)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  b.halo = W.roundRect(b, "BACKGROUND", -8, 13, -4):SetColor(C.gold)
+  local face = W.face(b)
+  b.halo = W.roundRect(face, "BACKGROUND", -8, 13, -4):SetColor(C.gold)
   b.halo:Hide()
-  b.shape = W.shape(b, 10, C.edgeCommon, C.parchment, 4, -7, 0.22)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.shape = W.shape(face, 10, C.edgeCommon, C.parchment, 4, -7, 0.22)
+  b.icon = face:CreateTexture(nil, "ARTWORK")
   b.icon:SetSize(40, 40)
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
   b.icon:Hide()
-  b.label = W.label(b, "title", 18, C.ink)
+  b.label = W.label(face, "title", 18, C.ink)
   b.label:SetWidth(280)
   b.label:SetJustifyH("CENTER")
-  b.sub = W.label(b, "body", 14, C.inkSoft)
+  b.sub = W.label(face, "body", 14, C.inkSoft)
   b.sub:SetWidth(280)
   b.sub:SetJustifyH("CENTER")
   b.sub:SetWordWrap(true)
@@ -107,6 +118,8 @@ local function plaque(parent)
     self.sub:ClearAllPoints()
     self.sub:SetPoint("TOP", self.label, "BOTTOM", 0, -8)
     self:SetAlpha(o.disabled and 0.6 or 1)
+    -- une réponse impossible bouge à peine au survol
+    self.hoverScale, self.hoverLift = o.disabled and 1.01 or 1.04, o.disabled and 0 or 5
     self:Show()
   end
   b:SetScript("OnClick", function(self) chooseOption(self.option) end)
@@ -114,16 +127,18 @@ local function plaque(parent)
     local o = self.option
     if o and o.item then W.fillItemTooltip(tt, o.item.kind, o.item.id, { reason = o.disabled and o.reason or nil }) end
   end, "ANCHOR_TOP")
-  b.onEnterExtra = function(self)
-    if self.option and not self.option.disabled then
+  -- survol : la plaque se lève, son halo doré s'allume en fondu, le parchemin s'éclaircit
+  W.hoverable(b, { scale = 1.04, lift = 5, paint = function(self, h)
+    local live = self.option and not self.option.disabled
+    if live and h > 0 then
       self.halo:Show()
-      self.shape.fill:SetColor(C.parchmentLight)
+      self.halo:SetAlpha(h)
+      self.shape.fill:SetColor(W.lerpColor(C.parchment, C.parchmentLight, h))
+    else
+      self.halo:Hide()
+      self.shape.fill:SetColor(C.parchment)
     end
-  end
-  b.onLeaveExtra = function(self)
-    self.halo:Hide()
-    self.shape.fill:SetColor(C.parchment)
-  end
+  end })
   return b
 end
 
@@ -133,19 +148,21 @@ local function groundObject(parent, size, shape)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  -- l'ombre et l'étiquette restent au sol ; l'objet (face) se soulève au survol
   b.shadow = W.disc(b, "BACKGROUND", -8, C.shadow, 0.55)
   b.shadow:SetSize(size * 1.05, 14)
   b.shadow:SetPoint("TOP", b, "BOTTOM", 0, 8)
-  b.halo = W.roundRect(b, "BACKGROUND", -7, shape == "flask" and floor(size / 3) + 3 or 10, -4):SetColor(C.gold)
+  local face = W.face(b)
+  b.halo = W.roundRect(face, "BACKGROUND", -7, shape == "flask" and floor(size / 3) + 3 or 10, -4):SetColor(C.gold)
   b.halo:Hide()
   local radius = shape == "flask" and floor(size / 3) or (shape == "bag" and floor(size / 2.4) or 8)
-  b.shape = W.shape(b, radius, C.cream, C.woodDark, 3, -6)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.shape = W.shape(face, radius, C.cream, C.woodDark, 3, -6)
+  b.icon = face:CreateTexture(nil, "ARTWORK")
   b.icon:SetPoint("TOPLEFT", 4, -4)
   b.icon:SetPoint("BOTTOMRIGHT", -4, 4)
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  if shape == "flask" or shape == "bag" then W.roundMask(b, b.icon) end
-  b.big = W.label(b, "title", 20, C.creamLight, "OVERLAY", true)
+  if shape == "flask" or shape == "bag" then W.roundMask(face, b.icon) end
+  b.big = W.label(face, "title", 20, C.creamLight, "OVERLAY", true)
   b.big:SetPoint("CENTER", 0, 0)
   b.tag = CreateFrame("Frame", nil, b)
   b.tag:SetSize(80, 22)
@@ -162,8 +179,9 @@ local function groundObject(parent, size, shape)
     self.tag:SetWidth((self.tag.text:GetStringWidth() or 40) + 20)
     self.tag:Show()
   end
-  b.onEnterExtra = function(self) if self.active ~= false then self.halo:Show() end end
-  b.onLeaveExtra = function(self) self.halo:Hide() end
+  W.hoverable(b, { scale = 1.08, lift = 6, paint = function(self, h)
+    if h > 0 then self.halo:Show() self.halo:SetAlpha(h) else self.halo:Hide() end
+  end })
   W.tooltip(b, function(tt, self)
     local info = self.info
     if not info then return end
@@ -241,7 +259,7 @@ function Start:Build(f)
   self.classButtons = {}
   for i = 1, 4 do
     local b = W.button(panel, "", 220, 52, nil, "parchment", 16)
-    b.sub = W.label(b, "body", 11, C.inkSoft)
+    b.sub = W.label(b.face, "body", 11, C.inkSoft)
     b.sub:SetPoint("TOP", b.label, "BOTTOM", 0, -2)
     b.label:ClearAllPoints()
     b.label:SetPoint("CENTER", 0, 7)
@@ -256,13 +274,15 @@ function Start:Build(f)
   for i = 1, 6 do
     local b = CreateFrame("Button", nil, panel)
     b:SetSize(46, 46)
-    b.ring = W.disc(b, "BACKGROUND", 0, C.gold)
+    local face = W.face(b)
+    b.ring = W.disc(face, "BACKGROUND", 0, C.gold)
     b.ring:SetAllPoints()
-    b.fill = W.disc(b, "BACKGROUND", 1, C.key)
+    b.fill = W.disc(face, "BACKGROUND", 1, C.key)
     b.fill:SetPoint("TOPLEFT", 3, -3)
     b.fill:SetPoint("BOTTOMRIGHT", -3, 3)
-    b.label = W.label(b, "title", 16, C.frame)
+    b.label = W.label(face, "title", 16, C.frame)
     b.label:SetPoint("CENTER")
+    W.hoverable(b, { scale = 1.14 })
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
     W.tooltip(b, function(tt, btn)
       local o = btn.option
@@ -562,8 +582,7 @@ function Reward:Build(f)
   for i = 1, 4 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) Reward:Pick(card) end)
-    c.onEnterExtra = function(card) card.hover = true Reward:PlaceCard(card) end
-    c.onLeaveExtra = function(card) card.hover = false Reward:PlaceCard(card) end
+    c.hoverScale, c.hoverLift = 1.09, 18 / REWARD_SCALE
     c:Hide()
     self.cards[i] = c
   end
@@ -594,13 +613,12 @@ function Reward:Build(f)
   self.optionButtons = {}
 end
 
+-- Pose au repos (zone de clic fixe) ; le survol anime le visuel (W.card).
 function Reward:PlaceCard(card)
   if not card.cx then return end
-  local up = card.hover
-  local sc = up and REWARD_SCALE * 1.09 or REWARD_SCALE
-  W.placeCenter(card, self.frame, card.cx, card.cy - (up and 18 or 0), sc)
-  card:SetFrameLevel(self.frame:GetFrameLevel() + 10 + (up and 20 or card.slot))
-  card:SetHot(up)
+  local base = self.frame:GetFrameLevel() + 10 + card.slot
+  W.placeCard(card, self.frame, card.cx, card.cy, REWARD_SCALE, base, base + 30)
+  card:SetHot(card.hover and true or false)
 end
 
 function Reward:Show(step)
@@ -637,8 +655,7 @@ function Reward:Show(step)
   end
   -- bulle : texte « après coup » d'une rencontre
   if step.rewardKind == "event" and step.after and not closed then
-    local txt = step.after:gsub("\n?Choisis une carte à ajouter à ton deck%.", "")
-    self.bubble:Set(step.title, txt)
+    self.bubble:Set(step.title, step.after)
     self.bubble:Show()
   else
     self.bubble:Hide()
@@ -667,9 +684,9 @@ function Reward:Show(step)
   end
   for i = k + 1, #self.cards do
     self.cards[i].option, self.cards[i].cx = nil, nil
-    self.cards[i]:Hide()
+    W.hideCard(self.cards[i])
   end
-  if closed then for i = 1, #self.cards do self.cards[i]:Hide() end end
+  if closed then for i = 1, #self.cards do W.hideCard(self.cards[i]) end end
   -- butin
   local loot = {}
   local hold = UI.hold
@@ -693,7 +710,7 @@ function Reward:Show(step)
   local pendingPotion = r2.potion and not r2.potionTaken
   if r2.potion and (hold.potion or pendingPotion) and not closed then
     self.flask.info = { kind = "potion", id = r2.potion,
-      hint = pendingPotion and "Tes emplacements de potion sont pleins : jettes-en une (clic droit dans le bandeau)." or nil }
+      hint = pendingPotion and "Emplacements de potion pleins : en jeter une (clic droit dans le bandeau)." or nil }
     W.setIcon(self.flask.icon, Art.potion(r2.potion), "potion:" .. r2.potion)
     self.flask.icon:SetDesaturated(pendingPotion and true or false)
     self.flask:SetTag(pendingPotion and "Pas de place" or nil, C.hpText)
@@ -744,7 +761,7 @@ function Reward:Collect(kind, silent)
     local o
     for _, op in ipairs(self.step.options) do if op.id == "takePotion" then o = op end end
     if not o or o.disabled then
-      if not silent then UI.flash(o and o.reason or "Tes emplacements de potion sont pleins.") end
+      if not silent then UI.flash(o and o.reason or "Emplacements de potion pleins.") end
       return
     end
     UI.choose("takePotion")
@@ -829,8 +846,11 @@ function Deck:Build(f)
     local c = W.card(f)
     c:SetFrameLevel(panel:GetFrameLevel() + 5)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    c.onEnterExtra = function(card) card.hover = true Deck:PlaceCard(card) end
-    c.onLeaveExtra = function(card) card.hover = false Deck:PlaceCard(card) end
+    c.hoverScale, c.hoverLift = 1.2, 8 / GRID_SCALE
+    -- survol : animation commune (W.card) + aperçu de l'amélioration
+    local enter, leave = c.onEnterExtra, c.onLeaveExtra
+    c.onEnterExtra = function(card) enter(card) Deck:Preview(card) end
+    c.onLeaveExtra = function(card) leave(card) Deck:Preview(card) end
     c:Hide()
     self.cards[i] = c
   end
@@ -852,11 +872,14 @@ end
 
 function Deck:PlaceCard(card)
   if not card.cx then return end
-  local up = card.hover
-  local sc = up and GRID_SCALE * 1.2 or GRID_SCALE
-  W.placeCenter(card, self.frame, card.cx, card.cy - (up and 8 or 0), sc)
-  card:SetFrameLevel(self.panel:GetFrameLevel() + 5 + (up and 40 or card.slot))
-  -- aperçu de l'amélioration au survol
+  local base = self.panel:GetFrameLevel() + 5 + card.slot
+  W.placeCard(card, self.frame, card.cx, card.cy, GRID_SCALE, base, base + 40)
+  self:Preview(card)
+end
+
+-- Aperçu de l'amélioration au survol.
+function Deck:Preview(card)
+  local up = card.hover and true or false
   if card.option and card.option.preview then
     card:SetCard(card.option.card.id, card.option.card.up, { preview = true, showUp = up,
       playable = not card.option.disabled, reason = card.option.disabled and card.option.reason or nil })
@@ -905,7 +928,7 @@ function Deck:Layout()
       self.optionButtons[o.id] = card
     else
       card.option, card.cx = nil, nil
-      card:Hide()
+      W.hideCard(card)
     end
   end
   for i = 1, #self.buttons do
@@ -976,8 +999,7 @@ function Shop:Build(f)
   for i = 1, 7 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    c.onEnterExtra = function(card) card.hover = true Shop:PlaceCard(card) end
-    c.onLeaveExtra = function(card) card.hover = false Shop:PlaceCard(card) end
+    c.hoverScale, c.hoverLift = 1.12, 10 / 0.92
     c:Hide()
     self.cards[i] = c
   end
@@ -1002,11 +1024,9 @@ local SHOP_SCALE = 0.92
 
 function Shop:PlaceCard(card)
   if not card.cx then return end
-  local up = card.hover
-  local sc = up and SHOP_SCALE * 1.12 or SHOP_SCALE
-  W.placeCenter(card, self.frame, card.cx, card.cy - (up and 10 or 0), sc)
-  card:SetFrameLevel(self.frame:GetFrameLevel() + 10 + (up and 30 or card.slot))
-  card:SetHot(up)
+  local base = self.frame:GetFrameLevel() + 10 + card.slot
+  W.placeCard(card, self.frame, card.cx, card.cy, SHOP_SCALE, base, base + 30)
+  card:SetHot(card.hover and true or false)
 end
 
 function Shop:Show(step)
@@ -1041,7 +1061,7 @@ function Shop:Show(step)
       self.optionButtons[o.id] = card
     else
       card.option, card.cx = nil, nil
-      card:Hide()
+      W.hideCard(card)
     end
   end
   -- Bibelots (rangée du haut) puis fioles, à droite de l'étal.
@@ -1128,42 +1148,45 @@ local function nodeButton(self, i)
   local b = CreateFrame("Button", nil, self.canvas)
   b:SetSize(46, 46)
   b:SetFrameLevel(self.canvas:GetFrameLevel() + 5)
-  b.halo = W.disc(b, "BACKGROUND", 0, C.nodeHalo)
+  local face = W.face(b)
+  b.halo = W.disc(face, "BACKGROUND", 0, C.nodeHalo)
   b.halo:SetPoint("CENTER")
-  b.outer = W.disc(b, "BACKGROUND", 1, C.creamLight)
+  b.outer = W.disc(face, "BACKGROUND", 1, C.creamLight)
   b.outer:SetPoint("CENTER")
-  b.edge = W.disc(b, "BACKGROUND", 2, C.nodeFutureEdge)
+  b.edge = W.disc(face, "BACKGROUND", 2, C.nodeFutureEdge)
   b.edge:SetAllPoints()
-  b.fill = W.disc(b, "BACKGROUND", 3, C.nodeFuture)
+  b.fill = W.disc(face, "BACKGROUND", 3, C.nodeFuture)
   b.fill:SetPoint("TOPLEFT", 3, -3)
   b.fill:SetPoint("BOTTOMRIGHT", -3, 3)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.icon = face:CreateTexture(nil, "ARTWORK")
   b.icon:SetPoint("TOPLEFT", 8, -8)
   b.icon:SetPoint("BOTTOMRIGHT", -8, 8)
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  W.roundMask(b, b.icon)
-  b.glyph = W.label(b, "title", 22, C.inkSoft)
+  W.roundMask(face, b.icon)
+  b.glyph = W.label(face, "title", 22, C.inkSoft)
   b.glyph:SetPoint("CENTER", 0, 0)
-  b.check = b:CreateTexture(nil, "OVERLAY")
+  b.check = face:CreateTexture(nil, "OVERLAY")
   b.check:SetTexture(Art.tex.check)
   b.check:SetSize(24, 24)
   b.check:SetPoint("CENTER")
   -- boss : losange
-  b.dEdge = W.rect(b, "BACKGROUND", 2, C.ink)
+  b.dEdge = W.rect(face, "BACKGROUND", 2, C.ink)
   b.dEdge:SetSize(84, 84)
   b.dEdge:SetPoint("CENTER")
-  b.dFill = W.rect(b, "BACKGROUND", 3, C.nodeDone)
+  b.dFill = W.rect(face, "BACKGROUND", 3, C.nodeDone)
   b.dFill:SetSize(76, 76)
   b.dFill:SetPoint("CENTER")
-  b.dHalo = W.rect(b, "BACKGROUND", 1, C.nodeHalo)
+  b.dHalo = W.rect(face, "BACKGROUND", 1, C.nodeHalo)
   b.dHalo:SetSize(96, 96)
   b.dHalo:SetPoint("CENTER")
   for _, t in ipairs({ b.dEdge, b.dFill, b.dHalo }) do if t.SetRotation then t:SetRotation(math.pi / 4) end end
-  b.bossText = W.label(b, "title", 22, C.creamLight)
+  b.bossText = W.label(face, "title", 22, C.creamLight)
   b.bossText:SetPoint("CENTER")
   b.bossText:SetText("Boss")
-  b.bossName = W.label(b, "title", 15, C.ink)
-  b.bossName:SetPoint("TOP", b, "BOTTOM", 0, -20)
+  b.bossName = W.label(face, "title", 15, C.ink)
+  b.bossName:SetPoint("TOP", face, "BOTTOM", 0, -20)
+  -- survol : l'étape grossit (davantage si elle est accessible, voir paintNode)
+  W.hoverable(b, { scale = 1.1 })
   b:SetScript("OnClick", function(btn)
     local node = btn.node
     if node and node.state == "available" then W.sound("click") UI.choose(node.id)
@@ -1190,6 +1213,7 @@ local function paintNode(b, node, bossName)
   local boss = kind == "boss"
   local size = boss and 84 or (st == "current" and 60 or (st == "available" and 56 or 46))
   b:SetSize(size, size)
+  b.hoverScale = st == "available" and 1.18 or 1.06
   for _, t in ipairs({ b.dEdge, b.dFill, b.dHalo, b.bossText, b.bossName }) do if boss then t:Show() else t:Hide() end end
   for _, t in ipairs({ b.edge, b.fill, b.halo, b.outer }) do if boss then t:Hide() end end
   b.check:Hide()
@@ -1437,4 +1461,187 @@ function Progress:HandleKey(key)
   if idx then chooseOption(opts[idx]) return true end
   if key == "ENTER" or key == "SPACE" then chooseOption(opts[1]) return true end
   return false
+end
+
+---------------------------------------------------------------------------
+-- Consultation des cartes (par-dessus l'écran) : deck complet, pioche, défausse, consumées
+---------------------------------------------------------------------------
+-- Grille de vraies cartes (W.card), triées par type, coût puis nom ; la pioche n'est jamais montrée
+-- dans l'ordre de tirage. Défilement à la molette ; fermeture par Échap, clic hors du panneau ou
+-- « Fermer ». Aucune règle : ne fait que lire l'état.
+
+local DV = { kind = nil, offset = 0, list = {} }
+UI.deckView = DV
+
+local DV_X, DV_Y, DV_W, DV_H = 52, 58, 930, 540
+local DV_SCALE, DV_ROW, DV_ROWS = 0.72, 8, 3
+local DV_GAPX, DV_GAPY = 14, 12
+local DV_TOP = DV_Y + 52
+local DV_TITLE = { deck = "Deck", draw = "Pioche", discard = "Défausse", exhaust = "Consumées" }
+local TYPE_ORDER = { attack = 1, skill = 2, power = 3 }
+
+-- Copie triée : type, coût, nom, puis non améliorée avant améliorée (l'ordre réel est perdu).
+function DV.sorted(list)
+  local out = {}
+  for i = 1, #(list or {}) do
+    local inst = list[i]
+    local d = ns.Card.defById(inst.id, inst.up)
+    out[i] = { inst = inst, t = TYPE_ORDER[d.type] or 9, cost = d.cost or 99, name = d.name or inst.id,
+      up = inst.up and 1 or 0, uid = tostring(inst.uid or "") }
+  end
+  table.sort(out, function(a, b)
+    if a.t ~= b.t then return a.t < b.t end
+    if a.cost ~= b.cost then return a.cost < b.cost end
+    if a.name ~= b.name then return a.name < b.name end
+    if a.up ~= b.up then return a.up < b.up end
+    return a.uid < b.uid
+  end)
+  for i = 1, #out do out[i] = out[i].inst end
+  return out
+end
+
+-- Cartes de la source demandée (nil si indisponible : pas d'expédition, ou pile hors combat).
+function DV.source(kind)
+  if kind == "deck" then
+    local r = Controller.runInfo()
+    return r and r.deck
+  end
+  local c = Controller.combat()
+  return c and c[kind]
+end
+
+local function wheel(_, delta) DV:Scroll(-delta) end
+
+function DV:Build()
+  local content = UI.content
+  local base = content:GetFrameLevel() + 110
+  -- voile cliquable sous le bandeau : un clic hors du panneau ferme
+  local veil = CreateFrame("Button", nil, content)
+  at(veil, content, 0, Scene.TOP, Scene.W, Scene.H - Scene.TOP)
+  veil:SetFrameLevel(base)
+  veil:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local shade = W.rect(veil, "BACKGROUND", 0, C.black, 0.5)
+  shade:SetAllPoints()
+  veil:SetScript("OnClick", function() DV:Close() end)
+  veil:EnableMouseWheel(true)
+  veil:SetScript("OnMouseWheel", wheel)
+  veil:Hide()
+  self.frame = veil
+
+  local panel = W.woodPanel(veil, 12)
+  at(panel, content, DV_X, DV_Y, DV_W, DV_H)
+  panel:SetFrameLevel(base + 2)
+  panel:EnableMouseWheel(true)
+  panel:SetScript("OnMouseWheel", wheel)
+  self.panel = panel
+  self.title = W.label(panel, "title", 20, C.gold)
+  self.title:SetPoint("TOP", 0, -14)
+  self.empty = W.label(panel, "body", 14, C.cream)
+  self.empty:SetPoint("CENTER", 0, 10)
+  self.empty:SetText("Aucune carte.")
+  self.close = W.button(panel, "Fermer", 120, 34, function() DV:Close() end, "gold", 14)
+  self.close:SetPoint("BOTTOMRIGHT", -16, 14)
+  -- indicateur de défilement
+  self.track = W.rect(panel, "ARTWORK", 0, C.woodDark)
+  self.thumb = W.rect(panel, "ARTWORK", 1, C.goldDeep)
+
+  self.cards = {}
+  for i = 1, DV_ROW * DV_ROWS do
+    local c = W.card(veil)
+    c.hoverScale, c.hoverLift = 1.14, 6 / DV_SCALE
+    c:EnableMouseWheel(true)
+    c:SetScript("OnMouseWheel", wheel)
+    c:SetScript("OnClick", function(_, button) if button == "RightButton" then DV:Close() end end)
+    c:Hide()
+    self.cards[i] = c
+  end
+end
+
+function DV:Rows() return math.ceil(#self.list / DV_ROW) end
+function DV:MaxOffset() return max(0, self:Rows() - DV_ROWS) end
+
+function DV:Layout()
+  local cw, ch = W.CARD_W * DV_SCALE, W.CARD_H * DV_SCALE
+  local perRow = max(1, min(DV_ROW, #self.list)) -- une seule rangée incomplète : centrée
+  local rowW = perRow * (cw + DV_GAPX) - DV_GAPX
+  local x0 = DV_X + (DV_W - rowW) / 2
+  local first = self.offset * DV_ROW
+  local level = self.panel:GetFrameLevel() + 5
+  for i, card in ipairs(self.cards) do
+    local inst = self.list[first + i]
+    if inst then
+      local col, row = (i - 1) % DV_ROW, floor((i - 1) / DV_ROW)
+      card:SetCard(inst.id, inst.up, {})
+      W.placeCard(card, UI.content, x0 + col * (cw + DV_GAPX) + cw / 2,
+        DV_TOP + row * (ch + DV_GAPY) + ch / 2, DV_SCALE, level + i, level + 60)
+      card:SetHot(card.hover and true or false)
+      card:Show()
+    else
+      W.hideCard(card)
+    end
+  end
+  if #self.list == 0 then self.empty:Show() else self.empty:Hide() end
+  -- indicateur de défilement : seulement si tout ne tient pas
+  local maxOff = self:MaxOffset()
+  if maxOff > 0 then
+    local trackH = DV_ROWS * (ch + DV_GAPY) - DV_GAPY
+    local thumbH = max(24, trackH * DV_ROWS / self:Rows())
+    at(self.track, self.panel, DV_W - 22, DV_TOP - DV_Y, 6, trackH)
+    at(self.thumb, self.panel, DV_W - 22, DV_TOP - DV_Y + (trackH - thumbH) * self.offset / maxOff, 6, thumbH)
+    self.track:Show()
+    self.thumb:Show()
+  else
+    self.track:Hide()
+    self.thumb:Hide()
+  end
+end
+
+-- Relit la source (l'état a pu changer : potion bue, combat fini…).
+function DV:Refresh()
+  if not self:IsShown() then return end
+  local src = DV.source(self.kind)
+  if not src then self:Close() return end
+  self.list = DV.sorted(src)
+  local n = #self.list
+  self.title:SetText((DV_TITLE[self.kind] or "Cartes") .. " · " .. n .. " carte" .. (n > 1 and "s" or ""))
+  if self.offset > self:MaxOffset() then self.offset = self:MaxOffset() end
+  self:Layout()
+end
+
+function DV:Open(kind)
+  if not UI.content or not DV.source(kind) then return false end
+  if not self.frame then self:Build() end
+  if GameTooltip then GameTooltip:Hide() end
+  self.kind = kind
+  self.offset = 0
+  self.frame:Show()
+  self:Refresh()
+  W.sound("card")
+  return true
+end
+
+function DV:Close()
+  if not self:IsShown() then return end
+  for _, card in ipairs(self.cards) do W.hideCard(card) end
+  self.frame:Hide()
+  self.kind = nil
+  if GameTooltip then GameTooltip:Hide() end
+end
+
+function DV:IsShown() return self.frame ~= nil and self.frame:IsShown() and true or false end
+
+-- delta > 0 : vers le bas (une rangée par cran de molette).
+function DV:Scroll(delta)
+  local off = self.offset + (delta > 0 and 1 or -1)
+  if off < 0 then off = 0 end
+  if off > self:MaxOffset() then off = self:MaxOffset() end
+  if off == self.offset then return end
+  self.offset = off
+  self:Layout()
+end
+
+-- Ouvre la source demandée, ou ferme si elle est déjà affichée.
+function UI.toggleDeckView(kind)
+  if DV:IsShown() and DV.kind == kind then DV:Close() return end
+  if not DV:Open(kind) then UI.flash("Aucune carte à montrer.") end
 end
