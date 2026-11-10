@@ -59,104 +59,140 @@ function UI.setStage(stage)
   if Scene.decor then Scene.set(stage) end
 end
 
+local BAND_H = 44
+
+-- Bandeau d'ardoise (docs/maquette/combat_pack.jpg) : à gauche classe, PV (hexagone rouge), or
+-- (pièce), deck (dos de carte + nombre) ; au centre zone et progression ; à droite clé (hexagone
+-- violet), bibelots, séparateur, fioles, ≡, ×.
 local function buildBand(f)
   local band = CreateFrame("Frame", nil, f)
-  Scene.at(band, f, 0, 0, UI.CONTENT_W, 44)
+  Scene.at(band, f, 0, 0, UI.CONTENT_W, BAND_H)
   band:SetFrameLevel(f:GetFrameLevel() + 40)
   band:EnableMouse(true)
   band:RegisterForDrag("LeftButton")
   band:SetScript("OnDragStart", function() UI.frame:StartMoving() end)
   band:SetScript("OnDragStop", function() UI.frame:StopMovingOrSizing() savePosition(UI.frame) end)
-  local bg = W.rect(band, "BACKGROUND", 0, C.band)
+  local bg = Scene.slate(band, "BACKGROUND", 0, UI.CONTENT_W, BAND_H, 1.15)
   bg:SetAllPoints()
-  local edge = W.rect(band, "BORDER", 0, C.bandEdge)
-  edge:SetPoint("BOTTOMLEFT")
-  edge:SetPoint("BOTTOMRIGHT")
-  edge:SetHeight(2)
+  local line = W.rect(band, "BORDER", 0, Art.hex("#ced6e2"))
+  line:SetPoint("BOTTOMLEFT", 0, 1.5)
+  line:SetPoint("BOTTOMRIGHT", 0, 1.5)
+  line:SetHeight(1.5)
+  local dark = W.rect(band, "BORDER", 0, C.slateDark)
+  dark:SetPoint("BOTTOMLEFT")
+  dark:SetPoint("BOTTOMRIGHT")
+  dark:SetHeight(1.5)
   UI.band = band
 
-  UI.className = W.label(band, "title", 16, C.gold)
-  UI.className:SetPoint("LEFT", 14, 0)
-  UI.hpText = W.label(band, "body", 15, C.hpText)
-  UI.hpText:SetPoint("LEFT", UI.className, "RIGHT", 16, 0)
-  UI.goldText = W.label(band, "body", 15, C.gold)
-  UI.goldText:SetPoint("LEFT", UI.hpText, "RIGHT", 16, 0)
-
-  -- Centre : nom de la zone (ligne du haut) et progression de l'acte (ligne du bas). Le cadre
-  -- s'étend de l'or (à gauche) au premier élément de droite (UI.layoutMid) : un nom trop long est
-  -- tronqué, jamais posé sur les points ni sur les icônes.
-  local mid = CreateFrame("Frame", nil, band)
-  mid:SetHeight(40)
-  mid:SetPoint("LEFT", UI.goldText, "RIGHT", 16, 0)
-  mid:SetPoint("RIGHT", band, "RIGHT", -100, 0)
-  UI.zone = W.label(mid, "title", 14, C.cream)
-  UI.zone:SetWordWrap(false)
-  UI.zone:SetJustifyH("CENTER")
-  UI.dots = {}
-  for i = 1, 12 do
-    local d = W.disc(mid, "ARTWORK", 0, C.gold)
-    d:Hide()
-    UI.dots[i] = d
-  end
-  UI.bossDot = W.rect(mid, "ARTWORK", 0, C.hp)
-  UI.bossDot:SetSize(11, 11)
-  if UI.bossDot.SetRotation then UI.bossDot:SetRotation(math.pi / 4) end
-  UI.bossDot:Hide()
-  UI.mid = mid
-
-  -- Droite : × ≡ potions | bibelots, clé, deck.
-  local close = W.roundButton(band, "×", 30, C.red, C.redEdge, function() UI.close("button") end)
-  close:SetPoint("RIGHT", -10, 0)
-  UI.closeButton = close
-  local gear = W.roundButton(band, "menu", 30, C.woodDark, C.woodLine, function() UI.toggleOptions() end)
-  gear:SetPoint("RIGHT", close, "LEFT", -6, 0)
-  UI.gear = gear
-
-  UI.potionSlots = {}
-  for i = 1, 3 do
-    local b = W.iconButton(band, 30, "flask")
-    b:SetPoint("RIGHT", gear, "LEFT", -14 - (3 - i) * 31, 0)
-    b.slot = i
-    b:SetScript("OnClick", function(self, button) UI.clickPotion(self, button) end)
-    UI.potionSlots[i] = b
-  end
-  local sep = W.rect(band, "ARTWORK", 0, C.bandEdge)
-  sep:SetSize(2, 24)
-  sep:SetPoint("RIGHT", UI.potionSlots[1], "LEFT", -8, 0)
-  UI.sep = sep
-  UI.RELICS_SHOWN = 6
-  UI.relicIcons = {}
-  for i = 1, UI.RELICS_SHOWN do
-    local b = W.iconButton(band, 28, "square")
-    b:SetPoint("RIGHT", sep, "LEFT", -8 - (UI.RELICS_SHOWN - i) * 32, 0)
-    b:Hide()
-    UI.relicIcons[i] = b
-  end
-  UI.relicMore = W.label(band, "body", 11, C.cream)
-  UI.relicMore:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -3, 0)
-
-  -- Clé mythique : pastille violette.
-  local ks = CreateFrame("Button", nil, band)
-  ks:SetSize(54, 20)
-  W.face(ks)
-  ks.shape = W.shape(ks.face, 4, C.key, C.key, 1, -4)
-  ks.count = W.label(ks.face, "body", 13, C.frame)
-  ks.count:SetPoint("CENTER")
-  W.hoverable(ks, { scale = 1.1 })
-  W.tooltip(ks, function(tt, self)
-    if self.info then W.fillItemTooltip(tt, "keystone", self.info.id, self.info) end
-  end, "ANCHOR_BOTTOM")
-  ks:Hide()
-  UI.keystone = ks
-
-  -- Deck : bouton de bois (aussi en combat), infobulle = contenu du deck ; clic = consulter.
-  local deck = W.button(band, "Deck", 74, 28, function() UI.toggleDeckView("deck") end, "wood", 13)
+  UI.className = W.label(band, "bold", 18, C.text)
+  UI.className:SetPoint("LEFT", 17, 0)
+  -- PV : hexagone rouge, valeur, « /max »
+  UI.hpHex = W.hex(band, "red", 22)
+  UI.hpHex:SetPoint("LEFT", UI.className, "RIGHT", 22, 0)
+  UI.hpText = W.label(band, "heavy", 17, C.text)
+  UI.hpText:SetPoint("LEFT", UI.hpHex, "RIGHT", 4, 0)
+  UI.hpMax = W.label(band, "bold", 12.5, C.textSoft)
+  UI.hpMax:SetPoint("LEFT", UI.hpText, "RIGHT", 2, -1)
+  -- or
+  UI.goldIcon = band:CreateTexture(nil, "ARTWORK")
+  UI.goldIcon:SetSize(20, 20)
+  UI.goldIcon:SetPoint("LEFT", UI.hpMax, "RIGHT", 22, 1)
+  W.roundMask(band, UI.goldIcon)
+  W.setIcon(UI.goldIcon, Art.ui.gold, "ui:gold")
+  UI.goldText = W.label(band, "heavy", 17, C.goldText)
+  UI.goldText:SetPoint("LEFT", UI.goldIcon, "RIGHT", 5, 0)
+  -- deck : dos de carte et nombre (aussi en combat) ; infobulle = contenu ; clic = consulter
+  local deck = CreateFrame("Button", nil, band)
+  deck:SetSize(52, 32)
+  deck:SetPoint("LEFT", UI.goldText, "RIGHT", 20, 0)
+  deck:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local dface = W.face(deck)
+  deck.back = W.cardBack(dface, 30)
+  deck.back:SetPoint("LEFT", 0, 0)
+  deck.label = W.label(dface, "heavy", 17, C.text)
+  deck.label:SetPoint("LEFT", deck.back, "RIGHT", 5, 0)
+  deck.SetText = function(self, t) self.label:SetText(t) self._text = t end
+  W.hoverable(deck, { scale = 1.08 })
+  deck:SetScript("OnClick", function(_, button)
+    if button == "RightButton" then return end
+    W.sound("click")
+    UI.toggleDeckView("deck")
+  end)
   W.tooltip(deck, function(tt)
     UI.fillDeckTooltip(tt)
     tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
   end, "ANCHOR_BOTTOM")
   UI.info = deck
   UI.deckButton = deck
+
+  -- Centre : nom de la zone (ligne du haut) et progression de l'acte (ligne du bas). Le cadre
+  -- s'étend du deck (à gauche) au premier élément de droite (layoutMid) : un nom trop long est
+  -- tronqué, jamais posé sur les points ni sur les icônes.
+  local mid = CreateFrame("Frame", nil, band)
+  mid:SetHeight(40)
+  mid:SetPoint("LEFT", deck, "RIGHT", 16, 0)
+  mid:SetPoint("RIGHT", band, "RIGHT", -100, 0)
+  UI.zone = W.label(mid, "bold", 13, C.text)
+  UI.zone:SetWordWrap(false)
+  UI.zone:SetJustifyH("CENTER")
+  UI.track = W.rect(mid, "ARTWORK", 0, Art.hex("#5c6880"))
+  UI.trackDark = W.rect(mid, "ARTWORK", -1, C.slateDark)
+  UI.trackDone = W.rect(mid, "ARTWORK", 1, C.goldText)
+  UI.dots = {}
+  for i = 1, 12 do
+    local d = { edge = W.disc(mid, "ARTWORK", 2, C.slateDark), fill = W.disc(mid, "ARTWORK", 3, C.goldText) }
+    d.edge:Hide() d.fill:Hide()
+    UI.dots[i] = d
+  end
+  UI.bossDot = W.hex(mid, "red", 16, "ARTWORK", 3)
+  UI.bossDot:Hide()
+  UI.mid = mid
+
+  -- Droite : × ≡ fioles | bibelots, clé.
+  local close = W.roundButton(band, "×", 28, { 1, 0.43, 0.43 }, nil, function() UI.close("button") end)
+  close:SetPoint("CENTER", band, "RIGHT", -29, 0)
+  UI.closeButton = close
+  local gear = W.roundButton(band, "menu", 28, 1, nil, function() UI.toggleOptions() end)
+  gear:SetPoint("CENTER", band, "RIGHT", -65, 0)
+  UI.gear = gear
+
+  UI.potionSlots = {}
+  for i = 1, 3 do
+    local b = W.iconButton(band, 30, "square")
+    b:SetPoint("CENTER", band, "RIGHT", -103 - (3 - i) * 34, 0)
+    b.slot = i
+    b:SetScript("OnClick", function(self, button) UI.clickPotion(self, button) end)
+    UI.potionSlots[i] = b
+  end
+  local sep = W.rect(band, "ARTWORK", 0, C.slateDark)
+  sep:SetSize(1.5, 24)
+  sep:SetPoint("RIGHT", UI.potionSlots[1], "LEFT", -9, 0)
+  UI.sep = sep
+  UI.RELICS_SHOWN = 6
+  UI.relicIcons = {}
+  for i = 1, UI.RELICS_SHOWN do
+    local b = W.iconButton(band, 30, "square")
+    b:SetPoint("RIGHT", sep, "LEFT", -9 - (UI.RELICS_SHOWN - i) * 34, 0)
+    b:Hide()
+    UI.relicIcons[i] = b
+  end
+  UI.relicMore = W.label(band, "bold", 11, C.textSoft)
+  UI.relicMore:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -3, 0)
+
+  -- Clé mythique : hexagone violet « +N ».
+  local ks = CreateFrame("Button", nil, band)
+  ks:SetSize(30, 30)
+  W.face(ks)
+  ks.hex = W.hex(ks.face, "violet", 28)
+  ks.hex:SetPoint("CENTER")
+  ks.count = W.label(ks.face, "heavy", 11.5, C.text)
+  ks.count:SetPoint("CENTER", 0, 1)
+  W.hoverable(ks, { scale = 1.1 })
+  W.tooltip(ks, function(tt, self)
+    if self.info then W.fillItemTooltip(tt, "keystone", self.info.id, self.info) end
+  end, "ANCHOR_BOTTOM")
+  ks:Hide()
+  UI.keystone = ks
 end
 
 function UI.fillDeckTooltip(tt)
@@ -185,13 +221,19 @@ function UI.build()
   f:EnableMouse(true)
   f:Hide()
   if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "SlayTheDragonFrame") end
-  W.roundRect(f, "BACKGROUND", -8, 10, 0):SetColor(C.frameEdge)
-  W.roundRect(f, "BACKGROUND", -7, 8, 3):SetColor(C.frame)
+  -- cadre : ardoise sombre, liseré d'argent ; le contenu est rogné à la fenêtre (rien ne déborde)
+  UI.framePlaque = W.plaque(f, { r = 10, fill = 0.45, gloss = false, sub = -8 })
 
   local content = CreateFrame("Frame", nil, f)
   content:SetPoint("TOPLEFT", 3, -3)
   content:SetSize(UI.CONTENT_W, UI.CONTENT_H)
+  content:SetClipsChildren(true)
   UI.content = content
+  -- liseré du cadre par-dessus le contenu (les coins du décor ne débordent pas de l'arrondi)
+  local rimHost = CreateFrame("Frame", nil, f)
+  rimHost:SetAllPoints()
+  rimHost:SetFrameLevel(f:GetFrameLevel() + 120)
+  UI.frameRim = W.nine(rimHost, "nine_rim", "OVERLAY", 7, { corner = 10, noCenter = true })
   Scene.build(content)
   buildBand(content)
 
@@ -200,8 +242,9 @@ function UI.build()
   err:SetSize(520, 34)
   Scene.at(err, content, (UI.CONTENT_W - 520) / 2, 196, 520, 34)
   err:SetFrameLevel(content:GetFrameLevel() + 90)
-  err.shape = W.shape(err, 10, C.red, C.band, 2, -4)
-  err.text = W.label(err, "body", 15, C.hpText, "OVERLAY", true)
+  err.plaque = W.plaque(err, { r = 12, pill = true })
+  err.plaque:SetRim(Art.rim.red)
+  err.text = W.label(err, "bold", 15, C.badText, "OVERLAY")
   err.text:SetPoint("CENTER")
   err:Hide()
   -- Compatibilité avec le harnais : err._text / err:SetText.
@@ -259,33 +302,55 @@ local function layoutDots(r)
   local zy = showDots and 9 or 0
   UI.zone:SetPoint("LEFT", mid, "LEFT", 4, zy)
   UI.zone:SetPoint("RIGHT", mid, "RIGHT", -4, zy)
+  local track = { UI.track, UI.trackDark, UI.trackDone }
   if not showDots then
-    for i = 1, #UI.dots do UI.dots[i]:Hide() end
+    for i = 1, #UI.dots do UI.dots[i].edge:Hide() UI.dots[i].fill:Hide() end
+    for _, t in ipairs(track) do t:Hide() end
     UI.bossDot:Hide()
     return
   end
+  -- points sur un filet : franchis dorés, étape en cours plus grande et claire, à venir sombres, boss
+  -- en hexagone rouge (planche : pas de 22)
   local cur = math.max(1, (r.floor or 0))
   local n = math.min(floors - 1, #UI.dots)
-  local dotsW = n * 15 + 16
-  local x = -dotsW / 2
+  local step = 22
+  local x0 = -(n * step) / 2
+  local y = -10
+  UI.trackDark:ClearAllPoints()
+  UI.trackDark:SetPoint("LEFT", mid, "CENTER", x0, y)
+  UI.trackDark:SetSize(n * step, 4)
+  UI.track:ClearAllPoints()
+  UI.track:SetPoint("LEFT", mid, "CENTER", x0, y)
+  UI.track:SetSize(n * step, 2)
+  UI.trackDone:ClearAllPoints()
+  UI.trackDone:SetPoint("LEFT", mid, "CENTER", x0, y)
+  UI.trackDone:SetSize(math.max(0.01, (cur - 1) * step), 2)
+  for _, t in ipairs(track) do t:Show() end
   for i = 1, #UI.dots do
     local d = UI.dots[i]
     if i <= n then
-      d:ClearAllPoints()
-      local size = (i == cur) and 13 or 9
-      d:SetSize(size, size)
-      d:SetPoint("CENTER", mid, "CENTER", x + 5, -11)
-      local c = i < cur and C.gold or (i == cur and C.creamLight or Art.hex("#5a4630"))
-      d:SetVertexColor(c[1], c[2], c[3], 1)
-      d:Show()
-      x = x + 15
+      local x = x0 + (i - 1) * step
+      local size, edge, fill
+      if i < cur then size, edge, fill = 9, C.slateDark, C.goldText
+      elseif i == cur then size, edge, fill = 13, C.goldText, Art.hex("#fffae0")
+      else size, edge, fill = 9, Art.hex("#828ea0"), Art.hex("#28303e") end
+      d.edge:ClearAllPoints()
+      d.edge:SetSize(size + 2, size + 2)
+      d.edge:SetPoint("CENTER", mid, "CENTER", x, y)
+      d.edge:SetVertexColor(edge[1], edge[2], edge[3], 1)
+      d.fill:ClearAllPoints()
+      d.fill:SetSize(size - (i == cur and 2 or 0), size - (i == cur and 2 or 0))
+      d.fill:SetPoint("CENTER", mid, "CENTER", x, y)
+      d.fill:SetVertexColor(fill[1], fill[2], fill[3], 1)
+      d.edge:Show()
+      d.fill:Show()
     else
-      d:Hide()
+      d.edge:Hide()
+      d.fill:Hide()
     end
   end
   UI.bossDot:ClearAllPoints()
-  UI.bossDot:SetSize(10, 10)
-  UI.bossDot:SetPoint("CENTER", mid, "CENTER", x + 6, -11)
+  UI.bossDot:SetPoint("CENTER", mid, "CENTER", x0 + n * step, y)
   UI.bossDot:Show()
 end
 
@@ -294,7 +359,7 @@ local function layoutMid(rightmost)
   local mid = UI.mid
   mid:ClearAllPoints()
   mid:SetHeight(40)
-  mid:SetPoint("LEFT", UI.goldText, "RIGHT", 16, 0)
+  mid:SetPoint("LEFT", UI.deckButton, "RIGHT", 12, 0)
   mid:SetPoint("RIGHT", rightmost, "LEFT", -12, 0)
 end
 
@@ -336,7 +401,7 @@ function UI.refreshInfo()
   local right = anchor
   if r and (r.key or 0) > 0 then
     UI.keystone.info = { id = r.key, title = "Clé mythique +" .. r.key, text = affixText(r) }
-    UI.keystone.count:SetText("Clé +" .. r.key)
+    UI.keystone.count:SetText("+" .. r.key)
     UI.keystone:ClearAllPoints()
     UI.keystone:SetPoint("RIGHT", right, "LEFT", -10, 0)
     UI.keystone:Show()
@@ -344,21 +409,23 @@ function UI.refreshInfo()
   else
     UI.keystone:Hide()
   end
+  if not r then right = UI.gear end
+  local shown = r and true or false
+  for _, t in ipairs({ UI.hpHex, UI.hpText, UI.hpMax, UI.goldIcon, UI.goldText }) do
+    if shown then t:Show() else t:Hide() end
+  end
   if r then
-    UI.deckButton:SetText("Deck " .. #r.deck)
-    UI.deckButton:ClearAllPoints()
-    UI.deckButton:SetPoint("RIGHT", right, "LEFT", -10, 0)
+    UI.deckButton:SetText(tostring(#r.deck))
     UI.deckButton:Show()
-    right = UI.deckButton
   else
     UI.deckButton:Hide()
-    right = UI.gear
   end
   layoutMid(right)
   if UI.deckView then UI.deckView:Refresh() end
   if not r then
     UI.className:SetText("Slay the Dragon")
     UI.hpText:SetText("")
+    UI.hpMax:SetText("")
     UI.goldText:SetText("")
     UI.zone:SetText("")
     layoutDots(nil)
@@ -366,8 +433,9 @@ function UI.refreshInfo()
   end
   local cls = Controller.exp() and ns.Classes[Controller.exp().class]
   UI.className:SetText(cls and cls.name or "Slay the Dragon")
-  UI.hpText:SetText(r.hp .. " / " .. r.maxHp .. " PV")
-  UI.goldText:SetText(math.max(0, r.gold - (hold.gold or 0)) .. " po")
+  UI.hpText:SetText(tostring(r.hp))
+  UI.hpMax:SetText("/" .. r.maxHp)
+  UI.goldText:SetText(tostring(math.max(0, r.gold - (hold.gold or 0))))
   local zone = r.act or ""
   if UI.step and UI.step.kind == "map" then zone = "Acte " .. (Controller.exp() and Controller.exp().act or 1) .. " · " .. zone end
   UI.zone:SetText(zone)
@@ -376,10 +444,10 @@ end
 
 -- Position (coordonnées du contenu) d'une destination du bandeau, pour le butin qui y vole.
 function UI.bandTarget(kind)
-  if kind == "gold" then return 190, 22 end
-  if kind == "potion" then return 880, 22 end
-  if kind == "relic" then return 760, 22 end
-  return 517, 22
+  if kind == "gold" then return 197, 22 end
+  if kind == "potion" then return 897, 22 end
+  if kind == "relic" then return 780, 22 end
+  return 263, 22
 end
 
 -- Clic sur un emplacement de potion : boire en combat (cible au clic suivant si besoin),
@@ -541,14 +609,14 @@ end
 ---------------------------------------------------------------------------
 
 function UI.buildOptions()
-  local p = W.parchment(UI.content, 10)
+  local p = W.woodPanel(UI.content, 12)
   p:SetSize(360, 330)
   p:SetPoint("TOPRIGHT", UI.content, "TOPRIGHT", -10, -48)
   p:SetFrameLevel(UI.content:GetFrameLevel() + 100)
   p:Hide()
   UI.optionsFrame = p
 
-  local t = W.label(p, "title", 20, C.ink)
+  local t = W.label(p, "bold", 20, C.text)
   t:SetPoint("TOPLEFT", 16, -14)
   t:SetText("Options")
 
@@ -571,10 +639,10 @@ function UI.buildOptions()
   UI.optionChecks = checks
 
   local function stepper(label, y, get, set, fmt)
-    local l = W.label(p, "body", 12, C.ink)
+    local l = W.label(p, "body", 13, C.text)
     l:SetPoint("TOPLEFT", 18, y)
     l:SetText(label)
-    local v = W.label(p, "title", 14, C.ink)
+    local v = W.label(p, "heavy", 14, C.text)
     v:SetPoint("TOPLEFT", 214, y + 1)
     local minus = W.button(p, "-", 26, 22, function() set(-1) v:SetText(fmt(get())) end)
     minus:SetPoint("TOPLEFT", 178, y + 4)
@@ -795,6 +863,11 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "decor" or msg:match("^decor%s") or msg == "décor" or msg:match("^décor%s") then
     decorCommand(msg:match("^d%S+%s*(.*)$") or "")
   elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
+  elseif msg == "ruban" then
+    -- nom des cartes incliné comme le ruban (rotation des textes) ou ruban redressé, nom horizontal
+    opts().flatRibbon = not opts().flatRibbon or nil
+    say("nom des cartes : " .. (opts().flatRibbon and "ruban redressé, texte horizontal" or "ruban incliné, texte tourné") .. ".")
+    if UI.frame and UI.frame:IsShown() then UI.refresh() end
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
@@ -807,6 +880,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
-      .. "/slay decor [essai] ; /slay facing <j> <e> ; /slay centre")
+      .. "/slay decor [essai] ; /slay ruban ; /slay facing <j> <e> ; /slay centre")
   end
 end

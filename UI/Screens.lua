@@ -24,12 +24,9 @@ local function chooseOption(o)
   UI.choose(o.id)
 end
 
--- Couleurs WoW vives -> encres lisibles sur parchemin.
+-- Textes du moteur (couleurs WoW vives) : lisibles tels quels sur l'ardoise.
 local function inkText(t)
-  t = t or ""
-  t = t:gsub("|cffffd700", "|cff8a5a00"):gsub("|cff40ff40", "|cff1f6b2a"):gsub("|cff40c0ff", "|cff2f5f8a")
-  t = t:gsub("|cffff6060", "|cff9a2a1a")
-  return t
+  return t or ""
 end
 
 -- Héros posé à gauche (récompense, rencontre, feu de camp, accueil).
@@ -40,21 +37,29 @@ local function heroFigure(f)
   return fig
 end
 
--- Tas du deck sur le plateau (nombre de cartes ; infobulle = contenu ; clic = consulter le deck).
+-- Tas du deck sur le plateau : deux dos de carte, nombre dans un hexagone d'acier (planches) ;
+-- infobulle = contenu ; clic = consulter le deck. Bas à y 574 : rien ne déborde de la fenêtre.
+local PILE_X, PILE_Y, PILE_H = 67, 519, 104
 local function deckPile(f)
-  local back = CreateFrame("Frame", nil, f)
-  at(back, f, 68, 476, 72, 100)
-  W.roundRect(back, "BACKGROUND", -8, 8, 0):SetColor(C.band)
-  local mid = CreateFrame("Frame", nil, f)
-  at(mid, f, 64, 472, 72, 100)
-  W.roundRect(mid, "BACKGROUND", -8, 8, 0):SetColor(C.woodDark)
+  local w = W.skinWidth("card_back", PILE_H)
+  local under = CreateFrame("Frame", nil, f)
+  at(under, f, PILE_X - w / 2 + 5, PILE_Y - PILE_H / 2 - 4, w, PILE_H)
+  local ub = W.cardBack(under, PILE_H, "BACKGROUND", 0)
+  ub:SetPoint("CENTER")
+  ub:SetVertexColor(0.7, 0.7, 0.7, 1)
   local p = CreateFrame("Button", nil, f)
-  at(p, f, 60, 468, 72, 100)
+  at(p, f, PILE_X - w / 2, PILE_Y - PILE_H / 2, w, PILE_H)
   p:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(p)
-  p.shape = W.shape(face, 8, C.gold, C.wood, 3, -6)
-  p.count = W.label(face, "title", 28, C.creamLight)
-  p.count:SetPoint("CENTER")
+  p.shadow = W.cardBack(face, PILE_H, "BACKGROUND", -1)
+  p.shadow:SetPoint("CENTER", 2, -3)
+  p.shadow:SetVertexColor(0, 0, 0, 0.5)
+  p.back = W.cardBack(face, PILE_H, "BACKGROUND", 0)
+  p.back:SetPoint("CENTER")
+  p.hex = W.hex(face, "steel", 34, "ARTWORK", 0)
+  p.hex:SetPoint("CENTER", 30, -46)
+  p.count = W.label(face, "heavy", 15, C.text)
+  p.count:SetPoint("CENTER", p.hex, "CENTER", 0, 1)
   W.hoverable(p, { scale = 1.06, lift = 6 })
   p:SetScript("OnClick", function(_, button)
     if button == "RightButton" then return end
@@ -72,23 +77,22 @@ local function deckPile(f)
   return p
 end
 
--- Plaque de réponse (rencontre, bibelot) : libellé + ce que ça donne.
+-- Plaque de réponse (rencontre, bibelot, feu de camp, service) : libellé + ce que ça donne (vert si
+-- c'est un gain). Survol : liseré doré, ardoise plus claire, halo, levée.
 local function plaque(parent)
   local b = CreateFrame("Button", nil, parent)
-  b:SetSize(300, 124)
+  b:SetSize(300, 118)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
-  b.halo = W.roundRect(face, "BACKGROUND", -8, 13, -4):SetColor(C.gold)
-  b.halo:Hide()
-  b.shape = W.shape(face, 10, C.edgeCommon, C.parchment, 4, -7, 0.22)
+  b.plaque = W.plaque(face, { r = 14 })
   b.icon = face:CreateTexture(nil, "ARTWORK")
   b.icon:SetSize(40, 40)
-  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  W.roundMask(face, b.icon, "mask_roundsq")
   b.icon:Hide()
-  b.label = W.label(face, "title", 18, C.ink)
+  b.label = W.label(face, "bold", 20, C.text)
   b.label:SetWidth(280)
   b.label:SetJustifyH("CENTER")
-  b.sub = W.label(face, "body", 14, C.inkSoft)
+  b.sub = W.label(face, "bold", 15.5, C.textSoft)
   b.sub:SetWidth(280)
   b.sub:SetJustifyH("CENTER")
   b.sub:SetWordWrap(true)
@@ -99,9 +103,9 @@ local function plaque(parent)
     self.sub:SetWidth(w - 24)
     self.label:SetText(o.label or o.id)
     local sub = o.text or ""
-    local col = C.inkSoft
-    if o.disabled and o.reason then sub, col = o.reason, C.numberInk
-    elseif sub:match("^%+") then col = C.green end
+    local col = C.textSoft
+    if o.disabled and o.reason then sub, col = o.reason, C.badText
+    elseif sub:match("^%+") then col = C.healGreen end
     self.sub:SetText(sub)
     self.sub:SetTextColor(col[1], col[2], col[3])
     self.label:ClearAllPoints()
@@ -127,60 +131,94 @@ local function plaque(parent)
     local o = self.option
     if o and o.item then W.fillItemTooltip(tt, o.item.kind, o.item.id, { reason = o.disabled and o.reason or nil }) end
   end, "ANCHOR_TOP")
-  -- survol : la plaque se lève, son halo doré s'allume en fondu, le parchemin s'éclaircit
+  -- survol : la plaque se lève, son liseré passe à l'or, l'ardoise s'éclaircit, le halo s'allume
   W.hoverable(b, { scale = 1.04, lift = 5, paint = function(self, h)
     local live = self.option and not self.option.disabled
-    if live and h > 0 then
-      self.halo:Show()
-      self.halo:SetAlpha(h)
-      self.shape.fill:SetColor(W.lerpColor(C.parchment, C.parchmentLight, h))
-    else
-      self.halo:Hide()
-      self.shape.fill:SetColor(C.parchment)
-    end
+    if not live then h = 0 end
+    self.plaque:SetFill(1 + 0.25 * h)
+    self.plaque:SetRim(W.lerpColor(Art.rim.silver, Art.rim.gold, h))
+    self.plaque:SetGlow(0.75 * h)
   end })
   return b
 end
 
 -- Objet posé au sol, cliquable (couchage, grimoire, bourse, fiole, bibelot, coffre) : ombre, cadre,
 -- icône, étiquette dessous.
+-- Pastille d'étiquette (pilule d'ardoise) : t:Set(texte, couleur, prix, trop cher) ; un prix montre la
+-- pièce à gauche du nombre, « trop cher » rougit le liseré ; texte vide = cachée.
+local function tagPill(parent)
+  local t = CreateFrame("Frame", nil, parent)
+  t:SetSize(58, 22)
+  t.plaque = W.plaque(t, { r = 11, pill = true, gloss = false })
+  t.coin = t:CreateTexture(nil, "ARTWORK")
+  t.coin:SetSize(15, 15)
+  t.coin:SetPoint("LEFT", 6, 0)
+  W.roundMask(t, t.coin)
+  W.setIcon(t.coin, Art.ui.gold, "ui:gold")
+  t.text = W.label(t, "heavy", 13.5, C.goldText)
+  t.text:SetPoint("CENTER", 0, 1)
+  t:Hide()
+  t.Set = function(self, text, color, isPrice, bad)
+    if not text or text == "" then self:Hide() return end
+    self.text:SetText(text)
+    local c = color or C.goldText
+    self.text:SetTextColor(c[1], c[2], c[3])
+    self.text:ClearAllPoints()
+    if isPrice then
+      self.coin:Show()
+      self.text:SetPoint("CENTER", 7, 1)
+      self:SetWidth(max(58, (self.text:GetStringWidth() or 30) + 36))
+    else
+      self.coin:Hide()
+      self.text:SetPoint("CENTER", 0, 1)
+      self:SetWidth((self.text:GetStringWidth() or 40) + 24)
+    end
+    self.plaque:SetRim(bad and Art.rim.red or Art.rim.silver)
+    self:Show()
+  end
+  return t
+end
+
+-- Objet cliquable (butin, articles du marchand, couchage et grimoire du feu, coffre) : case d'ardoise
+-- et icône aux coins arrondis (shape "square"), ou médaillon argenté (shape "round") ; nombre en bas à
+-- droite (b.big) ; étiquette dessous (prix : pièce + nombre, rouge si trop cher ; ou texte).
 local function groundObject(parent, size, shape)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  -- l'ombre et l'étiquette restent au sol ; l'objet (face) se soulève au survol
-  b.shadow = W.disc(b, "BACKGROUND", -8, C.shadow, 0.55)
-  b.shadow:SetSize(size * 1.05, 14)
-  b.shadow:SetPoint("TOP", b, "BOTTOM", 0, 8)
   local face = W.face(b)
-  b.halo = W.roundRect(face, "BACKGROUND", -7, shape == "flask" and floor(size / 3) + 3 or 10, -4):SetColor(C.gold)
-  b.halo:Hide()
-  local radius = shape == "flask" and floor(size / 3) or (shape == "bag" and floor(size / 2.4) or 8)
-  b.shape = W.shape(face, radius, C.cream, C.woodDark, 3, -6)
-  b.icon = face:CreateTexture(nil, "ARTWORK")
-  b.icon:SetPoint("TOPLEFT", 4, -4)
-  b.icon:SetPoint("BOTTOMRIGHT", -4, 4)
-  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  if shape == "flask" or shape == "bag" then W.roundMask(face, b.icon) end
-  b.big = W.label(face, "title", 20, C.creamLight, "OVERLAY", true)
-  b.big:SetPoint("CENTER", 0, 0)
-  b.tag = CreateFrame("Frame", nil, b)
-  b.tag:SetSize(80, 22)
-  b.tag:SetPoint("TOP", b, "BOTTOM", 0, -10)
-  b.tag.shape = W.shape(b.tag, 7, C.goldDeep, C.band, 2, -4)
-  b.tag.text = W.label(b.tag, "body", 13, C.gold)
-  b.tag.text:SetPoint("CENTER")
-  b.tag:Hide()
-  b.SetTag = function(self, text, color)
-    if not text or text == "" then self.tag:Hide() return end
-    self.tag.text:SetText(text)
-    local c = color or C.gold
-    self.tag.text:SetTextColor(c[1], c[2], c[3])
-    self.tag:SetWidth((self.tag.text:GetStringWidth() or 40) + 20)
-    self.tag:Show()
+  b.icon = face:CreateTexture(nil, "ARTWORK", nil, 1)
+  if shape == "round" then
+    b.glow = W.skin(face, "glow_round", "BACKGROUND", -8)
+    b.glow:SetPoint("CENTER")
+    b.glow:SetSize(size * 1.55, size * 1.55)
+    b.glow:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    b.glow:SetAlpha(0)
+    b.ring = W.skin(face, "medal_ring", "ARTWORK", 0)
+    b.ring:SetAllPoints()
+    b.icon:SetPoint("TOPLEFT", size * 0.11, -size * 0.11)
+    b.icon:SetPoint("BOTTOMRIGHT", -size * 0.11, size * 0.11)
+    W.roundMask(face, b.icon)
+  else
+    b.plaque = W.plaque(face, { r = max(8, floor(size / 4.4)), fill = 0.7, gloss = false })
+    local pad = max(4, floor(size * 0.09))
+    b.icon:SetPoint("TOPLEFT", pad, -pad)
+    b.icon:SetPoint("BOTTOMRIGHT", -pad, pad)
+    W.roundMask(face, b.icon, "mask_roundsq")
   end
+  b.big = W.label(face, "heavy", 15, C.goldText, "OVERLAY")
+  b.big:SetPoint("CENTER", face, "BOTTOMRIGHT", -6, 6)
+  b.tag = tagPill(b)
+  b.tag:SetPoint("TOP", b, "BOTTOM", 0, -6)
+  b.SetTag = function(self, ...) self.tag:Set(...) end
+  b.SetRim = function(self, c) if self.plaque then self.plaque:SetRim(c) end end
   W.hoverable(b, { scale = 1.08, lift = 6, paint = function(self, h)
-    if h > 0 then self.halo:Show() self.halo:SetAlpha(h) else self.halo:Hide() end
+    if self.active == false then h = 0 end
+    if self.glow then self.glow:SetAlpha(0.8 * h) end
+    if self.plaque then
+      self.plaque:SetGlow(0.7 * h)
+      self.plaque:SetFill(0.7 * (1 + 0.3 * h))
+    end
   end })
   W.tooltip(b, function(tt, self)
     local info = self.info
@@ -190,52 +228,51 @@ local function groundObject(parent, size, shape)
   return b
 end
 
--- Bulle de dialogue (parchemin bordé) avec pointe facultative.
+-- Bulle de dialogue : ivoire du pack au liseré d'argent, texte sombre, pointe facultative vers le
+-- personnage ; edge = teinte du liseré (or : rencontre rare, violet : histoire).
 local function bubble(parent)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(370, 100)
-  f.shape = W.shape(f, 14, C.wood, C.parchmentLight, 3, -6, 0.2)
-  f.title = W.label(f, "title", 16, C.wood)
+  f:SetSize(400, 96)
+  f.plaque = W.plaque(f, { mat = "ivory", r = 14 })
+  f.tail = W.skin(f, "tail_ivory", "BACKGROUND", -8)
+  f.tail:SetSize(26, 18)
+  f.tailRim = W.skin(f, "tail_rim", "BACKGROUND", -7)
+  f.tailRim:SetAllPoints(f.tail)
+  f.title = W.label(f, "bold", 16, C.inkDark, "OVERLAY", false)
   f.title:SetPoint("TOPLEFT", 18, -12)
-  f.text = W.label(f, "body", 15, C.ink)
-  f.text:SetWidth(334)
+  f.text = W.label(f, "bold", 14.5, C.inkDark, "OVERLAY", false)
+  f.text:SetWidth(364)
   f.text:SetJustifyH("LEFT")
   f.text:SetWordWrap(true)
-  f.tail = CreateFrame("Frame", nil, f)
-  f.tail:SetSize(22, 22)
-  f.tail.edge = W.rect(f.tail, "BACKGROUND", -8, C.wood)
-  f.tail.edge:SetAllPoints()
-  f.tail.fill = W.rect(f.tail, "BACKGROUND", -7, C.parchmentLight)
-  f.tail.fill:SetPoint("TOPLEFT", 3, -3)
-  f.tail.fill:SetPoint("BOTTOMRIGHT", -3, 3)
-  if f.tail.edge.SetRotation then
-    f.tail.edge:SetRotation(math.pi / 4)
-    f.tail.fill:SetRotation(math.pi / 4)
-  end
-  f.tail:SetFrameLevel(f:GetFrameLevel())
+  f.text:SetSpacing(4)
   f.Set = function(self, title, text, edge, tail)
     self.title:SetText(title or "")
+    self.text:SetWidth(self:GetWidth() - 36)
     self.text:ClearAllPoints()
     if title and title ~= "" then
       self.text:SetPoint("TOPLEFT", self.title, "BOTTOMLEFT", 0, -8)
     else
-      self.text:SetPoint("TOPLEFT", 18, -14)
+      self.text:SetPoint("TOPLEFT", 18, -16)
     end
     self.text:SetText(text or "")
     local h = (self.text.GetStringHeight and self.text:GetStringHeight()) or 60
     if type(h) ~= "number" or h <= 0 then h = 60 end
     self:SetHeight(h + ((title and title ~= "") and 58 or 34))
-    self.shape.edge:SetColor(edge or C.wood)
-    self.tail.edge:SetColorTexture(W.rgb(edge or C.wood))
+    local rim = edge or Art.rim.silver
+    self.plaque:SetRim(rim)
+    self.tailRim:SetVertexColor(rim[1], rim[2], rim[3], 1)
     self.tail:ClearAllPoints()
     if tail == "right" then
-      self.tail:SetPoint("CENTER", self, "BOTTOMRIGHT", -50, 1)
+      self.tail:SetPoint("TOP", self, "BOTTOMRIGHT", -60, 2)
       self.tail:Show()
+      self.tailRim:Show()
     elseif tail == "left" then
-      self.tail:SetPoint("CENTER", self, "BOTTOMLEFT", 50, 1)
+      self.tail:SetPoint("TOP", self, "BOTTOMLEFT", 60, 2)
       self.tail:Show()
+      self.tailRim:Show()
     else
       self.tail:Hide()
+      self.tailRim:Hide()
     end
   end
   return f
@@ -250,16 +287,16 @@ UI.register("start", Start)
 
 function Start:Build(f)
   self.hero = heroFigure(f)
-  local panel = W.parchment(f, 12)
+  local panel = W.woodPanel(f, 14)
   at(panel, f, 280, 70, 560, 290)
   self.panel = panel
-  self.title = W.label(panel, "title", 32, C.ink)
+  self.title = W.label(panel, "heavy", 32, C.text)
   self.title:SetPoint("TOP", 0, -18)
   self.title:SetText("Slay the Dragon")
   self.classButtons = {}
   for i = 1, 4 do
-    local b = W.button(panel, "", 220, 52, nil, "parchment", 16)
-    b.sub = W.label(b.face, "body", 11, C.inkSoft)
+    local b = W.button(panel, "", 220, 52, nil, "slate", 17)
+    b.sub = W.label(b.face, "body", 11, C.textSoft)
     b.sub:SetPoint("TOP", b.label, "BOTTOM", 0, -2)
     b.label:ClearAllPoints()
     b.label:SetPoint("CENTER", 0, 7)
@@ -267,21 +304,19 @@ function Start:Build(f)
     b:Hide()
     self.classButtons[i] = b
   end
-  self.keyLabel = W.label(panel, "title", 15, C.wood)
+  self.keyLabel = W.label(panel, "bold", 15, C.textSoft)
   self.keyLabel:SetPoint("TOP", 0, -150)
   self.keyLabel:SetText("Clé mythique")
   self.keyButtons = {}
+  -- clés +0…+5 : hexagones violets (verrouillées : hexagones vides)
   for i = 1, 6 do
     local b = CreateFrame("Button", nil, panel)
     b:SetSize(46, 46)
     local face = W.face(b)
-    b.ring = W.disc(face, "BACKGROUND", 0, C.gold)
-    b.ring:SetAllPoints()
-    b.fill = W.disc(face, "BACKGROUND", 1, C.key)
-    b.fill:SetPoint("TOPLEFT", 3, -3)
-    b.fill:SetPoint("BOTTOMRIGHT", -3, 3)
-    b.label = W.label(face, "title", 16, C.frame)
-    b.label:SetPoint("CENTER")
+    b.hex = W.hex(face, "violet", 46, "BACKGROUND", 0)
+    b.hex:SetPoint("CENTER")
+    b.label = W.label(face, "heavy", 16, C.text)
+    b.label:SetPoint("CENTER", 0, 1)
     W.hoverable(b, { scale = 1.14 })
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
     W.tooltip(b, function(tt, btn)
@@ -300,16 +335,16 @@ function Start:Build(f)
     b:Hide()
     self.affixIcons[i] = b
   end
-  self.note = W.label(f, "body", 13, C.cream, "OVERLAY", true)
-  at(self.note, f, 190, 440, 590, 0)
-  self.note:SetWidth(600)
+  self.note = W.label(f, "bold", 14, C.textSoft, "OVERLAY")
+  at(self.note, f, 250, 446, 540, 0)
+  self.note:SetWidth(540)
   self.note:SetJustifyH("CENTER")
   self.note:SetWordWrap(true)
-  self.go = W.button(f, "Partir en expédition", 230, 52, nil, "gold", 16)
-  at(self.go, f, 790, 492, 230, 52)
+  self.go = W.button(f, "Partir en expédition", 230, 50, nil, "gold", 18)
+  at(self.go, f, 790, 494, 230, 50)
   self.go:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  self.meta = W.button(f, "Réputation et journal", 200, 34, nil, "wood", 13)
-  at(self.meta, f, 20, 500, 200, 34)
+  self.meta = W.button(f, "Réputation et journal", 210, 44, nil, "slate", 15)
+  at(self.meta, f, 24, 497, 210, 44)
   self.meta:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
   self.optionButtons = {}
 end
@@ -333,7 +368,8 @@ function Start:Show(step)
       b.option = o
       b:SetText(o.label)
       b.sub:SetText(o.text or "")
-      b.shape.edge:SetColor(o.selected and C.gold or C.edgeCommon)
+      b.plaque:SetRim(o.selected and Art.rim.gold or Art.rim.silver)
+      b.plaque:SetGlow(o.selected and 0.5 or 0)
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -348,13 +384,12 @@ function Start:Show(step)
       b:SetPoint("TOP", self.panel, "TOP", (i - (#keys + 1) / 2) * 56, -176)
       b.option = o
       b.label:SetText(o.label)
-      local ring = o.selected and C.creamLight or (o.disabled and C.woodLine or C.gold)
-      b.ring:SetVertexColor(ring[1], ring[2], ring[3], 1)
-      local fill = o.disabled and C.woodDark or C.key
-      b.fill:SetVertexColor(fill[1], fill[2], fill[3], 1)
-      local lc = o.disabled and C.woodLine or C.frame
+      local s = o.selected and 54 or 44
+      W.setHex(b.hex, o.disabled and "empty" or "violet", s)
+      local lc = o.disabled and C.textDim or C.text
       b.label:SetTextColor(lc[1], lc[2], lc[3])
-      b:SetSize(o.selected and 52 or 44, o.selected and 52 or 44)
+      W.setSize(b.label, o.selected and 19 or 16)
+      b:SetSize(s, s)
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -406,19 +441,19 @@ end
 local Choice = { kinds = { "choice", "startRelic", "event" } }
 UI.register("choice", Choice)
 
-local RARITY_EDGE = { rare = C.goldDeep, story = Art.hex("#7b4bb3") }
+local RARITY_EDGE = { rare = Art.rim.gold, story = Art.rim.violet }
 
 function Choice:Build(f)
   self.hero = heroFigure(f)
   self.npc = Scene.figure(f, 170, 200)
   at(self.npc, f, 765, 146, 170, 200)
   self.npc:EnableMouse(false)
-  self.speaker = W.label(f, "body", 14, C.cream, "OVERLAY", true)
-  at(self.speaker, f, 770, 350, 160, 0)
+  self.speaker = W.label(f, "bold", 14, C.text, "OVERLAY")
+  at(self.speaker, f, 770, 293, 160, 0)
   self.speaker:SetWidth(160)
   self.speaker:SetJustifyH("CENTER")
   self.bubble = bubble(f)
-  at(self.bubble, f, 380, 64)
+  at(self.bubble, f, 397, 68)
   self.buttons = {}
   for i = 1, 4 do
     local b = plaque(f)
@@ -435,22 +470,22 @@ function Choice:Show(step)
   UI.setStage({ scene = step.scene or Controller.scene(), board = true })
   Scene.playerFigure(self.hero)
   self.speaker:SetText(step.kind == "event" and (step.speaker or "") or "")
-  local edge = RARITY_EDGE[step.rarity or ""] or C.wood
+  local edge = RARITY_EDGE[step.rarity or ""]
+  self.bubble:SetWidth(npcShown and 400 or 470)
   self.bubble:Set(step.title, step.text, edge, npcShown and "right" or nil)
-  self.bubble:SetWidth(npcShown and 370 or 470)
-  at(self.bubble, self.frame, npcShown and 380 or 282, 64)
+  at(self.bubble, self.frame, npcShown and 397 or 282, 68)
   self.optionButtons = {}
   local opts = step.options or {}
   local n = min(#opts, #self.buttons)
-  local span = n <= 2 and 734 or (n == 3 and 900 or 980)
-  local gap = 22
+  local span = n <= 2 and 668 or (n == 3 and 900 or 980)
+  local gap = n <= 2 and 28 or 22
   local w = (span - (n - 1) * gap) / max(n, 1)
-  local h = n >= 4 and 116 or 124
+  local h = n >= 4 and 112 or 118
   local x0 = (Scene.W - span) / 2
   for i, b in ipairs(self.buttons) do
     local o = opts[i]
     if o and i <= n then
-      at(b, self.frame, x0 + (i - 1) * (w + gap), 456)
+      at(b, self.frame, x0 + (i - 1) * (w + gap), 462)
       b:SetOption(o, w, h)
       self.optionButtons[o.id] = b
     else
@@ -510,17 +545,28 @@ function Camp:Build(f)
   end)
   self.fire = fire
 
-  self.rest = groundObject(f, 92, "square")
-  at(self.rest, f, 250, 250, 92, 92)
+  -- couchage et grimoire : médaillons au sol ; leurs plaques sur le plateau (planche ecran_feu.jpg)
+  self.rest = groundObject(f, 74, "round")
+  at(self.rest, f, 387 - 37, 347 - 37, 74, 74)
   W.setIcon(self.rest.icon, Art.ui.bedroll, "ui:bedroll")
   self.rest:SetScript("OnClick", function(b) chooseOption(b.option) end)
-  self.book = groundObject(f, 92, "square")
-  at(self.book, f, 690, 250, 92, 92)
+  self.book = groundObject(f, 74, "round")
+  at(self.book, f, 657 - 37, 347 - 37, 74, 74)
   W.setIcon(self.book.icon, Art.ui.grimoire, "ui:grimoire")
   self.book:SetScript("OnClick", function(b) chooseOption(b.option) end)
+  self.restPlaque = plaque(f)
+  self.bookPlaque = plaque(f)
+  -- la plaque et le médaillon s'allument ensemble
+  for _, pair in ipairs({ { self.rest, self.restPlaque }, { self.book, self.bookPlaque } }) do
+    local obj, pl = pair[1], pair[2]
+    obj.onEnterExtra = function() W.hoverEnter(pl) end
+    obj.onLeaveExtra = function() W.hoverLeave(pl) end
+    pl.onEnterExtra = function() W.hoverEnter(obj) end
+    pl.onLeaveExtra = function() W.hoverLeave(obj) end
+  end
   self.pile = deckPile(f)
-  self.leave = W.button(f, "Reprendre la route", 200, 52, nil, "gold", 16)
-  at(self.leave, f, 808, 492, 200, 52)
+  self.leave = W.button(f, "Reprendre la route", 210, 44, nil, "slate", 15)
+  at(self.leave, f, 800, 497, 210, 44)
   self.leave:SetScript("OnClick", function(b) chooseOption(b.option) end)
   self.optionButtons = {}
 end
@@ -535,18 +581,24 @@ function Camp:Show(step)
     if o.id == "rest" then
       self.rest.option = o
       local heal = (o.text or ""):match("(%d+)")
-      self.rest:SetTag(heal and ("+" .. heal .. " PV") or o.label, C.healText)
       self.rest.info = { title = o.label, text = o.text, reason = o.disabled and o.reason or nil }
       self.rest.active = not o.disabled
       self.rest:SetAlpha(o.disabled and 0.5 or 1)
+      at(self.restPlaque, self.frame, 385 - 120, 469)
+      self.restPlaque:SetOption({ id = o.id, label = o.label, text = heal and ("+" .. heal .. " PV") or o.text,
+        disabled = o.disabled, reason = o.reason }, 240, 104)
+      self.restPlaque.option = o
       self.optionButtons[o.id] = self.rest
     elseif o.id == "ui:upgrade" then
       self.book.option = o
-      self.book:SetTag("Améliorer une carte", C.gold)
       self.book.info = { title = o.label, reason = o.disabled and o.reason or nil }
       self.book.active = not o.disabled
       self.book.icon:SetDesaturated(o.disabled and true or false)
       self.book:SetAlpha(o.disabled and 0.5 or 1)
+      at(self.bookPlaque, self.frame, 662 - 120, 469)
+      self.bookPlaque:SetOption({ id = o.id, label = "S'entraîner", text = "Améliore une carte",
+        disabled = o.disabled, reason = o.reason }, 240, 104)
+      self.bookPlaque.option = o
       self.optionButtons[o.id] = self.book
     elseif o.id == "leave" then
       self.leave.option = o
@@ -570,8 +622,11 @@ end
 local Reward = { kinds = { "reward" } }
 UI.register("reward", Reward)
 
-local REWARD_CARDS = { { 378, 118 + 111 }, { 563, 118 + 111 }, { 748, 118 + 111 } } -- centres
-local REWARD_SCALE = 1.26
+-- Planche ecran_recompense.jpg : trois cartes ×1,08 (centres x 407 / 552 / 697, haut du corps y 147),
+-- butin à droite, consigne au centre du plateau.
+local REWARD_SCALE = 1.08
+local REWARD_TOP = 147
+local REWARD_CARDS = { 407, 552, 697 }
 
 function Reward:Build(f)
   self.hero = heroFigure(f)
@@ -582,22 +637,20 @@ function Reward:Build(f)
   for i = 1, 4 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) Reward:Pick(card) end)
-    c.hoverScale, c.hoverLift = 1.09, 18 / REWARD_SCALE
+    c.hoverScale, c.hoverLift = 1.17, 22 / REWARD_SCALE
     c:Hide()
     self.cards[i] = c
   end
-  -- butin au sol
-  self.goldBag = groundObject(f, 62, "bag")
-  at(self.goldBag, f, 868, 296, 62, 62)
-  W.setIcon(self.goldBag.icon, Art.ui.gold, "ui:gold")
-  self.goldBag.icon:SetAlpha(0.45)
+  -- butin au sol : bourse (montant), bibelot, fiole
+  self.goldBag = groundObject(f, 44, "square")
+  at(self.goldBag, f, 878 - 22, 327 - 22, 44, 44)
+  W.setIcon(self.goldBag.icon, Art.ui.bag, "ui:bag")
   self.goldBag:SetScript("OnClick", function() Reward:Collect("gold") end)
-  self.flask = groundObject(f, 48, "flask")
-  at(self.flask, f, 950, 300, 42, 56)
-  self.flask:SetSize(42, 56)
+  self.flask = groundObject(f, 44, "square")
+  at(self.flask, f, 934 - 22, 335 - 22, 44, 44)
   self.flask:SetScript("OnClick", function() Reward:Collect("potion") end)
-  self.relic = groundObject(f, 54, "square")
-  at(self.relic, f, 898, 222, 54, 54)
+  self.relic = groundObject(f, 44, "square")
+  at(self.relic, f, 906 - 22, 273 - 22, 44, 44)
   self.relic:SetScript("OnClick", function() Reward:Collect("relic") end)
   -- coffre fermé
   self.chest = groundObject(f, 120, "square")
@@ -607,8 +660,11 @@ function Reward:Build(f)
   self.loot = CreateFrame("Frame", nil, f) -- compatibilité harnais : butin affiché
   self.loot:SetSize(1, 1)
   self.pile = deckPile(f)
-  self.leave = W.button(f, "Reprendre la route", 200, 52, nil, "gold", 16)
-  at(self.leave, f, 808, 492, 200, 52)
+  self.hint = W.label(f, "bold", 15, C.textSoft)
+  self.hint:SetPoint("CENTER", f, "TOPLEFT", 552, -519)
+  self.hint:SetText("Une carte au choix, ou aucune.")
+  self.leave = W.button(f, "Reprendre la route", 206, 50, nil, "gold", 18)
+  at(self.leave, f, 913 - 103, 519 - 25, 206, 50)
   self.leave:SetScript("OnClick", function() Reward:Leave() end)
   self.optionButtons = {}
 end
@@ -668,7 +724,8 @@ function Reward:Show(step)
       local card = self.cards[k]
       if card and not closed then
         card.option, card.slot = o, k
-        card.cx, card.cy = REWARD_CARDS[k] and REWARD_CARDS[k][1] or (378 + (k - 1) * 185), 229
+        card.cx = REWARD_CARDS[k] or (407 + (k - 1) * 145)
+        card.cy = REWARD_TOP + W.CARD_H * REWARD_SCALE / 2
         card:SetCard(o.card.id, o.card.up, { playable = not o.disabled, reason = o.disabled and o.reason or nil })
         self:PlaceCard(card)
         card:SetAlpha(1)
@@ -692,6 +749,9 @@ function Reward:Show(step)
   local hold = UI.hold
   local r2 = r or {}
   self.goldBag.info = r2.goldGained and { title = "Bourse", text = "+" .. r2.goldGained .. " po" } or nil
+  local anyCard = false
+  for _, o in ipairs(step.options) do if o.card then anyCard = true end end
+  if anyCard and not closed then self.hint:Show() else self.hint:Hide() end
   if hold.gold and not closed then
     self.goldBag.big:SetText(tostring(hold.gold))
     self.goldBag:Show()
@@ -702,6 +762,8 @@ function Reward:Show(step)
   if r2.relic and hold.relic and not closed then
     self.relic.info = { kind = "relic", id = r2.relic }
     W.setIcon(self.relic.icon, Art.relic(r2.relic), "relic:" .. r2.relic)
+    local rel = ns.Relics[r2.relic]
+    self.relic:SetRim(Art.rarityRim[rel and rel.rarity or "common"] or Art.rim.silver)
     self.relic:Show()
     loot[#loot + 1] = "relic"
   else
@@ -713,7 +775,7 @@ function Reward:Show(step)
       hint = pendingPotion and "Emplacements de potion pleins : en jeter une (clic droit dans le bandeau)." or nil }
     W.setIcon(self.flask.icon, Art.potion(r2.potion), "potion:" .. r2.potion)
     self.flask.icon:SetDesaturated(pendingPotion and true or false)
-    self.flask:SetTag(pendingPotion and "Pas de place" or nil, C.hpText)
+    self.flask:SetTag(pendingPotion and "Pas de place" or nil, C.badText, false, true)
     self.flask:Show()
     loot[#loot + 1] = "potion"
   else
@@ -745,7 +807,7 @@ function Reward:Pick(card)
   local x, y = card.cx, card.cy
   W.sound("pick")
   if UI.choose(o.id) then
-    W.fly(g, self.frame, x, y, 96, 518, REWARD_SCALE, 0.4, 1, 0.3, 0.45, function() W.releaseGhost(g) end, 60)
+    W.fly(g, self.frame, x, y, 67, 519, REWARD_SCALE, 0.4, 1, 0.3, 0.45, function() W.releaseGhost(g) end, 60)
   else
     W.releaseGhost(g)
   end
@@ -833,13 +895,14 @@ end
 local Deck = { kinds = { "deck", "select" } }
 UI.register("deck", Deck)
 
-local PER_PAGE, PER_ROW, GRID_SCALE = 16, 8, 0.8
+local PER_PAGE, PER_ROW, GRID_SCALE = 16, 8, 0.75
+local GRID_TOP, GRID_GAPY = 100, 28 -- haut du corps de la 1re rangée ; écart (languette et plaque du bas)
 
 function Deck:Build(f)
   local panel = W.woodPanel(f, 12)
   at(panel, f, 16, 54, 1002, 362)
   self.panel = panel
-  self.title = W.label(panel, "title", 18, C.gold)
+  self.title = W.label(panel, "bold", 18, C.text)
   self.title:SetPoint("TOP", 0, -12)
   self.cards = {}
   for i = 1, PER_PAGE do
@@ -854,14 +917,14 @@ function Deck:Build(f)
     c:Hide()
     self.cards[i] = c
   end
-  self.prev = W.button(f, "<", 34, 34, function() self.page = self.page - 1 self:Layout() end, "wood", 18)
+  self.prev = W.roundButton(f, "<", 34, 1, nil, function() self.page = self.page - 1 self:Layout() end)
   at(self.prev, f, 24, 214, 34, 34)
-  self.next = W.button(f, ">", 34, 34, function() self.page = self.page + 1 self:Layout() end, "wood", 18)
+  self.next = W.roundButton(f, ">", 34, 1, nil, function() self.page = self.page + 1 self:Layout() end)
   at(self.next, f, 976, 214, 34, 34)
   self.pile = deckPile(f)
   self.buttons = {}
   for i = 1, 2 do
-    local b = W.button(f, "", 200, 52, nil, i == 1 and "gold" or "wood", 16)
+    local b = W.button(f, "", 206, i == 1 and 50 or 44, nil, i == 1 and "gold" or "slate", i == 1 and 18 or 15)
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
     b:Hide()
     self.buttons[i] = b
@@ -919,7 +982,7 @@ function Deck:Layout()
     if o and i <= count then
       local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)
       card.cx = x0 + col * (cw + gapX) + cw / 2
-      card.cy = 100 + row * (ch + 12) + ch / 2
+      card.cy = GRID_TOP + row * (ch + GRID_GAPY) + ch / 2
       card.option, card.slot = o, i
       card:SetCard(o.card.id, o.card.up, { preview = o.preview, playable = not o.disabled,
         reason = o.disabled and o.reason or nil })
@@ -936,7 +999,7 @@ function Deck:Layout()
     if o then
       b.option = o
       b:SetText(o.label or o.id)
-      at(b, self.frame, 808 - (i - 1) * 216, 492, 200, 52)
+      at(b, self.frame, 810 - (i - 1) * 222, i == 1 and 494 or 497, 206, i == 1 and 50 or 44)
       b:SetAlpha(o.disabled and 0.5 or 1)
       b:Show()
       self.optionButtons[o.id] = b
@@ -974,53 +1037,82 @@ end
 local Shop = { kinds = { "merchant" } }
 UI.register("shop", Shop)
 
-function Shop:Build(f)
-  -- l'étal : comptoir de bois et tenture
-  local stall = CreateFrame("Frame", nil, f)
-  at(stall, f, 24, 70, 986, 300)
-  local cloth = W.rect(stall, "BACKGROUND", -8, Art.hex("#7a2a1e"), 0.85)
-  at(cloth, stall, 0, 0, 986, 18)
-  for i = 0, 12 do
-    local scallop = W.disc(stall, "BACKGROUND", -8, Art.hex("#7a2a1e"), 0.85)
-    at(scallop, stall, i * 78, 8, 80, 22)
-  end
-  local counter = W.rect(stall, "BACKGROUND", -7, C.wood)
-  at(counter, stall, 0, 254, 986, 46)
-  local top = W.rect(stall, "BACKGROUND", -6, C.woodLine)
-  at(top, stall, 0, 254, 986, 6)
-  local grain = stall:CreateTexture(nil, "BACKGROUND", nil, -5)
-  grain:SetTexture(Art.tex.wood)
-  at(grain, stall, 0, 260, 986, 40)
-  grain:SetVertexColor(0.55, 0.38, 0.24)
-  grain:SetAlpha(0.4)
-  self.stall = stall
+-- Planche ecran_marchand.jpg : rangée de cartes ×0,92 (prix en pastille dessous), puis « Bibelots »,
+-- « Potions » et « Service » (plaque « Retirer une carte ») ; plateau : deck, or, « Reprendre la route ».
+local SHOP_SCALE = 0.92
+local SHOP_TOP, SHOP_X0, SHOP_DX = 81, 147, 150
+local SHOP_ITEM_Y, SHOP_ITEM_DX = 365, 104
 
+-- Plaque de service (icône à gauche, libellé), étiquette de prix dessous.
+local function serviceButton(parent)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(230, 52)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(b)
+  b.plaque = W.plaque(face, { r = 12 })
+  b.icon = face:CreateTexture(nil, "ARTWORK")
+  b.icon:SetSize(34, 34)
+  b.icon:SetPoint("CENTER", face, "LEFT", 29, 0)
+  W.roundMask(face, b.icon, "mask_roundsq")
+  W.setIcon(b.icon, Art.ui.remove, "ui:remove")
+  b.label = W.label(face, "bold", 15, C.text)
+  b.label:SetPoint("LEFT", face, "LEFT", 53, 0)
+  b.tag = tagPill(b)
+  b.tag:SetPoint("TOP", b, "BOTTOM", 0, -6)
+  W.hoverable(b, { scale = 1.04, lift = 3, paint = function(self, h)
+    if self.option and self.option.disabled then h = 0 end
+    self.plaque:SetFill(1 + 0.25 * h)
+    self.plaque:SetRim(W.lerpColor(Art.rim.silver, Art.rim.gold, h))
+    self.plaque:SetGlow(0.7 * h)
+  end })
+  b:SetScript("OnClick", function(self) chooseOption(self.option) end)
+  W.tooltip(b, function(tt, self)
+    local o = self.option
+    if o and o.disabled and o.reason then tt:AddLine(o.reason, 1, 0.3, 0.3, true) end
+  end, "ANCHOR_TOP")
+  return b
+end
+
+function Shop:Build(f)
   self.cards = {}
   for i = 1, 7 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    c.hoverScale, c.hoverLift = 1.12, 10 / 0.92
+    c.hoverScale, c.hoverLift = 1.12, 10 / SHOP_SCALE
     c:Hide()
     self.cards[i] = c
   end
+  self.sections = {}
+  for i, t in ipairs({ { "Bibelots", 57 }, { "Potions", 417 }, { "Service", 757 } }) do
+    local l = W.label(f, "bold", 13, Art.hex("#d6deec"))
+    l:SetPoint("LEFT", f, "TOPLEFT", t[2], -319)
+    l:SetText(t[1])
+    self.sections[i] = l
+  end
   self.items = {}
   for i = 1, 8 do
-    local b = groundObject(f, 56, "square")
+    local b = groundObject(f, 46, "square")
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
     b:Hide()
     self.items[i] = b
   end
-  -- service : retrait de carte (plaque sur le plateau)
-  self.remove = plaque(f)
+  -- service : retrait de carte
+  self.remove = serviceButton(f)
+  at(self.remove, f, 869 - 115, 369 - 26, 230, 52)
   self.remove:Hide()
   self.pile = deckPile(f)
-  self.leave = W.button(f, "Partir", 200, 52, nil, "gold", 16)
-  at(self.leave, f, 808, 492, 200, 52)
+  self.coin = f:CreateTexture(nil, "ARTWORK")
+  self.coin:SetSize(34, 34)
+  self.coin:SetPoint("CENTER", f, "TOPLEFT", 467, -519)
+  W.roundMask(f, self.coin)
+  W.setIcon(self.coin, Art.ui.gold, "ui:gold")
+  self.gold = W.label(f, "heavy", 30, C.goldText)
+  self.gold:SetPoint("LEFT", f, "TOPLEFT", 491, -517)
+  self.leave = W.button(f, "Reprendre la route", 206, 50, nil, "gold", 18)
+  at(self.leave, f, 913 - 103, 519 - 25, 206, 50)
   self.leave:SetScript("OnClick", function(b) chooseOption(b.option) end)
   self.optionButtons = {}
 end
-
-local SHOP_SCALE = 0.92
 
 function Shop:PlaceCard(card)
   if not card.cx then return end
@@ -1031,8 +1123,10 @@ end
 
 function Shop:Show(step)
   self.step = step
-  UI.setStage({ scene = "shop", board = true })
+  UI.setStage({ scene = "shop", board = true, veil = 0.4 })
   self.pile:Sync()
+  local r = Controller.runInfo()
+  self.gold:SetText(r and tostring(r.gold) or "")
   local cards, relics, potions, services = {}, {}, {}, {}
   for _, o in ipairs(step.options) do
     if o.card then cards[#cards + 1] = o
@@ -1044,16 +1138,13 @@ function Shop:Show(step)
   self.serviceOptions = services
   self.optionButtons = {}
   local n = min(#cards, #self.cards)
-  local cw = W.CARD_W * SHOP_SCALE
-  local gap = 16
-  local rowW = n * (cw + gap) - gap
-  local x0 = 30 + (660 - rowW) / 2
+  local dx = n > 6 and 140 or SHOP_DX
   for i = 1, #self.cards do
     local card, o = self.cards[i], cards[i]
     if o and i <= n then
       card.option, card.slot = o, i
-      card.cx = x0 + (i - 1) * (cw + gap) + cw / 2
-      card.cy = 92 + W.CARD_H * SHOP_SCALE / 2
+      card.cx = SHOP_X0 + (i - 1) * dx
+      card.cy = SHOP_TOP + W.CARD_H * SHOP_SCALE / 2
       card:SetCard(o.card.id, o.card.up, { price = o.price, sold = o.sold, tooPoor = o.disabled and not o.sold,
         playable = true })
       self:PlaceCard(card)
@@ -1064,24 +1155,25 @@ function Shop:Show(step)
       W.hideCard(card)
     end
   end
-  -- Bibelots (rangée du haut) puis fioles, à droite de l'étal.
+  -- Bibelots puis potions : cases sous leur titre, prix en pastille (rouge si trop cher).
   local k = 0
-  local function place(list, y, shape)
+  local function place(list, x0)
+    local step = #list > 3 and (SHOP_ITEM_DX * 3 / #list) or SHOP_ITEM_DX
     for i, o in ipairs(list) do
       k = k + 1
       local b = self.items[k]
       if b then
-        local x = 780 + (i - 1) * 78 - ((#list - 1) * 78) / 2 + 78
-        b.cx, b.cy = x, y + 28
-        at(b, self.frame, x - 28, y, 56, 56)
+        local x = x0 + (i - 1) * step
+        b.cx, b.cy = x, SHOP_ITEM_Y
+        at(b, self.frame, x - 23, SHOP_ITEM_Y - 23, 46, 46)
         b.option = o
         b.info = { kind = o.item.kind, id = o.item.id, price = o.price, reason = o.disabled and o.reason or nil }
         W.setIcon(b.icon, W.itemEntry(o.item.kind, o.item.id), o.item.kind .. ":" .. tostring(o.item.id))
         b.icon:SetDesaturated(o.sold and true or false)
-        b.shape.edge:SetColor(o.item.kind == "relic"
-          and (Art.rarity[(ns.Relics[o.item.id] or {}).rarity or "common"] or C.cream) or C.cream)
+        b:SetRim(o.item.kind == "relic" and Art.rarityRim[(ns.Relics[o.item.id] or {}).rarity or "common"]
+          or Art.rim.silver)
         if o.sold then b:SetTag("Vendu", { 0.6, 0.6, 0.6 })
-        else b:SetTag(o.price .. " po", o.disabled and C.hpText or C.gold) end
+        else b:SetTag(tostring(o.price), o.disabled and C.badText or C.goldText, true, o.disabled) end
         b.active = not o.disabled
         b:SetAlpha(o.sold and 0.45 or 1)
         b:Show()
@@ -1089,20 +1181,22 @@ function Shop:Show(step)
       end
     end
   end
-  place(relics, 96, "square")
-  place(potions, 214, "flask")
+  place(relics, 81)
+  place(potions, 441)
   for i = k + 1, #self.items do self.items[i].option = nil self.items[i]:Hide() end
+  self.remove:Hide()
   for _, o in ipairs(services) do
     if o.id == "leave" then
       self.leave.option = o
       self.optionButtons[o.id] = self.leave
     else
-      local label = { id = o.id, label = o.label, text = (o.price and (o.price .. " po") or ""),
-        disabled = o.disabled, reason = o.reason }
-      at(self.remove, self.frame, 330, 462)
-      self.remove:SetOption(label, 300, 104)
-      self.remove.option = o
-      self.optionButtons[o.id] = self.remove
+      local rm = self.remove
+      rm.option = o
+      rm.label:SetText(o.label or o.id)
+      rm.tag:Set(o.price and tostring(o.price) or "", o.disabled and C.badText or C.goldText, true, o.disabled)
+      rm:SetAlpha(o.disabled and 0.6 or 1)
+      rm:Show()
+      self.optionButtons[o.id] = rm
     end
   end
 end
@@ -1125,19 +1219,23 @@ end
 local Map = { kinds = { "map" } }
 UI.register("map", Map)
 
-local MAP_X0, MAP_X1, BOSS_X = 110, 790, 900
-local MAP_Y0, MAP_Y1 = 150, 440
-
-local NODE_FILL = { combat = C.nodeCombat, elite = C.nodeElite, boss = C.nodeDone }
+-- Planche ecran_parcours.jpg : feuille d'ivoire au liseré d'argent ; étapes en médaillons argentés
+-- (icône du type) ; accessibles : halo blanc ; position actuelle : plus grande, halo doré ; franchies :
+-- icône estompée et petit hexagone vert ; à venir : icône grisée ; boss : grand médaillon à halo rouge
+-- et son nom ; liens en pointillés (chemin parcouru brun doré, départs possibles sombres et épais,
+-- le reste clair et fin). Aucune légende ; infobulle = nom du type.
+local MAP_X0, MAP_X1, BOSS_X = 110, 790, 910
+local MAP_Y0, MAP_Y1 = 150, 450
+local NODE = 46            -- médaillon d'une étape (position actuelle : 54 ; boss : 76)
 
 function Map:Build(f)
-  local parch = W.parchment(f, 8)
-  at(parch, f, 20, 62, 994, 536)
-  parch:EnableMouse(false)
-  self.parch = parch
+  local sheet = W.parchment(f, 12)
+  at(sheet, f, 17, 60, 1000, 540)
+  sheet:EnableMouse(false)
+  self.parch = sheet
   self.canvas = CreateFrame("Frame", nil, f)
   self.canvas:SetAllPoints()
-  self.canvas:SetFrameLevel(parch:GetFrameLevel() + 2)
+  self.canvas:SetFrameLevel(sheet:GetFrameLevel() + 2)
   self.nodes = {}
   self.lines = {}
   self.dots = {}
@@ -1146,45 +1244,26 @@ end
 
 local function nodeButton(self, i)
   local b = CreateFrame("Button", nil, self.canvas)
-  b:SetSize(46, 46)
+  b:SetSize(NODE, NODE)
   b:SetFrameLevel(self.canvas:GetFrameLevel() + 5)
   local face = W.face(b)
-  b.halo = W.disc(face, "BACKGROUND", 0, C.nodeHalo)
+  b.halo = W.skin(face, "glow_round", "BACKGROUND", 0)
   b.halo:SetPoint("CENTER")
-  b.outer = W.disc(face, "BACKGROUND", 1, C.creamLight)
-  b.outer:SetPoint("CENTER")
-  b.edge = W.disc(face, "BACKGROUND", 2, C.nodeFutureEdge)
-  b.edge:SetAllPoints()
-  b.fill = W.disc(face, "BACKGROUND", 3, C.nodeFuture)
-  b.fill:SetPoint("TOPLEFT", 3, -3)
-  b.fill:SetPoint("BOTTOMRIGHT", -3, 3)
-  b.icon = face:CreateTexture(nil, "ARTWORK")
-  b.icon:SetPoint("TOPLEFT", 8, -8)
-  b.icon:SetPoint("BOTTOMRIGHT", -8, 8)
-  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  b.halo:Hide()
+  b.shadow = W.skin(face, "medal_ring", "BACKGROUND", 1)
+  b.shadow:SetPoint("CENTER", 1.5, -2)
+  b.shadow:SetVertexColor(0, 0, 0, 0.45)
+  b.ring = W.skin(face, "medal_ring", "ARTWORK", 0)
+  b.ring:SetAllPoints()
+  b.icon = face:CreateTexture(nil, "ARTWORK", nil, 1)
+  b.icon:SetPoint("TOPLEFT", NODE * 0.11, -NODE * 0.11)
+  b.icon:SetPoint("BOTTOMRIGHT", -NODE * 0.11, NODE * 0.11)
   W.roundMask(face, b.icon)
-  b.glyph = W.label(face, "title", 22, C.inkSoft)
-  b.glyph:SetPoint("CENTER", 0, 0)
-  b.check = face:CreateTexture(nil, "OVERLAY")
-  b.check:SetTexture(Art.tex.check)
-  b.check:SetSize(24, 24)
-  b.check:SetPoint("CENTER")
-  -- boss : losange
-  b.dEdge = W.rect(face, "BACKGROUND", 2, C.ink)
-  b.dEdge:SetSize(84, 84)
-  b.dEdge:SetPoint("CENTER")
-  b.dFill = W.rect(face, "BACKGROUND", 3, C.nodeDone)
-  b.dFill:SetSize(76, 76)
-  b.dFill:SetPoint("CENTER")
-  b.dHalo = W.rect(face, "BACKGROUND", 1, C.nodeHalo)
-  b.dHalo:SetSize(96, 96)
-  b.dHalo:SetPoint("CENTER")
-  for _, t in ipairs({ b.dEdge, b.dFill, b.dHalo }) do if t.SetRotation then t:SetRotation(math.pi / 4) end end
-  b.bossText = W.label(face, "title", 22, C.creamLight)
-  b.bossText:SetPoint("CENTER")
-  b.bossText:SetText("Boss")
-  b.bossName = W.label(face, "title", 15, C.ink)
-  b.bossName:SetPoint("TOP", face, "BOTTOM", 0, -20)
+  b.done = W.hex(face, "green", 16, "OVERLAY", 0)
+  b.done:SetPoint("CENTER", face, "CENTER", 16, -16)
+  b.done:Hide()
+  b.bossName = W.label(face, "bold", 14, C.inkDark, "OVERLAY", false)
+  b.bossName:SetPoint("TOP", face, "BOTTOM", 0, -12)
   -- survol : l'étape grossit (davantage si elle est accessible, voir paintNode)
   W.hoverable(b, { scale = 1.1 })
   b:SetScript("OnClick", function(btn)
@@ -1211,79 +1290,57 @@ end
 local function paintNode(b, node, bossName)
   local st, kind = node.state, node.kind
   local boss = kind == "boss"
-  local size = boss and 84 or (st == "current" and 60 or (st == "available" and 56 or 46))
+  local cur = st == "current"
+  local size = boss and 76 or (cur and 54 or NODE)
   b:SetSize(size, size)
+  b.shadow:SetSize(size, size)
   b.hoverScale = st == "available" and 1.18 or 1.06
-  for _, t in ipairs({ b.dEdge, b.dFill, b.dHalo, b.bossText, b.bossName }) do if boss then t:Show() else t:Hide() end end
-  for _, t in ipairs({ b.edge, b.fill, b.halo, b.outer }) do if boss then t:Hide() end end
-  b.check:Hide()
-  b.glyph:Hide()
-  b.icon:Hide()
-  if boss then
-    b.bossName:SetText(bossName or "")
-    if st == "available" then b.dHalo:Show() else b.dHalo:Hide() end
-    b.icon:SetTexture(nil)
-    W.setIcon(b.icon, Art.ui.map.boss, "map:boss")
-    return
-  end
-  b.edge:Show()
-  b.fill:Show()
-  b.halo:SetSize(size + 12, size + 12)
-  b.outer:SetSize(size + 10, size + 10)
-  if st == "available" then b.halo:Show() else b.halo:Hide() end
-  if st == "current" then b.outer:Show() else b.outer:Hide() end
-  local edge, fill = C.nodeFutureEdge, C.nodeFuture
-  if st == "done" or st == "current" then
-    edge, fill = st == "current" and C.gold or C.nodeDoneEdge, C.nodeDone
-    b.check:SetSize(size * 0.5, size * 0.5)
-    b.check:Show()
-  elseif st == "available" then
-    edge, fill = C.nodeRing, NODE_FILL[kind] or Art.hex("#7a5a2a")
-  elseif kind == "elite" then
-    edge = C.nodeElite
-  end
-  b.edge:SetVertexColor(edge[1], edge[2], edge[3], 1)
-  b.fill:SetVertexColor(fill[1], fill[2], fill[3], 1)
-  if st == "done" or st == "current" then
-    W.setIcon(b.icon, Art.ui.map[kind] or Art.ui.map.event, "map:" .. tostring(kind))
-    return
-  end
-  if kind == "event" then
-    b.glyph:SetText("?")
-    local gc = st == "available" and C.creamLight or C.inkSoft
-    b.glyph:SetTextColor(gc[1], gc[2], gc[3])
-    b.glyph:Show()
-    W.setIcon(b.icon, Art.ui.map.event, "map:event")
-    b.icon:Hide()
-    return
-  end
+  b.icon:ClearAllPoints()
+  b.icon:SetPoint("TOPLEFT", size * 0.11, -size * 0.11)
+  b.icon:SetPoint("BOTTOMRIGHT", -size * 0.11, size * 0.11)
   W.setIcon(b.icon, Art.ui.map[kind] or Art.ui.map.event, "map:" .. tostring(kind))
-  b.icon:Show()
-  b.icon:SetDesaturated(st ~= "available")
-  b.icon:SetAlpha(st == "available" and 1 or 0.7)
-  if st ~= "available" then b.icon:SetVertexColor(0.85, 0.7, 0.5) else b.icon:SetVertexColor(1, 1, 1) end
+  -- halo : doré (position actuelle), blanc (accessible), rouge (boss)
+  local halo = boss and { 0.84, 0.15, 0.17 } or (cur and C.gold or (st == "available" and C.white or nil))
+  if halo then
+    b.halo:SetSize(size * 1.7, size * 1.7)
+    b.halo:SetVertexColor(halo[1], halo[2], halo[3], 1)
+    b.halo:SetAlpha(boss and 0.9 or (cur and 0.95 or 0.7))
+    b.halo:Show()
+  else
+    b.halo:Hide()
+  end
+  -- icône : vive (accessible, actuelle, boss), estompée (franchie), grisée (à venir)
+  local live = cur or st == "available" or boss
+  b.icon:SetDesaturated(not live and st ~= "done")
+  if st == "done" then b.icon:SetAlpha(0.6) b.icon:SetVertexColor(1, 1, 1, 1)
+  elseif live then b.icon:SetAlpha(1) b.icon:SetVertexColor(1, 1, 1, 1)
+  else b.icon:SetAlpha(1) b.icon:SetVertexColor(1.0, 1.0, 1.0, 1) end
+  if st == "done" then b.done:Show() else b.done:Hide() end
+  b.bossName:SetText(boss and (bossName or "") or "")
 end
 
 -- Pointillés : petits disques le long d'un segment (pool).
-function Map:Dots(x1, y1, x2, y2, color, size, step, startK)
+function Map:Dots(x1, y1, x2, y2, color, size, step, startK, alpha)
   local dx, dy = x2 - x1, y2 - y1
   local len = math.sqrt(dx * dx + dy * dy)
   local n = floor(len / step)
   local k = startK
-  for j = 1, n - 1 do
+  for j = 2, n - 2 do
     k = k + 1
     local d = self.dots[k]
     if not d then
       d = W.disc(self.canvas, "ARTWORK", 0, color)
       self.dots[k] = d
     end
-    d:SetVertexColor(color[1], color[2], color[3], 1)
+    d:SetVertexColor(color[1], color[2], color[3], alpha or 1)
     d:SetSize(size, size)
     at(d, self.frame, x1 + dx * j / n - size / 2, y1 + dy * j / n - size / 2)
     d:Show()
   end
   return k
 end
+
+local DOT_WALKED, DOT_NEXT, DOT_REST = Art.hex("#966014"), Art.hex("#3c3428"), Art.hex("#786e5c")
 
 function Map:Show(step)
   self.step = step
@@ -1311,8 +1368,8 @@ function Map:Show(step)
       b:Hide()
     end
   end
-  -- Liens : chemin parcouru en trait plein, départs possibles en pointillés dorés, le reste en pointillés.
-  local k, kd = 0, 0
+  -- Liens en pointillés : chemin parcouru (brun doré), départs possibles (sombres, épais), le reste.
+  local kd = 0
   self.linkCount = 0
   for i = 1, #nodes do
     local from = nodes[i]
@@ -1323,27 +1380,17 @@ function Map:Show(step)
         self.linkCount = self.linkCount + 1
         local s1, s2 = from.state, stateOf[to]
         local walked = (s1 == "done" or s1 == "current") and (s2 == "done" or s2 == "current")
-        if walked and self.canvas.CreateLine then
-          k = k + 1
-          local line = self.lines[k]
-          if not line then
-            line = self.canvas:CreateLine(nil, "ARTWORK")
-            self.lines[k] = line
-          end
-          line:SetThickness(5)
-          line:SetColorTexture(C.nodeDone[1], C.nodeDone[2], C.nodeDone[3], 1)
-          line:SetStartPoint("TOPLEFT", self.frame, p1[1], -p1[2])
-          line:SetEndPoint("TOPLEFT", self.frame, p2[1], -p2[2])
-          line:Show()
+        if walked then
+          kd = self:Dots(p1[1], p1[2], p2[1], p2[2], DOT_WALKED, 4.8, 9, kd)
         elseif s1 == "current" and s2 == "available" or (s1 == nil and s2 == "available") then
-          kd = self:Dots(p1[1], p1[2], p2[1], p2[2], C.nodeRing, 6, 14, kd)
+          kd = self:Dots(p1[1], p1[2], p2[1], p2[2], DOT_NEXT, 4.8, 9, kd)
         else
-          kd = self:Dots(p1[1], p1[2], p2[1], p2[2], C.nodeFutureEdge, 4, 12, kd)
+          kd = self:Dots(p1[1], p1[2], p2[1], p2[2], DOT_REST, 3.2, 9, kd, 0.6)
         end
       end
     end
   end
-  for i = k + 1, #self.lines do self.lines[i]:Hide() end
+  for i = 1, #self.lines do self.lines[i]:Hide() end
   for i = kd + 1, #self.dots do self.dots[i]:Hide() end
   self.options = step.options or {}
   for _, o in ipairs(self.options) do
@@ -1360,19 +1407,19 @@ function Map:HandleKey(key)
 end
 
 ---------------------------------------------------------------------------
--- Bilan et méta : parchemin, barres de réputation, journal
+-- Bilan et méta : panneau d'ardoise, barres de réputation, journal
 ---------------------------------------------------------------------------
 
 local Progress = { kinds = { "end", "meta" } }
 UI.register("progress", Progress)
 
 function Progress:Build(f)
-  local panel = W.parchment(f, 12)
+  local panel = W.woodPanel(f, 14)
   at(panel, f, 167, 60, 700, 356)
   self.panel = panel
-  self.title = W.label(panel, "title", 28, C.ink)
+  self.title = W.label(panel, "heavy", 28, C.text)
   self.title:SetPoint("TOP", 0, -16)
-  self.text = W.label(panel, "body", 13, C.ink)
+  self.text = W.label(panel, "bold", 13.5, C.textSoft)
   self.text:SetPoint("TOP", self.title, "BOTTOM", 0, -10)
   self.text:SetWidth(620)
   self.text:SetJustifyH("CENTER")
@@ -1385,14 +1432,14 @@ function Progress:Build(f)
   end
   self.journal = {}
   for i = 1, 8 do
-    local fs = W.label(panel, "body", 12, C.inkSoft)
+    local fs = W.label(panel, "body", 12, C.textSoft)
     fs:SetWidth(600)
     fs:SetJustifyH("LEFT")
     self.journal[i] = fs
   end
   self.buttons = {}
   for i = 1, 3 do
-    local b = W.button(f, "", 220, 52, nil, i == 1 and "gold" or "wood", i == 1 and 16 or 13)
+    local b = W.button(f, "", 220, i == 1 and 50 or 44, nil, i == 1 and "gold" or "slate", i == 1 and 18 or 15)
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
     b:Hide()
     self.buttons[i] = b
@@ -1404,8 +1451,8 @@ function Progress:Show(step)
   self.step = step
   UI.setStage({ scene = step.kind == "end" and Controller.scene() or "road", board = true, veil = 0.45 })
   self.title:SetText(step.title or "")
-  local tc = C.ink
-  if step.kind == "end" then tc = step.won and C.green or C.numberInk end
+  local tc = C.text
+  if step.kind == "end" then tc = step.won and C.healGreen or C.badText end
   self.title:SetTextColor(tc[1], tc[2], tc[3])
   self.text:SetText(inkText(step.text))
   local bars = step.bars or {}
@@ -1429,7 +1476,7 @@ function Progress:Show(step)
     fs:SetPoint("TOP", self.panel, "TOP", 0, jy - (i - 1) * 16)
     if l then
       fs:SetText(l.text)
-      local c = l.won and C.green or C.inkSoft
+      local c = l.won and C.healGreen or C.textSoft
       fs:SetTextColor(c[1], c[2], c[3])
       fs:Show()
     else
@@ -1444,8 +1491,7 @@ function Progress:Show(step)
     if o then
       b.option = o
       b:SetText(o.label)
-      if i == 1 then at(b, self.frame, 790, 492, 220, 52) else at(b, self.frame, 24 + (i - 2) * 236, 500, 220, 36) end
-      b:SetSize(220, i == 1 and 52 or 36)
+      if i == 1 then at(b, self.frame, 790, 494, 220, 50) else at(b, self.frame, 24 + (i - 2) * 236, 497, 220, 44) end
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -1475,8 +1521,8 @@ UI.deckView = DV
 
 local DV_X, DV_Y, DV_W, DV_H = 52, 58, 930, 540
 local DV_SCALE, DV_ROW, DV_ROWS = 0.72, 8, 3
-local DV_GAPX, DV_GAPY = 14, 12
-local DV_TOP = DV_Y + 52
+local DV_GAPX, DV_GAPY = 14, 28 -- (languette de coût et plaque du bas entre deux rangées)
+local DV_TOP = DV_Y + 58
 local DV_TITLE = { deck = "Deck", draw = "Pioche", discard = "Défausse", exhaust = "Consumées" }
 local TYPE_ORDER = { attack = 1, skill = 2, power = 3 }
 
@@ -1534,16 +1580,16 @@ function DV:Build()
   panel:EnableMouseWheel(true)
   panel:SetScript("OnMouseWheel", wheel)
   self.panel = panel
-  self.title = W.label(panel, "title", 20, C.gold)
+  self.title = W.label(panel, "bold", 20, C.text)
   self.title:SetPoint("TOP", 0, -14)
-  self.empty = W.label(panel, "body", 14, C.cream)
+  self.empty = W.label(panel, "body", 14, C.textSoft)
   self.empty:SetPoint("CENTER", 0, 10)
   self.empty:SetText("Aucune carte.")
   self.close = W.button(panel, "Fermer", 120, 34, function() DV:Close() end, "gold", 14)
   self.close:SetPoint("BOTTOMRIGHT", -16, 14)
   -- indicateur de défilement
-  self.track = W.rect(panel, "ARTWORK", 0, C.woodDark)
-  self.thumb = W.rect(panel, "ARTWORK", 1, C.goldDeep)
+  self.track = W.rect(panel, "ARTWORK", 0, C.barTrack)
+  self.thumb = W.rect(panel, "ARTWORK", 1, Art.hex("#ced6e2"))
 
   self.cards = {}
   for i = 1, DV_ROW * DV_ROWS do

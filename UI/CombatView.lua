@@ -16,19 +16,23 @@ local max, min, abs, floor = math.max, math.min, math.abs, math.floor
 local V = { kinds = { "combat" } }
 UI.register("combat", V)
 
+-- Positions : docs/maquette/gen_combat_pack.py (coordonnées de fenêtre moins le cadre de 3).
 local SLOTS = 6
 local SLOT_W, SLOT_H = 150, 280
 local HERO_X = 196                       -- centre du héros
 local HERO_FEET = 292
 local ENEMY_X0, ENEMY_X1 = 470, 1022     -- zone des ennemis
-local HAND_CX, HAND_W = 525, 670         -- main : centre et largeur
-local HAND_TOP = 428
+local HAND_CX, HAND_W = 530, 660         -- main : centre et largeur
+local HAND_TOP = 418                     -- (plaque du bas comprise, la main reste dans la fenêtre)
 local HOVER_SCALE = 1.16
 local HOVER_TOP = 372                    -- haut d'une carte levée (survol ou sélection)
 local SPREAD = { 26, 12 }                -- écart des voisines d'une carte levée (1re, 2e)
-local DRAW_PILE = { 77, 584 }
-local DISCARD_PILE = { 123, 584 }
-local EXHAUST_PILE = { 169, 584 }
+local PILE_H = 44                        -- piles : dos de carte de 44 de haut, bas à y 595 (< 614)
+local DRAW_PILE = { 49, 573 }
+local DISCARD_PILE = { 113, 573 }
+local EXHAUST_PILE = { 177, 573 }
+local MANA_X, MANA_Y = 81, 474           -- hexagone de mana (84) ; points de mana dessous
+local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
 local AIM_SCALE = 1.07                   -- ennemi visé (carte à cible armée) : il grandit un peu
 
 local function now() return GetTime and GetTime() or 0 end
@@ -42,19 +46,28 @@ end
 -- Construction
 ---------------------------------------------------------------------------
 
--- Bulle d'intention : fond sombre arrondi, liseré de couleur, icône ronde + chiffre.
+-- Bulle d'intention : pilule d'ardoise au liseré de la couleur de l'intention (rouge attaque, bleu
+-- défense, violet guet…), pointe vers l'ennemi, icône ronde + chiffre blanc.
 local function intentBubble(parent)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(80, 28)
+  f:SetSize(64, 30)
   f:EnableMouse(true)
-  f.shape = W.shape(f, 13, C.attack, C.band, 2, -4)
+  f.plaque = W.plaque(f, { r = 15, pill = true })
+  f.tail = W.skin(f, "tail_slate", "BACKGROUND", -8)
+  f.tail:SetSize(18, 9)
+  f.tail:SetPoint("TOP", f, "BOTTOM", 0, 1.5)
+  f.tailRim = W.skin(f, "tail_rim", "BACKGROUND", -7)
+  f.tailRim:SetAllPoints(f.tail)
   f.icon = f:CreateTexture(nil, "ARTWORK")
-  f.icon:SetSize(18, 18)
-  f.icon:SetPoint("LEFT", 10, 0)
-  f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  f.icon:SetSize(22, 22)
+  f.icon:SetPoint("CENTER", f, "LEFT", 16, 0)
   W.roundMask(f, f.icon)
-  f.text = W.label(f, "title", 18, C.attackText)
-  f.text:SetPoint("LEFT", f.icon, "RIGHT", 5, 0)
+  f.text = W.label(f, "heavy", 19, C.text)
+  f.text:SetPoint("LEFT", f, "LEFT", 31, 0)
+  f.SetRim = function(self, c)
+    self.plaque:SetRim(c)
+    self.tailRim:SetVertexColor(c[1], c[2], c[3], 1)
+  end
   W.tooltip(f, function(tt, self) V.fillIntentTooltip(tt, self.enemy) end, "ANCHOR_TOP")
   return f
 end
@@ -92,15 +105,15 @@ local function buildSlot(self, i)
   s.flash = W.disc(s.fig, "OVERLAY", 0, C.hp, 0)
   s.flash:SetSize(110, 130)
   s.flash:SetPoint("CENTER", 0, 4)
-  s.block = W.shieldBadge(s, 28, 22)
-  s.block:SetPoint("RIGHT", s, "TOPLEFT", 4 + 5, -207)
-  s.hp = W.hpBar(s, 140, 18, 12)
-  s.hp:SetPoint("TOP", 0, -198)
-  s.name = W.label(s, "body", 13, C.cream, "OVERLAY", true)
-  s.name:SetPoint("TOP", 0, -220)
-  s.name:SetWidth(SLOT_W + 10)
-  s.st = W.pillRow(s, 6, SLOT_W + 10, 11)
-  s.st:SetPoint("TOP", 0, -238)
+  s.hp = W.hpBar(s, 120, 13, 14)
+  s.hp:SetPoint("TOP", 8, -200)
+  s.block = W.shieldBadge(s, 28, 28)
+  s.block:SetPoint("LEFT", s.hp, "RIGHT", 4, 0)
+  s.name = W.label(s, "bold", 13.5, C.text, "OVERLAY")
+  s.name:SetPoint("TOP", 0, -222)
+  s.name:SetWidth(SLOT_W + 20)
+  s.st = W.tokenRow(s, 6, SLOT_W + 10, 26)
+  s.st:SetPoint("TOP", 0, -242)
   s:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
   s:SetScript("OnEnter", function() s.hover = true V:RenderTargets() end)
   s:SetScript("OnLeave", function() s.hover = false V:RenderTargets() end)
@@ -110,23 +123,23 @@ end
 
 -- Pile (pioche, défausse, consumées) : petit tas de cartes avec nombre ; clic = consulter
 -- (panneau du deck, pioche triée).
-local function pile(self, parent, x, y, key, label, style, level)
-  local dashed = style ~= "full"
-  if not dashed then
-    local back = CreateFrame("Frame", nil, parent)
-    at(back, parent, x + 3, y + 3, 36, 48)
-    back:SetFrameLevel(level)
-    W.roundRect(back, "BACKGROUND", -8, 5, 0):SetColor(C.woodDark)
-  end
+local function pile(self, parent, cx, cy, key, label, style, level)
+  local w = W.skinWidth("card_back", PILE_H)
   local b = CreateFrame("Button", nil, parent)
-  at(b, parent, x, y, 36, 48)
+  at(b, parent, cx - w / 2, cy - PILE_H / 2, w, PILE_H)
   b:SetFrameLevel(level + 1)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
-  local edge = style == "exhaust" and C.watch or (dashed and C.woodLine or C.gold)
-  b.shape = W.shape(face, 5, edge, dashed and C.woodDark or C.wood, 2, -6)
-  b.count = W.label(face, "title", 18, style == "exhaust" and C.watchText or (dashed and C.parchment or C.creamLight))
-  b.count:SetPoint("CENTER")
+  -- ombre portée, dos de carte (défausse estompée, consumées teintées de violet)
+  b.shadow = W.cardBack(face, PILE_H, "BACKGROUND", -1)
+  b.shadow:SetPoint("CENTER", 1.5, -2)
+  b.shadow:SetVertexColor(0, 0, 0, 0.55)
+  b.back = W.cardBack(face, PILE_H, "BACKGROUND", 0)
+  b.back:SetPoint("CENTER")
+  if style == "dashed" then b.back:SetAlpha(0.6) end
+  if style == "exhaust" then b.back:SetDesaturated(true) b.back:SetVertexColor(0.75, 0.55, 1, 1) end
+  b.count = W.label(face, "heavy", 15, C.text)
+  b.count:SetPoint("CENTER", 0, 1)
   W.hoverable(b, { scale = 1.12, lift = 3 })
   b.pileKey = key
   b:SetScript("OnClick", function(_, button)
@@ -156,21 +169,24 @@ function V:Build(parent)
   hero.flash:SetSize(130, 160)
   hero.flash:SetPoint("CENTER", 0, 0)
 
+  -- Barre d'incantation : plaque d'ardoise, médaillon du sort, nom, jauge dorée.
   local cast = CreateFrame("Frame", nil, parent)
-  at(cast, parent, HERO_X - 95, 84, 190, 32)
+  at(cast, parent, HERO_X - 98, 79, 190, 36)
   cast:SetFrameLevel(parent:GetFrameLevel() + 20)
-  cast.shape = W.shape(cast, 6, C.gold, C.band, 2, -4)
-  cast.name = W.label(cast, "body", 12, C.cream)
-  cast.name:SetPoint("TOPLEFT", 8, -4)
-  cast.when = W.label(cast, "body", 12, C.gold)
-  cast.when:SetPoint("TOPRIGHT", -8, -4)
-  cast.when:SetText("au prochain tour")
-  cast.track = W.rect(cast, "ARTWORK", 0, C.woodDark)
-  cast.track:SetPoint("BOTTOMLEFT", 8, 5)
-  cast.track:SetSize(174, 7)
-  cast.bar = W.rect(cast, "ARTWORK", 1, C.gold)
-  cast.bar:SetPoint("BOTTOMLEFT", 8, 5)
-  cast.bar:SetSize(108, 7)
+  cast.plaque = W.plaque(cast, { r = 10 })
+  cast.medal = W.medallion(cast, 32)
+  cast.medal:SetPoint("CENTER", cast, "LEFT", 22, 0)
+  cast.name = W.label(cast, "bold", 12.5, C.text)
+  cast.name:SetPoint("LEFT", cast, "LEFT", 41, 5)
+  cast.name:SetWidth(140)
+  cast.name:SetJustifyH("LEFT")
+  cast.name:SetWordWrap(false)
+  cast.track = W.rect(cast, "ARTWORK", 0, C.barTrack)
+  cast.track:SetPoint("LEFT", cast, "LEFT", 41, -8)
+  cast.track:SetSize(140, 6)
+  cast.bar = W.rect(cast, "ARTWORK", 1, C.goldText)
+  cast.bar:SetPoint("LEFT", cast.track, "LEFT", 1, 0)
+  cast.bar:SetSize(87, 4)
   cast:EnableMouse(true)
   W.tooltip(cast, function(tt)
     local c = Controller.combat()
@@ -183,14 +199,15 @@ function V:Build(parent)
   cast:Hide()
   self.cast = cast
 
+  -- Jauge de vie (hexagone rouge au bout), Absorption en hexagone d'acier au bout droit, jetons d'état.
   local hpRow = CreateFrame("Frame", nil, parent)
-  at(hpRow, parent, HERO_X - 95, HERO_FEET + 6, 190, 30)
-  self.playerBlock = W.shieldBadge(hpRow, 34, 30)
-  self.playerBlock:SetPoint("LEFT", 0, 0)
-  self.playerHp = W.hpBar(hpRow, 150, 24, 14)
-  self.playerHp:SetPoint("RIGHT", 0, 0)
-  self.playerSt = W.pillRow(parent, 8, 230, 12)
-  at(self.playerSt, parent, HERO_X - 115, HERO_FEET + 42, 230, 18)
+  at(hpRow, parent, HERO_X - 65, HERO_FEET + 10, 138, 13)
+  self.playerHp = W.hpBar(hpRow, 138, 13, 15)
+  self.playerHp:SetPoint("LEFT", 0, 0)
+  self.playerBlock = W.shieldBadge(hpRow, 30, 30)
+  self.playerBlock:SetPoint("CENTER", self.playerHp, "RIGHT", 18, 0)
+  self.playerSt = W.tokenRow(parent, 8, 230, 30)
+  at(self.playerSt, parent, HERO_X - 115, HERO_FEET + 38, 230, 30)
   hpRow:SetFrameLevel(bf:GetFrameLevel() + 15)
   self.playerSt:SetFrameLevel(bf:GetFrameLevel() + 15)
 
@@ -205,32 +222,38 @@ function V:Build(parent)
   hz:SetFrameLevel(parent:GetFrameLevel() + 10)
   self.hz = hz
 
+  -- Mana : grand hexagone bleu « 2/3 », un petit hexagone par point de mana (vides une fois dépensés).
   local mana = CreateFrame("Frame", nil, parent)
-  at(mana, parent, 55, 440, 84, 84)
+  at(mana, parent, MANA_X - 42, MANA_Y - 42, 84, 84)
   mana:SetFrameLevel(hz:GetFrameLevel() + 2)
   mana:EnableMouse(true)
-  mana.edge = W.disc(mana, "ARTWORK", 0, C.gemEdge)
-  mana.edge:SetAllPoints()
-  mana.fill = W.disc(mana, "ARTWORK", 1, C.gem)
-  mana.fill:SetPoint("TOPLEFT", 4, -4)
-  mana.fill:SetPoint("BOTTOMRIGHT", -4, 4)
-  mana.shine = W.disc(mana, "ARTWORK", 2, C.white, 0.18)
-  mana.shine:SetSize(40, 26)
-  mana.shine:SetPoint("TOP", -8, -10)
-  mana.text = W.label(mana, "title", 28, C.white, "OVERLAY", true)
-  mana.text:SetPoint("CENTER", 0, 5)
-  mana.sub = W.label(mana, "body", 12, C.white)
-  mana.sub:SetPoint("TOP", mana.text, "BOTTOM", 0, -1)
-  mana.sub:SetText("mana")
+  mana.hex = W.hex(mana, "blue", 84)
+  mana.hex:SetPoint("CENTER")
+  mana.text = W.label(mana, "heavy", 36, C.text, "OVERLAY")
+  mana.text:SetPoint("CENTER", -6, 3)
+  mana.max = W.label(mana, "heavy", 18, Art.hex("#d6e6ff"), "OVERLAY")
+  mana.max:SetPoint("LEFT", mana.text, "RIGHT", 0, -6)
+  mana.pips = {}
+  for i = 1, 8 do
+    local p = W.hex(parent, "blue", 18, "ARTWORK", 0)
+    p:Hide()
+    mana.pips[i] = p
+  end
   W.tooltip(mana, function(tt)
     tt:AddLine("Mana", 0.4, 0.6, 1)
     tt:AddLine("Le mana non dépensé est perdu à la fin du tour.", 0.8, 0.8, 0.8, true)
   end, "ANCHOR_RIGHT")
   self.mana = mana
 
-  local dem = W.pill(parent, 13)
-  dem:SetFrameLevel(hz:GetFrameLevel() + 2)
+  -- Démence : hexagone violet en haut à droite du mana (caché à 0).
+  local dem = CreateFrame("Frame", nil, parent)
+  at(dem, parent, MANA_X + 44 - 17, MANA_Y - 32 - 17, 34, 34)
+  dem:SetFrameLevel(hz:GetFrameLevel() + 3)
   dem:EnableMouse(true)
+  dem.hex = W.hex(dem, "violet", 34)
+  dem.hex:SetPoint("CENTER")
+  dem.text = W.label(dem, "heavy", 15, C.text)
+  dem.text:SetPoint("CENTER", 0, 1)
   W.tooltip(dem, function(tt)
     local kw = Art.keywords.demence
     tt:AddLine(kw.name, 0.75, 0.5, 1)
@@ -238,31 +261,30 @@ function V:Build(parent)
   end, "ANCHOR_RIGHT")
   self.demence = dem
 
-  self.drawPile = pile(self, parent, DRAW_PILE[1] - 18, DRAW_PILE[2] - 24, "draw", "Pioche", "full",
+  self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Pioche", "full", hz:GetFrameLevel() + 1)
+  self.discardPile = pile(self, parent, DISCARD_PILE[1], DISCARD_PILE[2], "discard", "Défausse", "dashed",
     hz:GetFrameLevel() + 1)
-  self.discardPile = pile(self, parent, DISCARD_PILE[1] - 18, DISCARD_PILE[2] - 24, "discard", "Défausse", "dashed",
-    hz:GetFrameLevel() + 1)
-  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1] - 18, EXHAUST_PILE[2] - 24, "exhaust", "Consumées", "exhaust",
+  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1], EXHAUST_PILE[2], "exhaust", "Consumées", "exhaust",
     hz:GetFrameLevel() + 1)
   self.exhaustPile:Hide()
 
-  -- Recharges (mini-cartes) et fin du tour ------------------------------------------
+  -- Recharges (cases d'ardoise : icône grisée, tours restants) et fin du tour -------------------
   self.cdCards = {}
   for i = 1, 6 do
     local m = CreateFrame("Frame", nil, parent)
-    m:SetSize(44, 58)
+    m:SetSize(46, 46)
     m:SetFrameLevel(hz:GetFrameLevel() + 2)
     m:EnableMouse(true)
-    m.shape = W.shape(m, 5, C.edgeCommon, Art.hex("#8f8468"), 2, -6)
+    m.plaque = W.plaque(m, { r = 9, fill = 0.7, gloss = false })
+    m.plaque:SetRim(Art.rim.dim)
     m.icon = m:CreateTexture(nil, "ARTWORK")
-    m.icon:SetSize(24, 24)
-    m.icon:SetPoint("TOP", 0, -5)
-    m.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    m.icon:SetSize(38, 38)
+    m.icon:SetPoint("CENTER")
     m.icon:SetDesaturated(true)
-    m.icon:SetAlpha(0.7)
-    W.roundMask(m, m.icon)
-    m.count = W.label(m, "title", 20, C.frame)
-    m.count:SetPoint("BOTTOM", 0, 5)
+    m.icon:SetVertexColor(0.6, 0.6, 0.6, 1)
+    W.roundMask(m, m.icon, "mask_roundsq")
+    m.count = W.label(m, "heavy", 24, C.text)
+    m.count:SetPoint("CENTER", 0, 1)
     W.tooltip(m, function(tt, f)
       if not f.cd then return end
       W.fillCardTooltip(tt, f.cd.card.id, f.cd.card.up, { full = true })
@@ -273,8 +295,8 @@ function V:Build(parent)
     self.cdCards[i] = m
   end
 
-  self.endTurn = W.button(parent, "Fin du tour", 146, 48, function() V:EndTurn() end, "gold", 16)
-  at(self.endTurn, parent, 874, 506, 146, 48)
+  self.endTurn = W.button(parent, "Fin du tour", 156, 50, function() V:EndTurn() end, "gold", 19)
+  at(self.endTurn, parent, 863, 520, 156, 50)
   self.endTurn:SetFrameLevel(hz:GetFrameLevel() + 2)
 
   -- Main -----------------------------------------------------------------------------
@@ -300,12 +322,10 @@ function V:Build(parent)
   at(banner, parent, 317, 150, 400, 150)
   banner:SetFrameLevel(parent:GetFrameLevel() + 70)
   banner:EnableMouse(true)
-  banner.glow = W.disc(banner, "BACKGROUND", 0, C.black, 0.45)
-  banner.glow:SetPoint("TOPLEFT", -40, 10)
-  banner.glow:SetPoint("BOTTOMRIGHT", 40, -10)
-  banner.text = W.label(banner, "title", 44, C.gold, "OVERLAY", true)
-  banner.text:SetPoint("TOP", 0, -14)
-  banner.button = W.button(banner, "Continuer", 180, 46, function() Controller.finishCombat() end, "gold", 16)
+  banner.plaque = W.plaque(banner, { r = 16 })
+  banner.text = W.label(banner, "heavy", 44, C.goldText, "OVERLAY")
+  banner.text:SetPoint("TOP", 0, -18)
+  banner.button = W.button(banner, "Continuer", 190, 50, function() Controller.finishCombat() end, "gold", 18)
   banner.button:SetPoint("BOTTOM", 0, 12)
   banner:Hide()
   self.banner = banner
@@ -536,12 +556,11 @@ function V:RenderIntent(s, e)
   if e.dead or c.result then s.intent:Hide() return end
   local entry, text, color = intentDisplay(c, e)
   W.setIcon(s.intent.icon, entry, "intent:" .. tostring(Combat.intentInfo(c, e).kind))
-  local edge, ink = C[color] or C.attack, C[color .. "Text"] or C.attackText
-  s.intent.shape.edge:SetColor(edge)
-  s.intent.text:SetTextColor(ink[1], ink[2], ink[3])
-  W.setSize(s.intent.text, text:match("^%d") and 20 or 14)
+  s.intent:SetRim(Art.rim[color] or Art.rim.attack)
+  local big = W.utf8len(text) <= 2
+  W.setSize(s.intent.text, big and 19 or 13.5)
   s.intent.text:SetText(text)
-  s.intent:SetWidth(max(56, (s.intent.text:GetStringWidth() or 20) + 46))
+  s.intent:SetWidth(big and 64 or max(64, (s.intent.text:GetStringWidth() or 20) + 44))
   s.intent:SetAlpha(1)
   s.intent:SetScale(1)
   s.intent:Show()
@@ -555,7 +574,7 @@ function V:RenderEnemies(full)
     local e = enemyByUid(c, uid)
     local def = ns.Enemies[e.id]
     s.name:SetText(def.name)
-    local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.cream)
+    local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.text)
     s.name:SetTextColor(nc[1], nc[2], nc[3])
     if full then
       s.hp:Set(e.hp, e.maxHp)
@@ -615,7 +634,8 @@ function V:RenderPlayer(full)
     local list = W.unitStatuses(p)
     for i = 1, #p.powers do
       local inst = p.powers[i]
-      list[#list + 1] = { text = Card.def(inst).name, edge = C.goldDeep, ink = C.gold, info = { power = inst } }
+      list[#list + 1] = { icon = W.cardArt(inst.id), text = Card.def(inst).name, rim = Art.rim.gold,
+        info = { power = inst }, key = "card:" .. inst.id }
     end
     self.playerSt:Set(list)
   end
@@ -623,14 +643,30 @@ function V:RenderPlayer(full)
     local d = Card.def(p.cast.card)
     local tgt = p.cast.target and enemyByUid(c, p.cast.target)
     self.cast.name:SetText(d.name .. (tgt and (" sur " .. ns.Enemies[tgt.id].name) or ""))
+    W.setIcon(self.cast.medal.icon, W.cardArt(p.cast.card.id), "card:" .. p.cast.card.id)
     self.cast:Show()
   else
     self.cast:Hide()
   end
-  self.mana.text:SetText(p.mana .. "/" .. Controller.maxMana())
+  -- mana : chiffre, maximum, un petit hexagone par point (bleu disponible, vide dépensé)
+  local maxMana = Controller.maxMana()
+  self.mana.text:SetText(tostring(p.mana))
+  self.mana.max:SetText("/" .. maxMana)
+  local pips = self.mana.pips
+  local n = min(#pips, max(maxMana, p.mana))
+  for i = 1, #pips do
+    local pip = pips[i]
+    if i <= n then
+      W.setHex(pip, i <= p.mana and "blue" or "empty", 18)
+      pip:ClearAllPoints()
+      pip:SetPoint("CENTER", self.parent, "TOPLEFT", MANA_X + (i - (n + 1) / 2) * 22, -(MANA_Y + 55))
+      pip:Show()
+    else
+      pip:Hide()
+    end
+  end
   local dem = p.demence or 0
-  local w = self.demence:Set("Démence " .. dem, C.watch, C.watchText)
-  at(self.demence, self.parent, 97 - w / 2, 530, w, 19)
+  self.demence.text:SetText(tostring(dem))
   if dem > 0 then self.demence:Show() else self.demence:Hide() end
   self.drawPile.count:SetText(#c.draw)
   self.discardPile.count:SetText(#c.discard)
@@ -645,14 +681,12 @@ function V:RenderPlayer(full)
     if cd and i <= n then
       local turns = cd.turns + 1
       m.cd, m.turns = cd, turns
-      local d = Card.def(cd.card)
-      m.shape.edge:SetColor(Art.rarity[d.rarity] or C.edgeCommon)
       W.setIcon(m.icon, W.cardArt(cd.card.id), "card:" .. cd.card.id)
       m.count:SetText(tostring(turns))
       local row, col = floor((i - 1) / 3), (i - 1) % 3
       local rowN = (row == 0) and per or (n - 3)
-      local x0 = 947 - (rowN * 52 - 8) / 2
-      at(m, self.parent, x0 + col * 52, 440 - row * 64, 44, 58)
+      local x0 = COOLDOWN_X - (rowN * 54 - 8) / 2
+      at(m, self.parent, x0 + col * 54, COOLDOWN_Y - 23 - row * 54, 46, 46)
       m:Show()
     else
       m.cd = nil
@@ -743,7 +777,7 @@ function V:RenderBanner()
   local over = Controller.over()
   if over then
     self.banner.text:SetText(over == "won" and "Victoire !" or "Défaite")
-    local col = over == "won" and C.gold or C.hpText
+    local col = over == "won" and C.goldText or C.badText
     self.banner.text:SetTextColor(col[1], col[2], col[3])
     self.banner.button:SetText(over == "won" and "Continuer" or "Voir le bilan")
     if not self.banner:IsShown() then
@@ -974,16 +1008,16 @@ function V:QueueEvent(ev)
       if x then W.float(self_.parent, x, y - 60, label, C.defendText, 16) end
     end)
   elseif t == "saved" then
-    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, "Esprit de rédemption !", C.gold, 18, 2) end)
+    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, "Esprit de rédemption !", C.goldText, 18, 2) end)
   elseif t == "demence" and ev.n ~= 0 then
     self:Push(0.1, function()
-      W.float(self_.parent, 97, 500, (ev.n > 0 and "+" or "") .. ev.n .. " Démence", C.watchText, 15, 1.0, 26)
+      W.float(self_.parent, MANA_X + 44, MANA_Y - 40, (ev.n > 0 and "+" or "") .. ev.n .. " Démence", C.watchText, 15, 1.0, 26)
     end)
   elseif t == "mana" and ev.n ~= 0 then
-    self:Push(0.1, function() W.float(self_.parent, 97, 470, "+" .. ev.n .. " mana", C.gemEdge, 15, 1.0, 26) end)
+    self:Push(0.1, function() W.float(self_.parent, MANA_X, MANA_Y - 10, "+" .. ev.n .. " mana", C.defendText, 15, 1.0, 26) end)
   elseif t == "turn" then
     self:Push(0.35, function()
-      W.float(self_.parent, 517, 120, "Tour " .. ev.round, C.gold, 26, 1.1, 16)
+      W.float(self_.parent, 517, 120, "Tour " .. ev.round, C.goldText, 26, 1.1, 16)
     end)
   elseif t == "draw" or t == "cooldown_back" then
     self:Push(0.09, function() self_:FlyDraw(ev.card, t == "cooldown_back") end)
@@ -1003,7 +1037,7 @@ function V:FlyDraw(uid, fromCooldown)
   g:SetFrameLevel(self.hz:GetFrameLevel() + 80)
   g:SetCard(card.cardId, card.cardUp, card.opts)
   local fx, fy = DRAW_PILE[1], DRAW_PILE[2]
-  if fromCooldown then fx, fy = 947, 469 end
+  if fromCooldown then fx, fy = COOLDOWN_X, COOLDOWN_Y end
   W.fly(g, self.parent, fx, fy, card.baseX, card.baseY + W.CARD_H / 2, 0.3, 1, 0.6, 1, 0.28, function()
     W.releaseGhost(g)
     if card.uid == uid then card:SetAlpha(1) end
@@ -1246,7 +1280,7 @@ function V:PreviewEnemies()
       fb:SetSize(48, 48)
       fb:SetPoint("CENTER", m, "CENTER")
       fb:Hide()
-      local label = W.label(p, "body", 12, C.cream)
+      local label = W.label(p, "body", 12, C.text)
       label:SetPoint("TOP", m, "BOTTOM", 0, -4)
       local art = Art.enemies[ids[k]]
       label:SetText((ns.Enemies[ids[k]] and ns.Enemies[ids[k]].name or ids[k])

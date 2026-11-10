@@ -1,6 +1,8 @@
--- Briques d'interface « table de jeu illustrée » : formes (rectangles arrondis, disques), polices,
--- sons, interpolations (tweens), icônes vérifiées, carte unique (main, récompense, marchand, deck),
--- barres de vie, pastilles d'état, boutons, infobulles, textes flottants, modèles 3D.
+-- Briques d'interface, peau « Mechanized Magic » (pièces du pack de Dumivid, CC0, fabriquées par
+-- tools/build_media.py dans Media/, décrites par UI/SkinData.lua) : plaques d'ardoise au liseré
+-- d'argent (neuf tranches), hexagones, médaillons, police Baloo Chettan 2, sons, interpolations,
+-- survols, icônes (améliorées d'abord, icône du jeu en repli), carte unique (main, récompense, marchand,
+-- deck), jauges de vie, jetons d'état, boutons, infobulles, textes flottants, modèles 3D.
 -- Seule couche (avec Main/Scene/CombatView/Screens/Flight) à toucher l'API WoW.
 local _, ns = ...
 if not CreateFrame then return end -- hors du jeu (Sim/load.lua) : pas d'interface
@@ -215,7 +217,7 @@ function W.face(f)
   face:SetSize(f:GetWidth(), f:GetHeight())
   face:SetPoint("CENTER", f, "CENTER", 0, 0)
   f.face = face
-  f:SetScript("OnSizeChanged", function(self, w, h) if w and h then self.face:SetSize(w, h) end end)
+  f:HookScript("OnSizeChanged", function(self, w, h) if w and h then self.face:SetSize(w, h) end end)
   return face
 end
 
@@ -277,7 +279,7 @@ function W.sound(key)
 end
 
 ---------------------------------------------------------------------------
--- Couleurs, formes
+-- Couleurs, formes simples
 ---------------------------------------------------------------------------
 
 function W.rgb(c) return c[1], c[2], c[3] end
@@ -289,7 +291,7 @@ function W.rect(parent, layer, sub, color, alpha)
   return t
 end
 
--- Disque (texture ronde teintée).
+-- Disque (texture ronde du jeu, teintée).
 function W.disc(parent, layer, sub, color, alpha)
   local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
   t:SetTexture(Art.tex.circle)
@@ -308,101 +310,346 @@ function W.gradient(tex, top, bottom)
   end
 end
 
--- Rectangle arrondi en 7 textures sans recouvrement (alpha propre) : bandes + quarts de disque.
--- inset > 0 rentre la forme dans le cadre, < 0 la fait déborder (halo).
-local RR = {}
-RR.__index = RR
+local function lerpColor(a, b, t)
+  return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+end
+W.lerpColor = lerpColor
 
-function W.roundRect(parent, layer, sub, radius, inset)
-  local o = setmetatable({ parts = {}, r = radius, inset = inset or 0, parent = parent }, RR)
-  local function tex() local t = parent:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0) o.parts[#o.parts + 1] = t return t end
-  o.mid, o.top, o.bot = tex(), tex(), tex()
-  o.tl, o.tr, o.bl, o.br = tex(), tex(), tex(), tex()
-  for _, t in ipairs({ o.mid, o.top, o.bot }) do t:SetTexture(WHITE) end
-  for _, t in ipairs({ o.tl, o.tr, o.bl, o.br }) do t:SetTexture(Art.tex.circle) end
-  o.tl:SetTexCoord(0, 0.5, 0, 0.5)
-  o.tr:SetTexCoord(0.5, 1, 0, 0.5)
-  o.bl:SetTexCoord(0, 0.5, 0.5, 1)
-  o.br:SetTexCoord(0.5, 1, 0.5, 1)
-  o:Layout()
+local function mul(c, k)
+  if type(k) == "table" then return { c[1] * k[1], c[2] * k[2], c[3] * k[3] } end
+  return { c[1] * k, c[2] * k, c[3] * k }
+end
+
+local function clamp1(c) return { min(1, c[1]), min(1, c[2]), min(1, c[3]) } end
+
+---------------------------------------------------------------------------
+-- Peau : textures de Media/ (UI/SkinData.lua, fabriqué par tools/build_media.py)
+---------------------------------------------------------------------------
+-- Aucun chiffre de texture en dur ici : fichiers, zones utiles, coordonnées et géométrie de la carte
+-- viennent de ns.Skin. Les textures sont des TGA 32 bits en puissances de deux (contenu en haut à gauche).
+
+local Skin = ns.Skin
+W.Skin = Skin
+local ROOT, TEX = Skin.root, Skin.tex
+
+function W.skinPath(name)
+  local e = TEX[name]
+  return e and (ROOT .. e.file) or nil
+end
+
+-- Pose la texture `name` (zone utile) sur tex ; sub = { l, r, t, b } en fractions de la zone utile.
+function W.setSkin(tex, name, sub)
+  local e = TEX[name]
+  if not e then tex:SetTexture(nil) return false end
+  tex:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
+  local u, v = e.tc[2], e.tc[4]
+  if sub then tex:SetTexCoord(sub[1] * u, sub[2] * u, sub[3] * v, sub[4] * v)
+  else tex:SetTexCoord(0, u, 0, v) end
+  return true
+end
+
+function W.skin(parent, name, layer, sub, alpha)
+  local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
+  W.setSkin(t, name)
+  if alpha then t:SetAlpha(alpha) end
+  return t
+end
+
+-- Largeur d'une pièce posée à la hauteur h (proportions de sa zone utile).
+function W.skinWidth(name, h)
+  local e = TEX[name]
+  return e and h * e.cw / e.ch or h
+end
+
+-- Groupe de textures piloté d'un bloc (couleur, alpha, visibilité).
+local Group = {}
+Group.__index = Group
+function Group:SetVertexColor(r, g, b, a) for _, t in ipairs(self.parts) do t:SetVertexColor(r, g, b, a or 1) end end
+function Group:SetAlpha(a) for _, t in ipairs(self.parts) do t:SetAlpha(a) end end
+function Group:SetShown(on) for _, t in ipairs(self.parts) do if on then t:Show() else t:Hide() end end self.shown = on end
+function Group:Show() self:SetShown(true) end
+function Group:Hide() self:SetShown(false) end
+function Group:SetDesaturated(on) for _, t in ipairs(self.parts) do t:SetDesaturated(on) end end
+
+-- Texture à neuf tranches : coins de `corner` unités (le coin de la texture), bords étirés.
+-- opts = { corner, inset, noCenter, cornersOnly }. Ancrages seulement : suit la taille de l'hôte.
+-- Bords d'une tranche : colonne -> (gauche, droite), rangée -> (haut, bas) ; chaque bord = côté de
+-- l'hôte et décalage (i = retrait, c = coin).
+local function sliceEdges(col, row, i, c)
+  local l, r, t, b
+  if col == 1 then l, r = { "LEFT", i }, { "LEFT", i + c }
+  elseif col == 2 then l, r = { "LEFT", i + c }, { "RIGHT", -(i + c) }
+  else l, r = { "RIGHT", -(i + c) }, { "RIGHT", -i } end
+  if row == 1 then t, b = { "TOP", -i }, { "TOP", -(i + c) }
+  elseif row == 2 then t, b = { "TOP", -(i + c) }, { "BOTTOM", i + c }
+  else t, b = { "BOTTOM", i + c }, { "BOTTOM", i } end
+  return l, r, t, b
+end
+
+function W.nine(host, name, layer, sub, opts)
+  opts = opts or {}
+  local e = TEX[name]
+  local o = setmetatable({ host = host, parts = {}, e = e, slices = {} }, Group)
+  local a, bu = e.corner / e.w, 1 - e.corner / e.w
+  local av, bv = e.corner / e.h, 1 - e.corner / e.h
+  local us, vs = { 0, a, bu, 1 }, { 0, av, bv, 1 }
+  for row = 1, 3 do
+    for col = 1, 3 do
+      local corner = row ~= 2 and col ~= 2
+      local center = row == 2 and col == 2
+      if not (center and opts.noCenter) and not (opts.cornersOnly and not corner) then
+        local t = host:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0)
+        t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
+        t:SetTexCoord(us[col], us[col + 1], vs[row], vs[row + 1])
+        o.parts[#o.parts + 1] = t
+        o.slices[#o.slices + 1] = { t, row, col }
+      end
+    end
+  end
+  o.Layout = function(self, corner, inset)
+    self.c, self.i = corner or self.c, inset or self.i
+    local c, i, h = self.c, self.i, self.host
+    for _, s in ipairs(self.slices) do
+      local t, row, col = s[1], s[2], s[3]
+      local l, r, tp, b = sliceEdges(col, row, i, c)
+      t:ClearAllPoints()
+      t:SetPoint("TOPLEFT", h, tp[1] .. l[1], l[2], tp[2])
+      t:SetPoint("BOTTOMRIGHT", h, b[1] .. r[1], r[2], b[2])
+    end
+  end
+  o:Layout(opts.corner or 8, opts.inset or 0)
   return o
 end
 
-function RR:Layout()
-  local p, r, i = self.parent, self.r, self.inset
-  for _, t in ipairs(self.parts) do t:ClearAllPoints() end
-  self.mid:SetPoint("TOPLEFT", p, "TOPLEFT", i, -i - r)
-  self.mid:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -i, i + r)
-  self.top:SetPoint("TOPLEFT", p, "TOPLEFT", i + r, -i)
-  self.top:SetPoint("BOTTOMRIGHT", p, "TOPRIGHT", -i - r, -i - r)
-  self.bot:SetPoint("TOPLEFT", p, "BOTTOMLEFT", i + r, i + r)
-  self.bot:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -i - r, i)
-  for _, t in ipairs({ self.tl, self.tr, self.bl, self.br }) do t:SetSize(r, r) end
-  self.tl:SetPoint("TOPLEFT", p, "TOPLEFT", i, -i)
-  self.tr:SetPoint("TOPRIGHT", p, "TOPRIGHT", -i, -i)
-  self.bl:SetPoint("BOTTOMLEFT", p, "BOTTOMLEFT", i, i)
-  self.br:SetPoint("BOTTOMRIGHT", p, "BOTTOMRIGHT", -i, i)
+---------------------------------------------------------------------------
+-- Plaques : ardoise (ou ivoire) au liseré d'argent
+---------------------------------------------------------------------------
+-- Coins en neuf tranches (matière et liseré), intérieur en deux bandes de matière carrelée à l'échelle
+-- (coordonnées de texture répétées, recalculées quand l'hôte change de taille), reflet léger en haut.
+-- p:SetFill(k | couleur) éclaircit ou teinte la matière (k = 1 : ardoise de la maquette, 1,25 : plaque
+-- chaude) ; p:SetRim(couleur) teinte le liseré (Art.rim) ; p:SetGlow(alpha, couleur) allume un halo.
+
+local Plaque = {}
+Plaque.__index = Plaque
+
+function W.plaque(host, opts)
+  opts = opts or {}
+  local ivory = opts.mat == "ivory"
+  local pill = opts.pill
+  local r = opts.r or 8
+  local layer, sub = opts.layer or "BACKGROUND", opts.sub or -6
+  local p = setmetatable({ host = host, r = r, i = opts.inset or 0, ivory = ivory, layer = layer, sub = sub,
+    tile = ivory and Skin.ivoryTile or Skin.slateTile, base = ivory and 1 or Skin.slateBase }, Plaque)
+  local fillName = ivory and "nine_ivory" or (pill and "pill_slate" or "nine_slate")
+  local rimName = pill and "pill_rim" or "nine_rim"
+  p.corners = W.nine(host, fillName, layer, sub, { corner = r, inset = p.i, cornersOnly = true })
+  local tileName = ivory and "tile_ivory" or "tile_slate"
+  p.bands = {}
+  for k = 1, 2 do
+    local t = host:CreateTexture(nil, layer, nil, sub + 1)
+    t:SetTexture(ROOT .. TEX[tileName].file, "REPEAT", "REPEAT")
+    p.bands[k] = t
+  end
+  local re = TEX[rimName]
+  p.rimIn = re.rimIn * r / re.corner
+  if opts.gloss ~= false and not ivory then
+    p.gloss = host:CreateTexture(nil, layer, nil, sub + 2)
+    W.gradient(p.gloss, { 1, 1, 1, 0.08 }, { 1, 1, 1, 0 })
+  end
+  p.rim = W.nine(host, rimName, layer, sub + 3, { corner = r, inset = p.i, noCenter = true })
+  p:Layout()
+  if host.HookScript then host:HookScript("OnSizeChanged", function(_, w, h) p:Tile(w, h) end) end
+  p:Tile(host:GetWidth(), host:GetHeight())
+  p:SetFill(opts.fill or 1)
+  p:SetRim(opts.rim)
+  return p
 end
 
-function RR:SetColor(c, a)
-  local r, g, b = c[1], c[2], c[3]
-  a = a or 1
-  self.mid:SetColorTexture(r, g, b, a)
-  self.top:SetColorTexture(r, g, b, a)
-  self.bot:SetColorTexture(r, g, b, a)
-  for _, t in ipairs({ self.tl, self.tr, self.bl, self.br }) do t:SetVertexColor(r, g, b, a) end
-  self.color = c
-  return self
+function Plaque:Layout()
+  local r, i, ri, h = self.r, self.i, self.rimIn, self.host
+  local hb, vb = self.bands[1], self.bands[2]
+  hb:ClearAllPoints()
+  hb:SetPoint("TOPLEFT", h, "TOPLEFT", i + ri, -(i + r))
+  hb:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", -(i + ri), i + r)
+  vb:ClearAllPoints()
+  vb:SetPoint("TOPLEFT", h, "TOPLEFT", i + r, -(i + ri))
+  vb:SetPoint("BOTTOMRIGHT", h, "BOTTOMRIGHT", -(i + r), i + ri)
+  if self.gloss then
+    self.gloss:ClearAllPoints()
+    self.gloss:SetPoint("TOPLEFT", h, "TOPLEFT", i + r * 0.7, -(i + ri))
+    self.gloss:SetPoint("BOTTOMRIGHT", h, "RIGHT", -(i + r * 0.7), 0)
+  end
 end
 
-function RR:SetAlpha(a)
-  for _, t in ipairs(self.parts) do t:SetAlpha(a) end
+-- Coordonnées de la matière carrelée : la même grille pour les deux bandes (aucune couture).
+function Plaque:Tile(w, h)
+  if not w or not h or w <= 0 or h <= 0 then return end
+  local T, r, i, ri = self.tile, self.r, self.i, self.rimIn
+  local function set(t, x0, y0, x1, y1)
+    if x1 - x0 <= 0.5 or y1 - y0 <= 0.5 then t:SetAlpha(0) return end
+    t:SetAlpha(self.alpha or 1)
+    t:SetTexCoord(x0 / T, x1 / T, y0 / T, y1 / T)
+  end
+  set(self.bands[1], i + ri, i + r, w - i - ri, h - i - r)
+  set(self.bands[2], i + r, i + ri, w - i - r, h - i - ri)
 end
 
-function RR:SetShown(on)
-  for _, t in ipairs(self.parts) do if on then t:Show() else t:Hide() end end
+function Plaque:SetRadius(r)
+  self.r = r
+  self.rimIn = self.rim.e.rimIn * r / self.rim.e.corner
+  self.corners:Layout(r)
+  self.rim:Layout(r)
+  self:Layout()
+  self:Tile(self.host:GetWidth(), self.host:GetHeight())
+end
+
+-- k : facteur de clarté (1 = normal) ou couleur multiplicative { r, g, b } (clarté 1).
+function Plaque:SetFill(k)
+  self.fillK = k
+  local c = type(k) == "table" and clamp1(mul(k, self.base)) or clamp1({ self.base * k, self.base * k, self.base * k })
+  self.corners:SetVertexColor(c[1], c[2], c[3])
+  for _, t in ipairs(self.bands) do t:SetVertexColor(c[1], c[2], c[3], 1) end
+end
+
+function Plaque:SetRim(c)
+  c = c or Art.rim.silver
+  self.rimColor = c
+  self.rim:SetVertexColor(c[1], c[2], c[3])
+end
+
+-- Halo (lueur douce autour de la plaque) : alpha 0 le cache.
+function Plaque:SetGlow(a, c)
+  if (a or 0) <= 0 then
+    if self.glow then self.glow:Hide() end
+    return
+  end
+  if not self.glow then
+    local g = 10
+    self.glow = W.nine(self.host, "nine_glow", self.layer, self.sub - 1, { corner = 2 * g, inset = self.i - g })
+  end
+  c = c or C.gold
+  self.glow:SetVertexColor(c[1], c[2], c[3], 1)
+  self.glow:SetAlpha(a)
+  self.glow:Show()
+end
+
+function Plaque:SetAlpha(a)
+  self.alpha = a
+  self.corners:SetAlpha(a)
+  self.rim:SetAlpha(a)
+  for _, t in ipairs(self.bands) do t:SetAlpha(a) end
+  if self.gloss then self.gloss:SetAlpha(a) end
+  self:Tile(self.host:GetWidth(), self.host:GetHeight())
+end
+
+function Plaque:SetShown(on)
   self.shown = on
+  self.corners:SetShown(on)
+  self.rim:SetShown(on)
+  for _, t in ipairs(self.bands) do if on then t:Show() else t:Hide() end end
+  if self.gloss then if on then self.gloss:Show() else self.gloss:Hide() end end
+  if self.glow and not on then self.glow:Hide() end
 end
-function RR:Show() self:SetShown(true) end
-function RR:Hide() self:SetShown(false) end
+function Plaque:Show() self:SetShown(true) end
+function Plaque:Hide() self:SetShown(false) end
 
--- Forme bordée : bord + fond (+ grain de parchemin facultatif).
-function W.shape(parent, radius, edge, fill, edgeW, layerSub, grain)
-  local base = layerSub or -6
-  local o = {}
-  o.edge = W.roundRect(parent, "BACKGROUND", base, radius, 0):SetColor(edge)
-  o.fill = W.roundRect(parent, "BACKGROUND", base + 1, max(1, radius - (edgeW or 2)), edgeW or 2):SetColor(fill)
-  if grain then
-    o.grain = parent:CreateTexture(nil, "BACKGROUND", nil, base + 2)
-    o.grain:SetTexture(Art.tex.parchment)
-    o.grain:SetPoint("TOPLEFT", (edgeW or 2) + 3, -(edgeW or 2) - 3)
-    o.grain:SetPoint("BOTTOMRIGHT", -(edgeW or 2) - 3, (edgeW or 2) + 3)
-    o.grain:SetAlpha(grain)
+-- Pilule dorée de l'action principale (trois tranches : bouts d'une demi-hauteur).
+function W.goldPill(host, layer, sub)
+  local e = TEX.button_gold
+  local a = e.cap / e.w
+  local o = setmetatable({ parts = {} }, Group)
+  local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
+  for k = 1, 3 do
+    local t = host:CreateTexture(nil, layer or "BACKGROUND", nil, sub or -6)
+    t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
+    t:SetTexCoord(cuts[k][1], cuts[k][2], 0, 1)
+    o.parts[k] = t
+  end
+  o.Layout = function(self, h)
+    local cap = h / 2
+    local l, m, r = self.parts[1], self.parts[2], self.parts[3]
+    l:ClearAllPoints() m:ClearAllPoints() r:ClearAllPoints()
+    l:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+    l:SetPoint("BOTTOMRIGHT", host, "BOTTOMLEFT", cap, 0)
+    r:SetPoint("TOPLEFT", host, "TOPRIGHT", -cap, 0)
+    r:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 0, 0)
+    m:SetPoint("TOPLEFT", host, "TOPLEFT", cap, 0)
+    m:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -cap, 0)
   end
   return o
 end
 
+-- Hexagone du pack (red, green, blue, steel, violet, empty) de hauteur h, centré sur le cadre.
+function W.hex(parent, color, h, layer, sub)
+  local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
+  W.setHex(t, color, h)
+  return t
+end
+
+function W.setHex(t, color, h)
+  local name = "hex_" .. color
+  if color == "blue" and h and h > 60 then name = "hex_blue_l" end
+  W.setSkin(t, name)
+  if h then t:SetSize(W.skinWidth(name, h), h) end
+  t._hex = color
+end
+
+-- Plaque montée sur un cadre propre (panneaux, bulles) : W.panel(parent, "slate" | "ivory", rayon).
+function W.panel(parent, mat, r)
+  local f = CreateFrame("Frame", nil, parent)
+  f:EnableMouse(true)
+  f.plaque = W.plaque(f, { mat = mat, r = r or 12 })
+  return f
+end
+function W.parchment(parent, r) return W.panel(parent, "ivory", r) end
+function W.woodPanel(parent, r) return W.panel(parent, "slate", r) end
+
 ---------------------------------------------------------------------------
--- Polices
+-- Polices : Baloo Chettan 2 en instances statiques (Media/Fonts), blanc avec ombre portée
 ---------------------------------------------------------------------------
 
-W.FONT_TITLE = "Fonts\\MORPHEUS.ttf"
-W.FONT_BODY = "Fonts\\FRIZQT__.TTF"
+W.FONT = {
+  title = ROOT .. Skin.fonts.bold, bold = ROOT .. Skin.fonts.bold,
+  heavy = ROOT .. Skin.fonts.heavy, body = ROOT .. Skin.fonts.medium,
+}
+W.FONT_FALLBACK = "Fonts\\FRIZQT__.TTF"
 
--- kind = "title" (Morpheus, titres et chiffres) ou "body" ; color = couleur Art.C ; shadow = vrai.
-function W.label(parent, kind, size, color, layer, shadow)
-  local fs = parent:CreateFontString(nil, layer or "OVERLAY", "GameFontHighlight")
-  local file = kind == "title" and W.FONT_TITLE or W.FONT_BODY
-  local ok = fs:SetFont(file, size or 12, "")
+local function setFont(fs, kind, size)
+  local ok = fs:SetFont(W.FONT[kind] or W.FONT.body, size, "")
   if ok == false then
-    local f = fs:GetFont()
-    if f then fs:SetFont(f, size or 12, "") end
+    ok = fs:SetFont(W.FONT_FALLBACK, size, "")
+    if ok == false then
+      local f = fs:GetFont()
+      if f then fs:SetFont(f, size, "") end
+    end
   end
+end
+
+-- Préchargement : une police d'addon peut ne rien afficher à son tout premier emploi.
+do
+  local pre = CreateFrame("Frame", nil, UIParent)
+  pre:SetSize(1, 1)
+  pre:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -50, 50)
+  pre:SetAlpha(0)
+  for _, kind in ipairs({ "body", "bold", "heavy" }) do
+    local fs = pre:CreateFontString(nil, "OVERLAY")
+    setFont(fs, kind, 12)
+    fs:SetText("Éé")
+  end
+  W.fontPreload = pre
+end
+
+-- kind = "title" / "bold" (700), "heavy" (800, chiffres), "body" (500) ; shadow : ombre portée
+-- (par défaut ; false pour un texte sombre sur ivoire).
+function W.label(parent, kind, size, color, layer, shadow)
+  local fs = parent:CreateFontString(nil, layer or "OVERLAY")
   fs._size = size or 12
-  fs._fontKind = kind
-  if color then fs:SetTextColor(color[1], color[2], color[3]) end
-  if shadow then
-    fs:SetShadowColor(0, 0, 0, 0.9)
+  fs._fontKind = kind or "body"
+  setFont(fs, fs._fontKind, fs._size)
+  color = color or C.text
+  fs:SetTextColor(color[1], color[2], color[3])
+  if shadow ~= false then
+    fs:SetShadowColor(0, 0, 0, 0.85)
     fs:SetShadowOffset(1, -1)
   else
     fs:SetShadowOffset(0, 0)
@@ -413,11 +660,13 @@ end
 function W.setSize(fs, size)
   if fs._size == size then return end
   fs._size = size
-  local ok = fs:SetFont(fs._fontKind == "title" and W.FONT_TITLE or W.FONT_BODY, size, "")
-  if ok == false then
-    local f = fs:GetFont()
-    if f then fs:SetFont(f, size, "") end
-  end
+  setFont(fs, fs._fontKind or "body", size)
+end
+
+function W.setFontKind(fs, kind)
+  if fs._fontKind == kind then return end
+  fs._fontKind = kind
+  setFont(fs, kind, fs._size or 12)
 end
 
 -- Compatibilité : texte à objet de police Blizzard.
@@ -436,6 +685,14 @@ function W.utf8len(s)
   return n
 end
 
+-- Ajuste la taille d'un texte sur une ligne à la largeur w (de size vers le bas, jusqu'à minSize).
+function W.fitText(fs, text, size, w, minSize)
+  W.setSize(fs, size)
+  fs:SetText(text)
+  local sw = fs:GetStringWidth() or 0
+  if sw > w and sw > 0 then W.setSize(fs, max(minSize or 6, floor(size * w / sw * 10) / 10)) end
+end
+
 local function hexOf(c)
   return string.format("%02x%02x%02x", floor(c[1] * 255 + 0.5), floor(c[2] * 255 + 0.5), floor(c[3] * 255 + 0.5))
 end
@@ -446,16 +703,26 @@ function W.colorize(text, c)
 end
 
 ---------------------------------------------------------------------------
--- Icônes
+-- Icônes : icône améliorée de Media/Icons d'abord, sinon icône du jeu
 ---------------------------------------------------------------------------
 
 local function noteMissing(key)
   if key then W.missing[key] = true end
 end
 
--- entry = { spell = id, icon = FileDataID ou chemin } ; key sert au rapport /slay art.
+-- entry = { tga = nom d'icône améliorée, spell = id, icon = FileDataID ou chemin } ; key sert au
+-- rapport /slay art. Ordre : fichier de Media/Icons (s'il a été copié par tools/build_media.py), icône
+-- du sort, FileDataID, point d'interrogation.
 function W.setIcon(tex, entry, key)
   entry = entry or {}
+  if entry.tga then
+    local f = Skin.icons[entry.tga:lower()]
+    if f and tex:SetTexture(ROOT .. f, nil, nil, "TRILINEAR") ~= false then
+      tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+      return true
+    end
+  end
+  tex:SetTexCoord(0.07, 0.93, 0.07, 0.93)
   if entry.spell and C_Spell and C_Spell.GetSpellTexture then
     local ok, id = pcall(C_Spell.GetSpellTexture, entry.spell)
     if ok and id then
@@ -480,43 +747,42 @@ function W.cardArt(id)
   return d and Art.schools[d.school] or nil
 end
 
--- Masque rond sur une texture d'icône (si l'API existe).
-function W.roundMask(frame, tex)
+-- Masque sur une texture d'icône (Media : disque "mask_disc" par défaut, "mask_roundsq", "medal_mask").
+function W.roundMask(frame, tex, maskName)
   if not frame.CreateMaskTexture or not tex.AddMaskTexture then return end
   local m = frame:CreateMaskTexture()
-  m:SetTexture(Art.tex.circle, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  local file = W.skinPath(maskName or "mask_disc") or Art.tex.circle
+  m:SetTexture(file, "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
   m:SetAllPoints(tex)
   tex:AddMaskTexture(m)
   return m
 end
 
--- Médaillon : disque de couleur, fond sombre, icône ronde.
+-- Médaillon argenté : anneau du pack, icône masquée en rond. f.icon, f:Resize(taille), f:SetRing(teinte).
 function W.medallion(parent, size, layerSub)
   local f = CreateFrame("Frame", nil, parent)
   f:SetSize(size, size)
-  f.ring = W.disc(f, "ARTWORK", (layerSub or 0), C.wood)
+  local sub = layerSub or 0
+  f.ring = f:CreateTexture(nil, "ARTWORK", nil, sub)
   f.ring:SetAllPoints()
-  f.inner = W.disc(f, "ARTWORK", (layerSub or 0) + 1, C.ink)
-  f.icon = f:CreateTexture(nil, "ARTWORK", nil, (layerSub or 0) + 2)
-  f.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+  f.icon = f:CreateTexture(nil, "ARTWORK", nil, sub + 1)
+  f.icon:SetPoint("TOPLEFT", size * 0.13, -size * 0.13)
+  f.icon:SetPoint("BOTTOMRIGHT", -size * 0.13, size * 0.13)
   W.roundMask(f, f.icon)
-  f.Resize = function(self, s, ringW)
+  f.Resize = function(self, s)
     self:SetSize(s, s)
-    ringW = ringW or max(2, floor(s / 16))
-    self.inner:ClearAllPoints()
-    self.inner:SetPoint("TOPLEFT", ringW, -ringW)
-    self.inner:SetPoint("BOTTOMRIGHT", -ringW, ringW)
+    W.setSkin(self.ring, s > 48 and "medal_ring" or "medal_ring_s")
     self.icon:ClearAllPoints()
-    self.icon:SetPoint("TOPLEFT", ringW + 1, -ringW - 1)
-    self.icon:SetPoint("BOTTOMRIGHT", -ringW - 1, ringW + 1)
+    self.icon:SetPoint("TOPLEFT", s * 0.13, -s * 0.13)
+    self.icon:SetPoint("BOTTOMRIGHT", -s * 0.13, s * 0.13)
   end
-  f.SetRing = function(self, c) self.ring:SetVertexColor(c[1], c[2], c[3], 1) end
+  f.SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end
   f:Resize(size)
   return f
 end
 
 ---------------------------------------------------------------------------
--- Cadres de base
+-- Cadres de base, boutons
 ---------------------------------------------------------------------------
 
 function W.create(kind, name, parent, template)
@@ -527,58 +793,50 @@ function W.create(kind, name, parent, template)
   return CreateFrame(kind, name, parent)
 end
 
--- Panneau de parchemin bordé (bilan, accueil, options, grilles).
-function W.parchment(parent, radius)
-  local f = CreateFrame("Frame", nil, parent)
-  f:EnableMouse(true)
-  f.shape = W.shape(f, radius or 10, C.mapEdge, C.map, 4, -6, 0.35)
-  return f
-end
-
--- Panneau de bois sombre.
-function W.woodPanel(parent, radius)
-  local f = CreateFrame("Frame", nil, parent)
-  f:EnableMouse(true)
-  f.shape = W.shape(f, radius or 8, C.wood, C.board, 3, -6)
-  return f
-end
-
--- Bouton générique dessiné : style = "gold" | "wood" | "parchment" | "red".
-local STYLES = {
-  gold = { edge = C.creamLight, fill = C.gold, hover = { 1, 0.86, 0.48 }, text = C.ink, font = "title" },
-  wood = { edge = C.woodLine, fill = C.woodDark, hover = { 0.38, 0.27, 0.17 }, text = C.cream, font = "body" },
-  parchment = { edge = C.edgeCommon, fill = C.parchment, hover = C.parchmentLight, text = C.ink, font = "title" },
-  red = { edge = C.redEdge, fill = C.red, hover = { 0.6, 0.22, 0.15 }, text = C.creamLight, font = "body" },
-}
-
-local function lerpColor(a, b, t)
-  return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
-end
-W.lerpColor = lerpColor
-
--- Survol d'un bouton : le fond glisse vers la couleur de survol.
+-- Survol d'un bouton : l'ardoise s'éclaircit, la pilule dorée s'allume d'un halo.
 local function buttonPaint(self, h)
-  local st = self.style
   if self.active == false then h = 0 end
-  self.shape.fill:SetColor(h > 0 and lerpColor(st.fill, st.hover, h) or st.fill)
+  if self.gold then
+    local k = 0.93 + 0.07 * h
+    self.gold:SetVertexColor(k, k, k)
+    self.plaqueGlow(h)
+  else
+    self.plaque:SetFill((self.fillK or 1) * (1 + 0.25 * h))
+  end
 end
 
+-- style : "gold" (action principale, un seul accent chaud) ; "red" (abandon) ; sinon ardoise.
 function W.button(parent, label, w, h, onClick, style, size)
-  local st = STYLES[style or "wood"]
   local b = CreateFrame("Button", nil, parent)
-  b:SetSize(w or 120, h or 26)
+  w, h = w or 120, h or 26
+  b:SetSize(w, h)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  b.style = st
   local face = W.face(b)
-  local radius = min(8, floor((h or 26) / 3))
-  b.shape = W.shape(face, radius, st.edge, st.fill, (h or 26) >= 40 and 3 or 2, -6, style == "parchment" and 0.25 or nil)
-  b.label = W.label(face, st.font, size or ((h or 26) >= 40 and 16 or 12), st.text)
-  b.label:SetPoint("CENTER", 0, 0)
+  if style == "gold" then
+    b.gold = W.goldPill(face, "BACKGROUND", -6)
+    b.gold:Layout(h)
+    b.glow = W.nine(face, "nine_glow", "BACKGROUND", -8, { corner = 20, inset = -10 })
+    b.glow:SetVertexColor(C.gold[1], C.gold[2], C.gold[3])
+    b.glow:SetAlpha(0)
+    b.plaqueGlow = function(k) b.glow:SetAlpha(0.7 * k) end
+    b.label = W.label(face, "heavy", size or (h >= 40 and 18 or 13), C.goldInk, "OVERLAY", false)
+    b.Relayout = function(self, hh) self.gold:Layout(hh) end
+  else
+    b.plaque = W.plaque(face, { r = min(h / 2, 22), pill = h <= 52 })
+    if style == "red" then
+      b.fillK = { 1, 0.5, 0.48 }
+      b.plaque:SetFill(b.fillK)
+      b.plaque:SetRim(Art.rim.red)
+    end
+    b.label = W.label(face, "bold", size or (h >= 40 and 16 or 12), C.text)
+    b.Relayout = function() end
+  end
+  b.label:SetPoint("CENTER", 0, 1)
   b.label:SetText(label or "")
   b.SetText = function(self, t) self.label:SetText(t or "") self._text = t end
   b.GetText = function(self) return self.label:GetText() end
   b._text = label
-  W.hoverable(b, { scale = (h or 26) >= 40 and 1.04 or 1.06, paint = buttonPaint })
+  W.hoverable(b, { scale = h >= 40 and 1.04 or 1.06, paint = buttonPaint })
   b:SetScript("OnEnter", function(self)
     W.hoverEnter(self)
     if self.onEnterExtra then self:onEnterExtra() end
@@ -599,31 +857,29 @@ function W.button(parent, label, w, h, onClick, style, size)
   return b
 end
 
--- Bouton rond (≡, ×).
-function W.roundButton(parent, glyph, size, fill, edge, onClick)
+-- Bouton rond (≡, ×) : plaque ronde au liseré d'argent ; × teinté de rouge.
+function W.roundButton(parent, glyph, size, tint, _, onClick)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
   local face = W.face(b)
-  b.edge = W.disc(face, "BACKGROUND", 0, edge)
-  b.edge:SetAllPoints()
-  b.fill = W.disc(face, "BACKGROUND", 1, fill)
-  b.fill:SetPoint("TOPLEFT", 2, -2)
-  b.fill:SetPoint("BOTTOMRIGHT", -2, 2)
-  b.label = W.label(face, "body", 15, C.creamLight)
-  b.label:SetPoint("CENTER", 0, 1)
+  b.plaque = W.plaque(face, { r = size / 2, pill = true })
+  b.fillK = tint or 1
+  b.plaque:SetFill(b.fillK)
+  b.label = W.label(face, "heavy", 17, C.text)
+  b.label:SetPoint("CENTER", 0, 0)
   if glyph == "menu" then
-    -- trois traits (le glyphe ≡ manque aux polices du jeu)
+    -- trois traits (le glyphe ≡ manque à la police)
     for i = -1, 1 do
-      local l = W.rect(face, "ARTWORK", 0, C.creamLight)
-      l:SetSize(size * 0.42, 2)
-      l:SetPoint("CENTER", 0, i * 5)
+      local l = W.rect(face, "ARTWORK", 0, C.white)
+      l:SetSize(size * 0.4, 2)
+      l:SetPoint("CENTER", 0, i * 4.5)
     end
   else
     b.label:SetText(glyph)
   end
   W.hoverable(b, { scale = 1.12, paint = function(self, h)
-    local k = 1 + 0.3 * h
-    self.fill:SetVertexColor(fill[1] * k, fill[2] * k, fill[3] * k, 1)
+    local k = self.fillK
+    if type(k) == "table" then self.plaque:SetFill(mul(k, 1 + 0.25 * h)) else self.plaque:SetFill(k * (1 + 0.25 * h)) end
   end })
   b:SetScript("OnEnter", function(self) W.hoverEnter(self) end)
   b:SetScript("OnLeave", function(self) W.hoverLeave(self) end)
@@ -631,15 +887,15 @@ function W.roundButton(parent, glyph, size, fill, edge, onClick)
   return b
 end
 
--- Case à cocher faite main (textures classiques, sans dépendre d'un modèle XML).
-function W.check(parent, label, getter, setter)
+-- Case à cocher (textures classiques du jeu, sans modèle XML).
+function W.check(parent, label, getter, setter, color)
   local b = CreateFrame("CheckButton", nil, parent)
   b:SetSize(24, 24)
   b:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Up")
   b:SetPushedTexture("Interface\\Buttons\\UI-CheckBox-Down")
   b:SetHighlightTexture("Interface\\Buttons\\UI-CheckBox-Highlight", "ADD")
   b:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
-  local fs = W.label(b, "body", 12, C.ink)
+  local fs = W.label(b, "body", 13, color or C.text)
   fs:SetPoint("LEFT", b, "RIGHT", 4, 0)
   fs:SetText(label)
   b.label = fs
@@ -649,27 +905,33 @@ function W.check(parent, label, getter, setter)
 end
 
 ---------------------------------------------------------------------------
--- Barre de vie (portion perdue claire qui se vide) et écusson d'Absorption
+-- Jauge de vie à hexagone (portion perdue claire qui se vide) et hexagone d'Absorption
 ---------------------------------------------------------------------------
 
+-- Rail d'ardoise (w × 13) ; hexagone rouge au bout gauche avec les PV ; textSize : taille du chiffre.
 function W.hpBar(parent, w, h, textSize)
   local f = CreateFrame("Frame", nil, parent)
+  h = 13
   f:SetSize(w, h)
   f.w = w
-  f.edge = W.rect(f, "BACKGROUND", 0, C.barEdge)
-  f.edge:SetAllPoints()
-  f.bg = W.rect(f, "BACKGROUND", 1, C.barBg)
-  f.bg:SetPoint("TOPLEFT", 2, -2)
-  f.bg:SetPoint("BOTTOMRIGHT", -2, 2)
-  f.ghost = W.rect(f, "ARTWORK", 0, C.ghost, 0.85)
-  f.ghost:SetPoint("TOPLEFT", 2, -2)
-  f.ghost:SetPoint("BOTTOMLEFT", 2, 2)
-  f.fill = W.rect(f, "ARTWORK", 1, C.hp)
-  f.fill:SetPoint("TOPLEFT", 2, -2)
-  f.fill:SetPoint("BOTTOMLEFT", 2, 2)
-  f.text = W.label(f, "body", textSize or 13, C.white, "OVERLAY", true)
-  f.text:SetPoint("CENTER", 0, 0)
-  local inner = w - 4
+  f.track = W.plaque(f, { r = 6, pill = true, fill = 0.6, gloss = false })
+  f.track:SetRim(Art.rim.dim)
+  f.ghost = W.rect(f, "ARTWORK", 0, C.ghostLight, 1)
+  f.ghost:SetPoint("TOPLEFT", 3, -3)
+  f.ghost:SetPoint("BOTTOMLEFT", 3, 3)
+  f.fill = W.rect(f, "ARTWORK", 1, C.hpRed)
+  f.fill:SetPoint("TOPLEFT", 3, -3)
+  f.fill:SetPoint("BOTTOMLEFT", 3, 3)
+  f.shine = W.rect(f, "ARTWORK", 2, C.hpShine, 0.8)
+  f.shine:SetPoint("TOPLEFT", f.fill, "TOPLEFT", 2, -1)
+  f.shine:SetPoint("TOPRIGHT", f.fill, "TOPRIGHT", -2, -1)
+  f.shine:SetHeight(2)
+  local hexH = textSize and textSize >= 14 and 36 or 32
+  f.hex = W.hex(f, "red", hexH, "ARTWORK", 5)
+  f.hex:SetPoint("CENTER", f, "LEFT", -2, 0)
+  f.text = W.label(f, "heavy", textSize or 14, C.text, "OVERLAY")
+  f.text:SetPoint("CENTER", f.hex, "CENTER", 0, 1)
+  local inner = w - 6
   local function width(frac) return max(0.01, inner * max(0, min(1, frac))) end
   -- animate : la portion perdue reste claire un instant puis se vide.
   f.Set = function(self, hp, maxHp, animate)
@@ -677,8 +939,9 @@ function W.hpBar(parent, w, h, textSize)
     maxHp = maxHp > 0 and maxHp or 1
     local old = self.hp
     self.hp, self.maxHp = hp, maxHp
-    self.text:SetText(hp .. " / " .. maxHp)
+    self.text:SetText(tostring(hp))
     self.fill:SetWidth(width(hp / maxHp))
+    if hp <= 0 then self.fill:Hide() self.shine:Hide() else self.fill:Show() self.shine:Show() end
     if animate and old and old > hp then
       local from = old / maxHp
       self.ghost:SetWidth(width(from))
@@ -694,18 +957,24 @@ function W.hpBar(parent, w, h, textSize)
       self.ghost:Hide()
     end
   end
+  f:EnableMouse(true)
+  W.tooltip(f, function(tt, self)
+    if self.hp then tt:AddLine("Points de vie : " .. self.hp .. " / " .. self.maxHp, 1, 0.5, 0.45) end
+  end, "ANCHOR_TOP")
   f.ghost:Hide()
   return f
 end
 
--- Écusson d'Absorption (bleu, chiffre).
+-- Hexagone d'acier : Absorption (chiffre) ; caché à 0.
 function W.shieldBadge(parent, w, h)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(w or 34, h or 30)
+  local s = max(w or 30, h or 30)
+  f:SetSize(s, s)
   f:EnableMouse(true)
-  f.shape = W.shape(f, 7, C.absorbEdge, C.absorb, 2, -4)
-  f.text = W.label(f, "title", 15, C.absorbText)
-  f.text:SetPoint("CENTER", 0, 0)
+  f.hex = W.hex(f, "steel", s, "ARTWORK", 0)
+  f.hex:SetPoint("CENTER")
+  f.text = W.label(f, "heavy", s >= 30 and 14 or 12, C.text)
+  f.text:SetPoint("CENTER", 0, 1)
   f.Set = function(self, n)
     if n and n > 0 then self.text:SetText(tostring(n)) self:Show() else self:Hide() end
   end
@@ -845,23 +1114,31 @@ function W.itemEntry(kind, id)
   return nil
 end
 
--- Case à icône bordée (bibelot, potion, affixe, clé) ; info = { kind, id, ... } pour l'infobulle.
--- shape = "square" | "flask" | "round".
+-- Case à icône (bibelot, potion, affixe, clé) : plaque d'ardoise, icône aux coins arrondis ;
+-- info = { kind, id, ... } pour l'infobulle. shape = "square" | "flask" | "round" (médaillon).
 function W.iconButton(parent, size, shape)
   local b = CreateFrame("Button", nil, parent)
-  local w, h = size, size
-  if shape == "flask" then w, h = floor(size * 0.87), size end
-  b:SetSize(w, h)
+  b:SetSize(size, size)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
-  local radius = shape == "flask" and floor(w / 3) or (shape == "round" and floor(size / 2) or 6)
-  b.shape = W.shape(face, radius, C.woodLine, C.woodDark, 2, -4)
+  b.round = shape == "round"
   b.icon = face:CreateTexture(nil, "ARTWORK")
-  b.icon:SetPoint("TOPLEFT", 3, -3)
-  b.icon:SetPoint("BOTTOMRIGHT", -3, 3)
-  b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  if shape == "round" or shape == "flask" then W.roundMask(face, b.icon) end
-  b.count = W.label(face, "title", 11, C.creamLight, "OVERLAY", true)
+  if b.round then
+    b.ring = face:CreateTexture(nil, "ARTWORK", nil, 0)
+    W.setSkin(b.ring, size > 48 and "medal_ring" or "medal_ring_s")
+    b.ring:SetAllPoints()
+    b.icon:SetPoint("TOPLEFT", size * 0.13, -size * 0.13)
+    b.icon:SetPoint("BOTTOMRIGHT", -size * 0.13, size * 0.13)
+    b.icon:SetDrawLayer("ARTWORK", 1)
+    W.roundMask(face, b.icon)
+  else
+    b.plaque = W.plaque(face, { r = max(5, floor(size / 4.5)), fill = 0.7, gloss = false })
+    local pad = max(3, floor(size * 0.12))
+    b.icon:SetPoint("TOPLEFT", pad, -pad)
+    b.icon:SetPoint("BOTTOMRIGHT", -pad, pad)
+    W.roundMask(face, b.icon, "mask_roundsq")
+  end
+  b.count = W.label(face, "heavy", 11, C.text, "OVERLAY")
   b.count:SetPoint("BOTTOMRIGHT", 2, -2)
   W.hoverable(b, { scale = 1.14 })
   W.tooltip(b, function(tt, self)
@@ -877,18 +1154,16 @@ function W.iconButton(parent, size, shape)
       W.setIcon(self.icon, W.itemEntry(kind, id), kind .. ":" .. tostring(id))
       self.icon:SetDesaturated(false)
       self.icon:Show()
-      local edge = C.woodLine
+      local rim = Art.rim.silver
       if kind == "relic" then
         local r = ns.Relics[id]
-        edge = Art.rarity[r and r.rarity or "common"] or C.edgeCommon
-      elseif kind == "potion" then
-        edge = C.cream
+        rim = Art.rarityRim[r and r.rarity or "common"] or Art.rim.silver
       end
-      self.shape.edge:SetColor(edge)
+      if self.plaque then self.plaque:SetRim(rim) end
     else
       self.icon:SetTexture(nil)
       self.icon:Hide()
-      self.shape.edge:SetColor(C.woodLine)
+      if self.plaque then self.plaque:SetRim(Art.rim.silver) end
     end
   end
   return b
@@ -897,34 +1172,31 @@ end
 -- Barre de réputation : bar = { label, levelName, cur, size, detail, hint } (UI/Controller.lua).
 function W.repBar(parent, w)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(w, 16)
+  f:SetSize(w, 18)
   f:EnableMouse(true)
-  f.edge = W.rect(f, "BACKGROUND", 0, C.inkSoft)
-  f.edge:SetAllPoints()
-  f.bg = W.rect(f, "BACKGROUND", 1, C.barBg)
-  f.bg:SetPoint("TOPLEFT", 2, -2)
-  f.bg:SetPoint("BOTTOMRIGHT", -2, 2)
+  f.track = W.plaque(f, { r = 8, pill = true, fill = 0.6, gloss = false })
+  f.track:SetRim(Art.rim.dim)
   f.fill = W.rect(f, "ARTWORK", 0, C.goldDeep)
-  f.fill:SetPoint("TOPLEFT", 2, -2)
-  f.fill:SetPoint("BOTTOMLEFT", 2, 2)
-  f.label = W.label(f, "title", 14, C.ink)
-  f.label:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 0, 3)
-  f.value = W.label(f, "body", 11, C.creamLight, "OVERLAY", true)
+  f.fill:SetPoint("TOPLEFT", 3, -3)
+  f.fill:SetPoint("BOTTOMLEFT", 3, 3)
+  f.label = W.label(f, "bold", 14, C.text)
+  f.label:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 2, 3)
+  f.value = W.label(f, "bold", 11, C.text, "OVERLAY")
   f.value:SetPoint("CENTER")
-  f.detail = W.label(f, "body", 11, C.inkSoft)
-  f.detail:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 0, -3)
+  f.detail = W.label(f, "body", 11, C.textSoft)
+  f.detail:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 2, -3)
   W.tooltip(f, function(tt, self)
     local b = self.bar
     if not b then return end
-    gold(tt, b.label)
+    tt:AddLine(b.label, 1, 0.82, 0)
     tt:AddLine(b.levelName .. (b.size and (" : " .. b.cur .. " / " .. b.size) or " (palier maximal)"), 1, 1, 1)
-    if b.hint then wrap(tt, b.hint, 0.8, 0.8, 0.8) end
+    if b.hint then tt:AddLine(b.hint, 0.8, 0.8, 0.8, true) end
   end, "ANCHOR_TOP")
   f.Set = function(self, b)
     self.bar = b
     self.label:SetText(b.label)
     local frac = b.size and (b.cur / b.size) or 1
-    self.fill:SetWidth(max(0.01, (w - 4) * frac))
+    self.fill:SetWidth(max(0.01, (w - 6) * frac))
     self.value:SetText(b.size and (b.levelName .. "  " .. b.cur .. " / " .. b.size) or b.levelName)
     self.detail:SetText(b.detail or "")
   end
@@ -932,87 +1204,67 @@ function W.repBar(parent, w)
 end
 
 ---------------------------------------------------------------------------
--- Pastilles (états, mots-clés, Démence)
+-- Jetons d'état : médaillon argenté, icône ronde, nombre en bas à droite
 ---------------------------------------------------------------------------
 
--- Pastille : fond sombre arrondi, bord coloré, texte.
-function W.pill(parent, size)
-  local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(60, (size or 12) + 6)
-  f.shape = W.shape(f, floor(((size or 12) + 6) / 2), C.goldDeep, C.band, 1, -4)
-  f.text = W.label(f, "body", size or 12, C.gold)
-  f.text:SetPoint("CENTER", 0, 0)
-  f.Set = function(self, text, edge, ink, fill)
-    self.text:SetText(text)
-    self.text:SetTextColor(ink[1], ink[2], ink[3])
-    self.shape.edge:SetColor(edge)
-    self.shape.fill:SetColor(fill or C.band)
-    local tw = self.text:GetStringWidth() or (#text * 6)
-    self:SetWidth(tw + 16)
-    return self:GetWidth()
-  end
-  return f
-end
-
--- Rangée centrée de pastilles avec infobulle ; list = { {text, edge, ink, info} }.
-function W.pillRow(parent, maxN, width, size)
+-- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, info = {...} } }.
+function W.tokenRow(parent, maxN, width, size)
+  size = size or 30
   local row = CreateFrame("Frame", nil, parent)
-  row:SetSize(width, (size or 12) + 6)
-  row.pills = {}
+  row:SetSize(width, size)
+  row.tokens = {}
   for i = 1, maxN do
-    local p = W.pill(row, size)
-    p:EnableMouse(true)
-    W.tooltip(p, function(tt, self)
+    local t = CreateFrame("Frame", nil, row)
+    t:SetSize(size, size)
+    t:EnableMouse(true)
+    local face = W.face(t)
+    t.medal = W.medallion(face, size)
+    t.medal:SetPoint("CENTER")
+    t.count = W.label(t.medal, "heavy", floor(size * 0.42), C.text, "OVERLAY") -- au-dessus du médaillon
+    t.count:SetPoint("CENTER", t.medal, "BOTTOMRIGHT", -2, 3)
+    W.hoverable(t, { scale = 1.12 })
+    W.tooltip(t, function(tt, self)
       local info = self.info
       if not info then return end
       if info.status then W.addStatusLines(tt, info.status, info.n)
       elseif info.power then W.fillCardTooltip(tt, info.power.id, info.power.up, { full = true })
       else
-        if info.title then gold(tt, info.title) end
-        if info.text then wrap(tt, info.text) end
+        if info.title then tt:AddLine(info.title, 1, 0.82, 0) end
+        if info.text then tt:AddLine(info.text, 1, 1, 1, true) end
       end
     end, "ANCHOR_TOP")
-    p:Hide()
-    row.pills[i] = p
+    t:Hide()
+    row.tokens[i] = t
   end
+  row.pills = row.tokens -- compatibilité
   row.Set = function(self, list)
-    local widths, total = {}, 0
-    local n = min(#list, #self.pills)
-    for i = 1, #self.pills do
-      local p, it = self.pills[i], list[i]
+    local n = min(#list, #self.tokens)
+    local gap = 6
+    local perLine = max(1, floor((width + gap) / (size + gap)))
+    for i = 1, #self.tokens do
+      local t, it = self.tokens[i], list[i]
       if it and i <= n then
-        widths[i] = p:Set(it.text, it.edge, it.ink, it.fill)
-        total = total + widths[i] + 4
-        p.info = it.info
-        p:Show()
+        t.info = it.info
+        W.setIcon(t.medal.icon, it.icon, it.key)
+        t.medal:SetRing(it.rim)
+        t.count:SetText((it.n and it.n ~= 0 and it.n ~= true) and tostring(it.n) or "")
+        local line, col = floor((i - 1) / perLine), (i - 1) % perLine
+        local inLine = min(perLine, n - line * perLine)
+        local x = (width - (inLine * (size + gap) - gap)) / 2 + col * (size + gap)
+        t:ClearAllPoints()
+        t:SetPoint("TOPLEFT", self, "TOPLEFT", x, -line * (size + 4))
+        t:Show()
       else
-        p.info = nil
-        p:Hide()
-      end
-    end
-    -- deux lignes au plus, centrées
-    local lineH = (size or 12) + 8
-    local lines, cur, curW = {}, {}, 0
-    for i = 1, n do
-      if curW + widths[i] > width and #cur > 0 then lines[#lines + 1] = { cur, curW } cur, curW = {}, 0 end
-      cur[#cur + 1] = i
-      curW = curW + widths[i] + 4
-    end
-    if #cur > 0 then lines[#lines + 1] = { cur, curW } end
-    for li, line in ipairs(lines) do
-      local x = (width - (line[2] - 4)) / 2
-      for _, i in ipairs(line[1]) do
-        local p = self.pills[i]
-        p:ClearAllPoints()
-        p:SetPoint("TOPLEFT", self, "TOPLEFT", x, -(li - 1) * lineH)
-        x = x + widths[i] + 4
+        t.info = nil
+        t:Hide()
       end
     end
   end
   return row
 end
+W.pillRow = W.tokenRow
 
--- États d'une unité en pastilles (triés par id, stable).
+-- États d'une unité en jetons (triés par id, stable).
 function W.unitStatuses(unit)
   local ids = {}
   for id, v in pairs(unit.st or {}) do if v and v ~= 0 then ids[#ids + 1] = id end end
@@ -1022,11 +1274,11 @@ function W.unitStatuses(unit)
     local id, n = ids[i], unit.st[ids[i]]
     local s = ns.Statuses[id]
     local bad = s and (s.debuff or s.affix)
-    local good = id == "regen" or id == "atonement" or id == "halved"
     list[#list + 1] = {
-      text = (s and s.name or id) .. ((type(n) == "number" and n > 0) and (" " .. n) or ""),
-      edge = bad and C.watch or (good and C.heal or C.goldDeep),
-      ink = bad and C.watchText or (good and C.healText or C.gold),
+      icon = Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
+      n = type(n) == "number" and n or nil,
+      rim = bad and Art.rim.red or nil,
+      text = (s and s.name or id), -- nom (infobulle, harnais)
       info = { status = id, n = n }, key = "status:" .. id,
     }
   end
@@ -1036,8 +1288,15 @@ end
 ---------------------------------------------------------------------------
 -- Carte (composant unique : main, récompense, marchand, deck, amélioration)
 ---------------------------------------------------------------------------
+-- Pièces du pack posées sur le visuel `face` d'après la géométrie de ns.Skin.card (fractions de la
+-- largeur du corps) : halo, plaque du bas (mots-clés), corps à la couleur de la carte, médaillon
+-- (anneau, icône masquée par l'ouverture exacte du PSD, verre), panneau de texte, languette de coût,
+-- ruban du nom (texte incliné comme le ruban si le client sait tourner un texte, sinon ruban redressé),
+-- gemme de rareté ; textes Baloo Chettan 2 blancs à ombre portée.
 
-W.CARD_W, W.CARD_H = 124, 176
+local SC = Skin.card
+W.CARD_W = 124
+W.CARD_H = W.CARD_W * SC.aspect
 
 local KEYWORD_STRIP = {
   { flag = "cooldown", pat = "%s*Recharge %d+%." },
@@ -1047,8 +1306,8 @@ local KEYWORD_STRIP = {
   { flag = "power", pat = "^Pouvoir%.%s*" },
 }
 
--- Texte affiché : sans les mots-clés déjà en pastilles, chiffres en évidence (verts s'ils
--- changent avec l'amélioration).
+-- Texte affiché : sans les mots-clés de la plaque du bas, chiffres en évidence (blancs, ou verts
+-- s'ils changent avec l'amélioration ; la police ne mêle pas deux graisses dans un même texte).
 function W.cardBody(d, base)
   local text = d.text or ""
   for _, k in ipairs(KEYWORD_STRIP) do
@@ -1059,14 +1318,16 @@ function W.cardBody(d, base)
   local i = 0
   text = text:gsub("%d+", function(n)
     i = i + 1
-    if base and baseNums[i] ~= n then return W.colorize(n, C.green) end
-    return W.colorize(n, C.numberInk)
+    if base and baseNums[i] ~= n then return W.colorize(n, C.upGreen) end
+    return W.colorize(n, C.white)
   end)
   return text
 end
 
+-- Mots-clés de la plaque du bas.
 function W.cardPills(d)
   local list = {}
+  if d.type == "power" then list[#list + 1] = "Pouvoir" end
   if d.cast then list[#list + 1] = "Incantation" end
   if d.cooldown then list[#list + 1] = "Recharge " .. d.cooldown end
   if d.exhaust then list[#list + 1] = "Consumée" end
@@ -1074,171 +1335,218 @@ function W.cardPills(d)
   return list
 end
 
+-- Taille du texte de la carte selon sa longueur (zone du panneau : largeur tw, hauteur th).
+local function bodySize(len, tw, th)
+  for _, s in ipairs({ 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6 }) do
+    local perLine = max(1, floor(tw / (s * 0.5)))
+    local lines = math.ceil(len * 1.1 / perLine) -- (+10 % : coupures entre les mots)
+    if lines * s * 1.2 <= th then return s end
+  end
+  return 6
+end
+
+-- Pose une pièce (fractions de la largeur du corps) sur le visuel de la carte.
+local function place(tex, face, rect)
+  local CW = W.CARD_W
+  tex:ClearAllPoints()
+  tex:SetPoint("TOPLEFT", face, "TOPLEFT", rect[1] * CW, -rect[2] * CW)
+  tex:SetSize(rect[3] * CW, rect[4] * CW)
+end
+
+-- Rotation des textes (FontString:SetRotation, documentée pour ce client) ; /slay ruban la coupe :
+-- ruban redressé et nom horizontal.
+function W.ribbonTilt()
+  local o = ns.Persist and ns.Persist.options and ns.Persist.options()
+  return not (o and o.flatRibbon)
+end
+
+-- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin.
+local function cardPlaque(b, key, w, h)
+  local p = b[key]
+  if p then return p end
+  p = CreateFrame("Frame", nil, b.face)
+  p:SetSize(w, h)
+  p.plaque = W.plaque(p, { r = h / 2, pill = true, gloss = false })
+  p.icon = p:CreateTexture(nil, "ARTWORK")
+  p.icon:SetSize(h - 6, h - 6)
+  p.icon:SetPoint("LEFT", 5, 0)
+  p.icon:Hide()
+  p.text = W.label(p, "heavy", 11, C.text, "OVERLAY")
+  p.text:SetPoint("CENTER", 0, 1)
+  b[key] = p
+  return p
+end
+
 -- La carte est un bouton immobile (zone de survol et de clic) ; tout son visuel est dans b.face,
 -- que le survol anime (W.hoverable). Réglages par écran : b.hoverScale, b.hoverLift (unités de la
 -- carte, vers le haut) ; b.baseLevel / b.upLevel : niveau au repos et au survol (passage devant).
 function W.card(parent)
+  local CW, CH = W.CARD_W, W.CARD_H
+  local P = SC.pieces
   local b = CreateFrame("Button", nil, parent)
-  b:SetSize(W.CARD_W, W.CARD_H)
+  b:SetSize(CW, CH)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
 
-  b.halo = W.roundRect(face, "BACKGROUND", -8, 12, -4):SetColor(C.gold)
+  b.halo = W.skin(face, "card_glow", "BACKGROUND", -8)
+  place(b.halo, face, P.card_glow)
+  b.halo:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
   b.halo:Hide()
-  b.edge = W.roundRect(face, "BACKGROUND", -7, 9, 0):SetColor(C.edgeCommon)
-  b.fill = W.roundRect(face, "BACKGROUND", -6, 6, 3):SetColor(C.parchment)
-  b.grain = face:CreateTexture(nil, "BACKGROUND", nil, -5)
-  b.grain:SetTexture(Art.tex.parchment)
-  b.grain:SetPoint("TOPLEFT", 6, -6)
-  b.grain:SetPoint("BOTTOMRIGHT", -6, 6)
-  b.grain:SetAlpha(0.22)
+  b.plate = W.skin(face, "card_plate", "BACKGROUND", -7)
+  place(b.plate, face, P.card_plate)
+  b.bg = W.skin(face, "card_body_ivory", "BACKGROUND", -6)
+  place(b.bg, face, SC.body)
+  -- médaillon : anneau, icône masquée, verre
+  b.ring = W.skin(face, "medal_ring", "BORDER", 0)
+  place(b.ring, face, P.medal_ring)
+  b.icon = face:CreateTexture(nil, "BORDER", nil, 1)
+  place(b.icon, face, P.medal_mask)
+  b.iconMask = W.roundMask(face, b.icon, "medal_mask")
+  b.glass = W.skin(face, "medal_glass", "BORDER", 2)
+  place(b.glass, face, P.medal_glass)
+  b.medal = { icon = b.icon } -- compatibilité (harnais : b.medal.icon)
+  -- devant : panneau, languette de coût, ruban, gemme
+  b.panel = W.skin(face, "card_panel", "ARTWORK", 0)
+  place(b.panel, face, P.card_panel)
+  b.costTab = W.skin(face, "card_cost", "ARTWORK", 1)
+  place(b.costTab, face, P.card_cost)
+  b.ribbon = face:CreateTexture(nil, "ARTWORK", nil, 2)
+  b.gem = face:CreateTexture(nil, "ARTWORK", nil, 3)
+  b.gem:Hide()
 
-  b.name = W.label(face, "title", 13, C.ink)
-  b.name:SetPoint("TOP", 0, -9)
-  b.name:SetWidth(W.CARD_W - 18)
+  -- textes
+  b.name = W.label(face, "bold", 10, C.text, "OVERLAY")
+  b.name:SetWordWrap(false)
   b.name:SetJustifyH("CENTER")
-  b.name:SetWordWrap(true)
-  b.name:SetMaxLines(2)
-
-  b.medal = W.medallion(face, 58)
-  b.medal:SetPoint("TOP", 0, -26)
-
-  b.kind = W.label(face, "body", 10, C.wood)
-  b.kind:SetPoint("TOP", b.medal, "BOTTOM", 0, -3)
-
-  b.body = W.label(face, "body", 12, C.ink)
-  b.body:SetPoint("TOP", b.kind, "BOTTOM", 0, -3)
-  b.body:SetWidth(W.CARD_W - 16)
+  b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
+  b.cost:SetPoint("CENTER", face, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
+  local tb = SC.text
+  b.body = W.label(face, "bold", 9, C.textSoft, "OVERLAY")
+  -- centré dans le panneau ; largeur fixée, hauteur libre (un texte trop long déborde au lieu d'être
+  -- tronqué en « … »)
+  b.body:SetPoint("CENTER", face, "TOPLEFT", (tb[1] + tb[3] / 2) * CW, -(tb[2] + tb[4] / 2) * CW)
+  b.body:SetWidth(tb[3] * CW)
   b.body:SetJustifyH("CENTER")
-  b.body:SetJustifyV("TOP")
+  b.body:SetJustifyV("MIDDLE")
   b.body:SetWordWrap(true)
+  b.textW, b.textH = tb[3] * CW, tb[4] * CW
+  b.plateText = W.label(face, "bold", 8.5, C.text, "OVERLAY")
+  b.plateText:SetPoint("CENTER", face, "TOPLEFT", SC.plateText.cx * CW, -SC.plateText.cy * CW)
+  b.plateText:SetWordWrap(false)
+  b.kind = b.plateText -- compatibilité
 
-  b.pills = {}
-  for i = 1, 2 do
-    local p = W.pill(face, 10)
-    p:Hide()
-    b.pills[i] = p
-  end
-
-  -- Gemme de coût (déborde en haut à gauche).
-  local gem = CreateFrame("Frame", nil, face)
-  gem:SetSize(30, 30)
-  gem:SetPoint("CENTER", face, "TOPLEFT", 6, -6)
-  gem.edge = W.disc(gem, "ARTWORK", 0, C.gemEdge)
-  gem.edge:SetAllPoints()
-  gem.fill = W.disc(gem, "ARTWORK", 1, C.gem)
-  gem.fill:SetPoint("TOPLEFT", 2, -2)
-  gem.fill:SetPoint("BOTTOMRIGHT", -2, 2)
-  gem.text = W.label(gem, "title", 17, C.white, "OVERLAY", true)
-  gem.text:SetPoint("CENTER", 0, 0)
-  b.gem = gem
-
-  -- Étiquette de prix (marchand).
-  local tag = CreateFrame("Frame", nil, face)
-  tag:SetSize(70, 22)
-  tag:SetPoint("TOP", face, "BOTTOM", 0, 6)
-  tag.shape = W.shape(tag, 7, C.goldDeep, C.band, 2, -4)
-  tag.text = W.label(tag, "title", 14, C.gold)
-  tag.text:SetPoint("CENTER", 0, 0)
-  tag:Hide()
-  b.tag = tag
-
-  -- opts : cost, playable, reason, manaShort, price, sold, preview, showUp
+  -- opts : cost, playable, reason, manaShort, price, sold, tooPoor, preview, showUp
   b.SetCard = function(self, id, up, opts)
     opts = opts or {}
     self.cardId, self.cardUp, self.opts = id, up, opts
     local showUp = up or opts.showUp
     local d = Card.defById(id, showUp)
     local base = showUp and ns.Cards[id] or nil
-    local path = Art.paths[d.path] or Art.paths.start
-    self.edge:SetColor(Art.rarity[d.rarity] or C.edgeCommon)
     local dim = opts.playable == false
-    self.fill:SetColor(dim and C.parchmentDim or (self.hot and C.parchmentLight or C.parchment))
-    -- nom (sur deux lignes s'il est long : le médaillon descend et rétrécit)
-    self.name:SetText(d.name)
-    local nameLen = W.utf8len(d.name)
-    local twoLines = nameLen > 15
-    W.setSize(self.name, nameLen > 13 and 12 or 13)
-    local nc = showUp and C.green or C.ink
+    -- corps à la couleur de la carte
+    W.setSkin(self.bg, "card_body_" .. Art.cardBody(id, ns.Cards[id] or d))
+    -- ruban et nom (incliné comme le ruban, ou ruban redressé)
+    local tilt = W.ribbonTilt() and self.name.SetRotation ~= nil
+    local rib = tilt and "card_ribbon" or "card_ribbon_flat"
+    if self._rib ~= rib then
+      self._rib = rib
+      W.setSkin(self.ribbon, rib)
+      place(self.ribbon, self.face, P[rib])
+      self.name:ClearAllPoints()
+      self.name:SetPoint("CENTER", self.face, "TOPLEFT", SC.name.cx * CW, -(tilt and SC.name.cy or SC.name.flatCy) * CW)
+      self.name:SetWidth(SC.name.len * CW)
+      if self.name.SetRotation then self.name:SetRotation(tilt and SC.name.angle or 0) end
+    end
+    W.fitText(self.name, d.name, 10.5, SC.name.len * CW - 4, 7)
+    local nc = showUp and C.upGreen or C.text
     self.name:SetTextColor(nc[1], nc[2], nc[3])
     -- médaillon
-    local text = W.cardBody(d, base)
-    local long = W.utf8len(text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-    local ms = long > 80 and 42 or (long > 52 and 50 or 58)
-    if twoLines then ms = ms - 8 end
-    self.medal:Resize(ms, 3)
-    self.medal:ClearAllPoints()
-    self.medal:SetPoint("TOP", 0, twoLines and -38 or -26)
-    self.medal:SetRing(path.ring)
-    W.setIcon(self.medal.icon, W.cardArt(id), "card:" .. id)
-    self.medal.icon:SetDesaturated(dim)
-    -- type
-    self.kind:SetText((Art.typeName[d.type] or "Sort") .. " · " .. path.name)
-    self.kind:SetTextColor(path.ink[1], path.ink[2], path.ink[3])
+    W.setIcon(self.icon, W.cardArt(id), "card:" .. id)
     -- texte
-    W.setSize(self.body, long > 80 and 10 or (long > 52 and 11 or 12))
+    local text = W.cardBody(d, base)
+    local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    W.setSize(self.body, bodySize(W.utf8len(plain), self.textW, self.textH))
     self.body:SetText(text)
-    -- pastilles (raison d'injouabilité en rouge à la place)
+    -- plaque du bas : mots-clés
     local pills = W.cardPills(d)
-    local list = {}
-    if dim and opts.reason then
-      list[1] = { opts.reason, C.redEdge, C.white, C.red }
+    if #pills > 0 then
+      W.fitText(self.plateText, table.concat(pills, " · "), 9, SC.plateText.w * CW, 6.5)
+      self.plate:Show()
+      self.plateText:Show()
     else
-      for i = 1, min(2, #pills) do list[i] = { pills[i], C.ink, C.cream, C.ink } end
+      self.plate:Hide()
+      self.plateText:Hide()
     end
-    local total = 0
-    for i = 1, 2 do
-      local p, it = self.pills[i], list[i]
-      if it then
-        total = total + p:Set(it[1], it[2], it[3], it[4]) + 4
-        p:Show()
-      else
-        p:Hide()
-      end
+    -- gemme de rareté
+    local gem = Art.gems[d.rarity or ""]
+    if gem then
+      W.setSkin(self.gem, "gem_" .. gem)
+      place(self.gem, self.face, SC.gems[gem])
+      self.gem:Show()
+    else
+      self.gem:Hide()
     end
-    if total - 4 <= W.CARD_W - 12 then
-      local x = (W.CARD_W - (total - 4)) / 2
-      for i = 1, 2 do
-        local p = self.pills[i]
-        if p:IsShown() then
-          p:ClearAllPoints()
-          p:SetPoint("BOTTOMLEFT", self.face, "BOTTOMLEFT", x, 8)
-          x = x + p:GetWidth() + 4
-        end
-      end
-    else -- trop larges : l'une au-dessus de l'autre
-      for i = 1, 2 do
-        local p = self.pills[i]
-        p:ClearAllPoints()
-        p:SetPoint("BOTTOM", self.face, "BOTTOM", 0, 8 + (2 - i) * 18)
-      end
-    end
-    -- texte masqué sur une carte injouable (raison écrite), revient au survol
-    if dim and opts.reason and not self.hot then self.body:Hide() else self.body:Show() end
     -- coût
     local cost = opts.cost or d.cost
-    self.gem.text:SetText(tostring(cost))
-    local bad = opts.manaShort
-    self.gem.edge:SetVertexColor(W.rgb(bad and C.gemBadEdge or C.gemEdge))
-    self.gem.fill:SetVertexColor(W.rgb(bad and C.gemBad or C.gem))
-    if d.cost == nil or d.unplayable then self.gem:Hide() else self.gem:Show() end
-    -- prix
-    if opts.sold then
-      self.tag.text:SetText("Vendu")
-      self.tag.text:SetTextColor(0.6, 0.6, 0.6)
-      self.tag:Show()
-    elseif opts.price then
-      self.tag.text:SetText(opts.price .. " po")
-      local pc = opts.tooPoor and C.hpText or C.gold
-      self.tag.text:SetTextColor(pc[1], pc[2], pc[3])
-      self.tag:Show()
-    else
-      self.tag:Hide()
+    self.cost:SetText(tostring(cost))
+    if d.cost == nil or d.unplayable then self.cost:Hide() self.costTab:Hide() else self.cost:Show() self.costTab:Show() end
+    -- injouable : grisée, raison dans une plaque rouge au bas de la carte
+    local k = dim and 0.62 or 1
+    for _, t in ipairs({ self.bg, self.ribbon, self.costTab, self.panel, self.ring, self.plate, self.gem, self.glass }) do
+      t:SetDesaturated(dim)
+      t:SetVertexColor(k, k, k, 1)
+    end
+    self.icon:SetDesaturated(dim)
+    self.icon:SetVertexColor(k, k, k, 1)
+    local short = opts.manaShort and not dim
+    if short then
+      self.costTab:SetDesaturated(true)
+      self.costTab:SetVertexColor(1, 0.42, 0.38, 1)
+    end
+    local dc = dim and C.textDim or C.textSoft
+    self.body:SetTextColor(dc[1], dc[2], dc[3])
+    if dim and opts.reason then
+      local p = cardPlaque(self, "reasonPlate", 0.84 * CW, 20)
+      p.plaque:SetFill({ 1, 0.47, 0.43 })
+      p.plaque:SetRim(Art.rim.red)
+      W.fitText(p.text, opts.reason, 11, 0.84 * CW - 12, 7)
+      p:ClearAllPoints()
+      p:SetPoint("CENTER", self.face, "TOPLEFT", CW / 2, -CH * 0.877)
+      p:Show()
+    elseif self.reasonPlate then
+      self.reasonPlate:Hide()
+    end
+    -- prix (marchand)
+    if opts.sold or opts.price then
+      local p = cardPlaque(self, "priceTag", 58, 22)
+      p:ClearAllPoints()
+      p:SetPoint("CENTER", self.face, "TOPLEFT", CW / 2, -(CH + 0.185 * CW))
+      if opts.sold then
+        p.icon:Hide()
+        p.text:SetText("Vendu")
+        p.text:SetTextColor(0.6, 0.6, 0.6)
+        p.text:ClearAllPoints()
+        p.text:SetPoint("CENTER", 0, 1)
+        p.plaque:SetRim(Art.rim.silver)
+      else
+        W.setIcon(p.icon, Art.ui.gold, "ui:gold")
+        p.icon:Show()
+        p.text:SetText(tostring(opts.price))
+        local pc = opts.tooPoor and C.badText or C.goldText
+        p.text:SetTextColor(pc[1], pc[2], pc[3])
+        p.text:ClearAllPoints()
+        p.text:SetPoint("CENTER", 7, 1)
+        p.plaque:SetRim(opts.tooPoor and Art.rim.red or Art.rim.silver)
+      end
+      p:Show()
+      self.tag = p
+    elseif self.priceTag then
+      self.priceTag:Hide()
     end
     self:SetAlpha(opts.sold and 0.45 or 1)
   end
 
-  -- Survol / sélection : halo doré, parchemin plus clair (la position est gérée par l'écran).
+  -- Survol / sélection : halo doré en fondu (la position est gérée par l'écran).
   b.SetHot = function(self, on)
     if self.hot == on and self.cardId == self._hotId then return end
     self.hot, self._hotId = on, self.cardId
@@ -1248,7 +1556,6 @@ function W.card(parent)
     else
       self.halo:Hide()
     end
-    if self.cardId then self:SetCard(self.cardId, self.cardUp, self.opts) end
   end
   b.SetSelected = function(self, on) self:SetHot(on or self.hover) end
 
@@ -1276,6 +1583,14 @@ function W.card(parent)
     if self.cardId then W.fillCardTooltip(tt, self.cardId, self.cardUp, self.opts) end
   end, "ANCHOR_RIGHT")
   return b
+end
+
+-- Dos de carte (piles, tas du deck) : texture du pack, hauteur h.
+function W.cardBack(parent, h, layer, sub)
+  local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
+  W.setSkin(t, "card_back")
+  t:SetSize(W.skinWidth("card_back", h), h)
+  return t
 end
 
 -- Niveau d'un cadre survolable et de son visuel : le client relève d'ordinaire les enfants avec
@@ -1370,7 +1685,7 @@ function W.float(container, x, y, text, color, size, dur, rise)
   if not f then
     f = CreateFrame("Frame", nil, container)
     f:SetSize(200, 40)
-    f.fs = W.label(f, "title", 30, C.white, "OVERLAY", true)
+    f.fs = W.label(f, "heavy", 30, C.white, "OVERLAY")
     f.fs:SetPoint("CENTER")
     f.fs:SetShadowColor(0.29, 0.06, 0.03, 1)
     f.fs:SetShadowOffset(2, -2)
