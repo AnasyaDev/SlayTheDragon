@@ -47,7 +47,7 @@ X.PRICE_JITTER = 0.10
 X.REMOVE_PRICE, X.REMOVE_STEP = 75, 25
 X.SHOP = { cards = 5, relics = 3, potions = 3 }
 -- Poids de tirage d'une rencontre selon sa famille (ev.weight le remplace).
-X.EVENT_WEIGHT = { common = 10, rare = 3, story = 12 }
+X.EVENT_WEIGHT = { common = 10, rare = 3, story = 8 }
 
 X.PHASES = { start = true, map = true, combat = true, reward = true, campfire = true,
   merchant = true, event = true, select = true, done = true }

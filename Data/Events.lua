@@ -4,7 +4,7 @@
 --   name      titre affiché
 --   act       acte (nil = tous)           tier   palier de la Ligue des explorateurs (0..3)
 --   rarity    "common" (ordinaire) | "rare" (poids faible) | "story" (une fois par compte)
---   weight    poids de tirage (défaut : Expedition.EVENT_WEIGHT selon rarity : 10 / 3 / 12)
+--   weight    poids de tirage (défaut : Expedition.EVENT_WEIGHT selon rarity : 10 / 3 / 8)
 --   once      true = une fois par compte (drapeau « event:<id> » posé à l'entrée) ; ou nom de drapeau
 --   when      conditions de déclenchement (voir plus bas), toutes requises, évaluées à l'entrée du nœud
 --   speaker   nom du personnage qui parle   npc   identifiant libre du personnage (modèle 3D)
@@ -133,9 +133,9 @@ event("coast_murlocs", {
         winText = "Entre deux crabes, une fiole intacte et une bourse oubliée par un noyé.",
         lose = { { "loseHp", 7 } },
         loseText = "Une nasse cachait un murloc. Il te mord avant de filer." } } },
-    { label = "Laisser Hank à ses murlocs", outcome = "Rien",
-      result = "« Merci pour rien ! » te crie-t-il dans le dos.",
-      effects = {} },
+    { label = "Partager sa friture", outcome = "+8 PV",
+      result = "« Les murlocs, ça se mange pas. Le poisson, si. » Hank grommelle, mais il partage.",
+      effects = { { "heal", 8 } } },
   },
 })
 
@@ -154,9 +154,9 @@ event("jangolode_prospector", {
         winText = "Le filon tient ses promesses. Grenaille te rembourse en riant.",
         lose = {},
         loseText = "Le filon s'arrête net contre la roche. « La prochaine fois, c'est sûr ! »" } } },
-    { label = "Le laisser à ses rêves", outcome = "Rien",
-      result = "Tu le laisses creuser. Ses coups de pioche résonnent longtemps.",
-      effects = {} },
+    { label = "Lui acheter sa flasque", outcome = "Paie 15 po, une potion",
+      result = "« Un remontant de mineur. Ça réveille un mort, ou presque. »",
+      effects = { { "pay", 15 }, { "potion" } } },
   },
 })
 
