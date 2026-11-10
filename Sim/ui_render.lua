@@ -1,8 +1,11 @@
 -- Rendu approximatif en SVG des cadres du faux client (Sim/ui_harness.lua) : résout les ancres,
 -- tailles, échelles, couleurs, disques et textes pour vérifier une mise en page sans le jeu.
--- Usage (depuis le harnais) : R.svg(H, cadre, "build/x.svg"). Les icônes sont des carrés gris,
--- les modèles 3D des silhouettes en pointillés, les illustrations un aplat. Approximatif : les
--- polices, la césure et les masques ne sont qu'estimés.
+-- Usage (depuis le harnais) : R.svg(H, cadre, "build/x.svg"). Les textures de Media/ sont dessinées
+-- d'après leurs aperçus PNG (tools/build_media.py → build/media_png, copiés dans <dossier>/media) avec
+-- coordonnées de texture, couleur de sommet, désaturation, masque et rotation ; textes en Baloo
+-- Chettan 2 (police installée) avec ombre et couleurs |c. Icônes du jeu = carrés bleus, modèles 3D =
+-- silhouettes en pointillés, illustrations = aplat. Approximatif : la césure et la largeur des textes
+-- ne sont qu'estimées.
 local R = {}
 
 local CIRCLE = 130924
@@ -134,9 +137,65 @@ local function esc(t)
   return (t:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
 end
 
+-- Textures de l'addon (Media/) : aperçus PNG de tools/build_media.py, copiés à côté des SVG
+-- (R.media = préfixe relatif, ex. "media/") ; coordonnées de texture (répétées comprises), couleur de
+-- sommet, désaturation, masque (disque ou carré arrondi), rotation, alpha.
+local MEDIA = "Interface\\AddOns\\SlayTheDragon\\Media\\"
+R.media = "media/"
+
+local function mediaHref(tex)
+  if type(tex) ~= "string" or tex:sub(1, #MEDIA) ~= MEDIA then return nil end
+  return R.media .. tex:sub(#MEDIA + 1):gsub("\\", "/"):gsub("%.tga$", ".png")
+end
+
+-- Taille d'un aperçu PNG (en-tête IHDR), mémorisée.
+local pngSize = {}
+function R.pngSize(dir, href)
+  if pngSize[href] then return pngSize[href][1], pngSize[href][2] end
+  local f = io.open(dir .. "/" .. href, "rb")
+  if not f then return nil end
+  local h = f:read(24)
+  f:close()
+  local function be(i) return h:byte(i) * 16777216 + h:byte(i + 1) * 65536 + h:byte(i + 2) * 256 + h:byte(i + 3) end
+  pngSize[href] = { be(17), be(21) }
+  return be(17), be(21)
+end
+
+-- Morceaux colorés d'un texte (codes |cffRRGGBB … |r) : { { mot, couleur | nil, espace avant } }.
+local function words(text)
+  local out, color = {}, nil
+  local i, n = 1, #text
+  local cur, space = "", false
+  local function push()
+    if cur ~= "" then out[#out + 1] = { cur, color, space } cur = "" space = false end
+  end
+  while i <= n do
+    local c = text:sub(i, i)
+    if c == "|" and text:sub(i + 1, i + 1) == "c" then
+      push()
+      color = "#" .. text:sub(i + 4, i + 9)
+      i = i + 10
+    elseif c == "|" and text:sub(i + 1, i + 1) == "r" then
+      push()
+      color = nil
+      i = i + 2
+    elseif c == " " or c == "\n" then
+      push()
+      space = true
+      i = i + 1
+    else
+      cur = cur .. c
+      i = i + 1
+    end
+  end
+  push()
+  return out
+end
+
 function R.svg(H, root, path, label)
   local rr = rect(root)
   if not rr then return false end
+  local dir = path:match("^(.*)/") or "."
   local W, Hh = rr[3] - rr[1], rr[4] - rr[2]
   local function X(x) return x - rr[1] end
   local function Y(y) return rr[4] - y end
@@ -156,6 +215,28 @@ function R.svg(H, root, path, label)
   table.sort(items, function(a, b) return a.key < b.key end)
   local out = { string.format('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">',
     W, Hh, W, Hh), '<rect width="100%" height="100%" fill="#000"/>' }
+  local defs, nid = {}, 0
+  local filters = {}
+  local function newId(p) nid = nid + 1 return p .. nid end
+  -- filtre couleur de sommet (et désaturation), mémorisé
+  local function filter(vc, desat)
+    local r, g, b, a = vc[1] or 1, vc[2] or 1, vc[3] or 1, vc[4] or 1
+    if not desat and r == 1 and g == 1 and b == 1 and a == 1 then return "" end
+    local key = string.format("%.3f,%.3f,%.3f,%.3f,%s", r, g, b, a, tostring(desat))
+    if not filters[key] then
+      local id = newId("f")
+      filters[key] = id
+      local m
+      if desat then
+        m = string.format("%f %f %f 0 0 %f %f %f 0 0 %f %f %f 0 0 0 0 0 %f 0", 0.299 * r, 0.587 * r, 0.114 * r,
+          0.299 * g, 0.587 * g, 0.114 * g, 0.299 * b, 0.587 * b, 0.114 * b, a)
+      else
+        m = string.format("%f 0 0 0 0 0 %f 0 0 0 0 0 %f 0 0 0 0 0 %f 0", r, g, b, a)
+      end
+      defs[#defs + 1] = string.format('<filter id="%s" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="%s"/></filter>', id, m)
+    end
+    return string.format(' filter="url(#%s)"', filters[key])
+  end
   for _, it in ipairs(items) do
     local o = it.o
     local r = rect(o)
@@ -179,12 +260,41 @@ function R.svg(H, root, path, label)
     if r and a > 0.01 and it.kind ~= "Line" then
       local x, y, w, h = X(r[1]), Y(r[4]), r[3] - r[1], r[4] - r[2]
       local rot = calls.SetRotation and calls.SetRotation[1]
-      local tf = rot and string.format(' transform="rotate(%.1f %.1f %.1f)"', -rot * 180 / math.pi, x + w / 2, y + h / 2) or ""
+      local tf = (rot and rot ~= 0) and string.format(' transform="rotate(%.2f %.1f %.1f)"', -rot * 180 / math.pi, x + w / 2, y + h / 2) or ""
       if it.kind == "Texture" then
         local tex = rawget(o, "_texture")
         local vc = calls.SetVertexColor or { 1, 1, 1, 1 }
         local cc = calls.SetColorTexture
-        if tex == CIRCLE then
+        local href = mediaHref(tex)
+        local iw, ih = href and R.pngSize(dir, href)
+        if href and iw and w > 0.1 and h > 0.1 then
+          -- texture de Media : motif de l'image entière, cadré par les coordonnées de texture
+          local tc = calls.SetTexCoord or { 0, 1, 0, 1 }
+          local u0, u1, v0, v1 = tc[1], tc[2], tc[3], tc[4]
+          if u1 == u0 then u1 = u0 + 1 end
+          if v1 == v0 then v1 = v0 + 1 end
+          local tw, th = w / (u1 - u0), h / (v1 - v0)
+          local pid = newId("p")
+          defs[#defs + 1] = string.format('<pattern id="%s" patternUnits="userSpaceOnUse" x="%.2f" y="%.2f" width="%.2f" height="%.2f"><image width="%.2f" height="%.2f" preserveAspectRatio="none" href="%s"/></pattern>',
+            pid, x - u0 * tw, y - v0 * th, tw, th, tw, th, href)
+          local clip = ""
+          local mask = calls.AddMaskTexture and calls.AddMaskTexture[1]
+          if mask then
+            local cid = newId("c")
+            local mt = tostring(rawget(mask, "_texture") or "")
+            if mt:find("mask_roundsq", 1, true) then
+              defs[#defs + 1] = string.format('<clipPath id="%s"><rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" rx="%.1f"/></clipPath>',
+                cid, x, y, w, h, w * 0.19)
+            else
+              defs[#defs + 1] = string.format('<clipPath id="%s"><ellipse cx="%.1f" cy="%.1f" rx="%.1f" ry="%.1f"/></clipPath>',
+                cid, x + w / 2, y + h / 2, w / 2, h / 2)
+            end
+            clip = string.format(' clip-path="url(#%s)"', cid)
+          end
+          local desat = calls.SetDesaturated and calls.SetDesaturated[1]
+          out[#out + 1] = string.format('<g%s%s opacity="%.2f"><rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="url(#%s)"%s/></g>',
+            clip, filter(vc, desat), a, x, y, w, h, pid, tf)
+        elseif tex == CIRCLE then
           local fill, fa = col(vc), (vc[4] or 1) * a
           local tc = calls.SetTexCoord
           if tc and (tc[2] - tc[1]) < 0.9 then
@@ -202,6 +312,9 @@ function R.svg(H, root, path, label)
         elseif cc and (tex == nil or tex == WHITE) then
           out[#out + 1] = string.format('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s" fill-opacity="%.2f"%s/>',
             x, y, w, h, col(cc), (cc[4] or 1) * a, tf)
+        elseif tex == WHITE and calls.SetGradient then
+          out[#out + 1] = string.format('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#fff" fill-opacity="%.2f"/>',
+            x, y, w, h, 0.04 * a)
         elseif tex ~= nil then
           local desat = calls.SetDesaturated and calls.SetDesaturated[1]
           local big = w * h > 60000
@@ -215,17 +328,25 @@ function R.svg(H, root, path, label)
       elseif it.kind == "FontString" then
         local text = rawget(o, "_text")
         if text and text ~= "" then
-          text = tostring(text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
           local size = (rawget(o, "_fontSize") or 12) * escale(o)
           local tc = calls.SetTextColor or { 1, 1, 1 }
           local jh = calls.SetJustifyH and calls.SetJustifyH[1] or "CENTER"
           local ww = (rawget(o, "_w") or 0) * escale(o)
-          local lines = {}
-          local maxChars = ww > 0 and math.max(4, math.floor(ww / (size * 0.52))) or 999
-          local cur = ""
-          for word in text:gmatch("%S+") do
-            if #cur > 0 and #cur + 1 + #word > maxChars then lines[#lines + 1] = cur cur = word
-            else cur = (#cur > 0) and (cur .. " " .. word) or word end
+          local fpath = tostring(rawget(o, "_fontPath") or "")
+          local weight = fpath:find("heavy") and 800 or (fpath:find("bold") and 700 or 500)
+          local family = fpath:find("Baloo") and "'Baloo Chettan 2'" or (rawget(o, "_fontFile") == "title" and "serif" or "sans-serif")
+          -- césure par mots (largeur estimée), couleurs des codes |c conservées par mot
+          local ws = words(tostring(text))
+          local maxW = ww > 0 and ww or 1e9
+          local lines, cur, curW = {}, {}, 0
+          for _, wd in ipairs(ws) do
+            local wl = R.textWidth(wd[1], size)
+            local add = (#cur > 0 and wd[3]) and size * 0.25 or 0
+            if #cur > 0 and wd[3] and curW + add + wl > maxW then
+              lines[#lines + 1] = cur cur, curW = {}, 0 add = 0
+            end
+            cur[#cur + 1] = { wd[1], wd[2], #cur > 0 and wd[3] }
+            curW = curW + add + wl
           end
           if #cur > 0 then lines[#lines + 1] = cur end
           local anchor, tx = "middle", x + w / 2
@@ -235,21 +356,38 @@ function R.svg(H, root, path, label)
             local p = pt and pt[1] or "CENTER"
             if p:find("LEFT") then anchor = "start" elseif p:find("RIGHT") then anchor = "end" end
           end
-          local lh = size * 1.15
+          local lh = size * 1.15 + (calls.SetSpacing and calls.SetSpacing[1] or 0)
           local ty
-          local top = (h > 0 and h < lh * #lines) and y or y
-          if h > 0 then ty = y + (h - lh * #lines) / 2 + size else ty = y - lh * (#lines - 1) / 2 + size * 0.35 end
+          if h > 0 then ty = y + (h - lh * #lines) / 2 + size * 0.8 else ty = y - lh * (#lines - 1) / 2 + size * 0.35 end
           local pt = rawget(o, "_points")[1]
           if pt and pt[1] and pt[1]:find("TOP") and h == 0 then ty = y + size end
+          local so = calls.SetShadowOffset
+          local shadow = so and ((so[1] or 0) ~= 0 or (so[2] or 0) ~= 0)
+          local base = col(tc)
+          local ttf = (rot and rot ~= 0) and string.format(' transform="rotate(%.2f %.1f %.1f)"', -rot * 180 / math.pi, x + w / 2, y + h / 2) or ""
           for li, line in ipairs(lines) do
-            out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-size="%.1f" fill="%s" fill-opacity="%.2f" text-anchor="%s">%s</text>',
-              tx, ty + (li - 1) * lh, rawget(o, "_fontFile") == "title" and "serif" or "sans-serif", size,
-              col(tc), a, anchor, esc(line))
+            local function spans()
+              local s = {}
+              for _, wd in ipairs(line) do
+                s[#s + 1] = string.format('<tspan%s>%s%s</tspan>', wd[2] and (' fill="' .. wd[2] .. '"') or "",
+                  wd[3] and " " or "", esc(wd[1]))
+              end
+              return table.concat(s)
+            end
+            local yy = ty + (li - 1) * lh
+            if shadow then
+              out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="#000" fill-opacity="%.2f" text-anchor="%s" xml:space="preserve"%s>%s</text>',
+                tx + 1, yy + 1, family, weight, size, 0.8 * a, anchor, ttf, esc(table.concat((function()
+                  local t = {} for k, wd in ipairs(line) do t[#t + 1] = (wd[3] and " " or "") .. wd[1] end return t end)())))
+            end
+            out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="%s" fill-opacity="%.2f" text-anchor="%s" xml:space="preserve"%s>%s</text>',
+              tx, yy, family, weight, size, base, a, anchor, ttf, spans())
           end
         end
       end
     end
   end
+  if #defs > 0 then out[2] = "<defs>" .. table.concat(defs, "\n") .. "</defs>\n" .. out[2] end
   if label then
     out[#out + 1] = string.format('<text x="6" y="%d" font-size="11" fill="#f0f">%s</text>', Hh - 4, esc(label))
   end

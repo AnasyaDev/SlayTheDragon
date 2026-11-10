@@ -46,6 +46,12 @@ Art.C = {
   nodeCombat = hex("#8a5f22"), nodeHalo = hex("#f0c75e"), nodeRing = hex("#b8860b"),
   nodeFuture = hex("#cdb783"), nodeFutureEdge = hex("#8a6a3a"),
   white = { 1, 1, 1 }, black = { 0, 0, 0 },
+  -- peau « Mechanized Magic » (docs/maquette/gen_combat_pack.py, gen_screens_pack.py)
+  slateDark = hex("#12161e"), text = hex("#f4f6fa"), textSoft = hex("#bec8d6"), textDim = hex("#8e98a8"),
+  inkDark = hex("#28221a"), goldText = hex("#ffd660"), goldInk = hex("#342208"), hpRed = hex("#d6262c"),
+  hpShine = hex("#ff8282"), ghostLight = hex("#ffeca9"), upGreen = hex("#7dff7d"), healGreen = hex("#78e682"),
+  badText = hex("#ff8278"), costText = hex("#ffffff"), cool = hex("#3c5a96"), barTrack = hex("#0c1016"),
+  rarityUncommon = hex("#43b24f"),
 }
 
 ---------------------------------------------------------------------------
@@ -141,46 +147,46 @@ Art.sounds = {
 ---------------------------------------------------------------------------
 
 Art.cards = {
-  smite                = { spell = 585,    icon = 135924 },  -- spell_holy_holysmite
-  inner_fire           = { spell = 588,    icon = 135926 },  -- spell_holy_innerfire
-  pw_shield            = { spell = 17,     icon = 135940 },  -- spell_holy_powerwordshield
-  sw_pain              = { spell = 589,    icon = 136207 },  -- spell_shadow_shadowwordpain
-  radiance             = { spell = 194509, icon = 1386546 }, -- spell_priest_power word
-  penance              = { spell = 47540,  icon = 237545 },  -- spell_holy_penance
-  pain_suppression     = { spell = 33206,  icon = 135936 },  -- spell_holy_painsupression
-  solace               = { spell = 129250, icon = 612968 },  -- ability_priest_flashoflight
-  angelic_feather      = { spell = 121536, icon = 642580 },  -- ability_priest_angelicfeather
-  luminous_barrier     = { spell = 271466, icon = 253400 },  -- spell_holy_powerwordbarrier
-  schism               = { spell = 214621, icon = 463285 },  -- spell_warlock_focusshadow
-  shadow_mend          = { spell = 186263, icon = 1386547 }, -- spell_priest_shadow mend
-  evangelism           = { spell = 246287, icon = 458968 },  -- ability_priest_evangelism
-  rapture              = { spell = 47536,  icon = 237548 },  -- spell_holy_rapture
-  mind_flay            = { spell = 15407,  icon = 136208 },  -- spell_shadow_siphonmana
-  mind_blast           = { spell = 8092,   icon = 136224 },  -- spell_shadow_unholyfrenzy
-  devouring_plague     = { spell = 2944,   icon = 252997 },  -- spell_shadow_devouringplague
-  shadowform           = { spell = 15473,  icon = 136200 },  -- spell_shadow_shadowform
-  silence              = { spell = 15487,  icon = 458230 },  -- ability_priest_silence
-  vampiric_touch       = { spell = 34914,  icon = 135978 },  -- spell_holy_stoicism
-  mind_sear            = { spell = 48045,  icon = 237565 },  -- spell_shadow_mindshear
-  sw_death             = { spell = 32379,  icon = 136149 },  -- spell_shadow_demonicfortitude
-  psychic_scream       = { spell = 8122,   icon = 136184 },  -- spell_shadow_psychicscream
-  void_eruption        = { spell = 228260, icon = 1386548 }, -- spell_priest_void blast
-  holy_fire            = { spell = 14914,  icon = 135972 },  -- spell_holy_searinglight
-  holy_nova            = { spell = 15237,  icon = 135922 },  -- spell_holy_holynova
-  chastise             = { spell = 88625,  icon = 135886 },  -- spell_holy_chastise
-  greater_heal         = { spell = 2060,   icon = 135913 },  -- spell_holy_greaterheal
-  spirit_of_redemption = { spell = 20711,  icon = 1445240 }, -- ability_priest_spiritoftheredeemer
-  renew                = { spell = 139,    icon = 135953 },  -- spell_holy_renew
-  halo                 = { spell = 120517, icon = 632352 },  -- ability_priest_halo
-  flash_heal           = { spell = 2061,   icon = 135907 },  -- spell_holy_flashheal
-  empyreal_blaze       = { spell = 372616, icon = 4667419 }, -- ability_priest_empyrealblaze
-  apotheosis           = { spell = 200183, icon = 1060983 }, -- ability_priest_ascension
+  smite                = { spell = 585,    icon = 135924, tga = "Spell_Holy_HolySmite" },  -- spell_holy_holysmite
+  inner_fire           = { spell = 588,    icon = 135926, tga = "Spell_Holy_InnerFire" },  -- spell_holy_innerfire
+  pw_shield            = { spell = 17,     icon = 135940, tga = "Spell_Holy_PowerWordShield" },  -- spell_holy_powerwordshield
+  sw_pain              = { spell = 589,    icon = 136207, tga = "Spell_Shadow_ShadowWordPain" },  -- spell_shadow_shadowwordpain
+  radiance             = { spell = 194509, icon = 1386546, tga = "Spell_Priest_Power Word" }, -- spell_priest_power word
+  penance              = { spell = 47540,  icon = 237545, tga = "Spell_Holy_Penance" },  -- spell_holy_penance
+  pain_suppression     = { spell = 33206,  icon = 135936, tga = "Spell_Holy_PainSupression" },  -- spell_holy_painsupression
+  solace               = { spell = 129250, icon = 612968, tga = "Ability_Priest_Flashoflight" },  -- ability_priest_flashoflight
+  angelic_feather      = { spell = 121536, icon = 642580, tga = "Ability_Priest_AngelicFeather" },  -- ability_priest_angelicfeather
+  luminous_barrier     = { spell = 271466, icon = 253400, tga = "Spell_Holy_PowerWordBarrier" },  -- spell_holy_powerwordbarrier
+  schism               = { spell = 214621, icon = 463285, tga = "spell_Warlock_Focusshadow" },  -- spell_warlock_focusshadow
+  shadow_mend          = { spell = 186263, icon = 1386547, tga = "Spell_Priest_Shadow Mend" }, -- spell_priest_shadow mend
+  evangelism           = { spell = 246287, icon = 458968, tga = "Ability_Priest_Evangelism" },  -- ability_priest_evangelism
+  rapture              = { spell = 47536,  icon = 237548, tga = "Spell_Holy_Rapture" },  -- spell_holy_rapture
+  mind_flay            = { spell = 15407,  icon = 136208, tga = "Spell_Shadow_SiphonMana" },  -- spell_shadow_siphonmana
+  mind_blast           = { spell = 8092,   icon = 136224, tga = "Spell_Shadow_UnholyFrenzy" },  -- spell_shadow_unholyfrenzy
+  devouring_plague     = { spell = 2944,   icon = 252997, tga = "Spell_Shadow_DevouringPlague" },  -- spell_shadow_devouringplague
+  shadowform           = { spell = 15473,  icon = 136200, tga = "Spell_Shadow_Shadowform" },  -- spell_shadow_shadowform
+  silence              = { spell = 15487,  icon = 458230, tga = "Ability_Priest_Silence" },  -- ability_priest_silence
+  vampiric_touch       = { spell = 34914,  icon = 135978, tga = "Spell_Holy_Stoicism" },  -- spell_holy_stoicism
+  mind_sear            = { spell = 48045,  icon = 237565, tga = "Spell_Shadow_MindShear" },  -- spell_shadow_mindshear
+  sw_death             = { spell = 32379,  icon = 136149, tga = "Spell_Shadow_DemonicFortitude" },  -- spell_shadow_demonicfortitude
+  psychic_scream       = { spell = 8122,   icon = 136184, tga = "Spell_Shadow_PsychicScream" },  -- spell_shadow_psychicscream
+  void_eruption        = { spell = 228260, icon = 1386548, tga = "Spell_Priest_Void Blast" }, -- spell_priest_void blast
+  holy_fire            = { spell = 14914,  icon = 135972, tga = "Spell_Holy_SearingLight" },  -- spell_holy_searinglight
+  holy_nova            = { spell = 15237,  icon = 135922, tga = "Spell_Holy_HolyNova" },  -- spell_holy_holynova
+  chastise             = { spell = 88625,  icon = 135886, tga = "Spell_Holy_Chastise" },  -- spell_holy_chastise
+  greater_heal         = { spell = 2060,   icon = 135913, tga = "Spell_Holy_GreaterHeal" },  -- spell_holy_greaterheal
+  spirit_of_redemption = { spell = 20711,  icon = 1445240, tga = "Ability_Priest_SpiritOfTheRedeemer" }, -- ability_priest_spiritoftheredeemer
+  renew                = { spell = 139,    icon = 135953, tga = "Spell_Holy_Renew" },  -- spell_holy_renew
+  halo                 = { spell = 120517, icon = 632352, tga = "Ability_Priest_Halo" },  -- ability_priest_halo
+  flash_heal           = { spell = 2061,   icon = 135907, tga = "Spell_Holy_FlashHeal" },  -- spell_holy_flashheal
+  empyreal_blaze       = { spell = 372616, icon = 4667419, tga = "Ability_Priest_EmpyrealBlaze" }, -- ability_priest_empyrealblaze
+  apotheosis           = { spell = 200183, icon = 1060983, tga = "Ability_Priest_Ascension" }, -- ability_priest_ascension
 }
 
 -- Repli par école quand une carte n'a pas encore d'entrée.
 Art.schools = {
-  holy   = { icon = 135920 }, -- spell_holy_holybolt
-  shadow = { icon = 136197 }, -- spell_shadow_shadowbolt
+  holy   = { icon = 135920, tga = "Spell_Holy_HolyBolt" }, -- spell_holy_holybolt
+  shadow = { icon = 136197, tga = "Spell_Shadow_ShadowBolt" }, -- spell_shadow_shadowbolt
 }
 
 -- Liseré de rareté (maquette : blanc, vert, bleu).
@@ -226,49 +232,49 @@ Art.enemyIcon = Art.QUESTION
 -- États (pastilles : couleur bonne/mauvaise ; icône pour les mini-affichages)
 ---------------------------------------------------------------------------
 Art.statuses = {
-  armor_broken = { icon = 132363 }, -- ability_warrior_sunder
-  demoralized  = { icon = 132366 }, -- ability_warrior_warcry
-  atonement    = { icon = 458720 }, -- ability_priest_atonement
-  pain         = { icon = 136207 }, -- spell_shadow_shadowwordpain
-  regen        = { icon = 135953 }, -- spell_holy_renew
-  stunned      = { icon = 135963 }, -- spell_holy_sealofmight
-  halved       = { icon = 135936 }, -- spell_holy_painsupression
-  force        = { icon = 132333 }, -- ability_warrior_battleshout
-  necrotic     = { icon = "Interface\\Icons\\spell_deathknight_necroticplague" },
+  armor_broken = { icon = 132363, tga = "Ability_Warrior_Sunder" }, -- ability_warrior_sunder
+  demoralized  = { icon = 132366, tga = "Ability_Warrior_WarCry" }, -- ability_warrior_warcry
+  atonement    = { icon = 458720, tga = "Ability_Priest_Atonement" }, -- ability_priest_atonement
+  pain         = { icon = 136207, tga = "Spell_Shadow_ShadowWordPain" }, -- spell_shadow_shadowwordpain
+  regen        = { icon = 135953, tga = "Spell_Holy_Renew" }, -- spell_holy_renew
+  stunned      = { icon = 135963, tga = "Spell_Holy_SealOfMight" }, -- spell_holy_sealofmight
+  halved       = { icon = 135936, tga = "Spell_Holy_PainSupression" }, -- spell_holy_painsupression
+  force        = { icon = 132333, tga = "Ability_Warrior_BattleShout" }, -- ability_warrior_battleshout
+  necrotic     = { icon = "Interface\\Icons\\spell_deathknight_necroticplague", tga = "Spell_Deathknight_Necroticplague" },
 }
 
 -- Affixes mythiques (chemins vérifiés par wow_icon_search, piste D).
-Art.keystone = { icon = "Interface\\Icons\\inv_relics_hourglass" }
+Art.keystone = { icon = "Interface\\Icons\\inv_relics_hourglass", tga = "INV_Relics_Hourglass" }
 Art.affixes = {
-  fortified  = { icon = "Interface\\Icons\\ability_toughness" },
-  tyrannical = { icon = "Interface\\Icons\\achievement_boss_archaedas" },
-  bolstering = { icon = 132333 },
-  necrotic   = { icon = "Interface\\Icons\\spell_deathknight_necroticplague" },
-  famine     = { icon = "Interface\\Icons\\inv_misc_food_15" },
+  fortified  = { icon = "Interface\\Icons\\ability_toughness", tga = "ability_toughness" },
+  tyrannical = { icon = "Interface\\Icons\\achievement_boss_archaedas", tga = "Achievement_Boss_Archaedas" },
+  bolstering = { icon = 132333, tga = "Ability_Warrior_BattleShout" }, -- ability_warrior_battleshout
+  necrotic   = { icon = "Interface\\Icons\\spell_deathknight_necroticplague", tga = "Spell_Deathknight_Necroticplague" },
+  famine     = { icon = "Interface\\Icons\\inv_misc_food_15", tga = "INV_Misc_Food_15" },
 }
 
 ---------------------------------------------------------------------------
 -- Bibelots et potions
 ---------------------------------------------------------------------------
 Art.relics = {
-  hearthstone      = { icon = 134414 },  -- inv_misc_rune_01
-  defias_purse     = { icon = 133639 },  -- inv_misc_bag_10
-  linen_bandage    = { icon = 133671 },  -- inv_misc_bandage_01
-  stormwind_tabard = { icon = 135026 },  -- inv_shirt_guildtabard_01
-  vancleef_bandana = { icon = 133694 },  -- inv_misc_bandana_03
-  faction_insignia = { icon = 133452 },  -- inv_jewelry_trinketpvp_01
-  sharpening_stone = { icon = 135248 },  -- inv_stone_sharpeningstone_01
-  focus_talisman   = { icon = "Interface\\Icons\\inv_jewelry_talisman_07" },
-  camp_kettle      = { icon = 133779 },  -- inv_misc_cauldron_fire
-  mana_ruby        = { icon = 134128 },  -- inv_misc_gem_ruby_01
+  hearthstone      = { icon = 134414, tga = "INV_MISC_RUNE_01" },  -- inv_misc_rune_01
+  defias_purse     = { icon = 133639, tga = "INV_Misc_Bag_10" },  -- inv_misc_bag_10
+  linen_bandage    = { icon = 133671, tga = "INV_Misc_Bandage_01" },  -- inv_misc_bandage_01
+  stormwind_tabard = { icon = 135026, tga = "INV_Shirt_GuildTabard_01" },  -- inv_shirt_guildtabard_01
+  vancleef_bandana = { icon = 133694, tga = "INV_Misc_Bandana_03" },  -- inv_misc_bandana_03
+  faction_insignia = { icon = 133452, tga = "INV_Jewelry_TrinketPVP_01" },  -- inv_jewelry_trinketpvp_01
+  sharpening_stone = { icon = 135248, tga = "INV_Stone_SharpeningStone_01" },  -- inv_stone_sharpeningstone_01
+  focus_talisman   = { icon = "Interface\\Icons\\inv_jewelry_talisman_07", tga = "INV_Jewelry_Talisman_07" },
+  camp_kettle      = { icon = 133779, tga = "INV_Misc_Cauldron_Fire" },  -- inv_misc_cauldron_fire
+  mana_ruby        = { icon = 134128, tga = "INV_Misc_Gem_Ruby_01" },  -- inv_misc_gem_ruby_01
 }
 Art.relicFallback = { icon = "Interface\\Icons\\inv_jewelry_talisman_07" }
 Art.potions = {
-  healing_potion    = { icon = 134831, color = hex("#b3402e") }, -- inv_potion_51
-  mana_potion       = { icon = 134856, color = hex("#3b82d6") }, -- inv_potion_76
-  shadow_protection = { icon = 134803, color = hex("#7b4bb3") }, -- inv_potion_23
-  liquid_fire       = { icon = 134805, color = hex("#e2863b") }, -- inv_potion_25
-  wisdom_elixir     = { icon = 134721, color = hex("#3fae4a") }, -- inv_potion_10
+  healing_potion    = { icon = 134831, color = hex("#b3402e"), tga = "INV_Potion_51" }, -- inv_potion_51
+  mana_potion       = { icon = 134856, color = hex("#3b82d6"), tga = "INV_Potion_76" }, -- inv_potion_76
+  shadow_protection = { icon = 134803, color = hex("#7b4bb3"), tga = "INV_Potion_23" }, -- inv_potion_23
+  liquid_fire       = { icon = 134805, color = hex("#e2863b"), tga = "INV_Potion_25" }, -- inv_potion_25
+  wisdom_elixir     = { icon = 134721, color = hex("#3fae4a"), tga = "INV_Potion_10" }, -- inv_potion_10
 }
 Art.potionFallback = { icon = 134831, color = hex("#b3402e") }
 Art.emptySlot = { icon = "Interface\\Buttons\\UI-EmptySlot" }
@@ -285,16 +291,16 @@ end
 -- Intentions (bulle au-dessus de l'ennemi : icône + chiffre, liseré de couleur)
 ---------------------------------------------------------------------------
 Art.intents = {
-  attack = { icon = 132223, color = "attack" },  -- ability_meleedamage
-  defend = { icon = 134952, color = "defend" },  -- inv_shield_06
-  cast   = { icon = 135812, color = "attack" },  -- spell_fire_flamebolt
-  watch  = { icon = 132219, color = "watch" },   -- ability_kick
-  debuff = { icon = 136138, color = "watch" },   -- spell_shadow_curseofmannoroth
-  buff   = { icon = 132333, color = "defend" },  -- ability_warrior_battleshout
-  heal   = { icon = 135929, color = "heal" },    -- spell_holy_lesserheal
-  summon = { icon = 136218, color = "watch" },   -- spell_shadow_summonimp
-  stunned = { icon = 135963, color = "defend" }, -- spell_holy_sealofmight
-  interrupted = { icon = 132219, color = "defend" },
+  attack = { icon = 132223, color = "attack", tga = "Ability_MeleeDamage" },  -- ability_meleedamage
+  defend = { icon = 134950, color = "defend", tga = "INV_Shield_04" },  -- inv_shield_04 (planche)
+  cast   = { icon = 135812, color = "attack", tga = "Spell_Fire_FlameBolt" },  -- spell_fire_flamebolt
+  watch  = { icon = 136155, color = "watch", tga = "Spell_Shadow_EvilEye" },   -- spell_shadow_evileye (planche)
+  debuff = { icon = 136138, color = "watch", tga = "Spell_Shadow_CurseOfMannoroth" },   -- spell_shadow_curseofmannoroth
+  buff   = { icon = 132333, color = "defend", tga = "Ability_Warrior_BattleShout" },  -- ability_warrior_battleshout
+  heal   = { icon = 135929, color = "heal", tga = "Spell_Holy_LesserHeal" },    -- spell_holy_lesserheal
+  summon = { icon = 136218, color = "watch", tga = "Spell_Shadow_SummonImp" },   -- spell_shadow_summonimp
+  stunned = { icon = 135963, color = "defend", tga = "Spell_Holy_SealOfMight" }, -- spell_holy_sealofmight
+  interrupted = { icon = 132219, color = "defend", tga = "Ability_Kick" }, -- ability_kick
 }
 Art.intentName = {
   attack = "Attaque", defend = "Défense", cast = "Incante", watch = "Guette",
@@ -305,24 +311,58 @@ Art.intentName = {
 -- Interface
 ---------------------------------------------------------------------------
 Art.ui = {
-  minimap   = { icon = 133741 },  -- inv_misc_book_09
-  mana      = { icon = 132841 },  -- inv_elemental_mote_mana
-  demence   = { icon = 136223 },  -- spell_shadow_twilight
-  gold      = { icon = 133784 },  -- inv_misc_coin_01
-  bedroll   = { icon = 5545560 }, -- inv_misc_nightelfbedroll
-  grimoire  = { icon = 133741 },  -- inv_misc_book_09
-  chest     = { icon = 1542843 }, -- inv_misc_treasurechest01a
-  remove    = { icon = 135805 },  -- spell_fire_fire
+  minimap   = { icon = 133741, tga = "INV_Misc_Book_09" },  -- inv_misc_book_09
+  mana      = { icon = 132841, tga = "INV_Elemental_Mote_Mana" },  -- inv_elemental_mote_mana
+  demence   = { icon = 136223, tga = "Spell_Shadow_Twilight" },  -- spell_shadow_twilight
+  gold      = { icon = 133784, tga = "INV_Misc_Coin_01" },  -- inv_misc_coin_01
+  bedroll   = { icon = 5545560, tga = "INV_MISC_NightelfBedroll" }, -- inv_misc_nightelfbedroll
+  grimoire  = { icon = 133741, tga = "INV_Misc_Book_09" },  -- inv_misc_book_09
+  chest     = { icon = 1542843, tga = "inv_misc_treasurechest01a" }, -- inv_misc_treasurechest01a
+  remove    = { icon = 135813, tga = "Spell_Fire_FlameShock" },  -- spell_fire_flameshock (planche)
+  bag       = { icon = 133639, tga = "INV_Misc_Bag_10" },  -- inv_misc_bag_10 (bourse du butin)
+  -- Étapes du parcours (icônes des planches docs/maquette/ecran_parcours.jpg)
   map = {
-    combat   = { icon = 132147 },  -- ability_dualwield
-    elite    = { icon = 132352 },  -- ability_warrior_rampage
-    boss     = { icon = 134153 },  -- inv_misc_head_dragon_01
-    campfire = { icon = 135805 },  -- spell_fire_fire
-    merchant = { icon = 133639 },  -- inv_misc_bag_10
-    shop     = { icon = 133639 },
-    event    = { icon = 134328 },  -- inv_misc_note_02
-    chest    = { icon = 132595 },  -- inv_box_02
+    combat   = { icon = 132223, tga = "Ability_MeleeDamage" },  -- ability_meleedamage
+    elite    = { icon = 133730, tga = "INV_Misc_Bone_HumanSkull_01" },  -- inv_misc_bone_humanskull_01
+    boss     = { icon = 236409, tga = "Achievement_Boss_EdwinVancleef" },  -- achievement_boss_edwinvancleef
+    campfire = { icon = 7808148, tga = "INV_Camelot_Camping_WelcomingCampfire" }, -- inv_camelot_camping_welcomingcampfire
+    merchant = { icon = 133639, tga = "INV_Misc_Bag_10" },  -- inv_misc_bag_10
+    shop     = { icon = 133639, tga = "INV_Misc_Bag_10" },
+    event    = { icon = 134400, tga = "INV_Misc_QuestionMark" },  -- inv_misc_questionmark
+    chest    = { icon = 132594, tga = "INV_Box_01" },  -- inv_box_01
   },
+}
+
+---------------------------------------------------------------------------
+-- Peau (pack Mechanized Magic) : couleur du corps des cartes, gemmes, teintes des liserés
+---------------------------------------------------------------------------
+
+-- Corps de carte : violet = Ombre, bleu = protections (Absorption d'abord), or = cartes de départ,
+-- ivoire = Sacré (le reste). Art.cards[id].body force une couleur.
+function Art.cardBody(id, d)
+  local e = Art.cards[id]
+  if e and e.body then return e.body end
+  if d.school == "shadow" then return "violet" end
+  local first = d.effects and d.effects[1]
+  if first and (first[1] == "absorb" or (first[1] == "apply" and first[2] == "halved")) then return "blue" end
+  if d.path == "start" then return "gold" end
+  return "ivory"
+end
+
+-- Liseré d'une case de bibelot selon sa rareté.
+Art.rarityRim = {
+  basic = { 1, 1, 1 }, common = { 1, 1, 1 }, uncommon = { 0.55, 1, 0.55 }, rare = { 0.6, 0.8, 1 },
+  epic = { 0.85, 0.6, 1 }, boss = { 1, 0.7, 0.35 },
+}
+
+-- Gemme de rareté (aucune pour une carte de base ou commune).
+Art.gems = { uncommon = "uncommon", rare = "rare", epic = "epic", boss = "legendary", legendary = "legendary" }
+
+-- Teintes multiplicatives du liseré d'argent (couleur de sommet) et de l'ardoise.
+Art.rim = {
+  silver = { 1, 1, 1 }, gold = { 1, 0.86, 0.42 }, red = { 1, 0.55, 0.5 }, attack = { 1, 0.55, 0.5 },
+  defend = { 0.7, 0.86, 1 }, watch = { 0.9, 0.7, 1 }, heal = { 0.62, 1, 0.62 }, dim = { 0.6, 0.63, 0.68 },
+  violet = { 0.85, 0.6, 1 }, green = { 0.55, 1, 0.55 },
 }
 
 -- Mots-clés (infobulles des cartes) ------------------------------------------

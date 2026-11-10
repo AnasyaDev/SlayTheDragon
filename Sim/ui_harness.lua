@@ -82,7 +82,7 @@ SetAlpha SetNormalTexture SetPushedTexture SetHighlightTexture SetCheckedTexture
 SetMaxLines SetFading SetTimeVisible EnableMouseWheel ScrollUp ScrollDown SetThickness SetStartPoint
 SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale SetPortraitZoom
 SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
-SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren
+SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -228,6 +228,7 @@ function Frame:SetFont(f, size, flags)
   if type(size) ~= "number" or size <= 0 then error("SetFont : taille invalide") end
   self._fontSize = size
   self._fontFile = type(f) == "string" and f:upper():find("MORPHEUS") and "title" or "body"
+  self._fontPath = f
 end
 
 -- Textures
@@ -773,6 +774,11 @@ local SEED = tonumber(arg and arg[1]) or 1 -- graine 1 : victoire, donc clé +1 
 -- Instantanés SVG facultatifs de chaque écran : lua5.1 Sim/ui_harness.lua 1 build/snap
 local SNAP = arg and arg[2]
 local Render = SNAP and dofile(root .. "/Sim/ui_render.lua")
+if SNAP then
+  -- aperçus PNG des textures de Media (tools/build_media.py) à côté des SVG : rsvg-convert ne lit
+  -- que les images du dossier du SVG et de ses sous-dossiers
+  os.execute("mkdir -p '" .. SNAP .. "/media' && cp -r '" .. root .. "/build/media_png/.' '" .. SNAP .. "/media/' 2>/dev/null")
+end
 local snapped = {}
 local function snap(name, force)
   if not SNAP or (snapped[name] and not force) then return end
@@ -1009,7 +1015,7 @@ H.key("ENTER")
 exp = EXP()
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
-  check("clé mythique dans le bandeau", UI().keystone._shown and UI().keystone.count._text == "Clé +" .. keyMax)
+  check("clé mythique dans le bandeau (hexagone violet « +N »)", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
   tt = H.hover(UI().keystone)
   check("infobulle de la clé : affixes", table.concat(tt, " "):find("Fortifié", 1, true), table.concat(tt, " | "))
   check("affixes dans le texte de la carte", (UI().step.text or ""):find("Fortifié", 1, true))
@@ -1082,8 +1088,17 @@ ns = H.ns
 check("écran marchand", currentKind() == "merchant", currentKind())
 snap("marchand")
 local s = UI().current
-check("cinq cartes à prix", #s.cardOptions == 5 and s.cards[5]._shown and s.cards[1].tag._shown
-  and (s.cards[1].tag.text._text or ""):find("po", 1, true))
+check("cinq cartes à prix (pastille : pièce + nombre)", #s.cardOptions == 5 and s.cards[5]._shown and s.cards[1].tag._shown
+  and s.cards[1].tag.text._text == tostring(s.cardOptions[1].price) and s.cards[1].tag.icon._shown)
+do
+  local poor
+  for i, o in ipairs(s.cardOptions) do if o.disabled and not o.sold then poor = i end end
+  if poor then
+    local tc = s.cards[poor].tag.text._calls.SetTextColor
+    check("carte trop chère : prix en rouge", tc and math.abs(tc[1] - H.ns.Art.C.badText[1]) < 1e-9
+      and math.abs(tc[2] - H.ns.Art.C.badText[2]) < 1e-9)
+  end
+end
 local relicOpt, potionOpt
 for _, o in ipairs(UI().step.options) do
   if o.item and o.item.kind == "relic" and not relicOpt then relicOpt = o end
@@ -1267,8 +1282,10 @@ H.boot("n'importe quoi")
 check("base illisible remplacée", type(_G.SlayTheDragonDB) == "table" and _G.SlayTheDragonDB.version == H.ns.Save.VERSION)
 
 print("U15 art manquant : repli et rapport /slay art")
+-- icône améliorée de Media, icône du sort, FileDataID : tout manque -> point d'interrogation
 H.badSpells = { [585] = true }
 H.badFiles = { [135924] = true }
+H.badPaths = { ["Interface\\AddOns\\SlayTheDragon\\Media\\Icons\\spell_holy_holysmite.tga"] = true }
 H.badCreatures = { [639] = true, [117] = true }
 freshRun(SEED, "combat")
 H.advance(2)
@@ -1482,7 +1499,7 @@ do
     check("voisine écartée (visuel seulement)", Wd.animValue(v.cards[2], "dx") > 0)
   end
   check("carte survolée devant les autres (visuel et médaillon compris)", card._level > v.cards[n]._level
-    and card.face._level > v.cards[n].face._level and card.medal._level > v.cards[n].medal._level)
+    and card.face._level > v.cards[n].face._level)
   check("zone de survol prolongée vers le haut", card._calls.SetHitRectInsets
     and card._calls.SetHitRectInsets[3] < 0)
   run(card, "OnLeave")
@@ -1554,7 +1571,7 @@ do
   local upShown
   for _, cd in ipairs(Dv.cards) do if cd._shown and cd.cardUp then upShown = cd end end
   check("carte améliorée : nom en vert", upShown and upShown.name._calls.SetTextColor
-    and math.abs(upShown.name._calls.SetTextColor[2] - H.ns.Art.C.green[2]) < 1e-9)
+    and math.abs(upShown.name._calls.SetTextColor[2] - H.ns.Art.C.upGreen[2]) < 1e-9)
   check("plus de cartes que de places : défilement possible", Dv:MaxOffset() > 0, Dv:MaxOffset())
   run(Dv.panel, "OnMouseWheel", -1)
   check("molette : une rangée plus bas", Dv.offset == 1)
@@ -1633,6 +1650,119 @@ do
   check("panneau ouvert en combat : la touche 1 ne joue rien", #c.hand == hand and Dv:IsShown())
   H.key("ESCAPE")
   check("Échap : panneau fermé, combat intact", not Dv:IsShown() and currentKind() == "combat")
+end
+
+print("U20 peau : SkinData cohérent avec Media/, carte composée, repli d'icône")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local Skin = H.ns.Skin
+  local W = H.ns.Widgets
+  local ROOT = "Interface\\AddOns\\SlayTheDragon\\Media\\"
+  check("racine des textures de l'addon", Skin.root == ROOT, Skin.root)
+  local function disk(rel) return root .. "/Media/" .. rel:gsub("\\", "/") end
+  local function u16(s, i) return s:byte(i) + 256 * s:byte(i + 1) end
+  local function pow2(n) return n > 0 and math.floor(math.log(n) / math.log(2) + 0.5) == math.log(n) / math.log(2) end
+  -- chaque texture : fichier présent, TGA 32 bits non compressé (origine en bas, 8 bits d'alpha),
+  -- dimensions en puissances de deux égales à celles de SkinData, zone utile et coordonnées cohérentes
+  local bad, n = {}, 0
+  for name, e in pairs(Skin.tex) do
+    n = n + 1
+    local f = io.open(disk(e.file), "rb")
+    local hdr = f and f:read(18)
+    local size = f and f:seek("end")
+    if f then f:close() end
+    local ok = hdr and #hdr == 18 and hdr:byte(3) == 2 and hdr:byte(17) == 32 and hdr:byte(18) == 8
+      and u16(hdr, 13) == e.w and u16(hdr, 15) == e.h and size == 18 + e.w * e.h * 4
+      and pow2(e.w) and pow2(e.h) and e.cw <= e.w and e.ch <= e.h
+      and math.abs(e.tc[2] - e.cw / e.w) < 1e-4 and math.abs(e.tc[4] - e.ch / e.h) < 1e-4
+    if not ok then bad[#bad + 1] = name end
+  end
+  table.sort(bad)
+  check(n .. " textures de SkinData : fichiers TGA présents et conformes", #bad == 0, table.concat(bad, ", "))
+  bad = {}
+  for _, need in ipairs({ "card_body_ivory", "card_body_violet", "card_body_blue", "card_body_gold", "card_panel",
+    "card_ribbon", "card_ribbon_flat", "card_cost", "card_plate", "medal_ring", "medal_mask", "medal_glass",
+    "gem_uncommon", "gem_rare", "gem_epic", "gem_legendary", "hex_red", "hex_green", "hex_blue", "hex_steel",
+    "hex_violet", "hex_empty", "card_back", "tile_slate", "tile_ivory", "nine_slate", "nine_rim", "nine_ivory",
+    "pill_slate", "pill_rim", "button_gold" }) do
+    if not Skin.tex[need] then bad[#bad + 1] = need end
+  end
+  check("pièces attendues présentes (corps, ruban, coût, médaillon, gemmes, hexagones, ardoise, ivoire, liserés)",
+    #bad == 0, table.concat(bad, ", "))
+  local missingIcons, ni = {}, 0
+  for key, rel in pairs(Skin.icons) do
+    ni = ni + 1
+    local f = io.open(disk(rel), "rb")
+    if f then f:close() else missingIcons[#missingIcons + 1] = key end
+  end
+  check(ni .. " icônes de SkinData présentes dans Media/Icons", ni > 0 and #missingIcons == 0, table.concat(missingIcons, ", "))
+  -- icônes réellement utilisées : chaque nom `tga` de UI/Art.lua est copié (ou signalé par le script)
+  local used, absent = 0, {}
+  local art = assert(io.open(root .. "/UI/Art.lua")):read("*a")
+  for name in art:gmatch('tga%s*=%s*"([^"]+)"') do
+    used = used + 1
+    if not Skin.icons[name:lower()] then absent[#absent + 1] = name end
+  end
+  check("icônes nommées dans Art.lua toutes copiées (" .. used .. ")", #absent == 0, table.concat(absent, ", "))
+  for kind, rel in pairs(Skin.fonts) do
+    local f = io.open(disk(rel), "rb")
+    check("police " .. kind .. " présente", f ~= nil, rel)
+    if f then f:close() end
+  end
+  -- carte composée
+  local holder = UI().content
+  local card = W.card(holder)
+  local function tex(t) return t._texture end
+  card:SetCard("penance", false, { cost = 2, playable = true })
+  check("carte : corps ivoire (Sacré), ruban, coût, panneau, médaillon",
+    tex(card.bg) == ROOT .. Skin.tex.card_body_ivory.file and tex(card.panel) == ROOT .. Skin.tex.card_panel.file
+    and tex(card.ring) == ROOT .. Skin.tex.medal_ring.file and card.cost._text == "2" and card.name._text == "Pénitence"
+    and (tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file or tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon_flat.file))
+  check("carte : icône améliorée de Media, masquée par l'ouverture du médaillon",
+    tex(card.icon) == ROOT .. Skin.icons.spell_holy_penance and card.icon._calls.AddMaskTexture ~= nil)
+  check("carte peu commune : gemme triangle verte", card.gem._shown and tex(card.gem) == ROOT .. Skin.tex.gem_uncommon.file)
+  check("texte centré dans le panneau, chiffres en évidence", (card.body._text or ""):find("|cffffffff", 1, true)
+    and card.body._calls.SetJustifyH[1] == "CENTER")
+  local angle = card.name._calls.SetRotation and card.name._calls.SetRotation[1]
+  check("nom incliné comme le ruban (rotation du texte)", angle and math.abs(angle - Skin.card.name.angle) < 1e-9, angle)
+  card:SetCard("mind_blast", false, { cost = 1, playable = true })
+  check("Ombre : corps violet ; mot-clé dans la plaque du bas", tex(card.bg) == ROOT .. Skin.tex.card_body_violet.file
+    and card.plate._shown and (card.plateText._text or ""):find("Recharge", 1, true) and not card.gem._shown)
+  card:SetCard("inner_fire", false, { cost = 1, playable = true })
+  check("protection : corps bleu ; carte de base sans gemme ni plaque", tex(card.bg) == ROOT .. Skin.tex.card_body_blue.file
+    and not card.gem._shown and not card.plate._shown)
+  card:SetCard("smite", false, { cost = 1, playable = true })
+  check("départ : corps doré", tex(card.bg) == ROOT .. Skin.tex.card_body_gold.file)
+  card:SetCard("smite", false, { cost = 3, playable = false, reason = "Pas assez de mana." })
+  check("injouable : corps grisé, raison dans une plaque rouge", card.bg._calls.SetDesaturated[1] == true
+    and card.reasonPlate and card.reasonPlate._shown and card.reasonPlate.text._text == "Pas assez de mana.")
+  card:SetCard("smite", true, { cost = 1, playable = true })
+  check("améliorée : nom vert, chiffre changé en vert", card.name._calls.SetTextColor[2] == H.ns.Art.C.upGreen[2]
+    and (card.body._text or ""):find("|cff7dff7d9|r", 1, true), card.body._text)
+  check("carte jouable : plus de plaque rouge", not card.reasonPlate._shown)
+  H.slash("ruban")
+  card:SetCard("smite", false, {})
+  check("/slay ruban : ruban redressé, nom horizontal", tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon_flat.file
+    and card.name._calls.SetRotation[1] == 0)
+  H.slash("ruban")
+  card:SetCard("smite", false, {})
+  check("/slay ruban à nouveau : ruban incliné", tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file)
+  -- repli : icône améliorée absente de Media -> icône du sort du jeu
+  local saved = Skin.icons.spell_holy_holysmite
+  Skin.icons.spell_holy_holysmite = nil
+  card:SetCard("smite", false, {})
+  check("repli : sans fichier dans Media, icône du sort du jeu", tex(card.icon) == 100000 + 585, tex(card.icon))
+  Skin.icons.spell_holy_holysmite = saved
+  card:Hide()
+  -- jeton d'état et bulle d'intention : médaillon et liseré teinté
+  local v = V()
+  local slot
+  for _, s in pairs(v.slotOf) do slot = s end
+  check("bulle d'intention : pilule d'ardoise au liseré teinté", slot and slot.intent.plaque and slot.intent._shown
+    and (slot.intent.text._text or "") ~= "")
+  check("mana : hexagone bleu et un point par mana", v.mana.text._text == tostring(C().combat().player.mana)
+    and v.mana.pips[1]._shown)
 end
 
 print("U16 méthodes d'API inconnues appelées")

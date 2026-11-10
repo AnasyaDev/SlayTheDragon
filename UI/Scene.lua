@@ -193,34 +193,55 @@ function S.build(parent)
   local art = decor:CreateTexture(nil, "BORDER", nil, 0)
   art:SetAllPoints()
   S.art = art
-  -- voile (assombrir pour les écrans de bilan), fondu vers le plateau
+  -- voile froid léger (planches), voile d'assombrissement (bilan), fondu vers le plateau
+  local cool = W.rect(decor, "BORDER", 1, C.cool, 0.15)
+  cool:SetAllPoints()
   local veil = W.rect(decor, "BORDER", 2, C.black, 0)
   veil:SetAllPoints()
   S.veil = veil
   local fade = decor:CreateTexture(nil, "BORDER", nil, 3)
-  W.gradient(fade, { 0, 0, 0, 0 }, { 0.1, 0.06, 0.03, 0.45 })
+  W.gradient(fade, { 0, 0, 0, 0 }, { 0.05, 0.06, 0.09, 0.4 })
   at(fade, decor, 0, S.DECOR_H - 50, S.W, 50)
 
-  -- Plateau de bois
+  -- Plateau d'ardoise (matière carrelée du pack), filets sombre / argent / sombre, ombre portée
   local board = CreateFrame("Frame", nil, parent)
   at(board, parent, 0, S.BOARD_Y, S.W, S.BOARD_H)
   board:SetFrameLevel(parent:GetFrameLevel() + 1)
-  local bbg = W.rect(board, "BACKGROUND", 0, C.board)
-  bbg:SetAllPoints()
-  local grain = board:CreateTexture(nil, "BACKGROUND", nil, 1)
-  grain:SetTexture(Art.tex.wood)
-  grain:SetAllPoints()
-  grain:SetVertexColor(0.55, 0.38, 0.24)
-  grain:SetAlpha(0.35)
-  S.boardGrain = grain
-  local edge = W.rect(board, "BORDER", 0, C.boardEdge)
-  at(edge, board, 0, 0, S.W, 4)
   S.board = board
+  S.boardTile = S.slate(board, "BACKGROUND", 0, S.W, S.BOARD_H, 0.95)
+  S.boardTile:SetAllPoints()
+  S.rule(board, 0)
+  local shade = board:CreateTexture(nil, "BORDER", nil, 0)
+  W.gradient(shade, { 0, 0, 0, 0.47 }, { 0, 0, 0, 0 })
+  at(shade, board, 0, 6, S.W, 26)
 
   -- Fond plein (écrans sans décor : carte de parcours)
-  local plain = W.rect(parent, "BACKGROUND", -8, C.frame)
+  local plain = W.rect(parent, "BACKGROUND", -8, C.slateDark)
   plain:SetAllPoints()
   S.scene = nil
+end
+
+-- Ardoise carrelée (taille fixe w × h) ; bright = clarté (1 = ardoise des plaques).
+function S.slate(parent, layer, sub, w, h, bright)
+  local t = parent:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0)
+  local T = W.Skin.slateTile
+  t:SetTexture(W.skinPath("tile_slate"), "REPEAT", "REPEAT")
+  t:SetTexCoord(0, w / T, 0, h / T)
+  local k = math.min(1, W.Skin.slateBase * (bright or 1))
+  t:SetVertexColor(k, k, k, 1)
+  return t
+end
+
+-- Filet horizontal (sombre, argent, sombre) posé à y unités sous le haut du cadre.
+function S.rule(parent, y)
+  local yy = y
+  for _, p in ipairs({ { 2.5, C.slateDark }, { 2, Art.hex("#ced6e2") }, { 1.5, C.slateDark } }) do
+    local r = W.rect(parent, "BORDER", 1, p[2])
+    r:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yy)
+    r:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -yy)
+    r:SetHeight(p[1])
+    yy = yy + p[1]
+  end
 end
 
 ---------------------------------------------------------------------------
