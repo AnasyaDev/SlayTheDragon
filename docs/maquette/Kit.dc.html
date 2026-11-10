@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Éléments — design précis</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Alegreya+Sans:wght@400;500;700;800&display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 1040px; height: 620px; position: relative; overflow: hidden; background: #1c130d; border-radius: 10px">
+<svg role="img" aria-label="Éléments — design précis" viewBox="0 0 1040 620" style="position: absolute; left: 0; top: 0; width: 1040px; height: 620px">
+
+<defs>
+<clipPath id="win"><rect x="1.5" y="1.5" width="1037" height="617" rx="9"/></clipPath>
+<filter id="grainWood" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.008 0.55" numOctaves="3" seed="7"/><feColorMatrix values="0 0 0 0 0.07  0 0 0 0 0.04  0 0 0 0 0.02  0 0 0 -1.5 1.05"/></filter>
+<filter id="grainPaper" x="0" y="0" width="100%" height="100%"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="3"/><feColorMatrix values="0 0 0 0 0.42  0 0 0 0 0.29  0 0 0 0 0.12  0 0 0 -0.9 0.5"/></filter>
+<filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#0d0805" flood-opacity="0.6"/></filter>
+<filter id="shadowSm" x="-30%" y="-30%" width="160%" height="170%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#0d0805" flood-opacity="0.65"/></filter>
+<filter id="glow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="0" stdDeviation="6" flood-color="#ffd76a" flood-opacity="0.95"/></filter>
+<filter id="txt" x="-20%" y="-30%" width="140%" height="170%"><feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#0d0805" flood-opacity="0.9"/></filter>
+<filter id="grey"><feColorMatrix type="saturate" values="0.15"/><feComponentTransfer><feFuncR type="linear" slope="0.72"/><feFuncG type="linear" slope="0.72"/><feFuncB type="linear" slope="0.72"/></feComponentTransfer></filter>
+<linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6e2a2"/><stop offset="0.45" stop-color="#eec873"/><stop offset="1" stop-color="#d9a44c"/></linearGradient>
+<radialGradient id="sun" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#fff6d2"/><stop offset="0.35" stop-color="#fbe9ae" stop-opacity="0.9"/><stop offset="1" stop-color="#fbe9ae" stop-opacity="0"/></radialGradient>
+<linearGradient id="vign" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c130d" stop-opacity="0.35"/><stop offset="0.25" stop-color="#1c130d" stop-opacity="0"/><stop offset="0.8" stop-color="#1c130d" stop-opacity="0"/><stop offset="1" stop-color="#1c130d" stop-opacity="0.55"/></linearGradient>
+<linearGradient id="bar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b281b"/><stop offset="1" stop-color="#21150e"/></linearGradient>
+<linearGradient id="table" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#523420"/><stop offset="1" stop-color="#2c1b11"/></linearGradient>
+<linearGradient id="lip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a87a44"/><stop offset="0.5" stop-color="#7a5229"/><stop offset="1" stop-color="#4a2f18"/></linearGradient>
+<linearGradient id="lipShade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d0805" stop-opacity="0.6"/><stop offset="1" stop-color="#0d0805" stop-opacity="0"/></linearGradient>
+<linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff3c4"/><stop offset="0.45" stop-color="#f0c75e"/><stop offset="1" stop-color="#9c6e22"/></linearGradient>
+<linearGradient id="goldFlat" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="0.5" stop-color="#eebd4e"/><stop offset="1" stop-color="#c08c2c"/></linearGradient>
+<linearGradient id="goldHot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff0b8"/><stop offset="0.5" stop-color="#ffd76a"/><stop offset="1" stop-color="#d9a23a"/></linearGradient>
+<linearGradient id="plaque" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#35241a"/><stop offset="1" stop-color="#1e140d"/></linearGradient>
+<linearGradient id="parch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf0d0"/><stop offset="0.6" stop-color="#f1dfb3"/><stop offset="1" stop-color="#dfc893"/></linearGradient>
+<linearGradient id="ribbon" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a3a22"/><stop offset="1" stop-color="#3a2416"/></linearGradient>
+<linearGradient id="hp" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f08a6e"/><stop offset="0.45" stop-color="#c8402c"/><stop offset="1" stop-color="#7c2015"/></linearGradient>
+<linearGradient id="trough" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f0906"/><stop offset="1" stop-color="#2a1b12"/></linearGradient>
+<linearGradient id="castFill" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c08c2c"/><stop offset="1" stop-color="#ffe08a"/></linearGradient>
+<radialGradient id="mana" cx="0.36" cy="0.3" r="0.8"><stop offset="0" stop-color="#bfe2ff"/><stop offset="0.35" stop-color="#3f86dc"/><stop offset="1" stop-color="#12306a"/></radialGradient>
+<radialGradient id="manaOff" cx="0.36" cy="0.3" r="0.8"><stop offset="0" stop-color="#f0b3a6"/><stop offset="0.4" stop-color="#a23a2a"/><stop offset="1" stop-color="#4a140c"/></radialGradient>
+<radialGradient id="void" cx="0.36" cy="0.3" r="0.8"><stop offset="0" stop-color="#e6c8ff"/><stop offset="0.4" stop-color="#8a50c8"/><stop offset="1" stop-color="#2e1552"/></radialGradient>
+<radialGradient id="mHoly" cx="0.5" cy="0.4" r="0.7"><stop offset="0" stop-color="#fff2bd"/><stop offset="0.55" stop-color="#e7b740"/><stop offset="1" stop-color="#8f5f17"/></radialGradient>
+<radialGradient id="mShadow" cx="0.5" cy="0.4" r="0.7"><stop offset="0" stop-color="#c9a2f0"/><stop offset="0.55" stop-color="#6d3fa8"/><stop offset="1" stop-color="#27123f"/></radialGradient>
+<radialGradient id="mWard" cx="0.5" cy="0.4" r="0.7"><stop offset="0" stop-color="#dff0ff"/><stop offset="0.55" stop-color="#6aa8dc"/><stop offset="1" stop-color="#1f4a78"/></radialGradient>
+<linearGradient id="back" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3c5f8a"/><stop offset="1" stop-color="#1a2c47"/></linearGradient>
+<linearGradient id="slot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1a110b"/><stop offset="1" stop-color="#3a281a"/></linearGradient>
+<linearGradient id="gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff" stop-opacity="0.45"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></linearGradient>
+
+<!-- pictogrammes des médaillons (boîte 48, centrés) -->
+<symbol id="gSun" viewBox="0 0 48 48"><circle cx="24" cy="24" r="8" fill="#fffbe6"/><path d="M24 3v9M24 36v9M3 24h9M36 24h9M9 9l6.5 6.5M32.5 32.5L39 39M39 9l-6.5 6.5M15.5 32.5L9 39" stroke="#fffbe6" stroke-width="3.4" stroke-linecap="round"/></symbol>
+<symbol id="gStars" viewBox="0 0 48 48"><path d="M24 4l3.6 9.4L37 17l-9.4 3.6L24 30l-3.6-9.4L11 17l9.4-3.6zM11 28l2.2 5.8L19 36l-5.8 2.2L11 44l-2.2-5.8L3 36l5.8-2.2zM37 28l2.2 5.8L45 36l-5.8 2.2L37 44l-2.2-5.8L29 36l5.8-2.2z" fill="#fffbe6"/></symbol>
+<symbol id="gMind" viewBox="0 0 48 48"><path d="M4 24s8-13 20-13 20 13 20 13-8 13-20 13S4 24 4 24z" fill="none" stroke="#f3e1ff" stroke-width="3.2"/><circle cx="24" cy="24" r="7" fill="#f3e1ff"/><circle cx="24" cy="24" r="3" fill="#27123f"/></symbol>
+<symbol id="gFlame" viewBox="0 0 48 48"><path d="M24 4c3 9 12 12 12 23a12 12 0 0 1-24 0c0-6 4-8 5-13 3 2 4 5 4 8 3-4 4-10 3-18z" fill="#f4faff"/></symbol>
+<symbol id="gWings" viewBox="0 0 48 48"><circle cx="24" cy="13" r="5" fill="#fffbe6"/><path d="M24 19v22M21 22C12 14 6 16 3 22c5 0 7 3 9 7 3-1 6-1 9 1zM27 22c9-8 15-6 18 0-5 0-7 3-9 7-3-1-6-1-9 1z" fill="#fffbe6" stroke="#fffbe6" stroke-width="2.4" stroke-linejoin="round"/></symbol>
+<symbol id="gNova" viewBox="0 0 48 48"><circle cx="24" cy="24" r="6" fill="#fffbe6"/><circle cx="24" cy="24" r="13" fill="none" stroke="#fffbe6" stroke-width="3"/><circle cx="24" cy="24" r="20" fill="none" stroke="#fffbe6" stroke-width="2" stroke-dasharray="4 5"/></symbol>
+
+<!-- châssis commun d'une carte 124 × 176 ; la couleur de rareté passe par « color » -->
+<symbol id="card" viewBox="0 0 124 176" overflow="visible">
+<rect x="0.75" y="0.75" width="122.5" height="174.5" rx="9" fill="#2b1b11" stroke="#120b07" stroke-width="1.5"/>
+<rect x="3.5" y="3.5" width="117" height="169" rx="7" fill="none" stroke="currentColor" stroke-width="2.6"/>
+<rect x="6.5" y="6.5" width="111" height="163" rx="5" fill="url(#parch)"/>
+<rect x="6.5" y="6.5" width="111" height="163" rx="5" filter="url(#grainPaper)" opacity="0.5"/>
+<rect x="6.5" y="6.5" width="111" height="163" rx="5" fill="none" stroke="#8a6a3a" stroke-width="1"/>
+<path d="M10 14 H114 V30 Q62 37 10 30Z" fill="url(#ribbon)" stroke="#1c110a" stroke-width="1"/>
+<path d="M11.5 15.5 H112.5" stroke="#8a6238" stroke-width="1"/>
+<circle cx="62" cy="71" r="30" fill="#2b1b11"/>
+<circle cx="62" cy="71" r="28.5" fill="none" stroke="url(#gold)" stroke-width="3.4"/>
+<path d="M14 110 H50 M74 110 H110" stroke="#a8875060" stroke-width="1"/>
+<path d="M14 110 H50 M74 110 H110" stroke="#8a6a3a" stroke-width="1" opacity="0.7"/>
+<path d="M62 105 l5 5 l-5 5 l-5 -5z" fill="currentColor" stroke="#2b1b11" stroke-width="1"/>
+</symbol>
+
+<symbol id="cardBack" viewBox="0 0 124 176" overflow="visible">
+<rect x="0.75" y="0.75" width="122.5" height="174.5" rx="9" fill="#2b1b11" stroke="#120b07" stroke-width="1.5"/>
+<rect x="4" y="4" width="116" height="168" rx="7" fill="url(#back)" stroke="url(#gold)" stroke-width="2.4"/>
+<rect x="11" y="11" width="102" height="154" rx="4" fill="none" stroke="#f0c75e" stroke-width="1" opacity="0.6"/>
+<path d="M62 52 l22 36 l-22 36 l-22 -36z" fill="none" stroke="url(#gold)" stroke-width="3"/>
+<path d="M62 68 l12 20 l-12 20 l-12 -20z" fill="url(#gold)"/>
+</symbol>
+
+<symbol id="flask" viewBox="0 0 24 30" overflow="visible">
+<path d="M9 2h6v2h-1v7c5 2 7 6 7 10a9 9 0 0 1-18 0c0-4 2-8 7-10V4H9z" fill="#1c120b" stroke="#f3e6c8" stroke-width="1.6" stroke-linejoin="round"/>
+<path d="M5 20a7 7 0 0 0 14 0c0-1.4-.3-2.6-.9-3.6H5.900000000000001C5.3 17.4 5 18.600000000000001 5 20z" fill="currentColor"/>
+<path d="M7.500000000000001 19c0-2 1-3.500000000000001 2.5-4.5" stroke="#ffffff" stroke-opacity="0.6" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+<rect x="8.5" y="0.5" width="7" height="3" rx="1" fill="#8a5f33" stroke="#1c120b" stroke-width="0.8"/>
+</symbol>
+<symbol id="flaskEmpty" viewBox="0 0 24 30" overflow="visible">
+<path d="M9 2h6v2h-1v7c5 2 7 6 7 10a9 9 0 0 1-18 0c0-4 2-8 7-10V4H9z" fill="#1c120b" fill-opacity="0.5" stroke="#8a7350" stroke-width="1.4" stroke-dasharray="3 2.5" stroke-linejoin="round"/>
+</symbol>
+<symbol id="iSword" viewBox="0 0 24 24"><path d="M19.5 2.5l2 2L10 16l-2.5.5L8 14zM5 15l4 4M4.500000000000001 21.5l-2-2 3-3 2 2z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+<symbol id="iEye" viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" fill="none" stroke="currentColor" stroke-width="2.2"/><circle cx="12" cy="12" r="3.2" fill="currentColor"/></symbol>
+<symbol id="iShield" viewBox="0 0 24 24"><path d="M12 2.5l8.5 3v6.500000000000001c0 5-3.6 8.5-8.5 9.5-4.9-1-8.5-4.500000000000001-8.5-9.5V5.500000000000001z" fill="currentColor" fill-opacity="0.3" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/></symbol>
+<symbol id="iHeart" viewBox="0 0 24 24"><path d="M12 21C5 15.5 2 12 2 8a5 5 0 0 1 10-1.500000000000001A5 5 0 0 1 22 8c0 4-3 7.500000000000001-10 13z" fill="currentColor"/></symbol>
+</defs>
+
+<g clip-path="url(#win)">
+<rect width="1040" height="620" fill="url(#table)"/><rect width="1040" height="620" filter="url(#grainWood)" opacity="0.7"/>
+<text x="34" y="38" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">LA CARTE</text><path d="M34 44 h76" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(40 66) scale(2.25)">
+<g filter="url(#shadowSm)">
+<g >
+<use href="#card" width="124" height="176" style="color:#43b24f"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mHoly)"/>
+<use href="#gStars" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="11.5" fill="#fbeecb">Pénitence</text>
+<text xml:space="preserve" x="62" y="123.0" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="10.4" fill="#2b1c10"><tspan font-weight="500">Inflige </tspan><tspan font-weight="800">6</tspan><tspan font-weight="500"> trois fois.</tspan></text>
+<text xml:space="preserve" x="62" y="135.6" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="10.4" fill="#2b1c10"><tspan font-weight="500">Sous </tspan><tspan font-weight="800">Expiation</tspan><tspan font-weight="500"> :</tspan></text>
+<text xml:space="preserve" x="62" y="148.2" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="10.4" fill="#2b1c10"><tspan font-weight="800">2</tspan><tspan font-weight="500"> Absorption par coup.</tspan></text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#mana)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">2</text>
+</g></g>
+<text x="34" y="492" font-family="'Alegreya Sans', sans-serif" font-size="13.5" fill="#d9c8a0"><tspan x="34" dy="0">Châssis de bois, liseré à la couleur de la</tspan><tspan x="34" dy="18">rareté, bandeau du titre, médaillon cerclé</tspan><tspan x="34" dy="18">d'or portant l'icône du sort, gemme de coût.</tspan><tspan x="34" dy="18">L'école se lit à la couleur du médaillon.</tspan></text>
+<text x="350" y="38" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">RARETÉS</text><path d="M350 44 h66" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(350 56) scale(0.92)">
+<g filter="url(#shadowSm)">
+<g >
+<use href="#card" width="124" height="176" style="color:#d9cfb4"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mHoly)"/>
+<use href="#gSun" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="11.5" fill="#fbeecb">Châtiment</text>
+<text xml:space="preserve" x="62" y="131.0" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="500">Inflige </tspan><tspan font-weight="800">6</tspan><tspan font-weight="500">.</tspan></text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#mana)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">1</text>
+</g></g>
+<g transform="translate(476 56) scale(0.92)">
+<g filter="url(#shadowSm)">
+<g >
+<use href="#card" width="124" height="176" style="color:#43b24f"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mHoly)"/>
+<use href="#gNova" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="11.5" fill="#fbeecb">Nova sacrée</text>
+<text xml:space="preserve" x="62" y="131.0" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="500">Inflige </tspan><tspan font-weight="800">3</tspan><tspan font-weight="500"> à tous.</tspan></text>
+<text xml:space="preserve" x="62" y="145.5" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="800">Récupération 3</tspan><tspan font-weight="500">.</tspan></text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#mana)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">1</text>
+</g></g>
+<g transform="translate(602 56) scale(0.92)">
+<g filter="url(#shadowSm)">
+<g >
+<use href="#card" width="124" height="176" style="color:#3f8be0"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mHoly)"/>
+<use href="#gWings" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="8.6" fill="#fbeecb">Esprit de rédemption</text>
+<text xml:space="preserve" x="62" y="131.0" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="500">Une fois par combat,</tspan></text>
+<text xml:space="preserve" x="62" y="145.5" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="500">survit à </tspan><tspan font-weight="800">1 PV</tspan><tspan font-weight="500">.</tspan></text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#mana)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">3</text>
+</g></g>
+<text x="742" y="38" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">ÉTATS</text><path d="M742 44 h48" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(746 60) scale(0.92)">
+<g filter="url(#glow)">
+<rect x="-2.5" y="-2.5" width="129" height="181" rx="11" fill="none" stroke="url(#goldHot)" stroke-width="3"/>
+<g >
+<use href="#card" width="124" height="176" style="color:#d9cfb4"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mShadow)"/>
+<use href="#gMind" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="10.6" fill="#fbeecb">Attaque mentale</text>
+<text xml:space="preserve" x="62" y="131.0" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="500">Inflige </tspan><tspan font-weight="800">9</tspan><tspan font-weight="500">.</tspan></text>
+<text xml:space="preserve" x="62" y="145.5" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="800">+2 Démence</tspan><tspan font-weight="500">.</tspan></text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#mana)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">1</text>
+<rect x="19.0" y="157" width="86.0" height="17" rx="8.5" fill="#2b1b11" stroke="#a8782a" stroke-width="1.2"/>
+<text x="62" y="169.5" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="700" font-size="11.5" fill="#f3e6c8">Recharge 1</text>
+</g></g>
+<g transform="translate(880 56) scale(0.92)">
+<g filter="url(#shadowSm)">
+<g >
+<use href="#card" width="124" height="176" style="color:#d9cfb4"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mHoly)"/>
+<use href="#gSun" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="11.5" fill="#bff0a8">Châtiment+</text>
+<text xml:space="preserve" x="62" y="131.0" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="11.6" fill="#2b1c10"><tspan font-weight="500">Inflige </tspan><tspan font-weight="800">9</tspan><tspan font-weight="500">.</tspan></text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#mana)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">1</text>
+</g></g>
+<text x="803" y="242" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12.5" fill="#d9c8a0">survolée</text><text x="937" y="242" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12.5" fill="#d9c8a0">améliorée</text>
+<g transform="translate(350 262) scale(0.92)">
+<g filter="url(#shadowSm)">
+<g filter="url(#grey)">
+<use href="#card" width="124" height="176" style="color:#d9cfb4"/>
+<circle cx="62" cy="71" r="26.5" fill="url(#mWard)"/>
+<use href="#gFlame" x="42" y="51" width="40" height="40" opacity="0.95"/>
+<path d="M38 62a26.5 26.5 0 0 1 48 0a40 30 0 0 0-48 0z" fill="#ffffff" opacity="0.22"/>
+<text x="66" y="27" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="11.5" fill="#fbeecb">Feu intérieur</text>
+</g>
+<circle cx="8" cy="8" r="15.5" fill="#1c110a"/>
+<circle cx="8" cy="8" r="14" fill="none" stroke="url(#gold)" stroke-width="2.6"/>
+<circle cx="8" cy="8" r="12" fill="url(#manaOff)"/>
+<ellipse cx="5" cy="3" rx="6.5" ry="3.6" fill="#ffffff" opacity="0.35"/>
+<text x="8" y="14" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="17" fill="#ffffff" filter="url(#txt)">3</text>
+<rect x="-2.0" y="157" width="128.0" height="17" rx="8.5" fill="#7a2a1e" stroke="#f0b3a6" stroke-width="1.2"/>
+<text x="62" y="169.5" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="700" font-size="11.5" fill="#fff3ec">Mana insuffisant</text>
+</g></g>
+<g transform="translate(476 262) scale(0.92)" filter="url(#shadowSm)"><use href="#cardBack" width="124" height="176"/></g>
+<text x="407" y="446" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12.5" fill="#d9c8a0">injouable</text><text x="533" y="446" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12.5" fill="#d9c8a0">dos</text>
+<text x="620" y="276" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">BOUTONS</text><path d="M620 282 h66" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(620 296)" filter="url(#shadowSm)"><rect width="150" height="48" rx="8" fill="#1c110a"/><rect x="2" y="2" width="146" height="44" rx="6.5" fill="url(#goldFlat)" stroke="#6e4a14" stroke-width="1.4"/><rect x="4.5" y="4.5" width="141" height="39" rx="4.5" fill="none" stroke="#fff3c4" stroke-width="1" opacity="0.8"/><path d="M12 24.0 l4 -4 l4 4 l-4 4z M138 24.0 l-4 -4 l-4 4 l4 4z" fill="#6e4a14" opacity="0.75"/><text x="75.0" y="29.8" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="16" fill="#2b1c10">Fin du tour</text></g>
+<g transform="translate(790 296)" filter="url(#glow)"><rect width="150" height="48" rx="8" fill="#1c110a"/><rect x="2" y="2" width="146" height="44" rx="6.5" fill="url(#goldHot)" stroke="#6e4a14" stroke-width="1.4"/><rect x="4.5" y="4.5" width="141" height="39" rx="4.5" fill="none" stroke="#ffffff" stroke-width="1" opacity="0.8"/><path d="M12 24.0 l4 -4 l4 4 l-4 4z M138 24.0 l-4 -4 l-4 4 l4 4z" fill="#6e4a14" opacity="0.75"/><text x="75.0" y="29.8" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="16" fill="#2b1c10">Fin du tour</text></g>
+<g transform="translate(620 365.5)" filter="url(#shadowSm)"><rect width="150" height="48" rx="8" fill="#1c110a"/><rect x="2" y="2" width="146" height="44" rx="6.5" fill="#c08c2c" stroke="#4a3210" stroke-width="1.4"/><rect x="4.5" y="4.5" width="141" height="39" rx="4.5" fill="none" stroke="#d9a23a" stroke-width="1" opacity="0.8"/><path d="M12 24.0 l4 -4 l4 4 l-4 4z M138 24.0 l-4 -4 l-4 4 l4 4z" fill="#4a3210" opacity="0.75"/><text x="75.0" y="29.8" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="16" fill="#2b1c10">Fin du tour</text></g>
+<g transform="translate(790 364)" filter="url(#shadowSm)"><rect width="150" height="48" rx="8" fill="#1c110a"/><rect x="2" y="2" width="146" height="44" rx="6.5" fill="#5a4a38" stroke="#2b1b11" stroke-width="1.4"/><rect x="4.5" y="4.5" width="141" height="39" rx="4.5" fill="none" stroke="#7a6a55" stroke-width="1" opacity="0.8"/><path d="M12 24.0 l4 -4 l4 4 l-4 4z M138 24.0 l-4 -4 l-4 4 l4 4z" fill="#2b1b11" opacity="0.75"/><text x="75.0" y="29.8" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="16" fill="#a89878">Fin du tour</text></g>
+<text x="695" y="358" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12" fill="#d9c8a0">repos</text>
+<text x="865" y="358" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12" fill="#d9c8a0">survol</text>
+<text x="695" y="426" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12" fill="#d9c8a0">enfoncé</text>
+<text x="865" y="426" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-size="12" fill="#d9c8a0">inactif</text>
+<text x="350" y="478" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">INTENTIONS</text><path d="M350 484 h95" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(382 496)" filter="url(#shadowSm)"><path d="M-7 27 L0 36 L7 27Z" fill="#1e140d" stroke="#e2634c" stroke-width="1.8"/><rect x="-29.0" y="0" width="58" height="28" rx="14" fill="url(#plaque)" stroke="#e2634c" stroke-width="1.8"/><path d="M-6 27.200000000000003 H6" stroke="#1e140d" stroke-width="2.4"/><use href="#iSword" x="-20.0" y="5" width="18" height="18" style="color:#ffb3a3"/><text x="3.0" y="20.5" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="19" fill="#ffb3a3">6</text></g>
+<g transform="translate(452 496)" filter="url(#shadowSm)"><path d="M-7 27 L0 36 L7 27Z" fill="#1e140d" stroke="#7fb6e8" stroke-width="1.8"/><rect x="-29.0" y="0" width="58" height="28" rx="14" fill="url(#plaque)" stroke="#7fb6e8" stroke-width="1.8"/><path d="M-6 27.200000000000003 H6" stroke="#1e140d" stroke-width="2.4"/><use href="#iShield" x="-20.0" y="5" width="18" height="18" style="color:#cfe5ff"/><text x="3.0" y="20.5" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="19" fill="#cfe5ff">6</text></g>
+<g transform="translate(540 496)" filter="url(#shadowSm)"><path d="M-7 27 L0 36 L7 27Z" fill="#1e140d" stroke="#b77bea" stroke-width="1.8"/><rect x="-45.599999999999994" y="0" width="91.19999999999999" height="28" rx="14" fill="url(#plaque)" stroke="#b77bea" stroke-width="1.8"/><path d="M-6 27.200000000000003 H6" stroke="#1e140d" stroke-width="2.4"/><use href="#iEye" x="-36.599999999999994" y="5" width="18" height="18" style="color:#e3c6ff"/><text x="-13.599999999999994" y="19" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="13.5" fill="#e3c6ff">Guette</text></g>
+<text x="620" y="478" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">JETONS D'ÉTAT</text><path d="M620 484 h124" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(636 512)" filter="url(#shadowSm)"><circle r="12" fill="#1e140d" stroke="#f0c75e" stroke-width="1.8"/><g color="#f0c75e"><circle r="3.4" fill="currentColor"/><path d="M0-8v3M0 5v3M-8 0h3M5 0h3M-5.600000000000001-5.600000000000001l2 2M3.6 3.6l2 2M5.600000000000001-5.600000000000001l-2 2M-3.6 3.6l-2 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></g><circle cx="10" cy="9" r="7" fill="#120b07" stroke="#f0c75e" stroke-width="1"/><text x="10" y="13" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="10.5" fill="#ffffff">2</text></g>
+<g transform="translate(674 512)" filter="url(#shadowSm)"><circle r="12" fill="#1e140d" stroke="#7fd08a" stroke-width="1.8"/><g color="#7fd08a"><path d="M-2-7h4v5h5v4h-5v5h-4v-5h-5v-4h5z" fill="currentColor"/></g><circle cx="10" cy="9" r="7" fill="#120b07" stroke="#7fd08a" stroke-width="1"/><text x="10" y="13" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="10.5" fill="#ffffff">3</text></g>
+<g transform="translate(712 512)" filter="url(#shadowSm)"><circle r="12" fill="#1e140d" stroke="#c79bf2" stroke-width="1.8"/><g color="#c79bf2"><path d="M0-8c2 5 6 6 6 10a6 6 0 0 1-12 0c0-4 4-5 6-10z" fill="currentColor"/></g><circle cx="10" cy="9" r="7" fill="#120b07" stroke="#c79bf2" stroke-width="1"/><text x="10" y="13" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="10.5" fill="#ffffff">4</text></g>
+<g transform="translate(750 512)" filter="url(#shadowSm)"><circle r="12" fill="#1e140d" stroke="#e2634c" stroke-width="1.8"/><g color="#e2634c"><path d="M0-8l7 2.5v5c0 4-3 7-7 8-4-1-7-4-7-8v-5z" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M1-6l-3 5 3 2-2 5" fill="none" stroke="currentColor" stroke-width="1.6"/></g><circle cx="10" cy="9" r="7" fill="#120b07" stroke="#e2634c" stroke-width="1"/><text x="10" y="13" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="10.5" fill="#ffffff">2</text></g>
+<text x="620" y="548" font-family="'Alegreya Sans', sans-serif" font-size="12.5" fill="#d9c8a0">Pictogramme et valeur ; le nom et la règle au survol.</text>
+<text x="350" y="560" font-family="Cinzel, serif" font-weight="600" font-size="11.5" letter-spacing="1.6" fill="#b89a66">BARRES ET RÉSERVES</text><path d="M350 566 h171" stroke="#6b4a22" stroke-width="1"/>
+<g transform="translate(350 580)">
+<rect x="-1.5" y="-1.5" width="153" height="23" rx="11.5" fill="#120b07"/>
+<rect width="150" height="20" rx="10.0" fill="url(#trough)" stroke="#6b4a22" stroke-width="1.2"/>
+<rect x="2" y="2" width="116.8" height="16" rx="8.0" fill="url(#hp)"/>
+<rect x="4" y="3" width="112.8" height="6.1" rx="2" fill="url(#gloss)"/>
+<text x="75.0" y="14.3" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="13.5" fill="#ffffff" filter="url(#txt)">52 / 65</text>
+</g>
+<g transform="translate(520 582)">
+<rect x="-1.5" y="-1.5" width="133" height="19" rx="9.5" fill="#120b07"/>
+<rect width="130" height="16" rx="8.0" fill="url(#trough)" stroke="#6b4a22" stroke-width="1.2"/>
+<rect x="2" y="2" width="126.0" height="12" rx="6.0" fill="#ffe9a8"/>
+<rect x="2" y="2" width="45.0" height="12" rx="6.0" fill="url(#hp)"/>
+<rect x="4" y="3" width="41.0" height="4.6" rx="2" fill="url(#gloss)"/>
+<text x="65.0" y="12.3" text-anchor="middle" font-family="'Alegreya Sans', sans-serif" font-weight="800" font-size="12.5" fill="#ffffff" filter="url(#txt)">5 / 14</text>
+</g>
+<use href="#flask" x="676" y="570" width="24" height="30" style="color:#d8472f"/><use href="#flask" x="706" y="570" width="24" height="30" style="color:#3f8be0"/><use href="#flaskEmpty" x="736" y="570" width="24" height="30"/>
+<g transform="translate(812 586)"><circle r="20" fill="#120b07"/><circle r="18.5" fill="none" stroke="url(#gold)" stroke-width="2.6"/><circle r="16.5" fill="url(#mana)"/><text x="0" y="6" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="15" fill="#ffffff" filter="url(#txt)">2/3</text></g>
+<g transform="translate(862 586)"><circle r="16.5" fill="#120b07"/><circle r="15" fill="url(#void)" stroke="#e6c8ff" stroke-width="1.5"/><text x="0" y="5.5" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="15" fill="#ffffff" filter="url(#txt)">3</text></g>
+<g transform="translate(900 560)"><g filter="url(#shadowSm)"><use href="#cardBack" x="3" y="-3" width="36" height="51"/><use href="#cardBack" width="36" height="51"/></g><circle cx="34" cy="46" r="11" fill="#1c110a" stroke="url(#gold)" stroke-width="1.6"/><text x="34" y="50.5" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="12.5" fill="#fff3cf">7</text></g>
+<g transform="translate(956 560)"><g filter="url(#shadowSm)" opacity="0.55"><use href="#cardBack" width="36" height="51"/></g><circle cx="34" cy="46" r="11" fill="#1c110a" stroke="url(#gold)" stroke-width="1.6"/><text x="34" y="50.5" text-anchor="middle" font-family="Cinzel, serif" font-weight="700" font-size="12.5" fill="#fff3cf">3</text></g>
+</g>
+<rect x="1.5" y="1.5" width="1037" height="617" rx="9" fill="none" stroke="#6b4a22" stroke-width="3"/>
+<rect x="4" y="4" width="1032" height="612" rx="7" fill="none" stroke="#f0c75e" stroke-opacity="0.35" stroke-width="1"/>
+</svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1040,"height":620}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
