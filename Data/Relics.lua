@@ -22,7 +22,7 @@ end
 
 relic("hearthstone", {
   name = "Pierre de foyer fêlée", rarity = "uncommon", tier = 0,
-  text = "Une fois par expédition, tu peux fuir un combat normal ou d'élite, sans récompense.",
+  text = "Une fois par expédition, permet de fuir un combat normal ou d'élite, sans récompense.",
   hooks = {
     canFlee = function(c, src, v)
       if c.charges.hearthstone_used then return v end
@@ -65,7 +65,7 @@ relic("stormwind_tabard", {
 -- Bibelot de boss de l'acte 1 : fort, avec une contrepartie.
 relic("vancleef_bandana", {
   name = "Bandeau rouge de VanCleef", rarity = "boss", tier = 0,
-  text = "+1 mana à chacun de tes tours. Au début de chaque combat, les ennemis gagnent 2 Force.",
+  text = "+1 mana à chaque tour. Au début de chaque combat, les ennemis gagnent 2 Force.",
   hooks = {
     maxMana = function(c, src, v) return v + 1 end,
     onCombatStart = function(c, src)
@@ -81,7 +81,7 @@ relic("vancleef_bandana", {
 
 relic("faction_insignia", {
   name = "Insigne de l'Alliance", nameHorde = "Insigne de la Horde", rarity = "rare", tier = 1,
-  text = "Une fois par combat, au début de ton tour, retire tous tes états négatifs.",
+  text = "Une fois par combat, au début du tour, retire tous les états négatifs.",
   hooks = {
     onTurnStart = function(c, src)
       if c.relicState.insignia_used then return end
@@ -95,7 +95,7 @@ relic("faction_insignia", {
 
 relic("sharpening_stone", {
   name = "Pierre à aiguiser grossière", rarity = "uncommon", tier = 1,
-  text = "Tes cartes d'attaque infligent 1 de plus par coup.",
+  text = "Les cartes d'attaque infligent 1 de plus par coup.",
   hooks = {
     damage = function(c, src, v, dst, cardDef)
       if cardDef and cardDef.type == "attack" then return v + 1 end
@@ -108,7 +108,7 @@ relic("sharpening_stone", {
 
 relic("focus_talisman", {
   name = "Talisman de concentration", rarity = "uncommon", tier = 2,
-  text = "La première interruption de ton incantation, à chaque combat, est sans effet.",
+  text = "La première interruption subie, à chaque combat, est sans effet.",
   hooks = {
     preventInterrupt = function(c, src)
       if c.relicState.talisman_used then return false end
@@ -120,7 +120,7 @@ relic("focus_talisman", {
 
 relic("camp_kettle", {
   name = "Marmite de campagne", rarity = "common", tier = 2,
-  text = "Te reposer au feu de camp soigne 10 PV de plus.",
+  text = "Se reposer au feu de camp soigne 10 PV de plus.",
   run = {
     restHeal = function(run, v) return v + 10 end,
   },

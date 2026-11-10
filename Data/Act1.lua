@@ -37,7 +37,7 @@ E.gnoll = {
 E.mystic = {
   name = "Mystique Rivepatte", hp = { 15, 17 },
   moves = {
-    watch = { name = "Guette", intent = "watch", text = "Coupe ton incantation ; sinon, t'inflige 3.",
+    watch = { name = "Guette", intent = "watch", text = "Coupe l'incantation ; sinon, inflige 3.",
       actions = { { "fn", watchOrZap(3) } } },
     mend = { name = "Soins", intent = "heal", actions = { { "heal_ally", 6 } } },
     zap = { name = "Horion", intent = "attack", actions = { { "attack", 5 } } },

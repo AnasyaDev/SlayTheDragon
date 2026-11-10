@@ -130,7 +130,7 @@ ns.Statuses.necrotic = { name = "Nécrotique", affix = true,
 
 A.necrotic = {
   name = "Nécrotique", level = 4,
-  text = ("Chaque coup reçu réduit tes soins de %d %% jusqu'à la fin du combat."):format(pct(P.necrotic.step)),
+  text = ("Chaque coup reçu réduit les soins de %d %% jusqu'à la fin du combat."):format(pct(P.necrotic.step)),
   hooks = {
     onPlayerHit = function(c, src, enemy, loss)
       if (c.player.st.necrotic or 0) < P.necrotic.cap then ns.Combat.applyStatus(c, c.player, "necrotic", 1) end

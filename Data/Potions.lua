@@ -42,5 +42,5 @@ potion("liquid_fire", {
 potion("wisdom_elixir", {
   name = "Élixir de sagesse", rarity = "rare", tier = 2,
   effects = { { "draw", 3 }, { "cleanse" } },
-  text = "Pioche 3 cartes et retire tes états négatifs.",
+  text = "Pioche 3 cartes et retire les états négatifs.",
 })

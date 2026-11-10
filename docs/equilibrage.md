@@ -110,11 +110,11 @@ cartes, 34 au total avec les 4 de départ).
 | Mot de pouvoir : Réconfort | Disc. | commune | 0 | 1 | Inflige 5 ; sous Expiation +1 mana ; Expiation 1 | +3,6 | 83 % |
 | Plume angélique | Disc. | commune | 0 | 0 | 2 Absorption, pioche 1, Recharge 2 | +5,1 | 95 % |
 | Barrière lumineuse | Disc. | commune | 0 | 2 | 12 Absorption, Expiation 1, Recharge 2 | −2,0 | 65 % |
-| Guérison de l'ombre | Disc. | commune | 1 | 1 | Soigne 10, Douleur 2 sur toi, +1 Démence, Consumée | −2,5 | 75 % |
+| Guérison de l'ombre | Disc. | commune | 1 | 1 | Soigne 10, Douleur 2 sur soi, +1 Démence, Consumée | −2,5 | 75 % |
 | Pénitence | Disc. | peu commune | 0 | 2 | 6 × 3 ; sous Expiation 2 Absorption par coup | +2,6 | 53 % |
 | Schisme | Disc. | peu commune | 0 | 1 | Inflige 3, Armure fracassée 2, Expiation 1 | −0,8 | 77 % |
 | Évangélisme | Disc. | peu commune | 1 | 1 | Expiation 3, pioche 2, Consumée | −1,0 | 55 % |
-| Suppression de la douleur | Disc. | rare | 0 | 1 | Dégâts subis ÷ 2 jusqu'à ton tour, Recharge 4 | +0,7 | 72 % |
+| Suppression de la douleur | Disc. | rare | 0 | 1 | Dégâts subis ÷ 2 jusqu'au prochain tour, Recharge 4 | +0,7 | 72 % |
 | Extase | Disc. | rare | 2 | 1 | Pouvoir : +1 à chaque gain d'Absorption | −3,7 | 96 % |
 | Fouet mental | Ombre | commune | 0 | 1 | Inflige 8 ; si Douleur : +2 Démence et pioche 1 | +1,5 | 68 % |
 | Attaque mentale | Ombre | commune | 0 | 1 | Inflige 10, +2 Démence, Recharge 1 | −0,8 | 72 % |
@@ -195,7 +195,7 @@ gonfle les écarts : quelques PV de plus suffisent à passer le boss).
 | Bandage en lin | commune | 0 | Soigne 3 après chaque victoire | +16,7 |
 | Tabard de Hurlevent | commune | 0 | 5 Absorption au 1er tour | +28,1 |
 | Bandeau rouge de VanCleef | boss | 0 | +1 mana par tour ; ennemis Force 2 au début du combat | +27,7 |
-| Insigne de l'Alliance / de la Horde | rare | 1 | Une fois par combat, retire tes états négatifs au début du tour | +8,2 |
+| Insigne de l'Alliance / de la Horde | rare | 1 | Une fois par combat, retire les états négatifs au début du tour | +8,2 |
 | Pierre à aiguiser grossière | peu commune | 1 | Attaques +1 par coup | +20,3 |
 | Talisman de concentration | peu commune | 2 | Ignore la 1re interruption de chaque combat | +2,3 |
 | Marmite de campagne | commune | 2 | Repos +10 PV (crochet `run.restHeal`) | +17,0 |
@@ -218,7 +218,7 @@ palier 0 (dont le bibelot de boss), 2 au palier 1, 2 au palier 2 et 1 au palier 
 | Potion de mana | commune | 0 | +2 mana ce tour | 65, surtout en combat normal |
 | Potion de protection contre l'ombre | peu commune | 0 | 12 Absorption | 24 |
 | Feu liquide | peu commune | 2 | 10 à la cible et Douleur 3 (ciblée) | 24 |
-| Élixir de sagesse | rare | 2 | Pioche 3, retire tes états négatifs | 20 |
+| Élixir de sagesse | rare | 2 | Pioche 3, retire les états négatifs | 20 |
 
 Le bot garde une valeur de conservation par potion (`Bots.POTION_KEEP`) : la potion de soins
 n'est bue que pour éviter la mort ou au dernier combat ; la potion de mana quand elle débloque

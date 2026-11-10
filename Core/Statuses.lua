@@ -25,7 +25,7 @@ S.armor_broken = { name = "Armure fracassée", debuff = true, duration = true,
 S.demoralized = { name = "Démoralisé", debuff = true, duration = true,
   text = "Inflige 25 % de dégâts en moins." }
 S.atonement = { name = "Expiation", duration = true,
-  text = "Chaque carte qui inflige des dégâts te rend 2 PV." }
+  text = "Chaque carte qui inflige des dégâts rend 2 PV." }
 S.pain = { name = "Douleur", debuff = true,
   text = "Subit X dégâts au début de son tour, puis X baisse de 1. Ignore l'Absorption." }
 S.regen = { name = "Récupération",
@@ -33,6 +33,6 @@ S.regen = { name = "Récupération",
 S.stunned = { name = "Étourdi", debuff = true,
   text = "Perd son prochain tour." }
 S.halved = { name = "Suppression de la douleur",
-  text = "Dégâts subis divisés par deux jusqu'à ton prochain tour." }
+  text = "Dégâts subis divisés par deux jusqu'au prochain tour." }
 S.force = { name = "Force",
   text = "Inflige X dégâts de plus par coup." }

@@ -449,22 +449,22 @@ end
 X.CONDITIONS = {
   hpBelow = { -- PV strictement sous la fraction arg des PV max
     test = function(exp, f) return exp.hp < exp.maxHp * f end,
-    text = function(f) return ("Seulement sous %d %% de tes PV."):format(pct(f)) end },
+    text = function(f) return ("Seulement sous %d %% des PV."):format(pct(f)) end },
   hpAbove = { -- PV au moins égaux à la fraction arg des PV max
     test = function(exp, f) return exp.hp >= exp.maxHp * f end,
-    text = function(f) return ("Il te faut au moins %d %% de tes PV."):format(pct(f)) end },
+    text = function(f) return ("Il faut au moins %d %% des PV."):format(pct(f)) end },
   gold = {
     test = function(exp, n) return exp.gold >= n end,
-    text = function(n) return ("Il te faut %d po."):format(n) end },
+    text = function(n) return ("Il faut %d po."):format(n) end },
   relic = {
     test = function(exp, id) return hasRelic(exp, id) end,
-    text = function(id) return "Il te faut : " .. relicLabel(id) .. "." end },
+    text = function(id) return "Il faut : " .. relicLabel(id) .. "." end },
   noRelic = {
     test = function(exp, id) return not hasRelic(exp, id) end,
-    text = function(id) return "Tu possèdes déjà : " .. relicLabel(id) .. "." end },
+    text = function(id) return "Déjà possédé : " .. relicLabel(id) .. "." end },
   potion = {
     test = function(exp) return hasPotion(exp) end,
-    text = function() return "Il te faut une potion." end },
+    text = function() return "Il faut une potion." end },
   card = {
     test = function(exp, id)
       for i = 1, #exp.deck do
@@ -474,7 +474,7 @@ X.CONDITIONS = {
     end,
     text = function(id)
       local d = ns.Cards[id]
-      return "Il te faut la carte " .. (d and d.name or tostring(id)) .. "."
+      return "Il faut la carte " .. (d and d.name or tostring(id)) .. "."
     end },
   key = {
     test = function(exp, n) return (exp.key or 0) >= n end,
@@ -585,10 +585,10 @@ end
 -- Codes de refus des effets et leur texte (l'interface traduit aussi les codes).
 X.EVENT_REASONS = {
   ["or"] = "Pas assez d'or.",
-  deck = "Ton deck est trop petit.",
+  deck = "Deck trop petit.",
   ["amélioration"] = "Aucune carte à améliorer.",
-  potion = "Il te faut une potion.",
-  ["bibelot"] = "Tu possèdes déjà ce bibelot.",
+  potion = "Il faut une potion.",
+  ["bibelot"] = "Bibelot déjà possédé.",
 }
 
 -- Le choix ci de la rencontre est-il possible ? (true | false, raison)

@@ -39,12 +39,12 @@ Pour une réponse : elle reste affichée mais désactivée, avec la raison (`Exp
 
 | Condition | Vraie si | Raison affichée |
 | --- | --- | --- |
-| `hpBelow f` | PV < f × PV max | « Seulement sous 50 % de tes PV. » |
-| `hpAbove f` | PV ≥ f × PV max | « Il te faut au moins 60 % de tes PV. » |
-| `gold n` | or ≥ n | « Il te faut 60 po. » |
-| `relic id` / `noRelic id` | bibelot possédé / absent | « Il te faut : Tabard de Hurlevent. » |
-| `potion` | au moins une potion | « Il te faut une potion. » |
-| `card id` | carte dans le deck | « Il te faut la carte Pénitence. » |
+| `hpBelow f` | PV < f × PV max | « Seulement sous 50 % des PV. » |
+| `hpAbove f` | PV ≥ f × PV max | « Il faut au moins 60 % des PV. » |
+| `gold n` | or ≥ n | « Il faut 60 po. » |
+| `relic id` / `noRelic id` | bibelot possédé / absent | « Il faut : Tabard de Hurlevent. » |
+| `potion` | au moins une potion | « Il faut une potion. » |
+| `card id` | carte dans le deck | « Il faut la carte Pénitence. » |
 | `key n` | clé mythique ≥ n | « Clé mythique +2 ou plus. » |
 | `flag nom` / `noFlag nom` | drapeau de compte présent / absent | « Pas encore. » / « Plus maintenant. » |
 | `floor n` | étape ≥ n | « À partir de l'étape 4. » |
@@ -81,13 +81,13 @@ Notation : `-` perte, `+` gain ; « récompense habituelle » = celle d'un comba
 **La carriole renversée** — le combat facultatif classique.
 1. Charger les bandits : combat normal, récompense habituelle + 20 po.
 2. Dégager le cocher : -5 PV, une potion.
-3. Passer ton chemin : rien.
+3. Passer son chemin : rien.
 
 **La Colline des sentinelles** — l'entraînement et le retrait payant ; le tabard ouvre l'armurerie.
 1. S'entraîner : -6 PV, 2 cartes améliorées au hasard.
 2. Faire un don : paie 40 po, retire une carte.
 3. Repartir : rien.
-4. *(Tabard de Hurlevent)* Montrer ton tabard : une carte peu commune parmi 3.
+4. *(Tabard de Hurlevent)* Montrer son tabard : une carte peu commune parmi 3.
 Intention : récompenser un bibelot commun sans le rendre obligatoire.
 
 **Les nasses du vieux Hank** — combat de murlocs, pari ou repas.
@@ -106,7 +106,7 @@ emplacements.
 **Les réfugiés de Ruisselune** — le prêtre qui donne de lui-même.
 1. Soigner les blessés : -6 PV, améliore une carte au choix.
 2. Leur donner 35 po : +6 PV max.
-3. Passer ton chemin : rien.
+3. Passer son chemin : rien.
 4. *(une potion)* Leur laisser une potion : perds une potion (le dernier emplacement occupé),
    2 cartes améliorées au hasard.
 
@@ -122,7 +122,7 @@ inférieurs à un feu de camp, sauf à payer).
 3. Le laisser grincer : rien.
 
 **Le gardien du phare** *(étape ≥ 4)* — veille ou repos, avant le boss.
-1. Garder le feu toute la nuit : -10 PV, copie une carte de ton deck.
+1. Garder le feu toute la nuit : -10 PV, copie une carte du deck.
 2. Dormir dans la lanterne : soigne 30 % des PV max.
 Intention : le choix « renforcer le deck ou arriver en forme » juste avant VanCleef.
 
