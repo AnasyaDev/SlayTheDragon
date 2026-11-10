@@ -782,7 +782,8 @@ end
 -- /slay
 ---------------------------------------------------------------------------
 
--- /slay art : décors (peint ou candidat validé, décor par décor ; verdicts), puis icônes et modèles manquants.
+-- /slay art : fonds embarqués, décors (fond embarqué, candidat validé ou peint ; verdicts), puis icônes et
+-- modèles manquants.
 local function artReport()
   if not UI.frame then UI.build() end
   say("décors" .. (opts().decor == false and " (illustrations désactivées : /slay decor illustre)" or "") .. " :")
@@ -805,8 +806,9 @@ local function artPreview()
   if s and s.PreviewEnemies then s:PreviewEnemies() end
 end
 
--- /slay decor [essai | suivant | precedent | ok | non | peint | illustre] : décor peint ou illustré,
--- et essai manuel des illustrations (seul moyen de savoir si un fichier existe dans ce client).
+-- /slay decor [essai | suivant | precedent | ok | non | peint | illustre] : décor illustré (fonds embarqués
+-- dans l'addon, affichés sans validation) ou peint ; essai manuel des candidats du client (repli facultatif :
+-- seul moyen de savoir si un fichier existe dans ce client).
 local DECOR_HELP = "/slay decor ok (image visible) ou non (aplat vert, noir ou vide) ; "
   .. "/slay decor suivant / precedent ; /slay decor peint pour finir."
 
@@ -820,7 +822,7 @@ local function decorCommand(arg)
   if trialCmd then
     if arg == "essai" and Scene.trial then
       Scene.trialStop()
-      say("essai terminé ; décor " .. (opts().decor == false and "peint" or "illustré (candidats validés)") .. ".")
+      say("essai terminé ; décor " .. (opts().decor == false and "peint" or "illustré (fonds embarqués)") .. ".")
       return
     end
     local first = not Scene.trial
@@ -849,12 +851,12 @@ local function decorCommand(arg)
     else
       opts().decor = arg ~= "peint"
     end
-    say((was and "essai terminé ; " or "") .. "décor " .. (opts().decor and "illustré (seulement les candidats "
-      .. "validés par /slay decor essai)" or "peint") .. ".")
+    say((was and "essai terminé ; " or "") .. "décor " .. (opts().decor and "illustré (fonds embarqués "
+      .. "dans l'addon)" or "peint") .. ".")
     if UI.frame and UI.frame:IsShown() then UI.refresh() end
   else
-    say("/slay decor : bascule peint / illustré ; /slay decor essai (puis suivant, precedent, ok, non) ; "
-      .. "/slay decor peint ; /slay decor illustre.")
+    say("/slay decor : bascule peint / illustré ; /slay decor peint ; /slay decor illustre ; "
+      .. "/slay decor essai (puis suivant, precedent, ok, non) : candidats du client, facultatif.")
   end
 end
 

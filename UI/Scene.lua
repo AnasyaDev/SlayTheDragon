@@ -1,5 +1,5 @@
--- Scène commune à tous les écrans : décor plein cadre en haut (décor peint en couches unies, aux
--- couleurs des maquettes, ou illustration du jeu validée par le joueur), plateau de bois en bas, personnages
+-- Scène commune à tous les écrans : décor plein cadre en haut (illustration embarquée dans l'addon,
+-- Media/Backgrounds, sur un décor peint en couches unies aux couleurs des maquettes), plateau en bas, personnages
 -- (modèle 3D avec ombre au sol). Coordonnées : celles des maquettes, depuis le coin haut gauche de
 -- la zone intérieure (1034 × 614), x vers la droite, y vers le bas.
 local _, ns = ...
@@ -14,6 +14,7 @@ ns.Scene = S
 S.W, S.H = 1034, 614
 S.TOP, S.DECOR_H = 44, 380      -- bande du décor : y 44 à 424
 S.BOARD_Y, S.BOARD_H = 424, 190 -- plateau : y 424 à 614
+S.GROUND_H, S.GROUND_ALPHA = 170, 0.38 -- voile du bas de l'illustration (hauteur, opacité en bas)
 
 local function opts() return ns.Persist.options() end
 
@@ -193,6 +194,12 @@ function S.build(parent)
   local art = decor:CreateTexture(nil, "BORDER", nil, 0)
   art:SetAllPoints()
   S.art = art
+  -- voile sombre léger sur le bas de l'illustration (sol des personnages, lisibilité des modèles)
+  local ground = decor:CreateTexture(nil, "BORDER", nil, 1)
+  W.gradient(ground, { 0, 0, 0, 0 }, { 0.02, 0.03, 0.05, S.GROUND_ALPHA })
+  at(ground, decor, 0, S.DECOR_H - S.GROUND_H, S.W, S.GROUND_H)
+  ground:Hide()
+  S.ground = ground
   -- voile froid léger (planches), voile d'assombrissement (bilan), fondu vers le plateau
   local cool = W.rect(decor, "BORDER", 1, C.cool, 0.15)
   cool:SetAllPoints()
@@ -245,13 +252,13 @@ function S.rule(parent, y)
 end
 
 ---------------------------------------------------------------------------
--- Illustrations : seulement les candidats validés par le joueur, sinon décor peint
+-- Illustrations : fond embarqué (Media/Backgrounds), sinon candidat validé, sinon décor peint
 ---------------------------------------------------------------------------
--- Sur ce client, rien ne dit de façon fiable si un fichier existe : pour un fichier absent, SetTexture
--- réussit, GetTextureFileID renvoie l'identifiant, IsObjectLoaded devient vrai… et WoW dessine un
--- aplat vert. Aucune API documentée (GetFileIDFromPath, C_Texture.GetFilenameFromFileDataID,
--- GetTextureFilePath) ne promet de distinguer un fichier absent. Donc : décor peint par défaut ; un
--- décor montre le premier candidat de SA liste que le joueur a validé à l'œil (mode essai ci-dessous).
+-- Un fond embarqué est un fichier de l'addon : il existe forcément, il est affiché sans validation.
+-- Repli (candidats du client, FileDataID ou chemin) : sur ce client, rien ne dit de façon fiable si un
+-- tel fichier existe (pour un fichier absent, SetTexture réussit, GetTextureFileID renvoie l'identifiant,
+-- IsObjectLoaded devient vrai… et WoW dessine un aplat vert) : seuls ceux que le joueur a validés à
+-- l'œil (mode essai ci-dessous) peuvent s'afficher.
 
 -- Liste à plat des candidats d'une illustration (les entrées chaîne renvoient à une autre liste).
 local function candidates(key, out, seen)
@@ -281,7 +288,8 @@ function S.describe(cand)
     .. (v == true and " [validé]" or v == false and " [refusé]" or " [pas encore jugé]")
 end
 
--- Liste d'essai : tous les candidats de toutes les illustrations, dédoublonnés, ordre stable.
+-- Liste d'essai : tous les candidats du client (pas les fonds embarqués, qui n'ont rien à valider) de
+-- toutes les illustrations, dédoublonnés, ordre stable.
 function S.trialList()
   if S.trials then return S.trials end
   local keys = {}
@@ -291,21 +299,45 @@ function S.trialList()
   for _, key in ipairs(keys) do
     for _, c in ipairs(candidates(key)) do
       local k = tostring(c.file)
-      if not seen[k] then seen[k] = true list[#list + 1] = c end
+      if not c.embedded and not seen[k] then seen[k] = true list[#list + 1] = c end
     end
   end
   S.trials = list
   return list
 end
 
--- Illustration affichée pour un décor : candidat en essai, sinon premier validé de sa liste, sinon nil.
+-- Fond embarqué d'un décor (premier de sa liste), ou nil.
+function S.embedded(entry)
+  if not (entry and entry.art) then return nil end
+  for _, c in ipairs(candidates(entry.art)) do
+    if c.embedded then return c end
+  end
+  return nil
+end
+
+-- Illustration affichée pour un décor : candidat en essai, sinon le premier de sa liste qui est un fond
+-- embarqué ou un candidat validé, sinon nil (décor peint).
 function S.chosen(entry)
   if S.trial then return S.trialList()[S.trial] end
   if not (entry and entry.art) or opts().decor == false then return nil end
   for _, c in ipairs(candidates(entry.art)) do
-    if S.verdict(c) == true then return c end
+    if c.embedded or S.verdict(c) == true then return c end
   end
   return nil
+end
+
+-- Coordonnées de texture d'un fond embarqué : bande au format du décor (S.W × S.DECOR_H) dans une
+-- texture qui contient une zone de rapport `ratio` (étirée), placée en hauteur par `focus` (0..1).
+function S.bandCoords(cand, focus)
+  local target = S.W / S.DECOR_H
+  local r = cand.ratio or target
+  if r >= target then
+    local g = target / r
+    return (1 - g) / 2, (1 + g) / 2, 0, 1
+  end
+  local f = r / target
+  local top = (1 - f) * math.max(0, math.min(1, focus or 0.5))
+  return 0, 1, top, top + f
 end
 
 -- Texture recadrée et teintée ; faux (illustration cachée, décor peint visible) sinon. En essai :
@@ -313,17 +345,22 @@ end
 function S.applyArt(entry)
   local art = S.art
   local cand = S.chosen(entry)
-  if not cand then art:Hide() return false end
-  if art:SetTexture(cand.file) == false then art:Hide() return false end
+  if not cand then art:Hide() S.ground:Hide() return false end
+  if art:SetTexture(cand.file) == false then art:Hide() S.ground:Hide() return false end
   local trial = S.trial ~= nil
-  local c = cand.crop or { 0, 1, 0, 1 }
-  local top, bottom = c[3], c[4]
-  local shift = not trial and entry.shift or 0
-  if top + shift < 0 then shift = -top elseif bottom + shift > 1 then shift = 1 - bottom end
-  art:SetTexCoord(c[1], c[2], top + shift, bottom + shift)
+  if cand.embedded then
+    art:SetTexCoord(S.bandCoords(cand, entry.focus))
+  else
+    local c = cand.crop or { 0, 1, 0, 1 }
+    local top, bottom = c[3], c[4]
+    local shift = not trial and entry.shift or 0
+    if top + shift < 0 then shift = -top elseif bottom + shift > 1 then shift = 1 - bottom end
+    art:SetTexCoord(c[1], c[2], top + shift, bottom + shift)
+  end
   local t = not trial and entry.tint or { 1, 1, 1 }
   art:SetVertexColor(t[1], t[2], t[3], 1)
   art:Show()
+  if trial then S.ground:Hide() else S.ground:Show() end
   return true
 end
 
@@ -365,13 +402,27 @@ function S.trialMark(ok)
   return cand
 end
 
--- Rapport de /slay art : une ligne par décor (peint ou candidat validé), puis les verdicts.
+-- Rapport de /slay art : les fonds embarqués (et leurs scènes), une ligne par décor (fond embarqué,
+-- candidat validé ou peint), puis les verdicts de l'essai.
 function S.report()
   local lines = {}
   local ids = {}
   for id in pairs(Art.scenes) do ids[#ids + 1] = id end
   table.sort(ids)
   local off = opts().decor == false
+  local bgKeys, users = {}, {}
+  for key in pairs(Art.backgrounds or {}) do bgKeys[#bgKeys + 1] = key users[key] = {} end
+  table.sort(bgKeys)
+  for _, id in ipairs(ids) do
+    local bg = S.embedded(Art.scenes[id])
+    if bg and users[bg.key] then table.insert(users[bg.key], id) end
+  end
+  lines[#lines + 1] = "fonds embarqués (Media\\Backgrounds) : " .. #bgKeys
+  for _, key in ipairs(bgKeys) do
+    local bg = Art.backgrounds[key]
+    lines[#lines + 1] = "  " .. key .. ".tga — " .. (bg.name or "sans nom") .. " (FileDataID " .. tostring(bg.source)
+      .. ") : " .. (#users[key] > 0 and table.concat(users[key], ", ") or "aucune scène")
+  end
   for _, id in ipairs(ids) do
     local entry = Art.scenes[id]
     if not entry.art then
@@ -379,13 +430,15 @@ function S.report()
     else
       local list, cand = candidates(entry.art), nil
       for _, c in ipairs(list) do
-        if S.verdict(c) == true then cand = c break end
+        if c.embedded or S.verdict(c) == true then cand = c break end
       end
+      local tail = off and " (illustrations désactivées : peint)" or ""
       if not cand then
         lines[#lines + 1] = id .. " : peint (aucun des " .. #list .. " candidats validé)"
+      elseif cand.embedded then
+        lines[#lines + 1] = id .. " : fond embarqué " .. cand.key .. " — " .. (cand.name or "sans nom") .. tail
       else
-        lines[#lines + 1] = id .. " : " .. tostring(cand.file) .. " — " .. (cand.name or "sans nom")
-          .. (off and " (illustrations désactivées : peint)" or "")
+        lines[#lines + 1] = id .. " : " .. tostring(cand.file) .. " — " .. (cand.name or "sans nom") .. tail
       end
     end
   end
@@ -395,7 +448,7 @@ function S.report()
     local label = tostring(c.file) .. " (" .. (c.name or "sans nom") .. ")"
     if v == true then ok[#ok + 1] = label elseif v == false then ko[#ko + 1] = label else todo = todo + 1 end
   end
-  lines[#lines + 1] = "validés : " .. (#ok > 0 and table.concat(ok, ", ") or "aucun")
+  lines[#lines + 1] = "candidats du client (repli facultatif) : validés : " .. (#ok > 0 and table.concat(ok, ", ") or "aucun")
   lines[#lines + 1] = "refusés : " .. (#ko > 0 and table.concat(ko, ", ") or "aucun")
   lines[#lines + 1] = "pas encore jugés : " .. todo .. " sur " .. #S.trialList() .. " (/slay decor essai)"
   return lines
