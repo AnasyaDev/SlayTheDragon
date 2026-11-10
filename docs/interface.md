@@ -133,25 +133,62 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   améliorées comptées à part, 68 en tout), 7,5 → 5, 7 → 6, sous le plancher : Esprit de rédemption (et +)
   à 6 ; nom 10 → 42, 8,5 → 10, 7 → 12, sous le plancher (6,5) : Suppression de la douleur+, Mot de
   pouvoir : Radiance+, Mot de pouvoir : Réconfort et Réconfort+. Textes à raccourcir côté `Data/`.
-- **Plaque de raison** (carte injouable) : descendue à cheval sur le bas du panneau (centre à 1,24 de la
-  largeur du corps), sous la zone du texte ; la zone remonterait si elle y mordait.
-- **Zoom sans tressautement** : avant, le survol changeait l'échelle réelle du visuel à chaque image ;
-  le client recalculait la taille de police effective (arrondie) et les retours à la ligne à chaque pas.
-  Désormais (mode `anim`, défaut) l'échelle passe par une animation `Scale` d'un `AnimationGroup` posé
-  sur le visuel `face` (transformation purement visuelle), et chaque texte de l'interface est en
-  `SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)` : sommets mis à l'échelle, mise en
-  page figée — la technique de `Blizzard_EncounterWarnings` (`scaleAnimationMode="Vertex"` sous une
-  animation Scale). L'échelle d'arrivée est tenue par un long délai de fin (`SetEndDelay`) : l'échelle
-  réelle reste 1, aucune mise en page à l'arrivée ; une cible qui change en route (souris qui ressort)
-  relance l'animation depuis l'échelle visuelle courante (`GetSmoothProgress`). La position (levée,
-  écart des voisines) reste pilotée par l'`OnUpdate` partagé ; la zone de survol ne bouge pas. Vaut pour
-  tout `W.hoverable` : main, récompense, marchand, grilles, plaques de réponse, boutons, objets ; et aux
-  vols de cartes (`W.fly` : échelle réelle fixée au départ, animation Scale `IN_OUT`, échelle réelle
-  d'arrivée posée une fois à la fin).
-  Contrepartie : une fois agrandi, le texte est un rendu étiré (un peu moins net qu'un texte rendu à sa
-  taille). `/slay zoom` bascule sur `lisse` (échelle réelle à chaque image, comme avant, mais textes en
-  `SetSmoothScaling` : hauteur de police non arrondie, comme les barres d'info de Blizzard) ;
-  `/slay zoom anim` revient au défaut ; option persistée `zoom`.
+- **Plaque du bas** (mots-clés) : `Media/card_plate.tga` en trois tranches (bords à l'échelle de la
+  hauteur, milieu étiré : élargie sans déformer ses coins), **devant** le corps (derrière, l'ombre portée
+  du corps la masquait : on n'en voyait qu'un liseré), à la place du PSD (liseré du haut à cheval sur le
+  bas opaque du corps). Zone utile mesurée sur la texture (`W.CARD_PLATE` : intérieur sombre x 20 à 234,
+  y 20 à 70 sur 256 × 89 px) moins 3 unités de chaque côté. Paliers 9 / 8,5 / 8 (plancher) à la largeur
+  de repos ; sinon plaque élargie au plancher, jusqu'à la largeur du corps ; au-delà, secours 7,5 / 7,
+  puis mots-clés abrégés (`W.PLATE_SHORT`), puis les premiers suivis de « … ». Seule combinaison réelle
+  élargie : « Incantation · Consumée » (Soins supérieurs, plaque de 102 unités, taille 8) ; aucune n'est
+  abrégée. Mesure par le client (`GetUnboundedStringWidth`), vérification `IsTruncated`.
+- **Plaque de raison** (carte injouable) : centre à 1,225 de la largeur du corps, son bas au-dessus du
+  texte des mots-clés. Raison aux paliers 11 à 8 dans 0,84 du corps (6 unités de marge) ; au plancher,
+  plaque élargie jusqu'à la largeur du corps ; au-delà, deux lignes équilibrées, la plaque grandit vers le
+  haut et la zone du texte de la carte remonte d'autant (« Une incantation / est déjà en cours. »).
+- **Zoom net** (`W.faceApply`, mode `net` par défaut) : pendant le mouvement (0,12 s), l'échelle passe
+  par une animation `Scale` d'un `AnimationGroup` posé sur le visuel `face`, textes en
+  `SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)` (mise en page figée, glyphes étirés
+  — invisible à cette vitesse) ; à l'arrivée, dans le même pas de l'`OnUpdate` partagé, l'échelle
+  d'arrivée devient l'échelle **réelle** du visuel (`SetScale`) et l'animation est coupée (`Stop`) : le
+  client redessine les polices à la vraie taille, le texte de la carte survolée est net. Avant (mode
+  `anim`), l'échelle d'arrivée restait tenue par l'animation (long délai de fin) : texte étiré, baveux,
+  tant que la carte était survolée. L'animation est toujours relative à l'échelle réelle du moment et part
+  du facteur 1 (première image identique avec ou sans animation, aucun saut si le client n'applique
+  l'animation qu'à l'image suivante) ; elle tient son état d'arrivée (délai de fin) jusqu'à la bascule,
+  pour qu'aucune image ne la montre retombée à 1 avant le `SetScale`. Sortie : depuis l'échelle réelle
+  agrandie, étirement vers 1 / échelle, puis échelle réelle 1 posée à la fin. Une cible qui change en route
+  relance l'animation depuis le facteur courant (réversible, y compris au pas même de la bascule). La
+  position (levée, écart des voisines) reste pilotée par l'`OnUpdate`, décalages divisés par l'échelle
+  réelle ; la zone de survol ne bouge pas. Mise en page inchangée à la bascule : retours à la ligne
+  explicites, largeurs et ancrages en unités du visuel, et **tous les textes en `SetSmoothScaling`**
+  (hauteur de police non arrondie au pixel, comme les barres d'info de Blizzard : la taille rendue est
+  exactement proportionnelle à l'échelle ; le texte de mesure des cartes aussi). Vols de cartes
+  (`W.fly`) : échelle réelle de départ, étirement pendant le vol, échelle réelle d'arrivée posée à
+  l'atterrissage (carte posée nette). `/slay zoom` bascule entre `net` et `lisse` (échelle réelle à chaque
+  image, pour comparer) ; `/slay zoom net|lisse` ; l'ancienne valeur sauvegardée `anim` (et `/slay zoom
+  anim`) retombe sur `net`. Écartée : dessiner les textes à la taille agrandie dans un cadre d'échelle
+  de repos < 1 (glyphes réduits au repos) — la carte au repos, la plus souvent lue (la main entière),
+  serait alors un rendu réduit sans mipmaps (crénelé), il faudrait tenir une animation sur chaque carte,
+  bouton et plaque en permanence (arrêtée dès qu'un cadre est caché : texte géant au retour), et le
+  problème de netteté passerait du survol au repos.
+- **Carte d'un seul bloc** : le visuel d'une carte (`face`) est agrandi de 0,3 de la largeur de chaque
+  côté (`W.CARD_MARGIN`) pour contenir halo, languette de coût, ruban, plaques et étiquette de prix ;
+  toutes les pièces et tous les textes sont posés par rapport au corps (`b.bg`, centré sur le visuel).
+  Capture en jeu (mode `anim`) : ruban et plaque du bas restés à leur taille de repos pendant que corps,
+  médaillon et textes grossissaient — les pièces qui débordaient du cadre animé ne suivaient pas
+  l'animation `Scale` (hypothèse : seul cas commun aux pièces fautives) ; à l'arrivée, l'échelle réelle
+  (mode `net`) vaut de toute façon pour tout le visuel.
+- **Écran doré au premier survol** : le halo d'une plaque (`Plaque:SetGlow`) était créé au premier
+  survol, donc pendant l'animation `Scale` du visuel ; le client dessinait ces textures nées en cours
+  d'animation démesurées (aplat doré sur la scène et le plateau, seulement la première fois). Le halo est
+  maintenant créé avec la plaque (caché, alpha 0) ; le halo des cartes part aussi de 0. Le faux client
+  relève toute région créée sous un cadre dont une animation d'échelle joue (U23).
+- **Plaques de réponse** (`plaque` de `UI/Screens.lua`) : zone utile = plaque moins 16 unités sur les côtés
+  et 10 en haut et en bas ; libellé sur une ligne (paliers 20 / 18 / 16) ; texte sur une ligne aux deux
+  premiers paliers (15,5 / 14,5), sinon en lignes équilibrées (coupure au mot le plus près du milieu,
+  paliers 15,5 à 12,5) ; bloc (icône, libellé, texte) centré verticalement ; mesures par le client.
+  « Combat : récompense habituelle + 20 po » : « Combat : récompense / habituelle + 20 po », loin des bords.
 - **Textes vides jusqu'au survol** : une police d'addon chargée de façon asynchrone ne dessine rien pour
   un texte posé avant son arrivée, jusqu'à la prochaine mise en page — que provoquait justement le
   `SetScale` du survol. Le préchargement était sur un cadre transparent hors écran (sans doute jamais
@@ -271,7 +308,10 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
   marchand, PV rendus au repos, raison d'une carte ou d'une action refusée. Les infobulles restent, à la
   demande (mots-clés, états, intentions, bibelots, potions, piles, recharges, deck). L'infobulle d'une
   carte n'explique plus que ses mots-clés (et l'amélioration, et la raison d'un refus) : la carte se lit
-  d'elle-même.
+  d'elle-même. Un mot-clé = une ligne « Nom : effet. » (`Art.keywordLine`), 60 caractères au plus, l'effet
+  principal seulement (« Incantation : se lance au début du prochain tour. ») ; plusieurs mots-clés =
+  une ligne chacun, en bloc. Les aides (potion, réputation) : une idée par ligne. Les états (`Core/Statuses.lua`)
+  gardent leur texte, sur la même ligne que leur nom.
 - **Retour visuel** : carte jouée qui file vers sa cible (ou le héros), chiffres flottants (dégâts blancs,
   Absorption bleue, soins verts), portion de vie perdue qui reste claire puis se vide, secousse et éclair
   rouge de l'unité touchée, animation du modèle, mort en fondu, intention qui « s'exécute » (la bulle
@@ -538,9 +578,9 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   (icônes rondes, carrées arrondies, ouverture du médaillon), de la police Baloo Chettan 2 (sinon Friz
   Quadrata) ; netteté des cartes au survol ; matières répétées sans couture (`"REPEAT"`) ; rognage de la fenêtre (`SetClipsChildren`) sans effet de bord (la carte
   qu'on glisse hors de la fenêtre disparaît : voulu).
-- Le zoom des survols (animation Scale + textes Vertex, échelle tenue par le délai de fin) : fluidité,
-  textes immobiles pendant l'agrandissement, netteté une fois agrandi ; `/slay zoom` pour comparer avec
-  `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
+- Le zoom des survols (mode `net` : animation Scale + textes Vertex pendant le mouvement, échelle réelle
+  posée à l'arrivée) : fluidité, textes immobiles pendant l'agrandissement, aucun sursaut ni clignotement à
+  l'arrivée (moment de la bascule), texte net une fois agrandi ; `/slay zoom` pour comparer avec `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
 - La mise en page des textes de carte : mesurée par le client (`GetStringWidth`, `GetStringHeight`,
   `GetNumLines`, `IsTruncated`) ; hors jeu, seules les métriques du faux client (Baloo Chettan 2, ligne
   de 1,47 cadratin) la vérifient.
@@ -612,9 +652,7 @@ bulle d'intention ; mana) ; **textes des cartes** (U22 : les 34 cartes, de base 
 et injouables avec leur plaque de raison : chaque ligne posée, marges comprises, sur les pixels sombres
 de `Media/card_panel.tga` et hors de la gemme, au-dessus des plaques ; nom dans la bande opaque de
 `Media/card_ribbon.tga` ; aucune recoupe par le client ; répartition par palier et cartes sous le
-plancher affichées ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom (U18 :
-animation Scale, échelle réelle intacte, textes Vertex, aucune nouvelle mise en page, reprise depuis
-l'échelle visuelle courante, tenue à l'arrivée, `/slay zoom`). Le faux client mesure les textes avec les
+plancher affichées ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; `/slay zoom net|lisse`, ancienne valeur `anim`) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus). Le faux client mesure les textes avec les
 avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne de 1,47 cadratin (hhea),
 retours explicites puis par mots, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
@@ -645,7 +683,10 @@ En tout premier (peau « Mechanized Magic ») :
    de l'air tout autour (côtés, haut sous la gemme, bas biseauté) même sur Forme d'ombre, Pénitence,
    Esprit de rédemption, chiffres blancs (verts une fois
    améliorés) ; gemme verte / bleue sur les peu communes / rares ; « Recharge N », « Incantation »,
-   « Consumée », « Pouvoir » dans la plaque sous la carte ; carte injouable grisée avec sa raison en rouge.
+   « Consumée », « Pouvoir » dans la plaque sous la carte, plaque bien visible (ardoise et liseré entiers
+   sous le corps, comme « Recharge 1 » sur la planche), texte jamais plus large qu'elle (Soins supérieurs :
+   « Incantation · Consumée » sur une plaque élargie) ; carte injouable grisée avec sa raison en rouge,
+   toujours dans sa plaque (« Une incantation est déjà en cours. » sur deux lignes).
 4. **Plaques** : ardoise sans couture visible (bandeau, plateau, plaques de réponse, bulles d'intention,
    options), liseré d'argent régulier aux coins ; bulles ivoire (rencontre, parcours) ; survol doré des
    plaques de réponse et du feu de camp ; pilule dorée « Fin du tour » / « Reprendre la route ».
@@ -660,9 +701,13 @@ Ensuite (retours du premier essai) :
    sens derrière les personnages (sans logo ni texte, bien cadrée) ? Sinon dire lequel et ce qui cloche
    (trop haut / trop bas / logo) ; `/slay decor peint` revient au décor peint.
 3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se lève et grossit en
-   ~0,1 s **sans que le nom, le coût ni le texte tressautent ou changent de coupure** (comparer avec
-   `/slay zoom` → `lisse`, puis `/slay zoom anim` ; dire lequel garder et si le texte agrandi est assez
-   net), les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
+   ~0,1 s **sans que le nom, le coût ni le texte tressautent ou changent de coupure**, **d'un seul bloc**
+   (ruban, languette de coût, plaque du bas et halo grossissent avec le corps, pendant le mouvement comme
+   à l'arrivée) ; **une fois agrandie, le texte est net** (aussi net qu'au repos, pas baveux) et **rien ne
+   saute ni ne clignote au moment où elle arrive** (bascule vers la vraie taille) ; comparer avec
+   `/slay zoom` → `lisse`, puis `/slay zoom net`, et dire lequel garder ; **premier survol** de chaque
+   élément après un `/reload` (plaques de réponse d'une rencontre, boutons, butin) : aucun aplat doré
+   sur l'écran ; les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
    redescendre sans à-coup ; aucun clignotement en bord de carte ; on peut monter le curseur sur la
    partie levée sans la perdre. Idem : cartes de récompense / marchand / grilles, boutons (dont « Fin du
    tour », ≡, ×), butin au sol, couchage et grimoire, étapes du parcours, plaques de réponse, fioles et
