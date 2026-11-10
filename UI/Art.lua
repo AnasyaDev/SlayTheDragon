@@ -83,6 +83,21 @@ Art.scenes = {
     texture = 7377860, crop = { 0, 1, 0.16, 0.86 }, tint = { 0.32, 0.34, 0.55 },
     paint = "night",
   },
+  hill = { -- Colline des sentinelles
+    texture = 7377860, crop = { 0, 1, 0.06, 0.76 }, tint = { 1, 0.93, 0.8 },
+    paint = "fields",
+  },
+  camp = { -- campements (réfugiés, gnolls)
+    texture = 7377860, crop = { 0, 1, 0.2, 0.9 }, tint = { 0.95, 0.85, 0.7 },
+    paint = "fields",
+  },
+  ruins = {
+    texture = 7377860, crop = { 0, 1, 0.2, 0.9 }, tint = { 0.8, 0.75, 0.7 },
+    paint = "cave",
+  },
+  coast = { -- côte de la Marche : décor peint seulement (aucune illustration de côte confirmée)
+    paint = "coast",
+  },
   shop = {
     texture = 7377860, crop = { 0, 1, 0.2, 0.9 }, tint = { 1, 0.9, 0.75 },
     paint = "fields",

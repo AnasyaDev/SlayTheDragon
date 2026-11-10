@@ -709,7 +709,10 @@ function V:RunQueue()
   end
   self.playing = true
   item.fn()
-  W.delay(item.delay * W.pace(), function() V:RunQueue() end)
+  -- File en retard (clics rapides) : on rattrape en accélérant.
+  local d = item.delay * W.pace()
+  if #self.queue > 10 then d = d * 0.35 elseif #self.queue > 5 then d = d * 0.6 end
+  W.delay(d, function() V:RunQueue() end)
 end
 
 function V:OnEvents(evs)

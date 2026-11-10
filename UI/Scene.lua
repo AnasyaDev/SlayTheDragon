@@ -133,6 +133,28 @@ function PAINT.cave(f, g)
   g[#g + 1] = top
 end
 
+function PAINT.coast(f, g)
+  sky(g, f, { 0.95, 0.86, 0.6 }, { 0.85, 0.82, 0.62 })
+  local sun = W.disc(f, "BACKGROUND", -7, Art.hex("#f8e6ae"))
+  at(sun, f, 160, 40, 80, 80)
+  g[#g + 1] = sun
+  hills(g, f, 160, Art.hex("#4f7f8f"), {}, -6)
+  local swell = W.rect(f, "BACKGROUND", -5, Art.hex("#6f9fa8"))
+  at(swell, f, 0, 190, S.W, 6)
+  g[#g + 1] = swell
+  local tower = W.rect(f, "BACKGROUND", -5, Art.hex("#e8e2d0"))
+  at(tower, f, 840, 70, 30, 120)
+  local cap = W.rect(f, "BACKGROUND", -5, Art.hex("#7a2a1e"))
+  at(cap, f, 834, 60, 42, 16)
+  g[#g + 1] = tower
+  g[#g + 1] = cap
+  hills(g, f, 236, Art.hex("#d9b97a"), { { 300, 700, 50 }, { 900, 400, 30 } }, -4)
+  hills(g, f, 280, Art.hex("#b08f52"), { { 600, 900, 30 } }, -3)
+  local ground = W.rect(f, "BACKGROUND", -2, Art.hex("#8a6a3a"))
+  at(ground, f, 0, 310, S.W, 70)
+  g[#g + 1] = ground
+end
+
 function PAINT.night(f, g)
   sky(g, f, { 0.09, 0.1, 0.2 }, { 0.17, 0.2, 0.33 })
   local moon = W.disc(f, "BACKGROUND", -7, Art.hex("#e8e2d0"))

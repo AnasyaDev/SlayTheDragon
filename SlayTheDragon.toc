@@ -26,6 +26,7 @@ UI\Art.lua
 UI\Persist.lua
 UI\Controller.lua
 UI\Widgets.lua
+UI\Scene.lua
 UI\Main.lua
 UI\CombatView.lua
 UI\Screens.lua

@@ -559,10 +559,9 @@ end
 local function startStep()
   local db = ns.Persist.db
   local st = C.startInfo()
-  local text = "Un deckbuilder à jouer pendant tes vols. Choisis ta classe et ta clé mythique, "
-    .. "puis traverse la Marche de l'Ouest jusqu'à son boss."
+  local text = ""
   local last = db.journal[#db.journal]
-  if last then text = text .. "\n\nDernière expédition : " .. (journalLine(last)) .. "." end
+  if last then text = "Dernière expédition : " .. (journalLine(last)) .. "." end
   if C.restoreNote then
     text = text .. "\n|cffff6060L'expédition sauvegardée était illisible (" .. C.restoreNote
       .. ") : elle a été mise de côté.|r"
@@ -713,8 +712,7 @@ local function rewardStep(exp)
   local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
   if r.kind == "event" and ev then
     title = ev.name
-    local ch = exp.event.chosen and ev.choices[exp.event.chosen]
-    text = ch and ch.after or ""
+    text = eventResult(exp)
   elseif r.kind == "chest" then
     text = "Tu forces la serrure du coffre."
   else
@@ -822,6 +820,17 @@ local function merchantStep(exp)
     text = "« Que des affaires, l'ami ! » Tu as |cffffd700" .. exp.gold .. " po|r.", options = opts }
 end
 
+-- Texte « après coup » d'une rencontre : exp.event.result (issue d'un pari comprise), sinon after.
+local function eventResult(exp)
+  local ev = exp.event
+  local def = ev and ev.id and ns.Events[ev.id]
+  if not def or not ev.chosen then return "" end
+  if ev.result and ev.result ~= "" then return ev.result end
+  local ch = def.choices[ev.chosen]
+  return ch and (ch.result or ch.after) or ""
+end
+C.eventResult = eventResult
+
 local function eventStep(exp)
   local ev = exp.event
   local avail = available(exp)
@@ -830,22 +839,30 @@ local function eventStep(exp)
       options = { actionOption(avail, { id = "leave", label = "Continuer" }) } }
   end
   local def = ns.Events[ev.id]
-  -- Champs facultatifs (piste F) : speaker, scene, npc, rarity ; choix : outcome, hidden.
+  -- Champs facultatifs (piste F) : speaker, scene, npc, rarity ; réponses : outcome, hidden.
   local base = { kind = "event", title = def.name, speaker = def.speaker, scene = def.scene, npc = def.npc,
     rarity = def.rarity }
   if ev.chosen then
-    local ch = def.choices[ev.chosen]
-    base.text = ch and ch.after or ""
+    base.text = eventResult(exp)
     base.after = true
     base.options = { actionOption(avail, { id = "leave", label = "Continuer" }) }
     return base
   end
   local opts = {}
-  for i, ch in ipairs(def.choices) do
-    local outcome = ch.outcome or ch.text
-    if ch.hidden then outcome = "?" end
-    opts[#opts + 1] = actionOption(avail, { id = "choose:" .. i, label = ch.label, text = outcome,
-      hidden = ch.hidden })
+  if X.eventOptions then
+    -- Toutes les réponses, y compris désactivées (grisées avec leur raison) ; « ? » si cachée.
+    for _, o in ipairs(X.eventOptions(exp)) do
+      local opt = { id = "choose:" .. o.index, label = o.label, text = o.outcome or "", hidden = o.hidden }
+      if o.disabled then opt.disabled, opt.reason = true, o.reason or "Indisponible." end
+      opts[#opts + 1] = actionOption(avail, opt)
+    end
+  else
+    for i, ch in ipairs(def.choices) do
+      local outcome = ch.outcome or ch.text
+      if ch.hidden then outcome = "?" end
+      opts[#opts + 1] = actionOption(avail, { id = "choose:" .. i, label = ch.label, text = outcome,
+        hidden = ch.hidden })
+    end
   end
   base.text = def.text
   base.options = opts
@@ -864,10 +881,10 @@ local function selectStep(exp)
     end
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipSelect", label = "Passer" })
-  local what = sel.kind == "upgrade" and "choisis une carte à améliorer" or "choisis une carte à retirer"
-  local ch = ev and exp.event.chosen and ev.choices[exp.event.chosen]
+  local what = sel.kind == "upgrade" and "choisis une carte à améliorer"
+    or (sel.kind == "dupe" and "choisis une carte à copier" or "choisis une carte à retirer")
   return { kind = "select", title = (ev and ev.name or "Rencontre") .. " : " .. what,
-    text = ch and ch.after or "", options = opts, selectKind = sel.kind }
+    text = eventResult(exp), options = opts, selectKind = sel.kind }
 end
 
 local function startRelicStep(exp)

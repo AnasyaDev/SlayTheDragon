@@ -81,7 +81,8 @@ SetJustifyV SetWordWrap SetFontObject SetTextColor SetStatusBarTexture SetStatus
 SetAlpha SetNormalTexture SetPushedTexture SetHighlightTexture SetCheckedTexture SetFacing ClearModel
 SetMaxLines SetFading SetTimeVisible EnableMouseWheel ScrollUp ScrollDown SetThickness SetStartPoint
 SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale SetPortraitZoom
-SetDrawLayer SetBlendMode
+SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
+SetGradient SetMaxLines SetHorizTile SetVertTile
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -197,12 +198,14 @@ function Frame:CreateTexture() return newObject("Texture", nil, self) end
 function Frame:CreateFontString(_, _, font) local o = newObject("FontString", nil, self) o._font = font return o end
 function Frame:CreateLine() return newObject("Line", nil, self) end
 function Frame:CreateAnimationGroup() return newObject("AnimationGroup", nil, self) end
+function Frame:CreateMaskTexture() return newObject("MaskTexture", nil, self) end
 
 -- Texte
 function Frame:SetText(t) self._text = t end
 function Frame:GetText() return self._text end
 function Frame:SetFormattedText(fmt, ...) self._text = fmt:format(...) end
 function Frame:GetStringWidth() return #(self._text or "") * 6 end
+function Frame:GetStringHeight() return 14 * math.max(1, math.ceil(#(self._text or "") * 6 / math.max(1, self._w or 200))) end
 function Frame:GetFont() return "Fonts\\FRIZQT__.TTF", 12, "" end
 function Frame:SetFont(f, size, flags)
   if type(size) ~= "number" or size <= 0 then error("SetFont : taille invalide") end
@@ -214,12 +217,14 @@ function Frame:SetTexture(t)
   if t ~= nil and type(t) ~= "string" and type(t) ~= "number" then error("SetTexture : argument " .. type(t)) end
   self._texture = t
   if type(t) == "string" and H.badPaths[t] then return false end
+  if type(t) == "number" and H.badFiles and H.badFiles[t] then return false end
   return true
 end
 function Frame:GetTexture() return self._texture end
 function Frame:GetTextureFileID()
   local t = self._texture
   if t == nil or (type(t) == "string" and H.badPaths[t]) then return nil end
+  if type(t) == "number" and H.badFiles and H.badFiles[t] then return nil end
   return type(t) == "number" and t or 4242
 end
 function Frame:SetAtlas(a) self._atlas = a return true end
@@ -336,8 +341,13 @@ function H.boot(db)
   _G.DEFAULT_CHAT_FRAME = newObject("ScrollingMessageFrame", "ChatFrame1", _G.UIParent)
   _G.UISpecialFrames = {}
   _G.SlashCmdList = {}
-  _G.SOUNDKIT = { IG_SPELLBOOK_OPEN = 829, IG_SPELLBOOK_CLOSE = 830 }
-  _G.PlaySound = function() end
+  -- SOUNDKIT : tout nom demandé reçoit un identifiant (les noms sont vérifiés dans UI/Art.lua).
+  H.sounds = {}
+  _G.SOUNDKIT = setmetatable({}, { __index = function(_, k) return type(k) == "string" and (#k + 1000) or nil end })
+  _G.PlaySound = function(id)
+    if type(id) ~= "number" then error("PlaySound : identifiant attendu") end
+    H.sounds[#H.sounds + 1] = id
+  end
   _G.GameFontNormal, _G.GameFontHighlightSmall, _G.GameFontHighlight = {}, {}, {}
   _G.C_Timer = {
     After = function(d, fn)
@@ -410,6 +420,16 @@ function H.advance(seconds)
     best.fn()
   end
   H.now = target
+end
+
+-- Laisse la file d'animations du combat se vider (au plus 60 s virtuelles).
+function H.settle()
+  local v = H.ns.UI.screens.combat
+  for _ = 1, 120 do
+    if not v.playing then break end
+    H.advance(0.5)
+  end
+  H.advance(1)
 end
 
 function H.slash(msg)
@@ -578,7 +598,7 @@ local function fightUntil(stopFn, maxActions)
   H.actions = H.actions or 0
   local bot = newBot()
   for _ = 1, maxActions or 400 do
-    if C().over() then return C().over() end
+    if C().over() then H.settle() return C().over() end
     if stopFn and stopFn() then return nil end
     local before = C().combat().round
     local kind = playAction(bot)
@@ -588,6 +608,7 @@ local function fightUntil(stopFn, maxActions)
       error("le tour a changé sur un coup")
     end
   end
+  if C().over() then H.settle() end
   return C().over()
 end
 
@@ -630,6 +651,7 @@ local function decide(state)
     if state.mapStyle and idx then H.key(tostring(idx)) else clickOption(target) end
     state.mapStyle = not state.mapStyle
   elseif k == "reward" then
+    if UI().current.opened == false then H.click(UI().current.chest) end
     local best, bestR
     for _, o in ipairs(step.options) do
       if o.card and not o.disabled and (not bestR or rating(o.card.id) > bestR) then best, bestR = o, rating(o.card.id) end
@@ -782,11 +804,9 @@ for _, n in ipairs(st.nodes) do if n.kind == "boss" then boss = n end end
 check("boss à droite, icône de boss", boss and boss.x > 0.9 and button(boss.id).icon._texture ~= ns.Art.QUESTION)
 H.click(button(boss.id))
 check("nœud inaccessible : refus", EXP().node == nil and UI().err._text == "Étape inaccessible.", UI().err._text)
-local lineCount = 0
-for _, l in ipairs(UI().current.lines) do if l._shown then lineCount = lineCount + 1 end end
-check("liens tracés", lineCount >= #exp.map.nodes - 1, lineCount)
+check("liens tracés", (UI().current.linkCount or 0) >= #exp.map.nodes - 1, UI().current.linkCount)
 check("trois emplacements de potion vides dans le bandeau", UI().potionSlots[3]._shown
-  and UI().potionSlots[1].icon._texture == ns.Art.emptySlot.icon)
+  and not UI().potionSlots[1].icon._shown)
 check("pas de clé mythique affichée à +0", not UI().keystone._shown)
 
 print("U6  expédition complète par l'interface (clics, touches, glisser-déposer)")
@@ -810,8 +830,18 @@ while guard < 400 do
         check("intention affichée", firstSlot.intent._shown and (firstSlot.intent.text._text or "") ~= "")
         tt = H.hover(firstSlot.intent)
         check("infobulle d'intention", #tt >= 2, #tt)
-        tt = H.hover(V().cards[1])
-        check("infobulle de carte", #tt >= 2, #tt)
+        -- Infobulle de carte : seulement les mots-clés (la carte se lit d'elle-même).
+        local kwCard
+        for i = 1, #C().combat().hand do
+          local d = H.ns.Card.def(C().combat().hand[i])
+          if #H.ns.Widgets.cardKeywords(d) > 0 and not kwCard then kwCard = V().cards[i] end
+        end
+        if kwCard then
+          tt = H.hover(kwCard)
+          check("infobulle de carte : mots-clés", #tt >= 2, #tt)
+        end
+        check("carte : nom, médaillon et texte dessinés", (V().cards[1].name._text or "") ~= ""
+          and V().cards[1].medal.icon._texture ~= nil and (V().cards[1].body._text or "") ~= "")
         tt = H.hover(UI().info)
         check("infobulle du deck dans le bandeau", #tt >= 2 and tt[1]:find("Deck", 1, true), tt[1])
         -- Carte injouable : raison, rien ne bouge.
@@ -862,7 +892,7 @@ while guard < 400 do
   else
     decide(state)
   end
-  H.advance(0.3)
+  H.advance(1)
 end
 check("bilan de fin d'expédition atteint", finished, currentKind())
 check("sauvegarde rechargée en plein combat", combatReloaded)
@@ -913,11 +943,10 @@ H.key("ENTER")
 exp = EXP()
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
-  check("clé mythique dans le bandeau", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
+  check("clé mythique dans le bandeau", UI().keystone._shown and UI().keystone.count._text == "Clé +" .. keyMax)
   tt = H.hover(UI().keystone)
   check("infobulle de la clé : affixes", table.concat(tt, " "):find("Fortifié", 1, true), table.concat(tt, " | "))
-  check("affixes sur la carte", (UI().step.text or ""):find("Fortifié", 1, true)
-    and UI().current.affixRow.icons[2]._shown)
+  check("affixes dans le texte de la carte", (UI().step.text or ""):find("Fortifié", 1, true))
 end
 
 print("U8  potions et bibelots : bandeau, défausse, boire en combat")
@@ -986,7 +1015,8 @@ exp = freshRun(SEED + 2, "merchant")
 ns = H.ns
 check("écran marchand", currentKind() == "merchant", currentKind())
 local s = UI().current
-check("cinq cartes à prix", #s.cardOptions == 5 and s.cards[5]._shown and (s.cards[1].tag._text or ""):find("po", 1, true))
+check("cinq cartes à prix", #s.cardOptions == 5 and s.cards[5]._shown and s.cards[1].tag._shown
+  and (s.cards[1].tag.text._text or ""):find("po", 1, true))
 local relicOpt, potionOpt
 for _, o in ipairs(UI().step.options) do
   if o.item and o.item.kind == "relic" and not relicOpt then relicOpt = o end
@@ -1056,7 +1086,7 @@ if ev then
   check("choix appliqué (résultat, sélection ou récompense)", exp.event.chosen == pick
     and (k == "event" or k == "select" or k == "reward"), k)
   if k == "event" then
-    check("texte après coup", UI().step.text == ev.choices[pick].after, UI().step.text)
+    check("texte après coup", UI().step.text == (exp.event.result or ev.choices[pick].after), UI().step.text)
     H.key("ENTER")
   elseif k == "select" then
     clickOption("skipSelect")
@@ -1166,7 +1196,7 @@ check("base illisible remplacée", type(_G.SlayTheDragonDB) == "table" and _G.Sl
 
 print("U15 art manquant : repli et rapport /slay art")
 H.badSpells = { [585] = true }
-H.badPaths = { ["Interface\\Icons\\Spell_Holy_HolySmite"] = true }
+H.badFiles = { [135924] = true }
 H.badCreatures = { [639] = true, [117] = true }
 freshRun(SEED, "combat")
 H.advance(2)
@@ -1175,8 +1205,8 @@ for i = 1, 10 do
   local card = V().cards[i]
   if card._shown and card.cardId == "smite" then smite = card end
 end
-check("icône introuvable -> point d'interrogation", smite and smite.icon._texture == H.ns.Art.QUESTION,
-  smite and smite.icon._texture)
+check("icône introuvable -> point d'interrogation", smite and smite.medal.icon._texture == H.ns.Art.QUESTION,
+  smite and smite.medal.icon._texture)
 H.slash("modeles")
 H.advance(2)
 check("VanCleef : repli SetDisplayInfo", (function()
@@ -1192,7 +1222,7 @@ end)())
 H.slash("art")
 local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
 check("/slay art liste l'icône et le modèle manquants", said:find("card:smite", 1, true) and said:find("model:gnoll", 1, true), said)
-H.badSpells, H.badPaths, H.badCreatures = nil, {}, {}
+H.badSpells, H.badPaths, H.badFiles, H.badCreatures = nil, {}, nil, {}
 
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
