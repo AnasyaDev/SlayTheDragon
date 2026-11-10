@@ -1296,39 +1296,150 @@ local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
 check("/slay art liste l'icône et le modèle manquants", said:find("card:smite", 1, true) and said:find("model:gnoll", 1, true), said)
 H.badSpells, H.badPaths, H.badFiles, H.badCreatures = nil, {}, nil, {}
 
-print("U17 décors illustrés : premier candidat chargé, sinon repli peint ; /slay art")
+print("U17 décors : peint par défaut, essai manuel (suivant, ok, non, peint), verdicts gardés")
 do
+  local function chat() return table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n") end
+  local function clearChat() _G.DEFAULT_CHAT_FRAME._lines = {} end
+  -- Même quand tous les fichiers « répondent » (SetTexture, FileID, chargement), rien n'est affiché
+  -- sans validation : sur Forever un fichier absent répond pareil et s'affiche en aplat vert.
+  H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
+  H.boot(nil)
+  H.slash("")
   local Sc = H.ns.Scene
-  check("par défaut : la route retient le 1er candidat", Sc.illus.elwynn and Sc.illus.elwynn.state == "ok"
-    and Sc.illus.elwynn.index == 1)
-  -- Logement d'Elwynn absent (SetTexture refuse), écran Forever qui ne finit jamais de charger,
-  -- Mortemines introuvables sous toutes leurs formes.
-  H.badFiles = { [7377860] = true, [131833] = true, [7963782] = true }
-  H.badPaths = { ["Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines"] = true }
-  H.unloaded = { [7963776] = true, [7963777] = true }
-  freshRun(SEED, nil)
-  Sc = H.ns.Scene
-  check("en attente pendant le chargement : décor peint seul", Sc.illus.elwynn.state == "pending"
-    and Sc.illus.elwynn.index == 2 and not Sc.art._shown)
-  H.advance(Sc.TIMEOUT + 2)
-  check("candidat qui ne charge pas : écarté après le délai, 3e retenu", Sc.illus.elwynn.state == "ok"
-    and Sc.illus.elwynn.index == 3 and Sc.illus.elwynn.cand.file == 131839, Sc.illus.elwynn.index)
-  check("Mortemines : aucun candidat -> repli", Sc.illus.deadmines.state == "fallback")
-  check("ruines : la liste d'Elwynn sert de suite", Sc.illus.ruins.state == "ok" and Sc.illus.ruins.cand.file == 131839)
-  Sc.set({ scene = "road", board = true })
-  check("décor de la route : illustration retenue affichée", Sc.art._shown and Sc.art._texture == 131839)
-  check("recadrage appliqué", Sc.art._calls.SetTexCoord and math.abs(Sc.art._calls.SetTexCoord[3] - 0.14) < 1e-9)
-  Sc.set({ scene = "mine", board = true })
-  local cave = Sc.paints.cave[1]
-  check("décor du boss : repli peint (illustration cachée)", not Sc.art._shown and cave._shown)
-  _G.DEFAULT_CHAT_FRAME._lines = {}
+  local fields = Sc.paints.fields[1]
+  check("accueil : décor de la route", Sc.scene == "road" and Sc.decor._shown)
+  check("par défaut : décor peint, aucune illustration", not Sc.art._shown and fields._shown
+    and H.ns.Persist.options().decor == true)
+  for id, entry in pairs(H.ns.Art.scenes) do
+    if Sc.chosen(entry) ~= nil then check("décor " .. id .. " : rien de choisi par défaut", false) end
+  end
+  check("plus aucune sonde automatique", Sc.illus == nil and Sc.resolveAll == nil and Sc.probeFrame == nil)
+  clearChat()
   H.slash("art")
-  local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
-  check("/slay art : candidat retenu par décor", said:find("road : candidat 3/4 = 131839", 1, true), said)
-  check("/slay art : candidats écartés et raison", said:find("7377860 refusé", 1, true)
-    and said:find("7963776 non chargé", 1, true), said)
-  check("/slay art : repli signalé", said:find("mine : repli", 1, true), said)
-  check("/slay art : décor peint seulement", said:find("coast : peint", 1, true), said)
+  local said = chat()
+  check("/slay art : décors peints par défaut", said:find("road : peint (aucun des 4 candidats validé)", 1, true)
+    and said:find("mine : peint (aucun des 3 candidats validé)", 1, true)
+    and said:find("coast : peint (pas d'illustration)", 1, true), said)
+  check("/slay art : aucun verdict", said:find("validés : aucun", 1, true) and said:find("refusés : aucun", 1, true)
+    and said:find("pas encore jugés : 8 sur 8", 1, true), said)
+
+  -- Liste d'essai : toutes les illustrations, dédoublonnée (les ruines reprennent Elwynn).
+  local list = Sc.trialList()
+  local keys, dup = {}, false
+  for _, c in ipairs(list) do
+    if keys[tostring(c.file)] then dup = true end
+    keys[tostring(c.file)] = true
+  end
+  check("liste d'essai : 8 candidats sans doublon", #list == 8 and not dup, #list)
+  check("liste d'essai : écrans classiques et Forever", keys["131839"] and keys["131833"] and keys["7963776"]
+    and keys["7963777"] and keys["7963782"] and keys["7377860"])
+
+  clearChat()
+  H.slash("decor essai")
+  said = chat()
+  check("essai : candidat 1 affiché sur le décor courant", Sc.trial == 1 and Sc.art._shown
+    and Sc.art._texture == list[1].file, Sc.art._texture)
+  check("essai : sans teinte ni voile", Sc.art._calls.SetVertexColor[1] == 1 and Sc.art._calls.SetVertexColor[3] == 1
+    and Sc.veil._calls.SetColorTexture[4] == 0)
+  check("essai : numéro, fichier, nom et mode d'emploi", said:find("essai du décor 1/8 : " .. tostring(list[1].file)
+    .. " — " .. list[1].name .. " [pas encore jugé]", 1, true) and said:find("/slay decor ok", 1, true), said)
+  clearChat()
+  H.slash("decor suivant")
+  check("suivant : candidat 2", Sc.trial == 2 and Sc.art._texture == list[2].file
+    and chat():find("essai du décor 2/8 : " .. tostring(list[2].file), 1, true), chat())
+  H.slash("decor precedent")
+  H.slash("decor precedent")
+  check("précédent depuis le 1er : retour au dernier", Sc.trial == 8 and Sc.art._texture == list[8].file)
+  H.slash("decor suivant")
+  check("suivant depuis le dernier : retour au 1er", Sc.trial == 1)
+
+  -- Verdicts : le 1er refusé, puis on valide le premier candidat de la liste d'Elwynn qui n'est pas
+  -- le 1er de la liste d'essai, pour vérifier que chaque décor prend le premier validé de SA liste.
+  local elwynn = Sc.candidates("elwynn")
+  local deadmines = Sc.candidates("deadmines")
+  clearChat()
+  H.slash("decor non")
+  check("non : refusé et dit", H.ns.Persist.options().artChecks[tostring(list[1].file)] == false
+    and chat():find(tostring(list[1].file) .. " refusé", 1, true), chat())
+  local function goTo(file)
+    for _ = 1, #list do
+      if Sc.trialList()[Sc.trial].file == file then return true end
+      H.slash("decor suivant")
+    end
+    return false
+  end
+  check("aller au 3e candidat d'Elwynn", goTo(elwynn[3].file))
+  clearChat()
+  H.slash("decor ok")
+  check("ok : validé et dit", H.ns.Persist.options().artChecks[tostring(elwynn[3].file)] == true
+    and chat():find(tostring(elwynn[3].file) .. " validé", 1, true), chat())
+  goTo(elwynn[1].file)
+  H.slash("decor non")
+  goTo(elwynn[4].file)
+  H.slash("decor ok")
+  goTo(deadmines[3].file)
+  H.slash("decor ok")
+  check("en essai, le décor montre le candidat essayé", Sc.art._texture == deadmines[3].file)
+
+  clearChat()
+  H.slash("decor peint")
+  check("peint : fin de l'essai, décor peint", Sc.trial == nil and not Sc.art._shown and fields._shown
+    and H.ns.Persist.options().decor == false, chat())
+  H.slash("decor illustre")
+  check("illustre : la route montre le premier validé de sa liste", H.ns.Persist.options().decor == true
+    and Sc.art._shown and Sc.art._texture == elwynn[3].file)
+  check("recadrage et teinte du décor", math.abs(Sc.art._calls.SetTexCoord[3] - elwynn[3].crop[3]) < 1e-9
+    and math.abs(Sc.art._calls.SetVertexColor[2] - H.ns.Art.scenes.road.tint[2]) < 1e-9)
+  check("voile de l'accueil rétabli", math.abs(Sc.veil._calls.SetColorTexture[4] - 0.2) < 1e-9)
+  Sc.set({ scene = "mine", board = true })
+  check("boss : premier validé de la liste des Mortemines", Sc.art._shown and Sc.art._texture == deadmines[3].file)
+  Sc.set({ scene = "ruins", board = true })
+  check("ruines : la liste d'Elwynn sert de suite", Sc.art._texture == elwynn[3].file)
+  Sc.set({ scene = "coast", board = true })
+  check("côte : toujours peinte", not Sc.art._shown and Sc.paints.coast[1]._shown)
+  Sc.set({ scene = "road", board = true, veil = 0.2 })
+  H.slash("decor")
+  check("/slay decor seul : bascule vers peint", H.ns.Persist.options().decor == false and not Sc.art._shown)
+  H.slash("decor")
+  check("/slay decor seul : bascule vers illustré", H.ns.Persist.options().decor == true and Sc.art._shown)
+  H.slash("decor essai")
+  H.slash("decor essai")
+  check("essai deux fois : bascule (essai fermé)", Sc.trial == nil and Sc.art._texture == elwynn[3].file)
+  clearChat()
+  H.slash("decor ok")
+  check("ok hors essai : rien, message", chat():find("aucun essai en cours", 1, true), chat())
+
+  clearChat()
+  H.slash("art")
+  said = chat()
+  check("/slay art : candidat validé par décor", said:find("road : " .. tostring(elwynn[3].file) .. " — "
+    .. elwynn[3].name, 1, true) and said:find("mine : " .. tostring(deadmines[3].file), 1, true), said)
+  check("/slay art : validés et refusés", said:find("validés : " .. tostring(deadmines[3].file) .. " (", 1, true)
+    and said:find(tostring(elwynn[4].file) .. " (", 1, true)
+    and said:find("refusés : " .. tostring(deadmines[1].file) .. " (", 1, true)
+    and said:find(tostring(elwynn[1].file) .. " (" .. elwynn[1].name .. ")", 1, true)
+    and said:find("pas encore jugés : 3 sur 8", 1, true), said)
+
+  -- Persistance : verdicts relus au rechargement, essai non repris.
+  local saved = deepcopy(_G.SlayTheDragonDB)
+  local okData = plainData(saved, nil, "SlayTheDragonDB")
+  check("verdicts : données simples dans la sauvegarde", okData)
+  H.boot(saved)
+  H.slash("")
+  Sc = H.ns.Scene
+  check("rechargement : verdicts gardés", H.ns.Persist.options().artChecks[tostring(elwynn[3].file)] == true
+    and H.ns.Persist.options().artChecks[tostring(elwynn[1].file)] == false)
+  check("rechargement : la route montre le validé, pas d'essai", Sc.trial == nil and Sc.art._shown
+    and Sc.art._texture == elwynn[3].file)
+  -- Écran sans décor (parcours) : l'essai prévient où le voir.
+  clickOption("go")
+  check("parcours : pas de décor", Sc.scene == false)
+  clearChat()
+  H.slash("decor essai")
+  check("essai sur le parcours : message", chat():find("cet écran n'a pas de décor", 1, true)
+    and chat():find("essai du décor", 1, true), chat())
+  check("essai : départ au premier candidat pas encore jugé", Sc.trial and Sc.verdict(list[Sc.trial]) == nil)
+  H.slash("decor peint")
   H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
 end
 

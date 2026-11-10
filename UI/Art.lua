@@ -60,40 +60,45 @@ Art.tex = {
   check = 136814,       -- interface/raidframe/readycheck-ready
 }
 
--- Illustrations (écrans de chargement recadrés) : pour chacune, une liste ORDONNÉE de candidats ;
--- UI/Scene.lua retient le premier qui se charge réellement dans le client, sinon le décor peint sert
--- de repli (`/slay art` dit lequel a été retenu). `file` = FileDataID ou chemin ; `crop` = { gauche,
--- droite, haut, bas } en fraction de l'image, pour la bande 1034 × 380 (≈ 2,7:1) : ≈ 0,65 de la
--- hauteur pour une image 16:9, ≈ 0,5 pour une image 4:3 (cadrages à confirmer en jeu). Une entrée
--- chaîne renvoie à la liste d'une autre illustration (à la suite).
+-- Illustrations (écrans de chargement recadrés) : pour chacune, une liste ORDONNÉE de candidats.
+-- Aucun test fiable ne dit, sur ce client, si un fichier existe : un fichier absent est dessiné en
+-- aplat vert, et SetTexture / GetTextureFileID / IsObjectLoaded le disent pourtant présent. Le décor
+-- peint est donc la règle : UI/Scene.lua n'affiche que le premier candidat de la liste VALIDÉ par le
+-- joueur (`/slay decor essai`, puis `ok` / `non` ; verdicts dans options.artChecks).
+-- `file` = FileDataID ou chemin ; `name` = nom annoncé pendant l'essai ; `crop` = { gauche, droite,
+-- haut, bas } en fraction de l'image, pour la bande 1034 × 380 (≈ 2,7:1) : ≈ 0,65 de la hauteur pour
+-- une image 16:9, ≈ 0,5 pour une image 4:3 (cadrages à confirmer en jeu). Une entrée chaîne renvoie à
+-- la liste d'une autre illustration (à la suite).
 -- FileDataID confirmés dans la liste de fichiers retail 12.1.5 (wow_file_search) ; leur présence
 -- dans le client Forever (« Camelot », 1.16) n'est PAS vérifiable hors jeu :
---   * 7377860 (logement d'Elwynn, Midnight) : très probablement absent de Forever — c'était le seul
---     décor des champs, d'où l'absence de paysage en jeu ;
---   * camelot160/* (7963776…7963782) : écrans de chargement propres à Forever, présents par nature ;
+--   * 7377860 (logement d'Elwynn, Midnight) : très probablement absent de Forever ;
+--   * camelot160/main/* (7963776, 7963777, 7963782) : écrans de chargement propres à Forever ;
 --   * 131833, 131839 (Mortemines, royaumes de l'Est) : écrans de la version classique.
 Art.illustrations = {
   elwynn = {
-    { file = 7377860, crop = { 0, 1, 0.16, 0.86 } }, -- expansion10/main/loadscreen_housing_elwynnforest
-    { file = 7963776, crop = { 0, 1, 0.18, 0.83 } }, -- camelot160/main/loadscreen_camelot_easternkingdom
-    { file = 131839, crop = { 0, 1, 0.14, 0.64 } },  -- loadscreeneasternkingdom (classique)
-    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenEasternKingdom", crop = { 0, 1, 0.14, 0.64 } },
+    { file = 7377860, crop = { 0, 1, 0.16, 0.86 }, name = "Logement d'Elwynn (Midnight)" },
+    { file = 7963776, crop = { 0, 1, 0.18, 0.83 }, name = "Royaumes de l'Est (écran Forever)" },
+    { file = 131839, crop = { 0, 1, 0.14, 0.64 }, name = "Royaumes de l'Est (écran classique)" },
+    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenEasternKingdom", crop = { 0, 1, 0.14, 0.64 },
+      name = "Royaumes de l'Est (écran classique, par chemin)" },
   },
   deadmines = {
-    { file = 131833, crop = { 0, 1, 0.22, 0.72 } },  -- loadscreendeadmines (classique)
-    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines", crop = { 0, 1, 0.22, 0.72 } },
-    { file = 7963777, crop = { 0, 1, 0.18, 0.83 } }, -- camelot160/main/loadscreen_camelot_excavation
+    { file = 131833, crop = { 0, 1, 0.22, 0.72 }, name = "Mortemines (écran classique)" },
+    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines", crop = { 0, 1, 0.22, 0.72 },
+      name = "Mortemines (écran classique, par chemin)" },
+    { file = 7963777, crop = { 0, 1, 0.18, 0.83 }, name = "Excavation (écran Forever)" },
   },
   ruins = {
-    { file = 7963782, crop = { 0, 1, 0.18, 0.83 } }, -- camelot160/main/loadscreen_camelot_ruinsoflordaeron
+    { file = 7963782, crop = { 0, 1, 0.18, 0.83 }, name = "Ruines de Lordaeron (écran Forever)" },
     "elwynn",
   },
 }
 
 -- Décors : `art` = illustration (ci-dessus) posée sur la bande du haut, décalée verticalement de
 -- `shift` (fraction) et teintée par `tint` ; `paint` = décor peint en couches unies aux couleurs des
--- maquettes, toujours dessiné dessous (repli). Point d'extension : ajouter une entrée ici (et
--- `scene = "<clé>"` dans une rencontre) suffit ; `/slay decor` bascule illustration/peint.
+-- maquettes, toujours dessiné dessous (seul visible tant qu'aucun candidat n'est validé). Point
+-- d'extension : ajouter une entrée ici (et `scene = "<clé>"` dans une rencontre) suffit ;
+-- `/slay decor` bascule illustration validée / peint.
 Art.scenes = {
   road = { art = "elwynn", tint = { 1, 0.93, 0.78 }, paint = "fields" },          -- route et combats
   farm = { art = "elwynn", shift = -0.04, tint = { 1, 0.95, 0.82 }, paint = "farm" },

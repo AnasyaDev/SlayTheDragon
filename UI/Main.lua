@@ -708,10 +708,10 @@ end
 -- /slay
 ---------------------------------------------------------------------------
 
--- /slay art : décors (candidat retenu ou repli, décor par décor), puis icônes et modèles manquants.
+-- /slay art : décors (peint ou candidat validé, décor par décor ; verdicts), puis icônes et modèles manquants.
 local function artReport()
   if not UI.frame then UI.build() end
-  say("décors illustrés" .. (opts().decor == false and " (désactivés : /slay decor)" or "") .. " :")
+  say("décors" .. (opts().decor == false and " (illustrations désactivées : /slay decor illustre)" or "") .. " :")
   for _, line in ipairs(Scene.report()) do say("  " .. line) end
   local keys = {}
   for k in pairs(W.missing) do keys[#keys + 1] = k end
@@ -731,6 +731,59 @@ local function artPreview()
   if s and s.PreviewEnemies then s:PreviewEnemies() end
 end
 
+-- /slay decor [essai | suivant | precedent | ok | non | peint | illustre] : décor peint ou illustré,
+-- et essai manuel des illustrations (seul moyen de savoir si un fichier existe dans ce client).
+local DECOR_HELP = "/slay decor ok (image visible) ou non (aplat vert, noir ou vide) ; "
+  .. "/slay decor suivant / precedent ; /slay decor peint pour finir."
+
+local function trialSay(cand)
+  local list = Scene.trialList()
+  say("essai du décor " .. Scene.trial .. "/" .. #list .. " : " .. Scene.describe(cand) .. ".")
+end
+
+local function decorCommand(arg)
+  local trialCmd = arg == "essai" or arg == "suivant" or arg == "precedent" or arg == "précédent"
+  if trialCmd then
+    if arg == "essai" and Scene.trial then
+      Scene.trialStop()
+      say("essai terminé ; décor " .. (opts().decor == false and "peint" or "illustré (candidats validés)") .. ".")
+      return
+    end
+    local first = not Scene.trial
+    if first and not UI.isShown() and not UI.open("decor") then return end
+    local cand
+    if first then cand = Scene.trialStart()
+    else cand = Scene.trialStep(arg == "suivant" and 1 or -1) end
+    trialSay(cand)
+    if first then
+      say(DECOR_HELP)
+      if Scene.scene == false then
+        say("cet écran n'a pas de décor : l'essai se voit à l'accueil, en combat, sur une récompense, "
+          .. "au marchand ou au feu de camp.")
+      end
+    end
+  elseif arg == "ok" or arg == "non" then
+    local cand = Scene.trialMark(arg == "ok")
+    if not cand then say("aucun essai en cours : /slay decor essai.") return end
+    say(tostring(cand.file) .. " " .. (arg == "ok" and "validé" or "refusé") .. " (gardé dans la sauvegarde). "
+      .. "Suite : /slay decor suivant.")
+  elseif arg == "peint" or arg == "illustre" or arg == "illustré" or arg == "" then
+    local was = Scene.trial
+    if was then Scene.trialStop() end
+    if arg == "" then
+      if not was then opts().decor = opts().decor == false end
+    else
+      opts().decor = arg ~= "peint"
+    end
+    say((was and "essai terminé ; " or "") .. "décor " .. (opts().decor and "illustré (seulement les candidats "
+      .. "validés par /slay decor essai)" or "peint") .. ".")
+    if UI.frame and UI.frame:IsShown() then UI.refresh() end
+  else
+    say("/slay decor : bascule peint / illustré ; /slay decor essai (puis suivant, precedent, ok, non) ; "
+      .. "/slay decor peint ; /slay decor illustre.")
+  end
+end
+
 SLASH_SLAYTHEDRAGON1 = "/slay"
 SLASH_SLAYTHEDRAGON2 = "/slaythedragon"
 SlashCmdList.SLAYTHEDRAGON = function(msg)
@@ -739,10 +792,8 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "options" or msg == "config" then UI.toggleOptions()
   elseif msg == "art" then artReport()
   elseif msg == "modeles" or msg == "models" then artPreview()
-  elseif msg == "decor" then
-    opts().decor = opts().decor == false
-    say("décor " .. (opts().decor and "illustré" or "peint") .. ".")
-    if UI.frame and UI.frame:IsShown() then UI.refresh() end
+  elseif msg == "decor" or msg:match("^decor%s") or msg == "décor" or msg:match("^décor%s") then
+    decorCommand(msg:match("^d%S+%s*(.*)$") or "")
   elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
@@ -756,6 +807,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
-      .. "/slay decor ; /slay facing <j> <e> ; /slay centre")
+      .. "/slay decor [essai] ; /slay facing <j> <e> ; /slay centre")
   end
 end
