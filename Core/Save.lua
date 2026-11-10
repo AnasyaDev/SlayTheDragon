@@ -11,7 +11,8 @@ local U = ns.Util
 local Save = {}
 ns.Save = Save
 
-Save.VERSION = 1
+-- 1 : format initial ; 2 : drapeaux de compte (meta.flags).
+Save.VERSION = 2
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -32,6 +33,11 @@ function Save.normalize(db)
   m.league = tonumber(m.league) or 0
   m.runs = tonumber(m.runs) or 0
   if type(m.classes) ~= "table" then m.classes = {} end
+  -- Drapeaux de compte : on ne garde que les entrées vraies, on n'en retire jamais une.
+  if type(m.flags) ~= "table" then m.flags = {} end
+  for k, v in pairs(m.flags) do
+    if v ~= true then m.flags[k] = v and true or nil end
+  end
   if type(db.journal) ~= "table" then db.journal = {} end
   if type(db.quarantine) ~= "table" then db.quarantine = {} end
 end
@@ -40,8 +46,19 @@ end
 -- avec seulement une partie des champs).
 Save.MIGRATIONS[0] = Save.normalize
 
+-- 1 -> 2 : drapeaux de compte (meta.flags, vide au départ ; normalize le crée).
+Save.MIGRATIONS[1] = Save.normalize
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
+
+-- Expédition 1 -> 2 : drapeaux de compte (aucun connu : l'expédition a commencé avant) et
+-- journal des rencontres.
+Save.EXP_MIGRATIONS[1] = function(exp)
+  if type(exp.flags) ~= "table" then exp.flags = {} end
+  if type(exp.newFlags) ~= "table" then exp.newFlags = {} end
+  if type(exp.stats) == "table" and type(exp.stats.events) ~= "table" then exp.stats.events = {} end
+end
 
 local function quarantine(db, state, reason)
   db.quarantine[#db.quarantine + 1] = { reason = reason, state = state }
@@ -156,6 +173,7 @@ function Save.validate(db)
     for class, cs in pairs(m.classes) do
       if type(cs) ~= "table" or type(cs.rep) ~= "number" or type(cs.keyMax) ~= "number" then err("meta." .. tostring(class)) end
     end
+    if type(m.flags) ~= "table" then err("meta.flags") end
   end
   if type(db.journal) ~= "table" then err("journal") end
   if db.current ~= nil then

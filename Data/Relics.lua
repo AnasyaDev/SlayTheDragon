@@ -126,6 +126,34 @@ relic("camp_kettle", {
   },
 })
 
+-- Bibelots de rencontre (noPool : jamais tirés, donnés par une rencontre précise) --------
+
+-- La roulotte de Grisette (rencontre rare) : contre 8 PV max.
+relic("harvest_cog", {
+  name = "Engrenage de moissonneur", rarity = "rare", tier = 0, noPool = true,
+  text = "Au premier tour de chaque combat, pioche 2 cartes de plus.",
+  hooks = {
+    drawPerTurn = function(c, src, v)
+      if c.round == 1 then return v + 2 end
+      return v
+    end,
+  },
+})
+
+-- Le guetteur de la Colline (suite de l'histoire de Tobin).
+relic("tobin_knife", {
+  name = "Canif de Tobin", rarity = "rare", tier = 0, noPool = true,
+  text = "Au début de chaque combat, inflige Douleur 3 à tous les ennemis.",
+  hooks = {
+    onCombatStart = function(c, src)
+      for i = 1, #c.enemies do
+        local e = c.enemies[i]
+        if not e.dead then Combat.applyStatus(c, e, "pain", 3) end
+      end
+    end,
+  },
+})
+
 -- Révéré (palier 3) ---------------------------------------------------------
 
 relic("mana_ruby", {

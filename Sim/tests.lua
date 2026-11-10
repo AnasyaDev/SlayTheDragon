@@ -304,7 +304,7 @@ end)
 test("bibelots et potions respectent le contrat", function()
   local nr, np = 0, 0
   for id, r in pairs(ns.Relics) do
-    nr = nr + 1
+    if not r.noPool then nr = nr + 1 end -- bibelots de rencontre (noPool) à part
     assert(r.name and r.text and r.hooks, id)
     assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
     assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id)
