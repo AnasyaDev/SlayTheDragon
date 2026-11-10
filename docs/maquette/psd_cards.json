@@ -1,1 +1,64 @@
-[{"out": "penance.png", "name": "Pénitence", "cost": 2, "desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.", "icon": "Spell_Holy_Penance", "color": "#d9d2bd", "rarity": "uncommon", "desc_size": 12.5, "desc_dy": 30}, {"out": "blast.png", "name": "Attaque mentale", "cost": 1, "desc": "Inflige **9**. **+2 Démence**.", "icon": "Spell_Shadow_UnholyFrenzy", "color": "#7a52b8", "rarity": "common", "tag": "Recharge 1", "desc_size": 15, "name_px": 64, "desc_dy": 70}, {"out": "smite.png", "name": "Châtiment", "cost": 1, "desc": "Inflige **6**.", "icon": "Spell_Holy_HolySmite", "color": "#e2b23a", "rarity": "common", "desc_size": 15, "desc_dy": 70}, {"out": "spirit.png", "name": "Esprit de rédemption", "cost": 3, "desc": "Une fois par combat, survit à **1 PV**.", "icon": "Spell_Holy_GreaterHeal", "color": "#d9d2bd", "rarity": "rare", "desc_size": 15, "name_px": 54, "emblem": 4, "desc_dy": 45}, {"out": "fire.png", "name": "Feu intérieur", "cost": 1, "desc": "Gagne **5** Absorption.", "icon": "Spell_Holy_InnerFire", "color": "#4f86c8", "rarity": "common", "desc_size": 15, "desc_dy": 70}, {"out": "tex1.png", "name": "Pénitence", "cost": 2, "desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.", "icon": "Spell_Holy_Penance", "color": "#d9d2bd", "rarity": "uncommon", "desc_size": 12.5, "metal": 1, "desc_dy": 30}, {"out": "tex2.png", "name": "Pénitence", "cost": 2, "desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.", "icon": "Spell_Holy_Penance", "color": "#d9d2bd", "rarity": "uncommon", "desc_size": 12.5, "metal": 2, "desc_dy": 30}, {"out": "tex3.png", "name": "Pénitence", "cost": 2, "desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.", "icon": "Spell_Holy_Penance", "color": "#d9d2bd", "rarity": "uncommon", "desc_size": 12.5, "metal": 3, "desc_dy": 30}, {"out": "tex5.png", "name": "Pénitence", "cost": 2, "desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.", "icon": "Spell_Holy_Penance", "color": "#d9d2bd", "rarity": "uncommon", "desc_size": 12.5, "metal": 5, "desc_dy": 30}, {"out": "tex0.png", "name": "Pénitence", "cost": 2, "desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.", "icon": "Spell_Holy_Penance", "color": "#d9d2bd", "rarity": "uncommon", "desc_size": 12.5, "metal": 0, "plastic": 0, "desc_dy": 30}, {"out": "dark.png", "name": "Attaque mentale", "cost": 1, "desc": "Inflige **9**. **+2 Démence**.", "icon": "Spell_Shadow_UnholyFrenzy", "color": "#7a52b8", "rarity": "epic", "darker": true, "desc_size": 15, "name_px": 64, "desc_dy": 70}]
+[
+{
+"out": "penance.png",
+"name": "Pénitence",
+"cost": 2,
+"desc": "Inflige **6** trois fois. Sous **Expiation** : **2** Absorption par coup.",
+"icon": "Spell_Holy_Penance",
+"color": "#d9d2bd",
+"rarity": "uncommon",
+"desc_size": 12.5,
+"desc_dy": 30,
+"metal": 1
+},
+{
+"out": "blast.png",
+"name": "Attaque mentale",
+"cost": 1,
+"desc": "Inflige **9**. **+2 Démence**.",
+"icon": "Spell_Shadow_UnholyFrenzy",
+"color": "#7a52b8",
+"rarity": "common",
+"tag": "Recharge 1",
+"desc_size": 15,
+"desc_dy": 70,
+"metal": 1
+},
+{
+"out": "smite.png",
+"name": "Châtiment",
+"cost": 1,
+"desc": "Inflige **6**.",
+"icon": "Spell_Holy_HolySmite",
+"color": "#e2b23a",
+"rarity": "common",
+"desc_size": 15,
+"desc_dy": 70,
+"metal": 1
+},
+{
+"out": "spirit.png",
+"name": "Esprit de rédemption",
+"cost": 3,
+"desc": "Une fois par combat, survit à **1 PV**.",
+"icon": "Spell_Holy_GreaterHeal",
+"color": "#d9d2bd",
+"rarity": "rare",
+"desc_size": 15,
+"emblem": 4,
+"desc_dy": 45,
+"metal": 1
+},
+{
+"out": "fire.png",
+"name": "Feu intérieur",
+"cost": 1,
+"desc": "Gagne **5** Absorption.",
+"icon": "Spell_Holy_InnerFire",
+"color": "#4f86c8",
+"rarity": "common",
+"desc_size": 15,
+"desc_dy": 70,
+"metal": 1
+}
+]

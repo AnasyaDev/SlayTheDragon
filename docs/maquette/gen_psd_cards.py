@@ -45,7 +45,16 @@ def build(out, name, cost, desc, icon, color, rarity=None, emblem=None, metal=4,
     vis(DOWN, bool(tag)); vis(TXT["type"], bool(tag))
     vis(DARKER, darker); vis(GRADIENT, gradient)
     c("layer.fill.solidColor.set", layer=COLOR, color=color)
-    vis(TXT["name"], False)      # le texte sur tracé se décentre quand on le remplace : nom redessiné après coup
+    f = ImageFont.truetype(FONT, 72)
+    try: f.set_variation_by_axes([700])
+    except Exception: pass
+    d0 = ImageDraw.Draw(Image.new("L", (8, 8)))
+    wname, wsp, LEN = d0.textlength(name, font=f), d0.textlength("\u00a0", font=f), 690
+    pt = 18.0
+    if wname > LEN: pt = 18.0 * LEN / wname; wname = LEN
+    pad = int(round((LEN - wname) / 2 / (wsp * pt / 18.0)))
+    c("type.edit", layer=TXT["name"], text="\u00a0" * pad + name)   # texte sur tracé calé à gauche : retrait pour centrer
+    if pt != 18.0: c("type.setStyle", layer=TXT["name"], size=round(pt, 2))
     rarity = QUALITY.get(rarity, rarity)
     cmds[:] = [x for x in cmds if not (x[0] == "layer.setProps" and x[1]["layer"] in RARITY.values())]
     for k, lid in RARITY.items(): vis(lid, k == rarity)
@@ -67,17 +76,6 @@ def build(out, name, cost, desc, icon, color, rarity=None, emblem=None, metal=4,
     r = subprocess.run(args, capture_output=True, text=True)
     errs = [l for l in (r.stdout + r.stderr).splitlines() if "error" in l.lower()]
     print(out, "OK" if r.returncode == 0 and not errs else f"ECHEC {r.returncode}", *errs[:4], sep="\n  " if errs else " ")
-    im = Image.open(OUT / out).convert("RGBA")
-    f = ImageFont.truetype(FONT, name_px or 72)
-    try: f.set_variation_by_axes([700])
-    except Exception: pass
-    lay = Image.new("RGBA", (900, 200)); d = ImageDraw.Draw(lay)
-    sh = Image.new("RGBA", lay.size); ImageDraw.Draw(sh).text((450, 106), name, font=f, fill=(0, 0, 0, 200), anchor="mm")
-    lay.alpha_composite(sh.filter(ImageFilter.GaussianBlur(4)))
-    d.text((450, 100), name, font=f, fill=(255, 255, 255, 255), anchor="mm")
-    lay = lay.rotate(-7.5, resample=Image.BICUBIC, expand=True)
-    im.alpha_composite(lay, (522 - lay.width // 2, 222 - lay.height // 2))
-    im.save(OUT / out)
     return OUT / out
 
 
