@@ -870,13 +870,17 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     decorCommand(msg:match("^d%S+%s*(.*)$") or "")
   elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
   elseif msg == "zoom" or msg:match("^zoom%s") then
-    -- technique d'agrandissement au survol (voir W.faceApply) : animation Scale (défaut) ou échelle
-    -- réelle à chaque image, police non arrondie
+    -- technique d'agrandissement au survol (voir W.faceApply) : « net » (défaut : étirement pendant
+    -- le mouvement, vraie taille à l'arrivée) ou « lisse » (vraie taille à chaque image) ; « anim »,
+    -- ancien nom, vaut « net »
     local want = msg:match("^zoom%s+(%S+)")
-    local mode = (want == "anim" or want == "lisse") and want or (W.zoomMode() == "anim" and "lisse" or "anim")
-    W.setZoomMode(mode)
-    say("zoom au survol : " .. (mode == "anim" and "anim (animation Scale, textes figés)"
-      or "lisse (échelle à chaque image, police non arrondie)") .. ".")
+    local mode
+    if want == "lisse" then mode = "lisse"
+    elseif want == "net" or want == "anim" then mode = "net"
+    else mode = W.zoomMode() == "net" and "lisse" or "net" end
+    mode = W.setZoomMode(mode)
+    say("zoom au survol : " .. (mode == "net" and "net (texte redessiné à la vraie taille à l'arrivée)"
+      or "lisse (vraie taille à chaque image)") .. ".")
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
@@ -889,6 +893,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
-      .. "/slay decor [essai] ; /slay zoom [anim|lisse] ; /slay facing <j> <e> ; /slay centre")
+      .. "/slay decor [essai] ; /slay zoom [net|lisse] ; /slay facing <j> <e> ; /slay centre")
   end
 end

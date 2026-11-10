@@ -211,27 +211,32 @@ function W.driverAwake() return driver.awake and true or false end
 -- curseur de la zone (entrée/sortie en boucle). Le cadre interactif reste donc immobile (zone de
 -- survol) ; tout ce qui se voit vit dans son enfant `face`, seul animé (échelle, décalage).
 
--- Agrandissement sans tressautement des textes. Changer l'échelle réelle (SetScale) à chaque image
--- fait recalculer au client la taille de police effective (arrondie au pixel) et les retours à la
--- ligne : glyphes qui sautent, lignes recoupées autrement. Deux techniques, au choix (/slay zoom) :
---   * « anim » (défaut) : l'échelle du visuel passe par une animation Scale d'un AnimationGroup
---     (transformation purement visuelle, sans nouvelle mise en page) et les textes sont en mode
---     Vertex (FontString:SetScaleAnimationMode : sommets mis à l'échelle, mise en page figée), comme
---     Blizzard_EncounterWarnings. L'échelle d'arrivée est tenue par un long délai de fin (l'échelle
---     réelle reste 1 : aucune mise en page à l'arrivée non plus) ; une cible qui change en route
---     relance l'animation depuis l'échelle visuelle courante (réversible).
---   * « lisse » : SetScale à chaque image comme avant, mais textes en SetSmoothScaling (hauteur de
---     police non arrondie, comme les barres d'info des ennemis de Blizzard) ; les retours à la ligne
---     du texte des cartes sont de toute façon figés (lignes posées une à une, voir W.card).
-W.ZOOM_MODES = { "anim", "lisse" }
-local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée (secondes)
+-- Agrandissement des visuels (survols, vols de cartes). Deux exigences : aucun tressautement des
+-- textes pendant le mouvement, et un texte NET une fois la carte agrandie (c'est celle qu'on lit).
+--   * Changer l'échelle réelle (SetScale) à chaque image fait recalculer au client la taille de
+--     police effective à chaque pas : glyphes qui sautent pendant le mouvement.
+--   * Une animation Scale d'un AnimationGroup avec des textes en mode Vertex
+--     (FontString:SetScaleAnimationMode, comme Blizzard_EncounterWarnings) fige la mise en page,
+--     mais les glyphes rasterisés à la petite taille sont étirés : baveux s'ils le restent.
+-- Mode « net » (défaut) : l'étirement ne sert que pendant le mouvement (0,12 s, invisible) ; à
+-- l'arrivée, dans le même pas de l'OnUpdate partagé, l'échelle d'arrivée devient l'échelle RÉELLE
+-- du visuel (SetScale) et l'animation est coupée (Stop) : le client re-rasterise les polices à la
+-- vraie taille. L'animation est toujours relative à l'échelle réelle du moment (facteur 1 au départ :
+-- la toute première image est identique avec ou sans animation) et tient son état d'arrivée par un
+-- long délai de fin jusqu'à la bascule (pas d'image où elle serait retombée à 1 avant le SetScale).
+-- La mise en page ne bouge pas à la bascule : retours à la ligne explicites (W.card), largeurs et
+-- ancrages en unités du visuel, et textes en SetSmoothScaling (hauteur de police non arrondie au
+-- pixel, comme les barres d'info de Blizzard) : la taille rendue est exactement proportionnelle.
+-- Mode « lisse » (/slay zoom lisse, comparaison) : SetScale à chaque image, comme avant l'animation.
+W.ZOOM_MODES = { "net", "lisse" }
+local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée jusqu'à la bascule (secondes)
 
 function W.zoomMode()
   local o = ns.Persist and ns.Persist.options and ns.Persist.options()
-  return (o and o.zoom == "lisse") and "lisse" or "anim"
+  return (o and o.zoom == "lisse") and "lisse" or "net"
 end
 
--- Textes de l'interface (W.label, W.text), pour le mode de zoom et le rafraîchissement des polices.
+-- Textes de l'interface (W.label, W.text), pour le rafraîchissement des polices.
 local labels = setmetatable({}, { __mode = "k" })
 
 local function zoomText(fs)
@@ -239,16 +244,15 @@ local function zoomText(fs)
   if fs.SetScaleAnimationMode and Enum and Enum.FontStringScaleAnimationMode then
     fs:SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)
   end
-  if fs.SetSmoothScaling then fs:SetSmoothScaling(W.zoomMode() == "lisse") end
+  if fs.SetSmoothScaling then fs:SetSmoothScaling(true) end
 end
 W.zoomText = zoomText
 
--- Bascule la technique de zoom ; renvoie le nouveau mode.
+-- Bascule la technique de zoom ; renvoie le nouveau mode (une valeur inconnue, dont l'ancien
+-- « anim », retombe sur « net »).
 function W.setZoomMode(mode)
+  if mode ~= "lisse" then mode = "net" end
   ns.Persist.options().zoom = mode
-  for fs in pairs(labels) do
-    if fs.SetSmoothScaling then fs:SetSmoothScaling(mode == "lisse") end
-  end
   return mode
 end
 
@@ -257,8 +261,8 @@ local ease = {
   IN_OUT = function(p) if p < 0.5 then return 2 * p * p end return 1 - 2 * (1 - p) * (1 - p) end,
 }
 
--- Échelle visuelle courante d'un visuel animé (mode « anim ») : 1 au repos.
-function W.visualScale(face)
+-- Facteur courant de l'animation Scale d'un visuel (1 si elle ne joue pas).
+local function animFactor(face)
   local z = face._zoom
   if not z or not z.ag:IsPlaying() then return 1 end
   local dur = z.dur
@@ -270,8 +274,24 @@ function W.visualScale(face)
   return z.from + (z.to - z.from) * p
 end
 
--- Fait filer l'échelle visuelle de face vers target en dur secondes (0 : immédiat) ; smooth = lissage
--- de l'animation ("OUT" par défaut, "IN_OUT" pour les vols de cartes).
+-- Échelle visuelle courante (échelle réelle × facteur de l'animation).
+function W.visualScale(face)
+  return face:GetScale() * animFactor(face)
+end
+
+-- Coupe l'animation d'échelle (le facteur retombe à 1).
+local function stopZoom(face)
+  local z = face._zoom
+  if z then
+    z.ag:Stop()
+    z.from, z.to = 1, 1
+  end
+end
+
+-- Fait filer le facteur d'animation de face vers target (relatif à l'échelle réelle) en dur
+-- secondes, depuis le facteur courant (1 si l'animation ne joue pas : la première image d'un départ
+-- est identique avec ou sans animation) ; dur 0 : coupe. smooth = lissage ("OUT" par défaut,
+-- "IN_OUT" pour les vols de cartes).
 local function zoomTo(face, target, dur, smooth)
   local z = face._zoom
   if not z then
@@ -288,11 +308,11 @@ local function zoomTo(face, target, dur, smooth)
     z.anim:SetSmoothing(smooth)
   end
   local playing = z.ag:IsPlaying()
-  -- déjà en route vers cette cible (ou au repos à 1)
-  if z.to == target and (playing or target == 1) then return end
-  local cur = W.visualScale(face)
+  -- déjà en route vers cette cible
+  if playing and z.to == target then return end
+  local cur = playing and animFactor(face) or 1
   z.ag:Stop()
-  if target == 1 and (dur <= 0 or cur == 1) then
+  if dur <= 0 or cur == target then
     z.from, z.to = 1, 1
     return
   end
@@ -300,24 +320,32 @@ local function zoomTo(face, target, dur, smooth)
   z.anim:SetScaleFrom(cur, cur)
   z.anim:SetScaleTo(target, target)
   z.anim:SetDuration(dur)
-  z.anim:SetEndDelay(target ~= 1 and ZOOM_HOLD or 0)
+  z.anim:SetEndDelay(ZOOM_HOLD)
   z.from, z.to, z.t0, z.dur = cur, target, GetTime(), dur
   z.ag:Play()
 end
 
--- Crée le visuel `f.face`, centré sur f, de même taille (suivie par OnSizeChanged).
-function W.face(f)
+-- Crée le visuel `f.face`, centré sur f, de même taille (suivie par OnSizeChanged) plus margin de
+-- chaque côté : un visuel dont des pièces débordent (carte : ruban, languette, plaque, halo) est
+-- agrandi pour les contenir toutes, et l'animation Scale porte sur un cadre qui les englobe.
+function W.face(f, margin)
   local face = CreateFrame("Frame", nil, f)
-  face:SetSize(f:GetWidth(), f:GetHeight())
+  margin = margin or 0
+  f.faceMargin = margin
+  face:SetSize(f:GetWidth() + 2 * margin, f:GetHeight() + 2 * margin)
   face:SetPoint("CENTER", f, "CENTER", 0, 0)
   f.face = face
-  f:HookScript("OnSizeChanged", function(self, w, h) if w and h then self.face:SetSize(w, h) end end)
-  -- un cadre caché arrête ses animations : au retour, l'échelle tenue est reposée
+  f:HookScript("OnSizeChanged", function(self, w, h)
+    if w and h then self.face:SetSize(w + 2 * self.faceMargin, h + 2 * self.faceMargin) end
+  end)
+  -- un cadre caché arrête ses animations : au retour, l'état est reposé
   face:SetScript("OnShow", function() if f._animApply == W.faceApply then W.faceApply(f) end end)
   return face
 end
 
--- Applique les canaux « hover » (0..1) et « dx » (pixels) au visuel.
+-- Applique les canaux « hover » (0..1) et « dx » (pixels) au visuel. Mode « net » : pendant le
+-- mouvement du canal « hover », échelle réelle inchangée et animation Scale vers l'échelle
+-- d'arrivée ; canal immobile : échelle réelle = échelle d'arrivée, animation coupée (même appel).
 function W.faceApply(f)
   local face = f.face
   if not face then return end
@@ -325,20 +353,27 @@ function W.faceApply(f)
   local dx = W.animValue(f, "dx")
   local hs = f.hoverScale or 1
   local lift = (f.hoverLift or 0) * h
-  if W.zoomMode() == "anim" then
-    if face:GetScale() ~= 1 then face:SetScale(1) end
+  local base
+  if W.zoomMode() == "net" then
     local ch = f._ch and f._ch.hover
-    local target = 1 + (hs - 1) * (ch and ch.to or 0)
-    zoomTo(face, target, ch and (ch.dur - ch.t) or 0)
-    face:ClearAllPoints()
-    face:SetPoint("CENTER", f, "CENTER", dx, lift)
+    local goal = 1 + (hs - 1) * (ch and ch.to or 0)
+    base = face:GetScale()
+    if ch and ch.t < ch.dur then
+      -- en route : étirement visuel relatif à l'échelle réelle (repart du facteur courant si la
+      -- cible change en route : réversible)
+      zoomTo(face, goal / base, ch.dur - ch.t)
+    else
+      -- arrivée : échelle réelle posée, animation coupée, dans le même appel
+      if base ~= goal then face:SetScale(goal) base = goal end
+      stopZoom(face)
+    end
   else
-    if face._zoom then face._zoom.ag:Stop() face._zoom.from, face._zoom.to = 1, 1 end
-    local s = 1 + (hs - 1) * h
-    face:SetScale(s)
-    face:ClearAllPoints()
-    face:SetPoint("CENTER", f, "CENTER", dx / s, lift / s)
+    stopZoom(face)
+    base = 1 + (hs - 1) * h
+    face:SetScale(base)
   end
+  face:ClearAllPoints()
+  face:SetPoint("CENTER", f, "CENTER", dx / base, lift / base)
   if f.hoverPaint then f:hoverPaint(h) end
 end
 
@@ -565,6 +600,12 @@ function W.plaque(host, opts)
     W.gradient(p.gloss, { 1, 1, 1, 0.08 }, { 1, 1, 1, 0 })
   end
   p.rim = W.nine(host, rimName, layer, sub + 3, { corner = r, inset = p.i, noCenter = true })
+  -- halo créé dès maintenant, caché : une texture créée au premier survol naîtrait pendant
+  -- l'animation Scale du visuel (le client la dessinait alors démesurée, en aplat doré sur l'écran)
+  local g = 10
+  p.glow = W.nine(host, "nine_glow", layer, max(-8, sub - 1), { corner = 2 * g, inset = p.i - g })
+  p.glow:SetAlpha(0)
+  p.glow:Hide()
   p:Layout()
   if host.HookScript then host:HookScript("OnSizeChanged", function(_, w, h) p:Tile(w, h) end) end
   p:Tile(host:GetWidth(), host:GetHeight())
@@ -628,12 +669,9 @@ end
 -- Halo (lueur douce autour de la plaque) : alpha 0 le cache.
 function Plaque:SetGlow(a, c)
   if (a or 0) <= 0 then
-    if self.glow then self.glow:Hide() end
+    self.glow:SetAlpha(0)
+    self.glow:Hide()
     return
-  end
-  if not self.glow then
-    local g = 10
-    self.glow = W.nine(self.host, "nine_glow", self.layer, self.sub - 1, { corner = 2 * g, inset = self.i - g })
   end
   c = c or C.gold
   self.glow:SetVertexColor(c[1], c[2], c[3], 1)
@@ -656,7 +694,7 @@ function Plaque:SetShown(on)
   self.rim:SetShown(on)
   for _, t in ipairs(self.bands) do if on then t:Show() else t:Hide() end end
   if self.gloss then if on then self.gloss:Show() else self.gloss:Hide() end end
-  if self.glow and not on then self.glow:Hide() end
+  if not on then self.glow:Hide() end
 end
 function Plaque:Show() self:SetShown(true) end
 function Plaque:Hide() self:SetShown(false) end
@@ -1500,6 +1538,8 @@ local function measureFS(kind, size)
     measurer = W.fontPreload:CreateFontString(nil, "OVERLAY")
     measurer:SetPoint("BOTTOMLEFT", W.fontPreload, "BOTTOMLEFT", 0, 0)
     measurer:SetWordWrap(false)
+    -- même rendu que les textes des cartes (hauteur non arrondie) : mesures proportionnelles
+    if measurer.SetSmoothScaling then measurer:SetSmoothScaling(true) end
   end
   if measurer._fontKind ~= kind or measurer._size ~= size then
     measurer._fontKind, measurer._size = kind, size
@@ -1573,7 +1613,7 @@ local function fitBody(card, text, bottom)
   for _, s in ipairs(W.BODY_SIZES) do sizes[#sizes + 1] = s end
   for _, s in ipairs(W.BODY_UNDER) do sizes[#sizes + 1] = s end
   fs:ClearAllPoints()
-  fs:SetPoint("CENTER", card.face, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
+  fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
   fs:SetWidth(2 * TZ.half * CW + 8)
   local fit, fontErr
   for idx, s in ipairs(sizes) do
@@ -1626,11 +1666,11 @@ local function fitName(fs, text)
   return { size = sizes[#sizes], under = true, ok = false }
 end
 
--- Pose une pièce (fractions de la largeur du corps) sur le visuel de la carte.
-local function place(tex, face, rect)
+-- Pose une pièce (fractions de la largeur du corps) par rapport au corps de la carte (org = b.bg).
+local function place(tex, org, rect)
   local CW = W.CARD_W
   tex:ClearAllPoints()
-  tex:SetPoint("TOPLEFT", face, "TOPLEFT", rect[1] * CW, -rect[2] * CW)
+  tex:SetPoint("TOPLEFT", org, "TOPLEFT", rect[1] * CW, -rect[2] * CW)
   tex:SetSize(rect[3] * CW, rect[4] * CW)
 end
 
@@ -1665,6 +1705,10 @@ end
 -- carte, vers le haut) ; b.baseLevel / b.upLevel : niveau au repos et au survol (passage devant).
 -- Plaque rouge de raison (carte injouable) : à cheval sur le bas du panneau, sous la zone du texte.
 local REASON_Y, REASON_H = 1.24, 20
+-- Marge du visuel autour du corps (fraction de la largeur) : contient le halo (0,215), la languette
+-- de coût, le ruban, la plaque du bas et l'étiquette de prix (jusqu'à 0,29 sous le corps).
+local CARD_MARGIN = 0.3
+W.CARD_MARGIN = CARD_MARGIN
 
 function W.card(parent)
   local CW, CH = W.CARD_W, W.CARD_H
@@ -1672,32 +1716,38 @@ function W.card(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(CW, CH)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
-  local face = W.face(b)
+  -- visuel agrandi de CARD_MARGIN de chaque côté : il contient halo, ruban, languette, plaques
+  local face = W.face(b, CARD_MARGIN * CW)
+  -- corps : centré sur le visuel, à la taille de la carte ; toutes les pièces et tous les textes
+  -- sont posés par rapport à lui (régions du même visuel : elles grossissent d'un seul bloc)
+  b.bg = W.skin(face, "card_body_ivory", "BACKGROUND", -6)
+  b.bg:SetSize(CW, CH)
+  b.bg:SetPoint("CENTER", face, "CENTER", 0, 0)
+  local org = b.bg
 
   b.halo = W.skin(face, "card_glow", "BACKGROUND", -8)
-  place(b.halo, face, P.card_glow)
+  place(b.halo, org, P.card_glow)
   b.halo:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+  b.halo:SetAlpha(0)
   b.halo:Hide()
   b.plate = W.skin(face, "card_plate", "BACKGROUND", -7)
-  place(b.plate, face, P.card_plate)
-  b.bg = W.skin(face, "card_body_ivory", "BACKGROUND", -6)
-  place(b.bg, face, SC.body)
+  place(b.plate, org, P.card_plate)
   -- médaillon : anneau, icône masquée, verre
   b.ring = W.skin(face, "medal_ring", "BORDER", 0)
-  place(b.ring, face, P.medal_ring)
+  place(b.ring, org, P.medal_ring)
   b.icon = face:CreateTexture(nil, "BORDER", nil, 1)
-  place(b.icon, face, P.medal_mask)
+  place(b.icon, org, P.medal_mask)
   b.iconMask = W.roundMask(face, b.icon, "medal_mask")
   b.glass = W.skin(face, "medal_glass", "BORDER", 2)
-  place(b.glass, face, P.medal_glass)
+  place(b.glass, org, P.medal_glass)
   b.medal = { icon = b.icon } -- compatibilité (harnais : b.medal.icon)
   -- devant : panneau, languette de coût, ruban, gemme
   b.panel = W.skin(face, "card_panel", "ARTWORK", 0)
-  place(b.panel, face, P.card_panel)
+  place(b.panel, org, P.card_panel)
   b.costTab = W.skin(face, "card_cost", "ARTWORK", 1)
-  place(b.costTab, face, P.card_cost)
+  place(b.costTab, org, P.card_cost)
   b.ribbon = W.skin(face, "card_ribbon", "ARTWORK", 2)
-  place(b.ribbon, face, P.card_ribbon)
+  place(b.ribbon, org, P.card_ribbon)
   b.gem = face:CreateTexture(nil, "ARTWORK", nil, 3)
   b.gem:Hide()
 
@@ -1705,10 +1755,10 @@ function W.card(parent)
   b.name = W.label(face, "bold", 10, C.text, "OVERLAY")
   b.name:SetWordWrap(false)
   b.name:SetJustifyH("CENTER")
-  b.name:SetPoint("CENTER", face, "TOPLEFT", SC.name.cx * CW, -SC.name.cy * CW)
+  b.name:SetPoint("CENTER", org, "TOPLEFT", SC.name.cx * CW, -SC.name.cy * CW)
   b.name:SetWidth(SC.name.len * CW)
   b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
-  b.cost:SetPoint("CENTER", face, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
+  b.cost:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
   b.body = W.label(face, "bold", W.BODY_SIZES[1], C.textSoft, "OVERLAY")
   -- centré dans la zone utile du panneau, lignes posées par fitBody ; hauteur libre (un texte trop
   -- long déborde au lieu d'être tronqué en « … » : le harnais le signale)
@@ -1716,7 +1766,7 @@ function W.card(parent)
   b.body:SetJustifyV("MIDDLE")
   b.body:SetWordWrap(true)
   b.plateText = W.label(face, "bold", 8.5, C.text, "OVERLAY")
-  b.plateText:SetPoint("CENTER", face, "TOPLEFT", SC.plateText.cx * CW, -SC.plateText.cy * CW)
+  b.plateText:SetPoint("CENTER", org, "TOPLEFT", SC.plateText.cx * CW, -SC.plateText.cy * CW)
   b.plateText:SetWordWrap(false)
   b.kind = b.plateText -- compatibilité
 
@@ -1763,7 +1813,7 @@ function W.card(parent)
     local gem = Art.gems[d.rarity or ""]
     if gem then
       W.setSkin(self.gem, "gem_" .. gem)
-      place(self.gem, self.face, SC.gems[gem])
+      place(self.gem, self.bg, SC.gems[gem])
       self.gem:Show()
     else
       self.gem:Hide()
@@ -1793,7 +1843,7 @@ function W.card(parent)
       p.plaque:SetRim(Art.rim.red)
       W.fitText(p.text, opts.reason, 11, 0.84 * CW - 12, 7)
       p:ClearAllPoints()
-      p:SetPoint("CENTER", self.face, "TOPLEFT", CW / 2, -REASON_Y * CW)
+      p:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, -REASON_Y * CW)
       p:Show()
     elseif self.reasonPlate then
       self.reasonPlate:Hide()
@@ -1802,7 +1852,7 @@ function W.card(parent)
     if opts.sold or opts.price then
       local p = cardPlaque(self, "priceTag", 58, 22)
       p:ClearAllPoints()
-      p:SetPoint("CENTER", self.face, "TOPLEFT", CW / 2, -(CH + 0.185 * CW))
+      p:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, -(CH + 0.185 * CW))
       if opts.sold then
         p.icon:Hide()
         p.text:SetText("Vendu")
@@ -1834,7 +1884,7 @@ function W.card(parent)
     self.hot, self._hotId = on, self.cardId
     if on then
       self.halo:Show()
-      self.halo:SetAlpha(0.35 + 0.65 * W.animValue(self, "hover"))
+      self.halo:SetAlpha(W.animValue(self, "hover"))
     else
       self.halo:Hide()
     end
@@ -1843,7 +1893,7 @@ function W.card(parent)
 
   -- Survol animé : levée, agrandissement, halo qui s'allume ; passage au premier plan.
   W.hoverable(b, { scale = 1.12, lift = 10, paint = function(self, h)
-    if self.hot then self.halo:SetAlpha(0.35 + 0.65 * h) end
+    if self.hot then self.halo:SetAlpha(h) end -- fondu depuis 0 (pas d'éclat à la première image)
   end })
   b.onAnimSettled = function(self)
     if self.baseLevel and W.animValue(self, "hover") == 0 then W.setLevel(self, self.baseLevel) end
@@ -1942,25 +1992,28 @@ function W.placeCenter(f, container, x, y, scale)
   f:SetPoint("CENTER", container, "TOPLEFT", x / scale, -y / scale)
 end
 
--- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone. Mode de zoom « anim » :
+-- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone. Mode de zoom « net » :
 -- échelle réelle fixée à s1 pendant le vol (aucune nouvelle mise en page des textes), changement
--- d'échelle par animation Scale ; échelle réelle s2 posée à l'arrivée.
+-- d'échelle par animation Scale partant du facteur 1 (première image identique avec ou sans
+-- animation) ; à l'arrivée, dans le même appel, animation coupée et échelle réelle s2 posée : la
+-- carte posée est nette (l'étirement ne dure que le vol).
 function W.fly(f, container, x1, y1, x2, y2, s1, s2, a1, a2, dur, onDone, arc)
   f:Show()
-  local anim = W.zoomMode() == "anim" and s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
-  if f._zoom then zoomTo(f, 1, 0) end
+  local anim = W.zoomMode() == "net" and s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
+  local base = s1
+  stopZoom(f)
   if anim then
-    W.placeCenter(f, container, x1, y1, s1)
-    zoomTo(f, s2 / s1, max(0.01, dur * W.pace()), "IN_OUT")
+    W.placeCenter(f, container, x1, y1, base)
+    zoomTo(f, s2 / base, max(0.01, dur * W.pace()), "IN_OUT")
   end
   W.tween(dur, function(p)
     local x = x1 + (x2 - x1) * p
     local y = y1 + (y2 - y1) * p - (arc or 0) * 4 * p * (1 - p)
-    W.placeCenter(f, container, x, y, anim and s1 or (s1 + (s2 - s1) * p))
+    W.placeCenter(f, container, x, y, anim and base or (s1 + (s2 - s1) * p))
     f:SetAlpha(a1 + (a2 - a1) * p)
   end, function()
     if anim then
-      zoomTo(f, 1, 0)
+      stopZoom(f)
       W.placeCenter(f, container, x2, y2, s2)
     end
     if onDone then onDone() end

@@ -104,7 +104,26 @@ function H.record(obj, name, ...)
   calls[name] = { ... }
 end
 
+-- Régions et cadres créés sous un cadre dont une animation d'échelle joue (le client les dessine
+-- alors mal : aplat doré démesuré au premier survol) : relevés pour le harnais (U23).
+H.playingGroups = {}
+H.bornInAnim = {}
+local function underPlayingAnim(o)
+  if next(H.playingGroups) == nil then return nil end
+  while o do
+    for g in pairs(H.playingGroups) do
+      if rawget(g, "_parent") == o and rawget(g, "_playing") then return o end
+    end
+    o = rawget(o, "_parent")
+  end
+  return nil
+end
+
 local function newObject(kind, name, parent)
+  if parent and kind ~= "AnimationGroup" and kind ~= "Animation" and underPlayingAnim(parent) then
+    local where = debug.traceback("", 2):match("UI/[%w_]+%.lua:%d+") or "?"
+    H.bornInAnim[#H.bornInAnim + 1] = kind .. " (" .. where .. ")"
+  end
   local o = setmetatable({ _kind = kind, _name = name, _parent = parent, _scripts = {}, _calls = {},
     _shown = true, _points = {},
     _w = 0, _h = 0, _scale = 1, _level = parent and (rawget(parent, "_level") or 1) + 1 or 1,
@@ -244,9 +263,10 @@ end
 function Frame:GetSmoothProgress() return animProgress(self) or 0 end
 function Frame:Play()
   self._playing, self._t0 = true, H.now
+  H.playingGroups[self] = true
 end
-function Frame:Stop() self._playing = false end
-function Frame:Pause() self._playing = false end
+function Frame:Stop() self._playing = false H.playingGroups[self] = nil end
+function Frame:Pause() self._playing = false H.playingGroups[self] = nil end
 function Frame:IsPlaying()
   if not self._playing then return false end
   for _, a in ipairs(self._anims or {}) do animProgress(a) end
@@ -289,11 +309,22 @@ function H.textWidth(self, text, size)
   for ch in plainText(text):gmatch("[%z\1-\127\194-\244][\128-\191]*") do w = w + (adv[ch] or 550) end
   return w / 1000 * (size or rawget(self, "_fontSize") or 12)
 end
+-- Taille de police rendue (unités du texte) : sans SetSmoothScaling(true), le client arrondit la
+-- hauteur de police effective au pixel entier (ici : taille × échelle effective arrondie), ce qui
+-- change largeurs et coupures quand l'échelle réelle change ; avec, elle est proportionnelle.
+function H.renderSize(self)
+  local size = rawget(self, "_fontSize") or 12
+  local c = rawget(self, "_calls").SetSmoothScaling
+  if c and c[1] == true then return size end
+  local e = self:GetEffectiveScale()
+  if e <= 0 then return size end
+  return math.max(1, math.floor(size * e + 0.5)) / e
+end
 -- Lignes affichées : { largeurs }, tronqué ?
 local function wrapLines(self)
   local text = plainText(rawget(self, "_text"))
   if text == "" then return {}, false end
-  local size = rawget(self, "_fontSize") or 12
+  local size = H.renderSize(self)
   local w = rawget(self, "_w") or 0
   local wc = rawget(self, "_calls").SetWordWrap
   local wrap = not (wc and wc[1] == false)
@@ -327,7 +358,7 @@ end
 H.wrapLines = wrapLines
 function Frame:GetUnboundedStringWidth()
   local m = 0
-  for para in (plainText(self._text) .. "\n"):gmatch("(.-)\n") do m = math.max(m, H.textWidth(self, para)) end
+  for para in (plainText(self._text) .. "\n"):gmatch("(.-)\n") do m = math.max(m, H.textWidth(self, para, H.renderSize(self))) end
   return m
 end
 function Frame:GetStringWidth()
@@ -336,7 +367,7 @@ function Frame:GetStringWidth()
   for _, lw in ipairs(lines) do m = math.max(m, lw) end
   return m
 end
-function Frame:GetLineHeight() return (self._fontSize or 12) * METRICS.lineHeight end
+function Frame:GetLineHeight() return H.renderSize(self) * METRICS.lineHeight end
 function Frame:GetNumLines() return #(wrapLines(self)) end
 function Frame:GetStringHeight() return #(wrapLines(self)) * self:GetLineHeight() end
 function Frame:IsTruncated() local _, t = wrapLines(self) return t end
@@ -468,6 +499,7 @@ function H.boot(db)
   H.timers = {}
   H.listeners = {}
   H.objects = {}
+  H.playingGroups = {}
   H.unknown = H.unknown or {}
   H.anims = {}
   H.chat = {}
@@ -1373,7 +1405,14 @@ db = _G.SlayTheDragonDB
 check("ancienne sauvegarde de l'interface : options gardées", H.ns.Persist.options().scale == 1.2
   and H.ns.Persist.options().autoOpen == true)
 check("ancienne option du ruban ignorée, zoom invalide remis au défaut", H.ns.Persist.options().flatRibbon == nil
-  and H.ns.Persist.options().zoom == "anim")
+  and H.ns.Persist.options().zoom == "net")
+do
+  local o = H.ns.Persist.options()
+  o.zoom = "anim" -- valeur sauvegardée par la version précédente
+  H.ns.Persist.init()
+  check("ancienne valeur de zoom « anim » : nouveau défaut « net », sans erreur",
+    H.ns.Persist.options().zoom == "net" and H.ns.Widgets.zoomMode() == "net")
+end
 check("ancienne expédition en quarantaine, méta réparée", db.current == nil and #db.quarantine == 1
   and type(db.meta.classes) == "table")
 H.slash("")
@@ -1597,42 +1636,127 @@ do
       .. "|" .. tostring(p[5]) .. "|" .. tostring(f._scale)) or "?"
   end
   local before = hit(card)
+  local face = card.face
+  local hs = card.hoverScale
+  -- échelle visuelle totale (réelle × animation) et état de l'animation d'échelle
+  local function vis(f) return f.face._scale * H.visualScale(f.face) end
+  local function animOn(f) local z = f.face._zoom return z ~= nil and z.ag:IsPlaying() end
+  -- mise en page des textes de la carte : lignes, coupures, largeurs (unités du visuel), tailles
+  local function layout(c)
+    local out = {}
+    for _, key in ipairs({ "name", "cost", "body", "plateText" }) do
+      local fs = c[key]
+      out[#out + 1] = key .. "=" .. tostring(fs._text) .. "#" .. fs:GetNumLines() .. "/"
+        .. tostring(fs:IsTruncated()) .. "/" .. string.format("%.3f", fs:GetStringWidth())
+        .. "/" .. tostring(fs._fontSize) .. "/" .. tostring(fs._setFontCount)
+    end
+    return table.concat(out, " ; ")
+  end
+  local rest = layout(card)
   check("pilote à l'arrêt quand rien ne bouge", not Wd.driverAwake() and driver._scripts.OnUpdate == nil)
   run(card, "OnEnter")
   check("survol : le pilote démarre", Wd.driverAwake() and driver._scripts.OnUpdate ~= nil)
   run(driver, "OnUpdate", 0.04)
   local mid = Wd.animValue(card, "hover")
   check("survol en cours : valeur intermédiaire", mid > 0 and mid < 1, mid)
-  local zoom = card.face._zoom
-  check("zoom « anim » : animation Scale vers l'échelle du survol, échelle réelle intacte (aucune mise en page)",
-    zoom and zoom.ag:IsPlaying() and math.abs(zoom.to - card.hoverScale) < 1e-9 and card.face._scale == 1
+  local zoom = face._zoom
+  check("zoom « net » en route : animation Scale vers l'échelle du survol, échelle réelle encore 1",
+    zoom and animOn(card) and math.abs(zoom.to - hs) < 1e-9 and zoom.from == 1 and face._scale == 1
     and hit(card) == before, zoom and zoom.to)
-  check("textes en mode Vertex (sommets mis à l'échelle, mise en page figée)",
+  check("textes en mode Vertex et SetSmoothScaling (taille rendue proportionnelle à l'échelle)",
     card.body._calls.SetScaleAnimationMode and card.body._calls.SetScaleAnimationMode[1] == 1
-    and card.name._calls.SetScaleAnimationMode and card.cost._calls.SetScaleAnimationMode)
-  local body0, nameSize0 = card.body._text, card.name._fontSize
+    and card.name._calls.SetScaleAnimationMode and card.cost._calls.SetScaleAnimationMode
+    and card.body._calls.SetSmoothScaling and card.body._calls.SetSmoothScaling[1] == true
+    and card.name._calls.SetSmoothScaling[1] == true and card.plateText._calls.SetSmoothScaling[1] == true)
+  check("mise en page identique pendant le mouvement", layout(card) == rest, layout(card))
   H.now = H.now + 0.05
-  local vs = H.visualScale(card.face)
-  check("échelle visuelle intermédiaire au cours du survol", vs > 1 and vs < card.hoverScale, vs)
+  local vs = vis(card)
+  check("échelle visuelle intermédiaire au cours du survol", vs > 1 and vs < hs, vs)
   run(card, "OnLeave")
   run(driver, "OnUpdate", 0.01)
   local back = Wd.animValue(card, "hover")
   check("sortie en cours de route : repart de la valeur courante", back > 0 and back <= mid, back .. " / " .. mid)
-  check("sortie : l'animation repart de l'échelle visuelle courante vers 1",
-    zoom.ag:IsPlaying() and math.abs(zoom.from - vs) < 1e-6 and zoom.to == 1, zoom.from .. " / " .. vs)
-  check("aucune nouvelle mise en page du texte pendant le zoom", card.body._text == body0
-    and card.name._fontSize == nameSize0)
+  check("sortie en route : l'animation repart de l'échelle visuelle courante vers 1, échelle réelle 1",
+    animOn(card) and math.abs(zoom.from - vs) < 1e-6 and zoom.to == 1 and face._scale == 1, zoom.from .. " / " .. vs)
   for _ = 1, 30 do run(driver, "OnUpdate", 0.02) end
   H.now = H.now + 1
-  check("sortie terminée : repos exact", Wd.animValue(card, "hover") == 0 and card.face._scale == 1
-    and H.visualScale(card.face) == 1)
+  check("sortie terminée : repos exact, aucune animation d'échelle", Wd.animValue(card, "hover") == 0
+    and face._scale == 1 and not animOn(card) and vis(card) == 1)
   check("pilote arrêté une fois tout immobile", not Wd.driverAwake() and driver._scripts.OnUpdate == nil)
+  check("mise en page identique après le survol", layout(card) == rest, layout(card))
+
+  -- arrivée image par image : la bascule (échelle réelle posée, animation coupée) se fait dans le pas
+  -- où le canal s'arrête, sans saut d'échelle visible
+  run(card, "OnEnter")
+  local last, jump, steps, switched = 1, 0, 0, nil
+  while Wd.animValue(card, "hover") < 1 and steps < 100 do
+    run(driver, "OnUpdate", 0.016)
+    H.now = H.now + 0.016
+    steps = steps + 1
+    local s = vis(card)
+    if face._scale ~= 1 and not switched then switched = { s = s, prev = last, anim = animOn(card) } end
+    jump = math.max(jump, math.abs(s - last))
+    last = s
+  end
+  check("arrivée : échelle réelle du visuel = échelle de survol, aucune animation d'échelle active",
+    face._scale == hs and not animOn(card) and H.visualScale(face) == 1 and hit(card) == before, face._scale)
+  check("bascule à l'arrivée : même pas, sans saut ni image à la mauvaise taille", switched
+    and not switched.anim and math.abs(switched.s - hs) < 1e-9 and math.abs(switched.s - switched.prev) < 0.02
+    and jump < 0.05, switched and (switched.prev .. " -> " .. switched.s) or "pas de bascule")
+  local lift0 = face._points[1]
+  check("arrivée : position du visuel compensée par l'échelle réelle (levée en unités d'écran)",
+    lift0 and math.abs(lift0[5] * face._scale - card.hoverLift) < 1e-6, lift0 and lift0[5])
+  check("mise en page identique une fois agrandie (même nombre de lignes, mêmes coupures)",
+    layout(card) == rest, layout(card))
+  -- sortie depuis l'état agrandi : étirement depuis l'échelle réelle, sans saut au départ
+  run(card, "OnLeave")
+  run(driver, "OnUpdate", 0.016)
+  H.now = H.now + 0.016
+  check("sortie : échelle réelle gardée, animation vers 1 / échelle (facteur 1 au départ)",
+    face._scale == hs and animOn(card) and zoom.from == 1 and math.abs(zoom.to - 1 / hs) < 1e-9
+    and vis(card) < hs and vis(card) > hs - 0.05, vis(card))
+  check("mise en page identique pendant la sortie", layout(card) == rest, layout(card))
+  -- retour en plein mouvement (réversible), puis bascule interrompue au pas même de l'arrivée
+  run(card, "OnEnter")
+  run(driver, "OnUpdate", 0.016)
+  H.now = H.now + 0.016
+  check("retour en route : animation relancée depuis le facteur courant, échelle réelle inchangée",
+    face._scale == hs and animOn(card) and zoom.to == 1 and zoom.from < 1, zoom.from)
+  for _ = 1, 20 do run(driver, "OnUpdate", 0.016) H.now = H.now + 0.016 end
+  check("retour terminé : échelle réelle de survol, aucune animation", face._scale == hs and not animOn(card)
+    and Wd.animValue(card, "hover") == 1)
+  -- sortie au pas même de la bascule d'arrivée
+  run(card, "OnLeave")
+  run(card, "OnEnter")
+  run(driver, "OnUpdate", 0.016)
+  H.now = H.now + 0.016
+  check("sortie et retour dans le même pas : rien ne bouge", face._scale == hs and not animOn(card)
+    and Wd.animValue(card, "hover") == 1)
+  run(card, "OnLeave")
+  for _ = 1, 30 do run(driver, "OnUpdate", 0.016) H.now = H.now + 0.016 end
+  check("sortie terminée : échelle réelle 1, aucune animation d'échelle", face._scale == 1 and not animOn(card)
+    and vis(card) == 1 and Wd.animValue(card, "hover") == 0)
+  check("mise en page identique après la sortie", layout(card) == rest, layout(card))
+  -- témoin : sans SetSmoothScaling, le faux client arrondit la hauteur de police à l'échelle réelle
+  do
+    local probe = H.ns.Widgets.label(face, "bold", 7.5)
+    probe._calls.SetSmoothScaling = nil
+    probe:SetText("Inflige 6 points de dégâts.")
+    local w1 = probe:GetStringWidth()
+    face:SetScale(1.12)
+    local w2 = probe:GetStringWidth()
+    face:SetScale(1)
+    probe:Hide()
+    check("témoin : sans hauteur non arrondie, la largeur d'un texte change avec l'échelle réelle", w1 ~= w2,
+      w1 .. " / " .. w2)
+  end
+
   -- état final par les seuls minuteurs de secours (images sautées)
   run(card, "OnEnter")
   H.advance(0.5)
-  check("survol : état final atteint et tenu (délai de fin), échelle réelle 1", Wd.animValue(card, "hover") == 1
-    and math.abs(H.visualScale(card.face) - 1.16) < 1e-9 and card.face._scale == 1 and hit(card) == before,
-    H.visualScale(card.face))
+  check("survol : état final par les minuteurs, échelle réelle de survol, aucune animation",
+    Wd.animValue(card, "hover") == 1 and face._scale == hs and not animOn(card) and hit(card) == before,
+    face._scale)
   local n = #C().combat().hand
   if n >= 2 then
     check("voisine écartée (visuel seulement)", Wd.animValue(v.cards[2], "dx") > 0)
@@ -1650,27 +1774,43 @@ do
     local hb = hit(f)
     run(f, "OnEnter")
     H.advance(0.5)
-    local up = H.visualScale(f.face) > 1 and f.face._scale == 1
+    local up = f.face._scale > 1 and f.face._scale == f.hoverScale and not animOn(f)
     run(f, "OnLeave")
     H.advance(0.5)
-    check("survol animé : " .. tostring(f.label and f.label._text or f.pileKey or "icône"),
-      up and H.visualScale(f.face) == 1 and f.face._scale == 1 and hit(f) == hb)
+    check("survol animé : " .. tostring(f.label and f.label._text or f.pileKey or "icône")
+      .. " (échelle réelle à l'arrivée, repos exact ensuite)",
+      up and not animOn(f) and f.face._scale == 1 and hit(f) == hb)
   end
-  -- /slay zoom : bascule « lisse » (échelle réelle à chaque image, police non arrondie) et retour
+  -- /slay zoom : bascule « lisse » (échelle réelle à chaque image) et retour
   H.slash("zoom")
-  check("/slay zoom : mode lisse, textes en SetSmoothScaling", H.ns.Persist.options().zoom == "lisse"
-    and card.body._calls.SetSmoothScaling and card.body._calls.SetSmoothScaling[1] == true)
+  check("/slay zoom : mode lisse", H.ns.Persist.options().zoom == "lisse")
   local eb = v.endTurn
   run(eb, "OnEnter")
   run(driver, "OnUpdate", 0.04)
   check("mode lisse : échelle réelle du visuel animée, sans animation Scale", eb.face._scale > 1
-    and H.visualScale(eb.face) == 1, eb.face._scale)
+    and eb.face._scale < eb.hoverScale and H.visualScale(eb.face) == 1, eb.face._scale)
   run(eb, "OnLeave")
   H.advance(0.5)
   check("mode lisse : repos exact", eb.face._scale == 1)
+  H.slash("zoom net")
+  check("/slay zoom net : retour au défaut", H.ns.Persist.options().zoom == "net")
+  H.slash("zoom lisse")
   H.slash("zoom anim")
-  check("/slay zoom anim : retour au défaut", H.ns.Persist.options().zoom == "anim"
-    and card.body._calls.SetSmoothScaling[1] == false)
+  check("/slay zoom anim (ancien nom) : mode net", H.ns.Persist.options().zoom == "net")
+  -- vol de carte : étirement pendant le vol, carte nette une fois posée
+  do
+    local g = Wd.ghostCard(v.parent)
+    g:SetCard(card.cardId, card.cardUp, card.opts)
+    local landed = false
+    Wd.fly(g, v.parent, 100, 400, 500, 300, 0.3, 1, 0.6, 1, 0.28, function() landed = true end)
+    local gz = g._zoom
+    local inFlight = gz and gz.ag:IsPlaying() and g._scale == 0.3 and math.abs(gz.to - 1 / 0.3) < 1e-9
+      and gz.from == 1
+    H.advance(0.5)
+    check("vol de carte : étirement en vol (échelle réelle de départ), à l'arrivée échelle réelle d'arrivée"
+      .. " et aucune animation d'échelle", inFlight and landed and g._scale == 1 and not gz.ag:IsPlaying())
+    Wd.releaseGhost(g)
+  end
   -- ennemi ciblable quand une carte à cible est armée
   local c = C().combat()
   local idx
@@ -2344,6 +2484,158 @@ do
     Render.svg(H, sheet, SNAP .. "/cartes.svg", "cartes")
     sheet:Hide()
   end
+end
+
+print("U23 premier survol : halos bornés et éteints au départ, pièces d'un seul bloc, rien de créé en route")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function under(o, top)
+    while o do
+      if o == top then return true end
+      o = rawget(o, "_parent")
+    end
+    return false
+  end
+  local function visibleIn(o, top)
+    while o and o ~= top do
+      if not rawget(o, "_shown") then return false end
+      o = rawget(o, "_parent")
+    end
+    return true
+  end
+  local function alphaOf(o)
+    local c = rawget(o, "_calls").SetAlpha
+    return c and (c[1] or 1) or 1
+  end
+  local function effScale(o)
+    local s = 1
+    while o do s = s * (rawget(o, "_scale") or 1) o = rawget(o, "_parent") end
+    return s
+  end
+  -- régions (textures, textes) sous f
+  local function regions(f, out)
+    out = out or {}
+    for _, k in ipairs(rawget(f, "_kids")) do
+      local kind = rawget(k, "_kind")
+      if kind == "Texture" or kind == "FontString" then out[#out + 1] = k
+      elseif kind ~= "AnimationGroup" and kind ~= "Animation" and kind ~= "MaskTexture" then regions(k, out) end
+    end
+    return out
+  end
+  local function isGlow(t)
+    local tex = rawget(t, "_texture")
+    return rawget(t, "_kind") == "Texture" and type(tex) == "string" and tex:find("glow", 1, true) ~= nil
+  end
+  -- premier survol d'un élément : une image, puis contrôles ; enfin survol mené à son terme
+  local function firstHover(label, f, opts)
+    opts = opts or {}
+    local Wd = H.ns.Widgets
+    local fr = R.rect(f)
+    check(label .. " : élément affiché et mesurable", f:IsVisible() and fr ~= nil)
+    if not fr then return end
+    local size = math.max(fr[3] - fr[1], fr[4] - fr[2])
+    local m = 0.4 * size + 12
+    local glows = {}
+    for _, t in ipairs(regions(f.face)) do if isGlow(t) then glows[#glows + 1] = t end end
+    local dark = true
+    for _, t in ipairs(glows) do
+      if visibleIn(t, f) and alphaOf(t) > 0 and not opts.staticGlow then dark = false end
+    end
+    check(label .. " : halo éteint avant le premier survol (alpha 0 ou caché)", dark)
+    local n0 = #H.bornInAnim
+    run(f, "OnEnter")
+    run(Wd.driver, "OnUpdate", 0.016)
+    H.now = H.now + 0.016
+    local bad = {}
+    local hs = f.hoverScale or 1
+    for _, t in ipairs(glows) do
+      if visibleIn(t, f) then
+        local r = R.rect(t)
+        local a = alphaOf(t)
+        if not r or r[1] < fr[1] - m or r[3] > fr[3] + m or r[2] < fr[2] - m or r[4] > fr[4] + m then
+          bad[#bad + 1] = "taille " .. (r and string.format("%.0f×%.0f", r[3] - r[1], r[4] - r[2]) or "?")
+        end
+        if effScale(t) * H.visualScale(f.face) > effScale(f) * hs * 1.001 then bad[#bad + 1] = "échelle" end
+        if not opts.staticGlow and a > 0.5 then bad[#bad + 1] = "alpha " .. a end
+      end
+    end
+    check(label .. " : première image du premier survol, halo borné autour de l'élément et alpha parti de 0",
+      #bad == 0, table.concat(bad, ", "))
+    check(label .. " : aucune région créée pendant l'animation d'échelle", #H.bornInAnim == n0,
+      table.concat(H.bornInAnim, ", ", n0 + 1))
+    H.advance(0.5)
+    -- survol terminé : toutes les régions visibles descendent du visuel et ont la même échelle effective
+    local scales, outside = {}, {}
+    local target = effScale(f.face)
+    local fr2 = R.rect(f.face)
+    for _, t in ipairs(regions(f)) do
+      local excluded = false
+      for _, x in ipairs(opts.fixed or {}) do if under(t, x) then excluded = true end end
+      if not excluded and visibleIn(t, f) and (rawget(t, "_kind") ~= "FontString" or (t._text or "") ~= "") then
+        if not under(t, f.face) then outside[#outside + 1] = tostring(rawget(t, "_texture") or t._text or rawget(t, "_kind")) end
+        if math.abs(effScale(t) - target) > 1e-9 then scales[#scales + 1] = string.format("%.3f", effScale(t)) end
+        if opts.inside then
+          local r = R.rect(t)
+          if r and fr2 and (r[1] < fr2[1] - 0.5 or r[3] > fr2[3] + 0.5 or r[2] < fr2[2] - 0.5 or r[4] > fr2[4] + 0.5) then
+            outside[#outside + 1] = "hors du visuel : " .. tostring(rawget(t, "_texture") or t._text)
+          end
+        end
+      end
+    end
+    check(label .. " : survol terminé, toutes les pièces dans le visuel animé, même échelle effective ("
+      .. string.format("%.2f", target) .. ")", #outside == 0 and #scales == 0 and f.face._scale == hs,
+      table.concat(outside, ", ") .. " " .. table.concat(scales, ", "))
+    run(f, "OnLeave")
+    H.advance(0.5)
+  end
+
+  -- combat : carte de la main (avec plaque du bas et plaque de raison), bouton doré, bouton rond
+  freshRun(SEED, "combat")
+  H.settle()
+  local v = V()
+  firstHover("carte de la main", v.cards[1], { inside = true })
+  local unplayable
+  for i = 1, #C().combat().hand do
+    local info = C().handInfo(i)
+    if info and not info.playable and v.cards[i].reasonPlate then unplayable = v.cards[i] end
+  end
+  if not unplayable then
+    -- carte rendue injouable pour l'essai : plaque de raison
+    local c2 = v.cards[2]
+    c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Pas assez de mana" })
+    unplayable = c2
+  end
+  firstHover("carte injouable (plaque de raison)", unplayable, { inside = true })
+  firstHover("bouton doré « Fin du tour »", v.endTurn)
+  firstHover("bouton rond ≡", UI().gear)
+  -- marchand : objets (butin) et service
+  freshRun(SEED + 2, "merchant")
+  local s = UI().current
+  local item
+  for _, b in ipairs(s.items) do if b:IsVisible() and not item then item = b end end
+  if item then firstHover("objet du marchand (butin)", item, { fixed = { item.tag } }) end
+  firstHover("carte du marchand (étiquette de prix)", s.cards[1], { inside = true })
+  firstHover("service du marchand", s.remove, { fixed = { s.remove.tag } })
+  -- feu de camp : couchage (médaillon)
+  freshRun(SEED + 3, "campfire")
+  s = UI().current
+  firstHover("couchage du feu de camp", s.rest, { fixed = { s.rest.tag } })
+  -- rencontre : plaque de réponse
+  freshRun(SEED + 4, "event")
+  local live
+  for _, o in ipairs(UI().step.options) do if not o.disabled and not live then live = o end end
+  if live then firstHover("plaque de réponse", button(live.id)) end
+  -- parcours : étape accessible (halo fixe : seule la taille est contrôlée)
+  freshRun(SEED + 5, nil)
+  local map = UI().screens.map
+  local node
+  for _, b in ipairs(map and map.nodes or {}) do
+    if b:IsVisible() and b.node and b.node.state == "available" and not node then node = b end
+  end
+  if node then firstHover("étape du parcours", node, { staticGlow = true }) end
+  check("aucune région créée sous un visuel en cours d'animation, sur tout le harnais", #H.bornInAnim == 0,
+    table.concat(H.bornInAnim, ", "))
 end
 
 print("U16 méthodes d'API inconnues appelées")
