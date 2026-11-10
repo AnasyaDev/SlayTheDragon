@@ -118,7 +118,7 @@ return function(ns)
       elseif k == "dupe" then v = v + 1.3
       elseif k == "fight" then
         -- Récompense attendue contre PV perdus en moyenne (mesurés à clé +0 : normal ≈ 15,
-        -- élite ≈ 20 ; à +3 : 20 et 35) ; une élite optionnelle devient un risque de mort
+        -- élite ≈ 20 ; à +3 : 20 et 35) ; un combat optionnel (surtout d'élite) devient un risque de mort
         -- avec la clé (Tyrannique).
         local elite = e.kind == "elite"
         local key = exp.key or 0
@@ -127,7 +127,7 @@ return function(ns)
         if exp.hp - cost < 12 then
           v = v - 5
         else
-          v = v + gain - cost * 0.12 / math.max(hpRatio, 0.2) - (elite and key or 0)
+          v = v + gain - cost * 0.12 / math.max(hpRatio, 0.2) - (elite and key or 0.3 * key)
         end
       elseif k == "gamble" then
         v = v + e[2] * effectsValue(exp, e.win or {}) + (1 - e[2]) * effectsValue(exp, e.lose or {})
