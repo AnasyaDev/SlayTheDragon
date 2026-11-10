@@ -117,7 +117,7 @@ def hpbar(dst, x, y, w, cur, mx, flash=None):
 
 def token(dst, cx, cy, ic, n):
     put(dst, shadow(fith(RING, 30), 2, 2), cx, cy + 1); put(dst, icon(ic, 23), cx, cy - 0.6)
-    text(dst, cx + 10, cy + 9, str(n), 12.5, w=800)
+    text(dst, cx + 13, cy + 10, str(n), 12.5, w=800)
 
 
 def intent(dst, cx, y, rim, ic, label):
@@ -235,13 +235,13 @@ d.rectangle((0, 424 * S, W, 427 * S), fill=(18, 22, 30, 255)); d.rectangle((0, 4
 sh = Image.new("RGBA", (W, 26 * S)); sd = ImageDraw.Draw(sh)
 for y in range(26 * S): sd.line((0, y, W, y), fill=(0, 0, 0, int(120 * (1 - y / (26 * S)))))
 b.alpha_composite(sh, (0, 430 * S))
-hexnum(b, 84, 490, HEX_BLUE, "", 96); text(b, 78, 486, "2", 40, w=800); text(b, 103, 494, "/3", 20, (214, 230, 255), w=700)
-for i, sp in enumerate([HEX_BLUE, HEX_BLUE, HEX_EMPTY]): hexnum(b, 62 + i * 22, 548, sp, "", 20)
-hexnum(b, 130, 452, HEX_VOID, 3, 36, 16)
+hexnum(b, 84, 480, HEX_BLUE, "", 84); text(b, 78, 476, "2", 36, w=800); text(b, 102, 484, "/3", 18, (214, 230, 255), w=700)
+for i, sp in enumerate([HEX_BLUE, HEX_BLUE, HEX_EMPTY]): hexnum(b, 62 + i * 22, 532, sp, "", 18)
+hexnum(b, 128, 448, HEX_VOID, 3, 34, 15)
 for cx, n, a in [(52, 7, 255), (116, 3, 150)]:
-    cb = fith(CARDBACK, 52)
+    cb = fith(CARDBACK, 44)
     if a < 255: cb.putalpha(cb.split()[3].point(lambda v: v * a // 255))
-    put(b, shadow(cb, 2, 2), cx, 590); text(b, cx, 589, str(n), 17, w=800)
+    put(b, shadow(cb, 2, 2), cx, 576); text(b, cx, 575, str(n), 15, w=800)
 hand_card(b, "smite", 258, 454); hand_card(b, "penance", 388, 440); hand_card(b, "fire", 660, 440)
 hand_card(b, "spirit", 790, 454, off="Mana insuffisant")
 hand_card(b, "blast", 524, 372, scale=1.18, glow=True)

@@ -60,5 +60,29 @@
 "desc_size": 15,
 "desc_dy": 70,
 "metal": 1
+},
+{
+"out": "nova.png",
+"name": "Nova sacrée",
+"cost": 1,
+"desc": "Inflige **3** à tous. **Récupération 3**.",
+"icon": "Spell_Holy_HolyNova",
+"color": "#d9d2bd",
+"rarity": "uncommon",
+"desc_size": 15,
+"desc_dy": 45,
+"metal": 1
+},
+{
+"out": "whip.png",
+"name": "Fouet mental",
+"cost": 1,
+"desc": "Inflige **4**. Si la cible a **Douleur** : **+2 Démence**.",
+"icon": "Spell_Shadow_SiphonMana",
+"color": "#7a52b8",
+"rarity": "common",
+"desc_size": 12.5,
+"desc_dy": 30,
+"metal": 1
 }
 ]
