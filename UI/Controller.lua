@@ -240,13 +240,17 @@ function C.act(a)
   if not exp then return false, "terminée" end
   local c = exp.combat
   local title = exp.fight and FIGHT_TITLE[exp.fight.kind]
+  local kindBefore = exp.fight and exp.fight.kind
   local ok, why = X.act(exp, a)
   if not ok then return false, why end
   local evs = {}
   if c then
     evs = c.events or {}
     c.events = {}
-    if c.result and exp.combat ~= c then C.ended = { c = c, result = c.result, title = title } end
+    if c.result and exp.combat ~= c then
+      C.ended = { c = c, result = c.result, title = title, kind = kindBefore }
+      C.lastFightKind = kindBefore
+    end
   end
   -- Nouveau combat (chemin, rencontre) : ses événements d'ouverture ne sont pas rejoués.
   if exp.combat and exp.combat ~= c then
@@ -405,6 +409,29 @@ function C.aliveTargets()
     if not c.enemies[i].dead then list[#list + 1] = i end
   end
   return list
+end
+
+-- Mana maximal du tour (affichage « 2/3 » de l'orbe) : lecture du moteur, aucune règle ici.
+function C.maxMana()
+  local c = C.combat()
+  if not c then return 0 end
+  local ok, v = pcall(Combat.modify, c, "maxMana", Combat.BASE_MANA)
+  return ok and v or (Combat.BASE_MANA or 3)
+end
+
+-- Décor de l'étape en cours (clé de UI/Art.lua : Art.scenes) : boss -> mine, feu de camp -> night,
+-- rencontre -> champ `scene` facultatif de la rencontre (piste F), sinon route.
+function C.scene()
+  local exp = C.exp()
+  if not exp then return "road" end
+  local f = (C.ended and C.ended.kind) or (exp.fight and exp.fight.kind) or C.lastFightKind
+  if exp.phase == "campfire" then return "night" end
+  if exp.phase == "merchant" then return "shop" end
+  local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
+  if (exp.phase == "event" or exp.phase == "select") and ev then return ev.scene or "road" end
+  if (exp.phase == "combat" or exp.phase == "reward" or C.ended) and f == "boss" then return "mine" end
+  if exp.phase == "reward" and exp.reward and exp.reward.kind == "event" and ev then return ev.scene or "road" end
+  return "road"
 end
 
 -- Résumé pour le bandeau (PV, or, deck, bibelots, clé).
@@ -661,8 +688,19 @@ local function mapStep(exp)
   local text = "Choisis ta prochaine étape."
   local al = affixLine(exp.affixes, exp.key)
   if al then text = text .. "\n" .. al end
+  -- Nom du boss de l'acte (si tous les groupes de boss ont le même chef).
+  local bossName
+  local act = Map.ACTS[exp.act or 1]
+  local groups = act and ns.Encounters[act.encounters] and ns.Encounters[act.encounters].boss
+  if groups and groups[1] then
+    local first = groups[1][1]
+    local same = true
+    for _, g in ipairs(groups) do if g[1] ~= first then same = false end end
+    if same and ns.Enemies[first] then bossName = ns.Enemies[first].name end
+  end
   return { kind = "map", title = X.actName(exp) .. " · étape " .. min(exp.floor + 1, floors) .. " sur " .. floors,
-    text = text, nodes = nodes, options = opts, affixes = exp.affixes, key = exp.key }
+    text = text, nodes = nodes, options = opts, affixes = exp.affixes, key = exp.key, bossName = bossName,
+    floor = exp.floor, floors = floors }
 end
 
 local REWARD_TITLE = { combat = "Victoire !", elite = "Élite vaincue !", boss = "Boss vaincu !", chest = "Coffre" }
@@ -713,7 +751,8 @@ local function rewardStep(exp)
     opts[#opts + 1] = actionOption(avail, { id = "takePotion", label = "Prendre la potion" })
   end
   opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Continuer" })
-  return { kind = "reward", title = title, text = text, loot = loot, options = opts }
+  return { kind = "reward", title = title, text = text, loot = loot, options = opts, rewardKind = r.kind,
+    picked = r.picked, cardsDone = r.cardsDone, after = (r.kind == "event") and text or nil }
 end
 
 local function campfireStep(exp)
@@ -791,16 +830,26 @@ local function eventStep(exp)
       options = { actionOption(avail, { id = "leave", label = "Continuer" }) } }
   end
   local def = ns.Events[ev.id]
+  -- Champs facultatifs (piste F) : speaker, scene, npc, rarity ; choix : outcome, hidden.
+  local base = { kind = "event", title = def.name, speaker = def.speaker, scene = def.scene, npc = def.npc,
+    rarity = def.rarity }
   if ev.chosen then
     local ch = def.choices[ev.chosen]
-    return { kind = "event", title = def.name, text = ch and ch.after or "",
-      options = { actionOption(avail, { id = "leave", label = "Continuer" }) } }
+    base.text = ch and ch.after or ""
+    base.after = true
+    base.options = { actionOption(avail, { id = "leave", label = "Continuer" }) }
+    return base
   end
   local opts = {}
   for i, ch in ipairs(def.choices) do
-    opts[#opts + 1] = actionOption(avail, { id = "choose:" .. i, label = ch.label, text = ch.text })
+    local outcome = ch.outcome or ch.text
+    if ch.hidden then outcome = "?" end
+    opts[#opts + 1] = actionOption(avail, { id = "choose:" .. i, label = ch.label, text = outcome,
+      hidden = ch.hidden })
   end
-  return { kind = "event", title = def.name, text = def.text, options = opts }
+  base.text = def.text
+  base.options = opts
+  return base
 end
 
 local function selectStep(exp)
@@ -818,7 +867,7 @@ local function selectStep(exp)
   local what = sel.kind == "upgrade" and "choisis une carte à améliorer" or "choisis une carte à retirer"
   local ch = ev and exp.event.chosen and ev.choices[exp.event.chosen]
   return { kind = "select", title = (ev and ev.name or "Rencontre") .. " : " .. what,
-    text = ch and ch.after or "", options = opts }
+    text = ch and ch.after or "", options = opts, selectKind = sel.kind }
 end
 
 local function startRelicStep(exp)

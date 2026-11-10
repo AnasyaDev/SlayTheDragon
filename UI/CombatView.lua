@@ -1,176 +1,84 @@
--- Écran de combat : héros à gauche, 1 à 5 ennemis à droite, main en éventail en bas.
--- N'applique aucune règle : lit l'état du moteur (ns.Combat) et passe par ns.Controller
--- (donc par Expedition.act : coups, fin de tour, potions).
+-- Écran de combat (docs/maquette/Main.dc.html) : décor plein cadre, héros à gauche et ennemis à
+-- droite posés au sol, bulle d'intention, barres de vie ; plateau de bois : orbe de mana, Démence,
+-- pioche et défausse, main en arc, recharges, « Fin du tour ».
+-- N'applique aucune règle : lit l'état du moteur (ns.Combat) et passe par ns.Controller (donc par
+-- Expedition.act). L'état est à jour avant les animations : elles rejouent les événements dans une
+-- file (cosmétique), puis l'écran se resynchronise sur le moteur.
 local _, ns = ...
 if not CreateFrame then return end -- hors du jeu (Sim/load.lua) : pas d'interface
 
-local W, Art, UI, Controller, Combat, Card = ns.Widgets, ns.Art, ns.UI, ns.Controller, ns.Combat, ns.Card
+local W, Art, UI, Controller, Combat, Card, Scene = ns.Widgets, ns.Art, ns.UI, ns.Controller, ns.Combat, ns.Card,
+  ns.Scene
+local C = Art.C
+local at = Scene.at
+local max, min, abs, floor = math.max, math.min, math.abs, math.floor
 
 local V = { kinds = { "combat" } }
 UI.register("combat", V)
 
-local BF_W, BF_H = 876, 296
-local HAND_X, HAND_W = 96, 684
-local SLOT_W, SLOTS = 128, 6
-local ENEMY_X, ENEMY_W = 212, 660
+local SLOTS = 6
+local SLOT_W, SLOT_H = 150, 280
+local HERO_X = 196                       -- centre du héros
+local HERO_FEET = 292
+local ENEMY_X0, ENEMY_X1 = 470, 1022     -- zone des ennemis
+local HAND_CX, HAND_W = 525, 670         -- main : centre et largeur
+local HAND_TOP = 428
+local HOVER_SCALE = 1.16
+local DRAW_PILE = { 77, 584 }
+local DISCARD_PILE = { 123, 584 }
 
 local function now() return GetTime and GetTime() or 0 end
 local function opts() return ns.Persist.options() end
 
----------------------------------------------------------------------------
--- Noms pour le journal
----------------------------------------------------------------------------
-
 local function enemyByUid(c, uid)
   for i = 1, #c.enemies do if c.enemies[i].uid == uid then return c.enemies[i], i end end
-end
-
-local function unitName(c, ref)
-  if ref == nil then return "?" end
-  if ref == "player" then return "Toi" end
-  local e = enemyByUid(c, ref)
-  return e and ns.Enemies[e.id].name or "?"
-end
-
-local function cardNameByUid(c, uid)
-  local function scan(t)
-    for i = 1, #t do if t[i].uid == uid then return Card.def(t[i]).name end end
-  end
-  local n = scan(c.hand) or scan(c.draw) or scan(c.discard) or scan(c.exhaust) or scan(c.player.powers)
-  if n then return n end
-  for i = 1, #c.cooldown do
-    if c.cooldown[i].card.uid == uid then return Card.def(c.cooldown[i].card).name end
-  end
-  if c.player.cast and c.player.cast.card.uid == uid then return Card.def(c.player.cast.card).name end
-  return "?"
-end
-
-local function cardName(id)
-  local d = ns.Cards[id]
-  return d and d.name or tostring(id)
-end
-
--- Ligne de journal pour un événement du moteur ; nil = rien à écrire.
-function V.describe(c, ev)
-  local t = ev.t
-  if t == "play" then
-    local s = "Tu joues " .. cardName(ev.id)
-    if ev.target then s = s .. " sur " .. unitName(c, ev.target) end
-    return s, 1, 1, 1
-  elseif t == "damage" then
-    local s = (ev.src and (unitName(c, ev.src) .. " inflige ") or "") .. ev.loss
-      .. (ev.src and "" or " dégâts") .. " à " .. (ev.dst == "player" and "toi" or unitName(c, ev.dst))
-    if ev.absorbed > 0 then s = s .. " (" .. ev.absorbed .. " absorbés)" end
-    if ev.dst == "player" then return s, 1, 0.4, 0.4 end
-    return s, 1, 0.85, 0.6
-  elseif t == "heal" then
-    return unitName(c, ev.unit) .. " récupère " .. ev.amount .. " PV", 0.4, 1, 0.4
-  elseif t == "block" then
-    return unitName(c, ev.unit) .. " gagne " .. ev.amount .. " Absorption", 0.55, 0.75, 1
-  elseif t == "status" then
-    local s = ns.Statuses[ev.id]
-    return unitName(c, ev.unit) .. " : " .. (s and s.name or ev.id) .. (ev.n >= 0 and " +" or " ") .. ev.n,
-      0.9, 0.75, 1
-  elseif t == "tick" then
-    return "Douleur : " .. ev.n .. " dégâts à " .. (ev.unit == "player" and "toi" or unitName(c, ev.unit)),
-      0.8, 0.5, 1
-  elseif t == "death" then
-    if ev.unit == "player" then return "Tu tombes…", 1, 0.2, 0.2 end
-    return unitName(c, ev.unit) .. " meurt", 1, 0.6, 0.2
-  elseif t == "turn" then
-    return "— Tour " .. ev.round .. " —", 1, 0.82, 0
-  elseif t == "interrupt" then
-    if ev.src == "player" then return "Tu interromps " .. unitName(c, ev.dst), 0.4, 0.9, 1 end
-    return unitName(c, ev.src) .. " interrompt ton incantation (" .. cardName(ev.card) .. ")", 1, 0.4, 0.4
-  elseif t == "cast_start" then
-    return "Tu commences à incanter " .. cardNameByUid(c, ev.card), 0.8, 0.8, 1
-  elseif t == "cast_resolve" then
-    return cardNameByUid(c, ev.card) .. " se résout", 0.8, 0.8, 1
-  elseif t == "cast_lost" then
-    return unitName(c, ev.unit) .. " perd son sort", 0.4, 0.9, 1
-  elseif t == "act" then
-    local e = enemyByUid(c, ev.unit)
-    local mv = e and ns.Enemies[e.id].moves[ev.move]
-    return unitName(c, ev.unit) .. " : " .. (mv and mv.name or ev.move), 0.85, 0.85, 0.85
-  elseif t == "say" then
-    return unitName(c, ev.unit) .. " : « " .. ev.text .. " »", 1, 1, 0.4
-  elseif t == "spawn" then
-    return (ns.Enemies[ev.id] and ns.Enemies[ev.id].name or ev.id) .. " entre en combat", 0.85, 0.85, 0.85
-  elseif t == "flee" then
-    return unitName(c, ev.unit) .. " s'enfuit", 0.85, 0.85, 0.85
-  elseif t == "stunned" then
-    return unitName(c, ev.unit) .. " est étourdi et perd son tour", 0.4, 0.9, 1
-  elseif t == "immune" then
-    return unitName(c, ev.unit) .. " est insensible à l'étourdissement", 0.85, 0.85, 0.85
-  elseif t == "saved" then
-    return "L'Esprit de rédemption te maintient à 1 PV", 1, 1, 0.6
-  elseif t == "power" then
-    return "Pouvoir actif : " .. cardName(ev.card), 0.9, 0.75, 1
-  elseif t == "demence" then
-    return "Démence " .. (ev.n >= 0 and "+" or "") .. ev.n .. " (total " .. ev.total .. ")", 0.75, 0.5, 1
-  elseif t == "reshuffle" then
-    return "La défausse est mélangée dans la pioche (" .. ev.n .. " cartes)", 0.7, 0.7, 0.7
-  elseif t == "cooldown_back" then
-    return cardNameByUid(c, ev.card) .. " revient en main", 0.7, 0.7, 0.7
-  elseif t == "result" then
-    if ev.result == "won" then return "Victoire !", 0.3, 1, 0.3 end
-    return "Défaite…", 1, 0.3, 0.3
-  end
-  return nil
 end
 
 ---------------------------------------------------------------------------
 -- Construction
 ---------------------------------------------------------------------------
 
-local function newModel(parent, w, h)
-  local m = W.create("PlayerModel", nil, parent)
-  m:SetSize(w, h)
-  return m
+-- Bulle d'intention : fond sombre arrondi, liseré de couleur, icône ronde + chiffre.
+local function intentBubble(parent)
+  local f = CreateFrame("Frame", nil, parent)
+  f:SetSize(80, 28)
+  f:EnableMouse(true)
+  f.shape = W.shape(f, 13, C.attack, C.band, 2, -4)
+  f.icon = f:CreateTexture(nil, "ARTWORK")
+  f.icon:SetSize(18, 18)
+  f.icon:SetPoint("LEFT", 10, 0)
+  f.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+  W.roundMask(f, f.icon)
+  f.text = W.label(f, "title", 18, C.attackText)
+  f.text:SetPoint("LEFT", f.icon, "RIGHT", 5, 0)
+  W.tooltip(f, function(tt, self) V.fillIntentTooltip(tt, self.enemy) end, "ANCHOR_TOP")
+  return f
 end
 
 local function buildSlot(self, i)
   local s = CreateFrame("Button", nil, self.bf)
-  s:SetSize(SLOT_W, 248)
+  s:SetSize(SLOT_W, SLOT_H)
   s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   s.index = i
-
-  s.glow = s:CreateTexture(nil, "BACKGROUND")
-  s.glow:SetPoint("TOPLEFT", 2, -28)
-  s.glow:SetPoint("BOTTOMRIGHT", -2, 2)
-  s.glow:SetColorTexture(1, 0.85, 0.2, 0.18)
-  s.glow:Hide()
-
-  local intent = CreateFrame("Frame", nil, s)
-  intent:SetSize(SLOT_W, 26)
-  intent:SetPoint("TOP", 0, 0)
-  intent:EnableMouse(true)
-  intent.icon = intent:CreateTexture(nil, "ARTWORK")
-  intent.icon:SetSize(24, 24)
-  intent.icon:SetPoint("LEFT", 8, 0)
-  intent.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
-  intent.text = W.text(intent, "GameFontNormalLarge", 14)
-  intent.text:SetPoint("LEFT", intent.icon, "RIGHT", 4, 0)
-  intent.text:SetPoint("RIGHT", -2, 0)
-  intent.text:SetJustifyH("LEFT")
-  W.tooltip(intent, function(tt, f) V.fillIntentTooltip(tt, f.enemy) end, "ANCHOR_TOP")
-  s.intent = intent
-
-  s.model = newModel(s, 120, 160)
-  s.model:SetPoint("TOP", 0, -30)
-  s.fallback = s:CreateTexture(nil, "ARTWORK")
-  s.fallback:SetSize(56, 56)
-  s.fallback:SetPoint("CENTER", s.model, "CENTER")
-  s.fallback:Hide()
-
-  s.name = W.text(s, "GameFontNormal", 11)
-  s.name:SetPoint("TOP", 0, -192)
-  s.name:SetWidth(SLOT_W)
-  s.hp = W.bar(s, 116, 12, 0.8, 0.1, 0.1)
-  s.hp:SetPoint("TOP", 0, -208)
-  s.st = W.statusRow(s, 16, 6)
-  s.st:SetPoint("TOPLEFT", 6, -226)
-
+  s.intent = intentBubble(s)
+  s.intent:SetPoint("TOP", 0, 0)
+  s.fig = Scene.figure(s, 150, 160)
+  s.fig:SetPoint("TOP", 0, -33)
+  s.fig:EnableMouse(false)
+  s.model = s.fig.model
+  s.fallback = s.fig.fallback
+  s.flash = W.disc(s.fig, "OVERLAY", 0, C.hp, 0)
+  s.flash:SetSize(110, 130)
+  s.flash:SetPoint("CENTER", 0, 4)
+  s.block = W.shieldBadge(s, 28, 22)
+  s.block:SetPoint("RIGHT", s, "TOPLEFT", 4 + 5, -207)
+  s.hp = W.hpBar(s, 140, 18, 12)
+  s.hp:SetPoint("TOP", 0, -198)
+  s.name = W.label(s, "body", 13, C.cream, "OVERLAY", true)
+  s.name:SetPoint("TOP", 0, -220)
+  s.name:SetWidth(SLOT_W + 10)
+  s.st = W.pillRow(s, 6, SLOT_W + 10, 11)
+  s.st:SetPoint("TOP", 0, -238)
   s:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
   s:SetScript("OnEnter", function() s.hover = true V:RenderTargets() end)
   s:SetScript("OnLeave", function() s.hover = false V:RenderTargets() end)
@@ -178,171 +86,163 @@ local function buildSlot(self, i)
   return s
 end
 
-local function pileButton(self, parent, label, entry, key, y)
-  local b = CreateFrame("Button", nil, parent)
-  b:SetSize(88, 34)
-  b:SetPoint("TOPLEFT", 2, y)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
-  b.icon:SetSize(28, 28)
-  b.icon:SetPoint("LEFT", 2, 0)
-  W.setIcon(b.icon, entry, "ui:" .. key)
-  b.label = W.text(b, "GameFontNormalSmall")
-  b.label:SetPoint("TOPLEFT", b.icon, "TOPRIGHT", 4, -1)
-  b.label:SetText(label)
-  b.count = W.text(b, "GameFontHighlightLarge", 14)
-  b.count:SetPoint("BOTTOMLEFT", b.icon, "BOTTOMRIGHT", 4, 0)
-  b.pile = key
+-- Pile (pioche ou défausse) : petit tas de cartes avec nombre.
+local function pile(self, parent, x, y, key, label, dashed, level)
+  if not dashed then
+    local back = CreateFrame("Frame", nil, parent)
+    at(back, parent, x + 3, y + 3, 36, 48)
+    back:SetFrameLevel(level)
+    W.roundRect(back, "BACKGROUND", -8, 5, 0):SetColor(C.woodDark)
+  end
+  local b = CreateFrame("Frame", nil, parent)
+  at(b, parent, x, y, 36, 48)
+  b:SetFrameLevel(level + 1)
+  b:EnableMouse(true)
+  b.shape = W.shape(b, 5, dashed and C.woodLine or C.gold, dashed and C.woodDark or C.wood, 2, -6)
+  b.count = W.label(b, "title", 18, dashed and C.parchment or C.creamLight)
+  b.count:SetPoint("CENTER")
   W.tooltip(b, function(tt) V.fillPileTooltip(tt, key, label) end, "ANCHOR_RIGHT")
   return b
 end
 
 function V:Build(parent)
   self.parent = parent
+  -- Champ de bataille (bande du décor) : clic = jouer une carte sans cible.
   local bf = CreateFrame("Frame", nil, parent)
-  bf:SetSize(BF_W, BF_H)
-  bf:SetPoint("TOPLEFT", 0, 0)
+  at(bf, parent, 0, Scene.TOP, Scene.W, Scene.DECOR_H)
   bf:EnableMouse(true)
   bf:SetScript("OnMouseUp", function(_, button) V:ClickField(button) end)
   self.bf = bf
-  local bg = bf:CreateTexture(nil, "BACKGROUND")
-  bg:SetAllPoints()
-  bg:SetColorTexture(0.12, 0.1, 0.08, 0.35)
-
-  self.round = W.text(bf, "GameFontNormal", 12)
-  self.round:SetPoint("TOP", 0, -2)
 
   -- Héros ----------------------------------------------------------------
-  local hero = CreateFrame("Frame", nil, bf)
-  hero:SetSize(196, BF_H)
-  hero:SetPoint("TOPLEFT", 4, 0)
+  local hero = Scene.figure(parent, 200, 220)
+  at(hero, parent, HERO_X - 100, HERO_FEET - 220, 200, 220)
   self.hero = hero
+  self.playerModel = hero.model
+  hero.flash = W.disc(hero, "OVERLAY", 0, C.hp, 0)
+  hero.flash:SetSize(130, 160)
+  hero.flash:SetPoint("CENTER", 0, 0)
 
-  local cast = CreateFrame("StatusBar", nil, hero)
-  cast:SetSize(150, 14)
-  cast:SetPoint("TOPLEFT", 30, -6)
-  cast:SetStatusBarTexture("Interface\\TargetingFrame\\UI-StatusBar")
-  cast:SetStatusBarColor(0.6, 0.45, 1)
-  cast:SetMinMaxValues(0, 1)
-  cast:SetValue(1)
-  local cbg = cast:CreateTexture(nil, "BACKGROUND")
-  cbg:SetAllPoints()
-  cbg:SetColorTexture(0, 0, 0, 0.6)
-  cast.icon = cast:CreateTexture(nil, "ARTWORK")
-  cast.icon:SetSize(18, 18)
-  cast.icon:SetPoint("RIGHT", cast, "LEFT", -4, 0)
-  cast.text = W.text(cast, "GameFontHighlightSmall", 9)
-  cast.text:SetPoint("CENTER")
+  local cast = CreateFrame("Frame", nil, parent)
+  at(cast, parent, HERO_X - 95, 84, 190, 32)
+  cast:SetFrameLevel(parent:GetFrameLevel() + 20)
+  cast.shape = W.shape(cast, 6, C.gold, C.band, 2, -4)
+  cast.name = W.label(cast, "body", 12, C.cream)
+  cast.name:SetPoint("TOPLEFT", 8, -4)
+  cast.when = W.label(cast, "body", 12, C.gold)
+  cast.when:SetPoint("TOPRIGHT", -8, -4)
+  cast.when:SetText("au prochain tour")
+  cast.track = W.rect(cast, "ARTWORK", 0, C.woodDark)
+  cast.track:SetPoint("BOTTOMLEFT", 8, 5)
+  cast.track:SetSize(174, 7)
+  cast.bar = W.rect(cast, "ARTWORK", 1, C.gold)
+  cast.bar:SetPoint("BOTTOMLEFT", 8, 5)
+  cast.bar:SetSize(108, 7)
   cast:EnableMouse(true)
   W.tooltip(cast, function(tt)
     local c = Controller.combat()
     local pc = c and c.player.cast
     if not pc then return end
-    W.fillCardTooltip(tt, pc.card.id, pc.card.up)
+    W.fillCardTooltip(tt, pc.card.id, pc.card.up, { full = true })
     tt:AddLine(" ")
     tt:AddLine("Se résout au début de ton prochain tour, sauf interruption.", 0.8, 0.8, 1, true)
   end, "ANCHOR_TOP")
   cast:Hide()
   self.cast = cast
 
-  self.playerModel = newModel(hero, 180, 168)
-  self.playerModel:SetPoint("TOP", 0, -24)
-
-  self.playerName = W.text(hero, "GameFontNormal", 11)
-  self.playerName:SetPoint("TOP", 0, -194)
-  self.playerHp = W.bar(hero, 170, 14, 0.1, 0.8, 0.1)
-  self.playerHp:SetPoint("TOP", 0, -210)
-  self.playerSt = W.statusRow(hero, 18, 9)
-  self.playerSt:SetPoint("TOPLEFT", 12, -230)
+  local hpRow = CreateFrame("Frame", nil, parent)
+  at(hpRow, parent, HERO_X - 95, HERO_FEET + 6, 190, 30)
+  self.playerBlock = W.shieldBadge(hpRow, 34, 30)
+  self.playerBlock:SetPoint("LEFT", 0, 0)
+  self.playerHp = W.hpBar(hpRow, 150, 24, 14)
+  self.playerHp:SetPoint("RIGHT", 0, 0)
+  self.playerSt = W.pillRow(parent, 8, 230, 12)
+  at(self.playerSt, parent, HERO_X - 115, HERO_FEET + 42, 230, 18)
 
   -- Ennemis ----------------------------------------------------------------
   self.slots = {}
   for i = 1, SLOTS do self.slots[i] = buildSlot(self, i) end
   self.slotOf = {}
 
-  -- Journal discret ----------------------------------------------------------
-  local log = W.create("ScrollingMessageFrame", nil, bf)
-  log:SetPoint("TOPLEFT", ENEMY_X, -262)
-  log:SetPoint("BOTTOMRIGHT", -4, 2)
-  log:SetFontObject(GameFontHighlightSmall)
-  log:SetJustifyH("LEFT")
-  log:SetMaxLines(200)
-  log:SetFading(true)
-  log:SetTimeVisible(20)
-  log:EnableMouseWheel(true)
-  log:SetScript("OnMouseWheel", function(f, d) if d > 0 then f:ScrollUp() else f:ScrollDown() end end)
-  self.log = log
-
-  -- Bandeau de fin de combat ---------------------------------------------------
-  local banner = W.panel(bf, "tooltip")
-  banner:SetSize(300, 110)
-  banner:SetPoint("CENTER", bf, "CENTER", 110, 10)
-  banner:SetFrameLevel(bf:GetFrameLevel() + 30)
-  banner.text = W.text(banner, "GameFontNormalHuge")
-  banner.text:SetPoint("TOP", 0, -18)
-  banner.button = W.button(banner, "Continuer", 140, 26, function() Controller.finishCombat() end)
-  banner.button:SetPoint("BOTTOM", 0, 16)
-  banner:Hide()
-  self.banner = banner
-
-  -- Bas de l'écran : piles, main, mana, fin du tour --------------------------------
+  -- Plateau : mana, Démence, piles ----------------------------------------------
   local hz = CreateFrame("Frame", nil, parent)
-  hz:SetPoint("TOPLEFT", 0, -BF_H - 2)
-  hz:SetPoint("BOTTOMRIGHT", 0, 0)
+  at(hz, parent, 0, Scene.BOARD_Y, Scene.W, Scene.BOARD_H)
+  hz:SetFrameLevel(parent:GetFrameLevel() + 10)
   self.hz = hz
 
-  self.drawPile = pileButton(self, hz, "Pioche", Art.ui.draw, "draw", -2)
-  self.discardPile = pileButton(self, hz, "Défausse", Art.ui.discard, "discard", -38)
-  self.exhaustPile = pileButton(self, hz, "Consumées", Art.ui.exhaust, "exhaust", -74)
-  local cdl = W.text(hz, "GameFontNormalSmall")
-  cdl:SetPoint("TOPLEFT", 4, -112)
-  cdl:SetText("Recharges")
-  self.cdRow = W.statusRow(hz, 20, 4)
-  self.cdRow:SetPoint("TOPLEFT", 2, -126)
-
-  local mana = CreateFrame("Frame", nil, hz)
-  mana:SetSize(56, 56)
-  mana:SetPoint("TOPRIGHT", -18, -4)
+  local mana = CreateFrame("Frame", nil, parent)
+  at(mana, parent, 55, 440, 84, 84)
+  mana:SetFrameLevel(hz:GetFrameLevel() + 2)
   mana:EnableMouse(true)
-  mana.icon = mana:CreateTexture(nil, "ARTWORK")
-  mana.icon:SetAllPoints()
-  W.setIcon(mana.icon, Art.ui.mana, "ui:mana")
-  mana.text = W.text(mana, "GameFontNormalHuge")
-  mana.text:SetPoint("CENTER")
-  mana.text:SetTextColor(1, 1, 1)
+  mana.edge = W.disc(mana, "ARTWORK", 0, C.gemEdge)
+  mana.edge:SetAllPoints()
+  mana.fill = W.disc(mana, "ARTWORK", 1, C.gem)
+  mana.fill:SetPoint("TOPLEFT", 4, -4)
+  mana.fill:SetPoint("BOTTOMRIGHT", -4, 4)
+  mana.shine = W.disc(mana, "ARTWORK", 2, C.white, 0.18)
+  mana.shine:SetSize(40, 26)
+  mana.shine:SetPoint("TOP", -8, -10)
+  mana.text = W.label(mana, "title", 28, C.white, "OVERLAY", true)
+  mana.text:SetPoint("CENTER", 0, 5)
+  mana.sub = W.label(mana, "body", 12, C.white)
+  mana.sub:SetPoint("TOP", mana.text, "BOTTOM", 0, -1)
+  mana.sub:SetText("mana")
   W.tooltip(mana, function(tt)
-    local c = Controller.combat()
     tt:AddLine("Mana", 0.4, 0.6, 1)
-    if c then tt:AddLine(c.player.mana .. " disponible(s) ce tour.", 1, 1, 1) end
     tt:AddLine("Le mana non dépensé est perdu à la fin du tour.", 0.8, 0.8, 0.8, true)
-  end, "ANCHOR_LEFT")
+  end, "ANCHOR_RIGHT")
   self.mana = mana
 
-  local dem = CreateFrame("Frame", nil, hz)
-  dem:SetSize(80, 22)
-  dem:SetPoint("TOPRIGHT", -6, -66)
+  local dem = W.pill(parent, 13)
+  dem:SetFrameLevel(hz:GetFrameLevel() + 2)
   dem:EnableMouse(true)
-  dem.icon = dem:CreateTexture(nil, "ARTWORK")
-  dem.icon:SetSize(20, 20)
-  dem.icon:SetPoint("LEFT")
-  W.setIcon(dem.icon, Art.ui.demence, "ui:demence")
-  dem.text = W.text(dem, "GameFontHighlight")
-  dem.text:SetPoint("LEFT", dem.icon, "RIGHT", 4, 0)
   W.tooltip(dem, function(tt)
     local kw = Art.keywords.demence
     tt:AddLine(kw.name, 0.75, 0.5, 1)
     tt:AddLine(kw.text, 1, 1, 1, true)
-  end, "ANCHOR_LEFT")
+  end, "ANCHOR_RIGHT")
   self.demence = dem
 
-  self.endTurn = W.button(hz, "Fin du tour", 92, 30, function() V:EndTurn() end)
-  self.endTurn:SetPoint("BOTTOMRIGHT", -2, 6)
-  local hint = W.text(hz, "GameFontDisableSmall", 8)
-  hint:SetPoint("BOTTOM", self.endTurn, "TOP", 0, 2)
-  hint:SetText("(Espace)")
+  self.drawPile = pile(self, parent, DRAW_PILE[1] - 18, DRAW_PILE[2] - 24, "draw", "Pioche", false,
+    hz:GetFrameLevel() + 1)
+  self.discardPile = pile(self, parent, DISCARD_PILE[1] - 18, DISCARD_PILE[2] - 24, "discard", "Défausse", true,
+    hz:GetFrameLevel() + 1)
 
+  -- Recharges (mini-cartes) et fin du tour ------------------------------------------
+  self.cdCards = {}
+  for i = 1, 6 do
+    local m = CreateFrame("Frame", nil, parent)
+    m:SetSize(44, 58)
+    m:SetFrameLevel(hz:GetFrameLevel() + 2)
+    m:EnableMouse(true)
+    m.shape = W.shape(m, 5, C.edgeCommon, Art.hex("#8f8468"), 2, -6)
+    m.icon = m:CreateTexture(nil, "ARTWORK")
+    m.icon:SetSize(24, 24)
+    m.icon:SetPoint("TOP", 0, -5)
+    m.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
+    m.icon:SetDesaturated(true)
+    m.icon:SetAlpha(0.7)
+    W.roundMask(m, m.icon)
+    m.count = W.label(m, "title", 20, C.frame)
+    m.count:SetPoint("BOTTOM", 0, 5)
+    W.tooltip(m, function(tt, f)
+      if not f.cd then return end
+      W.fillCardTooltip(tt, f.cd.card.id, f.cd.card.up, { full = true })
+      tt:AddLine(" ")
+      tt:AddLine("Revient en main dans " .. f.turns .. " tour" .. (f.turns > 1 and "s" or "") .. ".", 1, 0.82, 0)
+    end, "ANCHOR_TOP")
+    m:Hide()
+    self.cdCards[i] = m
+  end
+
+  self.endTurn = W.button(parent, "Fin du tour", 146, 48, function() V:EndTurn() end, "gold", 16)
+  at(self.endTurn, parent, 874, 506, 146, 48)
+  self.endTurn:SetFrameLevel(hz:GetFrameLevel() + 2)
+
+  -- Main -----------------------------------------------------------------------------
   self.cards = {}
   for i = 1, Combat.HAND_MAX do
-    local card = W.card(hz)
+    local card = W.card(parent)
     card.index = i
     card:RegisterForDrag("LeftButton")
     card:SetScript("OnClick", function(f, button) V:ClickCard(f.index, button) end)
@@ -354,8 +254,24 @@ function V:Build(parent)
     self.cards[i] = card
   end
 
+  -- Fin de combat ---------------------------------------------------------------------
+  local banner = CreateFrame("Frame", nil, parent)
+  at(banner, parent, 317, 150, 400, 150)
+  banner:SetFrameLevel(parent:GetFrameLevel() + 70)
+  banner:EnableMouse(true)
+  banner.glow = W.disc(banner, "BACKGROUND", 0, C.black, 0.45)
+  banner.glow:SetPoint("TOPLEFT", -40, 10)
+  banner.glow:SetPoint("BOTTOMRIGHT", 40, -10)
+  banner.text = W.label(banner, "title", 44, C.gold, "OVERLAY", true)
+  banner.text:SetPoint("TOP", 0, -14)
+  banner.button = W.button(banner, "Continuer", 180, 46, function() Controller.finishCombat() end, "gold", 16)
+  banner.button:SetPoint("BOTTOM", 0, 12)
+  banner:Hide()
+  self.banner = banner
+
   self.queue = {}
   self.playing = false
+  self.pendingDraw = {}
 end
 
 ---------------------------------------------------------------------------
@@ -394,12 +310,14 @@ function V.fillIntentTooltip(tt, e)
   tt:AddLine(Art.intentName[info.kind] or info.kind or "", 0.7, 0.7, 0.7)
   if info.stunned then tt:AddLine("Étourdi : perd son prochain tour.", 0.4, 0.9, 1, true) end
   if info.interrupted then tt:AddLine("Sort interrompu : il ne partira pas.", 0.4, 0.9, 1, true) end
+  if mv.text then tt:AddLine(mv.text, 1, 1, 1, true) end
   for i = 1, #mv.actions do
     local a = mv.actions[i]
     if a[1] == "attack" then
       local times = a.times or 1
       tt:AddLine("Attaque : " .. Combat.calcDamage(c, e, c.player, a[2])
-        .. (times > 1 and (" × " .. times) or "") .. " dégâts.", 1, 0.5, 0.5, true)
+        .. (times > 1 and (" × " .. times) or "") .. " dégâts."
+        .. (a.interrupts and " Interrompt ton incantation." or ""), 1, 0.5, 0.5, true)
     elseif ACTION_TEXT[a[1]] then
       tt:AddLine(ACTION_TEXT[a[1]](a), 1, 1, 1, true)
     end
@@ -412,17 +330,21 @@ end
 function V.fillPileTooltip(tt, key, label)
   local c = Controller.combat()
   if not c then return end
-  local pile = c[key]
-  tt:AddLine(label .. " (" .. #pile .. ")", 1, 0.82, 0)
+  local pileList = c[key]
+  tt:AddLine(label .. " (" .. #pileList .. ")", 1, 0.82, 0)
   if key == "draw" then tt:AddLine("Ordre caché ; liste triée.", 0.6, 0.6, 0.6) end
   local counts, order = {}, {}
-  for i = 1, #pile do
-    local n = Card.def(pile[i]).name
+  for i = 1, #pileList do
+    local n = Card.def(pileList[i]).name
     if not counts[n] then counts[n] = 0 order[#order + 1] = n end
     counts[n] = counts[n] + 1
   end
   table.sort(order)
   for i = 1, #order do tt:AddLine(counts[order[i]] .. " × " .. order[i], 1, 1, 1) end
+  if key == "discard" and #c.exhaust > 0 then
+    tt:AddLine(" ")
+    tt:AddLine("Consumées : " .. #c.exhaust, 0.8, 0.6, 0.4)
+  end
 end
 
 ---------------------------------------------------------------------------
@@ -439,6 +361,7 @@ end
 
 function V:Show(step)
   local c = step.state
+  UI.setStage({ scene = Controller.scene(), board = true })
   if self.preview then self.preview:Hide() end
   if self.c ~= c then
     self.c = c
@@ -446,6 +369,9 @@ function V:Show(step)
     self.potionSlot = nil
     self.kbTarget = nil
     self.queue = {}
+    self.playing = false
+    self.frozen = false
+    self.pendingDraw = {}
     self.slotOf = {}
     for i = 1, #self.slots do
       local s = self.slots[i]
@@ -453,22 +379,17 @@ function V:Show(step)
       s.dying = false
       s:Hide()
     end
-    if self.log.Clear then self.log:Clear() end
-    local names = {}
-    for i = 1, #c.enemies do
-      if not c.enemies[i].dead then names[#names + 1] = ns.Enemies[c.enemies[i].id].name end
-    end
-    self.log:AddMessage((step.title or "Combat") .. " : " .. table.concat(names, ", "), 1, 0.82, 0)
-    self.playerModel:SetUnit("player")
-    self.playerModel.dead = false
+    Scene.playerFigure(self.hero)
+    self.shownHand = {}
   end
   self:ApplyFacing()
-  self:Render()
+  self:Render(true)
 end
 
 function V:OnHide()
   self.queue = {}
   self.playing = false
+  self.frozen = false
   if self.dragging then self:StopDrag(self.dragging, true) end
 end
 
@@ -499,8 +420,8 @@ function V:LayoutEnemies()
     end
   end
   local n = #shown
-  local w = n > 0 and math.min(132, ENEMY_W / n) or 132
-  local x0 = ENEMY_X + (ENEMY_W - n * w) / 2
+  local spacing = n > 0 and min(170, (ENEMY_X1 - ENEMY_X0) / n) or 170
+  local cx0 = (ENEMY_X0 + ENEMY_X1) / 2 - (n - 1) * spacing / 2
   for k = 1, n do
     local idx = shown[k]
     local e = c.enemies[idx]
@@ -513,20 +434,36 @@ function V:LayoutEnemies()
       s.dying = false
       self.slotOf[e.uid] = s
       s:Show()
+      local art = Art.enemies[e.id] or {}
+      local sc = art.scale or 1
+      s.fig:SetSize(150 * sc, 160 * sc)
+      s.model:SetSize(150 * sc, 160 * sc)
       W.setCreature(s.model, e.id, s.fallback)
       if s.model.SetFacing then s.model:SetFacing(opts().facingEnemy or -0.6) end
-      s.model:SetAlpha(1)
+      W.modelAlpha(s.model, 1)
+      s:SetAlpha(1)
+      s.hp:Set(e.hp, e.maxHp)
+      s.block:Set(e.block)
     end
     s.enemyIndex = idx
-    s:ClearAllPoints()
-    s:SetPoint("TOPLEFT", self.bf, "TOPLEFT", x0 + (k - 1) * w + (w - SLOT_W) / 2, -16)
+    s.cx = cx0 + (k - 1) * spacing
+    s.top = 92 + ((k % 2 == 0) and 26 or 0) - Scene.TOP
+    s:SetScale(n >= 5 and 0.86 or 1)
+    self:PlaceSlot(s, 0, 0)
   end
 end
 
+function V:PlaceSlot(s, dx, dy)
+  local sc = s:GetScale() or 1
+  s:ClearAllPoints()
+  s:SetPoint("TOP", self.bf, "TOPLEFT", (s.cx + (dx or 0)) / sc, -(s.top + (dy or 0)) / sc)
+end
+
+-- Bulle d'intention : icône + chiffres exacts (Combat.calcDamage).
 local function intentDisplay(c, e)
   local info = Combat.intentInfo(c, e)
-  if info.stunned then return Art.intents.stunned, "Étourdi", 0.6, 0.6, 0.6 end
-  if info.interrupted then return Art.intents.interrupted, "Interrompu", 0.6, 0.6, 0.6 end
+  if info.stunned then return Art.intents.stunned, "Étourdi", "defend" end
+  if info.interrupted then return Art.intents.interrupted, "Coupé", "defend" end
   local mv = ns.Enemies[e.id].moves[e.intent]
   local parts = {}
   for i = 1, #mv.actions do
@@ -534,43 +471,54 @@ local function intentDisplay(c, e)
     if a[1] == "attack" then
       local times = a.times or 1
       local dmg = Combat.calcDamage(c, e, c.player, a[2])
-      parts[#parts + 1] = "|cffff5050" .. dmg .. (times > 1 and ("×" .. times) or "") .. "|r"
+      parts[#parts + 1] = dmg .. (times > 1 and ("×" .. times) or "")
     elseif a[1] == "block" or a[1] == "block_ally" then
-      parts[#parts + 1] = "|cff8cc4ff+" .. a[2] .. "|r"
+      parts[#parts + 1] = (#parts > 0 and "+" or "") .. a[2]
     elseif a[1] == "heal_ally" then
-      parts[#parts + 1] = "|cff60ff60+" .. a[2] .. "|r"
+      parts[#parts + 1] = "+" .. a[2]
     elseif a[1] == "summon" then
       parts[#parts + 1] = "+" .. (a.count or 1)
     end
   end
   local text = table.concat(parts, " ")
   if info.kind == "watch" then text = "Guette" end
-  if info.cast then text = "|cffff9a30Incante|r " .. text end
-  return Art.intents[info.kind] or Art.intents.attack, text, 1, 1, 1
+  local entry = Art.intents[info.kind] or Art.intents.attack
+  return entry, text, entry.color
 end
 
-function V:RenderEnemies()
+function V:RenderIntent(s, e)
+  local c = self.c
+  s.intent.enemy = e
+  if e.dead or c.result then s.intent:Hide() return end
+  local entry, text, color = intentDisplay(c, e)
+  W.setIcon(s.intent.icon, entry, "intent:" .. tostring(Combat.intentInfo(c, e).kind))
+  local edge, ink = C[color] or C.attack, C[color .. "Text"] or C.attackText
+  s.intent.shape.edge:SetColor(edge)
+  s.intent.text:SetTextColor(ink[1], ink[2], ink[3])
+  W.setSize(s.intent.text, text:match("^%d") and 20 or 14)
+  s.intent.text:SetText(text)
+  s.intent:SetWidth(max(56, (s.intent.text:GetStringWidth() or 20) + 46))
+  s.intent:SetAlpha(1)
+  s.intent:SetScale(1)
+  s.intent:Show()
+end
+
+-- full = resynchroniser barres et états sur le moteur (hors animations).
+function V:RenderEnemies(full)
   local c = self.c
   self:LayoutEnemies()
   for uid, s in pairs(self.slotOf) do
     local e = enemyByUid(c, uid)
     local def = ns.Enemies[e.id]
     s.name:SetText(def.name)
-    if def.boss then s.name:SetTextColor(1, 0.5, 0.1)
-    elseif def.elite then s.name:SetTextColor(0.8, 0.4, 1)
-    else s.name:SetTextColor(1, 0.82, 0) end
-    s.hp:Set(math.max(e.hp, 0), e.maxHp, e.block)
-    s.st:Set(W.unitStatuses(e))
-    s.intent.enemy = e
-    if e.dead or c.result then
-      s.intent:Hide()
-    else
-      local entry, text = intentDisplay(c, e)
-      W.setIcon(s.intent.icon, entry, "intent:" .. tostring(Combat.intentInfo(c, e).kind))
-      s.intent.text:SetText(text)
-      s.intent:Show()
+    local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.cream)
+    s.name:SetTextColor(nc[1], nc[2], nc[3])
+    if full then
+      s.hp:Set(e.hp, e.maxHp)
+      s.block:Set(e.block)
+      s.st:Set(W.unitStatuses(e))
     end
-    s:SetAlpha(e.dead and 0.6 or 1)
+    if not self.frozen or e.dead then self:RenderIntent(s, e) end
   end
   self:RenderTargets()
 end
@@ -595,6 +543,7 @@ function V:KbTarget()
   return nil
 end
 
+-- Anneau doré aux pieds de la cible.
 function V:RenderTargets()
   if not self.c then return end
   local info = self:SelectedInfo()
@@ -602,81 +551,104 @@ function V:RenderTargets()
   local kb = self:KbTarget()
   for _, s in pairs(self.slotOf) do
     local e = self.c.enemies[s.enemyIndex]
-    local on = e and not e.dead and (s.hover or (targeting and s.enemyIndex == kb))
-    if on then s.glow:Show() else s.glow:Hide() end
+    local alive = e and not e.dead and not s.dying
+    local on = alive and ((targeting and (s.hover or s.enemyIndex == kb)) or s.hover)
+    s.fig:SetRing(on, not targeting)
   end
 end
 
-function V:RenderPlayer()
+function V:RenderPlayer(full)
   local c = self.c
   local p = c.player
-  self.playerName:SetText(UnitName and UnitName("player") or "Toi")
-  self.playerHp:Set(math.max(p.hp, 0), p.maxHp, p.block)
-  local list = W.unitStatuses(p)
-  for i = 1, #p.powers do
-    local inst = p.powers[i]
-    list[#list + 1] = { entry = W.cardArt(inst.id), key = "card:" .. inst.id, info = { power = inst } }
+  if full then
+    self.playerHp:Set(p.hp, p.maxHp)
+    self.playerBlock:Set(p.block)
+    local list = W.unitStatuses(p)
+    for i = 1, #p.powers do
+      local inst = p.powers[i]
+      list[#list + 1] = { text = Card.def(inst).name, edge = C.goldDeep, ink = C.gold, info = { power = inst } }
+    end
+    self.playerSt:Set(list)
   end
-  self.playerSt:Set(list)
   if p.cast then
     local d = Card.def(p.cast.card)
     local tgt = p.cast.target and enemyByUid(c, p.cast.target)
-    W.setIcon(self.cast.icon, W.cardArt(p.cast.card.id), "card:" .. p.cast.card.id)
-    self.cast.text:SetText(d.name .. (tgt and (" → " .. ns.Enemies[tgt.id].name) or ""))
+    self.cast.name:SetText(d.name .. (tgt and (" → " .. ns.Enemies[tgt.id].name) or ""))
     self.cast:Show()
   else
     self.cast:Hide()
   end
-  self.mana.text:SetText(tostring(p.mana))
-  self.demence.text:SetText(tostring(p.demence or 0))
+  self.mana.text:SetText(p.mana .. "/" .. Controller.maxMana())
+  local dem = p.demence or 0
+  local w = self.demence:Set("Démence " .. dem, C.watch, C.watchText)
+  at(self.demence, self.parent, 97 - w / 2, 530, w, 19)
   self.drawPile.count:SetText(#c.draw)
   self.discardPile.count:SetText(#c.discard)
-  self.exhaustPile.count:SetText(#c.exhaust)
-  local cds = {}
-  for i = 1, #c.cooldown do
+  -- recharges
+  local n = min(#c.cooldown, #self.cdCards)
+  local per = n > 3 and 3 or n
+  for i = 1, #self.cdCards do
+    local m = self.cdCards[i]
     local cd = c.cooldown[i]
-    local d = Card.def(cd.card)
-    local turns = cd.turns + 1
-    cds[#cds + 1] = { entry = W.cardArt(cd.card.id), key = "card:" .. cd.card.id, count = turns,
-      info = { title = d.name, text = "Revient en main dans " .. turns .. " tour" .. (turns > 1 and "s" or "") .. "." } }
+    if cd and i <= n then
+      local turns = cd.turns + 1
+      m.cd, m.turns = cd, turns
+      local d = Card.def(cd.card)
+      m.shape.edge:SetColor(Art.rarity[d.rarity] or C.edgeCommon)
+      W.setIcon(m.icon, W.cardArt(cd.card.id), "card:" .. cd.card.id)
+      m.count:SetText(tostring(turns))
+      local row, col = floor((i - 1) / 3), (i - 1) % 3
+      local rowN = (row == 0) and per or (n - 3)
+      local x0 = 947 - (rowN * 52 - 8) / 2
+      at(m, self.parent, x0 + col * 52, 440 - row * 64, 44, 58)
+      m:Show()
+    else
+      m.cd = nil
+      m:Hide()
+    end
   end
-  self.cdRow:Set(cds)
-  self.round:SetText("Tour " .. c.round)
 end
 
-local function keyLabel(i) return i == 10 and "0" or tostring(i) end
+-- Position d'une carte de la main (centre x, haut y), sans survol.
+function V:HandSlot(i, n)
+  local spacing = n > 1 and min(130, (HAND_W - W.CARD_W) / (n - 1)) or 0
+  local d = i - (n + 1) / 2
+  local half = max(1, (n - 1) / 2)
+  local x = HAND_CX + d * spacing
+  local y = HAND_TOP + 10 * (d / half) * (d / half)
+  return x, y
+end
 
 function V:PlaceCard(card)
   if not card.baseX or self.dragging == card then return end
-  local lift = 0
-  if self.selected == card.index then lift = 22 elseif card.hover then lift = 14 end
-  card:ClearAllPoints()
-  card:SetPoint("TOPLEFT", self.hz, "TOPLEFT", card.baseX, card.baseY + lift)
-  card:SetFrameLevel(self.hz:GetFrameLevel() + card.index + ((lift > 0) and 20 or 0))
-  card:SetSelected(self.selected == card.index)
+  local up = self.selected == card.index or card.hover
+  local sc = up and HOVER_SCALE or 1
+  local top = up and 372 or card.baseY
+  W.placeCenter(card, self.parent, card.baseX, top + W.CARD_H * sc / 2, sc)
+  card:SetFrameLevel(self.hz:GetFrameLevel() + 5 + card.index * 3 + (up and 60 or 0))
+  card:SetHot(up)
 end
 
 function V:RenderHand()
   local c = self.c
   local n = #c.hand
   if self.selected and self.selected > n then self.selected = nil end
-  local cw = W.CARD_W
-  local spacing = n > 1 and math.min(cw + 4, (HAND_W - cw) / (n - 1)) or 0
-  local total = cw + (n - 1) * spacing
-  local x0 = HAND_X + (HAND_W - total) / 2
+  local mana = c.player.mana
+  self.shownHand = {}
   for i = 1, #self.cards do
     local card = self.cards[i]
     if i <= n then
       local info = Controller.handInfo(i)
       card:SetCard(info.inst.id, info.inst.up, { cost = info.cost, playable = info.playable,
-        key = keyLabel(i), reason = not info.playable and Controller.reasonText(info.why) or nil })
-      local d = i - (n + 1) / 2
-      card.baseX = x0 + (i - 1) * spacing
-      card.baseY = -10 - d * d * 0.7
+        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil })
+      card.uid = info.inst.uid
+      card.baseX, card.baseY = self:HandSlot(i, n)
       self:PlaceCard(card)
+      card:SetAlpha(self.pendingDraw[card.uid] and 0 or 1)
       card:Show()
+      self.shownHand[card.uid] = i
     else
-      card.baseX = nil
+      card.baseX, card.uid = nil, nil
       card:Hide()
     end
   end
@@ -685,32 +657,41 @@ end
 function V:RenderBanner()
   local over = Controller.over()
   if over then
-    self.banner.text:SetText(over == "won" and "|cff40ff40Victoire !|r" or "|cffff4040Défaite…|r")
+    self.banner.text:SetText(over == "won" and "Victoire !" or "Défaite…")
+    local col = over == "won" and C.gold or C.hpText
+    self.banner.text:SetTextColor(col[1], col[2], col[3])
     self.banner.button:SetText(over == "won" and "Continuer" or "Voir le bilan")
-    self.banner:Show()
-    self.endTurn:Disable()
+    if not self.banner:IsShown() then
+      self.banner:Show()
+      W.tween(0.35, function(p) self.banner:SetAlpha(p) end, nil, self.banner, "show")
+    end
+    self.endTurn:SetActive(false)
   else
     self.banner:Hide()
-    self.endTurn:Enable()
+    self.endTurn:SetActive(true)
   end
 end
 
-function V:Render()
+function V:Render(full)
   if not self.c then return end
-  self:RenderPlayer()
-  self:RenderEnemies()
+  if full == nil then full = not self.playing end
+  self:RenderPlayer(full)
+  self:RenderEnemies(full)
   self:RenderHand()
-  self:RenderBanner()
+  if full then self:RenderBanner() end
 end
 
 ---------------------------------------------------------------------------
--- Événements du moteur : journal + animations (cosmétiques, l'état est déjà à jour)
+-- Événements du moteur : animations (cosmétiques, l'état est déjà à jour)
 ---------------------------------------------------------------------------
 
-local function unitAnchor(self, ref)
-  if ref == "player" then return self.playerModel end
+-- Centre (coordonnées du contenu) d'une unité.
+function V:UnitPos(ref)
+  if ref == "player" then return HERO_X, HERO_FEET - 100, self.hero end
   local s = self.slotOf[ref]
-  return s and s.model
+  if not s then return nil end
+  local sc = s:GetScale() or 1
+  return s.cx, Scene.TOP + s.top + (33 + 80) * sc, s
 end
 
 function V:Push(delay, fn)
@@ -719,7 +700,13 @@ end
 
 function V:RunQueue()
   local item = table.remove(self.queue, 1)
-  if not item then self.playing = false return end
+  if not item then
+    self.playing = false
+    self.frozen = false
+    self.pendingDraw = {}
+    if self.c then self:Render(true) end
+    return
+  end
   self.playing = true
   item.fn()
   W.delay(item.delay * W.pace(), function() V:RunQueue() end)
@@ -730,16 +717,49 @@ function V:OnEvents(evs)
   if not c then return end
   for i = 1, #evs do
     local ev = evs[i]
-    local line, r, g, b = V.describe(c, ev)
-    if line then self.log:AddMessage(line, r, g, b) end
     if ev.t == "death" and ev.unit ~= "player" then
       local s = self.slotOf[ev.unit]
       if s then s.dying = true end
+    elseif ev.t == "draw" or ev.t == "cooldown_back" then
+      self.pendingDraw[ev.card] = ev.t
     end
     self:QueueEvent(ev)
   end
-  self:Render()
-  if not self.playing then self:RunQueue() end
+  local wasPlaying = self.playing
+  self.playing = true
+  self:Render(false)
+  if not wasPlaying then self:RunQueue() end
+end
+
+local function shake(self, s, amount)
+  W.tween(0.32, function(p)
+    local dx = math.sin(p * 28) * (1 - p) * (amount or 6)
+    if s == self.hero then
+      at(self.hero, self.parent, HERO_X - 100 + dx, HERO_FEET - 220)
+    else
+      self:PlaceSlot(s, dx, 0)
+    end
+  end, nil, s, "shake", W.ease.linear)
+end
+
+local function flash(tex, r, g, b)
+  tex:SetVertexColor(r, g, b, 1)
+  W.tween(0.35, function(p) tex:SetAlpha(0.45 * (1 - p)) end, nil, tex, "flash", W.ease.linear)
+end
+
+-- Ligne d'une carte jouée : carte fantôme qui file vers la cible ou le héros.
+function V:FlyPlayed(pp, ev)
+  if not pp then return end
+  local g = W.ghostCard(self.parent)
+  g:SetFrameLevel(self.hz:GetFrameLevel() + 90)
+  g:SetCard(pp.id, pp.up, { cost = pp.cost })
+  g:SetHot(true)
+  local tx, ty = HERO_X, HERO_FEET - 110
+  if ev.target then
+    local x, y = self:UnitPos(ev.target)
+    if x then tx, ty = x, y end
+  end
+  W.fly(g, self.parent, pp.x, pp.y, tx, ty, HOVER_SCALE, 0.35, 1, 0.1, 0.38, function() W.releaseGhost(g) end, 40)
 end
 
 function V:QueueEvent(ev)
@@ -747,87 +767,172 @@ function V:QueueEvent(ev)
   local A = Art.anim
   local self_ = self
   if t == "play" then
-    self:Push(0.2, function() W.anim(self_.playerModel, A.spell, 1.0) end)
+    local pp = self.pendingPlay
+    self.pendingPlay = nil
+    self:Push(0.3, function()
+      W.sound("play")
+      self_:FlyPlayed(pp, ev)
+      W.anim(self_.playerModel, A.spell, 1.0)
+    end)
   elseif t == "act" then
     local e = enemyByUid(self.c, ev.unit)
     local mv = e and ns.Enemies[e.id].moves[ev.move]
-    self:Push(0.25, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.anim(m, (mv and mv.intent == "attack") and A.attack or A.spellOmni, 0.9) end
+    local isAttack = mv and mv.intent == "attack"
+    self:Push(0.35, function()
+      local s = self_.slotOf[ev.unit]
+      if not s then return end
+      local b = s.intent
+      if b:IsShown() then
+        W.tween(0.3, function(p) b:SetScale(1 + 0.5 * p) b:SetAlpha(1 - p) end, function()
+          b:Hide() b:SetScale(1) b:SetAlpha(1)
+        end, b, "pop")
+      end
+      if isAttack then
+        W.tween(0.34, function(p)
+          local k = p < 0.5 and p * 2 or (1 - p) * 2
+          self_:PlaceSlot(s, -46 * k, 0)
+        end, nil, s, "shake", W.ease.linear)
+      end
+      W.anim(s.model, isAttack and A.attack or A.spellOmni, 0.9)
     end)
   elseif t == "damage" then
-    self:Push(0.3, function()
-      local m = unitAnchor(self_, ev.dst)
-      if not m then return end
-      if ev.loss > 0 then W.anim(m, A.wound, 0.6) end
-      local txt = "-" .. ev.loss
-      if ev.absorbed > 0 then txt = txt .. " |cff8cc4ff(" .. ev.absorbed .. ")|r" end
-      W.float(m, txt, 1, 0.3, 0.3, 20)
+    self:Push(0.32, function()
+      local x, y, who = self_:UnitPos(ev.dst)
+      if not x then return end
+      local bar = ev.dst == "player" and self_.playerHp or who.hp
+      local badge = ev.dst == "player" and self_.playerBlock or who.block
+      if ev.loss > 0 then
+        W.sound(ev.loss >= 12 and "bigHit" or "hit")
+        W.float(self_.parent, x + 18, y - 40, "−" .. ev.loss, C.white, ev.loss >= 12 and 36 or 30)
+        if bar.hp then bar:Set(bar.hp - ev.loss, bar.maxHp, true) end
+        shake(self_, who, ev.loss >= 12 and 9 or 6)
+        flash(who.flash, C.hp[1], C.hp[2], C.hp[3])
+        W.anim(who.model or self_.playerModel, A.wound, 0.6)
+      end
+      if ev.absorbed > 0 then
+        W.sound("block")
+        W.float(self_.parent, x - 34, y - 10, "−" .. ev.absorbed, C.absorb, 20, 0.9)
+        local cur = tonumber(badge.text:GetText() or "") or 0
+        badge:Set(max(0, cur - ev.absorbed))
+      end
     end)
   elseif t == "heal" then
-    self:Push(0.15, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.float(m, "+" .. ev.amount, 0.3, 1, 0.3, 30) end
+    self:Push(0.2, function()
+      local x, y, who = self_:UnitPos(ev.unit)
+      if not x then return end
+      W.sound("heal")
+      W.float(self_.parent, x, y - 40, "+" .. ev.amount, C.healText, 28)
+      local bar = ev.unit == "player" and self_.playerHp or who.hp
+      if bar.hp then bar:Set(bar.hp + ev.amount, bar.maxHp) end
     end)
   elseif t == "block" then
-    self:Push(0.15, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.float(m, "+" .. ev.amount .. " Absorption", 0.55, 0.75, 1, 40) end
+    self:Push(0.18, function()
+      local x, y, who = self_:UnitPos(ev.unit)
+      if not x then return end
+      W.sound("block")
+      W.float(self_.parent, x - 30, y - 20, "+" .. ev.amount, C.absorb, 24)
+      local badge = ev.unit == "player" and self_.playerBlock or who.block
+      badge:Set(ev.total)
+      W.tween(0.25, function(p) badge:SetScale(1 + 0.3 * (1 - p)) end, nil, badge, "pop")
     end)
   elseif t == "status" then
     local s = ns.Statuses[ev.id]
     self:Push(0.12, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.float(m, (s and s.name or ev.id), 0.9, 0.75, 1, 55, 1.0) end
+      local x, y = self_:UnitPos(ev.unit)
+      if x and ev.n > 0 then W.float(self_.parent, x, y - 70, s and s.name or ev.id, C.watchText, 15, 1.0, 20) end
     end)
   elseif t == "death" then
-    self:Push(0.4, function()
-      local m = unitAnchor(self_, ev.unit)
-      if not m then return end
+    self:Push(0.5, function()
+      local _, _, who = self_:UnitPos(ev.unit)
+      if not who then return end
+      local m = who.model or self_.playerModel
+      W.sound(ev.unit == "player" and "playerDeath" or "enemyDeath")
       W.anim(m, A.death)
       m.dead = true
-      W.delay(1.2 * W.pace(), function() if m.dead and m.SetAnimation then m:SetAnimation(A.dead) end end)
       if ev.unit ~= "player" then
-        W.delay(1.6 * W.pace(), function()
-          local s = self_.slotOf[ev.unit]
-          if s then s.dying = false end
-          if self_.c then self_:RenderEnemies() end
-        end)
+        who.intent:Hide()
+        W.tween(0.9, function(p) W.modelAlpha(m, 1 - p) who:SetAlpha(1 - 0.7 * p) end, function()
+          who.dying = false
+          if self_.c then self_:RenderEnemies(false) end
+        end, who, "fade", W.ease.linear)
+      else
+        W.delay(1.2 * W.pace(), function() if m.dead and m.SetAnimation then m:SetAnimation(A.dead) end end)
       end
     end)
   elseif t == "interrupt" then
-    self:Push(0.25, function()
-      local m = unitAnchor(self_, ev.dst)
-      if m then W.float(m, "Interrompu !", 0.4, 0.9, 1, 60) end
+    self:Push(0.3, function()
+      local x, y = self_:UnitPos(ev.dst)
+      W.sound("interrupt")
+      if x then W.float(self_.parent, x, y - 60, "Interrompu !", C.defendText, 20, 1.3) end
     end)
   elseif t == "cast_start" then
     self:Push(0.2, function() W.anim(self_.playerModel, A.ready, 1.2) end)
   elseif t == "cast_resolve" then
-    self:Push(0.3, function() W.anim(self_.playerModel, A.spellOmni, 1.0) end)
+    self:Push(0.35, function() W.anim(self_.playerModel, A.spellOmni, 1.0) end)
   elseif t == "cast_lost" then
     self:Push(0.2, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.float(m, "Sort perdu", 0.6, 0.6, 0.6, 60) end
+      local x, y = self_:UnitPos(ev.unit)
+      if x then W.float(self_.parent, x, y - 60, "Sort perdu", C.defendText, 16) end
     end)
   elseif t == "say" then
-    self:Push(0.3, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.float(m, ev.text, 1, 1, 0.4, 70, 2.5) end
+    self:Push(0.4, function()
+      local x, y = self_:UnitPos(ev.unit)
+      if x then W.float(self_.parent, x, y - 110, ev.text, C.creamLight, 15, 2.6, 12) end
     end)
   elseif t == "stunned" or t == "immune" or t == "flee" then
     local label = t == "stunned" and "Étourdi" or t == "immune" and "Insensible" or "S'enfuit"
-    self:Push(0.2, function()
-      local m = unitAnchor(self_, ev.unit)
-      if m then W.float(m, label, 0.8, 0.8, 0.8, 60) end
+    self:Push(0.25, function()
+      local x, y = self_:UnitPos(ev.unit)
+      if x then W.float(self_.parent, x, y - 60, label, C.defendText, 16) end
     end)
   elseif t == "saved" then
-    self:Push(0.3, function() W.float(self_.playerModel, "Esprit de rédemption !", 1, 1, 0.6, 60, 2) end)
+    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, "Esprit de rédemption !", C.gold, 18, 2) end)
   elseif t == "demence" and ev.n ~= 0 then
     self:Push(0.1, function()
-      W.float(self_.playerModel, (ev.n > 0 and "+" or "") .. ev.n .. " Démence", 0.75, 0.5, 1, 75, 1.0)
+      W.float(self_.parent, 97, 500, (ev.n > 0 and "+" or "") .. ev.n .. " Démence", C.watchText, 15, 1.0, 26)
     end)
+  elseif t == "mana" and ev.n ~= 0 then
+    self:Push(0.1, function() W.float(self_.parent, 97, 470, "+" .. ev.n .. " mana", C.gemEdge, 15, 1.0, 26) end)
   elseif t == "turn" then
-    self:Push(0.2, function() W.float(self_.bf, "Tour " .. ev.round, 1, 0.82, 0, 60, 1.0) end)
+    self:Push(0.35, function()
+      W.float(self_.parent, 517, 120, "Tour " .. ev.round, C.gold, 26, 1.1, 16)
+    end)
+  elseif t == "draw" or t == "cooldown_back" then
+    self:Push(0.09, function() self_:FlyDraw(ev.card, t == "cooldown_back") end)
+  elseif t == "result" then
+    self:Push(0.2, function() W.sound(ev.result == "won" and "victory" or "defeat") end)
+  end
+end
+
+-- Pioche : une carte arrive du tas (ou des recharges) jusqu'à sa place dans la main.
+function V:FlyDraw(uid, fromCooldown)
+  local idx = self.shownHand and self.shownHand[uid]
+  local card = idx and self.cards[idx]
+  self.pendingDraw[uid] = nil
+  if not card or not card.baseX then return end
+  W.sound("card")
+  local g = W.ghostCard(self.parent)
+  g:SetFrameLevel(self.hz:GetFrameLevel() + 80)
+  g:SetCard(card.cardId, card.cardUp, card.opts)
+  local fx, fy = DRAW_PILE[1], DRAW_PILE[2]
+  if fromCooldown then fx, fy = 947, 469 end
+  W.fly(g, self.parent, fx, fy, card.baseX, card.baseY + W.CARD_H / 2, 0.3, 1, 0.6, 1, 0.28, function()
+    W.releaseGhost(g)
+    if card.uid == uid then card:SetAlpha(1) end
+  end)
+end
+
+-- Fin du tour : la main part à la défausse.
+function V:FlyDiscard(before)
+  for uid, pos in pairs(before) do
+    if not (self.shownHand and self.shownHand[uid]) then
+      local g = W.ghostCard(self.parent)
+      g:SetFrameLevel(self.hz:GetFrameLevel() + 80)
+      g:SetCard(pos.id, pos.up, { cost = pos.cost })
+      W.fly(g, self.parent, pos.x, pos.y, DISCARD_PILE[1], DISCARD_PILE[2], 1, 0.3, 1, 0.3, 0.3, function()
+        W.releaseGhost(g)
+      end)
+    end
   end
 end
 
@@ -840,6 +945,7 @@ function V:Select(i)
   if not info then return end
   self.potionSlot = nil
   if not info.playable then UI.flash(Controller.reasonText(info.why)) return end
+  W.sound("card")
   self.selected = i
   self:RenderHand()
   self:RenderTargets()
@@ -853,9 +959,16 @@ function V:Deselect()
 end
 
 function V:Play(i, target)
+  local card = self.cards[i]
+  if card and card.baseX then
+    local info = Controller.handInfo(i)
+    self.pendingPlay = { x = card.baseX, y = 372 + W.CARD_H * HOVER_SCALE / 2, id = card.cardId, up = card.cardUp,
+      cost = info and info.cost }
+  end
   self.selected = nil
   local ok, why = Controller.play(i, target)
   if not ok then
+    self.pendingPlay = nil
     UI.flash(Controller.reasonText(why))
     self:Render()
   end
@@ -924,7 +1037,18 @@ end
 function V:EndTurn()
   if Controller.over() then Controller.finishCombat() return end
   self.selected = nil
-  Controller.endTurn()
+  local before = {}
+  for i = 1, #self.cards do
+    local card = self.cards[i]
+    if card.uid and card.baseX then
+      before[card.uid] = { x = card.baseX, y = card.baseY + W.CARD_H / 2, id = card.cardId, up = card.cardUp,
+        cost = card.opts and card.opts.cost }
+    end
+  end
+  self.frozen = true
+  W.sound("endTurn")
+  local ok = Controller.endTurn()
+  if ok then self:FlyDiscard(before) else self.frozen = false end
 end
 
 function V:CycleTarget(back)
@@ -945,7 +1069,7 @@ function V:StartDrag(card)
   self.selected = card.index
   self.dragging = card
   self:RenderTargets()
-  card:SetFrameLevel(self.hz:GetFrameLevel() + 60)
+  card:SetFrameLevel(self.hz:GetFrameLevel() + 95)
   card:SetScript("OnUpdate", function(f)
     local x, y = GetCursorPosition()
     local s = f:GetEffectiveScale()
@@ -1014,32 +1138,32 @@ end
 
 function V:PreviewEnemies()
   if not self.preview then
-    local p = W.panel(UI.content, "tooltip")
-    p:SetAllPoints()
-    p:SetFrameLevel(UI.content:GetFrameLevel() + 50)
-    p:EnableMouse(true)
+    local p = W.woodPanel(UI.content, 10)
+    p:SetPoint("TOPLEFT", 10, -50)
+    p:SetPoint("BOTTOMRIGHT", -10, 10)
+    p:SetFrameLevel(UI.content:GetFrameLevel() + 95)
     p.models = {}
     local ids = {}
     for id in pairs(Art.enemies) do ids[#ids + 1] = id end
     table.sort(ids)
     for k = 1, #ids do
-      local col, row = (k - 1) % 5, math.floor((k - 1) / 5)
-      local m = newModel(p, 160, 180)
-      m:SetPoint("TOPLEFT", 10 + col * 172, -10 - row * 216)
+      local col, row = (k - 1) % 5, floor((k - 1) / 5)
+      local m = W.model(p, 180, 200)
+      m:SetPoint("TOPLEFT", 20 + col * 200, -16 - row * 270)
       local fb = p:CreateTexture(nil, "ARTWORK")
       fb:SetSize(48, 48)
       fb:SetPoint("CENTER", m, "CENTER")
       fb:Hide()
-      local label = W.text(p, "GameFontNormal", 11)
-      label:SetPoint("TOP", m, "BOTTOM", 0, -2)
+      local label = W.label(p, "body", 12, C.cream)
+      label:SetPoint("TOP", m, "BOTTOM", 0, -4)
       local art = Art.enemies[ids[k]]
       label:SetText((ns.Enemies[ids[k]] and ns.Enemies[ids[k]].name or ids[k])
         .. " (" .. tostring(art.creature) .. ")")
       m.id, m.fallback = ids[k], fb
       p.models[k] = m
     end
-    local close = W.button(p, "Fermer", 100, 24, function() p:Hide() end)
-    close:SetPoint("BOTTOMRIGHT", -10, 10)
+    local close = W.button(p, "Fermer", 110, 30, function() p:Hide() end, "gold", 14)
+    close:SetPoint("BOTTOMRIGHT", -14, 14)
     self.preview = p
   end
   self.preview:Show()

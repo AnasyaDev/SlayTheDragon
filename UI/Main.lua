@@ -1,17 +1,20 @@
--- Fenêtre principale, gestion des écrans, clavier, options, /slay et bouton de minimap.
+-- Fenêtre principale (1040 × 620), bandeau, gestion des écrans, clavier, options, /slay, minimap.
 local addonName, ns = ...
 if not CreateFrame then return end -- hors du jeu (Sim/load.lua) : pas d'interface
 
-local W, Art, Controller, Persist = ns.Widgets, ns.Art, ns.Controller, ns.Persist
+local W, Art, Controller, Persist, Scene = ns.Widgets, ns.Art, ns.Controller, ns.Persist, ns.Scene
+local C = Art.C
 
 local UI = {}
 ns.UI = UI
 
-UI.WIDTH, UI.HEIGHT = 900, 520
-UI.screens = {}         -- kind d'étape -> écran
-UI.screenByKind = {}    -- kind -> nom d'écran
+UI.WIDTH, UI.HEIGHT = 1040, 620
+UI.CONTENT_W, UI.CONTENT_H = 1034, 614
+UI.screens = {}         -- nom -> écran
+UI.screenByKind = {}    -- kind d'étape -> nom d'écran
 UI.current = nil        -- écran affiché
 UI.dirty = true
+UI.hold = {}            -- butin pas encore « ramassé » à l'écran (cosmétique) : gold, relic, potion
 
 local function opts() return Persist.options() end
 
@@ -21,7 +24,7 @@ local function say(msg)
 end
 UI.say = say
 
--- Enregistre un écran : screen = { kinds = {...}, Build(self, parent), Show(self, step), Hide(self),
+-- Enregistre un écran : screen = { kinds = {...}, Build(self, parent), Show(self, step), OnHide(self),
 -- HandleKey(self, key) -> handled }.
 function UI.register(name, screen)
   UI.screens[name] = screen
@@ -41,7 +44,7 @@ function UI.applyPosition()
   local f = UI.frame
   local pt = opts().point
   f:ClearAllPoints()
-  if pt then f:SetPoint(pt[1], UIParent, pt[2], pt[3], pt[4]) else f:SetPoint("CENTER", UIParent, "CENTER", 0, 40) end
+  if pt then f:SetPoint(pt[1], UIParent, pt[2], pt[3], pt[4]) else f:SetPoint("CENTER", UIParent, "CENTER", 0, 30) end
 end
 
 function UI.applyScale()
@@ -51,9 +54,118 @@ function UI.applyScale()
   UI.frame:SetScale(s)
 end
 
+-- Décor et plateau (Scene.set) ; appelé par chaque écran.
+function UI.setStage(stage)
+  if Scene.decor then Scene.set(stage) end
+end
+
+local function buildBand(f)
+  local band = CreateFrame("Frame", nil, f)
+  Scene.at(band, f, 0, 0, UI.CONTENT_W, 44)
+  band:SetFrameLevel(f:GetFrameLevel() + 40)
+  band:EnableMouse(true)
+  band:RegisterForDrag("LeftButton")
+  band:SetScript("OnDragStart", function() UI.frame:StartMoving() end)
+  band:SetScript("OnDragStop", function() UI.frame:StopMovingOrSizing() savePosition(UI.frame) end)
+  local bg = W.rect(band, "BACKGROUND", 0, C.band)
+  bg:SetAllPoints()
+  local edge = W.rect(band, "BORDER", 0, C.bandEdge)
+  edge:SetPoint("BOTTOMLEFT")
+  edge:SetPoint("BOTTOMRIGHT")
+  edge:SetHeight(2)
+  UI.band = band
+
+  UI.className = W.label(band, "title", 16, C.gold)
+  UI.className:SetPoint("LEFT", 14, 0)
+  UI.hpText = W.label(band, "body", 15, C.hpText)
+  UI.hpText:SetPoint("LEFT", UI.className, "RIGHT", 16, 0)
+  UI.goldText = W.label(band, "body", 15, C.gold)
+  UI.goldText:SetPoint("LEFT", UI.hpText, "RIGHT", 16, 0)
+
+  -- Centre : nom de la zone et progression de l'acte.
+  local mid = CreateFrame("Frame", nil, band)
+  mid:SetSize(360, 30)
+  mid:SetPoint("CENTER", -10, 0)
+  UI.zone = W.label(mid, "title", 14, C.cream)
+  UI.dots = {}
+  for i = 1, 12 do
+    local d = W.disc(mid, "ARTWORK", 0, C.gold)
+    d:Hide()
+    UI.dots[i] = d
+  end
+  UI.bossDot = W.rect(mid, "ARTWORK", 0, C.hp)
+  UI.bossDot:SetSize(11, 11)
+  if UI.bossDot.SetRotation then UI.bossDot:SetRotation(math.pi / 4) end
+  UI.bossDot:Hide()
+  UI.mid = mid
+
+  -- Droite : × ≡ potions | bibelots, clé, deck.
+  local close = W.roundButton(band, "×", 30, C.red, C.redEdge, function() UI.close("button") end)
+  close:SetPoint("RIGHT", -10, 0)
+  UI.closeButton = close
+  local gear = W.roundButton(band, "≡", 30, C.woodDark, C.woodLine, function() UI.toggleOptions() end)
+  gear:SetPoint("RIGHT", close, "LEFT", -6, 0)
+  UI.gear = gear
+
+  UI.potionSlots = {}
+  for i = 1, 3 do
+    local b = W.iconButton(band, 30, "flask")
+    b:SetPoint("RIGHT", gear, "LEFT", -14 - (3 - i) * 31, 0)
+    b.slot = i
+    b:SetScript("OnClick", function(self, button) UI.clickPotion(self, button) end)
+    UI.potionSlots[i] = b
+  end
+  local sep = W.rect(band, "ARTWORK", 0, C.bandEdge)
+  sep:SetSize(2, 24)
+  sep:SetPoint("RIGHT", UI.potionSlots[1], "LEFT", -8, 0)
+  UI.sep = sep
+  UI.RELICS_SHOWN = 6
+  UI.relicIcons = {}
+  for i = 1, UI.RELICS_SHOWN do
+    local b = W.iconButton(band, 28, "square")
+    b:SetPoint("RIGHT", sep, "LEFT", -8 - (UI.RELICS_SHOWN - i) * 32, 0)
+    b:Hide()
+    UI.relicIcons[i] = b
+  end
+  UI.relicMore = W.label(band, "body", 11, C.cream)
+  UI.relicMore:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -3, 0)
+
+  -- Clé mythique : pastille violette.
+  local ks = CreateFrame("Button", nil, band)
+  ks:SetSize(54, 20)
+  ks.shape = W.shape(ks, 4, C.key, C.key, 1, -4)
+  ks.count = W.label(ks, "body", 13, C.frame)
+  ks.count:SetPoint("CENTER")
+  W.tooltip(ks, function(tt, self)
+    if self.info then W.fillItemTooltip(tt, "keystone", self.info.id, self.info) end
+  end, "ANCHOR_BOTTOM")
+  ks:Hide()
+  UI.keystone = ks
+
+  -- Deck : bouton de bois, infobulle = contenu du deck et bibelots.
+  local deck = W.button(band, "Deck", 74, 28, nil, "wood", 13)
+  W.tooltip(deck, function(tt) UI.fillDeckTooltip(tt) end, "ANCHOR_BOTTOM")
+  UI.info = deck
+  UI.deckButton = deck
+end
+
+function UI.fillDeckTooltip(tt)
+  local r = Controller.runInfo()
+  if not r then tt:AddLine("Aucune expédition en cours.") return end
+  tt:AddLine("Deck (" .. #r.deck .. " cartes)", 1, 0.82, 0)
+  local counts, order = {}, {}
+  for i = 1, #r.deck do
+    local c = r.deck[i]
+    local d = ns.Card.defById(c.id, c.up)
+    if not counts[d.name] then counts[d.name] = 0 order[#order + 1] = d.name end
+    counts[d.name] = counts[d.name] + 1
+  end
+  for i = 1, #order do tt:AddLine(counts[order[i]] .. " × " .. order[i], 1, 1, 1) end
+end
+
 function UI.build()
   if UI.frame then return UI.frame end
-  local f = W.panel(UIParent, "dialog", "SlayTheDragonFrame")
+  local f = CreateFrame("Frame", "SlayTheDragonFrame", UIParent)
   UI.frame = f
   f:SetSize(UI.WIDTH, UI.HEIGHT)
   f:SetFrameStrata("HIGH")
@@ -61,94 +173,31 @@ function UI.build()
   f:SetClampedToScreen(true)
   f:SetMovable(true)
   f:EnableMouse(true)
-  f:RegisterForDrag("LeftButton")
-  f:SetScript("OnDragStart", function(self) self:StartMoving() end)
-  f:SetScript("OnDragStop", function(self) self:StopMovingOrSizing() savePosition(self) end)
   f:Hide()
   if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "SlayTheDragonFrame") end
-
-  local title = W.text(f, "GameFontNormalLarge")
-  title:SetPoint("TOPLEFT", 18, -14)
-  title:SetText("Slay the Dragon")
-  UI.title = title
-
-  local info = CreateFrame("Frame", nil, f)
-  info:SetSize(330, 18)
-  info:SetPoint("LEFT", title, "RIGHT", 18, 0)
-  info.text = W.text(info, "GameFontHighlight")
-  info.text:SetPoint("LEFT")
-  info:EnableMouse(true)
-  W.tooltip(info, function(tt)
-    local r = Controller.runInfo()
-    if not r then tt:AddLine("Aucune expédition en cours.") return end
-    tt:AddLine("Deck (" .. #r.deck .. " cartes)", 1, 0.82, 0)
-    local counts, order = {}, {}
-    for i = 1, #r.deck do
-      local c = r.deck[i]
-      local d = ns.Card.defById(c.id, c.up)
-      if not counts[d.name] then counts[d.name] = 0 order[#order + 1] = d.name end
-      counts[d.name] = counts[d.name] + 1
-    end
-    for i = 1, #order do tt:AddLine(counts[order[i]] .. " × " .. order[i], 1, 1, 1) end
-    local relics = r.relics or {}
-    if #relics > 0 then
-      tt:AddLine(" ")
-      tt:AddLine("Bibelots", 1, 0.82, 0)
-      for i = 1, #relics do
-        local def = ns.Relics[relics[i]]
-        tt:AddLine(def and def.name or tostring(relics[i]), 0.6, 0.8, 1)
-        if def and def.text then tt:AddLine(def.text, 0.85, 0.85, 0.85, true) end
-      end
-    end
-  end, "ANCHOR_BOTTOM")
-  UI.info = info
-
-  local close = W.closeButton(f, function() UI.close("button") end)
-  close:SetPoint("TOPRIGHT", -6, -6)
-
-  local gear = W.button(f, "Options", 80, 22, function() UI.toggleOptions() end)
-  gear:SetPoint("RIGHT", close, "LEFT", -4, 0)
-  UI.gear = gear
-
-  -- Potions (3 emplacements), bibelots et clé mythique, à droite du bandeau.
-  UI.potionSlots = {}
-  for i = 1, 3 do
-    local b = W.iconButton(f, 22)
-    b:SetPoint("RIGHT", gear, "LEFT", -8 - (3 - i) * 25, 0)
-    b.slot = i
-    b:SetScript("OnClick", function(self, button) UI.clickPotion(self, button) end)
-    UI.potionSlots[i] = b
-  end
-  UI.RELICS_SHOWN = 6
-  UI.relicIcons = {}
-  for i = 1, UI.RELICS_SHOWN do
-    local b = W.iconButton(f, 20)
-    b:SetPoint("RIGHT", UI.potionSlots[1], "LEFT", -10 - (UI.RELICS_SHOWN - i) * 22, 0)
-    b:Hide()
-    UI.relicIcons[i] = b
-  end
-  local more = W.text(f, "GameFontHighlightSmall")
-  more:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -2, 0)
-  UI.relicMore = more
-  local ks = W.iconButton(f, 22)
-  ks:SetPoint("RIGHT", UI.relicIcons[1], "LEFT", -22, 0)
-  ks:Hide()
-  UI.keystone = ks
+  W.roundRect(f, "BACKGROUND", -8, 10, 0):SetColor(C.frameEdge)
+  W.roundRect(f, "BACKGROUND", -7, 8, 3):SetColor(C.frame)
 
   local content = CreateFrame("Frame", nil, f)
-  content:SetPoint("TOPLEFT", 12, -36)
-  content:SetPoint("BOTTOMRIGHT", -12, 12)
+  content:SetPoint("TOPLEFT", 3, -3)
+  content:SetSize(UI.CONTENT_W, UI.CONTENT_H)
   UI.content = content
-  UI.CONTENT_W, UI.CONTENT_H = UI.WIDTH - 24, UI.HEIGHT - 48
+  Scene.build(content)
+  buildBand(content)
 
-  -- Message d'erreur passager (raison d'une carte injouable, etc.).
-  local err = W.text(f, "GameFontNormalLarge", 14)
-  err:SetPoint("CENTER", content, "CENTER", 0, 30)
-  err:SetTextColor(1, 0.25, 0.25)
+  -- Message passager (raison d'un refus, consigne).
+  local err = CreateFrame("Frame", nil, content)
+  err:SetSize(520, 34)
+  Scene.at(err, content, (UI.CONTENT_W - 520) / 2, 196, 520, 34)
+  err:SetFrameLevel(content:GetFrameLevel() + 90)
+  err.shape = W.shape(err, 10, C.red, C.band, 2, -4)
+  err.text = W.label(err, "body", 15, C.hpText, "OVERLAY", true)
+  err.text:SetPoint("CENTER")
   err:Hide()
+  -- Compatibilité avec le harnais : err._text / err:SetText.
+  err.SetText = function(self, t) self.text:SetText(t) self._text = t end
   UI.err = err
 
-  -- Clavier : capté seulement fenêtre ouverte, le reste passe au jeu.
   f:SetScript("OnKeyDown", function(self, key) UI.onKey(key) end)
   f:SetScript("OnShow", function() UI.onShow() end)
   f:SetScript("OnHide", function() UI.onHide() end)
@@ -156,6 +205,7 @@ function UI.build()
   for _, s in pairs(UI.screens) do
     s.frame = CreateFrame("Frame", nil, content)
     s.frame:SetAllPoints()
+    s.frame:SetFrameLevel(content:GetFrameLevel() + 5)
     s.frame:Hide()
     s:Build(s.frame)
   end
@@ -169,14 +219,15 @@ function UI.flash(msg)
   local err = UI.err
   if not err then return end
   err:SetText(msg)
+  err:SetWidth(math.max(220, (err.text:GetStringWidth() or 200) + 40))
   err:Show()
   UI.flashToken = (UI.flashToken or 0) + 1
   local token = UI.flashToken
-  W.delay(1.6, function() if UI.flashToken == token then err:Hide() end end)
+  W.delay(1.8, function() if UI.flashToken == token then err:Hide() end end)
 end
 
 ---------------------------------------------------------------------------
--- Affichage des étapes
+-- Bandeau
 ---------------------------------------------------------------------------
 
 local function affixText(r)
@@ -188,18 +239,59 @@ local function affixText(r)
   return table.concat(lines, "\n")
 end
 
+local function layoutDots(r)
+  local mid = UI.mid
+  local floors = r and r.floors
+  local showDots = floors and UI.step and UI.step.kind ~= "map"
+  UI.zone:ClearAllPoints()
+  if not showDots then
+    UI.zone:SetPoint("CENTER", mid, "CENTER", 0, 0)
+    for i = 1, #UI.dots do UI.dots[i]:Hide() end
+    UI.bossDot:Hide()
+    return
+  end
+  local cur = math.max(1, (r.floor or 0))
+  local n = math.min(floors - 1, #UI.dots)
+  local dotsW = n * 15 + 16
+  local zw = UI.zone:GetStringWidth() or 120
+  local x0 = (360 - (zw + 10 + dotsW)) / 2
+  UI.zone:SetPoint("LEFT", mid, "LEFT", x0, 0)
+  local x = x0 + zw + 12
+  for i = 1, #UI.dots do
+    local d = UI.dots[i]
+    if i <= n then
+      d:ClearAllPoints()
+      local size = (i == cur) and 14 or 10
+      d:SetSize(size, size)
+      d:SetPoint("CENTER", mid, "LEFT", x + 5, 0)
+      local c = i < cur and C.gold or (i == cur and C.creamLight or Art.hex("#5a4630"))
+      d:SetVertexColor(c[1], c[2], c[3], 1)
+      d:Show()
+      x = x + 15
+    else
+      d:Hide()
+    end
+  end
+  UI.bossDot:ClearAllPoints()
+  UI.bossDot:SetPoint("CENTER", mid, "LEFT", x + 6, 0)
+  UI.bossDot:Show()
+end
+
 function UI.refreshInfo()
   local r = Controller.runInfo()
   local potions = Controller.potions()
+  local hold = UI.hold
+  local heldPotion = hold.potion
   for i = 1, #UI.potionSlots do
     local b = UI.potionSlots[i]
     local id = potions and potions[i]
+    if heldPotion and id == heldPotion and i == hold.potionSlot then id = nil end
     if r then
       if id then
         b:SetItem("potion", id, { hint = Controller.inCombat() and "Clic : boire."
           or "Se boit en combat. Clic droit (deux fois) : jeter." })
       else
-        b:SetItem(nil, nil, { kind = "empty", title = "Emplacement de potion vide" })
+        b:SetItem(nil, nil, { kind = "empty" })
       end
       b:Show()
     else
@@ -207,25 +299,63 @@ function UI.refreshInfo()
     end
   end
   local relics = r and r.relics or {}
+  local nShown = #relics
+  if hold.relic and relics[#relics] == hold.relic then nShown = nShown - 1 end
   -- calés à droite : le dernier bibelot obtenu touche les potions
   for i = 1, UI.RELICS_SHOWN do
     local b = UI.relicIcons[i]
-    local id = relics[#relics - (UI.RELICS_SHOWN - i)]
-    if id then b:SetItem("relic", id) b:Show() else b:Hide() end
+    local id = relics[nShown - (UI.RELICS_SHOWN - i)]
+    if id and nShown - (UI.RELICS_SHOWN - i) >= 1 then b:SetItem("relic", id) b:Show() else b:Hide() end
   end
-  UI.relicMore:SetText(#relics > UI.RELICS_SHOWN and ("+" .. (#relics - UI.RELICS_SHOWN)) or "")
+  UI.relicMore:SetText(nShown > UI.RELICS_SHOWN and ("+" .. (nShown - UI.RELICS_SHOWN)) or "")
+  if r then UI.sep:Show() else UI.sep:Hide() end
+  -- clé et deck, à gauche des bibelots
+  local anchor = UI.relicIcons[math.max(1, UI.RELICS_SHOWN - math.min(nShown, UI.RELICS_SHOWN) + 1)]
+  if nShown == 0 then anchor = UI.sep end
+  local right = anchor
   if r and (r.key or 0) > 0 then
-    UI.keystone:SetItem("keystone", r.key, { title = "Clé mythique +" .. r.key, text = affixText(r) })
-    UI.keystone.count:SetText("+" .. r.key)
+    UI.keystone.info = { id = r.key, title = "Clé mythique +" .. r.key, text = affixText(r) }
+    UI.keystone.count:SetText("Clé +" .. r.key)
+    UI.keystone:ClearAllPoints()
+    UI.keystone:SetPoint("RIGHT", right, "LEFT", -10, 0)
     UI.keystone:Show()
+    right = UI.keystone
   else
     UI.keystone:Hide()
   end
-  if not r then UI.info.text:SetText("") return end
-  local t = "|cffff5050" .. r.hp .. "/" .. r.maxHp .. " PV|r   |cffffd700" .. r.gold .. " po|r   "
-    .. #r.deck .. " cartes"
-  if r.floors then t = t .. "   étape " .. math.max(r.floor or 0, 1) .. "/" .. r.floors end
-  UI.info.text:SetText(t)
+  local inFight = UI.step and UI.step.kind == "combat"
+  if r and not inFight then
+    UI.deckButton:SetText("Deck " .. #r.deck)
+    UI.deckButton:ClearAllPoints()
+    UI.deckButton:SetPoint("RIGHT", right, "LEFT", -10, 0)
+    UI.deckButton:Show()
+  else
+    UI.deckButton:Hide()
+  end
+  if not r then
+    UI.className:SetText("Slay the Dragon")
+    UI.hpText:SetText("")
+    UI.goldText:SetText("")
+    UI.zone:SetText("")
+    layoutDots(nil)
+    return
+  end
+  local cls = Controller.exp() and ns.Classes[Controller.exp().class]
+  UI.className:SetText(cls and cls.name or "Slay the Dragon")
+  UI.hpText:SetText(r.hp .. " / " .. r.maxHp .. " PV")
+  UI.goldText:SetText(math.max(0, r.gold - (hold.gold or 0)) .. " po")
+  local zone = r.act or ""
+  if UI.step and UI.step.kind == "map" then zone = "Acte " .. (Controller.exp() and Controller.exp().act or 1) .. " · " .. zone end
+  UI.zone:SetText(zone)
+  layoutDots(r)
+end
+
+-- Position (coordonnées du contenu) d'une destination du bandeau, pour le butin qui y vole.
+function UI.bandTarget(kind)
+  if kind == "gold" then return 190, 22 end
+  if kind == "potion" then return 880, 22 end
+  if kind == "relic" then return 760, 22 end
+  return 517, 22
 end
 
 -- Clic sur un emplacement de potion : boire en combat (cible au clic suivant si besoin),
@@ -265,7 +395,10 @@ function UI.refresh()
   UI.step = step
   local name = UI.screenByKind[step.kind] or "choice"
   local screen = UI.screens[name]
-  if UI.current and UI.current ~= screen then UI.current.frame:Hide() if UI.current.OnHide then UI.current:OnHide() end end
+  if UI.current and UI.current ~= screen then
+    UI.current.frame:Hide()
+    if UI.current.OnHide then UI.current:OnHide() end
+  end
   UI.current = screen
   screen.frame:Show()
   screen:Show(step)
@@ -275,7 +408,7 @@ end
 -- Choix générique depuis un écran (bouton, carte, nœud de carte).
 function UI.choose(id)
   local ok, why = Controller.choose(id)
-  if not ok and why then UI.flash("Choix impossible.") end
+  if not ok and why then UI.flash(Controller.reasonText(why) or "Choix impossible.") end
   return ok
 end
 
@@ -335,7 +468,7 @@ end
 
 function UI.onShow()
   setKeyboard(true)
-  if PlaySound and SOUNDKIT and SOUNDKIT.IG_SPELLBOOK_OPEN then pcall(PlaySound, SOUNDKIT.IG_SPELLBOOK_OPEN) end
+  W.sound("open")
   UI.refresh()
 end
 
@@ -343,7 +476,7 @@ function UI.onHide()
   setKeyboard(false)
   if UI.current and UI.current.OnHide then UI.current:OnHide() end
   if GameTooltip then GameTooltip:Hide() end
-  if PlaySound and SOUNDKIT and SOUNDKIT.IG_SPELLBOOK_CLOSE then pcall(PlaySound, SOUNDKIT.IG_SPELLBOOK_CLOSE) end
+  W.sound("close")
 end
 
 -- Touche pressée, fenêtre ouverte. Les touches non gérées sont rendues au jeu.
@@ -377,16 +510,15 @@ end
 ---------------------------------------------------------------------------
 
 function UI.buildOptions()
-  local p = W.panel(UI.frame, "tooltip")
-  p:SetSize(360, 300)
-  p:SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", -14, -34)
-  p:SetFrameLevel(UI.frame:GetFrameLevel() + 40)
-  p:EnableMouse(true)
+  local p = W.parchment(UI.content, 10)
+  p:SetSize(360, 330)
+  p:SetPoint("TOPRIGHT", UI.content, "TOPRIGHT", -10, -48)
+  p:SetFrameLevel(UI.content:GetFrameLevel() + 100)
   p:Hide()
   UI.optionsFrame = p
 
-  local t = W.text(p, "GameFontNormalLarge")
-  t:SetPoint("TOPLEFT", 14, -12)
+  local t = W.label(p, "title", 20, C.ink)
+  t:SetPoint("TOPLEFT", 16, -14)
   t:SetText("Options")
 
   local checks = {}
@@ -397,32 +529,33 @@ function UI.buildOptions()
     checks[#checks + 1] = c
     return c
   end
-  check("Ouvrir au décollage", "autoOpen", -40)
-  check("Fermer à l'atterrissage", "autoClose", -66)
+  check("Ouvrir au décollage", "autoOpen", -44)
+  check("Fermer à l'atterrissage", "autoClose", -68)
   check("Mode rapide (animations éclair)", "fast", -92)
   local mm = W.check(p, "Bouton de minimap", function() return not opts().minimap.hide end,
     function(v) opts().minimap.hide = not v UI.updateMinimapButton() end)
-  mm:SetPoint("TOPLEFT", 14, -118)
+  mm:SetPoint("TOPLEFT", 14, -116)
   checks[#checks + 1] = mm
+  check("Décor illustré (sinon peint)", "decor", -140, function() UI.refresh() end)
   UI.optionChecks = checks
 
   local function stepper(label, y, get, set, fmt)
-    local l = W.text(p, "GameFontHighlight")
+    local l = W.label(p, "body", 12, C.ink)
     l:SetPoint("TOPLEFT", 18, y)
     l:SetText(label)
-    local v = W.text(p, "GameFontNormal")
-    v:SetPoint("TOPLEFT", 200, y)
-    local minus = W.button(p, "-", 26, 20, function() set(-1) v:SetText(fmt(get())) end)
-    minus:SetPoint("TOPLEFT", 160, y + 3)
-    local plus = W.button(p, "+", 26, 20, function() set(1) v:SetText(fmt(get())) end)
-    plus:SetPoint("TOPLEFT", 250, y + 3)
+    local v = W.label(p, "title", 14, C.ink)
+    v:SetPoint("TOPLEFT", 214, y + 1)
+    local minus = W.button(p, "-", 26, 22, function() set(-1) v:SetText(fmt(get())) end)
+    minus:SetPoint("TOPLEFT", 178, y + 4)
+    local plus = W.button(p, "+", 26, 22, function() set(1) v:SetText(fmt(get())) end)
+    plus:SetPoint("TOPLEFT", 270, y + 4)
     v.Sync = function() v:SetText(fmt(get())) end
     return v, minus, plus
   end
   local pct = function(x) return math.floor(x * 100 + 0.5) .. " %" end
-  UI.scaleValue, UI.scaleMinus, UI.scalePlus = stepper("Échelle", -156, function() return opts().scale end,
+  UI.scaleValue, UI.scaleMinus, UI.scalePlus = stepper("Échelle", -178, function() return opts().scale end,
     function(d) opts().scale = (opts().scale or 1) + d * 0.05 UI.applyScale() end, pct)
-  UI.speedValue, UI.speedMinus, UI.speedPlus = stepper("Vitesse des animations", -184,
+  UI.speedValue, UI.speedMinus, UI.speedPlus = stepper("Vitesse des animations", -208,
     function() return opts().speed end,
     function(d)
       local s = (opts().speed or 1) + d * 0.25
@@ -430,8 +563,8 @@ function UI.buildOptions()
       opts().speed = s
     end, function(x) return "×" .. x end)
 
-  local ab = W.button(p, "Abandonner l'expédition", 200, 24)
-  ab:SetPoint("BOTTOMLEFT", 14, 44)
+  local ab = W.button(p, "Abandonner l'expédition", 200, 26, nil, "red")
+  ab:SetPoint("BOTTOMLEFT", 14, 48)
   ab:SetScript("OnClick", function(self)
     if not Controller.exp() then UI.flash("Aucune expédition en cours.") return end
     if self.armed then
@@ -447,14 +580,14 @@ function UI.buildOptions()
   end)
   UI.abandonButton = ab
 
-  local rp = W.button(p, "Recentrer la fenêtre", 200, 24, function()
+  local rp = W.button(p, "Recentrer la fenêtre", 200, 26, function()
     opts().point = nil
     UI.applyPosition()
   end)
-  rp:SetPoint("BOTTOMLEFT", 14, 14)
+  rp:SetPoint("BOTTOMLEFT", 14, 16)
 
-  local ok = W.button(p, "Fermer", 80, 24, function() p:Hide() end)
-  ok:SetPoint("BOTTOMRIGHT", -14, 14)
+  local ok = W.button(p, "Fermer", 90, 26, function() p:Hide() end, "gold", 13)
+  ok:SetPoint("BOTTOMRIGHT", -14, 16)
 
   p:SetScript("OnShow", function()
     for i = 1, #checks do checks[i]:Sync() end
@@ -571,6 +704,10 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "options" or msg == "config" then UI.toggleOptions()
   elseif msg == "art" then artReport()
   elseif msg == "modeles" or msg == "models" then artPreview()
+  elseif msg == "decor" then
+    opts().decor = opts().decor == false
+    say("décor " .. (opts().decor and "illustré" or "peint") .. ".")
+    if UI.frame and UI.frame:IsShown() then UI.refresh() end
   elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
@@ -578,12 +715,12 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     if p and e then
       opts().facingPlayer, opts().facingEnemy = p, e
       say("orientation : joueur " .. p .. ", ennemis " .. e .. ".")
-      if UI.screens.combat and UI.screens.combat.ApplyFacing then UI.screens.combat:ApplyFacing() end
+      for _, s in pairs(UI.screens) do if s.ApplyFacing then s:ApplyFacing() end end
     else
       say("usage : /slay facing <joueur> <ennemis>  (radians, ex. 0.6 -0.6)")
     end
   else
     say("/slay : ouvrir/fermer ; /slay options ; /slay art (art manquant) ; /slay modeles ; "
-      .. "/slay facing <j> <e> ; /slay centre")
+      .. "/slay decor ; /slay facing <j> <e> ; /slay centre")
   end
 end
