@@ -702,6 +702,8 @@ local function mapStep(exp)
     floor = exp.floor, floors = floors }
 end
 
+local eventResult -- défini plus bas (texte « après coup » d'une rencontre)
+
 local REWARD_TITLE = { combat = "Victoire !", elite = "Élite vaincue !", boss = "Boss vaincu !", chest = "Coffre" }
 
 local function rewardStep(exp)
@@ -821,7 +823,7 @@ local function merchantStep(exp)
 end
 
 -- Texte « après coup » d'une rencontre : exp.event.result (issue d'un pari comprise), sinon after.
-local function eventResult(exp)
+eventResult = function(exp)
   local ev = exp.event
   local def = ev and ev.id and ns.Events[ev.id]
   if not def or not ev.chosen then return "" end

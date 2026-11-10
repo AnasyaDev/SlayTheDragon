@@ -934,6 +934,7 @@ check("marchand traversé", state.seen.merchant)
 check("rencontre traversée", state.seen.event)
 check("feu de camp traversé", state.seen.campfire)
 check("animations jouées", #H.anims > 0, #H.anims)
+check("sons joués (PlaySound)", #H.sounds > 0, #H.sounds)
 local step = UI().step
 local won = step.won
 do
@@ -1132,6 +1133,7 @@ if ev then
   else
     clickOption("leave")
   end
+  H.advance(1) -- le butin vole vers le bandeau avant le départ
   check("retour à la carte", currentKind() == "map", currentKind())
 else
   check("rencontre vide : continuer", option("leave") ~= nil)
