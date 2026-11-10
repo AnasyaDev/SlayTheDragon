@@ -1149,9 +1149,7 @@ function W.shieldBadge(parent, w, h)
     if n and n > 0 then self.text:SetText(tostring(n)) self:Show() else self:Hide() end
   end
   W.tooltip(f, function(tt)
-    local kw = Art.keywords.absorb
-    tt:AddLine(kw.name, 0.55, 0.75, 1)
-    tt:AddLine(kw.text, 1, 1, 1, true)
+    tt:AddLine(Art.keywordLine("absorb"), 1, 1, 1, true)
   end, "ANCHOR_TOP")
   return f
 end
@@ -1200,13 +1198,13 @@ end
 -- Mots-clés d'une définition de carte (pour l'infobulle).
 function W.cardKeywords(d)
   local list, seen = {}, {}
-  local function add(k, label)
+  local function add(k, label, n)
     if seen[k] then return end
     seen[k] = true
-    list[#list + 1] = { key = k, label = label }
+    list[#list + 1] = { key = k, label = label, n = n }
   end
   if d.cast then add("cast") end
-  if d.cooldown then add("cooldown", "Recharge " .. d.cooldown) end
+  if d.cooldown then add("cooldown", "Recharge " .. d.cooldown, d.cooldown) end
   if d.exhaust then add("exhaust") end
   if d.retain then add("retain") end
   if d.power or d.type == "power" then add("power") end
@@ -1234,16 +1232,17 @@ function W.fillCardTooltip(tt, id, up, extra)
     gold(tt, "Après amélioration :")
     wrap(tt, u.text or "", 0.5, 1, 0.5)
   end
+  -- mots-clés : une ligne chacun, en bloc (séparé du reste par une ligne vide)
   local kws = W.cardKeywords(d)
+  if #kws > 0 and tt:NumLines() > 0 then tt:AddLine(" ") end
   for i = 1, #kws do
     local k = kws[i]
-    if tt:NumLines() > 0 then tt:AddLine(" ") end
     if k.key:sub(1, 7) == "status:" then
-      W.addStatusLines(tt, k.key:sub(8))
+      local name, text = W.statusText(k.key:sub(8))
+      text = text:gsub("^%u", string.lower)
+      wrap(tt, "|cffffd100" .. name .. "|r : " .. text, 0.85, 0.85, 0.85)
     else
-      local kw = Art.keywords[k.key]
-      gold(tt, k.label or (kw and kw.name) or k.key)
-      if kw then wrap(tt, kw.text, 0.85, 0.85, 0.85) end
+      wrap(tt, Art.keywordLine(k.key, k.label, k.n), 0.85, 0.85, 0.85)
     end
   end
   if extra and extra.reason then
@@ -1270,7 +1269,11 @@ function W.fillItemTooltip(tt, kind, id, extra)
     gold(tt, extra.title)
   end
   if extra and extra.text and kind ~= "relic" and kind ~= "potion" and kind ~= "affix" then wrap(tt, extra.text) end
-  if extra and extra.hint then wrap(tt, extra.hint, 0.7, 0.7, 0.7) end
+  if extra and extra.hint then
+    -- aide : une ligne par idée (texte ou liste de lignes)
+    local lines = type(extra.hint) == "table" and extra.hint or { extra.hint }
+    for _, l in ipairs(lines) do wrap(tt, l, 0.7, 0.7, 0.7) end
+  end
   if extra and extra.reason then wrap(tt, extra.reason, 1, 0.3, 0.3) end
   if extra and extra.price then tt:AddLine(extra.price .. " po", 1, 0.82, 0) end
 end
@@ -1360,7 +1363,10 @@ function W.repBar(parent, w)
     if not b then return end
     tt:AddLine(b.label, 1, 0.82, 0)
     tt:AddLine(b.levelName .. (b.size and (" : " .. b.cur .. " / " .. b.size) or " (palier maximal)"), 1, 1, 1)
-    if b.hint then tt:AddLine(b.hint, 0.8, 0.8, 0.8, true) end
+    if b.hint then
+      local lines = type(b.hint) == "table" and b.hint or { b.hint }
+      for _, l in ipairs(lines) do tt:AddLine(l, 0.8, 0.8, 0.8, true) end
+    end
   end, "ANCHOR_TOP")
   f.Set = function(self, b)
     self.bar = b

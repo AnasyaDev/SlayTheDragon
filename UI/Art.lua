@@ -379,20 +379,27 @@ Art.rim = {
   violet = { 0.85, 0.6, 1 }, green = { 0.55, 1, 0.55 },
 }
 
--- Mots-clés (infobulles des cartes) ------------------------------------------
+-- Mots-clés (infobulles) : une ligne « Nom : effet. » par mot-clé, 60 caractères au plus, l'effet
+-- principal et rien d'autre (le reste se découvre en jouant). N = nombre de tours (Recharge).
 Art.keywords = {
-  cast = { name = "Incantation", text = "Se paie maintenant, se résout au début du prochain tour. "
-    .. "Une seule à la fois ; un ennemi qui Guette l'interrompt." },
-  cooldown = { name = "Recharge", text = "Après usage, la carte quitte le cycle pendant N tours "
-    .. "puis revient directement en main." },
-  exhaust = { name = "Consumée", text = "La carte quitte le combat après usage." },
-  retain = { name = "Conservée", text = "La carte reste en main à la fin du tour." },
-  power = { name = "Pouvoir", text = "Reste actif tout le combat une fois joué." },
-  absorb = { name = "Absorption", text = "Absorbe les dégâts. Tombe au début du tour de son porteur." },
-  demence = { name = "Démence", text = "Ressource de l'Ombre, gagnée par les cartes d'ombre ; "
-    .. "certaines cartes la dépensent toute d'un coup." },
-  interrupt = { name = "Interruption", text = "Annule le sort qu'un ennemi incante." },
+  cast = { name = "Incantation", text = "se lance au début du prochain tour." },
+  cooldown = { name = "Recharge", text = "revient en main après N." },
+  exhaust = { name = "Consumée", text = "quitte le combat une fois jouée." },
+  retain = { name = "Conservée", text = "reste en main à la fin du tour." },
+  power = { name = "Pouvoir", text = "reste actif jusqu'à la fin du combat." },
+  absorb = { name = "Absorption", text = "absorbe les dégâts jusqu'au prochain tour." },
+  demence = { name = "Démence", text = "ressource gagnée par les cartes d'ombre." },
+  interrupt = { name = "Interruption", text = "annule le sort qu'un ennemi incante." },
 }
+
+-- Ligne d'un mot-clé : nom en or, effet ; n = nombre de tours d'une Recharge.
+function Art.keywordLine(key, label, n)
+  local kw = Art.keywords[key]
+  if not kw then return label or key end
+  local text = kw.text
+  if n then text = text:gsub("N", n .. " tour" .. (n > 1 and "s" or "")) end
+  return "|cffffd100" .. (label or kw.name) .. "|r : " .. text
+end
 
 -- Animations des modèles (identifiants AnimationData usuels ; à confirmer en jeu).
 Art.anim = { stand = 0, death = 1, dead = 6, wound = 9, attack = 16, attack1h = 17,

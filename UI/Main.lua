@@ -375,7 +375,7 @@ function UI.refreshInfo()
     if r then
       if id then
         b:SetItem("potion", id, { hint = Controller.inCombat() and "Clic : boire."
-          or "Se boit en combat. Clic droit (deux fois) : jeter." })
+          or { "Se boit en combat.", "Deux clics droits : jeter." } })
       else
         b:SetItem(nil, nil, { kind = "empty" })
       end

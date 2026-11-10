@@ -221,9 +221,8 @@ function V:Build(parent)
     local c = Controller.combat()
     local pc = c and c.player.cast
     if not pc then return end
+    -- la ligne « Incantation » de la carte dit déjà quand elle part
     W.fillCardTooltip(tt, pc.card.id, pc.card.up, { full = true })
-    tt:AddLine(" ")
-    tt:AddLine("Se résout au début du prochain tour, sauf interruption.", 0.8, 0.8, 1, true)
   end, "ANCHOR_TOP")
   cast:Hide()
   self.cast = cast
@@ -284,9 +283,7 @@ function V:Build(parent)
   dem.text = W.label(dem, "heavy", 15, C.text)
   dem.text:SetPoint("CENTER", 0, 1)
   W.tooltip(dem, function(tt)
-    local kw = Art.keywords.demence
-    tt:AddLine(kw.name, 0.75, 0.5, 1)
-    tt:AddLine(kw.text, 1, 1, 1, true)
+    tt:AddLine(Art.keywordLine("demence"), 1, 1, 1, true)
   end, "ANCHOR_RIGHT")
   self.demence = dem
 
@@ -384,7 +381,7 @@ local ACTION_TEXT = {
   end,
   heal_ally = function(a) return "Soigne de " .. a[2] .. " l'allié le plus blessé." end,
   block_ally = function(a) return "Donne " .. a[2] .. " Absorption à un allié." end,
-  interrupt = function() return "Interrompt toute incantation lancée ce tour." end,
+  interrupt = function() return "Interrompt votre incantation." end,
   summon = function(a)
     local d = ns.Enemies[a[2]]
     return "Invoque " .. ((a.count or 1) > 1 and (a.count .. " × ") or "") .. (d and d.name or a[2]) .. "."
@@ -406,14 +403,14 @@ function V.fillIntentTooltip(tt, e)
     if a[1] == "attack" then
       local times = a.times or 1
       tt:AddLine("Attaque : " .. Combat.calcDamage(c, e, c.player, a[2])
-        .. (times > 1 and (" × " .. times) or "") .. " dégâts."
-        .. (a.interrupts and " Interrompt l'incantation en cours." or ""), 1, 0.5, 0.5, true)
+        .. (times > 1 and (" × " .. times) or "") .. " dégâts.", 1, 0.5, 0.5, true)
+      if a.interrupts then tt:AddLine("Interrompt votre incantation.", 1, 0.5, 0.5, true) end
     elseif ACTION_TEXT[a[1]] then
       tt:AddLine(ACTION_TEXT[a[1]](a), 1, 1, 1, true)
     end
   end
   if info.cast and not info.interrupted then
-    tt:AddLine("Sort incanté : peut être interrompu (Silence…).", 1, 0.6, 0.2, true)
+    tt:AddLine("Sort incanté : une Interruption l'annule.", 1, 0.6, 0.2, true)
   end
 end
 
@@ -422,7 +419,7 @@ function V.fillPileTooltip(tt, key, label)
   if not c then return end
   local pileList = c[key]
   tt:AddLine(label .. " (" .. #pileList .. ")", 1, 0.82, 0)
-  if key == "draw" then tt:AddLine("Ordre caché ; liste triée.", 0.6, 0.6, 0.6) end
+  if key == "draw" then tt:AddLine("Liste triée : l'ordre de tirage reste caché.", 0.6, 0.6, 0.6) end
   local counts, order = {}, {}
   for i = 1, #pileList do
     local n = Card.def(pileList[i]).name

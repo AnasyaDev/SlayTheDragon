@@ -511,11 +511,12 @@ local function affixLine(affixes, key_)
 end
 C.affixLine = affixLine
 
+-- Aide d'une barre de réputation : une ligne par palier.
 local function levelHint(kind)
   if kind == "class" then
-    return "Amical et Honoré : nouvelles cartes. Révéré : bibelot de classe au départ. Exalté : titre."
+    return { "Amical, Honoré : nouvelles cartes.", "Révéré : bibelot de classe au départ.", "Exalté : titre." }
   end
-  return "Chaque palier ajoute des bibelots, potions et rencontres. Exalté : un bibelot de plus chez le marchand."
+  return { "Chaque palier : bibelots, potions et rencontres.", "Exalté : un bibelot de plus chez le marchand." }
 end
 
 -- Barre de réputation : { label, points, level, levelName, cur, size, hint }.

@@ -1045,7 +1045,10 @@ while guard < 400 do
         end
         if kwCard then
           tt = H.hover(kwCard)
-          check("infobulle de carte : mots-clés", #tt >= 2, #tt)
+          local nk = #H.ns.Widgets.cardKeywords(H.ns.Card.defById(kwCard.cardId, kwCard.cardUp))
+          local kl = 0
+          for _, l in ipairs(tt) do if l:find(" : ", 1, true) then kl = kl + 1 end end
+          check("infobulle de carte : une ligne « Nom : effet » par mot-clé", #tt == nk and kl == nk, #tt .. " / " .. nk)
         end
         check("carte : nom, médaillon et texte dessinés", (V().cards[1].name._text or "") ~= ""
           and V().cards[1].medal.icon._texture ~= nil and (V().cards[1].body._text or "") ~= "")
@@ -2825,6 +2828,23 @@ do
   check("« Combat : récompense habituelle + 20 po » : lignes équilibrées, au moins 16 unités des bords",
     widest <= 285.3 - 32 and (#ls == 1 or math.abs(H.textWidth(b.sub, ls[1], b.sub._fontSize)
       - H.textWidth(b.sub, ls[2], b.sub._fontSize)) < 0.4 * widest), b.sub._text)
+end
+
+print("U25 explications des mots-clés : une phrase courte par mot-clé")
+do
+  local Art = H.ns.Art
+  local bad = {}
+  for key in pairs(Art.keywords) do
+    for _, n in ipairs({ false, 1, 4 }) do
+      local line = Art.keywordLine(key, nil, n or nil):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+      local len = H.ns.Widgets.utf8len(line)
+      if len > 60 or line:find("[;()]") or select(2, line:gsub("%. ", "")) > 0 then
+        bad[#bad + 1] = line .. " (" .. len .. ")"
+      end
+    end
+  end
+  check("chaque mot-clé : une ligne de 60 caractères au plus, une seule phrase, sans point-virgule ni parenthèse",
+    #bad == 0, table.concat(bad, " | "))
 end
 
 print("U16 méthodes d'API inconnues appelées")

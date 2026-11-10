@@ -868,7 +868,7 @@ function Reward:Show(step)
   local pendingPotion = r2.potion and not r2.potionTaken
   if r2.potion and (hold.potion or pendingPotion) and not closed then
     self.flask.info = { kind = "potion", id = r2.potion,
-      hint = pendingPotion and "Emplacements de potion pleins : en jeter une (clic droit dans le bandeau)." or nil }
+      hint = pendingPotion and "Potions pleines : clic droit sur une potion pour la jeter." or nil }
     W.setIcon(self.flask.icon, Art.potion(r2.potion), "potion:" .. r2.potion)
     self.flask.icon:SetDesaturated(pendingPotion and true or false)
     self.flask:SetTag(pendingPotion and "Pas de place" or nil, C.badText, false, true)
