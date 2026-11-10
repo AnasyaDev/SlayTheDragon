@@ -145,7 +145,9 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   réelle reste 1, aucune mise en page à l'arrivée ; une cible qui change en route (souris qui ressort)
   relance l'animation depuis l'échelle visuelle courante (`GetSmoothProgress`). La position (levée,
   écart des voisines) reste pilotée par l'`OnUpdate` partagé ; la zone de survol ne bouge pas. Vaut pour
-  tout `W.hoverable` : main, récompense, marchand, grilles, plaques de réponse, boutons, objets.
+  tout `W.hoverable` : main, récompense, marchand, grilles, plaques de réponse, boutons, objets ; et aux
+  vols de cartes (`W.fly` : échelle réelle fixée au départ, animation Scale `IN_OUT`, échelle réelle
+  d'arrivée posée une fois à la fin).
   Contrepartie : une fois agrandi, le texte est un rendu étiré (un peu moins net qu'un texte rendu à sa
   taille). `/slay zoom` bascule sur `lisse` (échelle réelle à chaque image, comme avant, mais textes en
   `SetSmoothScaling` : hauteur de police non arrondie, comme les barres d'info de Blizzard) ;

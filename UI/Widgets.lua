@@ -252,7 +252,10 @@ function W.setZoomMode(mode)
   return mode
 end
 
-local ease = { OUT = function(p) return 1 - (1 - p) * (1 - p) end }
+local ease = {
+  OUT = function(p) return 1 - (1 - p) * (1 - p) end,
+  IN_OUT = function(p) if p < 0.5 then return 2 * p * p end return 1 - 2 * (1 - p) * (1 - p) end,
+}
 
 -- Échelle visuelle courante d'un visuel animé (mode « anim ») : 1 au repos.
 function W.visualScale(face)
@@ -261,22 +264,28 @@ function W.visualScale(face)
   local dur = z.dur
   local t = GetTime() - z.t0
   if dur <= 0 or t >= dur then return z.to end
-  local p = z.anim.GetSmoothProgress and z.anim:GetSmoothProgress() or ease.OUT(t / dur)
-  if type(p) ~= "number" or p < 0 or p > 1 then p = ease.OUT(t / dur) end
+  local fallback = ease[z.smooth] or ease.OUT
+  local p = z.anim.GetSmoothProgress and z.anim:GetSmoothProgress() or fallback(t / dur)
+  if type(p) ~= "number" or p < 0 or p > 1 then p = fallback(t / dur) end
   return z.from + (z.to - z.from) * p
 end
 
--- Fait filer l'échelle visuelle de face vers target en dur secondes (0 : immédiat).
-local function zoomTo(face, target, dur)
+-- Fait filer l'échelle visuelle de face vers target en dur secondes (0 : immédiat) ; smooth = lissage
+-- de l'animation ("OUT" par défaut, "IN_OUT" pour les vols de cartes).
+local function zoomTo(face, target, dur, smooth)
   local z = face._zoom
   if not z then
     if target == 1 then return end
     local ag = face:CreateAnimationGroup()
     local anim = ag:CreateAnimation("Scale")
     anim:SetOrigin("CENTER", 0, 0)
-    anim:SetSmoothing("OUT")
     z = { ag = ag, anim = anim, from = 1, to = 1, t0 = 0, dur = 0 }
     face._zoom = z
+  end
+  smooth = smooth or "OUT"
+  if z.smooth ~= smooth then
+    z.smooth = smooth
+    z.anim:SetSmoothing(smooth)
   end
   local playing = z.ag:IsPlaying()
   -- déjà en route vers cette cible (ou au repos à 1)
@@ -1933,15 +1942,29 @@ function W.placeCenter(f, container, x, y, scale)
   f:SetPoint("CENTER", container, "TOPLEFT", x / scale, -y / scale)
 end
 
--- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone.
+-- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone. Mode de zoom « anim » :
+-- échelle réelle fixée à s1 pendant le vol (aucune nouvelle mise en page des textes), changement
+-- d'échelle par animation Scale ; échelle réelle s2 posée à l'arrivée.
 function W.fly(f, container, x1, y1, x2, y2, s1, s2, a1, a2, dur, onDone, arc)
   f:Show()
+  local anim = W.zoomMode() == "anim" and s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
+  if f._zoom then zoomTo(f, 1, 0) end
+  if anim then
+    W.placeCenter(f, container, x1, y1, s1)
+    zoomTo(f, s2 / s1, max(0.01, dur * W.pace()), "IN_OUT")
+  end
   W.tween(dur, function(p)
     local x = x1 + (x2 - x1) * p
     local y = y1 + (y2 - y1) * p - (arc or 0) * 4 * p * (1 - p)
-    W.placeCenter(f, container, x, y, s1 + (s2 - s1) * p)
+    W.placeCenter(f, container, x, y, anim and s1 or (s1 + (s2 - s1) * p))
     f:SetAlpha(a1 + (a2 - a1) * p)
-  end, onDone, f, "fly", W.ease.inOut)
+  end, function()
+    if anim then
+      zoomTo(f, 1, 0)
+      W.placeCenter(f, container, x2, y2, s2)
+    end
+    if onDone then onDone() end
+  end, f, "fly", W.ease.inOut)
 end
 
 ---------------------------------------------------------------------------

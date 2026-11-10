@@ -2309,6 +2309,20 @@ do
   H.advance(0.2)
   check("ouverture : polices et textes reposés (texte vide jusqu'au survol évité)", (probe._setFontCount or 0) > n0
     and probe._text == "essai" and probe._fontSize == 11)
+  -- vol d'une carte (pioche, jeu, récompense) : échelle réelle fixe pendant le vol, animation Scale
+  local g = W.ghostCard(holder)
+  g:SetCard("smite", false, {})
+  local landed = false
+  W.fly(g, holder, 100, 100, 300, 200, 0.3, 1, 1, 1, 0.3, function() landed = true end)
+  local text0 = g.body._text
+  H.now = H.now + 0.1
+  local mid = H.visualScale(g)
+  check("vol de carte : échelle réelle fixe (0,3), agrandissement par animation Scale, texte inchangé",
+    g._scale == 0.3 and mid > 1 and mid < 1 / 0.3 and g.body._text == text0, g._scale .. " / " .. mid)
+  H.advance(0.5)
+  check("vol de carte : à l'arrivée, échelle réelle posée, animation arrêtée", landed and g._scale == 1
+    and H.visualScale(g) == 1)
+  W.releaseGhost(g)
   card:Hide()
   fresh:Hide()
   probe:Hide()
