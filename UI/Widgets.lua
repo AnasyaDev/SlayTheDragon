@@ -1257,7 +1257,7 @@ function W.card(parent)
     if self.hot then self.halo:SetAlpha(0.35 + 0.65 * h) end
   end })
   b.onAnimSettled = function(self)
-    if self.baseLevel and W.animValue(self, "hover") == 0 then self:SetFrameLevel(self.baseLevel) end
+    if self.baseLevel and W.animValue(self, "hover") == 0 then W.setLevel(self, self.baseLevel) end
   end
   b.onEnterExtra = function(self)
     if self._hoverManual then return end
@@ -1278,20 +1278,35 @@ function W.card(parent)
   return b
 end
 
+-- Niveau d'un cadre survolable et de son visuel : le client relève d'ordinaire les enfants avec
+-- leur parent, on le fait aussi explicitement pour le visuel (il doit passer devant les voisines).
+local function relevel(frame, level)
+  frame:SetFrameLevel(level)
+  if frame.GetChildren then
+    local kids = { frame:GetChildren() }
+    for i = 1, #kids do relevel(kids[i], level + 1) end
+  end
+end
+
+function W.setLevel(f, level)
+  f:SetFrameLevel(level)
+  if f.face then relevel(f.face, level + 1) end
+end
+
 -- Niveau d'une carte : devant au survol ; en sortie, juste au-dessus des voisines tant qu'elle
 -- rétrécit, puis au repos (onAnimSettled).
 function W.cardFront(card, up)
   if not card.baseLevel then return end
-  if up then card:SetFrameLevel(card.upLevel or (card.baseLevel + 60))
-  elseif W.animValue(card, "hover") > 0 then card:SetFrameLevel(card.baseLevel + 30)
-  else card:SetFrameLevel(card.baseLevel) end
+  if up then W.setLevel(card, card.upLevel or (card.baseLevel + 60))
+  elseif W.animValue(card, "hover") > 0 then W.setLevel(card, card.baseLevel + 30)
+  else W.setLevel(card, card.baseLevel) end
 end
 
 -- Cache une carte et remet son survol au repos (la souris ne la quittera pas : elle disparaît).
 function W.hideCard(card)
   card.hover, card.lifted = false, false
   W.hoverReset(card)
-  if card.baseLevel then card:SetFrameLevel(card.baseLevel) end
+  if card.baseLevel then W.setLevel(card, card.baseLevel) end
   card:Hide()
 end
 

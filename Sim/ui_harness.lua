@@ -107,9 +107,10 @@ local function newObject(kind, name, parent)
   local o = setmetatable({ _kind = kind, _name = name, _parent = parent, _scripts = {}, _calls = {},
     _shown = true, _points = {},
     _w = 0, _h = 0, _scale = 1, _level = parent and (rawget(parent, "_level") or 1) + 1 or 1,
-    _enabled = true, _lines = {} }, Frame)
+    _enabled = true, _lines = {}, _kids = {} }, Frame)
   H.objects[#H.objects + 1] = o
   if name then _G[name] = o end
+  if parent then local kids = rawget(parent, "_kids") kids[#kids + 1] = o end
   return o
 end
 H.newObject = newObject
@@ -321,6 +322,15 @@ function Frame:NumLines() return #(self._tt or {}) end
 local TEMPLATES = { BackdropTemplate = true, UIPanelButtonTemplate = true, UIPanelCloseButton = true }
 local KINDS = { Frame = true, Button = true, CheckButton = true, StatusBar = true, PlayerModel = true,
   ScrollingMessageFrame = true, Slider = true, EditBox = true, ScrollFrame = true }
+
+-- Cadres enfants (pas les textures ni les textes), comme Frame:GetChildren.
+function Frame:GetChildren()
+  local out = {}
+  for _, k in ipairs(self._kids) do
+    if KINDS[k._kind] and k._parent == self then out[#out + 1] = k end
+  end
+  return unpack(out)
+end
 
 local EVENTS = {}
 for e in ([[ADDON_LOADED PLAYER_LOGIN PLAYER_ENTERING_WORLD PLAYER_LOGOUT PLAYER_REGEN_DISABLED
@@ -1360,7 +1370,8 @@ do
   if n >= 2 then
     check("voisine écartée (visuel seulement)", Wd.animValue(v.cards[2], "dx") > 0)
   end
-  check("carte survolée devant les autres", card._level > v.cards[n]._level)
+  check("carte survolée devant les autres (visuel et médaillon compris)", card._level > v.cards[n]._level
+    and card.face._level > v.cards[n].face._level and card.medal._level > v.cards[n].medal._level)
   check("zone de survol prolongée vers le haut", card._calls.SetHitRectInsets
     and card._calls.SetHitRectInsets[3] < 0)
   run(card, "OnLeave")

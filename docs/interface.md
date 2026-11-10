@@ -1,8 +1,85 @@
-# Interface en jeu (pistes C, D et E)
+# Interface en jeu (pistes C, D, E et survols)
 
-État au 10/11/2026. Rien n'a encore tourné dans le client : tout ce qui suit est vérifié hors jeu par
+État au 10/11/2026. Premier essai en jeu fait par le joueur (disposition validée) ; les retours de cet
+essai sont traités dans « Retours du premier essai » ci-dessous, vérifiés hors jeu par
 `Sim/ui_harness.lua` (logique, clics, animations en temps virtuel) et par des instantanés SVG des écrans
 (`Sim/ui_render.lua`, rendu approximatif). La section « Tests en vol » liste ce qu'il reste à voir en jeu.
+
+## Retours du premier essai (survols, deck, paysages, bandeau, vouvoiement)
+
+- **Survols animés partout** (`W.hoverable`, `UI/Widgets.lua`). Règle : le cadre qui reçoit la souris
+  ne bouge jamais (zone de survol fixe, invisible) ; tout le visuel vit dans son enfant `face`, seul
+  animé (`SetScale` + `SetPoint` divisé par l'échelle + couleurs). Pas de clignotement entrée/sortie
+  possible. Canaux animés `W.animTo(obj, clé, cible, durée)` : la valeur file vers sa cible en
+  0,12 s (entrée) / 0,15 s (sortie), courbe amortie (cubique), et repart de sa valeur courante si la
+  souris ressort en route (réversible). Un seul `OnUpdate` partagé (`W.driver`) pour ces canaux et pour
+  les interpolations `W.tween` ; il se coupe (`SetScript("OnUpdate", nil)`) dès que plus rien ne bouge.
+  Minuteur de secours par animation (images sautées). Les durées de survol ne dépendent pas de la
+  vitesse des animations de combat.
+  - Main : la carte survolée (ou sélectionnée) se lève jusqu'à y 372, grossit ×1,16, passe devant ;
+    les voisines s'écartent (26 px puis 12 px, visuel seulement) ; sa zone de survol est prolongée vers
+    le haut tant qu'elle est levée (`SetHitRectInsets`), pour pouvoir « monter » sur la carte.
+  - Cartes de récompense, du marchand, des grilles et du panneau du deck : levée + agrandissement +
+    halo en fondu, passage au premier plan (`W.placeCard` / `W.cardFront` : niveau levé, puis juste
+    au-dessus des voisines tant qu'elle rétrécit, puis niveau de repos).
+  - Boutons (fond qui glisse vers la couleur de survol, ×1,04–1,06), boutons ronds ≡ ×, butin au sol
+    et objets du feu de camp (se soulèvent, halo en fondu, l'ombre reste au sol), étapes du parcours
+    (×1,18 si accessible, ×1,06 sinon), plaques de réponse (levée, halo, parchemin plus clair ; une
+    réponse impossible bouge à peine), fioles et bibelots du bandeau, clé, gemmes de clé de l'accueil,
+    tas du deck, pioche, défausse, consumées.
+  - Ennemis : quand une carte à cible (ou une potion à cible) est armée, l'ennemi survolé — ou la
+    cible clavier — grandit ×1,07 depuis ses pieds et son anneau s'allume ; la zone de clic (emplacement)
+    ne bouge pas.
+  - Infobulles conservées (le survol animé est ajouté dans `W.tooltip`).
+- **Consulter ses cartes** (`UI.deckView`, fin de `UI/Screens.lua`) : panneau de bois par-dessus
+  l'écran (sous le bandeau), titre court « Deck · 18 cartes » / « Pioche · … » / « Défausse · … » /
+  « Consumées · … », grille de vraies cartes (`W.card`, 8 par rangée, 3 rangées visibles, ×0,72),
+  triées par type (Sort offensif, Sort, Pouvoir), coût, nom (puis non améliorée avant améliorée) ;
+  améliorées en vert comme ailleurs. Molette : une rangée par cran (indicateur à droite si ça déborde).
+  Fermeture : `Échap` (après les options), clic hors du panneau (voile), clic droit sur une carte,
+  « Fermer », ou nouveau clic sur ce qui l'a ouvert. Panneau ouvert : les touches ne vont pas à
+  l'écran dessous (rendues au jeu). Accès : tas du deck du plateau (récompense, feu de camp, marchand,
+  grilles) et bouton « Deck N » du bandeau, désormais **aussi en combat** (deck complet) ; en combat,
+  clic sur la pioche (**toujours triée**, jamais l'ordre de tirage), la défausse, et le nouveau tas
+  violet des **consumées** (x 151–187, affiché dès qu'il y en a une).
+- **Paysages** : voir « Diagnostic des paysages » plus bas. Chaque décor a maintenant une liste
+  ordonnée de candidats (`Art.illustrations`) ; le premier qui se charge vraiment est retenu, sinon
+  repli automatique sur le décor peint ; `/slay art` dit, décor par décor, le candidat retenu ou
+  « repli » et les candidats écartés avec la raison.
+- **Bandeau** : le nom de zone est sur la ligne du haut, les points de progression centrés sur la ligne
+  du bas ; le cadre central va de l'or au premier élément de droite (bouton Deck) et un nom trop long
+  est tronqué. Plus aucun chevauchement possible.
+- **Vouvoiement** : plus de « tu / te / ton / ta / tes / toi / t' » ni d'impératif familier dans les
+  chaînes de `UI/` (raisons, bilan, étapes, infobulles, mots-clés) : tournures impersonnelles, « votre »
+  si la phrase s'adresse au joueur (« Ce n'est pas votre tour. »). Les textes de `Core/` et `Data/`
+  (cartes, rencontres, raisons du moteur) relèvent de l'autre piste.
+
+### Diagnostic des paysages
+
+- Le décor de tous les écrans de route, de ferme, de colline, de camp, du marchand et du feu de camp
+  utilisait **un seul fichier** : `7377860` = `interface/glues/loadingscreens/expansion10/main/
+  loadscreen_housing_elwynnforest` (écran de chargement du **logement de Midnight**). Il figure dans la
+  liste de fichiers **retail 12.1.5** du MCP, mais WoW Forever est un client « Camelot » (1.16) bâti sur
+  le contenu classique : ce fichier n'y est très probablement pas. `SetTexture` échouait (ou ne
+  chargeait rien), l'ancien code masquait l'illustration et laissait le décor peint — d'où « les
+  paysages ne s'affichent pas ».
+- La liste de fichiers contient en revanche des écrans de chargement **propres à Forever**
+  (`interface/glues/loadingscreens/camelot160/main/…` : `easternkingdom` 7963776, `excavation`
+  7963777, `ruinsoflordaeron` 7963782, `kalimdor`, `dalaran`, `oldironforge`, `zephrasisle`) et les
+  écrans classiques (`loadscreeneasternkingdom` 131839, `loadscreendeadmines` 131833).
+- Limites : le MCP ne trouve aucune installation sur cette machine (`wow_install_info`) et le code de
+  l'interface Blizzard de Forever n'est pas synchronisé (`wow_ui_grep` flavor forever refusé ; la
+  synchronisation n'a pas été lancée, consigne). Impossible donc de lister les fichiers réellement
+  présents dans le client Forever ni de voir comment son écran de chargement recadre ces images.
+- Candidats retenus (ordre) : Elwynn → 7377860, 7963776 (Forever, royaumes de l'Est), 131839 puis son
+  chemin `Interface\Glues\LoadingScreens\LoadScreenEasternKingdom` ; Mortemines → 131833, son chemin,
+  7963777 (Forever, excavation) ; ruines → 7963782 (Forever, ruines de Lordaeron) puis la liste
+  d'Elwynn. Les recadrages des nouveaux candidats sont estimés (16:9 → 65 % de la hauteur, 4:3 → 50 %).
+- Détection (`UI/Scene.lua`) : une sonde (petite texture cachée sous le décor) par illustration ;
+  candidat écarté si `SetTexture` renvoie `false` (« refusé »), si `GetTextureFileID` est vide
+  (« sans fichier »), ou si `IsObjectLoaded()` ne devient pas vrai en 4 s de fenêtre visible
+  (« non chargé ») ; `C_Texture.GetFilenameFromFileDataID` sert seulement au rapport. Tant que rien
+  n'est tranché, le décor peint est affiché ; l'illustration apparaît dès qu'un candidat est retenu.
 
 La piste C a écrit l'interface, la piste D l'a branchée sur la couche expédition, la **piste E** l'a
 entièrement redessinée en « table de jeu illustrée » d'après les maquettes validées
@@ -51,16 +128,17 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours), voies, mots-clés, animations | non |
 | `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor`) | non |
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
-| `UI/Widgets.lua` | Formes, polices, sons, interpolations, icônes, médaillon, carte unique, barre de vie, écusson d'Absorption, pastilles, boutons, infobulles, textes flottants, modèles | oui |
-| `UI/Scene.lua` | Décor (illustration + décor peint), plateau, personnages (modèle, ombre, anneau de cible) | oui |
+| `UI/Widgets.lua` | Formes, polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes, médaillon, carte unique, barre de vie, écusson d'Absorption, pastilles, boutons, infobulles, textes flottants, modèles | oui |
+| `UI/Scene.lua` | Décor (illustration à candidats sondés + décor peint de repli, rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
 | `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
-| `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta | oui |
+| `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta, panneau de consultation des cartes (`UI.deckView`) | oui |
 | `UI/Flight.lua` | Événements : chargement, vol en taxi, combat réel, déconnexion | oui |
 | `Sim/ui_harness.lua` | Harnais hors jeu (faux client WoW) | — |
 | `Sim/ui_render.lua` | Rendu SVG approximatif des cadres du faux client (instantanés d'écrans) | — |
 
-`UI\Scene.lua` est un **nouveau fichier du TOC** : il faut relancer le client (pas seulement `/reload`).
+`UI\Scene.lua` a été ajouté au TOC par la piste E (client relancé depuis) ; les retours du premier essai
+n'ajoutent aucun fichier.
 Les fichiers qui touchent l'API WoW commencent par `if not CreateFrame then return end` ; `Sim/load.lua`
 saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`**.
 
@@ -69,11 +147,11 @@ saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`
 Coordonnées : celles des maquettes, depuis le coin haut gauche de la zone intérieure (1034 × 614).
 
 **Bandeau** (y 0–44, sur tous les écrans ; on le saisit pour déplacer la fenêtre) : à gauche la classe,
-« PV », « po » ; au centre la zone (« Acte 1 · Marche de l'Ouest » sur la carte) et, ailleurs, la
-progression de l'acte (points dorés franchis, point clair = étape en cours, losange rouge = boss) ; à
-droite « Deck N » (hors combat, infobulle = contenu du deck), clé mythique (pastille violette « Clé +N »,
-infobulle = affixes), bibelots (cases liserées à la rareté), séparateur, 3 fioles (potions), ≡ (options),
-× (fermer).
+« PV », « po » ; au centre la zone (« Acte 1 · Marche de l'Ouest » sur la carte), sur la ligne du haut,
+et ailleurs la progression de l'acte sur la ligne du bas (points dorés franchis, point clair = étape en
+cours, losange rouge = boss) ; à droite « Deck N » (partout, combat compris ; infobulle = contenu du
+deck ; clic = panneau du deck), clé mythique (pastille violette « Clé +N », infobulle = affixes),
+bibelots (cases liserées à la rareté), séparateur, 3 fioles (potions), ≡ (options), × (fermer).
 
 | Phase / vue | Écran | Contenu |
 | --- | --- | --- |
@@ -112,9 +190,10 @@ de carte revient au même.
   clavier pendant une visée), barre de vie (+ écusson d'Absorption), nom (élite violet, boss orangé),
   états en pastilles.
 - Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
-  (cachée à 0), pioche et défausse (tas avec nombre ; infobulles : contenu trié, consumées), main en arc
-  au centre (cartes droites ; la survolée monte, grossit ×1,16, passe devant), mini-cartes des recharges
-  (tours restants), « Fin du tour » doré.
+  (cachée à 0), pioche, défausse et consumées (tas avec nombre ; infobulles : contenu trié ; clic =
+  panneau des cartes, pioche triée), main en arc au centre (cartes droites ; la survolée monte, grossit
+  ×1,16, passe devant, les voisines s'écartent — animé), mini-cartes des recharges (tours restants),
+  « Fin du tour » doré.
 - Fin de combat : « Victoire ! » / « Défaite » en grand, bouton « Continuer » / « Voir le bilan »,
   affichés quand la file d'animations est vide.
 
@@ -125,11 +204,13 @@ de carte revient au même.
   une carte sans cible. Clic droit : désélectionner.
 - Clavier (capté seulement fenêtre ouverte, `SetPropagateKeyboardInput`) : `1`…`0` choisit une carte
   (même touche ou `Entrée` pour la jouer), `Tab` change de cible (`Maj+Tab` à rebours), `Espace` finit le
-  tour (et « Continuer » après un combat), `Échap` ferme (les options d'abord). Ailleurs, `1`…`0` choisit
+  tour (et « Continuer » après un combat), `Échap` ferme (les options d'abord, puis le panneau des
+  cartes, puis la fenêtre). Ailleurs, `1`…`0` choisit
   (parcours : étapes accessibles de haut en bas ; accueil : clé +0…+5 ; feu de camp : 1 repos, 2 grimoire ;
   récompense : cartes, ou ouvrir le coffre), `Entrée`/`Espace` l'action par défaut. Toute autre touche est
   rendue au jeu.
-- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (icônes, modèles et décors introuvables) ;
+- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (décor par décor : candidat retenu ou repli
+  et candidats écartés ; puis icônes et modèles introuvables) ;
   `/slay modeles` (galerie des ennemis) ; `/slay decor` (décor illustré ou peint) ;
   `/slay facing <j> <e>` (orientation des modèles, radians) ; `/slay centre`.
 - Bouton de minimap : clic gauche ouvre/ferme, clic droit options, glisser pour le déplacer.
@@ -152,8 +233,9 @@ de carte revient au même.
 | `turn` | « Tour N » en haut du décor | — |
 | `result` | bandeau de fin en fondu (à la fin de la file) | `victory` / `defeat` |
 
-Interpolations : un seul `OnUpdate` (`W.tween`) ; chaque interpolation a aussi un minuteur de secours qui
-la termine (images sautées ; le harnais n'a pas d'`OnUpdate`).
+Interpolations : un seul `OnUpdate` (`W.driver`, partagé avec les survols), coupé quand rien ne bouge ;
+chaque animation a aussi un minuteur de secours qui la termine (images sautées ; le harnais n'a pas
+d'`OnUpdate`, mais ses tests de survol font avancer le pilote image par image).
 
 ## Contrôleur
 
@@ -212,13 +294,10 @@ point`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu
 - **Textures** (`wow_file_search`, liste de fichiers du client 12.1.5) : disque
   `interface/characterframe/tempportraitalphamask` (130924 : formes rondes et masques), parchemin
   `interface/helpframe/tileable-parchment` (516781), bois `interface/gamepad/woodtile` (7149548), coche
-  `interface/raidframe/readycheck-ready` (136814), illustrations
-  `interface/glues/loadingscreens/expansion10/main/loadscreen_housing_elwynnforest` (7377860 : route, ferme,
-  colline, camp, ruines, marchand, nuit teintée) et `interface/glues/loadingscreens/loadscreendeadmines`
-  (131833 : boss, mine). Aucune illustration de côte trouvée : la côte est peinte. Le MCP confirme la liste
-  de fichiers **retail 12.1.5**, pas l'installation Forever (il ne trouve aucune installation ici) : si un
-  fichier manque, `GetTextureFileID` le signale, l'illustration est masquée (le décor peint reste) et
-  `/slay art` le liste (`scene:<id>`).
+  `interface/raidframe/readycheck-ready` (136814) ; illustrations des décors : listes de candidats
+  (`Art.illustrations`, voir « Diagnostic des paysages »). Aucune illustration de côte trouvée : la côte
+  est peinte. Le MCP confirme la liste de fichiers **retail 12.1.5**, pas l'installation Forever (il ne
+  trouve aucune installation ici).
 - **Sons** : noms `SOUNDKIT` employés tels quels par l'interface Blizzard 12.1.5 (`wow_ui_grep`) :
   `IG_ABILITY_PAGE_TURN`, `IG_MAINMENU_OPTION_CHECKBOX_ON`, `IG_SPELLBOOK_OPEN/CLOSE`,
   `LOOT_WINDOW_COIN_SOUND`, `UI_ADVENTURES_*` (combats des Aventures de Shadowlands :
@@ -234,14 +313,24 @@ point`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu
   événements de vol, `SetPropagateKeyboardInput`, `SetCreature`, `SetDisplayInfo`, `SetUnit`,
   `SetAnimation`, `GetModelFileID`, `SetTexture -> success`, `SetDesaturated`, `CreateLine`,
   `IsMouseOver`, `C_Timer`, `C_Spell.GetSpellTexture`, `InCombatLockdown`, `GetCursorPosition`…
+  Survols et panneau : `SetScale` (cadre), `SetHitRectInsets`, `EnableMouseWheel`, `GetChildren`,
+  `SetFrameLevel` (et `SetFixedFrameLevel`, non employé), scripts `OnSizeChanged` et `OnMouseWheel`
+  (employés par l'interface Blizzard 12.1.5) ; décors : `IsObjectLoaded` (région),
+  `GetTextureFileID`, `C_Texture.GetFilenameFromFileDataID`.
 - `wow_lua_lint` (forever) sur tout `UI/` : aucune erreur ; un avertissement attendu sur `CreateColor`
   (fonction Lua de l'interface, pas de l'API C) ; notes « OnUpdate » sur le glisser-déposer, le bouton de
   minimap, le feu et le pilote des interpolations (voulues).
 
 ### Non vérifié (à voir en jeu)
 
-- L'**allure** des illustrations recadrées (impossible de les voir hors jeu) : recadrage `crop` et teinte
-  `tint` sont dans `Art.scenes`, à corriger après essai ; repli immédiat : `/slay decor`.
+- Quels **candidats de décor** existent dans Forever et si `IsObjectLoaded` repère bien un fichier absent
+  (s'il renvoyait vrai pour un fichier manquant, un candidat vide serait « retenu » : on verrait le
+  décor peint et `/slay art` le dirait retenu — me le signaler). L'**allure** des illustrations
+  recadrées : `crop` par candidat (`Art.illustrations`), `shift` et `tint` par décor (`Art.scenes`), à
+  corriger après essai ; repli immédiat : `/slay decor`.
+- Les **survols** : fluidité, absence de clignotement, passage au premier plan (le visuel `face` et ses
+  enfants sont re-nivelés explicitement par `W.setLevel`), zone prolongée vers le haut de la carte
+  levée, molette sur les cartes du panneau.
 - Les identifiants de **créatures** (ennemis : gnoll 117, mystique 453, murloc 126, bandit 116, sorcier 619,
   golem 36, Rhahk'Zor 644, sbire 594, VanCleef 639 + affichage 2029 ; rencontres : Salma Saldean 235,
   Gryan Fortmanteau 234, de mémoire) : le MCP n'indexe pas les créatures. Sans modèle : icône (ennemi) ou
@@ -250,8 +339,8 @@ point`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu
 - Les **animations** des modèles (0 attente, 1 mort, 6 à terre, 9 encaisser, 16 frapper, 25 prêt, 53/54
   sorts), l'orientation (`/slay facing`) et le cadrage des modèles dans leur cadre (pieds au sol ?).
 - La police **Morpheus** (`Fonts\MORPHEUS.ttf`) et ses accents ; repli sur la police de l'objet.
-- Le décalage d'un cadre mis à l'échelle (`SetScale` + `SetPoint` divisé par l'échelle) pour les cartes
-  survolées et la récompense : calculé, à confirmer à l'œil.
+- Le décalage d'un cadre mis à l'échelle (`SetScale` + `SetPoint` divisé par l'échelle) pour les visuels
+  survolés et les cartes de récompense : calculé, à confirmer à l'œil.
 
 Aucune fonction protégée, aucun `hooksecurefunc`, aucun hook de méthode de frame, aucune rotation de
 frame (seules des textures pivotent), aucun `loadstring`.
@@ -289,7 +378,7 @@ frame (seules des textures pivotent), aucun `loadstring`.
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (181 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (239 vérifications, graine 1)
 lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
 for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
 ```
@@ -302,44 +391,54 @@ glisser-déposer ; récompenses (coffre ouvert d'abord s'il se présente), amél
 vidée (`H.settle`) avant de vérifier le bandeau de fin ; aller-retour de sauvegarde en combat et sur une
 récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibelots ; marchand ; feu de camp ;
 rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
-et `/slay art`. Graines 1 à 12 : ALL PASS (lua5.1), 1 à 3 sous luajit.
+et `/slay art` ; décors à candidats (refusé, jamais chargé, repli, rapport) ; survols (zone fixe, valeur
+intermédiaire, sortie réversible depuis la valeur courante, état final par les minuteurs, pilote coupé
+au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap,
+clic dehors, Fermer, pioche triée et ordre réel intact, défausse, consumées, deck en combat, touches
+bloquées). Le faux client gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded` (fichiers
+`H.unloaded` jamais chargés) et `C_Texture`. Graines 1 à 7 : ALL PASS (lua5.1), 1 sous luajit.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
 faux client et écrit un SVG par écran (accueil, parcours, combat, combat-survol, récompense, marchand, feu
-de camp, amélioration, rencontre, bibelot de classe, bilan, méta). Icônes = carrés bleus, modèles =
+de camp, amélioration, rencontre, bibelot de classe, bilan, méta, panneau du deck, pioche en combat). Icônes = carrés bleus, modèles =
 silhouettes en pointillés, illustrations = aplats ; largeurs de texte estimées. Il a servi à corriger la
 mise en page (noms de cartes longs, pastilles trop larges, gemmes de clé) ; il ne remplace pas un essai.
 
 ## Tests en vol (pour toi)
 
 Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/Interface/AddOns/SlayTheDragon`
-(commande `rsync` dans `CLAUDE.md`). **Relancer le client** (nouveau fichier `UI\Scene.lua` dans le TOC).
-Activer les erreurs Lua (`/console scriptErrors 1`) ou BugSack.
+(commande `rsync` dans `CLAUDE.md`). Aucun nouveau fichier dans le TOC depuis le premier essai : `/reload`
+suffit. Activer les erreurs Lua (`/console scriptErrors 1`) ou BugSack.
 
-En priorité (ce que je n'ai pas pu voir) :
-1. `/slay` : la fenêtre 1040 × 620 s'ouvre ; formes arrondies, parchemin, bois, police des titres
-   (Morpheus) avec les accents. On la déplace par le bandeau ; Options → Échelle.
-2. Décor : l'illustration (champs d'Elwynn teintés) a-t-elle du sens derrière les personnages, sans logo
-   ni texte ? Sinon `/slay decor` (décor peint) et me dire lequel garder ; Mortemines pour le boss.
-3. Combat : ton personnage est-il posé au sol à gauche (pieds sur l'ombre), les ennemis à droite, face à
-   face ? `/slay facing` sinon. Bulles d'intention lisibles (icône ronde + chiffre) ; anneau doré à la cible.
-4. Cartes : gemme, nom, médaillon rond avec l'icône du sort, ligne de type, texte, pastilles ; carte trop
-   chère ternie avec « Pas assez de mana. » ; survol : la carte monte, grossit, passe devant.
-5. Retour visuel : carte qui file vers l'ennemi, « -9 » qui saute, vie qui laisse une traînée claire,
-   secousse, mort en fondu, intention qui éclate au tour ennemi, cartes qui arrivent du tas, sons.
-   Tester la vitesse ×0,5 / ×3 et le mode rapide.
-6. Récompense : 3 cartes en grand, bourse / fiole / bibelot au sol ; clic sur la bourse → elle vole vers
-   l'or du bandeau ; « Reprendre la route » ramasse le reste. Coffre : il faut d'abord l'ouvrir.
-7. Rencontre : bulle, nom du personnage, modèle de Salma Saldean (235) à droite si l'identifiant est bon,
-   réponses en plaques avec leur issue ; réponse impossible grisée avec sa raison ; texte après coup.
-8. Parcours : symboles, halo doré des étapes accessibles, trait rouge du chemin parcouru, pointillés.
-9. Feu de camp (feu qui vacille, couchage « +N PV », grimoire), marchand (étal, prix, retrait), grille
-   d'amélioration (survol = version améliorée), accueil, bilan, méta.
+En priorité (retours du premier essai) :
+1. **`/slay art`** juste après l'ouverture (attendre ~5 s fenêtre ouverte) : recopier la sortie. Elle dit,
+   décor par décor, le candidat retenu (`candidat 2/4 = 7963776 (…)`) ou `repli (décor peint)`, et les
+   candidats écartés avec la raison (`refusé`, `sans fichier`, `non chargé`). Un décor annoncé
+   « retenu » mais qui reste peint à l'écran = à me signaler (détection trompée).
+2. **Paysages** : sur la route, le feu de camp, le marchand et le boss, l'illustration retenue a-t-elle du
+   sens derrière les personnages (sans logo ni texte, bien cadrée) ? Sinon dire lequel et ce qui cloche
+   (trop haut / trop bas / logo) ; `/slay decor` bascule toujours vers le décor peint.
+3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se lève et grossit en
+   ~0,1 s, les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
+   redescendre sans à-coup ; aucun clignotement en bord de carte ; on peut monter le curseur sur la
+   partie levée sans la perdre. Idem : cartes de récompense / marchand / grilles, boutons (dont « Fin du
+   tour », ≡, ×), butin au sol, couchage et grimoire, étapes du parcours, plaques de réponse, fioles et
+   bibelots du bandeau, tas du deck, pioche, défausse.
+4. **Visée** : armer une carte à cible (ou une potion à cible) puis survoler les ennemis : l'ennemi
+   survolé grandit un peu depuis ses pieds, son anneau s'allume ; le clic vise toujours le bon ennemi.
+5. **Panneau des cartes** : hors combat, clic sur le tas du deck (plateau) et sur « Deck N » (bandeau) ;
+   en combat, clic sur la pioche (triée par type, coût, nom — pas l'ordre de tirage), la défausse, le tas
+   violet des consumées (après une carte Consumée) et « Deck N ». Molette si le deck dépasse 24 cartes ;
+   fermeture par Échap, clic hors du panneau, « Fermer ». Cartes améliorées en vert.
+6. **Bandeau** : en combat et sur la récompense, « Marche de l'Ouest » en haut au centre, points de
+   progression en dessous, sans chevauchement, même avec 6 bibelots et une clé.
+7. **Textes** : plus de tutoiement dans l'interface (bulles, raisons grisées, bilan, infobulles des
+   intentions et des mots-clés). Les textes des cartes et des rencontres viennent de `Data/` (autre piste).
 
 Ensuite, la liste habituelle : `/reload` en combat et sur une récompense (même état), potions (boire, à
 cible, jeter), touches 1–0 / Tab / Espace / Entrée / Échap (une touche non gérée agit sur le jeu),
-ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel, `/slay modeles`.
+ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel, `/slay modeles`,
+`/slay facing`.
 
-À me renvoyer : captures de chaque écran (combat avec la main survolée, récompense, rencontre, parcours,
-marchand, feu de camp), la sortie de `/slay art`, le choix décor illustré / peint, les valeurs de
-`/slay facing` qui conviennent, et toute erreur Lua (texte complet).
+À me renvoyer : la sortie de `/slay art`, une capture du combat avec une carte survolée, du panneau de
+la pioche, du bandeau, de chaque décor illustré retenu, et toute erreur Lua (texte complet).

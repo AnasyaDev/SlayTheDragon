@@ -1562,7 +1562,8 @@ function DV:MaxOffset() return max(0, self:Rows() - DV_ROWS) end
 
 function DV:Layout()
   local cw, ch = W.CARD_W * DV_SCALE, W.CARD_H * DV_SCALE
-  local rowW = DV_ROW * (cw + DV_GAPX) - DV_GAPX
+  local perRow = max(1, min(DV_ROW, #self.list)) -- une seule rangée incomplète : centrée
+  local rowW = perRow * (cw + DV_GAPX) - DV_GAPX
   local x0 = DV_X + (DV_W - rowW) / 2
   local first = self.offset * DV_ROW
   local level = self.panel:GetFrameLevel() + 5

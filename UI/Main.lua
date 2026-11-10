@@ -755,7 +755,7 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
       say("usage : /slay facing <joueur> <ennemis>  (radians, ex. 0.6 -0.6)")
     end
   else
-    say("/slay : ouvrir/fermer ; /slay options ; /slay art (art manquant) ; /slay modeles ; "
+    say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
       .. "/slay decor ; /slay facing <j> <e> ; /slay centre")
   end
 end
