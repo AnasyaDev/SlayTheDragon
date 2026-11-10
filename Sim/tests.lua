@@ -217,6 +217,61 @@ test("Pénitence sous Expiation : 2 Absorption par coup", function()
   eq(c.enemies[1].hp, 100 - 3 * num("penance", 1))
 end)
 
+test("Expiation 1 tour : dure encore tout le tour suivant du joueur", function()
+  local c = setup({ "luminous_barrier" })
+  Combat.play(c, 1)
+  eq(c.player.st.atonement, 1)
+  Combat.endTurn(c) -- tour 2
+  eq(c.player.st.atonement, 1, "toujours active au tour suivant")
+  c.hand = { Card.new("penance", false, c.nextUid) }
+  c.nextUid = c.nextUid + 1
+  c.player.block = 0
+  Combat.play(c, 1, 1)
+  eq(c.player.block, 3 * 2, "Pénitence : 2 Absorption par coup")
+  Combat.endTurn(c) -- tour 3
+  eq(c.player.st.atonement, nil, "disparue au tour d'après")
+end)
+
+test("Expiation : ré-empilement sans compter deux fois le tour en cours", function()
+  -- deux fois 1 au même tour : jusqu'à la fin du tour 3
+  local c = setup({ "solace", "solace" })
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.atonement, 2)
+  Combat.endTurn(c)
+  Combat.endTurn(c)
+  eq(c.player.st.atonement, 1, "active au tour 3")
+  Combat.endTurn(c)
+  eq(c.player.st.atonement, nil, "finie au tour 4")
+  -- 1 au tour 1 puis 1 au tour 2 : jusqu'à la fin du tour 3, pas plus
+  local d = setup({ "solace" })
+  Combat.play(d, 1, 1)
+  Combat.endTurn(d) -- tour 2
+  d.hand = { Card.new("solace", false, d.nextUid) }
+  d.nextUid = d.nextUid + 1
+  Combat.play(d, 1, 1)
+  eq(d.player.st.atonement, 1, "le tour en cours n'est pas recompté")
+  Combat.endTurn(d)
+  eq(d.player.st.atonement, 1, "active au tour 3")
+  Combat.endTurn(d)
+  eq(d.player.st.atonement, nil, "finie au tour 4")
+  -- le clone garde la protection
+  local e = setup({ "solace" })
+  Combat.play(e, 1, 1)
+  local k = Combat.clone(e)
+  Combat.endTurn(k)
+  eq(k.player.st.atonement, 1, "clone : active au tour 2")
+end)
+
+test("Armure fracassée posée par le joueur baisse dès la fin du round", function()
+  local c = setup({ "schism" })
+  Combat.play(c, 1, 1)
+  local e = c.enemies[1]
+  eq(e.st.armor_broken, num("schism", 2, 3))
+  Combat.endTurn(c)
+  eq(e.st.armor_broken, num("schism", 2, 3) - 1)
+end)
+
 test("Étourdi : l'ennemi perd son tour ; les boss y sont immunisés", function()
   local c = setup({ "chastise" }, { "test_hitter" })
   Combat.play(c, 1, 1)

@@ -225,6 +225,29 @@ n'est bue que pour éviter la mort ou au dernier combat ; la potion de mana quan
 un tour nettement meilleur. Le butin compte beaucoup : sans bibelot ni potion gagnés, la
 victoire pick=random tombe à 24 %.
 
+## Expiation : le tour où elle est posée ne compte plus (nov. 2026)
+
+Retour de test en jeu : « Expiation 1 tour » ne durait que le tour où la carte était jouée,
+ce qui rendait l'enchaînement Expiation puis Pénitence presque impossible (Barrière
+lumineuse 2 + Pénitence 2 = 4 mana sur 3). Règle désormais : un bienfait à durée que le
+joueur se pose pendant son tour saute la baisse de fin de ce round (« Expiation N » = le reste
+du tour + les N tours suivants) ; les durées ré-empilées s'additionnent sans recompter le tour
+en cours (détail dans l'en-tête de `Core/Statuses.lua`). Aucune compensation appliquée.
+
+Mesure (`runner=expedition key=0`, heuristic, 2 000 expéditions, graine 1) :
+
+| | Victoires | Boss | Élite | Normal | PV perdus boss | Tours boss |
+|---|---|---|---|---|---|---|
+| Avant | 71,0 % | 73,7 % | 98,0 % | 99,0 % | 53,1 | 7,23 |
+| Après | 79,8 % | 81,9 % | 98,6 % | 99,3 % | 53,1 | 7,21 |
+
++8,8 points, presque tout sur VanCleef. Réconfort (+12,7) profite le plus : il s'entretient
+seul (son Expiation couvre le tour suivant, donc le Réconfort suivant rend toujours 1 mana).
+Pistes de compensation, non mesurées : Expiation ramenée de 1 sur les cartes à 2 tours et plus
+(Radiance 2/3 → 1/2, Évangélisme 3 → 2, Schisme+ 2 → 1) pour leur rendre leur durée effective
+d'avant ; soin d'Expiation 2 → 1 PV (`Combat.ATONEMENT_HEAL`) ; Réconfort 5/8 → 4/6 dégâts ;
+ou VanCleef +10 % de PV.
+
 ## Écarts restants et suites
 
 - Les élites tuent rarement (< 1 %) : elles usent (20 PV) mais le seul mur est VanCleef.

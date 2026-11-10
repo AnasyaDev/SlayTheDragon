@@ -125,7 +125,18 @@ function Combat.applyStatus(c, unit, id, n)
     log(c, { t = "immune", unit = uref(unit), id = id })
     return
   end
-  local v = (unit.st[id] or 0) + n
+  local old = unit.st[id] or 0
+  if def.duration and not def.debuff and unit.side == "player" and c.phase ~= "enemy" and n > 0 then
+    -- Bienfait que le joueur se pose pendant son tour : ne décompte pas ce tour
+    -- (voir Statuses.lua). Un reste non protégé couvrait déjà le tour en cours :
+    -- on le compte une fois de moins avant d'ajouter n.
+    if old > 0 and not unit.fresh[id] then old = old - 1 end
+    unit.st[id] = old + n
+    unit.fresh[id] = true
+    log(c, { t = "status", unit = uref(unit), id = id, n = n, total = old + n })
+    return
+  end
+  local v = old + n
   if v <= 0 then v = nil end
   unit.st[id] = v
   if def.duration and c.phase == "enemy" and v then unit.fresh[id] = true end
