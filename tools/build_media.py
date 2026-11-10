@@ -513,6 +513,7 @@ for label, wght in (("medium", 500), ("bold", 700), ("heavy", 800)):
                  0x201D, 0x2022, 0x2026, 0x2212, 0x00D7, 0x00B7, 0x202F, 0x2009, 0x20AC])
     sub.subset(inst)
     out = MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf"
+    inst.recalcTimestamp = False         # fichier identique d'une fabrication à l'autre
     inst.save(out)
     cmap = TTFont(out).getBestCmap()
     missing = [c for c in "àâäéèêëîïôöùûüçœæÀÂÉÈÊËÎÏÔÙÛÜÇŒ’«»—–…·×−" if ord(c) not in cmap]
