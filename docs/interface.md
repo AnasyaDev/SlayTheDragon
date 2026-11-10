@@ -234,10 +234,11 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   grilles) et deck du bandeau (dos de carte et nombre), désormais **aussi en combat** (deck complet) ; en combat,
   clic sur la pioche (**toujours triée**, jamais l'ordre de tirage), la défausse, et le nouveau tas
   violet des **consumées** (x 151–187, affiché dès qu'il y en a une).
-- **Paysages** : voir « Diagnostic des paysages » plus bas. Chaque décor a une liste ordonnée de
-  candidats (`Art.illustrations`). Depuis le deuxième essai (aplat **vert** = fichier absent, que la
-  détection automatique disait présent), le décor est **peint par défaut** ; un décor n'affiche que le
-  premier candidat de sa liste **validé à l'œil** par le joueur (« Essai des décors » ci-dessous).
+- **Paysages** : voir « Fonds embarqués » plus bas. Chaque décor affiche **par défaut, sans
+  validation**, une illustration embarquée dans l'addon (`Media/Backgrounds/*.tga`) ; le décor peint
+  reste dessous en repli et `/slay decor peint` y revient. Les anciens candidats du client (FileDataID,
+  « Diagnostic des paysages ») restent en repli dans `Art.illustrations`, derrière le fond embarqué, et
+  ne servent plus.
 - **Bandeau** : le nom de zone est sur la ligne du haut, les points de progression centrés sur la ligne
   du bas ; le cadre central va de l'or au premier élément de droite (bouton Deck) et un nom trop long
   est tronqué. Plus aucun chevauchement possible.
@@ -245,6 +246,49 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   chaînes de `UI/` (raisons, bilan, étapes, infobulles, mots-clés) : tournures impersonnelles, « votre »
   si la phrase s'adresse au joueur (« Ce n'est pas votre tour. »). Les textes de `Core/` et `Data/`
   (cartes, rencontres, raisons du moteur) relèvent de l'autre piste.
+
+### Fonds embarqués
+
+Un fichier de l'addon existe forcément (comme `Media/Icons/*.tga`, qui s'affichent en jeu) : les fonds
+des scènes sont donc des TGA livrés avec l'addon, affichés sans essai ni validation.
+
+- **Source** : des **illustrations de Blizzard extraites du jeu** (écrans de chargement), téléchargées
+  par FileDataID depuis `https://wago.tools/api/casc/<id>?download` (BLP lu par Pillow) dans
+  `build/decors_src/`. **À réévaluer avant toute publication de l'addon** (droits de Blizzard).
+- **Fabrication** : `build/venv/bin/python -I tools/build_backgrounds.py [planche] [scenes]` (venv de
+  `tools/build_media.py`). Le script retélécharge les sources manquantes (liste en tête : FileDataID,
+  chemin, proportions réelles, zone gardée), écrit `Media/Backgrounds/<clé>.tga` (TGA 32 bits non
+  compressé, même écriture que `build_media.py`) et les aperçus `build/media_png/Backgrounds/<clé>.png`
+  (rendu hors jeu), puis affiche le `ratio` de chaque fond à recopier dans `Art.backgrounds`.
+  `planche` : `build/decors_planche.jpg` (candidats examinés, bande 2,72:1, retenus encadrés) ;
+  `scenes` : `build/decors_scenes.jpg` (les 9 scènes cadrées et teintées comme en jeu, d'après `UI/Art.lua`).
+- **Format** : la source est ramenée à ses vraies proportions (écrans classiques 2048 × 2048 = 4:3
+  étirés), la zone gardée (sans logo ni cadre) est **étirée sur toute la texture 1024 × 512** ; son
+  rapport réel (`ratio`, 2,0 à 2,6) est rétabli à l'affichage : `Scene.bandCoords` n'en montre qu'une
+  bande au format du décor (1034 × 380 ≈ 2,72:1), placée en hauteur par le `focus` de la scène
+  (0 = haut, 1 = bas). Une image sert ainsi plusieurs scènes avec des cadrages et teintes différents.
+  5 fonds × 2 Mo = 10,5 Mo.
+- **Affichage** : le fond embarqué est en tête de la liste de chaque illustration (`Art.illustrations`) ;
+  `Scene.chosen` prend le premier candidat qui est embarqué ou validé. Teinte par scène (`tint`), voile
+  sombre léger sur les 170 px du bas (sol des personnages, `Scene.ground`, 38 % au bas), décor peint
+  dessous. `/slay decor` (ou Options → « Décor illustré ») bascule illustré / peint ; `/slay art` liste
+  les fonds embarqués, leur FileDataID et leurs scènes.
+
+| Fond (`Media/Backgrounds`) | FileDataID | Illustration | Scènes (`focus`) |
+|---|---|---|---|
+| `elwynn.tga` | 7377860 | Forêt d'Elwynn (logement, Midnight) | road 0,62 · hill 0,15 · camp 0,9 · shop 0,78 · night 0,55 (teinte nuit bleutée) |
+| `farm.tga` | 407226 | Pics-Jumeaux : chaumière, chemin, charrette | farm 0,55 |
+| `deadmines.tga` | 131833 | Mortemines (écran classique, navire dans la grotte) | mine 0,5 |
+| `ruins.tga` | 7963782 | Ruines de Lordaeron (écran Forever) | ruins 0,5 |
+| `coast.tga` | 427941 | Gilnéas : phare sur la côte | coast 0,45 |
+
+Écartés (planche) : Excavation 7963777 (sépia, sans ferme), Bassin d'Arathi 2820825 et les autres
+écrans larges BfA (logo en haut), mine gobeline 2016712 (trop sombre, logo), cité en ruine 131866,
+Gilnéas la ville 405445 et Manoir Malvoie 1984118 (nuit : Elwynn assombri suffit), carte des royaumes
+de l'Est 7963776 (carte, pas paysage), Goulet des Chanteguerres 2827086 (personnages au premier plan).
+Limites : les cinq cadrages d'Elwynn diffèrent peu (zone de rapport 2,0) ; les Mortemines sont un
+croquis au trait, d'un autre style que les autres ; la côte est celle de Gilnéas (pins, gris-bleu), pas
+la Marche de l'Ouest dorée.
 
 ### Diagnostic des paysages
 
@@ -276,6 +320,7 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
 
 ### Essai des décors
 
+Facultatif depuis les fonds embarqués (les candidats du client ne servent qu'en repli, derrière eux).
 `/slay decor essai` (fenêtre ouverte au besoin ; l'accueil montre un décor, le parcours non) affiche sur le
 décor courant, sans teinte ni voile, le candidat n° k des 8 candidats connus (toutes listes, dédoublonnés),
 en commençant au premier pas encore jugé ; la discussion annonce « k/8 : fichier — nom [verdict] ».
@@ -292,10 +337,10 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
   cadre Blizzard ni de boutons gris : formes dessinées (rectangles arrondis, disques), parchemin, bois,
   polices Morpheus (titres, chiffres) et Friz Quadrata (texte), palette des maquettes (`Art.C`).
 - **Scène commune** (`UI/Scene.lua`) : décor plein cadre en haut (y 44–424), plateau de bois en bas
-  (y 424–614), personnages posés au sol avec ombre. Le décor est une illustration du jeu recadrée et
-  teintée, avec dessous un décor **peint** en couches unies (champs, ferme, côte, mine, nuit), seul visible
-  tant qu'aucun candidat n'est validé ; `/slay decor` (ou Options → « Décor illustré ») bascule de l'un à
-  l'autre.
+  (y 424–614), personnages posés au sol avec ombre. Le décor est une illustration embarquée dans l'addon
+  (`Media/Backgrounds`, « Fonds embarqués ») recadrée et teintée, avec dessous un décor **peint** en
+  couches unies (champs, ferme, côte, mine, nuit) en repli ; `/slay decor` (ou Options → « Décor
+  illustré ») bascule de l'un à l'autre.
 - **Une seule carte** (`W.card`) partout : parchemin, liseré de rareté (blanc, vert, bleu), gemme de coût
   (rouge si le mana manque), nom (sur deux lignes s'il est long), médaillon rond cerclé à la couleur de la
   voie (Discipline bleu ciel, Ombre violet, Sacré or, Départ bronze), ligne de type (« Sort · Discipline »),
@@ -335,7 +380,7 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor` et `artChecks`) | non |
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
 | `UI/Widgets.lua` | Peau (textures de `Media/`, neuf tranches, plaques, hexagones, médaillons, pilule dorée), polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes (améliorées d'abord), carte unique composée, jauges de vie, hexagone d'Absorption, jetons d'état, boutons, infobulles, textes flottants, modèles | oui |
-| `UI/Scene.lua` | Décor (peint par défaut, illustration validée par l'essai manuel, mode essai, rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
+| `UI/Scene.lua` | Décor (fond embarqué cadré et teinté, voile du bas, décor peint dessous ; repli : candidat du client validé par l'essai manuel ; rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
 | `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
 | `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta, panneau de consultation des cartes (`UI.deckView`) | oui |
@@ -421,11 +466,12 @@ de carte revient au même.
   (parcours : étapes accessibles de haut en bas ; accueil : clé +0…+5 ; feu de camp : 1 repos, 2 grimoire ;
   récompense : cartes, ou ouvrir le coffre), `Entrée`/`Espace` l'action par défaut. Toute autre touche est
   rendue au jeu.
-- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (décor par décor : « peint » ou candidat
-  validé, puis candidats validés / refusés / pas encore jugés ; puis icônes et modèles introuvables) ;
+- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (fonds embarqués avec FileDataID et scènes,
+  puis décor par décor : fond embarqué, candidat validé ou « peint », puis candidats du client validés /
+  refusés / pas encore jugés ; puis icônes et modèles introuvables) ;
   `/slay modeles` (galerie des ennemis et des personnages, puis au chat la liste des modèles absents
-  avec les identifiants essayés) ; `/slay decor` (bascule illustré validé / peint ; sous-commandes
-  `essai`, `suivant`, `precedent`, `ok`, `non`, `peint`, `illustre` : « Essai des décors ») ;
+  avec les identifiants essayés) ; `/slay decor` (bascule illustré / peint ; sous-commandes
+  `peint`, `illustre`, et, facultatives, `essai`, `suivant`, `precedent`, `ok`, `non` : « Essai des décors ») ;
   `/slay facing <j> <e>` (orientation des modèles, radians) ; `/slay centre`.
 - Bouton de minimap : clic gauche ouvre/ferme, clic droit options, glisser pour le déplacer.
 - La fenêtre se masque à l'entrée en combat réel, refuse de s'ouvrir en combat, et se rouvre à la sortie
@@ -509,9 +555,9 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 - **Textures** (`wow_file_search`, liste de fichiers du client 12.1.5) : disque
   `interface/characterframe/tempportraitalphamask` (130924 : formes rondes et masques), parchemin
   `interface/helpframe/tileable-parchment` (516781), bois `interface/gamepad/woodtile` (7149548), coche
-  `interface/raidframe/readycheck-ready` (136814) ; illustrations des décors : listes de candidats
-  (`Art.illustrations`, voir « Diagnostic des paysages »). Aucune illustration de côte trouvée : la côte
-  est peinte. Le MCP confirme la liste de fichiers **retail 12.1.5**, pas l'installation Forever (il ne
+  `interface/raidframe/readycheck-ready` (136814) ; illustrations des décors : fonds embarqués (« Fonds
+  embarqués » : sources par FileDataID, fichiers dans `Media/Backgrounds`), puis en repli les candidats
+  du client (`Art.illustrations`, voir « Diagnostic des paysages »). Le MCP confirme la liste de fichiers **retail 12.1.5**, pas l'installation Forever (il ne
   trouve aucune installation ici).
 - **Sons** : noms `SOUNDKIT` employés tels quels par l'interface Blizzard 12.1.5 (`wow_ui_grep`) :
   `IG_ABILITY_PAGE_TURN`, `IG_MAINMENU_OPTION_CHECKBOX_ON`, `IG_SPELLBOOK_OPEN/CLOSE`,
@@ -548,9 +594,11 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 
 ### Non vérifié (à voir en jeu)
 
-- Quels **candidats de décor** existent dans Forever : seul l'essai manuel le dit (`/slay decor essai`).
-  L'**allure** des illustrations validées : `crop` par candidat (`Art.illustrations`), `shift` et `tint`
-  par décor (`Art.scenes`), à corriger après essai ; repli immédiat : `/slay decor peint`.
+- Les **fonds embarqués** en jeu : chargement des TGA 1024 × 512 (même format que les autres TGA de
+  `Media/`, qui s'affichent), netteté de la bande étirée, cadrage (`focus`), teinte (`tint`) et voile du
+  bas derrière les vrais modèles ; à corriger dans `Art.scenes` ; repli immédiat : `/slay decor peint`.
+  Le rendu hors jeu dessine les dégradés (voile du bas, fondu vers le plateau) en aplat : en jeu ce sont
+  des dégradés. Quels candidats du client existent dans Forever : seul l'essai manuel le dit (facultatif).
 - Les **survols** : fluidité, absence de clignotement, passage au premier plan (le visuel `face` et ses
   enfants sont re-nivelés explicitement par `W.setLevel`), zone prolongée vers le haut de la carte
   levée, molette sur les cartes du panneau.
@@ -637,8 +685,10 @@ récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibe
 rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
 et `/slay art` ; modèles (essais créature puis affichages, médaillon de repli, relance tardive,
 `OnModelLoaded`, lignes de `/slay modeles`) ; noms des ennemis (1 à 6 ennemis × échelles 0,6 / 1 / 1,5 :
-visibles, dans le contenu, au-dessus du plateau, au-dessus du modèle et de la jauge, rien par-dessus) ; décors (peints par défaut, essai : suivant, précédent, ok, non, peint, illustre ; premier
-validé de chaque liste ; verdicts relus au rechargement ; rapport) ; survols (zone fixe, valeur
+visibles, dans le contenu, au-dessus du plateau, au-dessus du modèle et de la jauge, rien par-dessus) ; décors (fond embarqué par défaut pour chaque scène,
+TGA présent sur disque en 32 bits et puissances de deux, bande au format du décor, teinte ; essai : suivant,
+précédent, ok, non, peint, illustre ; repli sur le premier validé d'une liste sans fond embarqué ; verdicts
+relus au rechargement ; rapport avec les fonds embarqués) ; survols (zone fixe, valeur
 intermédiaire, sortie réversible depuis la valeur courante, état final par les minuteurs, pilote coupé
 au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap,
 clic dehors, Fermer, pioche triée et ordre réel intact, défausse, consumées, deck en combat, touches
@@ -694,12 +744,11 @@ En tout premier (peau « Mechanized Magic ») :
    tas du deck).
 
 Ensuite (retours du premier essai) :
-1. **Essai des décors** (accueil) : `/slay decor essai`, puis pour chacun des 8 candidats `ok` (image) ou
-   `non` (aplat vert, noir ou vide) et `suivant` ; `peint` pour finir. Recopier ensuite `/slay art`
-   (décor par décor : `peint` ou candidat validé ; listes des validés et refusés).
-2. **Paysages** : sur la route, le feu de camp, le marchand et le boss, l'illustration validée a-t-elle du
-   sens derrière les personnages (sans logo ni texte, bien cadrée) ? Sinon dire lequel et ce qui cloche
-   (trop haut / trop bas / logo) ; `/slay decor peint` revient au décor peint.
+1. **Fonds embarqués** (rien à faire : relancer le client, nouveaux fichiers) : l'accueil montre-t-il la
+   forêt d'Elwynn peinte (pas d'aplat vert ni noir) ? Recopier `/slay art` (fonds embarqués et scènes).
+2. **Paysages** : sur la route, la ferme, le feu de camp, le marchand, la côte et le boss, l'illustration
+   a-t-elle du sens derrière les personnages (bien cadrée, personnages lisibles) ? Sinon dire laquelle et
+   ce qui cloche (trop haut / trop bas / trop clair) ; `/slay decor peint` revient au décor peint.
 3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se lève et grossit en
    ~0,1 s **sans que le nom, le coût ni le texte tressautent ou changent de coupure**, **d'un seul bloc**
    (ruban, languette de coût, plaque du bas et halo grossissent avec le corps, pendant le mouvement comme
@@ -729,4 +778,4 @@ ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel
 (recopier ses lignes du chat), `/slay facing`.
 
 À me renvoyer : la sortie de `/slay art`, une capture du combat avec une carte survolée, du panneau de
-la pioche, du bandeau, de chaque décor illustré validé, et toute erreur Lua (texte complet).
+la pioche, du bandeau, de chaque décor illustré, et toute erreur Lua (texte complet).

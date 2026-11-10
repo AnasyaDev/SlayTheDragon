@@ -67,11 +67,33 @@ Art.tex = {
   check = 136814,       -- interface/raidframe/readycheck-ready
 }
 
--- Illustrations (écrans de chargement recadrés) : pour chacune, une liste ORDONNÉE de candidats.
--- Aucun test fiable ne dit, sur ce client, si un fichier existe : un fichier absent est dessiné en
--- aplat vert, et SetTexture / GetTextureFileID / IsObjectLoaded le disent pourtant présent. Le décor
--- peint est donc la règle : UI/Scene.lua n'affiche que le premier candidat de la liste VALIDÉ par le
--- joueur (`/slay decor essai`, puis `ok` / `non` ; verdicts dans options.artChecks).
+-- Fonds embarqués (Media/Backgrounds/*.tga, fabriqués par tools/build_backgrounds.py) : illustrations
+-- de Blizzard extraites du jeu (écrans de chargement, FileDataID `source`), recadrées sans logo ni cadre
+-- et étirées sur une texture 1024 × 512. `ratio` = rapport largeur / hauteur réel de la zone gardée
+-- (affiché par le script) : UI/Scene.lua en montre une bande au format du décor (≈ 2,72:1), placée en
+-- hauteur par le `focus` de la scène. Un fichier de l'addon existe forcément : affichés sans validation.
+-- À RÉÉVALUER avant toute publication de l'addon (droits de Blizzard).
+local BG = "Interface\\AddOns\\SlayTheDragon\\Media\\Backgrounds\\"
+Art.backgrounds = {
+  elwynn = { file = BG .. "elwynn.tga", embedded = true, key = "elwynn", ratio = 2.019, source = 7377860,
+    name = "Forêt d'Elwynn (logement, Midnight)" },
+  farm = { file = BG .. "farm.tga", embedded = true, key = "farm", ratio = 2.241, source = 407226,
+    name = "Pics-Jumeaux (ferme et chemin)" },
+  deadmines = { file = BG .. "deadmines.tga", embedded = true, key = "deadmines", ratio = 2.359, source = 131833,
+    name = "Mortemines (écran classique)" },
+  ruins = { file = BG .. "ruins.tga", embedded = true, key = "ruins", ratio = 2.629, source = 7963782,
+    name = "Ruines de Lordaeron (écran Forever)" },
+  coast = { file = BG .. "coast.tga", embedded = true, key = "coast", ratio = 2.221, source = 427941,
+    name = "Gilnéas (phare et côte)" },
+}
+local B = Art.backgrounds
+
+-- Illustrations : pour chacune, une liste ORDONNÉE de candidats ; le fond embarqué est en tête et
+-- s'affiche toujours. Repli (plus nécessaire) : les candidats par FileDataID ou chemin du client.
+-- Aucun test fiable ne dit, sur ce client, si un tel fichier existe : un fichier absent est dessiné en
+-- aplat vert, et SetTexture / GetTextureFileID / IsObjectLoaded le disent pourtant présent. Ils ne
+-- s'affichent donc que VALIDÉS par le joueur (`/slay decor essai`, puis `ok` / `non` ; verdicts dans
+-- options.artChecks), et seulement si le fond embarqué manquait à la liste.
 -- `file` = FileDataID ou chemin ; `name` = nom annoncé pendant l'essai ; `crop` = { gauche, droite,
 -- haut, bas } en fraction de l'image, pour la bande 1034 × 380 (≈ 2,7:1) : ≈ 0,65 de la hauteur pour
 -- une image 16:9, ≈ 0,5 pour une image 4:3 (cadrages à confirmer en jeu). Une entrée chaîne renvoie à
@@ -83,6 +105,7 @@ Art.tex = {
 --   * 131833, 131839 (Mortemines, royaumes de l'Est) : écrans de la version classique.
 Art.illustrations = {
   elwynn = {
+    B.elwynn,
     { file = 7377860, crop = { 0, 1, 0.16, 0.86 }, name = "Logement d'Elwynn (Midnight)" },
     { file = 7963776, crop = { 0, 1, 0.18, 0.83 }, name = "Royaumes de l'Est (écran Forever)" },
     { file = 131839, crop = { 0, 1, 0.14, 0.64 }, name = "Royaumes de l'Est (écran classique)" },
@@ -90,32 +113,36 @@ Art.illustrations = {
       name = "Royaumes de l'Est (écran classique, par chemin)" },
   },
   deadmines = {
+    B.deadmines,
     { file = 131833, crop = { 0, 1, 0.22, 0.72 }, name = "Mortemines (écran classique)" },
     { file = "Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines", crop = { 0, 1, 0.22, 0.72 },
       name = "Mortemines (écran classique, par chemin)" },
     { file = 7963777, crop = { 0, 1, 0.18, 0.83 }, name = "Excavation (écran Forever)" },
   },
   ruins = {
+    B.ruins,
     { file = 7963782, crop = { 0, 1, 0.18, 0.83 }, name = "Ruines de Lordaeron (écran Forever)" },
     "elwynn",
   },
+  farm = { B.farm, "elwynn" },
+  coast = { B.coast },
 }
 
--- Décors : `art` = illustration (ci-dessus) posée sur la bande du haut, décalée verticalement de
--- `shift` (fraction) et teintée par `tint` ; `paint` = décor peint en couches unies aux couleurs des
--- maquettes, toujours dessiné dessous (seul visible tant qu'aucun candidat n'est validé). Point
--- d'extension : ajouter une entrée ici (et `scene = "<clé>"` dans une rencontre) suffit ;
--- `/slay decor` bascule illustration validée / peint.
+-- Décors : `art` = illustration (ci-dessus) posée sur la bande du haut, teintée par `tint` ; fond
+-- embarqué cadré par `focus` (hauteur de la bande montrée : 0 = haut de l'image, 1 = bas), candidat du
+-- client décalé verticalement de `shift` (fraction) ; `paint` = décor peint en couches unies aux
+-- couleurs des maquettes, toujours dessiné dessous (repli). Point d'extension : ajouter une entrée ici
+-- (et `scene = "<clé>"` dans une rencontre) suffit ; `/slay decor` bascule illustré / peint.
 Art.scenes = {
-  road = { art = "elwynn", tint = { 1, 0.93, 0.78 }, paint = "fields" },          -- route et combats
-  farm = { art = "elwynn", shift = -0.04, tint = { 1, 0.95, 0.82 }, paint = "farm" },
-  mine = { art = "deadmines", tint = { 0.95, 0.85, 0.75 }, paint = "cave" },        -- boss
-  night = { art = "elwynn", tint = { 0.32, 0.34, 0.55 }, paint = "night" },       -- feu de camp
-  hill = { art = "elwynn", shift = -0.1, tint = { 1, 0.93, 0.8 }, paint = "fields" }, -- Colline des sentinelles
-  camp = { art = "elwynn", shift = 0.04, tint = { 0.95, 0.85, 0.7 }, paint = "fields" },
-  ruins = { art = "ruins", shift = 0.04, tint = { 0.8, 0.75, 0.7 }, paint = "cave" },
-  coast = { paint = "coast" }, -- côte de la Marche : peinte (aucune illustration de côte confirmée)
-  shop = { art = "elwynn", shift = 0.04, tint = { 1, 0.9, 0.75 }, paint = "fields" },
+  road = { art = "elwynn", focus = 0.62, tint = { 1, 0.96, 0.88 }, paint = "fields" },   -- route et combats
+  farm = { art = "farm", focus = 0.55, shift = -0.04, tint = { 1, 0.95, 0.82 }, paint = "farm" },
+  mine = { art = "deadmines", focus = 0.5, tint = { 0.9, 0.9, 0.86 }, paint = "cave" },    -- boss
+  night = { art = "elwynn", focus = 0.55, tint = { 0.32, 0.34, 0.55 }, paint = "night" }, -- feu de camp
+  hill = { art = "elwynn", focus = 0.15, shift = -0.1, tint = { 1, 0.95, 0.85 }, paint = "fields" }, -- Colline
+  camp = { art = "elwynn", focus = 0.9, shift = 0.04, tint = { 0.95, 0.87, 0.74 }, paint = "fields" },
+  ruins = { art = "ruins", focus = 0.5, shift = 0.04, tint = { 0.85, 0.82, 0.78 }, paint = "cave" },
+  coast = { art = "coast", focus = 0.45, tint = { 1, 0.97, 0.9 }, paint = "coast" }, -- côte de la Marche
+  shop = { art = "elwynn", focus = 0.78, shift = 0.04, tint = { 1, 0.92, 0.8 }, paint = "fields" },
 }
 Art.defaultScene = "road"
 

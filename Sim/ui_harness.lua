@@ -1478,41 +1478,95 @@ local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
 check("/slay art liste l'icône et le modèle manquants", said:find("card:smite", 1, true) and said:find("model:gnoll", 1, true), said)
 H.badSpells, H.badPaths, H.badFiles, H.badCreatures, H.badDisplays = nil, {}, nil, {}, nil
 
-print("U17 décors : peint par défaut, essai manuel (suivant, ok, non, peint), verdicts gardés")
+print("U17 décors : fonds embarqués par défaut (TGA sur disque), essai manuel en repli, verdicts gardés")
 do
   local function chat() return table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n") end
   local function clearChat() _G.DEFAULT_CHAT_FRAME._lines = {} end
-  -- Même quand tous les fichiers « répondent » (SetTexture, FileID, chargement), rien n'est affiché
-  -- sans validation : sur Forever un fichier absent répond pareil et s'affiche en aplat vert.
+  local function u16(s, i) return s:byte(i) + 256 * s:byte(i + 1) end
+  local function pow2(n) return n > 0 and math.floor(math.log(n) / math.log(2) + 0.5) == math.log(n) / math.log(2) end
+  local BG = "Interface\\AddOns\\SlayTheDragon\\Media\\Backgrounds\\"
+  -- Même quand tous les fichiers du client « répondent » (SetTexture, FileID, chargement), aucun
+  -- candidat du client n'est affiché sans validation : sur Forever un fichier absent répond pareil et
+  -- s'affiche en aplat vert. Les fonds embarqués, eux, sont des fichiers de l'addon.
   H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
   H.boot(nil)
   H.slash("")
   local Sc = H.ns.Scene
+  local Art = H.ns.Art
   local fields = Sc.paints.fields[1]
+  local target = Sc.W / Sc.DECOR_H
   check("accueil : décor de la route", Sc.scene == "road" and Sc.decor._shown)
-  check("par défaut : décor peint, aucune illustration", not Sc.art._shown and fields._shown
-    and H.ns.Persist.options().decor == true)
-  for id, entry in pairs(H.ns.Art.scenes) do
-    if Sc.chosen(entry) ~= nil then check("décor " .. id .. " : rien de choisi par défaut", false) end
-  end
+  check("par défaut : fond embarqué d'Elwynn, décor peint dessous, voile du bas", Sc.art._shown
+    and Sc.art._texture == Art.backgrounds.elwynn.file and fields._shown and Sc.ground._shown
+    and H.ns.Persist.options().decor == true, Sc.art._texture)
   check("plus aucune sonde automatique", Sc.illus == nil and Sc.resolveAll == nil and Sc.probeFrame == nil)
+
+  -- Chaque scène : un fond embarqué, en tête de sa liste, fichier TGA présent et conforme, affiché par
+  -- défaut au bon format (bande ≈ 2,72:1 dans la zone de rapport `ratio`), teinte de la scène.
+  local ids = {}
+  for id in pairs(Art.scenes) do ids[#ids + 1] = id end
+  table.sort(ids)
+  local used = {}
+  for _, id in ipairs(ids) do
+    local entry = Art.scenes[id]
+    local bg = Sc.embedded(entry)
+    local list = entry.art and Sc.candidates(entry.art) or {}
+    check("décor " .. id .. " : fond embarqué en tête de sa liste", bg ~= nil and list[1] == bg
+      and type(bg.file) == "string" and bg.file:sub(1, #BG) == BG and bg.file:sub(-4) == ".tga"
+      and Art.backgrounds[bg.key] == bg and type(bg.ratio) == "number" and type(bg.source) == "number",
+      bg and bg.file)
+    if bg then
+      used[bg.key] = true
+      local f = io.open(root .. "/Media/Backgrounds/" .. bg.file:sub(#BG + 1), "rb")
+      local hdr = f and f:read(18)
+      local size = f and f:seek("end")
+      if f then f:close() end
+      local w, h = hdr and u16(hdr, 13), hdr and u16(hdr, 15)
+      check("décor " .. id .. " : " .. bg.key .. ".tga sur disque, 32 bits non compressé, puissances de deux",
+        hdr and #hdr == 18 and hdr:byte(3) == 2 and hdr:byte(17) == 32 and hdr:byte(18) == 8
+        and pow2(w) and pow2(h) and size == 18 + w * h * 4, hdr and (w .. "×" .. h) or "absent")
+      check("décor " .. id .. " : choisi sans validation", Sc.chosen(entry) == bg)
+      Sc.set({ scene = id, board = true })
+      local tc = Sc.art._calls.SetTexCoord
+      local shownRatio = tc and bg.ratio * (tc[2] - tc[1]) / (tc[4] - tc[3])
+      check("décor " .. id .. " : affiché, bande au format du décor", Sc.art._shown and Sc.art._texture == bg.file
+        and tc[1] >= 0 and tc[2] <= 1 and tc[3] >= -1e-9 and tc[4] <= 1 + 1e-9
+        and math.abs(shownRatio - target) < 1e-6, tc and table.concat(tc, " "))
+      local t = entry.tint or { 1, 1, 1 }
+      local vc = Sc.art._calls.SetVertexColor
+      check("décor " .. id .. " : teinte de la scène", math.abs(vc[1] - t[1]) < 1e-9 and math.abs(vc[3] - t[3]) < 1e-9)
+    end
+  end
+  for key in pairs(Art.backgrounds) do
+    check("fond " .. key .. " employé par au moins une scène", used[key])
+  end
+  local fCamp = { Sc.bandCoords(Art.backgrounds.elwynn, Art.scenes.camp.focus) }
+  local fHill = { Sc.bandCoords(Art.backgrounds.elwynn, Art.scenes.hill.focus) }
+  check("même image, cadrages différents (colline plus haut que le camp)", fHill[3] < fCamp[3])
+  Sc.set({ scene = "road", board = true, veil = 0.2 })
+
   clearChat()
   H.slash("art")
   local said = chat()
-  check("/slay art : décors peints par défaut", said:find("road : peint (aucun des 4 candidats validé)", 1, true)
-    and said:find("mine : peint (aucun des 3 candidats validé)", 1, true)
-    and said:find("coast : peint (pas d'illustration)", 1, true), said)
+  check("/slay art : liste des fonds embarqués et de leurs scènes", said:find("fonds embarqués (Media\\Backgrounds) : 5", 1, true)
+    and said:find("elwynn.tga — " .. Art.backgrounds.elwynn.name .. " (FileDataID 7377860) : camp, hill, night, road, shop", 1, true)
+    and said:find("deadmines.tga — ", 1, true) and said:find(") : mine", 1, true)
+    and said:find("coast.tga — ", 1, true), said)
+  check("/slay art : chaque décor dit son fond", said:find("road : fond embarqué elwynn — ", 1, true)
+    and said:find("mine : fond embarqué deadmines — ", 1, true)
+    and said:find("coast : fond embarqué coast — ", 1, true), said)
   check("/slay art : aucun verdict", said:find("validés : aucun", 1, true) and said:find("refusés : aucun", 1, true)
     and said:find("pas encore jugés : 8 sur 8", 1, true), said)
 
-  -- Liste d'essai : toutes les illustrations, dédoublonnée (les ruines reprennent Elwynn).
+  -- Liste d'essai : les candidats du client seulement, dédoublonnée (les ruines reprennent Elwynn).
   local list = Sc.trialList()
-  local keys, dup = {}, false
+  local keys, dup, emb = {}, false, false
   for _, c in ipairs(list) do
     if keys[tostring(c.file)] then dup = true end
+    if c.embedded then emb = true end
     keys[tostring(c.file)] = true
   end
-  check("liste d'essai : 8 candidats sans doublon", #list == 8 and not dup, #list)
+  check("liste d'essai : 8 candidats du client, sans doublon ni fond embarqué", #list == 8 and not dup and not emb, #list)
   check("liste d'essai : écrans classiques et Forever", keys["131839"] and keys["131833"] and keys["7963776"]
     and keys["7963777"] and keys["7963782"] and keys["7377860"])
 
@@ -1522,7 +1576,7 @@ do
   check("essai : candidat 1 affiché sur le décor courant", Sc.trial == 1 and Sc.art._shown
     and Sc.art._texture == list[1].file, Sc.art._texture)
   check("essai : sans teinte ni voile", Sc.art._calls.SetVertexColor[1] == 1 and Sc.art._calls.SetVertexColor[3] == 1
-    and Sc.veil._calls.SetColorTexture[4] == 0)
+    and Sc.veil._calls.SetColorTexture[4] == 0 and not Sc.ground._shown)
   check("essai : numéro, fichier, nom et mode d'emploi", said:find("essai du décor 1/8 : " .. tostring(list[1].file)
     .. " — " .. list[1].name .. " [pas encore jugé]", 1, true) and said:find("/slay decor ok", 1, true), said)
   clearChat()
@@ -1535,10 +1589,15 @@ do
   H.slash("decor suivant")
   check("suivant depuis le dernier : retour au 1er", Sc.trial == 1)
 
-  -- Verdicts : le 1er refusé, puis on valide le premier candidat de la liste d'Elwynn qui n'est pas
-  -- le 1er de la liste d'essai, pour vérifier que chaque décor prend le premier validé de SA liste.
-  local elwynn = Sc.candidates("elwynn")
-  local deadmines = Sc.candidates("deadmines")
+  -- Verdicts : le 1er refusé, puis on valide le 3e candidat du client de la liste d'Elwynn, pour
+  -- vérifier qu'un décor sans fond embarqué prend le premier validé de SA liste.
+  local function clientOnly(key)
+    local out = {}
+    for _, c in ipairs(Sc.candidates(key)) do if not c.embedded then out[#out + 1] = c end end
+    return out
+  end
+  local elwynn = clientOnly("elwynn")
+  local deadmines = clientOnly("deadmines")
   clearChat()
   H.slash("decor non")
   check("non : refusé et dit", H.ns.Persist.options().artChecks[tostring(list[1].file)] == false
@@ -1566,19 +1625,26 @@ do
   clearChat()
   H.slash("decor peint")
   check("peint : fin de l'essai, décor peint", Sc.trial == nil and not Sc.art._shown and fields._shown
-    and H.ns.Persist.options().decor == false, chat())
+    and not Sc.ground._shown and H.ns.Persist.options().decor == false, chat())
   H.slash("decor illustre")
-  check("illustre : la route montre le premier validé de sa liste", H.ns.Persist.options().decor == true
-    and Sc.art._shown and Sc.art._texture == elwynn[3].file)
-  check("recadrage et teinte du décor", math.abs(Sc.art._calls.SetTexCoord[3] - elwynn[3].crop[3]) < 1e-9
-    and math.abs(Sc.art._calls.SetVertexColor[2] - H.ns.Art.scenes.road.tint[2]) < 1e-9)
+  check("illustre : la route montre son fond embarqué, même avec des candidats validés",
+    H.ns.Persist.options().decor == true and Sc.art._shown and Sc.art._texture == Art.backgrounds.elwynn.file
+    and Sc.ground._shown)
   check("voile de l'accueil rétabli", math.abs(Sc.veil._calls.SetColorTexture[4] - 0.2) < 1e-9)
   Sc.set({ scene = "mine", board = true })
-  check("boss : premier validé de la liste des Mortemines", Sc.art._shown and Sc.art._texture == deadmines[3].file)
-  Sc.set({ scene = "ruins", board = true })
-  check("ruines : la liste d'Elwynn sert de suite", Sc.art._texture == elwynn[3].file)
+  check("boss : fond embarqué des Mortemines", Sc.art._shown and Sc.art._texture == Art.backgrounds.deadmines.file)
   Sc.set({ scene = "coast", board = true })
-  check("côte : toujours peinte", not Sc.art._shown and Sc.paints.coast[1]._shown)
+  check("côte : fond embarqué de la côte", Sc.art._shown and Sc.art._texture == Art.backgrounds.coast.file)
+  -- Repli : sans fond embarqué dans la liste, le premier candidat validé (recadré, décalé, teinté).
+  local saved = Art.illustrations.elwynn
+  local stripped = {}
+  for _, c in ipairs(saved) do if type(c) ~= "table" or not c.embedded then stripped[#stripped + 1] = c end end
+  Art.illustrations.elwynn = stripped
+  Sc.set({ scene = "road", board = true })
+  check("repli : la route montre le premier validé de sa liste", Sc.art._shown and Sc.art._texture == elwynn[3].file
+    and math.abs(Sc.art._calls.SetTexCoord[3] - elwynn[3].crop[3]) < 1e-9
+    and math.abs(Sc.art._calls.SetVertexColor[2] - Art.scenes.road.tint[2]) < 1e-9)
+  Art.illustrations.elwynn = saved
   Sc.set({ scene = "road", board = true, veil = 0.2 })
   H.slash("decor")
   check("/slay decor seul : bascule vers peint", H.ns.Persist.options().decor == false and not Sc.art._shown)
@@ -1586,7 +1652,7 @@ do
   check("/slay decor seul : bascule vers illustré", H.ns.Persist.options().decor == true and Sc.art._shown)
   H.slash("decor essai")
   H.slash("decor essai")
-  check("essai deux fois : bascule (essai fermé)", Sc.trial == nil and Sc.art._texture == elwynn[3].file)
+  check("essai deux fois : bascule (essai fermé)", Sc.trial == nil and Sc.art._texture == Art.backgrounds.elwynn.file)
   clearChat()
   H.slash("decor ok")
   check("ok hors essai : rien, message", chat():find("aucun essai en cours", 1, true), chat())
@@ -1594,8 +1660,6 @@ do
   clearChat()
   H.slash("art")
   said = chat()
-  check("/slay art : candidat validé par décor", said:find("road : " .. tostring(elwynn[3].file) .. " — "
-    .. elwynn[3].name, 1, true) and said:find("mine : " .. tostring(deadmines[3].file), 1, true), said)
   check("/slay art : validés et refusés", said:find("validés : " .. tostring(deadmines[3].file) .. " (", 1, true)
     and said:find(tostring(elwynn[4].file) .. " (", 1, true)
     and said:find("refusés : " .. tostring(deadmines[1].file) .. " (", 1, true)
@@ -1603,16 +1667,16 @@ do
     and said:find("pas encore jugés : 3 sur 8", 1, true), said)
 
   -- Persistance : verdicts relus au rechargement, essai non repris.
-  local saved = deepcopy(_G.SlayTheDragonDB)
-  local okData = plainData(saved, nil, "SlayTheDragonDB")
+  local savedDB = deepcopy(_G.SlayTheDragonDB)
+  local okData = plainData(savedDB, nil, "SlayTheDragonDB")
   check("verdicts : données simples dans la sauvegarde", okData)
-  H.boot(saved)
+  H.boot(savedDB)
   H.slash("")
   Sc = H.ns.Scene
   check("rechargement : verdicts gardés", H.ns.Persist.options().artChecks[tostring(elwynn[3].file)] == true
     and H.ns.Persist.options().artChecks[tostring(elwynn[1].file)] == false)
-  check("rechargement : la route montre le validé, pas d'essai", Sc.trial == nil and Sc.art._shown
-    and Sc.art._texture == elwynn[3].file)
+  check("rechargement : la route montre son fond embarqué, pas d'essai", Sc.trial == nil and Sc.art._shown
+    and Sc.art._texture == H.ns.Art.backgrounds.elwynn.file)
   -- Écran sans décor (parcours) : l'essai prévient où le voir.
   clickOption("go")
   check("parcours : pas de décor", Sc.scene == false)
@@ -1622,6 +1686,7 @@ do
     and chat():find("essai du décor", 1, true), chat())
   check("essai : départ au premier candidat pas encore jugé", Sc.trial and Sc.verdict(list[Sc.trial]) == nil)
   H.slash("decor peint")
+  H.slash("decor illustre")
   H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
 end
 
