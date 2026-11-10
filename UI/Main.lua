@@ -563,6 +563,12 @@ function UI.onShow()
   setKeyboard(true)
   W.sound("open")
   UI.refresh()
+  -- police d'addon chargée après coup : textes reposés (sinon certains restent vides jusqu'au survol)
+  W.delay(0.1, function() if UI.isShown() then W.refreshFonts() end end)
+  if not UI.fontsRefreshed then
+    UI.fontsRefreshed = true
+    W.delay(1, function() if UI.isShown() then W.refreshFonts() end end)
+  end
 end
 
 function UI.onHide()
@@ -863,11 +869,14 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "decor" or msg:match("^decor%s") or msg == "décor" or msg:match("^décor%s") then
     decorCommand(msg:match("^d%S+%s*(.*)$") or "")
   elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
-  elseif msg == "ruban" then
-    -- nom des cartes incliné comme le ruban (rotation des textes) ou ruban redressé, nom horizontal
-    opts().flatRibbon = not opts().flatRibbon or nil
-    say("nom des cartes : " .. (opts().flatRibbon and "ruban redressé, texte horizontal" or "ruban incliné, texte tourné") .. ".")
-    if UI.frame and UI.frame:IsShown() then UI.refresh() end
+  elseif msg == "zoom" or msg:match("^zoom%s") then
+    -- technique d'agrandissement au survol (voir W.faceApply) : animation Scale (défaut) ou échelle
+    -- réelle à chaque image, police non arrondie
+    local want = msg:match("^zoom%s+(%S+)")
+    local mode = (want == "anim" or want == "lisse") and want or (W.zoomMode() == "anim" and "lisse" or "anim")
+    W.setZoomMode(mode)
+    say("zoom au survol : " .. (mode == "anim" and "anim (animation Scale, textes figés)"
+      or "lisse (échelle à chaque image, police non arrondie)") .. ".")
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
@@ -880,6 +889,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
-      .. "/slay decor [essai] ; /slay ruban ; /slay facing <j> <e> ; /slay centre")
+      .. "/slay decor [essai] ; /slay zoom [anim|lisse] ; /slay facing <j> <e> ; /slay centre")
   end
 end

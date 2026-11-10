@@ -39,13 +39,15 @@ build/venv/bin/python tools/build_media.py   # options : --psd, --icons, --font
   script et l'interface garde l'icône du jeu.
 - **Sorties** : `Media/*.tga`, `Media/Icons/*.tga`, `Media/Fonts/*.ttf`, `UI/SkinData.lua` (fichier GÉNÉRÉ :
   nom → fichier, toile, zone utile, coordonnées de texture, coin et liseré des neuf tranches, géométrie
-  de la carte en fractions de la largeur du corps, angle du nom), aperçus PNG dans `build/media_png`.
+  de la carte en fractions de la largeur du corps, centre et longueur utile du nom), aperçus PNG dans
+  `build/media_png` ; `Sim/baloo_metrics.lua` (GÉNÉRÉ : avances des glyphes des trois graisses et hauteur
+  de ligne, pour le faux client du harnais).
 
 **Format** : TGA 32 bits non compressé, origine en bas à gauche, 8 bits d'alpha (le format des icônes
 améliorées et des addons ; BLP impossible à produire ici), toiles en puissances de deux (requis pour la
 répétition des matières), couleur des pixels transparents « saignée » depuis les voisins (pas de liseré
 sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une carte de 124 unités vaut
-~232 px à 1440p, ~320 px agrandie ×1,37 : nette au survol), ruban 512 × 169, panneau 256 × 185, coût
+~232 px à 1440p, ~320 px agrandie ×1,37 : nette au survol), ruban 512 × 166, panneau 256 × 185, coût
 256 × 124, anneau 243 × 256 (et 61 × 64 pour les jetons), hexagones 128 (mana 256), gemmes 64, matières
 256 (répétées tous les 128 unités pour l'ardoise, 420 pour l'ivoire). `Media/` = 13,8 Mo (textures
 8,4 Mo dont 4 Mo pour les quatre corps, icônes 5,2 Mo, polices 0,15 Mo).
@@ -58,20 +60,23 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   `SetGlow`), `W.goldPill`, `W.hex` / `W.setHex`, `W.medallion`, `W.tokenRow` (jetons d'état),
   `W.cardBack`, `W.panel` (ardoise ou ivoire). Polices : `W.label(parent, "body" | "bold" | "heavy", …)`,
   blanc à ombre portée par défaut, repli Friz Quadrata si la police ne se charge pas ; préchargement des
-  trois polices au chargement.
+  trois polices au chargement (cadre à l'écran, presque transparent) et `W.refreshFonts` à l'ouverture
+  (police et texte reposés partout, voir « Texte des cartes et zoom »).
 - **Carte** (`W.card`) : halo, plaque du bas (mots-clés : Pouvoir, Incantation, Recharge N, Consumée,
   Conservée), corps à la couleur de la carte (`Art.cardBody` : violet = Ombre, bleu = protection
   — Absorption ou Suppression d'abord —, or = cartes de départ, ivoire = le reste), médaillon (anneau,
-  icône masquée par l'ouverture exacte du PSD, verre), panneau de texte (centré, taille selon la
-  longueur, chiffres blancs — verts s'ils changent à l'amélioration ; une chaîne WoW ne mêle pas deux
+  icône masquée par l'ouverture exacte du PSD, verre), panneau de texte (centré dans la zone utile,
+  taille par paliers, chiffres blancs — verts s'ils changent à l'amélioration ; une chaîne WoW ne mêle pas deux
   graisses, d'où la couleur au lieu du gras), languette de coût, ruban du nom, gemme de rareté (aucune =
   base ou commune, triangle vert, losange bleu, pentagone violet, carré orange). Injouable : pièces
   désaturées et assombries, raison dans une plaque rouge au bas de la carte. Prix : pastille (pièce +
   nombre, rouge si trop cher) sous la carte.
-- **Nom incliné** : le ruban du PSD penche de 9,2° (mesuré par le script sur la bande du ruban) ; le nom
-  suit par `FontString:SetRotation` (documentée pour Forever, `wow_api_search`). Non vérifiable hors
-  jeu : `/slay ruban` bascule sur le **ruban redressé** (exporté aussi) et un nom horizontal. Le nom
-  n'est pas courbé en jeu (accepté).
+- **Ruban horizontal** : redessiné à plat dans le PSD par le joueur (calque 246) ; une seule pièce
+  `card_ribbon`, nom horizontal (plus de `SetRotation`, plus de ruban « redressé » ni de `/slay ruban` ;
+  l'ancienne option `flatRibbon` d'une sauvegarde est effacée sans erreur). Le script place le nom à
+  l'aplomb du centre du corps, à la hauteur du calque de texte « Name » (280), et mesure sa longueur
+  utile : la largeur, symétrique autour du centre, où la bande couvre toute la hauteur de ce calque
+  (0,735 de la largeur du corps).
 
 ### Écrans (d'après les planches)
 
@@ -110,11 +115,54 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
 - Valeurs en évidence par la couleur (blanc, vert à l'amélioration) et non en gras (une chaîne de texte
   WoW n'a qu'une police).
 
+## Texte des cartes et zoom (retours du deuxième essai)
+
+- **Zone utile du texte** (`W.CARD_TEXT`, `UI/Widgets.lua`) : intérieur sombre du panneau d'ardoise
+  (mesuré sur `Media/card_panel.tga`) moins les marges : 5,5 unités sur les côtés (de 124), 5 unités au
+  bas, et sous la plus grande gemme de rareté en haut ; le bas biseauté rétrécit la zone (demi-largeur
+  0,308 − 0,56 × (y − 1,0754), marge ×1,15 en biais). Les lignes sont posées une à une : remplissage
+  glouton, chaque ligne limitée à la largeur de la zone à son bas, bloc centré verticalement ; puis le
+  texte est posé avec des retours explicites et une largeur un peu plus grande que la plus longue ligne
+  possible (le client ne recoupe jamais autrement, ni à une autre échelle, ni pendant un zoom).
+  Mesures par le client : `GetStringWidth` / `GetStringHeight` d'un texte de mesure (même police), puis
+  vérification sur la carte (`GetNumLines`, `IsTruncated`, `GetStringHeight`) — un échec fait descendre
+  d'un palier. Mises en page gardées en cache (texte, taille, bas de zone).
+- **Paliers** : texte 8 / 7,5 / 7 (plancher lisible), secours 6,5 / 6 signalé (`card.bodyFit.under`) ;
+  nom 10 / 8,5 / 7, secours 6,5 / 6 (`card.nameFit`), une ligne dans la bande du ruban moins 4 unités de
+  chaque côté. Répartition (harnais U22, métriques de Baloo Chettan 2) : texte 8 → 55 cartes (base et
+  améliorées comptées à part, 68 en tout), 7,5 → 5, 7 → 6, sous le plancher : Esprit de rédemption (et +)
+  à 6 ; nom 10 → 42, 8,5 → 10, 7 → 12, sous le plancher (6,5) : Suppression de la douleur+, Mot de
+  pouvoir : Radiance+, Mot de pouvoir : Réconfort et Réconfort+. Textes à raccourcir côté `Data/`.
+- **Plaque de raison** (carte injouable) : descendue à cheval sur le bas du panneau (centre à 1,24 de la
+  largeur du corps), sous la zone du texte ; la zone remonterait si elle y mordait.
+- **Zoom sans tressautement** : avant, le survol changeait l'échelle réelle du visuel à chaque image ;
+  le client recalculait la taille de police effective (arrondie) et les retours à la ligne à chaque pas.
+  Désormais (mode `anim`, défaut) l'échelle passe par une animation `Scale` d'un `AnimationGroup` posé
+  sur le visuel `face` (transformation purement visuelle), et chaque texte de l'interface est en
+  `SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)` : sommets mis à l'échelle, mise en
+  page figée — la technique de `Blizzard_EncounterWarnings` (`scaleAnimationMode="Vertex"` sous une
+  animation Scale). L'échelle d'arrivée est tenue par un long délai de fin (`SetEndDelay`) : l'échelle
+  réelle reste 1, aucune mise en page à l'arrivée ; une cible qui change en route (souris qui ressort)
+  relance l'animation depuis l'échelle visuelle courante (`GetSmoothProgress`). La position (levée,
+  écart des voisines) reste pilotée par l'`OnUpdate` partagé ; la zone de survol ne bouge pas. Vaut pour
+  tout `W.hoverable` : main, récompense, marchand, grilles, plaques de réponse, boutons, objets.
+  Contrepartie : une fois agrandi, le texte est un rendu étiré (un peu moins net qu'un texte rendu à sa
+  taille). `/slay zoom` bascule sur `lisse` (échelle réelle à chaque image, comme avant, mais textes en
+  `SetSmoothScaling` : hauteur de police non arrondie, comme les barres d'info de Blizzard) ;
+  `/slay zoom anim` revient au défaut ; option persistée `zoom`.
+- **Textes vides jusqu'au survol** : une police d'addon chargée de façon asynchrone ne dessine rien pour
+  un texte posé avant son arrivée, jusqu'à la prochaine mise en page — que provoquait justement le
+  `SetScale` du survol. Le préchargement était sur un cadre transparent hors écran (sans doute jamais
+  dessiné, donc rien chargé) : il est maintenant à l'écran, presque transparent ; et à chaque ouverture
+  de la fenêtre (0,1 s après, et 1 s après la première), `W.refreshFonts` repose police et texte de tous
+  les textes créés par `W.label` / `W.text` puis refait la mise en page des cartes.
+
 ## Retours du premier essai (survols, deck, paysages, bandeau, vouvoiement)
 
 - **Survols animés partout** (`W.hoverable`, `UI/Widgets.lua`). Règle : le cadre qui reçoit la souris
   ne bouge jamais (zone de survol fixe, invisible) ; tout le visuel vit dans son enfant `face`, seul
-  animé (`SetScale` + `SetPoint` divisé par l'échelle + couleurs). Pas de clignotement entrée/sortie
+  animé (échelle par animation Scale, position par `SetPoint`, couleurs ; voir « Texte des cartes et
+  zoom »). Pas de clignotement entrée/sortie
   possible. Canaux animés `W.animTo(obj, clé, cible, durée)` : la valeur file vers sa cible en
   0,12 s (entrée) / 0,15 s (sortie), courbe amortie (cubique), et repart de sa valeur courante si la
   souris ressort en route (réversible). Un seul `OnUpdate` partagé (`W.driver`) pour ces canaux et pour
@@ -486,11 +534,14 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   sorts), l'orientation (`/slay facing`) et le cadrage des modèles dans leur cadre (pieds au sol ?).
 - La **peau** : chargement des TGA de `Media/` (aplat vert = fichier absent ou mal lu), des masques TGA
   (icônes rondes, carrées arrondies, ouverture du médaillon), de la police Baloo Chettan 2 (sinon Friz
-  Quadrata) ; netteté des cartes au survol ; matières répétées sans couture (`"REPEAT"`) ; rotation du
-  nom (`/slay ruban` sinon) ; rognage de la fenêtre (`SetClipsChildren`) sans effet de bord (la carte
+  Quadrata) ; netteté des cartes au survol ; matières répétées sans couture (`"REPEAT"`) ; rognage de la fenêtre (`SetClipsChildren`) sans effet de bord (la carte
   qu'on glisse hors de la fenêtre disparaît : voulu).
-- Le décalage d'un cadre mis à l'échelle (`SetScale` + `SetPoint` divisé par l'échelle) pour les visuels
-  survolés et les cartes de récompense : calculé, à confirmer à l'œil.
+- Le zoom des survols (animation Scale + textes Vertex, échelle tenue par le délai de fin) : fluidité,
+  textes immobiles pendant l'agrandissement, netteté une fois agrandi ; `/slay zoom` pour comparer avec
+  `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
+- La mise en page des textes de carte : mesurée par le client (`GetStringWidth`, `GetStringHeight`,
+  `GetNumLines`, `IsTruncated`) ; hors jeu, seules les métriques du faux client (Baloo Chettan 2, ligne
+  de 1,47 cadratin) la vérifient.
 
 Aucune fonction protégée, aucun `hooksecurefunc`, aucun hook de méthode de frame, aucune rotation de
 frame (seules des textures pivotent), aucun `loadstring`.
@@ -553,9 +604,17 @@ bloquées) ; **peau** (U20 : chaque texture de `SkinData` présente dans `Media/
 compressé à origine en bas, dimensions en puissances de deux identiques à `SkinData`, coordonnées de la
 zone utile cohérentes ; pièces attendues présentes ; icônes de `SkinData` présentes et toutes celles que
 nomme `Art.lua` copiées ; polices présentes ; carte composée : corps par couleur — ivoire, violet, bleu,
-or —, ruban, coût, panneau, icône améliorée masquée, gemme, plaque du bas, nom incliné, carte grisée et
-sa raison, amélioration en vert, `/slay ruban` ; repli sur l'icône du jeu quand le fichier manque ;
-bulle d'intention ; mana). Le faux client gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
+or —, ruban, coût, panneau, icône améliorée masquée, gemme, plaque du bas, nom horizontal, carte grisée
+et sa raison, amélioration en vert, `/slay ruban` retiré ; repli sur l'icône du jeu quand le fichier manque ;
+bulle d'intention ; mana) ; **textes des cartes** (U22 : les 34 cartes, de base et améliorées, jouables
+et injouables avec leur plaque de raison : chaque ligne posée, marges comprises, sur les pixels sombres
+de `Media/card_panel.tga` et hors de la gemme, au-dessus des plaques ; nom dans la bande opaque de
+`Media/card_ribbon.tga` ; aucune recoupe par le client ; répartition par palier et cartes sous le
+plancher affichées ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom (U18 :
+animation Scale, échelle réelle intacte, textes Vertex, aucune nouvelle mise en page, reprise depuis
+l'échelle visuelle courante, tenue à l'arrivée, `/slay zoom`). Le faux client mesure les textes avec les
+avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne de 1,47 cadratin (hhea),
+retours explicites puis par mots, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
@@ -563,8 +622,8 @@ faux client et écrit un SVG par écran (accueil, parcours, combat, combat-survo
 de camp, amélioration, rencontre, bibelot de classe, bilan, méta, panneau du deck, pioche en combat). Les
 textures de `Media/` y sont dessinées (aperçus PNG : coordonnées de texture, couleur de sommet,
 désaturation, masques approchés, rotation), les textes en Baloo Chettan 2 avec ombre et couleurs ; icônes
-du jeu = carrés bleus, modèles = silhouettes en pointillés, illustrations = aplats ; largeurs de texte
-estimées. Comparé aux planches (`combat_pack.jpg`…) pour cette peau ; il ne remplace pas un essai.
+du jeu = carrés bleus, modèles = silhouettes en pointillés, illustrations = aplats ; textes mesurés comme
+le faux client ; planche `cartes.svg` (textes longs, injouable, mot-clé, noms longs). Comparé aux planches (`combat_pack.jpg`…) pour cette peau ; il ne remplace pas un essai.
 
 ## Tests en vol (pour toi)
 
@@ -580,8 +639,9 @@ En tout premier (peau « Mechanized Magic ») :
 2. **Police** : Baloo Chettan 2 partout (lettres rondes, accents corrects) ; si tout est en Friz Quadrata,
    la police ne se charge pas.
 3. **Cartes** : nettes au repos et au survol (×1,16 en main, ×1,17 en récompense) ; icône ronde bien dans
-   l'anneau ; nom **incliné** le long du ruban et centré dessus — sinon `/slay ruban` (ruban redressé, nom
-   horizontal) et me dire lequel garder ; texte du panneau centré, chiffres blancs (verts une fois
+   l'anneau ; nom horizontal centré sur le ruban, jamais hors de la bande ; texte du panneau centré, avec
+   de l'air tout autour (côtés, haut sous la gemme, bas biseauté) même sur Forme d'ombre, Pénitence,
+   Esprit de rédemption, chiffres blancs (verts une fois
    améliorés) ; gemme verte / bleue sur les peu communes / rares ; « Recharge N », « Incantation »,
    « Consumée », « Pouvoir » dans la plaque sous la carte ; carte injouable grisée avec sa raison en rouge.
 4. **Plaques** : ardoise sans couture visible (bandeau, plateau, plaques de réponse, bulles d'intention,
@@ -598,7 +658,9 @@ Ensuite (retours du premier essai) :
    sens derrière les personnages (sans logo ni texte, bien cadrée) ? Sinon dire lequel et ce qui cloche
    (trop haut / trop bas / logo) ; `/slay decor peint` revient au décor peint.
 3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se lève et grossit en
-   ~0,1 s, les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
+   ~0,1 s **sans que le nom, le coût ni le texte tressautent ou changent de coupure** (comparer avec
+   `/slay zoom` → `lisse`, puis `/slay zoom anim` ; dire lequel garder et si le texte agrandi est assez
+   net), les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
    redescendre sans à-coup ; aucun clignotement en bord de carte ; on peut monter le curseur sur la
    partie levée sans la perdre. Idem : cartes de récompense / marchand / grilles, boutons (dont « Fin du
    tour », ≡, ×), butin au sol, couchage et grimoire, étapes du parcours, plaques de réponse, fioles et

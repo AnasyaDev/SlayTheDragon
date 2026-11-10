@@ -95,12 +95,13 @@ PSD = ARGS.psd
 INFO = json.loads(subprocess.run(["photocraft-cli", "info", "--compact", PSD], capture_output=True, text=True,
                                  check=True).stdout)
 PSD_W, PSD_H = INFO["width"], INFO["height"]
-PARENT, KIDS, VISIBLE, ALL = {}, {}, {}, []
+PARENT, KIDS, VISIBLE, ALL, LAYER = {}, {}, {}, [], {}
 
 
 def walk(node, parent):
     for c in node.get("layers") or node.get("children") or []:
         ALL.append(c["id"])
+        LAYER[c["id"]] = c
         PARENT[c["id"]] = parent
         VISIBLE[c["id"]] = bool(c.get("visible"))
         KIDS.setdefault(parent, []).append(c["id"])
@@ -111,7 +112,7 @@ walk(INFO, None)
 
 # Identifiants des calques (photocraft-cli info ; voir docs/maquette/gen_psd_cards.py)
 L = dict(back=226, color=229, ribbon=246, cost=244, panel=242, plate=224, ring=235, icon=237, glass=239,
-         stats=232, cardback=222, metal1=296)
+         stats=232, cardback=222, metal1=296, name=280)
 METALS = (296, 294, 292, 290, 288)
 GEMS = {"uncommon": 276, "rare": 274, "epic": 272, "legendary": 266}   # triangle vert, losange bleu, pentagone violet, carré orange
 
@@ -290,34 +291,25 @@ BX, BY, BW, BH = body_box
 
 im, box = piece("ribbon", [L["ribbon"]])
 emit("card_ribbon", im, box, maxw=512, canvas=(512, 256))
-# Axe du nom : milieu de la bande du ruban, mesuré colonne par colonne au centre du ruban.
+# Nom (ruban horizontal, redessiné dans le PSD) : centré à l'aplomb du corps, à la hauteur du calque de
+# texte « Name » du PSD ; longueur utile = largeur, symétrique autour du centre, où la bande du ruban
+# couvre toute la hauteur de ce calque (les replis et les queues sont exclus).
+name_bounds = LAYER[L["name"]]["bounds"]       # x, y, w, h (pixels du PSD)
+name_cx = BX + BW / 2
+name_cy = name_bounds[1] + name_bounds[3] / 2
 a = im.split()[3]
-pts = []
-for x in range(int(im.width * 0.36), int(im.width * 0.66), 8):
-    ys = [y for y in range(im.height) if a.getpixel((x, y)) > 200]
-    if ys:
-        pts.append((x, (ys[0] + ys[-1]) / 2))
-n = len(pts)
-mx = sum(p[0] for p in pts) / n
-my = sum(p[1] for p in pts) / n
-slope = sum((p[0] - mx) * (p[1] - my) for p in pts) / sum((p[0] - mx) ** 2 for p in pts)
-angle = math.atan(slope)                       # > 0 : le ruban descend vers la droite
-cxr = BX + BW / 2 - box[0]                     # centre du nom : à l'aplomb du centre du corps
-name_cx, name_cy = BX + BW / 2, box[1] + my + slope * (cxr - mx)
-# Ruban redressé (si la rotation des textes n'est pas fiable en jeu) : on tourne l'image de l'angle mesuré.
-flat = im.rotate(math.degrees(angle), resample=Image.BICUBIC, expand=True)
-fb = flat.getbbox()
-flat = flat.crop(fb)
-# centre du nom dans l'image redressée : rotation du point (cxr, my_c) autour du centre de l'image
-ccx, ccy = im.width / 2, im.height / 2
-px, py = cxr - ccx, (my + slope * (cxr - mx)) - ccy
-c, s = math.cos(-angle), math.sin(-angle)
-rx, ry = px * c - py * s, px * s + py * c
-fw, fh = flat.width, flat.height
-ex, ey = (im.rotate(math.degrees(angle), expand=True).width) / 2, (im.rotate(math.degrees(angle), expand=True).height) / 2
-flat_name = (rx + ex - fb[0], ry + ey - fb[1])
-flat_box = (round(BX + BW / 2 - flat_name[0]), round(name_cy - flat_name[1]), fw, fh)
-emit("card_ribbon_flat", flat, flat_box, maxw=512, canvas=(512, 256))
+y0, y1 = round(name_cy - name_bounds[3] / 2 - box[1]), round(name_cy + name_bounds[3] / 2 - box[1])
+
+
+def band_covers(x):
+    return all(a.getpixel((x, y)) > 200 for y in range(y0, y1 + 1))
+
+
+cx0 = round(name_cx - box[0])
+half = 0
+while cx0 - half - 1 >= 0 and cx0 + half + 1 < im.width and band_covers(cx0 - half - 1) and band_covers(cx0 + half + 1):
+    half += 1
+name_len = 2 * half
 
 im, box = piece("cost", [L["cost"]])
 emit("card_cost", im, box, maxw=256, canvas=(256, 128))
@@ -521,6 +513,29 @@ for label, wght in (("medium", 500), ("bold", 700), ("heavy", 800)):
         sys.exit(f"police {label} : glyphes manquants {missing}")
     FONTS[label] = "Fonts\\" + out.name
 
+# Métriques pour le faux client du harnais (Sim/baloo_metrics.lua) : avance de chaque glyphe en
+# millièmes de cadratin (sans crénage), hauteur de ligne = (ascendante + descendante) / cadratin.
+metrics = ["-- Fichier GÉNÉRÉ par tools/build_media.py : métriques de Baloo Chettan 2 (Media/Fonts) pour le",
+           "-- faux client de Sim/ui_harness.lua. adv[graisse][caractère UTF-8] = avance en millièmes de",
+           "-- cadratin (sans crénage) ; lineHeight = hauteur d'une ligne en cadratins (hhea).",
+           "return {"]
+for label in ("medium", "bold", "heavy"):
+    ft = TTFont(MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf")
+    upm, hm, hh = ft["head"].unitsPerEm, ft["hmtx"], ft["hhea"]
+    if label == "bold":
+        metrics.append(f"  lineHeight = {round((hh.ascent - hh.descent) / upm, 4)},")
+    items = []
+    for cp, g in sorted(ft.getBestCmap().items()):
+        ch = chr(cp)
+        key = ch.replace("\\", "\\\\").replace('"', '\\"')
+        items.append(f'["{key}"]={round(hm[g][0] * 1000 / upm)}')
+    metrics.append(f"  {label} = {{")
+    for i in range(0, len(items), 12):
+        metrics.append("    " + ", ".join(items[i:i + 12]) + ",")
+    metrics.append("  },")
+metrics.append("}")
+(ROOT / "Sim/baloo_metrics.lua").write_text("\n".join(metrics) + "\n", encoding="utf-8")
+
 # ===========================================================================
 # 5. Icônes : celles que nomme UI/Art.lua (champ tga = "Nom")
 # ===========================================================================
@@ -575,11 +590,10 @@ text_box = (panel_box[0] + xs[0], panel_box[1] + ys[0], xs[-1] - xs[0], ys[-1] -
 CARD = {
     "aspect": round(BH / BW, 5),
     "body": rel(body_box),
-    "pieces": {k: rel(GEOM[k]) for k in ("card_ribbon", "card_ribbon_flat", "card_cost", "card_panel", "card_plate",
+    "pieces": {k: rel(GEOM[k]) for k in ("card_ribbon", "card_cost", "card_panel", "card_plate",
                                          "medal_ring", "medal_glass", "medal_mask", "card_glow")},
     "gems": {k: rel(GEOM["gem_" + k]) for k in GEMS},
-    "name": {"cx": round((name_cx - BX) / BW, 5), "cy": round((name_cy - BY) / BW, 5), "angle": round(-angle, 5),
-             "flatCy": round((flat_box[1] + flat_name[1] - BY) / BW, 5), "len": round(0.7 * GEOM["card_ribbon"][2] / BW, 5)},
+    "name": {"cx": round((name_cx - BX) / BW, 5), "cy": round((name_cy - BY) / BW, 5), "len": round(name_len / BW, 5)},
     "cost": {"cx": round((GEOM["card_cost"][0] + GEOM["card_cost"][2] / 2 - BX) / BW, 5),
              "cy": round((GEOM["card_cost"][1] + GEOM["card_cost"][3] * 0.47 - BY) / BW, 5)},
     "text": rel(text_box),
@@ -619,8 +633,9 @@ head = ("-- Fichier GÉNÉRÉ par tools/build_media.py : ne pas modifier à la m
         "-- gauche) : file, w × h (toile), cw × ch (zone utile, pixels), tc = coordonnées de texture de la zone\n"
         "-- utile ; corner = coin des textures à neuf tranches (pixels), rim = épaisseur du liseré (pixels).\n"
         "-- card : géométrie de la carte en fractions de la largeur du corps, origine au coin haut gauche du\n"
-        "-- corps (x, y, w, h) ; name.angle en radians (sens trigonométrique). Pièces : pack Mechanized Magic\n"
-        "-- (Dumivid, CC0) ; police : Baloo Chettan 2 (OFL) ; icônes : pack d'icônes améliorées 128 px.\n"
+        "-- corps (x, y, w, h) ; name : centre (cx, cy) et longueur utile du nom sur le ruban. Pièces : pack\n"
+        "-- Mechanized Magic (Dumivid, CC0) ; police : Baloo Chettan 2 (OFL) ; icônes : pack d'icônes améliorées\n"
+        "-- 128 px.\n"
         "local _, ns = ...\n\n")
 (ROOT / "UI/SkinData.lua").write_text(head + "ns.Skin = " + lua(skin) + "\n", encoding="utf-8")
 

@@ -211,6 +211,91 @@ function W.driverAwake() return driver.awake and true or false end
 -- curseur de la zone (entrée/sortie en boucle). Le cadre interactif reste donc immobile (zone de
 -- survol) ; tout ce qui se voit vit dans son enfant `face`, seul animé (échelle, décalage).
 
+-- Agrandissement sans tressautement des textes. Changer l'échelle réelle (SetScale) à chaque image
+-- fait recalculer au client la taille de police effective (arrondie au pixel) et les retours à la
+-- ligne : glyphes qui sautent, lignes recoupées autrement. Deux techniques, au choix (/slay zoom) :
+--   * « anim » (défaut) : l'échelle du visuel passe par une animation Scale d'un AnimationGroup
+--     (transformation purement visuelle, sans nouvelle mise en page) et les textes sont en mode
+--     Vertex (FontString:SetScaleAnimationMode : sommets mis à l'échelle, mise en page figée), comme
+--     Blizzard_EncounterWarnings. L'échelle d'arrivée est tenue par un long délai de fin (l'échelle
+--     réelle reste 1 : aucune mise en page à l'arrivée non plus) ; une cible qui change en route
+--     relance l'animation depuis l'échelle visuelle courante (réversible).
+--   * « lisse » : SetScale à chaque image comme avant, mais textes en SetSmoothScaling (hauteur de
+--     police non arrondie, comme les barres d'info des ennemis de Blizzard) ; les retours à la ligne
+--     du texte des cartes sont de toute façon figés (lignes posées une à une, voir W.card).
+W.ZOOM_MODES = { "anim", "lisse" }
+local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée (secondes)
+
+function W.zoomMode()
+  local o = ns.Persist and ns.Persist.options and ns.Persist.options()
+  return (o and o.zoom == "lisse") and "lisse" or "anim"
+end
+
+-- Textes de l'interface (W.label, W.text), pour le mode de zoom et le rafraîchissement des polices.
+local labels = setmetatable({}, { __mode = "k" })
+
+local function zoomText(fs)
+  labels[fs] = true
+  if fs.SetScaleAnimationMode and Enum and Enum.FontStringScaleAnimationMode then
+    fs:SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)
+  end
+  if fs.SetSmoothScaling then fs:SetSmoothScaling(W.zoomMode() == "lisse") end
+end
+W.zoomText = zoomText
+
+-- Bascule la technique de zoom ; renvoie le nouveau mode.
+function W.setZoomMode(mode)
+  ns.Persist.options().zoom = mode
+  for fs in pairs(labels) do
+    if fs.SetSmoothScaling then fs:SetSmoothScaling(mode == "lisse") end
+  end
+  return mode
+end
+
+local ease = { OUT = function(p) return 1 - (1 - p) * (1 - p) end }
+
+-- Échelle visuelle courante d'un visuel animé (mode « anim ») : 1 au repos.
+function W.visualScale(face)
+  local z = face._zoom
+  if not z or not z.ag:IsPlaying() then return 1 end
+  local dur = z.dur
+  local t = GetTime() - z.t0
+  if dur <= 0 or t >= dur then return z.to end
+  local p = z.anim.GetSmoothProgress and z.anim:GetSmoothProgress() or ease.OUT(t / dur)
+  if type(p) ~= "number" or p < 0 or p > 1 then p = ease.OUT(t / dur) end
+  return z.from + (z.to - z.from) * p
+end
+
+-- Fait filer l'échelle visuelle de face vers target en dur secondes (0 : immédiat).
+local function zoomTo(face, target, dur)
+  local z = face._zoom
+  if not z then
+    if target == 1 then return end
+    local ag = face:CreateAnimationGroup()
+    local anim = ag:CreateAnimation("Scale")
+    anim:SetOrigin("CENTER", 0, 0)
+    anim:SetSmoothing("OUT")
+    z = { ag = ag, anim = anim, from = 1, to = 1, t0 = 0, dur = 0 }
+    face._zoom = z
+  end
+  local playing = z.ag:IsPlaying()
+  -- déjà en route vers cette cible (ou au repos à 1)
+  if z.to == target and (playing or target == 1) then return end
+  local cur = W.visualScale(face)
+  z.ag:Stop()
+  if target == 1 and (dur <= 0 or cur == 1) then
+    z.from, z.to = 1, 1
+    return
+  end
+  dur = max(dur, 0.001)
+  z.anim:SetScaleFrom(cur, cur)
+  z.anim:SetScaleTo(target, target)
+  z.anim:SetDuration(dur)
+  z.anim:SetEndDelay(target ~= 1 and ZOOM_HOLD or 0)
+  z.from, z.to, z.t0, z.dur = cur, target, GetTime(), dur
+  z.ag:Play()
+end
+
 -- Crée le visuel `f.face`, centré sur f, de même taille (suivie par OnSizeChanged).
 function W.face(f)
   local face = CreateFrame("Frame", nil, f)
@@ -218,6 +303,8 @@ function W.face(f)
   face:SetPoint("CENTER", f, "CENTER", 0, 0)
   f.face = face
   f:HookScript("OnSizeChanged", function(self, w, h) if w and h then self.face:SetSize(w, h) end end)
+  -- un cadre caché arrête ses animations : au retour, l'échelle tenue est reposée
+  face:SetScript("OnShow", function() if f._animApply == W.faceApply then W.faceApply(f) end end)
   return face
 end
 
@@ -227,10 +314,22 @@ function W.faceApply(f)
   if not face then return end
   local h = W.animValue(f, "hover")
   local dx = W.animValue(f, "dx")
-  local s = 1 + ((f.hoverScale or 1) - 1) * h
-  face:SetScale(s)
-  face:ClearAllPoints()
-  face:SetPoint("CENTER", f, "CENTER", dx / s, (f.hoverLift or 0) * h / s)
+  local hs = f.hoverScale or 1
+  local lift = (f.hoverLift or 0) * h
+  if W.zoomMode() == "anim" then
+    if face:GetScale() ~= 1 then face:SetScale(1) end
+    local ch = f._ch and f._ch.hover
+    local target = 1 + (hs - 1) * (ch and ch.to or 0)
+    zoomTo(face, target, ch and (ch.dur - ch.t) or 0)
+    face:ClearAllPoints()
+    face:SetPoint("CENTER", f, "CENTER", dx, lift)
+  else
+    if face._zoom then face._zoom.ag:Stop() face._zoom.from, face._zoom.to = 1, 1 end
+    local s = 1 + (hs - 1) * h
+    face:SetScale(s)
+    face:ClearAllPoints()
+    face:SetPoint("CENTER", f, "CENTER", dx / s, lift / s)
+  end
   if f.hoverPaint then f:hoverPaint(h) end
 end
 
@@ -625,18 +724,40 @@ local function setFont(fs, kind, size)
   end
 end
 
--- Préchargement : une police d'addon peut ne rien afficher à son tout premier emploi.
+-- Préchargement : une police d'addon peut ne rien afficher à son tout premier emploi (chargement
+-- asynchrone du fichier : le texte posé avant reste vide jusqu'à sa prochaine mise en page — c'était
+-- le changement d'échelle du survol qui le faisait apparaître). Le cadre de préchargement est à
+-- l'écran (un cadre transparent ou hors écran peut ne jamais être dessiné, donc ne rien charger),
+-- presque invisible ; W.refreshFonts repose ensuite police et texte de tous les textes.
 do
   local pre = CreateFrame("Frame", nil, UIParent)
-  pre:SetSize(1, 1)
-  pre:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -50, 50)
-  pre:SetAlpha(0)
+  pre:SetSize(4, 4)
+  pre:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+  pre:SetAlpha(0.01)
   for _, kind in ipairs({ "body", "bold", "heavy" }) do
     local fs = pre:CreateFontString(nil, "OVERLAY")
     setFont(fs, kind, 12)
+    fs:SetPoint("BOTTOMLEFT", pre, "BOTTOMLEFT", 0, 0)
     fs:SetText("Éé")
   end
   W.fontPreload = pre
+end
+
+-- Repose police et texte de tous les textes de l'interface (police d'addon chargée après coup) ;
+-- les cartes refont leur mise en page (W.refreshCards).
+function W.refreshFonts()
+  for fs in pairs(labels) do
+    if fs._fontKind then
+      setFont(fs, fs._fontKind, fs._size + 0.01) -- taille différente : le client recharge vraiment
+      setFont(fs, fs._fontKind, fs._size)
+    end
+    local t = fs:GetText()
+    if t and t ~= "" then
+      fs:SetText("")
+      fs:SetText(t)
+    end
+  end
+  if W.refreshCards then W.refreshCards() end
 end
 
 -- kind = "title" / "bold" (700), "heavy" (800, chiffres), "body" (500) ; shadow : ombre portée
@@ -646,6 +767,7 @@ function W.label(parent, kind, size, color, layer, shadow)
   fs._size = size or 12
   fs._fontKind = kind or "body"
   setFont(fs, fs._fontKind, fs._size)
+  zoomText(fs)
   color = color or C.text
   fs:SetTextColor(color[1], color[2], color[3])
   if shadow ~= false then
@@ -676,6 +798,7 @@ function W.text(parent, font, size, layer)
     local f, _, flags = fs:GetFont()
     if f then fs:SetFont(f, size, flags) end
   end
+  zoomText(fs)
   return fs
 end
 
@@ -1291,8 +1414,7 @@ end
 -- Pièces du pack posées sur le visuel `face` d'après la géométrie de ns.Skin.card (fractions de la
 -- largeur du corps) : halo, plaque du bas (mots-clés), corps à la couleur de la carte, médaillon
 -- (anneau, icône masquée par l'ouverture exacte du PSD, verre), panneau de texte, languette de coût,
--- ruban du nom (texte incliné comme le ruban si le client sait tourner un texte, sinon ruban redressé),
--- gemme de rareté ; textes Baloo Chettan 2 blancs à ombre portée.
+-- ruban horizontal du nom, gemme de rareté ; textes Baloo Chettan 2 blancs à ombre portée.
 
 local SC = Skin.card
 W.CARD_W = 124
@@ -1335,14 +1457,164 @@ function W.cardPills(d)
   return list
 end
 
--- Taille du texte de la carte selon sa longueur (zone du panneau : largeur tw, hauteur th).
-local function bodySize(len, tw, th)
-  for _, s in ipairs({ 9.5, 9, 8.5, 8, 7.5, 7, 6.5, 6 }) do
-    local perLine = max(1, floor(tw / (s * 0.5)))
-    local lines = math.ceil(len * 1.1 / perLine) -- (+10 % : coupures entre les mots)
-    if lines * s * 1.2 <= th then return s end
+-- Zone utile du texte : intérieur sombre du panneau d'ardoise (mesuré sur Media/card_panel.tga :
+-- x 0,1541 à 0,8429, bas 1,19, biseau dès 1,0754 où la demi-largeur intérieure vaut 0,308 et rentre de
+-- 0,56 par unité de hauteur), sous la gemme de rareté (bas opaque de la plus grande : 0,7622, mesuré
+-- sur Media/gem_*.tga), marges comprises. Fractions de la largeur du corps. Le harnais vérifie chaque
+-- ligne posée contre les pixels mêmes des textures (Sim/ui_harness.lua, U22).
+local TZ = {
+  cx = 0.4985,                  -- axe de l'intérieur
+  half = 0.3004,                -- demi-largeur : 0,3444 moins la marge latérale (0,044 ≈ 5,5 unités)
+  top = 0.7661,                 -- haut des lignes : sous la gemme (les lignes ont ~2 unités de vide en haut)
+  bottom = 1.1492,              -- bas des lignes : 5 unités au-dessus du bas de l'intérieur
+  bevY = 1.0754, bevHalf = 0.2574, bevSlope = 0.56, -- biseau du bas, marge déduite (×1,15 en biais)
+}
+W.CARD_TEXT = TZ
+-- Paliers de taille du texte (unités de la carte) : la plupart des cartes au premier, les longues un
+-- ou deux crans en dessous ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
+W.BODY_SIZES = { 8, 7.5, 7 }
+W.BODY_UNDER = { 6.5, 6 }
+-- Nom sur le ruban : une ligne, paliers et plancher, marge de 4 unités de chaque côté de la bande.
+W.NAME_SIZES = { 10, 8.5, 7 }
+W.NAME_UNDER = { 6.5, 6 }
+W.NAME_MARGIN = 4
+
+-- Demi-largeur utile de la zone à la hauteur y (fraction de la largeur du corps).
+function W.cardTextHalf(y)
+  return min(TZ.half, TZ.bevHalf - (y - TZ.bevY) * TZ.bevSlope)
+end
+
+-- Texte de mesure (même police que le texte des cartes), hors de toute carte.
+local measurer
+local function measureFS(kind, size)
+  if not measurer then
+    measurer = W.fontPreload:CreateFontString(nil, "OVERLAY")
+    measurer:SetPoint("BOTTOMLEFT", W.fontPreload, "BOTTOMLEFT", 0, 0)
+    measurer:SetWordWrap(false)
   end
-  return 6
+  if measurer._fontKind ~= kind or measurer._size ~= size then
+    measurer._fontKind, measurer._size = kind, size
+    setFont(measurer, kind, size)
+  end
+  return measurer
+end
+
+local function widthOf(m, s)
+  m:SetText(s)
+  return m:GetStringWidth() or 0
+end
+
+-- Les lignes (de hauteur lh, centrées verticalement entre top et bottom, en unités) tiennent-elles
+-- chacune dans la largeur de la zone à leur bas ?
+local function linesFit(m, lines, lh, top, bottom)
+  local CW = W.CARD_W
+  local y0 = top + (bottom - top - #lines * lh) / 2
+  if y0 < top - 0.01 then return false end
+  for k = 1, #lines do
+    if widthOf(m, lines[k]) > 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW then return false end
+  end
+  return true
+end
+
+-- Coupe text en lignes à la taille size dans la zone (top, bottom en unités) : remplissage glouton,
+-- chaque ligne limitée à la largeur de la zone à sa hauteur (biseau compris). Renvoie les lignes,
+-- ou nil si le texte ne tient pas ; "font" si la police ne mesure rien (pas encore chargée).
+local function layoutBody(text, size, top, bottom)
+  local CW = W.CARD_W
+  local m = measureFS("bold", size)
+  m:SetText("Ég")
+  local lh = m:GetStringHeight() or 0
+  if lh <= 0 or widthOf(m, "Ég") <= 0 then return nil, "font" end
+  local words = {}
+  for w in text:gmatch("%S+") do words[#words + 1] = w end
+  if #words == 0 then return {}, lh end
+  local H = bottom - top
+  for n = 1, floor(H / lh + 1e-6) do
+    local y0 = top + (H - n * lh) / 2
+    local lines, i = {}, 1
+    for k = 1, n do
+      local wmax = 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW
+      local cur
+      while i <= #words do
+        local cand = cur and (cur .. " " .. words[i]) or words[i]
+        if widthOf(m, cand) <= wmax then cur, i = cand, i + 1 else break end
+      end
+      if not cur then break end
+      lines[#lines + 1] = cur
+      if i > #words then break end
+    end
+    if i > #words and linesFit(m, lines, lh, top, bottom) then return lines, lh end
+  end
+  return nil, lh
+end
+
+local layoutCache = {}
+function W.clearTextCache() layoutCache = {} end
+
+-- Pose le texte de la carte : premier palier où il tient, mise en page figée (lignes séparées par
+-- des retours explicites, largeur du texte un peu plus grande que la plus longue ligne possible :
+-- le client ne recoupe jamais autrement, ni à une autre échelle, ni pendant un zoom), puis
+-- vérification par le client (GetNumLines, IsTruncated, GetStringHeight). bottom : bas de la zone
+-- (unités), relevé si une plaque mord sur le panneau.
+local function fitBody(card, text, bottom)
+  local CW = W.CARD_W
+  local fs = card.body
+  local top = TZ.top * CW
+  local sizes = {}
+  for _, s in ipairs(W.BODY_SIZES) do sizes[#sizes + 1] = s end
+  for _, s in ipairs(W.BODY_UNDER) do sizes[#sizes + 1] = s end
+  fs:ClearAllPoints()
+  fs:SetPoint("CENTER", card.face, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
+  fs:SetWidth(2 * TZ.half * CW + 8)
+  local fit, fontErr
+  for idx, s in ipairs(sizes) do
+    local key = s .. "|" .. floor(bottom * 10 + 0.5) .. "|" .. text
+    local lines = layoutCache[key]
+    local err
+    if lines == nil then
+      lines, err = layoutBody(text, s, top, bottom)
+      if err == "font" then fontErr = true break end
+      layoutCache[key] = lines or false
+    end
+    if lines then
+      W.setSize(fs, s)
+      fs:SetText(table.concat(lines, "\n"))
+      local n = fs.GetNumLines and fs:GetNumLines() or #lines
+      local hh = fs:GetStringHeight() or 0
+      if (n == #lines or #lines == 0) and not (fs.IsTruncated and fs:IsTruncated()) and hh <= bottom - top + 0.5 then
+        fit = { size = s, lines = #lines, under = idx > #W.BODY_SIZES, ok = true }
+        break
+      end
+    end
+  end
+  if not fit then
+    -- police pas encore mesurable, ou texte trop long même au dernier secours : retour à la ligne du
+    -- client, au plancher (déborde peut-être : signalé)
+    local s = W.BODY_SIZES[#W.BODY_SIZES]
+    W.setSize(fs, s)
+    fs:SetWidth(2 * TZ.half * CW)
+    fs:SetText(text)
+    fit = { size = s, under = true, ok = false, font = fontErr }
+  end
+  card.bodyFit = fit
+  return fit
+end
+
+-- Nom sur le ruban : premier palier où il tient sur une ligne dans la bande (marges comprises).
+local function fitName(fs, text)
+  local w = SC.name.len * W.CARD_W - 2 * W.NAME_MARGIN
+  local sizes = {}
+  for _, s in ipairs(W.NAME_SIZES) do sizes[#sizes + 1] = s end
+  for _, s in ipairs(W.NAME_UNDER) do sizes[#sizes + 1] = s end
+  fs:SetText(text)
+  for idx, s in ipairs(sizes) do
+    W.setSize(fs, s)
+    local sw = (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
+    if sw > 0 and sw <= w and not (fs.IsTruncated and fs:IsTruncated()) then
+      return { size = s, under = idx > #W.NAME_SIZES, ok = true }
+    end
+  end
+  return { size = sizes[#sizes], under = true, ok = false }
 end
 
 -- Pose une pièce (fractions de la largeur du corps) sur le visuel de la carte.
@@ -1353,11 +1625,13 @@ local function place(tex, face, rect)
   tex:SetSize(rect[3] * CW, rect[4] * CW)
 end
 
--- Rotation des textes (FontString:SetRotation, documentée pour ce client) ; /slay ruban la coupe :
--- ruban redressé et nom horizontal.
-function W.ribbonTilt()
-  local o = ns.Persist and ns.Persist.options and ns.Persist.options()
-  return not (o and o.flatRibbon)
+-- Cartes créées (pour W.refreshCards : nouvelle mise en page quand la police arrive).
+local cards = setmetatable({}, { __mode = "k" })
+function W.refreshCards()
+  W.clearTextCache()
+  for card in pairs(cards) do
+    if card.cardId then card:SetCard(card.cardId, card.cardUp, card.opts) end
+  end
 end
 
 -- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin.
@@ -1380,6 +1654,9 @@ end
 -- La carte est un bouton immobile (zone de survol et de clic) ; tout son visuel est dans b.face,
 -- que le survol anime (W.hoverable). Réglages par écran : b.hoverScale, b.hoverLift (unités de la
 -- carte, vers le haut) ; b.baseLevel / b.upLevel : niveau au repos et au survol (passage devant).
+-- Plaque rouge de raison (carte injouable) : à cheval sur le bas du panneau, sous la zone du texte.
+local REASON_Y, REASON_H = 1.24, 20
+
 function W.card(parent)
   local CW, CH = W.CARD_W, W.CARD_H
   local P = SC.pieces
@@ -1410,7 +1687,8 @@ function W.card(parent)
   place(b.panel, face, P.card_panel)
   b.costTab = W.skin(face, "card_cost", "ARTWORK", 1)
   place(b.costTab, face, P.card_cost)
-  b.ribbon = face:CreateTexture(nil, "ARTWORK", nil, 2)
+  b.ribbon = W.skin(face, "card_ribbon", "ARTWORK", 2)
+  place(b.ribbon, face, P.card_ribbon)
   b.gem = face:CreateTexture(nil, "ARTWORK", nil, 3)
   b.gem:Hide()
 
@@ -1418,18 +1696,16 @@ function W.card(parent)
   b.name = W.label(face, "bold", 10, C.text, "OVERLAY")
   b.name:SetWordWrap(false)
   b.name:SetJustifyH("CENTER")
+  b.name:SetPoint("CENTER", face, "TOPLEFT", SC.name.cx * CW, -SC.name.cy * CW)
+  b.name:SetWidth(SC.name.len * CW)
   b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
   b.cost:SetPoint("CENTER", face, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
-  local tb = SC.text
-  b.body = W.label(face, "bold", 9, C.textSoft, "OVERLAY")
-  -- centré dans le panneau ; largeur fixée, hauteur libre (un texte trop long déborde au lieu d'être
-  -- tronqué en « … »)
-  b.body:SetPoint("CENTER", face, "TOPLEFT", (tb[1] + tb[3] / 2) * CW, -(tb[2] + tb[4] / 2) * CW)
-  b.body:SetWidth(tb[3] * CW)
+  b.body = W.label(face, "bold", W.BODY_SIZES[1], C.textSoft, "OVERLAY")
+  -- centré dans la zone utile du panneau, lignes posées par fitBody ; hauteur libre (un texte trop
+  -- long déborde au lieu d'être tronqué en « … » : le harnais le signale)
   b.body:SetJustifyH("CENTER")
   b.body:SetJustifyV("MIDDLE")
   b.body:SetWordWrap(true)
-  b.textW, b.textH = tb[3] * CW, tb[4] * CW
   b.plateText = W.label(face, "bold", 8.5, C.text, "OVERLAY")
   b.plateText:SetPoint("CENTER", face, "TOPLEFT", SC.plateText.cx * CW, -SC.plateText.cy * CW)
   b.plateText:SetWordWrap(false)
@@ -1445,28 +1721,25 @@ function W.card(parent)
     local dim = opts.playable == false
     -- corps à la couleur de la carte
     W.setSkin(self.bg, "card_body_" .. Art.cardBody(id, ns.Cards[id] or d))
-    -- ruban et nom (incliné comme le ruban, ou ruban redressé)
-    local tilt = W.ribbonTilt() and self.name.SetRotation ~= nil
-    local rib = tilt and "card_ribbon" or "card_ribbon_flat"
-    if self._rib ~= rib then
-      self._rib = rib
-      W.setSkin(self.ribbon, rib)
-      place(self.ribbon, self.face, P[rib])
-      self.name:ClearAllPoints()
-      self.name:SetPoint("CENTER", self.face, "TOPLEFT", SC.name.cx * CW, -(tilt and SC.name.cy or SC.name.flatCy) * CW)
-      self.name:SetWidth(SC.name.len * CW)
-      if self.name.SetRotation then self.name:SetRotation(tilt and SC.name.angle or 0) end
-    end
-    W.fitText(self.name, d.name, 10.5, SC.name.len * CW - 4, 7)
+    -- nom sur le ruban (paliers)
+    self.nameFit = fitName(self.name, d.name)
     local nc = showUp and C.upGreen or C.text
     self.name:SetTextColor(nc[1], nc[2], nc[3])
     -- médaillon
     W.setIcon(self.icon, W.cardArt(id), "card:" .. id)
-    -- texte
+    -- texte : zone utile du panneau, relevée au-dessus de la plaque de raison si elle y mord
     local text = W.cardBody(d, base)
-    local plain = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    W.setSize(self.body, bodySize(W.utf8len(plain), self.textW, self.textH))
-    self.body:SetText(text)
+    local bottom = TZ.bottom * CW
+    if dim and opts.reason then bottom = min(bottom, REASON_Y * CW - REASON_H / 2 - 1) end
+    local fit = fitBody(self, text, bottom)
+    if fit.font and not self._refit then
+      -- police pas encore chargée : nouvelle mise en page un peu plus tard
+      self._refit = true
+      W.delay(0.5, function()
+        self._refit = nil
+        if self.cardId == id and self.cardUp == up and self.opts == opts then self:SetCard(id, up, opts) end
+      end)
+    end
     -- plaque du bas : mots-clés
     local pills = W.cardPills(d)
     if #pills > 0 then
@@ -1506,12 +1779,12 @@ function W.card(parent)
     local dc = dim and C.textDim or C.textSoft
     self.body:SetTextColor(dc[1], dc[2], dc[3])
     if dim and opts.reason then
-      local p = cardPlaque(self, "reasonPlate", 0.84 * CW, 20)
+      local p = cardPlaque(self, "reasonPlate", 0.84 * CW, REASON_H)
       p.plaque:SetFill({ 1, 0.47, 0.43 })
       p.plaque:SetRim(Art.rim.red)
       W.fitText(p.text, opts.reason, 11, 0.84 * CW - 12, 7)
       p:ClearAllPoints()
-      p:SetPoint("CENTER", self.face, "TOPLEFT", CW / 2, -CH * 0.877)
+      p:SetPoint("CENTER", self.face, "TOPLEFT", CW / 2, -REASON_Y * CW)
       p:Show()
     elseif self.reasonPlate then
       self.reasonPlate:Hide()
@@ -1582,6 +1855,7 @@ function W.card(parent)
   W.tooltip(b, function(tt, self)
     if self.cardId then W.fillCardTooltip(tt, self.cardId, self.cardUp, self.opts) end
   end, "ANCHOR_RIGHT")
+  cards[b] = true
   return b
 end
 

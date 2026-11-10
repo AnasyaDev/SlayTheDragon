@@ -83,6 +83,7 @@ SetMaxLines SetFading SetTimeVisible EnableMouseWheel ScrollUp ScrollDown SetThi
 SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale SetPortraitZoom
 SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
 SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
+SetScaleAnimationMode SetSmoothScaling SetOrigin SetSmoothing
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -214,19 +215,136 @@ function Frame:CreateFontString(_, layer, font)
   return o
 end
 function Frame:CreateLine() return newObject("Line", nil, self) end
-function Frame:CreateAnimationGroup() return newObject("AnimationGroup", nil, self) end
+function Frame:CreateAnimationGroup()
+  local g = newObject("AnimationGroup", nil, self)
+  g._anims = {}
+  return g
+end
+-- Animations (Scale) : temps virtuel H.now ; lissage OUT = 1 - (1 - p)² ; le délai de fin tient
+-- l'état d'arrivée ; Stop rend l'échelle réelle. H.visualScale(cadre) = échelle animée courante.
+function Frame:CreateAnimation(kind)
+  if kind ~= "Scale" then error("CreateAnimation : type non simulé " .. tostring(kind)) end
+  local a = newObject("Animation", nil, self)
+  a._from, a._to, a._dur, a._endDelay = { 1, 1 }, { 1, 1 }, 0, 0
+  self._anims[#self._anims + 1] = a
+  return a
+end
+function Frame:SetScaleFrom(x, y) self._from = { x, y } end
+function Frame:SetScaleTo(x, y) self._to = { x, y } end
+function Frame:SetDuration(d) self._dur = d end
+function Frame:SetEndDelay(d) self._endDelay = d end
+local function animProgress(a)
+  local g = a._parent
+  if not g._playing then return nil end
+  local t = H.now - g._t0
+  if t >= a._dur + a._endDelay then g._playing = false return nil end
+  local p = a._dur > 0 and math.min(1, t / a._dur) or 1
+  return 1 - (1 - p) * (1 - p)
+end
+function Frame:GetSmoothProgress() return animProgress(self) or 0 end
+function Frame:Play()
+  self._playing, self._t0 = true, H.now
+end
+function Frame:Stop() self._playing = false end
+function Frame:Pause() self._playing = false end
+function Frame:IsPlaying()
+  if not self._playing then return false end
+  for _, a in ipairs(self._anims or {}) do animProgress(a) end
+  return self._playing
+end
+function H.visualScale(f)
+  local s = 1
+  for _, k in ipairs(rawget(f, "_kids")) do
+    if rawget(k, "_kind") == "AnimationGroup" and k:IsPlaying() then
+      for _, a in ipairs(k._anims) do
+        local p = animProgress(a)
+        if p then s = s * (a._from[1] + (a._to[1] - a._from[1]) * p) end
+      end
+    end
+  end
+  return s
+end
 function Frame:CreateMaskTexture() return newObject("MaskTexture", nil, self) end
 
 -- Texte
 function Frame:SetText(t) self._text = t end
 function Frame:GetText() return self._text end
 function Frame:SetFormattedText(fmt, ...) self._text = fmt:format(...) end
-function Frame:GetStringWidth() return #(self._text or "") * 6 end
-function Frame:GetStringHeight() return 14 * math.max(1, math.ceil(#(self._text or "") * 6 / math.max(1, self._w or 200))) end
-function Frame:GetFont() return "Fonts\\FRIZQT__.TTF", 12, "" end
+-- Mesure des textes : avances des glyphes de Baloo Chettan 2 (Sim/baloo_metrics.lua, généré depuis
+-- Media/Fonts ; graisse d'après le fichier de police, « bold » pour les polices du jeu), sans crénage ;
+-- taille de police = cadratin, hauteur de ligne = ascendante + descendante (1,47 cadratin) ; codes
+-- |c…|r ignorés ; retours explicites, puis retour à la ligne par mots si une largeur est posée.
+local METRICS = dofile(root .. "/Sim/baloo_metrics.lua")
+H.metrics = METRICS
+local function plainText(t)
+  return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+end
+local function fontAdv(self)
+  local p = tostring(rawget(self, "_fontPath") or "")
+  return METRICS[p:find("heavy") and "heavy" or (p:find("medium") and "medium" or "bold")]
+end
+-- Largeur d'un texte d'une ligne (sans codes) à la taille size, police de self.
+function H.textWidth(self, text, size)
+  local adv, w = fontAdv(self), 0
+  for ch in plainText(text):gmatch("[%z\1-\127\194-\244][\128-\191]*") do w = w + (adv[ch] or 550) end
+  return w / 1000 * (size or rawget(self, "_fontSize") or 12)
+end
+-- Lignes affichées : { largeurs }, tronqué ?
+local function wrapLines(self)
+  local text = plainText(rawget(self, "_text"))
+  if text == "" then return {}, false end
+  local size = rawget(self, "_fontSize") or 12
+  local w = rawget(self, "_w") or 0
+  local wc = rawget(self, "_calls").SetWordWrap
+  local wrap = not (wc and wc[1] == false)
+  local out, trunc = {}, false
+  for para in (text .. "\n"):gmatch("(.-)\n") do
+    if w <= 0 then
+      out[#out + 1] = H.textWidth(self, para, size)
+    elseif not wrap then
+      local pw = H.textWidth(self, para, size)
+      if pw > w + 0.01 then trunc = true pw = w end
+      out[#out + 1] = pw
+    else
+      local cur
+      for word in para:gmatch("%S+") do
+        local cand = cur and (cur .. " " .. word) or word
+        if cur and H.textWidth(self, cand, size) > w + 0.01 then
+          out[#out + 1] = H.textWidth(self, cur, size)
+          cur = word
+        else
+          cur = cand
+        end
+        if H.textWidth(self, word, size) > w + 0.01 then trunc = true end
+      end
+      out[#out + 1] = cur and math.min(w, H.textWidth(self, cur, size)) or 0
+    end
+  end
+  local h = rawget(self, "_h") or 0
+  if h > 0 and #out * size * METRICS.lineHeight > h + 0.01 then trunc = true end
+  return out, trunc
+end
+H.wrapLines = wrapLines
+function Frame:GetUnboundedStringWidth()
+  local m = 0
+  for para in (plainText(self._text) .. "\n"):gmatch("(.-)\n") do m = math.max(m, H.textWidth(self, para)) end
+  return m
+end
+function Frame:GetStringWidth()
+  local lines = wrapLines(self)
+  local m = 0
+  for _, lw in ipairs(lines) do m = math.max(m, lw) end
+  return m
+end
+function Frame:GetLineHeight() return (self._fontSize or 12) * METRICS.lineHeight end
+function Frame:GetNumLines() return #(wrapLines(self)) end
+function Frame:GetStringHeight() return #(wrapLines(self)) * self:GetLineHeight() end
+function Frame:IsTruncated() local _, t = wrapLines(self) return t end
+function Frame:GetFont() return self._fontPath or "Fonts\\FRIZQT__.TTF", self._fontSize or 12, "" end
 function Frame:SetFont(f, size, flags)
   if type(size) ~= "number" or size <= 0 then error("SetFont : taille invalide") end
   self._fontSize = size
+  self._setFontCount = (self._setFontCount or 0) + 1
   self._fontFile = type(f) == "string" and f:upper():find("MORPHEUS") and "title" or "body"
   self._fontPath = f
 end
@@ -410,6 +528,7 @@ function H.boot(db)
     return "interface/test/fichier_" .. id
   end }
   _G.GetTime = function() return H.now end
+  _G.Enum = { FontStringScaleAnimationMode = { FontSize = 0, Vertex = 1 } }
   _G.time = function() return 1762000000 + math.floor(H.now) end
   _G.UnitOnTaxi = function(u) assert(u == "player") return H.taxi end
   _G.InCombatLockdown = function() return H.inCombat end
@@ -1248,11 +1367,13 @@ check("déconnexion : journal d'animations vidé", #_G.SlayTheDragonDB.current.c
 
 print("U14 sauvegardes abîmées, anciennes ou futures")
 local devDb = { version = 1, meta = { saves = 4 }, current = { provider = "demo", seed = 1, run = {} },
-  journal = { { result = "abandon", floor = 2, seed = 1 } }, options = { scale = 1.2 } }
+  journal = { { result = "abandon", floor = 2, seed = 1 } }, options = { scale = 1.2, flatRibbon = true, zoom = 3 } }
 H.boot(devDb)
 db = _G.SlayTheDragonDB
 check("ancienne sauvegarde de l'interface : options gardées", H.ns.Persist.options().scale == 1.2
   and H.ns.Persist.options().autoOpen == true)
+check("ancienne option du ruban ignorée, zoom invalide remis au défaut", H.ns.Persist.options().flatRibbon == nil
+  and H.ns.Persist.options().zoom == "anim")
 check("ancienne expédition en quarantaine, méta réparée", db.current == nil and #db.quarantine == 1
   and type(db.meta.classes) == "table")
 H.slash("")
@@ -1482,20 +1603,36 @@ do
   run(driver, "OnUpdate", 0.04)
   local mid = Wd.animValue(card, "hover")
   check("survol en cours : valeur intermédiaire", mid > 0 and mid < 1, mid)
-  check("visuel agrandi et levé, zone de survol immobile", card.face._scale > 1 and hit(card) == before,
-    card.face._scale)
+  local zoom = card.face._zoom
+  check("zoom « anim » : animation Scale vers l'échelle du survol, échelle réelle intacte (aucune mise en page)",
+    zoom and zoom.ag:IsPlaying() and math.abs(zoom.to - card.hoverScale) < 1e-9 and card.face._scale == 1
+    and hit(card) == before, zoom and zoom.to)
+  check("textes en mode Vertex (sommets mis à l'échelle, mise en page figée)",
+    card.body._calls.SetScaleAnimationMode and card.body._calls.SetScaleAnimationMode[1] == 1
+    and card.name._calls.SetScaleAnimationMode and card.cost._calls.SetScaleAnimationMode)
+  local body0, nameSize0 = card.body._text, card.name._fontSize
+  H.now = H.now + 0.05
+  local vs = H.visualScale(card.face)
+  check("échelle visuelle intermédiaire au cours du survol", vs > 1 and vs < card.hoverScale, vs)
   run(card, "OnLeave")
   run(driver, "OnUpdate", 0.01)
   local back = Wd.animValue(card, "hover")
   check("sortie en cours de route : repart de la valeur courante", back > 0 and back <= mid, back .. " / " .. mid)
+  check("sortie : l'animation repart de l'échelle visuelle courante vers 1",
+    zoom.ag:IsPlaying() and math.abs(zoom.from - vs) < 1e-6 and zoom.to == 1, zoom.from .. " / " .. vs)
+  check("aucune nouvelle mise en page du texte pendant le zoom", card.body._text == body0
+    and card.name._fontSize == nameSize0)
   for _ = 1, 30 do run(driver, "OnUpdate", 0.02) end
-  check("sortie terminée : repos exact", Wd.animValue(card, "hover") == 0 and card.face._scale == 1)
+  H.now = H.now + 1
+  check("sortie terminée : repos exact", Wd.animValue(card, "hover") == 0 and card.face._scale == 1
+    and H.visualScale(card.face) == 1)
   check("pilote arrêté une fois tout immobile", not Wd.driverAwake() and driver._scripts.OnUpdate == nil)
   -- état final par les seuls minuteurs de secours (images sautées)
   run(card, "OnEnter")
   H.advance(0.5)
-  check("survol : état final atteint", Wd.animValue(card, "hover") == 1
-    and math.abs(card.face._scale - 1.16) < 1e-9 and hit(card) == before, card.face._scale)
+  check("survol : état final atteint et tenu (délai de fin), échelle réelle 1", Wd.animValue(card, "hover") == 1
+    and math.abs(H.visualScale(card.face) - 1.16) < 1e-9 and card.face._scale == 1 and hit(card) == before,
+    H.visualScale(card.face))
   local n = #C().combat().hand
   if n >= 2 then
     check("voisine écartée (visuel seulement)", Wd.animValue(v.cards[2], "dx") > 0)
@@ -1513,12 +1650,27 @@ do
     local hb = hit(f)
     run(f, "OnEnter")
     H.advance(0.5)
-    local up = f.face._scale > 1
+    local up = H.visualScale(f.face) > 1 and f.face._scale == 1
     run(f, "OnLeave")
     H.advance(0.5)
     check("survol animé : " .. tostring(f.label and f.label._text or f.pileKey or "icône"),
-      up and f.face._scale == 1 and hit(f) == hb)
+      up and H.visualScale(f.face) == 1 and f.face._scale == 1 and hit(f) == hb)
   end
+  -- /slay zoom : bascule « lisse » (échelle réelle à chaque image, police non arrondie) et retour
+  H.slash("zoom")
+  check("/slay zoom : mode lisse, textes en SetSmoothScaling", H.ns.Persist.options().zoom == "lisse"
+    and card.body._calls.SetSmoothScaling and card.body._calls.SetSmoothScaling[1] == true)
+  local eb = v.endTurn
+  run(eb, "OnEnter")
+  run(driver, "OnUpdate", 0.04)
+  check("mode lisse : échelle réelle du visuel animée, sans animation Scale", eb.face._scale > 1
+    and H.visualScale(eb.face) == 1, eb.face._scale)
+  run(eb, "OnLeave")
+  H.advance(0.5)
+  check("mode lisse : repos exact", eb.face._scale == 1)
+  H.slash("zoom anim")
+  check("/slay zoom anim : retour au défaut", H.ns.Persist.options().zoom == "anim"
+    and card.body._calls.SetSmoothScaling[1] == false)
   -- ennemi ciblable quand une carte à cible est armée
   local c = C().combat()
   local idx
@@ -1684,7 +1836,7 @@ do
   check(n .. " textures de SkinData : fichiers TGA présents et conformes", #bad == 0, table.concat(bad, ", "))
   bad = {}
   for _, need in ipairs({ "card_body_ivory", "card_body_violet", "card_body_blue", "card_body_gold", "card_panel",
-    "card_ribbon", "card_ribbon_flat", "card_cost", "card_plate", "medal_ring", "medal_mask", "medal_glass",
+    "card_ribbon", "card_cost", "card_plate", "medal_ring", "medal_mask", "medal_glass",
     "gem_uncommon", "gem_rare", "gem_epic", "gem_legendary", "hex_red", "hex_green", "hex_blue", "hex_steel",
     "hex_violet", "hex_empty", "card_back", "tile_slate", "tile_ivory", "nine_slate", "nine_rim", "nine_ivory",
     "pill_slate", "pill_rim", "button_gold" }) do
@@ -1720,14 +1872,15 @@ do
   check("carte : corps ivoire (Sacré), ruban, coût, panneau, médaillon",
     tex(card.bg) == ROOT .. Skin.tex.card_body_ivory.file and tex(card.panel) == ROOT .. Skin.tex.card_panel.file
     and tex(card.ring) == ROOT .. Skin.tex.medal_ring.file and card.cost._text == "2" and card.name._text == "Pénitence"
-    and (tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file or tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon_flat.file))
+    and tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file)
   check("carte : icône améliorée de Media, masquée par l'ouverture du médaillon",
     tex(card.icon) == ROOT .. Skin.icons.spell_holy_penance and card.icon._calls.AddMaskTexture ~= nil)
   check("carte peu commune : gemme triangle verte", card.gem._shown and tex(card.gem) == ROOT .. Skin.tex.gem_uncommon.file)
   check("texte centré dans le panneau, chiffres en évidence", (card.body._text or ""):find("|cffffffff", 1, true)
     and card.body._calls.SetJustifyH[1] == "CENTER")
-  local angle = card.name._calls.SetRotation and card.name._calls.SetRotation[1]
-  check("nom incliné comme le ruban (rotation du texte)", angle and math.abs(angle - Skin.card.name.angle) < 1e-9, angle)
+  check("nom horizontal sur le ruban (aucune rotation), centré sur la bande", card.name._calls.SetRotation == nil
+    and card.name._points[1][4] == Skin.card.name.cx * W.CARD_W and Skin.card.name.angle == nil
+    and Skin.tex.card_ribbon_flat == nil)
   card:SetCard("mind_blast", false, { cost = 1, playable = true })
   check("Ombre : corps violet ; mot-clé dans la plaque du bas", tex(card.bg) == ROOT .. Skin.tex.card_body_violet.file
     and card.plate._shown and (card.plateText._text or ""):find("Recharge", 1, true) and not card.gem._shown)
@@ -1743,13 +1896,10 @@ do
   check("améliorée : nom vert, chiffre changé en vert", card.name._calls.SetTextColor[2] == H.ns.Art.C.upGreen[2]
     and (card.body._text or ""):find("|cff7dff7d9|r", 1, true), card.body._text)
   check("carte jouable : plus de plaque rouge", not card.reasonPlate._shown)
+  local chat0 = #(_G.DEFAULT_CHAT_FRAME._lines)
   H.slash("ruban")
-  card:SetCard("smite", false, {})
-  check("/slay ruban : ruban redressé, nom horizontal", tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon_flat.file
-    and card.name._calls.SetRotation[1] == 0)
-  H.slash("ruban")
-  card:SetCard("smite", false, {})
-  check("/slay ruban à nouveau : ruban incliné", tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file)
+  check("/slay ruban retiré : simple aide, rien ne change", #(_G.DEFAULT_CHAT_FRAME._lines) > chat0
+    and tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file and H.ns.Persist.options().flatRibbon == nil)
   -- repli : icône améliorée absente de Media -> icône du sort du jeu
   local saved = Skin.icons.spell_holy_holysmite
   Skin.icons.spell_holy_holysmite = nil
@@ -1930,7 +2080,7 @@ do
           if nr[2] < boardTop + 4 * k or tr[2] < boardTop then bad[#bad + 1] = label .. " : nom sur le plateau" end
           local sr = R.rect(s.st)
           if sr and sr[2] < boardTop then bad[#bad + 1] = label .. " : états sur le plateau" end
-          if tr[3] - tr[1] + 0.5 < (s.name:GetStringWidth() or 0) * k then bad[#bad + 1] = label .. " : nom plus large que sa pilule" end
+          if tr[3] - tr[1] + 0.5 < (s.name:GetStringWidth() or 0) * s.name:GetEffectiveScale() then bad[#bad + 1] = label .. " : nom plus large que sa pilule" end
           local mr = R.rect(s.model)
           if mr and tr[4] > mr[2] + 0.5 then bad[#bad + 1] = label .. " : pilule du nom sur le personnage" end
           local hr = R.rect(s.hp)
@@ -1962,6 +2112,224 @@ do
   ns.UI.applyScale()
   check(("noms d'ennemis lisibles (%d dispositions : 1 à 6 ennemis × 3 échelles)"):format(layouts), #bad == 0,
     table.concat(bad, "\n        "))
+end
+
+print("U22 textes des cartes : toutes les cartes tiennent dans le panneau et le ruban ; textes visibles au repos")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W, Skin = ns.Widgets, ns.Skin
+  local SC = Skin.card
+  local CW = W.CARD_W
+  local LH = H.metrics.lineHeight
+  -- textures lues sur le disque (TGA 32 bits, origine en bas) : pixel(x, y) avec y vers le bas
+  local function readTGA(rel)
+    local f = assert(io.open(root .. "/Media/" .. rel:gsub("\\", "/"), "rb"))
+    local d = f:read("*a")
+    f:close()
+    local w, h = d:byte(13) + 256 * d:byte(14), d:byte(15) + 256 * d:byte(16)
+    return function(x, y)
+      x, y = math.floor(x), math.floor(y)
+      if x < 0 or y < 0 or x >= w or y >= h then return 0, 0, 0, 0 end
+      local i = 18 + ((h - 1 - y) * w + x) * 4 + 1
+      return d:byte(i + 2), d:byte(i + 1), d:byte(i), d:byte(i + 3)
+    end
+  end
+  -- échantillon d'une pièce posée en rect (fractions de la largeur du corps) au point (u, v) en unités
+  local function sampler(texName, rect)
+    local e = Skin.tex[texName]
+    local px = readTGA(e.file)
+    return function(u, v)
+      local x = (u / CW - rect[1]) / rect[3] * e.cw
+      local y = (v / CW - rect[2]) / rect[4] * e.ch
+      if x < 0 or y < 0 or x >= e.cw or y >= e.ch then return 0, 0, 0, 0 end
+      return px(x, y)
+    end
+  end
+  local panel = sampler("card_panel", SC.pieces.card_panel)
+  local ribbon = sampler("card_ribbon", SC.pieces.card_ribbon)
+  local gems = {}
+  for k, r in pairs(SC.gems) do gems[k] = sampler("gem_" .. k, r) end
+  local function dark(u, v)
+    local r, g, b, a = panel(u, v)
+    return a > 250 and r + g + b < 360
+  end
+  -- tous les points d'un rectangle (pas de 0,5 unité) vérifient pred ?
+  local function all(x0, y0, x1, y1, pred)
+    local y = y0
+    while y <= y1 + 1e-9 do
+      local x = x0
+      while x <= x1 + 1e-9 do
+        if not pred(x, y) then return false, ("(%.1f, %.1f)"):format(x, y) end
+        x = x + 0.5
+      end
+      y = y + 0.5
+    end
+    return true
+  end
+  local MX, MT, MB = 4, 1, 4   -- marges minimales vérifiées : côtés, haut (intérieur), bas (biseau compris)
+  local function splitLines(t)
+    local out = {}
+    if t == nil or t == "" then return out end
+    for l in (t .. "\n"):gmatch("(.-)\n") do out[#out + 1] = l end
+    return out
+  end
+  local holder = UI().content
+  local card = W.card(holder)
+  local ids = {}
+  for id in pairs(ns.Cards) do ids[#ids + 1] = id end
+  table.sort(ids)
+  local bad, under, nameUnder = {}, {}, {}
+  local bodyDist, nameDist = {}, {}
+  local variants = {
+    { key = "", opts = { playable = true } },
+    { key = " (injouable)", opts = { playable = false, reason = "Pas assez de mana." } },
+  }
+  local cases = 0
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      for vi, var in ipairs(variants) do
+        cases = cases + 1
+        card:SetCard(id, up, var.opts)
+        local label = id .. (up and "+" or "") .. var.key
+        local fit = card.bodyFit
+        local fs = card.body
+        local lines = splitLines(fs._text)
+        local size = fs._fontSize
+        local lh = size * LH
+        local pt = fs._points[1]
+        local cx, cy = pt[4], -pt[5]
+        local top = cy - #lines * lh / 2
+        local bottom = top + #lines * lh
+        if not fit.ok then bad[#bad + 1] = label .. " : ne tient à aucun palier" end
+        if fs:GetNumLines() ~= #lines or fs:IsTruncated() then
+          bad[#bad + 1] = label .. " : lignes recoupées par le client (" .. fs:GetNumLines() .. " / " .. #lines .. ")"
+        end
+        local gem = card.gem._shown and gems[(card.gem._texture or ""):match("gem_(%a+)%.tga$")]
+        for k, line in ipairs(lines) do
+          local lw = H.textWidth(fs, line, size)
+          local x0, x1 = cx - lw / 2, cx + lw / 2
+          local y0, y1 = top + (k - 1) * lh, top + k * lh
+          local ok, where = all(x0 - MX, y0 - MT, x1 + MX, y1 + MB, dark)
+          if not ok then bad[#bad + 1] = ("%s : ligne %d hors de l'ardoise (marges comprises) en %s"):format(label, k, where) end
+          if gem then
+            local ok2, where2 = all(x0, y0, x1, y1, function(u, v) local _, _, _, a = gem(u, v) return a <= 60 end)
+            if not ok2 then bad[#bad + 1] = ("%s : ligne %d sous la gemme en %s"):format(label, k, where2) end
+          end
+        end
+        if card.plate._shown and bottom > SC.pieces.card_plate[2] * CW then bad[#bad + 1] = label .. " : sur la plaque du bas" end
+        if card.reasonPlate and card.reasonPlate._shown then
+          local rp = card.reasonPlate._points[1]
+          if bottom > -rp[5] - card.reasonPlate._h / 2 then bad[#bad + 1] = label .. " : sous la plaque de raison" end
+        end
+        if vi == 1 then
+          bodyDist[size] = (bodyDist[size] or 0) + 1
+          if fit.under then under[#under + 1] = ("%s (%s)"):format(label, tostring(size)) end
+          -- nom : une ligne dans la bande du ruban (encre de la ligne, marge de 2 unités)
+          local nf = card.nameFit
+          local ns_ = card.name._fontSize
+          local np = card.name._points[1]
+          local nw = H.textWidth(card.name, card.name._text, ns_)
+          local nlh = ns_ * LH
+          local ny0 = -np[5] - nlh / 2
+          local ok, where = all(np[4] - nw / 2 - 2, ny0 + 0.28 * ns_, np[4] + nw / 2 + 2, ny0 + 1.33 * ns_,
+            function(u, v) local _, _, _, a = ribbon(u, v) return a > 200 end)
+          if not ok or not nf.ok or card.name:IsTruncated() then
+            bad[#bad + 1] = ("%s : nom hors du ruban en %s"):format(label, tostring(where))
+          end
+          nameDist[ns_] = (nameDist[ns_] or 0) + 1
+          if nf.under then nameUnder[#nameUnder + 1] = ("%s (%s)"):format(card.name._text, tostring(ns_)) end
+        end
+      end
+    end
+  end
+  local function dist(t)
+    local ks, out = {}, {}
+    for k in pairs(t) do ks[#ks + 1] = k end
+    table.sort(ks, function(a, b) return a > b end)
+    for _, k in ipairs(ks) do out[#out + 1] = k .. " : " .. t[k] end
+    return table.concat(out, ", ")
+  end
+  check(("%d cartes × base/améliorée × jouable/injouable (%d cas) : texte dans l'ardoise, marges comprises ; nom dans le ruban")
+    :format(#ids, cases), #bad == 0, table.concat(bad, "\n        "))
+  print("      texte, cartes par taille : " .. dist(bodyDist))
+  print("      nom, cartes par taille : " .. dist(nameDist))
+  print("      texte sous le plancher (" .. W.BODY_SIZES[#W.BODY_SIZES] .. ") : "
+    .. (#under > 0 and table.concat(under, ", ") or "aucune"))
+  print("      nom sous le plancher (" .. W.NAME_SIZES[#W.NAME_SIZES] .. ") : "
+    .. (#nameUnder > 0 and table.concat(nameUnder, ", ") or "aucun"))
+  check("paliers : la plupart des cartes au premier palier du texte", (bodyDist[W.BODY_SIZES[1]] or 0) * 2 > #ids * 2)
+  -- mise en page figée : lignes à retours explicites, largeur plus grande que la plus longue ligne
+  card:SetCard("shadowform", false, { playable = true })
+  check("Forme d'ombre : lignes posées une à une, aucune recoupe par le client",
+    (card.body._text or ""):find("\n", 1, true) and card.body:GetNumLines() == #splitLines(card.body._text)
+    and card.body._w >= 2 * W.CARD_TEXT.half * CW)
+  -- textes d'une carte fraîche, non survolée : visibles (alpha 1, police et taille valides, au-dessus
+  -- des pièces de la carte, rien de dessiné par-dessus)
+  local fresh = W.card(holder)
+  fresh:SetCard("penance", false, { playable = true, cost = 2 })
+  local LAYER = { BACKGROUND = 1, BORDER = 2, ARTWORK = 3, OVERLAY = 4, HIGHLIGHT = 5 }
+  local function effAlpha(o)
+    local a = 1
+    while o do
+      local c = rawget(o, "_calls").SetAlpha
+      if c then a = a * (c[1] or 1) end
+      o = rawget(o, "_parent")
+    end
+    return a
+  end
+  local vis = {}
+  for _, key in ipairs({ "name", "cost", "body", "plateText" }) do
+    local fs = fresh[key]
+    if fs._shown then
+      local col = fs._calls.SetTextColor
+      local okFont = type(fs._fontPath) == "string" and fs._fontPath:find("Baloo", 1, true) and (fs._fontSize or 0) >= 6
+      local okLayer = true
+      for _, k in ipairs(rawget(fresh.face, "_kids")) do
+        if rawget(k, "_kind") == "Texture" and (LAYER[k._layer] or 0) >= LAYER[fs._layer] then okLayer = false end
+      end
+      for _, k in ipairs(rawget(fresh.face, "_kids")) do
+        if rawget(k, "_kind") == "Frame" and k._shown and k ~= fresh.face then okLayer = false end
+      end
+      if not (fs:IsVisible() and effAlpha(fs) == 1 and okFont and okLayer and (fs._text or "") ~= ""
+        and (not col or (col[4] or 1) == 1)) then
+        vis[#vis + 1] = key
+      end
+    end
+  end
+  check("carte fraîche non survolée : nom, coût, texte et plaque visibles (alpha 1, police, couche au-dessus des pièces)",
+    #vis == 0, table.concat(vis, ", "))
+  -- police d'addon chargée après coup : à l'ouverture, police et texte de tous les textes sont reposés
+  local probe = W.label(holder, "bold", 11)
+  probe:SetText("essai")
+  local n0 = probe._setFontCount or 0
+  UI().frame:Hide()
+  UI().frame:Show()
+  H.advance(0.2)
+  check("ouverture : polices et textes reposés (texte vide jusqu'au survol évité)", (probe._setFontCount or 0) > n0
+    and probe._text == "essai" and probe._fontSize == 11)
+  card:Hide()
+  fresh:Hide()
+  probe:Hide()
+  -- planche de cartes (instantané facultatif) : textes longs, injouable, mot-clé, noms longs
+  if SNAP then
+    local sheet = CreateFrame("Frame", nil, _G.UIParent)
+    sheet:SetSize(6 * 140 + 20, 230)
+    sheet:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    sheet:SetScale(1.8)
+    local list = { { "shadowform", false, { playable = true } },
+      { "penance", false, { playable = false, reason = "Pas assez de mana." } },
+      { "spirit_of_redemption", true, { playable = true } }, { "solace", true, { playable = true } },
+      { "mind_blast", false, { playable = true } }, { "smite", false, { playable = true } } }
+    for i, e in ipairs(list) do
+      local c = W.card(sheet)
+      c:SetCard(e[1], e[2], e[3])
+      W.placeCenter(c, sheet, 80 + (i - 1) * 140, 125, 1)
+    end
+    Render.svg(H, sheet, SNAP .. "/cartes.svg", "cartes")
+    sheet:Hide()
+  end
 end
 
 print("U16 méthodes d'API inconnues appelées")

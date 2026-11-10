@@ -4,8 +4,9 @@
 -- d'après leurs aperçus PNG (tools/build_media.py → build/media_png, copiés dans <dossier>/media) avec
 -- coordonnées de texture, couleur de sommet, désaturation, masque et rotation ; textes en Baloo
 -- Chettan 2 (police installée) avec ombre et couleurs |c. Icônes du jeu = carrés bleus, modèles 3D =
--- silhouettes en pointillés, illustrations = aplat. Approximatif : la césure et la largeur des textes
--- ne sont qu'estimées.
+-- silhouettes en pointillés, illustrations = aplat. Textes mesurés comme le faux client du harnais
+-- (avances des glyphes de Baloo Chettan 2, ligne de 1,47 cadratin, retours explicites puis par mots) ;
+-- sans harnais, estimation à 0,5 cadratin par caractère.
 local R = {}
 
 local CIRCLE = 130924
@@ -17,11 +18,15 @@ local POINTS = {
 }
 local LAYERS = { BACKGROUND = 1, BORDER = 2, ARTWORK = 3, OVERLAY = 4, HIGHLIGHT = 5 }
 
-function R.textWidth(text, size)
+-- Largeur d'un texte (sans codes) à la taille size, police de o (faux client si disponible).
+function R.textWidth(text, size, o)
+  if R.H and R.H.textWidth and o then return R.H.textWidth(o, text, size) end
   local n = 0
   for _ in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do n = n + 1 end
   return n * size * 0.5
 end
+local function lineHeight(size) return size * ((R.H and R.H.metrics and R.H.metrics.lineHeight) or 1.15) end
+local ASC = 1.078 / 1.47 -- position de la ligne de base dans la ligne (Baloo Chettan 2)
 
 local function escale(o)
   local s = 1
@@ -50,9 +55,13 @@ local function rect(o, memo, depth)
     -- taille d'un texte sans largeur imposée : estimée (0,5 em par caractère)
     local text = tostring(rawget(o, "_text") or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
     local size = (rawget(o, "_fontSize") or 12) * s
-    local natural = R.textWidth(text, size)
+    local natural = 0
+    for para in (text .. "\n"):gmatch("(.-)\n") do natural = math.max(natural, R.textWidth(para, size, o)) end
     if w == 0 then w = natural end
-    if h == 0 then h = size * 1.15 * math.max(1, math.ceil(natural / math.max(1, w))) end
+    if h == 0 then
+      local n = (R.H and R.H.wrapLines) and #(R.H.wrapLines(o)) or math.ceil(natural / math.max(1, w))
+      h = lineHeight(size) * math.max(1, n)
+    end
     if text == "" then w, h = 0, 0 end
   end
   if pts[1] and pts[1][1] == "ALL" then
@@ -179,7 +188,12 @@ local function words(text)
       push()
       color = nil
       i = i + 2
-    elseif c == " " or c == "\n" then
+    elseif c == "\n" then
+      push()
+      out[#out + 1] = { "\n" }
+      space = false
+      i = i + 1
+    elseif c == " " then
       push()
       space = true
       i = i + 1
@@ -193,6 +207,7 @@ local function words(text)
 end
 
 function R.svg(H, root, path, label)
+  R.H = H
   local rr = rect(root)
   if not rr then return false end
   local dir = path:match("^(.*)/") or "."
@@ -339,14 +354,19 @@ function R.svg(H, root, path, label)
           local ws = words(tostring(text))
           local maxW = ww > 0 and ww or 1e9
           local lines, cur, curW = {}, {}, 0
+          local es = escale(o)
           for _, wd in ipairs(ws) do
-            local wl = R.textWidth(wd[1], size)
-            local add = (#cur > 0 and wd[3]) and size * 0.25 or 0
-            if #cur > 0 and wd[3] and curW + add + wl > maxW then
-              lines[#lines + 1] = cur cur, curW = {}, 0 add = 0
+            if wd[1] == "\n" then
+              lines[#lines + 1] = cur cur, curW = {}, 0
+            else
+              local wl = R.textWidth(wd[1], size / es, o) * es
+              local add = (#cur > 0 and wd[3]) and R.textWidth(" ", size / es, o) * es or 0
+              if #cur > 0 and wd[3] and curW + add + wl > maxW + 0.01 then
+                lines[#lines + 1] = cur cur, curW = {}, 0 add = 0
+              end
+              cur[#cur + 1] = { wd[1], wd[2], #cur > 0 and wd[3] }
+              curW = curW + add + wl
             end
-            cur[#cur + 1] = { wd[1], wd[2], #cur > 0 and wd[3] }
-            curW = curW + add + wl
           end
           if #cur > 0 then lines[#lines + 1] = cur end
           local anchor, tx = "middle", x + w / 2
@@ -356,11 +376,11 @@ function R.svg(H, root, path, label)
             local p = pt and pt[1] or "CENTER"
             if p:find("LEFT") then anchor = "start" elseif p:find("RIGHT") then anchor = "end" end
           end
-          local lh = size * 1.15 + (calls.SetSpacing and calls.SetSpacing[1] or 0)
+          local lh = lineHeight(size) + (calls.SetSpacing and calls.SetSpacing[1] or 0)
           local ty
-          if h > 0 then ty = y + (h - lh * #lines) / 2 + size * 0.8 else ty = y - lh * (#lines - 1) / 2 + size * 0.35 end
+          if h > 0 then ty = y + (h - lh * #lines) / 2 + lh * ASC else ty = y - lh * #lines / 2 + lh * ASC end
           local pt = rawget(o, "_points")[1]
-          if pt and pt[1] and pt[1]:find("TOP") and h == 0 then ty = y + size end
+          if pt and pt[1] and pt[1]:find("TOP") and h == 0 then ty = y + lh * ASC end
           local so = calls.SetShadowOffset
           local shadow = so and ((so[1] or 0) ~= 0 or (so[2] or 0) ~= 0)
           local base = col(tc)

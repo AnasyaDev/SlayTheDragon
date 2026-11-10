@@ -3,8 +3,9 @@
 -- gauche) : file, w × h (toile), cw × ch (zone utile, pixels), tc = coordonnées de texture de la zone
 -- utile ; corner = coin des textures à neuf tranches (pixels), rim = épaisseur du liseré (pixels).
 -- card : géométrie de la carte en fractions de la largeur du corps, origine au coin haut gauche du
--- corps (x, y, w, h) ; name.angle en radians (sens trigonométrique). Pièces : pack Mechanized Magic
--- (Dumivid, CC0) ; police : Baloo Chettan 2 (OFL) ; icônes : pack d'icônes améliorées 128 px.
+-- corps (x, y, w, h) ; name : centre (cx, cy) et longueur utile du nom sur le ruban. Pièces : pack
+-- Mechanized Magic (Dumivid, CC0) ; police : Baloo Chettan 2 (OFL) ; icônes : pack d'icônes améliorées
+-- 128 px.
 local _, ns = ...
 
 ns.Skin = {
@@ -22,19 +23,16 @@ ns.Skin = {
       uncommon = { 0.42558, 0.62209, 0.15, 0.13372 },
     },
     name = {
-      angle = -0.16035,
       cx = 0.5,
-      cy = 0.03559,
-      flatCy = 0.03612,
-      len = 0.77407,
+      cy = 0.0407,
+      len = 0.73488,
     },
     pieces = {
       card_cost = { 0.22558, -0.19419, 0.54884, 0.26512 },
       card_glow = { -0.21512, -0.21512, 1.43023, 1.80698 },
       card_panel = { 0.11163, 0.66279, 0.77674, 0.56279 },
       card_plate = { 0.20465, 1.27326, 0.5907, 0.20465 },
-      card_ribbon = { -0.05233, -0.11163, 1.10581, 0.36395 },
-      card_ribbon_flat = { -0.03605, -0.15349, 1.07558, 0.48256 },
+      card_ribbon = { -0.05349, -0.15698, 1.10349, 0.35814 },
       medal_glass = { 0.14419, 0.0407, 0.71163, 0.74767 },
       medal_mask = { 0.17093, 0.03953, 0.6593, 0.70233 },
       medal_ring = { 0.1, -0.00581, 0.8, 0.84186 },
@@ -221,19 +219,11 @@ ns.Skin = {
       w = 256,
     },
     card_ribbon = {
-      ch = 169,
+      ch = 166,
       cw = 512,
       file = "card_ribbon.tga",
       h = 256,
-      tc = { 0, 1, 0, 0.66016 },
-      w = 512,
-    },
-    card_ribbon_flat = {
-      ch = 230,
-      cw = 512,
-      file = "card_ribbon_flat.tga",
-      h = 256,
-      tc = { 0, 1, 0, 0.89844 },
+      tc = { 0, 1, 0, 0.64844 },
       w = 512,
     },
     gem_epic = {
