@@ -669,6 +669,364 @@ test("fin d'expédition : journal, méta, clé", function()
 end)
 
 ---------------------------------------------------------------------------
+-- Rencontres : familles, conditions, paris, histoires (piste F)
+---------------------------------------------------------------------------
+
+-- Entre dans la rencontre id en ignorant ses conditions et son caractère unique
+-- (restaurés ensuite) : sert aux tests des réponses.
+local function forceEvent(exp, id)
+  local ev = ns.Events[id]
+  local when, once, tier = ev.when, ev.once, ev.tier
+  ev.when, ev.once, ev.tier = nil, nil, 0
+  local ok, err = pcall(enterEvent, exp, id)
+  ev.when, ev.once, ev.tier = when, once, tier
+  if not ok then error(err, 0) end
+end
+
+local SCENES = { farm = true, road = true, coast = true, mine = true, hill = true, camp = true, ruins = true }
+local EFFECTS = { heal = true, healPct = true, loseHp = true, maxHp = true, loseMaxHp = true, gold = true,
+  pay = true, loseGold = true, card = true, cardChoice = true, relic = true, potion = true, losePotion = true,
+  upgradeRandom = true, upgrade = true, remove = true, dupe = true, fight = true, gamble = true, flag = true }
+local REQUIRES = { pay = true, remove = true, upgrade = true, dupe = true, losePotion = true }
+
+test("rencontres : données complètes (familles, décor, réponses, effets, conditions)", function()
+  local fam, tier0, withWhen = { common = 0, rare = 0, story = 0 }, 0, 0
+  local function checkEffects(id, effects)
+    for _, e in ipairs(effects) do
+      assert(EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
+      if e[1] == "fight" then
+        local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
+        assert(ns.Encounters.act1[pool], id .. " : groupe " .. tostring(pool))
+      elseif e[1] == "relic" and e[2] then
+        assert(ns.Relics[e[2]] and ns.Relics[e[2]].noPool, id .. " : bibelot propre " .. e[2])
+      elseif e[1] == "potion" and e[2] then
+        assert(ns.Potions[e[2]], id .. " : potion " .. e[2])
+      elseif e[1] == "gamble" then
+        assert(e[2] > 0 and e[2] < 1, id .. " : chance")
+        checkEffects(id, e.win or {})
+        checkEffects(id, e.lose or {})
+      end
+    end
+  end
+  for id, ev in pairs(ns.Events) do
+    assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
+    assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
+    assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
+    assert(ev.tier >= 0 and ev.tier <= 3, id .. " : tier")
+    if ev.act == 1 then fam[ev.rarity] = fam[ev.rarity] + 1 end
+    if ev.rarity == "common" and ev.tier == 0 then tier0 = tier0 + 1 end
+    if ev.rarity == "story" then assert(ev.once, id .. " : histoire unique") end
+    if ev.when then
+      withWhen = withWhen + 1
+      assert(X.check(newExp(), ev.when) ~= nil)
+    end
+    local free = false
+    assert(#ev.choices >= 2, id .. " : au moins 2 réponses")
+    for ci, ch in ipairs(ev.choices) do
+      assert(ch.label and ch.outcome and ch.outcome ~= "", id .. " : réponse " .. ci .. " sans label/outcome")
+      checkEffects(id, ch.effects)
+      local needs = ch.when ~= nil
+      for _, e in ipairs(ch.effects) do if REQUIRES[e[1]] then needs = true end end
+      if not needs then free = true end
+    end
+    assert(free, id .. " : aucune réponse toujours possible")
+  end
+  assert(fam.common >= 8 and fam.common <= 10, "ordinaires : " .. fam.common)
+  eq(fam.rare, 2, "rares")
+  assert(fam.story >= 1, "histoires")
+  assert(tier0 >= 5, "ordinaires au palier 0 : " .. tier0)
+  assert(withWhen >= 3, "rencontres conditionnelles : " .. withWhen)
+end)
+
+test("conditions : chaque condition et sa raison", function()
+  local exp = newExp({ key = 2, flags = { seen = true } })
+  exp.hp, exp.maxHp, exp.gold, exp.floor = 20, 60, 40, 3
+  local function ok(c) return (X.check(exp, { c })) end
+  assert(ok({ "hpBelow", 0.5 }) and not ok({ "hpBelow", 0.3 }))
+  assert(ok({ "hpAbove", 0.3 }) and not ok({ "hpAbove", 0.5 }))
+  assert(ok({ "gold", 40 }) and not ok({ "gold", 41 }))
+  assert(ok({ "key", 2 }) and not ok({ "key", 3 }))
+  assert(ok({ "floor", 3 }) and not ok({ "floor", 4 }))
+  assert(ok({ "flag", "seen" }) and not ok({ "flag", "other" }))
+  assert(ok({ "noFlag", "other" }) and not ok({ "noFlag", "seen" }))
+  assert(ok({ "card", "smite" }) and not ok({ "card", "penance" }))
+  assert(not ok({ "potion" }))
+  exp.potions[2] = "healing_potion"
+  assert(ok({ "potion" }))
+  assert(not ok({ "relic", "stormwind_tabard" }) and ok({ "noRelic", "stormwind_tabard" }))
+  local _, why = X.check(exp, { { "relic", "stormwind_tabard" } })
+  assert(why:find(ns.Relics.stormwind_tabard.name, 1, true), why)
+  _, why = X.check(exp, { { "gold", 60 } })
+  eq(why, "Il te faut 60 po.")
+  _, why = X.check(exp, { { "gold", 60, text = "Trop pauvre." } })
+  eq(why, "Trop pauvre.", "raison personnalisée")
+  assert(not pcall(X.check, exp, { { "inconnue" } }), "condition inconnue refusée")
+end)
+
+test("rencontres : conditions de déclenchement (PV, étape, clé, drapeau)", function()
+  local exp = newExp({ unlocks = { rep = 0, league = 3 } })
+  exp.floor = 1
+  local pool = X.eventPool(exp)
+  eq(count(pool, "herbalist"), 0, "PV pleins : pas d'herboriste")
+  eq(count(pool, "lighthouse_keeper"), 0, "étape 1 : pas de phare")
+  eq(count(pool, "gnoll_raiders"), 0, "clé +0 : pas de maraudeurs")
+  eq(count(pool, "harvest_watcher"), 1, "PV pleins : moissonneur")
+  eq(count(pool, "tobin_scout"), 0, "sans drapeau : pas de suite")
+  eq(count(pool, "tobin_thief"), 1, "compte neuf : premier temps")
+  exp.hp, exp.floor, exp.key = 20, 5, 2
+  exp.flags.tobin_spared = true
+  pool = X.eventPool(exp)
+  eq(count(pool, "herbalist"), 1)
+  eq(count(pool, "lighthouse_keeper"), 1)
+  eq(count(pool, "gnoll_raiders"), 1)
+  eq(count(pool, "harvest_watcher"), 0, "PV bas : pas de combat d'élite optionnel")
+  eq(count(pool, "tobin_scout"), 1)
+  eq(count(pool, "tobin_defias"), 0, "branche exclusive")
+  -- Le premier nœud d'une carte est à l'étape 1 : la rencontre tirée respecte les conditions.
+  for s = 1, 40 do
+    local e = newExp({ seed = s, unlocks = { rep = 0, league = 3 } })
+    enter(e, "event")
+    if e.event.id then
+      local ev = ns.Events[e.event.id]
+      assert(X.check(e, ev.when), e.event.id)
+      assert(e.event.id ~= "lighthouse_keeper" and e.event.id ~= "herbalist")
+    end
+  end
+end)
+
+test("réponse conditionnelle : désactivée avec la raison, puis possible", function()
+  local exp = newExp()
+  forceEvent(exp, "sentinel_hill")
+  local ok, why = X.eventChoiceOk(exp, 4)
+  eq(ok, false)
+  assert(why:find(ns.Relics.stormwind_tabard.name, 1, true), why)
+  local ok2, why2 = X.act(exp, { "choose", 4 })
+  eq(ok2, false); eq(why2, why, "act renvoie la même raison")
+  for _, a in ipairs(X.choices(exp)) do assert(not (a[1] == "choose" and a[2] == 4), "absente de choices") end
+  local opts = X.eventOptions(exp)
+  eq(#opts, 4)
+  eq(opts[4].disabled, true); eq(opts[4].reason, why)
+  eq(opts[1].disabled, nil)
+  exp.gold = 0
+  eq(X.eventOptions(exp)[2].reason, "Pas assez d'or.", "code traduit")
+  exp.relics[#exp.relics + 1] = "stormwind_tabard"
+  assert(X.eventChoiceOk(exp, 4))
+  assert(X.act(exp, { "choose", 4 }))
+  eq(exp.phase, "reward")
+  for _, id in ipairs(exp.reward.cards) do eq(ns.Cards[id].rarity, "uncommon") end
+  -- Réfugiés : la potion donnée disparaît, 2 cartes améliorées.
+  local b = newExp()
+  forceEvent(b, "moonbrook_refugees")
+  eq(X.eventChoiceOk(b, 4), false)
+  b.potions[1], b.potions[3] = "healing_potion", "mana_potion"
+  assert(X.act(b, { "choose", 4 }))
+  eq(b.potions[3], false); eq(b.potions[1], "healing_potion")
+  local ups = 0
+  for _, card in ipairs(b.deck) do if card.up then ups = ups + 1 end end
+  eq(ups, 2)
+end)
+
+test("pari : tiré à l'entrée, figé au rechargement, issues annoncées", function()
+  local wins, losses = 0, 0
+  for s = 1, 40 do
+    local exp = newExp({ seed = s })
+    forceEvent(exp, "coast_murlocs")
+    local roll = exp.event.rolls[2][1]
+    assert(type(roll.won) == "boolean")
+    local copy = reload(exp)
+    assert(X.act(exp, { "choose", 2 }))
+    assert(X.act(copy, { "choose", 2 }))
+    eq(serialize(copy), serialize(exp), "même issue après rechargement")
+    eq(exp.event.lucky, roll.won)
+    if roll.won then
+      wins = wins + 1
+      eq(exp.phase, "reward"); eq(exp.reward.goldGained, 20)
+      eq(exp.reward.potion, roll.win[1])
+      assert(exp.event.result:find("fiole", 1, true))
+    else
+      losses = losses + 1
+      eq(exp.hp, 65 - 7); eq(exp.phase, "event")
+      assert(exp.event.result:find("murloc", 1, true))
+    end
+  end
+  assert(wins > 5 and losses > 5, ("pari équilibré : %d / %d"):format(wins, losses))
+  -- Pari payant : le prix est dû même en cas de perte.
+  local exp = newExp()
+  forceEvent(exp, "jangolode_prospector")
+  exp.event.rolls[2][2].won = false
+  assert(X.act(exp, { "choose", 2 }))
+  eq(exp.gold, X.START_GOLD - 30)
+end)
+
+test("rencontre rare : poids faible, tirée rarement", function()
+  eq(X.eventWeight(ns.Events.goblin_peddler), X.EVENT_WEIGHT.rare)
+  eq(X.eventWeight(ns.Events.saldean_farm), X.EVENT_WEIGHT.common)
+  assert(X.EVENT_WEIGHT.rare * 3 <= X.EVENT_WEIGHT.common)
+  local n, seen = 0, {}
+  for s = 1, 1500 do
+    local exp = newExp({ seed = s, unlocks = { rep = 0, league = 3 } })
+    enter(exp, "event")
+    if exp.event.id then
+      n = n + 1
+      seen[exp.event.id] = (seen[exp.event.id] or 0) + 1
+    end
+  end
+  local rare = (seen.goblin_peddler or 0) + (seen.harvest_watcher or 0)
+  local common = seen.saldean_farm + seen.defias_caravan + seen.sentinel_hill
+  assert(rare > 0, "rares jamais tirées")
+  assert(rare / 2 < common / 3 / 2, ("rares %d contre ordinaires %d"):format(rare, common))
+  -- Poids explicite : remplace celui de la famille.
+  ns.Events.goblin_peddler.weight = 1000
+  local exp = newExp({ unlocks = { rep = 0, league = 3 } })
+  enter(exp, "event")
+  ns.Events.goblin_peddler.weight = nil
+  eq(exp.event.id, "goblin_peddler")
+end)
+
+test("rencontre rare : marché (bibelot contre PV max) et combat d'élite optionnel", function()
+  local exp = newExp()
+  forceEvent(exp, "goblin_peddler")
+  assert(X.act(exp, { "choose", 1 }))
+  eq(exp.maxHp, 65 - 8); eq(exp.hp, 65 - 8)
+  eq(exp.relics[#exp.relics], "harvest_cog")
+  local b = newExp()
+  forceEvent(b, "goblin_peddler")
+  b.relics[#b.relics + 1] = "harvest_cog"
+  eq(select(2, X.eventChoiceOk(b, 1)), "bibelot", "bibelot unique déjà possédé")
+  local c = newExp()
+  forceEvent(c, "harvest_watcher")
+  assert(X.act(c, { "choose", 1 }))
+  eq(c.phase, "combat")
+  eq(c.fight.kind, "elite"); eq(c.fight.pool, "event_golem")
+  eq(c.fight.encounter[1], "harvest_golem")
+  assert(c.fight.reward.relic, "récompense d'élite : bibelot")
+  assert(c.fight.reward.gold >= 25 + 40)
+  winCombat(c)
+  eq(c.phase, "reward"); eq(c.stats.elites, 1)
+end)
+
+test("histoire : une seule fois par compte, suite débloquée à l'expédition suivante", function()
+  local db = Save.new()
+  local exp = assert(Save.start(db, { seed = 21 }))
+  enterEvent(exp, "tobin_thief")
+  assert(exp.newFlags["event:tobin_thief"], "vue = drapeau posé à l'entrée")
+  assert(X.act(exp, { "choose", 2 }))
+  eq(exp.gold, X.START_GOLD - 20)
+  assert(exp.newFlags.tobin_spared)
+  eq(X.hasFlag(exp, "tobin_spared"), false, "pas dans cette expédition")
+  eq(count(X.eventPool(exp), "tobin_scout"), 0)
+  local s = Save.abandon(db, "x")
+  eq(table.concat(s.flags, ","), "event:tobin_thief,tobin_spared")
+  assert(Meta.hasFlag(db.meta, "tobin_spared"))
+  assert(Save.validate(db))
+  -- Expédition suivante : le premier temps ne revient plus, la suite est possible.
+  local e2 = assert(Save.start(db, { seed = 22 }))
+  local pool = X.eventPool(e2)
+  eq(count(pool, "tobin_thief"), 0, "déjà vue sur ce compte")
+  eq(count(pool, "tobin_scout"), 1)
+  eq(count(pool, "tobin_defias"), 0)
+  for other in pairs(ns.Events) do
+    if other ~= "tobin_scout" then e2.seenEvents[other] = true end
+  end
+  enter(e2, "event")
+  eq(e2.event.id, "tobin_scout")
+  assert(X.act(e2, { "choose", 1 }))
+  eq(e2.relics[#e2.relics], "tobin_knife")
+  Save.abandon(db, "y")
+  local e3 = assert(Save.start(db, { seed = 23 }))
+  eq(count(X.eventPool(e3), "tobin_scout"), 0, "suite vue une fois aussi")
+  -- Autre branche : livré à la milice -> foulard rouge, réponse cachée.
+  local m = Meta.new()
+  m.flags["event:tobin_thief"], m.flags.tobin_jailed = true, true
+  local e4 = Meta.newExpedition(m, { seed = 5 })
+  eq(count(X.eventPool(e4), "tobin_defias"), 1)
+  forceEvent(e4, "tobin_defias")
+  local o = X.eventOptions(e4)
+  eq(o[3].hidden, true); eq(o[3].outcome, "?")
+  eq(ns.Events.tobin_defias.choices[3].text, "?", "interface d'origine : « ? » aussi")
+  assert(X.act(e4, { "choose", 1 }))
+  eq(e4.fight.pool, "event_tobin")
+end)
+
+test("carte copiée (phare) puis récompense en attente après une sélection", function()
+  local exp = newExp()
+  forceEvent(exp, "lighthouse_keeper")
+  assert(X.act(exp, { "choose", 1 }))
+  eq(exp.phase, "select"); eq(exp.select.kind, "dupe")
+  eq(exp.hp, 55)
+  local id = exp.deck[3].id
+  assert(X.act(exp, { "select", 3 }))
+  eq(#exp.deck, 11); eq(exp.deck[11].id, id)
+  eq(exp.phase, "map")
+  -- Sélection et récompense dans la même réponse : la récompense s'ouvre après.
+  ns.Events.test_combo = { name = "x", act = 1, tier = 0, text = "", speaker = "x", npc = "x", scene = "road",
+    choices = { { label = "x", outcome = "x", effects = { { "remove" }, { "gold", 10 } } },
+      { label = "y", outcome = "y", effects = {} } } }
+  local b = newExp()
+  forceEvent(b, "test_combo")
+  assert(X.act(b, { "choose", 1 }))
+  eq(b.phase, "select")
+  assert(X.act(b, { "skipSelect" }))
+  ns.Events.test_combo = nil
+  eq(b.phase, "reward"); eq(b.reward.goldGained, 10)
+end)
+
+test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
+  for id, ev in pairs(ns.Events) do
+    for ci = 1, #ev.choices do
+      for _, lucky in ipairs({ true, false }) do
+        local exp = newExp()
+        forceEvent(exp, id)
+        exp.hp, exp.maxHp, exp.gold = 1, 6, 500
+        exp.potions[1] = "healing_potion"
+        exp.relics[#exp.relics + 1] = "stormwind_tabard"
+        for _, r in ipairs(exp.event.rolls[ci]) do
+          if type(r) == "table" and r.won ~= nil then r.won = lucky end
+        end
+        local ok, why = X.act(exp, { "choose", ci })
+        assert(ok or why == "bibelot", id .. " " .. ci .. " : " .. tostring(why))
+        if exp.phase ~= "combat" then
+          assert(exp.hp >= 1 and exp.hp <= exp.maxHp and exp.maxHp >= 1,
+            ("%s %d : PV %d / %d"):format(id, ci, exp.hp, exp.maxHp))
+        end
+        assert(Save.isPlain(exp))
+      end
+    end
+  end
+end)
+
+test("sauvegarde v1 -> v2 : drapeaux créés, gardés, expédition en cours migrée", function()
+  -- Sauvegarde v1 (avant les drapeaux), avec une expédition v1 en cours.
+  local cur = newExp({ seed = 8 })
+  cur.version, cur.flags, cur.newFlags, cur.stats.events = 1, nil, nil, nil
+  local v1 = { version = 1, meta = { league = 300, runs = 3, classes = {} }, current = cur, journal = {} }
+  local db, note = Save.migrate(reload(v1))
+  eq(note, "migrée"); eq(db.version, Save.VERSION); eq(Save.VERSION, 2)
+  eq(type(db.meta.flags), "table")
+  eq(db.meta.league, 300)
+  assert(db.current, "expédition gardée")
+  eq(db.current.version, X.VERSION)
+  eq(type(db.current.flags), "table"); eq(type(db.current.newFlags), "table")
+  assert(Save.validate(db))
+  -- Drapeaux déjà présents (sauvegarde de développement v1 ou v2) : jamais perdus.
+  local dev = { version = 1, meta = { league = 0, runs = 0, classes = {}, flags = { tobin_spared = true, odd = 1, no = false } } }
+  local m = Save.migrate(dev)
+  eq(m.meta.flags.tobin_spared, true); eq(m.meta.flags.odd, true); eq(m.meta.flags.no, nil)
+  local v2 = reload(m)
+  Save.migrate(v2)
+  eq(serialize(v2), serialize(m), "migration idempotente, drapeaux gardés")
+  -- La méta reporte les drapeaux d'une expédition terminée, même perdue.
+  local db2 = Save.migrate(nil)
+  local e = assert(Save.start(db2, { seed = 3 }))
+  X.setFlag(e, "test_flag")
+  e.result, e.phase = "lost", "done"
+  Save.finish(db2, "z")
+  eq(db2.meta.flags.test_flag, true)
+  local back = Save.migrate(reload(db2))
+  eq(back.meta.flags.test_flag, true, "après rechargement")
+end)
+
+---------------------------------------------------------------------------
 -- Robustesse et simulation
 ---------------------------------------------------------------------------
 

@@ -1,6 +1,7 @@
 -- Méta-progression du compte : réputation par classe, Ligue des explorateurs,
 -- clés mythiques et leurs affixes. L'état est fait de données simples :
--- meta = { league = points, runs = n, classes = { [classe] = { rep, runs, wins, keyMax, bestKey } } }
+-- meta = { league = points, runs = n, classes = { [classe] = { rep, runs, wins, keyMax, bestKey } },
+--          flags = { [nom] = true } }
 local _, ns = ...
 
 local floor, max, min = math.floor, math.max, math.min
@@ -160,8 +161,14 @@ end
 -- État du compte
 ---------------------------------------------------------------------------
 
+-- flags : drapeaux de compte { nom = true } posés par les rencontres (rencontres à histoire
+-- vues une fois, suites débloquées). Reportés en fin d'expédition (Meta.record), jamais retirés.
 function Meta.new()
-  return { league = 0, runs = 0, classes = {} }
+  return { league = 0, runs = 0, classes = {}, flags = {} }
+end
+
+function Meta.hasFlag(meta, name)
+  return type(meta.flags) == "table" and meta.flags[name] == true
 end
 
 function Meta.classState(meta, class)
@@ -215,11 +222,12 @@ function Meta.newExpedition(meta, opts)
   local key = opts.key or 0
   if key < 0 or key > Meta.keyMax(meta, class) then return nil, "clé verrouillée" end
   return ns.Expedition.new({ seed = opts.seed, class = class, key = key,
-    unlocks = Meta.unlocks(meta, class), stats = opts.stats, quiet = opts.quiet })
+    unlocks = Meta.unlocks(meta, class), flags = meta.flags, stats = opts.stats, quiet = opts.quiet })
 end
 
 -- Applique le résultat d'une expédition terminée au compte. Renvoie un résumé :
--- { rep, classBefore, classAfter, leagueBefore, leagueAfter, keyUnlocked (niveau ou nil) }
+-- { rep, classBefore, classAfter, leagueBefore, leagueAfter, keyUnlocked (niveau ou nil),
+--   flags (noms des drapeaux de compte nouvellement posés, triés) }
 function Meta.record(meta, exp)
   local cs = Meta.classState(meta, exp.class)
   local gained = Meta.repFor(exp)
@@ -240,5 +248,14 @@ function Meta.record(meta, exp)
   end
   summary.classAfter = Meta.level(cs.rep)
   summary.leagueAfter = Meta.level(meta.league)
+  -- Drapeaux de compte posés pendant l'expédition (quel que soit le résultat).
+  if type(meta.flags) ~= "table" then meta.flags = {} end
+  local names = {}
+  for name in pairs(exp.newFlags or {}) do
+    if not meta.flags[name] then names[#names + 1] = name end
+    meta.flags[name] = true
+  end
+  table.sort(names)
+  summary.flags = names
   return summary
 end

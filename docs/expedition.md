@@ -9,7 +9,7 @@ et les bots de simulation passent par la même API.
 | `Core/Meta.lua` | Réputation de classe, Ligue des explorateurs, clés mythiques, affixes |
 | `Core/Expedition.lua` | Machine à états d'une expédition |
 | `Core/Save.lua` | Format de `SlayTheDragonDB`, migrations, validation, journal |
-| `Data/Events.lua` | Rencontres (3 pour la Marche de l'Ouest) |
+| `Data/Events.lua` | Rencontres de la Marche de l'Ouest (liste et intentions : `docs/rencontres.md`) |
 | `Sim/expedition.lua` | Bot hors combat, `runner=expedition` dans `Sim/sim.lua` |
 | `Sim/tests_expedition.lua` | Tests (`lua5.1` et `luajit`, `ALL PASS`) |
 
@@ -30,7 +30,8 @@ local ok, why = ns.Expedition.act(db.current, { "path", idNoeud })
 
 -- Quand db.current.phase == "done"
 local summary, entry = ns.Save.finish(db, date("%Y-%m-%d %H:%M"))
--- summary = { rep, classBefore, classAfter, leagueBefore, leagueAfter, keyUnlocked }
+-- summary = { rep, classBefore, classAfter, leagueBefore, leagueAfter, keyUnlocked, flags }
+--           flags = noms des drapeaux de compte nouvellement posés (histoires), triés
 -- entry   = ligne ajoutée à db.journal
 
 -- Abandon volontaire
@@ -55,8 +56,8 @@ ns.Save.abandon(db, date(...))
 | `reward` | `{"pickCard", i}`, `{"skipCards"}`, `{"takePotion"}`, `{"leave"}` |
 | `campfire` | `{"rest"}`, `{"upgrade", indexDeck}`, `{"leave"}` |
 | `merchant` | `{"buyCard", i}`, `{"buyRelic", i}`, `{"buyPotion", i}`, `{"remove", indexDeck}`, `{"leave"}` |
-| `event` | `{"choose", i}` puis `{"leave"}` (si le choix n'a pas de suite) |
-| `select` (suite de rencontre) | `{"select", indexDeck}`, `{"skipSelect"}` |
+| `event` | `{"choose", i}` puis `{"leave"}` (si le choix n'a pas de suite) ; une réponse indisponible n'est pas dans `choices` et `act` la refuse avec sa raison (texte) |
+| `select` (suite de rencontre) | `{"select", indexDeck}`, `{"skipSelect"}` ; ensuite la récompense de la même réponse s'il y en a une, sinon la carte |
 | `done` | aucune |
 | toutes sauf `done` | `{"abandon"}` ; hors combat : `{"discardPotion", emplacement}` |
 
@@ -89,16 +90,19 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | `fight` | `{ kind = combat/elite/boss, pool, encounter, seed, reward }` pendant le combat |
 | `reward` | phase `reward` : `{ kind, gold, goldGained, cards = {ids}, cardsDone, picked, relic, relicTaken, potion, potionTaken }` |
 | `shop` | phase `merchant` : `{ cards = { {id, price, sold} }, relics = {...}, potions = {...} }` ; retrait : `Expedition.removePrice(exp)` |
-| `event` | phase `event` : `{ id (false = rien à signaler), chosen (false ou index), rolls }` ; texte dans `ns.Events[id]` |
-| `select` | phase `select` : `{ kind = "upgrade" | "remove" }` |
+| `event` | phase `event` : `{ id (false = rien à signaler), chosen (false ou index), rolls, result, lucky }` ; texte dans `ns.Events[id]` ; `result` = texte après le choix (réponse + issue du pari) ; `lucky` = issue d'un pari (true/false, nil sans pari) |
+| `select` | phase `select` : `{ kind = "upgrade" | "remove" | "dupe", reward? }` |
+| `flags` | drapeaux de compte connus au départ (copie de `meta.flags`, sert aux conditions) |
+| `newFlags` | drapeaux posés pendant l'expédition, reportés dans `meta.flags` par `Save.finish` |
 | `startRelics` | phase `start` : ids proposés |
 | `lastRest` | PV rendus par le dernier repos |
-| `stats` | `{ cleared, elites, bosses, combats, goldEarned, goldSpent, cardsAdded, removed, upgraded, visits = {type = n} }` |
+| `stats` | `{ cleared, elites, bosses, combats, goldEarned, goldSpent, cardsAdded, removed, upgraded, visits = {type = n}, events = {id = réponse (0 = pas encore choisi)} }` |
 | `result` | `won`, `lost`, `abandoned` (phase `done`) ; `killedBy` en cas de défaite |
 
 Aides de lecture : `Expedition.currentNode(exp)`, `Expedition.actName(exp)`,
 `Expedition.canUpgrade(exp, i)`, `Expedition.freeSlot(exp)`, `Expedition.eventChoiceOk(exp, i)`
-(griser un choix de rencontre), `Expedition.removePrice(exp)`.
+(griser un choix de rencontre), `Expedition.eventOptions(exp)` (réponses prêtes à afficher, voir
+plus bas), `Expedition.removePrice(exp)`.
 
 ### Carte
 
@@ -112,14 +116,56 @@ Aides de lecture : `Expedition.currentNode(exp)`, `Expedition.actName(exp)`,
 
 ### Rencontres (`Data/Events.lua`)
 
-`ns.Events[id] = { name, act, tier, text, choices = { { label, text, after, effects } } }` :
-`label` = bouton, `text` = conséquence affichée, `after` = texte après coup. Les effets sont des
-données (`heal`, `loseHp`, `maxHp`, `gold`, `pay`, `card`, `cardChoice`, `relic`, `potion`,
-`upgradeRandom`, `upgrade`, `remove`, `fight`), décrits en tête du fichier.
+Liste complète, familles et intentions de design : `docs/rencontres.md`. Format (détaillé en tête
+de `Data/Events.lua`) :
+
+```lua
+ns.Events[id] = {
+  name, act, tier,                 -- tier = palier de Ligue qui la débloque (0..3)
+  rarity = "common" | "rare" | "story", weight, once, when,
+  speaker, npc, scene,             -- personnage affiché, identifiant de modèle, décor
+  text,
+  choices = { { label, outcome, hidden, when, effects, result } },
+}
+```
+
+- `outcome` : ce que la réponse donne ou coûte, toujours écrit (« -6 PV, améliore 2 cartes au
+  hasard », « 50 % : une potion et 20 po, sinon -7 PV ») ; `hidden = true` → afficher « ? ».
+  `result` : texte après le choix. Pour l'interface d'origine, `text` et `after` sont recopiés de
+  `outcome` (« ? » si cachée) et `result`.
+- `scene` ∈ `farm`, `road`, `coast`, `mine`, `hill`, `camp`, `ruins`.
+- Familles : `common` (poids 10), `rare` (poids 3), `story` (poids 8, unique par compte) ;
+  `Expedition.EVENT_WEIGHT`, `ev.weight` le remplace. Tirage pondéré parmi les rencontres possibles.
+- `once` : une fois par compte. Drapeau `event:<id>` (ou le nom donné) posé **dès l'entrée** dans la
+  rencontre, même si l'on abandonne ensuite.
+- `when` : conditions, toutes requises, évaluées à l'entrée du nœud (rencontre) ou à l'affichage
+  (réponse) : `hpBelow`, `hpAbove`, `gold`, `relic`, `noRelic`, `potion`, `card`, `key`, `flag`,
+  `noFlag`, `floor` (`Expedition.CONDITIONS`, `Expedition.check(exp, when)` → `ok, raison`).
+- Effets (données) : `heal`, `healPct`, `loseHp`, `maxHp`, `loseMaxHp`, `gold`, `pay`, `loseGold`,
+  `card`, `cardChoice`, `relic` (tiré ou précis), `potion` (tirée ou précise), `losePotion`,
+  `upgradeRandom`, `upgrade`, `remove`, `dupe`, `fight` (`kind = "elite"` possible, groupe
+  `ns.Encounters.act1.event_*`), `gamble` (pari), `flag` (drapeau de compte).
+- Tout le hasard est tiré à l'entrée (`exp.event.rolls`, une liste par réponse ; un pari y stocke
+  `{ won, win = tirages, lose = tirages }`) : recharger ou choisir une autre réponse ne change rien.
+
+Pour l'interface, `Expedition.eventOptions(exp)` renvoie une ligne par réponse :
+`{ index, label, outcome (« ? » si cachée), hidden, disabled, reason (texte prêt à afficher), chosen }`.
+`Expedition.eventChoiceOk(exp, i)` renvoie `false, raison` : texte de la condition (« Il te faut :
+Tabard de Hurlevent. ») ou code d'effet (`"or"`, `"deck"`, `"amélioration"`, `"potion"`,
+`"bibelot"`, traduits par `Expedition.EVENT_REASONS`).
+
+### Drapeaux de compte
+
+`db.meta.flags = { [nom] = true }`. Une expédition reçoit une copie figée au départ
+(`exp.flags`, lue par les conditions `flag` / `noFlag`) ; les drapeaux posés pendant l'expédition
+vont dans `exp.newFlags` et ne sont reportés dans la méta qu'**à la fin de l'expédition**
+(`Meta.record`, appelé par `Save.finish` et `Save.abandon`), quel que soit le résultat. Une suite ne
+peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau n'est jamais retiré.
+`Meta.hasFlag(meta, nom)`.
 
 ## Méta-progression (`Core/Meta.lua`)
 
-`db.meta = { league, runs, classes = { priest = { rep, runs, wins, keyMax, bestKey } } }`
+`db.meta = { league, runs, classes = { priest = { rep, runs, wins, keyMax, bestKey } }, flags = { [nom] = true } }`
 
 - `Meta.level(points)` → 0 Neutre, 1 Amical, 2 Honoré, 3 Révéré, 4 Exalté ; `Meta.levelName(lv)` ;
   `Meta.progress(points)` → palier, points dans le palier, taille du palier (barre de progression).
@@ -147,10 +193,14 @@ données (`heal`, `loseHp`, `maxHp`, `gold`, `pay`, `card`, `cardChoice`, `relic
 
 ## Sauvegarde (`Core/Save.lua`)
 
-`SlayTheDragonDB = { version = 1, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
+`SlayTheDragonDB = { version = 2, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
 
 - `Save.new()`, `Save.migrate(db)` (une migration par version dans `Save.MIGRATIONS`, état
   d'expédition migré par `Save.EXP_MIGRATIONS`), `Save.validate(db)` → `ok, erreurs`.
+- Versions : 1 = format initial ; 2 = `meta.flags` (drapeaux de compte). La migration 1 → 2 et
+  `Save.normalize` créent `meta.flags` s'il manque et gardent tous les drapeaux existants (une
+  valeur vraie non booléenne devient `true`, une valeur fausse est retirée). L'expédition en cours
+  passe de la version 1 à 2 (`exp.flags = {}`, `exp.newFlags = {}`, `stats.events = {}`).
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
 - Journal : `{ result, class, key, seed, act, floor, cleared, elites, bosses, hp, maxHp, gold,
@@ -212,8 +262,9 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
   précisé par le GDD).
 - **Retrait de carte** : plusieurs retraits par visite autorisés, prix croissant sur toute
   l'expédition (75, 100, 125…).
-- **Rencontres** : les PV perdus ne tuent jamais (plancher à 1 PV) ; une rencontre déjà vue ne
-  revient pas dans la même expédition ; si aucune n'est disponible, l'étape est « rien à signaler ».
+- **Rencontres** : les PV perdus ne tuent jamais (plancher à 1 PV, PV max au moins 1) ; une
+  rencontre déjà vue ne revient pas dans la même expédition ; si aucune n'est disponible, l'étape
+  est « rien à signaler ». Familles, conditions, paris et histoires : `docs/rencontres.md`.
 - **Réputation** : cumulée par classe et pour la Ligue avec les mêmes points ; seuils calés pour
   Exalté vers la 16e–19e expédition (≈ 100–120 points par expédition d'un acte).
 - **Clés** : `keyMax` par classe ; jouer une clé inférieure reste possible.
@@ -226,6 +277,10 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
 ## Mesures (bot heuristique, acte 1, 3 000 expéditions, graine 1)
 
 `luajit Sim/sim.lua runs=3000 jobs=16 runner=expedition key=N meta=start|exalted`
+
+Le rapport liste aussi chaque rencontre vue (fréquence, victoires avec / sans, réponses choisies) ;
+mesures des rencontres : `docs/rencontres.md`. `meta=exalted` simule un compte vétéran (drapeaux
+d'histoire posés), `meta=start` un compte neuf.
 
 | Clé | Victoires | Écart | PV perdus contre le boss | Réputation moyenne |
 | --- | --- | --- | --- | --- |

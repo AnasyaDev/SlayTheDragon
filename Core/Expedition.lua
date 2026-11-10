@@ -17,7 +17,8 @@ local floor, min, max = math.floor, math.min, math.max
 local X = {}
 ns.Expedition = X
 
-X.VERSION = 1
+-- 2 : drapeaux de compte (exp.flags, exp.newFlags) et journal des rencontres (stats.events).
+X.VERSION = 2
 
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
@@ -45,6 +46,8 @@ X.PRICES = {
 X.PRICE_JITTER = 0.10
 X.REMOVE_PRICE, X.REMOVE_STEP = 75, 25
 X.SHOP = { cards = 5, relics = 3, potions = 3 }
+-- Poids de tirage d'une rencontre selon sa famille (ev.weight le remplace).
+X.EVENT_WEIGHT = { common = 10, rare = 3, story = 8 }
 
 X.PHASES = { start = true, map = true, combat = true, reward = true, campfire = true,
   merchant = true, event = true, select = true, done = true }
@@ -405,16 +408,150 @@ local function openShop(exp)
 end
 
 -- Rencontres -------------------------------------------------------------------
+-- Familles : common (ordinaire), rare (poids faible), story (une fois par compte, drapeau
+-- « event:<id> » posé à l'entrée). Conditions `when` (rencontre et réponse) : liste de
+-- conditions toutes requises, voir X.CONDITIONS. Effets : voir Data/Events.lua.
 
+local function pct(f) return floor(f * 100 + 0.5) end
+
+local function hasRelic(exp, id)
+  for i = 1, #exp.relics do
+    if exp.relics[i] == id then return true end
+  end
+  return false
+end
+
+local function hasPotion(exp)
+  for i = 1, #exp.potions do
+    if exp.potions[i] then return true end
+  end
+  return false
+end
+
+local function relicLabel(id)
+  local r = ns.Relics[id]
+  return r and r.name or tostring(id)
+end
+
+-- Drapeaux de compte connus au départ de l'expédition (les nouveaux ne comptent qu'à la suivante).
+function X.hasFlag(exp, name)
+  return exp.flags ~= nil and exp.flags[name] == true
+end
+
+-- Pose un drapeau de compte : reporté dans la méta en fin d'expédition (Meta.record).
+function X.setFlag(exp, name)
+  exp.newFlags = exp.newFlags or {}
+  exp.newFlags[name] = true
+end
+
+-- Conditions : CONDITIONS[nom] = { test(exp, arg, c) -> booléen, text(arg, c) -> raison affichée }.
+-- Une condition s'écrit { "nom", arg } ; c.text remplace la raison par défaut.
+X.CONDITIONS = {
+  hpBelow = { -- PV strictement sous la fraction arg des PV max
+    test = function(exp, f) return exp.hp < exp.maxHp * f end,
+    text = function(f) return ("Seulement sous %d %% de tes PV."):format(pct(f)) end },
+  hpAbove = { -- PV au moins égaux à la fraction arg des PV max
+    test = function(exp, f) return exp.hp >= exp.maxHp * f end,
+    text = function(f) return ("Il te faut au moins %d %% de tes PV."):format(pct(f)) end },
+  gold = {
+    test = function(exp, n) return exp.gold >= n end,
+    text = function(n) return ("Il te faut %d po."):format(n) end },
+  relic = {
+    test = function(exp, id) return hasRelic(exp, id) end,
+    text = function(id) return "Il te faut : " .. relicLabel(id) .. "." end },
+  noRelic = {
+    test = function(exp, id) return not hasRelic(exp, id) end,
+    text = function(id) return "Tu possèdes déjà : " .. relicLabel(id) .. "." end },
+  potion = {
+    test = function(exp) return hasPotion(exp) end,
+    text = function() return "Il te faut une potion." end },
+  card = {
+    test = function(exp, id)
+      for i = 1, #exp.deck do
+        if exp.deck[i].id == id then return true end
+      end
+      return false
+    end,
+    text = function(id)
+      local d = ns.Cards[id]
+      return "Il te faut la carte " .. (d and d.name or tostring(id)) .. "."
+    end },
+  key = {
+    test = function(exp, n) return (exp.key or 0) >= n end,
+    text = function(n) return ("Clé mythique +%d ou plus."):format(n) end },
+  flag = {
+    test = function(exp, name) return X.hasFlag(exp, name) end,
+    text = function() return "Pas encore." end },
+  noFlag = {
+    test = function(exp, name) return not X.hasFlag(exp, name) end,
+    text = function() return "Plus maintenant." end },
+  floor = { -- étape courante (celle du nœud) au moins égale à arg
+    test = function(exp, n) return (exp.floor or 0) >= n end,
+    text = function(n) return ("À partir de l'étape %d."):format(n) end },
+}
+
+-- Toutes les conditions de la liste sont-elles remplies ? (true | false, raison)
+function X.check(exp, when)
+  if not when then return true end
+  for i = 1, #when do
+    local c = when[i]
+    local def = X.CONDITIONS[c[1]]
+    if not def then error("condition de rencontre inconnue : " .. tostring(c[1])) end
+    if not def.test(exp, c[2], c) then return false, c.text or def.text(c[2], c) end
+  end
+  return true
+end
+
+function X.eventFamily(ev) return ev.rarity or "common" end
+
+function X.eventWeight(ev)
+  return ev.weight or X.EVENT_WEIGHT[X.eventFamily(ev)] or X.EVENT_WEIGHT.common
+end
+
+-- Drapeau « déjà vue » d'une rencontre unique par compte (nil si elle peut revenir).
+function X.onceFlag(id)
+  local ev = ns.Events[id]
+  if not ev or not ev.once then return nil end
+  if type(ev.once) == "string" then return ev.once end
+  return "event:" .. id
+end
+
+-- Rencontres possibles maintenant : acte, palier de Ligue, pas déjà vue (expédition ou
+-- compte pour les uniques), conditions de déclenchement remplies.
 function X.eventPool(exp)
   local list = {}
   for id, ev in pairs(ns.Events or {}) do
     if (ev.act == nil or ev.act == exp.act) and (ev.tier or 0) <= leagueTier(exp) and not exp.seenEvents[id] then
-      list[#list + 1] = id
+      local once = X.onceFlag(id)
+      if not (once and X.hasFlag(exp, once)) and X.check(exp, ev.when) then
+        list[#list + 1] = id
+      end
     end
   end
   table.sort(list)
   return list
+end
+
+-- Tirages d'une liste d'effets, faits à l'entrée de la rencontre (r[i] pour l'effet i).
+local function rollEffects(exp, rng, effects)
+  local r = {}
+  for ei, e in ipairs(effects) do
+    local k = e[1]
+    r[ei] = false
+    if k == "cardChoice" then
+      r[ei] = drawCards(exp, rng, e.n or 3, e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat)
+    elseif k == "relic" and not e[2] then
+      r[ei] = drawRelics(exp, rng, 1, X.RELIC_WEIGHTS.normal)[1] or false
+    elseif k == "potion" and not e[2] then
+      r[ei] = drawPotions(exp, rng, 1)[1] or false
+    elseif k == "fight" then
+      r[ei] = rollReward(exp, e.kind == "elite" and "elite" or "combat")
+    elseif k == "gamble" then
+      r[ei] = { won = Rng.float(rng) < e[2], win = rollEffects(exp, rng, e.win or {}),
+        lose = rollEffects(exp, rng, e.lose or {}) }
+    end
+  end
+  return r
 end
 
 local function openEvent(exp)
@@ -425,27 +562,15 @@ local function openEvent(exp)
     exp.event = { id = false, rolls = {}, chosen = false }
     return
   end
-  local id = Rng.pick(rng, pool)
+  local id = Rng.weighted(rng, pool, function(x) return X.eventWeight(ns.Events[x]) end)
   exp.seenEvents[id] = true
+  local once = X.onceFlag(id)
+  if once then X.setFlag(exp, once) end
+  exp.stats.events = exp.stats.events or {}
+  exp.stats.events[id] = 0
   local ev = ns.Events[id]
   local rolls = {}
-  for ci, ch in ipairs(ev.choices) do
-    local r = {}
-    for ei, e in ipairs(ch.effects) do
-      local k = e[1]
-      r[ei] = false
-      if k == "cardChoice" then
-        r[ei] = drawCards(exp, rng, e.n or 3, e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat)
-      elseif k == "relic" then
-        r[ei] = drawRelics(exp, rng, 1, X.RELIC_WEIGHTS.normal)[1] or false
-      elseif k == "potion" then
-        r[ei] = drawPotions(exp, rng, 1)[1] or false
-      elseif k == "fight" then
-        r[ei] = rollReward(exp, "combat")
-      end
-    end
-    rolls[ci] = r
-  end
+  for ci, ch in ipairs(ev.choices) do rolls[ci] = rollEffects(exp, rng, ch.effects) end
   exp.event = { id = id, rolls = rolls, chosen = false }
 end
 
@@ -457,31 +582,58 @@ local function upgradable(exp)
   return list
 end
 
+-- Codes de refus des effets et leur texte (l'interface traduit aussi les codes).
+X.EVENT_REASONS = {
+  ["or"] = "Pas assez d'or.",
+  deck = "Ton deck est trop petit.",
+  ["amélioration"] = "Aucune carte à améliorer.",
+  potion = "Il te faut une potion.",
+  ["bibelot"] = "Tu possèdes déjà ce bibelot.",
+}
+
 -- Le choix ci de la rencontre est-il possible ? (true | false, raison)
+-- Raison : texte de la condition `when` de la réponse, ou code d'un effet impossible
+-- ("or", "deck", "amélioration", "potion", "bibelot" ; X.EVENT_REASONS les traduit).
 function X.eventChoiceOk(exp, ci)
   local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
   local ch = ev and ev.choices[ci]
   if not ch then return false, "choix" end
+  local ok, why = X.check(exp, ch.when)
+  if not ok then return false, why end
   for _, e in ipairs(ch.effects) do
     local k = e[1]
     if k == "pay" and exp.gold < e[2] then return false, "or" end
-    if k == "remove" and #exp.deck <= 1 then return false, "deck" end
+    if (k == "remove" or k == "dupe") and #exp.deck <= 1 then return false, "deck" end
     if k == "upgrade" and #upgradable(exp) == 0 then return false, "amélioration" end
+    if k == "losePotion" and not hasPotion(exp) then return false, "potion" end
+    if k == "relic" and e[2] and hasRelic(exp, e[2]) then return false, "bibelot" end
   end
   return true
 end
 
-local function applyEvent(exp, ci)
-  local ev = ns.Events[exp.event.id]
-  local ch = ev.choices[ci]
-  local rolls = exp.event.rolls[ci]
-  exp.event.chosen = ci
-  local reward, follow
-  local function rw()
-    reward = reward or { kind = "event" }
-    return reward
+-- Vue des réponses pour l'interface : { index, label, outcome ("?" si cachée), hidden,
+-- disabled, reason (texte), chosen }.
+function X.eventOptions(exp)
+  local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
+  if not ev then return {} end
+  local list = {}
+  for i, ch in ipairs(ev.choices) do
+    local ok, why = X.eventChoiceOk(exp, i)
+    list[i] = { index = i, label = ch.label, outcome = ch.hidden and "?" or ch.outcome,
+      hidden = ch.hidden and true or false, disabled = not ok or nil,
+      reason = not ok and (X.EVENT_REASONS[why] or why) or nil,
+      chosen = exp.event.chosen == i or nil }
   end
-  for ei, e in ipairs(ch.effects) do
+  return list
+end
+
+-- Applique une liste d'effets ; ctx = { reward, follow, texts } accumule la suite.
+local function applyEffects(exp, effects, rolls, ctx)
+  local function rw()
+    ctx.reward = ctx.reward or { kind = "event" }
+    return ctx.reward
+  end
+  for ei, e in ipairs(effects) do
     local k = e[1]
     if k == "heal" then
       heal(exp, e[2])
@@ -489,37 +641,79 @@ local function applyEvent(exp, ci)
       heal(exp, floor(exp.maxHp * e[2]))
     elseif k == "loseHp" then
       exp.hp = max(1, exp.hp - e[2])
-    elseif k == "maxHp" then
-      exp.maxHp = max(1, exp.maxHp + e[2])
-      exp.hp = max(1, min(exp.maxHp, exp.hp + max(0, e[2])))
+    elseif k == "maxHp" or k == "loseMaxHp" then
+      local n = k == "maxHp" and e[2] or -e[2]
+      exp.maxHp = max(1, exp.maxHp + n)
+      exp.hp = max(1, min(exp.maxHp, exp.hp + max(0, n)))
     elseif k == "gold" then
-      rw().gold = (reward.gold or 0) + e[2]
+      local r = rw()
+      r.gold = (r.gold or 0) + e[2]
     elseif k == "pay" then
       spend(exp, e[2])
+    elseif k == "loseGold" then
+      spend(exp, min(exp.gold, e[2]))
     elseif k == "card" then
       X.addCard(exp, e[2], e.up)
     elseif k == "cardChoice" then
       rw().cards = U.copyArr(rolls[ei])
     elseif k == "relic" then
-      if rolls[ei] then rw().relic = rolls[ei] end
+      local id = e[2] or rolls[ei]
+      if id and not hasRelic(exp, id) then rw().relic = id end
     elseif k == "potion" then
-      if rolls[ei] then rw().potion = rolls[ei] end
+      local id = e[2] or rolls[ei]
+      if id then rw().potion = id end
+    elseif k == "losePotion" then
+      for s = #exp.potions, 1, -1 do
+        if exp.potions[s] then
+          exp.potions[s] = false
+          break
+        end
+      end
     elseif k == "upgradeRandom" then
       local list = Rng.shuffle(exp.rng.events, upgradable(exp))
       for i = 1, min(e[2], #list) do upgrade(exp, list[i]) end
-    elseif k == "upgrade" or k == "remove" then
-      follow = { kind = k }
+    elseif k == "upgrade" or k == "remove" or k == "dupe" then
+      ctx.follow = { kind = k }
     elseif k == "fight" then
-      follow = { kind = "fight", pool = e[2], reward = U.copy(rolls[ei]), bonus = e.gold }
+      ctx.follow = { kind = "fight", fight = e.kind == "elite" and "elite" or "combat", pool = e[2],
+        reward = U.copy(rolls[ei]), bonus = e.gold }
+    elseif k == "gamble" then
+      local r = rolls[ei]
+      exp.event.lucky = r.won
+      if r.won then
+        applyEffects(exp, e.win or {}, r.win, ctx)
+        if e.winText then ctx.texts[#ctx.texts + 1] = e.winText end
+      else
+        applyEffects(exp, e.lose or {}, r.lose, ctx)
+        if e.loseText then ctx.texts[#ctx.texts + 1] = e.loseText end
+      end
+    elseif k == "flag" then
+      X.setFlag(exp, e[2])
     else
       error("effet de rencontre inconnu : " .. tostring(k))
     end
   end
+end
+
+local function applyEvent(exp, ci)
+  local ev = ns.Events[exp.event.id]
+  local ch = ev.choices[ci]
+  exp.event.chosen = ci
+  if exp.stats.events then exp.stats.events[exp.event.id] = ci end
+  local ctx = { texts = {} }
+  if ch.result and ch.result ~= "" then ctx.texts[1] = ch.result end
+  applyEffects(exp, ch.effects, exp.event.rolls[ci], ctx)
+  exp.event.result = table.concat(ctx.texts, " ")
+  local follow, reward = ctx.follow, ctx.reward
   if follow and follow.kind == "fight" then
+    -- Récompense du combat : tirée à l'entrée, plus le bonus et l'or de la réponse.
     local r = follow.reward
-    if follow.bonus then r.gold = (r.gold or 0) + follow.bonus end
-    startFight(exp, "combat", follow.pool, r)
+    local bonus = (follow.bonus or 0) + (reward and reward.gold or 0)
+    if bonus > 0 then r.gold = (r.gold or 0) + bonus end
+    startFight(exp, follow.fight, follow.pool, r)
   elseif follow then
+    -- Sélection d'une carte ; une récompense de la même réponse s'ouvre après.
+    follow.reward = reward
     exp.select = follow
     exp.phase = "select"
   elseif reward then
@@ -560,6 +754,7 @@ end
 ---------------------------------------------------------------------------
 
 -- opts : seed, class ("priest"), key (0..5), unlocks = { rep = 0..4, league = 0..4 },
+--        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
 --        acts (nombre d'actes, par défaut tous ceux de Map.ACTS),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements)
 function X.new(opts)
@@ -578,6 +773,9 @@ function X.new(opts)
     hp = cdef.hp, maxHp = cdef.hp, gold = X.START_GOLD,
     deck = {}, relics = {}, potions = {},
     removals = 0, combatsInAct = 0, lastEnc = {}, seenEvents = {}, relicState = {},
+    -- Drapeaux de compte : copie figée au départ (conditions) et drapeaux posés pendant
+    -- l'expédition, reportés dans la méta par Meta.record.
+    flags = U.copyMap(opts.flags or {}), newFlags = {},
     nodeCleared = false,
     rng = {
       map = Rng.stream(seed, "map"),
@@ -587,7 +785,7 @@ function X.new(opts)
       combat = Rng.stream(seed, "combat"),
     },
     stats = { cleared = 0, elites = 0, bosses = 0, combats = 0, goldEarned = 0, goldSpent = 0,
-      cardsAdded = 0, removed = 0, upgraded = 0, visits = {} },
+      cardsAdded = 0, removed = 0, upgraded = 0, visits = {}, events = {} },
     combatStats = opts.stats and true or false,
     quiet = opts.quiet and true or false,
   }
@@ -760,6 +958,17 @@ H.event = {
   end,
 }
 
+-- Fin d'une sélection : récompense en attente de la même réponse, sinon retour à la carte.
+local function endSelect(exp)
+  local r = exp.select.reward
+  exp.select = nil
+  if r then
+    openReward(exp, r)
+  else
+    leaveNode(exp)
+  end
+end
+
 H.select = {
   select = function(exp, a)
     local i = a[2] or 0
@@ -771,12 +980,16 @@ H.select = {
       if not exp.deck[i] or #exp.deck <= 1 then return false, "carte" end
       table.remove(exp.deck, i)
       exp.stats.removed = exp.stats.removed + 1
+    elseif kind == "dupe" then
+      local card = exp.deck[i]
+      if not card then return false, "carte" end
+      X.addCard(exp, card.id, card.up)
     end
-    leaveNode(exp)
+    endSelect(exp)
     return true
   end,
   skipSelect = function(exp)
-    leaveNode(exp)
+    endSelect(exp)
     return true
   end,
 }

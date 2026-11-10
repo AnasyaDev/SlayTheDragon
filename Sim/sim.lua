@@ -149,6 +149,15 @@ local function addRecord(agg, rec)
     rs.n = rs.n + 1
     if rec.won then rs.wins = rs.wins + 1 end
   end
+  -- Rencontres vues (runner=expedition) : fréquence, victoires, réponses choisies.
+  for id, ci in pairs(rec.events or {}) do
+    agg.events = agg.events or {}
+    local es = agg.events[id] or { n = 0, wins = 0, choices = {} }
+    agg.events[id] = es
+    es.n = es.n + 1
+    if rec.won then es.wins = es.wins + 1 end
+    es.choices[ci] = (es.choices[ci] or 0) + 1
+  end
 end
 
 local function mergeInto(a, b)
@@ -414,6 +423,27 @@ local function report(a, title)
       vs[#vs + 1] = ("%s %.2f"):format(k, (a.visits[k] or 0) / a.runs)
     end
     out("Visites par expédition : " .. table.concat(vs, ", "))
+    out("")
+    out("Rencontres               famille  vues/100  vict. avec  vict. sans  écart   réponses choisies (%)")
+    local eids = {}
+    for id in pairs(a.events or {}) do eids[#eids + 1] = id end
+    table.sort(eids)
+    local evDefs = ns.Events or {}
+    for _, id in ipairs(eids) do
+      local es = a.events[id]
+      local without, winsWithout = a.runs - es.n, a.wins - es.wins
+      local gap = (es.n > 0 and without > 0)
+        and ("%+5.1f"):format(100 * es.wins / es.n - 100 * winsWithout / without) or "  -  "
+      local cs = {}
+      local maxCi = 0
+      for ci in pairs(es.choices) do if ci > maxCi then maxCi = ci end end
+      for ci = 0, maxCi do
+        if es.choices[ci] then cs[#cs + 1] = ("%d:%d"):format(ci, math.floor(100 * es.choices[ci] / es.n + 0.5)) end
+      end
+      local fam = evDefs[id] and (evDefs[id].rarity or "common") or "?"
+      out(("  %-24s %-7s %7.1f    %s     %s    %s   %s"):format(id, fam, 100 * es.n / a.runs, pct(es.wins, es.n),
+        pct(winsWithout, without), gap, table.concat(cs, " ")))
+    end
     out("")
   end
   out(("Incantations du joueur : %d, interrompues : %s"):format(a.castsStarted, pct(a.castsInterrupted, a.castsStarted)))

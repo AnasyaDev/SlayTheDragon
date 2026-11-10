@@ -155,4 +155,9 @@ ns.Encounters.act1 = {
   boss = {
     { "vancleef" },
   },
+  -- Combats déclenchés par une rencontre (Data/Events.lua, effet « fight »).
+  event_murlocs = { { "murloc", "murloc", "murloc", "murloc" } },
+  event_gnolls = { { "gnoll", "gnoll", "mystic" } },
+  event_golem = { { "harvest_golem" } },
+  event_tobin = { { "bandit", "defias_henchman", "defias_henchman" } },
 }

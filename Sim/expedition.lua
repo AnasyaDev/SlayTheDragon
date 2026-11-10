@@ -7,6 +7,10 @@
 return function(ns)
   local X, Rng, Bots, Meta = ns.Expedition, ns.Rng, ns.Bots, ns.Meta
   local SE = {}
+  -- Compte vétéran simulé (meta=exalted) : drapeaux toujours présents, et une branche
+  -- d'histoire choisie par la graine.
+  SE.VETERAN_FLAGS = { "event:tobin_thief" }
+  SE.VETERAN_BRANCHES = { "tobin_spared", "tobin_jailed" }
 
   local function rating(id) return ns.Run.RATING[id] or 3 end
 
@@ -88,27 +92,52 @@ return function(ns)
     return best
   end
 
-  local function eventValue(exp, ev, ci)
+  -- Valeur estimée d'une liste d'effets de rencontre (le bot ne regarde pas les tirages
+  -- figés : un pari vaut son espérance).
+  local CARD_VALUE = { common = 1.0, uncommon = 1.6, rare = 2.2 }
+  local function effectsValue(exp, effects)
     local hpRatio = exp.hp / exp.maxHp
     local v = 0
-    for _, e in ipairs(ev.choices[ci].effects) do
+    for _, e in ipairs(effects) do
       local k = e[1]
       if k == "heal" then v = v + math.min(e[2], exp.maxHp - exp.hp) * 0.15
       elseif k == "healPct" then v = v + math.min(math.floor(exp.maxHp * e[2]), exp.maxHp - exp.hp) * 0.15
-      elseif k == "loseHp" then v = v - e[2] * 0.12 / math.max(hpRatio, 0.2)
+      elseif k == "loseHp" then v = v - math.min(e[2], exp.hp - 1) * 0.12 / math.max(hpRatio, 0.2)
       elseif k == "maxHp" then v = v + e[2] * 0.2
+      elseif k == "loseMaxHp" then v = v - e[2] * 0.25
       elseif k == "gold" then v = v + e[2] * 0.03
-      elseif k == "pay" then v = v - e[2] * 0.03
-      elseif k == "cardChoice" or k == "card" then v = v + 1.2
+      elseif k == "pay" or k == "loseGold" then v = v - e[2] * 0.03
+      elseif k == "card" then v = v + 1.2
+      elseif k == "cardChoice" then v = v + (CARD_VALUE[e.rarity] or 1.2)
       elseif k == "relic" then v = v + 3
       elseif k == "potion" then v = v + (X.freeSlot(exp) and 1 or 0)
+      elseif k == "losePotion" then v = v - 1
       elseif k == "upgradeRandom" then v = v + 0.8 * e[2]
       elseif k == "upgrade" then v = v + 1
       elseif k == "remove" then v = v + 1.2
-      elseif k == "fight" then v = v + (hpRatio > 0.6 and 1.5 or -1.5)
+      elseif k == "dupe" then v = v + 1.3
+      elseif k == "fight" then
+        -- Récompense attendue contre PV perdus en moyenne (mesurés à clé +0 : normal ≈ 15,
+        -- élite ≈ 20 ; à +3 : 20 et 35) ; un combat optionnel (surtout d'élite) devient un risque de mort
+        -- avec la clé (Tyrannique).
+        local elite = e.kind == "elite"
+        local key = exp.key or 0
+        local cost = elite and (20 + 5 * key) or (15 + 2 * key)
+        local gain = (elite and 5.0 or 2.2) + (e.gold or 0) * 0.03
+        if exp.hp - cost < 12 then
+          v = v - 5
+        else
+          v = v + gain - cost * 0.12 / math.max(hpRatio, 0.2) - (elite and key or 0.3 * key)
+        end
+      elseif k == "gamble" then
+        v = v + e[2] * effectsValue(exp, e.win or {}) + (1 - e[2]) * effectsValue(exp, e.lose or {})
       end
     end
     return v
+  end
+
+  local function eventValue(exp, ev, ci)
+    return effectsValue(exp, ev.choices[ci].effects)
   end
 
   local function has(choices, verb)
@@ -181,7 +210,20 @@ return function(ns)
       return best or { "leave" }
     elseif ph == "select" then
       local i
-      if exp.select.kind == "upgrade" then i = bestUpgrade(exp) else i = worstCard(exp) end
+      local kind = exp.select.kind
+      if kind == "upgrade" then
+        i = bestUpgrade(exp)
+      elseif kind == "dupe" then
+        -- Copie : la meilleure carte non basique, sinon on passe.
+        local bestV = 0
+        for j = 1, #exp.deck do
+          local card = exp.deck[j]
+          local v = ns.Cards[card.id].rarity ~= "basic" and rating(card.id) + (card.up and 0.5 or 0) or 0
+          if v > bestV then i, bestV = j, v end
+        end
+      else
+        i = worstCard(exp)
+      end
       if i then return { "select", i } end
       return { "skipSelect" }
     end
@@ -224,8 +266,19 @@ return function(ns)
   function SE.play(opts)
     local seed = opts.seed or 1
     local unlocks = opts.meta == "exalted" and Meta.allUnlocked() or { rep = 0, league = 0 }
+    -- Drapeaux de compte : compte neuf pour « start » (premier temps des histoires possible),
+    -- compte vétéran pour « exalted » (premier temps vu, suite selon la parité de la graine).
+    local flags = opts.flags
+    if not flags then
+      flags = {}
+      if opts.meta == "exalted" then
+        for _, f in ipairs(SE.VETERAN_FLAGS) do flags[f] = true end
+        local branch = SE.VETERAN_BRANCHES[seed % #SE.VETERAN_BRANCHES + 1]
+        flags[branch] = true
+      end
+    end
     local exp = X.new({ seed = seed, class = opts.class or "priest", key = opts.key or 0,
-      unlocks = unlocks, stats = true, quiet = opts.quiet ~= false })
+      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false })
     local rng = Rng.stream(seed, "policy")
     local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
     local guard = 0
@@ -264,6 +317,7 @@ return function(ns)
     record.rep = Meta.repFor(exp)
     record.removed = exp.stats.removed
     record.upgraded = exp.stats.upgraded
+    record.events = exp.stats.events -- { id = réponse choisie }
     return record, exp
   end
 
