@@ -3,8 +3,9 @@
 -- d'abord l'icône du sort (C_Spell.GetSpellTexture), puis l'icône, puis le point d'interrogation.
 -- Les FileDataID d'icônes et de textures ci-dessous sont confirmés par le MCP « wow »
 -- (wow_icon_search / wow_file_search, liste de fichiers du client 12.1.5). Les identifiants de
--- sorts, de créatures et d'animations ne sont PAS vérifiables hors jeu : `/slay art` liste en jeu
--- ce qui manque (voir docs/interface.md).
+-- créatures viennent du cache du client Forever (voir Art.enemies) ; ceux des sorts et des animations
+-- ne sont PAS vérifiables hors jeu : `/slay art` et `/slay modeles` listent en jeu ce qui manque
+-- (voir docs/interface.md).
 local _, ns = ...
 
 local Art = {}
@@ -118,12 +119,12 @@ Art.scenes = {
 }
 Art.defaultScene = "road"
 
--- Personnages des rencontres : event.npc -> { creature = id } (Model:SetCreature). Identifiants de
--- mémoire, NON vérifiés (créatures non indexées par le MCP) ; sans modèle chargé, rien ne s'affiche.
+-- Personnages des rencontres : event.npc -> { creature = id, display = id } (voir Art.enemies pour
+-- l'ordre des essais et la source des identifiants) ; sans modèle chargé, rien ne s'affiche.
 Art.npcs = {
-  salma_saldean = { creature = 235 },
-  farmer_saldean = { creature = 233 },
-  gryan_stoutmantle = { creature = 234 },
+  salma_saldean = { creature = 235, display = 1691 },     -- Salma Saldean
+  farmer_saldean = { creature = 233, display = 1943 },    -- Saldean le fermier
+  gryan_stoutmantle = { creature = 234, display = 1690 }, -- Gryan Fortmanteau
 }
 
 ---------------------------------------------------------------------------
@@ -213,20 +214,33 @@ Art.schoolName = { holy = "Sacré", shadow = "Ombre" }
 ---------------------------------------------------------------------------
 -- Ennemis
 ---------------------------------------------------------------------------
--- creature = identifiant de créature (Model:SetCreature) ; display = identifiant d'affichage
--- (Model:SetDisplayInfo), essayé si le premier ne donne aucun modèle. NON vérifiés.
+-- creature = identifiant de créature (Model:SetCreature) ; display = identifiant d'affichage, ou liste
+-- (Model:SetDisplayInfo), essayés dans l'ordre si le précédent ne donne aucun modèle (W.setCreatureArt).
+-- Identifiants relevés le 10/11/2026 dans le cache de créatures du client Forever lui-même
+-- (Cache/WDB/enUS et frFR/creaturecache.wdb : identifiant, nom, affichages), wow_creature_search
+-- n'ayant pas accès à l'installation. Les créatures à deux affichages (homme / femme) sont des
+-- humanoïdes équipés : leur chargement est le plus fragile, d'où les affichages en repli.
+-- icon = repli dans le médaillon quand aucun modèle ne se charge (icônes de Media/Icons ou icônes
+-- classiques du jeu, FileDataID confirmés par wow_icon_search) ; sans icône : disque sombre.
+local HEAD_GNOLL = { icon = 134163 }  -- inv_misc_head_gnoll_01
+local HEAD_MURLOC = { icon = 134169 } -- inv_misc_head_murloc_01
+local BANDANA = { icon = 133694, tga = "INV_Misc_Bandana_03" } -- inv_misc_bandana_03
 Art.enemies = {
-  gnoll           = { creature = 117 },              -- Gnoll Rivepatte
-  mystic          = { creature = 453 },              -- Mystique Rivepatte
-  murloc          = { creature = 126 },              -- Murloc côtier (Coastrunner)
-  bandit          = { creature = 116 },              -- Bandit défias
-  sorcerer        = { creature = 619 },              -- Sorcier/Conjurateur défias
-  harvest_golem   = { creature = 36, scale = 1.2 },  -- Golem moissonneur
-  rhahkzor        = { creature = 644, scale = 1.2 }, -- Rhahk'Zor
-  defias_henchman = { creature = 594 },              -- Sbire défias
-  vancleef        = { creature = 639, display = 2029, scale = 1.15 }, -- Edwin VanCleef
+  gnoll           = { creature = 117, display = 175, icon = HEAD_GNOLL },   -- Riverpaw Gnoll
+  mystic          = { creature = 453, display = 502, icon = HEAD_GNOLL },   -- Riverpaw Mystic
+  murloc          = { creature = 126, display = 983, icon = HEAD_MURLOC },  -- Murloc Coastrunner
+  bandit          = { creature = 116, display = { 2357, 2358 }, icon = BANDANA }, -- Defias Bandit
+  -- Invocateur défias (Defias Conjurer, Marche de l'Ouest) ; « Sorcier défias » du client = 4418
+  -- (Mortemines, affichages 2447 / 2448, cache frFR seulement).
+  sorcerer        = { creature = 619, display = { 2329, 2330 },
+                      icon = { icon = 135812, tga = "Spell_Fire_FlameBolt" } }, -- spell_fire_flamebolt
+  harvest_golem   = { creature = 36, display = 367, scale = 1.2, icon = { icon = 134063 } }, -- inv_misc_gear_01
+  rhahkzor        = { creature = 644, display = 14403, scale = 1.2,
+                      icon = { icon = 133730, tga = "INV_Misc_Bone_HumanSkull_01" } }, -- inv_misc_bone_humanskull_01
+  defias_henchman = { creature = 594, display = { 2323, 2324 }, icon = BANDANA }, -- Malfrat défias (Defias Henchman)
+  vancleef        = { creature = 639, display = 2029, scale = 1.15,
+                      icon = { icon = 236409, tga = "Achievement_Boss_EdwinVancleef" } }, -- Edwin VanCleef
 }
-Art.enemyIcon = Art.QUESTION
 
 ---------------------------------------------------------------------------
 -- États (pastilles : couleur bonne/mauvaise ; icône pour les mini-affichages)

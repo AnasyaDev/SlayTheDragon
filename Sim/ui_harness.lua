@@ -295,8 +295,9 @@ function Frame:SetCreature(id)
 end
 function Frame:SetDisplayInfo(id)
   if type(id) ~= "number" then error("SetDisplayInfo : nombre attendu") end
-  self._model = "display:" .. id
+  self._model = (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil
 end
+function Frame:ClearModel() self._model = nil end
 function Frame:GetModelFileID() return self._model and 777 or nil end
 function Frame:SetAnimation(a)
   if type(a) ~= "number" then error("SetAnimation : nombre attendu") end
@@ -1287,6 +1288,7 @@ H.badSpells = { [585] = true }
 H.badFiles = { [135924] = true }
 H.badPaths = { ["Interface\\AddOns\\SlayTheDragon\\Media\\Icons\\spell_holy_holysmite.tga"] = true }
 H.badCreatures = { [639] = true, [117] = true }
+H.badDisplays = { [175] = true }
 freshRun(SEED, "combat")
 H.advance(2)
 local smite
@@ -1297,7 +1299,7 @@ end
 check("icône introuvable -> point d'interrogation", smite and smite.medal.icon._texture == H.ns.Art.QUESTION,
   smite and smite.medal.icon._texture)
 H.slash("modeles")
-H.advance(2)
+H.advance(2.6)
 check("VanCleef : repli SetDisplayInfo", (function()
   for _, m in ipairs(V().preview.models) do
     if m.id == "vancleef" then return m._model == "display:2029" end
@@ -1311,7 +1313,7 @@ end)())
 H.slash("art")
 local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
 check("/slay art liste l'icône et le modèle manquants", said:find("card:smite", 1, true) and said:find("model:gnoll", 1, true), said)
-H.badSpells, H.badPaths, H.badFiles, H.badCreatures = nil, {}, nil, {}
+H.badSpells, H.badPaths, H.badFiles, H.badCreatures, H.badDisplays = nil, {}, nil, {}, nil
 
 print("U17 décors : peint par défaut, essai manuel (suivant, ok, non, peint), verdicts gardés")
 do
@@ -1763,6 +1765,203 @@ do
     and (slot.intent.text._text or "") ~= "")
   check("mana : hexagone bleu et un point par mana", v.mana.text._text == tostring(C().combat().player.mana)
     and v.mana.pips[1]._shown)
+end
+
+print("U21 modèles d'ennemis (essais, repli en médaillon, /slay modeles) ; noms d'ennemis lisibles")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  -- client neuf (badCreatures/badDisplays lus au moment des essais, pas au démarrage)
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local Art, W = ns.Art, ns.Widgets
+  -- données : chaque ennemi et chaque PNJ a une créature ET un affichage de repli ; icône de repli
+  local noArt = {}
+  for id in pairs(ns.Enemies) do
+    local a = Art.enemies[id]
+    if not (a and a.creature and a.display and a.icon) then noArt[#noArt + 1] = id end
+  end
+  for id, a in pairs(Art.npcs) do
+    if not (a.creature and a.display) then noArt[#noArt + 1] = "npc:" .. id end
+  end
+  table.sort(noArt)
+  check("ennemis et PNJ : créature, affichage(s) et icône de repli", #noArt == 0, table.concat(noArt, ", "))
+  check("plus d'icône « point d'interrogation » pour les ennemis", Art.enemyIcon == nil)
+
+  -- combat Sorcier défias + murloc : sorcier sans aucun modèle, murloc chargé par son affichage
+  H.badCreatures = { [619] = true, [126] = true }
+  H.badDisplays = { [2329] = true, [2330] = true }
+  local function fight(ids)
+    local c = C().combat()
+    c.enemies = {}
+    for i = 1, #ids do
+      if not ns.Combat.spawn(c, ids[i]) then
+        -- au-delà de Combat.MAX_ENEMIES (un mourant reste affiché) : copie directe
+        local e = deepcopy(c.enemies[1])
+        e.uid, e.id, e.mem = c.nextUid, ids[i], {}
+        e.intent = ns.Enemies[ids[i]].pattern[1]
+        c.nextUid = c.nextUid + 1
+        c.enemies[#c.enemies + 1] = e
+      end
+    end
+    local v = V()
+    v.c = nil
+    v:Show({ state = c })
+    return v, c
+  end
+  local v = fight({ "sorcerer", "murloc" })
+  H.advance(0.5)
+  local function slotOf(id)
+    for _, s in pairs(v.slotOf) do
+      if s.uid and ns.Combat and v.c then
+        for _, e in ipairs(v.c.enemies) do if e.uid == s.uid and e.id == id then return s end end
+      end
+    end
+  end
+  local so, mu = slotOf("sorcerer"), slotOf("murloc")
+  check("pas de repli avant la fin des essais", so and not so.fallback._shown)
+  H.advance(3 * W.MODEL_WAIT)
+  check("sorcier sans modèle : médaillon argenté de repli", so.fallback._shown and so.fallback.ring ~= nil
+    and so.fallback.icon._texture ~= Art.QUESTION, so.fallback.icon._texture)
+  check("repli : icône de l'ennemi (Media)", so.fallback.icon._texture
+    == "Interface\\AddOns\\SlayTheDragon\\Media\\" .. ns.Skin.icons.spell_fire_flamebolt, so.fallback.icon._texture)
+  check("repli au-dessus du modèle", R.rect(so.fallback) ~= nil and so.fallback._level > so.model._level)
+  check("murloc : affichage 983 après l'échec de la créature", mu.model._model == "display:983" and not mu.fallback._shown,
+    mu.model._model)
+  check("statut des essais (créature, affichages)", W.models.sorcerer.state == "missing"
+    and table.concat(W.models.sorcerer.tries, ", ") == "créature 619, affichage 2329, affichage 2330"
+    and W.models.murloc.via == "affichage 983")
+  -- relance tardive : la créature arrive dans le cache du client -> le repli s'efface
+  H.badCreatures = { [126] = true }
+  H.advance(W.MODEL_LATE + W.MODEL_WAIT + 0.1)
+  check("relance tardive : modèle trouvé, repli caché, plus listé manquant", not so.fallback._shown
+    and so.model._model == "creature:619" and W.models.sorcerer.state == "ok" and not W.missing["model:sorcerer"])
+  -- OnModelLoaded sonne alors que GetModelFileID ne rend rien encore : l'essai est jugé réussi
+  H.badCreatures = { [117] = true }
+  W.setCreature(so.model, "gnoll", so.fallback)
+  so.model:GetScript("OnModelLoaded")(so.model)
+  H.advance(W.MODEL_WAIT + 0.05)
+  check("OnModelLoaded suffit à valider un essai", W.models.gnoll.state == "ok" and W.models.gnoll.via == "créature 117"
+    and not so.fallback._shown)
+  -- sans icône : disque sombre (silhouette), jamais le point d'interrogation
+  W.setFallbackArt(so.fallback, nil)
+  check("repli sans icône : disque sombre", so.fallback.icon._texture == nil and so.fallback.icon._calls.SetColorTexture
+    and so.fallback.icon._calls.SetColorTexture[1] == Art.C.slateDark[1])
+
+  -- /slay modeles : une ligne recopiable par modèle absent (ennemis et PNJ)
+  H.badCreatures = { [619] = true, [639] = true, [235] = true }
+  H.badDisplays = { [2329] = true, [2330] = true, [1691] = true }
+  _G.DEFAULT_CHAT_FRAME._lines = {}
+  H.slash("modeles")
+  H.advance(3.5)
+  local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
+  local total = 0
+  for _ in pairs(Art.enemies) do total = total + 1 end
+  for _ in pairs(Art.npcs) do total = total + 1 end
+  check("/slay modeles : bilan chiffré", said:find("modèles : " .. (total - 2) .. "/" .. total .. " chargés, 2 sans modèle", 1, true), said)
+  check("/slay modeles : ennemi manquant et identifiants essayés",
+    said:find("sorcerer : créature 619, affichage 2329, affichage 2330 -> aucun modèle", 1, true), said)
+  check("/slay modeles : PNJ manquant", said:find("npc:salma_saldean : créature 235, affichage 1691 -> aucun modèle", 1, true), said)
+  check("/slay modeles : modèle chargé par un repli signalé", said:find("vancleef : créature 639 -> aucun modèle ; chargé par affichage 2029", 1, true), said)
+  check("/slay modeles : un PNJ et tous les ennemis dans l'aperçu", #V().preview.models == total)
+  local stateOk = true
+  for _, m in ipairs(V().preview.models) do
+    local want = (m.key == "sorcerer" or m.key == "npc:salma_saldean") and "aucun modèle" or "modèle : "
+    if not (m.state._text or ""):find(want, 1, true) then stateOk = false end
+    if m.fallback.icon._texture == Art.QUESTION then stateOk = false end
+  end
+  check("aperçu : état sous chaque modèle, aucun point d'interrogation", stateOk)
+  H.badCreatures, H.badDisplays = {}, nil
+  V().preview:Hide()
+
+  -- noms : toujours lisibles, de 1 à 6 ennemis, aux échelles extrêmes de la fenêtre
+  local function vis(o)
+    while o do
+      if not rawget(o, "_shown") then return false end
+      o = rawget(o, "_parent")
+    end
+    return true
+  end
+  local function flevel(f)
+    if not f then return 0 end
+    local p = rawget(f, "_parent")
+    local own = rawget(f, "_level") or 0
+    if p and rawget(p, "_name") ~= "UIParent" then return math.max(own, flevel(p) + 1) end
+    return own
+  end
+  local function frameOf(o)
+    local k = rawget(o, "_kind")
+    if k == "Texture" or k == "FontString" or k == "Line" then return rawget(o, "_parent") end
+    return o
+  end
+  local function under(o, root2)
+    while o do if o == root2 then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local function inter(a, b) return a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5 end
+  local Scene = ns.Scene
+  local bad = {}
+  -- personnages agrandis (golem, VanCleef) aux places décalées vers le bas (2e, 4e) : cas le plus bas
+  local group = { "murloc", "harvest_golem", "sorcerer", "vancleef", "mystic", "gnoll" }
+  local layouts = 0
+  for _, scale in ipairs({ 0.6, 1, 1.5 }) do
+    ns.Persist.options().scale = scale
+    ns.UI.applyScale()
+    for n = 1, 6 do
+      local ids = {}
+      for i = 1, n do ids[i] = group[i] end
+      fight(ids)
+      H.advance(0.1)
+      layouts = layouts + 1
+      local content = R.rect(ns.UI.content)
+      local k = scale -- unités du contenu -> unités résolues
+      local boardTop = content[4] - Scene.BOARD_Y * k
+      local tags = {}
+      for _, s in pairs(V().slotOf) do
+        local label = ("%d ennemi(s), échelle %.1f, %s"):format(n, scale, tostring(s.name._text))
+        local nr = R.rect(s.name)
+        local tr = R.rect(s.tag)
+        if not (vis(s.name) and (s.name._text or "") ~= "" and nr and tr) then
+          bad[#bad + 1] = label .. " : nom caché ou vide"
+        else
+          if nr[1] < content[1] or nr[3] > content[3] or nr[4] > content[4] or nr[2] < content[2] then
+            bad[#bad + 1] = label .. " : nom rogné par le contenu"
+          end
+          if nr[2] < boardTop + 4 * k or tr[2] < boardTop then bad[#bad + 1] = label .. " : nom sur le plateau" end
+          local sr = R.rect(s.st)
+          if sr and sr[2] < boardTop then bad[#bad + 1] = label .. " : états sur le plateau" end
+          if tr[3] - tr[1] + 0.5 < (s.name:GetStringWidth() or 0) * k then bad[#bad + 1] = label .. " : nom plus large que sa pilule" end
+          local mr = R.rect(s.model)
+          if mr and tr[4] > mr[2] + 0.5 then bad[#bad + 1] = label .. " : pilule du nom sur le personnage" end
+          local hr = R.rect(s.hp)
+          if hr and tr[2] < hr[4] then bad[#bad + 1] = label .. " : pilule du nom sur la jauge" end
+          if flevel(s.tag) <= flevel(s.model) or flevel(s.tag) <= flevel(s.hp) or flevel(s.tag) <= flevel(s.fallback) then
+            bad[#bad + 1] = label .. " : pilule du nom sous le modèle, la jauge ou le repli"
+          end
+          -- rien de visible, d'un cadre de niveau supérieur ou égal (hors la pilule elle-même), ne le recouvre
+          local nl = flevel(s.tag)
+          for _, o in ipairs(H.objects) do
+            local kind = rawget(o, "_kind")
+            if (kind == "Texture" or kind == "FontString" or kind == "PlayerModel") and o ~= s.name and not under(o, s.tag)
+              and under(o, ns.UI.content) and vis(o) and not (o._calls.SetAlpha and o._calls.SetAlpha[1] == 0) then
+              local r = R.rect(o)
+              if r and inter(r, nr) and flevel(frameOf(o)) >= nl then
+                bad[#bad + 1] = label .. " : recouvert par " .. kind .. " " .. tostring(o._texture or o._text or "")
+              end
+            end
+          end
+          for _, t in ipairs(tags) do
+            if inter(t, tr) then bad[#bad + 1] = label .. " : chevauche un autre nom" end
+          end
+          tags[#tags + 1] = tr
+        end
+      end
+    end
+  end
+  ns.Persist.options().scale = 1
+  ns.UI.applyScale()
+  check(("noms d'ennemis lisibles (%d dispositions : 1 à 6 ennemis × 3 échelles)"):format(layouts), #bad == 0,
+    table.concat(bad, "\n        "))
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -305,8 +305,12 @@ de carte revient au même.
   bulle d'intention au-dessus (icône + chiffres exacts de `Combat.calcDamage`, « ×N » pour les coups
   multiples, « Guette », « Étourdi »… ; liseré rouge = attaque, bleu = défense / renfort, violet = guet /
   affaiblissement, vert = soin), modèle 3D avec ombre, anneau doré aux pieds de la cible (survol, ou cible
-  clavier pendant une visée), barre de vie (+ écusson d'Absorption), nom (élite violet, boss orangé),
-  états en pastilles.
+  clavier pendant une visée) ; sous les pieds, dans un cadre d'infos au-dessus du personnage (aucun
+  modèle ni repli ne peut les recouvrir) : nom sur une pilule d'ardoise (élite violet, boss orangé ;
+  réduit s'il est trop long), barre de vie (+ écusson d'Absorption), états en pastilles. Les pieds sont
+  sur la même ligne quelle que soit la taille du personnage (`art.scale` : l'emplacement remonte), de
+  sorte que nom et états restent au-dessus du plateau (vérifié par le harnais pour 1 à 6 ennemis).
+  Sans modèle : médaillon argenté à l'icône de l'ennemi (`Art.enemies[id].icon`), ou disque sombre.
 - Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
   (cachée à 0), pioche, défausse et consumées (tas avec nombre ; infobulles : contenu trié ; clic =
   panneau des cartes, pioche triée), main en arc au centre (cartes droites ; la survolée monte, grossit
@@ -329,7 +333,8 @@ de carte revient au même.
   rendue au jeu.
 - `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (décor par décor : « peint » ou candidat
   validé, puis candidats validés / refusés / pas encore jugés ; puis icônes et modèles introuvables) ;
-  `/slay modeles` (galerie des ennemis) ; `/slay decor` (bascule illustré validé / peint ; sous-commandes
+  `/slay modeles` (galerie des ennemis et des personnages, puis au chat la liste des modèles absents
+  avec les identifiants essayés) ; `/slay decor` (bascule illustré validé / peint ; sous-commandes
   `essai`, `suivant`, `precedent`, `ok`, `non`, `peint`, `illustre` : « Essai des décors ») ;
   `/slay facing <j> <e>` (orientation des modèles, radians) ; `/slay centre`.
 - Bouton de minimap : clic gauche ouvre/ferme, clic droit options, glisser pour le déplacer.
@@ -407,7 +412,8 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 ### Confirmé par le MCP « wow »
 
 - **Icônes** (FileDataID, `wow_icon_search`) : toutes celles de `UI/Art.lua` (cartes, états, intentions,
-  bibelots, potions, parcours, couchage, grimoire, coffre, mana, or, point d'interrogation 134400), plus
+  bibelots, potions, parcours, couchage, grimoire, coffre, mana, or, point d'interrogation 134400 ;
+  replis des ennemis sans modèle : têtes de gnoll 134163 et de murloc 134169, engrenage 134063), plus
   les chemins des affixes (piste D). Une carte essaie d'abord l'icône de son sort (`C_Spell.GetSpellTexture`),
   puis le FileDataID, puis le point d'interrogation.
 - **Textures** (`wow_file_search`, liste de fichiers du client 12.1.5) : disque
@@ -458,11 +464,24 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 - Les **survols** : fluidité, absence de clignotement, passage au premier plan (le visuel `face` et ses
   enfants sont re-nivelés explicitement par `W.setLevel`), zone prolongée vers le haut de la carte
   levée, molette sur les cartes du panneau.
-- Les identifiants de **créatures** (ennemis : gnoll 117, mystique 453, murloc 126, bandit 116, sorcier 619,
-  golem 36, Rhahk'Zor 644, sbire 594, VanCleef 639 + affichage 2029 ; rencontres : Salma Saldean 235,
-  Gryan Fortmanteau 234, de mémoire) : le MCP n'indexe pas les créatures. Sans modèle : icône (ennemi) ou
-  rien (personnage de rencontre). Les autres `npc` des rencontres n'ont pas d'entrée et n'affichent rien :
-  ajouter `Art.npcs.<npc> = { creature = id }` quand un identifiant est connu.
+- Les **modèles** (`/slay modeles`). Identifiants relevés dans le cache de créatures du client Forever
+  (`Cache/WDB/enUS|frFR/creaturecache.wdb` : identifiant, nom, affichages ; `wow_creature_search` ne
+  trouvait pas l'installation) : gnoll 117 / 175, mystique 453 / 502, murloc 126 / 983, bandit 116 /
+  2357, 2358, sorcier 619 (Invocateur défias) / 2329, 2330, golem 36 / 367, Rhahk'Zor 644 / 14403,
+  sbire 594 (Malfrat défias) / 2323, 2324, VanCleef 639 / 2029 ; rencontres : Salma Saldean 235 / 1691,
+  Saldean le fermier 233 / 1943, Gryan Fortmanteau 234 / 1690. Chaque entrée essaie la créature
+  (`SetCreature`), puis chaque affichage (`SetDisplayInfo`) ; un essai est réussi si `OnModelLoaded` a
+  sonné pour lui ou si `GetModelFileID` rend un fichier 0,8 s plus tard (`W.MODEL_WAIT`) ; sinon repli
+  (médaillon pour un ennemi, rien pour un personnage de rencontre), puis relance tardive de la créature
+  à 3 s (`W.MODEL_LATE`) et effacement du repli si un `OnModelLoaded` arrive après coup. **Fiabilité** :
+  aucun appel ne lève d'erreur pour un identifiant faux ; `GetModelFileID` peut rester vide le temps
+  qu'une créature absente du cache soit demandée au serveur (d'où la relance), et ne dit rien d'un
+  modèle chargé mais mal texturé ; `OnModelLoaded` n'est pas documenté pour ce client (posé par `pcall`).
+  `/slay modeles` ouvre la galerie (ennemis puis personnages, identifiants essayés et état sous chacun)
+  et écrit au chat, après les essais : « modèles : N/M chargés », une ligne par modèle absent
+  (« sorcerer : créature 619, affichage 2329, affichage 2330 -> aucun modèle »), puis les modèles
+  chargés seulement par un affichage de repli. Les autres `npc` des rencontres n'ont pas d'entrée et
+  n'affichent rien : ajouter `Art.npcs.<npc> = { creature = id, display = id }` (cache du client).
 - Les **animations** des modèles (0 attente, 1 mort, 6 à terre, 9 encaisser, 16 frapper, 25 prêt, 53/54
   sorts), l'orientation (`/slay facing`) et le cadrage des modèles dans leur cadre (pieds au sol ?).
 - La **peau** : chargement des TGA de `Media/` (aplat vert = fichier absent ou mal lu), des masques TGA
@@ -523,7 +542,9 @@ glisser-déposer ; récompenses (coffre ouvert d'abord s'il se présente), amél
 vidée (`H.settle`) avant de vérifier le bandeau de fin ; aller-retour de sauvegarde en combat et sur une
 récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibelots ; marchand ; feu de camp ;
 rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
-et `/slay art` ; décors (peints par défaut, essai : suivant, précédent, ok, non, peint, illustre ; premier
+et `/slay art` ; modèles (essais créature puis affichages, médaillon de repli, relance tardive,
+`OnModelLoaded`, lignes de `/slay modeles`) ; noms des ennemis (1 à 6 ennemis × échelles 0,6 / 1 / 1,5 :
+visibles, dans le contenu, au-dessus du plateau, au-dessus du modèle et de la jauge, rien par-dessus) ; décors (peints par défaut, essai : suivant, précédent, ok, non, peint, illustre ; premier
 validé de chaque liste ; verdicts relus au rechargement ; rapport) ; survols (zone fixe, valeur
 intermédiaire, sortie réversible depuis la valeur courante, état final par les minuteurs, pilote coupé
 au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap,
@@ -595,8 +616,8 @@ Ensuite (retours du premier essai) :
 
 Ensuite, la liste habituelle : `/reload` en combat et sur une récompense (même état), potions (boire, à
 cible, jeter), touches 1–0 / Tab / Espace / Entrée / Échap (une touche non gérée agit sur le jeu),
-ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel, `/slay modeles`,
-`/slay facing`.
+ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel, `/slay modeles`
+(recopier ses lignes du chat), `/slay facing`.
 
 À me renvoyer : la sortie de `/slay art`, une capture du combat avec une carte survolée, du panneau de
 la pioche, du bandeau, de chaque décor illustré validé, et toute erreur Lua (texte complet).

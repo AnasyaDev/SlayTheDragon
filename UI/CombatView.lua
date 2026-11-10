@@ -34,6 +34,14 @@ local EXHAUST_PILE = { 177, 573 }
 local MANA_X, MANA_Y = 81, 474           -- hexagone de mana (84) ; points de mana dessous
 local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
 local AIM_SCALE = 1.07                   -- ennemi visé (carte à cible armée) : il grandit un peu
+-- Sous les pieds d'un ennemi (33 + hauteur du personnage sous le haut de l'emplacement, 193 à
+-- l'échelle 1) : nom (pilule), jauge, états, décalés depuis les pieds.
+local FIG_H = 160
+local NAME_DY, NAME_H, NAME_SIZE = 3, 18, 13.5
+local HP_DY, ST_DY = 33, 59
+local INFO_LEVEL = 6                     -- cadre des infos : au-dessus du personnage (+1 à +4)
+local ENEMY_TOP = 92                     -- haut de l'emplacement d'un ennemi à l'échelle 1
+local ENEMY_STAGGER = 26                 -- un ennemi sur deux, posé un peu plus bas
 
 local function now() return GetTime and GetTime() or 0 end
 local function opts() return ns.Persist.options() end
@@ -81,6 +89,17 @@ local function placeFig(s)
   s.fig:SetPoint("BOTTOM", s, "TOP", 0, -(33 + h) / k)
 end
 
+-- Nom, jauge et états sous les pieds (qui descendent avec la hauteur du personnage).
+local function placeInfo(s)
+  local feet = 33 + (s.figH or FIG_H)
+  s.tag:ClearAllPoints()
+  s.tag:SetPoint("TOP", s, "TOP", 0, -(feet + NAME_DY))
+  s.hp:ClearAllPoints()
+  s.hp:SetPoint("TOP", s, "TOP", 8, -(feet + HP_DY))
+  s.st:ClearAllPoints()
+  s.st:SetPoint("TOP", s, "TOP", 0, -(feet + ST_DY))
+end
+
 local function aimApply(s)
   local v = W.animValue(s, "aim")
   s.fig:SetScale(1 + (AIM_SCALE - 1) * v)
@@ -105,15 +124,25 @@ local function buildSlot(self, i)
   s.flash = W.disc(s.fig, "OVERLAY", 0, C.hp, 0)
   s.flash:SetSize(110, 130)
   s.flash:SetPoint("CENTER", 0, 4)
-  s.hp = W.hpBar(s, 120, 13, 14)
-  s.hp:SetPoint("TOP", 8, -200)
-  s.block = W.shieldBadge(s, 28, 28)
+  -- Infos (nom, jauge, Absorption, états) dans un cadre au-dessus du personnage et de son repli :
+  -- aucun modèle, ombre ou anneau ne peut les recouvrir. Nom sur une pilule d'ardoise (lisible sur
+  -- tout décor), au-dessus de la jauge, juste sous les pieds.
+  s.info = CreateFrame("Frame", nil, s)
+  s.info:SetAllPoints()
+  s.info:SetFrameLevel(s:GetFrameLevel() + INFO_LEVEL)
+  s.tag = CreateFrame("Frame", nil, s.info)
+  s.tag:SetFrameLevel(s.info:GetFrameLevel() + 5) -- au-dessus de la jauge et des jetons d'état
+  s.tag:SetSize(SLOT_W, NAME_H)
+  s.tag.plaque = W.plaque(s.tag, { r = NAME_H / 2, pill = true, fill = 0.85, gloss = false })
+  s.tag.plaque:SetRim(Art.rim.dim)
+  s.name = W.label(s.tag, "bold", NAME_SIZE, C.text, "OVERLAY")
+  s.name:SetPoint("CENTER", s.tag, "CENTER", 0, 0.5)
+  s.name:SetWordWrap(false)
+  s.hp = W.hpBar(s.info, 120, 13, 14)
+  s.block = W.shieldBadge(s.info, 28, 28)
   s.block:SetPoint("LEFT", s.hp, "RIGHT", 4, 0)
-  s.name = W.label(s, "bold", 13.5, C.text, "OVERLAY")
-  s.name:SetPoint("TOP", 0, -222)
-  s.name:SetWidth(SLOT_W + 20)
-  s.st = W.tokenRow(s, 6, SLOT_W + 10, 26)
-  s.st:SetPoint("TOP", 0, -242)
+  s.st = W.tokenRow(s.info, 6, SLOT_W + 10, 26)
+  placeInfo(s)
   s:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
   s:SetScript("OnEnter", function() s.hover = true V:RenderTargets() end)
   s:SetScript("OnLeave", function() s.hover = false V:RenderTargets() end)
@@ -500,7 +529,8 @@ function V:LayoutEnemies()
       local sc = art.scale or 1
       s.fig:SetSize(150 * sc, 160 * sc)
       s.model:SetSize(150 * sc, 160 * sc)
-      s.figH = 160 * sc
+      s.figH = FIG_H * sc
+      placeInfo(s)
       W.animSet(s, "aim", 0)
       W.setCreature(s.model, e.id, s.fallback)
       if s.model.SetFacing then s.model:SetFacing(opts().facingEnemy or -0.6) end
@@ -511,7 +541,8 @@ function V:LayoutEnemies()
     end
     s.enemyIndex = idx
     s.cx = cx0 + (k - 1) * spacing
-    s.top = 92 + ((k % 2 == 0) and 26 or 0) - Scene.TOP
+    -- personnage agrandi (art.scale) : l'emplacement remonte, les pieds restent sur la même ligne
+    s.top = ENEMY_TOP + ((k % 2 == 0) and ENEMY_STAGGER or 0) - Scene.TOP - ((s.figH or FIG_H) - FIG_H)
     s:SetScale(n >= 5 and 0.86 or 1)
     self:PlaceSlot(s, 0, 0)
   end
@@ -573,7 +604,10 @@ function V:RenderEnemies(full)
   for uid, s in pairs(self.slotOf) do
     local e = enemyByUid(c, uid)
     local def = ns.Enemies[e.id]
-    s.name:SetText(def.name)
+    if s.name:GetText() ~= def.name then
+      W.fitText(s.name, def.name, NAME_SIZE, SLOT_W - 14, 10)
+      s.tag:SetWidth(min(SLOT_W, (s.name:GetStringWidth() or 60) + 18))
+    end
     local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.text)
     s.name:SetTextColor(nc[1], nc[2], nc[3])
     if full then
@@ -810,7 +844,7 @@ function V:UnitPos(ref)
   local s = self.slotOf[ref]
   if not s then return nil end
   local sc = s:GetScale() or 1
-  return s.cx, Scene.TOP + s.top + (33 + 80) * sc, s
+  return s.cx, Scene.TOP + s.top + (33 + (s.figH or FIG_H) / 2) * sc, s
 end
 
 function V:Push(delay, fn)
@@ -1262,30 +1296,74 @@ end
 -- Aperçu des modèles (/slay modeles) : vérifie l'art sans toucher à l'expédition
 ---------------------------------------------------------------------------
 
+-- Entrées de l'aperçu : ennemis (Art.enemies) puis personnages des rencontres (Art.npcs), triés.
+local function previewEntries()
+  local out, ids = {}, {}
+  for id in pairs(Art.enemies) do ids[#ids + 1] = id end
+  table.sort(ids)
+  for i = 1, #ids do
+    local d = ns.Enemies[ids[i]]
+    out[#out + 1] = { id = ids[i], key = ids[i], art = Art.enemies[ids[i]], name = d and d.name or ids[i] }
+  end
+  local speaker = {}
+  for _, ev in pairs(ns.Events or {}) do
+    if type(ev) == "table" and ev.npc and ev.speaker then speaker[ev.npc] = ev.speaker end
+  end
+  ids = {}
+  for id in pairs(Art.npcs) do ids[#ids + 1] = id end
+  table.sort(ids)
+  for i = 1, #ids do
+    out[#out + 1] = { id = "npc:" .. ids[i], key = "npc:" .. ids[i], art = Art.npcs[ids[i]],
+      name = speaker[ids[i]] or ids[i], npc = true }
+  end
+  return out
+end
+
+-- Identifiants essayés, en clair : « créature 619, affichage 2329, affichage 2330 ».
+local function triesText(art)
+  local t = W.modelTries(art)
+  local parts = {}
+  for i = 1, #t do parts[i] = W.tryLabel(t[i]) end
+  return #parts > 0 and table.concat(parts, ", ") or "aucun identifiant"
+end
+
+local PREVIEW_COLS = 6
+
 function V:PreviewEnemies()
   if not self.preview then
     local p = W.woodPanel(UI.content, 10)
     p:SetPoint("TOPLEFT", 10, -50)
     p:SetPoint("BOTTOMRIGHT", -10, 10)
     p:SetFrameLevel(UI.content:GetFrameLevel() + 95)
+    p:EnableMouse(true)
+    p.title = W.label(p, "bold", 14, C.textSoft)
+    p.title:SetPoint("TOPLEFT", 16, -10)
+    p.title:SetText("Modèles des ennemis et des personnages (le chat liste ceux qui manquent)")
     p.models = {}
-    local ids = {}
-    for id in pairs(Art.enemies) do ids[#ids + 1] = id end
-    table.sort(ids)
-    for k = 1, #ids do
-      local col, row = (k - 1) % 5, floor((k - 1) / 5)
-      local m = W.model(p, 180, 200)
-      m:SetPoint("TOPLEFT", 20 + col * 200, -16 - row * 270)
-      local fb = p:CreateTexture(nil, "ARTWORK")
-      fb:SetSize(48, 48)
-      fb:SetPoint("CENTER", m, "CENTER")
-      fb:Hide()
-      local label = W.label(p, "body", 12, C.text)
-      label:SetPoint("TOP", m, "BOTTOM", 0, -4)
-      local art = Art.enemies[ids[k]]
-      label:SetText((ns.Enemies[ids[k]] and ns.Enemies[ids[k]].name or ids[k])
-        .. " (" .. tostring(art.creature) .. ")")
-      m.id, m.fallback = ids[k], fb
+    local list = previewEntries()
+    local rows = math.ceil(#list / PREVIEW_COLS)
+    local cellW = (UI.CONTENT_W - 20 - 24) / PREVIEW_COLS
+    local rowH = min(236, (UI.CONTENT_H - 60 - 36 - 50) / max(1, rows))
+    local figH = min(170, rowH - 52)
+    for k = 1, #list do
+      local e = list[k]
+      local col, row = (k - 1) % PREVIEW_COLS, floor((k - 1) / PREVIEW_COLS)
+      local fig = Scene.figure(p, 150, figH)
+      fig:SetPoint("TOP", p, "TOPLEFT", 12 + (col + 0.5) * cellW, -36 - row * rowH)
+      local m = fig.model
+      local label = W.label(p, "bold", 12, C.text)
+      label:SetPoint("TOP", fig, "BOTTOM", 0, -3)
+      label:SetWidth(cellW - 6)
+      label:SetWordWrap(false)
+      label:SetText(e.name)
+      local ids = W.label(p, "body", 10.5, C.textDim)
+      ids:SetPoint("TOP", label, "BOTTOM", 0, -1)
+      ids:SetWidth(cellW - 6)
+      ids:SetText(triesText(e.art))
+      m.state = W.label(p, "bold", 11, C.textDim)
+      m.state:SetPoint("TOP", ids, "BOTTOM", 0, -1)
+      m.state:SetWidth(cellW - 6)
+      m.id, m.key, m.art, m.npc, m.fallback, m.label = e.id, e.key, e.art, e.npc, fig.fallback, e.name
       p.models[k] = m
     end
     local close = W.button(p, "Fermer", 110, 30, function() p:Hide() end, "gold", 14)
@@ -1293,9 +1371,72 @@ function V:PreviewEnemies()
     self.preview = p
   end
   self.preview:Show()
+  local most = 1
   for k = 1, #self.preview.models do
     local m = self.preview.models[k]
-    W.setCreature(m, m.id, m.fallback)
+    m.state:SetText("chargement")
+    m.state:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
+    if m.npc then
+      m.fallback:Hide()
+      W.setFallbackArt(m.fallback, nil)
+      W.setCreatureArt(m, m.art, m.key, function() m.fallback:Show() end, function() m.fallback:Hide() end)
+    else
+      W.setCreature(m, m.id, m.fallback)
+    end
+    most = max(most, #W.modelTries(m.art))
     if m.SetFacing then m:SetFacing(opts().facingEnemy or -0.6) end
   end
+  -- rapport au chat quand tous les essais ont eu leur délai
+  self.previewToken = (self.previewToken or 0) + 1
+  local token = self.previewToken
+  UI.say("aperçu des modèles : vérification (" .. #self.preview.models .. " modèles, environ "
+    .. math.ceil(most * W.MODEL_WAIT) .. " s).")
+  W.delay(most * W.MODEL_WAIT + 0.2, function()
+    if self.previewToken == token then self:ReportModels() end
+  end)
+end
+
+-- Lignes du rapport (/slay modeles), à recopier telles quelles : une par modèle absent, puis une par
+-- modèle chargé seulement par un essai de repli. ASCII pour les flèches (polices du jeu).
+function V:ModelReportLines()
+  local lost, late, ok = {}, {}, 0
+  local models = self.preview and self.preview.models or {}
+  for k = 1, #models do
+    local m = models[k]
+    local st = W.models[m.key]
+    if st and st.state == "ok" then
+      ok = ok + 1
+      if st.via ~= st.tries[1] then
+        local failed = {}
+        for i = 1, #st.tries do
+          if st.tries[i] == st.via then break end
+          failed[#failed + 1] = st.tries[i]
+        end
+        late[#late + 1] = m.key .. " : " .. table.concat(failed, ", ") .. " -> aucun modèle ; chargé par " .. st.via
+      end
+    else
+      local tried = st and #st.tries > 0 and table.concat(st.tries, ", ") or "aucun identifiant"
+      lost[#lost + 1] = m.key .. " : " .. tried .. " -> aucun modèle"
+    end
+  end
+  local lines = { "modèles : " .. ok .. "/" .. #models .. " chargés"
+    .. (#lost > 0 and (", " .. #lost .. " sans modèle :") or ".") }
+  for i = 1, #lost do lines[#lines + 1] = lost[i] end
+  if #late > 0 then lines[#lines + 1] = "chargés par un identifiant de repli :" end
+  for i = 1, #late do lines[#lines + 1] = late[i] end
+  return lines, #lost
+end
+
+function V:ReportModels()
+  local models = self.preview and self.preview.models or {}
+  for k = 1, #models do
+    local m = models[k]
+    local st = W.models[m.key]
+    local good = st and st.state == "ok"
+    m.state:SetText(good and ("modèle : " .. st.via) or "aucun modèle")
+    local c = good and C.healGreen or C.badText
+    m.state:SetTextColor(c[1], c[2], c[3])
+  end
+  local lines = self:ModelReportLines()
+  for i = 1, #lines do UI.say(i == 1 and lines[i] or ("  " .. lines[i])) end
 end

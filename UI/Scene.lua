@@ -445,9 +445,10 @@ function S.figure(parent, w, h)
   f.shadow:SetPoint("BOTTOM", 0, 2)
   f.model = W.model(f, w, h)
   f.model:SetPoint("BOTTOM", 0, 0)
-  f.fallback = f:CreateTexture(nil, "ARTWORK")
-  f.fallback:SetSize(56, 56)
-  f.fallback:SetPoint("CENTER", 0, 0)
+  -- repli sans modèle : médaillon argenté (icône de l'ennemi ou disque sombre), W.setFallbackArt
+  f.fallback = W.medallion(f, math.max(40, math.floor(math.min(w, h) * 0.42)))
+  f.fallback:SetPoint("CENTER", 0, h * 0.08)
+  f.fallback:SetFrameLevel(f.model:GetFrameLevel() + 2)
   f.fallback:Hide()
   f.SetRing = function(self, on, hover)
     if on then
@@ -478,7 +479,8 @@ function S.npcFigure(f, npcId)
   end
   f.model:Show()
   f.shadow:Show()
-  W.setCreatureArt(f.model, art, "npc:" .. npcId, function() f.model:Hide() f.shadow:Hide() end)
+  W.setCreatureArt(f.model, art, "npc:" .. npcId, function() f.model:Hide() f.shadow:Hide() end,
+    function() f.model:Show() f.shadow:Show() end)
   if f.model.SetFacing then f.model:SetFacing(opts().facingEnemy or -0.6) end
   return true
 end
