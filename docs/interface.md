@@ -1,9 +1,114 @@
-# Interface en jeu (pistes C, D, E et survols)
+# Interface en jeu (pistes C, D, E, survols et peau « Mechanized Magic »)
 
 État au 10/11/2026. Premier essai en jeu fait par le joueur (disposition validée) ; les retours de cet
-essai sont traités dans « Retours du premier essai » ci-dessous, vérifiés hors jeu par
-`Sim/ui_harness.lua` (logique, clics, animations en temps virtuel) et par des instantanés SVG des écrans
-(`Sim/ui_render.lua`, rendu approximatif). La section « Tests en vol » liste ce qu'il reste à voir en jeu.
+essai sont traités dans « Retours du premier essai » ci-dessous. Depuis, l'habillage « bois et
+parchemin » dessiné en code est remplacé par les pièces du pack CC0 « Mechanized Magic » (Dumivid),
+d'après les planches validées (`docs/maquette/combat_pack.jpg`, `ecran_*.jpg`, `psd.jpg`) : voir « Peau ».
+Vérifié hors jeu par `Sim/ui_harness.lua` (logique, clics, animations en temps virtuel, cohérence de la
+peau) et par des instantanés des écrans (`Sim/ui_render.lua`, qui dessine désormais les textures de
+`Media/`). La section « Tests en vol » liste ce qu'il reste à voir en jeu.
+
+## Peau « Mechanized Magic »
+
+### Fabrication des textures (`tools/build_media.py`, hors TOC, rejouable)
+
+```
+python3 -m venv build/venv && build/venv/bin/pip install pillow fonttools numpy
+build/venv/bin/python tools/build_media.py   # options : --psd, --icons, --font
+```
+
+- **PSD** (`~/Téléchargements/1_Free Pack/PSD Card Constructor.psd`, lecture seule) piloté par
+  `photocraft-cli run` : chaque pièce est rendue **seule** (tous les calques masqués sauf elle, ses
+  ancêtres et ses descendants à leur visibilité d'origine), matière « métal 1 » (calque 296) pour les
+  pièces de carte, puis rognée, mise à l'échelle et posée en haut à gauche d'une toile en puissances de
+  deux. Rendus mis en cache dans `build/media_cache` (clé = commandes envoyées). Identifiants : corps 226
+  + couleur 229 (`layer.fill.solidColor.set`), ruban 246, coût 244, panneau 242, plaque du bas 224,
+  anneau 235, verre 239 (opacité 0,66 cuite), ouverture du médaillon = calque 237 rempli de blanc,
+  gemmes 276 / 274 / 272 / 266, hexagones 232 (rouge et vert ; bleu, acier, violet, vide reteints comme
+  dans `gen_combat_pack.py`), dos 222 (cristal 197, sans l'emblème 215).
+- **Dessinées par le script** (même vocabulaire que les planches) : ardoise (intérieur du panneau de
+  texte, aplatie puis rendue raccordable par fondu avec sa copie décalée : pas de symétrie visible) et
+  ivoire (intérieur du corps ivoire), coins de remplissage arrondis (ardoise, ivoire, pilule), liseré
+  d'argent à neuf tranches (filet sombre, argent en dégradé, filet sombre), lueurs (halo de carte =
+  silhouette du corps floutée, halo rond, halo de plaque), pilule dorée du bouton principal (trois
+  tranches), pointes de bulle, masques (disque, carré arrondi).
+- **Police** : instances statiques de Baloo Chettan 2 (wght 500 / 700 / 800, `fontTools.varLib.instancer`),
+  réduites au latin (accents, « ’ », « « » », « … », « × », « − » vérifiés par le script).
+- **Icônes** : seules celles que nomme `UI/Art.lua` (champ `tga = "Nom"`, 81 aujourd'hui), copiées de
+  `~/Téléchargements/ICONS` (déjà en TGA 32 bits 128 px). Une icône introuvable est signalée par le
+  script et l'interface garde l'icône du jeu.
+- **Sorties** : `Media/*.tga`, `Media/Icons/*.tga`, `Media/Fonts/*.ttf`, `UI/SkinData.lua` (fichier GÉNÉRÉ :
+  nom → fichier, toile, zone utile, coordonnées de texture, coin et liseré des neuf tranches, géométrie
+  de la carte en fractions de la largeur du corps, angle du nom), aperçus PNG dans `build/media_png`.
+
+**Format** : TGA 32 bits non compressé, origine en bas à gauche, 8 bits d'alpha (le format des icônes
+améliorées et des addons ; BLP impossible à produire ici), toiles en puissances de deux (requis pour la
+répétition des matières), couleur des pixels transparents « saignée » depuis les voisins (pas de liseré
+sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une carte de 124 unités vaut
+~232 px à 1440p, ~320 px agrandie ×1,37 : nette au survol), ruban 512 × 169, panneau 256 × 185, coût
+256 × 124, anneau 243 × 256 (et 61 × 64 pour les jetons), hexagones 128 (mana 256), gemmes 64, matières
+256 (répétées tous les 128 unités pour l'ardoise, 420 pour l'ivoire). `Media/` = 13,8 Mo (textures
+8,4 Mo dont 4 Mo pour les quatre corps, icônes 5,2 Mo, polices 0,15 Mo).
+
+### Briques (`UI/Widgets.lua`)
+
+- `W.setSkin` / `W.skin` (texture de `Media/`, zone utile), `W.nine` (neuf tranches faites main : neuf
+  textures ancrées, coins de N unités, suivent la taille de l'hôte), `W.plaque` (coins de matière +
+  deux bandes de matière carrelée à l'échelle + reflet + liseré d'argent ; `SetFill`, `SetRim`,
+  `SetGlow`), `W.goldPill`, `W.hex` / `W.setHex`, `W.medallion`, `W.tokenRow` (jetons d'état),
+  `W.cardBack`, `W.panel` (ardoise ou ivoire). Polices : `W.label(parent, "body" | "bold" | "heavy", …)`,
+  blanc à ombre portée par défaut, repli Friz Quadrata si la police ne se charge pas ; préchargement des
+  trois polices au chargement.
+- **Carte** (`W.card`) : halo, plaque du bas (mots-clés : Pouvoir, Incantation, Recharge N, Consumée,
+  Conservée), corps à la couleur de la carte (`Art.cardBody` : violet = Ombre, bleu = protection
+  — Absorption ou Suppression d'abord —, or = cartes de départ, ivoire = le reste), médaillon (anneau,
+  icône masquée par l'ouverture exacte du PSD, verre), panneau de texte (centré, taille selon la
+  longueur, chiffres blancs — verts s'ils changent à l'amélioration ; une chaîne WoW ne mêle pas deux
+  graisses, d'où la couleur au lieu du gras), languette de coût, ruban du nom, gemme de rareté (aucune =
+  base ou commune, triangle vert, losange bleu, pentagone violet, carré orange). Injouable : pièces
+  désaturées et assombries, raison dans une plaque rouge au bas de la carte. Prix : pastille (pièce +
+  nombre, rouge si trop cher) sous la carte.
+- **Nom incliné** : le ruban du PSD penche de 9,2° (mesuré par le script sur la bande du ruban) ; le nom
+  suit par `FontString:SetRotation` (documentée pour Forever, `wow_api_search`). Non vérifiable hors
+  jeu : `/slay ruban` bascule sur le **ruban redressé** (exporté aussi) et un nom horizontal. Le nom
+  n'est pas courbé en jeu (accepté).
+
+### Écrans (d'après les planches)
+
+- Fenêtre : ardoise sombre, liseré d'argent par-dessus, **contenu rogné à la fenêtre**
+  (`SetClipsChildren`) : rien ne peut déborder. Bandeau d'ardoise : classe ; PV (hexagone rouge,
+  « /max ») ; or (pièce) ; deck (dos de carte + nombre, clic = panneau du deck) ; zone et points de
+  progression sur un filet (boss = hexagone rouge) ; clé (hexagone violet « +N »), bibelots, fioles
+  (cases d'ardoise), ≡, × (rond rougi). Plateau d'ardoise carrelée sous un filet sombre / argent / sombre.
+- Combat : barre d'incantation (plaque, médaillon du sort, jauge dorée), jauges de vie à hexagone rouge,
+  Absorption en hexagone d'acier, jetons d'état en médaillons, bulles d'intention (pilule au liseré
+  rouge / bleu / violet / vert, pointe), mana en grand hexagone bleu « 2/3 » + un petit hexagone par
+  point, Démence en hexagone violet (cachée à 0), pioche / défausse / consumées en dos de carte (bas à
+  y 595 < 614), recharges en cases d'ardoise (icône grisée, tours), « Fin du tour » doré. La main
+  remonte de 10 (haut des cartes à 418) pour que la plaque du bas reste dans la fenêtre.
+- Récompense : cartes ×1,08 (x 407 / 552 / 697), butin en cases d'ardoise (bourse avec son montant),
+  « Une carte au choix, ou aucune. », « Reprendre la route » doré. Rencontre : bulle ivoire à pointe,
+  plaques de réponse 320 × 118 (gain en vert), survol = liseré doré + halo. Parcours : feuille ivoire,
+  médaillons argentés (halo blanc = accessible, doré = position, rouge = boss), franchies estompées avec
+  un petit hexagone vert, pointillés (parcouru brun doré, départs possibles sombres). Marchand : rangée
+  de cartes ×0,92 à prix en pastille, « Bibelots », « Potions », « Service » (plaque « Retirer une
+  carte » et son prix), or au centre du plateau. Feu de camp : couchage et grimoire en médaillons au sol,
+  leurs plaques « Se reposer / +N PV » et « S'entraîner / Améliore une carte » sur le plateau (la plaque
+  et le médaillon s'allument ensemble). Accueil, bilan, méta, grilles, panneau du deck, options : panneaux
+  d'ardoise, clés en hexagones violets (verrouillées : hexagones vides), boutons d'ardoise, action
+  principale dorée.
+
+### Écarts volontaires aux planches
+
+- Feu de camp : un bouton d'ardoise « Reprendre la route » en plus (repartir sans rien faire reste
+  possible, règle du moteur) ; la planche n'en montre pas.
+- Main : 10 unités plus haut que sur la planche (la plaque du bas sortait de la fenêtre).
+- Grilles et panneau du deck : cartes ×0,75 / ×0,72 et rangées plus espacées (la languette de coût et la
+  plaque du bas débordent du corps).
+- Rencontre : la pointe de la bulle part du bas à droite (vers le personnage) ; sans personnage, pas de
+  pointe. Bulle d'un événement « rare » / « histoire » : liseré doré / violet.
+- Valeurs en évidence par la couleur (blanc, vert à l'amélioration) et non en gras (une chaîne de texte
+  WoW n'a qu'une police).
 
 ## Retours du premier essai (survols, deck, paysages, bandeau, vouvoiement)
 
@@ -39,7 +144,7 @@ essai sont traités dans « Retours du premier essai » ci-dessous, vérifiés h
   Fermeture : `Échap` (après les options), clic hors du panneau (voile), clic droit sur une carte,
   « Fermer », ou nouveau clic sur ce qui l'a ouvert. Panneau ouvert : les touches ne vont pas à
   l'écran dessous (rendues au jeu). Accès : tas du deck du plateau (récompense, feu de camp, marchand,
-  grilles) et bouton « Deck N » du bandeau, désormais **aussi en combat** (deck complet) ; en combat,
+  grilles) et deck du bandeau (dos de carte et nombre), désormais **aussi en combat** (deck complet) ; en combat,
   clic sur la pioche (**toujours triée**, jamais l'ordre de tirage), la défausse, et le nouveau tas
   violet des **consumées** (x 151–187, affiché dès qu'il y en a une).
 - **Paysages** : voir « Diagnostic des paysages » plus bas. Chaque décor a une liste ordonnée de
@@ -135,20 +240,22 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 
 | Fichier | Rôle | API WoW |
 | --- | --- | --- |
-| `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours), voies, mots-clés, animations | non |
+| `UI/SkinData.lua` | GÉNÉRÉ par `tools/build_media.py` : textures de `Media/` (fichier, toile, zone utile, coordonnées), géométrie de la carte, icônes copiées, polices | non |
+| `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours ; champ `tga` = icône améliorée), couleur du corps des cartes, gemmes, teintes des liserés, mots-clés, animations | non |
 | `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor` et `artChecks`) | non |
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
-| `UI/Widgets.lua` | Formes, polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes, médaillon, carte unique, barre de vie, écusson d'Absorption, pastilles, boutons, infobulles, textes flottants, modèles | oui |
+| `UI/Widgets.lua` | Peau (textures de `Media/`, neuf tranches, plaques, hexagones, médaillons, pilule dorée), polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes (améliorées d'abord), carte unique composée, jauges de vie, hexagone d'Absorption, jetons d'état, boutons, infobulles, textes flottants, modèles | oui |
 | `UI/Scene.lua` | Décor (peint par défaut, illustration validée par l'essai manuel, mode essai, rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
 | `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
 | `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta, panneau de consultation des cartes (`UI.deckView`) | oui |
 | `UI/Flight.lua` | Événements : chargement, vol en taxi, combat réel, déconnexion | oui |
 | `Sim/ui_harness.lua` | Harnais hors jeu (faux client WoW) | — |
-| `Sim/ui_render.lua` | Rendu SVG approximatif des cadres du faux client (instantanés d'écrans) | — |
+| `Sim/ui_render.lua` | Rendu SVG des cadres du faux client (instantanés d'écrans, textures de `Media/` comprises) | — |
+| `tools/build_media.py` | Fabrication de `Media/` et de `UI/SkinData.lua` (hors TOC, non déployé) | — |
 
-`UI\Scene.lua` a été ajouté au TOC par la piste E (client relancé depuis) ; les retours du premier essai
-n'ajoutent aucun fichier.
+`UI\Scene.lua` a été ajouté au TOC par la piste E (client relancé depuis) ; la peau ajoute
+**`UI\SkinData.lua`** (avant `UI\Art.lua`) et le dossier `Media/` : **relancer le client** au prochain essai.
 Les fichiers qui touchent l'API WoW commencent par `if not CreateFrame then return end` ; `Sim/load.lua`
 saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`**.
 
@@ -157,11 +264,12 @@ saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`
 Coordonnées : celles des maquettes, depuis le coin haut gauche de la zone intérieure (1034 × 614).
 
 **Bandeau** (y 0–44, sur tous les écrans ; on le saisit pour déplacer la fenêtre) : à gauche la classe,
-« PV », « po » ; au centre la zone (« Acte 1 · Marche de l'Ouest » sur la carte), sur la ligne du haut,
-et ailleurs la progression de l'acte sur la ligne du bas (points dorés franchis, point clair = étape en
-cours, losange rouge = boss) ; à droite « Deck N » (partout, combat compris ; infobulle = contenu du
-deck ; clic = panneau du deck), clé mythique (pastille violette « Clé +N », infobulle = affixes),
-bibelots (cases liserées à la rareté), séparateur, 3 fioles (potions), ≡ (options), × (fermer).
+les PV (hexagone rouge, « /max »), l'or (pièce), le deck (dos de carte et nombre ; partout, combat
+compris ; infobulle = contenu du deck ; clic = panneau du deck) ; au centre la zone (« Acte 1 · Marche de
+l'Ouest » sur la carte), sur la ligne du haut, et ailleurs la progression de l'acte sur la ligne du bas
+(points dorés franchis, point clair = étape en cours, hexagone rouge = boss) ; à droite la clé mythique
+(hexagone violet « +N », infobulle = affixes), les bibelots (cases liserées à la rareté), séparateur,
+3 fioles (potions), ≡ (options), × (fermer).
 
 | Phase / vue | Écran | Contenu |
 | --- | --- | --- |
@@ -328,9 +436,19 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   `SetFrameLevel` (et `SetFixedFrameLevel`, non employé), scripts `OnSizeChanged` et `OnMouseWheel`
   (employés par l'interface Blizzard 12.1.5). Les décors n'appellent plus `IsObjectLoaded`,
   `GetTextureFileID` ni `C_Texture.GetFilenameFromFileDataID` (détection supprimée).
+- **Peau** (`wow_api_search`, Forever) : `SetTexture(fichier, enveloppeH, enveloppeV, filtre)` (filtre
+  `"TRILINEAR"` comme la carte du monde Blizzard ; `"REPEAT"` + coordonnées > 1 pour les matières
+  carrelées), `SetTexCoord`, `CreateMaskTexture` / `AddMaskTexture` (masques TGA de l'addon),
+  `FontString:SetRotation` (nom des cartes), `SetSpacing`, `SetDrawLayer`, `SetClipsChildren` (fenêtre),
+  `HookScript` (`OnSizeChanged` : plusieurs observateurs de taille). `SetTextureSliceMargins` existe mais
+  n'est pas employé (neuf tranches faites main, comportement connu). Icônes de repli des nouvelles icônes
+  (`wow_file_search`) : 134950 (inv_shield_04), 136155 (spell_shadow_evileye), 133730
+  (inv_misc_bone_humanskull_01), 236409 (achievement_boss_edwinvancleef), 7808148
+  (inv_camelot_camping_welcomingcampfire), 132594 (inv_box_01), 135813 (spell_fire_flameshock).
 - `wow_lua_lint` (forever) sur tout `UI/` : aucune erreur ; un avertissement attendu sur `CreateColor`
   (fonction Lua de l'interface, pas de l'API C) ; notes « OnUpdate » sur le glisser-déposer, le bouton de
-  minimap, le feu et le pilote des interpolations (voulues).
+  minimap, le feu et le pilote des interpolations (voulues). `wow_toc_validate` : aucune erreur
+  (avertissements habituels sur les barres obliques inverses).
 
 ### Non vérifié (à voir en jeu)
 
@@ -347,7 +465,11 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   ajouter `Art.npcs.<npc> = { creature = id }` quand un identifiant est connu.
 - Les **animations** des modèles (0 attente, 1 mort, 6 à terre, 9 encaisser, 16 frapper, 25 prêt, 53/54
   sorts), l'orientation (`/slay facing`) et le cadrage des modèles dans leur cadre (pieds au sol ?).
-- La police **Morpheus** (`Fonts\MORPHEUS.ttf`) et ses accents ; repli sur la police de l'objet.
+- La **peau** : chargement des TGA de `Media/` (aplat vert = fichier absent ou mal lu), des masques TGA
+  (icônes rondes, carrées arrondies, ouverture du médaillon), de la police Baloo Chettan 2 (sinon Friz
+  Quadrata) ; netteté des cartes au survol ; matières répétées sans couture (`"REPEAT"`) ; rotation du
+  nom (`/slay ruban` sinon) ; rognage de la fenêtre (`SetClipsChildren`) sans effet de bord (la carte
+  qu'on glisse hors de la fenêtre disparaît : voulu).
 - Le décalage d'un cadre mis à l'échelle (`SetScale` + `SetPoint` divisé par l'échelle) pour les visuels
   survolés et les cartes de récompense : calculé, à confirmer à l'œil.
 
@@ -387,8 +509,9 @@ frame (seules des textures pivotent), aucun `loadstring`.
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (239 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (287 vérifications, graine 1)
 lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
+                                               #   (aperçus de Media copiés dans build/snap/media)
 for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
 ```
 
@@ -405,22 +528,48 @@ validé de chaque liste ; verdicts relus au rechargement ; rapport) ; survols (z
 intermédiaire, sortie réversible depuis la valeur courante, état final par les minuteurs, pilote coupé
 au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap,
 clic dehors, Fermer, pioche triée et ordre réel intact, défausse, consumées, deck en combat, touches
-bloquées). Le faux client gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded` (fichiers
-`H.unloaded` jamais chargés) et `C_Texture`. Graines 1 à 7 : ALL PASS (lua5.1), 1 sous luajit.
+bloquées) ; **peau** (U20 : chaque texture de `SkinData` présente dans `Media/`, TGA 32 bits non
+compressé à origine en bas, dimensions en puissances de deux identiques à `SkinData`, coordonnées de la
+zone utile cohérentes ; pièces attendues présentes ; icônes de `SkinData` présentes et toutes celles que
+nomme `Art.lua` copiées ; polices présentes ; carte composée : corps par couleur — ivoire, violet, bleu,
+or —, ruban, coût, panneau, icône améliorée masquée, gemme, plaque du bas, nom incliné, carte grisée et
+sa raison, amélioration en vert, `/slay ruban` ; repli sur l'icône du jeu quand le fichier manque ;
+bulle d'intention ; mana). Le faux client gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
+(fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
 faux client et écrit un SVG par écran (accueil, parcours, combat, combat-survol, récompense, marchand, feu
-de camp, amélioration, rencontre, bibelot de classe, bilan, méta, panneau du deck, pioche en combat). Icônes = carrés bleus, modèles =
-silhouettes en pointillés, illustrations = aplats ; largeurs de texte estimées. Il a servi à corriger la
-mise en page (noms de cartes longs, pastilles trop larges, gemmes de clé) ; il ne remplace pas un essai.
+de camp, amélioration, rencontre, bibelot de classe, bilan, méta, panneau du deck, pioche en combat). Les
+textures de `Media/` y sont dessinées (aperçus PNG : coordonnées de texture, couleur de sommet,
+désaturation, masques approchés, rotation), les textes en Baloo Chettan 2 avec ombre et couleurs ; icônes
+du jeu = carrés bleus, modèles = silhouettes en pointillés, illustrations = aplats ; largeurs de texte
+estimées. Comparé aux planches (`combat_pack.jpg`…) pour cette peau ; il ne remplace pas un essai.
 
 ## Tests en vol (pour toi)
 
 Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/Interface/AddOns/SlayTheDragon`
-(commande `rsync` dans `CLAUDE.md`). Aucun nouveau fichier dans le TOC depuis le premier essai : `/reload`
-suffit. Activer les erreurs Lua (`/console scriptErrors 1`) ou BugSack.
+(commande `rsync` dans `CLAUDE.md`). **Nouveau fichier dans le TOC (`UI\SkinData.lua`) et nouveau dossier
+`Media/` : relancer le client** (`/reload` ne suffit pas). Activer les erreurs Lua
+(`/console scriptErrors 1`) ou BugSack.
 
-En priorité (retours du premier essai) :
+En tout premier (peau « Mechanized Magic ») :
+1. **Chargement des textures** : aucun aplat vert ni carré noir sur les cartes, le bandeau, le plateau, les
+   boutons, les hexagones (PV, Absorption, mana, Démence, clé), les médaillons et le parcours. Sinon dire
+   lesquels (une capture suffit).
+2. **Police** : Baloo Chettan 2 partout (lettres rondes, accents corrects) ; si tout est en Friz Quadrata,
+   la police ne se charge pas.
+3. **Cartes** : nettes au repos et au survol (×1,16 en main, ×1,17 en récompense) ; icône ronde bien dans
+   l'anneau ; nom **incliné** le long du ruban et centré dessus — sinon `/slay ruban` (ruban redressé, nom
+   horizontal) et me dire lequel garder ; texte du panneau centré, chiffres blancs (verts une fois
+   améliorés) ; gemme verte / bleue sur les peu communes / rares ; « Recharge N », « Incantation »,
+   « Consumée », « Pouvoir » dans la plaque sous la carte ; carte injouable grisée avec sa raison en rouge.
+4. **Plaques** : ardoise sans couture visible (bandeau, plateau, plaques de réponse, bulles d'intention,
+   options), liseré d'argent régulier aux coins ; bulles ivoire (rencontre, parcours) ; survol doré des
+   plaques de réponse et du feu de camp ; pilule dorée « Fin du tour » / « Reprendre la route ».
+5. **Bords** : rien ne dépasse de la fenêtre (piles en bas à gauche, plaque du bas des cartes de la main,
+   tas du deck).
+
+Ensuite (retours du premier essai) :
 1. **Essai des décors** (accueil) : `/slay decor essai`, puis pour chacun des 8 candidats `ok` (image) ou
    `non` (aplat vert, noir ou vide) et `suivant` ; `peint` pour finir. Recopier ensuite `/slay art`
    (décor par décor : `peint` ou candidat validé ; listes des validés et refusés).
@@ -435,9 +584,9 @@ En priorité (retours du premier essai) :
    bibelots du bandeau, tas du deck, pioche, défausse.
 4. **Visée** : armer une carte à cible (ou une potion à cible) puis survoler les ennemis : l'ennemi
    survolé grandit un peu depuis ses pieds, son anneau s'allume ; le clic vise toujours le bon ennemi.
-5. **Panneau des cartes** : hors combat, clic sur le tas du deck (plateau) et sur « Deck N » (bandeau) ;
+5. **Panneau des cartes** : hors combat, clic sur le tas du deck (plateau) et sur le deck du bandeau ;
    en combat, clic sur la pioche (triée par type, coût, nom — pas l'ordre de tirage), la défausse, le tas
-   violet des consumées (après une carte Consumée) et « Deck N ». Molette si le deck dépasse 24 cartes ;
+   violet des consumées (après une carte Consumée) et le deck du bandeau. Molette si le deck dépasse 24 cartes ;
    fermeture par Échap, clic hors du panneau, « Fermer ». Cartes améliorées en vert.
 6. **Bandeau** : en combat et sur la récompense, « Marche de l'Ouest » en haut au centre, points de
    progression en dessous, sans chevauchement, même avec 6 bibelots et une clé.
