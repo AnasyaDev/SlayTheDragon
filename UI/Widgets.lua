@@ -34,10 +34,18 @@ function W.pace()
   return 1 / s
 end
 
--- Interpolations pilotées par un seul OnUpdate ; chaque interpolation a aussi un minuteur de
--- secours qui la termine (le client peut sauter des images ; le harnais n'a pas d'OnUpdate).
+-- Un seul OnUpdate partagé (W.driver) fait avancer deux sortes d'animations, et se coupe dès que
+-- plus rien ne bouge :
+--   * les interpolations W.tween (durée fixe, fn(p) de 0 à 1 : vols de cartes, chiffres, fondus) ;
+--   * les canaux animés W.animTo (une valeur par objet et par clé qui file vers une cible, et repart
+--     de sa valeur courante si la cible change en route : survols réversibles).
+-- Chaque animation a aussi un minuteur de secours qui la termine (le client peut sauter des images ;
+-- le harnais n'a pas d'OnUpdate).
 local tweens = {}
+local animated = {}   -- objet -> vrai tant qu'un de ses canaux bouge
 local driver = CreateFrame("Frame")
+W.driver = driver
+
 local function finishTween(tw)
   if tw.done then return end
   tw.done = true
@@ -45,16 +53,58 @@ local function finishTween(tw)
   if tw.fn then tw.fn(1) end
   if tw.onDone then tw.onDone() end
 end
-local running = {}
-driver:SetScript("OnUpdate", function(_, elapsed)
-  -- copie : les rappels peuvent lancer d'autres interpolations pendant le parcours
+
+W.ease = {
+  out = function(p) return 1 - (1 - p) * (1 - p) end,
+  -- sortie amortie (survols) : départ vif, arrivée douce
+  outCubic = function(p) local q = 1 - p return 1 - q * q * q end,
+  inOut = function(p) if p < 0.5 then return 2 * p * p end return 1 - 2 * (1 - p) * (1 - p) end,
+  linear = function(p) return p end,
+}
+
+-- Fait avancer les canaux d'un objet ; vrai si l'un d'eux bouge encore.
+local function stepChannels(obj, dt)
+  local moving = false
+  for _, ch in pairs(obj._ch) do
+    if ch.t < ch.dur then
+      ch.t = ch.t + dt
+      if ch.t >= ch.dur then
+        ch.t, ch.v = ch.dur, ch.to
+      else
+        ch.v = ch.from + (ch.to - ch.from) * W.ease.outCubic(ch.t / ch.dur)
+        moving = true
+      end
+    end
+  end
+  if obj._animApply then obj:_animApply() end
+  return moving
+end
+
+local running, runningObjs = {}, {}
+local onUpdate
+local function sleepIfIdle()
+  if driver.awake and next(tweens) == nil and next(animated) == nil then
+    driver.awake = false
+    driver:SetScript("OnUpdate", nil)
+  end
+end
+local function wake()
+  if not driver.awake then
+    driver.awake = true
+    driver:SetScript("OnUpdate", onUpdate)
+  end
+end
+
+onUpdate = function(_, elapsed)
+  elapsed = elapsed or 0
+  -- copies : les rappels peuvent lancer d'autres animations pendant le parcours
   local n = 0
   for tw in pairs(tweens) do n = n + 1 running[n] = tw end
   for i = 1, n do
     local tw = running[i]
     running[i] = nil
     if not tw.done then
-      tw.t = tw.t + (elapsed or 0)
+      tw.t = tw.t + elapsed
       if tw.t >= tw.dur then
         finishTween(tw)
       elseif tw.fn then
@@ -63,13 +113,18 @@ driver:SetScript("OnUpdate", function(_, elapsed)
       end
     end
   end
-end)
-
-W.ease = {
-  out = function(p) return 1 - (1 - p) * (1 - p) end,
-  inOut = function(p) if p < 0.5 then return 2 * p * p end return 1 - 2 * (1 - p) * (1 - p) end,
-  linear = function(p) return p end,
-}
+  local m = 0
+  for obj in pairs(animated) do m = m + 1 runningObjs[m] = obj end
+  for i = 1, m do
+    local obj = runningObjs[i]
+    runningObjs[i] = nil
+    if animated[obj] and not stepChannels(obj, elapsed) then
+      animated[obj] = nil
+      if obj.onAnimSettled then obj:onAnimSettled() end
+    end
+  end
+  sleepIfIdle()
+end
 
 -- fn(p) avec p de 0 à 1 ; owner/key : une nouvelle interpolation remplace l'ancienne de même clé.
 function W.tween(dur, fn, onDone, owner, key, ease)
@@ -82,14 +137,128 @@ function W.tween(dur, fn, onDone, owner, key, ease)
     owner._tweens[key] = tw
   end
   tweens[tw] = true
+  wake()
   if fn then fn(0) end
-  W.delay(dur + 0.02, function() finishTween(tw) end)
+  W.delay(dur + 0.02, function() finishTween(tw) sleepIfIdle() end)
   return tw
 end
 
 function W.cancel(owner, key)
   local tw = owner and owner._tweens and owner._tweens[key]
   if tw and not tw.done then tw.done = true tweens[tw] = nil end
+end
+
+-- Canaux animés -----------------------------------------------------------------------------
+
+W.HOVER_IN, W.HOVER_OUT = 0.12, 0.15  -- survols : entrée vive, sortie un peu plus douce
+
+-- Valeur courante d'un canal (rest si jamais animé).
+function W.animValue(obj, key, rest)
+  local ch = obj._ch and obj._ch[key]
+  if ch then return ch.v end
+  return rest or 0
+end
+
+-- Pose une valeur sans animation.
+function W.animSet(obj, key, value)
+  obj._ch = obj._ch or {}
+  local ch = obj._ch[key] or {}
+  obj._ch[key] = ch
+  ch.v, ch.from, ch.to, ch.t, ch.dur = value, value, value, 0, 0
+  ch.token = (ch.token or 0) + 1
+  if obj._animApply then obj:_animApply() end
+end
+
+-- Fait filer le canal `key` de obj vers `target` en `dur` secondes, depuis sa valeur courante
+-- (réversible : une cible qui change en route repart de là où l'on en est). obj._animApply(obj)
+-- est appelé à chaque image ; obj.onAnimSettled(obj) quand plus aucun canal ne bouge.
+function W.animTo(obj, key, target, dur, rest)
+  obj._ch = obj._ch or {}
+  local ch = obj._ch[key]
+  if not ch then
+    local v0 = rest or 0
+    ch = { v = v0, from = v0, to = v0, t = 0, dur = 0 }
+    obj._ch[key] = ch
+  end
+  if ch.to == target then return end
+  dur = dur or W.HOVER_IN
+  if dur <= 0 then W.animSet(obj, key, target) return end
+  ch.from, ch.to, ch.t, ch.dur = ch.v, target, 0, dur
+  ch.token = (ch.token or 0) + 1
+  local token = ch.token
+  animated[obj] = true
+  wake()
+  W.delay(dur + 0.05, function()
+    if ch.token ~= token or ch.t >= ch.dur then return end
+    ch.t, ch.v = ch.dur, ch.to
+    if obj._animApply then obj:_animApply() end
+    for _, other in pairs(obj._ch) do if other.t < other.dur then return end end
+    animated[obj] = nil
+    if obj.onAnimSettled then obj:onAnimSettled() end
+    sleepIfIdle()
+  end)
+end
+
+-- Vrai si le pilote tourne (pour le harnais : il doit s'arrêter quand tout est immobile).
+function W.driverAwake() return driver.awake and true or false end
+
+---------------------------------------------------------------------------
+-- Survols : zone de survol fixe, visuel animé
+---------------------------------------------------------------------------
+-- Piège évité : animer l'échelle ou la position du cadre qui reçoit la souris ferait sortir le
+-- curseur de la zone (entrée/sortie en boucle). Le cadre interactif reste donc immobile (zone de
+-- survol) ; tout ce qui se voit vit dans son enfant `face`, seul animé (échelle, décalage).
+
+-- Crée le visuel `f.face`, centré sur f, de même taille (suivie par OnSizeChanged).
+function W.face(f)
+  local face = CreateFrame("Frame", nil, f)
+  face:SetSize(f:GetWidth(), f:GetHeight())
+  face:SetPoint("CENTER", f, "CENTER", 0, 0)
+  f.face = face
+  f:SetScript("OnSizeChanged", function(self, w, h) if w and h then self.face:SetSize(w, h) end end)
+  return face
+end
+
+-- Applique les canaux « hover » (0..1) et « dx » (pixels) au visuel.
+function W.faceApply(f)
+  local face = f.face
+  if not face then return end
+  local h = W.animValue(f, "hover")
+  local dx = W.animValue(f, "dx")
+  local s = 1 + ((f.hoverScale or 1) - 1) * h
+  face:SetScale(s)
+  face:ClearAllPoints()
+  face:SetPoint("CENTER", f, "CENTER", dx / s, (f.hoverLift or 0) * h / s)
+  if f.hoverPaint then f:hoverPaint(h) end
+end
+
+-- Rend f survolable : opts = { scale, lift (unités de f, vers le haut), paint(f, h), manual }.
+-- manual = l'écran pilote lui-même le canal « hover » (main, cartes à sélection).
+function W.hoverable(f, opts)
+  opts = opts or {}
+  if not f.face then W.face(f) end
+  f._hoverable = true
+  f.hoverScale = opts.scale or 1.06
+  f.hoverLift = opts.lift or 0
+  f.hoverPaint = opts.paint or f.hoverPaint
+  f._hoverManual = opts.manual
+  f._animApply = W.faceApply
+  return f
+end
+
+function W.hoverEnter(f)
+  if f._hoverable and not f._hoverManual and f.active ~= false then W.animTo(f, "hover", 1, W.HOVER_IN) end
+end
+
+function W.hoverLeave(f)
+  if f._hoverable and not f._hoverManual then W.animTo(f, "hover", 0, W.HOVER_OUT) end
+end
+
+-- Remet un visuel au repos sans animation (écran qui se reconstruit, cadre caché).
+function W.hoverReset(f)
+  if f._ch then
+    for key in pairs(f._ch) do W.animSet(f, key, 0) end
+  end
 end
 
 ---------------------------------------------------------------------------
@@ -184,6 +353,10 @@ function RR:SetColor(c, a)
   for _, t in ipairs({ self.tl, self.tr, self.bl, self.br }) do t:SetVertexColor(r, g, b, a) end
   self.color = c
   return self
+end
+
+function RR:SetAlpha(a)
+  for _, t in ipairs(self.parts) do t:SetAlpha(a) end
 end
 
 function RR:SetShown(on)
@@ -378,32 +551,46 @@ local STYLES = {
   red = { edge = C.redEdge, fill = C.red, hover = { 0.6, 0.22, 0.15 }, text = C.creamLight, font = "body" },
 }
 
+local function lerpColor(a, b, t)
+  return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+end
+W.lerpColor = lerpColor
+
+-- Survol d'un bouton : le fond glisse vers la couleur de survol.
+local function buttonPaint(self, h)
+  local st = self.style
+  if self.active == false then h = 0 end
+  self.shape.fill:SetColor(h > 0 and lerpColor(st.fill, st.hover, h) or st.fill)
+end
+
 function W.button(parent, label, w, h, onClick, style, size)
   local st = STYLES[style or "wood"]
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(w or 120, h or 26)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   b.style = st
+  local face = W.face(b)
   local radius = min(8, floor((h or 26) / 3))
-  b.shape = W.shape(b, radius, st.edge, st.fill, (h or 26) >= 40 and 3 or 2, -6, style == "parchment" and 0.25 or nil)
-  b.label = W.label(b, st.font, size or ((h or 26) >= 40 and 16 or 12), st.text)
+  b.shape = W.shape(face, radius, st.edge, st.fill, (h or 26) >= 40 and 3 or 2, -6, style == "parchment" and 0.25 or nil)
+  b.label = W.label(face, st.font, size or ((h or 26) >= 40 and 16 or 12), st.text)
   b.label:SetPoint("CENTER", 0, 0)
   b.label:SetText(label or "")
   b.SetText = function(self, t) self.label:SetText(t or "") self._text = t end
   b.GetText = function(self) return self.label:GetText() end
   b._text = label
+  W.hoverable(b, { scale = (h or 26) >= 40 and 1.04 or 1.06, paint = buttonPaint })
   b:SetScript("OnEnter", function(self)
-    if self.active ~= false then self.shape.fill:SetColor(self.style.hover) end
+    W.hoverEnter(self)
     if self.onEnterExtra then self:onEnterExtra() end
   end)
   b:SetScript("OnLeave", function(self)
-    self.shape.fill:SetColor(self.style.fill)
+    W.hoverLeave(self)
     if self.onLeaveExtra then self:onLeaveExtra() end
   end)
   b.SetActive = function(self, on)
     self.active = on
     self:SetAlpha(on and 1 or 0.5)
-    if on then self:Enable() else self:Disable() end
+    if on then self:Enable() else self:Disable() W.animTo(self, "hover", 0, W.HOVER_OUT) end
   end
   if onClick then b:SetScript("OnClick", function(self, button)
     W.sound("click")
@@ -416,25 +603,30 @@ end
 function W.roundButton(parent, glyph, size, fill, edge, onClick)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
-  b.edge = W.disc(b, "BACKGROUND", 0, edge)
+  local face = W.face(b)
+  b.edge = W.disc(face, "BACKGROUND", 0, edge)
   b.edge:SetAllPoints()
-  b.fill = W.disc(b, "BACKGROUND", 1, fill)
+  b.fill = W.disc(face, "BACKGROUND", 1, fill)
   b.fill:SetPoint("TOPLEFT", 2, -2)
   b.fill:SetPoint("BOTTOMRIGHT", -2, 2)
-  b.label = W.label(b, "body", 15, C.creamLight)
+  b.label = W.label(face, "body", 15, C.creamLight)
   b.label:SetPoint("CENTER", 0, 1)
   if glyph == "menu" then
     -- trois traits (le glyphe ≡ manque aux polices du jeu)
     for i = -1, 1 do
-      local l = W.rect(b, "ARTWORK", 0, C.creamLight)
+      local l = W.rect(face, "ARTWORK", 0, C.creamLight)
       l:SetSize(size * 0.42, 2)
       l:SetPoint("CENTER", 0, i * 5)
     end
   else
     b.label:SetText(glyph)
   end
-  b:SetScript("OnEnter", function(self) self.fill:SetVertexColor(fill[1] * 1.3, fill[2] * 1.3, fill[3] * 1.3, 1) end)
-  b:SetScript("OnLeave", function(self) self.fill:SetVertexColor(fill[1], fill[2], fill[3], 1) end)
+  W.hoverable(b, { scale = 1.12, paint = function(self, h)
+    local k = 1 + 0.3 * h
+    self.fill:SetVertexColor(fill[1] * k, fill[2] * k, fill[3] * k, 1)
+  end })
+  b:SetScript("OnEnter", function(self) W.hoverEnter(self) end)
+  b:SetScript("OnLeave", function(self) W.hoverLeave(self) end)
   if onClick then b:SetScript("OnClick", onClick) end
   return b
 end
@@ -529,14 +721,17 @@ end
 -- Infobulles (seulement si on les demande, et seulement si elles ont quelque chose à dire)
 ---------------------------------------------------------------------------
 
+-- Infobulle au survol ; anime aussi le survol si le cadre est survolable (W.hoverable).
 function W.tooltip(frame, fill, anchor)
   frame:SetScript("OnEnter", function(self)
+    W.hoverEnter(self)
     if self.onEnterExtra then self:onEnterExtra() end
     GameTooltip:SetOwner(self, anchor or "ANCHOR_RIGHT")
     fill(GameTooltip, self)
     if GameTooltip:NumLines() > 0 then GameTooltip:Show() else GameTooltip:Hide() end
   end)
   frame:SetScript("OnLeave", function(self)
+    W.hoverLeave(self)
     if self.onLeaveExtra then self:onLeaveExtra() end
     GameTooltip:Hide()
   end)
@@ -658,15 +853,17 @@ function W.iconButton(parent, size, shape)
   if shape == "flask" then w, h = floor(size * 0.87), size end
   b:SetSize(w, h)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(b)
   local radius = shape == "flask" and floor(w / 3) or (shape == "round" and floor(size / 2) or 6)
-  b.shape = W.shape(b, radius, C.woodLine, C.woodDark, 2, -4)
-  b.icon = b:CreateTexture(nil, "ARTWORK")
+  b.shape = W.shape(face, radius, C.woodLine, C.woodDark, 2, -4)
+  b.icon = face:CreateTexture(nil, "ARTWORK")
   b.icon:SetPoint("TOPLEFT", 3, -3)
   b.icon:SetPoint("BOTTOMRIGHT", -3, 3)
   b.icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
-  if shape == "round" or shape == "flask" then W.roundMask(b, b.icon) end
-  b.count = W.label(b, "title", 11, C.creamLight, "OVERLAY", true)
+  if shape == "round" or shape == "flask" then W.roundMask(face, b.icon) end
+  b.count = W.label(face, "title", 11, C.creamLight, "OVERLAY", true)
   b.count:SetPoint("BOTTOMRIGHT", 2, -2)
+  W.hoverable(b, { scale = 1.14 })
   W.tooltip(b, function(tt, self)
     local info = self.info
     if not info then return end
@@ -877,35 +1074,39 @@ function W.cardPills(d)
   return list
 end
 
+-- La carte est un bouton immobile (zone de survol et de clic) ; tout son visuel est dans b.face,
+-- que le survol anime (W.hoverable). Réglages par écran : b.hoverScale, b.hoverLift (unités de la
+-- carte, vers le haut) ; b.baseLevel / b.upLevel : niveau au repos et au survol (passage devant).
 function W.card(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(W.CARD_W, W.CARD_H)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(b)
 
-  b.halo = W.roundRect(b, "BACKGROUND", -8, 12, -4):SetColor(C.gold)
+  b.halo = W.roundRect(face, "BACKGROUND", -8, 12, -4):SetColor(C.gold)
   b.halo:Hide()
-  b.edge = W.roundRect(b, "BACKGROUND", -7, 9, 0):SetColor(C.edgeCommon)
-  b.fill = W.roundRect(b, "BACKGROUND", -6, 6, 3):SetColor(C.parchment)
-  b.grain = b:CreateTexture(nil, "BACKGROUND", nil, -5)
+  b.edge = W.roundRect(face, "BACKGROUND", -7, 9, 0):SetColor(C.edgeCommon)
+  b.fill = W.roundRect(face, "BACKGROUND", -6, 6, 3):SetColor(C.parchment)
+  b.grain = face:CreateTexture(nil, "BACKGROUND", nil, -5)
   b.grain:SetTexture(Art.tex.parchment)
   b.grain:SetPoint("TOPLEFT", 6, -6)
   b.grain:SetPoint("BOTTOMRIGHT", -6, 6)
   b.grain:SetAlpha(0.22)
 
-  b.name = W.label(b, "title", 13, C.ink)
+  b.name = W.label(face, "title", 13, C.ink)
   b.name:SetPoint("TOP", 0, -9)
   b.name:SetWidth(W.CARD_W - 18)
   b.name:SetJustifyH("CENTER")
   b.name:SetWordWrap(true)
   b.name:SetMaxLines(2)
 
-  b.medal = W.medallion(b, 58)
+  b.medal = W.medallion(face, 58)
   b.medal:SetPoint("TOP", 0, -26)
 
-  b.kind = W.label(b, "body", 10, C.wood)
+  b.kind = W.label(face, "body", 10, C.wood)
   b.kind:SetPoint("TOP", b.medal, "BOTTOM", 0, -3)
 
-  b.body = W.label(b, "body", 12, C.ink)
+  b.body = W.label(face, "body", 12, C.ink)
   b.body:SetPoint("TOP", b.kind, "BOTTOM", 0, -3)
   b.body:SetWidth(W.CARD_W - 16)
   b.body:SetJustifyH("CENTER")
@@ -914,15 +1115,15 @@ function W.card(parent)
 
   b.pills = {}
   for i = 1, 2 do
-    local p = W.pill(b, 10)
+    local p = W.pill(face, 10)
     p:Hide()
     b.pills[i] = p
   end
 
   -- Gemme de coût (déborde en haut à gauche).
-  local gem = CreateFrame("Frame", nil, b)
+  local gem = CreateFrame("Frame", nil, face)
   gem:SetSize(30, 30)
-  gem:SetPoint("CENTER", b, "TOPLEFT", 6, -6)
+  gem:SetPoint("CENTER", face, "TOPLEFT", 6, -6)
   gem.edge = W.disc(gem, "ARTWORK", 0, C.gemEdge)
   gem.edge:SetAllPoints()
   gem.fill = W.disc(gem, "ARTWORK", 1, C.gem)
@@ -933,9 +1134,9 @@ function W.card(parent)
   b.gem = gem
 
   -- Étiquette de prix (marchand).
-  local tag = CreateFrame("Frame", nil, b)
+  local tag = CreateFrame("Frame", nil, face)
   tag:SetSize(70, 22)
-  tag:SetPoint("TOP", b, "BOTTOM", 0, 6)
+  tag:SetPoint("TOP", face, "BOTTOM", 0, 6)
   tag.shape = W.shape(tag, 7, C.goldDeep, C.band, 2, -4)
   tag.text = W.label(tag, "title", 14, C.gold)
   tag.text:SetPoint("CENTER", 0, 0)
@@ -1001,7 +1202,7 @@ function W.card(parent)
         local p = self.pills[i]
         if p:IsShown() then
           p:ClearAllPoints()
-          p:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", x, 8)
+          p:SetPoint("BOTTOMLEFT", self.face, "BOTTOMLEFT", x, 8)
           x = x + p:GetWidth() + 4
         end
       end
@@ -1009,7 +1210,7 @@ function W.card(parent)
       for i = 1, 2 do
         local p = self.pills[i]
         p:ClearAllPoints()
-        p:SetPoint("BOTTOM", self, "BOTTOM", 0, 8 + (2 - i) * 18)
+        p:SetPoint("BOTTOM", self.face, "BOTTOM", 0, 8 + (2 - i) * 18)
       end
     end
     -- texte masqué sur une carte injouable (raison écrite), revient au survol
@@ -1039,16 +1240,66 @@ function W.card(parent)
 
   -- Survol / sélection : halo doré, parchemin plus clair (la position est gérée par l'écran).
   b.SetHot = function(self, on)
-    self.hot = on
-    if on then self.halo:Show() else self.halo:Hide() end
+    if self.hot == on and self.cardId == self._hotId then return end
+    self.hot, self._hotId = on, self.cardId
+    if on then
+      self.halo:Show()
+      self.halo:SetAlpha(0.35 + 0.65 * W.animValue(self, "hover"))
+    else
+      self.halo:Hide()
+    end
     if self.cardId then self:SetCard(self.cardId, self.cardUp, self.opts) end
   end
   b.SetSelected = function(self, on) self:SetHot(on or self.hover) end
+
+  -- Survol animé : levée, agrandissement, halo qui s'allume ; passage au premier plan.
+  W.hoverable(b, { scale = 1.12, lift = 10, paint = function(self, h)
+    if self.hot then self.halo:SetAlpha(0.35 + 0.65 * h) end
+  end })
+  b.onAnimSettled = function(self)
+    if self.baseLevel and W.animValue(self, "hover") == 0 then self:SetFrameLevel(self.baseLevel) end
+  end
+  b.onEnterExtra = function(self)
+    if self._hoverManual then return end
+    self.hover = true
+    W.cardFront(self, true)
+    self:SetHot(true)
+  end
+  b.onLeaveExtra = function(self)
+    if self._hoverManual then return end
+    self.hover = false
+    W.cardFront(self, false)
+    self:SetHot(false)
+  end
 
   W.tooltip(b, function(tt, self)
     if self.cardId then W.fillCardTooltip(tt, self.cardId, self.cardUp, self.opts) end
   end, "ANCHOR_RIGHT")
   return b
+end
+
+-- Niveau d'une carte : devant au survol ; en sortie, juste au-dessus des voisines tant qu'elle
+-- rétrécit, puis au repos (onAnimSettled).
+function W.cardFront(card, up)
+  if not card.baseLevel then return end
+  if up then card:SetFrameLevel(card.upLevel or (card.baseLevel + 60))
+  elseif W.animValue(card, "hover") > 0 then card:SetFrameLevel(card.baseLevel + 30)
+  else card:SetFrameLevel(card.baseLevel) end
+end
+
+-- Cache une carte et remet son survol au repos (la souris ne la quittera pas : elle disparaît).
+function W.hideCard(card)
+  card.hover, card.lifted = false, false
+  W.hoverReset(card)
+  if card.baseLevel then card:SetFrameLevel(card.baseLevel) end
+  card:Hide()
+end
+
+-- Pose une carte au repos : centre (x, y) et échelle de base, niveaux ; le survol garde sa valeur.
+function W.placeCard(card, container, x, y, scale, baseLevel, upLevel)
+  W.placeCenter(card, container, x, y, scale)
+  card.baseLevel, card.upLevel = baseLevel, upLevel
+  W.cardFront(card, card.hover or card.lifted)
 end
 
 -- Carte fantôme (vol de la main vers la cible, de la pioche vers la main…).

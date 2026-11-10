@@ -31,16 +31,16 @@ C.ui = {}
 
 C.REASONS = {
   -- combat (Core/Combat.lua)
-  phase = "Ce n'est pas ton tour.",
+  phase = "Ce n'est pas votre tour.",
   card = "Carte introuvable.",
   unplayable = "Cette carte ne se joue pas.",
   mana = "Pas assez de mana.",
   casting = "Une incantation est déjà en cours.",
   forbidden = "Interdit par un Pouvoir actif.",
   condition = "Condition non remplie.",
-  target = "Choisis une cible valide.",
+  target = "Cible invalide.",
   over = "Le combat est terminé.",
-  combat = "Termine d'abord le combat.",
+  combat = "Le combat doit d'abord se terminer.",
   potions = "Les potions ne sont pas encore utilisables en combat.",
   -- expédition (Core/Expedition.lua, Core/Meta.lua, Core/Save.lua)
   ["or"] = "Pas assez d'or.",
@@ -51,9 +51,9 @@ C.REASONS = {
   action = "Impossible ici.",
   potion = "Aucune potion à prendre.",
   index = "Choix invalide.",
-  choix = "Fais d'abord un choix.",
+  choix = "Un choix est d'abord nécessaire.",
   ["déjà choisi"] = "Choix déjà fait.",
-  deck = "Ton deck est trop petit.",
+  deck = "Deck trop petit.",
   ["amélioration"] = "Aucune carte à améliorer.",
   ["terminée"] = "L'expédition est terminée.",
   ["clé verrouillée"] = "Cette clé n'est pas encore débloquée.",
@@ -583,7 +583,7 @@ local function startStep()
       text = affixLine(Meta.affixesFor(k), k) or "Sans affixe." }
     if k > st.keyMax then
       o.disabled = true
-      o.reason = "Gagne une expédition à +" .. st.keyMax .. " pour ouvrir la clé +" .. (st.keyMax + 1) .. "."
+      o.reason = "Une victoire à +" .. st.keyMax .. " ouvre la clé +" .. (st.keyMax + 1) .. "."
     end
     opts[#opts + 1] = o
   end
@@ -629,16 +629,16 @@ local function endStep()
     or "Expédition abandonnée"
   local lines = {}
   if won then
-    lines[#lines + 1] = "Le boss de l'acte est tombé. Tu termines avec " .. e.hp .. " PV et " .. #e.deck .. " cartes."
+    lines[#lines + 1] = "Le boss de l'acte est tombé. Fin de l'expédition avec " .. e.hp .. " PV et " .. #e.deck .. " cartes."
   elseif e.result == "lost" then
     local names = {}
     for id in tostring(e.killedBy or ""):gmatch("[^+]+") do
       names[#names + 1] = ns.Enemies[id] and ns.Enemies[id].name or id
     end
-    lines[#lines + 1] = "Tu tombes à l'étape " .. (e.floor or "?")
+    lines[#lines + 1] = "Chute à l'étape " .. (e.floor or "?")
       .. (#names > 0 and (" face à " .. table.concat(names, ", ")) or "") .. "."
   else
-    lines[#lines + 1] = "Tu rentres à l'étape " .. (e.floor or "?") .. "."
+    lines[#lines + 1] = "Retour à l'étape " .. (e.floor or "?") .. "."
   end
   lines[#lines + 1] = (e.cleared or 0) .. " étape(s) franchie(s), " .. (e.elites or 0) .. " élite(s), "
     .. (e.bosses or 0) .. " boss."
@@ -684,7 +684,7 @@ local function mapStep(exp)
   for _, id in ipairs(nx) do
     opts[#opts + 1] = actionOption(avail, { id = "path:" .. id, label = Map.KINDS[map.nodes[id].kind] })
   end
-  local text = "Choisis ta prochaine étape."
+  local text = "Prochaine étape au choix."
   local al = affixLine(exp.affixes, exp.key)
   if al then text = text .. "\n" .. al end
   -- Nom du boss de l'acte (si tous les groupes de boss ont le même chef).
@@ -716,14 +716,14 @@ local function rewardStep(exp)
     title = ev.name
     text = eventResult(exp)
   elseif r.kind == "chest" then
-    text = "Tu forces la serrure du coffre."
+    text = "La serrure du coffre cède."
   else
     text = "Le combat est gagné."
   end
   local loot = {}
   if r.goldGained and r.goldGained > 0 then
     loot[#loot + 1] = { kind = "gold", label = "+" .. r.goldGained .. " po", title = "Or",
-      text = "Ajouté à ta bourse." }
+      text = "Ajouté à la bourse." }
   end
   if r.relic then
     local def = ns.Relics[r.relic]
@@ -736,8 +736,9 @@ local function rewardStep(exp)
       text = def and def.text, pending = not r.potionTaken }
   end
   local opts = {}
+  local after = text -- texte « après coup » d'une rencontre, sans la consigne des cartes
   if not r.cardsDone then
-    text = text .. (text ~= "" and "\n" or "") .. "Choisis une carte à ajouter à ton deck."
+    text = text .. (text ~= "" and "\n" or "") .. "Une carte à ajouter au deck."
     for i, id in ipairs(r.cards) do
       opts[#opts + 1] = actionOption(avail, { id = "pickCard:" .. i, card = { id = id, up = false } })
     end
@@ -746,13 +747,13 @@ local function rewardStep(exp)
     text = text .. (text ~= "" and "\n" or "") .. "Carte ajoutée : " .. cardName(r.picked) .. "."
   end
   if r.potion and not r.potionTaken then
-    text = text .. "\nTes emplacements de potion sont pleins : jettes-en une (clic droit) pour prendre "
+    text = text .. "\nEmplacements de potion pleins : en jeter une (clic droit) pour prendre "
       .. potionName(r.potion) .. "."
     opts[#opts + 1] = actionOption(avail, { id = "takePotion", label = "Prendre la potion" })
   end
   opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Continuer" })
   return { kind = "reward", title = title, text = text, loot = loot, options = opts, rewardKind = r.kind,
-    picked = r.picked, cardsDone = r.cardsDone, after = (r.kind == "event") and text or nil }
+    picked = r.picked, cardsDone = r.cardsDone, after = (r.kind == "event") and after or nil }
 end
 
 local function campfireStep(exp)
@@ -763,13 +764,13 @@ local function campfireStep(exp)
   local canUp = false
   for k in pairs(avail) do if k:match("^upgrade:") then canUp = true end end
   local opts = {
-    actionOption(avail, { id = "rest", label = "Se reposer", text = "Rends " .. heal .. " PV." }),
-    { id = "ui:upgrade", label = "Méditer", text = "Améliore une carte de ton deck.",
+    actionOption(avail, { id = "rest", label = "Se reposer", text = "Rend " .. heal .. " PV." }),
+    { id = "ui:upgrade", label = "Méditer", text = "Améliorer une carte du deck.",
       disabled = not canUp, reason = not canUp and C.reasonText("amélioration") or nil },
-    actionOption(avail, { id = "leave", label = "Repartir", text = "Sans t'arrêter." }),
+    actionOption(avail, { id = "leave", label = "Repartir", text = "Sans s'arrêter." }),
   }
   return { kind = "campfire", title = "Feu de camp",
-    text = "Les braises crépitent. Tu as " .. exp.hp .. " PV sur " .. exp.maxHp .. ".", options = opts }
+    text = "Les braises crépitent. " .. exp.hp .. " PV sur " .. exp.maxHp .. ".", options = opts }
 end
 
 local function deckStep(exp, view)
@@ -777,7 +778,7 @@ local function deckStep(exp, view)
   local opts = {}
   local title
   if view == "upgrade" then
-    title = "Méditer : choisis une carte à améliorer"
+    title = "Méditer : une carte à améliorer"
     for i, card in ipairs(exp.deck) do
       if avail["upgrade:" .. i] then
         opts[#opts + 1] = { id = "upgrade:" .. i, card = { id = card.id, up = card.up }, preview = true }
@@ -815,11 +816,11 @@ local function merchantStep(exp)
   local canRemove = false
   for k in pairs(avail) do if k:match("^remove:") then canRemove = true end end
   opts[#opts + 1] = { id = "ui:remove", label = "Retirer une carte", service = true,
-    text = "Le gobelin te débarrasse d'une carte.", price = X.removePrice(exp),
+    text = "Le gobelin retire une carte du deck.", price = X.removePrice(exp),
     disabled = not canRemove, reason = not canRemove and (C.reasonFor({ "remove", 1 }) or "Indisponible.") or nil }
   opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Partir", service = true })
   return { kind = "merchant", title = "Marchand gobelin", gold = exp.gold,
-    text = "« Que des affaires, l'ami ! » Tu as |cffffd700" .. exp.gold .. " po|r.", options = opts }
+    text = "« Que des affaires, l'ami ! » Bourse : |cffffd700" .. exp.gold .. " po|r.", options = opts }
 end
 
 -- Texte « après coup » d'une rencontre : exp.event.result (issue d'un pari comprise), sinon after.
@@ -883,8 +884,8 @@ local function selectStep(exp)
     end
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipSelect", label = "Passer" })
-  local what = sel.kind == "upgrade" and "choisis une carte à améliorer"
-    or (sel.kind == "dupe" and "choisis une carte à copier" or "choisis une carte à retirer")
+  local what = sel.kind == "upgrade" and "une carte à améliorer"
+    or (sel.kind == "dupe" and "une carte à copier" or "une carte à retirer")
   return { kind = "select", title = (ev and ev.name or "Rencontre") .. " : " .. what,
     text = eventResult(exp), options = opts, selectKind = sel.kind }
 end
@@ -898,8 +899,8 @@ local function startRelicStep(exp)
       item = { kind = "relic", id = id } })
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipStartRelic", label = "Partir sans bibelot" })
-  return { kind = "startRelic", title = "Faveur de ta classe",
-    text = "Ta réputation (Révéré) te vaut un bibelot de classe pour cette expédition. Choisis-en un.",
+  return { kind = "startRelic", title = "Faveur de la classe",
+    text = "Réputation Révéré : un bibelot de classe au choix pour cette expédition.",
     options = opts }
 end
 

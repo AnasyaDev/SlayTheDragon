@@ -82,7 +82,7 @@ SetAlpha SetNormalTexture SetPushedTexture SetHighlightTexture SetCheckedTexture
 SetMaxLines SetFading SetTimeVisible EnableMouseWheel ScrollUp ScrollDown SetThickness SetStartPoint
 SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale SetPortraitZoom
 SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
-SetGradient SetMaxLines SetHorizTile SetVertTile
+SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -152,9 +152,17 @@ function Frame:IsVisible()
 end
 
 -- Géométrie
-function Frame:SetSize(w, h) self._w, self._h = w, h end
-function Frame:SetWidth(w) self._w = w end
-function Frame:SetHeight(h) self._h = h end
+local function sizeChanged(self)
+  local f = self._scripts.OnSizeChanged
+  if f then f(self, self._w, self._h) end
+end
+function Frame:SetSize(w, h)
+  local changed = self._w ~= w or self._h ~= h
+  self._w, self._h = w, h
+  if changed then sizeChanged(self) end
+end
+function Frame:SetWidth(w) local c = self._w ~= w self._w = w if c then sizeChanged(self) end end
+function Frame:SetHeight(h) local c = self._h ~= h self._h = h if c then sizeChanged(self) end end
 function Frame:GetWidth() return self._w end
 function Frame:GetHeight() return self._h end
 function Frame:GetSize() return self._w, self._h end
@@ -237,6 +245,11 @@ function Frame:GetTextureFileID()
   return type(t) == "number" and t or 4242
 end
 function Frame:SetAtlas(a) self._atlas = a return true end
+-- Chargement asynchrone : un fichier de H.unloaded ne finit jamais de charger.
+function Frame:IsObjectLoaded()
+  local t = self._texture
+  return not (H.unloaded and t ~= nil and H.unloaded[t])
+end
 
 -- Barres
 function Frame:SetMinMaxValues(a, b) self._min, self._max = a, b end
@@ -378,6 +391,11 @@ function H.boot(db)
   _G.C_Spell = { GetSpellTexture = function(id)
     if H.badSpells and H.badSpells[id] then return nil end
     return 100000 + id
+  end }
+  _G.C_Texture = { GetFilenameFromFileDataID = function(id)
+    if type(id) ~= "number" then error("GetFilenameFromFileDataID : nombre attendu") end
+    if H.badFiles and H.badFiles[id] then return nil end
+    return "interface/test/fichier_" .. id
   end }
   _G.GetTime = function() return H.now end
   _G.time = function() return 1762000000 + math.floor(H.now) end
@@ -801,7 +819,7 @@ check("bouton de classe Prêtre sélectionné", option("class:priest") and optio
 check("clé +0 sélectionnée par défaut", option("key:0").selected and st.key == 0)
 check("clé +1 verrouillée, avec raison", option("key:1").disabled and (option("key:1").reason or ""):find("+0", 1, true))
 H.click(button("key:1"))
-check("clic sur une clé verrouillée : message", UI().err._shown and (UI().err._text or ""):find("Gagne", 1, true), UI().err._text)
+check("clic sur une clé verrouillée : message", UI().err._shown and (UI().err._text or ""):find("victoire", 1, true), UI().err._text)
 tt = H.hover(button("key:2"))
 check("infobulle d'une clé : affixes", table.concat(tt, " "):find("Tyrannique", 1, true), table.concat(tt, " | "))
 check("potions et bibelots masqués sans expédition", not UI().potionSlots[1]._shown)
@@ -883,10 +901,12 @@ while guard < 400 do
           local v = V()
           v.cards[2].hover = true
           v:PlaceCard(v.cards[2])
+          v:Spread()
           H.advance(6)
           snap("combat-survol")
           v.cards[2].hover = false
           v:PlaceCard(v.cards[2])
+          v:Spread()
         end
         if not C().over() then
           combatReloaded = true
@@ -1097,7 +1117,7 @@ snap("feu-de-camp")
 exp.hp = 20
 UI().refresh()
 local heal = math.floor(exp.maxHp * ns.Expedition.REST_FRACTION)
-check("repos : PV rendus calculés par le moteur", option("rest").text == "Rends " .. heal .. " PV.", option("rest").text)
+check("repos : PV rendus calculés par le moteur", option("rest").text == "Rend " .. heal .. " PV.", option("rest").text)
 clickOption("ui:upgrade")
 check("grille d'amélioration", currentKind() == "deck" and #UI().current.cardOptions >= 1)
 snap("amelioration")
@@ -1265,6 +1285,233 @@ H.slash("art")
 local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
 check("/slay art liste l'icône et le modèle manquants", said:find("card:smite", 1, true) and said:find("model:gnoll", 1, true), said)
 H.badSpells, H.badPaths, H.badFiles, H.badCreatures = nil, {}, nil, {}
+
+print("U17 décors illustrés : premier candidat chargé, sinon repli peint ; /slay art")
+do
+  local Sc = H.ns.Scene
+  check("par défaut : la route retient le 1er candidat", Sc.illus.elwynn and Sc.illus.elwynn.state == "ok"
+    and Sc.illus.elwynn.index == 1)
+  -- Logement d'Elwynn absent (SetTexture refuse), écran Forever qui ne finit jamais de charger,
+  -- Mortemines introuvables sous toutes leurs formes.
+  H.badFiles = { [7377860] = true, [131833] = true, [7963782] = true }
+  H.badPaths = { ["Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines"] = true }
+  H.unloaded = { [7963776] = true, [7963777] = true }
+  freshRun(SEED, nil)
+  Sc = H.ns.Scene
+  check("en attente pendant le chargement : décor peint seul", Sc.illus.elwynn.state == "pending"
+    and Sc.illus.elwynn.index == 2 and not Sc.art._shown)
+  H.advance(Sc.TIMEOUT + 2)
+  check("candidat qui ne charge pas : écarté après le délai, 3e retenu", Sc.illus.elwynn.state == "ok"
+    and Sc.illus.elwynn.index == 3 and Sc.illus.elwynn.cand.file == 131839, Sc.illus.elwynn.index)
+  check("Mortemines : aucun candidat -> repli", Sc.illus.deadmines.state == "fallback")
+  check("ruines : la liste d'Elwynn sert de suite", Sc.illus.ruins.state == "ok" and Sc.illus.ruins.cand.file == 131839)
+  Sc.set({ scene = "road", board = true })
+  check("décor de la route : illustration retenue affichée", Sc.art._shown and Sc.art._texture == 131839)
+  check("recadrage appliqué", Sc.art._calls.SetTexCoord and math.abs(Sc.art._calls.SetTexCoord[3] - 0.14) < 1e-9)
+  Sc.set({ scene = "mine", board = true })
+  local cave = Sc.paints.cave[1]
+  check("décor du boss : repli peint (illustration cachée)", not Sc.art._shown and cave._shown)
+  _G.DEFAULT_CHAT_FRAME._lines = {}
+  H.slash("art")
+  local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
+  check("/slay art : candidat retenu par décor", said:find("road : candidat 3/4 = 131839", 1, true), said)
+  check("/slay art : candidats écartés et raison", said:find("7377860 refusé", 1, true)
+    and said:find("7963776 non chargé", 1, true), said)
+  check("/slay art : repli signalé", said:find("mine : repli", 1, true), said)
+  check("/slay art : décor peint seulement", said:find("coast : peint", 1, true), said)
+  H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
+end
+
+print("U18 survols animés : zone fixe, visuel animé, réversible, pilote qui s'arrête")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local Wd = H.ns.Widgets
+  local driver = Wd.driver
+  local v = V()
+  local card = v.cards[1]
+  local function hit(f)
+    local p = f._points[1]
+    return p and (tostring(p[1]) .. "|" .. tostring(p[2]) .. "|" .. tostring(p[3]) .. "|" .. tostring(p[4])
+      .. "|" .. tostring(p[5]) .. "|" .. tostring(f._scale)) or "?"
+  end
+  local before = hit(card)
+  check("pilote à l'arrêt quand rien ne bouge", not Wd.driverAwake() and driver._scripts.OnUpdate == nil)
+  run(card, "OnEnter")
+  check("survol : le pilote démarre", Wd.driverAwake() and driver._scripts.OnUpdate ~= nil)
+  run(driver, "OnUpdate", 0.04)
+  local mid = Wd.animValue(card, "hover")
+  check("survol en cours : valeur intermédiaire", mid > 0 and mid < 1, mid)
+  check("visuel agrandi et levé, zone de survol immobile", card.face._scale > 1 and hit(card) == before,
+    card.face._scale)
+  run(card, "OnLeave")
+  run(driver, "OnUpdate", 0.01)
+  local back = Wd.animValue(card, "hover")
+  check("sortie en cours de route : repart de la valeur courante", back > 0 and back <= mid, back .. " / " .. mid)
+  for _ = 1, 30 do run(driver, "OnUpdate", 0.02) end
+  check("sortie terminée : repos exact", Wd.animValue(card, "hover") == 0 and card.face._scale == 1)
+  check("pilote arrêté une fois tout immobile", not Wd.driverAwake() and driver._scripts.OnUpdate == nil)
+  -- état final par les seuls minuteurs de secours (images sautées)
+  run(card, "OnEnter")
+  H.advance(0.5)
+  check("survol : état final atteint", Wd.animValue(card, "hover") == 1
+    and math.abs(card.face._scale - 1.16) < 1e-9 and hit(card) == before, card.face._scale)
+  local n = #C().combat().hand
+  if n >= 2 then
+    check("voisine écartée (visuel seulement)", Wd.animValue(v.cards[2], "dx") > 0)
+  end
+  check("carte survolée devant les autres", card._level > v.cards[n]._level)
+  check("zone de survol prolongée vers le haut", card._calls.SetHitRectInsets
+    and card._calls.SetHitRectInsets[3] < 0)
+  run(card, "OnLeave")
+  H.advance(0.5)
+  check("retour au repos", Wd.animValue(card, "hover") == 0 and card._level == card.baseLevel
+    and Wd.animValue(v.cards[2], "dx") == 0)
+  -- bouton, pile, potion, menu : même mécanique
+  for _, f in ipairs({ v.endTurn, v.drawPile, UI().potionSlots[1], UI().gear }) do
+    local hb = hit(f)
+    run(f, "OnEnter")
+    H.advance(0.5)
+    local up = f.face._scale > 1
+    run(f, "OnLeave")
+    H.advance(0.5)
+    check("survol animé : " .. tostring(f.label and f.label._text or f.pileKey or "icône"),
+      up and f.face._scale == 1 and hit(f) == hb)
+  end
+  -- ennemi ciblable quand une carte à cible est armée
+  local c = C().combat()
+  local idx
+  for i = 1, #c.hand do
+    local info = C().handInfo(i)
+    if info and info.playable and info.needsTarget and not idx then idx = i end
+  end
+  if idx then
+    v:Select(idx)
+    local t = C().aliveTargets()[1]
+    local slot = enemySlot(t)
+    local hs = hit(slot)
+    run(slot, "OnEnter")
+    H.advance(0.5)
+    check("ennemi visé : il grandit, sa zone de clic reste", slot.fig._scale > 1 and hit(slot) == hs, slot.fig._scale)
+    run(slot, "OnLeave")
+    v:Deselect()
+    H.advance(0.5)
+    check("visée annulée : ennemi au repos", Wd.animValue(slot, "aim") == 0)
+  end
+end
+
+print("U19 panneau du deck : ouverture, tri, défilement, fermeture ; pioche triée en combat")
+do
+  local exp = freshRun(SEED + 6, nil)
+  local Dv = UI().deckView
+  local Card = H.ns.Card
+  -- deck assez grand pour défiler, une carte améliorée
+  local n0 = #exp.deck
+  for i = 1, 20 do
+    local src = exp.deck[(i - 1) % n0 + 1]
+    exp.deck[#exp.deck + 1] = { uid = 9000 + i, id = src.id, up = false }
+  end
+  exp.deck[2].up = true
+  UI().refresh()
+  check("bouton Deck du bandeau affiché", UI().deckButton._shown)
+  H.click(UI().deckButton)
+  check("clic sur Deck : panneau ouvert", Dv:IsShown() and Dv.kind == "deck")
+  snap("deck-panneau")
+  check("compteur total dans le titre", (Dv.title._text or ""):find(#exp.deck .. " cartes", 1, true), Dv.title._text)
+  local TYPE = { attack = 1, skill = 2, power = 3 }
+  local sorted = #Dv.list == #exp.deck
+  for i = 2, #Dv.list do
+    local a, b = Card.defById(Dv.list[i - 1].id, Dv.list[i - 1].up), Card.defById(Dv.list[i].id, Dv.list[i].up)
+    local ka = { TYPE[a.type] or 9, a.cost or 99, a.name }
+    local kb = { TYPE[b.type] or 9, b.cost or 99, b.name }
+    if ka[1] > kb[1] or (ka[1] == kb[1] and (ka[2] > kb[2] or (ka[2] == kb[2] and ka[3] > kb[3]))) then sorted = false end
+  end
+  check("cartes triées par type, coût puis nom", sorted)
+  check("vraies cartes (W.card) dans l'ordre trié", Dv.cards[1]._shown and Dv.cards[1].cardId == Dv.list[1].id
+    and Dv.cards[1].name._text ~= nil)
+  local upShown
+  for _, cd in ipairs(Dv.cards) do if cd._shown and cd.cardUp then upShown = cd end end
+  check("carte améliorée : nom en vert", upShown and upShown.name._calls.SetTextColor
+    and math.abs(upShown.name._calls.SetTextColor[2] - H.ns.Art.C.green[2]) < 1e-9)
+  check("plus de cartes que de places : défilement possible", Dv:MaxOffset() > 0, Dv:MaxOffset())
+  run(Dv.panel, "OnMouseWheel", -1)
+  check("molette : une rangée plus bas", Dv.offset == 1)
+  for _ = 1, 10 do run(Dv.cards[1], "OnMouseWheel", -1) end
+  local last = Dv.list[#Dv.list]
+  local lastShown = false
+  for _, cd in ipairs(Dv.cards) do
+    if cd._shown and cd.cardId == last.id and (cd.cardUp or false) == (last.up or false) then lastShown = true end
+  end
+  check("molette jusqu'au bout : dernière carte visible", Dv.offset == Dv:MaxOffset() and lastShown)
+  run(Dv.frame, "OnMouseWheel", 5)
+  check("molette vers le haut", Dv.offset == Dv:MaxOffset() - 1)
+  local prop = H.key("1")
+  check("panneau ouvert : les touches ne vont pas à l'écran dessous", prop == true and Dv:IsShown()
+    and currentKind() == "map")
+  H.key("ESCAPE")
+  check("Échap ferme le panneau (pas la fenêtre)", not Dv:IsShown() and shown())
+  H.click(UI().deckButton)
+  H.click(Dv.frame)
+  check("clic hors du panneau : fermé", not Dv:IsShown())
+  H.click(UI().deckButton)
+  H.click(Dv.close)
+  check("bouton Fermer", not Dv:IsShown())
+  H.click(UI().deckButton)
+  H.click(UI().deckButton)
+  check("second clic sur Deck : fermé", not Dv:IsShown())
+
+  -- plateau d'un écran hors combat : la pile du deck
+  exp = freshRun(SEED + 3, "campfire")
+  Dv = UI().deckView
+  H.click(UI().current.pile)
+  check("pile du deck (feu de camp) : panneau ouvert", Dv:IsShown() and Dv.kind == "deck" and #Dv.list == #exp.deck)
+  H.key("ESCAPE")
+
+  -- combat : pioche (triée, jamais l'ordre réel), défausse, consumées, deck complet
+  exp = freshRun(SEED, "combat")
+  Dv = UI().deckView
+  H.settle()
+  local c = C().combat()
+  -- ordre réel volontairement à rebours du tri
+  local rev = Dv.sorted(c.draw)
+  for i = 1, #rev do c.draw[i] = rev[#rev - i + 1] end
+  local real = {}
+  for i = 1, #c.draw do real[i] = c.draw[i].uid end
+  H.click(V().drawPile)
+  check("clic sur la pioche : panneau de la pioche", Dv:IsShown() and Dv.kind == "draw" and #Dv.list == #c.draw)
+  snap("combat-pioche")
+  local same, differs = true, false
+  local srt = Dv.sorted(c.draw)
+  for i = 1, #srt do
+    if Dv.list[i] ~= srt[i] then same = false end
+    if Dv.list[i].uid ~= real[i] then differs = true end
+  end
+  check("pioche affichée triée", same)
+  check("pioche : jamais l'ordre réel de tirage", differs or #c.draw < 2)
+  local untouched = true
+  for i = 1, #c.draw do if c.draw[i].uid ~= real[i] then untouched = false end end
+  check("ouvrir la pioche ne touche pas à l'ordre réel", untouched)
+  H.click(V().drawPile)
+  check("second clic sur la pioche : fermé", not Dv:IsShown())
+  H.click(V().discardPile)
+  check("défausse consultable", Dv:IsShown() and Dv.kind == "discard" and #Dv.list == #c.discard)
+  H.key("ESCAPE")
+  c.exhaust[#c.exhaust + 1] = c.draw[#c.draw]
+  table.remove(c.draw)
+  V():Render()
+  check("tas des consumées affiché quand il y en a", V().exhaustPile._shown and V().exhaustPile.count._text == 1)
+  H.click(V().exhaustPile)
+  check("consumées consultables", Dv:IsShown() and Dv.kind == "exhaust" and #Dv.list == 1)
+  H.key("ESCAPE")
+  check("bouton Deck aussi en combat", UI().deckButton._shown)
+  H.click(UI().deckButton)
+  check("deck complet consultable en combat", Dv:IsShown() and Dv.kind == "deck" and #Dv.list == #exp.deck)
+  local hand = #c.hand
+  H.key("1")
+  check("panneau ouvert en combat : la touche 1 ne joue rien", #c.hand == hand and Dv:IsShown())
+  H.key("ESCAPE")
+  check("Échap : panneau fermé, combat intact", not Dv:IsShown() and currentKind() == "combat")
+end
 
 print("U16 méthodes d'API inconnues appelées")
 local names = {}

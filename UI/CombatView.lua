@@ -24,8 +24,12 @@ local ENEMY_X0, ENEMY_X1 = 470, 1022     -- zone des ennemis
 local HAND_CX, HAND_W = 525, 670         -- main : centre et largeur
 local HAND_TOP = 428
 local HOVER_SCALE = 1.16
+local HOVER_TOP = 372                    -- haut d'une carte levée (survol ou sélection)
+local SPREAD = { 26, 12 }                -- écart des voisines d'une carte levée (1re, 2e)
 local DRAW_PILE = { 77, 584 }
 local DISCARD_PILE = { 123, 584 }
+local EXHAUST_PILE = { 169, 584 }
+local AIM_SCALE = 1.07                   -- ennemi visé (carte à cible armée) : il grandit un peu
 
 local function now() return GetTime and GetTime() or 0 end
 local function opts() return ns.Persist.options() end
@@ -55,6 +59,22 @@ local function intentBubble(parent)
   return f
 end
 
+-- Personnage d'un emplacement posé par les pieds : la mise à l'échelle (visée) le fait grandir
+-- vers le haut sans bouger la zone de clic (l'emplacement lui-même).
+local function placeFig(s)
+  local k = s.fig:GetScale() or 1
+  local h = s.figH or 160
+  s.fig:ClearAllPoints()
+  s.fig:SetPoint("BOTTOM", s, "TOP", 0, -(33 + h) / k)
+end
+
+local function aimApply(s)
+  local v = W.animValue(s, "aim")
+  s.fig:SetScale(1 + (AIM_SCALE - 1) * v)
+  placeFig(s)
+  if s.fig.ring:IsShown() then s.fig.ring:SetAlpha(0.45 + 0.55 * max(v, s.ringBase or 0)) end
+end
+
 local function buildSlot(self, i)
   local s = CreateFrame("Button", nil, self.bf)
   s:SetSize(SLOT_W, SLOT_H)
@@ -63,8 +83,10 @@ local function buildSlot(self, i)
   s.intent = intentBubble(s)
   s.intent:SetPoint("TOP", 0, 0)
   s.fig = Scene.figure(s, 150, 160)
-  s.fig:SetPoint("TOP", 0, -33)
+  s.figH = 160
+  placeFig(s)
   s.fig:EnableMouse(false)
+  s._animApply = aimApply
   s.model = s.fig.model
   s.fallback = s.fig.fallback
   s.flash = W.disc(s.fig, "OVERLAY", 0, C.hp, 0)
@@ -86,21 +108,32 @@ local function buildSlot(self, i)
   return s
 end
 
--- Pile (pioche ou défausse) : petit tas de cartes avec nombre.
-local function pile(self, parent, x, y, key, label, dashed, level)
+-- Pile (pioche, défausse, consumées) : petit tas de cartes avec nombre ; clic = consulter
+-- (panneau du deck, pioche triée).
+local function pile(self, parent, x, y, key, label, style, level)
+  local dashed = style ~= "full"
   if not dashed then
     local back = CreateFrame("Frame", nil, parent)
     at(back, parent, x + 3, y + 3, 36, 48)
     back:SetFrameLevel(level)
     W.roundRect(back, "BACKGROUND", -8, 5, 0):SetColor(C.woodDark)
   end
-  local b = CreateFrame("Frame", nil, parent)
+  local b = CreateFrame("Button", nil, parent)
   at(b, parent, x, y, 36, 48)
   b:SetFrameLevel(level + 1)
-  b:EnableMouse(true)
-  b.shape = W.shape(b, 5, dashed and C.woodLine or C.gold, dashed and C.woodDark or C.wood, 2, -6)
-  b.count = W.label(b, "title", 18, dashed and C.parchment or C.creamLight)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(b)
+  local edge = style == "exhaust" and C.watch or (dashed and C.woodLine or C.gold)
+  b.shape = W.shape(face, 5, edge, dashed and C.woodDark or C.wood, 2, -6)
+  b.count = W.label(face, "title", 18, style == "exhaust" and C.watchText or (dashed and C.parchment or C.creamLight))
   b.count:SetPoint("CENTER")
+  W.hoverable(b, { scale = 1.12, lift = 3 })
+  b.pileKey = key
+  b:SetScript("OnClick", function(_, button)
+    if button == "RightButton" then return end
+    W.sound("click")
+    UI.toggleDeckView(key)
+  end)
   W.tooltip(b, function(tt) V.fillPileTooltip(tt, key, label) end, "ANCHOR_RIGHT")
   return b
 end
@@ -145,7 +178,7 @@ function V:Build(parent)
     if not pc then return end
     W.fillCardTooltip(tt, pc.card.id, pc.card.up, { full = true })
     tt:AddLine(" ")
-    tt:AddLine("Se résout au début de ton prochain tour, sauf interruption.", 0.8, 0.8, 1, true)
+    tt:AddLine("Se résout au début du prochain tour, sauf interruption.", 0.8, 0.8, 1, true)
   end, "ANCHOR_TOP")
   cast:Hide()
   self.cast = cast
@@ -205,10 +238,13 @@ function V:Build(parent)
   end, "ANCHOR_RIGHT")
   self.demence = dem
 
-  self.drawPile = pile(self, parent, DRAW_PILE[1] - 18, DRAW_PILE[2] - 24, "draw", "Pioche", false,
+  self.drawPile = pile(self, parent, DRAW_PILE[1] - 18, DRAW_PILE[2] - 24, "draw", "Pioche", "full",
     hz:GetFrameLevel() + 1)
-  self.discardPile = pile(self, parent, DISCARD_PILE[1] - 18, DISCARD_PILE[2] - 24, "discard", "Défausse", true,
+  self.discardPile = pile(self, parent, DISCARD_PILE[1] - 18, DISCARD_PILE[2] - 24, "discard", "Défausse", "dashed",
     hz:GetFrameLevel() + 1)
+  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1] - 18, EXHAUST_PILE[2] - 24, "exhaust", "Consumées", "exhaust",
+    hz:GetFrameLevel() + 1)
+  self.exhaustPile:Hide()
 
   -- Recharges (mini-cartes) et fin du tour ------------------------------------------
   self.cdCards = {}
@@ -250,8 +286,11 @@ function V:Build(parent)
     card:SetScript("OnClick", function(f, button) V:ClickCard(f.index, button) end)
     card:SetScript("OnDragStart", function(f) V:StartDrag(f) end)
     card:SetScript("OnDragStop", function(f) V:StopDrag(f) end)
-    card.onEnterExtra = function(f) f.hover = true V:PlaceCard(f) end
-    card.onLeaveExtra = function(f) f.hover = false V:PlaceCard(f) end
+    -- Survol piloté par l'écran (la carte sélectionnée reste levée).
+    card._hoverManual = true
+    card.hoverScale = HOVER_SCALE
+    card.onEnterExtra = function(f) f.hover = true V:PlaceCard(f) V:Spread() end
+    card.onLeaveExtra = function(f) f.hover = false V:PlaceCard(f) V:Spread() end
     card:Hide()
     self.cards[i] = card
   end
@@ -284,7 +323,7 @@ local ACTION_TEXT = {
   block = function(a) return "Gagne " .. a[2] .. " Absorption." end,
   debuff = function(a)
     local s = ns.Statuses[a[2]]
-    return "T'inflige " .. (s and s.name or a[2]) .. " " .. a[3] .. "."
+    return "Inflige " .. (s and s.name or a[2]) .. " " .. a[3] .. "."
   end,
   buff = function(a)
     local s = ns.Statuses[a[2]]
@@ -296,7 +335,7 @@ local ACTION_TEXT = {
   end,
   heal_ally = function(a) return "Soigne de " .. a[2] .. " l'allié le plus blessé." end,
   block_ally = function(a) return "Donne " .. a[2] .. " Absorption à un allié." end,
-  interrupt = function() return "Interrompt ton incantation si tu en lances une ce tour." end,
+  interrupt = function() return "Interrompt toute incantation lancée ce tour." end,
   summon = function(a)
     local d = ns.Enemies[a[2]]
     return "Invoque " .. ((a.count or 1) > 1 and (a.count .. " × ") or "") .. (d and d.name or a[2]) .. "."
@@ -319,7 +358,7 @@ function V.fillIntentTooltip(tt, e)
       local times = a.times or 1
       tt:AddLine("Attaque : " .. Combat.calcDamage(c, e, c.player, a[2])
         .. (times > 1 and (" × " .. times) or "") .. " dégâts."
-        .. (a.interrupts and " Interrompt ton incantation." or ""), 1, 0.5, 0.5, true)
+        .. (a.interrupts and " Interrompt l'incantation en cours." or ""), 1, 0.5, 0.5, true)
     elseif ACTION_TEXT[a[1]] then
       tt:AddLine(ACTION_TEXT[a[1]](a), 1, 1, 1, true)
     end
@@ -347,6 +386,7 @@ function V.fillPileTooltip(tt, key, label)
     tt:AddLine(" ")
     tt:AddLine("Consumées : " .. #c.exhaust, 0.8, 0.6, 0.4)
   end
+  tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
 end
 
 ---------------------------------------------------------------------------
@@ -440,6 +480,8 @@ function V:LayoutEnemies()
       local sc = art.scale or 1
       s.fig:SetSize(150 * sc, 160 * sc)
       s.model:SetSize(150 * sc, 160 * sc)
+      s.figH = 160 * sc
+      W.animSet(s, "aim", 0)
       W.setCreature(s.model, e.id, s.fallback)
       if s.model.SetFacing then s.model:SetFacing(opts().facingEnemy or -0.6) end
       W.modelAlpha(s.model, 1)
@@ -556,6 +598,11 @@ function V:RenderTargets()
     local alive = e and not e.dead and not s.dying
     local on = alive and ((targeting and (s.hover or s.enemyIndex == kb)) or s.hover)
     s.fig:SetRing(on, not targeting)
+    -- visée : l'ennemi survolé (ou la cible clavier) grandit, son anneau s'allume
+    s.ringBase = targeting and 0 or 1
+    local aim = alive and targeting and (s.hover or s.enemyIndex == kb)
+    W.animTo(s, "aim", aim and 1 or 0, aim and W.HOVER_IN or W.HOVER_OUT)
+    aimApply(s)
   end
 end
 
@@ -587,6 +634,8 @@ function V:RenderPlayer(full)
   if dem > 0 then self.demence:Show() else self.demence:Hide() end
   self.drawPile.count:SetText(#c.draw)
   self.discardPile.count:SetText(#c.discard)
+  self.exhaustPile.count:SetText(#c.exhaust)
+  if #c.exhaust > 0 then self.exhaustPile:Show() else self.exhaustPile:Hide() end
   -- recharges
   local n = min(#c.cooldown, #self.cdCards)
   local per = n > 3 and 3 or n
@@ -622,14 +671,44 @@ function V:HandSlot(i, n)
   return x, y
 end
 
+-- Carte de la main : la zone de clic reste à sa place dans l'éventail ; le visuel (face) se lève,
+-- grossit et passe devant au survol ou à la sélection (canal « hover »).
 function V:PlaceCard(card)
   if not card.baseX or self.dragging == card then return end
-  local up = self.selected == card.index or card.hover
-  local sc = up and HOVER_SCALE or 1
-  local top = up and 372 or card.baseY
-  W.placeCenter(card, self.parent, card.baseX, top + W.CARD_H * sc / 2, sc)
-  card:SetFrameLevel(self.hz:GetFrameLevel() + 5 + card.index * 3 + (up and 60 or 0))
+  local up = (self.selected == card.index or card.hover) and true or false
+  card.lifted = up
+  local cy = card.baseY + W.CARD_H / 2
+  -- levée : le haut de la carte agrandie arrive à HOVER_TOP
+  card.hoverLift = cy - (HOVER_TOP + W.CARD_H * HOVER_SCALE / 2)
+  local base = self.hz:GetFrameLevel() + 5 + card.index * 3
+  W.placeCard(card, self.parent, card.baseX, cy, 1, base, base + 60)
+  W.animTo(card, "hover", up and 1 or 0, up and W.HOVER_IN or W.HOVER_OUT)
+  -- zone de survol prolongée vers le haut tant que la carte est levée (on peut monter dessus)
+  if card.SetHitRectInsets then
+    local top = up and -floor(card.hoverLift + W.CARD_H * (HOVER_SCALE - 1) / 2) or 0
+    if card._hitTop ~= top then card._hitTop = top card:SetHitRectInsets(0, 0, top, 0) end
+  end
   card:SetHot(up)
+end
+
+-- Les voisines d'une carte levée (agrandie, donc plus large) s'écartent un peu ; visuel seulement :
+-- leurs zones de clic ne bougent pas.
+function V:Spread()
+  local n = self.c and #self.c.hand or 0
+  local focus
+  for i = 1, min(n, #self.cards) do
+    if self.cards[i].hover then focus = i end
+  end
+  focus = focus or self.selected
+  for i = 1, #self.cards do
+    local card = self.cards[i]
+    local dx = 0
+    if focus and i ~= focus and i <= n then
+      local d = i - focus
+      dx = (SPREAD[abs(d)] or 0) * (d > 0 and 1 or -1)
+    end
+    if self.dragging ~= card then W.animTo(card, "dx", dx, W.HOVER_IN) end
+  end
 end
 
 function V:RenderHand()
@@ -652,9 +731,12 @@ function V:RenderHand()
       self.shownHand[card.uid] = i
     else
       card.baseX, card.uid = nil, nil
+      card.hover, card.lifted = false, false
+      W.hoverReset(card)
       card:Hide()
     end
   end
+  self:Spread()
 end
 
 function V:RenderBanner()
@@ -1021,7 +1103,7 @@ function V:SelectPotion(slot)
   self.potionSlot = slot
   self:RenderHand()
   self:RenderTargets()
-  UI.flash("Choisis une cible pour la potion.")
+  UI.flash("Potion : cliquer sa cible.")
 end
 
 function V:DrinkPotion(slot, target)
@@ -1076,6 +1158,10 @@ function V:StartDrag(card)
   self.dragging = card
   self:RenderTargets()
   card:SetFrameLevel(self.hz:GetFrameLevel() + 95)
+  -- la carte suit le curseur : plus de levée ni d'écart, elle garde sa taille de survol
+  card.hoverLift = 0
+  W.animSet(card, "dx", 0)
+  W.animTo(card, "hover", 1, W.HOVER_IN)
   card:SetScript("OnUpdate", function(f)
     local x, y = GetCursorPosition()
     local s = f:GetEffectiveScale()

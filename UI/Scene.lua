@@ -221,25 +221,172 @@ function S.build(parent)
   local plain = W.rect(parent, "BACKGROUND", -8, C.frame)
   plain:SetAllPoints()
   S.scene = nil
+
+  -- Sondes des illustrations : un cadre visible mais recouvert par le décor (niveau inférieur),
+  -- une petite texture par illustration pour vérifier qu'un candidat se charge vraiment.
+  local probe = CreateFrame("Frame", nil, parent)
+  at(probe, parent, 0, S.TOP, 8, 8)
+  probe:SetFrameLevel(parent:GetFrameLevel())
+  S.probeFrame = probe
+  S.resolveAll()
 end
 
--- Texture recadrée et teintée ; faux si le fichier n'est pas chargé.
-local function applyArt(entry)
-  local art = S.art
-  if not entry or not entry.texture or opts().decor == false then art:Hide() return false end
-  local ok = art:SetTexture(entry.texture)
-  local fid = art.GetTextureFileID and art:GetTextureFileID()
-  if ok == false or (art.GetTextureFileID and not fid) then
-    W.missing["scene:" .. tostring(entry.texture)] = true
-    art:Hide()
-    return false
+---------------------------------------------------------------------------
+-- Illustrations : premier candidat qui se charge réellement, sinon repli sur le décor peint
+---------------------------------------------------------------------------
+-- Pour chaque candidat (Art.illustrations) : SetTexture doit réussir (pas `false`), la texture doit
+-- avoir un FileDataID, puis IsObjectLoaded() doit devenir vrai (chargement asynchrone) dans le délai
+-- (compté seulement fenêtre visible). Sinon : candidat suivant ; plus de candidat : repli peint.
+
+S.POLL, S.TIMEOUT = 0.25, 4
+S.illus = {}   -- clé -> { state = "pending" | "ok" | "fallback", list, index, cand, log = {} }
+
+-- Liste à plat des candidats d'une illustration (les entrées chaîne renvoient à une autre liste).
+local function candidates(key, out, seen)
+  out, seen = out or {}, seen or {}
+  if seen[key] then return out end
+  seen[key] = true
+  for _, c in ipairs(Art.illustrations[key] or {}) do
+    if type(c) == "string" then candidates(c, out, seen) else out[#out + 1] = c end
   end
-  local c = entry.crop or { 0, 1, 0, 1 }
-  art:SetTexCoord(c[1], c[2], c[3], c[4])
+  return out
+end
+
+function S.fileName(file)
+  if type(file) == "string" then return file end
+  local get = C_Texture and C_Texture.GetFilenameFromFileDataID
+  if not get then return nil end
+  local ok, name = pcall(get, file)
+  if ok and type(name) == "string" and name ~= "" then return name end
+  return nil
+end
+
+local function resolved(key)
+  -- le décor affiché utilise cette illustration : on le reprend
+  local entry = S.entry
+  if entry and entry.art == key and S.scene ~= false then S.applyArt(entry) end
+end
+
+local function tryCandidate(key, i)
+  local st = S.illus[key]
+  local cand = st.list[i]
+  st.index = i
+  if not cand then
+    st.state, st.cand = "fallback", nil
+    resolved(key)
+    return
+  end
+  st.state = "pending"
+  local tex = st.probe
+  local ok = tex:SetTexture(cand.file)
+  if ok == false then
+    st.log[i] = "refusé"
+    return tryCandidate(key, i + 1)
+  end
+  if tex.GetTextureFileID then
+    local fid = tex:GetTextureFileID()
+    if not fid or fid == 0 then
+      st.log[i] = "sans fichier"
+      return tryCandidate(key, i + 1)
+    end
+  end
+  local waited = 0
+  local function poll()
+    if st.index ~= i or st.state ~= "pending" then return end
+    if not tex.IsObjectLoaded or tex:IsObjectLoaded() then
+      st.state, st.cand, st.log[i] = "ok", cand, "retenu"
+      resolved(key)
+      return
+    end
+    local visible = S.probeFrame:IsVisible()
+    if visible then waited = waited + S.POLL end
+    if waited >= S.TIMEOUT then
+      st.log[i] = "non chargé"
+      return tryCandidate(key, i + 1)
+    end
+    W.delay(visible and S.POLL or 1, poll)
+  end
+  poll()
+end
+
+function S.resolve(key)
+  if S.illus[key] then return S.illus[key] end
+  local probe = S.probeFrame:CreateTexture(nil, "BACKGROUND")
+  probe:SetSize(4, 4)
+  probe:SetPoint("TOPLEFT", 0, 0)
+  local st = { state = "pending", list = candidates(key), log = {}, probe = probe }
+  S.illus[key] = st
+  tryCandidate(key, 1)
+  return st
+end
+
+function S.resolveAll()
+  local keys = {}
+  for key in pairs(Art.illustrations) do keys[#keys + 1] = key end
+  table.sort(keys)
+  for _, key in ipairs(keys) do S.resolve(key) end
+end
+
+-- Illustration retenue pour un décor (candidat ou nil).
+function S.chosen(entry)
+  local st = entry and entry.art and S.illus[entry.art]
+  return st and st.state == "ok" and st.cand or nil
+end
+
+-- Texture recadrée et teintée ; faux (illustration cachée, décor peint visible) sinon.
+function S.applyArt(entry)
+  local art = S.art
+  local cand = S.chosen(entry)
+  if not cand or opts().decor == false then art:Hide() return false end
+  if art:SetTexture(cand.file) == false then art:Hide() return false end
+  local c = cand.crop or { 0, 1, 0, 1 }
+  local top, bottom = c[3], c[4]
+  local shift = entry.shift or 0
+  if top + shift < 0 then shift = -top elseif bottom + shift > 1 then shift = 1 - bottom end
+  art:SetTexCoord(c[1], c[2], top + shift, bottom + shift)
   local t = entry.tint or { 1, 1, 1 }
   art:SetVertexColor(t[1], t[2], t[3], 1)
   art:Show()
   return true
+end
+
+-- Rapport de /slay art : une ligne par décor.
+function S.report()
+  local lines = {}
+  local ids = {}
+  for id in pairs(Art.scenes) do ids[#ids + 1] = id end
+  table.sort(ids)
+  for _, id in ipairs(ids) do
+    local entry = Art.scenes[id]
+    local line
+    if not entry.art then
+      line = id .. " : peint (pas d'illustration)"
+    else
+      local st = S.illus and S.illus[entry.art]
+      if not st then
+        line = id .. " : pas encore essayé (ouvrir la fenêtre)"
+      elseif st.state == "ok" then
+        local name = S.fileName(st.cand.file)
+        line = id .. " : candidat " .. st.index .. "/" .. #st.list .. " = " .. tostring(st.cand.file)
+          .. (name and name ~= st.cand.file and (" (" .. name .. ")") or "")
+      elseif st.state == "fallback" then
+        line = id .. " : repli (décor peint)"
+      else
+        line = id .. " : en cours (candidat " .. tostring(st.index) .. "/" .. #st.list .. ")"
+      end
+      if st and st.state ~= "pending" then
+        local refused = {}
+        for i = 1, #st.list do
+          if st.log[i] and st.log[i] ~= "retenu" then
+            refused[#refused + 1] = tostring(st.list[i].file) .. " " .. st.log[i]
+          end
+        end
+        if #refused > 0 then line = line .. " ; écartés : " .. table.concat(refused, ", ") end
+      end
+    end
+    lines[#lines + 1] = line
+  end
+  return lines
 end
 
 -- stage = { scene = clé d'Art.scenes | false, board = bool, veil = 0..1 }
@@ -250,12 +397,13 @@ function S.set(stage)
     S.decor:Hide()
   else
     local entry = Art.scenes[id or Art.defaultScene] or Art.scenes[Art.defaultScene]
+    S.entry = entry
     S.decor:Show()
     for name, g in pairs(S.paints) do
       local on = name == entry.paint
       for i = 1, #g do if on then g[i]:Show() else g[i]:Hide() end end
     end
-    applyArt(entry)
+    S.applyArt(entry)
     S.veil:SetColorTexture(0, 0, 0, stage.veil or 0)
   end
   if stage.board == false then S.board:Hide() else S.board:Show() end

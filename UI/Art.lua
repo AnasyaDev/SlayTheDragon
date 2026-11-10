@@ -60,48 +60,50 @@ Art.tex = {
   check = 136814,       -- interface/raidframe/readycheck-ready
 }
 
--- Décors : `texture` = illustration du jeu posée sur la bande du haut (recadrée par `crop` =
--- { gauche, droite, haut, bas } en fraction, teintée par `tint`) ; `paint` = décor de repli peint en
--- couches unies aux couleurs des maquettes, toujours dessiné dessous. Point d'extension : ajouter une
--- entrée ici (et `scene = "<clé>"` dans une rencontre) suffit ; `/slay decor` bascule illustration/peint.
-Art.scenes = {
-  road = { -- Marche de l'Ouest, route et combats
-    texture = 7377860, -- glues/loadingscreens/expansion10/main/loadscreen_housing_elwynnforest
-    crop = { 0, 1, 0.16, 0.86 }, tint = { 1, 0.93, 0.78 },
-    paint = "fields",
+-- Illustrations (écrans de chargement recadrés) : pour chacune, une liste ORDONNÉE de candidats ;
+-- UI/Scene.lua retient le premier qui se charge réellement dans le client, sinon le décor peint sert
+-- de repli (`/slay art` dit lequel a été retenu). `file` = FileDataID ou chemin ; `crop` = { gauche,
+-- droite, haut, bas } en fraction de l'image, pour la bande 1034 × 380 (≈ 2,7:1) : ≈ 0,65 de la
+-- hauteur pour une image 16:9, ≈ 0,5 pour une image 4:3 (cadrages à confirmer en jeu). Une entrée
+-- chaîne renvoie à la liste d'une autre illustration (à la suite).
+-- FileDataID confirmés dans la liste de fichiers retail 12.1.5 (wow_file_search) ; leur présence
+-- dans le client Forever (« Camelot », 1.16) n'est PAS vérifiable hors jeu :
+--   * 7377860 (logement d'Elwynn, Midnight) : très probablement absent de Forever — c'était le seul
+--     décor des champs, d'où l'absence de paysage en jeu ;
+--   * camelot160/* (7963776…7963782) : écrans de chargement propres à Forever, présents par nature ;
+--   * 131833, 131839 (Mortemines, royaumes de l'Est) : écrans de la version classique.
+Art.illustrations = {
+  elwynn = {
+    { file = 7377860, crop = { 0, 1, 0.16, 0.86 } }, -- expansion10/main/loadscreen_housing_elwynnforest
+    { file = 7963776, crop = { 0, 1, 0.18, 0.83 } }, -- camelot160/main/loadscreen_camelot_easternkingdom
+    { file = 131839, crop = { 0, 1, 0.14, 0.64 } },  -- loadscreeneasternkingdom (classique)
+    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenEasternKingdom", crop = { 0, 1, 0.14, 0.64 } },
   },
-  farm = {
-    texture = 7377860, crop = { 0, 1, 0.12, 0.82 }, tint = { 1, 0.95, 0.82 },
-    paint = "farm",
-  },
-  mine = { -- Mortemines : boss
-    texture = 131833, -- glues/loadingscreens/loadscreendeadmines
-    crop = { 0, 1, 0.22, 0.72 }, tint = { 0.95, 0.85, 0.75 },
-    paint = "cave",
-  },
-  night = { -- feu de camp
-    texture = 7377860, crop = { 0, 1, 0.16, 0.86 }, tint = { 0.32, 0.34, 0.55 },
-    paint = "night",
-  },
-  hill = { -- Colline des sentinelles
-    texture = 7377860, crop = { 0, 1, 0.06, 0.76 }, tint = { 1, 0.93, 0.8 },
-    paint = "fields",
-  },
-  camp = { -- campements (réfugiés, gnolls)
-    texture = 7377860, crop = { 0, 1, 0.2, 0.9 }, tint = { 0.95, 0.85, 0.7 },
-    paint = "fields",
+  deadmines = {
+    { file = 131833, crop = { 0, 1, 0.22, 0.72 } },  -- loadscreendeadmines (classique)
+    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines", crop = { 0, 1, 0.22, 0.72 } },
+    { file = 7963777, crop = { 0, 1, 0.18, 0.83 } }, -- camelot160/main/loadscreen_camelot_excavation
   },
   ruins = {
-    texture = 7377860, crop = { 0, 1, 0.2, 0.9 }, tint = { 0.8, 0.75, 0.7 },
-    paint = "cave",
+    { file = 7963782, crop = { 0, 1, 0.18, 0.83 } }, -- camelot160/main/loadscreen_camelot_ruinsoflordaeron
+    "elwynn",
   },
-  coast = { -- côte de la Marche : décor peint seulement (aucune illustration de côte confirmée)
-    paint = "coast",
-  },
-  shop = {
-    texture = 7377860, crop = { 0, 1, 0.2, 0.9 }, tint = { 1, 0.9, 0.75 },
-    paint = "fields",
-  },
+}
+
+-- Décors : `art` = illustration (ci-dessus) posée sur la bande du haut, décalée verticalement de
+-- `shift` (fraction) et teintée par `tint` ; `paint` = décor peint en couches unies aux couleurs des
+-- maquettes, toujours dessiné dessous (repli). Point d'extension : ajouter une entrée ici (et
+-- `scene = "<clé>"` dans une rencontre) suffit ; `/slay decor` bascule illustration/peint.
+Art.scenes = {
+  road = { art = "elwynn", tint = { 1, 0.93, 0.78 }, paint = "fields" },          -- route et combats
+  farm = { art = "elwynn", shift = -0.04, tint = { 1, 0.95, 0.82 }, paint = "farm" },
+  mine = { art = "deadmines", tint = { 0.95, 0.85, 0.75 }, paint = "cave" },        -- boss
+  night = { art = "elwynn", tint = { 0.32, 0.34, 0.55 }, paint = "night" },       -- feu de camp
+  hill = { art = "elwynn", shift = -0.1, tint = { 1, 0.93, 0.8 }, paint = "fields" }, -- Colline des sentinelles
+  camp = { art = "elwynn", shift = 0.04, tint = { 0.95, 0.85, 0.7 }, paint = "fields" },
+  ruins = { art = "ruins", shift = 0.04, tint = { 0.8, 0.75, 0.7 }, paint = "cave" },
+  coast = { paint = "coast" }, -- côte de la Marche : peinte (aucune illustration de côte confirmée)
+  shop = { art = "elwynn", shift = 0.04, tint = { 1, 0.9, 0.75 }, paint = "fields" },
 }
 Art.defaultScene = "road"
 
@@ -320,14 +322,14 @@ Art.ui = {
 
 -- Mots-clés (infobulles des cartes) ------------------------------------------
 Art.keywords = {
-  cast = { name = "Incantation", text = "Se paie maintenant, se résout au début de ton prochain tour. "
+  cast = { name = "Incantation", text = "Se paie maintenant, se résout au début du prochain tour. "
     .. "Une seule à la fois ; un ennemi qui Guette l'interrompt." },
   cooldown = { name = "Recharge", text = "Après usage, la carte quitte le cycle pendant N tours "
     .. "puis revient directement en main." },
   exhaust = { name = "Consumée", text = "La carte quitte le combat après usage." },
   retain = { name = "Conservée", text = "La carte reste en main à la fin du tour." },
   power = { name = "Pouvoir", text = "Reste actif tout le combat une fois joué." },
-  absorb = { name = "Absorption", text = "Absorbe les dégâts. Tombe au début de ton tour." },
+  absorb = { name = "Absorption", text = "Absorbe les dégâts. Tombe au début du tour de son porteur." },
   demence = { name = "Démence", text = "Ressource de l'Ombre, gagnée par les cartes d'ombre ; "
     .. "certaines cartes la dépensent toute d'un coup." },
   interrupt = { name = "Interruption", text = "Annule le sort qu'un ennemi incante." },

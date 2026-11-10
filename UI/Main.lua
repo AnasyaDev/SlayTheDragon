@@ -82,11 +82,16 @@ local function buildBand(f)
   UI.goldText = W.label(band, "body", 15, C.gold)
   UI.goldText:SetPoint("LEFT", UI.hpText, "RIGHT", 16, 0)
 
-  -- Centre : nom de la zone et progression de l'acte.
+  -- Centre : nom de la zone (ligne du haut) et progression de l'acte (ligne du bas). Le cadre
+  -- s'étend de l'or (à gauche) au premier élément de droite (UI.layoutMid) : un nom trop long est
+  -- tronqué, jamais posé sur les points ni sur les icônes.
   local mid = CreateFrame("Frame", nil, band)
-  mid:SetSize(360, 30)
-  mid:SetPoint("CENTER", -10, 0)
+  mid:SetHeight(40)
+  mid:SetPoint("LEFT", UI.goldText, "RIGHT", 16, 0)
+  mid:SetPoint("RIGHT", band, "RIGHT", -100, 0)
   UI.zone = W.label(mid, "title", 14, C.cream)
+  UI.zone:SetWordWrap(false)
+  UI.zone:SetJustifyH("CENTER")
   UI.dots = {}
   for i = 1, 12 do
     local d = W.disc(mid, "ARTWORK", 0, C.gold)
@@ -133,18 +138,23 @@ local function buildBand(f)
   -- Clé mythique : pastille violette.
   local ks = CreateFrame("Button", nil, band)
   ks:SetSize(54, 20)
-  ks.shape = W.shape(ks, 4, C.key, C.key, 1, -4)
-  ks.count = W.label(ks, "body", 13, C.frame)
+  W.face(ks)
+  ks.shape = W.shape(ks.face, 4, C.key, C.key, 1, -4)
+  ks.count = W.label(ks.face, "body", 13, C.frame)
   ks.count:SetPoint("CENTER")
+  W.hoverable(ks, { scale = 1.1 })
   W.tooltip(ks, function(tt, self)
     if self.info then W.fillItemTooltip(tt, "keystone", self.info.id, self.info) end
   end, "ANCHOR_BOTTOM")
   ks:Hide()
   UI.keystone = ks
 
-  -- Deck : bouton de bois, infobulle = contenu du deck et bibelots.
-  local deck = W.button(band, "Deck", 74, 28, nil, "wood", 13)
-  W.tooltip(deck, function(tt) UI.fillDeckTooltip(tt) end, "ANCHOR_BOTTOM")
+  -- Deck : bouton de bois (aussi en combat), infobulle = contenu du deck ; clic = consulter.
+  local deck = W.button(band, "Deck", 74, 28, function() UI.toggleDeckView("deck") end, "wood", 13)
+  W.tooltip(deck, function(tt)
+    UI.fillDeckTooltip(tt)
+    tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
+  end, "ANCHOR_BOTTOM")
   UI.info = deck
   UI.deckButton = deck
 end
@@ -239,13 +249,17 @@ local function affixText(r)
   return table.concat(lines, "\n")
 end
 
+-- Nom de zone sur la ligne du haut, points de progression centrés sur la ligne du bas : les deux
+-- ne peuvent pas se chevaucher, quelle que soit la longueur du nom (tronqué à la largeur du cadre).
 local function layoutDots(r)
   local mid = UI.mid
   local floors = r and r.floors
   local showDots = floors and UI.step and UI.step.kind ~= "map"
   UI.zone:ClearAllPoints()
+  local zy = showDots and 9 or 0
+  UI.zone:SetPoint("LEFT", mid, "LEFT", 4, zy)
+  UI.zone:SetPoint("RIGHT", mid, "RIGHT", -4, zy)
   if not showDots then
-    UI.zone:SetPoint("CENTER", mid, "CENTER", 0, 0)
     for i = 1, #UI.dots do UI.dots[i]:Hide() end
     UI.bossDot:Hide()
     return
@@ -253,17 +267,14 @@ local function layoutDots(r)
   local cur = math.max(1, (r.floor or 0))
   local n = math.min(floors - 1, #UI.dots)
   local dotsW = n * 15 + 16
-  local zw = UI.zone:GetStringWidth() or 120
-  local x0 = (360 - (zw + 10 + dotsW)) / 2
-  UI.zone:SetPoint("LEFT", mid, "LEFT", x0, 0)
-  local x = x0 + zw + 12
+  local x = -dotsW / 2
   for i = 1, #UI.dots do
     local d = UI.dots[i]
     if i <= n then
       d:ClearAllPoints()
-      local size = (i == cur) and 14 or 10
+      local size = (i == cur) and 13 or 9
       d:SetSize(size, size)
-      d:SetPoint("CENTER", mid, "LEFT", x + 5, 0)
+      d:SetPoint("CENTER", mid, "CENTER", x + 5, -11)
       local c = i < cur and C.gold or (i == cur and C.creamLight or Art.hex("#5a4630"))
       d:SetVertexColor(c[1], c[2], c[3], 1)
       d:Show()
@@ -273,8 +284,18 @@ local function layoutDots(r)
     end
   end
   UI.bossDot:ClearAllPoints()
-  UI.bossDot:SetPoint("CENTER", mid, "LEFT", x + 6, 0)
+  UI.bossDot:SetSize(10, 10)
+  UI.bossDot:SetPoint("CENTER", mid, "CENTER", x + 6, -11)
   UI.bossDot:Show()
+end
+
+-- Bornes du cadre central : de l'or à l'élément le plus à gauche du groupe de droite.
+local function layoutMid(rightmost)
+  local mid = UI.mid
+  mid:ClearAllPoints()
+  mid:SetHeight(40)
+  mid:SetPoint("LEFT", UI.goldText, "RIGHT", 16, 0)
+  mid:SetPoint("RIGHT", rightmost, "LEFT", -12, 0)
 end
 
 function UI.refreshInfo()
@@ -323,15 +344,18 @@ function UI.refreshInfo()
   else
     UI.keystone:Hide()
   end
-  local inFight = UI.step and UI.step.kind == "combat"
-  if r and not inFight then
+  if r then
     UI.deckButton:SetText("Deck " .. #r.deck)
     UI.deckButton:ClearAllPoints()
     UI.deckButton:SetPoint("RIGHT", right, "LEFT", -10, 0)
     UI.deckButton:Show()
+    right = UI.deckButton
   else
     UI.deckButton:Hide()
+    right = UI.gear
   end
+  layoutMid(right)
+  if UI.deckView then UI.deckView:Refresh() end
   if not r then
     UI.className:SetText("Slay the Dragon")
     UI.hpText:SetText("")
@@ -398,6 +422,7 @@ function UI.refresh()
   if UI.current and UI.current ~= screen then
     UI.current.frame:Hide()
     if UI.current.OnHide then UI.current:OnHide() end
+    if UI.deckView then UI.deckView:Close() end
   end
   UI.current = screen
   screen.frame:Show()
@@ -474,6 +499,7 @@ end
 
 function UI.onHide()
   setKeyboard(false)
+  if UI.deckView then UI.deckView:Close() end
   if UI.current and UI.current.OnHide then UI.current:OnHide() end
   if GameTooltip then GameTooltip:Hide() end
   W.sound("close")
@@ -482,11 +508,16 @@ end
 -- Touche pressée, fenêtre ouverte. Les touches non gérées sont rendues au jeu.
 function UI.onKey(key)
   local handled = false
+  local dv = UI.deckView
   if key == "ESCAPE" then
-    if UI.optionsFrame and UI.optionsFrame:IsShown() then UI.optionsFrame:Hide() else UI.close("escape") end
+    if UI.optionsFrame and UI.optionsFrame:IsShown() then UI.optionsFrame:Hide()
+    elseif dv and dv:IsShown() then dv:Close()
+    else UI.close("escape") end
     handled = true
   elseif UI.optionsFrame and UI.optionsFrame:IsShown() then
     handled = false
+  elseif dv and dv:IsShown() then
+    handled = false -- panneau des cartes ouvert : l'écran dessous ne reçoit rien
   elseif UI.current and UI.current.HandleKey then
     handled = UI.current:HandleKey(key) and true or false
   end
@@ -677,12 +708,16 @@ end
 -- /slay
 ---------------------------------------------------------------------------
 
+-- /slay art : décors (candidat retenu ou repli, décor par décor), puis icônes et modèles manquants.
 local function artReport()
+  if not UI.frame then UI.build() end
+  say("décors illustrés" .. (opts().decor == false and " (désactivés : /slay decor)" or "") .. " :")
+  for _, line in ipairs(Scene.report()) do say("  " .. line) end
   local keys = {}
   for k in pairs(W.missing) do keys[#keys + 1] = k end
   table.sort(keys)
   if #keys == 0 then
-    say("aucune icône ni aucun modèle manquant repéré jusqu'ici (ouvre d'abord quelques écrans).")
+    say("aucune icône ni aucun modèle manquant repéré jusqu'ici (à relancer après quelques écrans).")
   else
     say(#keys .. " élément(s) d'art manquant(s) :")
     for i = 1, #keys do say("  " .. keys[i]) end
