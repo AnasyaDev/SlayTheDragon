@@ -1,101 +1,159 @@
-# Interface en jeu (pistes C et D)
+# Interface en jeu (pistes C, D et E)
 
-État au 09/11/2026. Rien n'a encore tourné dans le client : tout ce qui suit est vérifié hors jeu
-par `Sim/ui_harness.lua`. La section « Tests en vol » liste ce qu'il reste à voir en jeu.
-La piste C a écrit l'interface sur une expédition de démonstration ; la piste D l'a branchée sur la
-vraie couche expédition (`Core/Expedition.lua`, `Core/Meta.lua`, `Core/Save.lua`, voir
-`docs/expedition.md`) et a supprimé la démonstration (`UI/DemoExpedition.lua`).
+État au 10/11/2026. Rien n'a encore tourné dans le client : tout ce qui suit est vérifié hors jeu par
+`Sim/ui_harness.lua` (logique, clics, animations en temps virtuel) et par des instantanés SVG des écrans
+(`Sim/ui_render.lua`, rendu approximatif). La section « Tests en vol » liste ce qu'il reste à voir en jeu.
+
+La piste C a écrit l'interface, la piste D l'a branchée sur la couche expédition, la **piste E** l'a
+entièrement redessinée en « table de jeu illustrée » d'après les maquettes validées
+(`docs/maquette/*.dc.html` : `Main`, `Cartes`, `Parcours`, `Recompense`, `Rencontre`).
+
+## Piste E : ce qui a changé
+
+- Fenêtre **1040 × 620** (au lieu de 900 × 520), déplaçable par le bandeau, échelle 60–150 %. Plus de
+  cadre Blizzard ni de boutons gris : formes dessinées (rectangles arrondis, disques), parchemin, bois,
+  polices Morpheus (titres, chiffres) et Friz Quadrata (texte), palette des maquettes (`Art.C`).
+- **Scène commune** (`UI/Scene.lua`) : décor plein cadre en haut (y 44–424), plateau de bois en bas
+  (y 424–614), personnages posés au sol avec ombre. Le décor est une illustration du jeu recadrée et
+  teintée, avec dessous un décor **peint** en couches unies (champs, ferme, côte, mine, nuit) qui sert de
+  repli ; `/slay decor` (ou Options → « Décor illustré ») bascule de l'un à l'autre.
+- **Une seule carte** (`W.card`) partout : parchemin, liseré de rareté (blanc, vert, bleu), gemme de coût
+  (rouge si le mana manque), nom (sur deux lignes s'il est long), médaillon rond cerclé à la couleur de la
+  voie (Discipline bleu ciel, Ombre violet, Sacré or, Départ bronze), ligne de type (« Sort · Discipline »),
+  texte avec chiffres en évidence, pastilles Incantation / Recharge N / Consumée / Conservée (retirées du
+  texte). États : survolée (halo doré, plus claire, plus grande, devant), injouable (ternie, raison écrite
+  en rouge à la place du texte, texte de retour au survol), améliorée (nom vert, chiffres changés en vert).
+- **Pas de légende ni de panneau explicatif** : le journal de combat, les titres d'écran, l'intro de
+  l'accueil, la légende et les libellés de la carte de parcours ont disparu. Restent annoncés : chiffres
+  exacts des intentions, coût et texte des cartes, issue de chaque réponse d'une rencontre, prix chez le
+  marchand, PV rendus au repos, raison d'une carte ou d'une action refusée. Les infobulles restent, à la
+  demande (mots-clés, états, intentions, bibelots, potions, piles, recharges, deck). L'infobulle d'une
+  carte n'explique plus que ses mots-clés (et l'amélioration, et la raison d'un refus) : la carte se lit
+  d'elle-même.
+- **Retour visuel** : carte jouée qui file vers sa cible (ou le héros), chiffres flottants (dégâts blancs,
+  Absorption bleue, soins verts), portion de vie perdue qui reste claire puis se vide, secousse et éclair
+  rouge de l'unité touchée, animation du modèle, mort en fondu, intention qui « s'exécute » (la bulle
+  éclate, l'ennemi se jette vers le héros), pioche (les cartes arrivent du tas), main défaussée qui file à
+  la défausse en fin de tour, bandeau de victoire en fondu, sons du jeu.
+- Toutes les animations sont **cosmétiques et en file** : l'état du moteur est à jour avant elles ; pendant
+  la file, barres, Absorption et intentions affichées suivent les événements, puis l'écran se resynchronise
+  sur le moteur à la fin. Vitesse réglable (×0,5 à ×3), mode rapide (×0,15) ; une file en retard (clics
+  rapides) se rattrape toute seule (délais ×0,6 au-delà de 5 événements en attente, ×0,35 au-delà de 10).
+- **Rencontres** (piste F) : réponses lues par `Expedition.eventOptions` (désactivées comprises, grisées avec
+  leur raison ; « ? » si `hidden`), texte après coup = `exp.event.result` (issue d'un pari comprise ;
+  `rolls` n'est jamais affiché), champs `speaker`, `npc`, `scene`, `rarity` exploités s'ils sont présents ;
+  sélection `dupe` (« choisis une carte à copier »).
 
 ## Fichiers
 
 | Fichier | Rôle | API WoW |
 | --- | --- | --- |
-| `UI/Art.lua` | Table d'art : carte → icône, ennemi → créature, état, intention, affixe, clé, bibelot, potion, mots-clés, animations | non |
-| `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`) | non |
-| `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` : étapes génériques, combat, potions, fin, validation | non |
-| `UI/Widgets.lua` | Briques : icônes vérifiées, panneaux, cartes, barres de vie et de réputation, boutons d'objet, états, infobulles, textes flottants, modèles | oui |
-| `UI/Main.lua` | Fenêtre 900 × 520, bandeau (PV, or, deck, clé, bibelots, potions), écrans, clavier, options, `/slay`, bouton de minimap | oui |
-| `UI/CombatView.lua` | Écran de combat | oui |
-| `UI/Screens.lua` | Accueil, choix, cartes, marchand, carte de parcours, bilan et méta | oui |
+| `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours), voies, mots-clés, animations | non |
+| `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor`) | non |
+| `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
+| `UI/Widgets.lua` | Formes, polices, sons, interpolations, icônes, médaillon, carte unique, barre de vie, écusson d'Absorption, pastilles, boutons, infobulles, textes flottants, modèles | oui |
+| `UI/Scene.lua` | Décor (illustration + décor peint), plateau, personnages (modèle, ombre, anneau de cible) | oui |
+| `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
+| `UI/CombatView.lua` | Écran de combat et ses animations | oui |
+| `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta | oui |
 | `UI/Flight.lua` | Événements : chargement, vol en taxi, combat réel, déconnexion | oui |
 | `Sim/ui_harness.lua` | Harnais hors jeu (faux client WoW) | — |
+| `Sim/ui_render.lua` | Rendu SVG approximatif des cadres du faux client (instantanés d'écrans) | — |
 
+`UI\Scene.lua` est un **nouveau fichier du TOC** : il faut relancer le client (pas seulement `/reload`).
 Les fichiers qui touchent l'API WoW commencent par `if not CreateFrame then return end` ; `Sim/load.lua`
-saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`** : ce qui est possible
-vient de `Expedition.choices`, les refus et leur raison de `Expedition.act`, les prix et tirages de
-l'état de l'expédition.
+saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`**.
 
 ## Écrans
 
-Une phase d'expédition = un écran (choisi par `step.kind`, `UI.register` dans `Screens.lua`) :
+Coordonnées : celles des maquettes, depuis le coin haut gauche de la zone intérieure (1034 × 614).
+
+**Bandeau** (y 0–44, sur tous les écrans ; on le saisit pour déplacer la fenêtre) : à gauche la classe,
+« PV », « po » ; au centre la zone (« Acte 1 · Marche de l'Ouest » sur la carte) et, ailleurs, la
+progression de l'acte (points dorés franchis, point clair = étape en cours, losange rouge = boss) ; à
+droite « Deck N » (hors combat, infobulle = contenu du deck), clé mythique (pastille violette « Clé +N »,
+infobulle = affixes), bibelots (cases liserées à la rareté), séparateur, 3 fioles (potions), ≡ (options),
+× (fermer).
 
 | Phase / vue | Écran | Contenu |
 | --- | --- | --- |
-| aucune expédition | **Accueil** (`start`) | classe (boutons, palier de réputation), clé mythique +0…+5 (verrouillées grisées avec la raison ; affixes de la clé choisie en icônes et en texte ; infobulle par clé), « Partir en expédition », « Réputation et journal », rappel de la dernière expédition |
-| `start` | **Choix** | bibelot de classe (Révéré) : 3 bibelots avec icône et infobulle, ou « Partir sans bibelot » |
-| `map` | **Carte de parcours** | toute la carte de l'acte, étapes de gauche à droite (8 colonnes, boss à droite), icône par type ; nœuds accessibles (`Map.nextNodes`) entourés d'or et cliquables, position actuelle en bleu, chemin parcouru coché et tracé en clair ; boutons 1…3 des étapes accessibles ; clé et affixes actifs en bas à gauche |
-| `combat` | **Combat** | voir plus bas ; potions cliquables dans le bandeau |
-| `reward` | **Cartes** | butin (or, bibelot, potion — grisée si non prise faute de place) en icônes avec infobulle, 3 cartes, « Passer les cartes », « Prendre la potion » si possible, « Continuer » ; titre selon combat, élite, boss, coffre ou rencontre (texte « après coup » de la rencontre) |
-| `campfire` | **Choix** | « Se reposer » (PV rendus calculés par le moteur, bibelots et Disette compris), « Méditer » (grille d'amélioration avec infobulle « Après amélioration »), « Repartir » |
-| `merchant` | **Marchand** | 5 cartes à prix, bibelots (1re rangée) et potions (2e rangée) avec icône, prix et infobulle, « Vendu », « Retirer une carte » (prix croissant, grille du deck), « Partir », or dans le texte ; article trop cher grisé avec « Pas assez d'or. » |
-| `event` | **Choix** | nom, texte, un bouton par choix (conséquence en sous-titre, grisé si le moteur refuse) ; après coup : texte `after` et « Continuer » ; « rien à signaler » si aucune rencontre |
-| `select` | **Cartes** | suite de rencontre : carte à améliorer (aperçu) ou à retirer, « Passer » |
-| `done` | **Bilan** (`end`) | victoire / défaite / abandon, étape, adversaire fatal, étapes franchies, élites, boss, réputation gagnée, changements de palier (classe, Ligue), clé débloquée, barres de réputation ; « Nouvelle expédition », « Réputation et journal » |
-| vue méta | **Méta** (`meta`) | barre par classe (palier, points, infobulle des déblocages, clés ouvertes, meilleure clé, titre d'Exalté) et Ligue des explorateurs ; 8 dernières expéditions du journal |
+| aucune expédition | **Accueil** (`start`) | décor voilé, héros ; parchemin : titre, classes (plaques), clé +0…+5 en gemmes (verrouillées sombres ; infobulle = affixes et raison), icônes d'affixes de la clé choisie ; plateau : « Réputation et journal », dernière expédition et avertissements de sauvegarde, « Partir en expédition » |
+| `start` | **Rencontre** (`choice`) | bibelot de classe (Révéré) : bulle, une plaque par bibelot (icône, nom, effet), « Partir sans bibelot » |
+| `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss » et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
+| `combat` | **Combat** | voir plus bas |
+| `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic, `Entrée` ou `1`). Rencontre : bulle du texte après coup |
+| `campfire` | **Feu de camp** | décor de nuit, feu qui vacille, couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
+| `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
+| `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle si `npc` est dans `Art.npcs`, sinon rien), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
+| `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
+| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan, barres de réputation ; « Nouvelle expédition », « Réputation et journal » |
+| vue méta | **Méta** | parchemin : barres par classe et Ligue, 8 dernières expéditions ; « Retour » |
 
-**Bandeau** (en haut, sur tous les écrans) : PV, or, taille du deck (infobulle : deck et bibelots),
-étape ; à droite : clé mythique (+N, infobulle des affixes), 6 derniers bibelots (infobulle nom + `text`,
-« +N » au-delà) et 3 emplacements de potions.
+**Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi (ou `Entrée` sur la
+cible clavier) ; clic droit annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits
+en 3 s = jeter.
 
-**Potions** : en combat, clic = boire (`act {"potion", emplacement}`) ; si `ns.Potions[id].target`, le
-clic arme la potion et le clic suivant sur un ennemi (ou `Entrée` sur la cible clavier) la lance ; clic
-droit annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits en 3 s = jeter
-(`discardPotion`), par exemple pour faire place à la potion d'une récompense.
-
-**Affixes** : clé et icônes d'affixes sur la carte, à l'accueil et dans le bandeau ; l'état `necrotic`
-s'affiche sur le héros comme les autres états (icône `spell_deathknight_necroticplague`, couleur
-d'affaiblissement).
+**Ramassage du butin** (récompense) : le moteur a déjà tout attribué ; l'interface retient à l'écran l'or,
+le bibelot et la potion obtenus (`UI.hold`, soustraits du bandeau) tant qu'ils sont au sol. Clic sur un
+objet : il file vers le bandeau. « Reprendre la route » fait partir le reste tout seul (0,5 s × vitesse)
+puis quitte. Une fiole qui n'a pas trouvé de place (`potionTaken` faux) reste grise ; un clic la prend
+(`takePotion`) si une place s'est libérée. « Passer les cartes » n'a plus de bouton : partir sans cliquer
+de carte revient au même.
 
 ### Combat
 
-- à gauche, le modèle 3D du personnage (`PlayerModel:SetUnit("player")`), PV + Absorption, états et
-  Pouvoirs actifs, barre d'incantation ;
-- à droite, 1 à 5 ennemis (6 emplacements pour les morts en cours d'animation), modèle 3D, nom (élite
-  violet, boss orange), PV, états, intention chiffrée (`Combat.calcDamage`) et infobulle ;
-- main en éventail, coût réel, raison d'injouabilité ; pioche / défausse / consumées, recharges,
-  mana, Démence, Fin du tour, journal ;
-- bandeau de fin de combat (Continuer / Voir le bilan) : le combat est déjà conclu par
-  `Expedition.act` (récompense ouverte, ou expédition archivée), le contrôleur garde l'état du combat
-  le temps du bandeau (`Controller.ended`).
-
-**Options** : ouvrir au décollage, fermer à l'atterrissage, mode rapide, bouton de minimap, échelle
-(60–150 %), vitesse des animations (×0,5 à ×3), abandon (double clic : `Save.abandon` puis bilan),
-recentrer.
+- Décor plein cadre (Mortemines pour le boss, route sinon). Héros à gauche (x 96–296) : modèle 3D du
+  joueur posé au sol, barre d'incantation au-dessus (nom du sort, cible, « au prochain tour »), écusson
+  d'Absorption à gauche de la barre de vie, états et Pouvoirs actifs en pastilles dessous.
+- Ennemis à droite (x 470–1022, 1 à 5, légèrement décalés en profondeur, réduits à 86 % à partir de 5) :
+  bulle d'intention au-dessus (icône + chiffres exacts de `Combat.calcDamage`, « ×N » pour les coups
+  multiples, « Guette », « Étourdi »… ; liseré rouge = attaque, bleu = défense / renfort, violet = guet /
+  affaiblissement, vert = soin), modèle 3D avec ombre, anneau doré aux pieds de la cible (survol, ou cible
+  clavier pendant une visée), barre de vie (+ écusson d'Absorption), nom (élite violet, boss orangé),
+  états en pastilles.
+- Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
+  (cachée à 0), pioche et défausse (tas avec nombre ; infobulles : contenu trié, consumées), main en arc
+  au centre (cartes droites ; la survolée monte, grossit ×1,16, passe devant), mini-cartes des recharges
+  (tours restants), « Fin du tour » doré.
+- Fin de combat : « Victoire ! » / « Défaite… » en grand, bouton « Continuer » / « Voir le bilan »,
+  affichés quand la file d'animations est vide.
 
 ### Contrôles
 
-- Souris : clic sur une carte (elle se lève), puis clic sur l'ennemi ; une carte sans cible se joue
-  par un second clic ou un clic dans le champ de bataille. Glisser-déposer : sur l'ennemi, ou n'importe
-  où au-dessus de la main pour une carte sans cible. Clic droit : désélectionner.
+- Souris : clic sur une carte (elle se lève), puis clic sur l'ennemi ; une carte sans cible se joue par un
+  second clic ou un clic dans le décor. Glisser-déposer : sur l'ennemi, ou n'importe où dans le décor pour
+  une carte sans cible. Clic droit : désélectionner.
 - Clavier (capté seulement fenêtre ouverte, `SetPropagateKeyboardInput`) : `1`…`0` choisit une carte
-  (même touche ou `Entrée` pour la jouer), `Tab` change de cible (`Maj+Tab` à rebours), `Espace` finit
-  le tour (et « Continuer » après un combat), `Échap` ferme (les options d'abord). Sur les autres écrans,
-  `1`…`0` choisit une option (carte de parcours : étapes accessibles de gauche à droite ; accueil :
-  clé +0…+5), `Entrée`/`Espace` l'action par défaut (Partir, Continuer, Partir de chez le marchand).
-  Toute autre touche est rendue au jeu.
-- `/slay` (ou `/slaythedragon`) : ouvrir/fermer ; `/slay options` ; `/slay art` (icônes et modèles
-  introuvables repérés) ; `/slay modeles` (galerie des ennemis de l'acte) ; `/slay facing <j> <e>`
-  (orientation des modèles en radians, enregistrée) ; `/slay centre`.
+  (même touche ou `Entrée` pour la jouer), `Tab` change de cible (`Maj+Tab` à rebours), `Espace` finit le
+  tour (et « Continuer » après un combat), `Échap` ferme (les options d'abord). Ailleurs, `1`…`0` choisit
+  (parcours : étapes accessibles de haut en bas ; accueil : clé +0…+5 ; feu de camp : 1 repos, 2 grimoire ;
+  récompense : cartes, ou ouvrir le coffre), `Entrée`/`Espace` l'action par défaut. Toute autre touche est
+  rendue au jeu.
+- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (icônes, modèles et décors introuvables) ;
+  `/slay modeles` (galerie des ennemis) ; `/slay decor` (décor illustré ou peint) ;
+  `/slay facing <j> <e>` (orientation des modèles, radians) ; `/slay centre`.
 - Bouton de minimap : clic gauche ouvre/ferme, clic droit options, glisser pour le déplacer.
-- La fenêtre se masque à l'entrée en combat réel (`PLAYER_REGEN_DISABLED`), refuse de s'ouvrir en
-  combat, et se rouvre à la sortie du combat si l'on est toujours en vol.
+- La fenêtre se masque à l'entrée en combat réel, refuse de s'ouvrir en combat, et se rouvre à la sortie
+  du combat si l'on est toujours en vol.
 
-### Animations
+### Animations (file de `CombatView`)
 
-L'état affiché est toujours celui du moteur, mis à jour aussitôt. Les animations sont cosmétiques et
-rejouent les événements `c.events` dans une file : frappe (`act` d'attaque), encaisser (dégâts),
-mourir puis rester à terre, incantation, textes flottants (dégâts, Absorption, soins, états, Démence,
-« Interrompu ! », répliques comme « À moi, la Confrérie ! »). Vitesse réglable, mode rapide (×0,15).
+| Événement du moteur | Animation | Son (`Art.sounds`) |
+| --- | --- | --- |
+| `play` | la carte (fantôme) file de la main vers la cible ou le héros ; héros : sort | `play` |
+| `draw`, `cooldown_back` | la carte arrive du tas (ou des recharges) à sa place | `card` |
+| fin du tour (clic) | les cartes non gardées filent à la défausse | `endTurn` |
+| `act` | la bulle d'intention éclate ; attaque : l'ennemi se jette vers le héros ; modèle : attaque / sort | — |
+| `damage` | chiffre blanc « −N » (plus gros à 12+), portion de vie claire qui se vide, secousse, éclair rouge, modèle : encaisser ; Absorption : chiffre bleu, écusson qui baisse | `hit` / `bigHit`, `block` |
+| `heal` / `block` | « +N » vert / bleu, barre ou écusson à jour | `heal` / `block` |
+| `status`, `demence`, `mana` | petit texte flottant | — |
+| `death` | modèle : mort, fondu de l'ennemi puis retrait ; héros : à terre | `enemyDeath` / `playerDeath` |
+| `interrupt`, `cast_lost`, `stunned`, `say`… | texte flottant | `interrupt` |
+| `turn` | « Tour N » en haut du décor | — |
+| `result` | bandeau de fin en fondu (à la fin de la file) | `victory` / `defeat` |
+
+Interpolations : un seul `OnUpdate` (`W.tween`) ; chaque interpolation a aussi un minuteur de secours qui
+la termine (images sautées ; le harnais n'a pas d'`OnUpdate`).
 
 ## Contrôleur
 
@@ -103,9 +161,9 @@ mourir puis rester à terre, incantation, textes flottants (dégâts, Absorption
 `Expedition.act` la modifie sur place, rien n'est recopié. État propre à l'interface (jamais sauvegardé) :
 
 ```lua
-Controller.ended  = { c, result, title }   -- combat tranché, bandeau affiché
-Controller.ending = { summary, entry }     -- expédition archivée par Save.finish, bilan affiché
-Controller.ui     = { view, class, key }   -- sous-écran (upgrade, remove, meta), choix de départ
+Controller.ended  = { c, result, title, kind } -- combat tranché, bandeau affiché
+Controller.ending = { summary, entry }         -- expédition archivée par Save.finish, bilan affiché
+Controller.ui     = { view, class, key }       -- sous-écran (upgrade, remove, meta), choix de départ
 ```
 
 - `Controller.step()` traduit la phase en étape générique `{ kind, title, text, options, ... }`.
@@ -115,7 +173,12 @@ Controller.ui     = { view, class, key }   -- sous-écran (upgrade, remove, meta
   (`class:priest`, `key:2`, `go`).
 - Option grisée = action absente de `Expedition.choices` ; sa raison vient d'un essai de l'action sur
   une **copie** de l'expédition (`Controller.reasonFor`), traduite par `Controller.REASONS`. Même
-  principe pour les PV rendus au repos (essai de `rest` sur une copie).
+  principe pour les PV rendus au repos (essai de `rest` sur une copie). Rencontres : la raison vient de
+  `Expedition.eventOptions`.
+- Ajouts piste E (affichage seulement) : `Controller.scene()` (décor de l'étape : boss → `mine`, feu de
+  camp → `night`, marchand → `shop`, rencontre → son champ `scene`, sinon `road`), `Controller.maxMana()`,
+  `Controller.eventResult(exp)`, `step.bossName` (carte), `step.rewardKind` (récompense),
+  `step.speaker/scene/npc/rarity` (rencontre).
 - `Controller.choose(id)`, `play(main, cible)`, `endTurn()`, `usePotion(emplacement, cible)`,
   `discardPotion(emplacement)`, `finishCombat()`, `abandon()` : tout passe par `Expedition.act`
   (ou `Save.start` / `Save.finish` / `Save.abandon`).
@@ -128,171 +191,155 @@ Controller.ui     = { view, class, key }   -- sous-écran (upgrade, remove, meta
 ### Sauvegarde
 
 Format : celui de `Core/Save.lua` (`docs/expedition.md`), plus un champ `options` propre à l'interface
-(`autoOpen, autoClose, scale, speed, fast, minimap = { hide, angle }, facingPlayer, facingEnemy, point`),
-que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu ; testé). Plus aucun format de
-sauvegarde côté interface.
+(`autoOpen, autoClose, scale, speed, fast, decor, minimap = { hide, angle }, facingPlayer, facingEnemy,
+point`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu ; testé).
 
 - Chargement (`ADDON_LOADED`) : `SlayTheDragonDB = Save.migrate(SlayTheDragonDB)`, puis options par défaut.
-- Expédition illisible pour `Save` (structure, carte inconnue…) : quarantaine par `Save.migrate`.
-  Illisible pour l'interface (bibelot, potion, ennemi, intention, article ou rencontre inconnus, combat
-  abîmé) ou erreur Lua à la reprise : `Save.quarantine(db, raison)`. Un message le signale à l'accueil
-  et dans la discussion ; rien n'est effacé.
+- Expédition illisible pour `Save` : quarantaine par `Save.migrate`. Illisible pour l'interface (bibelot,
+  potion, ennemi, intention, article ou rencontre inconnus, combat abîmé) ou erreur Lua à la reprise :
+  `Save.quarantine(db, raison)`. Un message le signale à l'accueil et dans la discussion ; rien n'est effacé.
 - Sauvegarde d'une version **plus récente** de l'addon : `Save.migrate` n'y touche pas ; l'interface
   joue alors sur une base de session jamais écrite (`Persist.readOnly`, message dans la discussion).
-- Sauvegarde de développement de la piste C (version 1, `meta = { saves, savedAt }`, `current` du
-  fournisseur « demo ») : options gardées, ancienne expédition en quarantaine, méta réparée.
 
-### Changements dans `Core/` (piste D)
+## Art, textures, sons et API
 
-- `Core/Save.lua` : `Save.normalize(db)` (l'ancienne migration 0 → 1, idempotente) est rejouée à chaque
-  `Save.migrate` pour réparer une méta incomplète ; `Save.quarantine(db, raison)` devient public. Test
-  « migrate : options de l'interface gardées, méta incomplète réparée » dans `Sim/tests_expedition.lua`.
-- `Core/Expedition.lua` : `exp.path` = nœuds visités dans l'acte (chemin parcouru sur la carte), remis
-  à zéro à chaque acte. Test « chemin parcouru ».
+### Confirmé par le MCP « wow »
 
-## API WoW utilisées
+- **Icônes** (FileDataID, `wow_icon_search`) : toutes celles de `UI/Art.lua` (cartes, états, intentions,
+  bibelots, potions, parcours, couchage, grimoire, coffre, mana, or, point d'interrogation 134400), plus
+  les chemins des affixes (piste D). Une carte essaie d'abord l'icône de son sort (`C_Spell.GetSpellTexture`),
+  puis le FileDataID, puis le point d'interrogation.
+- **Textures** (`wow_file_search`, liste de fichiers du client 12.1.5) : disque
+  `interface/characterframe/tempportraitalphamask` (130924 : formes rondes et masques), parchemin
+  `interface/helpframe/tileable-parchment` (516781), bois `interface/gamepad/woodtile` (7149548), coche
+  `interface/raidframe/readycheck-ready` (136814), illustrations
+  `interface/glues/loadingscreens/expansion10/main/loadscreen_housing_elwynnforest` (7377860 : route, ferme,
+  colline, camp, ruines, marchand, nuit teintée) et `interface/glues/loadingscreens/loadscreendeadmines`
+  (131833 : boss, mine). Aucune illustration de côte trouvée : la côte est peinte. Le MCP confirme la liste
+  de fichiers **retail 12.1.5**, pas l'installation Forever (il ne trouve aucune installation ici) : si un
+  fichier manque, `GetTextureFileID` le signale, l'illustration est masquée (le décor peint reste) et
+  `/slay art` le liste (`scene:<id>`).
+- **Sons** : noms `SOUNDKIT` employés tels quels par l'interface Blizzard 12.1.5 (`wow_ui_grep`) :
+  `IG_ABILITY_PAGE_TURN`, `IG_MAINMENU_OPTION_CHECKBOX_ON`, `IG_SPELLBOOK_OPEN/CLOSE`,
+  `LOOT_WINDOW_COIN_SOUND`, `UI_ADVENTURES_*` (combats des Aventures de Shadowlands :
+  `DAMAGE_SWEETENER_MEDIUM/LARGE`, `DEFENSIVE_SWEETENER`, `HEAL_FOLLOWER`, `DEATH_ENEMY/FRIENDLY`,
+  `ADVENTURE_SUCCESS_COMPLETE`, `ADVENTURE_FAILURE_COMPLETE`, `ADVENTURER_SLOTTED/SELECTED`),
+  `UI_GARRISON_MISSION_ENCOUNTER_ANIMATION_GENERIC`, `UI_GARRISON_MISSION_THREAT_COUNTERED`. Joués par
+  `PlaySound(SOUNDKIT[nom])` sous `pcall`, ignorés si le nom manque.
+- **API** (`wow_api_search`, Forever) : `CreateMaskTexture`, `AddMaskTexture`, `SetGradient`, `SetRotation`
+  (texture), `SetVertexOffset`, `SetHorizTile`, `SetModelAlpha`, `SetFont -> success`, `SetShadowColor`,
+  `SetShadowOffset`, `SetMaxLines`, `GetStringWidth`, `GetStringHeight`, `PlaySound` ; `CreateColor`
+  (Lua de l'interface Blizzard, `Blizzard_SharedXMLBase/Color.lua`, appelé sous garde) ;
+  `GameTooltip:NumLines` (employé par l'interface Blizzard). Plus celles de la piste D : `UnitOnTaxi`, les
+  événements de vol, `SetPropagateKeyboardInput`, `SetCreature`, `SetDisplayInfo`, `SetUnit`,
+  `SetAnimation`, `GetModelFileID`, `SetTexture -> success`, `SetDesaturated`, `CreateLine`,
+  `IsMouseOver`, `C_Timer`, `C_Spell.GetSpellTexture`, `InCombatLockdown`, `GetCursorPosition`…
+- `wow_lua_lint` (forever) sur tout `UI/` : aucune erreur ; un avertissement attendu sur `CreateColor`
+  (fonction Lua de l'interface, pas de l'API C) ; notes « OnUpdate » sur le glisser-déposer, le bouton de
+  minimap, le feu et le pilote des interpolations (voulues).
 
-Confirmé par le MCP « wow » (base API Forever 1.60 / 12.1.5) :
-`UnitOnTaxi(unit)`, événements `PLAYER_CONTROL_LOST`, `PLAYER_CONTROL_GAINED`, `TAXIMAP_CLOSED`,
-`TAXIMAP_OPENED`, `PLAYER_ENTERING_WORLD (isInitialLogin, isReloadingUi)`, `PLAYER_REGEN_DISABLED/ENABLED`,
-`ADDON_LOADED (addOnName, containsBindings)`, `PLAYER_LOGOUT` ; méthodes `SetPropagateKeyboardInput`,
-`SetCreature(creatureID, displayID)`, `SetDisplayInfo`, `SetUnit`, `SetAnimation(anim, variation)`,
-`SetPortraitZoom`, `SetCamDistanceScale`, `GetModelFileID`, `SetTexture -> success`, `SetDesaturated`,
-`CreateLine` + `SetStartPoint/SetEndPoint`, `IsMouseOver` ; `date()` (global « Legacy » présent sur
-Forever, vérifié par la piste D ; repli sur `time()`).
-Confirmé par la capture d'API Forever du kit `forever-addon-kit` (`data/forever_api.json`, build 69893) :
-`C_Timer.After/NewTicker`, `C_Spell.GetSpellTexture`, `InCombatLockdown`, `GetCursorPosition`,
-`PlaySound`, `UnitName`, `GetTime`, `time`, et les objets de police utilisés (`GameFontNormal`,
-`GameFontHighlight(Small/Large)`, `GameFontNormal(Small/Large/Huge)`, `GameFontDisableSmall`,
-`NumberFontNormal`).
+### Non vérifié (à voir en jeu)
 
-Icônes ajoutées par la piste D (affixes, Nécrotique, clé mythique, repli des bibelots et potions) :
-chemins vérifiés par `wow_icon_search` — l'index des icônes du MCP répond désormais, il servira à
-vérifier aussi les icônes plus anciennes de `UI/Art.lua`.
+- L'**allure** des illustrations recadrées (impossible de les voir hors jeu) : recadrage `crop` et teinte
+  `tint` sont dans `Art.scenes`, à corriger après essai ; repli immédiat : `/slay decor`.
+- Les identifiants de **créatures** (ennemis : gnoll 117, mystique 453, murloc 126, bandit 116, sorcier 619,
+  golem 36, Rhahk'Zor 644, sbire 594, VanCleef 639 + affichage 2029 ; rencontres : Salma Saldean 235,
+  Gryan Fortmanteau 234, de mémoire) : le MCP n'indexe pas les créatures. Sans modèle : icône (ennemi) ou
+  rien (personnage de rencontre). Les autres `npc` des rencontres n'ont pas d'entrée et n'affichent rien :
+  ajouter `Art.npcs.<npc> = { creature = id }` quand un identifiant est connu.
+- Les **animations** des modèles (0 attente, 1 mort, 6 à terre, 9 encaisser, 16 frapper, 25 prêt, 53/54
+  sorts), l'orientation (`/slay facing`) et le cadrage des modèles dans leur cadre (pieds au sol ?).
+- La police **Morpheus** (`Fonts\MORPHEUS.ttf`) et ses accents ; repli sur la police de l'objet.
+- Le décalage d'un cadre mis à l'échelle (`SetScale` + `SetPoint` divisé par l'échelle) pour les cartes
+  survolées et la récompense : calculé, à confirmer à l'œil.
 
-**Non vérifié** (créatures et source de l'interface Blizzard non synchronisées ; la synchronisation
-`npx -y hated-wow-mcp sync …` a été refusée) :
-
-- les modèles XML `BackdropTemplate`, `UIPanelButtonTemplate`, `UIPanelCloseButton` (repli sans
-  modèle sous `pcall` s'ils manquent) ;
-- les chemins d'icônes de la piste C dans `UI/Art.lua` (repli : icône du sort par
-  `C_Spell.GetSpellTexture`, puis le chemin, puis le point d'interrogation ; `/slay art` liste les manques) ;
-- les identifiants de créatures (gnoll 117, mystique 453, murloc 126, bandit 116, sorcier 619,
-  golem 36, Rhahk'Zor 644, sbire 594, VanCleef 639 + affichage 2029) : repli `SetDisplayInfo` puis icône ;
-- les identifiants d'animation (0 attente, 1 mort, 6 mort au sol, 9 encaisser, 16 frapper, 25 prêt,
-  53/54 sorts) et l'orientation des modèles (`/slay facing`) ;
-- l'ordre exact des événements de taxi sur Forever. La détection ne dépend d'aucun d'eux : seule la
-  transition de `UnitOnTaxi("player")` compte, vérifiée à chaque événement puis 0,3 s, 1 s et 2,5 s
-  après, plus un sondage de secours toutes les 2 s (`C_Timer.NewTicker`).
-- `SetPropagateKeyboardInput` : protégé en combat sur Retail récent ; jamais appelé en combat ici.
-
-Aucune fonction protégée, aucun `hooksecurefunc` (cassés sur ce build), aucun `loadstring`.
-Les événements sont enregistrés un par un sous `pcall` (un événement inconnu lève une erreur sur Forever).
-`wow_lua_lint` (forever) : aucune erreur ni avertissement sur `UI/` ; `wow_toc_validate` : seulement
-les avertissements habituels sur les `\` du TOC.
+Aucune fonction protégée, aucun `hooksecurefunc`, aucun hook de méthode de frame, aucune rotation de
+frame (seules des textures pivotent), aucun `loadstring`.
 
 ## Besoins côté moteur (notés, contournés côté interface)
 
 - `Combat.intentInfo` ne donne que les dégâts : l'interface lit `ns.Enemies[id].moves[intent].actions`
   pour afficher Absorption, soins, états et invocations. Un champ `info.actions` normalisé serait plus sûr.
-- Pas de prévisualisation des dégâts d'une carte sur une cible (Force, Armure fracassée, Forme d'ombre).
-- **Potions (piste A)** : l'interface lit les emplacements dans `c.player.potions` en combat (sinon
-  `exp.potions`) et boit par `act {"potion", emplacement, cible}`. Il faut `Combat.usePotion(c, slot, tIdx)
-  -> true | false, raison` (raisons reconnues par `Controller.REASONS` : `potion`, `target`, `over`… ;
-  une autre raison s'affiche telle quelle) et la copie de `opts.potions` dans `c.player.potions` par
-  `Combat.new`. Champs lus : `name`, `text`, `target` (vrai = demande une cible), `rarity`. Tant que
-  `Combat.usePotion` manque, boire répond « Les potions ne sont pas encore utilisables en combat. »
-- **Bibelots (piste A)** : champs lus `name`, `text`, `rarity`, `class`. Icônes : une entrée par id dans
-  `Art.relics` / `Art.potions` (sinon repli générique : talisman pour les bibelots, fiole pour les potions).
+- Pas de prévisualisation des dégâts d'une carte sur une cible (Force, Armure fracassée, Forme d'ombre) :
+  les chiffres en évidence sur les cartes sont ceux du texte, pas ceux du combat en cours.
+- Le mana max s'obtient par `Combat.modify(c, "maxMana", Combat.BASE_MANA)` ; un `c.player.maxMana`
+  explicite serait plus propre.
 
 ## Décisions
 
 - Clé proposée par défaut à l'accueil : la plus haute ouverte pour la classe.
 - La réputation est acquise dès la fin de l'expédition (`Save.finish` automatique), le bilan n'est
-  qu'un affichage : après un `/reload` sur le bilan, on retombe sur l'accueil (dernière expédition
-  rappelée, détail dans « Réputation et journal »).
+  qu'un affichage.
 - Le bandeau de fin de combat n'est pas sauvegardé : un `/reload` à ce moment reprend sur la
   récompense (ou l'accueil après une défaite).
-- Récompense : « Continuer » est toujours possible (la carte est alors abandonnée), « Passer les
-  cartes » n'est qu'un raccourci explicite. Clic sur une carte = prise immédiate.
-- Feu de camp : « Repartir » sans rien faire est proposé (le moteur l'accepte).
+- Récompense : « Reprendre la route » est toujours possible (la carte est alors abandonnée) ; clic sur une
+  carte = prise immédiate (elle file vers le tas du deck).
+- Le ramassage du butin est purement visuel : `/reload` sur une récompense le pose à nouveau au sol.
+- Le coffre « fermé » n'existe qu'à l'écran (le moteur a déjà tiré son contenu) ; `/reload` le referme.
+- Feu de camp : repartir sans rien faire est proposé (le moteur l'accepte). Le couchage affiche « +N PV »,
+  même 0 à PV pleins.
 - Marchand : plusieurs retraits par visite (règle de `Core/Expedition`), le prix affiché monte.
-- Jeter une potion : deux clics droits en 3 s (pas de menu).
-- Carte de parcours : étapes en colonnes de gauche à droite (la fenêtre est plus large que haute) ;
-  `node.x` du moteur devient la position verticale.
-- La graine d'une expédition vient de `time()` et `GetTime()` (ce n'est pas une règle).
-- Fenêtre en strate `HIGH`, textes flottants en `DIALOG`. L'atterrissage ferme la fenêtre même ouverte
-  à la main (option désactivable).
+- Carte de parcours : étapes en colonnes de gauche à droite ; `node.x` du moteur devient la hauteur ;
+  infobulle d'une étape = nom de son type (une seule ligne), rien pour une rencontre (« ? »).
+- Le journal de combat a été retiré (dégueuli d'informations) ; tout passe par les animations et les
+  infobulles.
+- Démence cachée à 0 ; pastilles d'état triées par identifiant (stable).
+- Fenêtre en strate `HIGH`. L'atterrissage ferme la fenêtre même ouverte à la main (option désactivable).
 
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine]   # ou luajit ; doit finir par ALL PASS (181 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (181 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
+for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
 ```
 
 Il charge tous les fichiers du TOC avec un faux client (cadres enregistreurs, horloge virtuelle,
-événements, infobulle, modèles), refuse les modèles XML et événements inconnus et signale toute méthode
-d'API inconnue. Il déclare des bibelots et potions de test (`ui_test_*`) et, tant que le moteur n'a pas
-`Combat.usePotion`, une doublure minimale (soin, dégâts) pour exercer les potions.
+événements, infobulle, modèles, sons), refuse les modèles XML et événements inconnus et signale toute
+méthode d'API inconnue. Scénario : accueil, options, clé verrouillée ; **expédition complète de l'acte 1
+jouée par clics** (combats par le bot heuristique à travers l'interface : clics carte puis cible, touches,
+glisser-déposer ; récompenses (coffre ouvert d'abord s'il se présente), amélioration, retrait, achats) ; la file d'animations est
+vidée (`H.settle`) avant de vérifier le bandeau de fin ; aller-retour de sauvegarde en combat et sur une
+récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibelots ; marchand ; feu de camp ;
+rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
+et `/slay art`. Graines 1 à 12 : ALL PASS (lua5.1), 1 à 3 sous luajit.
 
-Scénario : accueil, `/slay`, Échap, options ; clé verrouillée ; **expédition complète de l'acte 1
-jouée par clics simulés** (chemin choisi pour passer par un marchand, une rencontre et un feu de camp ;
-combats joués par le bot heuristique à travers l'interface : clics carte puis cible, touches 1–0/Tab/
-Espace, glisser-déposer ; récompenses, amélioration, retrait, achats) ; aller-retour de sauvegarde en
-plein combat (état identique, tirage suivant identique) et sur un écran de récompense (mêmes cartes) ;
-bilan, `Save.finish`, réputation, méta, journal ; nouvelle expédition à la clé +1 (graine 1 = victoire ;
-avec une graine perdante, le harnais vérifie qu'aucune clé ne s'ouvre) ; bandeau de potions et bibelots,
-défausse, potions bues en combat (avec et sans cible) ; marchand complet ; feu de camp ; rencontre ;
-bibelot de classe à Révéré ; abandon ; vol (décollage, atterrissage, combat réel, `/reload` en vol,
-déconnexion) ; sauvegardes anciennes, abîmées ou futures ; art manquant et `/slay art`.
+`Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
+faux client et écrit un SVG par écran (accueil, parcours, combat, combat-survol, récompense, marchand, feu
+de camp, amélioration, rencontre, bibelot de classe, bilan, méta). Icônes = carrés bleus, modèles =
+silhouettes en pointillés, illustrations = aplats ; largeurs de texte estimées. Il a servi à corriger la
+mise en page (noms de cartes longs, pastilles trop larges, gemmes de clé) ; il ne remplace pas un essai.
 
 ## Tests en vol (pour toi)
 
 Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/Interface/AddOns/SlayTheDragon`
-(le client Forever n'est plus dans `_classic_beta_`), sans `Sim/`, `docs/`, `build/`, `reports/`
-(commande `rsync` dans `CLAUDE.md`). **Relancer le client** : un nouvel addon, ou un fichier ajouté ou
-retiré du TOC (comme `UI\DemoExpedition.lua`, supprimé ici), n'est pris en compte qu'au lancement du
-client ; `/reload` ne suffit pas. Activer les erreurs Lua (`/console scriptErrors 1`) ou BugSack.
-Une ancienne sauvegarde de développement est reprise : options gardées, ancienne expédition mise de côté
-(message dans la discussion).
+(commande `rsync` dans `CLAUDE.md`). **Relancer le client** (nouveau fichier `UI\Scene.lua` dans le TOC).
+Activer les erreurs Lua (`/console scriptErrors 1`) ou BugSack.
 
-Au sol :
-1. `/slay` ouvre la fenêtre au centre ; on la déplace par le bord/titre ; `/reload` → même position.
-2. Le bouton de minimap est là, se déplace en le glissant, clic gauche/droit OK, infobulle OK.
-3. `/slay modeles` : les 9 ennemis ont-ils un modèle ? Noter ceux qui montrent un point d'interrogation.
-   Les personnages regardent-ils vers le centre ? Sinon essayer `/slay facing -0.6 0.6` (ou d'autres valeurs).
-4. Accueil : Prêtre sélectionné, clés +1…+5 grisées (infobulle : affixes ; clic : raison). « Partir » →
-   carte de parcours : la carte entière est-elle lisible (8 colonnes, liens, icônes par type, libellés) ?
-   Les étapes accessibles sont-elles entourées d'or et cliquables, les autres refusées ?
-5. Combat : ton personnage est-il visible à gauche ? Les icônes des cartes, des intentions et des états
-   sont-elles bonnes ? `/slay art` liste ce qui manque.
-6. Jouer quelques cartes : clic carte + clic ennemi ; second clic pour une carte sans cible ; glisser
-   sur un ennemi ; touches 1–0, Tab, Entrée, Espace. Une touche non gérée (Z, M…) doit encore agir sur le jeu.
-7. Une carte trop chère est grisée et dit « Pas assez de mana. » ; les infobulles des mots-clés, états,
-   intentions, pioche/défausse et recharges s'affichent.
-8. Animations : l'ennemi frappe, tu encaisses, il meurt et reste à terre ; textes flottants lisibles.
-   Tester Options → Mode rapide et la vitesse.
-9. `/reload` en plein combat : même tour, même main, mêmes PV ennemis, même intention.
-10. Gagner : bandeau, récompense (or et éventuelle potion en icônes) ; `/reload` sur la récompense →
-    mêmes 3 cartes.
-11. Continuer l'acte : sur la carte, le chemin parcouru est tracé et coché. Traverser si possible un
-    marchand (achat de carte ; retrait : le prix monte de 25 po), une rencontre (texte, choix, résultat)
-    et un feu de camp (PV rendus annoncés, « Méditer » avec aperçu). Infobulles des bibelots et potions
-    du bandeau. Une potion se boit en combat d'un clic (à cible : clic puis ennemi) ; deux clics droits
-    la jettent hors combat. (Bibelots et potions n'existent qu'après la fusion de la piste A.)
-12. Fin d'expédition : bilan (réputation gagnée, paliers, barres) ; « Réputation et journal » ; après
-    une victoire, la clé +1 est proposée à l'accueil, ses affixes apparaissent sur la carte et dans le
-    bandeau. Options → Abandonner (deux clics) mène au bilan « abandonnée ».
-13. Entrer en combat contre un vrai monstre fenêtre ouverte → elle se masque ; `/slay` refusé en combat.
+En priorité (ce que je n'ai pas pu voir) :
+1. `/slay` : la fenêtre 1040 × 620 s'ouvre ; formes arrondies, parchemin, bois, police des titres
+   (Morpheus) avec les accents. On la déplace par le bandeau ; Options → Échelle.
+2. Décor : l'illustration (champs d'Elwynn teintés) a-t-elle du sens derrière les personnages, sans logo
+   ni texte ? Sinon `/slay decor` (décor peint) et me dire lequel garder ; Mortemines pour le boss.
+3. Combat : ton personnage est-il posé au sol à gauche (pieds sur l'ombre), les ennemis à droite, face à
+   face ? `/slay facing` sinon. Bulles d'intention lisibles (icône ronde + chiffre) ; anneau doré à la cible.
+4. Cartes : gemme, nom, médaillon rond avec l'icône du sort, ligne de type, texte, pastilles ; carte trop
+   chère ternie avec « Pas assez de mana. » ; survol : la carte monte, grossit, passe devant.
+5. Retour visuel : carte qui file vers l'ennemi, « −9 » qui saute, vie qui laisse une traînée claire,
+   secousse, mort en fondu, intention qui éclate au tour ennemi, cartes qui arrivent du tas, sons.
+   Tester la vitesse ×0,5 / ×3 et le mode rapide.
+6. Récompense : 3 cartes en grand, bourse / fiole / bibelot au sol ; clic sur la bourse → elle vole vers
+   l'or du bandeau ; « Reprendre la route » ramasse le reste. Coffre : il faut d'abord l'ouvrir.
+7. Rencontre : bulle, nom du personnage, modèle de Salma Saldean (235) à droite si l'identifiant est bon,
+   réponses en plaques avec leur issue ; réponse impossible grisée avec sa raison ; texte après coup.
+8. Parcours : symboles, halo doré des étapes accessibles, trait rouge du chemin parcouru, pointillés.
+9. Feu de camp (feu qui vacille, couchage « +N PV », grimoire), marchand (étal, prix, retrait), grille
+   d'amélioration (survol = version améliorée), accueil, bilan, méta.
 
-En vol :
-14. Prendre un griffon : la fenêtre s'ouvre seule au décollage (dans les 2–3 s), sur l'étape en cours.
-15. Jouer pendant le vol ; les touches 1–0 ne lancent pas tes sorts, Échap ferme la fenêtre.
-16. À l'atterrissage, la fenêtre se ferme ; au vol suivant, on reprend exactement au même point.
-17. Désactiver « Ouvrir au décollage » : le vol suivant n'ouvre rien ; `/slay` marche toujours.
-18. `/reload` pendant un vol : la fenêtre se rouvre seule.
-19. Déconnexion puis reconnexion (autre personnage) : l'expédition reprend (sauvegarde par compte).
+Ensuite, la liste habituelle : `/reload` en combat et sur une récompense (même état), potions (boire, à
+cible, jeter), touches 1–0 / Tab / Espace / Entrée / Échap (une touche non gérée agit sur le jeu),
+ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel, `/slay modeles`.
 
-À me renvoyer : la sortie de `/slay art`, les modèles manquants, les valeurs de `/slay facing` qui
-conviennent, des captures de l'accueil, de la carte de parcours, du marchand et du bilan (lisibilité,
-chevauchements), et toute erreur Lua (texte complet).
+À me renvoyer : captures de chaque écran (combat avec la main survolée, récompense, rencontre, parcours,
+marchand, feu de camp), la sortie de `/slay art`, le choix décor illustré / peint, les valeurs de
+`/slay facing` qui conviennent, et toute erreur Lua (texte complet).
