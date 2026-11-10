@@ -17,7 +17,8 @@ Persist.DEFAULT_OPTIONS = {
   scale = 1.0,
   speed = 1.0,         -- multiplicateur de vitesse des animations
   fast = false,        -- mode rapide : animations quasi instantanées
-  decor = true,        -- décor illustré (texture du jeu) ; faux = décor peint en couches unies
+  decor = true,        -- décor illustré (illustrations validées seulement) ; faux = toujours peint
+  artChecks = {},      -- verdicts de /slay decor essai : tostring(fichier) -> true (validé) | false (refusé)
   minimap = { hide = false, angle = 215 },
   facingPlayer = 0.6,  -- orientation des modèles (radians), réglable par /slay facing
   facingEnemy = -0.6,

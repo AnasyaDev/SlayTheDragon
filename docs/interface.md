@@ -42,10 +42,10 @@ essai sont traités dans « Retours du premier essai » ci-dessous, vérifiés h
   grilles) et bouton « Deck N » du bandeau, désormais **aussi en combat** (deck complet) ; en combat,
   clic sur la pioche (**toujours triée**, jamais l'ordre de tirage), la défausse, et le nouveau tas
   violet des **consumées** (x 151–187, affiché dès qu'il y en a une).
-- **Paysages** : voir « Diagnostic des paysages » plus bas. Chaque décor a maintenant une liste
-  ordonnée de candidats (`Art.illustrations`) ; le premier qui se charge vraiment est retenu, sinon
-  repli automatique sur le décor peint ; `/slay art` dit, décor par décor, le candidat retenu ou
-  « repli » et les candidats écartés avec la raison.
+- **Paysages** : voir « Diagnostic des paysages » plus bas. Chaque décor a une liste ordonnée de
+  candidats (`Art.illustrations`). Depuis le deuxième essai (aplat **vert** = fichier absent, que la
+  détection automatique disait présent), le décor est **peint par défaut** ; un décor n'affiche que le
+  premier candidat de sa liste **validé à l'œil** par le joueur (« Essai des décors » ci-dessous).
 - **Bandeau** : le nom de zone est sur la ligne du haut, les points de progression centrés sur la ligne
   du bas ; le cadre central va de l'or au premier élément de droite (bouton Deck) et un nom trop long
   est tronqué. Plus aucun chevauchement possible.
@@ -71,15 +71,24 @@ essai sont traités dans « Retours du premier essai » ci-dessous, vérifiés h
   l'interface Blizzard de Forever n'est pas synchronisé (`wow_ui_grep` flavor forever refusé ; la
   synchronisation n'a pas été lancée, consigne). Impossible donc de lister les fichiers réellement
   présents dans le client Forever ni de voir comment son écran de chargement recadre ces images.
-- Candidats retenus (ordre) : Elwynn → 7377860, 7963776 (Forever, royaumes de l'Est), 131839 puis son
+- Candidats listés (ordre) : Elwynn → 7377860, 7963776 (Forever, royaumes de l'Est), 131839 puis son
   chemin `Interface\Glues\LoadingScreens\LoadScreenEasternKingdom` ; Mortemines → 131833, son chemin,
   7963777 (Forever, excavation) ; ruines → 7963782 (Forever, ruines de Lordaeron) puis la liste
   d'Elwynn. Les recadrages des nouveaux candidats sont estimés (16:9 → 65 % de la hauteur, 4:3 → 50 %).
-- Détection (`UI/Scene.lua`) : une sonde (petite texture cachée sous le décor) par illustration ;
-  candidat écarté si `SetTexture` renvoie `false` (« refusé »), si `GetTextureFileID` est vide
-  (« sans fichier »), ou si `IsObjectLoaded()` ne devient pas vrai en 4 s de fenêtre visible
-  (« non chargé ») ; `C_Texture.GetFilenameFromFileDataID` sert seulement au rapport. Tant que rien
-  n'est tranché, le décor peint est affiché ; l'illustration apparaît dès qu'un candidat est retenu.
+- Détection automatique **supprimée** : en jeu, `SetTexture`, `GetTextureFileID` et `IsObjectLoaded`
+  ont déclaré « retenus » 7377860, 131833 et 7963782 alors que l'écran était vert (fichier absent).
+  Aucune API documentée pour Forever (`GetFileIDFromPath`, `C_Texture.GetFilenameFromFileDataID`,
+  `GetTextureFilePath`, `IsObjectLoaded`) ne promet de distinguer un fichier absent (`wow_api_search` ;
+  le code Blizzard de Forever n'est pas synchronisé, celui de retail n'en montre aucun usage en ce sens) :
+  aucune n'est employée. Le décor peint est la règle ; seul le joueur valide un candidat.
+
+### Essai des décors
+
+`/slay decor essai` (fenêtre ouverte au besoin ; l'accueil montre un décor, le parcours non) affiche sur le
+décor courant, sans teinte ni voile, le candidat n° k des 8 candidats connus (toutes listes, dédoublonnés),
+en commençant au premier pas encore jugé ; la discussion annonce « k/8 : fichier — nom [verdict] ».
+`suivant` / `precedent` changent de candidat ; `ok` (image visible) ou `non` (aplat vert, noir, vide) jugent
+celui affiché (`options.artChecks`, sauvegardé) ; `peint` finit l'essai et fixe le décor peint (`illustre` l'inverse).
 
 La piste C a écrit l'interface, la piste D l'a branchée sur la couche expédition, la **piste E** l'a
 entièrement redessinée en « table de jeu illustrée » d'après les maquettes validées
@@ -92,8 +101,9 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
   polices Morpheus (titres, chiffres) et Friz Quadrata (texte), palette des maquettes (`Art.C`).
 - **Scène commune** (`UI/Scene.lua`) : décor plein cadre en haut (y 44–424), plateau de bois en bas
   (y 424–614), personnages posés au sol avec ombre. Le décor est une illustration du jeu recadrée et
-  teintée, avec dessous un décor **peint** en couches unies (champs, ferme, côte, mine, nuit) qui sert de
-  repli ; `/slay decor` (ou Options → « Décor illustré ») bascule de l'un à l'autre.
+  teintée, avec dessous un décor **peint** en couches unies (champs, ferme, côte, mine, nuit), seul visible
+  tant qu'aucun candidat n'est validé ; `/slay decor` (ou Options → « Décor illustré ») bascule de l'un à
+  l'autre.
 - **Une seule carte** (`W.card`) partout : parchemin, liseré de rareté (blanc, vert, bleu), gemme de coût
   (rouge si le mana manque), nom (sur deux lignes s'il est long), médaillon rond cerclé à la couleur de la
   voie (Discipline bleu ciel, Ombre violet, Sacré or, Départ bronze), ligne de type (« Sort · Discipline »),
@@ -126,10 +136,10 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | Fichier | Rôle | API WoW |
 | --- | --- | --- |
 | `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours), voies, mots-clés, animations | non |
-| `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor`) | non |
+| `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor` et `artChecks`) | non |
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
 | `UI/Widgets.lua` | Formes, polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes, médaillon, carte unique, barre de vie, écusson d'Absorption, pastilles, boutons, infobulles, textes flottants, modèles | oui |
-| `UI/Scene.lua` | Décor (illustration à candidats sondés + décor peint de repli, rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
+| `UI/Scene.lua` | Décor (peint par défaut, illustration validée par l'essai manuel, mode essai, rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
 | `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
 | `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta, panneau de consultation des cartes (`UI.deckView`) | oui |
@@ -209,9 +219,10 @@ de carte revient au même.
   (parcours : étapes accessibles de haut en bas ; accueil : clé +0…+5 ; feu de camp : 1 repos, 2 grimoire ;
   récompense : cartes, ou ouvrir le coffre), `Entrée`/`Espace` l'action par défaut. Toute autre touche est
   rendue au jeu.
-- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (décor par décor : candidat retenu ou repli
-  et candidats écartés ; puis icônes et modèles introuvables) ;
-  `/slay modeles` (galerie des ennemis) ; `/slay decor` (décor illustré ou peint) ;
+- `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (décor par décor : « peint » ou candidat
+  validé, puis candidats validés / refusés / pas encore jugés ; puis icônes et modèles introuvables) ;
+  `/slay modeles` (galerie des ennemis) ; `/slay decor` (bascule illustré validé / peint ; sous-commandes
+  `essai`, `suivant`, `precedent`, `ok`, `non`, `peint`, `illustre` : « Essai des décors ») ;
   `/slay facing <j> <e>` (orientation des modèles, radians) ; `/slay centre`.
 - Bouton de minimap : clic gauche ouvre/ferme, clic droit options, glisser pour le déplacer.
 - La fenêtre se masque à l'entrée en combat réel, refuse de s'ouvrir en combat, et se rouvre à la sortie
@@ -273,8 +284,8 @@ Controller.ui     = { view, class, key }       -- sous-écran (upgrade, remove, 
 ### Sauvegarde
 
 Format : celui de `Core/Save.lua` (`docs/expedition.md`), plus un champ `options` propre à l'interface
-(`autoOpen, autoClose, scale, speed, fast, decor, minimap = { hide, angle }, facingPlayer, facingEnemy,
-point`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu ; testé).
+(`autoOpen, autoClose, scale, speed, fast, decor, artChecks, minimap = { hide, angle }, facingPlayer,
+facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(fichier) -> true | false`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu ; testé).
 
 - Chargement (`ADDON_LOADED`) : `SlayTheDragonDB = Save.migrate(SlayTheDragonDB)`, puis options par défaut.
 - Expédition illisible pour `Save` : quarantaine par `Save.migrate`. Illisible pour l'interface (bibelot,
@@ -315,19 +326,17 @@ point`), que `Save.migrate` garde tel quel (il ne retire jamais un champ inconnu
   `IsMouseOver`, `C_Timer`, `C_Spell.GetSpellTexture`, `InCombatLockdown`, `GetCursorPosition`…
   Survols et panneau : `SetScale` (cadre), `SetHitRectInsets`, `EnableMouseWheel`, `GetChildren`,
   `SetFrameLevel` (et `SetFixedFrameLevel`, non employé), scripts `OnSizeChanged` et `OnMouseWheel`
-  (employés par l'interface Blizzard 12.1.5) ; décors : `IsObjectLoaded` (région),
-  `GetTextureFileID`, `C_Texture.GetFilenameFromFileDataID`.
+  (employés par l'interface Blizzard 12.1.5). Les décors n'appellent plus `IsObjectLoaded`,
+  `GetTextureFileID` ni `C_Texture.GetFilenameFromFileDataID` (détection supprimée).
 - `wow_lua_lint` (forever) sur tout `UI/` : aucune erreur ; un avertissement attendu sur `CreateColor`
   (fonction Lua de l'interface, pas de l'API C) ; notes « OnUpdate » sur le glisser-déposer, le bouton de
   minimap, le feu et le pilote des interpolations (voulues).
 
 ### Non vérifié (à voir en jeu)
 
-- Quels **candidats de décor** existent dans Forever et si `IsObjectLoaded` repère bien un fichier absent
-  (s'il renvoyait vrai pour un fichier manquant, un candidat vide serait « retenu » : on verrait le
-  décor peint et `/slay art` le dirait retenu — me le signaler). L'**allure** des illustrations
-  recadrées : `crop` par candidat (`Art.illustrations`), `shift` et `tint` par décor (`Art.scenes`), à
-  corriger après essai ; repli immédiat : `/slay decor`.
+- Quels **candidats de décor** existent dans Forever : seul l'essai manuel le dit (`/slay decor essai`).
+  L'**allure** des illustrations validées : `crop` par candidat (`Art.illustrations`), `shift` et `tint`
+  par décor (`Art.scenes`), à corriger après essai ; repli immédiat : `/slay decor peint`.
 - Les **survols** : fluidité, absence de clignotement, passage au premier plan (le visuel `face` et ses
   enfants sont re-nivelés explicitement par `W.setLevel`), zone prolongée vers le haut de la carte
   levée, molette sur les cartes du panneau.
@@ -391,7 +400,8 @@ glisser-déposer ; récompenses (coffre ouvert d'abord s'il se présente), amél
 vidée (`H.settle`) avant de vérifier le bandeau de fin ; aller-retour de sauvegarde en combat et sur une
 récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibelots ; marchand ; feu de camp ;
 rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
-et `/slay art` ; décors à candidats (refusé, jamais chargé, repli, rapport) ; survols (zone fixe, valeur
+et `/slay art` ; décors (peints par défaut, essai : suivant, précédent, ok, non, peint, illustre ; premier
+validé de chaque liste ; verdicts relus au rechargement ; rapport) ; survols (zone fixe, valeur
 intermédiaire, sortie réversible depuis la valeur courante, état final par les minuteurs, pilote coupé
 au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap,
 clic dehors, Fermer, pioche triée et ordre réel intact, défausse, consumées, deck en combat, touches
@@ -411,13 +421,12 @@ Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/In
 suffit. Activer les erreurs Lua (`/console scriptErrors 1`) ou BugSack.
 
 En priorité (retours du premier essai) :
-1. **`/slay art`** juste après l'ouverture (attendre ~5 s fenêtre ouverte) : recopier la sortie. Elle dit,
-   décor par décor, le candidat retenu (`candidat 2/4 = 7963776 (…)`) ou `repli (décor peint)`, et les
-   candidats écartés avec la raison (`refusé`, `sans fichier`, `non chargé`). Un décor annoncé
-   « retenu » mais qui reste peint à l'écran = à me signaler (détection trompée).
-2. **Paysages** : sur la route, le feu de camp, le marchand et le boss, l'illustration retenue a-t-elle du
+1. **Essai des décors** (accueil) : `/slay decor essai`, puis pour chacun des 8 candidats `ok` (image) ou
+   `non` (aplat vert, noir ou vide) et `suivant` ; `peint` pour finir. Recopier ensuite `/slay art`
+   (décor par décor : `peint` ou candidat validé ; listes des validés et refusés).
+2. **Paysages** : sur la route, le feu de camp, le marchand et le boss, l'illustration validée a-t-elle du
    sens derrière les personnages (sans logo ni texte, bien cadrée) ? Sinon dire lequel et ce qui cloche
-   (trop haut / trop bas / logo) ; `/slay decor` bascule toujours vers le décor peint.
+   (trop haut / trop bas / logo) ; `/slay decor peint` revient au décor peint.
 3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se lève et grossit en
    ~0,1 s, les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
    redescendre sans à-coup ; aucun clignotement en bord de carte ; on peut monter le curseur sur la
@@ -441,4 +450,4 @@ ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel
 `/slay facing`.
 
 À me renvoyer : la sortie de `/slay art`, une capture du combat avec une carte survolée, du panneau de
-la pioche, du bandeau, de chaque décor illustré retenu, et toute erreur Lua (texte complet).
+la pioche, du bandeau, de chaque décor illustré validé, et toute erreur Lua (texte complet).
