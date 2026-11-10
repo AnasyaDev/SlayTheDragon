@@ -79,6 +79,58 @@ end
 
 -- Plaque de réponse (rencontre, bibelot, feu de camp, service) : libellé + ce que ça donne (vert si
 -- c'est un gain). Survol : liseré doré, ardoise plus claire, halo, levée.
+-- Mise en page (comme le texte des cartes) : zone utile = intérieur de la plaque moins OPT_MX sur les
+-- côtés et OPT_MY en haut et en bas ; libellé sur une ligne (paliers OPT_LABEL), texte en dessous sur
+-- une ligne si possible (paliers OPT_SUB), sinon coupé en lignes équilibrées au mot le plus près du
+-- milieu ; le bloc (icône, libellé, texte) est centré verticalement. Mesures par le client.
+local OPT_MX, OPT_MY, OPT_GAP = 16, 10, 6
+local OPT_LABEL = { 20, 18, 16 }
+local OPT_SUB = { 15.5, 14.5, 13.5, 12.5 }
+UI.OPT = { mx = OPT_MX, my = OPT_MY, label = OPT_LABEL, sub = OPT_SUB }
+
+-- Largeur d'un texte d'une ligne à la taille s (police du texte fs).
+local function textWidth(fs, t, s)
+  W.setSize(fs, s)
+  fs:SetWordWrap(false)
+  fs:SetWidth(0)
+  fs:SetText(t)
+  return (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
+end
+
+-- Coupe t en n lignes équilibrées (la plus longue la plus courte possible) ; renvoie lignes, largeur.
+local function balanced(fs, t, s, n)
+  local words = {}
+  for w in t:gmatch("%S+") do words[#words + 1] = w end
+  if n <= 1 or #words < n then return { t }, textWidth(fs, t, s) end
+  local best, bestW
+  if n == 2 then
+    for k = 1, #words - 1 do
+      local a, b = table.concat(words, " ", 1, k), table.concat(words, " ", k + 1)
+      local m = max(textWidth(fs, a, s), textWidth(fs, b, s))
+      if not bestW or m < bestW then best, bestW = { a, b }, m end
+    end
+  else
+    for i = 1, #words - 2 do
+      for k = i + 1, #words - 1 do
+        local a, b, c = table.concat(words, " ", 1, i), table.concat(words, " ", i + 1, k), table.concat(words, " ", k + 1)
+        local m = max(textWidth(fs, a, s), textWidth(fs, b, s), textWidth(fs, c, s))
+        if not bestW or m < bestW then best, bestW = { a, b, c }, m end
+      end
+    end
+  end
+  return best, bestW
+end
+
+-- Pose un texte de plaque : lignes explicites, largeur un peu plus grande que la plus longue ligne
+-- (le client ne recoupe jamais autrement) ; renvoie sa hauteur mesurée.
+local function setLines(fs, lines, s, zw)
+  W.setSize(fs, s)
+  fs:SetWordWrap(#lines > 1)
+  fs:SetWidth(zw + 1)
+  fs:SetText(table.concat(lines, "\n"))
+  return fs:GetStringHeight() or 0
+end
+
 local function plaque(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(300, 118)
@@ -90,37 +142,81 @@ local function plaque(parent)
   W.roundMask(face, b.icon, "mask_roundsq")
   b.icon:Hide()
   b.label = W.label(face, "bold", 20, C.text)
-  b.label:SetWidth(280)
   b.label:SetJustifyH("CENTER")
+  b.label:SetWordWrap(false)
   b.sub = W.label(face, "bold", 15.5, C.textSoft)
-  b.sub:SetWidth(280)
   b.sub:SetJustifyH("CENTER")
   b.sub:SetWordWrap(true)
+  -- Libellé et texte dans la zone utile (voir OPT_*) ; renvoie la mise en page retenue.
+  b.Layout = function(self, label, sub, w, h, withIcon)
+    local zw = w - 2 * OPT_MX
+    local zh = h - 2 * OPT_MY
+    local iconH = withIcon and (40 + OPT_GAP) or 0
+    local fit = { ok = false }
+    -- libellé : une ligne au premier palier qui tient ; sinon deux lignes au plancher
+    local ls, llines = nil, { label }
+    for _, s in ipairs(OPT_LABEL) do
+      if textWidth(self.label, label, s) <= zw then ls = s break end
+    end
+    if not ls then
+      ls = OPT_LABEL[#OPT_LABEL]
+      llines = balanced(self.label, label, ls, 2)
+    end
+    local lh = setLines(self.label, llines, ls, zw)
+    -- texte : une ligne si possible (deux premiers paliers), sinon lignes équilibrées
+    local cands = {}
+    if sub ~= "" then
+      for i = 1, 2 do cands[#cands + 1] = { OPT_SUB[i], 1 } end
+      for _, s in ipairs(OPT_SUB) do cands[#cands + 1] = { s, 2 } end
+      cands[#cands + 1] = { OPT_SUB[#OPT_SUB], 3 }
+    end
+    local sh, slines, ss = 0, {}, OPT_SUB[1]
+    for _, c in ipairs(cands) do
+      local lines, lw = balanced(self.sub, sub, c[1], c[2])
+      if #lines == c[2] and lw <= zw then
+        local hh = setLines(self.sub, lines, c[1], zw)
+        if iconH + lh + OPT_GAP + hh <= zh then sh, slines, ss, fit.ok = hh, lines, c[1], true break end
+      end
+    end
+    if sub == "" then fit.ok = iconH + lh <= zh
+    elseif not fit.ok then
+      -- rien ne tient : plus petit palier sur trois lignes (signalé)
+      slines = balanced(self.sub, sub, OPT_SUB[#OPT_SUB], 3)
+      ss = OPT_SUB[#OPT_SUB]
+      sh = setLines(self.sub, slines, ss, zw)
+    end
+    self.sub:SetShown(sub ~= "")
+    local block = iconH + lh + (sub ~= "" and (OPT_GAP + sh) or 0)
+    local top = (h - block) / 2
+    self.label:ClearAllPoints()
+    self.icon:ClearAllPoints()
+    if withIcon then
+      self.icon:SetPoint("TOP", self.face, "TOP", 0, -top)
+      self.label:SetPoint("TOP", self.face, "TOP", 0, -(top + iconH))
+    else
+      self.label:SetPoint("TOP", self.face, "TOP", 0, -top)
+    end
+    self.sub:ClearAllPoints()
+    self.sub:SetPoint("TOP", self.label, "BOTTOM", 0, -OPT_GAP)
+    fit.label, fit.sub, fit.subLines, fit.block, fit.zw, fit.zh = ls, ss, #slines, block, zw, zh
+    self.optFit = fit
+    return fit
+  end
   b.SetOption = function(self, o, w, h)
     self.option = o
     self:SetSize(w, h)
-    self.label:SetWidth(w - 24)
-    self.sub:SetWidth(w - 24)
-    self.label:SetText(o.label or o.id)
     local sub = o.text or ""
     local col = C.textSoft
     if o.disabled and o.reason then sub, col = o.reason, C.badText
     elseif sub:match("^%+") then col = C.healGreen end
-    self.sub:SetText(sub)
     self.sub:SetTextColor(col[1], col[2], col[3])
-    self.label:ClearAllPoints()
     if o.item then
       W.setIcon(self.icon, W.itemEntry(o.item.kind, o.item.id), o.item.kind .. ":" .. tostring(o.item.id))
-      self.icon:ClearAllPoints()
-      self.icon:SetPoint("TOP", 0, -12)
       self.icon:Show()
-      self.label:SetPoint("TOP", self.icon, "BOTTOM", 0, -6)
     else
       self.icon:Hide()
-      self.label:SetPoint("CENTER", 0, sub ~= "" and 14 or 0)
     end
-    self.sub:ClearAllPoints()
-    self.sub:SetPoint("TOP", self.label, "BOTTOM", 0, -8)
+    self:Layout(o.label or o.id, sub, w, h, o.item ~= nil)
     self:SetAlpha(o.disabled and 0.6 or 1)
     -- une réponse impossible bouge à peine au survol
     self.hoverScale, self.hoverLift = o.disabled and 1.01 or 1.04, o.disabled and 0 or 5

@@ -2736,6 +2736,97 @@ do
     table.concat(H.bornInAnim, ", "))
 end
 
+print("U24 plaques de réponse : toutes les réponses de Data/Events.lua dans la zone utile (marges, paliers, coupures)")
+do
+  freshRun(SEED + 4, "event")
+  local ns = H.ns
+  local s = UI().current
+  local b = s.buttons[1]
+  local O = UI().OPT
+  local bad, dist, multi = {}, {}, {}
+  local cases = 0
+  local function lines(t)
+    local out = {}
+    for l in ((t or "") .. "\n"):gmatch("(.-)\n") do out[#out + 1] = l end
+    return out
+  end
+  local function try(label, o, w, h)
+    cases = cases + 1
+    b:SetOption(o, w, h)
+    local fit = b.optFit
+    local zw = w - 2 * O.mx
+    local why = {}
+    if not fit.ok then why[#why + 1] = "ne tient à aucun palier" end
+    for _, fs in ipairs({ b.label, b.sub }) do
+      if fs._shown and (fs._text or "") ~= "" then
+        local ls = lines(fs._text)
+        for _, l in ipairs(ls) do
+          if H.textWidth(fs, l, fs._fontSize) > zw + 0.01 then why[#why + 1] = "« " .. l .. " » plus large que la zone" end
+        end
+        if fs:IsTruncated() or fs:GetNumLines() ~= #ls then why[#why + 1] = "recoupé par le client" end
+      end
+    end
+    if fit.block > h - 2 * O.my + 0.01 then why[#why + 1] = "bloc trop haut" end
+    local pt = b.label._points[1]
+    if pt and -pt[5] < O.my - 0.01 then why[#why + 1] = "libellé collé au haut" end
+    if #why > 0 then bad[#bad + 1] = label .. " : " .. table.concat(why, ", ") end
+    if b.sub._shown then
+      local k = fit.sub .. " × " .. fit.subLines
+      dist[k] = (dist[k] or 0) + 1
+      if fit.subLines > 1 then multi[#multi + 1] = ("%s (%s)"):format(label, k) end
+    end
+  end
+  -- raison affichée d'une réponse impossible : texte de sa première condition, ou d'un paiement
+  local X = ns.Expedition
+  local function reasonOf(ch)
+    for _, c in ipairs(ch.when or {}) do
+      local def = X.CONDITIONS[c[1]]
+      if c.text then return c.text end
+      if def and def.text then return def.text(c[2], c) end
+    end
+    for _, e in ipairs(ch.effects or {}) do
+      if e[1] == "pay" then return X.EVENT_REASONS["or"] or "Pas assez d'or." end
+    end
+    return "Il faut au moins 50 % des PV."
+  end
+  local ids = {}
+  for id in pairs(ns.Events) do ids[#ids + 1] = id end
+  table.sort(ids)
+  for _, id in ipairs(ids) do
+    local ev = ns.Events[id]
+    local n = math.min(#ev.choices, #s.buttons)
+    local span = n <= 2 and 668 or (n == 3 and 900 or 980)
+    local gap = n <= 2 and 28 or 22
+    local w = (span - (n - 1) * gap) / math.max(n, 1)
+    local h = n >= 4 and 112 or 118
+    for i = 1, n do
+      local ch = ev.choices[i]
+      local text = ch.hidden and "?" or (ch.outcome or ch.text or "")
+      try(id .. "/" .. i, { id = "x", label = ch.label, text = text }, w, h)
+      try(id .. "/" .. i .. " (impossible)", { id = "x", label = ch.label, text = text, disabled = true,
+        reason = reasonOf(ch) }, w, h)
+    end
+  end
+  -- feu de camp (240 × 104)
+  try("feu : se reposer", { id = "rest", label = "Se reposer", text = "+21 PV" }, 240, 104)
+  try("feu : s'entraîner", { id = "u", label = "S'entraîner", text = "Améliore une carte" }, 240, 104)
+  check(("%d rencontres (%d cas de réponse, possibles et impossibles) : libellé et texte dans la zone utile, marges de %d unités")
+    :format(#ids, cases, O.mx), #bad == 0, table.concat(bad, "\n        "))
+  local dl = {}
+  for k, n in pairs(dist) do dl[#dl + 1] = k .. " : " .. n end
+  table.sort(dl)
+  print("      texte des réponses (taille × lignes) : " .. table.concat(dl, ", "))
+  print("      sur plusieurs lignes : " .. (#multi > 0 and table.concat(multi, ", ") or "aucune"))
+  -- la réponse de la capture : une coupure propre, loin des bords
+  try("bandits", { id = "x", label = "Charger les bandits", text = "Combat : récompense habituelle + 20 po" }, 285.3, 118)
+  local ls = lines(b.sub._text)
+  local widest = 0
+  for _, l in ipairs(ls) do widest = math.max(widest, H.textWidth(b.sub, l, b.sub._fontSize)) end
+  check("« Combat : récompense habituelle + 20 po » : lignes équilibrées, au moins 16 unités des bords",
+    widest <= 285.3 - 32 and (#ls == 1 or math.abs(H.textWidth(b.sub, ls[1], b.sub._fontSize)
+      - H.textWidth(b.sub, ls[2], b.sub._fontSize)) < 0.4 * widest), b.sub._text)
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end
