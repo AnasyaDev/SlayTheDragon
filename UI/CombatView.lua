@@ -575,7 +575,7 @@ function V:RenderPlayer(full)
   if p.cast then
     local d = Card.def(p.cast.card)
     local tgt = p.cast.target and enemyByUid(c, p.cast.target)
-    self.cast.name:SetText(d.name .. (tgt and (" → " .. ns.Enemies[tgt.id].name) or ""))
+    self.cast.name:SetText(d.name .. (tgt and (" sur " .. ns.Enemies[tgt.id].name) or ""))
     self.cast:Show()
   else
     self.cast:Hide()
@@ -660,7 +660,7 @@ end
 function V:RenderBanner()
   local over = Controller.over()
   if over then
-    self.banner.text:SetText(over == "won" and "Victoire !" or "Défaite…")
+    self.banner.text:SetText(over == "won" and "Victoire !" or "Défaite")
     local col = over == "won" and C.gold or C.hpText
     self.banner.text:SetTextColor(col[1], col[2], col[3])
     self.banner.button:SetText(over == "won" and "Continuer" or "Voir le bilan")
@@ -809,7 +809,7 @@ function V:QueueEvent(ev)
       local badge = ev.dst == "player" and self_.playerBlock or who.block
       if ev.loss > 0 then
         W.sound(ev.loss >= 12 and "bigHit" or "hit")
-        W.float(self_.parent, x + 18, y - 40, "−" .. ev.loss, C.white, ev.loss >= 12 and 36 or 30)
+        W.float(self_.parent, x + 18, y - 40, "-" .. ev.loss, C.white, ev.loss >= 12 and 36 or 30)
         if bar.hp then bar:Set(bar.hp - ev.loss, bar.maxHp, true) end
         shake(self_, who, ev.loss >= 12 and 9 or 6)
         flash(who.flash, C.hp[1], C.hp[2], C.hp[3])
@@ -817,7 +817,7 @@ function V:QueueEvent(ev)
       end
       if ev.absorbed > 0 then
         W.sound("block")
-        W.float(self_.parent, x - 34, y - 10, "−" .. ev.absorbed, C.absorb, 20, 0.9)
+        W.float(self_.parent, x - 34, y - 10, "-" .. ev.absorbed, C.absorb, 20, 0.9)
         local cur = tonumber(badge.text:GetText() or "") or 0
         badge:Set(max(0, cur - ev.absorbed))
       end

@@ -115,7 +115,7 @@ de carte revient au même.
   (cachée à 0), pioche et défausse (tas avec nombre ; infobulles : contenu trié, consumées), main en arc
   au centre (cartes droites ; la survolée monte, grossit ×1,16, passe devant), mini-cartes des recharges
   (tours restants), « Fin du tour » doré.
-- Fin de combat : « Victoire ! » / « Défaite… » en grand, bouton « Continuer » / « Voir le bilan »,
+- Fin de combat : « Victoire ! » / « Défaite » en grand, bouton « Continuer » / « Voir le bilan »,
   affichés quand la file d'animations est vide.
 
 ### Contrôles
@@ -144,7 +144,7 @@ de carte revient au même.
 | `draw`, `cooldown_back` | la carte arrive du tas (ou des recharges) à sa place | `card` |
 | fin du tour (clic) | les cartes non gardées filent à la défausse | `endTurn` |
 | `act` | la bulle d'intention éclate ; attaque : l'ennemi se jette vers le héros ; modèle : attaque / sort | — |
-| `damage` | chiffre blanc « −N » (plus gros à 12+), portion de vie claire qui se vide, secousse, éclair rouge, modèle : encaisser ; Absorption : chiffre bleu, écusson qui baisse | `hit` / `bigHit`, `block` |
+| `damage` | chiffre blanc « -N » (plus gros à 12+), portion de vie claire qui se vide, secousse, éclair rouge, modèle : encaisser ; Absorption : chiffre bleu, écusson qui baisse | `hit` / `bigHit`, `block` |
 | `heal` / `block` | « +N » vert / bleu, barre ou écusson à jour | `heal` / `block` |
 | `status`, `demence`, `mana` | petit texte flottant | — |
 | `death` | modèle : mort, fondu de l'ennemi puis retrait ; héros : à terre | `enemyDeath` / `playerDeath` |
@@ -325,7 +325,7 @@ En priorité (ce que je n'ai pas pu voir) :
    face ? `/slay facing` sinon. Bulles d'intention lisibles (icône ronde + chiffre) ; anneau doré à la cible.
 4. Cartes : gemme, nom, médaillon rond avec l'icône du sort, ligne de type, texte, pastilles ; carte trop
    chère ternie avec « Pas assez de mana. » ; survol : la carte monte, grossit, passe devant.
-5. Retour visuel : carte qui file vers l'ennemi, « −9 » qui saute, vie qui laisse une traînée claire,
+5. Retour visuel : carte qui file vers l'ennemi, « -9 » qui saute, vie qui laisse une traînée claire,
    secousse, mort en fondu, intention qui éclate au tour ennemi, cartes qui arrivent du tas, sons.
    Tester la vitesse ×0,5 / ×3 et le mode rapide.
 6. Récompense : 3 cartes en grand, bourse / fiole / bibelot au sol ; clic sur la bourse → elle vole vers

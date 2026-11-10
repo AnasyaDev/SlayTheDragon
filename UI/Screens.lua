@@ -834,9 +834,9 @@ function Deck:Build(f)
     c:Hide()
     self.cards[i] = c
   end
-  self.prev = W.button(f, "‹", 34, 34, function() self.page = self.page - 1 self:Layout() end, "wood", 18)
+  self.prev = W.button(f, "<", 34, 34, function() self.page = self.page - 1 self:Layout() end, "wood", 18)
   at(self.prev, f, 24, 214, 34, 34)
-  self.next = W.button(f, "›", 34, 34, function() self.page = self.page + 1 self:Layout() end, "wood", 18)
+  self.next = W.button(f, ">", 34, 34, function() self.page = self.page + 1 self:Layout() end, "wood", 18)
   at(self.next, f, 976, 214, 34, 34)
   self.pile = deckPile(f)
   self.buttons = {}

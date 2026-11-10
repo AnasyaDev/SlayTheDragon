@@ -645,11 +645,11 @@ local function endStep()
   lines[#lines + 1] = "|cffffd700+" .. (s.rep or 0) .. " réputation|r (classe et Ligue)."
   local cname = ns.Classes[e.class] and ns.Classes[e.class].name or tostring(e.class)
   if s.classAfter ~= s.classBefore then
-    lines[#lines + 1] = "|cff40ff40" .. cname .. " : " .. Meta.levelName(s.classBefore) .. " → "
+    lines[#lines + 1] = "|cff40ff40" .. cname .. " passe de " .. Meta.levelName(s.classBefore) .. " à "
       .. Meta.levelName(s.classAfter) .. " !|r"
   end
   if s.leagueAfter ~= s.leagueBefore then
-    lines[#lines + 1] = "|cff40ff40Ligue des explorateurs : " .. Meta.levelName(s.leagueBefore) .. " → "
+    lines[#lines + 1] = "|cff40ff40Ligue des explorateurs : de " .. Meta.levelName(s.leagueBefore) .. " à "
       .. Meta.levelName(s.leagueAfter) .. " !|r"
   end
   if s.keyUnlocked then lines[#lines + 1] = "|cff40c0ffClé mythique +" .. s.keyUnlocked .. " débloquée !|r" end

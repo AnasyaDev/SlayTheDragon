@@ -423,7 +423,16 @@ function W.roundButton(parent, glyph, size, fill, edge, onClick)
   b.fill:SetPoint("BOTTOMRIGHT", -2, 2)
   b.label = W.label(b, "body", 15, C.creamLight)
   b.label:SetPoint("CENTER", 0, 1)
-  b.label:SetText(glyph)
+  if glyph == "menu" then
+    -- trois traits (le glyphe ≡ manque aux polices du jeu)
+    for i = -1, 1 do
+      local l = W.rect(b, "ARTWORK", 0, C.creamLight)
+      l:SetSize(size * 0.42, 2)
+      l:SetPoint("CENTER", 0, i * 5)
+    end
+  else
+    b.label:SetText(glyph)
+  end
   b:SetScript("OnEnter", function(self) self.fill:SetVertexColor(fill[1] * 1.3, fill[2] * 1.3, fill[3] * 1.3, 1) end)
   b:SetScript("OnLeave", function(self) self.fill:SetVertexColor(fill[1], fill[2], fill[3], 1) end)
   if onClick then b:SetScript("OnClick", onClick) end

@@ -103,7 +103,7 @@ local function buildBand(f)
   local close = W.roundButton(band, "×", 30, C.red, C.redEdge, function() UI.close("button") end)
   close:SetPoint("RIGHT", -10, 0)
   UI.closeButton = close
-  local gear = W.roundButton(band, "≡", 30, C.woodDark, C.woodLine, function() UI.toggleOptions() end)
+  local gear = W.roundButton(band, "menu", 30, C.woodDark, C.woodLine, function() UI.toggleOptions() end)
   gear:SetPoint("RIGHT", close, "LEFT", -6, 0)
   UI.gear = gear
 
