@@ -158,6 +158,8 @@ function V:Build(parent)
   self.playerHp:SetPoint("RIGHT", 0, 0)
   self.playerSt = W.pillRow(parent, 8, 230, 12)
   at(self.playerSt, parent, HERO_X - 115, HERO_FEET + 42, 230, 18)
+  hpRow:SetFrameLevel(bf:GetFrameLevel() + 15)
+  self.playerSt:SetFrameLevel(bf:GetFrameLevel() + 15)
 
   -- Ennemis ----------------------------------------------------------------
   self.slots = {}
@@ -582,6 +584,7 @@ function V:RenderPlayer(full)
   local dem = p.demence or 0
   local w = self.demence:Set("Démence " .. dem, C.watch, C.watchText)
   at(self.demence, self.parent, 97 - w / 2, 530, w, 19)
+  if dem > 0 then self.demence:Show() else self.demence:Hide() end
   self.drawPile.count:SetText(#c.draw)
   self.discardPile.count:SetText(#c.discard)
   -- recharges

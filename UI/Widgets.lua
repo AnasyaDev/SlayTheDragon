@@ -45,14 +45,22 @@ local function finishTween(tw)
   if tw.fn then tw.fn(1) end
   if tw.onDone then tw.onDone() end
 end
+local running = {}
 driver:SetScript("OnUpdate", function(_, elapsed)
-  for tw in pairs(tweens) do
-    tw.t = tw.t + (elapsed or 0)
-    if tw.t >= tw.dur then
-      finishTween(tw)
-    elseif tw.fn then
-      local p = tw.t / tw.dur
-      tw.fn(tw.ease and tw.ease(p) or p)
+  -- copie : les rappels peuvent lancer d'autres interpolations pendant le parcours
+  local n = 0
+  for tw in pairs(tweens) do n = n + 1 running[n] = tw end
+  for i = 1, n do
+    local tw = running[i]
+    running[i] = nil
+    if not tw.done then
+      tw.t = tw.t + (elapsed or 0)
+      if tw.t >= tw.dur then
+        finishTween(tw)
+      elseif tw.fn then
+        local p = tw.t / tw.dur
+        tw.fn(tw.ease and tw.ease(p) or p)
+      end
     end
   end
 end)
@@ -218,7 +226,7 @@ function W.label(parent, kind, size, color, layer, shadow)
     if f then fs:SetFont(f, size or 12, "") end
   end
   fs._size = size or 12
-  fs._kind = kind
+  fs._fontKind = kind
   if color then fs:SetTextColor(color[1], color[2], color[3]) end
   if shadow then
     fs:SetShadowColor(0, 0, 0, 0.9)
@@ -232,7 +240,7 @@ end
 function W.setSize(fs, size)
   if fs._size == size then return end
   fs._size = size
-  local ok = fs:SetFont(fs._kind == "title" and W.FONT_TITLE or W.FONT_BODY, size, "")
+  local ok = fs:SetFont(fs._fontKind == "title" and W.FONT_TITLE or W.FONT_BODY, size, "")
   if ok == false then
     local f = fs:GetFont()
     if f then fs:SetFont(f, size, "") end
@@ -247,6 +255,12 @@ function W.text(parent, font, size, layer)
     if f then fs:SetFont(f, size, flags) end
   end
   return fs
+end
+
+function W.utf8len(s)
+  local n = 0
+  for _ in tostring(s or ""):gmatch("[%z\1-\127\194-\244][\128-\191]*") do n = n + 1 end
+  return n
 end
 
 local function hexOf(c)
@@ -873,7 +887,8 @@ function W.card(parent)
   b.name:SetPoint("TOP", 0, -9)
   b.name:SetWidth(W.CARD_W - 18)
   b.name:SetJustifyH("CENTER")
-  b.name:SetWordWrap(false)
+  b.name:SetWordWrap(true)
+  b.name:SetMaxLines(2)
 
   b.medal = W.medallion(b, 58)
   b.medal:SetPoint("TOP", 0, -26)
@@ -929,16 +944,21 @@ function W.card(parent)
     self.edge:SetColor(Art.rarity[d.rarity] or C.edgeCommon)
     local dim = opts.playable == false
     self.fill:SetColor(dim and C.parchmentDim or (self.hot and C.parchmentLight or C.parchment))
-    -- nom
+    -- nom (sur deux lignes s'il est long : le médaillon descend et rétrécit)
     self.name:SetText(d.name)
-    W.setSize(self.name, #d.name > 22 and 11 or (#d.name > 16 and 12 or 13))
+    local nameLen = W.utf8len(d.name)
+    local twoLines = nameLen > 15
+    W.setSize(self.name, nameLen > 13 and 12 or 13)
     local nc = showUp and C.green or C.ink
     self.name:SetTextColor(nc[1], nc[2], nc[3])
     -- médaillon
     local text = W.cardBody(d, base)
-    local long = #(d.text or "")
-    local ms = long > 95 and 42 or (long > 62 and 50 or 58)
+    local long = W.utf8len(text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+    local ms = long > 80 and 42 or (long > 52 and 50 or 58)
+    if twoLines then ms = ms - 8 end
     self.medal:Resize(ms, 3)
+    self.medal:ClearAllPoints()
+    self.medal:SetPoint("TOP", 0, twoLines and -38 or -26)
     self.medal:SetRing(path.ring)
     W.setIcon(self.medal.icon, W.cardArt(id), "card:" .. id)
     self.medal.icon:SetDesaturated(dim)
@@ -946,7 +966,7 @@ function W.card(parent)
     self.kind:SetText((Art.typeName[d.type] or "Sort") .. " · " .. path.name)
     self.kind:SetTextColor(path.ink[1], path.ink[2], path.ink[3])
     -- texte
-    W.setSize(self.body, long > 95 and 10 or (long > 62 and 11 or 12))
+    W.setSize(self.body, long > 80 and 10 or (long > 52 and 11 or 12))
     self.body:SetText(text)
     -- pastilles (raison d'injouabilité en rouge à la place)
     local pills = W.cardPills(d)
@@ -966,13 +986,21 @@ function W.card(parent)
         p:Hide()
       end
     end
-    local x = (W.CARD_W - (total - 4)) / 2
-    for i = 1, 2 do
-      local p = self.pills[i]
-      if p:IsShown() then
+    if total - 4 <= W.CARD_W - 12 then
+      local x = (W.CARD_W - (total - 4)) / 2
+      for i = 1, 2 do
+        local p = self.pills[i]
+        if p:IsShown() then
+          p:ClearAllPoints()
+          p:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", x, 8)
+          x = x + p:GetWidth() + 4
+        end
+      end
+    else -- trop larges : l'une au-dessus de l'autre
+      for i = 1, 2 do
+        local p = self.pills[i]
         p:ClearAllPoints()
-        p:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", x, 8)
-        x = x + p:GetWidth() + 4
+        p:SetPoint("BOTTOM", self, "BOTTOM", 0, 8 + (2 - i) * 18)
       end
     end
     -- texte masqué sur une carte injouable (raison écrite), revient au survol

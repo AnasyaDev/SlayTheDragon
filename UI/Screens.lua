@@ -206,7 +206,7 @@ local function bubble(parent)
     self.text:SetText(text or "")
     local h = (self.text.GetStringHeight and self.text:GetStringHeight()) or 60
     if type(h) ~= "number" or h <= 0 then h = 60 end
-    self:SetHeight(h + ((title and title ~= "") and 52 or 30))
+    self:SetHeight(h + ((title and title ~= "") and 58 or 34))
     self.shape.edge:SetColor(edge or C.wood)
     self.tail.edge:SetColorTexture(W.rgb(edge or C.wood))
     self.tail:ClearAllPoints()
@@ -233,7 +233,7 @@ UI.register("start", Start)
 function Start:Build(f)
   self.hero = heroFigure(f)
   local panel = W.parchment(f, 12)
-  at(panel, f, 280, 64, 560, 330)
+  at(panel, f, 280, 70, 560, 290)
   self.panel = panel
   self.title = W.label(panel, "title", 32, C.ink)
   self.title:SetPoint("TOP", 0, -18)
@@ -334,7 +334,7 @@ function Start:Show(step)
       b.fill:SetVertexColor(fill[1], fill[2], fill[3], 1)
       local lc = o.disabled and C.woodLine or C.frame
       b.label:SetTextColor(lc[1], lc[2], lc[3])
-      b:SetScale(o.selected and 1.15 or 1)
+      b:SetSize(o.selected and 52 or 44, o.selected and 52 or 44)
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -1115,11 +1115,6 @@ function Map:Build(f)
   at(parch, f, 20, 62, 994, 536)
   parch:EnableMouse(false)
   self.parch = parch
-  -- chemins décoratifs
-  for _, r in ipairs({ { 40, 470, 960, 16 }, { 60, 104, 200, 9 }, { 700, 98, 200, 9 } }) do
-    local road = W.rect(parch, "BACKGROUND", -3, C.mapRoad, 0.6)
-    at(road, parch, r[1] - 20, r[2] - 62, r[3], r[4])
-  end
   self.canvas = CreateFrame("Frame", nil, f)
   self.canvas:SetAllPoints()
   self.canvas:SetFrameLevel(parch:GetFrameLevel() + 2)

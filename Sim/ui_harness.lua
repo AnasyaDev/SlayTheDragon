@@ -194,8 +194,16 @@ function Frame:GetObjectType() return self._kind end
 function Frame:IsMouseOver() return self._mouseOver and true or false end
 
 -- Enfants
-function Frame:CreateTexture() return newObject("Texture", nil, self) end
-function Frame:CreateFontString(_, _, font) local o = newObject("FontString", nil, self) o._font = font return o end
+function Frame:CreateTexture(_, layer, _, sub)
+  local o = newObject("Texture", nil, self)
+  o._layer, o._sub = layer, sub
+  return o
+end
+function Frame:CreateFontString(_, layer, font)
+  local o = newObject("FontString", nil, self)
+  o._font, o._layer = font, layer
+  return o
+end
 function Frame:CreateLine() return newObject("Line", nil, self) end
 function Frame:CreateAnimationGroup() return newObject("AnimationGroup", nil, self) end
 function Frame:CreateMaskTexture() return newObject("MaskTexture", nil, self) end
@@ -210,6 +218,7 @@ function Frame:GetFont() return "Fonts\\FRIZQT__.TTF", 12, "" end
 function Frame:SetFont(f, size, flags)
   if type(size) ~= "number" or size <= 0 then error("SetFont : taille invalide") end
   self._fontSize = size
+  self._fontFile = type(f) == "string" and f:upper():find("MORPHEUS") and "title" or "body"
 end
 
 -- Textures
@@ -733,6 +742,16 @@ end
 ---------------------------------------------------------------------------
 
 local SEED = tonumber(arg and arg[1]) or 1 -- graine 1 : victoire, donc clé +1 exercée
+-- Instantanés SVG facultatifs de chaque écran : lua5.1 Sim/ui_harness.lua 1 build/snap
+local SNAP = arg and arg[2]
+local Render = SNAP and dofile(root .. "/Sim/ui_render.lua")
+local snapped = {}
+local function snap(name, force)
+  if not SNAP or (snapped[name] and not force) then return end
+  snapped[name] = true
+  local content = H.ns.UI.content
+  if content then Render.svg(H, _G.SlayTheDragonFrame, SNAP .. "/" .. name .. ".svg", name) end
+end
 
 print("U1  chargement de tous les fichiers du TOC et premier lancement")
 local ns = H.boot(nil)
@@ -787,12 +806,14 @@ tt = H.hover(button("key:2"))
 check("infobulle d'une clé : affixes", table.concat(tt, " "):find("Tyrannique", 1, true), table.concat(tt, " | "))
 check("potions et bibelots masqués sans expédition", not UI().potionSlots[1]._shown)
 ns.Controller.makeSeed = function() return SEED end
+snap("accueil")
 clickOption("go")
 local exp = EXP()
 check("expédition démarrée par Save.start", exp ~= nil and exp.seed == SEED and exp.key == 0 and exp.class == "priest")
 check("db.current est l'expédition", _G.SlayTheDragonDB.current == exp)
 
 print("U5  carte de parcours ramifiée")
+snap("parcours")
 check("écran carte", currentKind() == "map", currentKind())
 st = UI().step
 check("tous les nœuds de l'acte affichés", #st.nodes == #exp.map.nodes, #st.nodes)
@@ -855,7 +876,18 @@ while guard < 400 do
         check("carte non jouée", #c.hand == handBefore)
         c.player.mana = saveMana
         V():Render()
+        H.advance(3)
+        snap("combat")
         fightUntil(function() return C().combat().round >= 2 and #C().combat().hand > 0 end, 100)
+        if SNAP and not C().over() then
+          local v = V()
+          v.cards[2].hover = true
+          v:PlaceCard(v.cards[2])
+          H.advance(6)
+          snap("combat-survol")
+          v.cards[2].hover = false
+          v:PlaceCard(v.cards[2])
+        end
         if not C().over() then
           combatReloaded = true
           check("journal d'animations vidé dans la sauvegarde", #_G.SlayTheDragonDB.current.combat.events == 0)
@@ -876,6 +908,7 @@ while guard < 400 do
     end
   elseif k == "reward" and not rewardReloaded then
     rewardReloaded = true
+    snap("recompense")
     local r = EXP().reward
     check("récompense : or affiché dans le butin", UI().current.loot._shown and #UI().step.loot >= 1)
     check("récompense : trois cartes", #UI().current.cardOptions == #r.cards and #r.cards == 3, #r.cards)
@@ -915,6 +948,7 @@ check("expédition archivée (db.current = nil)", db.current == nil)
 check("une entrée au journal", #db.journal == 1 and db.journal[1].date ~= nil)
 check("réputation gagnée", db.meta.classes.priest.rep > 0 and db.meta.league == db.meta.classes.priest.rep)
 check("texte du bilan : réputation", (step.text or ""):find("réputation", 1, true), step.text)
+snap("bilan")
 check("barres de réputation affichées", UI().current.bars[1]._shown and UI().current.bars[2]._shown)
 tt = H.hover(UI().current.bars[1])
 check("infobulle d'une barre : palier", #tt >= 2, #tt)
@@ -925,6 +959,7 @@ else
 end
 clickOption("ui:meta")
 check("écran méta", currentKind() == "meta", currentKind())
+snap("meta")
 check("méta : barres classe et Ligue", UI().current.bars[1]._shown and UI().current.bars[2]._shown
   and UI().current.bars[2].label._text == "Ligue des explorateurs")
 check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Prêtre", 1, true),
@@ -1014,6 +1049,7 @@ end
 exp = freshRun(SEED + 2, "merchant")
 ns = H.ns
 check("écran marchand", currentKind() == "merchant", currentKind())
+snap("marchand")
 local s = UI().current
 check("cinq cartes à prix", #s.cardOptions == 5 and s.cards[5]._shown and s.cards[1].tag._shown
   and (s.cards[1].tag.text._text or ""):find("po", 1, true))
@@ -1056,12 +1092,14 @@ print("U10 feu de camp : repos chiffré, amélioration avec aperçu")
 exp = freshRun(SEED + 3, "campfire")
 ns = H.ns
 check("écran feu de camp", currentKind() == "campfire", currentKind())
+snap("feu-de-camp")
 exp.hp = 20
 UI().refresh()
 local heal = math.floor(exp.maxHp * ns.Expedition.REST_FRACTION)
 check("repos : PV rendus calculés par le moteur", option("rest").text == "Rends " .. heal .. " PV.", option("rest").text)
 clickOption("ui:upgrade")
 check("grille d'amélioration", currentKind() == "deck" and #UI().current.cardOptions >= 1)
+snap("amelioration")
 tt = H.hover(UI().current.cards[1])
 check("aperçu « Après amélioration »", table.concat(tt, " "):find("Après amélioration", 1, true), table.concat(tt, " | "))
 local cardId = UI().current.cardOptions[1].id
@@ -1073,6 +1111,7 @@ print("U11 rencontre : texte, choix, résultat")
 exp = freshRun(SEED + 4, "event")
 ns = H.ns
 check("écran de rencontre", currentKind() == "event", currentKind())
+snap("rencontre")
 local ev = exp.event.id and ns.Events[exp.event.id]
 if ev then
   check("texte de la rencontre", UI().step.text == ev.text)
@@ -1102,6 +1141,7 @@ print("U12 Révéré : bibelot de classe au départ ; abandon")
 exp = freshRun(SEED + 5, nil, { league = 0, runs = 3,
   classes = { priest = { rep = 1100, runs = 3, wins = 0, keyMax = 0, bestKey = -1 } } })
 check("phase de bibelot de départ", currentKind() == "startRelic", currentKind())
+snap("bibelot-de-classe")
 check("bibelot de classe proposé avec icône", option("startRelic:1") and button("startRelic:1").icon._shown)
 clickOption("startRelic:1")
 check("bibelot de départ pris", exp.relics[1] == "ui_test_symbol" and currentKind() == "map")
