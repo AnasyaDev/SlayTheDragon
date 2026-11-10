@@ -51,10 +51,10 @@ card("sw_pain", {
 
 card("radiance", {
   rep = 0, name = "Mot de pouvoir : Radiance", cost = 1, type = "skill", school = "holy", rarity = "common", path = "discipline",
-  effects = { { "apply", "atonement", 2, self = true }, { "absorb", 4 } },
-  text = "Expiation 2 tours. Gagne 4 Absorption.",
-  up = { effects = { { "apply", "atonement", 3, self = true }, { "absorb", 6 } },
-    text = "Expiation 3 tours. Gagne 6 Absorption." },
+  effects = { { "apply", "atonement", 1, self = true }, { "absorb", 4 } },
+  text = "Expiation 1 tour. Gagne 4 Absorption.",
+  up = { effects = { { "apply", "atonement", 2, self = true }, { "absorb", 6 } },
+    text = "Expiation 2 tours. Gagne 6 Absorption." },
 })
 
 local function penanceHit(c, ctx, t)
@@ -111,8 +111,8 @@ card("schism", {
   target = "enemy",
   effects = { { "damage", 3 }, { "apply", "armor_broken", 2 }, { "apply", "atonement", 1, self = true } },
   text = "Inflige 3. La cible a Armure fracassée 2 tours. Expiation 1 tour.",
-  up = { effects = { { "damage", 6 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 2, self = true } },
-    text = "Inflige 6. La cible a Armure fracassée 3 tours. Expiation 2 tours." },
+  up = { effects = { { "damage", 6 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 1, self = true } },
+    text = "Inflige 6. La cible a Armure fracassée 3 tours. Expiation 1 tour." },
 })
 
 card("shadow_mend", {
@@ -125,9 +125,9 @@ card("shadow_mend", {
 
 card("evangelism", {
   rep = 1, name = "Évangélisme", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "discipline",
-  exhaust = true, effects = { { "apply", "atonement", 3, self = true }, { "draw", 2 } },
-  text = "Expiation 3 tours. Pioche 2. Consumée.",
-  up = { cost = 0, text = "Expiation 3 tours. Pioche 2. Consumée." },
+  exhaust = true, effects = { { "apply", "atonement", 2, self = true }, { "draw", 2 } },
+  text = "Expiation 2 tours. Pioche 2. Consumée.",
+  up = { cost = 0, text = "Expiation 2 tours. Pioche 2. Consumée." },
 })
 
 local function raptureHooks(bonus)

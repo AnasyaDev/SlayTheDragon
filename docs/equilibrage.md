@@ -240,6 +240,7 @@ Mesure (`runner=expedition key=0`, heuristic, 2 000 expéditions, graine 1) :
 |---|---|---|---|---|---|---|
 | Avant | 71,0 % | 73,7 % | 98,0 % | 99,0 % | 53,1 | 7,23 |
 | Après | 79,8 % | 81,9 % | 98,6 % | 99,3 % | 53,1 | 7,21 |
+| Compensation (Radiance 1/2, Évangélisme 2, Schisme+ 1) | 78,8 % | 81,0 % | 98,5 % | 99,3 % | 53,2 | 7,21 |
 
 +8,8 points, presque tout sur VanCleef. Réconfort (+12,7) profite le plus : il s'entretient
 seul (son Expiation couvre le tour suivant, donc le Réconfort suivant rend toujours 1 mana).
@@ -247,6 +248,7 @@ Pistes de compensation, non mesurées : Expiation ramenée de 1 sur les cartes �
 (Radiance 2/3 → 1/2, Évangélisme 3 → 2, Schisme+ 2 → 1) pour leur rendre leur durée effective
 d'avant ; soin d'Expiation 2 → 1 PV (`Combat.ATONEMENT_HEAL`) ; Réconfort 5/8 → 4/6 dégâts ;
 ou VanCleef +10 % de PV.
+Compensation appliquée : Expiation −1 tour sur Radiance (2/3 → 1/2), Évangélisme (3 → 2) et Schisme+ (2 → 1) ; −1,0 point seulement (78,8 %), l'écart vient surtout de Réconfort (+13,3), non touché.
 
 ## Écarts restants et suites
 
