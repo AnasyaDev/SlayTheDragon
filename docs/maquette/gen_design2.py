@@ -31,6 +31,17 @@ EXTRA = """
 <clipPath id="cTok"><circle r="10.5"/></clipPath>
 <clipPath id="cInt"><circle r="10"/></clipPath>
 <clipPath id="cSq"><rect x="3" y="3" width="22" height="22" rx="3.5"/></clipPath>
+<filter id="texStone"><feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="4" seed="4" result="n"/><feDiffuseLighting in="n" surfaceScale="1.5" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="58"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<filter id="texPaper"><feTurbulence type="fractalNoise" baseFrequency="0.9 0.5" numOctaves="3" seed="9" result="n"/><feDiffuseLighting in="n" surfaceScale="0.9" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="64"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<filter id="texLeather"><feTurbulence type="fractalNoise" baseFrequency="1.1" numOctaves="3" seed="12" result="n"/><feDiffuseLighting in="n" surfaceScale="2.2" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="52"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<filter id="texCloth"><feTurbulence type="fractalNoise" baseFrequency="0.9 0.25" numOctaves="2" seed="5" result="n"/><feDiffuseLighting in="n" surfaceScale="1.6" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="56"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<filter id="texWood"><feTurbulence type="fractalNoise" baseFrequency="0.012 0.5" numOctaves="4" seed="7" result="n"/><feDiffuseLighting in="n" surfaceScale="2.4" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="56"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<filter id="texMetal"><feTurbulence type="fractalNoise" baseFrequency="0.02 1.2" numOctaves="2" seed="3" result="n"/><feDiffuseLighting in="n" surfaceScale="1.0" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="62"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<filter id="texRock"><feTurbulence type="fractalNoise" baseFrequency="0.22" numOctaves="4" seed="21" result="n"/><feDiffuseLighting in="n" surfaceScale="2.6" diffuseConstant="1.18" lighting-color="#ffffff" result="l"><feDistantLight azimuth="235" elevation="54"/></feDiffuseLighting><feComposite in="l" in2="SourceAlpha" operator="in" result="lc"/><feBlend in="SourceGraphic" in2="lc" mode="multiply"/></filter>
+<clipPath id="cIcon"><rect x="77" y="9" width="38" height="38" rx="5"/></clipPath>
+<linearGradient id="hHoly" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6d77a"/><stop offset="1" stop-color="#a8721c"/></linearGradient>
+<linearGradient id="hShadow" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a47ad6"/><stop offset="1" stop-color="#3a1d63"/></linearGradient>
+<linearGradient id="hWard" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#9fcbee"/><stop offset="1" stop-color="#2c5a8c"/></linearGradient>
 <path id="namePath" d="M10 100.5 Q62 91.5 114 100.5"/>
 <linearGradient id="stone" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7f1e0"/><stop offset="0.5" stop-color="#ddd3ba"/><stop offset="1" stop-color="#b3a78c"/></linearGradient>
 <linearGradient id="banner" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a5a34"/><stop offset="0.5" stop-color="#6a4226"/><stop offset="1" stop-color="#3e2413"/></linearGradient>
@@ -45,6 +56,7 @@ EXTRA = """
 <linearGradient id="btnHot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff7c8"/><stop offset="0.55" stop-color="#ffd24a"/><stop offset="1" stop-color="#f0a520"/></linearGradient>
 <linearGradient id="btnOff" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8d8573"/><stop offset="1" stop-color="#5c5546"/></linearGradient>
 """
+DEFS = DEFS.replace('fill="url(#back)" stroke="url(#gold)" stroke-width="2.4"/>', 'fill="url(#back)" stroke="url(#gold)" stroke-width="2.4" filter="url(#texLeather)"/>')
 DEFS = DEFS.replace("</defs>", EXTRA + icon_defs() + "\n</defs>")
 
 HEX = "0,-16 13.9,-8 13.9,8 0,16 -13.9,8 -13.9,-8"
@@ -54,7 +66,7 @@ def crystal(cx, cy, s, fill, label=None, fs=19):
     """Cristal hexagonal facetté (coût, mana, Démence)."""
     g = [f'<g transform="translate({cx} {cy}) scale({s})">',
          f'<polygon points="{HEX}" fill="#140c07" stroke="#140c07" stroke-width="5" stroke-linejoin="round"/>',
-         f'<polygon points="{HEX}" fill="url(#{fill})" stroke="url(#gold)" stroke-width="2.2" stroke-linejoin="round"/>',
+         f'<polygon points="{HEX}" fill="url(#{fill})" stroke="url(#gold)" stroke-width="2.2" stroke-linejoin="round" filter="url(#texRock)"/>',
          '<polygon points="0,-16 13.9,-8 0,-2 -13.9,-8" fill="#ffffff" opacity="0.28"/>',
          '<polygon points="-13.9,-8 0,-2 0,16 -13.9,8" fill="#ffffff" opacity="0.08"/>',
          '<polygon points="13.9,-8 0,-2 0,16 13.9,8" fill="#000000" opacity="0.18"/>']
@@ -66,37 +78,40 @@ def crystal(cx, cy, s, fill, label=None, fs=19):
 
 def card(x, y, title, cost, rarity, icon, lines, scale=1.0, tag=None, state=None, tsize=12, up=False):
     col = RARITY[rarity]
+    school = "hShadow" if "shadow" in icon else ("hWard" if "innerfire" in icon or "shield" in icon else "hHoly")
     g = [f'<g transform="translate({x} {y}) scale({scale})">']
     g.append('<g filter="url(#glow)">' if state == "hover" else '<g filter="url(#shadowSm)">')
     if state == "hover":
         g.append('<rect x="-3" y="-3" width="130" height="182" rx="13" fill="none" stroke="url(#goldHot)" stroke-width="3.5"/>')
     g.append('<g filter="url(#grey)">' if state == "off" else '<g>')
-    # corps
     g.append('<rect x="0" y="0" width="124" height="176" rx="11" fill="#140c07"/>')
-    g.append('<rect x="2.5" y="2.5" width="119" height="171" rx="9" fill="url(#stone)"/>')
-    g.append('<rect x="2.5" y="2.5" width="119" height="171" rx="9" filter="url(#grainPaper)" opacity="0.35"/>')
-    g.append('<path d="M5 12 Q5 5 12 5 H112 Q119 5 119 12" fill="none" stroke="#ffffff" stroke-width="1.6" opacity="0.8"/>')
+    g.append('<rect x="2.5" y="2.5" width="119" height="171" rx="9" fill="url(#stone)" filter="url(#texStone)"/>')
+    # en-tête à la couleur de l'école
+    g.append(f'<path d="M5.5 52 V12 Q5.5 5.5 12 5.5 H112 Q118.5 5.5 118.5 12 V52Z" fill="url(#{school})" filter="url(#texCloth)"/>')
+    g.append('<path d="M5.5 52 V12 Q5.5 5.5 12 5.5 H112 Q118.5 5.5 118.5 12 V52Z" fill="none" stroke="#140c07" stroke-opacity="0.55" stroke-width="1.2"/>')
+    g.append('<path d="M34 27 l5 -5 l5 5 l-5 5z M48 27 l5 -5 l5 5 l-5 5z M62 27 l5 -5 l5 5 l-5 5z" fill="#ffffff" opacity="0.22"/><path d="M28 36 H72" stroke="#140c07" stroke-opacity="0.3" stroke-width="1"/>')
+    g.append('<path d="M5 12 Q5 5 12 5 H112 Q119 5 119 12" fill="none" stroke="#ffffff" stroke-width="1.4" opacity="0.7"/>')
     g.append(f'<rect x="5.5" y="5.5" width="113" height="165" rx="6.5" fill="none" stroke="{col}" stroke-width="2"/>')
-    # fenêtre de l'illustration : l'icône du sort
-    g.append('<path d="M25 87 V49 A37 37 0 0 1 99 49 V87Z" fill="#140c07" stroke="#140c07" stroke-width="9" stroke-linejoin="round"/>')
-    g.append(f'<g clip-path="url(#cArch)"><use href="#ic_{icon}" transform="translate(22 10) scale(1.4286)"/><rect x="22" y="10" width="80" height="26" fill="url(#gloss)" opacity="0.5"/></g>')
-    g.append('<path d="M25 87 V49 A37 37 0 0 1 99 49 V87Z" fill="none" stroke="url(#gold)" stroke-width="4" stroke-linejoin="round"/>')
-    g.append('<path d="M27.5 86 V49 A34.5 34.5 0 0 1 96.5 49 V86" fill="none" stroke="#140c07" stroke-opacity="0.55" stroke-width="1"/>')
+    # icône du sort, à sa taille d'origine, en haut à droite
+    g.append('<rect x="73.5" y="5.500000000000001" width="45" height="45" rx="8" fill="#140c07"/>')
+    g.append(f'<g clip-path="url(#cIcon)"><use href="#ic_{icon}" transform="translate(77 9) scale(0.6786)"/><rect x="77" y="9" width="38" height="13" fill="url(#gloss)" opacity="0.45"/></g>')
+    g.append('<rect x="76" y="8" width="40" height="40" rx="6" fill="none" stroke="url(#gold)" stroke-width="2.4" filter="url(#texMetal)"/>')
     # bandeau du nom
-    g.append('<path d="M2 88 Q62 77 122 88 V106 Q62 95 2 106Z" fill="url(#banner)" stroke="#140c07" stroke-width="2.2" stroke-linejoin="round"/>')
-    g.append('<path d="M5 90.5 Q62 80 119 90.5" fill="none" stroke="#e2b877" stroke-width="1.2" opacity="0.8"/>')
+    g.append('<path d="M2 51 Q62 44 122 51 V69 Q62 62 2 69Z" fill="#140c07" stroke="#140c07" stroke-width="2.2" stroke-linejoin="round"/>')
+    g.append('<path d="M3 51.5 Q62 44.8 121 51.5 V68.5 Q62 61.8 3 68.5Z" fill="url(#banner)" filter="url(#texLeather)"/>')
+    g.append('<path d="M5 53.5 Q62 47 119 53.5" fill="none" stroke="#e2b877" stroke-width="1.2" opacity="0.8"/>')
     tcol = "#b8f59a" if up else "#ffffff"
-    g.append(f'<text {FT} font-size="{tsize}" fill="{tcol}" stroke-width="2.6" {OUTL} text-anchor="middle" x="62" y="99.5">{title}{"+" if up else ""}</text>')
+    g.append(f'<text {FT} font-size="{tsize}" fill="{tcol}" stroke-width="2.6" {OUTL} text-anchor="middle" x="62" y="63">{title}{"+" if up else ""}</text>')
     # texte
-    g.append('<rect x="10" y="111" width="104" height="57" rx="5" fill="#140c07"/><rect x="11.5" y="112.5" width="101" height="54" rx="4" fill="url(#textbox)"/>')
+    g.append('<rect x="10" y="75" width="104" height="93" rx="5" fill="#140c07"/><rect x="11.5" y="76.5" width="101" height="90" rx="4" fill="url(#textbox)" filter="url(#texPaper)"/>')
+    g.append('<rect x="14" y="79" width="96" height="85" rx="3" fill="none" stroke="#8a6a3a" stroke-opacity="0.45" stroke-width="1"/>')
     n = len(lines)
-    size = 11.8 if n <= 2 else 10.4
-    step = 14 if n <= 2 else 12.4
-    y0 = 142.5 - (n - 1) * step / 2 + size * 0.34 + 2
+    size = 12 if n <= 2 else 10.4
+    step = 16 if n <= 2 else 14
+    y0 = 124 - (n - 1) * step / 2 + size * 0.34 + (4 if tag else 2)
     for i, ln in enumerate(lines):
         g.append(f'<text xml:space="preserve" x="62" y="{y0 + i * step:.1f}" text-anchor="middle" {FB} font-size="{size}" fill="#2b1c10">{rich(ln)}</text>')
-    # gemme de rareté
-    g.append(f'<path d="M62 104 l7.500000000000001 7 l-7.500000000000001 7 l-7.500000000000001 -7z" fill="#140c07" stroke="#140c07" stroke-width="3" stroke-linejoin="round"/><path d="M62 104 l7.500000000000001 7 l-7.500000000000001 7 l-7.500000000000001 -7z" fill="{col}" stroke="url(#gold)" stroke-width="1.4"/><path d="M62 104 l7.500000000000001 7 h-15z" fill="#ffffff" opacity="0.45"/>')
+    g.append(f'<path d="M62 66 l7.500000000000001 7 l-7.500000000000001 7 l-7.500000000000001 -7z" fill="#140c07" stroke="#140c07" stroke-width="3" stroke-linejoin="round"/><path d="M62 66 l7.500000000000001 7 l-7.500000000000001 7 l-7.500000000000001 -7z" fill="{col}" stroke="url(#gold)" stroke-width="1.4"/><path d="M62 66 l7.500000000000001 7 h-15z" fill="#ffffff" opacity="0.45"/>')
     g.append('</g>')
     g.append(crystal(9, 11, 1.02, "crystalOff" if state == "off" else "crystal", cost))
     if tag:
@@ -148,7 +163,7 @@ def intent(cx, y, color, light, icon, label, w=None):
     return (f'<g transform="translate({cx} {y})" filter="url(#shadowSm)">'
             f'<path d="M-8 28 L0 39 L8 28Z" fill="#2b1b11" stroke="#140c07" stroke-width="2.4" stroke-linejoin="round"/>'
             f'<rect x="{-w / 2}" y="0" width="{w}" height="30" rx="15" fill="#140c07"/>'
-            f'<rect x="{-w / 2 + 2}" y="2" width="{w - 4}" height="26" rx="13" fill="url(#plaque)" stroke="{color}" stroke-width="2"/>'
+            f'<rect x="{-w / 2 + 2}" y="2" width="{w - 4}" height="26" rx="13" fill="url(#plaque)" stroke="{color}" stroke-width="2" filter="url(#texLeather)"/>'
             f'<path d="M-6 28.5 L0 36.5 L6 28.5Z" fill="#241710"/>'
             f'<g transform="translate({-w / 2 + 16} 15)"><circle r="11.5" fill="#140c07"/><g clip-path="url(#cInt)"><use href="#ic_{icon}" transform="translate(-11 -11) scale(0.393)"/></g><circle r="10.5" fill="none" stroke="{color}" stroke-width="1.6"/></g>'
             f'<text x="{-w / 2 + 32}" y="{22.5 if big else 20.5}" {FT} font-size="{20 if big else 14}" fill="{light if not big else "#ffffff"}" stroke-width="3" {OUTL}>{label}</text></g>')
@@ -163,7 +178,7 @@ def button(x, y, w, h, label, kind="gold", size=18):
     return (f'<g transform="translate({x} {y + (5 - lip)})" {f}>'
             f'<rect x="0" y="0" width="{w}" height="{h + lip}" rx="{r}" fill="#140c07"/>'
             f'<rect x="2.5" y="{2.5 + lip}" width="{w - 5}" height="{h - 5}" rx="{r - 2.5}" fill="{"#8a5a0c" if kind != "off" else "#3c372d"}"/>'
-            f'<rect x="2.5" y="2.5" width="{w - 5}" height="{h - 5}" rx="{r - 2.5}" fill="url(#{fill})"/>'
+            f'<rect x="2.5" y="2.5" width="{w - 5}" height="{h - 5}" rx="{r - 2.5}" fill="url(#{fill})" filter="url(#texMetal)"/>'
             + (f'<rect x="2.5" y="2.5" width="{w - 5}" height="{h - 5}" rx="{r - 2.5}" fill="#000000" opacity="0.14"/>' if kind == "down" else
                f'<rect x="10" y="5.500000000000001" width="{w - 20}" height="{h * 0.3:.1f}" rx="{h * 0.15:.1f}" fill="#ffffff" opacity="0.4"/>')
             + f'<text x="{w / 2}" y="{h / 2 + size * 0.34:.1f}" text-anchor="middle" {FT} font-size="{size}" fill="{tc}">{label}</text></g>')
@@ -184,14 +199,13 @@ def pile(x, y, n, faded=False):
 
 
 FRAME = '''<rect x="3" y="3" width="1034" height="614" rx="8" fill="none" stroke="#140c07" stroke-width="6"/>
-<rect x="3" y="3" width="1034" height="614" rx="8" fill="none" stroke="#7a5229" stroke-width="3.5"/>
+<rect x="3" y="3" width="1034" height="614" rx="8" fill="none" stroke="#7a5229" stroke-width="3.5" filter="url(#texWood)"/>
 <rect x="5.5" y="5.5" width="1029" height="609" rx="6" fill="none" stroke="#f0c75e" stroke-opacity="0.55" stroke-width="1"/>
 <g fill="url(#gold)" stroke="#140c07" stroke-width="1.6"><circle cx="11" cy="11" r="5.500000000000001"/><circle cx="1029" cy="11" r="5.500000000000001"/><circle cx="11" cy="609" r="5.500000000000001"/><circle cx="1029" cy="609" r="5.500000000000001"/></g>'''
 
 
 def topbar():
-    s = ['<rect x="0" y="0" width="1040" height="46" fill="url(#bar)"/>',
-         '<rect x="0" y="0" width="1040" height="46" filter="url(#grainWood)" opacity="0.5"/>',
+    s = ['<rect x="0" y="0" width="1040" height="46" fill="url(#bar)" filter="url(#texWood)"/>',
          '<rect x="0" y="43" width="1040" height="3.5" fill="#140c07"/><rect x="0" y="42" width="1040" height="2.4" fill="url(#gold)"/><rect x="0" y="46" width="1040" height="7" fill="url(#lipShade)"/>',
          f'<text x="22" y="29" {FT} font-size="18" fill="#ffd76a" stroke-width="3" {OUTL}>Prêtre</text>',
          drop(116, 23, "", r=9),
@@ -226,6 +240,13 @@ def topbar():
 
 def name(cx, y, t):
     return f'<text x="{cx}" y="{y}" text-anchor="middle" {FT6} font-size="14" fill="#ffffff" stroke-width="3" {OUTL}>{t}</text>'
+
+
+def table():
+    return '''<rect x="0" y="424" width="1040" height="196" fill="url(#table)" filter="url(#texWood)"/>
+<path d="M0 492 H1040 M0 560 H1040" stroke="#170e08" stroke-width="2" opacity="0.75"/><path d="M0 494 H1040 M0 562 H1040" stroke="#8a5f33" stroke-width="1" opacity="0.4"/>
+<rect x="0" y="424" width="1040" height="10" fill="url(#lip)" filter="url(#texWood)"/><rect x="0" y="424" width="1040" height="1.2" fill="#e2bd7a" opacity="0.8"/><rect x="0" y="434" width="1040" height="2" fill="#140c07"/>
+<rect x="0" y="436" width="1040" height="16" fill="url(#lipShade)"/>'''
 
 
 def manaBlock(cx, cy):
@@ -265,7 +286,7 @@ ENEMY = {
 
 def combat():
     b = ['<g clip-path="url(#win)">', SCENE.replace('y="44"', 'y="46"'), topbar()]
-    b.append('<g transform="translate(101 82)" filter="url(#shadowSm)"><rect width="190" height="34" rx="17" fill="#140c07"/><rect x="2" y="2" width="186" height="30" rx="15" fill="url(#plaque)" stroke="url(#gold)" stroke-width="1.6"/>'
+    b.append('<g transform="translate(101 82)" filter="url(#shadowSm)"><rect width="190" height="34" rx="17" fill="#140c07"/><rect x="2" y="2" width="186" height="30" rx="15" fill="url(#plaque)" stroke="url(#gold)" stroke-width="1.6" filter="url(#texLeather)"/>'
              '<g transform="translate(17 17)"><circle r="12.5" fill="#140c07"/><g clip-path="url(#cInt)"><use href="#ic_spell_holy_searinglight" transform="translate(-11 -11) scale(0.393)"/></g><circle r="10.5" fill="none" stroke="url(#gold)" stroke-width="1.6"/></g>'
              f'<text x="36" y="15" {FB} font-weight="800" font-size="12" fill="#ffffff">Flammes sacrées</text>'
              '<rect x="35" y="20" width="142" height="7" rx="3.5" fill="#0f0906"/><rect x="36" y="21" width="88" height="5" rx="2.5" fill="url(#castFill)"/></g>')
@@ -317,10 +338,10 @@ def kit():
 
     def cap(x, y, t):
         return f'<text x="{x}" y="{y}" text-anchor="middle" {FB} font-size="12.5" fill="#d9c8a0">{t}</text>'
-    b = ['<g clip-path="url(#win)">', '<rect width="1040" height="620" fill="url(#table)"/><rect width="1040" height="620" filter="url(#grainWood)" opacity="0.7"/>']
+    b = ['<g clip-path="url(#win)">', '<rect width="1040" height="620" fill="url(#table)" filter="url(#texWood)"/>']
     b.append(label(34, 38, "La carte"))
     b.append(C("penance", 44, 70, scale=2.2))
-    b.append(f'<text x="34" y="496" {FB} font-size="13.5" fill="#d9c8a0"><tspan x="34" dy="0">Corps de pierre claire, fenêtre en arche avec</tspan><tspan x="34" dy="18">l\'icône du sort, bandeau du nom, gemme de</tspan><tspan x="34" dy="18">rareté, cristal de coût. Chiffres blancs cernés</tspan><tspan x="34" dy="18">de noir, lisibles sur tous les fonds.</tspan></text>')
+    b.append(f'<text x="34" y="496" {FB} font-size="13.5" fill="#d9c8a0"><tspan x="34" dy="0">Corps de pierre, en-tête à la couleur de</tspan><tspan x="34" dy="18">l\'école, icône du sort à sa taille en haut à</tspan><tspan x="34" dy="18">droite, bandeau du nom, gemme de rareté.</tspan><tspan x="34" dy="18">Un grain par matière : pierre, cuir, papier.</tspan></text>')
     b.append(label(350, 38, "Raretés"))
     b.append(C("smite", 352, 58, scale=0.92))
     b.append(C("nova", 480, 58, scale=0.92))
