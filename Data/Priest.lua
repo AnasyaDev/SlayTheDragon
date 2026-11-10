@@ -34,14 +34,14 @@ card("inner_fire", {
 })
 
 card("pw_shield", {
-  name = "Mot de pouvoir : Bouclier", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
+  name = "MdP : Bouclier", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
   cooldown = 2, effects = { { "absorb", 8 } },
   text = "Gagne 8 Absorption. Recharge 2.",
   up = { effects = { { "absorb", 11 } }, text = "Gagne 11 Absorption. Recharge 2." },
 })
 
 card("sw_pain", {
-  name = "Mot de l'ombre : Douleur", cost = 1, type = "skill", school = "shadow", rarity = "basic", path = "start",
+  name = "MdlO : Douleur", cost = 1, type = "skill", school = "shadow", rarity = "basic", path = "start",
   target = "enemy", effects = { { "apply", "pain", 5 }, { "demence", 1 } },
   text = "Douleur 5. +1 Démence.",
   up = { effects = { { "apply", "pain", 7 }, { "demence", 1 } }, text = "Douleur 7. +1 Démence." },
@@ -50,7 +50,7 @@ card("sw_pain", {
 -- Discipline ----------------------------------------------------------------
 
 card("radiance", {
-  rep = 0, name = "Mot de pouvoir : Radiance", cost = 1, type = "skill", school = "holy", rarity = "common", path = "discipline",
+  rep = 0, name = "MdP : Radiance", cost = 1, type = "skill", school = "holy", rarity = "common", path = "discipline",
   effects = { { "apply", "atonement", 1, self = true }, { "absorb", 4 } },
   text = "Expiation 1 tour. Gagne 4 Absorption.",
   up = { effects = { { "apply", "atonement", 2, self = true }, { "absorb", 6 } },
@@ -64,9 +64,9 @@ end
 card("penance", {
   rep = 0, name = "Pénitence", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "discipline",
   target = "enemy", effects = { { "damage", 6, times = 3, onHit = penanceHit } },
-  text = "Inflige 6 trois fois. Sous Expiation, chaque coup donne aussi 2 Absorption.",
+  text = "Inflige 6 trois fois. Chaque coup sous Expiation : +2 Absorption.",
   up = { effects = { { "damage", 8, times = 3, onHit = penanceHit } },
-    text = "Inflige 8 trois fois. Sous Expiation, chaque coup donne aussi 2 Absorption." },
+    text = "Inflige 8 trois fois. Chaque coup sous Expiation : +2 Absorption." },
 })
 
 card("pain_suppression", {
@@ -84,7 +84,7 @@ local function solaceMana(c, ctx)
 end
 
 card("solace", {
-  rep = 0, name = "Mot de pouvoir : Réconfort", cost = 1, type = "attack", school = "holy", rarity = "common", path = "discipline",
+  rep = 0, name = "MdP : Réconfort", cost = 1, type = "attack", school = "holy", rarity = "common", path = "discipline",
   target = "enemy", effects = { { "fn", solaceMana }, { "damage", 5 }, { "apply", "atonement", 1, self = true } },
   text = "Inflige 5. Sous Expiation : +1 mana. Expiation 1 tour.",
   up = { effects = { { "fn", solaceMana }, { "damage", 8 }, { "apply", "atonement", 1, self = true } },
@@ -101,9 +101,9 @@ card("angelic_feather", {
 card("luminous_barrier", {
   rep = 0, name = "Barrière lumineuse", cost = 2, type = "skill", school = "holy", rarity = "common", path = "discipline",
   cooldown = 2, effects = { { "absorb", 12 }, { "apply", "atonement", 1, self = true } },
-  text = "Gagne 12 Absorption. Expiation 1 tour. Recharge 2.",
+  text = "Expiation 1 tour. Gagne 12 Absorption. Recharge 2.",
   up = { effects = { { "absorb", 16 }, { "apply", "atonement", 1, self = true } },
-    text = "Gagne 16 Absorption. Expiation 1 tour. Recharge 2." },
+    text = "Expiation 1 tour. Gagne 16 Absorption. Recharge 2." },
 })
 
 card("schism", {
@@ -139,8 +139,8 @@ end
 card("rapture", {
   rep = 2, name = "Extase", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
   power = true, effects = {}, hooks = raptureHooks(1),
-  text = "Pouvoir. Chaque gain d'Absorption donne 1 de plus.",
-  up = { hooks = raptureHooks(2), text = "Pouvoir. Chaque gain d'Absorption donne 2 de plus." },
+  text = "Pouvoir. Chaque gain d'Absorption : +1.",
+  up = { hooks = raptureHooks(2), text = "Pouvoir. Chaque gain d'Absorption : +2." },
 })
 
 -- Ombre -----------------------------------------------------------------------
@@ -204,16 +204,16 @@ end
 card("shadowform", {
   rep = 0, name = "Forme d'ombre", cost = 1, type = "power", school = "shadow", rarity = "rare", path = "shadow",
   power = true, effects = { { "demence", 2 } }, hooks = shadowformHooks(3),
-  text = "Pouvoir. +2 Démence. Les cartes d'ombre infligent 3 de plus et posent 3 Douleur de plus.",
+  text = "Pouvoir. +2 Démence. Cartes d'ombre : dégâts et Douleur +3.",
   up = { hooks = shadowformHooks(4),
-    text = "Pouvoir. +2 Démence. Les cartes d'ombre infligent 4 de plus et posent 4 Douleur de plus." },
+    text = "Pouvoir. +2 Démence. Cartes d'ombre : dégâts et Douleur +4." },
 })
 
 card("silence", {
   rep = 0, name = "Silence", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "draw", 1 } },
-  text = "Interrompt le sort que la cible incante. Pioche 1. Recharge 2.",
-  up = { cooldown = 1, text = "Interrompt le sort que la cible incante. Pioche 1. Recharge 1." },
+  text = "Interrompt l'incantation de la cible. Pioche 1. Recharge 2.",
+  up = { cooldown = 1, text = "Interrompt l'incantation de la cible. Pioche 1. Recharge 1." },
 })
 
 card("vampiric_touch", {
@@ -237,7 +237,7 @@ local function executeBonus(c, ctx, t)
 end
 
 card("sw_death", {
-  rep = 1, name = "Mot de l'ombre : Mort", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "shadow",
+  rep = 1, name = "MdlO : Mort", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "shadow",
   target = "enemy", executeBonus = 6, effects = { { "damage", 6, bonus = executeBonus }, { "demence", 1 } },
   text = "Inflige 6, ou 12 si la cible a la moitié de ses PV ou moins. +1 Démence.",
   up = { executeBonus = 9, effects = { { "damage", 8, bonus = executeBonus }, { "demence", 1 } },
@@ -266,8 +266,8 @@ card("void_eruption", {
   rep = 2, name = "Éruption du Vide", cost = 1, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
   target = "enemy", perDemence = 4, effects = { { "fn", spendDemence }, { "damage", 4, bonus = eruptionBonus } },
   canPlay = function(c) return c.player.demence > 0 end,
-  text = "Dépense toute la Démence : inflige 4, plus 4 par point dépensé.",
-  up = { perDemence = 5, text = "Dépense toute la Démence : inflige 4, plus 5 par point dépensé." },
+  text = "Dépense toute la Démence : inflige 4 + 4 par point.",
+  up = { perDemence = 5, text = "Dépense toute la Démence : inflige 4 + 5 par point." },
 })
 
 -- Sacré -----------------------------------------------------------------------
@@ -283,9 +283,9 @@ card("holy_fire", {
 card("holy_nova", {
   rep = 0, name = "Nova sacrée", cost = 1, type = "attack", school = "holy", rarity = "common", path = "holy",
   effects = { { "damage", 4, all = true }, { "apply", "regen", 2, self = true } },
-  text = "Inflige 4 à tous les ennemis. Récupération 2.",
+  text = "Récupération 2. Inflige 4 à tous les ennemis.",
   up = { effects = { { "damage", 6, all = true }, { "apply", "regen", 3, self = true } },
-    text = "Inflige 6 à tous les ennemis. Récupération 3." },
+    text = "Récupération 3. Inflige 6 à tous les ennemis." },
 })
 
 card("chastise", {
@@ -316,9 +316,9 @@ card("spirit_of_redemption", {
       return true
     end,
   },
-  text = "Pouvoir. Une fois par combat, à 0 PV, reste à 1 PV, gagne Récupération 6 et le tour suivant est gratuit.",
+  text = "Pouvoir. Une fois par combat, à 0 PV : reste à 1 PV, Récupération 6, tour suivant gratuit.",
   up = { cost = 0,
-    text = "Pouvoir. Une fois par combat, à 0 PV, reste à 1 PV, gagne Récupération 6 et le tour suivant est gratuit." },
+    text = "Pouvoir. Une fois par combat, à 0 PV : reste à 1 PV, Récupération 6, tour suivant gratuit." },
 })
 
 card("renew", {
@@ -331,9 +331,9 @@ card("renew", {
 card("halo", {
   rep = 0, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
   cast = true, effects = { { "damage", 15, all = true }, { "apply", "regen", 3, self = true } },
-  text = "Incantation. Inflige 15 à tous les ennemis. Récupération 3.",
+  text = "Incantation. Récupération 3. Inflige 15 à tous les ennemis.",
   up = { effects = { { "damage", 19, all = true }, { "apply", "regen", 4, self = true } },
-    text = "Incantation. Inflige 19 à tous les ennemis. Récupération 4." },
+    text = "Incantation. Récupération 4. Inflige 19 à tous les ennemis." },
 })
 
 card("flash_heal", {
@@ -363,8 +363,8 @@ local apotheosisHooks = {
 card("apotheosis", {
   rep = 2, name = "Apothéose", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {}, hooks = apotheosisHooks,
-  text = "Pouvoir. +1 mana à chaque tour. Les incantations coûtent 1 mana de moins.",
-  up = { cost = 1, text = "Pouvoir. +1 mana à chaque tour. Les incantations coûtent 1 mana de moins." },
+  text = "Pouvoir. +1 mana par tour. Incantations : coût −1.",
+  up = { cost = 1, text = "Pouvoir. +1 mana par tour. Incantations : coût −1." },
 })
 
 -- Classe ------------------------------------------------------------------------

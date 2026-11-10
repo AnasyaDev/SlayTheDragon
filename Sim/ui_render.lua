@@ -102,6 +102,48 @@ local function rect(o, memo, depth)
 end
 R.rect = rect
 
+-- Animations d'échelle (faux client : R.H.visualScale) : la mise en page (rect) les ignore, comme dans
+-- le jeu ; le rendu les applique autour du centre du cadre animé. Cadres dont l'animation s'applique à
+-- la région o, du plus proche au plus lointain : son parent et ses ancêtres ; avec regionsOnly
+-- (hypothèse prudente : une animation Scale ne porte que sur les régions du cadre animé, pas sur ses
+-- cadres enfants), le seul parent direct.
+local function animated(o, regionsOnly)
+  local out = {}
+  local kind = rawget(o, "_kind")
+  local a = (kind == "Texture" or kind == "FontString" or kind == "Line" or kind == "MaskTexture")
+    and rawget(o, "_parent") or o
+  while a and rawget(a, "_name") ~= "UIParent" do
+    local k = (R.H and R.H.visualScale and rawget(a, "_kids")) and R.H.visualScale(a) or 1
+    if k ~= 1 then out[#out + 1] = { a, k } end
+    if regionsOnly then break end
+    a = rawget(a, "_parent")
+  end
+  return out
+end
+
+-- Rectangle affiché {l, b, r, t} (animations d'échelle comprises).
+function R.vrect(o, regionsOnly)
+  local r = rect(o)
+  if not r then return nil end
+  local l, b, rr, t = r[1], r[2], r[3], r[4]
+  for _, e in ipairs(animated(o, regionsOnly)) do
+    local c = rect(e[1])
+    if c then
+      local cx, cy, k = (c[1] + c[3]) / 2, (c[2] + c[4]) / 2, e[2]
+      l, rr = cx + (l - cx) * k, cx + (rr - cx) * k
+      b, t = cy + (b - cy) * k, cy + (t - cy) * k
+    end
+  end
+  return { l, b, rr, t }
+end
+
+-- Facteur d'échelle affiché d'une région dû aux animations (1 sans animation).
+function R.vfactor(o, regionsOnly)
+  local k = 1
+  for _, e in ipairs(animated(o, regionsOnly)) do k = k * e[2] end
+  return k
+end
+
 local function visible(o)
   while o do
     if not rawget(o, "_shown") then return false end
@@ -254,7 +296,8 @@ function R.svg(H, root, path, label)
   end
   for _, it in ipairs(items) do
     local o = it.o
-    local r = rect(o)
+    local r = R.vrect(o)
+    local vk = R.vfactor(o)
     local calls = rawget(o, "_calls")
     local a = alpha(o)
     if it.kind == "Line" and a > 0.01 and calls.SetStartPoint and calls.SetEndPoint then
@@ -343,10 +386,10 @@ function R.svg(H, root, path, label)
       elseif it.kind == "FontString" then
         local text = rawget(o, "_text")
         if text and text ~= "" then
-          local size = (rawget(o, "_fontSize") or 12) * escale(o)
+          local size = (rawget(o, "_fontSize") or 12) * escale(o) * vk
           local tc = calls.SetTextColor or { 1, 1, 1 }
           local jh = calls.SetJustifyH and calls.SetJustifyH[1] or "CENTER"
-          local ww = (rawget(o, "_w") or 0) * escale(o)
+          local ww = (rawget(o, "_w") or 0) * escale(o) * vk
           local fpath = tostring(rawget(o, "_fontPath") or "")
           local weight = fpath:find("heavy") and 800 or (fpath:find("bold") and 700 or 500)
           local family = fpath:find("Baloo") and "'Baloo Chettan 2'" or (rawget(o, "_fontFile") == "title" and "serif" or "sans-serif")
@@ -354,7 +397,7 @@ function R.svg(H, root, path, label)
           local ws = words(tostring(text))
           local maxW = ww > 0 and ww or 1e9
           local lines, cur, curW = {}, {}, 0
-          local es = escale(o)
+          local es = escale(o) * vk
           for _, wd in ipairs(ws) do
             if wd[1] == "\n" then
               lines[#lines + 1] = cur cur, curW = {}, 0

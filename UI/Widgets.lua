@@ -184,6 +184,7 @@ function W.animTo(obj, key, target, dur, rest)
   end
   if ch.to == target then return end
   dur = dur or W.HOVER_IN
+  if obj._hoverable and dur > 0 then dur = dur * W.zoomSlow() end
   if dur <= 0 then W.animSet(obj, key, target) return end
   ch.from, ch.to, ch.t, ch.dur = ch.v, target, 0, dur
   ch.token = (ch.token or 0) + 1
@@ -211,29 +212,61 @@ function W.driverAwake() return driver.awake and true or false end
 -- curseur de la zone (entrée/sortie en boucle). Le cadre interactif reste donc immobile (zone de
 -- survol) ; tout ce qui se voit vit dans son enfant `face`, seul animé (échelle, décalage).
 
--- Agrandissement des visuels (survols, vols de cartes). Deux exigences : aucun tressautement des
--- textes pendant le mouvement, et un texte NET une fois la carte agrandie (c'est celle qu'on lit).
---   * Changer l'échelle réelle (SetScale) à chaque image fait recalculer au client la taille de
---     police effective à chaque pas : glyphes qui sautent pendant le mouvement.
+-- Agrandissement des visuels (survols, vols de cartes). Trois exigences : un mouvement fluide, aucun
+-- tressautement des textes, et un texte net une fois la carte agrandie (c'est celle qu'on lit).
+--   * Changer l'échelle réelle (SetScale) fait re-rasteriser au client toutes les polices du visuel
+--     (SetSmoothScaling : hauteur non arrondie, donc une nouvelle taille à chaque pas) : à chaque
+--     image, c'est lent (15 images/s en jeu) ; en une fois, les glyphes se recalent (« saut »).
 --   * Une animation Scale d'un AnimationGroup avec des textes en mode Vertex
---     (FontString:SetScaleAnimationMode, comme Blizzard_EncounterWarnings) fige la mise en page,
---     mais les glyphes rasterisés à la petite taille sont étirés : baveux s'ils le restent.
--- Mode « net » (défaut) : l'étirement ne sert que pendant le mouvement (0,12 s, invisible) ; à
--- l'arrivée, dans le même pas de l'OnUpdate partagé, l'échelle d'arrivée devient l'échelle RÉELLE
--- du visuel (SetScale) et l'animation est coupée (Stop) : le client re-rasterise les polices à la
--- vraie taille. L'animation est toujours relative à l'échelle réelle du moment (facteur 1 au départ :
--- la toute première image est identique avec ou sans animation) et tient son état d'arrivée par un
--- long délai de fin jusqu'à la bascule (pas d'image où elle serait retombée à 1 avant le SetScale).
--- La mise en page ne bouge pas à la bascule : retours à la ligne explicites (W.card), largeurs et
--- ancrages en unités du visuel, et textes en SetSmoothScaling (hauteur de police non arrondie au
--- pixel, comme les barres d'info de Blizzard) : la taille rendue est exactement proportionnelle.
--- Mode « lisse » (/slay zoom lisse, comparaison) : SetScale à chaque image, comme avant l'animation.
-W.ZOOM_MODES = { "net", "lisse" }
-local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée jusqu'à la bascule (secondes)
+--     (FontString:SetScaleAnimationMode, comme Blizzard_EncounterWarnings) est fluide (GPU) et fige
+--     la mise en page, mais étire les glyphes rasterisés à l'échelle réelle.
+-- Mode « net » (défaut, préféré pour la fluidité) : l'étirement ne sert que pendant le mouvement ; à
+-- l'arrivée, dans le même pas de l'OnUpdate partagé, l'échelle d'arrivée devient l'échelle réelle
+-- (SetScale) et l'animation est coupée (Stop) : texte net. L'animation est relative à l'échelle réelle du
+-- moment (facteur 1 au départ) et tient son état d'arrivée jusqu'à la bascule. Pour qu'à la bascule rien
+-- ne saute : aucun cadre enfant dessiné sous un visuel (une animation Scale pourrait ne porter que sur
+-- les régions du cadre animé : un cadre enfant ne grossirait qu'à la bascule) — plaques de carte et
+-- médaillons de jetons sont des régions du visuel —, et textures sans accrochage au pixel (W.noSnap).
+-- Reste la re-rasterisation des polices à la bascule, inhérente à ce mode.
+-- Mode « fluide » (comparaison) : l'échelle RÉELLE du visuel vaut en permanence l'échelle survolée
+-- (hoverScale) : les polices sont rasterisées une fois, à la taille qu'on lit. Au repos, une animation
+-- Scale tenue (long délai de fin) réduit le visuel d'un facteur 1 / hoverScale ; le survol anime ce
+-- facteur vers 1, la sortie le ramène à 1 / hoverScale. Jamais de SetScale ni de Stop pendant un
+-- survol : aucune re-rasterisation, aucune bascule. Le repos est identique en taille et en position aux
+-- autres modes (harnais, U26). Un cadre caché arrête ses animations : l'OnShow du visuel repose l'état.
+-- L'animation n'est armée qu'après la construction du widget (image suivante) : une région créée sous
+-- un visuel dont l'animation joue est mal dessinée par le client (U23) ; avant, le visuel est au repos
+-- sans animation (échelle réelle 1), identique à l'œil. Les créations tardives passent par W.faceBuild.
+-- Mode « lisse » (comparaison) : SetScale à chaque image.
+-- Dans tous les modes, la mise en page ne dépend pas de l'échelle : retours à la ligne explicites
+-- (W.card), largeurs et ancrages en unités du visuel, textes en SetSmoothScaling (taille rendue
+-- exactement proportionnelle). /slay zoom lent : survols au ralenti (diagnostic en jeu).
+W.ZOOM_MODES = { "net", "fluide", "lisse" }
+W.ZOOM_DEFAULT = "net"
+local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée (secondes)
 
 function W.zoomMode()
   local o = ns.Persist and ns.Persist.options and ns.Persist.options()
-  return (o and o.zoom == "lisse") and "lisse" or "net"
+  local z = o and o.zoom
+  if z == "fluide" or z == "net" or z == "lisse" then return z end
+  return W.ZOOM_DEFAULT
+end
+
+-- Ralenti des survols (/slay zoom lent, diagnostic en jeu : voir ce qui ne suit pas l'animation et ce
+-- qui bouge à l'arrivée).
+W.ZOOM_SLOW = 8
+function W.zoomSlow()
+  local o = ns.Persist and ns.Persist.options and ns.Persist.options()
+  return (o and o.zoomSlow) and W.ZOOM_SLOW or 1
+end
+
+-- Accrochage au pixel coupé (textures : SetSnapToPixelGrid, SetTexelSnappingBias, comme les neuf
+-- tranches de Blizzard) : une pièce animée ne se recale pas d'un pixel d'une image à l'autre. Les
+-- FontString n'ont pas ces méthodes (SimpleTextureBaseAPI) : test d'existence.
+function W.noSnap(r)
+  if r.SetSnapToPixelGrid then r:SetSnapToPixelGrid(false) end
+  if r.SetTexelSnappingBias then r:SetTexelSnappingBias(0) end
+  return r
 end
 
 -- Textes de l'interface (W.label, W.text), pour le rafraîchissement des polices.
@@ -245,14 +278,21 @@ local function zoomText(fs)
     fs:SetScaleAnimationMode(Enum.FontStringScaleAnimationMode.Vertex)
   end
   if fs.SetSmoothScaling then fs:SetSmoothScaling(true) end
+  W.noSnap(fs)
 end
 W.zoomText = zoomText
 
+-- Survolables créés (pour reposer leur état quand la technique de zoom change).
+local faceOwners = setmetatable({}, { __mode = "k" })
+
 -- Bascule la technique de zoom ; renvoie le nouveau mode (une valeur inconnue, dont l'ancien
--- « anim », retombe sur « net »).
+-- « anim », retombe sur le défaut). Les visuels sont reposés dans le nouveau mode.
 function W.setZoomMode(mode)
-  if mode ~= "lisse" then mode = "net" end
+  if mode ~= "fluide" and mode ~= "net" and mode ~= "lisse" then mode = W.ZOOM_DEFAULT end
   ns.Persist.options().zoom = mode
+  for f in pairs(faceOwners) do
+    if f._animApply == W.faceApply and not f._fly then W.faceApply(f) end
+  end
   return mode
 end
 
@@ -288,25 +328,45 @@ local function stopZoom(face)
   end
 end
 
--- Fait filer le facteur d'animation de face vers target (relatif à l'échelle réelle) en dur
--- secondes, depuis le facteur courant (1 si l'animation ne joue pas : la première image d'un départ
--- est identique avec ou sans animation) ; dur 0 : coupe. smooth = lissage ("OUT" par défaut,
--- "IN_OUT" pour les vols de cartes).
-local function zoomTo(face, target, dur, smooth)
-  local z = face._zoom
-  if not z then
-    if target == 1 then return end
-    local ag = face:CreateAnimationGroup()
-    local anim = ag:CreateAnimation("Scale")
-    anim:SetOrigin("CENTER", 0, 0)
-    z = { ag = ag, anim = anim, from = 1, to = 1, t0 = 0, dur = 0 }
-    face._zoom = z
-  end
+local function newZoom(face)
+  local ag = face:CreateAnimationGroup()
+  local anim = ag:CreateAnimation("Scale")
+  anim:SetOrigin("CENTER", 0, 0)
+  local z = { ag = ag, anim = anim, from = 1, to = 1, t0 = 0, dur = 0 }
+  face._zoom = z
+  return z
+end
+
+local function setSmooth(z, smooth)
   smooth = smooth or "OUT"
   if z.smooth ~= smooth then
     z.smooth = smooth
     z.anim:SetSmoothing(smooth)
   end
+end
+
+-- Lance l'animation de cur vers target en dur secondes, puis la tient (long délai de fin).
+local function playZoom(z, cur, target, dur)
+  dur = max(dur, 0.001)
+  z.anim:SetScaleFrom(cur, cur)
+  z.anim:SetScaleTo(target, target)
+  z.anim:SetDuration(dur)
+  z.anim:SetEndDelay(ZOOM_HOLD)
+  z.from, z.to, z.t0, z.dur = cur, target, GetTime(), dur
+  z.ag:Play()
+end
+
+-- Mode « net » : fait filer le facteur d'animation de face vers target (relatif à l'échelle réelle)
+-- en dur secondes, depuis le facteur courant (1 si l'animation ne joue pas : la première image d'un
+-- départ est identique avec ou sans animation) ; dur 0 : coupe. smooth = lissage ("OUT" par défaut,
+-- "IN_OUT" pour les vols de cartes).
+local function zoomTo(face, target, dur, smooth)
+  local z = face._zoom
+  if not z then
+    if target == 1 then return end
+    z = newZoom(face)
+  end
+  setSmooth(z, smooth)
   local playing = z.ag:IsPlaying()
   -- déjà en route vers cette cible
   if playing and z.to == target then return end
@@ -316,13 +376,43 @@ local function zoomTo(face, target, dur, smooth)
     z.from, z.to = 1, 1
     return
   end
-  dur = max(dur, 0.001)
-  z.anim:SetScaleFrom(cur, cur)
-  z.anim:SetScaleTo(target, target)
-  z.anim:SetDuration(dur)
-  z.anim:SetEndDelay(ZOOM_HOLD)
-  z.from, z.to, z.t0, z.dur = cur, target, GetTime(), dur
-  z.ag:Play()
+  playZoom(z, cur, target, dur)
+end
+
+-- Mode « fluide » : le facteur d'animation de face file vers target en dur secondes puis y reste
+-- (jamais coupé : le facteur tenu EST l'état du visuel). Départ : facteur courant si l'animation joue,
+-- sinon cur0 (état à reposer : cadre remontré, premier armement) ; dur 0 : target tout de suite.
+-- force : relance même si la cible ne change pas (échelle réelle changée).
+local function holdTo(face, target, dur, smooth, cur0, force)
+  local z = face._zoom
+  if not z then
+    if target == 1 and (cur0 or 1) == 1 then return end -- facteur 1 : rien à animer
+    z = newZoom(face)
+  end
+  setSmooth(z, smooth)
+  local playing = z.ag:IsPlaying()
+  if playing and z.to == target and not force then return end
+  local cur
+  if force and cur0 then cur = cur0 elseif playing then cur = animFactor(face) else cur = cur0 or target end
+  if dur <= 0 then cur = target end
+  z.ag:Stop()
+  if not playing and cur == 1 and target == 1 then z.from, z.to = 1, 1 return end
+  playZoom(z, cur, target, cur == target and 0 or dur)
+end
+
+-- Crée des régions sous le visuel de f (création tardive : plaque de raison, étiquette de prix…)
+-- sans animation d'échelle en cours (le client dessine mal une région née pendant l'animation) :
+-- l'animation tenue est coupée le temps de fn, puis relancée au même facteur, dans le même appel.
+function W.faceBuild(f, fn)
+  local face = f.face
+  local z = face and face._zoom
+  if not (z and z.ag:IsPlaying()) then return fn() end
+  local cur, to = animFactor(face), z.to
+  local left = max(0, z.dur - (GetTime() - z.t0))
+  z.ag:Stop()
+  local a, b, c = fn()
+  playZoom(z, cur, to, cur == to and 0 or left)
+  return a, b, c
 end
 
 -- Crée le visuel `f.face`, centré sur f, de même taille (suivie par OnSizeChanged) plus margin de
@@ -335,17 +425,47 @@ function W.face(f, margin)
   face:SetSize(f:GetWidth() + 2 * margin, f:GetHeight() + 2 * margin)
   face:SetPoint("CENTER", f, "CENTER", 0, 0)
   f.face = face
+  faceOwners[f] = true
   f:HookScript("OnSizeChanged", function(self, w, h)
     if w and h then self.face:SetSize(w + 2 * self.faceMargin, h + 2 * self.faceMargin) end
   end)
-  -- un cadre caché arrête ses animations : au retour, l'état est reposé
+  -- un cadre caché arrête ses animations : au retour, l'état est reposé (avant la première image)
   face:SetScript("OnShow", function() if f._animApply == W.faceApply then W.faceApply(f) end end)
   return face
 end
 
--- Applique les canaux « hover » (0..1) et « dx » (pixels) au visuel. Mode « net » : pendant le
--- mouvement du canal « hover », échelle réelle inchangée et animation Scale vers l'échelle
--- d'arrivée ; canal immobile : échelle réelle = échelle d'arrivée, animation coupée (même appel).
+-- Mode « fluide » : échelle réelle = hs, facteur tenu = échelle voulue / hs. Renvoie l'échelle réelle.
+local function applyFluid(f, face, hs, h)
+  local ch = f._ch and f._ch.hover
+  local moving = ch and ch.t < ch.dur
+  if not face._armed and not moving and h == 0 then
+    -- widget pas encore armé (construction en cours) : repos sans animation, échelle réelle 1
+    if face:GetScale() ~= 1 then face:SetScale(1) end
+    stopZoom(face)
+    return 1
+  end
+  face._armed = true
+  local real = face:GetScale()
+  local cur0, force = (1 + (hs - 1) * h) / hs, nil
+  if real ~= hs then
+    -- premier armement, échelle de survol changée ou autre mode avant : échelle réelle posée, facteur
+    -- recalculé pour garder la taille visible
+    cur0 = real * animFactor(face) / hs
+    face:SetScale(hs)
+    force = true
+  end
+  if moving then
+    holdTo(face, (1 + (hs - 1) * ch.to) / hs, ch.dur - ch.t, "OUT", cur0, force)
+  else
+    holdTo(face, (1 + (hs - 1) * h) / hs, 0, "OUT", cur0, force)
+  end
+  return hs
+end
+
+-- Applique les canaux « hover » (0..1) et « dx » (pixels) au visuel. Mode « fluide » : voir
+-- applyFluid. Mode « net » : pendant le mouvement du canal « hover », échelle réelle inchangée et
+-- animation Scale vers l'échelle d'arrivée ; canal immobile : échelle réelle = échelle d'arrivée,
+-- animation coupée (même appel). Les décalages (levée, écart) sont divisés par l'échelle réelle.
 function W.faceApply(f)
   local face = f.face
   if not face then return end
@@ -354,7 +474,12 @@ function W.faceApply(f)
   local hs = f.hoverScale or 1
   local lift = (f.hoverLift or 0) * h
   local base
-  if W.zoomMode() == "net" then
+  local mode = W.zoomMode()
+  if f._fly then
+    base = face:GetScale() -- vol en cours (W.fly) : l'échelle appartient au vol
+  elseif mode == "fluide" then
+    base = applyFluid(f, face, hs, h)
+  elseif mode == "net" then
     local ch = f._ch and f._ch.hover
     local goal = 1 + (hs - 1) * (ch and ch.to or 0)
     base = face:GetScale()
@@ -377,8 +502,17 @@ function W.faceApply(f)
   if f.hoverPaint then f:hoverPaint(h) end
 end
 
+-- Change l'échelle et la levée de survol d'un visuel et repose son état (mode fluide : échelle
+-- réelle posée tout de suite, au repos, plutôt qu'au survol suivant).
+function W.setHover(f, scale, lift)
+  if scale then f.hoverScale = scale end
+  if lift then f.hoverLift = lift end
+  if f._animApply == W.faceApply and f.face and f.face._armed then W.faceApply(f) end
+end
+
 -- Rend f survolable : opts = { scale, lift (unités de f, vers le haut), paint(f, h), manual }.
--- manual = l'écran pilote lui-même le canal « hover » (main, cartes à sélection).
+-- manual = l'écran pilote lui-même le canal « hover » (main, cartes à sélection). Mode fluide :
+-- armé à l'image suivante (après la construction du widget, qui suit souvent cet appel).
 function W.hoverable(f, opts)
   opts = opts or {}
   if not f.face then W.face(f) end
@@ -388,6 +522,12 @@ function W.hoverable(f, opts)
   f.hoverPaint = opts.paint or f.hoverPaint
   f._hoverManual = opts.manual
   f._animApply = W.faceApply
+  W.delay(0, function()
+    if f._animApply == W.faceApply and f.face and not f.face._armed and not f._fly then
+      f.face._armed = true
+      W.faceApply(f)
+    end
+  end)
   return f
 end
 
@@ -492,7 +632,7 @@ function W.setSkin(tex, name, sub)
 end
 
 function W.skin(parent, name, layer, sub, alpha)
-  local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
+  local t = W.noSnap(parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0))
   W.setSkin(t, name)
   if alpha then t:SetAlpha(alpha) end
   return t
@@ -515,7 +655,8 @@ function Group:Hide() self:SetShown(false) end
 function Group:SetDesaturated(on) for _, t in ipairs(self.parts) do t:SetDesaturated(on) end end
 
 -- Texture à neuf tranches : coins de `corner` unités (le coin de la texture), bords étirés.
--- opts = { corner, inset, noCenter, cornersOnly }. Ancrages seulement : suit la taille de l'hôte.
+-- opts = { corner, inset, noCenter, cornersOnly, parent }. Ancrages seulement : suit la taille de
+-- l'hôte ; textures créées sur opts.parent (défaut : l'hôte), ancrées à l'hôte.
 -- Bords d'une tranche : colonne -> (gauche, droite), rangée -> (haut, bas) ; chaque bord = côté de
 -- l'hôte et décalage (i = retrait, c = coin).
 local function sliceEdges(col, row, i, c)
@@ -533,6 +674,7 @@ function W.nine(host, name, layer, sub, opts)
   opts = opts or {}
   local e = TEX[name]
   local o = setmetatable({ host = host, parts = {}, e = e, slices = {} }, Group)
+  local owner = opts.parent or host
   local a, bu = e.corner / e.w, 1 - e.corner / e.w
   local av, bv = e.corner / e.h, 1 - e.corner / e.h
   local us, vs = { 0, a, bu, 1 }, { 0, av, bv, 1 }
@@ -541,7 +683,7 @@ function W.nine(host, name, layer, sub, opts)
       local corner = row ~= 2 and col ~= 2
       local center = row == 2 and col == 2
       if not (center and opts.noCenter) and not (opts.cornersOnly and not corner) then
-        local t = host:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0)
+        local t = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
         t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
         t:SetTexCoord(us[col], us[col + 1], vs[row], vs[row + 1])
         o.parts[#o.parts + 1] = t
@@ -571,6 +713,8 @@ end
 -- (coordonnées de texture répétées, recalculées quand l'hôte change de taille), reflet léger en haut.
 -- p:SetFill(k | couleur) éclaircit ou teinte la matière (k = 1 : ardoise de la maquette, 1,25 : plaque
 -- chaude) ; p:SetRim(couleur) teinte le liseré (Art.rim) ; p:SetGlow(alpha, couleur) allume un halo.
+-- opts.parent : cadre qui porte les textures (défaut : l'hôte, qui ne sert alors que d'ancre) — une
+-- plaque posée sur un visuel animé y met ses textures (régions du visuel : elles suivent son animation).
 
 local Plaque = {}
 Plaque.__index = Plaque
@@ -581,29 +725,30 @@ function W.plaque(host, opts)
   local pill = opts.pill
   local r = opts.r or 8
   local layer, sub = opts.layer or "BACKGROUND", opts.sub or -6
+  local owner = opts.parent or host
   local p = setmetatable({ host = host, r = r, i = opts.inset or 0, ivory = ivory, layer = layer, sub = sub,
     tile = ivory and Skin.ivoryTile or Skin.slateTile, base = ivory and 1 or Skin.slateBase }, Plaque)
   local fillName = ivory and "nine_ivory" or (pill and "pill_slate" or "nine_slate")
   local rimName = pill and "pill_rim" or "nine_rim"
-  p.corners = W.nine(host, fillName, layer, sub, { corner = r, inset = p.i, cornersOnly = true })
+  p.corners = W.nine(host, fillName, layer, sub, { corner = r, inset = p.i, cornersOnly = true, parent = owner })
   local tileName = ivory and "tile_ivory" or "tile_slate"
   p.bands = {}
   for k = 1, 2 do
-    local t = host:CreateTexture(nil, layer, nil, sub + 1)
+    local t = W.noSnap(owner:CreateTexture(nil, layer, nil, sub + 1))
     t:SetTexture(ROOT .. TEX[tileName].file, "REPEAT", "REPEAT")
     p.bands[k] = t
   end
   local re = TEX[rimName]
   p.rimIn = re.rimIn * r / re.corner
   if opts.gloss ~= false and not ivory then
-    p.gloss = host:CreateTexture(nil, layer, nil, sub + 2)
+    p.gloss = W.noSnap(owner:CreateTexture(nil, layer, nil, sub + 2))
     W.gradient(p.gloss, { 1, 1, 1, 0.08 }, { 1, 1, 1, 0 })
   end
-  p.rim = W.nine(host, rimName, layer, sub + 3, { corner = r, inset = p.i, noCenter = true })
+  p.rim = W.nine(host, rimName, layer, sub + 3, { corner = r, inset = p.i, noCenter = true, parent = owner })
   -- halo créé dès maintenant, caché : une texture créée au premier survol naîtrait pendant
   -- l'animation Scale du visuel (le client la dessinait alors démesurée, en aplat doré sur l'écran)
   local g = 10
-  p.glow = W.nine(host, "nine_glow", layer, max(-8, sub - 1), { corner = 2 * g, inset = p.i - g })
+  p.glow = W.nine(host, "nine_glow", layer, max(-8, sub - 1), { corner = 2 * g, inset = p.i - g, parent = owner })
   p.glow:SetAlpha(0)
   p.glow:Hide()
   p:Layout()
@@ -706,7 +851,7 @@ function W.goldPill(host, layer, sub)
   local o = setmetatable({ parts = {} }, Group)
   local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
   for k = 1, 3 do
-    local t = host:CreateTexture(nil, layer or "BACKGROUND", nil, sub or -6)
+    local t = W.noSnap(host:CreateTexture(nil, layer or "BACKGROUND", nil, sub or -6))
     t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
     t:SetTexCoord(cuts[k][1], cuts[k][2], 0, 1)
     o.parts[k] = t
@@ -727,7 +872,7 @@ end
 
 -- Hexagone du pack (red, green, blue, steel, violet, empty) de hauteur h, centré sur le cadre.
 function W.hex(parent, color, h, layer, sub)
-  local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
+  local t = W.noSnap(parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0))
   W.setHex(t, color, h)
   return t
 end
@@ -929,13 +1074,18 @@ function W.roundMask(frame, tex, maskName)
 end
 
 -- Médaillon argenté : anneau du pack, icône masquée en rond. f.icon, f:Resize(taille), f:SetRing(teinte).
+-- W.medallionOn(f, …) pose ces pièces sur un cadre existant (visuel animé : régions du visuel).
 function W.medallion(parent, size, layerSub)
   local f = CreateFrame("Frame", nil, parent)
+  return W.medallionOn(f, size, layerSub)
+end
+
+function W.medallionOn(f, size, layerSub)
   f:SetSize(size, size)
   local sub = layerSub or 0
-  f.ring = f:CreateTexture(nil, "ARTWORK", nil, sub)
+  f.ring = W.noSnap(f:CreateTexture(nil, "ARTWORK", nil, sub))
   f.ring:SetAllPoints()
-  f.icon = f:CreateTexture(nil, "ARTWORK", nil, sub + 1)
+  f.icon = W.noSnap(f:CreateTexture(nil, "ARTWORK", nil, sub + 1))
   f.icon:SetPoint("TOPLEFT", size * 0.13, -size * 0.13)
   f.icon:SetPoint("BOTTOMRIGHT", -size * 0.13, size * 0.13)
   W.roundMask(f, f.icon)
@@ -1394,11 +1544,11 @@ function W.tokenRow(parent, maxN, width, size)
     local t = CreateFrame("Frame", nil, row)
     t:SetSize(size, size)
     t:EnableMouse(true)
+    -- médaillon posé sur le visuel même (aucun cadre enfant : tout suit l'animation d'échelle)
     local face = W.face(t)
-    t.medal = W.medallion(face, size)
-    t.medal:SetPoint("CENTER")
-    t.count = W.label(t.medal, "heavy", floor(size * 0.42), C.text, "OVERLAY") -- au-dessus du médaillon
-    t.count:SetPoint("CENTER", t.medal, "BOTTOMRIGHT", -2, 3)
+    t.medal = W.medallionOn(face, size)
+    t.count = W.label(face, "heavy", floor(size * 0.42), C.text, "OVERLAY") -- au-dessus du médaillon
+    t.count:SetPoint("CENTER", face, "BOTTOMRIGHT", -2, 3)
     W.hoverable(t, { scale = 1.12 })
     W.tooltip(t, function(tt, self)
       local info = self.info
@@ -1524,12 +1674,12 @@ local TZ = {
   bevY = 1.0754, bevHalf = 0.2574, bevSlope = 0.56, -- biseau du bas, marge déduite (×1,15 en biais)
 }
 W.CARD_TEXT = TZ
--- Paliers de taille du texte (unités de la carte) : la plupart des cartes au premier, les longues un
--- ou deux crans en dessous ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
-W.BODY_SIZES = { 8, 7.5, 7 }
+-- Paliers de taille du texte (unités de la carte) : chaque carte prend le plus grand qui tient dans la
+-- zone utile ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
+W.BODY_SIZES = { 10, 9.5, 9, 8.5, 8, 7.5, 7 }
 W.BODY_UNDER = { 6.5, 6 }
--- Nom sur le ruban : une ligne, paliers et plancher, marge de 4 unités de chaque côté de la bande.
-W.NAME_SIZES = { 10, 8.5, 7 }
+-- Nom sur le ruban : une ligne, le plus grand palier qui tient, marge de 4 unités de chaque côté.
+W.NAME_SIZES = { 11, 10, 9, 8, 7 }
 W.NAME_UNDER = { 6.5, 6 }
 W.NAME_MARGIN = 4
 
@@ -1560,46 +1710,90 @@ local function widthOf(m, s)
   return m:GetStringWidth() or 0
 end
 
--- Les lignes (de hauteur lh, centrées verticalement entre top et bottom, en unités) tiennent-elles
--- chacune dans la largeur de la zone à leur bas ?
-local function linesFit(m, lines, lh, top, bottom)
-  local CW = W.CARD_W
-  local y0 = top + (bottom - top - #lines * lh) / 2
-  if y0 < top - 0.01 then return false end
-  for k = 1, #lines do
-    if widthOf(m, lines[k]) > 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW then return false end
+-- Mots insécables : une ponctuation détachée (« : ») et un nombre qui finit la phrase (« Pioche 1. »)
+-- restent avec le mot d'avant, un nombre seul (« 12 », « +1 ») avec le mot d'après (« 12 Absorption »,
+-- « +1 Démence », « 2 tours »).
+local function plainWord(w) return (w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+function W.cardWords(text)
+  local raw = {}
+  for w in text:gmatch("%S+") do raw[#raw + 1] = w end
+  local words = {}
+  local i = 1
+  while i <= #raw do
+    local w = raw[i]
+    local p = plainWord(w)
+    if (p:match("^[:;!?»]+$") or p:match("^%d+[.,]$")) and #words > 0 then
+      words[#words] = words[#words] .. " " .. w
+      i = i + 1
+    else
+      local num = p:gsub("^−", "")
+      while num:match("^[+%-]?%d+$") and raw[i + 1] and not plainWord(raw[i + 1]):match("^[:;!?»]+$") do
+        i = i + 1
+        w = w .. " " .. raw[i]
+        num = plainWord(raw[i]):gsub("^−", "")
+      end
+      words[#words + 1] = w
+      i = i + 1
+    end
   end
-  return true
+  return words
 end
 
--- Coupe text en lignes à la taille size dans la zone (top, bottom en unités) : remplissage glouton,
--- chaque ligne limitée à la largeur de la zone à sa hauteur (biseau compris). Renvoie les lignes,
--- ou nil si le texte ne tient pas ; "font" si la police ne mesure rien (pas encore chargée).
+-- Coupe text en lignes à la taille size dans la zone (top, bottom en unités) : le moins de lignes
+-- possible, chaque ligne limitée à la largeur de la zone à sa hauteur (biseau compris), bloc centré
+-- verticalement ; lignes remplies de haut en bas (chaque ligne prend le plus de mots possible tant que
+-- la suite tient dans les lignes restantes). Renvoie les lignes, ou nil si le texte ne tient pas ;
+-- "font" si la police ne mesure rien (pas encore chargée).
 local function layoutBody(text, size, top, bottom)
   local CW = W.CARD_W
   local m = measureFS("bold", size)
   m:SetText("Ég")
   local lh = m:GetStringHeight() or 0
   if lh <= 0 or widthOf(m, "Ég") <= 0 then return nil, "font" end
-  local words = {}
-  for w in text:gmatch("%S+") do words[#words + 1] = w end
-  if #words == 0 then return {}, lh end
-  local H = bottom - top
-  for n = 1, floor(H / lh + 1e-6) do
-    local y0 = top + (H - n * lh) / 2
-    local lines, i = {}, 1
-    for k = 1, n do
-      local wmax = 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW
-      local cur
-      while i <= #words do
-        local cand = cur and (cur .. " " .. words[i]) or words[i]
-        if widthOf(m, cand) <= wmax then cur, i = cand, i + 1 else break end
-      end
-      if not cur then break end
-      lines[#lines + 1] = cur
-      if i > #words then break end
+  local words = W.cardWords(text)
+  local nw = #words
+  if nw == 0 then return {}, lh end
+  -- largeur des mots i..j sur une ligne (mesurée une fois)
+  local memo = {}
+  local function span(i, j)
+    local key = i * 1000 + j
+    local v = memo[key]
+    if not v then
+      v = widthOf(m, table.concat(words, " ", i, j))
+      memo[key] = v
     end
-    if i > #words and linesFit(m, lines, lh, top, bottom) then return lines, lh end
+    return v
+  end
+  local H = bottom - top
+  for n = 1, min(nw, floor(H / lh + 1e-6)) do
+    local y0 = top + (H - n * lh) / 2
+    local wmax = {}
+    for k = 1, n do wmax[k] = 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW end
+    -- ok[k][i] : les mots i.. tiennent exactement sur les lignes k..n
+    local ok = {}
+    ok[n + 1] = { [nw + 1] = true }
+    for k = n, 1, -1 do
+      ok[k] = {}
+      for i = k, nw - (n - k) do
+        for j = i, nw - (n - k) do
+          if span(i, j) > wmax[k] then break end
+          if ok[k + 1][j + 1] then ok[k][i] = true break end
+        end
+      end
+    end
+    if ok[1][1] then
+      local lines, i = {}, 1
+      for k = 1, n do
+        local j = i
+        for jj = i, nw - (n - k) do
+          if span(i, jj) > wmax[k] then break end
+          if ok[k + 1][jj + 1] then j = jj end
+        end
+        lines[k] = table.concat(words, " ", i, j)
+        i = j + 1
+      end
+      return lines, lh
+    end
   end
   return nil, lh
 end
@@ -1727,7 +1921,7 @@ local function cardPlate(face)
   local a = PLATE.capPx / PLATE.texW
   local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
   for k = 1, 3 do
-    local t = face:CreateTexture(nil, "BACKGROUND", nil, -5)
+    local t = W.noSnap(face:CreateTexture(nil, "BACKGROUND", nil, -5))
     t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
     t:SetTexCoord(cuts[k][1] * e.tc[2], cuts[k][2] * e.tc[2], 0, e.tc[4])
     o.parts[k] = t
@@ -1819,19 +2013,49 @@ local function fitPlate(b, pills)
   return fit
 end
 
--- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin.
+-- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin (hors animation
+-- d'échelle : W.faceBuild).
+local newCardPlaque
 local function cardPlaque(b, key, w, h)
   local p = b[key]
   if p then return p end
-  p = CreateFrame("Frame", nil, b.face)
+  return W.faceBuild(b, function() return newCardPlaque(b, key, w, h) end)
+end
+
+-- p est un cadre d'ancrage seulement (taille, position) : plaque, icône et texte sont des régions du
+-- visuel de la carte, ancrées à p (un cadre enfant du visuel pourrait ne pas suivre son animation
+-- Scale) ; p:Show() / p:Hide() montrent ou cachent ces régions, p:SetIcon(entrée | nil) pose l'icône.
+newCardPlaque = function(b, key, w, h)
+  local face = b.face
+  local p = CreateFrame("Frame", nil, face)
   p:SetSize(w, h)
-  p.plaque = W.plaque(p, { r = h / 2, pill = true, gloss = false })
-  p.icon = p:CreateTexture(nil, "ARTWORK")
+  -- devant les pièces de la carte (ARTWORK 0 à 3), sous les textes (OVERLAY)
+  p.plaque = W.plaque(p, { r = h / 2, pill = true, gloss = false, parent = face, layer = "ARTWORK", sub = 4 })
+  p.icon = W.noSnap(face:CreateTexture(nil, "OVERLAY", nil, -1))
   p.icon:SetSize(h - 6, h - 6)
-  p.icon:SetPoint("LEFT", 5, 0)
+  p.icon:SetPoint("LEFT", p, "LEFT", 5, 0)
   p.icon:Hide()
-  p.text = W.label(p, "heavy", 11, C.text, "OVERLAY")
-  p.text:SetPoint("CENTER", 0, 1)
+  p.text = W.label(face, "heavy", 11, C.text, "OVERLAY")
+  p.text:SetPoint("CENTER", p, "CENTER", 0, 1)
+  local frameShow, frameHide = p.Show, p.Hide
+  p.Show = function(self)
+    frameShow(self)
+    self.plaque:Show()
+    self.text:Show()
+    if self.iconOn then self.icon:Show() else self.icon:Hide() end
+  end
+  p.Hide = function(self)
+    frameHide(self)
+    self.plaque:Hide()
+    self.text:Hide()
+    self.icon:Hide()
+  end
+  p.SetIcon = function(self, entry, k)
+    self.iconOn = entry ~= nil
+    if entry then W.setIcon(self.icon, entry, k) end
+    if self.iconOn and self:IsShown() then self.icon:Show() else self.icon:Hide() end
+  end
+  p:Hide()
   b[key] = p
   return p
 end
@@ -1927,7 +2151,7 @@ function W.card(parent)
   -- médaillon : anneau, icône masquée, verre
   b.ring = W.skin(face, "medal_ring", "BORDER", 0)
   place(b.ring, org, P.medal_ring)
-  b.icon = face:CreateTexture(nil, "BORDER", nil, 1)
+  b.icon = W.noSnap(face:CreateTexture(nil, "BORDER", nil, 1))
   place(b.icon, org, P.medal_mask)
   b.iconMask = W.roundMask(face, b.icon, "medal_mask")
   b.glass = W.skin(face, "medal_glass", "BORDER", 2)
@@ -1940,7 +2164,7 @@ function W.card(parent)
   place(b.costTab, org, P.card_cost)
   b.ribbon = W.skin(face, "card_ribbon", "ARTWORK", 2)
   place(b.ribbon, org, P.card_ribbon)
-  b.gem = face:CreateTexture(nil, "ARTWORK", nil, 3)
+  b.gem = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 3))
   b.gem:Hide()
 
   -- textes
@@ -2052,20 +2276,19 @@ function W.card(parent)
       p:ClearAllPoints()
       p:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, -(CH + 0.185 * CW))
       if opts.sold then
-        p.icon:Hide()
+        p:SetIcon(nil)
         p.text:SetText("Vendu")
         p.text:SetTextColor(0.6, 0.6, 0.6)
         p.text:ClearAllPoints()
-        p.text:SetPoint("CENTER", 0, 1)
+        p.text:SetPoint("CENTER", p, "CENTER", 0, 1)
         p.plaque:SetRim(Art.rim.silver)
       else
-        W.setIcon(p.icon, Art.ui.gold, "ui:gold")
-        p.icon:Show()
+        p:SetIcon(Art.ui.gold, "ui:gold")
         p.text:SetText(tostring(opts.price))
         local pc = opts.tooPoor and C.badText or C.goldText
         p.text:SetTextColor(pc[1], pc[2], pc[3])
         p.text:ClearAllPoints()
-        p.text:SetPoint("CENTER", 7, 1)
+        p.text:SetPoint("CENTER", p, "CENTER", 7, 1)
         p.plaque:SetRim(opts.tooPoor and Art.rim.red or Art.rim.silver)
       end
       p:Show()
@@ -2185,32 +2408,56 @@ end
 -- Place un cadre par son centre dans les coordonnées du conteneur (x vers la droite, y vers le bas).
 function W.placeCenter(f, container, x, y, scale)
   scale = scale or 1
-  f:SetScale(scale)
+  if f:GetScale() ~= scale then f:SetScale(scale) end -- même échelle : rien à redessiner
   f:ClearAllPoints()
   f:SetPoint("CENTER", container, "TOPLEFT", x / scale, -y / scale)
 end
 
--- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone. Mode de zoom « net » :
--- échelle réelle fixée à s1 pendant le vol (aucune nouvelle mise en page des textes), changement
--- d'échelle par animation Scale partant du facteur 1 (première image identique avec ou sans
--- animation) ; à l'arrivée, dans le même appel, animation coupée et échelle réelle s2 posée : la
--- carte posée est nette (l'étirement ne dure que le vol).
+-- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone.
+-- Mode « fluide » (cadre à visuel survolable : cartes) : échelle réelle du cadre fixée pendant tout le
+-- vol à B = max(s1, s2) (polices rasterisées une fois, à la plus grande taille du vol : jamais étirées),
+-- visuel à son échelle réelle de survol, et le facteur tenu du visuel anime la taille de s1 à s2. Une
+-- carte qui grandit (pioche) arrive exactement dans l'état de repos (échelle réelle s2, facteur
+-- 1 / hoverScale) : rien ne change à l'atterrissage. Une carte qui rétrécit (vers la cible, la
+-- défausse) reçoit son échelle réelle s2 et son facteur de repos dans le même appel, puis est cachée.
+-- Mode « net » : échelle réelle fixée à s1 pendant le vol, changement d'échelle par animation Scale
+-- partant du facteur 1 ; à l'arrivée, dans le même appel, animation coupée et échelle réelle s2 posée.
+-- Mode « lisse » : échelle réelle à chaque image.
 function W.fly(f, container, x1, y1, x2, y2, s1, s2, a1, a2, dur, onDone, arc)
   f:Show()
-  local anim = W.zoomMode() == "net" and s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
-  local base = s1
+  local mode = W.zoomMode()
+  local ok = s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
+  local fluid = ok and mode == "fluide" and f.face ~= nil and f._animApply == W.faceApply
+  local anim = ok and mode == "net"
+  local base = fluid and max(s1, s2) or s1
   stopZoom(f)
-  if anim then
+  if fluid then
+    local face = f.face
+    local hs = f.hoverScale or 1
+    local rest = (1 + (hs - 1) * W.animValue(f, "hover")) / hs
+    f._fly = true
+    face._armed = true
+    W.placeCenter(f, container, x1, y1, base)
+    if face:GetScale() ~= hs then face:SetScale(hs) end
+    holdTo(face, rest * s2 / base, max(0.01, dur * W.pace()), "IN_OUT", rest * s1 / base, true)
+  elseif anim then
     W.placeCenter(f, container, x1, y1, base)
     zoomTo(f, s2 / base, max(0.01, dur * W.pace()), "IN_OUT")
   end
   W.tween(dur, function(p)
     local x = x1 + (x2 - x1) * p
     local y = y1 + (y2 - y1) * p - (arc or 0) * 4 * p * (1 - p)
-    W.placeCenter(f, container, x, y, anim and base or (s1 + (s2 - s1) * p))
+    W.placeCenter(f, container, x, y, (fluid or anim) and base or (s1 + (s2 - s1) * p))
     f:SetAlpha(a1 + (a2 - a1) * p)
   end, function()
-    if anim then
+    if fluid then
+      f._fly = nil
+      W.placeCenter(f, container, x2, y2, s2)
+      if base ~= s2 then
+        local hs = f.hoverScale or 1
+        holdTo(f.face, (1 + (hs - 1) * W.animValue(f, "hover")) / hs, 0, "OUT", nil, true)
+      end
+    elseif anim then
       stopZoom(f)
       W.placeCenter(f, container, x2, y2, s2)
     end

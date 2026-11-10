@@ -873,16 +873,33 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
   elseif msg == "zoom" or msg:match("^zoom%s") then
     -- technique d'agrandissement au survol (voir W.faceApply) : « net » (défaut : étirement pendant
-    -- le mouvement, vraie taille à l'arrivée) ou « lisse » (vraie taille à chaque image) ; « anim »,
-    -- ancien nom, vaut « net »
+    -- le mouvement, vraie taille à l'arrivée), « fluide » (échelle réelle de survol tenue, taille par
+    -- animation) ou « lisse » (vraie taille à chaque image) ; sans argument : le suivant du cycle ;
+    -- « anim », ancien nom, vaut le défaut ; « lent » : survols au ralenti (diagnostic), bascule
     local want = msg:match("^zoom%s+(%S+)")
+    if want == "lent" then
+      opts().zoomSlow = not opts().zoomSlow
+      say("survols au ralenti (×" .. W.ZOOM_SLOW .. ") : " .. (opts().zoomSlow and "oui" or "non") .. ".")
+      return
+    end
+    local modes = W.ZOOM_MODES
     local mode
-    if want == "lisse" then mode = "lisse"
-    elseif want == "net" or want == "anim" then mode = "net"
-    else mode = W.zoomMode() == "net" and "lisse" or "net" end
+    if want then
+      for _, m in ipairs(modes) do if want == m then mode = m end end
+      if not mode and want ~= "anim" then
+        say("usage : /slay zoom [net|fluide|lisse|lent]")
+        return
+      end
+      mode = mode or W.ZOOM_DEFAULT
+    else
+      local cur = W.zoomMode()
+      for i, m in ipairs(modes) do if m == cur then mode = modes[i % #modes + 1] end end
+    end
     mode = W.setZoomMode(mode)
-    say("zoom au survol : " .. (mode == "net" and "net (texte redessiné à la vraie taille à l'arrivée)"
-      or "lisse (vraie taille à chaque image)") .. ".")
+    local what = { net = "net (texte redessiné à la vraie taille à l'arrivée)",
+      fluide = "fluide (texte dessiné à la taille agrandie, taille animée)",
+      lisse = "lisse (vraie taille à chaque image)" }
+    say("zoom au survol : " .. what[mode] .. ".")
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
@@ -895,6 +912,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
-      .. "/slay decor [essai] ; /slay zoom [net|lisse] ; /slay facing <j> <e> ; /slay centre")
+      .. "/slay decor [essai] ; /slay zoom [net|fluide|lisse|lent] ; /slay facing <j> <e> ; /slay centre")
   end
 end

@@ -219,7 +219,7 @@ local function plaque(parent)
     self:Layout(o.label or o.id, sub, w, h, o.item ~= nil)
     self:SetAlpha(o.disabled and 0.6 or 1)
     -- une réponse impossible bouge à peine au survol
-    self.hoverScale, self.hoverLift = o.disabled and 1.01 or 1.04, o.disabled and 0 or 5
+    W.setHover(self, o.disabled and 1.01 or 1.04, o.disabled and 0 or 5)
     self:Show()
   end
   b:SetScript("OnClick", function(self) chooseOption(self.option) end)
@@ -733,7 +733,7 @@ function Reward:Build(f)
   for i = 1, 4 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) Reward:Pick(card) end)
-    c.hoverScale, c.hoverLift = 1.17, 22 / REWARD_SCALE
+    W.setHover(c, 1.17, 22 / REWARD_SCALE)
     c:Hide()
     self.cards[i] = c
   end
@@ -1005,7 +1005,7 @@ function Deck:Build(f)
     local c = W.card(f)
     c:SetFrameLevel(panel:GetFrameLevel() + 5)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    c.hoverScale, c.hoverLift = 1.2, 8 / GRID_SCALE
+    W.setHover(c, 1.2, 8 / GRID_SCALE)
     -- survol : animation commune (W.card) + aperçu de l'amélioration
     local enter, leave = c.onEnterExtra, c.onLeaveExtra
     c.onEnterExtra = function(card) enter(card) Deck:Preview(card) end
@@ -1174,7 +1174,7 @@ function Shop:Build(f)
   for i = 1, 7 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    c.hoverScale, c.hoverLift = 1.12, 10 / SHOP_SCALE
+    W.setHover(c, 1.12, 10 / SHOP_SCALE)
     c:Hide()
     self.cards[i] = c
   end
@@ -1390,7 +1390,7 @@ local function paintNode(b, node, bossName)
   local size = boss and 76 or (cur and 54 or NODE)
   b:SetSize(size, size)
   b.shadow:SetSize(size, size)
-  b.hoverScale = st == "available" and 1.18 or 1.06
+  W.setHover(b, st == "available" and 1.18 or 1.06)
   b.icon:ClearAllPoints()
   b.icon:SetPoint("TOPLEFT", size * 0.11, -size * 0.11)
   b.icon:SetPoint("BOTTOMRIGHT", -size * 0.11, size * 0.11)
@@ -1690,7 +1690,7 @@ function DV:Build()
   self.cards = {}
   for i = 1, DV_ROW * DV_ROWS do
     local c = W.card(veil)
-    c.hoverScale, c.hoverLift = 1.14, 6 / DV_SCALE
+    W.setHover(c, 1.14, 6 / DV_SCALE)
     c:EnableMouseWheel(true)
     c:SetScript("OnMouseWheel", wheel)
     c:SetScript("OnClick", function(_, button) if button == "RightButton" then DV:Close() end end)
