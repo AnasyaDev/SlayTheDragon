@@ -151,6 +151,9 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 
 - **Fenêtre** : fond roche ; cadre métal (UI-Frame-Metal) à k = 0,87 : filets gauche, droit et bas sur le
   bord de la fenêtre, par-dessus tout le contenu ; barre de titre (y 0–34) sous les éléments du bandeau.
+  Contenu rentré de 2,5 (gauche, haut) et 3,5 (droite, bas) dans la fenêtre : ses bords tombent sur la partie
+  opaque des filets et ses coins dans la silhouette des coins biseautés ; le fond de roche a son rectangle
+  (voir « Ordre de dessin et silhouette »).
   Le décor commence maintenant à y 34 (`Scene.TOP`, 380 → 390 de haut ; les positions des écrans, en
   coordonnées absolues, ne bougent pas). Table du bas : pierre Dragonflight répétée, filet du cadre métal
   en séparation.
@@ -201,7 +204,42 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 - **Rencontre** : pas de pointe de bulle (B) ; couleur du titre au lieu du liseré pour la rareté.
 - **Infobulles** : celles du jeu (`GameTooltip`), inchangées ; la maquette C (parchemin) n'est pas reprise.
 
+### Ordre de dessin et silhouette (retours du 11/11/2026 en jeu)
+
+- **Bandeau invisible en jeu** (barre de titre vide, l'aperçu les montrait) : le bandeau était un enfant du
+  contenu (rogné, `SetClipsChildren`) au niveau contenu + 40, la barre de titre un frère du contenu au niveau
+  contenu + 39. Règle retenue (hypothèse cohérente avec la capture, non documentée par Blizzard) : un cadre
+  rogneur dessine tout son sous-arbre dans sa propre passe, à **son** niveau ; ses descendants ne se
+  comparent qu'entre eux. La barre (contenu + 39) passait donc sur tout le contenu (niveau L), bandeau compris.
+- **Solution** : plus rien qui doive passer au-dessus du cadre n'est descendant du contenu. Frères, enfants de
+  la fenêtre : contenu (rogné, L) < `frameTop` (L + 300 : barre de titre, puis le **bandeau, son enfant**,
+  placé en coordonnées du contenu) < `UI.overlay` (L + 600, rogné au contenu : message passager, butin en vol)
+  < `rimHost` (L + 900 : filets gauche, droit, bas). Les écarts tiennent aussi si le client comparait tous les
+  niveaux (sous-arbre du contenu < L + 200). Le butin qui vole vers le bandeau (`Reward:Collect`) passe sur
+  `UI.overlay` le temps du vol (`W.lift` : parent et niveaux rendus à l'arrivée), toujours ancré à l'écran.
+  Le message passager est sur `UI.overlay` : au-dessus des options et du panneau du deck (il passait sous ce
+  dernier). Revue des autres cas : options, panneau du deck, fin de combat, aperçu des modèles, cartes en vol,
+  textes flottants, halos restent dans le contenu et ne recouvrent ni la barre ni les filets (rien à changer).
+- **Coins** : le fond de roche couvrait toute la fenêtre, donc les coins biseautés transparents du cadre
+  (jusqu'à 36 u² par coin), et le contenu (rentré de 3) dépassait de 1,4 u² au coin bas droit (biseau plus
+  large, ombre portée à droite et en bas). Maintenant : contenu rentré de 2,5 / 3,5, fond = rectangle du
+  contenu ; vérifié au pixel (U31 : pièces lues dans `Media/WowUI`, pixels d'alpha < 0,5 reliés au bord
+  extérieur = hors silhouette ; aucun pixel du contenu, du fond, du bandeau n'y tombe ; bords du contenu sur
+  la partie opaque des filets). Boîtes DiamondMetal (options, deck, fin de combat) et parchemins (parcours,
+  rencontre) vérifiés de même : déjà justes (ornements opaques aux coins, rien sous les parchemins).
+- **Cases d'icônes** (gros pourtour noir) : l'icône était à 80 % de la case, centrée sur la pièce du cadre
+  (ombre portée comprise), et le fond de case (`slot_bg`) à 132 % : sa partie sombre débordait de 2 à 5
+  unités hors du cadre. Mesures des pièces : liseré opaque de 4 px, ouverture [4, 62)² du cadre 69 × 68,
+  carré visible [0, 66)² ; fond plein sur [7, 89)². Maintenant (`W.slotFit`, toutes les cases : bandeau,
+  pioche, défausse, récompense, marchand, bibelots, fioles, états, intentions, incantation, réponses) :
+  ouverture centrée sur l'hôte, icône = ouverture, partie pleine du fond = ouverture (son bord adouci sous
+  le liseré) ; U31 vérifie sur les pixels l'icône à ±1 unité de l'ouverture et le fond dans le cadre.
+
 ### Non vérifiable hors jeu (à voir)
+
+- Règle de dessin des cadres rogneurs (ci-dessus) : bandeau, pastilles, cases, Menu et fermeture visibles
+  sur la barre de titre ; butin qui vole jusqu'au bandeau par-dessus la barre ; message passager devant les
+  options.
 
 - Chargement des TGA de `Media/WowUI` (aplat vert = fichier absent ou mal lu) ; nouveau fichier du TOC
   `UI\WowSkin.lua` : **relancer le client**.
@@ -983,7 +1021,7 @@ frame (seules des textures pivotent), aucun `loadstring`.
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (504 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (527 vérifications, graine 1)
 lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
                                                #   (aperçus de Media copiés dans build/snap/media)
 for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
@@ -1033,7 +1071,7 @@ retirées, aucun `SetAtlas`, chemins `Interface\` du client seulement dans la li
 textures de la fenêtre = fichiers de l'addon présents sur disque, icônes ou texture blanche ; pièces entières
 jamais agrandies au-delà de leurs pixels à l'échelle 115 % (combat, options, marchand, parcours, rencontre,
 feu de camp) ; libellés des boutons entre leurs bouts, nom et PV du héros dans leurs logements, PV des
-ennemis dans leur barre ; aucun cadre enfant dessiné sous un visuel survolable). U21 contrôle les cadres
+ennemis dans leur barre ; aucun cadre enfant dessiné sous un visuel survolable) ; **ordre de dessin et silhouette** (U31 : règle du faux client — un cadre rogneur dessine son sous-arbre à son niveau, `R.drawKey` dans `Sim/ui_render.lua`, que les aperçus SVG appliquent aussi, avec le rognage — ; chaque élément du bandeau au-dessus de la barre de titre et filets au-dessus du contenu (combat, récompense, parcours, rencontre) ; message passager devant les options et le panneau du deck ; butin en vol sur la couche du dessus puis rendu à son écran ; rien du contenu, du fond ni du bandeau sur un pixel extérieur des pièces du cadre métal, contenu bord à bord avec la partie opaque des filets ; dialogues et parchemins de même ; cases d'icônes : icône = ouverture du cadre mesurée sur les pixels à ±1, fond dans le cadre). U21 contrôle les cadres
 compacts des ennemis (nom dans son logement, barre dans le cadre, jamais sur le bandeau ni sous le modèle,
 sans chevauchement, 1 à 6 ennemis × 3 échelles), U24 les réponses (libellé d'une ligne dans le bouton, texte
 dessous dans la place restante). Le faux client mesure les textes avec les

@@ -227,7 +227,7 @@ function Frame:SetPoint(p, a, b, c, d)
   if type(a) == "string" then rel, rp, x, y = self._parent, a, b, c end
   self._points[#self._points + 1] = { p, rel, rp or p, x or 0, y or 0 }
 end
-function Frame:SetAllPoints() self._points = { { "ALL" } } end
+function Frame:SetAllPoints(rel) self._points = { { "ALL", type(rel) == "table" and rel or nil } } end
 function Frame:ClearAllPoints() self._points = {} end
 function Frame:GetPoint(i)
   local pt = self._points[i or 1]
@@ -248,7 +248,16 @@ end
 function Frame:SetFrameLevel(l) self._level = l end
 function Frame:GetFrameLevel() return self._level end
 function Frame:GetParent() return self._parent end
-function Frame:SetParent(p) self._parent = p end
+function Frame:SetParent(p)
+  local old = self._parent
+  if old == p then return end
+  if old then
+    local kids = rawget(old, "_kids")
+    for i = #kids, 1, -1 do if kids[i] == self then table.remove(kids, i) end end
+  end
+  self._parent = p
+  if p then local kids = rawget(p, "_kids") kids[#kids + 1] = self end
+end
 function Frame:GetName() return self._name end
 function Frame:GetObjectType() return self._kind end
 function Frame:IsMouseOver() return self._mouseOver and true or false end
@@ -4146,6 +4155,467 @@ do
   end
   check(("pièces entières nettes à l'échelle %.2f (affichées au plus à leur taille stockée)"):format(scale),
     #blurry == 0, table.concat(blurry, ", "))
+end
+
+print("U31 ordre de dessin (cadres rogneurs), bandeau sur la barre de titre, silhouette des cadres, cases d'icônes")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  -- chaque expédition neuve relance l'addon (H.boot) : références reprises après chaque freshRun
+  local Um, WS, P, bar, rim
+  local function refs()
+    Um, WS = H.ns.UI, H.ns.WowSkin
+    P = Um.frameMetal.P
+    bar = { P.top, P.tl, P.tr }
+    rim = { P.left, P.right, P.bottom, P.bl, P.br }
+  end
+  local function fresh(...)
+    freshRun(...)
+    refs()
+  end
+  refs()
+  local function under(o, top)
+    while o do if o == top then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function alphaOf(o)
+    local a = 1
+    while o do
+      local c = rawget(o, "_calls")
+      if c and c.SetAlpha then a = a * (c.SetAlpha[1] or 1) end
+      o = rawget(o, "_parent")
+    end
+    return a
+  end
+  local function isRegion(o)
+    local k = rawget(o, "_kind")
+    if k == "Texture" then return rawget(o, "_texture") ~= nil or (o._calls.SetColorTexture ~= nil) end
+    if k == "FontString" then return (rawget(o, "_text") or "") ~= "" end
+    return false
+  end
+  -- régions visibles (alpha > 0) sous top, sauf celles sous un des cadres de `skip`
+  local function regionsUnder(top, skip)
+    local out = {}
+    for _, o in ipairs(H.objects) do
+      if isRegion(o) and under(o, top) and vis(o) and alphaOf(o) > 0.01 then
+        local ok = true
+        for _, s in ipairs(skip or {}) do if under(o, s) or o == s then ok = false end end
+        if ok then out[#out + 1] = o end
+      end
+    end
+    return out
+  end
+  local function clipped(o)
+    local r = R.rect(o)
+    if not r then return nil end
+    local c = R.clipRect(o)
+    if c then r = { math.max(r[1], c[1]), math.max(r[2], c[2]), math.min(r[3], c[3]), math.min(r[4], c[4]) } end
+    if r[3] - r[1] <= 0 or r[4] - r[2] <= 0 then return nil end
+    return r
+  end
+  local function area(a, b)
+    if not a or not b then return 0 end
+    local w = math.min(a[3], b[3]) - math.max(a[1], b[1])
+    local h = math.min(a[4], b[4]) - math.max(a[2], b[2])
+    return (w > 0 and h > 0) and w * h or 0
+  end
+  local function above(o, t) return R.drawnBefore(R.drawKey(t), R.drawKey(o)) end
+
+  -- 1. règle du faux client : un cadre rogneur dessine ses descendants à son niveau
+  do
+    local top = CreateFrame("Frame", nil, UIParent)
+    local clip = CreateFrame("Frame", nil, top)
+    clip:SetFrameLevel(2)
+    clip:SetClipsChildren(true)
+    local kid = CreateFrame("Frame", nil, clip)
+    kid:SetFrameLevel(50)
+    local sib = CreateFrame("Frame", nil, top)
+    sib:SetFrameLevel(10)
+    local tk, ts, tc = kid:CreateTexture(nil, "OVERLAY"), sib:CreateTexture(nil, "BACKGROUND"), clip:CreateTexture(nil, "ARTWORK")
+    local free = CreateFrame("Frame", nil, top)
+    free:SetFrameLevel(50)
+    local tf = free:CreateTexture(nil, "OVERLAY")
+    check("faux client : un descendant (niveau 50) d'un rogneur (niveau 2) passe sous un frère du rogneur (niveau 10)",
+      above(ts, tk) and above(tk, tc) and above(tf, ts))
+    top:Hide()
+  end
+
+  -- 2. bandeau au-dessus de la barre de titre ; filets au-dessus du contenu ; écran par écran
+  local function bandCheck(where)
+    local bad, n = {}, 0
+    for _, o in ipairs(regionsUnder(Um.band)) do
+      for _, t in ipairs(bar) do
+        if area(clipped(o), R.rect(t)) > 0 then
+          n = n + 1
+          if not above(o, t) then bad[#bad + 1] = (rawget(o, "_text") or rawget(o, "_wow") or rawget(o, "_kind")) end
+        end
+      end
+    end
+    check(where .. " : les " .. n .. " éléments du bandeau sont dessinés au-dessus de la barre de titre",
+      n >= 12 and #bad == 0, table.concat(bad, ", "))
+    local under0 = {}
+    for _, o in ipairs(regionsUnder(Um.content)) do
+      for _, t in ipairs(rim) do
+        if area(clipped(o), R.rect(t)) > 0 and not above(t, o) then under0[#under0 + 1] = tostring(rawget(o, "_wow") or rawget(o, "_kind")) end
+      end
+    end
+    check(where .. " : filets du cadre métal par-dessus tout le contenu", #under0 == 0, table.concat(under0, ", "))
+  end
+  fresh(SEED, "combat")
+  H.settle()
+  bandCheck("combat")
+
+  -- message passager au-dessus des options et du panneau du deck
+  H.slash("options")
+  Um.flash("Test message.")
+  local function errOver(panel)
+    local bad = 0
+    for _, o in ipairs(regionsUnder(panel)) do
+      if area(clipped(o), R.rect(Um.err.text)) > 0 and not above(Um.err.text, o) then bad = bad + 1 end
+    end
+    return bad
+  end
+  check("message passager au-dessus du panneau d'options", Um.err._shown and errOver(Um.optionsFrame) == 0)
+  H.key("ESCAPE")
+  Um.toggleDeckView("deck")
+  Um.flash("Test message.")
+  check("message passager au-dessus du panneau du deck", Um.deckView:IsShown() and errOver(Um.deckView.frame) == 0)
+  H.key("ESCAPE")
+  H.advance(3)
+
+  -- 3. silhouette des cadres : rien du contenu ni d'un fond ne tombe sur un pixel transparent à
+  -- l'extérieur du cadre (pièces lues dans Media/WowUI, alpha < 0,5 relié au bord extérieur)
+  local tgaCache = {}
+  local function tga(file)
+    if tgaCache[file] then return tgaCache[file] end
+    local f = assert(io.open(root .. "/Media/WowUI/" .. file, "rb"))
+    local s = f:read("*a")
+    f:close()
+    local w, h = s:byte(13) + 256 * s:byte(14), s:byte(15) + 256 * s:byte(16)
+    local t = { w = w, h = h, alpha = function(x, y) return s:byte(18 + ((h - 1 - y) * w + x) * 4 + 4) end }
+    tgaCache[file] = t
+    return t
+  end
+  -- masque extérieur d'une pièce (pixels de la pièce, origine en haut à gauche) : remplissage depuis les
+  -- côtés extérieurs (l, r, t, b) à travers les pixels d'alpha < 128
+  local extCache = {}
+  local function exterior(name, sides)
+    local key = name .. ":" .. sides
+    if extCache[key] then return extCache[key] end
+    local e = WS.pieces[name]
+    local img = tga(e.file)
+    local x0, y0 = math.floor(e.tc[1] * e.w + 0.5), math.floor(e.tc[3] * e.h + 0.5)
+    local pw, ph = e.pw, e.ph
+    local ext, stack = {}, {}
+    local function push(x, y)
+      if x < 0 or y < 0 or x >= pw or y >= ph then return end
+      local i = y * pw + x
+      if ext[i] or img.alpha(x0 + x, y0 + y) >= 128 then return end
+      ext[i] = true
+      stack[#stack + 1] = i
+    end
+    if sides:find("l") then for y = 0, ph - 1 do push(0, y) end end
+    if sides:find("r") then for y = 0, ph - 1 do push(pw - 1, y) end end
+    if sides:find("t") then for x = 0, pw - 1 do push(x, 0) end end
+    if sides:find("b") then for x = 0, pw - 1 do push(x, ph - 1) end end
+    while #stack > 0 do
+      local i = table.remove(stack)
+      local x, y = i % pw, math.floor(i / pw)
+      push(x + 1, y) push(x - 1, y) push(x, y + 1) push(x, y - 1)
+    end
+    local m = { ext = ext, pw = pw, ph = ph, e = e }
+    extCache[key] = m
+    return m
+  end
+  -- boîtes d'écran {l, b, r, t} des pixels extérieurs d'une texture posée (pièce entière, tranche
+  -- d'une pièce, ou bord répété : alors une bande par colonne / rangée extérieure)
+  local function extBoxes(tex, sides)
+    local name = rawget(tex, "_wow")
+    local m = exterior(name, sides)
+    local e = m.e
+    local r = R.rect(tex)
+    local out = {}
+    if not r then return out end
+    if e.tile then
+      -- bord répété : profil pris au milieu de la pièce, sur l'axe non répété
+      if e.tile == "v" then
+        local y = math.floor(m.ph / 2)
+        for x = 0, m.pw - 1 do
+          if m.ext[y * m.pw + x] then
+            local sx = (r[3] - r[1]) / m.pw
+            out[#out + 1] = { r[1] + x * sx, r[2], r[1] + (x + 1) * sx, r[4] }
+          end
+        end
+      else
+        local x = math.floor(m.pw / 2)
+        for y = 0, m.ph - 1 do
+          if m.ext[y * m.pw + x] then
+            local sy = (r[4] - r[2]) / m.ph
+            out[#out + 1] = { r[1], r[4] - (y + 1) * sy, r[3], r[4] - y * sy }
+          end
+        end
+      end
+      return out
+    end
+    local tc = tex._calls.SetTexCoord or { 0, 1, 0, 1 }
+    -- coordonnées de texture -> pixels de la pièce
+    local px0 = (tc[1] - e.tc[1]) * e.w
+    local px1 = (tc[2] - e.tc[1]) * e.w
+    local py0 = (tc[3] - e.tc[3]) * e.h
+    local py1 = (tc[4] - e.tc[3]) * e.h
+    local sx, sy = (r[3] - r[1]) / (px1 - px0), (r[4] - r[2]) / (py1 - py0)
+    for y = math.max(0, math.floor(py0)), math.min(m.ph, math.ceil(py1)) - 1 do
+      for x = math.max(0, math.floor(px0)), math.min(m.pw, math.ceil(px1)) - 1 do
+        if m.ext[y * m.pw + x] then
+          local l = r[1] + (math.max(x, px0) - px0) * sx
+          local rr = r[1] + (math.min(x + 1, px1) - px0) * sx
+          local t = r[4] - (math.max(y, py0) - py0) * sy
+          local b = r[4] - (math.min(y + 1, py1) - py0) * sy
+          out[#out + 1] = { l, b, rr, t }
+        end
+      end
+    end
+    return out
+  end
+  -- fuites : rectangles testés (nom -> rect) posés sur un pixel extérieur d'une pièce du cadre
+  local function leaks(pieces, rects)
+    local out = {}
+    for _, pc in ipairs(pieces) do
+      local boxes = extBoxes(pc[1], pc[2])
+      for nm, rr in pairs(rects) do
+        local a = 0
+        for _, bx in ipairs(boxes) do a = a + area(bx, rr) end
+        if a > 0.01 then out[#out + 1] = string.format("%s sur %s (%.2f u²)", nm, rawget(pc[1], "_wow"), a) end
+      end
+    end
+    table.sort(out)
+    return out
+  end
+  local function frameLeaks(where)
+    local pieces = { { P.tl, "lt" }, { P.tr, "rt" }, { P.bl, "lb" }, { P.br, "rb" }, { P.top, "t" },
+      { P.left, "l" }, { P.right, "r" }, { P.bottom, "b" } }
+    local rects = { contenu = R.rect(Um.content), ["fond de roche"] = R.rect(Um.frameBg), ["couche du dessus"] = R.rect(Um.overlay) }
+    for i, o in ipairs(regionsUnder(Um.band)) do rects["bandeau " .. i .. " " .. tostring(rawget(o, "_wow") or rawget(o, "_text") or "")] = clipped(o) end
+    local l = leaks(pieces, rects)
+    check(where .. " : fenêtre, rien du contenu, du fond ni du bandeau hors de la silhouette du cadre métal (coins compris)",
+      #l == 0, table.concat(l, ", "))
+  end
+  frameLeaks("combat")
+  -- contenu bord à bord avec le filet : ses bords tombent sur la partie opaque (alpha ≥ 0,5) des filets
+  do
+    local c = R.rect(Um.content)
+    local function opaqueSpan(tex, axis)
+      local m = exterior(rawget(tex, "_wow"), "")
+      local e = m.e
+      local img = tga(e.file)
+      local r = R.rect(tex)
+      local lo, hi
+      if axis == "x" then
+        local y = math.floor(m.ph / 2)
+        for x = 0, m.pw - 1 do
+          if img.alpha(x, y) >= 128 then lo = lo or x hi = x + 1 end
+        end
+        local s = (r[3] - r[1]) / m.pw
+        return r[1] + lo * s, r[1] + hi * s
+      else
+        local x = math.floor(m.pw / 2)
+        for y = 0, m.ph - 1 do
+          if img.alpha(x, y) >= 128 then lo = lo or y hi = y + 1 end
+        end
+        local s = (r[4] - r[2]) / m.ph
+        return r[4] - hi * s, r[4] - lo * s
+      end
+    end
+    local l0, l1 = opaqueSpan(P.left, "x")
+    local r0, r1 = opaqueSpan(P.right, "x")
+    local b0, b1 = opaqueSpan(P.bottom, "y")
+    local t0, t1 = opaqueSpan(P.top, "y")
+    local ok = c[1] >= l0 - 0.01 and c[1] <= l1 + 0.01 and c[3] >= r0 - 0.01 and c[3] <= r1 + 0.01
+      and c[2] >= b0 - 0.01 and c[2] <= b1 + 0.01 and c[4] >= t0 - 0.01 and c[4] <= t1 + 0.01
+    check("contenu bord à bord avec les filets (aucune bande vide entre le contenu et le filet)", ok,
+      string.format("contenu %.2f %.2f %.2f %.2f ; filets x %.2f-%.2f / %.2f-%.2f, y %.2f-%.2f / %.2f-%.2f",
+        c[1], c[3], c[2], c[4], l0, l1, r0, r1, b0, b1, t0, t1))
+  end
+
+  -- boîtes de dialogue (DiamondMetal) visibles : fond et contenu dans la silhouette
+  local function dialogLeaks(where)
+    local bad, n = {}, 0
+    for _, d in ipairs(H.objects) do
+      local bd = rawget(d, "border")
+      if bd and type(bd) == "table" and bd.P and rawget(d, "bg") and rawget(d, "header") and vis(d) then
+        n = n + 1
+        local Q = bd.P
+        local pieces = { { Q.tl, "lt" }, { Q.tr, "rt" }, { Q.bl, "lb" }, { Q.br, "rb" }, { Q.top, "t" },
+          { Q.left, "l" }, { Q.right, "r" }, { Q.bottom, "b" } }
+        local rects = {}
+        local skip = { d.header }
+        for _, t in ipairs(bd.parts) do skip[#skip + 1] = t end
+        for i, o in ipairs(regionsUnder(d, skip)) do rects[where .. " " .. i .. " " .. tostring(rawget(o, "_wow") or rawget(o, "_text") or "")] = clipped(o) end
+        for _, l in ipairs(leaks(pieces, rects)) do bad[#bad + 1] = l end
+      end
+    end
+    return bad, n
+  end
+  local allBad, nd = {}, 0
+  local function dl(where)
+    local b, n = dialogLeaks(where)
+    nd = nd + n
+    for _, x in ipairs(b) do allBad[#allBad + 1] = x end
+  end
+  H.slash("options")
+  dl("options")
+  H.key("ESCAPE")
+  Um.toggleDeckView("deck")
+  dl("deck")
+  H.key("ESCAPE")
+
+  -- butin en vol vers le bandeau : sur la couche du dessus pendant le vol, de retour à l'arrivée
+  local res = fightUntil(nil, 600)
+  if res and V().banner._shown then
+    dl("fin de combat")
+    H.click(V().banner.button)
+  end
+  check("récompense atteinte (butin à ramasser)", currentKind() == "reward", currentKind())
+  if currentKind() == "reward" then
+    bandCheck("récompense")
+    frameLeaks("récompense")
+    local rw = Um.current
+    local bag = rw.goldBag
+    local home = bag:GetParent()
+    if bag._shown and Um.hold.gold then
+      H.click(bag)
+      H.advance(0.2)
+      local icon = bag.slot.icon
+      local flying = bag:GetParent() == Um.overlay and above(icon, P.top) and above(icon, Um.band.bg or P.top)
+      local bandTop = true
+      for _, o in ipairs(regionsUnder(Um.band)) do
+        if area(clipped(o), clipped(icon)) > 0 and not above(icon, o) then bandTop = false end
+      end
+      check("butin en vol : sur la couche du dessus, au-dessus de la barre de titre et du bandeau", flying and bandTop)
+      H.advance(1)
+      check("butin arrivé : rendu à son écran, caché, or crédité au bandeau", bag:GetParent() == home and not bag._shown
+        and Um.hold.gold == nil and bag:GetFrameLevel() < Um.overlay:GetFrameLevel())
+    else
+      check("butin : bourse d'or à ramasser", false)
+    end
+  end
+
+  -- parchemins visibles : rien posé dessus ne déborde de leur silhouette
+  local function parchLeaks(where)
+    local bad, n = {}, 0
+    for _, p in ipairs(H.objects) do
+      local nine = rawget(p, "nine")
+      if nine and type(nine) == "table" and nine.parts and vis(p) then
+        n = n + 1
+        local pieces = {}
+        for i, t in ipairs(nine.parts) do if i ~= 5 then pieces[#pieces + 1] = { t, "lrtb" } end end
+        local rects = {}
+        -- ce que porte le parchemin : ses textes, et pour le parcours le canevas posé dessus (étapes, traits)
+        for _, s in pairs(Um.screens) do
+          if s.parch == p and s.canvas then
+            for i, o in ipairs(regionsUnder(s.canvas)) do
+              rects[where .. " " .. i .. " " .. tostring(rawget(o, "_wow") or rawget(o, "_text") or rawget(o, "_kind"))] = clipped(o)
+            end
+          end
+        end
+        for i, t in ipairs(regionsUnder(p, nine.parts)) do rects[where .. " texte " .. i .. " " .. tostring(rawget(t, "_text") or "")] = clipped(t) end
+        for _, l in ipairs(leaks(pieces, rects)) do bad[#bad + 1] = l end
+      end
+    end
+    return bad, n
+  end
+  local pBad, np = {}, 0
+  for _, sc in ipairs({ { SEED + 5, nil, "parcours" }, { SEED + 4, "event", "rencontre" } }) do
+    fresh(sc[1], sc[2])
+    H.advance(1)
+    local b, n = parchLeaks(sc[3])
+    np = np + n
+    for _, x in ipairs(b) do pBad[#pBad + 1] = x end
+    frameLeaks(sc[3])
+    bandCheck(sc[3])
+  end
+  check(nd .. " boîtes de dialogue (options, deck, fin de combat) : fond et contenu dans la silhouette du cadre",
+    nd >= 3 and #allBad == 0, table.concat(allBad, ", "))
+  check(np .. " parchemins (parcours, rencontre) : rien ne déborde de leur silhouette", np >= 2 and #pBad == 0,
+    table.concat(pBad, ", "))
+
+  -- 4. cases d'icônes : l'icône couvre l'ouverture du cadre (mesurée sur les pixels de la pièce, bord
+  -- intérieur du liseré d'alpha ≥ 0,5) à ±1 unité ; le fond reste dans le cadre
+  do
+    local e = WS.pieces.slot_frame
+    local img = tga(e.file)
+    local x0, y0 = math.floor(e.tc[1] * e.w + 0.5), math.floor(e.tc[3] * e.h + 0.5)
+    local function a(x, y) return img.alpha(x0 + x, y0 + y) end
+    local my, mx = math.floor(e.ph / 2), math.floor(e.pw / 2)
+    local oL, oR, oT, oB = 0, e.pw, 0, e.ph
+    while a(oL, my) >= 128 or oL == 0 do oL = oL + 1 end            -- premier pixel après le liseré gauche
+    oR = oL while a(oR, my) < 128 do oR = oR + 1 end                -- début du liseré droit
+    while a(mx, oT) >= 128 or oT == 0 do oT = oT + 1 end
+    oB = oT while a(mx, oB) < 128 do oB = oB + 1 end
+    local outR = oR while a(outR, my) >= 128 do outR = outR + 1 end -- bord extérieur du liseré droit
+    local outB = oB while a(mx, outB) >= 128 do outB = outB + 1 end
+    check(("ouverture du cadre de case mesurée [%d, %d) × [%d, %d), carré visible [0, %d) × [0, %d) (pixels de la pièce)")
+      :format(oL, oR, oT, oB, outR, outB), oR - oL > 40 and oB - oT > 40)
+    -- partie non nulle du fond de case
+    local be = WS.pieces.slot_bg
+    local bimg = tga(be.file)
+    local bx0, by0 = math.floor(be.tc[1] * be.w + 0.5), math.floor(be.tc[3] * be.h + 0.5)
+    local bl, br, bt, bb = be.pw, -1, be.ph, -1
+    for y = 0, be.ph - 1 do
+      for x = 0, be.pw - 1 do
+        if bimg.alpha(bx0 + x, by0 + y) > 8 then
+          if x < bl then bl = x end
+          if x > br then br = x end
+          if y < bt then bt = y end
+          if y > bb then bb = y end
+        end
+      end
+    end
+    local function fitAll(where)
+      local bad, n = {}, 0
+      for _, f in ipairs(H.objects) do
+        local icon = rawget(f, "_slotIcon")
+        if icon and vis(f) and rawget(f, "_wow") == "slot_frame" then
+          n = n + 1
+          local fr, ir = R.rect(f), R.rect(icon)
+          local kx, ky = (fr[3] - fr[1]) / e.pw, (fr[4] - fr[2]) / e.ph
+          local want = { fr[1] + oL * kx, fr[4] - oB * ky, fr[1] + oR * kx, fr[4] - oT * ky }
+          local d = math.max(math.abs(ir[1] - want[1]), math.abs(ir[2] - want[2]), math.abs(ir[3] - want[3]), math.abs(ir[4] - want[4]))
+          if d > 1 then bad[#bad + 1] = string.format("%s : icône à %.1f u de l'ouverture (case %.0f)", where, d, fr[3] - fr[1]) end
+          local bg = rawget(f, "_slotBg")
+          if bg and vis(bg) then
+            local gr = R.rect(bg)
+            local gx, gy = (gr[3] - gr[1]) / be.pw, (gr[4] - gr[2]) / be.ph
+            local vis0 = { gr[1] + bl * gx, gr[4] - (bb + 1) * gy, gr[1] + (br + 1) * gx, gr[4] - bt * gy }
+            local box = { fr[1], fr[4] - outB * ky, fr[1] + outR * kx, fr[4] }
+            if vis0[1] < box[1] - 0.25 or vis0[3] > box[3] + 0.25 or vis0[2] < box[2] - 0.25 or vis0[4] > box[4] + 0.25 then
+              bad[#bad + 1] = string.format("%s : fond de case hors du cadre (%.1f %.1f %.1f %.1f / %.1f %.1f %.1f %.1f)", where,
+                vis0[1], vis0[2], vis0[3], vis0[4], box[1], box[2], box[3], box[4])
+            end
+          end
+        end
+      end
+      return bad, n
+    end
+    local sBad, ns0 = {}, 0
+    local function sl(where)
+      local b, n = fitAll(where)
+      ns0 = ns0 + n
+      for _, x in ipairs(b) do sBad[#sBad + 1] = x end
+    end
+    fresh(SEED, "combat")
+    H.settle()
+    sl("combat")
+    fresh(SEED + 2, "merchant")
+    H.advance(1)
+    sl("marchand")
+    check(ns0 .. " cases d'icônes (bandeau, combat, marchand) : icône = ouverture du cadre à ±1, fond dans le cadre",
+      ns0 >= 15 and #sBad == 0, table.concat(sBad, ", "))
+  end
 end
 
 print("U16 méthodes d'API inconnues appelées")

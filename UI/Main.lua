@@ -10,6 +10,7 @@ ns.UI = UI
 
 UI.WIDTH, UI.HEIGHT = 1040, 620
 UI.CONTENT_W, UI.CONTENT_H = 1034, 614
+UI.INSET_L, UI.INSET_T = 2.5, 2.5 -- contenu dans la fenêtre (droite et bas : 3,5 ; voir UI.build)
 UI.screens = {}         -- nom -> écran
 UI.screenByKind = {}    -- kind d'étape -> nom d'écran
 UI.current = nil        -- écran affiché
@@ -65,10 +66,12 @@ local BAND_SLOT = 25    -- cases du bandeau (bibelots, fioles, clé)
 -- Bandeau (direction B) : posé sur la barre de titre du cadre métal de la fenêtre. À gauche classe, PV,
 -- or (pièce), deck (dos de carte + nombre) ; au centre zone et pastilles de progression (icônes de la
 -- carte de vol) ; à droite clé, bibelots et fioles dans des cases de barre d'action, Menu, fermeture.
-local function buildBand(f)
-  local band = CreateFrame("Frame", nil, f)
-  Scene.at(band, f, 0, 0, UI.CONTENT_W, BAND_H)
-  band:SetFrameLevel(f:GetFrameLevel() + 40)
+-- host : porteur (frameTop, qui dessine la barre de titre : le bandeau, son enfant, passe au-dessus) ;
+-- place : cadre de référence des positions (le contenu : UI.bandTarget reste en coordonnées du contenu).
+local function buildBand(host, place)
+  local band = CreateFrame("Frame", nil, host)
+  Scene.at(band, place, 0, 0, UI.CONTENT_W, BAND_H)
+  band:SetFrameLevel(host:GetFrameLevel() + 1)
   band:EnableMouse(true)
   band:RegisterForDrag("LeftButton")
   band:SetScript("OnDragStart", function() UI.frame:StartMoving() end)
@@ -204,38 +207,62 @@ function UI.build()
   f:EnableMouse(true)
   f:Hide()
   if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "SlayTheDragonFrame") end
-  -- fond de roche (UI-Background-Rock) ; le contenu est rogné à la fenêtre (rien ne déborde)
-  UI.frameBg = W.fillTile(f, "rock", 1, "BACKGROUND", -8, 0)
-  UI.frameBg:SetVertexColor(0.55, 0.55, 0.55, 1)
 
+  -- Ordre de dessin. Un cadre qui rogne ses enfants (SetClipsChildren) dessine tout son sous-arbre dans
+  -- sa propre passe, à SON niveau : les niveaux de ses descendants ne se comparent qu'entre eux, jamais à
+  -- ceux d'un cadre extérieur (le bandeau, enfant du contenu au niveau contenu + 40, restait sous la
+  -- barre de titre, sœur du contenu au niveau contenu + 39). Tout ce qui doit passer au-dessus du
+  -- contenu est donc un cadre frère, enfant de la fenêtre, de niveau supérieur, et les écarts sont assez
+  -- grands pour que l'ordre tienne même si le client comparait tous les niveaux entre eux (sous-arbre
+  -- du contenu < contenu + 300) :
+  --   contenu (rogné)          niveau L        décor, plateau, écrans, options, panneau du deck
+  --   frameTop                 L + 300         barre de titre du cadre métal, puis le bandeau (enfant)
+  --   UI.overlay (rogné)       L + 600         message passager, butin en vol vers le bandeau
+  --   rimHost                  L + 900         filets gauche, droit et bas du cadre métal
+  -- Le contenu est rentré de 2,5 (gauche, haut) et 3,5 (droite, bas) : ses bords tombent sous la partie
+  -- opaque du filet et ses coins dans la silhouette des coins biseautés (le harnais le vérifie au pixel,
+  -- U31) ; le fond de roche a exactement son rectangle (rien de visible hors de la silhouette du cadre).
   local content = CreateFrame("Frame", nil, f)
-  content:SetPoint("TOPLEFT", 3, -3)
+  content:SetPoint("TOPLEFT", UI.INSET_L, -UI.INSET_T)
   content:SetSize(UI.CONTENT_W, UI.CONTENT_H)
   content:SetClipsChildren(true)
   UI.content = content
-  -- Cadre métal des fenêtres du jeu (UI-Frame-Metal) : barre de titre sous les éléments du bandeau,
-  -- filets des côtés et du bas par-dessus tout le contenu. Débords : filets gauche, droit et bas sur le
-  -- bord de la fenêtre, haut de la barre de titre au bord haut.
+  local L = content:GetFrameLevel()
+  -- fond de roche (UI-Background-Rock), porté par la fenêtre, au rectangle du contenu
+  UI.frameBg = W.fillTile(content, "rock", 1, "BACKGROUND", -8, 0, f)
+  UI.frameBg:SetVertexColor(0.55, 0.55, 0.55, 1)
+  -- Cadre métal des fenêtres du jeu (UI-Frame-Metal) : barre de titre (frameTop) sous le bandeau, filets
+  -- des côtés et du bas (rimHost) par-dessus tout. Débords : filets gauche, droit et bas sur le bord de la
+  -- fenêtre, haut de la barre de titre au bord haut.
   local k, mm = W.K_METAL, W.Wow.meta.metal
   local frameTop = CreateFrame("Frame", nil, f)
   frameTop:SetAllPoints()
-  frameTop:SetFrameLevel(content:GetFrameLevel() + 39)
+  frameTop:SetFrameLevel(L + 300)
+  UI.frameTop = frameTop
+  local overlay = CreateFrame("Frame", nil, f)
+  overlay:SetAllPoints(content)
+  overlay:SetClipsChildren(true)
+  overlay:SetFrameLevel(L + 600)
+  UI.overlay = overlay
   local rimHost = CreateFrame("Frame", nil, f)
   rimHost:SetAllPoints()
-  rimHost:SetFrameLevel(f:GetFrameLevel() + 120)
+  rimHost:SetFrameLevel(L + 900)
+  UI.rimHost = rimHost
   UI.frameMetal = W.frameSlices(f, { tl = "metal_tl", tr = "metal_tr", bl = "metal_bl", br = "metal_br",
     top = "metal_top", bottom = "metal_bottom", left = "metal_left", right = "metal_right" }, k,
     { mm.lineL0 * k, mm.barTop * k, (150 - mm.lineR1) * k, (64 - mm.lineB1) * k },
     { parent = rimHost, top = frameTop, layer = "ARTWORK" })
   Scene.build(content)
-  buildBand(content)
+  -- bandeau : enfant de frameTop (au-dessus de sa barre de titre), placé en coordonnées du contenu
+  buildBand(frameTop, content)
 
   -- Message passager (raison d'un refus, consigne) : à la façon des erreurs du jeu (texte rouge), sur
-  -- un voile sombre léger pour rester lisible sur le décor.
-  local err = CreateFrame("Frame", nil, content)
+  -- un voile sombre léger pour rester lisible sur le décor ; sur la couche du dessus (au-dessus des
+  -- options et du panneau du deck).
+  local err = CreateFrame("Frame", nil, overlay)
   err:SetSize(520, 34)
   Scene.at(err, content, (UI.CONTENT_W - 520) / 2, 196, 520, 34)
-  err:SetFrameLevel(content:GetFrameLevel() + 90)
+  err:SetFrameLevel(overlay:GetFrameLevel() + 10)
   err.veil = W.rect(err, "BACKGROUND", 0, C.black, 0.55)
   err.veil:SetAllPoints()
   err.text = W.label(err, "heavy", 15, { 1, 0.3, 0.25 }, "OVERLAY")

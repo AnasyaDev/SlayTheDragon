@@ -1574,30 +1574,70 @@ function W.shieldBadge(parent, w, h)
   return f
 end
 
--- Case de barre d'action Dragonflight (fond, icône, cadre, cadre doré de survol), centrée sur le cadre
--- host de taille `size` (le cadre de la case en couvre exactement la taille) ; textures portées par owner
+-- Géométrie des cases, mesurée sur les pixels des pièces (pixels stockés, origine en haut à gauche ;
+-- le harnais la revérifie sur Media/WowUI/atlas.tga, U31) :
+--   slot_frame (69 × 68) : liseré opaque (alpha ≥ 0,5) de 4 px, ouverture [4, 62) × [4, 62), carré
+--   visible [0, 66) ; à droite et en bas, 3 px d'ombre portée (d'où les 69 × 68) ; dans l'ouverture,
+--   biseau sombre translucide (0,4 → 0) sur 4 px, posé sur l'icône comme sur les barres d'action.
+--   slot_bg (96 × 93) : case vide sombre, pleine sur [7, 89) × [7, 89), bord adouci sur 5 px autour
+--   (alpha non nul sur [2, 94) × [2, 93)) ; la partie pleine est posée sur l'ouverture, le bord adouci
+--   reste sous le liseré.
+-- Dans le jeu (ActionButtonTemplate), l'icône couvre tout le bouton et le cadre (46 × 45) se pose
+-- dessus : seul le liseré du cadre la borde. L'ancienne case posait l'icône à 80 % de la taille, centrée
+-- sur la pièce (ombre comprise), et le fond à 132 % : la case vide débordait de 2 à 5 unités hors du
+-- cadre, d'où le gros pourtour noir. Ici : ouverture centrée sur l'hôte, icône = ouverture, fond rentré
+-- sous le liseré (rien ne dépasse du cadre).
+local SLOT_PW, SLOT_PH = 69, 68
+local SLOT_OPEN = { 4, 4, 62, 62 }      -- ouverture du cadre { x0, y0, x1, y1 }
+local SLOT_BG_FULL = { 7, 7, 89, 89 }   -- partie pleine du fond
+local SLOT_BG_TO = { 4, 4, 62, 62 }     -- … posée sur l'ouverture
+W.SLOT = { pw = SLOT_PW, ph = SLOT_PH, open = SLOT_OPEN, bgFull = SLOT_BG_FULL, bgTo = SLOT_BG_TO }
+
+-- Pose la pièce `tex` dont la boîte { x0, y0, x1, y1 } (pixels de la pièce) doit couvrir la boîte `to`
+-- (pixels du cadre de case, unités = k par pixel) ; (ox, oy) : coin haut gauche du cadre de case par
+-- rapport au centre de l'hôte, en unités (y vers le haut).
+local function slotPlace(tex, host, k, ox, oy, pw, ph, box, to)
+  local s = (to[3] - to[1]) / (box[3] - box[1])          -- pixels du cadre par pixel de la pièce
+  local sy = (to[4] - to[2]) / (box[4] - box[2])
+  local x0 = to[1] - box[1] * s                           -- coin haut gauche de la pièce (px du cadre)
+  local y0 = to[2] - box[2] * sy
+  tex:SetSize(pw * s * k, ph * sy * k)
+  tex:ClearAllPoints()
+  tex:SetPoint("TOPLEFT", host, "CENTER", ox + x0 * k, oy - y0 * k)
+end
+
+-- Case de barre d'action Dragonflight (fond, icône, cadre, cadre doré de survol) de taille `size` (largeur
+-- de la pièce du cadre, ombre comprise), ouverture centrée sur le cadre host ; textures portées par owner
 -- (défaut : host ; un cadre d'ancrage posé sur un visuel animé y laisse ainsi ses pièces). Renvoie { icon,
 -- frame, hot, bg } ; slot.frame:SetVertexColor teint le cadre (qualité d'un bibelot).
-local SLOT_BG = 1.32   -- fond : plus grand que le cadre (ombre portée de la pièce)
-local SLOT_ICON = 0.80 -- icône dans l'ouverture du cadre
+-- Place icône, cadre et fond (facultatif) d'une case de taille `size` sur l'hôte (ouverture centrée).
+function W.slotFit(host, size, icon, frame, bg)
+  local k = size / SLOT_PW
+  -- coin haut gauche du cadre : centre de l'ouverture sur le centre de l'hôte
+  local ox = -(SLOT_OPEN[1] + SLOT_OPEN[3]) / 2 * k
+  local oy = (SLOT_OPEN[2] + SLOT_OPEN[4]) / 2 * k
+  if bg then slotPlace(bg, host, k, ox, oy, WP.slot_bg.pw, WP.slot_bg.ph, SLOT_BG_FULL, SLOT_BG_TO) end
+  icon:ClearAllPoints()
+  icon:SetSize((SLOT_OPEN[3] - SLOT_OPEN[1]) * k, (SLOT_OPEN[4] - SLOT_OPEN[2]) * k)
+  icon:SetPoint("CENTER", host, "CENTER", 0, 0)
+  slotPlace(frame, host, k, ox, oy, SLOT_PW, SLOT_PH, { 0, 0, SLOT_PW, SLOT_PH }, { 0, 0, SLOT_PW, SLOT_PH })
+  frame._slotIcon, frame._slotBg = icon, bg -- (harnais : l'icône couvre l'ouverture, U31)
+end
+
 function W.slotOn(host, size, sub, owner)
   sub = sub or 0
   local face = host
   owner = owner or host
   local s = {}
   s.bg = W.wow(owner, "slot_bg", "BACKGROUND", sub)
-  s.bg:SetSize(size * SLOT_BG, size * SLOT_BG * WP.slot_bg.ph / WP.slot_bg.pw)
-  s.bg:SetPoint("CENTER", face, "CENTER", 0, -size * 0.02)
   s.icon = W.noSnap(owner:CreateTexture(nil, "ARTWORK", nil, sub))
-  s.icon:SetSize(size * SLOT_ICON, size * SLOT_ICON)
-  s.icon:SetPoint("CENTER", face, "CENTER", 0, 0)
   s.frame = W.wow(owner, "slot_frame", "ARTWORK", sub + 2)
-  s.frame:SetSize(size, size * WP.slot_frame.ph / WP.slot_frame.pw)
-  s.frame:SetPoint("CENTER", face, "CENTER", 0, 0)
+  W.slotFit(face, size, s.icon, s.frame, s.bg)
   s.hot = W.hoverLayer(W.wow(owner, "slot_hover", "ARTWORK", sub + 3))
   s.hot:SetSize(size * 1.04, size * 1.04 * WP.slot_hover.ph / WP.slot_hover.pw)
   s.hot:SetPoint("CENTER", face, "CENTER", 0, 0)
   s.hot:SetAlpha(0)
+  s.size = size
   return s
 end
 
@@ -1869,10 +1909,8 @@ function W.tokenRow(parent, maxN, width, size)
     t:EnableMouse(true)
     local face = W.face(t)
     local icon = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 0))
-    icon:SetPoint("TOPLEFT", size * 0.09, -size * 0.09)
-    icon:SetPoint("BOTTOMRIGHT", -size * 0.09, size * 0.09)
     local ring = W.wow(face, "slot_frame", "ARTWORK", 1)
-    ring:SetAllPoints()
+    W.slotFit(face, size, icon, ring) -- icône = ouverture du cadre (liseré fin, comme les cases)
     t.medal = { icon = icon, ring = ring,
       SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end }
     t.count = W.label(face, "heavy", floor(size * 0.45), C.text, "OVERLAY")
@@ -2935,6 +2973,29 @@ end
 function W.setLevel(f, level)
   f:SetFrameLevel(level)
   if f.face then relevel(f.face, level + 1) end
+end
+
+-- Passe un cadre (et son sous-arbre) sous un autre parent, au niveau `level` (enfants au-dessus, dans
+-- l'ordre où ils étaient) ; renvoie de quoi le remettre en place (parent et niveaux d'origine). Sert au
+-- butin qui vole vers le bandeau : il quitte le contenu rogné pour la couche du dessus (UI.overlay).
+function W.lift(f, parent, level)
+  local saved = {}
+  local function save(fr)
+    saved[#saved + 1] = { fr, fr:GetFrameLevel() }
+    if fr.GetChildren then
+      local kids = { fr:GetChildren() }
+      for i = 1, #kids do save(kids[i]) end
+    end
+  end
+  save(f)
+  local home = f:GetParent()
+  local base = saved[1][2]
+  f:SetParent(parent)
+  for i = 1, #saved do saved[i][1]:SetFrameLevel(level + (saved[i][2] - base)) end
+  return function()
+    f:SetParent(home)
+    for i = 1, #saved do saved[i][1]:SetFrameLevel(saved[i][2]) end
+  end
 end
 
 -- Niveau d'une carte : devant au survol ; en sortie, juste au-dessus des voisines tant qu'elle

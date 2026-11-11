@@ -65,7 +65,8 @@ local function rect(o, memo, depth)
     if text == "" then w, h = 0, 0 end
   end
   if pts[1] and pts[1][1] == "ALL" then
-    local r = parent and rect(parent, memo, depth)
+    local rel = pts[1][2] or parent
+    local r = rel and rect(rel, memo, depth)
     memo[o] = r or false
     return r
   end
@@ -171,12 +172,78 @@ local function flevel(f)
   return own
 end
 
-local function level(o)
-  local f = o
-  if rawget(o, "_kind") == "Texture" or rawget(o, "_kind") == "FontString" or rawget(o, "_kind") == "Line" then
-    f = rawget(o, "_parent")
+local function frameOf(o)
+  local k = rawget(o, "_kind")
+  if k == "Texture" or k == "FontString" or k == "Line" or k == "MaskTexture" then return rawget(o, "_parent") end
+  return o
+end
+
+local function level(o) return flevel(frameOf(o)) end
+R.flevel = flevel
+
+-- Cadre rogneur (SetClipsChildren(true)).
+local function clips(f)
+  local c = rawget(f, "_calls")
+  c = c and c.SetClipsChildren
+  return c and c[1] and true or false
+end
+R.clips = clips
+
+-- Règle retenue pour le client : un cadre rogneur dessine tout son sous-arbre dans sa propre passe, à
+-- SON niveau. Les niveaux de ses descendants ne se comparent qu'entre eux ; face à un cadre extérieur,
+-- c'est le niveau du rogneur qui compte. Clé de tri d'une région = liste { rogneur le plus extérieur,
+-- …, rogneur le plus proche, région } comparée terme à terme : rogneur = niveau × 1000 + 999 (+ ordre
+-- de création), région = niveau × 1000 + couche × 100 + sous-couche × 5 (+ ordre de création).
+local LAYER_KEY = LAYERS
+local indexOf, indexN, indexList = {}, 0, nil
+local function objIndex(o)
+  local objs = R.H and R.H.objects
+  if objs ~= indexList then indexOf, indexN, indexList = {}, 0, objs end
+  if objs and #objs ~= indexN then
+    for i = indexN + 1, #objs do indexOf[objs[i]] = i end
+    indexN = #objs
   end
-  return flevel(f)
+  return indexOf[o] or 0
+end
+
+function R.drawKey(o)
+  local key = {}
+  local f = frameOf(o)
+  local a = f
+  while a and rawget(a, "_name") ~= "UIParent" do
+    if clips(a) then table.insert(key, 1, flevel(a) * 1000 + 999 + objIndex(a) / 1e6) end
+    a = rawget(a, "_parent")
+  end
+  local layer = LAYER_KEY[rawget(o, "_layer") or ""] or 3
+  key[#key + 1] = flevel(f) * 1000 + layer * 100 + (rawget(o, "_sub") or 0) * 5 + objIndex(o) / 100000
+  return key
+end
+
+-- a est dessiné avant (sous) b ?
+function R.drawnBefore(ka, kb)
+  for i = 1, math.max(#ka, #kb) do
+    local x, y = ka[i], kb[i]
+    if x == nil then return true end
+    if y == nil then return false end
+    if x ~= y then return x < y end
+  end
+  return false
+end
+
+-- Rectangle de rognage d'une région (intersection des rogneurs ancêtres) ou nil.
+function R.clipRect(o)
+  local a, c = frameOf(o), nil
+  while a and rawget(a, "_name") ~= "UIParent" do
+    if clips(a) then
+      local r = rect(a)
+      if r then
+        if not c then c = { r[1], r[2], r[3], r[4] }
+        else c = { math.max(c[1], r[1]), math.max(c[2], r[2]), math.min(c[3], r[3]), math.min(c[4], r[4]) } end
+      end
+    end
+    a = rawget(a, "_parent")
+  end
+  return c
 end
 
 local function col(c)
@@ -278,12 +345,11 @@ function R.svg(H, root, path, label)
       local p, inside = o, false
       while p do if p == root then inside = true break end p = rawget(p, "_parent") end
       if inside then
-        local layer = LAYERS[rawget(o, "_layer") or ""] or 3
-        items[#items + 1] = { o = o, kind = kind, key = level(o) * 1000 + layer * 100 + (rawget(o, "_sub") or 0) * 5 + idx / 100000 }
+        items[#items + 1] = { o = o, kind = kind, key = R.drawKey(o), clip = R.clipRect(o) }
       end
     end
   end
-  table.sort(items, function(a, b) return a.key < b.key end)
+  table.sort(items, function(a, b) return R.drawnBefore(a.key, b.key) end)
   local out = { string.format('<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">',
     W, Hh, W, Hh), '<rect width="100%" height="100%" fill="#000"/>' }
   local defs, nid = {}, 0
@@ -308,7 +374,9 @@ function R.svg(H, root, path, label)
     end
     return string.format(' filter="url(#%s)"', filters[key])
   end
+  local clipIds = {}
   for _, it in ipairs(items) do
+    local n0 = #out
     local o = it.o
     local r = R.vrect(o)
     local vk = R.vfactor(o)
@@ -517,6 +585,18 @@ function R.svg(H, root, path, label)
           end
         end
       end
+    end
+    -- rognage des cadres rogneurs ancêtres (SetClipsChildren)
+    if it.clip and #out > n0 then
+      local c = it.clip
+      local ck = string.format("%.2f,%.2f,%.2f,%.2f", c[1], c[2], c[3], c[4])
+      if not clipIds[ck] then
+        clipIds[ck] = newId("k")
+        defs[#defs + 1] = string.format('<clipPath id="%s"><rect x="%.2f" y="%.2f" width="%.2f" height="%.2f"/></clipPath>',
+          clipIds[ck], X(c[1]), Y(c[4]), math.max(0, c[3] - c[1]), math.max(0, c[4] - c[2]))
+      end
+      out[n0 + 1] = string.format('<g clip-path="url(#%s)">', clipIds[ck]) .. out[n0 + 1]
+      out[#out] = out[#out] .. "</g>"
     end
   end
   if #defs > 0 then out[2] = "<defs>" .. table.concat(defs, "\n") .. "</defs>\n" .. out[2] end

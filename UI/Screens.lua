@@ -929,12 +929,17 @@ function Reward:Collect(kind, silent)
   local p, rel, rp, ox, oy = obj:GetPoint(1)
   local bx, by = (ox or 0) + obj:GetWidth() / 2, -(oy or 0) + obj:GetHeight() / 2
   if p ~= "TOPLEFT" then bx, by = x, y end
+  -- en vol, l'objet passe sur la couche du dessus (au-dessus de la barre de titre et du bandeau, rognée
+  -- au contenu) ; il reste ancré à l'écran (self.frame couvre le contenu) : coordonnées inchangées
+  if obj.landHome then obj.landHome() end
+  obj.landHome = W.lift(obj, UI.overlay, UI.overlay:GetFrameLevel() + 20)
   W.tween(0.45, function(t)
     obj:ClearAllPoints()
     obj:SetPoint("CENTER", self.frame, "TOPLEFT", bx + (tx - bx) * t, -(by + (ty - by) * t - 60 * 4 * t * (1 - t)))
     obj:SetAlpha(1 - 0.6 * t)
   end, function()
     obj:Hide()
+    if obj.landHome then obj.landHome() obj.landHome = nil end
     obj:SetAlpha(1)
     obj:ClearAllPoints()
     if p then obj:SetPoint(p, rel, rp, ox, oy) end
