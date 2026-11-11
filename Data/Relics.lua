@@ -21,8 +21,8 @@ end
 -- Neutre (palier 0) ---------------------------------------------------------
 
 relic("hearthstone", {
-  name = "Pierre de foyer fêlée", rarity = "uncommon", tier = 0,
-  text = "Une fois par expédition, permet de fuir un combat normal ou d'élite, sans récompense.",
+  name = "Cracked Hearthstone", rarity = "uncommon", tier = 0,
+  text = "Once per expedition, flee a normal or elite combat, with no reward.",
   hooks = {
     canFlee = function(c, src, v)
       if c.charges.hearthstone_used then return v end
@@ -35,16 +35,16 @@ relic("hearthstone", {
 })
 
 relic("defias_purse", {
-  name = "Bourse défias", rarity = "uncommon", tier = 0,
-  text = "+25 % d'or gagné.",
+  name = "Defias Purse", rarity = "uncommon", tier = 0,
+  text = "+25% gold gained.",
   run = {
     gold = function(run, v) return floor(v * 1.25 + 0.5) end,
   },
 })
 
 relic("linen_bandage", {
-  name = "Bandage en lin", rarity = "common", tier = 0,
-  text = "À la fin de chaque combat gagné, soigne 3 PV.",
+  name = "Linen Bandage", rarity = "common", tier = 0,
+  text = "After each combat won, heal 3 HP.",
   hooks = {
     onVictory = function(c, src)
       Combat.heal(c, c.player, 3)
@@ -53,8 +53,8 @@ relic("linen_bandage", {
 })
 
 relic("stormwind_tabard", {
-  name = "Tabard de Hurlevent", rarity = "common", tier = 0,
-  text = "Au premier tour de chaque combat, gagne 5 Absorption.",
+  name = "Stormwind Tabard", rarity = "common", tier = 0,
+  text = "On the first turn of each combat, gain 5 Absorb.",
   hooks = {
     onTurnStart = function(c, src)
       if c.round == 1 then Combat.gainBlock(c, c.player, 5) end
@@ -64,8 +64,8 @@ relic("stormwind_tabard", {
 
 -- Bibelot de boss de l'acte 1 : fort, avec une contrepartie.
 relic("vancleef_bandana", {
-  name = "Bandeau rouge de VanCleef", rarity = "boss", tier = 0,
-  text = "+1 mana à chaque tour. Au début de chaque combat, les ennemis gagnent 2 Force.",
+  name = "VanCleef's Red Bandana", rarity = "boss", tier = 0,
+  text = "+1 mana each turn. At the start of each combat, enemies gain 2 Strength.",
   hooks = {
     maxMana = function(c, src, v) return v + 1 end,
     onCombatStart = function(c, src)
@@ -80,8 +80,8 @@ relic("vancleef_bandana", {
 -- Amical (palier 1) ---------------------------------------------------------
 
 relic("faction_insignia", {
-  name = "Insigne de l'Alliance", nameHorde = "Insigne de la Horde", rarity = "rare", tier = 1,
-  text = "Une fois par combat, au début du tour, retire tous les états négatifs.",
+  name = "Insignia of the Alliance", nameHorde = "Insignia of the Horde", rarity = "rare", tier = 1,
+  text = "Once per combat, at the start of the turn, remove all negative effects.",
   hooks = {
     onTurnStart = function(c, src)
       if c.relicState.insignia_used then return end
@@ -94,8 +94,8 @@ relic("faction_insignia", {
 })
 
 relic("sharpening_stone", {
-  name = "Pierre à aiguiser grossière", rarity = "uncommon", tier = 1,
-  text = "Les cartes d'attaque infligent 1 de plus par coup.",
+  name = "Coarse Sharpening Stone", rarity = "uncommon", tier = 1,
+  text = "Attack cards deal 1 more damage per hit.",
   hooks = {
     damage = function(c, src, v, dst, cardDef)
       if cardDef and cardDef.type == "attack" then return v + 1 end
@@ -107,8 +107,8 @@ relic("sharpening_stone", {
 -- Honoré (palier 2) ---------------------------------------------------------
 
 relic("focus_talisman", {
-  name = "Talisman de concentration", rarity = "uncommon", tier = 2,
-  text = "La première interruption subie, à chaque combat, est sans effet.",
+  name = "Talisman of Focus", rarity = "uncommon", tier = 2,
+  text = "The first interrupt suffered in each combat has no effect.",
   hooks = {
     preventInterrupt = function(c, src)
       if c.relicState.talisman_used then return false end
@@ -119,8 +119,8 @@ relic("focus_talisman", {
 })
 
 relic("camp_kettle", {
-  name = "Marmite de campagne", rarity = "common", tier = 2,
-  text = "Se reposer au feu de camp soigne 10 PV de plus.",
+  name = "Camp Kettle", rarity = "common", tier = 2,
+  text = "Resting at a campfire heals 10 more HP.",
   run = {
     restHeal = function(run, v) return v + 10 end,
   },
@@ -130,8 +130,8 @@ relic("camp_kettle", {
 
 -- La roulotte de Grisette (rencontre rare) : contre 8 PV max.
 relic("harvest_cog", {
-  name = "Engrenage de moissonneur", rarity = "rare", tier = 0, noPool = true,
-  text = "Au premier tour de chaque combat, pioche 2 cartes de plus.",
+  name = "Harvest Golem Cog", rarity = "rare", tier = 0, noPool = true,
+  text = "On the first turn of each combat, draw 2 more cards.",
   hooks = {
     drawPerTurn = function(c, src, v)
       if c.round == 1 then return v + 2 end
@@ -142,8 +142,8 @@ relic("harvest_cog", {
 
 -- Le guetteur de la Colline (suite de l'histoire de Tobin).
 relic("tobin_knife", {
-  name = "Canif de Tobin", rarity = "rare", tier = 0, noPool = true,
-  text = "Au début de chaque combat, inflige Douleur 3 à tous les ennemis.",
+  name = "Tobin's Pocketknife", rarity = "rare", tier = 0, noPool = true,
+  text = "At the start of each combat, apply Pain 3 to all enemies.",
   hooks = {
     onCombatStart = function(c, src)
       for i = 1, #c.enemies do
@@ -157,8 +157,8 @@ relic("tobin_knife", {
 -- Révéré (palier 3) ---------------------------------------------------------
 
 relic("mana_ruby", {
-  name = "Rubis de mana", rarity = "rare", tier = 3,
-  text = "Au premier tour de chaque combat, +1 mana.",
+  name = "Mana Ruby", rarity = "rare", tier = 3,
+  text = "On the first turn of each combat, +1 mana.",
   hooks = {
     onTurnStart = function(c, src)
       if c.round == 1 then

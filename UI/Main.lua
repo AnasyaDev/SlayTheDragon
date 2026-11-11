@@ -20,7 +20,7 @@ local function opts() return Persist.options() end
 
 local function say(msg)
   local cf = DEFAULT_CHAT_FRAME
-  if cf and cf.AddMessage then cf:AddMessage("|cffd4a017Slay the Dragon|r : " .. msg) else print(msg) end
+  if cf and cf.AddMessage then cf:AddMessage("|cffd4a017Slay the Dragon|r: " .. msg) else print(msg) end
 end
 UI.say = say
 
@@ -120,7 +120,7 @@ local function buildBand(f)
   end)
   W.tooltip(deck, function(tt)
     UI.fillDeckTooltip(tt)
-    tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
+    tt:AddLine("Click: view the cards.", 0.6, 0.6, 0.6)
   end, "ANCHOR_BOTTOM")
   UI.info = deck
   UI.deckButton = deck
@@ -197,8 +197,8 @@ end
 
 function UI.fillDeckTooltip(tt)
   local r = Controller.runInfo()
-  if not r then tt:AddLine("Aucune expédition en cours.") return end
-  tt:AddLine("Deck (" .. #r.deck .. " cartes)", 1, 0.82, 0)
+  if not r then tt:AddLine("No expedition in progress.") return end
+  tt:AddLine("Deck (" .. #r.deck .. " cards)", 1, 0.82, 0)
   local counts, order = {}, {}
   for i = 1, #r.deck do
     local c = r.deck[i]
@@ -287,7 +287,7 @@ local function affixText(r)
   local lines = {}
   for i = 1, #(r.affixes or {}) do
     local a = ns.Affixes[r.affixes[i]]
-    if a then lines[#lines + 1] = a.name .. " : " .. a.text end
+    if a then lines[#lines + 1] = a.name .. ": " .. a.text end
   end
   return table.concat(lines, "\n")
 end
@@ -374,8 +374,8 @@ function UI.refreshInfo()
     if heldPotion and id == heldPotion and i == hold.potionSlot then id = nil end
     if r then
       if id then
-        b:SetItem("potion", id, { hint = Controller.inCombat() and "Clic : boire."
-          or { "Se boit en combat.", "Deux clics droits : jeter." } })
+        b:SetItem("potion", id, { hint = Controller.inCombat() and "Click: drink."
+          or { "Drink it in combat.", "Right-click twice: discard." } })
       else
         b:SetItem(nil, nil, { kind = "empty" })
       end
@@ -400,7 +400,7 @@ function UI.refreshInfo()
   if nShown == 0 then anchor = UI.sep end
   local right = anchor
   if r and (r.key or 0) > 0 then
-    UI.keystone.info = { id = r.key, title = "Clé mythique +" .. r.key, text = affixText(r) }
+    UI.keystone.info = { id = r.key, title = "Mythic Keystone +" .. r.key, text = affixText(r) }
     UI.keystone.count:SetText("+" .. r.key)
     UI.keystone:ClearAllPoints()
     UI.keystone:SetPoint("RIGHT", right, "LEFT", -10, 0)
@@ -437,7 +437,7 @@ function UI.refreshInfo()
   UI.hpMax:SetText("/" .. r.maxHp)
   UI.goldText:SetText(tostring(math.max(0, r.gold - (hold.gold or 0))))
   local zone = r.act or ""
-  if UI.step and UI.step.kind == "map" then zone = "Acte " .. (Controller.exp() and Controller.exp().act or 1) .. " · " .. zone end
+  if UI.step and UI.step.kind == "map" then zone = "Act " .. (Controller.exp() and Controller.exp().act or 1) .. " · " .. zone end
   UI.zone:SetText(zone)
   layoutDots(r)
 end
@@ -459,19 +459,19 @@ function UI.clickPotion(b, button)
   local def = ns.Potions[id]
   local name = def and def.name or tostring(id)
   if button == "RightButton" then
-    if Controller.inCombat() then UI.flash("On ne jette pas une potion en plein combat.") return end
+    if Controller.inCombat() then UI.flash("Potions can't be discarded during combat.") return end
     if b.armed then
       b.armed = false
       local ok, why = Controller.discardPotion(b.slot)
       if not ok then UI.flash(Controller.reasonText(why)) end
     else
       b.armed = true
-      UI.flash("Clic droit à nouveau pour jeter " .. name .. ".")
+      UI.flash("Right-click again to discard " .. name .. ".")
       W.delay(3, function() b.armed = false end)
     end
     return
   end
-  if not Controller.inCombat() then UI.flash("Les potions se boivent en combat.") return end
+  if not Controller.inCombat() then UI.flash("Potions are drunk in combat.") return end
   if def and def.target then
     UI.screens.combat:SelectPotion(b.slot)
   else
@@ -501,7 +501,7 @@ end
 -- Choix générique depuis un écran (bouton, carte, nœud de carte).
 function UI.choose(id)
   local ok, why = Controller.choose(id)
-  if not ok and why then UI.flash(Controller.reasonText(why) or "Choix impossible.") end
+  if not ok and why then UI.flash(Controller.reasonText(why) or "Choice not possible.") end
   return ok
 end
 
@@ -530,7 +530,7 @@ function UI.isShown() return UI.frame and UI.frame:IsShown() or false end
 
 function UI.open(reason)
   if InCombatLockdown and InCombatLockdown() then
-    if reason ~= "flight" then say("indisponible en combat.") end
+    if reason ~= "flight" then say("unavailable in combat.") end
     return false
   end
   UI.build()
@@ -634,14 +634,14 @@ function UI.buildOptions()
     checks[#checks + 1] = c
     return c
   end
-  check("Ouvrir au décollage", "autoOpen", -44)
-  check("Fermer à l'atterrissage", "autoClose", -68)
-  check("Mode rapide (animations éclair)", "fast", -92)
-  local mm = W.check(p, "Bouton de minimap", function() return not opts().minimap.hide end,
+  check("Open on takeoff", "autoOpen", -44)
+  check("Close on landing", "autoClose", -68)
+  check("Fast mode (instant animations)", "fast", -92)
+  local mm = W.check(p, "Minimap button", function() return not opts().minimap.hide end,
     function(v) opts().minimap.hide = not v UI.updateMinimapButton() end)
   mm:SetPoint("TOPLEFT", 14, -116)
   checks[#checks + 1] = mm
-  check("Décor illustré (sinon peint)", "decor", -140, function() UI.refresh() end)
+  check("Illustrated scenery (else painted)", "decor", -140, function() UI.refresh() end)
   UI.optionChecks = checks
 
   local function stepper(label, y, get, set, fmt)
@@ -657,10 +657,10 @@ function UI.buildOptions()
     v.Sync = function() v:SetText(fmt(get())) end
     return v, minus, plus
   end
-  local pct = function(x) return math.floor(x * 100 + 0.5) .. " %" end
-  UI.scaleValue, UI.scaleMinus, UI.scalePlus = stepper("Échelle", -178, function() return opts().scale end,
+  local pct = function(x) return math.floor(x * 100 + 0.5) .. "%" end
+  UI.scaleValue, UI.scaleMinus, UI.scalePlus = stepper("Scale", -178, function() return opts().scale end,
     function(d) opts().scale = (opts().scale or 1) + d * 0.05 UI.applyScale() end, pct)
-  UI.speedValue, UI.speedMinus, UI.speedPlus = stepper("Vitesse des animations", -208,
+  UI.speedValue, UI.speedMinus, UI.speedPlus = stepper("Animation speed", -208,
     function() return opts().speed end,
     function(d)
       local s = (opts().speed or 1) + d * 0.25
@@ -668,30 +668,30 @@ function UI.buildOptions()
       opts().speed = s
     end, function(x) return "×" .. x end)
 
-  local ab = W.button(p, "Abandonner l'expédition", 200, 26, nil, "red")
+  local ab = W.button(p, "Abandon expedition", 200, 26, nil, "red")
   ab:SetPoint("BOTTOMLEFT", 14, 48)
   ab:SetScript("OnClick", function(self)
-    if not Controller.exp() then UI.flash("Aucune expédition en cours.") return end
+    if not Controller.exp() then UI.flash("No expedition in progress.") return end
     if self.armed then
       self.armed = false
-      self:SetText("Abandonner l'expédition")
+      self:SetText("Abandon expedition")
       Controller.abandon()
       p:Hide()
     else
       self.armed = true
-      self:SetText("Confirmer l'abandon ?")
-      W.delay(3, function() if self.armed then self.armed = false self:SetText("Abandonner l'expédition") end end)
+      self:SetText("Confirm abandon?")
+      W.delay(3, function() if self.armed then self.armed = false self:SetText("Abandon expedition") end end)
     end
   end)
   UI.abandonButton = ab
 
-  local rp = W.button(p, "Recentrer la fenêtre", 200, 26, function()
+  local rp = W.button(p, "Recenter the window", 200, 26, function()
     opts().point = nil
     UI.applyPosition()
   end)
   rp:SetPoint("BOTTOMLEFT", 14, 16)
 
-  local ok = W.button(p, "Fermer", 90, 26, function() p:Hide() end, "gold", 13)
+  local ok = W.button(p, "Close", 90, 26, function() p:Hide() end, "gold", 13)
   ok:SetPoint("BOTTOMRIGHT", -14, 16)
 
   p:SetScript("OnShow", function()
@@ -771,9 +771,9 @@ function UI.createMinimapButton()
   b:SetScript("OnDragStop", function(self) self:SetScript("OnUpdate", nil) end)
   W.tooltip(b, function(tt)
     tt:AddLine("Slay the Dragon", 1, 0.82, 0)
-    tt:AddLine("Clic gauche : ouvrir / fermer", 1, 1, 1)
-    tt:AddLine("Clic droit : options", 1, 1, 1)
-    tt:AddLine("Glisser : déplacer ce bouton", 0.7, 0.7, 0.7)
+    tt:AddLine("Left-click: open / close", 1, 1, 1)
+    tt:AddLine("Right-click: options", 1, 1, 1)
+    tt:AddLine("Drag: move this button", 0.7, 0.7, 0.7)
   end, "ANCHOR_LEFT")
   UI.updateMinimapButton()
 end
@@ -786,15 +786,15 @@ end
 -- modèles manquants.
 local function artReport()
   if not UI.frame then UI.build() end
-  say("décors" .. (opts().decor == false and " (illustrations désactivées : /slay decor illustre)" or "") .. " :")
+  say("scenery" .. (opts().decor == false and " (illustrations off: /slay scenery illustrated)" or "") .. ":")
   for _, line in ipairs(Scene.report()) do say("  " .. line) end
   local keys = {}
   for k in pairs(W.missing) do keys[#keys + 1] = k end
   table.sort(keys)
   if #keys == 0 then
-    say("aucune icône ni aucun modèle manquant repéré jusqu'ici (à relancer après quelques écrans).")
+    say("no missing icon or model found so far (run again after a few screens).")
   else
-    say(#keys .. " élément(s) d'art manquant(s) :")
+    say(#keys .. " missing art element(s):")
     for i = 1, #keys do say("  " .. keys[i]) end
   end
 end
@@ -806,59 +806,65 @@ local function artPreview()
   if s and s.PreviewEnemies then s:PreviewEnemies() end
 end
 
--- /slay decor [essai | suivant | precedent | ok | non | peint | illustre] : décor illustré (fonds embarqués
+-- /slay scenery [test | next | prev | ok | no | painted | illustrated] : décor illustré (fonds embarqués
 -- dans l'addon, affichés sans validation) ou peint ; essai manuel des candidats du client (repli facultatif :
 -- seul moyen de savoir si un fichier existe dans ce client).
-local DECOR_HELP = "/slay decor ok (image visible) ou non (aplat vert, noir ou vide) ; "
-  .. "/slay decor suivant / precedent ; /slay decor peint pour finir."
+local DECOR_HELP = "/slay scenery ok (image visible) or no (flat green, black or empty); "
+  .. "/slay scenery next / prev; /slay scenery painted to finish."
 
 local function trialSay(cand)
   local list = Scene.trialList()
-  say("essai du décor " .. Scene.trial .. "/" .. #list .. " : " .. Scene.describe(cand) .. ".")
+  say("scenery test " .. Scene.trial .. "/" .. #list .. ": " .. Scene.describe(cand) .. ".")
 end
 
 local function decorCommand(arg)
-  local trialCmd = arg == "essai" or arg == "suivant" or arg == "precedent" or arg == "précédent"
+  local trialCmd = arg == "test" or arg == "next" or arg == "prev"
   if trialCmd then
-    if arg == "essai" and Scene.trial then
+    if arg == "test" and Scene.trial then
       Scene.trialStop()
-      say("essai terminé ; décor " .. (opts().decor == false and "peint" or "illustré (fonds embarqués)") .. ".")
+      say("test over; scenery " .. (opts().decor == false and "painted" or "illustrated (embedded backgrounds)") .. ".")
       return
     end
     local first = not Scene.trial
     if first and not UI.isShown() and not UI.open("decor") then return end
     local cand
     if first then cand = Scene.trialStart()
-    else cand = Scene.trialStep(arg == "suivant" and 1 or -1) end
+    else cand = Scene.trialStep(arg == "next" and 1 or -1) end
     trialSay(cand)
     if first then
       say(DECOR_HELP)
       if Scene.scene == false then
-        say("cet écran n'a pas de décor : l'essai se voit à l'accueil, en combat, sur une récompense, "
-          .. "au marchand ou au feu de camp.")
+        say("this screen has no scenery: the test shows on the home screen, in combat, on a reward, "
+          .. "at the merchant or at the campfire.")
       end
     end
-  elseif arg == "ok" or arg == "non" then
+  elseif arg == "ok" or arg == "no" then
     local cand = Scene.trialMark(arg == "ok")
-    if not cand then say("aucun essai en cours : /slay decor essai.") return end
-    say(tostring(cand.file) .. " " .. (arg == "ok" and "validé" or "refusé") .. " (gardé dans la sauvegarde). "
-      .. "Suite : /slay decor suivant.")
-  elseif arg == "peint" or arg == "illustre" or arg == "illustré" or arg == "" then
+    if not cand then say("no test in progress: /slay scenery test.") return end
+    say(tostring(cand.file) .. " " .. (arg == "ok" and "accepted" or "rejected") .. " (kept in the save). "
+      .. "Next: /slay scenery next.")
+  elseif arg == "painted" or arg == "illustrated" or arg == "" then
     local was = Scene.trial
     if was then Scene.trialStop() end
     if arg == "" then
       if not was then opts().decor = opts().decor == false end
     else
-      opts().decor = arg ~= "peint"
+      opts().decor = arg ~= "painted"
     end
-    say((was and "essai terminé ; " or "") .. "décor " .. (opts().decor and "illustré (fonds embarqués "
-      .. "dans l'addon)" or "peint") .. ".")
+    say((was and "test over; " or "") .. "scenery " .. (opts().decor and "illustrated (backgrounds embedded "
+      .. "in the addon)" or "painted") .. ".")
     if UI.frame and UI.frame:IsShown() then UI.refresh() end
   else
-    say("/slay decor : bascule peint / illustré ; /slay decor peint ; /slay decor illustre ; "
-      .. "/slay decor essai (puis suivant, precedent, ok, non) : candidats du client, facultatif.")
+    say("/slay scenery: toggle painted / illustrated; /slay scenery painted; /slay scenery illustrated; "
+      .. "/slay scenery test (then next, prev, ok, no): client candidates, optional.")
   end
 end
+
+-- Mots tapés pour le zoom (/slay zoom) -> valeur enregistrée dans options.zoom (inchangée : « net »,
+-- « fluide », « lisse », pour ne casser aucune sauvegarde), et l'inverse pour l'affichage.
+local ZOOM_WORDS = { sharp = "net", fluid = "fluide", smooth = "lisse" }
+local ZOOM_NAMES = { net = "sharp", fluide = "fluid", lisse = "smooth" }
+UI.ZOOM_WORDS, UI.ZOOM_NAMES = ZOOM_WORDS, ZOOM_NAMES
 
 SLASH_SLAYTHEDRAGON1 = "/slay"
 SLASH_SLAYTHEDRAGON2 = "/slaythedragon"
@@ -867,27 +873,28 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   if msg == "" then UI.toggle()
   elseif msg == "options" or msg == "config" then UI.toggleOptions()
   elseif msg == "art" then artReport()
-  elseif msg == "modeles" or msg == "models" then artPreview()
-  elseif msg == "decor" or msg:match("^decor%s") or msg == "décor" or msg:match("^décor%s") then
-    decorCommand(msg:match("^d%S+%s*(.*)$") or "")
-  elseif msg == "centre" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
+  elseif msg == "models" then artPreview()
+  elseif msg == "scenery" or msg:match("^scenery%s") then
+    decorCommand(msg:match("^scenery%s*(.*)$") or "")
+  elseif msg == "center" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
   elseif msg == "zoom" or msg:match("^zoom%s") then
-    -- technique d'agrandissement au survol (voir W.faceApply) : « net » (défaut : étirement pendant
-    -- le mouvement, vraie taille à l'arrivée), « fluide » (échelle réelle de survol tenue, taille par
-    -- animation) ou « lisse » (vraie taille à chaque image) ; sans argument : le suivant du cycle ;
-    -- « anim », ancien nom, vaut le défaut ; « lent » : survols au ralenti (diagnostic), bascule
+    -- technique d'agrandissement au survol (voir W.faceApply) : « sharp » = net (défaut : étirement
+    -- pendant le mouvement, vraie taille à l'arrivée), « fluid » = fluide (échelle réelle de survol
+    -- tenue, taille par animation) ou « smooth » = lisse (vraie taille à chaque image) ; sans argument :
+    -- le suivant du cycle ; « anim », ancien nom, vaut le défaut ; « slow » : survols au ralenti
+    -- (diagnostic), bascule
     local want = msg:match("^zoom%s+(%S+)")
-    if want == "lent" then
+    if want == "slow" then
       opts().zoomSlow = not opts().zoomSlow
-      say("survols au ralenti (×" .. W.ZOOM_SLOW .. ") : " .. (opts().zoomSlow and "oui" or "non") .. ".")
+      say("slow-motion hovers (×" .. W.ZOOM_SLOW .. "): " .. (opts().zoomSlow and "on" or "off") .. ".")
       return
     end
     local modes = W.ZOOM_MODES
     local mode
     if want then
-      for _, m in ipairs(modes) do if want == m then mode = m end end
+      mode = ZOOM_WORDS[want]
       if not mode and want ~= "anim" then
-        say("usage : /slay zoom [net|fluide|lisse|lent]")
+        say("usage: /slay zoom [sharp|fluid|smooth|slow]")
         return
       end
       mode = mode or W.ZOOM_DEFAULT
@@ -896,22 +903,22 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
       for i, m in ipairs(modes) do if m == cur then mode = modes[i % #modes + 1] end end
     end
     mode = W.setZoomMode(mode)
-    local what = { net = "net (texte redessiné à la vraie taille à l'arrivée)",
-      fluide = "fluide (texte dessiné à la taille agrandie, taille animée)",
-      lisse = "lisse (vraie taille à chaque image)" }
-    say("zoom au survol : " .. what[mode] .. ".")
+    local what = { net = "sharp (text redrawn at true size on arrival)",
+      fluide = "fluid (text drawn at the enlarged size, size animated)",
+      lisse = "smooth (true size on every frame)" }
+    say("hover zoom: " .. what[mode] .. ".")
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
     if p and e then
       opts().facingPlayer, opts().facingEnemy = p, e
-      say("orientation : joueur " .. p .. ", ennemis " .. e .. ".")
+      say("facing: player " .. p .. ", enemies " .. e .. ".")
       for _, s in pairs(UI.screens) do if s.ApplyFacing then s:ApplyFacing() end end
     else
-      say("usage : /slay facing <joueur> <ennemis>  (radians, ex. 0.6 -0.6)")
+      say("usage: /slay facing <player> <enemies>  (radians, e.g. 0.6 -0.6)")
     end
   else
-    say("/slay : ouvrir/fermer ; /slay options ; /slay art (décors, art manquant) ; /slay modeles ; "
-      .. "/slay decor [essai] ; /slay zoom [net|fluide|lisse|lent] ; /slay facing <j> <e> ; /slay centre")
+    say("/slay: open/close; /slay options; /slay art (scenery, missing art); /slay models; "
+      .. "/slay scenery [test]; /slay zoom [sharp|fluid|smooth|slow]; /slay facing <p> <e>; /slay center")
   end
 end

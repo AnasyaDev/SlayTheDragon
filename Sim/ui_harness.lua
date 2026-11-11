@@ -709,14 +709,14 @@ end
 
 function H.setup(ns)
   local R, P = ns.Relics, ns.Potions
-  R.ui_test_charm = { name = "Breloque d'essai", text = "Bibelot du harnais (sans effet).", rarity = "common", tier = 0 }
-  R.ui_test_idol = { name = "Idole d'essai", text = "Bibelot du harnais (sans effet).", rarity = "uncommon", tier = 0 }
-  R.ui_test_lens = { name = "Loupe d'essai", text = "Bibelot du harnais (sans effet).", rarity = "rare", tier = 0 }
-  R.ui_test_trophy = { name = "Trophée d'essai", text = "Bibelot de boss du harnais.", rarity = "boss", tier = 0 }
-  R.ui_test_symbol = { name = "Symbole d'essai", text = "Bibelot de classe du harnais.", rarity = "rare", tier = 0,
+  R.ui_test_charm = { name = "Test Charm", text = "Harness relic (no effect).", rarity = "common", tier = 0 }
+  R.ui_test_idol = { name = "Test Idol", text = "Harness relic (no effect).", rarity = "uncommon", tier = 0 }
+  R.ui_test_lens = { name = "Test Lens", text = "Harness relic (no effect).", rarity = "rare", tier = 0 }
+  R.ui_test_trophy = { name = "Test Trophy", text = "Harness boss relic.", rarity = "boss", tier = 0 }
+  R.ui_test_symbol = { name = "Test Symbol", text = "Harness class relic.", rarity = "rare", tier = 0,
     class = "priest" }
-  P.ui_test_heal = { name = "Potion de soins d'essai", text = "Rends 10 PV.", rarity = "common", tier = 0, effects = {} }
-  P.ui_test_bomb = { name = "Bombe d'essai", text = "Inflige 10 dégâts à un ennemi.", rarity = "common", tier = 0,
+  P.ui_test_heal = { name = "Test Healing Potion", text = "Heal 10 HP.", rarity = "common", tier = 0, effects = {} }
+  P.ui_test_bomb = { name = "Test Bomb", text = "Deal 10 damage to an enemy.", rarity = "common", tier = 0,
     target = true, effects = {} }
   H.potionStub = false
   if not ns.Combat.usePotion then
@@ -942,7 +942,7 @@ local function decide(state)
     state.seen.event = true
     local pick
     for _, o in ipairs(step.options) do
-      local fight = (o.text or ""):find("Combat", 1, true)
+      local fight = (o.text or ""):find("[Ff]ight")
       if not pick and not o.disabled and (not fight or exp.hp / exp.maxHp > 0.6) then pick = o.id end
     end
     clickOption(pick or step.options[#step.options].id)
@@ -1041,9 +1041,9 @@ check("bouton de classe Prêtre sélectionné", option("class:priest") and optio
 check("clé +0 sélectionnée par défaut", option("key:0").selected and st.key == 0)
 check("clé +1 verrouillée, avec raison", option("key:1").disabled and (option("key:1").reason or ""):find("+0", 1, true))
 H.click(button("key:1"))
-check("clic sur une clé verrouillée : message", UI().err._shown and (UI().err._text or ""):find("victoire", 1, true), UI().err._text)
+check("clic sur une clé verrouillée : message", UI().err._shown and (UI().err._text or ""):find("victory", 1, true), UI().err._text)
 tt = H.hover(button("key:2"))
-check("infobulle d'une clé : affixes", table.concat(tt, " "):find("Tyrannique", 1, true), table.concat(tt, " | "))
+check("infobulle d'une clé : affixes", table.concat(tt, " "):find("Tyrannical", 1, true), table.concat(tt, " | "))
 check("potions et bibelots masqués sans expédition", not UI().potionSlots[1]._shown)
 ns.Controller.makeSeed = function() return SEED end
 snap("accueil")
@@ -1064,7 +1064,7 @@ local boss
 for _, n in ipairs(st.nodes) do if n.kind == "boss" then boss = n end end
 check("boss à droite, icône de boss", boss and boss.x > 0.9 and button(boss.id).icon._texture ~= ns.Art.QUESTION)
 H.click(button(boss.id))
-check("nœud inaccessible : refus", EXP().node == nil and UI().err._text == "Étape inaccessible.", UI().err._text)
+check("nœud inaccessible : refus", EXP().node == nil and UI().err._text == "Stage out of reach.", UI().err._text)
 check("liens tracés", (UI().current.linkCount or 0) >= #exp.map.nodes - 1, UI().current.linkCount)
 check("trois emplacements de potion vides dans le bandeau", UI().potionSlots[3]._shown
   and not UI().potionSlots[1].icon._shown)
@@ -1101,7 +1101,7 @@ while guard < 400 do
           tt = H.hover(kwCard)
           local nk = #H.ns.Widgets.cardKeywords(H.ns.Card.defById(kwCard.cardId, kwCard.cardUp))
           local kl = 0
-          for _, l in ipairs(tt) do if l:find(" : ", 1, true) then kl = kl + 1 end end
+          for _, l in ipairs(tt) do if l:find(": ", 1, true) then kl = kl + 1 end end
           check("infobulle de carte : une ligne « Nom : effet » par mot-clé", #tt == nk and kl == nk, #tt .. " / " .. nk)
         end
         check("carte : nom, médaillon et texte dessinés", (V().cards[1].name._text or "") ~= ""
@@ -1115,7 +1115,7 @@ while guard < 400 do
         V():Render()
         local handBefore = #c.hand
         H.click(V().cards[1])
-        check("carte injouable : « Pas assez de mana. »", UI().err._text == "Pas assez de mana.", UI().err._text)
+        check("carte injouable : « Not enough mana. »", UI().err._text == "Not enough mana.", UI().err._text)
         check("carte non jouée", #c.hand == handBefore)
         c.player.mana = saveMana
         V():Render()
@@ -1163,7 +1163,7 @@ while guard < 400 do
     local deckN = #EXP().deck
     H.key("1")
     check("touche 1 prend la première carte", #EXP().deck == deckN + 1 and EXP().reward.cardsDone, #EXP().deck)
-    check("texte « Carte ajoutée »", (UI().step.text or ""):find("Carte ajoutée", 1, true), UI().step.text)
+    check("texte « Card added »", (UI().step.text or ""):find("Card added", 1, true), UI().step.text)
   elseif k == "end" then
     finished = true
     break
@@ -1193,7 +1193,7 @@ local db = _G.SlayTheDragonDB
 check("expédition archivée (db.current = nil)", db.current == nil)
 check("une entrée au journal", #db.journal == 1 and db.journal[1].date ~= nil)
 check("réputation gagnée", db.meta.classes.priest.rep > 0 and db.meta.league == db.meta.classes.priest.rep)
-check("texte du bilan : réputation", (step.text or ""):find("réputation", 1, true), step.text)
+check("texte du bilan : réputation", (step.text or ""):find("reputation", 1, true), step.text)
 snap("bilan")
 check("barres de réputation affichées", UI().current.bars[1]._shown and UI().current.bars[2]._shown)
 tt = H.hover(UI().current.bars[1])
@@ -1207,17 +1207,17 @@ clickOption("ui:meta")
 check("écran méta", currentKind() == "meta", currentKind())
 snap("meta")
 check("méta : barres classe et Ligue", UI().current.bars[1]._shown and UI().current.bars[2]._shown
-  and UI().current.bars[2].label._text == "Ligue des explorateurs")
-check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Prêtre", 1, true),
+  and UI().current.bars[2].label._text == "Explorers' League")
+check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Priest", 1, true),
   UI().current.journal[1]._text)
-check("méta : clés ouvertes", (UI().current.bars[1].detail._text or ""):find("Clés ouvertes", 1, true))
+check("méta : clés ouvertes", (UI().current.bars[1].detail._text or ""):find("Keys unlocked", 1, true))
 clickOption("ui:back")
 check("retour au bilan", currentKind() == "end", currentKind())
 clickOption("ui:new")
 check("accueil", currentKind() == "start", currentKind())
 local keyMax = db.meta.classes.priest.keyMax
 check("clé par défaut = la plus haute ouverte", UI().step.key == keyMax and option("key:" .. keyMax).selected)
-check("dernière expédition rappelée", (UI().step.text or ""):find("Dernière expédition", 1, true))
+check("dernière expédition rappelée", (UI().step.text or ""):find("Last expedition", 1, true))
 ns = H.ns
 ns.Controller.makeSeed = function() return SEED + 1 end
 H.key("ENTER")
@@ -1226,8 +1226,8 @@ check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax an
 if keyMax > 0 then
   check("clé mythique dans le bandeau (hexagone violet « +N »)", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
   tt = H.hover(UI().keystone)
-  check("infobulle de la clé : affixes", table.concat(tt, " "):find("Fortifié", 1, true), table.concat(tt, " | "))
-  check("affixes dans le texte de la carte", (UI().step.text or ""):find("Fortifié", 1, true))
+  check("infobulle de la clé : affixes", table.concat(tt, " "):find("Fortified", 1, true), table.concat(tt, " | "))
+  check("affixes dans le texte de la carte", (UI().step.text or ""):find("Fortified", 1, true))
 end
 
 print("U8  potions et bibelots : bandeau, défausse, boire en combat")
@@ -1236,15 +1236,15 @@ exp.relics[#exp.relics + 1] = "ui_test_charm"
 UI().refresh()
 check("bibelot dans le bandeau", UI().relicIcons[UI().RELICS_SHOWN]._shown)
 tt = H.hover(UI().relicIcons[UI().RELICS_SHOWN])
-check("infobulle du bibelot : nom et texte", tt[1] == "Breloque d'essai" and table.concat(tt, " "):find("sans effet", 1, true),
+check("infobulle du bibelot : nom et texte", tt[1] == "Test Charm" and table.concat(tt, " "):find("no effect", 1, true),
   table.concat(tt, " | "))
 tt = H.hover(UI().potionSlots[1])
-check("infobulle de potion", tt[1] == "Potion de soins d'essai", tt[1])
+check("infobulle de potion", tt[1] == "Test Healing Potion", tt[1])
 H.click(UI().potionSlots[1])
-check("hors combat : on ne boit pas", UI().err._text == "Les potions se boivent en combat.", UI().err._text)
+check("hors combat : on ne boit pas", UI().err._text == "Potions are drunk in combat.", UI().err._text)
 exp.potions[3] = "ui_test_heal"
 H.click(UI().potionSlots[3], "RightButton")
-check("premier clic droit : confirmation demandée", exp.potions[3] == "ui_test_heal" and (UI().err._text or ""):find("jeter", 1, true))
+check("premier clic droit : confirmation demandée", exp.potions[3] == "ui_test_heal" and (UI().err._text or ""):find("discard", 1, true))
 H.click(UI().potionSlots[3], "RightButton")
 check("second clic droit : potion jetée (discardPotion)", exp.potions[3] == false)
 -- Entrer dans un combat
@@ -1261,7 +1261,7 @@ H.click(UI().potionSlots[1])
 check("potion bue : emplacement vidé", C().potions()[1] == false)
 if H.potionStub then check("effet de la potion (doublure)", c.player.hp == hpBefore + 10, c.player.hp) end
 H.click(UI().potionSlots[2])
-check("potion à cible : choix de la cible demandé", V().potionSlot == 2 and (UI().err._text or ""):find("cible", 1, true))
+check("potion à cible : choix de la cible demandé", V().potionSlot == 2 and (UI().err._text or ""):find("target", 1, true))
 local t = C().aliveTargets()[1]
 local ehp = c.enemies[t].hp
 H.click(enemySlot(t))
@@ -1316,7 +1316,7 @@ end
 check("bibelots en vente (registre de test)", relicOpt ~= nil and button(relicOpt.id).icon._shown)
 check("potions en vente", potionOpt ~= nil)
 tt = H.hover(button(relicOpt.id))
-check("infobulle d'un bibelot en vente : prix", table.concat(tt, " "):find(relicOpt.price .. " po", 1, true), table.concat(tt, " | "))
+check("infobulle d'un bibelot en vente : prix", table.concat(tt, " "):find(relicOpt.price .. "g", 1, true), table.concat(tt, " | "))
 local gold = exp.gold
 clickOption(relicOpt.id)
 check("bibelot acheté", exp.relics[#exp.relics] == relicOpt.item.id and exp.gold == gold - relicOpt.price)
@@ -1337,9 +1337,9 @@ check("retour sans retirer", currentKind() == "merchant" and #exp.deck == deckN 
 exp.gold = 0
 UI().refresh()
 check("trop pauvre : carte grisée avec raison du moteur", UI().step.options[1].disabled
-  and UI().step.options[1].reason == "Pas assez d'or.", UI().step.options[1].reason)
+  and UI().step.options[1].reason == "Not enough gold.", UI().step.options[1].reason)
 H.click(UI().current.cards[1])
-check("clic sur un article trop cher : message", UI().err._text == "Pas assez d'or.", UI().err._text)
+check("clic sur un article trop cher : message", UI().err._text == "Not enough gold.", UI().err._text)
 clickOption("leave")
 check("départ : retour à la carte", currentKind() == "map", currentKind())
 
@@ -1351,12 +1351,12 @@ snap("feu-de-camp")
 exp.hp = 20
 UI().refresh()
 local heal = math.floor(exp.maxHp * ns.Expedition.REST_FRACTION)
-check("repos : PV rendus calculés par le moteur", option("rest").text == "Rend " .. heal .. " PV.", option("rest").text)
+check("repos : PV rendus calculés par le moteur", option("rest").text == "Restores " .. heal .. " HP.", option("rest").text)
 clickOption("ui:upgrade")
 check("grille d'amélioration", currentKind() == "deck" and #UI().current.cardOptions >= 1)
 snap("amelioration")
 tt = H.hover(UI().current.cards[1])
-check("aperçu « Après amélioration »", table.concat(tt, " "):find("Après amélioration", 1, true), table.concat(tt, " | "))
+check("aperçu « Upgraded »", table.concat(tt, " "):find("Upgraded:", 1, true), table.concat(tt, " | "))
 local cardId = UI().current.cardOptions[1].id
 H.click(UI().current.cards[1])
 local idx = tonumber(cardId:match("%d+"))
@@ -1373,7 +1373,7 @@ if ev then
   check("un bouton par choix", #UI().step.options == #ev.choices)
   local pick
   for i, o in ipairs(UI().step.options) do
-    if not pick and not o.disabled and not (o.text or ""):find("Combat", 1, true) then pick = i end
+    if not pick and not o.disabled and not (o.text or ""):find("[Ff]ight") then pick = i end
   end
   H.key(tostring(pick))
   local k = currentKind()
@@ -1473,7 +1473,7 @@ end
 check("ancienne expédition en quarantaine, méta réparée", db.current == nil and #db.quarantine == 1
   and type(db.meta.classes) == "table")
 H.slash("")
-check("accueil malgré un journal ancien", currentKind() == "start" and (UI().step.text or ""):find("Dernière", 1, true))
+check("accueil malgré un journal ancien", currentKind() == "start" and (UI().step.text or ""):find("Last expedition", 1, true))
 H.ns.Controller.makeSeed = function() return 77 end
 clickOption("go")
 local good = deepcopy(_G.SlayTheDragonDB)
@@ -1487,7 +1487,7 @@ H.boot(bad)
 check("bibelot inconnu : l'interface met l'expédition en quarantaine", EXP() == nil
   and (_G.SlayTheDragonDB.quarantine[2].reason or ""):find("bibelot", 1, true))
 H.slash("")
-check("message de mise de côté à l'accueil", (UI().step.text or ""):find("mise de côté", 1, true))
+check("message de mise de côté à l'accueil", (UI().step.text or ""):find("set aside", 1, true))
 local future = { version = 99, current = { x = 1 }, meta = { odd = true } }
 H.boot(future)
 check("version future : pas touchée", _G.SlayTheDragonDB.version == 99 and _G.SlayTheDragonDB.current.x == 1
@@ -1515,7 +1515,7 @@ for i = 1, 10 do
 end
 check("icône introuvable -> point d'interrogation", smite and smite.medal.icon._texture == H.ns.Art.QUESTION,
   smite and smite.medal.icon._texture)
-H.slash("modeles")
+H.slash("models")
 H.advance(2.6)
 check("VanCleef : repli SetDisplayInfo", (function()
   for _, m in ipairs(V().preview.models) do
@@ -1602,15 +1602,15 @@ do
   clearChat()
   H.slash("art")
   local said = chat()
-  check("/slay art : liste des fonds embarqués et de leurs scènes", said:find("fonds embarqués (Media\\Backgrounds) : 5", 1, true)
-    and said:find("elwynn.tga — " .. Art.backgrounds.elwynn.name .. " (FileDataID 7377860) : camp, hill, night, road, shop", 1, true)
-    and said:find("deadmines.tga — ", 1, true) and said:find(") : mine", 1, true)
+  check("/slay art : liste des fonds embarqués et de leurs scènes", said:find("embedded backgrounds (Media\\Backgrounds): 5", 1, true)
+    and said:find("elwynn.tga — " .. Art.backgrounds.elwynn.name .. " (FileDataID 7377860): camp, hill, night, road, shop", 1, true)
+    and said:find("deadmines.tga — ", 1, true) and said:find("): mine", 1, true)
     and said:find("coast.tga — ", 1, true), said)
-  check("/slay art : chaque décor dit son fond", said:find("road : fond embarqué elwynn — ", 1, true)
-    and said:find("mine : fond embarqué deadmines — ", 1, true)
-    and said:find("coast : fond embarqué coast — ", 1, true), said)
-  check("/slay art : aucun verdict", said:find("validés : aucun", 1, true) and said:find("refusés : aucun", 1, true)
-    and said:find("pas encore jugés : 8 sur 8", 1, true), said)
+  check("/slay art : chaque décor dit son fond", said:find("road: embedded background elwynn — ", 1, true)
+    and said:find("mine: embedded background deadmines — ", 1, true)
+    and said:find("coast: embedded background coast — ", 1, true), said)
+  check("/slay art : aucun verdict", said:find("accepted: none", 1, true) and said:find("rejected: none", 1, true)
+    and said:find("not judged yet: 8 of 8", 1, true), said)
 
   -- Liste d'essai : les candidats du client seulement, dédoublonnée (les ruines reprennent Elwynn).
   local list = Sc.trialList()
@@ -1625,22 +1625,22 @@ do
     and keys["7963777"] and keys["7963782"] and keys["7377860"])
 
   clearChat()
-  H.slash("decor essai")
+  H.slash("scenery test")
   said = chat()
   check("essai : candidat 1 affiché sur le décor courant", Sc.trial == 1 and Sc.art._shown
     and Sc.art._texture == list[1].file, Sc.art._texture)
   check("essai : sans teinte ni voile", Sc.art._calls.SetVertexColor[1] == 1 and Sc.art._calls.SetVertexColor[3] == 1
     and Sc.veil._calls.SetColorTexture[4] == 0 and not Sc.ground._shown)
-  check("essai : numéro, fichier, nom et mode d'emploi", said:find("essai du décor 1/8 : " .. tostring(list[1].file)
-    .. " — " .. list[1].name .. " [pas encore jugé]", 1, true) and said:find("/slay decor ok", 1, true), said)
+  check("essai : numéro, fichier, nom et mode d'emploi", said:find("scenery test 1/8: " .. tostring(list[1].file)
+    .. " — " .. list[1].name .. " [not judged yet]", 1, true) and said:find("/slay scenery ok", 1, true), said)
   clearChat()
-  H.slash("decor suivant")
+  H.slash("scenery next")
   check("suivant : candidat 2", Sc.trial == 2 and Sc.art._texture == list[2].file
-    and chat():find("essai du décor 2/8 : " .. tostring(list[2].file), 1, true), chat())
-  H.slash("decor precedent")
-  H.slash("decor precedent")
+    and chat():find("scenery test 2/8: " .. tostring(list[2].file), 1, true), chat())
+  H.slash("scenery prev")
+  H.slash("scenery prev")
   check("précédent depuis le 1er : retour au dernier", Sc.trial == 8 and Sc.art._texture == list[8].file)
-  H.slash("decor suivant")
+  H.slash("scenery next")
   check("suivant depuis le dernier : retour au 1er", Sc.trial == 1)
 
   -- Verdicts : le 1er refusé, puis on valide le 3e candidat du client de la liste d'Elwynn, pour
@@ -1653,34 +1653,34 @@ do
   local elwynn = clientOnly("elwynn")
   local deadmines = clientOnly("deadmines")
   clearChat()
-  H.slash("decor non")
+  H.slash("scenery no")
   check("non : refusé et dit", H.ns.Persist.options().artChecks[tostring(list[1].file)] == false
-    and chat():find(tostring(list[1].file) .. " refusé", 1, true), chat())
+    and chat():find(tostring(list[1].file) .. " rejected", 1, true), chat())
   local function goTo(file)
     for _ = 1, #list do
       if Sc.trialList()[Sc.trial].file == file then return true end
-      H.slash("decor suivant")
+      H.slash("scenery next")
     end
     return false
   end
   check("aller au 3e candidat d'Elwynn", goTo(elwynn[3].file))
   clearChat()
-  H.slash("decor ok")
+  H.slash("scenery ok")
   check("ok : validé et dit", H.ns.Persist.options().artChecks[tostring(elwynn[3].file)] == true
-    and chat():find(tostring(elwynn[3].file) .. " validé", 1, true), chat())
+    and chat():find(tostring(elwynn[3].file) .. " accepted", 1, true), chat())
   goTo(elwynn[1].file)
-  H.slash("decor non")
+  H.slash("scenery no")
   goTo(elwynn[4].file)
-  H.slash("decor ok")
+  H.slash("scenery ok")
   goTo(deadmines[3].file)
-  H.slash("decor ok")
+  H.slash("scenery ok")
   check("en essai, le décor montre le candidat essayé", Sc.art._texture == deadmines[3].file)
 
   clearChat()
-  H.slash("decor peint")
+  H.slash("scenery painted")
   check("peint : fin de l'essai, décor peint", Sc.trial == nil and not Sc.art._shown and fields._shown
     and not Sc.ground._shown and H.ns.Persist.options().decor == false, chat())
-  H.slash("decor illustre")
+  H.slash("scenery illustrated")
   check("illustre : la route montre son fond embarqué, même avec des candidats validés",
     H.ns.Persist.options().decor == true and Sc.art._shown and Sc.art._texture == Art.backgrounds.elwynn.file
     and Sc.ground._shown)
@@ -1700,25 +1700,25 @@ do
     and math.abs(Sc.art._calls.SetVertexColor[2] - Art.scenes.road.tint[2]) < 1e-9)
   Art.illustrations.elwynn = saved
   Sc.set({ scene = "road", board = true, veil = 0.2 })
-  H.slash("decor")
+  H.slash("scenery")
   check("/slay decor seul : bascule vers peint", H.ns.Persist.options().decor == false and not Sc.art._shown)
-  H.slash("decor")
+  H.slash("scenery")
   check("/slay decor seul : bascule vers illustré", H.ns.Persist.options().decor == true and Sc.art._shown)
-  H.slash("decor essai")
-  H.slash("decor essai")
+  H.slash("scenery test")
+  H.slash("scenery test")
   check("essai deux fois : bascule (essai fermé)", Sc.trial == nil and Sc.art._texture == Art.backgrounds.elwynn.file)
   clearChat()
-  H.slash("decor ok")
-  check("ok hors essai : rien, message", chat():find("aucun essai en cours", 1, true), chat())
+  H.slash("scenery ok")
+  check("ok hors essai : rien, message", chat():find("no test in progress", 1, true), chat())
 
   clearChat()
   H.slash("art")
   said = chat()
-  check("/slay art : validés et refusés", said:find("validés : " .. tostring(deadmines[3].file) .. " (", 1, true)
+  check("/slay art : validés et refusés", said:find("accepted: " .. tostring(deadmines[3].file) .. " (", 1, true)
     and said:find(tostring(elwynn[4].file) .. " (", 1, true)
-    and said:find("refusés : " .. tostring(deadmines[1].file) .. " (", 1, true)
+    and said:find("rejected: " .. tostring(deadmines[1].file) .. " (", 1, true)
     and said:find(tostring(elwynn[1].file) .. " (" .. elwynn[1].name .. ")", 1, true)
-    and said:find("pas encore jugés : 3 sur 8", 1, true), said)
+    and said:find("not judged yet: 3 of 8", 1, true), said)
 
   -- Persistance : verdicts relus au rechargement, essai non repris.
   local savedDB = deepcopy(_G.SlayTheDragonDB)
@@ -1735,12 +1735,12 @@ do
   clickOption("go")
   check("parcours : pas de décor", Sc.scene == false)
   clearChat()
-  H.slash("decor essai")
-  check("essai sur le parcours : message", chat():find("cet écran n'a pas de décor", 1, true)
-    and chat():find("essai du décor", 1, true), chat())
+  H.slash("scenery test")
+  check("essai sur le parcours : message", chat():find("this screen has no scenery", 1, true)
+    and chat():find("scenery test", 1, true), chat())
   check("essai : départ au premier candidat pas encore jugé", Sc.trial and Sc.verdict(list[Sc.trial]) == nil)
-  H.slash("decor peint")
-  H.slash("decor illustre")
+  H.slash("scenery painted")
+  H.slash("scenery illustrated")
   H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
 end
 
@@ -1863,7 +1863,7 @@ do
   do
     local probe = H.ns.Widgets.label(face, "bold", 7.5)
     probe._calls.SetSmoothScaling = nil
-    probe:SetText("Inflige 6 points de dégâts.")
+    probe:SetText("Deal 6 points of damage.")
     local w1 = probe:GetStringWidth()
     face:SetScale(1.12)
     local w2 = probe:GetStringWidth()
@@ -1916,9 +1916,9 @@ do
   run(eb, "OnLeave")
   H.advance(0.5)
   check("mode lisse : repos exact", eb.face._scale == 1)
-  H.slash("zoom net")
+  H.slash("zoom sharp")
   check("/slay zoom net : retour au défaut", H.ns.Persist.options().zoom == "net")
-  H.slash("zoom lisse")
+  H.slash("zoom smooth")
   H.slash("zoom anim")
   check("/slay zoom anim (ancien nom) : mode net", H.ns.Persist.options().zoom == "net")
   -- vol de carte : étirement pendant le vol, carte nette une fois posée
@@ -1974,7 +1974,7 @@ do
   H.click(UI().deckButton)
   check("clic sur Deck : panneau ouvert", Dv:IsShown() and Dv.kind == "deck")
   snap("deck-panneau")
-  check("compteur total dans le titre", (Dv.title._text or ""):find(#exp.deck .. " cartes", 1, true), Dv.title._text)
+  check("compteur total dans le titre", (Dv.title._text or ""):find(#exp.deck .. " cards", 1, true), Dv.title._text)
   local TYPE = { attack = 1, skill = 2, power = 3 }
   local sorted = #Dv.list == #exp.deck
   for i = 2, #Dv.list do
@@ -2135,7 +2135,7 @@ do
   card:SetCard("penance", false, { cost = 2, playable = true })
   check("carte : corps ivoire (Sacré), ruban, coût, panneau, médaillon",
     tex(card.bg) == ROOT .. Skin.tex.card_body_ivory.file and tex(card.panel) == ROOT .. Skin.tex.card_panel.file
-    and tex(card.ring) == ROOT .. Skin.tex.medal_ring.file and card.cost._text == "2" and card.name._text == "Pénitence"
+    and tex(card.ring) == ROOT .. Skin.tex.medal_ring.file and card.cost._text == "2" and card.name._text == "Penance"
     and tex(card.ribbon) == ROOT .. Skin.tex.card_ribbon.file)
   check("carte : icône améliorée de Media, masquée par l'ouverture du médaillon",
     tex(card.icon) == ROOT .. Skin.icons.spell_holy_penance and card.icon._calls.AddMaskTexture ~= nil)
@@ -2147,15 +2147,15 @@ do
     and Skin.tex.card_ribbon_flat == nil)
   card:SetCard("mind_blast", false, { cost = 1, playable = true })
   check("Ombre : corps violet ; mot-clé dans la plaque du bas", tex(card.bg) == ROOT .. Skin.tex.card_body_violet.file
-    and card.plate.shown and (card.plateText._text or ""):find("Recharge", 1, true) and not card.gem._shown)
+    and card.plate.shown and (card.plateText._text or ""):find("Cooldown", 1, true) and not card.gem._shown)
   card:SetCard("inner_fire", false, { cost = 1, playable = true })
   check("protection : corps bleu ; carte de base sans gemme ni plaque", tex(card.bg) == ROOT .. Skin.tex.card_body_blue.file
     and not card.gem._shown and not card.plate.shown)
   card:SetCard("smite", false, { cost = 1, playable = true })
   check("départ : corps doré", tex(card.bg) == ROOT .. Skin.tex.card_body_gold.file)
-  card:SetCard("smite", false, { cost = 3, playable = false, reason = "Pas assez de mana." })
+  card:SetCard("smite", false, { cost = 3, playable = false, reason = "Not enough mana." })
   check("injouable : corps grisé, raison dans une plaque rouge", card.bg._calls.SetDesaturated[1] == true
-    and card.reasonPlate and card.reasonPlate._shown and card.reasonPlate.text._text == "Pas assez de mana.")
+    and card.reasonPlate and card.reasonPlate._shown and card.reasonPlate.text._text == "Not enough mana.")
   card:SetCard("smite", true, { cost = 1, playable = true })
   check("améliorée : nom vert, chiffre changé en vert", card.name._calls.SetTextColor[2] == H.ns.Art.C.upGreen[2]
     and (card.body._text or ""):find("|cff7dff7d9|r", 1, true), card.body._text)
@@ -2243,8 +2243,8 @@ do
   check("murloc : affichage 983 après l'échec de la créature", mu.model._model == "display:983" and not mu.fallback._shown,
     mu.model._model)
   check("statut des essais (créature, affichages)", W.models.sorcerer.state == "missing"
-    and table.concat(W.models.sorcerer.tries, ", ") == "créature 619, affichage 2329, affichage 2330"
-    and W.models.murloc.via == "affichage 983")
+    and table.concat(W.models.sorcerer.tries, ", ") == "creature 619, display 2329, display 2330"
+    and W.models.murloc.via == "display 983")
   -- relance tardive : la créature arrive dans le cache du client -> le repli s'efface
   H.badCreatures = { [126] = true }
   H.advance(W.MODEL_LATE + W.MODEL_WAIT + 0.1)
@@ -2255,7 +2255,7 @@ do
   W.setCreature(so.model, "gnoll", so.fallback)
   so.model:GetScript("OnModelLoaded")(so.model)
   H.advance(W.MODEL_WAIT + 0.05)
-  check("OnModelLoaded suffit à valider un essai", W.models.gnoll.state == "ok" and W.models.gnoll.via == "créature 117"
+  check("OnModelLoaded suffit à valider un essai", W.models.gnoll.state == "ok" and W.models.gnoll.via == "creature 117"
     and not so.fallback._shown)
   -- sans icône : disque sombre (silhouette), jamais le point d'interrogation
   W.setFallbackArt(so.fallback, nil)
@@ -2266,21 +2266,21 @@ do
   H.badCreatures = { [619] = true, [639] = true, [235] = true }
   H.badDisplays = { [2329] = true, [2330] = true, [1691] = true }
   _G.DEFAULT_CHAT_FRAME._lines = {}
-  H.slash("modeles")
+  H.slash("models")
   H.advance(3.5)
   local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
   local total = 0
   for _ in pairs(Art.enemies) do total = total + 1 end
   for _ in pairs(Art.npcs) do total = total + 1 end
-  check("/slay modeles : bilan chiffré", said:find("modèles : " .. (total - 2) .. "/" .. total .. " chargés, 2 sans modèle", 1, true), said)
+  check("/slay modeles : bilan chiffré", said:find("models: " .. (total - 2) .. "/" .. total .. " loaded, 2 without a model", 1, true), said)
   check("/slay modeles : ennemi manquant et identifiants essayés",
-    said:find("sorcerer : créature 619, affichage 2329, affichage 2330 -> aucun modèle", 1, true), said)
-  check("/slay modeles : PNJ manquant", said:find("npc:salma_saldean : créature 235, affichage 1691 -> aucun modèle", 1, true), said)
-  check("/slay modeles : modèle chargé par un repli signalé", said:find("vancleef : créature 639 -> aucun modèle ; chargé par affichage 2029", 1, true), said)
+    said:find("sorcerer: creature 619, display 2329, display 2330 -> no model", 1, true), said)
+  check("/slay modeles : PNJ manquant", said:find("npc:salma_saldean: creature 235, display 1691 -> no model", 1, true), said)
+  check("/slay modeles : modèle chargé par un repli signalé", said:find("vancleef: creature 639 -> no model; loaded by display 2029", 1, true), said)
   check("/slay modeles : un PNJ et tous les ennemis dans l'aperçu", #V().preview.models == total)
   local stateOk = true
   for _, m in ipairs(V().preview.models) do
-    local want = (m.key == "sorcerer" or m.key == "npc:salma_saldean") and "aucun modèle" or "modèle : "
+    local want = (m.key == "sorcerer" or m.key == "npc:salma_saldean") and "no model" or "model: "
     if not (m.state._text or ""):find(want, 1, true) then stateOk = false end
     if m.fallback.icon._texture == Art.QUESTION then stateOk = false end
   end
@@ -2448,7 +2448,7 @@ do
   local bodyDist, nameDist = {}, {}
   local variants = {
     { key = "", opts = { playable = true } },
-    { key = " (injouable)", opts = { playable = false, reason = "Pas assez de mana." } },
+    { key = " (injouable)", opts = { playable = false, reason = "Not enough mana." } },
   }
   -- toutes les raisons d'une carte injouable en combat (les plus longues passent sur deux lignes)
   for _, why in ipairs({ "phase", "unplayable", "casting", "forbidden", "condition", "target", "over" }) do
@@ -2714,7 +2714,7 @@ do
     sheet:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
     sheet:SetScale(1.8)
     local list = { { "shadowform", false, { playable = true } },
-      { "penance", false, { playable = false, reason = "Pas assez de mana." } },
+      { "penance", false, { playable = false, reason = "Not enough mana." } },
       { "spirit_of_redemption", true, { playable = true } }, { "solace", true, { playable = true } },
       { "mind_blast", false, { playable = true } }, { "smite", false, { playable = true } } }
     for i, e in ipairs(list) do
@@ -2860,7 +2860,7 @@ do
   if not unplayable then
     -- carte rendue injouable pour l'essai : plaque de raison
     local c2 = v.cards[2]
-    c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Pas assez de mana" })
+    c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Not enough mana" })
     unplayable = c2
   end
   firstHover("carte injouable (plaque de raison)", unplayable, { inside = true })
@@ -2944,9 +2944,9 @@ do
       if def and def.text then return def.text(c[2], c) end
     end
     for _, e in ipairs(ch.effects or {}) do
-      if e[1] == "pay" then return X.EVENT_REASONS["or"] or "Pas assez d'or." end
+      if e[1] == "pay" then return X.EVENT_REASONS.gold or "Not enough gold." end
     end
-    return "Il faut au moins 50 % des PV."
+    return "Requires at least 50% HP."
   end
   local ids = {}
   for id in pairs(ns.Events) do ids[#ids + 1] = id end
@@ -2967,8 +2967,8 @@ do
     end
   end
   -- feu de camp (240 × 104)
-  try("feu : se reposer", { id = "rest", label = "Se reposer", text = "+21 PV" }, 240, 104)
-  try("feu : s'entraîner", { id = "u", label = "S'entraîner", text = "Améliore une carte" }, 240, 104)
+  try("feu : se reposer", { id = "rest", label = "Rest", text = "+21 HP" }, 240, 104)
+  try("feu : s'entraîner", { id = "u", label = "Train", text = "Upgrade a card" }, 240, 104)
   check(("%d rencontres (%d cas de réponse, possibles et impossibles) : libellé et texte dans la zone utile, marges de %d unités")
     :format(#ids, cases, O.mx), #bad == 0, table.concat(bad, "\n        "))
   local dl = {}
@@ -2977,11 +2977,11 @@ do
   print("      texte des réponses (taille × lignes) : " .. table.concat(dl, ", "))
   print("      sur plusieurs lignes : " .. (#multi > 0 and table.concat(multi, ", ") or "aucune"))
   -- la réponse de la capture : une coupure propre, loin des bords
-  try("bandits", { id = "x", label = "Charger les bandits", text = "Combat : récompense habituelle + 20 po" }, 285.3, 118)
+  try("bandits", { id = "x", label = "Charge the bandits", text = "Fight: usual reward + 20g" }, 285.3, 118)
   local ls = lines(b.sub._text)
   local widest = 0
   for _, l in ipairs(ls) do widest = math.max(widest, H.textWidth(b.sub, l, b.sub._fontSize)) end
-  check("« Combat : récompense habituelle + 20 po » : lignes équilibrées, au moins 16 unités des bords",
+  check("« Fight: usual reward + 20g » : lignes équilibrées, au moins 16 unités des bords",
     widest <= 285.3 - 32 and (#ls == 1 or math.abs(H.textWidth(b.sub, ls[1], b.sub._fontSize)
       - H.textWidth(b.sub, ls[2], b.sub._fontSize)) < 0.4 * widest), b.sub._text)
 end
@@ -3084,7 +3084,7 @@ do
   local v = V()
   -- une carte injouable (plaque de raison) dans la main, un jeton d'état
   local c2 = v.cards[2]
-  c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Pas assez de mana." })
+  c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Not enough mana." })
   v.playerSt:Set({ { icon = H.ns.Art.ui.gold, key = "ui:gold", n = 3, info = { title = "Essai" } } })
   H.advance(0.1)
   local list = {}
@@ -3207,7 +3207,7 @@ do
     math.abs(vis(nc) - 1) < 1e-9 and playing(nc) and math.abs(vis(fresh) - 1) < 1e-9, vis(nc))
   -- création tardive sous un visuel armé (plaques de raison et de prix) : rien né pendant l'animation
   local nb = #H.bornInAnim
-  nc:SetCard("smite", false, { playable = false, reason = "Pas assez de mana." })
+  nc:SetCard("smite", false, { playable = false, reason = "Not enough mana." })
   nc:SetCard("smite", false, { price = 50 })
   check("plaques créées après l'armement (raison, prix) : hors animation (W.faceBuild), animation reprise",
     #H.bornInAnim == nb and playing(nc) and math.abs(vis(nc) - 1) < 1e-9, table.concat(H.bornInAnim, ", ", nb + 1))
@@ -3262,7 +3262,7 @@ do
   H.settle()
   v = V()
   c2 = v.cards[2]
-  c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Pas assez de mana." })
+  c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Not enough mana." })
   v.playerSt:Set({ { icon = H.ns.Art.ui.gold, key = "ui:gold", n = 3, info = { title = "Essai" } } })
   H.advance(0.1)
   local worst, label = 0, nil
@@ -3315,7 +3315,7 @@ do
     local cases = {}
     for i = 1, #C().combat().hand do
       cases[#cases + 1] = { i, { playable = true } }
-      cases[#cases + 1] = { i, { playable = false, reason = "Pas assez de mana." } }
+      cases[#cases + 1] = { i, { playable = false, reason = "Not enough mana." } }
     end
     local card1 = v.cards[1]
     for _, cs in ipairs(cases) do
@@ -3354,17 +3354,19 @@ do
       table.concat(outW, ", "))
   end
 
-  -- 8. noms abrégés
+  -- 8. noms abrégés : en anglais, « Power Word: Radiance » ne tient pas au palier 9 (relevé du
+  -- harnais : 8, et 7 améliorée) ; toutes les cartes « Power Word » et « Shadow Word » sont donc
+  -- abrégées de la même façon (« PW: », « SW: »)
   local long = {}
   for _, dd in pairs(H.ns.Cards) do
-    if dd.name:find("Mot de", 1, true) then long[#long + 1] = dd.name end
+    if dd.name:find("Power Word", 1, true) or dd.name:find("Shadow Word", 1, true) then long[#long + 1] = dd.name end
   end
-  check("noms abrégés : plus de « Mot de pouvoir » ni « Mot de l'ombre » (MdP, MdlO)", #long == 0
-    and H.ns.Cards.pw_shield.name == "MdP : Bouclier" and H.ns.Cards.sw_pain.name == "MdlO : Douleur"
-    and H.ns.Card.defById("sw_death", true).name:find("^MdlO : Mort") ~= nil, table.concat(long, ", "))
+  check("noms abrégés : plus de « Power Word » ni « Shadow Word » (PW:, SW:)", #long == 0
+    and H.ns.Cards.pw_shield.name == "PW: Shield" and H.ns.Cards.sw_pain.name == "SW: Pain"
+    and H.ns.Card.defById("sw_death", true).name:find("^SW: Death") ~= nil, table.concat(long, ", "))
 end
 
-print("U27 langage des cartes : mots-clés, états posés (Donne / Applique), sablier, explications, Pouvoirs")
+print("U27 langage des cartes : mots-clés, états posés (Gain / Apply), sablier, explications, Pouvoirs")
 do
   freshRun(SEED, "combat")
   H.settle()
@@ -3382,8 +3384,12 @@ do
     for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
     return out
   end
-  local PLATE = { "^Recharge %d+%.$", "^Consumée%.$", "^Conservée%.$", "^Incantation%.$", "^Pouvoir%.$" }
+  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$" }
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
+  -- ligne d'état : « Apply … », ou « Gain » suivi d'un nom (« Gain 5 Absorb. » est un effet)
+  local function isStateCl(cl)
+    return cl:find("^Apply ") ~= nil or (cl:find("^Gain %a") ~= nil and cl:find("^Gain %d") == nil)
+  end
   -- 1. forme des textes, cohérence texte <-> effets
   local bad, nState = {}, 0
   for _, id in ipairs(ids) do
@@ -3402,31 +3408,31 @@ do
       -- clauses d'état : en dernier (avant les seuls mots de la plaque), une par état, dans l'ordre
       local states, seenState, afterState = {}, false, false
       for _, cl in ipairs(cls) do
-        local isState = cl:find("^Donne ") or cl:find("^Applique ")
+        local isState = isStateCl(cl)
         if isState then states[#states + 1] = cl seenState = true
         elseif seenState and not isPlate(cl) then afterState = true end
-        if cl:find("^Incantation%.$") or cl:find("^Pouvoir%.$") then
+        if cl:find("^Cast%.$") or cl:find("^Power%.$") then
           if cl ~= cls[1] then bad[#bad + 1] = label .. " : « " .. cl .. " » pas en tête" end
         end
       end
       if afterState then bad[#bad + 1] = label .. " : une clause suit les états posés" end
       if #states ~= #want then
-        bad[#bad + 1] = ("%s : %d état(s) posé(s) par les effets, %d ligne(s) Donne / Applique"):format(label, #want, #states)
+        bad[#bad + 1] = ("%s : %d état(s) posé(s) par les effets, %d ligne(s) Gain / Apply"):format(label, #want, #states)
       else
-        -- ordre : ennemis (« Applique ») d'abord, puis soi (« Donne »)
+        -- ordre : ennemis (« Apply ») d'abord, puis soi (« Gain »)
         table.sort(want, function(a, b) return (a.self and 1 or 0) < (b.self and 1 or 0) end)
         for k, w in ipairs(want) do
           local cl = states[k]
-          local verb = w.self and "Donne" or "Applique"
+          local verb = w.self and "Gain" or "Apply"
           local expect = verb .. " " .. w.name .. " " .. tostring(w.n)
-            .. (W.isTurnStatus(w.id) and (" " .. HG) or "") .. (w.all and " à tous" or "")
+            .. (W.isTurnStatus(w.id) and (" " .. HG) or "") .. (w.all and " to all" or "")
           nState = nState + 1
           if cl ~= expect then bad[#bad + 1] = ("%s : « %s » au lieu de « %s »"):format(label, cl, expect) end
         end
       end
-      -- sablier : seulement dans une ligne d'état, seulement pour une durée ; jamais « N tour(s) »
+      -- sablier : seulement dans une ligne d'état, seulement pour une durée ; jamais « N turn(s) »
       for _, cl in ipairs(cls) do
-        local isState = cl:find("^Donne ") or cl:find("^Applique ")
+        local isState = isStateCl(cl)
         if cl:find(HG, 1, true) and not isState then bad[#bad + 1] = label .. " : sablier hors d'une ligne d'état" end
         if isState then
           if cl:find("%.$") then bad[#bad + 1] = label .. " : ligne d'état terminée par un point" end
@@ -3437,29 +3443,29 @@ do
             end
           end
         end
-        if cl:find("%d+ tours?") then bad[#bad + 1] = label .. " : « N tour(s) » au lieu du sablier" end
-        -- « Inflige » réservé aux dégâts
+        if cl:find("%d+ turns?") then bad[#bad + 1] = label .. " : « N turn(s) » au lieu du sablier" end
+        -- « Deal » réservé aux dégâts
         for _, s in pairs(ns.Statuses) do
-          if cl:find("[Ii]nflige " .. s.name, 1, false) then bad[#bad + 1] = label .. " : « Inflige » pour un état" end
+          if cl:find("[Dd]eal " .. s.name, 1, false) then bad[#bad + 1] = label .. " : « Deal » pour un état" end
         end
         -- impersonnel
         local low = " " .. cl:lower():gsub("[%p]", " ") .. " "
-        for _, w in ipairs({ "tu", "te", "ton", "ta", "tes", "toi", "vous", "votre", "vos" }) do
+        for _, w in ipairs({ "you", "your", "yours", "yourself" }) do
           if low:find(" " .. w .. " ", 1, true) then bad[#bad + 1] = label .. " : « " .. w .. " »" end
         end
-        -- « Nom : » = état ou condition nommée (ou libellé sans majuscule de mot-clé)
-        local lab = cl:match("^(.-) : ")
+        -- « Name: » = état ou condition nommée (ou libellé sans majuscule de mot-clé)
+        local lab = cl:match("^(.-): ")
         if lab and lab:find("^%u") then
           local known = false
           for _, k in ipairs(W.keywordList()) do if k.name == lab then known = true end end
           -- libellés qui ne sont pas des conditions (cible d'un Pouvoir) : liste fermée
-          local NOT_COND = { ["Incantations"] = true, ["Chaque gain d'Absorption"] = true }
+          local NOT_COND = { ["Cast cards"] = true, ["Each Absorb gain"] = true }
           if not known and not NOT_COND[lab] then bad[#bad + 1] = label .. " : condition inconnue « " .. lab .. " »" end
         end
       end
     end
   end
-  check(("textes : %d états posés, chacun sur sa ligne « Donne » (soi) / « Applique » (ennemi) en dernier, sablier seulement pour une durée, impersonnels")
+  check(("textes : %d états posés, chacun sur sa ligne « Gain » (soi) / « Apply » (ennemi) en dernier, sablier seulement pour une durée, impersonnels")
     :format(nState), #bad == 0, table.concat(bad, "\n        "))
   -- conditions vérifiables depuis les données : Exécution (bonus d'exécution), Déferlement (dépense
   -- de la Démence : la carte ne se joue qu'avec de la Démence), Dernier souffle (empêche la mort),
@@ -3469,26 +3475,26 @@ do
     for _, up in ipairs({ false, true }) do
       local d = Card.defById(id, up)
       local t = d.text or ""
-      local function has(n) return W.hasPhrase(t, n .. " :") end
-      if has("Exécution") ~= (d.executeBonus ~= nil) then cbad[#cbad + 1] = id .. " : Exécution" end
-      if has("Déferlement") ~= (d.canPlay ~= nil) then cbad[#cbad + 1] = id .. " : Déferlement" end
-      if has("Dernier souffle") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = id .. " : Dernier souffle" end
-      if has("Ombre") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = id .. " : Ombre" end
+      local function has(n) return W.hasPhrase(t, n .. ":") end
+      if has("Execute") ~= (d.executeBonus ~= nil) then cbad[#cbad + 1] = id .. " : Execute" end
+      if has("Surge") ~= (d.canPlay ~= nil) then cbad[#cbad + 1] = id .. " : Surge" end
+      if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = id .. " : Last Breath" end
+      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = id .. " : Shadow" end
       -- chiffres d'Exécution et de Déferlement
       if d.executeBonus then
         local base = d.effects[1][2]
-        if not t:find("Inflige " .. base .. "%.") or not t:find("Exécution : inflige " .. (base + d.executeBonus) .. "%.") then
-          cbad[#cbad + 1] = id .. (up and "+" or "") .. " : chiffres d'Exécution"
+        if not t:find("Deal " .. base .. "%.") or not t:find("Execute: deal " .. (base + d.executeBonus) .. "%.") then
+          cbad[#cbad + 1] = id .. (up and "+" or "") .. " : chiffres d'Execute"
         end
       end
-      if d.perDemence and not t:find("par Démence", 1, true) then cbad[#cbad + 1] = id .. " : Déferlement chiffré" end
-      if d.perDemence and not t:find("+ " .. d.perDemence .. " par Démence", 1, true) then cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Déferlement chiffré" end
-      if d.plagueMult and not t:find("applique Douleur " .. d.plagueMult .. " par Démence", 1, true) then
+      if d.perDemence and not t:find("per Insanity", 1, true) then cbad[#cbad + 1] = id .. " : Surge chiffré" end
+      if d.perDemence and not t:find("+ " .. d.perDemence .. " per Insanity", 1, true) then cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Surge chiffré" end
+      if d.plagueMult and not t:find("apply Pain " .. d.plagueMult .. " per Insanity", 1, true) then
         cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Peste chiffrée"
       end
     end
   end
-  check("conditions nommées présentes exactement sur les cartes qui les ont (Exécution, Déferlement, Dernier souffle, Ombre), chiffres justes",
+  check("conditions nommées présentes exactement sur les cartes qui les ont (Execute, Surge, Last Breath, Shadow), chiffres justes",
     #cbad == 0, table.concat(cbad, ", "))
   -- 2. mise en page : la ligne d'état commence une ligne et finit le texte ; une clause par ligne aux
   -- paliers >= 8,5 ; sablier en icône |T dans le texte posé, compté dans la mesure
@@ -3507,11 +3513,18 @@ do
       for _, cl in ipairs(clauses(d.text or "")) do if not isPlate(cl) then cls[#cls + 1] = cl end end
       -- première ligne d'état : en début de ligne ; plus rien après la dernière
       local firstState
-      for _, cl in ipairs(cls) do if cl:find("^Donne ") or cl:find("^Applique ") then firstState = cl break end end
+      for _, cl in ipairs(cls) do if isStateCl(cl) then firstState = cl break end end
       if firstState then
-        local verb = firstState:match("^%S+")
+        -- verbe puis nom (« Gain Atonement », « Apply Pain »), le verbe seul en fin de ligne possible
+        -- (« Apply » / « Stunned 1 ⌛ ») ; « Gain 4 Absorb. » ne compte pas
+        local verb, name1 = firstState:match("^(%S+) (%S+)")
         local startLine
-        for k, l in ipairs(pl) do if l:find("^" .. verb .. " ") or l == verb then startLine = k break end end
+        for k, l in ipairs(pl) do
+          local lp = l:gsub("\194\160", " ")
+          local nx = (pl[k + 1] or ""):gsub("\194\160", " ")
+          if lp:sub(1, #verb + #name1 + 1) == verb .. " " .. name1
+            or (lp == verb and nx:sub(1, #name1) == name1) then startLine = k break end
+        end
         if not startLine then lbad[#lbad + 1] = label .. " : la ligne d'état ne commence pas une ligne" end
         local lastCl = cls[#cls]:gsub(" " .. HG, HG)
         local tail = pl[#pl]
@@ -3545,10 +3558,10 @@ do
     #lbad == 0, table.concat(lbad, "\n        "))
   -- l'icône est comptée dans la mesure (faux client comme le client : largeur de la séquence |T)
   local m = W.label(UI().content, "bold", 9)
-  m:SetText("Expiation 1")
+  m:SetText("Atonement 1")
   local w0 = m:GetStringWidth()
   local hgt, wid = W.hourglassSize(9)
-  m:SetText("Expiation 1" .. W.hourglass(9))
+  m:SetText("Atonement 1" .. W.hourglass(9))
   local w1 = m:GetStringWidth()
   check(("sablier compté dans la mesure du texte (+%.1f unités à la taille 9, hauteur %d)"):format(w1 - w0, hgt),
     math.abs(w1 - w0 - wid) < 1e-6 and hgt >= 5 and wid >= 4, w1 - w0)
@@ -3611,18 +3624,18 @@ do
         if not all:find(line, 1, true) then ebad[#ebad + 1] = label .. " : pas d'explication pour " .. what end
       end
       for _, c in ipairs(W.CONDITIONS) do
-        if W.hasPhrase(t, c.name .. " :") then need(c.name, c.name .. " : ") end
+        if W.hasPhrase(t, c.name .. ":") then need(c.name, c.name .. ": ") end
       end
       for sid, s in pairs(ns.Statuses) do
-        if W.hasPhrase(t, s.name) then need(s.name, s.name .. " : ") end
-        if W.hasPhrase(t, s.name .. " :") then need(s.name .. " (condition)", s.name .. " : effet en plus") end
+        if W.hasPhrase(t, s.name) then need(s.name, s.name .. ": ") end
+        if W.hasPhrase(t, s.name .. ":") then need(s.name .. " (condition)", s.name .. ": bonus effect") end
       end
       for _, e in ipairs(d.effects or {}) do
-        if e[1] == "apply" then need(ns.Statuses[e[2]].name, ns.Statuses[e[2]].name .. " : ") end
+        if e[1] == "apply" then need(ns.Statuses[e[2]].name, ns.Statuses[e[2]].name .. ": ") end
       end
-      if t:find(HG, 1, true) then need("le sablier", HG .. " : ") end
-      if t:find("Absorption", 1, true) then need("Absorption", "Absorption : ") end
-      if t:find("Démence", 1, true) then need("Démence", "Démence : ") end
+      if t:find(HG, 1, true) then need("le sablier", HG .. ": ") end
+      if W.hasPhrase(t, "Absorb") then need("Absorb", "Absorb: ") end
+      if W.hasPhrase(t, "Insanity") then need("Insanity", "Insanity: ") end
       for _, l in ipairs(tt.lines) do
         local p = plain(l)
         if p ~= " " then
@@ -3646,7 +3659,7 @@ do
   for sid in pairs(Art.statusShort) do
     if not ns.Statuses[sid] or W.utf8len(plain(Art.statusLine(sid))) > 60 then kbad[#kbad + 1] = "état " .. sid end
   end
-  check("Exécution, Déferlement, Dernier souffle, Ombre, sablier et définitions courtes des états : une ligne de 60 caractères au plus",
+  check("Execute, Surge, Last Breath, Shadow, sablier et définitions courtes des états : une ligne de 60 caractères au plus",
     #kbad == 0, table.concat(kbad, ", "))
   -- 4. Pouvoir joué : jeton sous le personnage (icône de la carte, liseré doré), effet au survol ;
   -- l'état sérialisé ne change pas (la liste des pouvoirs existait déjà)
@@ -3668,10 +3681,10 @@ do
       local all = plain(table.concat(lines, "\n"))
       local d = Card.defById(pid, pid == "rapture")
       local first = plain(W.cardTextLines(d)[1] or "")
-      if not all:find(d.name, 1, true) or not all:find(first, 1, true) or not all:find("Pouvoir : ", 1, true) then
+      if not all:find(d.name, 1, true) or not all:find(first, 1, true) or not all:find("Power: ", 1, true) then
         pbad[#pbad + 1] = pid .. " : infobulle « " .. all:gsub("\n", " / ") .. " »"
       end
-      if all:find("Pouvoir.", 1, true) then pbad[#pbad + 1] = pid .. " : « Pouvoir. » dans le texte de l'infobulle" end
+      if all:find("Power.", 1, true) then pbad[#pbad + 1] = pid .. " : « Power. » dans le texte de l'infobulle" end
       local tex = tok.medal.icon._texture
       if tex == nil then pbad[#pbad + 1] = pid .. " : jeton sans icône" end
     end
@@ -3794,6 +3807,115 @@ do
   if ch.npc.model:IsShown() then shadowBad(ch.npc, "PNJ", ebad) end
   check("rencontre : ombre du héros sous les pieds ; ombre du PNJ affichée avec son modèle seulement",
     #ebad == 0 and ch.npc.shadow:IsShown() == (ch.npc.model:IsShown() and true or false), table.concat(ebad, " ; "))
+end
+
+print("U29 textes affichés en anglais : aucune chaîne française dans Core/, Data/, UI/ ni le TOC")
+do
+  -- Chaînes du code (hors commentaires) des fichiers du TOC, plus Title et Notes du TOC. Une chaîne est
+  -- française si elle contient une lettre accentuée latine, des guillemets « », ou un mot-outil
+  -- français. Exceptions : valeurs enregistrées dans la sauvegarde gardées telles quelles (zoom) et
+  -- textes de mesure de police (jamais lus par le joueur).
+  local KEEP = { ["fluide"] = true, ["lisse"] = true, ["net"] = true, ["\195\137\195\169"] = true, ["\195\137g"] = true }
+  -- mots-outils et vocabulaire du jeu en français (comparés en minuscules), sans homographes anglais
+  local FR_WORDS = { "de", "du", "des", "les", "le", "la", "une", "et", "pour", "avec", "aux", "au", "est", "pas",
+    "sur", "dans", "sans", "vous", "votre", "vos", "ou", "il", "elle", "ici", "trop", "faut", "aucun", "aucune",
+    "non", "oui", "carte", "cartes", "tour", "tours", "ennemi", "ennemis", "pv", "po", "recharge", "incantation",
+    "pouvoir", "pioche", "inflige", "soigne", "soins", "gagne", "donne", "applique", "fermer", "retour", "passer",
+    "continuer", "partir", "rien", "coffre", "rencontre", "marchand", "douleur", "expiation", "absorption", "ombre",
+    "bibelot", "bibelots", "essai", "suivant", "peint", "modeles", "clic", "acte", "inconnu", "inconnue", "vendu",
+    "indisponible", "choix", "cible", "chemin", "emplacement", "nouvelle", "titre", "centre", "quarantaine",
+    "palier", "neutre", "amical", "galvanisant", "disette", "tyrannique", "rugissement", "horion", "rafale",
+    "blindage", "moisson", "griffe", "morsure", "guette", "garde", "invoque", "attaque", "chargement", "schisme",
+    "extase", "rivepatte", "moissonneur", "cocher", "fouet", "mentale", "liquide", "consumée", "conservée",
+    "manquant", "manquants", "manquante", "absente", "invalide", "maintenant", "nombre", "classe", "sauvegarde",
+    "toucher", "psychique", "frappe", "mortelle", "vieux", "tante", "fermier", "gardien", "bricoleur", "chercheur",
+    "logement", "souffle", "dernier", "perdu", "pouv", "rech" }
+  local function isFrench(s)
+    if KEEP[s] then return nil end
+    local plain = s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", " ")
+    -- lettres latines accentuées (U+00C0 à U+017F, sauf × et ÷) ; guillemets « »
+    for c1, c2 in plain:gmatch("([\195\196\197])(.)") do
+      local b2 = c2:byte()
+      if not (c1 == "\195" and (b2 == 0x97 or b2 == 0xB7)) then return "lettre accentuée" end
+    end
+    if plain:find("\194\171", 1, true) or plain:find("\194\187", 1, true) then return "guillemets « »" end
+    -- typographie française : espace avant « : », « ! », « ? », « ; »
+    if plain:find("[%w%)] [:!?;]") or plain:find("^ :") then return "espace avant la ponctuation" end
+    local padded = " " .. plain:lower():gsub("[%p%d]", " ") .. " "
+    for _, w in ipairs(FR_WORDS) do
+      if padded:find(" " .. w .. " ", 1, true) then return "mot « " .. w .. " »" end
+    end
+    return nil
+  end
+  -- extraction des chaînes d'un source Lua (commentaires et chaînes longues compris)
+  local function strings(src)
+    local out, i, n, line = {}, 1, #src, 1
+    while i <= n do
+      local c = src:sub(i, i)
+      if c == "\n" then line = line + 1 i = i + 1
+      elseif src:sub(i, i + 1) == "--" then
+        local eq = src:match("^%-%-%[(=*)%[", i)
+        if eq then
+          local j = src:find("]" .. eq .. "]", i, true)
+          local body = src:sub(i, j)
+          line = line + select(2, body:gsub("\n", ""))
+          i = j + #eq + 2
+        else
+          local j = src:find("\n", i, true)
+          i = j or n + 1
+        end
+      elseif src:match("^%[=*%[", i) then
+        local eq = src:match("^%[(=*)%[", i)
+        local j = src:find("]" .. eq .. "]", i, true)
+        local body = src:sub(i + #eq + 2, j - 1)
+        out[#out + 1] = { line, body }
+        line = line + select(2, body:gsub("\n", ""))
+        i = j + #eq + 2
+      elseif c == "\"" or c == "'" then
+        local j, buf = i + 1, {}
+        while j <= n do
+          local d = src:sub(j, j)
+          if d == "\\" then buf[#buf + 1] = src:sub(j, j + 1) j = j + 2
+          elseif d == c or d == "\n" then break
+          else buf[#buf + 1] = d j = j + 1 end
+        end
+        out[#out + 1] = { line, table.concat(buf) }
+        i = j + 1
+      else
+        i = i + 1
+      end
+    end
+    return out
+  end
+  local found, nStr, nFiles = {}, 0, 0
+  local toc = assert(io.open(root .. "/" .. ADDON .. ".toc", "r"))
+  for raw in toc:lines() do
+    local l = raw:gsub("\r", "")
+    local field, value = l:match("^## (%a+): (.*)$")
+    if field == "Title" or field == "Notes" then
+      nStr = nStr + 1
+      local why = isFrench(value)
+      if why then found[#found + 1] = ADDON .. ".toc " .. field .. " : « " .. value .. " » (" .. why .. ")" end
+    elseif l:match("%.lua$") and not l:match("^#") then
+      local path = l:gsub("\\", "/")
+      local f = assert(io.open(root .. "/" .. path, "r"))
+      local src = f:read("*a")
+      f:close()
+      nFiles = nFiles + 1
+      for _, s in ipairs(strings(src)) do
+        nStr = nStr + 1
+        local why = isFrench(s[2])
+        if why then found[#found + 1] = path .. ":" .. s[1] .. " : « " .. s[2] .. " » (" .. why .. ")" end
+      end
+    end
+  end
+  toc:close()
+  check(("%d fichiers du TOC, %d chaînes : aucune en français"):format(nFiles, nStr), #found == 0,
+    table.concat(found, "\n        "))
+  -- le détecteur reconnaît bien du français (témoins)
+  check("détecteur : témoins français reconnus, anglais accepté", isFrench("Inflige 6.") and isFrench("Ce n'est pas votre tour.")
+    and isFrench("Démence") and isFrench("« Merci. »") and not isFrench("Deal 6.") and not isFrench("Gain Atonement 1 ⌛")
+    and not isFrench("\"Thank you.\" × 2 · —"))
 end
 
 print("U16 méthodes d'API inconnues appelées")

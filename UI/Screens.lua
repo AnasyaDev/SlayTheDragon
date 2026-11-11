@@ -19,7 +19,7 @@ local max, min, floor = math.max, math.min, math.floor
 
 local function chooseOption(o)
   if not o then return end
-  if o.disabled then UI.flash(o.reason or "Indisponible.") return end
+  if o.disabled then UI.flash(o.reason or "Unavailable.") return end
   W.sound("click")
   UI.choose(o.id)
 end
@@ -68,7 +68,7 @@ local function deckPile(f)
   end)
   W.tooltip(p, function(tt)
     UI.fillDeckTooltip(tt)
-    tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
+    tt:AddLine("Click: view the cards.", 0.6, 0.6, 0.6)
   end, "ANCHOR_RIGHT")
   p.Sync = function(self)
     local r = Controller.runInfo()
@@ -402,7 +402,7 @@ function Start:Build(f)
   end
   self.keyLabel = W.label(panel, "bold", 15, C.textSoft)
   self.keyLabel:SetPoint("TOP", 0, -150)
-  self.keyLabel:SetText("Clé mythique")
+  self.keyLabel:SetText("Mythic Keystone")
   self.keyButtons = {}
   -- clés +0…+5 : hexagones violets (verrouillées : hexagones vides)
   for i = 1, 6 do
@@ -418,7 +418,7 @@ function Start:Build(f)
     W.tooltip(b, function(tt, btn)
       local o = btn.option
       if not o then return end
-      tt:AddLine("Clé +" .. o.label:gsub("^%+", ""), 1, 0.82, 0)
+      tt:AddLine("Key +" .. o.label:gsub("^%+", ""), 1, 0.82, 0)
       if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
       if o.disabled and o.reason then tt:AddLine(o.reason, 1, 0.3, 0.3, true) end
     end, "ANCHOR_TOP")
@@ -436,10 +436,10 @@ function Start:Build(f)
   self.note:SetWidth(540)
   self.note:SetJustifyH("CENTER")
   self.note:SetWordWrap(true)
-  self.go = W.button(f, "Partir en expédition", 230, 50, nil, "gold", 18)
+  self.go = W.button(f, "Start expedition", 230, 50, nil, "gold", 18)
   at(self.go, f, 790, 494, 230, 50)
   self.go:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  self.meta = W.button(f, "Réputation et journal", 210, 44, nil, "slate", 15)
+  self.meta = W.button(f, "Reputation and log", 210, 44, nil, "slate", 15)
   at(self.meta, f, 24, 497, 210, 44)
   self.meta:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
   self.optionButtons = {}
@@ -661,7 +661,7 @@ function Camp:Build(f)
     pl.onLeaveExtra = function() W.hoverLeave(obj) end
   end
   self.pile = deckPile(f)
-  self.leave = W.button(f, "Reprendre la route", 210, 44, nil, "slate", 15)
+  self.leave = W.button(f, "Back on the road", 210, 44, nil, "slate", 15)
   at(self.leave, f, 800, 497, 210, 44)
   self.leave:SetScript("OnClick", function(b) chooseOption(b.option) end)
   self.optionButtons = {}
@@ -681,7 +681,7 @@ function Camp:Show(step)
       self.rest.active = not o.disabled
       self.rest:SetAlpha(o.disabled and 0.5 or 1)
       at(self.restPlaque, self.frame, 385 - 120, 469)
-      self.restPlaque:SetOption({ id = o.id, label = o.label, text = heal and ("+" .. heal .. " PV") or o.text,
+      self.restPlaque:SetOption({ id = o.id, label = o.label, text = heal and ("+" .. heal .. " HP") or o.text,
         disabled = o.disabled, reason = o.reason }, 240, 104)
       self.restPlaque.option = o
       self.optionButtons[o.id] = self.rest
@@ -692,7 +692,7 @@ function Camp:Show(step)
       self.book.icon:SetDesaturated(o.disabled and true or false)
       self.book:SetAlpha(o.disabled and 0.5 or 1)
       at(self.bookPlaque, self.frame, 662 - 120, 469)
-      self.bookPlaque:SetOption({ id = o.id, label = "S'entraîner", text = "Améliore une carte",
+      self.bookPlaque:SetOption({ id = o.id, label = "Train", text = "Upgrade a card",
         disabled = o.disabled, reason = o.reason }, 240, 104)
       self.bookPlaque.option = o
       self.optionButtons[o.id] = self.book
@@ -758,8 +758,8 @@ function Reward:Build(f)
   self.pile = deckPile(f)
   self.hint = W.label(f, "bold", 15, C.textSoft)
   self.hint:SetPoint("CENTER", f, "TOPLEFT", 552, -519)
-  self.hint:SetText("Une carte au choix, ou aucune.")
-  self.leave = W.button(f, "Reprendre la route", 206, 50, nil, "gold", 18)
+  self.hint:SetText("Choose one card, or none.")
+  self.leave = W.button(f, "Back on the road", 206, 50, nil, "gold", 18)
   at(self.leave, f, 913 - 103, 519 - 25, 206, 50)
   self.leave:SetScript("OnClick", function() Reward:Leave() end)
   self.optionButtons = {}
@@ -801,7 +801,7 @@ function Reward:Show(step)
   local closed = not self.opened
   if closed then
     self.chest:Show()
-    self.chest.info = { title = "Coffre" }
+    self.chest.info = { title = "Chest" }
   else
     self.chest:Hide()
   end
@@ -844,7 +844,7 @@ function Reward:Show(step)
   local loot = {}
   local hold = UI.hold
   local r2 = r or {}
-  self.goldBag.info = r2.goldGained and { title = "Bourse", text = "+" .. r2.goldGained .. " po" } or nil
+  self.goldBag.info = r2.goldGained and { title = "Purse", text = "+" .. r2.goldGained .. "g" } or nil
   local anyCard = false
   for _, o in ipairs(step.options) do if o.card then anyCard = true end end
   if anyCard and not closed then self.hint:Show() else self.hint:Hide() end
@@ -868,10 +868,10 @@ function Reward:Show(step)
   local pendingPotion = r2.potion and not r2.potionTaken
   if r2.potion and (hold.potion or pendingPotion) and not closed then
     self.flask.info = { kind = "potion", id = r2.potion,
-      hint = pendingPotion and "Potions pleines : clic droit sur une potion pour la jeter." or nil }
+      hint = pendingPotion and "Potions full: right-click a potion to discard it." or nil }
     W.setIcon(self.flask.icon, Art.potion(r2.potion), "potion:" .. r2.potion)
     self.flask.icon:SetDesaturated(pendingPotion and true or false)
-    self.flask:SetTag(pendingPotion and "Pas de place" or nil, C.badText, false, true)
+    self.flask:SetTag(pendingPotion and "No room" or nil, C.badText, false, true)
     self.flask:Show()
     loot[#loot + 1] = "potion"
   else
@@ -896,7 +896,7 @@ end
 function Reward:Pick(card)
   local o = card.option
   if not o then return end
-  if o.disabled then UI.flash(o.reason or "Indisponible.") return end
+  if o.disabled then UI.flash(o.reason or "Unavailable.") return end
   local g = W.ghostCard(self.frame)
   g:SetFrameLevel(self.frame:GetFrameLevel() + 60)
   g:SetCard(card.cardId, card.cardUp, {})
@@ -919,7 +919,7 @@ function Reward:Collect(kind, silent)
     local o
     for _, op in ipairs(self.step.options) do if op.id == "takePotion" then o = op end end
     if not o or o.disabled then
-      if not silent then UI.flash(o and o.reason or "Emplacements de potion pleins.") end
+      if not silent then UI.flash(o and o.reason or "Potion slots full.") end
       return
     end
     UI.choose("takePotion")
@@ -951,7 +951,7 @@ function Reward:Leave()
   if self.leaving then return end
   local o = self.leave.option
   if not o then return end
-  if o.disabled then UI.flash(o.reason or "Indisponible.") return end
+  if o.disabled then UI.flash(o.reason or "Unavailable.") return end
   self.leaving = true
   local any = false
   for _, k in ipairs({ "gold", "relic", "potion" }) do
@@ -1179,7 +1179,7 @@ function Shop:Build(f)
     self.cards[i] = c
   end
   self.sections = {}
-  for i, t in ipairs({ { "Bibelots", 57 }, { "Potions", 417 }, { "Service", 757 } }) do
+  for i, t in ipairs({ { "Relics", 57 }, { "Potions", 417 }, { "Service", 757 } }) do
     local l = W.label(f, "bold", 13, Art.hex("#d6deec"))
     l:SetPoint("LEFT", f, "TOPLEFT", t[2], -319)
     l:SetText(t[1])
@@ -1204,7 +1204,7 @@ function Shop:Build(f)
   W.setIcon(self.coin, Art.ui.gold, "ui:gold")
   self.gold = W.label(f, "heavy", 30, C.goldText)
   self.gold:SetPoint("LEFT", f, "TOPLEFT", 491, -517)
-  self.leave = W.button(f, "Reprendre la route", 206, 50, nil, "gold", 18)
+  self.leave = W.button(f, "Back on the road", 206, 50, nil, "gold", 18)
   at(self.leave, f, 913 - 103, 519 - 25, 206, 50)
   self.leave:SetScript("OnClick", function(b) chooseOption(b.option) end)
   self.optionButtons = {}
@@ -1268,7 +1268,7 @@ function Shop:Show(step)
         b.icon:SetDesaturated(o.sold and true or false)
         b:SetRim(o.item.kind == "relic" and Art.rarityRim[(ns.Relics[o.item.id] or {}).rarity or "common"]
           or Art.rim.silver)
-        if o.sold then b:SetTag("Vendu", { 0.6, 0.6, 0.6 })
+        if o.sold then b:SetTag("Sold", { 0.6, 0.6, 0.6 })
         else b:SetTag(tostring(o.price), o.disabled and C.badText or C.goldText, true, o.disabled) end
         b.active = not o.disabled
         b:SetAlpha(o.sold and 0.45 or 1)
@@ -1365,7 +1365,7 @@ local function nodeButton(self, i)
   b:SetScript("OnClick", function(btn)
     local node = btn.node
     if node and node.state == "available" then W.sound("click") UI.choose(node.id)
-    elseif node then UI.flash("Étape inaccessible.") end
+    elseif node then UI.flash("Stage out of reach.") end
   end)
   W.tooltip(b, function(tt, btn)
     local node = btn.node
@@ -1619,7 +1619,7 @@ local DV_X, DV_Y, DV_W, DV_H = 52, 58, 930, 540
 local DV_SCALE, DV_ROW, DV_ROWS = 0.72, 8, 3
 local DV_GAPX, DV_GAPY = 14, 28 -- (languette de coût et plaque du bas entre deux rangées)
 local DV_TOP = DV_Y + 58
-local DV_TITLE = { deck = "Deck", draw = "Pioche", discard = "Défausse", exhaust = "Consumées" }
+local DV_TITLE = { deck = "Deck", draw = "Draw pile", discard = "Discard pile", exhaust = "Exhausted" }
 local TYPE_ORDER = { attack = 1, skill = 2, power = 3 }
 
 -- Copie triée : type, coût, nom, puis non améliorée avant améliorée (l'ordre réel est perdu).
@@ -1680,8 +1680,8 @@ function DV:Build()
   self.title:SetPoint("TOP", 0, -14)
   self.empty = W.label(panel, "body", 14, C.textSoft)
   self.empty:SetPoint("CENTER", 0, 10)
-  self.empty:SetText("Aucune carte.")
-  self.close = W.button(panel, "Fermer", 120, 34, function() DV:Close() end, "gold", 14)
+  self.empty:SetText("No cards.")
+  self.close = W.button(panel, "Close", 120, 34, function() DV:Close() end, "gold", 14)
   self.close:SetPoint("BOTTOMRIGHT", -16, 14)
   -- indicateur de défilement
   self.track = W.rect(panel, "ARTWORK", 0, C.barTrack)
@@ -1745,7 +1745,7 @@ function DV:Refresh()
   if not src then self:Close() return end
   self.list = DV.sorted(src)
   local n = #self.list
-  self.title:SetText((DV_TITLE[self.kind] or "Cartes") .. " · " .. n .. " carte" .. (n > 1 and "s" or ""))
+  self.title:SetText((DV_TITLE[self.kind] or "Cards") .. " · " .. n .. " card" .. (n ~= 1 and "s" or ""))
   if self.offset > self:MaxOffset() then self.offset = self:MaxOffset() end
   self:Layout()
 end
@@ -1785,5 +1785,5 @@ end
 -- Ouvre la source demandée, ou ferme si elle est déjà affichée.
 function UI.toggleDeckView(kind)
   if DV:IsShown() and DV.kind == kind then DV:Close() return end
-  if not DV:Open(kind) then UI.flash("Aucune carte à montrer.") end
+  if not DV:Open(kind) then UI.flash("No cards to show.") end
 end

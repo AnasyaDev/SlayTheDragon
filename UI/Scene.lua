@@ -284,8 +284,8 @@ function S.verdict(cand) return checks()[tostring(cand.file)] end
 -- Description d'un candidat pour la discussion : fichier, nom, verdict.
 function S.describe(cand)
   local v = S.verdict(cand)
-  return tostring(cand.file) .. " — " .. (cand.name or "sans nom")
-    .. (v == true and " [validé]" or v == false and " [refusé]" or " [pas encore jugé]")
+  return tostring(cand.file) .. " — " .. (cand.name or "unnamed")
+    .. (v == true and " [accepted]" or v == false and " [rejected]" or " [not judged yet]")
 end
 
 -- Liste d'essai : tous les candidats du client (pas les fonds embarqués, qui n'ont rien à valider) de
@@ -417,40 +417,40 @@ function S.report()
     local bg = S.embedded(Art.scenes[id])
     if bg and users[bg.key] then table.insert(users[bg.key], id) end
   end
-  lines[#lines + 1] = "fonds embarqués (Media\\Backgrounds) : " .. #bgKeys
+  lines[#lines + 1] = "embedded backgrounds (Media\\Backgrounds): " .. #bgKeys
   for _, key in ipairs(bgKeys) do
     local bg = Art.backgrounds[key]
-    lines[#lines + 1] = "  " .. key .. ".tga — " .. (bg.name or "sans nom") .. " (FileDataID " .. tostring(bg.source)
-      .. ") : " .. (#users[key] > 0 and table.concat(users[key], ", ") or "aucune scène")
+    lines[#lines + 1] = "  " .. key .. ".tga — " .. (bg.name or "unnamed") .. " (FileDataID " .. tostring(bg.source)
+      .. "): " .. (#users[key] > 0 and table.concat(users[key], ", ") or "no scene")
   end
   for _, id in ipairs(ids) do
     local entry = Art.scenes[id]
     if not entry.art then
-      lines[#lines + 1] = id .. " : peint (pas d'illustration)"
+      lines[#lines + 1] = id .. ": painted (no illustration)"
     else
       local list, cand = candidates(entry.art), nil
       for _, c in ipairs(list) do
         if c.embedded or S.verdict(c) == true then cand = c break end
       end
-      local tail = off and " (illustrations désactivées : peint)" or ""
+      local tail = off and " (illustrations off: painted)" or ""
       if not cand then
-        lines[#lines + 1] = id .. " : peint (aucun des " .. #list .. " candidats validé)"
+        lines[#lines + 1] = id .. ": painted (none of the " .. #list .. " candidates accepted)"
       elseif cand.embedded then
-        lines[#lines + 1] = id .. " : fond embarqué " .. cand.key .. " — " .. (cand.name or "sans nom") .. tail
+        lines[#lines + 1] = id .. ": embedded background " .. cand.key .. " — " .. (cand.name or "unnamed") .. tail
       else
-        lines[#lines + 1] = id .. " : " .. tostring(cand.file) .. " — " .. (cand.name or "sans nom") .. tail
+        lines[#lines + 1] = id .. ": " .. tostring(cand.file) .. " — " .. (cand.name or "unnamed") .. tail
       end
     end
   end
   local ok, ko, todo = {}, {}, 0
   for _, c in ipairs(S.trialList()) do
     local v = S.verdict(c)
-    local label = tostring(c.file) .. " (" .. (c.name or "sans nom") .. ")"
+    local label = tostring(c.file) .. " (" .. (c.name or "unnamed") .. ")"
     if v == true then ok[#ok + 1] = label elseif v == false then ko[#ko + 1] = label else todo = todo + 1 end
   end
-  lines[#lines + 1] = "candidats du client (repli facultatif) : validés : " .. (#ok > 0 and table.concat(ok, ", ") or "aucun")
-  lines[#lines + 1] = "refusés : " .. (#ko > 0 and table.concat(ko, ", ") or "aucun")
-  lines[#lines + 1] = "pas encore jugés : " .. todo .. " sur " .. #S.trialList() .. " (/slay decor essai)"
+  lines[#lines + 1] = "client candidates (optional fallback): accepted: " .. (#ok > 0 and table.concat(ok, ", ") or "none")
+  lines[#lines + 1] = "rejected: " .. (#ko > 0 and table.concat(ko, ", ") or "none")
+  lines[#lines + 1] = "not judged yet: " .. todo .. " of " .. #S.trialList() .. " (/slay scenery test)"
   return lines
 end
 

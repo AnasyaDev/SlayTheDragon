@@ -13,12 +13,12 @@ Map.FLOORS = 7 -- étapes avant le boss
 
 -- Actes d'une expédition. encounters = clé de ns.Encounters.
 Map.ACTS = {
-  { name = "Marche de l'Ouest", zone = "westfall", encounters = "act1" },
+  { name = "Westfall", zone = "westfall", encounters = "act1" },
 }
 
 Map.KINDS = {
-  combat = "Combat", elite = "Élite", campfire = "Feu de camp", merchant = "Marchand gobelin",
-  event = "Rencontre", chest = "Coffre", boss = "Boss",
+  combat = "Combat", elite = "Elite", campfire = "Campfire", merchant = "Goblin Merchant",
+  event = "Encounter", chest = "Chest", boss = "Boss",
 }
 
 -- Poids des types de nœuds pour les étapes libres (2 à 6) ; l'étape 1 est un combat,
@@ -112,22 +112,22 @@ function Map.validate(map)
   local merchants = 0
   for _, node in ipairs(map.nodes) do
     if node.kind == "merchant" then merchants = merchants + 1 end
-    if node.floor < (Map.MIN_FLOOR[node.kind] or 1) then return false, node.kind .. " trop tôt" end
+    if node.floor < (Map.MIN_FLOOR[node.kind] or 1) then return false, node.kind .. " too early" end
   end
-  if merchants == 0 then return false, "aucun marchand" end
+  if merchants == 0 then return false, "no merchant" end
   Map.eachPath(map, function(path)
     if err then return end
     local count = {}
     for i = 1, #path do
       local k = path[i].kind
       count[k] = (count[k] or 0) + 1
-      if i > 1 and k == "elite" and path[i - 1].kind == "elite" then err = "élites consécutives" end
+      if i > 1 and k == "elite" and path[i - 1].kind == "elite" then err = "consecutive elites" end
     end
-    if path[#path].kind ~= "boss" or #path ~= Map.FLOORS + 1 then err = "chemin sans boss" end
-    if path[#path - 1].kind ~= "campfire" then err = "pas de feu de camp avant le boss" end
+    if path[#path].kind ~= "boss" or #path ~= Map.FLOORS + 1 then err = "path without boss" end
+    if path[#path - 1].kind ~= "campfire" then err = "no campfire before the boss" end
     for k, r in pairs(Map.PATH_RANGE) do
       local n = count[k] or 0
-      if n < r[1] or n > r[2] then err = ("chemin : %s × %d"):format(k, n) end
+      if n < r[1] or n > r[2] then err = ("path: %s × %d"):format(k, n) end
     end
   end)
   if err then return false, err end

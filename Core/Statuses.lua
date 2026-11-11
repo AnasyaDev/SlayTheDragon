@@ -20,21 +20,21 @@ local _, ns = ...
 
 local S = ns.Statuses
 
-S.armor_broken = { name = "Armure fracassée", debuff = true, duration = true,
-  text = "Subit 25 % de dégâts en plus." }
-S.demoralized = { name = "Démoralisé", debuff = true, duration = true,
-  text = "Inflige 25 % de dégâts en moins." }
-S.atonement = { name = "Expiation", duration = true,
-  text = "Chaque carte qui inflige des dégâts rend 2 PV." }
-S.pain = { name = "Douleur", debuff = true,
-  text = "Subit X dégâts au début de son tour, puis X baisse de 1. Ignore l'Absorption." }
-S.regen = { name = "Récupération",
-  text = "Soigne X au début de son tour, puis X baisse de 1." }
+S.armor_broken = { name = "Sundered", debuff = true, duration = true,
+  text = "Takes 25% more damage." }
+S.demoralized = { name = "Demoralized", debuff = true, duration = true,
+  text = "Deals 25% less damage." }
+S.atonement = { name = "Atonement", duration = true,
+  text = "Each card that deals damage restores 2 HP." }
+S.pain = { name = "Pain", debuff = true,
+  text = "Takes X damage at the start of its turn, then X drops by 1. Ignores Absorb." }
+S.regen = { name = "Regen",
+  text = "Heals X at the start of its turn, then X drops by 1." }
 -- turns : affichage seulement (le nombre compte des tours perdus, sablier sur les cartes) ;
 -- les règles n'en tiennent pas compte.
-S.stunned = { name = "Étourdi", debuff = true, turns = true,
-  text = "Perd son prochain tour." }
-S.halved = { name = "Suppression de la douleur",
-  text = "Dégâts subis divisés par deux jusqu'au prochain tour." }
-S.force = { name = "Force",
-  text = "Inflige X dégâts de plus par coup." }
+S.stunned = { name = "Stunned", debuff = true, turns = true,
+  text = "Loses its next turn." }
+S.halved = { name = "Pain Suppression",
+  text = "Damage taken halved until the next turn." }
+S.force = { name = "Strength",
+  text = "Deals X more damage per hit." }

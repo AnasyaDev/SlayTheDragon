@@ -14,33 +14,33 @@ end
 -- Neutre (palier 0) ---------------------------------------------------------
 
 potion("healing_potion", {
-  name = "Potion de soins", rarity = "common", tier = 0,
+  name = "Healing Potion", rarity = "common", tier = 0,
   effects = { { "heal", 15 } },
-  text = "Soigne 15 PV.",
+  text = "Heal 15 HP.",
 })
 
 potion("mana_potion", {
-  name = "Potion de mana", rarity = "common", tier = 0,
+  name = "Mana Potion", rarity = "common", tier = 0,
   effects = { { "mana", 2 } },
-  text = "+2 mana ce tour.",
+  text = "+2 mana this turn.",
 })
 
 potion("shadow_protection", {
-  name = "Potion de protection contre l'ombre", rarity = "uncommon", tier = 0,
+  name = "Shadow Protection Potion", rarity = "uncommon", tier = 0,
   effects = { { "absorb", 12 } },
-  text = "Gagne 12 Absorption.",
+  text = "Gain 12 Absorb.",
 })
 
 -- Honoré (palier 2) ---------------------------------------------------------
 
 potion("liquid_fire", {
-  name = "Feu liquide", rarity = "uncommon", tier = 2, target = true,
+  name = "Liquid Fire", rarity = "uncommon", tier = 2, target = true,
   effects = { { "damage", 10 }, { "apply", "pain", 3 } },
-  text = "Inflige 10 à la cible et Douleur 3.",
+  text = "Deal 10 to the target and apply Pain 3.",
 })
 
 potion("wisdom_elixir", {
-  name = "Élixir de sagesse", rarity = "rare", tier = 2,
+  name = "Elixir of Wisdom", rarity = "rare", tier = 2,
   effects = { { "draw", 3 }, { "cleanse" } },
-  text = "Pioche 3 cartes et retire les états négatifs.",
+  text = "Draw 3 cards and remove negative effects.",
 })

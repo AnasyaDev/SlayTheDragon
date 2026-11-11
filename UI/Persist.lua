@@ -18,14 +18,14 @@ Persist.DEFAULT_OPTIONS = {
   speed = 1.0,         -- multiplicateur de vitesse des animations
   fast = false,        -- mode rapide : animations quasi instantanées
   decor = true,        -- décor illustré (illustrations validées seulement) ; faux = toujours peint
-  artChecks = {},      -- verdicts de /slay decor essai : tostring(fichier) -> true (validé) | false (refusé)
+  artChecks = {},      -- verdicts de /slay scenery test : tostring(fichier) -> true (validé) | false (refusé)
   minimap = { hide = false, angle = 215 },
   facingPlayer = 0.6,  -- orientation des modèles (radians), réglable par /slay facing
   facingEnemy = -0.6,
   zoom = "net",        -- agrandissement au survol : "net" (étirement en route, échelle réelle à l'arrivée),
                        -- "fluide" (échelle réelle de survol tenue, taille par animation) ou "lisse"
                        -- (échelle réelle à chaque image) ; /slay zoom
-  zoomSlow = false,    -- survols au ralenti (×8, /slay zoom lent) : pour voir ce qui bouge à l'arrivée
+  zoomSlow = false,    -- survols au ralenti (×8, /slay zoom slow) : pour voir ce qui bouge à l'arrivée
   point = nil,         -- { point, relPoint, x, y } de la fenêtre
 }
 
@@ -45,7 +45,7 @@ end
 function Persist.init()
   local db, note = Save.migrate(_G.SlayTheDragonDB)
   Persist.note = note
-  if note == "plus récente" then
+  if note == "newer" then
     Persist.readOnly = true
     db = Save.new()
   else

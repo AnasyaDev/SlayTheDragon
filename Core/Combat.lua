@@ -120,7 +120,7 @@ end
 function Combat.applyStatus(c, unit, id, n)
   if unit.dead then return end
   local def = ns.Statuses[id]
-  if not def then error("état inconnu : " .. tostring(id)) end
+  if not def then error("unknown status: " .. tostring(id)) end
   if id == "stunned" and unit.boss then
     log(c, { t = "immune", unit = uref(unit), id = id })
     return
@@ -334,7 +334,7 @@ end
 function Combat.spawn(c, id)
   if #Combat.aliveEnemies(c) >= Combat.MAX_ENEMIES then return nil end
   local def = ns.Enemies[id]
-  if not def then error("ennemi inconnu : " .. tostring(id)) end
+  if not def then error("unknown enemy: " .. tostring(id)) end
   local hp = def.hp
   if type(hp) == "table" then hp = Rng.int(c.rng.ai, hp[1], hp[2]) end
   hp = Combat.modify(c, "enemyHp", hp, def)
@@ -369,7 +369,7 @@ function Combat.chooseIntent(c, e)
     e.mem.idx = idx
     move = pat[idx]
   end
-  if not def.moves[move] then error(e.id .. " : intention inconnue " .. tostring(move)) end
+  if not def.moves[move] then error(e.id .. ": unknown move " .. tostring(move)) end
   e.intent = move
   e.interrupted = false
   log(c, { t = "intent", unit = e.uid, move = move })
@@ -466,7 +466,7 @@ local function executeMove(c, e)
     elseif k == "fn" then
       a[2](c, e)
     else
-      error("action ennemie inconnue : " .. tostring(k))
+      error("unknown enemy action: " .. tostring(k))
     end
     if c.result or e.dead then break end
   end
@@ -599,7 +599,7 @@ function Combat.resolveCard(c, inst, target)
   for i = 1, #effects do
     local e = effects[i]
     local h = ns.Effects[e[1]]
-    if not h then error(inst.id .. " : effet inconnu " .. tostring(e[1])) end
+    if not h then error(inst.id .. ": unknown effect " .. tostring(e[1])) end
     h(c, ctx, e)
     if c.result then break end
   end
@@ -704,7 +704,7 @@ function Combat.usePotion(c, slot, tIdx)
   for i = 1, #def.effects do
     local e = def.effects[i]
     local h = ns.Effects[e[1]]
-    if not h then error(id .. " : effet inconnu " .. tostring(e[1])) end
+    if not h then error(id .. ": unknown effect " .. tostring(e[1])) end
     h(c, ctx, e)
     if c.result then break end
   end

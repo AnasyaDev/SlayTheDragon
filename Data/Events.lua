@@ -60,197 +60,197 @@ end
 ---------------------------------------------------------------------------
 
 event("saldean_farm", {
-  name = "La ferme des Saldean", act = 1, tier = 0,
+  name = "The Saldean Farm", act = 1, tier = 0,
   speaker = "Salma Saldean", npc = "salma_saldean", scene = "farm",
-  text = "« Vous avez l'air affamé, voyageur. Entrez donc, il reste du ragoût ! Et si vous avez "
-    .. "un moment, mon mari aurait besoin d'aide aux champs. »",
+  text = "\"You look hungry, traveler. Come in, there's stew left! And if you have a moment, "
+    .. "my husband could use some help in the fields.\"",
   choices = {
-    { label = "Manger le ragoût", outcome = "+10 PV",
-      result = "Salma vous sert un bol de ragoût. Vous repartez reposé.",
+    { label = "Eat the stew", outcome = "+10 HP",
+      result = "Salma serves you a bowl of stew. You leave rested.",
       effects = { { "heal", 10 } } },
-    { label = "Apprendre sa recette", outcome = "Une carte commune parmi 3",
-      result = "Salma vous recopie sa recette de ragoût au dos d'un vieux registre.",
+    { label = "Learn her recipe", outcome = "One of 3 common cards",
+      result = "Salma copies her stew recipe onto the back of an old ledger for you.",
       effects = { { "cardChoice", n = 3, rarity = "common" } } },
-    { label = "Aider le fermier Saldean", outcome = "-5 PV, puis +5 PV max",
-      result = "Vous désherbez les champs tout l'après-midi et en sortez endurci.",
+    { label = "Help Farmer Saldean", outcome = "-5 HP, then +5 max HP",
+      result = "You weed the fields all afternoon and come out tougher.",
       effects = { { "loseHp", 5 }, { "maxHp", 5 } } },
   },
 })
 
 event("defias_caravan", {
-  name = "La carriole renversée", act = 1, tier = 0,
-  speaker = "Le cocher", npc = "wagon_driver", scene = "road",
-  text = "« À l'aide ! Des bandits défias ont renversé ma carriole sur la route de Ruisselune, et je "
-    .. "suis coincé dessous. Ils pillent mes caisses ! »",
+  name = "The Overturned Wagon", act = 1, tier = 0,
+  speaker = "The wagon driver", npc = "wagon_driver", scene = "road",
+  text = "\"Help! Defias bandits overturned my wagon on the road to Moonbrook, and I'm "
+    .. "stuck under it. They're looting my crates!\"",
   choices = {
-    { label = "Charger les bandits", outcome = "Combat : récompense habituelle + 20 po",
-      result = "Vous attaquez les bandits défias.",
+    { label = "Charge the bandits", outcome = "Fight: usual reward + 20g",
+      result = "You attack the Defias bandits.",
       effects = { { "fight", "normal", gold = 20 } } },
-    { label = "Dégager le cocher", outcome = "-5 PV, une potion",
-      result = "Vous soulevez la carriole et libérez le cocher. Il vous donne une potion en remerciement.",
+    { label = "Free the driver", outcome = "-5 HP, a potion",
+      result = "You lift the wagon and free the driver. He gives you a potion as thanks.",
       effects = { { "loseHp", 5 }, { "potion" } } },
-    { label = "Passer son chemin", outcome = "Rien",
-      result = "Vous laissez le cocher et reprenez la route.",
+    { label = "Move on", outcome = "Nothing",
+      result = "You leave the driver and continue down the road.",
       effects = {} },
   },
 })
 
 event("sentinel_hill", {
-  name = "La Colline des sentinelles", act = 1, tier = 0,
-  speaker = "Gryan Fortmanteau", npc = "gryan_stoutmantle", scene = "hill",
-  text = "« La milice du peuple défend la Marche de l'Ouest contre les Défias, et nous manquons de "
-    .. "tout. Si vous voulez nous aider, vous êtes le bienvenu. »",
+  name = "Sentinel Hill", act = 1, tier = 0,
+  speaker = "Gryan Stoutmantle", npc = "gryan_stoutmantle", scene = "hill",
+  text = "\"The People's Militia defends Westfall against the Defias, and we're short on "
+    .. "everything. If you want to help us, you're welcome here.\"",
   choices = {
-    { label = "S'entraîner avec la milice", outcome = "-6 PV, améliore 2 cartes au hasard",
-      result = "Vous vous entraînez des heures avec les miliciens et progressez.",
+    { label = "Train with the militia", outcome = "-6 HP, upgrade 2 random cards",
+      result = "You train for hours with the militiamen and improve.",
       effects = { { "loseHp", 6 }, { "upgradeRandom", 2 } } },
-    { label = "Donner à la milice", outcome = "Paie 40 po, retire une carte du deck",
-      result = "« Merci. Laissez-nous aussi ce qui vous encombre, la milice en fera bon usage. »",
+    { label = "Donate to the militia", outcome = "Pay 40g, remove a card from the deck",
+      result = "\"Thank you. Leave us whatever weighs you down too, the militia will put it to good use.\"",
       effects = { { "pay", 40 }, { "remove" } } },
-    { label = "Repartir", outcome = "Rien",
-      result = "Vous saluez la garde et reprenez la route.",
+    { label = "Leave", outcome = "Nothing",
+      result = "You salute the guard and head back on the road.",
       effects = {} },
     -- Réponse conditionnelle : le tabard de Hurlevent ouvre l'armurerie.
-    { label = "Montrer son tabard de Hurlevent", outcome = "Une carte peu commune parmi 3",
+    { label = "Show your Stormwind Tabard", outcome = "One of 3 uncommon cards",
       when = { { "relic", "stormwind_tabard" } },
-      result = "Gryan reconnaît le tabard. « Un soldat de Hurlevent ? Servez-vous à l'armurerie. »",
+      result = "Gryan recognizes the tabard. \"A soldier of Stormwind? Help yourself at the armory.\"",
       effects = { { "cardChoice", n = 3, rarity = "uncommon" } } },
   },
 })
 
 event("coast_murlocs", {
-  name = "Les nasses du vieux Hank", act = 1, tier = 0,
-  speaker = "Vieux Hank", npc = "old_fisherman", scene = "coast",
-  text = "« Ces maudits murlocs ont pris mon ponton, et mes nasses avec ! Chassez-les de là, ou "
-    .. "allez relever mes nasses vous-même. Moi, je suis trop vieux pour ça. »",
+  name = "Old Hank's Traps", act = 1, tier = 0,
+  speaker = "Old Hank", npc = "old_fisherman", scene = "coast",
+  text = "\"Those blasted murlocs took my dock, and my fish traps with it! Run them off, or "
+    .. "go pull up my traps yourself. I'm too old for that.\"",
   choices = {
-    { label = "Reprendre le ponton", outcome = "Combat contre 4 murlocs : récompense habituelle + 15 po",
-      result = "Vous attaquez les murlocs du ponton.",
+    { label = "Retake the dock", outcome = "Fight 4 murlocs: usual reward + 15g",
+      result = "You attack the murlocs on the dock.",
       effects = { { "fight", "event_murlocs", gold = 15 } } },
-    { label = "Relever les nasses soi-même", outcome = "50 % : une potion et 20 po, sinon -7 PV",
+    { label = "Pull up the traps yourself", outcome = "50%: a potion and 20g, else -7 HP",
       effects = { { "gamble", 0.5,
         win = { { "potion" }, { "gold", 20 } },
-        winText = "Dans les nasses, vous trouvez une potion intacte et une bourse.",
+        winText = "In the traps, you find an intact potion and a coin purse.",
         lose = { { "loseHp", 7 } },
-        loseText = "Une nasse cachait un murloc. Il vous mord avant de filer." } } },
-    { label = "Partager sa friture", outcome = "+8 PV",
-      result = "Hank partage sa friture avec vous. « Mangez, ça vous remettra d'aplomb. »",
+        loseText = "A murloc was hiding in a trap. It bites you and runs off." } } },
+    { label = "Share his fried fish", outcome = "+8 HP",
+      result = "Hank shares his fried fish with you. \"Eat up, it'll get you back on your feet.\"",
       effects = { { "heal", 8 } } },
   },
 })
 
 event("jangolode_prospector", {
-  name = "Le filon de la mine de Jango", act = 1, tier = 0,
-  speaker = "Grenaille, chercheur d'or", npc = "gold_prospector", scene = "mine",
-  text = "« Il reste de l'or dans cette mine, j'en suis sûr ! Les Défias sont partis manger. "
-    .. "Aidez-moi à creuser, ou financez mon filon, et on partage. »",
+  name = "The Jangolode Vein", act = 1, tier = 0,
+  speaker = "Grit, gold prospector", npc = "gold_prospector", scene = "mine",
+  text = "\"There's still gold in this mine, I'm sure of it! The Defias have gone to eat. "
+    .. "Help me dig, or fund my claim, and we'll split it.\"",
   choices = {
-    { label = "Piocher avec lui", outcome = "-8 PV, +45 po",
-      result = "Vous creusez des heures et trouvez une pépite. Grenaille partage avec vous.",
+    { label = "Dig with him", outcome = "-8 HP, +45g",
+      result = "You dig for hours and find a nugget. Grit splits it with you.",
       effects = { { "loseHp", 8 }, { "gold", 45 } } },
-    { label = "Financer son filon", outcome = "Paie 30 po. 50 % : 80 po",
+    { label = "Fund his claim", outcome = "Pay 30g. 50%: 80g",
       effects = { { "pay", 30 }, { "gamble", 0.5,
         win = { { "gold", 80 } },
-        winText = "Grenaille trouve de l'or et vous rembourse largement.",
+        winText = "Grit strikes gold and pays you back generously.",
         lose = {},
-        loseText = "Grenaille ne trouve rien. « La prochaine fois, c'est sûr ! »" } } },
-    { label = "Lui acheter sa flasque", outcome = "Paie 15 po, une potion",
-      result = "« Un remontant de mineur. Buvez-le quand ça va mal. »",
+        loseText = "Grit finds nothing. \"Next time for sure!\"" } } },
+    { label = "Buy his flask", outcome = "Pay 15g, a potion",
+      result = "\"A miner's pick-me-up. Drink it when things go bad.\"",
       effects = { { "pay", 15 }, { "potion" } } },
   },
 })
 
 event("moonbrook_refugees", {
-  name = "Les réfugiés de Ruisselune", act = 1, tier = 1,
-  speaker = "Mère Hanna", npc = "moonbrook_refugee", scene = "camp",
-  text = "« Les Défias nous ont chassés de Ruisselune. Nous avons des blessés, et plus rien pour "
-    .. "les soigner ni pour nous nourrir. Toute aide sera la bienvenue. »",
+  name = "The Moonbrook Refugees", act = 1, tier = 1,
+  speaker = "Mother Hanna", npc = "moonbrook_refugee", scene = "camp",
+  text = "\"The Defias drove us out of Moonbrook. We have wounded, and nothing left to treat "
+    .. "them or to feed ourselves. Any help is welcome.\"",
   choices = {
-    { label = "Soigner les blessés", outcome = "-6 PV, améliore une carte au choix",
-      result = "Vous passez la journée à soigner les blessés. Vous y gagnez en expérience.",
+    { label = "Tend to the wounded", outcome = "-6 HP, upgrade a card of your choice",
+      result = "You spend the day tending to the wounded. You gain experience from it.",
       effects = { { "loseHp", 6 }, { "upgrade" } } },
-    { label = "Leur donner 35 po", outcome = "Paie 35 po, +6 PV max",
-      result = "Mère Hanna vous remercie et prie la Lumière de vous protéger.",
+    { label = "Give them 35g", outcome = "Pay 35g, +6 max HP",
+      result = "Mother Hanna thanks you and asks the Light to protect you.",
       effects = { { "pay", 35 }, { "maxHp", 6 } } },
-    { label = "Passer son chemin", outcome = "Rien",
-      result = "Vous reprenez la route sans vous arrêter.",
+    { label = "Move on", outcome = "Nothing",
+      result = "You continue on your way without stopping.",
       effects = {} },
     -- Réponse conditionnelle : il faut une potion à donner.
-    { label = "Leur laisser une potion", outcome = "Perd une potion, améliore 2 cartes au hasard",
+    { label = "Leave them a potion", outcome = "Lose a potion, upgrade 2 random cards",
       when = { { "potion" } },
-      result = "La potion guérit un vieux prêtre. Il vous apprend ses prières.",
+      result = "The potion heals an old priest. He teaches you his prayers.",
       effects = { { "losePotion" }, { "upgradeRandom", 2 } } },
   },
 })
 
 event("herbalist", {
-  name = "La cueilleuse de pacifiques", act = 1, tier = 1,
-  speaker = "Tante Mirelle", npc = "herbalist", scene = "road",
+  name = "The Peacebloom Picker", act = 1, tier = 1,
+  speaker = "Aunt Mirelle", npc = "herbalist", scene = "road",
   -- N'apparaît que si l'on est mal en point.
   when = { { "hpBelow", 0.5 } },
-  text = "« Par la Lumière, vous tenez à peine debout ! Asseyez-vous. Mes remèdes ne sont pas gratuits, "
-    .. "mais ils marchent. Sinon, aidez-moi à cueillir mes pacifiques. »",
+  text = "\"By the Light, you can barely stand! Sit down. My remedies aren't free, but they "
+    .. "work. Otherwise, help me pick my peacebloom.\"",
   choices = {
-    { label = "Payer ses remèdes", outcome = "Paie 25 po, soigne 35 % des PV max",
-      result = "Tante Mirelle pose un cataplasme sur vos plaies.",
+    { label = "Pay for her remedies", outcome = "Pay 25g, heal 35% of max HP",
+      result = "Aunt Mirelle puts a poultice on your wounds.",
       effects = { { "pay", 25 }, { "healPct", 0.35 } } },
-    { label = "Cueillir avec elle", outcome = "+12 PV",
-      result = "Vous cueillez avec elle, en mâchant les feuilles qu'elle vous donne.",
+    { label = "Pick with her", outcome = "+12 HP",
+      result = "You pick flowers with her, chewing the leaves she gives you.",
       effects = { { "heal", 12 } } },
   },
 })
 
 event("scarecrow_field", {
-  name = "L'épouvantail qui grince", act = 1, tier = 2,
-  speaker = "Fermier Molsen", npc = "farmer_molsen", scene = "farm",
-  text = "« Cet épouvantail bouge la nuit, je vous dis ! Hier, il était à l'autre bout du champ. "
-    .. "C'est sûrement un sortilège des Défias. Brûlez-le, s'il vous plaît. »",
+  name = "The Creaking Scarecrow", act = 1, tier = 2,
+  speaker = "Farmer Molsen", npc = "farmer_molsen", scene = "farm",
+  text = "\"That scarecrow moves at night, I tell you! Yesterday it was at the other end of "
+    .. "the field. Must be Defias sorcery. Burn it, please.\"",
   choices = {
-    { label = "Brûler l'épouvantail", outcome = "-5 PV, retire une carte du deck",
-      result = "La paille s'enflamme d'un coup et vous brûle les mains. Molsen vous remercie.",
+    { label = "Burn the scarecrow", outcome = "-5 HP, remove a card from the deck",
+      result = "The straw catches all at once and burns your hands. Molsen thanks you.",
       effects = { { "loseHp", 5 }, { "remove" } } },
-    { label = "Fouiller sa paille", outcome = "-4 PV max, une carte rare parmi 3",
-      result = "Vous trouvez dans la paille un parchemin défias. Sa magie vous affaiblit.",
+    { label = "Search its straw", outcome = "-4 max HP, one of 3 rare cards",
+      result = "You find a Defias scroll in the straw. Its magic weakens you.",
       effects = { { "loseMaxHp", 4 }, { "cardChoice", n = 3, rarity = "rare" } } },
-    { label = "Ne pas y toucher", outcome = "Rien",
-      result = "Vous laissez le fermier Molsen à son épouvantail.",
+    { label = "Leave it alone", outcome = "Nothing",
+      result = "You leave Farmer Molsen to his scarecrow.",
       effects = {} },
   },
 })
 
 event("lighthouse_keeper", {
-  name = "Le gardien du phare", act = 1, tier = 2,
-  speaker = "Gardien Alden", npc = "lighthouse_keeper", scene = "coast",
+  name = "The Lighthouse Keeper", act = 1, tier = 2,
+  speaker = "Keeper Alden", npc = "lighthouse_keeper", scene = "coast",
   -- Le phare est au bout de la côte : seulement après l'étape 4.
   when = { { "floor", 4 } },
-  text = "« Le feu doit rester allumé toute la nuit, ou les navires s'échoueront sur les récifs. "
-    .. "Je suis malade et les murlocs rôdent. Pouvez-vous veiller à ma place ? »",
+  text = "\"The light must burn all night, or ships will run aground on the reefs. I'm sick "
+    .. "and the murlocs are prowling. Can you keep watch for me?\"",
   choices = {
-    { label = "Garder le feu toute la nuit", outcome = "-10 PV, copie une carte du deck",
-      result = "Vous repoussez les murlocs dans l'escalier du phare jusqu'à l'aube. Le feu reste allumé.",
+    { label = "Tend the light all night", outcome = "-10 HP, copy a card in the deck",
+      result = "You hold the murlocs off on the lighthouse stairs until dawn. The light stays lit.",
       effects = { { "loseHp", 10 }, { "dupe" } } },
-    { label = "Dormir au phare", outcome = "Soigne 30 % des PV max",
-      result = "Alden vous laisse un lit près du feu. Vous dormez jusqu'au matin.",
+    { label = "Sleep at the lighthouse", outcome = "Heal 30% of max HP",
+      result = "Alden gives you a bed near the fire. You sleep until morning.",
       effects = { { "healPct", 0.30 } } },
   },
 })
 
 event("gnoll_raiders", {
-  name = "Les maraudeurs Rivepatte", act = 1, tier = 3,
-  speaker = "Grisgueule", npc = "riverpaw_gnoll", scene = "camp",
+  name = "The Riverpaw Raiders", act = 1, tier = 3,
+  speaker = "Graymaw", npc = "riverpaw_gnoll", scene = "camp",
   -- Les meutes Rivepatte ne s'aventurent sur la route qu'à partir de la clé +2.
   when = { { "key", 2 } },
-  text = "« Toi donner or. Ou toi donner sang. » Grisgueule et ses maraudeurs Rivepatte vous "
-    .. "barrent la route. « Grisgueule pas difficile. »",
+  text = "\"You give gold. Or you give blood.\" Graymaw and his Riverpaw raiders block "
+    .. "your path. \"Graymaw not picky.\"",
   choices = {
-    { label = "Affronter la meute", outcome = "Combat contre 3 gnolls : récompense habituelle + 30 po",
-      result = "Vous attaquez la meute de Grisgueule.",
+    { label = "Face the pack", outcome = "Fight 3 gnolls: usual reward + 30g",
+      result = "You attack Graymaw's pack.",
       effects = { { "fight", "event_gnolls", gold = 30 } } },
-    { label = "Payer le péage", outcome = "Paie 30 po",
-      result = "Grisgueule mord la pièce, satisfait. « Toi passer. Toi revenir. »",
+    { label = "Pay the toll", outcome = "Pay 30g",
+      result = "Graymaw bites the coin, satisfied. \"You pass. You come back.\"",
       effects = { { "pay", 30 } } },
-    { label = "Fuir à travers champs", outcome = "-8 PV",
-      result = "Vous fuyez à travers champs. Une flèche vous touche.",
+    { label = "Flee across the fields", outcome = "-8 HP",
+      result = "You flee across the fields. An arrow hits you.",
       effects = { { "loseHp", 8 } } },
   },
 })
@@ -260,45 +260,45 @@ event("gnoll_raiders", {
 ---------------------------------------------------------------------------
 
 event("goblin_peddler", {
-  name = "La roulotte de Grisette", act = 1, tier = 1, rarity = "rare",
-  speaker = "Grisette Vifcliquet", npc = "goblin_peddler", scene = "road",
-  text = "« Pièces rares, prix uniques, aucun remboursement ! Cet engrenage vient d'un vrai golem "
-    .. "moissonneur. Il marche à merveille, mais il prend un peu de votre santé, l'ami. »",
+  name = "Grizzle's Wagon", act = 1, tier = 1, rarity = "rare",
+  speaker = "Grizzle Quickclick", npc = "goblin_peddler", scene = "road",
+  text = "\"Rare parts, unique prices, no refunds! This cog came off a real harvest golem. "
+    .. "Works like a charm, but it takes a bit of your health, friend.\"",
   choices = {
-    { label = "Prendre l'engrenage", outcome = "-8 PV max, Engrenage de moissonneur (bibelot)",
-      result = "Grisette vous fixe l'engrenage sur la poitrine. Vous vous sentez aussitôt affaibli.",
+    { label = "Take the cog", outcome = "-8 max HP, Harvest Golem Cog (relic)",
+      result = "Grizzle fastens the cog to your chest. You feel weaker at once.",
       effects = { { "loseMaxHp", 8 }, { "relic", "harvest_cog" } } },
-    { label = "Jouer au bonneteau", outcome = "Paie 40 po. 50 % : 100 po",
+    { label = "Play the shell game", outcome = "Pay 40g. 50%: 100g",
       effects = { { "pay", 40 }, { "gamble", 0.5,
         win = { { "gold", 100 } },
-        winText = "Vous trouvez le bon gobelet. Grisette grimace et paie.",
+        winText = "You find the right cup. Grizzle grimaces and pays.",
         lose = {},
-        loseText = "Le gobelet est vide. Grisette empoche votre or." } } },
-    { label = "Décliner poliment", outcome = "Rien",
-      result = "« Tant pis pour vous ! » Grisette repart avec sa roulotte.",
+        loseText = "The cup is empty. Grizzle pockets your gold." } } },
+    { label = "Politely decline", outcome = "Nothing",
+      result = "\"Your loss!\" Grizzle leaves with her wagon.",
       effects = {} },
   },
 })
 
 event("harvest_watcher", {
-  name = "Le moissonneur endormi", act = 1, tier = 0, rarity = "rare",
-  speaker = "Bricoleur Bertil", npc = "gnome_tinker", scene = "farm",
+  name = "The Sleeping Harvester", act = 1, tier = 0, rarity = "rare",
+  speaker = "Tinker Bertil", npc = "gnome_tinker", scene = "farm",
   -- Proposé seulement en bonne santé : la réponse principale est un combat d'élite.
   when = { { "hpAbove", 0.6 } },
-  text = "« Pas un bruit ! Ce golem moissonneur garde un coffre. S'il se réveille, il nous "
-    .. "attaquera tous les deux. Vous savez crocheter une serrure ? »",
+  text = "\"Not a sound! That harvest golem is guarding a chest. If it wakes up, it'll "
+    .. "attack us both. Can you pick a lock?\"",
   choices = {
-    { label = "Réveiller le golem", outcome = "Combat d'élite : récompense d'élite + 40 po",
-      result = "Les yeux du golem s'allument. Bertil plonge dans le foin.",
+    { label = "Wake the golem", outcome = "Elite fight: elite reward + 40g",
+      result = "The golem's eyes light up. Bertil dives into the hay.",
       effects = { { "fight", "event_golem", kind = "elite", gold = 40 } } },
-    { label = "Crocheter le coffre en silence", outcome = "40 % : un bibelot, sinon -12 PV",
+    { label = "Quietly pick the chest", outcome = "40%: a relic, else -12 HP",
       effects = { { "gamble", 0.4,
         win = { { "relic" } },
-        winText = "Le coffre s'ouvre sans bruit. Le golem dort toujours.",
+        winText = "The chest opens without a sound. The golem is still asleep.",
         lose = { { "loseHp", 12 } },
-        loseText = "La serrure claque. Le golem se réveille et vous frappe." } } },
-    { label = "Ressortir sur la pointe des pieds", outcome = "Rien",
-      result = "Bertil vous regarde partir, déçu.",
+        loseText = "The lock clicks loudly. The golem wakes up and hits you." } } },
+    { label = "Tiptoe back out", outcome = "Nothing",
+      result = "Bertil watches you leave, disappointed.",
       effects = {} },
   },
 })
@@ -309,57 +309,57 @@ event("harvest_watcher", {
 
 -- Premier temps : le choix fixe la suite (drapeau tobin_jailed ou tobin_spared).
 event("tobin_thief", {
-  name = "Le voleur de pain", act = 1, tier = 0, rarity = "story", once = true,
+  name = "The Bread Thief", act = 1, tier = 0, rarity = "story", once = true,
   speaker = "Tobin", npc = "tobin_young", scene = "farm",
-  text = "Vous attrapez par le col un gamin maigre, les poches pleines de pain volé aux Saldean. "
-    .. "« Lâchez-moi ! Les Défias disent qu'ils nourrissent ceux qui les rejoignent. Moi, j'ai juste faim. »",
+  text = "You grab a skinny boy by the collar, his pockets full of bread stolen from the Saldeans. "
+    .. "\"Let go of me! The Defias say they feed anyone who joins them. I'm just hungry.\"",
   choices = {
-    { label = "Le livrer à la milice", outcome = "+30 po. Il s'en souviendra.",
-      result = "Gryan Fortmanteau vous compte la prime sans un regard pour le gamin. « Il apprendra. »",
+    { label = "Turn him in to the militia", outcome = "+30g. He will remember.",
+      result = "Gryan Stoutmantle counts out the bounty without a glance at the boy. \"He'll learn.\"",
       effects = { { "gold", 30 }, { "flag", "tobin_jailed" } } },
-    { label = "Lui offrir un vrai repas", outcome = "Paie 20 po. Il s'en souviendra.",
-      result = "Tobin dévore la miche, puis file vers la Colline des sentinelles. « Je vous revaudrai ça ! »",
+    { label = "Buy him a real meal", outcome = "Pay 20g. He will remember.",
+      result = "Tobin wolfs down the loaf, then runs off toward Sentinel Hill. \"I'll pay you back!\"",
       effects = { { "pay", 20 }, { "flag", "tobin_spared" } } },
-    { label = "Le laisser filer", outcome = "Rien",
-      result = "Tobin s'enfuit dans les champs de blé.",
+    { label = "Let him go", outcome = "Nothing",
+      result = "Tobin runs off into the wheat fields.",
       effects = {} },
   },
 })
 
 -- Second temps, s'il a été nourri : retrouvé dans la milice. Débloque le Canif de Tobin.
 event("tobin_scout", {
-  name = "Le guetteur de la Colline", act = 1, tier = 0, rarity = "story", once = true,
-  speaker = "Tobin, guetteur de la milice", npc = "tobin_scout", scene = "hill",
+  name = "The Hill Lookout", act = 1, tier = 0, rarity = "story", once = true,
+  speaker = "Tobin, militia lookout", npc = "tobin_scout", scene = "hill",
   when = { { "flag", "tobin_spared" } },
-  text = "« Hé ! Vous vous souvenez de moi ? Le pain des Saldean ! Je suis guetteur dans la milice "
-    .. "du peuple, maintenant. J'ai gardé quelque chose pour vous. »",
+  text = "\"Hey! Remember me? The Saldeans' bread! I'm a lookout for the People's Militia "
+    .. "now. I kept something for you.\"",
   choices = {
-    { label = "Accepter son canif", outcome = "Canif de Tobin (bibelot)",
-      result = "« Je l'avais volé à un Défias. Il sera mieux chez vous. »",
+    { label = "Accept his pocketknife", outcome = "Tobin's Pocketknife (relic)",
+      result = "\"I stole it from a Defias. It's better off with you.\"",
       effects = { { "relic", "tobin_knife" } } },
-    { label = "Lui demander ce qu'il sait des Défias", outcome = "Une carte rare parmi 3",
-      result = "Tobin vous dessine le plan des tunnels défias et vous explique leurs habitudes.",
+    { label = "Ask what he knows about the Defias", outcome = "One of 3 rare cards",
+      result = "Tobin draws you a map of the Defias tunnels and explains their habits.",
       effects = { { "cardChoice", n = 3, rarity = "rare" } } },
   },
 })
 
 -- Second temps, s'il a été livré : il a rejoint la Confrérie.
 event("tobin_defias", {
-  name = "Le foulard rouge", act = 1, tier = 0, rarity = "story", once = true,
-  speaker = "Tobin, coupe-jarret défias", npc = "tobin_defias", scene = "road",
+  name = "The Red Kerchief", act = 1, tier = 0, rarity = "story", once = true,
+  speaker = "Tobin, Defias cutthroat", npc = "tobin_defias", scene = "road",
   when = { { "flag", "tobin_jailed" } },
-  text = "« Vous vous souvenez de moi ? La milice m'a gardé six mois au cachot. Ce sont les Défias "
-    .. "qui m'en ont sorti. Maintenant, donnez-moi votre bourse. »",
+  text = "\"Remember me? The militia kept me in a cell for six months. The Defias got me "
+    .. "out. Now hand over your purse.\"",
   choices = {
-    { label = "Le combattre", outcome = "Combat contre Tobin et ses sbires : récompense habituelle + 25 po",
-      result = "Tobin et ses sbires vous attaquent.",
+    { label = "Fight him", outcome = "Fight Tobin and his henchmen: usual reward + 25g",
+      result = "Tobin and his henchmen attack you.",
       effects = { { "fight", "event_tobin", gold = 25 } } },
-    { label = "Lui rendre la prime", outcome = "Paie 30 po",
-      result = "Tobin prend la bourse. « On est quittes. »",
+    { label = "Pay back the bounty", outcome = "Pay 30g",
+      result = "Tobin takes the purse. \"We're even.\"",
       effects = { { "pay", 30 } } },
     -- La surprise fait l'intérêt : parler suffit, mais rien ne l'annonce.
-    { label = "Lui parler du pain des Saldean", outcome = "Il baisse sa lame : rien à payer", hidden = true,
-      result = "Tobin range sa dague. « Filez, avant que je change d'avis. »",
+    { label = "Mention the Saldeans' bread", outcome = "He lowers his blade: nothing to pay", hidden = true,
+      result = "Tobin sheathes his dagger. \"Get going, before I change my mind.\"",
       effects = {} },
   },
 })

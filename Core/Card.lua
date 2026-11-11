@@ -13,13 +13,13 @@ function Card.defById(id, up)
   local d = cache[key]
   if d then return d end
   local base = ns.Cards[id]
-  if not base then error("carte inconnue : " .. tostring(id)) end
+  if not base then error("unknown card: " .. tostring(id)) end
   d = {}
   for k, v in pairs(base) do
     if k ~= "up" then d[k] = v end
   end
   if up then
-    if not base.up then error("carte sans amélioration : " .. id) end
+    if not base.up then error("card without upgrade: " .. id) end
     for k, v in pairs(base.up) do d[k] = v end
     d.name = base.name .. "+"
     d.isUp = true
