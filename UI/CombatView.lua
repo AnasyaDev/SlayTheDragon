@@ -532,6 +532,7 @@ function V:LayoutEnemies()
       W.setCreature(s.model, e.id, s.fallback)
       if s.model.SetFacing then s.model:SetFacing(opts().facingEnemy or -0.6) end
       W.modelAlpha(s.model, 1)
+      s.fig.shadow:SetAlpha(1)
       s:SetAlpha(1)
       s.hp:Set(e.hp, e.maxHp)
       s.block:Set(e.block)
@@ -1004,7 +1005,7 @@ function V:QueueEvent(ev)
       m.dead = true
       if ev.unit ~= "player" then
         who.intent:Hide()
-        W.tween(0.9, function(p) W.modelAlpha(m, 1 - p) who:SetAlpha(1 - 0.7 * p) end, function()
+        W.tween(0.9, function(p) W.modelAlpha(m, 1 - p) who.fig.shadow:SetAlpha(1 - p) who:SetAlpha(1 - 0.7 * p) end, function()
           who.dying = false
           if self_.c then self_:RenderEnemies(false) end
         end, who, "fade", W.ease.linear)

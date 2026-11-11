@@ -3684,6 +3684,118 @@ do
   m:Hide()
 end
 
+print("U28 ombres de contact : une par personnage affiché, sous les pieds, texture fondue sur disque, mort")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local Sc = ns.Scene
+  -- texture : Media/shadow_soft.tga, TGA 32 bits non compressé 128 × 128, blanche, alpha nul sur tout
+  -- le bord, plein au centre, décroissant du centre vers le bord
+  local f = io.open(root .. "/Media/shadow_soft.tga", "rb")
+  local hdr = f and f:read(18)
+  local body = f and f:read("*a")
+  if f then f:close() end
+  local N = 128
+  local okTex = Sc.SHADOW == "Interface\\AddOns\\SlayTheDragon\\Media\\shadow_soft.tga" and hdr ~= nil
+    and hdr:byte(3) == 2 and hdr:byte(17) == 32 and hdr:byte(18) == 8
+    and hdr:byte(13) + 256 * hdr:byte(14) == N and hdr:byte(15) + 256 * hdr:byte(16) == N
+    and body ~= nil and #body == N * N * 4
+  local why
+  if okTex then
+    local function px(x, y) local i = (y * N + x) * 4 return body:byte(i + 1), body:byte(i + 2), body:byte(i + 3), body:byte(i + 4) end
+    for i = 0, N * N - 1 do
+      local b, g, r = body:byte(i * 4 + 1), body:byte(i * 4 + 2), body:byte(i * 4 + 3)
+      if b ~= 255 or g ~= 255 or r ~= 255 then why = "pixel non blanc" break end
+    end
+    for k = 0, N - 1 do
+      if select(4, px(k, 0)) ~= 0 or select(4, px(k, N - 1)) ~= 0 or select(4, px(0, k)) ~= 0
+        or select(4, px(N - 1, k)) ~= 0 then why = "bord non transparent" break end
+    end
+    local prev = 256
+    for x = N / 2, N - 1 do
+      local a = select(4, px(x, N / 2))
+      if a > prev then why = "alpha non décroissant" break end
+      prev = a
+    end
+    if not why and select(4, px(N / 2, N / 2)) < 250 then why = "centre non plein" end
+  end
+  check("Media/shadow_soft.tga : TGA 32 bits 128 × 128, blanc, bord à alpha 0, dégradé radial du centre plein au bord",
+    okTex and why == nil, why)
+
+  -- une ombre par personnage affiché (héros + ennemis), centrée sous les pieds, aplatie, noire, sans
+  -- accrochage au pixel, proportionnelle au cadre (ennemi agrandi compris)
+  local function shadowBad(fig, label, bad)
+    local sh = fig.shadow
+    if not (sh and sh.parts and #sh.parts == #Sc.SHADOW_LAYERS) then bad[#bad + 1] = label .. " : pas d'ombre" return end
+    local fr = R.rect(fig)
+    local fx = (fr[1] + fr[3]) / 2
+    local k = (fr[3] - fr[1]) / fig._w
+    for i, t in ipairs(sh.parts) do
+      local r = R.rect(t)
+      local w, h = r[3] - r[1], r[4] - r[2]
+      local vc = t._calls.SetVertexColor or {}
+      local snap = t._calls.SetSnapToPixelGrid
+      local problems = {}
+      if not t:IsVisible() then problems[#problems + 1] = "cachée" end
+      if t._texture ~= Sc.SHADOW then problems[#problems + 1] = "texture " .. tostring(t._texture) end
+      if vc[1] ~= 0 or vc[2] ~= 0 or vc[3] ~= 0 or vc[4] ~= Sc.SHADOW_LAYERS[i].a then problems[#problems + 1] = "teinte" end
+      if not (snap and snap[1] == false) then problems[#problems + 1] = "accrochage au pixel" end
+      if math.abs(w / h - Sc.SHADOW_RATIO) > 0.01 then problems[#problems + 1] = ("rapport %.2f"):format(w / h) end
+      if math.abs(w - fig._w * Sc.SHADOW_LAYERS[i].w * k) > 0.01 then problems[#problems + 1] = ("largeur %.1f"):format(w) end
+      if math.abs((r[1] + r[3]) / 2 - fx) > 0.01 then problems[#problems + 1] = "décentrée" end
+      local cy = (r[2] + r[4]) / 2 - fr[2]
+      if cy <= 0 or cy > 20 * k then problems[#problems + 1] = ("hauteur des pieds %.1f"):format(cy) end
+      if #problems > 0 then bad[#bad + 1] = label .. " couche " .. i .. " : " .. table.concat(problems, ", ") end
+    end
+  end
+  local c = C().combat()
+  c.enemies = {}
+  for _, id in ipairs({ "murloc", "harvest_golem" }) do ns.Combat.spawn(c, id) end
+  local v = V()
+  v.c = nil
+  v:Show({ state = c })
+  H.advance(0.5)
+  local bad, n, figs = {}, 0, {}
+  shadowBad(v.hero, "héros", bad)
+  n = n + 1
+  for _, s in pairs(v.slotOf) do
+    if s:IsVisible() then
+      n = n + 1
+      figs[#figs + 1] = s
+      for _, e in ipairs(c.enemies) do if e.uid == s.uid then shadowBad(s.fig, e.id, bad) end end
+    end
+  end
+  check("combat : une ombre par personnage affiché (héros, murloc, golem agrandi), sous les pieds, fondue",
+    n == 3 and #bad == 0, table.concat(bad, " ; "))
+  -- mort d'un ennemi : l'ombre s'efface avec le modèle, puis part avec l'emplacement
+  local golem
+  for _, s in ipairs(figs) do
+    for _, e in ipairs(c.enemies) do if e.uid == s.uid and e.id == "harvest_golem" then golem = { s = s, e = e } end end
+  end
+  if golem then
+    golem.e.hp, golem.e.dead = 0, true
+    v:OnEvents({ { t = "death", unit = golem.e.uid } })
+    H.advance(5)
+    local part = golem.s.fig.shadow.parts[1]
+    local a = part._calls.SetAlpha
+    check("mort d'un ennemi : son ombre s'efface (alpha 0) et disparaît avec lui",
+      a and a[1] == 0 and not part:IsVisible() and not golem.s:IsVisible(), a and a[1])
+  else
+    check("mort d'un ennemi : golem affiché", false)
+  end
+
+  -- rencontre : ombre du héros, ombre du PNJ seulement quand son modèle est affiché
+  freshRun(SEED + 4, "event")
+  local ch = UI().current
+  local ebad = {}
+  shadowBad(ch.hero, "héros (rencontre)", ebad)
+  if ch.npc.model:IsShown() then shadowBad(ch.npc, "PNJ", ebad) end
+  check("rencontre : ombre du héros sous les pieds ; ombre du PNJ affichée avec son modèle seulement",
+    #ebad == 0 and ch.npc.shadow:IsShown() == (ch.npc.model:IsShown() and true or false), table.concat(ebad, " ; "))
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end

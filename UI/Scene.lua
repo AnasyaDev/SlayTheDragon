@@ -480,6 +480,50 @@ end
 -- Personnages : modèle 3D posé au sol, ombre, anneau de cible
 ---------------------------------------------------------------------------
 
+-- Ombre de contact : Media/shadow_soft.tga (disque blanc, alpha en dégradé radial doux nul sur tout le
+-- bord, tools/build_shadow.py) teintée en noir, aplatie (SHADOW_RATIO:1), centrée sur les pieds
+-- (SHADOW_FEET au-dessus du bas du cadre, centre de l'anneau de cible). Deux couches : pénombre large
+-- et légère, cœur étroit et dense (≈ 58 % d'opacité au centre). Largeurs proportionnelles à celle du
+-- cadre, recalculées quand il change de taille (ennemis agrandis). Sans accrochage au pixel : elle suit
+-- les décalages et la visée sans sauter d'un pixel. f.shadow : Show, Hide, SetShown, IsShown, SetAlpha.
+S.SHADOW = ns.Skin.root .. "shadow_soft.tga"
+S.SHADOW_RATIO, S.SHADOW_FEET = 3.5, 10
+S.SHADOW_LAYERS = {
+  { w = 0.74, a = 0.25 }, -- pénombre
+  { w = 0.46, a = 0.44 }, -- cœur
+}
+
+local Shadow = {}
+Shadow.__index = Shadow
+function Shadow:SetShown(on)
+  for _, t in ipairs(self.parts) do if on then t:Show() else t:Hide() end end
+  self.shown = on and true or false
+end
+function Shadow:Show() self:SetShown(true) end
+function Shadow:Hide() self:SetShown(false) end
+function Shadow:IsShown() return self.shown end
+function Shadow:SetAlpha(a) for _, t in ipairs(self.parts) do t:SetAlpha(a) end end
+function Shadow:Place(w)
+  for i, t in ipairs(self.parts) do
+    local lw = w * S.SHADOW_LAYERS[i].w
+    t:SetSize(lw, lw / S.SHADOW_RATIO)
+  end
+end
+
+local function contactShadow(f, w)
+  local sh = setmetatable({ parts = {}, shown = true }, Shadow)
+  for i, layer in ipairs(S.SHADOW_LAYERS) do
+    local t = W.noSnap(f:CreateTexture(nil, "BACKGROUND", nil, 1 + i))
+    t:SetTexture(S.SHADOW, nil, nil, "TRILINEAR")
+    t:SetVertexColor(0, 0, 0, layer.a)
+    t:SetPoint("CENTER", f, "BOTTOM", 0, S.SHADOW_FEET)
+    sh.parts[i] = t
+  end
+  sh:Place(w)
+  f:SetScript("OnSizeChanged", function(self, nw) if nw and nw > 0 then sh:Place(nw) end end)
+  return sh
+end
+
 -- Cadre de personnage : w × h, pieds au bas du cadre (feetY depuis le bas).
 function S.figure(parent, w, h)
   local f = CreateFrame("Frame", nil, parent)
@@ -493,9 +537,7 @@ function S.figure(parent, w, h)
   f.ring.inner:SetPoint("TOPLEFT", 4, -3)
   f.ring.inner:SetPoint("BOTTOMRIGHT", -4, 3)
   f.ring:Hide()
-  f.shadow = W.disc(f, "BACKGROUND", 2, C.shadow, 0.55)
-  f.shadow:SetSize(w * 0.78, 16)
-  f.shadow:SetPoint("BOTTOM", 0, 2)
+  f.shadow = contactShadow(f, w)
   f.model = W.model(f, w, h)
   f.model:SetPoint("BOTTOM", 0, 0)
   -- repli sans modèle : médaillon argenté (icône de l'ennemi ou disque sombre), W.setFallbackArt
