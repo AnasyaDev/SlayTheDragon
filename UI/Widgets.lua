@@ -1431,7 +1431,13 @@ end
 -- Curseur minimal du jeu (Minimal_SliderBar) : rail, poignée, flèches aux deux bouts. get() -> fraction
 -- 0..1 ; step(-1 | 1) avance d'un cran ; setFrac(f) pose une fraction (clic ou glisser sur le rail).
 -- s.minus, s.plus : flèches (boutons) ; s:Sync() replace la poignée.
-function W.slider(parent, w, get, step, setFrac)
+-- preview(f) (facultatif) : glisser différé, pour un réglage qui déplace ou redimensionne le curseur
+-- lui-même (échelle de la fenêtre : appliqué en direct, le rail bougeait sous la souris, la valeur
+-- recalculée changeait l'échelle à nouveau, et ainsi de suite). Pendant le glisser, seule la poignée
+-- bouge : preview(f) met à jour l'aperçu (libellé) et renvoie la fraction à afficher (arrondie au cran)
+-- ou nil ; setFrac n'est appelé qu'une fois, au relâchement du bouton, même hors du rail (relâchement
+-- constaté par IsMouseButtonDown si le rail ne reçoit pas OnMouseUp) ou si le rail est caché.
+function W.slider(parent, w, get, step, setFrac, preview)
   local s = CreateFrame("Frame", nil, parent)
   s:SetSize(w, 16)
   local track = CreateFrame("Button", nil, s)
@@ -1445,6 +1451,11 @@ function W.slider(parent, w, get, step, setFrac)
   m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
   s.thumb = W.wow(track, "slider_thumb", "ARTWORK", 0)
   s.thumb:SetSize(17, 16)
+  local tw = w - 32 - 12 -- course du centre de la poignée (unités du rail), de 6 à 6 + tw
+  local function place(f)
+    s.thumb:ClearAllPoints()
+    s.thumb:SetPoint("CENTER", track, "LEFT", 6 + tw * max(0, min(1, f)), 0)
+  end
   local function arrow(piece, d, side)
     local a = CreateFrame("Button", nil, s)
     a:SetSize(piece == "arrow_l" and 9 or 7.5, piece == "arrow_l" and 16 or 15)
@@ -1459,28 +1470,59 @@ function W.slider(parent, w, get, step, setFrac)
   s.minus = arrow("arrow_l", -1, "LEFT")
   s.plus = arrow("arrow_r", 1, "RIGHT")
   s.Sync = function(self)
-    local f = max(0, min(1, get() or 0))
-    local tw = w - 32 - 12
-    self.thumb:ClearAllPoints()
-    self.thumb:SetPoint("CENTER", track, "LEFT", 6 + tw * f, 0)
+    if preview and self.dragging then return end -- glisser différé : la poignée suit l'aperçu
+    place(get() or 0)
   end
-  -- clic ou glisser sur le rail : fraction sous le curseur
-  local function fromCursor()
-    if not GetCursorPosition then return end
+  -- Fraction sous la souris. GetCursorPosition : pixels d'écran ; divisés par l'échelle effective du
+  -- rail (échelle de l'interface × échelle de la fenêtre), ils passent dans les unités du rail, celles
+  -- de GetLeft et de la course tw : juste quelle que soit l'échelle de la fenêtre.
+  local function cursorFrac()
+    if not GetCursorPosition then return nil end
     local x = GetCursorPosition()
-    local sc = track:GetEffectiveScale() or 1
+    local sc = track:GetEffectiveScale()
     local left = track:GetLeft()
-    if not left then return end
-    local tw = w - 32 - 12
-    setFrac(max(0, min(1, (x / sc - left - 6) / max(1, tw))))
+    if not x or not left or not sc or sc <= 0 then return nil end
+    return max(0, min(1, (x / sc - left - 6) / max(1, tw)))
+  end
+  local pending -- glisser différé : fraction à appliquer au relâchement
+  local function follow()
+    local f = cursorFrac()
+    if not f then return end
+    if preview then
+      pending = f
+      place(preview(f) or f)
+    else
+      setFrac(f)
+      place(get() or 0)
+    end
+  end
+  local function finish()
+    track:SetScript("OnUpdate", nil)
+    if not s.dragging then return end
+    s.dragging = false
+    local f = pending
+    pending = nil
+    if f then setFrac(f) end
     s:Sync()
   end
-  track:SetScript("OnMouseDown", function(self)
-    fromCursor()
-    self:SetScript("OnUpdate", fromCursor)
+  local function onUpdate()
+    -- bouton relâché hors du rail (OnMouseUp non reçu) : fin du glisser, valeur appliquée
+    if IsMouseButtonDown and not IsMouseButtonDown("LeftButton") then finish() return end
+    follow()
+  end
+  track:SetScript("OnMouseDown", function(self, button)
+    if button and button ~= "LeftButton" then return end
+    s.dragging = true
+    pending = nil
+    follow()
+    self:SetScript("OnUpdate", onUpdate)
   end)
-  track:SetScript("OnMouseUp", function(self) self:SetScript("OnUpdate", nil) end)
-  track:SetScript("OnHide", function(self) self:SetScript("OnUpdate", nil) end)
+  track:SetScript("OnMouseUp", function(self, button)
+    if button and button ~= "LeftButton" then return end
+    if s.dragging then follow() end -- position du relâchement (la fenêtre n'a pas encore bougé)
+    finish()
+  end)
+  track:SetScript("OnHide", finish)
   s:Sync()
   return s
 end

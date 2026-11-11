@@ -55,6 +55,34 @@ function UI.applyScale()
   UI.frame:SetScale(s)
 end
 
+-- Nouvelle échelle choisie par le joueur : la fenêtre garde son centre à l'écran et reste entière dans
+-- l'écran (centrée sur un axe où elle ne tient pas). Les décalages d'ancre (SetPoint, GetPoint, donc
+-- opts().point) sont en unités de la fenêtre, multipliés par son échelle à l'écran : sans conversion, la
+-- fenêtre glissait d'autant. Elle est réancrée par son centre sur le coin bas gauche de UIParent, et la
+-- position enregistrée l'est dans les unités de la nouvelle échelle (cohérente avec opts().scale).
+function UI.setScale(s)
+  local f = UI.frame
+  local old = f:GetScale() or 1
+  local cx, cy = f:GetCenter() -- unités de la fenêtre, à l'ancienne échelle
+  opts().scale = s
+  UI.applyScale()
+  local new = f:GetScale() or 1
+  if not cx or not cy or old <= 0 or new <= 0 then return end
+  local ux, uy = cx * old, cy * old -- unités de UIParent (parent de la fenêtre)
+  local pw, ph = UIParent:GetWidth() or 0, UIParent:GetHeight() or 0
+  local fw, fh = (f:GetWidth() or 0) * new, (f:GetHeight() or 0) * new
+  local function fit(c, size, room)
+    if room <= 0 then return c end
+    if size >= room then return room / 2 end
+    return math.max(size / 2, math.min(room - size / 2, c))
+  end
+  ux, uy = fit(ux, fw, pw), fit(uy, fh, ph)
+  local pt = { "CENTER", "BOTTOMLEFT", ux / new, uy / new }
+  opts().point = pt
+  f:ClearAllPoints()
+  f:SetPoint(pt[1], UIParent, pt[2], pt[3], pt[4])
+end
+
 -- Décor et plateau (Scene.set) ; appelé par chaque écran.
 function UI.setStage(stage)
   if Scene.decor then Scene.set(stage) end
@@ -663,28 +691,40 @@ function UI.buildOptions()
   check("Illustrated scenery (else painted)", "decor", -142, function() UI.refresh() end)
   UI.optionChecks = checks
 
-  -- curseur : libellé doré, rail (flèches aux bouts = un cran), valeur à droite
-  local function slider(label, y, lo, hi, stepV, get, set, fmt)
+  -- curseur : libellé doré, rail (flèches aux bouts = un cran), valeur à droite. deferred : le glisser
+  -- ne montre qu'un aperçu (poignée et valeur), set n'est appelé qu'au relâchement (W.slider, preview).
+  local function slider(label, y, lo, hi, stepV, get, set, fmt, deferred)
     local l = W.label(p, "bold", 13, C.wowGold)
     l:SetPoint("TOPLEFT", 26, y)
     l:SetText(label)
     local v = W.label(p, "heavy", 13.5, C.text)
     v:SetPoint("TOPLEFT", 288, y - 21)
+    -- valeur au cran le plus proche, bornée (arrondie : pas de 1.1500000000000001)
+    local function snap(x)
+      local val = tonumber(("%.6f"):format(lo + math.floor((x - lo) / stepV + 0.5) * stepV))
+      return math.max(lo, math.min(hi, val))
+    end
     local function frac() return ((get() or lo) - lo) / (hi - lo) end
+    local preview = deferred and function(f)
+      local val = snap(lo + f * (hi - lo))
+      v:SetText(fmt(val))
+      return (val - lo) / (hi - lo)
+    end or nil
     local s = W.slider(p, 252, frac, function(d)
-      set(math.max(lo, math.min(hi, (get() or lo) + d * stepV)))
+      set(snap((get() or lo) + d * stepV))
       v:SetText(fmt(get()))
     end, function(f)
-      local val = lo + math.floor(f * (hi - lo) / stepV + 0.5) * stepV
-      if val ~= get() then set(val) v:SetText(fmt(get())) end
-    end)
+      local val = snap(lo + f * (hi - lo))
+      if val ~= get() then set(val) end
+      v:SetText(fmt(get()))
+    end, preview)
     s:SetPoint("TOPLEFT", 24, y - 20)
     v.Sync = function() v:SetText(fmt(get())) s:Sync() end
     return v, s.minus, s.plus, s
   end
   local pct = function(x) return math.floor(x * 100 + 0.5) .. "%" end
   UI.scaleValue, UI.scaleMinus, UI.scalePlus, UI.scaleSlider = slider("Window scale", -174, 0.6, 1.5, 0.05,
-    function() return opts().scale end, function(s) opts().scale = s UI.applyScale() end, pct)
+    function() return opts().scale end, function(s) UI.setScale(s) end, pct, true)
   UI.speedValue, UI.speedMinus, UI.speedPlus, UI.speedSlider = slider("Animation speed", -222, 0.5, 3, 0.25,
     function() return opts().speed end, function(s) opts().speed = s end, function(x) return "×" .. x end)
 

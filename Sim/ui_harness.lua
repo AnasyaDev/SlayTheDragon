@@ -629,6 +629,9 @@ function H.boot(db)
   _G.InCombatLockdown = function() return H.inCombat end
   _G.UnitName = function() return "Testeur" end
   _G.GetCursorPosition = function() return H.cursor[1], H.cursor[2] end
+  -- boutons de souris enfoncés (H.mouseDown.LeftButton) : glisser des curseurs (U32)
+  H.mouseDown = {}
+  _G.IsMouseButtonDown = function(b) return H.mouseDown[b or "LeftButton"] and true or false end
   _G.IsShiftKeyDown = function() return false end
   _G.date = function(fmt) return os.date(fmt, 1762000000 + math.floor(H.now)) end
   _G.SlayTheDragonDB = db and deepcopy(db) or nil
@@ -4616,6 +4619,175 @@ do
     check(ns0 .. " cases d'icônes (bandeau, combat, marchand) : icône = ouverture du cadre à ±1, fond dans le cadre",
       ns0 >= 15 and #sBad == 0, table.concat(sBad, ", "))
   end
+end
+
+print("U32 curseur d'échelle : aperçu pendant le glisser, échelle au relâchement, valeur juste à toute échelle, fenêtre en place")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  -- géométrie résolue (R.rect, unités d'écran = pixels, UIParent 1600 × 1000 à l'échelle 1) : GetLeft et
+  -- GetCenter rendent, comme dans le jeu, des unités du cadre (écran / échelle effective)
+  local oldLeft, oldCenter = Frame.GetLeft, Frame.GetCenter
+  local uiW, uiH = UIParent._w, UIParent._h
+  UIParent._w, UIParent._h = 1600, 1000
+  Frame.GetLeft = function(self)
+    local r = R.rect(self)
+    return r and r[1] / self:GetEffectiveScale() or nil
+  end
+  Frame.GetCenter = function(self)
+    local r = R.rect(self)
+    if not r then return nil end
+    local e = self:GetEffectiveScale()
+    return (r[1] + r[3]) / 2 / e, (r[2] + r[4]) / 2 / e
+  end
+
+  local Um = UI()
+  if not Um.frame:IsShown() then H.slash("") end
+  if not Um.optionsFrame:IsShown() then H.slash("options") end
+  local f, o = Um.frame, H.ns.Persist.options() -- addon relancé par les sections précédentes : H.ns
+  local sl, sp = Um.scaleSlider, Um.speedSlider
+  local function near(a, b, eps) return a and b and math.abs(a - b) < (eps or 1e-6) end
+  -- pixel d'écran (x, y) du centre de la poignée de `s` à la fraction fr
+  local function at(s, fr)
+    local r = R.rect(s.track)
+    local e = s.track:GetEffectiveScale()
+    return r[1] + (6 + (s.track._w - 12) * fr) * e, (r[2] + r[4]) / 2
+  end
+  local function thumbX(s)
+    local _, _, _, x = s.thumb:GetPoint(1)
+    return (x - 6) / (s.track._w - 12)
+  end
+  local function down(s, fr)
+    H.cursor = { at(s, fr) }
+    H.mouseDown.LeftButton = true
+    run(s.track, "OnMouseDown", "LeftButton")
+  end
+  local function move(s, fr) H.cursor = { at(s, fr) } run(s.track, "OnUpdate", 0.016) end
+  local function up(s)
+    H.mouseDown.LeftButton = false
+    run(s.track, "OnMouseUp", "LeftButton")
+  end
+  local function fracOf(v) return (v - 0.6) / 0.9 end
+  local function onScreen()
+    local r = R.rect(f)
+    return r[1] >= -0.01 and r[2] >= -0.01 and r[3] <= 1600.01 and r[4] <= 1000.01, r
+  end
+  local function centerU() -- centre de la fenêtre en unités de UIParent
+    local r = R.rect(f)
+    return (r[1] + r[3]) / 2, (r[2] + r[4]) / 2
+  end
+
+  -- 1. glisser : l'échelle de la fenêtre ne bouge pas avant le relâchement
+  Um.setScale(1.15)
+  local n0, pts0 = f._nSetScale or 0, f._points[1]
+  down(sl, fracOf(1.15))
+  for i = 1, 10 do move(sl, fracOf(1.15 + 0.025 * i)) end
+  check("glisser : échelle de la fenêtre et ancre inchangées pendant le glisser",
+    (f._nSetScale or 0) == n0 and f._scale == 1.15 and f._points[1] == pts0 and o.scale == 1.15, f._scale)
+  check("glisser : aperçu = libellé 140 % et poignée au cran de 140 %",
+    Um.scaleValue._text == "140%" and near(thumbX(sl), fracOf(1.4)), tostring(Um.scaleValue._text) .. " " .. thumbX(sl))
+  up(sl)
+  check("relâchement : échelle 1,4 appliquée une fois et enregistrée",
+    f._scale == 1.4 and o.scale == 1.4 and (f._nSetScale or 0) == n0 + 1 and Um.scaleValue._text == "140%", f._scale)
+  check("relâchement : glisser terminé (plus d'OnUpdate)", sl.track._scripts.OnUpdate == nil and not sl.dragging)
+  local ok, r = onScreen()
+  check("fenêtre entière dans l'écran après application", ok, r and table.concat(r, " "))
+
+  -- 2. valeur juste depuis la souris à toute échelle (aller-retour : clic sur le rail)
+  for _, sc in ipairs({ 1, 1.15, 1.5 }) do
+    Um.setScale(sc)
+    local bad = {}
+    for _, v in ipairs({ 0.6, 0.75, 1, 1.15, 1.3, 1.5 }) do
+      Um.setScale(sc)
+      down(sl, fracOf(v))
+      up(sl)
+      if not near(o.scale, v) then bad[#bad + 1] = v .. " -> " .. tostring(o.scale) end
+    end
+    check(("échelle %.2f : clic sur le rail = valeur sous la souris (0,6 à 1,5)"):format(sc), #bad == 0, table.concat(bad, ", "))
+    Um.setScale(sc)
+    local before = o.speed
+    down(sp, (2 - 0.5) / 2.5)
+    local live = o.speed
+    move(sp, (2.75 - 0.5) / 2.5)
+    local live2 = o.speed
+    up(sp)
+    check(("échelle %.2f : vitesse d'animation juste et appliquée en direct (×2 puis ×2.75)"):format(sc),
+      near(live, 2) and near(live2, 2.75) and near(o.speed, 2.75) and Um.speedValue._text == "×2.75",
+      tostring(live) .. " " .. tostring(live2))
+    o.speed = before
+    Um.speedValue.Sync()
+  end
+
+  -- 3. un clic sur une flèche = un pas de 5 %, appliqué tout de suite, une seule fois
+  Um.setScale(1)
+  local n1 = f._nSetScale or 0
+  H.click(Um.scalePlus)
+  check("flèche + : un pas de 5 % (1 -> 1,05), une seule application",
+    near(o.scale, 1.05) and near(f._scale, 1.05) and (f._nSetScale or 0) == n1 + 1 and Um.scaleValue._text == "105%", o.scale)
+  H.click(Um.scaleMinus)
+  check("flèche - : retour à 1", near(o.scale, 1) and (f._nSetScale or 0) == n1 + 2)
+
+  -- 4. relâchement hors du rail (OnMouseUp non reçu) : valeur appliquée, glisser terminé
+  Um.setScale(1)
+  down(sl, fracOf(1))
+  move(sl, fracOf(1.2))
+  H.cursor = { 1590, 20 } -- loin du rail
+  run(sl.track, "OnUpdate", 0.016)
+  check("souris hors du rail, bouton tenu : aperçu au bout (150 %), échelle inchangée",
+    f._scale == 1 and Um.scaleValue._text == "150%", tostring(f._scale) .. " " .. tostring(Um.scaleValue._text))
+  H.mouseDown.LeftButton = false
+  run(sl.track, "OnUpdate", 0.016)
+  check("relâché hors du rail : échelle 1,5 appliquée, OnUpdate retiré, curseur libéré",
+    o.scale == 1.5 and f._scale == 1.5 and sl.track._scripts.OnUpdate == nil and not sl.dragging, f._scale)
+  local n2 = f._nSetScale or 0
+  run(sl.track, "OnMouseUp", "LeftButton") -- OnMouseUp tardif : sans effet
+  check("OnMouseUp tardif après la fin : rien de plus", (f._nSetScale or 0) == n2 and o.scale == 1.5)
+  -- rail caché pendant un glisser : terminé et appliqué
+  Um.setScale(1)
+  down(sl, fracOf(1))
+  move(sl, fracOf(0.8))
+  Um.optionsFrame:Hide()
+  check("options fermées pendant le glisser : valeur appliquée, glisser terminé",
+    near(o.scale, 0.8) and sl.track._scripts.OnUpdate == nil and not sl.dragging, o.scale)
+  H.mouseDown.LeftButton = false
+  Um.optionsFrame:Show()
+
+  -- 5. position : le centre reste en place, la position enregistrée suit l'échelle, fenêtre dans l'écran
+  Um.setScale(1)
+  f:ClearAllPoints()
+  f:SetPoint("CENTER", UIParent, "BOTTOMLEFT", 700, 450)
+  Um.setScale(1.15)
+  local cx, cy = centerU()
+  check("échelle 1 -> 1,15 : centre gardé (700, 450)", near(cx, 700, 0.01) and near(cy, 450, 0.01), cx .. ", " .. cy)
+  local pt = o.point
+  check("position enregistrée en unités de la nouvelle échelle (décalage × échelle = centre)",
+    pt and pt[1] == "CENTER" and pt[2] == "BOTTOMLEFT" and near(pt[3] * 1.15, 700, 0.01) and near(pt[4] * 1.15, 450, 0.01))
+  local r1 = R.rect(f)
+  Um.applyScale() Um.applyPosition() -- rechargement : échelle puis position enregistrées
+  local r2 = R.rect(f)
+  check("rechargement : même rectangle à l'écran", near(r1[1], r2[1], 0.01) and near(r1[4], r2[4], 0.01))
+  -- ancre d'un déplacement (unités de l'ancienne échelle) près du bord droit, puis agrandissement
+  Um.setScale(1)
+  f:ClearAllPoints()
+  f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", 1600 - 1040, 1000)
+  local bad = {}
+  for _, v in ipairs({ 1.15, 1.5, 0.6, 1.3 }) do
+    Um.setScale(v)
+    local okv, rv = onScreen()
+    if not okv then bad[#bad + 1] = v .. " : " .. table.concat(rv, " ") end
+  end
+  check("fenêtre collée au coin haut droit, échelle 1,15 / 1,5 / 0,6 / 1,3 : toujours entière dans l'écran",
+    #bad == 0, table.concat(bad, " ; "))
+
+  -- remise en l'état
+  o.point = nil
+  Um.applyPosition()
+  Um.setScale(1.15)
+  o.point = nil
+  Um.applyPosition()
+  Frame.GetLeft, Frame.GetCenter = oldLeft, oldCenter
+  UIParent._w, UIParent._h = uiW, uiH
+  H.mouseDown.LeftButton = false
 end
 
 print("U16 méthodes d'API inconnues appelées")
