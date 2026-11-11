@@ -417,7 +417,44 @@ Art.keywords = {
   absorb = { name = "Absorption", text = "absorbe les dégâts jusqu'au prochain tour." },
   demence = { name = "Démence", text = "ressource gagnée par les cartes d'ombre." },
   interrupt = { name = "Interruption", text = "annule le sort qu'un ennemi incante." },
+  -- conditions nommées du texte des cartes (« Nom : effet »)
+  execute = { name = "Exécution", text = "si la cible a la moitié de ses PV ou moins." },
+  surge = { name = "Déferlement", text = "dépense toute la Démence pour l'effet." },
+  lastBreath = { name = "Dernier souffle", text = "une fois par combat, en tombant à 0 PV." },
+  shadow = { name = "Ombre", text = "s'applique aux cartes d'ombre." },
+  -- sablier du texte des cartes (« Donne Expiation 1 ⌛ »)
+  turns = { name = "⌛", text = "le nombre compte des tours." },
 }
+
+-- Définition courte d'un état pour l'infobulle d'une carte (« Nom : effet. », 60 caractères au plus ;
+-- le texte complet de Core/Statuses.lua reste celui des jetons d'état).
+Art.statusShort = {
+  atonement = "chaque carte qui inflige des dégâts rend 2 PV.",
+  pain = "N dégâts par tour, puis N baisse de 1.",
+  regen = "soigne N par tour, puis N baisse de 1.",
+  armor_broken = "subit 25 % de dégâts en plus.",
+  demoralized = "inflige 25 % de dégâts en moins.",
+  stunned = "perd son prochain tour.",
+  halved = "dégâts subis divisés par deux.",
+  force = "N dégâts de plus par coup.",
+}
+
+-- Ligne d'un état cité par une carte : nom en or, définition courte.
+function Art.statusLine(id)
+  local s = ns.Statuses[id]
+  local name = s and s.name or id
+  local text = Art.statusShort[id] or (s and s.text and s.text:gsub("^%u", string.lower)) or ""
+  return "|cffffd100" .. name .. "|r : " .. text
+end
+
+-- Ligne d'une condition sur un état (« Expiation : … ») : sur soi pour un bienfait, sur la cible
+-- pour un affaiblissement.
+function Art.conditionLine(id)
+  local s = ns.Statuses[id]
+  local name = s and s.name or id
+  if s and s.debuff then return "|cffffd100" .. name .. " :|r effet en plus si la cible a " .. name .. "." end
+  return "|cffffd100" .. name .. " :|r effet en plus sous " .. name .. "."
+end
 
 -- Ligne d'un mot-clé : nom en or, effet ; n = nombre de tours d'une Recharge.
 function Art.keywordLine(key, label, n)

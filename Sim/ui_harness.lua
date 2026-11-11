@@ -336,11 +336,31 @@ local function fontAdv(self)
   local p = tostring(rawget(self, "_fontPath") or "")
   return METRICS[p:find("heavy") and "heavy" or (p:find("medium") and "medium" or "bold")]
 end
--- Largeur d'un texte d'une ligne (sans codes) à la taille size, police de self.
+-- Icônes en ligne |Tchemin:hauteur:largeur:…|t (comme le client) : largeur = 3e champ, sinon la
+-- hauteur ; hauteur 0 = taille du texte. Renvoie le texte sans les séquences et la largeur des icônes.
+function H.inlineIcons(text, size)
+  local icons = 0
+  local list = {}
+  text = tostring(text or ""):gsub("|T(.-)|t", function(spec)
+    local f = {}
+    for v in (spec .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
+    local hgt = tonumber(f[2] or "") or 0
+    local wid = tonumber(f[3] or "") or hgt
+    if hgt == 0 then hgt = size end
+    if wid == 0 then wid = hgt end
+    icons = icons + wid
+    list[#list + 1] = { path = f[1], w = wid, h = hgt, spec = f }
+    return ""
+  end)
+  return text, icons, list
+end
+-- Largeur d'un texte d'une ligne (sans codes) à la taille size, police de self ; icônes comprises.
 function H.textWidth(self, text, size)
   local adv, w = fontAdv(self), 0
-  for ch in plainText(text):gmatch("[%z\1-\127\194-\244][\128-\191]*") do w = w + (adv[ch] or 550) end
-  return w / 1000 * (size or rawget(self, "_fontSize") or 12)
+  size = size or rawget(self, "_fontSize") or 12
+  local plain, icons = H.inlineIcons(text, size)
+  for ch in plainText(plain):gmatch("[%z\1-\127\194-\244][\128-\191]*") do w = w + (adv[ch] or 550) end
+  return w / 1000 * size + icons
 end
 -- Taille de police rendue (unités du texte) : sans SetSmoothScaling(true), le client arrondit la
 -- hauteur de police effective au pixel entier (ici : taille × échelle effective arrondie), ce qui
@@ -2704,6 +2724,22 @@ do
     end
     Render.svg(H, sheet, SNAP .. "/cartes.svg", "cartes")
     sheet:Hide()
+    -- planche de toutes les cartes (base puis améliorée, côte à côte), langage en mots-clés
+    local perRow, cw, ch = 10, 140, 230
+    local all = {}
+    for _, id in ipairs(ids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+    local rows = math.ceil(#all / perRow)
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, rows * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, e in ipairs(all) do
+      local c = W.card(big)
+      c:SetCard(e[1], e[2], { playable = true })
+      W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+    end
+    Render.svg(H, big, SNAP .. "/cartes_mots_cles.svg", "toutes les cartes (base, améliorée)")
+    big:Hide()
   end
 end
 
@@ -3326,6 +3362,326 @@ do
   check("noms abrégés : plus de « Mot de pouvoir » ni « Mot de l'ombre » (MdP, MdlO)", #long == 0
     and H.ns.Cards.pw_shield.name == "MdP : Bouclier" and H.ns.Cards.sw_pain.name == "MdlO : Douleur"
     and H.ns.Card.defById("sw_death", true).name:find("^MdlO : Mort") ~= nil, table.concat(long, ", "))
+end
+
+print("U27 langage des cartes : mots-clés, états posés (Donne / Applique), sablier, explications, Pouvoirs")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W, Art, Card = ns.Widgets, ns.Art, ns.Card
+  local HG = W.HOURGLASS_CHAR
+  local ids = {}
+  for id in pairs(ns.Cards) do ids[#ids + 1] = id end
+  table.sort(ids)
+  local function plain(t)
+    return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", HG))
+  end
+  local function clauses(t)
+    local out = {}
+    for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
+    return out
+  end
+  local PLATE = { "^Recharge %d+%.$", "^Consumée%.$", "^Conservée%.$", "^Incantation%.$", "^Pouvoir%.$" }
+  local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
+  -- 1. forme des textes, cohérence texte <-> effets
+  local bad, nState = {}, 0
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
+      local cls = clauses(d.text or "")
+      -- états posés par les effets (un état qui porte le nom de la carte est décrit, pas nommé)
+      local want = {}
+      for _, e in ipairs(d.effects or {}) do
+        if e[1] == "apply" and ns.Statuses[e[2]] and ns.Statuses[e[2]].name ~= ns.Cards[id].name then
+          local s = ns.Statuses[e[2]]
+          want[#want + 1] = { id = e[2], n = e[3], self = e.self, all = e.all, name = s.name }
+        end
+      end
+      -- clauses d'état : en dernier (avant les seuls mots de la plaque), une par état, dans l'ordre
+      local states, seenState, afterState = {}, false, false
+      for _, cl in ipairs(cls) do
+        local isState = cl:find("^Donne ") or cl:find("^Applique ")
+        if isState then states[#states + 1] = cl seenState = true
+        elseif seenState and not isPlate(cl) then afterState = true end
+        if cl:find("^Incantation%.$") or cl:find("^Pouvoir%.$") then
+          if cl ~= cls[1] then bad[#bad + 1] = label .. " : « " .. cl .. " » pas en tête" end
+        end
+      end
+      if afterState then bad[#bad + 1] = label .. " : une clause suit les états posés" end
+      if #states ~= #want then
+        bad[#bad + 1] = ("%s : %d état(s) posé(s) par les effets, %d ligne(s) Donne / Applique"):format(label, #want, #states)
+      else
+        -- ordre : ennemis (« Applique ») d'abord, puis soi (« Donne »)
+        table.sort(want, function(a, b) return (a.self and 1 or 0) < (b.self and 1 or 0) end)
+        for k, w in ipairs(want) do
+          local cl = states[k]
+          local verb = w.self and "Donne" or "Applique"
+          local expect = verb .. " " .. w.name .. " " .. tostring(w.n)
+            .. (W.isTurnStatus(w.id) and (" " .. HG) or "") .. (w.all and " à tous" or "")
+          nState = nState + 1
+          if cl ~= expect then bad[#bad + 1] = ("%s : « %s » au lieu de « %s »"):format(label, cl, expect) end
+        end
+      end
+      -- sablier : seulement dans une ligne d'état, seulement pour une durée ; jamais « N tour(s) »
+      for _, cl in ipairs(cls) do
+        local isState = cl:find("^Donne ") or cl:find("^Applique ")
+        if cl:find(HG, 1, true) and not isState then bad[#bad + 1] = label .. " : sablier hors d'une ligne d'état" end
+        if isState then
+          if cl:find("%.$") then bad[#bad + 1] = label .. " : ligne d'état terminée par un point" end
+          local name = cl:match("^%S+ (.-) %d")
+          for sid, s in pairs(ns.Statuses) do
+            if s.name == name and (cl:find(HG, 1, true) ~= nil) ~= W.isTurnStatus(sid) then
+              bad[#bad + 1] = label .. " : sablier " .. (W.isTurnStatus(sid) and "manquant" or "en trop") .. " (" .. name .. ")"
+            end
+          end
+        end
+        if cl:find("%d+ tours?") then bad[#bad + 1] = label .. " : « N tour(s) » au lieu du sablier" end
+        -- « Inflige » réservé aux dégâts
+        for _, s in pairs(ns.Statuses) do
+          if cl:find("[Ii]nflige " .. s.name, 1, false) then bad[#bad + 1] = label .. " : « Inflige » pour un état" end
+        end
+        -- impersonnel
+        local low = " " .. cl:lower():gsub("[%p]", " ") .. " "
+        for _, w in ipairs({ "tu", "te", "ton", "ta", "tes", "toi", "vous", "votre", "vos" }) do
+          if low:find(" " .. w .. " ", 1, true) then bad[#bad + 1] = label .. " : « " .. w .. " »" end
+        end
+        -- « Nom : » = état ou condition nommée (ou libellé sans majuscule de mot-clé)
+        local lab = cl:match("^(.-) : ")
+        if lab and lab:find("^%u") then
+          local known = false
+          for _, k in ipairs(W.keywordList()) do if k.name == lab then known = true end end
+          -- libellés qui ne sont pas des conditions (cible d'un Pouvoir) : liste fermée
+          local NOT_COND = { ["Incantations"] = true, ["Chaque gain d'Absorption"] = true }
+          if not known and not NOT_COND[lab] then bad[#bad + 1] = label .. " : condition inconnue « " .. lab .. " »" end
+        end
+      end
+    end
+  end
+  check(("textes : %d états posés, chacun sur sa ligne « Donne » (soi) / « Applique » (ennemi) en dernier, sablier seulement pour une durée, impersonnels")
+    :format(nState), #bad == 0, table.concat(bad, "\n        "))
+  -- conditions vérifiables depuis les données : Exécution (bonus d'exécution), Déferlement (dépense
+  -- de la Démence : la carte ne se joue qu'avec de la Démence), Dernier souffle (empêche la mort),
+  -- Ombre (Pouvoir d'ombre)
+  local cbad = {}
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      local d = Card.defById(id, up)
+      local t = d.text or ""
+      local function has(n) return W.hasPhrase(t, n .. " :") end
+      if has("Exécution") ~= (d.executeBonus ~= nil) then cbad[#cbad + 1] = id .. " : Exécution" end
+      if has("Déferlement") ~= (d.canPlay ~= nil) then cbad[#cbad + 1] = id .. " : Déferlement" end
+      if has("Dernier souffle") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = id .. " : Dernier souffle" end
+      if has("Ombre") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = id .. " : Ombre" end
+      -- chiffres d'Exécution et de Déferlement
+      if d.executeBonus then
+        local base = d.effects[1][2]
+        if not t:find("Inflige " .. base .. "%.") or not t:find("Exécution : inflige " .. (base + d.executeBonus) .. "%.") then
+          cbad[#cbad + 1] = id .. (up and "+" or "") .. " : chiffres d'Exécution"
+        end
+      end
+      if d.perDemence and not t:find("par Démence", 1, true) then cbad[#cbad + 1] = id .. " : Déferlement chiffré" end
+      if d.perDemence and not t:find("+ " .. d.perDemence .. " par Démence", 1, true) then cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Déferlement chiffré" end
+      if d.plagueMult and not t:find("applique Douleur " .. d.plagueMult .. " par Démence", 1, true) then
+        cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Peste chiffrée"
+      end
+    end
+  end
+  check("conditions nommées présentes exactement sur les cartes qui les ont (Exécution, Déferlement, Dernier souffle, Ombre), chiffres justes",
+    #cbad == 0, table.concat(cbad, ", "))
+  -- 2. mise en page : la ligne d'état commence une ligne et finit le texte ; une clause par ligne aux
+  -- paliers >= 8,5 ; sablier en icône |T dans le texte posé, compté dans la mesure
+  local card = W.card(UI().content)
+  local lbad, nIcons = {}, 0
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
+      local fit = card.bodyFit
+      local lines = clauses(card.body._text or "")
+      local pl = {}
+      for k, l in ipairs(lines) do pl[k] = plain(l) end
+      local cls = {}
+      for _, cl in ipairs(clauses(d.text or "")) do if not isPlate(cl) then cls[#cls + 1] = cl end end
+      -- première ligne d'état : en début de ligne ; plus rien après la dernière
+      local firstState
+      for _, cl in ipairs(cls) do if cl:find("^Donne ") or cl:find("^Applique ") then firstState = cl break end end
+      if firstState then
+        local verb = firstState:match("^%S+")
+        local startLine
+        for k, l in ipairs(pl) do if l:find("^" .. verb .. " ") or l == verb then startLine = k break end end
+        if not startLine then lbad[#lbad + 1] = label .. " : la ligne d'état ne commence pas une ligne" end
+        local lastCl = cls[#cls]:gsub(" " .. HG, HG)
+        local tail = pl[#pl]
+        if lastCl:sub(-#tail) ~= tail then lbad[#lbad + 1] = label .. " : texte après la ligne d'état (« " .. tail .. " »)" end
+      end
+      -- une clause par ligne : chaque clause commence une ligne
+      if fit.mode == "clauses" then
+        for _, cl in ipairs(cls) do
+          local head = plain(cl):match("^%S+")
+          local found = false
+          for _, l in ipairs(pl) do if l:sub(1, #head) == head then found = true end end
+          if not found then lbad[#lbad + 1] = label .. " : clause « " .. cl .. " » au milieu d'une ligne" end
+        end
+      end
+      -- ordre des essais : une clause par ligne à tous les paliers >= 8,5 avant tout texte coulé
+      local tries, flowed = W.cardTries(W.cardBody(d)), false
+      for _, t in ipairs(tries) do
+        if t.mode ~= "clauses" then flowed = true
+        elseif flowed and t.size >= W.CLAUSE_MIN then lbad[#lbad + 1] = label .. " : essai coulé avant une clause par ligne à " .. t.size end
+      end
+      -- sablier : présent en icône dans le texte posé, autant que de « ⌛ » dans la source
+      local nSrc = select(2, (d.text or ""):gsub(HG, ""))
+      local nTex = select(2, (card.body._text or ""):gsub("|T[^|]*hourglass%.tga[^|]*|t", ""))
+      nIcons = nIcons + nTex
+      if nSrc ~= nTex or (card.body._text or ""):find(HG, 1, true) then
+        lbad[#lbad + 1] = ("%s : %d sablier(s) dans le texte, %d icône(s) posée(s)"):format(label, nSrc, nTex)
+      end
+    end
+  end
+  check(("mise en page : états posés en début de ligne et en dernier, une clause par ligne en mode « clauses », %d sabliers en icône |T"):format(nIcons),
+    #lbad == 0, table.concat(lbad, "\n        "))
+  -- l'icône est comptée dans la mesure (faux client comme le client : largeur de la séquence |T)
+  local m = W.label(UI().content, "bold", 9)
+  m:SetText("Expiation 1")
+  local w0 = m:GetStringWidth()
+  local hgt, wid = W.hourglassSize(9)
+  m:SetText("Expiation 1" .. W.hourglass(9))
+  local w1 = m:GetStringWidth()
+  check(("sablier compté dans la mesure du texte (+%.1f unités à la taille 9, hauteur %d)"):format(w1 - w0, hgt),
+    math.abs(w1 - w0 - wid) < 1e-6 and hgt >= 5 and wid >= 4, w1 - w0)
+  -- séquence |T : forme de CreateTextureMarkup (chemin:hauteur:largeur:x:y:largeur et hauteur du
+  -- fichier:gauche:droite:haut:bas) + couleur r:g:b, entiers, fichier de Media/ présent (TGA 32 bits,
+  -- puissance de deux, blanc)
+  local mk = W.hourglass(8.5)
+  local f = {}
+  for v in (mk:match("^|T(.-)|t$") .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
+  local allInt = #f == 14
+  for k = 2, 14 do if not (f[k] or ""):match("^%d+$") then allInt = false end end
+  local tga = io.open(root .. "/Media/hourglass.tga", "rb")
+  local hdr = tga and tga:read(18)
+  local body = tga and tga:read("*a")
+  if tga then tga:close() end
+  local white = body and #body == 32 * 32 * 4
+  if white then
+    for i = 1, #body, 4 do
+      if body:byte(i) ~= 255 or body:byte(i + 1) ~= 255 or body:byte(i + 2) ~= 255 then white = false break end
+    end
+  end
+  check("séquence |T du sablier : 14 champs entiers, Media/hourglass.tga 32 × 32 TGA 32 bits, blanc (teinté par la séquence)",
+    allInt and f[1] == W.HOURGLASS and hdr and hdr:byte(3) == 2 and hdr:byte(17) == 32
+      and hdr:byte(13) + 256 * hdr:byte(14) == 32 and hdr:byte(15) + 256 * hdr:byte(16) == 32 and white, mk)
+  -- mots-clés en couleur d'accent (une seule), chiffres blancs / verts : rien d'autre en couleur
+  local colors, cbad2 = {}, {}
+  local accent = "|cff" .. W.hexOf(W.KEYWORD_COLOR)
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      local txt = W.cardBody(Card.defById(id, up), up and ns.Cards[id] or nil)
+      for code, word in txt:gmatch("(|c%x%x%x%x%x%x%x%x)(.-)|r") do
+        colors[code] = true
+        if code == accent then
+          local ok = false
+          for _, k in ipairs(W.keywordList()) do if word == k.name then ok = true end end
+          if not ok then cbad2[#cbad2 + 1] = id .. " : « " .. word .. " » en couleur d'accent" end
+        elseif not word:match("^%d+$") then
+          cbad2[#cbad2 + 1] = id .. " : « " .. word .. " » coloré"
+        end
+      end
+    end
+  end
+  local nColors = 0
+  for _ in pairs(colors) do nColors = nColors + 1 end
+  check(("couleurs du texte : noms d'états et conditions en %s, chiffres blancs ou verts (%d couleurs)"):format(accent, nColors),
+    #cbad2 == 0 and nColors <= 3 and colors[accent], table.concat(cbad2, ", "))
+  -- 3. explications au survol : chaque mot-clé employé a sa ligne, 60 caractères au plus, une phrase
+  local ebad, nLines = {}, 0
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
+      local tt = { lines = {} }
+      function tt:AddLine(t) self.lines[#self.lines + 1] = t end
+      function tt:NumLines() return #self.lines end
+      W.fillCardTooltip(tt, id, up)
+      local all = plain(table.concat(tt.lines, "\n"))
+      local t = d.text or ""
+      local function need(what, line)
+        if not all:find(line, 1, true) then ebad[#ebad + 1] = label .. " : pas d'explication pour " .. what end
+      end
+      for _, c in ipairs(W.CONDITIONS) do
+        if W.hasPhrase(t, c.name .. " :") then need(c.name, c.name .. " : ") end
+      end
+      for sid, s in pairs(ns.Statuses) do
+        if W.hasPhrase(t, s.name) then need(s.name, s.name .. " : ") end
+        if W.hasPhrase(t, s.name .. " :") then need(s.name .. " (condition)", s.name .. " : effet en plus") end
+      end
+      for _, e in ipairs(d.effects or {}) do
+        if e[1] == "apply" then need(ns.Statuses[e[2]].name, ns.Statuses[e[2]].name .. " : ") end
+      end
+      if t:find(HG, 1, true) then need("le sablier", HG .. " : ") end
+      if t:find("Absorption", 1, true) then need("Absorption", "Absorption : ") end
+      if t:find("Démence", 1, true) then need("Démence", "Démence : ") end
+      for _, l in ipairs(tt.lines) do
+        local p = plain(l)
+        if p ~= " " then
+          nLines = nLines + 1
+          local len = W.utf8len(p)
+          if len > 60 or p:find("[;()]") or select(2, p:gsub("%. ", "")) > 0 then
+            ebad[#ebad + 1] = label .. " : « " .. p .. " » (" .. len .. ")"
+          end
+        end
+      end
+    end
+  end
+  check(("explications : chaque mot-clé, état et condition des textes expliqué, %d lignes de 60 caractères au plus"):format(nLines),
+    #ebad == 0, table.concat(ebad, "\n        "))
+  -- explications des nouveaux mots-clés : présentes, une phrase courte
+  local kbad = {}
+  for _, k in ipairs({ "execute", "surge", "lastBreath", "shadow", "turns" }) do
+    local l = Art.keywords[k] and plain(Art.keywordLine(k)) or ""
+    if l == "" or W.utf8len(l) > 60 then kbad[#kbad + 1] = k end
+  end
+  for sid in pairs(Art.statusShort) do
+    if not ns.Statuses[sid] or W.utf8len(plain(Art.statusLine(sid))) > 60 then kbad[#kbad + 1] = "état " .. sid end
+  end
+  check("Exécution, Déferlement, Dernier souffle, Ombre, sablier et définitions courtes des états : une ligne de 60 caractères au plus",
+    #kbad == 0, table.concat(kbad, ", "))
+  -- 4. Pouvoir joué : jeton sous le personnage (icône de la carte, liseré doré), effet au survol ;
+  -- l'état sérialisé ne change pas (la liste des pouvoirs existait déjà)
+  local c = C().combat()
+  local v = V()
+  local before = #c.player.powers
+  local pbad = {}
+  for _, pid in ipairs({ "shadowform", "rapture", "spirit_of_redemption", "apotheosis" }) do
+    c.player.powers[#c.player.powers + 1] = { uid = 9000 + #c.player.powers, id = pid, up = pid == "rapture" }
+    v:Render(true)
+    local tok
+    for _, t in ipairs(v.playerSt.tokens) do
+      if t._shown and t.info and t.info.power and t.info.power.id == pid then tok = t end
+    end
+    if not tok then
+      pbad[#pbad + 1] = pid .. " : pas de jeton"
+    else
+      local lines = H.hover(tok)
+      local all = plain(table.concat(lines, "\n"))
+      local d = Card.defById(pid, pid == "rapture")
+      local first = plain(W.cardTextLines(d)[1] or "")
+      if not all:find(d.name, 1, true) or not all:find(first, 1, true) or not all:find("Pouvoir : ", 1, true) then
+        pbad[#pbad + 1] = pid .. " : infobulle « " .. all:gsub("\n", " / ") .. " »"
+      end
+      if all:find("Pouvoir.", 1, true) then pbad[#pbad + 1] = pid .. " : « Pouvoir. » dans le texte de l'infobulle" end
+      local tex = tok.medal.icon._texture
+      if tex == nil then pbad[#pbad + 1] = pid .. " : jeton sans icône" end
+    end
+  end
+  for i = #c.player.powers, before + 1, -1 do c.player.powers[i] = nil end
+  v:Render(true)
+  check("Pouvoirs joués (Forme d'ombre, Extase+, Esprit de rédemption, Apothéose) : jeton sous le personnage, icône de la carte, nom, texte et mots-clés au survol",
+    #pbad == 0, table.concat(pbad, "\n        "))
+  card:Hide()
+  m:Hide()
 end
 
 print("U16 méthodes d'API inconnues appelées")

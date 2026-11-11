@@ -1359,14 +1359,43 @@ function W.cardKeywords(d)
   if d.exhaust then add("exhaust") end
   if d.retain then add("retain") end
   if d.power or d.type == "power" then add("power") end
+  -- texte : conditions nommées et conditions sur un état (« Nom : »), puis états cités
+  local text = d.text or ""
+  for _, c in ipairs(W.CONDITIONS) do
+    if W.hasPhrase(text, c.name .. " :") then add(c.key) end
+  end
+  local ids = {}
+  for id in pairs(ns.Statuses) do ids[#ids + 1] = id end
+  table.sort(ids)
+  for _, id in ipairs(ids) do
+    if W.hasPhrase(text, ns.Statuses[id].name .. " :") then add("cond:" .. id) end
+  end
+  for i = 1, #(d.effects or {}) do
+    local e = d.effects[i]
+    if e[1] == "apply" then add("status:" .. e[2]) end
+  end
+  for _, id in ipairs(ids) do
+    if W.hasPhrase(text, ns.Statuses[id].name) then add("status:" .. id) end
+  end
+  if text:find(W.HOURGLASS_CHAR, 1, true) then add("turns") end
   for i = 1, #(d.effects or {}) do
     local e = d.effects[i]
     if e[1] == "absorb" then add("absorb")
     elseif e[1] == "demence" then add("demence")
-    elseif e[1] == "interrupt" then add("interrupt")
-    elseif e[1] == "apply" then add("status:" .. e[2]) end
+    elseif e[1] == "interrupt" then add("interrupt") end
   end
+  if text:find("Absorption", 1, true) then add("absorb") end
+  if text:find("Démence", 1, true) then add("demence") end
   return list
+end
+
+-- Ligne d'explication d'un mot-clé de carte (W.cardKeywords), sablier en icône.
+function W.keywordText(k)
+  local line
+  if k.key:sub(1, 7) == "status:" then line = Art.statusLine(k.key:sub(8))
+  elseif k.key:sub(1, 5) == "cond:" then line = Art.conditionLine(k.key:sub(6))
+  else line = Art.keywordLine(k.key, k.label, k.n) end
+  return W.inlineIcons(line, 12)
 end
 
 -- Infobulle de carte : la carte se lit d'elle-même ; l'infobulle n'explique que les mots-clés,
@@ -1376,25 +1405,18 @@ function W.fillCardTooltip(tt, id, up, extra)
   if extra and extra.full then
     local rc = Art.rarityText[d.rarity] or Art.rarityText.common
     tt:AddLine(d.name, rc[1], rc[2], rc[3])
-    wrap(tt, d.text or "")
+    for _, l in ipairs(W.cardTextLines(d)) do wrap(tt, l) end
   end
   if extra and extra.preview and not up and ns.Cards[id].up then
     local u = Card.defById(id, true)
     gold(tt, "Après amélioration :")
-    wrap(tt, u.text or "", 0.5, 1, 0.5)
+    for _, l in ipairs(W.cardTextLines(u, ns.Cards[id])) do wrap(tt, l, 0.5, 1, 0.5) end
   end
   -- mots-clés : une ligne chacun, en bloc (séparé du reste par une ligne vide)
   local kws = W.cardKeywords(d)
   if #kws > 0 and tt:NumLines() > 0 then tt:AddLine(" ") end
   for i = 1, #kws do
-    local k = kws[i]
-    if k.key:sub(1, 7) == "status:" then
-      local name, text = W.statusText(k.key:sub(8))
-      text = text:gsub("^%u", string.lower)
-      wrap(tt, "|cffffd100" .. name .. "|r : " .. text, 0.85, 0.85, 0.85)
-    else
-      wrap(tt, Art.keywordLine(k.key, k.label, k.n), 0.85, 0.85, 0.85)
-    end
+    wrap(tt, W.keywordText(kws[i]), 0.85, 0.85, 0.85)
   end
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
@@ -1632,13 +1654,120 @@ local KEYWORD_STRIP = {
   { flag = "power", pat = "^Pouvoir%.%s*" },
 }
 
--- Texte affiché : sans les mots-clés de la plaque du bas, chiffres en évidence (blancs, ou verts
--- s'ils changent avec l'amélioration ; la police ne mêle pas deux graisses dans un même texte).
+-- Langage des cartes (docs/interface.md, « Langage des cartes ») : une clause par ligne dans `text`
+-- (séparées par « \n ») ; « Nom d'état : » = si l'état est présent ; conditions nommées ; états posés
+-- en dernier (« Donne » sur soi, « Applique » sur un ennemi) ; « ⌛ » = nombre de tours, remplacé à
+-- l'affichage par une petite icône dans le texte (séquence |T…|t, Media/hourglass.tga, blanche et
+-- teinte par la séquence). Mots-clés en évidence par la COULEUR (une seule couleur d'accent : la
+-- police ne mêle pas deux graisses dans un même texte).
+W.KEYWORD_COLOR = C.goldText
+W.HOURGLASS = ROOT .. "hourglass.tga"
+W.HOURGLASS_CHAR = "⌛"
+local NBSP = "\194\160" -- espace insécable : glue les mots d'un nom d'état et le nom à son nombre
+-- Conditions nommées (texte « Nom : effet ») et clé de leur explication (Art.keywords).
+W.CONDITIONS = {
+  { name = "Exécution", key = "execute" },
+  { name = "Déferlement", key = "surge" },
+  { name = "Dernier souffle", key = "lastBreath" },
+  { name = "Ombre", key = "shadow" },
+}
+
+-- Le nombre de l'état compte des tours (sablier) ?
+function W.isTurnStatus(id)
+  local s = ns.Statuses[id]
+  return s ~= nil and (s.duration or s.turns) and true or false
+end
+
+-- Séquence |T du sablier pour un texte de taille size (unités) : hauteur entière (la séquence ne
+-- prend que des entiers), ~0,68 cadratin (le dessin occupe 30 px sur 32 : à la hauteur des chiffres
+-- de Baloo Chettan 2, 0,62 cadratin) ; texture rognée à droite (x 0 à 28 sur 32) : la marge de gauche
+-- du dessin tient lieu d'espace après le nombre, presque rien après. color : teinte (couleur de
+-- sommet r:g:b, 0–255), blanc par défaut.
+W.HOURGLASS_CROP = 28
+function W.hourglassSize(size)
+  local h = max(5, floor(size * 0.68 + 0.5))
+  return h, max(4, floor(h * W.HOURGLASS_CROP / 32 + 0.5))
+end
+function W.hourglass(size, color)
+  local h, w = W.hourglassSize(size)
+  local c = color or C.white
+  return ("|T%s:%d:%d:0:0:32:32:0:%d:0:32:%d:%d:%d|t"):format(W.HOURGLASS, h, w, W.HOURGLASS_CROP,
+    floor(c[1] * 255 + 0.5), floor(c[2] * 255 + 0.5), floor(c[3] * 255 + 0.5))
+end
+
+-- Remplace « ⌛ » (et l'espace qui le précède : la marge du dessin en tient lieu) par l'icône.
+function W.inlineIcons(text, size, color)
+  local m = W.hourglass(size, color)
+  return (text:gsub(" ?" .. W.HOURGLASS_CHAR, function() return m end))
+end
+
+-- Noms à mettre en évidence : noms d'états, conditions nommées ; les plus longs d'abord.
+local keywordNames
+local function keywordList()
+  if keywordNames then return keywordNames end
+  keywordNames = {}
+  for id, s in pairs(ns.Statuses) do keywordNames[#keywordNames + 1] = { name = s.name, status = id } end
+  for _, c in ipairs(W.CONDITIONS) do keywordNames[#keywordNames + 1] = { name = c.name, cond = c.key } end
+  table.sort(keywordNames, function(a, b)
+    if #a.name ~= #b.name then return #a.name > #b.name end
+    return a.name < b.name
+  end)
+  return keywordNames
+end
+W.keywordList = keywordList
+
+-- Remplace chaque occurrence de phrase comme mot entier (début, espace, retour ou insécable avant ;
+-- fin, espace, retour, ponctuation ou insécable après). fn(phrase) -> remplacement.
+local function eachPhrase(text, phrase, fn)
+  local out, pos = {}, 1
+  while true do
+    local i, j = text:find(phrase, pos, true)
+    if not i then break end
+    local before = i > 1 and text:sub(i - 1, i - 1) or ""
+    local after = text:sub(j + 1, j + 1)
+    local okB = before == "" or before == " " or before == "\n" or (before == "\160" and text:sub(i - 2, i - 2) == "\194")
+    local okA = after == "" or after:find("^[ \n.,:]") ~= nil or after == "\194"
+    out[#out + 1] = text:sub(pos, i - 1)
+    out[#out + 1] = (okB and okA) and fn(text:sub(i, j)) or text:sub(i, j)
+    pos = j + 1
+  end
+  out[#out + 1] = text:sub(pos)
+  return table.concat(out)
+end
+W.eachPhrase = eachPhrase
+
+-- Le texte d'une carte contient-il phrase comme mot entier ?
+function W.hasPhrase(text, phrase)
+  local found = false
+  eachPhrase(text, phrase, function(p) found = true return p end)
+  return found
+end
+
+-- Clause d'état posé (« Donne … » / « Applique … ») ?
+local function plainClause(s)
+  return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR):gsub(NBSP, " "))
+end
+function W.isStateClause(s)
+  local p = plainClause(s)
+  return p:find("^Donne ") ~= nil or p:find("^Applique ") ~= nil
+end
+
+-- Texte affiché : sans les mots-clés de la plaque du bas, noms d'états et conditions insécables et
+-- en couleur d'accent, chiffres en évidence (blancs, ou verts s'ils changent avec l'amélioration).
+-- Garde les « \n » des clauses et le « ⌛ » (posé à la taille du palier par la mise en page).
 function W.cardBody(d, base)
   local text = d.text or ""
   for _, k in ipairs(KEYWORD_STRIP) do
     if d[k.flag] or (k.flag == "power" and d.type == "power") then text = text:gsub(k.pat, "") end
   end
+  -- un nom d'état insécable avec son nombre (« Douleur 5 », « fracassée 2 ⌛ ») ; « à tous » insécable
+  for _, k in ipairs(keywordList()) do
+    if k.status then
+      text = eachPhrase(text, k.name, function(p) return p .. "\001" end)
+      text = text:gsub("\001 ([+%-]?%d)", NBSP .. "%1"):gsub("\001", "")
+    end
+  end
+  text = eachPhrase(text, "à tous", function() return "à" .. NBSP .. "tous" end)
   local baseNums = {}
   if base then for n in (base.text or ""):gmatch("%d+") do baseNums[#baseNums + 1] = n end end
   local i = 0
@@ -1647,7 +1776,22 @@ function W.cardBody(d, base)
     if base and baseNums[i] ~= n then return W.colorize(n, C.upGreen) end
     return W.colorize(n, C.white)
   end)
+  -- mots-clés : noms d'états et conditions nommées (une seule couleur d'accent)
+  for _, k in ipairs(keywordList()) do
+    text = eachPhrase(text, k.name, function(p) return W.colorize(p, W.KEYWORD_COLOR) end)
+  end
   return text
+end
+
+-- Texte d'une carte pour une infobulle (jeton de Pouvoir, recharge, aperçu d'amélioration) : comme
+-- sur la carte (sans les mots de la plaque, mots-clés en couleur), une ligne par clause, sablier en
+-- icône à la taille du texte des infobulles. base : chiffres changés en vert (aperçu).
+function W.cardTextLines(d, base)
+  local out = {}
+  for l in (W.cardBody(d, base) .. "\n"):gmatch("(.-)\n") do
+    if l ~= "" then out[#out + 1] = W.inlineIcons((l:gsub(NBSP, " ")), 12) end
+  end
+  return out
 end
 
 -- Mots-clés de la plaque du bas.
@@ -1677,6 +1821,9 @@ W.CARD_TEXT = TZ
 -- Paliers de taille du texte (unités de la carte) : chaque carte prend le plus grand qui tient dans la
 -- zone utile ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
 W.BODY_SIZES = { 10, 9.5, 9, 8.5, 8, 7.5, 7 }
+-- Position verticale du bloc dans la zone (fraction du jeu vertical : 0,5 = centré, 0 = en haut) :
+-- essais dans l'ordre, le premier où les lignes tiennent.
+W.BODY_LIFT = { 0.5, 0.33, 0.17, 0 }
 W.BODY_UNDER = { 6.5, 6 }
 -- Nom sur le ruban : une ligne, le plus grand palier qui tient, marge de 4 unités de chaque côté.
 W.NAME_SIZES = { 11, 10, 9, 8, 7 }
@@ -1713,7 +1860,9 @@ end
 -- Mots insécables : une ponctuation détachée (« : ») et un nombre qui finit la phrase (« Pioche 1. »)
 -- restent avec le mot d'avant, un nombre seul (« 12 », « +1 ») avec le mot d'après (« 12 Absorption »,
 -- « +1 Démence », « 2 tours »).
-local function plainWord(w) return (w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+local function plainWord(w)
+  return (w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR))
+end
 function W.cardWords(text)
   local raw = {}
   for w in text:gmatch("%S+") do raw[#raw + 1] = w end
@@ -1739,60 +1888,136 @@ function W.cardWords(text)
   return words
 end
 
--- Coupe text en lignes à la taille size dans la zone (top, bottom en unités) : le moins de lignes
--- possible, chaque ligne limitée à la largeur de la zone à sa hauteur (biseau compris), bloc centré
--- verticalement ; lignes remplies de haut en bas (chaque ligne prend le plus de mots possible tant que
--- la suite tient dans les lignes restantes). Renvoie les lignes, ou nil si le texte ne tient pas ;
--- "font" si la police ne mesure rien (pas encore chargée).
-local function layoutBody(text, size, top, bottom)
+-- Une ligne qui finit dans une couleur ouverte (nom d'état coupé en deux lignes) la ferme, et la
+-- ligne suivante la rouvre : chaque ligne est autonome.
+local function balanceColors(lines)
+  local open
+  for k = 1, #lines do
+    local l = lines[k]
+    if open then l = open .. l end
+    open = nil
+    local pos = 1
+    while true do
+      local i = l:find("|[cr]", pos)
+      if not i then break end
+      if l:sub(i + 1, i + 1) == "c" then open = l:sub(i, i + 9) pos = i + 10 else open = nil pos = i + 2 end
+    end
+    if open then l = l .. "|r" end
+    lines[k] = l
+  end
+  return lines
+end
+W.balanceColors = balanceColors
+
+-- Paragraphes du texte d'une carte selon le mode : "clauses" = une clause par paragraphe ; "flow" =
+-- les clauses d'effet coulent ensemble, chaque clause d'état posé (« Donne » / « Applique ») reste un
+-- paragraphe ; "flowAll" = les clauses d'état sont groupées en un dernier paragraphe (« Applique
+-- Douleur 3. Donne Récupération 1 »). Un paragraphe commence toujours une ligne.
+-- Une clause conditionnelle (« Douleur : … », « Exécution : … ») commence toujours une ligne, et la
+-- clause qui la suit aussi (elle ne doit pas paraître soumise à la condition) : seules les clauses
+-- simples qui se suivent coulent ensemble.
+function W.isConditionClause(s)
+  local label = plainClause(s):match("^(.-) : ")
+  if not label then return false end
+  for _, k in ipairs(keywordList()) do if k.name == label then return true end end
+  return false
+end
+
+function W.cardParagraphs(text, mode)
+  local clauses = {}
+  for l in (text .. "\n"):gmatch("(.-)\n") do if l ~= "" then clauses[#clauses + 1] = l end end
+  if mode == "clauses" then return clauses end
+  local paras, states = {}, {}
+  local prevSimple = false
+  for _, cl in ipairs(clauses) do
+    if W.isStateClause(cl) then
+      states[#states + 1] = cl
+    else
+      local simple = not W.isConditionClause(cl)
+      if simple and prevSimple then paras[#paras] = paras[#paras] .. " " .. cl else paras[#paras + 1] = cl end
+      prevSimple = simple
+    end
+  end
+  if mode == "flowAll" and #states > 0 then
+    -- états groupés : le verbe d'un état qui n'ouvre pas la ligne reste avec le nom qui le suit
+    for k = 2, #states do states[k] = states[k]:gsub("^(%S+) ", "%1" .. NBSP, 1) end
+    paras[#paras + 1] = table.concat(states, ". ")
+  else
+    for _, s in ipairs(states) do paras[#paras + 1] = s end
+  end
+  return paras
+end
+
+-- Coupe les paragraphes paras en lignes à la taille size dans la zone (top, bottom en unités) : le
+-- moins de lignes possible, chaque ligne limitée à la largeur de la zone à sa hauteur (biseau
+-- compris), bloc centré verticalement ; lignes remplies de haut en bas (chaque ligne prend le plus de
+-- mots possible tant que la suite tient dans les lignes restantes) ; un paragraphe commence une ligne.
+-- Le sablier est posé à la taille size (largeur mesurée avec le texte). Renvoie les lignes, ou nil si
+-- le texte ne tient pas ; "font" si la police ne mesure rien (pas encore chargée).
+local function layoutBody(paras, size, top, bottom)
   local CW = W.CARD_W
   local m = measureFS("bold", size)
   m:SetText("Ég")
   local lh = m:GetStringHeight() or 0
   if lh <= 0 or widthOf(m, "Ég") <= 0 then return nil, "font" end
-  local words = W.cardWords(text)
+  local words, brk = {}, {}
+  for p = 1, #paras do
+    local ws = W.cardWords(W.inlineIcons(paras[p], size))
+    for k = 1, #ws do
+      words[#words + 1] = ws[k]
+      if k == 1 and p > 1 then brk[#words] = true end
+    end
+  end
   local nw = #words
   if nw == 0 then return {}, lh end
-  -- largeur des mots i..j sur une ligne (mesurée une fois)
+  -- largeur des mots i..j sur une ligne (mesurée une fois, icônes comprises) ; infinie si la ligne
+  -- franchirait un début de paragraphe
   local memo = {}
   local function span(i, j)
     local key = i * 1000 + j
     local v = memo[key]
     if not v then
-      v = widthOf(m, table.concat(words, " ", i, j))
+      v = 0
+      for k = i + 1, j do if brk[k] then v = math.huge end end
+      if v == 0 then v = widthOf(m, (table.concat(words, " ", i, j):gsub(NBSP, " "))) end
       memo[key] = v
     end
     return v
   end
   local H = bottom - top
   for n = 1, min(nw, floor(H / lh + 1e-6)) do
-    local y0 = top + (H - n * lh) / 2
-    local wmax = {}
-    for k = 1, n do wmax[k] = 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW end
-    -- ok[k][i] : les mots i.. tiennent exactement sur les lignes k..n
-    local ok = {}
-    ok[n + 1] = { [nw + 1] = true }
-    for k = n, 1, -1 do
-      ok[k] = {}
-      for i = k, nw - (n - k) do
-        for j = i, nw - (n - k) do
-          if span(i, j) > wmax[k] then break end
-          if ok[k + 1][j + 1] then ok[k][i] = true break end
+    -- bloc centré verticalement ; s'il ne tient pas, remonté par paliers jusqu'au haut de la zone
+    -- (le biseau du bas laisse alors plus de largeur à la dernière ligne)
+    local slack = H - n * lh
+    for _, f in ipairs(W.BODY_LIFT) do
+      local y0 = top + slack * f
+      local wmax = {}
+      for k = 1, n do wmax[k] = 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW end
+      -- ok[k][i] : les mots i.. tiennent exactement sur les lignes k..n
+      local ok = {}
+      ok[n + 1] = { [nw + 1] = true }
+      for k = n, 1, -1 do
+        ok[k] = {}
+        for i = k, nw - (n - k) do
+          for j = i, nw - (n - k) do
+            if span(i, j) > wmax[k] then break end
+            if ok[k + 1][j + 1] then ok[k][i] = true break end
+          end
         end
       end
-    end
-    if ok[1][1] then
-      local lines, i = {}, 1
-      for k = 1, n do
-        local j = i
-        for jj = i, nw - (n - k) do
-          if span(i, jj) > wmax[k] then break end
-          if ok[k + 1][jj + 1] then j = jj end
+      if ok[1][1] then
+        local lines, i = {}, 1
+        for k = 1, n do
+          local j = i
+          for jj = i, nw - (n - k) do
+            if span(i, jj) > wmax[k] then break end
+            if ok[k + 1][jj + 1] then j = jj end
+          end
+          lines[k] = (table.concat(words, " ", i, j):gsub(NBSP, " "))
+          i = j + 1
         end
-        lines[k] = table.concat(words, " ", i, j)
-        i = j + 1
+        return { lines = balanceColors(lines), y0 = y0 }, lh
       end
-      return lines, lh
     end
   end
   return nil, lh
@@ -1806,33 +2031,63 @@ function W.clearTextCache() layoutCache = {} end
 -- le client ne recoupe jamais autrement, ni à une autre échelle, ni pendant un zoom), puis
 -- vérification par le client (GetNumLines, IsTruncated, GetStringHeight). bottom : bas de la zone
 -- (unités), relevé si une plaque mord sur le panneau.
+-- Essais dans l'ordre : une clause par ligne aux paliers >= W.CLAUSE_MIN (du plus grand au plus
+-- petit) ; sinon, à chaque palier du plus grand au plus petit : une clause par ligne, puis texte qui
+-- coule avec chaque état posé sur sa ligne (« flow »), puis états groupés en une dernière ligne
+-- (« flowAll »).
+W.CLAUSE_MIN = 8.5
+function W.cardTries(text)
+  local all = {}
+  for _, s in ipairs(W.BODY_SIZES) do all[#all + 1] = { s = s } end
+  for _, s in ipairs(W.BODY_UNDER) do all[#all + 1] = { s = s, under = true } end
+  local tries, seen = {}, {}
+  local function add(e, mode)
+    local paras = W.cardParagraphs(text, mode)
+    local key = e.s .. "|" .. table.concat(paras, "\n")
+    if seen[key] then return end
+    seen[key] = true
+    tries[#tries + 1] = { size = e.s, under = e.under, mode = mode, paras = paras, key = key }
+  end
+  for _, e in ipairs(all) do if not e.under and e.s >= W.CLAUSE_MIN then add(e, "clauses") end end
+  for _, e in ipairs(all) do
+    add(e, "clauses")
+    add(e, "flow")
+    add(e, "flowAll")
+  end
+  return tries
+end
+
 local function fitBody(card, text, bottom)
   local CW = W.CARD_W
   local fs = card.body
   local top = TZ.top * CW
-  local sizes = {}
-  for _, s in ipairs(W.BODY_SIZES) do sizes[#sizes + 1] = s end
-  for _, s in ipairs(W.BODY_UNDER) do sizes[#sizes + 1] = s end
   fs:ClearAllPoints()
   fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
   fs:SetWidth(2 * TZ.half * CW + 8)
   local fit, fontErr
-  for idx, s in ipairs(sizes) do
-    local key = s .. "|" .. floor(bottom * 10 + 0.5) .. "|" .. text
-    local lines = layoutCache[key]
-    local err
-    if lines == nil then
-      lines, err = layoutBody(text, s, top, bottom)
+  for _, t in ipairs(W.cardTries(text)) do
+    local s = t.size
+    local key = floor(bottom * 10 + 0.5) .. "|" .. t.key
+    local lay = layoutCache[key]
+    local err, lh
+    if lay == nil then
+      lay, err = layoutBody(t.paras, s, top, bottom)
       if err == "font" then fontErr = true break end
-      layoutCache[key] = lines or false
+      lh = err
+      if lay then lay.lh = lh end
+      layoutCache[key] = lay or false
     end
-    if lines then
+    if lay then
+      local lines = lay.lines
       W.setSize(fs, s)
       fs:SetText(table.concat(lines, "\n"))
+      -- centre du bloc : centre de la zone, ou plus haut si le bloc a été remonté
+      fs:ClearAllPoints()
+      fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(lay.y0 + #lines * lay.lh / 2))
       local n = fs.GetNumLines and fs:GetNumLines() or #lines
       local hh = fs:GetStringHeight() or 0
       if (n == #lines or #lines == 0) and not (fs.IsTruncated and fs:IsTruncated()) and hh <= bottom - top + 0.5 then
-        fit = { size = s, lines = #lines, under = idx > #W.BODY_SIZES, ok = true }
+        fit = { size = s, lines = #lines, under = t.under or false, ok = true, mode = t.mode, y0 = lay.y0 }
         break
       end
     end
@@ -1843,7 +2098,7 @@ local function fitBody(card, text, bottom)
     local s = W.BODY_SIZES[#W.BODY_SIZES]
     W.setSize(fs, s)
     fs:SetWidth(2 * TZ.half * CW)
-    fs:SetText(text)
+    fs:SetText((W.inlineIcons(text, s):gsub(NBSP, " ")))
     fit = { size = s, under = true, ok = false, font = fontErr }
   end
   card.bodyFit = fit

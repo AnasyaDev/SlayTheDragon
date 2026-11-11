@@ -30,7 +30,9 @@ S.pain = { name = "Douleur", debuff = true,
   text = "Subit X dégâts au début de son tour, puis X baisse de 1. Ignore l'Absorption." }
 S.regen = { name = "Récupération",
   text = "Soigne X au début de son tour, puis X baisse de 1." }
-S.stunned = { name = "Étourdi", debuff = true,
+-- turns : affichage seulement (le nombre compte des tours perdus, sablier sur les cartes) ;
+-- les règles n'en tiennent pas compte.
+S.stunned = { name = "Étourdi", debuff = true, turns = true,
   text = "Perd son prochain tour." }
 S.halved = { name = "Suppression de la douleur",
   text = "Dégâts subis divisés par deux jusqu'au prochain tour." }

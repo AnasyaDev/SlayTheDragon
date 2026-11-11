@@ -230,6 +230,20 @@ local function words(text)
       push()
       color = nil
       i = i + 2
+    elseif c == "|" and text:sub(i + 1, i + 1) == "T" then
+      -- icône en ligne |Tchemin:h:l:x:y:lf:hf:g:d:h:b:r:v:b|t (dimensions en unités du texte)
+      push()
+      local e = text:find("|t", i + 2, true) or (n + 1)
+      local f = {}
+      for v in (text:sub(i + 2, e - 1) .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
+      local h = tonumber(f[2] or "") or 0
+      local w = tonumber(f[3] or "") or h
+      out[#out + 1] = { "", color, space, icon = { path = f[1], h = h, w = (w ~= 0) and w or h,
+        fw = tonumber(f[6] or ""), fh = tonumber(f[7] or ""), l = tonumber(f[8] or ""), r = tonumber(f[9] or ""),
+        t = tonumber(f[10] or ""), b = tonumber(f[11] or ""),
+        rgb = f[12] and { (tonumber(f[12]) or 255) / 255, (tonumber(f[13]) or 255) / 255, (tonumber(f[14]) or 255) / 255 } } }
+      space = false
+      i = e + 2
     elseif c == "\n" then
       push()
       out[#out + 1] = { "\n" }
@@ -402,12 +416,12 @@ function R.svg(H, root, path, label)
             if wd[1] == "\n" then
               lines[#lines + 1] = cur cur, curW = {}, 0
             else
-              local wl = R.textWidth(wd[1], size / es, o) * es
+              local wl = wd.icon and ((wd.icon.h == 0 and size or wd.icon.w * es)) or R.textWidth(wd[1], size / es, o) * es
               local add = (#cur > 0 and wd[3]) and R.textWidth(" ", size / es, o) * es or 0
               if #cur > 0 and wd[3] and curW + add + wl > maxW + 0.01 then
                 lines[#lines + 1] = cur cur, curW = {}, 0 add = 0
               end
-              cur[#cur + 1] = { wd[1], wd[2], #cur > 0 and wd[3] }
+              cur[#cur + 1] = { wd[1], wd[2], #cur > 0 and wd[3], icon = wd.icon }
               curW = curW + add + wl
             end
           end
@@ -438,13 +452,57 @@ function R.svg(H, root, path, label)
               return table.concat(s)
             end
             local yy = ty + (li - 1) * lh
-            if shadow then
+            local hasIcon = false
+            for _, wd in ipairs(line) do if wd.icon then hasIcon = true end end
+            if hasIcon then
+              -- ligne avec icône : morceaux posés un à un (largeurs du faux client), icône centrée sur
+              -- la hauteur de la ligne
+              local segs, total = {}, 0
+              local spW = R.textWidth(" ", size / es, o) * es
+              for _, wd in ipairs(line) do
+                local sp = wd[3] and spW or 0
+                local ww = wd.icon and ((wd.icon.h == 0 and size) or wd.icon.w * es) or R.textWidth(wd[1], size / es, o) * es
+                segs[#segs + 1] = { wd = wd, x = total + sp, w = ww }
+                total = total + sp + ww
+              end
+              local x0 = anchor == "middle" and tx - total / 2 or (anchor == "end" and tx - total or tx)
+              for _, sg in ipairs(segs) do
+                local wd = sg.wd
+                if wd.icon then
+                  local ic = wd.icon
+                  local ih = (ic.h == 0 and size) or ic.h * es
+                  local href = mediaHref(ic.path)
+                  local fw, fh = ic.fw or 1, ic.fh or 1
+                  local u0, u1 = (ic.l or 0) / fw, (ic.r or fw) / fw
+                  local v0, v1 = (ic.t or 0) / fh, (ic.b or fh) / fh
+                  local iy = yy - lh * ASC + lh / 2 - ih / 2
+                  if href then
+                    local pid = newId("p")
+                    local tw, th = sg.w / (u1 - u0), ih / (v1 - v0)
+                    defs[#defs + 1] = string.format('<pattern id="%s" patternUnits="userSpaceOnUse" x="%.2f" y="%.2f" width="%.2f" height="%.2f"><image width="%.2f" height="%.2f" preserveAspectRatio="none" href="%s"/></pattern>',
+                      pid, x0 + sg.x - u0 * tw, iy - v0 * th, tw, th, tw, th, href)
+                    out[#out + 1] = string.format('<g%s opacity="%.2f"><rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="url(#%s)"/></g>',
+                      filter(ic.rgb or { 1, 1, 1, 1 }, false), a, x0 + sg.x, iy, sg.w, ih, pid)
+                  end
+                elseif wd[1] ~= "" then
+                  if shadow then
+                    out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="#000" fill-opacity="%.2f" xml:space="preserve">%s</text>',
+                      x0 + sg.x + 1, yy + 1, family, weight, size, 0.8 * a, esc(wd[1]))
+                  end
+                  out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="%s" fill-opacity="%.2f" xml:space="preserve">%s</text>',
+                    x0 + sg.x, yy, family, weight, size, wd[2] or base, a, esc(wd[1]))
+                end
+              end
+            end
+            if not hasIcon and shadow then
               out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="#000" fill-opacity="%.2f" text-anchor="%s" xml:space="preserve"%s>%s</text>',
                 tx + 1, yy + 1, family, weight, size, 0.8 * a, anchor, ttf, esc(table.concat((function()
                   local t = {} for k, wd in ipairs(line) do t[#t + 1] = (wd[3] and " " or "") .. wd[1] end return t end)())))
             end
-            out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="%s" fill-opacity="%.2f" text-anchor="%s" xml:space="preserve"%s>%s</text>',
-              tx, yy, family, weight, size, base, a, anchor, ttf, spans())
+            if not hasIcon then
+              out[#out + 1] = string.format('<text x="%.1f" y="%.1f" font-family="%s" font-weight="%d" font-size="%.1f" fill="%s" fill-opacity="%.2f" text-anchor="%s" xml:space="preserve"%s>%s</text>',
+                tx, yy, family, weight, size, base, a, anchor, ttf, spans())
+            end
           end
         end
       end
