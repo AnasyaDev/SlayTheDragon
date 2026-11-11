@@ -423,7 +423,7 @@ Art.keywords = {
   lastBreath = { name = "Dernier souffle", text = "une fois par combat, en tombant à 0 PV." },
   shadow = { name = "Ombre", text = "s'applique aux cartes d'ombre." },
   -- sablier du texte des cartes (« Donne Expiation 1 ⌛ »)
-  turns = { name = "⌛", text = "le nombre compte des tours." },
+  turns = { name = "⌛", text = "durée de l'état, en tours." },
 }
 
 -- Définition courte d'un état pour l'infobulle d'une carte (« Nom : effet. », 60 caractères au plus ;
