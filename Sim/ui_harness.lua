@@ -2794,7 +2794,8 @@ do
   end
   local function isGlow(t)
     local tex = rawget(t, "_texture")
-    return rawget(t, "_kind") == "Texture" and type(tex) == "string" and tex:find("glow", 1, true) ~= nil
+    return rawget(t, "_kind") == "Texture" and ((type(tex) == "string" and tex:find("glow", 1, true) ~= nil)
+      or rawget(t, "_glowLayer") == true)
   end
   -- premier survol d'un élément : une image, puis contrôles ; enfin survol mené à son terme
   local function firstHover(label, f, opts)
@@ -3933,6 +3934,218 @@ do
   check("détecteur : témoins français reconnus, anglais accepté", isFrench("Inflige 6.") and isFrench("Ce n'est pas votre tour.")
     and isFrench("Démence") and isFrench("« Merci. »") and not isFrench("Deal 6.") and not isFrench("Gain Atonement 1 ⌛")
     and not isFrench("\"Thank you.\" × 2 · —"))
+end
+
+print("U30 habillage WoW : pièces embarquées (TGA conformes), aucune texture supprimée, ni atlas ni chemin du client, textes dans leurs zones")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W = ns.Widgets
+  local WS = ns.WowSkin
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local MEDIA = "Interface\\AddOns\\SlayTheDragon\\Media\\"
+  check("racine des pièces : Media\\WowUI de l'addon", WS.root == MEDIA .. "WowUI\\", WS.root)
+  local function u16(s, i) return s:byte(i) + 256 * s:byte(i + 1) end
+  local function pow2(n) return n > 0 and math.floor(math.log(n) / math.log(2) + 0.5) == math.log(n) / math.log(2) end
+  -- 1. chaque pièce : fichier présent, TGA 32 bits non compressé à origine en bas (descripteur 8),
+  -- dimensions en puissances de deux égales à la table, coordonnées = pièce / toile, pièce répétée qui
+  -- remplit sa toile sur l'axe répété
+  local bad, n, files = {}, 0, {}
+  for name, e in pairs(WS.pieces) do
+    n = n + 1
+    local f = io.open(root .. "/Media/WowUI/" .. e.file, "rb")
+    local hdr = f and f:read(18)
+    local size = f and f:seek("end")
+    if f then f:close() end
+    local ok = hdr and #hdr == 18 and hdr:byte(3) == 2 and hdr:byte(17) == 32 and hdr:byte(18) == 8
+      and u16(hdr, 13) == e.w and u16(hdr, 15) == e.h and size == 18 + e.w * e.h * 4 and pow2(e.w) and pow2(e.h)
+      and e.pw <= e.w and e.ph <= e.h and e.tc[2] - e.tc[1] > 0 and e.tc[4] - e.tc[3] > 0
+      and math.abs((e.tc[2] - e.tc[1]) - e.pw / e.w) < 1e-4 and math.abs((e.tc[4] - e.tc[3]) - e.ph / e.h) < 1e-4
+      and type(e.fid) == "number"
+    if e.tile then
+      ok = ok and (not e.tile:find("h") or e.pw == e.w) and (not e.tile:find("v") or e.ph == e.h)
+        and e.tc[1] == 0 and e.tc[3] == 0
+    end
+    if not ok then bad[#bad + 1] = name end
+    files[e.file] = true
+  end
+  table.sort(bad)
+  check(n .. " pièces de UI/WowSkin.lua : TGA de Media\\WowUI présents et conformes", n > 30 and #bad == 0,
+    table.concat(bad, ", "))
+  -- aucun fichier orphelin dans Media/WowUI
+  local orphans = {}
+  local pipe = io.popen("ls '" .. root .. "/Media/WowUI'")
+  for line in pipe:lines() do if not files[line] then orphans[#orphans + 1] = line end end
+  pipe:close()
+  check("Media\\WowUI : aucun fichier hors de la table", #orphans == 0, table.concat(orphans, ", "))
+
+  -- 2. sources de UI/ : pièces nommées connues, aucune texture supprimée, aucun atlas, chemins du client
+  -- seulement dans la liste permise (texture blanche, bouton de minicarte, icônes, police de repli,
+  -- écrans de chargement candidats du décor)
+  local REMOVED = { "hex_red", "hex_green", "hex_blue", "hex_steel", "hex_violet", "hex_empty", "tile_ivory",
+    "nine_slate", "nine_ivory", "nine_rim", "button_gold", "tail_slate", "tail_ivory", "tail_rim", "medal_ring_s",
+    "mask_roundsq" }
+  local ALLOWED = { "Interface\\\\Buttons\\\\WHITE8X8", "Interface\\\\Minimap\\\\", "Interface\\\\Icons\\\\",
+    "Interface\\\\AddOns\\\\SlayTheDragon\\\\", "Interface\\\\Glues\\\\LoadingScreens\\\\" }
+  local unknownPieces, removedRefs, atlas, clientPaths = {}, {}, {}, {}
+  for _, file in ipairs({ "Widgets", "Main", "Scene", "CombatView", "Screens", "Flight", "Art", "Controller", "Persist" }) do
+    local src = assert(io.open(root .. "/UI/" .. file .. ".lua")):read("*a")
+    for fn, name in src:gmatch("W%.(%a+)%([^\n]-\"([%l_]+)\"") do
+      if (fn == "wow" or fn == "setWow" or fn == "wowSize" or fn == "fillTile" or fn == "threeSlice" or fn == "nineStretch"
+        or fn == "wowPath") and not WS.pieces[name] then unknownPieces[#unknownPieces + 1] = file .. ": " .. name end
+    end
+    for _, r in ipairs(REMOVED) do
+      if src:find('"' .. r .. '"', 1, true) or src:find(r .. ".tga", 1, true) then removedRefs[#removedRefs + 1] = file .. ": " .. r end
+    end
+    if src:find("SetAtlas", 1, true) then atlas[#atlas + 1] = file end
+    for lit in src:gmatch('"(Interface\\\\[^"]*)"') do
+      local ok = false
+      for _, a in ipairs(ALLOWED) do if lit:sub(1, #a) == a then ok = true end end
+      if not ok then clientPaths[#clientPaths + 1] = file .. ": " .. lit end
+    end
+  end
+  check("pièces nommées dans UI/ toutes présentes dans UI/WowSkin.lua", #unknownPieces == 0, table.concat(unknownPieces, ", "))
+  check("aucune référence aux textures supprimées de l'ancienne peau", #removedRefs == 0, table.concat(removedRefs, ", "))
+  removedRefs = {}
+  for _, r in ipairs(REMOVED) do
+    local f = io.open(root .. "/Media/" .. r .. ".tga", "rb")
+    if f then f:close() removedRefs[#removedRefs + 1] = "Media/" .. r .. ".tga" end
+  end
+  check("textures de l'ancienne peau retirées de Media/", #removedRefs == 0, table.concat(removedRefs, ", "))
+  check("aucun SetAtlas dans UI/", #atlas == 0, table.concat(atlas, ", "))
+  check("chemins Interface\\ du client : seulement la liste permise (blanc, minicarte, icônes, écrans de chargement)",
+    #clientPaths == 0, table.concat(clientPaths, ", "))
+
+  -- 3. à l'exécution : toute texture de la fenêtre est un fichier de l'addon (présent sur disque), la
+  -- texture blanche, une icône (chemin ou FileDataID d'icône) ou un fond du décor ; toute pièce posée existe
+  local function under(o, top)
+    while o do if o == top then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local frame = _G.SlayTheDragonFrame
+  local missingFiles, strayTex, unknownWow = {}, {}, {}
+  local seen = {}
+  for _, o in ipairs(H.objects) do
+    local kind = rawget(o, "_kind")
+    if (kind == "Texture" or kind == "MaskTexture" or kind == "Line") and under(o, frame) then
+      local tex = rawget(o, "_texture")
+      if type(tex) == "string" and not seen[tex] then
+        seen[tex] = true
+        if tex:sub(1, #MEDIA) == MEDIA then
+          local f = io.open(root .. "/Media/" .. tex:sub(#MEDIA + 1):gsub("\\", "/"), "rb")
+          if f then f:close() else missingFiles[#missingFiles + 1] = tex end
+        elseif tex ~= ns.Art.tex.white and not tex:find("^Interface\\Icons\\") and not tex:find("^Interface\\Glues\\") then
+          strayTex[#strayTex + 1] = tex
+        end
+      end
+      local wn = rawget(o, "_wow")
+      if wn and not WS.pieces[wn] then unknownWow[#unknownWow + 1] = wn end
+    end
+  end
+  check("textures de la fenêtre : fichiers de l'addon présents sur disque", #missingFiles == 0, table.concat(missingFiles, ", "))
+  check("textures de la fenêtre : aucun chemin du client hors icônes et texture blanche", #strayTex == 0,
+    table.concat(strayTex, ", "))
+  check("pièces posées à l'exécution toutes connues de UI/WowSkin.lua", #unknownWow == 0, table.concat(unknownWow, ", "))
+
+  -- 4. netteté : une pièce entière (ni tranche, ni répétée) n'est jamais affichée plus grande que ses
+  -- pixels stockés, à l'échelle de la fenêtre (115 %) et au repos
+  local scale = frame._scale or 1
+  local function visible(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local blurry = {}
+  local function sharp(where)
+    local fr = _G.SlayTheDragonFrame
+    for _, o in ipairs(H.objects) do
+      local wn = rawget(o, "_wow")
+      local e = wn and WS.pieces[wn]
+      local tc = e and o._calls.SetTexCoord
+      if e and not e.tile and tc and visible(o) and under(o, fr)
+        and math.abs((tc[2] - tc[1]) - (e.tc[2] - e.tc[1])) < 1e-6 and math.abs((tc[4] - tc[3]) - (e.tc[4] - e.tc[3])) < 1e-6 then
+        local r = R.rect(o)
+        if r then
+          local w, h = (r[3] - r[1]), (r[4] - r[2])
+          if (w > e.pw + 0.75 and e.stretch ~= "h") or h > e.ph + 0.75 then
+            blurry[#blurry + 1] = string.format("%s : %s %.0f×%.0f > %d×%d", where, wn, w, h, e.pw, e.ph)
+          end
+        end
+      end
+    end
+  end
+  sharp("combat")
+  H.slash("options")
+  sharp("options")
+  H.key("ESCAPE")
+
+  -- 5. textes dans leurs zones : libellés des boutons rouges (entre les bouts du bouton), cadre du héros
+  -- (nom dans son logement, PV dans la barre), cadres compacts des ennemis (voir U21)
+  local outB = {}
+  for _, o in ipairs(H.objects) do
+    if rawget(o, "_kind") == "Button" and rawget(o, "base") and rawget(o, "label") and o.base.cap and visible(o) then
+      local t = o.label._text or ""
+      if t ~= "" then
+        local tw = H.textWidth(o.label, t, o.label._fontSize)
+        local inner = o._w - 2 * o.base.cap
+        if tw > inner + 0.5 then outB[#outB + 1] = string.format("« %s » %.0f > %.0f", t, tw, inner) end
+        if o.label._fontSize * H.metrics.lineHeight > o._h + 1 then outB[#outB + 1] = "« " .. t .. " » plus haut que le bouton" end
+      end
+    end
+  end
+  check("libellés des boutons affichés entre les bouts du bouton", #outB == 0, table.concat(outB, ", "))
+  local v = V()
+  local hf = v.heroFrame
+  local m = WS.meta.unit_player
+  local k = hf._w / WS.pieces.unit_player.pw
+  local nameW = H.textWidth(hf.name, hf.name._text or "", hf.name._fontSize)
+  local hpW = H.textWidth(v.playerHp.text, v.playerHp.text._text or "", v.playerHp.text._fontSize)
+  check("cadre du héros : nom dans son logement, PV dans la barre, barre dans son logement",
+    nameW <= m.name[3] * k and hpW <= v.playerHp._w and math.abs(v.playerHp._w - m.hp[3] * k) < 0.01
+    and v.playerHp.text._fontSize * H.metrics.lineHeight <= m.hp[4] * k + 3 and (hf.name._text or "") ~= "",
+    string.format("nom %.0f / %.0f, PV %.0f / %.0f", nameW, m.name[3] * k, hpW, v.playerHp._w))
+  local outE = {}
+  for _, s in pairs(v.slotOf) do
+    local t = s.hp.text._text or ""
+    if H.textWidth(s.hp.text, t, s.hp.text._fontSize) > s.hp.w then outE[#outE + 1] = t end
+  end
+  check("cadres compacts des ennemis : PV dans la barre", #outE == 0, table.concat(outE, ", "))
+
+  -- 6. visuels survolables : aucun cadre enfant dessiné (une animation d'échelle pourrait ne pas le suivre)
+  local function drawnRegions(f)
+    for _, kid in ipairs(rawget(f, "_kids") or {}) do
+      local kk = rawget(kid, "_kind")
+      if kk == "Texture" or kk == "FontString" then return true end
+      if kk ~= "AnimationGroup" and kk ~= "Animation" and kk ~= "MaskTexture" and drawnRegions(kid) then return true end
+    end
+    return false
+  end
+  local childBad, nh = {}, 0
+  for _, o in ipairs(H.objects) do
+    local face = rawget(o, "face")
+    if rawget(o, "_hoverable") and face then
+      nh = nh + 1
+      for _, kid in ipairs(rawget(face, "_kids") or {}) do
+        local kk = rawget(kid, "_kind")
+        if kk ~= "Texture" and kk ~= "FontString" and kk ~= "MaskTexture" and kk ~= "AnimationGroup"
+          and kk ~= "Animation" and drawnRegions(kid) then
+          childBad[#childBad + 1] = tostring(rawget(o, "_text") or rawget(o, "_kind"))
+        end
+      end
+    end
+  end
+  check(nh .. " visuels survolables : aucun cadre enfant dessiné", nh > 20 and #childBad == 0, table.concat(childBad, ", "))
+
+  -- netteté (suite) : les autres écrans
+  for _, sc in ipairs({ { SEED + 2, "merchant", "marchand" }, { SEED + 5, nil, "parcours" },
+    { SEED + 4, "event", "rencontre" }, { SEED + 3, "campfire", "feu de camp" } }) do
+    freshRun(sc[1], sc[2])
+    H.advance(1)
+    sharp(sc[3])
+  end
+  check(("pièces entières nettes à l'échelle %.2f (affichées au plus à leur taille stockée)"):format(scale),
+    #blurry == 0, table.concat(blurry, ", "))
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -258,12 +258,12 @@ add("btn_goldred", rs(gold, 0.5), 3856481, (295, 521, 406, 128), 0.5,
     "bouton rouge et or (128-GoldRedButton-Left + Right)", cap=24)
 piece("btn_close", 4698972, (39, 1, 36, 38), 1, "bouton de fermeture (RedButton-Exit-2x)", refine=True)
 
-# --- Cadres d'unité (Dragonflight, -2x, stockés à 0,75 ; barres à 0,6, étirées)
+# --- Cadres d'unité et barres (Dragonflight, -2x, stockés à 0,75)
 S_UNIT = 0.75
 piece("unit_player", 4642466, (1, 171, 396, 142), S_UNIT, "cadre du héros (UI-HUD-UnitFrame-Player-PortraitOn-2x)")
-piece("bar_hp", 4642466, (889, 415, 248, 40), 0.6, "barre de vie (…-Player-PortraitOn-Bar-Health-2x)")
-piece("bar_absorb", 4642466, (642, 524, 240, 18), 0.6, "barre d'Absorption (…-Bar-Mana-2x, mesurée à la main)")
-piece("bar_yellow", 4703662, (337, 209, 169, 15), 0.6, "barre jaune : incantation, réputation (…-Boss-Small-PortraitOff-Bar-Energy-2x)", refine=True)
+piece("bar_hp", 4642466, (889, 415, 248, 40), 0.75, "barre de vie (…-Player-PortraitOn-Bar-Health-2x)")
+piece("bar_absorb", 4642466, (642, 524, 240, 18), 0.75, "barre d'Absorption (…-Bar-Mana-2x, mesurée à la main)")
+piece("bar_yellow", 4703662, (337, 209, 169, 15), 0.75, "barre jaune : incantation, réputation (…-Boss-Small-PortraitOff-Bar-Energy-2x)", refine=True)
 piece("unit_boss", 4703662, (201, 1, 230, 112), S_UNIT, "cadre compact d'élite / boss, dragon d'or (…-Boss-Small-PortraitOff-2x)")
 # Cadre compact ordinaire : la moitié gauche du même cadre (sans le dragon) et son miroir.
 fr = crop(4703662, (203, 18, 90, 76))
@@ -272,13 +272,13 @@ clean.alpha_composite(fr, (0, 0))
 clean.alpha_composite(ImageOps.mirror(fr), (90, 0))
 add("unit_enemy", rs(clean, S_UNIT), 4703662, (203, 18, 90, 76), S_UNIT,
     "cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon)", cap=18)
-piece("bar_enemy", 4703662, (337, 165, 169, 20), 0.6, "barre de vie compacte (…-Boss-Small-PortraitOff-Bar-Health-2x)")
+piece("bar_enemy", 4703662, (337, 165, 169, 20), 0.75, "barre de vie compacte (…-Boss-Small-PortraitOff-Bar-Health-2x)")
 piece("elite_dragon", 1300837, (1, 1, 80, 80), 1, "dragon d'or des élites et boss (nameplates-icon-elite-gold)")
 
-# --- Cases d'icônes (barre d'action Dragonflight, -2x, stockées à 0,5)
-piece("slot_bg", 4615764, (359, 209, 128, 124), 0.5, "fond de case (UI-HUD-ActionBar-IconFrame-Slot-2x)")
-piece("slot_frame", 4615764, (359, 649, 92, 90), 0.5, "cadre de case (UI-HUD-ActionBar-IconFrame-2x)")
-piece("slot_hover", 4615764, (358, 543, 92, 94), 0.5, "cadre doré de survol (UI-HUD-ActionBar-IconFrame-Mouseover-2x, mesuré)", refine=True)
+# --- Cases d'icônes (barre d'action Dragonflight, -2x, stockées à 0,75 : nettes jusqu'à 60 unités)
+piece("slot_bg", 4615764, (359, 209, 128, 124), 0.75, "fond de case (UI-HUD-ActionBar-IconFrame-Slot-2x)")
+piece("slot_frame", 4615764, (359, 649, 92, 90), 0.75, "cadre de case (UI-HUD-ActionBar-IconFrame-2x)")
+piece("slot_hover", 4615764, (358, 543, 92, 94), 0.75, "cadre doré de survol (UI-HUD-ActionBar-IconFrame-Mouseover-2x, mesuré)", refine=True)
 
 # --- Anneaux dorés
 ring = crop(2406979, (12, 165, 130, 130))
@@ -296,7 +296,7 @@ piece("ring_small", 4691255, (295, 1, 61, 61), 1, "petit anneau doré : étapes 
 # --- Parcours (carte de vol)
 piece("boot", 1455734, (1, 187, 74, 74), 1, "botte ailée : position (taxi_frame_yellow)", refine=True)
 line = crop(1455735, (1, 0, 32, 32)).rotate(90, expand=True)
-add("taxi_line", line, 1455735, (1, 0, 32, 32), 1, "trait de trajet, couché (!UI-Taxi-Line)")
+add("taxi_line", line, 1455735, (1, 0, 32, 32), 1, "trait de trajet, couché (!UI-Taxi-Line)", stretch="h")
 piece("elite_node", 1121272, (203, 659, 64, 64), 1, "étape d'élite (VignetteKillElite)", refine=True)
 for col, fid in (("green", 137033), ("yellow", 137037), ("gray", 137032), ("red", 137035)):
     piece("pip_" + col, fid, (0, 0, 16, 16), 1, f"pastille de progression (ui-taxi-icon-{col})")
@@ -305,7 +305,7 @@ for col, fid in (("green", 137033), ("yellow", 137037), ("gray", 137032), ("red"
 piece("check_box", 4614134, (1, 1, 30, 29), 1, "case à cocher (checkbox-minimal)", refine=True)
 piece("check_mark", 4614134, (4, 31, 28, 28), 1, "coche (checkbox-minimal, coche jaune)", refine=True)
 piece("slider_l", 4567914, (14, 41, 11, 17), 1, "curseur, bout gauche (Minimal_SliderBar_Left)")
-piece("slider_m", 4567914, (0, 1, 1, 17), 1, "curseur, milieu (_Minimal_SliderBar_Middle)")
+piece("slider_m", 4567914, (0, 1, 1, 17), 1, "curseur, milieu (_Minimal_SliderBar_Middle)", stretch="h")
 piece("slider_r", 4567914, (1, 62, 11, 17), 1, "curseur, bout droit (Minimal_SliderBar_Right)")
 piece("slider_thumb", 4567914, (1, 20, 20, 19), 1, "poignée (Minimal_SliderBar_Button)")
 piece("arrow_l", 4567914, (1, 41, 11, 19), 1, "flèche gauche (Minimal_SliderBar_Button_Left)")
@@ -457,7 +457,7 @@ for n, im in PIECES.items():
     px, py = SLOT[n]
     e = {"file": "atlas.tga", "w": W, "h": H, "pw": im.width, "ph": im.height,
          "tc": [px / W, (px + im.width) / W, py / H, (py + im.height) / H], "fid": INFO[n]["fid"]}
-    for k in ("cap", "nine"):
+    for k in ("cap", "nine", "stretch"):
         if k in INFO[n]:
             e[k] = INFO[n][k]
     pieces[n] = e
@@ -474,6 +474,7 @@ head = ("-- Fichier GÉNÉRÉ par tools/build_wowui.py : ne pas modifier à la m
         "-- à réévaluer avant publication), EMBARQUÉES dans Media/WowUI (jamais d'atlas ni de chemin du client).\n"
         "-- pieces[nom] = { file, w × h (toile), pw × ph (pièce, pixels stockés), tc = coordonnées de texture\n"
         "-- de la pièce, cap = bouts d'un trois tranches (pixels stockés), tile = axe répété (fichier à part),\n"
+        "-- stretch = axe étiré par construction (milieu d'un rail, trait de trajet),\n"
         "-- fid = FileDataID de la source } ; meta = mesures pour la mise en page (pixels stockés).\n"
         "local _, ns = ...\n\n")
 LUA.write_text(head + "ns.WowSkin = " + lua({"root": LUA_ROOT, "pieces": pieces, "meta": META}) + "\n", encoding="utf-8")

@@ -322,7 +322,6 @@ Art.potions = {
   wisdom_elixir     = { icon = 134721, color = hex("#3fae4a"), tga = "INV_Potion_10" }, -- inv_potion_10
 }
 Art.potionFallback = { icon = 134831, color = hex("#b3402e") }
-Art.emptySlot = { icon = "Interface\\Buttons\\UI-EmptySlot" }
 
 function Art.relic(id)
   return Art.relics[id] or Art.relicFallback

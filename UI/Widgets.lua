@@ -574,10 +574,10 @@ function W.rect(parent, layer, sub, color, alpha)
   return t
 end
 
--- Disque (texture ronde du jeu, teintée).
+-- Disque teinté : disque blanc embarqué (Media/mask_disc), repli sur le disque du jeu.
 function W.disc(parent, layer, sub, color, alpha)
   local t = parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0)
-  t:SetTexture(Art.tex.circle)
+  if not W.setSkin(t, "mask_disc") then t:SetTexture(Art.tex.circle) end
   t:SetVertexColor(color[1], color[2], color[3], alpha or 1)
   return t
 end
@@ -839,7 +839,7 @@ function Plaque:Hide() self:SetShown(false) end
 
 ---------------------------------------------------------------------------
 -- Habillage WoW : pièces de l'interface du jeu embarquées (Media/WowUI, décrites par UI/WowSkin.lua,
--- fabriqué par tools/build_wowui.py). Jamais de SetAtlas ni de chemin Interface\… du client pour
+-- fabriqué par tools/build_wowui.py). Jamais d'atlas du jeu ni de chemin Interface\… du client pour
 -- l'habillage : sur WoW Forever, une texture absente s'afficherait en aplat vert sans qu'on le sache.
 ---------------------------------------------------------------------------
 -- Échelles d'affichage (unités par pixel stocké) : à l'échelle 115 % d'un écran où une unité vaut un
@@ -999,6 +999,13 @@ function W.threeSlice(host, name, layer, sub, opts)
   if host.HookScript then host:HookScript("OnSizeChanged", function(_, _, h) o:Layout(h) end) end
   o:Layout()
   return o
+end
+
+-- Marque un calque de survol (liseré d'or, cadre doré) : éteint au repos, allumé en fondu au survol
+-- (le harnais le contrôle comme un halo, U23).
+function W.hoverLayer(x)
+  if x.parts then for _, t in ipairs(x.parts) do t._glowLayer = true end else x._glowLayer = true end
+  return x
 end
 
 -- Neuf tranches d'une seule pièce étirée (parchemins) : marges m = { l, t, r, b } en pixels stockés,
@@ -1250,7 +1257,7 @@ function W.cardArt(id)
   return d and Art.schools[d.school] or nil
 end
 
--- Masque sur une texture d'icône (Media : disque "mask_disc" par défaut, "mask_roundsq", "medal_mask").
+-- Masque sur une texture d'icône (Media : disque "mask_disc" par défaut, ou "medal_mask").
 function W.roundMask(frame, tex, maskName)
   if not frame.CreateMaskTexture or not tex.AddMaskTexture then return end
   local m = frame:CreateMaskTexture()
@@ -1325,7 +1332,7 @@ function W.button(parent, label, w, h, onClick, style, size)
   b.base = W.threeSlice(face, gold and "btn_goldred" or "btn_red", "BACKGROUND", -6)
   if not gold then
     -- liseré d'or du survol et de la sélection : le bouton rouge et or par-dessus, en fondu
-    b.hot = W.threeSlice(face, "btn_goldred", "BACKGROUND", -5)
+    b.hot = W.hoverLayer(W.threeSlice(face, "btn_goldred", "BACKGROUND", -5))
     b.hot:SetAlpha(0)
   end
   b.label = W.label(face, "bold", size or (h >= 40 and 18 or (h >= 30 and 14 or 12.5)), C.wowGold)
@@ -1400,7 +1407,7 @@ function W.check(parent, label, getter, setter, color)
   b.box = W.wow(b, "check_box", "BACKGROUND", 0)
   b.box:SetAllPoints()
   b.mark = W.wow(b, "check_mark", "ARTWORK", 0)
-  b.mark:SetSize(20, 20)
+  b.mark:SetSize(19, 16)
   b.mark:SetPoint("CENTER", 2, 2)
   local fs = W.label(b, "body", 13, color or C.text)
   fs:SetPoint("LEFT", b, "RIGHT", 7, 0)
@@ -1426,21 +1433,21 @@ end
 -- s.minus, s.plus : flèches (boutons) ; s:Sync() replace la poignée.
 function W.slider(parent, w, get, step, setFrac)
   local s = CreateFrame("Frame", nil, parent)
-  s:SetSize(w, 18)
+  s:SetSize(w, 16)
   local track = CreateFrame("Button", nil, s)
   track:SetPoint("LEFT", 16, 0)
-  track:SetSize(w - 32, 17)
+  track:SetSize(w - 32, 14)
   s.track = track
   local l, m, r = W.wow(track, "slider_l", "BACKGROUND", 0), W.wow(track, "slider_m", "BACKGROUND", 0),
     W.wow(track, "slider_r", "BACKGROUND", 0)
-  l:SetSize(11, 17) l:SetPoint("LEFT")
-  r:SetSize(11, 17) r:SetPoint("RIGHT")
+  l:SetSize(9, 14) l:SetPoint("LEFT")
+  r:SetSize(9, 14) r:SetPoint("RIGHT")
   m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
   s.thumb = W.wow(track, "slider_thumb", "ARTWORK", 0)
-  s.thumb:SetSize(20, 19)
+  s.thumb:SetSize(17, 16)
   local function arrow(piece, d, side)
     local a = CreateFrame("Button", nil, s)
-    a:SetSize(11, 19)
+    a:SetSize(piece == "arrow_l" and 9 or 7.5, piece == "arrow_l" and 16 or 15)
     a:SetPoint(side, s, side, 0, 0)
     a.tex = W.wow(a, piece, "ARTWORK", 0)
     a.tex:SetAllPoints()
@@ -1587,7 +1594,7 @@ function W.slotOn(host, size, sub, owner)
   s.frame = W.wow(owner, "slot_frame", "ARTWORK", sub + 2)
   s.frame:SetSize(size, size * WP.slot_frame.ph / WP.slot_frame.pw)
   s.frame:SetPoint("CENTER", face, "CENTER", 0, 0)
-  s.hot = W.wow(owner, "slot_hover", "ARTWORK", sub + 3)
+  s.hot = W.hoverLayer(W.wow(owner, "slot_hover", "ARTWORK", sub + 3))
   s.hot:SetSize(size * 1.04, size * 1.04 * WP.slot_hover.ph / WP.slot_hover.pw)
   s.hot:SetPoint("CENTER", face, "CENTER", 0, 0)
   s.hot:SetAlpha(0)
@@ -1806,17 +1813,17 @@ end
 -- cur, size, detail, hint } (UI/Controller.lua).
 function W.repBar(parent, w)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(w, 17)
+  f:SetSize(w, 14)
   f:EnableMouse(true)
   local l, m, r = W.wow(f, "slider_l", "BACKGROUND", 0), W.wow(f, "slider_m", "BACKGROUND", 0),
     W.wow(f, "slider_r", "BACKGROUND", 0)
-  l:SetSize(11, 17) l:SetPoint("LEFT")
-  r:SetSize(11, 17) r:SetPoint("RIGHT")
+  l:SetSize(9, 14) l:SetPoint("LEFT")
+  r:SetSize(9, 14) r:SetPoint("RIGHT")
   m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
   f.fill = W.wow(f, "bar_yellow", "ARTWORK", 0)
   f.fill:SetVertexColor(0.95, 0.72, 0.2, 1) -- or plus sombre : le texte blanc reste lisible dessus
-  f.fill:SetPoint("TOPLEFT", 3, -3)
-  f.fill:SetPoint("BOTTOMLEFT", 3, 3)
+  f.fill:SetPoint("TOPLEFT", 3, -2.5)
+  f.fill:SetPoint("BOTTOMLEFT", 3, 2.5)
   f.label = W.label(f, "bold", 14, C.wowGold)
   f.label:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 2, 3)
   f.value = W.label(f, "bold", 11, C.text, "OVERLAY")

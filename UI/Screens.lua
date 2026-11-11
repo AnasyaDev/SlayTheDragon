@@ -146,7 +146,7 @@ local function plaque(parent)
   b.btn:SetPoint("TOPRIGHT", face, "TOPRIGHT", 0, 0)
   b.btn:SetHeight(OPT_BTN)
   b.base = W.threeSlice(b.btn, "btn_red", "BACKGROUND", -6, { parent = face })
-  b.hot = W.threeSlice(b.btn, "btn_goldred", "BACKGROUND", -5, { parent = face })
+  b.hot = W.hoverLayer(W.threeSlice(b.btn, "btn_goldred", "BACKGROUND", -5, { parent = face }))
   b.hot:SetAlpha(0)
   b.iconBox = CreateFrame("Frame", nil, face)
   b.iconBox:SetSize(OPT_ICON, OPT_ICON)
@@ -229,7 +229,7 @@ local function plaque(parent)
     if withIcon then
       W.setIcon(self.icon, W.itemEntry(o.item.kind, o.item.id), o.item.kind .. ":" .. tostring(o.item.id))
     end
-    for _, t in ipairs({ self.slot.bg, self.slot.icon, self.slot.frame }) do t:SetShown(withIcon) end
+    for _, t in ipairs({ self.slot.bg, self.slot.icon, self.slot.frame, self.slot.hot }) do t:SetShown(withIcon) end
     self.base:Layout(OPT_BTN)
     self.hot:Layout(OPT_BTN)
     self:Layout(o.label or o.id, sub, w, h, withIcon)
@@ -260,18 +260,18 @@ end
 -- t:Set(texte, couleur, prix, trop cher) ; texte vide = cachée. « Trop cher » : nombre en rouge.
 local function tagPill(parent)
   local t = CreateFrame("Frame", nil, parent)
-  t:SetSize(58, 18)
+  t:SetSize(58, 14)
   local l, m, r = W.wow(t, "slider_l", "BACKGROUND", 0), W.wow(t, "slider_m", "BACKGROUND", 0),
     W.wow(t, "slider_r", "BACKGROUND", 0)
-  l:SetSize(11, 18) l:SetPoint("LEFT")
-  r:SetSize(11, 18) r:SetPoint("RIGHT")
+  l:SetSize(9, 14) l:SetPoint("LEFT")
+  r:SetSize(9, 14) r:SetPoint("RIGHT")
   m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
   t.coin = t:CreateTexture(nil, "ARTWORK")
-  t.coin:SetSize(14, 14)
-  t.coin:SetPoint("LEFT", 6, 0)
+  t.coin:SetSize(13, 13)
+  t.coin:SetPoint("LEFT", 5, 0)
   W.roundMask(t, t.coin)
   W.setIcon(t.coin, Art.ui.gold, "ui:gold")
-  t.text = W.label(t, "heavy", 13, C.goldText)
+  t.text = W.label(t, "heavy", 12.5, C.goldText)
   t.text:SetPoint("CENTER", 0, 0.5)
   t:Hide()
   t.Set = function(self, text, color, isPrice, bad)
@@ -744,8 +744,8 @@ function Reward:Build(f)
   at(self.relic, f, 906 - 22, 273 - 22, 44, 44)
   self.relic:SetScript("OnClick", function() Reward:Collect("relic") end)
   -- coffre fermé
-  self.chest = groundObject(f, 120, "square")
-  at(self.chest, f, 457, 190, 120, 120)
+  self.chest = groundObject(f, 110, "round")
+  at(self.chest, f, 462, 195, 110, 110)
   W.setIcon(self.chest.icon, Art.ui.chest, "ui:chest")
   self.chest:SetScript("OnClick", function() Reward:OpenChest() end)
   self.loot = CreateFrame("Frame", nil, f) -- compatibilité harnais : butin affiché
@@ -1141,7 +1141,7 @@ local function serviceButton(parent)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
   b.base = W.threeSlice(face, "btn_red", "BACKGROUND", -6)
-  b.hot = W.threeSlice(face, "btn_goldred", "BACKGROUND", -5)
+  b.hot = W.hoverLayer(W.threeSlice(face, "btn_goldred", "BACKGROUND", -5))
   b.hot:SetAlpha(0)
   b.iconBox = CreateFrame("Frame", nil, face)
   b.iconBox:SetSize(30, 30)
@@ -1498,9 +1498,9 @@ function Map:Show(step)
         local walked = (s1 == "done" or s1 == "current") and (s2 == "done" or s2 == "current")
         local nextUp = s1 == "current" and s2 == "available" or (s1 == nil and s2 == "available")
         k = k + 1
-        if walked then self:Line(k, p1[1], p1[2], p2[1], p2[2], 40, 1)
-        elseif nextUp then self:Line(k, p1[1], p1[2], p2[1], p2[2], 40, 0.95)
-        else self:Line(k, p1[1], p1[2], p2[1], p2[2], 32, 0.5) end
+        if walked then self:Line(k, p1[1], p1[2], p2[1], p2[2], 27, 1)
+        elseif nextUp then self:Line(k, p1[1], p1[2], p2[1], p2[2], 27, 0.95)
+        else self:Line(k, p1[1], p1[2], p2[1], p2[2], 22, 0.55) end
       end
     end
   end

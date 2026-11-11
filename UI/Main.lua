@@ -289,7 +289,7 @@ end
 -- Nom de zone puis pastilles de progression, sur une ligne, centrés dans le cadre central (UI.mid, de
 -- largeur connue : layoutMid). Le nom est tronqué à la place laissée par les pastilles : rien ne se
 -- chevauche, quelle que soit sa longueur.
-local PIP, PIP_CUR, PIP_STEP = 12, 15, 14
+local PIP, PIP_CUR, PIP_STEP = 11, 13, 13
 local function layoutDots(r)
   local mid = UI.mid
   local midW = UI.midW or 300

@@ -83,7 +83,7 @@ end
 
 -- Cadre compact (direction B) au-dessus de la tête, intention dessous ; états sous les pieds. Le
 -- cadre ne sort jamais du haut du décor (FRAME_MIN_Y, coordonnées du contenu).
-local FRAME_W, FRAME_H, BOSS_H = 118, 46, 62
+local FRAME_W, FRAME_H, BOSS_H = 114, 46, 62
 local FRAME_MIN_Y = Scene.TOP + 4
 V.FRAME_W, V.FRAME_H = FRAME_W, FRAME_H
 local function placeInfo(s)
