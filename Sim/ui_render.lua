@@ -338,7 +338,8 @@ function R.svg(H, root, path, label)
         local vc = calls.SetVertexColor or { 1, 1, 1, 1 }
         local cc = calls.SetColorTexture
         local href = mediaHref(tex)
-        local iw, ih = href and R.pngSize(dir, href)
+        local iw, ih
+        if href then iw, ih = R.pngSize(dir, href) end
         if href and iw and w > 0.1 and h > 0.1 then
           -- texture de Media : motif de l'image entière, cadré par les coordonnées de texture
           local tc = calls.SetTexCoord or { 0, 1, 0, 1 }
@@ -346,9 +347,14 @@ function R.svg(H, root, path, label)
           if u1 == u0 then u1 = u0 + 1 end
           if v1 == v0 then v1 = v0 + 1 end
           local tw, th = w / (u1 - u0), h / (v1 - v0)
+          -- coordonnées dans l'image (pièce d'un atlas, tranche) : vue recadrée de l'image ; au-delà
+          -- (matière répétée), motif
+          local inside = u0 >= 0 and u1 <= 1 and v0 >= 0 and v1 <= 1 and u1 > u0 and v1 > v0
           local pid = newId("p")
-          defs[#defs + 1] = string.format('<pattern id="%s" patternUnits="userSpaceOnUse" x="%.2f" y="%.2f" width="%.2f" height="%.2f"><image width="%.2f" height="%.2f" preserveAspectRatio="none" href="%s"/></pattern>',
-            pid, x - u0 * tw, y - v0 * th, tw, th, tw, th, href)
+          if not inside then
+            defs[#defs + 1] = string.format('<pattern id="%s" patternUnits="userSpaceOnUse" x="%.2f" y="%.2f" width="%.2f" height="%.2f"><image width="%.2f" height="%.2f" preserveAspectRatio="none" href="%s"/></pattern>',
+              pid, x - u0 * tw, y - v0 * th, tw, th, tw, th, href)
+          end
           local clip = ""
           local mask = calls.AddMaskTexture and calls.AddMaskTexture[1]
           if mask then
@@ -364,8 +370,13 @@ function R.svg(H, root, path, label)
             clip = string.format(' clip-path="url(#%s)"', cid)
           end
           local desat = calls.SetDesaturated and calls.SetDesaturated[1]
-          out[#out + 1] = string.format('<g%s%s opacity="%.2f"><rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="url(#%s)"%s/></g>',
-            clip, filter(vc, desat), a, x, y, w, h, pid, tf)
+          if inside then
+            out[#out + 1] = string.format('<g%s%s opacity="%.2f"><g%s><svg x="%.2f" y="%.2f" width="%.2f" height="%.2f" viewBox="%.3f %.3f %.3f %.3f" preserveAspectRatio="none"><image width="%d" height="%d" href="%s"/></svg></g></g>',
+              clip, filter(vc, desat), a, tf, x, y, w, h, u0 * iw, v0 * ih, (u1 - u0) * iw, (v1 - v0) * ih, iw, ih, href)
+          else
+            out[#out + 1] = string.format('<g%s%s opacity="%.2f"><rect x="%.2f" y="%.2f" width="%.2f" height="%.2f" fill="url(#%s)"%s/></g>',
+              clip, filter(vc, desat), a, x, y, w, h, pid, tf)
+          end
         elseif tex == CIRCLE then
           local fill, fa = col(vc), (vc[4] or 1) * a
           local tc = calls.SetTexCoord

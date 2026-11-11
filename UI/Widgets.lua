@@ -1429,8 +1429,7 @@ function W.slider(parent, w, get, step, setFrac)
   s:SetSize(w, 18)
   local track = CreateFrame("Button", nil, s)
   track:SetPoint("LEFT", 16, 0)
-  track:SetPoint("RIGHT", -16, 0)
-  track:SetHeight(17)
+  track:SetSize(w - 32, 17)
   s.track = track
   local l, m, r = W.wow(track, "slider_l", "BACKGROUND", 0), W.wow(track, "slider_m", "BACKGROUND", 0),
     W.wow(track, "slider_r", "BACKGROUND", 0)
@@ -1454,7 +1453,7 @@ function W.slider(parent, w, get, step, setFrac)
   s.plus = arrow("arrow_r", 1, "RIGHT")
   s.Sync = function(self)
     local f = max(0, min(1, get() or 0))
-    local tw = (track:GetWidth() or (w - 32)) - 12
+    local tw = w - 32 - 12
     self.thumb:ClearAllPoints()
     self.thumb:SetPoint("CENTER", track, "LEFT", 6 + tw * f, 0)
   end
@@ -1465,7 +1464,7 @@ function W.slider(parent, w, get, step, setFrac)
     local sc = track:GetEffectiveScale() or 1
     local left = track:GetLeft()
     if not left then return end
-    local tw = (track:GetWidth() or 1) - 12
+    local tw = w - 32 - 12
     setFrac(max(0, min(1, (x / sc - left - 6) / max(1, tw))))
     s:Sync()
   end
@@ -1815,6 +1814,7 @@ function W.repBar(parent, w)
   r:SetSize(11, 17) r:SetPoint("RIGHT")
   m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
   f.fill = W.wow(f, "bar_yellow", "ARTWORK", 0)
+  f.fill:SetVertexColor(0.95, 0.72, 0.2, 1) -- or plus sombre : le texte blanc reste lisible dessus
   f.fill:SetPoint("TOPLEFT", 3, -3)
   f.fill:SetPoint("BOTTOMLEFT", 3, 3)
   f.label = W.label(f, "bold", 14, C.wowGold)

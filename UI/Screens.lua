@@ -1498,9 +1498,9 @@ function Map:Show(step)
         local walked = (s1 == "done" or s1 == "current") and (s2 == "done" or s2 == "current")
         local nextUp = s1 == "current" and s2 == "available" or (s1 == nil and s2 == "available")
         k = k + 1
-        if walked then self:Line(k, p1[1], p1[2], p2[1], p2[2], 30, 1)
-        elseif nextUp then self:Line(k, p1[1], p1[2], p2[1], p2[2], 30, 0.95)
-        else self:Line(k, p1[1], p1[2], p2[1], p2[2], 24, 0.4) end
+        if walked then self:Line(k, p1[1], p1[2], p2[1], p2[2], 40, 1)
+        elseif nextUp then self:Line(k, p1[1], p1[2], p2[1], p2[2], 40, 0.95)
+        else self:Line(k, p1[1], p1[2], p2[1], p2[2], 32, 0.5) end
       end
     end
   end

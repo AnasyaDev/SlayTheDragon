@@ -1132,6 +1132,11 @@ while guard < 400 do
           v.cards[2].hover = false
           v:PlaceCard(v.cards[2])
           v:Spread()
+          -- options par-dessus le combat (aperçu seulement)
+          H.slash("options")
+          H.advance(0.2)
+          snap("options")
+          H.key("ESCAPE")
         end
         if not C().over() then
           combatReloaded = true
@@ -1168,6 +1173,8 @@ while guard < 400 do
     finished = true
     break
   else
+    -- parcours en cours de route (position, chemin parcouru) : aperçu seulement
+    if k == "map" and ((H.ns.Controller.runInfo() or {}).floor or 0) >= 3 then snap("parcours-milieu") end
     decide(state)
   end
   H.advance(1)
@@ -2326,6 +2333,7 @@ do
       for i = 1, n do ids[i] = group[i] end
       fight(ids)
       H.advance(0.1)
+      if scale == 1 and n == 4 then snap("combat-boss") end
       layouts = layouts + 1
       local content = R.rect(ns.UI.content)
       local k = scale -- unités du contenu -> unités résolues
