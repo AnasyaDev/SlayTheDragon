@@ -1535,7 +1535,7 @@ function W.repBar(parent, w)
     local b = self.bar
     if not b then return end
     tt:AddLine(b.label, 1, 0.82, 0)
-    tt:AddLine(b.levelName .. (b.size and (" : " .. b.cur .. " / " .. b.size) or " (palier maximal)"), 1, 1, 1)
+    tt:AddLine(b.levelName .. (b.size and (": " .. b.cur .. " / " .. b.size) or " (max level)"), 1, 1, 1)
     if b.hint then
       local lines = type(b.hint) == "table" and b.hint or { b.hint }
       for _, l in ipairs(lines) do tt:AddLine(l, 0.8, 0.8, 0.8, true) end

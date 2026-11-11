@@ -3697,6 +3697,115 @@ do
   m:Hide()
 end
 
+print("U28 textes affichés en anglais : aucune chaîne française dans Core/, Data/, UI/ ni le TOC")
+do
+  -- Chaînes du code (hors commentaires) des fichiers du TOC, plus Title et Notes du TOC. Une chaîne est
+  -- française si elle contient une lettre accentuée latine, des guillemets « », ou un mot-outil
+  -- français. Exceptions : valeurs enregistrées dans la sauvegarde gardées telles quelles (zoom) et
+  -- textes de mesure de police (jamais lus par le joueur).
+  local KEEP = { ["fluide"] = true, ["lisse"] = true, ["net"] = true, ["\195\137\195\169"] = true, ["\195\137g"] = true }
+  -- mots-outils et vocabulaire du jeu en français (comparés en minuscules), sans homographes anglais
+  local FR_WORDS = { "de", "du", "des", "les", "le", "la", "une", "et", "pour", "avec", "aux", "au", "est", "pas",
+    "sur", "dans", "sans", "vous", "votre", "vos", "ou", "il", "elle", "ici", "trop", "faut", "aucun", "aucune",
+    "non", "oui", "carte", "cartes", "tour", "tours", "ennemi", "ennemis", "pv", "po", "recharge", "incantation",
+    "pouvoir", "pioche", "inflige", "soigne", "soins", "gagne", "donne", "applique", "fermer", "retour", "passer",
+    "continuer", "partir", "rien", "coffre", "rencontre", "marchand", "douleur", "expiation", "absorption", "ombre",
+    "bibelot", "bibelots", "essai", "suivant", "peint", "modeles", "clic", "acte", "inconnu", "inconnue", "vendu",
+    "indisponible", "choix", "cible", "chemin", "emplacement", "nouvelle", "titre", "centre", "quarantaine",
+    "palier", "neutre", "amical", "galvanisant", "disette", "tyrannique", "rugissement", "horion", "rafale",
+    "blindage", "moisson", "griffe", "morsure", "guette", "garde", "invoque", "attaque", "chargement", "schisme",
+    "extase", "rivepatte", "moissonneur", "cocher", "fouet", "mentale", "liquide", "consumée", "conservée",
+    "manquant", "manquants", "manquante", "absente", "invalide", "maintenant", "nombre", "classe", "sauvegarde",
+    "toucher", "psychique", "frappe", "mortelle", "vieux", "tante", "fermier", "gardien", "bricoleur", "chercheur",
+    "logement", "souffle", "dernier", "perdu", "pouv", "rech" }
+  local function isFrench(s)
+    if KEEP[s] then return nil end
+    local plain = s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", " ")
+    -- lettres latines accentuées (U+00C0 à U+017F, sauf × et ÷) ; guillemets « »
+    for c1, c2 in plain:gmatch("([\195\196\197])(.)") do
+      local b2 = c2:byte()
+      if not (c1 == "\195" and (b2 == 0x97 or b2 == 0xB7)) then return "lettre accentuée" end
+    end
+    if plain:find("\194\171", 1, true) or plain:find("\194\187", 1, true) then return "guillemets « »" end
+    -- typographie française : espace avant « : », « ! », « ? », « ; »
+    if plain:find("[%w%)] [:!?;]") or plain:find("^ :") then return "espace avant la ponctuation" end
+    local padded = " " .. plain:lower():gsub("[%p%d]", " ") .. " "
+    for _, w in ipairs(FR_WORDS) do
+      if padded:find(" " .. w .. " ", 1, true) then return "mot « " .. w .. " »" end
+    end
+    return nil
+  end
+  -- extraction des chaînes d'un source Lua (commentaires et chaînes longues compris)
+  local function strings(src)
+    local out, i, n, line = {}, 1, #src, 1
+    while i <= n do
+      local c = src:sub(i, i)
+      if c == "\n" then line = line + 1 i = i + 1
+      elseif src:sub(i, i + 1) == "--" then
+        local eq = src:match("^%-%-%[(=*)%[", i)
+        if eq then
+          local j = src:find("]" .. eq .. "]", i, true)
+          local body = src:sub(i, j)
+          line = line + select(2, body:gsub("\n", ""))
+          i = j + #eq + 2
+        else
+          local j = src:find("\n", i, true)
+          i = j or n + 1
+        end
+      elseif src:match("^%[=*%[", i) then
+        local eq = src:match("^%[(=*)%[", i)
+        local j = src:find("]" .. eq .. "]", i, true)
+        local body = src:sub(i + #eq + 2, j - 1)
+        out[#out + 1] = { line, body }
+        line = line + select(2, body:gsub("\n", ""))
+        i = j + #eq + 2
+      elseif c == "\"" or c == "'" then
+        local j, buf = i + 1, {}
+        while j <= n do
+          local d = src:sub(j, j)
+          if d == "\\" then buf[#buf + 1] = src:sub(j, j + 1) j = j + 2
+          elseif d == c or d == "\n" then break
+          else buf[#buf + 1] = d j = j + 1 end
+        end
+        out[#out + 1] = { line, table.concat(buf) }
+        i = j + 1
+      else
+        i = i + 1
+      end
+    end
+    return out
+  end
+  local found, nStr, nFiles = {}, 0, 0
+  local toc = assert(io.open(root .. "/" .. ADDON .. ".toc", "r"))
+  for raw in toc:lines() do
+    local l = raw:gsub("\r", "")
+    local field, value = l:match("^## (%a+): (.*)$")
+    if field == "Title" or field == "Notes" then
+      nStr = nStr + 1
+      local why = isFrench(value)
+      if why then found[#found + 1] = ADDON .. ".toc " .. field .. " : « " .. value .. " » (" .. why .. ")" end
+    elseif l:match("%.lua$") and not l:match("^#") then
+      local path = l:gsub("\\", "/")
+      local f = assert(io.open(root .. "/" .. path, "r"))
+      local src = f:read("*a")
+      f:close()
+      nFiles = nFiles + 1
+      for _, s in ipairs(strings(src)) do
+        nStr = nStr + 1
+        local why = isFrench(s[2])
+        if why then found[#found + 1] = path .. ":" .. s[1] .. " : « " .. s[2] .. " » (" .. why .. ")" end
+      end
+    end
+  end
+  toc:close()
+  check(("%d fichiers du TOC, %d chaînes : aucune en français"):format(nFiles, nStr), #found == 0,
+    table.concat(found, "\n        "))
+  -- le détecteur reconnaît bien du français (témoins)
+  check("détecteur : témoins français reconnus, anglais accepté", isFrench("Inflige 6.") and isFrench("Ce n'est pas votre tour.")
+    and isFrench("Démence") and isFrench("« Merci. »") and not isFrench("Deal 6.") and not isFrench("Gain Atonement 1 ⌛")
+    and not isFrench("\"Thank you.\" × 2 · —"))
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end
