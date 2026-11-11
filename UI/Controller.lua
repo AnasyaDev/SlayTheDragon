@@ -717,7 +717,7 @@ local function rewardStep(exp)
     title = ev.name
     text = eventResult(exp)
   elseif r.kind == "chest" then
-    text = "La serrure du coffre cède."
+    text = "Vous ouvrez le coffre."
   else
     text = "Le combat est gagné."
   end
@@ -771,7 +771,7 @@ local function campfireStep(exp)
     actionOption(avail, { id = "leave", label = "Repartir", text = "Sans s'arrêter." }),
   }
   return { kind = "campfire", title = "Feu de camp",
-    text = "Les braises crépitent. " .. exp.hp .. " PV sur " .. exp.maxHp .. ".", options = opts }
+    text = "Vous avez " .. exp.hp .. " PV sur " .. exp.maxHp .. ".", options = opts }
 end
 
 local function deckStep(exp, view)

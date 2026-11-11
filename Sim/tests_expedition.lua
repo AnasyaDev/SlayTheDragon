@@ -842,7 +842,7 @@ test("pari : tiré à l'entrée, figé au rechargement, issues annoncées", func
       wins = wins + 1
       eq(exp.phase, "reward"); eq(exp.reward.goldGained, 20)
       eq(exp.reward.potion, roll.win[1])
-      assert(exp.event.result:find("fiole", 1, true))
+      assert(exp.event.result:find("potion", 1, true))
     else
       losses = losses + 1
       eq(exp.hp, 65 - 7); eq(exp.phase, "event")

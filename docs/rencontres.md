@@ -19,6 +19,10 @@ moissonneurs, chercheurs d'or).
 - **Tirages figés.** Cartes, bibelots, potions, récompense d'un combat et issue d'un pari sont
   tirés à l'entrée de la rencontre (flux `events`) et stockés dans `exp.event.rolls`.
 - **PV hors combat** : jamais sous 1 ; les PV max jamais sous 1, les PV ramenés au maximum.
+- **Écriture : registre des textes de quête de la VF.** Le personnage parle au joueur (vouvoiement,
+  sauf parlers établis : gnolls, gobelins, kobolds, murlocs) : qui il est, ce qui se passe, ce qu'il
+  demande. Les résultats disent ce qui s'est passé, simplement. Ni métaphore, ni personnification,
+  ni chute, ni points de suspension dramatiques ; une phrase qui n'apporte ni fait ni demande saute.
 
 ## Familles et tirage
 
@@ -74,7 +78,7 @@ Notation : `-` perte, `+` gain ; « récompense habituelle » = celle d'un comba
 | `gnoll_raiders` Les maraudeurs Rivepatte | 3 | clé ≥ +2 | camp, Grisgueule |
 
 **La ferme des Saldean** — la halte réconfortante du début.
-1. Manger la soupe : +10 PV.
+1. Manger le ragoût : +10 PV.
 2. Apprendre sa recette : une carte commune parmi 3.
 3. Aider le fermier : -5 PV puis +5 PV max.
 
@@ -85,7 +89,7 @@ Notation : `-` perte, `+` gain ; « récompense habituelle » = celle d'un comba
 
 **La Colline des sentinelles** — l'entraînement et le retrait payant ; le tabard ouvre l'armurerie.
 1. S'entraîner : -6 PV, 2 cartes améliorées au hasard.
-2. Faire un don : paie 40 po, retire une carte.
+2. Donner à la milice : paie 40 po, retire une carte.
 3. Repartir : rien.
 4. *(Tabard de Hurlevent)* Montrer son tabard : une carte peu commune parmi 3.
 Intention : récompenser un bibelot commun sans le rendre obligatoire.
@@ -119,11 +123,11 @@ inférieurs à un feu de camp, sauf à payer).
 **L'épouvantail qui grince** — purge ou savoir interdit.
 1. Brûler l'épouvantail : -5 PV, retire une carte.
 2. Fouiller sa paille : -4 PV max, une carte rare parmi 3.
-3. Le laisser grincer : rien.
+3. Ne pas y toucher : rien.
 
 **Le gardien du phare** *(étape ≥ 4)* — veille ou repos, avant le boss.
 1. Garder le feu toute la nuit : -10 PV, copie une carte du deck.
-2. Dormir dans la lanterne : soigne 30 % des PV max.
+2. Dormir au phare : soigne 30 % des PV max.
 Intention : le choix « renforcer le deck ou arriver en forme » juste avant VanCleef.
 
 **Les maraudeurs Rivepatte** *(clé ≥ +2)* — un péage, en clé mythique.
