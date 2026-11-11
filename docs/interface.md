@@ -135,10 +135,10 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   restantes (le glouton d'avant finissait parfois en moins de lignes que prévu, puis le bloc recentré
   sortait du biseau : Embrasement empyréen restait à 8) ; mots insécables (`W.cardWords`) : « : » avec le
   mot d'avant, un nombre qui finit la phrase (« Pioche 1. ») avec le mot d'avant, un nombre seul avec le
-  mot d'après (« 12 Absorption », « +1 Démence », « 2 tours »). Répartition (harnais U22, métriques de
-  Baloo Chettan 2, 68 cartes base et améliorées) : texte 10 → 34, 9,5 → 2, 9 → 10, 8,5 → 3, 8 → 17, 7 → 2
-  (Esprit de rédemption et +), soit 49 à 8,5 ou plus (35 avant raccourcis) ; avant : 8 → 55, 7,5 → 5,
-  7 → 6, 6 → 2. Nom 11 → 44, 10 → 8, 9 → 6, 8 → 4, 7 → 5, sous le plancher : Suppression de la douleur+
+  mot d'après (« 12 Absorption », « +1 Démence »). Répartition depuis le langage en mots-clés (voir
+  « Langage des cartes », harnais U22, métriques de Baloo Chettan 2, 68 cartes base et améliorées) :
+  texte 10 → 28, 9,5 → 6, 9 → 6, 8,5 → 6, 8 → 19, 7,5 → 1, 7 → 2 (Schisme et +), soit 46 à 8,5 ou plus ;
+  avant les mots-clés : 10 → 34, 9,5 → 2, 9 → 10, 8,5 → 3, 8 → 17, 7 → 2 (49 à 8,5 ou plus). Nom 11 → 44, 10 → 8, 9 → 6, 8 → 4, 7 → 5, sous le plancher : Suppression de la douleur+
   (6,5). La largeur de Baloo et le biseau limitent la troisième ligne : un texte de trois lignes dont la
   dernière dépasse ~59 unités reste à 8 ; textes raccourcis dans `Data/Priest.lua` (règles et chiffres
   inchangés). Noms abrégés : « MdP : » (Mot de pouvoir) et « MdlO : » (Mot de l'ombre).
@@ -226,6 +226,105 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   dessiné, donc rien chargé) : il est maintenant à l'écran, presque transparent ; et à chaque ouverture
   de la fenêtre (0,1 s après, et 1 s après la première), `W.refreshFonts` repose police et texte de tous
   les textes créés par `W.label` / `W.text` puis refait la mise en page des cartes.
+
+## Langage des cartes (mots-clés, validé par le joueur)
+
+Façon Hearthstone : les tournures deviennent des mots-clés visibles, en couleur, expliqués au survol.
+
+### Écriture de `text` (`Data/Priest.lua`, Lua pur, la simulation ne lit pas `text`)
+
+- **Une clause par ligne** : les clauses sont séparées par `\n` dans `text` ; une phrase par clause,
+  terminée par un point (sauf les lignes d'état). Textes impersonnels, sans « tu » ni « vous ».
+- **Condition sur un état** : « Nom : effet » = si l'état est présent ; sur soi pour un bienfait
+  (« Expiation : +1 mana. »), sur la cible pour un affaiblissement (« Douleur : +2 Démence, pioche 1. »).
+- **Conditions nommées** : « Exécution : » (la cible a la moitié de ses PV ou moins), « Déferlement : »
+  (dépense toute la Démence), « Dernier souffle : » (une fois par combat, en tombant à 0 PV), « Ombre : »
+  (s'applique aux cartes d'ombre). Une clause conditionnelle commence toujours une ligne, et la clause
+  qui la suit aussi (« +1 Démence. » sous « Exécution : inflige 12. » ne doit pas paraître conditionnel).
+- **États posés** : chaque état posé par les effets de la carte (`{ "apply", id, n }`) a sa ligne, à la fin
+  du texte, sans point : « Donne » pour un état posé sur soi, « Applique » sur un ennemi (« à tous » si
+  `all`), nom, nombre, puis « ⌛ » si le nombre est une durée en tours (état `duration` de
+  `Core/Statuses.lua` : Expiation, Armure fracassée, Démoralisé ; et Étourdi, marqué `turns = true` pour
+  l'affichage seulement : son nombre compte des tours perdus). Les états à intensité (Douleur,
+  Récupération) n'ont pas de sablier. « Inflige » reste réservé aux dégâts. Ordre : « Applique » d'abord,
+  puis « Donne ». Exceptions : un état posé sous condition (Récupération de Dernier souffle, Douleur de
+  Déferlement) reste dans sa clause (« Déferlement : applique Douleur 2 par Démence. ») ; un état qui porte
+  le nom de la carte (Suppression de la douleur) est décrit, pas nommé.
+- **Mots de la plaque du bas** : « Pouvoir. » et « Incantation. » en tête, « Recharge N. », « Consumée. »,
+  « Conservée. » en dernier, chacun sur sa clause ; retirés à l'affichage (`KEYWORD_STRIP`).
+
+### Affichage (`UI/Widgets.lua`)
+
+- `W.cardBody` : mots de la plaque retirés ; nom d'état collé à son nombre par une espace insécable
+  (« Douleur 5 », « fracassée 2 ⌛ » ne se coupent pas), « à tous » insécable ; chiffres blancs (verts
+  s'ils changent à l'amélioration) ; **noms d'états et conditions nommées en or** (`W.KEYWORD_COLOR` =
+  `C.goldText` #ffd660, seule couleur d'accent : la police ne mêle pas deux graisses). Les verbes
+  « Donne » / « Applique », l'Absorption et la Démence (ressources) restent dans la couleur du texte.
+- **Sablier** : « ⌛ » (et l'espace qui le précède) devient à la mise en page une séquence
+  `|TInterface\AddOns\SlayTheDragon\Media\hourglass.tga:h:l:0:0:32:32:0:28:0:32:255:255:255|t`
+  (`W.hourglass(taille)`) : forme de `CreateTextureMarkup` (Blizzard_SharedXMLBase/TextureUtil.lua :
+  hauteur, largeur, décalages, taille du fichier, coordonnées en pixels) plus la couleur de sommet r:g:b
+  (0–255), forme qu'emploie Blizzard pour l'icône de l'armurerie dans la discussion
+  (ChatFrameUtil.lua) ; champs entiers (`%d` partout chez Blizzard). Hauteur = taille × 0,68 arrondie
+  (5 à 7 unités : les chiffres de Baloo Chettan 2 font 0,62 cadratin), largeur rognée à 28/32 (la marge
+  gauche du dessin tient lieu d'espace après le nombre). La mesure par le client (`GetStringWidth`) et
+  celle du faux client (`H.textWidth`) comptent la largeur de l'icône. Texture : `tools/build_glyphs.py`
+  (Pillow, suréchantillonné ×8 puis réduit ; TGA 32 bits, 32 × 32, blanc à alpha, même écriture que
+  `tools/build_media.py`, aperçu `build/media_png/hourglass.png`, `planche` = rendus à 8–16 px).
+- **Lignes** (`W.cardTries`, `W.cardParagraphs`) : essais dans l'ordre, au premier qui tient : une clause
+  par ligne (une clause peut tenir sur plusieurs lignes, elle commence toujours une ligne) aux paliers
+  10 à 8,5 ; puis, palier par palier de 10 à 6 : une clause par ligne, texte coulé (les clauses simples
+  qui se suivent partagent une ligne, chaque ligne d'état reste seule), états groupés en une dernière
+  ligne (« Applique Douleur 3. Donne Récupération 1 », le verbe du second état collé à son nom). La ligne
+  d'état commence toujours une ligne et finit le texte. Le bloc est centré verticalement ; s'il ne tient
+  pas, il remonte par paliers (`W.BODY_LIFT` : 0,5 / 0,33 / 0,17 / 0 du jeu vertical) pour que le biseau
+  du bas laisse plus de largeur à la dernière ligne ; zone utile `TZ` inchangée. Une couleur coupée par
+  un retour est fermée et rouverte (`W.balanceColors`).
+- **Infobulles** (`W.cardKeywords`, `W.keywordText`) : mots de la plaque, puis conditions nommées
+  (`Art.keywords` : execute, surge, lastBreath, shadow), conditions sur un état (`Art.conditionLine` :
+  « Expiation : effet en plus sous Expiation. », « Douleur : effet en plus si la cible a Douleur. »), états
+  posés ou cités avec leur définition courte (`Art.statusShort`, ≤ 60 caractères ; le texte complet de
+  `Core/Statuses.lua` reste celui des jetons), le sablier (« ⌛ : le nombre compte des tours. »), puis
+  Absorption, Démence, Interruption. Le texte de la carte dans une infobulle (jeton de Pouvoir, aperçu
+  d'amélioration) passe par `W.cardTextLines` : une ligne par clause, couleurs et sablier comme sur la
+  carte (12 unités).
+- **Pouvoirs joués** : déjà présents avant ce travail : `CombatView:RenderPlayer` ajoute à la rangée de
+  jetons du héros un jeton par carte de `c.player.powers` (icône de la carte, liseré doré), infobulle =
+  nom, texte et mots-clés (`W.fillCardTooltip(…, { full = true })`). Aucun changement de règle ni de
+  sauvegarde ; le harnais (U27) le vérifie pour Forme d'ombre, Extase+, Esprit de rédemption, Apothéose.
+
+### Textes (avant → après)
+
+Planche de toutes les cartes : `lua5.1 Sim/ui_harness.lua 1 build/snap` puis
+`rsvg-convert build/snap/cartes_mots_cles.svg -o build/cartes_mots_cles.png`.
+
+| Carte | Avant | Après (`/` = retour de clause) |
+|---|---|---|
+| MdlO : Douleur | Douleur 5. +1 Démence. | +1 Démence. / Applique Douleur 5 |
+| MdP : Radiance | Expiation 1 tour. Gagne 4 Absorption. | Gagne 4 Absorption. / Donne Expiation 1 ⌛ |
+| Pénitence | Inflige 6 trois fois. Chaque coup sous Expiation : +2 Absorption. | Inflige 6 trois fois. / Expiation : +2 Absorption par coup. |
+| MdP : Réconfort | Inflige 5. Sous Expiation : +1 mana. Expiation 1 tour. | Inflige 5. / Expiation : +1 mana. / Donne Expiation 1 ⌛ |
+| Barrière lumineuse | Expiation 1 tour. Gagne 12 Absorption. | Gagne 12 Absorption. / Donne Expiation 1 ⌛ |
+| Schisme | Inflige 3. La cible a Armure fracassée 2 tours. Expiation 1 tour. | Inflige 3. / Applique Armure fracassée 2 ⌛ / Donne Expiation 1 ⌛ |
+| Guérison de l'ombre | Soigne 10. Douleur 2 sur soi. +1 Démence. | Soigne 10. / +1 Démence. / Donne Douleur 2 |
+| Évangélisme | Expiation 2 tours. Pioche 2. | Pioche 2. / Donne Expiation 2 ⌛ |
+| Fouet mental | Inflige 8. Si la cible a Douleur : +2 Démence et pioche 1. | Inflige 8. / Douleur : +2 Démence, pioche 1. |
+| Peste dévorante | Dépense toute la Démence : Douleur égale au double. | Déferlement : applique Douleur 2 par Démence. |
+| Forme d'ombre | +2 Démence. Cartes d'ombre : dégâts et Douleur +3. | +2 Démence. / Ombre : dégâts et Douleur +3. |
+| Toucher vampirique | Douleur 3. Récupération 1. +1 Démence. | +1 Démence. / Applique Douleur 3 / Donne Récupération 1 |
+| Incandescence mentale | Douleur 4 à tous les ennemis. +1 Démence. | +1 Démence. / Applique Douleur 4 à tous |
+| MdlO : Mort | Inflige 6, ou 12 si la cible a la moitié de ses PV ou moins. +1 Démence. | Inflige 6. / Exécution : inflige 12. / +1 Démence. |
+| Cri psychique | Tous les ennemis sont Démoralisés 2 tours. +1 Démence. | +1 Démence. / Applique Démoralisé 2 ⌛ à tous |
+| Éruption du Vide | Dépense toute la Démence : inflige 4 + 4 par point. | Déferlement : inflige 4 + 4 par Démence. |
+| Flammes sacrées | Inflige 24 et Douleur 3. | Inflige 24. / Applique Douleur 3 |
+| Nova sacrée | Récupération 2. Inflige 4 à tous les ennemis. | Inflige 4 à tous. / Donne Récupération 2 |
+| Mot sacré : Châtier | Inflige 7. Étourdi 1. | Inflige 7. / Applique Étourdi 1 ⌛ |
+| Esprit de rédemption | Une fois par combat, à 0 PV : reste à 1 PV, Récupération 6, tour suivant gratuit. | Dernier souffle : reste à 1 PV, Récupération 6, tour gratuit. |
+| Rénovation | Récupération 3. | Donne Récupération 3 |
+| Halo | Récupération 3. Inflige 15 à tous les ennemis. | Inflige 15 à tous. / Donne Récupération 3 |
+| Embrasement empyréen | Inflige 28. Armure fracassée 2 tours. | Inflige 28. / Applique Armure fracassée 2 ⌛ |
+
+Les autres cartes ne changent que par leurs retours de clause (mots de la plaque omis ci-dessus).
 
 ## Retours du premier essai (survols, deck, paysages, bandeau, vouvoiement)
 
@@ -386,8 +485,9 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
   carte n'explique plus que ses mots-clés (et l'amélioration, et la raison d'un refus) : la carte se lit
   d'elle-même. Un mot-clé = une ligne « Nom : effet. » (`Art.keywordLine`), 60 caractères au plus, l'effet
   principal seulement (« Incantation : se lance au début du prochain tour. ») ; plusieurs mots-clés =
-  une ligne chacun, en bloc. Les aides (potion, réputation) : une idée par ligne. Les états (`Core/Statuses.lua`)
-  gardent leur texte, sur la même ligne que leur nom.
+  une ligne chacun, en bloc. Les aides (potion, réputation) : une idée par ligne. Les états cités par une carte ont une
+  définition courte (`Art.statusShort`, voir « Langage des cartes ») ; leurs jetons gardent le texte de
+  `Core/Statuses.lua`.
 - **Retour visuel** : carte jouée qui file vers sa cible (ou le héros), chiffres flottants (dégâts blancs,
   Absorption bleue, soins verts), portion de vie perdue qui reste claire puis se vide, secousse et éclair
   rouge de l'unité touchée, animation du modèle, mort en fondu, intention qui « s'exécute » (la bulle
@@ -419,6 +519,7 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | `Sim/ui_harness.lua` | Harnais hors jeu (faux client WoW) | — |
 | `Sim/ui_render.lua` | Rendu SVG des cadres du faux client (instantanés d'écrans, textures de `Media/` comprises) | — |
 | `tools/build_media.py` | Fabrication de `Media/` et de `UI/SkinData.lua` (hors TOC, non déployé) | — |
+| `tools/build_glyphs.py` | Icônes en ligne du texte des cartes : `Media/hourglass.tga` (sablier, Pillow ; hors TOC, non déployé) | — |
 
 `UI\Scene.lua` a été ajouté au TOC par la piste E (client relancé depuis) ; la peau ajoute
 **`UI\SkinData.lua`** (avant `UI\Art.lua`) et le dossier `Media/` : **relancer le client** au prochain essai.
@@ -660,6 +761,11 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 - Le zoom des survols (mode `net` : animation Scale + textes Vertex pendant le mouvement, échelle réelle
   posée à l'arrivée) : fluidité, textes immobiles pendant l'agrandissement, aucun sursaut ni clignotement à
   l'arrivée (moment de la bascule), texte net une fois agrandi ; `/slay zoom` pour comparer avec `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
+- Le **sablier** dans le texte des cartes (séquence |T à 14 champs) : affiché, blanc, net à 10 px, à
+  la hauteur des chiffres et **centré verticalement** sur la ligne (supposé : aucune source ne dit où le
+  client place une icône en ligne ; décalage y possible dans la séquence), non déformé par le rognage
+  28/32, et sa largeur bien comptée par `GetStringWidth` (sinon une ligne recoupée par le client le
+  montrerait). Avec la police de repli (Friz Quadrata), le texte reste juste mais plus large.
 - La mise en page des textes de carte : mesurée par le client (`GetStringWidth`, `GetStringHeight`,
   `GetNumLines`, `IsTruncated`) ; hors jeu, seules les métriques du faux client (Baloo Chettan 2, ligne
   de 1,47 cadratin) la vérifient.
@@ -700,7 +806,7 @@ frame (seules des textures pivotent), aucun `loadstring`.
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (473 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (482 vérifications, graine 1)
 lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
                                                #   (aperçus de Media copiés dans build/snap/media)
 for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
@@ -733,9 +839,19 @@ bulle d'intention ; mana) ; **textes des cartes** (U22 : les 34 cartes, de base 
 et injouables avec leur plaque de raison : chaque ligne posée, marges comprises, sur les pixels sombres
 de `Media/card_panel.tga` et hors de la gemme, au-dessus des plaques ; nom dans la bande opaque de
 `Media/card_ribbon.tga` ; aucune recoupe par le client ; répartition par palier et cartes sous le
-plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom net (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; cycle `/slay zoom`, ancienne valeur `anim`) ; zoom fluide et saut du mode net (U26 : sauvegarde ; repos identique au net à ±0,01 sur 99 régions ; survol sans `SetScale`, arrivée identique au net ; sortie ; cible changée en route ; fenêtre cachée puis remontrée ; carte jamais montrée ; plaques créées après l'armement ; vols ; écrans construits en fluide sans région née sous une animation ; aucun cadre enfant dessiné sous un visuel ; bascule du mode net sans déplacement ajouté ; carte survolée de la main dans la fenêtre à toutes les places ; noms abrégés) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus). Le faux client mesure les textes avec les
+plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom net (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; cycle `/slay zoom`, ancienne valeur `anim`) ; zoom fluide et saut du mode net (U26 : sauvegarde ; repos identique au net à ±0,01 sur 99 régions ; survol sans `SetScale`, arrivée identique au net ; sortie ; cible changée en route ; fenêtre cachée puis remontrée ; carte jamais montrée ; plaques créées après l'armement ; vols ; écrans construits en fluide sans région née sous une animation ; aucun cadre enfant dessiné sous un visuel ; bascule du mode net sans déplacement ajouté ; carte survolée de la main dans la fenêtre à toutes les places ; noms abrégés) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus) ; **langage des cartes** (U27 : chaque état posé
+par les effets a sa ligne « Donne » (soi) / « Applique » (ennemi, « à tous ») avec nom et nombre exacts, en
+dernier, sans point, sablier seulement pour une durée, jamais « N tour(s) » ni « Inflige » pour un état,
+textes impersonnels, libellés « Nom : » connus ; Exécution, Déferlement, Dernier souffle et Ombre
+exactement sur les cartes qui en ont la règle, chiffres d'Exécution et de Déferlement justes ; mise en
+page : ligne d'état en début de ligne et en dernier, une clause par ligne en mode « clauses », essais
+dans l'ordre, sablier posé en séquence |T autant de fois que dans la source et compté dans la mesure,
+séquence à 14 champs entiers, `Media/hourglass.tga` 32 × 32 blanc ; couleurs : or pour les seuls noms
+d'états et conditions, blanc / vert pour les chiffres ; infobulle de chaque carte : une explication par
+mot-clé, état, condition et sablier employés, 60 caractères au plus ; jeton et infobulle des Pouvoirs
+joués). Le faux client mesure les textes avec les
 avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne de 1,47 cadratin (hhea),
-retours explicites puis par mots, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
+retours explicites puis par mots, icônes |T comptées à leur largeur, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
@@ -744,7 +860,9 @@ de camp, amélioration, rencontre, bibelot de classe, bilan, méta, panneau du d
 textures de `Media/` y sont dessinées (aperçus PNG : coordonnées de texture, couleur de sommet,
 désaturation, masques approchés, rotation), les textes en Baloo Chettan 2 avec ombre et couleurs ; icônes
 du jeu = carrés bleus, modèles = silhouettes en pointillés, illustrations = aplats ; textes mesurés comme
-le faux client ; planche `cartes.svg` (textes longs, injouable, mot-clé, noms longs). Comparé aux planches (`combat_pack.jpg`…) pour cette peau ; il ne remplace pas un essai.
+le faux client, icônes |T de `Media/` posées dans la ligne (centrées sur la hauteur de ligne : supposé) ;
+planche `cartes.svg` (textes longs, injouable, mot-clé, noms longs) et `cartes_mots_cles.svg` (toutes les
+cartes, base et améliorée). Comparé aux planches (`combat_pack.jpg`…) pour cette peau ; il ne remplace pas un essai.
 
 ## Tests en vol (pour toi)
 
@@ -804,7 +922,11 @@ Ensuite (retours du premier essai) :
    fermeture par Échap, clic hors du panneau, « Fermer ». Cartes améliorées en vert.
 6. **Bandeau** : en combat et sur la récompense, « Marche de l'Ouest » en haut au centre, points de
    progression en dessous, sans chevauchement, même avec 6 bibelots et une clé.
-7. **Textes** : plus de tutoiement dans l'interface (bulles, raisons grisées, bilan, infobulles des
+7. **Langage des cartes** : mots-clés en or (Expiation, Douleur, Exécution, Déferlement…), chiffres
+   blancs, lignes « Donne … » / « Applique … » en dernier ; sablier ⌛ visible après le nombre des durées
+   (Radiance, Schisme, Cri psychique, Châtier), aligné sur les chiffres ; Schisme lisible (palier 7) ;
+   survol d'une carte : une ligne par mot-clé ; Forme d'ombre jouée : jeton sous le héros, effet au survol.
+8. **Textes** : plus de tutoiement dans l'interface (bulles, raisons grisées, bilan, infobulles des
    intentions et des mots-clés). Les textes des cartes et des rencontres viennent de `Data/` (autre piste).
 
 Ensuite, la liste habituelle : `/reload` en combat et sur une récompense (même état), potions (boire, à
