@@ -4,7 +4,7 @@
 -- Les FileDataID d'icônes et de textures ci-dessous sont confirmés par le MCP « wow »
 -- (wow_icon_search / wow_file_search, liste de fichiers du client 12.1.5). Les identifiants de
 -- créatures viennent du cache du client Forever (voir Art.enemies) ; ceux des sorts et des animations
--- ne sont PAS vérifiables hors jeu : `/slay art` et `/slay modeles` listent en jeu ce qui manque
+-- ne sont PAS vérifiables hors jeu : `/slay art` et `/slay models` listent en jeu ce qui manque
 -- (voir docs/interface.md).
 local _, ns = ...
 
@@ -76,15 +76,15 @@ Art.tex = {
 local BG = "Interface\\AddOns\\SlayTheDragon\\Media\\Backgrounds\\"
 Art.backgrounds = {
   elwynn = { file = BG .. "elwynn.tga", embedded = true, key = "elwynn", ratio = 2.019, source = 7377860,
-    name = "Forêt d'Elwynn (logement, Midnight)" },
+    name = "Elwynn Forest (housing, Midnight)" },
   farm = { file = BG .. "farm.tga", embedded = true, key = "farm", ratio = 2.241, source = 407226,
-    name = "Pics-Jumeaux (ferme et chemin)" },
+    name = "Twin Peaks (farm and path)" },
   deadmines = { file = BG .. "deadmines.tga", embedded = true, key = "deadmines", ratio = 2.359, source = 131833,
-    name = "Mortemines (écran classique)" },
+    name = "The Deadmines (classic screen)" },
   ruins = { file = BG .. "ruins.tga", embedded = true, key = "ruins", ratio = 2.629, source = 7963782,
-    name = "Ruines de Lordaeron (écran Forever)" },
+    name = "Ruins of Lordaeron (Forever screen)" },
   coast = { file = BG .. "coast.tga", embedded = true, key = "coast", ratio = 2.221, source = 427941,
-    name = "Gilnéas (phare et côte)" },
+    name = "Gilneas (lighthouse and coast)" },
 }
 local B = Art.backgrounds
 
@@ -92,7 +92,7 @@ local B = Art.backgrounds
 -- s'affiche toujours. Repli (plus nécessaire) : les candidats par FileDataID ou chemin du client.
 -- Aucun test fiable ne dit, sur ce client, si un tel fichier existe : un fichier absent est dessiné en
 -- aplat vert, et SetTexture / GetTextureFileID / IsObjectLoaded le disent pourtant présent. Ils ne
--- s'affichent donc que VALIDÉS par le joueur (`/slay decor essai`, puis `ok` / `non` ; verdicts dans
+-- s'affichent donc que VALIDÉS par le joueur (`/slay scenery test`, puis `ok` / `no` ; verdicts dans
 -- options.artChecks), et seulement si le fond embarqué manquait à la liste.
 -- `file` = FileDataID ou chemin ; `name` = nom annoncé pendant l'essai ; `crop` = { gauche, droite,
 -- haut, bas } en fraction de l'image, pour la bande 1034 × 380 (≈ 2,7:1) : ≈ 0,65 de la hauteur pour
@@ -106,22 +106,22 @@ local B = Art.backgrounds
 Art.illustrations = {
   elwynn = {
     B.elwynn,
-    { file = 7377860, crop = { 0, 1, 0.16, 0.86 }, name = "Logement d'Elwynn (Midnight)" },
-    { file = 7963776, crop = { 0, 1, 0.18, 0.83 }, name = "Royaumes de l'Est (écran Forever)" },
-    { file = 131839, crop = { 0, 1, 0.14, 0.64 }, name = "Royaumes de l'Est (écran classique)" },
+    { file = 7377860, crop = { 0, 1, 0.16, 0.86 }, name = "Elwynn housing (Midnight)" },
+    { file = 7963776, crop = { 0, 1, 0.18, 0.83 }, name = "Eastern Kingdoms (Forever screen)" },
+    { file = 131839, crop = { 0, 1, 0.14, 0.64 }, name = "Eastern Kingdoms (classic screen)" },
     { file = "Interface\\Glues\\LoadingScreens\\LoadScreenEasternKingdom", crop = { 0, 1, 0.14, 0.64 },
-      name = "Royaumes de l'Est (écran classique, par chemin)" },
+      name = "Eastern Kingdoms (classic screen, by path)" },
   },
   deadmines = {
     B.deadmines,
-    { file = 131833, crop = { 0, 1, 0.22, 0.72 }, name = "Mortemines (écran classique)" },
+    { file = 131833, crop = { 0, 1, 0.22, 0.72 }, name = "The Deadmines (classic screen)" },
     { file = "Interface\\Glues\\LoadingScreens\\LoadScreenDeadmines", crop = { 0, 1, 0.22, 0.72 },
-      name = "Mortemines (écran classique, par chemin)" },
-    { file = 7963777, crop = { 0, 1, 0.18, 0.83 }, name = "Excavation (écran Forever)" },
+      name = "The Deadmines (classic screen, by path)" },
+    { file = 7963777, crop = { 0, 1, 0.18, 0.83 }, name = "Excavation (Forever screen)" },
   },
   ruins = {
     B.ruins,
-    { file = 7963782, crop = { 0, 1, 0.18, 0.83 }, name = "Ruines de Lordaeron (écran Forever)" },
+    { file = 7963782, crop = { 0, 1, 0.18, 0.83 }, name = "Ruins of Lordaeron (Forever screen)" },
     "elwynn",
   },
   farm = { B.farm, "elwynn" },
@@ -132,7 +132,7 @@ Art.illustrations = {
 -- embarqué cadré par `focus` (hauteur de la bande montrée : 0 = haut de l'image, 1 = bas), candidat du
 -- client décalé verticalement de `shift` (fraction) ; `paint` = décor peint en couches unies aux
 -- couleurs des maquettes, toujours dessiné dessous (repli). Point d'extension : ajouter une entrée ici
--- (et `scene = "<clé>"` dans une rencontre) suffit ; `/slay decor` bascule illustré / peint.
+-- (et `scene = "<clé>"` dans une rencontre) suffit ; `/slay scenery` bascule illustré / peint.
 Art.scenes = {
   road = { art = "elwynn", focus = 0.62, tint = { 1, 0.96, 0.88 }, paint = "fields" },   -- route et combats
   farm = { art = "farm", focus = 0.55, shift = -0.04, tint = { 1, 0.95, 0.82 }, paint = "farm" },
@@ -230,13 +230,13 @@ Art.rarityText = {
 
 -- Voies : couleur du cercle du médaillon, de la ligne de type, nom affiché.
 Art.paths = {
-  start      = { name = "Départ",     ring = hex("#8a6a3a"), ink = hex("#6b4a22") },
+  start      = { name = "Starter",     ring = hex("#8a6a3a"), ink = hex("#6b4a22") },
   discipline = { name = "Discipline", ring = hex("#7fb6e8"), ink = hex("#2f5f8a") },
-  shadow     = { name = "Ombre",      ring = hex("#7b4bb3"), ink = hex("#4f2a82") },
-  holy       = { name = "Sacré",      ring = hex("#e2b93b"), ink = hex("#8a4a12") },
+  shadow     = { name = "Shadow",      ring = hex("#7b4bb3"), ink = hex("#4f2a82") },
+  holy       = { name = "Holy",      ring = hex("#e2b93b"), ink = hex("#8a4a12") },
 }
-Art.typeName = { attack = "Sort", skill = "Sort", power = "Pouvoir" }
-Art.schoolName = { holy = "Sacré", shadow = "Ombre" }
+Art.typeName = { attack = "Spell", skill = "Spell", power = "Power" }
+Art.schoolName = { holy = "Holy", shadow = "Shadow" }
 
 ---------------------------------------------------------------------------
 -- Ennemis
@@ -344,8 +344,8 @@ Art.intents = {
   interrupted = { icon = 132219, color = "defend", tga = "Ability_Kick" }, -- ability_kick
 }
 Art.intentName = {
-  attack = "Attaque", defend = "Défense", cast = "Incante", watch = "Guette",
-  debuff = "Affaiblit", buff = "Renforce", heal = "Soigne", summon = "Invoque",
+  attack = "Attack", defend = "Defend", cast = "Casting", watch = "Watch",
+  debuff = "Debuff", buff = "Buff", heal = "Heal", summon = "Summon",
 }
 
 ---------------------------------------------------------------------------
@@ -409,34 +409,34 @@ Art.rim = {
 -- Mots-clés (infobulles) : une ligne « Nom : effet. » par mot-clé, 60 caractères au plus, l'effet
 -- principal et rien d'autre (le reste se découvre en jouant). N = nombre de tours (Recharge).
 Art.keywords = {
-  cast = { name = "Incantation", text = "se lance au début du prochain tour." },
-  cooldown = { name = "Recharge", text = "revient en main après N." },
-  exhaust = { name = "Consumée", text = "quitte le combat une fois jouée." },
-  retain = { name = "Conservée", text = "reste en main à la fin du tour." },
-  power = { name = "Pouvoir", text = "reste actif jusqu'à la fin du combat." },
-  absorb = { name = "Absorption", text = "absorbe les dégâts jusqu'au prochain tour." },
-  demence = { name = "Démence", text = "ressource gagnée par les cartes d'ombre." },
-  interrupt = { name = "Interruption", text = "annule le sort qu'un ennemi incante." },
+  cast = { name = "Cast", text = "resolves at the start of the next turn." },
+  cooldown = { name = "Cooldown", text = "returns to hand after N." },
+  exhaust = { name = "Exhaust", text = "removed from combat once played." },
+  retain = { name = "Retain", text = "stays in hand at the end of the turn." },
+  power = { name = "Power", text = "stays active until the end of combat." },
+  absorb = { name = "Absorb", text = "absorbs damage until the next turn." },
+  demence = { name = "Insanity", text = "resource gained by Shadow cards." },
+  interrupt = { name = "Interrupt", text = "cancels the spell an enemy is casting." },
   -- conditions nommées du texte des cartes (« Nom : effet »)
-  execute = { name = "Exécution", text = "si la cible a la moitié de ses PV ou moins." },
-  surge = { name = "Déferlement", text = "dépense toute la Démence pour l'effet." },
-  lastBreath = { name = "Dernier souffle", text = "une fois par combat, en tombant à 0 PV." },
-  shadow = { name = "Ombre", text = "s'applique aux cartes d'ombre." },
+  execute = { name = "Execute", text = "if the target has half its HP or less." },
+  surge = { name = "Surge", text = "spends all Insanity for the effect." },
+  lastBreath = { name = "Last Breath", text = "once per combat, upon dropping to 0 HP." },
+  shadow = { name = "Shadow", text = "applies to Shadow cards." },
   -- sablier du texte des cartes (« Donne Expiation 1 ⌛ »)
-  turns = { name = "⌛", text = "durée de l'état, en tours." },
+  turns = { name = "⌛", text = "status duration, in turns." },
 }
 
 -- Définition courte d'un état pour l'infobulle d'une carte (« Nom : effet. », 60 caractères au plus ;
 -- le texte complet de Core/Statuses.lua reste celui des jetons d'état).
 Art.statusShort = {
-  atonement = "chaque carte qui inflige des dégâts rend 2 PV.",
-  pain = "N dégâts par tour, puis N baisse de 1.",
-  regen = "soigne N par tour, puis N baisse de 1.",
-  armor_broken = "subit 25 % de dégâts en plus.",
-  demoralized = "inflige 25 % de dégâts en moins.",
-  stunned = "perd son prochain tour.",
-  halved = "dégâts subis divisés par deux.",
-  force = "N dégâts de plus par coup.",
+  atonement = "each card that deals damage restores 2 HP.",
+  pain = "N damage per turn, then N drops by 1.",
+  regen = "heals N per turn, then N drops by 1.",
+  armor_broken = "takes 25% more damage.",
+  demoralized = "deals 25% less damage.",
+  stunned = "loses its next turn.",
+  halved = "damage taken is halved.",
+  force = "N more damage per hit.",
 }
 
 -- Ligne d'un état cité par une carte : nom en or, définition courte.
@@ -444,7 +444,7 @@ function Art.statusLine(id)
   local s = ns.Statuses[id]
   local name = s and s.name or id
   local text = Art.statusShort[id] or (s and s.text and s.text:gsub("^%u", string.lower)) or ""
-  return "|cffffd100" .. name .. "|r : " .. text
+  return "|cffffd100" .. name .. "|r: " .. text
 end
 
 -- Ligne d'une condition sur un état (« Expiation : … ») : sur soi pour un bienfait, sur la cible
@@ -452,8 +452,8 @@ end
 function Art.conditionLine(id)
   local s = ns.Statuses[id]
   local name = s and s.name or id
-  if s and s.debuff then return "|cffffd100" .. name .. " :|r effet en plus si la cible a " .. name .. "." end
-  return "|cffffd100" .. name .. " :|r effet en plus sous " .. name .. "."
+  if s and s.debuff then return "|cffffd100" .. name .. ":|r bonus effect if the target has " .. name .. "." end
+  return "|cffffd100" .. name .. ":|r bonus effect while under " .. name .. "."
 end
 
 -- Ligne d'un mot-clé : nom en or, effet ; n = nombre de tours d'une Recharge.
@@ -461,8 +461,8 @@ function Art.keywordLine(key, label, n)
   local kw = Art.keywords[key]
   if not kw then return label or key end
   local text = kw.text
-  if n then text = text:gsub("N", n .. " tour" .. (n > 1 and "s" or "")) end
-  return "|cffffd100" .. (label or kw.name) .. "|r : " .. text
+  if n then text = text:gsub("N", n .. " turn" .. (n > 1 and "s" or "")) end
+  return "|cffffd100" .. (label or kw.name) .. "|r: " .. text
 end
 
 -- Animations des modèles (identifiants AnimationData usuels ; à confirmer en jeu).

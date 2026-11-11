@@ -31,33 +31,34 @@ C.ui = {}
 
 C.REASONS = {
   -- combat (Core/Combat.lua)
-  phase = "Ce n'est pas votre tour.",
-  card = "Carte introuvable.",
-  unplayable = "Cette carte ne se joue pas.",
-  mana = "Pas assez de mana.",
-  casting = "Une incantation est déjà en cours.",
-  forbidden = "Interdit par un Pouvoir actif.",
-  condition = "Condition non remplie.",
-  target = "Cible invalide.",
-  over = "Le combat est terminé.",
-  combat = "Le combat doit d'abord se terminer.",
-  potions = "Les potions ne sont pas encore utilisables en combat.",
+  phase = "It's not your turn.",
+  card = "Card not found.",
+  unplayable = "This card can't be played.",
+  mana = "Not enough mana.",
+  casting = "A cast is already in progress.",
+  forbidden = "Forbidden by an active Power.",
+  condition = "Condition not met.",
+  target = "Invalid target.",
+  over = "The combat is over.",
+  combat = "The combat must end first.",
+  potions = "Potions can't be used in combat yet.",
   -- expédition (Core/Expedition.lua, Core/Meta.lua, Core/Save.lua)
-  ["or"] = "Pas assez d'or.",
-  emplacement = "Plus d'emplacement de potion libre.",
-  article = "Déjà vendu.",
-  carte = "Impossible avec cette carte.",
-  chemin = "Étape inaccessible.",
-  action = "Impossible ici.",
-  potion = "Aucune potion à prendre.",
-  index = "Choix invalide.",
-  choix = "Un choix est d'abord nécessaire.",
-  ["déjà choisi"] = "Choix déjà fait.",
-  deck = "Deck trop petit.",
-  ["amélioration"] = "Aucune carte à améliorer.",
-  ["terminée"] = "L'expédition est terminée.",
-  ["clé verrouillée"] = "Cette clé n'est pas encore débloquée.",
-  ["expédition en cours"] = "Une expédition est déjà en cours.",
+  gold = "Not enough gold.",
+  slot = "No free potion slot.",
+  item = "Already sold.",
+  badCard = "Not possible with this card.",
+  path = "Stage out of reach.",
+  action = "Not possible here.",
+  potion = "No potion to take.",
+  index = "Invalid choice.",
+  choice = "A choice is needed first.",
+  chosen = "Choice already made.",
+  deck = "Deck too small.",
+  upgrade = "No card to upgrade.",
+  relic = "Relic already owned.",
+  ended = "The expedition is over.",
+  ["key locked"] = "This key isn't unlocked yet.",
+  running = "An expedition is already in progress.",
 }
 
 function C.reasonText(why)
@@ -132,8 +133,8 @@ function C.validateCombat(c)
   for i = 1, #c.enemies do
     local e = c.enemies[i]
     local def = ns.Enemies[e.id]
-    if not def then return false, "ennemi inconnu " .. tostring(e.id) end
-    if not e.dead and e.intent and not def.moves[e.intent] then return false, "intention" end
+    if not def then return false, "unknown enemy " .. tostring(e.id) end
+    if not e.dead and e.intent and not def.moves[e.intent] then return false, "move" end
   end
   return true
 end
@@ -141,41 +142,41 @@ end
 local function knownIds(list, registry, what)
   for i = 1, #(list or {}) do
     local id = list[i]
-    if id and not registry[id] then return false, what .. " inconnu " .. tostring(id) end
+    if id and not registry[id] then return false, "unknown " .. what .. " " .. tostring(id) end
   end
   return true
 end
 
 function C.validateExpedition(exp)
-  local ok, why = knownIds(exp.relics, ns.Relics, "bibelot")
+  local ok, why = knownIds(exp.relics, ns.Relics, "relic")
   if not ok then return false, why end
   ok, why = knownIds(exp.potions, ns.Potions, "potion")
   if not ok then return false, why end
   if exp.combat then
     ok, why = C.validateCombat(exp.combat)
     if not ok then return false, why end
-    ok, why = knownIds(exp.combat.relics, ns.Relics, "bibelot")
+    ok, why = knownIds(exp.combat.relics, ns.Relics, "relic")
     if not ok then return false, why end
   end
   local r = exp.reward
   if r then
-    ok, why = knownIds(r.cards, ns.Cards, "carte")
+    ok, why = knownIds(r.cards, ns.Cards, "card")
     if not ok then return false, why end
-    if r.relic and not ns.Relics[r.relic] then return false, "bibelot inconnu" end
-    if r.potion and not ns.Potions[r.potion] then return false, "potion inconnue" end
+    if r.relic and not ns.Relics[r.relic] then return false, "unknown relic" end
+    if r.potion and not ns.Potions[r.potion] then return false, "unknown potion" end
   end
   if exp.shop then
     for _, k in ipairs({ "cards", "relics", "potions" }) do
       local reg = k == "cards" and ns.Cards or k == "relics" and ns.Relics or ns.Potions
       for _, it in ipairs(exp.shop[k] or {}) do
-        if not reg[it.id] then return false, "article inconnu " .. tostring(it.id) end
+        if not reg[it.id] then return false, "unknown item " .. tostring(it.id) end
       end
     end
   end
   if exp.event and exp.event.id and not (ns.Events and ns.Events[exp.event.id]) then
-    return false, "rencontre inconnue"
+    return false, "unknown encounter"
   end
-  return knownIds(exp.startRelics, ns.Relics, "bibelot")
+  return knownIds(exp.startRelics, ns.Relics, "relic")
 end
 
 ---------------------------------------------------------------------------
@@ -191,7 +192,7 @@ function C.restore()
   if exp then
     local ok, why = C.validateExpedition(exp)
     if not ok then
-      Save.quarantine(db, "interface : " .. tostring(why))
+      Save.quarantine(db, "interface: " .. tostring(why))
       C.restoreNote = why
     else
       if exp.combat then
@@ -232,12 +233,12 @@ function C.abandon()
   return true
 end
 
-local FIGHT_TITLE = { combat = "Combat", elite = "Élite", boss = "Boss" }
+local FIGHT_TITLE = { combat = "Combat", elite = "Elite", boss = "Boss" }
 
 -- Applique une action d'expédition. Renvoie ok, raison, événements de combat produits.
 function C.act(a)
   local exp = C.exp()
-  if not exp then return false, "terminée" end
+  if not exp then return false, "ended" end
   local c = exp.combat
   local title = exp.fight and FIGHT_TITLE[exp.fight.kind]
   local kindBefore = exp.fight and exp.fight.kind
@@ -339,7 +340,7 @@ end
 
 function C.discardPotion(slot)
   local exp = C.exp()
-  if not exp then return false, "terminée" end
+  if not exp then return false, "ended" end
   if exp.phase == "combat" then return false, "combat" end
   local ok, why = C.act({ "discardPotion", slot })
   notify("step")
@@ -480,7 +481,7 @@ end
 local function actionOption(avail, o)
   if o.disabled == nil and not avail[o.id] then
     o.disabled = true
-    if not o.reason then o.reason = C.reasonFor({ parse(o.id) }) or "Indisponible." end
+    if not o.reason then o.reason = C.reasonFor({ parse(o.id) }) or "Unavailable." end
   end
   return o
 end
@@ -507,16 +508,16 @@ local function affixLine(affixes, key_)
     local a = ns.Affixes[affixes[i]]
     names[i] = a and a.name or affixes[i]
   end
-  return "Clé +" .. key_ .. " : " .. table.concat(names, ", ") .. "."
+  return "Key +" .. key_ .. ": " .. table.concat(names, ", ") .. "."
 end
 C.affixLine = affixLine
 
 -- Aide d'une barre de réputation : une ligne par palier.
 local function levelHint(kind)
   if kind == "class" then
-    return { "Amical, Honoré : nouvelles cartes.", "Révéré : bibelot de classe au départ.", "Exalté : titre." }
+    return { "Friendly, Honored: new cards.", "Revered: class relic at the start.", "Exalted: title." }
   end
-  return { "Chaque palier : bibelots, potions et rencontres.", "Exalté : un bibelot de plus chez le marchand." }
+  return { "Each level: relics, potions and encounters.", "Exalted: one more relic at the merchant." }
 end
 
 -- Barre de réputation : { label, points, level, levelName, cur, size, hint }.
@@ -533,7 +534,7 @@ local function sortedClasses()
   return list
 end
 
-local RESULT = { won = "victoire", lost = "défaite", abandoned = "abandon", abandon = "abandon" }
+local RESULT = { won = "victory", lost = "defeat", abandoned = "abandoned", abandon = "abandoned" }
 
 local function journalLine(e)
   local parts = {}
@@ -541,8 +542,8 @@ local function journalLine(e)
   local cls = e.class and ns.Classes[e.class]
   parts[#parts + 1] = (cls and cls.name or "?") .. (e.key and (" +" .. e.key) or "")
   parts[#parts + 1] = RESULT[e.result] or tostring(e.result)
-  if e.floor then parts[#parts + 1] = "étape " .. e.floor end
-  if e.rep then parts[#parts + 1] = "+" .. e.rep .. " réputation" end
+  if e.floor then parts[#parts + 1] = "stage " .. e.floor end
+  if e.rep then parts[#parts + 1] = "+" .. e.rep .. " reputation" end
   return table.concat(parts, " · "), e.result == "won"
 end
 
@@ -562,13 +563,13 @@ local function startStep()
   local st = C.startInfo()
   local text = ""
   local last = db.journal[#db.journal]
-  if last then text = "Dernière expédition : " .. (journalLine(last)) .. "." end
+  if last then text = "Last expedition: " .. (journalLine(last)) .. "." end
   if C.restoreNote then
-    text = text .. "\n|cffff6060L'expédition sauvegardée était illisible (" .. C.restoreNote
-      .. ") : elle a été mise de côté.|r"
+    text = text .. "\n|cffff6060The saved expedition was unreadable (" .. C.restoreNote
+      .. "): it has been set aside.|r"
   end
   if ns.Persist.readOnly then
-    text = text .. "\n|cffff6060Sauvegarde d'une version plus récente de l'addon : rien ne sera enregistré.|r"
+    text = text .. "\n|cffff6060Save from a newer version of the addon: nothing will be saved.|r"
   end
   local opts = {}
   for _, cid in ipairs(st.classes) do
@@ -576,20 +577,20 @@ local function startStep()
     local cs = db.meta.classes[cid]
     local lv = Meta.level(cs and cs.rep or 0)
     opts[#opts + 1] = { id = "class:" .. cid, group = "class", label = cd.name or cid,
-      text = (cd.hp or "?") .. " PV, " .. #(cd.deck or {}) .. " cartes · " .. Meta.levelName(lv),
+      text = (cd.hp or "?") .. " HP, " .. #(cd.deck or {}) .. " cards · " .. Meta.levelName(lv),
       selected = cid == st.class }
   end
   for k = 0, Meta.MAX_KEY do
     local o = { id = "key:" .. k, group = "key", label = "+" .. k, selected = k == st.key,
-      text = affixLine(Meta.affixesFor(k), k) or "Sans affixe." }
+      text = affixLine(Meta.affixesFor(k), k) or "No affix." }
     if k > st.keyMax then
       o.disabled = true
-      o.reason = "Une victoire à +" .. st.keyMax .. " ouvre la clé +" .. (st.keyMax + 1) .. "."
+      o.reason = "A victory at +" .. st.keyMax .. " unlocks key +" .. (st.keyMax + 1) .. "."
     end
     opts[#opts + 1] = o
   end
-  opts[#opts + 1] = { id = "go", label = "Partir en expédition", text = (Map.ACTS[1] and Map.ACTS[1].name or "") }
-  opts[#opts + 1] = { id = "ui:meta", label = "Réputation et journal" }
+  opts[#opts + 1] = { id = "go", label = "Start expedition", text = (Map.ACTS[1] and Map.ACTS[1].name or "") }
+  opts[#opts + 1] = { id = "ui:meta", label = "Reputation and log" }
   return { kind = "start", title = "Slay the Dragon", text = text, options = opts,
     class = st.class, key = st.key, keyMax = st.keyMax, affixes = Meta.affixesFor(st.key) }
 end
@@ -602,63 +603,63 @@ local function metaStep()
     local cs = m.classes[cid]
     local b = repBar(ns.Classes[cid].name or cid, cs and cs.rep or 0, "class")
     local km = Meta.keyMax(m, cid)
-    b.detail = "Clés ouvertes : +0 à +" .. km
-      .. ((cs and cs.bestKey and cs.bestKey >= 0) and (" · meilleure victoire : +" .. cs.bestKey) or "")
-      .. ((cs and cs.runs) and (" · " .. cs.runs .. " expédition(s), " .. (cs.wins or 0) .. " victoire(s)") or "")
+    b.detail = "Keys unlocked: +0 to +" .. km
+      .. ((cs and cs.bestKey and cs.bestKey >= 0) and (" · best victory: +" .. cs.bestKey) or "")
+      .. ((cs and cs.runs) and (" · " .. cs.runs .. " expedition(s), " .. (cs.wins or 0) .. " victory(ies)") or "")
     local title = Meta.title(m, cid)
-    if title then b.detail = b.detail .. " · titre : " .. title end
+    if title then b.detail = b.detail .. " · title: " .. title end
     bars[#bars + 1] = b
   end
-  local lb = repBar("Ligue des explorateurs", m.league, "league")
-  lb.detail = (m.runs or 0) .. " expédition(s) au total"
+  local lb = repBar("Explorers' League", m.league, "league")
+  lb.detail = (m.runs or 0) .. " expedition(s) in total"
   bars[#bars + 1] = lb
   local j = db.journal
   for i = #j, max(1, #j - 7), -1 do
     local line, won = journalLine(j[i])
     lines[#lines + 1] = { text = line, won = won }
   end
-  return { kind = "meta", title = "Réputation et journal",
-    text = #j == 0 and "Aucune expédition terminée pour l'instant." or "Dernières expéditions :",
-    bars = bars, journal = lines, options = { { id = "ui:back", label = "Retour" } } }
+  return { kind = "meta", title = "Reputation and log",
+    text = #j == 0 and "No expedition finished yet." or "Last expeditions:",
+    bars = bars, journal = lines, options = { { id = "ui:back", label = "Back" } } }
 end
 
 local function endStep()
   local db = ns.Persist.db
   local s, e = C.ending.summary, C.ending.entry
   local won = e.result == "won"
-  local title = won and "Expédition réussie !" or e.result == "lost" and "Expédition terminée"
-    or "Expédition abandonnée"
+  local title = won and "Expedition complete!" or e.result == "lost" and "Expedition over"
+    or "Expedition abandoned"
   local lines = {}
   if won then
-    lines[#lines + 1] = "Le boss de l'acte est tombé. Fin de l'expédition avec " .. e.hp .. " PV et " .. #e.deck .. " cartes."
+    lines[#lines + 1] = "The act's boss has fallen. Expedition ended with " .. e.hp .. " HP and " .. #e.deck .. " cards."
   elseif e.result == "lost" then
     local names = {}
     for id in tostring(e.killedBy or ""):gmatch("[^+]+") do
       names[#names + 1] = ns.Enemies[id] and ns.Enemies[id].name or id
     end
-    lines[#lines + 1] = "Chute à l'étape " .. (e.floor or "?")
-      .. (#names > 0 and (" face à " .. table.concat(names, ", ")) or "") .. "."
+    lines[#lines + 1] = "Fell at stage " .. (e.floor or "?")
+      .. (#names > 0 and (" against " .. table.concat(names, ", ")) or "") .. "."
   else
-    lines[#lines + 1] = "Retour à l'étape " .. (e.floor or "?") .. "."
+    lines[#lines + 1] = "Turned back at stage " .. (e.floor or "?") .. "."
   end
-  lines[#lines + 1] = (e.cleared or 0) .. " étape(s) franchie(s), " .. (e.elites or 0) .. " élite(s), "
-    .. (e.bosses or 0) .. " boss."
-  lines[#lines + 1] = "|cffffd700+" .. (s.rep or 0) .. " réputation|r (classe et Ligue)."
+  lines[#lines + 1] = (e.cleared or 0) .. " stage(s) cleared, " .. (e.elites or 0) .. " elite(s), "
+    .. (e.bosses or 0) .. " boss(es)."
+  lines[#lines + 1] = "|cffffd700+" .. (s.rep or 0) .. " reputation|r (class and League)."
   local cname = ns.Classes[e.class] and ns.Classes[e.class].name or tostring(e.class)
   if s.classAfter ~= s.classBefore then
-    lines[#lines + 1] = "|cff40ff40" .. cname .. " passe de " .. Meta.levelName(s.classBefore) .. " à "
+    lines[#lines + 1] = "|cff40ff40" .. cname .. " goes from " .. Meta.levelName(s.classBefore) .. " to "
       .. Meta.levelName(s.classAfter) .. " !|r"
   end
   if s.leagueAfter ~= s.leagueBefore then
-    lines[#lines + 1] = "|cff40ff40Ligue des explorateurs : de " .. Meta.levelName(s.leagueBefore) .. " à "
+    lines[#lines + 1] = "|cff40ff40Explorers' League: from " .. Meta.levelName(s.leagueBefore) .. " to "
       .. Meta.levelName(s.leagueAfter) .. " !|r"
   end
-  if s.keyUnlocked then lines[#lines + 1] = "|cff40c0ffClé mythique +" .. s.keyUnlocked .. " débloquée !|r" end
+  if s.keyUnlocked then lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked!|r" end
   local cs = db.meta.classes[e.class]
-  local bars = { repBar(cname, cs and cs.rep or 0, "class"), repBar("Ligue des explorateurs", db.meta.league, "league") }
+  local bars = { repBar(cname, cs and cs.rep or 0, "class"), repBar("Explorers' League", db.meta.league, "league") }
   return { kind = "end", won = won, result = e.result, title = title, text = table.concat(lines, "\n"),
-    bars = bars, options = { { id = "ui:new", label = "Nouvelle expédition" },
-      { id = "ui:meta", label = "Réputation et journal" } } }
+    bars = bars, options = { { id = "ui:new", label = "New expedition" },
+      { id = "ui:meta", label = "Reputation and log" } } }
 end
 
 local function mapStep(exp)
@@ -685,7 +686,7 @@ local function mapStep(exp)
   for _, id in ipairs(nx) do
     opts[#opts + 1] = actionOption(avail, { id = "path:" .. id, label = Map.KINDS[map.nodes[id].kind] })
   end
-  local text = "Prochaine étape au choix."
+  local text = "Choose the next stage."
   local al = affixLine(exp.affixes, exp.key)
   if al then text = text .. "\n" .. al end
   -- Nom du boss de l'acte (si tous les groupes de boss ont le même chef).
@@ -698,33 +699,33 @@ local function mapStep(exp)
     for _, g in ipairs(groups) do if g[1] ~= first then same = false end end
     if same and ns.Enemies[first] then bossName = ns.Enemies[first].name end
   end
-  return { kind = "map", title = X.actName(exp) .. " · étape " .. min(exp.floor + 1, floors) .. " sur " .. floors,
+  return { kind = "map", title = X.actName(exp) .. " · stage " .. min(exp.floor + 1, floors) .. " of " .. floors,
     text = text, nodes = nodes, options = opts, affixes = exp.affixes, key = exp.key, bossName = bossName,
     floor = exp.floor, floors = floors }
 end
 
 local eventResult -- défini plus bas (texte « après coup » d'une rencontre)
 
-local REWARD_TITLE = { combat = "Victoire !", elite = "Élite vaincue !", boss = "Boss vaincu !", chest = "Coffre" }
+local REWARD_TITLE = { combat = "Victory!", elite = "Elite defeated!", boss = "Boss defeated!", chest = "Chest" }
 
 local function rewardStep(exp)
   local r = exp.reward
   local avail = available(exp)
-  local title = REWARD_TITLE[r.kind] or "Récompense"
+  local title = REWARD_TITLE[r.kind] or "Reward"
   local text
   local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
   if r.kind == "event" and ev then
     title = ev.name
     text = eventResult(exp)
   elseif r.kind == "chest" then
-    text = "Vous ouvrez le coffre."
+    text = "You open the chest."
   else
-    text = "Le combat est gagné."
+    text = "The combat is won."
   end
   local loot = {}
   if r.goldGained and r.goldGained > 0 then
-    loot[#loot + 1] = { kind = "gold", label = "+" .. r.goldGained .. " po", title = "Or",
-      text = "Ajouté à la bourse." }
+    loot[#loot + 1] = { kind = "gold", label = "+" .. r.goldGained .. "g", title = "Gold",
+      text = "Added to your purse." }
   end
   if r.relic then
     local def = ns.Relics[r.relic]
@@ -739,20 +740,20 @@ local function rewardStep(exp)
   local opts = {}
   local after = text -- texte « après coup » d'une rencontre, sans la consigne des cartes
   if not r.cardsDone then
-    text = text .. (text ~= "" and "\n" or "") .. "Une carte à ajouter au deck."
+    text = text .. (text ~= "" and "\n" or "") .. "Choose a card to add to the deck."
     for i, id in ipairs(r.cards) do
       opts[#opts + 1] = actionOption(avail, { id = "pickCard:" .. i, card = { id = id, up = false } })
     end
-    opts[#opts + 1] = actionOption(avail, { id = "skipCards", label = "Passer les cartes" })
+    opts[#opts + 1] = actionOption(avail, { id = "skipCards", label = "Skip the cards" })
   elseif r.picked then
-    text = text .. (text ~= "" and "\n" or "") .. "Carte ajoutée : " .. cardName(r.picked) .. "."
+    text = text .. (text ~= "" and "\n" or "") .. "Card added: " .. cardName(r.picked) .. "."
   end
   if r.potion and not r.potionTaken then
-    text = text .. "\nEmplacements de potion pleins : en jeter une (clic droit) pour prendre "
+    text = text .. "\nPotion slots full: discard one (right-click) to take "
       .. potionName(r.potion) .. "."
-    opts[#opts + 1] = actionOption(avail, { id = "takePotion", label = "Prendre la potion" })
+    opts[#opts + 1] = actionOption(avail, { id = "takePotion", label = "Take the potion" })
   end
-  opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Continuer" })
+  opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Continue" })
   return { kind = "reward", title = title, text = text, loot = loot, options = opts, rewardKind = r.kind,
     picked = r.picked, cardsDone = r.cardsDone, after = (r.kind == "event") and after or nil }
 end
@@ -765,13 +766,13 @@ local function campfireStep(exp)
   local canUp = false
   for k in pairs(avail) do if k:match("^upgrade:") then canUp = true end end
   local opts = {
-    actionOption(avail, { id = "rest", label = "Se reposer", text = "Rend " .. heal .. " PV." }),
-    { id = "ui:upgrade", label = "Méditer", text = "Améliorer une carte du deck.",
-      disabled = not canUp, reason = not canUp and C.reasonText("amélioration") or nil },
-    actionOption(avail, { id = "leave", label = "Repartir", text = "Sans s'arrêter." }),
+    actionOption(avail, { id = "rest", label = "Rest", text = "Restores " .. heal .. " HP." }),
+    { id = "ui:upgrade", label = "Meditate", text = "Upgrade a card in the deck.",
+      disabled = not canUp, reason = not canUp and C.reasonText("upgrade") or nil },
+    actionOption(avail, { id = "leave", label = "Move on", text = "Without stopping." }),
   }
-  return { kind = "campfire", title = "Feu de camp",
-    text = "Vous avez " .. exp.hp .. " PV sur " .. exp.maxHp .. ".", options = opts }
+  return { kind = "campfire", title = "Campfire",
+    text = "You have " .. exp.hp .. " of " .. exp.maxHp .. " HP.", options = opts }
 end
 
 local function deckStep(exp, view)
@@ -779,19 +780,19 @@ local function deckStep(exp, view)
   local opts = {}
   local title
   if view == "upgrade" then
-    title = "Méditer : une carte à améliorer"
+    title = "Meditate: choose a card to upgrade"
     for i, card in ipairs(exp.deck) do
       if avail["upgrade:" .. i] then
         opts[#opts + 1] = { id = "upgrade:" .. i, card = { id = card.id, up = card.up }, preview = true }
       end
     end
   else
-    title = "Retirer une carte du deck (" .. X.removePrice(exp) .. " po)"
+    title = "Remove a card from the deck (" .. X.removePrice(exp) .. "g)"
     for i, card in ipairs(exp.deck) do
       opts[#opts + 1] = actionOption(avail, { id = "remove:" .. i, card = { id = card.id, up = card.up } })
     end
   end
-  opts[#opts + 1] = { id = "ui:back", label = "Retour" }
+  opts[#opts + 1] = { id = "ui:back", label = "Back" }
   return { kind = "deck", title = title, text = "", options = opts }
 end
 
@@ -802,7 +803,7 @@ local function merchantStep(exp)
   local function item(verb, i, it, extra)
     local o = { id = verb .. ":" .. i, price = it.price, sold = it.sold }
     for k, v in pairs(extra) do o[k] = v end
-    if it.sold then o.disabled, o.reason = true, "Vendu." end
+    if it.sold then o.disabled, o.reason = true, "Sold." end
     opts[#opts + 1] = actionOption(avail, o)
   end
   for i, it in ipairs(s.cards) do item("buyCard", i, it, { card = { id = it.id, up = false } }) end
@@ -816,12 +817,12 @@ local function merchantStep(exp)
   end
   local canRemove = false
   for k in pairs(avail) do if k:match("^remove:") then canRemove = true end end
-  opts[#opts + 1] = { id = "ui:remove", label = "Retirer une carte", service = true,
-    text = "Le gobelin retire une carte du deck.", price = X.removePrice(exp),
-    disabled = not canRemove, reason = not canRemove and (C.reasonFor({ "remove", 1 }) or "Indisponible.") or nil }
-  opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Partir", service = true })
-  return { kind = "merchant", title = "Marchand gobelin", gold = exp.gold,
-    text = "« Que des affaires, l'ami ! » Bourse : |cffffd700" .. exp.gold .. " po|r.", options = opts }
+  opts[#opts + 1] = { id = "ui:remove", label = "Remove a card", service = true,
+    text = "The goblin removes a card from the deck.", price = X.removePrice(exp),
+    disabled = not canRemove, reason = not canRemove and (C.reasonFor({ "remove", 1 }) or "Unavailable.") or nil }
+  opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Leave", service = true })
+  return { kind = "merchant", title = "Goblin Merchant", gold = exp.gold,
+    text = "\"Nothing but bargains, friend!\" Purse: |cffffd700" .. exp.gold .. "g|r.", options = opts }
 end
 
 -- Texte « après coup » d'une rencontre : exp.event.result (issue d'un pari comprise), sinon after.
@@ -839,8 +840,8 @@ local function eventStep(exp)
   local ev = exp.event
   local avail = available(exp)
   if not ev.id then
-    return { kind = "event", title = "Rencontre", text = "La route est calme : rien à signaler.",
-      options = { actionOption(avail, { id = "leave", label = "Continuer" }) } }
+    return { kind = "event", title = "Encounter", text = "The road is quiet: nothing to report.",
+      options = { actionOption(avail, { id = "leave", label = "Continue" }) } }
   end
   local def = ns.Events[ev.id]
   -- Champs facultatifs (piste F) : speaker, scene, npc, rarity ; réponses : outcome, hidden.
@@ -849,7 +850,7 @@ local function eventStep(exp)
   if ev.chosen then
     base.text = eventResult(exp)
     base.after = true
-    base.options = { actionOption(avail, { id = "leave", label = "Continuer" }) }
+    base.options = { actionOption(avail, { id = "leave", label = "Continue" }) }
     return base
   end
   local opts = {}
@@ -857,7 +858,7 @@ local function eventStep(exp)
     -- Toutes les réponses, y compris désactivées (grisées avec leur raison) ; « ? » si cachée.
     for _, o in ipairs(X.eventOptions(exp)) do
       local opt = { id = "choose:" .. o.index, label = o.label, text = o.outcome or "", hidden = o.hidden }
-      if o.disabled then opt.disabled, opt.reason = true, o.reason or "Indisponible." end
+      if o.disabled then opt.disabled, opt.reason = true, o.reason or "Unavailable." end
       opts[#opts + 1] = actionOption(avail, opt)
     end
   else
@@ -884,10 +885,10 @@ local function selectStep(exp)
       opts[#opts + 1] = { id = id, card = { id = card.id, up = card.up }, preview = sel.kind == "upgrade" or nil }
     end
   end
-  opts[#opts + 1] = actionOption(avail, { id = "skipSelect", label = "Passer" })
-  local what = sel.kind == "upgrade" and "une carte à améliorer"
-    or (sel.kind == "dupe" and "une carte à copier" or "une carte à retirer")
-  return { kind = "select", title = (ev and ev.name or "Rencontre") .. " : " .. what,
+  opts[#opts + 1] = actionOption(avail, { id = "skipSelect", label = "Skip" })
+  local what = sel.kind == "upgrade" and "choose a card to upgrade"
+    or (sel.kind == "dupe" and "choose a card to copy" or "choose a card to remove")
+  return { kind = "select", title = (ev and ev.name or "Encounter") .. ": " .. what,
     text = eventResult(exp), options = opts, selectKind = sel.kind }
 end
 
@@ -899,9 +900,9 @@ local function startRelicStep(exp)
     opts[#opts + 1] = actionOption(avail, { id = "startRelic:" .. i, label = relicName(id), text = def and def.text,
       item = { kind = "relic", id = id } })
   end
-  opts[#opts + 1] = actionOption(avail, { id = "skipStartRelic", label = "Partir sans bibelot" })
-  return { kind = "startRelic", title = "Faveur de la classe",
-    text = "Réputation Révéré : un bibelot de classe au choix pour cette expédition.",
+  opts[#opts + 1] = actionOption(avail, { id = "skipStartRelic", label = "Leave without a relic" })
+  return { kind = "startRelic", title = "Class Favor",
+    text = "Revered reputation: choose a class relic for this expedition.",
     options = opts }
 end
 

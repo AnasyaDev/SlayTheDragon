@@ -431,7 +431,7 @@ test("réputation : points par étape, élite et boss, paliers", function()
   eq(Meta.level(0), 0)
   eq(Meta.level(Meta.LEVELS[2].at), 1)
   eq(Meta.level(Meta.LEVELS[5].at + 1), 4)
-  eq(Meta.levelName(4), "Exalté")
+  eq(Meta.levelName(4), "Exalted")
   local lv, inLv, size = Meta.progress(Meta.LEVELS[2].at + 3)
   eq(lv, 1); eq(inLv, 3); eq(size, Meta.LEVELS[3].at - Meta.LEVELS[2].at)
 end)
@@ -454,7 +454,7 @@ test("déblocages : cartes par champ rep, bibelot de classe à Révéré", funct
   eq(r.phase, "map")
   eq(Meta.title(meta, "priest"), nil)
   Meta.classState(meta, "priest").rep = Meta.LEVELS[5].at
-  eq(Meta.title(meta, "priest"), "Tueur de dragons")
+  eq(Meta.title(meta, "priest"), "Dragonslayer")
 end)
 
 test("clés mythiques : +1 à la 1re victoire, +N ouvre +N+1, plafond +5", function()
@@ -570,14 +570,14 @@ test("Save.new / validate / migrate (nil, table vide, champs inconnus gardés)",
   local old = { custom = 5, journal = { { result = "won" } } }
   local m, note = Save.migrate(old)
   eq(m, old, "migration sur place")
-  eq(note, "migrée")
+  eq(note, "migrated")
   eq(m.version, Save.VERSION)
   eq(m.custom, 5, "rien n'est effacé")
   eq(#m.journal, 1)
   assert(Save.validate(m))
   local newer = { version = Save.VERSION + 1, foo = 1 }
   local n, why = Save.migrate(newer)
-  eq(why, "plus récente")
+  eq(why, "newer")
   eq(n.version, Save.VERSION + 1)
 end)
 
@@ -637,7 +637,7 @@ test("migration : expédition illisible mise en quarantaine, pas effacée", func
   eq(m.current, nil)
   eq(#m.quarantine, 1)
   eq(m.quarantine[1].state.phase, "bogus")
-  assert(note:find("quarantaine"))
+  assert(note:find("quarantined"))
   assert(Save.validate(m))
   local bad = Save.new()
   bad.current = newExp()
@@ -757,7 +757,7 @@ test("conditions : chaque condition et sa raison", function()
   local _, why = X.check(exp, { { "relic", "stormwind_tabard" } })
   assert(why:find(ns.Relics.stormwind_tabard.name, 1, true), why)
   _, why = X.check(exp, { { "gold", 60 } })
-  eq(why, "Il faut 60 po.")
+  eq(why, "Requires 60g.")
   _, why = X.check(exp, { { "gold", 60, text = "Trop pauvre." } })
   eq(why, "Trop pauvre.", "raison personnalisée")
   assert(not pcall(X.check, exp, { { "inconnue" } }), "condition inconnue refusée")
@@ -808,7 +808,7 @@ test("réponse conditionnelle : désactivée avec la raison, puis possible", fun
   eq(opts[4].disabled, true); eq(opts[4].reason, why)
   eq(opts[1].disabled, nil)
   exp.gold = 0
-  eq(X.eventOptions(exp)[2].reason, "Pas assez d'or.", "code traduit")
+  eq(X.eventOptions(exp)[2].reason, "Not enough gold.", "code traduit")
   exp.relics[#exp.relics + 1] = "stormwind_tabard"
   assert(X.eventChoiceOk(exp, 4))
   assert(X.act(exp, { "choose", 4 }))
@@ -892,7 +892,7 @@ test("rencontre rare : marché (bibelot contre PV max) et combat d'élite option
   local b = newExp()
   forceEvent(b, "goblin_peddler")
   b.relics[#b.relics + 1] = "harvest_cog"
-  eq(select(2, X.eventChoiceOk(b, 1)), "bibelot", "bibelot unique déjà possédé")
+  eq(select(2, X.eventChoiceOk(b, 1)), "relic", "bibelot unique déjà possédé")
   local c = newExp()
   forceEvent(c, "harvest_watcher")
   assert(X.act(c, { "choose", 1 }))
@@ -984,7 +984,7 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
           if type(r) == "table" and r.won ~= nil then r.won = lucky end
         end
         local ok, why = X.act(exp, { "choose", ci })
-        assert(ok or why == "bibelot", id .. " " .. ci .. " : " .. tostring(why))
+        assert(ok or why == "relic", id .. " " .. ci .. " : " .. tostring(why))
         if exp.phase ~= "combat" then
           assert(exp.hp >= 1 and exp.hp <= exp.maxHp and exp.maxHp >= 1,
             ("%s %d : PV %d / %d"):format(id, ci, exp.hp, exp.maxHp))
@@ -1001,7 +1001,7 @@ test("sauvegarde v1 -> v2 : drapeaux créés, gardés, expédition en cours migr
   cur.version, cur.flags, cur.newFlags, cur.stats.events = 1, nil, nil, nil
   local v1 = { version = 1, meta = { league = 300, runs = 3, classes = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v1))
-  eq(note, "migrée"); eq(db.version, Save.VERSION); eq(Save.VERSION, 2)
+  eq(note, "migrated"); eq(db.version, Save.VERSION); eq(Save.VERSION, 2)
   eq(type(db.meta.flags), "table")
   eq(db.meta.league, 300)
   assert(db.current, "expédition gardée")

@@ -76,18 +76,18 @@ end
 -- Met la sauvegarde au format courant. Accepte nil (première connexion).
 -- Renvoie db (éventuellement une nouvelle table) et une note (nil si rien à signaler).
 function Save.migrate(db)
-  if type(db) ~= "table" then return Save.new(), "nouvelle" end
+  if type(db) ~= "table" then return Save.new(), "new" end
   local v = tonumber(db.version) or 0
   if v > Save.VERSION then
     -- Sauvegarde d'une version plus récente de l'addon : on n'y touche pas.
-    return db, "plus récente"
+    return db, "newer"
   end
   local note
   while v < Save.VERSION do
     Save.MIGRATIONS[v](db)
     v = v + 1
     db.version = v
-    note = "migrée"
+    note = "migrated"
   end
   Save.normalize(db)
   local exp = db.current
@@ -106,7 +106,7 @@ function Save.migrate(db)
       if not ok then
         db.current = nil
         quarantine(db, exp, why)
-        note = "expédition en quarantaine : " .. why
+        note = "expedition quarantined: " .. why
       end
     end
   end
@@ -123,18 +123,18 @@ function Save.isPlain(v, path, seen)
   path = path or "db"
   local t = type(v)
   if t == "number" then
-    if v ~= v or v == math.huge or v == -math.huge then return false, path .. " (nombre invalide)" end
+    if v ~= v or v == math.huge or v == -math.huge then return false, path .. " (invalid number)" end
     return true
   end
   if t == "string" or t == "boolean" or t == "nil" then return true end
   if t ~= "table" then return false, path .. " (" .. t .. ")" end
   seen = seen or {}
-  if seen[v] then return false, path .. " (cycle ou table partagée)" end
+  if seen[v] then return false, path .. " (cycle or shared table)" end
   seen[v] = true
-  if getmetatable(v) ~= nil then return false, path .. " (métatable)" end
+  if getmetatable(v) ~= nil then return false, path .. " (metatable)" end
   for k, x in pairs(v) do
     local kt = type(k)
-    if kt ~= "string" and kt ~= "number" and kt ~= "boolean" then return false, path .. " (clé " .. kt .. ")" end
+    if kt ~= "string" and kt ~= "number" and kt ~= "boolean" then return false, path .. " (key " .. kt .. ")" end
     local ok, where = Save.isPlain(x, path .. "." .. tostring(k), seen)
     if not ok then return false, where end
   end
@@ -142,21 +142,21 @@ function Save.isPlain(v, path, seen)
 end
 
 function Save.validateExpedition(exp)
-  if type(exp) ~= "table" then return false, "expédition absente" end
-  if exp.version ~= ns.Expedition.VERSION then return false, "version d'expédition " .. tostring(exp.version) end
+  if type(exp) ~= "table" then return false, "no expedition" end
+  if exp.version ~= ns.Expedition.VERSION then return false, "expedition version " .. tostring(exp.version) end
   if not ns.Expedition.PHASES[exp.phase] then return false, "phase " .. tostring(exp.phase) end
   if type(exp.deck) ~= "table" or type(exp.map) ~= "table" or type(exp.rng) ~= "table" then
-    return false, "champs manquants"
+    return false, "missing fields"
   end
-  if type(exp.hp) ~= "number" or type(exp.gold) ~= "number" then return false, "PV ou or" end
-  if not ns.Classes[exp.class] then return false, "classe " .. tostring(exp.class) end
+  if type(exp.hp) ~= "number" or type(exp.gold) ~= "number" then return false, "HP or gold" end
+  if not ns.Classes[exp.class] then return false, "class " .. tostring(exp.class) end
   for i = 1, #exp.deck do
-    if not ns.Cards[exp.deck[i].id] then return false, "carte inconnue " .. tostring(exp.deck[i].id) end
+    if not ns.Cards[exp.deck[i].id] then return false, "unknown card " .. tostring(exp.deck[i].id) end
   end
-  if exp.phase == "combat" and type(exp.combat) ~= "table" then return false, "combat manquant" end
-  if exp.phase == "reward" and type(exp.reward) ~= "table" then return false, "récompense manquante" end
-  if exp.phase == "merchant" and type(exp.shop) ~= "table" then return false, "marchand manquant" end
-  if exp.phase == "event" and type(exp.event) ~= "table" then return false, "rencontre manquante" end
+  if exp.phase == "combat" and type(exp.combat) ~= "table" then return false, "missing combat" end
+  if exp.phase == "reward" and type(exp.reward) ~= "table" then return false, "missing reward" end
+  if exp.phase == "merchant" and type(exp.shop) ~= "table" then return false, "missing merchant" end
+  if exp.phase == "event" and type(exp.event) ~= "table" then return false, "missing encounter" end
   return Save.isPlain(exp, "current")
 end
 
@@ -164,7 +164,7 @@ end
 function Save.validate(db)
   local errs = {}
   local function err(s) errs[#errs + 1] = s end
-  if type(db) ~= "table" then return false, { "sauvegarde absente" } end
+  if type(db) ~= "table" then return false, { "no save" } end
   if db.version ~= Save.VERSION then err("version " .. tostring(db.version)) end
   local m = db.meta
   if type(m) ~= "table" or type(m.classes) ~= "table" or type(m.league) ~= "number" then
@@ -191,7 +191,7 @@ end
 
 -- Démarre une expédition (opts : seed, class, key). Renvoie exp ou nil, raison.
 function Save.start(db, opts)
-  if db.current then return nil, "expédition en cours" end
+  if db.current then return nil, "running" end
   local exp, why = ns.Meta.newExpedition(db.meta, opts)
   if not exp then return nil, why end
   db.current = exp
@@ -203,8 +203,8 @@ end
 -- Renvoie le résumé de méta-progression (voir Meta.record) et l'entrée du journal.
 function Save.finish(db, date)
   local exp = db.current
-  if not exp then return nil, "aucune expédition" end
-  if exp.phase ~= "done" then return nil, "expédition en cours" end
+  if not exp then return nil, "no expedition" end
+  if exp.phase ~= "done" then return nil, "running" end
   local summary = ns.Meta.record(db.meta, exp)
   local entry = ns.Expedition.summary(exp)
   entry.date = date
@@ -217,7 +217,7 @@ end
 -- Abandonne l'expédition en cours et l'archive.
 function Save.abandon(db, date)
   local exp = db.current
-  if not exp then return nil, "aucune expédition" end
+  if not exp then return nil, "no expedition" end
   if exp.phase ~= "done" then ns.Expedition.act(exp, { "abandon" }) end
   return Save.finish(db, date)
 end

@@ -86,13 +86,13 @@ function handlers.ADDON_LOADED(name)
   if not ok then
     -- Dernier rempart : une expédition qui fait planter la reprise part en quarantaine
     -- (Core/Save.lua), elle n'est ni rejouée ni effacée.
-    ns.Save.quarantine(Persist.db, "erreur à la reprise : " .. tostring(err))
-    Controller.restoreNote = "erreur à la reprise"
+    ns.Save.quarantine(Persist.db, "error on resume: " .. tostring(err))
+    Controller.restoreNote = "error on resume"
   end
-  if note == "plus récente" then
-    UI.say("sauvegarde d'une version plus récente de l'addon : elle n'est pas modifiée, rien ne sera enregistré.")
-  elseif note and note:find("quarantaine", 1, true) then
-    UI.say("l'expédition sauvegardée était illisible ; elle a été mise de côté (" .. note .. ").")
+  if note == "newer" then
+    UI.say("save from a newer version of the addon: it is left untouched, nothing will be saved.")
+  elseif note and note:find("quarantined", 1, true) then
+    UI.say("the saved expedition was unreadable; it has been set aside (" .. note .. ").")
   end
   F.loaded = true
 end

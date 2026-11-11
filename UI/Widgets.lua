@@ -240,7 +240,7 @@ function W.driverAwake() return driver.awake and true or false end
 -- Mode « lisse » (comparaison) : SetScale à chaque image.
 -- Dans tous les modes, la mise en page ne dépend pas de l'échelle : retours à la ligne explicites
 -- (W.card), largeurs et ancrages en unités du visuel, textes en SetSmoothScaling (taille rendue
--- exactement proportionnelle). /slay zoom lent : survols au ralenti (diagnostic en jeu).
+-- exactement proportionnelle). /slay zoom slow : survols au ralenti (diagnostic en jeu).
 W.ZOOM_MODES = { "net", "fluide", "lisse" }
 W.ZOOM_DEFAULT = "net"
 local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée (secondes)
@@ -252,7 +252,7 @@ function W.zoomMode()
   return W.ZOOM_DEFAULT
 end
 
--- Ralenti des survols (/slay zoom lent, diagnostic en jeu : voir ce qui ne suit pas l'animation et ce
+-- Ralenti des survols (/slay zoom slow, diagnostic en jeu : voir ce qui ne suit pas l'animation et ce
 -- qui bouge à l'arrivée).
 W.ZOOM_SLOW = 8
 function W.zoomSlow()
@@ -1280,7 +1280,7 @@ function W.hpBar(parent, w, h, textSize)
   end
   f:EnableMouse(true)
   W.tooltip(f, function(tt, self)
-    if self.hp then tt:AddLine("Points de vie : " .. self.hp .. " / " .. self.maxHp, 1, 0.5, 0.45) end
+    if self.hp then tt:AddLine("Health: " .. self.hp .. " / " .. self.maxHp, 1, 0.5, 0.45) end
   end, "ANCHOR_TOP")
   f.ghost:Hide()
   return f
@@ -1339,7 +1339,7 @@ function W.addStatusLines(tt, id, n)
   local name, text = W.statusText(id, n)
   local s = ns.Statuses[id]
   local suffix = ""
-  if n and n > 0 then suffix = s and s.duration and (" (" .. n .. " tour" .. (n > 1 and "s" or "") .. ")")
+  if n and n > 0 then suffix = s and s.duration and (" (" .. n .. " turn" .. (n > 1 and "s" or "") .. ")")
     or (" " .. n) end
   local bad = s and (s.debuff or s.affix)
   tt:AddLine(name .. suffix, bad and 1 or 0.4, bad and 0.35 or 0.9, bad and 0.35 or 0.4)
@@ -1355,20 +1355,20 @@ function W.cardKeywords(d)
     list[#list + 1] = { key = k, label = label, n = n }
   end
   if d.cast then add("cast") end
-  if d.cooldown then add("cooldown", "Recharge " .. d.cooldown, d.cooldown) end
+  if d.cooldown then add("cooldown", "Cooldown " .. d.cooldown, d.cooldown) end
   if d.exhaust then add("exhaust") end
   if d.retain then add("retain") end
   if d.power or d.type == "power" then add("power") end
-  -- texte : conditions nommées et conditions sur un état (« Nom : »), puis états cités
+  -- texte : conditions nommées et conditions sur un état (« Name: »), puis états cités
   local text = d.text or ""
   for _, c in ipairs(W.CONDITIONS) do
-    if W.hasPhrase(text, c.name .. " :") then add(c.key) end
+    if W.hasPhrase(text, c.name .. ":") then add(c.key) end
   end
   local ids = {}
   for id in pairs(ns.Statuses) do ids[#ids + 1] = id end
   table.sort(ids)
   for _, id in ipairs(ids) do
-    if W.hasPhrase(text, ns.Statuses[id].name .. " :") then add("cond:" .. id) end
+    if W.hasPhrase(text, ns.Statuses[id].name .. ":") then add("cond:" .. id) end
   end
   for i = 1, #(d.effects or {}) do
     local e = d.effects[i]
@@ -1384,8 +1384,8 @@ function W.cardKeywords(d)
     elseif e[1] == "demence" then add("demence")
     elseif e[1] == "interrupt" then add("interrupt") end
   end
-  if text:find("Absorption", 1, true) then add("absorb") end
-  if text:find("Démence", 1, true) then add("demence") end
+  if W.hasPhrase(text, "Absorb") then add("absorb") end
+  if W.hasPhrase(text, "Insanity") then add("demence") end
   return list
 end
 
@@ -1409,7 +1409,7 @@ function W.fillCardTooltip(tt, id, up, extra)
   end
   if extra and extra.preview and not up and ns.Cards[id].up then
     local u = Card.defById(id, true)
-    gold(tt, "Après amélioration :")
+    gold(tt, "Upgraded:")
     for _, l in ipairs(W.cardTextLines(u, ns.Cards[id])) do wrap(tt, l, 0.5, 1, 0.5) end
   end
   -- mots-clés : une ligne chacun, en bloc (séparé du reste par une ligne vide)
@@ -1448,7 +1448,7 @@ function W.fillItemTooltip(tt, kind, id, extra)
     for _, l in ipairs(lines) do wrap(tt, l, 0.7, 0.7, 0.7) end
   end
   if extra and extra.reason then wrap(tt, extra.reason, 1, 0.3, 0.3) end
-  if extra and extra.price then tt:AddLine(extra.price .. " po", 1, 0.82, 0) end
+  if extra and extra.price then tt:AddLine(extra.price .. "g", 1, 0.82, 0) end
 end
 
 function W.itemEntry(kind, id)
@@ -1647,16 +1647,16 @@ W.CARD_W = 124
 W.CARD_H = W.CARD_W * SC.aspect
 
 local KEYWORD_STRIP = {
-  { flag = "cooldown", pat = "%s*Recharge %d+%." },
-  { flag = "exhaust", pat = "%s*Consumée%." },
-  { flag = "retain", pat = "%s*Conservée%." },
-  { flag = "cast", pat = "^Incantation%.%s*" },
-  { flag = "power", pat = "^Pouvoir%.%s*" },
+  { flag = "cooldown", pat = "%s*Cooldown %d+%." },
+  { flag = "exhaust", pat = "%s*Exhaust%." },
+  { flag = "retain", pat = "%s*Retain%." },
+  { flag = "cast", pat = "^Cast%.%s*" },
+  { flag = "power", pat = "^Power%.%s*" },
 }
 
 -- Langage des cartes (docs/interface.md, « Langage des cartes ») : une clause par ligne dans `text`
--- (séparées par « \n ») ; « Nom d'état : » = si l'état est présent ; conditions nommées ; états posés
--- en dernier (« Donne » sur soi, « Applique » sur un ennemi) ; « ⌛ » = nombre de tours, remplacé à
+-- (séparées par « \n ») ; « Status: » = si l'état est présent ; conditions nommées ; états posés
+-- en dernier (« Gain » + nom d'état sur soi, « Apply » sur un ennemi) ; « ⌛ » = nombre de tours, remplacé à
 -- l'affichage par une petite icône dans le texte (séquence |T…|t, Media/hourglass.tga, blanche et
 -- teinte par la séquence). Mots-clés en évidence par la COULEUR (une seule couleur d'accent : la
 -- police ne mêle pas deux graisses dans un même texte).
@@ -1664,12 +1664,12 @@ W.KEYWORD_COLOR = C.goldText
 W.HOURGLASS = ROOT .. "hourglass.tga"
 W.HOURGLASS_CHAR = "⌛"
 local NBSP = "\194\160" -- espace insécable : glue les mots d'un nom d'état et le nom à son nombre
--- Conditions nommées (texte « Nom : effet ») et clé de leur explication (Art.keywords).
+-- Conditions nommées (texte « Name: effect ») et clé de leur explication (Art.keywords).
 W.CONDITIONS = {
-  { name = "Exécution", key = "execute" },
-  { name = "Déferlement", key = "surge" },
-  { name = "Dernier souffle", key = "lastBreath" },
-  { name = "Ombre", key = "shadow" },
+  { name = "Execute", key = "execute" },
+  { name = "Surge", key = "surge" },
+  { name = "Last Breath", key = "lastBreath" },
+  { name = "Shadow", key = "shadow" },
 }
 
 -- Le nombre de l'état compte des tours (sablier) ?
@@ -1743,13 +1743,20 @@ function W.hasPhrase(text, phrase)
   return found
 end
 
--- Clause d'état posé (« Donne … » / « Applique … ») ?
+-- Clause d'état posé (« Gain <état> … » / « Apply … ») ? « Gain 5 Absorb. » n'en est pas une : après
+-- « Gain », il faut un nom d'état.
 local function plainClause(s)
   return (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR):gsub(NBSP, " "))
 end
 function W.isStateClause(s)
   local p = plainClause(s)
-  return p:find("^Donne ") ~= nil or p:find("^Applique ") ~= nil
+  if p:find("^Apply ") then return true end
+  local rest = p:match("^Gain (.*)$")
+  if not rest then return false end
+  for id, s in pairs(ns.Statuses) do
+    if rest:sub(1, #s.name + 1) == s.name .. " " then return true end
+  end
+  return false
 end
 
 -- Texte affiché : sans les mots-clés de la plaque du bas, noms d'états et conditions insécables et
@@ -1760,14 +1767,14 @@ function W.cardBody(d, base)
   for _, k in ipairs(KEYWORD_STRIP) do
     if d[k.flag] or (k.flag == "power" and d.type == "power") then text = text:gsub(k.pat, "") end
   end
-  -- un nom d'état insécable avec son nombre (« Douleur 5 », « fracassée 2 ⌛ ») ; « à tous » insécable
+  -- un nom d'état insécable avec son nombre (« Pain 5 », « Sundered 2 ⌛ ») ; « to all » insécable
   for _, k in ipairs(keywordList()) do
     if k.status then
       text = eachPhrase(text, k.name, function(p) return p .. "\001" end)
       text = text:gsub("\001 ([+%-]?%d)", NBSP .. "%1"):gsub("\001", "")
     end
   end
-  text = eachPhrase(text, "à tous", function() return "à" .. NBSP .. "tous" end)
+  text = eachPhrase(text, "to all", function() return "to" .. NBSP .. "all" end)
   local baseNums = {}
   if base then for n in (base.text or ""):gmatch("%d+") do baseNums[#baseNums + 1] = n end end
   local i = 0
@@ -1797,11 +1804,11 @@ end
 -- Mots-clés de la plaque du bas.
 function W.cardPills(d)
   local list = {}
-  if d.type == "power" then list[#list + 1] = "Pouvoir" end
-  if d.cast then list[#list + 1] = "Incantation" end
-  if d.cooldown then list[#list + 1] = "Recharge " .. d.cooldown end
-  if d.exhaust then list[#list + 1] = "Consumée" end
-  if d.retain then list[#list + 1] = "Conservée" end
+  if d.type == "power" then list[#list + 1] = "Power" end
+  if d.cast then list[#list + 1] = "Cast" end
+  if d.cooldown then list[#list + 1] = "Cooldown " .. d.cooldown end
+  if d.exhaust then list[#list + 1] = "Exhaust" end
+  if d.retain then list[#list + 1] = "Retain" end
   return list
 end
 
@@ -1857,9 +1864,9 @@ local function widthOf(m, s)
   return m:GetStringWidth() or 0
 end
 
--- Mots insécables : une ponctuation détachée (« : ») et un nombre qui finit la phrase (« Pioche 1. »)
--- restent avec le mot d'avant, un nombre seul (« 12 », « +1 ») avec le mot d'après (« 12 Absorption »,
--- « +1 Démence », « 2 tours »).
+-- Mots insécables : une ponctuation détachée (« : », plus employée en anglais, gardée par prudence)
+-- et un nombre qui finit la phrase (« Draw 1. ») restent avec le mot d'avant, un nombre seul (« 12 »,
+-- « +1 ») avec le mot d'après (« 12 Absorb », « +1 Insanity », « 2 turns »).
 local function plainWord(w)
   return (w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR))
 end
@@ -1871,12 +1878,12 @@ function W.cardWords(text)
   while i <= #raw do
     local w = raw[i]
     local p = plainWord(w)
-    if (p:match("^[:;!?»]+$") or p:match("^%d+[.,]$")) and #words > 0 then
+    if (p:match("^[:;!?]+$") or p:match("^%d+[.,]$")) and #words > 0 then
       words[#words] = words[#words] .. " " .. w
       i = i + 1
     else
       local num = p:gsub("^−", "")
-      while num:match("^[+%-]?%d+$") and raw[i + 1] and not plainWord(raw[i + 1]):match("^[:;!?»]+$") do
+      while num:match("^[+%-]?%d+$") and raw[i + 1] and not plainWord(raw[i + 1]):match("^[:;!?]+$") do
         i = i + 1
         w = w .. " " .. raw[i]
         num = plainWord(raw[i]):gsub("^−", "")
@@ -1911,13 +1918,13 @@ W.balanceColors = balanceColors
 
 -- Paragraphes du texte d'une carte selon le mode : "clauses" = une clause par paragraphe ; "flow" =
 -- les clauses d'effet coulent ensemble, chaque clause d'état posé (« Donne » / « Applique ») reste un
--- paragraphe ; "flowAll" = les clauses d'état sont groupées en un dernier paragraphe (« Applique
--- Douleur 3. Donne Récupération 1 »). Un paragraphe commence toujours une ligne.
--- Une clause conditionnelle (« Douleur : … », « Exécution : … ») commence toujours une ligne, et la
+-- paragraphe ; "flowAll" = les clauses d'état sont groupées en un dernier paragraphe (« Apply
+-- Pain 3. Gain Regeneration 1 »). Un paragraphe commence toujours une ligne.
+-- Une clause conditionnelle (« Pain: … », « Execute: … ») commence toujours une ligne, et la
 -- clause qui la suit aussi (elle ne doit pas paraître soumise à la condition) : seules les clauses
 -- simples qui se suivent coulent ensemble.
 function W.isConditionClause(s)
-  local label = plainClause(s):match("^(.-) : ")
+  local label = plainClause(s):match("^(.-): ")
   if not label then return false end
   for _, k in ipairs(keywordList()) do if k.name == label then return true end end
   return false
@@ -2151,8 +2158,7 @@ W.CARD_PLATE = PLATE
 -- largeur du corps) ; au-delà, secours 7,5 / 7, puis mots-clés abrégés (W.PLATE_SHORT).
 W.PLATE_SIZES = { 9, 8.5, 8 }
 W.PLATE_UNDER = { 7.5, 7 }
-W.PLATE_SHORT = { Incantation = "Incant.", ["Consumée"] = "Cons.", ["Conservée"] = "Conserv.",
-  Pouvoir = "Pouv.", Recharge = "Rech." }
+W.PLATE_SHORT = { Cooldown = "CD", Exhaust = "Exh.", Retain = "Ret." }
 
 -- Géométrie de la plaque (unités de la carte, origine au coin haut gauche du corps) pour une largeur
 -- totale w : position, bords, intérieur, zone du texte.
@@ -2532,7 +2538,7 @@ function W.card(parent)
       p:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, -(CH + 0.185 * CW))
       if opts.sold then
         p:SetIcon(nil)
-        p.text:SetText("Vendu")
+        p.text:SetText("Sold")
         p.text:SetTextColor(0.6, 0.6, 0.6)
         p.text:ClearAllPoints()
         p.text:SetPoint("CENTER", p, "CENTER", 0, 1)
@@ -2818,7 +2824,7 @@ function W.modelTries(art)
   return out
 end
 
-function W.tryLabel(t) return (t[1] == "creature" and "créature " or "affichage ") .. t[2] end
+function W.tryLabel(t) return (t[1] == "creature" and "creature " or "display ") .. t[2] end
 
 local function applyTry(model, t)
   if model.ClearModel then model:ClearModel() end
@@ -2836,7 +2842,7 @@ local function hookLoaded(model)
 end
 
 -- Affiche une créature : essais en chaîne (W.modelTries), puis repli.
--- art = { creature, display } ; key = clé des rapports (/slay art, /slay modeles) ;
+-- art = { creature, display } ; key = clé des rapports (/slay art, /slay models) ;
 -- onMissing() sans aucun modèle, onFound(libellé) quand un modèle (même tardif) est là.
 function W.setCreatureArt(model, art, key, onMissing, onFound)
   key = tostring(key)

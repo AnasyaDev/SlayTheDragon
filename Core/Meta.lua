@@ -18,11 +18,11 @@ ns.Meta = Meta
 -- Ligue  : bibelots, potions et rencontres de tier <= palier (tier 0..3) ;
 --          Exalté : un emplacement de plus chez le marchand.
 Meta.LEVELS = {
-  { id = "neutral", name = "Neutre", at = 0 },
-  { id = "friendly", name = "Amical", at = 200 },
-  { id = "honored", name = "Honoré", at = 550 },
-  { id = "revered", name = "Révéré", at = 1100 },
-  { id = "exalted", name = "Exalté", at = 1900 },
+  { id = "neutral", name = "Neutral", at = 0 },
+  { id = "friendly", name = "Friendly", at = 200 },
+  { id = "honored", name = "Honored", at = 550 },
+  { id = "revered", name = "Revered", at = 1100 },
+  { id = "exalted", name = "Exalted", at = 1900 },
 }
 Meta.REVERED, Meta.EXALTED = 3, 4
 
@@ -80,8 +80,8 @@ local function scale(v, f) return floor(v * (1 + f) + 0.5) end
 local function pct(f) return floor(f * 100 + 0.5) end
 
 A.fortified = {
-  name = "Fortifié", level = 1,
-  text = ("Ennemis normaux : +%d %% de PV."):format(pct(P.fortified.hp)),
+  name = "Fortified", level = 1,
+  text = ("Normal enemies: +%d%% HP."):format(pct(P.fortified.hp)),
   hooks = {
     enemyHp = function(c, src, v, def)
       if def.elite or def.boss then return v end
@@ -91,10 +91,10 @@ A.fortified = {
 }
 
 A.tyrannical = {
-  name = "Tyrannique", level = 2,
-  text = ("Élites : +%d %% de PV et de dégâts. Boss : +%d %% de PV%s.")
+  name = "Tyrannical", level = 2,
+  text = ("Elites: +%d%% HP and damage. Bosses: +%d%% HP%s.")
     :format(pct(P.tyrannical.eliteHp), pct(P.tyrannical.bossHp),
-      P.tyrannical.bossDamage > 0 and (" et +%d %% de dégâts"):format(pct(P.tyrannical.bossDamage)) or ""),
+      P.tyrannical.bossDamage > 0 and (" and +%d%% damage"):format(pct(P.tyrannical.bossDamage)) or ""),
   hooks = {
     enemyHp = function(c, src, v, def)
       if def.boss then return scale(v, P.tyrannical.bossHp) end
@@ -111,8 +111,8 @@ A.tyrannical = {
 }
 
 A.bolstering = {
-  name = "Galvanisant", level = 3,
-  text = ("Quand un ennemi meurt, les autres gagnent %d Force (sauf les boss)."):format(P.bolstering.force),
+  name = "Bolstering", level = 3,
+  text = ("When an enemy dies, the others gain %d Strength (except bosses)."):format(P.bolstering.force),
   hooks = {
     onEnemyDeath = function(c, src, dead)
       for i = 1, #c.enemies do
@@ -125,12 +125,12 @@ A.bolstering = {
   },
 }
 
-ns.Statuses.necrotic = { name = "Nécrotique", affix = true,
-  text = ("Soins reçus réduits de %d %% par cumul, jusqu'à la fin du combat."):format(pct(P.necrotic.step)) }
+ns.Statuses.necrotic = { name = "Necrotic", affix = true,
+  text = ("Healing received reduced by %d%% per stack, until the end of combat."):format(pct(P.necrotic.step)) }
 
 A.necrotic = {
-  name = "Nécrotique", level = 4,
-  text = ("Chaque coup reçu réduit les soins de %d %% jusqu'à la fin du combat."):format(pct(P.necrotic.step)),
+  name = "Necrotic", level = 4,
+  text = ("Each hit taken reduces healing by %d%% until the end of combat."):format(pct(P.necrotic.step)),
   hooks = {
     onPlayerHit = function(c, src, enemy, loss)
       if (c.player.st.necrotic or 0) < P.necrotic.cap then ns.Combat.applyStatus(c, c.player, "necrotic", 1) end
@@ -144,8 +144,8 @@ A.necrotic = {
 }
 
 A.famine = {
-  name = "Disette", level = 5,
-  text = ("Le feu de camp ne soigne plus que %d %% des PV."):format(pct(P.famine.rest)),
+  name = "Famine", level = 5,
+  text = ("Campfires only heal %d%% of HP."):format(pct(P.famine.rest)),
   run = {
     restFraction = function(exp, v) return min(v, P.famine.rest) end,
   },
@@ -197,7 +197,7 @@ end
 
 -- Titre cosmétique d'Exalté.
 function Meta.title(meta, class)
-  if Meta.isExalted(meta, class) then return "Tueur de dragons" end
+  if Meta.isExalted(meta, class) then return "Dragonslayer" end
   return nil
 end
 
@@ -220,7 +220,7 @@ end
 function Meta.newExpedition(meta, opts)
   local class = opts.class or "priest"
   local key = opts.key or 0
-  if key < 0 or key > Meta.keyMax(meta, class) then return nil, "clé verrouillée" end
+  if key < 0 or key > Meta.keyMax(meta, class) then return nil, "key locked" end
   return ns.Expedition.new({ seed = opts.seed, class = class, key = key,
     unlocks = Meta.unlocks(meta, class), flags = meta.flags, stats = opts.stats, quiet = opts.quiet })
 end

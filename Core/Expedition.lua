@@ -449,22 +449,22 @@ end
 X.CONDITIONS = {
   hpBelow = { -- PV strictement sous la fraction arg des PV max
     test = function(exp, f) return exp.hp < exp.maxHp * f end,
-    text = function(f) return ("Seulement sous %d %% des PV."):format(pct(f)) end },
+    text = function(f) return ("Only below %d%% HP."):format(pct(f)) end },
   hpAbove = { -- PV au moins égaux à la fraction arg des PV max
     test = function(exp, f) return exp.hp >= exp.maxHp * f end,
-    text = function(f) return ("Il faut au moins %d %% des PV."):format(pct(f)) end },
+    text = function(f) return ("Requires at least %d%% HP."):format(pct(f)) end },
   gold = {
     test = function(exp, n) return exp.gold >= n end,
-    text = function(n) return ("Il faut %d po."):format(n) end },
+    text = function(n) return ("Requires %dg."):format(n) end },
   relic = {
     test = function(exp, id) return hasRelic(exp, id) end,
-    text = function(id) return "Il faut : " .. relicLabel(id) .. "." end },
+    text = function(id) return "Requires: " .. relicLabel(id) .. "." end },
   noRelic = {
     test = function(exp, id) return not hasRelic(exp, id) end,
-    text = function(id) return "Déjà possédé : " .. relicLabel(id) .. "." end },
+    text = function(id) return "Already owned: " .. relicLabel(id) .. "." end },
   potion = {
     test = function(exp) return hasPotion(exp) end,
-    text = function() return "Il faut une potion." end },
+    text = function() return "Requires a potion." end },
   card = {
     test = function(exp, id)
       for i = 1, #exp.deck do
@@ -474,20 +474,20 @@ X.CONDITIONS = {
     end,
     text = function(id)
       local d = ns.Cards[id]
-      return "Il faut la carte " .. (d and d.name or tostring(id)) .. "."
+      return "Requires the card " .. (d and d.name or tostring(id)) .. "."
     end },
   key = {
     test = function(exp, n) return (exp.key or 0) >= n end,
-    text = function(n) return ("Clé mythique +%d ou plus."):format(n) end },
+    text = function(n) return ("Mythic Keystone +%d or higher."):format(n) end },
   flag = {
     test = function(exp, name) return X.hasFlag(exp, name) end,
-    text = function() return "Pas encore." end },
+    text = function() return "Not yet." end },
   noFlag = {
     test = function(exp, name) return not X.hasFlag(exp, name) end,
-    text = function() return "Plus maintenant." end },
+    text = function() return "Not anymore." end },
   floor = { -- étape courante (celle du nœud) au moins égale à arg
     test = function(exp, n) return (exp.floor or 0) >= n end,
-    text = function(n) return ("À partir de l'étape %d."):format(n) end },
+    text = function(n) return ("From stage %d onward."):format(n) end },
 }
 
 -- Toutes les conditions de la liste sont-elles remplies ? (true | false, raison)
@@ -496,7 +496,7 @@ function X.check(exp, when)
   for i = 1, #when do
     local c = when[i]
     local def = X.CONDITIONS[c[1]]
-    if not def then error("condition de rencontre inconnue : " .. tostring(c[1])) end
+    if not def then error("unknown encounter condition: " .. tostring(c[1])) end
     if not def.test(exp, c[2], c) then return false, c.text or def.text(c[2], c) end
   end
   return true
@@ -584,29 +584,29 @@ end
 
 -- Codes de refus des effets et leur texte (l'interface traduit aussi les codes).
 X.EVENT_REASONS = {
-  ["or"] = "Pas assez d'or.",
-  deck = "Deck trop petit.",
-  ["amélioration"] = "Aucune carte à améliorer.",
-  potion = "Il faut une potion.",
-  ["bibelot"] = "Bibelot déjà possédé.",
+  gold = "Not enough gold.",
+  deck = "Deck too small.",
+  upgrade = "No card to upgrade.",
+  potion = "Requires a potion.",
+  relic = "Relic already owned.",
 }
 
 -- Le choix ci de la rencontre est-il possible ? (true | false, raison)
 -- Raison : texte de la condition `when` de la réponse, ou code d'un effet impossible
--- ("or", "deck", "amélioration", "potion", "bibelot" ; X.EVENT_REASONS les traduit).
+-- ("gold", "deck", "upgrade", "potion", "relic" ; X.EVENT_REASONS les traduit).
 function X.eventChoiceOk(exp, ci)
   local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
   local ch = ev and ev.choices[ci]
-  if not ch then return false, "choix" end
+  if not ch then return false, "choice" end
   local ok, why = X.check(exp, ch.when)
   if not ok then return false, why end
   for _, e in ipairs(ch.effects) do
     local k = e[1]
-    if k == "pay" and exp.gold < e[2] then return false, "or" end
+    if k == "pay" and exp.gold < e[2] then return false, "gold" end
     if (k == "remove" or k == "dupe") and #exp.deck <= 1 then return false, "deck" end
-    if k == "upgrade" and #upgradable(exp) == 0 then return false, "amélioration" end
+    if k == "upgrade" and #upgradable(exp) == 0 then return false, "upgrade" end
     if k == "losePotion" and not hasPotion(exp) then return false, "potion" end
-    if k == "relic" and e[2] and hasRelic(exp, e[2]) then return false, "bibelot" end
+    if k == "relic" and e[2] and hasRelic(exp, e[2]) then return false, "relic" end
   end
   return true
 end
@@ -690,7 +690,7 @@ local function applyEffects(exp, effects, rolls, ctx)
     elseif k == "flag" then
       X.setFlag(exp, e[2])
     else
-      error("effet de rencontre inconnu : " .. tostring(k))
+      error("unknown encounter effect: " .. tostring(k))
     end
   end
 end
@@ -745,7 +745,7 @@ local function enterNode(exp, id)
   elseif k == "chest" then
     openReward(exp, rollReward(exp, "chest"))
   else
-    error("type de nœud inconnu : " .. tostring(k))
+    error("unknown node kind: " .. tostring(k))
   end
 end
 
@@ -762,7 +762,7 @@ function X.new(opts)
   local seed = floor(opts.seed or 1)
   local class = opts.class or "priest"
   local cdef = ns.Classes[class]
-  if not cdef then error("classe inconnue : " .. tostring(class)) end
+  if not cdef then error("unknown class: " .. tostring(class)) end
   local unlock = opts.unlocks or {}
   local key = opts.key or 0
   local exp = {
@@ -828,7 +828,7 @@ H.start = {
 H.map = {
   path = function(exp, a)
     local id = a[2]
-    if not U.indexOf(Map.nextNodes(exp.map, exp.node), id) then return false, "chemin" end
+    if not U.indexOf(Map.nextNodes(exp.map, exp.node), id) then return false, "path" end
     enterNode(exp, id)
     return true
   end,
@@ -858,21 +858,21 @@ H.reward = {
   pickCard = function(exp, a)
     local r = exp.reward
     local id = not r.cardsDone and r.cards[a[2] or 0]
-    if not id then return false, "carte" end
+    if not id then return false, "badCard" end
     X.addCard(exp, id)
     r.cardsDone = true
     r.picked = id
     return true
   end,
   skipCards = function(exp)
-    if exp.reward.cardsDone then return false, "carte" end
+    if exp.reward.cardsDone then return false, "badCard" end
     exp.reward.cardsDone = true
     return true
   end,
   takePotion = function(exp)
     local r = exp.reward
     if not r.potion or r.potionTaken then return false, "potion" end
-    if not X.gainPotion(exp, r.potion) then return false, "emplacement" end
+    if not X.gainPotion(exp, r.potion) then return false, "slot" end
     r.potionTaken = true
     return true
   end,
@@ -892,7 +892,7 @@ H.campfire = {
     return true
   end,
   upgrade = function(exp, a)
-    if not X.canUpgrade(exp, a[2] or 0) then return false, "carte" end
+    if not X.canUpgrade(exp, a[2] or 0) then return false, "badCard" end
     upgrade(exp, a[2])
     leaveNode(exp)
     return true
@@ -905,8 +905,8 @@ H.campfire = {
 
 local function buy(exp, list, i, give)
   local item = list[i or 0]
-  if not item or item.sold then return false, "article" end
-  if exp.gold < item.price then return false, "or" end
+  if not item or item.sold then return false, "item" end
+  if exp.gold < item.price then return false, "gold" end
   local ok, why = give(item.id)
   if ok == false then return false, why end
   spend(exp, item.price)
@@ -923,14 +923,14 @@ H.merchant = {
   end,
   buyPotion = function(exp, a)
     return buy(exp, exp.shop.potions, a[2], function(id)
-      if not X.gainPotion(exp, id) then return false, "emplacement" end
+      if not X.gainPotion(exp, id) then return false, "slot" end
     end)
   end,
   remove = function(exp, a)
     local i = a[2] or 0
     local price = X.removePrice(exp)
-    if not exp.deck[i] or #exp.deck <= 1 then return false, "carte" end
-    if exp.gold < price then return false, "or" end
+    if not exp.deck[i] or #exp.deck <= 1 then return false, "badCard" end
+    if exp.gold < price then return false, "gold" end
     spend(exp, price)
     table.remove(exp.deck, i)
     exp.removals = exp.removals + 1
@@ -945,14 +945,14 @@ H.merchant = {
 
 H.event = {
   choose = function(exp, a)
-    if exp.event.chosen then return false, "déjà choisi" end
+    if exp.event.chosen then return false, "chosen" end
     local ok, why = X.eventChoiceOk(exp, a[2] or 0)
     if not ok then return false, why end
     applyEvent(exp, a[2])
     return true
   end,
   leave = function(exp)
-    if exp.event.id and not exp.event.chosen then return false, "choix" end
+    if exp.event.id and not exp.event.chosen then return false, "choice" end
     leaveNode(exp)
     return true
   end,
@@ -974,15 +974,15 @@ H.select = {
     local i = a[2] or 0
     local kind = exp.select.kind
     if kind == "upgrade" then
-      if not X.canUpgrade(exp, i) then return false, "carte" end
+      if not X.canUpgrade(exp, i) then return false, "badCard" end
       upgrade(exp, i)
     elseif kind == "remove" then
-      if not exp.deck[i] or #exp.deck <= 1 then return false, "carte" end
+      if not exp.deck[i] or #exp.deck <= 1 then return false, "badCard" end
       table.remove(exp.deck, i)
       exp.stats.removed = exp.stats.removed + 1
     elseif kind == "dupe" then
       local card = exp.deck[i]
-      if not card then return false, "carte" end
+      if not card then return false, "badCard" end
       X.addCard(exp, card.id, card.up)
     end
     endSelect(exp)
@@ -999,7 +999,7 @@ local COMMON = {
   discardPotion = function(exp, a)
     if exp.phase == "combat" then return false, "phase" end
     local s = a[2] or 0
-    if not exp.potions[s] then return false, "emplacement" end
+    if not exp.potions[s] then return false, "slot" end
     exp.potions[s] = false
     return true
   end,
@@ -1010,7 +1010,7 @@ local COMMON = {
 }
 
 function X.act(exp, a)
-  if exp.phase == "done" then return false, "terminée" end
+  if exp.phase == "done" then return false, "ended" end
   -- Combat déjà tranché mais pas encore conclu (état rechargé, effet externe) : n'importe
   -- quelle action le conclut, et rien d'autre.
   if exp.phase == "combat" and exp.combat.result then

@@ -269,7 +269,7 @@ function V:Build(parent)
   end
   W.tooltip(mana, function(tt)
     tt:AddLine("Mana", 0.4, 0.6, 1)
-    tt:AddLine("Le mana non dépensé est perdu à la fin du tour.", 0.8, 0.8, 0.8, true)
+    tt:AddLine("Unspent mana is lost at the end of the turn.", 0.8, 0.8, 0.8, true)
   end, "ANCHOR_RIGHT")
   self.mana = mana
 
@@ -287,10 +287,10 @@ function V:Build(parent)
   end, "ANCHOR_RIGHT")
   self.demence = dem
 
-  self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Pioche", "full", hz:GetFrameLevel() + 1)
-  self.discardPile = pile(self, parent, DISCARD_PILE[1], DISCARD_PILE[2], "discard", "Défausse", "dashed",
+  self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Draw pile", "full", hz:GetFrameLevel() + 1)
+  self.discardPile = pile(self, parent, DISCARD_PILE[1], DISCARD_PILE[2], "discard", "Discard pile", "dashed",
     hz:GetFrameLevel() + 1)
-  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1], EXHAUST_PILE[2], "exhaust", "Consumées", "exhaust",
+  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1], EXHAUST_PILE[2], "exhaust", "Exhausted", "exhaust",
     hz:GetFrameLevel() + 1)
   self.exhaustPile:Hide()
 
@@ -315,13 +315,13 @@ function V:Build(parent)
       if not f.cd then return end
       W.fillCardTooltip(tt, f.cd.card.id, f.cd.card.up, { full = true })
       tt:AddLine(" ")
-      tt:AddLine("Revient en main dans " .. f.turns .. " tour" .. (f.turns > 1 and "s" or "") .. ".", 1, 0.82, 0)
+      tt:AddLine("Returns to hand in " .. f.turns .. " turn" .. (f.turns > 1 and "s" or "") .. ".", 1, 0.82, 0)
     end, "ANCHOR_TOP")
     m:Hide()
     self.cdCards[i] = m
   end
 
-  self.endTurn = W.button(parent, "Fin du tour", 156, 50, function() V:EndTurn() end, "gold", 19)
+  self.endTurn = W.button(parent, "End Turn", 156, 50, function() V:EndTurn() end, "gold", 19)
   at(self.endTurn, parent, 863, 520, 156, 50)
   self.endTurn:SetFrameLevel(hz:GetFrameLevel() + 2)
 
@@ -351,7 +351,7 @@ function V:Build(parent)
   banner.plaque = W.plaque(banner, { r = 16 })
   banner.text = W.label(banner, "heavy", 44, C.goldText, "OVERLAY")
   banner.text:SetPoint("TOP", 0, -18)
-  banner.button = W.button(banner, "Continuer", 190, 50, function() Controller.finishCombat() end, "gold", 18)
+  banner.button = W.button(banner, "Continue", 190, 50, function() Controller.finishCombat() end, "gold", 18)
   banner.button:SetPoint("BOTTOM", 0, 12)
   banner:Hide()
   self.banner = banner
@@ -366,25 +366,25 @@ end
 ---------------------------------------------------------------------------
 
 local ACTION_TEXT = {
-  block = function(a) return "Gagne " .. a[2] .. " Absorption." end,
+  block = function(a) return "Gains " .. a[2] .. " Absorb." end,
   debuff = function(a)
     local s = ns.Statuses[a[2]]
-    return "Inflige " .. (s and s.name or a[2]) .. " " .. a[3] .. "."
+    return "Applies " .. (s and s.name or a[2]) .. " " .. a[3] .. "."
   end,
   buff = function(a)
     local s = ns.Statuses[a[2]]
-    return "Gagne " .. (s and s.name or a[2]) .. " " .. a[3] .. "."
+    return "Gains " .. (s and s.name or a[2]) .. " " .. a[3] .. "."
   end,
   buff_allies = function(a)
     local s = ns.Statuses[a[2]]
-    return "Donne " .. (s and s.name or a[2]) .. " " .. a[3] .. " à ses alliés."
+    return "Gives " .. (s and s.name or a[2]) .. " " .. a[3] .. " to its allies."
   end,
-  heal_ally = function(a) return "Soigne de " .. a[2] .. " l'allié le plus blessé." end,
-  block_ally = function(a) return "Donne " .. a[2] .. " Absorption à un allié." end,
-  interrupt = function() return "Interrompt votre incantation." end,
+  heal_ally = function(a) return "Heals the most wounded ally for " .. a[2] .. "." end,
+  block_ally = function(a) return "Gives " .. a[2] .. " Absorb to an ally." end,
+  interrupt = function() return "Interrupts your cast." end,
   summon = function(a)
     local d = ns.Enemies[a[2]]
-    return "Invoque " .. ((a.count or 1) > 1 and (a.count .. " × ") or "") .. (d and d.name or a[2]) .. "."
+    return "Summons " .. ((a.count or 1) > 1 and (a.count .. " × ") or "") .. (d and d.name or a[2]) .. "."
   end,
 }
 
@@ -395,22 +395,22 @@ function V.fillIntentTooltip(tt, e)
   local mv = ns.Enemies[e.id].moves[e.intent]
   tt:AddLine(info.name or e.intent, 1, 0.82, 0)
   tt:AddLine(Art.intentName[info.kind] or info.kind or "", 0.7, 0.7, 0.7)
-  if info.stunned then tt:AddLine("Étourdi : perd son prochain tour.", 0.4, 0.9, 1, true) end
-  if info.interrupted then tt:AddLine("Sort interrompu : il ne partira pas.", 0.4, 0.9, 1, true) end
+  if info.stunned then tt:AddLine("Stunned: loses its next turn.", 0.4, 0.9, 1, true) end
+  if info.interrupted then tt:AddLine("Spell interrupted: it won't go off.", 0.4, 0.9, 1, true) end
   if mv.text then tt:AddLine(mv.text, 1, 1, 1, true) end
   for i = 1, #mv.actions do
     local a = mv.actions[i]
     if a[1] == "attack" then
       local times = a.times or 1
-      tt:AddLine("Attaque : " .. Combat.calcDamage(c, e, c.player, a[2])
-        .. (times > 1 and (" × " .. times) or "") .. " dégâts.", 1, 0.5, 0.5, true)
-      if a.interrupts then tt:AddLine("Interrompt votre incantation.", 1, 0.5, 0.5, true) end
+      tt:AddLine("Attack: " .. Combat.calcDamage(c, e, c.player, a[2])
+        .. (times > 1 and (" × " .. times) or "") .. " damage.", 1, 0.5, 0.5, true)
+      if a.interrupts then tt:AddLine("Interrupts your cast.", 1, 0.5, 0.5, true) end
     elseif ACTION_TEXT[a[1]] then
       tt:AddLine(ACTION_TEXT[a[1]](a), 1, 1, 1, true)
     end
   end
   if info.cast and not info.interrupted then
-    tt:AddLine("Sort incanté : une Interruption l'annule.", 1, 0.6, 0.2, true)
+    tt:AddLine("Spell being cast: an Interrupt cancels it.", 1, 0.6, 0.2, true)
   end
 end
 
@@ -419,7 +419,7 @@ function V.fillPileTooltip(tt, key, label)
   if not c then return end
   local pileList = c[key]
   tt:AddLine(label .. " (" .. #pileList .. ")", 1, 0.82, 0)
-  if key == "draw" then tt:AddLine("Liste triée : l'ordre de tirage reste caché.", 0.6, 0.6, 0.6) end
+  if key == "draw" then tt:AddLine("Sorted list: the draw order stays hidden.", 0.6, 0.6, 0.6) end
   local counts, order = {}, {}
   for i = 1, #pileList do
     local n = Card.def(pileList[i]).name
@@ -430,9 +430,9 @@ function V.fillPileTooltip(tt, key, label)
   for i = 1, #order do tt:AddLine(counts[order[i]] .. " × " .. order[i], 1, 1, 1) end
   if key == "discard" and #c.exhaust > 0 then
     tt:AddLine(" ")
-    tt:AddLine("Consumées : " .. #c.exhaust, 0.8, 0.6, 0.4)
+    tt:AddLine("Exhausted: " .. #c.exhaust, 0.8, 0.6, 0.4)
   end
-  tt:AddLine("Clic : voir les cartes.", 0.6, 0.6, 0.6)
+  tt:AddLine("Click: view the cards.", 0.6, 0.6, 0.6)
 end
 
 ---------------------------------------------------------------------------
@@ -554,8 +554,8 @@ end
 -- Bulle d'intention : icône + chiffres exacts (Combat.calcDamage).
 local function intentDisplay(c, e)
   local info = Combat.intentInfo(c, e)
-  if info.stunned then return Art.intents.stunned, "Étourdi", "defend" end
-  if info.interrupted then return Art.intents.interrupted, "Coupé", "defend" end
+  if info.stunned then return Art.intents.stunned, "Stunned", "defend" end
+  if info.interrupted then return Art.intents.interrupted, "Interrupted", "defend" end
   local mv = ns.Enemies[e.id].moves[e.intent]
   local parts = {}
   for i = 1, #mv.actions do
@@ -573,7 +573,7 @@ local function intentDisplay(c, e)
     end
   end
   local text = table.concat(parts, " ")
-  if info.kind == "watch" then text = "Guette" end
+  if info.kind == "watch" then text = "Watch" end
   local entry = Art.intents[info.kind] or Art.intents.attack
   return entry, text, entry.color
 end
@@ -673,7 +673,7 @@ function V:RenderPlayer(full)
   if p.cast then
     local d = Card.def(p.cast.card)
     local tgt = p.cast.target and enemyByUid(c, p.cast.target)
-    self.cast.name:SetText(d.name .. (tgt and (" sur " .. ns.Enemies[tgt.id].name) or ""))
+    self.cast.name:SetText(d.name .. (tgt and (" on " .. ns.Enemies[tgt.id].name) or ""))
     W.setIcon(self.cast.medal.icon, W.cardArt(p.cast.card.id), "card:" .. p.cast.card.id)
     self.cast:Show()
   else
@@ -807,10 +807,10 @@ end
 function V:RenderBanner()
   local over = Controller.over()
   if over then
-    self.banner.text:SetText(over == "won" and "Victoire !" or "Défaite")
+    self.banner.text:SetText(over == "won" and "Victory!" or "Defeat")
     local col = over == "won" and C.goldText or C.badText
     self.banner.text:SetTextColor(col[1], col[2], col[3])
-    self.banner.button:SetText(over == "won" and "Continuer" or "Voir le bilan")
+    self.banner.button:SetText(over == "won" and "Continue" or "See the summary")
     if not self.banner:IsShown() then
       self.banner:Show()
       W.tween(0.35, function(p) self.banner:SetAlpha(p) end, nil, self.banner, "show")
@@ -1016,7 +1016,7 @@ function V:QueueEvent(ev)
     self:Push(0.3, function()
       local x, y = self_:UnitPos(ev.dst)
       W.sound("interrupt")
-      if x then W.float(self_.parent, x, y - 60, "Interrompu !", C.defendText, 20, 1.3) end
+      if x then W.float(self_.parent, x, y - 60, "Interrupted!", C.defendText, 20, 1.3) end
     end)
   elseif t == "cast_start" then
     self:Push(0.2, function() W.anim(self_.playerModel, A.ready, 1.2) end)
@@ -1025,7 +1025,7 @@ function V:QueueEvent(ev)
   elseif t == "cast_lost" then
     self:Push(0.2, function()
       local x, y = self_:UnitPos(ev.unit)
-      if x then W.float(self_.parent, x, y - 60, "Sort perdu", C.defendText, 16) end
+      if x then W.float(self_.parent, x, y - 60, "Spell lost", C.defendText, 16) end
     end)
   elseif t == "say" then
     self:Push(0.4, function()
@@ -1033,22 +1033,22 @@ function V:QueueEvent(ev)
       if x then W.float(self_.parent, x, y - 110, ev.text, C.creamLight, 15, 2.6, 12) end
     end)
   elseif t == "stunned" or t == "immune" or t == "flee" then
-    local label = t == "stunned" and "Étourdi" or t == "immune" and "Insensible" or "S'enfuit"
+    local label = t == "stunned" and "Stunned" or t == "immune" and "Immune" or "Flees"
     self:Push(0.25, function()
       local x, y = self_:UnitPos(ev.unit)
       if x then W.float(self_.parent, x, y - 60, label, C.defendText, 16) end
     end)
   elseif t == "saved" then
-    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, "Esprit de rédemption !", C.goldText, 18, 2) end)
+    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, "Spirit of Redemption!", C.goldText, 18, 2) end)
   elseif t == "demence" and ev.n ~= 0 then
     self:Push(0.1, function()
-      W.float(self_.parent, MANA_X + 44, MANA_Y - 40, (ev.n > 0 and "+" or "") .. ev.n .. " Démence", C.watchText, 15, 1.0, 26)
+      W.float(self_.parent, MANA_X + 44, MANA_Y - 40, (ev.n > 0 and "+" or "") .. ev.n .. " Insanity", C.watchText, 15, 1.0, 26)
     end)
   elseif t == "mana" and ev.n ~= 0 then
     self:Push(0.1, function() W.float(self_.parent, MANA_X, MANA_Y - 10, "+" .. ev.n .. " mana", C.defendText, 15, 1.0, 26) end)
   elseif t == "turn" then
     self:Push(0.35, function()
-      W.float(self_.parent, 517, 120, "Tour " .. ev.round, C.goldText, 26, 1.1, 16)
+      W.float(self_.parent, 517, 120, "Turn " .. ev.round, C.goldText, 26, 1.1, 16)
     end)
   elseif t == "draw" or t == "cooldown_back" then
     self:Push(0.09, function() self_:FlyDraw(ev.card, t == "cooldown_back") end)
@@ -1168,7 +1168,7 @@ function V:SelectPotion(slot)
   self.potionSlot = slot
   self:RenderHand()
   self:RenderTargets()
-  UI.flash("Potion : cliquer sa cible.")
+  UI.flash("Potion: click its target.")
 end
 
 function V:DrinkPotion(slot, target)
@@ -1290,7 +1290,7 @@ function V:HandleKey(key)
 end
 
 ---------------------------------------------------------------------------
--- Aperçu des modèles (/slay modeles) : vérifie l'art sans toucher à l'expédition
+-- Aperçu des modèles (/slay models) : vérifie l'art sans toucher à l'expédition
 ---------------------------------------------------------------------------
 
 -- Entrées de l'aperçu : ennemis (Art.enemies) puis personnages des rencontres (Art.npcs), triés.
@@ -1316,12 +1316,12 @@ local function previewEntries()
   return out
 end
 
--- Identifiants essayés, en clair : « créature 619, affichage 2329, affichage 2330 ».
+-- Identifiants essayés, en clair : « creature 619, display 2329, display 2330 ».
 local function triesText(art)
   local t = W.modelTries(art)
   local parts = {}
   for i = 1, #t do parts[i] = W.tryLabel(t[i]) end
-  return #parts > 0 and table.concat(parts, ", ") or "aucun identifiant"
+  return #parts > 0 and table.concat(parts, ", ") or "no identifier"
 end
 
 local PREVIEW_COLS = 6
@@ -1335,7 +1335,7 @@ function V:PreviewEnemies()
     p:EnableMouse(true)
     p.title = W.label(p, "bold", 14, C.textSoft)
     p.title:SetPoint("TOPLEFT", 16, -10)
-    p.title:SetText("Modèles des ennemis et des personnages (le chat liste ceux qui manquent)")
+    p.title:SetText("Enemy and character models (chat lists the missing ones)")
     p.models = {}
     local list = previewEntries()
     local rows = math.ceil(#list / PREVIEW_COLS)
@@ -1363,7 +1363,7 @@ function V:PreviewEnemies()
       m.id, m.key, m.art, m.npc, m.fallback, m.label = e.id, e.key, e.art, e.npc, fig.fallback, e.name
       p.models[k] = m
     end
-    local close = W.button(p, "Fermer", 110, 30, function() p:Hide() end, "gold", 14)
+    local close = W.button(p, "Close", 110, 30, function() p:Hide() end, "gold", 14)
     close:SetPoint("BOTTOMRIGHT", -14, 14)
     self.preview = p
   end
@@ -1371,7 +1371,7 @@ function V:PreviewEnemies()
   local most = 1
   for k = 1, #self.preview.models do
     local m = self.preview.models[k]
-    m.state:SetText("chargement")
+    m.state:SetText("loading")
     m.state:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
     if m.npc then
       m.fallback:Hide()
@@ -1386,14 +1386,14 @@ function V:PreviewEnemies()
   -- rapport au chat quand tous les essais ont eu leur délai
   self.previewToken = (self.previewToken or 0) + 1
   local token = self.previewToken
-  UI.say("aperçu des modèles : vérification (" .. #self.preview.models .. " modèles, environ "
+  UI.say("model preview: checking (" .. #self.preview.models .. " models, about "
     .. math.ceil(most * W.MODEL_WAIT) .. " s).")
   W.delay(most * W.MODEL_WAIT + 0.2, function()
     if self.previewToken == token then self:ReportModels() end
   end)
 end
 
--- Lignes du rapport (/slay modeles), à recopier telles quelles : une par modèle absent, puis une par
+-- Lignes du rapport (/slay models), à recopier telles quelles : une par modèle absent, puis une par
 -- modèle chargé seulement par un essai de repli. ASCII pour les flèches (polices du jeu).
 function V:ModelReportLines()
   local lost, late, ok = {}, {}, 0
@@ -1409,17 +1409,17 @@ function V:ModelReportLines()
           if st.tries[i] == st.via then break end
           failed[#failed + 1] = st.tries[i]
         end
-        late[#late + 1] = m.key .. " : " .. table.concat(failed, ", ") .. " -> aucun modèle ; chargé par " .. st.via
+        late[#late + 1] = m.key .. ": " .. table.concat(failed, ", ") .. " -> no model; loaded by " .. st.via
       end
     else
-      local tried = st and #st.tries > 0 and table.concat(st.tries, ", ") or "aucun identifiant"
-      lost[#lost + 1] = m.key .. " : " .. tried .. " -> aucun modèle"
+      local tried = st and #st.tries > 0 and table.concat(st.tries, ", ") or "no identifier"
+      lost[#lost + 1] = m.key .. ": " .. tried .. " -> no model"
     end
   end
-  local lines = { "modèles : " .. ok .. "/" .. #models .. " chargés"
-    .. (#lost > 0 and (", " .. #lost .. " sans modèle :") or ".") }
+  local lines = { "models: " .. ok .. "/" .. #models .. " loaded"
+    .. (#lost > 0 and (", " .. #lost .. " without a model:") or ".") }
   for i = 1, #lost do lines[#lines + 1] = lost[i] end
-  if #late > 0 then lines[#lines + 1] = "chargés par un identifiant de repli :" end
+  if #late > 0 then lines[#lines + 1] = "loaded by a fallback identifier:" end
   for i = 1, #late do lines[#lines + 1] = late[i] end
   return lines, #lost
 end
@@ -1430,7 +1430,7 @@ function V:ReportModels()
     local m = models[k]
     local st = W.models[m.key]
     local good = st and st.state == "ok"
-    m.state:SetText(good and ("modèle : " .. st.via) or "aucun modèle")
+    m.state:SetText(good and ("model: " .. st.via) or "no model")
     local c = good and C.healGreen or C.badText
     m.state:SetTextColor(c[1], c[2], c[3])
   end

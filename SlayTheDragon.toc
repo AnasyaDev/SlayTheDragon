@@ -1,6 +1,6 @@
 ## Interface: 16001
 ## Title: Slay the Dragon
-## Notes: Deckbuilder roguelike à jouer pendant les vols.
+## Notes: Roguelike deckbuilder to play during flights.
 ## Author: AnasyaDev
 ## Version: 0.1.0-dev
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
