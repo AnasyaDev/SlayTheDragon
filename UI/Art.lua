@@ -53,6 +53,8 @@ Art.C = {
   hpShine = hex("#ff8282"), ghostLight = hex("#ffeca9"), upGreen = hex("#7dff7d"), healGreen = hex("#78e682"),
   badText = hex("#ff8278"), costText = hex("#ffffff"), cool = hex("#3c5a96"), barTrack = hex("#0c1016"),
   rarityUncommon = hex("#43b24f"),
+  -- habillage WoW (tools/build_wowui.py) : doré des libellés (NORMAL_FONT_COLOR), encre des parchemins
+  wowGold = { 1, 0.82, 0 }, parchInk = hex("#2e1d0c"), parchGood = hex("#1d6b12"), parchBad = hex("#8c1a0c"),
 }
 
 ---------------------------------------------------------------------------
@@ -286,6 +288,8 @@ Art.statuses = {
 
 -- Affixes mythiques (chemins vérifiés par wow_icon_search, piste D).
 Art.keystone = { icon = "Interface\\Icons\\inv_relics_hourglass", tga = "INV_Relics_Hourglass" }
+-- Portrait de repli du cadre du héros (si SetPortraitTexture manque) : icône de classe.
+Art.classes = { priest = { icon = 626004, tga = "ClassIcon_Priest" } } -- classicon_priest
 Art.affixes = {
   fortified  = { icon = "Interface\\Icons\\ability_toughness", tga = "ability_toughness" },
   tyrannical = { icon = "Interface\\Icons\\achievement_boss_archaedas", tga = "Achievement_Boss_Archaedas" },
@@ -401,7 +405,7 @@ Art.gems = { uncommon = "uncommon", rare = "rare", epic = "epic", boss = "legend
 
 -- Teintes multiplicatives du liseré d'argent (couleur de sommet) et de l'ardoise.
 Art.rim = {
-  silver = { 1, 1, 1 }, gold = { 1, 0.86, 0.42 }, red = { 1, 0.55, 0.5 }, attack = { 1, 0.55, 0.5 },
+  silver = { 1, 1, 1 }, gold = { 1, 0.86, 0.42 }, red = { 1, 0.55, 0.5 }, debuff = { 1, 0.3, 0.25 }, attack = { 1, 0.55, 0.5 },
   defend = { 0.7, 0.86, 1 }, watch = { 0.9, 0.7, 1 }, heal = { 0.62, 1, 0.62 }, dim = { 0.6, 0.63, 0.68 },
   violet = { 0.85, 0.6, 1 }, green = { 0.55, 1, 0.55 },
 }

@@ -707,43 +707,36 @@ function W.nine(host, name, layer, sub, opts)
 end
 
 ---------------------------------------------------------------------------
--- Plaques : ardoise (ou ivoire) au liseré d'argent
+-- Plaques d'ardoise au liseré d'argent (pièces de la peau des cartes) : seulement les plaques posées
+-- sous une carte (raison d'un refus, prix) ; le reste de l'interface est habillé de pièces du jeu.
 ---------------------------------------------------------------------------
 -- Coins en neuf tranches (matière et liseré), intérieur en deux bandes de matière carrelée à l'échelle
--- (coordonnées de texture répétées, recalculées quand l'hôte change de taille), reflet léger en haut.
--- p:SetFill(k | couleur) éclaircit ou teinte la matière (k = 1 : ardoise de la maquette, 1,25 : plaque
--- chaude) ; p:SetRim(couleur) teinte le liseré (Art.rim) ; p:SetGlow(alpha, couleur) allume un halo.
--- opts.parent : cadre qui porte les textures (défaut : l'hôte, qui ne sert alors que d'ancre) — une
--- plaque posée sur un visuel animé y met ses textures (régions du visuel : elles suivent son animation).
+-- (coordonnées de texture répétées, recalculées quand l'hôte change de taille).
+-- p:SetFill(k | couleur) éclaircit ou teinte la matière ; p:SetRim(couleur) teinte le liseré (Art.rim) ;
+-- p:SetGlow(alpha, couleur) allume un halo. opts.parent : cadre qui porte les textures (défaut : l'hôte,
+-- qui ne sert alors que d'ancre) — une plaque posée sur un visuel animé y met ses textures (régions du
+-- visuel : elles suivent son animation).
 
 local Plaque = {}
 Plaque.__index = Plaque
 
 function W.plaque(host, opts)
   opts = opts or {}
-  local ivory = opts.mat == "ivory"
-  local pill = opts.pill
   local r = opts.r or 8
   local layer, sub = opts.layer or "BACKGROUND", opts.sub or -6
   local owner = opts.parent or host
-  local p = setmetatable({ host = host, r = r, i = opts.inset or 0, ivory = ivory, layer = layer, sub = sub,
-    tile = ivory and Skin.ivoryTile or Skin.slateTile, base = ivory and 1 or Skin.slateBase }, Plaque)
-  local fillName = ivory and "nine_ivory" or (pill and "pill_slate" or "nine_slate")
-  local rimName = pill and "pill_rim" or "nine_rim"
+  local p = setmetatable({ host = host, r = r, i = opts.inset or 0, layer = layer, sub = sub,
+    tile = Skin.slateTile, base = Skin.slateBase }, Plaque)
+  local fillName, rimName = "pill_slate", "pill_rim"
   p.corners = W.nine(host, fillName, layer, sub, { corner = r, inset = p.i, cornersOnly = true, parent = owner })
-  local tileName = ivory and "tile_ivory" or "tile_slate"
   p.bands = {}
   for k = 1, 2 do
     local t = W.noSnap(owner:CreateTexture(nil, layer, nil, sub + 1))
-    t:SetTexture(ROOT .. TEX[tileName].file, "REPEAT", "REPEAT")
+    t:SetTexture(ROOT .. TEX.tile_slate.file, "REPEAT", "REPEAT")
     p.bands[k] = t
   end
   local re = TEX[rimName]
   p.rimIn = re.rimIn * r / re.corner
-  if opts.gloss ~= false and not ivory then
-    p.gloss = W.noSnap(owner:CreateTexture(nil, layer, nil, sub + 2))
-    W.gradient(p.gloss, { 1, 1, 1, 0.08 }, { 1, 1, 1, 0 })
-  end
   p.rim = W.nine(host, rimName, layer, sub + 3, { corner = r, inset = p.i, noCenter = true, parent = owner })
   -- halo créé dès maintenant, caché : une texture créée au premier survol naîtrait pendant
   -- l'animation Scale du visuel (le client la dessinait alors démesurée, en aplat doré sur l'écran)
@@ -844,56 +837,243 @@ end
 function Plaque:Show() self:SetShown(true) end
 function Plaque:Hide() self:SetShown(false) end
 
--- Pilule dorée de l'action principale (trois tranches : bouts d'une demi-hauteur).
-function W.goldPill(host, layer, sub)
-  local e = TEX.button_gold
-  local a = e.cap / e.w
-  local o = setmetatable({ parts = {} }, Group)
+---------------------------------------------------------------------------
+-- Habillage WoW : pièces de l'interface du jeu embarquées (Media/WowUI, décrites par UI/WowSkin.lua,
+-- fabriqué par tools/build_wowui.py). Jamais de SetAtlas ni de chemin Interface\… du client pour
+-- l'habillage : sur WoW Forever, une texture absente s'afficherait en aplat vert sans qu'on le sache.
+---------------------------------------------------------------------------
+-- Échelles d'affichage (unités par pixel stocké) : à l'échelle 115 % d'un écran où une unité vaut un
+-- pixel, une pièce reste nette tant que k ≤ 1 / 1,15 ≈ 0,87.
+
+local WS = ns.WowSkin
+W.Wow = WS
+local WROOT, WP, WM = WS.root, WS.pieces, WS.meta
+W.K_METAL = 0.87     -- cadre de la fenêtre (pièces -2x stockées à 1)
+W.K_DIAMOND = 0.5    -- boîtes de dialogue (pièces -2x stockées à 0,5)
+
+function W.wowPath(name)
+  local e = WP[name]
+  return e and (WROOT .. e.file) or nil
+end
+
+-- Pose la pièce `name` sur tex ; sub = { l, r, t, b } en fractions de la pièce.
+function W.setWow(tex, name, sub)
+  local e = WP[name]
+  if not e then tex:SetTexture(nil) return false end
+  if e.tile then tex:SetTexture(WROOT .. e.file, "REPEAT", "REPEAT")
+  else tex:SetTexture(WROOT .. e.file, nil, nil, "TRILINEAR") end
+  local l, r, t, b = e.tc[1], e.tc[2], e.tc[3], e.tc[4]
+  if sub then
+    local du, dv = r - l, b - t
+    tex:SetTexCoord(l + du * sub[1], l + du * sub[2], t + dv * sub[3], t + dv * sub[4])
+  else
+    tex:SetTexCoord(l, r, t, b)
+  end
+  tex._wow = name
+  return true
+end
+
+function W.wow(parent, name, layer, sub, alpha)
+  local t = W.noSnap(parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0))
+  W.setWow(t, name)
+  if alpha then t:SetAlpha(alpha) end
+  return t
+end
+
+-- Taille (unités) d'une pièce affichée à k unités par pixel stocké.
+function W.wowSize(name, k)
+  local e = WP[name]
+  return e.pw * k, e.ph * k
+end
+
+-- Coordonnées d'une pièce répétée (fichier à part) posée sur w × h unités, période = pièce × k ; un axe
+-- non répété garde la pièce entière (étirée).
+function W.tileTo(tex, name, w, h, k)
+  local e = WP[name]
+  local t = e.tile or ""
+  local u = t:find("h") and (max(0.01, w) / (e.pw * k)) or e.tc[2]
+  local v = t:find("v") and (max(0.01, h) / (e.ph * k)) or e.tc[4]
+  tex:SetTexCoord(0, u, 0, v)
+end
+
+-- Matière répétée (roche, table, parchemin carrelé) qui couvre l'hôte moins `inset` : période = pièce × k ;
+-- suit la taille de l'hôte. owner : cadre porteur de la texture (défaut : l'hôte).
+function W.fillTile(host, name, k, layer, sub, inset, owner)
+  local t = W.noSnap((owner or host):CreateTexture(nil, layer or "BACKGROUND", nil, sub or -8))
+  W.setWow(t, name)
+  inset = inset or 0
+  t:SetPoint("TOPLEFT", host, "TOPLEFT", inset, -inset)
+  t:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -inset, inset)
+  local function re(w, h)
+    if w and h and w > 0 and h > 0 then W.tileTo(t, name, w - 2 * inset, h - 2 * inset, k) end
+  end
+  if host.HookScript then host:HookScript("OnSizeChanged", function(_, w, h) re(w, h) end) end
+  re(host:GetWidth(), host:GetHeight())
+  return t
+end
+
+-- Cadre à pièces séparées autour de l'hôte : coins de l'atlas, bords répétés (fichiers à part).
+-- spec = { tl, tr, bl, br, top, bottom, left, right } ; k = unités par pixel stocké ; out = { l, t, r, b } :
+-- débord des pièces hors de l'hôte (unités). opts = { parent (porteur des textures), top (porteur de la
+-- rangée du haut), layer, sub }. Les bords se recalculent quand l'hôte change de taille.
+function W.frameSlices(host, spec, k, out, opts)
+  opts = opts or {}
+  local owner = opts.parent or host
+  local topOwner = opts.top or owner
+  local layer, sub = opts.layer or "BORDER", opts.sub or 0
+  local o = setmetatable({ parts = {}, host = host }, Group)
+  local P = {}
+  local function mk(key, own)
+    local t = W.noSnap(own:CreateTexture(nil, layer, nil, sub))
+    W.setWow(t, spec[key])
+    o.parts[#o.parts + 1] = t
+    P[key] = t
+    return t
+  end
+  for _, key in ipairs({ "tl", "top", "tr" }) do mk(key, topOwner) end
+  for _, key in ipairs({ "left", "right", "bl", "bottom", "br" }) do mk(key, owner) end
+  o.P = P
+  local function sz(key) return W.wowSize(spec[key], k) end
+  local tlw, tlh = sz("tl")
+  local trw, trh = sz("tr")
+  local blw, blh = sz("bl")
+  local brw, brh = sz("br")
+  local _, toph = sz("top")
+  local _, both = sz("bottom")
+  local lw = sz("left")
+  local rw = sz("right")
+  local l, t, r, b = out[1], out[2], out[3], out[4]
+  P.tl:SetSize(tlw, tlh) P.tl:SetPoint("TOPLEFT", host, "TOPLEFT", -l, t)
+  P.tr:SetSize(trw, trh) P.tr:SetPoint("TOPRIGHT", host, "TOPRIGHT", r, t)
+  P.bl:SetSize(blw, blh) P.bl:SetPoint("BOTTOMLEFT", host, "BOTTOMLEFT", -l, -b)
+  P.br:SetSize(brw, brh) P.br:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", r, -b)
+  P.top:SetPoint("TOPLEFT", host, "TOPLEFT", tlw - l, t)
+  P.top:SetPoint("BOTTOMRIGHT", host, "TOPRIGHT", r - trw, t - toph)
+  P.bottom:SetPoint("TOPLEFT", host, "BOTTOMLEFT", blw - l, both - b)
+  P.bottom:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", r - brw, -b)
+  P.left:SetPoint("TOPLEFT", host, "TOPLEFT", -l, t - tlh)
+  P.left:SetPoint("BOTTOMRIGHT", host, "BOTTOMLEFT", lw - l, blh - b)
+  P.right:SetPoint("TOPLEFT", host, "TOPRIGHT", r - rw, t - trh)
+  P.right:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", r, blh - b)
+  o.Tile = function(_, w, h)
+    if not w or not h or w <= 0 or h <= 0 then return end
+    local ww, hh = w + l + r, h + t + b
+    W.tileTo(P.top, spec.top, ww - tlw - trw, toph, k)
+    W.tileTo(P.bottom, spec.bottom, ww - blw - brw, both, k)
+    W.tileTo(P.left, spec.left, lw, hh - tlh - blh, k)
+    W.tileTo(P.right, spec.right, rw, hh - trh - brh, k)
+  end
+  if host.HookScript then host:HookScript("OnSizeChanged", function(_, w, h) o:Tile(w, h) end) end
+  o:Tile(host:GetWidth(), host:GetHeight())
+  return o
+end
+
+-- Trois tranches horizontales (boutons, cadre compact d'ennemi) : bouts de `cap` pixels stockés mis à
+-- l'échelle de la hauteur de l'hôte, milieu étiré. Textures sur opts.parent (défaut : l'hôte).
+function W.threeSlice(host, name, layer, sub, opts)
+  opts = opts or {}
+  local e = WP[name]
+  local owner = opts.parent or host
+  local o = setmetatable({ parts = {}, host = host, name = name }, Group)
+  local a = e.cap / e.pw
   local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
-  for k = 1, 3 do
-    local t = W.noSnap(host:CreateTexture(nil, layer or "BACKGROUND", nil, sub or -6))
-    t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
-    t:SetTexCoord(cuts[k][1], cuts[k][2], 0, 1)
-    o.parts[k] = t
+  for i = 1, 3 do
+    local t = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
+    W.setWow(t, name, { cuts[i][1], cuts[i][2], 0, 1 })
+    o.parts[i] = t
   end
   o.Layout = function(self, h)
-    local cap = h / 2
-    local l, m, r = self.parts[1], self.parts[2], self.parts[3]
-    l:ClearAllPoints() m:ClearAllPoints() r:ClearAllPoints()
-    l:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
-    l:SetPoint("BOTTOMRIGHT", host, "BOTTOMLEFT", cap, 0)
-    r:SetPoint("TOPLEFT", host, "TOPRIGHT", -cap, 0)
-    r:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 0, 0)
-    m:SetPoint("TOPLEFT", host, "TOPLEFT", cap, 0)
-    m:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -cap, 0)
+    h = h or host:GetHeight()
+    if not h or h <= 0 then return end
+    local cap = e.cap * h / e.ph
+    local L, M, R = self.parts[1], self.parts[2], self.parts[3]
+    L:ClearAllPoints() M:ClearAllPoints() R:ClearAllPoints()
+    L:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
+    L:SetPoint("BOTTOMRIGHT", host, "BOTTOMLEFT", cap, 0)
+    R:SetPoint("TOPLEFT", host, "TOPRIGHT", -cap, 0)
+    R:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 0, 0)
+    M:SetPoint("TOPLEFT", host, "TOPLEFT", cap, 0)
+    M:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -cap, 0)
+    self.cap = cap
+  end
+  if host.HookScript then host:HookScript("OnSizeChanged", function(_, _, h) o:Layout(h) end) end
+  o:Layout()
+  return o
+end
+
+-- Neuf tranches d'une seule pièce étirée (parchemins) : marges m = { l, t, r, b } en pixels stockés,
+-- affichées à k unités par pixel ; milieu et bords étirés.
+function W.nineStretch(host, name, m, k, layer, sub, owner)
+  local e = WP[name]
+  local o = setmetatable({ parts = {}, host = host }, Group)
+  owner = owner or host
+  local us = { 0, m[1] / e.pw, 1 - m[3] / e.pw, 1 }
+  local vs = { 0, m[2] / e.ph, 1 - m[4] / e.ph, 1 }
+  local L, T, R, B = m[1] * k, m[2] * k, m[3] * k, m[4] * k
+  local xs = { { "LEFT", 0 }, { "LEFT", L }, { "RIGHT", -R }, { "RIGHT", 0 } }
+  local ys = { { "TOP", 0 }, { "TOP", -T }, { "BOTTOM", B }, { "BOTTOM", 0 } }
+  for row = 1, 3 do
+    for col = 1, 3 do
+      local t = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
+      W.setWow(t, name, { us[col], us[col + 1], vs[row], vs[row + 1] })
+      t:SetPoint("TOPLEFT", host, ys[row][1] .. xs[col][1], xs[col][2], ys[row][2])
+      t:SetPoint("BOTTOMRIGHT", host, ys[row + 1][1] .. xs[col + 1][1], xs[col + 1][2], ys[row + 1][2])
+      o.parts[#o.parts + 1] = t
+    end
   end
   return o
 end
 
--- Hexagone du pack (red, green, blue, steel, violet, empty) de hauteur h, centré sur le cadre.
-function W.hex(parent, color, h, layer, sub)
-  local t = W.noSnap(parent:CreateTexture(nil, layer or "ARTWORK", nil, sub or 0))
-  W.setHex(t, color, h)
-  return t
-end
-
-function W.setHex(t, color, h)
-  local name = "hex_" .. color
-  if color == "blue" and h and h > 60 then name = "hex_blue_l" end
-  W.setSkin(t, name)
-  if h then t:SetSize(W.skinWidth(name, h), h) end
-  t._hex = color
-end
-
--- Plaque montée sur un cadre propre (panneaux, bulles) : W.panel(parent, "slate" | "ivory", rayon).
-function W.panel(parent, mat, r)
+-- Boîte de dialogue (cadre DiamondMetal, fond roche, en-tête du titre) : W.dialog(parent, titre | nil).
+-- f.title (texte doré de l'en-tête), f:SetTitle(t) ; le filet du cadre est sur le bord du cadre f.
+local DIAMOND = { tl = "diamond_tl", tr = "diamond_tr", bl = "diamond_bl", br = "diamond_br",
+  top = "diamond_top", bottom = "diamond_bottom", left = "diamond_left", right = "diamond_right" }
+function W.dialog(parent, title, titleSize)
   local f = CreateFrame("Frame", nil, parent)
   f:EnableMouse(true)
-  f.plaque = W.plaque(f, { mat = mat, r = r or 12 })
+  local k, dm = W.K_DIAMOND, WM.diamond
+  f.bg = W.fillTile(f, "rock", 1, "BACKGROUND", -8, 3)
+  f.bg:SetVertexColor(0.8, 0.8, 0.8, 1)
+  -- filets sur le bord du cadre : débord = position du filet dans la pièce
+  f.border = W.frameSlices(f, DIAMOND, k, { dm.lineL0 * k, dm.lineT0 * k, (64 - dm.lineR1) * k, (64 - dm.lineB1) * k },
+    { layer = "BORDER", sub = 2 })
+  f.header = CreateFrame("Frame", nil, f)
+  f.header:SetHeight(WP.header_m.ph * k)
+  f.header:SetPoint("CENTER", f, "TOP", 0, 1)
+  local hl = W.wow(f.header, "header_l", "ARTWORK", 0)
+  local hr = W.wow(f.header, "header_r", "ARTWORK", 0)
+  local capW = WP.header_l.pw * k
+  hl:SetPoint("TOPLEFT") hl:SetPoint("BOTTOMLEFT") hl:SetWidth(capW)
+  hr:SetPoint("TOPRIGHT") hr:SetPoint("BOTTOMRIGHT") hr:SetWidth(capW)
+  local hm = W.wow(f.header, "header_m", "ARTWORK", 0)
+  hm:SetPoint("TOPLEFT", hl, "TOPRIGHT") hm:SetPoint("BOTTOMRIGHT", hr, "BOTTOMLEFT")
+  f.header.mid = hm
+  f.title = W.label(f.header, "bold", titleSize or 15, C.wowGold, "OVERLAY")
+  f.title:SetPoint("CENTER", 0, 0)
+  f.SetTitle = function(self, t)
+    self.title:SetText(t or "")
+    if not t or t == "" then self.header:Hide() return end
+    local tw = self.title:GetStringWidth() or 60
+    local w = max(2 * capW + 20, tw + 2 * capW - 10)
+    self.header:SetWidth(w)
+    W.tileTo(self.header.mid, "header_m", w - 2 * capW, WP.header_m.ph * k, k)
+    self.header:Show()
+  end
+  f:SetTitle(title)
   return f
 end
-function W.parchment(parent, r) return W.panel(parent, "ivory", r) end
-function W.woodPanel(parent, r) return W.panel(parent, "slate", r) end
+
+-- Parchemin (texte sombre, sans ombre) : Dragonflight (rencontres) ou Neutral (parcours).
+function W.parchment(parent, kind)
+  local f = CreateFrame("Frame", nil, parent)
+  f:EnableMouse(true)
+  if kind == "map" then
+    f.nine = W.nineStretch(f, "parch_map", { 70, 60, 70, 60 }, 0.5, "BACKGROUND", 0)
+  else
+    f.nine = W.nineStretch(f, "parch_text", { 34, 28, 34, 28 }, 0.85, "BACKGROUND", 0)
+  end
+  return f
+end
 
 ---------------------------------------------------------------------------
 -- Polices : Baloo Chettan 2 en instances statiques (Media/Fonts), blanc avec ombre portée
@@ -1005,7 +1185,15 @@ function W.fitText(fs, text, size, w, minSize)
   W.setSize(fs, size)
   fs:SetText(text)
   local sw = fs:GetStringWidth() or 0
-  if sw > w and sw > 0 then W.setSize(fs, max(minSize or 6, floor(size * w / sw * 10) / 10)) end
+  if sw > w and sw > 0 then
+    local s = max(minSize or 6, floor(size * w / sw * 10) / 10)
+    W.setSize(fs, s)
+    -- la largeur n'est pas exactement proportionnelle (crénage, arrondis) : on descend jusqu'à ce que ça tienne
+    while s > (minSize or 6) and (fs:GetStringWidth() or 0) > w do
+      s = max(minSize or 6, s - 0.25)
+      W.setSize(fs, s)
+    end
+  end
 end
 
 local function hexOf(c)
@@ -1073,28 +1261,26 @@ function W.roundMask(frame, tex, maskName)
   return m
 end
 
--- Médaillon argenté : anneau du pack, icône masquée en rond. f.icon, f:Resize(taille), f:SetRing(teinte).
+-- Médaillon : grand anneau doré du jeu, icône masquée en rond. f.icon, f:Resize(taille), f:SetRing(teinte).
 -- W.medallionOn(f, …) pose ces pièces sur un cadre existant (visuel animé : régions du visuel).
 function W.medallion(parent, size, layerSub)
   local f = CreateFrame("Frame", nil, parent)
   return W.medallionOn(f, size, layerSub)
 end
 
+local RING_IN = 0.12 -- retrait de l'icône sous l'anneau (fraction de la taille)
 function W.medallionOn(f, size, layerSub)
   f:SetSize(size, size)
   local sub = layerSub or 0
-  f.ring = W.noSnap(f:CreateTexture(nil, "ARTWORK", nil, sub))
-  f.ring:SetAllPoints()
-  f.icon = W.noSnap(f:CreateTexture(nil, "ARTWORK", nil, sub + 1))
-  f.icon:SetPoint("TOPLEFT", size * 0.13, -size * 0.13)
-  f.icon:SetPoint("BOTTOMRIGHT", -size * 0.13, size * 0.13)
+  f.icon = W.noSnap(f:CreateTexture(nil, "ARTWORK", nil, sub))
   W.roundMask(f, f.icon)
+  f.ring = W.wow(f, "ring_large", "ARTWORK", sub + 1)
+  f.ring:SetAllPoints()
   f.Resize = function(self, s)
     self:SetSize(s, s)
-    W.setSkin(self.ring, s > 48 and "medal_ring" or "medal_ring_s")
     self.icon:ClearAllPoints()
-    self.icon:SetPoint("TOPLEFT", s * 0.13, -s * 0.13)
-    self.icon:SetPoint("BOTTOMRIGHT", -s * 0.13, s * 0.13)
+    self.icon:SetPoint("TOPLEFT", s * RING_IN, -s * RING_IN)
+    self.icon:SetPoint("BOTTOMRIGHT", -s * RING_IN, s * RING_IN)
   end
   f.SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end
   f:Resize(size)
@@ -1113,51 +1299,51 @@ function W.create(kind, name, parent, template)
   return CreateFrame(kind, name, parent)
 end
 
--- Survol d'un bouton : l'ardoise s'éclaircit, la pilule dorée s'allume d'un halo.
+-- Boutons rouges du jeu (128-RedButton) ; action principale : rouge et or (128-GoldRedButton). Survol :
+-- le bouton s'éclaircit, le liseré d'or apparaît (bouton rouge) ; sélection (b:SetSelected) : liseré d'or
+-- tenu. Libellé doré (NORMAL_FONT_COLOR), ombre portée.
+local BTN_DIM = 0.86
 local function buttonPaint(self, h)
   if self.active == false then h = 0 end
-  if self.gold then
-    local k = 0.93 + 0.07 * h
-    self.gold:SetVertexColor(k, k, k)
-    self.plaqueGlow(h)
-  else
-    local k = self.fillK or 1
-    if type(k) == "table" then self.plaque:SetFill(mul(k, 1 + 0.25 * h)) else self.plaque:SetFill(k * (1 + 0.25 * h)) end
+  local k = BTN_DIM + (1 - BTN_DIM) * h
+  self.base:SetVertexColor(k, k, k)
+  if self.hot then
+    self.hot:SetVertexColor(k, k, k)
+    self.hot:SetAlpha(max(self.selected and 1 or 0, h))
   end
 end
 
--- style : "gold" (action principale, un seul accent chaud) ; "red" (abandon) ; sinon ardoise.
+-- style : "gold" (action principale : rouge et or, un seul par écran) ; sinon rouge ("red", "slate").
 function W.button(parent, label, w, h, onClick, style, size)
   local b = CreateFrame("Button", nil, parent)
   w, h = w or 120, h or 26
   b:SetSize(w, h)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
-  if style == "gold" then
-    b.gold = W.goldPill(face, "BACKGROUND", -6)
-    b.gold:Layout(h)
-    b.glow = W.nine(face, "nine_glow", "BACKGROUND", -8, { corner = 20, inset = -10 })
-    b.glow:SetVertexColor(C.gold[1], C.gold[2], C.gold[3])
-    b.glow:SetAlpha(0)
-    b.plaqueGlow = function(k) b.glow:SetAlpha(0.7 * k) end
-    b.label = W.label(face, "heavy", size or (h >= 40 and 18 or 13), C.goldInk, "OVERLAY", false)
-    b.Relayout = function(self, hh) self.gold:Layout(hh) end
-  else
-    b.plaque = W.plaque(face, { r = min(h / 2, 22), pill = h <= 52 })
-    if style == "red" then
-      b.fillK = { 1, 0.5, 0.48 }
-      b.plaque:SetFill(b.fillK)
-      b.plaque:SetRim(Art.rim.red)
-    end
-    b.label = W.label(face, "bold", size or (h >= 40 and 16 or 12), C.text)
-    b.Relayout = function() end
+  local gold = style == "gold"
+  b.style = gold and "gold" or "red"
+  b.base = W.threeSlice(face, gold and "btn_goldred" or "btn_red", "BACKGROUND", -6)
+  if not gold then
+    -- liseré d'or du survol et de la sélection : le bouton rouge et or par-dessus, en fondu
+    b.hot = W.threeSlice(face, "btn_goldred", "BACKGROUND", -5)
+    b.hot:SetAlpha(0)
   end
-  b.label:SetPoint("CENTER", 0, 1)
+  b.label = W.label(face, "bold", size or (h >= 40 and 18 or (h >= 30 and 14 or 12.5)), C.wowGold)
+  b.label:SetPoint("CENTER", 0, 0.5)
   b.label:SetText(label or "")
   b.SetText = function(self, t) self.label:SetText(t or "") self._text = t end
   b.GetText = function(self) return self.label:GetText() end
   b._text = label
+  b.SetSelected = function(self, on)
+    self.selected = on and true or false
+    buttonPaint(self, W.animValue(self, "hover"))
+  end
+  b.Relayout = function(self, hh)
+    self.base:Layout(hh)
+    if self.hot then self.hot:Layout(hh) end
+  end
   W.hoverable(b, { scale = h >= 40 and 1.04 or 1.06, paint = buttonPaint })
+  buttonPaint(b, 0)
   b:SetScript("OnEnter", function(self)
     W.hoverEnter(self)
     if self.onEnterExtra then self:onEnterExtra() end
@@ -1169,6 +1355,7 @@ function W.button(parent, label, w, h, onClick, style, size)
   b.SetActive = function(self, on)
     self.active = on
     self:SetAlpha(on and 1 or 0.5)
+    self.base:SetDesaturated(not on)
     if on then self:Enable() else self:Disable() W.animTo(self, "hover", 0, W.HOVER_OUT) end
   end
   if onClick then b:SetScript("OnClick", function(self, button)
@@ -1178,91 +1365,156 @@ function W.button(parent, label, w, h, onClick, style, size)
   return b
 end
 
--- Bouton rond (≡, ×) : plaque ronde au liseré d'argent ; × teinté de rouge.
-function W.roundButton(parent, glyph, size, tint, _, onClick)
+-- Bouton de fermeture rouge du jeu (RedButton-Exit) pour « × » ; autre glyphe (« < », « > ») : petit
+-- bouton rouge carré portant le glyphe. Survol : s'éclaircit et grossit un peu.
+function W.roundButton(parent, glyph, size, _, _, onClick)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
   local face = W.face(b)
-  b.plaque = W.plaque(face, { r = size / 2, pill = true })
-  b.fillK = tint or 1
-  b.plaque:SetFill(b.fillK)
-  b.label = W.label(face, "heavy", 17, C.text)
-  b.label:SetPoint("CENTER", 0, 0)
-  if glyph == "menu" then
-    -- trois traits (le glyphe ≡ manque à la police)
-    for i = -1, 1 do
-      local l = W.rect(face, "ARTWORK", 0, C.white)
-      l:SetSize(size * 0.4, 2)
-      l:SetPoint("CENTER", 0, i * 4.5)
-    end
+  if glyph == "×" then
+    b.base = W.wow(face, "btn_close", "ARTWORK", 0)
+    b.base:SetAllPoints()
+    b.label = W.label(face, "heavy", 1, C.text) -- (compatibilité : pas de glyphe dessiné)
   else
+    b.base = W.threeSlice(face, "btn_red", "ARTWORK", 0)
+    b.label = W.label(face, "heavy", floor(size * 0.55), C.wowGold)
+    b.label:SetPoint("CENTER", 0, 1)
     b.label:SetText(glyph)
   end
   W.hoverable(b, { scale = 1.12, paint = function(self, h)
-    local k = self.fillK
-    if type(k) == "table" then self.plaque:SetFill(mul(k, 1 + 0.25 * h)) else self.plaque:SetFill(k * (1 + 0.25 * h)) end
+    local k = BTN_DIM + (1 - BTN_DIM) * h
+    self.base:SetVertexColor(k, k, k)
   end })
+  b.base:SetVertexColor(BTN_DIM, BTN_DIM, BTN_DIM)
   b:SetScript("OnEnter", function(self) W.hoverEnter(self) end)
   b:SetScript("OnLeave", function(self) W.hoverLeave(self) end)
   if onClick then b:SetScript("OnClick", onClick) end
   return b
 end
+W.closeButton = function(parent, size, onClick) return W.roundButton(parent, "×", size, nil, nil, onClick) end
 
--- Case à cocher (textures classiques du jeu, sans modèle XML).
+-- Case à cocher minimale du jeu (checkbox-minimal) : case et coche embarquées, libellé à droite.
 function W.check(parent, label, getter, setter, color)
   local b = CreateFrame("CheckButton", nil, parent)
-  b:SetSize(24, 24)
-  b:SetNormalTexture("Interface\\Buttons\\UI-CheckBox-Up")
-  b:SetPushedTexture("Interface\\Buttons\\UI-CheckBox-Down")
-  b:SetHighlightTexture("Interface\\Buttons\\UI-CheckBox-Highlight", "ADD")
-  b:SetCheckedTexture("Interface\\Buttons\\UI-CheckBox-Check")
+  b:SetSize(22, 22)
+  b.box = W.wow(b, "check_box", "BACKGROUND", 0)
+  b.box:SetAllPoints()
+  b.mark = W.wow(b, "check_mark", "ARTWORK", 0)
+  b.mark:SetSize(20, 20)
+  b.mark:SetPoint("CENTER", 2, 2)
   local fs = W.label(b, "body", 13, color or C.text)
-  fs:SetPoint("LEFT", b, "RIGHT", 4, 0)
+  fs:SetPoint("LEFT", b, "RIGHT", 7, 0)
   fs:SetText(label)
   b.label = fs
-  b:SetScript("OnClick", function(self) setter(self:GetChecked() and true or false) end)
-  b.Sync = function(self) self:SetChecked(getter() and true or false) end
+  local function paint(self)
+    local on = self:GetChecked() and true or false
+    if on then self.mark:Show() else self.mark:Hide() end
+    local c = on and (color or C.text) or C.textSoft
+    self.label:SetTextColor(c[1], c[2], c[3])
+  end
+  b:SetScript("OnClick", function(self)
+    paint(self)
+    setter(self:GetChecked() and true or false)
+  end)
+  b.Sync = function(self) self:SetChecked(getter() and true or false) paint(self) end
+  paint(b)
   return b
 end
 
+-- Curseur minimal du jeu (Minimal_SliderBar) : rail, poignée, flèches aux deux bouts. get() -> fraction
+-- 0..1 ; step(-1 | 1) avance d'un cran ; setFrac(f) pose une fraction (clic ou glisser sur le rail).
+-- s.minus, s.plus : flèches (boutons) ; s:Sync() replace la poignée.
+function W.slider(parent, w, get, step, setFrac)
+  local s = CreateFrame("Frame", nil, parent)
+  s:SetSize(w, 18)
+  local track = CreateFrame("Button", nil, s)
+  track:SetPoint("LEFT", 16, 0)
+  track:SetPoint("RIGHT", -16, 0)
+  track:SetHeight(17)
+  s.track = track
+  local l, m, r = W.wow(track, "slider_l", "BACKGROUND", 0), W.wow(track, "slider_m", "BACKGROUND", 0),
+    W.wow(track, "slider_r", "BACKGROUND", 0)
+  l:SetSize(11, 17) l:SetPoint("LEFT")
+  r:SetSize(11, 17) r:SetPoint("RIGHT")
+  m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+  s.thumb = W.wow(track, "slider_thumb", "ARTWORK", 0)
+  s.thumb:SetSize(20, 19)
+  local function arrow(piece, d, side)
+    local a = CreateFrame("Button", nil, s)
+    a:SetSize(11, 19)
+    a:SetPoint(side, s, side, 0, 0)
+    a.tex = W.wow(a, piece, "ARTWORK", 0)
+    a.tex:SetAllPoints()
+    a:SetScript("OnEnter", function(self) self.tex:SetVertexColor(1, 0.9, 0.5, 1) end)
+    a:SetScript("OnLeave", function(self) self.tex:SetVertexColor(1, 1, 1, 1) end)
+    a:SetScript("OnClick", function() W.sound("click") step(d) s:Sync() end)
+    return a
+  end
+  s.minus = arrow("arrow_l", -1, "LEFT")
+  s.plus = arrow("arrow_r", 1, "RIGHT")
+  s.Sync = function(self)
+    local f = max(0, min(1, get() or 0))
+    local tw = (track:GetWidth() or (w - 32)) - 12
+    self.thumb:ClearAllPoints()
+    self.thumb:SetPoint("CENTER", track, "LEFT", 6 + tw * f, 0)
+  end
+  -- clic ou glisser sur le rail : fraction sous le curseur
+  local function fromCursor()
+    if not GetCursorPosition then return end
+    local x = GetCursorPosition()
+    local sc = track:GetEffectiveScale() or 1
+    local left = track:GetLeft()
+    if not left then return end
+    local tw = (track:GetWidth() or 1) - 12
+    setFrac(max(0, min(1, (x / sc - left - 6) / max(1, tw))))
+    s:Sync()
+  end
+  track:SetScript("OnMouseDown", function(self)
+    fromCursor()
+    self:SetScript("OnUpdate", fromCursor)
+  end)
+  track:SetScript("OnMouseUp", function(self) self:SetScript("OnUpdate", nil) end)
+  track:SetScript("OnHide", function(self) self:SetScript("OnUpdate", nil) end)
+  s:Sync()
+  return s
+end
+
 ---------------------------------------------------------------------------
--- Jauge de vie à hexagone (portion perdue claire qui se vide) et hexagone d'Absorption
+-- Barres d'unité (texture de barre du jeu rognée à la fraction) et Absorption
 ---------------------------------------------------------------------------
 
--- Rail d'ardoise (w × 13) ; hexagone rouge au bout gauche avec les PV ; textSize : taille du chiffre.
-function W.hpBar(parent, w, h, textSize)
+-- Barre de vie : texture `piece` (bar_hp, bar_enemy) rognée à la fraction, portion perdue claire qui se
+-- vide, texte « PV / max » centré. Le cadre d'unité qui la porte dessine le logement.
+function W.hpBar(parent, w, h, textSize, piece)
   local f = CreateFrame("Frame", nil, parent)
-  h = 13
   f:SetSize(w, h)
   f.w = w
-  f.track = W.plaque(f, { r = 6, pill = true, fill = 0.6, gloss = false })
-  f.track:SetRim(Art.rim.dim)
-  f.ghost = W.rect(f, "ARTWORK", 0, C.ghostLight, 1)
-  f.ghost:SetPoint("TOPLEFT", 3, -3)
-  f.ghost:SetPoint("BOTTOMLEFT", 3, 3)
-  f.fill = W.rect(f, "ARTWORK", 1, C.hpRed)
-  f.fill:SetPoint("TOPLEFT", 3, -3)
-  f.fill:SetPoint("BOTTOMLEFT", 3, 3)
-  f.shine = W.rect(f, "ARTWORK", 2, C.hpShine, 0.8)
-  f.shine:SetPoint("TOPLEFT", f.fill, "TOPLEFT", 2, -1)
-  f.shine:SetPoint("TOPRIGHT", f.fill, "TOPRIGHT", -2, -1)
-  f.shine:SetHeight(2)
-  local hexH = textSize and textSize >= 14 and 36 or 32
-  f.hex = W.hex(f, "red", hexH, "ARTWORK", 5)
-  f.hex:SetPoint("CENTER", f, "LEFT", -2, 0)
-  f.text = W.label(f, "heavy", textSize or 14, C.text, "OVERLAY")
-  f.text:SetPoint("CENTER", f.hex, "CENTER", 0, 1)
-  local inner = w - 6
-  local function width(frac) return max(0.01, inner * max(0, min(1, frac))) end
+  piece = piece or "bar_hp"
+  f.piece = piece
+  f.ghost = W.rect(f, "ARTWORK", 0, C.ghostLight, 0.9)
+  f.ghost:SetPoint("TOPLEFT")
+  f.ghost:SetPoint("BOTTOMLEFT")
+  f.fill = W.wow(f, piece, "ARTWORK", 1)
+  f.fill:SetPoint("TOPLEFT")
+  f.fill:SetPoint("BOTTOMLEFT")
+  f.text = W.label(f, "heavy", textSize or 11, C.text, "OVERLAY")
+  f.text:SetPoint("CENTER", 0, 0.5)
+  -- largeur courante (f.w : le cadre d'unité qui porte la barre peut la redimensionner)
+  local function width(frac) return max(0.01, (f.w or w) * max(0, min(1, frac))) end
+  local function setFill(self, frac)
+    frac = max(0.001, min(1, frac))
+    self.fill:SetWidth(width(frac))
+    W.setWow(self.fill, piece, { 0, frac, 0, 1 })
+  end
   -- animate : la portion perdue reste claire un instant puis se vide.
   f.Set = function(self, hp, maxHp, animate)
     hp = max(0, hp)
     maxHp = maxHp > 0 and maxHp or 1
     local old = self.hp
     self.hp, self.maxHp = hp, maxHp
-    self.text:SetText(tostring(hp))
-    self.fill:SetWidth(width(hp / maxHp))
-    if hp <= 0 then self.fill:Hide() self.shine:Hide() else self.fill:Show() self.shine:Show() end
+    self.text:SetText(hp .. " / " .. maxHp)
+    setFill(self, hp / maxHp)
+    if hp <= 0 then self.fill:Hide() else self.fill:Show() end
     if animate and old and old > hp then
       local from = old / maxHp
       self.ghost:SetWidth(width(from))
@@ -1286,23 +1538,61 @@ function W.hpBar(parent, w, h, textSize)
   return f
 end
 
--- Hexagone d'acier : Absorption (chiffre) ; caché à 0.
+-- Absorption : barre bleue du jeu dans le logement bas du cadre d'unité (fraction des PV max, plafonnée)
+-- et son nombre ; cachée à 0 (le logement vide reste dessiné par le cadre). Set(n, maxHp).
 function W.shieldBadge(parent, w, h)
   local f = CreateFrame("Frame", nil, parent)
-  local s = max(w or 30, h or 30)
-  f:SetSize(s, s)
+  f:SetSize(w, h)
   f:EnableMouse(true)
-  f.hex = W.hex(f, "steel", s, "ARTWORK", 0)
-  f.hex:SetPoint("CENTER")
-  f.text = W.label(f, "heavy", s >= 30 and 14 or 12, C.text)
-  f.text:SetPoint("CENTER", 0, 1)
-  f.Set = function(self, n)
-    if n and n > 0 then self.text:SetText(tostring(n)) self:Show() else self:Hide() end
+  f.fill = W.wow(f, "bar_absorb", "ARTWORK", 1)
+  f.fill:SetPoint("TOPLEFT")
+  f.fill:SetPoint("BOTTOMLEFT")
+  f.text = W.label(f, "heavy", max(9, min(12, h + 1)), C.text, "OVERLAY")
+  f.text:SetPoint("CENTER", 0, 0.5)
+  f.w = w
+  f.Set = function(self, n, maxHp)
+    if maxHp then self.maxHp = maxHp end
+    if n and n > 0 then
+      local frac = min(1, n / max(1, self.maxHp or 50))
+      self.fill:SetWidth(max(0.01, self.w * frac))
+      W.setWow(self.fill, "bar_absorb", { 0, max(0.001, frac), 0, 1 })
+      self.text:SetText(tostring(n))
+      self:Show()
+    else
+      self:Hide()
+    end
   end
   W.tooltip(f, function(tt)
     tt:AddLine(Art.keywordLine("absorb"), 1, 1, 1, true)
   end, "ANCHOR_TOP")
   return f
+end
+
+-- Case de barre d'action Dragonflight (fond, icône, cadre, cadre doré de survol), centrée sur le cadre
+-- host de taille `size` (le cadre de la case en couvre exactement la taille) ; textures portées par owner
+-- (défaut : host ; un cadre d'ancrage posé sur un visuel animé y laisse ainsi ses pièces). Renvoie { icon,
+-- frame, hot, bg } ; slot.frame:SetVertexColor teint le cadre (qualité d'un bibelot).
+local SLOT_BG = 1.32   -- fond : plus grand que le cadre (ombre portée de la pièce)
+local SLOT_ICON = 0.80 -- icône dans l'ouverture du cadre
+function W.slotOn(host, size, sub, owner)
+  sub = sub or 0
+  local face = host
+  owner = owner or host
+  local s = {}
+  s.bg = W.wow(owner, "slot_bg", "BACKGROUND", sub)
+  s.bg:SetSize(size * SLOT_BG, size * SLOT_BG * WP.slot_bg.ph / WP.slot_bg.pw)
+  s.bg:SetPoint("CENTER", face, "CENTER", 0, -size * 0.02)
+  s.icon = W.noSnap(owner:CreateTexture(nil, "ARTWORK", nil, sub))
+  s.icon:SetSize(size * SLOT_ICON, size * SLOT_ICON)
+  s.icon:SetPoint("CENTER", face, "CENTER", 0, 0)
+  s.frame = W.wow(owner, "slot_frame", "ARTWORK", sub + 2)
+  s.frame:SetSize(size, size * WP.slot_frame.ph / WP.slot_frame.pw)
+  s.frame:SetPoint("CENTER", face, "CENTER", 0, 0)
+  s.hot = W.wow(owner, "slot_hover", "ARTWORK", sub + 3)
+  s.hot:SetSize(size * 1.04, size * 1.04 * WP.slot_hover.ph / WP.slot_hover.pw)
+  s.hot:SetPoint("CENTER", face, "CENTER", 0, 0)
+  s.hot:SetAlpha(0)
+  return s
 end
 
 ---------------------------------------------------------------------------
@@ -1460,38 +1750,36 @@ function W.itemEntry(kind, id)
   return nil
 end
 
--- Case à icône (bibelot, potion, affixe, clé) : plaque d'ardoise, icône aux coins arrondis ;
--- info = { kind, id, ... } pour l'infobulle. shape = "square" | "flask" | "round" (médaillon).
+-- Case à icône (bibelot, potion, affixe, clé) : case de barre d'action (shape "square") ou médaillon à
+-- l'anneau doré (shape "round") ; info = { kind, id, ... } pour l'infobulle. Le cadre de la case prend
+-- la couleur de qualité d'un bibelot ; survol : cadre doré en fondu.
 function W.iconButton(parent, size, shape)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
   b.round = shape == "round"
-  b.icon = face:CreateTexture(nil, "ARTWORK")
   if b.round then
-    b.ring = face:CreateTexture(nil, "ARTWORK", nil, 0)
-    W.setSkin(b.ring, size > 48 and "medal_ring" or "medal_ring_s")
-    b.ring:SetAllPoints()
-    b.icon:SetPoint("TOPLEFT", size * 0.13, -size * 0.13)
-    b.icon:SetPoint("BOTTOMRIGHT", -size * 0.13, size * 0.13)
-    b.icon:SetDrawLayer("ARTWORK", 1)
-    W.roundMask(face, b.icon)
+    W.medallionOn(face, size)
+    b.icon, b.ring = face.icon, face.ring
   else
-    b.plaque = W.plaque(face, { r = max(5, floor(size / 4.5)), fill = 0.7, gloss = false })
-    local pad = max(3, floor(size * 0.12))
-    b.icon:SetPoint("TOPLEFT", pad, -pad)
-    b.icon:SetPoint("BOTTOMRIGHT", -pad, pad)
-    W.roundMask(face, b.icon, "mask_roundsq")
+    b.case = W.slotOn(face, size)
+    b.icon = b.case.icon
   end
   b.count = W.label(face, "heavy", 11, C.text, "OVERLAY")
-  b.count:SetPoint("BOTTOMRIGHT", 2, -2)
-  W.hoverable(b, { scale = 1.14 })
+  b.count:SetPoint("BOTTOMRIGHT", -1, 1)
+  W.hoverable(b, { scale = 1.12, paint = function(self, h)
+    if self.case then self.case.hot:SetAlpha(h) end
+  end })
   W.tooltip(b, function(tt, self)
     local info = self.info
     if not info then return end
     W.fillItemTooltip(tt, info.kind, info.id, info)
   end, "ANCHOR_BOTTOM")
+  b.SetRim = function(self, c)
+    c = c or Art.rim.silver
+    if self.case then self.case.frame:SetVertexColor(c[1], c[2], c[3], 1) end
+  end
   b.SetItem = function(self, kind, id, info)
     self.info = info or {}
     self.info.kind = kind or self.info.kind
@@ -1505,30 +1793,34 @@ function W.iconButton(parent, size, shape)
         local r = ns.Relics[id]
         rim = Art.rarityRim[r and r.rarity or "common"] or Art.rim.silver
       end
-      if self.plaque then self.plaque:SetRim(rim) end
+      self:SetRim(rim)
     else
       self.icon:SetTexture(nil)
       self.icon:Hide()
-      if self.plaque then self.plaque:SetRim(Art.rim.silver) end
+      self:SetRim(Art.rim.silver)
     end
   end
   return b
 end
 
--- Barre de réputation : bar = { label, levelName, cur, size, detail, hint } (UI/Controller.lua).
+-- Barre de réputation : barre jaune du jeu dans un rail de curseur minimal ; bar = { label, levelName,
+-- cur, size, detail, hint } (UI/Controller.lua).
 function W.repBar(parent, w)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(w, 18)
+  f:SetSize(w, 17)
   f:EnableMouse(true)
-  f.track = W.plaque(f, { r = 8, pill = true, fill = 0.6, gloss = false })
-  f.track:SetRim(Art.rim.dim)
-  f.fill = W.rect(f, "ARTWORK", 0, C.goldDeep)
+  local l, m, r = W.wow(f, "slider_l", "BACKGROUND", 0), W.wow(f, "slider_m", "BACKGROUND", 0),
+    W.wow(f, "slider_r", "BACKGROUND", 0)
+  l:SetSize(11, 17) l:SetPoint("LEFT")
+  r:SetSize(11, 17) r:SetPoint("RIGHT")
+  m:SetPoint("TOPLEFT", l, "TOPRIGHT") m:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+  f.fill = W.wow(f, "bar_yellow", "ARTWORK", 0)
   f.fill:SetPoint("TOPLEFT", 3, -3)
   f.fill:SetPoint("BOTTOMLEFT", 3, 3)
-  f.label = W.label(f, "bold", 14, C.text)
+  f.label = W.label(f, "bold", 14, C.wowGold)
   f.label:SetPoint("BOTTOMLEFT", f, "TOPLEFT", 2, 3)
   f.value = W.label(f, "bold", 11, C.text, "OVERLAY")
-  f.value:SetPoint("CENTER")
+  f.value:SetPoint("CENTER", 0, 0.5)
   f.detail = W.label(f, "body", 11, C.textSoft)
   f.detail:SetPoint("TOPLEFT", f, "BOTTOMLEFT", 2, -3)
   W.tooltip(f, function(tt, self)
@@ -1538,14 +1830,15 @@ function W.repBar(parent, w)
     tt:AddLine(b.levelName .. (b.size and (": " .. b.cur .. " / " .. b.size) or " (max level)"), 1, 1, 1)
     if b.hint then
       local lines = type(b.hint) == "table" and b.hint or { b.hint }
-      for _, l in ipairs(lines) do tt:AddLine(l, 0.8, 0.8, 0.8, true) end
+      for _, ln in ipairs(lines) do tt:AddLine(ln, 0.8, 0.8, 0.8, true) end
     end
   end, "ANCHOR_TOP")
   f.Set = function(self, b)
     self.bar = b
     self.label:SetText(b.label)
-    local frac = b.size and (b.cur / b.size) or 1
+    local frac = max(0.001, min(1, b.size and (b.cur / b.size) or 1))
     self.fill:SetWidth(max(0.01, (w - 6) * frac))
+    W.setWow(self.fill, "bar_yellow", { 0, frac, 0, 1 })
     self.value:SetText(b.size and (b.levelName .. "  " .. b.cur .. " / " .. b.size) or b.levelName)
     self.detail:SetText(b.detail or "")
   end
@@ -1553,10 +1846,11 @@ function W.repBar(parent, w)
 end
 
 ---------------------------------------------------------------------------
--- Jetons d'état : médaillon argenté, icône ronde, nombre en bas à droite
+-- Jetons d'état : icônes d'aura (cadre de case du jeu, rouge pour un affaiblissement), nombre en bas à droite
 ---------------------------------------------------------------------------
 
--- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, info = {...} } }.
+-- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, rim = teinte, info = {...} } }.
+-- t.medal = { icon, ring (cadre), SetRing(teinte) } (régions du visuel du jeton : tout suit son animation).
 function W.tokenRow(parent, maxN, width, size)
   size = size or 30
   local row = CreateFrame("Frame", nil, parent)
@@ -1566,11 +1860,16 @@ function W.tokenRow(parent, maxN, width, size)
     local t = CreateFrame("Frame", nil, row)
     t:SetSize(size, size)
     t:EnableMouse(true)
-    -- médaillon posé sur le visuel même (aucun cadre enfant : tout suit l'animation d'échelle)
     local face = W.face(t)
-    t.medal = W.medallionOn(face, size)
-    t.count = W.label(face, "heavy", floor(size * 0.42), C.text, "OVERLAY") -- au-dessus du médaillon
-    t.count:SetPoint("CENTER", face, "BOTTOMRIGHT", -2, 3)
+    local icon = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 0))
+    icon:SetPoint("TOPLEFT", size * 0.09, -size * 0.09)
+    icon:SetPoint("BOTTOMRIGHT", -size * 0.09, size * 0.09)
+    local ring = W.wow(face, "slot_frame", "ARTWORK", 1)
+    ring:SetAllPoints()
+    t.medal = { icon = icon, ring = ring,
+      SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end }
+    t.count = W.label(face, "heavy", floor(size * 0.45), C.text, "OVERLAY")
+    t.count:SetPoint("BOTTOMRIGHT", face, "BOTTOMRIGHT", 1, -1)
     W.hoverable(t, { scale = 1.12 })
     W.tooltip(t, function(tt, self)
       local info = self.info
@@ -1586,9 +1885,10 @@ function W.tokenRow(parent, maxN, width, size)
     row.tokens[i] = t
   end
   row.pills = row.tokens -- compatibilité
+  row.align = "CENTER"
   row.Set = function(self, list)
     local n = min(#list, #self.tokens)
-    local gap = 6
+    local gap = 4
     local perLine = max(1, floor((width + gap) / (size + gap)))
     for i = 1, #self.tokens do
       local t, it = self.tokens[i], list[i]
@@ -1599,7 +1899,8 @@ function W.tokenRow(parent, maxN, width, size)
         t.count:SetText((it.n and it.n ~= 0 and it.n ~= true) and tostring(it.n) or "")
         local line, col = floor((i - 1) / perLine), (i - 1) % perLine
         local inLine = min(perLine, n - line * perLine)
-        local x = (width - (inLine * (size + gap) - gap)) / 2 + col * (size + gap)
+        local x = col * (size + gap)
+        if self.align == "CENTER" then x = x + (width - (inLine * (size + gap) - gap)) / 2 end
         t:ClearAllPoints()
         t:SetPoint("TOPLEFT", self, "TOPLEFT", x, -line * (size + 4))
         t:Show()
@@ -1626,7 +1927,7 @@ function W.unitStatuses(unit)
     list[#list + 1] = {
       icon = Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
       n = type(n) == "number" and n or nil,
-      rim = bad and Art.rim.red or nil,
+      rim = bad and Art.rim.debuff or nil,
       text = (s and s.name or id), -- nom (infobulle, harnais)
       info = { status = id, n = n }, key = "status:" .. id,
     }

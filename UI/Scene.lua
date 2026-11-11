@@ -12,7 +12,7 @@ local S = {}
 ns.Scene = S
 
 S.W, S.H = 1034, 614
-S.TOP, S.DECOR_H = 44, 380      -- bande du décor : y 44 à 424
+S.TOP, S.DECOR_H = 34, 390      -- bande du décor : y 34 à 424 (sous la barre de titre du cadre métal)
 S.BOARD_Y, S.BOARD_H = 424, 190 -- plateau : y 424 à 614
 S.GROUND_H, S.GROUND_ALPHA = 170, 0.38 -- voile du bas de l'illustration (hauteur, opacité en bas)
 
@@ -210,45 +210,36 @@ function S.build(parent)
   W.gradient(fade, { 0, 0, 0, 0 }, { 0.05, 0.06, 0.09, 0.4 })
   at(fade, decor, 0, S.DECOR_H - 50, S.W, 50)
 
-  -- Plateau d'ardoise (matière carrelée du pack), filets sombre / argent / sombre, ombre portée
+  -- Table du bas : pierre sombre Dragonflight (UI-Frame-DragonFlight-BackgroundTile) répétée, filet du
+  -- cadre métal (bord bas des fenêtres) en séparation, ombre portée du décor
   local board = CreateFrame("Frame", nil, parent)
   at(board, parent, 0, S.BOARD_Y, S.W, S.BOARD_H)
   board:SetFrameLevel(parent:GetFrameLevel() + 1)
   S.board = board
-  S.boardTile = S.slate(board, "BACKGROUND", 0, S.W, S.BOARD_H, 0.95)
-  S.boardTile:SetAllPoints()
-  S.rule(board, 0)
+  S.boardTile = W.fillTile(board, "table", 1, "BACKGROUND", 0, 0)
   local shade = board:CreateTexture(nil, "BORDER", nil, 0)
-  W.gradient(shade, { 0, 0, 0, 0.47 }, { 0, 0, 0, 0 })
-  at(shade, board, 0, 6, S.W, 26)
+  W.gradient(shade, { 0, 0, 0, 0.5 }, { 0, 0, 0, 0 })
+  at(shade, board, 0, 4, S.W, 26)
+  S.rule(board, 0)
 
-  -- Fond plein (écrans sans décor : carte de parcours)
-  local plain = W.rect(parent, "BACKGROUND", -8, C.slateDark)
-  plain:SetAllPoints()
+  -- Fond plein (écrans sans décor : carte de parcours) : roche
+  local plain = W.fillTile(parent, "rock", 1, "BACKGROUND", -8, 0)
+  plain:SetVertexColor(0.45, 0.45, 0.45, 1)
   S.scene = nil
 end
 
--- Ardoise carrelée (taille fixe w × h) ; bright = clarté (1 = ardoise des plaques).
-function S.slate(parent, layer, sub, w, h, bright)
-  local t = parent:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0)
-  local T = W.Skin.slateTile
-  t:SetTexture(W.skinPath("tile_slate"), "REPEAT", "REPEAT")
-  t:SetTexCoord(0, w / T, 0, h / T)
-  local k = math.min(1, W.Skin.slateBase * (bright or 1))
-  t:SetVertexColor(k, k, k, 1)
-  return t
-end
-
--- Filet horizontal (sombre, argent, sombre) posé à y unités sous le haut du cadre.
+-- Filet de séparation (bord bas du cadre métal des fenêtres, répété) dont le trait est à y unités sous
+-- le haut du cadre.
 function S.rule(parent, y)
-  local yy = y
-  for _, p in ipairs({ { 2.5, C.slateDark }, { 2, Art.hex("#ced6e2") }, { 1.5, C.slateDark } }) do
-    local r = W.rect(parent, "BORDER", 1, p[2])
-    r:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -yy)
-    r:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -yy)
-    r:SetHeight(p[1])
-    yy = yy + p[1]
-  end
+  local k = W.K_METAL
+  local mm = W.Wow.meta.metal
+  local t = W.wow(parent, "metal_bottom", "BORDER", 1)
+  local _, h = W.wowSize("metal_bottom", k)
+  t:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -(y - mm.lineB0 * k))
+  t:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -(y - mm.lineB0 * k))
+  t:SetHeight(h)
+  W.tileTo(t, "metal_bottom", S.W, h, k)
+  return t
 end
 
 ---------------------------------------------------------------------------

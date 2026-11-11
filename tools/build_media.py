@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Fabrique les textures de l'interface (Media/) et UI/SkinData.lua.
+"""Fabrique les textures des cartes (Media/), la police, les icônes et UI/SkinData.lua.
+
+L'habillage de l'interface (fenêtre, boutons, cadres, cases, parcours) n'est plus fabriqué ici : ce sont
+des pièces de l'interface du jeu, embarquées par tools/build_wowui.py (Media/WowUI, UI/WowSkin.lua).
+Restent ici : pièces des cartes, dos de carte, ardoise et liseré des plaques posées sous une carte,
+halos, masque rond, police et icônes.
 
 Sources (lecture seule) :
   * le PSD « Card Constructor » du pack Mechanized Magic (Dumivid, CC0), piloté par photocraft-cli :
@@ -321,7 +326,6 @@ emit("card_plate", im, box, maxw=256, canvas=(256, 128))
 
 im, ring_box = piece("ring", [L["ring"]])
 emit("medal_ring", im, ring_box, maxw=256, maxh=256, canvas=(256, 256))
-emit("medal_ring_s", im, None, maxh=64, canvas=(64, 64))
 im, box = piece("glass", [L["glass"]])
 im.putalpha(im.split()[3].point(lambda v: int(v * 0.66)))      # opacité du calque « front circle »
 emit("medal_glass", im, box, maxw=256, maxh=256, canvas=(256, 256))
@@ -354,28 +358,13 @@ emit("card_glow", glow, (round(BX - pad * scale_px), round(BY - pad * scale_px),
      maxh=256, canvas=(256, 256))
 
 # ===========================================================================
-# 2. Dos de carte, hexagones, matières (ardoise, ivoire)
+# 2. Dos de carte, ardoise (matière des plaques sous les cartes)
 # ===========================================================================
 
 # dos : cadre doré, cristal pentagonal violet (calque « crystal 3 »), sans l'emblème au marteau
 im, box = piece("cardback", [L["cardback"]], [("layer.setProps", {"layer": 215, "visible": False}),
                                              ("layer.setProps", {"layer": 197, "visible": True})], metal=False)
 emit("card_back", im, None, maxh=256, canvas=(256, 256))
-
-stats, _ = piece("stats", [L["stats"]], metal=False)
-third = stats.width // 3
-HEX_RED = stats.crop((0, 0, third, stats.height))
-HEX_RED = HEX_RED.crop(HEX_RED.getbbox())
-HEX_GREEN = stats.crop((third * 2, 0, stats.width, stats.height))
-HEX_GREEN = HEX_GREEN.crop(HEX_GREEN.getbbox())
-hexes = {
-    "red": HEX_RED, "green": HEX_GREEN,
-    "blue": hue(HEX_GREEN, 0.60, 1.0, 1.1), "steel": hue(HEX_GREEN, 0.58, 0.35, 1.15),
-    "violet": hue(HEX_GREEN, 0.76, 0.9, 1.05), "empty": hue(HEX_GREEN, 0.6, 0.15, 0.45),
-}
-for hk, him in hexes.items():
-    emit("hex_" + hk, him, None, maxw=128, maxh=128, canvas=(128, 128))
-emit("hex_blue_l", hexes["blue"], None, maxw=256, maxh=256, canvas=(256, 256))
 
 # Ardoise : intérieur du panneau de texte (comme la maquette), tuile miroir raccordable.
 pw, ph = panel_img.size
@@ -387,15 +376,8 @@ SLATE = mirror_tile(src, 256)
 SLATE = SLATE.point(lambda v: min(255, int(v * 1.25)))
 SLATE.putalpha(255)
 emit("tile_slate", SLATE, None, canvas=(256, 256), extra=dict(tile=True))
-ivory_full = render("body_ivory", [L["back"], L["color"], L["metal1"]],
-                    [("layer.fill.solidColor.set", {"layer": L["color"], "color": BODY_COLORS["ivory"]})])
-isq = int(BW * 0.42)
-src = ivory_full.crop((BX + int(BW * 0.29), BY + int(BH * 0.06), BX + int(BW * 0.29) + isq, BY + int(BH * 0.06) + isq))
-IVORY = mirror_tile(src, 256)
-emit("tile_ivory", IVORY, None, canvas=(256, 256), extra=dict(tile=True))
-
 # ===========================================================================
-# 3. Plaques : remplissage arrondi (ardoise, ivoire) et liseré d'argent, en neuf tranches
+# 3. Plaques sous les cartes (raison d'un refus, prix) : pilule d'ardoise et liseré d'argent
 # ===========================================================================
 # Coins de R pixels ; en jeu, un coin mesure le rayon voulu (unités d'écran), les bords s'étirent.
 SILVER_TOP, SILVER_BOTTOM = (236, 240, 247), (176, 184, 198)
@@ -417,9 +399,6 @@ def rim_texture(name, size, R, dark, silver, inner, extra):
     return nine(name, size, size, R, [outer, sil, inn], dict(rim=dark + silver + inner, rimIn=dark + silver, **extra))
 
 
-fill_texture("nine_slate", SLATE, 128, 32, {})
-fill_texture("nine_ivory", IVORY, 128, 32, {})
-rim_texture("nine_rim", 128, 32, 3, 6, 2, {})
 fill_texture("pill_slate", SLATE, 128, 48, {})
 rim_texture("pill_rim", 128, 48, 2, 5, 2, {})
 # lueur douce (halo des plaques survolées) : rectangle arrondi flouté, coins larges
@@ -435,56 +414,11 @@ gd = gd.filter(ImageFilter.GaussianBlur(10))
 glow = Image.new("RGBA", (128, 128), (255, 255, 255, 0))
 glow.putalpha(gd)
 emit("glow_round", glow, None, canvas=(128, 128), extra=dict(inner=(105 - 22) / 128))
-# carré arrondi (masque des icônes posées dans une case)
-msq = Image.new("RGBA", (64, 64), (255, 255, 255, 0))
-msq.putalpha(rounded_mask(64, 64, 12))
-emit("mask_roundsq", msq, None, canvas=(64, 64))
 md = Image.new("RGBA", (128, 128), (255, 255, 255, 0))
 dm = Image.new("L", (128 * SS, 128 * SS), 0)
 ImageDraw.Draw(dm).ellipse((0, 0, 128 * SS - 1, 128 * SS - 1), fill=255)
 md.putalpha(dm.resize((128, 128), Image.LANCZOS))
 emit("mask_disc", md, None, canvas=(128, 128))
-
-# Bouton doré (action principale) : pilule en trois tranches (bouts = demi-hauteur).
-BW_, BH_ = 512, 128
-R = BH_ // 2
-btn = Image.new("RGBA", (BW_, BH_), (0, 0, 0, 0))
-gold = vgrad(BW_, BH_, (255, 214, 96, 255), (225, 144, 36, 255))
-gold.putalpha(rounded_mask(BW_, BH_, R, 9))
-btn.alpha_composite(ring_layer(BW_, BH_, R, 0, 3, DARK))
-rim = vgrad(BW_, BH_, (255, 248, 214, 255), (230, 200, 130, 255))
-rim.putalpha(ImageChops.subtract(rounded_mask(BW_, BH_, R, 3), rounded_mask(BW_, BH_, R, 9)))
-btn.alpha_composite(rim)
-btn.alpha_composite(gold)
-gloss = Image.new("L", (BW_ * SS, BH_ * SS), 0)
-ImageDraw.Draw(gloss).rounded_rectangle((26 * SS, 18 * SS, (BW_ - 26) * SS, 50 * SS), 20 * SS, fill=80)
-gl_ = Image.new("RGBA", (BW_, BH_), (255, 255, 255, 0))
-gl_.putalpha(gloss.resize((BW_, BH_), Image.LANCZOS))
-btn.alpha_composite(gl_)
-emit("button_gold", btn, None, canvas=(BW_, BH_), extra=dict(cap=R))
-
-# Pointes de bulle : triangle (remplissage ardoise / ivoire + liseré)
-def tail(name, fillc=None, mat=None):
-    w, h = 64, 32
-    m = Image.new("L", (w * SS, h * SS), 0)
-    ImageDraw.Draw(m).polygon([(2 * SS, 0), ((w - 2) * SS, 0), (w * SS // 2, (h - 1) * SS)], fill=255)
-    m = m.resize((w, h), Image.LANCZOS)
-    if mat is not None:
-        lay = mat.resize((w, w)).crop((0, 0, w, h))
-    else:
-        lay = Image.new("RGBA", (w, h), fillc + (255,))
-    lay.putalpha(m)
-    return emit(name, lay, None, canvas=(w, h))
-
-
-tail("tail_slate", mat=SLATE.point(lambda v: int(v * 0.95)))
-tail("tail_ivory", mat=IVORY)
-w, h = 64, 32
-rm = Image.new("L", (w * SS, h * SS), 0)
-ImageDraw.Draw(rm).line([(2 * SS, 0), (w * SS // 2, (h - 1) * SS), ((w - 2) * SS, 0)], fill=255, width=5 * SS)
-lay = Image.new("RGBA", (w, h), SILVER_TOP + (255,))
-lay.putalpha(rm.resize((w, h), Image.LANCZOS))
-emit("tail_rim", lay, None, canvas=(w, h))
 
 # ===========================================================================
 # 4. Police : instances statiques réduites au latin
@@ -627,7 +561,7 @@ def lua(v, ind=""):
 
 
 skin = {"root": LUA_ROOT, "tex": TEX, "card": CARD, "icons": ICONS, "fonts": FONTS,
-        "slateTile": 128, "ivoryTile": 420, "slateBase": 0.8}
+        "slateTile": 128, "slateBase": 0.8}
 head = ("-- Fichier GÉNÉRÉ par tools/build_media.py : ne pas modifier à la main (relancer le script).\n"
         "-- Textures de Media/ (TGA 32 bits non compressé, toiles en puissances de deux, contenu calé en haut à\n"
         "-- gauche) : file, w × h (toile), cw × ch (zone utile, pixels), tc = coordonnées de texture de la zone\n"
@@ -639,6 +573,12 @@ head = ("-- Fichier GÉNÉRÉ par tools/build_media.py : ne pas modifier à la m
         "local _, ns = ...\n\n")
 (ROOT / "UI/SkinData.lua").write_text(head + "ns.Skin = " + lua(skin) + "\n", encoding="utf-8")
 
+for old in ("hex_red", "hex_green", "hex_blue", "hex_blue_l", "hex_steel", "hex_violet", "hex_empty", "tile_ivory",
+            "nine_slate", "nine_ivory", "nine_rim", "button_gold", "tail_slate", "tail_ivory", "tail_rim",
+            "medal_ring_s", "mask_roundsq"):
+    for f in (MEDIA / (old + ".tga"), PREVIEW / (old + ".png")):
+        if f.exists():
+            f.unlink()
 total = sum(p.stat().st_size for p in MEDIA.rglob("*") if p.is_file())
 print(f"{len(TEX)} textures, {len(ICONS)} icônes, {len(FONTS)} polices ; Media/ = {total / 1048576:.2f} Mo")
 if MISSING:

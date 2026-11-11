@@ -27,18 +27,17 @@ local HAND_TOP = 418                     -- (plaque du bas comprise, la main res
 local HOVER_SCALE = 1.16
 local HOVER_TOP = 372                    -- haut d'une carte levée (survol ou sélection)
 local SPREAD = { 26, 12 }                -- écart des voisines d'une carte levée (1re, 2e)
-local PILE_H = 44                        -- piles : dos de carte de 44 de haut, bas à y 595 (< 614)
-local DRAW_PILE = { 49, 573 }
-local DISCARD_PILE = { 113, 573 }
-local EXHAUST_PILE = { 177, 573 }
-local MANA_X, MANA_Y = 81, 474           -- hexagone de mana (84) ; points de mana dessous
+local DRAW_PILE = { 45, 554 }            -- piles : cases de 36 et libellé dessous (bas à y 588 < 614)
+local DISCARD_PILE = { 95, 554 }
+local EXHAUST_PILE = { 145, 554 }
+local MANA_X, MANA_Y = 76, 466           -- anneau de mana (76) ; libellé « Mana » dessous
 local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
 local AIM_SCALE = 1.07                   -- ennemi visé (carte à cible armée) : il grandit un peu
--- Sous les pieds d'un ennemi (33 + hauteur du personnage sous le haut de l'emplacement, 193 à
--- l'échelle 1) : nom (pilule), jauge, états, décalés depuis les pieds.
+-- Personnage d'un ennemi : 33 sous le haut de l'emplacement, pieds à 33 + FIG_H (193 à l'échelle 1) ;
+-- cadre compact au-dessus de la tête, états ST_DY sous les pieds.
 local FIG_H = 160
-local NAME_DY, NAME_H, NAME_SIZE = 3, 18, 13.5
-local HP_DY, ST_DY = 33, 59
+local NAME_SIZE = 11.5
+local ST_DY = 10
 local INFO_LEVEL = 6                     -- cadre des infos : au-dessus du personnage (+1 à +4)
 local ENEMY_TOP = 92                     -- haut de l'emplacement d'un ennemi à l'échelle 1
 local ENEMY_STAGGER = 26                 -- un ennemi sur deux, posé un peu plus bas
@@ -54,28 +53,21 @@ end
 -- Construction
 ---------------------------------------------------------------------------
 
--- Bulle d'intention : pilule d'ardoise au liseré de la couleur de l'intention (rouge attaque, bleu
--- défense, violet guet…), pointe vers l'ennemi, icône ronde + chiffre blanc.
+-- Intention (direction B) : case de barre d'action à l'icône de l'intention, chiffres exacts à droite,
+-- en couleur (rouge attaque, bleu défense, violet guet…). f:SetColor(c) teint le chiffre.
+local INTENT_SLOT = 26
 local function intentBubble(parent)
   local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(64, 30)
+  f:SetSize(INTENT_SLOT + 60, INTENT_SLOT)
   f:EnableMouse(true)
-  f.plaque = W.plaque(f, { r = 15, pill = true })
-  f.tail = W.skin(f, "tail_slate", "BACKGROUND", -8)
-  f.tail:SetSize(18, 9)
-  f.tail:SetPoint("TOP", f, "BOTTOM", 0, 1.5)
-  f.tailRim = W.skin(f, "tail_rim", "BACKGROUND", -7)
-  f.tailRim:SetAllPoints(f.tail)
-  f.icon = f:CreateTexture(nil, "ARTWORK")
-  f.icon:SetSize(22, 22)
-  f.icon:SetPoint("CENTER", f, "LEFT", 16, 0)
-  W.roundMask(f, f.icon)
-  f.text = W.label(f, "heavy", 19, C.text)
-  f.text:SetPoint("LEFT", f, "LEFT", 31, 0)
-  f.SetRim = function(self, c)
-    self.plaque:SetRim(c)
-    self.tailRim:SetVertexColor(c[1], c[2], c[3], 1)
-  end
+  local box = CreateFrame("Frame", nil, f)
+  box:SetSize(INTENT_SLOT, INTENT_SLOT)
+  box:SetPoint("LEFT", 0, 0)
+  f.slot = W.slotOn(box, INTENT_SLOT)
+  f.icon = f.slot.icon
+  f.text = W.label(f, "heavy", 19, C.attackText)
+  f.text:SetPoint("LEFT", box, "RIGHT", 4, 0.5)
+  f.SetColor = function(self, c) self.text:SetTextColor(c[1], c[2], c[3]) end
   W.tooltip(f, function(tt, self) V.fillIntentTooltip(tt, self.enemy) end, "ANCHOR_TOP")
   return f
 end
@@ -89,13 +81,23 @@ local function placeFig(s)
   s.fig:SetPoint("BOTTOM", s, "TOP", 0, -(33 + h) / k)
 end
 
--- Nom, jauge et états sous les pieds (qui descendent avec la hauteur du personnage).
+-- Cadre compact (direction B) au-dessus de la tête, intention dessous ; états sous les pieds. Le
+-- cadre ne sort jamais du haut du décor (FRAME_MIN_Y, coordonnées du contenu).
+local FRAME_W, FRAME_H, BOSS_H = 118, 46, 62
+local FRAME_MIN_Y = Scene.TOP + 4
+V.FRAME_W, V.FRAME_H = FRAME_W, FRAME_H
 local function placeInfo(s)
   local feet = 33 + (s.figH or FIG_H)
+  local sc = s:GetScale() or 1
+  local h = s.tag:GetHeight() or FRAME_H
+  local y = 33 + 10 - h
+  local absTop = Scene.TOP + (s.top or 0)
+  local minRel = (FRAME_MIN_Y - absTop) / sc
+  if y < minRel then y = minRel end
   s.tag:ClearAllPoints()
-  s.tag:SetPoint("TOP", s, "TOP", 0, -(feet + NAME_DY))
-  s.hp:ClearAllPoints()
-  s.hp:SetPoint("TOP", s, "TOP", 8, -(feet + HP_DY))
+  s.tag:SetPoint("TOP", s, "TOP", 0, -y)
+  s.intent:ClearAllPoints()
+  s.intent:SetPoint("TOPLEFT", s.tag, "BOTTOMLEFT", 6, -3)
   s.st:ClearAllPoints()
   s.st:SetPoint("TOP", s, "TOP", 0, -(feet + ST_DY))
 end
@@ -107,13 +109,60 @@ local function aimApply(s)
   if s.fig.ring:IsShown() then s.fig.ring:SetAlpha(0.45 + 0.55 * max(v, s.ringBase or 0)) end
 end
 
+-- Pose le cadre compact d'un ennemi : ordinaire (trois tranches) ou élite / boss (dragon d'or) ; w =
+-- largeur du cadre ordinaire (le cadre d'élite garde ses proportions, réduit au besoin).
+local function setUnitFrame(s, boss, w)
+  local WS = W.Wow
+  local meta
+  local tag = s.tag
+  if boss then
+    local e = WS.pieces.unit_boss
+    local h = BOSS_H
+    local ww = h * e.pw / e.ph
+    local k = math.min(1, (w + 12) / ww)
+    h, ww = h * k, ww * k
+    tag:SetSize(ww, h)
+    tag.plain:Hide()
+    tag.boss:Show()
+    meta = WS.meta.unit_boss
+    tag.kk = h / e.ph
+  else
+    tag:SetSize(w, FRAME_H)
+    tag.plain:Show()
+    tag.boss:Hide()
+    meta = WS.meta.unit_enemy
+    tag.kk = FRAME_H / WS.pieces.unit_enemy.ph
+  end
+  -- logements (pixels stockés de la pièce) -> unités ; en trois tranches, x pris depuis les bords
+  local kk = tag.kk
+  local pw = boss and WS.pieces.unit_boss.pw or WS.pieces.unit_enemy.pw
+  local function box(r)
+    local x0, x1 = r[1] * kk, r[1] * kk + r[3] * kk
+    if not boss then x1 = w - (pw - r[1] - r[3]) * kk end
+    return x0, -r[2] * kk, x1 - x0, r[4] * kk
+  end
+  local x, y, bw, bh = box(meta.name)
+  s.name:ClearAllPoints()
+  s.name:SetPoint("CENTER", tag, "TOPLEFT", x + bw / 2, y - bh / 2)
+  s.nameW = bw - 6
+  x, y, bw, bh = box(meta.hp)
+  s.hp:ClearAllPoints()
+  s.hp:SetPoint("TOPLEFT", tag, "TOPLEFT", x, y)
+  s.hp:SetSize(bw, bh)
+  s.hp.w = bw
+  x, y, bw, bh = box(meta.low)
+  s.block:ClearAllPoints()
+  s.block:SetPoint("TOPLEFT", tag, "TOPLEFT", x, y)
+  s.block:SetSize(bw, bh)
+  s.block.w = bw
+  s.frameBoss, s.frameW = boss, w
+end
+
 local function buildSlot(self, i)
   local s = CreateFrame("Button", nil, self.bf)
   s:SetSize(SLOT_W, SLOT_H)
   s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   s.index = i
-  s.intent = intentBubble(s)
-  s.intent:SetPoint("TOP", 0, 0)
   s.fig = Scene.figure(s, 150, 160)
   s.figH = 160
   placeFig(s)
@@ -124,24 +173,26 @@ local function buildSlot(self, i)
   s.flash = W.disc(s.fig, "OVERLAY", 0, C.hp, 0)
   s.flash:SetSize(110, 130)
   s.flash:SetPoint("CENTER", 0, 4)
-  -- Infos (nom, jauge, Absorption, états) dans un cadre au-dessus du personnage et de son repli :
-  -- aucun modèle, ombre ou anneau ne peut les recouvrir. Nom sur une pilule d'ardoise (lisible sur
-  -- tout décor), au-dessus de la jauge, juste sous les pieds.
+  -- Infos (cadre compact : nom, vie, Absorption ; intention ; états) dans un cadre au-dessus du
+  -- personnage et de son repli : aucun modèle, ombre ou anneau ne peut les recouvrir.
   s.info = CreateFrame("Frame", nil, s)
   s.info:SetAllPoints()
   s.info:SetFrameLevel(s:GetFrameLevel() + INFO_LEVEL)
   s.tag = CreateFrame("Frame", nil, s.info)
-  s.tag:SetFrameLevel(s.info:GetFrameLevel() + 5) -- au-dessus de la jauge et des jetons d'état
-  s.tag:SetSize(SLOT_W, NAME_H)
-  s.tag.plaque = W.plaque(s.tag, { r = NAME_H / 2, pill = true, fill = 0.85, gloss = false })
-  s.tag.plaque:SetRim(Art.rim.dim)
+  s.tag:SetFrameLevel(s.info:GetFrameLevel() + 5) -- au-dessus des jetons d'état
+  s.tag:SetSize(FRAME_W, FRAME_H)
+  s.tag.plain = W.threeSlice(s.tag, "unit_enemy", "BACKGROUND", 0)
+  s.tag.boss = W.wow(s.tag, "unit_boss", "BACKGROUND", 0)
+  s.tag.boss:SetAllPoints()
+  s.tag.boss:Hide()
   s.name = W.label(s.tag, "bold", NAME_SIZE, C.text, "OVERLAY")
-  s.name:SetPoint("CENTER", s.tag, "CENTER", 0, 0.5)
   s.name:SetWordWrap(false)
-  s.hp = W.hpBar(s.info, 120, 13, 14)
-  s.block = W.shieldBadge(s.info, 28, 28)
-  s.block:SetPoint("LEFT", s.hp, "RIGHT", 4, 0)
-  s.st = W.tokenRow(s.info, 6, SLOT_W + 10, 26)
+  s.hp = W.hpBar(s.tag, 100, 10, 9.5, "bar_enemy")
+  s.block = W.shieldBadge(s.tag, 100, 8)
+  s.intent = intentBubble(s.info)
+  s.intent:SetFrameLevel(s.tag:GetFrameLevel() + 2)
+  s.st = W.tokenRow(s.info, 6, SLOT_W + 10, 24)
+  setUnitFrame(s, false, FRAME_W)
   placeInfo(s)
   s:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
   s:SetScript("OnEnter", function() s.hover = true V:RenderTargets() end)
@@ -150,26 +201,23 @@ local function buildSlot(self, i)
   return s
 end
 
--- Pile (pioche, défausse, consumées) : petit tas de cartes avec nombre ; clic = consulter
--- (panneau du deck, pioche triée).
-local function pile(self, parent, cx, cy, key, label, style, level)
-  local w = W.skinWidth("card_back", PILE_H)
+-- Pile (pioche, défausse, consumées) : case de barre d'action à l'icône du tas, nombre, libellé doré
+-- dessous ; clic = consulter (panneau du deck, pioche triée).
+local PILE_SLOT = 36
+local function pile(self, parent, cx, cy, key, label, short, entry, level)
   local b = CreateFrame("Button", nil, parent)
-  at(b, parent, cx - w / 2, cy - PILE_H / 2, w, PILE_H)
+  at(b, parent, cx - PILE_SLOT / 2, cy - PILE_SLOT / 2, PILE_SLOT, PILE_SLOT)
   b:SetFrameLevel(level + 1)
   b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   local face = W.face(b)
-  -- ombre portée, dos de carte (défausse estompée, consumées teintées de violet)
-  b.shadow = W.cardBack(face, PILE_H, "BACKGROUND", -1)
-  b.shadow:SetPoint("CENTER", 1.5, -2)
-  b.shadow:SetVertexColor(0, 0, 0, 0.55)
-  b.back = W.cardBack(face, PILE_H, "BACKGROUND", 0)
-  b.back:SetPoint("CENTER")
-  if style == "dashed" then b.back:SetAlpha(0.6) end
-  if style == "exhaust" then b.back:SetDesaturated(true) b.back:SetVertexColor(0.75, 0.55, 1, 1) end
-  b.count = W.label(face, "heavy", 15, C.text)
-  b.count:SetPoint("CENTER", 0, 1)
-  W.hoverable(b, { scale = 1.12, lift = 3 })
+  b.slot = W.slotOn(face, PILE_SLOT)
+  W.setIcon(b.slot.icon, entry, "ui:pile:" .. key)
+  b.count = W.label(face, "heavy", 15, C.text, "OVERLAY")
+  b.count:SetPoint("BOTTOMRIGHT", face, "BOTTOMRIGHT", -1, 1)
+  b.label = W.label(b, "bold", 11.5, C.wowGold)
+  b.label:SetPoint("TOP", b, "BOTTOM", 0, -3)
+  b.label:SetText(short)
+  W.hoverable(b, { scale = 1.12, lift = 3, paint = function(f, h) f.slot.hot:SetAlpha(h) end })
   b.pileKey = key
   b:SetScript("OnClick", function(_, button)
     if button == "RightButton" then return end
@@ -178,6 +226,47 @@ local function pile(self, parent, cx, cy, key, label, style, level)
   end)
   W.tooltip(b, function(tt) V.fillPileTooltip(tt, key, label) end, "ANCHOR_RIGHT")
   return b
+end
+-- Cadre d'unité du héros (direction B) : UI-HUD-UnitFrame-Player, portrait dans l'anneau, nom, barre de
+-- vie, Absorption dans le logement bas ; états (auras) dessous. Position : coin haut gauche du décor.
+local HERO_FRAME_X, HERO_FRAME_Y, HERO_K = 12, 42, 0.735
+local function heroFrame(self, parent, level)
+  local WS = W.Wow
+  local e, m = WS.pieces.unit_player, WS.meta.unit_player
+  local k = HERO_K
+  local f = CreateFrame("Frame", nil, parent)
+  at(f, parent, HERO_FRAME_X, HERO_FRAME_Y, e.pw * k, e.ph * k)
+  f:SetFrameLevel(level)
+  -- portrait : visage du personnage (SetPortraitTexture), sinon icône de classe ; sous l'anneau du cadre
+  f.portrait = W.noSnap(f:CreateTexture(nil, "BACKGROUND", nil, 0))
+  local p = m.portrait
+  at(f.portrait, f, p[1] * k, p[2] * k, p[3] * k, p[4] * k)
+  W.roundMask(f, f.portrait)
+  f.art = W.wow(f, "unit_player", "BORDER", 0)
+  f.art:SetAllPoints()
+  local nb = m.name
+  f.name = W.label(f, "bold", 13, C.wowGold, "OVERLAY")
+  f.name:SetPoint("LEFT", f, "TOPLEFT", nb[1] * k + 2, -(nb[2] + nb[4] / 2) * k)
+  local hb = m.hp
+  self.playerHp = W.hpBar(f, hb[3] * k, hb[4] * k, 12, "bar_hp")
+  self.playerHp:SetPoint("TOPLEFT", f, "TOPLEFT", hb[1] * k, -hb[2] * k)
+  self.playerHp:SetFrameLevel(level + 1)
+  local ab = m.absorb
+  self.playerBlock = W.shieldBadge(f, ab[3] * k, ab[4] * k)
+  self.playerBlock:SetPoint("TOPLEFT", f, "TOPLEFT", ab[1] * k, -ab[2] * k)
+  self.playerBlock:SetFrameLevel(level + 1)
+  f.SetPortrait = function(fr)
+    local ok = false
+    if SetPortraitTexture then ok = pcall(SetPortraitTexture, fr.portrait, "player") end
+    if ok then fr.portrait:SetTexCoord(0, 1, 0, 1) fr.portrait._unit = "player"
+    else
+      local exp = Controller.exp()
+      W.setIcon(fr.portrait, Art.classes[exp and exp.class or "priest"] or Art.classes.priest, "ui:class")
+    end
+  end
+  f:EnableMouse(false)
+  self.heroFrame = f
+  return f
 end
 
 function V:Build(parent)
@@ -198,24 +287,40 @@ function V:Build(parent)
   hero.flash:SetSize(130, 160)
   hero.flash:SetPoint("CENTER", 0, 0)
 
-  -- Barre d'incantation : plaque d'ardoise, médaillon du sort, nom, jauge dorée.
+  -- Cadre d'unité, états dessous (auras alignées à gauche, sous les barres).
+  local hf = heroFrame(self, parent, bf:GetFrameLevel() + 15)
+  self.playerSt = W.tokenRow(parent, 8, 220, 24)
+  self.playerSt.align = "LEFT"
+  at(self.playerSt, parent, HERO_FRAME_X + W.Wow.meta.unit_player.hp[1] * HERO_K, HERO_FRAME_Y + hf:GetHeight() + 4, 220, 24)
+  self.playerSt:SetFrameLevel(bf:GetFrameLevel() + 15)
+
+  -- Barre d'incantation : case du sort, nom, barre jaune du jeu dans un rail (à droite du cadre d'unité).
   local cast = CreateFrame("Frame", nil, parent)
-  at(cast, parent, HERO_X - 98, 79, 190, 36)
+  at(cast, parent, HERO_FRAME_X + hf:GetWidth() + 10, HERO_FRAME_Y + 14, 196, 34)
   cast:SetFrameLevel(parent:GetFrameLevel() + 20)
-  cast.plaque = W.plaque(cast, { r = 10 })
-  cast.medal = W.medallion(cast, 32)
-  cast.medal:SetPoint("CENTER", cast, "LEFT", 22, 0)
+  local box = CreateFrame("Frame", nil, cast)
+  box:SetSize(30, 30)
+  box:SetPoint("LEFT", 0, 0)
+  cast.slot = W.slotOn(box, 30)
+  cast.medal = { icon = cast.slot.icon } -- compatibilité
   cast.name = W.label(cast, "bold", 12.5, C.text)
-  cast.name:SetPoint("LEFT", cast, "LEFT", 41, 5)
-  cast.name:SetWidth(140)
+  cast.name:SetPoint("LEFT", cast, "LEFT", 38, 7)
+  cast.name:SetWidth(154)
   cast.name:SetJustifyH("LEFT")
   cast.name:SetWordWrap(false)
-  cast.track = W.rect(cast, "ARTWORK", 0, C.barTrack)
-  cast.track:SetPoint("LEFT", cast, "LEFT", 41, -8)
-  cast.track:SetSize(140, 6)
-  cast.bar = W.rect(cast, "ARTWORK", 1, C.goldText)
-  cast.bar:SetPoint("LEFT", cast.track, "LEFT", 1, 0)
-  cast.bar:SetSize(87, 4)
+  local rail = CreateFrame("Frame", nil, cast)
+  rail:SetSize(154, 13)
+  rail:SetPoint("LEFT", cast, "LEFT", 38, -8)
+  local l, mm, r = W.wow(rail, "slider_l", "BACKGROUND", 0), W.wow(rail, "slider_m", "BACKGROUND", 0),
+    W.wow(rail, "slider_r", "BACKGROUND", 0)
+  l:SetSize(8, 13) l:SetPoint("LEFT")
+  r:SetSize(8, 13) r:SetPoint("RIGHT")
+  mm:SetPoint("TOPLEFT", l, "TOPRIGHT") mm:SetPoint("BOTTOMRIGHT", r, "BOTTOMLEFT")
+  cast.track = rail
+  cast.bar = W.wow(rail, "bar_yellow", "ARTWORK", 0)
+  cast.bar:SetPoint("LEFT", rail, "LEFT", 3, 0)
+  cast.bar:SetSize(92, 7)
+  W.setWow(cast.bar, "bar_yellow", { 0, 0.62, 0, 1 })
   cast:EnableMouse(true)
   W.tooltip(cast, function(tt)
     local c = Controller.combat()
@@ -226,18 +331,6 @@ function V:Build(parent)
   end, "ANCHOR_TOP")
   cast:Hide()
   self.cast = cast
-
-  -- Jauge de vie (hexagone rouge au bout), Absorption en hexagone d'acier au bout droit, jetons d'état.
-  local hpRow = CreateFrame("Frame", nil, parent)
-  at(hpRow, parent, HERO_X - 65, HERO_FEET + 10, 138, 13)
-  self.playerHp = W.hpBar(hpRow, 138, 13, 15)
-  self.playerHp:SetPoint("LEFT", 0, 0)
-  self.playerBlock = W.shieldBadge(hpRow, 30, 30)
-  self.playerBlock:SetPoint("CENTER", self.playerHp, "RIGHT", 18, 0)
-  self.playerSt = W.tokenRow(parent, 8, 230, 30)
-  at(self.playerSt, parent, HERO_X - 115, HERO_FEET + 38, 230, 30)
-  hpRow:SetFrameLevel(bf:GetFrameLevel() + 15)
-  self.playerSt:SetFrameLevel(bf:GetFrameLevel() + 15)
 
   -- Ennemis ----------------------------------------------------------------
   self.slots = {}
@@ -250,36 +343,40 @@ function V:Build(parent)
   hz:SetFrameLevel(parent:GetFrameLevel() + 10)
   self.hz = hz
 
-  -- Mana : grand hexagone bleu « 2/3 », un petit hexagone par point de mana (vides une fois dépensés).
+  -- Mana (direction C) : grand anneau doré autour de l'orbe de mana, « 2/3 » au centre, libellé « Mana ».
   local mana = CreateFrame("Frame", nil, parent)
-  at(mana, parent, MANA_X - 42, MANA_Y - 42, 84, 84)
+  at(mana, parent, MANA_X - 38, MANA_Y - 38, 76, 76)
   mana:SetFrameLevel(hz:GetFrameLevel() + 2)
   mana:EnableMouse(true)
-  mana.hex = W.hex(mana, "blue", 84)
-  mana.hex:SetPoint("CENTER")
-  mana.text = W.label(mana, "heavy", 36, C.text, "OVERLAY")
-  mana.text:SetPoint("CENTER", -6, 3)
-  mana.max = W.label(mana, "heavy", 18, Art.hex("#d6e6ff"), "OVERLAY")
-  mana.max:SetPoint("LEFT", mana.text, "RIGHT", 0, -6)
-  mana.pips = {}
-  for i = 1, 8 do
-    local p = W.hex(parent, "blue", 18, "ARTWORK", 0)
-    p:Hide()
-    mana.pips[i] = p
-  end
+  W.medallionOn(mana, 76)
+  W.setIcon(mana.icon, Art.ui.mana, "ui:mana")
+  mana.shade = W.disc(mana, "ARTWORK", 0, C.black, 0.25)
+  mana.shade:SetAllPoints(mana.icon)
+  mana.text = W.label(mana, "heavy", 30, C.text, "OVERLAY")
+  mana.text:SetPoint("CENTER", -7, 1)
+  mana.max = W.label(mana, "heavy", 17, Art.hex("#d6e6ff"), "OVERLAY")
+  mana.max:SetPoint("LEFT", mana.text, "RIGHT", 0, -5)
+  mana.label = W.label(mana, "bold", 13, C.wowGold, "OVERLAY")
+  mana.label:SetPoint("TOP", mana, "BOTTOM", 0, -2)
+  mana.label:SetText("Mana")
   W.tooltip(mana, function(tt)
     tt:AddLine("Mana", 0.4, 0.6, 1)
     tt:AddLine("Unspent mana is lost at the end of the turn.", 0.8, 0.8, 0.8, true)
   end, "ANCHOR_RIGHT")
   self.mana = mana
 
-  -- Démence : hexagone violet en haut à droite du mana (caché à 0).
+  -- Démence : petit anneau doré à l'icône d'ombre, en haut à droite du mana (caché à 0).
   local dem = CreateFrame("Frame", nil, parent)
-  at(dem, parent, MANA_X + 44 - 17, MANA_Y - 32 - 17, 34, 34)
+  at(dem, parent, MANA_X + 46 - 18, MANA_Y - 30 - 18, 36, 36)
   dem:SetFrameLevel(hz:GetFrameLevel() + 3)
   dem:EnableMouse(true)
-  dem.hex = W.hex(dem, "violet", 34)
-  dem.hex:SetPoint("CENTER")
+  dem.icon = W.noSnap(dem:CreateTexture(nil, "ARTWORK", nil, 0))
+  dem.icon:SetPoint("TOPLEFT", 5, -5)
+  dem.icon:SetPoint("BOTTOMRIGHT", -5, 5)
+  W.roundMask(dem, dem.icon)
+  W.setIcon(dem.icon, Art.ui.demence, "ui:demence")
+  dem.ring = W.wow(dem, "ring_small", "ARTWORK", 1)
+  dem.ring:SetAllPoints()
   dem.text = W.label(dem, "heavy", 15, C.text)
   dem.text:SetPoint("CENTER", 0, 1)
   W.tooltip(dem, function(tt)
@@ -287,29 +384,26 @@ function V:Build(parent)
   end, "ANCHOR_RIGHT")
   self.demence = dem
 
-  self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Draw pile", "full", hz:GetFrameLevel() + 1)
-  self.discardPile = pile(self, parent, DISCARD_PILE[1], DISCARD_PILE[2], "discard", "Discard pile", "dashed",
+  self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Draw pile", "Draw", Art.ui.grimoire,
     hz:GetFrameLevel() + 1)
-  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1], EXHAUST_PILE[2], "exhaust", "Exhausted", "exhaust",
-    hz:GetFrameLevel() + 1)
+  self.discardPile = pile(self, parent, DISCARD_PILE[1], DISCARD_PILE[2], "discard", "Discard pile", "Discard",
+    Art.ui.bag, hz:GetFrameLevel() + 1)
+  self.exhaustPile = pile(self, parent, EXHAUST_PILE[1], EXHAUST_PILE[2], "exhaust", "Exhausted", "Exhaust",
+    Art.ui.remove, hz:GetFrameLevel() + 1)
   self.exhaustPile:Hide()
 
-  -- Recharges (cases d'ardoise : icône grisée, tours restants) et fin du tour -------------------
+  -- Recharges (cases de barre d'action : icône grisée, tours restants) et fin du tour ---------------
   self.cdCards = {}
   for i = 1, 6 do
     local m = CreateFrame("Frame", nil, parent)
-    m:SetSize(46, 46)
+    m:SetSize(42, 42)
     m:SetFrameLevel(hz:GetFrameLevel() + 2)
     m:EnableMouse(true)
-    m.plaque = W.plaque(m, { r = 9, fill = 0.7, gloss = false })
-    m.plaque:SetRim(Art.rim.dim)
-    m.icon = m:CreateTexture(nil, "ARTWORK")
-    m.icon:SetSize(38, 38)
-    m.icon:SetPoint("CENTER")
+    m.slot = W.slotOn(m, 42)
+    m.icon = m.slot.icon
     m.icon:SetDesaturated(true)
     m.icon:SetVertexColor(0.6, 0.6, 0.6, 1)
-    W.roundMask(m, m.icon, "mask_roundsq")
-    m.count = W.label(m, "heavy", 24, C.text)
+    m.count = W.label(m, "heavy", 22, C.text, "OVERLAY")
     m.count:SetPoint("CENTER", 0, 1)
     W.tooltip(m, function(tt, f)
       if not f.cd then return end
@@ -321,8 +415,8 @@ function V:Build(parent)
     self.cdCards[i] = m
   end
 
-  self.endTurn = W.button(parent, "End Turn", 156, 50, function() V:EndTurn() end, "gold", 19)
-  at(self.endTurn, parent, 863, 520, 156, 50)
+  self.endTurn = W.button(parent, "End Turn", 168, 50, function() V:EndTurn() end, "gold", 20)
+  at(self.endTurn, parent, 852, 520, 168, 50)
   self.endTurn:SetFrameLevel(hz:GetFrameLevel() + 2)
 
   -- Main -----------------------------------------------------------------------------
@@ -343,16 +437,14 @@ function V:Build(parent)
     self.cards[i] = card
   end
 
-  -- Fin de combat ---------------------------------------------------------------------
-  local banner = CreateFrame("Frame", nil, parent)
-  at(banner, parent, 317, 150, 400, 150)
+  -- Fin de combat : boîte de dialogue du jeu, « Victoire ! » en grand, bouton rouge et or ---------------
+  local banner = W.dialog(parent, nil)
+  at(banner, parent, 317, 140, 400, 150)
   banner:SetFrameLevel(parent:GetFrameLevel() + 70)
-  banner:EnableMouse(true)
-  banner.plaque = W.plaque(banner, { r = 16 })
-  banner.text = W.label(banner, "heavy", 44, C.goldText, "OVERLAY")
-  banner.text:SetPoint("TOP", 0, -18)
-  banner.button = W.button(banner, "Continue", 190, 50, function() Controller.finishCombat() end, "gold", 18)
-  banner.button:SetPoint("BOTTOM", 0, 12)
+  banner.text = W.label(banner, "heavy", 42, C.goldText, "OVERLAY")
+  banner.text:SetPoint("TOP", 0, -20)
+  banner.button = W.button(banner, "Continue", 190, 48, function() Controller.finishCombat() end, "gold", 18)
+  banner.button:SetPoint("BOTTOM", 0, 18)
   banner:Hide()
   self.banner = banner
 
@@ -527,7 +619,6 @@ function V:LayoutEnemies()
       s.fig:SetSize(150 * sc, 160 * sc)
       s.model:SetSize(150 * sc, 160 * sc)
       s.figH = FIG_H * sc
-      placeInfo(s)
       W.animSet(s, "aim", 0)
       W.setCreature(s.model, e.id, s.fallback)
       if s.model.SetFacing then s.model:SetFacing(opts().facingEnemy or -0.6) end
@@ -535,13 +626,18 @@ function V:LayoutEnemies()
       s.fig.shadow:SetAlpha(1)
       s:SetAlpha(1)
       s.hp:Set(e.hp, e.maxHp)
-      s.block:Set(e.block)
+      s.block:Set(e.block, e.maxHp)
     end
     s.enemyIndex = idx
     s.cx = cx0 + (k - 1) * spacing
     -- personnage agrandi (art.scale) : l'emplacement remonte, les pieds restent sur la même ligne
     s.top = ENEMY_TOP + ((k % 2 == 0) and ENEMY_STAGGER or 0) - Scene.TOP - ((s.figH or FIG_H) - FIG_H)
-    s:SetScale(n >= 5 and 0.86 or 1)
+    local sc = n >= 5 and 0.86 or 1
+    s:SetScale(sc)
+    -- cadre compact : ordinaire, ou d'élite / boss (dragon d'or) ; jamais plus large que l'écart
+    local def = ns.Enemies[e.id]
+    setUnitFrame(s, def.boss or def.elite, min(FRAME_W, spacing / sc - 8))
+    placeInfo(s)
     self:PlaceSlot(s, 0, 0)
   end
 end
@@ -585,11 +681,11 @@ function V:RenderIntent(s, e)
   if e.dead or c.result then s.intent:Hide() return end
   local entry, text, color = intentDisplay(c, e)
   W.setIcon(s.intent.icon, entry, "intent:" .. tostring(Combat.intentInfo(c, e).kind))
-  s.intent:SetRim(Art.rim[color] or Art.rim.attack)
-  local big = W.utf8len(text) <= 2
+  s.intent:SetColor(C[(color or "attack") .. "Text"] or C.attackText)
+  local big = W.utf8len(text) <= 3
   W.setSize(s.intent.text, big and 19 or 13.5)
   s.intent.text:SetText(text)
-  s.intent:SetWidth(big and 64 or max(64, (s.intent.text:GetStringWidth() or 20) + 44))
+  s.intent:SetWidth(30 + max(20, s.intent.text:GetStringWidth() or 20))
   s.intent:SetAlpha(1)
   s.intent:SetScale(1)
   s.intent:Show()
@@ -602,15 +698,15 @@ function V:RenderEnemies(full)
   for uid, s in pairs(self.slotOf) do
     local e = enemyByUid(c, uid)
     local def = ns.Enemies[e.id]
-    if s.name:GetText() ~= def.name then
-      W.fitText(s.name, def.name, NAME_SIZE, SLOT_W - 14, 10)
-      s.tag:SetWidth(min(SLOT_W, (s.name:GetStringWidth() or 60) + 18))
+    if s.name:GetText() ~= def.name or s.nameFitW ~= s.nameW then
+      s.nameFitW = s.nameW
+      W.fitText(s.name, def.name, NAME_SIZE, s.nameW or (FRAME_W - 14), 8)
     end
     local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.text)
     s.name:SetTextColor(nc[1], nc[2], nc[3])
     if full then
       s.hp:Set(e.hp, e.maxHp)
-      s.block:Set(e.block)
+      s.block:Set(e.block, e.maxHp)
       s.st:Set(W.unitStatuses(e))
     end
     if not self.frozen or e.dead then self:RenderIntent(s, e) end
@@ -662,7 +758,7 @@ function V:RenderPlayer(full)
   local p = c.player
   if full then
     self.playerHp:Set(p.hp, p.maxHp)
-    self.playerBlock:Set(p.block)
+    self.playerBlock:Set(p.block, p.maxHp)
     local list = W.unitStatuses(p)
     for i = 1, #p.powers do
       local inst = p.powers[i]
@@ -680,23 +776,12 @@ function V:RenderPlayer(full)
   else
     self.cast:Hide()
   end
-  -- mana : chiffre, maximum, un petit hexagone par point (bleu disponible, vide dépensé)
+  -- mana : chiffre et maximum dans l'anneau doré
   local maxMana = Controller.maxMana()
   self.mana.text:SetText(tostring(p.mana))
   self.mana.max:SetText("/" .. maxMana)
-  local pips = self.mana.pips
-  local n = min(#pips, max(maxMana, p.mana))
-  for i = 1, #pips do
-    local pip = pips[i]
-    if i <= n then
-      W.setHex(pip, i <= p.mana and "blue" or "empty", 18)
-      pip:ClearAllPoints()
-      pip:SetPoint("CENTER", self.parent, "TOPLEFT", MANA_X + (i - (n + 1) / 2) * 22, -(MANA_Y + 55))
-      pip:Show()
-    else
-      pip:Hide()
-    end
-  end
+  self.heroFrame.name:SetText((ns.Classes[(Controller.exp() or {}).class or "priest"] or {}).name or "")
+  if not self.heroFrame.portrait._unit then self.heroFrame:SetPortrait() end
   local dem = p.demence or 0
   self.demence.text:SetText(tostring(dem))
   if dem > 0 then self.demence:Show() else self.demence:Hide() end
@@ -717,8 +802,8 @@ function V:RenderPlayer(full)
       m.count:SetText(tostring(turns))
       local row, col = floor((i - 1) / 3), (i - 1) % 3
       local rowN = (row == 0) and per or (n - 3)
-      local x0 = COOLDOWN_X - (rowN * 54 - 8) / 2
-      at(m, self.parent, x0 + col * 54, COOLDOWN_Y - 23 - row * 54, 46, 46)
+      local x0 = COOLDOWN_X - (rowN * 50 - 8) / 2
+      at(m, self.parent, x0 + col * 50, COOLDOWN_Y - 21 - row * 50, 42, 42)
       m:Show()
     else
       m.cd = nil
@@ -1329,14 +1414,11 @@ local PREVIEW_COLS = 6
 
 function V:PreviewEnemies()
   if not self.preview then
-    local p = W.woodPanel(UI.content, 10)
+    local p = W.dialog(UI.content, "Enemy and character models (chat lists the missing ones)", 14)
     p:SetPoint("TOPLEFT", 10, -50)
     p:SetPoint("BOTTOMRIGHT", -10, 10)
     p:SetFrameLevel(UI.content:GetFrameLevel() + 95)
     p:EnableMouse(true)
-    p.title = W.label(p, "bold", 14, C.textSoft)
-    p.title:SetPoint("TOPLEFT", 16, -10)
-    p.title:SetText("Enemy and character models (chat lists the missing ones)")
     p.models = {}
     local list = previewEntries()
     local rows = math.ceil(#list / PREVIEW_COLS)
@@ -1364,8 +1446,8 @@ function V:PreviewEnemies()
       m.id, m.key, m.art, m.npc, m.fallback, m.label = e.id, e.key, e.art, e.npc, fig.fallback, e.name
       p.models[k] = m
     end
-    local close = W.button(p, "Close", 110, 30, function() p:Hide() end, "gold", 14)
-    close:SetPoint("BOTTOMRIGHT", -14, 14)
+    local close = W.button(p, "Close", 110, 30, function() p:Hide() end, "red", 14)
+    close:SetPoint("BOTTOMRIGHT", -16, 16)
     self.preview = p
   end
   self.preview:Show()

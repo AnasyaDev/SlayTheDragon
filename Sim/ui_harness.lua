@@ -2101,12 +2101,11 @@ do
   bad = {}
   for _, need in ipairs({ "card_body_ivory", "card_body_violet", "card_body_blue", "card_body_gold", "card_panel",
     "card_ribbon", "card_cost", "card_plate", "medal_ring", "medal_mask", "medal_glass",
-    "gem_uncommon", "gem_rare", "gem_epic", "gem_legendary", "hex_red", "hex_green", "hex_blue", "hex_steel",
-    "hex_violet", "hex_empty", "card_back", "tile_slate", "tile_ivory", "nine_slate", "nine_rim", "nine_ivory",
-    "pill_slate", "pill_rim", "button_gold" }) do
+    "gem_uncommon", "gem_rare", "gem_epic", "gem_legendary", "card_back", "tile_slate", "pill_slate", "pill_rim",
+    "nine_glow" }) do
     if not Skin.tex[need] then bad[#bad + 1] = need end
   end
-  check("pièces attendues présentes (corps, ruban, coût, médaillon, gemmes, hexagones, ardoise, ivoire, liserés)",
+  check("pièces attendues présentes (corps, ruban, coût, médaillon, gemmes, dos, plaques des cartes)",
     #bad == 0, table.concat(bad, ", "))
   local missingIcons, ni = {}, 0
   for key, rel in pairs(Skin.icons) do
@@ -2175,10 +2174,11 @@ do
   local v = V()
   local slot
   for _, s in pairs(v.slotOf) do slot = s end
-  check("bulle d'intention : pilule d'ardoise au liseré teinté", slot and slot.intent.plaque and slot.intent._shown
-    and (slot.intent.text._text or "") ~= "")
-  check("mana : hexagone bleu et un point par mana", v.mana.text._text == tostring(C().combat().player.mana)
-    and v.mana.pips[1]._shown)
+  check("intention : case de barre d'action du jeu et chiffre en couleur", slot and slot.intent.slot
+    and slot.intent.slot.frame._wow == "slot_frame" and slot.intent._shown and (slot.intent.text._text or "") ~= ""
+    and slot.intent.text._calls.SetTextColor ~= nil)
+  check("mana : grand anneau doré, « N » et « /max », libellé Mana", v.mana.text._text == tostring(C().combat().player.mana)
+    and v.mana.ring._wow == "ring_large" and v.mana.label._text == "Mana" and v.mana.pips == nil)
 end
 
 print("U21 modèles d'ennemis (essais, repli en médaillon, /slay modeles) ; noms d'ennemis lisibles")
@@ -2344,13 +2344,17 @@ do
           if nr[2] < boardTop + 4 * k or tr[2] < boardTop then bad[#bad + 1] = label .. " : nom sur le plateau" end
           local sr = R.rect(s.st)
           if sr and sr[2] < boardTop then bad[#bad + 1] = label .. " : états sur le plateau" end
-          if tr[3] - tr[1] + 0.5 < (s.name:GetStringWidth() or 0) * s.name:GetEffectiveScale() then bad[#bad + 1] = label .. " : nom plus large que sa pilule" end
-          local mr = R.rect(s.model)
-          if mr and tr[4] > mr[2] + 0.5 then bad[#bad + 1] = label .. " : pilule du nom sur le personnage" end
+          -- cadre compact (direction B) : au-dessus de la tête, dans le décor (sous le bandeau), nom dans
+          -- son logement, barre de vie dans le sien, au-dessus du modèle et du repli
+          if (s.name:GetStringWidth() or 0) > (s.nameW or 0) + 0.5 then bad[#bad + 1] = label .. " : nom plus large que son logement" end
+          if tr[4] > content[4] - Scene.TOP * k + 0.5 then bad[#bad + 1] = label .. " : cadre sur le bandeau" end
           local hr = R.rect(s.hp)
-          if hr and tr[2] < hr[4] then bad[#bad + 1] = label .. " : pilule du nom sur la jauge" end
-          if flevel(s.tag) <= flevel(s.model) or flevel(s.tag) <= flevel(s.hp) or flevel(s.tag) <= flevel(s.fallback) then
-            bad[#bad + 1] = label .. " : pilule du nom sous le modèle, la jauge ou le repli"
+          if not hr or hr[1] < tr[1] - 0.5 or hr[3] > tr[3] + 0.5 or hr[4] > tr[4] + 0.5 or hr[2] < tr[2] - 0.5 then
+            bad[#bad + 1] = label .. " : barre de vie hors du cadre"
+          end
+          if nr[2] < (hr and hr[4] or nr[2]) - 2 * k then bad[#bad + 1] = label .. " : nom sur la barre de vie" end
+          if flevel(s.tag) <= flevel(s.model) or flevel(s.tag) <= flevel(s.fallback) then
+            bad[#bad + 1] = label .. " : cadre sous le modèle ou le repli"
           end
           -- rien de visible, d'un cadre de niveau supérieur ou égal (hors la pilule elle-même), ne le recouvre
           local nl = flevel(s.tag)
@@ -2365,7 +2369,7 @@ do
             end
           end
           for _, t in ipairs(tags) do
-            if inter(t, tr) then bad[#bad + 1] = label .. " : chevauche un autre nom" end
+            if inter(t, tr) then bad[#bad + 1] = label .. " : chevauche un autre cadre" end
           end
           tags[#tags + 1] = tr
         end
@@ -2895,7 +2899,7 @@ do
     table.concat(H.bornInAnim, ", "))
 end
 
-print("U24 plaques de réponse : toutes les réponses de Data/Events.lua dans la zone utile (marges, paliers, coupures)")
+print("U24 réponses (bouton rouge, gain dessous) : toutes les réponses de Data/Events.lua dans leurs zones")
 do
   freshRun(SEED + 4, "event")
   local ns = H.ns
@@ -2913,10 +2917,12 @@ do
     cases = cases + 1
     b:SetOption(o, w, h)
     local fit = b.optFit
-    local zw = w - 2 * O.mx
     local why = {}
     if not fit.ok then why[#why + 1] = "ne tient à aucun palier" end
-    for _, fs in ipairs({ b.label, b.sub }) do
+    -- libellé : une ligne dans le bouton (moins ses bouts, une marge et l'icône) ; texte sous le bouton,
+    -- dans la largeur moins les marges, et dans la hauteur restante
+    for _, it in ipairs({ { b.label, fit.lw }, { b.sub, fit.zw } }) do
+      local fs, zw = it[1], it[2]
       if fs._shown and (fs._text or "") ~= "" then
         local ls = lines(fs._text)
         for _, l in ipairs(ls) do
@@ -2925,9 +2931,12 @@ do
         if fs:IsTruncated() or fs:GetNumLines() ~= #ls then why[#why + 1] = "recoupé par le client" end
       end
     end
-    if fit.block > h - 2 * O.my + 0.01 then why[#why + 1] = "bloc trop haut" end
-    local pt = b.label._points[1]
-    if pt and -pt[5] < O.my - 0.01 then why[#why + 1] = "libellé collé au haut" end
+    if #lines(b.label._text) ~= 1 then why[#why + 1] = "libellé sur plusieurs lignes" end
+    if (b.label._fontSize or 0) < 10 then why[#why + 1] = "libellé trop petit" end
+    if b.label._fontSize * H.metrics.lineHeight > O.btn - 8 then why[#why + 1] = "libellé plus haut que le bouton" end
+    if b.sub._shown and fit.subH > fit.zh + 0.01 then why[#why + 1] = "texte plus haut que la place sous le bouton" end
+    local cap = b.base.cap or 0
+    if fit.lw > w - 2 * cap + 0.01 then why[#why + 1] = "zone du libellé sur les bouts du bouton" end
     if #why > 0 then bad[#bad + 1] = label .. " : " .. table.concat(why, ", ") end
     if b.sub._shown then
       local k = fit.sub .. " × " .. fit.subLines

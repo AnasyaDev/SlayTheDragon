@@ -258,19 +258,20 @@ add("btn_goldred", rs(gold, 0.5), 3856481, (295, 521, 406, 128), 0.5,
     "bouton rouge et or (128-GoldRedButton-Left + Right)", cap=24)
 piece("btn_close", 4698972, (39, 1, 36, 38), 1, "bouton de fermeture (RedButton-Exit-2x)", refine=True)
 
-# --- Cadres d'unité (Dragonflight, -2x, stockés à 0,6)
-piece("unit_player", 4642466, (1, 171, 396, 142), 0.6, "cadre du héros (UI-HUD-UnitFrame-Player-PortraitOn-2x)")
+# --- Cadres d'unité (Dragonflight, -2x, stockés à 0,75 ; barres à 0,6, étirées)
+S_UNIT = 0.75
+piece("unit_player", 4642466, (1, 171, 396, 142), S_UNIT, "cadre du héros (UI-HUD-UnitFrame-Player-PortraitOn-2x)")
 piece("bar_hp", 4642466, (889, 415, 248, 40), 0.6, "barre de vie (…-Player-PortraitOn-Bar-Health-2x)")
 piece("bar_absorb", 4642466, (642, 524, 240, 18), 0.6, "barre d'Absorption (…-Bar-Mana-2x, mesurée à la main)")
 piece("bar_yellow", 4703662, (337, 209, 169, 15), 0.6, "barre jaune : incantation, réputation (…-Boss-Small-PortraitOff-Bar-Energy-2x)", refine=True)
-piece("unit_boss", 4703662, (201, 1, 230, 112), 0.6, "cadre compact d'élite / boss, dragon d'or (…-Boss-Small-PortraitOff-2x)")
+piece("unit_boss", 4703662, (201, 1, 230, 112), S_UNIT, "cadre compact d'élite / boss, dragon d'or (…-Boss-Small-PortraitOff-2x)")
 # Cadre compact ordinaire : la moitié gauche du même cadre (sans le dragon) et son miroir.
 fr = crop(4703662, (203, 18, 90, 76))
 clean = Image.new("RGBA", (180, 76))
 clean.alpha_composite(fr, (0, 0))
 clean.alpha_composite(ImageOps.mirror(fr), (90, 0))
-add("unit_enemy", rs(clean, 0.6), 4703662, (203, 18, 90, 76), 0.6,
-    "cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon)", cap=14)
+add("unit_enemy", rs(clean, S_UNIT), 4703662, (203, 18, 90, 76), S_UNIT,
+    "cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon)", cap=18)
 piece("bar_enemy", 4703662, (337, 165, 169, 20), 0.6, "barre de vie compacte (…-Boss-Small-PortraitOff-Bar-Health-2x)")
 piece("elite_dragon", 1300837, (1, 1, 80, 80), 1, "dragon d'or des élites et boss (nameplates-icon-elite-gold)")
 
@@ -361,10 +362,13 @@ hm = TILES["header_m"].crop((0, 0, 64, 78))
 rows = [y for y in range(78) if hm.getpixel((32, y))[3] > 120]
 META["header"] = {"top": rows[0], "bottom": rows[-1] + 1}
 # Cadre du héros : portrait (anneau), barres (pixels stockés, mesurés sur la pièce)
-META["unit_player"] = {"portrait": [11, 8, 64, 64], "name": [84, 12, 142, 18], "hp": [81, 31, 148, 23],
-                       "absorb": [81, 56, 148, 12]}
-META["unit_enemy"] = {"name": [6, 2, 96, 15], "hp": [3, 19, 102, 11], "low": [3, 32, 102, 9]}
-META["unit_boss"] = {"name": [5, 11, 66, 15], "hp": [3, 29, 100, 11], "low": [3, 42, 100, 9]}
+# Cadres d'unité : logements mesurés sur les pièces stockées à 0,6, convertis à l'échelle stockée.
+UNIT_META = {"unit_player": {"portrait": [11, 8, 64, 64], "name": [84, 12, 142, 18], "hp": [81, 31, 148, 23],
+                             "absorb": [81, 56, 148, 12]},
+             "unit_enemy": {"name": [6, 2, 96, 15], "hp": [3, 19, 102, 11], "low": [3, 32, 102, 9]},
+             "unit_boss": {"name": [5, 11, 96, 15], "hp": [3, 29, 100, 11], "low": [3, 42, 100, 9]}}
+for _n, _d in UNIT_META.items():
+    META[_n] = {k: [round(v * S_UNIT / 0.6, 1) for v in box] for k, box in _d.items()}
 
 # ---------------------------------------------------------------------------
 # Atlas : rangées (étagères) dans une toile de 1024 de large, 3 pixels d'écart, bords répétés
