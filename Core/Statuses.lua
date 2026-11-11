@@ -28,7 +28,7 @@ S.atonement = { name = "Atonement", duration = true,
   text = "Each card that deals damage restores 2 HP." }
 S.pain = { name = "Pain", debuff = true,
   text = "Takes X damage at the start of its turn, then X drops by 1. Ignores Absorb." }
-S.regen = { name = "Regeneration",
+S.regen = { name = "Regen",
   text = "Heals X at the start of its turn, then X drops by 1." }
 -- turns : affichage seulement (le nombre compte des tours perdus, sablier sur les cartes) ;
 -- les règles n'en tiennent pas compte.

@@ -227,9 +227,9 @@ card("silence", {
 card("vampiric_touch", {
   rep = 0, name = "Vampiric Touch", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 1, self = true }, { "demence", 1 } },
-  text = "+1 Insanity.\nApply Pain 3\nGain Regeneration 1",
+  text = "+1 Insanity.\nApply Pain 3\nGain Regen 1",
   up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "demence", 1 } },
-    text = "+1 Insanity.\nApply Pain 5\nGain Regeneration 2" },
+    text = "+1 Insanity.\nApply Pain 5\nGain Regen 2" },
 })
 
 card("mind_sear", {
@@ -291,9 +291,9 @@ card("holy_fire", {
 card("holy_nova", {
   rep = 0, name = "Holy Nova", cost = 1, type = "attack", school = "holy", rarity = "common", path = "holy",
   effects = { { "damage", 4, all = true }, { "apply", "regen", 2, self = true } },
-  text = "Deal 4 to all.\nGain Regeneration 2",
+  text = "Deal 4 to all.\nGain Regen 2",
   up = { effects = { { "damage", 6, all = true }, { "apply", "regen", 3, self = true } },
-    text = "Deal 6 to all.\nGain Regeneration 3" },
+    text = "Deal 6 to all.\nGain Regen 3" },
 })
 
 card("chastise", {
@@ -324,24 +324,24 @@ card("spirit_of_redemption", {
       return true
     end,
   },
-  text = "Power.\nLast Breath: stay at 1 HP, Regeneration 6, free turn.",
+  text = "Power.\nLast Breath: stay at 1 HP, Regen 6, free turn.",
   up = { cost = 0,
-    text = "Power.\nLast Breath: stay at 1 HP, Regeneration 6, free turn." },
+    text = "Power.\nLast Breath: stay at 1 HP, Regen 6, free turn." },
 })
 
 card("renew", {
   rep = 0, name = "Renew", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
   exhaust = true, effects = { { "apply", "regen", 3, self = true } },
-  text = "Gain Regeneration 3\nExhaust.",
-  up = { effects = { { "apply", "regen", 5, self = true } }, text = "Gain Regeneration 5\nExhaust." },
+  text = "Gain Regen 3\nExhaust.",
+  up = { effects = { { "apply", "regen", 5, self = true } }, text = "Gain Regen 5\nExhaust." },
 })
 
 card("halo", {
   rep = 0, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
   cast = true, effects = { { "damage", 15, all = true }, { "apply", "regen", 3, self = true } },
-  text = "Cast.\nDeal 15 to all.\nGain Regeneration 3",
+  text = "Cast.\nDeal 15 to all.\nGain Regen 3",
   up = { effects = { { "damage", 19, all = true }, { "apply", "regen", 4, self = true } },
-    text = "Cast.\nDeal 19 to all.\nGain Regeneration 4" },
+    text = "Cast.\nDeal 19 to all.\nGain Regen 4" },
 })
 
 card("flash_heal", {

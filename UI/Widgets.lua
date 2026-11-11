@@ -1767,6 +1767,13 @@ function W.cardBody(d, base)
   for _, k in ipairs(KEYWORD_STRIP) do
     if d[k.flag] or (k.flag == "power" and d.type == "power") then text = text:gsub(k.pat, "") end
   end
+  -- ligne d'état : le verbe reste avec le nom de l'état (« Gain Atonement », « Apply Stunned »)
+  local cl = {}
+  for l in (text .. "\n"):gmatch("(.-)\n") do
+    if W.isStateClause(l) then l = l:gsub("^(%S+) ", "%1" .. NBSP, 1) end
+    cl[#cl + 1] = l
+  end
+  text = table.concat(cl, "\n")
   -- un nom d'état insécable avec son nombre (« Pain 5 », « Sundered 2 ⌛ ») ; « to all » insécable
   for _, k in ipairs(keywordList()) do
     if k.status then
@@ -1878,7 +1885,7 @@ function W.cardWords(text)
   while i <= #raw do
     local w = raw[i]
     local p = plainWord(w)
-    if (p:match("^[:;!?]+$") or p:match("^%d+[.,]$")) and #words > 0 then
+    if (p:match("^[:;!?]+$") or (p:gsub("^−", "")):match("^[+%-]?%d+[.,]$")) and #words > 0 then
       words[#words] = words[#words] .. " " .. w
       i = i + 1
     else
@@ -1919,7 +1926,7 @@ W.balanceColors = balanceColors
 -- Paragraphes du texte d'une carte selon le mode : "clauses" = une clause par paragraphe ; "flow" =
 -- les clauses d'effet coulent ensemble, chaque clause d'état posé (« Donne » / « Applique ») reste un
 -- paragraphe ; "flowAll" = les clauses d'état sont groupées en un dernier paragraphe (« Apply
--- Pain 3. Gain Regeneration 1 »). Un paragraphe commence toujours une ligne.
+-- Pain 3. Gain Regen 1 »). Un paragraphe commence toujours une ligne.
 -- Une clause conditionnelle (« Pain: … », « Execute: … ») commence toujours une ligne, et la
 -- clause qui la suit aussi (elle ne doit pas paraître soumise à la condition) : seules les clauses
 -- simples qui se suivent coulent ensemble.
@@ -1946,8 +1953,7 @@ function W.cardParagraphs(text, mode)
     end
   end
   if mode == "flowAll" and #states > 0 then
-    -- états groupés : le verbe d'un état qui n'ouvre pas la ligne reste avec le nom qui le suit
-    for k = 2, #states do states[k] = states[k]:gsub("^(%S+) ", "%1" .. NBSP, 1) end
+    -- états groupés (le verbe de chaque état est déjà collé à son nom, W.cardBody)
     paras[#paras + 1] = table.concat(states, ". ")
   else
     for _, s in ipairs(states) do paras[#paras + 1] = s end
