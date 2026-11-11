@@ -8,7 +8,7 @@ chemin Interface\\… du client (sur WoW Forever, une texture absente s'affiche 
 permet de le savoir) : tout est découpé ici puis livré avec l'addon.
 
 Usage (depuis la racine du dépôt, venv de tools/build_media.py) :
-  build/venv/bin/python -I tools/build_wowui.py [planche]
+  build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 Sources : build/wowui_src/<FileDataID>.blp, retéléchargées si absentes depuis
 https://wago.tools/api/casc/<FileDataID>?download (User-Agent générique).
 Sorties : Media/WowUI/*.tga (TGA 32 bits non compressé, origine en bas à gauche, 8 bits d'alpha, toiles
@@ -283,11 +283,18 @@ piece("slot_hover", 4615764, (358, 543, 92, 94), 0.75, "cadre doré de survol (U
 # --- Anneaux dorés
 ring = crop(2406979, (12, 165, 130, 130))
 m = Image.new("L", (130 * 4, 130 * 4), 0)
-c, ro, ri = 65 * 4, 64.5 * 4, 49 * 4
+c, ro, ri = 65 * 4, 61.5 * 4, 49 * 4
 ImageDraw.Draw(m).ellipse((c - ro, c - ro, c + ro, c + ro), fill=255)
 ImageDraw.Draw(m).ellipse((c - ri, c - ri, c + ri, c + ri), fill=0)
 m = m.resize((130, 130), Image.LANCZOS)
 ring.putalpha(ImageChops.multiply(ring.split()[3], m))
+# restes du cadre métal sous l'anneau (gris peu saturé, ni or ni ombre) : effacés
+px = ring.load()
+for yy in range(ring.height):
+    for xx in range(ring.width):
+        r_, g_, b_, a_ = px[xx, yy]
+        if a_ and max(r_, g_, b_) - min(r_, g_, b_) < 28 and (r_ + g_ + b_) / 3 > 50:
+            px[xx, yy] = (r_, g_, b_, 0)
 ring = ring.crop(ring.getbbox())
 add("ring_large", ring, 2406979, (12, 165, 130, 130), 1,
     "grand anneau doré : mana, objets ronds, boss (anneau de UI-Frame-PortraitMetal-CornerTopLeft-2x, isolé)")
@@ -587,3 +594,13 @@ if "planche" in sys.argv[1:]:
     asm.append(("dialogue DiamondMetal", dd))
     label_sheet(asm, ROOT / "build" / "wowui_assemblages.png", bg=(40, 44, 40))
     print("planches : build/wowui_planche.png, build/wowui_assemblages.png")
+
+if "doc" in sys.argv[1:]:
+    # table des pièces pour docs/interface.md (nom, FileDataID, taille stockée, usage)
+    print("| Pièce | FileDataID | Stockée (px) | Usage |")
+    print("|---|---|---|---|")
+    for n in sorted(INFO):
+        i = INFO[n]
+        im = PIECES.get(n) or TILES[n]
+        w, h = (im.size if n in PIECES else (i["pw"], i["ph"]))
+        print(f"| `{n}` | {i['fid']} | {w}×{h}{' (répétée)' if i.get('tile') else ''} | {i['usage']} |")

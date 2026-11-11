@@ -1,4 +1,4 @@
-# Interface en jeu (pistes C, D, E, survols et peau « Mechanized Magic »)
+# Interface en jeu (pistes C, D, E, survols, peau « Mechanized Magic » des cartes, habillage WoW)
 
 État au 10/11/2026. Premier essai en jeu fait par le joueur (disposition validée) ; les retours de cet
 essai sont traités dans « Retours du premier essai » ci-dessous. Depuis, l'habillage « bois et
@@ -7,8 +7,212 @@ d'après les planches validées (`docs/maquette/combat_pack.jpg`, `ecran_*.jpg`,
 Vérifié hors jeu par `Sim/ui_harness.lua` (logique, clics, animations en temps virtuel, cohérence de la
 peau) et par des instantanés des écrans (`Sim/ui_render.lua`, qui dessine désormais les textures de
 `Media/`). La section « Tests en vol » liste ce qu'il reste à voir en jeu.
+Le 11/11/2026, l'habillage de la fenêtre et des écrans (hors cartes) est passé aux pièces de l'interface
+du jeu : voir « Habillage WoW » ci-dessous ; la peau « Mechanized Magic » ne vêt plus que les cartes.
 
-## Peau « Mechanized Magic »
+## Habillage WoW (direction B, mana et parcours façon C)
+
+État au 11/11/2026, choisi par le joueur sur maquettes (`build/wowui/direction_*.jpg`, générateurs
+`docs/maquette/gen_wowui.py` et `docs/maquette/wowui_kit.py`) : tout l'habillage en **direction B**
+(moderne Dragonflight / Midnight) ; l'indicateur de mana et l'écran de parcours repris de la
+**direction C** (carte de vol). Les **cartes** (pack « Mechanized Magic ») et la police (Baloo Chettan 2)
+ne changent pas (voir « Peau « Mechanized Magic » »). Pas encore vu en jeu.
+
+### Règle : embarqué, jamais d'atlas
+
+Toutes les pièces sont des **textures de Blizzard extraites du jeu** (CASC retail 12.1.5, téléchargées par
+FileDataID depuis `https://wago.tools/api/casc/<id>?download`), découpées et **livrées avec l'addon**
+(`Media/WowUI/*.tga`). L'interface ne les appelle **jamais** par `SetAtlas`, par un chemin `Interface\…`
+du client ni par un FileDataID : sur WoW Forever, une texture absente s'affiche en aplat vert et rien ne
+permet de le savoir. Restent des fichiers du client, comme avant : les icônes (mécanisme actuel : icône
+améliorée de `Media/Icons`, sinon icône du sort ou FileDataID), la texture blanche `WHITE8X8` (aplats,
+dégradés), le bouton de minicarte (hors de la fenêtre) et, en repli seulement, les écrans de chargement
+candidats du décor. Le disque des ronds teintés (`W.disc`) est maintenant `Media/mask_disc.tga`.
+**À réévaluer avant toute publication de l'addon** (droits de Blizzard, comme les fonds des scènes).
+
+### Fabrication (`tools/build_wowui.py`, hors TOC, rejouable)
+
+```
+build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
+```
+
+- Liste des sources en tête du script (FileDataID → fichier du client), retéléchargées si absentes dans
+  `build/wowui_src/` (User-Agent générique ; BLP lus par Pillow, encodage 3 décodé à la main).
+- Découpes : coordonnées d'atlas (table UiTextureAtlasMember, build 12.1.5) **vérifiées à l'œil** sur
+  les fichiers servis (planche `build/wowui_planche.png`, assemblages `build/wowui_assemblages.png`).
+  Plusieurs feuilles ne correspondent plus à l'atlas connu : cadre d'unité compact et barres de la feuille
+  des boss (4703662), cadre doré des cases (4615764), barre de mana du joueur (4642466) — rectangles
+  mesurés à la main ou resserrés sur l'alpha. Retouches : cadre compact ordinaire = moitié gauche du cadre
+  de boss et son miroir (le fichier servi n'a que la version au dragon) ; grand anneau doré isolé du coin
+  « PortraitMetal » (anneau masqué, restes gris du cadre effacés) ; bouton rouge et or = bouts gauche et
+  droit accolés ; trait de taxi couché.
+- Sorties : `Media/WowUI/atlas.tga` (1024 × 512, 42 pièces, 3 pixels d'écart aux bords répétés) et 13
+  fichiers répétés (bords du cadre métal et des dialogues, roche 256, table 256, parchemins), TGA 32 bits
+  non compressés, origine en bas à gauche, toiles en puissances de deux (même écriture que
+  `tools/build_media.py`) ; `UI/WowSkin.lua` (GÉNÉRÉ : par pièce, fichier, toile, taille stockée,
+  coordonnées de texture, bouts des trois tranches, axe répété ou étiré, FileDataID ; mesures des filets et
+  logements dans `meta`) ; aperçus `build/media_png/WowUI/*.png` (rendu hors jeu) ; `doc` : la table
+  ci-dessous.
+- Poids : `Media/WowUI` = 3,98 Mo ; l'ancienne peau en a rendu 1,3 Mo (17 textures retirées : hexagones,
+  ardoise et ivoire en neuf tranches, liseré, pilule dorée, pointes de bulle, petit anneau, carré arrondi ;
+  `tools/build_media.py` ne les fabrique plus ; icône de classe ajoutée, 64 Ko). `Media/` = 23,3 Mo avant,
+  26,0 Mo après.
+- Netteté : à l'échelle 115 % d'un écran où une unité vaut un pixel, une pièce reste nette affichée à au
+  plus (pixels stockés ÷ 1,15) unités. Les pièces -2x sont stockées à 0,5 (dialogues), 0,75 (cadres
+  d'unité, barres, cases) ou 1 (cadre de la fenêtre, anneaux) selon leur taille d'affichage ; le harnais
+  (U30) vérifie qu'aucune pièce entière n'est agrandie au-delà. Exceptions voulues : milieux étirés des
+  trois tranches, du rail de curseur, des barres et des parchemins (dégradés sans détail).
+
+| Pièce | FileDataID | Stockée (px) | Usage |
+|---|---|---|---|
+| `arrow_l` | 4567914 | 11×19 | flèche gauche (Minimal_SliderBar_Button_Left) |
+| `arrow_r` | 4567914 | 9×18 | flèche droite (Minimal_SliderBar_Button_Right) |
+| `bar_absorb` | 4642466 | 180×14 | barre d'Absorption (…-Bar-Mana-2x, mesurée à la main) |
+| `bar_enemy` | 4703662 | 127×15 | barre de vie compacte (…-Boss-Small-PortraitOff-Bar-Health-2x) |
+| `bar_hp` | 4642466 | 186×30 | barre de vie (…-Player-PortraitOn-Bar-Health-2x) |
+| `bar_yellow` | 4703662 | 127×11 | barre jaune : incantation, réputation (…-Boss-Small-PortraitOff-Bar-Energy-2x) |
+| `boot` | 1455734 | 72×73 | botte ailée : position (taxi_frame_yellow) |
+| `btn_close` | 4698972 | 34×37 | bouton de fermeture (RedButton-Exit-2x) |
+| `btn_goldred` | 3856481 | 203×64 | bouton rouge et or (128-GoldRedButton-Left + Right) |
+| `btn_red` | 6794983 | 233×62 | bouton rouge (128-RedButton-Up, 9-sliced) |
+| `check_box` | 4614134 | 28×27 | case à cocher (checkbox-minimal) |
+| `check_mark` | 4614134 | 22×19 | coche (checkbox-minimal, coche jaune) |
+| `diamond_bl` | 3056750 | 64×64 | boîte de dialogue (UI-Frame-DiamondMetal-Corner*-2x) |
+| `diamond_bottom` | 3056750 | 64×64 (répétée) | bord bas (_UI-Frame-DiamondMetal-EdgeBottom-2x) |
+| `diamond_br` | 3056750 | 64×64 | boîte de dialogue (UI-Frame-DiamondMetal-Corner*-2x) |
+| `diamond_left` | 3056755 | 64×64 (répétée) | bord gauche (!UI-Frame-DiamondMetal-EdgeLeft-2x) |
+| `diamond_right` | 3056755 | 64×64 (répétée) | bord droit (!UI-Frame-DiamondMetal-EdgeRight-2x) |
+| `diamond_tl` | 3056750 | 64×64 | boîte de dialogue (UI-Frame-DiamondMetal-Corner*-2x) |
+| `diamond_top` | 3056750 | 64×64 (répétée) | bord haut (_UI-Frame-DiamondMetal-EdgeTop-2x) |
+| `diamond_tr` | 3056750 | 64×64 | boîte de dialogue (UI-Frame-DiamondMetal-Corner*-2x) |
+| `elite_dragon` | 1300837 | 80×80 | dragon d'or des élites et boss (nameplates-icon-elite-gold) |
+| `elite_node` | 1121272 | 62×62 | étape d'élite (VignetteKillElite) |
+| `header_l` | 3058483 | 64×78 | en-tête de titre (UI-Frame-DiamondMetal-Header-CornerLeft-2x) |
+| `header_m` | 3058483 | 64×78 (répétée) | en-tête de titre (_UI-Frame-DiamondMetal-Header-Tile-2x) |
+| `header_r` | 3058483 | 64×78 | en-tête de titre (UI-Frame-DiamondMetal-Header-CornerRight-2x) |
+| `metal_bl` | 2406979 | 64×64 | cadre de la fenêtre (UI-Frame-Metal-Corner*-2x) |
+| `metal_bottom` | 2406987 | 32×64 (répétée) | bord bas, filet du plateau (_UI-Frame-Metal-EdgeBottom-2x) |
+| `metal_br` | 2406979 | 64×64 | cadre de la fenêtre (UI-Frame-Metal-Corner*-2x) |
+| `metal_left` | 2406984 | 150×32 (répétée) | bord gauche (!UI-Frame-Metal-EdgeLeft-2x) |
+| `metal_right` | 2406984 | 150×32 (répétée) | bord droit (!UI-Frame-Metal-EdgeRight-2x) |
+| `metal_tl` | 2406979 | 150×150 | cadre de la fenêtre (UI-Frame-Metal-Corner*-2x) |
+| `metal_top` | 2406987 | 64×150 (répétée) | barre de titre (_UI-Frame-Metal-EdgeTop-2x) |
+| `metal_tr` | 2406979 | 150×150 | cadre de la fenêtre (UI-Frame-Metal-Corner*-2x) |
+| `parch_map` | 2142239 | 512×435 | parchemin du parcours (UI-Frame-Neutral-CardParchmentWider) |
+| `parch_text` | 4699152 | 256×218 | parchemin des textes (UI-Frame-DragonFlight-CardParchmentWider) |
+| `pip_gray` | 137032 | 16×16 | pastille de progression (ui-taxi-icon-gray) |
+| `pip_green` | 137033 | 16×16 | pastille de progression (ui-taxi-icon-green) |
+| `pip_red` | 137035 | 16×16 | pastille de progression (ui-taxi-icon-red) |
+| `pip_yellow` | 137037 | 16×16 | pastille de progression (ui-taxi-icon-yellow) |
+| `ribbon` | 2142239 | 281×84 | ruban du nom du boss (UI-Frame-Neutral-Ribbon) |
+| `ring_large` | 2406979 | 126×124 | grand anneau doré : mana, objets ronds, boss (anneau de UI-Frame-PortraitMetal-CornerTopLeft-2x, isolé) |
+| `ring_small` | 4691255 | 59×60 | petit anneau doré : étapes du parcours, Démence (bag-border-2x) |
+| `rock` | 374155 | 256×256 (répétée) | fond des fenêtres (UI-Background-Rock), réduit à 256 |
+| `slider_l` | 4567914 | 11×17 | curseur, bout gauche (Minimal_SliderBar_Left) |
+| `slider_m` | 4567914 | 1×17 | curseur, milieu (_Minimal_SliderBar_Middle) |
+| `slider_r` | 4567914 | 11×17 | curseur, bout droit (Minimal_SliderBar_Right) |
+| `slider_thumb` | 4567914 | 20×19 | poignée (Minimal_SliderBar_Button) |
+| `slot_bg` | 4615764 | 96×93 | fond de case (UI-HUD-ActionBar-IconFrame-Slot-2x) |
+| `slot_frame` | 4615764 | 69×68 | cadre de case (UI-HUD-ActionBar-IconFrame-2x) |
+| `slot_hover` | 4615764 | 68×68 | cadre doré de survol (UI-HUD-ActionBar-IconFrame-Mouseover-2x, mesuré) |
+| `table` | 4699279 | 256×256 (répétée) | table du bas (UI-Frame-DragonFlight-BackgroundTile) |
+| `taxi_line` | 1455735 | 32×32 | trait de trajet, couché (!UI-Taxi-Line) |
+| `unit_boss` | 4703662 | 172×84 | cadre compact d'élite / boss, dragon d'or (…-Boss-Small-PortraitOff-2x) |
+| `unit_enemy` | 4703662 | 135×57 | cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon) |
+| `unit_player` | 4642466 | 297×106 | cadre du héros (UI-HUD-UnitFrame-Player-PortraitOn-2x) |
+
+### Briques (`UI/Widgets.lua`)
+
+- `W.setWow` / `W.wow` / `W.wowSize` (pièce de `UI/WowSkin.lua`), `W.tileTo` (coordonnées répétées, période
+  = pièce × k), `W.fillTile` (matière répétée qui suit la taille de l'hôte), `W.frameSlices` (cadre à pièces
+  séparées : coins de l'atlas, bords répétés, débords réglables, rangée du haut sur un autre porteur),
+  `W.threeSlice` (bouts à l'échelle de la hauteur), `W.nineStretch` (parchemins), `W.hoverLayer` (calque de
+  survol, contrôlé comme un halo par U23). Échelles : `W.K_METAL` = 0,87, `W.K_DIAMOND` = 0,5.
+- `W.dialog(parent, titre)` : boîte DiamondMetal (filet sur le bord du cadre, fond roche, en-tête du titre
+  en or, `SetTitle`) — options, accueil, grille du deck, panneau des cartes, bilan et méta, fin de combat,
+  galerie des modèles. `W.parchment(parent[, "map"])` : parchemin Dragonflight (textes) ou Neutral (parcours).
+- `W.button` : bouton rouge (128-RedButton) ou, style `"gold"`, rouge et or (128-GoldRedButton, action
+  principale) ; libellé doré (NORMAL_FONT_COLOR) ; survol : s'éclaircit, le liseré d'or apparaît en fondu
+  (bouton rouge et or par-dessus) ; `SetSelected` tient le liseré (classe choisie). `W.roundButton("×")` /
+  `W.closeButton` : bouton de fermeture rouge ; autre glyphe : petit bouton rouge (pages de la grille).
+- `W.check` (checkbox-minimal, coche jaune), `W.slider` (Minimal_SliderBar : rail, poignée, flèches = un
+  cran, clic ou glisser sur le rail), `W.slotOn` (case de barre d'action : fond, icône, cadre, cadre doré au
+  survol ; cadre teint à la qualité d'un bibelot), `W.iconButton` (case, ou icône dans le grand anneau),
+  `W.medallion` (grand anneau doré), `W.tokenRow` (auras : icône dans le cadre de case, rouge pour un
+  affaiblissement, nombre en bas à droite), `W.hpBar` (barre du jeu rognée à la fraction, portion perdue
+  claire, « PV / max »), `W.shieldBadge` (Absorption : barre bleue dans le logement bas du cadre d'unité,
+  fraction des PV max, nombre), `W.repBar` (barre jaune assombrie dans un rail).
+- Inchangés : survols (`W.hoverable`, modes de zoom, aucun cadre enfant dessiné dans un visuel — les cadres
+  d'ancrage des boutons de réponse et de leurs cases ne portent aucune région), halos créés d'avance,
+  infobulles (`GameTooltip`, bordure du jeu), `W.fitText` (descend maintenant jusqu'à ce que ça tienne).
+  `W.plaque` ne sert plus qu'aux plaques posées sous une carte (raison d'un refus, prix).
+
+### Écrans
+
+- **Fenêtre** : fond roche ; cadre métal (UI-Frame-Metal) à k = 0,87 : filets gauche, droit et bas sur le
+  bord de la fenêtre, par-dessus tout le contenu ; barre de titre (y 0–34) sous les éléments du bandeau.
+  Le décor commence maintenant à y 34 (`Scene.TOP`, 380 → 390 de haut ; les positions des écrans, en
+  coordonnées absolues, ne bougent pas). Table du bas : pierre Dragonflight répétée, filet du cadre métal
+  en séparation.
+- **Bandeau** (barre de titre) : classe, « HP 52/65 », pièce et or, deck (dos de carte et nombre) ; au
+  centre la zone puis, sur la même ligne, les pastilles de la carte de vol (franchies vertes, en cours
+  jaune, à venir grises, boss rouge) — nom tronqué à la place laissée ; à droite clé (case à l'icône de la
+  clé, « +N »), bibelots et fioles en cases de barre d'action (25), bouton rouge « Menu » (ouvre les
+  options, comme ≡), bouton de fermeture rouge.
+- **Combat** : cadre d'unité du héros en haut à gauche (UI-HUD-UnitFrame-Player : portrait par
+  `SetPortraitTexture(…, "player")`, icône de classe en repli ; nom ; vie ; Absorption dans le logement
+  bas) ; auras dessous ; incantation à droite du cadre (case du sort, nom, barre jaune dans un rail).
+  Ennemis : cadre compact au-dessus de la tête (nom, vie, Absorption dans le logement bas), version d'élite
+  et de boss au dragon d'or, largeur réduite à l'écart entre ennemis, jamais sur le bandeau ; intention
+  dessous (case à l'icône, chiffres en couleur) ; états sous les pieds. Mana (C) : orbe de mana dans le
+  grand anneau doré, « 2/3 », libellé « Mana » ; Démence : petit anneau. Pioche, défausse, consumées :
+  cases (livre, bourse, flamme) avec nombre et libellé doré. Recharges : cases à l'icône grisée et tours.
+  « End Turn » rouge et or ; fin de combat : boîte de dialogue.
+- **Parcours** (C, dans la fenêtre au cadre B) : parchemin Neutral ; étapes en icônes rondes dans le petit
+  anneau doré (élites : vignette d'élite), accessibles en couleur avec une lueur, franchies grisées, hors de
+  portée grisées et estompées ; position : botte ailée au-dessus de l'étape ; boss : portrait dans le grand
+  anneau, dragon d'or, ruban à son nom ; traits de trajet de taxi (parcouru et départs possibles pleins, le
+  reste estompé).
+- **Rencontre** (B) : texte sur parchemin Dragonflight, à l'encre (titre or sombre pour une rencontre rare,
+  violet sombre pour une histoire), sans pointe ; nom du personnage en or ; réponses en gros boutons rouges,
+  icône de l'objet dans une case à gauche du libellé, et **sous le bouton ce que la réponse donne ou coûte**
+  (vert pour un gain « + », rouge pour une perte « - » ou la raison d'un refus, blanc sinon).
+- **Options** : boîte DiamondMetal « Options », bouton de fermeture, cases à cocher et curseurs (échelle,
+  vitesse ; flèches = un cran), boutons rouges.
+- **Autres écrans** (mêmes briques) : récompense (texte après coup sur parchemin, butin en cases, coffre
+  dans le grand anneau), marchand (cases, étiquettes de prix dans un rail sombre, service en bouton rouge à
+  case), feu de camp (couchage et grimoire dans le grand anneau, réponses en boutons), grille du deck,
+  panneau des cartes, accueil (classes en boutons rouges, la choisie au liseré d'or ; clés en cases), bilan
+  et méta (dialogues, barres de réputation). Messages passagers : texte rouge des erreurs du jeu sur un
+  voile sombre léger.
+
+### Écarts aux maquettes (et pourquoi)
+
+- **Bandeau** : la classe et les PV restent dans le bandeau (la maquette B les ôte hors combat : on les
+  perdrait sur le parcours et les rencontres) ; bibelots et fioles dans le bandeau plutôt que sous lui, dans
+  le décor. « Menu » ouvre les options existantes : pas de « Game Menu » (Reprendre, Comment jouer, durée
+  du vol…) ni d'option nouvelle — aucune information ajoutée. Pastilles : celles de la carte de vol (C) au
+  lieu des gemmes d'essence de la maquette B (qui se ressemblaient toutes).
+- **Combat** : pas de barre de mana dans le cadre du héros (le mana est l'anneau C) : son logement porte
+  l'Absorption ; les auras des ennemis restent sous leurs pieds ; libellés « Draw », « Discard »,
+  « Exhaust » sous les cases (comme la maquette ; le tas des consumées n'existe que s'il y en a).
+- **Parcours** : pas de légende « Flight path : … 3 of 9 stops » (information nouvelle) ; traits plus fins
+  que la maquette C (trait de taxi 1x, pas agrandi : netteté) ; lueur dorée sous les étapes accessibles.
+- **Rencontre** : pas de pointe de bulle (B) ; couleur du titre au lieu du liseré pour la rareté.
+- **Infobulles** : celles du jeu (`GameTooltip`), inchangées ; la maquette C (parchemin) n'est pas reprise.
+
+### Non vérifiable hors jeu (à voir)
+
+- Chargement des TGA de `Media/WowUI` (aplat vert = fichier absent ou mal lu) ; nouveau fichier du TOC
+  `UI\WowSkin.lua` : **relancer le client**.
+- Répétition des bords (`SetTexture(…, "REPEAT", "REPEAT")` + coordonnées > 1) sans couture ; neuf tranches
+  du parchemin sans ligne aux limites (le rendu hors jeu en montre, artefact de l'aperçu SVG).
+- Rotation des traits de taxi (`Texture:SetRotation`, quad pivoté autour de son centre).
+- `SetPortraitTexture(texture, "player")` dans le cadre du héros (rond, sans débord de l'anneau).
+- Filtrage de l'atlas (`TRILINEAR`) : aucun liseré d'une pièce voisine aux bords des tranches.
+- Contraste des textes : or sur métal, encre sur parchemin, blanc sur les barres (vie verte, réputation).
+
+## Peau « Mechanized Magic » (cartes)
 
 ### Fabrication des textures (`tools/build_media.py`, hors TOC, rejouable)
 
@@ -27,11 +231,12 @@ build/venv/bin/python tools/build_media.py   # options : --psd, --icons, --font
   gemmes 276 / 274 / 272 / 266, hexagones 232 (rouge et vert ; bleu, acier, violet, vide reteints comme
   dans `gen_combat_pack.py`), dos 222 (cristal 197, sans l'emblème 215).
 - **Dessinées par le script** (même vocabulaire que les planches) : ardoise (intérieur du panneau de
-  texte, aplatie puis rendue raccordable par fondu avec sa copie décalée : pas de symétrie visible) et
-  ivoire (intérieur du corps ivoire), coins de remplissage arrondis (ardoise, ivoire, pilule), liseré
-  d'argent à neuf tranches (filet sombre, argent en dégradé, filet sombre), lueurs (halo de carte =
-  silhouette du corps floutée, halo rond, halo de plaque), pilule dorée du bouton principal (trois
-  tranches), pointes de bulle, masques (disque, carré arrondi).
+  texte, aplatie puis rendue raccordable par fondu avec sa copie décalée : pas de symétrie visible), pilule
+  d'ardoise et son liseré d'argent (plaques posées sous une carte : raison d'un refus, prix), lueurs (halo
+  de carte = silhouette du corps floutée, halo rond, halo de plaque), masque rond. Depuis l'habillage WoW,
+  le script ne fabrique plus les hexagones, l'ivoire, les neuf tranches d'ardoise et leur liseré, la pilule
+  dorée, les pointes de bulle, le petit anneau ni le carré arrondi (il les efface de `Media/` s'il les
+  trouve) ; les pièces des cartes sont identiques au bit près.
 - **Police** : instances statiques de Baloo Chettan 2 (wght 500 / 700 / 800, `fontTools.varLib.instancer`),
   réduites au latin (accents, « ’ », « « » », « … », « × », « − » vérifiés par le script).
 - **Icônes** : seules celles que nomme `UI/Art.lua` (champ `tga = "Nom"`, 81 aujourd'hui), copiées de
@@ -55,10 +260,9 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
 ### Briques (`UI/Widgets.lua`)
 
 - `W.setSkin` / `W.skin` (texture de `Media/`, zone utile), `W.nine` (neuf tranches faites main : neuf
-  textures ancrées, coins de N unités, suivent la taille de l'hôte), `W.plaque` (coins de matière +
-  deux bandes de matière carrelée à l'échelle + reflet + liseré d'argent ; `SetFill`, `SetRim`,
-  `SetGlow`), `W.goldPill`, `W.hex` / `W.setHex`, `W.medallion`, `W.tokenRow` (jetons d'état),
-  `W.cardBack`, `W.panel` (ardoise ou ivoire). Polices : `W.label(parent, "body" | "bold" | "heavy", …)`,
+  textures ancrées, coins de N unités, suivent la taille de l'hôte), `W.plaque` (pilule d'ardoise au
+  liseré d'argent, seulement sous les cartes ; `SetFill`, `SetRim`, `SetGlow`), `W.cardBack`. Les autres
+  briques sont celles de l'habillage WoW (voir plus haut). Polices : `W.label(parent, "body" | "bold" | "heavy", …)`,
   blanc à ombre portée par défaut, repli Friz Quadrata si la police ne se charge pas ; préchargement des
   trois polices au chargement (cadre à l'écran, presque transparent) et `W.refreshFonts` à l'ouverture
   (police et texte reposés partout, voir « Texte des cartes et zoom »).
@@ -78,42 +282,13 @@ sombre au filtrage). **Tailles** : corps de carte 372 × 512 dans 512² (une car
   utile : la largeur, symétrique autour du centre, où la bande couvre toute la hauteur de ce calque
   (0,735 de la largeur du corps).
 
-### Écrans (d'après les planches)
+### Écrans et écarts aux planches (avant l'habillage WoW)
 
-- Fenêtre : ardoise sombre, liseré d'argent par-dessus, **contenu rogné à la fenêtre**
-  (`SetClipsChildren`) : rien ne peut déborder. Bandeau d'ardoise : classe ; PV (hexagone rouge,
-  « /max ») ; or (pièce) ; deck (dos de carte + nombre, clic = panneau du deck) ; zone et points de
-  progression sur un filet (boss = hexagone rouge) ; clé (hexagone violet « +N »), bibelots, fioles
-  (cases d'ardoise), ≡, × (rond rougi). Plateau d'ardoise carrelée sous un filet sombre / argent / sombre.
-- Combat : barre d'incantation (plaque, médaillon du sort, jauge dorée), jauges de vie à hexagone rouge,
-  Absorption en hexagone d'acier, jetons d'état en médaillons, bulles d'intention (pilule au liseré
-  rouge / bleu / violet / vert, pointe), mana en grand hexagone bleu « 2/3 » + un petit hexagone par
-  point, Démence en hexagone violet (cachée à 0), pioche / défausse / consumées en dos de carte (bas à
-  y 595 < 614), recharges en cases d'ardoise (icône grisée, tours), « Fin du tour » doré. La main
-  remonte de 10 (haut des cartes à 418) pour que la plaque du bas reste dans la fenêtre.
-- Récompense : cartes ×1,08 (x 407 / 552 / 697), butin en cases d'ardoise (bourse avec son montant),
-  « Une carte au choix, ou aucune. », « Reprendre la route » doré. Rencontre : bulle ivoire à pointe,
-  plaques de réponse 320 × 118 (gain en vert), survol = liseré doré + halo. Parcours : feuille ivoire,
-  médaillons argentés (halo blanc = accessible, doré = position, rouge = boss), franchies estompées avec
-  un petit hexagone vert, pointillés (parcouru brun doré, départs possibles sombres). Marchand : rangée
-  de cartes ×0,92 à prix en pastille, « Bibelots », « Potions », « Service » (plaque « Retirer une
-  carte » et son prix), or au centre du plateau. Feu de camp : couchage et grimoire en médaillons au sol,
-  leurs plaques « Se reposer / +N PV » et « S'entraîner / Améliore une carte » sur le plateau (la plaque
-  et le médaillon s'allument ensemble). Accueil, bilan, méta, grilles, panneau du deck, options : panneaux
-  d'ardoise, clés en hexagones violets (verrouillées : hexagones vides), boutons d'ardoise, action
-  principale dorée.
-
-### Écarts volontaires aux planches
-
-- Feu de camp : un bouton d'ardoise « Reprendre la route » en plus (repartir sans rien faire reste
-  possible, règle du moteur) ; la planche n'en montre pas.
-- Main : 10 unités plus haut que sur la planche (la plaque du bas sortait de la fenêtre).
-- Grilles et panneau du deck : cartes ×0,75 / ×0,72 et rangées plus espacées (la languette de coût et la
-  plaque du bas débordent du corps).
-- Rencontre : la pointe de la bulle part du bas à droite (vers le personnage) ; sans personnage, pas de
-  pointe. Bulle d'un événement « rare » / « histoire » : liseré doré / violet.
-- Valeurs en évidence par la couleur (blanc, vert à l'amélioration) et non en gras (une chaîne de texte
-  WoW n'a qu'une police).
+La description des écrans en ardoise et hexagones (bandeau d'ardoise, hexagones de PV, de mana, de
+Démence et des clés, bulles ivoire, plaques de réponse d'ardoise, médaillons argentés du parcours) est
+remplacée par « Habillage WoW » ; restent valables : la main remonte de 10 (plaque du bas dans la
+fenêtre), grilles et panneau du deck à ×0,75 / ×0,72 aux rangées espacées, couleur (et non gras) des
+valeurs, bouton « Back on the road » du feu de camp.
 
 ## Texte des cartes et zoom (retours du deuxième essai)
 
@@ -507,10 +682,11 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | Fichier | Rôle | API WoW |
 | --- | --- | --- |
 | `UI/SkinData.lua` | GÉNÉRÉ par `tools/build_media.py` : textures de `Media/` (fichier, toile, zone utile, coordonnées), géométrie de la carte, icônes copiées, polices | non |
+| `UI/WowSkin.lua` | GÉNÉRÉ par `tools/build_wowui.py` : pièces de l'interface du jeu embarquées dans `Media/WowUI` (fichier, toile, taille, coordonnées, bouts, axe répété, FileDataID), mesures des filets et logements | non |
 | `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours ; champ `tga` = icône améliorée), couleur du corps des cartes, gemmes, teintes des liserés, mots-clés, animations | non |
 | `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor` et `artChecks`) | non |
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
-| `UI/Widgets.lua` | Peau (textures de `Media/`, neuf tranches, plaques, hexagones, médaillons, pilule dorée), polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes (améliorées d'abord), carte unique composée, jauges de vie, hexagone d'Absorption, jetons d'état, boutons, infobulles, textes flottants, modèles | oui |
+| `UI/Widgets.lua` | Habillage WoW (pièces de `Media/WowUI` : cadres à pièces, trois et neuf tranches, dialogues, parchemins, boutons rouges, cases, curseurs, barres d'unité), peau des cartes (textures de `Media/`), polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes (améliorées d'abord), carte unique composée, jauges de vie, hexagone d'Absorption, jetons d'état, boutons, infobulles, textes flottants, modèles | oui |
 | `UI/Scene.lua` | Décor (fond embarqué cadré et teinté, voile du bas, décor peint dessous ; repli : candidat du client validé par l'essai manuel ; rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
 | `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
@@ -518,11 +694,13 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | `UI/Flight.lua` | Événements : chargement, vol en taxi, combat réel, déconnexion | oui |
 | `Sim/ui_harness.lua` | Harnais hors jeu (faux client WoW) | — |
 | `Sim/ui_render.lua` | Rendu SVG des cadres du faux client (instantanés d'écrans, textures de `Media/` comprises) | — |
-| `tools/build_media.py` | Fabrication de `Media/` et de `UI/SkinData.lua` (hors TOC, non déployé) | — |
+| `tools/build_media.py` | Fabrication des pièces des cartes, de la police, des icônes (`Media/`) et de `UI/SkinData.lua` (hors TOC, non déployé) | — |
+| `tools/build_wowui.py` | Fabrication de l'habillage WoW : `Media/WowUI` et `UI/WowSkin.lua` (sources par FileDataID, planches de contrôle ; hors TOC, non déployé) | — |
 | `tools/build_glyphs.py` | Icônes en ligne du texte des cartes : `Media/hourglass.tga` (sablier, Pillow ; hors TOC, non déployé) | — |
 
 `UI\Scene.lua` a été ajouté au TOC par la piste E (client relancé depuis) ; la peau ajoute
-**`UI\SkinData.lua`** (avant `UI\Art.lua`) et le dossier `Media/` : **relancer le client** au prochain essai.
+**`UI\SkinData.lua`** (avant `UI\Art.lua`) et le dossier `Media/` ; l'habillage WoW ajoute
+**`UI\WowSkin.lua`** (après `UI\SkinData.lua`) et `Media/WowUI` : **relancer le client** au prochain essai.
 Les fichiers qui touchent l'API WoW commencent par `if not CreateFrame then return end` ; `Sim/load.lua`
 saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`**.
 
@@ -530,13 +708,12 @@ saute de toute façon les lignes `UI\` du TOC. **Aucune règle de jeu dans `UI/`
 
 Coordonnées : celles des maquettes, depuis le coin haut gauche de la zone intérieure (1034 × 614).
 
-**Bandeau** (y 0–44, sur tous les écrans ; on le saisit pour déplacer la fenêtre) : à gauche la classe,
-les PV (hexagone rouge, « /max »), l'or (pièce), le deck (dos de carte et nombre ; partout, combat
-compris ; infobulle = contenu du deck ; clic = panneau du deck) ; au centre la zone (« Acte 1 · Marche de
-l'Ouest » sur la carte), sur la ligne du haut, et ailleurs la progression de l'acte sur la ligne du bas
-(points dorés franchis, point clair = étape en cours, hexagone rouge = boss) ; à droite la clé mythique
-(hexagone violet « +N », infobulle = affixes), les bibelots (cases liserées à la rareté), séparateur,
-3 fioles (potions), ≡ (options), × (fermer).
+**Bandeau** (y 0–31, sur la barre de titre du cadre métal, sur tous les écrans ; on le saisit pour déplacer
+la fenêtre) : à gauche la classe, « HP 52/65 », l'or (pièce), le deck (dos de carte et nombre ; partout,
+combat compris ; infobulle = contenu du deck ; clic = panneau du deck) ; au centre la zone (« Act 1 ·
+Westfall » sur la carte) puis, ailleurs, les pastilles de progression de la carte de vol sur la même ligne ;
+à droite la clé mythique (case à l'icône de la clé, « +N », infobulle = affixes), les bibelots (cases au
+cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture. Détail : « Habillage WoW ».
 
 | Phase / vue | Écran | Contenu |
 | --- | --- | --- |
@@ -806,7 +983,7 @@ frame (seules des textures pivotent), aucun `loadstring`.
 ## Harnais hors jeu
 
 ```
-lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (482 vérifications, graine 1)
+lua5.1 Sim/ui_harness.lua [graine] [dossier]   # ou luajit ; doit finir par ALL PASS (504 vérifications, graine 1)
 lua5.1 Sim/ui_harness.lua 1 build/snap         # + instantanés SVG des écrans dans build/snap
                                                #   (aperçus de Media copiés dans build/snap/media)
 for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
@@ -849,14 +1026,26 @@ dans l'ordre, sablier posé en séquence |T autant de fois que dans la source et
 séquence à 14 champs entiers, `Media/hourglass.tga` 32 × 32 blanc ; couleurs : or pour les seuls noms
 d'états et conditions, blanc / vert pour les chiffres ; infobulle de chaque carte : une explication par
 mot-clé, état, condition et sablier employés, 60 caractères au plus ; jeton et infobulle des Pouvoirs
-joués). Le faux client mesure les textes avec les
+joués) ; **habillage WoW** (U30 : chaque pièce de `UI/WowSkin.lua` en TGA 32 bits non compressé à origine
+en bas, puissances de deux, coordonnées = pièce / toile, pièce répétée qui remplit sa toile, aucun fichier
+orphelin dans `Media/WowUI` ; pièces nommées dans `UI/` connues, aucune référence ni fichier des textures
+retirées, aucun `SetAtlas`, chemins `Interface\` du client seulement dans la liste permise ; à l'exécution,
+textures de la fenêtre = fichiers de l'addon présents sur disque, icônes ou texture blanche ; pièces entières
+jamais agrandies au-delà de leurs pixels à l'échelle 115 % (combat, options, marchand, parcours, rencontre,
+feu de camp) ; libellés des boutons entre leurs bouts, nom et PV du héros dans leurs logements, PV des
+ennemis dans leur barre ; aucun cadre enfant dessiné sous un visuel survolable). U21 contrôle les cadres
+compacts des ennemis (nom dans son logement, barre dans le cadre, jamais sur le bandeau ni sous le modèle,
+sans chevauchement, 1 à 6 ennemis × 3 échelles), U24 les réponses (libellé d'une ligne dans le bouton, texte
+dessous dans la place restante). Le faux client mesure les textes avec les
 avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne de 1,47 cadratin (hhea),
 retours explicites puis par mots, icônes |T comptées à leur largeur, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
-faux client et écrit un SVG par écran (accueil, parcours, combat, combat-survol, récompense, marchand, feu
-de camp, amélioration, rencontre, bibelot de classe, bilan, méta, panneau du deck, pioche en combat). Les
+faux client et écrit un SVG par écran (accueil, parcours, parcours en route, combat, combat-survol, combat
+avec élite et boss, options, récompense, marchand, feu de camp, amélioration, rencontre, bibelot de classe,
+bilan, méta, panneau du deck, pioche en combat). Une pièce d'atlas (coordonnées dans l'image) est dessinée
+par une vue recadrée de l'image, une matière répétée par un motif. Les
 textures de `Media/` y sont dessinées (aperçus PNG : coordonnées de texture, couleur de sommet,
 désaturation, masques approchés, rotation), les textes en Baloo Chettan 2 avec ombre et couleurs ; icônes
 du jeu = carrés bleus, modèles = silhouettes en pointillés, illustrations = aplats ; textes mesurés comme
@@ -871,7 +1060,23 @@ Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/In
 `Media/` : relancer le client** (`/reload` ne suffit pas). Activer les erreurs Lua
 (`/console scriptErrors 1`) ou BugSack.
 
-En tout premier (peau « Mechanized Magic ») :
+En tout premier (habillage WoW, 11/11/2026 ; nouveau fichier `UI\WowSkin.lua` : relancer le client) :
+1. **Chargement** : aucun aplat vert ni carré noir sur le cadre de la fenêtre (filets, barre de titre), le
+   bandeau (cases, bouton Menu, fermeture), les boutons rouges, les cadres d'unité, les cases, le parchemin
+   et les étapes du parcours, les dialogues (options, accueil, grille, panneau des cartes, bilan).
+2. **Cadre** : barre de titre continue derrière le bandeau, filets gauche, droit et bas sur le bord de la
+   fenêtre, sans couture entre coins et bords répétés ; table du bas sans couture.
+3. **Combat** : portrait du personnage dans l'anneau du cadre du héros (sinon icône de classe) ; barres de
+   vie vertes qui se vident, Absorption bleue dans le logement bas ; cadres des ennemis au-dessus des
+   têtes, dragon d'or des élites et du boss ; anneau de mana ; cases de pioche et défausse ; « End Turn ».
+4. **Parcours** : traits de taxi bien orientés d'une étape à l'autre (rotation), botte ailée sur la
+   position, ruban du boss lisible.
+5. **Lisibilité** : or sur métal, encre sur parchemin, PV blancs sur les barres, chiffres des intentions ;
+   rien de flou (sinon dire quelle pièce).
+6. **Survols** : liseré d'or des boutons rouges et des réponses, cadre doré des cases ; options : cases à
+   cocher, curseurs (glisser la poignée, cliquer sur le rail, flèches).
+
+Ensuite (peau « Mechanized Magic », cartes) :
 1. **Chargement des textures** : aucun aplat vert ni carré noir sur les cartes, le bandeau, le plateau, les
    boutons, les hexagones (PV, Absorption, mana, Démence, clé), les médaillons et le parcours. Sinon dire
    lesquels (une capture suffit).
