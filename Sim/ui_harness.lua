@@ -374,12 +374,33 @@ end
 -- Taille de police rendue (unités du texte) : sans SetSmoothScaling(true), le client arrondit la
 -- hauteur de police effective au pixel entier (ici : taille × échelle effective arrondie), ce qui
 -- change largeurs et coupures quand l'échelle réelle change ; avec, elle est proportionnelle.
+-- Client défavorable (H.strictText, U33 ; reproduit le « Gain 4 Absorb.... » vu en jeu sur une carte
+-- survolée, fenêtre à 115 %) : la police est rendue à la hauteur arrondie au pixel SUPÉRIEUR à l'échelle
+-- effective, SetSmoothScaling ou non (glyphes, interligne et largeurs un peu plus grands que mesurés) ;
+-- la hauteur automatique d'un texte de plusieurs lignes (aucune hauteur posée) est calculée, elle, à la
+-- hauteur arrondie au pixel le plus PROCHE : quand les deux diffèrent, les lignes qui n'y tiennent plus
+-- disparaissent et la dernière visible finit par « … » (IsTruncated). La première ligne reste toujours.
+H.strictText = false
+local function effScale(self)
+  local e = self:GetEffectiveScale()
+  return (e and e > 0) and e or 1
+end
 function H.renderSize(self)
   local size = rawget(self, "_fontSize") or 12
+  if H.strictText then
+    local e = effScale(self)
+    return math.max(1, math.ceil(size * e - 1e-9)) / e
+  end
   local c = rawget(self, "_calls").SetSmoothScaling
   if c and c[1] == true then return size end
   local e = self:GetEffectiveScale()
   if e <= 0 then return size end
+  return math.max(1, math.floor(size * e + 0.5)) / e
+end
+-- Taille avec laquelle le client défavorable calcule une hauteur automatique (pixel le plus proche).
+function H.layoutSize(self)
+  local size = rawget(self, "_fontSize") or 12
+  local e = effScale(self)
   return math.max(1, math.floor(size * e + 0.5)) / e
 end
 -- Lignes affichées : { largeurs }, tronqué ?
@@ -414,7 +435,15 @@ local function wrapLines(self)
     end
   end
   local h = rawget(self, "_h") or 0
-  if h > 0 and #out * size * METRICS.lineHeight > h + 0.01 then trunc = true end
+  local lineH = size * METRICS.lineHeight
+  if H.strictText and h <= 0 and #out > 1 then h = #out * H.layoutSize(self) * METRICS.lineHeight end
+  if h > 0 and #out * lineH > h + 0.01 then
+    trunc = true
+    if H.strictText then
+      -- lignes qui ne tiennent pas : retirées (la première reste)
+      for i = #out, math.max(1, math.floor(h / lineH + 1e-6)) + 1, -1 do out[i] = nil end
+    end
+  end
   return out, trunc
 end
 H.wrapLines = wrapLines
@@ -4788,6 +4817,204 @@ do
   Frame.GetLeft, Frame.GetCenter = oldLeft, oldCenter
   UIParent._w, UIParent._h = uiW, uiH
   H.mouseDown.LeftButton = false
+end
+
+print("U33 textes jamais tronqués ni recoupés par le client : cartes au repos et survolées, réponses, boutons (client défavorable)")
+do
+  -- Retour en jeu : « PW: Radiance » survolée en main (fenêtre à 115 %, zoom net) affichait
+  -- « Gain 4 Absorb.... » sur une ligne au lieu de ses deux lignes. Le client défavorable
+  -- (H.strictText) arrondit la police rendue au pixel supérieur et la hauteur automatique au plus proche.
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W = ns.Widgets
+  local frame = UI().frame
+  local scale0 = frame._scale
+  local mode0 = W.zoomMode()
+  H.strictText = true
+  W.clearTextCache()
+  local function nLines(t)
+    local n = 0
+    for _ in ((t or "") .. "\n"):gmatch("(.-)\n") do n = n + 1 end
+    return n
+  end
+  -- texte posé (lignes choisies par la mise en page) : ni tronqué, ni recoupé
+  local function textBad(fs)
+    if not fs or not fs._shown or (fs._text or "") == "" then return nil end
+    local want = nLines(fs._text)
+    if fs:IsTruncated() then return "tronqué (" .. fs:GetNumLines() .. "/" .. want .. " lignes)" end
+    if fs:GetNumLines() ~= want then return "recoupé (" .. fs:GetNumLines() .. "/" .. want .. " lignes)" end
+    return nil
+  end
+  local function cardBad(c, label, out)
+    local list = { { "nom", c.name }, { "coût", c.cost }, { "texte", c.body }, { "plaque", c.plateText } }
+    if c.reasonPlate and c.reasonPlate._shown then list[#list + 1] = { "raison", c.reasonPlate.text } end
+    for _, it in ipairs(list) do
+      local why = textBad(it[2])
+      if why then
+        out[#out + 1] = ("%s : %s « %s » %s"):format(label, it[1],
+          tostring(it[2]._text):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", "⌛"):gsub("\n", " / "), why)
+      end
+    end
+  end
+  local ids = {}
+  for id in pairs(ns.Cards) do ids[#ids + 1] = id end
+  table.sort(ids)
+  local SCALES = { 1, 1.15, 1.5, 0.6 }
+  -- (1) toutes les cartes, base et améliorées, jouables et injouables : échelle de la fenêtre, échelle
+  -- réelle du visuel à la pose (1 : modes net et lisse ; échelle de survol : mode fluide), puis affichée
+  -- au repos et survolée ; écrans : main (survol 1,16), récompense (1,08 × 1,17), grille (0,75 × 1,2),
+  -- marchand (0,92 × 1,12)
+  local holder = CreateFrame("Frame", nil, UI().content)
+  local card = W.card(holder)
+  local SCREENS = { { "main", 1, 1.16 }, { "récompense", 1.08, 1.17 }, { "grille", 0.75, 1.2 }, { "marchand", 0.92, 1.12 } }
+  local VARS = { { "", { playable = true } }, { " (injouable)", { playable = false, reason = "Not enough mana." } } }
+  local bad, cases = {}, 0
+  for _, ws in ipairs(SCALES) do
+    frame:SetScale(ws)
+    for _, sc in ipairs(SCREENS) do
+      holder:SetScale(sc[2])
+      local hs = sc[3]
+      for _, id in ipairs(ids) do
+        for _, up in ipairs({ false, true }) do
+          for _, var in ipairs(VARS) do
+            for _, at in ipairs({ 1, hs }) do
+              card.face:SetScale(at)
+              card:SetCard(id, up, var[2])
+              for _, view in ipairs({ 1, hs }) do
+                card.face:SetScale(view)
+                cases = cases + 1
+                cardBad(card, ("%s%s%s, fenêtre %.2f, %s, pose ×%.2f, vue ×%.2f"):format(id, up and "+" or "", var[1],
+                  ws, sc[1], at, view), bad)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  holder:SetScale(1)
+  card:Hide()
+  local function head(t, n)
+    local out = {}
+    for i = 1, math.min(#t, n) do out[i] = t[i] end
+    if #t > n then out[#out + 1] = ("… (%d en tout)"):format(#t) end
+    return table.concat(out, "\n        ")
+  end
+  check(("%d cartes × base/améliorée × jouable/injouable × fenêtre 1 / 1,15 / 1,5 / 0,6 × 4 écrans, au repos et survolées (%d cas) : aucun texte tronqué ni recoupé")
+    :format(#ids, cases), #bad == 0, head(bad, 12))
+  -- (2) la carte de la capture, en main, par le vrai survol, dans les trois modes de zoom
+  local v = V()
+  local hc = v.cards[1]
+  local bad2 = {}
+  for _, mode in ipairs(W.ZOOM_MODES) do
+    W.setZoomMode(mode)
+    for _, ws in ipairs(SCALES) do
+      frame:SetScale(ws)
+      for _, up in ipairs({ false, true }) do
+        hc:SetCard("radiance", up, { playable = true })
+        hc:Show()
+        W.animSet(hc, "hover", 1)
+        cardBad(hc, ("%s, fenêtre %.2f, survolée ×%.3f"):format(mode, ws, hc.face._scale * H.visualScale(hc.face)), bad2)
+        W.animSet(hc, "hover", 0)
+        cardBad(hc, ("%s, fenêtre %.2f, au repos ×%.3f"):format(mode, ws, hc.face._scale * H.visualScale(hc.face)), bad2)
+      end
+    end
+  end
+  check("« PW: Radiance » en main, survolée et au repos, zoom net / fluide / lisse, fenêtre 0,6 à 1,5 : deux lignes entières",
+    #bad2 == 0, head(bad2, 8))
+  -- garde-fou en jeu : un texte que le client tronque malgré tout fait descendre la carte d'un palier
+  if not W.checkCardTexts then
+    check("garde-fou : texte tronqué après la pose ou le zoom -> un palier plus bas (W.checkCardTexts)", false, "absent")
+  else
+    local c = W.card(holder)
+    c:SetCard("radiance", false, { playable = true })
+    local s0 = c.bodyFit.size
+    local orig = c.body.IsTruncated
+    c.body.IsTruncated = function() return true end
+    W.checkCardTexts(c)
+    c.body.IsTruncated = orig
+    local log = W.truncatedLog()
+    check("garde-fou : texte tronqué après la pose ou le zoom -> un palier plus bas, relevé pour /slay text",
+      c.bodyFit.size < s0 and #log > 0 and log[#log]:find("PW: Radiance", 1, true) ~= nil,
+      tostring(c.bodyFit.size) .. " / " .. tostring(log[#log]))
+    local chat = rawget(_G.DEFAULT_CHAT_FRAME, "_lines")
+    local n0 = #chat
+    H.slash("text")
+    local said = {}
+    for i = n0 + 1, #chat do said[#said + 1] = chat[i] end
+    local joined = table.concat(said, "\n")
+    check("/slay text : textes tronqués listés", joined:find("PW: Radiance", 1, true) ~= nil, joined)
+    c:Hide()
+  end
+  -- (3) réponses des rencontres (libellé dans le bouton, texte dessous) et feu de camp
+  freshRun(SEED + 4, "event")
+  frame = UI().frame
+  local s = UI().current
+  local b = s.buttons[1]
+  local bad3, cases3 = {}, 0
+  local evIds = {}
+  for id in pairs(ns.Events) do evIds[#evIds + 1] = id end
+  table.sort(evIds)
+  local function tryOpt(label, o, w, h)
+    for _, ws in ipairs(SCALES) do
+      frame:SetScale(ws)
+      b.face:SetScale(1)
+      b:SetOption(o, w, h)
+      for _, view in ipairs({ 1, 1.04 }) do
+        b.face:SetScale(view)
+        cases3 = cases3 + 1
+        for _, it in ipairs({ { "libellé", b.label }, { "texte", b.sub } }) do
+          local why = textBad(it[2])
+          if why then bad3[#bad3 + 1] = ("%s, fenêtre %.2f, ×%.2f : %s « %s » %s"):format(label, ws, view, it[1],
+            tostring(it[2]._text):gsub("\n", " / "), why) end
+        end
+      end
+    end
+  end
+  for _, id in ipairs(evIds) do
+    local ev = ns.Events[id]
+    local n = math.min(#ev.choices, #s.buttons)
+    local span = n <= 2 and 668 or (n == 3 and 900 or 980)
+    local gap = n <= 2 and 28 or 22
+    local w = (span - (n - 1) * gap) / math.max(n, 1)
+    local h = n >= 4 and 112 or 118
+    for i = 1, n do
+      local ch = ev.choices[i]
+      tryOpt(id .. "/" .. i, { id = "x", label = ch.label, text = ch.hidden and "?" or (ch.outcome or ch.text or "") }, w, h)
+    end
+  end
+  tryOpt("feu : se reposer", { id = "rest", label = "Rest", text = "+21 HP" }, 240, 104)
+  tryOpt("bandits", { id = "x", label = "Charge the bandits", text = "Fight: usual reward + 20g" }, 285.3, 118)
+  check(("%d rencontres, réponses aux fenêtres 1 / 1,15 / 1,5 / 0,6, au repos et survolées (%d cas) : libellé et texte entiers")
+    :format(#evIds, cases3), #bad3 == 0, head(bad3, 12))
+  -- (4) libellés des boutons et autres textes des visuels survolables créés jusqu'ici (une ligne, largeur
+  -- libre) : entiers à toute échelle de fenêtre, au repos et survolés
+  local bad4, n4 = {}, 0
+  for _, o in ipairs(H.objects) do
+    local face = rawget(o, "_parent")
+    local owner = face and rawget(face, "_parent")
+    if rawget(o, "_kind") == "FontString" and owner and rawget(owner, "face") == face and rawget(owner, "_hoverable")
+      and (rawget(o, "_text") or "") ~= "" then
+      n4 = n4 + 1
+      for _, ws in ipairs(SCALES) do
+        frame:SetScale(ws)
+        local s0 = face._scale
+        for _, view in ipairs({ 1, owner.hoverScale or 1.06 }) do
+          face._scale = view
+          local why = textBad(o)
+          if why then bad4[#bad4 + 1] = ("« %s », fenêtre %.2f, ×%.2f : %s"):format(tostring(o._text):gsub("\n", " / "), ws, view, why) end
+        end
+        face._scale = s0
+      end
+    end
+  end
+  check(("%d textes des visuels survolables (boutons, plaques, jetons…) : entiers aux fenêtres 1 / 1,15 / 1,5 / 0,6, au repos et survolés")
+    :format(n4), n4 > 20 and #bad4 == 0, head(bad4, 12))
+  H.strictText = false
+  W.clearTextCache()
+  W.setZoomMode(mode0)
+  frame:SetScale(scale0)
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -2232,6 +2232,29 @@ W.NAME_SIZES = { 11, 10, 9, 8, 7 }
 W.NAME_UNDER = { 6.5, 6 }
 W.NAME_MARGIN = 4
 
+-- Boîte d'un texte dont la mise en page a choisi les lignes (retours explicites) : largeur ET hauteur
+-- posées, bien plus grandes que le texte (W.TEXT_ROOM, plus W.TEXT_PAD unités), lignes illimitées
+-- (SetMaxLines(0)). Retour en jeu (fenêtre à 115 %, zoom net, carte survolée en main) : « PW: Radiance »
+-- affichait « Gain 4 Absorb.... » sur une ligne au lieu de deux. Le texte avait une hauteur AUTOMATIQUE
+-- (aucune hauteur posée) : à l'échelle survolée, la hauteur que le client lui donnait ne suffisait plus
+-- pour deux lignes, il a gardé la première et l'a finie par « … » (arrondi de la police à l'échelle
+-- effective, voir docs/interface.md). Avec une boîte posée et large, le client n'a jamais à recouper ni
+-- à tronquer, à aucune échelle (fenêtre 0,6 à 1,5, survol, zoom net, fluide ou lisse), même si sa police
+-- rendue est un peu plus grande que mesurée. Le texte reste centré dans la boîte (ancrage par le centre et
+-- JustifyV "MIDDLE", ou par le haut et JustifyV "TOP"). n : nombre de lignes ; w : plus grande largeur
+-- permise d'une ligne ; lh : hauteur d'une ligne (sinon GetLineHeight).
+-- W.TEXT_SAFE : marge du choix des paliers (une ligne mesurée doit tenir dans sa zone multipliée par
+-- W.TEXT_SAFE : la mesure est faite à l'échelle de UIParent, l'affichage à une autre).
+W.TEXT_SAFE = 1.02
+W.TEXT_ROOM = 1.3
+W.TEXT_PAD = 8
+function W.looseBox(fs, n, w, lh)
+  lh = lh or (fs.GetLineHeight and fs:GetLineHeight()) or (fs._size or 12) * 1.5
+  if fs.SetMaxLines then fs:SetMaxLines(0) end
+  fs:SetWidth(w * W.TEXT_ROOM + W.TEXT_PAD)
+  fs:SetHeight(max(1, n) * lh * W.TEXT_ROOM + W.TEXT_PAD)
+end
+
 -- Demi-largeur utile de la zone à la hauteur y (fraction de la largeur du corps).
 function W.cardTextHalf(y)
   return min(TZ.half, TZ.bevHalf - (y - TZ.bevY) * TZ.bevSlope)
@@ -2380,7 +2403,8 @@ local function layoutBody(paras, size, top, bottom)
     if not v then
       v = 0
       for k = i + 1, j do if brk[k] then v = math.huge end end
-      if v == 0 then v = widthOf(m, (table.concat(words, " ", i, j):gsub(NBSP, " "))) end
+      -- marge W.TEXT_SAFE : la ligne doit tenir avec quelques pour cent de reste
+      if v == 0 then v = widthOf(m, (table.concat(words, " ", i, j):gsub(NBSP, " "))) * W.TEXT_SAFE end
       memo[key] = v
     end
     return v
@@ -2428,8 +2452,8 @@ local layoutCache = {}
 function W.clearTextCache() layoutCache = {} end
 
 -- Pose le texte de la carte : premier palier où il tient, mise en page figée (lignes séparées par
--- des retours explicites, largeur du texte un peu plus grande que la plus longue ligne possible :
--- le client ne recoupe jamais autrement, ni à une autre échelle, ni pendant un zoom), puis
+-- des retours explicites dans une boîte posée, large et haute, W.looseBox : le client ne recoupe ni ne
+-- tronque jamais, ni à une autre échelle, ni pendant un zoom), puis
 -- vérification par le client (GetNumLines, IsTruncated, GetStringHeight). bottom : bas de la zone
 -- (unités), relevé si une plaque mord sur le panneau.
 -- Essais dans l'ordre : une clause par ligne aux paliers >= W.CLAUSE_MIN (du plus grand au plus
@@ -2464,12 +2488,13 @@ local function fitBody(card, text, bottom)
   local top = TZ.top * CW
   fs:ClearAllPoints()
   fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
-  fs:SetWidth(2 * TZ.half * CW + 8)
+  -- cap : palier interdit et au-dessus (garde-fou W.checkCardTexts : le client a tronqué ce texte)
+  local cap = card.textCap and card.textCap.body
   local fit, fontErr
   for _, t in ipairs(W.cardTries(text)) do
     local s = t.size
     local key = floor(bottom * 10 + 0.5) .. "|" .. t.key
-    local lay = layoutCache[key]
+    local lay = (not cap or s < cap) and layoutCache[key]
     local err, lh
     if lay == nil then
       lay, err = layoutBody(t.paras, s, top, bottom)
@@ -2481,6 +2506,8 @@ local function fitBody(card, text, bottom)
     if lay then
       local lines = lay.lines
       W.setSize(fs, s)
+      -- boîte posée, large et haute (W.looseBox) : le client ne recoupe ni ne tronque jamais ces lignes
+      W.looseBox(fs, #lines, 2 * TZ.half * CW, lay.lh)
       fs:SetText(table.concat(lines, "\n"))
       -- centre du bloc : centre de la zone, ou plus haut si le bloc a été remonté
       fs:ClearAllPoints()
@@ -2499,6 +2526,7 @@ local function fitBody(card, text, bottom)
     local s = W.BODY_SIZES[#W.BODY_SIZES]
     W.setSize(fs, s)
     fs:SetWidth(2 * TZ.half * CW)
+    fs:SetHeight(0) -- hauteur libre : le texte déborde (signalé) plutôt que d'être tronqué
     fs:SetText((W.inlineIcons(text, s):gsub(NBSP, " ")))
     fit = { size = s, under = true, ok = false, font = fontErr }
   end
@@ -2507,19 +2535,25 @@ local function fitBody(card, text, bottom)
 end
 
 -- Nom sur le ruban : premier palier où il tient sur une ligne dans la bande (marges comprises).
-local function fitName(fs, text)
+-- Boîte posée et large (W.looseBox) ; marge W.TEXT_SAFE ; cap : palier interdit et au-dessus (garde-fou).
+local function fitName(fs, text, cap)
   local w = SC.name.len * W.CARD_W - 2 * W.NAME_MARGIN
   local sizes = {}
   for _, s in ipairs(W.NAME_SIZES) do sizes[#sizes + 1] = s end
   for _, s in ipairs(W.NAME_UNDER) do sizes[#sizes + 1] = s end
   fs:SetText(text)
   for idx, s in ipairs(sizes) do
-    W.setSize(fs, s)
-    local sw = (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
-    if sw > 0 and sw <= w and not (fs.IsTruncated and fs:IsTruncated()) then
-      return { size = s, under = idx > #W.NAME_SIZES, ok = true }
+    if not cap or s < cap then
+      W.setSize(fs, s)
+      W.looseBox(fs, 1, SC.name.len * W.CARD_W)
+      local sw = (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
+      if sw > 0 and sw * W.TEXT_SAFE <= w and not (fs.IsTruncated and fs:IsTruncated()) then
+        return { size = s, under = idx > #W.NAME_SIZES, ok = true }
+      end
     end
   end
+  W.setSize(fs, sizes[#sizes])
+  W.looseBox(fs, 1, SC.name.len * W.CARD_W)
   return { size = sizes[#sizes], under = true, ok = false }
 end
 
@@ -2616,12 +2650,12 @@ local function fitPlate(b, pills)
   local text = table.concat(pills, " · ")
   local fit
   for _, s in ipairs(W.PLATE_SIZES) do
-    local sw = width(text, s)
+    local sw = width(text, s) * W.TEXT_SAFE
     if sw > 0 and sw <= baseText then fit = { size = s, w = base, text = text } break end
   end
   if not fit then
     local s = W.PLATE_SIZES[#W.PLATE_SIZES]
-    local sw = width(text, s)
+    local sw = width(text, s) * W.TEXT_SAFE
     if sw + extra <= maxW then fit = { size = s, w = max(base, sw + extra), text = text, wide = true } end
   end
   if not fit then
@@ -2632,7 +2666,7 @@ local function fitPlate(b, pills)
     end
     for _, t in ipairs({ text, table.concat(short, " · ") }) do
       for _, s in ipairs(W.PLATE_UNDER) do
-        local sw = width(t, s)
+        local sw = width(t, s) * W.TEXT_SAFE
         if sw + extra <= maxW then
           fit = { size = s, w = max(base, sw + extra), text = t, wide = true, under = true, short = t ~= text }
           break
@@ -2653,7 +2687,7 @@ local function fitPlate(b, pills)
     repeat
       keep[#keep] = nil
       t = table.concat(keep, " · ") .. (#keep > 0 and " …" or "…")
-    until #keep == 0 or width(t, s) + extra <= maxW
+    until #keep == 0 or width(t, s) * W.TEXT_SAFE + extra <= maxW
     fit = { size = s, w = maxW, text = t, wide = true, under = true, short = true, cut = true }
   end
   b.plate:Layout(b.bg, fit.w)
@@ -2662,7 +2696,7 @@ local function fitPlate(b, pills)
   fs:SetText(fit.text)
   fs:ClearAllPoints()
   fs:SetPoint("CENTER", b.bg, "TOPLEFT", box.cx, -box.cy)
-  fs:SetWidth(box.textW + 1)
+  W.looseBox(fs, 1, box.textW) -- boîte posée et large : jamais tronqué par le client
   if fit.ok == nil then fit.ok = not (fs.IsTruncated and fs:IsTruncated()) end
   b.plateFit = fit
   return fit
@@ -2741,11 +2775,11 @@ local function fitReason(p, text)
   end
   local w, t, size, lines = baseW, text, nil, 1
   for _, s in ipairs(W.REASON_SIZES) do
-    if width(text, s) <= baseW - 2 * REASON_PAD then size = s break end
+    if width(text, s) * W.TEXT_SAFE <= baseW - 2 * REASON_PAD then size = s break end
   end
   if not size then
     size = W.REASON_SIZES[#W.REASON_SIZES]
-    local sw = width(text, size)
+    local sw = width(text, size) * W.TEXT_SAFE
     if sw + 2 * REASON_PAD <= CW then
       w = sw + 2 * REASON_PAD
     else
@@ -2755,7 +2789,7 @@ local function fitReason(p, text)
       for k = 1, #words - 1 do
         local a = table.concat(words, " ", 1, k)
         local b = table.concat(words, " ", k + 1)
-        local m = max(width(a, size), width(b, size))
+        local m = max(width(a, size), width(b, size)) * W.TEXT_SAFE
         if not bestW or m < bestW then best, bestW = { a, b }, m end
       end
       if best then
@@ -2768,7 +2802,7 @@ local function fitReason(p, text)
   end
   W.setSize(fs, size)
   fs:SetWordWrap(lines > 1)
-  fs:SetWidth(w - 2 * REASON_PAD + 1)
+  W.looseBox(fs, lines, w - 2 * REASON_PAD) -- boîte posée et large : jamais tronqué par le client
   fs:SetText(t)
   local h = REASON_H
   if lines > 1 then h = max(REASON_H, (fs:GetStringHeight() or 2 * size * 1.5) + 6) end
@@ -2776,6 +2810,73 @@ local function fitReason(p, text)
   p.fit = { size = size, lines = lines, w = w, h = h }
   return h
 end
+-- Garde-fou en jeu : après la pose d'une carte et après chaque survol (une image plus tard : le client a
+-- refait sa mise en page à l'échelle d'arrivée), un texte que le client tronque malgré tout (IsTruncated)
+-- fait descendre son palier (texte, nom ; card.textCap, propre à la carte) et reposer la carte ; tout
+-- texte tronqué est relevé (W.truncatedLog, /slay text) pour que le joueur puisse le signaler.
+local truncLog = {}
+local TRUNC_LOG_MAX = 40
+local function plainShort(t)
+  return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR)
+    :gsub("\n", " / "))
+end
+local function isTruncated(fs)
+  return fs ~= nil and fs:IsShown() and fs.IsTruncated ~= nil and (fs:GetText() or "") ~= "" and fs:IsTruncated()
+end
+local function describeText(fs)
+  local e = fs.GetEffectiveScale and fs:GetEffectiveScale() or 1
+  return ("\"%s\" (size %s, scale %.3f, zoom %s)"):format(plainShort(fs:GetText()), tostring(fs._size), e, W.zoomMode())
+end
+local function logTruncated(line)
+  truncLog[#truncLog + 1] = line
+  if #truncLog > TRUNC_LOG_MAX then table.remove(truncLog, 1) end
+end
+function W.truncatedLog() return truncLog end
+
+function W.checkCardTexts(card)
+  if not card.cardId or not card:IsShown() then return end
+  local who = plainShort(card.name:GetText())
+  local refit = false
+  local parts = { { "name", card.name, "name", card.nameFit }, { "text", card.body, "body", card.bodyFit },
+    { "keywords", card.plateText }, { "cost", card.cost } }
+  if card.reasonPlate and card.reasonPlate:IsShown() then parts[#parts + 1] = { "reason", card.reasonPlate.text } end
+  if card.priceTag and card.priceTag:IsShown() then parts[#parts + 1] = { "price", card.priceTag.text } end
+  for _, p in ipairs(parts) do
+    local fs, key, fit = p[2], p[3], p[4]
+    if isTruncated(fs) then
+      local what = describeText(fs)
+      if key and fit and fit.ok and fit.size then
+        card.textCap = card.textCap or {}
+        card.textCap[key] = fit.size
+        refit = true
+        what = what .. " -> smaller size"
+      end
+      logTruncated(who .. " (" .. p[1] .. "): " .. what)
+    end
+  end
+  if refit then card:SetCard(card.cardId, card.cardUp, card.opts) end
+end
+
+-- Vérification une image plus tard (une seule en attente par carte).
+function W.checkCardTextsSoon(card)
+  if card._textCheck then return end
+  card._textCheck = true
+  W.delay(0, function()
+    card._textCheck = nil
+    W.checkCardTexts(card)
+  end)
+end
+
+-- Textes de l'interface (W.label, W.text) visibles et tronqués en ce moment.
+function W.truncatedNow()
+  local out = {}
+  for fs in pairs(labels) do
+    if fs:IsVisible() and isTruncated(fs) then out[#out + 1] = describeText(fs) end
+  end
+  table.sort(out)
+  return out
+end
+
 -- Marge du visuel autour du corps (fraction de la largeur) : contient le halo (0,215), la languette
 -- de coût, le ruban, la plaque du bas et l'étiquette de prix (jusqu'à 0,29 sous le corps).
 local CARD_MARGIN = 0.3
@@ -2831,8 +2932,8 @@ function W.card(parent)
   b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
   b.cost:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
   b.body = W.label(face, "bold", W.BODY_SIZES[1], C.textSoft, "OVERLAY")
-  -- centré dans la zone utile du panneau, lignes posées par fitBody ; hauteur libre (un texte trop
-  -- long déborde au lieu d'être tronqué en « … » : le harnais le signale)
+  -- centré dans la zone utile du panneau, lignes posées par fitBody dans une boîte posée (W.looseBox) ;
+  -- hauteur libre seulement au secours (un texte trop long déborde au lieu d'être tronqué en « … »)
   b.body:SetJustifyH("CENTER")
   b.body:SetJustifyV("MIDDLE")
   b.body:SetWordWrap(true)
@@ -2850,10 +2951,13 @@ function W.card(parent)
     local d = Card.defById(id, showUp)
     local base = showUp and ns.Cards[id] or nil
     local dim = opts.playable == false
+    -- paliers interdits par le garde-fou (W.checkCardTexts) : propres à une carte
+    local capFor = id .. (showUp and "+" or "")
+    if self.textCapFor ~= capFor then self.textCap, self.textCapFor = nil, capFor end
     -- corps à la couleur de la carte
     W.setSkin(self.bg, "card_body_" .. Art.cardBody(id, ns.Cards[id] or d))
     -- nom sur le ruban (paliers)
-    self.nameFit = fitName(self.name, d.name)
+    self.nameFit = fitName(self.name, d.name, self.textCap and self.textCap.name)
     local nc = showUp and C.upGreen or C.text
     self.name:SetTextColor(nc[1], nc[2], nc[3])
     -- médaillon
@@ -2952,6 +3056,7 @@ function W.card(parent)
       self.priceTag:Hide()
     end
     self:SetAlpha(opts.sold and 0.45 or 1)
+    W.checkCardTextsSoon(self)
   end
 
   -- Survol / sélection : halo doré en fondu (la position est gérée par l'écran).
@@ -2973,6 +3078,8 @@ function W.card(parent)
   end })
   b.onAnimSettled = function(self)
     if self.baseLevel and W.animValue(self, "hover") == 0 then W.setLevel(self, self.baseLevel) end
+    -- après la bascule du zoom (échelle réelle d'arrivée) : textes vérifiés une image plus tard
+    W.checkCardTextsSoon(self)
   end
   b.onEnterExtra = function(self)
     if self._hoverManual then return end

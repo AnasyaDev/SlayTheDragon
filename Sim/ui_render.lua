@@ -514,7 +514,10 @@ function R.svg(H, root, path, label)
           end
           local lh = lineHeight(size) + (calls.SetSpacing and calls.SetSpacing[1] or 0)
           local ty
-          if h > 0 then ty = y + (h - lh * #lines) / 2 + lh * ASC else ty = y - lh * #lines / 2 + lh * ASC end
+          local jv = calls.SetJustifyV and calls.SetJustifyV[1] or "MIDDLE"
+          if h > 0 and jv == "TOP" then ty = y + lh * ASC
+          elseif h > 0 and jv == "BOTTOM" then ty = y + h - lh * #lines + lh * ASC
+          elseif h > 0 then ty = y + (h - lh * #lines) / 2 + lh * ASC else ty = y - lh * #lines / 2 + lh * ASC end
           local pt = rawget(o, "_points")[1]
           if pt and pt[1] and pt[1]:find("TOP") and h == 0 then ty = y + lh * ASC end
           local so = calls.SetShadowOffset
