@@ -550,8 +550,8 @@ valeurs, bouton « Back on the road » du feu de camp.
 
 - **Zone utile du texte** (`W.CARD_TEXT`, `UI/Widgets.lua`) : intérieur sombre du panneau d'ardoise
   (mesuré sur `Media/card_panel.tga`) moins les marges : 5,5 unités sur les côtés (de 124), 5 unités au
-  bas, et sous la plus grande gemme de rareté en haut ; le bas biseauté rétrécit la zone (demi-largeur
-  0,308 − 0,56 × (y − 1,0754), marge ×1,15 en biais). Les lignes sont posées une à une (voir « Retours à
+  bas, et sous la plus grande gemme de rareté en haut ; le bas biseauté rétrécit la zone (forme exacte
+  depuis le 12/11/2026 : voir « Texte centré et sablier à la hauteur des chiffres »). Les lignes sont posées une à une (voir « Retours à
   la ligne plutôt que des paliers plus petits » plus bas : clauses repliées, coupures choisies, écart
   entre clauses), chaque ligne limitée à la largeur de la zone à son bas, bloc centré verticalement ;
   puis le texte est posé avec des retours explicites dans une **boîte posée** (`W.looseBox`, voir
@@ -673,14 +673,68 @@ valeurs, bouton « Back on the road » du feu de camp.
     Freezing Trap (9 : « Apply Stunned 1 ⌛ » ne tient pas à 9,5, et quatre lignes butent sur le biseau).
     26 textes perdent ainsi un demi-palier ou un palier par rapport à l'ancienne mise en page, qui coupait
     un nom en deux ou laissait « times. » / « twice. » seul. Aucun texte n'appelle de réécriture.
-  - **Biseau** (non changé, noté) : `W.cardTextHalf` prolonge la pente du biseau au-dessus de son début
-    (y 124 à 133 : jusqu'à 10 unités de moins que l'intérieur sombre, mesuré plein jusqu'à y ≈ 133,5) ;
-    c'est ce qui remonte des blocs de quatre lignes en haut de la zone et retient Freezing Trap à 9. Un
-    modèle exact (marges rectangulaires sous un intérieur plein jusqu'à 1,0754) rendrait de la place ;
-    à décider avec le joueur (la zone est restée inchangée pour ce lot).
+  - **Biseau** (noté ici, corrigé ensuite) : `W.cardTextHalf` prolongeait la pente du biseau au-dessus de
+    son début (y 124 à 133 : jusqu'à 10 unités de moins que l'intérieur sombre, mesuré plein jusqu'à
+    y ≈ 133) ; c'est ce qui remontait les blocs en haut de la zone. Remplacé par la forme exacte le
+    12/11/2026 (« Texte centré et sablier à la hauteur des chiffres » ci-dessous).
   - **Petites cartes** (grilles 0,75, panneau du deck 0,72, progression 0,6) : la mise en page est en
     unités de la carte, la même à toute échelle : le texte y grandit avec son palier (ou perd le
     demi-palier ci-dessus).
+- **Texte centré et sablier à la hauteur des chiffres** (retour en jeu du 12/11/2026, main du Mage,
+  fenêtre à 115 % : Frostbolt « Deal 6. » / « Apply » / « Demoralized 1 ⌛ » collé en haut du panneau, vide
+  dessous, « le texte est remonté, il ne devrait pas » ; Fireball « Deal 10. » / « Apply DoT 2 » ; le
+  sablier à peu près deux fois plus petit que le chiffre voisin, lu comme un « z »).
+  - **Cause du bloc remonté (établie)** : la mise en page essayait le bloc centré, puis remonté de
+    0,33 / 0,17 / 0 du jeu vertical (`W.BODY_LIFT`), et gardait le premier où chaque ligne tenait dans
+    `W.cardTextHalf` jugée au bas de la BOÎTE de la ligne. Ce modèle prolongeait la pente du biseau
+    au-dessus de son début : à y 125–133, où l'intérieur est plein, il retirait jusqu'à 10 unités de
+    largeur. « Demoralized 1 ⌛ » (67 à 71 unités selon la largeur comptée au sablier) ne tenait donc pas centré et Frostbolt remontait tout en
+    haut (y0 = 95, le haut de la zone) : centre de l'encre 7,4 unités au-dessus du centre du panneau.
+    Le faux client montrait déjà ce bloc remonté (planche `cartes_mage.svg`) : aucune vérification ne
+    regardait la position verticale.
+  - **Forme réelle du biseau** (pixels de `Media/card_panel.tga`, critère de U22) : intérieur plein
+    (x 14 à 240 sur 256 px, demi-largeur 0,3444) jusqu'à y 1,0735 (133,1 unités) ; là, un
+    **décrochement** (le bord gauche passe de x 14 à 25 px d'une ligne à la suivante, demi-largeur 0,3110
+    du côté gauche, le plus étroit), puis une pente de 0,557 jusqu'au bas (146,3 unités).
+  - **Règle** (`layoutBody`, `W.cardTextHalf`, `UI/Widgets.lua`) : le bloc est **centré sur le centre
+    optique** du panneau (`TZ.optY`, milieu de l'intérieur sombre dans la colonne du milieu, 87,1 à 146,3
+    unités, mesuré par UC) : haut des capitales de la première ligne et ligne de base de la dernière à
+    égale distance des bords (ligne de base aux 1,078 / 1,47 de la ligne, capitales de 0,602 cadratin :
+    `W.TEXT_BASE`, `W.TEXT_CAP`, Baloo Chettan 2 ; si une plaque relève le bas de la zone, le centre
+    remonte de moitié). Il ne se décale que si une ligne sortirait de la forme (biseau, gemme, bas de
+    la zone), du minimum nécessaire, pas à pas de 0,25 et d'**une unité au plus** (`W.BODY_SHIFT`,
+    `W.SHIFT_COST` = 2 par unité) ; sinon une autre coupure ou le palier inférieur. Le biseau est jugé
+    sur la **forme exacte**, 2 unités sous l'**encre** de la ligne (ligne de base, plus 0,2 cadratin si
+    elle a des jambages : `W.lineInkBottom`, `W.DESC_CHARS`), marge latérale de 5,5 unités. U22 vérifie
+    de même sur les pixels : rectangle de la ligne (4 unités sur les côtés, 1 en haut) jusqu'à 2 unités
+    sous l'encre, et 4 unités sous la boîte de la ligne au milieu (le bas de l'intérieur).
+  - **Cause du sablier trop petit (établie par élimination)** : le dessin remplissait 60/64 de la
+    texture et la séquence demandait 7 unités pour un texte de 10, plus que les chiffres (6,2) : ni le
+    dessin ni le calcul ne le rapetissaient. C'est donc la **hauteur explicite** de la séquence |T que le
+    client ne rend pas dans les unités du texte. Le rapport vu (≈ 0,5) correspond à une hauteur prise en
+    pixels d'écran : 7 px à côté de chiffres de 6,2 × 1,875 × 1,15 ≈ 13 px (écran de 1440 px de haut,
+    échelle d'interface 1, fenêtre à 115 %) ; c'est le modèle du faux client désormais (`H.ICON_PX`),
+    qui reproduit la capture (témoin de UC : 51 %). Le mécanisme exact du client reste non documenté.
+  - **Correction du sablier** (texture changée : relancer le client) : séquence à **hauteur et largeur
+    nulles** (`|T…hourglass.tga:0:0:0:0:64:64:0:64:0:64:r:g:b|t`, `W.hourglass`) : le client donne à
+    l'icône la hauteur de la police qu'il rend, carrée, comme les icônes de Blizzard à la taille du
+    texte (« |T…:0:0:0:0|t » après un prix, `Blizzard_GarrisonBuildingUI.lua` ; « |T…:0|t » des marques
+    du journal de combat). La texture 64 × 64 est la boîte d'une ligne (`tools/build_glyphs.py`) : même
+    silhouette, de la ligne de base (y 47) au haut des chiffres (y 7 : 41 texels, 0,64 cadratin, 106 %
+    de la hauteur de capitale), x 12 à 41 : la marge de gauche (0,19 cadratin) fait la petite espace
+    après le nombre. Planche `build/sablier_planche.png` (`… build_glyphs.py planche`).
+  - **Prix en largeur** : la boîte de l'icône fait maintenant un cadratin (0,70 avant), soit 3 unités de
+    plus à la taille 10 sur chaque ligne à sablier ; « Demoralized 2 ⌛ » (75,7 unités, marge comprise)
+    ne tient plus dans la pleine largeur (74,5) à 10. Une largeur plus étroite que la hauteur
+    demanderait un champ largeur explicite, donc soumis au même défaut. Répartition (360 textes) :
+    10 / 9,5 / 9 / 8,5 = 330 / 4 / 22 / 4 avant → 316 / 18 / 18 / 8 après ; **334 textes à 9,5–10 avant
+    comme après**, aucun sous 8,5. Perdent un demi-palier : Blizzard, Concussive Shot, Demoralizing
+    Shout, Glacial Spike, Psychic Scream, Smoke Bomb (et leurs +), Frost Trap+, Thunder Clap+ (10 → 9,5) ;
+    Flurry et Freezing Trap (et +) (9 → 8,5). Mises en page changées au même palier : Polymorph (« Apply »
+    / « Stunned 2 ⌛ » sur deux lignes), Schism (cinq lignes, « Gain » / « Atonement 1 ⌛ »).
+  - **Harnais UC** : voir « Harnais hors jeu ». Planche avant / après :
+    `build/planche_texte_centre.png` (Frostbolt, Fireball, Shadowform à quatre lignes, Smite à une
+    ligne ; fenêtre 1,15, rendu ×3 ; « avant » = code d'avant, faux client corrigé).
 - **Plaque du bas** (mots-clés) : `Media/card_plate.tga` en trois tranches (bords à l'échelle de la
   hauteur, milieu étiré : élargie sans déformer ses coins), **devant** le corps (derrière, l'ombre portée
   du corps la masquait : on n'en voyait qu'un liseré), à la place du PSD (liseré du haut à cheval sur le
@@ -754,7 +808,9 @@ Façon Hearthstone : les tournures deviennent des mots-clés visibles, en couleu
   « Donne » / « Applique », l'Absorption et la Démence (ressources) restent dans la couleur du texte.
   Le verbe d'une ligne d'état n'est plus collé à l'état (12/11/2026) : la mise en page peut couper
   « Apply » / « Demoralized 1 ⌛ » (coupure de second choix, voir « Retours à la ligne »).
-- **Sablier** : « ⌛ » (et l'espace qui le précède) devient à la mise en page une séquence
+- **Sablier** (historique : depuis le second retour du 12/11/2026, hauteur et largeur nulles et texture
+  boîte de ligne, voir « Texte centré et sablier à la hauteur des chiffres » ; ce qui suit décrit l'état
+  d'avant) : « ⌛ » (et l'espace qui le précède) devient à la mise en page une séquence
   `|TInterface\AddOns\SlayTheDragon\Media\hourglass.tga:h:h:0:0:64:64:0:64:0:64:255:255:255|t`
   (`W.hourglass(taille)`) : forme de `CreateTextureMarkup` (Blizzard_SharedXMLBase/TextureUtil.lua, relu
   le 12/11/2026 : chemin, **hauteur**, **largeur**, décalages x et y, largeur et hauteur du fichier,
@@ -781,8 +837,8 @@ Façon Hearthstone : les tournures deviennent des mots-clés visibles, en couleu
   chaque clause commence une ligne et se replie au besoin, au plus grand palier où le texte tient (voir
   « Retours à la ligne plutôt que des paliers plus petits ») ; texte coulé et états groupés ne sont plus
   qu'un secours après tous les paliers. La ligne d'état commence toujours une ligne et finit le texte.
-  Le bloc est centré verticalement ; s'il ne tient pas, il remonte par paliers (`W.BODY_LIFT` : 0,5 /
-  0,33 / 0,17 / 0 du jeu vertical) pour que le biseau du bas laisse plus de largeur à la dernière ligne ;
+  Le bloc est centré sur le centre optique du panneau, décalé d'une unité au plus si une ligne sortirait
+  de la forme (depuis le 12/11/2026 ; avant, il remontait jusqu'en haut de la zone, `W.BODY_LIFT`) ;
   zone utile `TZ` inchangée. Une couleur coupée par un retour est fermée et rouverte (`W.balanceColors`).
 - **Infobulles** (`W.cardKeywords`, `W.keywordText`) : mots de la plaque, puis conditions nommées
   (`Art.keywords` : execute, surge, lastBreath, shadow), conditions sur un état (`Art.conditionLine` :
@@ -1329,16 +1385,19 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 - Survols sans agrandissement (voir « Survols (sans agrandissement) ») : texte des boutons immobile,
   surbrillance additive assez visible, levée des cartes nette, aperçu des petites cartes. Le décalage des
   cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
-- Le **sablier** dans le texte des cartes (séquence |T à 14 champs) : affiché, blanc, net à 10 px, à
 - Le zoom des survols (mode `net` : animation Scale + textes Vertex pendant le mouvement, échelle réelle
   posée à l'arrivée) : fluidité, textes immobiles pendant l'agrandissement, aucun sursaut ni clignotement à
   l'arrivée (moment de la bascule), texte net une fois agrandi ; `/slay zoom` pour comparer avec `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
-- Le **sablier** dans le texte des cartes (séquence |T à 14 champs, texture 64 × 64 pleine depuis le
-  12/11/2026) : affiché, blanc, reconnaissable à 7–8 px (planche `build/sablier_planche.png`), à
-  la hauteur des chiffres et **centré verticalement** sur la ligne (supposé : aucune source ne dit où le
-  client place une icône en ligne ; décalage y possible dans la séquence), entier et carré (plus de
-  rognage), un peu détaché du chiffre, et sa largeur bien comptée par `GetStringWidth` (sinon une ligne recoupée par le client le
-  montrerait). Avec la police de repli (Friz Quadrata), le texte reste juste mais plus large.
+- Le **sablier** dans le texte des cartes (séquence |T à 14 champs, **hauteur et largeur nulles** depuis
+  le second retour du 12/11/2026, texture = boîte d'une ligne) : à la hauteur des chiffres (et non plus
+  la moitié), **posé sur la ligne de base** (supposé : le client donne à l'icône la hauteur du texte et
+  la pose sur la boîte de la ligne, ligne de base aux 1,078 / 1,47 de la ligne comme le faux client ;
+  si le dessin flotte au-dessus ou plonge sous les lettres, déplacer le dessin dans
+  `tools/build_glyphs.py`, `Y0`/`Y1`), une petite espace avant lui, et la forme 14 champs acceptée avec
+  une hauteur nulle (Blizzard n'emploie la hauteur nulle qu'en 2 ou 5 champs). Voir « Texte centré et
+  sablier à la hauteur des chiffres ».
+- Le **centrage** du texte des cartes (même section) : bloc centré à l'œil dans le panneau ; dépend de la
+  position de la ligne de base dans la ligne chez le client (modèle 1,078 / 1,47, non vérifié).
 - La mise en page des textes de carte : mesurée par le client (`GetStringWidth`, `GetStringHeight`,
   `GetNumLines`, `IsTruncated`) ; hors jeu, seules les métriques du faux client (Baloo Chettan 2, ligne
   d'un cadratin depuis le 12/11/2026, d'après la capture) la vérifient. À voir : l'interligne réel
@@ -1441,8 +1500,15 @@ sans chevauchement, 1 à 6 ennemis × 3 échelles), U24 les réponses (libellé 
 dessous dans la place restante). Le faux client mesure les textes avec les
 avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne d'un cadratin (`H.LINE_EM` :
 l'interligne du client, mesuré sur une capture ; le fichier généré donne 1,47, la hauteur hhea),
-retours explicites puis par mots, icônes |T comptées à leur largeur, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
+retours explicites puis par mots, icônes |T comptées à leur largeur (hauteur nulle : la taille du texte ;
+hauteur explicite : en **pixels d'écran**, `H.ICON_PX`, modèle qui reproduit le sablier deux fois trop
+petit vu en jeu le 12/11/2026), et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
+**UC** (avant U16) : centre optique mesuré sur les pixels du panneau ; bloc du texte centré à ±1 unité
+(haut des capitales de la première ligne, ligne de base de la dernière) sur toutes les cartes de 1 à 4
+lignes, base et améliorées, avec un témoin (l'ancienne position de Frostbolt, refusée) ; chaque sablier
+posé (fenêtre 1, 1,15 et 0,6) d'au moins 90 % de la hauteur de capitale, posé sur la ligne de base, avec
+un témoin (l'ancienne séquence à 1,15 : 51 %) ; planche `texte_centre.svg`.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
 faux client et écrit un SVG par écran (accueil, parcours, parcours en route, combat, combat-survol, combat

@@ -307,7 +307,8 @@ local function words(text)
       color = nil
       i = i + 2
     elseif c == "|" and text:sub(i + 1, i + 1) == "T" then
-      -- icône en ligne |Tchemin:h:l:x:y:lf:hf:g:d:h:b:r:v:b|t (dimensions en unités du texte)
+      -- icône en ligne |Tchemin:h:l:x:y:lf:hf:g:d:h:b:r:v:b|t (hauteur nulle : la taille du texte ;
+      -- explicite : pixels d'écran, H.iconUnit, comme le client vu en jeu)
       push()
       local e = text:find("|t", i + 2, true) or (n + 1)
       local f = {}
@@ -523,11 +524,13 @@ function R.svg(H, root, path, label)
           local maxW = ww > 0 and ww or 1e9
           local lines, cur, curW = {}, {}, 0
           local es = escale(o) * vk
+          -- taille explicite d'une icône : pixels d'écran (H.ICON_PX), ramenés aux unités du texte
+          local iu = es * ((R.H and R.H.iconUnit) and R.H.iconUnit(o) or 1)
           for _, wd in ipairs(ws) do
             if wd[1] == "\n" then
               lines[#lines + 1] = cur cur, curW = {}, 0
             else
-              local wl = wd.icon and ((wd.icon.h == 0 and size or wd.icon.w * es)) or R.textWidth(wd[1], size / es, o) * es
+              local wl = wd.icon and ((wd.icon.h == 0 and size or wd.icon.w * iu)) or R.textWidth(wd[1], size / es, o) * es
               local add = (#cur > 0 and wd[3]) and R.textWidth(" ", size / es, o) * es or 0
               if #cur > 0 and wd[3] and curW + add + wl > maxW + 0.01 then
                 lines[#lines + 1] = cur cur, curW = {}, 0 add = 0
@@ -575,7 +578,7 @@ function R.svg(H, root, path, label)
               local spW = R.textWidth(" ", size / es, o) * es
               for _, wd in ipairs(line) do
                 local sp = wd[3] and spW or 0
-                local ww = wd.icon and ((wd.icon.h == 0 and size) or wd.icon.w * es) or R.textWidth(wd[1], size / es, o) * es
+                local ww = wd.icon and ((wd.icon.h == 0 and size) or wd.icon.w * iu) or R.textWidth(wd[1], size / es, o) * es
                 segs[#segs + 1] = { wd = wd, x = total + sp, w = ww }
                 total = total + sp + ww
               end
@@ -584,7 +587,7 @@ function R.svg(H, root, path, label)
                 local wd = sg.wd
                 if wd.icon then
                   local ic = wd.icon
-                  local ih = (ic.h == 0 and size) or ic.h * es
+                  local ih = (ic.h == 0 and size) or ic.h * iu
                   local href = mediaHref(ic.path)
                   local fw, fh = ic.fw or 1, ic.fh or 1
                   local u0, u1 = (ic.l or 0) / fw, (ic.r or fw) / fw

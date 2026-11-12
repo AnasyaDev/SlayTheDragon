@@ -7,20 +7,24 @@ Usage : build/venv/bin/python -I tools/build_glyphs.py [planche]
 compressé, origine en bas à gauche, 8 bits d'alpha, toile en puissances de deux, même écriture que
 tools/build_media.py (qui n'est ni appelé ni modifié : les textures existantes ne changent pas).
 L'icône est BLANCHE (teinte posée par la séquence |T, couleur de sommet r:g:b) sur fond transparent
-dont la couleur est saignée (blanc). Toile 64 × 64, dessin centré, marges transparentes SYMÉTRIQUES
-(x 11 à 53, y 2 à 62) : l'interface l'affiche entière et carrée (UI/Widgets.lua, W.hourglass), sans
-rognage ; la marge de gauche fait la petite espace avant l'icône, celle de droite l'espace après.
+dont la couleur est saignée (blanc).
 
-Dessin pour 5 à 9 pixels de haut (texte de 7 à 10 unités, fenêtre à 115 %) : silhouette PLEINE,
-deux traverses épaisses et deux triangles opposés (pointe contre pointe), sans détail intérieur,
-séparés des traverses par un mince jour transparent ; aucun trait plus fin que 8 texels (1 pixel à
-8 pixels de haut). Retour du joueur (12/11/2026) : l'ancien dessin (32 × 32, verre en contour de
-3 texels, sable, rogné à 28/32) n'était à l'écran qu'une tache floue et rognée.
+Depuis le 12/11/2026 (retour en jeu : sablier deux fois plus petit que le chiffre voisin, lu comme un
+« z ») : la séquence |T demande une hauteur NULLE (« :0: », la hauteur du texte, celle que le client
+donne à la police réellement rendue ; une hauteur explicite n'était pas rendue dans les unités du
+texte, voir UI/Widgets.lua, W.hourglass). La toile 64 × 64 est donc la BOÎTE D'UNE LIGNE (un cadratin
+de haut, posée sur la ligne comme le faux client du harnais) et le dessin y est placé comme un chiffre
+de Baloo Chettan 2 : ligne de base aux 1,078 / 1,47 de la boîte (ligne 46,9), haut des chiffres à
+0,62 cadratin au-dessus (dessin y 7,5 à 47, 0,617 cadratin, au moins la hauteur de capitale 0,602),
+x 13 à 41 : la marge transparente de gauche (0,2 cadratin, la largeur d'une espace) fait la petite
+espace après le nombre, celle de droite (0,34) complète la boîte carrée (largeur nulle = hauteur). Silhouette PLEINE : deux traverses et deux triangles opposés (pointe contre pointe),
+sans détail intérieur (même dessin qu'avant, réduit dans la boîte).
 
 Aperçu : build/media_png/hourglass.png ; `planche` écrit build/sablier_planche.png : le sablier
-avant / après à 6, 7, 8, 10 et 12 pixels de haut sur l'ardoise des cartes, après le chiffre « 1 » de
-Baloo Chettan 2 à la taille correspondante, réduit sans mipmap (échantillonnage bilinéaire au centre
-des pixels, le pire cas) et avec (moyenne par zone), agrandi ×8 pour juger.
+avant (64 × 64 plein, 0,70 de la taille) / après (boîte de ligne) pour des lignes de 9, 10, 12, 16 et
+22 pixels sur l'ardoise des cartes, après le chiffre « 1 » de Baloo Chettan 2 à la même taille, réduit
+sans mipmap (échantillonnage bilinéaire au centre des pixels, le pire cas) et avec (moyenne par zone),
+agrandi ×5 pour juger.
 """
 import os
 import struct
@@ -31,7 +35,10 @@ from PIL import Image, ImageDraw, ImageFont
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SIZE = 64          # toile (puissance de deux)
 SS = 8             # suréchantillonnage du dessin
-K = 0.70           # hauteur de l'icône / taille du texte (W.HOURGLASS_K de UI/Widgets.lua)
+K = 1.0            # hauteur de la boîte de l'icône / taille du texte (|T à hauteur nulle : la ligne)
+BASE = 1.078 / 1.47  # ligne de base dans la ligne (W.TEXT_BASE de UI/Widgets.lua)
+# dessin : ancien cadre (x 11 à 53, y 2 à 62) ramené à x 13 à 41, y 7,5 à 47 (chiffres de Baloo)
+X0, X1, Y0, Y1 = 13, 41, 7.5, 47
 
 
 def write_tga(im, path):
@@ -59,17 +66,20 @@ def read_tga(path):
 
 
 def hourglass():
-    """Sablier plein 64 × 64 : traverses (y 2–11 et 53–62, x 11–53), triangles opposés (base x 16–48,
-    col de 6 texels à y 32), jour de 2 texels entre traverses et triangles."""
+    """Sablier plein dans une boîte de ligne 64 × 64 : traverses et triangles opposés de l'ancien dessin
+    (cadre x 11 à 53, y 2 à 62), ramenés au cadre des chiffres (x 13 à 41, y 7,5 à 47)."""
     S = SIZE * SS
-    m = Image.new("L", (S, S), 0)
-    d = ImageDraw.Draw(m)
 
     def P(x, y):
-        return (x * SS, y * SS)
+        xx = X0 + (x - 11) * (X1 - X0) / 42
+        yy = Y0 + (y - 2) * (Y1 - Y0) / 60
+        return (xx * SS, yy * SS)
 
-    d.rounded_rectangle([P(11, 2), P(53, 10.5)], radius=3 * SS, fill=255)
-    d.rounded_rectangle([P(11, 53.5), P(53, 62)], radius=3 * SS, fill=255)
+    m = Image.new("L", (S, S), 0)
+    d = ImageDraw.Draw(m)
+    r = 2 * SS
+    d.rounded_rectangle([P(11, 2), P(53, 10.5)], radius=r, fill=255)
+    d.rounded_rectangle([P(11, 53.5), P(53, 62)], radius=r, fill=255)
     d.polygon([P(14, 10), P(50, 10), P(50, 15), P(36, 30), P(36, 34), P(50, 49), P(50, 54),
                P(14, 54), P(14, 49), P(28, 34), P(28, 30), P(14, 15)], fill=255)
     alpha = m.resize((SIZE, SIZE), Image.LANCZOS)
@@ -102,9 +112,9 @@ def planche(new, old):
     """build/sablier_planche.png : avant / après, 6 à 12 px, sans et avec mipmap, agrandi ×8."""
     font_path = os.path.join(ROOT, "Media", "Fonts", "BalooChettan2-bold.ttf")
     slate = (32, 37, 48, 255)
-    heights = [6, 7, 8, 10, 12]
-    Z = 8
-    cell_w, cell_h = 26, 18
+    heights = [9, 10, 12, 16, 22]
+    Z = 5
+    cell_w, cell_h = 44, 32
     rows = [("avant, sans mipmap", "old", False), ("après, sans mipmap", "new", False),
             ("avant, avec mipmap", "old", True), ("après, avec mipmap", "new", True)]
     label_w = 230
@@ -112,27 +122,35 @@ def planche(new, old):
     dl = ImageDraw.Draw(sheet)
     lab = ImageFont.truetype(font_path, 22)
     for ci, hpx in enumerate(heights):
-        dl.text((label_w + ci * cell_w * Z + 8, 6), f"icône {hpx} px", font=lab, fill=(220, 220, 220))
+        dl.text((label_w + ci * cell_w * Z + 8, 6), f"boîte {hpx} px", font=lab, fill=(220, 220, 220))
     for ri, (name, which, mip) in enumerate(rows):
         dl.text((8, 40 + ri * cell_h * Z + cell_h * Z // 2 - 12), name, font=lab, fill=(220, 220, 220))
         for ci, hpx in enumerate(heights):
             tile = Image.new("RGBA", (cell_w, cell_h), slate)
             if which == "old":
-                size = hpx / 0.68           # taille du texte qui donnait cette hauteur
-                w = max(4, round(hpx * 28 / 32))
-                src = old.crop((0, 0, 28, 32))
+                # ancienne icône (64 × 64, hauteur explicite 0,70 × taille) à la hauteur que le
+                # texte de cette boîte lui demandait
+                size = hpx
+                hpx_old = max(4, round(hpx * 0.70))
+                w = hpx_old
+                src = old
             else:
-                size = hpx / K
+                size = hpx / K          # boîte de l'icône = une ligne (hauteur nulle dans la séquence)
                 w = hpx
                 src = new
-            icon = src.resize((w, hpx), Image.BOX) if mip else sample_nomip(src, w, hpx)
+            ih = hpx_old if which == "old" else hpx
+            icon = src.resize((w, ih), Image.BOX) if mip else sample_nomip(src, w, ih)
             f = ImageFont.truetype(font_path, max(1, round(size)))
             d = ImageDraw.Draw(tile)
-            base = cell_h - 4
+            base = cell_h - 8
             d.text((2, base), "1", font=f, fill=(255, 255, 255), anchor="ls")
             x = 2 + round(d.textlength("1", font=f))
-            # icône centrée sur les chiffres (hauteur des chiffres : 0,62 cadratin au-dessus de la ligne de base)
-            y = round(base - 0.62 * size / 2 - hpx / 2)
+            if which == "old":
+                # ancienne icône centrée sur les chiffres (0,62 cadratin au-dessus de la ligne de base)
+                y = round(base - 0.62 * size / 2 - ih / 2)
+            else:
+                # nouvelle : la boîte est la ligne (ligne de base aux BASE de sa hauteur)
+                y = round(base - BASE * hpx)
             tile.alpha_composite(icon, (x, y))
             big = tile.resize((cell_w * Z, cell_h * Z), Image.NEAREST)
             sheet.paste(big, (label_w + ci * cell_w * Z, 40 + ri * cell_h * Z))

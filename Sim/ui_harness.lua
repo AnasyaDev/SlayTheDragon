@@ -364,16 +364,19 @@ local function fontAdv(self)
 end
 -- Icônes en ligne |Tchemin:hauteur:largeur:…|t (comme le client) : largeur = 3e champ, sinon la
 -- hauteur ; hauteur 0 = taille du texte. Renvoie le texte sans les séquences et la largeur des icônes.
-function H.inlineIcons(text, size)
+-- unit : unités du texte par unité de la séquence pour une hauteur ou une largeur EXPLICITE (H.ICON_PX :
+-- pixels d'écran, H.iconUnit) ; une hauteur nulle suit la police, quelle que soit l'échelle.
+function H.inlineIcons(text, size, unit)
   local icons = 0
   local list = {}
+  unit = unit or 1
   text = tostring(text or ""):gsub("|T(.-)|t", function(spec)
     local f = {}
     for v in (spec .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
     local hgt = tonumber(f[2] or "") or 0
     local wid = tonumber(f[3] or "") or hgt
-    if hgt == 0 then hgt = size end
-    if wid == 0 then wid = hgt end
+    if hgt == 0 then hgt = size else hgt = hgt * unit end
+    if wid == 0 then wid = hgt else wid = wid * unit end
     icons = icons + wid
     list[#list + 1] = { path = f[1], w = wid, h = hgt, spec = f }
     return ""
@@ -384,7 +387,7 @@ end
 function H.textWidth(self, text, size)
   local adv, w = fontAdv(self), 0
   size = size or rawget(self, "_fontSize") or 12
-  local plain, icons = H.inlineIcons(text, size)
+  local plain, icons = H.inlineIcons(text, size, H.iconUnit(self))
   for ch in plainText(plain):gmatch("[%z\1-\127\194-\244][\128-\191]*") do w = w + (adv[ch] or 550) end
   return w / 1000 * size + icons
 end
@@ -401,6 +404,19 @@ H.strictText = false
 local function effScale(self)
   local e = self:GetEffectiveScale()
   return (e and e > 0) and e or 1
+end
+-- Taille EXPLICITE d'une icône en ligne (|Tchemin:7:7:…|t) : prise en PIXELS D'ÉCRAN (H.ICON_PX), pas
+-- dans les unités du texte. Retour en jeu du 12/11/2026 (Frostbolt, fenêtre à 115 %, écran de 1440 px
+-- de haut : 1,875 × 1,15 ≈ 2,16 px par unité) : un sablier demandé à 7 (dessin de 6,6) à côté de
+-- chiffres de 6,2 unités se voyait à peu près deux fois plus petit que le chiffre (7 px contre ~13) ;
+-- l'ancien faux client le dessinait à 6,6 unités, plus haut que le chiffre, et ne pouvait pas le voir.
+-- Modèle retenu parce qu'il reproduit la capture (mécanisme du client non documenté) ; une hauteur
+-- nulle (« :0: ») suit la police à toute échelle et n'en dépend pas. Renvoie les unités du texte par
+-- pixel d'écran (1 si H.ICON_PX est faux ou sans cadre).
+H.ICON_PX = true
+function H.iconUnit(self)
+  if not H.ICON_PX or not self or not self.GetEffectiveScale then return 1 end
+  return 768 / (effScale(self) * ((H.screen and H.screen[2]) or 1440))
 end
 function H.renderSize(self)
   local size = rawget(self, "_fontSize") or 12
@@ -2547,7 +2563,12 @@ do
     end
     return true
   end
-  local MX, MT, MB = 4, 1, 4   -- marges minimales vérifiées : côtés, haut (intérieur), bas (biseau compris)
+  -- marges minimales vérifiées : côtés, haut (boîte de la ligne), bas de la boîte de la ligne au milieu
+  -- (bas de l'intérieur), et sous l'ENCRE de la ligne sur toute sa largeur (biseau : ligne de base, ou
+  -- bas des jambages, W.lineInkBottom ; depuis le 12/11/2026 — avant, 4 unités sous la BOÎTE sur toute
+  -- la largeur, soit ~6,7 unités sous la ligne de base d'une ligne sans jambage : le décrochement du
+  -- biseau à y 133,1 interdisait la pleine largeur à des lignes dont l'encre finit 3 unités plus haut)
+  local MX, MT, MB, MBI = 4, 1, 4, 2
   local function splitLines(t)
     local out = {}
     if t == nil or t == "" then return out end
@@ -2609,7 +2630,9 @@ do
             local lw = H.textWidth(p, line, size)
             local x0, x1 = cx - lw / 2, cx + lw / 2
             local y0, y1 = top + (k - 1) * lh, top + k * lh
-            local ok, where = all(x0 - MX, y0 - MT, x1 + MX, y1 + MB, dark)
+            local yi = W.lineInkBottom(line, y0, lh, size)
+            local ok, where = all(x0 - MX, y0 - MT, x1 + MX, yi + MBI, dark)
+            if ok then ok, where = all(cx, y1, cx, y1 + MB, dark) end
             if not ok then bad[#bad + 1] = ("%s : ligne %d hors de l'ardoise (marges comprises) en %s"):format(label, #lines, where) end
             if gem then
               local ok2, where2 = all(x0, y0, x1, y1, function(u, v) local _, _, _, a = gem(u, v) return a <= 60 end)
@@ -3567,19 +3590,20 @@ do
   local hgt, wid = W.hourglassSize(9)
   m:SetText("Atonement 1" .. W.hourglass(9))
   local w1 = m:GetStringWidth()
-  -- hauteur : au moins celle des chiffres de Baloo (0,62 cadratin) pour le dessin (60 texels sur 64),
-  -- à tous les paliers du texte des cartes ; icône carrée (largeur = hauteur : rien de rogné)
+  -- boîte : la hauteur du texte (séquence à hauteur nulle), carrée, à tous les paliers (la hauteur du
+  -- dessin dans la boîte est vérifiée par UC, sur les pixels de la texture)
   local hOk = true
   for _, s in ipairs(W.BODY_SIZES) do
     local hh, ww = W.hourglassSize(s)
-    if hh * 60 / 64 < 0.62 * s - 0.35 or hh > 0.8 * s + 0.5 or ww ~= hh then hOk = false end
+    if hh ~= s or ww ~= hh then hOk = false end
   end
-  check(("sablier compté dans la mesure du texte (+%.1f unités à la taille 9, hauteur %d), carré, à la hauteur des chiffres à chaque palier"):format(w1 - w0, hgt),
-    math.abs(w1 - w0 - wid) < 1e-6 and hgt >= 5 and wid == hgt and hOk, w1 - w0)
+  check(("sablier compté dans la mesure du texte (+%.1f unités à la taille 9, boîte %s), carré, à la hauteur du texte à chaque palier"):format(w1 - w0, tostring(hgt)),
+    math.abs(w1 - w0 - wid) < 1e-6 and hgt == 9 and wid == hgt and hOk, w1 - w0)
   -- séquence |T : forme de CreateTextureMarkup (chemin:hauteur:largeur:x:y:largeur et hauteur du
-  -- fichier:gauche:droite:haut:bas) + couleur r:g:b, entiers, fichier de Media/ présent (TGA 32 bits,
-  -- 64 × 64, blanc), affiché ENTIER (coordonnées 0:64:0:64, aucun rognage), dessin centré à marges
-  -- symétriques (alpha nul sur les colonnes et lignes du bord, même étendue à gauche et à droite)
+  -- fichier:gauche:droite:haut:bas) + couleur r:g:b, entiers, hauteur et largeur NULLES (la taille du
+  -- texte), fichier de Media/ présent (TGA 32 bits, 64 × 64, blanc), affiché ENTIER (coordonnées
+  -- 0:64:0:64, aucun rognage), dessin posé à gauche de la boîte : marge de gauche d'environ une espace
+  -- (0,15 à 0,25 cadratin), alpha nul sur les colonnes du bord
   local mk = W.hourglass(8.5)
   local f = {}
   for v in (mk:match("^|T(.-)|t$") .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
@@ -3601,10 +3625,10 @@ do
       end
     end
   end
-  local sym = xmin > 2 and math.abs(xmin - (PX - 1 - xmax)) <= 1
+  local sym = xmin >= 0.15 * PX and xmin <= 0.25 * PX and xmax < PX - 2
   local full = f[6] == tostring(PX) and f[7] == tostring(PX) and f[8] == "0" and f[9] == tostring(PX)
-    and f[10] == "0" and f[11] == tostring(PX) and f[2] == f[3]
-  check(("séquence |T du sablier : 14 champs entiers, Media/hourglass.tga 64 × 64 TGA 32 bits, blanc (teinté par la séquence), entier et carré, marges symétriques (x %d à %d)"):format(xmin, xmax),
+    and f[10] == "0" and f[11] == tostring(PX) and f[2] == "0" and f[3] == "0"
+  check(("séquence |T du sablier : 14 champs entiers, hauteur nulle, Media/hourglass.tga 64 × 64 TGA 32 bits, blanc (teinté par la séquence), entier, marge de gauche d'une espace (x %d à %d)"):format(xmin, xmax),
     allInt and f[1] == W.HOURGLASS and hdr and hdr:byte(3) == 2 and hdr:byte(17) == 32 and full and sym
       and hdr:byte(13) + 256 * hdr:byte(14) == PX and hdr:byte(15) + 256 * hdr:byte(16) == PX and white, mk)
   -- mots-clés en couleur d'accent (une seule), chiffres blancs / verts : rien d'autre en couleur
@@ -7533,6 +7557,187 @@ do
   check("rencontre : préchargement des ennemis des combats qu'elle peut lancer, feu de camp gardé", fightOk,
     EXP().event.id .. " : " .. #need .. " ennemi(s)")
   H.badCreatures = {}
+end
+
+-- UC : retours en jeu du 12/11/2026 (main du Mage, fenêtre à 115 %). Frostbolt : « Deal 6. » / « Apply » /
+-- « Demoralized 1 ⌛ » collé en haut du panneau, vide dessous (« le texte est remonté, il ne devrait
+-- pas ») ; le sablier à peu près deux fois plus petit que le chiffre voisin, lu comme un « z ». Le faux
+-- client montrait déjà le bloc remonté (aucune vérification ne le regardait) ; il dessinait le sablier
+-- trop grand (taille explicite prise en unités du texte : H.ICON_PX).
+print("UC  texte des cartes centré dans le panneau (1 à 4 lignes, toutes les classes), sablier à la hauteur des chiffres")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W, Card = ns.Widgets, ns.Card
+  local TZ, CW = W.CARD_TEXT, W.CARD_W
+  local LH = H.metrics.lineHeight
+  local optC = TZ.optY * CW
+  local function splitLines(t)
+    local out = {}
+    if t == nil or t == "" then return out end
+    for l in (t .. "\n"):gmatch("(.-)\n") do out[#out + 1] = l end
+    return out
+  end
+  -- centre optique mesuré sur les pixels du panneau : premières et dernières lignes sombres (critère de
+  -- U22) dans la colonne du milieu
+  do
+    local e = ns.Skin.tex.card_panel
+    local f = assert(io.open(root .. "/Media/" .. e.file:gsub("\\", "/"), "rb"))
+    local d = f:read("*a")
+    f:close()
+    local w, h = d:byte(13) + 256 * d:byte(14), d:byte(15) + 256 * d:byte(16)
+    local function dark(x, y)
+      local i = 18 + ((h - 1 - y) * w + x) * 4 + 1
+      return d:byte(i + 3) > 250 and d:byte(i) + d:byte(i + 1) + d:byte(i + 2) < 360
+    end
+    local x = math.floor(TZ.cx * CW / (ns.Skin.card.pieces.card_panel[3] * CW) * e.cw
+      - ns.Skin.card.pieces.card_panel[1] / ns.Skin.card.pieces.card_panel[3] * e.cw)
+    local y0, y1
+    for y = 0, e.ch - 1 do
+      if dark(x, y) then y0 = y0 or y y1 = y end
+    end
+    local r = ns.Skin.card.pieces.card_panel
+    local top = (r[2] + y0 / e.ch * r[4]) * CW
+    local bot = (r[2] + (y1 + 1) / e.ch * r[4]) * CW
+    check(("centre optique : milieu de l'intérieur sombre mesuré sur Media/card_panel.tga (%.1f à %.1f unités, centre %.2f ; TZ.optY : %.2f)")
+      :format(top, bot, (top + bot) / 2, optC), math.abs((top + bot) / 2 - optC) < 0.3)
+  end
+  -- encre d'un texte posé : haut des capitales de la première ligne, ligne de base de la dernière
+  -- (ligne de base aux W.TEXT_BASE de la ligne, capitales de W.TEXT_CAP cadratin : Baloo Chettan 2, même
+  -- modèle que le rendu SVG du harnais)
+  local function inkCenter(card)
+    local first, last, n = nil, nil, 0
+    for b = 1, card.bodyUsed or 1 do
+      local p = card.bodyParts[b]
+      local pl = splitLines(p._text)
+      if #pl > 0 then
+        local size = H.renderSize(p)
+        local lh = size * LH
+        local top = -p._points[1][5] - #pl * lh / 2
+        first = first or (top + W.TEXT_BASE * lh - W.TEXT_CAP * size)
+        last = top + (#pl - 1) * lh + W.TEXT_BASE * lh
+        n = n + #pl
+      end
+    end
+    return first and (first + last) / 2 or nil, n
+  end
+  local holder = UI().content
+  local card = W.card(holder)
+  local ids = {}
+  for id in pairs(ns.Cards) do ids[#ids + 1] = id end
+  table.sort(ids)
+  local bad, worst, byLines, more = {}, 0, {}, {}
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local c, n = inkCenter(card)
+      local label = id .. (up and "+" or "")
+      if c and card.bodyFit.ok then
+        local dv = c - optC
+        if n >= 1 and n <= 4 then
+          byLines[n] = (byLines[n] or 0) + 1
+          worst = math.max(worst, math.abs(dv))
+          if math.abs(dv) > 1 + 1e-6 then
+            bad[#bad + 1] = ("%s (%d lignes, taille %s) : centre de l'encre à %+.2f du centre optique"):format(label, n, tostring(card.bodyFit.size), dv)
+          end
+        else
+          more[#more + 1] = ("%s %+.1f"):format(label, dv)
+        end
+      elseif not card.bodyFit.ok then
+        bad[#bad + 1] = label .. " : ne tient à aucun palier"
+      end
+    end
+  end
+  -- témoin : l'ancienne position de Frostbolt (bloc en haut de la zone, 3 lignes à 10, sans écart) serait refusée
+  local oldC = (TZ.top * CW + W.TEXT_BASE * 10 - W.TEXT_CAP * 10 + TZ.top * CW + 2 * 10 + W.TEXT_BASE * 10) / 2
+  local cnt = {}
+  for k = 1, 4 do cnt[#cnt + 1] = ("%d → %d"):format(k, byLines[k] or 0) end
+  check(("bloc centré à ±1 unité (encre : haut des capitales de la 1re ligne, ligne de base de la dernière) sur toutes les cartes de 1 à 4 lignes, base et améliorées (%s ; écart maximal %.2f) ; témoin : Frostbolt d'avant à %+.1f")
+    :format(table.concat(cnt, ", "), worst, oldC - optC), #bad == 0 and math.abs(oldC - optC) > 1, table.concat(bad, "\n        "))
+  print("      5 lignes et plus (décalage au plus nécessaire, sous la gemme) : " .. (#more > 0 and table.concat(more, ", ") or "aucune"))
+  -- sablier : dessin mesuré sur les pixels de Media/hourglass.tga (alpha > 8)
+  local tf = assert(io.open(root .. "/Media/hourglass.tga", "rb"))
+  local td = tf:read("*a")
+  tf:close()
+  local tw, th = td:byte(13) + 256 * td:byte(14), td:byte(15) + 256 * td:byte(16)
+  local ymin, ymax = th, -1
+  for r = 0, th - 1 do
+    for x = 0, tw - 1 do
+      if td:byte(18 + (r * tw + x) * 4 + 4) > 8 then
+        local y = th - 1 - r
+        ymin, ymax = math.min(ymin, y), math.max(ymax, y)
+      end
+    end
+  end
+  local frac, botFrac = (ymax - ymin + 1) / th, (ymax + 1) / th
+  -- chaque sablier posé sur une carte, fenêtre 1, 1,15 et 0,6 : hauteur du dessin (taille de la séquence
+  -- telle que le faux client la rend, H.iconUnit) ≥ 90 % de la hauteur de capitale du texte rendu ; bas
+  -- du dessin sur la ligne de base (icône centrée sur la ligne)
+  local hbad, nHg, minR = {}, 0, math.huge
+  for _, sc in ipairs({ 1, 1.15, 0.6 }) do
+    local box = CreateFrame("Frame", nil, _G.UIParent)
+    box:SetSize(300, 300)
+    box:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    box:SetScale(sc)
+    local c2 = W.card(box)
+    for _, id in ipairs(ids) do
+      for _, up in ipairs({ false, true }) do
+        c2:SetCard(id, up, { playable = true })
+        for b = 1, c2.bodyUsed or 1 do
+          local p = c2.bodyParts[b]
+          local size = H.renderSize(p)
+          local _, _, list = H.inlineIcons(p._text or "", size, H.iconUnit(p))
+          for _, ic in ipairs(list) do
+            nHg = nHg + 1
+            local r = ic.h * frac / (W.TEXT_CAP * size)
+            minR = math.min(minR, r)
+            local lh = size * LH
+            local base = (lh - ic.h) / 2 + botFrac * ic.h -- bas du dessin, depuis le haut de la ligne
+            if r < 0.9 or math.abs(base - W.TEXT_BASE * lh) > 0.08 * size then
+              hbad[#hbad + 1] = ("%s%s ×%s : dessin %.2f / capitale %.2f, bas à %+.2f de la ligne de base"):format(id, up and "+" or "", tostring(sc),
+                ic.h * frac, W.TEXT_CAP * size, base - W.TEXT_BASE * lh)
+            end
+          end
+        end
+      end
+    end
+    box:Hide()
+  end
+  -- témoin : l'ancienne séquence (hauteur explicite 7 pour un texte de 10, dessin de 60/64) dans une carte à
+  -- 1,15 : la moitié de la hauteur de capitale, comme sur la capture
+  local box = CreateFrame("Frame", nil, _G.UIParent)
+  box:SetScale(1.15)
+  local fs = W.label(box, "bold", 10)
+  local _, _, olist = H.inlineIcons("1|TInterface\\AddOns\\SlayTheDragon\\Media\\hourglass.tga:7:7:0:0:64:64:0:64:0:64:255:255:255|t", 10, H.iconUnit(fs))
+  local oldR = olist[1].h * 60 / 64 / (W.TEXT_CAP * 10)
+  box:Hide()
+  check(("sablier : %d posés (fenêtre 1, 1,15 et 0,6), dessin ≥ 90 %% de la hauteur de capitale (au plus petit %d %%), bas sur la ligne de base ; dessin %d/%d texels de haut ; témoin : ancienne séquence à 1,15 : %d %%")
+    :format(nHg, math.floor(minR * 100 + 0.5), ymax - ymin + 1, th, math.floor(oldR * 100 + 0.5)),
+    #hbad == 0 and nHg > 0 and oldR < 0.9, table.concat(hbad, "\n        "))
+  card:Hide()
+  -- planche : Frostbolt, Fireball, une carte de quatre lignes, une d'une ligne (texte_centre.svg)
+  if SNAP then
+    local four, one
+    for _, id in ipairs({ "shadowform", "penance" }) do
+      card:SetCard(id, false, { playable = true })
+      if not four and select(2, inkCenter(card)) == 4 then four = id end
+    end
+    card:SetCard("smite", false, { playable = true })
+    if select(2, inkCenter(card)) == 1 then one = "smite" end
+    local list = { "frostbolt", "fireball", four or "shadowform", one or "smite" }
+    local zoom = CreateFrame("Frame", nil, _G.UIParent)
+    zoom:SetSize(#list * 140 + 20, 240)
+    zoom:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    zoom:SetScale(3)
+    for i, id in ipairs(list) do
+      local c = W.card(zoom)
+      c:SetCard(id, false, { playable = true })
+      W.placeCenter(c, zoom, 80 + (i - 1) * 140, 125, 1)
+    end
+    Render.svg(H, zoom, SNAP .. "/texte_centre.svg", "texte centré, sablier : " .. table.concat(list, ", "))
+    zoom:Hide()
+  end
 end
 
 print("U16 méthodes d'API inconnues appelées")
