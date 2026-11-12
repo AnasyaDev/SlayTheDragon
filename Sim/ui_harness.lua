@@ -5849,6 +5849,154 @@ if SNAP then
   big:Hide()
 end
 
+print("UM  Mage : textes des cartes dans la zone, accueil, combat (pastille d'Arcane Charges, portrait, Instant, deuxième incantation)")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, Art = ns.Widgets, ns.Art
+  -- textes : les 34 cartes du Mage (base et améliorée) tiennent dans le panneau, une clause par ligne
+  local card = W.card(UI().content)
+  local ids, bad, minSize = {}, {}, 99
+  for id, d in pairs(ns.Cards) do if d.class == "mage" then ids[#ids + 1] = id end end
+  table.sort(ids)
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      if not (fit and fit.ok and not fit.under and fit.mode == "clauses") then
+        bad[#bad + 1] = id .. (up and "+" or "") .. " : " .. tostring(fit and fit.mode) .. " " .. tostring(fit and fit.size)
+      else
+        minSize = math.min(minSize, fit.size)
+      end
+      if not Art.cards[id] or not Art.cards[id].tga or not ns.Skin.icons[Art.cards[id].tga:lower()] then
+        bad[#bad + 1] = id .. " : icône absente de Media/Icons"
+      end
+    end
+  end
+  card:Hide()
+  check(("textes : %d cartes du Mage (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), icônes embarquées")
+    :format(#ids, minSize), #ids == 34 and #bad == 0, table.concat(bad, ", "))
+  local rbad = {}
+  for id, r in pairs(ns.Relics) do
+    if r.class == "mage" and not (Art.relics[id] and ns.Skin.icons[Art.relics[id].tga:lower()]) then rbad[#rbad + 1] = id end
+  end
+  check("bibelots du Mage : icônes embarquées", #rbad == 0, table.concat(rbad, ", "))
+  -- accueil : le Mage proposé après le Priest et le Warrior, choisissable
+  local cls = {}
+  for _, o in ipairs(UI().step.options) do if o.group == "class" then cls[#cls + 1] = o.id end end
+  local pos
+  for i, id in ipairs(cls) do if id == "class:mage" then pos = i end end
+  check("accueil : Mage proposé après le Priest et le Warrior", pos ~= nil and pos > 2, table.concat(cls, ","))
+  local mb = button("class:mage")
+  check("accueil : bouton du Mage (PV, cartes)", mb and mb._shown and (mb.sub._text or ""):find(ns.Classes.mage.hp .. " HP", 1, true)
+    and (mb.sub._text or ""):find("10 cards", 1, true), mb and mb.sub._text)
+  clickOption("class:mage")
+  check("accueil : clic sur le Mage, il devient le choix", option("class:mage").selected and not option("class:priest").selected)
+  snap("accueil-mage", true)
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  check("départ : expédition du Mage (classe, deck, Apprentice's Wand)", e and e.class == "mage"
+    and ns.Cards[e.deck[1].id].class == "mage" and e.relics[1] == "apprentice_wand")
+  check("bandeau : nom de la classe", UI().className._text == "Mage", UI().className._text)
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  check("combat du Mage : classe du combat, 0 charge au départ", c and c.class == "mage" and c.player.res == 0)
+  v:Render(true)
+  check("pastille de ressource cachée à 0 charge", not v.resource._shown)
+  c.player.res = 2
+  v:Render(true)
+  local r = v.resource
+  check("pastille de ressource : icône des Arcane Charges, nombre, visible",
+    r._shown and (r.icon._texture or ""):lower():find("spell_arcane_arcane01", 1, true) and r.text._text == "2",
+    tostring(r.icon._texture) .. " / " .. tostring(r.text._text))
+  local tt = table.concat(H.hover(r), " | ")
+  check("pastille de ressource : explication des Arcane Charges et plafond 4", tt:find("Arcane Charge", 1, true) and tt:find("2 / 4", 1, true), tt)
+  check("cadre du héros : nom et portrait = icône du Mage",
+    v.heroFrame.name._text == "Mage" and (v.heroFrame.portrait._texture or ""):lower():find("classicon_mage", 1, true),
+    tostring(v.heroFrame.portrait._texture))
+  local allM = #c.hand > 0
+  for _, inst in ipairs(c.hand) do if ns.Cards[inst.id].class ~= "mage" then allM = false end end
+  check("main du Mage : ses cartes", allM)
+  -- chiffre flottant au nom de la ressource (singulier / pluriel)
+  local floats = {}
+  local old = W.float
+  W.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  v:OnEvents({ { t = "resource", n = 1, total = 3 }, { t = "resource", n = 2, total = 4 } })
+  H.advance(2)
+  W.float = old
+  local fl = table.concat(floats, "|")
+  check("chiffres flottants : « +1 Arcane Charge » et « +2 Arcane Charges »", fl:find("+1 Arcane Charge", 1, true)
+    and fl:find("+2 Arcane Charges", 1, true), fl)
+  -- Instant : jeton sous le héros avec son nombre
+  ns.Combat.applyStatus(c, c.player, "instant", 2)
+  v:Render(true)
+  local tok
+  for _, t in ipairs(v.playerSt.tokens) do if t._shown and t.info and t.info.status == "instant" then tok = t end end
+  check("jeton Instant sous le héros (nombre 2)", tok ~= nil and tok.info.n == 2)
+  -- deux incantations : la barre commune montre la plus ancienne, la vue du Mage la plus récente
+  c.player.st.instant = nil
+  c.player.mana = 9
+  c.hand[#c.hand + 1] = ns.Card.new("fireball", false, 9101)
+  c.hand[#c.hand + 1] = ns.Card.new("pyroblast", false, 9102)
+  ns.Combat.play(c, #c.hand - 1, 1)
+  ns.Combat.play(c, #c.hand, 1)
+  v:Render(true)
+  local host = v.classZone.views.mage
+  check("deux incantations : barre commune = Fireball, vue du Mage = « 2nd cast: Pyroblast »",
+    v.cast._shown and (v.cast.name._text or ""):find("Fireball", 1, true) and host and host._shown
+      and host.name._shown and host.name._text == "2nd cast: Pyroblast",
+    tostring(v.cast.name._text) .. " / " .. tostring(host and host.name._text))
+  local ctt = table.concat(H.hover(host.box), " | ")
+  check("infobulle de la deuxième incantation : carte et interruption", ctt:find("Pyroblast", 1, true)
+    and ctt:find("interrupt cancels this cast first", 1, true), ctt)
+  -- Hot Streak en jeu : compte Fire du tour
+  c.player.powers[#c.player.powers + 1] = ns.Card.new("hot_streak", false, 9103)
+  v:Render(true)
+  check("Hot Streak en jeu : « Fire 2/2 » dans la vue du Mage", host.fire._shown and host.fire._text == "Fire 2/2", host.fire._text)
+  snap("combat-mage", true)
+  -- carte Cast injouable avec deux incantations : raison du moteur
+  c.hand[#c.hand + 1] = ns.Card.new("blizzard", false, 9104)
+  local ok, why = ns.Combat.canPlay(c, #c.hand)
+  check("troisième carte Cast : injouable (raison « casting »)", not ok and why == "casting", why)
+end
+
+-- planche des cartes du Mage (base et améliorée)
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local ids = {}
+  for id, d in pairs(ns.Cards) do if d.class == "mage" then ids[#ids + 1] = id end end
+  local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
+  local PATH = { start = 0, fire = 1, frost = 2, arcane = 3 }
+  table.sort(ids, function(a, b)
+    local da, db = ns.Cards[a], ns.Cards[b]
+    if PATH[da.path] ~= PATH[db.path] then return PATH[da.path] < PATH[db.path] end
+    if RANK[da.rarity] ~= RANK[db.rarity] then return RANK[da.rarity] < RANK[db.rarity] end
+    return a < b
+  end)
+  local perRow, cw, ch = 10, 140, 230
+  local all = {}
+  for _, id in ipairs(ids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+  local rows = math.ceil(#all / perRow)
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, rows * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, e in ipairs(all) do
+    local c = W.card(big)
+    c:SetCard(e[1], e[2], { playable = true })
+    W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+  end
+  Render.svg(H, big, SNAP .. "/cartes_mage.svg", "cartes du Mage (base, améliorée)")
+  big:Hide()
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end
