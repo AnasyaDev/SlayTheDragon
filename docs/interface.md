@@ -335,11 +335,43 @@ valeurs, bouton « Back on the road » du feu de camp.
   bas, et sous la plus grande gemme de rareté en haut ; le bas biseauté rétrécit la zone (demi-largeur
   0,308 − 0,56 × (y − 1,0754), marge ×1,15 en biais). Les lignes sont posées une à une : remplissage
   glouton, chaque ligne limitée à la largeur de la zone à son bas, bloc centré verticalement ; puis le
-  texte est posé avec des retours explicites et une largeur un peu plus grande que la plus longue ligne
-  possible (le client ne recoupe jamais autrement, ni à une autre échelle, ni pendant un zoom).
-  Mesures par le client : `GetStringWidth` / `GetStringHeight` d'un texte de mesure (même police), puis
-  vérification sur la carte (`GetNumLines`, `IsTruncated`, `GetStringHeight`) — un échec fait descendre
-  d'un palier. Mises en page gardées en cache (texte, taille, bas de zone).
+  texte est posé avec des retours explicites dans une **boîte posée** (`W.looseBox`, voir « Textes
+  tronqués au survol » plus bas). Mesures par le client : `GetStringWidth` / `GetStringHeight` d'un texte
+  de mesure (même police), avec une marge `W.TEXT_SAFE` (une ligne mesurée × 1,02 doit tenir dans sa
+  largeur), puis vérification sur la carte (`GetNumLines`, `IsTruncated`, `GetStringHeight`) — un échec
+  fait descendre d'un palier. Mises en page gardées en cache (texte, taille, bas de zone).
+- **Textes tronqués au survol** (retour en jeu du 12/11/2026, fenêtre à 115 %, zoom net) : « PW: Radiance »
+  survolée en main affichait « Gain 4 Absorb.... » sur une ligne au lieu de ses deux lignes
+  (« Gain 4 Absorb. » / « Gain Atonement 1 ⌛ »). **Établi** : c'est la troncature verticale du client (la
+  première ligne entière, suivie de « … », la seconde absente : une ligne trop large aurait été coupée en
+  son milieu ou recoupée en une ligne de plus) ; le texte avait une largeur posée mais une hauteur
+  **automatique** (aucune `SetHeight`), et le harnais, dont le faux client ne bornait jamais une hauteur
+  automatique, ne pouvait pas le voir. **Hypothèse** (non vérifiable hors jeu, aucun code de Blizzard
+  n'emploie `SetSmoothScaling`) : à l'échelle survolée, la hauteur automatique est calculée avec la police
+  arrondie au pixel le plus proche, le rendu avec une hauteur plus grande (`SetSmoothScaling` : non
+  arrondie, ou arrondie au-dessus) ; 10 × 1,15 × 1,16 = 13,34 px → boîte pour 13 px, lignes de 13,34 px
+  ou plus : deux lignes n'y tiennent plus. Au repos (10 × 1,15 = 11,5 px → 12 px) la boîte suffisait.
+  **Correction** : tout texte dont nos mises en page choisissent les lignes est posé dans une boîte de
+  taille posée, largeur = zone × 1,3 + 8, hauteur = lignes × hauteur de ligne × 1,3 + 8, `SetMaxLines(0)`
+  (`W.looseBox`, `W.TEXT_ROOM`, `W.TEXT_PAD`), centrée sur le bloc (ancrage par le centre et `JustifyV`
+  « MIDDLE », ou par le haut et « TOP » pour le texte sous les plaques de réponse) : le client n'a plus
+  jamais à recouper ni tronquer, à aucune échelle, et rien ne bouge (le texte reste centré au même point).
+  Concernés : texte, nom (ruban), plaque du bas et raison des cartes ; libellé et texte des plaques de
+  réponse (`setLines` de `UI/Screens.lua`). Les textes d'une ligne à largeur libre (libellés de boutons,
+  coût, prix) ne sont jamais tronqués (vérifié, U33). Marge `W.TEXT_SAFE` (1,02) dans le choix des paliers :
+  15 cartes perdent un demi-palier (texte ou nom ; Schisme 8 → 7,5, Évangélisation 8,5 → 8…).
+  **Garde-fou en jeu** (`W.checkCardTexts`) : une image après la pose d'une carte et après chaque survol
+  (`onAnimSettled`, donc après la bascule du zoom), un texte que le client tronque malgré tout
+  (`IsTruncated`) fait descendre son palier (texte ou nom, `card.textCap`, propre à la carte) et reposer la
+  carte ; tout texte tronqué est relevé (40 derniers) : **`/slay text`** les liste (avec taille, échelle
+  effective et mode de zoom), ainsi que les textes visibles tronqués en ce moment ; `/slay art` en donne le
+  nombre. **Harnais U33** : faux client défavorable (`H.strictText` : police rendue arrondie au pixel
+  supérieur à l'échelle effective, hauteur automatique au plus proche) ; toutes les cartes base et
+  améliorées, jouables et injouables, fenêtre 1 / 1,15 / 1,5 / 0,6, écrans main (×1,16), récompense,
+  grille et marchand, posées au repos ou à l'échelle survolée (mode fluide), vues au repos et survolées ;
+  « PW: Radiance » en main par le vrai survol dans les trois modes ; toutes les réponses des
+  rencontres ; tous les textes des visuels survolables. Sur l'ancien code : 2 127 cas tronqués, dont
+  PW: Radiance en net à 1 et 1,15 survolée (« 1/2 lignes »), et 24 réponses.
 - **Paliers** (retour du troisième essai : « texte trop petit ») : chaque carte prend le plus grand
   palier qui tient dans la zone utile (inchangée, marges comprises) : texte 10 / 9,5 / 9 / 8,5 / 8 / 7,5 / 7
   (plancher lisible), secours 6,5 / 6 signalé (`card.bodyFit.under`) ; nom 11 / 10 / 9 / 8 / 7, secours
@@ -350,7 +382,9 @@ valeurs, bouton « Back on the road » du feu de camp.
   mot d'avant, un nombre qui finit la phrase (« Pioche 1. ») avec le mot d'avant, un nombre seul avec le
   mot d'après (« 12 Absorption », « +1 Démence »). Répartition depuis le langage en mots-clés (voir
   « Langage des cartes », harnais U22, métriques de Baloo Chettan 2, 68 cartes base et améliorées) :
-  texte 10 → 28, 9,5 → 6, 9 → 6, 8,5 → 6, 8 → 19, 7,5 → 1, 7 → 2 (Schisme et +), soit 46 à 8,5 ou plus ;
+  depuis la marge `W.TEXT_SAFE` (12/11/2026, texte des cartes en anglais) : texte 10 → 39, 9,5 → 11, 9 → 2,
+  8,5 → 5, 8 → 5, 7,5 → 6, soit 57 à 8,5 ou plus (60 avant la marge) ; nom 11 → 54, 10 → 7, 9 → 4, 8 → 3 ;
+  plus ancien (textes en français) : texte 10 → 28, 9,5 → 6, 9 → 6, 8,5 → 6, 8 → 19, 7,5 → 1, 7 → 2 (Schisme et +), soit 46 à 8,5 ou plus ;
   avant les mots-clés : 10 → 34, 9,5 → 2, 9 → 10, 8,5 → 3, 8 → 17, 7 → 2 (49 à 8,5 ou plus). Nom 11 → 44, 10 → 8, 9 → 6, 8 → 4, 7 → 5, sous le plancher : Suppression de la douleur+
   (6,5). La largeur de Baloo et le biseau limitent la troisième ligne : un texte de trois lignes dont la
   dernière dépasse ~59 unités reste à 8 ; textes raccourcis dans `Data/Priest.lua` (règles et chiffres
@@ -1097,6 +1131,16 @@ Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/In
 (commande `rsync` dans `CLAUDE.md`). **Nouveau fichier dans le TOC (`UI\SkinData.lua`) et nouveau dossier
 `Media/` : relancer le client** (`/reload` ne suffit pas). Activer les erreurs Lua
 (`/console scriptErrors 1`) ou BugSack.
+
+Avant tout (textes tronqués au survol, 12/11/2026 ; `/reload` suffit) : en zoom net (défaut), fenêtre à
+115 % puis à 100 % et 150 %, survoler lentement chaque carte de la main (et en récompense, au marchand,
+dans le deck) : **aucun texte ne finit par « … »** (texte du panneau, nom du ruban, plaque du bas, raison en
+rouge) ; « PW: Radiance » montre ses deux lignes, au repos comme agrandie ; idem en `/slay zoom fluid` et
+`/slay zoom smooth`. Réponses des rencontres : libellé et texte dessous entiers, texte toujours juste sous le
+bouton (pas décalé vers le bas). Puis **`/slay text`** : « no truncated text found so far » attendu ; sinon
+recopier la liste (chaque ligne donne la carte, le texte, la taille, l'échelle et le mode de zoom ; la carte
+a déjà été reposée un palier plus bas). Dire si certaines cartes paraissent plus petites qu'avant (marge de
+2 % : 15 cartes perdent un demi-palier).
 
 En tout premier (habillage WoW, 11/11/2026 ; nouveau fichier `UI\WowSkin.lua` : relancer le client) :
 1. **Chargement** : aucun aplat vert ni carré noir sur le cadre de la fenêtre (filets, barre de titre), le

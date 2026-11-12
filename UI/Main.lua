@@ -857,6 +857,26 @@ local function artReport()
     say(#keys .. " missing art element(s):")
     for i = 1, #keys do say("  " .. keys[i]) end
   end
+  local cut = #W.truncatedLog() + #W.truncatedNow()
+  if cut > 0 then say(cut .. " truncated text(s): /slay text.") end
+end
+
+-- /slay text : textes que le client a tronqués (« … ») : relevés du garde-fou des cartes (palier
+-- descendu, voir W.checkCardTexts), puis textes visibles tronqués en ce moment.
+local function textReport()
+  local log, now = W.truncatedLog(), W.truncatedNow()
+  if #log == 0 and #now == 0 then
+    say("no truncated text found so far (hover a few cards, then run again).")
+    return
+  end
+  if #log > 0 then
+    say(#log .. " truncated card text(s) caught (please report them):")
+    for i = 1, #log do say("  " .. log[i]) end
+  end
+  if #now > 0 then
+    say(#now .. " text(s) truncated on screen right now:")
+    for i = 1, #now do say("  " .. now[i]) end
+  end
 end
 
 -- Affiche tous les ennemis de l'acte (vérification des modèles), sans toucher à l'expédition.
@@ -933,6 +953,7 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   if msg == "" then UI.toggle()
   elseif msg == "options" or msg == "config" then UI.toggleOptions()
   elseif msg == "art" then artReport()
+  elseif msg == "text" then textReport()
   elseif msg == "models" then artPreview()
   elseif msg == "scenery" or msg:match("^scenery%s") then
     decorCommand(msg:match("^scenery%s*(.*)$") or "")

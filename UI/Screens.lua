@@ -125,12 +125,13 @@ local function balanced(fs, t, s, n)
   return best, bestW
 end
 
--- Pose un texte : lignes explicites, largeur un peu plus grande que la plus longue ligne (le client ne
--- recoupe jamais autrement) ; renvoie sa hauteur mesurée.
+-- Pose un texte : lignes explicites dans une boîte posée, bien plus large et plus haute que le texte
+-- (W.looseBox : le client ne recoupe ni ne tronque jamais, à aucune échelle) ; renvoie sa hauteur mesurée
+-- (nombre de lignes × hauteur d'une ligne : la hauteur du texte, pas celle de la boîte).
 local function setLines(fs, lines, s, zw)
   W.setSize(fs, s)
   fs:SetWordWrap(#lines > 1)
-  fs:SetWidth(zw + 1)
+  W.looseBox(fs, #lines, zw)
   fs:SetText(table.concat(lines, "\n"))
   return fs:GetStringHeight() or 0
 end
@@ -157,6 +158,7 @@ local function plaque(parent)
   b.label:SetWordWrap(false)
   b.sub = W.label(face, "bold", OPT_SUB[1], C.text)
   b.sub:SetJustifyH("CENTER")
+  b.sub:SetJustifyV("TOP") -- ancré par le haut dans une boîte plus haute que lui (W.looseBox)
   b.sub:SetWordWrap(true)
   -- Libellé dans le bouton, texte dessous ; renvoie la mise en page retenue.
   b.Layout = function(self, label, sub, w, h, withIcon)
@@ -166,11 +168,11 @@ local function plaque(parent)
     local fit = { ok = false }
     local ls
     for _, s in ipairs(OPT_LABEL) do
-      if textWidth(self.label, label, s) <= lw then ls = s break end
+      if textWidth(self.label, label, s) * W.TEXT_SAFE <= lw then ls = s break end
     end
     if not ls then
       ls = OPT_LABEL[#OPT_LABEL]
-      local tw = textWidth(self.label, label, ls)
+      local tw = textWidth(self.label, label, ls) * W.TEXT_SAFE
       ls = max(10, floor(ls * lw / max(1, tw) * 10) / 10)
     end
     setLines(self.label, { label }, ls, lw)
@@ -187,7 +189,7 @@ local function plaque(parent)
       for _, s in ipairs(OPT_SUB) do cands[#cands + 1] = { s, 3 } end
       for _, c in ipairs(cands) do
         local lines, lwid = balanced(self.sub, sub, c[1], c[2])
-        if #lines == c[2] and lwid <= zw then
+        if #lines == c[2] and lwid * W.TEXT_SAFE <= zw then
           local hh = setLines(self.sub, lines, c[1], zw)
           if hh <= zh then sh, slines, ss, fit.ok = hh, lines, c[1], true break end
         end
