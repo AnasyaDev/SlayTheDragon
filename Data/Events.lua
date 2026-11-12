@@ -2,7 +2,7 @@
 --
 -- Une rencontre :
 --   name      titre affiché
---   act       acte (nil = tous)           tier   palier de la Ligue des explorateurs (0..3)
+--   zone      zone (id de ns.Zones, nil = toutes)   tier   palier commun (0 d'emblée, N = zone N gagnée par le compte)
 --   rarity    "common" (ordinaire) | "rare" (poids faible) | "story" (une fois par compte)
 --   weight    poids de tirage (défaut : Expedition.EVENT_WEIGHT selon rarity : 10 / 3 / 8)
 --   once      true = une fois par compte (drapeau « event:<id> » posé à l'entrée) ; ou nom de drapeau
@@ -23,7 +23,7 @@
 --   { "hpAbove", 0.6 } PV >= 60 % ; { "gold", n } ; { "relic", id } ; { "noRelic", id } ;
 --   { "potion" } une potion en poche ; { "card", id } ; { "key", n } clé mythique >= n ;
 --   { "flag", nom } / { "noFlag", nom } drapeau de compte (connu au départ de l'expédition) ;
---   { "floor", n } étape >= n ; { "unlocked", idCarte } carte débloquée (neutre : palier de Ligue).
+--   { "floor", n } étape >= n ; { "unlocked", idCarte } carte débloquée (neutre : palier commun).
 --   Champ text = raison affichée à la place de celle par défaut ; hide = true : réponse absente (et
 --   non grisée) tant que la condition manque.
 --
@@ -63,7 +63,7 @@ end
 ---------------------------------------------------------------------------
 
 event("saldean_farm", {
-  name = "The Saldean Farm", act = 1, tier = 0,
+  name = "The Saldean Farm", zone = "westfall", tier = 0,
   speaker = "Salma Saldean", npc = "salma_saldean", scene = "farm",
   text = "\"You look hungry, traveler. Come in, there's stew left! And if you have a moment, "
     .. "my husband could use some help in the fields.\"",
@@ -85,7 +85,7 @@ event("saldean_farm", {
 })
 
 event("defias_caravan", {
-  name = "The Overturned Wagon", act = 1, tier = 0,
+  name = "The Overturned Wagon", zone = "westfall", tier = 0,
   speaker = "The wagon driver", npc = "wagon_driver", scene = "road",
   text = "\"Help! Defias bandits overturned my wagon on the road to Moonbrook, and I'm "
     .. "stuck under it. They're looting my crates!\"",
@@ -107,7 +107,7 @@ event("defias_caravan", {
 })
 
 event("sentinel_hill", {
-  name = "Sentinel Hill", act = 1, tier = 0,
+  name = "Sentinel Hill", zone = "westfall", tier = 0,
   speaker = "Gryan Stoutmantle", npc = "gryan_stoutmantle", scene = "hill",
   text = "\"The People's Militia defends Westfall against the Defias, and we're short on "
     .. "everything. If you want to help us, you're welcome here.\"",
@@ -130,7 +130,7 @@ event("sentinel_hill", {
 })
 
 event("coast_murlocs", {
-  name = "Old Hank's Traps", act = 1, tier = 0,
+  name = "Old Hank's Traps", zone = "westfall", tier = 0,
   speaker = "Old Hank", npc = "old_fisherman", scene = "coast",
   text = "\"Those blasted murlocs took my dock, and my fish traps with it! Run them off, or "
     .. "go pull up my traps yourself. I'm too old for that.\"",
@@ -151,7 +151,7 @@ event("coast_murlocs", {
 })
 
 event("jangolode_prospector", {
-  name = "The Jangolode Vein", act = 1, tier = 0,
+  name = "The Jangolode Vein", zone = "westfall", tier = 0,
   speaker = "Grit, gold prospector", npc = "gold_prospector", scene = "mine",
   text = "\"There's still gold in this mine, I'm sure of it! The Defias have gone to eat. "
     .. "Help me dig, or fund my claim, and we'll split it.\"",
@@ -176,7 +176,7 @@ event("jangolode_prospector", {
 })
 
 event("moonbrook_refugees", {
-  name = "The Moonbrook Refugees", act = 1, tier = 1,
+  name = "The Moonbrook Refugees", zone = "westfall", tier = 1,
   speaker = "Mother Hanna", npc = "moonbrook_refugee", scene = "camp",
   text = "\"The Defias drove us out of Moonbrook. We have wounded, and nothing left to treat "
     .. "them or to feed ourselves. Any help is welcome.\"",
@@ -200,7 +200,7 @@ event("moonbrook_refugees", {
 })
 
 event("herbalist", {
-  name = "The Peacebloom Picker", act = 1, tier = 1,
+  name = "The Peacebloom Picker", zone = "westfall", tier = 1,
   speaker = "Aunt Mirelle", npc = "herbalist", scene = "road",
   -- N'apparaît que si l'on est mal en point.
   when = { { "hpBelow", 0.5 } },
@@ -223,7 +223,7 @@ event("herbalist", {
 })
 
 event("scarecrow_field", {
-  name = "The Creaking Scarecrow", act = 1, tier = 2,
+  name = "The Creaking Scarecrow", zone = "westfall", tier = 2,
   speaker = "Farmer Molsen", npc = "farmer_molsen", scene = "farm",
   text = "\"That scarecrow moves at night, I tell you! Yesterday it was at the other end of "
     .. "the field. Must be Defias sorcery. Burn it, please.\"",
@@ -241,7 +241,7 @@ event("scarecrow_field", {
 })
 
 event("lighthouse_keeper", {
-  name = "The Lighthouse Keeper", act = 1, tier = 2,
+  name = "The Lighthouse Keeper", zone = "westfall", tier = 2,
   speaker = "Keeper Alden", npc = "lighthouse_keeper", scene = "coast",
   -- Le phare est au bout de la côte : seulement après l'étape 4.
   when = { { "floor", 4 } },
@@ -262,7 +262,7 @@ event("lighthouse_keeper", {
 })
 
 event("gnoll_raiders", {
-  name = "The Riverpaw Raiders", act = 1, tier = 3,
+  name = "The Riverpaw Raiders", zone = "westfall", tier = 3,
   speaker = "Graymaw", npc = "riverpaw_gnoll", scene = "camp",
   -- Les meutes Rivepatte ne s'aventurent sur la route qu'à partir de la clé +2.
   when = { { "key", 2 } },
@@ -286,7 +286,7 @@ event("gnoll_raiders", {
 ---------------------------------------------------------------------------
 
 event("goblin_peddler", {
-  name = "Grizzle's Wagon", act = 1, tier = 1, rarity = "rare",
+  name = "Grizzle's Wagon", zone = "westfall", tier = 1, rarity = "rare",
   speaker = "Grizzle Quickclick", npc = "goblin_peddler", scene = "road",
   text = "\"Rare parts, unique prices, no refunds! This cog came off a real harvest golem. "
     .. "Works like a charm, but it takes a bit of your health, friend.\"",
@@ -311,7 +311,7 @@ event("goblin_peddler", {
 })
 
 event("harvest_watcher", {
-  name = "The Sleeping Harvester", act = 1, tier = 0, rarity = "rare",
+  name = "The Sleeping Harvester", zone = "westfall", tier = 0, rarity = "rare",
   speaker = "Tinker Bertil", npc = "gnome_tinker", scene = "farm",
   -- Proposé seulement en bonne santé : la réponse principale est un combat d'élite.
   when = { { "hpAbove", 0.6 } },
@@ -339,7 +339,7 @@ event("harvest_watcher", {
 
 -- Premier temps : le choix fixe la suite (drapeau tobin_jailed ou tobin_spared).
 event("tobin_thief", {
-  name = "The Bread Thief", act = 1, tier = 0, rarity = "story", once = true,
+  name = "The Bread Thief", zone = "westfall", tier = 0, rarity = "story", once = true,
   speaker = "Tobin", npc = "tobin_young", scene = "farm",
   text = "You grab a skinny boy by the collar, his pockets full of bread stolen from the Saldeans. "
     .. "\"Let go of me! The Defias say they feed anyone who joins them. I'm just hungry.\"",
@@ -358,7 +358,7 @@ event("tobin_thief", {
 
 -- Second temps, s'il a été nourri : retrouvé dans la milice. Débloque le Canif de Tobin.
 event("tobin_scout", {
-  name = "The Hill Lookout", act = 1, tier = 0, rarity = "story", once = true,
+  name = "The Hill Lookout", zone = "westfall", tier = 0, rarity = "story", once = true,
   speaker = "Tobin, militia lookout", npc = "tobin_scout", scene = "hill",
   when = { { "flag", "tobin_spared" } },
   text = "\"Hey! Remember me? The Saldeans' bread! I'm a lookout for the People's Militia "
@@ -375,7 +375,7 @@ event("tobin_scout", {
 
 -- Second temps, s'il a été livré : il a rejoint la Confrérie.
 event("tobin_defias", {
-  name = "The Red Kerchief", act = 1, tier = 0, rarity = "story", once = true,
+  name = "The Red Kerchief", zone = "westfall", tier = 0, rarity = "story", once = true,
   speaker = "Tobin, Defias cutthroat", npc = "tobin_defias", scene = "road",
   when = { { "flag", "tobin_jailed" } },
   text = "\"Remember me? The militia kept me in a cell for six months. The Defias got me "

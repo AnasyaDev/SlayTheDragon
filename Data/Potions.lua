@@ -1,6 +1,6 @@
 -- Potions : à usage unique, bues pendant son tour sans mana (Combat.usePotion).
--- Champs : name, text, rarity (common|uncommon|rare), tier (palier de la Ligue des
--- explorateurs qui la débloque), target = true si elle vise un ennemi,
+-- Champs : name, text, rarity (common|uncommon|rare), tier (palier commun
+-- qui la débloque : 0 d'emblée, N = première victoire du compte dans la zone N), target = true si elle vise un ennemi,
 -- effects = mêmes effets que les cartes (sans Expiation ni crochet onCardPlayed).
 local _, ns = ...
 
@@ -11,7 +11,7 @@ local function potion(id, t)
   P[id] = t
 end
 
--- Neutre (palier 0) ---------------------------------------------------------
+-- Disponible d'emblée (tier 0) ---------------------------------------------------------
 
 potion("healing_potion", {
   name = "Healing Potion", rarity = "common", tier = 0,
@@ -31,7 +31,7 @@ potion("shadow_protection", {
   text = "Gain 12 Absorb.",
 })
 
--- Honoré (palier 2) ---------------------------------------------------------
+-- Duskwood, zone 2 (tier 2) ---------------------------------------------------------
 
 potion("liquid_fire", {
   name = "Liquid Fire", rarity = "uncommon", tier = 2, target = true,

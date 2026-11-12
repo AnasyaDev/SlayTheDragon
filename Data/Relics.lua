@@ -1,6 +1,7 @@
 -- Bibelots : effets passifs pour toute l'expédition.
--- Champs : name, text, rarity (common|uncommon|rare|boss), tier (palier de la Ligue des
--- explorateurs qui le débloque : 0 Neutre, 1 Amical, 2 Honoré, 3 Révéré),
+-- Champs : name, text, rarity (common|uncommon|rare|boss), tier (palier commun qui le débloque : 0 d'emblée,
+-- N = première victoire du compte dans la zone d'ordre N ; docs/zones.md), ou class + level (bibelot de
+-- classe), ou key = { zone, level } (bibelot de clé : première victoire de la classe à +level dans la zone),
 -- hooks = crochets de combat (comme les pouvoirs ; src = id du bibelot),
 -- run = crochets d'expédition appelés par la couche expédition :
 --   gold(run, v) -> v, restHeal(run, v) -> v, onPickup(run).
@@ -18,7 +19,7 @@ local function relic(id, t)
   R[id] = t
 end
 
--- Neutre (palier 0) ---------------------------------------------------------
+-- Disponible d'emblée (tier 0) ---------------------------------------------------------
 
 relic("hearthstone", {
   name = "Cracked Hearthstone", rarity = "uncommon", tier = 0,
@@ -77,7 +78,7 @@ relic("vancleef_bandana", {
   },
 })
 
--- Amical (palier 1) ---------------------------------------------------------
+-- Westfall, zone 1 (tier 1) ---------------------------------------------------------
 
 relic("faction_insignia", {
   name = "Insignia of the Alliance", nameHorde = "Insignia of the Horde", rarity = "rare", tier = 1,
@@ -104,7 +105,7 @@ relic("sharpening_stone", {
   },
 })
 
--- Honoré (palier 2) ---------------------------------------------------------
+-- Duskwood, zone 2 (tier 2) ---------------------------------------------------------
 
 relic("focus_talisman", {
   name = "Talisman of Focus", rarity = "uncommon", tier = 2,
@@ -154,7 +155,7 @@ relic("tobin_knife", {
   },
 })
 
--- Révéré (palier 3) ---------------------------------------------------------
+-- Wetlands, zone 3 (tier 3) ---------------------------------------------------------
 
 relic("mana_ruby", {
   name = "Mana Ruby", rarity = "rare", tier = 3,
@@ -170,7 +171,7 @@ relic("mana_ruby", {
 
 ---------------------------------------------------------------------------
 -- Bibelots communs de la fiche (docs/bibelots-communs.md, 12/11/2026) : offerts à toutes les classes,
--- débloqués par la Ligue des explorateurs. Aucun ne suppose un soin venant des cartes, une ressource
+-- débloqués par les zones gagnées par le compte (tier). Aucun ne suppose un soin venant des cartes, une ressource
 -- ni un état de classe. needs = genre de cartes que la classe doit avoir pour qu'il lui soit proposé
 -- (Expedition.usefulFor : « cast », « castDamage », « cooldown », « exhaust », « attack », « absorb »).
 -- Deux ids de la fiche étaient déjà pris par des bibelots du Guerrier (hand_of_justice,
@@ -181,7 +182,7 @@ relic("mana_ruby", {
 
 local Card = ns.Card
 
--- Neutre (palier 0) ---------------------------------------------------------
+-- Disponible d'emblée (tier 0) ---------------------------------------------------------
 
 relic("scroll_of_intellect", {
   name = "Scroll of Intellect", rarity = "common", tier = 0,
@@ -224,7 +225,7 @@ relic("lifegiving_gem", {
   },
 })
 
--- Amical (palier 1) ---------------------------------------------------------
+-- Westfall, zone 1 (tier 1) ---------------------------------------------------------
 
 relic("darkmoon_prize_ticket", {
   name = "Darkmoon Faire Prize Ticket", rarity = "common", tier = 1,
@@ -314,7 +315,7 @@ relic("royal_seal_of_eldre_thalas", {
   },
 })
 
--- Honoré (palier 2) ---------------------------------------------------------
+-- Duskwood, zone 2 (tier 2) ---------------------------------------------------------
 
 relic("philosophers_stone", {
   name = "Philosopher's Stone", rarity = "uncommon", tier = 2,
@@ -391,7 +392,7 @@ relic("drake_fang_talisman", {
   },
 })
 
--- Révéré (palier 3) ---------------------------------------------------------
+-- Wetlands, zone 3 (tier 3) ---------------------------------------------------------
 
 relic("ironfoe", {
   name = "Ironfoe", rarity = "rare", tier = 3, needs = "attack",

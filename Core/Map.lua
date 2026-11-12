@@ -11,10 +11,7 @@ ns.Map = Map
 
 Map.FLOORS = 7 -- étapes avant le boss
 
--- Actes d'une expédition. encounters = clé de ns.Encounters.
-Map.ACTS = {
-  { name = "Westfall", zone = "westfall", encounters = "act1" },
-}
+-- Les groupes de combats et le nom viennent de la zone de l'expédition (Core/Zones.lua, docs/zones.md).
 
 Map.KINDS = {
   combat = "Combat", elite = "Elite", campfire = "Campfire", merchant = "Goblin Merchant",

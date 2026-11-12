@@ -4,10 +4,12 @@
 --   bot  : random | greedy | heuristic        pick : rated | random | skip
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
 --   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
---     avec key=N (clé mythique) et meta=start|exalted (Ligue au palier 0 ou complète, drapeaux d'histoire)
+--     avec key=N (clé mythique) et zones=0..7 (zones gagnées par le compte et la classe, à toutes les clés :
+--     commun, cartes de zone, bibelots de clé ; drapeaux d'histoire d'un vétéran dès 1) ; meta=start et
+--     meta=exalted restent des alias de zones=0 et zones=7 ; zone=<id> : zone jouée (défaut : la première)
 --   level=1..7 : niveau de classe (cartes et bibelots de classe débloqués) ; défaut 7 avec
 --     runner=expedition (tout débloqué, les mesures d'avant la progression par classe), toutes les cartes sinon
---   tier=0..3 : bibelots/potions débloqués (Ligue des explorateurs ; défaut : tous)
+--   tier=0..7 : bibelots/potions communs débloqués (palier commun : zones gagnées par le compte ; défaut : tous)
 --   relics=id,id : bibelots dès le départ        loot=0 : ni bibelot ni potion gagnés
 --   nointerrupt=1 : monde témoin où les ennemis n'interrompent jamais
 --   sweep=cards [only=id,id] : mesure chaque carte de la réserve, ajoutée de force au deck de départ,
@@ -16,7 +18,6 @@
 --   oldstun=1 : ancienne règle de Stunned pendant le tour ennemi (l'action part, le tour suivant est perdu)
 --   hp=N : PV de départ de la classe remplacés (runner=expedition), pour mesurer l'effet des PV.
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
---   league=0..4 : palier de Ligue imposé (runner=expedition), quel que soit meta= (drapeaux d'histoire de meta=).
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 local opts = {}
@@ -67,7 +68,7 @@ local function newAgg()
   return { runs = 0, wins = 0, floors = {}, hpEndWin = 0, elapsed = 0,
     enc = {}, cards = {}, kinds = {}, potions = {}, relics = {},
     castsStarted = 0, castsInterrupted = 0, enemyCasts = 0, enemyCastsInterrupted = 0,
-    goldEarned = 0, goldSpent = 0, goldEnd = 0, rep = 0, xp = 0, xpWin = 0, xpLoss = 0, cleared = 0, removed = 0, upgraded = 0,
+    goldEarned = 0, goldSpent = 0, goldEnd = 0, xp = 0, xpWin = 0, xpLoss = 0, cleared = 0, removed = 0, upgraded = 0,
     visits = {} }
 end
 
@@ -82,7 +83,6 @@ local function addRecord(agg, rec)
     agg.goldEarned = agg.goldEarned + rec.goldEarned
     agg.goldSpent = agg.goldSpent + rec.goldSpent
     agg.goldEnd = agg.goldEnd + rec.gold
-    agg.rep = agg.rep + rec.rep
     agg.xp = agg.xp + (rec.xp or 0)
     if rec.won then agg.xpWin = agg.xpWin + (rec.xp or 0) else agg.xpLoss = agg.xpLoss + (rec.xp or 0) end
     agg.cleared = agg.cleared + rec.cleared
@@ -203,7 +203,7 @@ local function runRange(from, to)
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
         meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
-        hp = tonumber(opts.hp), path = opts.path, league = tonumber(opts.league) })
+        hp = tonumber(opts.hp), path = opts.path, zones = tonumber(opts.zones), zone = opts.zone })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),
@@ -427,12 +427,13 @@ local function report(a, title)
   end
   out("")
   if opts.runner == "expedition" then
-    out(("Expédition : clé +%d, déblocages %s, niveau de classe %d"):format(tonumber(opts.key or 0), opts.meta or "start",
-      tonumber(opts.level or 7)))
+    local zones = tonumber(opts.zones) or (opts.meta == "exalted" and 7 or 0)
+    out(("Expédition : %s, clé +%d, zones gagnées %d, niveau de classe %d"):format(opts.zone or "westfall",
+      tonumber(opts.key or 0), zones, tonumber(opts.level or 7)))
     out(("Expérience de classe : %.1f par expédition (victoire %.1f, défaite %.1f)"):format(a.xp / a.runs,
       a.wins > 0 and a.xpWin / a.wins or 0, a.runs > a.wins and a.xpLoss / (a.runs - a.wins) or 0))
-    out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Réputation moyenne : %.1f   Étapes franchies : %.2f")
-      :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.rep / a.runs, a.cleared / a.runs))
+    out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Étapes franchies : %.2f")
+      :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.cleared / a.runs))
     out(("Cartes retirées : %.2f   améliorées : %.2f par expédition"):format(a.removed / a.runs, a.upgraded / a.runs))
     local vs = {}
     for _, k in ipairs({ "combat", "elite", "campfire", "merchant", "event", "chest", "boss" }) do
