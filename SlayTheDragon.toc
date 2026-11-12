@@ -21,6 +21,8 @@ Core\Save.lua
 Data\Priest.lua
 Data\Warrior.lua
 Core\Classes\warrior.lua
+Data\Mage.lua
+Core\Classes\mage.lua
 Data\Act1.lua
 Data\Relics.lua
 Data\Potions.lua
@@ -29,6 +31,7 @@ UI\SkinData.lua
 UI\WowSkin.lua
 UI\Art.lua
 UI\Art\warrior.lua
+UI\Art\mage.lua
 UI\Persist.lua
 UI\Controller.lua
 UI\Widgets.lua

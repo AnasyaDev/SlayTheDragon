@@ -1064,5 +1064,474 @@ test("tour ennemi sauté (drapeau skipEnemyTurn), Interrupt de tous, onAttackHit
   eq(hits, 2); eq(surged, 4)
 end)
 
+---------------------------------------------------------------------------
+-- Mage : Arcane Charges, deux Cast, Instant, Hot Streak, Frozen, Ice Block, cartes et bibelots
+-- (docs/classes/mage.md, docs/classes/decisions.md)
+---------------------------------------------------------------------------
+
+local M = { class = "mage" } -- options de Combat.new pour un combat de Mage
+ns.Enemies.test_mage_triple = { name = "Triple", hp = 100,
+  moves = { hit = { name = "Coups", intent = "attack", actions = { { "attack", 10, times = 3, interrupts = true } } } },
+  pattern = { "hit" } }
+
+local function mageHand(hand, encounter, more)
+  local o = { class = "mage" }
+  for k, v in pairs(more or {}) do o[k] = v end
+  return setup(hand, encounter, { "mana_shield", "mana_shield", "mana_shield", "mana_shield", "mana_shield" }, o)
+end
+local function power(c, id, up)
+  c.player.powers[#c.player.powers + 1] = Card.new(id, up, 800 + #c.player.powers)
+end
+
+-- Fiche, section 2 : coût (base, amélioré), type, voie, école, rareté, niveau.
+local MAGE_SHEET = {
+  fireball = { 1, 1, "attack", "start", "fire", "basic", 1 },
+  frostbolt = { 1, 1, "attack", "start", "frost", "basic", 1 },
+  mana_shield = { 1, 1, "skill", "start", "arcane", "basic", 1 },
+  arcane_blast = { 1, 1, "attack", "start", "arcane", "basic", 1 },
+  fire_blast = { 1, 1, "attack", "fire", "fire", "common", 1 },
+  scorch = { 0, 0, "attack", "fire", "fire", "common", 1 },
+  flamestrike = { 2, 2, "attack", "fire", "fire", "common", 1 },
+  blazing_barrier = { 1, 1, "skill", "fire", "fire", "common", 1 },
+  pyroblast = { 2, 2, "attack", "fire", "fire", "uncommon", 1 },
+  hot_streak = { 1, 0, "power", "fire", "fire", "uncommon", 1 },
+  living_bomb = { 1, 1, "attack", "fire", "fire", "uncommon", 2 },
+  phoenix_flames = { 1, 1, "attack", "fire", "fire", "uncommon", 4 },
+  ignite = { 1, 1, "power", "fire", "fire", "rare", 6 },
+  combustion = { 1, 0, "skill", "fire", "fire", "rare", 7 },
+  ice_lance = { 0, 0, "attack", "frost", "frost", "common", 1 },
+  frost_nova = { 1, 1, "skill", "frost", "frost", "common", 1 },
+  ice_barrier = { 1, 1, "skill", "frost", "frost", "common", 1 },
+  cone_of_cold = { 1, 1, "attack", "frost", "frost", "common", 1 },
+  flurry = { 1, 1, "attack", "frost", "frost", "uncommon", 1 },
+  blizzard = { 2, 2, "attack", "frost", "frost", "uncommon", 1 },
+  glacial_spike = { 2, 2, "attack", "frost", "frost", "uncommon", 2 },
+  ice_block = { 1, 0, "power", "frost", "frost", "rare", 4 },
+  deep_freeze = { 1, 1, "attack", "frost", "frost", "uncommon", 6 },
+  shatter = { 1, 1, "power", "frost", "frost", "rare", 7 },
+  arcane_missiles = { 1, 1, "attack", "arcane", "arcane", "common", 1 },
+  arcane_explosion = { 1, 1, "attack", "arcane", "arcane", "common", 1 },
+  prismatic_barrier = { 1, 1, "skill", "arcane", "arcane", "common", 1 },
+  arcane_barrage = { 1, 1, "attack", "arcane", "arcane", "common", 1 },
+  counterspell = { 0, 0, "skill", "arcane", "arcane", "uncommon", 1 },
+  evocation = { 0, 0, "skill", "arcane", "arcane", "uncommon", 1 },
+  polymorph = { 1, 0, "skill", "arcane", "arcane", "common", 2 },
+  presence_of_mind = { 0, 0, "skill", "arcane", "arcane", "uncommon", 4 },
+  arcane_power = { 1, 0, "power", "arcane", "arcane", "rare", 6 },
+  arcane_surge = { 1, 0, "skill", "arcane", "arcane", "rare", 7 },
+}
+
+test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté, niveau), 13/11/6, 10 par voie, rep 20/5/5 dans l'ordre des niveaux", function()
+  local n, r, paths, repByLevel = 0, {}, {}, {}
+  for id, d in pairs(ns.Cards) do
+    if d.class == "mage" then
+      n = n + 1
+      local s = MAGE_SHEET[id]
+      assert(s, id .. " : absente de la fiche")
+      local up = Card.defById(id, true)
+      eq(d.cost, s[1], id .. " coût"); eq(up.cost, s[2], id .. "+ coût"); eq(d.type, s[3], id .. " type")
+      eq(d.path, s[4], id .. " voie"); eq(d.school, s[5], id .. " école"); eq(d.rarity, s[6], id .. " rareté")
+      eq(d.level, s[7], id .. " niveau")
+      r[d.rarity] = (r[d.rarity] or 0) + 1
+      paths[d.path] = (paths[d.path] or 0) + 1
+      if d.rarity ~= "basic" then
+        repByLevel[#repByLevel + 1] = { d.level, d.rep, id }
+      end
+    end
+  end
+  eq(n, 34); eq(r.basic, 4); eq(r.common, 13); eq(r.uncommon, 11); eq(r.rare, 6)
+  eq(paths.start, 4); eq(paths.fire, 10); eq(paths.frost, 10); eq(paths.arcane, 10)
+  -- rep monotone avec le niveau (un niveau plus haut n'a jamais un palier plus bas)
+  for _, a in ipairs(repByLevel) do
+    for _, b in ipairs(repByLevel) do
+      if a[1] < b[1] then assert(a[2] <= b[2], a[3] .. " / " .. b[3] .. " : rep non monotone") end
+    end
+  end
+end)
+
+test("Mage : définition (52 PV, Arcane Charges 0 à 4 gardées, deck de départ, Apprentice's Wand), 6 bibelots avec niveau, Interrupt et Last Breath", function()
+  local cd = ns.Classes.mage
+  eq(cd.hp, 52); eq(cd.resource.id, "arcane"); eq(cd.resource.cap, 4); eq(cd.resource.keep, true)
+  eq(cd.startRelic, "apprentice_wand"); eq(ns.Relics.apprentice_wand.noPool, true); eq(cd.survival, "control")
+  local cnt = {}
+  for _, id in ipairs(cd.deck) do cnt[id] = (cnt[id] or 0) + 1 end
+  eq(#cd.deck, 10); eq(cnt.frostbolt, 3); eq(cnt.mana_shield, 4); eq(cnt.fireball, 2); eq(cnt.arcane_blast, 1)
+  local levels = { apprentice_wand = 1, tome_arcane_brilliance = 1, robe_archmage = 3, glacial_cloak = 5,
+    fire_ruby = 7, mind_quickening_gem = 7 }
+  local nr = 0
+  for id, rel in pairs(ns.Relics) do
+    if rel.class == "mage" then
+      nr = nr + 1
+      eq(rel.level, levels[id], id .. " niveau")
+      local low = " " .. rel.text:lower():gsub("[%p]", " ") .. " "
+      assert(not low:find(" you ", 1, true) and not low:find(" your ", 1, true), id .. " : « you »")
+    end
+  end
+  eq(nr, 6)
+  local nInt, nLb = 0, 0
+  for _, d in pairs(ns.Cards) do
+    if d.class == "mage" then
+      for _, e in ipairs(d.effects) do if e[1] == "interrupt" then nInt = nInt + 1 end end
+      if d.hooks and d.hooks.preventDeath then nLb = nLb + 1 end
+    end
+  end
+  eq(nInt, 1); eq(nLb, 1)
+end)
+
+-- Chiffres du texte = chiffres des effets (« Deal N », « Gain N Absorb. », « Apply X N », « +N Arcane
+-- Charge. », « Draw N. », plaque).
+test("Mage : texte de chaque carte (base et améliorée) conforme à ses effets et à sa plaque", function()
+  for id, d0 in pairs(ns.Cards) do
+    if d0.class == "mage" then
+      for _, up in ipairs({ false, true }) do
+        local d = Card.defById(id, up)
+        local t, label = d.text, id .. (up and "+" or "")
+        local function has(s) assert(t:find(s, 1, true), label .. " : « " .. s .. " » absent de « " .. t:gsub("\n", " / ") .. " »") end
+        for _, e in ipairs(d.effects) do
+          local k = e[1]
+          if k == "damage" and e[2] > 0 then
+            has("Deal " .. e[2] .. (e.times == 3 and " three times" or "") .. (e.all and " to all" or ""))
+            for _, m in ipairs(e.more or {}) do
+              if m[2] == "frozen" then has("Frozen: deal " .. m[1] .. " more.") end
+              if m[2] == "execute" then has("Execute: deal " .. (e[2] + m[1]) .. ".") end
+            end
+          elseif k == "damage" then
+            has("deal " .. e.per[1] .. " per Arcane Charge" .. (e.all and " to all" or ""))
+          elseif k == "absorb" then has("Gain " .. e[2] .. " Absorb.")
+          elseif k == "res" then has("+" .. e[2] .. " Arcane Charge.")
+          elseif k == "draw" and e[2] > 0 then has("Draw " .. e[2] .. ".")
+          elseif k == "apply" then
+            local s = ns.Statuses[e[2]]
+            has((e.self and "Gain " or "Apply ") .. s.name .. " " .. e[3])
+          elseif k == "interrupt" then has("Interrupt the target's cast.")
+          end
+        end
+        if d.cast then eq(t:match("^[^\n]+"), "Cast.", label) end
+        if d.power then eq(t:match("^[^\n]+"), "Power.", label) end
+        if d.cooldown then has("Cooldown " .. d.cooldown .. ".") end
+        if d.exhaust then has("Exhaust.") end
+        if d.retain then has("Retain.") end
+        if d.evoMana then has("+" .. d.evoMana .. " mana.") end
+      end
+    end
+  end
+end)
+
+test("Mage : chaque carte (base et améliorée) jouable sans erreur, deux tours joués ensuite", function()
+  local n = 0
+  for id, d0 in pairs(ns.Cards) do
+    if d0.class == "mage" then
+      for _, up in ipairs({ false, true }) do
+        local c = mageHand({ id }, { "test_dummy", "test_caster" })
+        c.player.mana, c.player.res = 9, 4
+        c.hand[1] = Card.new(id, up, 999)
+        c.enemies[1].hp = 40
+        Combat.applyStatus(c, c.enemies[1], "demoralized", 1)
+        local ok, why = Combat.play(c, 1, 1)
+        assert(ok, id .. (up and "+" or "") .. " : " .. tostring(why))
+        Combat.endTurn(c)
+        Combat.endTurn(c)
+        n = n + 1
+      end
+    end
+  end
+  eq(n, 68)
+end)
+
+test("Arcane Charges : gagnées après le coup (Arcane Blast), plafond 4 (le surplus est perdu), gardées d'un tour à l'autre", function()
+  local c = mageHand({ "arcane_blast", "arcane_blast" })
+  c.player.res = 3
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 100 - num("arcane_blast", 1) - 3, "charges d'avant le coup"); eq(c.player.res, 4)
+  Combat.play(c, 1, 1)
+  eq(c.player.res, 4, "plafond")
+  Combat.endTurn(c)
+  eq(c.player.res, 4, "gardées")
+  local f = mageHand({ "frostbolt" })
+  eq(f.player.res, 0, "0 au début du combat")
+end)
+
+test("Arcane Charges : +1 par charge à chaque coup des cartes Attack, sur chaque cible ; rien aux Skills ni aux DoT ; avant Demoralized et Sundered", function()
+  local c = mageHand({ "arcane_missiles" })
+  c.player.res = 2
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 100 - 3 * (num("arcane_missiles", 1) + 2), "trois coups"); eq(c.player.res, 3)
+  local a = mageHand({ "arcane_explosion" }, { "test_dummy", "test_dummy" })
+  a.player.res = 2
+  Combat.play(a, 1)
+  eq(a.enemies[1].hp, 100 - num("arcane_explosion", 1) - 2); eq(a.enemies[2].hp, 100 - num("arcane_explosion", 1) - 2)
+  local s = mageHand({ "prismatic_barrier", "fireball" })
+  s.player.res = 4
+  Combat.play(s, 1)
+  eq(s.player.block, num("prismatic_barrier", 1), "Skill : pas de bonus")
+  local d = mageHand({ "frostbolt" })
+  d.player.res = 2
+  Combat.applyStatus(d, d.player, "demoralized", 1)
+  Combat.applyStatus(d, d.enemies[1], "armor_broken", 1)
+  Combat.play(d, 1, 1)
+  eq(d.enemies[1].hp, 100 - math.floor(math.floor((num("frostbolt", 1) + 2) * 0.75) * 1.25))
+  -- DoT de Fireball : sans bonus
+  local f = mageHand({ "fireball" })
+  f.player.res = 4
+  f.player.st.instant = 1
+  Combat.play(f, 1, 1)
+  local hp = f.enemies[1].hp
+  eq(hp, 100 - num("fireball", 1) - 4)
+  Combat.endTurn(f)
+  eq(f.enemies[1].hp, hp - num("fireball", 2, 3), "DoT sans charge")
+end)
+
+test("Arcane Power : 2 par charge au lieu de 1 (deux exemplaires ne font pas 3)", function()
+  local c = mageHand({ "frostbolt", "frostbolt" })
+  c.player.res = 3
+  power(c, "arcane_power")
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 100 - num("frostbolt", 1) - 6)
+  power(c, "arcane_power")
+  local hp = c.enemies[1].hp
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, hp - num("frostbolt", 1) - 6)
+end)
+
+test("Surge du Mage : Arcane Barrage injouable à 0, vide les charges, 6 par charge à tous sans bonus passif ; Arcane Surge : mana et pioche", function()
+  local c = mageHand({ "arcane_barrage" }, { "test_dummy", "test_dummy" })
+  eq(select(2, Combat.canPlay(c, 1)), "resource")
+  c.player.res = 3
+  Combat.play(c, 1)
+  eq(c.player.res, 0)
+  eq(c.enemies[1].hp, 100 - 18); eq(c.enemies[2].hp, 100 - 18)
+  local s = mageHand({ "arcane_surge" })
+  eq(select(2, Combat.canPlay(s, 1)), "resource")
+  s.player.res = 4
+  local hand = #s.hand
+  Combat.play(s, 1)
+  eq(s.player.mana, 3 - 1 + 4); eq(#s.hand, hand - 1 + 4); eq(s.player.res, 0)
+end)
+
+test("Deux Cast : deux emplacements, une troisième carte Cast injouable sauf sous Instant ; résolues de la plus ancienne à la plus récente", function()
+  local c = mageHand({ "fireball", "glacial_spike", "pyroblast" })
+  c.player.mana = 9
+  eq(Combat.castSlots(c), 2)
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1, 1)
+  eq(Combat.castCount(c), 2)
+  eq(select(2, Combat.canPlay(c, 1)), "casting")
+  Combat.applyStatus(c, c.player, "instant", 1)
+  assert(Combat.canPlay(c, 1), "Instant : jouable avec deux incantations en cours")
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 100 - num("pyroblast", 1), "partie tout de suite"); eq(Combat.castCount(c), 2)
+  eq(c.player.st.instant, nil)
+  c.events = {}
+  Combat.endTurn(c)
+  local order = {}
+  for _, ev in ipairs(c.events) do
+    if ev.t == "cast_resolve" then
+      for _, x in ipairs({ c.discard, c.hand, c.draw }) do
+        for _, inst in ipairs(x) do if inst.uid == ev.card then order[#order + 1] = inst.id end end
+      end
+    end
+  end
+  eq(table.concat(order, ","), "fireball,glacial_spike")
+  eq(c.enemies[1].hp, 100 - num("pyroblast", 1) - num("fireball", 1) - num("glacial_spike", 1))
+  eq(c.enemies[1].st.demoralized, 2)
+end)
+
+test("Deux Cast : une interruption coupe la plus récente ; la seconde est perdue si la première finit le combat", function()
+  local c = mageHand({ "fireball", "pyroblast" }, { "test_pusher" })
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.mana, 0, "mana payé au jeu")
+  Combat.endTurn(c)
+  eq(c.enemies[1].hp, 100 - num("fireball", 1), "Fireball résolue, Pyroblast coupée")
+  local cut = false
+  for _, x in ipairs({ c.discard, c.hand, c.draw }) do for _, inst in ipairs(x) do if inst.id == "pyroblast" then cut = true end end end
+  assert(cut, "Pyroblast à la défausse")
+  -- plusieurs coups qui interrompent : une incantation par coup qui fait perdre des PV
+  local t = mageHand({ "fireball", "fireball" }, { "test_mage_triple" })
+  Combat.play(t, 1, 1)
+  Combat.play(t, 1, 1)
+  Combat.endTurn(t)
+  eq(t.enemies[1].hp, 100, "les deux coupées")
+  local k = mageHand({ "fireball", "pyroblast" })
+  k.enemies[1].hp = 10
+  Combat.play(k, 1, 1)
+  Combat.play(k, 1, 1)
+  Combat.endTurn(k)
+  eq(k.result, "won")
+end)
+
+test("Instant : se cumule, se garde d'un tour à l'autre, la prochaine carte Cast (quelle qu'elle soit) le consomme et ne peut pas être coupée", function()
+  local c = mageHand({ "fire_blast", "fire_blast", "evocation", "fireball" }, { "test_pusher" })
+  c.player.mana = 9
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.instant, 2)
+  local mana = c.player.mana
+  Combat.play(c, handIndex(c, "evocation"))
+  eq(c.player.st.instant, 1, "Evocation le consomme"); eq(c.player.mana, mana + 3, "+3 mana tout de suite")
+  eq(c.player.cast, nil)
+  Combat.endTurn(c)
+  eq(c.player.st.instant, 1, "gardé")
+  c.hand[#c.hand + 1] = Card.new("fireball", false, 950)
+  Combat.play(c, #c.hand, 1)
+  eq(c.player.cast, nil, "sans emplacement"); eq(c.player.st.instant, nil)
+  local hp = c.enemies[1].hp
+  Combat.endTurn(c)
+  eq(c.enemies[1].hp, hp - num("fireball", 2, 3), "pas d'incantation à couper (DoT seul)")
+end)
+
+test("Hot Streak : la 2e carte Fire du tour donne Instant 1, après sa mise en emplacement ; une fois par tour ; deux exemplaires = 2", function()
+  local c = mageHand({ "scorch", "fireball", "fireball", "scorch" })
+  c.player.mana = 9
+  power(c, "hot_streak")
+  Combat.play(c, 1, 1)
+  eq(c.player.st.instant, nil)
+  Combat.play(c, 1, 1)
+  assert(c.player.cast ~= nil, "la 2e carte Fire (Cast) prend son emplacement"); eq(c.player.st.instant, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.instant, nil, "la Fireball suivante part tout de suite"); eq(Combat.castCount(c), 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.instant, nil, "une fois par tour")
+  local d = mageHand({ "scorch", "scorch" })
+  power(d, "hot_streak"); power(d, "hot_streak", true)
+  Combat.play(d, 1, 1)
+  Combat.play(d, 1, 1)
+  eq(d.player.st.instant, 2)
+  Combat.endTurn(d)
+  eq(d.turn.bySchool.fire or 0, 0, "compte remis à 0")
+end)
+
+test("Frozen : Stunned ou Demoralized, lu sur la cible au coup (Ice Lance), marche contre un boss Demoralized", function()
+  local c = mageHand({ "ice_lance", "ice_lance" }, { "test_dummy", "test_boss" })
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].hp, 100 - num("ice_lance", 1))
+  Combat.applyStatus(c, c.enemies[2], "stunned", 1)
+  eq(c.enemies[2].st.stunned, nil, "boss immunisé à Stunned")
+  Combat.applyStatus(c, c.enemies[2], "demoralized", 1)
+  Combat.play(c, 1, 2)
+  eq(c.enemies[2].hp, 100 - num("ice_lance", 1) - Card.defById("ice_lance").effects[1].more[1][1])
+  local f = mageHand({ "frostbolt", "ice_lance" })
+  Combat.play(f, 1, 1)
+  Combat.play(f, 1, 1)
+  eq(f.enemies[1].hp, 100 - num("frostbolt", 1) - num("ice_lance", 1) - 8, "Frostbolt rend Frozen")
+end)
+
+test("Deep Freeze : Stunned 1 seulement sur une cible Frozen ; Shatter : +3 par coup d'Attack sur une cible Frozen", function()
+  local c = mageHand({ "deep_freeze" })
+  Combat.play(c, 1, 1)
+  eq(c.enemies[1].st.stunned, nil)
+  local d = mageHand({ "deep_freeze" })
+  Combat.applyStatus(d, d.enemies[1], "demoralized", 1)
+  Combat.play(d, 1, 1)
+  eq(d.enemies[1].st.stunned, 1)
+  local s = mageHand({ "flurry", "flurry" })
+  power(s, "shatter")
+  Combat.play(s, 1, 1)
+  eq(s.enemies[1].hp, 100 - 3 * num("flurry", 1), "pas encore Frozen au coup")
+  local hp = s.enemies[1].hp
+  Combat.play(s, 1, 1)
+  eq(s.enemies[1].hp, hp - 3 * math.floor(num("flurry", 1) + 3), "Frozen : +3 à chaque coup")
+end)
+
+test("Ignite : chaque coup d'une carte Fire pose DoT 2 ; Phoenix Flames : DoT sur la cible, Instant 1", function()
+  local c = mageHand({ "living_bomb", "phoenix_flames" }, { "test_dummy", "test_dummy" })
+  power(c, "ignite")
+  Combat.play(c, 1)
+  eq(c.enemies[1].st.pain, num("living_bomb", 2, 3) + 2); eq(c.enemies[2].st.pain, num("living_bomb", 2, 3) + 2)
+  eq(c.enemies[1].stIcon.pain, "burn")
+  local p = mageHand({ "phoenix_flames" })
+  Combat.play(p, 1, 1)
+  eq(p.player.st.instant, nil, "sans DoT")
+  local q = mageHand({ "phoenix_flames" })
+  power(q, "ignite")
+  Combat.play(q, 1, 1)
+  eq(q.player.st.instant, 1, "le DoT d'Ignite compte")
+end)
+
+test("Ice Block : Last Breath une fois, PV 0 puis soin 10, les coups suivants font 0 et n'interrompent pas, retiré au début du tour", function()
+  local c = mageHand({ "ice_block", "fireball", "fireball" }, { "test_mage_triple" })
+  c.player.mana = 4
+  Combat.play(c, 1)
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1, 1)
+  c.player.hp = 5
+  Combat.endTurn(c)
+  eq(c.result, nil); eq(c.player.hp, 10)
+  eq(c.player.st.ice_block, nil, "retiré au début du tour")
+  eq(c.enemies[1].hp, 100 - num("fireball", 1), "le coup mortel coupe la plus récente, les suivants (0) rien")
+  c.player.hp = 5
+  Combat.endTurn(c)
+  eq(c.result, "lost")
+  -- intention affichée à 0 pendant Ice Block
+  local d = mageHand({ "frostbolt" }, { "test_hitter" })
+  Combat.applyStatus(d, d.player, "ice_block", 1)
+  eq(Combat.intentInfo(d, d.enemies[1]).damage, 0)
+end)
+
+test("Evocation : +3 mana au tour suivant (6 mana), +3 tout de suite sous Instant ; Counterspell et Polymorph donnent une charge", function()
+  local c = mageHand({ "evocation" })
+  Combat.play(c, 1)
+  assert(c.player.cast ~= nil)
+  Combat.endTurn(c)
+  eq(c.player.mana, Combat.BASE_MANA + 3)
+  local k = mageHand({ "counterspell", "polymorph" }, { "test_caster", "test_boss" })
+  Combat.play(k, 1, 1)
+  assert(k.enemies[1].interrupted); eq(k.player.res, 1)
+  Combat.play(k, 1, 2)
+  eq(k.player.res, 2); eq(k.enemies[2].st.stunned, nil, "boss immunisé, la charge reste")
+  local p = mageHand({ "polymorph" }, { "test_hitter" })
+  Combat.play(p, 1, 1)
+  eq(p.enemies[1].st.stunned, 2)
+  local hp = p.player.hp
+  Combat.endTurn(p); Combat.endTurn(p)
+  eq(p.player.hp, hp, "deux tours perdus")
+end)
+
+test("Bibelots du Mage : baguette (1re carte Cast à 0, même Evocation), Tome, Robe (Instant compris), Cape, Rubis, Gemme", function()
+  local w = mageHand({ "pyroblast", "pyroblast" }, nil, { relics = { "apprentice_wand" } })
+  eq(Combat.cost(w, w.hand[1]), 0)
+  Combat.play(w, 1, 1)
+  eq(w.player.mana, 3); eq(Combat.cost(w, w.hand[1]), 2)
+  local e = mageHand({ "evocation", "pyroblast" }, nil, { relics = { "apprentice_wand" } })
+  Combat.play(e, 1)
+  eq(Combat.cost(e, e.hand[1]), 2, "consommée par Evocation")
+  local t = mageHand({ "frostbolt" }, nil, { relics = { "tome_arcane_brilliance" } })
+  eq(t.player.res, 1)
+  local r = mageHand({ "fireball", "fireball" }, nil, { relics = { "robe_archmage" } })
+  Combat.play(r, 1, 1)
+  eq(r.player.block, 0)
+  Combat.endTurn(r)
+  eq(r.player.block, 4, "à la résolution, après la remise à 0")
+  Combat.applyStatus(r, r.player, "instant", 1)
+  r.hand[#r.hand + 1] = Card.new("fireball", false, 950)
+  Combat.play(r, #r.hand, 1)
+  eq(r.player.block, 8, "sous Instant aussi")
+  local g = mageHand({ "ice_lance" }, { "test_dummy", "test_boss" }, { relics = { "glacial_cloak" } })
+  eq(g.enemies[1].st.demoralized, 1); eq(g.enemies[2].st.demoralized, 1)
+  Combat.play(g, 1, 2)
+  eq(g.enemies[2].hp, 100 - num("ice_lance", 1) - 8, "boss Frozen au premier tour")
+  local f = mageHand({ "frostbolt" }, nil, { relics = { "fire_ruby" } })
+  eq(f.player.st.instant, 1)
+  local m = mageHand({ "frostbolt" }, nil, { relics = { "mind_quickening_gem" } })
+  m.player.res = 3
+  Combat.endTurn(m)
+  eq(m.player.mana, 3)
+  m.player.res = 4
+  Combat.endTurn(m)
+  eq(m.player.mana, 4)
+end)
+
+test("Mage : état cloné (deux incantations, Instant), combats simulés par le bot heuristique sans erreur", function()
+  local c = mageHand({ "fireball", "pyroblast" })
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1, 1)
+  local t = Combat.clone(c)
+  Combat.interruptPlayer(t, t.enemies[1])
+  eq(Combat.castCount(c), 2); eq(Combat.castCount(t), 1)
+  assert(type(ns.ClassRules.mage.botKey(c)) == "string")
+  local r = ns.Run.play({ seed = 4, bot = "heuristic", class = "mage", cap = 120 })
+  assert(r.combats[1] ~= nil)
+end)
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end
