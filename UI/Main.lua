@@ -177,12 +177,15 @@ local function buildBand(host, place)
   gear:SetPoint("CENTER", band, "RIGHT", -72, 0)
   UI.gear = gear
 
+  -- emplacements de potion : 3, jusqu'à 4 avec Herb Pouch (#exp.potions) ; calés à droite (UI.refreshInfo)
   UI.potionSlots = {}
-  for i = 1, 3 do
+  UI.POTION_SLOTS_MAX = 4
+  for i = 1, UI.POTION_SLOTS_MAX do
     local b = W.iconButton(band, BAND_SLOT, "square")
     b:SetPoint("CENTER", band, "RIGHT", -124 - (3 - i) * 29, 0)
     b.slot = i
     b:SetScript("OnClick", function(self, button) UI.clickPotion(self, button) end)
+    if i > 3 then b:Hide() end
     UI.potionSlots[i] = b
   end
   local sep = CreateFrame("Frame", nil, band)
@@ -413,11 +416,16 @@ function UI.refreshInfo()
   local potions = Controller.potions()
   local hold = UI.hold
   local heldPotion = hold.potion
+  local nSlots = math.max(3, math.min(potions and #potions or 3, #UI.potionSlots))
   for i = 1, #UI.potionSlots do
     local b = UI.potionSlots[i]
     local id = potions and potions[i]
     if heldPotion and id == heldPotion and i == hold.potionSlot then id = nil end
-    if r then
+    b:ClearAllPoints()
+    b:SetPoint("CENTER", UI.band, "RIGHT", -124 - (nSlots - i) * 29, 0)
+    if i > nSlots then
+      b:Hide()
+    elseif r then
       if id then
         b:SetItem("potion", id, { hint = Controller.inCombat() and "Click: drink."
           or { "Drink it in combat.", "Right-click twice: discard." } })
@@ -442,7 +450,7 @@ function UI.refreshInfo()
   if r then UI.sep:Show() else UI.sep:Hide() end
   -- place prise à droite : fermeture, Menu, fioles, séparateur, bibelots, clé
   local rightW = 103
-  if r then rightW = 210.5 + math.min(nShown, UI.RELICS_SHOWN) * 29 end
+  if r then rightW = 210.5 + (nSlots - 3) * 29 + math.min(nShown, UI.RELICS_SHOWN) * 29 end
   if nShown > UI.RELICS_SHOWN then rightW = rightW + 3 + (UI.relicMore:GetStringWidth() or 12) end
   -- clé, à gauche des bibelots
   local anchor = UI.relicIcons[math.max(1, UI.RELICS_SHOWN - math.min(nShown, UI.RELICS_SHOWN) + 1)]

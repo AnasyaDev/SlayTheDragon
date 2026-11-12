@@ -41,12 +41,14 @@ X.POTION_WEIGHTS = { common = 65, uncommon = 25, rare = 10 }
 X.POTION_DROP = 0.35 -- chance de potion après un combat normal ou d'élite
 X.PRICES = {
   card = { common = 35, uncommon = 55, rare = 90 },
+  neutral = { common = 45, uncommon = 65, rare = 100 }, -- cartes neutres (docs/cartes-neutres.md)
   relic = { common = 90, uncommon = 120, rare = 160, boss = 220 },
   potion = { common = 30, uncommon = 45, rare = 60 },
 }
 X.PRICE_JITTER = 0.10
 X.REMOVE_PRICE, X.REMOVE_STEP = 75, 25
-X.SHOP = { cards = 5, relics = 3, potions = 3 }
+-- neutral : emplacement « Neutral » en plus des cartes de classe (une carte neutre débloquée)
+X.SHOP = { cards = 5, neutral = 1, relics = 3, potions = 3 }
 -- Poids de tirage d'une rencontre selon sa famille (ev.weight le remplace).
 X.EVENT_WEIGHT = { common = 10, rare = 3, story = 8 }
 
@@ -58,7 +60,8 @@ X.PHASES = { start = true, map = true, combat = true, reward = true, campfire = 
 ---------------------------------------------------------------------------
 
 -- Valeur modifiée : chaque crochet reçoit (exp, v, a, b) et renvoie la nouvelle valeur.
--- Noms utilisés : gold (v, source), restFraction (v), restHeal (v), price (v, genre).
+-- Noms utilisés : gold (v, source), goldBonus (v, source : ajouts fixes, après tous les « gold »),
+-- restFraction (v), restHeal (v), price (v, genre), removePrice (v : prix du retrait chez le marchand).
 function X.modify(exp, name, v, a, b)
   local relics = exp.relics
   for i = 1, #relics do
@@ -77,6 +80,7 @@ end
 
 -- Notification : chaque crochet reçoit (exp, a, b) ; true arrête la chaîne.
 -- Noms utilisés : onNodeEnter (nœud), onCombatWon (genre), onRest.
+-- Bibelot « utile à cette classe » : champ `needs` (voir X.usefulFor), sinon toujours proposé.
 function X.fire(exp, name, a, b)
   local relics = exp.relics
   for i = 1, #relics do
@@ -127,17 +131,39 @@ local function drawFrom(rng, ids, rarityOf, n, weights, taken)
   return out
 end
 
--- Cartes de la classe jouée (neutral : cartes neutres comprises, réservées au marchand et aux
--- rencontres par le GDD ; aucune n'existe encore).
+-- Cartes de la classe jouée (neutral : cartes neutres sans noReward comprises ; les cartes neutres
+-- du GDD portent noReward et ne sortent que par X.neutralPool : marchand et rencontres).
 function X.cardPool(exp, neutral)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and not d.noReward and (d.rep or 0) <= exp.unlock.rep then
+    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and not d.noReward and (d.rep or 0) <= exp.unlock.rep
+        and (d.class or (d.tier or 0) <= leagueTier(exp)) then
       list[#list + 1] = id
     end
   end
   table.sort(list)
   return list
+end
+
+-- Cartes neutres (sans classe, neutral = true) débloquées par le palier de Ligue (champ tier) :
+-- emplacement « Neutral » du marchand, choix de rencontre { "cardChoice", neutral = true }.
+function X.neutralPool(exp)
+  local list = {}
+  for id, d in pairs(ns.Cards) do
+    if d.class == nil and d.neutral and d.rarity ~= "basic" and (d.tier or 0) <= leagueTier(exp) then
+      list[#list + 1] = id
+    end
+  end
+  table.sort(list)
+  return list
+end
+
+-- Une carte neutre est-elle débloquée pour cette expédition ? (condition de rencontre « unlocked »)
+function X.cardUnlocked(exp, id)
+  local d = ns.Cards[id]
+  if not d then return false end
+  if d.class == nil then return (d.tier or 0) <= leagueTier(exp) end
+  return (d.rep or 0) <= exp.unlock.rep
 end
 
 local function cardRarity(id) return ns.Cards[id].rarity end
@@ -149,14 +175,58 @@ local function drawCards(exp, rng, n, weights, neutral)
   return out
 end
 
+local function drawNeutral(exp, rng, n, weights)
+  local pool = X.neutralPool(exp)
+  local out = drawFrom(rng, pool, cardRarity, n, weights)
+  if #out == 0 then out = drawFrom(rng, pool, cardRarity, n, X.CARD_WEIGHTS.combat) end
+  return out
+end
+
+-- La classe a-t-elle des cartes de ce genre ? key : "cast", "cooldown", "exhaust", "retain",
+-- "attack" (type), "absorb", "damage", "castDamage" (effet ; Cast qui inflige des dégâts).
+function X.classHas(class, key)
+  local v = false
+  for _, d in pairs(ns.Cards) do
+    if d.class == class then
+      if key == "attack" then
+        if d.type == "attack" then v = true end
+      elseif key == "absorb" or key == "damage" or key == "castDamage" then
+        for _, e in ipairs(d.effects or {}) do
+          if (key == "absorb" and e[1] == "absorb") or (key == "damage" and e[1] == "damage")
+              or (key == "castDamage" and d.cast and e[1] == "damage") then v = true end
+        end
+      elseif d[key] then
+        v = true
+      end
+    end
+    if v then break end
+  end
+  return v
+end
+
+-- Bibelot utile à la classe jouée : champ `needs` absent, une clé de X.classHas (« cast »), une liste
+-- de clés (toutes requises) ou une fonction(classe) -> booléen. Un bibelot inutile n'est jamais proposé.
+function X.usefulFor(r, class)
+  local n = r.needs
+  if not n then return true end
+  if type(n) == "function" then return n(class) and true or false end
+  if type(n) == "string" then return X.classHas(class, n) end
+  for i = 1, #n do
+    if not X.classHas(class, n[i]) then return false end
+  end
+  return true
+end
+
 -- Bibelots proposables : tier débloqué, pas déjà possédés, communs (sans champ class) ou de la
--- classe jouée ; jamais ceux marqués noPool (bibelot de départ, bibelots de rencontre).
+-- classe jouée, utiles à cette classe (needs) ; jamais ceux marqués noPool (bibelot de départ,
+-- bibelots de rencontre).
 function X.relicPool(exp)
   local owned = {}
   for i = 1, #exp.relics do owned[exp.relics[i]] = true end
   local list = {}
   for id, r in pairs(ns.Relics) do
-    if not owned[id] and (not r.class or r.class == exp.class) and not r.noPool and (r.tier or 0) <= leagueTier(exp) then
+    if not owned[id] and (not r.class or r.class == exp.class) and not r.noPool and (r.tier or 0) <= leagueTier(exp)
+        and X.usefulFor(r, exp.class) then
       list[#list + 1] = id
     end
   end
@@ -185,6 +255,11 @@ local function drawPotions(exp, rng, n)
   return drawFrom(rng, X.potionPool(exp), potionRarity, n, X.POTION_WEIGHTS)
 end
 
+-- Une potion tirée (rng : flux de l'état, par défaut exp.rng.loot), ou nil.
+function X.randomPotion(exp, rng)
+  return drawPotions(exp, rng or exp.rng.loot, 1)[1]
+end
+
 -- Bibelots de classe (Révéré) : relic.class == classe, ni déjà possédés (bibelot de départ), ni noPool.
 local function classRelics(exp)
   local owned = {}
@@ -204,7 +279,8 @@ end
 ---------------------------------------------------------------------------
 
 function X.gainGold(exp, n, source)
-  n = floor(X.modify(exp, "gold", n, source) + 0.5)
+  -- pourcentages d'abord (gold), puis ajouts fixes (goldBonus : Bloodsail Admiral's Hat)
+  n = floor(X.modify(exp, "goldBonus", X.modify(exp, "gold", n, source), source) + 0.5)
   if n < 0 then n = 0 end
   exp.gold = exp.gold + n
   exp.stats.goldEarned = exp.stats.goldEarned + n
@@ -237,6 +313,12 @@ function X.gainPotion(exp, id)
   return true
 end
 
+-- Un emplacement de potion de plus pour l'expédition (Herb Pouch) : le nombre d'emplacements est la
+-- longueur de exp.potions (3 au départ, X.POTION_SLOTS), transmise au combat (Combat.new).
+function X.addPotionSlot(exp)
+  exp.potions[#exp.potions + 1] = false
+end
+
 function X.addCard(exp, id, up)
   exp.deck[#exp.deck + 1] = { id = id, up = up and true or false }
   exp.stats.cardsAdded = exp.stats.cardsAdded + 1
@@ -258,8 +340,10 @@ local function heal(exp, n)
   return exp.hp - before
 end
 
+-- Prix du retrait (crochet removePrice : Darkmoon Faire Prize Ticket) ; exp.shop.removed = retraits
+-- faits pendant la visite en cours du marchand.
 function X.removePrice(exp)
-  return X.REMOVE_PRICE + X.REMOVE_STEP * exp.removals
+  return max(0, floor(X.modify(exp, "removePrice", X.REMOVE_PRICE + X.REMOVE_STEP * exp.removals) + 0.5))
 end
 
 ---------------------------------------------------------------------------
@@ -394,11 +478,17 @@ local function openShop(exp)
     p = X.modify(exp, "price", p, kind)
     return max(1, floor(p + 0.5))
   end
-  local shop = { cards = {}, relics = {}, potions = {} }
-  local cards = drawCards(exp, rng, X.SHOP.cards, X.CARD_WEIGHTS.shop, true)
+  local shop = { cards = {}, relics = {}, potions = {}, removed = 0 }
+  local cards = drawCards(exp, rng, X.SHOP.cards, X.CARD_WEIGHTS.shop, false)
   for i = 1, #cards do
     local base = X.PRICES.card[ns.Cards[cards[i]].rarity] or X.PRICES.card.uncommon
     shop.cards[i] = { id = cards[i], price = price(base, "card"), sold = false }
+  end
+  -- emplacement « Neutral » : en plus des cartes de classe, à la suite (neutral = true)
+  local neutral = drawNeutral(exp, rng, X.SHOP.neutral, X.CARD_WEIGHTS.shop)
+  for i = 1, #neutral do
+    local base = X.PRICES.neutral[ns.Cards[neutral[i]].rarity] or X.PRICES.neutral.uncommon
+    shop.cards[#shop.cards + 1] = { id = neutral[i], price = price(base, "card"), sold = false, neutral = true }
   end
   local nRelics = X.SHOP.relics + (exp.unlock.league >= ns.Meta.EXALTED and 1 or 0)
   local relics = drawRelics(exp, rng, nRelics, X.RELIC_WEIGHTS.normal)
@@ -496,7 +586,25 @@ X.CONDITIONS = {
   floor = { -- étape courante (celle du nœud) au moins égale à arg
     test = function(exp, n) return (exp.floor or 0) >= n end,
     text = function(n) return ("From stage %d onward."):format(n) end },
+  unlocked = { -- carte débloquée (neutre : palier de Ligue) ; avec hide = true, réponse absente sinon
+    test = function(exp, id) return X.cardUnlocked(exp, id) end,
+    text = function(id)
+      local d = ns.Cards[id]
+      return "Not yet unlocked: " .. (d and d.name or tostring(id)) .. "."
+    end },
 }
+
+-- Réponse cachée tant qu'une de ses conditions marquées hide = true n'est pas remplie (au lieu d'être
+-- grisée avec sa raison) : { "unlocked", id, hide = true }.
+function X.choiceHidden(exp, ch)
+  for _, c in ipairs(ch.when or {}) do
+    if c.hide then
+      local def = X.CONDITIONS[c[1]]
+      if def and not def.test(exp, c[2], c) then return true end
+    end
+  end
+  return false
+end
 
 -- Toutes les conditions de la liste sont-elles remplies ? (true | false, raison)
 function X.check(exp, when)
@@ -547,7 +655,10 @@ local function rollEffects(exp, rng, effects)
     local k = e[1]
     r[ei] = false
     if k == "cardChoice" then
-      r[ei] = drawCards(exp, rng, e.n or 3, e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat, true)
+      -- neutral = true : choix parmi les cartes neutres débloquées ; sinon cartes de la classe
+      local w = e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat
+      if e.neutral then r[ei] = drawNeutral(exp, rng, e.n or 3, w)
+      else r[ei] = drawCards(exp, rng, e.n or 3, w, false) end
     elseif k == "relic" and not e[2] then
       r[ei] = drawRelics(exp, rng, 1, X.RELIC_WEIGHTS.normal)[1] or false
     elseif k == "potion" and not e[2] then
@@ -590,6 +701,14 @@ local function upgradable(exp)
   return list
 end
 
+-- Améliore n cartes au hasard parmi celles qui peuvent l'être (rng : flux de l'état) ; renvoie le nombre.
+function X.upgradeRandom(exp, n, rng)
+  local list = Rng.shuffle(rng, upgradable(exp))
+  local k = min(n, #list)
+  for i = 1, k do upgrade(exp, list[i]) end
+  return k
+end
+
 -- Codes de refus des effets et leur texte (l'interface traduit aussi les codes).
 X.EVENT_REASONS = {
   gold = "Not enough gold.",
@@ -626,11 +745,14 @@ function X.eventOptions(exp)
   if not ev then return {} end
   local list = {}
   for i, ch in ipairs(ev.choices) do
-    local ok, why = X.eventChoiceOk(exp, i)
-    list[i] = { index = i, label = ch.label, outcome = ch.hidden and "?" or ch.outcome,
-      hidden = ch.hidden and true or false, disabled = not ok or nil,
-      reason = not ok and (X.EVENT_REASONS[why] or why) or nil,
-      chosen = exp.event.chosen == i or nil }
+    -- réponse absente (pas grisée) tant qu'une condition « hide » manque (X.choiceHidden)
+    if not X.choiceHidden(exp, ch) then
+      local ok, why = X.eventChoiceOk(exp, i)
+      list[#list + 1] = { index = i, label = ch.label, outcome = ch.hidden and "?" or ch.outcome,
+        hidden = ch.hidden and true or false, disabled = not ok or nil,
+        reason = not ok and (X.EVENT_REASONS[why] or why) or nil,
+        chosen = exp.event.chosen == i or nil }
+    end
   end
   return list
 end
@@ -678,8 +800,7 @@ local function applyEffects(exp, effects, rolls, ctx)
         end
       end
     elseif k == "upgradeRandom" then
-      local list = Rng.shuffle(exp.rng.events, upgradable(exp))
-      for i = 1, min(e[2], #list) do upgrade(exp, list[i]) end
+      X.upgradeRandom(exp, e[2], exp.rng.events)
     elseif k == "upgrade" or k == "remove" or k == "dupe" then
       ctx.follow = { kind = k }
     elseif k == "fight" then
@@ -945,6 +1066,7 @@ H.merchant = {
     spend(exp, price)
     table.remove(exp.deck, i)
     exp.removals = exp.removals + 1
+    exp.shop.removed = (exp.shop.removed or 0) + 1
     exp.stats.removed = exp.stats.removed + 1
     return true
   end,

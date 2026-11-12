@@ -66,6 +66,7 @@ function Rewards.relicPool(opts)
     local isBoss = r.rarity == "boss"
     if (opts.maxTier == nil or (r.tier or 0) <= opts.maxTier) and (isBoss == (opts.boss or false))
         and not r.noPool and (not r.class or r.class == opts.class)
+        and not (opts.class and ns.Expedition and not ns.Expedition.usefulFor(r, opts.class))
         and not (opts.exclude and opts.exclude[id]) then
       list[#list + 1] = id
     end

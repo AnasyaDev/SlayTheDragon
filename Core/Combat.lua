@@ -666,6 +666,10 @@ function Combat.drawCards(c, n)
       draw = c.draw
       Rng.shuffle(c.rng.draw, draw)
       log(c, { t = "reshuffle", n = #draw })
+      -- défausse remélangée dans la pioche (Scroll of Intellect) ; un crochet peut piocher à son tour
+      Combat.fire(c, "onReshuffle", #draw)
+      draw = c.draw
+      if #draw == 0 or #hand >= Combat.HAND_MAX then return end
     end
     local inst = draw[#draw]
     draw[#draw] = nil
@@ -735,6 +739,8 @@ function Combat.canPlay(c, idx)
   -- « Pay N HP » : jamais mortel, la carte est injouable s'il ferait tomber à 0
   local pay = Combat.payHpOf(c, d, inst)
   if pay > 0 and c.player.hp <= pay then return false, "hp" end
+  -- perte de PV par effet (« Lose 5 HP. », minHp = 5) : jamais mortelle, injouable à minHp PV ou moins
+  if d.minHp and c.player.hp <= d.minHp then return false, "lowHp" end
   -- ressource requise (Surge qui n'a de sens qu'avec de la ressource)
   if d.minRes and (c.player.res or 0) < d.minRes then return false, "resource" end
   -- incantation : emplacements pleins, sauf si elle partira tout de suite (« instantCast » interrogé
@@ -816,7 +822,9 @@ local function afterPlay(c, inst, d)
   elseif d.exhaust then
     c.exhaust[#c.exhaust + 1] = inst
   elseif d.cooldown then
-    c.cooldown[#c.cooldown + 1] = { card = inst, turns = d.cooldown }
+    -- durée de la recharge (crochet « cooldown » : Hourglass Sand), 1 au moins
+    local turns = max(1, Combat.modify(c, "cooldown", d.cooldown, d, inst))
+    c.cooldown[#c.cooldown + 1] = { card = inst, turns = turns }
   else
     c.discard[#c.discard + 1] = inst
   end
@@ -832,10 +840,10 @@ end
 -- Résolution des effets d'une carte. ctx = { card, def, target, dealt, hits, spent, surge, cast } ;
 -- un effet qui porte cond = "nom" ne s'applique que si la condition est vraie (Combat.test).
 -- spent : la dépense « Spend N » a été payée au moment du jeu (Combat.play).
-function Combat.resolveCard(c, inst, target, cast, spent)
-  local d = Card.def(inst)
+-- copy = vrai pour une copie (crochet « replay ») : ctx.copy, aucun coût, la carte ne bouge pas.
+local function resolveEffects(c, inst, d, target, cast, spent, copy)
   local ctx = { card = inst, def = d, target = target, dealt = false, hits = 0, cast = cast or false,
-    spent = spent or false }
+    spent = spent or false, copy = copy or nil }
   Combat.fire(c, "beforeCard", inst, ctx)
   local effects = d.effects
   for i = 1, #effects do
@@ -849,6 +857,24 @@ function Combat.resolveCard(c, inst, target, cast, spent)
     Combat.heal(c, c.player, Combat.ATONEMENT_HEAL)
   end
   if not c.result then Combat.fire(c, "onCardPlayed", inst, ctx) end
+  return ctx
+end
+
+function Combat.resolveCard(c, inst, target, cast, spent)
+  local d = Card.def(inst)
+  local ctx = resolveEffects(c, inst, d, target, cast, spent)
+  -- copies (crochet « replay », Ironfoe) : résolues tout de suite après, sur la même cible (ou le
+  -- premier ennemi vivant si elle est morte), sans coût ; la carte ne part qu'une fois
+  if not c.result then
+    local n = Combat.modify(c, "replay", 0, inst, ctx)
+    for _ = 1, n do
+      if c.result then break end
+      local t = target
+      if d.target == "enemy" and (not t or t.dead) then t = firstAlive(c) end
+      log(c, { t = "replay", card = inst.uid })
+      resolveEffects(c, inst, d, t, cast, spent, true)
+    end
+  end
   afterPlay(c, inst, d)
 end
 
@@ -1067,7 +1093,8 @@ function Combat.startPlayerTurn(c)
   c.phase = "player"
   stat(c, "turns")
   local p = c.player
-  p.block = 0
+  -- Absorb gardée d'un tour à l'autre (crochet « blockKeep », 0 par défaut : Absorb remise à 0)
+  p.block = min(p.block, max(0, Combat.modify(c, "blockKeep", 0)))
   p.st.halved = nil
   -- états retirés au début du tour (clearAtTurnStart : Pain Suppression, Ice Block…)
   for id in pairs(p.st) do
@@ -1183,7 +1210,7 @@ end
 
 -- opts : seed, class (id de ns.Classes, « priest » par défaut), hp, maxHp,
 --        deck = { {id=, up=}, ... }, encounter = { idEnnemi, ... },
---        relics = { id, ... }, potions = { id|false, ... } (POTION_SLOTS emplacements),
+--        relics = { id, ... }, potions = { id|false, ... } (POTION_SLOTS emplacements au moins),
 --        charges = { clé = valeur } (état de bibelots propre à l'expédition, relu après le combat),
 --        affixes = { id de ns.Affixes, ... } (clés mythiques), stats = bool, quiet = bool
 -- État propre à la classe : c.cls (table de données simples, vide au départ, remplie par
@@ -1214,7 +1241,8 @@ function Combat.new(opts)
     stats = opts.stats and Combat.newStats() or nil,
   }
   local potions = opts.potions or {}
-  for i = 1, Combat.POTION_SLOTS do c.player.potions[i] = potions[i] or false end
+  -- emplacements : 3, ou plus si l'expédition en a gagné (Herb Pouch : #exp.potions)
+  for i = 1, max(Combat.POTION_SLOTS, #potions) do c.player.potions[i] = potions[i] or false end
   for i = 1, #opts.deck do
     local card = opts.deck[i]
     c.draw[#c.draw + 1] = Card.new(card.id, card.up, c.nextUid)
