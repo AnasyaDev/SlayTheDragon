@@ -447,7 +447,30 @@ function R.svg(H, root, path, label)
             clip = string.format(' clip-path="url(#%s)"', cid)
           end
           local desat = calls.SetDesaturated and calls.SetDesaturated[1]
-          if inside then
+          local sm = calls.SetTextureSliceMargins
+          if inside and sm then
+            -- découpe par le client : marges en pixels de la texture, 1 pixel = 1 unité de la région
+            -- (échelle propre comprise), centre et bords étirés ; neuf morceaux de la même image
+            local u = escale(o) * vk
+            local ml, mt, mr, mb = sm[1] or 0, sm[2] or 0, sm[3] or 0, sm[4] or 0
+            local xs = { x, x + ml * u, x + w - mr * u, x + w }
+            local ys = { y, y + mt * u, y + h - mb * u, y + h }
+            local us = { u0 * iw, u0 * iw + ml, u1 * iw - mr, u1 * iw }
+            local vs = { v0 * ih, v0 * ih + mt, v1 * ih - mb, v1 * ih }
+            local parts = {}
+            for row = 1, 3 do
+              for c = 1, 3 do
+                local pw, ph = xs[c + 1] - xs[c], ys[row + 1] - ys[row]
+                local sw, sh = us[c + 1] - us[c], vs[row + 1] - vs[row]
+                if pw > 0.001 and ph > 0.001 and sw > 0 and sh > 0 then
+                  parts[#parts + 1] = string.format('<svg x="%.3f" y="%.3f" width="%.3f" height="%.3f" viewBox="%.3f %.3f %.3f %.3f" preserveAspectRatio="none"><image width="%d" height="%d" href="%s"/></svg>',
+                    xs[c], ys[row], pw, ph, us[c], vs[row], sw, sh, iw, ih, href)
+                end
+              end
+            end
+            out[#out + 1] = string.format('<g%s%s opacity="%.2f"><g%s>%s</g></g>', clip, filter(vc, desat), a, tf,
+              table.concat(parts))
+          elseif inside then
             out[#out + 1] = string.format('<g%s%s opacity="%.2f"><g%s><svg x="%.2f" y="%.2f" width="%.2f" height="%.2f" viewBox="%.3f %.3f %.3f %.3f" preserveAspectRatio="none"><image width="%d" height="%d" href="%s"/></svg></g></g>',
               clip, filter(vc, desat), a, tf, x, y, w, h, u0 * iw, v0 * ih, (u1 - u0) * iw, (v1 - v0) * ih, iw, ih, href)
           else

@@ -14,10 +14,14 @@ du jeu : voir « Habillage WoW » ci-dessous ; la peau « Mechanized Magic » ne
 
 Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
 
-- **Accueil** : une classe jouable (`ns.Classes`, ordre `order`) a son bouton d'office. Jusqu'à deux,
-  grands boutons rouges en une rangée (PV, cartes, réputation dessous, la choisie au liseré d'or) ;
-  au-delà, grille de trois colonnes de boutons de 170 × 36 (détail en infobulle), le reste du panneau
-  (clés, affixes) descend et le panneau grandit (harnais U33 : neuf classes tiennent dans le panneau).
+- **Accueil** (demande du joueur, 12/11/2026 : « juste l'icône de classe ») : une icône par classe
+  jouable (`ns.Classes`, ordre `order`), sans texte, en une rangée centrée et régulière : icône de la
+  classe (`Art.class(id)`, celle du portrait de repli : `ClassIcon_*` du pack d'icônes, `Media/Icons`)
+  dans le grand anneau doré, 64 unités, pas de 92 (réduits au-delà de cinq classes pour tenir dans
+  520 unités). Choisie : halo doré tenu, icône et anneau pleins, son nom seul en or sous son icône ;
+  les autres assombries, éclairées au survol (`W.hoverable`, halo créé d'avance). Nom, PV et cartes,
+  réputation dans l'infobulle (« Click: play this class. » si elle n'est pas choisie). Un clic choisit
+  la classe ; le départ reste le bouton « Start expedition » (Entrée). Harnais : U4, U35 (2, 5, 9 classes).
 - **Bandeau, cadre du héros** : nom de la classe jouée. Portrait : visage du personnage (`SetPortraitTexture`)
   si sa classe de jeu (`UnitClass("player")`, champ `wow` de `Art.classes`) est celle de l'expédition,
   sinon l'icône de la classe (Guerrier joué par un prêtre : icône du Guerrier).
@@ -214,7 +218,7 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 - **Autres écrans** (mêmes briques) : récompense (texte après coup sur parchemin, butin en cases, coffre
   dans le grand anneau), marchand (cases, étiquettes de prix dans un rail sombre, service en bouton rouge à
   case), feu de camp (couchage et grimoire dans le grand anneau, réponses en boutons), grille du deck,
-  panneau des cartes, accueil (classes en boutons rouges, la choisie au liseré d'or ; clés en cases), bilan
+  panneau des cartes, accueil (classes en icônes dans le grand anneau, la choisie au halo d'or ; clés en cases), bilan
   et méta (dialogues, barres de réputation). Messages passagers : texte rouge des erreurs du jeu sur un
   voile sombre léger.
 
@@ -264,7 +268,45 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   ouverture centrée sur l'hôte, icône = ouverture, partie pleine du fond = ouverture (son bord adouci sous
   le liseré) ; U31 vérifie sur les pixels l'icône à ±1 unité de l'ouverture et le fond dans le cadre.
 
+### Coutures des pièces en tranches (retour du 12/11/2026 en jeu)
+
+- **Vu** (capture, zoom net, fenêtre à 115 %, bouton de classe survolé) : deux traits verticaux qui
+  traversent le bouton aux jonctions bouts / milieu. Mesuré sur la capture : un **jour de 3 pixels** où le
+  fond se voit (ombre du bouton comprise, d'où le trait qui dépasse en haut et en bas), aux deux
+  jonctions, sur le bouton rouge ET le liseré d'or par-dessus.
+- **Établi** : ce n'est ni un arrondi ni le filtrage. Les trois tranches étaient ancrées bord à bord sur
+  les mêmes points (mêmes expressions), sans accrochage au pixel ; une jonction fractionnaire ou un texel
+  voisin donnent au plus un pixel de liseré, pas 3 pixels de vide ; l'intérieur de la pièce est continu.
+- **Hypothèse** (non vérifiable hors jeu) : l'animation `Scale` du visuel transforme ses régions une à une
+  (autour de leur propre centre, ou une partie seulement) plutôt que le visuel d'un bloc ; pendant la
+  réduction (sortie du survol en mode net : facteur 1 → 1 / échelle), les tranches s'écartent
+  (jour ≈ (1 − facteur) × (largeur − bout) / 2, soit 3 à 4 pixels sur ce bouton). Cohérent avec la capture
+  d'avant (ruban et plaque des cartes qui ne suivaient pas l'animation).
+- **Correction, indépendante de cette hypothèse** : chaque pièce en tranches est **une seule texture
+  découpée par le client** (`SetTextureSliceMargins` + `SetTextureSliceMode(Stretched)`, présents sur WoW
+  Forever d'après le MCP ; « préféré aux neuf textures séparées ») : boutons rouges, rouge et or, liseré
+  de survol, plaques de réponse, bouton « < » / « > », cadre compact d'ennemi (`W.threeSlice`),
+  parchemins (`W.nineStretch`), plaque du bas des cartes. Plus aucune jointure entre régions, ni au repos
+  ni pendant l'animation, à toute échelle. Marges en pixels de la texture ; pour qu'un pixel de marge
+  vaille d unités (d = hauteur / hauteur de la pièce pour un trois tranches), la texture prend l'**échelle
+  propre d** (`Region:SetScale`) et couvre son hôte par deux points sans décalage (`W.sliceFit` ; plaque des
+  cartes : région d'ancrage sans texture). Repli sans l'API (`W.CLIENT_SLICE = false` ou autre client) :
+  tranches séparées bord à bord, comme avant.
+- **Gardes de l'atlas** (trouvé en vérifiant) : `tools/build_wowui.py` répétait les colonnes gauche et
+  droite AVANT d'avoir posé la pièce : gardes latérales noires sous l'alpha du bord (2 514 pixels, 30
+  pièces : barres, cases, en-têtes, cadre compact…), liseré sombre possible au filtrage sur les bords
+  gauche et droit. Script corrigé ; `Media/WowUI/atlas.tga` réparé en place (gardes recopiées du bord,
+  rien d'autre ne change). Harnais UB : gardes de 2 pixels au moins, bord répété, aucune voisine.
+- Restent les coins à pièces séparées (cadre métal de la fenêtre, boîtes DiamondMetal, en-tête, rail du
+  curseur, plaques d'ardoise des cartes) : fichiers différents, hors des visuels animés, bord à bord.
+
 ### Non vérifiable hors jeu (à voir)
+
+- Découpe par le client (`SetTextureSliceMargins` sur une pièce de l'atlas posée par `SetTexCoord`, région
+  à échelle propre) : bouts des boutons à la même taille qu'avant (hauteur × 24 / 62), coins des
+  parchemins inchangés, plus aucun trait aux jonctions pendant les survols. Si les bouts paraissent trop
+  larges ou trop étroits, le client ne suit pas l'échelle propre de la région pour les marges : repli en
+  posant `W.CLIENT_SLICE = false` (tranches séparées).
 
 - Règle de dessin des cadres rogneurs (ci-dessus) : bandeau, pastilles, cases, Menu et fermeture visibles
   sur la barre de titre ; butin qui vole jusqu'au bandeau par-dessus la barre ; message passager devant les
