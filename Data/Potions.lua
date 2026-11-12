@@ -36,7 +36,7 @@ potion("shadow_protection", {
 potion("liquid_fire", {
   name = "Liquid Fire", rarity = "uncommon", tier = 2, target = true,
   effects = { { "damage", 10 }, { "apply", "pain", 3 } },
-  text = "Deal 10 to the target and apply Pain 3.",
+  text = "Deal 10 to the target and apply DoT 3.",
 })
 
 potion("wisdom_elixir", {

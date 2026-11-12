@@ -51,8 +51,8 @@ card("pw_shield", {
 card("sw_pain", {
   name = "SW: Pain", cost = 1, type = "skill", school = "shadow", rarity = "basic", path = "start",
   target = "enemy", effects = { { "apply", "pain", 5 }, { "demence", 1 } },
-  text = "+1 Insanity.\nApply Pain 5",
-  up = { effects = { { "apply", "pain", 7 }, { "demence", 1 } }, text = "+1 Insanity.\nApply Pain 7" },
+  text = "+1 Insanity.\nApply DoT 5",
+  up = { effects = { { "apply", "pain", 7 }, { "demence", 1 } }, text = "+1 Insanity.\nApply DoT 7" },
 })
 
 -- Discipline ----------------------------------------------------------------
@@ -126,9 +126,9 @@ card("schism", {
 card("shadow_mend", {
   rep = 1, name = "Shadow Mend", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "discipline",
   exhaust = true, effects = { { "heal", 10 }, { "apply", "pain", 2, self = true }, { "demence", 1 } },
-  text = "Heal 10.\n+1 Insanity.\nGain Pain 2\nExhaust.",
+  text = "Heal 10.\n+1 Insanity.\nGain DoT 2\nExhaust.",
   up = { effects = { { "heal", 14 }, { "apply", "pain", 2, self = true }, { "demence", 1 } },
-    text = "Heal 14.\n+1 Insanity.\nGain Pain 2\nExhaust." },
+    text = "Heal 14.\n+1 Insanity.\nGain DoT 2\nExhaust." },
 })
 
 card("evangelism", {
@@ -165,8 +165,8 @@ end
 card("mind_flay", {
   rep = 0, name = "Mind Flay", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", effects = { { "fn", flayBonus }, { "damage", 8 } },
-  text = "Deal 8.\nPain: +2 Insanity, draw 1.",
-  up = { effects = { { "fn", flayBonus }, { "damage", 11 } }, text = "Deal 11.\nPain: +2 Insanity, draw 1." },
+  text = "Deal 8.\nDoT: +2 Insanity, draw 1.",
+  up = { effects = { { "fn", flayBonus }, { "damage", 11 } }, text = "Deal 11.\nDoT: +2 Insanity, draw 1." },
 })
 
 card("mind_blast", {
@@ -189,8 +189,8 @@ card("devouring_plague", {
   rep = 0, name = "Devouring Plague", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
   target = "enemy", plagueMult = 2, effects = { { "fn", plague } },
   canPlay = function(c) return c.player.demence > 0 end,
-  text = "Surge: apply Pain 2 per Insanity.",
-  up = { plagueMult = 3, text = "Surge: apply Pain 3 per Insanity." },
+  text = "Surge: apply DoT 2 per Insanity.",
+  up = { plagueMult = 3, text = "Surge: apply DoT 3 per Insanity." },
 })
 
 -- Forme d'ombre : l'interdiction des cartes sacrées (version d'origine), puis un surcoût
@@ -212,9 +212,9 @@ end
 card("shadowform", {
   rep = 0, name = "Shadowform", cost = 1, type = "power", school = "shadow", rarity = "rare", path = "shadow",
   power = true, effects = { { "demence", 2 } }, hooks = shadowformHooks(3),
-  text = "Power.\n+2 Insanity.\nShadow: damage and Pain +3.",
+  text = "Power.\n+2 Insanity.\nShadow: damage and DoT +3.",
   up = { hooks = shadowformHooks(4),
-    text = "Power.\n+2 Insanity.\nShadow: damage and Pain +4." },
+    text = "Power.\n+2 Insanity.\nShadow: damage and DoT +4." },
 })
 
 card("silence", {
@@ -227,16 +227,16 @@ card("silence", {
 card("vampiric_touch", {
   rep = 0, name = "Vampiric Touch", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 1, self = true }, { "demence", 1 } },
-  text = "+1 Insanity.\nApply Pain 3\nGain Regen 1",
+  text = "+1 Insanity.\nApply DoT 3\nGain Regen 1",
   up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "demence", 1 } },
-    text = "+1 Insanity.\nApply Pain 5\nGain Regen 2" },
+    text = "+1 Insanity.\nApply DoT 5\nGain Regen 2" },
 })
 
 card("mind_sear", {
   rep = 1, name = "Mind Sear", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
   effects = { { "apply", "pain", 4, all = true }, { "demence", 1 } },
-  text = "+1 Insanity.\nApply Pain 4 to all",
-  up = { effects = { { "apply", "pain", 6, all = true }, { "demence", 1 } }, text = "+1 Insanity.\nApply Pain 6 to all" },
+  text = "+1 Insanity.\nApply DoT 4 to all",
+  up = { effects = { { "apply", "pain", 6, all = true }, { "demence", 1 } }, text = "+1 Insanity.\nApply DoT 6 to all" },
 })
 
 local function executeBonus(c, ctx, t)
@@ -284,8 +284,8 @@ card("void_eruption", {
 card("holy_fire", {
   rep = 0, name = "Holy Fire", cost = 2, type = "attack", school = "holy", rarity = "common", path = "holy",
   target = "enemy", cast = true, effects = { { "damage", 24 }, { "apply", "pain", 3 } },
-  text = "Cast.\nDeal 24.\nApply Pain 3",
-  up = { effects = { { "damage", 31 }, { "apply", "pain", 4 } }, text = "Cast.\nDeal 31.\nApply Pain 4" },
+  text = "Cast.\nDeal 24.\nApply DoT 3",
+  up = { effects = { { "damage", 31 }, { "apply", "pain", 4 } }, text = "Cast.\nDeal 31.\nApply DoT 4" },
 })
 
 card("holy_nova", {

@@ -2162,7 +2162,7 @@ function W.cardBody(d, base)
     cl[#cl + 1] = l
   end
   text = table.concat(cl, "\n")
-  -- un nom d'état insécable avec son nombre (« Pain 5 », « Sundered 2 ⌛ ») ; « to all » insécable
+  -- un nom d'état insécable avec son nombre (« DoT 5 », « Sundered 2 ⌛ ») ; « to all » insécable
   for _, k in ipairs(keywordList()) do
     if k.status then
       text = eachPhrase(text, k.name, function(p) return p .. "\001" end)
@@ -2314,8 +2314,8 @@ W.balanceColors = balanceColors
 -- Paragraphes du texte d'une carte selon le mode : "clauses" = une clause par paragraphe ; "flow" =
 -- les clauses d'effet coulent ensemble, chaque clause d'état posé (« Donne » / « Applique ») reste un
 -- paragraphe ; "flowAll" = les clauses d'état sont groupées en un dernier paragraphe (« Apply
--- Pain 3. Gain Regen 1 »). Un paragraphe commence toujours une ligne.
--- Une clause conditionnelle (« Pain: … », « Execute: … ») commence toujours une ligne, et la
+-- DoT 3. Gain Regen 1 »). Un paragraphe commence toujours une ligne.
+-- Une clause conditionnelle (« DoT: … », « Execute: … ») commence toujours une ligne, et la
 -- clause qui la suit aussi (elle ne doit pas paraître soumise à la condition) : seules les clauses
 -- simples qui se suivent coulent ensemble.
 function W.isConditionClause(s)

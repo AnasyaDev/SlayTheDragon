@@ -3519,7 +3519,7 @@ do
       end
       if d.perDemence and not t:find("per Insanity", 1, true) then cbad[#cbad + 1] = id .. " : Surge chiffré" end
       if d.perDemence and not t:find("+ " .. d.perDemence .. " per Insanity", 1, true) then cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Surge chiffré" end
-      if d.plagueMult and not t:find("apply Pain " .. d.plagueMult .. " per Insanity", 1, true) then
+      if d.plagueMult and not t:find("apply DoT " .. d.plagueMult .. " per Insanity", 1, true) then
         cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Peste chiffrée"
       end
     end
@@ -3545,7 +3545,7 @@ do
       local firstState
       for _, cl in ipairs(cls) do if isStateCl(cl) then firstState = cl break end end
       if firstState then
-        -- verbe puis nom (« Gain Atonement », « Apply Pain »), le verbe seul en fin de ligne possible
+        -- verbe puis nom (« Gain Atonement », « Apply DoT »), le verbe seul en fin de ligne possible
         -- (« Apply » / « Stunned 1 ⌛ ») ; « Gain 4 Absorb. » ne compte pas
         local verb, name1 = firstState:match("^(%S+) (%S+)")
         local startLine

@@ -26,7 +26,7 @@ S.demoralized = { name = "Demoralized", debuff = true, duration = true,
   text = "Deals 25% less damage." }
 S.atonement = { name = "Atonement", duration = true,
   text = "Each card that deals damage restores 2 HP." }
-S.pain = { name = "Pain", debuff = true,
+S.pain = { name = "DoT", debuff = true,
   text = "Takes X damage at the start of its turn, then X drops by 1. Ignores Absorb." }
 S.regen = { name = "Regen",
   text = "Heals X at the start of its turn, then X drops by 1." }
