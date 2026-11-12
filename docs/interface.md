@@ -41,8 +41,7 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   explications dérivées). « Pay N HP. » en première ligne a son explication.
 - **État `pain`** affiché « DoT » ; l'icône d'un DoT peut dépendre de sa source (`Art.statusIcons`,
   saignement du Guerrier).
-- Raisons nouvelles : « Not enough HP to pay. », « Not enough Rage. » (ressource de la classe),
-  « Not enough HP. » (carte `minHp`).
+- Raisons nouvelles : « Not enough HP to pay. », « Not enough Rage. » (ressource de la classe).
 - **Cartes neutres et bibelots communs** (12/11/2026, `UI/Art/neutral.lua`) : corps ivoire teinté vert
   sauge (`Art.cardBodyTint`, couleur de sommet multipliée par l'assombrissement d'une carte injouable),
   mot-clé « Neutral » en infobulle ; bandeau : 3 cases de potion, 4 avec Herb Pouch (calées à droite,

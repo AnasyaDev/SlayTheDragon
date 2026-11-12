@@ -71,10 +71,10 @@ end
 
 card("penance", {
   level = 1, name = "Penance", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "discipline",
-  target = "enemy", effects = { { "damage", 6, times = 3, onHit = penanceHit } },
-  text = "Deal 6 three times.\nAtonement: +2 Absorb per hit.",
-  up = { effects = { { "damage", 8, times = 3, onHit = penanceHit } },
-    text = "Deal 8 three times.\nAtonement: +2 Absorb per hit." },
+  target = "enemy", effects = { { "damage", 5, times = 3, onHit = penanceHit } },
+  text = "Deal 5 three times.\nAtonement: +2 Absorb per hit.",
+  up = { effects = { { "damage", 7, times = 3, onHit = penanceHit } },
+    text = "Deal 7 three times.\nAtonement: +2 Absorb per hit." },
 })
 
 card("pain_suppression", {
@@ -93,10 +93,10 @@ end
 
 card("solace", {
   level = 1, name = "PW: Solace", cost = 1, type = "attack", school = "holy", rarity = "common", path = "discipline",
-  target = "enemy", effects = { { "fn", solaceMana }, { "damage", 5 }, { "apply", "atonement", 1, self = true } },
-  text = "Deal 5.\nAtonement: +1 mana.\nGain Atonement 1 ⌛",
-  up = { effects = { { "fn", solaceMana }, { "damage", 8 }, { "apply", "atonement", 1, self = true } },
-    text = "Deal 8.\nAtonement: +1 mana.\nGain Atonement 1 ⌛" },
+  target = "enemy", effects = { { "fn", solaceMana }, { "damage", 4 }, { "apply", "atonement", 1, self = true } },
+  text = "Deal 4.\nAtonement: +1 mana.\nGain Atonement 1 ⌛",
+  up = { effects = { { "fn", solaceMana }, { "damage", 6 }, { "apply", "atonement", 1, self = true } },
+    text = "Deal 6.\nAtonement: +1 mana.\nGain Atonement 1 ⌛" },
 })
 
 card("angelic_feather", {
@@ -146,9 +146,9 @@ end
 
 card("rapture", {
   level = 7, name = "Rapture", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
-  power = true, effects = {}, hooks = raptureHooks(1),
-  text = "Power.\nEach Absorb gain: +1.",
-  up = { hooks = raptureHooks(2), text = "Power.\nEach Absorb gain: +2." },
+  power = true, effects = {}, hooks = raptureHooks(2),
+  text = "Power.\nEach Absorb gain: +2.",
+  up = { hooks = raptureHooks(3), text = "Power.\nEach Absorb gain: +3." },
 })
 
 -- Ombre -----------------------------------------------------------------------
@@ -265,10 +265,10 @@ card("holy_fire", {
 
 card("holy_nova", {
   level = 1, name = "Holy Nova", cost = 1, type = "attack", school = "holy", rarity = "common", path = "holy",
-  effects = { { "damage", 4, all = true }, { "apply", "regen", 2, self = true } },
-  text = "Deal 4 to all.\nGain Regen 2",
-  up = { effects = { { "damage", 6, all = true }, { "apply", "regen", 3, self = true } },
-    text = "Deal 6 to all.\nGain Regen 3" },
+  effects = { { "damage", 3, all = true }, { "apply", "regen", 2, self = true } },
+  text = "Deal 3 to all.\nGain Regen 2",
+  up = { effects = { { "damage", 5, all = true }, { "apply", "regen", 3, self = true } },
+    text = "Deal 5 to all.\nGain Regen 3" },
 })
 
 card("chastise", {
@@ -280,9 +280,9 @@ card("chastise", {
 
 card("greater_heal", {
   level = 1, name = "Greater Heal", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "holy",
-  cast = true, exhaust = true, effects = { { "heal", 12 } },
-  text = "Cast.\nHeal 12.\nExhaust.",
-  up = { effects = { { "heal", 16 } }, text = "Cast.\nHeal 16.\nExhaust." },
+  cast = true, exhaust = true, effects = { { "heal", 10 } },
+  text = "Cast.\nHeal 10.\nExhaust.",
+  up = { effects = { { "heal", 13 } }, text = "Cast.\nHeal 13.\nExhaust." },
 })
 
 card("spirit_of_redemption", {
@@ -313,10 +313,10 @@ card("renew", {
 
 card("halo", {
   level = 4, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  cast = true, effects = { { "damage", 15, all = true }, { "apply", "regen", 3, self = true } },
-  text = "Cast.\nDeal 15 to all.\nGain Regen 3",
-  up = { effects = { { "damage", 19, all = true }, { "apply", "regen", 4, self = true } },
-    text = "Cast.\nDeal 19 to all.\nGain Regen 4" },
+  cast = true, effects = { { "damage", 18, all = true }, { "apply", "regen", 3, self = true } },
+  text = "Cast.\nDeal 18 to all.\nGain Regen 3",
+  up = { effects = { { "damage", 22, all = true }, { "apply", "regen", 4, self = true } },
+    text = "Cast.\nDeal 22 to all.\nGain Regen 4" },
 })
 
 card("flash_heal", {
@@ -328,9 +328,9 @@ card("flash_heal", {
 
 card("empyreal_blaze", {
   level = 6, name = "Empyreal Blaze", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  target = "enemy", cast = true, effects = { { "damage", 28 }, { "apply", "armor_broken", 2 } },
-  text = "Cast.\nDeal 28.\nApply Sundered 2 ⌛",
-  up = { effects = { { "damage", 36 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 36.\nApply Sundered 2 ⌛" },
+  target = "enemy", cast = true, effects = { { "damage", 32 }, { "apply", "armor_broken", 2 } },
+  text = "Cast.\nDeal 32.\nApply Sundered 2 ⌛",
+  up = { effects = { { "damage", 40 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 40.\nApply Sundered 2 ⌛" },
 })
 
 -- Apothéose : une pioche en plus ne valait rien (3 mana pour 5 cartes à 1 mana : la main
@@ -425,7 +425,7 @@ relic("truefaith_vestments", {
 
 -- Définition de classe (contrat : docs/classes.md).
 ns.Classes.priest = {
-  id = "priest", name = "Priest", order = 1, hp = 65,
+  id = "priest", name = "Priest", order = 1, hp = 52,
   -- Insanity : sans plafond, gardée d'un tour à l'autre (GDD, décision du 11/11/2026)
   resource = { id = "insanity", cap = nil, keep = true },
   deck = {
@@ -442,13 +442,12 @@ ns.Classes.priest = {
   bot = {
     resValue = 1.5,
     rating = {
-      vampiric_touch = 7, angelic_feather = 6, flash_heal = 6, solace = 6, luminous_barrier = 6,
-      mind_sear = 6, radiance = 5, holy_nova = 5, shadow_mend = 5, renew = 5, mind_blast = 5,
-      holy_fire = 5, mind_flay = 4,
-      schism = 6, psychic_scream = 6, silence = 5, evangelism = 5, greater_heal = 5, chastise = 5,
-      penance = 5, devouring_plague = 4, sw_death = 4, halo = 4, empyreal_blaze = 4,
-      rapture = 7, pain_suppression = 7, shadowform = 5, apotheosis = 5, void_eruption = 4,
-      spirit_of_redemption = 4,
+      solace = 11, devouring_plague = 10, luminous_barrier = 9.5, psychic_scream = 8.5, mind_sear = 8,
+      angelic_feather = 8, rapture = 8, spirit_of_redemption = 8, pain_suppression = 8, chastise = 8,
+      schism = 7.5, shadowform = 7.5, radiance = 7.5, greater_heal = 7, void_eruption = 6.5,
+      mind_blast = 6.5, sw_death = 6, evangelism = 6, silence = 6, renew = 6, flash_heal = 6, mind_flay = 6,
+      vampiric_touch = 6, holy_nova = 6, penance = 5.5, halo = 5.5, shadow_mend = 5.5, empyreal_blaze = 5,
+      holy_fire = 5, apotheosis = 5,
     },
     upgrade = { smite = 2.5, inner_fire = 2, pw_shield = 1.5, sw_pain = 1.5 },
     upgradeRun = { smite = 2.5, inner_fire = 2 }, -- ancien coureur (Sim/run.lua)

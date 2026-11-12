@@ -608,11 +608,11 @@ test("Apothéose : les incantations coûtent 1 de moins", function()
   eq(Combat.cost(c, c.hand[2]), 1)
 end)
 
-test("Extase : +1 à chaque gain d'Absorption", function()
+test("Extase : +2 à chaque gain d'Absorption", function()
   local c = setup({ "rapture", "inner_fire" })
   Combat.play(c, 1)
   Combat.play(c, 1)
-  eq(c.player.block, num("inner_fire", 1) + 1)
+  eq(c.player.block, num("inner_fire", 1) + 2)
 end)
 
 test("Guérison de l'ombre : soigne puis Douleur sur soi", function()
@@ -1093,7 +1093,8 @@ test("Trap : posée au jeu, déclenchée à la prochaine attaque ennemie sur l'a
   local hp = c.player.hp
   Combat.endTurn(c)
   eq(#c.traps, 2, "une seule déclenchée (une attaque)"); eq(c.enemies[1].hp, 100, "pas sur l'ennemi passif")
-  eq(c.enemies[2].hp, 93); eq(c.player.hp, hp - 10, "l'attaque part quand même")
+  eq(c.enemies[2].hp, 93); eq(c.player.hp, hp, "étourdi pendant son tour : l'attaque n'a pas lieu")
+  eq(c.enemies[2].st.stunned, nil, "charge consommée par ce tour-là")
   local t = Combat.clone(c)
   table.remove(t.traps)
   eq(#c.traps, 2, "clone indépendant")
@@ -1186,7 +1187,7 @@ test("Rogue : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveau 1 à 7 sur 
   eq(nr, 6)
   local cd = ns.Classes.rogue
   eq(#cd.deck, 10); eq(cd.resource.id, "combo"); eq(cd.resource.cap, 5); eq(cd.resource.keep, true)
-  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 60)
+  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 49)
   eq(Card.defById("kick").cost, 0)
 end)
 
@@ -1337,16 +1338,17 @@ test("Surge à 0 : Eviscerate, Rupture, Exsanguinate injouables ; Envenom, Secre
   eq(hpOf(b), 100); eq(b.enemies[1].st.stunned, 1)
 end)
 
-test("Eviscerate : 5 + 5 par point ; Between the Eyes : 4 par point et Stunned", function()
+test("Eviscerate : 4 + 4 par point ; Between the Eyes : 4 par point et Stunned", function()
+  local ev, evu = Card.defById("eviscerate").effects[2], Card.defById("eviscerate", true).effects[2]
   local c = setup({ "eviscerate" }, nil, nil, RO)
   c.player.res = 4
   Combat.play(c, 1, 1)
-  eq(hpOf(c), 100 - 5 - 5 * 4); eq(c.player.res, 0)
+  eq(hpOf(c), 100 - ev[2] - ev.per[1] * 4); eq(c.player.res, 0)
   local u = setup({ "eviscerate" }, nil, nil, RO)
   u.hand[1] = Card.new("eviscerate", true, 999)
   u.player.res = 5
   Combat.play(u, 1, 1)
-  eq(hpOf(u), 100 - 8 - 6 * 5)
+  eq(hpOf(u), 100 - evu[2] - evu.per[1] * 5)
   local b = setup({ "between_the_eyes" }, nil, nil, RO)
   b.player.res = 3
   Combat.play(b, 1, 1)
@@ -1387,28 +1389,28 @@ test("Mutilate : +1 point de plus sur une cible sous DoT ; Garrote, Fan of Knive
   eq(m.player.res, 3)
   local g = setup({ "garrote" }, nil, nil, RO)
   Combat.play(g, 1, 1)
-  eq(hpOf(g), 97); eq(g.player.res, 1); eq(g.enemies[1].st.pain, 4)
+  eq(hpOf(g), 97); eq(g.player.res, 1); eq(g.enemies[1].st.pain, num("garrote", 3, 3))
   local f = setup({ "fan_of_knives" }, { "test_dummy", "test_dummy" }, nil, RO)
   Combat.play(f, 1)
   eq(hpOf(f, 1), 97); eq(hpOf(f, 2), 97); eq(f.enemies[2].st.pain, 2); eq(f.player.res, 1)
   local h = setup({ "hemorrhage" }, nil, nil, RO)
   Combat.play(h, 1, 1)
-  eq(hpOf(h), 95); eq(h.enemies[1].st.armor_broken, 1); eq(h.player.res, 1)
+  eq(hpOf(h), 100 - num("hemorrhage", 1)); eq(h.enemies[1].st.armor_broken, num("hemorrhage", 3, 3)); eq(h.player.res, 1)
 end)
 
 test("Killing Spree : six coups au hasard (flux des cartes), Deadly Poison sur chacun ; Blade Flurry", function()
   local c = setup({ "deadly_poison", "killing_spree" }, { "test_dummy", "test_dummy" }, nil, RO)
-  c.player.mana = 3
+  c.player.mana = Card.defById("deadly_poison").cost + Card.defById("killing_spree").cost
   Combat.play(c, 1)
   local before = Rng.int(Combat.clone(c).rng.cards, 1, 2)
   Combat.play(c, 1)
-  eq((100 - hpOf(c, 1)) + (100 - hpOf(c, 2)), 30)
+  eq((100 - hpOf(c, 1)) + (100 - hpOf(c, 2)), 6 * num("killing_spree", 1))
   eq((c.enemies[1].st.pain or 0) + (c.enemies[2].st.pain or 0), 6, "un DoT 1 par coup")
   assert(before == 1 or before == 2)
   local b = setup({ "blade_flurry", "sinister_strike", "feint" }, { "test_dummy", "test_dummy" }, nil, RO)
   Combat.play(b, 1)
   Combat.play(b, 1, 1)
-  eq(hpOf(b, 1), 100 - 6 - 2); eq(hpOf(b, 2), 98)
+  eq(hpOf(b, 1), 100 - num("sinister_strike", 1) - 2); eq(hpOf(b, 2), 98)
   Combat.play(b, 1)
   eq(hpOf(b, 2), 98, "un Skill ne déclenche rien")
   eq(b.enemies[2].st.pain, nil, "pas un coup d'Attack")
@@ -1469,23 +1471,24 @@ test("Kick : coupe le sort et +1 point ; Riposte : Parry ; Cloak of Shadows : ne
   eq(cl.player.st.demoralized, nil); eq(cl.player.st.parry, 1)
   local a = setup({ "adrenaline_rush" }, nil, { "feint", "feint" }, RO)
   Combat.play(a, 1)
-  eq(a.player.mana, 3 - 1 + 3); eq(#a.hand, 2); eq(a.exhaust[1].id, "adrenaline_rush")
+  eq(a.player.mana, 3 - 1 + num("adrenaline_rush", 1)); eq(#a.hand, 2); eq(a.exhaust[1].id, "adrenaline_rush")
   local sb = setup({ "smoke_bomb", "sinister_strike" }, { "test_dummy", "test_dummy" }, nil, RO)
   Combat.play(sb, 2, 1)
   Combat.play(sb, 1)
   eq(sb.enemies[2].st.demoralized, 2); eq(sb.player.st.stealth, 1)
 end)
 
-test("Secret Technique : 3 par point à tous, deux fois sous Stealth", function()
+test("Secret Technique : 4 par point à tous, deux fois sous Stealth", function()
   local c = setup({ "secret_technique" }, { "test_dummy", "test_dummy" }, nil, RO)
   c.player.res = 4
   Combat.play(c, 1)
-  eq(hpOf(c, 1), 100 - 24); eq(hpOf(c, 2), 100 - 24); eq(c.player.st.stealth, nil)
+  local k = Card.defById("secret_technique").effects[2].per[1]
+  eq(hpOf(c, 1), 100 - 2 * 4 * k); eq(hpOf(c, 2), 100 - 2 * 4 * k); eq(c.player.st.stealth, nil)
   local n = setup({ "sinister_strike", "secret_technique" }, { "test_dummy", "test_dummy" }, nil, RO)
   Combat.play(n, 1, 1)
   n.player.res = 4
   Combat.play(n, 1)
-  eq(hpOf(n, 2), 100 - 12)
+  eq(hpOf(n, 2), 100 - 4 * k)
 end)
 
 test("bibelots du Voleur : Thieves' Tools, Blinding Powder, Crystal Vial, Ravenholdt Signet, Shadowfang", function()
@@ -1497,10 +1500,10 @@ test("bibelots du Voleur : Thieves' Tools, Blinding Powder, Crystal Vial, Ravenh
   eq(#t.hand, 5, "5 ensuite")
   local v = setup({ "garrote", "rupture" }, nil, nil, { class = "rogue", relics = { "crystal_vial", "ravenholdt_signet" } })
   Combat.play(v, 1, 1)
-  eq(v.enemies[1].st.pain, 5, "Garrote 4 + 1")
+  eq(v.enemies[1].st.pain, num("garrote", 3, 3) + 1, "Garrote + 1")
   v.player.res = 2
   Combat.play(v, 1, 1)
-  eq(v.enemies[1].st.pain, 5 + 7, "Rupture 6 + 1"); eq(v.player.st.parry, 1, "Parry après le Surge")
+  eq(v.enemies[1].st.pain, num("garrote", 3, 3) + 1 + 7, "Rupture 6 + 1"); eq(v.player.st.parry, 1, "Parry après le Surge")
 end)
 
 test("Rogue : chaque carte (base et améliorée) jouable sans erreur, combat déroulé deux tours", function()
@@ -1564,7 +1567,7 @@ local MAGE_SHEET = {
   living_bomb = { 1, 1, "attack", "fire", "fire", "uncommon", 2 },
   phoenix_flames = { 1, 1, "attack", "fire", "fire", "uncommon", 4 },
   ignite = { 1, 1, "power", "fire", "fire", "rare", 6 },
-  combustion = { 1, 0, "skill", "fire", "fire", "rare", 7 },
+  combustion = { 0, 0, "skill", "fire", "fire", "rare", 7 },
   ice_lance = { 0, 0, "attack", "frost", "frost", "common", 1 },
   frost_nova = { 1, 1, "skill", "frost", "frost", "common", 1 },
   ice_barrier = { 1, 1, "skill", "frost", "frost", "common", 1 },
@@ -1581,7 +1584,7 @@ local MAGE_SHEET = {
   arcane_barrage = { 1, 1, "attack", "arcane", "arcane", "common", 1 },
   counterspell = { 0, 0, "skill", "arcane", "arcane", "uncommon", 1 },
   evocation = { 0, 0, "skill", "arcane", "arcane", "uncommon", 1 },
-  polymorph = { 1, 0, "skill", "arcane", "arcane", "common", 2 },
+  polymorph = { 2, 1, "skill", "arcane", "arcane", "common", 2 },
   presence_of_mind = { 0, 0, "skill", "arcane", "arcane", "uncommon", 4 },
   arcane_power = { 1, 0, "power", "arcane", "arcane", "rare", 6 },
   arcane_surge = { 1, 0, "skill", "arcane", "arcane", "rare", 7 },
@@ -1606,9 +1609,9 @@ test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté
   eq(paths.start, 4); eq(paths.fire, 10); eq(paths.frost, 10); eq(paths.arcane, 10)
 end)
 
-test("Mage : définition (52 PV, Arcane Charges 0 à 4 gardées, deck de départ, Apprentice's Wand), 6 bibelots avec niveau, Interrupt et Last Breath", function()
+test("Mage : définition (42 PV, Arcane Charges 0 à 4 gardées, deck de départ, Apprentice's Wand), 6 bibelots avec niveau, Interrupt et Last Breath", function()
   local cd = ns.Classes.mage
-  eq(cd.hp, 52); eq(cd.resource.id, "arcane"); eq(cd.resource.cap, 4); eq(cd.resource.keep, true)
+  eq(cd.hp, 42); eq(cd.resource.id, "arcane"); eq(cd.resource.cap, 4); eq(cd.resource.keep, true)
   eq(cd.startRelic, "apprentice_wand"); eq(ns.Relics.apprentice_wand.noPool, true); eq(cd.survival, "control")
   local cnt = {}
   for _, id in ipairs(cd.deck) do cnt[id] = (cnt[id] or 0) + 1 end
@@ -1872,10 +1875,11 @@ test("Frozen : Stunned ou Demoralized, lu sur la cible au coup (Ice Lance), marc
   local f = mageHand({ "frostbolt", "ice_lance" })
   Combat.play(f, 1, 1)
   Combat.play(f, 1, 1)
-  eq(f.enemies[1].hp, 100 - num("frostbolt", 1) - num("ice_lance", 1) - 8, "Frostbolt rend Frozen")
+  eq(f.enemies[1].hp, 100 - num("frostbolt", 1) - num("ice_lance", 1)
+    - Card.defById("ice_lance").effects[1].more[1][1], "Frostbolt rend Frozen")
 end)
 
-test("Deep Freeze : Stunned 1 seulement sur une cible Frozen ; Shatter : +3 par coup d'Attack sur une cible Frozen", function()
+test("Deep Freeze : Stunned 1 seulement sur une cible Frozen ; Shatter : +4 par coup d'Attack sur une cible Frozen", function()
   local c = mageHand({ "deep_freeze" })
   Combat.play(c, 1, 1)
   eq(c.enemies[1].st.stunned, nil)
@@ -1889,14 +1893,14 @@ test("Deep Freeze : Stunned 1 seulement sur une cible Frozen ; Shatter : +3 par 
   eq(s.enemies[1].hp, 100 - 3 * num("flurry", 1), "pas encore Frozen au coup")
   local hp = s.enemies[1].hp
   Combat.play(s, 1, 1)
-  eq(s.enemies[1].hp, hp - 3 * math.floor(num("flurry", 1) + 3), "Frozen : +3 à chaque coup")
+  eq(s.enemies[1].hp, hp - 3 * math.floor(num("flurry", 1) + 4), "Frozen : +4 à chaque coup")
 end)
 
-test("Ignite : chaque coup d'une carte Fire pose DoT 2 ; Phoenix Flames : DoT sur la cible, Instant 1", function()
+test("Ignite : chaque coup d'une carte Fire pose DoT 3 ; Phoenix Flames : DoT sur la cible, Instant 1", function()
   local c = mageHand({ "living_bomb", "phoenix_flames" }, { "test_dummy", "test_dummy" })
   power(c, "ignite")
   Combat.play(c, 1)
-  eq(c.enemies[1].st.pain, num("living_bomb", 2, 3) + 2); eq(c.enemies[2].st.pain, num("living_bomb", 2, 3) + 2)
+  eq(c.enemies[1].st.pain, num("living_bomb", 2, 3) + 3); eq(c.enemies[2].st.pain, num("living_bomb", 2, 3) + 3)
   eq(c.enemies[1].stIcon.pain, "burn")
   local p = mageHand({ "phoenix_flames" })
   Combat.play(p, 1, 1)
@@ -1968,7 +1972,7 @@ test("Bibelots du Mage : baguette (1re carte Cast à 0, même Evocation), Tome, 
   local g = mageHand({ "ice_lance" }, { "test_dummy", "test_boss" }, { relics = { "glacial_cloak" } })
   eq(g.enemies[1].st.demoralized, 1); eq(g.enemies[2].st.demoralized, 1)
   Combat.play(g, 1, 2)
-  eq(g.enemies[2].hp, 100 - num("ice_lance", 1) - 8, "boss Frozen au premier tour")
+  eq(g.enemies[2].hp, 100 - num("ice_lance", 1) - Card.defById("ice_lance").effects[1].more[1][1], "boss Frozen au premier tour")
   local f = mageHand({ "frostbolt" }, nil, { relics = { "fire_ruby" } })
   eq(f.player.st.instant, 1)
   local m = mageHand({ "frostbolt" }, nil, { relics = { "mind_quickening_gem" } })
@@ -2142,18 +2146,97 @@ do
     eq(#c.traps, 2, "une seule déclenchée"); eq(c.traps[1].card.id, "freezing_trap")
     eq(c.enemies[1].hp, 100 - P - num("counterattack", 1), "Counterattack sur l'attaquant")
     eq(c.player.hp, hp - 3 * 8, "attaque à trois coups : la Trap ne part qu'une fois")
-    -- Freezing Trap : Demoralized dès l'attaque en cours (tous ses coups), Stunned : le prochain tour
+    -- Freezing Trap : Stunned posé pendant son tour => l'attaque en cours n'a pas lieu (aucun des trois
+    -- coups), charge consommée ; Demoralized couvre l'attaque du tour suivant
     hp = c.player.hp
     Combat.endTurn(c)
-    eq(#c.traps, 1); eq(c.player.hp, hp - 3 * math.floor(8 * 0.75), "Demoralized sur les trois coups")
-    eq(c.enemies[1].st.stunned, 1)
+    eq(#c.traps, 1); eq(c.player.hp, hp, "étourdi pendant son tour : aucun des trois coups")
+    eq(c.enemies[1].st.stunned, nil, "charge consommée")
+    assert((c.enemies[1].st.demoralized or 0) > 0, "Demoralized encore là au tour suivant")
+    -- la Frost Trap (Demoralized à tous) part à l'attaque suivante ; Demoralized réduit les trois coups
     hp = c.player.hp
     Combat.endTurn(c)
-    eq(c.player.hp, hp, "étourdi : pas d'attaque"); eq(#c.traps, 1, "la Trap attend")
+    eq(c.player.hp, hp - 3 * math.floor(8 * 0.75), "attaque du tour suivant affaiblie de 25 %")
+    eq(#c.traps, 0, "Frost Trap déclenchée")
     local q = setup({ "counterattack" }, { "test_dummy" }, nil, HU)
     Combat.play(q, 1)
     Combat.endTurn(q); Combat.endTurn(q)
     eq(#q.traps, 1, "ennemi qui n'attaque pas : la Trap reste posée")
+  end)
+
+  test("Stunned posé pendant le tour de l'ennemi : arrêt immédiat (plusieurs actions, boss, Stunned 2, deux Traps)", function()
+    ns.Enemies.test_combo = { name = "Combo", hp = 100, moves = { combo = { name = "Combo", intent = "attack",
+      actions = { { "block", 5 }, { "attack", 6, times = 2 }, { "buff", "force", 2 } } } }, pattern = { "combo" } }
+    ns.Enemies.test_boss_hitter = { name = "Boss frappeur", hp = 100, boss = true,
+      moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 12 } } } }, pattern = { "hit" } }
+    ns.Cards.test_stun2 = { id = "test_stun2", name = "s", cost = 0, type = "skill", trap = true, rarity = "common",
+      effects = { { "apply", "stunned", 2 } }, text = "Trap.\nApply Stunned 2 ⌛" }
+    ns.Cards.test_stun_all = { id = "test_stun_all", name = "s", cost = 0, type = "skill", trap = true, rarity = "common",
+      effects = { { "apply", "stunned", 1, all = true } }, text = "Trap.\nApply Stunned 1 ⌛ to all" }
+    -- ennemi à plusieurs actions : ce qui précède l'attaque a eu lieu, l'attaque et la suite sont annulées
+    local c = setup({ "freezing_trap" }, { "test_combo" }, nil, HU)
+    Combat.play(c, 1)
+    local hp = c.player.hp
+    Combat.endPlayerTurn(c); Combat.enemyPhase(c)
+    local e = c.enemies[1]
+    eq(c.player.hp, hp, "aucun coup"); eq(e.block, 5, "l'action d'avant a eu lieu"); eq(e.st.force, nil, "l'action d'après est annulée")
+    eq(e.st.stunned, nil, "charge consommée")
+    local stoppedEv, actEv = false, false
+    for _, ev in ipairs(c.events) do
+      if ev.t == "stunned" and ev.stopped and ev.unit == e.uid then stoppedEv = true end
+      if ev.t == "act" and ev.unit == e.uid then actEv = true end
+    end
+    assert(stoppedEv, "journal : stunned (stopped)"); assert(actEv, "journal : act (le bloc est parti)")
+    Combat.endRound(c); Combat.startPlayerTurn(c)
+    hp = c.player.hp
+    Combat.endTurn(c)
+    eq(c.player.hp, hp - 2 * math.floor(6 * 0.75), "tour suivant : il agit, affaibli par Demoralized")
+    -- attaque d'abord : aucun « act » (pas d'élan d'attaque à l'écran) ; deux Traps : une seule part
+    local t = setup({ "freezing_trap", "counterattack" }, { "test_triple" }, nil, HU)
+    t.player.mana = 9
+    Combat.play(t, 1); Combat.play(t, 1)
+    hp = t.player.hp
+    Combat.endPlayerTurn(t); Combat.enemyPhase(t)
+    eq(t.player.hp, hp, "aucun des trois coups"); eq(#t.traps, 1, "une Trap par attaque")
+    for _, ev in ipairs(t.events) do assert(ev.t ~= "act", "pas d'action partie : pas d'élan") end
+    -- boss : immunisé à Stunned, Demoralized réduit l'attaque en cours et la suivante
+    local b = setup({ "freezing_trap" }, { "test_boss_hitter" }, nil, HU)
+    Combat.play(b, 1)
+    hp = b.player.hp
+    Combat.endTurn(b)
+    eq(b.player.hp, hp - math.floor(12 * 0.75), "boss : attaque en cours affaiblie")
+    hp = b.player.hp
+    Combat.endTurn(b)
+    eq(b.player.hp, hp - math.floor(12 * 0.75), "boss : attaque suivante affaiblie")
+    hp = b.player.hp
+    Combat.endTurn(b)
+    eq(b.player.hp, hp - 12, "puis pleine")
+    -- Stunned 2 : ce tour et le suivant
+    local s = setup({ "test_stun2" }, { "test_hitter" }, nil, HU)
+    Combat.play(s, 1)
+    hp = s.player.hp
+    Combat.endTurn(s)
+    eq(s.player.hp, hp, "ce tour"); eq(s.enemies[1].st.stunned, 1)
+    Combat.endTurn(s)
+    eq(s.player.hp, hp, "et le suivant"); eq(s.enemies[1].st.stunned, nil)
+    Combat.endTurn(s)
+    eq(s.player.hp, hp - 10, "puis il frappe")
+    -- Stunned posé sur un AUTRE ennemi pendant le tour d'un premier : règle habituelle (il perd son
+    -- prochain tour, ici celui de cette phase) ; le premier est arrêté
+    local a = setup({ "test_stun_all" }, { "test_hitter", "test_hitter" }, nil, HU)
+    Combat.play(a, 1)
+    hp = a.player.hp
+    Combat.endTurn(a)
+    eq(a.player.hp, hp, "les deux perdent ce tour"); eq(a.enemies[1].st.stunned, nil); eq(a.enemies[2].st.stunned, nil)
+    Combat.endTurn(a)
+    eq(a.player.hp, hp - 20, "puis les deux frappent")
+    -- Stunned posé pendant le tour du joueur : inchangé (perd son prochain tour, charge consommée alors)
+    local p = setup({ "chastise" }, { "test_hitter" })
+    Combat.play(p, 1, 1)
+    hp = p.player.hp
+    Combat.endTurn(p)
+    eq(p.player.hp, hp); eq(p.enemies[1].st.stunned, nil)
+    ns.Enemies.test_combo, ns.Enemies.test_boss_hitter, ns.Cards.test_stun2, ns.Cards.test_stun_all = nil, nil, nil, nil
   end)
 
   test("Traps : deux attaquants, chacun la sienne ; l'attaquant tué par la Trap n'attaque pas ; tour sauté : rien", function()
@@ -2221,8 +2304,8 @@ do
     Combat.play(ta, 1)
     ta.enemies[1].hp = 64
     Combat.play(ta, 1, 1)
-    -- 64 -> 57 (3+4) -> 50 (3+4) -> 47 (moitié exacte : plus de bonus) -> 44
-    eq(ta.enemies[1].hp, 44, "bonus perdu en cours de route")
+    -- 64 -> 56 (3+5) -> 48 (3+5) -> 45 (sous la moitié : plus de bonus) -> 42
+    eq(ta.enemies[1].hp, 42, "bonus perdu en cours de route")
     local en = setup({ "entrapment", "frost_trap", "counterattack" }, { "test_hitter" }, { "disengage", "disengage" }, HU)
     en.player.mana = 9
     Combat.play(en, 1)
@@ -2270,7 +2353,7 @@ do
     local pw = setup({ "disengage" }, nil, nil, { class = "hunter", relics = { "pet_whistle" } })
     eq(pw.enemies[1].hp, 100 - P); eq(pw.player.res, 1, "Frenzy 1 au premier tour")
     local kb = setup({ "disengage" }, nil, nil, { class = "hunter", relics = { "kiblers_bits" } })
-    eq(kb.player.res, 2)
+    eq(kb.player.res, 1)
     local lq = setup({ "aimed_shot", "concussive_shot" }, nil, nil, { class = "hunter", relics = { "light_quiver" } })
     lq.player.mana = 9
     lq.enemies[1].hp = 40
@@ -2320,7 +2403,8 @@ do
             elseif k == "draw" and not has(t, "raw " .. e[2] .. ".") then bad[#bad + 1] = lab .. " : draw"
             elseif k == "res" and not has(t, "+" .. e[2] .. " Frenzy.") then bad[#bad + 1] = lab .. " : res"
             elseif k == "pet" then
-              local w = e.surge and "pet attacks once per Frenzy." or (e[2] == 2 and "et attacks twice." or "et attacks.")
+              local w = e.surge and "pet attacks once per Frenzy."
+                or (e[2] == 3 and "et attacks three times." or e[2] == 2 and "et attacks twice." or "et attacks.")
               if not has(t, w) then bad[#bad + 1] = lab .. " : pet" end
             elseif k == "interrupt" and not has(t, e.all and "Interrupt all casts." or "Interrupt the target's cast.") then
               bad[#bad + 1] = lab .. " : interrupt"
@@ -2421,7 +2505,9 @@ do
         eq(d.class, nil, id); eq(d.path, "neutral", id); eq(d.noReward, true, id)
         eq(d.tier, want[1], id .. " palier"); eq(d.rarity, want[2], id); eq(d.cost, want[3], id); eq(d.type, want[4], id)
         assert(d.up and d.up.text, id .. " : amélioration")
-        assert(d.rep == nil and d.level == nil and not d.spend and not d.minRes and not d.payHp, id .. " : champ de classe")
+        -- payHp est commun (« Pay N HP. », décisions communes) : seule Goblin Sapper Charge le porte
+        assert(d.rep == nil and d.level == nil and not d.spend and not d.minRes, id .. " : champ de classe")
+        assert(not d.payHp or id == "goblin_sapper_charge", id .. " : coût en PV inattendu")
         for _, up in ipairs({ false, true }) do
           for _, e in ipairs(Card.defById(id, up).effects) do
             assert(e[1] ~= "res" and e[1] ~= "surge" and e[1] ~= "demence", id .. " : ressource de classe")
@@ -2503,7 +2589,7 @@ do
         -- Black Lotus : +2 mana (pioche 1 améliorée)
         c, b = playNeutral(cl, "black_lotus", up)
         eq(c.player.mana - b.mana, 2, tag .. " lotus"); eq(#c.hand, b.hand - 1 + (up and 1 or 0), tag .. " lotus pioche")
-        -- Goblin Sapper Charge : 14 (18) à tous, -5 PV
+        -- Goblin Sapper Charge : Pay 5 HP, 14 (18) à tous
         c, b = playNeutral(cl, "goblin_sapper_charge", up, { "test_hitter", "test_dummy" })
         k = up and 18 or 14
         eq(b.e1 - c.enemies[1].hp, k, tag .. " sapper 1"); eq(b.e2 - c.enemies[2].hp, k, tag .. " sapper 2")
@@ -2512,18 +2598,19 @@ do
     end
   end)
 
-  test("neutres : Goblin Sapper Charge injouable à 5 PV ou moins (Not enough HP.), jamais mortelle", function()
+  test("neutres : Goblin Sapper Charge, « Pay 5 HP. » (coût), injouable s'il ferait tomber à 0", function()
     for _, cl in ipairs(CLASSES) do
       local c = setup({ "goblin_sapper_charge" }, { "test_dummy" }, nil, { class = cl })
+      eq(ns.Cards.goblin_sapper_charge.payHp, 5, cl .. " : coût en PV")
       c.player.hp = 5
       local ok, why = Combat.canPlay(c, 1)
-      assert(not ok and why == "lowHp", cl .. " : " .. tostring(why))
+      assert(not ok and why == "hp", cl .. " : " .. tostring(why))
       c.player.hp = 6
       assert(Combat.canPlay(c, 1), cl .. " jouable à 6 PV")
-      -- PV perdus entre le jeu et la résolution (copie, riposte) : la perte laisse au moins 1 PV (safe)
-      c.player.hp = 3
-      Combat.resolveCard(c, c.hand[1], nil)
-      eq(c.player.hp, 1, cl .. " : jamais sous 1 PV")
+      c.player.block = 10
+      Combat.play(c, 1, nil)
+      eq(c.player.hp, 1, cl .. " : payé à 6 PV, il reste 1 PV (l'Absorb ne protège pas)")
+      eq(c.player.block, 10, cl .. " : Absorb intacte")
       assert(not c.result, cl .. " : pas de défaite")
     end
   end)

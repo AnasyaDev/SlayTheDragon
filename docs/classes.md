@@ -59,7 +59,6 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 |---|---|
 | `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD ; `Data/Neutral.lua`) |
 | `neutral`, `tier` | carte neutre : `neutral = true`, `path = "neutral"`, `noReward = true`, `tier` = palier de Ligue (0..3) qui la débloque ; tirée par `Expedition.neutralPool` (emplacement « Neutral » du marchand, `{ "cardChoice", neutral = true }`), jamais par `cardPool` (récompenses) |
-| `minHp = N` | injouable à N PV ou moins (raison `lowHp`, « Not enough HP. ») : carte qui perd N PV par effet (« Lose N HP. », `{ "loseHp", N, safe = true }`, jamais mortel) ; ce n'est pas le coût `payHp` |
 | `school` | champ libre (holy, shadow, fire, frost, arcane, nature…) : condition `school:<x>`, compteurs du tour, couleur |
 | `payHp = N` | « Pay N HP. » en première ligne ; payé au jeu (crochet `payHp` pour le modifier), injouable s'il ferait tomber à 0 (raison `hp`) ; compte comme une perte de PV (`onHpLost`), n'est pas une attaque, ignore l'Absorb |
 | `spend = N` | « Spend N: … » ; **au choix du joueur** : payé AU JEU si la ressource suffit (et si `spendNeed(c, inst)` le permet), sauf `Combat.play(c, i, t, { spend = false })` (action `{ "play", i, t, "nospend" }`, Maj enfoncée dans l'interface) ; `ctx.spent` à la résolution, gardé dans l'incantation ou la Trap |
@@ -315,8 +314,9 @@ cartes : `… sweep=cards runs=300` (chaque carte ajoutée de force au deck de d
 expédition au niveau N, 7 par défaut). Une seule
 simulation à la fois, `jobs=8` au plus. Les bots jouent les formes communes sans code de classe (ils
 simulent chaque coup sur une copie) ; une classe les guide par `bot` (définition), `botKey` et `botValue`
-(règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cible :
-60 à 80 % de victoires au bot heuristic, clé 0 (Priest ≈ 79 %, Warrior ≈ 73 %, Rogue ≈ 89 % à 60 PV, à régler).
+(règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cibles
+et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec la Ligue
+exaltée, clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
 
 ## Exemple minimal
 
@@ -360,6 +360,7 @@ ns.ClassRules.rogue = { hooks = {
 | Powers de fin de tour | `onTurnEnd` sur le Power (avant la défausse) |
 | Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
 | Traps (Hunter) | commun : `trap = true`, zone `c.traps`, déclenchement avant les coups de l'attaque (`Combat.triggerTrap`), `onTrapTriggered` |
+| Stunned pendant le tour ennemi (Trap, riposte) | commun : `Combat.applyStatus` pose `e.stopTurn` si l'ennemi est celui qui agit (`c.acting`) ; `executeMove` arrête le tour avant le coup suivant (aucun coup de l'attaque qui a déclenché l'effet), consomme une charge, journal `{ t = "stunned", stopped = true }` ; « act » n'est journalisé qu'à la première action qui part (`decisions.md`) |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
 | Maelstrom à 5 : Cast instantané | `onResource` + `instantCast` |
 | Formes et lignes « Forme: » (Druid) | état de classe `c.cls.form` ; conditions `bear`, `cat`, `moonkin`, `caster` (registre prêt) dans `Combat.CONDITIONS` ; `cond = "bear"` sur les effets ; événement propre `onShift` ; pastille : `resource = nil`, la forme dans `ns.ClassViews.druid` |

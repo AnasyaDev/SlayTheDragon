@@ -3441,13 +3441,10 @@ do
       -- Pay N HP : champ payHp <-> première clause « Pay N HP. »
       local payCl = cls[1] and cls[1]:match("^Pay (%d+) HP%.$")
       local anyPay = false
-      -- « Lose N HP. » seul sur sa ligne est un EFFET (carte neutre : { "loseHp", N, safe } et minHp = N,
-      -- docs/cartes-neutres.md) ; ailleurs, une perte de PV qui sert de coût s'écrit « Pay N HP. »
-      local loseEff = effectOf(d, "loseHp")
+      -- une seule formulation pour une perte de PV sur une carte : « Pay N HP. » en première ligne
+      -- (décisions communes) ; « Lose N HP » n'existe plus
       for _, cl in ipairs(cls) do
-        local ln = cl:match("^Lose (%d+) HP%.$")
-        local isEffect = ln and loseEff and tonumber(ln) == loseEff[2] and d.minHp == loseEff[2]
-        if cl:find("^Pay %d+ HP") or (cl:find("Lose %d+ HP") and not isEffect) then anyPay = true end
+        if cl:find("^Pay %d+ HP") or cl:find("Lose %d+ HP") then anyPay = true end
       end
       if (d.payHp ~= nil) ~= (payCl ~= nil) or (d.payHp and tonumber(payCl) ~= d.payHp) or (anyPay and not payCl) then
         cbad[#cbad + 1] = label .. " : Pay N HP (première ligne, champ payHp)"
@@ -6617,14 +6614,14 @@ do
   check(("textes : %d cartes neutres (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), langage, icônes, corps ivoire teinté vert sauge"):format(#ids, minSize),
     #ids == 10 and #bad == 0, table.concat(bad, ", "))
   check("carte de classe : corps et couleur inchangés (Inner Fire bleue, sans teinte)", classOk)
-  -- infobulle : ligne « Neutral », explication de « Lose N HP. »
+  -- infobulle : ligne « Neutral », explication de « Pay N HP. » (seule formulation d'un coût en PV)
   local tip = { lines = {} }
   function tip:AddLine(t) self.lines[#self.lines + 1] = t end
   function tip:NumLines() return #self.lines end
   W.fillCardTooltip(tip, "goblin_sapper_charge", false)
   local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-  check("infobulle d'une carte neutre : « Neutral » et « Lose N HP » expliqués", all:find("Neutral: a card that every class can use.", 1, true)
-    and all:find("Lose N HP: loses HP", 1, true), all)
+  check("infobulle d'une carte neutre : « Neutral » et « Pay N HP » expliqués", all:find("Neutral: a card that every class can use.", 1, true)
+    and all:find("Pay N HP: costs HP", 1, true) and not all:find("Lose N HP", 1, true), all)
 
   -- 2. marchand : 5 cartes de classe + l'emplacement neutre, dans la fenêtre, sans chevauchement
   for _, cl in ipairs({ "priest", "warrior" }) do

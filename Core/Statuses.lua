@@ -13,7 +13,11 @@
 --    tour 1 => jusqu'à la fin du tour 3 aussi.
 --    Les affaiblissements posés par le joueur sur les ennemis n'ont pas ce report.
 --  * pain / regen : se déclenchent au début du tour du porteur, puis baissent de 1.
---  * stunned : consommé quand le porteur perd son tour. Les boss y sont immunisés.
+--  * stunned : consommé quand le porteur perd son tour. Les boss y sont immunisés. Posé sur un ennemi
+--    pendant SON propre tour (Trap, riposte, effet déclenché par son action), il arrête ce tour tout de
+--    suite : ses actions restantes sont annulées (aucun coup de l'attaque qui a déclenché l'effet) et la
+--    charge est consommée par ce tour-là (« Stunned 2 » = ce tour et le suivant). Combat.applyStatus
+--    pose le drapeau stopTurn, executeMove l'applique (journal « stunned », stopped = true).
 --  * halved : retiré au début du tour du joueur.
 --  * force : permanent pour le combat.
 --  * max = N : plafond de la valeur (Parry 3) ; flag = true : présent ou non (valeur 1, sans nombre).
@@ -35,7 +39,7 @@ S.regen = { name = "Regen",
 -- turns : affichage seulement (le nombre compte des tours perdus, sablier sur les cartes) ;
 -- les règles n'en tiennent pas compte.
 S.stunned = { name = "Stunned", debuff = true, turns = true,
-  text = "Loses its next turn." }
+  text = "Loses its next turn, or the rest of this one." }
 S.halved = { name = "Pain Suppression", clearAtTurnStart = true,
   text = "Damage taken halved until the next turn." }
 S.force = { name = "Strength",

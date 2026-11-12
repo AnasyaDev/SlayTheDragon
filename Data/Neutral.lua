@@ -5,7 +5,8 @@
 -- tier = palier de la Ligue des explorateurs qui la débloque (0 Neutre … 3 Révéré, comme les bibelots),
 -- noReward = true (jamais dans X.cardPool : récompenses). Aucune ressource ni aucun état de classe :
 -- Absorb, DoT, Strength, Stunned, mana, pioche, Interrupt et les mots de plaque communs seulement.
--- minHp = N : la carte perd N PV (« Lose N HP. ») et est injouable à N PV ou moins (raison lowHp).
+-- payHp = N : « Pay N HP. » en première ligne, coût payé au jeu, injouable s'il ferait tomber à 0 (décisions
+-- communes : une seule formulation pour une perte de PV sur une carte).
 -- Textes dans le langage des cartes (docs/classes.md, « Langage des cartes »), affichés en anglais.
 local _, ns = ...
 
@@ -19,10 +20,6 @@ local function card(id, t)
   t.noReward = true
   C[id] = t
 end
-
--- « Lose N HP. » : perte de PV par effet (pas un coût), expliquée au survol.
-ns.Language.keyword("loseHp", { name = "Lose N HP", pattern = "^Lose %d+ HP%.$",
-  text = "loses HP, ignores Absorb, never lethal." })
 
 -- Neutre (palier 0) ------------------------------------------------------------------------
 
@@ -104,18 +101,19 @@ card("black_lotus", {
 
 card("goblin_sapper_charge", {
   tier = 3, name = "Goblin Sapper Charge", cost = 2, type = "attack", rarity = "rare",
-  exhaust = true, minHp = 5, effects = { { "damage", 14, all = true }, { "loseHp", 5, safe = true } },
-  text = "Deal 14 to all.\nLose 5 HP.\nExhaust.",
-  up = { effects = { { "damage", 18, all = true }, { "loseHp", 5, safe = true } },
-    text = "Deal 18 to all.\nLose 5 HP.\nExhaust." },
+  exhaust = true, payHp = 5, effects = { { "damage", 14, all = true } },
+  text = "Pay 5 HP.\nDeal 14 to all.\nExhaust.",
+  up = { effects = { { "damage", 18, all = true } }, text = "Pay 5 HP.\nDeal 18 to all.\nExhaust." },
 })
 
 -- Conseils aux bots de simulation (Sim/run.lua les réunit avec ceux des classes) : note des cartes
--- pour les choix (≈ 5 + écart / 2) ; le marchand du bot achète à partir de 6.
+-- pour les choix : 5 + écart / 2, écart moyen des cinq classes au balayage sweep=cards only=<neutres>
+-- (meta=start level=7, 500 expéditions par ligne ; docs/equilibrage.md). Le bot n'achète ou ne prend
+-- une carte que si sa valeur dans le deck dépasse son prix ou ce qu'il laisse.
 ns.NeutralBot = {
   rating = {
-    rough_dynamite = 5, heavy_silk_bandage = 6, rugged_armor_kit = 5, smoked_desert_dumplings = 5.5,
-    runecloth_bag = 5, iron_grenade = 6, arcane_bomb = 5, elixir_of_superior_defense = 6,
-    black_lotus = 6, goblin_sapper_charge = 6.5,
+    rough_dynamite = 4.5, heavy_silk_bandage = 6.5, rugged_armor_kit = 4, smoked_desert_dumplings = 4.5,
+    runecloth_bag = 3.5, iron_grenade = 6.5, arcane_bomb = 4, elixir_of_superior_defense = 5.5,
+    black_lotus = 6, goblin_sapper_charge = 4,
   },
 }

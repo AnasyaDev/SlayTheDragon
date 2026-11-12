@@ -102,11 +102,17 @@ Codé : `Data/Hunter.lua`, `Core/Classes/hunter.lua`, `UI/Art/hunter.lua`, tests
    l'attaquant l'affectent **dès l'attaque en cours** (Demoralized réduit tous ses coups de cette attaque).
 5. **Attaque à plusieurs coups** : la Trap se déclenche une seule fois, avant le premier coup.
 6. **L'attaquant meurt de la Trap** : son attaque est annulée (le moteur s'arrête déjà sur `e.dead`).
-7. **Stunned posé par une Trap** : l'attaque en cours a lieu quand même ; l'ennemi perd son *prochain*
-   tour. Boss : immunisé, comme partout (Freezing Trap garde son Demoralized, voir plus bas).
+7. **Stunned posé par une Trap** (règle commune du 12/11/2026, `decisions.md`) : posé pendant le tour de
+   l'attaquant, il **arrête ce tour tout de suite** : l'attaque qui a déclenché la Trap n'a pas lieu (aucun
+   de ses coups), ni ses actions suivantes ; la charge est consommée par ce tour-là (il ne perd pas en plus
+   le tour suivant ; « Stunned 2 » = ce tour et le suivant). Boss : immunisé, comme partout (Freezing Trap
+   garde son Demoralized, voir plus bas). Avant cette règle, l'attaque partait et l'ennemi perdait son
+   prochain tour.
 8. **Durées** : un état à durée posé pendant le tour ennemi saute la baisse de fin de round (règle de
    `Core/Statuses.lua`). « Demoralized 1 ⌛ » posé par une Trap couvre donc l'attaque en cours **et** le tour
-   ennemi suivant. C'est voulu : le chiffre sur la carte reste petit.
+   ennemi suivant. C'est voulu : le chiffre sur la carte reste petit. Freezing Trap : l'attaquant est stoppé
+   net, puis son attaque du tour suivant est réduite de 25 % ; sur un boss (immunisé à Stunned),
+   Demoralized réduit l'attaque en cours et la suivante (vérifié par les tests, aucune valeur changée).
 9. **Pas d'attaque ennemie ce tour** (ennemis étourdis, qui se renforcent, incantent, invoquent) : les
    Traps restent posées et attendent. Une action `interrupt`, `debuff`, `buff` ou `summon` ne déclenche rien.
    Le DoT d'un ennemi ne déclenche rien.
@@ -276,8 +282,8 @@ relance Wyvern Sting.
 
 **Tour type** (deux Gnolls qui annoncent une attaque) : Freezing Trap, Explosive Trap, Raptor Strike sur
 le Gnoll de gauche (5 dégâts, 3 Absorb). Fin du tour : le familier frappe le même Gnoll. Tour ennemi :
-le Gnoll de gauche attaque, Freezing Trap se déclenche avant son coup (Demoralized : coup réduit,
-Stunned : il perd son prochain tour) ; le Gnoll de droite attaque, Explosive Trap (6 à tous, DoT 3).
+le Gnoll de gauche attaque, Freezing Trap se déclenche avant son coup (Stunned : son tour s'arrête, le
+coup ne part pas ; Demoralized : son attaque du tour suivant est réduite) ; le Gnoll de droite attaque, Explosive Trap (6 à tous, DoT 3).
 
 ## 4. Bibelots de classe
 

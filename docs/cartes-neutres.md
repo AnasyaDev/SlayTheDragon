@@ -32,7 +32,7 @@ explorateurs, commune au compte. Textes affichés en anglais, écrits dans le la
 | `arcane_bomb` | Arcane Bomb | Engineering | uncommon | 0 | Skill | Exhaust | Interrupt the target's cast. | Interrupt the target's cast. / Draw 1. | `inv_misc_bomb_04` | 2 Honored |
 | `elixir_of_superior_defense` | Elixir of Superior Defense | Alchemy | uncommon | 1 | Power | — | Turn start: gain 3 Absorb. | Turn start: gain 4 Absorb. | `inv_potion_86` | 2 Honored |
 | `black_lotus` | Black Lotus | Herbalism | rare | 0 | Skill | Exhaust | +2 mana. | +2 mana. / Draw 1. | `inv_misc_herb_blacklotus` | 3 Revered |
-| `goblin_sapper_charge` | Goblin Sapper Charge | Engineering | rare | 2 | Attack | Exhaust | Deal 14 to all. / Lose 5 HP. | Deal 18 to all. / Lose 5 HP. | `spell_fire_selfdestruct` | 3 Revered |
+| `goblin_sapper_charge` | Goblin Sapper Charge | Engineering | rare | 2 | Attack | Exhaust | Pay 5 HP. / Deal 14 to all. | Pay 5 HP. / Deal 18 to all. | `spell_fire_selfdestruct` | 3 Revered |
 
 Comptes : 4 communes, 4 inhabituelles, 2 rares ; paliers 0 / 1 / 2 / 3 : 4 / 2 / 2 / 2. Cibles :
 Rough Dynamite, Iron Grenade et Arcane Bomb visent un ennemi ou tous ; les autres se jouent sur soi.
@@ -54,9 +54,10 @@ Rough Dynamite, Iron Grenade et Arcane Bomb visent un ennemi ou tous ; les autre
 
 ### Précisions de règle
 
-- `Lose 5 HP.` : perte de PV sans source (ignore l'Absorb, ne déclenche pas les effets « quand tu es
-  touché »), qui ne peut pas tuer : la carte est injouable à 5 PV ou moins (plaque de raison
-  `Not enough HP.`). Ce n'est pas le `Pay N HP` du Warlock (coût, première ligne) : c'est un effet.
+- `Pay 5 HP.` (Goblin Sapper Charge, décision commune du 12/11/2026 : une seule formulation pour une perte
+  de PV sur une carte) : coût en première ligne, payé au jeu (champ `payHp`), ignore l'Absorb, n'est pas une
+  attaque ; la carte est injouable s'il ferait tomber à 0 (raison « Not enough HP to pay. »). La première
+  version écrivait « Lose 5 HP. » comme un effet (`minHp`, `loseHp`), retiré.
 - `Turn start:` : au début de ton tour, après les tics de DoT et Regen (même tournure que Starfall,
   `docs/classes/druid.md`). L'Absorb gagné dure jusqu'au début du tour suivant.
 - `Gain Strength 1` : Strength dure tout le combat (état commun, intensité, sans sablier).
@@ -100,7 +101,7 @@ une autre réponse.
   de `rep`, `noReward = true` (le filtre existe déjà dans `X.cardPool`).
 - `X.neutralPool(exp)` et l'emplacement « Neutral » du marchand (`X.SHOP.neutral = 1`, prix
   `X.PRICES.neutral`).
-- Effet `{ "loseHp", n }` en combat (perte sans source, non mortelle) avec `canPlay` sur les PV.
+- Coût `payHp` (« Pay N HP. ») porté par une carte neutre.
 - Condition de rencontre `{ "unlocked", id }` ; option `neutral = true` de `cardChoice` si une
   rencontre doit proposer un choix parmi les cartes neutres.
 - Interface : voie « Neutral » (médaillon gris), école absente (repli d'icône `Art.schools`), écran de
@@ -135,9 +136,8 @@ art et icônes dans `UI/Art/neutral.lua` (icônes de la fiche, embarquées), TOC
   issue sans condition reste : la réponse elle-même) ; la cueilleuse : condition `{ "unlocked", id,
   hide = true }` (réponse absente tant que la carte n'est pas débloquée, `X.choiceHidden`).
   `{ "cardChoice", neutral = true }` existe, aucune rencontre ne l'emploie encore.
-- Moteur : `minHp = 5` + `{ "loseHp", 5, safe = true }` pour Goblin Sapper Charge (raison `lowHp`,
-  « Not enough HP. ») ; mot « Lose N HP » au registre du langage (explication au survol) ; le harnais
-  (U27) accepte « Lose N HP. » seulement comme effet (`loseHp` = `minHp`), le coût reste « Pay N HP. ».
+- Moteur : Goblin Sapper Charge porte `payHp = 5` (« Pay 5 HP. », coût commun) ; `minHp`, la raison `lowHp`
+  et le mot « Lose N HP » sont retirés ; le harnais (U27) refuse toute clause « Lose N HP ».
 - Elixir of Superior Defense : « Start of turn: » (déclencheur du registre) au lieu de « Turn start: ».
 - Druid : la carte de soin n'a pas le mot `Caster` (classe non codée).
 - Corps : ivoire teinté vert sauge (`Art.cardBodyTint`), quel que soit le premier effet (Rugged Armor

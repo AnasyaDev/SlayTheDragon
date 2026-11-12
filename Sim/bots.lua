@@ -52,8 +52,108 @@ return function(ns)
     return k / n
   end
 
-  -- Valeur d'un pouvoir en jeu (défaut W.power) : environ 3 tours restants × 3 cartes par tour.
+  -- Valeur d'un Pouvoir en jeu (unités de W : 10 = 1 PV, 4 = 1 PV ennemi). Chaque estimation suit le texte
+  -- de la carte avec les mêmes repères : environ POWER_TURNS tours encore à jouer, POWER_PLAYS cartes jouées
+  -- par tour, et la part du deck du combat qui profite du Pouvoir (deckShare). Fonction (c, inst) ; un
+  -- Pouvoir absent de la table vaut W.power × (1 + coût), à défaut de mieux (classe à venir).
+  -- Tours restants : la longueur attendue du combat (PV max de tous ses ennemis / POWER_DPT, constante
+  -- pendant le combat : tuer plus vite ne fait pas perdre de valeur au Pouvoir) moins les tours déjà
+  -- joués, entre 0,5 et POWER_TURNS. Un Pouvoir posé au dernier tour d'un combat court ne vaut presque rien.
+  Bots.POWER_TURNS, Bots.POWER_PLAYS, Bots.POWER_DPT = 5, 3.5, 15
+  local P = Bots.POWER_PLAYS
+  local T -- tours restants du combat évalué (posé par powersValue)
+  local function turnsLeft(c)
+    local hp = 0
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      hp = hp + (e.minion and 0.5 or 1) * (e.maxHp or e.hp)
+    end
+    local t = hp / Bots.POWER_DPT - ((c.round or 1) - 1)
+    if t < 0.5 then t = 0.5 elseif t > Bots.POWER_TURNS then t = Bots.POWER_TURNS end
+    return t
+  end
+  local function anyEffect(d, pred)
+    for i = 1, #d.effects do if pred(d.effects[i]) then return true end end
+    return false
+  end
+  local function isAttack(d) return d.type == "attack" end
+  local function dealsDamage(d) return anyEffect(d, function(e) return e[1] == "damage" end) end
+  local function appliesDot(d)
+    return anyEffect(d, function(e) return (e[1] == "apply" and e[2] == "pain") or e[1] == "dotPer" end)
+  end
+  local function readsStealth(d)
+    return anyEffect(d, function(e)
+      if e.cond == "stealth" then return true end
+      for j = 1, #(e.more or {}) do if e.more[j][2] == "stealth" then return true end end
+      return false
+    end)
+  end
+  local function petCard(d) return anyEffect(d, function(e) return e[1] == "pet" end) end
+  local function isTrap(d) return d.trap == true end
+  local function isFire(d) return d.school == "fire" and dealsDamage(d) end
+  local function aliveCount(c)
+    local n = 0
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      if not e.dead then n = n + (e.minion and 0.5 or 1) end
+    end
+    return n
+  end
+  -- cartes du genre jouées par tour, au plus une
+  local function perTurn(c, pred) return math.min(1, P * deckShare(c, pred)) end
+  -- cartes du genre jouées par tour
+  local function playsOf(c, pred) return P * deckShare(c, pred) end
+  -- Last Breath : vaut d'autant plus que les PV manquent (repris de Spirit of Redemption)
+  local function lastBreath(c)
+    local miss = 1 - c.player.hp / c.player.maxHp
+    return 25 + 150 * miss * miss
+  end
+  -- DoT n ajouté à une pile : environ 2,5 tics de plus par point, à 0,8 (la cible meurt parfois avant)
+  local function dotUnits(n) return n * 2.5 * 0.8 * W.enemyHp end
+  local MANA = 6 * W.enemyHp -- un point de mana ≈ une carte de 6 dégâts
+  local function up(inst, a, b) return inst and inst.up and b or a end
+
   Bots.POWER_VALUE = {
+    -- Rogue
+    blade_flurry = function(c, inst)
+      return T * playsOf(c, isAttack) * up(inst, 2, 3) * aliveCount(c) * W.enemyHp
+    end,
+    deadly_poison = function(c)
+      return T * playsOf(c, isAttack) * 1.3 * dotUnits(1)
+    end,
+    venomous_wounds = function(c)
+      return T * aliveCount(c) * math.min(1, 0.2 + 2 * deckShare(c, appliesDot)) * 1.5 * Bots.resValue(c)
+    end,
+    slice_and_dice = function(c) return T * perTurn(c, isAttack) * MANA end,
+    shadow_dance = function(c) return T * perTurn(c, readsStealth) * 8 * W.enemyHp end,
+    cheat_death = lastBreath,
+    -- Warrior
+    deep_wounds = function(c, inst) return T * playsOf(c, isAttack) * dotUnits(up(inst, 2, 3)) end,
+    enrage = function(c) return T * 0.7 * W.force end,
+    retaliation = function(c, inst) return T * aliveCount(c) * 0.8 * up(inst, 4, 6) * W.enemyHp end,
+    last_stand = lastBreath,
+    -- Mage
+    hot_streak = function(c) return T * math.min(1, playsOf(c, function(d) return d.school == "fire" end) / 2) * 20 end,
+    ignite = function(c, inst) return T * playsOf(c, isFire) * dotUnits(up(inst, 2, 3)) end,
+    shatter = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 3, 4) * W.enemyHp end,
+    arcane_power = function(c)
+      return T * playsOf(c, function(d) return isAttack(d) and dealsDamage(d) end) * 2 * W.enemyHp
+    end,
+    ice_block = lastBreath,
+    -- Hunter
+    spirit_bond = function(c) return T * (1 + playsOf(c, petCard)) * 2 * W.hp * 0.5 end,
+    the_beast_within = function(c)
+      local pet = ns.Hunter and ns.Hunter.petDamage(c) or 3
+      return T * playsOf(c, isAttack) * (pet + 0.5) * W.enemyHp
+    end,
+    trueshot_aura = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 4, 6) * W.enemyHp end,
+    entrapment = function(c) return T * perTurn(c, isTrap) * 12 end,
+    lock_and_load = function(c) return T * perTurn(c, isTrap) * 20 end,
+    resourcefulness = function(c) return T * perTurn(c, isTrap) * 25 end,
+    feign_death = lastBreath,
+    -- Carte neutre
+    elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
+    -- Priest
     shadowform = function(c)
       local sh = deckShare(c, function(d) return d.school == "shadow" end)
       return 10 + 9 * sh * 5 * W.enemyHp
@@ -77,9 +177,11 @@ return function(ns)
   local function powersValue(c)
     local v = 0
     local powers = c.player.powers
+    if #powers > 0 then T = turnsLeft(c) end
     for i = 1, #powers do
       local f = Bots.POWER_VALUE[powers[i].id]
-      v = v + (f and f(c) or W.power)
+      if f then v = v + f(c, powers[i])
+      else v = v + W.power * (1 + (Card.def(powers[i]).cost or 1)) end
     end
     return v
   end
