@@ -131,3 +131,29 @@ et potions », et `Core/Combat.lua`).
 - Or restant en fin d'expédition avec Admiral's Hat et Prize Ticket (aujourd'hui 185 po dorment).
 - Bag of Marbles et Hand of Justice : écart sur les combats normaux et sur le boss (immunisé au
   Stunned, mais pas à la double Attack).
+
+## 5. État de l'implémentation (12/11/2026)
+
+Bloc à part en fin de `Data/Relics.lua`, art dans `UI/Art/neutral.lua`, icônes de la fiche embarquées.
+**19 bibelots sur 20** : la table commune passe à 31 (12 d'origine + 19), 29 tirables.
+
+- **Ids renommés** : `hand_of_justice` et `force_reactive_disk` sont des bibelots du Guerrier (autres
+  effets). Les équivalents communs : `ironfoe` « Ironfoe » (`inv_mace_15`, masse qui donne des attaques
+  en plus) et `harm_prevention_belt` « Gnomish Harm Prevention Belt » (`inv_belt_29`, ingénierie).
+- **Laissé de côté : Traveler's Backpack** (garder une carte au choix en fin de tour) : il faut une
+  étape de choix en combat (interface du combat, action, bot, harnais) que rien d'autre ne demande ;
+  disproportionné pour un bibelot. Les six autres points d'extension sont faits (`docs/classes.md`).
+- **Textes impersonnels** (règle du langage) : « Whenever the draw pile is reshuffled… », « Whenever an
+  Exhaust card is played… », « Whenever a potion is drunk… », « Up to 5 Absorb carries over to the next
+  turn. », « The first Attack played in each combat is played twice. ».
+- **Utiles à la classe** (`needs`) : Demonic Rune (exhaust), Talisman of Ephemeral Power (castDamage),
+  Mark of the Champion et Ironfoe (attack), Hourglass Sand (cooldown), Harm Prevention Belt (absorb),
+  et Talisman of Focus (cast, posé depuis le bloc). Le Rogue n'en reçoit pas trois.
+- Précisions de règle : Bloodsail Hat par le crochet `goldBonus` (après Defias Purse, quel que soit
+  l'ordre) ; Prize Ticket : le retrait gratuit compte dans la hausse du prix (75 → 100 au suivant) ;
+  Head of Onyxia : potion tirée au flux `loot` de l'expédition ; Bag of Marbles : flux `misc` du combat ;
+  Flint and Tinder : carte tirée au flux `loot` ; Ironfoe : la première Attack JOUÉE (marquée au jeu,
+  même Cast ou Trap) est résolue deux fois, la copie ne déclenche pas Demonic Rune ; Herb Pouch : la
+  4e case apparaît au bandeau (cases calées à droite).
+- Demonic Rune : la fiche du Warlock (`docs/classes/warlock.md`) prévoit un bibelot de classe du même
+  id ; à renommer quand le Warlock sera codé.

@@ -115,3 +115,34 @@ une autre réponse.
 - Écart de victoire de chaque carte neutre ajoutée de force au deck de départ (`sweep=cards`), pour
   le Priest puis pour chaque nouvelle classe : aucune ne doit dépasser l'écart de sa carte repère.
 - Heavy Silk Bandage pour le Warrior (sans soin) : c'est la carte qui doit le plus compter pour lui.
+
+## État de l'implémentation (12/11/2026)
+
+Faites : `Data/Neutral.lua` (les dix cartes, version améliorée, `ns.NeutralBot.rating` pour les bots),
+art et icônes dans `UI/Art/neutral.lua` (icônes de la fiche, embarquées), TOC (`Data\Neutral.lua` après
+`Core\Classes\hunter.lua`, `UI\Art\neutral.lua` après `UI\Art\hunter.lua` : relancer le client).
+
+- Champs : pas de `class`, `neutral = true`, `path = "neutral"`, `tier`, `noReward = true` (la fiche
+  proposait `class = "neutral"` ; le socle traite déjà « sans classe + neutral » comme carte commune,
+  `Card.inClass`). Jamais dans `Expedition.cardPool` ni `Card.pool` (récompenses de combat).
+- Marchand : `X.SHOP.neutral = 1`, `X.PRICES.neutral` 45 / 65 / 100 (±10 %), carte neutre en 6e position
+  de `exp.shop.cards` (`neutral = true` sur l'article), tirée par `X.neutralPool` (palier de Ligue,
+  poids du marchand) ; sans carte neutre débloquée, le marchand garde 5 cartes. Les 5 cartes de classe
+  ne tirent plus jamais de neutre.
+- Rencontres : les sept réponses de la fiche. Écarts : Saldean = 4e réponse « Ask for her dumplings »
+  (la recette « une commune parmi 3 » reste telle quelle) ; Grenaille = 4e réponse (la flasque reste) ;
+  Ruisselune : « Roll bandages with her » remplace « Move on » (quatre réponses au plus à l'écran ; une
+  issue sans condition reste : la réponse elle-même) ; la cueilleuse : condition `{ "unlocked", id,
+  hide = true }` (réponse absente tant que la carte n'est pas débloquée, `X.choiceHidden`).
+  `{ "cardChoice", neutral = true }` existe, aucune rencontre ne l'emploie encore.
+- Moteur : `minHp = 5` + `{ "loseHp", 5, safe = true }` pour Goblin Sapper Charge (raison `lowHp`,
+  « Not enough HP. ») ; mot « Lose N HP » au registre du langage (explication au survol) ; le harnais
+  (U27) accepte « Lose N HP. » seulement comme effet (`loseHp` = `minHp`), le coût reste « Pay N HP. ».
+- Elixir of Superior Defense : « Start of turn: » (déclencheur du registre) au lieu de « Turn start: ».
+- Druid : la carte de soin n'a pas le mot `Caster` (classe non codée).
+- Corps : ivoire teinté vert sauge (`Art.cardBodyTint`), quel que soit le premier effet (Rugged Armor
+  Kit n'est pas bleue) ; infobulle : ligne « Neutral: a card that every class can use. ».
+- Pas faits : écran de progression de la Ligue avec les cartes verrouillées (l'écran méta est refondu
+  en parallèle) ; balayage `sweep=cards` des neutres (le balayage ne force que les cartes de la classe).
+- Bot : achète une carte neutre notée 6 ou plus (Heavy Silk Bandage, Iron Grenade, Elixir, Black Lotus,
+  Sapper) ; une réponse `card` vaut 1,2.

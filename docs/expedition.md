@@ -46,8 +46,9 @@ ns.Save.abandon(db, date(...))
 L'expédition est celle d'une classe (`exp.class`, contrat complet : `docs/classes.md`) : PV et deck de
 départ, bibelot de départ (`startRelic`, jamais tiré), combats (`c.class`, ressource `c.player.res`).
 Récompenses, marchand et rencontres tirent dans le pool de la classe jouée : cartes de cette classe
-(`Card.inClass` ; les cartes neutres prévues par le GDD, `neutral = true`, seulement chez le marchand et
-dans les rencontres) et bibelots communs (sans champ `class`) ou de cette classe ; le choix de Révéré
+(`Card.inClass`) et bibelots communs (sans champ `class`, utiles à la classe : champ `needs`) ou de cette
+classe ; les cartes neutres (`Data/Neutral.lua`, palier de Ligue `tier`) seulement dans l'emplacement
+« Neutral » du marchand (`X.neutralPool`) et dans les réponses de rencontres (`docs/cartes-neutres.md`) ; le choix de Révéré
 propose les bibelots de la classe hors bibelot de départ. Les douze bibelots actuels sont communs
 (rapport du socle multi-classes, docs/classes.md).
 
@@ -95,11 +96,11 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | `hp`, `maxHp`, `gold` | |
 | `deck` | `{ {id, up}, ... }` (`ns.Card.defById(id, up)` pour l'affichage) |
 | `relics` | ids de `ns.Relics` (le bibelot de départ de la classe, `startRelic`, en tête) |
-| `potions` | 3 emplacements : id ou `false` |
+| `potions` | 3 emplacements (4 avec Herb Pouch : `X.addPotionSlot`) : id ou `false` |
 | `combat` | état du combat en cours (phase `combat`) |
 | `fight` | `{ kind = combat/elite/boss, pool, encounter, seed, reward }` pendant le combat |
 | `reward` | phase `reward` : `{ kind, gold, goldGained, cards = {ids}, cardsDone, picked, relic, relicTaken, potion, potionTaken }` |
-| `shop` | phase `merchant` : `{ cards = { {id, price, sold} }, relics = {...}, potions = {...} }` ; retrait : `Expedition.removePrice(exp)` |
+| `shop` | phase `merchant` : `{ cards = { {id, price, sold, neutral?} }, relics = {...}, potions = {...}, removed }` (6e carte `neutral = true` : emplacement « Neutral » ; `removed` = retraits de la visite) ; retrait : `Expedition.removePrice(exp)` (crochet `removePrice`) |
 | `event` | phase `event` : `{ id (false = rien à signaler), chosen (false ou index), rolls, result, lucky }` ; texte dans `ns.Events[id]` ; `result` = texte après le choix (réponse + issue du pari) ; `lucky` = issue d'un pari (true/false, nil sans pari) |
 | `select` | phase `select` : `{ kind = "upgrade" | "remove" | "dupe", reward? }` |
 | `flags` | drapeaux de compte connus au départ (copie de `meta.flags`, sert aux conditions) |
@@ -150,9 +151,10 @@ ns.Events[id] = {
   rencontre, même si l'on abandonne ensuite.
 - `when` : conditions, toutes requises, évaluées à l'entrée du nœud (rencontre) ou à l'affichage
   (réponse) : `hpBelow`, `hpAbove`, `gold`, `relic`, `noRelic`, `potion`, `card`, `key`, `flag`,
-  `noFlag`, `floor` (`Expedition.CONDITIONS`, `Expedition.check(exp, when)` → `ok, raison`).
+  `noFlag`, `floor`, `unlocked` (carte débloquée) (`Expedition.CONDITIONS`, `Expedition.check(exp, when)`
+  → `ok, raison`) ; une condition `hide = true` rend la réponse absente (`X.choiceHidden`) au lieu de grisée.
 - Effets (données) : `heal`, `healPct`, `loseHp`, `maxHp`, `loseMaxHp`, `gold`, `pay`, `loseGold`,
-  `card`, `cardChoice`, `relic` (tiré ou précis), `potion` (tirée ou précise), `losePotion`,
+  `card`, `cardChoice` (`neutral = true` : parmi les cartes neutres), `relic` (tiré ou précis), `potion` (tirée ou précise), `losePotion`,
   `upgradeRandom`, `upgrade`, `remove`, `dupe`, `fight` (`kind = "elite"` possible, groupe
   `ns.Encounters.act1.event_*`), `gamble` (pari), `flag` (drapeau de compte).
 - Tout le hasard est tiré à l'entrée (`exp.event.rolls`, une liste par réponse ; un pari y stocke
@@ -224,7 +226,8 @@ peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau 
 ## Contrat avec les bibelots et potions (piste A)
 
 - `ns.Relics[id].run` : crochets d'expédition appelés par `Expedition.modify / fire` :
-  `gold(exp, v, source)`, `restFraction(exp, v)`, `restHeal(exp, v)`, `price(exp, v, genre)`
+  `gold(exp, v, source)`, `goldBonus(exp, v, source)` (fixe, après `gold`), `restFraction(exp, v)`,
+  `restHeal(exp, v)`, `price(exp, v, genre)`, `removePrice(exp, v)`
   (valeurs), `onPickup(exp)` (au ramassage), `onNodeEnter(exp, nœud)`, `onCombatWon(exp, genre)`,
   `onRest(exp)` (notifications). `exp.relicState` est libre pour un compteur d'expédition.
 - `rarity` : `common`, `uncommon`, `rare` (récompenses, coffres, marchand), `boss` (boss
@@ -251,7 +254,7 @@ Ces crochets sont aussi disponibles pour les bibelots et pouvoirs.
 
 `Core/Expedition.lua` : or de départ 50 ; or par combat 12–18, élite 25–35, boss 75–85 ;
 potion après combat 35 % ; cartes 35/55/90 po, bibelots 90/120/160 (boss 220), potions 30/45/60
-(±10 %) ; retrait 75 po puis +25 ; marchand 5 cartes, 3 bibelots, 3 potions ; repos 30 % ;
+(±10 %), cartes neutres 45/65/100 ; retrait 75 po puis +25 ; marchand 5 cartes + 1 neutre, 3 bibelots, 3 potions ; repos 30 % ;
 2 premiers combats de l'acte dans le groupe `easy`.
 
 `Core/Map.lua` : étape 1 = combat, étape 7 = feu de camp, 8 = boss ; chaque chemin compte

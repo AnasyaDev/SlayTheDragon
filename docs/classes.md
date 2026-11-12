@@ -21,6 +21,8 @@ Ordre de chargement actuel : `Core\*` (dont `Core\Language.lua`), `Data\Priest.l
 `UI\Art\warrior.lua`, `UI\Art\rogue.lua`, le reste de `UI\`.
 `Core\Classes\warrior.lua`, `Data\Hunter.lua`, `Core\Classes\hunter.lua`, `Data\Act1.lua`… puis `UI\Art.lua`,
 `UI\Art\warrior.lua`, `UI\Art\hunter.lua`, le reste de `UI\`.
+Contenu commun : `Data\Neutral.lua` (cartes neutres) après les fichiers des classes, `UI\Art\neutral.lua`
+(cartes neutres, bibelots communs ajoutés) après les arts des classes ; une classe nouvelle se place avant.
 Fichiers communs que deux classes ajoutées en parallèle modifient toutes deux : le TOC et `UI/SkinData.lua`
 (table `icons`, triée : conflit de fusion trivial, ou relancer `--icons-only` après la fusion).
 
@@ -55,7 +57,9 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, rep) p
 
 | Champ | Règle |
 |---|---|
-| `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD) |
+| `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD ; `Data/Neutral.lua`) |
+| `neutral`, `tier` | carte neutre : `neutral = true`, `path = "neutral"`, `noReward = true`, `tier` = palier de Ligue (0..3) qui la débloque ; tirée par `Expedition.neutralPool` (emplacement « Neutral » du marchand, `{ "cardChoice", neutral = true }`), jamais par `cardPool` (récompenses) |
+| `minHp = N` | injouable à N PV ou moins (raison `lowHp`, « Not enough HP. ») : carte qui perd N PV par effet (« Lose N HP. », `{ "loseHp", N, safe = true }`, jamais mortel) ; ce n'est pas le coût `payHp` |
 | `school` | champ libre (holy, shadow, fire, frost, arcane, nature…) : condition `school:<x>`, compteurs du tour, couleur |
 | `payHp = N` | « Pay N HP. » en première ligne ; payé au jeu (crochet `payHp` pour le modifier), injouable s'il ferait tomber à 0 (raison `hp`) ; compte comme une perte de PV (`onHpLost`), n'est pas une attaque, ignore l'Absorb |
 | `spend = N` | « Spend N: … » ; **au choix du joueur** : payé AU JEU si la ressource suffit (et si `spendNeed(c, inst)` le permet), sauf `Combat.play(c, i, t, { spend = false })` (action `{ "play", i, t, "nospend" }`, Maj enfoncée dans l'interface) ; `ctx.spent` à la résolution, gardé dans l'incantation ou la Trap |
@@ -75,7 +79,7 @@ Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start
 Effets : `damage` (times, all, pierce, onHit, bonus), `absorb`, `apply` (état, n, all, self, `icon` = clé
 d'art de la source), `heal`, `draw`, `mana`, `res` (« +N Rage. »), `surge` (« Surge: », toute la ressource,
 `ctx.surge`), `tickDot` (déclenche tout de suite le DoT de la cible, ou de tous avec `all`), `loseHp`,
-`interrupt` (`all = true` : tous les ennemis), `cleanse`, `fn`. Une classe ajoute les siens dans `ns.Effects`.
+`interrupt` (`all = true` : tous les ennemis), `cleanse`, `fn` ; `loseHp` prend `safe = true` (laisse au moins 1 PV). Une classe ajoute les siens dans `ns.Effects`.
 Options lues sur tous les effets :
 
 - `cond = "nom"` : l'effet ne s'applique que si la condition est vraie, **lue à la résolution** ;
@@ -123,6 +127,9 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `castSlots` | — | nombre d'incantations tenues à la fois (1 ; Mage : 2) |
 | `powerLasts` | d, inst | durée d'un Power à durée |
 | `dotDecay` | unité | baisse du DoT après son tick (1 ; Agony : 0) |
+| `blockKeep` | — | Absorb gardée au début du tour (0 : remise à 0 ; Gnomish Harm Prevention Belt : +5) |
+| `cooldown` | d, inst | durée d'une recharge posée (`d.cooldown` ; 1 au moins : Hourglass Sand) |
+| `replay` | inst, ctx | copies de la carte résolues tout de suite après elle, même cible (premier ennemi vivant si elle est morte), sans coût, la carte ne part qu'une fois ; `ctx.copy` vrai pour une copie, journal `replay` (Ironfoe ; Windfury Totem du Shaman) |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
 
 Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
@@ -130,6 +137,7 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | Nom | Arguments | Quand |
 |---|---|---|
 | `onCombatStart` | — | après `init`, avant le premier tour |
+| `onReshuffle` | nombre de cartes | défausse remélangée dans la pioche pendant une pioche (Scroll of Intellect : un crochet peut piocher) |
 | `onTurnStart` / `onTurnEnd` | — | début du tour joueur (après pioche et mana) / fin (avant la défausse) : Powers de fin de tour, familier, démon |
 | `onRoundEnd` | — | après le tour ennemi, avant la baisse des durées |
 | `onCardCommitted` | inst, d, cible | carte jouée, tous ses coûts payés, avant incantation ou résolution (Hot Streak, baguette) |
@@ -240,13 +248,29 @@ ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte
 - **Accueil** : une classe jouable apparaît d'office (ordre `order`) ; jusqu'à deux, grands boutons ; au-delà,
   grille de trois colonnes (PV, cartes et réputation en infobulle), le reste du panneau descend.
 - Corps des cartes (`Art.cardBody`) : violet = école shadow, bleu = premier effet d'Absorb, or = départ,
-  ivoire = le reste ; `Art.cards[id].body` force une couleur.
+  ivoire = le reste ; `Art.cards[id].body` force une couleur. Carte neutre (sans classe) : ivoire teinté
+  vert sauge, toujours (`Art.cardBodyTint`, `Art.bodyTints.neutral`, couleur de sommet ; aucune texture de plus).
 
 ## Bibelots de classe
 
 `class = "<id>"` : tirés seulement pour cette classe (récompenses, marchand, rencontres, choix de Révéré).
 Le bibelot de départ porte `noPool = true` et `startRelic` dans la définition de classe. Six par classe
 (GDD) : le bibelot de départ et cinq autres.
+
+## Bibelots communs : utiles à la classe
+
+Un bibelot commun (sans `class`) peut porter `needs` : genre de cartes que la classe doit avoir pour
+qu'il lui soit proposé (`Expedition.usefulFor`, appliqué par `Expedition.relicPool` et
+`Rewards.relicPool`) : `"cast"`, `"castDamage"` (Cast qui inflige des dégâts), `"cooldown"`, `"exhaust"`,
+`"retain"`, `"attack"`, `"absorb"`, `"damage"` (`Expedition.classHas(classe, clé)`, cartes de la classe
+seulement), une liste de clés (toutes requises) ou une fonction(classe). Aujourd'hui : le Rogue (ni Cast
+ni Absorb) ne se voit proposer ni Talisman of Focus, ni Talisman of Ephemeral Power, ni Gnomish Harm
+Prevention Belt. Une classe nouvelle n'a rien à déclarer : le filtre lit ses cartes.
+
+Crochets d'expédition ajoutés pour les bibelots communs (`Expedition.modify` / `fire`) : `goldBonus`
+(ajouts fixes, après les pourcentages de `gold`), `removePrice` (prix du retrait ; `exp.shop.removed` =
+retraits de la visite), `Expedition.addPotionSlot(exp)` (emplacements = longueur de `exp.potions`,
+transmise au combat), `Expedition.randomPotion(exp, rng)`, `Expedition.upgradeRandom(exp, n, rng)`.
 
 ## Simulation et bots
 

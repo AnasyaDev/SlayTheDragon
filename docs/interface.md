@@ -41,7 +41,12 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   explications dérivées). « Pay N HP. » en première ligne a son explication.
 - **État `pain`** affiché « DoT » ; l'icône d'un DoT peut dépendre de sa source (`Art.statusIcons`,
   saignement du Guerrier).
-- Raisons nouvelles : « Not enough HP to pay. », « Not enough Rage. » (ressource de la classe).
+- Raisons nouvelles : « Not enough HP to pay. », « Not enough Rage. » (ressource de la classe),
+  « Not enough HP. » (carte `minHp`).
+- **Cartes neutres et bibelots communs** (12/11/2026, `UI/Art/neutral.lua`) : corps ivoire teinté vert
+  sauge (`Art.cardBodyTint`, couleur de sommet multipliée par l'assombrissement d'une carte injouable),
+  mot-clé « Neutral » en infobulle ; bandeau : 3 cases de potion, 4 avec Herb Pouch (calées à droite,
+  séparateur et bibelots décalés, `UI.refreshInfo`). Harnais : section UN, planche `cartes_neutres.svg`.
 
 ## Habillage WoW (direction B, mana et parcours façon C)
 
@@ -865,7 +870,7 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `combat` | **Combat** | voir plus bas |
 | `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic). Rencontre : bulle du texte après coup |
 | `campfire` | **Feu de camp** | décor de nuit, feu qui vacille, couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
-| `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
+| `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle si `npc` est dans `Art.npcs`, sinon rien), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
 | `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan, barres de réputation ; « Nouvelle expédition », « Réputation et journal » |
