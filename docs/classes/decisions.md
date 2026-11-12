@@ -44,7 +44,16 @@ Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est c
 - **PV de départ** (à régler par simulation) : Priest 65, Warrior à fixer par son agent, Rogue 65,
   Paladin 75, Mage 60, Warlock 70, Hunter 65, Shaman 60, Druid 65.
 
+## Fixé avec la progression par classe (12/11/2026)
+- **Niveaux de classe** : seuils cumulés 100 / 250 / 450 / 700 / 1 000 / 1 400 ; expérience par expédition
+  = (réputation × 0,5 + 15 si gagnée) × (1 + 0,1 × clé) : niveau 2 à la 2e expédition, niveau 7 vers la 20e
+  (`docs/expedition.md`, « Niveau de classe »).
+- **Réputation de classe supprimée** : la Ligue, commune au compte, ne débloque que le commun. Révéré de la
+  Ligue : un bibelot au choix parmi 3 au départ, tiré dans la réserve de l'expédition (remplace « un bibelot
+  de classe parmi 3 », sans objet) ; Exalté : un bibelot de plus chez le marchand (inchangé). Le titre
+  « Dragonslayer » passe au niveau 7 de la classe.
+- **Répartition** : Priest d'après `priest-progression.md` ; Warrior réparti dans `docs/classes.md`
+  (« Progression par classe ») ; Mage, Rogue, Hunter d'après leur fiche.
+
 ## Encore ouvert
-- Seuils d'expérience des niveaux de classe (proposition : 100 / 250 / 450 / 700 / 1 000 / 1 400) et ce
-  que deviennent les récompenses Révéré et Exalté de la Ligue.
 - Cible de PV perdus par combat pour chaque style de survie : à mesurer classe par classe.

@@ -5,6 +5,10 @@ des classes : niveau 1 = 4 cartes de départ + 6 par voie et 2 bibelots de class
 une carte par voie ; niveau 7 : une rare par voie et 2 bibelots ; niveaux 3 et 5 : un bibelot.
 Aucun chiffre de carte ne change ici.
 
+**Appliqué le 12/11/2026** (`Data/Priest.lua` : champ `level`, six bibelots, Sacred Candle en bibelot de
+départ ; mesures : `docs/expedition.md`, « Niveau de classe »). Écart à cette fiche : le texte de
+Benediction devient « Each Regen gained: +1. » (pas de « you » dans les textes).
+
 ## Point de départ
 
 Aujourd'hui, le champ `rep` des cartes suit la réputation de classe (0 Neutre, 1 Amical, 2 Honoré) :

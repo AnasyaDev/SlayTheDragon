@@ -20,7 +20,7 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   dans le grand anneau doré, 64 unités, pas de 92 (réduits au-delà de cinq classes pour tenir dans
   520 unités). Choisie : halo doré tenu, icône et anneau pleins, son nom seul en or sous son icône ;
   les autres assombries, éclairées au survol (`W.hoverable`, halo créé d'avance). Nom, PV et cartes,
-  réputation dans l'infobulle (« Click: play this class. » si elle n'est pas choisie). Un clic choisit
+  niveau de classe dans l'infobulle (« Click: play this class. » si elle n'est pas choisie). Un clic choisit
   la classe ; le départ reste le bouton « Start expedition » (Entrée). Harnais : U4, U35 (2, 5, 9 classes).
 - **Bandeau, cadre du héros** : nom de la classe jouée. Portrait : visage du personnage (`SetPortraitTexture`)
   si sa classe de jeu (`UnitClass("player")`, champ `wow` de `Art.classes`) est celle de l'expédition,
@@ -42,6 +42,36 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
 - **État `pain`** affiché « DoT » ; l'icône d'un DoT peut dépendre de sa source (`Art.statusIcons`,
   saignement du Guerrier).
 - Raisons nouvelles : « Not enough HP to pay. », « Not enough Rage. » (ressource de la classe).
+
+## Progression par classe (12/11/2026)
+
+- **Accès** : le bouton rouge de l'accueil (bas gauche, ex-« Reputation and log ») devient « Progress » et
+  ouvre l'écran de progression de la classe choisie ; le bilan y mène aussi (classe de l'expédition finie).
+  L'écran porte « Reputation and log » (ancien écran méta : barre de niveau de la classe, Ligue, journal,
+  dont « Back » revient à la progression) et « Back ». Un seul bouton de plus en tout.
+- **Écran** (`ClassProgress`, étape `classProgress` du contrôleur) : boîte DiamondMetal sur la scène ; en
+  haut les icônes de classe de l'accueil (44 unités, la classe affichée au halo d'or ; infobulle = nom et
+  « Level N » ; un clic change de classe, option `pclass:<id>`), la barre d'expérience (`W.repBar` :
+  libellé = classe, « Level 3 · 20 / 150 »), puis les deux boutons. Dessous, quatre rangées (départ, puis
+  les trois voies, nom de la voie à gauche, réduit s'il ne tient pas) de vraies cartes `W.card` à 0,6, dans
+  l'ordre de leur niveau, et les 6 bibelots en cases à droite des cartes de départ. Tout tient dans
+  1040 × 620 sans défilement (34 cartes, pas de 84, rangées de 122).
+- **Débloqué** : la carte telle qu'en jeu, infobulle habituelle, agrandie ×1,65 au survol (levée pour rester
+  dans la fenêtre) ; le bibelot dans sa case, infobulle du bibelot. **Verrouillé** : dos de carte du pack
+  assombri et désaturé (rien d'autre : ni nom, ni texte, ni icône, ni rareté) ; case de bibelot au point
+  d'interrogation grisé, liseré éteint. Infobulle = la condition seule, en rouge (« Priest level 4 »).
+- **Bilan** : « +76 Priest experience, +122 reputation (Explorers' League). », « Priest reaches level 2! » ;
+  barres niveau de classe et Ligue ; en cas de montée, les cartes et bibelots débloqués révélés sous les
+  barres (vraies cartes à 0,5, agrandies au survol ; cases des bibelots), le panneau monte et grandit sans
+  toucher aux boutons. Les barres se placent sous le texte (il chevauchait la première barre à 6 lignes).
+- **Accueil** : l'infobulle d'une classe dit « Level N » au lieu de la réputation.
+- Harnais UP (5 classes aux niveaux 1, 4, 7 : nombre de cartes et bibelots ouverts, silhouettes sans texte
+  ni icône, infobulle = condition seule, tout dans la fenêtre, rien de tronqué, carte de la dernière rangée
+  survolée dans la fenêtre ; bilan au niveau 2 et au niveau 3 ; accueil). Aperçus :
+  `progression-priest-1`, `progression-warrior-4`, `bilan-montee-de-niveau`.
+- Non vérifiable hors jeu : rendu du dos de carte désaturé (`SetDesaturated` sur une texture du pack), lisibilité
+  des cartes à 0,6 au repos sur l'ardoise, zoom ×1,65 en mode net, nouvelles icônes des bibelots du Priest
+  (`Media/Icons`, nouveaux fichiers : relancer le client).
 
 ## Habillage WoW (direction B, mana et parcours façon C)
 

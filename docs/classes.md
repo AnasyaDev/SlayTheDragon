@@ -51,7 +51,7 @@ L'expédition enregistre la classe (`exp.class`), le combat aussi (`c.class`) ; 
 ## Cartes
 
 Champs de `Data/Priest.lua` (name, cost, type attack|skill|power, rarity basic|common|uncommon|rare, path,
-target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, rep) plus :
+target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level) plus :
 
 | Champ | Règle |
 |---|---|
@@ -64,11 +64,11 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, rep) p
 | `slot = "nom"` | Power unique par emplacement (Seal, Demon, totem d'un élément) : en jouer un autre remplace l'ancien |
 | `lasts = N` | Power à durée : retiré à la fin du N-ième round (crochet `powerLasts`) ; `c.player.powerTurns[uid]` |
 | `replacedTo = "exhaust"` | un Power remplacé ou expiré part aux consumées (défausse par défaut) |
-| `rep` | palier de réputation qui débloque la carte (0, 1, 2) ; un champ `level` (progression par classe) prendra le relais, lu par les mêmes filtres (`Card.inClass`, `Expedition.cardPool`) |
-| `level` | niveau de classe (1 à 7) qui débloquera la carte ou le bibelot (fiche § Progression) ; posé par le Rogue, pas encore lu (tout est disponible) |
+| `level` | niveau de classe (1 à 7) qui débloque la carte ou le bibelot (table du GDD, « Progression par classe » ci-dessous) ; lu par `Expedition.cardPool` / `relicPool` (`Expedition.unlocked`) et l'écran de progression. Plus de `rep` : la réputation (Ligue) ne débloque rien de la classe |
 
-Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start"`, pas de `rep`) + 13 communes,
-11 inhabituelles, 6 rares ; 10 par voie ; `rep` 0/1/2 = 20/5/5 (test « cartes : par classe »).
+Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start"`, `level = 1`) + 13 communes,
+11 inhabituelles, 6 rares ; 10 par voie ; niveaux : voir « Progression par classe » (test « progression :
+répartition exacte »).
 
 ### Effets (`Core/Effects.lua`) et options communes
 
@@ -123,6 +123,8 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `castSlots` | — | nombre d'incantations tenues à la fois (1 ; Mage : 2) |
 | `powerLasts` | d, inst | durée d'un Power à durée |
 | `dotDecay` | unité | baisse du DoT après son tick (1 ; Agony : 0) |
+| `applySelf` | état | valeur d'un état posé sur le héros, toutes sources (Benediction : Regen +1) |
+| `surge` | ctx | montant compté par les effets d'un Surge qui a dépensé quelque chose (Anathema : +2) ; la dépense ne change pas |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
 
 Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
@@ -238,20 +240,55 @@ ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte
 - **Portrait** : visage du personnage si sa classe de jeu (`UnitClass`) est celle de l'expédition, sinon
   l'icône de classe. Nom de classe dans le bandeau et sur le cadre du héros.
 - **Accueil** : une classe jouable apparaît d'office (ordre `order`) ; jusqu'à deux, grands boutons ; au-delà,
-  grille de trois colonnes (PV, cartes et réputation en infobulle), le reste du panneau descend.
+  grille de trois colonnes (PV, cartes et niveau de classe en infobulle), le reste du panneau descend.
 - Corps des cartes (`Art.cardBody`) : violet = école shadow, bleu = premier effet d'Absorb, or = départ,
   ivoire = le reste ; `Art.cards[id].body` force une couleur.
 
 ## Bibelots de classe
 
-`class = "<id>"` : tirés seulement pour cette classe (récompenses, marchand, rencontres, choix de Révéré).
-Le bibelot de départ porte `noPool = true` et `startRelic` dans la définition de classe. Six par classe
-(GDD) : le bibelot de départ et cinq autres.
+`class = "<id>"` + `level` (1..7, pas de `tier`) : tirés seulement pour cette classe (récompenses, coffres,
+marchand, rencontres, choix du Révéré de la Ligue), dès que la classe a ce niveau. Le bibelot de départ
+porte `noPool = true`, `level = 1` et `startRelic` dans la définition de classe : porté à chaque expédition.
+Six par classe (GDD) : niveau 1 = le bibelot de départ et un autre ; 3 et 5 = un ; 7 = deux.
+
+## Progression par classe
+
+Table du GDD (`docs/gdd-classes.md`), vérifiée pour chaque classe jouable par le test « progression :
+répartition exacte » : niveau 1 = 4 cartes de départ + 6 par voie (22) et 2 bibelots ; 2, 4 et 6 = une carte
+par voie ; 3 et 5 = un bibelot ; 7 = une rare par voie et 2 bibelots (34 cartes, 6 bibelots). Expérience,
+seuils et règles : `docs/expedition.md`, « Niveau de classe ». Mage, Rogue, Hunter : niveaux de leur fiche
+(`docs/classes/<classe>.md`, § Progression). Priest : `docs/classes/priest-progression.md`.
+
+| Niveau | Priest : Discipline / Shadow / Holy | Warrior : Arms / Fury / Protection |
+| --- | --- | --- |
+| 1 | Radiance, Solace, Angelic Feather, Penance, Schism, Pain Suppression / Mind Flay, Mind Blast, Vampiric Touch, Devouring Plague, Silence, Shadowform / Holy Fire, Holy Nova, Renew, Chastise, Greater Heal, Spirit of Redemption | Rend, Overpower, Colossus Smash, Execute, Pummel, Bladestorm / Raging Blow, Whirlwind, Victory Rush, Bloodthirst, Rampage, Enrage / Shield Block, Revenge, Devastate, Shield Slam, Ignore Pain, Last Stand |
+| 2 | Evangelism / Mind Sear / Flash Heal | Cleave / Berserker Rage / Thunder Clap |
+| 4 | Luminous Barrier / SW: Death / Halo | Slam / Battle Shout / Demoralizing Shout |
+| 6 | Shadow Mend / Psychic Scream / Empyreal Blaze | Mortal Strike / Onslaught / Retaliation |
+| 7 (rares) | Rapture / Void Eruption / Apotheosis | Deep Wounds / Recklessness / Shield Wall |
+
+| Niveau | Bibelots du Priest | Bibelots du Warrior |
+| --- | --- | --- |
+| 1 | Sacred Candle (départ), Mindtap Talisman | Battle Standard (départ), Hand of Justice |
+| 3 | Benediction | Diamond Flask |
+| 5 | Robes of Prophecy | Lionheart Helm |
+| 7 | Anathema, Truefaith Vestments | Force Reactive Disk, Skullflame Shield |
+
+Warrior (réparti le 12/11/2026, d'après l'esprit des fiches) : au niveau 1, chaque voie garde son moteur
+avec ses 6 cartes — Arms : Sundered (Colossus Smash) payé par Overpower, Rend, Execute par la Rage ; Fury :
+petites attaques, Strength (Bloodthirst), PV payés (Rampage) et Enrage ; Protection : Absorb converti
+(Shield Slam), Ignore Pain, Revenge — avec l'Interrupt (Pummel) et le Last Breath (Last Stand). Une rare par
+voie reste au niveau 1 (Bladestorm, Enrage, Last Stand). Les cartes verrouillées ouvrent une façon de
+jouer : la zone (Cleave, Thunder Clap au 2), le Cast (Slam au 4), la Strength empilée (Battle Shout au 4),
+la pioche par la Rage (Onslaught au 6), les ripostes (Retaliation au 6) ; au 7, les moteurs rares (Deep
+Wounds, Recklessness, Shield Wall). Bibelots : la commune au 1, les inhabituelles au 3 et au 5, les rares
+au 7.
 
 ## Simulation et bots
 
 `luajit Sim/sim.lua runs=2000 bot=heuristic jobs=8 runner=expedition key=0 class=<id>` ; balayage des
-cartes : `… sweep=cards rep=2 runs=300` (chaque carte ajoutée de force au deck de départ). Une seule
+cartes : `… sweep=cards runs=300` (chaque carte ajoutée de force au deck de départ ; `level=N` : cartes et
+expédition au niveau N, 7 par défaut). Une seule
 simulation à la fois, `jobs=8` au plus. Les bots jouent les formes communes sans code de classe (ils
 simulent chaque coup sur une copie) ; une classe les guide par `bot` (définition), `botKey` et `botValue`
 (règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cible :
@@ -306,7 +343,8 @@ ns.ClassRules.rogue = { hooks = {
 
 ## Sauvegarde
 
-`Save.VERSION` 3, `Expedition.VERSION` 3 : migration de la Démence du combat en cours
-(`c.player.demence` → `c.player.res`, `c.class`, `c.cls`). Une classe qui ajoute un état de combat le
+`Save.VERSION` 4, `Expedition.VERSION` 4 : version 3, migration de la Démence du combat en cours
+(`c.player.demence` → `c.player.res`, `c.class`, `c.cls`) ; version 4, niveau de classe (`cs.xp` tiré de
+l'ancienne réputation de classe, `exp.unlock.level`, docs/expedition.md). Une classe qui ajoute un état de combat le
 range dans `c.cls` (données simples) : rien à migrer tant que les champs absents ont une valeur par
 défaut. Une expédition d'une classe inconnue (fichier retiré) part en quarantaine (`Save.validateExpedition`).
