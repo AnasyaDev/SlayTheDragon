@@ -40,9 +40,9 @@ card("disengage", {
 
 card("serpent_sting", {
   level = 1, name = "Serpent Sting", cost = 1, type = "skill", rarity = "basic", path = "start",
-  target = "enemy", effects = { { "draw", 1 }, { "apply", "pain", 5, icon = "sting" } },
-  text = "Draw 1.\nApply DoT 5",
-  up = { effects = { { "draw", 1 }, { "apply", "pain", 7, icon = "sting" } }, text = "Draw 1.\nApply DoT 7" },
+  target = "enemy", effects = { { "draw", 1 }, { "apply", "pain", 3, icon = "sting" } },
+  text = "Draw 1.\nApply DoT 3",
+  up = { effects = { { "draw", 1 }, { "apply", "pain", 5, icon = "sting" } }, text = "Draw 1.\nApply DoT 5" },
 })
 
 card("freezing_trap", {
@@ -57,16 +57,16 @@ card("freezing_trap", {
 
 card("kill_command", {
   level = 1, name = "Kill Command", cost = 1, type = "attack", rarity = "common", path = "beast_mastery",
-  target = "enemy", cooldown = 2, effects = { { "pet", 2 } },
-  text = "Pet attacks twice.\nCooldown 2.",
-  up = { cooldown = 1, text = "Pet attacks twice.\nCooldown 1." },
+  target = "enemy", cooldown = 3, effects = { { "pet", 2 } },
+  text = "Pet attacks twice.\nCooldown 3.",
+  up = { cooldown = 2, text = "Pet attacks twice.\nCooldown 2." },
 })
 
 card("cobra_shot", {
   level = 1, name = "Cobra Shot", cost = 1, type = "attack", rarity = "common", path = "beast_mastery",
-  target = "enemy", effects = { { "damage", 5 }, { "res", 1 } },
-  text = "Deal 5.\n+1 Frenzy.",
-  up = { effects = { { "damage", 8 }, { "res", 1 } }, text = "Deal 8.\n+1 Frenzy." },
+  target = "enemy", effects = { { "damage", 7 }, { "res", 1 } },
+  text = "Deal 7.\n+1 Frenzy.",
+  up = { effects = { { "damage", 10 }, { "res", 1 } }, text = "Deal 10.\n+1 Frenzy." },
 })
 
 card("barbed_shot", {
@@ -78,9 +78,9 @@ card("barbed_shot", {
 
 card("dire_beast", {
   level = 2, name = "Dire Beast", cost = 0, type = "skill", rarity = "common", path = "beast_mastery",
-  target = "enemy", exhaust = true, effects = { { "pet", 1 } },
-  text = "Pet attacks.\nExhaust.",
-  up = { effects = { { "pet", 2 } }, text = "Pet attacks twice.\nExhaust." },
+  target = "enemy", exhaust = true, effects = { { "pet", 2 } },
+  text = "Pet attacks twice.\nExhaust.",
+  up = { effects = { { "pet", 3 } }, text = "Pet attacks three times.\nExhaust." },
 })
 
 -- Growl : Spend 2 retire 2 Frenzy (le familier frappera moins fort) contre de l'Absorb en plus.
@@ -93,17 +93,17 @@ card("growl", {
 
 card("intimidation", {
   level = 1, name = "Intimidation", cost = 1, type = "skill", rarity = "uncommon", path = "beast_mastery",
-  target = "enemy", cooldown = 3, effects = { { "pet", 1 }, { "apply", "stunned", 1 } },
-  text = "Pet attacks.\nApply Stunned 1 ⌛\nCooldown 3.",
-  up = { cooldown = 2, text = "Pet attacks.\nApply Stunned 1 ⌛\nCooldown 2." },
+  target = "enemy", cooldown = 4, effects = { { "pet", 1 }, { "apply", "stunned", 1 } },
+  text = "Pet attacks.\nApply Stunned 1 ⌛\nCooldown 4.",
+  up = { cooldown = 3, text = "Pet attacks.\nApply Stunned 1 ⌛\nCooldown 3." },
 })
 
 -- Multi-Shot : sans cible, le familier reste sur la sienne.
 card("multi_shot", {
   level = 4, name = "Multi-Shot", cost = 1, type = "attack", rarity = "uncommon", path = "beast_mastery",
-  effects = { { "damage", 4, all = true }, { "pet", 1 } },
-  text = "Deal 4 to all.\nPet attacks.",
-  up = { effects = { { "damage", 6, all = true }, { "pet", 1 } }, text = "Deal 6 to all.\nPet attacks." },
+  effects = { { "damage", 5, all = true }, { "pet", 1 } },
+  text = "Deal 5 to all.\nPet attacks.",
+  up = { effects = { { "damage", 7, all = true }, { "pet", 1 } }, text = "Deal 7 to all.\nPet attacks." },
 })
 
 -- Spirit Bond : chaque attaque du familier (automatique, commandée ou de Surge) donne de l'Absorb.
@@ -135,26 +135,26 @@ local beastWithinHooks = {
 }
 
 card("the_beast_within", {
-  level = 7, name = "The Beast Within", cost = 2, type = "power", rarity = "rare", path = "beast_mastery",
+  level = 7, name = "The Beast Within", cost = 1, type = "power", rarity = "rare", path = "beast_mastery",
   power = true, effects = {}, hooks = beastWithinHooks,
   text = "Power.\nAttacks: pet attacks.",
-  up = { cost = 1, text = "Power.\nAttacks: pet attacks." },
+  up = { cost = 0, text = "Power.\nAttacks: pet attacks." },
 })
 
 -- Marksmanship : Careful Aim (cible au-dessus de la moitié de ses PV), tirs en Cast ----------------
 
 card("aimed_shot", {
   level = 1, name = "Aimed Shot", cost = 2, type = "attack", rarity = "common", path = "marksmanship",
-  target = "enemy", cast = true, effects = { { "damage", 20, more = { { 10, "careful" } } } },
-  text = "Cast.\nDeal 20.\nCareful Aim: deal 10 more.",
-  up = { effects = { { "damage", 26, more = { { 12, "careful" } } } }, text = "Cast.\nDeal 26.\nCareful Aim: deal 12 more." },
+  target = "enemy", cast = true, effects = { { "damage", 24, more = { { 10, "careful" } } } },
+  text = "Cast.\nDeal 24.\nCareful Aim: deal 10 more.",
+  up = { effects = { { "damage", 30, more = { { 12, "careful" } } } }, text = "Cast.\nDeal 30.\nCareful Aim: deal 12 more." },
 })
 
 card("steady_shot", {
   level = 1, name = "Steady Shot", cost = 1, type = "attack", rarity = "common", path = "marksmanship",
-  target = "enemy", cast = true, effects = { { "damage", 10 }, { "draw", 1, cond = "careful" } },
-  text = "Cast.\nDeal 10.\nCareful Aim: draw 1.",
-  up = { effects = { { "damage", 14 }, { "draw", 1, cond = "careful" } }, text = "Cast.\nDeal 14.\nCareful Aim: draw 1." },
+  target = "enemy", cast = true, effects = { { "damage", 13 }, { "draw", 1, cond = "careful" } },
+  text = "Cast.\nDeal 13.\nCareful Aim: draw 1.",
+  up = { effects = { { "damage", 17 }, { "draw", 1, cond = "careful" } }, text = "Cast.\nDeal 17.\nCareful Aim: draw 1." },
 })
 
 card("hunters_mark", {
@@ -180,16 +180,16 @@ card("rapid_fire", {
 
 card("counter_shot", {
   level = 1, name = "Counter Shot", cost = 0, type = "skill", rarity = "uncommon", path = "marksmanship",
-  target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "pet", 1 } },
-  text = "Interrupt the target's cast.\nPet attacks.\nCooldown 2.",
-  up = { cooldown = 1, text = "Interrupt the target's cast.\nPet attacks.\nCooldown 1." },
+  target = "enemy", cooldown = 3, effects = { { "interrupt" }, { "pet", 1 } },
+  text = "Interrupt the target's cast.\nPet attacks.\nCooldown 3.",
+  up = { cooldown = 2, text = "Interrupt the target's cast.\nPet attacks.\nCooldown 2." },
 })
 
 card("volley", {
   level = 2, name = "Volley", cost = 2, type = "attack", rarity = "uncommon", path = "marksmanship",
-  cast = true, effects = { { "damage", 13, all = true } },
-  text = "Cast.\nDeal 13 to all.",
-  up = { effects = { { "damage", 17, all = true } }, text = "Cast.\nDeal 17 to all." },
+  cast = true, effects = { { "damage", 16, all = true } },
+  text = "Cast.\nDeal 16 to all.",
+  up = { effects = { { "damage", 20, all = true } }, text = "Cast.\nDeal 20 to all." },
 })
 
 card("readiness", {
@@ -212,9 +212,9 @@ end
 
 card("trueshot_aura", {
   level = 6, name = "Trueshot Aura", cost = 1, type = "power", rarity = "rare", path = "marksmanship",
-  power = true, effects = {}, hooks = trueshotHooks(4),
-  text = "Power.\nCareful Aim: Attacks deal 4 more.",
-  up = { hooks = trueshotHooks(6), text = "Power.\nCareful Aim: Attacks deal 6 more." },
+  power = true, effects = {}, hooks = trueshotHooks(5),
+  text = "Power.\nCareful Aim: Attacks deal 5 more.",
+  up = { hooks = trueshotHooks(7), text = "Power.\nCareful Aim: Attacks deal 7 more." },
 })
 
 card("wailing_arrow", {
@@ -236,9 +236,9 @@ card("immolation_trap", {
 
 card("counterattack", {
   level = 1, name = "Counterattack", cost = 1, type = "skill", rarity = "common", path = "survival",
-  trap = true, effects = { { "damage", 10 } },
-  text = "Trap.\nDeal 10.",
-  up = { effects = { { "damage", 14 } }, text = "Trap.\nDeal 14." },
+  trap = true, effects = { { "damage", 13 } },
+  text = "Trap.\nDeal 13.",
+  up = { effects = { { "damage", 17 } }, text = "Trap.\nDeal 17." },
 })
 
 card("frost_trap", {
@@ -266,36 +266,38 @@ card("explosive_trap", {
 
 card("wyvern_sting", {
   level = 1, name = "Wyvern Sting", cost = 1, type = "skill", rarity = "uncommon", path = "survival",
-  target = "enemy", cooldown = 3,
-  effects = { { "apply", "stunned", 1 }, { "apply", "pain", 6, icon = "sting" } },
-  text = "Apply Stunned 1 ⌛\nApply DoT 6\nCooldown 3.",
-  up = { cooldown = 2, text = "Apply Stunned 1 ⌛\nApply DoT 6\nCooldown 2." },
+  target = "enemy", cooldown = 4,
+  effects = { { "apply", "stunned", 1 }, { "apply", "pain", 4, icon = "sting" } },
+  text = "Apply Stunned 1 ⌛\nApply DoT 4\nCooldown 4.",
+  up = { cooldown = 3, text = "Apply Stunned 1 ⌛\nApply DoT 4\nCooldown 3." },
 })
 
 -- Entrapment : chaque Trap déclenchée pose aussi Demoralized 1 sur l'attaquant (même une Trap « to all »).
-local entrapmentHooks = {
-  onTrapTriggered = function(c, power, inst, enemy)
-    if enemy and not enemy.dead then Combat.applyStatus(c, enemy, "demoralized", 1) end
-  end,
-}
+local function entrapmentHooks(n)
+  return {
+    onTrapTriggered = function(c, power, inst, enemy)
+      if enemy and not enemy.dead then Combat.applyStatus(c, enemy, "demoralized", n) end
+    end,
+  }
+end
 
 card("entrapment", {
-  level = 2, name = "Entrapment", cost = 1, type = "power", rarity = "uncommon", path = "survival",
-  power = true, effects = {}, hooks = entrapmentHooks,
+  level = 2, name = "Entrapment", cost = 0, type = "power", rarity = "uncommon", path = "survival",
+  power = true, effects = {}, hooks = entrapmentHooks(1),
   text = "Power.\nTraps: also apply Demoralized 1.",
-  up = { cost = 0, text = "Power.\nTraps: also apply Demoralized 1." },
+  up = { hooks = entrapmentHooks(2), text = "Power.\nTraps: also apply Demoralized 2." },
 })
 
 -- Lock and Load : la carte piochée arrive pendant le tour ennemi (main de 10 au plus).
-local lockAndLoadHooks = {
-  onTrapTriggered = function(c) Combat.drawCards(c, 1) end,
-}
+local function lockAndLoadHooks(n)
+  return { onTrapTriggered = function(c) Combat.drawCards(c, n) end }
+end
 
 card("lock_and_load", {
-  level = 4, name = "Lock and Load", cost = 1, type = "power", rarity = "uncommon", path = "survival",
-  power = true, effects = {}, hooks = lockAndLoadHooks,
+  level = 4, name = "Lock and Load", cost = 0, type = "power", rarity = "uncommon", path = "survival",
+  power = true, effects = {}, hooks = lockAndLoadHooks(1),
   text = "Power.\nWhen a Trap triggers: draw 1.",
-  up = { cost = 0, text = "Power.\nWhen a Trap triggers: draw 1." },
+  up = { hooks = lockAndLoadHooks(2), text = "Power.\nWhen a Trap triggers: draw 2." },
 })
 
 -- Feign Death : Last Breath ; tombé pendant le tour ennemi, le reste de ce tour est annulé (coups restants
@@ -337,10 +339,10 @@ local resourcefulnessHooks = {
 }
 
 card("resourcefulness", {
-  level = 7, name = "Resourcefulness", cost = 2, type = "power", rarity = "rare", path = "survival",
+  level = 7, name = "Resourcefulness", cost = 1, type = "power", rarity = "rare", path = "survival",
   power = true, effects = {}, hooks = resourcefulnessHooks,
   text = "Power.\nTriggered Traps return to hand.",
-  up = { cost = 1, text = "Power.\nTriggered Traps return to hand." },
+  up = { cost = 0, text = "Power.\nTriggered Traps return to hand." },
 })
 
 -- Bibelots du Chasseur (class = "hunter" : tirés seulement pour lui) -------------------------------
@@ -365,9 +367,9 @@ relic("pet_whistle", {
 
 relic("kiblers_bits", {
   level = 1, name = "Kibler's Bits", rarity = "common",
-  text = "At the start of each combat, +2 Frenzy.",
+  text = "At the start of each combat, +1 Frenzy.",
   hooks = {
-    onCombatStart = function(c) Combat.gainRes(c, 2, "relic") end,
+    onCombatStart = function(c) Combat.gainRes(c, 1, "relic") end,
   },
 })
 
@@ -418,7 +420,7 @@ relic("rhokdelar", {
 
 ns.Classes.hunter = {
   -- PV : 65 dans la fiche et les décisions (« à régler par simulation ») ; 55 après la simulation de fumée
-  id = "hunter", name = "Hunter", order = 5, hp = 55,
+  id = "hunter", name = "Hunter", order = 5, hp = 41,
   resource = { id = "frenzy", cap = 5, keep = true },
   deck = {
     "arcane_shot", "arcane_shot", "arcane_shot", "arcane_shot",
@@ -433,12 +435,12 @@ ns.Classes.hunter = {
     -- un point de Frenzy : +1 à chaque attaque du familier à venir, moins la baisse de 1 par tour
     resValue = 6,
     rating = {
-      wyvern_sting = 8, feign_death = 5.5, kill_command = 7, growl = 6.5, counter_shot = 6.5, intimidation = 6.5,
-      rapid_fire = 6.5, dire_beast = 6, raptor_strike = 6, concussive_shot = 6, wailing_arrow = 5.5,
-      hunters_mark = 5.5, multi_shot = 5.5, bestial_wrath = 5, barbed_shot = 5, explosive_trap = 5,
-      counterattack = 4.5, readiness = 4.5, frost_trap = 4.5, spirit_bond = 5.5, volley = 4, entrapment = 3.5,
-      steady_shot = 3.5, resourcefulness = 3.5, aimed_shot = 3, trueshot_aura = 4.5, cobra_shot = 3,
-      lock_and_load = 3, the_beast_within = 4.5, immolation_trap = 3,
+      spirit_bond = 13.5, the_beast_within = 13, dire_beast = 11.5, counter_shot = 10.5, feign_death = 10.5,
+      wyvern_sting = 8, growl = 7, intimidation = 6.5, explosive_trap = 6.5, multi_shot = 6, rapid_fire = 6,
+      barbed_shot = 6, hunters_mark = 5.5, kill_command = 5.5, wailing_arrow = 5, trueshot_aura = 5,
+      readiness = 4.5, immolation_trap = 4.5, bestial_wrath = 4, concussive_shot = 4, frost_trap = 3.5,
+      raptor_strike = 3, volley = 3, steady_shot = 3, aimed_shot = 3, counterattack = 3, cobra_shot = 3,
+      entrapment = 3, resourcefulness = 3, lock_and_load = 3,
     },
     upgrade = { arcane_shot = 2.5, disengage = 2, serpent_sting = 1.5, freezing_trap = 1.5 },
     remove = { disengage = 1, arcane_shot = 1.5 },
