@@ -335,6 +335,8 @@ return function(ns)
     onlyPath = opts.path
     local level = opts.level or Meta.MAX_LEVEL
     local unlocks = opts.meta == "exalted" and Meta.allUnlocked(level) or { level = level, league = 0 }
+    -- league=N : palier de Ligue imposé (0..4), pour mesurer ce que chaque palier apporte à une classe
+    if opts.league then unlocks.league = opts.league end
     -- Drapeaux de compte : compte neuf pour « start » (premier temps des histoires possible),
     -- compte vétéran pour « exalted » (premier temps vu, suite selon la parité de la graine).
     local flags = opts.flags
