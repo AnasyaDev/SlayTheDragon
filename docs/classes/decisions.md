@@ -3,6 +3,10 @@
 Règles tranchées après relecture des fiches (12/11/2026). Elles priment sur les fiches de `docs/classes/`
 quand une fiche dit autre chose. Les trois premières viennent du joueur, les autres du concepteur.
 
+## Périmètre (décision du joueur, 12/11/2026)
+Cinq classes à produire maintenant : **Priest, Mage, Warrior, Rogue, Hunter**. Paladin, Warlock, Shaman et
+Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est codé pour elles.
+
 ## Tranché par le joueur
 - **Spend N est au choix.** Un clic gauche joue la carte en dépensant si les points sont là ; un clic droit
   (ou une touche de modification, à choisir côté interface) la joue SANS dépenser. La carte montre clairement
