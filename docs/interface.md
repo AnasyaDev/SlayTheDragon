@@ -356,6 +356,118 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 - Filtrage de l'atlas (`TRILINEAR`) : aucun liseré d'une pièce voisine aux bords des tranches.
 - Contraste des textes : or sur métal, encre sur parchemin, blanc sur les barres (vie verte, réputation).
 
+## Feu de camp, personnages des rencontres, préchargement (12/11/2026)
+
+Retours en jeu : « le feu de camp n'est pas bon » (dessin en ellipses) ; « certains modèles de PNJ des
+rencontres ne chargent pas du tout » ; « on ne peut pas forcer le chargement et attendre sa fin ? ».
+
+### Constat
+
+- 12 des 16 personnages des rencontres n'avaient **aucune** entrée dans `Art.npcs` (seuls Salma, Saldean
+  et Gryan) : rien ne pouvait s'afficher. Les 3 autres n'avaient qu'un affichage de secours.
+- Délai d'essai `W.MODEL_WAIT` = 0,8 s : un premier chargement plus lent (humanoïde équipé, créature
+  absente du cache) était abandonné (`ClearModel`) juste avant d'arriver ; la relance tardive ne
+  retentait que la créature.
+- Invocateur défias (619) : 2329 / 2330 sont bien ce que le serveur annonce (deux caches), mais rien ne
+  s'affichait : affichages peut-être absents de ce client, ou lenteur. Candidats ajoutés : 2359 / 2360
+  (Sorcier-voleur défias, Elwynn), 4281 / 4282 (Enchanteur défias).
+
+### Cache de créatures (`tools/wdb_creatures.py`, lecture seule)
+
+`python3 -I tools/wdb_creatures.py [--id N] [--display N] [mot …]` lit
+`_forever_/Cache/WDB/enUS|frFR/creaturecache.wdb` (en-tête « BOMW » de 24 octets, puis des
+enregistrements { identifiant, taille, données } ; bloc des affichages { nombre, probabilité totale,
+nombre × { affichage, échelle, probabilité } } repéré par sa forme). 12/11/2026 : enUS (build 70888)
+998 créatures, frFR (build 70862) 1 853 créatures, toutes lues avec leurs affichages sauf une. Le client
+Forever a remodelé certaines créatures (Nervi défias 38 → 129962 / 129963, Vermine kobold 6 → 127670) :
+le cache dit l'affichage que CE serveur annonce.
+
+### Personnages (`Art.npcs`)
+
+Chaque personnage : la créature citée (`SetCreature`), puis trois affichages ou plus (`SetDisplayInfo`),
+tous lus dans le cache : le sien, puis ceux de créatures du même genre (personnages inventés : une
+créature d'Elwynn ou de la Marche de l'Ouest du bon genre) ; une icône embarquée évoquant le personnage
+pour le médaillon. Détail et provenance dans les commentaires de `UI/Art.lua`.
+
+### Mécanisme (`UI/Scene.lua`)
+
+- `S.loadModel(model, art, clé, h)` : essais créature, affichages, fichiers (`SetModel`), dans l'ordre ;
+  succès = `OnModelLoaded` pour cet essai, ou (créature, affichage) `GetModelFileID` non nul après
+  `S.MODEL_WAIT` = **2 s** ; fichier : `OnModelLoaded` seulement (si le client a ce script : un fichier
+  absent pourrait être « vu » par `GetModelFileID`). Après l'échec de tous : repli, puis 2 tours de
+  relance de **tous** les candidats (4 s entre deux), puis le premier reste posé (un `OnModelLoaded`
+  tardif le valide).
+- Pourquoi 2 s : 0,8 s abandonnait des premiers chargements de plus d'une seconde ; le délai ne coûte
+  rien quand le modèle charge (validé à l'`OnModelLoaded`) ni quand le gagnant est connu ; il ne retarde
+  que l'abandon d'un candidat qui échoue vraiment.
+- **Mémoire** : gagnant par clé (session `S.won`, et `options.modelWins` d'une session à l'autre : un
+  affichage ou un fichier qui a chargé chargera encore ; oublié dès qu'il échoue), essayé en premier ;
+  candidats en échec essayés en dernier (`S.failed`) ; clé dont tout a échoué (`S.lost`) : médaillon
+  aussitôt pendant les nouveaux essais.
+- **Attendre** (`S.showModel`) : le modèle est posé invisible (alpha 0 : le client le charge quand même,
+  comme les cadres de préchargement de Blizzard, `MissionCompletePreloadModelTemplate` à `alpha="0"`),
+  ombre cachée ; au chargement, fondu de 0,3 s du modèle et de son ombre. Le médaillon (icône de
+  `art.icon`, au-dessus du modèle) n'apparaît qu'après l'échec de **tous** les candidats et s'efface si
+  un modèle arrive. Texte, réponses, cartes et boutons ne l'attendent jamais. Pour les ennemis
+  (`S.enemyFigure`, `UI/CombatView.lua`), les PNJ (`S.npcFigure`), le familier (`UI/Art/hunter.lua`), le
+  feu. Les cadres gardent leur modèle cachés (`SetKeepModelOnHide(true)`). `W.setCreatureArt` et
+  `W.MODEL_WAIT` (`UI/Widgets.lua`) ne servent plus.
+- **Préchargement** (`S.preload`, `S.nextNeeds`) : à chaque affichage du parcours (étapes accessibles
+  connues ; au départ de l'expédition c'est le premier écran), cadres de modèle créés une fois et
+  réutilisés, enfants d'`UIParent`, **montrés à alpha 0** dans l'écran (un `PlayerModel` caché libère
+  son modèle), qui font les essais : feu de camp, familier du Chasseur, ennemis des groupes du genre de
+  chaque étape accessible (combat : `easy` / `normal` selon `EASY_COMBATS`, élite, boss), personnages des
+  rencontres possibles (`X.eventPool`). À l'ouverture d'une rencontre : ennemis des combats que ses
+  réponses peuvent lancer. Un cadre chargé est caché (plus rien à dessiner) en gardant son modèle
+  (`SetKeepModelOnHide(true)`). Le gagnant mémorisé est posé en premier par la scène ; le modèle, déjà en
+  mémoire du client, arrive aussitôt. Le héros (`SetUnit("player")`) n'a pas besoin de préchargement.
+- **Limite** : attendre règle le modèle lent ; pas l'identifiant que le client ne connaît pas
+  (créature jamais envoyée par le serveur, affichage ou fichier absent de ce client), qui ne se chargera
+  jamais : d'où plusieurs affichages par personnage (`SetDisplayInfo` lit les données du client, sans
+  serveur ni cache de créatures ; `SetCreature` dépend des données de la créature, cache ou serveur ;
+  `SetModel` ne dépend que du fichier) et le médaillon.
+
+### Feu de camp
+
+- `Art.campfire.files` (FileDataID ou chemin, `wow_model_search`) : 189705 `elwynncampfire.m2` (Elwynn,
+  classique), 198193 `undeadcampfire.m2` (feu humain générique, classique), 199156 `smallfirepit01.m2`
+  (petit foyer orc, classique), le premier par chemin, 987238 `6fx_campfire01.m2` (Draenor), 195041
+  `northrendelwynncampfire.m2`. Flammes = émetteurs de particules : un cadre de modèle les dessine
+  (l'interface de Blizzard affiche ainsi un effet de sort, 1601381, dans `RecruitAFriendFrame`, cadre
+  `Model` + `SetModel` + `OnModelLoaded`). Repli : médaillon de 74 à l'icône
+  `inv_camelot_camping_welcomingcampfire` (embarquée).
+- `S.campfire` : cadre 140 × 130 au sol (x 517, pieds y 346 comme le héros), lueur = texture fondue de
+  l'ombre (`shadow_soft.tga`) teintée orange en mode additif, deux couches qui vacillent, au pied du
+  feu, sous le modèle ; pas d'ombre de contact. Couchage et grimoire au-dessus du feu (niveaux) ; 140 de
+  large : leur halo de survol s'arrête avant.
+- Cadrage (non vérifiable hors jeu) : orientation `Art.campfire.facing` = 0,5 ; caméra par défaut du
+  cadre (`SetPortraitZoom` ne vaut que pour les créatures). `/slay fire <échelle> <hauteur>
+  <orientation>` (`SetModelScale`, `SetPosition(0, 0, h)`, `SetFacing`) règle le feu affiché et le garde
+  (`options.fireCam`) ; `/slay fire reset`.
+
+### `/slay models`
+
+Galerie (ennemis, chaque `npc` des rencontres, familier, feu de camp) puis, quand plus rien n'est en
+cours (au plus 60 s), au chat : « models: N/M loaded, K on fallback: » et **une ligne par modèle** :
+`clé (nom): display 1691` (candidat chargé, « (declared first: creature 235) » si d'autres ont échoué
+avant), `clé (nom): fallback (no model: creature 619, display 2329, …)`, ou `loading (…)`.
+
+### Harnais (UF, et U15, U21, U28 adaptés)
+
+Faux client : `OnModelLoaded` sonne `H.modelDelay` = 0,2 s après la pose d'un modèle connu
+(`H.slowModels` : délai propre) ; `H.noModels` : aucun modèle ; `SetModel` : seuls les fichiers de
+`H.goodFiles` existent (aperçus du feu en repli). UF : données (chaque rencontre a un personnage déclaré,
+3 candidats ou plus, icône embarquée ; feu : 3 fichiers ou plus) ; plus de trace de l'ancien dessin ;
+feu invisible puis médaillon après tous les fichiers, lueur orange additive au pied et sous le modèle,
+place et échelle par rapport au héros, rien d'interface sous le modèle, fichier arrivé à la relance qui
+remplace le médaillon ; rencontre sans modèle : texte et réponses tout de suite, personnage invisible,
+pas de médaillon tant qu'il reste des candidats, puis médaillon à son icône avec son nom au-dessus,
+remplacé par un modèle tardif ; chargement lent (1,5 s) attendu sans médaillon ; préchargement au
+parcours (feu, PNJ des rencontres possibles, ennemis des combats possibles, cadres montrés à alpha 0
+hors de la fenêtre), gagnant mémorisé, scène qui le pose en premier et l'affiche en moins d'une seconde,
+ennemis des combats d'une rencontre préchargés. Aperçus : `feu-de-camp-repli`, `rencontre-repli`.
+Nouvelles icônes embarquées (13, `tools/build_media.py --icons-only`) : **relancer le client**.
+
 ## Peau « Mechanized Magic » (cartes)
 
 ### Fabrication des textures (`tools/build_media.py`, hors TOC, rejouable)
@@ -899,9 +1011,9 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss » et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
 | `combat` | **Combat** | voir plus bas |
 | `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic). Rencontre : bulle du texte après coup |
-| `campfire` | **Feu de camp** | décor de nuit, feu qui vacille, couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
+| `campfire` | **Feu de camp** | décor de nuit, modèle 3D d'un feu de camp du jeu (`Art.campfire`, lueur orange au sol, médaillon du feu de camp en repli), couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
-| `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle si `npc` est dans `Art.npcs`, sinon rien), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
+| `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
 | `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan, barres de réputation ; « Nouvelle expédition », « Réputation et journal » |
 | vue méta | **Méta** | parchemin : barres par classe et Ligue, 8 dernières expéditions ; « Retour » |
@@ -1117,6 +1229,8 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   (« sorcerer : créature 619, affichage 2329, affichage 2330 -> aucun modèle »), puis les modèles
   chargés seulement par un affichage de repli. Les autres `npc` des rencontres n'ont pas d'entrée et
   n'affichent rien : ajouter `Art.npcs.<npc> = { creature = id, display = id }` (cache du client).
+  **Remplacé le 12/11/2026** : voir « Feu de camp, personnages des rencontres, préchargement » (délai
+  de 2 s, repli après tous les candidats, gagnant mémorisé, `/slay models` ligne par ligne).
 - Les **animations** des modèles (0 attente, 1 mort, 6 à terre, 9 encaisser, 16 frapper, 25 prêt, 53/54
   sorts), l'orientation (`/slay facing`) et le cadrage des modèles dans leur cadre (pieds au sol ?).
 - La **peau** : chargement des TGA de `Media/` (aplat vert = fichier absent ou mal lu), des masques TGA
@@ -1185,8 +1299,8 @@ ennemi retenu puis double clic, clic dans le décor, glisser-déposer ; récompe
 vidée (`H.settle`) avant de vérifier le bandeau de fin ; aller-retour de sauvegarde en combat et sur une
 récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibelots ; marchand ; feu de camp ;
 rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
-et `/slay art` ; modèles (essais créature puis affichages, médaillon de repli, relance tardive,
-`OnModelLoaded`, lignes de `/slay modeles`) ; noms des ennemis (1 à 6 ennemis × échelles 0,6 / 1 / 1,5 :
+et `/slay art` ; modèles (essais créature puis affichages, médaillon de repli après tous les candidats, relance tardive,
+`OnModelLoaded`, attente invisible puis fondu, gagnant mémorisé, préchargement, feu de camp, lignes de `/slay models`) ; noms des ennemis (1 à 6 ennemis × échelles 0,6 / 1 / 1,5 :
 visibles, dans le contenu, au-dessus du plateau, au-dessus du modèle et de la jauge, rien par-dessus) ; décors (fond embarqué par défaut pour chaque scène,
 TGA présent sur disque en 32 bits et puissances de deux, bande au format du décor, teinte ; essai : suivant,
 précédent, ok, non, peint, illustre ; repli sur le premier validé d'une liste sans fond embarqué ; verdicts
