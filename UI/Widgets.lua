@@ -2097,20 +2097,26 @@ function W.isTurnStatus(id)
   return s ~= nil and (s.duration or s.turns) and true or false
 end
 
--- Séquence |T du sablier pour un texte de taille size (unités) : hauteur entière (la séquence ne
--- prend que des entiers), ~0,68 cadratin (le dessin occupe 30 px sur 32 : à la hauteur des chiffres
--- de Baloo Chettan 2, 0,62 cadratin) ; texture rognée à droite (x 0 à 28 sur 32) : la marge de gauche
--- du dessin tient lieu d'espace après le nombre, presque rien après. color : teinte (couleur de
--- sommet r:g:b, 0–255), blanc par défaut.
-W.HOURGLASS_CROP = 28
+-- Séquence |T du sablier pour un texte de taille size (unités). Champs (CreateTextureMarkup,
+-- Blizzard_SharedXMLBase/TextureUtil.lua) : chemin:hauteur:largeur:décalage x:décalage y:largeur et
+-- hauteur du fichier:gauche:droite:haut:bas (en pixels du fichier), puis couleur de sommet r:g:b
+-- (0–255) ; entiers (%d partout chez Blizzard). Texture 64 × 64 (tools/build_glyphs.py) : silhouette
+-- pleine (deux traverses, deux triangles opposés), centrée, marges transparentes symétriques (x 11 à
+-- 53, y 2 à 62) ; affichée ENTIÈRE, carrée (largeur = hauteur) : rien n'est rogné ni déformé, et la
+-- marge de gauche du dessin fait la petite espace insécable après le nombre. Hauteur ≈ 0,70 cadratin
+-- arrondie : le dessin (60/64) a la hauteur des chiffres de Baloo Chettan 2 (0,62 cadratin), pas
+-- moins. color : teinte, blanc par défaut.
+W.HOURGLASS_K = 0.70
+W.HOURGLASS_PX = 64
 function W.hourglassSize(size)
-  local h = max(5, floor(size * 0.68 + 0.5))
-  return h, max(4, floor(h * W.HOURGLASS_CROP / 32 + 0.5))
+  local h = max(5, floor(size * W.HOURGLASS_K + 0.5))
+  return h, h
 end
 function W.hourglass(size, color)
   local h, w = W.hourglassSize(size)
   local c = color or C.white
-  return ("|T%s:%d:%d:0:0:32:32:0:%d:0:32:%d:%d:%d|t"):format(W.HOURGLASS, h, w, W.HOURGLASS_CROP,
+  local P = W.HOURGLASS_PX
+  return ("|T%s:%d:%d:0:0:%d:%d:0:%d:0:%d:%d:%d:%d|t"):format(W.HOURGLASS, h, w, P, P, P, P,
     floor(c[1] * 255 + 0.5), floor(c[2] * 255 + 0.5), floor(c[3] * 255 + 0.5))
 end
 
@@ -2188,13 +2194,8 @@ function W.cardBody(d, base, spendOff)
   for _, k in ipairs(keywordStrip()) do
     if ns.Language.plateWord(k.plate, d) then text = text:gsub(k.pat, "") end
   end
-  -- ligne d'état : le verbe reste avec le nom de l'état (« Gain Atonement », « Apply Stunned »)
-  local cl = {}
-  for l in (text .. "\n"):gmatch("(.-)\n") do
-    if W.isStateClause(l) then l = l:gsub("^(%S+) ", "%1" .. NBSP, 1) end
-    cl[#cl + 1] = l
-  end
-  text = table.concat(cl, "\n")
+  -- (ligne d'état : le verbe et le nom de l'état peuvent se couper, coupure de second choix de la
+  -- mise en page, W.clauseGroups ; plus d'insécable entre eux)
   -- un nom d'état insécable avec son nombre (« DoT 5 », « Sundered 2 ⌛ ») ; « to all » insécable
   for _, k in ipairs(keywordList()) do
     if k.status then
@@ -2263,7 +2264,8 @@ local TZ = {
 }
 W.CARD_TEXT = TZ
 -- Paliers de taille du texte (unités de la carte) : chaque carte prend le plus grand qui tient dans la
--- zone utile ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
+-- zone utile en repliant ses clauses sur autant de lignes que la zone en contient à ce palier
+-- (layoutBody) ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
 W.BODY_SIZES = { 10, 9.5, 9, 8.5, 8, 7.5, 7 }
 -- Position verticale du bloc dans la zone (fraction du jeu vertical : 0,5 = centré, 0 = en haut) :
 -- essais dans l'ordre, le premier où les lignes tiennent.
@@ -2324,35 +2326,137 @@ local function widthOf(m, s)
   return m:GetStringWidth() or 0
 end
 
--- Mots insécables : une ponctuation détachée (« : », plus employée en anglais, gardée par prudence)
--- et un nombre qui finit la phrase (« Draw 1. ») restent avec le mot d'avant, un nombre seul (« 12 »,
--- « +1 ») avec le mot d'après (« 12 Absorb », « +1 Insanity », « 2 turns »).
+-- Coupures d'une clause (retour du joueur : « s'autoriser à revenir à la ligne au lieu de réduire le
+-- texte ») : la clause est découpée en GROUPES insécables, et chaque espace entre deux groupes est une
+-- coupure possible avec son coût (plus petit = préférée). Ordre de préférence : entre deux clauses
+-- (coût nul, hors de cette fonction ; « clause » entre deux phrases d'un texte coulé) ; après une
+-- condition « Name: » (cond) ; après une virgule (comma) ; entre le verbe et le nom d'état (« Apply » /
+-- « Demoralized 1 ⌛ », state) ; avant « to all », « to … », « per … », « once per », « three times »,
+-- « twice » (tail) ; ailleurs en dernier recours (any). Jamais coupés (même
+-- groupe) : un nombre et ce qu'il compte (« 5 Absorb », « +2 Insanity », « 1 HP », « Stunned 1 ⌛ »
+-- par l'insécable de W.cardBody), un verbe et son nombre (« Deal 6 », « Draw 1. », « Pay 3 HP. »), un
+-- nombre et le mot d'avant quand rien ne suit qu'il compte (« deal 4 + 4 »), « N times », les noms en
+-- plusieurs mots (noms d'états et conditions nommées, ressources : « Combo Points », « Arcane
+-- Charge », « Last Breath: »), une ponctuation détachée, le sablier et son nombre (icône collée).
+W.BREAK = { clause = 1, cond = 10, comma = 12, state = 14, tail = 18, any = 40 }
+W.BREAK_SHORT = 60     -- ligne d'un seul mot très court (« to », « a ») dans une clause coupée
+W.BREAK_DANGLING = 12  -- ligne coupée après un petit mot (« the », « to », « per »…)
+W.BREAK_BALANCE = 10   -- lignes d'une même clause inégales (écart rapporté à la largeur utile)
+local SMALL = { the = true, a = true, an = true, to = true, of = true, at = true, ["and"] = true,
+  ["or"] = true, per = true, with = true, ["in"] = true, on = true, ["for"] = true, its = true }
+local NUMVERBS = { deal = true, heal = true, draw = true, pay = true, lose = true, spend = true,
+  cooldown = true, cost = true, costs = true }
+local COUNTED = { more = true, mana = true, damage = true, less = true }
+local NUMWORDS = { two = true, three = true, four = true, five = true, six = true, seven = true, eight = true }
+local TAIL = { to = true, per = true, once = true, twice = true }
+
 local function plainWord(w)
   return (w:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR))
 end
-function W.cardWords(text)
-  local raw = {}
-  for w in text:gmatch("%S+") do raw[#raw + 1] = w end
-  local words = {}
-  local i = 1
-  while i <= #raw do
-    local w = raw[i]
-    local p = plainWord(w)
-    if (p:match("^[:;!?]+$") or (p:gsub("^−", "")):match("^[+%-]?%d+[.,]$")) and #words > 0 then
-      words[#words] = words[#words] .. " " .. w
-      i = i + 1
-    else
-      local num = p:gsub("^−", "")
-      while num:match("^[+%-]?%d+$") and raw[i + 1] and not plainWord(raw[i + 1]):match("^[:;!?]+$") do
-        i = i + 1
-        w = w .. " " .. raw[i]
-        num = plainWord(raw[i]):gsub("^−", "")
-      end
-      words[#words + 1] = w
-      i = i + 1
+-- mot sans ponctuation finale, insécables en espaces
+local function bare(p) return ((p:gsub(NBSP, " "):gsub("[.,:;!?]+$", ""))) end
+local function firstWord(p) return (bare(p):match("^(%S+)") or ""):lower() end
+
+-- Noms en plusieurs mots (noms d'états, conditions nommées, ressources), les plus longs d'abord.
+local phraseList
+local function phrases()
+  if phraseList then return phraseList end
+  phraseList = {}
+  local function add(name)
+    if name and name:find(" ", 1, true) then
+      local ws = {}
+      for w in name:gmatch("%S+") do ws[#ws + 1] = w end
+      phraseList[#phraseList + 1] = ws
     end
   end
-  return words
+  for _, k in ipairs(keywordList()) do add(k.name) end
+  for _, r in pairs(ns.Language.resources) do add(r.name) add(r.plural) end
+  table.sort(phraseList, function(a, b) return #a > #b end)
+  return phraseList
+end
+
+-- Le texte p commence-t-il par un nom d'état (« Stunned 1 ⌛ », « Stealth ») ?
+local function startsStatus(p)
+  p = p:gsub(NBSP, " ")
+  for _, k in ipairs(keywordList()) do
+    if k.status and p:sub(1, #k.name) == k.name and not p:sub(#k.name + 1, #k.name + 1):find("^%a") then return true end
+  end
+  return false
+end
+
+-- Groupes d'une clause (texte de W.cardBody, sablier déjà en icône) : { groups = { { text, plain,
+-- short, small } }, cost = { coût de la coupure après le groupe k } }.
+function W.clauseGroups(clause)
+  local raw, pl = {}, {}
+  for w in clause:gmatch("[^ ]+") do raw[#raw + 1] = w pl[#pl + 1] = plainWord(w) end
+  local n = #raw
+  local glue = {}
+  -- noms en plusieurs mots
+  for _, ph in ipairs(phrases()) do
+    for i = 1, n - #ph + 1 do
+      local ok = true
+      for k = 1, #ph do
+        local w = pl[i + k - 1]:gsub(NBSP, " ")
+        local want = ph[k]
+        if k < #ph then
+          if w ~= want then ok = false break end
+        elseif w:sub(1, #want) ~= want or w:sub(#want + 1, #want + 1):find("^%a") then
+          ok = false break
+        end
+      end
+      if ok then for k = i, i + #ph - 2 do glue[k] = true end end
+    end
+  end
+  for i = 1, n do
+    local p = pl[i]:gsub("^−", "-")
+    if p == "+" or p == "-" or p == "×" then
+      -- opérateur : collé des deux côtés (« deal 4 + 4 per Insanity »)
+      if i > 1 then glue[i - 1] = true end
+      if i < n then glue[i] = true end
+    elseif p:match("^[+%-]?%d+$") then
+      -- nombre nu : avec ce qu'il compte (mot suivant à majuscule, « more », « mana »…) ; « +N » toujours
+      -- avec le mot suivant ; avec le verbe d'avant (« Deal 6 », « Pay 3 HP »), ou avec le mot d'avant
+      -- s'il ne compte rien après lui (« deal 4 + 4 »)
+      local nx = pl[i + 1] and bare(pl[i + 1])
+      local counted = nx ~= nil and (nx:find("^%u") ~= nil or COUNTED[(nx:match("^(%S+)") or ""):lower()] == true)
+      if p:find("^%+") and nx then counted = true end
+      if counted then glue[i] = true end
+      if i > 1 and (NUMVERBS[firstWord(pl[i - 1])] or not counted) then glue[i - 1] = true end
+    elseif p:match("^[+%-]?%d+[.,:;]$") or p:match("^[:;!?]+$") then
+      -- nombre qui finit la phrase (« Draw 1. », « Spend 2: »), ponctuation détachée
+      if i > 1 then glue[i - 1] = true end
+    end
+    if NUMWORDS[firstWord(pl[i])] and pl[i + 1] and firstWord(pl[i + 1]) == "times" then glue[i] = true end
+    -- « once per … » : une seule tournure
+    if firstWord(pl[i]) == "once" and pl[i + 1] and firstWord(pl[i + 1]) == "per" then glue[i] = true end
+  end
+  -- groupes et coûts des coupures entre eux
+  local groups, cost = {}, {}
+  local cur = { i = 1 }
+  for i = 1, n do
+    if i == n or not glue[i] then
+      local parts, pparts = {}, {}
+      for k = cur.i, i do parts[#parts + 1] = raw[k] pparts[#pparts + 1] = pl[k] end
+      local plain = table.concat(pparts, " "):gsub(NBSP, " ")
+      local last = bare(pl[i]):match("(%S+)$") or ""
+      groups[#groups + 1] = { text = table.concat(parts, " "), plain = plain, last = i,
+        short = cur.i == i and #bare(pl[i]) <= 3 and not bare(pl[i]):find("%d") and not pl[i]:find(":$"),
+        small = SMALL[last:lower()] == true }
+      if i < n then
+        local pa, pb = pl[i], pl[i + 1]
+        local c
+        if pa:find(":$") then c = W.BREAK.cond
+        elseif pa:find("%.$") then c = W.BREAK.clause
+        elseif pa:find(",$") then c = W.BREAK.comma
+        elseif (firstWord(pa) == "apply" or firstWord(pa) == "gain") and cur.i == i and startsStatus(pb) then c = W.BREAK.state
+        elseif TAIL[firstWord(pb)] or (NUMWORDS[firstWord(pb)] and pl[i + 2] and firstWord(pl[i + 2]) == "times") then c = W.BREAK.tail
+        else c = W.BREAK.any end
+        cost[#groups] = c
+      end
+      cur = { i = i + 1 }
+    end
+  end
+  return { groups = groups, cost = cost }
 end
 
 -- Une ligne qui finit dans une couleur ouverte (nom d'état coupé en deux lignes) la ferme, et la
@@ -2417,95 +2521,171 @@ function W.cardParagraphs(text, mode)
   return paras
 end
 
--- Coupe les paragraphes paras en lignes à la taille size dans la zone (top, bottom en unités) : le
--- moins de lignes possible, chaque ligne limitée à la largeur de la zone à sa hauteur (biseau
--- compris), bloc centré verticalement ; lignes remplies de haut en bas (chaque ligne prend le plus de
--- mots possible tant que la suite tient dans les lignes restantes) ; un paragraphe commence une ligne.
--- Le sablier est posé à la taille size (largeur mesurée avec le texte). Renvoie les lignes, ou nil si
--- le texte ne tient pas ; "font" si la police ne mesure rien (pas encore chargée).
+-- Coupe les paragraphes paras (un paragraphe = une clause, qui commence toujours une ligne) en lignes
+-- à la taille size dans la zone (top, bottom en unités). Hauteur de ligne MESURÉE par le client
+-- (texte de mesure « Ég ») : la zone contient floor(hauteur ÷ ligne) lignes à ce palier, toutes
+-- utilisables. Chaque clause peut se replier sur plusieurs lignes, aux coupures de W.clauseGroups ;
+-- chaque ligne tient dans la largeur de la zone à son bas (biseau compris, marge W.TEXT_SAFE). Parmi
+-- les mises en page qui tiennent, la moins coûteuse : somme des coupures, ligne d'un seul petit mot,
+-- ligne finie par un petit mot, lignes inégales dans une clause, bloc remonté (W.BODY_LIFT) plutôt que
+-- centré, pas d'écart entre clauses (W.CLAUSE_GAP) quand il y a la place ; à coût égal, le moins de
+-- lignes. Sablier posé à la taille size (largeur mesurée avec le texte). Renvoie { lines, y0, gap,
+-- clause = { clause de chaque ligne }, cost }, lh ; nil si rien ne tient ; nil, "font" si la police ne
+-- mesure rien (pas encore chargée).
+W.LIFT_COST = { 0, 2, 4, 6 }
+-- Écart entre deux clauses (fraction de la hauteur de ligne), quand la hauteur le permet : une clause
+-- repliée sur deux lignes reste lisible comme UNE clause (« Deal 6. » / écart / « Apply » / « Sundered 3 ⌛ »).
+-- Sans écart, coût W.NOGAP_COST : préféré à une coupure de plus, pas à un bloc remonté de deux crans.
+W.CLAUSE_GAP = 1 / 3
+W.NOGAP_COST = 3
+-- Le bas de l'intérieur sombre est mesuré à y ≈ 146,3 unités (liseré clair dès 146,5 ; 1,19 de la
+-- largeur, 147,6, dans le commentaire de TZ) : la marge de 5 unités sous TZ.bottom n'en fait que ~3,8.
+-- Avec des lignes d'un cadratin, la dernière ligne peut arriver au bas de la zone : 0,5 unité de garde
+-- pour garder 4 unités sous la boîte de la ligne (vérifié sur les pixels, harnais U22).
+W.TEXT_BOTTOM_GUARD = 0.5
 local function layoutBody(paras, size, top, bottom)
   local CW = W.CARD_W
   local m = measureFS("bold", size)
   m:SetText("Ég")
   local lh = m:GetStringHeight() or 0
   if lh <= 0 or widthOf(m, "Ég") <= 0 then return nil, "font" end
-  local words, brk = {}, {}
-  for p = 1, #paras do
-    local ws = W.cardWords(W.inlineIcons(paras[p], size))
-    for k = 1, #ws do
-      words[#words + 1] = ws[k]
-      if k == 1 and p > 1 then brk[#words] = true end
+  -- garde de W.TEXT_BOTTOM_GUARD au bas : la dernière ligne peut maintenant toucher le bas de la zone
+  local H = bottom - top - W.TEXT_BOTTOM_GUARD
+  local N = floor(H / lh + 1e-6)
+  local C = #paras
+  if C == 0 then return { lines = {}, y0 = top, clause = {} }, lh end
+  if C > N then return nil, lh end
+  local full = 2 * TZ.half * CW
+  -- candidats de chaque clause : toutes les façons de la couper en lignes assez étroites
+  local cands, groupsOf = {}, {}
+  for c = 1, C do
+    local g = W.clauseGroups(W.inlineIcons(paras[c], size))
+    groupsOf[c] = g
+    local G = #g.groups
+    local memo = {}
+    local function span(i, j)
+      local key = i * 256 + j
+      local v = memo[key]
+      if not v then
+        local parts = {}
+        for k = i, j do parts[#parts + 1] = g.groups[k].text end
+        -- marge W.TEXT_SAFE : la ligne doit tenir avec quelques pour cent de reste
+        v = widthOf(m, (table.concat(parts, " "):gsub(NBSP, " "))) * W.TEXT_SAFE
+        memo[key] = v
+      end
+      return v
     end
-  end
-  local nw = #words
-  if nw == 0 then return {}, lh end
-  -- largeur des mots i..j sur une ligne (mesurée une fois, icônes comprises) ; infinie si la ligne
-  -- franchirait un début de paragraphe
-  local memo = {}
-  local function span(i, j)
-    local key = i * 1000 + j
-    local v = memo[key]
-    if not v then
-      v = 0
-      for k = i + 1, j do if brk[k] then v = math.huge end end
-      -- marge W.TEXT_SAFE : la ligne doit tenir avec quelques pour cent de reste
-      if v == 0 then v = widthOf(m, (table.concat(words, " ", i, j):gsub(NBSP, " "))) * W.TEXT_SAFE end
-      memo[key] = v
+    local list, acc, ws = {}, {}, {}
+    local maxK = N - (C - 1)
+    local function finish()
+      local k, cost = #acc, 0
+      if k > 1 then
+        local lo, hi = math.huge, 0
+        for t = 1, k do
+          local a, b = acc[t][1], acc[t][2]
+          if t < k then
+            cost = cost + g.cost[b]
+            if g.groups[b].small then cost = cost + W.BREAK_DANGLING end
+          end
+          if a == b and g.groups[a].short then cost = cost + W.BREAK_SHORT end
+          lo, hi = min(lo, ws[t]), max(hi, ws[t])
+        end
+        cost = cost + W.BREAK_BALANCE * (hi - lo) / full
+      end
+      local r, w = {}, {}
+      for t = 1, k do r[t] = { acc[t][1], acc[t][2] } w[t] = ws[t] end
+      list[#list + 1] = { ranges = r, widths = w, cost = cost }
     end
-    return v
+    local function rec(i)
+      if i > G then finish() return end
+      if #acc >= maxK then return end
+      for j = i, G do
+        local w = span(i, j)
+        if w > full then break end
+        acc[#acc + 1] = { i, j }
+        ws[#ws + 1] = w
+        rec(j + 1)
+        acc[#acc] = nil
+        ws[#ws] = nil
+      end
+    end
+    if G > 0 then rec(1) end
+    if #list == 0 then return nil, lh end
+    table.sort(list, function(a, b) return a.cost < b.cost end)
+    cands[c] = list
   end
-  local H = bottom - top
-  for n = 1, min(nw, floor(H / lh + 1e-6)) do
-    -- bloc centré verticalement ; s'il ne tient pas, remonté par paliers jusqu'au haut de la zone
-    -- (le biseau du bas laisse alors plus de largeur à la dernière ligne)
-    local slack = H - n * lh
-    for _, f in ipairs(W.BODY_LIFT) do
+  -- meilleure combinaison pour n lignes en tout, avec ou sans écart entre clauses, et chaque
+  -- position du bloc
+  local best
+  local gaps = (C > 1 and W.CLAUSE_GAP > 0) and { W.CLAUSE_GAP * lh, 0 } or { 0 }
+  for n = C, N do
+   for _, gap in ipairs(gaps) do
+    local slack = H - n * lh - (C - 1) * gap
+    for fi, f in ipairs(slack >= -1e-6 and W.BODY_LIFT or {}) do
       local y0 = top + slack * f
-      local wmax = {}
-      for k = 1, n do wmax[k] = 2 * W.cardTextHalf((y0 + k * lh) / CW) * CW end
-      -- ok[k][i] : les mots i.. tiennent exactement sur les lignes k..n
-      local ok = {}
-      ok[n + 1] = { [nw + 1] = true }
-      for k = n, 1, -1 do
-        ok[k] = {}
-        for i = k, nw - (n - k) do
-          for j = i, nw - (n - k) do
-            if span(i, j) > wmax[k] then break end
-            if ok[k + 1][j + 1] then ok[k][i] = true break end
+      local dp = { [0] = { [0] = { cost = 0 } } }
+      for c = 1, C do
+        local row = {}
+        for L, st in pairs(dp[c - 1]) do
+          for ci, cand in ipairs(cands[c]) do
+            local k = #cand.ranges
+            if L + k <= n - (C - c) then
+              local e = row[L + k]
+              local nc = st.cost + cand.cost
+              if not e or nc < e.cost then
+                local ok = true
+                for t = 1, k do
+                  local yb = y0 + (L + t) * lh + (c - 1) * gap
+                  if cand.widths[t] > 2 * W.cardTextHalf(yb / CW) * CW then ok = false break end
+                end
+                if ok then row[L + k] = { cost = nc, prev = L, cand = ci } end
+              end
+            end
           end
         end
+        dp[c] = row
       end
-      if ok[1][1] then
-        local lines, i = {}, 1
-        for k = 1, n do
-          local j = i
-          for jj = i, nw - (n - k) do
-            if span(i, jj) > wmax[k] then break end
-            if ok[k + 1][jj + 1] then j = jj end
-          end
-          lines[k] = (table.concat(words, " ", i, j):gsub(NBSP, " "))
-          i = j + 1
-        end
-        return { lines = balanceColors(lines), y0 = y0 }, lh
+      local e = dp[C][n]
+      if e then
+        local total = e.cost + (W.LIFT_COST[fi] or 0) + ((C > 1 and gap == 0) and W.NOGAP_COST or 0)
+        if not best or total < best.cost - 1e-9 then best = { cost = total, n = n, y0 = y0, dp = dp, gap = gap } end
       end
     end
+   end
   end
-  return nil, lh
+  if not best then return nil, lh end
+  -- lignes de la meilleure combinaison
+  local picks, L = {}, best.n
+  for c = C, 1, -1 do
+    local e = best.dp[c][L]
+    picks[c] = cands[c][e.cand]
+    L = e.prev
+  end
+  local lines, clause = {}, {}
+  for c = 1, C do
+    local g = groupsOf[c]
+    for _, r in ipairs(picks[c].ranges) do
+      local parts = {}
+      for k = r[1], r[2] do parts[#parts + 1] = g.groups[k].text end
+      lines[#lines + 1] = (table.concat(parts, " "):gsub(NBSP, " "))
+      clause[#clause + 1] = c
+    end
+  end
+  return { lines = balanceColors(lines), y0 = best.y0, clause = clause, cost = best.cost, gap = best.gap }, lh
 end
+W.layoutBody = layoutBody
 
 local layoutCache = {}
 function W.clearTextCache() layoutCache = {} end
 
 -- Pose le texte de la carte : premier palier où il tient, mise en page figée (lignes séparées par
 -- des retours explicites dans une boîte posée, large et haute, W.looseBox : le client ne recoupe ni ne
--- tronque jamais, ni à une autre échelle, ni pendant un zoom), puis
--- vérification par le client (GetNumLines, IsTruncated, GetStringHeight). bottom : bas de la zone
--- (unités), relevé si une plaque mord sur le panneau.
--- Essais dans l'ordre : une clause par ligne aux paliers >= W.CLAUSE_MIN (du plus grand au plus
--- petit) ; sinon, à chaque palier du plus grand au plus petit : une clause par ligne, puis texte qui
--- coule avec chaque état posé sur sa ligne (« flow »), puis états groupés en une dernière ligne
--- (« flowAll »).
-W.CLAUSE_MIN = 8.5
+-- tronque jamais, à aucune échelle), puis vérification par le client (GetNumLines, IsTruncated,
+-- GetStringHeight). bottom : bas de la zone (unités), relevé si une plaque mord sur le panneau.
+-- Essais dans l'ordre : une clause par paragraphe (chaque clause commence une ligne et peut se
+-- replier), du plus grand palier au plus petit, secours compris ; seulement ensuite, palier par palier,
+-- texte qui coule (« flow » : clauses simples qui se suivent sur les mêmes lignes) puis états groupés
+-- (« flowAll »). Le palier retenu est donc le plus grand où le texte tient en se repliant.
 function W.cardTries(text)
   local all = {}
   for _, s in ipairs(W.BODY_SIZES) do all[#all + 1] = { s = s } end
@@ -2518,19 +2698,38 @@ function W.cardTries(text)
     seen[key] = true
     tries[#tries + 1] = { size = e.s, under = e.under, mode = mode, paras = paras, key = key }
   end
-  for _, e in ipairs(all) do if not e.under and e.s >= W.CLAUSE_MIN then add(e, "clauses") end end
+  for _, e in ipairs(all) do add(e, "clauses") end
   for _, e in ipairs(all) do
-    add(e, "clauses")
     add(e, "flow")
     add(e, "flowAll")
   end
   return tries
 end
 
+-- Blocs du texte d'une carte : card.body, puis d'autres textes (W.BODY_PARTS en tout, créés avec la
+-- carte, cachés tant qu'inutiles). Sans écart entre clauses, tout le texte est dans card.body ; avec
+-- écart, un texte par clause (même police, même boîte posée), posés l'un sous l'autre.
+W.BODY_PARTS = 6
+-- Texte complet affiché (lignes de tous les blocs, retours compris).
+function W.cardBodyText(card)
+  local out = {}
+  for k = 1, card.bodyUsed or 1 do
+    local t = card.bodyParts and card.bodyParts[k] and card.bodyParts[k]:GetText() or (k == 1 and card.body:GetText())
+    if t and t ~= "" then out[#out + 1] = t end
+  end
+  return table.concat(out, "\n")
+end
+
 local function fitBody(card, text, bottom)
   local CW = W.CARD_W
   local fs = card.body
+  local parts = card.bodyParts or { fs }
   local top = TZ.top * CW
+  for k = 2, #parts do
+    parts[k]:SetText("")
+    parts[k]:Hide()
+  end
+  card.bodyUsed = 1
   fs:ClearAllPoints()
   fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
   -- cap : palier interdit et au-dessus (garde-fou W.checkCardTexts : le client a tronqué ce texte)
@@ -2550,17 +2749,39 @@ local function fitBody(card, text, bottom)
     end
     if lay then
       local lines = lay.lines
-      W.setSize(fs, s)
-      -- boîte posée, large et haute (W.looseBox) : le client ne recoupe ni ne tronque jamais ces lignes
-      W.looseBox(fs, #lines, 2 * TZ.half * CW, lay.lh)
-      fs:SetText(table.concat(lines, "\n"))
-      -- centre du bloc : centre de la zone, ou plus haut si le bloc a été remonté
-      fs:ClearAllPoints()
-      fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(lay.y0 + #lines * lay.lh / 2))
-      local n = fs.GetNumLines and fs:GetNumLines() or #lines
-      local hh = fs:GetStringHeight() or 0
-      if (n == #lines or #lines == 0) and not (fs.IsTruncated and fs:IsTruncated()) and hh <= bottom - top + 0.5 then
-        fit = { size = s, lines = #lines, under = t.under or false, ok = true, mode = t.mode, y0 = lay.y0 }
+      -- blocs : un par clause s'il y a un écart (et assez de textes), sinon un seul
+      local blocks = {}
+      local split = (lay.gap or 0) > 0 and (lay.clause[#lines] or 1) <= #parts
+      for i, l in ipairs(lines) do
+        local b = split and lay.clause[i] or 1
+        blocks[b] = blocks[b] or {}
+        blocks[b][#blocks[b] + 1] = l
+      end
+      local ok, y = true, lay.y0
+      for b = 1, #blocks do
+        local p = parts[b]
+        local bl = blocks[b]
+        W.setSize(p, s)
+        -- boîte posée, large et haute (W.looseBox) : le client ne recoupe ni ne tronque jamais ces lignes
+        W.looseBox(p, #bl, 2 * TZ.half * CW, lay.lh)
+        p:SetText(table.concat(bl, "\n"))
+        -- centre du bloc : dans la zone, au-dessous du bloc précédent et de l'écart
+        p:ClearAllPoints()
+        p:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(y + #bl * lay.lh / 2))
+        p:Show()
+        y = y + #bl * lay.lh + (split and lay.gap or 0)
+        local n = p.GetNumLines and p:GetNumLines() or #bl
+        local hh = p:GetStringHeight() or 0
+        if not ((n == #bl or #bl == 0) and not (p.IsTruncated and p:IsTruncated()) and hh <= bottom - top + 0.5) then ok = false end
+      end
+      for k = #blocks + 1, #parts do
+        parts[k]:SetText("")
+        parts[k]:Hide()
+      end
+      card.bodyUsed = max(1, #blocks)
+      if ok then
+        fit = { size = s, lines = #lines, under = t.under or false, ok = true, mode = t.mode, y0 = lay.y0,
+          lh = lay.lh, clause = lay.clause, cost = lay.cost, gap = split and lay.gap or 0, blocks = #blocks }
         break
       end
     end
@@ -2568,12 +2789,19 @@ local function fitBody(card, text, bottom)
   if not fit then
     -- police pas encore mesurable, ou texte trop long même au dernier secours : retour à la ligne du
     -- client, au plancher (déborde peut-être : signalé)
+    for k = 2, #parts do
+      parts[k]:SetText("")
+      parts[k]:Hide()
+    end
+    card.bodyUsed = 1
     local s = W.BODY_SIZES[#W.BODY_SIZES]
     W.setSize(fs, s)
+    fs:ClearAllPoints()
+    fs:SetPoint("CENTER", card.bg, "TOPLEFT", TZ.cx * CW, -(top + bottom) / 2)
     fs:SetWidth(2 * TZ.half * CW)
     fs:SetHeight(0) -- hauteur libre : le texte déborde (signalé) plutôt que d'être tronqué
     fs:SetText((W.inlineIcons(text, s):gsub(NBSP, " ")))
-    fit = { size = s, under = true, ok = false, font = fontErr }
+    fit = { size = s, under = true, ok = false, font = fontErr, gap = 0, blocks = 1 }
   end
   card.bodyFit = fit
   return fit
@@ -2903,6 +3131,7 @@ function W.checkCardTexts(card)
   local refit = false
   local parts = { { "name", card.name, "name", card.nameFit }, { "text", card.body, "body", card.bodyFit },
     { "keywords", card.plateText }, { "cost", card.cost } }
+  for k = 2, card.bodyUsed or 1 do parts[#parts + 1] = { "text", card.bodyParts[k], "body", card.bodyFit } end
   if card.reasonPlate and card.reasonPlate:IsShown() then parts[#parts + 1] = { "reason", card.reasonPlate.text } end
   if card.priceTag and card.priceTag:IsShown() then parts[#parts + 1] = { "price", card.priceTag.text } end
   for _, p in ipairs(parts) do
@@ -2995,12 +3224,20 @@ function W.card(parent)
   b.name:SetWidth(SC.name.len * CW)
   b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
   b.cost:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
-  b.body = W.label(face, "bold", W.BODY_SIZES[1], C.textSoft, "OVERLAY")
   -- centré dans la zone utile du panneau, lignes posées par fitBody dans une boîte posée (W.looseBox) ;
-  -- hauteur libre seulement au secours (un texte trop long déborde au lieu d'être tronqué en « … »)
-  b.body:SetJustifyH("CENTER")
-  b.body:SetJustifyV("MIDDLE")
-  b.body:SetWordWrap(true)
+  -- hauteur libre seulement au secours (un texte trop long déborde au lieu d'être tronqué en « … »).
+  -- Blocs des clauses (écart entre clauses) : b.body puis W.BODY_PARTS - 1 autres, créés ici (jamais
+  -- pendant un survol), cachés tant qu'inutiles.
+  b.bodyParts = {}
+  for k = 1, W.BODY_PARTS do
+    local p = W.label(face, "bold", W.BODY_SIZES[1], C.textSoft, "OVERLAY")
+    p:SetJustifyH("CENTER")
+    p:SetJustifyV("MIDDLE")
+    p:SetWordWrap(true)
+    if k > 1 then p:Hide() end
+    b.bodyParts[k] = p
+  end
+  b.body = b.bodyParts[1]
   b.plateText = W.label(face, "bold", 8.5, C.text, "OVERLAY")
   b.plateText:SetPoint("CENTER", org, "TOPLEFT", SC.plateText.cx * CW, -SC.plateText.cy * CW)
   b.plateText:SetWordWrap(false)
@@ -3083,7 +3320,7 @@ function W.card(parent)
       self.costTab:SetVertexColor(1, 0.42, 0.38, 1)
     end
     local dc = dim and C.textDim or C.textSoft
-    self.body:SetTextColor(dc[1], dc[2], dc[3])
+    for _, p in ipairs(self.bodyParts) do p:SetTextColor(dc[1], dc[2], dc[3]) end
     if dim and opts.reason then
       local p = self.reasonPlate
       p.plaque:SetFill({ 1, 0.47, 0.43 })

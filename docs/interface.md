@@ -440,10 +440,11 @@ valeurs, bouton « Back on the road » du feu de camp.
 - **Zone utile du texte** (`W.CARD_TEXT`, `UI/Widgets.lua`) : intérieur sombre du panneau d'ardoise
   (mesuré sur `Media/card_panel.tga`) moins les marges : 5,5 unités sur les côtés (de 124), 5 unités au
   bas, et sous la plus grande gemme de rareté en haut ; le bas biseauté rétrécit la zone (demi-largeur
-  0,308 − 0,56 × (y − 1,0754), marge ×1,15 en biais). Les lignes sont posées une à une : remplissage
-  glouton, chaque ligne limitée à la largeur de la zone à son bas, bloc centré verticalement ; puis le
-  texte est posé avec des retours explicites dans une **boîte posée** (`W.looseBox`, voir « Textes
-  tronqués au survol » plus bas). Mesures par le client : `GetStringWidth` / `GetStringHeight` d'un texte
+  0,308 − 0,56 × (y − 1,0754), marge ×1,15 en biais). Les lignes sont posées une à une (voir « Retours à
+  la ligne plutôt que des paliers plus petits » plus bas : clauses repliées, coupures choisies, écart
+  entre clauses), chaque ligne limitée à la largeur de la zone à son bas, bloc centré verticalement ;
+  puis le texte est posé avec des retours explicites dans une **boîte posée** (`W.looseBox`, voir
+  « Textes tronqués au survol » plus bas). Mesures par le client : `GetStringWidth` / `GetStringHeight` d'un texte
   de mesure (même police), avec une marge `W.TEXT_SAFE` (une ligne mesurée × 1,02 doit tenir dans sa
   largeur), puis vérification sur la carte (`GetNumLines`, `IsTruncated`, `GetStringHeight`) — un échec
   fait descendre d'un palier. Mises en page gardées en cache (texte, taille, bas de zone).
@@ -478,7 +479,9 @@ valeurs, bouton « Back on the road » du feu de camp.
   plus d'échelle de survol depuis le 12/11/2026) ; « PW: Radiance » en main levée et au repos ; toutes les
   réponses des rencontres ; tous les textes des visuels survolables. Sur l'ancien code : 2 127 cas tronqués, dont
   PW: Radiance en net à 1 et 1,15 survolée (« 1/2 lignes »), et 24 réponses.
-- **Paliers** (retour du troisième essai : « texte trop petit ») : chaque carte prend le plus grand
+- **Paliers** (retour du troisième essai : « texte trop petit » ; règle de coupure d'avant le retour du
+  12/11/2026, remplacée par « Retours à la ligne plutôt que des paliers plus petits » ci-dessous) :
+  chaque carte prend le plus grand
   palier qui tient dans la zone utile (inchangée, marges comprises) : texte 10 / 9,5 / 9 / 8,5 / 8 / 7,5 / 7
   (plancher lisible), secours 6,5 / 6 signalé (`card.bodyFit.under`) ; nom 11 / 10 / 9 / 8 / 7, secours
   6,5 / 6 (`card.nameFit`), une ligne dans la bande du ruban moins 4 unités de chaque côté. Coupure : le
@@ -495,6 +498,78 @@ valeurs, bouton « Back on the road » du feu de camp.
   (6,5). La largeur de Baloo et le biseau limitent la troisième ligne : un texte de trois lignes dont la
   dernière dépasse ~59 unités reste à 8 ; textes raccourcis dans `Data/Priest.lua` (règles et chiffres
   inchangés). Noms abrégés : « MdP : » (Mot de pouvoir) et « MdlO : » (Mot de l'ombre).
+- **Retours à la ligne plutôt que des paliers plus petits** (retour du joueur du 12/11/2026, capture de
+  Freezing Trap survolée : « Apply Stunned 1 ⌛ » / « Apply Demoralized 1 ⌛ » en tout petit au milieu d'un
+  panneau vide : « il faut s'autoriser à revenir à la ligne au lieu de réduire le texte »). L'ancienne
+  règle collait le verbe à l'état et gardait chaque clause sur une ligne : elle descendait de palier
+  plutôt que de couper, alors que le panneau avait de la hauteur libre.
+  - **Hauteur de ligne** (constat) : le faux client comptait une ligne de 1,47 cadratin (ascendante +
+    descendante de Baloo, hhea) ; la capture montre deux lignes de texte de 7,5 unités à 9 px l'une de
+    l'autre pour des glyphes à ~1,25–1,35 px par unité, soit ~0,9–1 cadratin : le client règle
+    l'interligne sur la taille de police. En jeu, la mise en page mesure la ligne (`GetStringHeight`) et
+    n'a pas changé ; le faux client suit maintenant le client (`H.LINE_EM` = 1, `Sim/ui_harness.lua`).
+    La zone (47,5 unités de haut, garde de 0,5 au bas : `W.TEXT_BOTTOM_GUARD`, le bas de l'intérieur
+    sombre est mesuré à y ≈ 146,3 et non 147,6) contient donc, palier par palier : 10 → 4 lignes,
+    9,5 → 4, 9 → 5, 8,5 → 5, 8 → 5, 7,5 → 6, 7 → 6 (affiché par la section UT du harnais) — et non
+    3 lignes comme le laissait croire l'ancien interligne.
+  - **Règle** (`layoutBody`, `UI/Widgets.lua`) : pour chaque carte, le plus GRAND palier où le texte tient
+    dans la zone (TZ, marges et biseau inchangés), chaque clause commençant une ligne et pouvant se
+    replier sur plusieurs ; à ce palier, la mise en page la moins coûteuse. Essais (`W.cardTries`) : les
+    clauses repliées à tous les paliers d'abord ; le texte coulé (clauses simples sur une même ligne)
+    n'est plus qu'un dernier secours, jamais employé aujourd'hui.
+  - **Coupures** (`W.clauseGroups`) : chaque clause est découpée en groupes insécables, chaque espace
+    entre deux groupes a un coût (`W.BREAK`) dans l'ordre de préférence : entre deux clauses (0) ; après
+    une condition « Name: » (10) ; après une virgule (12) ; entre le verbe et le nom d'état (« Apply » /
+    « Demoralized 1 ⌛ », 14) ; avant « to all », « to … », « per … », « once per », « three times »,
+    « twice » (18) ; ailleurs (40, dernier recours). Plus : ligne d'un seul mot de trois lettres ou moins
+    (60, sauf une condition « DoT: »), ligne finie par un petit mot (« the », « to », « per », 12), lignes
+    inégales dans une clause (jusqu'à 10), bloc remonté plutôt que centré (2 à 6). **Jamais coupés** :
+    un nombre et ce qu'il compte (« 5 Absorb », « +2 Insanity », « 1 HP », « 2 damage », « 6 more »), un
+    verbe et son nombre (« Deal 6 », « Draw 1. », « Pay 3 HP. », « Cooldown 2 »), un nombre et le mot
+    d'avant quand rien ne suit qu'il compte (« deal 4 + 4 »), « N times », « once per », un nom d'état et
+    son nombre (« Stunned 1 ⌛ », insécable de `W.cardBody`), le sablier et son nombre (icône collée),
+    « to all », les noms en plusieurs mots (états, conditions nommées, ressources : « Combo Points »,
+    « Arcane Charge », « Last Breath: », « Careful Aim: »). `W.cardBody` ne colle plus le verbe à l'état.
+  - **Écart entre clauses** : un tiers de ligne (`W.CLAUSE_GAP`) quand la hauteur et le biseau le
+    permettent (sinon l'interligne seul, coût `W.NOGAP_COST` = 3 : préféré à une coupure de plus, pas à
+    un bloc remonté de deux crans). Maquette regardée (`build/texte_ecart_clauses.png`) : une clause
+    repliée (« Apply » / « Sundered 3 ⌛ ») se lit nettement comme UNE clause, la suivante se détache.
+    Une police ne règle pas l'écart d'une seule ligne : avec écart, la carte pose un texte par clause
+    (`card.bodyParts`, `W.BODY_PARTS` = 6 textes créés avec la carte, jamais pendant un survol ; sans
+    écart, tout dans `card.body` comme avant) ; `W.cardBodyText(card)` rend le texte complet affiché,
+    le garde-fou `W.checkCardTexts` vérifie chaque bloc. 168 textes sur 360 ont l'écart.
+  - **Répartition** (180 cartes × base / améliorée ; « avant » au même interligne que le client) :
+
+    | Classe | 10 | 9,5 | 9 | 8,5 | 8 | 7,5 |
+    |---|---|---|---|---|---|---|
+    | Prêtre, avant → après | 50 → 62 | 4 → 0 | 0 → 2 | 7 → 4 | 5 → 0 | 2 → 0 |
+    | Guerrier | 58 → 66 | 2 → 2 | 0 | 4 → 0 | 0 | 4 → 0 |
+    | Mage | 54 → 52 | 2 → 0 | 2 → 16 | 0 | 0 | 10 → 0 |
+    | Voleur | 54 → 54 | 8 → 2 | 0 → 12 | 2 → 0 | 0 | 4 → 0 |
+    | Chasseur | 56 → 66 | 4 → 0 | 0 → 2 | 2 → 0 | 0 | 6 → 0 |
+    | Neutres | 18 → 20 | 2 → 0 | 0 | 0 | 0 | 0 |
+    | Toutes | 290 → 320 | 22 → 4 | 2 → 32 | 15 → 4 | 5 → 0 | 26 → 0 |
+
+    (Avec l'ancien interligne du faux client : 232 / 35 / 13 / 23 / 26 / 31.) Toutes les cartes à 8,5 ou
+    plus, 324 sur 360 à 9,5–10 ; plus gros gains (7,5 → 10) : Psychic Scream, Thunder Clap, Blizzard,
+    Cone of Cold, Demoralizing Shout, Frost Trap, Frostbolt, Glacial Spike, Concussive Shot, Crippling
+    Poison, Smoke Bomb ; Evangelism 8 → 10 ; Freezing Trap 7,5 → 9. **Sous 9,5, et pourquoi** (palier
+    maximal vérifié par UT) : Schism et PW: Solace (8,5 : à 9, « Gain » / « Atonement 1 ⌛ » ne tient pas
+    contre le biseau du bas, et « Apply Sundered 2 ⌛ » / « Atonement: +1 mana. » pas sur une ligne) ; les
+    textes à « +1 Arcane Charge. », « +2 Combo Points. », « Deal 3 three times. » (9 : le nom en deux mots
+    et « N times » ne se coupent plus ; l'ancienne mise en page écrivait « +1 Arcane » / « Charge. ») ;
+    Penance, Envenom, Secret Technique (9 : cinq lignes, la garde du bas ne les laisse pas à 9,5) ;
+    Freezing Trap (9 : « Apply Stunned 1 ⌛ » ne tient pas à 9,5, et quatre lignes butent sur le biseau).
+    26 textes perdent ainsi un demi-palier ou un palier par rapport à l'ancienne mise en page, qui coupait
+    un nom en deux ou laissait « times. » / « twice. » seul. Aucun texte n'appelle de réécriture.
+  - **Biseau** (non changé, noté) : `W.cardTextHalf` prolonge la pente du biseau au-dessus de son début
+    (y 124 à 133 : jusqu'à 10 unités de moins que l'intérieur sombre, mesuré plein jusqu'à y ≈ 133,5) ;
+    c'est ce qui remonte des blocs de quatre lignes en haut de la zone et retient Freezing Trap à 9. Un
+    modèle exact (marges rectangulaires sous un intérieur plein jusqu'à 1,0754) rendrait de la place ;
+    à décider avec le joueur (la zone est restée inchangée pour ce lot).
+  - **Petites cartes** (grilles 0,75, panneau du deck 0,72, progression 0,6) : la mise en page est en
+    unités de la carte, la même à toute échelle : le texte y grandit avec son palier (ou perd le
+    demi-palier ci-dessus).
 - **Plaque du bas** (mots-clés) : `Media/card_plate.tga` en trois tranches (bords à l'échelle de la
   hauteur, milieu étiré : élargie sans déformer ses coins), **devant** le corps (derrière, l'ombre portée
   du corps la masquait : on n'en voyait qu'un liseré), à la place du PSD (liseré du haut à cheval sur le
@@ -566,26 +641,38 @@ Façon Hearthstone : les tournures deviennent des mots-clés visibles, en couleu
   s'ils changent à l'amélioration) ; **noms d'états et conditions nommées en or** (`W.KEYWORD_COLOR` =
   `C.goldText` #ffd660, seule couleur d'accent : la police ne mêle pas deux graisses). Les verbes
   « Donne » / « Applique », l'Absorption et la Démence (ressources) restent dans la couleur du texte.
+  Le verbe d'une ligne d'état n'est plus collé à l'état (12/11/2026) : la mise en page peut couper
+  « Apply » / « Demoralized 1 ⌛ » (coupure de second choix, voir « Retours à la ligne »).
 - **Sablier** : « ⌛ » (et l'espace qui le précède) devient à la mise en page une séquence
-  `|TInterface\AddOns\SlayTheDragon\Media\hourglass.tga:h:l:0:0:32:32:0:28:0:32:255:255:255|t`
-  (`W.hourglass(taille)`) : forme de `CreateTextureMarkup` (Blizzard_SharedXMLBase/TextureUtil.lua :
-  hauteur, largeur, décalages, taille du fichier, coordonnées en pixels) plus la couleur de sommet r:g:b
-  (0–255), forme qu'emploie Blizzard pour l'icône de l'armurerie dans la discussion
-  (ChatFrameUtil.lua) ; champs entiers (`%d` partout chez Blizzard). Hauteur = taille × 0,68 arrondie
-  (5 à 7 unités : les chiffres de Baloo Chettan 2 font 0,62 cadratin), largeur rognée à 28/32 (la marge
-  gauche du dessin tient lieu d'espace après le nombre). La mesure par le client (`GetStringWidth`) et
-  celle du faux client (`H.textWidth`) comptent la largeur de l'icône. Texture : `tools/build_glyphs.py`
-  (Pillow, suréchantillonné ×8 puis réduit ; TGA 32 bits, 32 × 32, blanc à alpha, même écriture que
-  `tools/build_media.py`, aperçu `build/media_png/hourglass.png`, `planche` = rendus à 8–16 px).
-- **Lignes** (`W.cardTries`, `W.cardParagraphs`) : essais dans l'ordre, au premier qui tient : une clause
-  par ligne (une clause peut tenir sur plusieurs lignes, elle commence toujours une ligne) aux paliers
-  10 à 8,5 ; puis, palier par palier de 10 à 6 : une clause par ligne, texte coulé (les clauses simples
-  qui se suivent partagent une ligne, chaque ligne d'état reste seule), états groupés en une dernière
-  ligne (« Applique Douleur 3. Donne Récupération 1 », le verbe du second état collé à son nom). La ligne
-  d'état commence toujours une ligne et finit le texte. Le bloc est centré verticalement ; s'il ne tient
-  pas, il remonte par paliers (`W.BODY_LIFT` : 0,5 / 0,33 / 0,17 / 0 du jeu vertical) pour que le biseau
-  du bas laisse plus de largeur à la dernière ligne ; zone utile `TZ` inchangée. Une couleur coupée par
-  un retour est fermée et rouverte (`W.balanceColors`).
+  `|TInterface\AddOns\SlayTheDragon\Media\hourglass.tga:h:h:0:0:64:64:0:64:0:64:255:255:255|t`
+  (`W.hourglass(taille)`) : forme de `CreateTextureMarkup` (Blizzard_SharedXMLBase/TextureUtil.lua, relu
+  le 12/11/2026 : chemin, **hauteur**, **largeur**, décalages x et y, largeur et hauteur du fichier,
+  gauche, droite, haut, bas en pixels du fichier) plus la couleur de sommet r:g:b (0–255), forme
+  qu'emploie Blizzard pour l'icône de l'armurerie dans la discussion (ChatFrameUtil.lua) ; champs entiers
+  (`%d` partout chez Blizzard). Chaque champ était bien employé ; la tache floue et rognée vue en jeu
+  (capture de Freezing Trap, retour du 12/11/2026) venait du **dessin** : verre en contour de 3 texels
+  sur 32 et sable intérieur, réduits à 5–8 pixels (traits d'un demi-pixel, flous) et rognés à 28/32 à
+  droite. **Nouveau sablier** (`tools/build_glyphs.py`, texture changée : relancer le client) : toile
+  64 × 64, silhouette PLEINE (deux traverses de 8,5 texels, deux triangles opposés pointe contre pointe,
+  sans détail intérieur), marges transparentes symétriques (x 11 à 53, y 2 à 62), affichée **entière et
+  carrée** (largeur = hauteur, coordonnées 0:64:0:64 : rien n'est rogné ni déformé) ; les marges du
+  dessin font la petite espace insécable avant l'icône (elle ne touche plus le chiffre) et après.
+  Hauteur = taille × 0,70 arrondie (`W.HOURGLASS_K` ; 6 unités à 8,5–9, 7 à 9,5–10) : le dessin (60/64)
+  a au moins la hauteur des chiffres de Baloo Chettan 2 (0,62 cadratin). Planche de contrôle
+  `build/sablier_planche.png` (`… build_glyphs.py planche`) : avant / après à 6, 7, 8, 10 et 12 px sur
+  l'ardoise, après le chiffre « 1 » de Baloo à la même taille, réduit sans mipmap (le pire cas) et avec ;
+  à 7 px et plus le nouveau se lit comme un sablier, à 6 px il reste un « I » à traverses (trop peu de
+  pixels). Centrage vertical : sur la ligne (supposé, décalage y nul ; à voir en jeu). La mesure par le
+  client (`GetStringWidth`) et celle du faux client (`H.textWidth`) comptent la largeur de l'icône. Les
+  infobulles emploient la même icône (`W.inlineIcons(…, 12)` : 8 unités) pour « ⌛: status duration, in
+  turns. » et le texte des cartes qu'elles citent.
+- **Lignes** (`W.cardTries`, `W.cardParagraphs`, `W.clauseGroups`, `layoutBody`) : depuis le 12/11/2026,
+  chaque clause commence une ligne et se replie au besoin, au plus grand palier où le texte tient (voir
+  « Retours à la ligne plutôt que des paliers plus petits ») ; texte coulé et états groupés ne sont plus
+  qu'un secours après tous les paliers. La ligne d'état commence toujours une ligne et finit le texte.
+  Le bloc est centré verticalement ; s'il ne tient pas, il remonte par paliers (`W.BODY_LIFT` : 0,5 /
+  0,33 / 0,17 / 0 du jeu vertical) pour que le biseau du bas laisse plus de largeur à la dernière ligne ;
+  zone utile `TZ` inchangée. Une couleur coupée par un retour est fermée et rouverte (`W.balanceColors`).
 - **Infobulles** (`W.cardKeywords`, `W.keywordText`) : mots de la plaque, puis conditions nommées
   (`Art.keywords` : execute, surge, lastBreath, shadow), conditions sur un état (`Art.conditionLine` :
   « Expiation : effet en plus sous Expiation. », « Douleur : effet en plus si la cible a Douleur. »), états
@@ -1130,13 +1217,20 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   surbrillance additive assez visible, levée des cartes nette, aperçu des petites cartes. Le décalage des
   cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
 - Le **sablier** dans le texte des cartes (séquence |T à 14 champs) : affiché, blanc, net à 10 px, à
+- Le zoom des survols (mode `net` : animation Scale + textes Vertex pendant le mouvement, échelle réelle
+  posée à l'arrivée) : fluidité, textes immobiles pendant l'agrandissement, aucun sursaut ni clignotement à
+  l'arrivée (moment de la bascule), texte net une fois agrandi ; `/slay zoom` pour comparer avec `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
+- Le **sablier** dans le texte des cartes (séquence |T à 14 champs, texture 64 × 64 pleine depuis le
+  12/11/2026) : affiché, blanc, reconnaissable à 7–8 px (planche `build/sablier_planche.png`), à
   la hauteur des chiffres et **centré verticalement** sur la ligne (supposé : aucune source ne dit où le
-  client place une icône en ligne ; décalage y possible dans la séquence), non déformé par le rognage
-  28/32, et sa largeur bien comptée par `GetStringWidth` (sinon une ligne recoupée par le client le
+  client place une icône en ligne ; décalage y possible dans la séquence), entier et carré (plus de
+  rognage), un peu détaché du chiffre, et sa largeur bien comptée par `GetStringWidth` (sinon une ligne recoupée par le client le
   montrerait). Avec la police de repli (Friz Quadrata), le texte reste juste mais plus large.
 - La mise en page des textes de carte : mesurée par le client (`GetStringWidth`, `GetStringHeight`,
   `GetNumLines`, `IsTruncated`) ; hors jeu, seules les métriques du faux client (Baloo Chettan 2, ligne
-  de 1,47 cadratin) la vérifient.
+  d'un cadratin depuis le 12/11/2026, d'après la capture) la vérifient. À voir : l'interligne réel
+  (`/slay text` ne le dit pas ; quatre lignes de texte 10 doivent tenir dans le panneau, centrées), les
+  coupures (« Apply » / « Demoralized 1 ⌛ » / « to all ») et l'écart d'un tiers de ligne entre clauses.
 
 Aucune fonction protégée, aucun `hooksecurefunc`, aucun hook de méthode de frame, aucune rotation de
 frame (seules des textures pivotent), aucun `loadstring`.
@@ -1211,6 +1305,7 @@ et injouables avec leur plaque de raison : chaque ligne posée, marges comprises
 de `Media/card_panel.tga` et hors de la gemme, au-dessus des plaques ; nom dans la bande opaque de
 `Media/card_ribbon.tga` ; aucune recoupe par le client ; répartition par palier et cartes sous le
 plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; survols sans échelle (U18 : visuel levé sans échelle, réversible, levée entière en pixels aux fenêtres 0,85 à 1,5, carte devant, voisines immobiles, boutons allumés sans bouger, `/slay zoom` retiré, vol posé une fois, ennemi visé sans échelle ; U26 : plus de modes de zoom, aucun cadre enfant dessiné sous un visuel, vols, carte levée de la main dans la fenêtre à toutes les places, noms abrégés ; UX : voir « Survols (sans agrandissement) ») ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus) ; **langage des cartes** (U27 : chaque état posé
+plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture ; chaque bloc du texte, s'il y a un écart entre clauses, vérifié de même, dans l'ordre, à l'écart prévu) ; **texte replié** (UT : lignes que la zone contient à chaque palier ; pour chaque carte de chaque classe et les neutres, base et améliorée : palier ≥ 8,5 (exceptions justifiées : aucune), palier maximal effectivement choisi (aucun palier plus grand ne tient, quelle que soit la coupure permise), coupures permises seulement — jamais un nombre séparé de ce qu'il compte, un verbe de son nombre, un nom en deux mots coupé, un sablier ou un petit mot seul —, nature des coupures comptée et coupures de dernier recours listées ; ordre des coûts ; groupes insécables de clauses types ; planche `cartes_priest.svg` et gros plan `texte_gros_plan.svg`) ; zoom net (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; cycle `/slay zoom`, ancienne valeur `anim`) ; zoom fluide et saut du mode net (U26 : sauvegarde ; repos identique au net à ±0,01 sur 99 régions ; survol sans `SetScale`, arrivée identique au net ; sortie ; cible changée en route ; fenêtre cachée puis remontrée ; carte jamais montrée ; plaques créées après l'armement ; vols ; écrans construits en fluide sans région née sous une animation ; aucun cadre enfant dessiné sous un visuel ; bascule du mode net sans déplacement ajouté ; carte survolée de la main dans la fenêtre à toutes les places ; noms abrégés) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus) ; **langage des cartes** (U27 : chaque état posé
 par les effets a sa ligne « Donne » (soi) / « Applique » (ennemi, « à tous ») avec nom et nombre exacts, en
 dernier, sans point, sablier seulement pour une durée, jamais « N tour(s) » ni « Inflige » pour un état,
 textes impersonnels, libellés « Nom : » connus ; Exécution, Déferlement, Dernier souffle et Ombre
@@ -1231,7 +1326,8 @@ ennemis dans leur barre ; aucun cadre enfant dessiné sous un visuel survolable)
 compacts des ennemis (nom dans son logement, barre dans le cadre, jamais sur le bandeau ni sous le modèle,
 sans chevauchement, 1 à 6 ennemis × 3 échelles), U24 les réponses (libellé d'une ligne dans le bouton, texte
 dessous dans la place restante). Le faux client mesure les textes avec les
-avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne de 1,47 cadratin (hhea),
+avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne d'un cadratin (`H.LINE_EM` :
+l'interligne du client, mesuré sur une capture ; le fichier généré donne 1,47, la hauteur hhea),
 retours explicites puis par mots, icônes |T comptées à leur largeur, et simule les animations Scale. Il gère aussi `OnSizeChanged`, `GetChildren`, `IsObjectLoaded`
 (fichiers `H.unloaded` jamais chargés) et `C_Texture`. Graine 1 : ALL PASS sous lua5.1 et luajit.
 
