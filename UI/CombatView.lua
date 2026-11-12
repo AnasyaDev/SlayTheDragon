@@ -24,15 +24,11 @@ local HERO_FEET = 292
 local ENEMY_X0, ENEMY_X1 = 470, 1022     -- zone des ennemis
 local HAND_CX, HAND_W = 530, 660         -- main : centre et largeur
 local HAND_TOP = 418                     -- (plaque du bas comprise, la main reste dans la fenêtre)
-local HOVER_SCALE = 1.16
-local HOVER_TOP = 372                    -- haut d'une carte levée (survol ou sélection)
-local SPREAD = { 26, 12 }                -- écart des voisines d'une carte levée (1re, 2e)
 local DRAW_PILE = { 45, 554 }            -- piles : cases de 36 et libellé dessous (bas à y 588 < 614)
 local DISCARD_PILE = { 95, 554 }
 local EXHAUST_PILE = { 145, 554 }
 local MANA_X, MANA_Y = 76, 466           -- anneau de mana (76) ; libellé « Mana » dessous
 local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
-local AIM_SCALE = 1.07                   -- ennemi visé (carte à cible armée) : il grandit un peu
 -- Personnage d'un ennemi : 33 sous le haut de l'emplacement, pieds à 33 + FIG_H (193 à l'échelle 1) ;
 -- cadre compact au-dessus de la tête, états ST_DY sous les pieds.
 local FIG_H = 160
@@ -73,8 +69,7 @@ local function intentBubble(parent)
   return f
 end
 
--- Personnage d'un emplacement posé par les pieds : la mise à l'échelle (visée) le fait grandir
--- vers le haut sans bouger la zone de clic (l'emplacement lui-même).
+-- Personnage d'un emplacement posé par les pieds (zone de clic : l'emplacement lui-même).
 local function placeFig(s)
   local k = s.fig:GetScale() or 1
   local h = s.figH or 160
@@ -103,9 +98,10 @@ local function placeInfo(s)
   s.st:SetPoint("TOP", s, "TOP", 0, -(feet + ST_DY))
 end
 
+-- Ennemi visé (carte à cible armée) : son anneau s'allume ; il ne grandit plus (aucune échelle au
+-- survol dans l'addon).
 local function aimApply(s)
   local v = W.animValue(s, "aim")
-  s.fig:SetScale(1 + (AIM_SCALE - 1) * v)
   placeFig(s)
   if s.fig.ring:IsShown() then s.fig.ring:SetAlpha(0.45 + 0.55 * max(v, s.ringBase or 0)) end
 end
@@ -219,7 +215,8 @@ local function pile(self, parent, cx, cy, key, label, short, entry, level)
   b.label = W.label(b, "bold", 11.5, C.wowGold)
   b.label:SetPoint("TOP", b, "BOTTOM", 0, -3)
   b.label:SetText(short)
-  W.hoverable(b, { scale = 1.12, lift = 3, paint = function(f, h) f.slot.hot:SetAlpha(h) end })
+  -- survol : cadre doré de la case en fondu, sans grossir ni bouger (le nombre reste stable)
+  W.hoverable(b, { paint = function(f, h) f.slot.hot:SetAlpha(h) end })
   b.pileKey = key
   b:SetScript("OnClick", function(_, button)
     if button == "RightButton" then return end
@@ -462,9 +459,8 @@ function V:Build(parent)
     card:SetScript("OnDragStop", function(f) V:StopDrag(f) end)
     -- Survol piloté par l'écran (la carte sélectionnée reste levée).
     card._hoverManual = true
-    card.hoverScale = HOVER_SCALE
-    card.onEnterExtra = function(f) f.hover = true V:PlaceCard(f) V:Spread() end
-    card.onLeaveExtra = function(f) f.hover = false V:PlaceCard(f) V:Spread() end
+    card.onEnterExtra = function(f) f.hover = true V:PlaceCard(f) end
+    card.onLeaveExtra = function(f) f.hover = false V:PlaceCard(f) end
     card:Hide()
     self.cards[i] = card
   end
@@ -875,44 +871,24 @@ function V:HandSlot(i, n)
   return x, y
 end
 
--- Carte de la main : la zone de clic reste à sa place dans l'éventail ; le visuel (face) se lève,
--- grossit et passe devant au survol ou à la sélection (canal « hover »).
+-- Carte de la main : la zone de clic reste à sa place dans l'éventail ; au survol ou à la sélection
+-- (canal « hover »), le visuel (face) se soulève de W.CARD_LIFT (nombre entier de pixels à l'arrivée),
+-- son halo doré s'allume et il passe devant ses voisines. Aucune échelle : le texte reste celui du repos.
 function V:PlaceCard(card)
   if not card.baseX or self.dragging == card then return end
   local up = (self.selected == card.index or card.hover) and true or false
   card.lifted = up
   local cy = card.baseY + W.CARD_H / 2
-  -- levée : le haut de la carte agrandie arrive à HOVER_TOP
-  card.hoverLift = cy - (HOVER_TOP + W.CARD_H * HOVER_SCALE / 2)
+  card.hoverLift = W.CARD_LIFT
   local base = self.hz:GetFrameLevel() + 5 + card.index * 3
   W.placeCard(card, self.parent, card.baseX, cy, 1, base, base + 60)
   W.animTo(card, "hover", up and 1 or 0, up and W.HOVER_IN or W.HOVER_OUT)
   -- zone de survol prolongée vers le haut tant que la carte est levée (on peut monter dessus)
   if card.SetHitRectInsets then
-    local top = up and -floor(card.hoverLift + W.CARD_H * (HOVER_SCALE - 1) / 2) or 0
+    local top = up and -math.ceil(card.hoverLift) or 0
     if card._hitTop ~= top then card._hitTop = top card:SetHitRectInsets(0, 0, top, 0) end
   end
   card:SetHot(up)
-end
-
--- Les voisines d'une carte levée (agrandie, donc plus large) s'écartent un peu ; visuel seulement :
--- leurs zones de clic ne bougent pas.
-function V:Spread()
-  local n = self.c and #self.c.hand or 0
-  local focus
-  for i = 1, min(n, #self.cards) do
-    if self.cards[i].hover then focus = i end
-  end
-  focus = focus or self.selected
-  for i = 1, #self.cards do
-    local card = self.cards[i]
-    local dx = 0
-    if focus and i ~= focus and i <= n then
-      local d = i - focus
-      dx = (SPREAD[abs(d)] or 0) * (d > 0 and 1 or -1)
-    end
-    if self.dragging ~= card then W.animTo(card, "dx", dx, W.HOVER_IN) end
-  end
 end
 
 function V:RenderHand()
@@ -942,7 +918,6 @@ function V:RenderHand()
       card:Hide()
     end
   end
-  self:Spread()
 end
 
 function V:RenderBanner()
@@ -1053,7 +1028,7 @@ function V:FlyPlayed(pp, ev)
     local x, y = self:UnitPos(ev.target)
     if x then tx, ty = x, y end
   end
-  W.fly(g, self.parent, pp.x, pp.y, tx, ty, HOVER_SCALE, 0.35, 1, 0.1, 0.38, function() W.releaseGhost(g) end, 40)
+  W.fly(g, self.parent, pp.x, pp.y, tx, ty, 1, 0.35, 1, 0.1, 0.38, function() W.releaseGhost(g) end, 40)
 end
 
 function V:QueueEvent(ev)
@@ -1271,7 +1246,7 @@ function V:Play(i, target)
   local card = self.cards[i]
   if card and card.baseX then
     local info = Controller.handInfo(i)
-    self.pendingPlay = { x = card.baseX, y = 372 + W.CARD_H * HOVER_SCALE / 2, id = card.cardId, up = card.cardUp,
+    self.pendingPlay = { x = card.baseX, y = card.baseY + W.CARD_H / 2 - W.CARD_LIFT, id = card.cardId, up = card.cardUp,
       cost = info and info.cost }
   end
   self.selected = nil
@@ -1370,9 +1345,8 @@ function V:StartDrag(card)
   self.dragging = card
   self:RenderTargets()
   card:SetFrameLevel(self.hz:GetFrameLevel() + 95)
-  -- la carte suit le curseur : plus de levée ni d'écart, elle garde sa taille de survol
+  -- la carte suit le curseur : plus de levée, halo allumé
   card.hoverLift = 0
-  W.animSet(card, "dx", 0)
   W.animTo(card, "hover", 1, W.HOVER_IN)
   card:SetScript("OnUpdate", function(f)
     local x, y = GetCursorPosition()

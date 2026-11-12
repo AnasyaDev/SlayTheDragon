@@ -621,6 +621,11 @@ function R.svg(H, root, path, label)
         end
       end
     end
+    -- mélange additif (SetBlendMode("ADD") : surbrillance des boutons) : approché par « screen »
+    if it.kind == "Texture" and calls.SetBlendMode and calls.SetBlendMode[1] == "ADD" and #out > n0 then
+      out[n0 + 1] = '<g style="mix-blend-mode:screen">' .. out[n0 + 1]
+      out[#out] = out[#out] .. "</g>"
+    end
     -- rognage des cadres rogneurs ancêtres (SetClipsChildren)
     if it.clip and #out > n0 then
       local c = it.clip

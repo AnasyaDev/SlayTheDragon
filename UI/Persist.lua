@@ -22,10 +22,6 @@ Persist.DEFAULT_OPTIONS = {
   minimap = { hide = false, angle = 215 },
   facingPlayer = 0.6,  -- orientation des modèles (radians), réglable par /slay facing
   facingEnemy = -0.6,
-  zoom = "net",        -- agrandissement au survol : "net" (étirement en route, échelle réelle à l'arrivée),
-                       -- "fluide" (échelle réelle de survol tenue, taille par animation) ou "lisse"
-                       -- (échelle réelle à chaque image) ; /slay zoom
-  zoomSlow = false,    -- survols au ralenti (×8, /slay zoom slow) : pour voir ce qui bouge à l'arrivée
   point = nil,         -- { point, relPoint, x, y } de la fenêtre
 }
 
@@ -54,9 +50,9 @@ function Persist.init()
   end
   if type(db.options) ~= "table" then db.options = {} end
   db.options.flatRibbon = nil -- ancienne option (/slay ruban, ruban incliné) : le ruban est horizontal
-  -- ancienne valeur « anim » (ou inconnue) : défaut ; « net » ou « lisse » déjà enregistrés : gardés
-  local z = db.options.zoom
-  if z ~= "fluide" and z ~= "net" and z ~= "lisse" then db.options.zoom = nil end
+  -- anciennes options du zoom au survol (/slay zoom, retiré : plus aucun agrandissement au survol) :
+  -- toute valeur enregistrée est ignorée et effacée
+  db.options.zoom, db.options.zoomSlow = nil, nil
   fillDefaults(db.options, Persist.DEFAULT_OPTIONS)
   Persist.db = db
   return db, note

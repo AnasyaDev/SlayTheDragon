@@ -665,6 +665,9 @@ function H.boot(db)
   _G.InCombatLockdown = function() return H.inCombat end
   _G.UnitName = function() return "Testeur" end
   _G.GetCursorPosition = function() return H.cursor[1], H.cursor[2] end
+  -- écran physique (pixels) : levée des cartes ramenée à un nombre entier de pixels (W.pixelSnap)
+  H.screen = H.screen or { 2560, 1440 }
+  _G.GetPhysicalScreenSize = function() return H.screen[1], H.screen[2] end
   -- boutons de souris enfoncés (H.mouseDown.LeftButton) : glisser des curseurs (U32)
   H.mouseDown = {}
   _G.IsMouseButtonDown = function(b) return H.mouseDown[b or "LeftButton"] and true or false end
@@ -1210,12 +1213,10 @@ while guard < 400 do
           local v = V()
           v.cards[2].hover = true
           v:PlaceCard(v.cards[2])
-          v:Spread()
           H.advance(6)
           snap("combat-survol")
           v.cards[2].hover = false
           v:PlaceCard(v.cards[2])
-          v:Spread()
           -- options par-dessus le combat (aperçu seulement)
           H.slash("options")
           H.advance(0.2)
@@ -1564,14 +1565,14 @@ H.boot(devDb)
 db = _G.SlayTheDragonDB
 check("ancienne sauvegarde de l'interface : options gardées", H.ns.Persist.options().scale == 1.2
   and H.ns.Persist.options().autoOpen == true)
-check("ancienne option du ruban ignorée, zoom invalide remis au défaut", H.ns.Persist.options().flatRibbon == nil
-  and H.ns.Persist.options().zoom == "net")
+check("ancienne option du ruban ignorée, ancienne option de zoom effacée", H.ns.Persist.options().flatRibbon == nil
+  and H.ns.Persist.options().zoom == nil)
 do
   local o = H.ns.Persist.options()
-  o.zoom = "anim" -- valeur sauvegardée par la version précédente
+  o.zoom, o.zoomSlow = "fluide", true -- valeurs sauvegardées par les versions avec /slay zoom
   H.ns.Persist.init()
-  check("ancienne valeur de zoom « anim » : nouveau défaut « net », sans erreur",
-    H.ns.Persist.options().zoom == "net" and H.ns.Widgets.zoomMode() == "net")
+  check("anciennes options de zoom (« fluide », ralenti) : ignorées et effacées, sans erreur",
+    H.ns.Persist.options().zoom == nil and H.ns.Persist.options().zoomSlow == nil and H.ns.Widgets.zoomMode == nil)
 end
 check("ancienne expédition en quarantaine, méta réparée", db.current == nil and #db.quarantine == 1
   and type(db.meta.classes) == "table")
@@ -1847,7 +1848,7 @@ do
   H.badFiles, H.badPaths, H.unloaded = nil, {}, nil
 end
 
-print("U18 survols animés : zone fixe, visuel animé, réversible, pilote qui s'arrête")
+print("U18 survols animés : zone fixe, visuel levé et allumé sans échelle, réversible, pilote qui s'arrête")
 do
   freshRun(SEED, "combat")
   H.settle()
@@ -1862,10 +1863,9 @@ do
   end
   local before = hit(card)
   local face = card.face
-  local hs = card.hoverScale
-  -- échelle visuelle totale (réelle × animation) et état de l'animation d'échelle
+  -- échelle visuelle totale du visuel (réelle × animation éventuelle)
   local function vis(f) return f.face._scale * H.visualScale(f.face) end
-  local function animOn(f) local z = f.face._zoom return z ~= nil and z.ag:IsPlaying() end
+  local function liftOf(f) local p = f.face._points[1] return p and p[5] or 0 end
   -- mise en page des textes de la carte : lignes, coupures, largeurs (unités du visuel), tailles
   local function layout(c)
     local out = {}
@@ -1884,161 +1884,94 @@ do
   run(driver, "OnUpdate", 0.04)
   local mid = Wd.animValue(card, "hover")
   check("survol en cours : valeur intermédiaire", mid > 0 and mid < 1, mid)
-  local zoom = face._zoom
-  check("zoom « net » en route : animation Scale vers l'échelle du survol, échelle réelle encore 1",
-    zoom and animOn(card) and math.abs(zoom.to - hs) < 1e-9 and zoom.from == 1 and face._scale == 1
-    and hit(card) == before, zoom and zoom.to)
-  check("textes en mode Vertex et SetSmoothScaling (taille rendue proportionnelle à l'échelle)",
+  local n0 = face._nSetScale or 0
+  check("survol en route : aucune échelle (ni SetScale, ni animation Scale), visuel qui monte, zone fixe",
+    vis(card) == 1 and face._zoom == nil and liftOf(card) > 0 and liftOf(card) < card.hoverLift
+    and hit(card) == before, liftOf(card))
+  check("textes en mode Vertex et SetSmoothScaling (vols de cartes, fenêtre à l'échelle)",
     card.body._calls.SetScaleAnimationMode and card.body._calls.SetScaleAnimationMode[1] == 1
-    and card.name._calls.SetScaleAnimationMode and card.cost._calls.SetScaleAnimationMode
-    and card.body._calls.SetSmoothScaling and card.body._calls.SetSmoothScaling[1] == true
-    and card.name._calls.SetSmoothScaling[1] == true and card.plateText._calls.SetSmoothScaling[1] == true)
+    and card.body._calls.SetSmoothScaling and card.body._calls.SetSmoothScaling[1] == true)
   check("mise en page identique pendant le mouvement", layout(card) == rest, layout(card))
-  H.now = H.now + 0.05
-  local vs = vis(card)
-  check("échelle visuelle intermédiaire au cours du survol", vs > 1 and vs < hs, vs)
   run(card, "OnLeave")
   run(driver, "OnUpdate", 0.01)
   local back = Wd.animValue(card, "hover")
   check("sortie en cours de route : repart de la valeur courante", back > 0 and back <= mid, back .. " / " .. mid)
-  check("sortie en route : l'animation repart de l'échelle visuelle courante vers 1, échelle réelle 1",
-    animOn(card) and math.abs(zoom.from - vs) < 1e-6 and zoom.to == 1 and face._scale == 1, zoom.from .. " / " .. vs)
   for _ = 1, 30 do run(driver, "OnUpdate", 0.02) end
   H.now = H.now + 1
-  check("sortie terminée : repos exact, aucune animation d'échelle", Wd.animValue(card, "hover") == 0
-    and face._scale == 1 and not animOn(card) and vis(card) == 1)
+  check("sortie terminée : repos exact (levée 0), aucune échelle", Wd.animValue(card, "hover") == 0
+    and liftOf(card) == 0 and vis(card) == 1 and (face._nSetScale or 0) == n0)
   check("pilote arrêté une fois tout immobile", not Wd.driverAwake() and driver._scripts.OnUpdate == nil)
   check("mise en page identique après le survol", layout(card) == rest, layout(card))
 
-  -- arrivée image par image : la bascule (échelle réelle posée, animation coupée) se fait dans le pas
-  -- où le canal s'arrête, sans saut d'échelle visible
-  run(card, "OnEnter")
-  local last, jump, steps, switched = 1, 0, 0, nil
-  while Wd.animValue(card, "hover") < 1 and steps < 100 do
-    run(driver, "OnUpdate", 0.016)
-    H.now = H.now + 0.016
-    steps = steps + 1
-    local s = vis(card)
-    if face._scale ~= 1 and not switched then switched = { s = s, prev = last, anim = animOn(card) } end
-    jump = math.max(jump, math.abs(s - last))
-    last = s
-  end
-  check("arrivée : échelle réelle du visuel = échelle de survol, aucune animation d'échelle active",
-    face._scale == hs and not animOn(card) and H.visualScale(face) == 1 and hit(card) == before, face._scale)
-  check("bascule à l'arrivée : même pas, sans saut ni image à la mauvaise taille", switched
-    and not switched.anim and math.abs(switched.s - hs) < 1e-9 and math.abs(switched.s - switched.prev) < 0.02
-    and jump < 0.05, switched and (switched.prev .. " -> " .. switched.s) or "pas de bascule")
-  local lift0 = face._points[1]
-  check("arrivée : position du visuel compensée par l'échelle réelle (levée en unités d'écran)",
-    lift0 and math.abs(lift0[5] * face._scale - card.hoverLift) < 1e-6, lift0 and lift0[5])
-  check("mise en page identique une fois agrandie (même nombre de lignes, mêmes coupures)",
-    layout(card) == rest, layout(card))
-  -- sortie depuis l'état agrandi : étirement depuis l'échelle réelle, sans saut au départ
-  run(card, "OnLeave")
-  run(driver, "OnUpdate", 0.016)
-  H.now = H.now + 0.016
-  check("sortie : échelle réelle gardée, animation vers 1 / échelle (facteur 1 au départ)",
-    face._scale == hs and animOn(card) and zoom.from == 1 and math.abs(zoom.to - 1 / hs) < 1e-9
-    and vis(card) < hs and vis(card) > hs - 0.05, vis(card))
-  check("mise en page identique pendant la sortie", layout(card) == rest, layout(card))
-  -- retour en plein mouvement (réversible), puis bascule interrompue au pas même de l'arrivée
-  run(card, "OnEnter")
-  run(driver, "OnUpdate", 0.016)
-  H.now = H.now + 0.016
-  check("retour en route : animation relancée depuis le facteur courant, échelle réelle inchangée",
-    face._scale == hs and animOn(card) and zoom.to == 1 and zoom.from < 1, zoom.from)
-  for _ = 1, 20 do run(driver, "OnUpdate", 0.016) H.now = H.now + 0.016 end
-  check("retour terminé : échelle réelle de survol, aucune animation", face._scale == hs and not animOn(card)
-    and Wd.animValue(card, "hover") == 1)
-  -- sortie au pas même de la bascule d'arrivée
-  run(card, "OnLeave")
-  run(card, "OnEnter")
-  run(driver, "OnUpdate", 0.016)
-  H.now = H.now + 0.016
-  check("sortie et retour dans le même pas : rien ne bouge", face._scale == hs and not animOn(card)
-    and Wd.animValue(card, "hover") == 1)
-  run(card, "OnLeave")
-  for _ = 1, 30 do run(driver, "OnUpdate", 0.016) H.now = H.now + 0.016 end
-  check("sortie terminée : échelle réelle 1, aucune animation d'échelle", face._scale == 1 and not animOn(card)
-    and vis(card) == 1 and Wd.animValue(card, "hover") == 0)
-  check("mise en page identique après la sortie", layout(card) == rest, layout(card))
-  -- témoin : sans SetSmoothScaling, le faux client arrondit la hauteur de police à l'échelle réelle
-  do
-    local probe = H.ns.Widgets.label(face, "bold", 7.5)
-    probe._calls.SetSmoothScaling = nil
-    probe:SetText("Deal 6 points of damage.")
-    local w1 = probe:GetStringWidth()
-    face:SetScale(1.12)
-    local w2 = probe:GetStringWidth()
-    face:SetScale(1)
-    probe:Hide()
-    check("témoin : sans hauteur non arrondie, la largeur d'un texte change avec l'échelle réelle", w1 ~= w2,
-      w1 .. " / " .. w2)
-  end
-
-  -- état final par les seuls minuteurs de secours (images sautées)
+  -- arrivée : levée de W.CARD_LIFT ramenée à un nombre entier de pixels de l'écran physique
   run(card, "OnEnter")
   H.advance(0.5)
-  check("survol : état final par les minuteurs, échelle réelle de survol, aucune animation",
-    Wd.animValue(card, "hover") == 1 and face._scale == hs and not animOn(card) and hit(card) == before,
-    face._scale)
+  local px = liftOf(card) * face:GetEffectiveScale() * H.screen[2] / 768
+  check(("arrivée : carte levée de %.2f unités = %.3f pixels (entier), halo allumé, échelle 1"):format(liftOf(card), px),
+    math.abs(px - math.floor(px + 0.5)) < 1e-6 and math.abs(liftOf(card) - Wd.CARD_LIFT) < 1
+    and card.halo._shown and (card.halo._calls.SetAlpha or {})[1] == 1 and vis(card) == 1 and hit(card) == before)
+  check("mise en page identique une fois levée (même nombre de lignes, mêmes coupures)", layout(card) == rest, layout(card))
+  for _, ws in ipairs({ 1.15, 0.85, 1.5 }) do
+    UI().frame:SetScale(ws)
+    Wd.faceApply(card)
+    local p2 = liftOf(card) * face:GetEffectiveScale() * H.screen[2] / 768
+    check(("fenêtre à %.2f : levée toujours entière en pixels (%.3f)"):format(ws, p2),
+      math.abs(p2 - math.floor(p2 + 0.5)) < 1e-6)
+  end
+  UI().frame:SetScale(1)
+  Wd.faceApply(card)
   local n = #C().combat().hand
-  if n >= 2 then
-    check("voisine écartée (visuel seulement)", Wd.animValue(v.cards[2], "dx") > 0)
-  end
-  check("carte survolée devant les autres (visuel et médaillon compris)", card._level > v.cards[n]._level
+  check("carte survolée devant les autres (visuel compris)", card._level > v.cards[n]._level
     and card.face._level > v.cards[n].face._level)
-  check("zone de survol prolongée vers le haut", card._calls.SetHitRectInsets
-    and card._calls.SetHitRectInsets[3] < 0)
+  check("zone de survol prolongée vers le haut (de la levée)", card._calls.SetHitRectInsets
+    and card._calls.SetHitRectInsets[3] < 0 and card._calls.SetHitRectInsets[3] >= -math.ceil(Wd.CARD_LIFT))
+  if n >= 2 then
+    check("voisines immobiles (plus d'écart : la carte ne grossit plus)", Wd.animValue(v.cards[2], "dx") == 0
+      and liftOf(v.cards[2]) == 0)
+  end
   run(card, "OnLeave")
   H.advance(0.5)
-  check("retour au repos", Wd.animValue(card, "hover") == 0 and card._level == card.baseLevel
-    and Wd.animValue(v.cards[2], "dx") == 0)
-  -- bouton, pile, potion, menu : même mécanique
+  check("retour au repos", Wd.animValue(card, "hover") == 0 and card._level == card.baseLevel and liftOf(card) == 0)
+
+  -- bouton, pile, potion, menu : surbrillance seule, aucune échelle, aucun déplacement
   for _, f in ipairs({ v.endTurn, v.drawPile, UI().potionSlots[1], UI().gear }) do
-    local hb = hit(f)
+    local hb, fb = hit(f), hit(f.face)
     run(f, "OnEnter")
     H.advance(0.5)
-    local up = f.face._scale > 1 and f.face._scale == f.hoverScale and not animOn(f)
+    local up = vis(f) == 1 and hit(f.face) == fb and Wd.animValue(f, "hover") == 1
     run(f, "OnLeave")
     H.advance(0.5)
-    check("survol animé : " .. tostring(f.label and f.label._text or f.pileKey or "icône")
-      .. " (échelle réelle à l'arrivée, repos exact ensuite)",
-      up and not animOn(f) and f.face._scale == 1 and hit(f) == hb)
+    check("survol : " .. tostring(f.label and f.label._text or f.pileKey or "icône")
+      .. " (allumé, ni échelle ni déplacement, repos exact ensuite)",
+      up and vis(f) == 1 and hit(f) == hb and hit(f.face) == fb and Wd.animValue(f, "hover") == 0)
   end
-  -- /slay zoom : cycle net → fluide → lisse, puis « lisse » (échelle réelle à chaque image) et retour
+  -- /slay zoom : retiré (l'aide ne le cite plus, aucune option posée)
+  local chat = rawget(_G.DEFAULT_CHAT_FRAME, "_lines")
+  local c0 = #chat
   H.slash("zoom")
-  check("/slay zoom : net → fluide", H.ns.Persist.options().zoom == "fluide" and Wd.zoomMode() == "fluide")
-  H.slash("zoom")
-  check("/slay zoom : fluide → lisse", H.ns.Persist.options().zoom == "lisse")
-  local eb = v.endTurn
-  run(eb, "OnEnter")
-  run(driver, "OnUpdate", 0.04)
-  check("mode lisse : échelle réelle du visuel animée, sans animation Scale", eb.face._scale > 1
-    and eb.face._scale < eb.hoverScale and H.visualScale(eb.face) == 1, eb.face._scale)
-  run(eb, "OnLeave")
-  H.advance(0.5)
-  check("mode lisse : repos exact", eb.face._scale == 1)
-  H.slash("zoom sharp")
-  check("/slay zoom net : retour au défaut", H.ns.Persist.options().zoom == "net")
-  H.slash("zoom smooth")
-  H.slash("zoom anim")
-  check("/slay zoom anim (ancien nom) : mode net", H.ns.Persist.options().zoom == "net")
-  -- vol de carte : étirement pendant le vol, carte nette une fois posée
+  H.slash("zoom fluid")
+  local said = table.concat(chat, "\n", c0 + 1)
+  check("/slay zoom retiré : aide générale, sans « zoom », aucune option enregistrée",
+    said:find("/slay options", 1, true) ~= nil and not said:find("zoom", 1, true)
+    and H.ns.Persist.options().zoom == nil, said)
+  -- vol de carte : étirement pendant le vol, échelle réelle d'arrivée posée une fois, texte net
   do
     local g = Wd.ghostCard(v.parent)
     g:SetCard(card.cardId, card.cardUp, card.opts)
     local landed = false
+    local s0 = g._nSetScale or 0
     Wd.fly(g, v.parent, 100, 400, 500, 300, 0.3, 1, 0.6, 1, 0.28, function() landed = true end)
-    local gz = g._zoom
+    local gz = g._flyScale
     local inFlight = gz and gz.ag:IsPlaying() and g._scale == 0.3 and math.abs(gz.to - 1 / 0.3) < 1e-9
       and gz.from == 1
+    local nIn = (g._nSetScale or 0) - s0
     H.advance(0.5)
     check("vol de carte : étirement en vol (échelle réelle de départ), à l'arrivée échelle réelle d'arrivée"
-      .. " et aucune animation d'échelle", inFlight and landed and g._scale == 1 and not gz.ag:IsPlaying())
+      .. " posée une fois et aucune animation d'échelle", inFlight and landed and g._scale == 1
+      and not gz.ag:IsPlaying() and (g._nSetScale or 0) - s0 == nIn + 1, (g._nSetScale or 0) - s0)
     Wd.releaseGhost(g)
   end
-  -- ennemi ciblable quand une carte à cible est armée
+  -- ennemi ciblable quand une carte à cible est armée : son anneau s'allume, il ne grandit plus
   local c = C().combat()
   local idx
   for i = 1, #c.hand do
@@ -2052,7 +1985,8 @@ do
     local hs = hit(slot)
     run(slot, "OnEnter")
     H.advance(0.5)
-    check("ennemi visé : il grandit, sa zone de clic reste", slot.fig._scale > 1 and hit(slot) == hs, slot.fig._scale)
+    check("ennemi visé : anneau allumé, ni échelle ni zone de clic changées", slot.fig._scale == 1
+      and hit(slot) == hs and Wd.animValue(slot, "aim") == 1, slot.fig._scale)
     run(slot, "OnLeave")
     v:Deselect()
     H.advance(0.5)
@@ -3147,39 +3081,13 @@ do
     #bad == 0, table.concat(bad, " | "))
 end
 
-print("U26 zoom fluide (repos identique, survol sans re-rasterisation, caché, vol) ; mode net sans saut ; abréviations")
+print("U26 survols sans échelle (plus de modes de zoom) : aucun cadre enfant dessiné, carte levée dans la fenêtre, vols ; abréviations")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
-  -- sauvegarde : « net » par défaut, valeurs choisies gardées, inconnues remises au défaut
-  for _, z in ipairs({ "net", "fluide", "lisse", "anim", 3 }) do
-    H.boot({ version = 1, options = { zoom = z } })
-    local want = (z == "fluide" or z == "lisse") and z or "net"
-    check("sauvegarde : zoom « " .. tostring(z) .. " » → « " .. want .. " »",
-      H.ns.Persist.options().zoom == want and H.ns.Widgets.zoomMode() == want, H.ns.Persist.options().zoom)
-  end
-  H.boot(nil)
-  check("défaut : zoom « net »", H.ns.Widgets.zoomMode() == "net" and H.ns.Persist.options().zoom == "net")
-
-  -- expédition lancée avec le mode de zoom voulu dès la construction des écrans
-  local Wd
-  local function freshRunZ(seed, kind, zoom)
-    H.boot(nil)
-    Wd = H.ns.Widgets
-    H.ns.Persist.options().zoom = zoom
-    H.slash("")
-    H.ns.Controller.makeSeed = function() return seed end
-    clickOption("go")
-    local e = EXP()
-    if kind then
-      local id = e.map.start[1]
-      e.map.nodes[id].kind = kind
-      e.gold = 500
-      clickOption("path:" .. id)
-    end
-    H.advance(0.1)
-    return e
-  end
+  local Wd = H.ns.Widgets
+  check("plus de modes de zoom (W.zoomMode, W.setZoomMode, W.faceBuild, W.setHover retirés)",
+    Wd.zoomMode == nil and Wd.setZoomMode == nil and Wd.faceBuild == nil and Wd.setHover == nil and Wd.ZOOM_MODES == nil)
   local function regions(f, out)
     out = out or {}
     for _, k in ipairs(rawget(f, "_kids")) do
@@ -3190,315 +3098,76 @@ do
     end
     return out
   end
-  -- rectangles affichés de toutes les régions visibles des éléments (ordre de création stable)
-  local function shot(list, regionsOnly)
-    local out = {}
-    for _, f in ipairs(list) do
-      for _, t in ipairs(regions(f)) do
-        local r = R.vrect(t, regionsOnly)
-        if r then out[#out + 1] = { t = t, r = r } end
-      end
-    end
-    return out
-  end
-  local function maxDiff(a, b)
-    if #a ~= #b then return math.huge, "nombre de régions " .. #a .. " / " .. #b end
-    local m, what = 0, nil
-    for i = 1, #a do
-      for k = 1, 4 do
-        local d = math.abs(a[i].r[k] - b[i].r[k])
-        if d > m then m, what = d, tostring(rawget(a[i].t, "_texture") or a[i].t._text or a[i].t._kind) end
-      end
-    end
-    return m, what
-  end
-  local function step(n, dt)
-    for _ = 1, n do
-      run(Wd.driver, "OnUpdate", dt)
-      H.now = H.now + dt
-    end
-  end
-  local function vis(f) return f.face._scale * H.visualScale(f.face) end
-  local function playing(f) local z = f.face._zoom return z ~= nil and z.ag:IsPlaying() end
   local function name(f) return tostring(f.cardId or (f.label and f.label._text) or "jeton") end
 
-  -- 1. repos identique : mêmes rectangles affichés en net et en fluide (main, boutons, jetons d'état)
-  freshRunZ(SEED, "combat", "net")
+  -- 1. aucun cadre enfant dessiné sous un visuel survolable (carte, plaques, bouton, jeton)
+  freshRun(SEED, "combat")
   H.settle()
   local v = V()
-  -- une carte injouable (plaque de raison) dans la main, un jeton d'état
   local c2 = v.cards[2]
   c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Not enough mana." })
   v.playerSt:Set({ { icon = H.ns.Art.ui.gold, key = "ui:gold", n = 3, info = { title = "Essai" } } })
   H.advance(0.1)
-  local list = {}
-  for i = 1, #C().combat().hand do list[#list + 1] = v.cards[i] end
-  list[#list + 1] = v.endTurn
-  list[#list + 1] = UI().gear
-  list[#list + 1] = v.playerSt.tokens[1]
-  local restNet = shot(list)
-  Wd.setZoomMode("fluide")
-  H.advance(0.1)
-  local restFluid = shot(list)
-  local armed, bad = 0, {}
-  for _, f in ipairs(list) do
-    local hs = f.hoverScale
-    if f.face._scale == hs and playing(f) and math.abs(H.visualScale(f.face) - 1 / hs) < 1e-9 then armed = armed + 1
-    else bad[#bad + 1] = name(f) end
-  end
-  check(("fluide au repos : %d éléments, échelle réelle = échelle de survol, animation tenue à 1 / échelle"):format(#list),
-    armed == #list, table.concat(bad, ", "))
-  local d, what = maxDiff(restNet, restFluid)
-  check(("fluide au repos : %d régions affichées aux mêmes rectangles qu'en net (±0,01)"):format(#restNet), d <= 0.01,
-    string.format("%.4f %s", d, tostring(what)))
-
-  -- 2. survol en fluide : ni SetScale ni Stop, taille animée, arrivée = rectangles du net agrandi
-  local card = v.cards[1]
-  local face = card.face
-  local hs = card.hoverScale
-  local n0s = face._nSetScale or 0
-  card.hover = true
-  v:PlaceCard(card)
-  local last, jump, steps = vis(card), 0, 0
-  while (Wd.animValue(card, "hover") < 1 or steps < 2) and steps < 100 do
-    step(1, 0.016)
-    steps = steps + 1
-    local s = vis(card)
-    jump = math.max(jump, math.abs(s - last))
-    last = s
-  end
-  step(5, 0.016)
-  check("fluide, survol : aucune re-rasterisation (SetScale) ni bascule pendant et après le mouvement",
-    (face._nSetScale or 0) == n0s and playing(card) and face._scale == hs, (face._nSetScale or 0) - n0s)
-  check("fluide, survol : taille croissante sans à-coup, arrivée à l'échelle de survol (facteur tenu 1)",
-    math.abs(vis(card) - hs) < 1e-9 and jump < 0.05, vis(card) .. " / saut " .. jump)
-  local hoverFluid = shot({ card })
-  -- sortie
-  card.hover = false
-  v:PlaceCard(card)
-  step(40, 0.016)
-  check("fluide, sortie : retour au facteur 1 / échelle, échelle réelle inchangée, animation tenue",
-    face._scale == hs and playing(card) and math.abs(H.visualScale(face) - 1 / hs) < 1e-9 and (face._nSetScale or 0) == n0s)
-  local d2 = maxDiff(shot(list), restFluid)
-  check("fluide, sortie terminée : rectangles de repos retrouvés (±0,01)", d2 <= 0.01, d2)
-  -- cible qui change en route : la taille repart de là où elle est
-  local eb = v.endTurn
-  run(eb, "OnEnter")
-  step(3, 0.016)
-  local before = vis(eb)
-  run(eb, "OnLeave")
-  local after = vis(eb)
-  step(1, 0.016)
-  check("fluide, cible changée en route : aucun saut de taille, animation relancée du facteur courant",
-    math.abs(after - before) < 1e-9 and vis(eb) <= before + 1e-9 and before > 1 and playing(eb)
-    and eb.face._scale == eb.hoverScale, before .. " / " .. after .. " / " .. vis(eb))
-  step(40, 0.016)
-  -- même agrandissement que le mode net à l'arrivée
-  Wd.setZoomMode("net")
-  H.advance(0.1)
-  card.hover = true
-  v:PlaceCard(card)
-  H.advance(0.5)
-  local d3, w3 = maxDiff(shot({ card }), hoverFluid)
-  check("fluide, carte agrandie : mêmes rectangles qu'en net à l'arrivée (±0,01)", d3 <= 0.01,
-    string.format("%.4f %s", d3, tostring(w3)))
-  card.hover = false
-  v:PlaceCard(card)
-  H.advance(0.5)
-  Wd.setZoomMode("fluide")
-  H.advance(0.1)
-
-  -- 3. caché puis remontré : animation arrêtée par le client, état reposé à l'OnShow (avant toute image)
-  UI().frame:Hide()
-  check("fenêtre cachée : animations arrêtées (comme dans le jeu)", not playing(card))
-  UI().frame:Show()
-  check("fenêtre remontrée : animation tenue reposée dans l'OnShow même, taille de repos", playing(card)
-    and math.abs(vis(card) - 1) < 1e-9)
-  H.advance(0.2)
-  -- (l'écran s'est redessiné à l'ouverture : comparaison avec le même écran en net)
-  local again = shot(list)
-  Wd.setZoomMode("net")
-  H.advance(0.1)
-  local d4, w4 = maxDiff(again, shot(list))
-  check(("fenêtre remontrée : %d régions aux rectangles de repos du mode net (±0,01)"):format(#again), d4 <= 0.01,
-    tostring(d4) .. " " .. tostring(w4))
-  Wd.setZoomMode("fluide")
-  H.advance(0.1)
-  -- caché en plein survol, remontré : taille entre repos et survol, jamais démesurée
-  run(eb, "OnEnter")
-  step(2, 0.016)
-  eb:Hide()
-  eb:Show()
-  check("caché en plein survol puis remontré : taille entre repos et survol", vis(eb) >= 1 - 1e-9
-    and vis(eb) <= eb.hoverScale + 1e-9 and playing(eb), vis(eb))
-  run(eb, "OnLeave")
-  H.advance(0.5)
-  -- cadre jamais montré : carte créée sous un parent caché, puis montrée
-  local holder = CreateFrame("Frame", nil, UI().content)
-  holder:SetSize(10, 10)
-  holder:SetPoint("TOPLEFT", UI().content, "TOPLEFT", 0, 0)
-  local fresh = Wd.card(holder)
-  fresh:SetCard("smite", false, { playable = true })
-  check("carte neuve (pas encore armée) : repos sans animation, échelle réelle 1", fresh.face._scale == 1
-    and not playing(fresh))
-  holder:Hide()
-  local nc = Wd.card(holder)
-  nc:SetCard("smite", false, { playable = true })
-  H.advance(0.1)
-  check("carte jamais montrée : aucune animation sur un cadre caché", not playing(nc))
-  holder:Show()
-  check("carte montrée pour la première fois : état reposé avant la première image (taille de repos)",
-    math.abs(vis(nc) - 1) < 1e-9 and playing(nc) and math.abs(vis(fresh) - 1) < 1e-9, vis(nc))
-  -- création tardive sous un visuel armé (plaques de raison et de prix) : rien né pendant l'animation
-  local nb = #H.bornInAnim
-  nc:SetCard("smite", false, { playable = false, reason = "Not enough mana." })
-  nc:SetCard("smite", false, { price = 50 })
-  check("plaques créées après l'armement (raison, prix) : hors animation (W.faceBuild), animation reprise",
-    #H.bornInAnim == nb and playing(nc) and math.abs(vis(nc) - 1) < 1e-9, table.concat(H.bornInAnim, ", ", nb + 1))
-  holder:Hide()
-
-  -- 4. vols de cartes en fluide
-  local g = Wd.ghostCard(v.parent)
-  g:SetCard(card.cardId, card.cardUp, card.opts)
-  local landed = false
-  Wd.fly(g, v.parent, 100, 400, 500, 300, 0.3, 1, 0.6, 1, 0.28, function() landed = true end)
-  local ghs = g.hoverScale
-  local start = g._scale * vis(g)
-  H.now = H.now + 0.1
-  local mid = g._scale * vis(g)
-  local nS = g._nSetScale or 0
-  H.advance(0.5)
-  check("vol (pioche, 0,3 → 1) : échelle réelle fixe 1, visuel à son échelle de survol, taille animée de 0,3 à 1",
-    landed and g._scale == 1 and g.face._scale == ghs and math.abs(start - 0.3) < 1e-6 and mid > 0.3 and mid < 1
-    and math.abs(g._scale * vis(g) - 1) < 1e-9 and playing(g), start .. " / " .. mid)
-  check("vol (pioche) : à l'atterrissage, aucune nouvelle échelle réelle, état de repos exact", (g._nSetScale or 0) == nS
-    and math.abs(H.visualScale(g.face) - 1 / ghs) < 1e-9)
-  Wd.releaseGhost(g)
-  g = Wd.ghostCard(v.parent)
-  g:SetCard(card.cardId, card.cardUp, card.opts)
-  landed = false
-  Wd.fly(g, v.parent, 500, 300, 100, 400, 1.16, 0.35, 1, 0.1, 0.38, function() landed = true end)
-  start = g._scale * vis(g)
-  H.advance(0.6)
-  check("vol (vers la cible, 1,16 → 0,35) : polices à la plus grande échelle du vol, état de repos à l'arrivée",
-    landed and math.abs(start - 1.16) < 1e-6 and g._scale == 0.35 and math.abs(H.visualScale(g.face) - 1 / ghs) < 1e-9, start)
-  Wd.releaseGhost(g)
-
-  -- 5. écrans construits en fluide : aucune région créée sous un visuel animé
-  local nb2 = #H.bornInAnim
-  for i, kind in ipairs({ "merchant", "campfire", "event", "combat" }) do
-    freshRunZ(SEED + i, kind, "fluide")
-    local s = UI().current
-    for _, b in ipairs(s and (s.cards or s.items or s.buttons) or {}) do
-      if b.IsVisible and b:IsVisible() and b._hoverable then run(b, "OnEnter") H.advance(0.3) run(b, "OnLeave") H.advance(0.3) end
-    end
-  end
-  freshRunZ(SEED, "combat", "fluide")
-  H.settle()
-  fightUntil(function() return C().over() ~= nil end, 200)
-  H.advance(2)
-  check("fluide : marchand, feu, rencontre, combat jusqu'au bout, sans région créée sous une animation",
-    #H.bornInAnim == nb2, table.concat(H.bornInAnim, ", ", nb2 + 1))
-
-  -- 6. mode net : aucun saut à la bascule. Hypothèse prudente du rendu : une animation Scale ne porte
-  -- que sur les régions du cadre animé (un cadre enfant du visuel ne grossirait qu'à la bascule).
-  freshRunZ(SEED, "combat", "net")
-  H.settle()
-  v = V()
-  c2 = v.cards[2]
-  c2:SetCard(c2.cardId, c2.cardUp, { playable = false, reason = "Not enough mana." })
-  v.playerSt:Set({ { icon = H.ns.Art.ui.gold, key = "ui:gold", n = 3, info = { title = "Essai" } } })
-  H.advance(0.1)
-  local worst, label = 0, nil
   local childFrames = {}
   for _, f in ipairs({ v.cards[1], c2, v.endTurn, UI().gear, v.playerSt.tokens[1] }) do
     for _, k in ipairs(rawget(f.face, "_kids")) do
       if KINDS[rawget(k, "_kind")] and k:IsVisible() and #regions(k) > 0 then childFrames[#childFrames + 1] = name(f) end
     end
-    if f._hoverManual then f.hover = true v:PlaceCard(f) else run(f, "OnEnter") end
-    -- pas de la bascule comparé au pas d'avant : la bascule n'ajoute aucun déplacement au mouvement
-    local prev = shot({ f }, true)
-    local dPrev, dSwitch, wSwitch = 0, nil, nil
-    for _ = 1, 200 do
-      local sc0 = f.face._scale
-      run(Wd.driver, "OnUpdate", 0.004)
-      H.now = H.now + 0.004
-      local cur = shot({ f }, true)
-      local dd, w = maxDiff(prev, cur)
-      if f.face._scale ~= sc0 then dSwitch, wSwitch = dd, w break end
-      dPrev = dd
-      prev = cur
-    end
-    if f._hoverManual then f.hover = false v:PlaceCard(f) else run(f, "OnLeave") end
-    H.advance(0.5)
-    print(("      %s : %d régions, pas avant la bascule %.3f, pas de la bascule %s"):format(name(f), #prev, dPrev,
-      dSwitch and string.format("%.3f", dSwitch) or "ABSENT"))
-    local extra = dSwitch and (dSwitch - dPrev) or math.huge
-    if extra > worst then worst, label = extra, name(f) .. " : " .. tostring(wSwitch) end
   end
-  check("net : aucun cadre enfant dessiné sous un visuel survolable (carte, plaques, bouton, jeton)", #childFrames == 0,
+  check("aucun cadre enfant dessiné sous un visuel survolable (carte, plaques, bouton, jeton)", #childFrames == 0,
     table.concat(childFrames, ", "))
-  check(("net, survol image par image (4 ms) : la bascule n'ajoute aucun déplacement (au plus %.3f unité de plus que le pas d'avant)")
-    :format(worst), worst < 0.05, label)
 
-  -- 7. carte survolée de la main : dans la fenêtre, sans recouvrir les ennemis (noms, jauges, états) ;
-  -- toutes les places de la main, carte injouable comprise (plaque de raison), pour chaque taille de main
+  -- 2. vols de cartes : échelle réelle de départ pendant le vol, échelle réelle d'arrivée posée une fois
+  local card = v.cards[1]
+  for _, it in ipairs({ { "pioche, 0,3 → 1", 100, 400, 500, 300, 0.3, 1 }, { "vers la cible, 1 → 0,35", 500, 300, 100, 400, 1, 0.35 } }) do
+    local g = Wd.ghostCard(v.parent)
+    g:SetCard(card.cardId, card.cardUp, card.opts)
+    local landed = false
+    Wd.fly(g, v.parent, it[2], it[3], it[4], it[5], it[6], it[7], 1, 1, 0.3, function() landed = true end)
+    local start = g._scale * H.visualScale(g)
+    H.now = H.now + 0.12
+    local mid = g._scale * H.visualScale(g)
+    local real = g._scale
+    H.advance(0.6)
+    local lo, hi = math.min(it[6], it[7]), math.max(it[6], it[7])
+    check(("vol (%s) : échelle réelle fixe en vol, taille animée, arrivée à l'échelle réelle d'arrivée sans animation"):format(it[1]),
+      landed and math.abs(start - it[6]) < 1e-9 and real == it[6] and mid > lo and mid < hi and g._scale == it[7]
+      and H.visualScale(g) == 1 and g.face._scale == 1, start .. " / " .. mid .. " / " .. g._scale)
+    Wd.releaseGhost(g)
+  end
+
+  -- 3. carte levée de la main : dans la fenêtre, à toutes les places, carte injouable comprise
   do
     local content = R.rect(UI().content)
-    local enemyRects = {}
-    for _, sl in ipairs(v.slots) do
-      if sl:IsVisible() then
-        for kn, k in pairs({ nom = sl.tag, jauge = sl.hp, etats = sl.st }) do
-          if k and k:IsVisible() then
-            for _, t in ipairs(regions(k)) do local r = R.rect(t) r.what = kn enemyRects[#enemyRects + 1] = r end
+    local outW, lowest, highest = {}, math.huge, -math.huge
+    for i = 1, #C().combat().hand do
+      for _, opts in ipairs({ { playable = true }, { playable = false, reason = "Not enough mana." } }) do
+        local card1 = v.cards[i]
+        card1:SetCard("penance", false, opts)
+        card1.hover = true
+        v:PlaceCard(card1)
+        H.advance(0.5)
+        local box = { math.huge, math.huge, -math.huge, -math.huge }
+        for _, t in ipairs(regions(card1)) do
+          if t ~= card1.halo then
+            local r = R.vrect(t)
+            box = { math.min(box[1], r[1]), math.min(box[2], r[2]), math.max(box[3], r[3]), math.max(box[4], r[4]) }
           end
         end
+        lowest, highest = math.min(lowest, box[2]), math.max(highest, box[4])
+        if box[2] < content[2] - 0.01 or box[4] > content[4] + 0.01 then outW[#outW + 1] = i .. "/" .. tostring(opts.playable) end
+        card1.hover = false
+        v:PlaceCard(card1)
+        H.advance(0.5)
       end
     end
-    local outW, overE, lowest, highest = {}, {}, math.huge, -math.huge
-    local cases = {}
-    for i = 1, #C().combat().hand do
-      cases[#cases + 1] = { i, { playable = true } }
-      cases[#cases + 1] = { i, { playable = false, reason = "Not enough mana." } }
-    end
-    local card1 = v.cards[1]
-    for _, cs in ipairs(cases) do
-      card1 = v.cards[cs[1]]
-      local opts = cs[2]
-      card1:SetCard("penance", false, opts)
-      card1.hover = true
-      v:PlaceCard(card1)
-      H.advance(0.5)
-      local box = { math.huge, math.huge, -math.huge, -math.huge }
-      for _, t in ipairs(regions(card1)) do
-        if not (t == card1.halo) then
-          local r = R.vrect(t)
-          box = { math.min(box[1], r[1]), math.min(box[2], r[2]), math.max(box[3], r[3]), math.max(box[4], r[4]) }
-        end
-      end
-      lowest, highest = math.min(lowest, box[2]), math.max(highest, box[4])
-      if box[2] < content[2] - 0.01 or box[4] > content[4] + 0.01 then outW[#outW + 1] = tostring(opts.playable) end
-      for _, er in ipairs(enemyRects) do
-        if box[1] < er[3] and box[3] > er[1] and box[2] < er[4] and box[4] > er[2] then
-          overE[#overE + 1] = ("carte %d (%s, %.1f)"):format(cs[1], er.what, er[2] - box[4] < 0 and box[4] - er[2] or 0) break
-        end
-      end
-      card1.hover = false
-      v:PlaceCard(card1)
-      H.advance(0.5)
-    end
-    print(("      main : carte survolée ×%.2f, du haut %.1f au bas %.1f (fenêtre %.1f à %.1f ; bas de l'ennemi le plus bas %.1f)")
-      :format(card1.hoverScale, content[4] - highest, content[4] - lowest, 0, content[4] - content[2],
-        (function() local m = -math.huge for _, er in ipairs(enemyRects) do m = math.max(m, content[4] - er[2]) end return m end)()))
-    -- (relevé : avec ×1,16 et HOVER_TOP 372, la carte survolée au milieu de la main mord déjà de quelques
-    -- unités sur le bas des infos d'un ennemi quand il en a ; d'où l'échelle de survol laissée telle quelle)
-    print("      main : recouvrement des infos d'ennemis (unités d'écran) : "
-      .. (#overE > 0 and table.concat(overE, ", ") or "aucun"))
-    check("main : carte survolée (halo exclu) dans la fenêtre, à toutes les places, injouable comprise", #outW == 0,
+    print(("      main : carte levée de %d, du haut %.1f au bas %.1f (fenêtre 0 à %.1f)")
+      :format(Wd.CARD_LIFT, content[4] - highest, content[4] - lowest, content[4] - content[2]))
+    check("main : carte levée (halo exclu) dans la fenêtre, à toutes les places, injouable comprise", #outW == 0,
       table.concat(outW, ", "))
   end
 
-  -- 8. noms abrégés : en anglais, « Power Word: Radiance » ne tient pas au palier 9 (relevé du
+  -- 4. noms abrégés : en anglais, « Power Word: Radiance » ne tient pas au palier 9 (relevé du
   -- harnais : 8, et 7 améliorée) ; toutes les cartes « Power Word » et « Shadow Word » sont donc
   -- abrégées de la même façon (« PW: », « SW: »)
   local long = {}
@@ -4085,9 +3754,8 @@ print("U29 textes affichés en anglais : aucune chaîne française dans Core/, D
 do
   -- Chaînes du code (hors commentaires) des fichiers du TOC, plus Title et Notes du TOC. Une chaîne est
   -- française si elle contient une lettre accentuée latine, des guillemets « », ou un mot-outil
-  -- français. Exceptions : valeurs enregistrées dans la sauvegarde gardées telles quelles (zoom) et
-  -- textes de mesure de police (jamais lus par le joueur).
-  local KEEP = { ["fluide"] = true, ["lisse"] = true, ["net"] = true, ["\195\137\195\169"] = true, ["\195\137g"] = true }
+  -- français. Exceptions : textes de mesure de police (jamais lus par le joueur).
+  local KEEP = { ["\195\137\195\169"] = true, ["\195\137g"] = true }
   -- mots-outils et vocabulaire du jeu en français (comparés en minuscules), sans homographes anglais
   local FR_WORDS = { "de", "du", "des", "les", "le", "la", "une", "et", "pour", "avec", "aux", "au", "est", "pas",
     "sur", "dans", "sans", "vous", "votre", "vos", "ou", "il", "elle", "ici", "trop", "faut", "aucun", "aucune",
@@ -5281,7 +4949,7 @@ do
   end
 end
 
-print("U34 textes jamais tronqués ni recoupés par le client : cartes au repos et survolées, réponses, boutons (client défavorable)")
+print("U34 textes jamais tronqués ni recoupés par le client : cartes (toutes les échelles d'écran, aperçu), réponses, boutons (client défavorable)")
 do
   -- Retour en jeu : « PW: Radiance » survolée en main (fenêtre à 115 %, zoom net) affichait
   -- « Gain 4 Absorb.... » sur une ligne au lieu de ses deux lignes. Le client défavorable
@@ -5292,7 +4960,6 @@ do
   local W = ns.Widgets
   local frame = UI().frame
   local scale0 = frame._scale
-  local mode0 = W.zoomMode()
   H.strictText = true
   W.clearTextCache()
   local function nLines(t)
@@ -5323,33 +4990,26 @@ do
   for id in pairs(ns.Cards) do ids[#ids + 1] = id end
   table.sort(ids)
   local SCALES = { 1, 1.15, 1.5, 0.6 }
-  -- (1) toutes les cartes, base et améliorées, jouables et injouables : échelle de la fenêtre, échelle
-  -- réelle du visuel à la pose (1 : modes net et lisse ; échelle de survol : mode fluide), puis affichée
-  -- au repos et survolée ; écrans : main (survol 1,16), récompense (1,08 × 1,17), grille (0,75 × 1,2),
-  -- marchand (0,92 × 1,12)
+  -- (1) toutes les cartes, base et améliorées, jouables et injouables, à chaque échelle de fenêtre et
+  -- d'écran : main et aperçu des petites cartes (1), récompense (1,08), marchand (0,92), grille (0,75),
+  -- panneau du deck (0,72), progression (0,6), bilan (0,5). Plus aucune échelle de survol : la carte
+  -- survolée a le texte du repos (levée ou aperçu à l'échelle 1).
   local holder = CreateFrame("Frame", nil, UI().content)
   local card = W.card(holder)
-  local SCREENS = { { "main", 1, 1.16 }, { "récompense", 1.08, 1.17 }, { "grille", 0.75, 1.2 }, { "marchand", 0.92, 1.12 } }
+  local SCREENS = { { "main", 1 }, { "récompense", 1.08 }, { "marchand", 0.92 }, { "grille", 0.75 }, { "deck", 0.72 },
+    { "progression", 0.6 }, { "bilan", 0.5 } }
   local VARS = { { "", { playable = true } }, { " (injouable)", { playable = false, reason = "Not enough mana." } } }
   local bad, cases = {}, 0
   for _, ws in ipairs(SCALES) do
     frame:SetScale(ws)
     for _, sc in ipairs(SCREENS) do
       holder:SetScale(sc[2])
-      local hs = sc[3]
       for _, id in ipairs(ids) do
         for _, up in ipairs({ false, true }) do
           for _, var in ipairs(VARS) do
-            for _, at in ipairs({ 1, hs }) do
-              card.face:SetScale(at)
-              card:SetCard(id, up, var[2])
-              for _, view in ipairs({ 1, hs }) do
-                card.face:SetScale(view)
-                cases = cases + 1
-                cardBad(card, ("%s%s%s, fenêtre %.2f, %s, pose ×%.2f, vue ×%.2f"):format(id, up and "+" or "", var[1],
-                  ws, sc[1], at, view), bad)
-              end
-            end
+            card:SetCard(id, up, var[2])
+            cases = cases + 1
+            cardBad(card, ("%s%s%s, fenêtre %.2f, %s"):format(id, up and "+" or "", var[1], ws, sc[1]), bad)
           end
         end
       end
@@ -5363,31 +5023,28 @@ do
     if #t > n then out[#out + 1] = ("… (%d en tout)"):format(#t) end
     return table.concat(out, "\n        ")
   end
-  check(("%d cartes × base/améliorée × jouable/injouable × fenêtre 1 / 1,15 / 1,5 / 0,6 × 4 écrans, au repos et survolées (%d cas) : aucun texte tronqué ni recoupé")
+  check(("%d cartes × base/améliorée × jouable/injouable × fenêtre 1 / 1,15 / 1,5 / 0,6 × 7 échelles d'écran (%d cas) : aucun texte tronqué ni recoupé")
     :format(#ids, cases), #bad == 0, head(bad, 12))
-  -- (2) la carte de la capture, en main, par le vrai survol, dans les trois modes de zoom
+  -- (2) la carte de la capture, en main, survolée (levée) et au repos
   local v = V()
   local hc = v.cards[1]
   local bad2 = {}
-  for _, mode in ipairs(W.ZOOM_MODES) do
-    W.setZoomMode(mode)
-    for _, ws in ipairs(SCALES) do
-      frame:SetScale(ws)
-      for _, up in ipairs({ false, true }) do
-        hc:SetCard("radiance", up, { playable = true })
-        hc:Show()
-        W.animSet(hc, "hover", 1)
-        cardBad(hc, ("%s, fenêtre %.2f, survolée ×%.3f"):format(mode, ws, hc.face._scale * H.visualScale(hc.face)), bad2)
-        W.animSet(hc, "hover", 0)
-        cardBad(hc, ("%s, fenêtre %.2f, au repos ×%.3f"):format(mode, ws, hc.face._scale * H.visualScale(hc.face)), bad2)
-      end
+  for _, ws in ipairs(SCALES) do
+    frame:SetScale(ws)
+    for _, up in ipairs({ false, true }) do
+      hc:SetCard("radiance", up, { playable = true })
+      hc:Show()
+      W.animSet(hc, "hover", 1)
+      cardBad(hc, ("fenêtre %.2f, survolée ×%.3f"):format(ws, hc.face._scale * H.visualScale(hc.face)), bad2)
+      W.animSet(hc, "hover", 0)
+      cardBad(hc, ("fenêtre %.2f, au repos ×%.3f"):format(ws, hc.face._scale * H.visualScale(hc.face)), bad2)
     end
   end
-  check("« PW: Radiance » en main, survolée et au repos, zoom net / fluide / lisse, fenêtre 0,6 à 1,5 : deux lignes entières",
+  check("« PW: Radiance » en main, survolée (levée) et au repos, fenêtre 0,6 à 1,5 : deux lignes entières",
     #bad2 == 0, head(bad2, 8))
   -- garde-fou en jeu : un texte que le client tronque malgré tout fait descendre la carte d'un palier
   if not W.checkCardTexts then
-    check("garde-fou : texte tronqué après la pose ou le zoom -> un palier plus bas (W.checkCardTexts)", false, "absent")
+    check("garde-fou : texte tronqué après la pose -> un palier plus bas (W.checkCardTexts)", false, "absent")
   else
     local c = W.card(holder)
     c:SetCard("radiance", false, { playable = true })
@@ -5397,7 +5054,7 @@ do
     W.checkCardTexts(c)
     c.body.IsTruncated = orig
     local log = W.truncatedLog()
-    check("garde-fou : texte tronqué après la pose ou le zoom -> un palier plus bas, relevé pour /slay text",
+    check("garde-fou : texte tronqué après la pose -> un palier plus bas, relevé pour /slay text",
       c.bodyFit.size < s0 and #log > 0 and log[#log]:find("PW: Radiance", 1, true) ~= nil,
       tostring(c.bodyFit.size) .. " / " .. tostring(log[#log]))
     local chat = rawget(_G.DEFAULT_CHAT_FRAME, "_lines")
@@ -5421,16 +5078,12 @@ do
   local function tryOpt(label, o, w, h)
     for _, ws in ipairs(SCALES) do
       frame:SetScale(ws)
-      b.face:SetScale(1)
       b:SetOption(o, w, h)
-      for _, view in ipairs({ 1, 1.04 }) do
-        b.face:SetScale(view)
-        cases3 = cases3 + 1
-        for _, it in ipairs({ { "libellé", b.label }, { "texte", b.sub } }) do
-          local why = textBad(it[2])
-          if why then bad3[#bad3 + 1] = ("%s, fenêtre %.2f, ×%.2f : %s « %s » %s"):format(label, ws, view, it[1],
-            tostring(it[2]._text):gsub("\n", " / "), why) end
-        end
+      cases3 = cases3 + 1
+      for _, it in ipairs({ { "libellé", b.label }, { "texte", b.sub } }) do
+        local why = textBad(it[2])
+        if why then bad3[#bad3 + 1] = ("%s, fenêtre %.2f : %s « %s » %s"):format(label, ws, it[1],
+          tostring(it[2]._text):gsub("\n", " / "), why) end
       end
     end
   end
@@ -5448,10 +5101,10 @@ do
   end
   tryOpt("feu : se reposer", { id = "rest", label = "Rest", text = "+21 HP" }, 240, 104)
   tryOpt("bandits", { id = "x", label = "Charge the bandits", text = "Fight: usual reward + 20g" }, 285.3, 118)
-  check(("%d rencontres, réponses aux fenêtres 1 / 1,15 / 1,5 / 0,6, au repos et survolées (%d cas) : libellé et texte entiers")
+  check(("%d rencontres, réponses aux fenêtres 1 / 1,15 / 1,5 / 0,6 (%d cas ; le survol ne change que la surbrillance) : libellé et texte entiers")
     :format(#evIds, cases3), #bad3 == 0, head(bad3, 12))
   -- (4) libellés des boutons et autres textes des visuels survolables créés jusqu'ici (une ligne, largeur
-  -- libre) : entiers à toute échelle de fenêtre, au repos et survolés
+  -- libre) : entiers à toute échelle de fenêtre (le survol ne change pas leur échelle)
   local bad4, n4 = {}, 0
   for _, o in ipairs(H.objects) do
     local face = rawget(o, "_parent")
@@ -5461,21 +5114,15 @@ do
       n4 = n4 + 1
       for _, ws in ipairs(SCALES) do
         frame:SetScale(ws)
-        local s0 = face._scale
-        for _, view in ipairs({ 1, owner.hoverScale or 1.06 }) do
-          face._scale = view
-          local why = textBad(o)
-          if why then bad4[#bad4 + 1] = ("« %s », fenêtre %.2f, ×%.2f : %s"):format(tostring(o._text):gsub("\n", " / "), ws, view, why) end
-        end
-        face._scale = s0
+        local why = textBad(o)
+        if why then bad4[#bad4 + 1] = ("« %s », fenêtre %.2f : %s"):format(tostring(o._text):gsub("\n", " / "), ws, why) end
       end
     end
   end
-  check(("%d textes des visuels survolables (boutons, plaques, jetons…) : entiers aux fenêtres 1 / 1,15 / 1,5 / 0,6, au repos et survolés")
+  check(("%d textes des visuels survolables (boutons, plaques, jetons…) : entiers aux fenêtres 1 / 1,15 / 1,5 / 0,6")
     :format(n4), n4 > 20 and #bad4 == 0, head(bad4, 12))
   H.strictText = false
   W.clearTextCache()
-  W.setZoomMode(mode0)
   frame:SetScale(scale0)
 end
 
@@ -5509,10 +5156,10 @@ do
   check("accueil : classe choisie mise en évidence (halo doré tenu), l'autre assombrie et sans halo",
     pb.selected and glowA(pb) > 0.5 and iconK(pb) == 1 and not wb.selected and glowA(wb) == 0 and iconK(wb) < 0.7,
     glowA(pb) .. " / " .. glowA(wb) .. " / " .. iconK(wb))
-  -- survol d'une classe non choisie : halo et icône s'allument en fondu, visuel animé
+  -- survol d'une classe non choisie : halo et icône s'allument en fondu, sans grossir
   run(wb, "OnEnter")
   for _ = 1, 30 do run(W.driver, "OnUpdate", 0.02) H.now = H.now + 0.02 end
-  check("accueil : survol d'une icône (agrandie, éclairée, halo)", wb.face._scale > 1 and iconK(wb) == 1 and glowA(wb) > 0.3,
+  check("accueil : survol d'une icône (éclairée, halo, à sa taille)", wb.face._scale == 1 and iconK(wb) == 1 and glowA(wb) > 0.3,
     wb.face._scale .. " / " .. iconK(wb) .. " / " .. glowA(wb))
   run(wb, "OnLeave")
   for _ = 1, 30 do run(W.driver, "OnUpdate", 0.02) H.now = H.now + 0.02 end
@@ -6874,7 +6521,7 @@ do
         if vis(c) then
           nCards = nCards + 1
           if not (c.entry and c.entry.unlocked and c.cardId == c.entry.id) then badCard[#badCard + 1] = tostring(c.cardId) end
-          if c.hoverScale ~= UI().CP.zoom then badCard[#badCard + 1] = "zoom " .. tostring(c.hoverScale) end
+          if (c.hoverLift or 0) ~= 0 then badCard[#badCard + 1] = "levée " .. tostring(c.hoverLift) end
           if not inside(R.rect(c), content) then outside[#outside + 1] = "carte " .. tostring(c.cardId) .. " " .. fmt(R.rect(c)) end
         end
         if vis(k) then
@@ -6935,7 +6582,8 @@ do
       if lv == 1 and cid == "priest" then snap("progression-priest-1", true) end
       if lv == 4 and cid == "warrior" then snap("progression-warrior-4", true) end
     end
-    -- survol d'une carte de la dernière rangée : agrandie, levée, toujours dans la fenêtre
+    -- survol d'une carte de la dernière rangée : immobile et à sa taille, aperçu à taille réelle à côté,
+    -- dans la fenêtre
     local scr = UI().current
     local last
     for i = #scr.cards, 1, -1 do if vis(scr.cards[i]) then last = scr.cards[i] break end end
@@ -6944,12 +6592,17 @@ do
       last:GetScript("OnEnter")(last)
       for _ = 1, 40 do H.advance(0.02) end
       local vr = R.vrect(last.bg)
+      local pv = H.ns.Widgets.preview
+      local pr = pv and pv:IsVisible() and R.vrect(pv.bg)
       local content = R.rect(H.ns.UI.content)
-      local k = (vr[3] - vr[1]) / (r0[3] - r0[1])
-      check(("niveau %d : carte de la dernière rangée survolée agrandie (×%.2f) et dans la fenêtre"):format(lv, k),
-        k > 1.5 and inside(vr, content), fmt(r0) .. " -> " .. fmt(vr) .. " / " .. fmt(content))
+      local ws = (content[3] - content[1]) / H.ns.UI.CONTENT_W -- échelle de la fenêtre (unités d'écran par unité)
+      local k = pr and (pr[3] - pr[1]) / ws / H.ns.Widgets.CARD_W or 0
+      check(("niveau %d : carte de la dernière rangée survolée immobile, aperçu à taille réelle (×%.2f) dans la fenêtre"):format(lv, k),
+        fmt(vr) == fmt(r0) and pr and pv.of == last and pv.cardId == last.cardId and inside(pr, content)
+        and math.abs(k - 1) < 1e-6, fmt(r0) .. " -> " .. fmt(vr) .. " / " .. (pr and fmt(pr) or "pas d'aperçu"))
       last:GetScript("OnLeave")(last)
       for _ = 1, 40 do H.advance(0.02) end
+      check(("niveau %d : aperçu caché à la sortie"):format(lv), not pv:IsShown())
     end
     clickOption("ui:back")
     check(("niveau %d : retour à l'accueil"):format(lv), currentKind() == "start", currentKind())
@@ -7014,6 +6667,344 @@ do
   ns.UI.refresh()
   scr = UI().current
   check("bilan sans montée : rien de révélé", not vis(scr.newCards[1]) and not vis(scr.newRelics[1]))
+end
+
+print("UX survols sans agrandissement : texte immobile au pixel, surbrillance, cartes levées ou aperçu à taille réelle")
+do
+  -- Retour en jeu (vidéo, 12/11/2026) : au survol, un bouton grossissait de 4 % et son texte changeait
+  -- d'espacement et se décalait d'un ou deux pixels (étiré pendant l'animation, puis redessiné à une
+  -- autre taille). Règle : plus AUCUNE échelle au survol, nulle part. Pour chaque élément survolable de
+  -- chaque écran : échelle de tout son sous-arbre inchangée (pendant et après le mouvement) ; s'il porte
+  -- un texte et n'est pas une carte, textes au même rectangle au survol qu'au repos, visuel immobile, et
+  -- surbrillance qui s'allume puis s'éteint ; élément sans texte : surbrillance aussi ; carte lisible :
+  -- levée, halo, devant ses voisines ; petite carte : immobile, aperçu à taille réelle à côté.
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function under(o, top)
+    while o do
+      if o == top then return true end
+      o = rawget(o, "_parent")
+    end
+    return false
+  end
+  local function walk(f, out, kinds)
+    for _, k in ipairs(rawget(f, "_kids")) do
+      local kind = rawget(k, "_kind")
+      if kind == "Texture" or kind == "FontString" then
+        if not kinds or kinds[kind] then out[#out + 1] = k end
+      elseif kind ~= "AnimationGroup" and kind ~= "Animation" and kind ~= "MaskTexture" then
+        if kinds == nil or kinds.frames then out[#out + 1] = k end
+        walk(k, out, kinds)
+      end
+    end
+    return out
+  end
+  local function texts(f)
+    local out = {}
+    for _, t in ipairs(walk(f, {}, { FontString = true })) do
+      if t:IsVisible() and (t._text or "") ~= "" then out[#out + 1] = t end
+    end
+    return out
+  end
+  local function lum(t)
+    if not t:IsVisible() then return 0 end
+    local a = (t._calls.SetAlpha and t._calls.SetAlpha[1]) or 1
+    local vc = t._calls.SetVertexColor
+    local k = vc and math.max(vc[1] or 1, vc[2] or 1, vc[3] or 1) or 1
+    local o = rawget(t, "_parent")
+    while o do
+      local c = rawget(o, "_calls")
+      if c and c.SetAlpha then a = a * (c.SetAlpha[1] or 1) end
+      o = rawget(o, "_parent")
+    end
+    return a * k
+  end
+  local function lums(f)
+    local out = {}
+    for _, t in ipairs(walk(f, {}, { Texture = true })) do out[t] = lum(t) end
+    return out
+  end
+  local function brighter(a, b)
+    for t, v in pairs(b) do if v > (a[t] or 0) + 0.05 then return true end end
+    return false
+  end
+  local function sameLum(a, b)
+    for t, v in pairs(b) do if math.abs(v - (a[t] or 0)) > 1e-6 then return false end end
+    return true
+  end
+  -- échelles de tout le sous-arbre (cadres et régions) et animations d'échelle en cours
+  local function scales(f)
+    local out = { f = rawget(f, "_scale") }
+    for _, k in ipairs(walk(f, {}, nil)) do out[k] = rawget(k, "_scale") end
+    return out
+  end
+  local function anyAnim(f)
+    for _, k in ipairs(walk(f, {}, { frames = true })) do
+      if rawget(k, "_kind") ~= "Texture" and rawget(k, "_kind") ~= "FontString" and H.visualScale(k) ~= 1 then return true end
+    end
+    return H.visualScale(f) ~= 1
+  end
+  local function sameScales(a, b)
+    for k, v in pairs(a) do if b[k] ~= v then return false end end
+    return true
+  end
+  local function rects(list)
+    local out = {}
+    for i, t in ipairs(list) do out[i] = R.vrect(t) or { 0, 0, 0, 0 } end
+    return out
+  end
+  local function maxd(a, b)
+    if #a ~= #b then return math.huge end
+    local m = 0
+    for i = 1, #a do for k = 1, 4 do m = math.max(m, math.abs(a[i][k] - b[i][k])) end end
+    return m
+  end
+  local function isCard(f) return rawget(f, "cardId") ~= nil and rawget(f, "halo") ~= nil and rawget(f, "bg") ~= nil end
+  local function label(f)
+    if isCard(f) then return "carte " .. tostring(f.cardId) end
+    for _, t in ipairs(texts(f)) do return "« " .. tostring(t._text):gsub("\n", " / ") .. " »" end
+    return rawget(f, "pileKey") or rawget(f, "cid") or (rawget(f, "isLock") and "carte verrouillée") or "sans texte"
+  end
+  local function inside(r, box, m)
+    m = m or 0
+    return r[1] >= box[1] - m and r[3] <= box[3] + m and r[2] >= box[2] - m and r[4] <= box[4] + m
+  end
+  -- texte posé entier (ni tronqué, ni recoupé)
+  local function whole(fs)
+    if not fs or not fs:IsVisible() or (fs._text or "") == "" then return true end
+    local n = 0
+    for _ in ((fs._text or "") .. "\n"):gmatch("(.-)\n") do n = n + 1 end
+    return not fs:IsTruncated() and fs:GetNumLines() == n
+  end
+
+  local stats = { text = 0, plain = 0, readable = 0, small = 0, locked = 0 }
+  local bad = { scale = {}, text = {}, plain = {}, readable = {}, small = {}, locked = {} }
+  local function visit(where)
+    local Wd = H.ns.Widgets
+    local frame = UI().frame
+    local content = R.rect(UI().content)
+    local list = {}
+    for _, o in ipairs(H.objects) do
+      if rawget(o, "_hoverable") and rawget(o, "face") and not rawget(o, "isPreview") and under(o, frame) and o:IsVisible() then
+        list[#list + 1] = o
+      end
+    end
+    for _, f in ipairs(list) do
+      if f:IsVisible() then
+        local name = where .. " : " .. label(f)
+        local card = isCard(f)
+        local tx = texts(f.face)
+        local sc0, l0, r0 = scales(f), lums(f), rects(tx)
+        local fp0 = tostring(f.face._points[1] and f.face._points[1][5])
+        local lv0 = f._level
+        local body0 = card and R.vrect(f.bg)
+        run(f, "OnEnter")
+        run(Wd.driver, "OnUpdate", 0.04)
+        H.now = H.now + 0.04
+        local scMid, animMid, rMid = scales(f), anyAnim(f), rects(tx)
+        H.advance(0.5)
+        local sc1, l1, r1 = scales(f), lums(f), rects(tx)
+        local scaleOk = sameScales(sc0, scMid) and sameScales(sc0, sc1) and not animMid and not anyAnim(f)
+          and f.face._scale == 1
+        if not scaleOk then bad.scale[#bad.scale + 1] = name end
+        local lit = brighter(l0, l1) or (rawget(f, "selected") == true)
+        local pv = Wd.preview
+        if card then
+          local s = f:GetScale()
+          local body1 = R.vrect(f.bg)
+          if s >= Wd.PREVIEW_BELOW then
+            stats.readable = stats.readable + 1
+            local up = body1[2] - body0[2]
+            if not (up > 0 and math.abs((body1[3] - body1[1]) - (body0[3] - body0[1])) < 1e-9 and lit and f._level > lv0
+              and not (pv and pv:IsShown() and pv.of == f)) then
+              bad.readable[#bad.readable + 1] = ("%s (levée %.2f, halo %s, niveau %s→%s)"):format(name, up, tostring(lit), lv0, f._level)
+            end
+          else
+            stats.small = stats.small + 1
+            local why = {}
+            if maxd({ body0 }, { body1 }) > 1e-9 then why[#why + 1] = "bouge" end
+            if not lit then why[#why + 1] = "halo éteint" end
+            if not (pv and pv:IsVisible() and pv.of == f and pv.cardId == f.cardId and pv.cardUp == f.cardUp) then
+              why[#why + 1] = "pas d'aperçu"
+            else
+              local pr = R.vrect(pv.bg)
+              local k = (pr[3] - pr[1]) / ((content[3] - content[1]) / H.ns.UI.CONTENT_W) / Wd.CARD_W
+              if math.abs(k - 1) > 1e-6 then why[#why + 1] = ("aperçu ×%.2f"):format(k) end
+              local box = { math.huge, math.huge, -math.huge, -math.huge }
+              for _, t in ipairs(walk(pv.face, {}, { Texture = true, FontString = true })) do
+                if t:IsVisible() and t ~= pv.halo and (rawget(t, "_kind") == "Texture" or (t._text or "") ~= "") then
+                  local q = R.vrect(t)
+                  if q then box = { math.min(box[1], q[1]), math.min(box[2], q[2]), math.max(box[3], q[3]), math.max(box[4], q[4]) } end
+                end
+              end
+              if not inside(box, content, 0.01) then why[#why + 1] = ("aperçu hors de la fenêtre (%.0f..%.0f × %.0f..%.0f)"):format(box[1], box[3], box[2], box[4]) end
+              if box[1] < R.vrect(f.bg)[3] and box[3] > R.vrect(f.bg)[1] and box[2] < R.vrect(f.bg)[4] and box[4] > R.vrect(f.bg)[2] then
+                why[#why + 1] = "aperçu sur la carte"
+              end
+              for _, k in ipairs({ "name", "cost", "body", "plateText" }) do
+                if not whole(pv[k]) then why[#why + 1] = "aperçu : " .. k .. " tronqué" end
+              end
+              local tp = _G.GameTooltip._points[1]
+              if _G.GameTooltip._shown and not (tp and tp[2] == pv) then why[#why + 1] = "infobulle pas à côté de l'aperçu" end
+            end
+            if #why > 0 then bad.small[#bad.small + 1] = name .. " : " .. table.concat(why, ", ") end
+          end
+        elseif rawget(f, "isLock") then
+          stats.locked = stats.locked + 1
+          if (pv and pv:IsShown()) or not lit then bad.locked[#bad.locked + 1] = name end
+        elseif #tx > 0 then
+          stats.text = stats.text + 1
+          local fp1 = tostring(f.face._points[1] and f.face._points[1][5])
+          local d = math.max(maxd(r0, rMid), maxd(r0, r1))
+          local inactive = f.active == false or (rawget(f, "option") and f.option.disabled)
+          if d > 1e-9 or fp1 ~= fp0 or (not lit and not inactive) or (lit and inactive and not f.selected) then
+            bad.text[#bad.text + 1] = ("%s (texte déplacé de %.4f, %s)"):format(name, d, lit and "allumé" or "éteint")
+          end
+        else
+          stats.plain = stats.plain + 1
+          if not lit then bad.plain[#bad.plain + 1] = name end
+        end
+        run(f, "OnLeave")
+        H.advance(0.5)
+        local l2 = lums(f)
+        if not sameLum(l0, l2) and not card then bad.plain[#bad.plain + 1] = name .. " (surbrillance restée allumée)" end
+        if pv and pv:IsShown() then bad.small[#bad.small + 1] = name .. " : aperçu resté affiché" end
+      end
+    end
+  end
+
+  -- accueil, progression par classe
+  H.boot(nil)
+  H.slash("")
+  visit("accueil")
+  clickOption("ui:progress")
+  visit("progression")
+  if SNAP then
+    -- aperçu à taille réelle d'une petite carte (instantané)
+    local scr = UI().current
+    local c = scr.cards[3]
+    if c and c:IsVisible() then
+      run(c, "OnEnter")
+      H.advance(0.5)
+      snap("survol-apercu-progression", true)
+      run(c, "OnLeave")
+      H.advance(0.5)
+    end
+    -- gros plan des boutons au repos et survolés (rouge, rouge et or, fermeture, réponse)
+    local Wd = H.ns.Widgets
+    local holder = CreateFrame("Frame", nil, UI().content)
+    holder:SetSize(560, 260)
+    holder:SetPoint("TOPLEFT", UI().content, "TOPLEFT", 0, 0)
+    holder:SetFrameLevel(UI().content:GetFrameLevel() + 400)
+    local bg = Wd.rect(holder, "BACKGROUND", -8, { 0.12, 0.1, 0.08 }, 1)
+    bg:SetAllPoints()
+    local shots = {}
+    for row, spec in ipairs({ { "Back on the road", "red" }, { "Start expedition", "gold" } }) do
+      for col = 1, 2 do
+        local b = Wd.button(holder, spec[1], 220, 50, nil, spec[2], 18)
+        b:SetPoint("TOPLEFT", holder, "TOPLEFT", 20 + (col - 1) * 260, -20 - (row - 1) * 70)
+        shots[#shots + 1] = { b, col == 2 }
+      end
+    end
+    for col = 1, 2 do
+      local x = Wd.closeButton(holder, 30)
+      x:SetPoint("TOPLEFT", holder, "TOPLEFT", 20 + (col - 1) * 260, -170)
+      local m = Wd.button(holder, "Menu", 62, 22, nil, "red", 12.5)
+      m:SetPoint("TOPLEFT", holder, "TOPLEFT", 70 + (col - 1) * 260, -174)
+      shots[#shots + 1] = { x, col == 2 }
+      shots[#shots + 1] = { m, col == 2 }
+    end
+    for _, s in ipairs(shots) do if s[2] then run(s[1], "OnEnter") end end
+    H.advance(0.5)
+    Render.svg(H, holder, SNAP .. "/survol-boutons.svg", "boutons : repos (gauche) / survolés (droite)")
+    for _, s in ipairs(shots) do if s[2] then run(s[1], "OnLeave") end end
+    H.advance(0.5)
+    holder:Hide()
+  end
+  -- combat (main, boutons, piles, jetons, bandeau), panneau du deck, options
+  freshRun(SEED, "combat")
+  H.settle()
+  local v = V()
+  v.playerSt:Set({ { icon = H.ns.Art.ui.gold, key = "ui:gold", n = 3, info = { title = "Essai" } } })
+  H.advance(0.1)
+  visit("combat")
+  -- bouton inactif : rien ne s'allume
+  do
+    local eb = v.endTurn
+    eb:SetActive(false)
+    local l0 = lums(eb)
+    run(eb, "OnEnter")
+    H.advance(0.5)
+    check("bouton inactif (« End Turn ») : aucune surbrillance au survol", not brighter(l0, lums(eb)) and H.ns.Widgets.animValue(eb, "hover") == 0)
+    run(eb, "OnLeave")
+    H.advance(0.5)
+    eb:SetActive(true)
+    -- clic maintenu : assombri, sans bouger ; relâché : rallumé
+    run(eb, "OnEnter")
+    H.advance(0.5)
+    local lUp = lums(eb)
+    local tx0 = rects(texts(eb.face))
+    run(eb, "OnMouseDown", "LeftButton")
+    local lDown = lums(eb)
+    local darker = false
+    for t, val in pairs(lDown) do if val < (lUp[t] or 0) - 0.01 then darker = true end end
+    local still = maxd(tx0, rects(texts(eb.face))) == 0 and eb.face._scale == 1
+    run(eb, "OnMouseUp", "LeftButton")
+    check("clic maintenu : bouton assombri, texte immobile ; relâché : surbrillance rendue", eb.pressed == false and darker and still
+      and sameLum(lUp, lums(eb)))
+    run(eb, "OnLeave")
+    H.advance(0.5)
+  end
+  UI().toggleDeckView("deck")
+  H.advance(0.2)
+  visit("panneau du deck")
+  H.click(UI().deckView.close)
+  H.slash("options")
+  visit("options")
+  H.click(UI().optionsClose)
+  -- marchand, feu de camp, grille d'amélioration, rencontre, parcours
+  freshRun(SEED + 2, "merchant")
+  visit("marchand")
+  freshRun(SEED + 3, "campfire")
+  visit("feu de camp")
+  clickOption("ui:upgrade")
+  visit("grille d'amélioration")
+  freshRun(SEED + 4, "event")
+  visit("rencontre")
+  freshRun(SEED + 5, nil)
+  visit("parcours")
+  -- récompense (après une victoire)
+  freshRun(SEED, "combat")
+  H.settle()
+  fightUntil(nil, 600)
+  if V().banner._shown then
+    visit("fin de combat")
+    H.click(V().banner.button)
+  end
+  if currentKind() == "reward" then visit("récompense") end
+
+  local function head(t, n)
+    local out = {}
+    for i = 1, math.min(#t, n) do out[i] = t[i] end
+    if #t > n then out[#out + 1] = ("… (%d en tout)"):format(#t) end
+    return table.concat(out, "\n        ")
+  end
+  local total = stats.text + stats.plain + stats.readable + stats.small + stats.locked
+  check(("%d éléments survolés sur 12 écrans : aucune échelle changée (sous-arbre, animation Scale), pendant ni après le survol"):format(total),
+    total > 80 and #bad.scale == 0, head(bad.scale, 10))
+  check(("%d éléments à texte (boutons, plaques, onglets, cases à nombre…) : visuel immobile, texte au même rectangle au pixel près, surbrillance allumée puis éteinte (inactif : éteinte)"):format(stats.text),
+    stats.text > 30 and #bad.text == 0, head(bad.text, 10))
+  check(("%d éléments sans texte (icônes de classe, cases, étapes…) : à leur taille, surbrillance au survol, éteinte ensuite"):format(stats.plain),
+    stats.plain > 5 and #bad.plain == 0, head(bad.plain, 10))
+  check(("%d cartes lisibles (main, récompense, marchand) : levées, à leur taille, halo allumé, devant leurs voisines, sans aperçu"):format(stats.readable),
+    stats.readable > 5 and #bad.readable == 0, head(bad.readable, 10))
+  check(("%d petites cartes (grilles, panneau du deck, progression) : immobiles, halo, aperçu à taille réelle à côté, dans la fenêtre, texte entier, infobulle à côté"):format(stats.small),
+    stats.small > 10 and #bad.small == 0, head(bad.small, 10))
+  check(("%d cartes verrouillées : éclaircies, sans aperçu"):format(stats.locked), stats.locked > 0 and #bad.locked == 0, head(bad.locked, 10))
+  local nPrev = 0
+  for _, o in ipairs(H.objects) do if rawget(o, "isPreview") and under(o, UI().frame) then nPrev = nPrev + 1 end end
+  check("aperçu : une seule instance pour la fenêtre, sur la couche du dessus (UI.overlay)", nPrev == 1
+    and H.ns.Widgets.preview:GetParent() == UI().overlay, nPrev)
 end
 
 print("U16 méthodes d'API inconnues appelées")

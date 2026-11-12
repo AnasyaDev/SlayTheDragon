@@ -184,7 +184,6 @@ function W.animTo(obj, key, target, dur, rest)
   end
   if ch.to == target then return end
   dur = dur or W.HOVER_IN
-  if obj._hoverable and dur > 0 then dur = dur * W.zoomSlow() end
   if dur <= 0 then W.animSet(obj, key, target) return end
   ch.from, ch.to, ch.t, ch.dur = ch.v, target, 0, dur
   ch.token = (ch.token or 0) + 1
@@ -206,63 +205,24 @@ end
 function W.driverAwake() return driver.awake and true or false end
 
 ---------------------------------------------------------------------------
--- Survols : zone de survol fixe, visuel animé
+-- Survols : zone de survol fixe, visuel qui s'allume (et, pour une carte, se soulève), jamais agrandi
 ---------------------------------------------------------------------------
--- Piège évité : animer l'échelle ou la position du cadre qui reçoit la souris ferait sortir le
--- curseur de la zone (entrée/sortie en boucle). Le cadre interactif reste donc immobile (zone de
--- survol) ; tout ce qui se voit vit dans son enfant `face`, seul animé (échelle, décalage).
-
--- Agrandissement des visuels (survols, vols de cartes). Trois exigences : un mouvement fluide, aucun
--- tressautement des textes, et un texte net une fois la carte agrandie (c'est celle qu'on lit).
---   * Changer l'échelle réelle (SetScale) fait re-rasteriser au client toutes les polices du visuel
---     (SetSmoothScaling : hauteur non arrondie, donc une nouvelle taille à chaque pas) : à chaque
---     image, c'est lent (15 images/s en jeu) ; en une fois, les glyphes se recalent (« saut »).
---   * Une animation Scale d'un AnimationGroup avec des textes en mode Vertex
---     (FontString:SetScaleAnimationMode, comme Blizzard_EncounterWarnings) est fluide (GPU) et fige
---     la mise en page, mais étire les glyphes rasterisés à l'échelle réelle.
--- Mode « net » (défaut, préféré pour la fluidité) : l'étirement ne sert que pendant le mouvement ; à
--- l'arrivée, dans le même pas de l'OnUpdate partagé, l'échelle d'arrivée devient l'échelle réelle
--- (SetScale) et l'animation est coupée (Stop) : texte net. L'animation est relative à l'échelle réelle du
--- moment (facteur 1 au départ) et tient son état d'arrivée jusqu'à la bascule. Pour qu'à la bascule rien
--- ne saute : aucun cadre enfant dessiné sous un visuel (une animation Scale pourrait ne porter que sur
--- les régions du cadre animé : un cadre enfant ne grossirait qu'à la bascule) — plaques de carte et
--- médaillons de jetons sont des régions du visuel —, et textures sans accrochage au pixel (W.noSnap).
--- Reste la re-rasterisation des polices à la bascule, inhérente à ce mode.
--- Mode « fluide » (comparaison) : l'échelle RÉELLE du visuel vaut en permanence l'échelle survolée
--- (hoverScale) : les polices sont rasterisées une fois, à la taille qu'on lit. Au repos, une animation
--- Scale tenue (long délai de fin) réduit le visuel d'un facteur 1 / hoverScale ; le survol anime ce
--- facteur vers 1, la sortie le ramène à 1 / hoverScale. Jamais de SetScale ni de Stop pendant un
--- survol : aucune re-rasterisation, aucune bascule. Le repos est identique en taille et en position aux
--- autres modes (harnais, U26). Un cadre caché arrête ses animations : l'OnShow du visuel repose l'état.
--- L'animation n'est armée qu'après la construction du widget (image suivante) : une région créée sous
--- un visuel dont l'animation joue est mal dessinée par le client (U23) ; avant, le visuel est au repos
--- sans animation (échelle réelle 1), identique à l'œil. Les créations tardives passent par W.faceBuild.
--- Mode « lisse » (comparaison) : SetScale à chaque image.
--- Dans tous les modes, la mise en page ne dépend pas de l'échelle : retours à la ligne explicites
--- (W.card), largeurs et ancrages en unités du visuel, textes en SetSmoothScaling (taille rendue
--- exactement proportionnelle). /slay zoom slow : survols au ralenti (diagnostic en jeu).
-W.ZOOM_MODES = { "net", "fluide", "lisse" }
-W.ZOOM_DEFAULT = "net"
-local ZOOM_HOLD = 86400 -- délai de fin qui tient l'échelle d'arrivée (secondes)
-
-function W.zoomMode()
-  local o = ns.Persist and ns.Persist.options and ns.Persist.options()
-  local z = o and o.zoom
-  if z == "fluide" or z == "net" or z == "lisse" then return z end
-  return W.ZOOM_DEFAULT
-end
-
--- Ralenti des survols (/slay zoom slow, diagnostic en jeu : voir ce qui ne suit pas l'animation et ce
--- qui bouge à l'arrivée).
-W.ZOOM_SLOW = 8
-function W.zoomSlow()
-  local o = ns.Persist and ns.Persist.options and ns.Persist.options()
-  return (o and o.zoomSlow) and W.ZOOM_SLOW or 1
-end
+-- Piège évité : déplacer le cadre qui reçoit la souris ferait sortir le curseur de la zone
+-- (entrée/sortie en boucle). Le cadre interactif reste donc immobile (zone de survol) ; tout ce qui se
+-- voit vit dans son enfant `face`, seul déplacé (levée d'une carte, écart).
+--
+-- Aucun agrandissement au survol, nulle part (retour en jeu du 12/11/2026) : à une échelle de quelques
+-- pour cent, le client ne peut pas garder un texte stable (police recalée au pixel à chaque taille :
+-- espacement des lettres qui change, texte décalé d'un ou deux pixels, étiré pendant l'animation). Le
+-- survol se signale comme sur les boutons du jeu : une surbrillance (couche additive, liseré ou halo
+-- doré créés d'avance, en fondu par le canal « hover ») et, pour une carte lisible, une levée. La levée
+-- arrive sur un nombre entier de pixels (W.pixelSnap) : le texte est redessiné à l'identique, décalé.
+-- L'échelle d'un visuel ne change plus que pendant un vol de carte (W.fly : animation Scale, puis
+-- échelle réelle d'arrivée posée une fois).
 
 -- Accrochage au pixel coupé (textures : SetSnapToPixelGrid, SetTexelSnappingBias, comme les neuf
--- tranches de Blizzard) : une pièce animée ne se recale pas d'un pixel d'une image à l'autre. Les
--- FontString n'ont pas ces méthodes (SimpleTextureBaseAPI) : test d'existence.
+-- tranches de Blizzard) : une pièce déplacée ou en vol ne se recale pas d'un pixel d'une image à
+-- l'autre. Les FontString n'ont pas ces méthodes (SimpleTextureBaseAPI) : test d'existence.
 function W.noSnap(r)
   if r.SetSnapToPixelGrid then r:SetSnapToPixelGrid(false) end
   if r.SetTexelSnappingBias then r:SetTexelSnappingBias(0) end
@@ -272,6 +232,9 @@ end
 -- Textes de l'interface (W.label, W.text), pour le rafraîchissement des polices.
 local labels = setmetatable({}, { __mode = "k" })
 
+-- Texte posé par l'interface : taille rendue exactement proportionnelle à l'échelle (SetSmoothScaling :
+-- fenêtre à 115 %, aperçu, arrivée d'un vol) et mode Vertex pendant l'animation Scale d'un vol (comme
+-- Blizzard_EncounterWarnings : la mise en page reste figée pendant le vol).
 local function zoomText(fs)
   labels[fs] = true
   if fs.SetScaleAnimationMode and Enum and Enum.FontStringScaleAnimationMode then
@@ -282,252 +245,136 @@ local function zoomText(fs)
 end
 W.zoomText = zoomText
 
--- Survolables créés (pour reposer leur état quand la technique de zoom change).
-local faceOwners = setmetatable({}, { __mode = "k" })
-
--- Bascule la technique de zoom ; renvoie le nouveau mode (une valeur inconnue, dont l'ancien
--- « anim », retombe sur le défaut). Les visuels sont reposés dans le nouveau mode.
-function W.setZoomMode(mode)
-  if mode ~= "fluide" and mode ~= "net" and mode ~= "lisse" then mode = W.ZOOM_DEFAULT end
-  ns.Persist.options().zoom = mode
-  for f in pairs(faceOwners) do
-    if f._animApply == W.faceApply and not f._fly then W.faceApply(f) end
+-- Unités du cadre r les plus proches de u qui font un nombre entier de pixels d'écran (levée d'une
+-- carte : à l'arrivée, le texte est redessiné aux mêmes positions dans le pixel qu'au repos). Pixels
+-- par unité = échelle effective × hauteur physique ÷ 768 (repère de l'interface du jeu).
+function W.pixelSnap(r, u)
+  if not u or u == 0 then return 0 end
+  local s = r.GetEffectiveScale and r:GetEffectiveScale()
+  if type(s) ~= "number" or s <= 0 then return u end
+  local ph
+  if GetPhysicalScreenSize then
+    local _, h = GetPhysicalScreenSize()
+    ph = h
   end
-  return mode
+  local k = s * ((type(ph) == "number" and ph > 0) and ph / 768 or 1)
+  return floor(u * k + 0.5) / k
 end
 
+-- Vol de carte (W.fly) : animation Scale du cadre en vol, relative à son échelle réelle de départ.
+-- C'est la seule animation d'échelle de l'addon ; à l'arrivée, elle est coupée et l'échelle d'arrivée
+-- posée comme échelle réelle (texte net), dans le même appel.
 local ease = {
   OUT = function(p) return 1 - (1 - p) * (1 - p) end,
   IN_OUT = function(p) if p < 0.5 then return 2 * p * p end return 1 - 2 * (1 - p) * (1 - p) end,
 }
 
--- Facteur courant de l'animation Scale d'un visuel (1 si elle ne joue pas).
-local function animFactor(face)
-  local z = face._zoom
+-- Facteur courant de l'animation de vol de f (1 si elle ne joue pas).
+local function flyFactor(f)
+  local z = f._flyScale
   if not z or not z.ag:IsPlaying() then return 1 end
   local dur = z.dur
   local t = GetTime() - z.t0
   if dur <= 0 or t >= dur then return z.to end
-  local fallback = ease[z.smooth] or ease.OUT
-  local p = z.anim.GetSmoothProgress and z.anim:GetSmoothProgress() or fallback(t / dur)
-  if type(p) ~= "number" or p < 0 or p > 1 then p = fallback(t / dur) end
+  local p = z.anim.GetSmoothProgress and z.anim:GetSmoothProgress() or ease.IN_OUT(t / dur)
+  if type(p) ~= "number" or p < 0 or p > 1 then p = ease.IN_OUT(t / dur) end
   return z.from + (z.to - z.from) * p
 end
 
--- Échelle visuelle courante (échelle réelle × facteur de l'animation).
-function W.visualScale(face)
-  return face:GetScale() * animFactor(face)
+-- Échelle visuelle courante d'un cadre (échelle réelle × facteur d'un vol en cours).
+function W.visualScale(f)
+  return f:GetScale() * flyFactor(f)
 end
 
--- Coupe l'animation d'échelle (le facteur retombe à 1).
-local function stopZoom(face)
-  local z = face._zoom
+local function flyScaleStop(f)
+  local z = f._flyScale
   if z then
     z.ag:Stop()
     z.from, z.to = 1, 1
   end
 end
 
-local function newZoom(face)
-  local ag = face:CreateAnimationGroup()
-  local anim = ag:CreateAnimation("Scale")
-  anim:SetOrigin("CENTER", 0, 0)
-  local z = { ag = ag, anim = anim, from = 1, to = 1, t0 = 0, dur = 0 }
-  face._zoom = z
-  return z
-end
-
-local function setSmooth(z, smooth)
-  smooth = smooth or "OUT"
-  if z.smooth ~= smooth then
-    z.smooth = smooth
-    z.anim:SetSmoothing(smooth)
+-- Lance l'animation de vol de f : facteur 1 → target en dur secondes (lissage IN_OUT), tenu jusqu'à
+-- l'arrivée (long délai de fin).
+local function flyScaleTo(f, target, dur)
+  local z = f._flyScale
+  if not z then
+    if target == 1 then return end
+    local ag = f:CreateAnimationGroup()
+    local anim = ag:CreateAnimation("Scale")
+    anim:SetOrigin("CENTER", 0, 0)
+    anim:SetSmoothing("IN_OUT")
+    z = { ag = ag, anim = anim, from = 1, to = 1, t0 = 0, dur = 0 }
+    f._flyScale = z
   end
-end
-
--- Lance l'animation de cur vers target en dur secondes, puis la tient (long délai de fin).
-local function playZoom(z, cur, target, dur)
+  z.ag:Stop()
+  if dur <= 0 or target == 1 then z.from, z.to = 1, 1 return end
   dur = max(dur, 0.001)
-  z.anim:SetScaleFrom(cur, cur)
+  z.anim:SetScaleFrom(1, 1)
   z.anim:SetScaleTo(target, target)
   z.anim:SetDuration(dur)
-  z.anim:SetEndDelay(ZOOM_HOLD)
-  z.from, z.to, z.t0, z.dur = cur, target, GetTime(), dur
+  z.anim:SetEndDelay(86400)
+  z.from, z.to, z.t0, z.dur = 1, target, GetTime(), dur
   z.ag:Play()
 end
 
--- Mode « net » : fait filer le facteur d'animation de face vers target (relatif à l'échelle réelle)
--- en dur secondes, depuis le facteur courant (1 si l'animation ne joue pas : la première image d'un
--- départ est identique avec ou sans animation) ; dur 0 : coupe. smooth = lissage ("OUT" par défaut,
--- "IN_OUT" pour les vols de cartes).
-local function zoomTo(face, target, dur, smooth)
-  local z = face._zoom
-  if not z then
-    if target == 1 then return end
-    z = newZoom(face)
-  end
-  setSmooth(z, smooth)
-  local playing = z.ag:IsPlaying()
-  -- déjà en route vers cette cible
-  if playing and z.to == target then return end
-  local cur = playing and animFactor(face) or 1
-  z.ag:Stop()
-  if dur <= 0 or cur == target then
-    z.from, z.to = 1, 1
-    return
-  end
-  playZoom(z, cur, target, dur)
-end
-
--- Mode « fluide » : le facteur d'animation de face file vers target en dur secondes puis y reste
--- (jamais coupé : le facteur tenu EST l'état du visuel). Départ : facteur courant si l'animation joue,
--- sinon cur0 (état à reposer : cadre remontré, premier armement) ; dur 0 : target tout de suite.
--- force : relance même si la cible ne change pas (échelle réelle changée).
-local function holdTo(face, target, dur, smooth, cur0, force)
-  local z = face._zoom
-  if not z then
-    if target == 1 and (cur0 or 1) == 1 then return end -- facteur 1 : rien à animer
-    z = newZoom(face)
-  end
-  setSmooth(z, smooth)
-  local playing = z.ag:IsPlaying()
-  if playing and z.to == target and not force then return end
-  local cur
-  if force and cur0 then cur = cur0 elseif playing then cur = animFactor(face) else cur = cur0 or target end
-  if dur <= 0 then cur = target end
-  z.ag:Stop()
-  if not playing and cur == 1 and target == 1 then z.from, z.to = 1, 1 return end
-  playZoom(z, cur, target, cur == target and 0 or dur)
-end
-
--- Crée des régions sous le visuel de f (création tardive : plaque de raison, étiquette de prix…)
--- sans animation d'échelle en cours (le client dessine mal une région née pendant l'animation) :
--- l'animation tenue est coupée le temps de fn, puis relancée au même facteur, dans le même appel.
-function W.faceBuild(f, fn)
-  local face = f.face
-  local z = face and face._zoom
-  if not (z and z.ag:IsPlaying()) then return fn() end
-  local cur, to = animFactor(face), z.to
-  local left = max(0, z.dur - (GetTime() - z.t0))
-  z.ag:Stop()
-  local a, b, c = fn()
-  playZoom(z, cur, to, cur == to and 0 or left)
-  return a, b, c
-end
-
 -- Crée le visuel `f.face`, centré sur f, de même taille (suivie par OnSizeChanged) plus margin de
--- chaque côté : un visuel dont des pièces débordent (carte : ruban, languette, plaque, halo) est
--- agrandi pour les contenir toutes, et l'animation Scale porte sur un cadre qui les englobe.
+-- chaque côté (carte : halo, ruban, languette, plaques qui débordent du corps).
 function W.face(f, margin)
   local face = CreateFrame("Frame", nil, f)
   margin = margin or 0
   f.faceMargin = margin
   face:SetSize(f:GetWidth() + 2 * margin, f:GetHeight() + 2 * margin)
   face:SetPoint("CENTER", f, "CENTER", 0, 0)
+  face._x, face._y = 0, 0
   f.face = face
-  faceOwners[f] = true
   f:HookScript("OnSizeChanged", function(self, w, h)
     if w and h then self.face:SetSize(w + 2 * self.faceMargin, h + 2 * self.faceMargin) end
   end)
-  -- un cadre caché arrête ses animations : au retour, l'état est reposé (avant la première image)
-  face:SetScript("OnShow", function() if f._animApply == W.faceApply then W.faceApply(f) end end)
   return face
 end
 
--- Mode « fluide » : échelle réelle = hs, facteur tenu = échelle voulue / hs. Renvoie l'échelle réelle.
-local function applyFluid(f, face, hs, h)
-  local ch = f._ch and f._ch.hover
-  local moving = ch and ch.t < ch.dur
-  if not face._armed and not moving and h == 0 then
-    -- widget pas encore armé (construction en cours) : repos sans animation, échelle réelle 1
-    if face:GetScale() ~= 1 then face:SetScale(1) end
-    stopZoom(face)
-    return 1
-  end
-  face._armed = true
-  local real = face:GetScale()
-  local cur0, force = (1 + (hs - 1) * h) / hs, nil
-  if real ~= hs then
-    -- premier armement, échelle de survol changée ou autre mode avant : échelle réelle posée, facteur
-    -- recalculé pour garder la taille visible
-    cur0 = real * animFactor(face) / hs
-    face:SetScale(hs)
-    force = true
-  end
-  if moving then
-    holdTo(face, (1 + (hs - 1) * ch.to) / hs, ch.dur - ch.t, "OUT", cur0, force)
-  else
-    holdTo(face, (1 + (hs - 1) * h) / hs, 0, "OUT", cur0, force)
-  end
-  return hs
-end
-
--- Applique les canaux « hover » (0..1) et « dx » (pixels) au visuel. Mode « fluide » : voir
--- applyFluid. Mode « net » : pendant le mouvement du canal « hover », échelle réelle inchangée et
--- animation Scale vers l'échelle d'arrivée ; canal immobile : échelle réelle = échelle d'arrivée,
--- animation coupée (même appel). Les décalages (levée, écart) sont divisés par l'échelle réelle.
+-- Applique les canaux « hover » (0..1) et « dx » (unités de f) au visuel : surbrillance (f.hoverPaint)
+-- et position (levée f.hoverLift × hover, écart dx). Aucune échelle. La levée et l'écart d'arrivée sont
+-- ramenés à un nombre entier de pixels ; le visuel n'est réancré que si sa position change (un bouton
+-- ne fait que s'allumer : aucun SetPoint, rien de redessiné que la surbrillance).
 function W.faceApply(f)
   local face = f.face
   if not face then return end
   local h = W.animValue(f, "hover")
   local dx = W.animValue(f, "dx")
-  local hs = f.hoverScale or 1
-  local lift = (f.hoverLift or 0) * h
-  local base
-  local mode = W.zoomMode()
-  if f._fly then
-    base = face:GetScale() -- vol en cours (W.fly) : l'échelle appartient au vol
-  elseif mode == "fluide" then
-    base = applyFluid(f, face, hs, h)
-  elseif mode == "net" then
-    local ch = f._ch and f._ch.hover
-    local goal = 1 + (hs - 1) * (ch and ch.to or 0)
-    base = face:GetScale()
-    if ch and ch.t < ch.dur then
-      -- en route : étirement visuel relatif à l'échelle réelle (repart du facteur courant si la
-      -- cible change en route : réversible)
-      zoomTo(face, goal / base, ch.dur - ch.t)
-    else
-      -- arrivée : échelle réelle posée, animation coupée, dans le même appel
-      if base ~= goal then face:SetScale(goal) base = goal end
-      stopZoom(face)
-    end
-  else
-    stopZoom(face)
-    base = 1 + (hs - 1) * h
-    face:SetScale(base)
+  local lift = f.hoverLift or 0
+  local x, y = 0, 0
+  if lift ~= 0 then y = W.pixelSnap(face, lift) * h end
+  if dx ~= 0 then
+    local ch = f._ch and f._ch.dx
+    x = (ch and ch.t >= ch.dur) and W.pixelSnap(face, dx) or dx
   end
-  face:ClearAllPoints()
-  face:SetPoint("CENTER", f, "CENTER", dx / base, lift / base)
+  if face._x ~= x or face._y ~= y then
+    face._x, face._y = x, y
+    face:ClearAllPoints()
+    face:SetPoint("CENTER", f, "CENTER", x, y)
+  end
   if f.hoverPaint then f:hoverPaint(h) end
 end
 
--- Change l'échelle et la levée de survol d'un visuel et repose son état (mode fluide : échelle
--- réelle posée tout de suite, au repos, plutôt qu'au survol suivant).
-function W.setHover(f, scale, lift)
-  if scale then f.hoverScale = scale end
-  if lift then f.hoverLift = lift end
-  if f._animApply == W.faceApply and f.face and f.face._armed then W.faceApply(f) end
+-- Change la levée de survol d'un visuel (unités de f, vers le haut ; 0 : il ne fait que s'allumer).
+function W.setLift(f, lift)
+  f.hoverLift = lift or 0
+  if f._animApply == W.faceApply and f.face then W.faceApply(f) end
 end
 
--- Rend f survolable : opts = { scale, lift (unités de f, vers le haut), paint(f, h), manual }.
--- manual = l'écran pilote lui-même le canal « hover » (main, cartes à sélection). Mode fluide :
--- armé à l'image suivante (après la construction du widget, qui suit souvent cet appel).
+-- Rend f survolable : opts = { lift (unités de f, vers le haut ; cartes seulement), paint(f, h) : la
+-- surbrillance, manual }. manual = l'écran pilote lui-même le canal « hover » (main, cartes à
+-- sélection).
 function W.hoverable(f, opts)
   opts = opts or {}
   if not f.face then W.face(f) end
   f._hoverable = true
-  f.hoverScale = opts.scale or 1.06
   f.hoverLift = opts.lift or 0
   f.hoverPaint = opts.paint or f.hoverPaint
   f._hoverManual = opts.manual
   f._animApply = W.faceApply
-  W.delay(0, function()
-    if f._animApply == W.faceApply and f.face and not f.face._armed and not f._fly then
-      f.face._armed = true
-      W.faceApply(f)
-    end
-  end)
   return f
 end
 
@@ -536,6 +383,11 @@ function W.hoverEnter(f)
 end
 
 function W.hoverLeave(f)
+  if f.pressed then
+    -- clic maintenu puis sortie : relâché (repeint par le canal, ou tout de suite s'il est au repos)
+    f.pressed = false
+    if f.hoverPaint then f:hoverPaint(W.animValue(f, "hover")) end
+  end
   if f._hoverable and not f._hoverManual then W.animTo(f, "hover", 0, W.HOVER_OUT) end
 end
 
@@ -544,6 +396,41 @@ function W.hoverReset(f)
   if f._ch then
     for key in pairs(f._ch) do W.animSet(f, key, 0) end
   end
+end
+
+-- Surbrillance des boutons, à la façon du jeu (128-RedButton-Highlight, posé en ADD sur le bouton) :
+-- une copie de la pièce du bouton en mélange additif, éteinte au repos, à LIGHT_ADD au survol. Elle
+-- éclaircit le bouton en gardant sa forme (bords, ombre, liseré). Créée avec le bouton (jamais pendant
+-- un survol). x : un trois tranches (W.threeSlice) ou une texture.
+W.LIGHT_ADD = 0.32
+function W.lightLayer(x)
+  local parts = x.parts or { x }
+  for _, t in ipairs(parts) do
+    if t.SetBlendMode then t:SetBlendMode("ADD") end
+  end
+  W.hoverLayer(x)
+  x:SetAlpha(0)
+  return x
+end
+
+-- Enfoncement (clic maintenu) : f.pressed, puis repeint (la surbrillance l'assombrit, PRESS_DIM) ; rien
+-- ne bouge ni ne change d'échelle. Relâché au OnMouseUp, en le cachant et en le quittant (W.hoverLeave).
+W.PRESS_DIM = 0.8
+function W.pressable(f)
+  f:HookScript("OnMouseDown", function(self)
+    if self.active == false or (self.IsEnabled and not self:IsEnabled()) then return end
+    if self.option and self.option.disabled then return end -- réponse ou service impossible
+    self.pressed = true
+    if self.hoverPaint then self:hoverPaint(W.animValue(self, "hover")) end
+  end)
+  local function release(self)
+    if not self.pressed then return end
+    self.pressed = false
+    if self.hoverPaint then self:hoverPaint(W.animValue(self, "hover")) end
+  end
+  f:HookScript("OnMouseUp", release)
+  f:HookScript("OnHide", release)
+  return f
 end
 
 ---------------------------------------------------------------------------
@@ -1367,19 +1254,29 @@ function W.create(kind, name, parent, template)
   return CreateFrame(kind, name, parent)
 end
 
--- Boutons rouges du jeu (128-RedButton) ; action principale : rouge et or (128-GoldRedButton). Survol :
--- le bouton s'éclaircit, le liseré d'or apparaît (bouton rouge) ; sélection (b:SetSelected) : liseré d'or
--- tenu. Libellé doré (NORMAL_FONT_COLOR), ombre portée.
+-- Boutons rouges du jeu (128-RedButton) ; action principale : rouge et or (128-GoldRedButton). Survol,
+-- comme les boutons du jeu (SharedButtonTemplate : surbrillance 128-RedButton-Highlight en ADD, libellé
+-- qui passe de NORMAL_FONT_COLOR à HIGHLIGHT_FONT_COLOR) : le bouton s'éclaircit (pièce plus claire et
+-- sa copie additive, W.lightLayer), le liseré d'or apparaît en fondu (bouton rouge : le rouge et or
+-- par-dessus) et le libellé blanchit ; rien ne grossit ni ne bouge (texte stable). Clic maintenu :
+-- assombri (W.pressable). Sélection (b:SetSelected) : liseré d'or tenu. Inactif : rien ne s'allume.
 local BTN_DIM = 0.86
+W.BTN_DIM = BTN_DIM
 local function buttonPaint(self, h)
   if self.active == false then h = 0 end
-  local k = BTN_DIM + (1 - BTN_DIM) * h
+  local k = (BTN_DIM + (1 - BTN_DIM) * h) * (self.pressed and W.PRESS_DIM or 1)
   self.base:SetVertexColor(k, k, k)
   if self.hot then
     self.hot:SetVertexColor(k, k, k)
     self.hot:SetAlpha(max(self.selected and 1 or 0, h))
   end
+  if self.light then self.light:SetAlpha(W.LIGHT_ADD * h * (self.pressed and 0.5 or 1)) end
+  if self.label and self.labelColor then
+    local c = lerpColor(self.labelColor, C.white, h)
+    self.label:SetTextColor(c[1], c[2], c[3])
+  end
 end
+W.buttonPaint = buttonPaint
 
 -- style : "gold" (action principale : rouge et or, un seul par écran) ; sinon rouge ("red", "slate").
 function W.button(parent, label, w, h, onClick, style, size)
@@ -1396,9 +1293,13 @@ function W.button(parent, label, w, h, onClick, style, size)
     b.hot = W.hoverLayer(W.threeSlice(face, "btn_goldred", "BACKGROUND", -5))
     b.hot:SetAlpha(0)
   end
+  -- surbrillance additive : copie du bouton rouge et or (la pièce visible au survol, liseré d'or
+  -- compris), éteinte au repos
+  b.light = W.lightLayer(W.threeSlice(face, "btn_goldred", "BACKGROUND", -4))
   b.label = W.label(face, "bold", size or (h >= 40 and 18 or (h >= 30 and 14 or 12.5)), C.wowGold)
   b.label:SetPoint("CENTER", 0, 0.5)
   b.label:SetText(label or "")
+  b.labelColor = C.wowGold
   b.SetText = function(self, t) self.label:SetText(t or "") self._text = t end
   b.GetText = function(self) return self.label:GetText() end
   b._text = label
@@ -1409,8 +1310,9 @@ function W.button(parent, label, w, h, onClick, style, size)
   b.Relayout = function(self, hh)
     self.base:Layout(hh)
     if self.hot then self.hot:Layout(hh) end
+    self.light:Layout(hh)
   end
-  W.hoverable(b, { scale = h >= 40 and 1.04 or 1.06, paint = buttonPaint })
+  W.hoverable(b, { paint = buttonPaint })
   buttonPaint(b, 0)
   b:SetScript("OnEnter", function(self)
     W.hoverEnter(self)
@@ -1420,11 +1322,13 @@ function W.button(parent, label, w, h, onClick, style, size)
     W.hoverLeave(self)
     if self.onLeaveExtra then self:onLeaveExtra() end
   end)
+  W.pressable(b)
   b.SetActive = function(self, on)
     self.active = on
     self:SetAlpha(on and 1 or 0.5)
     self.base:SetDesaturated(not on)
     if on then self:Enable() else self:Disable() W.animTo(self, "hover", 0, W.HOVER_OUT) end
+    buttonPaint(self, W.animValue(self, "hover"))
   end
   if onClick then b:SetScript("OnClick", function(self, button)
     W.sound("click")
@@ -1434,7 +1338,8 @@ function W.button(parent, label, w, h, onClick, style, size)
 end
 
 -- Bouton de fermeture rouge du jeu (RedButton-Exit) pour « × » ; autre glyphe (« < », « > ») : petit
--- bouton rouge carré portant le glyphe. Survol : s'éclaircit et grossit un peu.
+-- bouton rouge carré portant le glyphe. Survol : s'éclaircit (pièce plus claire et copie additive,
+-- comme RedButton-Highlight en ADD dans UIPanelCloseButton), sans grossir ; clic maintenu : assombri.
 function W.roundButton(parent, glyph, size, _, _, onClick)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
@@ -1442,20 +1347,22 @@ function W.roundButton(parent, glyph, size, _, _, onClick)
   if glyph == "×" then
     b.base = W.wow(face, "btn_close", "ARTWORK", 0)
     b.base:SetAllPoints()
+    b.light = W.lightLayer(W.wow(face, "btn_close", "ARTWORK", 1))
+    b.light:SetAllPoints()
     b.label = W.label(face, "heavy", 1, C.text) -- (compatibilité : pas de glyphe dessiné)
   else
     b.base = W.threeSlice(face, "btn_red", "ARTWORK", 0)
+    b.light = W.lightLayer(W.threeSlice(face, "btn_red", "ARTWORK", 1))
     b.label = W.label(face, "heavy", floor(size * 0.55), C.wowGold)
     b.label:SetPoint("CENTER", 0, 1)
     b.label:SetText(glyph)
+    b.labelColor = C.wowGold
   end
-  W.hoverable(b, { scale = 1.12, paint = function(self, h)
-    local k = BTN_DIM + (1 - BTN_DIM) * h
-    self.base:SetVertexColor(k, k, k)
-  end })
-  b.base:SetVertexColor(BTN_DIM, BTN_DIM, BTN_DIM)
+  W.hoverable(b, { paint = buttonPaint })
+  buttonPaint(b, 0)
   b:SetScript("OnEnter", function(self) W.hoverEnter(self) end)
   b:SetScript("OnLeave", function(self) W.hoverLeave(self) end)
+  W.pressable(b)
   if onClick then b:SetScript("OnClick", onClick) end
   return b
 end
@@ -1748,18 +1655,28 @@ end
 -- Infobulles (seulement si on les demande, et seulement si elles ont quelque chose à dire)
 ---------------------------------------------------------------------------
 
--- Infobulle au survol ; anime aussi le survol si le cadre est survolable (W.hoverable).
+-- Infobulle au survol ; anime aussi le survol si le cadre est survolable (W.hoverable). Un cadre peut
+-- placer lui-même l'infobulle : self:tooltipSpot() -> { point, relatif, point relatif, x, y } ou nil
+-- (petite carte : à côté de son aperçu à taille réelle) ; self:tooltipLeave() à la sortie.
 function W.tooltip(frame, fill, anchor)
   frame:SetScript("OnEnter", function(self)
     W.hoverEnter(self)
     if self.onEnterExtra then self:onEnterExtra() end
-    GameTooltip:SetOwner(self, anchor or "ANCHOR_RIGHT")
+    local spot = self.tooltipSpot and self:tooltipSpot()
+    if spot then
+      GameTooltip:SetOwner(self, "ANCHOR_NONE")
+      GameTooltip:ClearAllPoints()
+      GameTooltip:SetPoint(spot[1], spot[2], spot[3], spot[4], spot[5])
+    else
+      GameTooltip:SetOwner(self, anchor or "ANCHOR_RIGHT")
+    end
     fill(GameTooltip, self)
     if GameTooltip:NumLines() > 0 then GameTooltip:Show() else GameTooltip:Hide() end
   end)
   frame:SetScript("OnLeave", function(self)
     W.hoverLeave(self)
     if self.onLeaveExtra then self:onLeaveExtra() end
+    if self.tooltipLeave then self:tooltipLeave() end
     GameTooltip:Hide()
   end)
 end
@@ -1953,10 +1870,20 @@ function W.iconButton(parent, size, shape)
     b.case = W.slotOn(face, size)
     b.icon = b.case.icon
   end
+  if b.round then
+    -- halo doré (créé d'avance, éteint) : surbrillance du médaillon
+    b.glow = W.skin(face, "glow_round", "BACKGROUND", -8)
+    b.glow:SetPoint("CENTER")
+    b.glow:SetSize(size * 1.55, size * 1.55)
+    b.glow:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+    b.glow:SetAlpha(0)
+  end
   b.count = W.label(face, "heavy", 11, C.text, "OVERLAY")
   b.count:SetPoint("BOTTOMRIGHT", -1, 1)
-  W.hoverable(b, { scale = 1.12, paint = function(self, h)
+  -- survol : cadre doré de la case (ou halo doré du médaillon) en fondu, sans grossir
+  W.hoverable(b, { paint = function(self, h)
     if self.case then self.case.hot:SetAlpha(h) end
+    if self.glow then self.glow:SetAlpha(0.7 * h) end
   end })
   W.tooltip(b, function(tt, self)
     local info = self.info
@@ -2056,7 +1983,12 @@ function W.tokenRow(parent, maxN, width, size)
       SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end }
     t.count = W.label(face, "heavy", floor(size * 0.45), C.text, "OVERLAY")
     t.count:SetPoint("BOTTOMRIGHT", face, "BOTTOMRIGHT", 1, -1)
-    W.hoverable(t, { scale = 1.12 })
+    -- survol : cadre doré de case (créé d'avance, éteint), sans grossir
+    t.hot = W.hoverLayer(W.wow(face, "slot_hover", "ARTWORK", 3))
+    t.hot:SetSize(size * 1.04, size * 1.04 * WP.slot_hover.ph / WP.slot_hover.pw)
+    t.hot:SetPoint("CENTER", face, "CENTER", 0, 0)
+    t.hot:SetAlpha(0)
+    W.hoverable(t, { paint = function(self, h) self.hot:SetAlpha(h) end })
     W.tooltip(t, function(tt, self)
       local info = self.info
       if not info then return end
@@ -2835,13 +2767,12 @@ local function fitPlate(b, pills)
   return fit
 end
 
--- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin (hors animation
--- d'échelle : W.faceBuild).
+-- Plaque posée sous la carte (raison d'un refus, prix) : créée au premier besoin.
 local newCardPlaque
 local function cardPlaque(b, key, w, h)
   local p = b[key]
   if p then return p end
-  return W.faceBuild(b, function() return newCardPlaque(b, key, w, h) end)
+  return newCardPlaque(b, key, w, h)
 end
 
 -- p est un cadre d'ancrage seulement (taille, position) : plaque, icône et texte sont des régions du
@@ -2883,7 +2814,7 @@ newCardPlaque = function(b, key, w, h)
 end
 
 -- La carte est un bouton immobile (zone de survol et de clic) ; tout son visuel est dans b.face,
--- que le survol anime (W.hoverable). Réglages par écran : b.hoverScale, b.hoverLift (unités de la
+-- que le survol anime (W.hoverable). Réglage par écran : b.hoverLift (W.setLift, unités de la
 -- carte, vers le haut) ; b.baseLevel / b.upLevel : niveau au repos et au survol (passage devant).
 -- Plaque rouge de raison (carte injouable) : à cheval sur le bas du panneau, sous la zone du texte.
 local REASON_Y, REASON_H = 1.225, 20
@@ -2958,7 +2889,7 @@ local function isTruncated(fs)
 end
 local function describeText(fs)
   local e = fs.GetEffectiveScale and fs:GetEffectiveScale() or 1
-  return ("\"%s\" (size %s, scale %.3f, zoom %s)"):format(plainShort(fs:GetText()), tostring(fs._size), e, W.zoomMode())
+  return ("\"%s\" (size %s, scale %.3f)"):format(plainShort(fs:GetText()), tostring(fs._size), e)
 end
 local function logTruncated(line)
   truncLog[#truncLog + 1] = line
@@ -3208,15 +3139,17 @@ function W.card(parent)
   end
   b.SetSelected = function(self, on) self:SetHot(on or self.hover) end
 
-  -- Survol animé : levée, agrandissement, halo qui s'allume ; passage au premier plan.
-  W.hoverable(b, { scale = 1.12, lift = 10, paint = function(self, h)
+  -- Survol : halo qui s'allume, passage au premier plan ; carte lisible : levée (W.setLift, réglée par
+  -- l'écran) ; petite carte : aperçu à taille réelle à côté (W.cardPreview). Jamais d'échelle.
+  W.hoverable(b, { paint = function(self, h)
     if self.hot then self.halo:SetAlpha(h) end -- fondu depuis 0 (pas d'éclat à la première image)
   end })
   b.onAnimSettled = function(self)
     if self.baseLevel and W.animValue(self, "hover") == 0 then W.setLevel(self, self.baseLevel) end
-    -- après la bascule du zoom (échelle réelle d'arrivée) : textes vérifiés une image plus tard
-    W.checkCardTextsSoon(self)
   end
+  b.tooltipSpot = function(self) return W.cardPreviewShow(self) end
+  b.tooltipLeave = function(self) W.cardPreviewHide(self) end
+  b:HookScript("OnHide", function(self) W.cardPreviewHide(self) end)
   b.onEnterExtra = function(self)
     if self._hoverManual then return end
     self.hover = true
@@ -3235,6 +3168,90 @@ function W.card(parent)
   end, "ANCHOR_RIGHT")
   cards[b] = true
   return b
+end
+
+---------------------------------------------------------------------------
+-- Aperçu à taille réelle d'une petite carte (grilles, panneau du deck, progression, bilan)
+---------------------------------------------------------------------------
+-- Une petite carte (échelle de base sous PREVIEW_BELOW) ne grossit pas au survol : une vraie carte à
+-- l'échelle 1 (la taille de la main) apparaît à côté d'elle, en fondu, du côté où il y a de la place,
+-- entièrement dans la fenêtre, sur la couche du dessus (UI.overlay : au-dessus du contenu rogné, des
+-- modèles 3D, du bandeau et de la barre de titre ; à PREVIEW_MARGIN des bords, sous les filets du cadre
+-- sans les toucher). L'infobulle des mots-clés se place à côté de l'aperçu, du côté opposé à la carte.
+-- Une seule instance pour tout l'addon, construite avec la fenêtre (W.buildCardPreview) et réutilisée :
+-- rien n'est créé pendant un survol. Position : coordonnées de pose de la carte (W.placeCenter), dans un
+-- conteneur qui couvre le contenu (écrans, panneau du deck) — mêmes unités que la couche du dessus.
+W.CARD_LIFT = 12         -- levée d'une carte lisible survolée, en unités de la scène (écran : W.CARD_LIFT / échelle)
+W.PREVIEW_BELOW = 0.9
+W.PREVIEW_GAP = 10       -- écart entre la petite carte et l'aperçu
+W.PREVIEW_MARGIN = 8     -- marge aux bords du contenu
+-- débords visibles d'une carte autour de son corps (fractions de la largeur) : languette de coût et
+-- ruban en haut, ruban sur les côtés, plaque du bas (vérifiés sur les pièces par le harnais, UX)
+W.PREVIEW_PAD = { side = 0.12, top = 0.14, bottom = 0.2 }
+local preview
+
+-- host : la couche du dessus (au rectangle du contenu, w × h unités).
+function W.buildCardPreview(host, w, h)
+  if preview then return preview end
+  local p = W.card(host)
+  p.areaW, p.areaH = w, h
+  p:EnableMouse(false)
+  p:SetFrameLevel(host:GetFrameLevel() + 20)
+  p.isPreview = true
+  p.tooltipSpot, p.tooltipLeave = nil, nil
+  -- fondu par le canal « show » (alpha du visuel ; l'alpha du cadre reste à SetCard : carte vendue)
+  p._animApply = function(self)
+    W.faceApply(self)
+    self.face:SetAlpha(W.animValue(self, "show"))
+  end
+  p.onAnimSettled = function(self)
+    if W.animValue(self, "show") == 0 then self.of = nil self:Hide() end
+  end
+  p.face:SetAlpha(0)
+  p:Hide()
+  preview = p
+  W.preview = p
+  return p
+end
+
+-- Montre l'aperçu de `card` si c'est une petite carte posée ; renvoie la place de l'infobulle (à côté de
+-- l'aperçu) ou nil (carte lisible : infobulle habituelle).
+function W.cardPreviewShow(card)
+  local p = preview
+  if not p or card.isPreview or not card.cardId or not card._pc then return nil end
+  local s = card:GetScale() or 1
+  if s >= W.PREVIEW_BELOW then return nil end
+  local host = p:GetParent()
+  local CW, CH = W.CARD_W, W.CARD_H
+  local pad, M = W.PREVIEW_PAD, W.PREVIEW_MARGIN
+  local width, height = p.areaW or host:GetWidth() or 0, p.areaH or host:GetHeight() or 0
+  local cx, cy = card._px, card._py
+  local half = CW / 2 + pad.side * CW
+  local off = CW * s / 2 + W.PREVIEW_GAP + half
+  local x, right = cx + off, true
+  if x + half > width - M then x, right = cx - off, false end
+  if x - half < M then
+    -- ni à droite ni à gauche en entier : du côté le plus large, rentré dans la fenêtre
+    right = cx < width / 2
+    x = right and min(cx + off, width - M - half) or max(cx - off, M + half)
+  end
+  local top, bottom = CH / 2 + pad.top * CW, CH / 2 + pad.bottom * CW
+  local y = max(M + top, min(height - M - bottom, cy))
+  p:SetCard(card.cardId, card.cardUp, card.opts)
+  W.placeCenter(p, host, x, y, 1)
+  p.of = card
+  p:Show()
+  W.animTo(p, "show", 1, W.HOVER_IN)
+  if right then return { "TOPLEFT", p, "TOPRIGHT", 6 + pad.side * CW, 0 } end
+  return { "TOPRIGHT", p, "TOPLEFT", -6 - pad.side * CW, 0 }
+end
+
+-- Cache l'aperçu (en fondu) s'il montre `card`.
+function W.cardPreviewHide(card)
+  local p = preview
+  if not p or p.of ~= card then return end
+  if W.animValue(p, "show") == 0 then p.of = nil p:Hide() return end
+  W.animTo(p, "show", 0, W.HOVER_OUT)
 end
 
 -- Dos de carte (piles, tas du deck) : texture du pack, hauteur h.
@@ -3329,57 +3346,32 @@ end
 -- Place un cadre par son centre dans les coordonnées du conteneur (x vers la droite, y vers le bas).
 function W.placeCenter(f, container, x, y, scale)
   scale = scale or 1
+  f._pc, f._px, f._py = container, x, y -- (aperçu d'une petite carte : W.cardPreviewShow)
   if f:GetScale() ~= scale then f:SetScale(scale) end -- même échelle : rien à redessiner
   f:ClearAllPoints()
   f:SetPoint("CENTER", container, "TOPLEFT", x / scale, -y / scale)
 end
 
--- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone.
--- Mode « fluide » (cadre à visuel survolable : cartes) : échelle réelle du cadre fixée pendant tout le
--- vol à B = max(s1, s2) (polices rasterisées une fois, à la plus grande taille du vol : jamais étirées),
--- visuel à son échelle réelle de survol, et le facteur tenu du visuel anime la taille de s1 à s2. Une
--- carte qui grandit (pioche) arrive exactement dans l'état de repos (échelle réelle s2, facteur
--- 1 / hoverScale) : rien ne change à l'atterrissage. Une carte qui rétrécit (vers la cible, la
--- défausse) reçoit son échelle réelle s2 et son facteur de repos dans le même appel, puis est cachée.
--- Mode « net » : échelle réelle fixée à s1 pendant le vol, changement d'échelle par animation Scale
--- partant du facteur 1 ; à l'arrivée, dans le même appel, animation coupée et échelle réelle s2 posée.
--- Mode « lisse » : échelle réelle à chaque image.
+-- Fait voler un cadre de (x1, y1) à (x2, y2) avec échelle et alpha, puis onDone. Échelle réelle fixée
+-- à s1 pendant le vol, changement de taille par l'animation Scale du cadre (textes en mode Vertex : mise
+-- en page figée) ; à l'arrivée, dans le même appel, animation coupée et échelle réelle s2 posée une fois
+-- (texte redessiné net, à sa taille d'arrivée). Sans animation possible : échelle réelle à chaque image.
 function W.fly(f, container, x1, y1, x2, y2, s1, s2, a1, a2, dur, onDone, arc)
   f:Show()
-  local mode = W.zoomMode()
-  local ok = s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
-  local fluid = ok and mode == "fluide" and f.face ~= nil and f._animApply == W.faceApply
-  local anim = ok and mode == "net"
-  local base = fluid and max(s1, s2) or s1
-  stopZoom(f)
-  if fluid then
-    local face = f.face
-    local hs = f.hoverScale or 1
-    local rest = (1 + (hs - 1) * W.animValue(f, "hover")) / hs
-    f._fly = true
-    face._armed = true
-    W.placeCenter(f, container, x1, y1, base)
-    if face:GetScale() ~= hs then face:SetScale(hs) end
-    holdTo(face, rest * s2 / base, max(0.01, dur * W.pace()), "IN_OUT", rest * s1 / base, true)
-  elseif anim then
-    W.placeCenter(f, container, x1, y1, base)
-    zoomTo(f, s2 / base, max(0.01, dur * W.pace()), "IN_OUT")
+  local anim = s1 > 0 and s2 > 0 and f.CreateAnimationGroup ~= nil
+  flyScaleStop(f)
+  if anim then
+    W.placeCenter(f, container, x1, y1, s1)
+    flyScaleTo(f, s2 / s1, max(0.01, dur * W.pace()))
   end
   W.tween(dur, function(p)
     local x = x1 + (x2 - x1) * p
     local y = y1 + (y2 - y1) * p - (arc or 0) * 4 * p * (1 - p)
-    W.placeCenter(f, container, x, y, (fluid or anim) and base or (s1 + (s2 - s1) * p))
+    W.placeCenter(f, container, x, y, anim and s1 or (s1 + (s2 - s1) * p))
     f:SetAlpha(a1 + (a2 - a1) * p)
   end, function()
-    if fluid then
-      f._fly = nil
-      W.placeCenter(f, container, x2, y2, s2)
-      if base ~= s2 then
-        local hs = f.hoverScale or 1
-        holdTo(f.face, (1 + (hs - 1) * W.animValue(f, "hover")) / hs, 0, "OUT", nil, true)
-      end
-    elseif anim then
-      stopZoom(f)
+    if anim then
+      flyScaleStop(f)
       W.placeCenter(f, container, x2, y2, s2)
     end
     if onDone then onDone() end

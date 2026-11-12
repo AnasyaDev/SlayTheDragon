@@ -61,21 +61,21 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   les trois voies, nom de la voie à gauche, réduit s'il ne tient pas) de vraies cartes `W.card` à 0,6, dans
   l'ordre de leur niveau, et les 6 bibelots en cases à droite des cartes de départ. Tout tient dans
   1040 × 620 sans défilement (34 cartes, pas de 84, rangées de 122).
-- **Débloqué** : la carte telle qu'en jeu, infobulle habituelle, agrandie ×1,65 au survol (levée pour rester
-  dans la fenêtre) ; le bibelot dans sa case, infobulle du bibelot. **Verrouillé** : dos de carte du pack
+- **Débloqué** : la carte telle qu'en jeu, infobulle habituelle ; au survol, halo et aperçu à taille réelle
+  à côté (voir « Survols ») ; le bibelot dans sa case, infobulle du bibelot. **Verrouillé** : dos de carte du pack
   assombri et désaturé (rien d'autre : ni nom, ni texte, ni icône, ni rareté) ; case de bibelot au point
   d'interrogation grisé, liseré éteint. Infobulle = la condition seule, en rouge (« Priest level 4 »).
 - **Bilan** : « +76 Priest experience, +122 reputation (Explorers' League). », « Priest reaches level 2! » ;
   barres niveau de classe et Ligue ; en cas de montée, les cartes et bibelots débloqués révélés sous les
-  barres (vraies cartes à 0,5, agrandies au survol ; cases des bibelots), le panneau monte et grandit sans
+  barres (vraies cartes à 0,5, aperçu à taille réelle au survol ; cases des bibelots), le panneau monte et grandit sans
   toucher aux boutons. Les barres se placent sous le texte (il chevauchait la première barre à 6 lignes).
 - **Accueil** : l'infobulle d'une classe dit « Level N » au lieu de la réputation.
 - Harnais UP (5 classes aux niveaux 1, 4, 7 : nombre de cartes et bibelots ouverts, silhouettes sans texte
   ni icône, infobulle = condition seule, tout dans la fenêtre, rien de tronqué, carte de la dernière rangée
-  survolée dans la fenêtre ; bilan au niveau 2 et au niveau 3 ; accueil). Aperçus :
+  survolée immobile, son aperçu à taille réelle dans la fenêtre ; bilan au niveau 2 et au niveau 3 ; accueil). Aperçus :
   `progression-priest-1`, `progression-warrior-4`, `bilan-montee-de-niveau`.
 - Non vérifiable hors jeu : rendu du dos de carte désaturé (`SetDesaturated` sur une texture du pack), lisibilité
-  des cartes à 0,6 au repos sur l'ardoise, zoom ×1,65 en mode net, nouvelles icônes des bibelots du Priest
+  des cartes à 0,6 au repos sur l'ardoise, aperçu à côté de la carte survolée, nouvelles icônes des bibelots du Priest
   (`Media/Icons`, nouveaux fichiers : relancer le client).
 
 ## Habillage WoW (direction B, mana et parcours façon C)
@@ -200,9 +200,9 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   en or, `SetTitle`) — options, accueil, grille du deck, panneau des cartes, bilan et méta, fin de combat,
   galerie des modèles. `W.parchment(parent[, "map"])` : parchemin Dragonflight (textes) ou Neutral (parcours).
 - `W.button` : bouton rouge (128-RedButton) ou, style `"gold"`, rouge et or (128-GoldRedButton, action
-  principale) ; libellé doré (NORMAL_FONT_COLOR) ; survol : s'éclaircit, le liseré d'or apparaît en fondu
-  (bouton rouge et or par-dessus) ; `SetSelected` tient le liseré (classe choisie). `W.roundButton("×")` /
-  `W.closeButton` : bouton de fermeture rouge ; autre glyphe : petit bouton rouge (pages de la grille).
+  principale) ; libellé doré (NORMAL_FONT_COLOR) ; survol : surbrillance sans échelle (voir « Survols ») ;
+  `SetSelected` tient le liseré (classe choisie). `W.roundButton("×")` / `W.closeButton` : bouton de
+  fermeture rouge ; autre glyphe : petit bouton rouge (pages de la grille).
 - `W.check` (checkbox-minimal, coche jaune), `W.slider` (Minimal_SliderBar : rail, poignée, flèches = un
   cran, clic ou glisser sur le rail), `W.slotOn` (case de barre d'action : fond, icône, cadre, cadre doré au
   survol ; cadre teint à la qualité d'un bibelot), `W.iconButton` (case, ou icône dans le grand anneau),
@@ -210,8 +210,9 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   affaiblissement, nombre en bas à droite), `W.hpBar` (barre du jeu rognée à la fraction, portion perdue
   claire, « PV / max »), `W.shieldBadge` (Absorption : barre bleue dans le logement bas du cadre d'unité,
   fraction des PV max, nombre), `W.repBar` (barre jaune assombrie dans un rail).
-- Inchangés : survols (`W.hoverable`, modes de zoom, aucun cadre enfant dessiné dans un visuel — les cadres
-  d'ancrage des boutons de réponse et de leurs cases ne portent aucune région), halos créés d'avance,
+- Survols : `W.hoverable` (voir « Survols (sans agrandissement) » ; aucun cadre enfant dessiné dans un
+  visuel — les cadres d'ancrage des boutons de réponse et de leurs cases ne portent aucune région), halos
+  créés d'avance,
   infobulles (`GameTooltip`, bordure du jeu), `W.fitText` (descend maintenant jusqu'à ce que ça tienne).
   `W.plaque` ne sert plus qu'aux plaques posées sous une carte (raison d'un refus, prix).
 
@@ -466,17 +467,16 @@ valeurs, bouton « Back on the road » du feu de camp.
   réponse (`setLines` de `UI/Screens.lua`). Les textes d'une ligne à largeur libre (libellés de boutons,
   coût, prix) ne sont jamais tronqués (vérifié, U33). Marge `W.TEXT_SAFE` (1,02) dans le choix des paliers :
   15 cartes perdent un demi-palier (texte ou nom ; Schisme 8 → 7,5, Évangélisation 8,5 → 8…).
-  **Garde-fou en jeu** (`W.checkCardTexts`) : une image après la pose d'une carte et après chaque survol
-  (`onAnimSettled`, donc après la bascule du zoom), un texte que le client tronque malgré tout
-  (`IsTruncated`) fait descendre son palier (texte ou nom, `card.textCap`, propre à la carte) et reposer la
+  **Garde-fou en jeu** (`W.checkCardTexts`) : une image après la pose d'une carte, un texte que le client
+  tronque malgré tout (`IsTruncated`) fait descendre son palier (texte ou nom, `card.textCap`, propre à la carte) et reposer la
   carte ; tout texte tronqué est relevé (40 derniers) : **`/slay text`** les liste (avec taille, échelle
-  effective et mode de zoom), ainsi que les textes visibles tronqués en ce moment ; `/slay art` en donne le
+  effective), ainsi que les textes visibles tronqués en ce moment ; `/slay art` en donne le
   nombre. **Harnais U33** : faux client défavorable (`H.strictText` : police rendue arrondie au pixel
   supérieur à l'échelle effective, hauteur automatique au plus proche) ; toutes les cartes base et
-  améliorées, jouables et injouables, fenêtre 1 / 1,15 / 1,5 / 0,6, écrans main (×1,16), récompense,
-  grille et marchand, posées au repos ou à l'échelle survolée (mode fluide), vues au repos et survolées ;
-  « PW: Radiance » en main par le vrai survol dans les trois modes ; toutes les réponses des
-  rencontres ; tous les textes des visuels survolables. Sur l'ancien code : 2 127 cas tronqués, dont
+  améliorées, jouables et injouables, fenêtre 1 / 1,15 / 1,5 / 0,6, aux sept échelles d'écran (main et
+  aperçu 1, récompense 1,08, marchand 0,92, grille 0,75, panneau du deck 0,72, progression 0,6, bilan 0,5 ;
+  plus d'échelle de survol depuis le 12/11/2026) ; « PW: Radiance » en main levée et au repos ; toutes les
+  réponses des rencontres ; tous les textes des visuels survolables. Sur l'ancien code : 2 127 cas tronqués, dont
   PW: Radiance en net à 1 et 1,15 survolée (« 1/2 lignes »), et 24 réponses.
 - **Paliers** (retour du troisième essai : « texte trop petit ») : chaque carte prend le plus grand
   palier qui tient dans la zone utile (inchangée, marges comprises) : texte 10 / 9,5 / 9 / 8,5 / 8 / 7,5 / 7
@@ -508,61 +508,14 @@ valeurs, bouton « Back on the road » du feu de camp.
   texte des mots-clés. Raison aux paliers 11 à 8 dans 0,84 du corps (6 unités de marge) ; au plancher,
   plaque élargie jusqu'à la largeur du corps ; au-delà, deux lignes équilibrées, la plaque grandit vers le
   haut et la zone du texte de la carte remonte d'autant (« Une incantation / est déjà en cours. »).
-- **Zoom** (`W.faceApply`, trois modes, `/slay zoom` : net → fluide → lisse ; `/slay zoom net|fluide|lisse` ;
-  `/slay zoom lent` : survols au ralenti ×8, diagnostic en jeu). Commun : mise en page indépendante de
-  l'échelle (retours à la ligne explicites, largeurs et ancrages en unités du visuel, **tous les textes en
-  `SetSmoothScaling`** : hauteur de police non arrondie, taille rendue exactement proportionnelle), position
-  (levée, écart des voisines) pilotée par l'`OnUpdate` partagé, décalages divisés par l'échelle réelle,
-  zone de survol immobile ; textures sans accrochage au pixel (`W.noSnap` : `SetSnapToPixelGrid(false)`,
-  `SetTexelSnappingBias(0)`, comme les neuf tranches de Blizzard, aux points de création : `W.skin`,
-  `W.nine`, `W.plaque`, `W.goldPill`, `W.hex`, `W.medallionOn`, pièces de `W.card` ; les FontString n'ont
-  pas ces méthodes — `SimpleTextureBaseAPI` —, d'où le test d'existence).
-  - **net** (défaut, préféré par le joueur pour la fluidité) : pendant le mouvement (0,12 s), animation
-    `Scale` d'un `AnimationGroup` sur le visuel `face`, textes en `SetScaleAnimationMode(Vertex)` ; à
-    l'arrivée, dans le même pas, échelle d'arrivée posée comme échelle **réelle** (`SetScale`) et
-    animation coupée (`Stop`) : texte redessiné net. L'animation part du facteur 1 et tient son état
-    d'arrivée (délai de fin) jusqu'à la bascule ; cible changée en route : relance depuis le facteur
-    courant. Retour du joueur : « fluide mais les éléments sautent à l'arrivée ». Causes possibles d'un
-    saut à la bascule, et ce qui est fait : (1) **cadres enfants du visuel** — si une animation `Scale` ne
-    porte que sur les régions du cadre animé (non vérifiable hors jeu ; cohérent avec la capture d'avant
-    où ruban et plaque ne suivaient pas), un cadre enfant ne grossit qu'à la bascule, d'un coup : la plaque
-    de raison et l'étiquette de prix des cartes (`p`, cadre d'ancrage seulement) et le médaillon des jetons
-    d'état (`W.medallionOn` sur le visuel) sont maintenant des **régions du visuel** ; le harnais (U26)
-    vérifie qu'aucun visuel survolable n'a de cadre enfant dessiné et, sous cette hypothèse prudente,
-    qu'image par image (4 ms) le pas de la bascule n'ajoute aucun déplacement au mouvement ; (2)
-    **accrochage au pixel** des textures (recalées sur la grille de pixels à la nouvelle échelle réelle,
-    alors que l'animation ne l'est pas) : coupé (`W.noSnap`) ; (3) **polices redessinées** à la nouvelle
-    taille (crénage et lissage d'une autre taille de pixels) : inhérent au mode net, aucune animation ne
-    peut le lisser ; c'est ce que supprime le mode fluide. Ce qui saute encore se verra au ralenti
-    (`/slay zoom lent`).
-  - **fluide** (option de comparaison) : l'échelle **réelle** du visuel vaut en permanence l'échelle
-    survolée (`hoverScale`) : polices rasterisées une fois, à la taille qu'on lit ; au repos, une animation
-    `Scale` tenue (délai de fin de 24 h) réduit le visuel d'un facteur 1 / `hoverScale` ; le survol anime ce
-    facteur vers 1, la sortie le ramène à 1 / `hoverScale` ; ni `SetScale` ni `Stop` pendant un survol.
-    Repos identique au mode net (harnais : mêmes rectangles affichés à ±0,01 ; carte agrandie : mêmes
-    rectangles qu'en net à l'arrivée). Armement à l'image suivant `W.hoverable` (après la construction du
-    widget : une région créée sous un visuel dont l'animation joue est mal dessinée, voir « Écran doré ») ;
-    avant, repos sans animation à l'échelle réelle 1, identique à l'œil ; créations tardives sous un
-    visuel armé (plaques de raison et de prix) par `W.faceBuild` (animation coupée le temps de la
-    création puis relancée au même facteur, dans le même appel). Un cadre caché arrête ses animations :
-    l'`OnShow` du visuel repose l'état avant la première image. `W.setHover` change échelle et levée de
-    survol (récompense, grilles, marchand, deck, plaques de réponse, étapes du parcours) et repose
-    l'échelle réelle tout de suite plutôt qu'au survol suivant. Vols (`W.fly`) : échelle réelle du cadre
-    fixée à max(départ, arrivée) pendant tout le vol (polices à la plus grande taille, jamais étirées),
-    taille animée par le facteur tenu du visuel ; pioche (0,3 → 1) : arrivée exactement dans l'état de
-    repos, rien ne change à l'atterrissage. Coûts à surveiller en jeu : une animation tenue sur chaque
-    visuel survolable affiché (cartes, boutons, jetons…), et un texte au repos rendu réduit (×0,86 en main)
-    — à comparer en netteté avec le mode net.
-  - **lisse** : échelle réelle à chaque image (15 images/s en jeu : re-rasterisation des polices).
-  - Persistance : `options.zoom` (`net` par défaut ; `fluide` ou `lisse` enregistrés gardés ; ancienne
-    valeur `anim` ou inconnue → `net`), `options.zoomSlow`.
+- **Zoom** (historique) : de la deuxième à la quatrième version, la carte survolée grossissait (×1,12 à
+  ×1,8) selon trois techniques au choix (`/slay zoom` net / fluide / lisse) ; aucune ne gardait un texte
+  stable (recalage au pixel à chaque taille). Retiré le 12/11/2026 : voir « Survols (sans agrandissement) ».
 - **Carte d'un seul bloc** : le visuel d'une carte (`face`) est agrandi de 0,3 de la largeur de chaque
   côté (`W.CARD_MARGIN`) pour contenir halo, languette de coût, ruban, plaques et étiquette de prix ;
   toutes les pièces et tous les textes sont posés par rapport au corps (`b.bg`, centré sur le visuel).
-  Capture en jeu (mode `anim`) : ruban et plaque du bas restés à leur taille de repos pendant que corps,
-  médaillon et textes grossissaient — les pièces qui débordaient du cadre animé ne suivaient pas
-  l'animation `Scale` (hypothèse : seul cas commun aux pièces fautives) ; à l'arrivée, l'échelle réelle
-  (mode `net`) vaut de toute façon pour tout le visuel.
+  (Historique : en zoom animé, ruban et plaque du bas restaient à leur taille de repos pendant que le
+  corps grossissait ; d'où ce visuel d'un seul bloc, toujours utile aux vols de cartes.)
 - **Écran doré au premier survol** : le halo d'une plaque (`Plaque:SetGlow`) était créé au premier
   survol, donc pendant l'animation `Scale` du visuel ; le client dessinait ces textures nées en cours
   d'animation démesurées (aplat doré sur la scène et le plateau, seulement la première fois). Le halo est
@@ -679,33 +632,83 @@ Planche de toutes les cartes : `lua5.1 Sim/ui_harness.lua 1 build/snap` puis
 
 Les autres cartes ne changent que par leurs retours de clause (mots de la plaque omis ci-dessus).
 
+## Survols (sans agrandissement, retour du 12/11/2026)
+
+- **Vu** (vidéo du joueur, image par image) : au survol, « Back on the road » grossissait d'environ 4 % ;
+  pendant l'animation le texte était étiré, puis redessiné à la nouvelle taille réelle avec d'autres
+  largeurs de glyphes : espacement des lettres qui change, texte décalé d'un ou deux pixels. À ces
+  échelles, le client recale la police au pixel à chaque taille : aucun réglage ne rend un texte stable.
+- **Règle** : plus **aucun agrandissement au survol**, nulle part (boutons, plaques, cases, icônes, étapes,
+  cartes, ennemis visés). Le survol se signale comme sur les boutons du jeu, par une **surbrillance**, et
+  pour une carte lisible par une **levée**. Aucune `SetScale` ni animation `Scale` au survol : le texte
+  survolé est exactement celui du repos (même rectangle, au pixel près ; harnais UX).
+- **Mécanique** (`W.hoverable`, `W.faceApply`, `UI/Widgets.lua`) : le cadre qui reçoit la souris ne bouge
+  jamais (zone fixe) ; le visuel `face` reçoit la surbrillance (`paint(f, h)`, canal « hover » de 0 à 1) et,
+  pour une carte, la levée (`f.hoverLift` × h, `W.setLift`). Canaux `W.animTo` : 0,12 s à l'entrée, 0,15 s à
+  la sortie, courbe amortie, réversibles en route ; un seul `OnUpdate` partagé (`W.driver`), coupé quand
+  rien ne bouge ; minuteur de secours. Le visuel n'est réancré que si sa position change : un bouton ne
+  fait que s'allumer. Levée et écart d'arrivée ramenés à un **nombre entier de pixels** (`W.pixelSnap` :
+  unités × échelle effective × hauteur physique ÷ 768, `GetPhysicalScreenSize`) : le texte levé est
+  redessiné aux mêmes positions dans le pixel qu'au repos.
+- **Boutons** (`W.button`, `W.roundButton` / fermeture, « < » « > », plaques de réponse, service du
+  marchand) : comme `SharedButtonTemplate` de Blizzard (`ThreeSliceButtonTemplate` :
+  `SetHighlightAtlas("128-RedButton-Highlight")`, mélange ADD ; `HighlightFont` blanche ; fermeture :
+  `RedButton-Highlight` en ADD — vu par le MCP, en recherche) : la pièce s'éclaircit (0,86 → 1), sa
+  **copie en mélange additif** (`W.lightLayer` : la pièce embarquée elle-même, `SetBlendMode("ADD")`, alpha
+  0 → `W.LIGHT_ADD` = 0,32) en garde la forme, le **liseré d'or** s'allume (bouton rouge : le rouge et or
+  par-dessus, déjà embarqué) et le libellé passe de l'or au blanc. Aucune texture nouvelle (la pièce
+  « 128-RedButton-Highlight » n'est pas embarquée : la copie additive de la pièce du bouton en tient lieu).
+  **Clic maintenu** (`W.pressable`) : bouton assombri (×0,8), rien ne bouge. **Inactif** (`SetActive(false)`,
+  réponse impossible, clé verrouillée, service trop cher) : rien ne s'allume.
+- **Éléments sans texte ou à nombre** : cases de bibelots, de potions, de clé, pioche / défausse /
+  consumées, jetons d'état, butin et objets du marchand : cadre doré de case (`slot_hover`, créé d'avance) ;
+  médaillons (affixes, coffre, couchage) et icônes de classe : halo doré ; étapes du parcours : lueur dorée
+  (plus vive si accessible) ; dos de carte (bandeau, tas du deck) : copie additive du dos ; carte verrouillée :
+  dos éclairci. Rien ne grossit ni ne se soulève.
+- **Cartes lisibles** (échelle de base ≥ `W.PREVIEW_BELOW` = 0,9 : main 1, récompense 1,08, marchand 0,92) :
+  **levée** de `W.CARD_LIFT` = 12 unités de la scène (nombre entier de pixels à l'arrivée), **halo doré**,
+  passage **devant** les voisines (`W.cardFront`) ; carte sélectionnée ou glissée : même état. Main : zone
+  de survol prolongée vers le haut de la levée (`SetHitRectInsets`) ; les voisines ne s'écartent plus.
+- **Petites cartes** (grille d'amélioration / de retrait 0,75, panneau du deck 0,72, progression 0,6,
+  bilan 0,5) : halo, carte immobile, et **aperçu à taille réelle** (`W.cardPreviewShow`) : une vraie carte à
+  l'échelle 1, **une seule instance** pour la fenêtre (`W.buildCardPreview`, construite avec la fenêtre,
+  jamais pendant un survol), sur `UI.overlay` (au-dessus du contenu rogné, des modèles 3D, du bandeau et
+  de la barre de titre ; à 8 unités des bords, sous les filets sans les toucher), à côté de la carte du
+  côté où il y a la place, en fondu (canal « show », alpha du visuel). Elle montre la carte telle qu'elle
+  est affichée (aperçu « Upgraded » de la grille d'amélioration compris). L'infobulle des mots-clés se
+  place à côté de l'aperçu, du côté opposé à la carte (`tooltipSpot` de `W.tooltip`). Carte verrouillée de
+  la progression : pas d'aperçu (infobulle de condition seule).
+- **Ennemi visé** : son anneau s'allume ; il ne grandit plus.
+- **Ce qui change encore d'échelle** : les vols de cartes seulement (`W.fly` : pioche → main, main → cible
+  ou défausse, échelle réelle de départ pendant le vol, animation `Scale` du cadre, textes en mode Vertex ;
+  à l'arrivée, animation coupée et échelle réelle d'arrivée posée une fois : texte net), le coffre qui
+  s'ouvre et les badges qui « sautent » (animations ponctuelles hors survol).
+- **Retiré** : `/slay zoom` (net / fluid / smooth / slow) et ses options (`options.zoom`, `options.zoomSlow` :
+  une valeur enregistrée est ignorée et effacée) ; `W.zoomMode`, `W.setZoomMode`, `W.zoomSlow`,
+  `ZOOM_MODES` ; les animations `Scale` de survol (`zoomTo`, `stopZoom`, `holdTo`, `applyFluid`, armement
+  `face._armed`, repose à l'`OnShow`) ; `W.faceBuild` ; `W.setHover` (échelle) remplacé par `W.setLift` ;
+  `hoverScale` partout (`HOVER_SCALE` de la main, `PG_ZOOM`, `CP_ZOOM`) ; l'écart des voisines (`V:Spread`) ;
+  l'agrandissement de l'ennemi visé (`AIM_SCALE`) ; la vérification des textes après la bascule du zoom.
+  Gardés : `W.noSnap` (rien ne tressaute pendant une levée ou un vol), `SetSmoothScaling` et le mode
+  Vertex des textes (vols, fenêtre à l'échelle), `W.looseBox`, le garde-fou de troncature.
+- **Harnais** : UX (12 écrans, 245 éléments survolés : aucune échelle changée dans tout le sous-arbre, ni
+  pendant ni après ; éléments à texte immobiles, texte au même rectangle au pixel près, surbrillance
+  allumée puis éteinte, inactif éteint ; éléments sans texte allumés ; cartes lisibles levées, halo,
+  devant ; petites cartes immobiles avec aperçu à taille réelle dans la fenêtre, texte entier, infobulle à
+  côté ; cartes verrouillées sans aperçu ; une seule instance ; clic maintenu assombri) ; U18 (levée
+  entière en pixels aux fenêtres 0,85 à 1,5, vol posé une fois, `/slay zoom` retiré) ; U26 (vols, carte
+  levée dans la fenêtre) ; U34 (textes aux sept échelles d'écran) ; UP (aperçu sur l'écran de
+  progression). Aperçus : `survol-boutons` (repos / survolé), `survol-apercu-progression`, `combat-survol`.
+- **À voir en jeu** : intensité de la surbrillance additive (`W.LIGHT_ADD`) — le rendu hors jeu l'approche
+  par un mélange « screen », plus doux que l'ADD du client ; texte parfaitement immobile au survol des
+  boutons ; levée des cartes nette ; aperçu des petites cartes à côté (grille, panneau du deck,
+  progression), jamais coupé par le bord ni sous un modèle 3D.
+
 ## Retours du premier essai (survols, deck, paysages, bandeau, vouvoiement)
 
-- **Survols animés partout** (`W.hoverable`, `UI/Widgets.lua`). Règle : le cadre qui reçoit la souris
-  ne bouge jamais (zone de survol fixe, invisible) ; tout le visuel vit dans son enfant `face`, seul
-  animé (échelle par animation Scale, position par `SetPoint`, couleurs ; voir « Texte des cartes et
-  zoom »). Pas de clignotement entrée/sortie
-  possible. Canaux animés `W.animTo(obj, clé, cible, durée)` : la valeur file vers sa cible en
-  0,12 s (entrée) / 0,15 s (sortie), courbe amortie (cubique), et repart de sa valeur courante si la
-  souris ressort en route (réversible). Un seul `OnUpdate` partagé (`W.driver`) pour ces canaux et pour
-  les interpolations `W.tween` ; il se coupe (`SetScript("OnUpdate", nil)`) dès que plus rien ne bouge.
-  Minuteur de secours par animation (images sautées). Les durées de survol ne dépendent pas de la
-  vitesse des animations de combat.
-  - Main : la carte survolée (ou sélectionnée) se lève jusqu'à y 372, grossit ×1,16, passe devant ;
-    les voisines s'écartent (26 px puis 12 px, visuel seulement) ; sa zone de survol est prolongée vers
-    le haut tant qu'elle est levée (`SetHitRectInsets`), pour pouvoir « monter » sur la carte.
-  - Cartes de récompense, du marchand, des grilles et du panneau du deck : levée + agrandissement +
-    halo en fondu, passage au premier plan (`W.placeCard` / `W.cardFront` : niveau levé, puis juste
-    au-dessus des voisines tant qu'elle rétrécit, puis niveau de repos).
-  - Boutons (fond qui glisse vers la couleur de survol, ×1,04–1,06), boutons ronds ≡ ×, butin au sol
-    et objets du feu de camp (se soulèvent, halo en fondu, l'ombre reste au sol), étapes du parcours
-    (×1,18 si accessible, ×1,06 sinon), plaques de réponse (levée, halo, parchemin plus clair ; une
-    réponse impossible bouge à peine), fioles et bibelots du bandeau, clé, gemmes de clé de l'accueil,
-    tas du deck, pioche, défausse, consumées.
-  - Ennemis : quand une carte à cible (ou une potion à cible) est armée, l'ennemi survolé — ou la
-    ennemi retenu — grandit ×1,07 depuis ses pieds et son anneau s'allume ; la zone de clic (emplacement)
-    ne bouge pas.
-  - Infobulles conservées (le survol animé est ajouté dans `W.tooltip`).
+- **Survols animés partout** (`W.hoverable`) : zone de survol fixe, visuel `face` animé, canaux réversibles
+  et pilote partagé. (Agrandissements d'alors — main ×1,16, boutons ×1,04–1,06, étapes ×1,18, ennemi visé
+  ×1,07 — retirés le 12/11/2026 : voir « Survols (sans agrandissement) ».)
 - **Consulter ses cartes** (`UI.deckView`, fin de `UI/Screens.lua`) : panneau de bois par-dessus
   l'écran (sous le bandeau), titre court « Deck · 18 cartes » / « Pioche · … » / « Défausse · … » /
   « Consumées · … », grille de vraies cartes (`W.card`, 8 par rangée, 3 rangées visibles, ×0,72),
@@ -934,8 +937,8 @@ de carte revient au même.
   Sans modèle : médaillon argenté à l'icône de l'ennemi (`Art.enemies[id].icon`), ou disque sombre.
 - Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
   (cachée à 0), pioche, défausse et consumées (tas avec nombre ; infobulles : contenu trié ; clic =
-  panneau des cartes, pioche triée), main en arc au centre (cartes droites ; la survolée monte, grossit
-  ×1,16, passe devant, les voisines s'écartent — animé), mini-cartes des recharges (tours restants),
+  panneau des cartes, pioche triée), main en arc au centre (cartes droites ; la survolée se lève de 12,
+  halo allumé, passe devant — animé, sans échelle), mini-cartes des recharges (tours restants),
   « Fin du tour » doré.
 - Fin de combat : « Victoire ! » / « Défaite » en grand, bouton « Continuer » / « Voir le bilan »,
   affichés quand la file d'animations est vide.
@@ -1123,9 +1126,9 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   (icônes rondes, carrées arrondies, ouverture du médaillon), de la police Baloo Chettan 2 (sinon Friz
   Quadrata) ; netteté des cartes au survol ; matières répétées sans couture (`"REPEAT"`) ; rognage de la fenêtre (`SetClipsChildren`) sans effet de bord (la carte
   qu'on glisse hors de la fenêtre disparaît : voulu).
-- Le zoom des survols (mode `net` : animation Scale + textes Vertex pendant le mouvement, échelle réelle
-  posée à l'arrivée) : fluidité, textes immobiles pendant l'agrandissement, aucun sursaut ni clignotement à
-  l'arrivée (moment de la bascule), texte net une fois agrandi ; `/slay zoom` pour comparer avec `lisse`. Le décalage des cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
+- Survols sans agrandissement (voir « Survols (sans agrandissement) ») : texte des boutons immobile,
+  surbrillance additive assez visible, levée des cartes nette, aperçu des petites cartes. Le décalage des
+  cartes de récompense (`SetScale` + `SetPoint` divisé par l'échelle) : calculé.
 - Le **sablier** dans le texte des cartes (séquence |T à 14 champs) : affiché, blanc, net à 10 px, à
   la hauteur des chiffres et **centré verticalement** sur la ligne (supposé : aucune source ne dit où le
   client place une icône en ligne ; décalage y possible dans la séquence), non déformé par le rognage
@@ -1207,7 +1210,7 @@ bulle d'intention ; mana) ; **textes des cartes** (U22 : les 34 cartes, de base 
 et injouables avec leur plaque de raison : chaque ligne posée, marges comprises, sur les pixels sombres
 de `Media/card_panel.tga` et hors de la gemme, au-dessus des plaques ; nom dans la bande opaque de
 `Media/card_ribbon.tga` ; aucune recoupe par le client ; répartition par palier et cartes sous le
-plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; zoom net (U18 : animation Scale en route, échelle réelle 1 ; à l'arrivée échelle réelle = échelle de survol et aucune animation, bascule dans le même pas sans saut ; sortie depuis l'échelle réelle, facteur 1 au départ ; réversible en route et au pas de la bascule ; mise en page des textes identique au repos, pendant et après ; témoin : sans `SetSmoothScaling`, le faux client arrondit la hauteur de police à l'échelle réelle et les largeurs changent ; vol de carte posé net ; cycle `/slay zoom`, ancienne valeur `anim`) ; zoom fluide et saut du mode net (U26 : sauvegarde ; repos identique au net à ±0,01 sur 99 régions ; survol sans `SetScale`, arrivée identique au net ; sortie ; cible changée en route ; fenêtre cachée puis remontrée ; carte jamais montrée ; plaques créées après l'armement ; vols ; écrans construits en fluide sans région née sous une animation ; aucun cadre enfant dessiné sous un visuel ; bascule du mode net sans déplacement ajouté ; carte survolée de la main dans la fenêtre à toutes les places ; noms abrégés) ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus) ; **langage des cartes** (U27 : chaque état posé
+plancher affichées, au moins deux tiers à 8,5 ou plus, relevé carte par carte avec `SLAY_TIERS=fichier` ; textes d'une carte fraîche visibles ; polices reposées à l'ouverture) ; survols sans échelle (U18 : visuel levé sans échelle, réversible, levée entière en pixels aux fenêtres 0,85 à 1,5, carte devant, voisines immobiles, boutons allumés sans bouger, `/slay zoom` retiré, vol posé une fois, ennemi visé sans échelle ; U26 : plus de modes de zoom, aucun cadre enfant dessiné sous un visuel, vols, carte levée de la main dans la fenêtre à toutes les places, noms abrégés ; UX : voir « Survols (sans agrandissement) ») ; premier survol (U23 : carte, carte injouable, bouton doré, bouton rond, objet et carte du marchand, service, couchage, plaque de réponse, étape du parcours — halo éteint avant, borné et parti de 0 à la première image, aucune région créée pendant une animation d'échelle sur tout le harnais, toutes les pièces dans le visuel animé avec la même échelle effective une fois arrivé) ; plaque du bas (U22 : zone utile vérifiée sur les pixels de `card_plate.tga`, toutes les cartes et combinaisons réelles plus un cas extrême, plaque visible devant le corps ; raisons d'une carte injouable dans leur plaque) ; plaques de réponse (U24 : toutes les réponses de `Data/Events.lua`, possibles et impossibles) ; mots-clés (U25 : une ligne de 60 caractères au plus) ; **langage des cartes** (U27 : chaque état posé
 par les effets a sa ligne « Donne » (soi) / « Applique » (ennemi, « à tous ») avec nom et nombre exacts, en
 dernier, sans point, sablier seulement pour une durée, jamais « N tour(s) » ni « Inflige » pour un état,
 textes impersonnels, libellés « Nom : » connus ; Exécution, Déferlement, Dernier souffle et Ombre
@@ -1251,13 +1254,18 @@ Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/In
 `Media/` : relancer le client** (`/reload` ne suffit pas). Activer les erreurs Lua
 (`/console scriptErrors 1`) ou BugSack.
 
-Avant tout (textes tronqués au survol, 12/11/2026 ; `/reload` suffit) : en zoom net (défaut), fenêtre à
-115 % puis à 100 % et 150 %, survoler lentement chaque carte de la main (et en récompense, au marchand,
-dans le deck) : **aucun texte ne finit par « … »** (texte du panneau, nom du ruban, plaque du bas, raison en
-rouge) ; « PW: Radiance » montre ses deux lignes, au repos comme agrandie ; idem en `/slay zoom fluid` et
-`/slay zoom smooth`. Réponses des rencontres : libellé et texte dessous entiers, texte toujours juste sous le
+Avant tout (survols sans agrandissement, 12/11/2026 ; `/reload` suffit) : fenêtre à 115 % puis à 100 % et
+150 %, survoler lentement les boutons (« Back on the road », « End Turn », « Menu », ×, réponses des
+rencontres, service du marchand) : **le texte ne bouge plus d'un pixel ni ne change d'espacement**, le
+bouton s'éclaircit, son liseré d'or s'allume, le libellé blanchit ; clic maintenu : bouton assombri ; bouton
+inactif : rien. Cartes de la main, de la récompense et du marchand : la carte se soulève et son halo
+s'allume, texte net ; grille d'amélioration, panneau du deck, progression : la petite carte ne bouge pas,
+un aperçu à taille réelle apparaît à côté (entier dans la fenêtre, au-dessus des modèles), l'infobulle des
+mots-clés à côté de lui. **Aucun texte ne finit par « … »** (texte du panneau, nom du ruban, plaque du bas,
+raison en rouge) ; « PW: Radiance » montre ses deux lignes. Dire si la surbrillance est trop faible ou trop
+forte (`W.LIGHT_ADD`). Réponses des rencontres : libellé et texte dessous entiers, texte toujours juste sous le
 bouton (pas décalé vers le bas). Puis **`/slay text`** : « no truncated text found so far » attendu ; sinon
-recopier la liste (chaque ligne donne la carte, le texte, la taille, l'échelle et le mode de zoom ; la carte
+recopier la liste (chaque ligne donne la carte, le texte, la taille et l'échelle ; la carte
 a déjà été reposée un palier plus bas). Dire si certaines cartes paraissent plus petites qu'avant (marge de
 2 % : 15 cartes perdent un demi-palier).
 
@@ -1283,7 +1291,7 @@ Ensuite (peau « Mechanized Magic », cartes) :
    lesquels (une capture suffit).
 2. **Police** : Baloo Chettan 2 partout (lettres rondes, accents corrects) ; si tout est en Friz Quadrata,
    la police ne se charge pas.
-3. **Cartes** : nettes au repos et au survol (×1,16 en main, ×1,17 en récompense) ; texte plus grand (le plus grand palier qui tient : 10 sur les textes courts) et noms « MdP : … » / « MdlO : … » ; icône ronde bien dans
+3. **Cartes** : nettes au repos et au survol (levées, sans agrandissement) ; texte plus grand (le plus grand palier qui tient : 10 sur les textes courts) et noms « MdP : … » / « MdlO : … » ; icône ronde bien dans
    l'anneau ; nom horizontal centré sur le ruban, jamais hors de la bande ; texte du panneau centré, avec
    de l'air tout autour (côtés, haut sous la gemme, bas biseauté) même sur Forme d'ombre, Pénitence,
    Esprit de rédemption, chiffres blancs (verts une fois
@@ -1304,24 +1312,13 @@ Ensuite (retours du premier essai) :
 2. **Paysages** : sur la route, la ferme, le feu de camp, le marchand, la côte et le boss, l'illustration
    a-t-elle du sens derrière les personnages (bien cadrée, personnages lisibles) ? Sinon dire laquelle et
    ce qui cloche (trop haut / trop bas / trop clair) ; `/slay decor peint` revient au décor peint.
-3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se lève et grossit en
-   ~0,1 s **sans que le nom, le coût ni le texte tressautent ou changent de coupure**, **d'un seul bloc**
-   (ruban, languette de coût, plaque du bas et halo grossissent avec le corps, pendant le mouvement comme
-   à l'arrivée) ; **une fois agrandie, le texte est net** (aussi net qu'au repos, pas baveux) et **rien ne
-   saute ni ne clignote au moment où elle arrive** (bascule vers la vraie taille) ; comparer avec
-   `/slay zoom fluide` (taille animée sans redessiner les textes : rien ne doit sauter à l'arrivée ; texte
-   au repos aussi net qu'en net ?), `/slay zoom lisse`, puis `/slay zoom net` ; en net, `/slay zoom lent`
-   (ralenti ×8) et dire quels éléments sautent encore à l'arrivée (texte seul ? textures ? une pièce
-   précise ?) et s'ils grossissent pendant le mouvement ; dire quel mode garder et si les images par
-   seconde baissent en fluide (animation tenue sur chaque élément survolable) ; **premier survol** de chaque
-   élément après un `/reload` (plaques de réponse d'une rencontre, boutons, butin) : aucun aplat doré
-   sur l'écran ; les voisines s'écartent un peu, elle passe devant ; ressortir en cours de route la fait
-   redescendre sans à-coup ; aucun clignotement en bord de carte ; on peut monter le curseur sur la
-   partie levée sans la perdre. Idem : cartes de récompense / marchand / grilles, boutons (dont « Fin du
-   tour », ≡, ×), butin au sol, couchage et grimoire, étapes du parcours, plaques de réponse, fioles et
-   bibelots du bandeau, tas du deck, pioche, défausse.
-4. **Visée** : armer une carte à cible (ou une potion à cible) puis survoler les ennemis : l'ennemi
-   survolé grandit un peu depuis ses pieds, son anneau s'allume ; le clic vise toujours le bon ennemi.
+3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se soulève et s'allume en
+   ~0,1 s **sans que le nom, le coût ni le texte changent**, passe devant ; ressortir en cours de route la
+   fait redescendre sans à-coup ; on peut monter le curseur sur la partie levée sans la perdre. Boutons,
+   butin, cases, étapes, plaques de réponse : s'allument sans grossir ; **premier survol** après un
+   `/reload` : aucun aplat doré sur l'écran.
+4. **Visée** : armer une carte à cible (ou une potion à cible) puis survoler les ennemis : l'anneau de
+   l'ennemi survolé s'allume (il ne grandit plus) ; le clic vise toujours le bon ennemi.
 5. **Panneau des cartes** : hors combat, clic sur le tas du deck (plateau) et sur le deck du bandeau ;
    en combat, clic sur la pioche (triée par type, coût, nom — pas l'ordre de tirage), la défausse, le tas
    violet des consumées (après une carte Consumée) et le deck du bandeau. Molette si le deck dépasse 24 cartes ;

@@ -56,6 +56,9 @@ local function deckPile(f)
   p.shadow:SetVertexColor(0, 0, 0, 0.5)
   p.back = W.cardBack(face, PILE_H, "BACKGROUND", 0)
   p.back:SetPoint("CENTER")
+  -- surbrillance : copie additive du dos de carte (créée d'avance, éteinte)
+  p.light = W.lightLayer(W.cardBack(face, PILE_H, "BACKGROUND", 1))
+  p.light:SetPoint("CENTER")
   p.disc = W.disc(face, "ARTWORK", 0, C.black, 0.8)
   p.disc:SetSize(28, 28)
   p.disc:SetPoint("CENTER", 30, -46)
@@ -64,7 +67,8 @@ local function deckPile(f)
   p.ring:SetPoint("CENTER", p.disc, "CENTER", 0, 0)
   p.count = W.label(face, "heavy", 15, C.text, "OVERLAY")
   p.count:SetPoint("CENTER", p.disc, "CENTER", 0, 1)
-  W.hoverable(p, { scale = 1.06, lift = 6 })
+  -- survol : le dos de carte s'éclaircit (le nombre ne bouge pas)
+  W.hoverable(p, { paint = function(self, h) self.light:SetAlpha(W.LIGHT_ADD * h) end })
   p:SetScript("OnClick", function(_, button)
     if button == "RightButton" then return end
     W.sound("click")
@@ -83,7 +87,8 @@ end
 
 -- Réponse (rencontre, bibelot, feu de camp) à la façon B : gros bouton rouge du jeu portant le libellé
 -- (icône de l'objet dans une case à gauche), et sous le bouton ce que la réponse donne ou coûte (vert
--- pour un gain, rouge pour une perte ou la raison d'un refus). Survol : liseré d'or, levée.
+-- pour un gain, rouge pour une perte ou la raison d'un refus). Survol : liseré d'or, bouton éclairci,
+-- libellé blanchi, sans grossir ni bouger (texte stable) ; clic maintenu : assombri.
 -- Mise en page : bouton de OPT_BTN de haut en haut de la zone ; libellé sur une ligne dans le bouton
 -- moins ses bouts et OPT_MX (paliers OPT_LABEL, puis réduit) ; texte dessous, dans la largeur moins
 -- OPT_MX, sur une ligne si possible (paliers OPT_SUB), sinon en lignes équilibrées ; mesures par le client.
@@ -149,6 +154,7 @@ local function plaque(parent)
   b.base = W.threeSlice(b.btn, "btn_red", "BACKGROUND", -6, { parent = face })
   b.hot = W.hoverLayer(W.threeSlice(b.btn, "btn_goldred", "BACKGROUND", -5, { parent = face }))
   b.hot:SetAlpha(0)
+  b.light = W.lightLayer(W.threeSlice(b.btn, "btn_goldred", "BACKGROUND", -4, { parent = face }))
   b.iconBox = CreateFrame("Frame", nil, face)
   b.iconBox:SetSize(OPT_ICON, OPT_ICON)
   b.slot = W.slotOn(b.iconBox, OPT_ICON, 0, face)
@@ -156,6 +162,7 @@ local function plaque(parent)
   b.label = W.label(face, "bold", OPT_LABEL[1], C.wowGold)
   b.label:SetJustifyH("CENTER")
   b.label:SetWordWrap(false)
+  b.labelColor = C.wowGold
   b.sub = W.label(face, "bold", OPT_SUB[1], C.text)
   b.sub:SetJustifyH("CENTER")
   b.sub:SetJustifyV("TOP") -- ancré par le haut dans une boîte plus haute que lui (W.looseBox)
@@ -234,11 +241,12 @@ local function plaque(parent)
     for _, t in ipairs({ self.slot.bg, self.slot.icon, self.slot.frame, self.slot.hot }) do t:SetShown(withIcon) end
     self.base:Layout(OPT_BTN)
     self.hot:Layout(OPT_BTN)
+    self.light:Layout(OPT_BTN)
     self:Layout(o.label or o.id, sub, w, h, withIcon)
     self.base:SetDesaturated(o.disabled and true or false)
     self:SetAlpha(o.disabled and 0.6 or 1)
-    -- une réponse impossible bouge à peine au survol
-    W.setHover(self, o.disabled and 1.01 or 1.04, o.disabled and 0 or 5)
+    -- une réponse impossible ne s'allume pas
+    self:hoverPaint(W.animValue(self, "hover"))
     self:Show()
   end
   b:SetScript("OnClick", function(self) chooseOption(self.option) end)
@@ -246,15 +254,13 @@ local function plaque(parent)
     local o = self.option
     if o and o.item then W.fillItemTooltip(tt, o.item.kind, o.item.id, { reason = o.disabled and o.reason or nil }) end
   end, "ANCHOR_TOP")
-  -- survol : le liseré d'or apparaît, le bouton s'éclaircit, la réponse se lève
-  W.hoverable(b, { scale = 1.04, lift = 5, paint = function(self, h)
-    local live = self.option and not self.option.disabled
-    if not live then h = 0 end
-    local k = 0.86 + 0.14 * h
-    self.base:SetVertexColor(k, k, k)
-    self.hot:SetVertexColor(k, k, k)
-    self.hot:SetAlpha(h)
+  -- survol : le liseré d'or apparaît, le bouton s'éclaircit (comme W.button) ; une réponse impossible
+  -- ne s'allume pas
+  W.hoverable(b, { paint = function(self, h)
+    if not (self.option and not self.option.disabled) then h = 0 end
+    W.buttonPaint(self, h)
   end })
+  W.pressable(b)
   return b
 end
 
@@ -300,7 +306,7 @@ end
 -- Objet cliquable (butin, articles du marchand, couchage et grimoire du feu, coffre) : case de barre
 -- d'action du jeu (shape "square") ou icône ronde dans le grand anneau doré (shape "round") ; nombre en
 -- bas à droite (b.big) ; étiquette dessous (prix : pièce + nombre, rouge si trop cher ; ou texte).
--- Survol : cadre doré (case) ou halo doré (anneau), l'objet se soulève.
+-- Survol : cadre doré (case) ou halo doré (anneau), sans grossir ni bouger (nombre et étiquette stables).
 local function groundObject(parent, size, shape)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(size, size)
@@ -326,7 +332,7 @@ local function groundObject(parent, size, shape)
   b.SetRim = function(self, c)
     if self.slot then c = c or Art.rim.silver self.slot.frame:SetVertexColor(c[1], c[2], c[3], 1) end
   end
-  W.hoverable(b, { scale = 1.08, lift = 6, paint = function(self, h)
+  W.hoverable(b, { paint = function(self, h)
     if self.active == false then h = 0 end
     if self.glow then self.glow:SetAlpha(0.8 * h) end
     if self.slot then self.slot.hot:SetAlpha(h) end
@@ -391,7 +397,7 @@ local function fillClassTooltip(tt, o)
 end
 
 -- Icône de classe : grand anneau doré, icône ronde, halo doré créé d'avance (éteint) ; choisie : halo
--- tenu, anneau et icône pleins ; sinon assombrie, éclairée au survol.
+-- tenu, anneau et icône pleins ; sinon assombrie, éclairée au survol (halo en fondu, sans grossir).
 local CLASS_DIM = 0.5
 local function classIcon(parent)
   local b = CreateFrame("Button", nil, parent)
@@ -410,7 +416,7 @@ local function classIcon(parent)
     self.glow:SetSize(s * 1.6, s * 1.6)
   end
   b:Resize(START_ICON)
-  W.hoverable(b, { scale = 1.08, lift = 3, paint = function(self, h)
+  W.hoverable(b, { paint = function(self, h)
     local sel = self.selected
     local k = sel and 1 or (CLASS_DIM + (1 - CLASS_DIM) * h)
     self.icon:SetVertexColor(k, k, k, 1)
@@ -454,7 +460,10 @@ function Start:Build(f)
     W.setIcon(b.slot.icon, Art.keystone, "ui:keystone")
     b.label = W.label(face, "heavy", 16, C.text, "OVERLAY")
     b.label:SetPoint("CENTER", 0, 1)
-    W.hoverable(b, { scale = 1.14, paint = function(self, h)
+    -- survol : cadre doré de la case (tenu pour la clé choisie), sans grossir ; clé verrouillée : rien
+    -- ne s'allume (son infobulle dit pourquoi)
+    W.hoverable(b, { paint = function(self, h)
+      if self.option and self.option.disabled then h = 0 end
       self.slot.hot:SetAlpha(max(h, self.selected and 1 or 0))
     end })
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
@@ -769,7 +778,7 @@ function Reward:Build(f)
   for i = 1, 4 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) Reward:Pick(card) end)
-    W.setHover(c, 1.17, 22 / REWARD_SCALE)
+    W.setLift(c, W.CARD_LIFT / REWARD_SCALE) -- carte lisible : levée et halo au survol
     c:Hide()
     self.cards[i] = c
   end
@@ -1029,8 +1038,7 @@ function Deck:Build(f)
     local c = W.card(f)
     c:SetFrameLevel(panel:GetFrameLevel() + 5)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    W.setHover(c, 1.2, 8 / GRID_SCALE)
-    -- survol : animation commune (W.card) + aperçu de l'amélioration
+    -- survol : halo et aperçu à taille réelle (petite carte, W.cardPreviewShow) + aperçu de l'amélioration
     local enter, leave = c.onEnterExtra, c.onLeaveExtra
     c.onEnterExtra = function(card) enter(card) Deck:Preview(card) end
     c.onLeaveExtra = function(card) leave(card) Deck:Preview(card) end
@@ -1151,7 +1159,7 @@ local SHOP_TOP, SHOP_X0, SHOP_DX = 81, 147, 150
 local SHOP_ITEM_Y, SHOP_ITEM_DX = 365, 104
 
 -- Service (retrait de carte) : bouton rouge du jeu, icône dans une case à gauche, libellé doré ;
--- étiquette de prix dessous. Survol : liseré d'or, levée.
+-- étiquette de prix dessous. Survol : liseré d'or, bouton éclairci, libellé blanchi, sans bouger.
 local function serviceButton(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(230, 46)
@@ -1160,6 +1168,7 @@ local function serviceButton(parent)
   b.base = W.threeSlice(face, "btn_red", "BACKGROUND", -6)
   b.hot = W.hoverLayer(W.threeSlice(face, "btn_goldred", "BACKGROUND", -5))
   b.hot:SetAlpha(0)
+  b.light = W.lightLayer(W.threeSlice(face, "btn_goldred", "BACKGROUND", -4))
   b.iconBox = CreateFrame("Frame", nil, face)
   b.iconBox:SetSize(30, 30)
   b.iconBox:SetPoint("CENTER", face, "LEFT", 34, 0)
@@ -1168,15 +1177,15 @@ local function serviceButton(parent)
   W.setIcon(b.icon, Art.ui.remove, "ui:remove")
   b.label = W.label(face, "bold", 15, C.wowGold)
   b.label:SetPoint("LEFT", face, "LEFT", 58, 0.5)
+  b.labelColor = C.wowGold
   b.tag = tagPill(b)
   b.tag:SetPoint("TOP", b, "BOTTOM", 0, -6)
-  W.hoverable(b, { scale = 1.04, lift = 3, paint = function(self, h)
+  W.hoverable(b, { paint = function(self, h)
     if self.option and self.option.disabled then h = 0 end
-    local k = 0.86 + 0.14 * h
-    self.base:SetVertexColor(k, k, k)
-    self.hot:SetVertexColor(k, k, k)
-    self.hot:SetAlpha(h)
+    W.buttonPaint(self, h)
   end })
+  W.pressable(b)
+  b:hoverPaint(0)
   b:SetScript("OnClick", function(self) chooseOption(self.option) end)
   W.tooltip(b, function(tt, self)
     local o = self.option
@@ -1190,7 +1199,7 @@ function Shop:Build(f)
   for i = 1, 7 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    W.setHover(c, 1.12, 10 / SHOP_SCALE)
+    W.setLift(c, W.CARD_LIFT / SHOP_SCALE) -- carte lisible : levée et halo au survol
     c:Hide()
     self.cards[i] = c
   end
@@ -1372,8 +1381,16 @@ local function nodeButton(self, i)
   b.ribbon:Hide()
   b.bossName = W.label(face, "bold", 14, C.parchInk, "OVERLAY", false)
   b.bossName:SetPoint("CENTER", b.ribbon, "CENTER", 0, 2)
-  -- survol : l'étape grossit (davantage si elle est accessible, voir paintNode)
-  W.hoverable(b, { scale = 1.1 })
+  -- surbrillance : lueur dorée (créée d'avance, éteinte), plus vive sur une étape accessible
+  b.hl = W.hoverLayer(W.skin(face, "glow_round", "BACKGROUND", 1))
+  b.hl:SetPoint("CENTER")
+  b.hl:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+  b.hl:SetAlpha(0)
+  -- survol : la lueur s'allume, l'étape ne grossit pas (le nom du boss reste stable)
+  W.hoverable(b, { paint = function(self, h)
+    local st = self.node and self.node.state
+    self.hl:SetAlpha(h * ((st == "available" or (self.node and self.node.kind == "boss")) and 0.8 or 0.35))
+  end })
   b:SetScript("OnClick", function(btn)
     local node = btn.node
     if node and node.state == "available" then W.sound("click") UI.choose(node.id)
@@ -1402,7 +1419,7 @@ local function paintNode(b, node, bossName)
   local cur = st == "current"
   local size = boss and 78 or (elite and 54 or NODE)
   b:SetSize(size, size)
-  W.setHover(b, st == "available" and 1.18 or 1.06)
+  b.hl:SetSize(size * 1.6, size * 1.6)
   b.icon:ClearAllPoints()
   local inset = boss and size * 0.12 or size * 0.16
   b.icon:SetPoint("TOPLEFT", inset, -inset)
@@ -1532,9 +1549,9 @@ UI.register("progress", Progress)
 -- PG_BARS_META), rangée des déblocages sous les barres.
 local PG_X, PG_W, PG_Y, PG_H, PG_UP_Y, PG_BOTTOM = 167, 700, 64, 352, 40, 488
 local PG_BARS, PG_BARS_META, PG_BAR_DY = 170, 110, 54
-local PG_SCALE, PG_ZOOM, PG_PITCH, PG_RELIC, PG_RELIC_DX = 0.5, 1.8, 72, 44, 58
+local PG_SCALE, PG_PITCH, PG_RELIC, PG_RELIC_DX = 0.5, 72, 44, 58
 local PG_MAX_CARDS, PG_MAX_RELICS = 9, 3
-UI.PG = { scale = PG_SCALE, zoom = PG_ZOOM, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS, bottom = PG_BOTTOM }
+UI.PG = { scale = PG_SCALE, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS, bottom = PG_BOTTOM }
 
 function Progress:Build(f)
   local panel = W.dialog(f, nil)
@@ -1572,7 +1589,6 @@ function Progress:Build(f)
   for i = 1, PG_MAX_CARDS do
     local c = W.card(f)
     c:SetFrameLevel(panel:GetFrameLevel() + 5)
-    W.setHover(c, PG_ZOOM, 8 / PG_SCALE)
     c:Hide()
     self.newCards[i] = c
   end
@@ -1705,13 +1721,13 @@ UI.register("classProgress", ClassProgress)
 -- Mise en page (coordonnées de la scène) : cartes à CP_SCALE, CP_PITCH entre deux centres, colonne des
 -- voies à gauche (noms à partir de CP_LABEL_X, réduits pour tenir dans CP_LABEL_W), rangées de CP_ROW_H à
 -- partir de CP_ROW_TOP ;
--- bibelots en cases de CP_RELIC, pas CP_RELIC_DX, à partir de CP_RELIC_X ; zoom au survol CP_ZOOM.
+-- bibelots en cases de CP_RELIC, pas CP_RELIC_DX, à partir de CP_RELIC_X.
 local CP_SCALE, CP_PITCH, CP_X0, CP_LABEL_X, CP_LABEL_W = 0.6, 84, 190, 18, 128
-local CP_ROW_TOP, CP_ROW_H, CP_ZOOM = 112, 122, 1.65
+local CP_ROW_TOP, CP_ROW_H = 112, 122
 local CP_RELIC, CP_RELIC_DX, CP_RELIC_X, CP_RELIC_LABEL_R = 46, 62, 612, 574
 local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 44, 56, 50, 76
 local CP_SLOTS, CP_ROWS = 34, 4
-UI.CP = { scale = CP_SCALE, pitch = CP_PITCH, x0 = CP_X0, rowTop = CP_ROW_TOP, rowH = CP_ROW_H, zoom = CP_ZOOM,
+UI.CP = { scale = CP_SCALE, pitch = CP_PITCH, x0 = CP_X0, rowTop = CP_ROW_TOP, rowH = CP_ROW_H,
   relic = CP_RELIC, relicDx = CP_RELIC_DX, relicX = CP_RELIC_X }
 
 -- Infobulle d'un élément verrouillé : la condition seule.
@@ -1730,7 +1746,7 @@ local function lockedCard(parent)
   b.back:SetPoint("CENTER")
   b.back:SetDesaturated(true)
   b.back:SetVertexColor(0.42, 0.42, 0.42, 1)
-  W.hoverable(b, { scale = 1.04, paint = function(self, h)
+  W.hoverable(b, { paint = function(self, h)
     local k = 0.42 + 0.12 * h
     self.back:SetVertexColor(k, k, k, 1)
   end })
@@ -1788,13 +1804,11 @@ function ClassProgress:Build(f)
   self.optionButtons = {}
 end
 
--- Pose une carte (vraie ou silhouette) au repos ; zoom au survol, levée pour rester dans la fenêtre.
+-- Pose une carte (vraie ou silhouette) au repos ; au survol : halo et aperçu à taille réelle à côté
+-- (petite carte, W.cardPreviewShow) ; silhouette : son infobulle de condition seulement.
 local function placeCP(self, card, slot, cx, cy)
   local lv = self.panel:GetFrameLevel()
-  local half = W.CARD_H * CP_SCALE * CP_ZOOM / 2
-  local lift = max(8, cy + half - (Scene.H - 6)) -- en unités de la scène
   if not card.isLock then
-    W.setHover(card, CP_ZOOM, lift / CP_SCALE)
     W.placeCard(card, self.frame, cx, cy, CP_SCALE, lv + 5 + slot, lv + 80)
   else
     W.placeCenter(card, self.frame, cx, cy, CP_SCALE)
@@ -2003,7 +2017,6 @@ function DV:Build()
   self.cards = {}
   for i = 1, DV_ROW * DV_ROWS do
     local c = W.card(veil)
-    W.setHover(c, 1.14, 6 / DV_SCALE)
     c:EnableMouseWheel(true)
     c:SetScript("OnMouseWheel", wheel)
     c:SetScript("OnClick", function(_, button) if button == "RightButton" then DV:Close() end end)

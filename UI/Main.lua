@@ -133,10 +133,13 @@ local function buildBand(host, place)
   local dface = W.face(deck)
   deck.back = W.cardBack(dface, 24)
   deck.back:SetPoint("LEFT", 0, 0)
+  -- surbrillance : copie additive du dos de carte (créée d'avance, éteinte) ; le nombre ne bouge pas
+  deck.light = W.lightLayer(W.cardBack(dface, 24, "ARTWORK", 1))
+  deck.light:SetPoint("LEFT", 0, 0)
   deck.label = W.label(dface, "heavy", 14.5, C.text)
   deck.label:SetPoint("LEFT", deck.back, "RIGHT", 4, 0)
   deck.SetText = function(self, t) self.label:SetText(t) self._text = t end
-  W.hoverable(deck, { scale = 1.08 })
+  W.hoverable(deck, { paint = function(self, h) self.light:SetAlpha(W.LIGHT_ADD * h) end })
   deck:SetScript("OnClick", function(_, button)
     if button == "RightButton" then return end
     W.sound("click")
@@ -251,7 +254,7 @@ function UI.build()
   -- du contenu < contenu + 300) :
   --   contenu (rogné)          niveau L        décor, plateau, écrans, options, panneau du deck
   --   frameTop                 L + 300         barre de titre du cadre métal, puis le bandeau (enfant)
-  --   UI.overlay (rogné)       L + 600         message passager, butin en vol vers le bandeau
+  --   UI.overlay (rogné)       L + 600         message passager, butin en vol, aperçu des petites cartes
   --   rimHost                  L + 900         filets gauche, droit et bas du cadre métal
   -- Le contenu est rentré de 2,5 (gauche, haut) et 3,5 (droite, bas) : ses bords tombent sous la partie
   -- opaque du filet et ses coins dans la silhouette des coins biseautés (le harnais le vérifie au pixel,
@@ -278,6 +281,8 @@ function UI.build()
   overlay:SetClipsChildren(true)
   overlay:SetFrameLevel(L + 600)
   UI.overlay = overlay
+  -- aperçu à taille réelle des petites cartes (une instance, construite ici, réutilisée)
+  UI.cardPreview = W.buildCardPreview(overlay, UI.CONTENT_W, UI.CONTENT_H)
   local rimHost = CreateFrame("Frame", nil, f)
   rimHost:SetAllPoints()
   rimHost:SetFrameLevel(L + 900)
@@ -909,12 +914,6 @@ local function decorCommand(arg)
   end
 end
 
--- Mots tapés pour le zoom (/slay zoom) -> valeur enregistrée dans options.zoom (inchangée : « net »,
--- « fluide », « lisse », pour ne casser aucune sauvegarde), et l'inverse pour l'affichage.
-local ZOOM_WORDS = { sharp = "net", fluid = "fluide", smooth = "lisse" }
-local ZOOM_NAMES = { net = "sharp", fluide = "fluid", lisse = "smooth" }
-UI.ZOOM_WORDS, UI.ZOOM_NAMES = ZOOM_WORDS, ZOOM_NAMES
-
 SLASH_SLAYTHEDRAGON1 = "/slay"
 SLASH_SLAYTHEDRAGON2 = "/slaythedragon"
 SlashCmdList.SLAYTHEDRAGON = function(msg)
@@ -927,36 +926,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "scenery" or msg:match("^scenery%s") then
     decorCommand(msg:match("^scenery%s*(.*)$") or "")
   elseif msg == "center" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
-  elseif msg == "zoom" or msg:match("^zoom%s") then
-    -- technique d'agrandissement au survol (voir W.faceApply) : « sharp » = net (défaut : étirement
-    -- pendant le mouvement, vraie taille à l'arrivée), « fluid » = fluide (échelle réelle de survol
-    -- tenue, taille par animation) ou « smooth » = lisse (vraie taille à chaque image) ; sans argument :
-    -- le suivant du cycle ; « anim », ancien nom, vaut le défaut ; « slow » : survols au ralenti
-    -- (diagnostic), bascule
-    local want = msg:match("^zoom%s+(%S+)")
-    if want == "slow" then
-      opts().zoomSlow = not opts().zoomSlow
-      say("slow-motion hovers (×" .. W.ZOOM_SLOW .. "): " .. (opts().zoomSlow and "on" or "off") .. ".")
-      return
-    end
-    local modes = W.ZOOM_MODES
-    local mode
-    if want then
-      mode = ZOOM_WORDS[want]
-      if not mode and want ~= "anim" then
-        say("usage: /slay zoom [sharp|fluid|smooth|slow]")
-        return
-      end
-      mode = mode or W.ZOOM_DEFAULT
-    else
-      local cur = W.zoomMode()
-      for i, m in ipairs(modes) do if m == cur then mode = modes[i % #modes + 1] end end
-    end
-    mode = W.setZoomMode(mode)
-    local what = { net = "sharp (text redrawn at true size on arrival)",
-      fluide = "fluid (text drawn at the enlarged size, size animated)",
-      lisse = "smooth (true size on every frame)" }
-    say("hover zoom: " .. what[mode] .. ".")
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
@@ -969,6 +938,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay: open/close; /slay options; /slay art (scenery, missing art); /slay models; "
-      .. "/slay scenery [test]; /slay zoom [sharp|fluid|smooth|slow]; /slay facing <p> <e>; /slay center")
+      .. "/slay scenery [test]; /slay facing <p> <e>; /slay center")
   end
 end
