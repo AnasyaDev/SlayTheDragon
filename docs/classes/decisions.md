@@ -52,7 +52,7 @@ Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est c
 - **État `halved`.** Il prend un nom neutre à l'affichage, donné par la carte qui le pose.
 - **PV de départ** (à régler par simulation) : Priest 65, Warrior à fixer par son agent, Rogue 65,
   Paladin 75, Mage 60, Warlock 70, Hunter 65, Shaman 60, Druid 65. Réglés le 12/11/2026 (`docs/equilibrage.md`) :
-  Priest 52, Warrior 72, Mage 42, Rogue 49, Hunter 41.
+  Priest 52, Warrior 72, Mage 42, Rogue 49, Hunter 41 ; passe 2 (même jour) : Warrior 74, Rogue 50.
 
 ## Fixé avec la progression par classe (12/11/2026)
 - **Niveaux de classe** : seuils cumulés 100 / 250 / 450 / 700 / 1 000 / 1 400 ; expérience par expédition

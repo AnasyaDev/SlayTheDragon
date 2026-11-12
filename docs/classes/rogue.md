@@ -15,7 +15,7 @@ durée (`pain` / « Pain » dans le code actuel, à renommer).
 | Style de survie | Tuer vite, et Parry. Aucun soin. |
 | Difficulté | Moyenne. |
 | PV de départ | 65 (comme le Priest : pas de soin, mais Parry ne se perd pas d'un tour à l'autre). À régler. |
-| Deck de départ | 4 Sinister Strike, 4 Feint, 1 Backstab, 1 Eviscerate. |
+| Deck de départ | 4 Sinister Strike, 4 Feint, 1 Backstab, 1 Eviscerate (5 Sinister Strike et 3 Feint depuis le 12/11/2026, § 10, passe 2). |
 | Interrupt | Kick (0 mana, voie Combat, niveau 1). |
 | Last Breath | Cheat Death (Power rare, voie Subtlety). |
 | Bibelot de départ | Thieves' Tools : pioche 1 carte de plus au premier tour. |
@@ -175,7 +175,7 @@ de fichiers exacts de `~/Téléchargements/ICONS/<nom>.tga` (tous vérifiés).
 | `between_the_eyes` | Between the Eyes | uncommon | 6 | 1 | Attack | Cooldown 2 | Surge: deal 4 per Combo Point. / Apply Stunned 1 ⌛ | Surge: deal 6 per Combo Point. / Apply Stunned 1 ⌛ | INV_Weapon_Rifle_01 |
 | `adrenaline_rush` | Adrenaline Rush | rare | 7 | 1 | Skill | Exhaust | +3 mana. / Draw 2. | (coût 0) | Spell_Shadow_ShadowWordDominate |
 
-### Subtlety (10 : 4 communes, 4 inhabituelles, 2 rares)
+### Subtlety (11 : 5 communes, 4 inhabituelles, 2 rares ; Nightblade ajoutée le 12/11/2026)
 
 | id | Nom | Rareté | Niv. | Coût | Type | Plaque | Texte | Amélioré | Icône |
 |---|---|---|---|---|---|---|---|---|---|
@@ -185,12 +185,14 @@ de fichiers exacts de `~/Téléchargements/ICONS/<nom>.tga` (tous vérifiés).
 | `shadowstep` | Shadowstep | common | 1 | 1 | Skill | Cooldown 3 | Gain Parry 1 / Gain Stealth | Cooldown 2 | Ability_Rogue_Shadowstep |
 | `cheap_shot` | Cheap Shot | uncommon | 1 | 1 | Skill | Cooldown 2 | +2 Combo Points. / Stealth: apply Stunned 1 ⌛. | (coût 0) | Ability_CheapShot |
 | `secret_technique` | Secret Technique | uncommon | 1 | 1 | Attack | | Surge: deal 3 per Combo Point to all. / Stealth: hits twice. | Surge: deal 4 per Combo Point to all. / Stealth: hits twice. | Ability_Rogue_SinisterCalling |
+| `nightblade` | Nightblade | common | 3 | 1 | Attack | | Surge: deal 6 per Combo. / Gain Stealth | Surge: deal 8 per Combo. / Gain Stealth | Ability_Rogue_Nightblade |
 | `premeditation` | Premeditation | uncommon | 2 | 0 | Skill | | Draw 1. / Stealth: +2 Combo Points. | Draw 2. / Stealth: +2 Combo Points. | Spell_Shadow_Possession |
 | `cheat_death` | Cheat Death | rare | 4 | 1 | Power | Power | Last Breath: stay at 1 HP, gain Parry 3 and Stealth. | (coût 0) | Ability_Rogue_CheatDeath |
 | `smoke_bomb` | Smoke Bomb | uncommon | 6 | 1 | Skill | Cooldown 3 | Apply Demoralized 2 ⌛ to all / Gain Stealth | Cooldown 2 | ability_rogue_smoke |
 | `shadow_dance` | Shadow Dance | rare | 7 | 2 | Power | Power | Turn start: gain Stealth. | (coût 1) | Ability_Rogue_ShadowDance |
 
-Comptes : 4 de départ, 13 communes (5 + 4 + 4), 11 inhabituelles (3 + 4 + 4), 6 rares (2 + 2 + 2) = 34.
+Comptes : 4 de départ, 14 communes (5 + 4 + 5), 11 inhabituelles (3 + 4 + 4), 6 rares (2 + 2 + 2) = 35
+(34 de la grille commune, plus Nightblade).
 
 Notes d'écriture :
 
@@ -250,8 +252,12 @@ Moteur : ouvrir sous Stealth avec un gros coup (Ambush, Secret Technique), retro
 Shadowstep, Smoke Bomb, Shadow Dance) et préparer l'ouverture avec des Skills qui lisent Stealth sans le
 consommer (Premeditation, Cheap Shot). Hemorrhage pose Sundered juste avant le coup qui compte.
 
-Cartes : Ambush, Hemorrhage, Vanish, Shadowstep, Cheap Shot, Secret Technique, Premeditation, Cheat
-Death, Smoke Bomb, Shadow Dance.
+Cartes : Ambush, Hemorrhage, Vanish, Shadowstep, Cheap Shot, Secret Technique, Nightblade, Premeditation,
+Cheat Death, Smoke Bomb, Shadow Dance.
+
+Nightblade (ajoutée le 12/11/2026, décision du joueur) est le coup de grâce mono-cible de la voie : un Surge
+qui frappe une cible et rend Stealth, pour que l'ouverture suivante (Backstab, Ambush) soit prête au tour
+d'après. Sous Stealth, la carte (une Attack) le consomme d'abord puis le rend.
 
 - Avec **Assassination** : les points des ouvertures alimentent Envenom ; Smoke Bomb protège pendant que
   le DoT travaille.
@@ -282,19 +288,21 @@ début de combat). Crystal Vial vaut aussi pour Deadly Poison (DoT 2 par coup).
 |---|---|---|---|---|
 | 1 | Mutilate, Garrote, Rupture, Fan of Knives, Envenom, Cloak of Shadows | Kick, Pistol Shot, Sprint, Riposte, Evasion, Blade Flurry | Ambush, Hemorrhage, Vanish, Shadowstep, Cheap Shot, Secret Technique | Thieves' Tools, Blinding Powder |
 | 2 | Crippling Poison | Slice and Dice | Premeditation | |
-| 3 | | | | Flash Powder |
+| 3 | | | Nightblade | Flash Powder |
 | 4 | Exsanguinate (rare) | Killing Spree (rare) | Cheat Death (rare) | |
 | 5 | | | | Crystal Vial |
 | 6 | Deadly Poison | Between the Eyes | Smoke Bomb | |
 | 7 | Venomous Wounds (rare) | Adrenaline Rush (rare) | Shadow Dance (rare) | Ravenholdt Signet, Shadowfang |
 
-Plus les 4 cartes de départ au niveau 1 (22 cartes). Le niveau 1 suffit pour gagner : chaque voie y a un
-Surge (Rupture ou Envenom, Secret Technique, plus Eviscerate), de la défense (Cloak of Shadows, Evasion,
+Plus les 4 cartes de départ au niveau 1 (22 cartes ; 35 au niveau 7 avec Nightblade). Le niveau 1 suffit
+pour gagner : chaque voie y a un Surge (Rupture ou Envenom, Secret Technique, plus Eviscerate), de la défense (Cloak of Shadows, Evasion,
 Riposte, Shadowstep, Feint), des dégâts de zone (Fan of Knives, Blade Flurry, Secret Technique) et
 l'Interrupt (Kick). Les déblocages ouvrent des façons de jouer :
 
 - niveau 2 : contrôle par Demoralized (Crippling Poison), Attack gratuites (Slice and Dice), points sans
   attaquer (Premeditation) ;
+- niveau 3 : le coup de grâce qui rend Stealth (Nightblade), avec Flash Powder qui pioche à chaque Stealth
+  rendu ;
 - niveau 4 : faire éclater un gros DoT (Exsanguinate), frapper en rafale aléatoire (Killing Spree), jouer
   au bord de la mort (Cheat Death) ;
 - niveau 6 : le poison sur toutes les attaques (Deadly Poison, pont vers Combat), le Surge de contrôle
@@ -437,3 +445,17 @@ section UR). Écarts avec la fiche, par ordre de priorité (decisions.md puis so
 - Non faits (interface commune) : crans de Combo Points dans la pastille (nombre générique), clignotement
   au plafond, chiffre flottant « Parry », surbrillance des lignes `Stealth:` / `DoT:`. Fait : modèle du
   héros en semi-transparence sous Stealth (`ns.ClassViews.rogue`).
+
+### Passe d'équilibrage 2 (12/11/2026, décisions du joueur ; détails : `docs/equilibrage.md`, « Passe 2 »)
+
+- **Deck de départ** : 5 Sinister Strike, 3 Feint, Backstab, Eviscerate (une Feint remplacée). **PV 49 → 50** :
+  le deck tue plus vite sans perdre plus de PV (6,3 PV par combat normal au niveau 1, contre 5,7), il est donc
+  plus fort à PV égaux (86 % au niveau 1 à 60 PV) ; 50 PV le remettent dans les cibles (70,0 % au niveau 1,
+  81,7 % au niveau 7). La cible 12–16 PV perdus par combat normal reste hors d'atteinte (règle de Parry
+  inchangée).
+- **Nightblade** (Subtlety, commune, niveau 3, coût 1, Attack) : `Surge: deal 6 per Combo.` / `Gain Stealth`
+  (améliorée : 8 par point). Le coup de grâce mono-cible qui manquait à la voie ; il rend Stealth pour
+  l'ouverture suivante. Icône `Ability_Rogue_Nightblade` (sort 195452). Subtlety jouée seule : 21 → 51,5 %
+  (2 000 expéditions ; 42 % sans Nightblade avec les mêmes notes).
+- Notes du bot : Nightblade 9 ; Shadowstep 3 → 7, Secret Technique 3 → 6, Hemorrhage 3,5 → 5,5,
+  Vanish 3 → 5,5 (positives au balayage avec le nouveau deck).
