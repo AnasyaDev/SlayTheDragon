@@ -14,9 +14,9 @@
 -- Protection : Absorb converti, Shield Slam, Ignore Pain), l'Interrupt (Pummel) et le Last Breath (Last
 -- Stand). Les cartes verrouillées ouvrent des façons de jouer et pèsent plus que la moyenne du niveau 1
 -- (12/11/2026 : le niveau 7 n'apportait rien de plus que le niveau 1) : zone (Cleave 2, Thunder Clap 2),
--- Strength à chaque recharge (Bloodthirst 4), Cast (Slam 4), Demoralized gratuit (Demoralizing Shout 4),
--- pioche par la Rage (Onslaught 6), gros coup (Mortal Strike 6), ripostes (Retaliation 6), moteurs rares
--- (Deep Wounds, Enrage, Shield Wall au niveau 7).
+-- Strength à chaque recharge (Bloodthirst 2), Cast (Slam 4), Rage sans attaquer (Berserker Rage 4),
+-- Demoralized gratuit (Demoralizing Shout 4), pioche par la Rage (Onslaught 6), gros coup (Mortal Strike 6),
+-- ripostes (Retaliation 6), moteurs rares (Deep Wounds, Enrage, Shield Wall au niveau 7).
 local _, ns = ...
 
 local Combat = ns.Combat
@@ -169,7 +169,7 @@ card("victory_rush", {
 })
 
 card("berserker_rage", {
-  level = 2, name = "Berserker Rage", cost = 0, type = "skill", rarity = "common", path = "fury",
+  level = 4, name = "Berserker Rage", cost = 0, type = "skill", rarity = "common", path = "fury",
   cooldown = 2, effects = { { "res", 2 }, { "cleanse" }, { "draw", 1 } },
   text = "+2 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.",
   up = { effects = { { "res", 3 }, { "cleanse" }, { "draw", 1 } },
@@ -177,7 +177,7 @@ card("berserker_rage", {
 })
 
 card("bloodthirst", {
-  level = 4, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
+  level = 2, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
   target = "enemy", cooldown = 4,
   effects = { { "damage", 6 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
   text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 4.",
