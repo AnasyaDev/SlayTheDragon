@@ -202,7 +202,8 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   `(réputation × 0,5 + 15 si gagnée) × (1 + 0,1 × clé)`, arrondi ; la réputation est celle de
   `Meta.repFor` ci-dessous. Clé 0 : ≈ 76 pour une victoire, ≈ 40 pour une défaite au boss, moins pour une
   défaite plus tôt (mesures plus bas). Avec ≈ 4 victoires pour 1 défaite (≈ 70 en moyenne) : niveau 2 à la
-  2e expédition, niveau 3 à la 4e, puis 3, 4, 4 et 6 expéditions par niveau, niveau 7 vers la 20e.
+  2e expédition, puis 2, 3, 3, 4 et 6 expéditions par niveau (niveaux 3 à 7 aux 4e, 7e, 10e, 14e et
+  20e ; mesuré : 72 à 75 par expédition au bot heuristique).
 - Ce que débloque le niveau entre dans la réserve de la classe : récompenses, marchand, rencontres
   (cartes) et bibelots de récompense, de coffre et du marchand. Le bibelot de départ (`startRelic`,
   `noPool`) est porté à chaque expédition.
