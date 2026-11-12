@@ -179,7 +179,7 @@ function Combat.loseHp(c, n, why)
   if p.hp <= 0 then
     Combat.kill(c, p)
   else
-    Combat.fire(c, "onHpLost", n, nil, why)
+    Combat.fire(c, "onHpLost", n, why, p.hp + n)
   end
   return n
 end
@@ -210,6 +210,9 @@ Combat.AMOUNTS = {
 }
 
 function Combat.test(c, ctx, name, t)
+  -- « school:fire » : la carte est de cette école (champ libre `school` : holy, shadow, fire…)
+  local sc = name:match("^school:(.+)$")
+  if sc then return ctx.def ~= nil and ctx.def.school == sc end
   local st = name:match("^status:(.+)$")
   if st then
     local s = ns.Statuses[st]
@@ -309,7 +312,10 @@ local function tickPeriodic(c, unit)
   if pain and pain > 0 then
     log(c, { t = "tick", unit = uref(unit), id = "pain", n = pain })
     Combat.dealDamage(c, nil, unit, pain, true)
-    if pain - 1 > 0 then unit.st.pain = pain - 1 else unit.st.pain = nil end
+    -- baisse du DoT après le tick (crochet « dotDecay » : Agony l'empêche de baisser)
+    local left = pain - Combat.modify(c, "dotDecay", 1, unit)
+    if left > 0 then unit.st.pain = left else unit.st.pain = nil end
+    if not c.result then Combat.fire(c, "onDotTick", unit, pain) end
     if unit.dead or c.result then return end
   end
   local regen = unit.st.regen
@@ -376,7 +382,7 @@ function Combat.dealDamage(c, src, dst, amount, pierce)
     if def.onDamaged then def.onDamaged(c, dst, loss) end
   elseif loss > 0 and dst.side == "player" then
     if src then Combat.fire(c, "onPlayerHit", src, loss) end
-    Combat.fire(c, "onHpLost", loss, src)
+    Combat.fire(c, "onHpLost", loss, src, dst.hp + loss)
   end
   return loss, absorbed
 end
@@ -542,26 +548,25 @@ local function mostDamagedAlly(c)
 end
 
 local function interruptPlayer(c, by)
-  local cast = c.player.cast
+  local p = c.player
+  local cast = p.cast
   if not cast then return end
+  -- file d'incantations (crochet « castSlots ») : l'interruption coupe la plus récente
+  local more = p.castMore
+  if more and #more > 0 then cast = more[#more] end
   if Combat.fire(c, "preventInterrupt", by) then
     log(c, { t = "interrupt_prevented", src = uref(by), dst = "player", card = cast.card.id })
     return
   end
-  c.player.cast = nil
+  if cast == p.cast then
+    p.cast = nil
+  else
+    more[#more] = nil
+    if #more == 0 then p.castMore = nil end
+  end
   c.discard[#c.discard + 1] = cast.card
   stat(c, "castsInterrupted")
   log(c, { t = "interrupt", src = uref(by), dst = "player", card = cast.card.id })
-  -- sorts suivants (classe à plusieurs incantations, crochet « castSlots ») : coupés aussi
-  local more = c.player.castMore
-  if more then
-    for i = 1, #more do
-      c.discard[#c.discard + 1] = more[i].card
-      stat(c, "castsInterrupted")
-      log(c, { t = "interrupt", src = uref(by), dst = "player", card = more[i].card.id })
-    end
-    c.player.castMore = nil
-  end
 end
 
 Combat.interruptPlayer = interruptPlayer
@@ -709,11 +714,14 @@ function Combat.canPlay(c, idx)
   if d.unplayable then return false, "unplayable" end
   if Combat.cost(c, inst) > c.player.mana then return false, "mana" end
   -- « Pay N HP » : jamais mortel, la carte est injouable s'il ferait tomber à 0
-  if d.payHp and c.player.hp <= d.payHp then return false, "hp" end
+  local pay = Combat.payHpOf(c, d, inst)
+  if pay > 0 and c.player.hp <= pay then return false, "hp" end
   -- ressource requise (Surge qui n'a de sens qu'avec de la ressource)
   if d.minRes and (c.player.res or 0) < d.minRes then return false, "resource" end
+  -- incantation : emplacements pleins, sauf si elle partira tout de suite (« instantCast » interrogé
+  -- sans rien consommer : commit = false)
   if d.cast and Combat.castCount(c) >= Combat.castSlots(c)
-    and not Combat.modify(c, "instantCast", false, d, inst) then return false, "casting" end
+    and not Combat.modify(c, "instantCast", false, d, inst, false) then return false, "casting" end
   if not allowed(c, d) then return false, "forbidden" end
   if d.canPlay and not d.canPlay(c, inst) then return false, "condition" end
   return true
@@ -740,13 +748,21 @@ function Combat.legalPlays(c)
   return list
 end
 
--- Retire le pouvoir n° i (fin de durée, remplacé dans son emplacement) : il part à la défausse.
+-- Coût en PV d'une carte (champ payHp, crochet « payHp » : Demonic Rune…), 0 sans coût.
+function Combat.payHpOf(c, d, inst)
+  if not d.payHp then return 0 end
+  return max(0, Combat.modify(c, "payHp", d.payHp, d, inst))
+end
+
+-- Retire le pouvoir n° i (fin de durée, remplacé dans son emplacement) : il part à la défausse, ou
+-- aux consumées si la carte porte replacedTo = "exhaust" (démon du Warlock).
 function Combat.removePower(c, i, why)
   local p = c.player
   local inst = table.remove(p.powers, i)
   if not inst then return end
   if p.powerTurns then p.powerTurns[inst.uid] = nil end
-  c.discard[#c.discard + 1] = inst
+  local pile = Card.def(inst).replacedTo == "exhaust" and c.exhaust or c.discard
+  pile[#pile + 1] = inst
   log(c, { t = "power_end", card = inst.id, why = why })
   Combat.fire(c, "onPowerEnd", inst, why)
 end
@@ -786,9 +802,11 @@ end
 
 -- Résolution des effets d'une carte. ctx = { card, def, target, dealt, hits, spent, surge, cast } ;
 -- un effet qui porte cond = "nom" ne s'applique que si la condition est vraie (Combat.test).
-function Combat.resolveCard(c, inst, target, cast)
+-- spent : la dépense « Spend N » a été payée au moment du jeu (Combat.play).
+function Combat.resolveCard(c, inst, target, cast, spent)
   local d = Card.def(inst)
-  local ctx = { card = inst, def = d, target = target, dealt = false, hits = 0, cast = cast or false }
+  local ctx = { card = inst, def = d, target = target, dealt = false, hits = 0, cast = cast or false,
+    spent = spent or false }
   Combat.fire(c, "beforeCard", inst, ctx)
   local effects = d.effects
   for i = 1, #effects do
@@ -806,6 +824,9 @@ function Combat.resolveCard(c, inst, target, cast)
 end
 
 -- Joue la carte n° idx de la main sur l'ennemi n° tIdx (si elle vise).
+-- Ordre : cible, puis tous les coûts payés maintenant (mana, « Pay N HP », « Spend N » si la
+-- ressource suffit) — une carte Cast interrompue ne rend rien —, compteurs du tour, événement
+-- « onCardCommitted », puis mise en incantation ou résolution (les conditions se lisent là).
 function Combat.play(c, idx, tIdx)
   local ok, why = Combat.canPlay(c, idx)
   if not ok then return false, why end
@@ -818,17 +839,35 @@ function Combat.play(c, idx, tIdx)
     -- ciblage : une classe peut rediriger la cible (crochet « target ») ; dernière cible retenue
     target = Combat.modify(c, "target", target, d, inst)
     if not target or target.dead then return false, "target" end
-    c.lastTarget = target.uid
+    c.player.lastTarget = target.uid
   end
   local cost = Combat.cost(c, inst)
+  local pay = Combat.payHpOf(c, d, inst)
   table.remove(c.hand, idx)
   c.player.mana = c.player.mana - cost
   statById(c, "played", inst.id)
   log(c, { t = "play", card = inst.uid, id = inst.id, target = target and target.uid, cost = cost })
-  if d.payHp then Combat.loseHp(c, d.payHp, "pay") end
+  if pay > 0 then
+    stat(c, "hpPaid", pay)
+    Combat.fire(c, "onPayHp", pay, inst)
+    Combat.loseHp(c, pay, "pay")
+  end
   if c.result then return true end
-  if d.cast and not Combat.modify(c, "instantCast", false, d, inst) then
-    local entry = { card = inst, target = target and target.uid }
+  -- Spend N : payé au jeu si la ressource suffit (et si spendNeed(c, inst) le permet)
+  local spent = false
+  if d.spend and (not d.spendNeed or d.spendNeed(c, inst)) then
+    spent = Combat.spendRes(c, d.spend)
+    if spent then Combat.fire(c, "onSpend", d.spend, inst) end
+  end
+  -- compteurs du tour (cartes jouées, par type et par école), remis à 0 au début du tour
+  local tu = c.turn
+  tu.played = tu.played + 1
+  tu.byType[d.type or "skill"] = (tu.byType[d.type or "skill"] or 0) + 1
+  if d.school then tu.bySchool[d.school] = (tu.bySchool[d.school] or 0) + 1 end
+  Combat.fire(c, "onCardCommitted", inst, d, target)
+  if c.result then return true end
+  if d.cast and not Combat.modify(c, "instantCast", false, d, inst, true) then
+    local entry = { card = inst, target = target and target.uid, spent = spent or nil }
     if c.player.cast then
       local more = c.player.castMore or {}
       c.player.castMore = more
@@ -841,7 +880,7 @@ function Combat.play(c, idx, tIdx)
     Combat.fire(c, "onCastStart", inst)
     return true
   end
-  Combat.resolveCard(c, inst, target)
+  Combat.resolveCard(c, inst, target, false, spent)
   return true
 end
 
@@ -852,7 +891,7 @@ local function resolveOne(c, cast)
     if not target or target.dead then target = firstAlive(c) end
   end
   log(c, { t = "cast_resolve", card = cast.card.uid })
-  Combat.resolveCard(c, cast.card, target, true)
+  Combat.resolveCard(c, cast.card, target, true, cast.spent)
   if not c.result then Combat.fire(c, "onCastResolved", cast.card) end
 end
 
@@ -965,16 +1004,22 @@ function Combat.startPlayerTurn(c)
   local p = c.player
   p.block = 0
   p.st.halved = nil
+  -- états retirés au début du tour (clearAtTurnStart : Pain Suppression, Ice Block…)
+  for id in pairs(p.st) do
+    if ns.Statuses[id] and ns.Statuses[id].clearAtTurnStart then p.st[id] = nil end
+  end
+  c.turn = { played = 0, byType = {}, bySchool = {} }
   log(c, { t = "turn", round = c.round })
   tickPeriodic(c, p)
   if c.result then return end
   local rd = Combat.resourceDef(c)
   if rd and rd.keep == false and (p.res or 0) ~= 0 then Combat.gainRes(c, -p.res, "turn") end
+  -- mana remis AVANT la résolution des incantations : un sort qui rend du mana (Evocation) compte
+  p.mana = Combat.modify(c, "maxMana", Combat.BASE_MANA)
   if p.cast then resolveCast(c) end
   if c.result then return end
   returnCooldowns(c)
   Combat.drawCards(c, Combat.modify(c, "drawPerTurn", Combat.DRAW_PER_TURN))
-  p.mana = Combat.modify(c, "maxMana", Combat.BASE_MANA)
   if p.flags.freeTurn then
     p.flags.freeTurn = nil
     p.flags.freeTurnActive = true
@@ -1078,6 +1123,7 @@ function Combat.new(opts)
   if not ns.Classes[class] then error("unknown class: " .. tostring(class)) end
   local c = {
     seed = seed, round = 0, phase = "start", result = nil, class = class, cls = {},
+    turn = { played = 0, byType = {}, bySchool = {} }, -- compteurs du tour (Combat.play)
     events = {}, quiet = opts.quiet or false, nextUid = 1,
     rng = {
       draw = Rng.stream(seed, "draw"),
@@ -1136,6 +1182,7 @@ function Combat.clone(c)
   n.stats = nil
   n.relicState = copyMap(c.relicState)
   n.cls = U.copy(c.cls) -- état de classe : copie profonde (totems, familier… peuvent être des tables)
+  n.turn = { played = c.turn.played, byType = copyMap(c.turn.byType), bySchool = copyMap(c.turn.bySchool) }
   n.charges = copyMap(c.charges)
   n.rng = { draw = copyMap(c.rng.draw), ai = copyMap(c.rng.ai), misc = copyMap(c.rng.misc) }
   n.player = copyUnit(c.player)

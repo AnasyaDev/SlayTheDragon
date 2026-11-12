@@ -115,6 +115,8 @@ L.condition("spend", { name = "Spend", pattern = "^Spend %d+$", text = "pays N %
 L.condition("lastBreath", { name = "Last Breath", text = "once per combat, upon dropping to 0 HP." })
 L.condition("shadow", { name = "Shadow", text = "applies to Shadow cards." })
 -- prévues par le GDD (Paladin, Druid) : explications prêtes, règles à écrire par la classe
+L.condition("frozen", { name = "Frozen", text = "if the target is Stunned or Demoralized." })
+L.condition("demon", { name = "Demon", text = "bonus effect while a Demon is in play." })
 L.condition("judgement", { name = "Judgement", text = "bonus effect when a Judgement card is played." })
 L.condition("shift", { name = "Shift", text = "triggers on each change of form." })
 L.condition("caster", { name = "Caster", text = "bonus effect in Caster form." })
@@ -127,7 +129,7 @@ L.condition("moonkin", { name = "Moonkin", text = "bonus effect in Moonkin form.
 L.keyword("payHp", { name = "Pay N HP", pattern = "^Pay %d+ HP%.$", text = "costs HP, unplayable if it would drop to 0." })
 
 -- Libellés de déclencheur des Pouvoirs (« When hit: … ») : pas des conditions, pas d'explication.
-for _, label in ipairs({ "Each Absorb gain", "Cast cards", "When hit", "Attacks", "Turn start", "Turn end" }) do
+for _, label in ipairs({ "Each Absorb gain", "Cast cards", "When hit", "Attacks", "Start of turn", "End of turn" }) do
   L.trigger(label)
 end
 
@@ -140,6 +142,7 @@ end
 L.plate("power", { word = "Power", head = true, text = "stays active until the end of combat." })
 L.plate("trap", { word = "Trap", head = true, text = "triggers on the next enemy attack." })
 L.plate("seal", { word = "Seal", head = true, text = "only one Seal at a time, a new one replaces it." })
+L.plate("demon", { word = "Demon", head = true, text = "only one Demon at a time, a new one replaces it." })
 L.plate("totem", { word = "Totem", head = true, n = true, text = "a Power that lasts N." })
 L.plate("shift", { word = "Shift", head = true, flag = "shift", text = "changes form." })
 L.plate("cast", { word = "Cast", head = true, text = "resolves at the start of the next turn." })

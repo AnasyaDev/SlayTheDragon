@@ -3533,8 +3533,8 @@ do
       if has("Surge") ~= (effectOf(d, "surge") ~= nil) then cbad[#cbad + 1] = label .. " : Surge" end
       if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = label .. " : Last Breath" end
       if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
-      -- Spend N : effet spend n <-> clause « Spend n: … »
-      local sp = effectOf(d, "spend")
+      -- Spend N : champ spend = n (payé au jeu) <-> clause « Spend n: … »
+      local sp = d.spend and { "spend", d.spend } or nil
       local spendCl
       for _, cl in ipairs(cls) do if cl:find("^Spend %d+: ") then spendCl = cl end end
       if (sp ~= nil) ~= (spendCl ~= nil) or (sp and not spendCl:find("^Spend " .. sp[2] .. ": ")) then

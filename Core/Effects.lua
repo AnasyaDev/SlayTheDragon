@@ -94,10 +94,8 @@ Effects.surge = function(c, ctx, e)
   ctx.surge = (ctx.surge or 0) + Combat.surge(c)
 end
 
--- { "spend", n } : « Spend N: … » paie N si possible ; ctx.spent = true / false (cond = "spent").
-Effects.spend = function(c, ctx, e)
-  ctx.spent = Combat.spendRes(c, e[2])
-end
+-- « Spend N: … » n'est PAS un effet : c'est le champ de carte spend = N, payé au moment du jeu
+-- (Combat.play, comme le mana) ; ctx.spent dit s'il a été payé (cond = "spent", more = { k, "spent" }).
 
 -- { "loseHp", n } : perte de PV sans Absorption (effet ; le coût « Pay N HP » est le champ payHp).
 Effects.loseHp = function(c, ctx, e)

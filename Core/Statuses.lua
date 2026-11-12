@@ -34,7 +34,7 @@ S.regen = { name = "Regen",
 -- les règles n'en tiennent pas compte.
 S.stunned = { name = "Stunned", debuff = true, turns = true,
   text = "Loses its next turn." }
-S.halved = { name = "Pain Suppression",
+S.halved = { name = "Pain Suppression", clearAtTurnStart = true,
   text = "Damage taken halved until the next turn." }
 S.force = { name = "Strength",
   text = "Deals X more damage per hit." }
