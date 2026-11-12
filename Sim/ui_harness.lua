@@ -6867,8 +6867,14 @@ do
           if not inside(R.rect(k), content) then outside[#outside + 1] = "dos " .. fmt(R.rect(k)) end
         end
       end
-      check(tag .. (" : 34 cartes, %d débloquées en vraies cartes, le reste en dos de carte"):format(OPEN_CARDS[lv]),
-        nCards == OPEN_CARDS[lv] and nCards + nLocks == 34 and #badCard == 0, nCards .. "+" .. nLocks .. " " .. table.concat(badCard, ","))
+      -- cartes hors grille (Rogue : Nightblade, Subtlety niveau 3) comptées depuis les données
+      local nAll, nOpen0 = 0, 0
+      for _, d in pairs(ns.Cards) do
+        if d.class == cid then nAll = nAll + 1; if (d.level or 1) <= lv then nOpen0 = nOpen0 + 1 end end
+      end
+      local xAll, xOpen = nAll - 34, nOpen0 - OPEN_CARDS[lv]
+      check(tag .. (" : %d cartes, %d débloquées en vraies cartes, le reste en dos de carte"):format(34 + xAll, OPEN_CARDS[lv] + xOpen),
+        nCards == OPEN_CARDS[lv] + xOpen and nCards + nLocks == 34 + xAll and #badCard == 0, nCards .. "+" .. nLocks .. " " .. table.concat(badCard, ","))
       check(tag .. " : carte verrouillée sans nom, texte ni icône ; infobulle = la condition seule",
         #badLock == 0 and #badTip == 0, table.concat(badLock, ",") .. " / " .. table.concat(badTip, ","))
       -- bibelots : 6 cases ; verrouillé = point d'interrogation grisé, infobulle = la condition

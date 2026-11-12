@@ -334,7 +334,10 @@ end)
 
 -- Table « Progression par classe » du GDD : niveau 1 = 4 cartes de départ + 6 par voie et 2 bibelots
 -- (dont celui de départ) ; 2, 4, 6 = une carte par voie ; 3 et 5 = un bibelot ; 7 = une rare par voie et
--- 2 bibelots.
+-- 2 bibelots. Ajouts hors grille, décidés par le joueur : EXTRA[classe][voie][niveau] = cartes en plus.
+local EXTRA = {
+  rogue = { subtlety = { [3] = 1 } }, -- Nightblade (12/11/2026 : coup de grâce mono-cible de Subtlety)
+}
 test("progression : répartition exacte des cartes et bibelots par niveau, pour chaque classe jouable", function()
   local n = 0
   for class, cd in pairs(ns.Classes) do
@@ -357,16 +360,22 @@ test("progression : répartition exacte des cartes et bibelots par niveau, pour 
       end
       eq(by.start[1], 4, class .. " : départ")
       local total = { 0, 0, 0, 0, 0, 0, 0 }
+      local nExtra, nExtra1 = 0, 0
       for _, p in ipairs(cd.paths) do
         local b = by[p.id] or {}
-        eq(b[1], 6, class .. "/" .. p.id .. " niveau 1")
-        for _, lv in ipairs({ 2, 4, 6, 7 }) do eq(b[lv], 1, class .. "/" .. p.id .. " niveau " .. lv) end
-        for _, lv in ipairs({ 3, 5 }) do eq(b[lv], nil, class .. "/" .. p.id .. " niveau " .. lv) end
+        local x = EXTRA[class] and EXTRA[class][p.id] or {}
+        nExtra1 = nExtra1 + (x[1] or 0)
+        local function want(lv, k) local v = k + (x[lv] or 0) nExtra = nExtra + (x[lv] or 0) return v > 0 and v or nil end
+        eq(b[1], want(1, 6), class .. "/" .. p.id .. " niveau 1")
+        for _, lv in ipairs({ 2, 4, 6, 7 }) do eq(b[lv], want(lv, 1), class .. "/" .. p.id .. " niveau " .. lv) end
+        for _, lv in ipairs({ 3, 5 }) do eq(b[lv], want(lv, 0), class .. "/" .. p.id .. " niveau " .. lv) end
         assert(rare7[p.id], class .. "/" .. p.id .. " : rare au niveau 7")
         for lv = 1, 7 do total[lv] = total[lv] + (b[lv] or 0) end
       end
-      eq(total[1] + 4, 22, class .. " : 22 cartes au niveau 1")
-      eq(total[1] + 4 + total[2] + total[4] + total[6] + total[7], 34, class .. " : 34 cartes au niveau 7")
+      local all = 0
+      for lv = 1, 7 do all = all + total[lv] end
+      eq(total[1] + 4, 22 + nExtra1, class .. " : 22 cartes au niveau 1")
+      eq(all + 4, 34 + nExtra, class .. " : 34 cartes au niveau 7 (plus les ajouts hors grille)")
       local rl, start = {}, cd.startRelic and ns.Relics[cd.startRelic]
       local nr = 0
       for id, r in pairs(ns.Relics) do
@@ -1161,7 +1170,7 @@ ns.Enemies.test_weak = { name = "Chiquenaude", hp = 100,
 -- Ennemi n° i à hp PV (tests de dégâts lisibles).
 local function hpOf(c, i) return c.enemies[i or 1].hp end
 
-test("Rogue : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveau 1 à 7 sur tout, 6 bibelots, Kick et Cheat Death", function()
+test("Rogue : 35 cartes (4 de départ, 14/11/6), 10 par voie (11 en Subtlety), niveau 1 à 7, 6 bibelots, Kick et Cheat Death", function()
   local r, paths, nInt, nLb, lv = {}, {}, 0, 0, {}
   for id, d in pairs(ns.Cards) do
     if d.class == "rogue" then
@@ -1173,9 +1182,10 @@ test("Rogue : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveau 1 à 7 sur 
       if d.hooks and d.hooks.preventDeath then nLb = nLb + 1 end
     end
   end
-  eq(r.basic, 4); eq(r.common, 13); eq(r.uncommon, 11); eq(r.rare, 6)
-  eq(paths.start, 4); eq(paths.assassination, 10); eq(paths.combat, 10); eq(paths.subtlety, 10)
-  eq(lv[1], 22, "niveau 1 : 18 + 4 de départ"); eq(lv[2], 3); eq(lv[4], 3); eq(lv[6], 3); eq(lv[7], 3)
+  eq(r.basic, 4); eq(r.common, 14); eq(r.uncommon, 11); eq(r.rare, 6)
+  eq(paths.start, 4); eq(paths.assassination, 10); eq(paths.combat, 10); eq(paths.subtlety, 11)
+  eq(lv[1], 22, "niveau 1 : 18 + 4 de départ"); eq(lv[2], 3); eq(lv[3], 1, "Nightblade"); eq(lv[4], 3)
+  eq(lv[6], 3); eq(lv[7], 3)
   eq(nInt, 1); eq(nLb, 1)
   local nr = 0
   for id, rel in pairs(ns.Relics) do
@@ -1187,7 +1197,12 @@ test("Rogue : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveau 1 à 7 sur 
   eq(nr, 6)
   local cd = ns.Classes.rogue
   eq(#cd.deck, 10); eq(cd.resource.id, "combo"); eq(cd.resource.cap, 5); eq(cd.resource.keep, true)
-  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 49)
+  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 50)
+  local nSS, nFeint = 0, 0
+  for _, id in ipairs(cd.deck) do
+    if id == "sinister_strike" then nSS = nSS + 1 elseif id == "feint" then nFeint = nFeint + 1 end
+  end
+  eq(nSS, 5, "5 Sinister Strike au départ"); eq(nFeint, 3, "3 Feint au départ")
   eq(Card.defById("kick").cost, 0)
 end)
 
@@ -1491,6 +1506,24 @@ test("Secret Technique : 4 par point à tous, deux fois sous Stealth", function(
   eq(hpOf(n, 2), 100 - 4 * k)
 end)
 
+test("Nightblade : K par point sur une cible, puis Stealth rendu ; à 0 point, Stealth seul", function()
+  local k = Card.defById("nightblade").effects[2].per[1]
+  -- sous Stealth : la carte le consomme au jeu, frappe, puis le rend
+  local c = setup({ "nightblade" }, { "test_dummy", "test_dummy" }, nil, RO)
+  c.player.res = 4
+  assert(Combat.play(c, 1, 1))
+  eq(hpOf(c, 1), 100 - 4 * k); eq(hpOf(c, 2), 100, "mono-cible"); eq(c.player.res, 0)
+  eq(c.player.st.stealth, 1, "Stealth rendu")
+  -- sans Stealth, à 0 point : jouable, ne fait que rendre Stealth
+  local z = setup({ "sinister_strike", "nightblade" }, nil, nil, RO)
+  Combat.play(z, 1, 1)
+  eq(z.player.st.stealth, nil)
+  z.player.res = 0
+  assert(Combat.canPlay(z, 1), "jouable à 0 point")
+  Combat.play(z, 1, 1)
+  eq(hpOf(z), 100 - num("sinister_strike", 1)); eq(z.player.st.stealth, 1)
+end)
+
 test("bibelots du Voleur : Thieves' Tools, Blinding Powder, Crystal Vial, Ravenholdt Signet, Shadowfang", function()
   local deck = { "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint" }
   local t = Combat.new({ seed = 3, hp = 60, class = "rogue", deck = deckOf(unpack(deck)), encounter = { "test_dummy" },
@@ -1525,7 +1558,7 @@ test("Rogue : chaque carte (base et améliorée) jouable sans erreur, combat dé
       end
     end
   end
-  eq(n, 68)
+  eq(n, 70)
 end)
 
 test("Rogue : combats simulés par le bot heuristique, sans erreur", function()

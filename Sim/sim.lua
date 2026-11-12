@@ -16,6 +16,7 @@
 --   oldstun=1 : ancienne règle de Stunned pendant le tour ennemi (l'action part, le tour suivant est perdu)
 --   hp=N : PV de départ de la classe remplacés (runner=expedition), pour mesurer l'effet des PV.
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
+--   league=0..4 : palier de Ligue imposé (runner=expedition), quel que soit meta= (drapeaux d'histoire de meta=).
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 local opts = {}
@@ -202,7 +203,7 @@ local function runRange(from, to)
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
         meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
-        hp = tonumber(opts.hp), path = opts.path })
+        hp = tonumber(opts.hp), path = opts.path, league = tonumber(opts.league) })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),

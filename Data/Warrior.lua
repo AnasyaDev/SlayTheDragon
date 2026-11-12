@@ -10,11 +10,13 @@
 --
 -- level = niveau de classe qui débloque la carte ou le bibelot (Core/Meta.lua ; table du GDD, répartition
 -- et raisons : docs/classes.md, « Progression par classe »). Niveau 1 : chaque voie garde son moteur
--- (Arms : Sundered, Overpower, Execute ; Fury : Strength et PV payés, Enrage ; Protection : Absorb converti,
--- Shield Slam, Ignore Pain), l'Interrupt (Pummel) et le Last Breath (Last Stand). Les cartes verrouillées
--- ouvrent des façons de jouer : zone (Cleave 2, Thunder Clap 2), Cast (Slam 4), Strength empilée (Battle
--- Shout 4), pioche par la Rage (Onslaught 6), ripostes (Retaliation 6), moteurs rares (Deep Wounds,
--- Recklessness, Shield Wall au niveau 7).
+-- (Arms : Sundered, Overpower, Execute ; Fury : Strength par Battle Shout et Recklessness, PV payés ;
+-- Protection : Absorb converti, Shield Slam, Ignore Pain), l'Interrupt (Pummel) et le Last Breath (Last
+-- Stand). Les cartes verrouillées ouvrent des façons de jouer et pèsent plus que la moyenne du niveau 1
+-- (12/11/2026 : le niveau 7 n'apportait rien de plus que le niveau 1) : zone (Cleave 2, Thunder Clap 2),
+-- Strength à chaque recharge (Bloodthirst 2), Cast (Slam 4), Rage sans attaquer (Berserker Rage 4),
+-- Demoralized gratuit (Demoralizing Shout 4), pioche par la Rage (Onslaught 6), gros coup (Mortal Strike 6),
+-- ripostes (Retaliation 6), moteurs rares (Deep Wounds, Enrage, Shield Wall au niveau 7).
 local _, ns = ...
 
 local Combat = ns.Combat
@@ -88,9 +90,9 @@ card("cleave", {
 
 card("mortal_strike", {
   level = 6, name = "Mortal Strike", cost = 2, type = "attack", rarity = "uncommon", path = "arms",
-  target = "enemy", effects = { { "damage", 18 }, { "apply", "armor_broken", 2 } },
-  text = "Deal 18.\nApply Sundered 2 ⌛",
-  up = { effects = { { "damage", 23 }, { "apply", "armor_broken", 3 } }, text = "Deal 23.\nApply Sundered 3 ⌛" },
+  target = "enemy", effects = { { "damage", 22 }, { "apply", "armor_broken", 2 } },
+  text = "Deal 22.\nApply Sundered 2 ⌛",
+  up = { effects = { { "damage", 28 }, { "apply", "armor_broken", 3 } }, text = "Deal 28.\nApply Sundered 3 ⌛" },
 })
 
 -- Execute : la Rage n'est dépensée que si la cible est entamée (condition lue à la résolution).
@@ -167,15 +169,15 @@ card("victory_rush", {
 })
 
 card("berserker_rage", {
-  level = 2, name = "Berserker Rage", cost = 0, type = "skill", rarity = "common", path = "fury",
-  cooldown = 2, effects = { { "res", 1 }, { "cleanse" }, { "draw", 1 } },
-  text = "+1 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.",
-  up = { effects = { { "res", 2 }, { "cleanse" }, { "draw", 1 } },
-    text = "+2 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2." },
+  level = 4, name = "Berserker Rage", cost = 0, type = "skill", rarity = "common", path = "fury",
+  cooldown = 2, effects = { { "res", 2 }, { "cleanse" }, { "draw", 1 } },
+  text = "+2 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.",
+  up = { effects = { { "res", 3 }, { "cleanse" }, { "draw", 1 } },
+    text = "+3 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2." },
 })
 
 card("bloodthirst", {
-  level = 1, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
+  level = 2, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
   target = "enemy", cooldown = 4,
   effects = { { "damage", 6 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
   text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 4.",
@@ -191,7 +193,7 @@ card("rampage", {
 })
 
 card("battle_shout", {
-  level = 4, name = "Battle Shout", cost = 1, type = "skill", rarity = "uncommon", path = "fury",
+  level = 1, name = "Battle Shout", cost = 1, type = "skill", rarity = "uncommon", path = "fury",
   exhaust = true, effects = { { "apply", "force", 2, self = true } },
   text = "Gain Strength 2\nExhaust.",
   up = { effects = { { "apply", "force", 3, self = true } }, text = "Gain Strength 3\nExhaust." },
@@ -215,14 +217,14 @@ local enrageHooks = {
 }
 
 card("enrage", {
-  level = 1, name = "Enrage", cost = 1, type = "power", rarity = "rare", path = "fury",
+  level = 7, name = "Enrage", cost = 1, type = "power", rarity = "rare", path = "fury",
   power = true, effects = {}, hooks = enrageHooks,
   text = "Power.\nHP lost: gain Strength 1, once per turn.",
   up = { cost = 0, text = "Power.\nHP lost: gain Strength 1, once per turn." },
 })
 
 card("recklessness", {
-  level = 7, name = "Recklessness", cost = 1, type = "skill", rarity = "rare", path = "fury",
+  level = 1, name = "Recklessness", cost = 1, type = "skill", rarity = "rare", path = "fury",
   payHp = 3, exhaust = true, effects = { { "apply", "force", 3, self = true } },
   text = "Pay 3 HP.\nGain Strength 3\nExhaust.",
   up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 3 HP.\nGain Strength 4\nExhaust." },
@@ -261,10 +263,10 @@ card("devastate", {
 })
 
 card("demoralizing_shout", {
-  level = 4, name = "Demoralizing Shout", cost = 1, type = "skill", rarity = "common", path = "protection",
-  cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
-  text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 3.",
-  up = { cost = 0, text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
+  level = 4, name = "Demoralizing Shout", cost = 0, type = "skill", rarity = "common", path = "protection",
+  cooldown = 4, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
+  text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 4.",
+  up = { cooldown = 3, text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
 })
 
 card("shield_slam", {
@@ -301,9 +303,9 @@ card("retaliation", {
 
 card("shield_wall", {
   level = 7, name = "Shield Wall", cost = 2, type = "skill", rarity = "rare", path = "protection",
-  cooldown = 3, effects = { { "absorb", 15 } },
-  text = "Gain 15 Absorb.\nCooldown 3.",
-  up = { effects = { { "absorb", 20 } }, text = "Gain 20 Absorb.\nCooldown 3." },
+  cooldown = 3, effects = { { "absorb", 18 } },
+  text = "Gain 18 Absorb.\nCooldown 3.",
+  up = { effects = { { "absorb", 24 } }, text = "Gain 24 Absorb.\nCooldown 3." },
 })
 
 card("last_stand", {
@@ -397,7 +399,7 @@ relic("skullflame_shield", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.warrior = {
-  id = "warrior", name = "Warrior", order = 2, hp = 72,
+  id = "warrior", name = "Warrior", order = 2, hp = 74,
   resource = { id = "rage", cap = 5, keep = true },
   deck = {
     "strike", "strike", "strike", "strike",
@@ -411,13 +413,14 @@ ns.Classes.warrior = {
     resValue = 8,
     -- notes des choix : 5 + écart / 2 du balayage sweep=cards (meta=start level=7, 500 expéditions par ligne),
     -- vérifiées en expédition complète (méthode : docs/equilibrage.md, « Notes des cartes du bot »)
+    -- (rebalayé le 12/11/2026 après la nouvelle répartition par niveau, PV 77, base 76 %)
     rating = {
-      bloodthirst = 17.5, victory_rush = 15, rend = 15, ignore_pain = 14.5, shield_block = 14.5,
-      execute = 14.5, battle_shout = 14, shield_slam = 13.5, whirlwind = 13.5, enrage = 13.5, revenge = 13.5,
-      pummel = 13, deep_wounds = 13, retaliation = 13, bladestorm = 12.5, thunder_clap = 12, rampage = 11.5,
-      shield_wall = 11.5, raging_blow = 11, last_stand = 11, demoralizing_shout = 11, overpower = 10,
-      recklessness = 10, cleave = 10, onslaught = 10, slam = 9.5, devastate = 9.5, colossus_smash = 9.5,
-      berserker_rage = 9.5, mortal_strike = 8.5,
+      bloodthirst = 12.5, shield_slam = 12, mortal_strike = 11, revenge = 11, battle_shout = 10.5,
+      demoralizing_shout = 10.5, ignore_pain = 10.5, whirlwind = 10.5, execute = 10, pummel = 10, rend = 10,
+      deep_wounds = 9.5, onslaught = 9.5, retaliation = 9.5, shield_block = 9.5, victory_rush = 9.5,
+      bladestorm = 9, cleave = 9, enrage = 9, last_stand = 9, rampage = 9, shield_wall = 9, slam = 9,
+      thunder_clap = 9, recklessness = 8.5, devastate = 8, raging_blow = 8, overpower = 7.5,
+      berserker_rage = 7, colossus_smash = 7,
     },
 
     upgrade = { strike = 2.5, defend = 2, heroic_strike = 2.5, bloodrage = 1.5 },

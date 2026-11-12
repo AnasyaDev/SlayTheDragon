@@ -71,7 +71,8 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 
 Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start"`, `level = 1`) + 13 communes,
 11 inhabituelles, 6 rares ; 10 par voie ; niveaux : voir « Progression par classe » (test « progression :
-répartition exacte »).
+répartition exacte »). Ajouts hors grille décidés par le joueur, déclarés dans la table `EXTRA` de ce test :
+Rogue, Nightblade (Subtlety, commune, niveau 3), soit 35 cartes.
 
 ### Effets (`Core/Effects.lua`) et options communes
 
@@ -269,11 +270,11 @@ seuils et règles : `docs/expedition.md`, « Niveau de classe ». Mage, Rogue, H
 
 | Niveau | Priest : Discipline / Shadow / Holy | Warrior : Arms / Fury / Protection |
 | --- | --- | --- |
-| 1 | Radiance, Solace, Angelic Feather, Penance, Schism, Pain Suppression / Mind Flay, Mind Blast, Vampiric Touch, Devouring Plague, Silence, Shadowform / Holy Fire, Holy Nova, Renew, Chastise, Greater Heal, Spirit of Redemption | Rend, Overpower, Colossus Smash, Execute, Pummel, Bladestorm / Raging Blow, Whirlwind, Victory Rush, Bloodthirst, Rampage, Enrage / Shield Block, Revenge, Devastate, Shield Slam, Ignore Pain, Last Stand |
-| 2 | Evangelism / Mind Sear / Flash Heal | Cleave / Berserker Rage / Thunder Clap |
-| 4 | Luminous Barrier / SW: Death / Halo | Slam / Battle Shout / Demoralizing Shout |
+| 1 | Radiance, Solace, Angelic Feather, Penance, Schism, Pain Suppression / Mind Flay, Mind Blast, Vampiric Touch, Devouring Plague, Silence, Shadowform / Holy Fire, Holy Nova, Renew, Chastise, Greater Heal, Spirit of Redemption | Rend, Overpower, Colossus Smash, Execute, Pummel, Bladestorm / Raging Blow, Whirlwind, Victory Rush, Battle Shout, Rampage, Recklessness / Shield Block, Revenge, Devastate, Shield Slam, Ignore Pain, Last Stand |
+| 2 | Evangelism / Mind Sear / Flash Heal | Cleave / Bloodthirst / Thunder Clap |
+| 4 | Luminous Barrier / SW: Death / Halo | Slam / Berserker Rage / Demoralizing Shout |
 | 6 | Shadow Mend / Psychic Scream / Empyreal Blaze | Mortal Strike / Onslaught / Retaliation |
-| 7 (rares) | Rapture / Void Eruption / Apotheosis | Deep Wounds / Recklessness / Shield Wall |
+| 7 (rares) | Rapture / Void Eruption / Apotheosis | Deep Wounds / Enrage / Shield Wall |
 
 | Niveau | Bibelots du Priest | Bibelots du Warrior |
 | --- | --- | --- |
@@ -282,15 +283,17 @@ seuils et règles : `docs/expedition.md`, « Niveau de classe ». Mage, Rogue, H
 | 5 | Robes of Prophecy | Lionheart Helm |
 | 7 | Anathema, Truefaith Vestments | Force Reactive Disk, Skullflame Shield |
 
-Warrior (réparti le 12/11/2026, d'après l'esprit des fiches) : au niveau 1, chaque voie garde son moteur
-avec ses 6 cartes — Arms : Sundered (Colossus Smash) payé par Overpower, Rend, Execute par la Rage ; Fury :
-petites attaques, Strength (Bloodthirst), PV payés (Rampage) et Enrage ; Protection : Absorb converti
-(Shield Slam), Ignore Pain, Revenge — avec l'Interrupt (Pummel) et le Last Breath (Last Stand). Une rare par
-voie reste au niveau 1 (Bladestorm, Enrage, Last Stand). Les cartes verrouillées ouvrent une façon de
-jouer : la zone (Cleave, Thunder Clap au 2), le Cast (Slam au 4), la Strength empilée (Battle Shout au 4),
-la pioche par la Rage (Onslaught au 6), les ripostes (Retaliation au 6) ; au 7, les moteurs rares (Deep
-Wounds, Recklessness, Shield Wall). Bibelots : la commune au 1, les inhabituelles au 3 et au 5, les rares
-au 7.
+Warrior (réparti le 12/11/2026, d'après l'esprit des fiches ; revu le même jour, `docs/equilibrage.md`,
+« Passe 2 ») : au niveau 1, chaque voie garde son moteur avec ses 6 cartes — Arms : Sundered (Colossus Smash)
+payé par Overpower, Rend, Execute par la Rage ; Fury : petites attaques, Strength (Battle Shout,
+Recklessness), PV payés (Rampage, Recklessness) ; Protection : Absorb converti (Shield Slam), Ignore Pain,
+Revenge — avec l'Interrupt (Pummel) et le Last Breath (Last Stand). Une rare par voie reste au niveau 1
+(Bladestorm, Recklessness, Last Stand). Les cartes verrouillées ouvrent une façon de jouer et valent plus
+que la moyenne du niveau 1 (sinon monter de niveau n'apporte rien : le niveau 7 faisait jeu égal avec le
+niveau 1) : la zone (Cleave, Thunder Clap au 2), la Strength à chaque recharge (Bloodthirst au 2), le Cast
+(Slam au 4), la Rage sans attaquer (Berserker Rage au 4), le Demoralized gratuit (Demoralizing Shout au 4), la pioche par la Rage (Onslaught au 6), le gros
+coup (Mortal Strike au 6), les ripostes (Retaliation au 6) ; au 7, les moteurs rares (Deep Wounds, Enrage,
+Shield Wall). Bibelots : la commune au 1, les inhabituelles au 3 et au 5, les rares au 7.
 
 ## Bibelots communs : utiles à la classe
 

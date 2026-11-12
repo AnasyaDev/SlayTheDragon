@@ -78,6 +78,8 @@ Mesurée par `oldstun=1` (ancienne règle : l'attaque part, le tour suivant est 
 
 ## Tableau final (clé 0, bot heuristic, graine 1)
 
+Warrior et Rogue ont changé depuis : voir « Passe 2 » plus bas.
+
 Niveau 1 compte neuf et niveau 7 exalté : 2 000 expéditions (intervalle à 95 % ≈ ± 2 points) ;
 niveau 1 exalté : 1 000 (± 2,6). Warrior : 1 000 expéditions après son dernier lot (± 2,9 / ± 2,4).
 
@@ -247,6 +249,97 @@ Ce qui bloque, et ce que je recommande :
 - **Hors combat** : choix de chemin, marchand et rencontres par règles simples (valeur d'unité arbitraire,
   1 unité ≈ une potion ≈ 3 points de victoire) ; le bot ne fuit jamais (Hearthstone) et achète peu.
 - **Bruit** : ± 2 points à 2 000 expéditions, ± 4 à 500 ; les voies et les clés ont été réglées à 500.
+
+## Passe 2 (12/11/2026) : Rogue, Subtlety, progression du Warrior
+
+Trois décisions du joueur. Même méthode (clé 0, bot heuristic, graine 1) ; 2 000 expéditions pour les
+mesures finales, 500 pour les voies et les essais. Priest, Mage et Hunter non touchés : rien de commun n'a
+changé (l'option `league=` n'agit que si on la donne ; l'écran de progression n'est que de l'affichage).
+
+### Tableau à jour (clé 0)
+
+| Classe | PV | L1 neuf | L1 exalté | L7 exalté | L7 − L1 (Ligue égale) | PV perdus par combat normal (L1 neuf / L7 exalté) |
+|---|---|---|---|---|---|---|
+| Warrior | 72 → 74 | 65,5 → 65,2 | 80,5 → 79,5 | 80,8 → **85,7** | +0,3 → **+6,2** | 9,7 / 9,2 → 9,0 / 8,0 |
+| Rogue | 49 → 50 | 70,0 → 70,0 | 78,8 → 79,2 | 81,5 → 81,7 | +2,7 → +2,5 | 5,7 / 5,3 → 6,3 / 5,8 |
+
+Warrior par niveau (exalté, 2 000) : L1 79,5 → L2 82,8 → L4 84,0 → L6 84,2 → L7 85,7.
+Voies seules (L7 exalté) : Subtlety 21,4 → **51,5 %** (2 000) ; Assassination 64,8, Combat 55,2 ; Arms 57,0,
+Fury 55,2, Protection 61,2 (500).
+
+### Rogue : une Feint de moins
+
+- Deck de départ 4 Sinister Strike / 4 Feint → **5 / 3** (décision). À 60 PV comme demandé : 85,9 / 91,3 /
+  92,3 % (L1 neuf / L1 exalté / L7 exalté) : le deck tue plus vite (combat normal 2,7 tours) et ne perd
+  presque pas plus de PV, il est donc plus fort, pas plus fragile. **PV 49 → 50** remet les cibles (70,0 /
+  79,2 / 81,7). Les PV n'ont pas pu monter vers 60.
+- **PV perdus par combat normal : 6,3 au niveau 1 (5,7 avant), cible 12–16 non atteinte, à 6 à 10 PV
+  près.** Pourquoi : un combat normal dure 2,7 tours et ses coups (4 à 8) sont entièrement parés ; essai
+  pour mesure (annulé) avec 2 Feint seulement : 7,1 PV par normal, mais 54 % au niveau 1 (−16 points). Le
+  nombre de Feint pèse sur les élites et le boss, presque pas sur les normaux. Règle de Parry non touchée.
+
+### Subtlety : Nightblade
+
+- Nouvelle carte **Nightblade** (Subtlety, commune, **niveau 3** avec Flash Powder, coût 1, Attack) :
+  `Surge: deal 6 per Combo.` / `Gain Stealth` ; améliorée 8 par point. Coup de grâce mono-cible qui rend
+  Stealth pour l'ouverture suivante (Backstab, Ambush). Icône `Ability_Rogue_Nightblade`.
+- Premier essai à 5 / 7 par point : 33,6 % (note 5) puis 38,2 % (note 9) seule. Le balayage la mesure
+  neutre (−0,4 à −0,2 : un second Surge dans un deck de départ qui manque de points), comme Rupture et
+  Envenom que la passe 1 avait notées 12 à la main : note 9.
+- Notes de Subtlety relevées au-dessus de 5 (positives au balayage avec le nouveau deck, base 57 %) :
+  Shadowstep 3 → 7, Secret Technique 3 → 6, Hemorrhage 3,5 → 5,5, Vanish 3 → 5,5. En voie seule, le bot ne
+  prenait presque rien (2,3 cartes par expédition).
+- Résultat : **51,5 % ± 2,2** (2 000) ; 42,2 % avec les mêmes notes sans Nightblade.
+- Essais annulés : notes du Rogue entièrement rebalayées (base 86 % : L7 exalté 69,8 % ; base 57 % à
+  42 PV : 52,4 / 59,6 %) : le balayage sous-cote les Surge et les moteurs (Rupture, Envenom, Blade Flurry) ;
+  les anciennes notes sont gardées pour toutes les autres cartes.
+
+### Warrior : progression par niveau
+
+Diagnostic (balayage `sweep=cards`, L7 neuf, PV 72, base 74,6 %, ± 4) :
+- les cartes débloquées valaient en moyenne +6,4 points ajoutées au deck de départ, contre +8,5 pour celles
+  du niveau 1, qui comptait les deux meilleures de la classe (Bloodthirst +16,2, Enrage +10,6, Enrage prise
+  plus d'une fois par expédition) : monter de niveau diluait la réserve ;
+- le bot les joue (jouées/piochées 54 à 95 %, comme celles du niveau 1 ; Shield Wall et Demoralizing Shout
+  sont conditionnelles) et les prend selon ses notes, mais ces notes étaient périmées (cartes changées
+  après le balayage) ; les recaler seules : L1 exalté 81,3, L7 exalté 78,9 — le problème est dans les cartes ;
+- la Ligue pèse 14 à 17 points pour le Warrior (4 à 11 pour les autres) : `league=1` +6 (bibelots et cartes
+  neutres du palier 1, dont ceux qui demandent Absorb ou Attack), `league=3` +6 (bibelot de départ au choix
+  de Révéré).
+
+Changements (avant → après) :
+- Niveaux : **Enrage 1 → 7** et Recklessness 7 → 1 (les deux rares de Fury) ; **Bloodthirst 1 → 2**,
+  Battle Shout 4 → 1 ; Berserker Rage 2 → 4 (une carte par voie et par niveau gardée).
+- Cartes débloquées : Mortal Strike 18/23 → 22/28 ; Demoralizing Shout coût 1/0 → 0/0 et Cooldown 3/3 →
+  4/3 ; Berserker Rage +1/+2 → +2/+3 Rage ; Shield Wall 15/20 → 18/24 Absorb.
+- PV 72 → 74.
+- Notes du bot rebalayées (L7 neuf, base 76 à 80 %).
+
+Balayage final (L7 neuf, PV 74, base 79,8 %, ± 4) par niveau de déblocage : niveau 2 Bloodthirst +13,4,
+Thunder Clap +5,2, Cleave +3,6 ; niveau 4 Demoralizing Shout +11,0, Slam +5,0, Berserker Rage +4,8 ;
+niveau 6 Mortal Strike +11,4, Onslaught +8,0, Retaliation +4,8 ; niveau 7 Shield Wall +9,0, Enrage +8,4,
+Deep Wounds +6,0 (moyenne du niveau 1 : +6,7). Chaque niveau de carte en débloque au moins une positive.
+
+Essais annulés : Enrage coût 2/1 (−0,6 au niveau 7 seulement, jouée deux fois moins) ; Bloodthirst sans
+soin (+16 → +10 au balayage) ; Strike 6/9 → 5/8 (L1 neuf −11, L7 exalté −5 : creuse l'écart) ; notes
+moyennées de deux balayages (L1 neuf 65,2 → 60,3 : le bot choisit moins bien, le niveau 1 dépend beaucoup
+des notes) ; PV 71, 76, 77.
+
+**Cible non atteinte : L7 exalté 85,7 % (cible 72–82, +3,7).** Écart L7 exalté − L1 neuf = gain de la Ligue
+(≈ 14 pour le Warrior) + gain des niveaux (≥ 5) ≈ 20 : avec le niveau 1 neuf à 64 % au moins (Priest 70 − 6),
+le niveau 7 exalté tombe vers 84–86 %. Baisser les PV creuse l'écart (PV 71 : 59,4 / 75,9 / 84,0 avant le
+dernier réglage) ; affaiblir les cartes débloquées retire le gain demandé. Rester dans 72–82 demande de
+réduire ce que la Ligue apporte au Warrior (bibelots communs d'Absorb et d'Attack, bibelot de Révéré), donc
+de toucher au commun : décision du joueur. L'écart entre classes au niveau 7 reste dans les 6 points (80,8
+à 85,7 : 4,9).
+
+### Limites propres à cette passe
+
+- Les notes du bot font bouger le niveau 1 de 5 à 6 points (Warrior : 64,2 → 70,4 % en ne changeant que les
+  notes) ; un balayage de 500 expéditions donne des notes à ± 2 : garder le jeu de notes qui gagne le plus.
+- La voie Subtlety seule est juste au-dessus de 50 % (51,5 ± 2,2).
+- Écran de progression : 36 emplacements ; une rangée de plus de 10 cartes (Subtlety, 11) resserre son pas
+  pour garder le même bord droit.
 
 
 # Équilibrage de l'acte 1 (piste A, historique : Prêtre seul, runner linéaire)

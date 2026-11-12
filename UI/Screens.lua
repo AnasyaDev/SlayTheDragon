@@ -1697,7 +1697,7 @@ function Progress:Show(step)
 end
 
 ---------------------------------------------------------------------------
--- Progression d'une classe : niveau, expérience, 34 cartes par voie, 6 bibelots
+-- Progression d'une classe : niveau, expérience, 34 cartes (35 au Rogue) par voie, 6 bibelots
 ---------------------------------------------------------------------------
 -- Une boîte DiamondMetal sur toute la scène. En-tête : icônes des classes (mêmes que l'accueil, la classe
 -- affichée au halo d'or ; infobulle = nom et niveau), barre d'expérience (« Level 3 · 20 / 150 »),
@@ -1718,7 +1718,9 @@ local CP_SCALE, CP_PITCH, CP_X0, CP_LABEL_X, CP_LABEL_W = 0.6, 84, 190, 18, 128
 local CP_ROW_TOP, CP_ROW_H = 112, 122
 local CP_RELIC, CP_RELIC_DX, CP_RELIC_X, CP_RELIC_LABEL_R = 46, 62, 612, 574
 local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 44, 56, 50, 76
-local CP_SLOTS, CP_ROWS = 34, 4
+-- 36 emplacements : 34 de la grille commune, plus les cartes hors grille (Rogue : Nightblade). Une rangée
+-- de plus de CP_ROW_MAX cartes resserre son pas pour garder le même bord droit.
+local CP_SLOTS, CP_ROWS, CP_ROW_MAX = 36, 4, 10
 UI.CP = { scale = CP_SCALE, pitch = CP_PITCH, x0 = CP_X0, rowTop = CP_ROW_TOP, rowH = CP_ROW_H,
   relic = CP_RELIC, relicDx = CP_RELIC_DX, relicX = CP_RELIC_X }
 
@@ -1863,11 +1865,12 @@ function ClassProgress:Show(step)
       l:ClearAllPoints()
       l:SetPoint("LEFT", self.frame, "TOPLEFT", CP_LABEL_X, -cy)
       l:Show()
+      local pitch = #row.cards > CP_ROW_MAX and CP_PITCH * (CP_ROW_MAX - 1) / (#row.cards - 1) or CP_PITCH
       for i, e in ipairs(row.cards) do
         slot = slot + 1
         local card, lock = self.cards[slot], self.locks[slot]
         if card and lock then
-          local cx = CP_X0 + (i - 1) * CP_PITCH
+          local cx = CP_X0 + (i - 1) * pitch
           card.entry, lock.entry = e, e
           if e.unlocked then
             W.hideCard(lock)

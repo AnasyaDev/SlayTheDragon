@@ -42,6 +42,7 @@ local cards = {
   shadowstep       = I("Ability_Rogue_Shadowstep", 36554),
   cheap_shot       = I("Ability_CheapShot", 1833),
   secret_technique = I("Ability_Rogue_SinisterCalling", 280719),
+  nightblade       = I("Ability_Rogue_Nightblade", 195452),
   premeditation    = I("Spell_Shadow_Possession", 14183),
   cheat_death      = I("Ability_Rogue_CheatDeath", 31230),
   smoke_bomb       = I("ability_rogue_smoke", 76577),
