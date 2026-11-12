@@ -968,24 +968,76 @@ function W.frameSlices(host, spec, k, out, opts)
   return o
 end
 
+-- Pièces en tranches d'un seul tenant (découpe par le client).
+-- Retour en jeu du 12/11/2026 (zoom net, fenêtre à 115 %) : pendant l'agrandissement d'un bouton, un
+-- jour de 3 pixels entre chaque bout et le milieu, où le fond se voit (ombre du bouton comprise). Les
+-- tranches séparées étaient pourtant ancrées bord à bord, sur les mêmes points, sans accrochage au
+-- pixel : un écart de 3 pixels ne vient ni d'un arrondi ni du filtrage (coutures d'au plus un pixel,
+-- l'atlas a 3 pixels de bords répétés autour de chaque pièce), mais de la façon dont l'animation Scale
+-- transforme les régions du visuel (hypothèse : chaque région séparément, pas le visuel d'un bloc).
+-- Remède qui ne dépend pas de ce que fait l'animation : une seule texture, découpée par le client
+-- (SetTextureSliceMargins, « préféré aux neuf textures séparées » d'après la documentation de l'API) :
+-- plus aucune jointure entre régions. Les marges sont en pixels de la texture ; pour qu'elles valent
+-- `d` unités de l'hôte par pixel stocké, la région prend l'échelle propre d et couvre l'ancre par deux
+-- points sans décalage (sa taille propre vaut alors l'ancre ÷ d). Repli sans l'API (autres clients,
+-- W.CLIENT_SLICE coupé) : tranches séparées, bord à bord sur les mêmes ancres (harnais, UB).
+W.CLIENT_SLICE = true
+local SLICE_STRETCHED = (Enum and Enum.UITextureSliceMode and Enum.UITextureSliceMode.Stretched) or 0
+
+function W.canSlice(t)
+  return W.CLIENT_SLICE and t.SetTextureSliceMargins ~= nil and t.SetScale ~= nil
+end
+
+-- Pose la texture découpée t sur l'ancre (deux points, sans décalage), d unités par pixel stocké.
+function W.sliceFit(t, anchor, d)
+  if not d or d <= 0 then return end
+  t:SetScale(d)
+  t:ClearAllPoints()
+  t:SetPoint("TOPLEFT", anchor, "TOPLEFT", 0, 0)
+  t:SetPoint("BOTTOMRIGHT", anchor, "BOTTOMRIGHT", 0, 0)
+end
+
+-- Découpe la texture t (pièce et coordonnées déjà posées) : marges l, tp, r, b en pixels stockés,
+-- centre et bords étirés.
+function W.sliceMargins(t, l, tp, r, b)
+  t:SetTextureSliceMargins(l, tp, r, b)
+  if t.SetTextureSliceMode then t:SetTextureSliceMode(SLICE_STRETCHED) end
+  t._slice = { l, tp, r, b }
+end
+
 -- Trois tranches horizontales (boutons, cadre compact d'ennemi) : bouts de `cap` pixels stockés mis à
--- l'échelle de la hauteur de l'hôte, milieu étiré. Textures sur opts.parent (défaut : l'hôte).
+-- l'échelle de la hauteur de l'hôte, milieu étiré. Textures sur opts.parent (défaut : l'hôte). Une seule
+-- texture découpée par le client quand il le permet (o.sliced), sinon trois tranches bord à bord.
 function W.threeSlice(host, name, layer, sub, opts)
   opts = opts or {}
   local e = WP[name]
   local owner = opts.parent or host
   local o = setmetatable({ parts = {}, host = host, name = name }, Group)
-  local a = e.cap / e.pw
-  local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
-  for i = 1, 3 do
-    local t = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
-    W.setWow(t, name, { cuts[i][1], cuts[i][2], 0, 1 })
-    o.parts[i] = t
+  local first = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
+  if W.canSlice(first) then
+    W.setWow(first, name)
+    W.sliceMargins(first, e.cap, 0, e.cap, 0)
+    o.parts[1] = first
+    o.sliced = true
+  else
+    local a = e.cap / e.pw
+    local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
+    for i = 1, 3 do
+      local t = i == 1 and first or W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
+      W.setWow(t, name, { cuts[i][1], cuts[i][2], 0, 1 })
+      o.parts[i] = t
+    end
   end
   o.Layout = function(self, h)
     h = h or host:GetHeight()
     if not h or h <= 0 then return end
     local cap = e.cap * h / e.ph
+    self.cap = cap
+    if self.sliced then
+      -- hauteur entière de la pièce (aucune marge verticale) : 1 pixel stocké = h / ph unités
+      W.sliceFit(self.parts[1], host, h / e.ph)
+      return
+    end
     local L, M, R = self.parts[1], self.parts[2], self.parts[3]
     L:ClearAllPoints() M:ClearAllPoints() R:ClearAllPoints()
     L:SetPoint("TOPLEFT", host, "TOPLEFT", 0, 0)
@@ -994,7 +1046,6 @@ function W.threeSlice(host, name, layer, sub, opts)
     R:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", 0, 0)
     M:SetPoint("TOPLEFT", host, "TOPLEFT", cap, 0)
     M:SetPoint("BOTTOMRIGHT", host, "BOTTOMRIGHT", -cap, 0)
-    self.cap = cap
   end
   if host.HookScript then host:HookScript("OnSizeChanged", function(_, _, h) o:Layout(h) end) end
   o:Layout()
@@ -1009,11 +1060,21 @@ function W.hoverLayer(x)
 end
 
 -- Neuf tranches d'une seule pièce étirée (parchemins) : marges m = { l, t, r, b } en pixels stockés,
--- affichées à k unités par pixel ; milieu et bords étirés.
+-- affichées à k unités par pixel ; milieu et bords étirés. Une seule texture découpée par le client quand
+-- il le permet (o.sliced), sinon neuf tranches bord à bord.
 function W.nineStretch(host, name, m, k, layer, sub, owner)
   local e = WP[name]
-  local o = setmetatable({ parts = {}, host = host }, Group)
+  local o = setmetatable({ parts = {}, host = host, name = name, margins = m, k = k }, Group)
   owner = owner or host
+  local first = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
+  if W.canSlice(first) then
+    W.setWow(first, name)
+    W.sliceMargins(first, m[1], m[2], m[3], m[4])
+    W.sliceFit(first, host, k)
+    o.parts[1] = first
+    o.sliced = true
+    return o
+  end
   local us = { 0, m[1] / e.pw, 1 - m[3] / e.pw, 1 }
   local vs = { 0, m[2] / e.ph, 1 - m[4] / e.ph, 1 }
   local L, T, R, B = m[1] * k, m[2] * k, m[3] * k, m[4] * k
@@ -1021,7 +1082,7 @@ function W.nineStretch(host, name, m, k, layer, sub, owner)
   local ys = { { "TOP", 0 }, { "TOP", -T }, { "BOTTOM", B }, { "BOTTOM", 0 } }
   for row = 1, 3 do
     for col = 1, 3 do
-      local t = W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
+      local t = (row == 1 and col == 1) and first or W.noSnap(owner:CreateTexture(nil, layer or "BACKGROUND", nil, sub or 0))
       W.setWow(t, name, { us[col], us[col + 1], vs[row], vs[row + 1] })
       t:SetPoint("TOPLEFT", host, ys[row][1] .. xs[col][1], xs[col][2], ys[row][2])
       t:SetPoint("BOTTOMRIGHT", host, ys[row + 1][1] .. xs[col + 1][1], xs[col + 1][2], ys[row + 1][2])
@@ -2652,18 +2713,38 @@ end
 local function cardPlate(face)
   local e = TEX.card_plate
   local o = setmetatable({ parts = {} }, Group)
-  local a = PLATE.capPx / PLATE.texW
-  local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
-  for k = 1, 3 do
-    local t = W.noSnap(face:CreateTexture(nil, "BACKGROUND", nil, -5))
-    t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
-    t:SetTexCoord(cuts[k][1] * e.tc[2], cuts[k][2] * e.tc[2], 0, e.tc[4])
-    o.parts[k] = t
+  local first = W.noSnap(face:CreateTexture(nil, "BACKGROUND", nil, -5))
+  if W.canSlice(first) then
+    -- une seule texture découpée par le client (voir W.threeSlice), posée sur une région d'ancrage sans
+    -- texture (rien de dessiné) qui porte le rectangle de la plaque
+    first:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
+    first:SetTexCoord(0, e.tc[2], 0, e.tc[4])
+    W.sliceMargins(first, PLATE.capPx, 0, PLATE.capPx, 0)
+    o.parts[1] = first
+    o.sliced = true
+    o.anchor = face:CreateTexture(nil, "BACKGROUND", nil, -5)
+  else
+    local a = PLATE.capPx / PLATE.texW
+    local cuts = { { 0, a }, { a, 1 - a }, { 1 - a, 1 } }
+    for k = 1, 3 do
+      local t = k == 1 and first or W.noSnap(face:CreateTexture(nil, "BACKGROUND", nil, -5))
+      t:SetTexture(ROOT .. e.file, nil, nil, "TRILINEAR")
+      t:SetTexCoord(cuts[k][1] * e.tc[2], cuts[k][2] * e.tc[2], 0, e.tc[4])
+      o.parts[k] = t
+    end
   end
   -- pose les tranches pour une largeur totale w (unités), par rapport au corps org
   o.Layout = function(self, org, w)
     local box = W.cardPlateBox(w)
     self.box = box
+    if self.sliced then
+      local an = self.anchor
+      an:ClearAllPoints()
+      an:SetPoint("TOPLEFT", org, "TOPLEFT", box.x, -box.y)
+      an:SetSize(box.w, box.h)
+      W.sliceFit(self.parts[1], an, box.h / PLATE.texH)
+      return
+    end
     local l, m, r = self.parts[1], self.parts[2], self.parts[3]
     for _, t in ipairs(self.parts) do t:ClearAllPoints() end
     l:SetPoint("TOPLEFT", org, "TOPLEFT", box.x, -box.y)

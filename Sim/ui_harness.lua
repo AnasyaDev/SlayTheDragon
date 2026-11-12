@@ -84,15 +84,21 @@ SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale Se
 SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
 SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
 SetScaleAnimationMode SetSmoothScaling SetOrigin SetSmoothing SetSnapToPixelGrid SetTexelSnappingBias
+SetTextureSliceMargins SetTextureSliceMode
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
 -- Méthodes propres aux textures (SimpleTextureBaseAPI) : absentes des textes et des cadres, comme dans
 -- le jeu (l'interface teste leur existence).
-local TEXTURE_ONLY = { SetSnapToPixelGrid = true, SetTexelSnappingBias = true }
+-- Découpe par le client (SetTextureSliceMargins, WoW Forever comme Retail) : H.noSlice = true simule un
+-- client sans cette API (repli de l'interface en tranches séparées, UB).
+local TEXTURE_ONLY = { SetSnapToPixelGrid = true, SetTexelSnappingBias = true, SetTextureSliceMargins = true,
+  SetTextureSliceMode = true }
+local SLICE_API = { SetTextureSliceMargins = true, SetTextureSliceMode = true }
 local TEXTURE_KINDS = { Texture = true, MaskTexture = true, Line = true }
 Frame.__index = function(self, k)
   if TEXTURE_ONLY[k] and not TEXTURE_KINDS[rawget(self, "_kind")] then return nil end
+  if SLICE_API[k] and H.noSlice then return nil end
   local m = rawget(Frame, k)
   if m then return m end
   if NOOP[k] then
@@ -1083,6 +1089,27 @@ check("Échap ferme d'abord les options", not UI().optionsFrame._shown and shown
 print("U4  accueil : classe, clé verrouillée, départ")
 local st = UI().step
 check("bouton de classe Prêtre sélectionné", option("class:priest") and option("class:priest").selected)
+do
+  -- choix de classe : icône de la classe (anneau doré, sans texte), nom et infos dans l'infobulle
+  local pb = button("class:priest")
+  local texts = {}
+  local function walk(o)
+    for _, k in ipairs(rawget(o, "_kids") or {}) do
+      if rawget(k, "_kind") == "FontString" and k._shown and (k._text or "") ~= "" then texts[#texts + 1] = k._text end
+      walk(k)
+    end
+  end
+  walk(pb)
+  check("accueil : la classe est une icône (classicon_priest), aucun texte sur l'icône",
+    (pb.icon._texture or ""):lower():find("classicon_priest", 1, true) and #texts == 0 and pb.ring and pb.ring._wow == "ring_large",
+    tostring(pb.icon._texture) .. " / " .. table.concat(texts, "|"))
+  local tt = table.concat(H.hover(pb), " | ")
+  check("accueil : infobulle de la classe (nom, PV, cartes, réputation)", tt:find("Priest", 1, true)
+    and tt:find(ns.Classes.priest.hp .. " HP", 1, true) and tt:find("cards", 1, true) and tt:find("Reputation: ", 1, true), tt)
+  local st0 = UI().screens.start
+  check("accueil : nom de la classe choisie sous la rangée", st0.className._shown and st0.className._text == "Priest",
+    st0.className._text)
+end
 check("clé +0 sélectionnée par défaut", option("key:0").selected and st.key == 0)
 check("clé +1 verrouillée, avec raison", option("key:1").disabled and (option("key:1").reason or ""):find("+0", 1, true))
 H.click(button("key:1"))
@@ -2636,15 +2663,28 @@ do
       if box.x < -0.01 or box.x + box.w > CW + 0.01 then plateBad[#plateBad + 1] = label .. " : plaque plus large que le corps" end
       for _, t in ipairs(pl.parts) do
         local a = t._calls.SetAlpha and t._calls.SetAlpha[1] or 1
-        if not t._shown or a < 1 or t._w <= 0 or t._h <= 0 or (t._sub or 0) <= (card.bg._sub or 0)
+        local sized = pl.sliced and (pl.anchor._w > 0 and pl.anchor._h > 0) or (t._w > 0 and t._h > 0)
+        if not t._shown or a < 1 or not sized or (t._sub or 0) <= (card.bg._sub or 0)
           or t._layer ~= card.bg._layer then
           plateBad[#plateBad + 1] = label .. " : plaque invisible (caché, alpha, taille nulle ou derrière le corps)"
           break
         end
       end
-      local l, m, r = pl.parts[1], pl.parts[2], pl.parts[3]
-      if math.abs(l._w + m._w + r._w - box.w) > 0.01 or math.abs(l._h - box.h) > 0.01 then
-        plateBad[#plateBad + 1] = label .. " : tranches mal posées"
+      if pl.sliced then
+        -- une texture découpée par le client, sur la région d'ancrage de la plaque (échelle propre = hauteur
+        -- ÷ hauteur de la texture, bouts de capPx pixels)
+        local t, an = pl.parts[1], pl.anchor
+        local sm = t._calls.SetTextureSliceMargins
+        if #pl.parts ~= 1 or math.abs(an._w - box.w) > 0.01 or math.abs(an._h - box.h) > 0.01
+          or math.abs(t._scale - box.h / W.CARD_PLATE.texH) > 1e-9 or not sm or sm[1] ~= W.CARD_PLATE.capPx
+          or math.abs(sm[1] * t._scale - box.cap) > 1e-9 then
+          plateBad[#plateBad + 1] = label .. " : plaque découpée mal posée"
+        end
+      else
+        local l, m, r = pl.parts[1], pl.parts[2], pl.parts[3]
+        if math.abs(l._w + m._w + r._w - box.w) > 0.01 or math.abs(l._h - box.h) > 0.01 then
+          plateBad[#plateBad + 1] = label .. " : tranches mal posées"
+        end
       end
       if box.inT < 163 then plateBad[#plateBad + 1] = label .. " : intérieur de la plaque sous le corps" end
       combos[fs._text] = combos[fs._text] or label
@@ -2834,8 +2874,11 @@ do
     local c = rawget(o, "_calls").SetAlpha
     return c and (c[1] or 1) or 1
   end
+  -- échelle effective d'une région ; une texture découpée par le client a une échelle propre (pixels de
+  -- ses marges -> unités de l'hôte, voir W.sliceFit) qui ne compte pas ici
   local function effScale(o)
     local s = 1
+    if rawget(o, "_calls") and o._calls.SetTextureSliceMargins then s = 1 / (rawget(o, "_scale") or 1) end
     while o do s = s * (rawget(o, "_scale") or 1) o = rawget(o, "_parent") end
     return s
   end
@@ -4219,7 +4262,15 @@ do
       local wn = rawget(o, "_wow")
       local e = wn and WS.pieces[wn]
       local tc = e and o._calls.SetTexCoord
-      if e and not e.tile and tc and visible(o) and under(o, fr)
+      local sliced = e and o._calls.SetTextureSliceMargins
+      if sliced and visible(o) and under(o, fr) then
+        -- découpée par le client : marges (bouts, coins) à l'échelle propre de la région, jamais agrandies
+        local s = 1
+        local p = o
+        while p and p ~= fr do s = s * (rawget(p, "_scale") or 1) p = rawget(p, "_parent") end
+        s = s * (fr._scale or 1)
+        if s > 1.01 then blurry[#blurry + 1] = string.format("%s : %s découpée, %.2f unité par pixel", where, wn, s) end
+      elseif e and not e.tile and tc and visible(o) and under(o, fr)
         and math.abs((tc[2] - tc[1]) - (e.tc[2] - e.tc[1])) < 1e-6 and math.abs((tc[4] - tc[3]) - (e.tc[4] - e.tc[3])) < 1e-6 then
         local r = R.rect(o)
         if r then
@@ -4487,6 +4538,28 @@ do
     local r = R.rect(tex)
     local out = {}
     if not r then return out end
+    local sm = tex._calls.SetTextureSliceMargins
+    if sm then
+      -- pièce entière découpée par le client : marges à 1 pixel = 1 unité de la région (échelle propre
+      -- comprise), centre étiré
+      local s, p = 1, tex
+      while p do s = s * (rawget(p, "_scale") or 1) p = rawget(p, "_parent") end
+      local function map(px, n, m0, m1, lo, hi)
+        if px <= m0 then return lo + px * s end
+        if px >= n - m1 then return hi - (n - px) * s end
+        return lo + m0 * s + (px - m0) * ((hi - lo) - (m0 + m1) * s) / math.max(1e-9, n - m0 - m1)
+      end
+      for y = 0, m.ph - 1 do
+        for x = 0, m.pw - 1 do
+          if m.ext[y * m.pw + x] then
+            local l, rr = map(x, m.pw, sm[1], sm[3], r[1], r[3]), map(x + 1, m.pw, sm[1], sm[3], r[1], r[3])
+            local t0, t1 = map(y, m.ph, sm[2], sm[4], 0, r[4] - r[2]), map(y + 1, m.ph, sm[2], sm[4], 0, r[4] - r[2])
+            out[#out + 1] = { l, r[4] - t1, rr, r[4] - t0 }
+          end
+        end
+      end
+      return out
+    end
     if e.tile then
       -- bord répété : profil pris au milieu de la pièce, sur l'axe non répété
       if e.tile == "v" then
@@ -5364,11 +5437,29 @@ do
     table.concat(ids, ",") == "class:priest,class:warrior" and option("class:priest").selected
     and not option("class:warrior").selected, table.concat(ids, ","))
   local wb = button("class:warrior")
-  check("accueil : bouton du Guerrier (PV, cartes, réputation)", wb and wb._shown and (wb.sub._text or ""):find(ns.Classes.warrior.hp .. " HP", 1, true)
-    and (wb.sub._text or ""):find("10 cards", 1, true), wb and wb.sub._text)
+  local wtt = table.concat(H.hover(wb), " | ")
+  check("accueil : icône du Guerrier, infobulle (nom, PV, cartes, réputation, clic)", wb and wb._shown
+    and (wb.icon._texture or ""):lower():find("classicon_warrior", 1, true)
+    and wtt:find("Warrior", 1, true) and wtt:find(ns.Classes.warrior.hp .. " HP, 10 cards", 1, true)
+    and wtt:find("Reputation: Neutral", 1, true) and wtt:find("Click", 1, true), wtt)
+  local pb = button("class:priest")
+  local function glowA(b) return b.glow._calls.SetAlpha and b.glow._calls.SetAlpha[1] or 1 end
+  local function iconK(b) return b.icon._calls.SetVertexColor and b.icon._calls.SetVertexColor[1] or 1 end
+  check("accueil : classe choisie mise en évidence (halo doré tenu), l'autre assombrie et sans halo",
+    pb.selected and glowA(pb) > 0.5 and iconK(pb) == 1 and not wb.selected and glowA(wb) == 0 and iconK(wb) < 0.7,
+    glowA(pb) .. " / " .. glowA(wb) .. " / " .. iconK(wb))
+  -- survol d'une classe non choisie : halo et icône s'allument en fondu, visuel animé
+  run(wb, "OnEnter")
+  for _ = 1, 30 do run(W.driver, "OnUpdate", 0.02) H.now = H.now + 0.02 end
+  check("accueil : survol d'une icône (agrandie, éclairée, halo)", wb.face._scale > 1 and iconK(wb) == 1 and glowA(wb) > 0.3,
+    wb.face._scale .. " / " .. iconK(wb) .. " / " .. glowA(wb))
+  run(wb, "OnLeave")
+  for _ = 1, 30 do run(W.driver, "OnUpdate", 0.02) H.now = H.now + 0.02 end
   clickOption("class:warrior")
-  check("accueil : clic sur le Guerrier, il devient le choix", option("class:warrior").selected
-    and not option("class:priest").selected and button("class:warrior").selected)
+  local st = UI().screens.start
+  check("accueil : clic sur l'icône du Guerrier, il devient le choix (halo, nom sous la rangée)", option("class:warrior").selected
+    and not option("class:priest").selected and button("class:warrior").selected and glowA(button("class:warrior")) > 0.5
+    and not button("class:priest").selected and st.className._text == "Warrior")
   snap("accueil-guerrier", true)
   H.ns.Controller.makeSeed = function() return SEED end
   clickOption("go")
@@ -5421,33 +5512,67 @@ do
     H.settle()
     check("Strike jouée : +1 Rage", c.player.res == before + 1, c.player.res)
   end
-  -- accueil à neuf classes : grille de trois colonnes, rien ne déborde du panneau ni ne chevauche les clés
-  H.boot(nil)
-  ns = H.ns
-  local fakes = { "rogue", "mage", "warlock", "hunter", "paladin", "shaman", "druid" }
-  for i, f in ipairs(fakes) do
-    ns.Classes["zz_" .. f] = { id = "zz_" .. f, name = f:sub(1, 1):upper() .. f:sub(2), order = 2 + i, hp = 70, deck = {},
-      resource = { id = "rage" } }
-  end
-  H.slash("")
-  H.settle()
-  local st = UI().screens.start
-  local n, inside, lowest = 0, true, 0
-  local panel = st.panel
-  for _, b in ipairs(st.classButtons) do
-    if b._shown then
-      n = n + 1
-      local pt = b._points[1]
-      local x, y = pt[4], -pt[5]
-      if x - b._w / 2 < -panel._w / 2 - 0.01 or x + b._w / 2 > panel._w / 2 + 0.01 then inside = false end
-      lowest = math.max(lowest, y + b._h)
+  -- accueil à 2, 5 et 9 classes : une icône par classe, rangée centrée et régulière, dans le panneau et la
+  -- fenêtre, au-dessus des clés ; aucune icône ne chevauche sa voisine (halo compris pour la choisie)
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local fakes = { "rogue", "mage", "hunter", "warlock", "paladin", "shaman", "druid" }
+  local real = 0
+  for _ in pairs(ns.Classes) do real = real + 1 end
+  for _, want in ipairs({ 2, 5, 9 }) do
+    H.boot(nil)
+    ns = H.ns
+    local added = {}
+    for i = 1, math.max(0, want - real) do
+      local f = fakes[i]
+      local id = "zz_" .. f
+      ns.Classes[id] = { id = id, name = f:sub(1, 1):upper() .. f:sub(2), order = 50 + i, hp = 70, deck = {},
+        resource = { id = "rage" } }
+      added[#added + 1] = id
     end
+    H.slash("")
+    H.settle()
+    local st = UI().screens.start
+    local panel = st.panel
+    local pr, fr = R.rect(panel), R.rect(_G.SlayTheDragonFrame)
+    local keyR = R.rect(st.keyLabel)
+    local n, bad, xs = 0, {}, {}
+    for _, b in ipairs(st.classIcons) do
+      if b._shown then
+        n = n + 1
+        local r = R.rect(b)
+        xs[#xs + 1] = (r[1] + r[3]) / 2
+        if r[1] < pr[1] + 8 or r[3] > pr[3] - 8 or r[1] < fr[1] or r[3] > fr[3] then bad[#bad + 1] = "hors du panneau" end
+        if r[2] < keyR[4] + 4 then bad[#bad + 1] = "sur les clés" end
+        if math.abs((r[3] - r[1]) - (r[4] - r[2])) > 1e-6 then bad[#bad + 1] = "pas carrée" end
+        local texts = 0
+        for _, k in ipairs(rawget(b.face, "_kids")) do
+          if rawget(k, "_kind") == "FontString" and (k._text or "") ~= "" then texts = texts + 1 end
+        end
+        if texts > 0 then bad[#bad + 1] = "texte sur l'icône" end
+        local tt = table.concat(H.hover(b), " | ")
+        if not (tt:find(b.option.label, 1, true) and tt:find("HP", 1, true)) then bad[#bad + 1] = "infobulle : " .. tt end
+      end
+    end
+    local regular = true
+    for i = 3, #xs do if math.abs((xs[i] - xs[i - 1]) - (xs[2] - xs[1])) > 1e-6 then regular = false end end
+    local centered = #xs > 0 and math.abs((xs[1] + xs[#xs]) / 2 - (pr[1] + pr[3]) / 2) < 1e-6
+    local w1 = n > 0 and R.rect(st.classIcons[1]) or { 0, 0, 0, 0 }
+    local apart = #xs < 2 or (xs[2] - xs[1]) > (w1[3] - w1[1]) * 1.08 + 4
+    local nameR = R.rect(st.className)
+    local nameOk = st.className._shown and nameR[2] > keyR[4] and nameR[4] < w1[2] + 0.01
+    check(("accueil à %d classes : %d icônes centrées, régulières, espacées, dans le panneau et la fenêtre, au-dessus des clés, nom de la choisie entre les deux"):format(want, n),
+      n == math.max(want, real) and #bad == 0 and regular and centered and apart and nameOk,
+      table.concat(bad, ", ") .. (regular and "" or " irrégulières") .. (centered and "" or " décentrées")
+        .. (apart and "" or " serrées") .. (nameOk and "" or " nom mal placé"))
+    -- clic sur la dernière : choisie (halo), départ inchangé (bouton existant)
+    local last = st.classIcons[n]
+    H.click(last)
+    check(("accueil à %d classes : clic sur la dernière icône, elle devient le choix"):format(want),
+      option(last.option.id).selected and button(last.option.id).selected, last.option.id)
+    snap("accueil-" .. want .. "-classes", true)
+    for _, id in ipairs(added) do ns.Classes[id] = nil end
   end
-  local keyTop = -st.keyLabel._points[1][5]
-  check(("accueil à 9 classes : %d boutons en grille dans le panneau, au-dessus des clés (bas %.0f, clés %.0f)"):format(n, lowest, keyTop),
-    n == 9 and inside and lowest < keyTop and panel._h > 290, n)
-  snap("accueil-9-classes", true)
-  for _, f in ipairs(fakes) do ns.Classes["zz_" .. f] = nil end
 end
 
 -- planche des cartes du Guerrier (base et améliorée), langage des cartes
@@ -5479,6 +5604,273 @@ if SNAP then
   end
   Render.svg(H, big, SNAP .. "/cartes_warrior.svg", "cartes du Guerrier (base, améliorée)")
   big:Hide()
+end
+
+print("UB  pièces en tranches : une texture découpée par le client, repli bord à bord à toute échelle, gardes de l'atlas")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W, WS = ns.Widgets, ns.WowSkin
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local frame = _G.SlayTheDragonFrame
+  local Wd = W
+  local function step(dt) run(Wd.driver, "OnUpdate", dt) H.now = H.now + dt end
+  local function settleHover() for _ = 1, 40 do step(0.02) end H.now = H.now + 1 end
+
+  -- 1. pièces en trois tranches : bouts dans la pièce (2 × bout < largeur), hauteur entière
+  local badCap = {}
+  for name, e in pairs(WS.pieces) do
+    if e.cap and not (e.cap > 0 and 2 * e.cap < e.pw) then badCap[#badCap + 1] = name end
+  end
+  check("pièces en trois tranches : bouts à l'intérieur de la pièce", #badCap == 0, table.concat(badCap, ", "))
+
+  -- 2. gardes de l'atlas : autour de chaque pièce, au moins 2 pixels qui répètent son bord (alpha et
+  -- couleur visible) et n'appartiennent à aucune autre pièce : le filtrage (bilinéaire, mipmaps du
+  -- trilinéaire jusqu'au demi) aux bords d'une pièce ou d'une tranche ne lit jamais une voisine. (Avant le
+  -- 12/11/2026, les gardes gauche et droite étaient noires sous l'alpha du bord : liseré sombre possible.)
+  local GUARD = 2
+  local f = assert(io.open(root .. "/Media/WowUI/atlas.tga", "rb"))
+  local img = f:read("*a")
+  f:close()
+  local AW, AH = img:byte(13) + 256 * img:byte(14), img:byte(15) + 256 * img:byte(16)
+  local function px(x, y)
+    local i = 18 + ((AH - 1 - y) * AW + x) * 4
+    return img:byte(i + 3), img:byte(i + 2), img:byte(i + 1), img:byte(i + 4) -- r, g, b, a (TGA : BGRA)
+  end
+  local rects = {}
+  for name, e in pairs(WS.pieces) do
+    if e.file == "atlas.tga" then
+      local x0, y0 = math.floor(e.tc[1] * e.w + 0.5), math.floor(e.tc[3] * e.h + 0.5)
+      rects[name] = { x0, y0, x0 + e.pw, y0 + e.ph }
+    end
+  end
+  local guardBad, nPieces = {}, 0
+  for name, r in pairs(rects) do
+    nPieces = nPieces + 1
+    local g = { r[1] - GUARD, r[2] - GUARD, r[3] + GUARD, r[4] + GUARD }
+    if g[1] < 0 or g[2] < 0 or g[3] > AW or g[4] > AH then guardBad[#guardBad + 1] = name .. " (bord de la toile)" end
+    for other, o in pairs(rects) do
+      if other ~= name and o[1] < g[3] and o[3] > g[1] and o[2] < g[4] and o[4] > g[2] then
+        guardBad[#guardBad + 1] = name .. " touche " .. other
+      end
+    end
+    -- anneau de garde = bord répété
+    local wrong = 0
+    for y = math.max(0, g[2]), math.min(AH, g[4]) - 1 do
+      for x = math.max(0, g[1]), math.min(AW, g[3]) - 1 do
+        if x < r[1] or x >= r[3] or y < r[2] or y >= r[4] then
+          local ex = math.min(math.max(x, r[1]), r[3] - 1)
+          local ey = math.min(math.max(y, r[2]), r[4] - 1)
+          local r1, g1, b1, a1 = px(x, y)
+          local r2, g2, b2, a2 = px(ex, ey)
+          -- couleur comparée prémultipliée (écart ≤ 2 sur 255 : rééchantillonnage des pixels presque transparents)
+          local k = a2 / 255
+          if a1 ~= a2 or math.abs(r1 - r2) * k > 2 or math.abs(g1 - g2) * k > 2 or math.abs(b1 - b2) * k > 2 then
+            wrong = wrong + 1
+          end
+        end
+      end
+    end
+    if wrong > 0 then guardBad[#guardBad + 1] = name .. " : " .. wrong .. " pixels de garde différents du bord" end
+  end
+  table.sort(guardBad)
+  check(("atlas : %d pièces entourées de %d pixels de garde (bord répété, aucune voisine)"):format(nPieces, GUARD),
+    nPieces > 30 and #guardBad == 0, table.concat(guardBad, ", "))
+
+  -- 3. client avec la découpe (WoW Forever) : chaque composition en tranches est UNE texture découpée,
+  -- sans jointure ; pièce entière (coordonnées de la pièce), marges dans la pièce, bouts à l'échelle de
+  -- la hauteur, texture qui couvre exactement son hôte ; vérifié sur les écrans parcourus
+  local function slicedIn(top)
+    local out = {}
+    local function walk(o)
+      for _, k in ipairs(rawget(o, "_kids") or {}) do
+        if rawget(k, "_kind") == "Texture" and k._calls.SetTextureSliceMargins then out[#out + 1] = k end
+        walk(k)
+      end
+    end
+    walk(top)
+    return out
+  end
+  local function groups()
+    local out = {}
+    for _, o in ipairs(H.objects) do
+      for _, key in ipairs({ "base", "hot", "nine", "plate" }) do
+        local g = rawget(o, key)
+        if type(g) == "table" and rawget(g, "parts") and (rawget(g, "Layout") or rawget(g, "margins")) then
+          out[#out + 1] = { g = g, owner = o, key = key }
+        end
+      end
+      local tag = rawget(o, "tag")
+      if type(tag) == "table" and type(rawget(tag, "plain")) == "table" then out[#out + 1] = { g = tag.plain, owner = o, key = "tag" } end
+    end
+    return out
+  end
+  local apiBad, nGroups, nTex = {}, 0, 0
+  local function apiCheck(where)
+    for _, it in ipairs(groups()) do
+      local g = it.g
+      local t = g.parts[1]
+      if t and t:IsVisible() then
+        nGroups = nGroups + 1
+        local label = where .. " " .. it.key .. " " .. tostring(rawget(t, "_wow") or rawget(t, "_texture"))
+        local sm = t._calls.SetTextureSliceMargins
+        if not g.sliced or #g.parts ~= 1 or not sm then
+          apiBad[#apiBad + 1] = label .. " : pas d'un seul tenant"
+        else
+          local e = rawget(t, "_wow") and WS.pieces[t._wow]
+          local tc = t._calls.SetTexCoord
+          if e then
+            if not tc or math.abs(tc[1] - e.tc[1]) > 1e-9 or math.abs(tc[2] - e.tc[2]) > 1e-9
+              or math.abs(tc[3] - e.tc[3]) > 1e-9 or math.abs(tc[4] - e.tc[4]) > 1e-9 then
+              apiBad[#apiBad + 1] = label .. " : coordonnées hors de la pièce"
+            end
+            if sm[1] + sm[3] >= e.pw or sm[2] + sm[4] >= e.ph then apiBad[#apiBad + 1] = label .. " : marges plus grandes que la pièce" end
+            if g.cap and math.abs(sm[1] * t._scale - g.cap) > 1e-9 then apiBad[#apiBad + 1] = label .. " : bout ≠ hauteur × bout / hauteur de la pièce" end
+          end
+          local host = g.host or (g.anchor)
+          if g.anchor then host = g.anchor end
+          local rt, rh = R.rect(t), host and R.rect(host)
+          if not rt or not rh or math.abs(rt[1] - rh[1]) > 1e-6 or math.abs(rt[3] - rh[3]) > 1e-6
+            or math.abs(rt[2] - rh[2]) > 1e-6 or math.abs(rt[4] - rh[4]) > 1e-6 then
+            apiBad[#apiBad + 1] = label .. " : texture qui ne couvre pas son hôte"
+          end
+          -- les bouts ne se chevauchent pas (hôte assez large pour deux bouts)
+          local s, p = 1, t
+          while p do s = s * (rawget(p, "_scale") or 1) p = rawget(p, "_parent") end
+          if rt and (sm[1] + sm[3]) * s > (rt[3] - rt[1]) + 1e-6 then apiBad[#apiBad + 1] = label .. " : bouts qui se chevauchent" end
+        end
+      end
+    end
+    nTex = nTex + #slicedIn(frame)
+  end
+  apiCheck("combat")
+  for _, sc in ipairs({ { SEED + 4, "event", "rencontre" }, { SEED + 5, nil, "parcours" }, { SEED + 2, "merchant", "marchand" },
+    { SEED + 3, "campfire", "feu de camp" } }) do
+    freshRun(sc[1], sc[2])
+    H.advance(1)
+    apiCheck(sc[3])
+  end
+  H.slash("options")
+  apiCheck("options")
+  H.key("ESCAPE")
+  check(("client avec découpe : %d compositions en tranches (boutons, liserés, plaques, parchemins, cadres d'ennemi) d'un seul tenant"):format(nGroups),
+    nGroups > 20 and nTex > 20 and #apiBad == 0, table.concat(apiBad, ", "))
+
+  -- pendant un survol (zoom net, fenêtre 0,6 à 1,5) : la texture découpée reste seule, à la même échelle
+  -- propre et sur les mêmes ancres ; seul le visuel est animé
+  freshRun(SEED, "combat")
+  H.settle()
+  local btn = V().endTurn
+  local tex = btn.base.parts[1]
+  local d0, pts0 = tex._scale, #tex._points
+  local animBad = {}
+  for _, ws in ipairs({ 0.6, 0.85, 1, 1.15, 1.5 }) do
+    frame:SetScale(ws)
+    run(btn, "OnEnter")
+    for i = 1, 8 do
+      step(0.013)
+      if tex._scale ~= d0 or #tex._points ~= pts0 or #btn.base.parts ~= 1 then animBad[#animBad + 1] = ws .. "/" .. i end
+    end
+    run(btn, "OnLeave")
+    settleHover()
+  end
+  frame:SetScale(1.15)
+  check("survol d'un bouton découpé (fenêtre 0,6 à 1,5, images intermédiaires) : une texture, échelle propre et ancres fixes",
+    #animBad == 0, table.concat(animBad, ", "))
+
+  -- 4. client sans la découpe (repli) : tranches bord à bord, sans jour ni chevauchement, aux fenêtres
+  -- 0,6 à 1,5 et à chaque image d'un survol (positions fractionnaires) ; coordonnées contiguës, dans la pièce
+  H.noSlice = true
+  local holder = CreateFrame("Frame", nil, frame)
+  holder:SetSize(600, 200)
+  holder:SetPoint("TOPLEFT", frame, "TOPLEFT", 37.3, -91.7)
+  local rb = W.button(holder, "Warrior", 220, 52, nil, "red", 17)
+  rb:SetPoint("TOPLEFT", holder, "TOPLEFT", 10.37, -12.41)
+  local gb = W.button(holder, "Start", 231.3, 49.7, nil, "gold", 18)
+  gb:SetPoint("TOPLEFT", holder, "TOPLEFT", 300.21, -15.66)
+  local parch = W.parchment(holder)
+  parch:SetSize(203.7, 121.3)
+  parch:SetPoint("TOPLEFT", holder, "TOPLEFT", 12.2, -80.9)
+  local card = W.card(holder)
+  card:SetCard("strike", false, { playable = true })
+  W.placeCenter(card, holder, 400.3, 140.7, 1)
+  H.settle()
+  local fbBad, samples = {}, 0
+  local function tcOf(t) return t._calls.SetTexCoord end
+  local function within(tc, e) return tc[1] >= e.tc[1] - 1e-9 and tc[2] <= e.tc[2] + 1e-9 and tc[3] >= e.tc[3] - 1e-9 and tc[4] <= e.tc[4] + 1e-9 end
+  local function rowCheck(label, parts, e)
+    if #parts ~= 3 then fbBad[#fbBad + 1] = label .. " : " .. #parts .. " tranches" return end
+    local a, b, c = R.vrect(parts[1]), R.vrect(parts[2]), R.vrect(parts[3])
+    samples = samples + 1
+    if not (a and b and c) then fbBad[#fbBad + 1] = label .. " : non mesurable" return end
+    local gap1, gap2 = b[1] - a[3], c[1] - b[3]
+    if math.abs(gap1) > 1e-6 or math.abs(gap2) > 1e-6 or math.abs(a[2] - b[2]) > 1e-6 or math.abs(a[4] - b[4]) > 1e-6
+      or math.abs(c[2] - b[2]) > 1e-6 or math.abs(c[4] - b[4]) > 1e-6 then
+      fbBad[#fbBad + 1] = string.format("%s : jour %.4f / %.4f", label, gap1, gap2)
+    end
+    local t1, t2, t3 = tcOf(parts[1]), tcOf(parts[2]), tcOf(parts[3])
+    if e and not (within(t1, e) and within(t2, e) and within(t3, e) and math.abs(t1[2] - t2[1]) < 1e-12
+      and math.abs(t2[2] - t3[1]) < 1e-12 and math.abs(t1[1] - e.tc[1]) < 1e-12 and math.abs(t3[2] - e.tc[2]) < 1e-12) then
+      fbBad[#fbBad + 1] = label .. " : coordonnées non contiguës ou hors de la pièce"
+    end
+  end
+  local function sampleAll(label)
+    rowCheck(label .. " bouton rouge", rb.base.parts, WS.pieces.btn_red)
+    rowCheck(label .. " liseré d'or", rb.hot.parts, WS.pieces.btn_goldred)
+    rowCheck(label .. " bouton rouge et or", gb.base.parts, WS.pieces.btn_goldred)
+    rowCheck(label .. " plaque de carte", card.plate.parts, nil)
+    local np = parch.nine.parts
+    if #np ~= 9 then fbBad[#fbBad + 1] = label .. " parchemin : " .. #np .. " tranches" else
+      for row = 0, 2 do rowCheck(label .. " parchemin rang " .. row, { np[row * 3 + 1], np[row * 3 + 2], np[row * 3 + 3] }, WS.pieces.parch_text) end
+      for col = 1, 3 do
+        local a, b, c = R.vrect(np[col]), R.vrect(np[col + 3]), R.vrect(np[col + 6])
+        if math.abs(a[2] - b[4]) > 1e-6 or math.abs(b[2] - c[4]) > 1e-6 then fbBad[#fbBad + 1] = label .. " parchemin colonne " .. col end
+      end
+    end
+  end
+  for _, ws in ipairs({ 0.6, 0.85, 1, 1.15, 1.5 }) do
+    frame:SetScale(ws)
+    sampleAll(("repos ×%.2f"):format(ws))
+    for _, b in ipairs({ rb, gb, card }) do
+      W.animTo(b, "hover", 1, W.HOVER_IN)
+      for i = 1, 6 do
+        step(0.017)
+        sampleAll(("survol ×%.2f image %d"):format(ws, i))
+      end
+      W.animTo(b, "hover", 0, W.HOVER_OUT)
+      for i = 1, 6 do
+        step(0.019)
+        sampleAll(("sortie ×%.2f image %d"):format(ws, i))
+      end
+      settleHover()
+    end
+  end
+  frame:SetScale(1.15)
+  check(("client sans découpe : tranches bord à bord, sans jour ni chevauchement (%d relevés, fenêtre 0,6 à 1,5, survols image par image), coordonnées contiguës dans la pièce"):format(samples),
+    samples > 500 and #fbBad == 0, table.concat(fbBad, ", ", 1, math.min(#fbBad, 6)))
+  H.noSlice = false
+
+  -- aperçu agrandi : un bouton découpé et son repli, fenêtre 1,15, à mi-survol (×3 pour l'aperçu)
+  if SNAP then
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(330, 90)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.15 * 3)
+    local b1 = W.button(big, "Warrior", 150.3, 52, nil, "red", 17)
+    b1:SetPoint("TOPLEFT", big, "TOPLEFT", 6.37, -10.21)
+    H.noSlice = true
+    local b2 = W.button(big, "Warrior", 150.3, 52, nil, "red", 17)
+    b2:SetPoint("TOPLEFT", big, "TOPLEFT", 170.61, -10.21)
+    H.noSlice = false
+    H.settle()
+    for _, b in ipairs({ b1, b2 }) do b:SetSelected(true) W.animTo(b, "hover", 1, W.HOVER_IN) end
+    step(0.03)
+    Render.svg(H, big, SNAP .. "/ub_bouton_mi_survol.svg", "découpé (gauche) / repli en tranches (droite), fenêtre 1,15, mi-survol, ×3")
+    big:Hide()
+  end
+  holder:Hide()
 end
 
 print("U16 méthodes d'API inconnues appelées")

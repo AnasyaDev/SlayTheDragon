@@ -404,9 +404,11 @@ for n, (px, py) in SLOT.items():
     big = im.resize((im.width, im.height))
     ext.paste(big.crop((0, 0, im.width, 1)).resize((im.width, PAD)), (PAD, 0))
     ext.paste(big.crop((0, im.height - 1, im.width, im.height)).resize((im.width, PAD)), (PAD, PAD + im.height))
+    # la pièce AVANT les colonnes répétées (sinon les gardes gauche et droite répètent une colonne encore
+    # vide : couleur noire sous l'alpha du bord, liseré sombre au filtrage ; corrigé le 12/11/2026)
+    ext.paste(im, (PAD, PAD))
     ext.paste(ext.crop((PAD, 0, PAD + 1, ext.height)).resize((PAD, ext.height)), (0, 0))
     ext.paste(ext.crop((PAD + im.width - 1, 0, PAD + im.width, ext.height)).resize((PAD, ext.height)), (PAD + im.width, 0))
-    ext.paste(im, (PAD, PAD))
     ext.putalpha(Image.new("L", ext.size, 0))
     a = Image.new("L", ext.size, 0)
     a.paste(im.split()[3], (PAD, PAD))

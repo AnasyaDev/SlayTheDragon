@@ -376,34 +376,78 @@ end
 local Start = { kinds = { "start" } }
 UI.register("start", Start)
 
+-- Rangée des classes : icônes de START_ICON unités (anneau compris) espacées de START_STEP, centrées dans
+-- START_ROW_W ; au-delà, pas et taille réduits pour tenir dans le panneau. Haut de la rangée à START_TOP
+-- sous le haut du panneau, libellé des clés à START_KEYS.
+local START_ICON, START_STEP, START_ROW_W, START_TOP, START_KEYS, START_PANEL_H = 64, 92, 520, 56, 160, 300
+UI.START = { icon = START_ICON, step = START_STEP, rowW = START_ROW_W, top = START_TOP, keys = START_KEYS }
+
+-- Infobulle d'une classe : nom, puis ce que le bouton texte affichait (PV et cartes, réputation).
+local function fillClassTooltip(tt, o)
+  tt:AddLine(o.label or "", 1, 0.82, 0)
+  local text = o.text or ""
+  local stats, rep = text:match("^(.-)%s*·%s*(.+)$")
+  if stats then
+    tt:AddLine(stats, 1, 1, 1, true)
+    tt:AddLine("Reputation: " .. rep, 1, 1, 1, true)
+  elseif text ~= "" then
+    tt:AddLine(text, 1, 1, 1, true)
+  end
+  if not o.selected then tt:AddLine("Click: play this class.", 0.6, 0.6, 0.6) end
+end
+
+-- Icône de classe : grand anneau doré, icône ronde, halo doré créé d'avance (éteint) ; choisie : halo
+-- tenu, anneau et icône pleins ; sinon assombrie, éclairée au survol.
+local CLASS_DIM = 0.5
+local function classIcon(parent)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(START_ICON, START_ICON)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(b)
+  b.glow = W.skin(face, "glow_round", "BACKGROUND", -8)
+  b.glow:SetPoint("CENTER")
+  b.glow:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
+  b.glow:SetAlpha(0)
+  W.medallionOn(face, START_ICON)
+  b.icon, b.ring = face.icon, face.ring
+  b.Resize = function(self, s)
+    self:SetSize(s, s)
+    self.face:Resize(s)
+    self.glow:SetSize(s * 1.6, s * 1.6)
+  end
+  b:Resize(START_ICON)
+  W.hoverable(b, { scale = 1.08, lift = 3, paint = function(self, h)
+    local sel = self.selected
+    local k = sel and 1 or (CLASS_DIM + (1 - CLASS_DIM) * h)
+    self.icon:SetVertexColor(k, k, k, 1)
+    local rk = sel and 1 or (0.62 + 0.38 * h)
+    self.ring:SetVertexColor(rk, rk, rk, 1)
+    self.glow:SetAlpha(sel and 0.85 or 0.45 * h)
+  end })
+  b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+  W.tooltip(b, function(tt, btn) if btn.option then fillClassTooltip(tt, btn.option) end end, "ANCHOR_TOP")
+  b.SetSelected = function(self, on)
+    self.selected = on and true or false
+    self:hoverPaint(W.animValue(self, "hover"))
+  end
+  b:Hide()
+  return b
+end
+
 function Start:Build(f)
   self.hero = heroFigure(f)
   local panel = W.dialog(f, "Slay the Dragon", 18)
-  at(panel, f, 280, 74, 560, 290)
+  at(panel, f, 280, 74, 560, START_PANEL_H)
   self.panel = panel
   self.title = panel.title
-  -- Classes : jusqu'à 2, grands boutons rouges en une rangée (PV, cartes et réputation dessous) ;
-  -- au-delà (neuf classes prévues), grille de 3 colonnes de boutons plus bas, détail en infobulle, et
-  -- le reste du panneau descend d'autant (Start:Show).
-  self.classButtons = {}
-  for i = 1, 9 do
-    local b = W.button(panel, "", 220, 52, nil, "red", 17)
-    b.sub = W.label(b.face, "body", 11, C.text)
-    b.sub:SetPoint("TOP", b.label, "BOTTOM", 0, -2)
-    b.label:ClearAllPoints()
-    b.label:SetPoint("CENTER", 0, 7)
-    b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-    W.tooltip(b, function(tt, btn)
-      local o = btn.option
-      if not o or not btn.compact then return end
-      tt:AddLine(o.label, 1, 0.82, 0)
-      if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
-    end, "ANCHOR_TOP")
-    b:Hide()
-    self.classButtons[i] = b
-  end
+  -- Classes : une rangée d'icônes de classe dans le grand anneau doré, sans texte ; nom, PV, cartes et
+  -- réputation dans l'infobulle ; la classe choisie a son halo doré, les autres sont assombries, et son
+  -- nom seul est écrit sous son icône. Autant d'icônes que de classes jouables (Start:Show).
+  self.classIcons = {}
+  self.className = W.label(panel, "bold", 14, C.wowGold)
+  self.className:Hide()
   self.keyLabel = W.label(panel, "bold", 15, C.wowGold)
-  self.keyLabel:SetPoint("TOP", 0, -150)
+  self.keyLabel:SetPoint("TOP", 0, -START_KEYS)
   self.keyLabel:SetText("Mythic Keystone")
   self.keyButtons = {}
   -- clés +0…+5 : cases de barre d'action à l'icône de la clé, « +N » ; choisie : cadre doré ;
@@ -461,40 +505,27 @@ function Start:Show(step)
     elseif o.group == "key" then keys[#keys + 1] = o
     else others[#others + 1] = o end
   end
+  -- rangée d'icônes de classe, centrée ; pas et taille réduits si les classes ne tiennent pas
   local nc = #classes
-  local compact = nc > 2
-  local cols = compact and 3 or max(nc, 1)
-  local rows = math.ceil(nc / cols)
-  -- décalage vertical du reste du panneau (clés, affixes) quand la grille a plusieurs rangées
-  local shift = compact and max(0, (rows - 1) * 42 - 24) or 0
-  for i, b in ipairs(self.classButtons) do
+  local pitch = min(START_STEP, START_ROW_W / max(nc, 1))
+  local size = min(START_ICON, floor(pitch - 20))
+  local chosen
+  for i = #self.classIcons + 1, nc do self.classIcons[i] = classIcon(self.panel) end
+  for i, b in ipairs(self.classIcons) do
     local o = classes[i]
     if o then
-      b:ClearAllPoints()
-      b.compact = compact
-      if compact then
-        local col, row = (i - 1) % cols, math.floor((i - 1) / cols)
-        local inRow = min(cols, nc - row * cols)
-        b:SetSize(170, 36)
-        b:Relayout(36)
-        W.setSize(b.label, 15)
-        b:SetPoint("TOP", self.panel, "TOP", (col + 1 - (inRow + 1) / 2) * 178, -62 - row * 42)
-        b.label:ClearAllPoints()
-        b.label:SetPoint("CENTER", 0, 0)
-        b.sub:Hide()
-      else
-        b:SetSize(220, 52)
-        b:Relayout(52)
-        W.setSize(b.label, 17)
-        b:SetPoint("TOP", self.panel, "TOP", (i - (nc + 1) / 2) * 232, -70)
-        b.label:ClearAllPoints()
-        b.label:SetPoint("CENTER", 0, 7)
-        b.sub:Show()
+      local cid = o.id:match("^class:(.+)$")
+      if b.cid ~= cid then
+        b.cid = cid
+        W.setIcon(b.icon, Art.class(cid), "class:" .. tostring(cid))
       end
+      if b.size ~= size then b.size = size b:Resize(size) end
+      b:ClearAllPoints()
+      b.x = (i - (nc + 1) / 2) * pitch
+      b:SetPoint("TOP", self.panel, "TOP", b.x, -START_TOP - (START_ICON - size) / 2)
       b.option = o
-      b:SetText(o.label)
-      b.sub:SetText(o.text or "")
       b:SetSelected(o.selected)
+      if o.selected then chosen = b end
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -502,14 +533,23 @@ function Start:Show(step)
       b:Hide()
     end
   end
-  self.panel:SetHeight(290 + shift)
+  -- nom seul de la classe choisie, sous son icône
+  self.className:ClearAllPoints()
+  if chosen then
+    self.className:SetPoint("TOP", self.panel, "TOP", chosen.x, -START_TOP - START_ICON - 6)
+    self.className:SetText(chosen.option.label or "")
+    self.className:Show()
+  else
+    self.className:Hide()
+  end
+  self.panel:SetHeight(START_PANEL_H)
   self.keyLabel:ClearAllPoints()
-  self.keyLabel:SetPoint("TOP", 0, -150 - shift)
+  self.keyLabel:SetPoint("TOP", 0, -START_KEYS)
   for i, b in ipairs(self.keyButtons) do
     local o = keys[i]
     if o then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", (i - (#keys + 1) / 2) * 56, -176 - shift)
+      b:SetPoint("TOP", self.panel, "TOP", (i - (#keys + 1) / 2) * 56, -START_KEYS - 26)
       b.option = o
       b.label:SetText(o.label)
       b.selected = o.selected and true or false
@@ -531,7 +571,7 @@ function Start:Show(step)
     local id = aff[i]
     if id then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", (i - (#aff + 1) / 2) * 36, -240 - shift)
+      b:SetPoint("TOP", self.panel, "TOP", (i - (#aff + 1) / 2) * 36, -START_KEYS - 90)
       b:SetItem("affix", id)
       b:Show()
     else
