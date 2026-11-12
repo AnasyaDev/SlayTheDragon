@@ -161,9 +161,9 @@ card("whirlwind", {
 
 card("victory_rush", {
   level = 1, name = "Victory Rush", cost = 0, type = "attack", rarity = "common", path = "fury",
-  target = "enemy", exhaust = true, effects = { { "damage", 4 }, { "heal", 4 } },
-  text = "Deal 4.\nHeal 4.\nExhaust.",
-  up = { effects = { { "damage", 6 }, { "heal", 6 } }, text = "Deal 6.\nHeal 6.\nExhaust." },
+  target = "enemy", exhaust = true, effects = { { "damage", 3 }, { "heal", 4 } },
+  text = "Deal 3.\nHeal 4.\nExhaust.",
+  up = { effects = { { "damage", 5 }, { "heal", 6 } }, text = "Deal 5.\nHeal 6.\nExhaust." },
 })
 
 card("berserker_rage", {
@@ -199,9 +199,9 @@ card("battle_shout", {
 
 card("onslaught", {
   level = 6, name = "Onslaught", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
-  target = "enemy", spend = 2, effects = { { "damage", 8 }, { "draw", 2, cond = "spent" } },
-  text = "Deal 8.\nSpend 2: draw 2.",
-  up = { effects = { { "damage", 11 }, { "draw", 2, cond = "spent" } }, text = "Deal 11.\nSpend 2: draw 2." },
+  target = "enemy", spend = 2, effects = { { "damage", 10 }, { "draw", 2, cond = "spent" } },
+  text = "Deal 10.\nSpend 2: draw 2.",
+  up = { effects = { { "damage", 13 }, { "draw", 2, cond = "spent" } }, text = "Deal 13.\nSpend 2: draw 2." },
 })
 
 -- Enrage : chaque perte de PV donne Strength 1, une fois par tour (par round).
@@ -223,9 +223,9 @@ card("enrage", {
 
 card("recklessness", {
   level = 7, name = "Recklessness", cost = 1, type = "skill", rarity = "rare", path = "fury",
-  payHp = 4, exhaust = true, effects = { { "apply", "force", 3, self = true } },
-  text = "Pay 4 HP.\nGain Strength 3\nExhaust.",
-  up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 4 HP.\nGain Strength 4\nExhaust." },
+  payHp = 3, exhaust = true, effects = { { "apply", "force", 3, self = true } },
+  text = "Pay 3 HP.\nGain Strength 3\nExhaust.",
+  up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 3 HP.\nGain Strength 4\nExhaust." },
 })
 
 -- Protection : Absorb converti en dégâts, ripostes quand il est frappé ------------------------------
