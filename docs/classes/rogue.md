@@ -416,3 +416,24 @@ les bibelots, série de référence `bot=heuristic` une fois les bots adaptés (
    la passer en Skill la rendrait plus lisible.
 5. **Deck de départ** : 4 / 4 / 1 / 1 comme le Priest, ou 3 Sinister Strike et 2 Eviscerate.
 6. **PV de départ** : 65 proposé.
+
+## 10. Implémentation (12/11/2026)
+
+Codé dans `Data/Rogue.lua`, `Core/Classes/rogue.lua`, `UI/Art/rogue.lua` (tests : `Sim/tests.lua`, harnais
+section UR). Écarts avec la fiche, par ordre de priorité (decisions.md puis socle) :
+
+- **PV de départ 60** (et non 65) : 89 % de victoires à 60 PV contre 92 % à 65 (bot heuristic, clé 0,
+  300 expéditions) ; les décisions laissent les PV à régler par simulation.
+- **Surge à 0** (décisions) : Envenom, Secret Technique et Between the Eyes ont une autre clause, elles se
+  jouent à 0 point (Envenom : éclate seulement ; Between the Eyes : Stunned sans dégâts ; Secret
+  Technique : rien, Stealth consommé). Eviscerate, Rupture, Exsanguinate : `minRes = 1`.
+- Forme du socle : ressource `res` (pas `combo`), `startRelic`, Stealth posé par `init`, Parry dans
+  `beforeHit`, raison « Not enough Combo Points. » (pas « No Combo Points. »), rareté `common` +
+  `noPool` pour Thieves' Tools, `rep` 0/1/2 = 20/5/5 dans l'ordre des niveaux, `level` posé non lu.
+- Textes : « Remove negative effects. » (Cloak of Shadows, aucun « your ») ; « Start of turn: » (au lieu
+  de « Turn start: », déclencheur du registre) ; « Attacks: deal 2 to all. » (Blade Flurry, comme Deep
+  Wounds) ; « Each Attack hit » ajouté au registre ; textes des bibelots sans « you ».
+- Crystal Vial : crochet `apply` (DoT posé sur un ennemi par une carte, Deadly Poison, Rupture, Envenom).
+- Non faits (interface commune) : crans de Combo Points dans la pastille (nombre générique), clignotement
+  au plafond, chiffre flottant « Parry », surbrillance des lignes `Stealth:` / `DoT:`. Fait : modèle du
+  héros en semi-transparence sous Stealth (`ns.ClassViews.rogue`).

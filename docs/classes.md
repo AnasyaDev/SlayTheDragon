@@ -1,7 +1,7 @@
 # Ajouter une classe (contrat du socle multi-classes)
 
 État au 12/11/2026. Le socle est en place, le Priest y est migré (résultats de simulation identiques à
-graine égale) et le Warrior en est la preuve. Ce document est le contrat des classes suivantes : une
+graine égale), le Warrior en est la preuve, le Rogue suit (fiche `docs/classes/rogue.md`). Ce document est le contrat des classes suivantes : une
 classe s'ajoute sans toucher au moteur, à l'interface ni au harnais, sauf besoin nouveau (à signaler).
 GDD : `docs/gdd-classes.md` (copie du Claude Doc) ; fiches de conception : `docs/classes/<classe>.md`.
 
@@ -17,7 +17,8 @@ GDD : `docs/gdd-classes.md` (copie du Claude Doc) ; fiches de conception : `docs
 
 Un nouveau fichier dans le TOC impose de **relancer le client** (`/reload` ne suffit pas).
 Ordre de chargement actuel : `Core\*` (dont `Core\Language.lua`), `Data\Priest.lua`, `Data\Warrior.lua`,
-`Core\Classes\warrior.lua`, `Data\Act1.lua`… puis `UI\Art.lua`, `UI\Art\warrior.lua`, le reste de `UI\`.
+`Core\Classes\warrior.lua`, `Data\Rogue.lua`, `Core\Classes\rogue.lua`, `Data\Act1.lua`… puis `UI\Art.lua`,
+`UI\Art\warrior.lua`, `UI\Art\rogue.lua`, le reste de `UI\`.
 Fichiers communs que deux classes ajoutées en parallèle modifient toutes deux : le TOC et `UI/SkinData.lua`
 (table `icons`, triée : conflit de fusion trivial, ou relancer `--icons-only` après la fusion).
 
@@ -62,6 +63,7 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, rep) p
 | `lasts = N` | Power à durée : retiré à la fin du N-ième round (crochet `powerLasts`) ; `c.player.powerTurns[uid]` |
 | `replacedTo = "exhaust"` | un Power remplacé ou expiré part aux consumées (défausse par défaut) |
 | `rep` | palier de réputation qui débloque la carte (0, 1, 2) ; un champ `level` (progression par classe) prendra le relais, lu par les mêmes filtres (`Card.inClass`, `Expedition.cardPool`) |
+| `level` | niveau de classe (1 à 7) qui débloquera la carte ou le bibelot (fiche § Progression) ; posé par le Rogue, pas encore lu (tout est disponible) |
 
 Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start"`, pas de `rep`) + 13 communes,
 11 inhabituelles, 6 rares ; 10 par voie ; `rep` 0/1/2 = 20/5/5 (test « cartes : par classe »).
@@ -155,6 +157,13 @@ interruption : `Combat.isInstant`) ; un état peut porter `max = N` (plafond : P
 `c.player.flags.skipEnemyTurn` : le prochain tour ennemi est sauté (Feign Death). Hasard des cartes :
 flux `c.rng.cards` (jamais `c.rng.ai`). `Combat.tickDot(c, unité)` déclenche un DoT hors du début de tour.
 
+Affichage d'un état à drapeau (`flag = true`, Stealth) : jeton sans nombre sous le personnage, infobulle
+sans nombre (`W.unitStatuses`, `W.addStatusLines`) ; sur une carte, la ligne d'état s'écrit sans nombre
+(« Gain Stealth »), vérifié par le harnais U27. Un état posé sous condition d'état reste dans sa clause :
+`{ "apply", "stunned", 1, cond = "stealth" }` ⇔ « Stealth: apply Stunned 1 ⌛ » (ligne d'état, en dernier,
+sans point final ; U27 la reconnaît par le libellé, nom d'un état). Raison « resource » au pluriel
+(« Not enough Combo Points. »).
+
 Une classe peut émettre ses propres événements (`Combat.fire(c, "onShift", forme)`) : Powers et bibelots
 de la classe s'y abonnent par le même mécanisme.
 
@@ -236,7 +245,7 @@ cartes : `… sweep=cards rep=2 runs=300` (chaque carte ajoutée de force au dec
 simulation à la fois, `jobs=8` au plus. Les bots jouent les formes communes sans code de classe (ils
 simulent chaque coup sur une copie) ; une classe les guide par `bot` (définition), `botKey` et `botValue`
 (règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cible :
-60 à 80 % de victoires au bot heuristic, clé 0 (Priest ≈ 79 %, Warrior : voir son rapport).
+60 à 80 % de victoires au bot heuristic, clé 0 (Priest ≈ 79 %, Warrior ≈ 73 %, Rogue ≈ 89 % à 60 PV, à régler).
 
 ## Exemple minimal
 
@@ -270,8 +279,8 @@ ns.ClassRules.rogue = { hooks = {
 | Mécanique | Point d'extension |
 |---|---|
 | Rage (Warrior) | `onHpLost` + `onCardPlayed` de classe, `Combat.gainRes`, plafond `resource.cap` |
-| Parry, Stealth (Rogue) | états de classe (`max = 3`, `flag = true`) ; `beforeHit` coup par coup, avant l'Absorb (annuler jusqu'à 8) ; condition « Stealth: » d'office (état), consommée dans `onCardCommitted` (au jeu, aussi pour une Attack en Cast) |
-| Envenom, Exsanguinate | effet `tickDot`, `Combat.tickDot` |
+| Parry, Stealth (Rogue, fait) | états de classe (`max = 3`, `flag = true`) ; `beforeHit` coup par coup, avant l'Absorb (annuler jusqu'à 8) ; Stealth consommé dans `onCardCommitted` (au jeu, aussi pour une Attack en Cast), l'uid de la carte gardé dans `c.cls.openers` jusqu'à sa résolution ; condition `stealth` (`Combat.CONDITIONS`) : Attack = elle l'a consommé, autre carte = état posé ; miroir `c.cls.hidden` pour Flash Powder (gain réel seulement) |
+| Envenom, Exsanguinate | effet `tickDot`, `Combat.tickDot` ; effets propres `dotPer` (« Surge: apply DoT K per Combo Point. »), `tickDotPer`, `randomHits` (Killing Spree, flux `c.rng.cards`) dans `Core/Classes/rogue.lua` |
 | Combo Points, coups de grâce | ressource `combo`, effet `surge` + `per`, `minRes` |
 | Seals et Judgement (Paladin) | Power `slot = "seal"` ; condition `judgement` (registre prêt) à enregistrer dans `Combat.CONDITIONS` ; effet propre « déclenche le Judgement du Seal » dans `ns.Effects` |
 | Holy Power, Spend 3 | ressource `holy` (cap 3), `spend = 3` |
