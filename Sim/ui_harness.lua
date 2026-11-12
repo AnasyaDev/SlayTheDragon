@@ -777,8 +777,6 @@ function H.setup(ns)
   R.ui_test_idol = { name = "Test Idol", text = "Harness relic (no effect).", rarity = "uncommon", tier = 0 }
   R.ui_test_lens = { name = "Test Lens", text = "Harness relic (no effect).", rarity = "rare", tier = 0 }
   R.ui_test_trophy = { name = "Test Trophy", text = "Harness boss relic.", rarity = "boss", tier = 0 }
-  R.ui_test_symbol = { name = "Test Symbol", text = "Harness class relic.", rarity = "rare", tier = 0,
-    class = "priest" }
   P.ui_test_heal = { name = "Test Healing Potion", text = "Heal 10 HP.", rarity = "common", tier = 0, effects = {} }
   P.ui_test_bomb = { name = "Test Bomb", text = "Deal 10 damage to an enemy.", rarity = "common", tier = 0,
     target = true, effects = {} }
@@ -6595,6 +6593,207 @@ do
     big:Hide()
   end
   holder:Hide()
+end
+
+print("UP  progression par classe : écran (5 classes aux niveaux 1, 4, 7), verrouillés muets, bilan avec montée de niveau, accueil")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function inside(r, box)
+    return r and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local function fmt(r) return r and ("%.0f,%.0f,%.0f,%.0f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  -- textes et textures visibles sous un cadre (descendants compris)
+  local function regionsUnder(f, out)
+    out = out or {}
+    for _, k in ipairs(rawget(f, "_kids") or {}) do
+      local kind = rawget(k, "_kind")
+      if (kind == "FontString" or kind == "Texture") and vis(k) then out[#out + 1] = k end
+      regionsUnder(k, out)
+    end
+    return out
+  end
+  local CLASSES = { "priest", "warrior", "mage", "rogue", "hunter" }
+  -- seuils d'expérience (Meta.XP_LEVELS, vérifiés par les tests de l'expédition)
+  local XPL = { 0, 100, 250, 450, 700, 1000, 1400 }
+  local function bootLevels(levels)
+    local db = { version = 4, meta = { league = 0, runs = 0, classes = {}, flags = {} }, journal = {} }
+    for cid, lv in pairs(levels) do
+      db.meta.classes[cid] = { xp = XPL[lv], runs = 0, wins = 0, keyMax = 0, bestKey = -1 }
+    end
+    H.boot(db)
+    H.slash("")
+  end
+  local OPEN_CARDS = { 22, 25, 25, 28, 28, 31, 34 }
+  local OPEN_RELICS = { 2, 2, 3, 3, 4, 4, 6 }
+  for _, lv in ipairs({ 1, 4, 7 }) do
+    local levels = {}
+    for _, c in ipairs(CLASSES) do levels[c] = lv end
+    bootLevels(levels)
+    local ns = H.ns
+    local W = ns.Widgets
+    clickOption("ui:progress")
+    check(("niveau %d : l'accueil mène à l'écran de progression"):format(lv), currentKind() == "classProgress", currentKind())
+    for _, cid in ipairs(CLASSES) do
+      clickOption("pclass:" .. cid)
+      local tag = ("%s niveau %d"):format(cid, lv)
+      local scr, st = UI().current, UI().step
+      check(tag .. " : classe et niveau affichés (onglet choisi, barre « Level N »)", st.class == cid and st.level == lv
+        and option("pclass:" .. cid).selected and (scr.bar.value._text or ""):find("Level " .. lv, 1, true) ~= nil
+        and scr.bar.label._text == ns.Classes[cid].name, scr.bar.value._text)
+      -- cartes : 34 emplacements, débloqués en vraies cartes, verrouillés en dos de carte
+      local nCards, nLocks, badLock, badCard, badTip, outside = 0, 0, {}, {}, {}, {}
+      local content = R.rect(ns.UI.content)
+      local cond = ns.Classes[cid].name .. " level "
+      for i = 1, #scr.cards do
+        local c, k = scr.cards[i], scr.locks[i]
+        if vis(c) then
+          nCards = nCards + 1
+          if not (c.entry and c.entry.unlocked and c.cardId == c.entry.id) then badCard[#badCard + 1] = tostring(c.cardId) end
+          if c.hoverScale ~= UI().CP.zoom then badCard[#badCard + 1] = "zoom " .. tostring(c.hoverScale) end
+          if not inside(R.rect(c), content) then outside[#outside + 1] = "carte " .. tostring(c.cardId) .. " " .. fmt(R.rect(c)) end
+        end
+        if vis(k) then
+          nLocks = nLocks + 1
+          -- rien d'autre que le dos de carte : aucun texte, aucune icône
+          for _, r in ipairs(regionsUnder(k)) do
+            local kind = rawget(r, "_kind")
+            if kind == "FontString" and (rawget(r, "_text") or "") ~= "" then badLock[#badLock + 1] = "texte " .. r._text
+            elseif kind == "Texture" and r ~= k.back then badLock[#badLock + 1] = "texture " .. tostring(rawget(r, "_texture")) end
+          end
+          if not tostring(rawget(k.back, "_texture") or ""):find("card_back", 1, true) then badLock[#badLock + 1] = "dos " .. tostring(rawget(k.back, "_texture")) end
+          local tt = H.hover(k)
+          if not (#tt == 1 and tt[1] == cond .. k.entry.level) then badTip[#badTip + 1] = table.concat(tt, " | ") end
+          if not inside(R.rect(k), content) then outside[#outside + 1] = "dos " .. fmt(R.rect(k)) end
+        end
+      end
+      check(tag .. (" : 34 cartes, %d débloquées en vraies cartes, le reste en dos de carte"):format(OPEN_CARDS[lv]),
+        nCards == OPEN_CARDS[lv] and nCards + nLocks == 34 and #badCard == 0, nCards .. "+" .. nLocks .. " " .. table.concat(badCard, ","))
+      check(tag .. " : carte verrouillée sans nom, texte ni icône ; infobulle = la condition seule",
+        #badLock == 0 and #badTip == 0, table.concat(badLock, ",") .. " / " .. table.concat(badTip, ","))
+      -- bibelots : 6 cases ; verrouillé = point d'interrogation grisé, infobulle = la condition
+      local nOpen, badRelic = 0, {}
+      for i, b in ipairs(scr.relics) do
+        if vis(b) then
+          local e = b.entry
+          local tt = H.hover(b)
+          if e.unlocked then
+            nOpen = nOpen + 1
+            if not (tt[1] == ns.Relics[e.id].name) then badRelic[#badRelic + 1] = "infobulle " .. table.concat(tt, " | ") end
+          else
+            if not (#tt == 1 and tt[1] == cond .. e.level) then badRelic[#badRelic + 1] = "verrou " .. table.concat(tt, " | ") end
+            if not tostring(rawget(b.icon, "_texture") or ""):lower():find("questionmark", 1, true) then
+              badRelic[#badRelic + 1] = "icône " .. tostring(rawget(b.icon, "_texture"))
+            end
+            if not b.icon._calls.SetDesaturated or b.icon._calls.SetDesaturated[1] ~= true then badRelic[#badRelic + 1] = "pas grisé" end
+          end
+          if not inside(R.rect(b), content) then outside[#outside + 1] = "bibelot " .. i .. " " .. fmt(R.rect(b)) end
+        else
+          badRelic[#badRelic + 1] = "case " .. i .. " cachée"
+        end
+      end
+      check(tag .. (" : 6 bibelots, %d débloqués (infobulle du bibelot), verrouillés muets"):format(OPEN_RELICS[lv]),
+        nOpen == OPEN_RELICS[lv] and #badRelic == 0, nOpen .. " " .. table.concat(badRelic, ","))
+      -- noms des voies, onglets, barre et boutons dans la fenêtre ; rien de tronqué
+      for i, l in ipairs(scr.rowLabels) do
+        if vis(l) and not inside(R.rect(l), content) then outside[#outside + 1] = "voie " .. i .. " " .. fmt(R.rect(l)) end
+      end
+      for _, o in ipairs({ scr.bar, scr.metaBtn, scr.back }) do
+        if not inside(R.rect(o), content) then outside[#outside + 1] = fmt(R.rect(o)) end
+      end
+      for i, b in ipairs(scr.tabs) do
+        if vis(b) and not inside(R.rect(b), content) then outside[#outside + 1] = "onglet " .. i end
+      end
+      check(tag .. " : tout tient dans la fenêtre, sans défilement", #outside == 0, table.concat(outside, " ; "))
+      H.settle()
+      local tr = W.truncatedNow()
+      check(tag .. " : aucun texte tronqué", #tr == 0, table.concat(tr, " ; "))
+      if lv == 1 and cid == "priest" then snap("progression-priest-1", true) end
+      if lv == 4 and cid == "warrior" then snap("progression-warrior-4", true) end
+    end
+    -- survol d'une carte de la dernière rangée : agrandie, levée, toujours dans la fenêtre
+    local scr = UI().current
+    local last
+    for i = #scr.cards, 1, -1 do if vis(scr.cards[i]) then last = scr.cards[i] break end end
+    if last then
+      local r0 = R.vrect(last.bg)
+      last:GetScript("OnEnter")(last)
+      for _ = 1, 40 do H.advance(0.02) end
+      local vr = R.vrect(last.bg)
+      local content = R.rect(H.ns.UI.content)
+      local k = (vr[3] - vr[1]) / (r0[3] - r0[1])
+      check(("niveau %d : carte de la dernière rangée survolée agrandie (×%.2f) et dans la fenêtre"):format(lv, k),
+        k > 1.5 and inside(vr, content), fmt(r0) .. " -> " .. fmt(vr) .. " / " .. fmt(content))
+      last:GetScript("OnLeave")(last)
+      for _ = 1, 40 do H.advance(0.02) end
+    end
+    clickOption("ui:back")
+    check(("niveau %d : retour à l'accueil"):format(lv), currentKind() == "start", currentKind())
+  end
+  -- accueil : l'infobulle d'une classe dit son niveau
+  bootLevels({ warrior = 4 })
+  local wtt = table.concat(H.hover(button("class:warrior")), " | ")
+  check("accueil : infobulle du Guerrier « Level 4 »", wtt:find("Level 4", 1, true) ~= nil, wtt)
+  -- bilan avec montée de niveau : expérience, niveau atteint, cartes révélées
+  bootLevels({ priest = 1 })
+  local ns = H.ns
+  _G.SlayTheDragonDB.meta.classes.priest.xp = 95
+  ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  check("expédition au niveau de la classe au départ", e and e.unlock.level == 1)
+  e.stats.cleared, e.stats.elites, e.stats.bosses = 8, 1, 1
+  e.result, e.phase = "won", "done"
+  ns.UI.refresh()
+  local st = UI().step
+  check("bilan : montée de niveau annoncée", currentKind() == "end" and (st.text or ""):find("Priest reaches level 2!", 1, true)
+    and (st.text or ""):find("Priest experience", 1, true), st.text)
+  local scr = UI().current
+  local shownIds, content, out = {}, R.rect(ns.UI.content), {}
+  for _, c in ipairs(scr.newCards) do
+    if vis(c) then
+      shownIds[#shownIds + 1] = c.cardId
+      if not inside(R.rect(c), content) then out[#out + 1] = fmt(R.rect(c)) end
+      for _, b in ipairs(scr.buttons) do
+        local br = R.rect(b)
+        local cr = R.rect(c)
+        if vis(b) and br and cr and cr[1] < br[3] and br[1] < cr[3] and cr[2] < br[4] and br[2] < cr[4] then out[#out + 1] = "sur un bouton" end
+      end
+    end
+  end
+  table.sort(shownIds)
+  check("bilan : les 3 cartes du niveau 2 révélées (vraies cartes), dans la fenêtre, hors des boutons",
+    table.concat(shownIds, ",") == "evangelism,flash_heal,mind_sear" and #out == 0, table.concat(shownIds, ",") .. " " .. table.concat(out, " "))
+  check("bilan : barres niveau de classe et Ligue", scr.bars[1]._shown and (scr.bars[1].value._text or ""):find("Level 2", 1, true)
+    and scr.bars[2].label._text == "Explorers' League")
+  H.settle()
+  check("bilan : aucun texte tronqué", #ns.Widgets.truncatedNow() == 0, table.concat(ns.Widgets.truncatedNow(), " ; "))
+  snap("bilan-montee-de-niveau", true)
+  -- niveau 3 : un bibelot révélé (case du bibelot, infobulle du bibelot)
+  clickOption("ui:new")
+  _G.SlayTheDragonDB.meta.classes.priest.xp = 245
+  clickOption("go")
+  e = EXP()
+  e.stats.cleared, e.stats.bosses = 8, 1
+  e.result, e.phase = "won", "done"
+  ns.UI.refresh()
+  scr = UI().current
+  local rb = scr.newRelics[1]
+  local rtt = vis(rb) and table.concat(H.hover(rb), " | ") or ""
+  check("bilan niveau 3 : Benediction révélée, aucune carte", vis(rb) and rtt:find("Benediction", 1, true) ~= nil
+    and not vis(scr.newCards[1]), rtt)
+  -- sans montée : rangée cachée, panneau à sa place
+  clickOption("ui:new")
+  clickOption("go")
+  e = EXP()
+  e.result, e.phase = "lost", "done"
+  ns.UI.refresh()
+  scr = UI().current
+  check("bilan sans montée : rien de révélé", not vis(scr.newCards[1]) and not vis(scr.newRelics[1]))
 end
 
 print("U16 méthodes d'API inconnues appelées")

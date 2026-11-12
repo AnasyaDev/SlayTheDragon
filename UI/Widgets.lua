@@ -2025,7 +2025,7 @@ function W.repBar(parent, w)
     local frac = max(0.001, min(1, b.size and (b.cur / b.size) or 1))
     self.fill:SetWidth(max(0.01, (w - 6) * frac))
     W.setWow(self.fill, "bar_yellow", { 0, frac, 0, 1 })
-    self.value:SetText(b.size and (b.levelName .. "  " .. b.cur .. " / " .. b.size) or b.levelName)
+    self.value:SetText(b.size and (b.levelName .. " · " .. b.cur .. " / " .. b.size) or b.levelName)
     self.detail:SetText(b.detail or "")
   end
   return f

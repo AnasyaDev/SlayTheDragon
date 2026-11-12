@@ -1527,12 +1527,14 @@ end
 local Progress = { kinds = { "end", "meta" } }
 UI.register("progress", Progress)
 
-local PG_X, PG_W = 167, 700
-local PG_Y, PG_H, PG_UP_Y, PG_UP_H = 64, 352, 40, 392
+-- Panneau : PG_X, PG_Y, PG_W × PG_H au moins ; monté à PG_UP_Y avec des déblocages, son bas jamais sous
+-- PG_BOTTOM (boutons du bas à y 494). Barres sous le texte (au moins à PG_BARS de son haut, la méta à
+-- PG_BARS_META), rangée des déblocages sous les barres.
+local PG_X, PG_W, PG_Y, PG_H, PG_UP_Y, PG_BOTTOM = 167, 700, 64, 352, 40, 488
+local PG_BARS, PG_BARS_META, PG_BAR_DY = 170, 110, 54
 local PG_SCALE, PG_ZOOM, PG_PITCH, PG_RELIC, PG_RELIC_DX = 0.5, 1.8, 72, 44, 58
-local PG_ROW_Y = 372 -- centre de la rangée des déblocages (scène), panneau monté
 local PG_MAX_CARDS, PG_MAX_RELICS = 9, 3
-UI.PG = { scale = PG_SCALE, zoom = PG_ZOOM, rowY = PG_ROW_Y, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS }
+UI.PG = { scale = PG_SCALE, zoom = PG_ZOOM, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS, bottom = PG_BOTTOM }
 
 function Progress:Build(f)
   local panel = W.dialog(f, nil)
@@ -1583,8 +1585,9 @@ function Progress:Build(f)
   self.optionButtons = {}
 end
 
--- Rangée des déblocages, centrée sous les barres ; cachée sans montée de niveau.
-function Progress:ShowUnlocked(u)
+-- Rangée des déblocages, centrée sous les barres (centre à rowY, coordonnées de la scène) ; cachée sans
+-- montée de niveau.
+function Progress:ShowUnlocked(u, rowY)
   local cards = u and u.cards or {}
   local relics = u and u.relics or {}
   local nc, nr = math.min(#cards, PG_MAX_CARDS), math.min(#relics, PG_MAX_RELICS)
@@ -1595,7 +1598,7 @@ function Progress:ShowUnlocked(u)
   for i, c in ipairs(self.newCards) do
     if i <= nc then
       c:SetCard(cards[i], false, {})
-      W.placeCard(c, self.frame, x + cw / 2 + (i - 1) * PG_PITCH, PG_ROW_Y, PG_SCALE, lv + 5 + i, lv + 60)
+      W.placeCard(c, self.frame, x + cw / 2 + (i - 1) * PG_PITCH, rowY, PG_SCALE, lv + 5 + i, lv + 60)
       c:Show()
     else
       W.hideCard(c)
@@ -1604,7 +1607,7 @@ function Progress:ShowUnlocked(u)
   x = x + (nc > 0 and ((nc - 1) * PG_PITCH + cw + 24) or 0)
   for i, b in ipairs(self.newRelics) do
     if i <= nr then
-      at(b, self.frame, x + (i - 1) * PG_RELIC_DX, PG_ROW_Y - PG_RELIC / 2, PG_RELIC, PG_RELIC)
+      at(b, self.frame, x + (i - 1) * PG_RELIC_DX, rowY - PG_RELIC / 2, PG_RELIC, PG_RELIC)
       b:SetItem("relic", relics[i])
       b:Show()
     else
@@ -1621,27 +1624,38 @@ function Progress:Show(step)
   self.step = step
   UI.setStage({ scene = step.kind == "end" and Controller.scene() or "road", board = true, veil = 0.45 })
   local up = step.kind == "end" and step.unlocked ~= nil
-  at(self.panel, self.frame, PG_X, up and PG_UP_Y or PG_Y, PG_W, up and PG_UP_H or PG_H)
-  self:ShowUnlocked(up and step.unlocked or nil)
   self.title:SetText(step.title or "")
   local tc = C.wowGold
   if step.kind == "end" then tc = step.won and C.healGreen or C.badText end
   self.title:SetTextColor(tc[1], tc[2], tc[3])
   self.text:SetText(inkText(step.text))
   local bars = step.bars or {}
-  local y0 = step.kind == "end" and -170 or -110
+  -- barres sous le texte (libellé de la barre au-dessus d'elle : 34 de marge)
+  local textH = tonumber(self.text:GetStringHeight()) or 0
+  local titleH = tonumber(self.title:GetStringHeight()) or 34
+  local y0 = -max(step.kind == "end" and PG_BARS or PG_BARS_META, 20 + titleH + 10 + textH + 34)
+  -- panneau : monté et agrandi pour la rangée des déblocages (centre sous la dernière barre et son détail)
+  local panelY, panelH = PG_Y, PG_H
+  local half = W.CARD_H * PG_SCALE / 2
+  local rowRel = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 58 + half
+  if up then
+    panelY = PG_UP_Y
+    panelH = min(PG_BOTTOM - PG_UP_Y, max(PG_H, rowRel + half + 20))
+  end
+  at(self.panel, self.frame, PG_X, panelY, PG_W, panelH)
+  self:ShowUnlocked(up and step.unlocked or nil, panelY + rowRel)
   for i, b in ipairs(self.bars) do
     local data = bars[i]
     if data then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", 0, y0 - (i - 1) * 54)
+      b:SetPoint("TOP", self.panel, "TOP", 0, y0 - (i - 1) * PG_BAR_DY)
       b:Set(data)
       b:Show()
     else
       b:Hide()
     end
   end
-  local jy = y0 - #bars * 54 - 4
+  local jy = y0 - #bars * PG_BAR_DY - 4
   local lines = step.journal or {}
   for i, fs in ipairs(self.journal) do
     local l = lines[i]
@@ -1678,7 +1692,7 @@ end
 -- Progression d'une classe : niveau, expérience, 34 cartes par voie, 6 bibelots
 ---------------------------------------------------------------------------
 -- Une boîte DiamondMetal sur toute la scène. En-tête : icônes des classes (mêmes que l'accueil, la classe
--- affichée au halo d'or ; infobulle = nom et niveau), barre d'expérience (« Level 3  20 / 150 »),
+-- affichée au halo d'or ; infobulle = nom et niveau), barre d'expérience (« Level 3 · 20 / 150 »),
 -- « Reputation and log » et « Back ». Dessous, une rangée par voie (départ, puis les trois voies), les cartes
 -- dans l'ordre de leur niveau ; les bibelots à droite des cartes de départ. Débloqué : la vraie carte (W.card)
 -- ou la case du bibelot, avec son infobulle, agrandie au survol. Verrouillé : dos de carte assombri et
