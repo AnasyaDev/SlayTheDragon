@@ -57,15 +57,15 @@ end
 
 -- Ids triés des bibelots débloqués au palier maxTier de la Ligue des explorateurs.
 -- opts : { maxTier = n (nil = tous), boss = bool (bibelots de boss seulement, sinon exclus),
---          exclude = { [id] = true } (déjà possédés) }
--- Les bibelots de classe (class = ...) et ceux marqués noPool ne sont jamais tirés.
+--          exclude = { [id] = true } (déjà possédés), class = classe jouée }
+-- Bibelots communs (sans champ class) et ceux de la classe jouée ; jamais ceux marqués noPool.
 function Rewards.relicPool(opts)
   opts = opts or {}
   local list = {}
   for id, r in pairs(ns.Relics) do
     local isBoss = r.rarity == "boss"
     if (opts.maxTier == nil or (r.tier or 0) <= opts.maxTier) and (isBoss == (opts.boss or false))
-        and not r.noPool and not r.class
+        and not r.noPool and (not r.class or r.class == opts.class)
         and not (opts.exclude and opts.exclude[id]) then
       list[#list + 1] = id
     end

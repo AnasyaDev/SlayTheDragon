@@ -143,7 +143,7 @@ test("Douleur : dégâts en début de tour, ignore l'Absorption, puis baisse", f
   e.block = 50
   Combat.play(c, 1, 1)
   eq(e.st.pain, 5)
-  eq(c.player.demence, 1)
+  eq(c.player.res, 1)
   Combat.endTurn(c)
   eq(e.hp, 95)
   eq(e.st.pain, 4)
@@ -288,7 +288,7 @@ test("Forme d'ombre : +3 dégâts et +3 Douleur aux cartes d'ombre, rien sur le 
   Combat.play(c, 1)
   eq(Combat.cost(c, c.hand[handIndex(c, "smite")]), 1)
   Combat.play(c, handIndex(c, "mind_flay"), 1)
-  eq(c.enemies[1].hp, 100 - num("mind_flay", 2) - 3)
+  eq(c.enemies[1].hp, 100 - num("mind_flay", 3) - 3)
   Combat.play(c, handIndex(c, "sw_pain"), 1)
   eq(c.enemies[1].st.pain, num("sw_pain", 1, 3) + 3)
 end)
@@ -306,9 +306,9 @@ end)
 test("Peste dévorante : dépense la Démence", function()
   local c = setup({ "devouring_plague" })
   eq(Combat.canPlay(c, 1), false, "sans Démence")
-  c.player.demence = 3
+  c.player.res = 3
   Combat.play(c, 1, 1)
-  eq(c.player.demence, 0)
+  eq(c.player.res, 0)
   eq(c.enemies[1].st.pain, 6)
 end)
 
@@ -514,9 +514,9 @@ end)
 test("Éruption du Vide : base + bonus par Démence dépensée", function()
   local c = setup({ "void_eruption" })
   eq(Combat.canPlay(c, 1), false)
-  c.player.demence = 4
+  c.player.res = 4
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 100 - num("void_eruption", 2) - 4 * Card.defById("void_eruption").perDemence); eq(c.player.demence, 0)
+  eq(c.enemies[1].hp, 100 - num("void_eruption", 2) - 4 * Card.defById("void_eruption").effects[2].per[1]); eq(c.player.res, 0)
 end)
 
 test("Apothéose : les incantations coûtent 1 de moins", function()
@@ -537,7 +537,7 @@ test("Guérison de l'ombre : soigne puis Douleur sur soi", function()
   local c = setup({ "shadow_mend" })
   c.player.hp = 30
   Combat.play(c, 1)
-  eq(c.player.hp, 40); eq(c.player.st.pain, 2); eq(c.player.demence, 1)
+  eq(c.player.hp, 40); eq(c.player.st.pain, 2); eq(c.player.res, 1)
   Combat.endTurn(c)
   eq(c.player.hp, 38)
 end)
@@ -589,7 +589,7 @@ test("Fouet mental : pioche 1 et +2 Démence si la cible a Douleur", function()
   local before = #c.hand
   Combat.play(c, 1, 1)
   eq(#c.hand, before, "une carte jouée, une piochée")
-  eq(c.player.demence, 3)
+  eq(c.player.res, 3)
 end)
 
 test("Apothéose : +1 mana par tour ; Forme d'ombre : +2 Démence", function()
@@ -598,7 +598,7 @@ test("Apothéose : +1 mana par tour ; Forme d'ombre : +2 Démence", function()
   c.player.mana = 4
   Combat.play(c, 1)
   Combat.play(c, 1)
-  eq(c.player.demence, 2)
+  eq(c.player.res, 2)
   eq(Combat.cost(c, c.hand[handIndex(c, "holy_fire")]), 1)
   Combat.endTurn(c)
   eq(c.player.mana, 4)

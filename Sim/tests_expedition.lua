@@ -409,7 +409,7 @@ test("bibelots : crochets d'expédition (or, repos, ramassage) et pool de Ligue"
   eq(exp.hp, 10 + math.floor(75 * 0.3) + 5)
   eq(count(X.relicPool(exp), "test_purse"), 0, "déjà possédé")
   eq(count(X.relicPool(exp), "test_league"), 0, "tier 2 verrouillé")
-  eq(count(X.relicPool(exp), "test_class"), 0, "bibelot de classe hors pool")
+  eq(count(X.relicPool(exp), "test_class"), 1, "bibelot de la classe jouée dans le pool")
   local b = newExp({ unlocks = { rep = 0, league = 2 } })
   eq(count(X.relicPool(b), "test_league"), 1)
 end)
@@ -1001,7 +1001,7 @@ test("sauvegarde v1 -> v2 : drapeaux créés, gardés, expédition en cours migr
   cur.version, cur.flags, cur.newFlags, cur.stats.events = 1, nil, nil, nil
   local v1 = { version = 1, meta = { league = 300, runs = 3, classes = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v1))
-  eq(note, "migrated"); eq(db.version, Save.VERSION); eq(Save.VERSION, 2)
+  eq(note, "migrated"); eq(db.version, Save.VERSION); assert(Save.VERSION >= 2)
   eq(type(db.meta.flags), "table")
   eq(db.meta.league, 300)
   assert(db.current, "expédition gardée")

@@ -3488,44 +3488,118 @@ do
         if lab and lab:find("^%u") then
           local known = false
           for _, k in ipairs(W.keywordList()) do if k.name == lab then known = true end end
-          -- libellés qui ne sont pas des conditions (cible d'un Pouvoir) : liste fermée
-          local NOT_COND = { ["Cast cards"] = true, ["Each Absorb gain"] = true }
-          if not known and not NOT_COND[lab] then bad[#bad + 1] = label .. " : condition inconnue « " .. lab .. " »" end
+          -- libellés qui ne sont pas des conditions (déclencheurs de Pouvoir) : registre du langage
+          if not known and not ns.Language.knownLabel(lab) then bad[#bad + 1] = label .. " : condition inconnue « " .. lab .. " »" end
         end
       end
     end
   end
   check(("textes : %d états posés, chacun sur sa ligne « Gain » (soi) / « Apply » (ennemi) en dernier, sablier seulement pour une durée, impersonnels")
     :format(nState), #bad == 0, table.concat(bad, "\n        "))
-  -- conditions vérifiables depuis les données : Exécution (bonus d'exécution), Déferlement (dépense
-  -- de la Démence : la carte ne se joue qu'avec de la Démence), Dernier souffle (empêche la mort),
-  -- Ombre (Pouvoir d'ombre)
+  -- grammaire commune, vérifiée depuis les données : Execute (condition « execute »), Surge (effet
+  -- « surge »), Spend N (effet « spend »), Last Breath (empêche la mort), Shadow (Pouvoir d'ombre),
+  -- Pay N HP (champ payHp, première clause), gains de ressource (« +N Rage. », nom de la ressource de
+  -- la classe au singulier ou au pluriel), chiffres des formes conditionnelles
+  local L = ns.Language
+  local function usesCond(d, name)
+    for _, e in ipairs(d.effects or {}) do
+      if e.cond == name then return true end
+      for _, m in ipairs(e.more or {}) do if m[2] == name then return true end end
+    end
+    return false
+  end
+  local function effectOf(d, kind)
+    for _, e in ipairs(d.effects or {}) do if e[1] == kind then return e end end
+    return nil
+  end
+  local function damageWith(d, pred)
+    for _, e in ipairs(d.effects or {}) do if e[1] == "damage" and pred(e) then return e end end
+    return nil
+  end
   local cbad = {}
+  local nForms = 0
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
       local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
       local t = d.text or ""
+      local cls = {}
+      for _, cl in ipairs(clauses(t)) do if not isPlate(cl) then cls[#cls + 1] = cl end end
       local function has(n) return W.hasPhrase(t, n .. ":") end
-      if has("Execute") ~= (d.executeBonus ~= nil) then cbad[#cbad + 1] = id .. " : Execute" end
-      if has("Surge") ~= (d.canPlay ~= nil) then cbad[#cbad + 1] = id .. " : Surge" end
-      if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = id .. " : Last Breath" end
-      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = id .. " : Shadow" end
-      -- chiffres d'Exécution et de Déferlement
-      if d.executeBonus then
-        local base = d.effects[1][2]
-        if not t:find("Deal " .. base .. "%.") or not t:find("Execute: deal " .. (base + d.executeBonus) .. "%.") then
-          cbad[#cbad + 1] = id .. (up and "+" or "") .. " : chiffres d'Execute"
+      local cd = ns.Classes[d.class or ""]
+      local rid = cd and cd.resource and cd.resource.id
+      local r = rid and L.resources[rid]
+      if has("Execute") ~= usesCond(d, "execute") then cbad[#cbad + 1] = label .. " : Execute" end
+      if has("Surge") ~= (effectOf(d, "surge") ~= nil) then cbad[#cbad + 1] = label .. " : Surge" end
+      if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = label .. " : Last Breath" end
+      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
+      -- Spend N : effet spend n <-> clause « Spend n: … »
+      local sp = effectOf(d, "spend")
+      local spendCl
+      for _, cl in ipairs(cls) do if cl:find("^Spend %d+: ") then spendCl = cl end end
+      if (sp ~= nil) ~= (spendCl ~= nil) or (sp and not spendCl:find("^Spend " .. sp[2] .. ": ")) then
+        cbad[#cbad + 1] = label .. " : Spend N"
+      end
+      if sp and spendCl then
+        nForms = nForms + 1
+        local dm = damageWith(d, function(e) return e.more ~= nil end)
+        for _, m in ipairs(dm and dm.more or {}) do
+          if m[2] == "spent" and not spendCl:find("deal " .. m[1] .. " more", 1, true) then cbad[#cbad + 1] = label .. " : chiffre de Spend" end
         end
       end
-      if d.perDemence and not t:find("per Insanity", 1, true) then cbad[#cbad + 1] = id .. " : Surge chiffré" end
-      if d.perDemence and not t:find("+ " .. d.perDemence .. " per Insanity", 1, true) then cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Surge chiffré" end
+      -- Pay N HP : champ payHp <-> première clause « Pay N HP. »
+      local payCl = cls[1] and cls[1]:match("^Pay (%d+) HP%.$")
+      local anyPay = false
+      for _, cl in ipairs(cls) do if cl:find("^Pay %d+ HP") or cl:find("Lose %d+ HP") then anyPay = true end end
+      if (d.payHp ~= nil) ~= (payCl ~= nil) or (d.payHp and tonumber(payCl) ~= d.payHp) or (anyPay and not payCl) then
+        cbad[#cbad + 1] = label .. " : Pay N HP (première ligne, champ payHp)"
+      end
+      if d.payHp then nForms = nForms + 1 end
+      -- gains de ressource : chaque effet { "res", n } sans condition a sa clause « +n Ressource. »
+      for _, e in ipairs(d.effects or {}) do
+        if (e[1] == "res" or e[1] == "demence") and not e.cond and not e.more and not e.per then
+          nForms = nForms + 1
+          local want = "+" .. e[2] .. " " .. (r and L.resourceName(rid, e[2]) or "?") .. "."
+          local found = false
+          for _, cl in ipairs(cls) do if cl == want then found = true end end
+          if not found then cbad[#cbad + 1] = label .. " : clause « " .. want .. " » absente" end
+        end
+      end
+      -- noms de ressource : seulement celle de la classe, accordée au nombre (« +1 Combo Point. »)
+      for orid, res in pairs(L.resources) do
+        if orid ~= rid and (W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural)) then
+          cbad[#cbad + 1] = label .. " : ressource d'une autre classe (" .. res.name .. ")"
+        end
+      end
+      if r and r.plural ~= r.name then
+        for n, word in t:gmatch("%+(%d+) ([%a ]-)%.") do
+          if word ~= L.resourceName(rid, tonumber(n)) and (word == r.name or word == r.plural) then
+            cbad[#cbad + 1] = label .. " : accord « +" .. n .. " " .. word .. " »"
+          end
+        end
+      end
+      -- chiffres d'Execute (« Deal X. » / « Execute: deal X+k. ») et de Surge (« deal B + K per Res. »)
+      local ex = damageWith(d, function(e) return e.more ~= nil end)
+      for _, m in ipairs(ex and ex.more or {}) do
+        if m[2] == "execute" and (not t:find("Deal " .. ex[2] .. "%.") or not t:find("Execute: deal " .. (ex[2] + m[1]) .. "%.")) then
+          cbad[#cbad + 1] = label .. " : chiffres d'Execute"
+        end
+      end
+      local sg = damageWith(d, function(e) return e.per ~= nil and e.per[2] == "surge" end)
+      if sg and r then
+        nForms = nForms + 1
+        local phrase = (sg[2] > 0 and ("deal " .. sg[2] .. " + ") or "deal ") .. sg.per[1] .. " per " .. r.name
+        if not t:find(phrase, 1, true) then
+          cbad[#cbad + 1] = label .. " : Surge chiffré (« " .. phrase .. " » attendu)"
+        end
+      end
       if d.plagueMult and not t:find("apply DoT " .. d.plagueMult .. " per Insanity", 1, true) then
-        cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Peste chiffrée"
+        cbad[#cbad + 1] = label .. " : Peste chiffrée"
       end
     end
   end
-  check("conditions nommées présentes exactement sur les cartes qui les ont (Execute, Surge, Last Breath, Shadow), chiffres justes",
-    #cbad == 0, table.concat(cbad, ", "))
+  check(("grammaire commune : Execute, Surge, Spend N, Last Breath, Shadow, Pay N HP, gains de ressource exactement sur les cartes qui les ont, chiffres justes (%d formes)"):format(nForms),
+    #cbad == 0, table.concat(cbad, "\n        "))
   -- 2. mise en page : la ligne d'état commence une ligne et finit le texte ; une clause par ligne aux
   -- paliers >= 8,5 ; sablier en icône |T dans le texte posé, compté dans la mesure
   local card = W.card(UI().content)
@@ -3665,7 +3739,9 @@ do
       end
       if t:find(HG, 1, true) then need("le sablier", HG .. ": ") end
       if W.hasPhrase(t, "Absorb") then need("Absorb", "Absorb: ") end
-      if W.hasPhrase(t, "Insanity") then need("Insanity", "Insanity: ") end
+      for _, res in pairs(ns.Language.resources) do
+        if W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural) then need(res.name, res.name .. ": ") end
+      end
       for _, l in ipairs(tt.lines) do
         local p = plain(l)
         if p ~= " " then
@@ -3680,17 +3756,34 @@ do
   end
   check(("explications : chaque mot-clé, état et condition des textes expliqué, %d lignes de 60 caractères au plus"):format(nLines),
     #ebad == 0, table.concat(ebad, "\n        "))
-  -- explications des nouveaux mots-clés : présentes, une phrase courte
+  -- explications du registre du langage (conditions, plaque, mots, ressources) : présentes, une
+  -- phrase courte, la ressource de chaque classe substituée
   local kbad = {}
-  for _, k in ipairs({ "execute", "surge", "lastBreath", "shadow", "turns" }) do
+  local reslist = {}
+  for rid in pairs(ns.Language.resources) do reslist[#reslist + 1] = rid end
+  table.sort(reslist)
+  for _, k in ipairs({ "turns", "absorb", "interrupt" }) do
     local l = Art.keywords[k] and plain(Art.keywordLine(k)) or ""
     if l == "" or W.utf8len(l) > 60 then kbad[#kbad + 1] = k end
   end
+  local function okLine(key, n)
+    for _, rid in ipairs(reslist) do
+      local l = plain(Art.keywordLine(key, nil, n, rid))
+      if W.utf8len(l) > 60 or l:find("%s", 1, true) or l:find("[;()]") or select(2, l:gsub("%. ", "")) > 0 then
+        kbad[#kbad + 1] = key .. " (" .. rid .. ") : « " .. l .. " »"
+        return
+      end
+    end
+  end
+  for _, c in ipairs(ns.Language.conditions) do okLine(c.key, 2) end
+  for _, p in ipairs(ns.Language.plates) do okLine(p.key, 2) end
+  for key in pairs(ns.Language.keywords) do okLine(key, 2) end
+  for _, rid in ipairs(reslist) do okLine("res:" .. rid) end
   for sid in pairs(Art.statusShort) do
     if not ns.Statuses[sid] or W.utf8len(plain(Art.statusLine(sid))) > 60 then kbad[#kbad + 1] = "état " .. sid end
   end
-  check("Execute, Surge, Last Breath, Shadow, sablier et définitions courtes des états : une ligne de 60 caractères au plus",
-    #kbad == 0, table.concat(kbad, ", "))
+  check(("registre du langage : %d conditions, %d mots de plaque, %d ressources, sablier et définitions courtes des états, une ligne de 60 caractères au plus")
+    :format(#ns.Language.conditions, #ns.Language.plates, #reslist), #kbad == 0, table.concat(kbad, ", "))
   -- 4. Pouvoir joué : jeton sous le personnage (icône de la carte, liseré doré), effet au survol ;
   -- l'état sérialisé ne change pas (la liste des pouvoirs existait déjà)
   local c = C().combat()

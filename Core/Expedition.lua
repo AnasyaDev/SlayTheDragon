@@ -18,7 +18,8 @@ local X = {}
 ns.Expedition = X
 
 -- 2 : drapeaux de compte (exp.flags, exp.newFlags) et journal des rencontres (stats.events).
-X.VERSION = 2
+-- 3 : classe générique (ressource de combat c.player.res au lieu de demence, état de classe c.cls).
+X.VERSION = 3
 
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
@@ -126,10 +127,12 @@ local function drawFrom(rng, ids, rarityOf, n, weights, taken)
   return out
 end
 
-function X.cardPool(exp)
+-- Cartes de la classe jouée (neutral : cartes neutres comprises, réservées au marchand et aux
+-- rencontres par le GDD ; aucune n'existe encore).
+function X.cardPool(exp, neutral)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if d.class == exp.class and d.rarity ~= "basic" and not d.noReward and (d.rep or 0) <= exp.unlock.rep then
+    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and not d.noReward and (d.rep or 0) <= exp.unlock.rep then
       list[#list + 1] = id
     end
   end
@@ -139,20 +142,21 @@ end
 
 local function cardRarity(id) return ns.Cards[id].rarity end
 
-local function drawCards(exp, rng, n, weights)
-  local pool = X.cardPool(exp)
+local function drawCards(exp, rng, n, weights, neutral)
+  local pool = X.cardPool(exp, neutral)
   local out = drawFrom(rng, pool, cardRarity, n, weights)
   if #out == 0 then out = drawFrom(rng, pool, cardRarity, n, X.CARD_WEIGHTS.combat) end
   return out
 end
 
--- Bibelots proposables : tier débloqué, pas déjà possédés, hors bibelots de classe.
+-- Bibelots proposables : tier débloqué, pas déjà possédés, communs (sans champ class) ou de la
+-- classe jouée ; jamais ceux marqués noPool (bibelot de départ, bibelots de rencontre).
 function X.relicPool(exp)
   local owned = {}
   for i = 1, #exp.relics do owned[exp.relics[i]] = true end
   local list = {}
   for id, r in pairs(ns.Relics) do
-    if not owned[id] and not r.class and not r.noPool and (r.tier or 0) <= leagueTier(exp) then
+    if not owned[id] and (not r.class or r.class == exp.class) and not r.noPool and (r.tier or 0) <= leagueTier(exp) then
       list[#list + 1] = id
     end
   end
@@ -181,11 +185,15 @@ local function drawPotions(exp, rng, n)
   return drawFrom(rng, X.potionPool(exp), potionRarity, n, X.POTION_WEIGHTS)
 end
 
--- Bibelots de classe (Révéré) : relic.class == classe.
+-- Bibelots de classe (Révéré) : relic.class == classe, ni déjà possédés (bibelot de départ), ni noPool.
 local function classRelics(exp)
+  local owned = {}
+  for i = 1, #exp.relics do owned[exp.relics[i]] = true end
   local list = {}
   for id, r in pairs(ns.Relics) do
-    if r.class == exp.class and (r.tier or 0) <= leagueTier(exp) then list[#list + 1] = id end
+    if r.class == exp.class and not owned[id] and not r.noPool and (r.tier or 0) <= leagueTier(exp) then
+      list[#list + 1] = id
+    end
   end
   table.sort(list)
   return list
@@ -373,7 +381,7 @@ local function startFight(exp, kind, pool, reward)
     reward = reward or rollReward(exp, kind) }
   exp.stats.combats = exp.stats.combats + 1
   exp.phase = "combat"
-  exp.combat = Combat.new({ seed = seed, hp = exp.hp, maxHp = exp.maxHp, deck = exp.deck,
+  exp.combat = Combat.new({ seed = seed, class = exp.class, hp = exp.hp, maxHp = exp.maxHp, deck = exp.deck,
     encounter = list[idx], relics = exp.relics, potions = U.copy(exp.potions), affixes = exp.affixes,
     stats = exp.combatStats, quiet = exp.quiet })
   if exp.combat.result then endFight(exp) end
@@ -387,7 +395,7 @@ local function openShop(exp)
     return max(1, floor(p + 0.5))
   end
   local shop = { cards = {}, relics = {}, potions = {} }
-  local cards = drawCards(exp, rng, X.SHOP.cards, X.CARD_WEIGHTS.shop)
+  local cards = drawCards(exp, rng, X.SHOP.cards, X.CARD_WEIGHTS.shop, true)
   for i = 1, #cards do
     local base = X.PRICES.card[ns.Cards[cards[i]].rarity] or X.PRICES.card.uncommon
     shop.cards[i] = { id = cards[i], price = price(base, "card"), sold = false }
@@ -539,7 +547,7 @@ local function rollEffects(exp, rng, effects)
     local k = e[1]
     r[ei] = false
     if k == "cardChoice" then
-      r[ei] = drawCards(exp, rng, e.n or 3, e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat)
+      r[ei] = drawCards(exp, rng, e.n or 3, e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat, true)
     elseif k == "relic" and not e[2] then
       r[ei] = drawRelics(exp, rng, 1, X.RELIC_WEIGHTS.normal)[1] or false
     elseif k == "potion" and not e[2] then
@@ -791,6 +799,8 @@ function X.new(opts)
   }
   for i = 1, X.POTION_SLOTS do exp.potions[i] = false end
   for i = 1, #cdef.deck do exp.deck[i] = { id = cdef.deck[i], up = false } end
+  -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
+  if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end
   startAct(exp, 1)
   if exp.unlock.rep >= ns.Meta.REVERED then
     local list = drawFrom(exp.rng.loot, classRelics(exp), relicRarity, 3,

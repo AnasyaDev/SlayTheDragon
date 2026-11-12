@@ -50,9 +50,9 @@ card("pw_shield", {
 
 card("sw_pain", {
   name = "SW: Pain", cost = 1, type = "skill", school = "shadow", rarity = "basic", path = "start",
-  target = "enemy", effects = { { "apply", "pain", 5 }, { "demence", 1 } },
+  target = "enemy", effects = { { "apply", "pain", 5 }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 5",
-  up = { effects = { { "apply", "pain", 7 }, { "demence", 1 } }, text = "+1 Insanity.\nApply DoT 7" },
+  up = { effects = { { "apply", "pain", 7 }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 7" },
 })
 
 -- Discipline ----------------------------------------------------------------
@@ -125,9 +125,9 @@ card("schism", {
 
 card("shadow_mend", {
   rep = 1, name = "Shadow Mend", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "discipline",
-  exhaust = true, effects = { { "heal", 10 }, { "apply", "pain", 2, self = true }, { "demence", 1 } },
+  exhaust = true, effects = { { "heal", 10 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
   text = "Heal 10.\n+1 Insanity.\nGain DoT 2\nExhaust.",
-  up = { effects = { { "heal", 14 }, { "apply", "pain", 2, self = true }, { "demence", 1 } },
+  up = { effects = { { "heal", 14 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
     text = "Heal 14.\n+1 Insanity.\nGain DoT 2\nExhaust." },
 })
 
@@ -153,33 +153,26 @@ card("rapture", {
 
 -- Ombre -----------------------------------------------------------------------
 
-local function flayBonus(c, ctx)
-  local t = ctx.target
-  if t and (t.st.pain or 0) > 0 then
-    c.player.demence = c.player.demence + 2
-    Combat.log(c, { t = "demence", n = 2, total = c.player.demence })
-    Combat.drawCards(c, 1)
-  end
-end
+-- Condition sur l'état de la cible, lue AVANT le coup (comme à l'origine).
+local FLAY = { { "res", 2, cond = "status:pain" }, { "draw", 1, cond = "status:pain" } }
 
 card("mind_flay", {
   rep = 0, name = "Mind Flay", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", effects = { { "fn", flayBonus }, { "damage", 8 } },
+  target = "enemy", effects = { FLAY[1], FLAY[2], { "damage", 8 } },
   text = "Deal 8.\nDoT: +2 Insanity, draw 1.",
-  up = { effects = { { "fn", flayBonus }, { "damage", 11 } }, text = "Deal 11.\nDoT: +2 Insanity, draw 1." },
+  up = { effects = { FLAY[1], FLAY[2], { "damage", 11 } }, text = "Deal 11.\nDoT: +2 Insanity, draw 1." },
 })
 
 card("mind_blast", {
   rep = 0, name = "Mind Blast", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", cooldown = 1, effects = { { "damage", 10 }, { "demence", 2 } },
+  target = "enemy", cooldown = 1, effects = { { "damage", 10 }, { "res", 2 } },
   text = "Deal 10.\n+2 Insanity.\nCooldown 1.",
-  up = { effects = { { "damage", 13 }, { "demence", 2 } }, text = "Deal 13.\n+2 Insanity.\nCooldown 1." },
+  up = { effects = { { "damage", 13 }, { "res", 2 } }, text = "Deal 13.\n+2 Insanity.\nCooldown 1." },
 })
 
+-- DoT posé directement (Combat.applyStatus) : le crochet « apply » de Forme d'ombre ne s'y ajoute pas.
 local function plague(c, ctx)
-  local n = c.player.demence
-  c.player.demence = 0
-  Combat.log(c, { t = "demence", n = -n, total = 0 })
+  local n = ctx.surge or 0
   if n > 0 and ctx.target and not ctx.target.dead then
     Combat.applyStatus(c, ctx.target, "pain", (ctx.def.plagueMult or 2) * n)
   end
@@ -187,8 +180,7 @@ end
 
 card("devouring_plague", {
   rep = 0, name = "Devouring Plague", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
-  target = "enemy", plagueMult = 2, effects = { { "fn", plague } },
-  canPlay = function(c) return c.player.demence > 0 end,
+  target = "enemy", plagueMult = 2, minRes = 1, effects = { { "surge" }, { "fn", plague } },
   text = "Surge: apply DoT 2 per Insanity.",
   up = { plagueMult = 3, text = "Surge: apply DoT 3 per Insanity." },
 })
@@ -211,7 +203,7 @@ end
 
 card("shadowform", {
   rep = 0, name = "Shadowform", cost = 1, type = "power", school = "shadow", rarity = "rare", path = "shadow",
-  power = true, effects = { { "demence", 2 } }, hooks = shadowformHooks(3),
+  power = true, effects = { { "res", 2 } }, hooks = shadowformHooks(3),
   text = "Power.\n+2 Insanity.\nShadow: damage and DoT +3.",
   up = { hooks = shadowformHooks(4),
     text = "Power.\n+2 Insanity.\nShadow: damage and DoT +4." },
@@ -226,56 +218,39 @@ card("silence", {
 
 card("vampiric_touch", {
   rep = 0, name = "Vampiric Touch", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
-  target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 1, self = true }, { "demence", 1 } },
+  target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 1, self = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 3\nGain Regen 1",
-  up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "demence", 1 } },
+  up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "res", 1 } },
     text = "+1 Insanity.\nApply DoT 5\nGain Regen 2" },
 })
 
 card("mind_sear", {
   rep = 1, name = "Mind Sear", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
-  effects = { { "apply", "pain", 4, all = true }, { "demence", 1 } },
+  effects = { { "apply", "pain", 4, all = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 4 to all",
-  up = { effects = { { "apply", "pain", 6, all = true }, { "demence", 1 } }, text = "+1 Insanity.\nApply DoT 6 to all" },
+  up = { effects = { { "apply", "pain", 6, all = true }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 6 to all" },
 })
-
-local function executeBonus(c, ctx, t)
-  if t.hp * 2 <= t.maxHp then return ctx.def.executeBonus or 0 end
-  return 0
-end
 
 card("sw_death", {
   rep = 1, name = "SW: Death", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "shadow",
-  target = "enemy", executeBonus = 6, effects = { { "damage", 6, bonus = executeBonus }, { "demence", 1 } },
+  target = "enemy", effects = { { "damage", 6, more = { { 6, "execute" } } }, { "res", 1 } },
   text = "Deal 6.\nExecute: deal 12.\n+1 Insanity.",
-  up = { executeBonus = 9, effects = { { "damage", 8, bonus = executeBonus }, { "demence", 1 } },
+  up = { effects = { { "damage", 8, more = { { 9, "execute" } } }, { "res", 1 } },
     text = "Deal 8.\nExecute: deal 17.\n+1 Insanity." },
 })
 
 card("psychic_scream", {
   rep = 2, name = "Psychic Scream", cost = 1, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
-  cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "demence", 1 } },
+  cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply Demoralized 2 ⌛ to all\nCooldown 3.",
   up = { cost = 0, text = "+1 Insanity.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
 })
 
-local function spendDemence(c, ctx)
-  local n = c.player.demence
-  ctx.spent = n
-  c.player.demence = 0
-  Combat.log(c, { t = "demence", n = -n, total = 0 })
-end
-
-local function eruptionBonus(c, ctx, t)
-  return (ctx.spent or 0) * (ctx.def.perDemence or 0)
-end
-
 card("void_eruption", {
   rep = 2, name = "Void Eruption", cost = 1, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
-  target = "enemy", perDemence = 4, effects = { { "fn", spendDemence }, { "damage", 4, bonus = eruptionBonus } },
-  canPlay = function(c) return c.player.demence > 0 end,
+  target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 4, per = { 4, "surge" } } },
   text = "Surge: deal 4 + 4 per Insanity.",
-  up = { perDemence = 5, text = "Surge: deal 4 + 5 per Insanity." },
+  up = { effects = { { "surge" }, { "damage", 4, per = { 5, "surge" } } }, text = "Surge: deal 4 + 5 per Insanity." },
 })
 
 -- Sacré -----------------------------------------------------------------------
@@ -377,13 +352,35 @@ card("apotheosis", {
 
 -- Classe ------------------------------------------------------------------------
 
-ns.Classes = ns.Classes or {}
+-- Définition de classe (contrat : docs/classes.md).
 ns.Classes.priest = {
-  name = "Priest",
-  hp = 65,
+  id = "priest", name = "Priest", order = 1, hp = 65,
+  -- Insanity : sans plafond, gardée d'un tour à l'autre (GDD, décision du 11/11/2026)
+  resource = { id = "insanity", cap = nil, keep = true },
   deck = {
     "smite", "smite", "smite", "smite",
     "inner_fire", "inner_fire", "inner_fire", "inner_fire",
     "pw_shield", "sw_pain",
+  },
+  startRelic = nil,
+  paths = { { id = "discipline", name = "Discipline" }, { id = "shadow", name = "Shadow" }, { id = "holy", name = "Holy" } },
+  survival = "heal",
+  -- Conseils aux bots de simulation (Sim/) : valeur d'un point de ressource (unités de Bots.W, 10 = 1 PV),
+  -- note des cartes pour les choix (≈ 5 + écart de victoires / 2, balayages sweep=cards), valeur des
+  -- cartes de départ pour l'amélioration (upgrade) et pour le retrait (remove ; les autres : note + 2).
+  bot = {
+    resValue = 1.5,
+    rating = {
+      vampiric_touch = 7, angelic_feather = 6, flash_heal = 6, solace = 6, luminous_barrier = 6,
+      mind_sear = 6, radiance = 5, holy_nova = 5, shadow_mend = 5, renew = 5, mind_blast = 5,
+      holy_fire = 5, mind_flay = 4,
+      schism = 6, psychic_scream = 6, silence = 5, evangelism = 5, greater_heal = 5, chastise = 5,
+      penance = 5, devouring_plague = 4, sw_death = 4, halo = 4, empyreal_blaze = 4,
+      rapture = 7, pain_suppression = 7, shadowform = 5, apotheosis = 5, void_eruption = 4,
+      spirit_of_redemption = 4,
+    },
+    upgrade = { smite = 2.5, inner_fire = 2, pw_shield = 1.5, sw_pain = 1.5 },
+    upgradeRun = { smite = 2.5, inner_fire = 2 }, -- ancien coureur (Sim/run.lua)
+    remove = { inner_fire = 1, smite = 1.5 },
   },
 }

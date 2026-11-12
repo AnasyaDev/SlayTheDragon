@@ -15,7 +15,7 @@ return function(ns)
   local Bots = {}
 
   -- Évaluation d'un état après le tour ennemi. Poids grossiers, à régler.
-  local W = { hp = 10, enemyHp = 4, enemyAlive = 30, demence = 1.5, atonement = 4,
+  local W = { hp = 10, enemyHp = 4, enemyAlive = 30, res = 1.5, atonement = 4,
     regen = 0.5, power = 25, castRisk = 0.95 }
   Bots.W = W
 
@@ -108,6 +108,13 @@ return function(ns)
     return v * W.castRisk
   end
 
+  -- Valeur d'un point de ressource de classe (conseil de la classe : classDef.bot.resValue).
+  local function resValue(c)
+    local cd = ns.Classes[c.class]
+    return cd and cd.bot and cd.bot.resValue or W.res
+  end
+  Bots.resValue = resValue
+
   local function evaluate(c)
     if c.result == "lost" then return -1e9 end
     local p = c.player
@@ -132,10 +139,13 @@ return function(ns)
     end
     local regen = p.st.regen or 0
     local selfPain = p.st.pain or 0
-    s = s + p.demence * W.demence + (p.st.atonement or 0) * W.atonement
+    s = s + (p.res or 0) * resValue(c) + (p.st.atonement or 0) * W.atonement
       + math.min(regen * (regen + 1) / 2, p.maxHp - p.hp) * W.hp * W.regen + powersValue(c)
       - selfPain * (selfPain + 1) / 2 * W.hp * 0.8
     if p.cast then s = s + Bots.castValue(c) end
+    -- valeur propre à la classe (état de classe, familier, formes…) : ns.ClassRules[classe].botValue
+    local cr = ns.ClassRules[c.class]
+    if cr and cr.botValue then s = s + cr.botValue(c, W) end
     return s
   end
   Bots.evaluate = evaluate
@@ -152,7 +162,7 @@ return function(ns)
 
   local function stateKey(c)
     local p = c.player
-    local parts = { p.mana, p.hp, p.block, p.demence, p.cast and p.cast.card.id or "-",
+    local parts = { p.mana, p.hp, p.block, p.res, p.cast and p.cast.card.id or "-",
       p.st.atonement or 0, p.st.halved or 0, p.st.regen or 0, #p.powers, #c.cooldown, #c.exhaust,
       p.st.pain or 0 }
     local ids = {}
@@ -169,6 +179,9 @@ return function(ns)
         .. ":" .. (e.st.demoralized or 0))
     end
     parts[#parts + 1] = c.result or ""
+    -- état propre à la classe qui distingue deux positions (ns.ClassRules[classe].botKey)
+    local cr = ns.ClassRules[c.class]
+    if cr and cr.botKey then parts[#parts + 1] = cr.botKey(c) end
     return table.concat(parts, "|")
   end
 

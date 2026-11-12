@@ -1725,22 +1725,42 @@ function W.addStatusLines(tt, id, n)
 end
 
 -- Mots-clés d'une définition de carte (pour l'infobulle).
+-- Ressource de la classe d'une carte (id du registre du langage) ou nil.
+function W.cardResource(d)
+  local cd = d and d.class and ns.Classes[d.class]
+  return cd and cd.resource and cd.resource.id or nil
+end
+
 function W.cardKeywords(d)
   local list, seen = {}, {}
+  local res = W.cardResource(d)
   local function add(k, label, n)
     if seen[k] then return end
     seen[k] = true
-    list[#list + 1] = { key = k, label = label, n = n }
+    list[#list + 1] = { key = k, label = label, n = n, res = res }
   end
-  if d.cast then add("cast") end
-  if d.cooldown then add("cooldown", "Cooldown " .. d.cooldown, d.cooldown) end
-  if d.exhaust then add("exhaust") end
-  if d.retain then add("retain") end
-  if d.power or d.type == "power" then add("power") end
+  -- mots de la plaque, dans l'ordre de la plaque (Core/Language.lua)
+  local L = ns.Language
+  for _, p in ipairs(L.plates) do
+    local word = L.plateWord(p, d)
+    if word then add(p.key, p.n and word or nil, p.n and d[p.flag] or nil) end
+  end
   -- texte : conditions nommées et conditions sur un état (« Name: »), puis états cités
   local text = d.text or ""
   for _, c in ipairs(W.CONDITIONS) do
-    if W.hasPhrase(text, c.name .. ":") then add(c.key) end
+    if c.pattern then
+      for cl in (text .. "\n"):gmatch("(.-)\n") do
+        local lab = cl:match("^(.-): ")
+        if lab and lab:find(c.pattern) then add(c.key, lab, tonumber(lab:match("%d+"))) end
+      end
+    elseif W.hasPhrase(text, c.name .. ":") then add(c.key) end
+  end
+  for key, kw in pairs(L.keywords) do
+    if kw.pattern then
+      for cl in (text .. "\n"):gmatch("(.-)\n") do
+        if cl:find(kw.pattern) then add(key) end
+      end
+    end
   end
   local ids = {}
   for id in pairs(ns.Statuses) do ids[#ids + 1] = id end
@@ -1759,11 +1779,18 @@ function W.cardKeywords(d)
   for i = 1, #(d.effects or {}) do
     local e = d.effects[i]
     if e[1] == "absorb" then add("absorb")
-    elseif e[1] == "demence" then add("demence")
+    elseif (e[1] == "res" or e[1] == "demence" or e[1] == "spend" or e[1] == "surge") and res then add("res:" .. res)
     elseif e[1] == "interrupt" then add("interrupt") end
   end
   if W.hasPhrase(text, "Absorb") then add("absorb") end
-  if W.hasPhrase(text, "Insanity") then add("demence") end
+  -- ressources nommées par le texte (celle de la classe, ou une autre citée)
+  local rids = {}
+  for id in pairs(L.resources) do rids[#rids + 1] = id end
+  table.sort(rids)
+  for _, id in ipairs(rids) do
+    local r = L.resources[id]
+    if W.hasPhrase(text, r.name) or W.hasPhrase(text, r.plural) then add("res:" .. id) end
+  end
   return list
 end
 
@@ -1772,7 +1799,7 @@ function W.keywordText(k)
   local line
   if k.key:sub(1, 7) == "status:" then line = Art.statusLine(k.key:sub(8))
   elseif k.key:sub(1, 5) == "cond:" then line = Art.conditionLine(k.key:sub(6))
-  else line = Art.keywordLine(k.key, k.label, k.n) end
+  else line = Art.keywordLine(k.key, k.label, k.n, k.res) end
   return W.inlineIcons(line, 12)
 end
 
@@ -2034,13 +2061,16 @@ local SC = Skin.card
 W.CARD_W = 124
 W.CARD_H = W.CARD_W * SC.aspect
 
-local KEYWORD_STRIP = {
-  { flag = "cooldown", pat = "%s*Cooldown %d+%." },
-  { flag = "exhaust", pat = "%s*Exhaust%." },
-  { flag = "retain", pat = "%s*Retain%." },
-  { flag = "cast", pat = "^Cast%.%s*" },
-  { flag = "power", pat = "^Power%.%s*" },
-}
+-- Mots de la plaque retirés du texte affiché : registre du langage (Core/Language.lua), en tête
+-- (« ^Cast. ») ou en fin (« Cooldown 2. »).
+local function keywordStrip()
+  local list = {}
+  for _, p in ipairs(ns.Language.plates) do
+    local w = p.word .. (p.n and " %d+" or "")
+    list[#list + 1] = { plate = p, pat = p.head and ("^" .. w .. "%.%s*") or ("%s*" .. w .. "%.") }
+  end
+  return list
+end
 
 -- Langage des cartes (docs/interface.md, « Langage des cartes ») : une clause par ligne dans `text`
 -- (séparées par « \n ») ; « Status: » = si l'état est présent ; conditions nommées ; états posés
@@ -2053,12 +2083,8 @@ W.HOURGLASS = ROOT .. "hourglass.tga"
 W.HOURGLASS_CHAR = "⌛"
 local NBSP = "\194\160" -- espace insécable : glue les mots d'un nom d'état et le nom à son nombre
 -- Conditions nommées (texte « Name: effect ») et clé de leur explication (Art.keywords).
-W.CONDITIONS = {
-  { name = "Execute", key = "execute" },
-  { name = "Surge", key = "surge" },
-  { name = "Last Breath", key = "lastBreath" },
-  { name = "Shadow", key = "shadow" },
-}
+-- Registre partagé (Core/Language.lua) : { name, key, pattern, text }.
+W.CONDITIONS = ns.Language.conditions
 
 -- Le nombre de l'état compte des tours (sablier) ?
 function W.isTurnStatus(id)
@@ -2152,8 +2178,8 @@ end
 -- Garde les « \n » des clauses et le « ⌛ » (posé à la taille du palier par la mise en page).
 function W.cardBody(d, base)
   local text = d.text or ""
-  for _, k in ipairs(KEYWORD_STRIP) do
-    if d[k.flag] or (k.flag == "power" and d.type == "power") then text = text:gsub(k.pat, "") end
+  for _, k in ipairs(keywordStrip()) do
+    if ns.Language.plateWord(k.plate, d) then text = text:gsub(k.pat, "") end
   end
   -- ligne d'état : le verbe reste avec le nom de l'état (« Gain Atonement », « Apply Stunned »)
   local cl = {}
@@ -2199,11 +2225,10 @@ end
 -- Mots-clés de la plaque du bas.
 function W.cardPills(d)
   local list = {}
-  if d.type == "power" then list[#list + 1] = "Power" end
-  if d.cast then list[#list + 1] = "Cast" end
-  if d.cooldown then list[#list + 1] = "Cooldown " .. d.cooldown end
-  if d.exhaust then list[#list + 1] = "Exhaust" end
-  if d.retain then list[#list + 1] = "Retain" end
+  for _, p in ipairs(ns.Language.plates) do
+    local w = ns.Language.plateWord(p, d)
+    if w then list[#list + 1] = w end
+  end
   return list
 end
 
@@ -2322,6 +2347,9 @@ function W.isConditionClause(s)
   local label = plainClause(s):match("^(.-): ")
   if not label then return false end
   for _, k in ipairs(keywordList()) do if k.name == label then return true end end
+  for _, c in ipairs(W.CONDITIONS) do
+    if c.pattern and label:find(c.pattern) then return true end
+  end
   return false
 end
 

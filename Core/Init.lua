@@ -9,6 +9,8 @@ ns.Encounters = ns.Encounters or {}
 ns.Relics = ns.Relics or {}
 ns.Potions = ns.Potions or {}
 ns.Statuses = ns.Statuses or {}
+ns.Classes = ns.Classes or {}       -- définitions de classe (Data/<Classe>.lua), docs/classes.md
+ns.ClassRules = ns.ClassRules or {} -- règles propres d'une classe (Core/Classes/<classe>.lua)
 
 local U = {}
 ns.Util = U
