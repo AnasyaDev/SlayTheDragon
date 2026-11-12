@@ -3,6 +3,8 @@
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 local ns = dofile(root .. "/Sim/load.lua")(root)
 local X, Map, Meta, Save, Combat, Rng = ns.Expedition, ns.Map, ns.Meta, ns.Save, ns.Combat, ns.Rng
+-- PV de départ du Prêtre (classe des expéditions de test), lus dans les données : ils changent avec l'équilibrage
+local PHP = ns.Classes.priest.hp
 
 local passed, failed = 0, 0
 local function test(name, f)
@@ -250,7 +252,7 @@ test("feu de camp : repos 30 %, amélioration, Disette 20 %", function()
   enter(exp, "campfire")
   exp.hp = 20
   assert(X.act(exp, { "rest" }))
-  eq(exp.hp, 20 + math.floor(65 * 0.30))
+  eq(exp.hp, 20 + math.floor(PHP * 0.30))
   eq(exp.phase, "map")
   local b = newExp()
   enter(b, "campfire")
@@ -263,7 +265,7 @@ test("feu de camp : repos 30 %, amélioration, Disette 20 %", function()
   enter(d, "campfire")
   d.hp = 20
   X.act(d, { "rest" })
-  eq(d.hp, 20 + math.floor(65 * 0.20), "Disette")
+  eq(d.hp, 20 + math.floor(PHP * 0.20), "Disette")
 end)
 
 test("marchand : achats, retrait au prix croissant, emplacements de potion", function()
@@ -366,7 +368,7 @@ test("rencontre : Colline des sentinelles (don conditionné à l'or, retrait)", 
   local ups = 0
   for _, card in ipairs(b.deck) do if card.up then ups = ups + 1 end end
   eq(ups, 2)
-  eq(b.hp, 65 - 6)
+  eq(b.hp, PHP - 6)
 end)
 
 test("rencontre : carriole (combat avec bonus d'or, potion)", function()
@@ -385,7 +387,7 @@ test("rencontre : carriole (combat avec bonus d'or, potion)", function()
   local b = newExp()
   enterEvent(b, "defias_caravan")
   assert(X.act(b, { "choose", 2 }))
-  eq(b.hp, 60)
+  eq(b.hp, PHP - 5)
   assert(b.potions[1], "potion reçue")
 end)
 
@@ -407,12 +409,12 @@ test("bibelots : crochets d'expédition (or, repos, ramassage) et pool de Ligue"
   X.gainRelic(exp, "test_purse")
   X.gainRelic(exp, "test_heart")
   X.gainRelic(exp, "test_pillow")
-  eq(exp.maxHp, 75)
+  eq(exp.maxHp, PHP + 10)
   eq(X.gainGold(exp, 10), 20)
   enter(exp, "campfire")
   exp.hp = 10
   X.act(exp, { "rest" })
-  eq(exp.hp, 10 + math.floor(75 * 0.3) + 5)
+  eq(exp.hp, 10 + math.floor((PHP + 10) * 0.3) + 5)
   eq(count(X.relicPool(exp), "test_purse"), 0, "déjà possédé")
   eq(count(X.relicPool(exp), "test_league"), 0, "tier 2 verrouillé")
   eq(count(X.relicPool(exp), "test_class"), 1, "bibelot de la classe jouée dans le pool")
@@ -933,7 +935,7 @@ test("pari : tiré à l'entrée, figé au rechargement, issues annoncées", func
       assert(exp.event.result:find("potion", 1, true))
     else
       losses = losses + 1
-      eq(exp.hp, 65 - 7); eq(exp.phase, "event")
+      eq(exp.hp, PHP - 7); eq(exp.phase, "event")
       assert(exp.event.result:find("murloc", 1, true))
     end
   end
@@ -975,7 +977,7 @@ test("rencontre rare : marché (bibelot contre PV max) et combat d'élite option
   local exp = newExp()
   forceEvent(exp, "goblin_peddler")
   assert(X.act(exp, { "choose", 1 }))
-  eq(exp.maxHp, 65 - 8); eq(exp.hp, 65 - 8)
+  eq(exp.maxHp, PHP - 8); eq(exp.hp, PHP - 8)
   eq(exp.relics[#exp.relics], "harvest_cog")
   local b = newExp()
   forceEvent(b, "goblin_peddler")
@@ -1041,7 +1043,7 @@ test("carte copiée (phare) puis récompense en attente après une sélection", 
   forceEvent(exp, "lighthouse_keeper")
   assert(X.act(exp, { "choose", 1 }))
   eq(exp.phase, "select"); eq(exp.select.kind, "dupe")
-  eq(exp.hp, 55)
+  eq(exp.hp, PHP - 10)
   local id = exp.deck[3].id
   assert(X.act(exp, { "select", 3 }))
   eq(#exp.deck, 11); eq(exp.deck[11].id, id)
