@@ -337,6 +337,13 @@ Art.relics = {
   camp_kettle      = { icon = 133779, tga = "INV_Misc_Cauldron_Fire" },  -- inv_misc_cauldron_fire
   mana_ruby        = { icon = 134128, tga = "INV_Misc_Gem_Ruby_01" },  -- inv_misc_gem_ruby_01
 }
+-- Bibelots du Prêtre (Data/Priest.lua ; icônes vérifiées dans ~/Téléchargements/ICONS)
+Art.relics.sacred_candle       = { icon = "Interface\\Icons\\inv_misc_candle_02", tga = "INV_Misc_Candle_02" }
+Art.relics.mindtap_talisman    = { icon = "Interface\\Icons\\inv_jewelry_talisman_04", tga = "INV_Jewelry_Talisman_04" }
+Art.relics.benediction         = { icon = "Interface\\Icons\\inv_staff_30", tga = "INV_Staff_30" }
+Art.relics.robes_of_prophecy   = { icon = "Interface\\Icons\\inv_chest_cloth_03", tga = "INV_Chest_Cloth_03" }
+Art.relics.anathema            = { icon = "Interface\\Icons\\inv_staff_29", tga = "INV_Staff_29" }
+Art.relics.truefaith_vestments = { icon = "Interface\\Icons\\inv_chest_cloth_11", tga = "INV_Chest_Cloth_11" }
 Art.relicFallback = { icon = "Interface\\Icons\\inv_jewelry_talisman_07" }
 Art.potions = {
   healing_potion    = { icon = 134831, color = hex("#b3402e"), tga = "INV_Potion_51" }, -- inv_potion_51
@@ -387,6 +394,7 @@ Art.ui = {
   chest     = { icon = 1542843, tga = "inv_misc_treasurechest01a" }, -- inv_misc_treasurechest01a
   remove    = { icon = 135813, tga = "Spell_Fire_FlameShock" },  -- spell_fire_flameshock (planche)
   bag       = { icon = 133639, tga = "INV_Misc_Bag_10" },  -- inv_misc_bag_10 (bourse du butin)
+  locked    = { icon = 134400, tga = "INV_Misc_QuestionMark" },  -- bibelot verrouillé (écran de progression)
   -- Étapes du parcours (icônes des planches docs/maquette/ecran_parcours.jpg)
   map = {
     combat   = { icon = 132223, tga = "Ability_MeleeDamage" },  -- ability_meleedamage

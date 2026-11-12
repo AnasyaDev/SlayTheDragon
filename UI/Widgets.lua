@@ -1909,6 +1909,10 @@ function W.fillItemTooltip(tt, kind, id, extra)
     local a = ns.Affixes and ns.Affixes[id]
     gold(tt, a and a.name or tostring(id))
     if a and a.text then wrap(tt, a.text) end
+  elseif kind == "locked" then
+    -- bibelot verrouillé (écran de progression) : la condition seule, rien de ce qu'on obtiendra
+    if extra and extra.condition then tt:AddLine(extra.condition, 1, 0.3, 0.3) end
+    return
   elseif extra and extra.title then
     gold(tt, extra.title)
   end

@@ -332,32 +332,108 @@ end)
 
 -- Contenu ajouté : réputation, bibelots, potions --------------------------------
 
-test("cartes : par classe, rep 0/1/2 = 20/5/5 hors départ ; aucune carte de départ n'a de rep", function()
-  for class in pairs(ns.Classes) do
-    local n = { [0] = 0, [1] = 0, [2] = 0 }
-    for id, d in pairs(ns.Cards) do
-      if d.class == class then
-        if d.rarity == "basic" then
-          assert(d.rep == nil, id)
-        else
-          assert(d.rep == 0 or d.rep == 1 or d.rep == 2, id .. " : rep")
-          n[d.rep] = n[d.rep] + 1
+-- Table « Progression par classe » du GDD : niveau 1 = 4 cartes de départ + 6 par voie et 2 bibelots
+-- (dont celui de départ) ; 2, 4, 6 = une carte par voie ; 3 et 5 = un bibelot ; 7 = une rare par voie et
+-- 2 bibelots.
+test("progression : répartition exacte des cartes et bibelots par niveau, pour chaque classe jouable", function()
+  local n = 0
+  for class, cd in pairs(ns.Classes) do
+    if cd.playable ~= false then
+      n = n + 1
+      local paths = { start = true }
+      for _, p in ipairs(cd.paths) do paths[p.id] = true end
+      local by = {} -- by[voie][niveau] = nombre
+      local rare7 = {}
+      for id, d in pairs(ns.Cards) do
+        if d.class == class then
+          assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
+          assert(d.rep == nil, id .. " : rep retiré")
+          assert(paths[d.path], id .. " : voie")
+          by[d.path] = by[d.path] or {}
+          by[d.path][d.level] = (by[d.path][d.level] or 0) + 1
+          if d.rarity == "basic" then eq(d.level, 1, id .. " : carte de départ au niveau 1") end
+          if d.level == 7 then eq(d.rarity, "rare", id .. " : niveau 7 = rare") rare7[d.path] = true end
         end
       end
+      eq(by.start[1], 4, class .. " : départ")
+      local total = { 0, 0, 0, 0, 0, 0, 0 }
+      for _, p in ipairs(cd.paths) do
+        local b = by[p.id] or {}
+        eq(b[1], 6, class .. "/" .. p.id .. " niveau 1")
+        for _, lv in ipairs({ 2, 4, 6, 7 }) do eq(b[lv], 1, class .. "/" .. p.id .. " niveau " .. lv) end
+        for _, lv in ipairs({ 3, 5 }) do eq(b[lv], nil, class .. "/" .. p.id .. " niveau " .. lv) end
+        assert(rare7[p.id], class .. "/" .. p.id .. " : rare au niveau 7")
+        for lv = 1, 7 do total[lv] = total[lv] + (b[lv] or 0) end
+      end
+      eq(total[1] + 4, 22, class .. " : 22 cartes au niveau 1")
+      eq(total[1] + 4 + total[2] + total[4] + total[6] + total[7], 34, class .. " : 34 cartes au niveau 7")
+      local rl, start = {}, cd.startRelic and ns.Relics[cd.startRelic]
+      local nr = 0
+      for id, r in pairs(ns.Relics) do
+        if r.class == class then
+          nr = nr + 1
+          assert(type(r.level) == "number", id .. " : level")
+          assert(r.tier == nil, id .. " : tier retiré (la Ligue ne compte pas)")
+          rl[r.level] = (rl[r.level] or 0) + 1
+        end
+      end
+      eq(nr, 6, class .. " : 6 bibelots de classe")
+      eq(rl[1], 2, class .. " : 2 bibelots au niveau 1"); eq(rl[3], 1); eq(rl[5], 1); eq(rl[7], 2, class .. " : 2 au niveau 7")
+      assert(start and start.class == class and start.level == 1 and start.noPool, class .. " : bibelot de départ")
     end
-    eq(n[0], 20, class .. " Neutre"); eq(n[1], 5, class .. " Amical"); eq(n[2], 5, class .. " Honoré")
   end
+  eq(n, 5, "cinq classes jouables")
 end)
 
-test("récompenses filtrées par réputation de classe", function()
+test("récompenses filtrées par niveau de classe", function()
   local rng = Rng.new(5)
   for _ = 1, 200 do
-    local ch = ns.Rewards.cardChoices(rng, "priest", 3, nil, 0)
+    local ch = ns.Rewards.cardChoices(rng, "priest", 3, nil, 1)
     eq(#ch, 3)
-    for _, id in ipairs(ch) do eq(ns.Cards[id].rep, 0, id) end
+    for _, id in ipairs(ch) do eq(ns.Cards[id].level, 1, id) end
   end
-  eq(#ns.Rewards.cardPool("priest", 1), 25)
+  eq(#ns.Rewards.cardPool("priest", 1), 18)
+  eq(#ns.Rewards.cardPool("priest", 2), 21)
+  eq(#ns.Rewards.cardPool("priest", 6), 27)
   eq(#ns.Rewards.cardPool("priest"), 30)
+  local pool = ns.Rewards.relicPool({ class = "priest", level = 3 })
+  local function has(id) for _, x in ipairs(pool) do if x == id then return true end end return false end
+  assert(has("mindtap_talisman") and has("benediction") and not has("robes_of_prophecy") and not has("sacred_candle"))
+end)
+
+test("bibelots du Prêtre : Sacred Candle, Mindtap Talisman, Benediction, Robes, Anathema, Vestments", function()
+  eq(ns.Classes.priest.startRelic, "sacred_candle")
+  -- Sacred Candle : Atonement 1 au début du combat (premier tour et le suivant)
+  local c = setup({ "smite" }, { "test_dummy" }, nil, { relics = { "sacred_candle" } })
+  assert((c.player.st.atonement or 0) >= 1, "Atonement posé")
+  -- Mindtap Talisman : +2 Insanity
+  c = setup({ "smite" }, { "test_dummy" }, nil, { relics = { "mindtap_talisman" } })
+  eq(c.player.res, 2)
+  -- Benediction : chaque Regen gagné +1 (Renew), sans toucher aux états des ennemis
+  local a = setup({ "renew" }, { "test_dummy" })
+  local b = setup({ "renew" }, { "test_dummy" }, nil, { relics = { "benediction" } })
+  Combat.play(a, 1, 1); Combat.play(b, 1, 1)
+  eq(b.player.st.regen, a.player.st.regen + 1)
+  -- Robes of Prophecy : Absorb +2 sous Atonement seulement
+  a = setup({ "inner_fire" }, { "test_dummy" }, nil, { relics = { "robes_of_prophecy" } })
+  Combat.play(a, 1)
+  eq(a.player.block, 5, "sans Atonement")
+  b = setup({ "inner_fire" }, { "test_dummy" }, nil, { relics = { "robes_of_prophecy", "sacred_candle" } })
+  Combat.play(b, 1)
+  eq(b.player.block, 7, "sous Atonement")
+  -- Anathema : un Surge compte 2 de plus (Void Eruption à 3 Insanity : 4 + 4 × 5), la dépense reste 3
+  a = setup({ "void_eruption" }, { "test_dummy" }, nil, { relics = { "anathema" } })
+  a.player.res = 3
+  local hp = a.enemies[1].hp
+  Combat.play(a, 1, 1)
+  eq(hp - a.enemies[1].hp, 4 + 4 * 5); eq(a.player.res, 0)
+  -- Truefaith Vestments : Absorb 4 quand un Cast se résout
+  a = setup({ "holy_fire" }, { "test_dummy" })
+  b = setup({ "holy_fire" }, { "test_dummy" }, nil, { relics = { "truefaith_vestments" } })
+  Combat.play(a, 1, 1); Combat.play(b, 1, 1)
+  Combat.endTurn(a); Combat.endTurn(b)
+  assert(a.player.cast == nil and b.player.cast == nil, "incantations résolues")
+  eq(b.player.block, a.player.block + 4, "Absorb de l'incantation résolue")
 end)
 
 test("bibelots et potions respectent le contrat", function()
@@ -366,7 +442,8 @@ test("bibelots et potions respectent le contrat", function()
     if not r.noPool and not r.class then nr = nr + 1 end -- communs (bibelots de rencontre et de classe à part)
     assert(r.name and r.text and r.hooks, id)
     assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
-    assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id)
+    -- communs : palier de Ligue (tier) ; de classe : niveau de classe (test « progression »)
+    if not r.class then assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id) end
   end
   for id, p in pairs(ns.Potions) do
     np = np + 1
@@ -1509,8 +1586,8 @@ local MAGE_SHEET = {
   arcane_surge = { 1, 0, "skill", "arcane", "arcane", "rare", 7 },
 }
 
-test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté, niveau), 13/11/6, 10 par voie, rep 20/5/5 dans l'ordre des niveaux", function()
-  local n, r, paths, repByLevel = 0, {}, {}, {}
+test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté, niveau), 13/11/6, 10 par voie", function()
+  local n, r, paths = 0, {}, {}
   for id, d in pairs(ns.Cards) do
     if d.class == "mage" then
       n = n + 1
@@ -1522,19 +1599,10 @@ test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté
       eq(d.level, s[7], id .. " niveau")
       r[d.rarity] = (r[d.rarity] or 0) + 1
       paths[d.path] = (paths[d.path] or 0) + 1
-      if d.rarity ~= "basic" then
-        repByLevel[#repByLevel + 1] = { d.level, d.rep, id }
-      end
     end
   end
   eq(n, 34); eq(r.basic, 4); eq(r.common, 13); eq(r.uncommon, 11); eq(r.rare, 6)
   eq(paths.start, 4); eq(paths.fire, 10); eq(paths.frost, 10); eq(paths.arcane, 10)
-  -- rep monotone avec le niveau (un niveau plus haut n'a jamais un palier plus bas)
-  for _, a in ipairs(repByLevel) do
-    for _, b in ipairs(repByLevel) do
-      if a[1] < b[1] then assert(a[2] <= b[2], a[3] .. " / " .. b[3] .. " : rep non monotone") end
-    end
-  end
 end)
 
 test("Mage : définition (52 PV, Arcane Charges 0 à 4 gardées, deck de départ, Apprentice's Wand), 6 bibelots avec niveau, Interrupt et Last Breath", function()

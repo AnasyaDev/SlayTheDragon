@@ -19,7 +19,8 @@ ns.Expedition = X
 
 -- 2 : drapeaux de compte (exp.flags, exp.newFlags) et journal des rencontres (stats.events).
 -- 3 : classe générique (ressource de combat c.player.res au lieu de demence, état de classe c.cls).
-X.VERSION = 3
+-- 4 : déblocages par niveau de classe (unlock.level au lieu de unlock.rep).
+X.VERSION = 4
 
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
@@ -127,12 +128,19 @@ local function drawFrom(rng, ids, rarityOf, n, weights, taken)
   return out
 end
 
+-- Déblocage d'une carte ou d'un bibelot pour cette expédition : ce qui est de classe suit le niveau de
+-- classe figé au départ (level, absent = 1) ; le reste (commun, neutre) suit la Ligue (tier, absent = 0).
+function X.unlocked(exp, def)
+  if def.class then return (def.level or 1) <= exp.unlock.level end
+  return (def.tier or 0) <= leagueTier(exp)
+end
+
 -- Cartes de la classe jouée (neutral : cartes neutres comprises, réservées au marchand et aux
--- rencontres par le GDD ; aucune n'existe encore).
+-- rencontres par le GDD).
 function X.cardPool(exp, neutral)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and not d.noReward and (d.rep or 0) <= exp.unlock.rep then
+    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and not d.noReward and X.unlocked(exp, d) then
       list[#list + 1] = id
     end
   end
@@ -149,14 +157,15 @@ local function drawCards(exp, rng, n, weights, neutral)
   return out
 end
 
--- Bibelots proposables : tier débloqué, pas déjà possédés, communs (sans champ class) ou de la
--- classe jouée ; jamais ceux marqués noPool (bibelot de départ, bibelots de rencontre).
+-- Bibelots proposables : pas déjà possédés, communs (sans champ class, tier de Ligue débloqué) ou de
+-- la classe jouée (niveau de classe atteint) ; jamais ceux marqués noPool (bibelot de départ, bibelots
+-- de rencontre).
 function X.relicPool(exp)
   local owned = {}
   for i = 1, #exp.relics do owned[exp.relics[i]] = true end
   local list = {}
   for id, r in pairs(ns.Relics) do
-    if not owned[id] and (not r.class or r.class == exp.class) and not r.noPool and (r.tier or 0) <= leagueTier(exp) then
+    if not owned[id] and (not r.class or r.class == exp.class) and not r.noPool and X.unlocked(exp, r) then
       list[#list + 1] = id
     end
   end
@@ -185,19 +194,6 @@ local function drawPotions(exp, rng, n)
   return drawFrom(rng, X.potionPool(exp), potionRarity, n, X.POTION_WEIGHTS)
 end
 
--- Bibelots de classe (Révéré) : relic.class == classe, ni déjà possédés (bibelot de départ), ni noPool.
-local function classRelics(exp)
-  local owned = {}
-  for i = 1, #exp.relics do owned[exp.relics[i]] = true end
-  local list = {}
-  for id, r in pairs(ns.Relics) do
-    if r.class == exp.class and not owned[id] and not r.noPool and (r.tier or 0) <= leagueTier(exp) then
-      list[#list + 1] = id
-    end
-  end
-  table.sort(list)
-  return list
-end
 
 ---------------------------------------------------------------------------
 -- Gains et pertes
@@ -761,7 +757,7 @@ end
 -- Création
 ---------------------------------------------------------------------------
 
--- opts : seed, class ("priest"), key (0..5), unlocks = { rep = 0..4, league = 0..4 },
+-- opts : seed, class ("priest"), key (0..5), unlocks = { level = 1..7 (niveau de classe), league = 0..4 },
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
 --        acts (nombre d'actes, par défaut tous ceux de Map.ACTS),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements)
@@ -776,7 +772,7 @@ function X.new(opts)
   local exp = {
     version = X.VERSION, seed = seed, class = class, key = key,
     affixes = ns.Meta.affixesFor(key),
-    unlock = { rep = unlock.rep or 0, league = unlock.league or 0 },
+    unlock = { level = unlock.level or 1, league = unlock.league or 0 },
     acts = min(opts.acts or #Map.ACTS, #Map.ACTS), act = 0, floor = 0,
     hp = cdef.hp, maxHp = cdef.hp, gold = X.START_GOLD,
     deck = {}, relics = {}, potions = {},
@@ -802,9 +798,12 @@ function X.new(opts)
   -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
   if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end
   startAct(exp, 1)
-  if exp.unlock.rep >= ns.Meta.REVERED then
-    local list = drawFrom(exp.rng.loot, classRelics(exp), relicRarity, 3,
-      { common = 1, uncommon = 1, rare = 1, boss = 1 })
+  -- Révéré de la Ligue : un bibelot au choix parmi 3, tirés dans la réserve de l'expédition (communs
+  -- et de classe débloqués, hors boss). Remplace le « bibelot de classe parmi 3 » de l'ancienne
+  -- réputation de classe : les bibelots de classe entrent dans la réserve avec le niveau de classe.
+  if exp.unlock.league >= ns.Meta.REVERED then
+    local list = drawFrom(exp.rng.loot, X.relicPool(exp), relicRarity, 3,
+      { common = 1, uncommon = 1, rare = 1 })
     if #list > 0 then
       exp.startRelics = list
       exp.phase = "start"

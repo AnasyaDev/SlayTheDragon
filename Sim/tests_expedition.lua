@@ -84,11 +84,15 @@ local function withoutRunRelics(f)
   if not ok then error(err, 0) end
 end
 
+-- Expédition de test ; la phase « start » (Révéré de la Ligue : bibelot au choix) est passée, sauf
+-- keepStart = true.
 local function newExp(opts)
   opts = opts or {}
   opts.seed = opts.seed or 11
   if opts.quiet == nil then opts.quiet = true end
-  return X.new(opts)
+  local exp = X.new(opts)
+  if exp.phase == "start" and not opts.keepStart then assert(X.act(exp, { "skipStartRelic" })) end
+  return exp
 end
 
 -- Force le type du premier nœud de départ et y entre.
@@ -195,7 +199,7 @@ test("combat : récompense tirée à l'entrée, identique après rechargement", 
     eq(serialize(exp.fight == nil and copy.fight == nil), "true")
     local r = exp.reward
     assert(r.goldGained >= 25 and r.goldGained <= 35, "or d'élite")
-    eq(exp.relics[1], r.relic, "bibelot pris")
+    eq(exp.relics[#exp.relics], r.relic, "bibelot pris")
     eq(#r.cards, 3)
     -- le tirage stocké avant le combat est bien celui qu'on reçoit
     local before = assert(loadstring("return " .. pending))()
@@ -298,17 +302,18 @@ test("marchand : achats, retrait au prix croissant, emplacements de potion", fun
 end)
 
 test("marchand : Ligue exaltée = un bibelot de plus", function()
-  local exp = newExp({ unlocks = { rep = 0, league = Meta.EXALTED } })
+  local exp = newExp({ unlocks = { level = 1, league = Meta.EXALTED } })
   enter(exp, "merchant")
   eq(#exp.shop.relics, 4)
 end)
 
 test("coffre : un bibelot", function()
   local exp = newExp()
+  eq(exp.relics[1], "sacred_candle", "bibelot de départ du Prêtre")
   enter(exp, "chest")
   eq(exp.phase, "reward")
-  eq(#exp.relics, 1)
-  assert(ns.Relics[exp.relics[1]].rarity ~= "boss")
+  eq(#exp.relics, 2)
+  assert(ns.Relics[exp.relics[2]].rarity ~= "boss")
   X.act(exp, { "leave" })
   eq(exp.phase, "map")
 end)
@@ -425,8 +430,10 @@ test("réputation : points par étape, élite et boss, paliers", function()
   exp.result = "lost"
   local s = Meta.record(meta, exp)
   eq(s.rep, 5 * Meta.REP.step + Meta.REP.elite)
-  eq(meta.classes.priest.rep, s.rep)
+  eq(meta.classes.priest.rep, nil, "plus de réputation de classe")
   eq(meta.league, s.rep)
+  eq(s.xp, math.floor(s.rep * Meta.XP.rate + 0.5), "défaite : expérience sans bonus de victoire")
+  eq(meta.classes.priest.xp, s.xp)
   eq(meta.classes.priest.keyMax, 0, "pas de clé sur une défaite")
   eq(Meta.level(0), 0)
   eq(Meta.level(Meta.LEVELS[2].at), 1)
@@ -436,25 +443,104 @@ test("réputation : points par étape, élite et boss, paliers", function()
   eq(lv, 1); eq(inLv, 3); eq(size, Meta.LEVELS[3].at - Meta.LEVELS[2].at)
 end)
 
-test("déblocages : cartes par champ rep, bibelot de classe à Révéré", function()
-  ns.Cards.radiance.rep = 1
+test("déblocages : cartes par niveau de classe, bibelot au choix à Révéré (Ligue), titre au niveau 7", function()
+  local lv0 = ns.Cards.radiance.level
+  ns.Cards.radiance.level = 2
   local exp = newExp()
+  eq(exp.unlock.level, 1, "niveau 1 par défaut")
   eq(count(X.cardPool(exp), "radiance"), 0, "verrouillée au départ")
-  local b = newExp({ unlocks = { rep = 1, league = 0 } })
+  local b = newExp({ unlocks = { level = 2, league = 0 } })
   eq(count(X.cardPool(b), "radiance"), 1)
-  ns.Cards.radiance.rep = nil
-  eq(count(X.cardPool(exp), "penance"), 1, "rep absent = 0")
+  ns.Cards.radiance.level = nil
+  eq(count(X.cardPool(exp), "radiance"), 1, "level absent = 1")
+  ns.Cards.radiance.level = lv0
+  -- la réputation de la Ligue ne débloque plus rien de la classe
+  local rich = newExp({ unlocks = { level = 1, league = Meta.EXALTED } })
+  eq(count(X.cardPool(rich), "rapture"), 0, "Rapture (niveau 7) verrouillée malgré la Ligue")
+  eq(count(X.relicPool(rich), "anathema"), 0)
+  -- Révéré de la Ligue : un bibelot au choix parmi 3, tirés dans la réserve de l'expédition
   local meta = Meta.new()
-  Meta.classState(meta, "priest").rep = Meta.LEVELS[4].at
+  meta.league = Meta.LEVELS[4].at
   local r = Meta.newExpedition(meta, { seed = 3, class = "priest" })
   eq(r.phase, "start")
-  eq(r.startRelics[1], "test_class")
-  assert(X.act(r, { "startRelic", 1 }))
-  eq(r.relics[1], "test_class")
+  eq(#r.startRelics, 3)
+  local pool = X.relicPool(r)
+  for _, id in ipairs(r.startRelics) do
+    assert(count(pool, id) == 1, id .. " hors de la réserve")
+    assert(ns.Relics[id].rarity ~= "boss", id)
+  end
+  local pick = r.startRelics[2]
+  assert(X.act(r, { "startRelic", 2 }))
+  eq(r.relics[1], "sacred_candle"); eq(r.relics[2], pick)
   eq(r.phase, "map")
   eq(Meta.title(meta, "priest"), nil)
-  Meta.classState(meta, "priest").rep = Meta.LEVELS[5].at
+  Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7] - 1
+  eq(Meta.title(meta, "priest"), nil)
+  Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7]
   eq(Meta.title(meta, "priest"), "Dragonslayer")
+end)
+
+test("niveau de classe : seuils, progression, expérience gagnée (victoire, défaite, clé)", function()
+  eq(Meta.MAX_LEVEL, 7)
+  local T = { 0, 100, 250, 450, 700, 1000, 1400 }
+  for i = 1, 7 do eq(Meta.XP_LEVELS[i], T[i], "seuil " .. i) end
+  eq(Meta.classLevel(0), 1); eq(Meta.classLevel(99), 1); eq(Meta.classLevel(100), 2)
+  eq(Meta.classLevel(1399), 6); eq(Meta.classLevel(1400), 7); eq(Meta.classLevel(99999), 7)
+  local lv, cur, size = Meta.xpProgress(120)
+  eq(lv, 2); eq(cur, 20); eq(size, 150)
+  lv, cur, size = Meta.xpProgress(1500)
+  eq(lv, 7); eq(cur, 100); eq(size, nil)
+  local function xpOf(result, key, cleared, elites, bosses)
+    local e = newExp({ key = key })
+    e.stats.cleared, e.stats.elites, e.stats.bosses, e.result = cleared, elites, bosses, result
+    return Meta.xpFor(e)
+  end
+  local won, lost = xpOf("won", 0, 8, 1, 1), xpOf("lost", 0, 7, 1, 0)
+  eq(won, math.floor((8 * 10 + 12 + 30) * Meta.XP.rate + Meta.XP.win + 0.5))
+  assert(won > lost, "une victoire rapporte plus")
+  assert(xpOf("won", 3, 8, 1, 1) > won, "une clé plus haute rapporte plus")
+  eq(xpOf("abandoned", 0, 0, 0, 0), 0, "abandon immédiat : rien")
+  -- cadence visée : 2 à 3 expéditions pour le niveau 2, de l'ordre de 20 pour le niveau 7
+  -- (≈ 4 victoires pour 1 défaite au boss)
+  local avg = (4 * won + lost) / 5
+  assert(100 / avg >= 1.2 and 100 / avg <= 3, ("niveau 2 en %.1f expéditions"):format(100 / avg))
+  assert(1400 / avg >= 17 and 1400 / avg <= 24, ("niveau 7 en %.1f expéditions"):format(1400 / avg))
+end)
+
+test("montée de niveau : résumé, ce qui vient d'être débloqué, expédition en cours figée", function()
+  local db = Save.new()
+  local exp = assert(Save.start(db, { seed = 4, class = "priest" }))
+  eq(exp.unlock.level, 1)
+  local before = X.cardPool(exp)
+  eq(#before, 18)
+  -- le compte gagne des niveaux pendant l'expédition : elle garde ses déblocages de départ
+  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[4] - 5
+  eq(exp.unlock.level, 1)
+  eq(#X.cardPool(exp), 18, "expédition figée")
+  exp.stats.cleared, exp.stats.elites, exp.stats.bosses = 8, 1, 1
+  exp.result, exp.phase = "won", "done"
+  local s = Save.finish(db, "x")
+  eq(s.levelBefore, 3); eq(s.levelAfter, 4)
+  eq(db.journal[1].xp, s.xp)
+  table.sort(s.unlocked.cards)
+  eq(table.concat(s.unlocked.cards, ","), "halo,luminous_barrier,sw_death")
+  eq(#s.unlocked.relics, 0)
+  -- deux niveaux d'un coup : cartes du 6 et bibelot du 5
+  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[5] - 1
+  local e2 = assert(Save.start(db, { seed = 5, class = "priest" }))
+  eq(e2.unlock.level, 4)
+  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[6] - 2
+  e2.stats.cleared, e2.stats.bosses = 8, 1
+  e2.result, e2.phase = "won", "done"
+  local s2 = Save.finish(db, "y")
+  eq(s2.levelBefore, 5); eq(s2.levelAfter, 6)
+  table.sort(s2.unlocked.cards)
+  eq(table.concat(s2.unlocked.cards, ","), "empyreal_blaze,psychic_scream,shadow_mend")
+  -- sans montée : rien de débloqué
+  local e3 = assert(Save.start(db, { seed = 6, class = "priest" }))
+  e3.result, e3.phase = "lost", "done"
+  local s3 = Save.finish(db, "z")
+  eq(s3.levelBefore, s3.levelAfter); eq(#s3.unlocked.cards, 0); eq(#s3.unlocked.relics, 0)
 end)
 
 test("clés mythiques : +1 à la 1re victoire, +N ouvre +N+1, plafond +5", function()
@@ -660,7 +746,8 @@ test("fin d'expédition : journal, méta, clé", function()
   eq(entry.seed, 4)
   eq(#entry.deck, 10)
   eq(s.keyUnlocked, 1)
-  eq(db.meta.classes.priest.rep, s.rep)
+  eq(db.meta.classes.priest.xp, s.xp)
+  eq(entry.xp, s.xp)
   assert(Save.validate(db))
   local e2 = assert(Save.start(db, { seed = 6, key = 1 }))
   eq(e2.key, 1)
@@ -764,7 +851,7 @@ test("conditions : chaque condition et sa raison", function()
 end)
 
 test("rencontres : conditions de déclenchement (PV, étape, clé, drapeau)", function()
-  local exp = newExp({ unlocks = { rep = 0, league = 3 } })
+  local exp = newExp({ unlocks = { level = 1, league = 3 } })
   exp.floor = 1
   local pool = X.eventPool(exp)
   eq(count(pool, "herbalist"), 0, "PV pleins : pas d'herboriste")
@@ -784,7 +871,7 @@ test("rencontres : conditions de déclenchement (PV, étape, clé, drapeau)", fu
   eq(count(pool, "tobin_defias"), 0, "branche exclusive")
   -- Le premier nœud d'une carte est à l'étape 1 : la rencontre tirée respecte les conditions.
   for s = 1, 40 do
-    local e = newExp({ seed = s, unlocks = { rep = 0, league = 3 } })
+    local e = newExp({ seed = s, unlocks = { level = 1, league = 3 } })
     enter(e, "event")
     if e.event.id then
       local ev = ns.Events[e.event.id]
@@ -864,7 +951,7 @@ test("rencontre rare : poids faible, tirée rarement", function()
   assert(X.EVENT_WEIGHT.rare * 3 <= X.EVENT_WEIGHT.common)
   local n, seen = 0, {}
   for s = 1, 1500 do
-    local exp = newExp({ seed = s, unlocks = { rep = 0, league = 3 } })
+    local exp = newExp({ seed = s, unlocks = { level = 1, league = 3 } })
     enter(exp, "event")
     if exp.event.id then
       n = n + 1
@@ -877,7 +964,7 @@ test("rencontre rare : poids faible, tirée rarement", function()
   assert(rare / 2 < common / 3 / 2, ("rares %d contre ordinaires %d"):format(rare, common))
   -- Poids explicite : remplace celui de la famille.
   ns.Events.goblin_peddler.weight = 1000
-  local exp = newExp({ unlocks = { rep = 0, league = 3 } })
+  local exp = newExp({ unlocks = { level = 1, league = 3 } })
   enter(exp, "event")
   ns.Events.goblin_peddler.weight = nil
   eq(exp.event.id, "goblin_peddler")
@@ -1032,7 +1119,7 @@ end)
 
 test("toutes les actions proposées sont acceptées (marche aléatoire)", function()
   for s = 1, 25 do
-    local exp = newExp({ seed = s, key = s % 6, unlocks = { rep = s % 5, league = s % 5 } })
+    local exp = newExp({ seed = s, key = s % 6, unlocks = { level = s % 7 + 1, league = s % 5 }, keepStart = true })
     local rng = Rng.new(s)
     for _ = 1, 3000 do
       if exp.phase == "done" then break end
@@ -1057,20 +1144,20 @@ end)
 -- Classes : choix au départ, pools par classe, bibelot de départ, sauvegarde v3
 ---------------------------------------------------------------------------
 
-test("classes : expédition du Guerrier (deck, PV, bibelot de départ), du Prêtre sans bibelot", function()
+test("classes : expédition du Guerrier (deck, PV, bibelot de départ), du Prêtre (Sacred Candle)", function()
   local w = newExp({ class = "warrior" })
   local cd = ns.Classes.warrior
   eq(w.class, "warrior"); eq(w.hp, cd.hp); eq(w.maxHp, cd.hp); eq(#w.deck, 10)
   eq(w.relics[1], "battle_standard"); eq(#w.relics, 1)
   for _, card in ipairs(w.deck) do eq(ns.Cards[card.id].class, "warrior", card.id) end
   local p = newExp({ class = "priest" })
-  eq(#p.relics, 0); eq(p.deck[1].id, "smite")
+  eq(p.relics[1], "sacred_candle"); eq(#p.relics, 1); eq(p.deck[1].id, "smite")
   assert(not pcall(X.new, { class = "nope" }), "classe inconnue refusée")
 end)
 
 test("classes : récompenses, marchand et rencontres tirés dans le pool de la classe jouée", function()
   for _, class in ipairs({ "priest", "warrior" }) do
-    local exp = newExp({ class = class, unlocks = { rep = 2, league = 3 } })
+    local exp = newExp({ class = class, unlocks = { level = 7, league = 3 } })
     for _, id in ipairs(X.cardPool(exp)) do eq(ns.Cards[id].class, class, id) end
     eq(#X.cardPool(exp), 30)
     for _, id in ipairs(X.relicPool(exp)) do
@@ -1083,21 +1170,48 @@ test("classes : récompenses, marchand et rencontres tirés dans le pool de la c
       assert(ns.Relics[it.id].class == nil or ns.Relics[it.id].class == class, it.id)
     end
   end
-  local w = newExp({ class = "warrior", unlocks = { rep = 0, league = 3 } })
+  local w = newExp({ class = "warrior", unlocks = { level = 1, league = 3 } })
   eq(count(X.relicPool(w), "battle_standard"), 0, "bibelot de départ jamais tiré (déjà possédé, noPool)")
-  eq(count(X.relicPool(w), "diamond_flask"), 1, "bibelot du Guerrier dans son pool")
-  eq(count(X.relicPool(newExp({ class = "priest", unlocks = { rep = 0, league = 3 } })), "diamond_flask"), 0,
+  eq(count(X.relicPool(w), "hand_of_justice"), 1, "bibelot du Guerrier (niveau 1) dans son pool")
+  eq(count(X.relicPool(newExp({ class = "priest", unlocks = { level = 7, league = 3 } })), "hand_of_justice"), 0,
     "pas dans celui du Prêtre")
   local c = Combat.new({ class = "warrior", hp = 50, deck = {}, encounter = { "test_hitter" } })
   eq(c.class, "warrior")
 end)
 
-test("classes : bibelots de classe au départ (Révéré) parmi ceux de la classe, hors bibelot de départ", function()
-  local w = newExp({ class = "warrior", unlocks = { rep = Meta.REVERED, league = 3 } })
-  eq(w.phase, "start")
-  for _, id in ipairs(w.startRelics) do
-    eq(ns.Relics[id].class, "warrior", id)
-    assert(id ~= "battle_standard")
+test("classes : bibelot au départ (Révéré de la Ligue) tiré dans la réserve de la classe, hors bibelot de départ", function()
+  for s = 1, 30 do
+    local w = newExp({ seed = s, class = "warrior", unlocks = { level = 7, league = Meta.REVERED }, keepStart = true })
+    eq(w.phase, "start")
+    for _, id in ipairs(w.startRelics) do
+      local r = ns.Relics[id]
+      assert(r.class == nil or r.class == "warrior", id)
+      assert(id ~= "battle_standard" and not r.noPool and r.rarity ~= "boss", id)
+    end
+  end
+  eq(newExp({ class = "warrior", unlocks = { level = 7, league = 2 }, keepStart = true }).phase, "map", "Honoré : rien")
+end)
+
+test("classes : réserves par niveau de classe (cartes et bibelots), sans effet de la Ligue", function()
+  local CARDS = { 18, 21, 21, 24, 24, 27, 30 }
+  local RELICS = { 1, 1, 2, 2, 3, 3, 5 } -- bibelots de classe tirables (hors bibelot de départ)
+  for _, class in ipairs({ "priest", "warrior", "mage", "rogue", "hunter" }) do
+    for lv = 1, 7 do
+      for _, league in ipairs({ 0, 3 }) do
+        local e = newExp({ class = class, unlocks = { level = lv, league = league } })
+        eq(#X.cardPool(e), CARDS[lv], class .. " niveau " .. lv .. " : cartes")
+        local n = 0
+        for _, id in ipairs(X.relicPool(e)) do
+          local r = ns.Relics[id]
+          if r.class and not id:find("^test_") then
+            eq(r.class, class, id)
+            assert((r.level or 1) <= lv, id .. " au-dessus du niveau")
+            n = n + 1
+          end
+        end
+        eq(n, RELICS[lv], class .. " niveau " .. lv .. " : bibelots de classe")
+      end
+    end
   end
 end)
 
@@ -1119,7 +1233,7 @@ test("classes : choix de la classe par Save.start, méta par classe", function()
   eq(db.journal[1].class, "warrior")
 end)
 
-test("sauvegarde v2 -> v3 : Démence du combat en cours devenue ressource de classe, classe du combat", function()
+test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de classe, classe du combat", function()
   local cur = newExp({ seed = 8, class = "priest" })
   enter(cur, "combat")
   local c = cur.combat
@@ -1129,10 +1243,10 @@ test("sauvegarde v2 -> v3 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 3); eq(Save.VERSION, 3); eq(X.VERSION, 3)
+  eq(note, "migrated"); eq(db.version, 4); eq(Save.VERSION, 4); eq(X.VERSION, 4)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 3); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
+  eq(m.version, 4); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
   eq(m.combat.class, "priest"); eq(type(m.combat.cls), "table")
   assert(Save.validate(db))
   -- le combat migré se joue tout de suite (compteurs du tour recréés), puis au tour suivant
@@ -1154,10 +1268,42 @@ test("Guerrier : expédition simulée complète, reproductible", function()
   for _, card in ipairs(a.deck) do eq(ns.Cards[card.id].class, "warrior", card.id) end
 end)
 
+test("sauvegarde v3 -> v4 : réputation de classe convertie en expérience, expédition au niveau de sa classe", function()
+  local cur = newExp({ seed = 8, class = "warrior", unlocks = { level = 1, league = 2 } })
+  enter(cur, "combat")
+  cur.version = 3
+  cur.unlock = { rep = 2, league = 2 }
+  local v3 = { version = 3, meta = { league = 900, runs = 9, flags = {}, classes = {
+    priest = { rep = 300, runs = 3, wins = 2, keyMax = 2, bestKey = 1 },
+    warrior = { rep = 800, runs = 6, wins = 4, keyMax = 1, bestKey = 0 } } },
+    current = cur, journal = { { result = "won", class = "priest", rep = 110 } } }
+  local db, note = Save.migrate(reload(v3))
+  eq(note, "migrated"); eq(db.version, 4)
+  local w, p = db.meta.classes.warrior, db.meta.classes.priest
+  eq(w.xp, math.floor(800 * Meta.XP.rate + 4 * Meta.XP.win + 0.5))
+  eq(p.xp, math.floor(300 * Meta.XP.rate + 2 * Meta.XP.win + 0.5))
+  eq(w.rep, 800, "ancienne réputation gardée"); eq(w.keyMax, 1); eq(db.meta.league, 900)
+  local m = db.current
+  assert(m, "expédition gardée")
+  eq(m.version, 4); eq(m.unlock.rep, nil); eq(m.unlock.league, 2)
+  eq(m.unlock.level, Meta.classLevel(w.xp), "niveau de sa classe après migration")
+  eq(Meta.classLevel(w.xp), 4)
+  assert(Save.validate(db))
+  assert(X.act(m, { "endTurn" }))
+  -- migration idempotente ; une méta sans réputation reste à 0
+  local again = reload(db)
+  Save.migrate(again)
+  eq(serialize(again), serialize(db))
+  local fresh = Save.migrate({ version = 3, meta = { league = 0, runs = 0, flags = {}, classes = {
+    mage = { runs = 0, wins = 0, keyMax = 0, bestKey = -1 } } }, journal = {} })
+  eq(fresh.meta.classes.mage.xp, 0)
+  assert(Save.validate(fresh))
+end)
+
 -- Chasseur ------------------------------------------------------------------
 
 test("Chasseur : expédition (deck, PV, Pet Whistle), pools de sa classe, expédition simulée reproductible", function()
-  local h = newExp({ class = "hunter", unlocks = { rep = 2, league = 3 } })
+  local h = newExp({ class = "hunter", unlocks = { level = 7, league = 3 } })
   local cd = ns.Classes.hunter
   eq(h.class, "hunter"); eq(h.hp, cd.hp); eq(#h.deck, 10); eq(h.relics[1], "pet_whistle")
   eq(#X.cardPool(h), 30)

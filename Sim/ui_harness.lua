@@ -1117,8 +1117,9 @@ do
     (pb.icon._texture or ""):lower():find("classicon_priest", 1, true) and #texts == 0 and pb.ring and pb.ring._wow == "ring_large",
     tostring(pb.icon._texture) .. " / " .. table.concat(texts, "|"))
   local tt = table.concat(H.hover(pb), " | ")
-  check("accueil : infobulle de la classe (nom, PV, cartes, réputation)", tt:find("Priest", 1, true)
-    and tt:find(ns.Classes.priest.hp .. " HP", 1, true) and tt:find("cards", 1, true) and tt:find("Reputation: ", 1, true), tt)
+  check("accueil : infobulle de la classe (nom, PV, cartes, niveau de classe)", tt:find("Priest", 1, true)
+    and tt:find(ns.Classes.priest.hp .. " HP", 1, true) and tt:find("cards", 1, true) and tt:find("Level 1", 1, true)
+    and not tt:find("Reputation", 1, true), tt)
   local st0 = UI().screens.start
   check("accueil : nom de la classe choisie sous la rangée", st0.className._shown and st0.className._text == "Priest",
     st0.className._text)
@@ -1284,8 +1285,10 @@ print("U7  bilan : Save.finish, réputation, journal, clé suivante")
 local db = _G.SlayTheDragonDB
 check("expédition archivée (db.current = nil)", db.current == nil)
 check("une entrée au journal", #db.journal == 1 and db.journal[1].date ~= nil)
-check("réputation gagnée", db.meta.classes.priest.rep > 0 and db.meta.league == db.meta.classes.priest.rep)
-check("texte du bilan : réputation", (step.text or ""):find("reputation", 1, true), step.text)
+check("réputation de la Ligue et expérience de classe gagnées", db.meta.league > 0 and db.meta.classes.priest.xp > 0
+  and db.journal[1].xp == db.meta.classes.priest.xp)
+check("texte du bilan : expérience et réputation", (step.text or ""):find("Priest experience", 1, true)
+  and (step.text or ""):find("reputation", 1, true), step.text)
 snap("bilan")
 check("barres de réputation affichées", UI().current.bars[1]._shown and UI().current.bars[2]._shown)
 tt = H.hover(UI().current.bars[1])
@@ -1295,14 +1298,19 @@ if won then
 else
   check("défaite : pas de nouvelle clé", db.meta.classes.priest.keyMax == 0)
 end
+clickOption("ui:progress")
+check("bilan -> progression de la classe jouée", currentKind() == "classProgress" and UI().step.class == "priest", currentKind())
 clickOption("ui:meta")
 check("écran méta", currentKind() == "meta", currentKind())
 snap("meta")
-check("méta : barres classe et Ligue", UI().current.bars[1]._shown and UI().current.bars[2]._shown
+check("méta : barres classe (niveau) et Ligue", UI().current.bars[1]._shown and UI().current.bars[2]._shown
+  and UI().current.bars[1].label._text == "Priest" and (UI().current.bars[1].value._text or ""):find("Level", 1, true)
   and UI().current.bars[2].label._text == "Explorers' League")
-check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Priest", 1, true),
-  UI().current.journal[1]._text)
+check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Priest", 1, true)
+  and (UI().current.journal[1]._text or ""):find("experience", 1, true), UI().current.journal[1]._text)
 check("méta : clés ouvertes", (UI().current.bars[1].detail._text or ""):find("Keys unlocked", 1, true))
+clickOption("ui:progress")
+check("méta -> retour à la progression", currentKind() == "classProgress", currentKind())
 clickOption("ui:back")
 check("retour au bilan", currentKind() == "end", currentKind())
 clickOption("ui:new")
@@ -1485,14 +1493,17 @@ else
   check("rencontre vide : continuer", option("leave") ~= nil)
 end
 
-print("U12 Révéré : bibelot de classe au départ ; abandon")
-exp = freshRun(SEED + 5, nil, { league = 0, runs = 3,
-  classes = { priest = { rep = 1100, runs = 3, wins = 0, keyMax = 0, bestKey = -1 } } })
+print("U12 Révéré de la Ligue : bibelot au choix au départ ; abandon")
+exp = freshRun(SEED + 5, nil, { league = 1100, runs = 3,
+  classes = { priest = { rep = 0, runs = 3, wins = 0, keyMax = 0, bestKey = -1 } } })
 check("phase de bibelot de départ", currentKind() == "startRelic", currentKind())
 snap("bibelot-de-classe")
-check("bibelot de classe proposé avec icône", option("startRelic:1") and button("startRelic:1").icon._shown)
+check("bibelot proposé avec icône", option("startRelic:1") and button("startRelic:1").icon._shown)
+check("texte : faveur de la Ligue", (UI().step.text or ""):find("Explorers' League", 1, true), UI().step.text)
+local offered = exp.startRelics[1]
 clickOption("startRelic:1")
-check("bibelot de départ pris", exp.relics[1] == "ui_test_symbol" and currentKind() == "map")
+check("bibelot choisi pris après le bibelot de départ", exp.relics[1] == "sacred_candle" and exp.relics[2] == offered
+  and currentKind() == "map")
 UI().toggleOptions()
 H.click(UI().abandonButton)
 check("abandon : confirmation demandée", EXP() ~= nil)
@@ -5481,10 +5492,10 @@ do
     and option("class:priest").selected and not option("class:warrior").selected, table.concat(ids, ","))
   local wb = button("class:warrior")
   local wtt = table.concat(H.hover(wb), " | ")
-  check("accueil : icône du Guerrier, infobulle (nom, PV, cartes, réputation, clic)", wb and wb._shown
+  check("accueil : icône du Guerrier, infobulle (nom, PV, cartes, niveau, clic)", wb and wb._shown
     and (wb.icon._texture or ""):lower():find("classicon_warrior", 1, true)
     and wtt:find("Warrior", 1, true) and wtt:find(ns.Classes.warrior.hp .. " HP, 10 cards", 1, true)
-    and wtt:find("Reputation: Neutral", 1, true) and wtt:find("Click", 1, true), wtt)
+    and wtt:find("Level 1", 1, true) and wtt:find("Click", 1, true), wtt)
   local pb = button("class:priest")
   local function glowA(b) return b.glow._calls.SetAlpha and b.glow._calls.SetAlpha[1] or 1 end
   local function iconK(b) return b.icon._calls.SetVertexColor and b.icon._calls.SetVertexColor[1] or 1 end
@@ -5780,6 +5791,8 @@ do
   H.click(UI().abandonButton)
   H.click(UI().abandonButton)
   probe("bilan")
+  clickOption("ui:progress")
+  probe("progression")
   clickOption("ui:meta")
   probe("méta")
   check("aucun cadre de l'addon ne capte le clavier (EnableKeyboard, OnKeyDown, OnKeyUp, OnChar), sur tous les écrans",

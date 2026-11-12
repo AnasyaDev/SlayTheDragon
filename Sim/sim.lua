@@ -4,8 +4,9 @@
 --   bot  : random | greedy | heuristic        pick : rated | random | skip
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
 --   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
---     avec key=N (clé mythique) et meta=start|exalted (pool de déblocages)
---   rep=0..2 : cartes débloquées (réputation de classe ; défaut : toutes)
+--     avec key=N (clé mythique) et meta=start|exalted (Ligue au palier 0 ou complète, drapeaux d'histoire)
+--   level=1..7 : niveau de classe (cartes et bibelots de classe débloqués) ; défaut 7 avec
+--     runner=expedition (tout débloqué, les mesures d'avant la progression par classe), toutes les cartes sinon
 --   tier=0..3 : bibelots/potions débloqués (Ligue des explorateurs ; défaut : tous)
 --   relics=id,id : bibelots dès le départ        loot=0 : ni bibelot ni potion gagnés
 --   nointerrupt=1 : monde témoin où les ennemis n'interrompent jamais
@@ -61,7 +62,7 @@ local function newAgg()
   return { runs = 0, wins = 0, floors = {}, hpEndWin = 0, elapsed = 0,
     enc = {}, cards = {}, kinds = {}, potions = {}, relics = {},
     castsStarted = 0, castsInterrupted = 0, enemyCasts = 0, enemyCastsInterrupted = 0,
-    goldEarned = 0, goldSpent = 0, goldEnd = 0, rep = 0, cleared = 0, removed = 0, upgraded = 0,
+    goldEarned = 0, goldSpent = 0, goldEnd = 0, rep = 0, xp = 0, xpWin = 0, xpLoss = 0, cleared = 0, removed = 0, upgraded = 0,
     visits = {} }
 end
 
@@ -77,6 +78,8 @@ local function addRecord(agg, rec)
     agg.goldSpent = agg.goldSpent + rec.goldSpent
     agg.goldEnd = agg.goldEnd + rec.gold
     agg.rep = agg.rep + rec.rep
+    agg.xp = agg.xp + (rec.xp or 0)
+    if rec.won then agg.xpWin = agg.xpWin + (rec.xp or 0) else agg.xpLoss = agg.xpLoss + (rec.xp or 0) end
     agg.cleared = agg.cleared + rec.cleared
     agg.removed = agg.removed + rec.removed
     agg.upgraded = agg.upgraded + rec.upgraded
@@ -193,11 +196,11 @@ local function runRange(from, to)
     if opts.runner == "expedition" then
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
-        meta = opts.meta or "start", class = opts.class, force = force })
+        meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level) })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),
-        rep = tonumber(opts.rep), tier = tonumber(opts.tier), relics = startRelics,
+        level = tonumber(opts.level), tier = tonumber(opts.tier), relics = startRelics,
         loot = opts.loot ~= "0", class = opts.class })
     end
     addRecord(agg, rec)
@@ -259,7 +262,7 @@ if opts.sweep then
   if opts.sweep == "relics" then
     for id in pairs(ns.Relics) do list[#list + 1] = id end
   else
-    list = ns.Rewards.cardPool(opts.class or "priest", tonumber(opts.rep))
+    list = ns.Rewards.cardPool(opts.class or "priest", tonumber(opts.level))
   end
   if opts.only then
     -- only=id,id : ne mesure que ces éléments.
@@ -414,7 +417,10 @@ local function report(a, title)
   end
   out("")
   if opts.runner == "expedition" then
-    out(("Expédition : clé +%d, déblocages %s"):format(tonumber(opts.key or 0), opts.meta or "start"))
+    out(("Expédition : clé +%d, déblocages %s, niveau de classe %d"):format(tonumber(opts.key or 0), opts.meta or "start",
+      tonumber(opts.level or 7)))
+    out(("Expérience de classe : %.1f par expédition (victoire %.1f, défaite %.1f)"):format(a.xp / a.runs,
+      a.wins > 0 and a.xpWin / a.wins or 0, a.runs > a.wins and a.xpLoss / (a.runs - a.wins) or 0))
     out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Réputation moyenne : %.1f   Étapes franchies : %.2f")
       :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.rep / a.runs, a.cleared / a.runs))
     out(("Cartes retirées : %.2f   améliorées : %.2f par expédition"):format(a.removed / a.runs, a.upgraded / a.runs))

@@ -92,9 +92,11 @@ end
 Effects.demence = Effects.res -- ancien nom (Démence du Prêtre)
 
 -- { "surge" } : « Surge: … » dépense toute la ressource ; ctx.surge = montant (per = { k, "surge" }).
+-- Crochet modify "surge" (c, src, n, ctx) : montant compté par les effets d'un Surge qui a dépensé
+-- quelque chose (Anathema) ; la ressource réellement dépensée ne change pas.
 Effects.surge = function(c, ctx, e)
   local n = Combat.surge(c)
-  ctx.surge = (ctx.surge or 0) + n
+  ctx.surge = (ctx.surge or 0) + (n > 0 and Combat.modify(c, "surge", n, ctx) or 0)
   if n > 0 then Combat.fire(c, "onSurge", n, ctx) end
 end
 

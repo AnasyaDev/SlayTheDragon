@@ -9,9 +9,7 @@
 -- première carte Attack jouée (sa ligne « Stealth: » s'applique), lu sans être consommé par les Skills.
 -- Voies : Assassination (DoT qui éclate), Combat (cartes à 0, Attack en chaîne), Subtlety (ouvertures).
 --
--- level = niveau de classe qui débloque la carte ou le bibelot (fiche § 5), posé mais pas encore
--- appliqué (progression par classe à venir) ; rep = palier de réputation lu aujourd'hui par le socle
--- (20 / 5 / 5, dans l'ordre des niveaux).
+-- level = niveau de classe qui débloque la carte ou le bibelot (fiche § 5 ; Core/Meta.lua).
 local _, ns = ...
 
 local Combat = ns.Combat
@@ -57,7 +55,7 @@ card("eviscerate", {
 -- Assassination : poser du DoT en montant les points, puis le faire éclater -------------------------
 
 card("mutilate", {
-  level = 1, rep = 0, name = "Mutilate", cost = 1, type = "attack", rarity = "common", path = "assassination",
+  level = 1, name = "Mutilate", cost = 1, type = "attack", rarity = "common", path = "assassination",
   target = "enemy", effects = { { "damage", 3, times = 2 }, { "res", 1 }, { "res", 1, cond = "status:pain" } },
   text = "Deal 3 twice.\n+1 Combo Point.\nDoT: +1 Combo Point.",
   up = { effects = { { "damage", 5, times = 2 }, { "res", 1 }, { "res", 1, cond = "status:pain" } },
@@ -65,7 +63,7 @@ card("mutilate", {
 })
 
 card("garrote", {
-  level = 1, rep = 0, name = "Garrote", cost = 1, type = "attack", rarity = "common", path = "assassination",
+  level = 1, name = "Garrote", cost = 1, type = "attack", rarity = "common", path = "assassination",
   target = "enemy", effects = { { "damage", 3 }, { "res", 1 }, { "apply", "pain", 4, icon = "bleed" } },
   text = "Deal 3.\n+1 Combo Point.\nApply DoT 4",
   up = { effects = { { "damage", 4 }, { "res", 1 }, { "apply", "pain", 6, icon = "bleed" } },
@@ -75,14 +73,14 @@ card("garrote", {
 -- « Surge: apply DoT K per Combo Point. » : effet propre dotPer (Core/Classes/rogue.lua), comme la
 -- Peste du Priest, pour que la ligne reste une clause Surge (et non une ligne d'état).
 card("rupture", {
-  level = 1, rep = 0, name = "Rupture", cost = 1, type = "skill", rarity = "common", path = "assassination",
+  level = 1, name = "Rupture", cost = 1, type = "skill", rarity = "common", path = "assassination",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "dotPer", 3, icon = "bleed" } },
   text = "Surge: apply DoT 3 per Combo Point.",
   up = { effects = { { "surge" }, { "dotPer", 4, icon = "bleed" } }, text = "Surge: apply DoT 4 per Combo Point." },
 })
 
 card("fan_of_knives", {
-  level = 1, rep = 0, name = "Fan of Knives", cost = 1, type = "attack", rarity = "common", path = "assassination",
+  level = 1, name = "Fan of Knives", cost = 1, type = "attack", rarity = "common", path = "assassination",
   effects = { { "damage", 3, all = true }, { "res", 1 }, { "apply", "pain", 2, all = true, icon = "poison" } },
   text = "Deal 3 to all.\n+1 Combo Point.\nApply DoT 2 to all",
   up = { effects = { { "damage", 4, all = true }, { "res", 1 }, { "apply", "pain", 3, all = true, icon = "poison" } },
@@ -92,7 +90,7 @@ card("fan_of_knives", {
 -- Envenom : jouable à 0 point (règle commune : une autre clause que le Surge), elle ne fait alors
 -- qu'éclater le DoT déjà posé.
 card("envenom", {
-  level = 1, rep = 0, name = "Envenom", cost = 1, type = "attack", rarity = "uncommon", path = "assassination",
+  level = 1, name = "Envenom", cost = 1, type = "attack", rarity = "uncommon", path = "assassination",
   target = "enemy", effects = { { "surge" }, { "dotPer", 2, icon = "poison" }, { "tickDot" } },
   text = "Surge: apply DoT 2 per Combo Point.\nIts DoT ticks now.",
   up = { effects = { { "surge" }, { "dotPer", 3, icon = "poison" }, { "tickDot" } },
@@ -100,7 +98,7 @@ card("envenom", {
 })
 
 card("cloak_of_shadows", {
-  level = 1, rep = 0, name = "Cloak of Shadows", cost = 1, type = "skill", rarity = "uncommon", path = "assassination",
+  level = 1, name = "Cloak of Shadows", cost = 1, type = "skill", rarity = "uncommon", path = "assassination",
   cooldown = 2, effects = { { "cleanse" }, { "apply", "parry", 1, self = true } },
   text = "Remove negative effects.\nGain Parry 1\nCooldown 2.",
   up = { effects = { { "cleanse" }, { "apply", "parry", 2, self = true } },
@@ -108,7 +106,7 @@ card("cloak_of_shadows", {
 })
 
 card("crippling_poison", {
-  level = 2, rep = 0, name = "Crippling Poison", cost = 1, type = "skill", rarity = "common", path = "assassination",
+  level = 2, name = "Crippling Poison", cost = 1, type = "skill", rarity = "common", path = "assassination",
   target = "enemy", effects = { { "apply", "pain", 3, icon = "poison" }, { "apply", "demoralized", 2 } },
   text = "Apply DoT 3\nApply Demoralized 2 ⌛",
   up = { effects = { { "apply", "pain", 5, icon = "poison" }, { "apply", "demoralized", 2 } },
@@ -116,7 +114,7 @@ card("crippling_poison", {
 })
 
 card("exsanguinate", {
-  level = 4, rep = 1, name = "Exsanguinate", cost = 1, type = "skill", rarity = "rare", path = "assassination",
+  level = 4, name = "Exsanguinate", cost = 1, type = "skill", rarity = "rare", path = "assassination",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "tickDotPer" } },
   text = "Surge: its DoT ticks once per Combo Point.",
   up = { cost = 0, text = "Surge: its DoT ticks once per Combo Point." },
@@ -133,7 +131,7 @@ local deadlyPoisonHooks = {
 }
 
 card("deadly_poison", {
-  level = 6, rep = 2, name = "Deadly Poison", cost = 1, type = "power", rarity = "uncommon", path = "assassination",
+  level = 6, name = "Deadly Poison", cost = 1, type = "power", rarity = "uncommon", path = "assassination",
   power = true, effects = {}, hooks = deadlyPoisonHooks,
   text = "Power.\nEach Attack hit: apply DoT 1.",
   up = { cost = 0, text = "Power.\nEach Attack hit: apply DoT 1." },
@@ -151,7 +149,7 @@ local venomousHooks = {
 }
 
 card("venomous_wounds", {
-  level = 7, rep = 2, name = "Venomous Wounds", cost = 1, type = "power", rarity = "rare", path = "assassination",
+  level = 7, name = "Venomous Wounds", cost = 1, type = "power", rarity = "rare", path = "assassination",
   power = true, effects = {}, hooks = venomousHooks,
   text = "Power.\nStart of turn: +1 Combo Point per enemy with DoT.",
   up = { cost = 0, text = "Power.\nStart of turn: +1 Combo Point per enemy with DoT." },
@@ -160,35 +158,35 @@ card("venomous_wounds", {
 -- Combat : cartes à 0 mana, Attack en chaîne, Parry sans casser le rythme ---------------------------
 
 card("kick", {
-  level = 1, rep = 0, name = "Kick", cost = 0, type = "skill", rarity = "common", path = "combat",
+  level = 1, name = "Kick", cost = 0, type = "skill", rarity = "common", path = "combat",
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "res", 1 } },
   text = "Interrupt the target's cast.\n+1 Combo Point.\nCooldown 2.",
   up = { cooldown = 1, text = "Interrupt the target's cast.\n+1 Combo Point.\nCooldown 1." },
 })
 
 card("pistol_shot", {
-  level = 1, rep = 0, name = "Pistol Shot", cost = 0, type = "attack", rarity = "common", path = "combat",
+  level = 1, name = "Pistol Shot", cost = 0, type = "attack", rarity = "common", path = "combat",
   target = "enemy", effects = { { "damage", 3 }, { "draw", 1 } },
   text = "Deal 3.\nDraw 1.",
   up = { effects = { { "damage", 5 }, { "draw", 1 } }, text = "Deal 5.\nDraw 1." },
 })
 
 card("sprint", {
-  level = 1, rep = 0, name = "Sprint", cost = 0, type = "skill", rarity = "common", path = "combat",
+  level = 1, name = "Sprint", cost = 0, type = "skill", rarity = "common", path = "combat",
   cooldown = 3, effects = { { "draw", 2 } },
   text = "Draw 2.\nCooldown 3.",
   up = { cooldown = 2, text = "Draw 2.\nCooldown 2." },
 })
 
 card("riposte", {
-  level = 1, rep = 0, name = "Riposte", cost = 1, type = "attack", rarity = "common", path = "combat",
+  level = 1, name = "Riposte", cost = 1, type = "attack", rarity = "common", path = "combat",
   target = "enemy", effects = { { "damage", 4 }, { "apply", "parry", 1, self = true } },
   text = "Deal 4.\nGain Parry 1",
   up = { effects = { { "damage", 7 }, { "apply", "parry", 1, self = true } }, text = "Deal 7.\nGain Parry 1" },
 })
 
 card("evasion", {
-  level = 1, rep = 0, name = "Evasion", cost = 1, type = "skill", rarity = "uncommon", path = "combat",
+  level = 1, name = "Evasion", cost = 1, type = "skill", rarity = "uncommon", path = "combat",
   cooldown = 3, effects = { { "apply", "parry", 2, self = true } },
   text = "Gain Parry 2\nCooldown 3.",
   up = { cooldown = 2, text = "Gain Parry 2\nCooldown 2." },
@@ -211,7 +209,7 @@ local function bladeFlurryHooks(n)
 end
 
 card("blade_flurry", {
-  level = 1, rep = 0, name = "Blade Flurry", cost = 1, type = "power", rarity = "uncommon", path = "combat",
+  level = 1, name = "Blade Flurry", cost = 1, type = "power", rarity = "uncommon", path = "combat",
   power = true, effects = {}, hooks = bladeFlurryHooks(2),
   text = "Power.\nAttacks: deal 2 to all.",
   up = { hooks = bladeFlurryHooks(3), text = "Power.\nAttacks: deal 3 to all." },
@@ -227,14 +225,14 @@ local sliceHooks = {
 }
 
 card("slice_and_dice", {
-  level = 2, rep = 1, name = "Slice and Dice", cost = 1, type = "power", rarity = "uncommon", path = "combat",
+  level = 2, name = "Slice and Dice", cost = 1, type = "power", rarity = "uncommon", path = "combat",
   power = true, effects = {}, hooks = sliceHooks,
   text = "Power.\nFirst Attack each turn costs 0.",
   up = { cost = 0, text = "Power.\nFirst Attack each turn costs 0." },
 })
 
 card("killing_spree", {
-  level = 4, rep = 1, name = "Killing Spree", cost = 2, type = "attack", rarity = "rare", path = "combat",
+  level = 4, name = "Killing Spree", cost = 2, type = "attack", rarity = "rare", path = "combat",
   effects = { { "randomHits", 5, times = 6 } },
   text = "Deal 5 to a random enemy six times.",
   up = { effects = { { "randomHits", 7, times = 6 } }, text = "Deal 7 to a random enemy six times." },
@@ -242,7 +240,7 @@ card("killing_spree", {
 
 -- Between the Eyes : jouable à 0 point (autre clause que le Surge) : Stunned seul, sans dégâts.
 card("between_the_eyes", {
-  level = 6, rep = 2, name = "Between the Eyes", cost = 1, type = "attack", rarity = "uncommon", path = "combat",
+  level = 6, name = "Between the Eyes", cost = 1, type = "attack", rarity = "uncommon", path = "combat",
   target = "enemy", cooldown = 2, effects = { { "surge" }, { "damage", 0, per = { 4, "surge" } }, { "apply", "stunned", 1 } },
   text = "Surge: deal 4 per Combo Point.\nApply Stunned 1 ⌛\nCooldown 2.",
   up = { effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } }, { "apply", "stunned", 1 } },
@@ -250,7 +248,7 @@ card("between_the_eyes", {
 })
 
 card("adrenaline_rush", {
-  level = 7, rep = 2, name = "Adrenaline Rush", cost = 1, type = "skill", rarity = "rare", path = "combat",
+  level = 7, name = "Adrenaline Rush", cost = 1, type = "skill", rarity = "rare", path = "combat",
   exhaust = true, effects = { { "mana", 3 }, { "draw", 2 } },
   text = "+3 mana.\nDraw 2.\nExhaust.",
   up = { cost = 0, text = "+3 mana.\nDraw 2.\nExhaust." },
@@ -259,7 +257,7 @@ card("adrenaline_rush", {
 -- Subtlety : ouvrir sous Stealth, le retrouver, préparer l'ouverture -------------------------------
 
 card("ambush", {
-  level = 1, rep = 0, name = "Ambush", cost = 2, type = "attack", rarity = "common", path = "subtlety",
+  level = 1, name = "Ambush", cost = 2, type = "attack", rarity = "common", path = "subtlety",
   target = "enemy", effects = { { "damage", 9, more = { { 12, "stealth" } } }, { "res", 2 } },
   text = "Deal 9.\n+2 Combo Points.\nStealth: deal 12 more.",
   up = { effects = { { "damage", 12, more = { { 16, "stealth" } } }, { "res", 2 } },
@@ -267,7 +265,7 @@ card("ambush", {
 })
 
 card("hemorrhage", {
-  level = 1, rep = 0, name = "Hemorrhage", cost = 1, type = "attack", rarity = "common", path = "subtlety",
+  level = 1, name = "Hemorrhage", cost = 1, type = "attack", rarity = "common", path = "subtlety",
   target = "enemy", effects = { { "damage", 5 }, { "res", 1 }, { "apply", "armor_broken", 1 } },
   text = "Deal 5.\n+1 Combo Point.\nApply Sundered 1 ⌛",
   up = { effects = { { "damage", 7 }, { "res", 1 }, { "apply", "armor_broken", 2 } },
@@ -275,14 +273,14 @@ card("hemorrhage", {
 })
 
 card("vanish", {
-  level = 1, rep = 0, name = "Vanish", cost = 1, type = "skill", rarity = "common", path = "subtlety",
+  level = 1, name = "Vanish", cost = 1, type = "skill", rarity = "common", path = "subtlety",
   exhaust = true, effects = { { "draw", 1 }, { "apply", "stealth", 1, self = true } },
   text = "Draw 1.\nGain Stealth\nExhaust.",
   up = { cost = 0, text = "Draw 1.\nGain Stealth\nExhaust." },
 })
 
 card("shadowstep", {
-  level = 1, rep = 0, name = "Shadowstep", cost = 1, type = "skill", rarity = "common", path = "subtlety",
+  level = 1, name = "Shadowstep", cost = 1, type = "skill", rarity = "common", path = "subtlety",
   cooldown = 3, effects = { { "apply", "parry", 1, self = true }, { "apply", "stealth", 1, self = true } },
   text = "Gain Parry 1\nGain Stealth\nCooldown 3.",
   up = { cooldown = 2, text = "Gain Parry 1\nGain Stealth\nCooldown 2." },
@@ -290,7 +288,7 @@ card("shadowstep", {
 
 -- Cheap Shot : Skill, lit Stealth sans le consommer ; l'état posé sous condition reste dans sa clause.
 card("cheap_shot", {
-  level = 1, rep = 0, name = "Cheap Shot", cost = 1, type = "skill", rarity = "uncommon", path = "subtlety",
+  level = 1, name = "Cheap Shot", cost = 1, type = "skill", rarity = "uncommon", path = "subtlety",
   target = "enemy", cooldown = 2, effects = { { "res", 2 }, { "apply", "stunned", 1, cond = "stealth" } },
   text = "+2 Combo Points.\nStealth: apply Stunned 1 ⌛\nCooldown 2.",
   up = { cost = 0, text = "+2 Combo Points.\nStealth: apply Stunned 1 ⌛\nCooldown 2." },
@@ -298,7 +296,7 @@ card("cheap_shot", {
 
 -- Secret Technique : jouable à 0 point (règle commune : la ligne Stealth n'est pas un Surge).
 card("secret_technique", {
-  level = 1, rep = 0, name = "Secret Technique", cost = 1, type = "attack", rarity = "uncommon", path = "subtlety",
+  level = 1, name = "Secret Technique", cost = 1, type = "attack", rarity = "uncommon", path = "subtlety",
   effects = { { "surge" }, { "damage", 0, per = { 3, "surge" }, all = true },
     { "damage", 0, per = { 3, "surge" }, all = true, cond = "stealth" } },
   text = "Surge: deal 3 per Combo Point to all.\nStealth: hits twice.",
@@ -308,7 +306,7 @@ card("secret_technique", {
 })
 
 card("premeditation", {
-  level = 2, rep = 0, name = "Premeditation", cost = 0, type = "skill", rarity = "uncommon", path = "subtlety",
+  level = 2, name = "Premeditation", cost = 0, type = "skill", rarity = "uncommon", path = "subtlety",
   effects = { { "draw", 1 }, { "res", 2, cond = "stealth" } },
   text = "Draw 1.\nStealth: +2 Combo Points.",
   up = { effects = { { "draw", 2 }, { "res", 2, cond = "stealth" } }, text = "Draw 2.\nStealth: +2 Combo Points." },
@@ -325,14 +323,14 @@ local cheatDeathHooks = {
 }
 
 card("cheat_death", {
-  level = 4, rep = 1, name = "Cheat Death", cost = 1, type = "power", rarity = "rare", path = "subtlety",
+  level = 4, name = "Cheat Death", cost = 1, type = "power", rarity = "rare", path = "subtlety",
   power = true, effects = {}, hooks = cheatDeathHooks,
   text = "Power.\nLast Breath: stay at 1 HP, gain Parry 3 and Stealth.",
   up = { cost = 0, text = "Power.\nLast Breath: stay at 1 HP, gain Parry 3 and Stealth." },
 })
 
 card("smoke_bomb", {
-  level = 6, rep = 1, name = "Smoke Bomb", cost = 1, type = "skill", rarity = "uncommon", path = "subtlety",
+  level = 6, name = "Smoke Bomb", cost = 1, type = "skill", rarity = "uncommon", path = "subtlety",
   cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "apply", "stealth", 1, self = true } },
   text = "Apply Demoralized 2 ⌛ to all\nGain Stealth\nCooldown 3.",
   up = { cooldown = 2, text = "Apply Demoralized 2 ⌛ to all\nGain Stealth\nCooldown 2." },
@@ -345,14 +343,14 @@ local shadowDanceHooks = {
 }
 
 card("shadow_dance", {
-  level = 7, rep = 2, name = "Shadow Dance", cost = 2, type = "power", rarity = "rare", path = "subtlety",
+  level = 7, name = "Shadow Dance", cost = 2, type = "power", rarity = "rare", path = "subtlety",
   power = true, effects = {}, hooks = shadowDanceHooks,
   text = "Power.\nStart of turn: gain Stealth.",
   up = { cost = 1, text = "Power.\nStart of turn: gain Stealth." },
 })
 
 -- Bibelots du Voleur (class = "rogue" : tirés seulement pour lui) ---------------------------------
--- tier = palier de Ligue (socle actuel) ; level = niveau de classe de la fiche (à venir).
+-- level = niveau de classe qui les débloque (dans la réserve de la classe ; la Ligue ne compte pas).
 
 local R = ns.Relics
 local function relic(id, t)
@@ -364,7 +362,7 @@ end
 
 -- Bibelot de départ (GDD) : une carte de plus au premier tour.
 relic("thieves_tools", {
-  level = 1, name = "Thieves' Tools", rarity = "common", tier = 0, noPool = true,
+  level = 1, name = "Thieves' Tools", rarity = "common", noPool = true,
   text = "On the first turn of each combat, draw 1 more card.",
   hooks = {
     drawPerTurn = function(c, src, v)
@@ -375,7 +373,7 @@ relic("thieves_tools", {
 })
 
 relic("blinding_powder", {
-  level = 1, name = "Blinding Powder", rarity = "common", tier = 0,
+  level = 1, name = "Blinding Powder", rarity = "common",
   text = "At the start of each combat, gain Parry 1.",
   hooks = {
     onCombatStart = function(c) Combat.applyStatus(c, c.player, "parry", 1) end,
@@ -385,7 +383,7 @@ relic("blinding_powder", {
 -- Flash Powder : seulement quand une carte fait passer Stealth d'absent à présent (le Stealth du début
 -- de combat ne compte pas) : c.cls.stealthGained, posé par la règle de classe juste avant ce crochet.
 relic("flash_powder", {
-  level = 3, name = "Flash Powder", rarity = "uncommon", tier = 0,
+  level = 3, name = "Flash Powder", rarity = "uncommon",
   text = "Each time a card grants Stealth, draw 1 card.",
   hooks = {
     onStatusApplied = function(c, src, unit, id)
@@ -395,7 +393,7 @@ relic("flash_powder", {
 })
 
 relic("crystal_vial", {
-  level = 5, name = "Crystal Vial", rarity = "uncommon", tier = 1,
+  level = 5, name = "Crystal Vial", rarity = "uncommon",
   text = "Each time DoT is applied to an enemy, apply 1 more.",
   hooks = {
     apply = function(c, src, n, id)
@@ -406,7 +404,7 @@ relic("crystal_vial", {
 })
 
 relic("ravenholdt_signet", {
-  level = 7, name = "Ravenholdt Signet", rarity = "rare", tier = 2,
+  level = 7, name = "Ravenholdt Signet", rarity = "rare",
   text = "After each Surge, gain Parry 1.",
   hooks = {
     onSurge = function(c) Combat.applyStatus(c, c.player, "parry", 1) end,
@@ -414,7 +412,7 @@ relic("ravenholdt_signet", {
 })
 
 relic("shadowfang", {
-  level = 7, name = "Shadowfang", rarity = "rare", tier = 1,
+  level = 7, name = "Shadowfang", rarity = "rare",
   text = "At the start of each combat, +2 Combo Points.",
   hooks = {
     onCombatStart = function(c) Combat.gainRes(c, 2, "relic") end,

@@ -9,12 +9,13 @@
 -- État propre à l'interface (jamais sauvegardé) :
 --   C.ended  = { c, result, title } : combat tranché, bandeau de fin affiché sur l'écran de combat
 --   C.ending = { summary, entry }   : expédition archivée (Save.finish), bilan affiché
---   C.ui     = { view, class, key } : sous-écran (amélioration, retrait, méta) et choix de départ
+--   C.ui     = { view, class, key, progressClass } : sous-écran (amélioration, retrait, progression,
+--              méta), choix de départ, classe affichée par l'écran de progression
 --
 -- Identifiants d'options : « verbe » ou « verbe:argument », où verbe est une action de
 -- Expedition.act (path:12, pickCard:2, buyRelic:1, remove:5, choose:1, leave…), ou une
--- navigation de l'interface (ui:upgrade, ui:remove, ui:meta, ui:back, ui:new) ou un choix de
--- départ (class:priest, key:2, go).
+-- navigation de l'interface (ui:upgrade, ui:remove, ui:progress, ui:meta, ui:back, ui:new), un choix de
+-- départ (class:priest, key:2, go) ou une classe de l'écran de progression (pclass:warrior).
 local _, ns = ...
 
 local U, Combat, Card, X, Save, Meta, Map = ns.Util, ns.Combat, ns.Card, ns.Expedition, ns.Save, ns.Meta, ns.Map
@@ -299,6 +300,11 @@ local function navigate(where)
     C.ending, C.ui.view = nil, nil
   elseif where == "upgrade" or where == "remove" or where == "meta" then
     C.ui.view = where
+  elseif where == "progress" then
+    -- depuis l'accueil ou le bilan : la classe choisie (ou celle de l'expédition finie) ; retour de
+    -- la méta : la classe déjà affichée
+    if C.ui.view ~= "meta" then C.ui.progressClass = nil end
+    C.ui.view = where
   else
     return false, "action"
   end
@@ -313,6 +319,8 @@ function C.choose(id)
   if not exp then
     if verb == "class" and ns.Classes[arg] then
       C.ui.class, C.ui.key = arg, nil
+    elseif verb == "pclass" and ns.Classes[arg] then
+      C.ui.progressClass = arg
     elseif verb == "key" and type(arg) == "number" then
       C.ui.key = arg
     elseif verb == "go" then
@@ -527,20 +535,24 @@ local function affixLine(affixes, key_)
 end
 C.affixLine = affixLine
 
--- Aide d'une barre de réputation : une ligne par palier.
-local function levelHint(kind)
-  if kind == "class" then
-    return { "Friendly, Honored: new cards.", "Revered: class relic at the start.", "Exalted: title." }
-  end
-  return { "Each level: relics, potions and encounters.", "Exalted: one more relic at the merchant." }
-end
-
--- Barre de réputation : { label, points, level, levelName, cur, size, hint }.
-local function repBar(label, points, kind)
+-- Barre de réputation de la Ligue : { label, points, level, levelName, cur, size, hint } ; aide : une
+-- ligne par palier.
+local LEAGUE_HINT = { "Each level: relics, potions and encounters.", "Revered: choose a relic at the start.",
+  "Exalted: one more relic at the merchant." }
+local function repBar(label, points)
   local lv, cur, size = Meta.progress(points or 0)
   return { label = label, points = points or 0, level = lv, levelName = Meta.levelName(lv), cur = cur,
-    size = size, hint = levelHint(kind) }
+    size = size, hint = LEAGUE_HINT }
 end
+
+-- Barre d'expérience d'une classe : même forme (W.repBar), « Level N » au lieu du palier.
+local function levelBar(cid)
+  local cs = ns.Persist.db.meta.classes[cid]
+  local lv, cur, size = Meta.xpProgress(cs and cs.xp or 0)
+  return { label = ns.Classes[cid] and ns.Classes[cid].name or cid, points = cs and cs.xp or 0, level = lv,
+    levelName = "Level " .. lv, cur = cur, size = size }
+end
+C.levelBar = levelBar
 
 -- Classes jouables (playable ~= false), dans l'ordre de leur définition (order), puis par id.
 local function sortedClasses()
@@ -566,7 +578,8 @@ local function journalLine(e)
   parts[#parts + 1] = (cls and cls.name or "?") .. (e.key and (" +" .. e.key) or "")
   parts[#parts + 1] = RESULT[e.result] or tostring(e.result)
   if e.floor then parts[#parts + 1] = "stage " .. e.floor end
-  if e.rep then parts[#parts + 1] = "+" .. e.rep .. " reputation" end
+  if e.xp then parts[#parts + 1] = "+" .. e.xp .. " experience"
+  elseif e.rep then parts[#parts + 1] = "+" .. e.rep .. " reputation" end
   return table.concat(parts, " · "), e.result == "won"
 end
 
@@ -597,10 +610,8 @@ local function startStep()
   local opts = {}
   for _, cid in ipairs(st.classes) do
     local cd = ns.Classes[cid]
-    local cs = db.meta.classes[cid]
-    local lv = Meta.level(cs and cs.rep or 0)
     opts[#opts + 1] = { id = "class:" .. cid, group = "class", label = cd.name or cid,
-      text = (cd.hp or "?") .. " HP, " .. #(cd.deck or {}) .. " cards · " .. Meta.levelName(lv),
+      text = (cd.hp or "?") .. " HP, " .. #(cd.deck or {}) .. " cards", level = Meta.levelOf(db.meta, cid),
       selected = cid == st.class }
   end
   for k = 0, Meta.MAX_KEY do
@@ -613,20 +624,69 @@ local function startStep()
     opts[#opts + 1] = o
   end
   opts[#opts + 1] = { id = "go", label = "Start expedition", text = (Map.ACTS[1] and Map.ACTS[1].name or "") }
-  opts[#opts + 1] = { id = "ui:meta", label = "Reputation and log" }
+  opts[#opts + 1] = { id = "ui:progress", label = "Progress" }
   return { kind = "start", title = "Slay the Dragon", text = text, options = opts,
     class = st.class, key = st.key, keyMax = st.keyMax, affixes = Meta.affixesFor(st.key) }
+end
+
+-- Classe affichée par l'écran de progression : choisie par ses onglets, sinon celle de l'expédition qui
+-- vient de finir (bilan), sinon celle de l'accueil.
+local function progressClass()
+  local cid = C.ui.progressClass
+  if cid and ns.Classes[cid] then return cid end
+  local e = C.ending and C.ending.entry
+  if e and e.class and ns.Classes[e.class] then return e.class end
+  return C.startInfo().class
+end
+C.progressClass = progressClass
+
+-- Écran de progression d'une classe : niveau et barre d'expérience, cartes rangées par voie (départ puis
+-- les trois voies, dans l'ordre des niveaux), bibelots de classe. Verrouillé : seulement la condition
+-- (« Priest level 4 »), ni nom ni texte ni icône.
+local function progressStep()
+  local db = ns.Persist.db
+  local cid = progressClass()
+  local cd = ns.Classes[cid]
+  local level = Meta.levelOf(db.meta, cid)
+  local function entry(id, def)
+    local lv = Meta.unlockLevel(def)
+    local open = lv <= level
+    return { id = open and id or nil, level = lv, unlocked = open,
+      condition = not open and ((cd.name or cid) .. " level " .. lv) or nil }
+  end
+  local content = Meta.classContent(cid)
+  local rows = { { id = "start", name = "Start", cards = {} } }
+  local byPath = { start = rows[1] }
+  for _, p in ipairs(cd.paths or {}) do
+    rows[#rows + 1] = { id = p.id, name = p.name, cards = {} }
+    byPath[p.id] = rows[#rows]
+  end
+  for _, id in ipairs(content.cards) do
+    local d = ns.Cards[id]
+    local row = byPath[d.path] or rows[1]
+    row.cards[#row.cards + 1] = entry(id, d)
+  end
+  local relics = {}
+  for _, id in ipairs(content.relics) do relics[#relics + 1] = entry(id, ns.Relics[id]) end
+  local opts = {}
+  for _, c in ipairs(sortedClasses()) do
+    opts[#opts + 1] = { id = "pclass:" .. c, group = "class", label = ns.Classes[c].name or c,
+      level = Meta.levelOf(db.meta, c), selected = c == cid }
+  end
+  opts[#opts + 1] = { id = "ui:meta", label = "Reputation and log" }
+  opts[#opts + 1] = { id = "ui:back", label = "Back" }
+  return { kind = "classProgress", title = cd.name or cid, class = cid, level = level, bar = levelBar(cid),
+    rows = rows, relics = relics, options = opts }
 end
 
 local function metaStep()
   local db = ns.Persist.db
   local m = db.meta
   local bars, lines = {}, {}
-  -- une barre de classe : celle choisie sur l'accueil (le panneau tient deux barres et le journal ;
-  -- un écran de progression par classe viendra avec la progression par niveaux)
-  for _, cid in ipairs({ C.startInfo().class }) do
+  -- une barre de classe (niveau) : celle de l'écran de progression ; puis la Ligue et le journal
+  for _, cid in ipairs({ progressClass() }) do
     local cs = m.classes[cid]
-    local b = repBar(ns.Classes[cid].name or cid, cs and cs.rep or 0, "class")
+    local b = levelBar(cid)
     local km = Meta.keyMax(m, cid)
     b.detail = "Keys unlocked: +0 to +" .. km
       .. ((cs and cs.bestKey and cs.bestKey >= 0) and (" · best victory: +" .. cs.bestKey) or "")
@@ -635,7 +695,7 @@ local function metaStep()
     if title then b.detail = b.detail .. " · title: " .. title end
     bars[#bars + 1] = b
   end
-  local lb = repBar("Explorers' League", m.league, "league")
+  local lb = repBar("Explorers' League", m.league)
   lb.detail = (m.runs or 0) .. " expedition(s) in total"
   bars[#bars + 1] = lb
   local j = db.journal
@@ -645,7 +705,7 @@ local function metaStep()
   end
   return { kind = "meta", title = "Reputation and log",
     text = #j == 0 and "No expedition finished yet." or "Last expeditions:",
-    bars = bars, journal = lines, options = { { id = "ui:back", label = "Back" } } }
+    bars = bars, journal = lines, options = { { id = "ui:progress", label = "Back" } } }
 end
 
 local function endStep()
@@ -669,22 +729,25 @@ local function endStep()
   end
   lines[#lines + 1] = (e.cleared or 0) .. " stage(s) cleared, " .. (e.elites or 0) .. " elite(s), "
     .. (e.bosses or 0) .. " boss(es)."
-  lines[#lines + 1] = "|cffffd700+" .. (s.rep or 0) .. " reputation|r (class and League)."
   local cname = ns.Classes[e.class] and ns.Classes[e.class].name or tostring(e.class)
-  if s.classAfter ~= s.classBefore then
-    lines[#lines + 1] = "|cff40ff40" .. cname .. " goes from " .. Meta.levelName(s.classBefore) .. " to "
-      .. Meta.levelName(s.classAfter) .. " !|r"
+  lines[#lines + 1] = "|cffffd700+" .. (s.xp or 0) .. " " .. cname .. " experience, +" .. (s.rep or 0)
+    .. " reputation|r (Explorers' League)."
+  local up = s.levelAfter and s.levelBefore and s.levelAfter > s.levelBefore
+  if up then
+    lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. s.levelAfter .. "!|r"
   end
   if s.leagueAfter ~= s.leagueBefore then
     lines[#lines + 1] = "|cff40ff40Explorers' League: from " .. Meta.levelName(s.leagueBefore) .. " to "
       .. Meta.levelName(s.leagueAfter) .. " !|r"
   end
   if s.keyUnlocked then lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked!|r" end
-  local cs = db.meta.classes[e.class]
-  local bars = { repBar(cname, cs and cs.rep or 0, "class"), repBar("Explorers' League", db.meta.league, "league") }
+  local bars = { levelBar(e.class), repBar("Explorers' League", db.meta.league) }
+  -- ce que la montée de niveau vient de débloquer (révélé : cartes et bibelots montrés tels quels)
+  local unlocked = up and s.unlocked or nil
+  if unlocked and #unlocked.cards + #unlocked.relics == 0 then unlocked = nil end
   return { kind = "end", won = won, result = e.result, title = title, text = table.concat(lines, "\n"),
-    bars = bars, options = { { id = "ui:new", label = "New expedition" },
-      { id = "ui:meta", label = "Reputation and log" } } }
+    bars = bars, unlocked = unlocked, options = { { id = "ui:new", label = "New expedition" },
+      { id = "ui:progress", label = "Progress" } } }
 end
 
 local function mapStep(exp)
@@ -926,8 +989,8 @@ local function startRelicStep(exp)
       item = { kind = "relic", id = id } })
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipStartRelic", label = "Leave without a relic" })
-  return { kind = "startRelic", title = "Class Favor",
-    text = "Revered reputation: choose a class relic for this expedition.",
+  return { kind = "startRelic", title = "League Favor",
+    text = "Revered with the Explorers' League: choose a relic for this expedition.",
     options = opts }
 end
 
@@ -939,6 +1002,7 @@ function C.step()
   local exp = C.exp()
   if not exp then
     if C.ui.view == "meta" then return metaStep() end
+    if C.ui.view == "progress" then return progressStep() end
     if C.ending then return endStep() end
     return startStep()
   end

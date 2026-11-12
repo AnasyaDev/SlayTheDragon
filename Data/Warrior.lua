@@ -7,6 +7,14 @@
 -- Attack jouée. Dépensée par « Spend N: » (champ spend, payé au jeu si la Rage suffit) ou « Surge: »
 -- (effet surge, toute la Rage). Voies : Arms (Sundered, gros coup, Execute), Fury (petites attaques,
 -- Strength, cartes payées en PV), Protection (Absorb converti en dégâts, ripostes).
+--
+-- level = niveau de classe qui débloque la carte ou le bibelot (Core/Meta.lua ; table du GDD, répartition
+-- et raisons : docs/classes.md, « Progression par classe »). Niveau 1 : chaque voie garde son moteur
+-- (Arms : Sundered, Overpower, Execute ; Fury : Strength et PV payés, Enrage ; Protection : Absorb converti,
+-- Shield Slam, Ignore Pain), l'Interrupt (Pummel) et le Last Breath (Last Stand). Les cartes verrouillées
+-- ouvrent des façons de jouer : zone (Cleave 2, Thunder Clap 2), Cast (Slam 4), Strength empilée (Battle
+-- Shout 4), pioche par la Rage (Onslaught 6), ripostes (Retaliation 6), moteurs rares (Deep Wounds,
+-- Recklessness, Shield Wall au niveau 7).
 local _, ns = ...
 
 local Combat = ns.Combat
@@ -21,28 +29,28 @@ end
 -- Départ -------------------------------------------------------------------
 
 card("strike", {
-  name = "Strike", cost = 1, type = "attack", rarity = "basic", path = "start",
+  level = 1, name = "Strike", cost = 1, type = "attack", rarity = "basic", path = "start",
   target = "enemy", effects = { { "damage", 6 } },
   text = "Deal 6.",
   up = { effects = { { "damage", 9 } }, text = "Deal 9." },
 })
 
 card("defend", {
-  name = "Defend", cost = 1, type = "skill", rarity = "basic", path = "start",
+  level = 1, name = "Defend", cost = 1, type = "skill", rarity = "basic", path = "start",
   effects = { { "absorb", 5 } },
   text = "Gain 5 Absorb.",
   up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
 })
 
 card("heroic_strike", {
-  name = "Heroic Strike", cost = 1, type = "attack", rarity = "basic", path = "start",
+  level = 1, name = "Heroic Strike", cost = 1, type = "attack", rarity = "basic", path = "start",
   target = "enemy", spend = 2, effects = { { "damage", 7, more = { { 5, "spent" } } } },
   text = "Deal 7.\nSpend 2: deal 5 more.",
   up = { effects = { { "damage", 9, more = { { 7, "spent" } } } }, text = "Deal 9.\nSpend 2: deal 7 more." },
 })
 
 card("bloodrage", {
-  name = "Bloodrage", cost = 0, type = "skill", rarity = "basic", path = "start",
+  level = 1, name = "Bloodrage", cost = 0, type = "skill", rarity = "basic", path = "start",
   payHp = 2, effects = { { "res", 2 }, { "draw", 1 } },
   text = "Pay 2 HP.\n+2 Rage.\nDraw 1.",
   up = { effects = { { "res", 3 }, { "draw", 1 } }, text = "Pay 2 HP.\n+3 Rage.\nDraw 1." },
@@ -51,35 +59,35 @@ card("bloodrage", {
 -- Arms : Sundered, puis un seul gros coup ; Execute sur les cibles entamées ---------------------
 
 card("rend", {
-  rep = 0, name = "Rend", cost = 1, type = "attack", rarity = "common", path = "arms",
+  level = 1, name = "Rend", cost = 1, type = "attack", rarity = "common", path = "arms",
   target = "enemy", effects = { { "damage", 3 }, { "apply", "pain", 4, icon = "bleed" } },
   text = "Deal 3.\nApply DoT 4",
   up = { effects = { { "damage", 4 }, { "apply", "pain", 6, icon = "bleed" } }, text = "Deal 4.\nApply DoT 6" },
 })
 
 card("overpower", {
-  rep = 0, name = "Overpower", cost = 0, type = "attack", rarity = "common", path = "arms",
+  level = 1, name = "Overpower", cost = 0, type = "attack", rarity = "common", path = "arms",
   target = "enemy", effects = { { "damage", 3, more = { { 4, "status:armor_broken" } } } },
   text = "Deal 3.\nSundered: deal 4 more.",
   up = { effects = { { "damage", 5, more = { { 5, "status:armor_broken" } } } }, text = "Deal 5.\nSundered: deal 5 more." },
 })
 
 card("slam", {
-  rep = 0, name = "Slam", cost = 1, type = "attack", rarity = "common", path = "arms",
+  level = 4, name = "Slam", cost = 1, type = "attack", rarity = "common", path = "arms",
   target = "enemy", cast = true, effects = { { "damage", 14 } },
   text = "Cast.\nDeal 14.",
   up = { effects = { { "damage", 18 } }, text = "Cast.\nDeal 18." },
 })
 
 card("cleave", {
-  rep = 1, name = "Cleave", cost = 1, type = "attack", rarity = "common", path = "arms",
+  level = 2, name = "Cleave", cost = 1, type = "attack", rarity = "common", path = "arms",
   effects = { { "damage", 7, all = true } },
   text = "Deal 7 to all.",
   up = { effects = { { "damage", 10, all = true } }, text = "Deal 10 to all." },
 })
 
 card("mortal_strike", {
-  rep = 0, name = "Mortal Strike", cost = 2, type = "attack", rarity = "uncommon", path = "arms",
+  level = 6, name = "Mortal Strike", cost = 2, type = "attack", rarity = "uncommon", path = "arms",
   target = "enemy", effects = { { "damage", 16 }, { "apply", "armor_broken", 2 } },
   text = "Deal 16.\nApply Sundered 2 ⌛",
   up = { effects = { { "damage", 21 }, { "apply", "armor_broken", 3 } }, text = "Deal 21.\nApply Sundered 3 ⌛" },
@@ -87,7 +95,7 @@ card("mortal_strike", {
 
 -- Execute : la Rage n'est dépensée que si la cible est entamée (condition lue à la résolution).
 card("execute", {
-  rep = 0, name = "Execute", cost = 1, type = "attack", rarity = "uncommon", path = "arms",
+  level = 1, name = "Execute", cost = 1, type = "attack", rarity = "uncommon", path = "arms",
   target = "enemy", effects = { { "surge", cond = "execute" }, { "damage", 5, per = { 4, "surge" } } },
   text = "Deal 5.\nExecute: Surge: deal 4 per Rage.",
   up = { effects = { { "surge", cond = "execute" }, { "damage", 7, per = { 5, "surge" } } },
@@ -95,14 +103,14 @@ card("execute", {
 })
 
 card("colossus_smash", {
-  rep = 0, name = "Colossus Smash", cost = 1, type = "attack", rarity = "uncommon", path = "arms",
+  level = 1, name = "Colossus Smash", cost = 1, type = "attack", rarity = "uncommon", path = "arms",
   target = "enemy", effects = { { "damage", 6 }, { "apply", "armor_broken", 3 } },
   text = "Deal 6.\nApply Sundered 3 ⌛",
   up = { effects = { { "damage", 8 }, { "apply", "armor_broken", 4 } }, text = "Deal 8.\nApply Sundered 4 ⌛" },
 })
 
 card("pummel", {
-  rep = 0, name = "Pummel", cost = 0, type = "attack", rarity = "uncommon", path = "arms",
+  level = 1, name = "Pummel", cost = 0, type = "attack", rarity = "uncommon", path = "arms",
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "damage", 3 } },
   text = "Interrupt the target's cast.\nDeal 3.\nCooldown 2.",
   up = { cooldown = 1, effects = { { "interrupt" }, { "damage", 5 } },
@@ -110,7 +118,7 @@ card("pummel", {
 })
 
 card("bladestorm", {
-  rep = 2, name = "Bladestorm", cost = 2, type = "attack", rarity = "rare", path = "arms",
+  level = 1, name = "Bladestorm", cost = 2, type = "attack", rarity = "rare", path = "arms",
   effects = { { "damage", 4, all = true, times = 3 } },
   text = "Deal 4 to all three times.",
   up = { effects = { { "damage", 6, all = true, times = 3 } }, text = "Deal 6 to all three times." },
@@ -129,7 +137,7 @@ local function deepWoundsHooks(n)
 end
 
 card("deep_wounds", {
-  rep = 2, name = "Deep Wounds", cost = 1, type = "power", rarity = "rare", path = "arms",
+  level = 7, name = "Deep Wounds", cost = 1, type = "power", rarity = "rare", path = "arms",
   power = true, effects = {}, hooks = deepWoundsHooks(2),
   text = "Power.\nAttacks: apply DoT 2.",
   up = { hooks = deepWoundsHooks(3), text = "Power.\nAttacks: apply DoT 3." },
@@ -138,28 +146,28 @@ card("deep_wounds", {
 -- Fury : beaucoup de petites attaques, Strength qui monte, cartes payées en PV ---------------------
 
 card("raging_blow", {
-  rep = 0, name = "Raging Blow", cost = 1, type = "attack", rarity = "common", path = "fury",
+  level = 1, name = "Raging Blow", cost = 1, type = "attack", rarity = "common", path = "fury",
   target = "enemy", effects = { { "damage", 5, times = 2 } },
   text = "Deal 5 twice.",
   up = { effects = { { "damage", 7, times = 2 } }, text = "Deal 7 twice." },
 })
 
 card("whirlwind", {
-  rep = 0, name = "Whirlwind", cost = 1, type = "attack", rarity = "common", path = "fury",
+  level = 1, name = "Whirlwind", cost = 1, type = "attack", rarity = "common", path = "fury",
   effects = { { "damage", 4, all = true, times = 2 } },
   text = "Deal 4 to all twice.",
   up = { effects = { { "damage", 5, all = true, times = 2 } }, text = "Deal 5 to all twice." },
 })
 
 card("victory_rush", {
-  rep = 0, name = "Victory Rush", cost = 0, type = "attack", rarity = "common", path = "fury",
+  level = 1, name = "Victory Rush", cost = 0, type = "attack", rarity = "common", path = "fury",
   target = "enemy", exhaust = true, effects = { { "damage", 4 }, { "heal", 4 } },
   text = "Deal 4.\nHeal 4.\nExhaust.",
   up = { effects = { { "damage", 6 }, { "heal", 6 } }, text = "Deal 6.\nHeal 6.\nExhaust." },
 })
 
 card("berserker_rage", {
-  rep = 1, name = "Berserker Rage", cost = 0, type = "skill", rarity = "common", path = "fury",
+  level = 2, name = "Berserker Rage", cost = 0, type = "skill", rarity = "common", path = "fury",
   cooldown = 2, effects = { { "res", 1 }, { "cleanse" }, { "draw", 1 } },
   text = "+1 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.",
   up = { effects = { { "res", 2 }, { "cleanse" }, { "draw", 1 } },
@@ -167,7 +175,7 @@ card("berserker_rage", {
 })
 
 card("bloodthirst", {
-  rep = 0, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
+  level = 1, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
   target = "enemy", cooldown = 3,
   effects = { { "damage", 6 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
   text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 3.",
@@ -176,21 +184,21 @@ card("bloodthirst", {
 })
 
 card("rampage", {
-  rep = 0, name = "Rampage", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
+  level = 1, name = "Rampage", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
   target = "enemy", payHp = 3, effects = { { "damage", 4, times = 4 } },
   text = "Pay 3 HP.\nDeal 4 four times.",
   up = { effects = { { "damage", 5, times = 4 } }, text = "Pay 3 HP.\nDeal 5 four times." },
 })
 
 card("battle_shout", {
-  rep = 1, name = "Battle Shout", cost = 1, type = "skill", rarity = "uncommon", path = "fury",
+  level = 4, name = "Battle Shout", cost = 1, type = "skill", rarity = "uncommon", path = "fury",
   exhaust = true, effects = { { "apply", "force", 2, self = true } },
   text = "Gain Strength 2\nExhaust.",
   up = { effects = { { "apply", "force", 3, self = true } }, text = "Gain Strength 3\nExhaust." },
 })
 
 card("onslaught", {
-  rep = 2, name = "Onslaught", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
+  level = 6, name = "Onslaught", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
   target = "enemy", spend = 2, effects = { { "damage", 8 }, { "draw", 2, cond = "spent" } },
   text = "Deal 8.\nSpend 2: draw 2.",
   up = { effects = { { "damage", 11 }, { "draw", 2, cond = "spent" } }, text = "Deal 11.\nSpend 2: draw 2." },
@@ -207,14 +215,14 @@ local enrageHooks = {
 }
 
 card("enrage", {
-  rep = 0, name = "Enrage", cost = 1, type = "power", rarity = "rare", path = "fury",
+  level = 1, name = "Enrage", cost = 1, type = "power", rarity = "rare", path = "fury",
   power = true, effects = {}, hooks = enrageHooks,
   text = "Power.\nHP lost: gain Strength 1, once per turn.",
   up = { cost = 0, text = "Power.\nHP lost: gain Strength 1, once per turn." },
 })
 
 card("recklessness", {
-  rep = 2, name = "Recklessness", cost = 1, type = "skill", rarity = "rare", path = "fury",
+  level = 7, name = "Recklessness", cost = 1, type = "skill", rarity = "rare", path = "fury",
   payHp = 4, exhaust = true, effects = { { "apply", "force", 3, self = true } },
   text = "Pay 4 HP.\nGain Strength 3\nExhaust.",
   up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 4 HP.\nGain Strength 4\nExhaust." },
@@ -223,7 +231,7 @@ card("recklessness", {
 -- Protection : Absorb converti en dégâts, ripostes quand il est frappé ------------------------------
 
 card("shield_block", {
-  rep = 0, name = "Shield Block", cost = 1, type = "skill", rarity = "common", path = "protection",
+  level = 1, name = "Shield Block", cost = 1, type = "skill", rarity = "common", path = "protection",
   cooldown = 1, effects = { { "absorb", 8 } },
   text = "Gain 8 Absorb.\nCooldown 1.",
   up = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb.\nCooldown 1." },
@@ -231,14 +239,14 @@ card("shield_block", {
 
 -- Revenge : coûte 0 si des PV ont été perdus au tour précédent (règle de classe, champ hurtCost).
 card("revenge", {
-  rep = 0, name = "Revenge", cost = 1, type = "attack", rarity = "common", path = "protection",
+  level = 1, name = "Revenge", cost = 1, type = "attack", rarity = "common", path = "protection",
   target = "enemy", retain = true, hurtCost = 0, effects = { { "damage", 6 } },
   text = "Deal 6.\nCosts 0 if hit last turn.\nRetain.",
   up = { effects = { { "damage", 9 } }, text = "Deal 9.\nCosts 0 if hit last turn.\nRetain." },
 })
 
 card("thunder_clap", {
-  rep = 0, name = "Thunder Clap", cost = 1, type = "attack", rarity = "common", path = "protection",
+  level = 2, name = "Thunder Clap", cost = 1, type = "attack", rarity = "common", path = "protection",
   effects = { { "damage", 4, all = true }, { "apply", "demoralized", 1, all = true } },
   text = "Deal 4 to all.\nApply Demoralized 1 ⌛ to all",
   up = { effects = { { "damage", 6, all = true }, { "apply", "demoralized", 2, all = true } },
@@ -246,21 +254,21 @@ card("thunder_clap", {
 })
 
 card("devastate", {
-  rep = 0, name = "Devastate", cost = 1, type = "attack", rarity = "common", path = "protection",
+  level = 1, name = "Devastate", cost = 1, type = "attack", rarity = "common", path = "protection",
   target = "enemy", effects = { { "damage", 6 }, { "absorb", 3 } },
   text = "Deal 6.\nGain 3 Absorb.",
   up = { effects = { { "damage", 8 }, { "absorb", 5 } }, text = "Deal 8.\nGain 5 Absorb." },
 })
 
 card("demoralizing_shout", {
-  rep = 0, name = "Demoralizing Shout", cost = 1, type = "skill", rarity = "common", path = "protection",
+  level = 4, name = "Demoralizing Shout", cost = 1, type = "skill", rarity = "common", path = "protection",
   cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
   text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 3.",
   up = { cost = 0, text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
 })
 
 card("shield_slam", {
-  rep = 0, name = "Shield Slam", cost = 1, type = "attack", rarity = "uncommon", path = "protection",
+  level = 1, name = "Shield Slam", cost = 1, type = "attack", rarity = "uncommon", path = "protection",
   target = "enemy", effects = { { "absorb", 4 }, { "damage", 0, per = { 1, "block" } } },
   text = "Gain 4 Absorb.\nDeal damage equal to Absorb.",
   up = { effects = { { "absorb", 6 }, { "damage", 0, per = { 1, "block" } } },
@@ -268,7 +276,7 @@ card("shield_slam", {
 })
 
 card("ignore_pain", {
-  rep = 1, name = "Ignore Pain", cost = 1, type = "skill", rarity = "uncommon", path = "protection",
+  level = 1, name = "Ignore Pain", cost = 1, type = "skill", rarity = "uncommon", path = "protection",
   minRes = 1, effects = { { "surge" }, { "absorb", 0, per = { 3, "surge" } } },
   text = "Surge: gain 3 Absorb per Rage.",
   up = { effects = { { "surge" }, { "absorb", 0, per = { 4, "surge" } } }, text = "Surge: gain 4 Absorb per Rage." },
@@ -285,21 +293,21 @@ local function retaliationHooks(n)
 end
 
 card("retaliation", {
-  rep = 0, name = "Retaliation", cost = 1, type = "power", rarity = "uncommon", path = "protection",
+  level = 6, name = "Retaliation", cost = 1, type = "power", rarity = "uncommon", path = "protection",
   power = true, effects = {}, hooks = retaliationHooks(4),
   text = "Power.\nWhen hit: deal 4 to the attacker.",
   up = { hooks = retaliationHooks(6), text = "Power.\nWhen hit: deal 6 to the attacker." },
 })
 
 card("shield_wall", {
-  rep = 2, name = "Shield Wall", cost = 2, type = "skill", rarity = "rare", path = "protection",
+  level = 7, name = "Shield Wall", cost = 2, type = "skill", rarity = "rare", path = "protection",
   cooldown = 3, effects = { { "absorb", 18 } },
   text = "Gain 18 Absorb.\nCooldown 3.",
   up = { effects = { { "absorb", 24 } }, text = "Gain 24 Absorb.\nCooldown 3." },
 })
 
 card("last_stand", {
-  rep = 1, name = "Last Stand", cost = 1, type = "power", rarity = "rare", path = "protection",
+  level = 1, name = "Last Stand", cost = 1, type = "power", rarity = "rare", path = "protection",
   power = true, effects = {},
   hooks = {
     preventDeath = function(c, power)
@@ -314,6 +322,7 @@ card("last_stand", {
 })
 
 -- Bibelots du Guerrier (class = "warrior" : tirés seulement pour lui) ------------------------------
+-- level = niveau de classe qui les débloque (dans la réserve de la classe ; la Ligue ne compte pas).
 
 local R = ns.Relics
 local function relic(id, t)
@@ -325,7 +334,7 @@ end
 
 -- Bibelot de départ (GDD) : amorce la Rage dès le premier tour.
 relic("battle_standard", {
-  name = "Battle Standard", rarity = "common", tier = 0, noPool = true,
+  level = 1, name = "Battle Standard", rarity = "common", noPool = true,
   text = "At the start of each combat, +1 Rage.",
   hooks = {
     onCombatStart = function(c) Combat.gainRes(c, 1, "relic") end,
@@ -333,7 +342,7 @@ relic("battle_standard", {
 })
 
 relic("diamond_flask", {
-  name = "Diamond Flask", rarity = "uncommon", tier = 0,
+  level = 3, name = "Diamond Flask", rarity = "uncommon",
   text = "Once per combat, upon dropping below half HP, gain Regen 5.",
   hooks = {
     onHpLost = function(c)
@@ -346,7 +355,7 @@ relic("diamond_flask", {
 })
 
 relic("hand_of_justice", {
-  name = "Hand of Justice", rarity = "common", tier = 0,
+  level = 1, name = "Hand of Justice", rarity = "common",
   text = "The third Attack played each turn draws 1 card.",
   hooks = {
     onCardCommitted = function(c, src, inst, d)
@@ -356,7 +365,7 @@ relic("hand_of_justice", {
 })
 
 relic("lionheart_helm", {
-  name = "Lionheart Helm", rarity = "uncommon", tier = 1,
+  level = 5, name = "Lionheart Helm", rarity = "uncommon",
   text = "At the start of each combat, gain Strength 1.",
   hooks = {
     onCombatStart = function(c) Combat.applyStatus(c, c.player, "force", 1) end,
@@ -364,7 +373,7 @@ relic("lionheart_helm", {
 })
 
 relic("force_reactive_disk", {
-  name = "Force Reactive Disk", rarity = "rare", tier = 1,
+  level = 7, name = "Force Reactive Disk", rarity = "rare",
   text = "When an attack is fully absorbed, deal 4 to the attacker.",
   hooks = {
     afterHit = function(c, src, enemy, loss, absorbed)
@@ -375,7 +384,7 @@ relic("force_reactive_disk", {
 })
 
 relic("skullflame_shield", {
-  name = "Skullflame Shield", rarity = "rare", tier = 2,
+  level = 7, name = "Skullflame Shield", rarity = "rare",
   text = "At the start of each turn, gain 2 Absorb per Rage.",
   hooks = {
     onTurnStart = function(c)
