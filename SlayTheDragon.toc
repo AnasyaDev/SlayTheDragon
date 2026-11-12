@@ -19,6 +19,8 @@ Core\Meta.lua
 Core\Expedition.lua
 Core\Save.lua
 Data\Priest.lua
+Data\Warrior.lua
+Core\Classes\warrior.lua
 Data\Act1.lua
 Data\Relics.lua
 Data\Potions.lua
@@ -26,6 +28,7 @@ Data\Events.lua
 UI\SkinData.lua
 UI\WowSkin.lua
 UI\Art.lua
+UI\Art\warrior.lua
 UI\Persist.lua
 UI\Controller.lua
 UI\Widgets.lua

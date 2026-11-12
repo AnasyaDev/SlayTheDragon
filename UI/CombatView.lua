@@ -408,6 +408,11 @@ function V:Build(parent)
   zone:SetFrameLevel(bf:GetFrameLevel() + 15)
   zone.views = {}
   self.classZone = zone
+  -- Maj enfoncée ou relâchée : la ligne « Spend N: » des cartes en main s'éteint ou se rallume
+  zone:RegisterEvent("MODIFIER_STATE_CHANGED")
+  zone:SetScript("OnEvent", function(_, _, key)
+    if (key == "LSHIFT" or key == "RSHIFT") and self.c and parent:IsVisible() and not self.frozen then self:RenderHand() end
+  end)
 
   self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Draw pile", "Draw", Art.ui.grimoire,
     hz:GetFrameLevel() + 1)
@@ -917,8 +922,10 @@ function V:RenderHand()
     local card = self.cards[i]
     if i <= n then
       local info = Controller.handInfo(i)
+      -- « Spend N: » allumée si la ressource suffit et que Maj n'est pas enfoncée, éteinte sinon
       card:SetCard(info.inst.id, info.inst.up, { cost = info.cost, playable = info.playable,
-        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil })
+        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil,
+        spendOff = info.spendOff })
       card.uid = info.inst.uid
       card.baseX, card.baseY = self:HandSlot(i, n)
       self:PlaceCard(card)
@@ -1259,7 +1266,9 @@ function V:Play(i, target)
       cost = info and info.cost }
   end
   self.selected = nil
-  local ok, why = Controller.play(i, target)
+  -- Maj enfoncée au moment de jouer : une carte « Spend N » se joue sans dépenser
+  local nospend = IsShiftKeyDown and IsShiftKeyDown() and true or false
+  local ok, why = Controller.play(i, target, nospend)
   if not ok then
     self.pendingPlay = nil
     UI.flash(Controller.reasonText(why))

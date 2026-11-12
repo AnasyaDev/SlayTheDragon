@@ -852,7 +852,8 @@ end
 
 H.combat = {
   play = function(exp, a)
-    return afterCombatAction(exp, Combat.play(exp.combat, a[2], a[3]))
+    local opts = a[4] == "nospend" and { spend = false } or nil
+    return afterCombatAction(exp, Combat.play(exp.combat, a[2], a[3], opts))
   end,
   endTurn = function(exp)
     if not Combat.endTurn(exp.combat) then return false, "phase" end
@@ -1048,7 +1049,8 @@ function X.choices(exp)
   elseif ph == "combat" then
     local c = exp.combat
     local plays = Combat.legalPlays(c)
-    for i = 1, #plays do add({ "play", plays[i][1], plays[i][2] }) end
+    -- quatrième champ "nospend" : carte « Spend N » jouée sans dépenser (choix du joueur)
+    for i = 1, #plays do add({ "play", plays[i][1], plays[i][2], plays[i][3] and "nospend" or nil }) end
     local pots = c.player.potions
     if Combat.usePotion and pots then
       for s = 1, #pots do

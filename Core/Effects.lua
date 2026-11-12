@@ -37,6 +37,8 @@ Effects.damage = function(c, ctx, e)
       ctx.dealt = true
       ctx.hits = ctx.hits + 1
       if e.onHit then e.onHit(c, ctx, t) end
+      -- chaque coup d'une carte Attack (poisons du Rogue, Ignite du Mage…)
+      if ctx.def and ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
       if c.result then return end
     end
   end
@@ -91,7 +93,9 @@ Effects.demence = Effects.res -- ancien nom (Démence du Prêtre)
 
 -- { "surge" } : « Surge: … » dépense toute la ressource ; ctx.surge = montant (per = { k, "surge" }).
 Effects.surge = function(c, ctx, e)
-  ctx.surge = (ctx.surge or 0) + Combat.surge(c)
+  local n = Combat.surge(c)
+  ctx.surge = (ctx.surge or 0) + n
+  if n > 0 then Combat.fire(c, "onSurge", n, ctx) end
 end
 
 -- « Spend N: … » n'est PAS un effet : c'est le champ de carte spend = N, payé au moment du jeu
@@ -102,14 +106,25 @@ Effects.loseHp = function(c, ctx, e)
   Combat.loseHp(c, e[2], "effect")
 end
 
--- { "interrupt" } : annule le sort que la cible s'apprête à lancer.
+-- { "interrupt", all = bool } : annule le sort que la cible (ou chaque ennemi) s'apprête à lancer.
 Effects.interrupt = function(c, ctx, e)
-  local t = ctx.target
-  if not t or t.dead then return end
-  local mv = ns.Enemies[t.id].moves[t.intent]
-  if mv and mv.cast and not t.interrupted then
-    t.interrupted = true
-    Combat.log(c, { t = "interrupt", src = "player", dst = t.uid, move = t.intent })
+  local list = e.all and Combat.aliveEnemies(c) or { ctx.target }
+  for i = 1, #list do
+    local t = list[i]
+    local mv = t and not t.dead and ns.Enemies[t.id].moves[t.intent]
+    if mv and mv.cast and not t.interrupted then
+      t.interrupted = true
+      Combat.log(c, { t = "interrupt", src = "player", dst = t.uid, move = t.intent })
+    end
+  end
+end
+
+-- { "tickDot", all = bool } : déclenche tout de suite le DoT de la cible (Envenom) ou de tous.
+Effects.tickDot = function(c, ctx, e)
+  local list = e.all and Combat.aliveEnemies(c) or { ctx.target }
+  for i = 1, #list do
+    if list[i] and not list[i].dead then Combat.tickDot(c, list[i]) end
+    if c.result then return end
   end
 end
 

@@ -1725,6 +1725,8 @@ function W.addStatusLines(tt, id, n)
 end
 
 -- Mots-clés d'une définition de carte (pour l'infobulle).
+W.SPEND_HINT = "|cffffd100Shift|r: play it without spending."
+
 -- Ressource de la classe d'une carte (id du registre du langage) ou nil.
 function W.cardResource(d)
   local cd = d and d.class and ns.Classes[d.class]
@@ -1823,6 +1825,8 @@ function W.fillCardTooltip(tt, id, up, extra)
   for i = 1, #kws do
     wrap(tt, W.keywordText(kws[i]), 0.85, 0.85, 0.85)
   end
+  -- « Spend N » au choix : comment jouer la carte sans dépenser (une ligne)
+  if d.spend then wrap(tt, W.SPEND_HINT, 0.85, 0.85, 0.85) end
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
@@ -2038,8 +2042,9 @@ function W.unitStatuses(unit)
     local id, n = ids[i], unit.st[ids[i]]
     local s = ns.Statuses[id]
     local bad = s and (s.debuff or s.affix)
+    local src = unit.stIcon and unit.stIcon[id]
     list[#list + 1] = {
-      icon = Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
+      icon = (src and Art.statusIcons[src]) or Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
       n = type(n) == "number" and n or nil,
       rim = bad and Art.rim.debuff or nil,
       text = (s and s.name or id), -- nom (infobulle, harnais)
@@ -2176,7 +2181,9 @@ end
 -- Texte affiché : sans les mots-clés de la plaque du bas, noms d'états et conditions insécables et
 -- en couleur d'accent, chiffres en évidence (blancs, ou verts s'ils changent avec l'amélioration).
 -- Garde les « \n » des clauses et le « ⌛ » (posé à la taille du palier par la mise en page).
-function W.cardBody(d, base)
+-- spendOff : la clause « Spend N: … » est éteinte (gris, chiffres compris) : le bonus ne sera pas payé.
+W.SPEND_OFF_COLOR = C.textDim
+function W.cardBody(d, base, spendOff)
   local text = d.text or ""
   for _, k in ipairs(keywordStrip()) do
     if ns.Language.plateWord(k.plate, d) then text = text:gsub(k.pat, "") end
@@ -2207,6 +2214,16 @@ function W.cardBody(d, base)
   -- mots-clés : noms d'états et conditions nommées (une seule couleur d'accent)
   for _, k in ipairs(keywordList()) do
     text = eachPhrase(text, k.name, function(p) return W.colorize(p, W.KEYWORD_COLOR) end)
+  end
+  if spendOff then
+    -- clause « Spend N: … » éteinte : couleurs retirées, la clause entière en gris
+    local out = {}
+    for l in (text .. "\n"):gmatch("(.-)\n") do
+      local plain = l:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+      if plain:find("^Spend %d+: ") then l = W.colorize(plain, W.SPEND_OFF_COLOR) end
+      out[#out + 1] = l
+    end
+    text = table.concat(out, "\n")
   end
   return text
 end
@@ -2887,7 +2904,7 @@ function W.card(parent)
     -- médaillon
     W.setIcon(self.icon, W.cardArt(id), "card:" .. id)
     -- texte : zone utile du panneau, relevée au-dessus de la plaque de raison si elle y mord
-    local text = W.cardBody(d, base)
+    local text = W.cardBody(d, base, opts.spendOff)
     local bottom = TZ.bottom * CW
     local reasonH
     if dim and opts.reason then

@@ -129,7 +129,7 @@ L.condition("moonkin", { name = "Moonkin", text = "bonus effect in Moonkin form.
 L.keyword("payHp", { name = "Pay N HP", pattern = "^Pay %d+ HP%.$", text = "costs HP, unplayable if it would drop to 0." })
 
 -- Libellés de déclencheur des Pouvoirs (« When hit: … ») : pas des conditions, pas d'explication.
-for _, label in ipairs({ "Each Absorb gain", "Cast cards", "When hit", "Attacks", "Start of turn", "End of turn" }) do
+for _, label in ipairs({ "Each Absorb gain", "Cast cards", "When hit", "HP lost", "Attacks", "Start of turn", "End of turn" }) do
   L.trigger(label)
 end
 

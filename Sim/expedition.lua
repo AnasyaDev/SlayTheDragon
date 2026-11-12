@@ -250,7 +250,7 @@ return function(ns)
       local a = bot:act(c)
       steps = steps + 1
       if a[1] == "play" then
-        if not X.act(exp, { "play", a[2], a[3] }) then X.act(exp, { "endTurn" }) end
+        if not X.act(exp, { "play", a[2], a[3], a[4] }) then X.act(exp, { "endTurn" }) end
       elseif a[1] == "potion" then
         if not X.act(exp, a) then X.act(exp, { "endTurn" }) end
       else
@@ -284,6 +284,8 @@ return function(ns)
     end
     local exp = X.new({ seed = seed, class = opts.class or "priest", key = opts.key or 0,
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false })
+    -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
+    for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     local rng = Rng.stream(seed, "policy")
     local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
     local guard = 0

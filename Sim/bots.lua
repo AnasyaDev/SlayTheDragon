@@ -16,7 +16,7 @@ return function(ns)
 
   -- Évaluation d'un état après le tour ennemi. Poids grossiers, à régler.
   local W = { hp = 10, enemyHp = 4, enemyAlive = 30, res = 1.5, atonement = 4,
-    regen = 0.5, power = 25, castRisk = 0.95 }
+    regen = 0.5, power = 25, castRisk = 0.95, force = 25 }
   Bots.W = W
 
   -- Valeur de garder une potion pour plus tard (unités de W : 10 = 1 PV). Une potion n'est
@@ -143,6 +143,8 @@ return function(ns)
       + math.min(regen * (regen + 1) / 2, p.maxHp - p.hp) * W.hp * W.regen + powersValue(c)
       - selfPain * (selfPain + 1) / 2 * W.hp * 0.8
     if p.cast then s = s + Bots.castValue(c) end
+    -- Strength du joueur (Guerrier) : environ six coups encore à porter dans le combat
+    s = s + (p.st.force or 0) * W.force
     -- valeur propre à la classe (état de classe, familier, formes…) : ns.ClassRules[classe].botValue
     local cr = ns.ClassRules[c.class]
     if cr and cr.botValue then s = s + cr.botValue(c, W) end
@@ -187,7 +189,7 @@ return function(ns)
 
   local function actionRef(c, a)
     local inst = c.hand[a[1]]
-    return { uid = inst.uid, target = a[2] and c.enemies[a[2]].uid }
+    return { uid = inst.uid, target = a[2] and c.enemies[a[2]].uid, nospend = a[3] or nil }
   end
 
   local function resolveRef(c, ref)
@@ -219,7 +221,7 @@ return function(ns)
     elseif Combat.needsTarget(c.hand[idx]) then
       return nil
     end
-    return { "play", idx, tIdx }
+    return { "play", idx, tIdx, ref.nospend and "nospend" or nil }
   end
 
   -- Recherche en profondeur des suites de coups du tour.
@@ -243,11 +245,11 @@ return function(ns)
       for i = 1, #acts do
         local a = acts[i]
         local inst = s.hand[a[1]]
-        local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0)
+        local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
         if not tried[key] then
           tried[key] = true
           local t = Combat.clone(s)
-          Combat.play(t, a[1], a[2])
+          Combat.play(t, a[1], a[2], a[3] and { spend = false } or nil)
           local k = stateKey(t)
           if not seen[k] then
             seen[k] = true
@@ -300,15 +302,15 @@ return function(ns)
       local acts = Combat.legalPlays(c)
       if #acts == 0 then return { "end" } end
       local a = Rng.pick(self.rng, acts)
-      return { "play", a[1], a[2] }
+      return { "play", a[1], a[2], a[3] and "nospend" or nil }
     elseif self.kind == "greedy" then
       local acts = Combat.legalPlays(c)
       local best, bestA = leafScore(c), nil
       for i = 1, #acts do
         local t = Combat.clone(c)
-        Combat.play(t, acts[i][1], acts[i][2])
+        Combat.play(t, acts[i][1], acts[i][2], acts[i][3] and { spend = false } or nil)
         local sc = leafScore(t)
-        if sc > best then best, bestA = sc, { "play", acts[i][1], acts[i][2] } end
+        if sc > best then best, bestA = sc, { "play", acts[i][1], acts[i][2], acts[i][3] and "nospend" or nil } end
       end
       local pots = Combat.legalPotions(c)
       for i = 1, #pots do

@@ -193,7 +193,7 @@ local function runRange(from, to)
     if opts.runner == "expedition" then
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
-        meta = opts.meta or "start", class = opts.class })
+        meta = opts.meta or "start", class = opts.class, force = force })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),

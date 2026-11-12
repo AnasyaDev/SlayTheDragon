@@ -73,6 +73,9 @@ Save.EXP_MIGRATIONS[2] = function(exp)
   if type(c) == "table" then
     if c.class == nil then c.class = exp.class end
     if type(c.cls) ~= "table" then c.cls = {} end
+    if type(c.turn) ~= "table" then c.turn = { played = 0, byType = {}, bySchool = {} } end
+    if type(c.traps) ~= "table" then c.traps = {} end
+    if type(c.rng) == "table" and c.rng.cards == nil then c.rng.cards = ns.Rng.stream(c.seed or 1, "cards") end
     local p = c.player
     if type(p) == "table" then
       if p.res == nil then p.res = tonumber(p.demence) or 0 end

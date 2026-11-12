@@ -382,8 +382,9 @@ local function combatAct(a)
   return ok, why
 end
 
-function C.play(handIdx, targetIdx)
-  return combatAct({ "play", handIdx, targetIdx })
+-- nospend : une carte « Spend N » se joue sans dépenser (Maj enfoncée en jouant).
+function C.play(handIdx, targetIdx, nospend)
+  return combatAct({ "play", handIdx, targetIdx, nospend and "nospend" or nil })
 end
 
 function C.endTurn()
@@ -408,8 +409,11 @@ function C.handInfo(i)
   if not inst then return nil end
   local ok, why = Combat.canPlay(c, i)
   if ok and C.over() then ok, why = false, "over" end
-  return { inst = inst, def = Card.def(inst), cost = Combat.cost(c, inst), playable = ok, why = why,
-    needsTarget = Combat.needsTarget(inst) }
+  local d = Card.def(inst)
+  local shift = IsShiftKeyDown and IsShiftKeyDown() and true or false
+  local spendOff = d.spend ~= nil and ((c.player.res or 0) < d.spend or shift)
+  return { inst = inst, def = d, cost = Combat.cost(c, inst), playable = ok, why = why,
+    needsTarget = Combat.needsTarget(inst), spendOff = spendOff or nil }
 end
 
 function C.aliveTargets()
@@ -617,7 +621,9 @@ local function metaStep()
   local db = ns.Persist.db
   local m = db.meta
   local bars, lines = {}, {}
-  for _, cid in ipairs(sortedClasses()) do
+  -- une barre de classe : celle choisie sur l'accueil (le panneau tient deux barres et le journal ;
+  -- un écran de progression par classe viendra avec la progression par niveaux)
+  for _, cid in ipairs({ C.startInfo().class }) do
     local cs = m.classes[cid]
     local b = repBar(ns.Classes[cid].name or cid, cs and cs.rep or 0, "class")
     local km = Meta.keyMax(m, cid)

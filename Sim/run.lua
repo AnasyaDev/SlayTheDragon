@@ -126,7 +126,7 @@ return function(ns)
       if a[1] == "end" then closeTurn() end
       steps = steps + 1
       if a[1] == "play" then
-        local ok = Combat.play(c, a[2], a[3])
+        local ok = Combat.play(c, a[2], a[3], a[4] == "nospend" and { spend = false } or nil)
         if not ok then Combat.endTurn(c) end
       elseif a[1] == "potion" then
         local ok = Combat.usePotion(c, a[2], a[3])

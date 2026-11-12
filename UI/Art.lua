@@ -284,7 +284,12 @@ Art.statuses = {
   halved       = { icon = 135936, tga = "Spell_Holy_PainSupression" }, -- spell_holy_painsupression
   force        = { icon = 132333, tga = "Ability_Warrior_BattleShout" }, -- ability_warrior_battleshout
   necrotic     = { icon = "Interface\\Icons\\spell_deathknight_necroticplague", tga = "Spell_Deathknight_Necroticplague" },
+  instant      = { icon = "Interface\\Icons\\spell_nature_lightning", tga = "Spell_Nature_Lightning" },
 }
+
+-- Icône d'un état selon sa source (Combat.applyStatus(c, unité, id, n, clé) → unit.stIcon[id] = clé) :
+-- Art.statusIcons[clé] remplace l'icône de l'état (DoT de poison, de saignement, de brûlure…).
+Art.statusIcons = Art.statusIcons or {}
 
 -- Affixes mythiques (chemins vérifiés par wow_icon_search, piste D).
 Art.keystone = { icon = "Interface\\Icons\\inv_relics_hourglass", tga = "INV_Relics_Hourglass" }
@@ -460,6 +465,7 @@ Art.statusShort = {
   stunned = "loses its next turn.",
   halved = "damage taken is halved.",
   force = "N more damage per hit.",
+  instant = "the next Cast card resolves at once.",
 }
 
 -- Ligne d'un état cité par une carte : nom en or, définition courte.
