@@ -239,10 +239,10 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
 
 | Clé | Affixe | Effet (réglé par simulation, `Meta.AFFIX`) |
 | --- | --- | --- |
-| +1 | Fortifié | Ennemis normaux : +20 % de PV |
-| +2 | Tyrannique | Élites : +20 % de PV et de dégâts ; boss : +7 % de PV |
+| +1 | Fortifié | Ennemis normaux : +12 % de PV |
+| +2 | Tyrannique | Élites : +5 % de PV et de dégâts ; boss : +3 % de PV |
 | +3 | Galvanisant | Quand un ennemi meurt, les autres (sauf boss) gagnent 1 Force |
-| +4 | Nécrotique | Chaque coup qui fait perdre des PV réduit tes soins de 10 % (état `necrotic` affiché sur le héros) |
+| +4 | Nécrotique | Chaque coup qui fait perdre des PV réduit tes soins de 5 %, 30 % au plus (état `necrotic` affiché sur le héros) |
 | +5 | Disette | Le feu de camp ne soigne plus que 20 % des PV |
 
 ## Sauvegarde (`Core/Save.lua`)
@@ -336,7 +336,7 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
   la moitié de la réputation, +15 pour une victoire, ×(1 + 0,1 × clé) : 2 expéditions pour le niveau 2,
   ≈ 20 pour le 7 (voir « Niveau de classe »).
 - **Clés** : `keyMax` par classe ; jouer une clé inférieure reste possible.
-- **Affixes** : intensités ajustées (voir tableau) pour ≈ −5 points par niveau ; Galvanisant
+- **Affixes** : intensités ajustées (voir tableau ; recalées le 12/11/2026 après l'équilibrage des cinq classes, `docs/equilibrage.md`) pour ≈ −5 points par niveau ; Galvanisant
   n'affecte pas les boss (sinon chaque sbire tué de VanCleef le rendait injouable), Nécrotique
   arrondit au plus proche (l'arrondi par défaut annulait les soins de 2 d'Expiation dès le 1er coup).
 - **Révéré sans bibelot à proposer** : si la réserve est vide, la phase `start` est sautée.

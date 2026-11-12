@@ -138,10 +138,10 @@ Meta.AFFIX_ORDER = { "fortified", "tyrannical", "bolstering", "necrotic", "famin
 -- boss plus faible et des boss exclus de Galvanisant (comme en jeu). À re-mesurer quand
 -- l'équilibrage des combats change (Sim/sim.lua runner=expedition key=N, docs/expedition.md).
 Meta.AFFIX = {
-  fortified = { hp = 0.20 },                      -- ennemis normaux : PV
-  tyrannical = { eliteHp = 0.20, eliteDamage = 0.20, bossHp = 0.07, bossDamage = 0 },
+  fortified = { hp = 0.12 },                      -- ennemis normaux : PV
+  tyrannical = { eliteHp = 0.05, eliteDamage = 0.05, bossHp = 0.03, bossDamage = 0 },
   bolstering = { force = 1 },                      -- Force donnée aux survivants (hors boss)
-  necrotic = { step = 0.10, cap = 10 },            -- soins −10 % par coup reçu
+  necrotic = { step = 0.05, cap = 6 },             -- soins −5 % par coup reçu, −30 % au plus
   famine = { rest = 0.20 },                        -- fraction soignée au feu de camp
 }
 local P = Meta.AFFIX
@@ -196,11 +196,13 @@ A.bolstering = {
 }
 
 ns.Statuses.necrotic = { name = "Necrotic", affix = true,
-  text = ("Healing received reduced by %d%% per stack, until the end of combat."):format(pct(P.necrotic.step)) }
+  text = ("Healing received reduced by %d%% per stack (max %d), until the end of combat.")
+    :format(pct(P.necrotic.step), P.necrotic.cap) }
 
 A.necrotic = {
   name = "Necrotic", level = 4,
-  text = ("Each hit taken reduces healing by %d%% until the end of combat."):format(pct(P.necrotic.step)),
+  text = ("Each hit taken reduces healing by %d%% (up to %d%%) until the end of combat.")
+    :format(pct(P.necrotic.step), pct(P.necrotic.step * P.necrotic.cap)),
   hooks = {
     onPlayerHit = function(c, src, enemy, loss)
       if (c.player.st.necrotic or 0) < P.necrotic.cap then ns.Combat.applyStatus(c, c.player, "necrotic", 1) end

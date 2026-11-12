@@ -579,15 +579,18 @@ local function fightWith(affixes, encounter)
 end
 
 test("Fortifié et Tyrannique : PV et dégâts", function()
+  -- intensités lues dans Meta.AFFIX (réglées par la simulation)
+  local A = Meta.AFFIX
+  local function sc(v, f) return math.floor(v * (1 + f) + 0.5) end
   local c = fightWith({ "fortified" }, { "test_dummy", "test_elite" })
-  eq(c.enemies[1].maxHp, 120)
+  eq(c.enemies[1].maxHp, sc(100, A.fortified.hp))
   eq(c.enemies[2].maxHp, 100)
   local t = fightWith({ "tyrannical" }, { "test_dummy", "test_elite" })
   eq(t.enemies[1].maxHp, 100)
-  eq(t.enemies[2].maxHp, 120)
-  eq(Combat.intentInfo(t, t.enemies[2]).damage, 12)
+  eq(t.enemies[2].maxHp, sc(100, A.tyrannical.eliteHp))
+  eq(Combat.intentInfo(t, t.enemies[2]).damage, sc(10, A.tyrannical.eliteDamage))
   Combat.endTurn(t)
-  eq(t.player.hp, 48)
+  eq(t.player.hp, 60 - sc(10, A.tyrannical.eliteDamage))
 end)
 
 test("Galvanisant : la mort d'un ennemi renforce les autres", function()
@@ -598,13 +601,17 @@ test("Galvanisant : la mort d'un ennemi renforce les autres", function()
   eq(c.enemies[3].st.force, nil, "les boss ne sont pas galvanisés")
 end)
 
-test("Nécrotique : chaque coup reçu réduit les soins de 10 %", function()
+test("Nécrotique : chaque coup reçu réduit les soins (Meta.AFFIX.necrotic.step), plafond", function()
+  local A = Meta.AFFIX.necrotic
   local c = fightWith({ "necrotic" }, { "test_hitter" })
   Combat.endTurn(c)
   eq(c.player.hp, 50)
   eq(c.player.st.necrotic, 1)
-  Combat.heal(c, c.player, 10)
-  eq(c.player.hp, 59)
+  c.player.hp = 20
+  Combat.heal(c, c.player, 20)
+  eq(c.player.hp, 20 + math.floor(20 * (1 - A.step) + 0.5))
+  for _ = 1, A.cap + 2 do Combat.fire(c, "onPlayerHit", c.enemies[1], 1) end
+  eq(c.player.st.necrotic, A.cap, "plafond")
   local d = fightWith({}, { "test_hitter" })
   Combat.endTurn(d)
   eq(d.player.st.necrotic, nil, "sans l'affixe")
