@@ -2100,23 +2100,29 @@ end
 -- Séquence |T du sablier pour un texte de taille size (unités). Champs (CreateTextureMarkup,
 -- Blizzard_SharedXMLBase/TextureUtil.lua) : chemin:hauteur:largeur:décalage x:décalage y:largeur et
 -- hauteur du fichier:gauche:droite:haut:bas (en pixels du fichier), puis couleur de sommet r:g:b
--- (0–255) ; entiers (%d partout chez Blizzard). Texture 64 × 64 (tools/build_glyphs.py) : silhouette
--- pleine (deux traverses, deux triangles opposés), centrée, marges transparentes symétriques (x 11 à
--- 53, y 2 à 62) ; affichée ENTIÈRE, carrée (largeur = hauteur) : rien n'est rogné ni déformé, et la
--- marge de gauche du dessin fait la petite espace insécable après le nombre. Hauteur ≈ 0,70 cadratin
--- arrondie : le dessin (60/64) a la hauteur des chiffres de Baloo Chettan 2 (0,62 cadratin), pas
--- moins. color : teinte, blanc par défaut.
-W.HOURGLASS_K = 0.70
+-- (0–255) ; entiers (%d partout chez Blizzard).
+-- HAUTEUR ET LARGEUR NULLES (« :0:0: », comme Blizzard pour une icône à la taille du texte : « 25
+-- |T…:0:0:0:0|t », Blizzard_GarrisonBuildingUI.lua ; « |T…:0|t » des marques du journal de combat) :
+-- le client donne à l'icône la hauteur de la police qu'il rend réellement, carrée. Retour en jeu du
+-- 12/11/2026 (fenêtre à 115 %, écran 2560 × 1440) : avec une hauteur explicite de 7 (0,70 × 10), le
+-- sablier était à peu près deux fois plus petit que le chiffre voisin, lu comme un « z » ; le dessin
+-- remplissait pourtant 60/64 de la texture et 7 unités dépassent les chiffres (6,2) : c'est la hauteur
+-- explicite qui n'est pas rendue dans les unités du texte. Ce que montre la capture correspond à une
+-- hauteur prise en pixels d'écran (7 px pour des chiffres de 6,2 × 2,16 ≈ 13 px : 0,5) ; le faux client
+-- du harnais suit ce modèle (H.ICON_PX). Une hauteur nulle n'en dépend pas.
+-- Texture 64 × 64 (tools/build_glyphs.py) = la boîte d'une ligne : dessin plein (deux traverses, deux
+-- triangles opposés) posé comme un chiffre de Baloo Chettan 2, de la ligne de base (aux W.TEXT_BASE de
+-- la boîte) à 0,62 cadratin au-dessus (y 7 à 47), x 12 à 41 : la marge de gauche fait la petite espace
+-- après le nombre. Affichée ENTIÈRE (0:64:0:64). color : teinte, blanc par défaut.
 W.HOURGLASS_PX = 64
+-- Boîte de l'icône (unités du texte) pour un texte de taille size : la hauteur du texte, carrée.
 function W.hourglassSize(size)
-  local h = max(5, floor(size * W.HOURGLASS_K + 0.5))
-  return h, h
+  return size, size
 end
 function W.hourglass(size, color)
-  local h, w = W.hourglassSize(size)
   local c = color or C.white
   local P = W.HOURGLASS_PX
-  return ("|T%s:%d:%d:0:0:%d:%d:0:%d:0:%d:%d:%d:%d|t"):format(W.HOURGLASS, h, w, P, P, P, P,
+  return ("|T%s:0:0:0:0:%d:%d:0:%d:0:%d:%d:%d:%d|t"):format(W.HOURGLASS, P, P, P, P,
     floor(c[1] * 255 + 0.5), floor(c[2] * 255 + 0.5), floor(c[3] * 255 + 0.5))
 end
 
@@ -2250,26 +2256,57 @@ function W.cardPills(d)
   return list
 end
 
--- Zone utile du texte : intérieur sombre du panneau d'ardoise (mesuré sur Media/card_panel.tga :
--- x 0,1541 à 0,8429, bas 1,19, biseau dès 1,0754 où la demi-largeur intérieure vaut 0,308 et rentre de
--- 0,56 par unité de hauteur), sous la gemme de rareté (bas opaque de la plus grande : 0,7622, mesuré
--- sur Media/gem_*.tga), marges comprises. Fractions de la largeur du corps. Le harnais vérifie chaque
--- ligne posée contre les pixels mêmes des textures (Sim/ui_harness.lua, U22).
+-- Zone utile du texte : intérieur sombre du panneau d'ardoise (mesuré sur les pixels de
+-- Media/card_panel.tga, critère du harnais U22 : opaque et r + g + b < 360), sous la gemme de rareté
+-- (bas opaque de la plus grande : 0,7622, mesuré sur Media/gem_*.tga), marges comprises. Fractions de
+-- la largeur du corps. Forme réelle de l'intérieur : demi-largeur 0,3444 (x 14 à 240 sur 256 px) de
+-- y 0,7039 à 1,0735 ; là, un DÉCROCHEMENT (le bord gauche passe de x 14 à 25 px d'une ligne à la
+-- suivante : demi-largeur 0,3110 côté gauche, le côté le plus étroit), puis un biseau qui rentre de
+-- 0,557 par unité de hauteur jusqu'au bas (1,1799). Le harnais vérifie chaque ligne posée contre les
+-- pixels mêmes des textures (Sim/ui_harness.lua, U22) ; W.cardTextHalf en est le modèle exact.
 local TZ = {
   cx = 0.4985,                  -- axe de l'intérieur
   half = 0.3004,                -- demi-largeur : 0,3444 moins la marge latérale (0,044 ≈ 5,5 unités)
   top = 0.7661,                 -- haut des lignes : sous la gemme (les lignes ont ~2 unités de vide en haut)
   bottom = 1.1492,              -- bas des lignes : 5 unités au-dessus du bas de l'intérieur
-  bevY = 1.0754, bevHalf = 0.2574, bevSlope = 0.56, -- biseau du bas, marge déduite (×1,15 en biais)
+  inHalf = 0.3444,              -- demi-largeur de l'intérieur au-dessus du biseau
+  bevY = 1.0735, bevIn = 0.3110, bevSlope = 0.557, -- biseau : début (décrochement), demi-largeur, pente
+  margin = 0.044,               -- marge latérale (côtés et biseau)
+  bevGuard = 2 / 124,           -- le biseau est jugé 2 unités sous l'encre de la ligne (marge du bas, U22)
+  -- centre optique : milieu de l'intérieur sombre dans la colonne du milieu (haut 87,1 unités, bas
+  -- 146,3 ; harnais UC), même marge visible au-dessus de l'encre de la première ligne et sous la ligne
+  -- de base de la dernière
+  optY = 0.94114,
 }
 W.CARD_TEXT = TZ
 -- Paliers de taille du texte (unités de la carte) : chaque carte prend le plus grand qui tient dans la
 -- zone utile en repliant ses clauses sur autant de lignes que la zone en contient à ce palier
 -- (layoutBody) ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
 W.BODY_SIZES = { 10, 9.5, 9, 8.5, 8, 7.5, 7 }
--- Position verticale du bloc dans la zone (fraction du jeu vertical : 0,5 = centré, 0 = en haut) :
--- essais dans l'ordre, le premier où les lignes tiennent.
-W.BODY_LIFT = { 0.5, 0.33, 0.17, 0 }
+-- Position verticale du bloc (retour en jeu du 12/11/2026, Frostbolt : « le texte est remonté, il ne
+-- devrait pas ») : le bloc est CENTRÉ sur le centre optique du panneau (TZ.optY : encre de la première
+-- ligne et ligne de base de la dernière à égale distance des bords de l'intérieur sombre). Il ne se
+-- décale que si une ligne sortirait de la forme du panneau (biseau, gemme, bas de la zone), du minimum
+-- nécessaire et de W.BODY_SHIFT unité au plus ; au-delà, une autre coupure ou un palier plus petit.
+-- (Avant : le bloc remontait jusqu'en haut de la zone, 0,5 / 0,33 / 0,17 / 0 du jeu vertical, pour
+-- élargir sa dernière ligne contre un biseau mal modélisé : Frostbolt 8,5 unités trop haut.)
+W.BODY_SHIFT = 1
+W.BODY_SHIFT_STEP = 0.25
+W.SHIFT_COST = 2       -- coût d'un décalage d'une unité (préféré à une coupure de plus, W.BREAK)
+-- Encre dans une ligne (police Baloo Chettan 2, même modèle que le faux client Sim/ui_render.lua) :
+-- ligne de base aux 1,078 / 1,47 de la hauteur de ligne (ascendante / ascendante + descendante, hhea),
+-- capitales et chiffres hauts de 0,602 cadratin (OS/2 sCapHeight).
+W.TEXT_BASE = 1.078 / 1.47
+W.TEXT_CAP = 0.602
+-- Jambages (g j p q y, virgule, parenthèses… : jusqu'à 0,2 cadratin sous la ligne de base).
+W.TEXT_DESC = 0.2
+W.DESC_CHARS = "[gjpqyQ,;/()%[%]{}$@_]"
+-- Bas de l'encre d'une ligne (texte affiché, codes compris) dont la boîte commence à yTop (unités) :
+-- ligne de base, plus les jambages s'il y en a.
+function W.lineInkBottom(line, yTop, lh, size)
+  local plain = line:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", "")
+  return yTop + W.TEXT_BASE * lh + (plain:find(W.DESC_CHARS) and W.TEXT_DESC * size or 0)
+end
 W.BODY_UNDER = { 6.5, 6 }
 -- Nom sur le ruban : une ligne, le plus grand palier qui tient, marge de 4 unités de chaque côté.
 W.NAME_SIZES = { 11, 10, 9, 8, 7 }
@@ -2299,9 +2336,18 @@ function W.looseBox(fs, n, w, lh)
   fs:SetHeight(max(1, n) * lh * W.TEXT_ROOM + W.TEXT_PAD)
 end
 
--- Demi-largeur utile de la zone à la hauteur y (fraction de la largeur du corps).
+-- Demi-largeur utile d'une ligne dont l'ENCRE finit à la hauteur y (fraction de la largeur du corps ;
+-- ligne de base, ou bas des jambages si la ligne en a, W.lineInkBottom) : forme réelle de l'intérieur
+-- (pleine largeur au-dessus du biseau, décrochement, pente), jugée TZ.bevGuard sous l'encre, moins la
+-- marge latérale. (Avant le 12/11/2026 : la pente du biseau était prolongée AU-DESSUS de son début,
+-- jusqu'à 10 unités de largeur retirées entre y 124 et 133 où l'intérieur est plein, et jugée au bas de
+-- la BOÎTE de la ligne, 2,7 unités sous la ligne de base à la taille 10 ; la mise en page remontait
+-- alors les blocs pour élargir leur dernière ligne.)
 function W.cardTextHalf(y)
-  return min(TZ.half, TZ.bevHalf - (y - TZ.bevY) * TZ.bevSlope)
+  local yy = y + TZ.bevGuard
+  local inner = TZ.inHalf
+  if yy >= TZ.bevY then inner = TZ.bevIn - (yy - TZ.bevY) * TZ.bevSlope end
+  return min(TZ.half, inner - TZ.margin)
 end
 
 -- Texte de mesure (même police que le texte des cartes), hors de toute carte.
@@ -2527,15 +2573,14 @@ end
 -- utilisables. Chaque clause peut se replier sur plusieurs lignes, aux coupures de W.clauseGroups ;
 -- chaque ligne tient dans la largeur de la zone à son bas (biseau compris, marge W.TEXT_SAFE). Parmi
 -- les mises en page qui tiennent, la moins coûteuse : somme des coupures, ligne d'un seul petit mot,
--- ligne finie par un petit mot, lignes inégales dans une clause, bloc remonté (W.BODY_LIFT) plutôt que
--- centré, pas d'écart entre clauses (W.CLAUSE_GAP) quand il y a la place ; à coût égal, le moins de
--- lignes. Sablier posé à la taille size (largeur mesurée avec le texte). Renvoie { lines, y0, gap,
--- clause = { clause de chaque ligne }, cost }, lh ; nil si rien ne tient ; nil, "font" si la police ne
--- mesure rien (pas encore chargée).
-W.LIFT_COST = { 0, 2, 4, 6 }
+-- ligne finie par un petit mot, lignes inégales dans une clause, bloc décalé de son centre (W.SHIFT_COST
+-- par unité, W.BODY_SHIFT au plus), pas d'écart entre clauses (W.CLAUSE_GAP) quand il y a la place ; à
+-- coût égal, le moins de lignes. Sablier posé à la taille size (largeur mesurée avec le texte). Renvoie
+-- { lines, y0, gap, clause = { clause de chaque ligne }, cost }, lh ; nil si rien ne tient ; nil,
+-- "font" si la police ne mesure rien (pas encore chargée).
 -- Écart entre deux clauses (fraction de la hauteur de ligne), quand la hauteur le permet : une clause
 -- repliée sur deux lignes reste lisible comme UNE clause (« Deal 6. » / écart / « Apply » / « Sundered 3 ⌛ »).
--- Sans écart, coût W.NOGAP_COST : préféré à une coupure de plus, pas à un bloc remonté de deux crans.
+-- Sans écart, coût W.NOGAP_COST : préféré à une coupure de plus.
 W.CLAUSE_GAP = 1 / 3
 W.NOGAP_COST = 3
 -- Le bas de l'intérieur sombre est mesuré à y ≈ 146,3 unités (liseré clair dès 146,5 ; 1,19 de la
@@ -2592,9 +2637,16 @@ local function layoutBody(paras, size, top, bottom)
         end
         cost = cost + W.BREAK_BALANCE * (hi - lo) / full
       end
-      local r, w = {}, {}
-      for t = 1, k do r[t] = { acc[t][1], acc[t][2] } w[t] = ws[t] end
-      list[#list + 1] = { ranges = r, widths = w, cost = cost }
+      local r, w, dsc = {}, {}, {}
+      for t = 1, k do
+        r[t] = { acc[t][1], acc[t][2] } w[t] = ws[t]
+        -- jambages de la ligne (le biseau est jugé sous l'encre, W.cardTextHalf)
+        dsc[t] = 0
+        for q = acc[t][1], acc[t][2] do
+          if g.groups[q].plain:find(W.DESC_CHARS) then dsc[t] = W.TEXT_DESC * size break end
+        end
+      end
+      list[#list + 1] = { ranges = r, widths = w, desc = dsc, cost = cost }
     end
     local function rec(i)
       if i > G then finish() return end
@@ -2614,15 +2666,35 @@ local function layoutBody(paras, size, top, bottom)
     table.sort(list, function(a, b) return a.cost < b.cost end)
     cands[c] = list
   end
-  -- meilleure combinaison pour n lignes en tout, avec ou sans écart entre clauses, et chaque
-  -- position du bloc
+  -- meilleure combinaison pour n lignes en tout, avec ou sans écart entre clauses : bloc centré sur
+  -- le centre optique (relevé de moitié si une plaque relève le bas de la zone), décalé seulement si
+  -- une ligne sort de la forme, de W.BODY_SHIFT au plus
   local best
   local gaps = (C > 1 and W.CLAUSE_GAP > 0) and { W.CLAUSE_GAP * lh, 0 } or { 0 }
+  local optC = TZ.optY * CW - (TZ.bottom * CW - bottom) / 2
+  -- centre de la boîte du bloc qui met le centre de l'encre sur optC
+  local boxC = optC + lh * (0.5 - W.TEXT_BASE) + W.TEXT_CAP * size / 2
+  local lowest = top + H
   for n = C, N do
    for _, gap in ipairs(gaps) do
-    local slack = H - n * lh - (C - 1) * gap
-    for fi, f in ipairs(slack >= -1e-6 and W.BODY_LIFT or {}) do
-      local y0 = top + slack * f
+    local total = n * lh + (C - 1) * gap
+    local ideal = boxC - total / 2
+    -- dans la zone (sous la gemme, au-dessus du bas) : le moins de décalage possible
+    local y0c = max(top, min(ideal, lowest - total))
+    local ys = {}
+    if total <= H + 1e-6 and math.abs(y0c - ideal) <= W.BODY_SHIFT + 1e-6 then
+      ys[1] = y0c
+      -- puis vers le haut (le biseau rétrécit le bas), pas à pas, sans sortir de la zone
+      local k = 1
+      while true do
+        local y = y0c - k * W.BODY_SHIFT_STEP
+        if y < top - 1e-6 or math.abs(y - ideal) > W.BODY_SHIFT + 1e-6 then break end
+        ys[#ys + 1] = y
+        k = k + 1
+      end
+    end
+    for _, y0 in ipairs(ys) do
+      local shiftCost = W.SHIFT_COST * math.abs(y0 - ideal)
       local dp = { [0] = { [0] = { cost = 0 } } }
       for c = 1, C do
         local row = {}
@@ -2635,8 +2707,9 @@ local function layoutBody(paras, size, top, bottom)
               if not e or nc < e.cost then
                 local ok = true
                 for t = 1, k do
-                  local yb = y0 + (L + t) * lh + (c - 1) * gap
-                  if cand.widths[t] > 2 * W.cardTextHalf(yb / CW) * CW then ok = false break end
+                  -- bas de l'encre : ligne de base de la ligne, plus ses jambages
+                  local yi = y0 + (L + t - 1) * lh + (c - 1) * gap + W.TEXT_BASE * lh + cand.desc[t]
+                  if cand.widths[t] > 2 * W.cardTextHalf(yi / CW) * CW then ok = false break end
                 end
                 if ok then row[L + k] = { cost = nc, prev = L, cand = ci } end
               end
@@ -2647,8 +2720,10 @@ local function layoutBody(paras, size, top, bottom)
       end
       local e = dp[C][n]
       if e then
-        local total = e.cost + (W.LIFT_COST[fi] or 0) + ((C > 1 and gap == 0) and W.NOGAP_COST or 0)
-        if not best or total < best.cost - 1e-9 then best = { cost = total, n = n, y0 = y0, dp = dp, gap = gap } end
+        local tc = e.cost + shiftCost + ((C > 1 and gap == 0) and W.NOGAP_COST or 0)
+        if not best or tc < best.cost - 1e-9 then best = { cost = tc, n = n, y0 = y0, dp = dp, gap = gap } end
+        -- premier essai qui tient à cette position : inutile de monter davantage
+        break
       end
     end
    end
