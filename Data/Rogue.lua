@@ -131,10 +131,10 @@ local deadlyPoisonHooks = {
 }
 
 card("deadly_poison", {
-  level = 6, name = "Deadly Poison", cost = 2, type = "power", rarity = "uncommon", path = "assassination",
+  level = 6, name = "Deadly Poison", cost = 1, type = "power", rarity = "uncommon", path = "assassination",
   power = true, effects = {}, hooks = deadlyPoisonHooks,
   text = "Power.\nEach Attack hit: apply DoT 1.",
-  up = { cost = 1, text = "Power.\nEach Attack hit: apply DoT 1." },
+  up = { cost = 0, text = "Power.\nEach Attack hit: apply DoT 1." },
 })
 
 local venomousHooks = {
@@ -266,10 +266,10 @@ card("ambush", {
 
 card("hemorrhage", {
   level = 1, name = "Hemorrhage", cost = 1, type = "attack", rarity = "common", path = "subtlety",
-  target = "enemy", effects = { { "damage", 5 }, { "res", 1 }, { "apply", "armor_broken", 2 } },
-  text = "Deal 5.\n+1 Combo Point.\nApply Sundered 2 ⌛",
-  up = { effects = { { "damage", 7 }, { "res", 1 }, { "apply", "armor_broken", 3 } },
-    text = "Deal 7.\n+1 Combo Point.\nApply Sundered 3 ⌛" },
+  target = "enemy", effects = { { "damage", 7 }, { "res", 1 }, { "apply", "armor_broken", 2 } },
+  text = "Deal 7.\n+1 Combo Point.\nApply Sundered 2 ⌛",
+  up = { effects = { { "damage", 9 }, { "res", 1 }, { "apply", "armor_broken", 3 } },
+    text = "Deal 9.\n+1 Combo Point.\nApply Sundered 3 ⌛" },
 })
 
 card("vanish", {
@@ -281,9 +281,9 @@ card("vanish", {
 
 card("shadowstep", {
   level = 1, name = "Shadowstep", cost = 1, type = "skill", rarity = "common", path = "subtlety",
-  cooldown = 3, effects = { { "apply", "parry", 1, self = true }, { "apply", "stealth", 1, self = true } },
-  text = "Gain Parry 1\nGain Stealth\nCooldown 3.",
-  up = { cooldown = 2, text = "Gain Parry 1\nGain Stealth\nCooldown 2." },
+  cooldown = 2, effects = { { "apply", "parry", 1, self = true }, { "apply", "stealth", 1, self = true } },
+  text = "Gain Parry 1\nGain Stealth\nCooldown 2.",
+  up = { cooldown = 1, text = "Gain Parry 1\nGain Stealth\nCooldown 1." },
 })
 
 -- Cheap Shot : Skill, lit Stealth sans le consommer ; l'état posé sous condition reste dans sa clause.
@@ -297,12 +297,12 @@ card("cheap_shot", {
 -- Secret Technique : jouable à 0 point (règle commune : la ligne Stealth n'est pas un Surge).
 card("secret_technique", {
   level = 1, name = "Secret Technique", cost = 1, type = "attack", rarity = "uncommon", path = "subtlety",
-  effects = { { "surge" }, { "damage", 0, per = { 3, "surge" }, all = true },
-    { "damage", 0, per = { 3, "surge" }, all = true, cond = "stealth" } },
-  text = "Surge: deal 3 per Combo Point to all.\nStealth: hits twice.",
-  up = { effects = { { "surge" }, { "damage", 0, per = { 4, "surge" }, all = true },
+  effects = { { "surge" }, { "damage", 0, per = { 4, "surge" }, all = true },
     { "damage", 0, per = { 4, "surge" }, all = true, cond = "stealth" } },
-    text = "Surge: deal 4 per Combo Point to all.\nStealth: hits twice." },
+  text = "Surge: deal 4 per Combo Point to all.\nStealth: hits twice.",
+  up = { effects = { { "surge" }, { "damage", 0, per = { 5, "surge" }, all = true },
+    { "damage", 0, per = { 5, "surge" }, all = true, cond = "stealth" } },
+    text = "Surge: deal 5 per Combo Point to all.\nStealth: hits twice." },
 })
 
 card("premeditation", {
@@ -343,10 +343,10 @@ local shadowDanceHooks = {
 }
 
 card("shadow_dance", {
-  level = 7, name = "Shadow Dance", cost = 1, type = "power", rarity = "rare", path = "subtlety",
+  level = 7, name = "Shadow Dance", cost = 2, type = "power", rarity = "rare", path = "subtlety",
   power = true, effects = {}, hooks = shadowDanceHooks,
   text = "Power.\nStart of turn: gain Stealth.",
-  up = { cost = 0, text = "Power.\nStart of turn: gain Stealth." },
+  up = { cost = 1, text = "Power.\nStart of turn: gain Stealth." },
 })
 
 -- Bibelots du Voleur (class = "rogue" : tirés seulement pour lui) ---------------------------------
@@ -436,11 +436,11 @@ ns.Classes.rogue = {
   bot = {
     resValue = 8,
     rating = {
-      crippling_poison = 14.5, blade_flurry = 13.5, deadly_poison = 12, envenom = 12, rupture = 12,
-      adrenaline_rush = 11, garrote = 11, smoke_bomb = 10, secret_technique = 8, fan_of_knives = 8,
-      slice_and_dice = 7.5, killing_spree = 7, sprint = 7, evasion = 6.5, between_the_eyes = 6.5,
-      pistol_shot = 6.5, shadowstep = 5.5, cheat_death = 5.5, kick = 5.5, premeditation = 5, riposte = 4.5,
-      cloak_of_shadows = 4, cheap_shot = 4, mutilate = 3.5, ambush = 3, shadow_dance = 3, hemorrhage = 3,
+      crippling_poison = 7.5, blade_flurry = 13.5, deadly_poison = 12, envenom = 12, rupture = 12,
+      adrenaline_rush = 10, garrote = 4.5, smoke_bomb = 7.5, secret_technique = 3, fan_of_knives = 8,
+      slice_and_dice = 7.5, killing_spree = 6, sprint = 7, evasion = 6.5, between_the_eyes = 6.5,
+      pistol_shot = 6.5, shadowstep = 3, cheat_death = 5.5, kick = 5.5, premeditation = 5.5, riposte = 4.5,
+      cloak_of_shadows = 4, cheap_shot = 5.5, mutilate = 3.5, ambush = 7.5, shadow_dance = 3, hemorrhage = 3.5,
       venomous_wounds = 3, exsanguinate = 3, vanish = 3,
     },
     upgrade = { sinister_strike = 2.5, feint = 2, backstab = 2.5, eviscerate = 3 },

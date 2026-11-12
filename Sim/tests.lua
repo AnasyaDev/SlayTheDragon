@@ -1395,7 +1395,7 @@ test("Mutilate : +1 point de plus sur une cible sous DoT ; Garrote, Fan of Knive
   eq(hpOf(f, 1), 97); eq(hpOf(f, 2), 97); eq(f.enemies[2].st.pain, 2); eq(f.player.res, 1)
   local h = setup({ "hemorrhage" }, nil, nil, RO)
   Combat.play(h, 1, 1)
-  eq(hpOf(h), 95); eq(h.enemies[1].st.armor_broken, num("hemorrhage", 3, 3)); eq(h.player.res, 1)
+  eq(hpOf(h), 100 - num("hemorrhage", 1)); eq(h.enemies[1].st.armor_broken, num("hemorrhage", 3, 3)); eq(h.player.res, 1)
 end)
 
 test("Killing Spree : six coups au hasard (flux des cartes), Deadly Poison sur chacun ; Blade Flurry", function()
@@ -1478,16 +1478,17 @@ test("Kick : coupe le sort et +1 point ; Riposte : Parry ; Cloak of Shadows : ne
   eq(sb.enemies[2].st.demoralized, 2); eq(sb.player.st.stealth, 1)
 end)
 
-test("Secret Technique : 3 par point à tous, deux fois sous Stealth", function()
+test("Secret Technique : 4 par point à tous, deux fois sous Stealth", function()
   local c = setup({ "secret_technique" }, { "test_dummy", "test_dummy" }, nil, RO)
   c.player.res = 4
   Combat.play(c, 1)
-  eq(hpOf(c, 1), 100 - 24); eq(hpOf(c, 2), 100 - 24); eq(c.player.st.stealth, nil)
+  local k = Card.defById("secret_technique").effects[2].per[1]
+  eq(hpOf(c, 1), 100 - 2 * 4 * k); eq(hpOf(c, 2), 100 - 2 * 4 * k); eq(c.player.st.stealth, nil)
   local n = setup({ "sinister_strike", "secret_technique" }, { "test_dummy", "test_dummy" }, nil, RO)
   Combat.play(n, 1, 1)
   n.player.res = 4
   Combat.play(n, 1)
-  eq(hpOf(n, 2), 100 - 12)
+  eq(hpOf(n, 2), 100 - 4 * k)
 end)
 
 test("bibelots du Voleur : Thieves' Tools, Blinding Powder, Crystal Vial, Ravenholdt Signet, Shadowfang", function()
