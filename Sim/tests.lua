@@ -1923,5 +1923,411 @@ test("Mage : état cloné (deux incantations, Instant), combats simulés par le 
   assert(r.combats[1] ~= nil)
 end)
 
+---------------------------------------------------------------------------
+-- Hunter : familier, Frenzy, Careful Aim, Traps, cartes et bibelots (docs/classes/hunter.md)
+---------------------------------------------------------------------------
+
+do
+  local HU = { class = "hunter" } -- options de Combat.new pour un combat de Chasseur
+  local Hn = ns.Hunter
+  local P = Hn.PET_BASE
+  ns.Enemies.test_triple = { name = "Triple", hp = 100,
+    moves = { hits = { name = "Rafale", intent = "attack", actions = { { "attack", 8, times = 3 } } } }, pattern = { "hits" } }
+  ns.Enemies.test_frail = { name = "Frêle", hp = 5,
+    moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10 } } } }, pattern = { "hit" } }
+  -- coups du familier pendant une action (dégâts lus dans le journal)
+  local function petHits(c)
+    local out = {}
+    for _, ev in ipairs(c.events) do if ev.t == "pet_attack" then out[#out + 1] = ev end end
+    return out
+  end
+
+  test("Hunter : le familier attaque en fin de tour (base + Frenzy) la première cible vivante sans cible visée, puis +1 Frenzy", function()
+    local c = setup({ "disengage" }, { "test_dummy", "test_dummy" }, nil, HU)
+    eq(c.player.res, 0)
+    Combat.play(c, 1)
+    eq(c.player.lastTarget, nil, "carte sans cible : pas de cible")
+    c.events = {}
+    Combat.endPlayerTurn(c)
+    eq(c.enemies[1].hp, 100 - P, "premier ennemi vivant"); eq(c.enemies[2].hp, 100)
+    eq(c.player.res, 1, "+1 Frenzy après le coup")
+    eq(#petHits(c), 1); eq(petHits(c)[1].dmg, P, "dégâts au Frenzy d'avant le gain")
+  end)
+
+  test("Hunter : cible du familier = dernière cible visée ; morte, il passe au premier ennemi vivant ; Cast : dès le jeu", function()
+    local c = setup({ "concussive_shot", "aimed_shot" }, { "test_dummy", "test_dummy", "test_dummy" }, nil, HU)
+    c.player.mana = 5
+    Combat.play(c, 1, 3)
+    eq(c.player.lastTarget, c.enemies[3].uid)
+    Combat.play(c, 1, 2) -- Aimed Shot (Cast) : la cible change au jeu, avant la résolution
+    eq(c.player.lastTarget, c.enemies[2].uid)
+    eq(Hn.petTarget(c), c.enemies[2])
+    c.enemies[2].hp, c.enemies[2].dead = 0, true
+    eq(Hn.petTarget(c), c.enemies[1], "cible morte : le plus à gauche")
+    c.enemies[1].dead = true
+    eq(Hn.petTarget(c), c.enemies[3])
+    local e = setup({ "disengage" }, { "test_dummy" }, nil, HU)
+    e.enemies[1].dead = true
+    eq(Hn.petTarget(e), nil); eq(Hn.petAttack(e, "auto"), 0, "aucun ennemi : rien")
+  end)
+
+  test("Hunter : Frenzy plafonné à 5, sans baisse au premier tour, -1 au début de chaque tour suivant, jamais sous 0", function()
+    local c = setup({ "disengage" }, { "test_dummy" }, nil, HU)
+    eq(Combat.gainRes(c, 9), 5); eq(c.player.res, 5)
+    c.player.res = 0
+    Combat.endTurn(c) -- fin du tour 1 : le familier frappe (+1), puis la baisse au début du tour 2
+    eq(c.round, 2); eq(c.player.res, 0, "+1 en fin de tour, -1 au tour suivant")
+    c.player.res = 4
+    Combat.endTurn(c)
+    eq(c.player.res, 4, "4 +1 (familier) -1 (baisse)")
+    local z = setup({ "disengage" }, { "test_dummy", "test_dummy" }, nil, HU)
+    z.enemies[1].dead, z.enemies[2].dead = true, true -- (combat figé : rien à frapper)
+    z.result = nil
+    Combat.endRound(z)
+    eq(z.player.res, 0, "jamais sous 0")
+  end)
+
+  test("Hunter : « Pet attacks twice » recalcule chaque coup (le second profite du Frenzy gagné)", function()
+    local c = setup({ "kill_command" }, nil, nil, HU)
+    c.player.res = 2
+    c.events = {}
+    Combat.play(c, 1, 1)
+    local h = petHits(c)
+    eq(#h, 2); eq(h[1].dmg, P + 2); eq(h[2].dmg, P + 3)
+    eq(c.player.res, 4); eq(c.enemies[1].hp, 100 - (2 * P + 5))
+    eq(c.cooldown[1].card.id, "kill_command")
+  end)
+
+  test("Hunter : Surge (Bestial Wrath) : une attaque par Frenzy au Frenzy compté, sans en redonner ; injouable à 0", function()
+    local c = setup({ "bestial_wrath" }, nil, nil, HU)
+    eq(select(2, Combat.canPlay(c, 1)), "resource")
+    c.player.res = 5
+    c.events = {}
+    Combat.play(c, 1, 1)
+    local h = petHits(c)
+    eq(#h, 5)
+    for i = 1, 5 do eq(h[i].dmg, P + 5, "coup " .. i) end
+    eq(c.player.res, 0, "vidé, rien regagné"); eq(c.enemies[1].hp, 100 - 5 * (P + 5))
+  end)
+
+  test("Hunter : coups du familier : Strength et Demoralized du Chasseur, Sundered et Absorb de la cible ; pas les bonus « Attacks »", function()
+    local c = setup({ "disengage" }, nil, nil, { class = "hunter", relics = { "light_quiver", "rhokdelar" } })
+    c.player.res = 3
+    Combat.applyStatus(c, c.player, "force", 2)
+    Combat.applyStatus(c, c.enemies[1], "armor_broken", 2)
+    local want = math.floor((P + 3 + 2) * 1.25)
+    eq(Hn.petAttack(c, "card"), want, "Strength puis Sundered, ni Light Quiver ni Rhok'delar")
+    c.player.res = 3
+    Combat.applyStatus(c, c.player, "demoralized", 1)
+    eq(Hn.petAttack(c, "card"), math.floor(math.floor((P + 3 + 2) * 0.75) * 1.25), "Demoralized du Chasseur")
+    local b = setup({ "trueshot_aura" }, nil, nil, HU)
+    Combat.play(b, 1)
+    b.enemies[1].block = 2
+    local hp = b.enemies[1].hp
+    Hn.petAttack(b, "card")
+    eq(b.enemies[1].hp, hp - (P - 2 > 0 and P - 2 or 0), "Absorb de la cible, sans Trueshot Aura"); eq(b.enemies[1].block, math.max(0, 2 - P))
+  end)
+
+  test("Hunter : le familier qui tue le dernier ennemi en fin de tour gagne le combat avant le tour ennemi", function()
+    local c = setup({ "disengage" }, { "test_hitter" }, nil, HU)
+    c.enemies[1].hp = P
+    local hp = c.player.hp
+    Combat.endTurn(c)
+    eq(c.result, "won"); eq(c.player.hp, hp)
+  end)
+
+  test("Careful Aim : au-dessus de la moitié des PV seulement (moitié exacte : non), lu au début de la résolution", function()
+    local d = Card.defById("aimed_shot")
+    local base, more = d.effects[1][2], d.effects[1].more[1][1]
+    local ok = setup({ "aimed_shot" }, nil, nil, HU)
+    ok.enemies[1].hp = 51 + P -- le familier la ramène à 51/100 avant la résolution
+    Combat.play(ok, 1, 1)
+    Combat.endTurn(ok)
+    eq(ok.enemies[1].hp, 51 - base - more, "51/100 à la résolution : Careful Aim")
+    local half = setup({ "aimed_shot" }, nil, nil, HU)
+    half.enemies[1].hp = 50 + P -- le familier la ramène à la moitié exacte avant la résolution
+    Combat.play(half, 1, 1)
+    Combat.endTurn(half)
+    eq(half.enemies[1].hp, 50 - base, "50/100 à la résolution : pas de Careful Aim")
+    eq(Combat.test(half, {}, "careful", { hp = 50, maxHp = 100 }), false)
+    eq(Combat.test(half, {}, "careful", { hp = 51, maxHp = 100 }), true)
+    -- Steady Shot : la pioche dépend de la cible au début de la résolution, pas après le coup
+    local s = setup({ "steady_shot" }, nil, { "disengage", "disengage", "disengage", "disengage", "disengage", "disengage" }, HU)
+    s.enemies[1].hp = 56
+    Combat.play(s, 1, 1)
+    Combat.endPlayerTurn(s); Combat.enemyPhase(s); Combat.endRound(s)
+    s.enemies[1].hp = 55
+    local nHand = #s.hand
+    Combat.startPlayerTurn(s)
+    eq(#s.hand, nHand + 1 + Combat.DRAW_PER_TURN, "55/100 : 1 de plus, puis la pioche du tour")
+  end)
+
+  test("Traps : 3 au plus, la plus ancienne d'abord, une par attaque, avant le premier coup ; rien sans attaque", function()
+    local c = setup({ "counterattack", "freezing_trap", "frost_trap", "immolation_trap" }, { "test_triple" }, nil, HU)
+    c.player.mana = 9
+    Combat.play(c, 1); Combat.play(c, 1); Combat.play(c, 1)
+    eq(select(2, Combat.canPlay(c, 1)), "traps")
+    eq(c.traps[1].card.id, "counterattack")
+    local hp = c.player.hp
+    Combat.endTurn(c)
+    eq(#c.traps, 2, "une seule déclenchée"); eq(c.traps[1].card.id, "freezing_trap")
+    eq(c.enemies[1].hp, 100 - P - num("counterattack", 1), "Counterattack sur l'attaquant")
+    eq(c.player.hp, hp - 3 * 8, "attaque à trois coups : la Trap ne part qu'une fois")
+    -- Freezing Trap : Demoralized dès l'attaque en cours (tous ses coups), Stunned : le prochain tour
+    hp = c.player.hp
+    Combat.endTurn(c)
+    eq(#c.traps, 1); eq(c.player.hp, hp - 3 * math.floor(8 * 0.75), "Demoralized sur les trois coups")
+    eq(c.enemies[1].st.stunned, 1)
+    hp = c.player.hp
+    Combat.endTurn(c)
+    eq(c.player.hp, hp, "étourdi : pas d'attaque"); eq(#c.traps, 1, "la Trap attend")
+    local q = setup({ "counterattack" }, { "test_dummy" }, nil, HU)
+    Combat.play(q, 1)
+    Combat.endTurn(q); Combat.endTurn(q)
+    eq(#q.traps, 1, "ennemi qui n'attaque pas : la Trap reste posée")
+  end)
+
+  test("Traps : deux attaquants, chacun la sienne ; l'attaquant tué par la Trap n'attaque pas ; tour sauté : rien", function()
+    local c = setup({ "counterattack", "counterattack" }, { "test_hitter", "test_frail" }, nil, HU)
+    c.player.mana = 9
+    Combat.play(c, 1); Combat.play(c, 1)
+    local hp = c.player.hp
+    Combat.endTurn(c)
+    eq(#c.traps, 0)
+    eq(c.enemies[1].hp, 100 - P - num("counterattack", 1)); eq(c.enemies[2].dead, true)
+    eq(c.player.hp, hp - 10, "seul le premier a frappé")
+    local s = setup({ "counterattack" }, { "test_hitter" }, nil, HU)
+    Combat.play(s, 1)
+    s.player.flags.skipEnemyTurn = true
+    Combat.endTurn(s)
+    eq(#s.traps, 1, "tour ennemi sauté : aucune Trap")
+    -- fin de combat : un nouveau combat repart sans Trap (le deck est reconstitué)
+    local n = setup({ "disengage" }, nil, { "counterattack" }, HU)
+    eq(#n.traps, 0)
+  end)
+
+  test("Hunter : Growl (Spend 2 au choix), Counter Shot, Wailing Arrow, Readiness, Hunter's Mark, Rapid Fire", function()
+    local g = setup({ "growl", "growl" }, nil, nil, HU)
+    g.player.res = 3
+    Combat.play(g, 1)
+    eq(g.player.block, 12); eq(g.player.res, 1)
+    Combat.play(g, 1)
+    eq(g.player.block, 18, "pas assez de Frenzy : sans bonus"); eq(g.player.res, 1)
+    local k = setup({ "counter_shot" }, { "test_caster" }, nil, HU)
+    Combat.play(k, 1, 1)
+    eq(k.enemies[1].interrupted, true); eq(k.enemies[1].hp, 100 - P)
+    local w = setup({ "wailing_arrow" }, { "test_caster", "test_caster" }, nil, HU)
+    Combat.play(w, 1)
+    assert(w.enemies[1].interrupted and w.enemies[2].interrupted)
+    eq(w.enemies[2].hp, 100 - num("wailing_arrow", 1)); eq(w.exhaust[1].id, "wailing_arrow")
+    local r = setup({ "kill_command", "rapid_fire", "readiness" }, nil, nil, HU)
+    r.player.mana = 9
+    Combat.play(r, 1, 1); Combat.play(r, 1, 1)
+    eq(#r.cooldown, 2)
+    Combat.play(r, 1)
+    eq(#r.cooldown, 0); eq(r.hand[1].id, "kill_command"); eq(r.hand[2].id, "rapid_fire")
+    local m = setup({ "hunters_mark", "rapid_fire" }, nil, nil, HU)
+    Combat.play(m, 1, 1)
+    eq(m.enemies[1].st.armor_broken, 3)
+    Combat.play(m, 1, 1)
+    eq(m.enemies[1].hp, 100 - 4 * math.floor(num("rapid_fire", 1) * 1.25))
+  end)
+
+  test("Hunter : Powers (Spirit Bond, The Beast Within, Trueshot Aura coup par coup, Entrapment, Lock and Load, Resourcefulness)", function()
+    local sb = setup({ "spirit_bond" }, nil, nil, HU)
+    sb.player.mana = 3
+    Combat.play(sb, 1)
+    Combat.endPlayerTurn(sb)
+    eq(sb.player.block, 2, "attaque automatique : +2 Absorb")
+    local bw = setup({ "the_beast_within", "concussive_shot", "disengage" }, nil, nil, HU)
+    bw.player.mana = 9
+    Combat.play(bw, 1)
+    bw.events = {}
+    Combat.play(bw, 1, 1)
+    eq(#petHits(bw), 1, "après une Attack")
+    bw.events = {}
+    Combat.play(bw, 1)
+    eq(#petHits(bw), 0, "pas après une Skill")
+    local ta = setup({ "trueshot_aura", "rapid_fire" }, nil, nil, HU)
+    Combat.play(ta, 1)
+    ta.enemies[1].hp = 64
+    Combat.play(ta, 1, 1)
+    -- 64 -> 57 (3+4) -> 50 (3+4) -> 47 (moitié exacte : plus de bonus) -> 44
+    eq(ta.enemies[1].hp, 44, "bonus perdu en cours de route")
+    local en = setup({ "entrapment", "frost_trap", "counterattack" }, { "test_hitter" }, { "disengage", "disengage" }, HU)
+    en.player.mana = 9
+    Combat.play(en, 1)
+    Combat.play(en, 1)
+    Combat.endPlayerTurn(en); Combat.enemyPhase(en)
+    eq(en.enemies[1].st.demoralized, 2, "Frost Trap 1 + Entrapment 1")
+    local ll = setup({ "lock_and_load", "counterattack" }, { "test_hitter" }, nil, HU)
+    Combat.play(ll, 1)
+    Combat.play(ll, 1)
+    Combat.endPlayerTurn(ll)
+    local nh = #ll.hand
+    Combat.enemyPhase(ll)
+    eq(#ll.hand, nh + 1, "une carte piochée pendant le tour ennemi")
+    local rf = setup({ "resourcefulness", "counterattack" }, { "test_hitter" }, nil, HU)
+    rf.player.mana = 9
+    Combat.play(rf, 1)
+    Combat.play(rf, 1)
+    Combat.endPlayerTurn(rf)
+    Combat.enemyPhase(rf)
+    eq(rf.hand[#rf.hand].id, "counterattack", "la Trap revient en main")
+  end)
+
+  test("Hunter : Feign Death (tour ennemi annulé : coups restants et ennemis suivants ; DoT : prochain tour sauté), une fois", function()
+    local c = setup({ "feign_death" }, { "test_triple", "test_hitter" }, nil, HU)
+    Combat.play(c, 1)
+    c.player.hp = 5
+    Combat.endTurn(c)
+    eq(c.result, nil); eq(c.player.hp, 1, "reste à 1 PV : coups restants et ennemi suivant annulés")
+    eq(c.player.flags.skipEnemyTurn, nil)
+    c.player.block = 0
+    Combat.endTurn(c)
+    eq(c.result, "lost", "une seule fois")
+    local d = setup({ "feign_death" }, { "test_hitter" }, nil, HU)
+    Combat.play(d, 1)
+    Combat.endPlayerTurn(d); Combat.enemyPhase(d); Combat.endRound(d)
+    d.player.hp, d.player.st.pain = 3, 5
+    Combat.startPlayerTurn(d)
+    eq(d.player.hp, 1); eq(d.player.flags.skipEnemyTurn, true)
+    local hp = d.player.hp
+    Combat.endPlayerTurn(d); Combat.enemyPhase(d)
+    eq(d.player.hp, hp, "tour ennemi sauté")
+  end)
+
+  test("Hunter : bibelots (Pet Whistle, Kibler's Bits, Light Quiver, Net-o-Matic, Devilsaur Eye, Rhok'delar)", function()
+    local pw = setup({ "disengage" }, nil, nil, { class = "hunter", relics = { "pet_whistle" } })
+    eq(pw.enemies[1].hp, 100 - P); eq(pw.player.res, 1, "Frenzy 1 au premier tour")
+    local kb = setup({ "disengage" }, nil, nil, { class = "hunter", relics = { "kiblers_bits" } })
+    eq(kb.player.res, 2)
+    local lq = setup({ "aimed_shot", "concussive_shot" }, nil, nil, { class = "hunter", relics = { "light_quiver" } })
+    lq.player.mana = 9
+    lq.enemies[1].hp = 40
+    Combat.play(lq, 2, 1)
+    eq(lq.enemies[1].hp, 40 - num("concussive_shot", 1), "Attack sans Cast : rien")
+    lq.enemies[1].st.demoralized = nil
+    local nm = setup({ "counterattack", "frost_trap" }, nil, nil, { class = "hunter", relics = { "net_o_matic" } })
+    eq(Combat.cost(nm, nm.hand[1]), 0)
+    Combat.play(nm, 1)
+    eq(nm.player.mana, 3); eq(Combat.cost(nm, nm.hand[1]), 1, "la première seulement")
+    local de = setup({ "concussive_shot" }, { "test_dummy", "test_dummy" }, nil, { class = "hunter", relics = { "devilsaur_eye" } })
+    de.enemies[1].hp = 2
+    Combat.play(de, 1, 1)
+    eq(de.player.res, 2)
+    local rk = setup({ "concussive_shot", "concussive_shot" }, nil, nil, { class = "hunter", relics = { "rhokdelar" } })
+    Combat.play(rk, 1, 1)
+    eq(rk.enemies[1].hp, 100 - num("concussive_shot", 1) - 5, "premier tour : +5")
+    Combat.endTurn(rk)
+    local i = handIndex(rk, "concussive_shot")
+    if i then
+      local hp = rk.enemies[1].hp
+      rk.enemies[1].st.armor_broken = nil
+      Combat.play(rk, i, 1)
+      eq(rk.enemies[1].hp, hp - num("concussive_shot", 1), "tour suivant : rien")
+    end
+  end)
+
+  -- Textes conformes aux effets : chaque nombre de dégâts, d'Absorb, de pioche, de Frenzy, d'attaques du
+  -- familier, et chaque mot de la plaque (Cast, Trap, Cooldown N, Exhaust, Power) est dans le texte.
+  test("Hunter : 34 cartes (base et améliorée) jouables sans erreur, textes conformes aux effets", function()
+    local n, bad = 0, {}
+    local function has(t, s) return t:find(s, 1, true) ~= nil end
+    for id, d0 in pairs(ns.Cards) do
+      if d0.class == "hunter" then
+        for _, up in ipairs({ false, true }) do
+          local d = Card.defById(id, up)
+          local t, lab = d.text, id .. (up and "+" or "")
+          for _, e in ipairs(d.effects) do
+            local k = e[1]
+            if k == "damage" then
+              local w = (e.times == 4 and ("eal " .. e[2] .. " four times")) or ("eal " .. e[2] .. (e.all and " to all" or "."))
+              if not has(t, w) then bad[#bad + 1] = lab .. " : " .. w end
+              for _, m in ipairs(e.more or {}) do
+                if not has(t, "deal " .. m[1] .. " more") then bad[#bad + 1] = lab .. " : more" end
+              end
+            elseif k == "absorb" and not has(t, "ain " .. e[2] .. " Absorb") then bad[#bad + 1] = lab .. " : absorb"
+            elseif k == "draw" and not has(t, "raw " .. e[2] .. ".") then bad[#bad + 1] = lab .. " : draw"
+            elseif k == "res" and not has(t, "+" .. e[2] .. " Frenzy.") then bad[#bad + 1] = lab .. " : res"
+            elseif k == "pet" then
+              local w = e.surge and "pet attacks once per Frenzy." or (e[2] == 2 and "et attacks twice." or "et attacks.")
+              if not has(t, w) then bad[#bad + 1] = lab .. " : pet" end
+            elseif k == "interrupt" and not has(t, e.all and "Interrupt all casts." or "Interrupt the target's cast.") then
+              bad[#bad + 1] = lab .. " : interrupt"
+            end
+          end
+          if (d.cast == true) ~= has(t, "Cast.\n") then bad[#bad + 1] = lab .. " : Cast" end
+          if (d.trap == true) ~= (t:find("^Trap%.\n") ~= nil) then bad[#bad + 1] = lab .. " : Trap" end
+          if (d.power == true) ~= (t:find("^Power%.\n") ~= nil) then bad[#bad + 1] = lab .. " : Power" end
+          if (d.exhaust == true) ~= has(t, "Exhaust.") then bad[#bad + 1] = lab .. " : Exhaust" end
+          if d.cooldown and not has(t, "Cooldown " .. d.cooldown .. ".") then bad[#bad + 1] = lab .. " : Cooldown" end
+          if d.trap and d.type ~= "skill" then bad[#bad + 1] = lab .. " : Trap = Skill" end
+          -- jouable : sur un ennemi passif et un lanceur, puis deux tours (Traps contre un attaquant)
+          local c = setup({ id }, { "test_dummy", "test_hitter" }, { "disengage", "disengage", "disengage", "disengage" },
+            { class = "hunter", hp = 60 })
+          c.player.mana, c.player.res = 9, 5
+          c.hand[1] = Card.new(id, up, 999)
+          c.enemies[1].hp = 40
+          local ok, why = Combat.play(c, 1, 1)
+          if not ok then bad[#bad + 1] = lab .. " : injouable (" .. tostring(why) .. ")" end
+          Combat.endTurn(c)
+          Combat.endTurn(c)
+          n = n + 1
+        end
+      end
+    end
+    eq(n, 68)
+    assert(#bad == 0, table.concat(bad, " ; "))
+  end)
+
+  test("Hunter : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveaux 1 à 7, 6 bibelots, Interrupt et Last Breath", function()
+    local r, paths, nInt, nLb = {}, {}, 0, 0
+    for id, d in pairs(ns.Cards) do
+      if d.class == "hunter" then
+        r[d.rarity] = (r[d.rarity] or 0) + 1
+        paths[d.path] = (paths[d.path] or 0) + 1
+        assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
+        if d.rarity == "basic" then eq(d.level, 1, id) end
+        for _, e in ipairs(d.effects) do if e[1] == "interrupt" then nInt = nInt + 1 end end
+        if d.hooks and d.hooks.preventDeath then nLb = nLb + 1 end
+      end
+    end
+    eq(r.basic, 4); eq(r.common, 13); eq(r.uncommon, 11); eq(r.rare, 6)
+    eq(paths.start, 4); eq(paths.beast_mastery, 10); eq(paths.marksmanship, 10); eq(paths.survival, 10)
+    assert(nInt >= 2 and nLb == 1)
+    local nr = 0
+    for id, rel in pairs(ns.Relics) do
+      if rel.class == "hunter" then
+        nr = nr + 1
+        assert(type(rel.level) == "number" and rel.level >= 1 and rel.level <= 7, id .. " : level")
+      end
+    end
+    eq(nr, 6)
+    local cd = ns.Classes.hunter
+    eq(#cd.deck, 10); eq(cd.resource.id, "frenzy"); eq(cd.resource.cap, 5); eq(cd.resource.keep, true)
+    eq(cd.startRelic, "pet_whistle"); eq(ns.Relics.pet_whistle.noPool, true)
+    -- niveaux de la fiche (§ 5) : quelques repères
+    eq(ns.Cards.dire_beast.level, 2); eq(ns.Cards.readiness.level, 4); eq(ns.Cards.feign_death.level, 6)
+    eq(ns.Cards.the_beast_within.level, 7); eq(ns.Relics.net_o_matic.level, 5); eq(ns.Relics.light_quiver.level, 3)
+  end)
+
+  test("Hunter : état cloné (Traps, cible), bots : clé et valeur propres, combat simulé sans erreur", function()
+    local c = setup({ "counterattack", "concussive_shot" }, { "test_dummy", "test_dummy" }, nil, HU)
+    Combat.play(c, 1)
+    Combat.play(c, 1, 2)
+    local t = Combat.clone(c)
+    table.remove(t.traps)
+    eq(#c.traps, 1)
+    local cr = ns.ClassRules.hunter
+    assert(cr.botKey(c):find("counterattack", 1, true))
+    eq(cr.botValue(c, ns.Bots.W), Hn.TRAP_VALUE)
+    local r = ns.Run.play({ seed = 4, bot = "heuristic", class = "hunter", cap = 120 })
+    assert(r.combats[1] ~= nil)
+  end)
+
+  ns.Enemies.test_triple, ns.Enemies.test_frail = nil, nil
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

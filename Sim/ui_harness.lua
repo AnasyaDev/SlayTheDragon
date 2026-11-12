@@ -3474,7 +3474,7 @@ do
     for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
     return out
   end
-  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$" }
+  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$" }
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
   -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
   -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle
@@ -5469,8 +5469,11 @@ do
   ns = H.ns
   local fakes = { "rogue", "mage", "warlock", "hunter", "paladin", "shaman", "druid" }
   for i, f in ipairs(fakes) do
-    ns.Classes["zz_" .. f] = { id = "zz_" .. f, name = f:sub(1, 1):upper() .. f:sub(2), order = 2 + i, hp = 70, deck = {},
-      resource = { id = "rage" } }
+    -- une classe déjà codée (Hunter…) compte pour elle-même : neuf classes en tout
+    if not ns.Classes[f] then
+      ns.Classes["zz_" .. f] = { id = "zz_" .. f, name = f:sub(1, 1):upper() .. f:sub(2), order = 2 + i, hp = 70, deck = {},
+        resource = { id = "rage" } }
+    end
   end
   H.slash("")
   H.settle()
@@ -5994,6 +5997,200 @@ if SNAP then
     W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
   end
   Render.svg(H, big, SNAP .. "/cartes_mage.svg", "cartes du Mage (base, améliorée)")
+  big:Hide()
+end
+
+print("UH  Hunter : choix sur l'accueil, combat (familier dans la scène, cible, Traps posées, pastille de Frenzy), dessus des modèles")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function under(o, top)
+    while o do if o == top then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function above(o, t) return R.drawnBefore(R.drawKey(t), R.drawKey(o)) end
+  local function inter(a, b) return a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5 end
+  local function isRegion(o)
+    local k = rawget(o, "_kind")
+    if k == "Texture" then return rawget(o, "_texture") ~= nil or (o._calls.SetColorTexture ~= nil) end
+    if k == "FontString" then return (rawget(o, "_text") or "") ~= "" end
+    return false
+  end
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  -- accueil : le Hunter est proposé (ordre 5, après le Guerrier), choisissable
+  local ids = {}
+  for _, o in ipairs(UI().step.options) do if o.group == "class" then ids[#ids + 1] = o.id end end
+  local joined = table.concat(ids, ",")
+  check("accueil : Hunter proposé après Priest et Warrior", joined:find("^class:priest,class:warrior") ~= nil
+    and joined:find("class:hunter", 1, true) ~= nil, joined)
+  local hb = button("class:hunter")
+  check("accueil : bouton du Hunter visible", hb and hb._shown and (hb.label._text or ""):find("Hunter", 1, true) ~= nil,
+    hb and hb.label._text)
+  clickOption("class:hunter")
+  check("accueil : clic sur le Hunter, il devient le choix", option("class:hunter").selected and not option("class:priest").selected)
+  snap("accueil-hunter", true)
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  check("départ : expédition du Hunter (classe, deck, Pet Whistle)", e and e.class == "hunter"
+    and ns.Cards[e.deck[1].id].class == "hunter" and e.relics[1] == "pet_whistle")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  check("combat du Hunter : Pet Whistle, le familier a déjà frappé (Frenzy 1)", c and c.class == "hunter" and c.player.res == 1)
+  -- une Trap posée par l'interface (Freezing Trap mise en main)
+  c.hand[1] = ns.Card.new("freezing_trap", false, 9001)
+  c.player.mana = 3
+  v:Render(true)
+  H.ns.Controller.act({ "play", 1 })
+  H.settle()
+  v:Render(true)
+  local host = v.classZone.views.hunter
+  check("vue de classe construite (familier, marqueur, cases de Traps)", host and host._shown and host.pet and host.mark and #host.traps == 3)
+  local pet = host.pet
+  check("familier dans la scène : figure visible (modèle ou médaillon), nom au-dessus sur l'étage f.ui",
+    vis(pet) and (vis(pet.model) or vis(pet.fallback)) and pet.name and pet.name._text == ns.Art.pet.name
+    and under(pet.name, pet.ui))
+  check("Trap posée : une case visible, icône de la carte, infobulle = la carte", #c.traps == 1 and vis(host.traps[1])
+    and not vis(host.traps[2]) and (host.traps[1].icon._texture or ""):lower():find("chainsofice", 1, true) ~= nil,
+    tostring(host.traps[1].icon._texture))
+  local tt = table.concat(H.hover(host.traps[1]), " | ")
+  check("infobulle de la Trap : nom, texte, déclenchement", tt:find("Freezing Trap", 1, true) and tt:find("Stunned", 1, true)
+    and tt:find("next enemy attack", 1, true), tt)
+  local tp = table.concat(H.hover(pet), " | ")
+  check("infobulle du familier : cible et dégâts, explication du Frenzy", tp:find("Attacks ", 1, true) and tp:find("Frenzy", 1, true), tp)
+  local tgt = ns.Hunter.petTarget(c)
+  local s = tgt and v.slotOf[tgt.uid]
+  check("marqueur de la cible du familier : visible, collé au cadre de l'ennemi visé", vis(host.mark) and s
+    and host.mark._points[1] and host.mark._points[1][2] == s.tag)
+  -- pastille de ressource : Frenzy
+  local r = v.resource
+  check("pastille de ressource : icône du Frenzy, nombre, visible", r._shown
+    and (r.icon._texture or ""):lower():find("ferociousinspiration", 1, true) ~= nil and r.text._text == tostring(c.player.res),
+    tostring(r.icon._texture) .. " / " .. tostring(r.text._text))
+  local tr = table.concat(H.hover(r), " | ")
+  check("pastille de ressource : explication du Frenzy et plafond", tr:find("Frenzy", 1, true) and tr:find(" / 5", 1, true), tr)
+  -- dessus des modèles : étage du familier, cases de Traps, marqueur ; aucun texte recouvert
+  local ms = {}
+  for _, o in ipairs(H.objects) do
+    if rawget(o, "_kind") == "PlayerModel" and under(o, ns.UI.content) and vis(o) then ms[#ms + 1] = o end
+  end
+  local bad, n = {}, 0
+  for _, root2 in ipairs({ pet.ui, host.traps[1], host.mark }) do
+    for _, o in ipairs(H.objects) do
+      if isRegion(o) and (o == root2 or under(o, root2)) and vis(o) then
+        n = n + 1
+        for _, m in ipairs(ms) do
+          if not above(o, m) then bad[#bad + 1] = tostring(rawget(o, "_text") or rawget(o, "_texture") or "?") break end
+        end
+      end
+    end
+  end
+  check(("familier (nom), Trap et marqueur : %d éléments au-dessus des %d modèles 3D"):format(n, #ms),
+    n > 0 and #ms >= 2 and #bad == 0, table.concat(bad, ", "))
+  local hidden = {}
+  for _, o in ipairs(H.objects) do
+    if rawget(o, "_kind") == "FontString" and isRegion(o) and under(o, ns.UI.content) and vis(o) then
+      local rr = R.rect(o)
+      for _, m in ipairs(ms) do
+        local mr = R.rect(m)
+        if rr and mr and inter(rr, mr) and not above(o, m) then hidden[#hidden + 1] = tostring(o._text) break end
+      end
+    end
+  end
+  check("combat du Hunter : aucun texte visible recouvert par un modèle", #hidden == 0, table.concat(hidden, ", "))
+  local sh = {}
+  for i, part in ipairs(pet.shadow.parts) do
+    if vis(part) and vis(pet.model) and not above(pet.model, part) then sh[#sh + 1] = i end
+  end
+  local nr, mr = R.rect(pet.name), R.rect(pet.model)
+  check("familier : ombre sous le modèle, nom hors du rectangle du modèle", #sh == 0 and nr and mr and not inter(nr, mr))
+  -- dans la scène : familier et cases de Traps dans la bande du décor, sans chevaucher les ennemis
+  local content = R.rect(ns.UI.content)
+  local inside = true
+  for _, o in ipairs({ pet, host.traps[1], host.traps[3], pet.name }) do
+    local rr = R.rect(o)
+    if not rr or rr[1] < content[1] or rr[3] > content[3] or rr[2] < content[2] or rr[4] > content[4] then inside = false end
+  end
+  local clash = {}
+  local pr = R.rect(pet)
+  for _, sl in pairs(v.slotOf) do
+    if sl:IsVisible() and inter(pr, R.rect(sl.fig.model)) then clash[#clash + 1] = tostring(sl.name._text) end
+  end
+  check("familier et Traps dans la fenêtre, le familier ne chevauche aucun ennemi", inside and #clash == 0, table.concat(clash, ", "))
+  snap("combat-hunter", true)
+  -- attaque du familier : bond dans la file d'animations, chiffre flottant de dégâts sur la cible
+  local floats = {}
+  local W = ns.Widgets
+  local old = W.float
+  W.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  local tw = 0
+  local oldTween = W.tween
+  W.tween = function(dur, fn, done, owner, key, ...) if owner == pet and key == "leap" then tw = tw + 1 end
+    return oldTween(dur, fn, done, owner, key, ...) end
+  local uid = tgt and tgt.uid
+  v:OnEvents({ { t = "pet_attack", dst = uid, dmg = 4, why = "auto" },
+    { t = "damage", src = "player", dst = uid, amount = 4, absorbed = 0, loss = 4 } })
+  H.advance(2)
+  W.float, W.tween = old, oldTween
+  check("attaque du familier : bond vers la cible et « -4 » flottant", tw == 1 and table.concat(floats, "|"):find("-4", 1, true) ~= nil,
+    tw .. " / " .. table.concat(floats, "|"))
+  -- fin du tour par l'interface : le familier frappe, le combat continue sans erreur
+  local hpBefore = tgt and tgt.hp
+  H.ns.Controller.act({ "endTurn" })
+  H.settle()
+  check("fin du tour : le familier a frappé sa cible", c.result or (tgt and (tgt.hp < hpBefore or tgt.dead)), tostring(hpBefore))
+  -- un combat d'une autre classe : la vue du Hunter et son familier disparaissent
+  H.boot(nil)
+  H.slash("")
+  clickOption("go")
+  local e2 = EXP()
+  local id2 = e2.map.start[1]
+  e2.map.nodes[id2].kind = "combat"
+  clickOption("path:" .. id2)
+  H.settle()
+  local v2 = V()
+  local h2 = v2.classZone.views.hunter
+  check("combat d'une autre classe (Priest) : pas de familier", e2.class ~= "hunter" and (h2 == nil or not vis(h2.pet)))
+end
+
+-- planche des cartes du Hunter (base et améliorée)
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local ids = {}
+  for id, d in pairs(ns.Cards) do if d.class == "hunter" then ids[#ids + 1] = id end end
+  local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
+  local PATH = { start = 0, beast_mastery = 1, marksmanship = 2, survival = 3 }
+  table.sort(ids, function(a, b)
+    local da, db = ns.Cards[a], ns.Cards[b]
+    if PATH[da.path] ~= PATH[db.path] then return PATH[da.path] < PATH[db.path] end
+    if RANK[da.rarity] ~= RANK[db.rarity] then return RANK[da.rarity] < RANK[db.rarity] end
+    return a < b
+  end)
+  local perRow, cw, ch = 10, 140, 230
+  local all = {}
+  for _, id in ipairs(ids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+  local rows = math.ceil(#all / perRow)
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, rows * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, e in ipairs(all) do
+    local c = W.card(big)
+    c:SetCard(e[1], e[2], { playable = true })
+    W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+  end
+  Render.svg(H, big, SNAP .. "/cartes_hunter.svg", "cartes du Hunter (base, améliorée)")
   big:Hide()
 end
 

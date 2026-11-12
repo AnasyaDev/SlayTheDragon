@@ -25,6 +25,8 @@ Data\Rogue.lua
 Core\Classes\rogue.lua
 Data\Mage.lua
 Core\Classes\mage.lua
+Data\Hunter.lua
+Core\Classes\hunter.lua
 Data\Act1.lua
 Data\Relics.lua
 Data\Potions.lua
@@ -35,6 +37,7 @@ UI\Art.lua
 UI\Art\warrior.lua
 UI\Art\rogue.lua
 UI\Art\mage.lua
+UI\Art\hunter.lua
 UI\Persist.lua
 UI\Controller.lua
 UI\Widgets.lua

@@ -17,6 +17,30 @@ des points de départ calés sur le Priest (`Data/Priest.lua`) ; la simulation l
 | Last Breath | Feign Death. |
 | Bibelot de départ | Pet Whistle. |
 
+## État de l'implémentation (12/11/2026)
+
+Codé : `Data/Hunter.lua`, `Core/Classes/hunter.lua`, `UI/Art/hunter.lua`, tests (`Sim/tests.lua`, bloc
+« Hunter » ; harnais, section UH). Écarts par rapport à cette fiche :
+
+- **Familier : 1 + Frenzy** (fiche : 3 + Frenzy ; `ns.Hunter.PET_BASE`). À 3, la simulation de fumée donnait
+  99 % de victoires à la clé 0 et le deck de départ seul en gagnait 95 % (Warrior : 0 %) ; à 1, 87 %.
+- **PV 55** (fiche et décisions : 65, « à régler par simulation »).
+- **Bestial Wrath coûte 2** (amélioré : 1), le levier prévu au risque 3.
+- **Baisse du Frenzy** posée en fin de round (crochet `onRoundEnd`), donc au début de chaque tour sauf le
+  premier mais avant la résolution des Cast (même effet que « avec le DoT et la Regen »).
+- **Careful Aim d'une carte** : verdict pris au début de sa résolution (toutes les lignes de la carte voient
+  la même cible : la pioche de Steady Shot ne dépend pas des 10 dégâts de la ligne d'avant) ; Trueshot Aura
+  reste coup par coup.
+- **Forme du socle** : « Pet attacks. » (jamais « Your pet »), mots de plaque dans le texte (« Trap. »,
+  « Power. »…), Spend = champ `spend`, ressource = `c.player.res`, cible = `c.player.lastTarget`, bibelot
+  de départ en rareté `common` + `noPool` (pas de rareté « Départ »), Entrapment : « Traps: also apply
+  Demoralized 1. » (sans sablier hors d'une ligne d'état), Feign Death : virgule au lieu du point-virgule.
+- **Niveaux** : champ `level` (1 à 7, § 5) sur chaque carte et bibelot, pas encore appliqué ; `rep` (20/5/5)
+  et `tier` dérivés de l'ordre des niveaux.
+- **Interface** : familier en modèle 3D (Young Wolf, repli en médaillon), marqueur rond sur sa cible, Traps en
+  cases sous le héros ; pas encore de crans autour de la pastille, de teinte rouge, de prévision de Trap sur
+  l'intention ni de griffe en pointillé au survol.
+
 ## 1. Règles propres
 
 ### Le familier
