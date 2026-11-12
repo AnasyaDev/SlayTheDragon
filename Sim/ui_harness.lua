@@ -3459,7 +3459,7 @@ do
     for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
     return out
   end
-  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$" }
+  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$" }
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
   -- ligne d'état : « Apply … », ou « Gain » suivi d'un nom (« Gain 5 Absorb. » est un effet)
   local function isStateCl(cl)
@@ -5360,8 +5360,8 @@ do
   -- accueil : Priest (order 1) choisi par défaut, Warrior proposé ; aucune autre classe
   local ids = {}
   for _, o in ipairs(UI().step.options) do if o.group == "class" then ids[#ids + 1] = o.id end end
-  check("accueil : classes jouables dans l'ordre (Priest, Warrior), Priest choisi par défaut",
-    table.concat(ids, ",") == "class:priest,class:warrior" and option("class:priest").selected
+  check("accueil : classes jouables dans l'ordre (Priest, Warrior, puis les autres), Priest choisi par défaut",
+    table.concat(ids, ","):find("^class:priest,class:warrior") ~= nil and option("class:priest").selected
     and not option("class:warrior").selected, table.concat(ids, ","))
   local wb = button("class:warrior")
   check("accueil : bouton du Guerrier (PV, cartes, réputation)", wb and wb._shown and (wb.sub._text or ""):find(ns.Classes.warrior.hp .. " HP", 1, true)
@@ -5426,8 +5426,11 @@ do
   ns = H.ns
   local fakes = { "rogue", "mage", "warlock", "hunter", "paladin", "shaman", "druid" }
   for i, f in ipairs(fakes) do
-    ns.Classes["zz_" .. f] = { id = "zz_" .. f, name = f:sub(1, 1):upper() .. f:sub(2), order = 2 + i, hp = 70, deck = {},
-      resource = { id = "rage" } }
+    -- une classe déjà codée (Hunter…) compte pour elle-même : neuf classes en tout
+    if not ns.Classes[f] then
+      ns.Classes["zz_" .. f] = { id = "zz_" .. f, name = f:sub(1, 1):upper() .. f:sub(2), order = 2 + i, hp = 70, deck = {},
+        resource = { id = "rage" } }
+    end
   end
   H.slash("")
   H.settle()

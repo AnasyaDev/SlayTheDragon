@@ -1059,6 +1059,12 @@ function V:QueueEvent(ev)
   local t = ev.t
   local A = Art.anim
   local self_ = self
+  -- vue de la classe : ses propres animations, dans la même file (ns.ClassViews[classe].event(hôte, ev, vue),
+  -- qui appelle vue:Push ; familier du Hunter), avant celles de l'événement commun
+  local cls = self.c and self.c.class
+  local cv = cls and ns.ClassViews and ns.ClassViews[cls]
+  local host = cv and cv.event and self.classZone.views[cls]
+  if host then cv.event(host, ev, self) end
   if t == "play" then
     local pp = self.pendingPlay
     self.pendingPlay = nil
