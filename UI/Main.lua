@@ -926,6 +926,25 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   elseif msg == "scenery" or msg:match("^scenery%s") then
     decorCommand(msg:match("^scenery%s*(.*)$") or "")
   elseif msg == "center" or msg == "reset" then opts().point = nil if UI.frame then UI.applyPosition() end
+  elseif msg == "fire" or msg:match("^fire%s") then
+    -- cadrage du modèle du feu de camp (non vérifiable hors jeu) : échelle, hauteur, orientation ;
+    -- « reset » rend les valeurs d'Art.campfire. Appliqué au feu affiché, gardé dans les options.
+    local a, b, c = msg:match("^fire%s+(%S+)%s+(%S+)%s+(%S+)")
+    a, b, c = tonumber(a), tonumber(b), tonumber(c)
+    if msg:match("^fire%s+reset") then
+      opts().fireCam = nil
+      say("campfire framing: defaults.")
+    elseif a and b and c then
+      opts().fireCam = { a, b, c }
+      say(("campfire framing: scale %g, height %g, facing %g."):format(a, b, c))
+    else
+      local o = opts().fireCam
+      say("usage: /slay fire <scale> <height> <facing>  (e.g. 1 0 0.5), or /slay fire reset; now: "
+        .. (type(o) == "table" and table.concat(o, " ") or "defaults") .. ".")
+      return
+    end
+    local camp = UI.screens.campfire
+    if camp and camp.fire and camp.fire.model then Scene.fireCam(camp.fire.model) end
   elseif msg:match("^facing") then
     local p, e = msg:match("^facing%s+(%S+)%s+(%S+)")
     p, e = tonumber(p), tonumber(e)
@@ -938,6 +957,6 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
     end
   else
     say("/slay: open/close; /slay options; /slay art (scenery, missing art); /slay models; "
-      .. "/slay scenery [test]; /slay facing <p> <e>; /slay center")
+      .. "/slay scenery [test]; /slay facing <p> <e>; /slay fire <scale> <height> <facing>; /slay center")
   end
 end
