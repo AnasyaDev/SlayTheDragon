@@ -1717,7 +1717,8 @@ function W.addStatusLines(tt, id, n)
   local name, text = W.statusText(id, n)
   local s = ns.Statuses[id]
   local suffix = ""
-  if n and n > 0 then suffix = s and s.duration and (" (" .. n .. " turn" .. (n > 1 and "s" or "") .. ")")
+  -- état à drapeau (Stealth) : présent ou non, sans nombre
+  if n and n > 0 and not (s and s.flag) then suffix = s and s.duration and (" (" .. n .. " turn" .. (n > 1 and "s" or "") .. ")")
     or (" " .. n) end
   local bad = s and (s.debuff or s.affix)
   tt:AddLine(name .. suffix, bad and 1 or 0.4, bad and 0.35 or 0.9, bad and 0.35 or 0.4)
@@ -2045,7 +2046,7 @@ function W.unitStatuses(unit)
     local src = unit.stIcon and unit.stIcon[id]
     list[#list + 1] = {
       icon = (src and Art.statusIcons[src]) or Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
-      n = type(n) == "number" and n or nil,
+      n = (type(n) == "number" and not (s and s.flag)) and n or nil, -- état à drapeau : sans nombre
       rim = bad and Art.rim.debuff or nil,
       text = (s and s.name or id), -- nom (infobulle, harnais)
       info = { status = id, n = n }, key = "status:" .. id,

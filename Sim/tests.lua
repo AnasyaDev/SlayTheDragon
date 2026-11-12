@@ -1064,5 +1064,393 @@ test("tour ennemi sauté (drapeau skipEnemyTurn), Interrupt de tous, onAttackHit
   eq(hits, 2); eq(surged, 4)
 end)
 
+---------------------------------------------------------------------------
+-- Rogue : Combo Points, Parry, Stealth, effets du DoT, cartes et bibelots (docs/classes/rogue.md)
+---------------------------------------------------------------------------
+
+local RO = { class = "rogue" } -- options de Combat.new pour un combat de Voleur
+ns.Enemies.test_big = { name = "Fracas", hp = 100,
+  moves = { smash = { name = "Fracas", intent = "attack", actions = { { "attack", 18 } } } }, pattern = { "smash" } }
+ns.Enemies.test_triple = { name = "Moisson", hp = 100,
+  moves = { reap = { name = "Moisson", intent = "attack", actions = { { "attack", 8, times = 3 } } } }, pattern = { "reap" } }
+ns.Enemies.test_poke = { name = "Piqûre", hp = 100,
+  moves = { poke = { name = "Piqûre", intent = "attack", actions = { { "attack", 6, interrupts = true } } } },
+  pattern = { "poke" } }
+ns.Enemies.test_weak = { name = "Chiquenaude", hp = 100,
+  moves = { tap = { name = "Rien", intent = "attack", actions = { { "attack", 0 } } } }, pattern = { "tap" } }
+
+-- Ennemi n° i à hp PV (tests de dégâts lisibles).
+local function hpOf(c, i) return c.enemies[i or 1].hp end
+
+test("Rogue : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveau 1 à 7 sur tout, 6 bibelots, Kick et Cheat Death", function()
+  local r, paths, nInt, nLb, lv = {}, {}, 0, 0, {}
+  for id, d in pairs(ns.Cards) do
+    if d.class == "rogue" then
+      r[d.rarity] = (r[d.rarity] or 0) + 1
+      paths[d.path] = (paths[d.path] or 0) + 1
+      assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
+      lv[d.level] = (lv[d.level] or 0) + 1
+      for _, e in ipairs(d.effects) do if e[1] == "interrupt" then nInt = nInt + 1 end end
+      if d.hooks and d.hooks.preventDeath then nLb = nLb + 1 end
+    end
+  end
+  eq(r.basic, 4); eq(r.common, 13); eq(r.uncommon, 11); eq(r.rare, 6)
+  eq(paths.start, 4); eq(paths.assassination, 10); eq(paths.combat, 10); eq(paths.subtlety, 10)
+  eq(lv[1], 22, "niveau 1 : 18 + 4 de départ"); eq(lv[2], 3); eq(lv[4], 3); eq(lv[6], 3); eq(lv[7], 3)
+  eq(nInt, 1); eq(nLb, 1)
+  local nr = 0
+  for id, rel in pairs(ns.Relics) do
+    if rel.class == "rogue" then
+      nr = nr + 1
+      assert(type(rel.level) == "number" and rel.level >= 1 and rel.level <= 7, id .. " : level")
+    end
+  end
+  eq(nr, 6)
+  local cd = ns.Classes.rogue
+  eq(#cd.deck, 10); eq(cd.resource.id, "combo"); eq(cd.resource.cap, 5); eq(cd.resource.keep, true)
+  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 60)
+  eq(Card.defById("kick").cost, 0)
+end)
+
+test("Combo Points : plafond 5, gardés d'un tour à l'autre, 0 au début du combat", function()
+  local c = setup({ "sinister_strike" }, nil, nil, RO)
+  eq(c.player.res, 0)
+  Combat.gainRes(c, 4)
+  Combat.play(c, 1, 1)
+  eq(c.player.res, 5)
+  eq(Combat.gainRes(c, 3), 0, "au-delà de 5 : perdu")
+  Combat.endTurn(c)
+  eq(c.player.res, 5, "gardés")
+end)
+
+test("Parry : un coup paré jusqu'à 8, le reste passe ; charges gardées d'un tour à l'autre, 3 au plus", function()
+  local c = setup({ "feint", "feint", "feint", "feint" }, { "test_hitter" }, nil, RO)
+  c.player.mana = 4
+  for _ = 1, 4 do Combat.play(c, 1) end
+  eq(c.player.st.parry, 3, "plafond 3")
+  local hp = c.player.hp
+  Combat.endTurn(c)
+  eq(c.player.hp, hp - 2, "coup de 10 : 8 parés, 2 passent"); eq(c.player.st.parry, 2)
+  local k = setup({ "feint" }, { "test_dummy" }, nil, RO)
+  Combat.play(k, 1)
+  Combat.endTurn(k); Combat.endTurn(k)
+  eq(k.player.st.parry, 1, "gardée sans coup reçu")
+end)
+
+test("Parry : avant l'Absorb (Fracas 18, Parry 1, 5 Absorb : 8 parés, 5 absorbés, 5 PV)", function()
+  local c = setup({ "feint" }, { "test_big" }, nil, RO)
+  Combat.play(c, 1)
+  c.player.block = 5
+  local hp = c.player.hp
+  Combat.endPlayerTurn(c); Combat.enemyPhase(c)
+  eq(c.player.hp, hp - 5); eq(c.player.block, 0); eq(c.player.st.parry, nil)
+  local stopped
+  for _, ev in ipairs(c.events) do if ev.t == "parry" then stopped = ev.prevented end end
+  eq(stopped, 8, "événement parry")
+end)
+
+test("Parry : une charge par coup (Moisson 8 × 3, Parry 2 : le troisième touche), coup de 0 ignoré", function()
+  local c = setup({ "evasion" }, { "test_triple" }, nil, RO)
+  Combat.play(c, 1)
+  local hp = c.player.hp
+  Combat.endPlayerTurn(c); Combat.enemyPhase(c)
+  eq(c.player.hp, hp - 8); eq(c.player.st.parry, nil)
+  local z = setup({ "feint" }, { "test_weak" }, nil, RO)
+  Combat.play(z, 1)
+  Combat.endTurn(z)
+  eq(z.player.st.parry, 1, "coup de 0 : aucune charge")
+end)
+
+test("Parry : jamais contre le DoT ; un coup entièrement paré ne coupe pas l'incantation", function()
+  local c = setup({ "feint" }, nil, nil, RO)
+  Combat.play(c, 1)
+  c.player.st.pain = 5
+  local hp = c.player.hp
+  Combat.endTurn(c)
+  eq(c.player.hp, hp - 5, "DoT subi"); eq(c.player.st.parry, 1)
+  local i = setup({ "feint", "slam" }, { "test_poke" }, nil, RO)
+  Combat.play(i, 1)
+  Combat.play(i, 1, 1)
+  assert(i.player.cast ~= nil)
+  Combat.endTurn(i)
+  eq(hpOf(i), 100 - num("slam", 1), "coup paré : l'incantation part")
+end)
+
+test("Stealth : posé au début du combat, sans nombre ; ne s'empile pas", function()
+  local c = setup({ "vanish", "vanish" }, nil, { "sinister_strike", "sinister_strike" }, RO)
+  eq(c.player.st.stealth, 1)
+  assert(ns.Statuses.stealth.flag and ns.Statuses.parry.max == 3)
+  Combat.play(c, 1)
+  eq(c.player.st.stealth, 1, "déjà caché : rien")
+end)
+
+test("Stealth : consommé par la première Attack (même sans ligne Stealth:), son bonus à la résolution", function()
+  local d = Card.defById("backstab")
+  local base, bonus = d.effects[1][2], d.effects[1].more[1][1]
+  local c = setup({ "backstab", "backstab" }, nil, nil, RO)
+  Combat.play(c, 1, 1)
+  eq(hpOf(c), 100 - base - bonus, "Backstab caché"); eq(c.player.st.stealth, nil)
+  Combat.play(c, 1, 1)
+  eq(hpOf(c), 100 - 2 * base - bonus, "la seconde sans bonus")
+  local s = setup({ "sinister_strike", "backstab" }, nil, nil, RO)
+  Combat.play(s, 1, 1)
+  eq(s.player.st.stealth, nil, "Sinister Strike consomme")
+  Combat.play(s, 1, 1)
+  eq(hpOf(s), 100 - num("sinister_strike", 1) - base)
+  eq(next(s.cls.openers), nil, "rien ne reste après la résolution")
+end)
+
+test("Stealth : lu sans être consommé par les Skills (Premeditation, Cheap Shot), puis Ambush", function()
+  local c = setup({ "premeditation", "cheap_shot", "ambush" }, nil, { "feint", "feint" }, RO)
+  c.player.mana = 4
+  Combat.play(c, 1)
+  eq(c.player.res, 2); eq(c.player.st.stealth, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.res, 4); eq(c.enemies[1].st.stunned, 1); eq(c.player.st.stealth, 1)
+  Combat.play(c, handIndex(c, "ambush"), 1)
+  local d = Card.defById("ambush")
+  eq(hpOf(c), 100 - d.effects[1][2] - d.effects[1].more[1][1]); eq(c.player.res, 5); eq(c.player.st.stealth, nil)
+  local n = setup({ "sinister_strike", "premeditation", "cheap_shot" }, nil, nil, RO)
+  Combat.play(n, 1, 1)
+  Combat.play(n, 1)
+  eq(n.player.res, 1, "Premeditation sans Stealth")
+  Combat.play(n, 1, 1)
+  eq(n.enemies[1].st.stunned, nil, "Cheap Shot sans Stealth : pas d'étourdissement")
+end)
+
+test("Stealth : rendu par Vanish et Shadowstep ; Flash Powder seulement sur un gain réel par une carte", function()
+  local c = setup({ "sinister_strike", "vanish", "shadowstep", "vanish" }, nil, { "feint", "feint", "feint" },
+    { class = "rogue", relics = { "flash_powder" } })
+  c.player.mana = 5
+  local hand = #c.hand
+  eq(hand, 4, "Stealth du début de combat : pas de pioche")
+  Combat.play(c, 1, 1)
+  Combat.play(c, 1)
+  eq(c.player.st.stealth, 1); eq(#c.hand, 2 + 1 + 1, "Vanish : pioche 1, Flash Powder 1")
+  Combat.play(c, handIndex(c, "shadowstep"))
+  eq(#c.hand, 3, "déjà caché : pas de Flash Powder"); eq(c.player.st.parry, 1)
+end)
+
+test("Stealth : une Attack en Cast le consomme au jeu et garde le bonus pour sa résolution", function()
+  ns.Cards.test_cast_stealth = { id = "test_cast_stealth", name = "x", cost = 0, type = "attack", rarity = "common",
+    target = "enemy", cast = true, effects = { { "damage", 5, more = { { 10, "stealth" } } } },
+    text = "Cast.\nDeal 5.\nStealth: deal 10 more." }
+  local c = setup({ "test_cast_stealth" }, nil, nil, RO)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.stealth, nil)
+  Combat.endTurn(c)
+  eq(hpOf(c), 85)
+  ns.Cards.test_cast_stealth = nil
+end)
+
+test("Surge à 0 : Eviscerate, Rupture, Exsanguinate injouables ; Envenom, Secret Technique, Between the Eyes jouables", function()
+  for _, id in ipairs({ "eviscerate", "rupture", "exsanguinate" }) do
+    local c = setup({ id }, nil, nil, RO)
+    eq(select(2, Combat.canPlay(c, 1)), "resource", id)
+  end
+  local e = setup({ "envenom" }, nil, nil, RO)
+  e.enemies[1].st.pain = 4
+  Combat.play(e, 1, 1)
+  eq(hpOf(e), 96, "Envenom à 0 : éclate seulement"); eq(e.enemies[1].st.pain, 3)
+  local s = setup({ "secret_technique" }, nil, nil, RO)
+  assert(Combat.canPlay(s, 1))
+  local b = setup({ "between_the_eyes" }, nil, nil, RO)
+  Combat.play(b, 1, 1)
+  eq(hpOf(b), 100); eq(b.enemies[1].st.stunned, 1)
+end)
+
+test("Eviscerate : 5 + 5 par point ; Between the Eyes : 4 par point et Stunned", function()
+  local c = setup({ "eviscerate" }, nil, nil, RO)
+  c.player.res = 4
+  Combat.play(c, 1, 1)
+  eq(hpOf(c), 100 - 5 - 5 * 4); eq(c.player.res, 0)
+  local u = setup({ "eviscerate" }, nil, nil, RO)
+  u.hand[1] = Card.new("eviscerate", true, 999)
+  u.player.res = 5
+  Combat.play(u, 1, 1)
+  eq(hpOf(u), 100 - 8 - 6 * 5)
+  local b = setup({ "between_the_eyes" }, nil, nil, RO)
+  b.player.res = 3
+  Combat.play(b, 1, 1)
+  eq(hpOf(b), 100 - 12); eq(b.enemies[1].st.stunned, 1)
+end)
+
+test("Envenom : DoT par point puis éclate tout de suite ; Rupture : DoT par point", function()
+  local c = setup({ "envenom" }, nil, nil, RO)
+  c.enemies[1].st.pain = 4
+  c.player.res = 5
+  Combat.play(c, 1, 1)
+  eq(hpOf(c), 100 - 14, "DoT 4 + 10 éclate : 14"); eq(c.enemies[1].st.pain, 13); eq(c.enemies[1].stIcon.pain, "poison")
+  local r = setup({ "rupture" }, nil, nil, RO)
+  r.player.res = 3
+  Combat.play(r, 1, 1)
+  eq(r.enemies[1].st.pain, 9); eq(r.player.res, 0); eq(hpOf(r), 100)
+end)
+
+test("Exsanguinate : un déclenchement par point, arrêt quand le DoT tombe à 0", function()
+  local c = setup({ "exsanguinate" }, nil, nil, RO)
+  c.enemies[1].st.pain = 10
+  c.player.res = 3
+  Combat.play(c, 1, 1)
+  eq(hpOf(c), 100 - 10 - 9 - 8); eq(c.enemies[1].st.pain, 7)
+  local s = setup({ "exsanguinate" }, nil, nil, RO)
+  s.enemies[1].st.pain = 2
+  s.player.res = 5
+  Combat.play(s, 1, 1)
+  eq(hpOf(s), 100 - 2 - 1); eq(s.enemies[1].st.pain, nil); eq(s.player.res, 0, "points dépensés")
+end)
+
+test("Mutilate : +1 point de plus sur une cible sous DoT ; Garrote, Fan of Knives, Hemorrhage", function()
+  local m = setup({ "mutilate", "mutilate" }, nil, nil, RO)
+  Combat.play(m, 1, 1)
+  eq(hpOf(m), 94); eq(m.player.res, 1)
+  m.enemies[1].st.pain = 2
+  Combat.play(m, 1, 1)
+  eq(m.player.res, 3)
+  local g = setup({ "garrote" }, nil, nil, RO)
+  Combat.play(g, 1, 1)
+  eq(hpOf(g), 97); eq(g.player.res, 1); eq(g.enemies[1].st.pain, 4)
+  local f = setup({ "fan_of_knives" }, { "test_dummy", "test_dummy" }, nil, RO)
+  Combat.play(f, 1)
+  eq(hpOf(f, 1), 97); eq(hpOf(f, 2), 97); eq(f.enemies[2].st.pain, 2); eq(f.player.res, 1)
+  local h = setup({ "hemorrhage" }, nil, nil, RO)
+  Combat.play(h, 1, 1)
+  eq(hpOf(h), 95); eq(h.enemies[1].st.armor_broken, 1); eq(h.player.res, 1)
+end)
+
+test("Killing Spree : six coups au hasard (flux des cartes), Deadly Poison sur chacun ; Blade Flurry", function()
+  local c = setup({ "deadly_poison", "killing_spree" }, { "test_dummy", "test_dummy" }, nil, RO)
+  c.player.mana = 3
+  Combat.play(c, 1)
+  local before = Rng.int(Combat.clone(c).rng.cards, 1, 2)
+  Combat.play(c, 1)
+  eq((100 - hpOf(c, 1)) + (100 - hpOf(c, 2)), 30)
+  eq((c.enemies[1].st.pain or 0) + (c.enemies[2].st.pain or 0), 6, "un DoT 1 par coup")
+  assert(before == 1 or before == 2)
+  local b = setup({ "blade_flurry", "sinister_strike", "feint" }, { "test_dummy", "test_dummy" }, nil, RO)
+  Combat.play(b, 1)
+  Combat.play(b, 1, 1)
+  eq(hpOf(b, 1), 100 - 6 - 2); eq(hpOf(b, 2), 98)
+  Combat.play(b, 1)
+  eq(hpOf(b, 2), 98, "un Skill ne déclenche rien")
+  eq(b.enemies[2].st.pain, nil, "pas un coup d'Attack")
+end)
+
+test("Slice and Dice : la première Attack du tour coûte 0, pas la suivante ; deux exemplaires idem", function()
+  local c = setup({ "slice_and_dice", "slice_and_dice", "ambush", "sinister_strike", "feint" }, nil, nil, RO)
+  c.player.mana = 9
+  Combat.play(c, 1)
+  Combat.play(c, 1)
+  eq(Combat.cost(c, c.hand[handIndex(c, "ambush")]), 0); eq(Combat.cost(c, c.hand[handIndex(c, "feint")]), 1)
+  local m = c.player.mana
+  Combat.play(c, handIndex(c, "ambush"), 1)
+  eq(c.player.mana, m); eq(Combat.cost(c, c.hand[handIndex(c, "sinister_strike")]), 1)
+  Combat.endTurn(c)
+  local ss = handIndex(c, "sinister_strike") or handIndex(c, "ambush")
+  if ss then eq(Combat.cost(c, c.hand[ss]), 0, "de nouveau au tour suivant") end
+end)
+
+test("Venomous Wounds : +1 point par ennemi sous DoT au début du tour ; Shadow Dance : Stealth", function()
+  local c = setup({ "venomous_wounds", "shadow_dance", "sinister_strike" }, { "test_dummy", "test_dummy", "test_dummy" }, nil, RO)
+  c.player.mana = 5
+  Combat.play(c, 1)
+  Combat.play(c, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.stealth, nil)
+  c.enemies[1].st.pain = 5
+  c.enemies[3].st.pain = 5
+  local r = c.player.res
+  Combat.endTurn(c)
+  eq(c.player.res, r + 2); eq(c.player.st.stealth, 1)
+end)
+
+test("Cheat Death : Last Breath, 1 PV, Parry 3 et Stealth, les coups suivants du tour parés ; une fois", function()
+  local c = setup({ "cheat_death", "sinister_strike" }, { "test_hitter", "test_poke" }, nil, RO)
+  Combat.play(c, 1)
+  Combat.play(c, 1, 1)
+  eq(c.player.st.stealth, nil)
+  c.player.hp = 5
+  Combat.endTurn(c)
+  eq(c.result, nil); eq(c.player.hp, 1, "le coup de 6 qui suit est paré")
+  eq(c.player.st.parry, 2); eq(c.player.st.stealth, 1)
+  c.player.st.parry = nil
+  Combat.endTurn(c)
+  eq(c.result, "lost", "une fois par combat")
+end)
+
+test("Kick : coupe le sort et +1 point ; Riposte : Parry ; Cloak of Shadows : nettoie et Parry ; Adrenaline Rush", function()
+  local k = setup({ "kick" }, { "test_caster" }, nil, RO)
+  Combat.play(k, 1, 1)
+  assert(k.enemies[1].interrupted); eq(k.player.res, 1); eq(k.player.mana, 3)
+  local r = setup({ "riposte" }, nil, nil, RO)
+  Combat.play(r, 1, 1)
+  eq(hpOf(r), 96); eq(r.player.st.parry, 1)
+  local cl = setup({ "cloak_of_shadows" }, nil, nil, RO)
+  cl.player.st.demoralized = 2
+  Combat.play(cl, 1)
+  eq(cl.player.st.demoralized, nil); eq(cl.player.st.parry, 1)
+  local a = setup({ "adrenaline_rush" }, nil, { "feint", "feint" }, RO)
+  Combat.play(a, 1)
+  eq(a.player.mana, 3 - 1 + 3); eq(#a.hand, 2); eq(a.exhaust[1].id, "adrenaline_rush")
+  local sb = setup({ "smoke_bomb", "sinister_strike" }, { "test_dummy", "test_dummy" }, nil, RO)
+  Combat.play(sb, 2, 1)
+  Combat.play(sb, 1)
+  eq(sb.enemies[2].st.demoralized, 2); eq(sb.player.st.stealth, 1)
+end)
+
+test("Secret Technique : 3 par point à tous, deux fois sous Stealth", function()
+  local c = setup({ "secret_technique" }, { "test_dummy", "test_dummy" }, nil, RO)
+  c.player.res = 4
+  Combat.play(c, 1)
+  eq(hpOf(c, 1), 100 - 24); eq(hpOf(c, 2), 100 - 24); eq(c.player.st.stealth, nil)
+  local n = setup({ "sinister_strike", "secret_technique" }, { "test_dummy", "test_dummy" }, nil, RO)
+  Combat.play(n, 1, 1)
+  n.player.res = 4
+  Combat.play(n, 1)
+  eq(hpOf(n, 2), 100 - 12)
+end)
+
+test("bibelots du Voleur : Thieves' Tools, Blinding Powder, Crystal Vial, Ravenholdt Signet, Shadowfang", function()
+  local deck = { "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint", "feint" }
+  local t = Combat.new({ seed = 3, hp = 60, class = "rogue", deck = deckOf(unpack(deck)), encounter = { "test_dummy" },
+    relics = { "thieves_tools", "blinding_powder", "shadowfang" } })
+  eq(#t.hand, 6, "Thieves' Tools : 6 cartes au premier tour"); eq(t.player.st.parry, 1); eq(t.player.res, 2)
+  Combat.endTurn(t)
+  eq(#t.hand, 5, "5 ensuite")
+  local v = setup({ "garrote", "rupture" }, nil, nil, { class = "rogue", relics = { "crystal_vial", "ravenholdt_signet" } })
+  Combat.play(v, 1, 1)
+  eq(v.enemies[1].st.pain, 5, "Garrote 4 + 1")
+  v.player.res = 2
+  Combat.play(v, 1, 1)
+  eq(v.enemies[1].st.pain, 5 + 7, "Rupture 6 + 1"); eq(v.player.st.parry, 1, "Parry après le Surge")
+end)
+
+test("Rogue : chaque carte (base et améliorée) jouable sans erreur, combat déroulé deux tours", function()
+  local n = 0
+  for id, d0 in pairs(ns.Cards) do
+    if d0.class == "rogue" then
+      for _, up in ipairs({ false, true }) do
+        local c = setup({ id }, { "test_dummy", "test_caster" }, { "feint", "feint", "feint", "feint" },
+          { class = "rogue", hp = 60 })
+        c.player.mana, c.player.res = 9, 5
+        c.hand[1] = Card.new(id, up, 999)
+        c.enemies[1].hp = 40
+        c.enemies[1].st.pain = 3
+        local ok, why = Combat.play(c, 1, 1)
+        assert(ok, id .. (up and "+" or "") .. " : " .. tostring(why))
+        Combat.endTurn(c)
+        Combat.endTurn(c)
+        n = n + 1
+      end
+    end
+  end
+  eq(n, 68)
+end)
+
+test("Rogue : combats simulés par le bot heuristique, sans erreur", function()
+  local r = ns.Run.play({ seed = 4, bot = "heuristic", class = "rogue", cap = 120 })
+  assert(r.combats[1] ~= nil)
+end)
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end
