@@ -126,14 +126,13 @@ function V.build(host, view)
   host.pet = pet
   -- le familier suit la zone de classe (cachée quand le combat est d'une autre classe)
   host:SetScript("OnHide", function() pet:Hide() end)
-  host:SetScript("OnShow", function() pet:Show() end)
   host.petX = PET_X - PET_W / 2
   host.petY = PET_FEET - PET_H
-  W.setFallbackArt(pet.fallback, Art.pet.icon)
-  pet.fallback:Hide()
-  W.setCreatureArt(pet.model, Art.pet, "pet:hunter", function() pet.fallback:Show() end,
-    function() pet.fallback:Hide() end)
-  if pet.model.SetFacing then pet.model:SetFacing(0.9) end
+  -- modèle : apparaît une fois chargé (candidat gagnant mémorisé, préchargé dès le parcours) ; médaillon
+  -- si aucun candidat ne charge
+  local function showPet() Scene.showModel(pet, Art.pet, "pet:hunter", { facing = 0.9 }) end
+  host:SetScript("OnShow", function() pet:Show() showPet() end)
+  showPet()
   -- marqueur de la cible du familier : petite icône ronde à gauche du cadre de l'ennemi visé
   local mark = CreateFrame("Frame", nil, host)
   mark:SetSize(18, 18)

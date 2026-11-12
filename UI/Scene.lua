@@ -599,19 +599,436 @@ function S.playerFigure(f)
   if f.model.SetFacing then f.model:SetFacing(opts().facingPlayer or 0.6) end
 end
 
--- Personnage de rencontre : modèle si l'identifiant est connu, sinon rien.
+---------------------------------------------------------------------------
+-- Chargement des modèles : candidats, attente, mémoire du gagnant, préchargement
+---------------------------------------------------------------------------
+-- Ce que dit l'API (wow_api_search, client Forever) et l'interface de Blizzard (wow_ui_grep, retail) :
+--   * SetCreature(idCréature) : l'affichage est lu dans les données de la créature, connues du client
+--     seulement si le serveur les lui a envoyées (cache Cache/WDB/…/creaturecache.wdb, rempli quand le
+--     joueur a croisé la créature) ; sinon le client les demande au serveur et le modèle arrive plus
+--     tard, ou jamais si le serveur ne la connaît pas ;
+--   * SetDisplayInfo(idAffichage) : lit les données d'affichage du client lui-même (pas de serveur,
+--     pas de cache de créatures) ; échoue seulement si l'affichage manque à ce client ;
+--   * SetModel(fichier) : un fichier .m2 du client (FileDataID ou chemin) ; idem.
+-- Aucun des trois ne lève d'erreur pour un identifiant inconnu : le cadre reste vide. Le chargement est
+-- asynchrone ; le script OnModelLoaded sonne quand le modèle est prêt (utilisé ainsi par
+-- MissionCompletePreload_* et RecruitAFriendFrame). Un essai réussit si OnModelLoaded a sonné pour lui,
+-- ou (créature, affichage) si GetModelFileID rend un fichier MODEL_WAIT secondes plus tard. Pour un
+-- fichier, GetModelFileID pourrait rendre l'identifiant demandé même absent (comme GetTextureFileID
+-- pour les textures, voir plus haut) : seul OnModelLoaded compte, sauf client sans ce script.
+--
+-- MODEL_WAIT : délai avant de passer au candidat suivant. Il valait 0,8 s (W.MODEL_WAIT) : trop court
+-- pour un premier chargement (humanoïde équipé : modèle, textures, objets lus sur le disque ; créature
+-- absente du cache : aller-retour au serveur), plus d'une seconde en jeu ; le candidat était alors
+-- abandonné (ClearModel) juste avant d'arriver. 2 s couvre ces cas ; le délai ne coûte rien quand le
+-- modèle charge (OnModelLoaded valide aussitôt) ni quand le gagnant est connu (préchargement), il ne
+-- retarde que l'abandon d'un candidat qui échoue vraiment.
+S.MODEL_WAIT = 2
+S.MODEL_LATE = 4     -- pause avant chaque tour de relance (repli affiché)
+S.MODEL_ROUNDS = 2   -- tours de relance de tous les candidats après l'échec de tous
+S.FADE_IN = 0.3      -- apparition d'un personnage chargé
+
+-- Candidats d'une entrée d'art, dans l'ordre déclaré : créature, affichage(s), fichier(s).
+function S.modelTries(art)
+  local out = {}
+  if not art then return out end
+  if art.creature then out[#out + 1] = { "creature", art.creature } end
+  local d = art.display
+  if type(d) == "number" then
+    out[#out + 1] = { "display", d }
+  elseif type(d) == "table" then
+    for i = 1, #d do out[#out + 1] = { "display", d[i] } end
+  end
+  for _, f in ipairs(art.files or {}) do out[#out + 1] = { "file", f[1], name = f[2] } end
+  return out
+end
+
+function S.tryLabel(t) return t[1] .. " " .. tostring(t[2]) end
+
+-- Mémoire : gagnant par clé (session S.won, et options.modelWins d'une session à l'autre : un affichage
+-- ou un fichier qui a chargé chargera encore ; oublié dès qu'il échoue), candidats qui ont échoué
+-- (session : essayés en dernier), clés dont tous les candidats ont échoué (S.lost : repli aussitôt).
+S.won, S.failed, S.lost = {}, {}, {}
+
+local function saved()
+  local o = opts()
+  if type(o.modelWins) ~= "table" then o.modelWins = {} end
+  return o.modelWins
+end
+
+function S.winner(key) return S.won[key] or saved()[key] end
+
+local function remember(key, label)
+  S.won[key] = label
+  saved()[key] = label
+  S.lost[key] = nil
+  if S.failed[key] then S.failed[key][label] = nil end
+end
+
+local function forget(key, label)
+  if S.won[key] == label then S.won[key] = nil end
+  if saved()[key] == label then saved()[key] = nil end
+  S.failed[key] = S.failed[key] or {}
+  S.failed[key][label] = true
+end
+
+-- Ordre d'essai : le gagnant connu, puis les candidats pas encore en échec, puis ceux en échec.
+function S.orderedTries(key, art)
+  local tries = S.modelTries(art)
+  local win, bad = S.winner(key), S.failed[key] or {}
+  local first, good, late = {}, {}, {}
+  for _, t in ipairs(tries) do
+    local l = S.tryLabel(t)
+    if l == win then first[#first + 1] = t elseif bad[l] then late[#late + 1] = t else good[#good + 1] = t end
+  end
+  for _, t in ipairs(good) do first[#first + 1] = t end
+  for _, t in ipairs(late) do first[#first + 1] = t end
+  return first, tries
+end
+
+local function applyTry(model, t)
+  if model.ClearModel then model:ClearModel() end
+  if t[1] == "creature" then model:SetCreature(t[2])
+  elseif t[1] == "display" then model:SetDisplayInfo(t[2])
+  else model:SetModel(t[2]) end
+end
+
+-- OnModelLoaded (pcall : sans effet sur un client qui ne connaît pas ce script ; model.sceneHook dit
+-- s'il est posé).
+local function hookLoaded(model)
+  if model.sceneHook ~= nil then return end
+  model.sceneHook = pcall(model.SetScript, model, "OnModelLoaded", function(self)
+    self.sceneLoaded = self.sceneToken
+    if self.sceneOnLoaded then self.sceneOnLoaded() end
+  end) and true or false
+end
+
+local function isLoaded(model, t, token)
+  if model.sceneLoaded == token then return true end
+  if t[1] == "file" and model.sceneHook then return false end
+  return W.hasModel(model)
+end
+
+-- Essais en chaîne sur un cadre de modèle. h = { onFound(libellé, essai), onMissing(), quiet = sans
+-- statut public }. Statut (W.models[key], lu par /slay models et /slay art) : tries = libellés dans
+-- l'ordre déclaré, state = "pending" | "ok" | "missing", via = libellé du candidat chargé.
+-- Après l'échec de tous : onMissing (repli), puis MODEL_ROUNDS tours de relance de tous les candidats
+-- (MODEL_LATE entre deux), puis le premier candidat reste posé : un OnModelLoaded tardif le valide.
+function S.loadModel(model, art, key, h)
+  key, h = tostring(key), h or {}
+  model.sceneChain = (model.sceneChain or 0) + 1
+  local chain = model.sceneChain
+  hookLoaded(model)
+  local tries, declared = S.orderedTries(key, art)
+  local labels, names = {}, {}
+  for i = 1, #tries do labels[i] = S.tryLabel(tries[i]) end
+  for i = 1, #declared do names[i] = S.tryLabel(declared[i]) end
+  local status = { tries = names, state = "pending" }
+  if not h.quiet then W.models[key] = status end
+  local function live() return model.sceneChain == chain and status.state ~= "ok" end
+  local function found(i)
+    if not live() then return end
+    status.state, status.via = "ok", labels[i]
+    model.sceneOnLoaded = nil
+    remember(key, labels[i])
+    if not h.quiet then W.missing["model:" .. key] = nil end
+    if h.onFound then h.onFound(labels[i], tries[i]) end
+  end
+  local function missing()
+    status.state = "missing"
+    S.lost[key] = true
+    if not h.quiet then W.missing["model:" .. key] = true end
+    if h.onMissing then h.onMissing() end
+  end
+  if #tries == 0 then
+    if model.ClearModel then model:ClearModel() end
+    missing()
+    return status
+  end
+  local function pose(i)
+    model.sceneToken = (model.sceneToken or 0) + 1
+    local token = model.sceneToken
+    model.sceneOnLoaded = function()
+      if model.sceneChain == chain and model.sceneToken == token then found(i) end
+    end
+    applyTry(model, tries[i])
+    return token
+  end
+  local function attempt(i, onFail)
+    local token = pose(i)
+    W.delay(S.MODEL_WAIT, function()
+      if not live() or model.sceneToken ~= token then return end
+      if isLoaded(model, tries[i], token) then found(i) return end
+      forget(key, labels[i])
+      onFail()
+    end)
+  end
+  local function run(i, round)
+    attempt(i, function()
+      if i < #tries then run(i + 1, round) return end
+      if round == 0 then missing() end
+      if round < S.MODEL_ROUNDS then
+        W.delay(S.MODEL_LATE, function() if live() then run(1, round + 1) end end)
+      else
+        pose(1)
+      end
+    end)
+  end
+  run(1, 0)
+  return status
+end
+
+-- Personnage (cadre de S.figure ou S.campfire : model, fallback, shadow facultative) : le modèle reste
+-- invisible (alpha 0 : le client le charge quand même, comme les cadres de préchargement de Blizzard,
+-- MissionCompletePreloadModelTemplate alpha="0") jusqu'à son chargement, puis apparaît en fondu court
+-- avec son ombre. Le médaillon de repli (icône de art.icon) n'apparaît qu'après l'échec de TOUS les
+-- candidats (aussitôt si une tentative précédente a déjà tout essayé en vain : S.lost), et s'efface
+-- si un modèle finit par arriver. o = { facing, onFound(libellé, essai) }. Rien d'autre n'attend.
+function S.showModel(f, art, key, o)
+  o = o or {}
+  local m = f.model
+  key = tostring(key)
+  W.cancel(m, "appear")
+  m.dead = false
+  -- un PlayerModel caché libère son modèle (SetKeepModelOnHide, CharacterModelBase) : gardé ici, la
+  -- fenêtre se fermant et se rouvrant en vol
+  if m.SetKeepModelOnHide then m:SetKeepModelOnHide(true) end
+  m:Show()
+  m:SetAlpha(0)
+  if f.shadow then f.shadow:Hide() end
+  W.setFallbackArt(f.fallback, art and art.icon)
+  if S.lost[key] then f.fallback:Show() else f.fallback:Hide() end
+  if o.facing and m.SetFacing then m:SetFacing(o.facing) end
+  S.loadModel(m, art, key, {
+    onFound = function(label, t)
+      f.fallback:Hide()
+      if o.onFound then o.onFound(label, t) end
+      if m.dead then return end
+      if f.shadow then f.shadow:Show() end
+      W.tween(S.FADE_IN, function(p)
+        W.modelAlpha(m, p)
+        if f.shadow then f.shadow:SetAlpha(p) end
+      end, nil, m, "appear")
+    end,
+    onMissing = function() f.fallback:Show() end,
+  })
+  return true
+end
+
+-- Personnage de rencontre : modèle (Art.npcs[npcId]) dès qu'il est chargé, sinon médaillon de repli ;
+-- sans déclaration : médaillon sombre (jamais de vide). Renvoie vrai si le personnage est montré.
 function S.npcFigure(f, npcId)
-  f.fallback:Hide()
-  local art = npcId and Art.npcs[npcId]
-  if not art then
+  if not npcId then
     f.model:Hide()
     f.shadow:Hide()
+    f.fallback:Hide()
     return false
   end
-  f.model:Show()
-  f.shadow:Show()
-  W.setCreatureArt(f.model, art, "npc:" .. npcId, function() f.model:Hide() f.shadow:Hide() end,
-    function() f.model:Show() f.shadow:Show() end)
-  if f.model.SetFacing then f.model:SetFacing(opts().facingEnemy or -0.6) end
-  return true
+  return S.showModel(f, Art.npcs[npcId], "npc:" .. npcId, { facing = opts().facingEnemy or -0.6 })
+end
+
+-- Ennemi en combat (UI/CombatView.lua) : même mécanisme, médaillon à l'icône de l'ennemi.
+function S.enemyFigure(fig, enemyId)
+  return S.showModel(fig, Art.enemies[enemyId], enemyId, { facing = opts().facingEnemy or -0.6 })
+end
+
+---------------------------------------------------------------------------
+-- Préchargement : modèles de la prochaine scène possible
+---------------------------------------------------------------------------
+-- Cadres de modèle créés une fois et réutilisés, MONTRÉS avec une alpha 0 (comme les cadres de
+-- MissionCompletePreloadModels de Blizzard : un cadre caché n'est pas garanti de charger, et un
+-- PlayerModel libère son modèle quand il est caché, sauf SetKeepModelOnHide), enfants d'UIParent (la
+-- fenêtre de l'addon peut être fermée), dans l'écran, sans souris. Chaque cadre fait les essais de sa
+-- clé (S.loadModel, sans statut public) : le gagnant est mémorisé ; une fois chargé, le cadre est
+-- caché (plus rien à dessiner) en gardant son modèle (SetKeepModelOnHide), qui reste ainsi en mémoire
+-- du client jusqu'à l'affichage de la scène, qui pose le gagnant en premier et l'obtient aussitôt.
+S.PRELOAD_MAX = 24
+S.preloads = {}   -- clé -> { model, status }
+
+local function preloadFrame()
+  local host = S.preloadHost
+  if not host then
+    host = CreateFrame("Frame", nil, UIParent)
+    host:SetSize(64, 64)
+    host:SetPoint("BOTTOMLEFT", UIParent, "BOTTOMLEFT", 0, 0)
+    host:EnableMouse(false)
+    S.preloadHost = host
+    S.preloadFree = {}
+  end
+  local m = table.remove(S.preloadFree)
+  if not m then
+    m = W.model(host, 64, 64)
+    m:SetPoint("BOTTOMLEFT", 0, 0)
+    m:EnableMouse(false)
+    if m.SetKeepModelOnHide then m:SetKeepModelOnHide(true) end
+  end
+  m:SetAlpha(0)
+  m:Show()
+  return m
+end
+
+-- list = { { key = clé, art = entrée d'art }, … } : les modèles de cette liste se chargent (ceux déjà
+-- en cours ou chargés sont gardés) ; les autres cadres sont vidés et rendus au réservoir.
+function S.preload(list)
+  local want, order = {}, {}
+  for _, e in ipairs(list or {}) do
+    local k = tostring(e.key)
+    if e.art and not want[k] then want[k] = e.art order[#order + 1] = k end
+  end
+  for k, p in pairs(S.preloads) do
+    if not want[k] then
+      p.model.sceneChain = (p.model.sceneChain or 0) + 1 -- arrête ses essais
+      if p.model.ClearModel then p.model:ClearModel() end
+      S.preloadFree[#S.preloadFree + 1] = p.model
+      S.preloads[k] = nil
+    end
+  end
+  local n = 0
+  for _ in pairs(S.preloads) do n = n + 1 end
+  for _, k in ipairs(order) do
+    if not S.preloads[k] and n < S.PRELOAD_MAX then
+      local m = preloadFrame()
+      -- chargé : le cadre est caché (plus rien à dessiner), son modèle gardé (SetKeepModelOnHide)
+      S.preloads[k] = { model = m, status = S.loadModel(m, want[k], k, { quiet = true,
+        onFound = function() m:Hide() end }) }
+      n = n + 1
+    end
+  end
+  return order
+end
+
+-- Ce dont la prochaine étape peut avoir besoin, depuis l'état de l'expédition : ennemis des combats
+-- possibles (groupes de la réserve du genre de chaque étape accessible), personnages des rencontres
+-- possibles (X.eventPool), feu de camp (toujours : petit, et l'écran le plus fréquent), familier.
+-- extra = entrées en plus (combats que peut lancer une rencontre ouverte).
+function S.nextNeeds(exp, extra)
+  local out = {}
+  local function enemies(pool)
+    for _, group in ipairs(pool or {}) do
+      for _, id in ipairs(group) do out[#out + 1] = { key = id, art = Art.enemies[id] } end
+    end
+  end
+  out[#out + 1] = { key = "campfire", art = Art.campfire }
+  if Art.pet and exp and exp.class == "hunter" then out[#out + 1] = { key = "pet:hunter", art = Art.pet } end
+  local Map, X = ns.Map, ns.Expedition
+  local act = exp and Map and Map.ACTS and Map.ACTS[exp.act or 1]
+  local pools = act and ns.Encounters and ns.Encounters[act.encounters]
+  if exp and exp.map and Map.nextNodes and pools then
+    for _, id in ipairs(Map.nextNodes(exp.map, exp.node) or {}) do
+      local node = exp.map.nodes[id]
+      local k = node and node.kind
+      if k == "combat" then
+        enemies((exp.combatsInAct or 0) < (X.EASY_COMBATS or 0) and pools.easy or pools.normal)
+      elseif k == "elite" or k == "boss" then
+        enemies(pools[k])
+      elseif k == "event" and X.eventPool then
+        local ok, ids = pcall(X.eventPool, exp)
+        for _, evId in ipairs(ok and ids or {}) do
+          local ev = ns.Events[evId]
+          if ev and ev.npc then out[#out + 1] = { key = "npc:" .. ev.npc, art = Art.npcs[ev.npc] } end
+        end
+      end
+    end
+  end
+  for _, e in ipairs(extra or {}) do out[#out + 1] = e end
+  return out
+end
+
+-- Combats qu'une rencontre peut lancer (effet « fight » de ses réponses) : leurs ennemis.
+function S.eventFightNeeds(ev, exp)
+  local out = {}
+  local act = exp and ns.Map and ns.Map.ACTS and ns.Map.ACTS[exp.act or 1]
+  local pools = act and ns.Encounters and ns.Encounters[act.encounters] or {}
+  local function scan(effects)
+    for _, e in ipairs(effects or {}) do
+      if e[1] == "fight" then
+        local pool = pools[e[2] or (e.kind == "elite" and "elite" or "normal")]
+        for _, group in ipairs(pool or {}) do
+          for _, id in ipairs(group) do out[#out + 1] = { key = id, art = Art.enemies[id] } end
+        end
+      elseif e[1] == "gamble" then
+        scan(e.win)
+        scan(e.lose)
+      end
+    end
+  end
+  for _, ch in ipairs(ev and ev.choices or {}) do scan(ch.effects) end
+  return out
+end
+
+---------------------------------------------------------------------------
+-- Feu de camp : modèle 3D d'un feu du jeu, lueur chaude au sol, médaillon de repli
+---------------------------------------------------------------------------
+-- Lueur : la texture fondue de l'ombre de contact (S.SHADOW), teintée orange, en mode additif, aplatie
+-- et centrée sur le pied du feu, deux couches (halo large et cœur) qui vacillent doucement. Elle est
+-- dessinée par le cadre du feu (niveau L, couche du fond), sous le modèle (L + 1) ; le médaillon de
+-- repli est au-dessus du modèle (L + 3). Pas d'ombre de contact : la lueur la remplace.
+S.FIRE_GLOW = {
+  { w = 2.1, ratio = 3.2, color = { 1, 0.45, 0.12 }, a = 0.42 }, -- halo
+  { w = 1.05, ratio = 3.4, color = { 1, 0.68, 0.3 }, a = 0.55 }, -- cœur
+}
+S.FIRE_FEET = 14 -- centre de la lueur au-dessus du bas du cadre (pied du feu)
+
+function S.campfire(parent, w, h)
+  local f = CreateFrame("Frame", nil, parent)
+  f:SetSize(w, h)
+  f:EnableMouse(false)
+  f.glow = {}
+  for i, g in ipairs(S.FIRE_GLOW) do
+    local t = W.noSnap(f:CreateTexture(nil, "BACKGROUND", nil, i))
+    t:SetTexture(S.SHADOW, nil, nil, "TRILINEAR")
+    t:SetBlendMode("ADD")
+    t:SetVertexColor(g.color[1], g.color[2], g.color[3], g.a)
+    t:SetSize(w * g.w, w * g.w / g.ratio)
+    t:SetPoint("CENTER", f, "BOTTOM", 0, S.FIRE_FEET)
+    f.glow[i] = t
+  end
+  -- vacillement doux (le halo et le cœur en opposition), seulement quand le feu est montré
+  local clock, halo, core, sin = 0, f.glow[1], f.glow[2], math.sin
+  f:SetScript("OnUpdate", function(_, el)
+    clock = clock + (el or 0)
+    local a = 0.9 + 0.06 * sin(clock * 7.3) + 0.04 * sin(clock * 12.1)
+    halo:SetAlpha(a)
+    core:SetAlpha((2 - a) * 0.95)
+  end)
+  f.model = W.model(f, w, h)
+  f.model:SetPoint("BOTTOM", 0, 0)
+  f.model:SetFrameLevel(f:GetFrameLevel() + 1)
+  f.model:EnableMouse(false)
+  f.fallback = W.medallion(f, 74)
+  f.fallback:SetPoint("CENTER", f, "BOTTOM", 0, 37 + 4)
+  f.fallback:SetFrameLevel(f.model:GetFrameLevel() + 2)
+  f.fallback:Hide()
+  return f
+end
+
+-- Cadrage du feu après chargement : orientation (Art.campfire.facing), échelle et hauteur facultatives
+-- (Art.campfire.scale / z), réglage du joueur (/slay fire, options.fireCam) en priorité.
+function S.fireCam(m)
+  local a, o = Art.campfire or {}, opts().fireCam
+  local scale, z, facing = a.scale, a.z, a.facing
+  if type(o) == "table" then scale, z, facing = o[1] or scale, o[2] or z, o[3] or facing end
+  if scale and m.SetModelScale then m:SetModelScale(scale) end
+  if z and m.SetPosition then m:SetPosition(0, 0, z) end
+  if facing and m.SetFacing then m:SetFacing(facing) end
+end
+
+function S.showCampfire(f)
+  return S.showModel(f, Art.campfire, "campfire", { onFound = function() S.fireCam(f.model) end })
+end
+
+-- Ligne de rapport d'un modèle (/slay models) : « clé (nom): display 1691 » si chargé (« , after
+-- creature 235 » si des candidats ont échoué avant), « clé (nom): fallback (no model: creature 619,
+-- display 2329, …) » sinon, « …: loading (…) » pendant les essais. ASCII seulement.
+function S.reportLine(key, name)
+  local st = W.models[tostring(key)]
+  local head = tostring(key) .. ((name and name ~= key) and (" (" .. name .. ")") or "") .. ": "
+  if not st then return head .. "not shown yet" end
+  local tried = #st.tries > 0 and table.concat(st.tries, ", ") or "no identifier"
+  if st.state == "ok" then
+    return head .. st.via .. (st.via ~= st.tries[1] and (" (declared first: " .. tostring(st.tries[1]) .. ")") or "")
+  elseif st.state == "missing" then
+    return head .. "fallback (no model: " .. tried .. ")"
+  end
+  return head .. "loading (" .. tried .. ")"
 end

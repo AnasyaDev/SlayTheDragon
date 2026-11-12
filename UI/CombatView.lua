@@ -652,10 +652,8 @@ function V:LayoutEnemies()
       s.model:SetSize(150 * sc, 160 * sc)
       s.figH = FIG_H * sc
       W.animSet(s, "aim", 0)
-      W.setCreature(s.model, e.id, s.fallback)
-      if s.model.SetFacing then s.model:SetFacing(opts().facingEnemy or -0.6) end
-      W.modelAlpha(s.model, 1)
-      s.fig.shadow:SetAlpha(1)
+      -- modèle : apparaît en fondu une fois chargé (ombre avec lui) ; médaillon si aucun candidat ne charge
+      Scene.enemyFigure(s.fig, e.id)
       s:SetAlpha(1)
       s.hp:Set(e.hp, e.maxHp)
       s.block:Set(e.block, e.maxHp)
@@ -1409,7 +1407,8 @@ end
 -- Aperçu des modèles (/slay models) : vérifie l'art sans toucher à l'expédition
 ---------------------------------------------------------------------------
 
--- Entrées de l'aperçu : ennemis (Art.enemies) puis personnages des rencontres (Art.npcs), triés.
+-- Entrées de l'aperçu, dans l'ordre du rapport : ennemis (Art.enemies), personnages des rencontres
+-- (chaque `npc` de Data/Events.lua, déclaré ou non dans Art.npcs), familier, feu de camp.
 local function previewEntries()
   local out, ids = {}, {}
   for id in pairs(Art.enemies) do ids[#ids + 1] = id end
@@ -1420,61 +1419,79 @@ local function previewEntries()
   end
   local speaker = {}
   for _, ev in pairs(ns.Events or {}) do
-    if type(ev) == "table" and ev.npc and ev.speaker then speaker[ev.npc] = ev.speaker end
+    if type(ev) == "table" and ev.npc then speaker[ev.npc] = speaker[ev.npc] or ev.speaker or ev.npc end
   end
+  for id in pairs(Art.npcs) do speaker[id] = speaker[id] or id end
   ids = {}
-  for id in pairs(Art.npcs) do ids[#ids + 1] = id end
+  for id in pairs(speaker) do ids[#ids + 1] = id end
   table.sort(ids)
   for i = 1, #ids do
     out[#out + 1] = { id = "npc:" .. ids[i], key = "npc:" .. ids[i], art = Art.npcs[ids[i]],
-      name = speaker[ids[i]] or ids[i], npc = true }
+      name = speaker[ids[i]], npc = true }
   end
+  if Art.pet then
+    out[#out + 1] = { id = "pet:hunter", key = "pet:hunter", art = Art.pet, name = Art.pet.name or "Pet", npc = true }
+  end
+  out[#out + 1] = { id = "campfire", key = "campfire", art = Art.campfire, name = "Campfire", fire = true }
   return out
 end
 
 -- Identifiants essayés, en clair : « creature 619, display 2329, display 2330 ».
 local function triesText(art)
-  local t = W.modelTries(art)
+  local t = Scene.modelTries(art)
   local parts = {}
-  for i = 1, #t do parts[i] = W.tryLabel(t[i]) end
+  for i = 1, #t do parts[i] = Scene.tryLabel(t[i]) end
   return #parts > 0 and table.concat(parts, ", ") or "no identifier"
 end
 
-local PREVIEW_COLS = 6
+V.PREVIEW_ROWS = 3
+V.PREVIEW_MAX = 60 -- secondes au plus avant le rapport (essais encore en cours : « loading »)
 
 function V:PreviewEnemies()
   if not self.preview then
-    local p = W.dialog(UI.content, "Enemy and character models (chat lists the missing ones)", 14)
+    local p = W.dialog(UI.content, "Models (chat lists every one: loaded candidate or fallback)", 14)
     p:SetPoint("TOPLEFT", 10, -50)
     p:SetPoint("BOTTOMRIGHT", -10, 10)
     p:SetFrameLevel(UI.content:GetFrameLevel() + 95)
     p:EnableMouse(true)
     p.models = {}
     local list = previewEntries()
-    local rows = math.ceil(#list / PREVIEW_COLS)
-    local cellW = (UI.CONTENT_W - 20 - 24) / PREVIEW_COLS
+    local cols = math.ceil(#list / V.PREVIEW_ROWS)
+    local rows = math.ceil(#list / cols)
+    local cellW = (UI.CONTENT_W - 20 - 24) / cols
     local rowH = min(236, (UI.CONTENT_H - 60 - 36 - 50) / max(1, rows))
+    local figW = min(150, cellW - 8)
     local figH = min(170, rowH - 52)
     for k = 1, #list do
       local e = list[k]
-      local col, row = (k - 1) % PREVIEW_COLS, floor((k - 1) / PREVIEW_COLS)
-      local fig = Scene.figure(p, 150, figH)
+      local col, row = (k - 1) % cols, floor((k - 1) / cols)
+      local fig = e.fire and Scene.campfire(p, figW, figH) or Scene.figure(p, figW, figH)
       fig:SetPoint("TOP", p, "TOPLEFT", 12 + (col + 0.5) * cellW, -36 - row * rowH)
+      -- textes au-dessus du modèle et du repli : jamais sous un modèle
+      local top = fig.ui
+      if not top then
+        top = CreateFrame("Frame", nil, fig)
+        top:SetAllPoints()
+        top:SetFrameLevel(fig.model:GetFrameLevel() + Scene.UI_LIFT)
+        fig.ui = top
+      end
       local m = fig.model
-      -- textes sur l'étage d'interface du personnage : jamais sous un modèle
-      local label = W.label(fig.ui, "bold", 12, C.text)
+      local label = W.label(top, "bold", 11, C.text)
       label:SetPoint("TOP", fig, "BOTTOM", 0, -3)
-      label:SetWidth(cellW - 6)
+      label:SetWidth(cellW - 4)
       label:SetWordWrap(false)
       label:SetText(e.name)
-      local ids = W.label(fig.ui, "body", 10.5, C.textDim)
+      local ids = W.label(top, "body", 9.5, C.textDim)
       ids:SetPoint("TOP", label, "BOTTOM", 0, -1)
-      ids:SetWidth(cellW - 6)
+      ids:SetWidth(cellW - 4)
+      ids:SetWordWrap(false)
       ids:SetText(triesText(e.art))
-      m.state = W.label(fig.ui, "bold", 11, C.textDim)
+      m.state = W.label(top, "bold", 10, C.textDim)
       m.state:SetPoint("TOP", ids, "BOTTOM", 0, -1)
-      m.state:SetWidth(cellW - 6)
-      m.id, m.key, m.art, m.npc, m.fallback, m.label = e.id, e.key, e.art, e.npc, fig.fallback, e.name
+      m.state:SetWidth(cellW - 4)
+      m.state:SetWordWrap(false)
+      m.id, m.key, m.art, m.npc, m.fire, m.fallback, m.label, m.fig = e.id, e.key, e.art, e.npc, e.fire,
+        fig.fallback, e.name, fig
       p.models[k] = m
     end
     local close = W.button(p, "Close", 110, 30, function() p:Hide() end, "red", 14)
@@ -1482,60 +1499,55 @@ function V:PreviewEnemies()
     self.preview = p
   end
   self.preview:Show()
-  local most = 1
   for k = 1, #self.preview.models do
     local m = self.preview.models[k]
     m.state:SetText("loading")
     m.state:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
-    if m.npc then
-      m.fallback:Hide()
-      W.setFallbackArt(m.fallback, nil)
-      W.setCreatureArt(m, m.art, m.key, function() m.fallback:Show() end, function() m.fallback:Hide() end)
+    if m.fire then
+      Scene.showCampfire(m.fig)
     else
-      W.setCreature(m, m.id, m.fallback)
+      Scene.showModel(m.fig, m.art, m.key, { facing = opts().facingEnemy or -0.6 })
     end
-    most = max(most, #W.modelTries(m.art))
-    if m.SetFacing then m:SetFacing(opts().facingEnemy or -0.6) end
   end
-  -- rapport au chat quand tous les essais ont eu leur délai
+  -- rapport au chat quand plus aucun essai n'est en cours (ou au bout de PREVIEW_MAX secondes)
   self.previewToken = (self.previewToken or 0) + 1
   local token = self.previewToken
-  UI.say("model preview: checking (" .. #self.preview.models .. " models, about "
-    .. math.ceil(most * W.MODEL_WAIT) .. " s).")
-  W.delay(most * W.MODEL_WAIT + 0.2, function()
-    if self.previewToken == token then self:ReportModels() end
-  end)
+  UI.say("model preview: checking " .. #self.preview.models .. " models (up to "
+    .. Scene.MODEL_WAIT .. " s per candidate; the report follows).")
+  local waited = 0
+  local function poll()
+    if self.previewToken ~= token then return end
+    local pending = false
+    for _, m in ipairs(self.preview.models) do
+      local st = W.models[m.key]
+      if not st or st.state == "pending" then pending = true end
+    end
+    if pending and waited < V.PREVIEW_MAX then
+      waited = waited + 0.5
+      W.delay(0.5, poll)
+    else
+      self:ReportModels()
+    end
+  end
+  W.delay(0.5, poll)
 end
 
--- Lignes du rapport (/slay models), à recopier telles quelles : une par modèle absent, puis une par
--- modèle chargé seulement par un essai de repli. ASCII pour les flèches (polices du jeu).
+-- Lignes du rapport (/slay models), à recopier telles quelles : bilan, puis une ligne par modèle
+-- (candidat chargé, ou « fallback » avec les candidats essayés). ASCII seulement (polices du jeu).
 function V:ModelReportLines()
-  local lost, late, ok = {}, {}, 0
+  local ok, lost = 0, 0
   local models = self.preview and self.preview.models or {}
+  local body = {}
   for k = 1, #models do
     local m = models[k]
     local st = W.models[m.key]
-    if st and st.state == "ok" then
-      ok = ok + 1
-      if st.via ~= st.tries[1] then
-        local failed = {}
-        for i = 1, #st.tries do
-          if st.tries[i] == st.via then break end
-          failed[#failed + 1] = st.tries[i]
-        end
-        late[#late + 1] = m.key .. ": " .. table.concat(failed, ", ") .. " -> no model; loaded by " .. st.via
-      end
-    else
-      local tried = st and #st.tries > 0 and table.concat(st.tries, ", ") or "no identifier"
-      lost[#lost + 1] = m.key .. ": " .. tried .. " -> no model"
-    end
+    if st and st.state == "ok" then ok = ok + 1 elseif st and st.state == "missing" then lost = lost + 1 end
+    body[#body + 1] = Scene.reportLine(m.key, m.label)
   end
-  local lines = { "models: " .. ok .. "/" .. #models .. " loaded"
-    .. (#lost > 0 and (", " .. #lost .. " without a model:") or ".") }
-  for i = 1, #lost do lines[#lines + 1] = lost[i] end
-  if #late > 0 then lines[#lines + 1] = "loaded by a fallback identifier:" end
-  for i = 1, #late do lines[#lines + 1] = late[i] end
-  return lines, #lost
+  local lines = { "models: " .. ok .. "/" .. #models .. " loaded, " .. lost .. " on fallback"
+    .. (ok + lost < #models and (", " .. (#models - ok - lost) .. " still loading") or "") .. ":" }
+  for i = 1, #body do lines[#lines + 1] = body[i] end
+  return lines, lost
 end
 
 function V:ReportModels()
@@ -1544,7 +1556,7 @@ function V:ReportModels()
     local m = models[k]
     local st = W.models[m.key]
     local good = st and st.state == "ok"
-    m.state:SetText(good and ("model: " .. st.via) or "no model")
+    m.state:SetText(good and ("model: " .. st.via) or (st and st.state == "missing" and "fallback" or "loading"))
     local c = good and C.healGreen or C.badText
     m.state:SetTextColor(c[1], c[2], c[3])
   end

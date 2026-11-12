@@ -84,7 +84,7 @@ SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale Se
 SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
 SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
 SetScaleAnimationMode SetSmoothScaling SetOrigin SetSmoothing SetSnapToPixelGrid SetTexelSnappingBias
-SetTextureSliceMargins SetTextureSliceMode
+SetTextureSliceMargins SetTextureSliceMode SetModelScale SetPosition SetKeepModelOnHide
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -533,17 +533,40 @@ function Frame:UnregisterEvent(e)
   for i = #l, 1, -1 do if l[i] == self then table.remove(l, i) end end
 end
 
--- Modèles
+-- Modèles. Chargement asynchrone, comme le client : le modèle posé (_model) est annoncé par le script
+-- OnModelLoaded H.modelDelay secondes plus tard (H.slowModels[nom] : délai propre, « creature:619 »),
+-- s'il est toujours celui du cadre. H.noModels = true : le client ne connaît aucun modèle (créatures,
+-- affichages, fichiers). Fichiers (SetModel) : seuls ceux de H.goodFiles existent (le faux client n'a
+-- pas de feu de camp par défaut : aperçus en repli).
+H.modelDelay = 0.2
+local function poseModel(self, name)
+  if H.noModels then name = nil end
+  self._model = name
+  self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1
+  if not name then return end
+  local serial = self._modelSerial
+  local d = (H.slowModels and H.slowModels[name]) or H.modelDelay
+  H.timers[#H.timers + 1] = { at = H.now + d, fn = function()
+    if rawget(self, "_modelSerial") == serial and rawget(self, "_model") == name then
+      H.modelLoads = (H.modelLoads or 0) + 1
+      run(self, "OnModelLoaded")
+    end
+  end }
+end
 function Frame:SetUnit(u) self._model = "unit:" .. u return true end
 function Frame:SetCreature(id)
   if type(id) ~= "number" then error("SetCreature : nombre attendu") end
-  self._model = (not H.badCreatures[id]) and ("creature:" .. id) or nil
+  poseModel(self, (not H.badCreatures[id]) and ("creature:" .. id) or nil)
 end
 function Frame:SetDisplayInfo(id)
   if type(id) ~= "number" then error("SetDisplayInfo : nombre attendu") end
-  self._model = (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil
+  poseModel(self, (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil)
 end
-function Frame:ClearModel() self._model = nil end
+function Frame:SetModel(file)
+  if type(file) ~= "number" and type(file) ~= "string" then error("SetModel : fichier attendu") end
+  poseModel(self, (H.goodFiles and H.goodFiles[file]) and ("file:" .. tostring(file)) or nil)
+end
+function Frame:ClearModel() self._model = nil self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1 end
 function Frame:GetModelFileID() return self._model and 777 or nil end
 function Frame:SetAnimation(a)
   if type(a) ~= "number" then error("SetAnimation : nombre attendu") end
@@ -1619,7 +1642,7 @@ end
 check("icône introuvable -> point d'interrogation", smite and smite.medal.icon._texture == H.ns.Art.QUESTION,
   smite and smite.medal.icon._texture)
 H.slash("models")
-H.advance(2.6)
+H.advance(4.5)
 check("VanCleef : repli SetDisplayInfo", (function()
   for _, m in ipairs(V().preview.models) do
     if m.id == "vancleef" then return m._model == "display:2029" end
@@ -2320,8 +2343,11 @@ do
   check("plus d'icône « point d'interrogation » pour les ennemis", Art.enemyIcon == nil)
 
   -- combat Sorcier défias + murloc : sorcier sans aucun modèle, murloc chargé par son affichage
+  local Sc = ns.Scene
+  local SORC = { 2329, 2330, 2359, 2360, 4281, 4282 }
   H.badCreatures = { [619] = true, [126] = true }
-  H.badDisplays = { [2329] = true, [2330] = true }
+  H.badDisplays = {}
+  for _, d in ipairs(SORC) do H.badDisplays[d] = true end
   local function fight(ids)
     local c = C().combat()
     c.enemies = {}
@@ -2350,28 +2376,33 @@ do
     end
   end
   local so, mu = slotOf("sorcerer"), slotOf("murloc")
-  check("pas de repli avant la fin des essais", so and not so.fallback._shown)
-  H.advance(3 * W.MODEL_WAIT)
-  check("sorcier sans modèle : médaillon argenté de repli", so.fallback._shown and so.fallback.ring ~= nil
-    and so.fallback.icon._texture ~= Art.QUESTION, so.fallback.icon._texture)
+  local function alpha(m) return m._calls.SetAlpha and m._calls.SetAlpha[1] end
+  check("pas de repli avant la fin des essais ; modèle invisible (alpha 0) tant qu'il n'est pas chargé",
+    so and not so.fallback._shown and alpha(so.model) == 0 and not so.fig.shadow:IsShown())
+  H.advance((#SORC + 1) * Sc.MODEL_WAIT + 0.5)
+  check("sorcier sans modèle : médaillon argenté de repli après l'échec des 7 candidats", so.fallback._shown
+    and so.fallback.ring ~= nil and so.fallback.icon._texture ~= Art.QUESTION, so.fallback.icon._texture)
   check("repli : icône de l'ennemi (Media)", so.fallback.icon._texture
     == "Interface\\AddOns\\SlayTheDragon\\Media\\" .. ns.Skin.icons.spell_fire_flamebolt, so.fallback.icon._texture)
   check("repli au-dessus du modèle", R.rect(so.fallback) ~= nil and so.fallback._level > so.model._level)
-  check("murloc : affichage 983 après l'échec de la créature", mu.model._model == "display:983" and not mu.fallback._shown,
+  check("murloc : affichage 983 après l'échec de la créature, apparu en fondu avec son ombre",
+    mu.model._model == "display:983" and not mu.fallback._shown and alpha(mu.model) == 1 and mu.fig.shadow:IsShown(),
     mu.model._model)
   check("statut des essais (créature, affichages)", W.models.sorcerer.state == "missing"
-    and table.concat(W.models.sorcerer.tries, ", ") == "creature 619, display 2329, display 2330"
+    and table.concat(W.models.sorcerer.tries, ", ") == "creature 619, display 2329, display 2330, display 2359, "
+      .. "display 2360, display 4281, display 4282"
     and W.models.murloc.via == "display 983")
+  check("gagnant mémorisé (session et options)", Sc.won.murloc == "display 983"
+    and ns.Persist.options().modelWins.murloc == "display 983" and Sc.lost.sorcerer == true)
   -- relance tardive : la créature arrive dans le cache du client -> le repli s'efface
   H.badCreatures = { [126] = true }
-  H.advance(W.MODEL_LATE + W.MODEL_WAIT + 0.1)
+  H.advance(Sc.MODEL_LATE + 0.5)
   check("relance tardive : modèle trouvé, repli caché, plus listé manquant", not so.fallback._shown
     and so.model._model == "creature:619" and W.models.sorcerer.state == "ok" and not W.missing["model:sorcerer"])
   -- OnModelLoaded sonne alors que GetModelFileID ne rend rien encore : l'essai est jugé réussi
   H.badCreatures = { [117] = true }
-  W.setCreature(so.model, "gnoll", so.fallback)
+  Sc.enemyFigure(so.fig, "gnoll")
   so.model:GetScript("OnModelLoaded")(so.model)
-  H.advance(W.MODEL_WAIT + 0.05)
   check("OnModelLoaded suffit à valider un essai", W.models.gnoll.state == "ok" and W.models.gnoll.via == "creature 117"
     and not so.fallback._shown)
   -- sans icône : disque sombre (silhouette), jamais le point d'interrogation
@@ -2379,30 +2410,47 @@ do
   check("repli sans icône : disque sombre", so.fallback.icon._texture == nil and so.fallback.icon._calls.SetColorTexture
     and so.fallback.icon._calls.SetColorTexture[1] == Art.C.slateDark[1])
 
-  -- /slay modeles : une ligne recopiable par modèle absent (ennemis et PNJ)
+  -- /slay models : une ligne recopiable par modèle (ennemis, PNJ des rencontres, familier, feu de camp) :
+  -- candidat chargé, ou « fallback » avec les candidats essayés
   H.badCreatures = { [619] = true, [639] = true, [235] = true }
-  H.badDisplays = { [2329] = true, [2330] = true, [1691] = true }
+  H.badDisplays = { [1691] = true, [3330] = true, [3323] = true }
+  for _, d in ipairs(SORC) do H.badDisplays[d] = true end
+  H.goodFiles = { [189705] = true }
+  Sc.won, Sc.failed, Sc.lost = {}, {}, {}
+  ns.Persist.options().modelWins = {}
   _G.DEFAULT_CHAT_FRAME._lines = {}
   H.slash("models")
-  H.advance(3.5)
+  H.advance(8 * Sc.MODEL_WAIT + 1)
   local said = table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n")
   local total = 0
   for _ in pairs(Art.enemies) do total = total + 1 end
-  for _ in pairs(Art.npcs) do total = total + 1 end
-  check("/slay modeles : bilan chiffré", said:find("models: " .. (total - 2) .. "/" .. total .. " loaded, 2 without a model", 1, true), said)
-  check("/slay modeles : ennemi manquant et identifiants essayés",
-    said:find("sorcerer: creature 619, display 2329, display 2330 -> no model", 1, true), said)
-  check("/slay modeles : PNJ manquant", said:find("npc:salma_saldean: creature 235, display 1691 -> no model", 1, true), said)
-  check("/slay modeles : modèle chargé par un repli signalé", said:find("vancleef: creature 639 -> no model; loaded by display 2029", 1, true), said)
-  check("/slay modeles : un PNJ et tous les ennemis dans l'aperçu", #V().preview.models == total)
+  local npcIds = {}
+  for _, ev in pairs(ns.Events) do if type(ev) == "table" and ev.npc then npcIds[ev.npc] = ev.speaker end end
+  for id in pairs(Art.npcs) do npcIds[id] = npcIds[id] or id end
+  for _ in pairs(npcIds) do total = total + 1 end
+  total = total + 2 -- familier, feu de camp
+  check("/slay models : bilan chiffré", said:find("models: " .. (total - 2) .. "/" .. total .. " loaded, 2 on fallback:", 1, true), said)
+  check("/slay models : ennemi en repli et identifiants essayés", said:find("sorcerer (" .. ns.Enemies.sorcerer.name
+    .. "): fallback (no model: creature 619, display 2329, display 2330, display 2359", 1, true), said)
+  check("/slay models : PNJ en repli", said:find("npc:salma_saldean (Salma Saldean): fallback (no model: creature 235, "
+    .. "display 1691, display 3330, display 3323)", 1, true), said)
+  check("/slay models : modèle chargé par un candidat de secours signalé",
+    said:find("vancleef (" .. ns.Enemies.vancleef.name .. "): display 2029 (declared first: creature 639)", 1, true), said)
+  check("/slay models : feu de camp (candidat chargé)", said:find("campfire (Campfire): file 189705", 1, true), said)
+  local everyNpc = true
+  for id, speaker in pairs(npcIds) do
+    if not said:find("npc:" .. id .. " (" .. speaker .. "): ", 1, true) then everyNpc = false end
+  end
+  check("/slay models : une ligne par PNJ des rencontres (nom affiché)", everyNpc, said)
+  check("/slay models : ennemis, PNJ, familier et feu dans l'aperçu", #V().preview.models == total)
   local stateOk = true
   for _, m in ipairs(V().preview.models) do
-    local want = (m.key == "sorcerer" or m.key == "npc:salma_saldean") and "no model" or "model: "
+    local want = (m.key == "sorcerer" or m.key == "npc:salma_saldean") and "fallback" or "model: "
     if not (m.state._text or ""):find(want, 1, true) then stateOk = false end
     if m.fallback.icon._texture == Art.QUESTION then stateOk = false end
   end
   check("aperçu : état sous chaque modèle, aucun point d'interrogation", stateOk)
-  H.badCreatures, H.badDisplays = {}, nil
+  H.badCreatures, H.badDisplays, H.goodFiles = {}, nil, nil
   V().preview:Hide()
 
   -- noms : toujours lisibles, de 1 à 6 ennemis, aux échelles extrêmes de la fenêtre
@@ -4071,14 +4119,19 @@ do
     check("mort d'un ennemi : golem affiché", false)
   end
 
-  -- rencontre : ombre du héros, ombre du PNJ seulement quand son modèle est affiché
+  -- rencontre : ombre du héros, ombre du PNJ seulement quand son modèle est chargé (elle apparaît
+  -- avec lui)
   freshRun(SEED + 4, "event")
   local ch = UI().current
+  local npcKey = "npc:" .. tostring(UI().step.npc)
+  local function loadedNpc() local st = H.ns.Widgets.models[npcKey] return st and st.state == "ok" end
+  check("rencontre : pas d'ombre du PNJ avant le chargement de son modèle", not ch.npc.shadow:IsShown())
+  H.advance(1)
   local ebad = {}
   shadowBad(ch.hero, "héros (rencontre)", ebad)
-  if ch.npc.model:IsShown() then shadowBad(ch.npc, "PNJ", ebad) end
-  check("rencontre : ombre du héros sous les pieds ; ombre du PNJ affichée avec son modèle seulement",
-    #ebad == 0 and ch.npc.shadow:IsShown() == (ch.npc.model:IsShown() and true or false), table.concat(ebad, " ; "))
+  if loadedNpc() then shadowBad(ch.npc, "PNJ", ebad) end
+  check("rencontre : ombre du héros sous les pieds ; ombre du PNJ affichée avec son modèle chargé",
+    #ebad == 0 and loadedNpc() and ch.npc.shadow:IsShown(), table.concat(ebad, " ; "))
 end
 
 print("U29 textes affichés en anglais : aucune chaîne française dans Core/, Data/, UI/ ni le TOC")
@@ -7014,6 +7067,229 @@ do
   ns.UI.refresh()
   scr = UI().current
   check("bilan sans montée : rien de révélé", not vis(scr.newCards[1]) and not vis(scr.newRelics[1]))
+end
+
+print("UF  feu de camp en modèle 3D (candidats, lueur, repli) ; PNJ des rencontres (candidats, attente, repli, gagnant) ; préchargement")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function under(o, top)
+    while o do if o == top then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function above(o, t) return R.drawnBefore(R.drawKey(t), R.drawKey(o)) end
+  local function inter(a, b) return a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5 end
+  local function alpha(m) return m._calls.SetAlpha and m._calls.SetAlpha[1] end
+  H.boot()
+  local ns = H.ns
+  local Art, W, Sc = ns.Art, ns.Widgets, ns.Scene
+
+  -- 1. données : feu (plusieurs fichiers, icône de repli embarquée) ; chaque rencontre a un personnage
+  -- déclaré avec au moins deux candidats et une icône de repli embarquée
+  local fireTries = Sc.modelTries(Art.campfire)
+  local fireIcon = Art.campfire.icon and Art.campfire.icon.tga and ns.Skin.icons[Art.campfire.icon.tga:lower()]
+  check("feu de camp : au moins 3 fichiers candidats (SetModel), icône du feu de camp embarquée en repli",
+    #fireTries >= 3 and fireTries[1][1] == "file" and fireIcon ~= nil, #fireTries)
+  local bad = {}
+  for id, ev in pairs(ns.Events) do
+    local a = ev.npc and Art.npcs[ev.npc]
+    if not a then
+      bad[#bad + 1] = id .. " : personnage " .. tostring(ev.npc) .. " non déclaré"
+    else
+      local n = #Sc.modelTries(a)
+      local ic = a.icon and a.icon.tga and ns.Skin.icons[a.icon.tga:lower()]
+      if n < 3 or not a.creature then bad[#bad + 1] = id .. " : " .. n .. " candidat(s)" end
+      if not ic then bad[#bad + 1] = id .. " : icône de repli non embarquée (" .. tostring(a.icon and a.icon.tga) .. ")" end
+    end
+  end
+  table.sort(bad)
+  check("chaque rencontre : personnage déclaré, créature + affichages (3 candidats ou plus), icône embarquée",
+    #bad == 0, table.concat(bad, " ; "))
+  local src = io.open(root .. "/UI/Screens.lua"):read("*a")
+  check("plus aucune trace de l'ancien dessin du feu (bûches, flammes en ellipses, halo ovale)",
+    not src:find("fire.outer", 1, true) and not src:find("fire.inner", 1, true) and not src:find("#e2863b", 1, true)
+    and not src:find("#5c3418", 1, true))
+
+  -- 2. feu de camp, faux client sans fichier de feu : modèle invisible, puis médaillon après tous
+  freshRun(SEED + 3, "campfire")
+  ns = H.ns
+  Art, W, Sc = ns.Art, ns.Widgets, ns.Scene
+  local cp = UI().current
+  local fire = cp.fire
+  check("feu : cadre de modèle (PlayerModel) posé, invisible tant qu'il n'est pas chargé, pas de repli tout de suite",
+    fire.model._kind == "PlayerModel" and fire.model:IsVisible() and alpha(fire.model) == 0 and not fire.fallback._shown)
+  check("feu : les boutons et réponses n'attendent pas le modèle", cp.restPlaque:IsVisible() and cp.bookPlaque:IsVisible()
+    and cp.leave:IsVisible())
+  H.advance(#fireTries * Sc.MODEL_WAIT + 0.5)
+  check("feu : aucun fichier ne charge -> médaillon à l'icône du feu de camp, au-dessus du modèle",
+    fire.fallback._shown and fire.fallback.icon._texture == "Interface\\AddOns\\SlayTheDragon\\Media\\" .. fireIcon
+    and fire.fallback._level > fire.model._level and W.models.campfire.state == "missing", fire.fallback.icon._texture)
+  local fr, mr, hr = R.rect(fire), R.rect(fire.model), R.rect(cp.hero)
+  local glowBad = {}
+  if #fire.glow ~= #Sc.FIRE_GLOW then glowBad[1] = "nombre de couches" end
+  for i, g in ipairs(fire.glow) do
+    local vc = g._calls.SetVertexColor or {}
+    local gr = R.rect(g)
+    local why = {}
+    if not vis(g) then why[#why + 1] = "cachée" end
+    if g._texture ~= Sc.SHADOW then why[#why + 1] = "texture " .. tostring(g._texture) end
+    if not (g._calls.SetBlendMode and g._calls.SetBlendMode[1] == "ADD") then why[#why + 1] = "pas additive" end
+    if not (vc[1] == 1 and vc[2] < 0.8 and vc[3] < 0.4) then why[#why + 1] = "pas orange" end
+    if not above(fire.model, g) then why[#why + 1] = "pas sous le modèle" end
+    local k = (fr[3] - fr[1]) / fire._w
+    if not gr or math.abs((gr[2] + gr[4]) / 2 - (mr[2] + Sc.FIRE_FEET * k)) > 0.6 then
+      why[#why + 1] = ("centre %.1f, pied %.1f"):format(gr and (gr[2] + gr[4]) / 2 or -1, mr[2] + Sc.FIRE_FEET * k)
+    end
+    if #why > 0 then glowBad[#glowBad + 1] = "couche " .. i .. " : " .. table.concat(why, ", ") end
+  end
+  check("feu : lueur chaude (texture fondue, orange, additive) au pied du feu, sous le modèle", #glowBad == 0,
+    table.concat(glowBad, " ; "))
+  local oldBits = {}
+  for _, o in ipairs(H.objects) do
+    if rawget(o, "_kind") == "Texture" and under(o, fire) and not under(o, fire.fallback) and o._texture ~= Sc.SHADOW then
+      oldBits[#oldBits + 1] = tostring(o._texture)
+    end
+  end
+  check("feu : aucune autre région que la lueur (ni ellipse ni bûche dessinée)", #oldBits == 0, table.concat(oldBits, ", "))
+  check("feu : posé sur la ligne des pieds du héros, entre le couchage et le grimoire, à l'échelle du héros",
+    math.abs(mr[2] - hr[2]) < 0.6 and mr[1] > R.rect(cp.rest)[3] and mr[3] < R.rect(cp.book)[1]
+    and (mr[4] - mr[2]) > 0.5 * (hr[4] - hr[2]) and (mr[4] - mr[2]) < 0.9 * (hr[4] - hr[2]))
+  -- rien d'interface sous un modèle : toute région visible du contenu qui croise le modèle du feu (hors
+  -- la lueur, ambiance voulue dessous, et le décor) est dessinée au-dessus de lui
+  local hidden = {}
+  for _, o in ipairs(H.objects) do
+    local k = rawget(o, "_kind")
+    if (k == "FontString" and (o._text or "") ~= "" or k == "Texture" and o._texture ~= nil) and vis(o)
+      and under(o, ns.UI.content) and not under(o, ns.Scene.decor) and not under(o, ns.Scene.board)
+      and rawget(o, "_parent") ~= ns.UI.content and not (o._calls.SetAlpha and o._calls.SetAlpha[1] == 0)
+      and not (under(o, fire) and not under(o, fire.fallback)) then
+      local r = R.rect(o)
+      if r and inter(r, mr) and not above(o, fire.model) then hidden[#hidden + 1] = k .. " " .. tostring(o._texture or o._text) end
+    end
+  end
+  check("feu : rien d'interface sous le modèle", #hidden == 0, table.concat(hidden, ", "))
+  snap("feu-de-camp-repli")
+  -- un fichier arrive tard (relance) : le modèle remplace le médaillon
+  H.goodFiles = { [189705] = true }
+  H.advance(Sc.MODEL_LATE + 0.5)
+  check("feu : fichier arrivé à la relance -> modèle en fondu, médaillon effacé",
+    not fire.fallback._shown and alpha(fire.model) == 1 and fire.model._model == "file:189705"
+    and W.models.campfire.via == "file 189705", fire.model._model)
+  H.goodFiles = nil
+
+  -- 3. rencontre, client sans aucun modèle : le personnage attend, puis médaillon ; le texte n'attend pas
+  H.noModels = true
+  freshRun(SEED + 4, "event")
+  ns = H.ns
+  Art, W, Sc = ns.Art, ns.Widgets, ns.Scene
+  local ch = UI().current
+  local npcId = UI().step.npc
+  local art = Art.npcs[npcId]
+  check("rencontre : texte et réponses tout de suite, personnage invisible (alpha 0), pas encore de médaillon",
+    ch.bubble:IsVisible() and ch.buttons[1]:IsVisible() and alpha(ch.npc.model) == 0 and not ch.npc.fallback._shown
+    and not ch.npc.shadow:IsShown())
+  H.advance(Sc.MODEL_WAIT * 1.5)
+  check("rencontre : toujours pas de médaillon tant que des candidats restent", not ch.npc.fallback._shown)
+  H.advance(#Sc.modelTries(art) * Sc.MODEL_WAIT)
+  local icon = ns.Skin.icons[art.icon.tga:lower()]
+  local nr, fr2 = R.rect(ch.npc.name), R.rect(ch.npc)
+  check("rencontre : tous les candidats en échec -> médaillon à l'icône du personnage, nom au-dessus",
+    ch.npc.fallback._shown and ch.npc.fallback.icon._texture == "Interface\\AddOns\\SlayTheDragon\\Media\\" .. icon
+    and ch.npc.name._text == UI().step.speaker and nr and nr[2] >= fr2[4] and above(ch.npc.name, ch.npc.model)
+    and W.models["npc:" .. npcId].state == "missing", ch.npc.fallback.icon._texture)
+  snap("rencontre-repli")
+  H.noModels = nil
+  H.advance(Sc.MODEL_LATE + 0.5)
+  check("rencontre : modèle arrivé tard -> il remplace le médaillon (fondu, ombre)",
+    not ch.npc.fallback._shown and alpha(ch.npc.model) == 1 and ch.npc.shadow:IsShown()
+    and W.models["npc:" .. npcId].state == "ok")
+
+  -- 4. premier chargement lent (1,5 s) : attendu, jamais abandonné ni remplacé par le médaillon
+  H.slowModels = { ["creature:235"] = 1.5 }
+  Sc.won, Sc.failed, Sc.lost = {}, {}, {}
+  ns.Persist.options().modelWins = {}
+  Sc.npcFigure(ch.npc, "salma_saldean")
+  local seen = false
+  for _ = 1, 9 do
+    H.advance(0.2)
+    if ch.npc.fallback._shown then seen = true end
+  end
+  check("chargement lent (1,5 s < délai d'essai) : premier candidat gardé, aucun médaillon entre-temps",
+    not seen and ch.npc.model._model == "creature:235" and W.models["npc:salma_saldean"].via == "creature 235"
+    and Sc.MODEL_WAIT >= 1.5, tostring(seen) .. " " .. tostring(ch.npc.model._model) .. " "
+    .. tostring(W.models["npc:salma_saldean"].state) .. " " .. tostring(W.models["npc:salma_saldean"].via))
+  H.slowModels = nil
+
+  -- 5. préchargement depuis le parcours : modèles des étapes accessibles chargés d'avance, gagnant
+  -- mémorisé, scène qui l'obtient aussitôt
+  H.boot()
+  ns = H.ns
+  Art, W, Sc = ns.Art, ns.Widgets, ns.Scene
+  H.badCreatures = {}
+  for _, a in pairs(Art.npcs) do H.badCreatures[a.creature] = true end
+  H.slash("")
+  ns.Controller.makeSeed = function() return SEED + 4 end
+  clickOption("go")
+  local e = EXP()
+  local first = e.map.start[1]
+  e.map.nodes[first].kind = "event"
+  for i = 2, #e.map.start do e.map.nodes[e.map.start[i]].kind = "combat" end
+  ns.UI.refresh()
+  local pre = Sc.preloads
+  local poolOk = pre.campfire ~= nil
+  for _, evId in ipairs(ns.Expedition.eventPool(e)) do
+    local npc = ns.Events[evId].npc
+    if npc and not pre["npc:" .. npc] then poolOk = false end
+  end
+  for _, group in ipairs(ns.Encounters.act1.easy) do
+    for _, id in ipairs(group) do if not pre[id] then poolOk = false end end
+  end
+  check("préchargement lancé au parcours : feu de camp, PNJ des rencontres possibles, ennemis des combats possibles", poolOk)
+  local framesOk = true
+  for _, p in pairs(pre) do
+    if not (vis(p.model) and alpha(p.model) == 0 and not under(p.model, _G.SlayTheDragonFrame)) then framesOk = false end
+  end
+  check("préchargement : cadres montrés avec une alpha 0, hors de la fenêtre de l'addon", framesOk)
+  H.advance(Sc.MODEL_WAIT + 1)
+  local winOk = true
+  for k, p in pairs(pre) do
+    if k:match("^npc:") then
+      local a = Art.npcs[k:sub(5)]
+      local d = type(a.display) == "table" and a.display[1] or a.display
+      if not (p.status.state == "ok" and Sc.won[k] == "display " .. d and ns.Persist.options().modelWins[k] == Sc.won[k]) then
+        winOk = false
+      end
+    end
+  end
+  check("préchargement : gagnant de chaque PNJ mémorisé (premier affichage, la créature échouant)", winOk)
+  local keptOk = true
+  for _, p in pairs(pre) do
+    if p.status.state == "ok" and (p.model._shown or not p.model._model
+      or not (p.model._calls.SetKeepModelOnHide and p.model._calls.SetKeepModelOnHide[1] == true)) then keptOk = false end
+  end
+  check("préchargement : cadre chargé caché (plus rien à dessiner), modèle gardé (SetKeepModelOnHide)", keptOk)
+  clickOption("path:" .. first)
+  local ch2 = UI().current
+  local key = "npc:" .. UI().step.npc
+  local a2 = Art.npcs[UI().step.npc]
+  local d2 = type(a2.display) == "table" and a2.display[1] or a2.display
+  check("scène : le gagnant mémorisé est posé en premier", ch2.npc.model._model == "display:" .. d2, ch2.npc.model._model)
+  H.advance(0.9)
+  check("scène : personnage affiché en moins d'une seconde grâce au préchargement, sans médaillon",
+    W.models[key].state == "ok" and W.models[key].via == "display " .. d2 and not ch2.npc.fallback._shown
+    and alpha(ch2.npc.model) == 1, tostring(W.models[key].state) .. " " .. tostring(W.models[key].via) .. " "
+    .. tostring(ch2.npc.fallback._shown) .. " " .. tostring(alpha(ch2.npc.model)))
+  local ev2 = ns.Events[EXP().event.id]
+  local need = Sc.eventFightNeeds(ev2, EXP())
+  local fightOk = Sc.preloads.campfire ~= nil
+  for _, n in ipairs(need) do if not Sc.preloads[n.key] then fightOk = false end end
+  check("rencontre : préchargement des ennemis des combats qu'elle peut lancer, feu de camp gardé", fightOk,
+    EXP().event.id .. " : " .. #need .. " ennemi(s)")
+  H.badCreatures = {}
 end
 
 print("U16 méthodes d'API inconnues appelées")

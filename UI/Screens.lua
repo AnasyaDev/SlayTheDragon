@@ -615,8 +615,16 @@ end
 
 function Choice:Show(step)
   self.step = step
+  -- personnage : apparaît quand son modèle est chargé (médaillon si aucun candidat ne charge) ; le
+  -- texte et les réponses ne l'attendent pas
   local npcShown = step.kind == "event" and Scene.npcFigure(self.npc, step.npc) or false
-  if not npcShown then self.npc.model:Hide() self.npc.shadow:Hide() end
+  if not npcShown then Scene.npcFigure(self.npc, nil) end
+  if step.kind == "event" then
+    -- combats que les réponses peuvent lancer : leurs ennemis se chargent pendant la lecture
+    local exp = Controller.exp()
+    local ev = exp and exp.event and exp.event.id and ns.Events[exp.event.id]
+    if ev then Scene.preload(Scene.nextNeeds(nil, Scene.eventFightNeeds(ev, exp))) end
+  end
   UI.setStage({ scene = step.scene or Controller.scene(), board = true })
   Scene.playerFigure(self.hero)
   Scene.setName(self.npc, step.kind == "event" and (step.speaker or "") or "")
@@ -652,38 +660,17 @@ end
 local Camp = { kinds = { "campfire" } }
 UI.register("campfire", Camp)
 
+-- Feu : centre x, ligne des pieds, taille du cadre du modèle. 140 de large : le halo doré de survol du
+-- couchage et du grimoire (1,55 × 74) s'arrête juste avant (x 444 et 599).
+local FIRE_X, FIRE_FEET, FIRE_W, FIRE_H = 517, 346, 140, 130
+
 function Camp:Build(f)
   self.hero = heroFigure(f)
-  -- Le feu : bûches, flammes en couches qui vacillent, lueur.
-  local fire = CreateFrame("Frame", nil, f)
-  at(fire, f, 457, 230, 120, 120)
-  fire.glow = W.disc(fire, "BACKGROUND", 0, C.gold, 0.22)
-  fire.glow:SetSize(300, 130)
-  fire.glow:SetPoint("BOTTOM", 0, -30)
-  for i, rot in ipairs({ 0.35, -0.35 }) do
-    local log = W.rect(fire, "ARTWORK", 0, Art.hex("#5c3418"))
-    log:SetSize(96, 14)
-    log:SetPoint("BOTTOM", 0, 6 + i)
-    if log.SetRotation then log:SetRotation(rot) end
-  end
-  fire.outer = W.disc(fire, "ARTWORK", 1, Art.hex("#e2863b"))
-  fire.outer:SetSize(62, 92)
-  fire.outer:SetPoint("BOTTOM", 0, 12)
-  fire.inner = W.disc(fire, "ARTWORK", 2, C.gold)
-  fire.inner:SetSize(38, 62)
-  fire.inner:SetPoint("BOTTOM", 0, 14)
-  fire.core = W.disc(fire, "ARTWORK", 3, C.creamLight)
-  fire.core:SetSize(18, 30)
-  fire.core:SetPoint("BOTTOM", 0, 16)
-  local t = 0
-  fire:SetScript("OnUpdate", function(_, el)
-    t = t + (el or 0)
-    local a = math.sin(t * 9) * 0.5 + math.sin(t * 13.7) * 0.5
-    fire.outer:SetSize(62 + a * 5, 92 + a * 9)
-    fire.inner:SetSize(38 - a * 3, 62 + a * 6)
-    fire.glow:SetAlpha(0.2 + 0.05 * a)
-  end)
-  self.fire = fire
+  -- Le feu : modèle 3D d'un feu de camp du jeu (Art.campfire, essais et repli : Scene.campfire), posé
+  -- au sol sur la ligne des pieds du héros (y 346), entre le couchage et le grimoire, lueur chaude
+  -- dessous. 140 × 130 : environ les deux tiers de la hauteur du héros, flammes comprises.
+  self.fire = Scene.campfire(f, FIRE_W, FIRE_H)
+  at(self.fire, f, FIRE_X - FIRE_W / 2, FIRE_FEET - FIRE_H, FIRE_W, FIRE_H)
 
   -- couchage et grimoire : médaillons au sol ; leurs plaques sur le plateau (planche ecran_feu.jpg)
   self.rest = groundObject(f, 74, "round")
@@ -694,6 +681,8 @@ function Camp:Build(f)
   at(self.book, f, 657 - 37, 347 - 37, 74, 74)
   W.setIcon(self.book.icon, Art.ui.grimoire, "ui:grimoire")
   self.book:SetScript("OnClick", function(b) chooseOption(b.option) end)
+  -- couchage et grimoire au-dessus du feu (modèle et médaillon) : rien d'interface sous un modèle
+  for _, obj in ipairs({ self.rest, self.book }) do obj:SetFrameLevel(self.fire.fallback:GetFrameLevel() + 1) end
   self.restPlaque = plaque(f)
   self.bookPlaque = plaque(f)
   -- la plaque et le médaillon s'allument ensemble
@@ -715,6 +704,7 @@ function Camp:Show(step)
   self.step = step
   UI.setStage({ scene = "night", board = true })
   Scene.playerFigure(self.hero)
+  Scene.showCampfire(self.fire)
   self.pile:Sync()
   self.optionButtons = {}
   for _, o in ipairs(step.options) do
@@ -1467,6 +1457,8 @@ end
 function Map:Show(step)
   self.step = step
   UI.setStage({ scene = false, board = false })
+  -- étapes accessibles connues : préchargement des modèles de la prochaine scène possible
+  Scene.preload(Scene.nextNeeds(Controller.exp()))
   local nodes = step.nodes or {}
   local floors = step.floors or 8
   local byId, stateOf, pos = {}, {}, {}

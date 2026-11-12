@@ -148,12 +148,91 @@ Art.scenes = {
 }
 Art.defaultScene = "road"
 
--- Personnages des rencontres : event.npc -> { creature = id, display = id } (voir Art.enemies pour
--- l'ordre des essais et la source des identifiants) ; sans modèle chargé, rien ne s'affiche.
+-- Personnages des rencontres : event.npc -> { creature = id, display = { id, … }, icon = repli }.
+-- Essais dans l'ordre (UI/Scene.lua, S.loadModel) : la créature, puis chaque affichage ; le candidat
+-- qui a réussi est essayé en premier aux fois suivantes. Tous les identifiants viennent du cache de
+-- créatures du client Forever (Cache/WDB/enUS et frFR/creaturecache.wdb, lus par
+-- tools/wdb_creatures.py le 12/11/2026) : la créature citée en commentaire, puis des affichages de
+-- créatures du même genre (même cache) en secours. Un affichage ne dépend pas du cache de créatures
+-- (SetDisplayInfo lit les données du client) : c'est le secours quand la créature n'est pas connue.
+-- Personnages inventés : une créature de la Marche de l'Ouest ou d'Elwynn du bon genre.
+-- icon = médaillon de repli (icône embarquée de Media/Icons) quand aucun modèle ne se charge.
 Art.npcs = {
-  salma_saldean = { creature = 235, display = 1691 },     -- Salma Saldean
-  farmer_saldean = { creature = 233, display = 1943 },    -- Saldean le fermier
-  gryan_stoutmantle = { creature = 234, display = 1690 }, -- Gryan Fortmanteau
+  -- Salma Saldean (235) ; Ma Stonefield (244), Maybell Maclure (251)
+  salma_saldean = { creature = 235, display = { 1691, 3330, 3323 },
+    icon = { icon = 236447, tga = "Achievement_Character_Human_Female" } },
+  -- Saldean le fermier (233) ; Ray le fermier (232), Getz le fermier (2403)
+  farmer_saldean = { creature = 233, display = { 1943, 3614, 3620 },
+    icon = { icon = 134058, tga = "INV_Misc_Food_Wheat_01" } },
+  -- cocher : Brog Hamfist <General Supplies> (151) ; Mike Miller (1670), Greishan Ironstove,
+  -- marchand itinérant (3291)
+  wagon_driver = { creature = 151, display = { 1292, 3262, 1837 },
+    icon = { icon = 236448, tga = "Achievement_Character_Human_Male" } },
+  -- Gryan Stoutmantle (234) ; Capitaine Danuvin (821), Protecteur Gariel (490), Milice du peuple
+  gryan_stoutmantle = { creature = 234, display = { 1690, 2372, 2367 },
+    icon = { icon = 132483, tga = "INV_Banner_02" } },
+  -- Old Hank, pêcheur : Lee Brown <Fisherman> (1651) ; Harold Riggs (3179), Stuart Fleming (3178)
+  old_fisherman = { creature = 1651, display = { 3272, 3470, 3468 },
+    icon = { icon = 132931, tga = "INV_Fishingpole_01" } },
+  -- Grit, prospecteur : Prospecteur Stormpike (1356) ; Prospecteurs Gehn (1255) et Ironband (1344)
+  gold_prospector = { creature = 1356, display = { 3594, 1623, 3437 },
+    icon = { icon = 134708, tga = "INV_Pick_02" } },
+  -- Mother Hanna, réfugiée : Ma Stonefield (244) ; « Auntie » Bernice Stonefield (246), Kalaba la
+  -- fermière (2451)
+  moonbrook_refugee = { creature = 244, display = { 3330, 3329, 3630 },
+    icon = { icon = 133671, tga = "INV_Misc_Bandage_01" } },
+  -- Aunt Mirelle, herboriste : Alma Jainrose <Herbalism Trainer> (812) ; Felicia Gump (1303),
+  -- « Auntie » Bernice Stonefield (246)
+  herbalist = { creature = 812, display = { 1745, 1441, 3329 },
+    icon = { icon = "Interface\\Icons\\inv_misc_flower_02", tga = "INV_Misc_Flower_02" } },
+  -- Farmer Molsen : Ray le fermier (232) ; Getz (2403), Kent (2436) le fermier
+  farmer_molsen = { creature = 232, display = { 3614, 3620, 3667 },
+    icon = { icon = 134059, tga = "INV_Misc_Food_Wheat_02" } },
+  -- Keeper Alden, gardien du phare : Chef des docks Baren (381) ; Harold Riggs (3179), Matthew Hooper (1680)
+  lighthouse_keeper = { creature = 381, display = { 3360, 3470, 3362 },
+    icon = { icon = 134249, tga = "INV_Misc_Lantern_01" } },
+  -- Graymaw, chef gnoll : Sous-chef Rivepatte (98) ; Brute Rivepatte (124), Gnoll Rivepatte (117)
+  riverpaw_gnoll = { creature = 98, display = { 376, 384, 175 },
+    icon = { icon = 134163, tga = "INV_Misc_Head_Gnoll_01" } },
+  -- Grizzle Quickclick, colporteur gobelin : Zixil <Merchant Supreme> (3537) ; Artisan (1731),
+  -- Ingénieur (622) et Sculpteur (641) gobelins
+  goblin_peddler = { creature = 3537, display = { 7133, 7110, 7109, 7111 },
+    icon = { icon = 463874, tga = "achievement_Goblinhead" } },
+  -- Tinker Bertil, gnome bricoleur : Deek Fizzlebizz <Journeyman Engineer> (3290) ; Bronk Guzzlegear
+  -- (1702), Loslor Rudge (1694)
+  gnome_tinker = { creature = 3290, display = { 1832, 3394, 3392 },
+    icon = { icon = 134520, tga = "INV_Misc_Wrench_01" } },
+  -- Tobin, gamin : Tommy Joe Stonefield (252) ; Thomas <Altar Boy> (4982), Nathan (847)
+  tobin_young = { creature = 252, display = { 3331, 262, 338 },
+    icon = { icon = 133964, tga = "INV_Misc_Food_11" } },
+  -- Tobin, guetteur de la Milice : Eclaireur Riell (820) ; Eclaireur Galiaan (878), Protecteur Bialon (487)
+  tobin_scout = { creature = 820, display = { 2374, 2373, 2368 },
+    icon = { icon = 134441, tga = "INV_Misc_Spyglass_02" } },
+  -- Tobin, coupe-jarret défias : Vide-gousset défias (94, homme / femme) ; Malandrin défias (122)
+  tobin_defias = { creature = 94, display = { 2361, 2362, 2342, 2343 },
+    icon = { icon = 133694, tga = "INV_Misc_Bandana_03" } },
+}
+
+-- Feu de camp (écran du feu de camp) : modèle 3D d'un feu de camp du jeu (Model:SetModel), essayé
+-- dans l'ordre comme les créatures ; repli : médaillon à l'icône du feu de camp du parcours.
+-- FileDataID et chemins confirmés par wow_model_search (liste de fichiers retail) ; leur présence dans
+-- le client Forever n'est pas vérifiable hors jeu. Ordre : feux de camp de la version classique
+-- d'abord (Elwynn, puis le feu humain générique, le petit foyer orc), le même par chemin, puis deux
+-- feux plus récents. Flammes : émetteurs de particules ; un cadre Model les dessine (l'interface de
+-- Blizzard montre ainsi un effet de sort, 1601381, dans RecruitAFriendFrame).
+-- facing = orientation (radians) ; scale / z = réglages facultatifs du cadrage (SetModelScale,
+-- SetPosition), surchargés en jeu par `/slay fire <échelle> <hauteur> <orientation>`.
+Art.campfire = {
+  files = {
+    { 189705, "Elwynn campfire" },   -- world/azeroth/elwynn/passivedoodads/campfire/elwynncampfire.m2
+    { 198193, "generic campfire" },  -- world/generic/human/passive doodads/fire/undeadcampfire.m2
+    { 199156, "small fire pit" },    -- world/generic/orc/passive doodads/firepits/smallfirepit01.m2
+    { "World\\Azeroth\\Elwynn\\PassiveDoodads\\Campfire\\ElwynnCampfire.m2", "Elwynn campfire (by path)" },
+    { 987238, "campfire (Draenor)" }, -- world/expansion05/doodads/fx/6fx_campfire01.m2
+    { 195041, "Elwynn campfire (Northrend)" }, -- world/expansion02/doodads/generic/northrend fires/northrendelwynncampfire.m2
+  },
+  icon = { icon = 7808148, tga = "INV_Camelot_Camping_WelcomingCampfire" }, -- inv_camelot_camping_welcomingcampfire
+  facing = 0.5,
 }
 
 ---------------------------------------------------------------------------
@@ -244,7 +323,7 @@ Art.schoolName = { holy = "Holy", shadow = "Shadow" }
 -- Ennemis
 ---------------------------------------------------------------------------
 -- creature = identifiant de créature (Model:SetCreature) ; display = identifiant d'affichage, ou liste
--- (Model:SetDisplayInfo), essayés dans l'ordre si le précédent ne donne aucun modèle (W.setCreatureArt).
+-- (Model:SetDisplayInfo), essayés dans l'ordre si le précédent ne donne aucun modèle (S.loadModel, UI/Scene.lua).
 -- Identifiants relevés le 10/11/2026 dans le cache de créatures du client Forever lui-même
 -- (Cache/WDB/enUS et frFR/creaturecache.wdb : identifiant, nom, affichages), wow_creature_search
 -- n'ayant pas accès à l'installation. Les créatures à deux affichages (homme / femme) sont des
@@ -259,9 +338,11 @@ Art.enemies = {
   mystic          = { creature = 453, display = 502, icon = HEAD_GNOLL },   -- Riverpaw Mystic
   murloc          = { creature = 126, display = 983, icon = HEAD_MURLOC },  -- Murloc Coastrunner
   bandit          = { creature = 116, display = { 2357, 2358 }, icon = BANDANA }, -- Defias Bandit
-  -- Invocateur défias (Defias Conjurer, Marche de l'Ouest) ; « Sorcier défias » du client = 4418
-  -- (Mortemines, affichages 2447 / 2448, cache frFR seulement).
-  sorcerer        = { creature = 619, display = { 2329, 2330 },
+  -- Invocateur défias (Defias Conjurer, 619, Marche de l'Ouest : affichages 2329 / 2330 dans les deux
+  -- caches, mais rien ne s'affichait en jeu le 12/11/2026). Secours : d'autres lanceurs de sorts défias
+  -- du cache, Sorcier-voleur défias (474, Elwynn) 2359 / 2360, Enchanteur défias (910) 4281 / 4282
+  -- (Magicien défias 1726 : 2321 / 2322 et Sorcier défias 4418 : 2447 / 2448, non retenus : liste courte).
+  sorcerer        = { creature = 619, display = { 2329, 2330, 2359, 2360, 4281, 4282 },
                       icon = { icon = 135812, tga = "Spell_Fire_FlameBolt" } }, -- spell_fire_flamebolt
   harvest_golem   = { creature = 36, display = 367, scale = 1.2, icon = { icon = 134063 } }, -- inv_misc_gear_01
   rhahkzor        = { creature = 644, display = 14403, scale = 1.2,
