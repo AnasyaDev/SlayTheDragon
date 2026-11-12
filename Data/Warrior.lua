@@ -74,23 +74,23 @@ card("overpower", {
 
 card("slam", {
   level = 4, name = "Slam", cost = 1, type = "attack", rarity = "common", path = "arms",
-  target = "enemy", cast = true, effects = { { "damage", 14 } },
-  text = "Cast.\nDeal 14.",
-  up = { effects = { { "damage", 18 } }, text = "Cast.\nDeal 18." },
+  target = "enemy", cast = true, effects = { { "damage", 16 } },
+  text = "Cast.\nDeal 16.",
+  up = { effects = { { "damage", 20 } }, text = "Cast.\nDeal 20." },
 })
 
 card("cleave", {
   level = 2, name = "Cleave", cost = 1, type = "attack", rarity = "common", path = "arms",
-  effects = { { "damage", 7, all = true } },
-  text = "Deal 7 to all.",
-  up = { effects = { { "damage", 10, all = true } }, text = "Deal 10 to all." },
+  effects = { { "damage", 8, all = true } },
+  text = "Deal 8 to all.",
+  up = { effects = { { "damage", 11, all = true } }, text = "Deal 11 to all." },
 })
 
 card("mortal_strike", {
   level = 6, name = "Mortal Strike", cost = 2, type = "attack", rarity = "uncommon", path = "arms",
-  target = "enemy", effects = { { "damage", 16 }, { "apply", "armor_broken", 2 } },
-  text = "Deal 16.\nApply Sundered 2 ⌛",
-  up = { effects = { { "damage", 21 }, { "apply", "armor_broken", 3 } }, text = "Deal 21.\nApply Sundered 3 ⌛" },
+  target = "enemy", effects = { { "damage", 18 }, { "apply", "armor_broken", 2 } },
+  text = "Deal 18.\nApply Sundered 2 ⌛",
+  up = { effects = { { "damage", 23 }, { "apply", "armor_broken", 3 } }, text = "Deal 23.\nApply Sundered 3 ⌛" },
 })
 
 -- Execute : la Rage n'est dépensée que si la cible est entamée (condition lue à la résolution).
@@ -138,9 +138,9 @@ end
 
 card("deep_wounds", {
   level = 7, name = "Deep Wounds", cost = 1, type = "power", rarity = "rare", path = "arms",
-  power = true, effects = {}, hooks = deepWoundsHooks(2),
-  text = "Power.\nAttacks: apply DoT 2.",
-  up = { hooks = deepWoundsHooks(3), text = "Power.\nAttacks: apply DoT 3." },
+  power = true, effects = {}, hooks = deepWoundsHooks(1),
+  text = "Power.\nAttacks: apply DoT 1.",
+  up = { hooks = deepWoundsHooks(2), text = "Power.\nAttacks: apply DoT 2." },
 })
 
 -- Fury : beaucoup de petites attaques, Strength qui monte, cartes payées en PV ---------------------
@@ -176,11 +176,11 @@ card("berserker_rage", {
 
 card("bloodthirst", {
   level = 1, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
-  target = "enemy", cooldown = 3,
+  target = "enemy", cooldown = 4,
   effects = { { "damage", 6 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
-  text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 3.",
+  text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 4.",
   up = { effects = { { "damage", 8 }, { "heal", 3 }, { "apply", "force", 1, self = true } },
-    text = "Deal 8.\nHeal 3.\nGain Strength 1\nCooldown 3." },
+    text = "Deal 8.\nHeal 3.\nGain Strength 1\nCooldown 4." },
 })
 
 card("rampage", {
@@ -247,10 +247,10 @@ card("revenge", {
 
 card("thunder_clap", {
   level = 2, name = "Thunder Clap", cost = 1, type = "attack", rarity = "common", path = "protection",
-  effects = { { "damage", 4, all = true }, { "apply", "demoralized", 1, all = true } },
-  text = "Deal 4 to all.\nApply Demoralized 1 ⌛ to all",
-  up = { effects = { { "damage", 6, all = true }, { "apply", "demoralized", 2, all = true } },
-    text = "Deal 6 to all.\nApply Demoralized 2 ⌛ to all" },
+  effects = { { "damage", 3, all = true }, { "apply", "demoralized", 1, all = true } },
+  text = "Deal 3 to all.\nApply Demoralized 1 ⌛ to all",
+  up = { effects = { { "damage", 5, all = true }, { "apply", "demoralized", 2, all = true } },
+    text = "Deal 5 to all.\nApply Demoralized 2 ⌛ to all" },
 })
 
 card("devastate", {
@@ -269,10 +269,10 @@ card("demoralizing_shout", {
 
 card("shield_slam", {
   level = 1, name = "Shield Slam", cost = 1, type = "attack", rarity = "uncommon", path = "protection",
-  target = "enemy", effects = { { "absorb", 4 }, { "damage", 0, per = { 1, "block" } } },
-  text = "Gain 4 Absorb.\nDeal damage equal to Absorb.",
-  up = { effects = { { "absorb", 6 }, { "damage", 0, per = { 1, "block" } } },
-    text = "Gain 6 Absorb.\nDeal damage equal to Absorb." },
+  target = "enemy", effects = { { "absorb", 3 }, { "damage", 0, per = { 1, "block" } } },
+  text = "Gain 3 Absorb.\nDeal damage equal to Absorb.",
+  up = { effects = { { "absorb", 5 }, { "damage", 0, per = { 1, "block" } } },
+    text = "Gain 5 Absorb.\nDeal damage equal to Absorb." },
 })
 
 card("ignore_pain", {
@@ -301,9 +301,9 @@ card("retaliation", {
 
 card("shield_wall", {
   level = 7, name = "Shield Wall", cost = 2, type = "skill", rarity = "rare", path = "protection",
-  cooldown = 3, effects = { { "absorb", 18 } },
-  text = "Gain 18 Absorb.\nCooldown 3.",
-  up = { effects = { { "absorb", 24 } }, text = "Gain 24 Absorb.\nCooldown 3." },
+  cooldown = 3, effects = { { "absorb", 15 } },
+  text = "Gain 15 Absorb.\nCooldown 3.",
+  up = { effects = { { "absorb", 20 } }, text = "Gain 20 Absorb.\nCooldown 3." },
 })
 
 card("last_stand", {
@@ -397,7 +397,7 @@ relic("skullflame_shield", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.warrior = {
-  id = "warrior", name = "Warrior", order = 2, hp = 75,
+  id = "warrior", name = "Warrior", order = 2, hp = 74,
   resource = { id = "rage", cap = 5, keep = true },
   deck = {
     "strike", "strike", "strike", "strike",
@@ -412,12 +412,12 @@ ns.Classes.warrior = {
     -- notes des choix : 5 + écart / 2 du balayage sweep=cards (meta=start level=7, 500 expéditions par ligne),
     -- vérifiées en expédition complète (méthode : docs/equilibrage.md, « Notes des cartes du bot »)
     rating = {
-      bloodthirst = 13.5, shield_slam = 12.5, deep_wounds = 12, thunder_clap = 11, victory_rush = 11,
-      execute = 11, shield_wall = 11, rend = 11, shield_block = 10, bladestorm = 10, revenge = 10,
-      ignore_pain = 9.5, enrage = 10.5, whirlwind = 9.5, onslaught = 9.5, berserker_rage = 9, raging_blow = 9,
-      retaliation = 8.5, battle_shout = 9, pummel = 9, last_stand = 9.5, colossus_smash = 8.5,
-      demoralizing_shout = 8, rampage = 7.5, mortal_strike = 7.5, cleave = 7.5, devastate = 7, slam = 7,
-      overpower = 6.5, recklessness = 5.5,
+      bloodthirst = 17.5, victory_rush = 15, rend = 15, ignore_pain = 14.5, shield_block = 14.5,
+      execute = 14.5, battle_shout = 14, shield_slam = 13.5, whirlwind = 13.5, enrage = 13.5, revenge = 13.5,
+      pummel = 13, deep_wounds = 13, retaliation = 13, bladestorm = 12.5, thunder_clap = 12, rampage = 11.5,
+      shield_wall = 11.5, raging_blow = 11, last_stand = 11, demoralizing_shout = 11, overpower = 10,
+      recklessness = 10, cleave = 10, onslaught = 10, slam = 9.5, devastate = 9.5, colossus_smash = 9.5,
+      berserker_rage = 9.5, mortal_strike = 8.5,
     },
 
     upgrade = { strike = 2.5, defend = 2, heroic_strike = 2.5, bloodrage = 1.5 },
