@@ -1803,6 +1803,8 @@ function W.cardKeywords(d)
     seen[k] = true
     list[#list + 1] = { key = k, label = label, n = n, res = res }
   end
+  -- carte neutre (sans classe) : utilisable par toutes les classes (Art.keywords.neutral)
+  if d.neutral and not d.class and Art.keywords.neutral then add("neutral") end
   -- mots de la plaque, dans l'ordre de la plaque (Core/Language.lua)
   local L = ns.Language
   for _, p in ipairs(L.plates) do
@@ -3135,6 +3137,9 @@ function W.card(parent)
       t:SetDesaturated(dim)
       t:SetVertexColor(k, k, k, 1)
     end
+    -- teinte du corps (carte neutre : Art.cardBodyTint), multipliée par l'assombrissement
+    local tint = Art.cardBodyTint(id, ns.Cards[id] or d)
+    if tint then self.bg:SetVertexColor(k * tint[1], k * tint[2], k * tint[3], 1) end
     self.icon:SetDesaturated(dim)
     self.icon:SetVertexColor(k, k, k, 1)
     local short = opts.manaShort and not dim

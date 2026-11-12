@@ -1389,7 +1389,9 @@ ns = H.ns
 check("écran marchand", currentKind() == "merchant", currentKind())
 snap("marchand")
 local s = UI().current
-check("cinq cartes à prix (pastille : pièce + nombre)", #s.cardOptions == 5 and s.cards[5]._shown and s.cards[1].tag._shown
+check("cinq cartes de classe et l'emplacement neutre, à prix (pastille : pièce + nombre)",
+  #s.cardOptions == #exp.shop.cards and #exp.shop.cards == 5 + (exp.shop.cards[6] and exp.shop.cards[6].neutral and 1 or 0)
+  and s.cards[#s.cardOptions]._shown and s.cards[1].tag._shown
   and s.cards[1].tag.text._text == tostring(s.cardOptions[1].price) and s.cards[1].tag.icon._shown)
 do
   local poor
@@ -3679,7 +3681,14 @@ do
       -- Pay N HP : champ payHp <-> première clause « Pay N HP. »
       local payCl = cls[1] and cls[1]:match("^Pay (%d+) HP%.$")
       local anyPay = false
-      for _, cl in ipairs(cls) do if cl:find("^Pay %d+ HP") or cl:find("Lose %d+ HP") then anyPay = true end end
+      -- « Lose N HP. » seul sur sa ligne est un EFFET (carte neutre : { "loseHp", N, safe } et minHp = N,
+      -- docs/cartes-neutres.md) ; ailleurs, une perte de PV qui sert de coût s'écrit « Pay N HP. »
+      local loseEff = effectOf(d, "loseHp")
+      for _, cl in ipairs(cls) do
+        local ln = cl:match("^Lose (%d+) HP%.$")
+        local isEffect = ln and loseEff and tonumber(ln) == loseEff[2] and d.minHp == loseEff[2]
+        if cl:find("^Pay %d+ HP") or (cl:find("Lose %d+ HP") and not isEffect) then anyPay = true end
+      end
       if (d.payHp ~= nil) ~= (payCl ~= nil) or (d.payHp and tonumber(payCl) ~= d.payHp) or (anyPay and not payCl) then
         cbad[#cbad + 1] = label .. " : Pay N HP (première ligne, champ payHp)"
       end
@@ -6582,6 +6591,153 @@ do
     big:Hide()
   end
   holder:Hide()
+end
+
+print("UN  cartes neutres et bibelots communs : textes dans la zone et au langage, corps teinté, emplacement neutre du marchand, infobulles des bibelots")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, Art, L = ns.Widgets, ns.Art, ns.Language
+  local ROOT = ns.Skin.root
+  -- 1. textes des 10 cartes neutres (base et améliorée) : panneau, une clause par ligne, icône embarquée,
+  -- langage (aucun « you / your », libellés connus, aucune ressource de classe), corps ivoire teinté
+  local card = W.card(UI().content)
+  local ids, bad, minSize = {}, {}, 99
+  for id, d in pairs(ns.Cards) do if d.neutral and not d.class then ids[#ids + 1] = id end end
+  table.sort(ids)
+  local tint = Art.bodyTints.neutral
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      local label = id .. (up and "+" or "")
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      if not (fit and fit.ok and not fit.under and fit.mode == "clauses") then
+        bad[#bad + 1] = label .. " : " .. tostring(fit and fit.mode) .. " " .. tostring(fit and fit.size)
+      else
+        minSize = math.min(minSize, fit.size)
+      end
+      local e = Art.cards[id]
+      if not e or not e.tga or not ns.Skin.icons[e.tga:lower()] then bad[#bad + 1] = label .. " : icône absente de Media/Icons" end
+      local d = ns.Card.defById(id, up)
+      local low = " " .. d.text:lower():gsub("[%p\n]", " ") .. " "
+      for _, w in ipairs({ "you", "your", "yours" }) do
+        if low:find(" " .. w .. " ", 1, true) then bad[#bad + 1] = label .. " : « " .. w .. " »" end
+      end
+      for cl in (d.text .. "\n"):gmatch("(.-)\n") do
+        local lab = cl:match("^(%u[%a ]-): ")
+        if lab and not L.knownLabel(lab) then bad[#bad + 1] = label .. " : libellé inconnu « " .. lab .. " »" end
+        if cl ~= "" and not cl:find("%.$") and not cl:find("^Gain %a") and not cl:find("^Apply ") then
+          bad[#bad + 1] = label .. " : clause sans point « " .. cl .. " »"
+        end
+      end
+      for _, r in pairs(L.resources) do
+        if W.hasPhrase(d.text, r.name) or W.hasPhrase(d.text, r.plural) then bad[#bad + 1] = label .. " : ressource " .. r.name end
+      end
+      local vc = card.bg._calls.SetVertexColor or {}
+      if card.bg._texture ~= ROOT .. ns.Skin.tex.card_body_ivory.file or math.abs((vc[1] or 0) - tint[1]) > 1e-9
+          or math.abs((vc[2] or 0) - tint[2]) > 1e-9 or math.abs((vc[3] or 0) - tint[3]) > 1e-9 then
+        bad[#bad + 1] = label .. " : corps " .. tostring(card.bg._texture) .. " teinte " .. tostring(vc[1])
+      end
+    end
+  end
+  -- une carte de classe garde son corps sans teinte
+  card:SetCard("inner_fire", false, { playable = true })
+  local vc = card.bg._calls.SetVertexColor or {}
+  local classOk = card.bg._texture == ROOT .. ns.Skin.tex.card_body_blue.file and vc[1] == 1 and vc[2] == 1 and vc[3] == 1
+  card:Hide()
+  check(("textes : %d cartes neutres (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), langage, icônes, corps ivoire teinté vert sauge"):format(#ids, minSize),
+    #ids == 10 and #bad == 0, table.concat(bad, ", "))
+  check("carte de classe : corps et couleur inchangés (Inner Fire bleue, sans teinte)", classOk)
+  -- infobulle : ligne « Neutral », explication de « Lose N HP. »
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  W.fillCardTooltip(tip, "goblin_sapper_charge", false)
+  local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  check("infobulle d'une carte neutre : « Neutral » et « Lose N HP » expliqués", all:find("Neutral: a card that every class can use.", 1, true)
+    and all:find("Lose N HP: loses HP", 1, true), all)
+
+  -- 2. marchand : 5 cartes de classe + l'emplacement neutre, dans la fenêtre, sans chevauchement
+  for _, cl in ipairs({ "priest", "warrior" }) do
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:" .. cl)
+    H.ns.Controller.makeSeed = function() return SEED + 7 end
+    clickOption("go")
+    local e = EXP()
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "merchant"
+    e.gold = 500
+    clickOption("path:" .. id)
+    H.settle()
+    local s = UI().current
+    local n = #s.cardOptions
+    local last = s.cards[n]
+    local lo = last and last.option
+    local nid = lo and lo.card.id
+    local fr = R.vrect(UI().content)
+    local rects = {}
+    for i = 1, n do rects[i] = { body = R.vrect(s.cards[i].bg), tag = s.cards[i].tag and R.vrect(s.cards[i].tag) } end
+    local why = {}
+    for i, r in ipairs(rects) do
+      for _, k in ipairs({ "body", "tag" }) do
+        local q = r[k]
+        if not q then why[#why + 1] = i .. " " .. k .. " absent"
+        elseif q[1] < fr[1] - 0.5 or q[3] > fr[3] + 0.5 or q[2] < fr[2] - 0.5 or q[4] > fr[4] + 0.5 then
+          why[#why + 1] = ("%d %s hors de la fenêtre (%.1f..%.1f)"):format(i, k, q[1], q[3])
+        end
+      end
+      if i > 1 and rects[i - 1].body and r.body and rects[i - 1].body[3] > r.body[1] + 0.5 then why[#why + 1] = i .. " chevauche " .. (i - 1) end
+    end
+    -- sous les cartes : titres des sections (bibelots, potions, service) plus bas que les étiquettes de prix
+    for _, l in ipairs(s.sections) do
+      local q = R.vrect(l)
+      for i, r in ipairs(rects) do if r.tag and q and r.tag[2] < q[4] and r.tag[4] > q[2] and r.tag[3] > q[1] and r.tag[1] < q[3] then why[#why + 1] = i .. " sur « " .. l._text .. " »" end end
+    end
+    check(("marchand (%s) : 5 cartes de classe et la carte neutre en 6e, corps teinté, prix, dans la fenêtre sans chevauchement"):format(cl),
+      n == 6 and last._shown and nid and ns.Cards[nid].neutral and e.shop.cards[6].neutral
+        and last.bg._texture == ROOT .. ns.Skin.tex.card_body_ivory.file and last.tag._shown
+        and last.tag.text._text == tostring(e.shop.cards[6].price) and #why == 0,
+      tostring(n) .. " " .. tostring(nid) .. " " .. table.concat(why, ", "))
+    local tt = table.concat(H.hover(last), " | ")
+    check(("marchand (%s) : infobulle de la carte neutre (« Neutral »)"):format(cl), tt:find("Neutral", 1, true), tt)
+    snap("marchand-neutre-" .. cl, true)
+    local deckN = #e.deck
+    clickOption(lo.id)
+    check(("marchand (%s) : carte neutre achetée, dans le deck, marquée vendue"):format(cl),
+      #e.deck == deckN + 1 and e.deck[#e.deck].id == nid and option(lo.id).sold)
+  end
+end
+
+-- planche des cartes neutres (base et améliorée)
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local ids = {}
+  for id, d in pairs(ns.Cards) do if d.neutral and not d.class then ids[#ids + 1] = id end end
+  table.sort(ids, function(a, b)
+    local da, db = ns.Cards[a], ns.Cards[b]
+    if da.tier ~= db.tier then return da.tier < db.tier end
+    return a < b
+  end)
+  local perRow, cw, ch = 10, 140, 230
+  local all = {}
+  for _, id in ipairs(ids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+  local rows = math.ceil(#all / perRow)
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, rows * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, e in ipairs(all) do
+    local c = W.card(big)
+    c:SetCard(e[1], e[2], { playable = true })
+    W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+  end
+  Render.svg(H, big, SNAP .. "/cartes_neutres.svg", "cartes neutres (base, améliorée), par palier de Ligue")
+  big:Hide()
 end
 
 print("U16 méthodes d'API inconnues appelées")

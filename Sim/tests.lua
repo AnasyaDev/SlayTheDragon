@@ -2329,5 +2329,136 @@ do
   ns.Enemies.test_triple, ns.Enemies.test_frail = nil, nil
 end
 
+---------------------------------------------------------------------------
+-- Cartes neutres (Data/Neutral.lua, docs/cartes-neutres.md) : jouables par les cinq classes
+---------------------------------------------------------------------------
+do
+  local CLASSES = { "priest", "warrior", "mage", "rogue", "hunter" }
+  local NEUTRAL = {
+    rough_dynamite = { 0, "common", 1, "attack" }, heavy_silk_bandage = { 0, "common", 1, "skill" },
+    rugged_armor_kit = { 0, "common", 1, "skill" }, smoked_desert_dumplings = { 0, "uncommon", 1, "skill" },
+    runecloth_bag = { 1, "common", 1, "skill" }, iron_grenade = { 1, "uncommon", 1, "attack" },
+    arcane_bomb = { 2, "uncommon", 0, "skill" }, elixir_of_superior_defense = { 2, "uncommon", 1, "power" },
+    black_lotus = { 3, "rare", 0, "skill" }, goblin_sapper_charge = { 3, "rare", 2, "attack" },
+  }
+
+  test("neutres : 10 cartes de la fiche (palier, rareté, coût, type), sans classe ni ressource, amélioration", function()
+    local n, byTier, byRarity = 0, {}, {}
+    for id, d in pairs(ns.Cards) do
+      if d.neutral then
+        n = n + 1
+        local want = NEUTRAL[id]
+        assert(want, id .. " : carte neutre hors fiche")
+        eq(d.class, nil, id); eq(d.path, "neutral", id); eq(d.noReward, true, id)
+        eq(d.tier, want[1], id .. " palier"); eq(d.rarity, want[2], id); eq(d.cost, want[3], id); eq(d.type, want[4], id)
+        assert(d.up and d.up.text, id .. " : amélioration")
+        assert(d.rep == nil and d.level == nil and not d.spend and not d.minRes and not d.payHp, id .. " : champ de classe")
+        for _, up in ipairs({ false, true }) do
+          for _, e in ipairs(Card.defById(id, up).effects) do
+            assert(e[1] ~= "res" and e[1] ~= "surge" and e[1] ~= "demence", id .. " : ressource de classe")
+            if e[1] == "apply" then
+              assert(({ force = 1, stunned = 1, pain = 1, regen = 1, armor_broken = 1, demoralized = 1 })[e[2]],
+                id .. " : état commun seulement (" .. e[2] .. ")")
+            end
+          end
+        end
+        byTier[d.tier] = (byTier[d.tier] or 0) + 1
+        byRarity[d.rarity] = (byRarity[d.rarity] or 0) + 1
+      end
+    end
+    eq(n, 10)
+    eq(byTier[0], 4); eq(byTier[1], 2); eq(byTier[2], 2); eq(byTier[3], 2)
+    eq(byRarity.common, 4); eq(byRarity.uncommon, 4); eq(byRarity.rare, 2)
+    -- jamais dans les récompenses de combat : Card.pool (sans neutres) ni Rewards.cardPool
+    for _, cl in ipairs(CLASSES) do
+      for _, id in ipairs(Card.pool(cl)) do assert(not ns.Cards[id].neutral, cl .. " : " .. id) end
+      for _, id in ipairs(Card.pool(cl, true)) do assert(not ns.Cards[id].neutral, cl .. " (neutral) : " .. id) end
+      for _, id in ipairs(ns.Rewards.cardPool(cl)) do assert(not ns.Cards[id].neutral, cl .. " : " .. id) end
+    end
+  end)
+
+  -- Joue la carte (base ou améliorée) dans un combat de la classe ; renvoie le combat et l'état d'avant.
+  local function playNeutral(cl, id, up, enc, hp)
+    local c = setup({ id }, enc or { "test_dummy", "test_dummy" }, { "smite", "smite", "smite" }, { class = cl })
+    if up then c.hand[1] = Card.new(id, true, c.hand[1].uid) end
+    c.player.hp = hp or 40
+    c.player.mana = 3
+    local before = { hp = c.player.hp, mana = c.player.mana, hand = #c.hand, e1 = c.enemies[1].hp, e2 = c.enemies[2] and c.enemies[2].hp }
+    local d = Card.defById(id, up)
+    local ok, why = Combat.play(c, 1, d.target == "enemy" and 1 or nil)
+    assert(ok, cl .. " " .. id .. (up and "+" or "") .. " : " .. tostring(why))
+    return c, before, d
+  end
+
+  test("neutres : chaque carte jouée par chaque classe, effets conformes au texte (base et améliorée)", function()
+    for _, cl in ipairs(CLASSES) do
+      for _, up in ipairs({ false, true }) do
+        local tag = cl .. (up and " +" or "")
+        -- Rough Dynamite : 6 (9) à tous
+        local c, b = playNeutral(cl, "rough_dynamite", up)
+        local k = up and 9 or 6
+        eq(b.e1 - c.enemies[1].hp, k, tag .. " dynamite 1"); eq(b.e2 - c.enemies[2].hp, k, tag .. " dynamite 2")
+        eq(#c.exhaust, 1, tag .. " dynamite Exhaust")
+        -- Heavy Silk Bandage : soigne 6 (9)
+        c, b = playNeutral(cl, "heavy_silk_bandage", up)
+        eq(c.player.hp - b.hp, up and 9 or 6, tag .. " bandage"); eq(#c.exhaust, 1, tag .. " bandage Exhaust")
+        -- Rugged Armor Kit : 4 (7) Absorb, gardée en main en fin de tour (Retain)
+        c, b = playNeutral(cl, "rugged_armor_kit", up)
+        eq(c.player.block, up and 7 or 4, tag .. " kit")
+        local kit = setup({ "rugged_armor_kit" }, { "test_dummy" }, nil, { class = cl })
+        Combat.endTurn(kit)
+        assert(handIndex(kit, "rugged_armor_kit"), tag .. " kit Retain")
+        -- Smoked Desert Dumplings : Strength 1 (2), dure le combat
+        c = playNeutral(cl, "smoked_desert_dumplings", up)
+        eq(c.player.st.force, up and 2 or 1, tag .. " dumplings")
+        Combat.endTurn(c)
+        eq(c.player.st.force, up and 2 or 1, tag .. " Strength gardée")
+        -- Runecloth Bag : pioche 2 (coût 0 améliorée)
+        c, b = playNeutral(cl, "runecloth_bag", up)
+        eq(#c.hand, b.hand - 1 + 2, tag .. " bag pioche"); eq(b.mana - c.player.mana, up and 0 or 1, tag .. " bag coût")
+        -- Iron Grenade : 5 (8) et Stunned 1 sur la cible
+        c, b = playNeutral(cl, "iron_grenade", up)
+        eq(b.e1 - c.enemies[1].hp, up and 8 or 5, tag .. " grenade"); eq(c.enemies[1].st.stunned, 1, tag .. " Stunned")
+        eq(c.enemies[2].hp, b.e2, tag .. " grenade : une seule cible")
+        -- Arcane Bomb : interrompt la cible (pioche 1 améliorée)
+        c, b = playNeutral(cl, "arcane_bomb", up, { "test_caster", "test_dummy" })
+        assert(c.enemies[1].interrupted, tag .. " bomb Interrupt")
+        eq(#c.hand, b.hand - 1 + (up and 1 or 0), tag .. " bomb pioche"); eq(c.player.mana, b.mana, tag .. " bomb coût 0")
+        -- Elixir of Superior Defense : Power, 3 (4) Absorb au début de chaque tour
+        c = playNeutral(cl, "elixir_of_superior_defense", up)
+        eq(#c.player.powers, 1, tag .. " elixir Power")
+        Combat.endTurn(c)
+        eq(c.player.block, up and 4 or 3, tag .. " elixir tour 2")
+        Combat.endTurn(c)
+        eq(c.player.block, up and 4 or 3, tag .. " elixir tour 3 (Absorb remise à 0 avant)")
+        -- Black Lotus : +2 mana (pioche 1 améliorée)
+        c, b = playNeutral(cl, "black_lotus", up)
+        eq(c.player.mana - b.mana, 2, tag .. " lotus"); eq(#c.hand, b.hand - 1 + (up and 1 or 0), tag .. " lotus pioche")
+        -- Goblin Sapper Charge : 14 (18) à tous, -5 PV
+        c, b = playNeutral(cl, "goblin_sapper_charge", up, { "test_hitter", "test_dummy" })
+        k = up and 18 or 14
+        eq(b.e1 - c.enemies[1].hp, k, tag .. " sapper 1"); eq(b.e2 - c.enemies[2].hp, k, tag .. " sapper 2")
+        eq(b.hp - c.player.hp, 5, tag .. " sapper -5 PV"); eq(b.mana - c.player.mana, 2, tag .. " sapper coût")
+      end
+    end
+  end)
+
+  test("neutres : Goblin Sapper Charge injouable à 5 PV ou moins (Not enough HP.), jamais mortelle", function()
+    for _, cl in ipairs(CLASSES) do
+      local c = setup({ "goblin_sapper_charge" }, { "test_dummy" }, nil, { class = cl })
+      c.player.hp = 5
+      local ok, why = Combat.canPlay(c, 1)
+      assert(not ok and why == "lowHp", cl .. " : " .. tostring(why))
+      c.player.hp = 6
+      assert(Combat.canPlay(c, 1), cl .. " jouable à 6 PV")
+      -- PV perdus entre le jeu et la résolution (copie, riposte) : la perte laisse au moins 1 PV (safe)
+      c.player.hp = 3
+      Combat.resolveCard(c, c.hand[1], nil)
+      eq(c.player.hp, 1, cl .. " : jamais sous 1 PV")
+      assert(not c.result, cl .. " : pas de défaite")
+    end
+  end)
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

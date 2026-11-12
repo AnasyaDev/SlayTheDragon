@@ -405,15 +405,27 @@ Art.ui = {
 ---------------------------------------------------------------------------
 
 -- Corps de carte : violet = Ombre, bleu = protections (Absorption d'abord), or = cartes de départ,
--- ivoire = Sacré (le reste). Art.cards[id].body force une couleur.
+-- ivoire = Sacré (le reste) ; carte neutre (sans classe) : ivoire teinté (Art.cardBodyTint), toujours.
+-- Art.cards[id].body force une couleur.
 function Art.cardBody(id, d)
   local e = Art.cards[id]
   if e and e.body then return e.body end
+  if d.neutral and not d.class then return "ivory" end
   if d.school == "shadow" then return "violet" end
   local first = d.effects and d.effects[1]
   if first and (first[1] == "absorb" or (first[1] == "apply" and first[2] == "halved")) then return "blue" end
   if d.path == "start" then return "gold" end
   return "ivory"
+end
+
+-- Teinte multiplicative du corps (couleur de sommet) ou nil : cartes neutres (Art.bodyTints.neutral,
+-- UI/Art/neutral.lua). Art.cards[id].tint force une teinte.
+Art.bodyTints = Art.bodyTints or {}
+function Art.cardBodyTint(id, d)
+  local e = Art.cards[id]
+  if e and e.tint then return e.tint end
+  if d.neutral and not d.class then return Art.bodyTints.neutral end
+  return nil
 end
 
 -- Liseré d'une case de bibelot selon sa rareté.

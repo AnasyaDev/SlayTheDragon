@@ -267,7 +267,8 @@ test("marchand : achats, retrait au prix croissant, emplacements de potion", fun
   enter(exp, "merchant")
   eq(exp.phase, "merchant")
   local s = exp.shop
-  eq(#s.cards, 5)
+  eq(#s.cards, 6, "5 cartes de classe + l'emplacement « Neutral »")
+  assert(s.cards[6].neutral and not s.cards[5].neutral, "carte neutre en dernier")
   eq(#s.relics, 3)
   eq(#s.potions, 3, "trois potions (registre réel + potions de test)")
   exp.gold = 1000
@@ -978,6 +979,7 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
         local exp = newExp()
         forceEvent(exp, id)
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
+        exp.unlock.league = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
         exp.potions[1] = "healing_potion"
         exp.relics[#exp.relics + 1] = "stormwind_tabard"
         for _, r in ipairs(exp.event.rolls[ci]) do
@@ -1078,7 +1080,11 @@ test("classes : récompenses, marchand et rencontres tirés dans le pool de la c
       assert(r.class == nil or r.class == class, class .. " : " .. id)
     end
     enter(exp, "merchant")
-    for _, it in ipairs(exp.shop.cards) do eq(ns.Cards[it.id].class, class, it.id) end
+    for _, it in ipairs(exp.shop.cards) do
+      -- emplacement « Neutral » : une carte neutre (sans classe), sinon une carte de la classe
+      if it.neutral then assert(ns.Cards[it.id].class == nil and ns.Cards[it.id].neutral, it.id)
+      else eq(ns.Cards[it.id].class, class, it.id) end
+    end
     for _, it in ipairs(exp.shop.relics) do
       assert(ns.Relics[it.id].class == nil or ns.Relics[it.id].class == class, it.id)
     end
@@ -1151,7 +1157,11 @@ test("Guerrier : expédition simulée complète, reproductible", function()
   local a = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "warrior" })
   local b = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "warrior" })
   eq(a.won, b.won); eq(a.floor, b.floor); eq(a.hp, b.hp)
-  for _, card in ipairs(a.deck) do eq(ns.Cards[card.id].class, "warrior", card.id) end
+  -- cartes de la classe, ou neutres (marchand, rencontres)
+  for _, card in ipairs(a.deck) do
+    local d = ns.Cards[card.id]
+    assert(d.class == "warrior" or (d.class == nil and d.neutral), card.id)
+  end
 end)
 
 -- Chasseur ------------------------------------------------------------------
@@ -1170,7 +1180,165 @@ test("Chasseur : expédition (deck, PV, Pet Whistle), pools de sa classe, expéd
   local a = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "hunter" })
   local b = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "hunter" })
   eq(a.won, b.won); eq(a.floor, b.floor); eq(a.hp, b.hp)
-  for _, card in ipairs(a.deck) do eq(ns.Cards[card.id].class, "hunter", card.id) end
+  -- cartes de la classe, ou neutres (marchand, rencontres)
+  for _, card in ipairs(a.deck) do
+    local d = ns.Cards[card.id]
+    assert(d.class == "hunter" or (d.class == nil and d.neutral), card.id)
+  end
+end)
+
+---------------------------------------------------------------------------
+-- Cartes neutres (docs/cartes-neutres.md) : marchand et rencontres seulement, palier de Ligue
+---------------------------------------------------------------------------
+
+local NEUTRAL_CLASSES = { "priest", "warrior", "mage", "rogue", "hunter" }
+local function isNeutral(id) local d = ns.Cards[id] return d and d.class == nil and d.neutral == true end
+
+test("neutres : jamais en récompense de combat (pool des cinq classes, 40 combats et élites tirés)", function()
+  for _, cl in ipairs(NEUTRAL_CLASSES) do
+    local exp = newExp({ class = cl, unlocks = { rep = 2, league = 3 } })
+    for _, id in ipairs(X.cardPool(exp)) do assert(not isNeutral(id), cl .. " : " .. id) end
+    for _, id in ipairs(X.cardPool(exp, true)) do assert(not isNeutral(id), cl .. " (neutral) : " .. id) end
+    for s = 1, 8 do
+      for _, kind in ipairs({ "combat", "elite" }) do
+        local e = newExp({ class = cl, seed = 100 + s, unlocks = { rep = 2, league = 3 } })
+        enter(e, kind)
+        for _, id in ipairs(e.fight.reward.cards) do assert(not isNeutral(id), cl .. " " .. kind .. " : " .. id) end
+      end
+    end
+  end
+end)
+
+test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), condition « unlocked »", function()
+  local want = { [0] = 4, 6, 8, 10 }
+  for lv = 0, 3 do
+    local exp = newExp({ unlocks = { rep = 0, league = lv } })
+    local pool = X.neutralPool(exp)
+    eq(#pool, want[lv], "palier " .. lv)
+    for _, id in ipairs(pool) do
+      assert(isNeutral(id) and ns.Cards[id].tier <= lv, id)
+      assert(X.cardUnlocked(exp, id), id)
+    end
+    eq(X.cardUnlocked(exp, "black_lotus"), lv >= 3, "Black Lotus au palier " .. lv)
+    eq(X.check(exp, { { "unlocked", "elixir_of_superior_defense" } }), lv >= 2, "condition unlocked " .. lv)
+  end
+  -- Exalté (4) : comme Révéré
+  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, league = 4 } })), 10)
+end)
+
+test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 100 ±10 %), pour chaque classe", function()
+  local base = { common = 45, uncommon = 65, rare = 100 }
+  local seen = {}
+  for _, cl in ipairs(NEUTRAL_CLASSES) do
+    for s = 1, 12 do
+      local lv = s % 4
+      local exp = newExp({ class = cl, seed = 200 + s, unlocks = { rep = 0, league = lv } })
+      enter(exp, "merchant")
+      local cards = exp.shop.cards
+      eq(#cards, 6, cl .. " : 5 + 1")
+      local nNeutral = 0
+      for i, it in ipairs(cards) do
+        if it.neutral then
+          nNeutral = nNeutral + 1
+          eq(i, 6, "en dernier")
+          local d = ns.Cards[it.id]
+          assert(isNeutral(it.id) and d.tier <= lv, it.id .. " palier " .. lv)
+          local b = base[d.rarity]
+          assert(it.price >= math.floor(b * 0.9) and it.price <= math.ceil(b * 1.1), it.id .. " prix " .. it.price)
+          seen[it.id] = true
+        else
+          eq(ns.Cards[it.id].class, cl, it.id)
+        end
+      end
+      eq(nNeutral, 1, cl .. " : une carte neutre")
+      -- achat : la carte neutre entre dans le deck
+      exp.gold = 500
+      assert(X.act(exp, { "buyCard", 6 }))
+      eq(exp.deck[#exp.deck].id, cards[6].id)
+    end
+  end
+  local n = 0
+  for _ in pairs(seen) do n = n + 1 end
+  assert(n >= 6, "variété des cartes neutres proposées : " .. n)
+  -- sans carte neutre débloquée (registre vidé le temps du test) : 5 cartes, comme avant
+  local saved = {}
+  for id, d in pairs(ns.Cards) do if d.neutral then saved[id] = d ns.Cards[id] = nil end end
+  local e = newExp()
+  enter(e, "merchant")
+  for id, d in pairs(saved) do ns.Cards[id] = d end
+  eq(#e.shop.cards, 5, "sans neutre")
+end)
+
+-- Choisit la réponse (label) d'une rencontre forcée ; renvoie l'expédition.
+local function neutralAnswer(evId, label, league, opts)
+  local exp = newExp({ unlocks = { rep = 0, league = league or 3 } })
+  local ev = ns.Events[evId]
+  local id = exp.map.start[1]
+  exp.map.nodes[id].kind = "event"
+  exp.gold, exp.hp = 200, exp.maxHp
+  if opts and opts.floor then exp.floor = opts.floor end
+  -- rencontre forcée : comme forceEvent (tirages à l'entrée)
+  local pool = X.eventPool
+  X.eventPool = function() return { evId } end
+  assert(X.act(exp, { "path", id }))
+  X.eventPool = pool
+  eq(exp.event.id, evId)
+  local ci
+  for i, ch in ipairs(ev.choices) do if ch.label == label then ci = i end end
+  assert(ci, evId .. " : réponse " .. label)
+  return exp, ci
+end
+
+test("neutres : réponses de rencontres (carte donnée, coût payé, palier respecté)", function()
+  local cases = {
+    { "defias_caravan", "Search the wagon", "rough_dynamite", hp = 3 },
+    { "jangolode_prospector", "Buy his dynamite", "rough_dynamite", gold = 20 },
+    { "saldean_farm", "Ask for her dumplings", "smoked_desert_dumplings" },
+    { "moonbrook_refugees", "Roll bandages with her", "heavy_silk_bandage", hp = 4 },
+    { "goblin_peddler", "Buy an iron grenade", "iron_grenade", gold = 35 },
+    { "herbalist", "Buy one of her elixirs", "elixir_of_superior_defense", gold = 30 },
+    { "lighthouse_keeper", "Search the lighthouse stores", "arcane_bomb", hp = 6 },
+  }
+  for _, k in ipairs(cases) do
+    local exp, ci = neutralAnswer(k[1], k[2])
+    local ev = ns.Events[k[1]]
+    -- palier de la carte <= palier de la rencontre, sauf réponse cachée tant que non débloquée
+    local hidden = X.choiceHidden(newExp({ unlocks = { rep = 0, league = ev.tier } }), ev.choices[ci])
+    assert(ns.Cards[k[3]].tier <= ev.tier or ev.choices[ci].when, k[1] .. " : palier")
+    assert(not hidden or ns.Cards[k[3]].tier > ev.tier, k[1])
+    local n, gold, hp = #exp.deck, exp.gold, exp.hp
+    assert(X.act(exp, { "choose", ci }))
+    eq(#exp.deck, n + 1, k[1]); eq(exp.deck[#exp.deck].id, k[3], k[1])
+    eq(gold - exp.gold, k.gold or 0, k[1] .. " or"); eq(hp - exp.hp, k.hp or 0, k[1] .. " PV")
+    -- toujours une issue sans condition, quatre réponses au plus
+    assert(#ev.choices <= 4, k[1] .. " : quatre réponses au plus")
+  end
+end)
+
+test("neutres : la cueilleuse ne propose l'élixir qu'une fois débloqué (réponse absente, pas grisée)", function()
+  for _, lv in ipairs({ 1, 2 }) do
+    local exp = neutralAnswer("herbalist", "Buy one of her elixirs", lv)
+    local labels = {}
+    for _, o in ipairs(X.eventOptions(exp)) do labels[#labels + 1] = o.label end
+    local shown = table.concat(labels, "|"):find("elixirs", 1, true) ~= nil
+    eq(shown, lv >= 2, "palier " .. lv)
+    local listed = false
+    for _, a in ipairs(X.choices(exp)) do if a[1] == "choose" and a[2] == 3 then listed = true end end
+    eq(listed, lv >= 2, "choix possible au palier " .. lv)
+    if lv < 2 then eq(X.act(exp, { "choose", 3 }), false, "refusée") end
+  end
+end)
+
+test("neutres : choix de rencontre parmi les cartes neutres (cardChoice neutral = true)", function()
+  ns.Events.test_neutral = { name = "x", act = 1, tier = 0, text = "", speaker = "x", npc = "x", scene = "road",
+    choices = { { label = "x", outcome = "x", effects = { { "cardChoice", n = 3, neutral = true } } } } }
+  local exp, ci = neutralAnswer("test_neutral", "x", 1)
+  local ok = X.act(exp, { "choose", ci })
+  ns.Events.test_neutral = nil
+  assert(ok)
+  eq(exp.phase, "reward")
+  eq(#exp.reward.cards, 3)
+  for _, id in ipairs(exp.reward.cards) do assert(isNeutral(id) and ns.Cards[id].tier <= 1, id) end
 end)
 
 print(("%d réussis, %d échoués"):format(passed, failed))

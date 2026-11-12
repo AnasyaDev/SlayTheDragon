@@ -101,9 +101,12 @@ end
 -- « Spend N: … » n'est PAS un effet : c'est le champ de carte spend = N, payé au moment du jeu
 -- (Combat.play, comme le mana) ; ctx.spent dit s'il a été payé (cond = "spent", more = { k, "spent" }).
 
--- { "loseHp", n } : perte de PV sans Absorption (effet ; le coût « Pay N HP » est le champ payHp).
+-- { "loseHp", n, safe = bool } : perte de PV sans Absorption (effet ; le coût « Pay N HP » est le champ
+-- payHp). safe : jamais mortelle (laisse au moins 1 PV ; carte neutre « Lose N HP. », avec minHp).
 Effects.loseHp = function(c, ctx, e)
-  Combat.loseHp(c, e[2], "effect")
+  local n = e[2]
+  if e.safe then n = math.min(n, c.player.hp - 1) end
+  Combat.loseHp(c, n, "effect")
 end
 
 -- { "interrupt", all = bool } : annule le sort que la cible (ou chaque ennemi) s'apprête à lancer.

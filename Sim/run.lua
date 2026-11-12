@@ -21,6 +21,8 @@ return function(ns)
   for _, cd in pairs(ns.Classes) do
     for id, r in pairs(cd.bot and cd.bot.rating or {}) do Run.RATING[id] = r end
   end
+  -- cartes neutres (Data/Neutral.lua) : marchand et rencontres
+  for id, r in pairs(ns.NeutralBot and ns.NeutralBot.rating or {}) do Run.RATING[id] = r end
 
   local function rating(id) return Run.RATING[id] or 3 end
 

@@ -23,13 +23,16 @@
 --   { "hpAbove", 0.6 } PV >= 60 % ; { "gold", n } ; { "relic", id } ; { "noRelic", id } ;
 --   { "potion" } une potion en poche ; { "card", id } ; { "key", n } clé mythique >= n ;
 --   { "flag", nom } / { "noFlag", nom } drapeau de compte (connu au départ de l'expédition) ;
---   { "floor", n } étape >= n. Champ text = raison affichée à la place de celle par défaut.
+--   { "floor", n } étape >= n ; { "unlocked", idCarte } carte débloquée (neutre : palier de Ligue).
+--   Champ text = raison affichée à la place de celle par défaut ; hide = true : réponse absente (et
+--   non grisée) tant que la condition manque.
 --
 -- Effets (données, interprétés par Core/Expedition.lua) :
 --   { "heal", n }   { "healPct", f }   { "loseHp", n } (jamais sous 1 PV)
 --   { "maxHp", n } +n PV max et +n PV      { "loseMaxHp", n } -n PV max (PV ramenés au max)
 --   { "gold", n }   { "pay", n } (réponse désactivée sans l'or)   { "loseGold", n } (ce qu'on a)
---   { "card", id, up = b }   { "cardChoice", n = 3, rarity = "common" } (une parmi n, ou passer)
+--   { "card", id, up = b }   { "cardChoice", n = 3, rarity = "common" } (une parmi n, ou passer ;
+--     neutral = true : parmi les cartes neutres débloquées au lieu des cartes de la classe)
 --   { "relic" } bibelot tiré   { "relic", id } bibelot précis (désactivé si déjà possédé)
 --   { "potion" } potion tirée  { "potion", id } potion précise   { "losePotion" } (requiert une potion)
 --   { "upgradeRandom", n }   { "upgrade" } / { "remove" } / { "dupe" } : carte au choix (sélection)
@@ -74,6 +77,10 @@ event("saldean_farm", {
     { label = "Help Farmer Saldean", outcome = "-5 HP, then +5 max HP",
       result = "You weed the fields all afternoon and come out tougher.",
       effects = { { "loseHp", 5 }, { "maxHp", 5 } } },
+    -- carte neutre (docs/cartes-neutres.md) : la recette de la fermière
+    { label = "Ask for her dumplings", outcome = "Smoked Desert Dumplings (card)",
+      result = "Salma wraps a batch of her smoked dumplings for the road.",
+      effects = { { "card", "smoked_desert_dumplings" } } },
   },
 })
 
@@ -92,6 +99,10 @@ event("defias_caravan", {
     { label = "Move on", outcome = "Nothing",
       result = "You leave the driver and continue down the road.",
       effects = {} },
+    -- carte neutre : les Défias font sauter les portes des Mortemines
+    { label = "Search the wagon", outcome = "-3 HP, Rough Dynamite (card)",
+      result = "You cut your hands on the broken crates and find a stick of Defias dynamite.",
+      effects = { { "loseHp", 3 }, { "card", "rough_dynamite" } } },
   },
 })
 
@@ -157,6 +168,10 @@ event("jangolode_prospector", {
     { label = "Buy his flask", outcome = "Pay 15g, a potion",
       result = "\"A miner's pick-me-up. Drink it when things go bad.\"",
       effects = { { "pay", 15 }, { "potion" } } },
+    -- carte neutre : la dynamite du chercheur d'or
+    { label = "Buy his dynamite", outcome = "Pay 20g, Rough Dynamite (card)",
+      result = "\"Keep it away from the lantern.\" Grit hands you a stick of dynamite.",
+      effects = { { "pay", 20 }, { "card", "rough_dynamite" } } },
   },
 })
 
@@ -172,9 +187,10 @@ event("moonbrook_refugees", {
     { label = "Give them 35g", outcome = "Pay 35g, +6 max HP",
       result = "Mother Hanna thanks you and asks the Light to protect you.",
       effects = { { "pay", 35 }, { "maxHp", 6 } } },
-    { label = "Move on", outcome = "Nothing",
-      result = "You continue on your way without stopping.",
-      effects = {} },
+    -- carte neutre (remplace « Move on » : quatre réponses au plus à l'écran) : les secours aux blessés
+    { label = "Roll bandages with her", outcome = "-4 HP, Heavy Silk Bandage (card)",
+      result = "You tear and roll silk bandages with Mother Hanna until nightfall. She lets you keep some.",
+      effects = { { "loseHp", 4 }, { "card", "heavy_silk_bandage" } } },
     -- Réponse conditionnelle : il faut une potion à donner.
     { label = "Leave them a potion", outcome = "Lose a potion, upgrade 2 random cards",
       when = { { "potion" } },
@@ -197,6 +213,12 @@ event("herbalist", {
     { label = "Pick with her", outcome = "+12 HP",
       result = "You pick flowers with her, chewing the leaves she gives you.",
       effects = { { "heal", 12 } } },
+    -- carte neutre de palier 2 dans une rencontre de palier 1 : réponse absente tant qu'elle n'est pas
+    -- débloquée (condition « unlocked », hide = true)
+    { label = "Buy one of her elixirs", outcome = "Pay 30g, Elixir of Superior Defense (card)",
+      when = { { "unlocked", "elixir_of_superior_defense", hide = true } },
+      result = "Aunt Mirelle corks a bottle of her best elixir. \"One sip each morning.\"",
+      effects = { { "pay", 30 }, { "card", "elixir_of_superior_defense" } } },
   },
 })
 
@@ -232,6 +254,10 @@ event("lighthouse_keeper", {
     { label = "Sleep at the lighthouse", outcome = "Heal 30% of max HP",
       result = "Alden gives you a bed near the fire. You sleep until morning.",
       effects = { { "healPct", 0.30 } } },
+    -- carte neutre : la réserve de matériel avant le boss
+    { label = "Search the lighthouse stores", outcome = "-6 HP, Arcane Bomb (card)",
+      result = "A shelf gives way on the stairs. Under it, you find an arcane bomb in its crate.",
+      effects = { { "loseHp", 6 }, { "card", "arcane_bomb" } } },
   },
 })
 
@@ -277,6 +303,10 @@ event("goblin_peddler", {
     { label = "Politely decline", outcome = "Nothing",
       result = "\"Your loss!\" Grizzle leaves with her wagon.",
       effects = {} },
+    -- carte neutre : une marchande gobeline
+    { label = "Buy an iron grenade", outcome = "Pay 35g, Iron Grenade (card)",
+      result = "\"Pull the pin, count to three. Or two. Never tested it.\"",
+      effects = { { "pay", 35 }, { "card", "iron_grenade" } } },
   },
 })
 
