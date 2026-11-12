@@ -340,10 +340,21 @@ function Frame:GetText() return self._text end
 function Frame:SetFormattedText(fmt, ...) self._text = fmt:format(...) end
 -- Mesure des textes : avances des glyphes de Baloo Chettan 2 (Sim/baloo_metrics.lua, généré depuis
 -- Media/Fonts ; graisse d'après le fichier de police, « bold » pour les polices du jeu), sans crénage ;
--- taille de police = cadratin, hauteur de ligne = ascendante + descendante (1,47 cadratin) ; codes
+-- taille de police = cadratin, hauteur de ligne = TAILLE DE POLICE (1 cadratin, H.LINE_EM) ; codes
 -- |c…|r ignorés ; retours explicites, puis retour à la ligne par mots si une largeur est posée.
+-- Hauteur de ligne : le fichier généré donne ascendante + descendante de Baloo (hhea, 1,47 cadratin),
+-- mais le client ne s'en sert pas : capture en jeu du 12/11/2026 (Freezing Trap survolée, texte de
+-- 7,5 unités à l'échelle 1,15 × 1,16) : deux lignes à 9 px l'une de l'autre pour des glyphes dont
+-- les largeurs donnent ~1,25–1,35 px par unité (≈ 0,9 à 1,0 cadratin d'interligne, pas 1,47) ; les
+-- lignes des infobulles, de même, sont espacées de la taille de leur police (plus l'espacement de
+-- l'infobulle). Le client règle l'interligne d'un texte sur sa taille de police (GetLineHeight).
+-- En jeu, la mise en page des cartes mesure la hauteur d'une ligne (GetStringHeight) : seul le faux
+-- client dépend de cette valeur.
 local METRICS = dofile(root .. "/Sim/baloo_metrics.lua")
 H.metrics = METRICS
+H.LINE_EM = 1.0
+H.HHEA_EM = METRICS.lineHeight
+METRICS.lineHeight = H.LINE_EM
 local function plainText(t)
   return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
 end
@@ -2589,28 +2600,43 @@ do
         local label = id .. (up and "+" or "") .. var.key
         local fit = card.bodyFit
         local fs = card.body
-        local lines = splitLines(fs._text)
-        local size = fs._fontSize
+        -- blocs du texte (un seul, ou un par clause avec l'écart entre clauses) : chacun vérifié
+        local lines, size = {}, fs._fontSize
         local lh = size * LH
-        local pt = fs._points[1]
-        local cx, cy = pt[4], -pt[5]
-        local top = cy - #lines * lh / 2
-        local bottom = top + #lines * lh
+        local bottom, prevBottom = -math.huge, nil
         if not fit.ok then bad[#bad + 1] = label .. " : ne tient à aucun palier" end
-        if fs:GetNumLines() ~= #lines or fs:IsTruncated() then
-          bad[#bad + 1] = label .. " : lignes recoupées par le client (" .. fs:GetNumLines() .. " / " .. #lines .. ")"
-        end
         local gem = card.gem._shown and gems[(card.gem._texture or ""):match("gem_(%a+)%.tga$")]
-        for k, line in ipairs(lines) do
-          local lw = H.textWidth(fs, line, size)
-          local x0, x1 = cx - lw / 2, cx + lw / 2
-          local y0, y1 = top + (k - 1) * lh, top + k * lh
-          local ok, where = all(x0 - MX, y0 - MT, x1 + MX, y1 + MB, dark)
-          if not ok then bad[#bad + 1] = ("%s : ligne %d hors de l'ardoise (marges comprises) en %s"):format(label, k, where) end
-          if gem then
-            local ok2, where2 = all(x0, y0, x1, y1, function(u, v) local _, _, _, a = gem(u, v) return a <= 60 end)
-            if not ok2 then bad[#bad + 1] = ("%s : ligne %d sous la gemme en %s"):format(label, k, where2) end
+        for b = 1, card.bodyUsed or 1 do
+          local p = card.bodyParts[b]
+          local pl = splitLines(p._text)
+          local pt = p._points[1]
+          local cx, cy = pt[4], -pt[5]
+          local top = cy - #pl * lh / 2
+          if p._fontSize ~= size or not p._shown then bad[#bad + 1] = label .. " : bloc " .. b .. " caché ou d'une autre taille" end
+          if p:GetNumLines() ~= #pl or p:IsTruncated() then
+            bad[#bad + 1] = label .. " : lignes recoupées par le client (" .. p:GetNumLines() .. " / " .. #pl .. ")"
           end
+          -- blocs dans l'ordre, sans chevauchement, séparés de l'écart prévu
+          if prevBottom and math.abs(top - prevBottom - (fit.gap or 0)) > 0.01 then
+            bad[#bad + 1] = ("%s : bloc %d à %.2f du précédent (écart %.2f attendu)"):format(label, b, top - prevBottom, fit.gap or 0)
+          end
+          prevBottom = top + #pl * lh
+          bottom = math.max(bottom, prevBottom)
+          for k, line in ipairs(pl) do
+            lines[#lines + 1] = line
+            local lw = H.textWidth(p, line, size)
+            local x0, x1 = cx - lw / 2, cx + lw / 2
+            local y0, y1 = top + (k - 1) * lh, top + k * lh
+            local ok, where = all(x0 - MX, y0 - MT, x1 + MX, y1 + MB, dark)
+            if not ok then bad[#bad + 1] = ("%s : ligne %d hors de l'ardoise (marges comprises) en %s"):format(label, #lines, where) end
+            if gem then
+              local ok2, where2 = all(x0, y0, x1, y1, function(u, v) local _, _, _, a = gem(u, v) return a <= 60 end)
+              if not ok2 then bad[#bad + 1] = ("%s : ligne %d sous la gemme en %s"):format(label, #lines, where2) end
+            end
+          end
+        end
+        for b = (card.bodyUsed or 1) + 1, #card.bodyParts do
+          if card.bodyParts[b]._shown or (card.bodyParts[b]._text or "") ~= "" then bad[#bad + 1] = label .. " : bloc " .. b .. " inutile affiché" end
         end
         if card.plate.shown and bottom > SC.pieces.card_plate[2] * CW then bad[#bad + 1] = label .. " : sur la plaque du bas" end
         if card.reasonPlate and card.reasonPlate._shown then
@@ -2641,14 +2667,18 @@ do
           local nw = H.textWidth(card.name, card.name._text, ns_)
           local nlh = ns_ * LH
           local ny0 = -np[5] - nlh / 2
-          local ok, where = all(np[4] - nw / 2 - 2, ny0 + 0.28 * ns_, np[4] + nw / 2 + 2, ny0 + 1.33 * ns_,
+          -- encre : de 0,455 cadratin au-dessus du milieu de la ligne à 0,595 au-dessous (capitales et
+          -- jambages de Baloo, ligne de base aux 1,078 / 1,47 d'une ligne de 1,47 cadratin : la mesure
+          -- d'avant la hauteur de ligne du client, H.LINE_EM, gardée telle quelle)
+          local mid = ny0 + nlh / 2
+          local ok, where = all(np[4] - nw / 2 - 2, mid - 0.455 * ns_, np[4] + nw / 2 + 2, mid + 0.595 * ns_,
             function(u, v) local _, _, _, a = ribbon(u, v) return a > 200 end)
           if not ok or not nf.ok or card.name:IsTruncated() then
             bad[#bad + 1] = ("%s : nom hors du ruban en %s"):format(label, tostring(where))
           end
           nameDist[ns_] = (nameDist[ns_] or 0) + 1
           tiers[#tiers + 1] = { label = label, name = card.name._text, nameSize = ns_, bodySize = size,
-            lines = #lines, text = d_text(card.body._text) }
+            lines = #lines, text = d_text(W.cardBodyText(card)), gap = card.bodyFit.gap or 0 }
           if nf.under then nameUnder[#nameUnder + 1] = ("%s (%s)"):format(card.name._text, tostring(ns_)) end
         end
       end
@@ -2760,7 +2790,7 @@ do
   if os.getenv("SLAY_TIERS") then
     local f = assert(io.open(os.getenv("SLAY_TIERS"), "w"))
     for _, t in ipairs(tiers) do
-      f:write(table.concat({ t.label, t.name, tostring(t.nameSize), tostring(t.bodySize), tostring(t.lines), t.text }, "\t"), "\n")
+      f:write(table.concat({ t.label, t.name, tostring(t.nameSize), tostring(t.bodySize), tostring(t.lines), t.text, ("%.2f"):format(t.gap or 0) }, "\t"), "\n")
     end
     f:close()
   end
@@ -2778,9 +2808,13 @@ do
   end
   -- mise en page figée : lignes à retours explicites, largeur plus grande que la plus longue ligne
   card:SetCard("shadowform", false, { playable = true })
-  check("Forme d'ombre : lignes posées une à une, aucune recoupe par le client",
-    (card.body._text or ""):find("\n", 1, true) and card.body:GetNumLines() == #splitLines(card.body._text)
-    and card.body._w >= 2 * W.CARD_TEXT.half * CW)
+  local okParts = true
+  for b = 1, card.bodyUsed or 1 do
+    local p = card.bodyParts[b]
+    if p:GetNumLines() ~= #splitLines(p._text) or p._w < 2 * W.CARD_TEXT.half * CW then okParts = false end
+  end
+  check("Forme d'ombre : lignes posées une à une (dans chaque bloc), aucune recoupe par le client",
+    W.cardBodyText(card):find("\n", 1, true) and okParts)
   -- textes d'une carte fraîche, non survolée : visibles (alpha 1, police et taille valides, au-dessus
   -- des pièces de la carte, rien de dessiné par-dessus)
   local fresh = W.card(holder)
@@ -3749,8 +3783,9 @@ do
   end
   check(("grammaire commune : Execute, Surge, Spend N, Last Breath, Shadow, Pay N HP, gains de ressource exactement sur les cartes qui les ont, chiffres justes (%d formes)"):format(nForms),
     #cbad == 0, table.concat(cbad, "\n        "))
-  -- 2. mise en page : la ligne d'état commence une ligne et finit le texte ; une clause par ligne aux
-  -- paliers >= 8,5 ; sablier en icône |T dans le texte posé, compté dans la mesure
+  -- 2. mise en page : la ligne d'état commence une ligne et finit le texte ; en mode « clauses », chaque
+  -- clause commence une ligne (elle peut se replier) ; tous les essais « clauses » (à tous les paliers)
+  -- avant le premier texte coulé ; sablier en icône |T dans le texte posé, compté dans la mesure
   local card = W.card(UI().content)
   local lbad, nIcons = {}, 0
   for _, id in ipairs(ids) do
@@ -3759,7 +3794,8 @@ do
       local d = Card.defById(id, up)
       local label = id .. (up and "+" or "")
       local fit = card.bodyFit
-      local lines = clauses(card.body._text or "")
+      local shown = W.cardBodyText(card)
+      local lines = clauses(shown)
       local pl = {}
       for k, l in ipairs(lines) do pl[k] = plain(l) end
       local cls = {}
@@ -3783,7 +3819,7 @@ do
         local tail = pl[#pl]
         if lastCl:sub(-#tail) ~= tail then lbad[#lbad + 1] = label .. " : texte après la ligne d'état (« " .. tail .. " »)" end
       end
-      -- une clause par ligne : chaque clause commence une ligne
+      -- mode « clauses » : chaque clause commence une ligne
       if fit.mode == "clauses" then
         for _, cl in ipairs(cls) do
           local head = plain(cl):match("^%S+")
@@ -3792,22 +3828,23 @@ do
           if not found then lbad[#lbad + 1] = label .. " : clause « " .. cl .. " » au milieu d'une ligne" end
         end
       end
-      -- ordre des essais : une clause par ligne à tous les paliers >= 8,5 avant tout texte coulé
+      -- ordre des essais : les clauses repliées à tous les paliers (secours compris) avant tout texte coulé
       local tries, flowed = W.cardTries(W.cardBody(d)), false
       for _, t in ipairs(tries) do
         if t.mode ~= "clauses" then flowed = true
-        elseif flowed and t.size >= W.CLAUSE_MIN then lbad[#lbad + 1] = label .. " : essai coulé avant une clause par ligne à " .. t.size end
+        elseif flowed then lbad[#lbad + 1] = label .. " : essai coulé avant les clauses repliées à " .. t.size end
       end
+      if fit.mode ~= "clauses" then lbad[#lbad + 1] = label .. " : texte coulé (" .. tostring(fit.mode) .. ")" end
       -- sablier : présent en icône dans le texte posé, autant que de « ⌛ » dans la source
       local nSrc = select(2, (d.text or ""):gsub(HG, ""))
-      local nTex = select(2, (card.body._text or ""):gsub("|T[^|]*hourglass%.tga[^|]*|t", ""))
+      local nTex = select(2, shown:gsub("|T[^|]*hourglass%.tga[^|]*|t", ""))
       nIcons = nIcons + nTex
-      if nSrc ~= nTex or (card.body._text or ""):find(HG, 1, true) then
+      if nSrc ~= nTex or shown:find(HG, 1, true) then
         lbad[#lbad + 1] = ("%s : %d sablier(s) dans le texte, %d icône(s) posée(s)"):format(label, nSrc, nTex)
       end
     end
   end
-  check(("mise en page : états posés en début de ligne et en dernier, une clause par ligne en mode « clauses », %d sabliers en icône |T"):format(nIcons),
+  check(("mise en page : états posés en début de ligne et en dernier, chaque clause en début de ligne (repliée au besoin), jamais de texte coulé, %d sabliers en icône |T"):format(nIcons),
     #lbad == 0, table.concat(lbad, "\n        "))
   -- l'icône est comptée dans la mesure (faux client comme le client : largeur de la séquence |T)
   local m = W.label(UI().content, "bold", 9)
@@ -3816,11 +3853,19 @@ do
   local hgt, wid = W.hourglassSize(9)
   m:SetText("Atonement 1" .. W.hourglass(9))
   local w1 = m:GetStringWidth()
-  check(("sablier compté dans la mesure du texte (+%.1f unités à la taille 9, hauteur %d)"):format(w1 - w0, hgt),
-    math.abs(w1 - w0 - wid) < 1e-6 and hgt >= 5 and wid >= 4, w1 - w0)
+  -- hauteur : au moins celle des chiffres de Baloo (0,62 cadratin) pour le dessin (60 texels sur 64),
+  -- à tous les paliers du texte des cartes ; icône carrée (largeur = hauteur : rien de rogné)
+  local hOk = true
+  for _, s in ipairs(W.BODY_SIZES) do
+    local hh, ww = W.hourglassSize(s)
+    if hh * 60 / 64 < 0.62 * s - 0.35 or hh > 0.8 * s + 0.5 or ww ~= hh then hOk = false end
+  end
+  check(("sablier compté dans la mesure du texte (+%.1f unités à la taille 9, hauteur %d), carré, à la hauteur des chiffres à chaque palier"):format(w1 - w0, hgt),
+    math.abs(w1 - w0 - wid) < 1e-6 and hgt >= 5 and wid == hgt and hOk, w1 - w0)
   -- séquence |T : forme de CreateTextureMarkup (chemin:hauteur:largeur:x:y:largeur et hauteur du
   -- fichier:gauche:droite:haut:bas) + couleur r:g:b, entiers, fichier de Media/ présent (TGA 32 bits,
-  -- puissance de deux, blanc)
+  -- 64 × 64, blanc), affiché ENTIER (coordonnées 0:64:0:64, aucun rognage), dessin centré à marges
+  -- symétriques (alpha nul sur les colonnes et lignes du bord, même étendue à gauche et à droite)
   local mk = W.hourglass(8.5)
   local f = {}
   for v in (mk:match("^|T(.-)|t$") .. ":"):gmatch("([^:]*):") do f[#f + 1] = v end
@@ -3830,15 +3875,24 @@ do
   local hdr = tga and tga:read(18)
   local body = tga and tga:read("*a")
   if tga then tga:close() end
-  local white = body and #body == 32 * 32 * 4
+  local PX = 64
+  local white = body and #body == PX * PX * 4
+  local xmin, xmax = PX, -1
   if white then
     for i = 1, #body, 4 do
       if body:byte(i) ~= 255 or body:byte(i + 1) ~= 255 or body:byte(i + 2) ~= 255 then white = false break end
+      if body:byte(i + 3) > 8 then
+        local x = ((i - 1) / 4) % PX
+        xmin, xmax = math.min(xmin, x), math.max(xmax, x)
+      end
     end
   end
-  check("séquence |T du sablier : 14 champs entiers, Media/hourglass.tga 32 × 32 TGA 32 bits, blanc (teinté par la séquence)",
-    allInt and f[1] == W.HOURGLASS and hdr and hdr:byte(3) == 2 and hdr:byte(17) == 32
-      and hdr:byte(13) + 256 * hdr:byte(14) == 32 and hdr:byte(15) + 256 * hdr:byte(16) == 32 and white, mk)
+  local sym = xmin > 2 and math.abs(xmin - (PX - 1 - xmax)) <= 1
+  local full = f[6] == tostring(PX) and f[7] == tostring(PX) and f[8] == "0" and f[9] == tostring(PX)
+    and f[10] == "0" and f[11] == tostring(PX) and f[2] == f[3]
+  check(("séquence |T du sablier : 14 champs entiers, Media/hourglass.tga 64 × 64 TGA 32 bits, blanc (teinté par la séquence), entier et carré, marges symétriques (x %d à %d)"):format(xmin, xmax),
+    allInt and f[1] == W.HOURGLASS and hdr and hdr:byte(3) == 2 and hdr:byte(17) == 32 and full and sym
+      and hdr:byte(13) + 256 * hdr:byte(14) == PX and hdr:byte(15) + 256 * hdr:byte(16) == PX and white, mk)
   -- mots-clés en couleur d'accent (une seule), chiffres blancs / verts : rien d'autre en couleur
   local colors, cbad2 = {}, {}
   local accent = "|cff" .. W.hexOf(W.KEYWORD_COLOR)
@@ -3967,6 +4021,205 @@ do
     #pbad == 0, table.concat(pbad, "\n        "))
   card:Hide()
   m:Hide()
+end
+
+print("UT texte des cartes replié plutôt que réduit : palier maximal, plancher 8,5, coupures permises, toutes les classes et les neutres")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W, Card, L = ns.Widgets, ns.Card, ns.Language
+  local TZ, CW = W.CARD_TEXT, W.CARD_W
+  local HG = W.HOURGLASS_CHAR
+  local FLOOR = 8.5
+  -- paliers sous 8,5 prouvés maximaux (aucune coupure permise ne fait tenir le texte plus grand) :
+  -- aucune carte aujourd'hui ; une entrée ici doit être justifiée (docs/interface.md)
+  local EXCEPT = {}
+  local top, bottom = TZ.top * CW, TZ.bottom * CW
+  -- lignes que la zone contient à chaque palier (hauteur de ligne mesurée, garde du bas comprise)
+  local caps = {}
+  for _, s in ipairs(W.BODY_SIZES) do
+    local m = W.label(UI().content, "bold", s)
+    m:SetText("Ég")
+    caps[#caps + 1] = ("%s → %d"):format(s, math.floor((bottom - top - W.TEXT_BOTTOM_GUARD) / m:GetStringHeight() + 1e-6))
+    m:Hide()
+  end
+  print("      lignes par palier (zone de " .. ("%.1f"):format(bottom - top) .. " unités) : " .. table.concat(caps, ", "))
+  local card = W.card(UI().content)
+  local ids = {}
+  for id in pairs(ns.Cards) do ids[#ids + 1] = id end
+  table.sort(ids)
+  -- noms en plusieurs mots (états, conditions, ressources)
+  local phrases = {}
+  local function addPhrase(n)
+    if n and n:find(" ", 1, true) then
+      local ws = {}
+      for w in n:gmatch("%S+") do ws[#ws + 1] = w end
+      phrases[#phrases + 1] = ws
+    end
+  end
+  for _, k in ipairs(W.keywordList()) do addPhrase(k.name) end
+  for _, r in pairs(L.resources) do addPhrase(r.name) addPhrase(r.plural) end
+  local statusNames = {}
+  for _, s in pairs(ns.Statuses) do statusNames[#statusNames + 1] = s.name end
+  local function plain(t)
+    return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", HG):gsub("\194\160", " "))
+  end
+  local function bare(w) return (w:gsub("[.,:;]+$", "")) end
+  local NUMVERBS = { deal = true, heal = true, draw = true, pay = true, lose = true, spend = true, cooldown = true, cost = true, costs = true }
+  local COUNTED = { more = true, mana = true, damage = true, HP = true }
+  local TAIL = { to = true, per = true, once = true, twice = true }
+  local NUMW = { two = true, three = true, four = true, five = true, six = true, seven = true, eight = true }
+  local classes = { "priest", "warrior", "mage", "rogue", "hunter", "neutral" }
+  local dist, under, notMax, bad = {}, {}, {}, {}
+  local kinds = { cond = 0, comma = 0, state = 0, tail = 0, any = 0 }
+  local anyList, gains = {}, {}
+  local nCards, nGap = 0, 0
+  for _, c in ipairs(classes) do dist[c] = {} end
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
+      local cls = d.class or "neutral"
+      local fit = card.bodyFit
+      nCards = nCards + 1
+      if (fit.gap or 0) > 0 then nGap = nGap + 1 end
+      dist[cls] = dist[cls] or {}
+      dist[cls][fit.size] = (dist[cls][fit.size] or 0) + 1
+      if not fit.ok or (fit.size < FLOOR and not EXCEPT[label]) then under[#under + 1] = label .. " (" .. tostring(fit.size) .. ")" end
+      -- palier maximal : aucun palier plus grand ne tient, quelle que soit la coupure permise
+      local paras = W.cardParagraphs(W.cardBody(d), "clauses")
+      for _, s in ipairs(W.BODY_SIZES) do
+        if s > fit.size and W.layoutBody(paras, s, top, bottom) then
+          notMax[#notMax + 1] = ("%s : %s choisi, %s tient"):format(label, tostring(fit.size), tostring(s))
+        end
+      end
+      -- coupures à l'intérieur d'une clause
+      local lines = {}
+      for l in (W.cardBodyText(card) .. "\n"):gmatch("(.-)\n") do lines[#lines + 1] = plain(l) end
+      if #lines ~= fit.lines then bad[#bad + 1] = label .. " : " .. #lines .. " lignes affichées, " .. tostring(fit.lines) .. " posées" end
+      for k = 1, #lines do
+        local l = lines[k]
+        local only = l:match("^(%S+)$")
+        if only and #bare(only) <= 3 and not only:find("%d") and not only:find(":$") and #lines > 1 then
+          bad[#bad + 1] = ("%s : ligne d'un seul petit mot « %s »"):format(label, only)
+        end
+        if l:find("^" .. HG) then bad[#bad + 1] = label .. " : sablier en début de ligne" end
+        if k < #lines and fit.clause and fit.clause[k] == fit.clause[k + 1] then
+          local a = l:match("(%S+)$") or ""
+          local b = lines[k + 1]:match("^(%S+)") or ""
+          local why
+          local an = (a:gsub("^−", "-"))
+          if an:match("^[+%-]?%d+$") and (bare(b):find("^%u") or COUNTED[bare(b)]) then why = "nombre séparé de ce qu'il compte"
+          elseif an:match("^%+%d+$") then why = "« +N » séparé de son nom"
+          elseif NUMVERBS[a:lower()] and b:gsub("^−", "-"):match("^[+%-]?%d") then why = "verbe séparé de son nombre"
+          elseif b:match("^%d+[.,:]?$") or b:match("^%d+" .. HG) then why = "nombre séparé du mot d'avant"
+          elseif a == "+" or b == "+" then why = "opérateur en bout de ligne"
+          end
+          for _, ph in ipairs(phrases) do
+            for i = 1, #ph - 1 do
+              if bare(a) == ph[i] and bare(b) == ph[i + 1] then why = "nom en deux mots coupé (" .. table.concat(ph, " ") .. ")" end
+            end
+          end
+          if why then bad[#bad + 1] = ("%s : %s (« %s » / « %s »)"):format(label, why, a, b) end
+          -- nature de la coupure (ordre de préférence : cond, comma, state, tail, any)
+          local kind
+          local isState = false
+          for _, n in ipairs(statusNames) do if lines[k + 1]:sub(1, #n) == n then isState = true end end
+          if a:find(":$") then kind = "cond"
+          elseif a:find(",$") then kind = "comma"
+          elseif (a == "Apply" or a == "Gain" or a == "apply" or a == "gain") and isState then kind = "state"
+          elseif TAIL[b:lower()] or (NUMW[b:lower()] and (lines[k + 1]:match("^%S+ (%S+)") or ""):find("^times")) then kind = "tail"
+          else kind = "any" anyList[#anyList + 1] = ("%s « %s / %s »"):format(label, l, lines[k + 1]) end
+          kinds[kind] = kinds[kind] + 1
+        end
+      end
+    end
+  end
+  local function row(t)
+    local ks, out, n, big = {}, {}, 0, 0
+    for k, v in pairs(t) do ks[#ks + 1] = k n = n + v if k >= 9.5 then big = big + v end end
+    table.sort(ks, function(a, b) return a > b end)
+    for _, k in ipairs(ks) do out[#out + 1] = k .. " : " .. t[k] end
+    return table.concat(out, ", ") .. (" (%d sur %d à 9,5 ou plus)"):format(big, n), big, n
+  end
+  local bigAll, nAll = 0, 0
+  for _, c in ipairs(classes) do
+    local r, big, n = row(dist[c])
+    bigAll, nAll = bigAll + big, nAll + n
+    print(("      %-8s %s"):format(c, r))
+  end
+  print(("      coupures dans une clause : après une condition %d, après une virgule %d, verbe / état %d, avant « to / per / once / N times » %d, ailleurs %d"):format(
+    kinds.cond, kinds.comma, kinds.state, kinds.tail, kinds.any))
+  print("      coupures « ailleurs » (dernier recours) : " .. (#anyList > 0 and table.concat(anyList, ", ") or "aucune"))
+  print(("      écart d'un tiers de ligne entre les clauses : %d textes sur %d (quand la hauteur le permet)"):format(nGap, nCards))
+  check(("toutes les cartes (%d, base et améliorées) à 8,5 ou plus, exceptions justifiées seulement ; la grande majorité à 9,5–10 (%d)"):format(nCards, bigAll),
+    #under == 0 and bigAll * 4 >= nAll * 3, table.concat(under, ", "))
+  check("palier maximal effectivement choisi : aucun palier plus grand ne tient, quelle que soit la coupure permise",
+    #notMax == 0, table.concat(notMax, "\n        "))
+  check("coupures permises seulement : jamais un nombre séparé de ce qu'il compte, un nom en deux mots coupé, un sablier seul, un petit mot seul sur sa ligne",
+    #bad == 0, table.concat(bad, "\n        "))
+  -- tri des coupures d'une clause : coûts dans l'ordre de préférence demandé
+  local B = W.BREAK
+  check("ordre de préférence des coupures : entre clauses < condition < virgule < verbe / état < « to / per / N times » < ailleurs",
+    B.clause < B.cond and B.cond < B.comma and B.comma < B.state and B.state < B.tail and B.tail < B.any)
+  -- groupes insécables de quelques clauses typiques (mesure sans police : W.clauseGroups seul)
+  local function groupsOf(t)
+    local g = W.clauseGroups(t)
+    local out = {}
+    for _, x in ipairs(g.groups) do out[#out + 1] = x.plain end
+    return table.concat(out, " | ")
+  end
+  local expect = {
+    { W.inlineIcons("Apply Demoralized\194\1602 ⌛ to\194\160all", 10), "Apply | Demoralized 2⌛ | to all" },
+    { "Deal 6 three times.", "Deal 6 | three times." },
+    { "Atonement: +2 Absorb per hit.", "Atonement: | +2 Absorb | per | hit." },
+    { "+1 Arcane Charge.", "+1 Arcane Charge." },
+    { "Surge: deal 4 + 4 per Insanity.", "Surge: | deal 4 + 4 | per | Insanity." },
+    { "Pay 3 HP.", "Pay 3 HP." },
+    { "Surge: pet attacks once per Frenzy.", "Surge: | pet | attacks | once per | Frenzy." },
+  }
+  local gbad = {}
+  for _, e in ipairs(expect) do
+    local got = groupsOf(e[1])
+    if got ~= e[2] then gbad[#gbad + 1] = ("« %s » -> « %s » (attendu « %s »)"):format(e[1], got, e[2]) end
+  end
+  check("groupes insécables : nombre et nom, verbe et nombre, « N times », « to all », noms en deux mots, opérateur",
+    #gbad == 0, table.concat(gbad, "\n        "))
+  card:Hide()
+  -- aperçus : cartes du Prêtre (base, améliorée) ; gros plan de cinq cartes (texte_gros_plan.svg)
+  if SNAP then
+    local pids = {}
+    for id, d in pairs(ns.Cards) do if d.class == "priest" then pids[#pids + 1] = id end end
+    table.sort(pids)
+    local perRow, cw, ch = 10, 140, 230
+    local all = {}
+    for _, id in ipairs(pids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, math.ceil(#all / perRow) * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, e in ipairs(all) do
+      local c = W.card(big)
+      c:SetCard(e[1], e[2], { playable = true })
+      W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+    end
+    Render.svg(H, big, SNAP .. "/cartes_priest.svg", "cartes du Prêtre (base, améliorée)")
+    big:Hide()
+    local five = { "freezing_trap", "schism", "psychic_scream", "colossus_smash", "thunder_clap" }
+    local zoom = CreateFrame("Frame", nil, _G.UIParent)
+    zoom:SetSize(#five * 140 + 20, 240)
+    zoom:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    zoom:SetScale(3)
+    for i, id in ipairs(five) do
+      local c = W.card(zoom)
+      c:SetCard(id, false, { playable = true })
+      W.placeCenter(c, zoom, 80 + (i - 1) * 140, 125, 1)
+    end
+    Render.svg(H, zoom, SNAP .. "/texte_gros_plan.svg", "texte des cartes, gros plan")
+    zoom:Hide()
+  end
 end
 
 print("U28 ombres de contact : une par personnage affiché, sous les pieds, texture fondue sur disque, mort")
@@ -5310,6 +5563,8 @@ do
   end
   local function cardBad(c, label, out)
     local list = { { "nom", c.name }, { "coût", c.cost }, { "texte", c.body }, { "plaque", c.plateText } }
+    -- blocs suivants du texte (écart entre clauses)
+    for b = 2, c.bodyUsed or 1 do list[#list + 1] = { "texte (bloc " .. b .. ")", c.bodyParts[b] } end
     if c.reasonPlate and c.reasonPlate._shown then list[#list + 1] = { "raison", c.reasonPlate.text } end
     for _, it in ipairs(list) do
       local why = textBad(it[2])
