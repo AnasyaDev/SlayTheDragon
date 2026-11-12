@@ -109,6 +109,7 @@ ns.Skin = {
     ability_rogue_feint = "Icons\\ability_rogue_feint.tga",
     ability_rogue_garrote = "Icons\\ability_rogue_garrote.tga",
     ability_rogue_murderspree = "Icons\\ability_rogue_murderspree.tga",
+    ability_rogue_nightblade = "Icons\\ability_rogue_nightblade.tga",
     ability_rogue_pistolshot = "Icons\\ability_rogue_pistolshot.tga",
     ability_rogue_rupture = "Icons\\ability_rogue_rupture.tga",
     ability_rogue_shadowdance = "Icons\\ability_rogue_shadowdance.tga",

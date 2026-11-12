@@ -305,6 +305,19 @@ card("secret_technique", {
     text = "Surge: deal 5 per Combo to all.\nStealth: hits twice." },
 })
 
+-- Nightblade : coup de grâce mono-cible de la voie (ajouté le 12/11/2026, décision du joueur : Subtlety
+-- jouée seule à 19-26 %). Il rend Stealth après le coup (la carte, une Attack, consomme d'abord un
+-- Stealth présent) : l'ouverture suivante (Backstab, Ambush) est prête. Jouable à 0 point (autre clause
+-- que le Surge) : Stealth seul. Débloqué au niveau 3, avec Flash Powder.
+card("nightblade", {
+  level = 3, name = "Nightblade", cost = 1, type = "attack", rarity = "common", path = "subtlety",
+  target = "enemy", effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } },
+    { "apply", "stealth", 1, self = true } },
+  text = "Surge: deal 6 per Combo.\nGain Stealth",
+  up = { effects = { { "surge" }, { "damage", 0, per = { 8, "surge" } }, { "apply", "stealth", 1, self = true } },
+    text = "Surge: deal 8 per Combo.\nGain Stealth" },
+})
+
 card("premeditation", {
   level = 2, name = "Premeditation", cost = 0, type = "skill", rarity = "uncommon", path = "subtlety",
   effects = { { "draw", 1 }, { "res", 2, cond = "stealth" } },
@@ -422,11 +435,14 @@ relic("shadowfang", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.rogue = {
-  id = "rogue", name = "Rogue", order = 3, hp = 49,
+  id = "rogue", name = "Rogue", order = 3, hp = 50,
   resource = { id = "combo", cap = 5, keep = true },
+  -- 5 Sinister Strike, 3 Feint (décision du joueur, 12/11/2026 : Parry annulait presque tous les coups des
+  -- normaux avec 4 Feint). Le deck tue plus vite sans perdre plus de PV : les PV n'ont pu monter que de
+  -- 49 à 50 sans sortir des cibles de victoires (docs/equilibrage.md, « Passe 2 »).
   deck = {
-    "sinister_strike", "sinister_strike", "sinister_strike", "sinister_strike",
-    "feint", "feint", "feint", "feint",
+    "sinister_strike", "sinister_strike", "sinister_strike", "sinister_strike", "sinister_strike",
+    "feint", "feint", "feint",
     "backstab", "eviscerate",
   },
   startRelic = "thieves_tools",
@@ -435,13 +451,17 @@ ns.Classes.rogue = {
   survival = "kill",
   bot = {
     resValue = 8,
+    -- 12/11/2026 : Nightblade 9 (coup de grâce : le balayage sous-évalue les Surge, comme Rupture et
+    -- Envenom) ; Shadowstep, Secret Technique, Hemorrhage, Vanish relevées au-dessus de 5 (positives au
+    -- balayage avec le nouveau deck de départ, reports/sw2-rogue-l7) ; le reste inchangé (un rebalayage
+    -- complet fait perdre 10 à 20 points au bot : il sous-cote les Surge et les moteurs).
     rating = {
-      crippling_poison = 7.5, blade_flurry = 13.5, deadly_poison = 12, envenom = 12, rupture = 12,
-      adrenaline_rush = 10, garrote = 4.5, smoke_bomb = 7.5, secret_technique = 3, fan_of_knives = 8,
-      slice_and_dice = 7.5, killing_spree = 6, sprint = 7, evasion = 6.5, between_the_eyes = 6.5,
-      pistol_shot = 6.5, shadowstep = 3, cheat_death = 5.5, kick = 5.5, premeditation = 5.5, riposte = 4.5,
-      cloak_of_shadows = 4, cheap_shot = 5.5, mutilate = 3.5, ambush = 7.5, shadow_dance = 3, hemorrhage = 3.5,
-      venomous_wounds = 3, exsanguinate = 3, vanish = 3,
+      blade_flurry = 13.5, deadly_poison = 12, envenom = 12, rupture = 12, adrenaline_rush = 10,
+      nightblade = 9, fan_of_knives = 8, ambush = 7.5, crippling_poison = 7.5, slice_and_dice = 7.5,
+      smoke_bomb = 7.5, shadowstep = 7, sprint = 7, between_the_eyes = 6.5, evasion = 6.5, pistol_shot = 6.5,
+      killing_spree = 6, secret_technique = 6, cheap_shot = 5.5, cheat_death = 5.5, hemorrhage = 5.5,
+      kick = 5.5, premeditation = 5.5, vanish = 5.5, garrote = 4.5, riposte = 4.5, cloak_of_shadows = 4,
+      mutilate = 3.5, exsanguinate = 3, shadow_dance = 3, venomous_wounds = 3,
     },
     upgrade = { sinister_strike = 2.5, feint = 2, backstab = 2.5, eviscerate = 3 },
     remove = { feint = 1.5, sinister_strike = 1 },

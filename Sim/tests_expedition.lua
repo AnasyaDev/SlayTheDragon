@@ -1214,7 +1214,9 @@ test("classes : réserves par niveau de classe (cartes et bibelots), sans effet 
     for lv = 1, 7 do
       for _, league in ipairs({ 0, 3 }) do
         local e = newExp({ class = class, unlocks = { level = lv, league = league } })
-        eq(#X.cardPool(e), CARDS[lv], class .. " niveau " .. lv .. " : cartes")
+        -- Rogue : Nightblade (Subtlety, niveau 3) en plus de la grille commune
+        local extra = (class == "rogue" and lv >= 3) and 1 or 0
+        eq(#X.cardPool(e), CARDS[lv] + extra, class .. " niveau " .. lv .. " : cartes")
         local n = 0
         for _, id in ipairs(X.relicPool(e)) do
           local r = ns.Relics[id]
