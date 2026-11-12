@@ -1,4 +1,4 @@
--- Art du Voleur : icônes des cartes et des bibelots, voies, classe, ressource (Combo Points), états
+-- Art du Voleur : icônes des cartes et des bibelots, voies, classe, ressource (Combo), états
 -- Parry et Stealth, vue de classe (modèle du héros en semi-transparence sous Stealth).
 -- Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la copie depuis
 -- ~/Téléchargements/ICONS) ; `spell` = repli par l'icône du sort ; `icon` = repli par chemin du client.

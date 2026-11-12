@@ -2336,7 +2336,7 @@ end
 -- groupe) : un nombre et ce qu'il compte (« 5 Absorb », « +2 Insanity », « 1 HP », « Stunned 1 ⌛ »
 -- par l'insécable de W.cardBody), un verbe et son nombre (« Deal 6 », « Draw 1. », « Pay 3 HP. »), un
 -- nombre et le mot d'avant quand rien ne suit qu'il compte (« deal 4 + 4 »), « N times », les noms en
--- plusieurs mots (noms d'états et conditions nommées, ressources : « Combo Points », « Arcane
+-- plusieurs mots (noms d'états et conditions nommées, ressources : « Combo », « Arcane
 -- Charge », « Last Breath: »), une ponctuation détachée, le sablier et son nombre (icône collée).
 W.BREAK = { clause = 1, cond = 10, comma = 12, state = 14, tail = 18, any = 40 }
 W.BREAK_SHORT = 60     -- ligne d'un seul mot très court (« to », « a ») dans une clause coupée

@@ -5,7 +5,7 @@
 --   Stealth : état à drapeau, posé au début de chaque combat ; la première carte Attack jouée le
 --     consomme (crochet onCardCommitted, au jeu) et toute sa résolution se fait « cachée » (condition
 --     stealth) ; une carte Skill ou Power lit l'état sans le consommer.
---   Effets propres : dotPer (« Surge: apply DoT K per Combo Point. »), tickDotPer (Exsanguinate),
+--   Effets propres : dotPer (« Surge: apply DoT K per Combo. »), tickDotPer (Exsanguinate),
 --     randomHits (Killing Spree, flux c.rng.cards).
 -- État de classe c.cls : hidden (miroir de Stealth, pour savoir si un gain est réel), stealthGained
 -- (le dernier état Stealth posé l'a fait apparaître : Flash Powder), openers (uid des cartes Attack qui

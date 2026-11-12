@@ -3460,7 +3460,7 @@ do
           if not found then cbad[#cbad + 1] = label .. " : clause « " .. want .. " » absente" end
         end
       end
-      -- noms de ressource : seulement celle de la classe, accordée au nombre (« +1 Combo Point. »)
+      -- noms de ressource : seulement celle de la classe, accordée au nombre (« +1 Combo. »)
       for orid, res in pairs(L.resources) do
         if orid ~= rid and (W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural)) then
           cbad[#cbad + 1] = label .. " : ressource d'une autre classe (" .. res.name .. ")"
@@ -5833,7 +5833,7 @@ do
     and not rawget(v.classZone, "_keyboard"))
 end
 
-print("UR  Rogue : accueil, combat (Combo Points, Parry et Stealth sous le héros, modèle caché), planche des cartes")
+print("UR  Rogue : accueil, combat (Combo, Parry et Stealth sous le héros, modèle caché), planche des cartes")
 do
   H.boot(nil)
   H.slash("")
@@ -5880,11 +5880,11 @@ do
     and ts:find("Attack", 1, true), ts)
   check("survol de Parry : nom, charges et explication", tp:find("Parry 2", 1, true) and tp:find("8 damage", 1, true), tp)
   local r = v.resource
-  check("pastille de ressource : icône des Combo Points, nombre",
+  check("pastille de ressource : icône des Combo, nombre",
     r._shown and (r.icon._texture or ""):lower():find("inv_throwingknife_04", 1, true) and r.text._text == "3",
     tostring(r.icon._texture) .. " / " .. tostring(r.text._text))
   local tt = table.concat(H.hover(r), " | ")
-  check("pastille de ressource : explication des Combo Points et plafond", tt:find("Combo Point", 1, true) and tt:find("3 / 5", 1, true), tt)
+  check("pastille de ressource : explication des Combo et plafond", tt:find("Combo", 1, true) and tt:find("3 / 5", 1, true), tt)
   local m = v.playerModel
   local function alpha() local k = m and m._calls and m._calls.SetModelAlpha return k and k[1] end
   check("modèle du héros en semi-transparence sous Stealth", alpha() and alpha() < 1, alpha())
@@ -5901,18 +5901,18 @@ do
     check("Attack jouée : Stealth consommé, jeton retiré, modèle opaque", c.player.st.stealth == nil and not still and alpha() == 1, alpha())
   end
   -- carte Surge à 0 point : raison au pluriel
-  check("raison d'une carte Surge à 0 : « Not enough Combo Points. »",
-    ns.Controller.reasonText("resource") == "Not enough Combo Points.", ns.Controller.reasonText("resource"))
-  -- infobulle d'une carte : Stealth, Parry, condition Stealth et Combo Points expliqués
+  check("raison d'une carte Surge à 0 : « Not enough Combo. »",
+    ns.Controller.reasonText("resource") == "Not enough Combo.", ns.Controller.reasonText("resource"))
+  -- infobulle d'une carte : Stealth, Parry, condition Stealth et Combo expliqués
   local tip = { lines = {} }
   function tip:AddLine(t) self.lines[#self.lines + 1] = t end
   function tip:NumLines() return #self.lines end
   W.fillCardTooltip(tip, "backstab", false)
   W.fillCardTooltip(tip, "shadowstep", false)
   local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-  check("infobulles des cartes : Stealth (condition et état), Parry, Combo Points",
+  check("infobulles des cartes : Stealth (condition et état), Parry, Combo",
     all:find("Stealth: bonus effect", 1, true) and all:find("Stealth: the next Attack", 1, true)
-    and all:find("Parry: each charge", 1, true) and all:find("Combo Point", 1, true), all)
+    and all:find("Parry: each charge", 1, true) and all:find("Combo", 1, true), all)
 end
 
 -- planche des cartes du Voleur (base et améliorée)

@@ -1144,7 +1144,7 @@ test("tour ennemi sauté (drapeau skipEnemyTurn), Interrupt de tous, onAttackHit
 end)
 
 ---------------------------------------------------------------------------
--- Rogue : Combo Points, Parry, Stealth, effets du DoT, cartes et bibelots (docs/classes/rogue.md)
+-- Rogue : Combo, Parry, Stealth, effets du DoT, cartes et bibelots (docs/classes/rogue.md)
 ---------------------------------------------------------------------------
 
 local RO = { class = "rogue" } -- options de Combat.new pour un combat de Voleur
@@ -1191,7 +1191,7 @@ test("Rogue : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveau 1 à 7 sur 
   eq(Card.defById("kick").cost, 0)
 end)
 
-test("Combo Points : plafond 5, gardés d'un tour à l'autre, 0 au début du combat", function()
+test("Combo : plafond 5, gardés d'un tour à l'autre, 0 au début du combat", function()
   local c = setup({ "sinister_strike" }, nil, nil, RO)
   eq(c.player.res, 0)
   Combat.gainRes(c, 4)
