@@ -16,15 +16,11 @@ return function(ns)
 
   -- Valeur grossière des cartes pour la politique de choix « rated », tirée des balayages
   -- (sweep=cards) : à peu près 5 + écart de victoires / 2.
-  Run.RATING = {
-    vampiric_touch = 7, angelic_feather = 6, flash_heal = 6, solace = 6, luminous_barrier = 6,
-    mind_sear = 6, radiance = 5, holy_nova = 5, shadow_mend = 5, renew = 5, mind_blast = 5,
-    holy_fire = 5, mind_flay = 4,
-    schism = 6, psychic_scream = 6, silence = 5, evangelism = 5, greater_heal = 5, chastise = 5,
-    penance = 5, devouring_plague = 4, sw_death = 4, halo = 4, empyreal_blaze = 4,
-    rapture = 7, pain_suppression = 7, shadowform = 5, apotheosis = 5, void_eruption = 4,
-    spirit_of_redemption = 4,
-  }
+  -- Les notes vivent dans la définition de chaque classe (classDef.bot.rating) ; réunies ici.
+  Run.RATING = {}
+  for _, cd in pairs(ns.Classes) do
+    for id, r in pairs(cd.bot and cd.bot.rating or {}) do Run.RATING[id] = r end
+  end
 
   local function rating(id) return Run.RATING[id] or 3 end
 
@@ -39,12 +35,13 @@ return function(ns)
     return best
   end
 
-  local function upgradeTarget(deck)
+  local function upgradeTarget(deck, cd)
+    local up = cd.bot and (cd.bot.upgradeRun or cd.bot.upgrade) or {}
     local best, bestR = nil, -1
     for i = 1, #deck do
       local card = deck[i]
       if not card.up then
-        local r = card.id == "smite" and 2.5 or card.id == "inner_fire" and 2 or rating(card.id)
+        local r = up[card.id] or rating(card.id)
         if r > bestR then best, bestR = i, r end
       end
     end
@@ -86,7 +83,7 @@ return function(ns)
   end
 
   local function fight(run, opts, encounter, kind, combatSeed, last)
-    local c = Combat.new({ seed = combatSeed, hp = run.hp, maxHp = run.maxHp, deck = run.deck,
+    local c = Combat.new({ seed = combatSeed, class = run.class, hp = run.hp, maxHp = run.maxHp, deck = run.deck,
       encounter = encounter, relics = run.relics, potions = run.potions, charges = run.charges,
       stats = true, quiet = opts.quiet ~= false })
     local bot = Bots.new(opts.bot or "heuristic", Rng.stream(combatSeed, "bot"),
@@ -129,7 +126,7 @@ return function(ns)
       if a[1] == "end" then closeTurn() end
       steps = steps + 1
       if a[1] == "play" then
-        local ok = Combat.play(c, a[2], a[3])
+        local ok = Combat.play(c, a[2], a[3], a[4] == "nospend" and { spend = false } or nil)
         if not ok then Combat.endTurn(c) end
       elseif a[1] == "potion" then
         local ok = Combat.usePotion(c, a[2], a[3])
@@ -163,11 +160,13 @@ return function(ns)
 
   function Run.play(opts)
     local seed = opts.seed or 1
-    local class = ns.Classes[opts.class or "priest"]
-    local run = { hp = class.hp, maxHp = class.hp, deck = {}, relics = {}, potions = {}, charges = {} }
+    local classId = opts.class or "priest"
+    local class = ns.Classes[classId]
+    local run = { class = classId, hp = class.hp, maxHp = class.hp, deck = {}, relics = {}, potions = {}, charges = {} }
     for i = 1, Combat.POTION_SLOTS do run.potions[i] = false end
     for i = 1, #class.deck do run.deck[#run.deck + 1] = { id = class.deck[i], up = false } end
     for i = 1, #(opts.force or {}) do run.deck[#run.deck + 1] = { id = opts.force[i], up = false } end
+    if class.startRelic then run.relics[#run.relics + 1] = class.startRelic end
     for i = 1, #(opts.relics or {}) do run.relics[#run.relics + 1] = opts.relics[i] end
     local rngMap = Rng.stream(seed, "map")
     local rngLoot = Rng.stream(seed, "loot")
@@ -186,7 +185,7 @@ return function(ns)
           run.hp = math.min(run.maxHp, run.hp + heal)
           record.picks[#record.picks + 1] = "rest"
         else
-          local i = upgradeTarget(run.deck)
+          local i = upgradeTarget(run.deck, class)
           if i then
             run.deck[i].up = true
             record.picks[#record.picks + 1] = "up:" .. run.deck[i].id
@@ -209,7 +208,7 @@ return function(ns)
           return record
         end
         if step ~= "boss" then
-          local choices = Rewards.cardChoices(rngLoot, opts.class or "priest", 3, nil, opts.rep)
+          local choices = Rewards.cardChoices(rngLoot, classId, 3, nil, opts.rep)
           local pick = pickCard(opts, rngLoot, choices)
           if pick then
             run.deck[#run.deck + 1] = { id = pick, up = false }
@@ -220,7 +219,7 @@ return function(ns)
             if step == "elite" then
               local owned = {}
               for i = 1, #run.relics do owned[run.relics[i]] = true end
-              local r = Rewards.relicChoices(rngTreasure, 1, { maxTier = opts.tier, exclude = owned })[1]
+              local r = Rewards.relicChoices(rngTreasure, 1, { maxTier = opts.tier, exclude = owned, class = classId })[1]
               if r then
                 run.relics[#run.relics + 1] = r
                 record.relicsGained[#record.relicsGained + 1] = r

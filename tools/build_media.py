@@ -20,7 +20,8 @@ fractions de la largeur du corps). Aperçus PNG pour le rendu hors jeu : build/m
 
 Usage (depuis la racine du dépôt) :
   python3 -m venv build/venv && build/venv/bin/pip install pillow fonttools
-  build/venv/bin/python tools/build_media.py [--psd CHEMIN] [--icons DOSSIER] [--font FICHIER]
+  build/venv/bin/python tools/build_media.py [--psd CHEMIN] [--icons DOSSIER] [--font FICHIER] [--icons-only]
+  --icons-only : ajoute seulement les icônes nouvellement nommées (nouvelle classe), rien d autre.
 Rejouable : les rendus du PSD sont mis en cache dans build/media_cache (clé = commandes envoyées).
 """
 import argparse, hashlib, json, math, os, pathlib, re, shutil, struct, subprocess, sys
@@ -32,6 +33,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--psd", default=str(HOME / "Téléchargements/1_Free Pack/PSD Card Constructor.psd"))
 ap.add_argument("--icons", default=str(HOME / "Téléchargements/ICONS"))
 ap.add_argument("--font", default=str(HOME / ".local/share/fonts/BalooChettan2.ttf"))
+ap.add_argument("--icons-only", action="store_true",
+                help="n'ajoute que les icônes manquantes (Media/Icons, table icons de UI/SkinData.lua)")
 ARGS = ap.parse_args()
 
 MEDIA = ROOT / "Media"
@@ -91,6 +94,69 @@ def write_tga(im, path):
 def read_tga_header(path):
     with open(path, "rb") as f:
         return struct.unpack("<BBBHHBHHHHBB", f.read(18))
+
+
+# Icônes nommées par l'art (champ tga = "Nom") : UI/Art.lua et les fichiers d'art des classes UI/Art/*.lua.
+def wanted_icons():
+    files = [ROOT / "UI/Art.lua"] + sorted((ROOT / "UI/Art").glob("*.lua"))
+    names = set()
+    for f in files:
+        names |= set(re.findall(r'tga\s*=\s*"([^"]+)"', f.read_text(encoding="utf-8")))
+    # aide I("Nom", …) des fichiers d'art de classe
+    for f in files[1:]:
+        names |= set(re.findall(r'\bI\(\s*"([^"]+)"', f.read_text(encoding="utf-8")))
+    return sorted(names, key=str.lower)
+
+
+def copy_icon(n, index):
+    """Copie l'icône n (TGA 32 bits 128 px) dans Media/Icons et son aperçu PNG ; renvoie le chemin
+    relatif de SkinData ou None si introuvable."""
+    p = index.get(n.lower())
+    if not p:
+        return None
+    hdr = read_tga_header(p)
+    fname = re.sub(r"[^a-z0-9_]", "_", n.lower())
+    dst = MEDIA / "Icons" / (fname + ".tga")
+    im = Image.open(p).convert("RGBA")
+    if hdr[2] == 2 and hdr[10] == 32 and hdr[11] == 8 and im.size[0] & (im.size[0] - 1) == 0:
+        shutil.copyfile(p, dst)                      # déjà au bon format : copie telle quelle
+    else:
+        write_tga(im.resize((128, 128), Image.LANCZOS), dst)
+    im.save(PREVIEW / "Icons" / (fname + ".png"))
+    return "Icons\\" + fname + ".tga"
+
+
+# --icons-only : n'ajoute que les icônes nouvellement nommées (classes ajoutées) dans Media/Icons et dans
+# la table `icons` de UI/SkinData.lua, sans relire le PSD ni régénérer les autres textures.
+if ARGS.icons_only:
+    skin_path = ROOT / "UI/SkinData.lua"
+    skin_src = skin_path.read_text(encoding="utf-8")
+    m = re.search(r"\n  icons = \{\n(.*?)\n  \},\n", skin_src, re.S)
+    assert m, "table icons introuvable dans UI/SkinData.lua"
+    have = {}
+    for a, b, c in re.findall(r'^\s*(?:\["([^"]+)"\]|([A-Za-z_][A-Za-z0-9_]*)) = "([^"]+)",$', m.group(1), re.M):
+        have[a or b] = c.replace("\\\\", "\\")
+    index = {p.name[:-4].lower(): p for p in pathlib.Path(ARGS.icons).glob("*.tga")}
+    added, missing = [], []
+    for n in wanted_icons():
+        k = n.lower()
+        if k in have and (MEDIA / have[k].replace("\\", "/")).exists():
+            continue
+        rel = copy_icon(n, index)
+        if rel:
+            have[k] = rel
+            added.append(n)
+        else:
+            missing.append(n)
+    lines = []
+    for k in sorted(have):
+        kk = k if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", k) else '["%s"]' % k
+        lines.append('    %s = "%s",' % (kk, have[k].replace("\\", "\\\\")))
+    skin_path.write_text(skin_src[:m.start(1)] + "\n".join(lines) + skin_src[m.end(1):], encoding="utf-8")
+    print(f"{len(added)} icône(s) ajoutée(s) : {', '.join(added) or '-'} ; {len(have)} au total")
+    if missing:
+        print("icônes introuvables (repli sur l'icône du jeu) :", ", ".join(missing))
+    sys.exit(0)
 
 # ---------------------------------------------------------------------------
 # PSD par photocraft-cli
@@ -471,34 +537,17 @@ metrics.append("}")
 (ROOT / "Sim/baloo_metrics.lua").write_text("\n".join(metrics) + "\n", encoding="utf-8")
 
 # ===========================================================================
-# 5. Icônes : celles que nomme UI/Art.lua (champ tga = "Nom")
+# 5. Icônes : celles que nomment UI/Art.lua et UI/Art/*.lua (champ tga = "Nom", aide I("Nom"))
 # ===========================================================================
 
-art = (ROOT / "UI/Art.lua").read_text(encoding="utf-8")
-wanted = sorted(set(re.findall(r'tga\s*=\s*"([^"]+)"', art)), key=str.lower)
 index = {p.name[:-4].lower(): p for p in pathlib.Path(ARGS.icons).glob("*.tga")}
 ICONS, MISSING = {}, []
-
-
-def icon_key(n):
-    return n.lower()
-
-
-for n in wanted:
-    p = index.get(n.lower())
-    if not p:
-        MISSING.append(n)
-        continue
-    hdr = read_tga_header(p)
-    fname = re.sub(r"[^a-z0-9_]", "_", n.lower())
-    dst = MEDIA / "Icons" / (fname + ".tga")
-    im = Image.open(p).convert("RGBA")
-    if hdr[2] == 2 and hdr[10] == 32 and hdr[11] == 8 and im.size[0] & (im.size[0] - 1) == 0:
-        shutil.copyfile(p, dst)                      # déjà au bon format : copie telle quelle
+for n in wanted_icons():
+    rel = copy_icon(n, index)
+    if rel:
+        ICONS[n.lower()] = rel
     else:
-        write_tga(im.resize((128, 128), Image.LANCZOS), dst)
-    im.save(PREVIEW / "Icons" / (fname + ".png"))
-    ICONS[icon_key(n)] = "Icons\\" + fname + ".tga"
+        MISSING.append(n)
 
 # ===========================================================================
 # 6. Géométrie de la carte (fractions de la largeur du corps, origine = coin haut gauche du corps)

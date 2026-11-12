@@ -1725,22 +1725,44 @@ function W.addStatusLines(tt, id, n)
 end
 
 -- Mots-clés d'une définition de carte (pour l'infobulle).
+W.SPEND_HINT = "|cffffd100Shift|r: play it without spending."
+
+-- Ressource de la classe d'une carte (id du registre du langage) ou nil.
+function W.cardResource(d)
+  local cd = d and d.class and ns.Classes[d.class]
+  return cd and cd.resource and cd.resource.id or nil
+end
+
 function W.cardKeywords(d)
   local list, seen = {}, {}
+  local res = W.cardResource(d)
   local function add(k, label, n)
     if seen[k] then return end
     seen[k] = true
-    list[#list + 1] = { key = k, label = label, n = n }
+    list[#list + 1] = { key = k, label = label, n = n, res = res }
   end
-  if d.cast then add("cast") end
-  if d.cooldown then add("cooldown", "Cooldown " .. d.cooldown, d.cooldown) end
-  if d.exhaust then add("exhaust") end
-  if d.retain then add("retain") end
-  if d.power or d.type == "power" then add("power") end
+  -- mots de la plaque, dans l'ordre de la plaque (Core/Language.lua)
+  local L = ns.Language
+  for _, p in ipairs(L.plates) do
+    local word = L.plateWord(p, d)
+    if word then add(p.key, p.n and word or nil, p.n and d[p.flag] or nil) end
+  end
   -- texte : conditions nommées et conditions sur un état (« Name: »), puis états cités
   local text = d.text or ""
   for _, c in ipairs(W.CONDITIONS) do
-    if W.hasPhrase(text, c.name .. ":") then add(c.key) end
+    if c.pattern then
+      for cl in (text .. "\n"):gmatch("(.-)\n") do
+        local lab = cl:match("^(.-): ")
+        if lab and lab:find(c.pattern) then add(c.key, lab, tonumber(lab:match("%d+"))) end
+      end
+    elseif W.hasPhrase(text, c.name .. ":") then add(c.key) end
+  end
+  for key, kw in pairs(L.keywords) do
+    if kw.pattern then
+      for cl in (text .. "\n"):gmatch("(.-)\n") do
+        if cl:find(kw.pattern) then add(key) end
+      end
+    end
   end
   local ids = {}
   for id in pairs(ns.Statuses) do ids[#ids + 1] = id end
@@ -1759,11 +1781,18 @@ function W.cardKeywords(d)
   for i = 1, #(d.effects or {}) do
     local e = d.effects[i]
     if e[1] == "absorb" then add("absorb")
-    elseif e[1] == "demence" then add("demence")
+    elseif (e[1] == "res" or e[1] == "demence" or e[1] == "spend" or e[1] == "surge") and res then add("res:" .. res)
     elseif e[1] == "interrupt" then add("interrupt") end
   end
   if W.hasPhrase(text, "Absorb") then add("absorb") end
-  if W.hasPhrase(text, "Insanity") then add("demence") end
+  -- ressources nommées par le texte (celle de la classe, ou une autre citée)
+  local rids = {}
+  for id in pairs(L.resources) do rids[#rids + 1] = id end
+  table.sort(rids)
+  for _, id in ipairs(rids) do
+    local r = L.resources[id]
+    if W.hasPhrase(text, r.name) or W.hasPhrase(text, r.plural) then add("res:" .. id) end
+  end
   return list
 end
 
@@ -1772,7 +1801,7 @@ function W.keywordText(k)
   local line
   if k.key:sub(1, 7) == "status:" then line = Art.statusLine(k.key:sub(8))
   elseif k.key:sub(1, 5) == "cond:" then line = Art.conditionLine(k.key:sub(6))
-  else line = Art.keywordLine(k.key, k.label, k.n) end
+  else line = Art.keywordLine(k.key, k.label, k.n, k.res) end
   return W.inlineIcons(line, 12)
 end
 
@@ -1796,6 +1825,8 @@ function W.fillCardTooltip(tt, id, up, extra)
   for i = 1, #kws do
     wrap(tt, W.keywordText(kws[i]), 0.85, 0.85, 0.85)
   end
+  -- « Spend N » au choix : comment jouer la carte sans dépenser (une ligne)
+  if d.spend then wrap(tt, W.SPEND_HINT, 0.85, 0.85, 0.85) end
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
@@ -2011,8 +2042,9 @@ function W.unitStatuses(unit)
     local id, n = ids[i], unit.st[ids[i]]
     local s = ns.Statuses[id]
     local bad = s and (s.debuff or s.affix)
+    local src = unit.stIcon and unit.stIcon[id]
     list[#list + 1] = {
-      icon = Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
+      icon = (src and Art.statusIcons[src]) or Art.statuses[id] or Art.affixes[id] or { icon = Art.QUESTION },
       n = type(n) == "number" and n or nil,
       rim = bad and Art.rim.debuff or nil,
       text = (s and s.name or id), -- nom (infobulle, harnais)
@@ -2034,13 +2066,16 @@ local SC = Skin.card
 W.CARD_W = 124
 W.CARD_H = W.CARD_W * SC.aspect
 
-local KEYWORD_STRIP = {
-  { flag = "cooldown", pat = "%s*Cooldown %d+%." },
-  { flag = "exhaust", pat = "%s*Exhaust%." },
-  { flag = "retain", pat = "%s*Retain%." },
-  { flag = "cast", pat = "^Cast%.%s*" },
-  { flag = "power", pat = "^Power%.%s*" },
-}
+-- Mots de la plaque retirés du texte affiché : registre du langage (Core/Language.lua), en tête
+-- (« ^Cast. ») ou en fin (« Cooldown 2. »).
+local function keywordStrip()
+  local list = {}
+  for _, p in ipairs(ns.Language.plates) do
+    local w = p.word .. (p.n and " %d+" or "")
+    list[#list + 1] = { plate = p, pat = p.head and ("^" .. w .. "%.%s*") or ("%s*" .. w .. "%.") }
+  end
+  return list
+end
 
 -- Langage des cartes (docs/interface.md, « Langage des cartes ») : une clause par ligne dans `text`
 -- (séparées par « \n ») ; « Status: » = si l'état est présent ; conditions nommées ; états posés
@@ -2053,12 +2088,8 @@ W.HOURGLASS = ROOT .. "hourglass.tga"
 W.HOURGLASS_CHAR = "⌛"
 local NBSP = "\194\160" -- espace insécable : glue les mots d'un nom d'état et le nom à son nombre
 -- Conditions nommées (texte « Name: effect ») et clé de leur explication (Art.keywords).
-W.CONDITIONS = {
-  { name = "Execute", key = "execute" },
-  { name = "Surge", key = "surge" },
-  { name = "Last Breath", key = "lastBreath" },
-  { name = "Shadow", key = "shadow" },
-}
+-- Registre partagé (Core/Language.lua) : { name, key, pattern, text }.
+W.CONDITIONS = ns.Language.conditions
 
 -- Le nombre de l'état compte des tours (sablier) ?
 function W.isTurnStatus(id)
@@ -2150,10 +2181,12 @@ end
 -- Texte affiché : sans les mots-clés de la plaque du bas, noms d'états et conditions insécables et
 -- en couleur d'accent, chiffres en évidence (blancs, ou verts s'ils changent avec l'amélioration).
 -- Garde les « \n » des clauses et le « ⌛ » (posé à la taille du palier par la mise en page).
-function W.cardBody(d, base)
+-- spendOff : la clause « Spend N: … » est éteinte (gris, chiffres compris) : le bonus ne sera pas payé.
+W.SPEND_OFF_COLOR = C.textDim
+function W.cardBody(d, base, spendOff)
   local text = d.text or ""
-  for _, k in ipairs(KEYWORD_STRIP) do
-    if d[k.flag] or (k.flag == "power" and d.type == "power") then text = text:gsub(k.pat, "") end
+  for _, k in ipairs(keywordStrip()) do
+    if ns.Language.plateWord(k.plate, d) then text = text:gsub(k.pat, "") end
   end
   -- ligne d'état : le verbe reste avec le nom de l'état (« Gain Atonement », « Apply Stunned »)
   local cl = {}
@@ -2162,7 +2195,7 @@ function W.cardBody(d, base)
     cl[#cl + 1] = l
   end
   text = table.concat(cl, "\n")
-  -- un nom d'état insécable avec son nombre (« Pain 5 », « Sundered 2 ⌛ ») ; « to all » insécable
+  -- un nom d'état insécable avec son nombre (« DoT 5 », « Sundered 2 ⌛ ») ; « to all » insécable
   for _, k in ipairs(keywordList()) do
     if k.status then
       text = eachPhrase(text, k.name, function(p) return p .. "\001" end)
@@ -2182,6 +2215,16 @@ function W.cardBody(d, base)
   for _, k in ipairs(keywordList()) do
     text = eachPhrase(text, k.name, function(p) return W.colorize(p, W.KEYWORD_COLOR) end)
   end
+  if spendOff then
+    -- clause « Spend N: … » éteinte : couleurs retirées, la clause entière en gris
+    local out = {}
+    for l in (text .. "\n"):gmatch("(.-)\n") do
+      local plain = l:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+      if plain:find("^Spend %d+: ") then l = W.colorize(plain, W.SPEND_OFF_COLOR) end
+      out[#out + 1] = l
+    end
+    text = table.concat(out, "\n")
+  end
   return text
 end
 
@@ -2199,11 +2242,10 @@ end
 -- Mots-clés de la plaque du bas.
 function W.cardPills(d)
   local list = {}
-  if d.type == "power" then list[#list + 1] = "Power" end
-  if d.cast then list[#list + 1] = "Cast" end
-  if d.cooldown then list[#list + 1] = "Cooldown " .. d.cooldown end
-  if d.exhaust then list[#list + 1] = "Exhaust" end
-  if d.retain then list[#list + 1] = "Retain" end
+  for _, p in ipairs(ns.Language.plates) do
+    local w = ns.Language.plateWord(p, d)
+    if w then list[#list + 1] = w end
+  end
   return list
 end
 
@@ -2337,14 +2379,17 @@ W.balanceColors = balanceColors
 -- Paragraphes du texte d'une carte selon le mode : "clauses" = une clause par paragraphe ; "flow" =
 -- les clauses d'effet coulent ensemble, chaque clause d'état posé (« Donne » / « Applique ») reste un
 -- paragraphe ; "flowAll" = les clauses d'état sont groupées en un dernier paragraphe (« Apply
--- Pain 3. Gain Regen 1 »). Un paragraphe commence toujours une ligne.
--- Une clause conditionnelle (« Pain: … », « Execute: … ») commence toujours une ligne, et la
+-- DoT 3. Gain Regen 1 »). Un paragraphe commence toujours une ligne.
+-- Une clause conditionnelle (« DoT: … », « Execute: … ») commence toujours une ligne, et la
 -- clause qui la suit aussi (elle ne doit pas paraître soumise à la condition) : seules les clauses
 -- simples qui se suivent coulent ensemble.
 function W.isConditionClause(s)
   local label = plainClause(s):match("^(.-): ")
   if not label then return false end
   for _, k in ipairs(keywordList()) do if k.name == label then return true end end
+  for _, c in ipairs(W.CONDITIONS) do
+    if c.pattern and label:find(c.pattern) then return true end
+  end
   return false
 end
 
@@ -2963,7 +3008,7 @@ function W.card(parent)
     -- médaillon
     W.setIcon(self.icon, W.cardArt(id), "card:" .. id)
     -- texte : zone utile du panneau, relevée au-dessus de la plaque de raison si elle y mord
-    local text = W.cardBody(d, base)
+    local text = W.cardBody(d, base, opts.spendOff)
     local bottom = TZ.bottom * CW
     local reasonH
     if dim and opts.reason then

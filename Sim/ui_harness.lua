@@ -577,7 +577,8 @@ end
 
 local EVENTS = {}
 for e in ([[ADDON_LOADED PLAYER_LOGIN PLAYER_ENTERING_WORLD PLAYER_LOGOUT PLAYER_REGEN_DISABLED
-PLAYER_REGEN_ENABLED PLAYER_CONTROL_LOST PLAYER_CONTROL_GAINED TAXIMAP_CLOSED TAXIMAP_OPENED]]):gmatch("%S+") do
+PLAYER_REGEN_ENABLED PLAYER_CONTROL_LOST PLAYER_CONTROL_GAINED TAXIMAP_CLOSED TAXIMAP_OPENED
+MODIFIER_STATE_CHANGED]]):gmatch("%S+") do
   EVENTS[e] = true
 end
 
@@ -661,7 +662,8 @@ function H.boot(db)
   -- boutons de souris enfoncés (H.mouseDown.LeftButton) : glisser des curseurs (U32)
   H.mouseDown = {}
   _G.IsMouseButtonDown = function(b) return H.mouseDown[b or "LeftButton"] and true or false end
-  _G.IsShiftKeyDown = function() return false end
+  _G.IsShiftKeyDown = function() return H.shift and true or false end
+  _G.UnitClass = function(u) assert(u == "player") return "Priest", "PRIEST", 5 end
   _G.date = function(fmt) return os.date(fmt, 1762000000 + math.floor(H.now)) end
   _G.SlayTheDragonDB = db and deepcopy(db) or nil
 
@@ -841,6 +843,7 @@ local function playAction(bot)
     return "end"
   end
   local idx, t = a[2], a[3]
+  H.shift = a[4] == "nospend" -- Maj enfoncée : carte « Spend N » jouée sans dépenser
   local card = v.cards[idx]
   local style = playStyle % 3
   playStyle = playStyle + 1
@@ -869,6 +872,7 @@ local function playAction(bot)
     if slot then slot._mouseOver = false end
     v.bf._mouseOver = false
   end
+  H.shift = false
   return "play"
 end
 
@@ -2163,13 +2167,25 @@ do
   end
   check(ni .. " icônes de SkinData présentes dans Media/Icons", ni > 0 and #missingIcons == 0, table.concat(missingIcons, ", "))
   -- icônes réellement utilisées : chaque nom `tga` de UI/Art.lua est copié (ou signalé par le script)
+  -- (UI/Art.lua et les fichiers d'art des classes UI/Art/*.lua, aide I("Nom") comprise : fichiers du TOC)
   local used, absent = 0, {}
-  local art = assert(io.open(root .. "/UI/Art.lua")):read("*a")
-  for name in art:gmatch('tga%s*=%s*"([^"]+)"') do
-    used = used + 1
-    if not Skin.icons[name:lower()] then absent[#absent + 1] = name end
+  local artFiles = { "UI/Art.lua" }
+  for line in io.lines(root .. "/SlayTheDragon.toc") do
+    local f = line:gsub("\r", ""):match("^UI\\Art\\(.+%.lua)$")
+    if f then artFiles[#artFiles + 1] = "UI/Art/" .. f end
   end
-  check("icônes nommées dans Art.lua toutes copiées (" .. used .. ")", #absent == 0, table.concat(absent, ", "))
+  for _, file in ipairs(artFiles) do
+    local art = assert(io.open(root .. "/" .. file)):read("*a")
+    for name in art:gmatch('tga%s*=%s*"([^"]+)"') do
+      used = used + 1
+      if not Skin.icons[name:lower()] then absent[#absent + 1] = name end
+    end
+    for name in art:gmatch('%f[%w_]I%(%s*"([^"]+)"') do
+      used = used + 1
+      if not Skin.icons[name:lower()] then absent[#absent + 1] = name end
+    end
+  end
+  check(("icônes nommées dans l'art (%d fichiers) toutes copiées (%d)"):format(#artFiles, used), #absent == 0, table.concat(absent, ", "))
   for kind, rel in pairs(Skin.fonts) do
     local f = io.open(disk(rel), "rb")
     check("police " .. kind .. " présente", f ~= nil, rel)
@@ -2504,7 +2520,7 @@ do
     { key = " (injouable)", opts = { playable = false, reason = "Not enough mana." } },
   }
   -- toutes les raisons d'une carte injouable en combat (les plus longues passent sur deux lignes)
-  for _, why in ipairs({ "phase", "unplayable", "casting", "forbidden", "condition", "target", "over" }) do
+  for _, why in ipairs({ "phase", "unplayable", "casting", "forbidden", "condition", "target", "over", "hp", "resource", "traps" }) do
     variants[#variants + 1] = { key = " (" .. why .. ")", opts = { playable = false, reason = ns.Controller.reasonText(why) } }
   end
   local reasonDist = {}
@@ -3517,44 +3533,124 @@ do
         if lab and lab:find("^%u") then
           local known = false
           for _, k in ipairs(W.keywordList()) do if k.name == lab then known = true end end
-          -- libellés qui ne sont pas des conditions (cible d'un Pouvoir) : liste fermée
-          local NOT_COND = { ["Cast cards"] = true, ["Each Absorb gain"] = true }
-          if not known and not NOT_COND[lab] then bad[#bad + 1] = label .. " : condition inconnue « " .. lab .. " »" end
+          -- libellés qui ne sont pas des conditions (déclencheurs de Pouvoir) : registre du langage
+          if not known and not ns.Language.knownLabel(lab) then bad[#bad + 1] = label .. " : condition inconnue « " .. lab .. " »" end
         end
       end
     end
   end
   check(("textes : %d états posés, chacun sur sa ligne « Gain » (soi) / « Apply » (ennemi) en dernier, sablier seulement pour une durée, impersonnels")
     :format(nState), #bad == 0, table.concat(bad, "\n        "))
-  -- conditions vérifiables depuis les données : Exécution (bonus d'exécution), Déferlement (dépense
-  -- de la Démence : la carte ne se joue qu'avec de la Démence), Dernier souffle (empêche la mort),
-  -- Ombre (Pouvoir d'ombre)
+  -- grammaire commune, vérifiée depuis les données : Execute (condition « execute »), Surge (effet
+  -- « surge »), Spend N (effet « spend »), Last Breath (empêche la mort), Shadow (Pouvoir d'ombre),
+  -- Pay N HP (champ payHp, première clause), gains de ressource (« +N Rage. », nom de la ressource de
+  -- la classe au singulier ou au pluriel), chiffres des formes conditionnelles
+  local L = ns.Language
+  local function usesCond(d, name)
+    for _, e in ipairs(d.effects or {}) do
+      if e.cond == name then return true end
+      for _, m in ipairs(e.more or {}) do if m[2] == name then return true end end
+    end
+    return false
+  end
+  local function effectOf(d, kind)
+    for _, e in ipairs(d.effects or {}) do if e[1] == kind then return e end end
+    return nil
+  end
+  local function damageWith(d, pred)
+    for _, e in ipairs(d.effects or {}) do if e[1] == "damage" and pred(e) then return e end end
+    return nil
+  end
   local cbad = {}
+  local nForms = 0
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
       local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
       local t = d.text or ""
+      local cls = {}
+      for _, cl in ipairs(clauses(t)) do if not isPlate(cl) then cls[#cls + 1] = cl end end
       local function has(n) return W.hasPhrase(t, n .. ":") end
-      if has("Execute") ~= (d.executeBonus ~= nil) then cbad[#cbad + 1] = id .. " : Execute" end
-      if has("Surge") ~= (d.canPlay ~= nil) then cbad[#cbad + 1] = id .. " : Surge" end
-      if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = id .. " : Last Breath" end
-      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = id .. " : Shadow" end
-      -- chiffres d'Exécution et de Déferlement
-      if d.executeBonus then
-        local base = d.effects[1][2]
-        if not t:find("Deal " .. base .. "%.") or not t:find("Execute: deal " .. (base + d.executeBonus) .. "%.") then
-          cbad[#cbad + 1] = id .. (up and "+" or "") .. " : chiffres d'Execute"
+      local cd = ns.Classes[d.class or ""]
+      local rid = cd and cd.resource and cd.resource.id
+      local r = rid and L.resources[rid]
+      if has("Execute") ~= usesCond(d, "execute") then cbad[#cbad + 1] = label .. " : Execute" end
+      if has("Surge") ~= (effectOf(d, "surge") ~= nil) then cbad[#cbad + 1] = label .. " : Surge" end
+      -- Surge à 0 : une carte dont toutes les clauses sont « Surge: … » est injouable à 0 (minRes)
+      local surgeOnly = #cls > 0
+      for _, cl in ipairs(cls) do if not cl:find("^Surge: ") then surgeOnly = false end end
+      if surgeOnly ~= ((d.minRes or 0) >= 1) then cbad[#cbad + 1] = label .. " : Surge seul <-> minRes" end
+      if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = label .. " : Last Breath" end
+      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
+      -- Spend N : champ spend = n (payé au jeu) <-> clause « Spend n: … »
+      local sp = d.spend and { "spend", d.spend } or nil
+      local spendCl
+      for _, cl in ipairs(cls) do if cl:find("^Spend %d+: ") then spendCl = cl end end
+      if (sp ~= nil) ~= (spendCl ~= nil) or (sp and not spendCl:find("^Spend " .. sp[2] .. ": ")) then
+        cbad[#cbad + 1] = label .. " : Spend N"
+      end
+      if sp and spendCl then
+        nForms = nForms + 1
+        local dm = damageWith(d, function(e) return e.more ~= nil end)
+        for _, m in ipairs(dm and dm.more or {}) do
+          if m[2] == "spent" and not spendCl:find("deal " .. m[1] .. " more", 1, true) then cbad[#cbad + 1] = label .. " : chiffre de Spend" end
         end
       end
-      if d.perDemence and not t:find("per Insanity", 1, true) then cbad[#cbad + 1] = id .. " : Surge chiffré" end
-      if d.perDemence and not t:find("+ " .. d.perDemence .. " per Insanity", 1, true) then cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Surge chiffré" end
-      if d.plagueMult and not t:find("apply Pain " .. d.plagueMult .. " per Insanity", 1, true) then
-        cbad[#cbad + 1] = id .. (up and "+" or "") .. " : Peste chiffrée"
+      -- Pay N HP : champ payHp <-> première clause « Pay N HP. »
+      local payCl = cls[1] and cls[1]:match("^Pay (%d+) HP%.$")
+      local anyPay = false
+      for _, cl in ipairs(cls) do if cl:find("^Pay %d+ HP") or cl:find("Lose %d+ HP") then anyPay = true end end
+      if (d.payHp ~= nil) ~= (payCl ~= nil) or (d.payHp and tonumber(payCl) ~= d.payHp) or (anyPay and not payCl) then
+        cbad[#cbad + 1] = label .. " : Pay N HP (première ligne, champ payHp)"
+      end
+      if d.payHp then nForms = nForms + 1 end
+      -- gains de ressource : chaque effet { "res", n } sans condition a sa clause « +n Ressource. »
+      for _, e in ipairs(d.effects or {}) do
+        if (e[1] == "res" or e[1] == "demence") and not e.cond and not e.more and not e.per then
+          nForms = nForms + 1
+          local want = "+" .. e[2] .. " " .. (r and L.resourceName(rid, e[2]) or "?") .. "."
+          local found = false
+          for _, cl in ipairs(cls) do if cl == want then found = true end end
+          if not found then cbad[#cbad + 1] = label .. " : clause « " .. want .. " » absente" end
+        end
+      end
+      -- noms de ressource : seulement celle de la classe, accordée au nombre (« +1 Combo Point. »)
+      for orid, res in pairs(L.resources) do
+        if orid ~= rid and (W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural)) then
+          cbad[#cbad + 1] = label .. " : ressource d'une autre classe (" .. res.name .. ")"
+        end
+      end
+      if r and r.plural ~= r.name then
+        for n, word in t:gmatch("%+(%d+) ([%a ]-)%.") do
+          if word ~= L.resourceName(rid, tonumber(n)) and (word == r.name or word == r.plural) then
+            cbad[#cbad + 1] = label .. " : accord « +" .. n .. " " .. word .. " »"
+          end
+        end
+      end
+      -- chiffres d'Execute (« Deal X. » / « Execute: deal X+k. ») et de Surge (« deal B + K per Res. »)
+      local ex = damageWith(d, function(e) return e.more ~= nil end)
+      for _, m in ipairs(ex and ex.more or {}) do
+        if m[2] == "execute" and (not t:find("Deal " .. ex[2] .. "%.") or not t:find("Execute: deal " .. (ex[2] + m[1]) .. "%.")) then
+          cbad[#cbad + 1] = label .. " : chiffres d'Execute"
+        end
+      end
+      local sg = damageWith(d, function(e) return e.per ~= nil and e.per[2] == "surge" end)
+      if sg and r then
+        nForms = nForms + 1
+        local phrase = (sg[2] > 0 and ("deal " .. sg[2] .. " + ") or "deal ") .. sg.per[1] .. " per " .. r.name
+        -- ou en deux clauses : « Deal B. » puis « …: deal K per Res. » (Execute du Guerrier)
+        local split = t:find("Deal " .. sg[2] .. ".", 1, true) and t:find("deal " .. sg.per[1] .. " per " .. r.name, 1, true)
+        if not t:find(phrase, 1, true) and not split then
+          cbad[#cbad + 1] = label .. " : Surge chiffré (« " .. phrase .. " » attendu)"
+        end
+      end
+      if d.plagueMult and not t:find("apply DoT " .. d.plagueMult .. " per Insanity", 1, true) then
+        cbad[#cbad + 1] = label .. " : Peste chiffrée"
       end
     end
   end
-  check("conditions nommées présentes exactement sur les cartes qui les ont (Execute, Surge, Last Breath, Shadow), chiffres justes",
-    #cbad == 0, table.concat(cbad, ", "))
+  check(("grammaire commune : Execute, Surge, Spend N, Last Breath, Shadow, Pay N HP, gains de ressource exactement sur les cartes qui les ont, chiffres justes (%d formes)"):format(nForms),
+    #cbad == 0, table.concat(cbad, "\n        "))
   -- 2. mise en page : la ligne d'état commence une ligne et finit le texte ; une clause par ligne aux
   -- paliers >= 8,5 ; sablier en icône |T dans le texte posé, compté dans la mesure
   local card = W.card(UI().content)
@@ -3574,7 +3670,7 @@ do
       local firstState
       for _, cl in ipairs(cls) do if isStateCl(cl) then firstState = cl break end end
       if firstState then
-        -- verbe puis nom (« Gain Atonement », « Apply Pain »), le verbe seul en fin de ligne possible
+        -- verbe puis nom (« Gain Atonement », « Apply DoT »), le verbe seul en fin de ligne possible
         -- (« Apply » / « Stunned 1 ⌛ ») ; « Gain 4 Absorb. » ne compte pas
         local verb, name1 = firstState:match("^(%S+) (%S+)")
         local startLine
@@ -3694,7 +3790,9 @@ do
       end
       if t:find(HG, 1, true) then need("le sablier", HG .. ": ") end
       if W.hasPhrase(t, "Absorb") then need("Absorb", "Absorb: ") end
-      if W.hasPhrase(t, "Insanity") then need("Insanity", "Insanity: ") end
+      for _, res in pairs(ns.Language.resources) do
+        if W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural) then need(res.name, res.name .. ": ") end
+      end
       for _, l in ipairs(tt.lines) do
         local p = plain(l)
         if p ~= " " then
@@ -3709,17 +3807,34 @@ do
   end
   check(("explications : chaque mot-clé, état et condition des textes expliqué, %d lignes de 60 caractères au plus"):format(nLines),
     #ebad == 0, table.concat(ebad, "\n        "))
-  -- explications des nouveaux mots-clés : présentes, une phrase courte
+  -- explications du registre du langage (conditions, plaque, mots, ressources) : présentes, une
+  -- phrase courte, la ressource de chaque classe substituée
   local kbad = {}
-  for _, k in ipairs({ "execute", "surge", "lastBreath", "shadow", "turns" }) do
+  local reslist = {}
+  for rid in pairs(ns.Language.resources) do reslist[#reslist + 1] = rid end
+  table.sort(reslist)
+  for _, k in ipairs({ "turns", "absorb", "interrupt" }) do
     local l = Art.keywords[k] and plain(Art.keywordLine(k)) or ""
     if l == "" or W.utf8len(l) > 60 then kbad[#kbad + 1] = k end
   end
+  local function okLine(key, n)
+    for _, rid in ipairs(reslist) do
+      local l = plain(Art.keywordLine(key, nil, n, rid))
+      if W.utf8len(l) > 60 or l:find("%s", 1, true) or l:find("[;()]") or select(2, l:gsub("%. ", "")) > 0 then
+        kbad[#kbad + 1] = key .. " (" .. rid .. ") : « " .. l .. " »"
+        return
+      end
+    end
+  end
+  for _, c in ipairs(ns.Language.conditions) do okLine(c.key, 2) end
+  for _, p in ipairs(ns.Language.plates) do okLine(p.key, 2) end
+  for key in pairs(ns.Language.keywords) do okLine(key, 2) end
+  for _, rid in ipairs(reslist) do okLine("res:" .. rid) end
   for sid in pairs(Art.statusShort) do
     if not ns.Statuses[sid] or W.utf8len(plain(Art.statusLine(sid))) > 60 then kbad[#kbad + 1] = "état " .. sid end
   end
-  check("Execute, Surge, Last Breath, Shadow, sablier et définitions courtes des états : une ligne de 60 caractères au plus",
-    #kbad == 0, table.concat(kbad, ", "))
+  check(("registre du langage : %d conditions, %d mots de plaque, %d ressources, sablier et définitions courtes des états, une ligne de 60 caractères au plus")
+    :format(#ns.Language.conditions, #ns.Language.plates, #reslist), #kbad == 0, table.concat(kbad, ", "))
   -- 4. Pouvoir joué : jeton sous le personnage (icône de la carte, liseré doré), effet au survol ;
   -- l'état sérialisé ne change pas (la liste des pouvoirs existait déjà)
   local c = C().combat()
@@ -5234,6 +5349,136 @@ do
   W.clearTextCache()
   W.setZoomMode(mode0)
   frame:SetScale(scale0)
+end
+
+print("U35 classes : choix sur l'accueil, Guerrier en combat (pastille de Rage, portrait, nom), accueil à neuf classes")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, Art = ns.Widgets, ns.Art
+  -- accueil : Priest (order 1) choisi par défaut, Warrior proposé ; aucune autre classe
+  local ids = {}
+  for _, o in ipairs(UI().step.options) do if o.group == "class" then ids[#ids + 1] = o.id end end
+  check("accueil : classes jouables dans l'ordre (Priest, Warrior), Priest choisi par défaut",
+    table.concat(ids, ",") == "class:priest,class:warrior" and option("class:priest").selected
+    and not option("class:warrior").selected, table.concat(ids, ","))
+  local wb = button("class:warrior")
+  check("accueil : bouton du Guerrier (PV, cartes, réputation)", wb and wb._shown and (wb.sub._text or ""):find(ns.Classes.warrior.hp .. " HP", 1, true)
+    and (wb.sub._text or ""):find("10 cards", 1, true), wb and wb.sub._text)
+  clickOption("class:warrior")
+  check("accueil : clic sur le Guerrier, il devient le choix", option("class:warrior").selected
+    and not option("class:priest").selected and button("class:warrior").selected)
+  snap("accueil-guerrier", true)
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  check("départ : expédition du Guerrier (classe, deck, Battle Standard)", e and e.class == "warrior"
+    and ns.Cards[e.deck[1].id].class == "warrior" and e.relics[1] == "battle_standard")
+  check("bandeau : nom de la classe", UI().className._text == "Warrior", UI().className._text)
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  check("combat du Guerrier : classe du combat, Rage 1 (Battle Standard)", c and c.class == "warrior" and c.player.res == 1)
+  v:Render(true)
+  local r = v.resource
+  check("pastille de ressource : icône de la Rage, nombre, visible",
+    r._shown and (r.icon._texture or ""):lower():find("ability_warrior_focusedrage", 1, true) and r.text._text == "1",
+    tostring(r.icon._texture) .. " / " .. tostring(r.text._text))
+  local tt = table.concat(H.hover(r), " | ")
+  check("pastille de ressource : explication de la Rage et plafond", tt:find("Rage", 1, true) and tt:find("1 / 5", 1, true), tt)
+  check("cadre du héros : nom et portrait = icône de classe (personnage d'une autre classe)",
+    v.heroFrame.name._text == "Warrior" and (v.heroFrame.portrait._texture or ""):lower():find("classicon_warrior", 1, true),
+    tostring(v.heroFrame.portrait._texture))
+  local allW = #c.hand > 0
+  for _, inst in ipairs(c.hand) do if ns.Cards[inst.id].class ~= "warrior" then allW = false end end
+  check("main du Guerrier : ses cartes", allW)
+  -- chiffre flottant de ressource au nom de la classe
+  local floats = {}
+  local old = W.float
+  W.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  v:OnEvents({ { t = "resource", n = 2, total = 3 } })
+  H.advance(2)
+  W.float = old
+  check("chiffre flottant : « +2 Rage »", table.concat(floats, "|"):find("+2 Rage", 1, true), table.concat(floats, "|"))
+  -- zone libre de la classe : ns.ClassViews appelé (build une fois, render à chaque rendu)
+  local built, rendered = 0, 0
+  ns.ClassViews.warrior = { build = function() built = built + 1 end, render = function() rendered = rendered + 1 end }
+  v:Render(true)
+  v:Render(true)
+  ns.ClassViews.warrior = nil
+  check("zone libre de classe : build une fois, render à chaque rendu", built == 1 and rendered == 2, built .. "/" .. rendered)
+  snap("combat-guerrier", true)
+  -- carte du Guerrier jouée par l'interface (Strike) : Rage +1
+  local hi
+  for i, inst in ipairs(c.hand) do if inst.id == "strike" then hi = i end end
+  if hi then
+    local before = c.player.res
+    H.ns.Controller.act({ "play", hi, 1 })
+    H.settle()
+    check("Strike jouée : +1 Rage", c.player.res == before + 1, c.player.res)
+  end
+  -- accueil à neuf classes : grille de trois colonnes, rien ne déborde du panneau ni ne chevauche les clés
+  H.boot(nil)
+  ns = H.ns
+  local fakes = { "rogue", "mage", "warlock", "hunter", "paladin", "shaman", "druid" }
+  for i, f in ipairs(fakes) do
+    ns.Classes["zz_" .. f] = { id = "zz_" .. f, name = f:sub(1, 1):upper() .. f:sub(2), order = 2 + i, hp = 70, deck = {},
+      resource = { id = "rage" } }
+  end
+  H.slash("")
+  H.settle()
+  local st = UI().screens.start
+  local n, inside, lowest = 0, true, 0
+  local panel = st.panel
+  for _, b in ipairs(st.classButtons) do
+    if b._shown then
+      n = n + 1
+      local pt = b._points[1]
+      local x, y = pt[4], -pt[5]
+      if x - b._w / 2 < -panel._w / 2 - 0.01 or x + b._w / 2 > panel._w / 2 + 0.01 then inside = false end
+      lowest = math.max(lowest, y + b._h)
+    end
+  end
+  local keyTop = -st.keyLabel._points[1][5]
+  check(("accueil à 9 classes : %d boutons en grille dans le panneau, au-dessus des clés (bas %.0f, clés %.0f)"):format(n, lowest, keyTop),
+    n == 9 and inside and lowest < keyTop and panel._h > 290, n)
+  snap("accueil-9-classes", true)
+  for _, f in ipairs(fakes) do ns.Classes["zz_" .. f] = nil end
+end
+
+-- planche des cartes du Guerrier (base et améliorée), langage des cartes
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local ids = {}
+  for id, d in pairs(ns.Cards) do if d.class == "warrior" then ids[#ids + 1] = id end end
+  local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
+  local PATH = { start = 0, arms = 1, fury = 2, protection = 3 }
+  table.sort(ids, function(a, b)
+    local da, db = ns.Cards[a], ns.Cards[b]
+    if PATH[da.path] ~= PATH[db.path] then return PATH[da.path] < PATH[db.path] end
+    if RANK[da.rarity] ~= RANK[db.rarity] then return RANK[da.rarity] < RANK[db.rarity] end
+    return a < b
+  end)
+  local perRow, cw, ch = 10, 140, 230
+  local all = {}
+  for _, id in ipairs(ids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+  local rows = math.ceil(#all / perRow)
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, rows * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, e in ipairs(all) do
+    local c = W.card(big)
+    c:SetCard(e[1], e[2], { playable = true })
+    W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+  end
+  Render.svg(H, big, SNAP .. "/cartes_warrior.svg", "cartes du Guerrier (base, améliorée)")
+  big:Hide()
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -143,7 +143,7 @@ relic("harvest_cog", {
 -- Le guetteur de la Colline (suite de l'histoire de Tobin).
 relic("tobin_knife", {
   name = "Tobin's Pocketknife", rarity = "rare", tier = 0, noPool = true,
-  text = "At the start of each combat, apply Pain 3 to all enemies.",
+  text = "At the start of each combat, apply DoT 3 to all enemies.",
   hooks = {
     onCombatStart = function(c, src)
       for i = 1, #c.enemies do

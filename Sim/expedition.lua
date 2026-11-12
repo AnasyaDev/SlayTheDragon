@@ -14,31 +14,36 @@ return function(ns)
 
   local function rating(id) return ns.Run.RATING[id] or 3 end
 
+  -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
+  local function botOf(exp)
+    local cd = ns.Classes[exp.class]
+    return cd and cd.bot or {}
+  end
+
   -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
-  local function upgradeValue(card)
-    if card.id == "smite" then return 2.5 end
-    if card.id == "inner_fire" then return 2 end
-    if card.id == "pw_shield" or card.id == "sw_pain" then return 1.5 end
-    return rating(card.id)
+  local function upgradeValue(exp, card)
+    local up = botOf(exp).upgrade
+    return up and up[card.id] or rating(card.id)
   end
 
   local function bestUpgrade(exp)
     local best, bestV = nil, -1
     for i = 1, #exp.deck do
       if X.canUpgrade(exp, i) then
-        local v = upgradeValue(exp.deck[i])
+        local v = upgradeValue(exp, exp.deck[i])
         if v > bestV then best, bestV = i, v end
       end
     end
     return best
   end
 
-  -- Carte à retirer : la plus faible (Feu intérieur d'abord, puis Châtiment).
+  -- Carte à retirer : la plus faible (Priest : Inner Fire d'abord, puis Smite ; classDef.bot.remove).
   local function worstCard(exp)
     local worst, worstV = nil, math.huge
+    local rm = botOf(exp).remove or {}
     for i = 1, #exp.deck do
       local card = exp.deck[i]
-      local v = card.id == "inner_fire" and 1 or card.id == "smite" and 1.5 or rating(card.id) + 2
+      local v = rm[card.id] or rating(card.id) + 2
       if card.up then v = v + 1 end
       if v < worstV then worst, worstV = i, v end
     end
@@ -245,7 +250,7 @@ return function(ns)
       local a = bot:act(c)
       steps = steps + 1
       if a[1] == "play" then
-        if not X.act(exp, { "play", a[2], a[3] }) then X.act(exp, { "endTurn" }) end
+        if not X.act(exp, { "play", a[2], a[3], a[4] }) then X.act(exp, { "endTurn" }) end
       elseif a[1] == "potion" then
         if not X.act(exp, a) then X.act(exp, { "endTurn" }) end
       else
@@ -279,6 +284,8 @@ return function(ns)
     end
     local exp = X.new({ seed = seed, class = opts.class or "priest", key = opts.key or 0,
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false })
+    -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
+    for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     local rng = Rng.stream(seed, "policy")
     local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
     local guard = 0

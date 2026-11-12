@@ -382,14 +382,23 @@ function Start:Build(f)
   at(panel, f, 280, 74, 560, 290)
   self.panel = panel
   self.title = panel.title
+  -- Classes : jusqu'à 2, grands boutons rouges en une rangée (PV, cartes et réputation dessous) ;
+  -- au-delà (neuf classes prévues), grille de 3 colonnes de boutons plus bas, détail en infobulle, et
+  -- le reste du panneau descend d'autant (Start:Show).
   self.classButtons = {}
-  for i = 1, 4 do
+  for i = 1, 9 do
     local b = W.button(panel, "", 220, 52, nil, "red", 17)
     b.sub = W.label(b.face, "body", 11, C.text)
     b.sub:SetPoint("TOP", b.label, "BOTTOM", 0, -2)
     b.label:ClearAllPoints()
     b.label:SetPoint("CENTER", 0, 7)
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    W.tooltip(b, function(tt, btn)
+      local o = btn.option
+      if not o or not btn.compact then return end
+      tt:AddLine(o.label, 1, 0.82, 0)
+      if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
+    end, "ANCHOR_TOP")
     b:Hide()
     self.classButtons[i] = b
   end
@@ -452,11 +461,36 @@ function Start:Show(step)
     elseif o.group == "key" then keys[#keys + 1] = o
     else others[#others + 1] = o end
   end
+  local nc = #classes
+  local compact = nc > 2
+  local cols = compact and 3 or max(nc, 1)
+  local rows = math.ceil(nc / cols)
+  -- décalage vertical du reste du panneau (clés, affixes) quand la grille a plusieurs rangées
+  local shift = compact and max(0, (rows - 1) * 42 - 24) or 0
   for i, b in ipairs(self.classButtons) do
     local o = classes[i]
     if o then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", (i - (#classes + 1) / 2) * 232, -70)
+      b.compact = compact
+      if compact then
+        local col, row = (i - 1) % cols, math.floor((i - 1) / cols)
+        local inRow = min(cols, nc - row * cols)
+        b:SetSize(170, 36)
+        b:Relayout(36)
+        W.setSize(b.label, 15)
+        b:SetPoint("TOP", self.panel, "TOP", (col + 1 - (inRow + 1) / 2) * 178, -62 - row * 42)
+        b.label:ClearAllPoints()
+        b.label:SetPoint("CENTER", 0, 0)
+        b.sub:Hide()
+      else
+        b:SetSize(220, 52)
+        b:Relayout(52)
+        W.setSize(b.label, 17)
+        b:SetPoint("TOP", self.panel, "TOP", (i - (nc + 1) / 2) * 232, -70)
+        b.label:ClearAllPoints()
+        b.label:SetPoint("CENTER", 0, 7)
+        b.sub:Show()
+      end
       b.option = o
       b:SetText(o.label)
       b.sub:SetText(o.text or "")
@@ -468,11 +502,14 @@ function Start:Show(step)
       b:Hide()
     end
   end
+  self.panel:SetHeight(290 + shift)
+  self.keyLabel:ClearAllPoints()
+  self.keyLabel:SetPoint("TOP", 0, -150 - shift)
   for i, b in ipairs(self.keyButtons) do
     local o = keys[i]
     if o then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", (i - (#keys + 1) / 2) * 56, -176)
+      b:SetPoint("TOP", self.panel, "TOP", (i - (#keys + 1) / 2) * 56, -176 - shift)
       b.option = o
       b.label:SetText(o.label)
       b.selected = o.selected and true or false
@@ -494,7 +531,7 @@ function Start:Show(step)
     local id = aff[i]
     if id then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", (i - (#aff + 1) / 2) * 36, -240)
+      b:SetPoint("TOP", self.panel, "TOP", (i - (#aff + 1) / 2) * 36, -240 - shift)
       b:SetItem("affix", id)
       b:Show()
     else

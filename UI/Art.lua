@@ -284,12 +284,36 @@ Art.statuses = {
   halved       = { icon = 135936, tga = "Spell_Holy_PainSupression" }, -- spell_holy_painsupression
   force        = { icon = 132333, tga = "Ability_Warrior_BattleShout" }, -- ability_warrior_battleshout
   necrotic     = { icon = "Interface\\Icons\\spell_deathknight_necroticplague", tga = "Spell_Deathknight_Necroticplague" },
+  instant      = { icon = "Interface\\Icons\\spell_nature_lightning", tga = "Spell_Nature_Lightning" },
 }
+
+-- Icône d'un état selon sa source (Combat.applyStatus(c, unité, id, n, clé) → unit.stIcon[id] = clé) :
+-- Art.statusIcons[clé] remplace l'icône de l'état (DoT de poison, de saignement, de brûlure…).
+Art.statusIcons = Art.statusIcons or {}
 
 -- Affixes mythiques (chemins vérifiés par wow_icon_search, piste D).
 Art.keystone = { icon = "Interface\\Icons\\inv_relics_hourglass", tga = "INV_Relics_Hourglass" }
--- Portrait de repli du cadre du héros (si SetPortraitTexture manque) : icône de classe.
-Art.classes = { priest = { icon = 626004, tga = "ClassIcon_Priest" } } -- classicon_priest
+-- Classes : icône de classe (portrait du cadre du héros quand le personnage n'est pas de cette classe,
+-- bouton de l'accueil), pastille de la ressource (`resource` : icône, couleur des chiffres flottants),
+-- `wow` = nom de classe du jeu (UnitClass) pour reprendre le portrait du personnage.
+-- Une classe ajoute son entrée depuis UI/Art/<classe>.lua (Art.classes.<id> = { … }).
+Art.classes = {
+  priest = { icon = 626004, tga = "ClassIcon_Priest", wow = "PRIEST", -- classicon_priest
+    resource = { icon = 136223, tga = "Spell_Shadow_Twilight", color = "watchText" } }, -- spell_shadow_twilight
+}
+
+-- Affichage propre d'une classe dans la zone libre du combat (UI/CombatView.lua) :
+-- ns.ClassViews[id] = { build = f(hôte, vue), render = f(hôte, combat, vue) } (docs/classes.md).
+ns.ClassViews = ns.ClassViews or {}
+
+-- Entrée d'art d'une classe (repli : Priest) et de sa ressource.
+function Art.class(id)
+  return Art.classes[id] or Art.classes.priest
+end
+function Art.classResource(id)
+  local e = Art.classes[id]
+  return (e and e.resource) or Art.classes.priest.resource
+end
 Art.affixes = {
   fortified  = { icon = "Interface\\Icons\\ability_toughness", tga = "ability_toughness" },
   tyrannical = { icon = "Interface\\Icons\\achievement_boss_archaedas", tga = "Achievement_Boss_Archaedas" },
@@ -357,8 +381,7 @@ Art.intentName = {
 Art.ui = {
   minimap   = { icon = 133741, tga = "INV_Misc_Book_09" },  -- inv_misc_book_09
   mana      = { icon = 132841, tga = "INV_Elemental_Mote_Mana" },  -- inv_elemental_mote_mana
-  demence   = { icon = 136223, tga = "Spell_Shadow_Twilight" },  -- spell_shadow_twilight
-  gold      = { icon = 133784, tga = "INV_Misc_Coin_01" },  -- inv_misc_coin_01
+  gold     = { icon = 133784, tga = "INV_Misc_Coin_01" },  -- inv_misc_coin_01
   bedroll   = { icon = 5545560, tga = "INV_MISC_NightelfBedroll" }, -- inv_misc_nightelfbedroll
   grimoire  = { icon = 133741, tga = "INV_Misc_Book_09" },  -- inv_misc_book_09
   chest     = { icon = 1542843, tga = "inv_misc_treasurechest01a" }, -- inv_misc_treasurechest01a
@@ -411,23 +434,25 @@ Art.rim = {
 
 -- Mots-clés (infobulles) : une ligne « Nom : effet. » par mot-clé, 60 caractères au plus, l'effet
 -- principal et rien d'autre (le reste se découvre en jouant). N = nombre de tours (Recharge).
+-- Les mots de la plaque, les conditions nommées (Execute, Surge, Spend…), les ressources des classes
+-- et « Pay N HP » viennent du registre du langage des cartes (Core/Language.lua) : une classe y
+-- ajoute les siens sans toucher à ce fichier.
 Art.keywords = {
-  cast = { name = "Cast", text = "resolves at the start of the next turn." },
-  cooldown = { name = "Cooldown", text = "returns to hand after N." },
-  exhaust = { name = "Exhaust", text = "removed from combat once played." },
-  retain = { name = "Retain", text = "stays in hand at the end of the turn." },
-  power = { name = "Power", text = "stays active until the end of combat." },
   absorb = { name = "Absorb", text = "absorbs damage until the next turn." },
-  demence = { name = "Insanity", text = "resource gained by Shadow cards." },
   interrupt = { name = "Interrupt", text = "cancels the spell an enemy is casting." },
-  -- conditions nommées du texte des cartes (« Nom : effet »)
-  execute = { name = "Execute", text = "if the target has half its HP or less." },
-  surge = { name = "Surge", text = "spends all Insanity for the effect." },
-  lastBreath = { name = "Last Breath", text = "once per combat, upon dropping to 0 HP." },
-  shadow = { name = "Shadow", text = "applies to Shadow cards." },
   -- sablier du texte des cartes (« Donne Expiation 1 ⌛ »)
   turns = { name = "⌛", text = "status duration, in turns." },
 }
+
+-- Mot-clé : Art.keywords, puis le registre du langage (plaque, condition, mot, ressource « res:<id> »).
+function Art.keyword(key)
+  local kw = Art.keywords[key]
+  if kw then return kw end
+  local L = ns.Language
+  local rid = key:match("^res:(.+)$")
+  if rid then return L.resources[rid] end
+  return L.plateByKey(key) or L.conditionByKey(key) or L.keywords[key]
+end
 
 -- Définition courte d'un état pour l'infobulle d'une carte (« Nom : effet. », 60 caractères au plus ;
 -- le texte complet de Core/Statuses.lua reste celui des jetons d'état).
@@ -440,6 +465,7 @@ Art.statusShort = {
   stunned = "loses its next turn.",
   halved = "damage taken is halved.",
   force = "N more damage per hit.",
+  instant = "the next Cast card resolves at once.",
 }
 
 -- Ligne d'un état cité par une carte : nom en or, définition courte.
@@ -459,12 +485,21 @@ function Art.conditionLine(id)
   return "|cffffd100" .. name .. ":|r bonus effect while under " .. name .. "."
 end
 
--- Ligne d'un mot-clé : nom en or, effet ; n = nombre de tours d'une Recharge.
-function Art.keywordLine(key, label, n)
-  local kw = Art.keywords[key]
+-- Ligne d'un mot-clé : nom en or, effet ; n = nombre de tours d'une Recharge ; res = id de la ressource
+-- de la classe de la carte (« %s » de l'explication : « Surge: spends all Rage for the effect. »).
+function Art.keywordLine(key, label, n, res)
+  local kw = Art.keyword(key)
   if not kw then return label or key end
-  local text = kw.text
-  if n then text = text:gsub("N", n .. " turn" .. (n > 1 and "s" or "")) end
+  local text = kw.text or ""
+  if text:find("%s", 1, true) then
+    local L = ns.Language
+    local rname = res and L.resources[res] and L.resources[res].name or "resource"
+    text = text:gsub("%%s", rname)
+  end
+  if n and text:find("%f[%w]N%f[%W]") then
+    local rep = (kw.n or key == "cooldown") and (n .. " turn" .. (n > 1 and "s" or "")) or tostring(n)
+    text = text:gsub("%f[%w]N%f[%W]", rep)
+  end
   return "|cffffd100" .. (label or kw.name) .. "|r: " .. text
 end
 

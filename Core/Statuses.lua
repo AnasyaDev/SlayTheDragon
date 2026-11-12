@@ -16,6 +16,8 @@
 --  * stunned : consommé quand le porteur perd son tour. Les boss y sont immunisés.
 --  * halved : retiré au début du tour du joueur.
 --  * force : permanent pour le combat.
+--  * max = N : plafond de la valeur (Parry 3) ; flag = true : présent ou non (valeur 1, sans nombre).
+--  * clearAtTurnStart = true : retiré au début du tour du joueur.
 local _, ns = ...
 
 local S = ns.Statuses
@@ -26,7 +28,7 @@ S.demoralized = { name = "Demoralized", debuff = true, duration = true,
   text = "Deals 25% less damage." }
 S.atonement = { name = "Atonement", duration = true,
   text = "Each card that deals damage restores 2 HP." }
-S.pain = { name = "Pain", debuff = true,
+S.pain = { name = "DoT", debuff = true,
   text = "Takes X damage at the start of its turn, then X drops by 1. Ignores Absorb." }
 S.regen = { name = "Regen",
   text = "Heals X at the start of its turn, then X drops by 1." }
@@ -34,7 +36,11 @@ S.regen = { name = "Regen",
 -- les règles n'en tiennent pas compte.
 S.stunned = { name = "Stunned", debuff = true, turns = true,
   text = "Loses its next turn." }
-S.halved = { name = "Pain Suppression",
+S.halved = { name = "Pain Suppression", clearAtTurnStart = true,
   text = "Damage taken halved until the next turn." }
 S.force = { name = "Strength",
   text = "Deals X more damage per hit." }
+-- Instant (état commun, Mage et Shaman) : se cumule, se garde d'un tour à l'autre ; la prochaine carte
+-- Cast en consomme 1 et se résout tout de suite (Combat.isInstant), sans emplacement ni interruption.
+S.instant = { name = "Instant",
+  text = "The next Cast card resolves at once." }

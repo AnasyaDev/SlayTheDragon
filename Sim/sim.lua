@@ -1,5 +1,5 @@
 -- Simulation d'expéditions en masse.
--- Usage : luajit Sim/sim.lua runs=2000 bot=heuristic seed=1 jobs=16 pick=rated cap=400
+-- Usage : luajit Sim/sim.lua runs=2000 bot=heuristic seed=1 jobs=8 pick=rated cap=400 [class=priest|warrior]
 --         [force=penance,mind_blast] [save=rapport.lua] [compare=ancien.lua]
 --   bot  : random | greedy | heuristic        pick : rated | random | skip
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
@@ -193,12 +193,12 @@ local function runRange(from, to)
     if opts.runner == "expedition" then
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
-        meta = opts.meta or "start" })
+        meta = opts.meta or "start", class = opts.class, force = force })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),
         rep = tonumber(opts.rep), tier = tonumber(opts.tier), relics = startRelics,
-        loot = opts.loot ~= "0" })
+        loot = opts.loot ~= "0", class = opts.class })
     end
     addRecord(agg, rec)
   end
@@ -259,7 +259,7 @@ if opts.sweep then
   if opts.sweep == "relics" then
     for id in pairs(ns.Relics) do list[#list + 1] = id end
   else
-    list = ns.Rewards.cardPool("priest", tonumber(opts.rep))
+    list = ns.Rewards.cardPool(opts.class or "priest", tonumber(opts.rep))
   end
   if opts.only then
     -- only=id,id : ne mesure que ces éléments.
@@ -346,7 +346,7 @@ local function report(a, title)
   local function out(s) lines[#lines + 1] = s end
   local se = math.sqrt(math.max(a.wins * (a.runs - a.wins), 1) / a.runs) / a.runs * 100
   out(("== %s =="):format(title))
-  out(("Expéditions : %d   bot : %s   choix : %s   graine : %d%s"):format(a.runs, opts.bot or "heuristic",
+  out(("Expéditions : %d   classe : %s   bot : %s   choix : %s   graine : %d%s"):format(a.runs, opts.class or "priest", opts.bot or "heuristic",
     opts.pick or "rated", seed0, #force > 0 and ("   forcées : " .. table.concat(force, ",")) or ""))
   out(("Victoires   : %s (± %.1f)   PV moyens à la victoire : %.1f"):format(pct(a.wins, a.runs), 1.96 * se,
     a.wins > 0 and a.hpEndWin / a.wins or 0))

@@ -38,6 +38,9 @@ C.REASONS = {
   casting = "A cast is already in progress.",
   forbidden = "Forbidden by an active Power.",
   condition = "Condition not met.",
+  hp = "Not enough HP to pay.",
+  resource = "Not enough %s.",
+  traps = "Too many Traps already set.",
   target = "Invalid target.",
   over = "The combat is over.",
   combat = "The combat must end first.",
@@ -61,8 +64,16 @@ C.REASONS = {
   running = "An expedition is already in progress.",
 }
 
+-- « %s » : nom de la ressource de la classe jouée (« Not enough Rage. »).
 function C.reasonText(why)
-  return C.REASONS[why] or tostring(why)
+  local t = C.REASONS[why] or tostring(why)
+  if t:find("%s", 1, true) then
+    local exp = C.exp()
+    local cd = ns.Classes[exp and exp.class or "priest"]
+    local rid = cd and cd.resource and cd.resource.id
+    t = t:gsub("%%s", rid and ns.Language.resourceName(rid) or "resource")
+  end
+  return t
 end
 
 function C.onChange(fn)
@@ -372,8 +383,9 @@ local function combatAct(a)
   return ok, why
 end
 
-function C.play(handIdx, targetIdx)
-  return combatAct({ "play", handIdx, targetIdx })
+-- nospend : une carte « Spend N » se joue sans dépenser (Maj enfoncée en jouant).
+function C.play(handIdx, targetIdx, nospend)
+  return combatAct({ "play", handIdx, targetIdx, nospend and "nospend" or nil })
 end
 
 function C.endTurn()
@@ -398,8 +410,11 @@ function C.handInfo(i)
   if not inst then return nil end
   local ok, why = Combat.canPlay(c, i)
   if ok and C.over() then ok, why = false, "over" end
-  return { inst = inst, def = Card.def(inst), cost = Combat.cost(c, inst), playable = ok, why = why,
-    needsTarget = Combat.needsTarget(inst) }
+  local d = Card.def(inst)
+  local shift = IsShiftKeyDown and IsShiftKeyDown() and true or false
+  local spendOff = d.spend ~= nil and ((c.player.res or 0) < d.spend or shift)
+  return { inst = inst, def = d, cost = Combat.cost(c, inst), playable = ok, why = why,
+    needsTarget = Combat.needsTarget(inst), spendOff = spendOff or nil }
 end
 
 function C.aliveTargets()
@@ -527,12 +542,20 @@ local function repBar(label, points, kind)
     size = size, hint = levelHint(kind) }
 end
 
+-- Classes jouables (playable ~= false), dans l'ordre de leur définition (order), puis par id.
 local function sortedClasses()
   local list = {}
-  for id in pairs(ns.Classes) do list[#list + 1] = id end
-  table.sort(list)
+  for id, cd in pairs(ns.Classes) do
+    if cd.playable ~= false then list[#list + 1] = id end
+  end
+  table.sort(list, function(a, b)
+    local oa, ob = ns.Classes[a].order or 99, ns.Classes[b].order or 99
+    if oa ~= ob then return oa < ob end
+    return a < b
+  end)
   return list
 end
+C.sortedClasses = sortedClasses
 
 local RESULT = { won = "victory", lost = "defeat", abandoned = "abandoned", abandon = "abandoned" }
 
@@ -599,7 +622,9 @@ local function metaStep()
   local db = ns.Persist.db
   local m = db.meta
   local bars, lines = {}, {}
-  for _, cid in ipairs(sortedClasses()) do
+  -- une barre de classe : celle choisie sur l'accueil (le panneau tient deux barres et le journal ;
+  -- un écran de progression par classe viendra avec la progression par niveaux)
+  for _, cid in ipairs({ C.startInfo().class }) do
     local cs = m.classes[cid]
     local b = repBar(ns.Classes[cid].name or cid, cs and cs.rep or 0, "class")
     local km = Meta.keyMax(m, cid)

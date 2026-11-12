@@ -409,7 +409,7 @@ test("bibelots : crochets d'expédition (or, repos, ramassage) et pool de Ligue"
   eq(exp.hp, 10 + math.floor(75 * 0.3) + 5)
   eq(count(X.relicPool(exp), "test_purse"), 0, "déjà possédé")
   eq(count(X.relicPool(exp), "test_league"), 0, "tier 2 verrouillé")
-  eq(count(X.relicPool(exp), "test_class"), 0, "bibelot de classe hors pool")
+  eq(count(X.relicPool(exp), "test_class"), 1, "bibelot de la classe jouée dans le pool")
   local b = newExp({ unlocks = { rep = 0, league = 2 } })
   eq(count(X.relicPool(b), "test_league"), 1)
 end)
@@ -1001,7 +1001,7 @@ test("sauvegarde v1 -> v2 : drapeaux créés, gardés, expédition en cours migr
   cur.version, cur.flags, cur.newFlags, cur.stats.events = 1, nil, nil, nil
   local v1 = { version = 1, meta = { league = 300, runs = 3, classes = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v1))
-  eq(note, "migrated"); eq(db.version, Save.VERSION); eq(Save.VERSION, 2)
+  eq(note, "migrated"); eq(db.version, Save.VERSION); assert(Save.VERSION >= 2)
   eq(type(db.meta.flags), "table")
   eq(db.meta.league, 300)
   assert(db.current, "expédition gardée")
@@ -1051,6 +1051,107 @@ test("expédition simulée reproductible", function()
   local b = ns.SimExpedition.play({ seed = 9, bot = "greedy" })
   eq(a.won, b.won); eq(a.floor, b.floor); eq(a.hp, b.hp); eq(a.gold, b.gold); eq(#a.deck, #b.deck)
   assert(a.visits.combat and a.visits.combat >= 1)
+end)
+
+---------------------------------------------------------------------------
+-- Classes : choix au départ, pools par classe, bibelot de départ, sauvegarde v3
+---------------------------------------------------------------------------
+
+test("classes : expédition du Guerrier (deck, PV, bibelot de départ), du Prêtre sans bibelot", function()
+  local w = newExp({ class = "warrior" })
+  local cd = ns.Classes.warrior
+  eq(w.class, "warrior"); eq(w.hp, cd.hp); eq(w.maxHp, cd.hp); eq(#w.deck, 10)
+  eq(w.relics[1], "battle_standard"); eq(#w.relics, 1)
+  for _, card in ipairs(w.deck) do eq(ns.Cards[card.id].class, "warrior", card.id) end
+  local p = newExp({ class = "priest" })
+  eq(#p.relics, 0); eq(p.deck[1].id, "smite")
+  assert(not pcall(X.new, { class = "nope" }), "classe inconnue refusée")
+end)
+
+test("classes : récompenses, marchand et rencontres tirés dans le pool de la classe jouée", function()
+  for _, class in ipairs({ "priest", "warrior" }) do
+    local exp = newExp({ class = class, unlocks = { rep = 2, league = 3 } })
+    for _, id in ipairs(X.cardPool(exp)) do eq(ns.Cards[id].class, class, id) end
+    eq(#X.cardPool(exp), 30)
+    for _, id in ipairs(X.relicPool(exp)) do
+      local r = ns.Relics[id]
+      assert(r.class == nil or r.class == class, class .. " : " .. id)
+    end
+    enter(exp, "merchant")
+    for _, it in ipairs(exp.shop.cards) do eq(ns.Cards[it.id].class, class, it.id) end
+    for _, it in ipairs(exp.shop.relics) do
+      assert(ns.Relics[it.id].class == nil or ns.Relics[it.id].class == class, it.id)
+    end
+  end
+  local w = newExp({ class = "warrior", unlocks = { rep = 0, league = 3 } })
+  eq(count(X.relicPool(w), "battle_standard"), 0, "bibelot de départ jamais tiré (déjà possédé, noPool)")
+  eq(count(X.relicPool(w), "diamond_flask"), 1, "bibelot du Guerrier dans son pool")
+  eq(count(X.relicPool(newExp({ class = "priest", unlocks = { rep = 0, league = 3 } })), "diamond_flask"), 0,
+    "pas dans celui du Prêtre")
+  local c = Combat.new({ class = "warrior", hp = 50, deck = {}, encounter = { "test_hitter" } })
+  eq(c.class, "warrior")
+end)
+
+test("classes : bibelots de classe au départ (Révéré) parmi ceux de la classe, hors bibelot de départ", function()
+  local w = newExp({ class = "warrior", unlocks = { rep = Meta.REVERED, league = 3 } })
+  eq(w.phase, "start")
+  for _, id in ipairs(w.startRelics) do
+    eq(ns.Relics[id].class, "warrior", id)
+    assert(id ~= "battle_standard")
+  end
+end)
+
+test("classes : le combat de l'expédition est celui de la classe (Rage, bibelot de départ)", function()
+  local w = newExp({ class = "warrior" })
+  enter(w, "combat")
+  eq(w.combat.class, "warrior"); eq(w.combat.player.res, 1, "Battle Standard")
+  assert(Save.isPlain(w))
+end)
+
+test("classes : choix de la classe par Save.start, méta par classe", function()
+  local db = Save.migrate(nil)
+  local e = assert(Save.start(db, { seed = 5, class = "warrior" }))
+  eq(e.class, "warrior")
+  e.result, e.phase = "lost", "done"
+  Save.finish(db, "z")
+  assert(db.meta.classes.warrior and db.meta.classes.warrior.runs == 1)
+  eq(db.meta.classes.priest, nil)
+  eq(db.journal[1].class, "warrior")
+end)
+
+test("sauvegarde v2 -> v3 : Démence du combat en cours devenue ressource de classe, classe du combat", function()
+  local cur = newExp({ seed = 8, class = "priest" })
+  enter(cur, "combat")
+  local c = cur.combat
+  -- état d'une sauvegarde v2 : Démence, ni classe ni état de classe dans le combat
+  c.player.demence, c.player.res, c.class, c.cls, c.turn = 3, nil, nil, nil, nil
+  cur.version = 2
+  local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
+    keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
+  local db, note = Save.migrate(reload(v2))
+  eq(note, "migrated"); eq(db.version, 3); eq(Save.VERSION, 3); eq(X.VERSION, 3)
+  local m = db.current
+  assert(m, "expédition gardée")
+  eq(m.version, 3); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
+  eq(m.combat.class, "priest"); eq(type(m.combat.cls), "table")
+  assert(Save.validate(db))
+  -- le combat migré se joue tout de suite (compteurs du tour recréés), puis au tour suivant
+  eq(m.combat.turn.played, 0)
+  local plays = {}
+  for _, a in ipairs(X.choices(m)) do if a[1] == "play" then plays[#plays + 1] = a end end
+  if plays[1] then assert(X.act(m, plays[1])) end
+  assert(X.act(m, { "endTurn" }))
+  -- migration idempotente
+  local again = reload(db)
+  Save.migrate(again)
+  eq(serialize(again), serialize(db))
+end)
+
+test("Guerrier : expédition simulée complète, reproductible", function()
+  local a = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "warrior" })
+  local b = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "warrior" })
+  eq(a.won, b.won); eq(a.floor, b.floor); eq(a.hp, b.hp)
+  for _, card in ipairs(a.deck) do eq(ns.Cards[card.id].class, "warrior", card.id) end
 end)
 
 print(("%d réussis, %d échoués"):format(passed, failed))

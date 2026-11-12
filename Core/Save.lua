@@ -11,8 +11,9 @@ local U = ns.Util
 local Save = {}
 ns.Save = Save
 
--- 1 : format initial ; 2 : drapeaux de compte (meta.flags).
-Save.VERSION = 2
+-- 1 : format initial ; 2 : drapeaux de compte (meta.flags) ; 3 : classes (expédition version 3 :
+-- ressource de combat générique).
+Save.VERSION = 3
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -49,6 +50,10 @@ Save.MIGRATIONS[0] = Save.normalize
 -- 1 -> 2 : drapeaux de compte (meta.flags, vide au départ ; normalize le crée).
 Save.MIGRATIONS[1] = Save.normalize
 
+-- 2 -> 3 : rien à changer dans la méta (meta.classes est déjà indexé par classe) ; l'expédition en
+-- cours passe par EXP_MIGRATIONS[2].
+Save.MIGRATIONS[2] = Save.normalize
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
@@ -58,6 +63,25 @@ Save.EXP_MIGRATIONS[1] = function(exp)
   if type(exp.flags) ~= "table" then exp.flags = {} end
   if type(exp.newFlags) ~= "table" then exp.newFlags = {} end
   if type(exp.stats) == "table" and type(exp.stats.events) ~= "table" then exp.stats.events = {} end
+end
+
+-- Expédition 2 -> 3 : classe générique. La Démence du combat en cours (c.player.demence) devient la
+-- ressource de classe (c.player.res) ; le combat connaît sa classe (c.class) et son état (c.cls).
+Save.EXP_MIGRATIONS[2] = function(exp)
+  if exp.class == nil then exp.class = "priest" end
+  local c = exp.combat
+  if type(c) == "table" then
+    if c.class == nil then c.class = exp.class end
+    if type(c.cls) ~= "table" then c.cls = {} end
+    if type(c.turn) ~= "table" then c.turn = { played = 0, byType = {}, bySchool = {} } end
+    if type(c.traps) ~= "table" then c.traps = {} end
+    if type(c.rng) == "table" and c.rng.cards == nil then c.rng.cards = ns.Rng.stream(c.seed or 1, "cards") end
+    local p = c.player
+    if type(p) == "table" then
+      if p.res == nil then p.res = tonumber(p.demence) or 0 end
+      p.demence = nil
+    end
+  end
 end
 
 local function quarantine(db, state, reason)

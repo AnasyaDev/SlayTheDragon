@@ -36,11 +36,21 @@ function Card.new(id, up, uid)
   return { id = id, up = up and true or false, uid = uid }
 end
 
--- Cartes proposables en récompense pour une classe (hors cartes de base).
-function Card.pool(class)
+-- Une carte appartient à une classe (champ class) ou est commune (class absent : cartes neutres,
+-- prévues par le GDD, proposées seulement chez le marchand et dans les rencontres : neutral = true).
+-- Pas de champ de niveau de déblocage aujourd'hui en dehors de rep (palier de réputation) ; un champ
+-- `level` pourra s'y ajouter (progression par classe), lu par les mêmes filtres.
+function Card.inClass(d, class, neutral)
+  if d.class == nil then return neutral and d.neutral == true end
+  return d.class == class
+end
+
+-- Cartes proposables en récompense pour une classe (hors cartes de base) ; neutral = cartes neutres
+-- comprises (marchand, rencontres).
+function Card.pool(class, neutral)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if d.class == class and d.rarity ~= "basic" and not d.noReward then
+    if Card.inClass(d, class, neutral) and d.rarity ~= "basic" and not d.noReward then
       list[#list + 1] = id
     end
   end

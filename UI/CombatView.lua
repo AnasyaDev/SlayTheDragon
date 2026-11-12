@@ -257,13 +257,23 @@ local function heroFrame(self, parent, level)
   self.playerBlock = W.shieldBadge(f, ab[3] * k, ab[4] * k)
   self.playerBlock:SetPoint("TOPLEFT", f, "TOPLEFT", ab[1] * k, -ab[2] * k)
   self.playerBlock:SetFrameLevel(level + 1)
+  -- Portrait : visage du personnage s'il est de la classe jouée (UnitClass), sinon icône de la classe.
   f.SetPortrait = function(fr)
+    local exp = Controller.exp()
+    local class = exp and exp.class or "priest"
+    local art = Art.class(class)
+    local same = false
+    if UnitClass then
+      local ok, _, file = pcall(UnitClass, "player")
+      same = ok and file ~= nil and file == art.wow
+    end
     local ok = false
-    if SetPortraitTexture then ok = pcall(SetPortraitTexture, fr.portrait, "player") end
-    if ok then fr.portrait:SetTexCoord(0, 1, 0, 1) fr.portrait._unit = "player"
+    if same and SetPortraitTexture then ok = pcall(SetPortraitTexture, fr.portrait, "player") end
+    if ok then fr.portrait:SetTexCoord(0, 1, 0, 1) fr.portrait._unit = "player" fr.portrait._class = class
     else
-      local exp = Controller.exp()
-      W.setIcon(fr.portrait, Art.classes[exp and exp.class or "priest"] or Art.classes.priest, "ui:class")
+      W.setIcon(fr.portrait, art, "ui:class")
+      fr.portrait._unit = nil
+      fr.portrait._class = class
     end
   end
   f:EnableMouse(false)
@@ -367,7 +377,8 @@ function V:Build(parent)
   end, "ANCHOR_RIGHT")
   self.mana = mana
 
-  -- Démence : petit anneau doré à l'icône d'ombre, en haut à droite du mana (caché à 0).
+  -- Ressource de classe (Insanity, Rage…) : petit anneau doré à l'icône de la ressource
+  -- (Art.classes[classe].resource), en haut à droite du mana, caché à 0 ; infobulle = explication.
   local dem = CreateFrame("Frame", nil, parent)
   at(dem, parent, MANA_X + 46 - 18, MANA_Y - 30 - 18, 36, 36)
   dem:SetFrameLevel(hz:GetFrameLevel() + 3)
@@ -376,15 +387,34 @@ function V:Build(parent)
   dem.icon:SetPoint("TOPLEFT", 5, -5)
   dem.icon:SetPoint("BOTTOMRIGHT", -5, 5)
   W.roundMask(dem, dem.icon)
-  W.setIcon(dem.icon, Art.ui.demence, "ui:demence")
+  W.setIcon(dem.icon, Art.classResource("priest"), "ui:resource")
   dem.ring = W.wow(dem, "ring_small", "ARTWORK", 1)
   dem.ring:SetAllPoints()
   dem.text = W.label(dem, "heavy", 15, C.text)
   dem.text:SetPoint("CENTER", 0, 1)
   W.tooltip(dem, function(tt)
-    tt:AddLine(Art.keywordLine("demence"), 1, 1, 1, true)
+    local c = Controller.combat()
+    local rd = c and ns.Classes[c.class] and ns.Classes[c.class].resource
+    local rid = rd and rd.id or "insanity"
+    tt:AddLine(Art.keywordLine("res:" .. rid), 1, 1, 1, true)
+    if rd and rd.cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, rd.cap), 0.8, 0.8, 0.8) end
   end, "ANCHOR_RIGHT")
-  self.demence = dem
+  self.resource = dem
+  self.demence = dem -- ancien nom
+
+  -- Zone libre de la classe (formes, totems, Seal, familier…) : cadre vide sous les états du héros,
+  -- rempli par ns.ClassViews[classe] (build(zone, vue) une fois, render(zone, combat, vue) à chaque
+  -- rendu). Contrat : docs/classes.md.
+  local zone = CreateFrame("Frame", nil, parent)
+  at(zone, parent, HERO_FRAME_X, HERO_FRAME_Y + hf:GetHeight() + 32, 300, 40)
+  zone:SetFrameLevel(bf:GetFrameLevel() + 15)
+  zone.views = {}
+  self.classZone = zone
+  -- Maj enfoncée ou relâchée : la ligne « Spend N: » des cartes en main s'éteint ou se rallume
+  zone:RegisterEvent("MODIFIER_STATE_CHANGED")
+  zone:SetScript("OnEvent", function(_, _, key)
+    if (key == "LSHIFT" or key == "RSHIFT") and self.c and parent:IsVisible() and not self.frozen then self:RenderHand() end
+  end)
 
   self.drawPile = pile(self, parent, DRAW_PILE[1], DRAW_PILE[2], "draw", "Draw pile", "Draw", Art.ui.grimoire,
     hz:GetFrameLevel() + 1)
@@ -782,11 +812,31 @@ function V:RenderPlayer(full)
   local maxMana = Controller.maxMana()
   self.mana.text:SetText(tostring(p.mana))
   self.mana.max:SetText("/" .. maxMana)
-  self.heroFrame.name:SetText((ns.Classes[(Controller.exp() or {}).class or "priest"] or {}).name or "")
-  if not self.heroFrame.portrait._unit then self.heroFrame:SetPortrait() end
-  local dem = p.demence or 0
-  self.demence.text:SetText(tostring(dem))
-  if dem > 0 then self.demence:Show() else self.demence:Hide() end
+  local class = c.class or "priest"
+  self.heroFrame.name:SetText((ns.Classes[class] or {}).name or "")
+  if self.heroFrame.portrait._class ~= class then self.heroFrame:SetPortrait() end
+  -- ressource de classe : icône de la classe jouée, nombre, cachée à 0
+  if self.resource._class ~= class then
+    self.resource._class = class
+    W.setIcon(self.resource.icon, Art.classResource(class), "ui:resource:" .. class)
+  end
+  local dem = p.res or 0
+  self.resource.text:SetText(tostring(dem))
+  if dem > 0 then self.resource:Show() else self.resource:Hide() end
+  -- zone libre de la classe
+  local zone, cv = self.classZone, ns.ClassViews and ns.ClassViews[class]
+  for k, f in pairs(zone.views) do if k ~= class then f:Hide() end end
+  if cv then
+    local host = zone.views[class]
+    if not host then
+      host = CreateFrame("Frame", nil, zone)
+      host:SetAllPoints()
+      if cv.build then cv.build(host, self) end
+      zone.views[class] = host
+    end
+    host:Show()
+    if cv.render then cv.render(host, c, self) end
+  end
   self.drawPile.count:SetText(#c.draw)
   self.discardPile.count:SetText(#c.discard)
   self.exhaustPile.count:SetText(#c.exhaust)
@@ -874,8 +924,10 @@ function V:RenderHand()
     local card = self.cards[i]
     if i <= n then
       local info = Controller.handInfo(i)
+      -- « Spend N: » allumée si la ressource suffit et que Maj n'est pas enfoncée, éteinte sinon
       card:SetCard(info.inst.id, info.inst.up, { cost = info.cost, playable = info.playable,
-        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil })
+        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil,
+        spendOff = info.spendOff })
       card.uid = info.inst.uid
       card.baseX, card.baseY = self:HandSlot(i, n)
       self:PlaceCard(card)
@@ -1127,10 +1179,19 @@ function V:QueueEvent(ev)
       if x then W.float(self_.parent, x, y - 60, label, C.defendText, 16) end
     end)
   elseif t == "saved" then
-    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, "Spirit of Redemption!", C.goldText, 18, 2) end)
-  elseif t == "demence" and ev.n ~= 0 then
+    -- nom du pouvoir (ou du bibelot) qui a empêché la mort
+    local by = ev.by and (ns.Cards[ev.by] or ns.Relics[ev.by])
+    local label = (by and by.name or "Last Breath") .. "!"
+    self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, label, C.goldText, 18, 2) end)
+  elseif (t == "resource" or t == "demence") and ev.n ~= 0 then
+    local c = Controller.combat()
+    local cd = c and ns.Classes[c.class]
+    local rid = cd and cd.resource and cd.resource.id or "insanity"
+    local ra = Art.classResource(c and c.class or "priest")
+    local col = ra.color and C[ra.color] or C.watchText
+    local word = ns.Language.resourceName(rid, ev.n)
     self:Push(0.1, function()
-      W.float(self_.parent, MANA_X + 44, MANA_Y - 40, (ev.n > 0 and "+" or "") .. ev.n .. " Insanity", C.watchText, 15, 1.0, 26)
+      W.float(self_.parent, MANA_X + 44, MANA_Y - 40, (ev.n > 0 and "+" or "") .. ev.n .. " " .. word, col, 15, 1.0, 26)
     end)
   elseif t == "mana" and ev.n ~= 0 then
     self:Push(0.1, function() W.float(self_.parent, MANA_X, MANA_Y - 10, "+" .. ev.n .. " mana", C.defendText, 15, 1.0, 26) end)
@@ -1207,7 +1268,9 @@ function V:Play(i, target)
       cost = info and info.cost }
   end
   self.selected = nil
-  local ok, why = Controller.play(i, target)
+  -- Maj enfoncée au moment de jouer : une carte « Spend N » se joue sans dépenser
+  local nospend = IsShiftKeyDown and IsShiftKeyDown() and true or false
+  local ok, why = Controller.play(i, target, nospend)
   if not ok then
     self.pendingPlay = nil
     UI.flash(Controller.reasonText(why))
