@@ -1093,7 +1093,8 @@ test("Trap : posée au jeu, déclenchée à la prochaine attaque ennemie sur l'a
   local hp = c.player.hp
   Combat.endTurn(c)
   eq(#c.traps, 2, "une seule déclenchée (une attaque)"); eq(c.enemies[1].hp, 100, "pas sur l'ennemi passif")
-  eq(c.enemies[2].hp, 93); eq(c.player.hp, hp - 10, "l'attaque part quand même")
+  eq(c.enemies[2].hp, 93); eq(c.player.hp, hp, "étourdi pendant son tour : l'attaque n'a pas lieu")
+  eq(c.enemies[2].st.stunned, nil, "charge consommée par ce tour-là")
   local t = Combat.clone(c)
   table.remove(t.traps)
   eq(#c.traps, 2, "clone indépendant")
@@ -2142,18 +2143,97 @@ do
     eq(#c.traps, 2, "une seule déclenchée"); eq(c.traps[1].card.id, "freezing_trap")
     eq(c.enemies[1].hp, 100 - P - num("counterattack", 1), "Counterattack sur l'attaquant")
     eq(c.player.hp, hp - 3 * 8, "attaque à trois coups : la Trap ne part qu'une fois")
-    -- Freezing Trap : Demoralized dès l'attaque en cours (tous ses coups), Stunned : le prochain tour
+    -- Freezing Trap : Stunned posé pendant son tour => l'attaque en cours n'a pas lieu (aucun des trois
+    -- coups), charge consommée ; Demoralized couvre l'attaque du tour suivant
     hp = c.player.hp
     Combat.endTurn(c)
-    eq(#c.traps, 1); eq(c.player.hp, hp - 3 * math.floor(8 * 0.75), "Demoralized sur les trois coups")
-    eq(c.enemies[1].st.stunned, 1)
+    eq(#c.traps, 1); eq(c.player.hp, hp, "étourdi pendant son tour : aucun des trois coups")
+    eq(c.enemies[1].st.stunned, nil, "charge consommée")
+    assert((c.enemies[1].st.demoralized or 0) > 0, "Demoralized encore là au tour suivant")
+    -- la Frost Trap (Demoralized à tous) part à l'attaque suivante ; Demoralized réduit les trois coups
     hp = c.player.hp
     Combat.endTurn(c)
-    eq(c.player.hp, hp, "étourdi : pas d'attaque"); eq(#c.traps, 1, "la Trap attend")
+    eq(c.player.hp, hp - 3 * math.floor(8 * 0.75), "attaque du tour suivant affaiblie de 25 %")
+    eq(#c.traps, 0, "Frost Trap déclenchée")
     local q = setup({ "counterattack" }, { "test_dummy" }, nil, HU)
     Combat.play(q, 1)
     Combat.endTurn(q); Combat.endTurn(q)
     eq(#q.traps, 1, "ennemi qui n'attaque pas : la Trap reste posée")
+  end)
+
+  test("Stunned posé pendant le tour de l'ennemi : arrêt immédiat (plusieurs actions, boss, Stunned 2, deux Traps)", function()
+    ns.Enemies.test_combo = { name = "Combo", hp = 100, moves = { combo = { name = "Combo", intent = "attack",
+      actions = { { "block", 5 }, { "attack", 6, times = 2 }, { "buff", "force", 2 } } } }, pattern = { "combo" } }
+    ns.Enemies.test_boss_hitter = { name = "Boss frappeur", hp = 100, boss = true,
+      moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 12 } } } }, pattern = { "hit" } }
+    ns.Cards.test_stun2 = { id = "test_stun2", name = "s", cost = 0, type = "skill", trap = true, rarity = "common",
+      effects = { { "apply", "stunned", 2 } }, text = "Trap.\nApply Stunned 2 ⌛" }
+    ns.Cards.test_stun_all = { id = "test_stun_all", name = "s", cost = 0, type = "skill", trap = true, rarity = "common",
+      effects = { { "apply", "stunned", 1, all = true } }, text = "Trap.\nApply Stunned 1 ⌛ to all" }
+    -- ennemi à plusieurs actions : ce qui précède l'attaque a eu lieu, l'attaque et la suite sont annulées
+    local c = setup({ "freezing_trap" }, { "test_combo" }, nil, HU)
+    Combat.play(c, 1)
+    local hp = c.player.hp
+    Combat.endPlayerTurn(c); Combat.enemyPhase(c)
+    local e = c.enemies[1]
+    eq(c.player.hp, hp, "aucun coup"); eq(e.block, 5, "l'action d'avant a eu lieu"); eq(e.st.force, nil, "l'action d'après est annulée")
+    eq(e.st.stunned, nil, "charge consommée")
+    local stoppedEv, actEv = false, false
+    for _, ev in ipairs(c.events) do
+      if ev.t == "stunned" and ev.stopped and ev.unit == e.uid then stoppedEv = true end
+      if ev.t == "act" and ev.unit == e.uid then actEv = true end
+    end
+    assert(stoppedEv, "journal : stunned (stopped)"); assert(actEv, "journal : act (le bloc est parti)")
+    Combat.endRound(c); Combat.startPlayerTurn(c)
+    hp = c.player.hp
+    Combat.endTurn(c)
+    eq(c.player.hp, hp - 2 * math.floor(6 * 0.75), "tour suivant : il agit, affaibli par Demoralized")
+    -- attaque d'abord : aucun « act » (pas d'élan d'attaque à l'écran) ; deux Traps : une seule part
+    local t = setup({ "freezing_trap", "counterattack" }, { "test_triple" }, nil, HU)
+    t.player.mana = 9
+    Combat.play(t, 1); Combat.play(t, 1)
+    hp = t.player.hp
+    Combat.endPlayerTurn(t); Combat.enemyPhase(t)
+    eq(t.player.hp, hp, "aucun des trois coups"); eq(#t.traps, 1, "une Trap par attaque")
+    for _, ev in ipairs(t.events) do assert(ev.t ~= "act", "pas d'action partie : pas d'élan") end
+    -- boss : immunisé à Stunned, Demoralized réduit l'attaque en cours et la suivante
+    local b = setup({ "freezing_trap" }, { "test_boss_hitter" }, nil, HU)
+    Combat.play(b, 1)
+    hp = b.player.hp
+    Combat.endTurn(b)
+    eq(b.player.hp, hp - math.floor(12 * 0.75), "boss : attaque en cours affaiblie")
+    hp = b.player.hp
+    Combat.endTurn(b)
+    eq(b.player.hp, hp - math.floor(12 * 0.75), "boss : attaque suivante affaiblie")
+    hp = b.player.hp
+    Combat.endTurn(b)
+    eq(b.player.hp, hp - 12, "puis pleine")
+    -- Stunned 2 : ce tour et le suivant
+    local s = setup({ "test_stun2" }, { "test_hitter" }, nil, HU)
+    Combat.play(s, 1)
+    hp = s.player.hp
+    Combat.endTurn(s)
+    eq(s.player.hp, hp, "ce tour"); eq(s.enemies[1].st.stunned, 1)
+    Combat.endTurn(s)
+    eq(s.player.hp, hp, "et le suivant"); eq(s.enemies[1].st.stunned, nil)
+    Combat.endTurn(s)
+    eq(s.player.hp, hp - 10, "puis il frappe")
+    -- Stunned posé sur un AUTRE ennemi pendant le tour d'un premier : règle habituelle (il perd son
+    -- prochain tour, ici celui de cette phase) ; le premier est arrêté
+    local a = setup({ "test_stun_all" }, { "test_hitter", "test_hitter" }, nil, HU)
+    Combat.play(a, 1)
+    hp = a.player.hp
+    Combat.endTurn(a)
+    eq(a.player.hp, hp, "les deux perdent ce tour"); eq(a.enemies[1].st.stunned, nil); eq(a.enemies[2].st.stunned, nil)
+    Combat.endTurn(a)
+    eq(a.player.hp, hp - 20, "puis les deux frappent")
+    -- Stunned posé pendant le tour du joueur : inchangé (perd son prochain tour, charge consommée alors)
+    local p = setup({ "chastise" }, { "test_hitter" })
+    Combat.play(p, 1, 1)
+    hp = p.player.hp
+    Combat.endTurn(p)
+    eq(p.player.hp, hp); eq(p.enemies[1].st.stunned, nil)
+    ns.Enemies.test_combo, ns.Enemies.test_boss_hitter, ns.Cards.test_stun2, ns.Cards.test_stun_all = nil, nil, nil, nil
   end)
 
   test("Traps : deux attaquants, chacun la sienne ; l'attaquant tué par la Trap n'attaque pas ; tour sauté : rien", function()

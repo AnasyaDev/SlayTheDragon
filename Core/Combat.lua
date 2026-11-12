@@ -20,6 +20,10 @@ Combat.BASE_MANA = 3
 Combat.MAX_ENEMIES = 5
 Combat.ATONEMENT_HEAL = 2
 Combat.POTION_SLOTS = 3
+-- Stunned posé sur un ennemi pendant son propre tour l'arrête tout de suite (décisions communes,
+-- 12/11/2026) ; false = ancienne règle (l'action en cours part, il perd son prochain tour), pour la
+-- simulation seulement (oldstun=1).
+Combat.STUN_STOPS_TURN = true
 Combat.TRAP_SLOTS = 3 -- Traps posées au plus (crochet « trapSlots »)
 
 ---------------------------------------------------------------------------
@@ -289,6 +293,11 @@ function Combat.applyStatus(c, unit, id, n, icon)
   if v <= 0 then v = nil end
   unit.st[id] = v
   if def.duration and c.phase == "enemy" and v then unit.fresh[id] = true end
+  -- Stunned posé sur un ennemi pendant SON tour (Trap, riposte, effet déclenché par son action) : son tour
+  -- s'arrête tout de suite (executeMove lit le drapeau et consomme la charge) ; décisions communes.
+  if id == "stunned" and v and c.phase == "enemy" and c.acting == unit.uid and Combat.STUN_STOPS_TURN then
+    unit.stopTurn = true
+  end
   log(c, { t = "status", unit = uref(unit), id = id, n = n, total = v or 0 })
   Combat.fire(c, "onStatusApplied", unit, id, n)
 end
@@ -601,8 +610,20 @@ local function executeMove(c, e)
       return
     end
   end
-  log(c, { t = "act", unit = e.uid, move = e.intent })
   local p = c.player
+  -- Étourdi pendant son propre tour : le reste du tour est annulé (aucun coup de l'attaque qui a
+  -- déclenché l'effet), la charge de Stunned est consommée par ce tour-là.
+  local function stopped()
+    if not e.stopTurn then return false end
+    e.stopTurn = nil
+    e.st.stunned = (e.st.stunned or 0) > 1 and e.st.stunned - 1 or nil
+    log(c, { t = "stunned", unit = e.uid, stopped = true, move = e.intent })
+    stat(c, "enemyTurnsStopped")
+    return true
+  end
+  -- « act » (élan de l'attaque à l'écran) seulement quand la première action part vraiment
+  local acted = #mv.actions == 0
+  if acted then log(c, { t = "act", unit = e.uid, move = e.intent }) end
   for i = 1, #mv.actions do
     local a = mv.actions[i]
     local k = a[1]
@@ -610,7 +631,12 @@ local function executeMove(c, e)
       -- Trap : la plus ancienne se déclenche avant les coups de cette attaque, sur l'attaquant
       Combat.triggerTrap(c, e)
     end
-    if c.result or e.dead then break end
+    if c.result or e.dead or stopped() then break end
+    if not acted then
+      acted = true
+      log(c, { t = "act", unit = e.uid, move = e.intent })
+    end
+    local halt = false
     if k == "attack" then
       for _ = 1, (a.times or 1) do
         local dmg = Combat.calcDamage(c, e, p, a[2])
@@ -623,7 +649,9 @@ local function executeMove(c, e)
         if c.result or e.dead then break end
         -- Coup qui interrompt : coupe l'incantation s'il fait perdre des PV.
         if a.interrupts and loss > 0 then interruptPlayer(c, e) end
+        if stopped() then halt = true break end
       end
+      if halt then break end
     elseif k == "block" then
       Combat.gainBlock(c, e, a[2])
     elseif k == "debuff" then
@@ -651,8 +679,9 @@ local function executeMove(c, e)
     else
       error("unknown enemy action: " .. tostring(k))
     end
-    if c.result or e.dead then break end
+    if c.result or e.dead or stopped() then break end
   end
+  e.stopTurn = nil
   e.mem.last = e.intent
 end
 
@@ -1162,7 +1191,9 @@ function Combat.enemyPhase(c)
           e.st.stunned = e.st.stunned > 1 and e.st.stunned - 1 or nil
           log(c, { t = "stunned", unit = e.uid })
         else
+          c.acting = e.uid -- ennemi dont c'est le tour (Stunned posé pendant ce tour : arrêt immédiat)
           executeMove(c, e)
+          c.acting = nil
         end
       end
       if c.result then return end

@@ -25,6 +25,15 @@ Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est c
   autre clause reste jouable ; son Surge ne fait alors rien.
 - **Moment des coûts.** Mana, PV et ressource se paient quand la carte est jouée ; les conditions se lisent
   à la résolution. Un Cast interrompu ne rend rien.
+- **Stunned posé pendant le tour de l'ennemi** (12/11/2026, après une remarque du joueur sur Freezing Trap) :
+  un Stunned posé sur un ennemi pendant SON propre tour (Trap, riposte, tout effet déclenché par son action)
+  arrête ce tour immédiatement : ses actions restantes sont annulées, à commencer par l'attaque qui a
+  déclenché l'effet (aucun de ses coups ne part), et la charge est consommée par ce tour-là (« Stunned 2 » =
+  ce tour et le suivant). Posé pendant le tour du joueur, rien ne change : l'ennemi perd son prochain tour.
+  Un Stunned posé sur un autre ennemi pendant ce tour suit la règle habituelle. Boss immunisés. Une
+  incantation ennemie arrêtée ainsi est perdue, comme le tour d'un ennemi étourdi. Survol : « Loses its next
+  turn, or the rest of this one. » ; journal `{ t = "stunned", stopped = true }` (moteur : drapeau
+  `stopTurn` posé par `Combat.applyStatus`, appliqué par `executeMove`).
 - **Instant est un état commun** (Mage, Shaman). Il se cumule, se garde d'un tour à l'autre, et la prochaine
   carte Cast le consomme : elle se résout tout de suite, sans prendre d'emplacement de Cast et sans pouvoir
   être interrompue. Le Shaman le reçoit en atteignant 5 de Maelstrom (le Maelstrom retombe à 0).
