@@ -55,8 +55,9 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, rep) p
 | `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD) |
 | `school` | champ libre (holy, shadow, fire, frost, arcane, nature…) : condition `school:<x>`, compteurs du tour, couleur |
 | `payHp = N` | « Pay N HP. » en première ligne ; payé au jeu (crochet `payHp` pour le modifier), injouable s'il ferait tomber à 0 (raison `hp`) ; compte comme une perte de PV (`onHpLost`), n'est pas une attaque, ignore l'Absorb |
-| `spend = N` | « Spend N: … » ; payé AU JEU si la ressource suffit (et si `spendNeed(c, inst)` le permet) ; `ctx.spent` à la résolution, gardé dans l'incantation pour une carte Cast |
-| `minRes = N` | injouable sous N points de ressource (raison `resource`) : cartes Surge qui n'ont de sens qu'avec de la ressource |
+| `spend = N` | « Spend N: … » ; **au choix du joueur** : payé AU JEU si la ressource suffit (et si `spendNeed(c, inst)` le permet), sauf `Combat.play(c, i, t, { spend = false })` (action `{ "play", i, t, "nospend" }`, Maj enfoncée dans l'interface) ; `ctx.spent` à la résolution, gardé dans l'incantation ou la Trap |
+| `minRes = N` | injouable sous N points de ressource (raison `resource`). Règle (décisions communes) : une carte dont TOUTES les clauses sont « Surge: … » porte `minRes = 1` ; une carte qui a une autre clause reste jouable à 0 et son Surge ne fait rien (Execute). Vérifié par le harnais |
+| `trap = true` | « Trap. » en tête : posée dans `c.traps` (3 au plus, crochet `trapSlots`, raison `traps`), résolue à la prochaine attaque ennemie avec l'attaquant pour cible (`Combat.triggerTrap`), la plus ancienne d'abord, puis suit sa plaque |
 | `slot = "nom"` | Power unique par emplacement (Seal, Demon, totem d'un élément) : en jouer un autre remplace l'ancien |
 | `lasts = N` | Power à durée : retiré à la fin du N-ième round (crochet `powerLasts`) ; `c.player.powerTurns[uid]` |
 | `replacedTo = "exhaust"` | un Power remplacé ou expiré part aux consumées (défausse par défaut) |
@@ -69,7 +70,8 @@ Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start
 
 Effets : `damage` (times, all, pierce, onHit, bonus), `absorb`, `apply` (état, n, all, self, `icon` = clé
 d'art de la source), `heal`, `draw`, `mana`, `res` (« +N Rage. »), `surge` (« Surge: », toute la ressource,
-`ctx.surge`), `loseHp`, `interrupt`, `cleanse`, `fn`. Une classe ajoute les siens dans `ns.Effects`.
+`ctx.surge`), `tickDot` (déclenche tout de suite le DoT de la cible, ou de tous avec `all`), `loseHp`,
+`interrupt` (`all = true` : tous les ennemis), `cleanse`, `fn`. Une classe ajoute les siens dans `ns.Effects`.
 Options lues sur tous les effets :
 
 - `cond = "nom"` : l'effet ne s'applique que si la condition est vraie, **lue à la résolution** ;
@@ -112,7 +114,8 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `apply` | état, cible, d | valeur d'un état posé sur un ennemi |
 | `block`, `heal` | — | Absorb gagné, soin reçu |
 | `target` | d, inst | cible d'une carte (rediriger) ; la cible retenue va dans `c.player.lastTarget` |
-| `instantCast` | d, inst, commit | une carte Cast part tout de suite (Instant, Maelstrom) ; ne rien consommer si commit est faux |
+| `instantCast` | d, inst, commit | une carte Cast part tout de suite (autre source que l'état Instant) ; ne rien consommer si commit est faux |
+| `trapSlots` | — | nombre de Traps posées au plus (3) |
 | `castSlots` | — | nombre d'incantations tenues à la fois (1 ; Mage : 2) |
 | `powerLasts` | d, inst | durée d'un Power à durée |
 | `dotDecay` | unité | baisse du DoT après son tick (1 ; Agony : 0) |
@@ -129,6 +132,9 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | `beforeCard` | inst, ctx | début de la résolution |
 | `onCardPlayed` | inst, ctx | fin de la résolution (Rage par Attack, Deep Wounds) |
 | `onCastStart` / `onCastResolved` | inst | incantation posée / résolue |
+| `onTrapSet` / `onTrapTriggered` | inst (, attaquant) | Trap posée / déclenchée |
+| `onAttackHit` | cible, ctx | chaque coup d'une carte Attack (poisons, Ignite) |
+| `onSurge` | montant, ctx | Surge qui a dépensé quelque chose |
 | `onPayHp` | n, inst | paiement « Pay N HP » (avant la perte) |
 | `onSpend` | n, inst | Spend payé |
 | `onResource` | variation, raison | ressource changée |
@@ -141,6 +147,13 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | `onPowerEnd` | inst, raison | Power remplacé (`replaced`) ou expiré (`expired`) |
 | `preventDeath` | — | le joueur tombe à 0 : true = sauvé (Last Breath) ; l'événement `saved` porte la source |
 | `onVictory`, `onPotion`, `onFlee`, `preventInterrupt` | | inchangés |
+
+États communs et règles d'état : `instant` (« Instant », commun au Mage et au Shaman : se cumule, se
+garde ; la prochaine carte Cast en consomme 1 et se résout tout de suite, sans emplacement ni
+interruption : `Combat.isInstant`) ; un état peut porter `max = N` (plafond : Parry 3), `flag = true`
+(présent ou non, valeur 1, sans nombre affiché : Stealth), `clearAtTurnStart = true`. Drapeau
+`c.player.flags.skipEnemyTurn` : le prochain tour ennemi est sauté (Feign Death). Hasard des cartes :
+flux `c.rng.cards` (jamais `c.rng.ai`). `Combat.tickDot(c, unité)` déclenche un DoT hors du début de tour.
 
 Une classe peut émettre ses propres événements (`Combat.fire(c, "onShift", forme)`) : Powers et bibelots
 de la classe s'y abonnent par le même mécanisme.
@@ -257,15 +270,16 @@ ns.ClassRules.rogue = { hooks = {
 | Mécanique | Point d'extension |
 |---|---|
 | Rage (Warrior) | `onHpLost` + `onCardPlayed` de classe, `Combat.gainRes`, plafond `resource.cap` |
-| Parry, Stealth (Rogue) | états de classe ; `beforeHit` (annuler un coup jusqu'à 8) ; condition « Stealth: » d'office (état), consommée dans `onCardPlayed` |
+| Parry, Stealth (Rogue) | états de classe (`max = 3`, `flag = true`) ; `beforeHit` coup par coup, avant l'Absorb (annuler jusqu'à 8) ; condition « Stealth: » d'office (état), consommée dans `onCardCommitted` (au jeu, aussi pour une Attack en Cast) |
+| Envenom, Exsanguinate | effet `tickDot`, `Combat.tickDot` |
 | Combo Points, coups de grâce | ressource `combo`, effet `surge` + `per`, `minRes` |
 | Seals et Judgement (Paladin) | Power `slot = "seal"` ; condition `judgement` (registre prêt) à enregistrer dans `Combat.CONDITIONS` ; effet propre « déclenche le Judgement du Seal » dans `ns.Effects` |
 | Holy Power, Spend 3 | ressource `holy` (cap 3), `spend = 3` |
-| Instant, double Cast (Mage) | `instantCast` (commit), `castSlots` = 2, file `cast` + `castMore` (interruption : la plus récente), `onCastResolved`, `onCardCommitted` + `c.turn.bySchool` (Hot Streak), condition `school:fire` |
+| Instant, double Cast (Mage) | état commun `instant`, `castSlots` = 2, file `cast` + `castMore` (interruption : la plus récente), `onCastResolved`, `onCardCommitted` + `c.turn.bySchool` (Hot Streak), condition `school:fire` |
 | Pay N HP, démon (Warlock) | `payHp` (crochet `payHp`, `onPayHp`), Power `slot = "demon"`, `replacedTo = "exhaust"`, `onTurnEnd`, `c.player.lastTarget`, `dotDecay`, `onDotTick`, `onEnemyDeath` |
 | Powers de fin de tour | `onTurnEnd` sur le Power (avant la défausse) |
 | Familier (Hunter) | état de classe `c.cls.pet`, attaque dans `onTurnEnd` sur `c.player.lastTarget`, Frenzy = ressource ; affichage dans `ns.ClassViews.hunter` |
-| Traps (Hunter) | Power ou état de classe armé au jeu, déclenché dans `beforeHit` / `afterHit` (seul effet pendant le tour ennemi), puis retiré (`Combat.removePower`) |
+| Traps (Hunter) | commun : `trap = true`, zone `c.traps`, déclenchement avant les coups de l'attaque (`Combat.triggerTrap`), `onTrapTriggered` |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
 | Maelstrom à 5 : Cast instantané | `onResource` + `instantCast` |
 | Formes et lignes « Forme: » (Druid) | état de classe `c.cls.form` ; conditions `bear`, `cat`, `moonkin`, `caster` (registre prêt) dans `Combat.CONDITIONS` ; `cond = "bear"` sur les effets ; événement propre `onShift` ; pastille : `resource = nil`, la forme dans `ns.ClassViews.druid` |

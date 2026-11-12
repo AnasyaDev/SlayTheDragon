@@ -41,6 +41,16 @@ ns.Save.abandon(db, date(...))
 `seed` : la graine vient de l'interface (par exemple `time()`), le cœur n'appelle jamais
 `math.random`. La même graine et les mêmes choix rejouent exactement la même expédition.
 
+## Classes
+
+L'expédition est celle d'une classe (`exp.class`, contrat complet : `docs/classes.md`) : PV et deck de
+départ, bibelot de départ (`startRelic`, jamais tiré), combats (`c.class`, ressource `c.player.res`).
+Récompenses, marchand et rencontres tirent dans le pool de la classe jouée : cartes de cette classe
+(`Card.inClass` ; les cartes neutres prévues par le GDD, `neutral = true`, seulement chez le marchand et
+dans les rencontres) et bibelots communs (sans champ `class`) ou de cette classe ; le choix de Révéré
+propose les bibelots de la classe hors bibelot de départ. Les douze bibelots actuels sont communs
+(rapport du socle multi-classes, docs/classes.md).
+
 ## API d'expédition
 
 - `Expedition.choices(exp)` → liste des actions possibles maintenant (« abandon » toujours possible,
@@ -52,7 +62,7 @@ ns.Save.abandon(db, date(...))
 | --- | --- |
 | `start` (Révéré : bibelot de classe) | `{"startRelic", i}` (i dans `exp.startRelics`), `{"skipStartRelic"}` |
 | `map` | `{"path", idNoeud}` : un nœud de `Map.nextNodes(exp.map, exp.node)` |
-| `combat` | `{"play", indexMain, indexEnnemi?}`, `{"endTurn"}`, `{"potion", emplacement, indexEnnemi?}` |
+| `combat` | `{"play", indexMain, indexEnnemi?, "nospend"?}` (« nospend » : carte « Spend N » jouée sans dépenser), `{"endTurn"}`, `{"potion", emplacement, indexEnnemi?}` |
 | `reward` | `{"pickCard", i}`, `{"skipCards"}`, `{"takePotion"}`, `{"leave"}` |
 | `campfire` | `{"rest"}`, `{"upgrade", indexDeck}`, `{"leave"}` |
 | `merchant` | `{"buyCard", i}`, `{"buyRelic", i}`, `{"buyPotion", i}`, `{"remove", indexDeck}`, `{"leave"}` |
@@ -77,14 +87,14 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | Champ | Contenu |
 | --- | --- |
 | `phase` | voir ci-dessus |
-| `class`, `seed`, `key`, `affixes` | classe, graine, niveau de clé, ids d'affixes actifs (`ns.Affixes[id].name/.text`) |
+| `class`, `seed`, `key`, `affixes` | classe (id de `ns.Classes`, choisie sur l'accueil), graine, niveau de clé, ids d'affixes actifs (`ns.Affixes[id].name/.text`) |
 | `unlock` | `{ rep = palier de classe 0..4, league = palier de Ligue 0..4 }`, figé au départ |
 | `act`, `acts` | acte courant, nombre d'actes de l'expédition |
 | `map` | carte de l'acte (voir plus bas) |
 | `node`, `floor` | nœud courant (nil avant le premier choix), étape 1..8 |
 | `hp`, `maxHp`, `gold` | |
 | `deck` | `{ {id, up}, ... }` (`ns.Card.defById(id, up)` pour l'affichage) |
-| `relics` | ids de `ns.Relics` |
+| `relics` | ids de `ns.Relics` (le bibelot de départ de la classe, `startRelic`, en tête) |
 | `potions` | 3 emplacements : id ou `false` |
 | `combat` | état du combat en cours (phase `combat`) |
 | `fight` | `{ kind = combat/elite/boss, pool, encounter, seed, reward }` pendant le combat |
@@ -193,7 +203,7 @@ peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau 
 
 ## Sauvegarde (`Core/Save.lua`)
 
-`SlayTheDragonDB = { version = 2, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
+`SlayTheDragonDB = { version = 3, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
 
 - `Save.new()`, `Save.migrate(db)` (une migration par version dans `Save.MIGRATIONS`, état
   d'expédition migré par `Save.EXP_MIGRATIONS`), `Save.validate(db)` → `ok, erreurs`.
@@ -201,6 +211,11 @@ peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau 
   `Save.normalize` créent `meta.flags` s'il manque et gardent tous les drapeaux existants (une
   valeur vraie non booléenne devient `true`, une valeur fausse est retirée). L'expédition en cours
   passe de la version 1 à 2 (`exp.flags = {}`, `exp.newFlags = {}`, `stats.events = {}`).
+- Version 3 (12/11/2026, classes) : rien à changer dans la méta (déjà par classe) ; l'expédition passe
+  de 2 à 3 : classe par défaut `priest`, et dans le combat en cours la Démence devient la ressource de
+  classe (`player.demence` → `player.res`), le combat reçoit `class`, son état de classe `cls = {}`, ses
+  compteurs du tour `turn`, sa zone de Traps `traps = {}` et le flux de hasard des cartes `rng.cards`
+  (test « sauvegarde v2 -> v3 »).
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
 - Journal : `{ result, class, key, seed, act, floor, cleared, elites, bosses, hp, maxHp, gold,

@@ -794,7 +794,7 @@ test("Shield Slam : dégâts égaux à l'Absorb ; Retaliation : riposte même su
   Combat.play(r, 1)
   r.player.block = 50
   Combat.endTurn(r)
-  eq(r.enemies[1].hp, 97)
+  eq(r.enemies[1].hp, 96)
 end)
 
 test("Last Stand : Last Breath, reste à 1 PV puis soin, une fois", function()

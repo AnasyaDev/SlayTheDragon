@@ -10,6 +10,35 @@ peau) et par des instantanés des écrans (`Sim/ui_render.lua`, qui dessine dés
 Le 11/11/2026, l'habillage de la fenêtre et des écrans (hors cartes) est passé aux pièces de l'interface
 du jeu : voir « Habillage WoW » ci-dessous ; la peau « Mechanized Magic » ne vêt plus que les cartes.
 
+## Classes (socle multi-classes, 12/11/2026)
+
+Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
+
+- **Accueil** : une classe jouable (`ns.Classes`, ordre `order`) a son bouton d'office. Jusqu'à deux,
+  grands boutons rouges en une rangée (PV, cartes, réputation dessous, la choisie au liseré d'or) ;
+  au-delà, grille de trois colonnes de boutons de 170 × 36 (détail en infobulle), le reste du panneau
+  (clés, affixes) descend et le panneau grandit (harnais U33 : neuf classes tiennent dans le panneau).
+- **Bandeau, cadre du héros** : nom de la classe jouée. Portrait : visage du personnage (`SetPortraitTexture`)
+  si sa classe de jeu (`UnitClass("player")`, champ `wow` de `Art.classes`) est celle de l'expédition,
+  sinon l'icône de la classe (Guerrier joué par un prêtre : icône du Guerrier).
+- **Pastille de ressource** (anciennement Démence) : petit anneau doré près du mana, icône de la
+  ressource de la classe (`Art.classes[id].resource`), nombre, cachée à 0 ; infobulle = explication du
+  registre du langage et « n / plafond » ; chiffres flottants « +2 Rage » à la couleur de la ressource.
+- **Zone libre de classe** : cadre de 300 × 40 sous les états du héros, rempli par `ns.ClassViews[id]`
+  (`build` une fois, `render` à chaque rendu) ; vide pour le Priest et le Warrior.
+- **Spend N au choix** (décision du joueur) : clic, touche ou glisser = la carte se joue en dépensant si
+  la ressource suffit ; **Maj enfoncée en jouant** = sans dépenser. Le clic droit n'est pas employé : il
+  désélectionne partout dans le combat. La ligne « Spend N: » de la carte en main est éteinte (gris)
+  quand le bonus ne sera pas payé (ressource insuffisante, ou Maj enfoncée : la main se redessine sur
+  `MODIFIER_STATE_CHANGED`) ; l'infobulle d'une carte Spend dit « Shift: play it without spending. ».
+- **Langage des cartes** : les mots de la plaque, les conditions nommées (Execute, Surge, Spend N, Last
+  Breath, Shadow…), les ressources et les déclencheurs de Power viennent de `Core/Language.lua` ; une
+  classe y ajoute les siens sans toucher à `UI/Widgets.lua` (W.CONDITIONS = registre, plaque et
+  explications dérivées). « Pay N HP. » en première ligne a son explication.
+- **État `pain`** affiché « DoT » ; l'icône d'un DoT peut dépendre de sa source (`Art.statusIcons`,
+  saignement du Guerrier).
+- Raisons nouvelles : « Not enough HP to pay. », « Not enough Rage. » (ressource de la classe).
+
 ## Habillage WoW (direction B, mana et parcours façon C)
 
 État au 11/11/2026, choisi par le joueur sur maquettes (`build/wowui/direction_*.jpg`, générateurs

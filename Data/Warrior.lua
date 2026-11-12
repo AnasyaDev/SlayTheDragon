@@ -52,9 +52,9 @@ card("bloodrage", {
 
 card("rend", {
   rep = 0, name = "Rend", cost = 1, type = "attack", rarity = "common", path = "arms",
-  target = "enemy", effects = { { "damage", 3 }, { "apply", "pain", 5, icon = "bleed" } },
-  text = "Deal 3.\nApply DoT 5",
-  up = { effects = { { "damage", 4 }, { "apply", "pain", 7, icon = "bleed" } }, text = "Deal 4.\nApply DoT 7" },
+  target = "enemy", effects = { { "damage", 3 }, { "apply", "pain", 4, icon = "bleed" } },
+  text = "Deal 3.\nApply DoT 4",
+  up = { effects = { { "damage", 4 }, { "apply", "pain", 6, icon = "bleed" } }, text = "Deal 4.\nApply DoT 6" },
 })
 
 card("overpower", {
@@ -66,16 +66,16 @@ card("overpower", {
 
 card("slam", {
   rep = 0, name = "Slam", cost = 1, type = "attack", rarity = "common", path = "arms",
-  target = "enemy", cast = true, effects = { { "damage", 13 } },
-  text = "Cast.\nDeal 13.",
-  up = { effects = { { "damage", 17 } }, text = "Cast.\nDeal 17." },
+  target = "enemy", cast = true, effects = { { "damage", 14 } },
+  text = "Cast.\nDeal 14.",
+  up = { effects = { { "damage", 18 } }, text = "Cast.\nDeal 18." },
 })
 
 card("cleave", {
   rep = 1, name = "Cleave", cost = 1, type = "attack", rarity = "common", path = "arms",
-  effects = { { "damage", 6, all = true } },
-  text = "Deal 6 to all.",
-  up = { effects = { { "damage", 9, all = true } }, text = "Deal 9 to all." },
+  effects = { { "damage", 7, all = true } },
+  text = "Deal 7 to all.",
+  up = { effects = { { "damage", 10, all = true } }, text = "Deal 10 to all." },
 })
 
 card("mortal_strike", {
@@ -139,16 +139,16 @@ card("deep_wounds", {
 
 card("raging_blow", {
   rep = 0, name = "Raging Blow", cost = 1, type = "attack", rarity = "common", path = "fury",
-  target = "enemy", effects = { { "damage", 4, times = 2 } },
-  text = "Deal 4 twice.",
-  up = { effects = { { "damage", 6, times = 2 } }, text = "Deal 6 twice." },
+  target = "enemy", effects = { { "damage", 5, times = 2 } },
+  text = "Deal 5 twice.",
+  up = { effects = { { "damage", 7, times = 2 } }, text = "Deal 7 twice." },
 })
 
 card("whirlwind", {
   rep = 0, name = "Whirlwind", cost = 1, type = "attack", rarity = "common", path = "fury",
-  effects = { { "damage", 3, all = true, times = 2 } },
-  text = "Deal 3 to all twice.",
-  up = { effects = { { "damage", 4, all = true, times = 2 } }, text = "Deal 4 to all twice." },
+  effects = { { "damage", 4, all = true, times = 2 } },
+  text = "Deal 4 to all twice.",
+  up = { effects = { { "damage", 5, all = true, times = 2 } }, text = "Deal 5 to all twice." },
 })
 
 card("victory_rush", {
@@ -168,18 +168,18 @@ card("berserker_rage", {
 
 card("bloodthirst", {
   rep = 0, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
-  target = "enemy", cooldown = 2,
+  target = "enemy", cooldown = 3,
   effects = { { "damage", 6 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
-  text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 2.",
+  text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 3.",
   up = { effects = { { "damage", 8 }, { "heal", 3 }, { "apply", "force", 1, self = true } },
-    text = "Deal 8.\nHeal 3.\nGain Strength 1\nCooldown 2." },
+    text = "Deal 8.\nHeal 3.\nGain Strength 1\nCooldown 3." },
 })
 
 card("rampage", {
   rep = 0, name = "Rampage", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
-  target = "enemy", payHp = 4, effects = { { "damage", 4, times = 4 } },
-  text = "Pay 4 HP.\nDeal 4 four times.",
-  up = { effects = { { "damage", 5, times = 4 } }, text = "Pay 4 HP.\nDeal 5 four times." },
+  target = "enemy", payHp = 3, effects = { { "damage", 4, times = 4 } },
+  text = "Pay 3 HP.\nDeal 4 four times.",
+  up = { effects = { { "damage", 5, times = 4 } }, text = "Pay 3 HP.\nDeal 5 four times." },
 })
 
 card("battle_shout", {
@@ -215,9 +215,9 @@ card("enrage", {
 
 card("recklessness", {
   rep = 2, name = "Recklessness", cost = 1, type = "skill", rarity = "rare", path = "fury",
-  payHp = 5, exhaust = true, effects = { { "apply", "force", 3, self = true } },
-  text = "Pay 5 HP.\nGain Strength 3\nExhaust.",
-  up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 5 HP.\nGain Strength 4\nExhaust." },
+  payHp = 4, exhaust = true, effects = { { "apply", "force", 3, self = true } },
+  text = "Pay 4 HP.\nGain Strength 3\nExhaust.",
+  up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 4 HP.\nGain Strength 4\nExhaust." },
 })
 
 -- Protection : Absorb converti en dégâts, ripostes quand il est frappé ------------------------------
@@ -261,17 +261,17 @@ card("demoralizing_shout", {
 
 card("shield_slam", {
   rep = 0, name = "Shield Slam", cost = 1, type = "attack", rarity = "uncommon", path = "protection",
-  target = "enemy", effects = { { "absorb", 5 }, { "damage", 0, per = { 1, "block" } } },
-  text = "Gain 5 Absorb.\nDeal damage equal to Absorb.",
-  up = { effects = { { "absorb", 8 }, { "damage", 0, per = { 1, "block" } } },
-    text = "Gain 8 Absorb.\nDeal damage equal to Absorb." },
+  target = "enemy", effects = { { "absorb", 4 }, { "damage", 0, per = { 1, "block" } } },
+  text = "Gain 4 Absorb.\nDeal damage equal to Absorb.",
+  up = { effects = { { "absorb", 6 }, { "damage", 0, per = { 1, "block" } } },
+    text = "Gain 6 Absorb.\nDeal damage equal to Absorb." },
 })
 
 card("ignore_pain", {
   rep = 1, name = "Ignore Pain", cost = 1, type = "skill", rarity = "uncommon", path = "protection",
-  minRes = 1, effects = { { "surge" }, { "absorb", 0, per = { 4, "surge" } } },
-  text = "Surge: gain 4 Absorb per Rage.",
-  up = { effects = { { "surge" }, { "absorb", 0, per = { 5, "surge" } } }, text = "Surge: gain 5 Absorb per Rage." },
+  minRes = 1, effects = { { "surge" }, { "absorb", 0, per = { 3, "surge" } } },
+  text = "Surge: gain 3 Absorb per Rage.",
+  up = { effects = { { "surge" }, { "absorb", 0, per = { 4, "surge" } } }, text = "Surge: gain 4 Absorb per Rage." },
 })
 
 -- Retaliation : chaque coup ennemi (même absorbé) renvoie des dégâts à l'attaquant.
@@ -286,9 +286,9 @@ end
 
 card("retaliation", {
   rep = 0, name = "Retaliation", cost = 1, type = "power", rarity = "uncommon", path = "protection",
-  power = true, effects = {}, hooks = retaliationHooks(3),
-  text = "Power.\nWhen hit: deal 3 to the attacker.",
-  up = { hooks = retaliationHooks(5), text = "Power.\nWhen hit: deal 5 to the attacker." },
+  power = true, effects = {}, hooks = retaliationHooks(4),
+  text = "Power.\nWhen hit: deal 4 to the attacker.",
+  up = { hooks = retaliationHooks(6), text = "Power.\nWhen hit: deal 6 to the attacker." },
 })
 
 card("shield_wall", {
@@ -388,7 +388,7 @@ relic("skullflame_shield", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.warrior = {
-  id = "warrior", name = "Warrior", order = 2, hp = 80,
+  id = "warrior", name = "Warrior", order = 2, hp = 75,
   resource = { id = "rage", cap = 5, keep = true },
   deck = {
     "strike", "strike", "strike", "strike",
@@ -400,13 +400,18 @@ ns.Classes.warrior = {
   survival = "absorb",
   bot = {
     resValue = 8,
+    -- notes des choix : premier balayage sweep=cards (reports/warrior_sweep1.txt, écart ramené à 4,5..7),
+    -- vérifiées en expédition complète (le second balayage, cartes ajoutées de force au deck de départ,
+    -- surcote les défenses : choisies d'après lui, les decks perdaient 14 points)
     rating = {
-      rend = 5, overpower = 5, slam = 5, cleave = 6, raging_blow = 5, whirlwind = 6, victory_rush = 5,
-      berserker_rage = 4, shield_block = 6, revenge = 5, thunder_clap = 6, devastate = 6, demoralizing_shout = 6,
-      mortal_strike = 6, execute = 5, colossus_smash = 6, pummel = 5, bloodthirst = 6, rampage = 6,
-      battle_shout = 6, onslaught = 5, shield_slam = 5, ignore_pain = 6, retaliation = 5,
-      bladestorm = 6, deep_wounds = 6, enrage = 6, recklessness = 5, shield_wall = 7, last_stand = 5,
+      rend = 7, deep_wounds = 7, execute = 7, ignore_pain = 7, bloodthirst = 7,
+      victory_rush = 6.5, bladestorm = 6.5, revenge = 6.5, enrage = 6.5, pummel = 6.5,
+      shield_block = 6, thunder_clap = 6, overpower = 6, last_stand = 6, shield_wall = 6,
+      demoralizing_shout = 5.5, retaliation = 5.5, berserker_rage = 5.5, rampage = 5.5, slam = 5.5,
+      devastate = 5.5, whirlwind = 5.5, raging_blow = 5.5, battle_shout = 5, onslaught = 5, cleave = 5,
+      colossus_smash = 5, mortal_strike = 5, shield_slam = 5, recklessness = 4.5,
     },
+
     upgrade = { strike = 2.5, defend = 2, heroic_strike = 2.5, bloodrage = 1.5 },
     remove = { defend = 1, strike = 1.5 },
   },

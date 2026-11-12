@@ -40,6 +40,7 @@ C.REASONS = {
   condition = "Condition not met.",
   hp = "Not enough HP to pay.",
   resource = "Not enough %s.",
+  traps = "Too many Traps already set.",
   target = "Invalid target.",
   over = "The combat is over.",
   combat = "The combat must end first.",

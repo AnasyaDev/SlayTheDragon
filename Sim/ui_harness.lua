@@ -2491,7 +2491,7 @@ do
     { key = " (injouable)", opts = { playable = false, reason = "Not enough mana." } },
   }
   -- toutes les raisons d'une carte injouable en combat (les plus longues passent sur deux lignes)
-  for _, why in ipairs({ "phase", "unplayable", "casting", "forbidden", "condition", "target", "over" }) do
+  for _, why in ipairs({ "phase", "unplayable", "casting", "forbidden", "condition", "target", "over", "hp", "resource", "traps" }) do
     variants[#variants + 1] = { key = " (" .. why .. ")", opts = { playable = false, reason = ns.Controller.reasonText(why) } }
   end
   local reasonDist = {}
@@ -4918,7 +4918,7 @@ do
     table.concat(ids, ",") == "class:priest,class:warrior" and option("class:priest").selected
     and not option("class:warrior").selected, table.concat(ids, ","))
   local wb = button("class:warrior")
-  check("accueil : bouton du Guerrier (PV, cartes, réputation)", wb and wb._shown and (wb.sub._text or ""):find("80 HP", 1, true)
+  check("accueil : bouton du Guerrier (PV, cartes, réputation)", wb and wb._shown and (wb.sub._text or ""):find(ns.Classes.warrior.hp .. " HP", 1, true)
     and (wb.sub._text or ""):find("10 cards", 1, true), wb and wb.sub._text)
   clickOption("class:warrior")
   check("accueil : clic sur le Guerrier, il devient le choix", option("class:warrior").selected
