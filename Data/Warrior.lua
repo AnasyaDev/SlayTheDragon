@@ -409,16 +409,15 @@ ns.Classes.warrior = {
   survival = "absorb",
   bot = {
     resValue = 8,
-    -- notes des choix : premier balayage sweep=cards (reports/warrior_sweep1.txt, écart ramené à 4,5..7),
-    -- vérifiées en expédition complète (le second balayage, cartes ajoutées de force au deck de départ,
-    -- surcote les défenses : choisies d'après lui, les decks perdaient 14 points)
+    -- notes des choix : 5 + écart / 2 du balayage sweep=cards (meta=start level=7, 500 expéditions par ligne),
+    -- vérifiées en expédition complète (méthode : docs/equilibrage.md, « Notes des cartes du bot »)
     rating = {
-      rend = 7, deep_wounds = 7, execute = 7, ignore_pain = 7, bloodthirst = 7,
-      victory_rush = 6.5, bladestorm = 6.5, revenge = 6.5, enrage = 6.5, pummel = 6.5,
-      shield_block = 6, thunder_clap = 6, overpower = 6, last_stand = 6, shield_wall = 6,
-      demoralizing_shout = 5.5, retaliation = 5.5, berserker_rage = 5.5, rampage = 5.5, slam = 5.5,
-      devastate = 5.5, whirlwind = 5.5, raging_blow = 5.5, battle_shout = 5, onslaught = 5, cleave = 5,
-      colossus_smash = 5, mortal_strike = 5, shield_slam = 5, recklessness = 4.5,
+      bloodthirst = 13.5, shield_slam = 12.5, deep_wounds = 12.5, thunder_clap = 11, victory_rush = 11,
+      execute = 11, shield_wall = 11, rend = 11, shield_block = 10, bladestorm = 10, revenge = 10,
+      ignore_pain = 9.5, enrage = 9.5, whirlwind = 9.5, onslaught = 9.5, berserker_rage = 9, raging_blow = 9,
+      retaliation = 9, battle_shout = 9, pummel = 9, last_stand = 8.5, colossus_smash = 8.5,
+      demoralizing_shout = 8, rampage = 7.5, mortal_strike = 7.5, cleave = 7.5, devastate = 7, slam = 7,
+      overpower = 6.5, recklessness = 5.5,
     },
 
     upgrade = { strike = 2.5, defend = 2, heroic_strike = 2.5, bloodrage = 1.5 },

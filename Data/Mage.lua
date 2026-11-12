@@ -453,12 +453,12 @@ ns.Classes.mage = {
   bot = {
     resValue = 10,
     rating = {
-      fire_blast = 6, scorch = 6, flamestrike = 6, blazing_barrier = 5.5, pyroblast = 6, hot_streak = 5.5,
-      living_bomb = 6, phoenix_flames = 5.5, ignite = 6, combustion = 5.5,
-      ice_lance = 6.5, frost_nova = 6.5, ice_barrier = 6, cone_of_cold = 6.5, flurry = 6, blizzard = 6,
-      glacial_spike = 6, ice_block = 5.5, deep_freeze = 6, shatter = 6,
-      arcane_missiles = 6, arcane_explosion = 6, prismatic_barrier = 6, arcane_barrage = 6, counterspell = 5,
-      evocation = 4.5, polymorph = 6.5, presence_of_mind = 5.5, arcane_power = 6, arcane_surge = 5,
+      presence_of_mind = 10.5, ice_lance = 9, polymorph = 9, arcane_missiles = 8.5, frost_nova = 8.5,
+      ice_block = 8.5, prismatic_barrier = 8, scorch = 7.5, deep_freeze = 7.5, ice_barrier = 7.5, flurry = 7,
+      counterspell = 7, pyroblast = 6.5, fire_blast = 6.5, glacial_spike = 6.5, living_bomb = 6,
+      cone_of_cold = 6, blazing_barrier = 6, flamestrike = 5.5, evocation = 5, blizzard = 5, arcane_barrage = 5,
+      arcane_explosion = 5, phoenix_flames = 5, shatter = 3, combustion = 3, arcane_surge = 3, ignite = 3,
+      hot_streak = 3, arcane_power = 3,
     },
     upgrade = { fireball = 2.5, frostbolt = 2.5, mana_shield = 2, arcane_blast = 2 },
     remove = { mana_shield = 1, frostbolt = 1.5 },

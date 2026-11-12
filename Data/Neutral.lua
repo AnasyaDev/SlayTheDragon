@@ -107,11 +107,13 @@ card("goblin_sapper_charge", {
 })
 
 -- Conseils aux bots de simulation (Sim/run.lua les réunit avec ceux des classes) : note des cartes
--- pour les choix (≈ 5 + écart / 2) ; le marchand du bot achète à partir de 6.
+-- pour les choix : 5 + écart / 2, écart moyen des cinq classes au balayage sweep=cards only=<neutres>
+-- (meta=start level=7, 500 expéditions par ligne ; docs/equilibrage.md). Le bot n'achète ou ne prend
+-- une carte que si sa valeur dans le deck dépasse son prix ou ce qu'il laisse.
 ns.NeutralBot = {
   rating = {
-    rough_dynamite = 5, heavy_silk_bandage = 6, rugged_armor_kit = 5, smoked_desert_dumplings = 5.5,
-    runecloth_bag = 5, iron_grenade = 6, arcane_bomb = 5, elixir_of_superior_defense = 6,
-    black_lotus = 6, goblin_sapper_charge = 6.5,
+    rough_dynamite = 4.5, heavy_silk_bandage = 6.5, rugged_armor_kit = 4, smoked_desert_dumplings = 4.5,
+    runecloth_bag = 3.5, iron_grenade = 6.5, arcane_bomb = 4, elixir_of_superior_defense = 5.5,
+    black_lotus = 6, goblin_sapper_charge = 4,
   },
 }

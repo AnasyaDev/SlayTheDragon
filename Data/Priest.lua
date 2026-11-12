@@ -442,13 +442,12 @@ ns.Classes.priest = {
   bot = {
     resValue = 1.5,
     rating = {
-      vampiric_touch = 7, angelic_feather = 6, flash_heal = 6, solace = 6, luminous_barrier = 6,
-      mind_sear = 6, radiance = 5, holy_nova = 5, shadow_mend = 5, renew = 5, mind_blast = 5,
-      holy_fire = 5, mind_flay = 4,
-      schism = 6, psychic_scream = 6, silence = 5, evangelism = 5, greater_heal = 5, chastise = 5,
-      penance = 5, devouring_plague = 4, sw_death = 4, halo = 4, empyreal_blaze = 4,
-      rapture = 7, pain_suppression = 7, shadowform = 5, apotheosis = 5, void_eruption = 4,
-      spirit_of_redemption = 4,
+      solace = 10.5, penance = 9.5, greater_heal = 9.5, chastise = 9.5, devouring_plague = 9, holy_nova = 9,
+      psychic_scream = 8.5, angelic_feather = 8.5, mind_blast = 8.5, mind_sear = 8, luminous_barrier = 7.5,
+      pain_suppression = 7.5, vampiric_touch = 7.5, flash_heal = 7, silence = 7, void_eruption = 7,
+      shadowform = 7, mind_flay = 7, sw_death = 6.5, schism = 6.5, renew = 6.5, shadow_mend = 6.5,
+      spirit_of_redemption = 5.5, holy_fire = 5.5, apotheosis = 5.5, radiance = 5.5, evangelism = 5.5,
+      empyreal_blaze = 5, halo = 5, rapture = 3.5,
     },
     upgrade = { smite = 2.5, inner_fire = 2, pw_shield = 1.5, sw_pain = 1.5 },
     upgradeRun = { smite = 2.5, inner_fire = 2 }, -- ancien coureur (Sim/run.lua)
