@@ -193,7 +193,8 @@ R.clips = clips
 -- SON niveau. Les niveaux de ses descendants ne se comparent qu'entre eux ; face à un cadre extérieur,
 -- c'est le niveau du rogneur qui compte. Clé de tri d'une région = liste { rogneur le plus extérieur,
 -- …, rogneur le plus proche, région } comparée terme à terme : rogneur = niveau × 1000 + 999 (+ ordre
--- de création), région = niveau × 1000 + couche × 100 + sous-couche × 5 (+ ordre de création).
+-- de création), région = niveau × 1000 + couche × 100 + sous-couche × 5 (+ ordre de création), modèle 3D
+-- = niveau × 1000 + 990 (au-dessus de toutes les couches de son niveau et des niveaux inférieurs).
 local LAYER_KEY = LAYERS
 local indexOf, indexN, indexList = {}, 0, nil
 local function objIndex(o)
@@ -213,6 +214,14 @@ function R.drawKey(o)
   while a and rawget(a, "_name") ~= "UIParent" do
     if clips(a) then table.insert(key, 1, flevel(a) * 1000 + 999 + objIndex(a) / 1e6) end
     a = rawget(a, "_parent")
+  end
+  if rawget(o, "_kind") == "PlayerModel" then
+    -- Cadre de modèle 3D : ses pixels se dessinent à son niveau, par-dessus toutes les régions (textes,
+    -- textures, toutes couches) des cadres de niveau inférieur et des cadres de même niveau créés avant
+    -- lui. À niveau égal, le jeu départage par l'ordre de création ; le faux client prend le pire cas
+    -- (modèle dessus, quel que soit l'ordre) : seul un niveau strictement supérieur est sûr.
+    key[#key + 1] = flevel(f) * 1000 + 990 + objIndex(o) / 100000
+    return key
   end
   local layer = LAYER_KEY[rawget(o, "_layer") or ""] or 3
   key[#key + 1] = flevel(f) * 1000 + layer * 100 + (rawget(o, "_sub") or 0) * 5 + objIndex(o) / 100000

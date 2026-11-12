@@ -38,7 +38,8 @@ local AIM_SCALE = 1.07                   -- ennemi visé (carte à cible armée)
 local FIG_H = 160
 local NAME_SIZE = 11.5
 local ST_DY = 10
-local INFO_LEVEL = 6                     -- cadre des infos : au-dessus du personnage (+1 à +4)
+local INFO_LEVEL = 10                    -- cadre des infos : au-dessus du personnage (modèle +2, repli +4,
+                                         -- étage d'interface fig.ui +8 : Scene.UI_LIFT)
 local ENEMY_TOP = 92                     -- haut de l'emplacement d'un ennemi à l'échelle 1
 local ENEMY_STAGGER = 26                 -- un ennemi sur deux, posé un peu plus bas
 
@@ -170,7 +171,8 @@ local function buildSlot(self, i)
   s._animApply = aimApply
   s.model = s.fig.model
   s.fallback = s.fig.fallback
-  s.flash = W.disc(s.fig, "OVERLAY", 0, C.hp, 0)
+  -- éclat d'un coup : sur l'étage d'interface du personnage, par-dessus le modèle
+  s.flash = W.disc(s.fig.ui, "OVERLAY", 0, C.hp, 0)
   s.flash:SetSize(110, 130)
   s.flash:SetPoint("CENTER", 0, 4)
   -- Infos (cadre compact : nom, vie, Absorption ; intention ; états) dans un cadre au-dessus du
@@ -283,7 +285,7 @@ function V:Build(parent)
   at(hero, parent, HERO_X - 100, HERO_FEET - 220, 200, 220)
   self.hero = hero
   self.playerModel = hero.model
-  hero.flash = W.disc(hero, "OVERLAY", 0, C.hp, 0)
+  hero.flash = W.disc(hero.ui, "OVERLAY", 0, C.hp, 0)
   hero.flash:SetSize(130, 160)
   hero.flash:SetPoint("CENTER", 0, 0)
 
@@ -1431,16 +1433,17 @@ function V:PreviewEnemies()
       local fig = Scene.figure(p, 150, figH)
       fig:SetPoint("TOP", p, "TOPLEFT", 12 + (col + 0.5) * cellW, -36 - row * rowH)
       local m = fig.model
-      local label = W.label(p, "bold", 12, C.text)
+      -- textes sur l'étage d'interface du personnage : jamais sous un modèle
+      local label = W.label(fig.ui, "bold", 12, C.text)
       label:SetPoint("TOP", fig, "BOTTOM", 0, -3)
       label:SetWidth(cellW - 6)
       label:SetWordWrap(false)
       label:SetText(e.name)
-      local ids = W.label(p, "body", 10.5, C.textDim)
+      local ids = W.label(fig.ui, "body", 10.5, C.textDim)
       ids:SetPoint("TOP", label, "BOTTOM", 0, -1)
       ids:SetWidth(cellW - 6)
       ids:SetText(triesText(e.art))
-      m.state = W.label(p, "bold", 11, C.textDim)
+      m.state = W.label(fig.ui, "bold", 11, C.textDim)
       m.state:SetPoint("TOP", ids, "BOTTOM", 0, -1)
       m.state:SetWidth(cellW - 6)
       m.id, m.key, m.art, m.npc, m.fallback, m.label = e.id, e.key, e.art, e.npc, fig.fallback, e.name

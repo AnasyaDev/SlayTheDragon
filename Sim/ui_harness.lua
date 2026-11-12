@@ -4790,6 +4790,225 @@ do
   H.mouseDown.LeftButton = false
 end
 
+print("U33 personnages : noms, cadres, barres, anneaux, éclats et textes flottants au-dessus des modèles 3D ; ombre dessous ; nom hors du modèle")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function under(o, top)
+    while o do if o == top then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function alphaOf(o)
+    local a = 1
+    while o do
+      local c = rawget(o, "_calls")
+      if c and c.SetAlpha then a = a * (c.SetAlpha[1] or 1) end
+      o = rawget(o, "_parent")
+    end
+    return a
+  end
+  local function above(o, t) return R.drawnBefore(R.drawKey(t), R.drawKey(o)) end
+  local function inter(a, b) return a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5 end
+  local function isRegion(o)
+    local k = rawget(o, "_kind")
+    if k == "Texture" then return rawget(o, "_texture") ~= nil or (o._calls.SetColorTexture ~= nil) end
+    if k == "FontString" then return (rawget(o, "_text") or "") ~= "" end
+    return false
+  end
+  local function nameOf(o)
+    return tostring(rawget(o, "_text") or rawget(o, "_wow") or rawget(o, "_texture") or rawget(o, "_kind"))
+  end
+
+  -- 1. règle du faux client : un cadre de modèle recouvre les régions (toutes couches) des cadres de
+  -- niveau inférieur ou égal créés avant lui ; un cadre de niveau supérieur passe dessus
+  do
+    local top = CreateFrame("Frame", nil, UIParent)
+    local low = CreateFrame("Frame", nil, top)
+    low:SetFrameLevel(5)
+    local eq = CreateFrame("Frame", nil, top)
+    eq:SetFrameLevel(7)
+    local tl, te = low:CreateFontString(nil, "OVERLAY"), eq:CreateFontString(nil, "OVERLAY")
+    local m = CreateFrame("PlayerModel", nil, top)
+    m:SetFrameLevel(7)
+    local high = CreateFrame("Frame", nil, top)
+    high:SetFrameLevel(8)
+    local th = high:CreateTexture(nil, "BACKGROUND", nil, -8)
+    check("faux client : un modèle (niveau 7) recouvre le texte d'un cadre de niveau 5 et d'un cadre de niveau 7 créé avant lui ; une texture de fond d'un cadre de niveau 8 passe dessus",
+      above(m, tl) and above(m, te) and above(th, m))
+    top:Hide()
+  end
+
+  -- 2. écran par écran
+  local function regionsOf(rootObj)
+    local out = {}
+    if not rootObj then return out end
+    for _, o in ipairs(H.objects) do
+      if isRegion(o) and (o == rootObj or under(o, rootObj)) and vis(o) then out[#out + 1] = o end
+    end
+    return out
+  end
+  local function models()
+    local out = {}
+    for _, o in ipairs(H.objects) do
+      if rawget(o, "_kind") == "PlayerModel" and under(o, H.ns.UI.content) and vis(o) then out[#out + 1] = o end
+    end
+    return out
+  end
+  -- assoc : { { libellé, cadre ou région } } (éléments d'interface des personnages) ; figs : { { libellé,
+  -- personnage, nom } } (ombre sous le modèle, nom hors de son rectangle)
+  local function sceneCheck(where, assoc, figs)
+    local ms = models()
+    local bad, n = {}, 0
+    for _, a in ipairs(assoc) do
+      for _, o in ipairs(regionsOf(a[2])) do
+        n = n + 1
+        for _, m in ipairs(ms) do
+          if not above(o, m) then bad[#bad + 1] = a[1] .. " (" .. nameOf(o) .. ")" break end
+        end
+      end
+    end
+    check(("%s : les %d éléments d'interface des personnages sont dessinés au-dessus des %d modèles 3D"):format(where, n, #ms),
+      n > 0 and #ms > 0 and #bad == 0, table.concat(bad, ", "))
+    -- tout texte visible du contenu qui croise un modèle est dessiné au-dessus de lui
+    local hidden = {}
+    for _, o in ipairs(H.objects) do
+      if rawget(o, "_kind") == "FontString" and isRegion(o) and under(o, H.ns.UI.content) and vis(o) and alphaOf(o) > 0.01 then
+        local r = R.rect(o)
+        for _, m in ipairs(ms) do
+          local mr = R.rect(m)
+          if r and mr and inter(r, mr) and not above(o, m) then hidden[#hidden + 1] = nameOf(o) break end
+        end
+      end
+    end
+    check(where .. " : aucun texte visible n'est recouvert par un modèle", #hidden == 0, table.concat(hidden, ", "))
+    local sbad, nbad = {}, {}
+    for _, f in ipairs(figs) do
+      local fig, nm = f[2], f[3]
+      if fig.model and vis(fig.model) then
+        for i, part in ipairs(fig.shadow.parts) do
+          if vis(part) and not above(fig.model, part) then sbad[#sbad + 1] = f[1] .. " couche " .. i end
+        end
+        if nm and vis(nm) and (rawget(nm, "_text") or "") ~= "" then
+          local nr, mr = R.rect(nm), R.rect(fig.model)
+          if nr and mr and inter(nr, mr) then
+            nbad[#nbad + 1] = ("%s : nom [%.0f, %.0f] dans le modèle [%.0f, %.0f] (hauteur)"):format(f[1], nr[2], nr[4], mr[2], mr[4])
+          end
+        end
+      end
+    end
+    check(where .. " : ombre de contact sous le modèle de chaque personnage", #sbad == 0, table.concat(sbad, ", "))
+    check(where .. " : le nom de chaque personnage ne chevauche pas le rectangle de son modèle", #nbad == 0, table.concat(nbad, " ; "))
+  end
+  local function heroRing(fig) fig:SetRing(true) return { "anneau du héros", fig.ring } end
+
+  -- accueil
+  H.boot()
+  H.slash("")
+  local st = UI().current
+  sceneCheck("accueil", { heroRing(st.hero) }, { { "héros", st.hero } })
+  st.hero:SetRing(false)
+
+  -- combat : héros, ennemis (anneaux de cible allumés, cible visée agrandie), texte flottant
+  freshRun(SEED, "combat")
+  H.settle()
+  local v = V()
+  local assoc = { { "cadre du héros", v.heroFrame }, { "états du héros", v.playerSt }, { "éclat du héros", v.hero.flash },
+    heroRing(v.hero) }
+  if v.cast:IsShown() then assoc[#assoc + 1] = { "incantation", v.cast } end
+  local figs = { { "héros", v.hero } }
+  local first
+  for _, s in pairs(v.slotOf) do
+    if s:IsVisible() then
+      first = first or s
+      local nm = tostring(s.name._text)
+      s.fig:SetRing(true)
+      assoc[#assoc + 1] = { nm .. " : cadre, intention, états", s.info }
+      assoc[#assoc + 1] = { nm .. " : éclat", s.flash }
+      assoc[#assoc + 1] = { nm .. " : anneau de cible", s.fig.ring }
+      figs[#figs + 1] = { nm, s.fig, s.name }
+    end
+  end
+  local fl = H.ns.Widgets.float(v.parent, 700, 200, "-12", H.ns.Art.C.white, 30)
+  assoc[#assoc + 1] = { "texte flottant", fl }
+  sceneCheck("combat", assoc, figs)
+  snap("combat-anneaux") -- aperçu : anneaux de cible allumés, texte flottant
+  -- ennemi visé (agrandi) : nom toujours hors du modèle
+  if first then
+    H.ns.Widgets.animSet(first, "aim", 1)
+    sceneCheck("combat, ennemi visé", { { "cadre de l'ennemi visé", first.info } }, { { "ennemi visé", first.fig, first.name } })
+    H.ns.Widgets.animSet(first, "aim", 0)
+  end
+  for _, s in pairs(v.slotOf) do s.fig:SetRing(false) end
+  v.hero:SetRing(false)
+  H.advance(2)
+  -- personnages agrandis (golem, VanCleef) aux places décalées, sans puis avec la visée, petite et
+  -- grande échelle de la fenêtre
+  local group = { "murloc", "harvest_golem", "sorcerer", "vancleef" }
+  for _, scale in ipairs({ 0.6, 1.5 }) do
+    H.ns.Persist.options().scale = scale
+    H.ns.UI.applyScale()
+    local c = C().combat()
+    c.enemies = {}
+    for _, id in ipairs(group) do H.ns.Combat.spawn(c, id) end
+    v.c = nil
+    v:Show({ state = c })
+    H.advance(0.5)
+    for _, aim in ipairs({ 0, 1 }) do
+      local ga, gf = {}, {}
+      for _, s in pairs(v.slotOf) do
+        if s:IsVisible() then
+          H.ns.Widgets.animSet(s, "aim", aim)
+          s.fig:SetRing(true)
+          ga[#ga + 1] = { tostring(s.name._text), s.info }
+          ga[#ga + 1] = { tostring(s.name._text) .. " : anneau", s.fig.ring }
+          gf[#gf + 1] = { tostring(s.name._text), s.fig, s.name }
+        end
+      end
+      sceneCheck(("combat, %d ennemis dont 2 agrandis, échelle %.1f, visée %d"):format(#gf, scale, aim), ga, gf)
+      for _, s in pairs(v.slotOf) do H.ns.Widgets.animSet(s, "aim", 0) s.fig:SetRing(false) end
+    end
+  end
+  H.ns.Persist.options().scale = 1
+  H.ns.UI.applyScale()
+
+  -- rencontre : PNJ (nom, voile du nom, anneau), héros
+  freshRun(SEED + 4, "event")
+  local ch = UI().current
+  local npcName = ch.npc.name or ch.speaker
+  check("rencontre : PNJ affiché avec son modèle et son nom",
+    ch.npc.model:IsVisible() and (npcName._text or "") ~= "", tostring(npcName._text))
+  ch.npc:SetRing(true)
+  local ea = { { "nom du PNJ", npcName }, { "anneau du PNJ", ch.npc.ring }, heroRing(ch.hero) }
+  if ch.npc.nameBack then ea[#ea + 1] = { "voile du nom du PNJ", ch.npc.nameBack } end
+  sceneCheck("rencontre", ea, { { "PNJ", ch.npc, npcName }, { "héros", ch.hero } })
+  ch.npc:SetRing(false)
+  ch.hero:SetRing(false)
+  -- même nom, même place, aux échelles extrêmes de la fenêtre
+  for _, scale in ipairs({ 0.6, 1.5 }) do
+    H.ns.Persist.options().scale = scale
+    H.ns.UI.applyScale()
+    sceneCheck(("rencontre, échelle %.1f"):format(scale), { { "nom du PNJ", npcName } }, { { "PNJ", ch.npc, npcName } })
+  end
+  H.ns.Persist.options().scale = 1
+  H.ns.UI.applyScale()
+
+  -- feu de camp, coffre
+  freshRun(SEED + 3, "campfire")
+  local cp = UI().current
+  sceneCheck("feu de camp", { heroRing(cp.hero) }, { { "héros", cp.hero } })
+  cp.hero:SetRing(false)
+  freshRun(SEED + 5, "chest")
+  local rw = UI().current
+  if rw.hero then
+    sceneCheck("coffre", { heroRing(rw.hero) }, { { "héros", rw.hero } })
+    rw.hero:SetRing(false)
+  end
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end

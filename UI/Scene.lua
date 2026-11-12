@@ -515,19 +515,28 @@ local function contactShadow(f, w)
   return sh
 end
 
+-- Ordre de dessin d'un personnage. Un cadre de modèle 3D (PlayerModel) dessine ses pixels à son propre
+-- niveau, par-dessus toutes les régions (textes, textures, toutes couches) des cadres de niveau inférieur
+-- ou égal : un nom posé comme région du cadre de l'écran, ou du personnage lui-même, passe sous le modèle
+-- (nom de Salma Saldean coupé par sa robe). D'où trois étages :
+--   f (niveau L)         : ombre de contact seulement, qui doit rester sous le modèle ;
+--   f.model (L + 1)      : le modèle, puis le repli en médaillon (L + 3) ;
+--   f.ui (L + 1 + UI_LIFT) : tout ce qui se lit ou se voit par-dessus le personnage (anneau de cible, nom,
+--                          éclat d'un coup) ; au-dessus de tous les modèles d'une scène dont les
+--                          personnages sont posés à moins de UI_LIFT - 2 niveaux d'écart.
+-- Les écrans portent leurs propres éléments (cadres d'unité, intentions, états) dans des cadres de niveau
+-- encore supérieur (CombatView : info au niveau de l'emplacement + 10).
+S.UI_LIFT = 6
+
+-- Nom d'un personnage (PNJ de rencontre) : au-dessus de la tête, comme le cadre des ennemis en combat ;
+-- bas du texte NAME_GAP au-dessus du haut du cadre du modèle (jamais sur le modèle), voile sombre fondu
+-- (texture de l'ombre de contact) derrière le texte pour qu'il se lise sur tout décor.
+S.NAME_GAP = 8
+
 -- Cadre de personnage : w × h, pieds au bas du cadre (feetY depuis le bas).
 function S.figure(parent, w, h)
   local f = CreateFrame("Frame", nil, parent)
   f:SetSize(w, h)
-  f.ring = CreateFrame("Frame", nil, f)
-  f.ring:SetSize(w * 0.9, 24)
-  f.ring:SetPoint("BOTTOM", 0, -2)
-  f.ring.outer = W.disc(f.ring, "BACKGROUND", 0, C.gold, 0.95)
-  f.ring.outer:SetAllPoints()
-  f.ring.inner = W.disc(f.ring, "BACKGROUND", 1, C.shadow, 0.9)
-  f.ring.inner:SetPoint("TOPLEFT", 4, -3)
-  f.ring.inner:SetPoint("BOTTOMRIGHT", -4, 3)
-  f.ring:Hide()
   f.shadow = contactShadow(f, w)
   f.model = W.model(f, w, h)
   f.model:SetPoint("BOTTOM", 0, 0)
@@ -536,15 +545,51 @@ function S.figure(parent, w, h)
   f.fallback:SetPoint("CENTER", 0, h * 0.08)
   f.fallback:SetFrameLevel(f.model:GetFrameLevel() + 2)
   f.fallback:Hide()
+  -- étage de l'interface du personnage, au-dessus du modèle et du repli
+  f.ui = CreateFrame("Frame", nil, f)
+  f.ui:SetAllPoints()
+  f.ui:SetFrameLevel(f.model:GetFrameLevel() + S.UI_LIFT)
+  f.ui:EnableMouse(false)
+  -- anneau de cible : anneau doré du jeu aplati, creux (il passe sur les pieds sans les masquer)
+  f.ring = CreateFrame("Frame", nil, f.ui)
+  f.ring:SetSize(w * 0.9, 24)
+  f.ring:SetPoint("BOTTOM", 0, -2)
+  f.ring.outer = W.wow(f.ring, "ring_small", "ARTWORK", 0)
+  f.ring.outer:SetAllPoints()
+  f.ring:Hide()
   f.SetRing = function(self, on, hover)
     if on then
       self.ring:Show()
-      self.ring.outer:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], hover and 0.6 or 0.95)
+      self.ring.outer:SetVertexColor(1, 1, 1, hover and 0.6 or 1)
     else
       self.ring:Hide()
     end
   end
   return f
+end
+
+-- Nom au-dessus de la tête du personnage f (créé à la demande, sur f.ui) ; texte vide = rien d'affiché.
+function S.setName(f, text, size, color)
+  if not f.name then
+    f.nameBack = W.noSnap(f.ui:CreateTexture(nil, "BACKGROUND", nil, 0))
+    f.nameBack:SetTexture(S.SHADOW, nil, nil, "TRILINEAR")
+    f.nameBack:SetVertexColor(0, 0, 0, 0.6)
+    f.name = W.label(f.ui, "bold", size or 14, color or C.wowGold, "OVERLAY")
+    f.name:SetPoint("BOTTOM", f, "TOP", 0, S.NAME_GAP)
+    f.name:SetWidth(f:GetWidth())
+    f.name:SetJustifyH("CENTER")
+    f.nameBack:SetPoint("CENTER", f.name, "CENTER", 0, 0)
+  end
+  text = text or ""
+  f.name:SetText(text)
+  if text == "" then
+    f.nameBack:Hide()
+  else
+    local tw = math.min(f.name:GetStringWidth() or 0, f:GetWidth())
+    f.nameBack:SetSize(tw + 44, (f.name:GetHeight() or 14) + 16)
+    f.nameBack:Show()
+  end
+  return f.name
 end
 
 function S.playerFigure(f)
