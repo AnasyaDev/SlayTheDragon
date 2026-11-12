@@ -3889,7 +3889,7 @@ do
     { W.inlineIcons("Apply Demoralized\194\1602 ⌛ to\194\160all", 10), "Apply | Demoralized 2⌛ | to all" },
     { "Deal 6 three times.", "Deal 6 | three times." },
     { "Atonement: +2 Absorb per hit.", "Atonement: | +2 Absorb | per | hit." },
-    { "+1 Arcane Charge.", "+1 Arcane Charge." },
+    { "+1 Charge.", "+1 Charge." },
     { "Surge: deal 4 + 4 per Insanity.", "Surge: | deal 4 + 4 | per | Insanity." },
     { "Pay 3 HP.", "Pay 3 HP." },
     { "Surge: pet attacks once per Frenzy.", "Surge: | pet | attacks | once per | Frenzy." },
@@ -5946,7 +5946,7 @@ if SNAP then
   big:Hide()
 end
 
-print("UM  Mage : textes des cartes dans la zone, accueil, combat (pastille d'Arcane Charges, portrait, Instant, deuxième incantation)")
+print("UM  Mage : textes des cartes dans la zone, accueil, combat (pastille d'Charges, portrait, Instant, deuxième incantation)")
 do
   H.boot(nil)
   H.slash("")
@@ -6010,11 +6010,11 @@ do
   c.player.res = 2
   v:Render(true)
   local r = v.resource
-  check("pastille de ressource : icône des Arcane Charges, nombre, visible",
+  check("pastille de ressource : icône des Charges, nombre, visible",
     r._shown and (r.icon._texture or ""):lower():find("spell_arcane_arcane01", 1, true) and r.text._text == "2",
     tostring(r.icon._texture) .. " / " .. tostring(r.text._text))
   local tt = table.concat(H.hover(r), " | ")
-  check("pastille de ressource : explication des Arcane Charges et plafond 4", tt:find("Arcane Charge", 1, true) and tt:find("2 / 4", 1, true), tt)
+  check("pastille de ressource : explication des Charges et plafond 4", tt:find("Charge", 1, true) and tt:find("2 / 4", 1, true), tt)
   check("cadre du héros : nom et portrait = icône du Mage",
     v.heroFrame.name._text == "Mage" and (v.heroFrame.portrait._texture or ""):lower():find("classicon_mage", 1, true),
     tostring(v.heroFrame.portrait._texture))
@@ -6029,8 +6029,8 @@ do
   H.advance(2)
   W.float = old
   local fl = table.concat(floats, "|")
-  check("chiffres flottants : « +1 Arcane Charge » et « +2 Arcane Charges »", fl:find("+1 Arcane Charge", 1, true)
-    and fl:find("+2 Arcane Charges", 1, true), fl)
+  check("chiffres flottants : « +1 Charge » et « +2 Charges »", fl:find("+1 Charge", 1, true)
+    and fl:find("+2 Charges", 1, true), fl)
   -- Instant : jeton sous le héros avec son nombre
   ns.Combat.applyStatus(c, c.player, "instant", 2)
   v:Render(true)

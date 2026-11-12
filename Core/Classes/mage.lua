@@ -1,5 +1,5 @@
 -- Règles propres du Mage (fiche : docs/classes/mage.md ; contrat : docs/classes.md).
---   Arcane Charges (ressource « arcane », 0 à 4, gardées) : chaque charge ajoute 1 aux dégâts de chaque
+--   Charges (ressource « arcane », 0 à 4, gardées) : chaque charge ajoute 1 aux dégâts de chaque
 --     coup d'une carte Attack (2 avec Arcane Power en jeu), comme Strength, avant Demoralized et
 --     Sundered ; ni aux DoT, ni aux Skills, ni aux bibelots et potions. Vidées par Surge (effet commun).
 --   Deux incantations à la fois (crochet castSlots) ; la file, l'ordre et l'interruption de la plus

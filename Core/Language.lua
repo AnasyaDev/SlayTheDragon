@@ -99,7 +99,7 @@ end
 L.resource("insanity", { name = "Insanity", text = "resource gained by Shadow cards." })
 L.resource("rage", { name = "Rage", text = "+1 per Attack played and per hit taken, up to 5." })
 L.resource("combo", { name = "Combo", plural = "Combo", text = "gained by openers, spent by finishers, up to 5." })
-L.resource("arcane", { name = "Arcane Charge", plural = "Arcane Charges", text = "+1 damage to Attacks per charge, up to 4." })
+L.resource("arcane", { name = "Charge", plural = "Charges", text = "+1 damage to Attacks per charge, up to 4." })
 L.resource("shards", { name = "Soul Shard", plural = "Soul Shards", text = "gained from kills and drains, up to 5." })
 L.resource("frenzy", { name = "Frenzy", text = "+1 pet damage per point, up to 5." })
 L.resource("holy", { name = "Holy Power", text = "gained by basic cards, up to 3." })

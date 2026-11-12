@@ -1,9 +1,9 @@
 -- Cartes et bibelots du Mage (fiche : docs/classes/mage.md ; règles communes : docs/classes/decisions.md).
--- Mêmes champs que Data/Priest.lua ; règles propres (Arcane Charges, deux Cast, Frozen, Ice Block) :
+-- Mêmes champs que Data/Priest.lua ; règles propres (Charges, deux Cast, Frozen, Ice Block) :
 -- Core/Classes/mage.lua ; art : UI/Art/mage.lua. Chiffres de la fiche, à régler par la simulation
 -- (luajit Sim/sim.lua ... class=mage, docs/classes.md).
 --
--- Arcane Charges (0 à 4, gardées d'un tour à l'autre) : gagnées par « +1 Arcane Charge. » (effet res),
+-- Charges (0 à 4, gardées d'un tour à l'autre) : gagnées par « +1 Charge. » (effet res),
 -- +1 dégât par charge à chaque coup des cartes Attack (Arcane Power : +2), vidées par « Surge: ».
 -- Deux incantations à la fois ; Instant (état commun) fait partir la prochaine carte Cast tout de suite.
 -- École (champ school) : fire, frost, arcane. Voies : Fire (enchaîner les gros sorts sous Instant),
@@ -51,8 +51,8 @@ card("mana_shield", {
 card("arcane_blast", {
   level = 1, name = "Arcane Blast", cost = 1, type = "attack", school = "arcane", rarity = "basic", path = "start",
   target = "enemy", effects = { { "damage", 6 }, { "res", 1 } },
-  text = "Deal 6.\n+1 Arcane Charge.",
-  up = { effects = { { "damage", 9 }, { "res", 1 } }, text = "Deal 9.\n+1 Arcane Charge." },
+  text = "Deal 6.\n+1 Charge.",
+  up = { effects = { { "damage", 9 }, { "res", 1 } }, text = "Deal 9.\n+1 Charge." },
 })
 
 -- Fire : les petites cartes Fire remplissent le compte du tour, l'Instant fait partir les gros Cast ----
@@ -274,38 +274,38 @@ card("shatter", {
 card("arcane_missiles", {
   level = 1, name = "Arcane Missiles", cost = 1, type = "attack", school = "arcane", rarity = "common", path = "arcane",
   target = "enemy", effects = { { "damage", 3, times = 3 }, { "res", 1 } },
-  text = "Deal 3 three times.\n+1 Arcane Charge.",
-  up = { effects = { { "damage", 4, times = 3 }, { "res", 1 } }, text = "Deal 4 three times.\n+1 Arcane Charge." },
+  text = "Deal 3 three times.\n+1 Charge.",
+  up = { effects = { { "damage", 4, times = 3 }, { "res", 1 } }, text = "Deal 4 three times.\n+1 Charge." },
 })
 
 card("arcane_explosion", {
   level = 1, name = "Arcane Explosion", cost = 1, type = "attack", school = "arcane", rarity = "common", path = "arcane",
   effects = { { "damage", 4, all = true }, { "res", 1 } },
-  text = "Deal 4 to all.\n+1 Arcane Charge.",
-  up = { effects = { { "damage", 6, all = true }, { "res", 1 } }, text = "Deal 6 to all.\n+1 Arcane Charge." },
+  text = "Deal 4 to all.\n+1 Charge.",
+  up = { effects = { { "damage", 6, all = true }, { "res", 1 } }, text = "Deal 6 to all.\n+1 Charge." },
 })
 
 card("prismatic_barrier", {
   level = 1, name = "Prismatic Barrier", cost = 1, type = "skill", school = "arcane", rarity = "common", path = "arcane",
   effects = { { "absorb", 5 }, { "res", 1 } },
-  text = "Gain 5 Absorb.\n+1 Arcane Charge.",
-  up = { effects = { { "absorb", 8 }, { "res", 1 } }, text = "Gain 8 Absorb.\n+1 Arcane Charge." },
+  text = "Gain 5 Absorb.\n+1 Charge.",
+  up = { effects = { { "absorb", 8 }, { "res", 1 } }, text = "Gain 8 Absorb.\n+1 Charge." },
 })
 
 -- Surge : les charges sont lues puis remises à 0 avant le coup, le bonus passif ne s'y ajoute donc pas.
 card("arcane_barrage", {
   level = 1, name = "Arcane Barrage", cost = 1, type = "attack", school = "arcane", rarity = "common", path = "arcane",
   minRes = 1, effects = { { "surge" }, { "damage", 0, all = true, per = { 6, "surge" } } },
-  text = "Surge: deal 6 per Arcane Charge to all.",
+  text = "Surge: deal 6 per Charge to all.",
   up = { effects = { { "surge" }, { "damage", 0, all = true, per = { 8, "surge" } } },
-    text = "Surge: deal 8 per Arcane Charge to all." },
+    text = "Surge: deal 8 per Charge to all." },
 })
 
 card("counterspell", {
   level = 1, name = "Counterspell", cost = 0, type = "skill", school = "arcane", rarity = "uncommon", path = "arcane",
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "res", 1 } },
-  text = "Interrupt the target's cast.\n+1 Arcane Charge.\nCooldown 2.",
-  up = { cooldown = 1, text = "Interrupt the target's cast.\n+1 Arcane Charge.\nCooldown 1." },
+  text = "Interrupt the target's cast.\n+1 Charge.\nCooldown 2.",
+  up = { cooldown = 1, text = "Interrupt the target's cast.\n+1 Charge.\nCooldown 1." },
 })
 
 -- Evocation : Cast à 0 mana ; le mana est remis au maximum AVANT la résolution des incantations (socle),
@@ -327,15 +327,15 @@ card("evocation", {
 card("polymorph", {
   level = 2, name = "Polymorph", cost = 2, type = "skill", school = "arcane", rarity = "common", path = "arcane",
   target = "enemy", exhaust = true, effects = { { "res", 1 }, { "apply", "stunned", 2 } },
-  text = "+1 Arcane Charge.\nApply Stunned 2 ⌛\nExhaust.",
-  up = { cost = 1, text = "+1 Arcane Charge.\nApply Stunned 2 ⌛\nExhaust." },
+  text = "+1 Charge.\nApply Stunned 2 ⌛\nExhaust.",
+  up = { cost = 1, text = "+1 Charge.\nApply Stunned 2 ⌛\nExhaust." },
 })
 
 card("presence_of_mind", {
   level = 4, name = "Presence of Mind", cost = 0, type = "skill", school = "arcane", rarity = "uncommon", path = "arcane",
   cooldown = 4, effects = { { "draw", 1 }, { "res", 1 }, { "apply", "instant", 1, self = true } },
-  text = "Draw 1.\n+1 Arcane Charge.\nGain Instant 1\nCooldown 4.",
-  up = { cooldown = 3, text = "Draw 1.\n+1 Arcane Charge.\nGain Instant 1\nCooldown 3." },
+  text = "Draw 1.\n+1 Charge.\nGain Instant 1\nCooldown 4.",
+  up = { cooldown = 3, text = "Draw 1.\n+1 Charge.\nGain Instant 1\nCooldown 3." },
 })
 
 -- Arcane Power : chaque charge ajoute 2 au lieu de 1 (lu par la règle de classe ; deux exemplaires
@@ -343,8 +343,8 @@ card("presence_of_mind", {
 card("arcane_power", {
   level = 6, name = "Arcane Power", cost = 1, type = "power", school = "arcane", rarity = "rare", path = "arcane",
   power = true, effects = {}, chargeBonus = 2,
-  text = "Power.\nArcane Charges add 2 damage, not 1.",
-  up = { cost = 0, text = "Power.\nArcane Charges add 2 damage, not 1." },
+  text = "Power.\n+2 damage per Charge, not +1.",
+  up = { cost = 0, text = "Power.\n+2 damage per Charge, not +1." },
 })
 
 local function surgeMana(c, ctx)
@@ -355,8 +355,8 @@ end
 card("arcane_surge", {
   level = 7, name = "Arcane Surge", cost = 1, type = "skill", school = "arcane", rarity = "rare", path = "arcane",
   minRes = 1, effects = { { "surge" }, { "fn", surgeMana }, { "draw", 0, per = { 1, "surge" } } },
-  text = "Surge: +1 mana, draw 1 per Arcane Charge.",
-  up = { cost = 0, text = "Surge: +1 mana, draw 1 per Arcane Charge." },
+  text = "Surge: +1 mana, draw 1 per Charge.",
+  up = { cost = 0, text = "Surge: +1 mana, draw 1 per Charge." },
 })
 
 -- Bibelots du Mage (class = "mage" : tirés seulement pour lui) -------------------------------------
@@ -387,7 +387,7 @@ relic("apprentice_wand", {
 
 relic("tome_arcane_brilliance", {
   level = 1, name = "Tome of Arcane Brilliance", rarity = "common",
-  text = "Start each combat with 1 Arcane Charge.",
+  text = "Start each combat with 1 Charge.",
   hooks = {
     onCombatStart = function(c) Combat.gainRes(c, 1, "relic") end,
   },
@@ -426,7 +426,7 @@ relic("fire_ruby", {
 
 relic("mind_quickening_gem", {
   level = 7, name = "Mind Quickening Gem", rarity = "rare",
-  text = "At the start of each turn with 4 Arcane Charges, +1 mana.",
+  text = "At the start of each turn with 4 Charges, +1 mana.",
   hooks = {
     onTurnStart = function(c)
       if (c.player.res or 0) >= 4 then manaGain(1)(c) end

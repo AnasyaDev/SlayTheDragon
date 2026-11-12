@@ -1534,7 +1534,7 @@ test("Rogue : combats simulés par le bot heuristique, sans erreur", function()
 end)
 
 ---------------------------------------------------------------------------
--- Mage : Arcane Charges, deux Cast, Instant, Hot Streak, Frozen, Ice Block, cartes et bibelots
+-- Mage : Charges, deux Cast, Instant, Hot Streak, Frozen, Ice Block, cartes et bibelots
 -- (docs/classes/mage.md, docs/classes/decisions.md)
 ---------------------------------------------------------------------------
 
@@ -1609,7 +1609,7 @@ test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté
   eq(paths.start, 4); eq(paths.fire, 10); eq(paths.frost, 10); eq(paths.arcane, 10)
 end)
 
-test("Mage : définition (42 PV, Arcane Charges 0 à 4 gardées, deck de départ, Apprentice's Wand), 6 bibelots avec niveau, Interrupt et Last Breath", function()
+test("Mage : définition (42 PV, Charges 0 à 4 gardées, deck de départ, Apprentice's Wand), 6 bibelots avec niveau, Interrupt et Last Breath", function()
   local cd = ns.Classes.mage
   eq(cd.hp, 42); eq(cd.resource.id, "arcane"); eq(cd.resource.cap, 4); eq(cd.resource.keep, true)
   eq(cd.startRelic, "apprentice_wand"); eq(ns.Relics.apprentice_wand.noPool, true); eq(cd.survival, "control")
@@ -1656,9 +1656,9 @@ test("Mage : texte de chaque carte (base et améliorée) conforme à ses effets 
               if m[2] == "execute" then has("Execute: deal " .. (e[2] + m[1]) .. ".") end
             end
           elseif k == "damage" then
-            has("deal " .. e.per[1] .. " per Arcane Charge" .. (e.all and " to all" or ""))
+            has("deal " .. e.per[1] .. " per Charge" .. (e.all and " to all" or ""))
           elseif k == "absorb" then has("Gain " .. e[2] .. " Absorb.")
-          elseif k == "res" then has("+" .. e[2] .. " Arcane Charge.")
+          elseif k == "res" then has("+" .. e[2] .. " Charge.")
           elseif k == "draw" and e[2] > 0 then has("Draw " .. e[2] .. ".")
           elseif k == "apply" then
             local s = ns.Statuses[e[2]]
@@ -1700,7 +1700,7 @@ test("Mage : chaque carte (base et améliorée) jouable sans erreur, deux tours 
   eq(n, 68)
 end)
 
-test("Arcane Charges : gagnées après le coup (Arcane Blast), plafond 4 (le surplus est perdu), gardées d'un tour à l'autre", function()
+test("Charges : gagnées après le coup (Arcane Blast), plafond 4 (le surplus est perdu), gardées d'un tour à l'autre", function()
   local c = mageHand({ "arcane_blast", "arcane_blast" })
   c.player.res = 3
   Combat.play(c, 1, 1)
@@ -1713,7 +1713,7 @@ test("Arcane Charges : gagnées après le coup (Arcane Blast), plafond 4 (le sur
   eq(f.player.res, 0, "0 au début du combat")
 end)
 
-test("Arcane Charges : +1 par charge à chaque coup des cartes Attack, sur chaque cible ; rien aux Skills ni aux DoT ; avant Demoralized et Sundered", function()
+test("Charges : +1 par charge à chaque coup des cartes Attack, sur chaque cible ; rien aux Skills ni aux DoT ; avant Demoralized et Sundered", function()
   local c = mageHand({ "arcane_missiles" })
   c.player.res = 2
   Combat.play(c, 1, 1)
