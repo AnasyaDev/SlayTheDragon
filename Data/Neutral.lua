@@ -5,7 +5,8 @@
 -- tier = palier de la Ligue des explorateurs qui la débloque (0 Neutre … 3 Révéré, comme les bibelots),
 -- noReward = true (jamais dans X.cardPool : récompenses). Aucune ressource ni aucun état de classe :
 -- Absorb, DoT, Strength, Stunned, mana, pioche, Interrupt et les mots de plaque communs seulement.
--- minHp = N : la carte perd N PV (« Lose N HP. ») et est injouable à N PV ou moins (raison lowHp).
+-- payHp = N : « Pay N HP. » en première ligne, coût payé au jeu, injouable s'il ferait tomber à 0 (décisions
+-- communes : une seule formulation pour une perte de PV sur une carte).
 -- Textes dans le langage des cartes (docs/classes.md, « Langage des cartes »), affichés en anglais.
 local _, ns = ...
 
@@ -19,10 +20,6 @@ local function card(id, t)
   t.noReward = true
   C[id] = t
 end
-
--- « Lose N HP. » : perte de PV par effet (pas un coût), expliquée au survol.
-ns.Language.keyword("loseHp", { name = "Lose N HP", pattern = "^Lose %d+ HP%.$",
-  text = "loses HP, ignores Absorb, never lethal." })
 
 -- Neutre (palier 0) ------------------------------------------------------------------------
 
@@ -104,10 +101,9 @@ card("black_lotus", {
 
 card("goblin_sapper_charge", {
   tier = 3, name = "Goblin Sapper Charge", cost = 2, type = "attack", rarity = "rare",
-  exhaust = true, minHp = 5, effects = { { "damage", 14, all = true }, { "loseHp", 5, safe = true } },
-  text = "Deal 14 to all.\nLose 5 HP.\nExhaust.",
-  up = { effects = { { "damage", 18, all = true }, { "loseHp", 5, safe = true } },
-    text = "Deal 18 to all.\nLose 5 HP.\nExhaust." },
+  exhaust = true, payHp = 5, effects = { { "damage", 14, all = true } },
+  text = "Pay 5 HP.\nDeal 14 to all.\nExhaust.",
+  up = { effects = { { "damage", 18, all = true } }, text = "Pay 5 HP.\nDeal 18 to all.\nExhaust." },
 })
 
 -- Conseils aux bots de simulation (Sim/run.lua les réunit avec ceux des classes) : note des cartes

@@ -104,7 +104,7 @@ end
 -- (Combat.play, comme le mana) ; ctx.spent dit s'il a été payé (cond = "spent", more = { k, "spent" }).
 
 -- { "loseHp", n, safe = bool } : perte de PV sans Absorption (effet ; le coût « Pay N HP » est le champ
--- payHp). safe : jamais mortelle (laisse au moins 1 PV ; carte neutre « Lose N HP. », avec minHp).
+-- payHp, seule formulation d'une perte de PV sur une carte). safe : jamais mortelle (laisse au moins 1 PV).
 Effects.loseHp = function(c, ctx, e)
   local n = e[2]
   if e.safe then n = math.min(n, c.player.hp - 1) end

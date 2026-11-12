@@ -744,8 +744,6 @@ function Combat.canPlay(c, idx)
   -- « Pay N HP » : jamais mortel, la carte est injouable s'il ferait tomber à 0
   local pay = Combat.payHpOf(c, d, inst)
   if pay > 0 and c.player.hp <= pay then return false, "hp" end
-  -- perte de PV par effet (« Lose 5 HP. », minHp = 5) : jamais mortelle, injouable à minHp PV ou moins
-  if d.minHp and c.player.hp <= d.minHp then return false, "lowHp" end
   -- ressource requise (Surge qui n'a de sens qu'avec de la ressource)
   if d.minRes and (c.player.res or 0) < d.minRes then return false, "resource" end
   -- incantation : emplacements pleins, sauf si elle partira tout de suite (« instantCast » interrogé

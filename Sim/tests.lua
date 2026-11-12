@@ -2421,7 +2421,9 @@ do
         eq(d.class, nil, id); eq(d.path, "neutral", id); eq(d.noReward, true, id)
         eq(d.tier, want[1], id .. " palier"); eq(d.rarity, want[2], id); eq(d.cost, want[3], id); eq(d.type, want[4], id)
         assert(d.up and d.up.text, id .. " : amélioration")
-        assert(d.rep == nil and d.level == nil and not d.spend and not d.minRes and not d.payHp, id .. " : champ de classe")
+        -- payHp est commun (« Pay N HP. », décisions communes) : seule Goblin Sapper Charge le porte
+        assert(d.rep == nil and d.level == nil and not d.spend and not d.minRes, id .. " : champ de classe")
+        assert(not d.payHp or id == "goblin_sapper_charge", id .. " : coût en PV inattendu")
         for _, up in ipairs({ false, true }) do
           for _, e in ipairs(Card.defById(id, up).effects) do
             assert(e[1] ~= "res" and e[1] ~= "surge" and e[1] ~= "demence", id .. " : ressource de classe")
@@ -2503,7 +2505,7 @@ do
         -- Black Lotus : +2 mana (pioche 1 améliorée)
         c, b = playNeutral(cl, "black_lotus", up)
         eq(c.player.mana - b.mana, 2, tag .. " lotus"); eq(#c.hand, b.hand - 1 + (up and 1 or 0), tag .. " lotus pioche")
-        -- Goblin Sapper Charge : 14 (18) à tous, -5 PV
+        -- Goblin Sapper Charge : Pay 5 HP, 14 (18) à tous
         c, b = playNeutral(cl, "goblin_sapper_charge", up, { "test_hitter", "test_dummy" })
         k = up and 18 or 14
         eq(b.e1 - c.enemies[1].hp, k, tag .. " sapper 1"); eq(b.e2 - c.enemies[2].hp, k, tag .. " sapper 2")
@@ -2512,18 +2514,19 @@ do
     end
   end)
 
-  test("neutres : Goblin Sapper Charge injouable à 5 PV ou moins (Not enough HP.), jamais mortelle", function()
+  test("neutres : Goblin Sapper Charge, « Pay 5 HP. » (coût), injouable s'il ferait tomber à 0", function()
     for _, cl in ipairs(CLASSES) do
       local c = setup({ "goblin_sapper_charge" }, { "test_dummy" }, nil, { class = cl })
+      eq(ns.Cards.goblin_sapper_charge.payHp, 5, cl .. " : coût en PV")
       c.player.hp = 5
       local ok, why = Combat.canPlay(c, 1)
-      assert(not ok and why == "lowHp", cl .. " : " .. tostring(why))
+      assert(not ok and why == "hp", cl .. " : " .. tostring(why))
       c.player.hp = 6
       assert(Combat.canPlay(c, 1), cl .. " jouable à 6 PV")
-      -- PV perdus entre le jeu et la résolution (copie, riposte) : la perte laisse au moins 1 PV (safe)
-      c.player.hp = 3
-      Combat.resolveCard(c, c.hand[1], nil)
-      eq(c.player.hp, 1, cl .. " : jamais sous 1 PV")
+      c.player.block = 10
+      Combat.play(c, 1, nil)
+      eq(c.player.hp, 1, cl .. " : payé à 6 PV, il reste 1 PV (l'Absorb ne protège pas)")
+      eq(c.player.block, 10, cl .. " : Absorb intacte")
       assert(not c.result, cl .. " : pas de défaite")
     end
   end)

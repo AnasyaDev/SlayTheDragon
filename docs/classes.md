@@ -59,7 +59,6 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 |---|---|
 | `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD ; `Data/Neutral.lua`) |
 | `neutral`, `tier` | carte neutre : `neutral = true`, `path = "neutral"`, `noReward = true`, `tier` = palier de Ligue (0..3) qui la débloque ; tirée par `Expedition.neutralPool` (emplacement « Neutral » du marchand, `{ "cardChoice", neutral = true }`), jamais par `cardPool` (récompenses) |
-| `minHp = N` | injouable à N PV ou moins (raison `lowHp`, « Not enough HP. ») : carte qui perd N PV par effet (« Lose N HP. », `{ "loseHp", N, safe = true }`, jamais mortel) ; ce n'est pas le coût `payHp` |
 | `school` | champ libre (holy, shadow, fire, frost, arcane, nature…) : condition `school:<x>`, compteurs du tour, couleur |
 | `payHp = N` | « Pay N HP. » en première ligne ; payé au jeu (crochet `payHp` pour le modifier), injouable s'il ferait tomber à 0 (raison `hp`) ; compte comme une perte de PV (`onHpLost`), n'est pas une attaque, ignore l'Absorb |
 | `spend = N` | « Spend N: … » ; **au choix du joueur** : payé AU JEU si la ressource suffit (et si `spendNeed(c, inst)` le permet), sauf `Combat.play(c, i, t, { spend = false })` (action `{ "play", i, t, "nospend" }`, Maj enfoncée dans l'interface) ; `ctx.spent` à la résolution, gardé dans l'incantation ou la Trap |

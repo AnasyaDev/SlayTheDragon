@@ -40,7 +40,6 @@ C.REASONS = {
   forbidden = "Forbidden by an active Power.",
   condition = "Condition not met.",
   hp = "Not enough HP to pay.",
-  lowHp = "Not enough HP.",
   resource = "Not enough %s.",
   traps = "Too many Traps already set.",
   target = "Invalid target.",
