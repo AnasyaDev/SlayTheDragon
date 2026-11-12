@@ -412,10 +412,10 @@ ns.Classes.warrior = {
     -- notes des choix : 5 + écart / 2 du balayage sweep=cards (meta=start level=7, 500 expéditions par ligne),
     -- vérifiées en expédition complète (méthode : docs/equilibrage.md, « Notes des cartes du bot »)
     rating = {
-      bloodthirst = 13.5, shield_slam = 12.5, deep_wounds = 12.5, thunder_clap = 11, victory_rush = 11,
+      bloodthirst = 13.5, shield_slam = 12.5, deep_wounds = 12, thunder_clap = 11, victory_rush = 11,
       execute = 11, shield_wall = 11, rend = 11, shield_block = 10, bladestorm = 10, revenge = 10,
-      ignore_pain = 9.5, enrage = 9.5, whirlwind = 9.5, onslaught = 9.5, berserker_rage = 9, raging_blow = 9,
-      retaliation = 9, battle_shout = 9, pummel = 9, last_stand = 8.5, colossus_smash = 8.5,
+      ignore_pain = 9.5, enrage = 10.5, whirlwind = 9.5, onslaught = 9.5, berserker_rage = 9, raging_blow = 9,
+      retaliation = 8.5, battle_shout = 9, pummel = 9, last_stand = 9.5, colossus_smash = 8.5,
       demoralizing_shout = 8, rampage = 7.5, mortal_strike = 7.5, cleave = 7.5, devastate = 7, slam = 7,
       overpower = 6.5, recklessness = 5.5,
     },

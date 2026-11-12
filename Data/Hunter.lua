@@ -433,12 +433,12 @@ ns.Classes.hunter = {
     -- un point de Frenzy : +1 à chaque attaque du familier à venir, moins la baisse de 1 par tour
     resValue = 6,
     rating = {
-      wyvern_sting = 8, feign_death = 7, kill_command = 7, growl = 6.5, counter_shot = 6.5, intimidation = 6.5,
+      wyvern_sting = 8, feign_death = 5.5, kill_command = 7, growl = 6.5, counter_shot = 6.5, intimidation = 6.5,
       rapid_fire = 6.5, dire_beast = 6, raptor_strike = 6, concussive_shot = 6, wailing_arrow = 5.5,
       hunters_mark = 5.5, multi_shot = 5.5, bestial_wrath = 5, barbed_shot = 5, explosive_trap = 5,
-      counterattack = 4.5, readiness = 4.5, frost_trap = 4.5, spirit_bond = 4, volley = 4, entrapment = 3.5,
-      steady_shot = 3.5, resourcefulness = 3, aimed_shot = 3, trueshot_aura = 3, cobra_shot = 3,
-      lock_and_load = 3, the_beast_within = 3, immolation_trap = 3,
+      counterattack = 4.5, readiness = 4.5, frost_trap = 4.5, spirit_bond = 5.5, volley = 4, entrapment = 3.5,
+      steady_shot = 3.5, resourcefulness = 3.5, aimed_shot = 3, trueshot_aura = 4.5, cobra_shot = 3,
+      lock_and_load = 3, the_beast_within = 4.5, immolation_trap = 3,
     },
     upgrade = { arcane_shot = 2.5, disengage = 2, serpent_sting = 1.5, freezing_trap = 1.5 },
     remove = { disengage = 1, arcane_shot = 1.5 },

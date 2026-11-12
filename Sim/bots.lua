@@ -56,8 +56,22 @@ return function(ns)
   -- de la carte avec les mêmes repères : environ POWER_TURNS tours encore à jouer, POWER_PLAYS cartes jouées
   -- par tour, et la part du deck du combat qui profite du Pouvoir (deckShare). Fonction (c, inst) ; un
   -- Pouvoir absent de la table vaut W.power × (1 + coût), à défaut de mieux (classe à venir).
-  Bots.POWER_TURNS, Bots.POWER_PLAYS = 3, 3.5
-  local T, P = Bots.POWER_TURNS, Bots.POWER_PLAYS
+  -- Tours restants : la longueur attendue du combat (PV max de tous ses ennemis / POWER_DPT, constante
+  -- pendant le combat : tuer plus vite ne fait pas perdre de valeur au Pouvoir) moins les tours déjà
+  -- joués, entre 0,5 et POWER_TURNS. Un Pouvoir posé au dernier tour d'un combat court ne vaut presque rien.
+  Bots.POWER_TURNS, Bots.POWER_PLAYS, Bots.POWER_DPT = 5, 3.5, 15
+  local P = Bots.POWER_PLAYS
+  local T -- tours restants du combat évalué (posé par powersValue)
+  local function turnsLeft(c)
+    local hp = 0
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      hp = hp + (e.minion and 0.5 or 1) * (e.maxHp or e.hp)
+    end
+    local t = hp / Bots.POWER_DPT - ((c.round or 1) - 1)
+    if t < 0.5 then t = 0.5 elseif t > Bots.POWER_TURNS then t = Bots.POWER_TURNS end
+    return t
+  end
   local function anyEffect(d, pred)
     for i = 1, #d.effects do if pred(d.effects[i]) then return true end end
     return false
@@ -163,6 +177,7 @@ return function(ns)
   local function powersValue(c)
     local v = 0
     local powers = c.player.powers
+    if #powers > 0 then T = turnsLeft(c) end
     for i = 1, #powers do
       local f = Bots.POWER_VALUE[powers[i].id]
       if f then v = v + f(c, powers[i])

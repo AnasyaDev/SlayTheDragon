@@ -436,12 +436,12 @@ ns.Classes.rogue = {
   bot = {
     resValue = 8,
     rating = {
-      crippling_poison = 9, garrote = 8, blade_flurry = 7.5, killing_spree = 7.5, adrenaline_rush = 7.5,
-      smoke_bomb = 7.5, fan_of_knives = 7, sprint = 7, deadly_poison = 6.5, pistol_shot = 6.5,
+      crippling_poison = 9, garrote = 8, blade_flurry = 6, killing_spree = 7.5, adrenaline_rush = 7.5,
+      smoke_bomb = 7.5, fan_of_knives = 7, sprint = 7, deadly_poison = 5.5, pistol_shot = 6.5,
       between_the_eyes = 6.5, premeditation = 6.5, cheap_shot = 6, kick = 6, rupture = 6, envenom = 6,
-      evasion = 6, hemorrhage = 5.5, cheat_death = 5.5, slice_and_dice = 5.5, ambush = 5.5, riposte = 5.5,
+      evasion = 6, hemorrhage = 5.5, cheat_death = 4.5, slice_and_dice = 6, ambush = 5.5, riposte = 5.5,
       mutilate = 5, shadowstep = 5, secret_technique = 5, cloak_of_shadows = 4.5, vanish = 4,
-      venomous_wounds = 3.5, exsanguinate = 3.5, shadow_dance = 3,
+      venomous_wounds = 3.5, exsanguinate = 3.5, shadow_dance = 3.5,
     },
     upgrade = { sinister_strike = 2.5, feint = 2, backstab = 2.5, eviscerate = 3 },
     remove = { feint = 1.5, sinister_strike = 1 },
