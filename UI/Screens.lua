@@ -382,18 +382,12 @@ UI.register("start", Start)
 local START_ICON, START_STEP, START_ROW_W, START_TOP, START_KEYS, START_PANEL_H = 64, 92, 520, 56, 160, 300
 UI.START = { icon = START_ICON, step = START_STEP, rowW = START_ROW_W, top = START_TOP, keys = START_KEYS }
 
--- Infobulle d'une classe : nom, puis ce que le bouton texte affichait (PV et cartes, réputation).
+-- Infobulle d'une classe : nom, PV et cartes (accueil), niveau de classe.
 local function fillClassTooltip(tt, o)
   tt:AddLine(o.label or "", 1, 0.82, 0)
-  local text = o.text or ""
-  local stats, rep = text:match("^(.-)%s*·%s*(.+)$")
-  if stats then
-    tt:AddLine(stats, 1, 1, 1, true)
-    tt:AddLine("Reputation: " .. rep, 1, 1, 1, true)
-  elseif text ~= "" then
-    tt:AddLine(text, 1, 1, 1, true)
-  end
-  if not o.selected then tt:AddLine("Click: play this class.", 0.6, 0.6, 0.6) end
+  if o.text and o.text ~= "" then tt:AddLine(o.text, 1, 1, 1, true) end
+  if o.level then tt:AddLine("Level " .. o.level, 1, 1, 1) end
+  if not o.selected and o.id and o.id:match("^class:") then tt:AddLine("Click: play this class.", 0.6, 0.6, 0.6) end
 end
 
 -- Icône de classe : grand anneau doré, icône ronde, halo doré créé d'avance (éteint) ; choisie : halo
@@ -488,7 +482,7 @@ function Start:Build(f)
   self.go = W.button(f, "Start expedition", 230, 50, nil, "gold", 18)
   at(self.go, f, 790, 494, 230, 50)
   self.go:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  self.meta = W.button(f, "Reputation and log", 210, 44, nil, "red", 15)
+  self.meta = W.button(f, "Progress", 210, 44, nil, "red", 15)
   at(self.meta, f, 24, 497, 210, 44)
   self.meta:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
   self.optionButtons = {}
@@ -1524,11 +1518,23 @@ function Map:Show(step)
 end
 
 ---------------------------------------------------------------------------
--- Bilan et méta : panneau d'ardoise, barres de réputation, journal
+-- Bilan et méta : panneau d'ardoise, barres (niveau de classe, Ligue), journal
 ---------------------------------------------------------------------------
+-- Bilan avec montée de niveau : sous les barres, ce qui vient d'être débloqué, révélé tel quel (vraies
+-- cartes à petite échelle, agrandies au survol ; cases des bibelots), sans autre texte. Le panneau monte
+-- et grandit pour les accueillir (jamais sur les boutons du bas).
 
 local Progress = { kinds = { "end", "meta" } }
 UI.register("progress", Progress)
+
+-- Panneau : PG_X, PG_Y, PG_W × PG_H au moins ; monté à PG_UP_Y avec des déblocages, son bas jamais sous
+-- PG_BOTTOM (boutons du bas à y 494). Barres sous le texte (au moins à PG_BARS de son haut, la méta à
+-- PG_BARS_META), rangée des déblocages sous les barres.
+local PG_X, PG_W, PG_Y, PG_H, PG_UP_Y, PG_BOTTOM = 167, 700, 64, 352, 40, 488
+local PG_BARS, PG_BARS_META, PG_BAR_DY = 170, 110, 54
+local PG_SCALE, PG_ZOOM, PG_PITCH, PG_RELIC, PG_RELIC_DX = 0.5, 1.8, 72, 44, 58
+local PG_MAX_CARDS, PG_MAX_RELICS = 9, 3
+UI.PG = { scale = PG_SCALE, zoom = PG_ZOOM, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS, bottom = PG_BOTTOM }
 
 function Progress:Build(f)
   local panel = W.dialog(f, nil)
@@ -1561,31 +1567,95 @@ function Progress:Build(f)
     b:Hide()
     self.buttons[i] = b
   end
+  -- déblocages révélés (bilan avec montée de niveau)
+  self.newCards, self.newRelics = {}, {}
+  for i = 1, PG_MAX_CARDS do
+    local c = W.card(f)
+    c:SetFrameLevel(panel:GetFrameLevel() + 5)
+    W.setHover(c, PG_ZOOM, 8 / PG_SCALE)
+    c:Hide()
+    self.newCards[i] = c
+  end
+  for i = 1, PG_MAX_RELICS do
+    local b = W.iconButton(f, PG_RELIC, "square")
+    b:SetFrameLevel(panel:GetFrameLevel() + 5)
+    b:Hide()
+    self.newRelics[i] = b
+  end
   self.optionButtons = {}
+end
+
+-- Rangée des déblocages, centrée sous les barres (centre à rowY, coordonnées de la scène) ; cachée sans
+-- montée de niveau.
+function Progress:ShowUnlocked(u, rowY)
+  local cards = u and u.cards or {}
+  local relics = u and u.relics or {}
+  local nc, nr = math.min(#cards, PG_MAX_CARDS), math.min(#relics, PG_MAX_RELICS)
+  local cw = W.CARD_W * PG_SCALE
+  local width = (nc > 0 and ((nc - 1) * PG_PITCH + cw) or 0) + (nr > 0 and ((nc > 0 and 24 or 0) + (nr - 1) * PG_RELIC_DX + PG_RELIC) or 0)
+  local x = PG_X + PG_W / 2 - width / 2
+  local lv = self.panel:GetFrameLevel()
+  for i, c in ipairs(self.newCards) do
+    if i <= nc then
+      c:SetCard(cards[i], false, {})
+      W.placeCard(c, self.frame, x + cw / 2 + (i - 1) * PG_PITCH, rowY, PG_SCALE, lv + 5 + i, lv + 60)
+      c:Show()
+    else
+      W.hideCard(c)
+    end
+  end
+  x = x + (nc > 0 and ((nc - 1) * PG_PITCH + cw + 24) or 0)
+  for i, b in ipairs(self.newRelics) do
+    if i <= nr then
+      at(b, self.frame, x + (i - 1) * PG_RELIC_DX, rowY - PG_RELIC / 2, PG_RELIC, PG_RELIC)
+      b:SetItem("relic", relics[i])
+      b:Show()
+    else
+      b:Hide()
+    end
+  end
+end
+
+function Progress:OnHide()
+  for _, c in ipairs(self.newCards) do W.hideCard(c) end
 end
 
 function Progress:Show(step)
   self.step = step
   UI.setStage({ scene = step.kind == "end" and Controller.scene() or "road", board = true, veil = 0.45 })
+  local up = step.kind == "end" and step.unlocked ~= nil
   self.title:SetText(step.title or "")
   local tc = C.wowGold
   if step.kind == "end" then tc = step.won and C.healGreen or C.badText end
   self.title:SetTextColor(tc[1], tc[2], tc[3])
   self.text:SetText(inkText(step.text))
   local bars = step.bars or {}
-  local y0 = step.kind == "end" and -170 or -110
+  -- barres sous le texte (libellé de la barre au-dessus d'elle : 34 de marge)
+  local textH = tonumber(self.text:GetStringHeight()) or 0
+  local titleH = tonumber(self.title:GetStringHeight()) or 34
+  local y0 = -max(step.kind == "end" and PG_BARS or PG_BARS_META, 20 + titleH + 10 + textH + 34)
+  -- panneau : monté et agrandi pour la rangée des déblocages (centre sous la dernière barre et son détail)
+  local panelY, panelH = PG_Y, PG_H
+  local half = W.CARD_H * PG_SCALE / 2
+  local rowRel = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 58 + half
+  if up then
+    panelY = PG_UP_Y
+    panelH = min(PG_BOTTOM - PG_UP_Y, max(PG_H, rowRel + half + 20))
+  end
+  at(self.panel, self.frame, PG_X, panelY, PG_W, panelH)
+  self:ShowUnlocked(up and step.unlocked or nil, panelY + rowRel)
   for i, b in ipairs(self.bars) do
     local data = bars[i]
     if data then
       b:ClearAllPoints()
-      b:SetPoint("TOP", self.panel, "TOP", 0, y0 - (i - 1) * 54)
+      b:SetPoint("TOP", self.panel, "TOP", 0, y0 - (i - 1) * PG_BAR_DY)
       b:Set(data)
       b:Show()
     else
       b:Hide()
     end
   end
-  local jy = y0 - #bars * 54 - 4
+  local jy = y0 - #bars * PG_BAR_DY - 4
   local lines = step.journal or {}
   for i, fs in ipairs(self.journal) do
     local l = lines[i]
@@ -1616,6 +1686,237 @@ function Progress:Show(step)
       b:Hide()
     end
   end
+end
+
+---------------------------------------------------------------------------
+-- Progression d'une classe : niveau, expérience, 34 cartes par voie, 6 bibelots
+---------------------------------------------------------------------------
+-- Une boîte DiamondMetal sur toute la scène. En-tête : icônes des classes (mêmes que l'accueil, la classe
+-- affichée au halo d'or ; infobulle = nom et niveau), barre d'expérience (« Level 3 · 20 / 150 »),
+-- « Reputation and log » et « Back ». Dessous, une rangée par voie (départ, puis les trois voies), les cartes
+-- dans l'ordre de leur niveau ; les bibelots à droite des cartes de départ. Débloqué : la vraie carte (W.card)
+-- ou la case du bibelot, avec son infobulle, agrandie au survol. Verrouillé : dos de carte assombri et
+-- désaturé, ou case grisée au point d'interrogation ; l'infobulle ne dit que la condition (« Priest level 4 »).
+-- Aucun texte permanent hors des noms de voies.
+
+local ClassProgress = { kinds = { "classProgress" } }
+UI.register("classProgress", ClassProgress)
+
+-- Mise en page (coordonnées de la scène) : cartes à CP_SCALE, CP_PITCH entre deux centres, colonne des
+-- voies à gauche (noms à partir de CP_LABEL_X, réduits pour tenir dans CP_LABEL_W), rangées de CP_ROW_H à
+-- partir de CP_ROW_TOP ;
+-- bibelots en cases de CP_RELIC, pas CP_RELIC_DX, à partir de CP_RELIC_X ; zoom au survol CP_ZOOM.
+local CP_SCALE, CP_PITCH, CP_X0, CP_LABEL_X, CP_LABEL_W = 0.6, 84, 190, 18, 128
+local CP_ROW_TOP, CP_ROW_H, CP_ZOOM = 112, 122, 1.65
+local CP_RELIC, CP_RELIC_DX, CP_RELIC_X, CP_RELIC_LABEL_R = 46, 62, 612, 574
+local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 44, 56, 50, 76
+local CP_SLOTS, CP_ROWS = 34, 4
+UI.CP = { scale = CP_SCALE, pitch = CP_PITCH, x0 = CP_X0, rowTop = CP_ROW_TOP, rowH = CP_ROW_H, zoom = CP_ZOOM,
+  relic = CP_RELIC, relicDx = CP_RELIC_DX, relicX = CP_RELIC_X }
+
+-- Infobulle d'un élément verrouillé : la condition seule.
+local function fillLocked(tt, cond)
+  if cond then tt:AddLine(cond, 1, 0.3, 0.3) end
+end
+
+-- Carte verrouillée : dos de carte du pack, assombri et désaturé, à la taille d'une carte ; rien d'autre.
+local function lockedCard(parent)
+  local b = CreateFrame("Button", nil, parent)
+  b:SetSize(W.CARD_W, W.CARD_H)
+  b:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local face = W.face(b)
+  b.isLock = true
+  b.back = W.cardBack(face, W.CARD_H, "ARTWORK", 0)
+  b.back:SetPoint("CENTER")
+  b.back:SetDesaturated(true)
+  b.back:SetVertexColor(0.42, 0.42, 0.42, 1)
+  W.hoverable(b, { scale = 1.04, paint = function(self, h)
+    local k = 0.42 + 0.12 * h
+    self.back:SetVertexColor(k, k, k, 1)
+  end })
+  W.tooltip(b, function(tt, self) fillLocked(tt, self.condition) end, "ANCHOR_RIGHT")
+  b:Hide()
+  return b
+end
+
+function ClassProgress:Build(f)
+  local panel = W.dialog(f, nil)
+  at(panel, f, 6, 40, 1022, 570)
+  self.panel = panel
+  local lv = panel:GetFrameLevel()
+  -- onglets : icônes des classes
+  self.tabs = {}
+  -- barre d'expérience (même brique que les barres de réputation)
+  self.bar = W.repBar(panel, 290)
+  at(self.bar, f, 318, 72, 290, 14)
+  self.metaBtn = W.button(f, "Reputation and log", 210, 44, nil, "red", 15)
+  at(self.metaBtn, f, 640, 52, 210, 44)
+  self.metaBtn:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+  self.back = W.button(f, "Back", 150, 48, nil, "gold", 18)
+  at(self.back, f, 866, 50, 150, 48)
+  self.back:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+  for _, b in ipairs({ self.metaBtn, self.back }) do b:SetFrameLevel(lv + 4) end
+  -- noms des voies (colonne de gauche) et titre des bibelots
+  self.rowLabels = {}
+  for i = 1, CP_ROWS do
+    local l = W.label(panel, "bold", 14, C.wowGold, "OVERLAY")
+    l:SetJustifyH("LEFT")
+    l:SetWordWrap(false)
+    self.rowLabels[i] = l
+  end
+  self.relicLabel = W.label(panel, "bold", 14, C.wowGold, "OVERLAY")
+  self.relicLabel:SetJustifyH("RIGHT")
+  -- cartes : une vraie carte et une silhouette par emplacement (l'une ou l'autre est montrée)
+  self.cards, self.locks = {}, {}
+  for i = 1, CP_SLOTS do
+    local c = W.card(f)
+    c:SetFrameLevel(lv + 5)
+    c:Hide()
+    self.cards[i] = c
+    local k = lockedCard(f)
+    k:SetFrameLevel(lv + 5)
+    self.locks[i] = k
+  end
+  -- bibelots : case du jeu (débloqué : icône et infobulle du bibelot ; verrouillé : point d'interrogation grisé)
+  self.relics = {}
+  for i = 1, 6 do
+    local b = W.iconButton(f, CP_RELIC, "square")
+    b:SetFrameLevel(lv + 5)
+    b:Hide()
+    self.relics[i] = b
+  end
+  self.optionButtons = {}
+end
+
+-- Pose une carte (vraie ou silhouette) au repos ; zoom au survol, levée pour rester dans la fenêtre.
+local function placeCP(self, card, slot, cx, cy)
+  local lv = self.panel:GetFrameLevel()
+  local half = W.CARD_H * CP_SCALE * CP_ZOOM / 2
+  local lift = max(8, cy + half - (Scene.H - 6)) -- en unités de la scène
+  if not card.isLock then
+    W.setHover(card, CP_ZOOM, lift / CP_SCALE)
+    W.placeCard(card, self.frame, cx, cy, CP_SCALE, lv + 5 + slot, lv + 80)
+  else
+    W.placeCenter(card, self.frame, cx, cy, CP_SCALE)
+    W.setLevel(card, lv + 5 + slot)
+  end
+  card.cx, card.cy = cx, cy
+end
+
+function ClassProgress:Show(step)
+  self.step = step
+  UI.setStage({ scene = "road", board = true, veil = 0.45 })
+  self.optionButtons = {}
+  local tabs, others = {}, {}
+  for _, o in ipairs(step.options or {}) do
+    if o.group == "class" then tabs[#tabs + 1] = o else others[#others + 1] = o end
+  end
+  for i = #self.tabs + 1, #tabs do
+    local b = classIcon(self.panel)
+    b:Resize(CP_TAB)
+    b:SetFrameLevel(self.panel:GetFrameLevel() + 4)
+    self.tabs[i] = b
+  end
+  for i, b in ipairs(self.tabs) do
+    local o = tabs[i]
+    if o then
+      local cid = o.id:match("^pclass:(.+)$")
+      if b.cid ~= cid then
+        b.cid = cid
+        W.setIcon(b.icon, Art.class(cid), "class:" .. tostring(cid))
+      end
+      at(b, self.frame, CP_TAB_X + (i - 1) * CP_TAB_DX - CP_TAB / 2, CP_TAB_Y - CP_TAB / 2, CP_TAB, CP_TAB)
+      b.option = o
+      b:SetSelected(o.selected)
+      b:Show()
+      self.optionButtons[o.id] = b
+    else
+      b.option = nil
+      b:Hide()
+    end
+  end
+  self.bar:Set(step.bar)
+  for _, o in ipairs(others) do
+    local b = o.id == "ui:meta" and self.metaBtn or self.back
+    b.option = o
+    b:SetText(o.label)
+    self.optionButtons[o.id] = b
+  end
+  -- rangées de cartes
+  local slot = 0
+  for r = 1, CP_ROWS do
+    local row = step.rows and step.rows[r]
+    local l = self.rowLabels[r]
+    local cy = CP_ROW_TOP + (r - 1) * CP_ROW_H + W.CARD_H * CP_SCALE / 2
+    if row then
+      -- nom de la voie : 14, réduit s'il ne tient pas dans la colonne
+      local name = row.name or ""
+      local size = 14
+      while size > 10 and textWidth(l, name, size) * W.TEXT_SAFE > CP_LABEL_W do size = size - 0.5 end
+      setLines(l, { name }, size, CP_LABEL_W)
+      l:ClearAllPoints()
+      l:SetPoint("LEFT", self.frame, "TOPLEFT", CP_LABEL_X, -cy)
+      l:Show()
+      for i, e in ipairs(row.cards) do
+        slot = slot + 1
+        local card, lock = self.cards[slot], self.locks[slot]
+        if card and lock then
+          local cx = CP_X0 + (i - 1) * CP_PITCH
+          card.entry, lock.entry = e, e
+          if e.unlocked then
+            W.hideCard(lock)
+            lock:Hide()
+            card:SetCard(e.id, false, {})
+            placeCP(self, card, slot, cx, cy)
+            card:Show()
+          else
+            W.hideCard(card)
+            lock.condition = e.condition
+            placeCP(self, lock, slot, cx, cy)
+            lock:Show()
+          end
+        end
+      end
+    else
+      l:Hide()
+    end
+  end
+  for i = slot + 1, CP_SLOTS do
+    W.hideCard(self.cards[i])
+    self.locks[i]:Hide()
+  end
+  -- bibelots, à droite des cartes de départ
+  local cy = CP_ROW_TOP + W.CARD_H * CP_SCALE / 2
+  self.relicLabel:SetText("Relics")
+  W.looseBox(self.relicLabel, 1, 120)
+  self.relicLabel:ClearAllPoints()
+  self.relicLabel:SetPoint("RIGHT", self.frame, "TOPLEFT", CP_RELIC_LABEL_R, -cy)
+  for i, b in ipairs(self.relics) do
+    local e = step.relics and step.relics[i]
+    if e then
+      at(b, self.frame, CP_RELIC_X + (i - 1) * CP_RELIC_DX - CP_RELIC / 2, cy - CP_RELIC / 2, CP_RELIC, CP_RELIC)
+      b.entry = e
+      if e.unlocked then
+        b:SetItem("relic", e.id)
+      else
+        b.info = { kind = "locked", condition = e.condition }
+        W.setIcon(b.icon, Art.ui.locked, "ui:locked")
+        b.icon:SetDesaturated(true)
+        b.icon:SetVertexColor(0.45, 0.45, 0.45, 1)
+        b.icon:Show()
+        b.case.frame:SetVertexColor(0.5, 0.5, 0.5, 1)
+      end
+      if e.unlocked then b.icon:SetVertexColor(1, 1, 1, 1) end
+      b:Show()
+    else
+      b.entry = nil
+      b:Hide()
+    end
+  end
+end
+
+function ClassProgress:OnHide()
+  for i = 1, CP_SLOTS do W.hideCard(self.cards[i]) end
 end
 
 ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@
 -- Run.play(opts) -> enregistrement { won, floor, hp, deck, relics, combats = {...} }
 -- opts : seed, bot ("random"|"greedy"|"heuristic"), class, pick ("rated"|"random"|"skip"),
 --        force = { idCarte, ... } ajoutées au deck de départ, relics = { idBibelot, ... } au départ,
---        rep (palier de réputation de classe : 0..2, nil = toutes les cartes),
+--        level (niveau de classe : 1..7, nil = toutes les cartes et tous les bibelots de classe),
 --        tier (palier de la Ligue des explorateurs : 0..3, nil = tout), loot (false = ni
 --        bibelot ni potion gagnés), cap (nœuds de recherche), sequence (liste d'étapes), maxRounds.
 return function(ns)
@@ -210,7 +210,7 @@ return function(ns)
           return record
         end
         if step ~= "boss" then
-          local choices = Rewards.cardChoices(rngLoot, classId, 3, nil, opts.rep)
+          local choices = Rewards.cardChoices(rngLoot, classId, 3, nil, opts.level)
           local pick = pickCard(opts, rngLoot, choices)
           if pick then
             run.deck[#run.deck + 1] = { id = pick, up = false }
@@ -221,7 +221,7 @@ return function(ns)
             if step == "elite" then
               local owned = {}
               for i = 1, #run.relics do owned[run.relics[i]] = true end
-              local r = Rewards.relicChoices(rngTreasure, 1, { maxTier = opts.tier, exclude = owned, class = classId })[1]
+              local r = Rewards.relicChoices(rngTreasure, 1, { maxTier = opts.tier, exclude = owned, class = classId, level = opts.level })[1]
               if r then
                 run.relics[#run.relics + 1] = r
                 record.relicsGained[#record.relicsGained + 1] = r

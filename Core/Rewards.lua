@@ -9,13 +9,13 @@ Rewards.RARITY_WEIGHT = { common = 60, uncommon = 33, rare = 7 }
 Rewards.RELIC_WEIGHT = { common = 50, uncommon = 35, rare = 15 }
 Rewards.POTION_WEIGHT = { common = 65, uncommon = 25, rare = 10 }
 
--- Cartes de la classe débloquées au palier de réputation maxRep (nil = toutes).
-function Rewards.cardPool(class, maxRep)
+-- Cartes de la classe débloquées au niveau de classe maxLevel (1..7 ; nil = toutes).
+function Rewards.cardPool(class, maxLevel)
   local pool = Card.pool(class)
-  if maxRep == nil then return pool end
+  if maxLevel == nil then return pool end
   local list = {}
   for i = 1, #pool do
-    if (ns.Cards[pool[i]].rep or 0) <= maxRep then list[#list + 1] = pool[i] end
+    if (ns.Cards[pool[i]].level or 1) <= maxLevel then list[#list + 1] = pool[i] end
   end
   return list
 end
@@ -48,23 +48,27 @@ local function pickByRarity(rng, pool, n, rarityOf, weights)
   return picked
 end
 
--- n cartes distinctes de la classe, tirées par rareté. maxRep : palier de réputation
--- de classe atteint (0 Neutre, 1 Amical, 2 Honoré ; nil = toutes les cartes).
-function Rewards.cardChoices(rng, class, n, weights, maxRep)
-  return pickByRarity(rng, Rewards.cardPool(class, maxRep), n,
+-- n cartes distinctes de la classe, tirées par rareté. maxLevel : niveau de classe atteint
+-- (1..7 ; nil = toutes les cartes).
+function Rewards.cardChoices(rng, class, n, weights, maxLevel)
+  return pickByRarity(rng, Rewards.cardPool(class, maxLevel), n,
     function(id) return ns.Cards[id].rarity end, weights or Rewards.RARITY_WEIGHT)
 end
 
 -- Ids triés des bibelots débloqués au palier maxTier de la Ligue des explorateurs.
 -- opts : { maxTier = n (nil = tous), boss = bool (bibelots de boss seulement, sinon exclus),
---          exclude = { [id] = true } (déjà possédés), class = classe jouée }
--- Bibelots communs (sans champ class) et ceux de la classe jouée ; jamais ceux marqués noPool.
+--          exclude = { [id] = true } (déjà possédés), class = classe jouée, level = niveau de classe (nil = tous) }
+-- Bibelots communs (sans champ class, filtrés par maxTier) et ceux de la classe jouée (filtrés par
+-- level) ; jamais ceux marqués noPool.
 function Rewards.relicPool(opts)
   opts = opts or {}
   local list = {}
   for id, r in pairs(ns.Relics) do
     local isBoss = r.rarity == "boss"
-    if (opts.maxTier == nil or (r.tier or 0) <= opts.maxTier) and (isBoss == (opts.boss or false))
+    local open
+    if r.class then open = opts.level == nil or (r.level or 1) <= opts.level
+    else open = opts.maxTier == nil or (r.tier or 0) <= opts.maxTier end
+    if open and (isBoss == (opts.boss or false))
         and not r.noPool and (not r.class or r.class == opts.class)
         and not (opts.class and ns.Expedition and not ns.Expedition.usefulFor(r, opts.class))
         and not (opts.exclude and opts.exclude[id]) then

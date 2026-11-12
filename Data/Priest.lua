@@ -2,8 +2,8 @@
 -- Champs : name, cost, type (attack|skill|power), school (holy|shadow), rarity
 -- (basic|common|uncommon|rare), path (discipline|shadow|holy|start), target ("enemy" ou nil),
 -- effects, text, et up = champs remplacés par l'amélioration (dont text).
--- rep = palier de réputation de classe qui débloque la carte (0 Neutre, 1 Amical, 2 Honoré) ;
--- absent sur les cartes de départ.
+-- level = niveau de classe qui débloque la carte (1 à 7, docs/classes/priest-progression.md ;
+-- Core/Meta.lua).
 -- Mots-clés : cast (incantation), cooldown = N, exhaust (Consumée), retain (Conservée),
 -- power (Pouvoir, avec hooks).
 -- Écriture de `text` (docs/interface.md, « Langage des cartes », textes affichés en anglais) : une
@@ -28,28 +28,28 @@ end
 -- Départ -------------------------------------------------------------------
 
 card("smite", {
-  name = "Smite", cost = 1, type = "attack", school = "holy", rarity = "basic", path = "start",
+  level = 1, name = "Smite", cost = 1, type = "attack", school = "holy", rarity = "basic", path = "start",
   target = "enemy", effects = { { "damage", 6 } },
   text = "Deal 6.",
   up = { effects = { { "damage", 9 } }, text = "Deal 9." },
 })
 
 card("inner_fire", {
-  name = "Inner Fire", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
+  level = 1, name = "Inner Fire", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
   effects = { { "absorb", 5 } },
   text = "Gain 5 Absorb.",
   up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
 })
 
 card("pw_shield", {
-  name = "PW: Shield", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
+  level = 1, name = "PW: Shield", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
   cooldown = 2, effects = { { "absorb", 8 } },
   text = "Gain 8 Absorb.\nCooldown 2.",
   up = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb.\nCooldown 2." },
 })
 
 card("sw_pain", {
-  name = "SW: Pain", cost = 1, type = "skill", school = "shadow", rarity = "basic", path = "start",
+  level = 1, name = "SW: Pain", cost = 1, type = "skill", school = "shadow", rarity = "basic", path = "start",
   target = "enemy", effects = { { "apply", "pain", 5 }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 5",
   up = { effects = { { "apply", "pain", 7 }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 7" },
@@ -58,7 +58,7 @@ card("sw_pain", {
 -- Discipline ----------------------------------------------------------------
 
 card("radiance", {
-  rep = 0, name = "PW: Radiance", cost = 1, type = "skill", school = "holy", rarity = "common", path = "discipline",
+  level = 1, name = "PW: Radiance", cost = 1, type = "skill", school = "holy", rarity = "common", path = "discipline",
   effects = { { "apply", "atonement", 1, self = true }, { "absorb", 4 } },
   text = "Gain 4 Absorb.\nGain Atonement 1 ⌛",
   up = { effects = { { "apply", "atonement", 2, self = true }, { "absorb", 6 } },
@@ -70,7 +70,7 @@ local function penanceHit(c, ctx, t)
 end
 
 card("penance", {
-  rep = 0, name = "Penance", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "discipline",
+  level = 1, name = "Penance", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "discipline",
   target = "enemy", effects = { { "damage", 6, times = 3, onHit = penanceHit } },
   text = "Deal 6 three times.\nAtonement: +2 Absorb per hit.",
   up = { effects = { { "damage", 8, times = 3, onHit = penanceHit } },
@@ -78,7 +78,7 @@ card("penance", {
 })
 
 card("pain_suppression", {
-  rep = 0, name = "Pain Suppression", cost = 1, type = "skill", school = "holy", rarity = "rare", path = "discipline",
+  level = 1, name = "Pain Suppression", cost = 1, type = "skill", school = "holy", rarity = "rare", path = "discipline",
   cooldown = 4, effects = { { "apply", "halved", 1, self = true } },
   text = "Damage taken halved until next turn.\nCooldown 4.",
   up = { cooldown = 3, text = "Damage taken halved until next turn.\nCooldown 3." },
@@ -92,7 +92,7 @@ local function solaceMana(c, ctx)
 end
 
 card("solace", {
-  rep = 0, name = "PW: Solace", cost = 1, type = "attack", school = "holy", rarity = "common", path = "discipline",
+  level = 1, name = "PW: Solace", cost = 1, type = "attack", school = "holy", rarity = "common", path = "discipline",
   target = "enemy", effects = { { "fn", solaceMana }, { "damage", 5 }, { "apply", "atonement", 1, self = true } },
   text = "Deal 5.\nAtonement: +1 mana.\nGain Atonement 1 ⌛",
   up = { effects = { { "fn", solaceMana }, { "damage", 8 }, { "apply", "atonement", 1, self = true } },
@@ -100,14 +100,14 @@ card("solace", {
 })
 
 card("angelic_feather", {
-  rep = 0, name = "Angelic Feather", cost = 0, type = "skill", school = "holy", rarity = "common", path = "discipline",
+  level = 1, name = "Angelic Feather", cost = 0, type = "skill", school = "holy", rarity = "common", path = "discipline",
   cooldown = 2, effects = { { "absorb", 2 }, { "draw", 1 } },
   text = "Gain 2 Absorb.\nDraw 1.\nCooldown 2.",
   up = { effects = { { "absorb", 4 }, { "draw", 1 } }, text = "Gain 4 Absorb.\nDraw 1.\nCooldown 2." },
 })
 
 card("luminous_barrier", {
-  rep = 0, name = "Luminous Barrier", cost = 2, type = "skill", school = "holy", rarity = "common", path = "discipline",
+  level = 4, name = "Luminous Barrier", cost = 2, type = "skill", school = "holy", rarity = "common", path = "discipline",
   cooldown = 2, effects = { { "absorb", 12 }, { "apply", "atonement", 1, self = true } },
   text = "Gain 12 Absorb.\nGain Atonement 1 ⌛\nCooldown 2.",
   up = { effects = { { "absorb", 16 }, { "apply", "atonement", 1, self = true } },
@@ -115,7 +115,7 @@ card("luminous_barrier", {
 })
 
 card("schism", {
-  rep = 0, name = "Schism", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "discipline",
+  level = 1, name = "Schism", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "discipline",
   target = "enemy",
   effects = { { "damage", 3 }, { "apply", "armor_broken", 2 }, { "apply", "atonement", 1, self = true } },
   text = "Deal 3.\nApply Sundered 2 ⌛\nGain Atonement 1 ⌛",
@@ -124,7 +124,7 @@ card("schism", {
 })
 
 card("shadow_mend", {
-  rep = 1, name = "Shadow Mend", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "discipline",
+  level = 6, name = "Shadow Mend", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "discipline",
   exhaust = true, effects = { { "heal", 10 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
   text = "Heal 10.\n+1 Insanity.\nGain DoT 2\nExhaust.",
   up = { effects = { { "heal", 14 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
@@ -132,7 +132,7 @@ card("shadow_mend", {
 })
 
 card("evangelism", {
-  rep = 1, name = "Evangelism", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "discipline",
+  level = 2, name = "Evangelism", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "discipline",
   exhaust = true, effects = { { "apply", "atonement", 2, self = true }, { "draw", 2 } },
   text = "Draw 2.\nGain Atonement 2 ⌛\nExhaust.",
   up = { cost = 0, text = "Draw 2.\nGain Atonement 2 ⌛\nExhaust." },
@@ -145,7 +145,7 @@ local function raptureHooks(bonus)
 end
 
 card("rapture", {
-  rep = 2, name = "Rapture", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
+  level = 7, name = "Rapture", cost = 1, type = "power", school = "holy", rarity = "rare", path = "discipline",
   power = true, effects = {}, hooks = raptureHooks(1),
   text = "Power.\nEach Absorb gain: +1.",
   up = { hooks = raptureHooks(2), text = "Power.\nEach Absorb gain: +2." },
@@ -157,14 +157,14 @@ card("rapture", {
 local FLAY = { { "res", 2, cond = "status:pain" }, { "draw", 1, cond = "status:pain" } }
 
 card("mind_flay", {
-  rep = 0, name = "Mind Flay", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
+  level = 1, name = "Mind Flay", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", effects = { FLAY[1], FLAY[2], { "damage", 8 } },
   text = "Deal 8.\nDoT: +2 Insanity, draw 1.",
   up = { effects = { FLAY[1], FLAY[2], { "damage", 11 } }, text = "Deal 11.\nDoT: +2 Insanity, draw 1." },
 })
 
 card("mind_blast", {
-  rep = 0, name = "Mind Blast", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
+  level = 1, name = "Mind Blast", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", cooldown = 1, effects = { { "damage", 10 }, { "res", 2 } },
   text = "Deal 10.\n+2 Insanity.\nCooldown 1.",
   up = { effects = { { "damage", 13 }, { "res", 2 } }, text = "Deal 13.\n+2 Insanity.\nCooldown 1." },
@@ -179,7 +179,7 @@ local function plague(c, ctx)
 end
 
 card("devouring_plague", {
-  rep = 0, name = "Devouring Plague", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
+  level = 1, name = "Devouring Plague", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
   target = "enemy", plagueMult = 2, minRes = 1, effects = { { "surge" }, { "fn", plague } },
   text = "Surge: apply DoT 2 per Insanity.",
   up = { plagueMult = 3, text = "Surge: apply DoT 3 per Insanity." },
@@ -202,7 +202,7 @@ local function shadowformHooks(bonus)
 end
 
 card("shadowform", {
-  rep = 0, name = "Shadowform", cost = 1, type = "power", school = "shadow", rarity = "rare", path = "shadow",
+  level = 1, name = "Shadowform", cost = 1, type = "power", school = "shadow", rarity = "rare", path = "shadow",
   power = true, effects = { { "res", 2 } }, hooks = shadowformHooks(3),
   text = "Power.\n+2 Insanity.\nShadow: damage and DoT +3.",
   up = { hooks = shadowformHooks(4),
@@ -210,14 +210,14 @@ card("shadowform", {
 })
 
 card("silence", {
-  rep = 0, name = "Silence", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
+  level = 1, name = "Silence", cost = 0, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "draw", 1 } },
   text = "Interrupt the target's cast.\nDraw 1.\nCooldown 2.",
   up = { cooldown = 1, text = "Interrupt the target's cast.\nDraw 1.\nCooldown 1." },
 })
 
 card("vampiric_touch", {
-  rep = 0, name = "Vampiric Touch", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
+  level = 1, name = "Vampiric Touch", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", effects = { { "apply", "pain", 3 }, { "apply", "regen", 1, self = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 3\nGain Regen 1",
   up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "res", 1 } },
@@ -225,14 +225,14 @@ card("vampiric_touch", {
 })
 
 card("mind_sear", {
-  rep = 1, name = "Mind Sear", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
+  level = 2, name = "Mind Sear", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
   effects = { { "apply", "pain", 4, all = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 4 to all",
   up = { effects = { { "apply", "pain", 6, all = true }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 6 to all" },
 })
 
 card("sw_death", {
-  rep = 1, name = "SW: Death", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "shadow",
+  level = 4, name = "SW: Death", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "shadow",
   target = "enemy", effects = { { "damage", 6, more = { { 6, "execute" } } }, { "res", 1 } },
   text = "Deal 6.\nExecute: deal 12.\n+1 Insanity.",
   up = { effects = { { "damage", 8, more = { { 9, "execute" } } }, { "res", 1 } },
@@ -240,14 +240,14 @@ card("sw_death", {
 })
 
 card("psychic_scream", {
-  rep = 2, name = "Psychic Scream", cost = 1, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
+  level = 6, name = "Psychic Scream", cost = 1, type = "skill", school = "shadow", rarity = "uncommon", path = "shadow",
   cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply Demoralized 2 ⌛ to all\nCooldown 3.",
   up = { cost = 0, text = "+1 Insanity.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
 })
 
 card("void_eruption", {
-  rep = 2, name = "Void Eruption", cost = 1, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
+  level = 7, name = "Void Eruption", cost = 1, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 4, per = { 4, "surge" } } },
   text = "Surge: deal 4 + 4 per Insanity.",
   up = { effects = { { "surge" }, { "damage", 4, per = { 5, "surge" } } }, text = "Surge: deal 4 + 5 per Insanity." },
@@ -257,14 +257,14 @@ card("void_eruption", {
 -- Les incantations frappent fort : elles paient le risque d'être interrompues.
 
 card("holy_fire", {
-  rep = 0, name = "Holy Fire", cost = 2, type = "attack", school = "holy", rarity = "common", path = "holy",
+  level = 1, name = "Holy Fire", cost = 2, type = "attack", school = "holy", rarity = "common", path = "holy",
   target = "enemy", cast = true, effects = { { "damage", 24 }, { "apply", "pain", 3 } },
   text = "Cast.\nDeal 24.\nApply DoT 3",
   up = { effects = { { "damage", 31 }, { "apply", "pain", 4 } }, text = "Cast.\nDeal 31.\nApply DoT 4" },
 })
 
 card("holy_nova", {
-  rep = 0, name = "Holy Nova", cost = 1, type = "attack", school = "holy", rarity = "common", path = "holy",
+  level = 1, name = "Holy Nova", cost = 1, type = "attack", school = "holy", rarity = "common", path = "holy",
   effects = { { "damage", 4, all = true }, { "apply", "regen", 2, self = true } },
   text = "Deal 4 to all.\nGain Regen 2",
   up = { effects = { { "damage", 6, all = true }, { "apply", "regen", 3, self = true } },
@@ -272,21 +272,21 @@ card("holy_nova", {
 })
 
 card("chastise", {
-  rep = 0, name = "Holy Word: Chastise", cost = 1, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
+  level = 1, name = "Holy Word: Chastise", cost = 1, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
   target = "enemy", cooldown = 3, effects = { { "damage", 7 }, { "apply", "stunned", 1 } },
   text = "Deal 7.\nApply Stunned 1 ⌛\nCooldown 3.",
   up = { cooldown = 2, effects = { { "damage", 10 }, { "apply", "stunned", 1 } }, text = "Deal 10.\nApply Stunned 1 ⌛\nCooldown 2." },
 })
 
 card("greater_heal", {
-  rep = 0, name = "Greater Heal", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "holy",
+  level = 1, name = "Greater Heal", cost = 1, type = "skill", school = "holy", rarity = "uncommon", path = "holy",
   cast = true, exhaust = true, effects = { { "heal", 12 } },
   text = "Cast.\nHeal 12.\nExhaust.",
   up = { effects = { { "heal", 16 } }, text = "Cast.\nHeal 16.\nExhaust." },
 })
 
 card("spirit_of_redemption", {
-  rep = 0, name = "Spirit of Redemption", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
+  level = 1, name = "Spirit of Redemption", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {},
   hooks = {
     preventDeath = function(c, power)
@@ -305,14 +305,14 @@ card("spirit_of_redemption", {
 })
 
 card("renew", {
-  rep = 0, name = "Renew", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
+  level = 1, name = "Renew", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
   exhaust = true, effects = { { "apply", "regen", 3, self = true } },
   text = "Gain Regen 3\nExhaust.",
   up = { effects = { { "apply", "regen", 5, self = true } }, text = "Gain Regen 5\nExhaust." },
 })
 
 card("halo", {
-  rep = 0, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
+  level = 4, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
   cast = true, effects = { { "damage", 15, all = true }, { "apply", "regen", 3, self = true } },
   text = "Cast.\nDeal 15 to all.\nGain Regen 3",
   up = { effects = { { "damage", 19, all = true }, { "apply", "regen", 4, self = true } },
@@ -320,14 +320,14 @@ card("halo", {
 })
 
 card("flash_heal", {
-  rep = 1, name = "Flash Heal", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
+  level = 2, name = "Flash Heal", cost = 1, type = "skill", school = "holy", rarity = "common", path = "holy",
   exhaust = true, effects = { { "heal", 7 }, { "draw", 1 } },
   text = "Heal 7.\nDraw 1.\nExhaust.",
   up = { effects = { { "heal", 10 }, { "draw", 1 } }, text = "Heal 10.\nDraw 1.\nExhaust." },
 })
 
 card("empyreal_blaze", {
-  rep = 2, name = "Empyreal Blaze", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
+  level = 6, name = "Empyreal Blaze", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
   target = "enemy", cast = true, effects = { { "damage", 28 }, { "apply", "armor_broken", 2 } },
   text = "Cast.\nDeal 28.\nApply Sundered 2 ⌛",
   up = { effects = { { "damage", 36 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 36.\nApply Sundered 2 ⌛" },
@@ -344,10 +344,81 @@ local apotheosisHooks = {
 }
 
 card("apotheosis", {
-  rep = 2, name = "Apotheosis", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
+  level = 7, name = "Apotheosis", cost = 2, type = "power", school = "holy", rarity = "rare", path = "holy",
   power = true, effects = {}, hooks = apotheosisHooks,
   text = "Power.\n+1 mana per turn.\nCast cards: cost −1.",
   up = { cost = 1, text = "Power.\n+1 mana per turn.\nCast cards: cost −1." },
+})
+
+-- Bibelots du Prêtre (class = "priest" : tirés seulement pour lui) --------------------------------
+-- docs/classes/priest-progression.md, § 2 : un bibelot par moteur (Atonement, Insanity, Regen, Cast).
+-- level = niveau de classe qui les débloque (dans la réserve de la classe ; la Ligue ne compte pas).
+
+local R = ns.Relics
+local function relic(id, t)
+  t.id = id
+  t.class = "priest"
+  t.hooks = t.hooks or {}
+  R[id] = t
+end
+
+-- Bibelot de départ : amorce l'Atonement dès le premier tour (posé au début du combat, il couvre le
+-- premier tour et le suivant).
+relic("sacred_candle", {
+  level = 1, name = "Sacred Candle", rarity = "common", noPool = true,
+  text = "At the start of each combat, gain Atonement 1 ⌛.",
+  hooks = {
+    onCombatStart = function(c) Combat.applyStatus(c, c.player, "atonement", 1) end,
+  },
+})
+
+relic("mindtap_talisman", {
+  level = 1, name = "Mindtap Talisman", rarity = "common",
+  text = "At the start of each combat, +2 Insanity.",
+  hooks = {
+    onCombatStart = function(c) Combat.gainRes(c, 2, "relic") end,
+  },
+})
+
+-- Crochet applySelf : état posé sur le héros (Renew, Holy Nova…), toutes sources.
+relic("benediction", {
+  level = 3, name = "Benediction", rarity = "uncommon",
+  text = "Each Regen gained: +1.",
+  hooks = {
+    applySelf = function(c, src, v, id)
+      if id == "regen" then return v + 1 end
+      return v
+    end,
+  },
+})
+
+relic("robes_of_prophecy", {
+  level = 5, name = "Robes of Prophecy", rarity = "uncommon",
+  text = "Atonement: each Absorb gain +2.",
+  hooks = {
+    block = function(c, src, v)
+      if (c.player.st.atonement or 0) > 0 then return v + 2 end
+      return v
+    end,
+  },
+})
+
+-- Crochet surge : montant compté par les effets « … per Insanity » d'un Surge qui a dépensé quelque
+-- chose (la ressource dépensée ne change pas).
+relic("anathema", {
+  level = 7, name = "Anathema", rarity = "rare",
+  text = "Surge cards count 2 more Insanity.",
+  hooks = {
+    surge = function(c, src, v) return v + 2 end,
+  },
+})
+
+relic("truefaith_vestments", {
+  level = 7, name = "Truefaith Vestments", rarity = "rare",
+  text = "When a Cast card resolves, gain 4 Absorb.",
+  hooks = {
+    onCastResolved = function(c) Combat.gainBlock(c, c.player, 4) end,
+  },
 })
 
 -- Classe ------------------------------------------------------------------------
@@ -362,7 +433,7 @@ ns.Classes.priest = {
     "inner_fire", "inner_fire", "inner_fire", "inner_fire",
     "pw_shield", "sw_pain",
   },
-  startRelic = nil,
+  startRelic = "sacred_candle",
   paths = { { id = "discipline", name = "Discipline" }, { id = "shadow", name = "Shadow" }, { id = "holy", name = "Holy" } },
   survival = "heal",
   -- Conseils aux bots de simulation (Sim/) : valeur d'un point de ressource (unités de Bots.W, 10 = 1 PV),

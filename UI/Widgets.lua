@@ -1911,6 +1911,10 @@ function W.fillItemTooltip(tt, kind, id, extra)
     local a = ns.Affixes and ns.Affixes[id]
     gold(tt, a and a.name or tostring(id))
     if a and a.text then wrap(tt, a.text) end
+  elseif kind == "locked" then
+    -- bibelot verrouillé (écran de progression) : la condition seule, rien de ce qu'on obtiendra
+    if extra and extra.condition then tt:AddLine(extra.condition, 1, 0.3, 0.3) end
+    return
   elseif extra and extra.title then
     gold(tt, extra.title)
   end
@@ -2023,7 +2027,7 @@ function W.repBar(parent, w)
     local frac = max(0.001, min(1, b.size and (b.cur / b.size) or 1))
     self.fill:SetWidth(max(0.01, (w - 6) * frac))
     W.setWow(self.fill, "bar_yellow", { 0, frac, 0, 1 })
-    self.value:SetText(b.size and (b.levelName .. "  " .. b.cur .. " / " .. b.size) or b.levelName)
+    self.value:SetText(b.size and (b.levelName .. " · " .. b.cur .. " / " .. b.size) or b.levelName)
     self.detail:SetText(b.detail or "")
   end
   return f

@@ -3,7 +3,8 @@
 -- les bots de Sim/bots.lua. Même API que l'interface : Expedition.choices / act.
 -- SimExpedition.play(opts) -> enregistrement compatible avec Sim/sim.lua
 -- opts : seed, bot, class, pick ("rated"|"random"|"skip"), cap, maxRounds,
---        key (niveau de clé mythique), meta ("start"|"exalted")
+--        key (niveau de clé mythique), meta ("start"|"exalted" : Ligue au palier 0 ou complète),
+--        level (niveau de classe 1..7, défaut 7)
 return function(ns)
   local X, Rng, Bots, Meta = ns.Expedition, ns.Rng, ns.Bots, ns.Meta
   local SE = {}
@@ -270,7 +271,8 @@ return function(ns)
 
   function SE.play(opts)
     local seed = opts.seed or 1
-    local unlocks = opts.meta == "exalted" and Meta.allUnlocked() or { rep = 0, league = 0 }
+    local level = opts.level or Meta.MAX_LEVEL
+    local unlocks = opts.meta == "exalted" and Meta.allUnlocked(level) or { level = level, league = 0 }
     -- Drapeaux de compte : compte neuf pour « start » (premier temps des histoires possible),
     -- compte vétéran pour « exalted » (premier temps vu, suite selon la parité de la graine).
     local flags = opts.flags
@@ -322,6 +324,7 @@ return function(ns)
     record.visits = exp.stats.visits
     record.cleared = exp.stats.cleared
     record.rep = Meta.repFor(exp)
+    record.xp = Meta.xpFor(exp)
     record.removed = exp.stats.removed
     record.upgraded = exp.stats.upgraded
     record.events = exp.stats.events -- { id = réponse choisie }

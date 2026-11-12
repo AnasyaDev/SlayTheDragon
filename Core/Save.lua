@@ -12,8 +12,9 @@ local Save = {}
 ns.Save = Save
 
 -- 1 : format initial ; 2 : drapeaux de compte (meta.flags) ; 3 : classes (expédition version 3 :
--- ressource de combat générique).
-Save.VERSION = 3
+-- ressource de combat générique) ; 4 : niveau de classe (meta.classes[id].xp, expédition version 4 :
+-- unlock.level).
+Save.VERSION = 4
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -34,6 +35,9 @@ function Save.normalize(db)
   m.league = tonumber(m.league) or 0
   m.runs = tonumber(m.runs) or 0
   if type(m.classes) ~= "table" then m.classes = {} end
+  for _, cs in pairs(m.classes) do
+    if type(cs) == "table" then cs.xp = tonumber(cs.xp) or 0 end
+  end
   -- Drapeaux de compte : on ne garde que les entrées vraies, on n'en retire jamais une.
   if type(m.flags) ~= "table" then m.flags = {} end
   for k, v in pairs(m.flags) do
@@ -54,7 +58,20 @@ Save.MIGRATIONS[1] = Save.normalize
 -- cours passe par EXP_MIGRATIONS[2].
 Save.MIGRATIONS[2] = Save.normalize
 
--- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp) de v à v + 1.
+-- 3 -> 4 : la réputation de classe (cs.rep, gardée) devient l'expérience de classe, au barème de
+-- Meta.XP sans le bonus de clé : xp = rep × rate + victoires × win (même ordre de grandeur que si les
+-- expéditions passées avaient déjà rapporté de l'expérience).
+Save.MIGRATIONS[3] = function(db)
+  Save.normalize(db)
+  local P = ns.Meta.XP
+  for _, cs in pairs(db.meta.classes) do
+    if type(cs) == "table" and (cs.xp == nil or cs.xp == 0) and cs.rep then
+      cs.xp = math.floor((tonumber(cs.rep) or 0) * P.rate + (tonumber(cs.wins) or 0) * P.win + 0.5)
+    end
+  end
+end
+
+-- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp, db) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
 -- Expédition 1 -> 2 : drapeaux de compte (aucun connu : l'expédition a commencé avant) et
@@ -82,6 +99,17 @@ Save.EXP_MIGRATIONS[2] = function(exp)
       p.demence = nil
     end
   end
+end
+
+-- Expédition 3 -> 4 : déblocages par niveau de classe. Elle reçoit le niveau qu'a sa classe après la
+-- migration de la méta (la réputation de classe, unlock.rep, n'est plus lue).
+Save.EXP_MIGRATIONS[3] = function(exp, db)
+  if type(exp.unlock) ~= "table" then exp.unlock = {} end
+  if exp.unlock.level == nil then
+    exp.unlock.level = (db and type(db.meta) == "table") and ns.Meta.levelOf(db.meta, exp.class or "priest") or 1
+  end
+  exp.unlock.league = tonumber(exp.unlock.league) or 0
+  exp.unlock.rep = nil
 end
 
 local function quarantine(db, state, reason)
@@ -122,7 +150,7 @@ function Save.migrate(db)
     else
       local ev = tonumber(exp.version) or 0
       while ev < ns.Expedition.VERSION and Save.EXP_MIGRATIONS[ev] do
-        Save.EXP_MIGRATIONS[ev](exp)
+        Save.EXP_MIGRATIONS[ev](exp, db)
         ev = ev + 1
         exp.version = ev
       end
@@ -195,7 +223,7 @@ function Save.validate(db)
     err("meta")
   else
     for class, cs in pairs(m.classes) do
-      if type(cs) ~= "table" or type(cs.rep) ~= "number" or type(cs.keyMax) ~= "number" then err("meta." .. tostring(class)) end
+      if type(cs) ~= "table" or type(cs.xp) ~= "number" or type(cs.keyMax) ~= "number" then err("meta." .. tostring(class)) end
     end
     if type(m.flags) ~= "table" then err("meta.flags") end
   end
@@ -233,6 +261,7 @@ function Save.finish(db, date)
   local entry = ns.Expedition.summary(exp)
   entry.date = date
   entry.rep = summary.rep
+  entry.xp = summary.xp
   db.journal[#db.journal + 1] = entry
   db.current = nil
   return summary, entry

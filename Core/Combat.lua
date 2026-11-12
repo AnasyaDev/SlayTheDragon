@@ -261,6 +261,11 @@ function Combat.applyStatus(c, unit, id, n, icon)
   end
   local def = ns.Statuses[id]
   if not def then error("unknown status: " .. tostring(id)) end
+  -- crochet applySelf (c, src, n, état) : valeur d'un état posé sur le héros, toutes sources (Benediction)
+  if unit.side == "player" and n > 0 then
+    n = Combat.modify(c, "applySelf", n, id)
+    if n <= 0 then return end
+  end
   if id == "stunned" and unit.boss then
     log(c, { t = "immune", unit = uref(unit), id = id })
     return
