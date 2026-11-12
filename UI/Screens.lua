@@ -551,18 +551,6 @@ function Start:Show(step)
   end
 end
 
-function Start:HandleKey(key)
-  if key == "ENTER" or key == "SPACE" then chooseOption(self.go.option) return true end
-  local idx = UI.keyIndex(key)
-  if idx and idx <= 6 then
-    -- 1..6 : clé +0..+5
-    local b = self.keyButtons[idx]
-    if b and b.option then chooseOption(b.option) end
-    return true
-  end
-  return false
-end
-
 ---------------------------------------------------------------------------
 -- Rencontre (et bibelot de classe) : bulle, personnage, plaques de réponses
 ---------------------------------------------------------------------------
@@ -621,16 +609,6 @@ function Choice:Show(step)
       b:Hide()
     end
   end
-end
-
-function Choice:HandleKey(key)
-  local idx = UI.keyIndex(key)
-  if idx then chooseOption(self.step.options[idx]) return true end
-  if (key == "ENTER" or key == "SPACE") and #self.step.options == 1 then
-    chooseOption(self.step.options[1])
-    return true
-  end
-  return false
 end
 
 ---------------------------------------------------------------------------
@@ -733,14 +711,6 @@ function Camp:Show(step)
       self.optionButtons[o.id] = self.leave
     end
   end
-end
-
-function Camp:HandleKey(key)
-  local idx = UI.keyIndex(key)
-  if idx == 1 then chooseOption(self.rest.option) return true end
-  if idx == 2 then chooseOption(self.book.option) return true end
-  if key == "ENTER" or key == "SPACE" then chooseOption(self.leave.option) return true end
-  return idx ~= nil
 end
 
 ---------------------------------------------------------------------------
@@ -1005,22 +975,6 @@ function Reward:OnHide()
   UI.hold = {}
 end
 
-function Reward:HandleKey(key)
-  local idx = UI.keyIndex(key)
-  if idx then
-    if not self.opened then self:OpenChest() return true end
-    local o = self.cardOptions and self.cardOptions[idx]
-    local card = o and self.optionButtons[o.id]
-    if card then self:Pick(card) end
-    return true
-  end
-  if key == "SPACE" or key == "ENTER" then
-    if not self.opened then self:OpenChest() else self:Leave() end
-    return true
-  end
-  return false
-end
-
 ---------------------------------------------------------------------------
 -- Grille du deck : amélioration, retrait, sélection de rencontre
 ---------------------------------------------------------------------------
@@ -1147,19 +1101,6 @@ function Deck:Layout()
     self.prev:Hide()
     self.next:Hide()
   end
-end
-
-function Deck:HandleKey(key)
-  local idx = UI.keyIndex(key)
-  if idx then
-    chooseOption(self.cardOptions[(self.page - 1) * PER_PAGE + idx])
-    return true
-  end
-  if key == "SPACE" or key == "ENTER" then
-    chooseOption(self.otherOptions[#self.otherOptions])
-    return true
-  end
-  return false
 end
 
 ---------------------------------------------------------------------------
@@ -1336,17 +1277,6 @@ function Shop:Show(step)
       self.optionButtons[o.id] = rm
     end
   end
-end
-
-function Shop:HandleKey(key)
-  local idx = UI.keyIndex(key)
-  if idx then chooseOption(self.cardOptions[idx]) return true end
-  if key == "SPACE" or key == "ENTER" then
-    for _, o in ipairs(self.serviceOptions or {}) do
-      if o.id == "leave" then chooseOption(o) return true end
-    end
-  end
-  return false
 end
 
 ---------------------------------------------------------------------------
@@ -1553,14 +1483,6 @@ function Map:Show(step)
   end
 end
 
-function Map:HandleKey(key)
-  local opts = self.step and self.step.options or {}
-  local idx = UI.keyIndex(key)
-  if idx then chooseOption(opts[idx]) return true end
-  if (key == "ENTER" or key == "SPACE") and #opts == 1 then chooseOption(opts[1]) return true end
-  return false
-end
-
 ---------------------------------------------------------------------------
 -- Bilan et méta : panneau d'ardoise, barres de réputation, journal
 ---------------------------------------------------------------------------
@@ -1656,20 +1578,12 @@ function Progress:Show(step)
   end
 end
 
-function Progress:HandleKey(key)
-  local opts = self.step and self.step.options or {}
-  local idx = UI.keyIndex(key)
-  if idx then chooseOption(opts[idx]) return true end
-  if key == "ENTER" or key == "SPACE" then chooseOption(opts[1]) return true end
-  return false
-end
-
 ---------------------------------------------------------------------------
 -- Consultation des cartes (par-dessus l'écran) : deck complet, pioche, défausse, consumées
 ---------------------------------------------------------------------------
 -- Grille de vraies cartes (W.card), triées par type, coût puis nom ; la pioche n'est jamais montrée
--- dans l'ordre de tirage. Défilement à la molette ; fermeture par Échap, clic hors du panneau ou
--- « Fermer ». Aucune règle : ne fait que lire l'état.
+-- dans l'ordre de tirage. Défilement à la molette ; fermeture par clic hors du panneau, « Fermer », ou
+-- avec la fenêtre (Échap). Aucune règle : ne fait que lire l'état.
 
 local DV = { kind = nil, offset = 0, list = {} }
 UI.deckView = DV

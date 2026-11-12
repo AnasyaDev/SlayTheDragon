@@ -726,10 +726,25 @@ function H.slash(msg)
   f(msg or "")
 end
 
+-- Touche pressée, à la façon du client : tout cadre visible qui capte le clavier (EnableKeyboard) la
+-- reçoit d'abord, et s'il ne la propage pas le jeu ne la voit pas ; sinon le jeu la traite (Échap :
+-- CloseSpecialWindows cache les fenêtres de UISpecialFrames). Renvoie vrai si la touche est allée au jeu.
 function H.key(key)
-  local f = _G.SlayTheDragonFrame
-  run(f, "OnKeyDown", key)
-  return f._propagate
+  local toGame = true
+  for _, o in ipairs(H.objects) do
+    if o._keyboard and o:IsVisible() then
+      local fn = o._scripts.OnKeyDown
+      if fn then fn(o, key) end
+      if not o._propagate then toGame = false end
+    end
+  end
+  if toGame and key == "ESCAPE" then
+    for _, name in pairs(_G.UISpecialFrames) do
+      local f = _G[name]
+      if f and f:IsShown() then f:Hide() end
+    end
+  end
+  return toGame
 end
 
 function H.click(obj, button)
@@ -825,8 +840,8 @@ local function enemySlot(t)
   error("emplacement de la cible introuvable")
 end
 
--- Un coup du bot, exécuté par l'interface : clic carte puis clic cible (ou second clic),
--- en variant clavier et glisser-déposer pour couvrir tous les chemins.
+-- Un coup du bot, exécuté par l'interface à la souris : clic carte puis clic cible (ou second clic),
+-- ennemi retenu puis double clic sur la carte (ou clic dans le décor), glisser-déposer.
 local playStyle = 0
 local function playAction(bot)
   local c = C().combat()
@@ -838,7 +853,7 @@ local function playAction(bot)
     return "potion"
   end
   if a[1] ~= "play" then
-    if playStyle % 2 == 0 then H.click(v.endTurn) else H.key("SPACE") end
+    H.click(v.endTurn)
     playStyle = playStyle + 1
     return "end"
   end
@@ -852,12 +867,14 @@ local function playAction(bot)
     H.click(card)
     if needs then H.click(enemySlot(t)) else H.click(card) end
   elseif style == 1 then
-    H.key(idx == 10 and "0" or tostring(idx))
     if needs then
-      local guard = 0
-      while v:KbTarget() ~= t and guard < 10 do H.key("TAB") guard = guard + 1 end
+      H.click(enemySlot(t)) -- sans carte choisie : l'ennemi est retenu
+      H.click(card)
+      H.click(card) -- second clic : jouée sur l'ennemi retenu
+    else
+      H.click(card)
+      run(v.bf, "OnMouseUp", "LeftButton") -- clic dans le décor
     end
-    H.key(idx == 10 and "0" or tostring(idx))
   else
     run(card, "OnDragStart")
     local slot
@@ -934,11 +951,7 @@ local function decide(state)
       if o and not o.disabled then target = o.id end
     end
     target = target or step.options[1].id
-    -- une fois sur deux au clavier (1..3 = étapes accessibles de gauche à droite)
-    local idx
-    for i, o in ipairs(step.options) do if o.id == target then idx = i end end
-    if state.mapStyle and idx then H.key(tostring(idx)) else clickOption(target) end
-    state.mapStyle = not state.mapStyle
+    clickOption(target)
   elseif k == "reward" then
     if UI().current.opened == false then H.click(UI().current.chest) end
     local best, bestR
@@ -1052,13 +1065,13 @@ check("infobulle du bouton de minimap", #tt >= 2, #tt)
 print("U2  /slay ouvre la fenêtre sur l'accueil, Échap la ferme")
 H.slash("")
 check("fenêtre ouverte", shown())
-check("clavier capté", _G.SlayTheDragonFrame._keyboard == true)
+check("clavier non capté", not _G.SlayTheDragonFrame._keyboard)
 check("écran d'accueil", currentKind() == "start", currentKind())
 check("UISpecialFrames contient la fenêtre", _G.UISpecialFrames[1] == "SlayTheDragonFrame")
 local prop = H.key("W")
-check("touche non gérée rendue au jeu", prop == true, prop)
+check("touche rendue au jeu", prop == true, prop)
 prop = H.key("ESCAPE")
-check("Échap gérée (non propagée)", prop == false, prop)
+check("Échap va au jeu (UISpecialFrames)", prop == true, prop)
 check("Échap ferme", not shown())
 H.slash("")
 check("/slay rouvre", shown())
@@ -1077,8 +1090,8 @@ autoOpen:SetChecked(false) H.click(autoOpen)
 check("décocher « ouvrir au décollage » enregistre l'option", ns.Persist.options().autoOpen == false)
 autoOpen:SetChecked(true) H.click(autoOpen)
 check("recocher", ns.Persist.options().autoOpen == true)
-H.key("ESCAPE")
-check("Échap ferme d'abord les options", not UI().optionsFrame._shown and shown())
+H.click(UI().optionsClose)
+check("bouton de fermeture des options", not UI().optionsFrame._shown and shown())
 
 print("U4  accueil : classe, clé verrouillée, départ")
 local st = UI().step
@@ -1126,7 +1139,7 @@ while guard < 400 do
   local k = currentKind()
   if k == "combat" then
     if C().over() then
-      if guard % 2 == 0 then H.click(V().banner.button) else H.key("SPACE") end
+      H.click(V().banner.button)
     else
       nCombats = nCombats + 1
       check("combat " .. nCombats .. " : main affichée", V().cards[1]._shown)
@@ -1181,7 +1194,7 @@ while guard < 400 do
           H.slash("options")
           H.advance(0.2)
           snap("options")
-          H.key("ESCAPE")
+          H.click(UI().optionsClose)
         end
         if not C().over() then
           combatReloaded = true
@@ -1211,8 +1224,8 @@ while guard < 400 do
     reloadRoundTrip("écran de récompense")
     check("reprise sur la récompense, mêmes cartes", currentKind() == "reward" and deepeq(EXP().reward.cards, cards))
     local deckN = #EXP().deck
-    H.key("1")
-    check("touche 1 prend la première carte", #EXP().deck == deckN + 1 and EXP().reward.cardsDone, #EXP().deck)
+    clickOption(UI().current.cardOptions[1].id)
+    check("clic : la première carte prise", #EXP().deck == deckN + 1 and EXP().reward.cardsDone, #EXP().deck)
     check("texte « Card added »", (UI().step.text or ""):find("Card added", 1, true), UI().step.text)
   elseif k == "end" then
     finished = true
@@ -1272,7 +1285,7 @@ check("clé par défaut = la plus haute ouverte", UI().step.key == keyMax and op
 check("dernière expédition rappelée", (UI().step.text or ""):find("Last expedition", 1, true))
 ns = H.ns
 ns.Controller.makeSeed = function() return SEED + 1 end
-H.key("ENTER")
+H.click(UI().current.go)
 exp = EXP()
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
@@ -1380,7 +1393,7 @@ local price1 = option("ui:remove").price
 clickOption("ui:remove")
 check("écran de retrait (grille du deck)", currentKind() == "deck" and #UI().current.cardOptions == #exp.deck)
 local deckN = #exp.deck
-H.key("1")
+clickOption(UI().current.cardOptions[1].id)
 check("carte retirée, retour chez le marchand", #exp.deck == deckN - 1 and currentKind() == "merchant", currentKind())
 check("prix du retrait croissant", option("ui:remove").price == price1 + ns.Expedition.REMOVE_STEP, option("ui:remove").price)
 clickOption("ui:remove")
@@ -1427,13 +1440,13 @@ if ev then
   for i, o in ipairs(UI().step.options) do
     if not pick and not o.disabled and not (o.text or ""):find("[Ff]ight") then pick = i end
   end
-  H.key(tostring(pick))
+  clickOption(UI().step.options[pick].id)
   local k = currentKind()
   check("choix appliqué (résultat, sélection ou récompense)", exp.event.chosen == pick
     and (k == "event" or k == "select" or k == "reward"), k)
   if k == "event" then
     check("texte après coup", UI().step.text == (exp.event.result or ev.choices[pick].after), UI().step.text)
-    H.key("ENTER")
+    clickOption(UI().step.options[1].id)
   elseif k == "select" then
     clickOption("skipSelect")
   else
@@ -2055,10 +2068,12 @@ do
   run(Dv.frame, "OnMouseWheel", 5)
   check("molette vers le haut", Dv.offset == Dv:MaxOffset() - 1)
   local prop = H.key("1")
-  check("panneau ouvert : les touches ne vont pas à l'écran dessous", prop == true and Dv:IsShown()
+  check("panneau ouvert : la touche 1 va au jeu, rien ne change", prop == true and Dv:IsShown()
     and currentKind() == "map")
   H.key("ESCAPE")
-  check("Échap ferme le panneau (pas la fenêtre)", not Dv:IsShown() and shown())
+  check("Échap ferme la fenêtre, et le panneau avec elle", not Dv:IsShown() and not shown())
+  H.slash("")
+  check("rouverte : panneau fermé, même écran", shown() and not Dv:IsShown() and currentKind() == "map")
   H.click(UI().deckButton)
   H.click(Dv.frame)
   check("clic hors du panneau : fermé", not Dv:IsShown())
@@ -2074,7 +2089,7 @@ do
   Dv = UI().deckView
   H.click(UI().current.pile)
   check("pile du deck (feu de camp) : panneau ouvert", Dv:IsShown() and Dv.kind == "deck" and #Dv.list == #exp.deck)
-  H.key("ESCAPE")
+  H.click(Dv.close)
 
   -- combat : pioche (triée, jamais l'ordre réel), défausse, consumées, deck complet
   exp = freshRun(SEED, "combat")
@@ -2104,22 +2119,22 @@ do
   check("second clic sur la pioche : fermé", not Dv:IsShown())
   H.click(V().discardPile)
   check("défausse consultable", Dv:IsShown() and Dv.kind == "discard" and #Dv.list == #c.discard)
-  H.key("ESCAPE")
+  H.click(Dv.close)
   c.exhaust[#c.exhaust + 1] = c.draw[#c.draw]
   table.remove(c.draw)
   V():Render()
   check("tas des consumées affiché quand il y en a", V().exhaustPile._shown and V().exhaustPile.count._text == 1)
   H.click(V().exhaustPile)
   check("consumées consultables", Dv:IsShown() and Dv.kind == "exhaust" and #Dv.list == 1)
-  H.key("ESCAPE")
+  H.click(Dv.close)
   check("bouton Deck aussi en combat", UI().deckButton._shown)
   H.click(UI().deckButton)
   check("deck complet consultable en combat", Dv:IsShown() and Dv.kind == "deck" and #Dv.list == #exp.deck)
   local hand = #c.hand
   H.key("1")
   check("panneau ouvert en combat : la touche 1 ne joue rien", #c.hand == hand and Dv:IsShown())
-  H.key("ESCAPE")
-  check("Échap : panneau fermé, combat intact", not Dv:IsShown() and currentKind() == "combat")
+  H.click(Dv.close)
+  check("Fermer : panneau fermé, combat intact", not Dv:IsShown() and currentKind() == "combat")
 end
 
 print("U20 peau : SkinData cohérent avec Media/, carte composée, repli d'icône")
@@ -4234,7 +4249,7 @@ do
   sharp("combat")
   H.slash("options")
   sharp("options")
-  H.key("ESCAPE")
+  H.click(UI().optionsClose)
 
   -- 5. textes dans leurs zones : libellés des boutons rouges (entre les bouts du bouton), cadre du héros
   -- (nom dans son logement, PV dans la barre), cadres compacts des ennemis (voir U21)
@@ -4427,11 +4442,11 @@ do
     return bad
   end
   check("message passager au-dessus du panneau d'options", Um.err._shown and errOver(Um.optionsFrame) == 0)
-  H.key("ESCAPE")
+  H.click(Um.optionsClose)
   Um.toggleDeckView("deck")
   Um.flash("Test message.")
   check("message passager au-dessus du panneau du deck", Um.deckView:IsShown() and errOver(Um.deckView.frame) == 0)
-  H.key("ESCAPE")
+  H.click(Um.deckView.close)
   H.advance(3)
 
   -- 3. silhouette des cadres : rien du contenu ni d'un fond ne tombe sur un pixel transparent à
@@ -4615,10 +4630,10 @@ do
   end
   H.slash("options")
   dl("options")
-  H.key("ESCAPE")
+  H.click(Um.optionsClose)
   Um.toggleDeckView("deck")
   dl("deck")
-  H.key("ESCAPE")
+  H.click(Um.deckView.close)
 
   -- butin en vol vers le bandeau : sur la couche du dessus pendant le vol, de retour à l'arrivée
   local res = fightUntil(nil, 600)
@@ -5479,6 +5494,218 @@ if SNAP then
   end
   Render.svg(H, big, SNAP .. "/cartes_warrior.svg", "cartes du Guerrier (base, améliorée)")
   big:Hide()
+end
+
+print("UK  clavier laissé au jeu : aucun cadre ne le capte, aucune touche n'agit, Échap par UISpecialFrames, aucun raccourci affiché, Maj au jeu d'une carte")
+do
+  local function head(t, n)
+    local out = {}
+    for i = 1, math.min(#t, n) do out[i] = t[i] end
+    if #t > n then out[#out + 1] = ("… (%d en tout)"):format(#t) end
+    return table.concat(out, "\n        ")
+  end
+  -- (1) sources de l'interface : aucune capture du clavier ni nom de touche (commentaires retirés)
+  local srcBad = {}
+  local tocF = assert(io.open("SlayTheDragon.toc", "r"))
+  for line in tocF:lines() do
+    local path = line:gsub("\r", ""):match("^(UI[\\/][%w_/\\]+%.lua)%s*$")
+    if path then
+      local f = io.open((path:gsub("\\", "/")), "r")
+      if f then
+        local n = 0
+        for l in f:lines() do
+          n = n + 1
+          local code = l:gsub("%-%-.*$", "")
+          for _, pat in ipairs({ "EnableKeyboard", "OnKeyDown", "OnKeyUp", "OnChar", "SetPropagateKeyboardInput",
+            "OverrideBinding", "SetBinding", "IsKeyDown", "GetBindingKey", '"SPACE"', '"ENTER"', '"TAB"', '"ESCAPE"',
+            "HandleKey", "keyIndex" }) do
+            if code:find(pat, 1, true) then srcBad[#srcBad + 1] = path .. ":" .. n .. " " .. pat end
+          end
+        end
+        f:close()
+      end
+    end
+  end
+  tocF:close()
+  check("sources de UI/ : ni capture du clavier, ni gestion de touche, ni nom de touche", #srcBad == 0, head(srcBad, 8))
+
+  -- touches essayées : tout ce qu'un joueur presse en vol (chat, saut, barres, déplacement, ciblage)
+  local KEYS = { "SPACE", "ENTER", "TAB", "BACKSPACE", "UP", "DOWN", "LEFT", "RIGHT", "LSHIFT", "LCTRL", "LALT",
+    "F1", "NUMPAD1", "-", "=", "/" }
+  for d = 0, 9 do KEYS[#KEYS + 1] = tostring(d) end
+  for b = string.byte("A"), string.byte("Z") do KEYS[#KEYS + 1] = string.char(b) end
+
+  local function lower(t) return (t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", ""):lower()) end
+  local WORDS = { "space", "spacebar", "enter", "return", "tab", "esc", "escape", "ctrl", "alt", "hotkey", "hotkeys",
+    "shortcut", "shortcuts", "keybind", "keybinding", "keyboard", "press", "numpad" }
+  -- nom de touche ou mention d'un raccourci ; « Key +N », « Keys unlocked » = clés mythiques, « Shift » permis
+  local function shortcutWord(t)
+    local l = " " .. lower(t) .. " "
+    for _, w in ipairs(WORDS) do
+      if l:find("%f[%a]" .. w .. "%f[%A]") then return w end
+    end
+    local rest = l:gsub("%f[%a]keys? %+", ""):gsub("%f[%a]keys unlocked", "")
+    if rest:find("%f[%a]keys?%f[%A]") then return "key" end
+    return nil
+  end
+
+  local seen, textBadList, nTexts, nTips = {}, {}, 0, 0
+  local consumers, actions = {}, {}
+  local function noteText(where, t)
+    if type(t) ~= "string" or t == "" or seen[t] then return end
+    seen[t] = true
+    nTexts = nTexts + 1
+    local w = shortcutWord(t)
+    if w then textBadList[#textBadList + 1] = where .. " : « " .. t:gsub("\n", " / ") .. " » (" .. w .. ")" end
+  end
+  -- état observable : sauvegarde complète, écran, fenêtre, options, panneau des cartes
+  local function state()
+    return { db = deepcopy(_G.SlayTheDragonDB), kind = currentKind(), shown = shown() and true or false,
+      opt = UI().optionsFrame and UI().optionsFrame._shown or false,
+      dv = UI().deckView and UI().deckView:IsShown() or false,
+      sel = V().selected, pot = V().potionSlot }
+  end
+  -- un écran : aucun cadre ne capte le clavier, chaque touche va au jeu sans rien changer, textes et
+  -- infobulles relevés
+  local function probe(where)
+    H.settle()
+    for _, o in ipairs(H.objects) do
+      local sc = rawget(o, "_scripts")
+      if rawget(o, "_keyboard") or (sc and (sc.OnKeyDown or sc.OnKeyUp or sc.OnChar)) then
+        consumers[#consumers + 1] = where .. " : " .. tostring(rawget(o, "_name") or rawget(o, "_kind"))
+      end
+    end
+    for _, k in ipairs(KEYS) do
+      local before = state()
+      local toGame = H.key(k)
+      H.advance(0.3)
+      local after = state()
+      local same, why = deepeq(before, after)
+      if not toGame or not same then
+        actions[#actions + 1] = where .. " : " .. k .. (toGame and "" or " (non rendue au jeu)") .. (same and "" or " — " .. tostring(why))
+      end
+    end
+    for _, o in ipairs(H.objects) do
+      if rawget(o, "_kind") == "FontString" and o:IsVisible() then noteText(where, rawget(o, "_text")) end
+    end
+    for _, o in ipairs(H.objects) do
+      local sc = rawget(o, "_scripts")
+      if sc and sc.OnEnter and o:IsVisible() then
+        for _, line in ipairs(H.hover(o)) do
+          nTips = nTips + 1
+          noteText(where .. " (infobulle)", type(line) == "table" and line[1] or line)
+        end
+      end
+    end
+  end
+
+  -- accueil, options, parcours, panneau des cartes, combat, feu de camp, marchand, rencontre, bilan, méta
+  H.boot(nil)
+  H.slash("")
+  probe("accueil")
+  UI().toggleOptions()
+  probe("options")
+  H.click(UI().optionsClose)
+  local exp = freshRun(SEED)
+  probe("parcours")
+  H.click(UI().deckButton)
+  probe("panneau du deck")
+  H.click(UI().deckView.close)
+  exp = freshRun(SEED, "combat")
+  probe("combat")
+  local v = V()
+  H.click(v.cards[1])
+  probe("combat, carte choisie")
+  H.click(v.cards[1], "RightButton")
+  exp = freshRun(SEED + 3, "campfire")
+  probe("feu de camp")
+  exp = freshRun(SEED + 2, "merchant")
+  probe("marchand")
+  exp = freshRun(SEED + 4, "event")
+  probe("rencontre")
+  UI().toggleOptions()
+  H.click(UI().abandonButton)
+  H.click(UI().abandonButton)
+  probe("bilan")
+  clickOption("ui:meta")
+  probe("méta")
+  check("aucun cadre de l'addon ne capte le clavier (EnableKeyboard, OnKeyDown, OnKeyUp, OnChar), sur tous les écrans",
+    #consumers == 0, head(consumers, 8))
+  check(("aucune des %d touches ne déclenche d'action ni n'est retenue (écran, sauvegarde, sélection, panneaux), sur 11 vues")
+    :format(#KEYS), #actions == 0, head(actions, 8))
+  check(("aucun texte affiché ni infobulle ne mentionne une touche ou un raccourci (%d textes, %d lignes d'infobulle)")
+    :format(nTexts, nTips), nTexts > 100 and nTips > 20 and #textBadList == 0, head(textBadList, 8))
+  check("le détecteur de mentions voit bien « Space: end turn » et « (Enter) », pas « Key +2 » ni « Shift: »",
+    shortcutWord("Space: end turn") and shortcutWord("Continue (Enter)") and shortcutWord("Press 1")
+    and not shortcutWord("Key +2") and not shortcutWord("Keys unlocked: +0 to +3")
+    and not shortcutWord(H.ns.Widgets.SPEND_HINT))
+
+  -- (2) Échap : rendu au jeu, qui ferme la fenêtre par UISpecialFrames (options et panneau avec elle)
+  exp = freshRun(SEED, "combat")
+  UI().toggleOptions()
+  UI().toggleDeckView("deck")
+  check("Échap : options et panneau des cartes ouverts avant", UI().optionsFrame._shown and UI().deckView:IsShown())
+  local listed = false
+  for _, n in pairs(_G.UISpecialFrames) do if n == "SlayTheDragonFrame" and _G[n] == UI().frame then listed = true end end
+  check("UISpecialFrames nomme la fenêtre de l'addon", listed)
+  local hand = #C().combat().hand
+  local toGame = H.key("ESCAPE")
+  check("Échap va au jeu et ferme la fenêtre par UISpecialFrames, options et panneau compris",
+    toGame and not shown() and not UI().optionsFrame._shown and not UI().deckView:IsShown(), toGame)
+  check("Échap ne joue rien", #C().combat().hand == hand and currentKind() == "combat")
+  H.slash("")
+  check("rouverte par /slay : même combat, rien d'ouvert par-dessus", shown() and currentKind() == "combat"
+    and not UI().optionsFrame._shown and not UI().deckView:IsShown())
+
+  -- (3) Maj tenue au jeu d'une carte « Spend N » : jouée sans dépenser (modificateur lu au clic)
+  H.boot(nil)
+  H.slash("")
+  clickOption("class:warrior")
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  exp = EXP()
+  local id = exp.map.start[1]
+  exp.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  v = V()
+  local c = C().combat()
+  local ctl = H.ns.Controller
+  local got = {}
+  local play0 = ctl.play
+  ctl.play = function(i, t, nospend) got[#got + 1] = nospend and true or false return play0(i, t, nospend) end
+  local function heroic()
+    c.hand[1] = { uid = 990000 + #got, id = "heroic_strike" }
+    c.player.res = 3 -- sous le plafond : un gain éventuel de l'attaque reste visible
+    c.player.mana = 3
+    v:Render(true)
+    H.settle()
+    return v.cards[1]
+  end
+  local target = C().aliveTargets()[1]
+  H.shift = true
+  local card = heroic()
+  local keyToGame = H.key("LSHIFT")
+  H.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 1)
+  H.click(card)
+  H.click(enemySlot(target))
+  H.shift = false
+  H.fire("MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+  H.settle()
+  local resShift = c.player.res
+  check("Maj tenue : la touche va au jeu, la carte Spend se joue sans dépenser",
+    keyToGame and got[1] == true and resShift >= 3, tostring(got[1]) .. " / " .. tostring(resShift))
+  card = heroic()
+  H.click(card)
+  H.click(enemySlot(target))
+  H.settle()
+  check("sans Maj : la même carte dépense (2 Rage de moins qu'avec Maj)", got[2] == false
+    and c.player.res == resShift - 2, tostring(got[2]) .. " / " .. tostring(c.player.res) .. " / " .. resShift)
+  ctl.play = play0
+  local zone = false
+  for _, o in ipairs(H.listeners.MODIFIER_STATE_CHANGED or {}) do if o == v.classZone then zone = true end end
+  check("MODIFIER_STATE_CHANGED écouté (ligne « Spend N: » redessinée), sans capter le clavier", zone
+    and not rawget(v.classZone, "_keyboard"))
 end
 
 print("U16 méthodes d'API inconnues appelées")

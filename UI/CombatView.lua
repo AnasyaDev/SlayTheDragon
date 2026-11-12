@@ -579,7 +579,7 @@ function V:Show(step)
     self.c = c
     self.selected = nil
     self.potionSlot = nil
-    self.kbTarget = nil
+    self.aimTarget = nil
     self.queue = {}
     self.playing = false
     self.frozen = false
@@ -750,17 +750,18 @@ function V:SelectedInfo()
   return self.selected and Controller.handInfo(self.selected) or nil
 end
 
--- Index de l'ennemi visé au clavier (uid stable, repli sur le premier vivant).
-function V:KbTarget()
+-- Index de l'ennemi retenu (dernier ennemi cliqué, uid stable ; repli sur le premier vivant) : un second
+-- clic sur une carte à cible la joue sur lui.
+function V:AimTarget()
   local c = self.c
   if not c then return nil end
-  if self.kbTarget then
-    local e, i = enemyByUid(c, self.kbTarget)
+  if self.aimTarget then
+    local e, i = enemyByUid(c, self.aimTarget)
     if e and not e.dead then return i end
   end
   local alive = Controller.aliveTargets()
   if alive[1] then
-    self.kbTarget = c.enemies[alive[1]].uid
+    self.aimTarget = c.enemies[alive[1]].uid
     return alive[1]
   end
   return nil
@@ -771,15 +772,15 @@ function V:RenderTargets()
   if not self.c then return end
   local info = self:SelectedInfo()
   local targeting = (info and info.needsTarget) or self.potionSlot ~= nil
-  local kb = self:KbTarget()
+  local aimed = self:AimTarget()
   for _, s in pairs(self.slotOf) do
     local e = self.c.enemies[s.enemyIndex]
     local alive = e and not e.dead and not s.dying
-    local on = alive and ((targeting and (s.hover or s.enemyIndex == kb)) or s.hover)
+    local on = alive and ((targeting and (s.hover or s.enemyIndex == aimed)) or s.hover)
     s.fig:SetRing(on, not targeting)
-    -- visée : l'ennemi survolé (ou la cible clavier) grandit, son anneau s'allume
+    -- visée : l'ennemi survolé (ou l'ennemi retenu) grandit, son anneau s'allume
     s.ringBase = targeting and 0 or 1
-    local aim = alive and targeting and (s.hover or s.enemyIndex == kb)
+    local aim = alive and targeting and (s.hover or s.enemyIndex == aimed)
     W.animTo(s, "aim", aim and 1 or 0, aim and W.HOVER_IN or W.HOVER_OUT)
     aimApply(s)
   end
@@ -1279,13 +1280,13 @@ function V:Play(i, target)
   return ok
 end
 
--- Joue la carte sélectionnée (sur la cible clavier si elle en demande une).
+-- Joue la carte sélectionnée (sur l'ennemi retenu si elle demande une cible).
 function V:Confirm()
   local i = self.selected
   local info = i and Controller.handInfo(i)
   if not info then return end
   if info.needsTarget then
-    local t = self:KbTarget()
+    local t = self:AimTarget()
     if not t then UI.flash(Controller.reasonText("target")) return end
     return self:Play(i, t)
   end
@@ -1308,12 +1309,12 @@ function V:ClickEnemy(slot, button)
   if info and info.needsTarget then
     self:Play(self.selected, slot.enemyIndex)
   else
-    self.kbTarget = e.uid
+    self.aimTarget = e.uid
     if info then self:Play(self.selected) else self:RenderTargets() end
   end
 end
 
--- Potion à cible (bandeau) : la prochaine cible cliquée la reçoit ; Entrée vise la cible clavier.
+-- Potion à cible (bandeau) : la prochaine cible cliquée la reçoit.
 function V:SelectPotion(slot)
   self.selected = nil
   self.potionSlot = slot
@@ -1353,17 +1354,6 @@ function V:EndTurn()
   W.sound("endTurn")
   local ok = Controller.endTurn()
   if ok then self:FlyDiscard(before) else self.frozen = false end
-end
-
-function V:CycleTarget(back)
-  local alive = Controller.aliveTargets()
-  if #alive == 0 then return end
-  local cur = self:KbTarget()
-  local pos = 1
-  for k = 1, #alive do if alive[k] == cur then pos = k end end
-  pos = back and (pos - 2) % #alive + 1 or pos % #alive + 1
-  self.kbTarget = self.c.enemies[alive[pos]].uid
-  self:RenderTargets()
 end
 
 function V:StartDrag(card)
@@ -1407,37 +1397,6 @@ function V:StopDrag(card, cancel)
   self.selected = nil
   self:RenderHand()
   self:RenderTargets()
-end
-
-function V:HandleKey(key)
-  local c = self.c
-  if not c then return false end
-  if Controller.over() then
-    if key == "SPACE" or key == "ENTER" then Controller.finishCombat() return true end
-    return UI.keyIndex(key) ~= nil
-  end
-  local idx = UI.keyIndex(key)
-  if idx then
-    if idx <= #c.hand then
-      if self.selected == idx then self:Confirm() else self:Select(idx) end
-    end
-    return true
-  elseif key == "TAB" then
-    self:CycleTarget(IsShiftKeyDown and IsShiftKeyDown())
-    return true
-  elseif key == "SPACE" then
-    self:EndTurn()
-    return true
-  elseif key == "ENTER" then
-    if self.potionSlot then
-      local t = self:KbTarget()
-      if t then self:DrinkPotion(self.potionSlot, t) end
-    else
-      self:Confirm()
-    end
-    return true
-  end
-  return false
 end
 
 ---------------------------------------------------------------------------

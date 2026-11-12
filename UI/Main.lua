@@ -1,4 +1,6 @@
--- Fenêtre principale (1040 × 620), bandeau, gestion des écrans, clavier, options, /slay, minimap.
+-- Fenêtre principale (1040 × 620), bandeau, gestion des écrans, options, /slay, minimap.
+-- Aucun raccourci clavier : la fenêtre ne capte jamais le clavier (les touches restent au jeu, joué en
+-- vol) ; Échap la ferme par UISpecialFrames, comme toute fenêtre du jeu.
 local addonName, ns = ...
 if not CreateFrame then return end -- hors du jeu (Sim/load.lua) : pas d'interface
 
@@ -25,8 +27,7 @@ local function say(msg)
 end
 UI.say = say
 
--- Enregistre un écran : screen = { kinds = {...}, Build(self, parent), Show(self, step), OnHide(self),
--- HandleKey(self, key) -> handled }.
+-- Enregistre un écran : screen = { kinds = {...}, Build(self, parent), Show(self, step), OnHide(self) }.
 function UI.register(name, screen)
   UI.screens[name] = screen
   for i = 1, #screen.kinds do UI.screenByKind[screen.kinds[i]] = name end
@@ -234,6 +235,8 @@ function UI.build()
   f:SetMovable(true)
   f:EnableMouse(true)
   f:Hide()
+  -- Échap : mécanisme standard du jeu (CloseSpecialWindows cache la fenêtre, et avec elle les options et
+  -- le panneau des cartes) ; la fenêtre ne capte pas le clavier.
   if type(UISpecialFrames) == "table" then table.insert(UISpecialFrames, "SlayTheDragonFrame") end
 
   -- Ordre de dessin. Un cadre qui rogne ses enfants (SetClipsChildren) dessine tout son sous-arbre dans
@@ -300,7 +303,6 @@ function UI.build()
   err.SetText = function(self, t) self.text:SetText(t) self._text = t end
   UI.err = err
 
-  f:SetScript("OnKeyDown", function(self, key) UI.onKey(key) end)
   f:SetScript("OnShow", function() UI.onShow() end)
   f:SetScript("OnHide", function() UI.onHide() end)
 
@@ -595,18 +597,7 @@ function UI.toggle()
   if UI.isShown() then UI.close("toggle") else UI.open("toggle") end
 end
 
-local function setKeyboard(on)
-  local f = UI.frame
-  if InCombatLockdown and InCombatLockdown() then
-    f:EnableKeyboard(false)
-    return
-  end
-  f:EnableKeyboard(on)
-  if on and f.SetPropagateKeyboardInput then f:SetPropagateKeyboardInput(true) end
-end
-
 function UI.onShow()
-  setKeyboard(true)
   W.sound("open")
   UI.refresh()
   -- police d'addon chargée après coup : textes reposés (sinon certains restent vides jusqu'au survol)
@@ -618,42 +609,12 @@ function UI.onShow()
 end
 
 function UI.onHide()
-  setKeyboard(false)
+  -- fermée (Échap compris) : options et panneau des cartes fermés avec elle, rien ne reste ouvert au retour
+  if UI.optionsFrame then UI.optionsFrame:Hide() end
   if UI.deckView then UI.deckView:Close() end
   if UI.current and UI.current.OnHide then UI.current:OnHide() end
   if GameTooltip then GameTooltip:Hide() end
   W.sound("close")
-end
-
--- Touche pressée, fenêtre ouverte. Les touches non gérées sont rendues au jeu.
-function UI.onKey(key)
-  local handled = false
-  local dv = UI.deckView
-  if key == "ESCAPE" then
-    if UI.optionsFrame and UI.optionsFrame:IsShown() then UI.optionsFrame:Hide()
-    elseif dv and dv:IsShown() then dv:Close()
-    else UI.close("escape") end
-    handled = true
-  elseif UI.optionsFrame and UI.optionsFrame:IsShown() then
-    handled = false
-  elseif dv and dv:IsShown() then
-    handled = false -- panneau des cartes ouvert : l'écran dessous ne reçoit rien
-  elseif UI.current and UI.current.HandleKey then
-    handled = UI.current:HandleKey(key) and true or false
-  end
-  local f = UI.frame
-  if f.SetPropagateKeyboardInput and not (InCombatLockdown and InCombatLockdown()) then
-    f:SetPropagateKeyboardInput(not handled)
-  end
-  return handled
-end
-
--- Touches numériques : "1".."9", "0" -> 1..10 ; nil sinon.
-function UI.keyIndex(key)
-  if key == "0" then return 10 end
-  local n = tonumber(key)
-  if n and n >= 1 and n <= 9 and #key == 1 then return n end
-  return nil
 end
 
 ---------------------------------------------------------------------------

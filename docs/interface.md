@@ -26,7 +26,7 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   registre du langage et « n / plafond » ; chiffres flottants « +2 Rage » à la couleur de la ressource.
 - **Zone libre de classe** : cadre de 300 × 40 sous les états du héros, rempli par `ns.ClassViews[id]`
   (`build` une fois, `render` à chaque rendu) ; vide pour le Priest et le Warrior.
-- **Spend N au choix** (décision du joueur) : clic, touche ou glisser = la carte se joue en dépensant si
+- **Spend N au choix** (décision du joueur) : clic ou glisser = la carte se joue en dépensant si
   la ressource suffit ; **Maj enfoncée en jouant** = sans dépenser. Le clic droit n'est pas employé : il
   désélectionne partout dans le combat. La ligne « Spend N: » de la carte en main est éteinte (gris)
   quand le bonus ne sera pas payé (ressource insuffisante, ou Maj enfoncée : la main se redessine sur
@@ -626,7 +626,7 @@ Les autres cartes ne changent que par leurs retours de clause (mots de la plaque
     réponse impossible bouge à peine), fioles et bibelots du bandeau, clé, gemmes de clé de l'accueil,
     tas du deck, pioche, défausse, consumées.
   - Ennemis : quand une carte à cible (ou une potion à cible) est armée, l'ennemi survolé — ou la
-    cible clavier — grandit ×1,07 depuis ses pieds et son anneau s'allume ; la zone de clic (emplacement)
+    ennemi retenu — grandit ×1,07 depuis ses pieds et son anneau s'allume ; la zone de clic (emplacement)
     ne bouge pas.
   - Infobulles conservées (le survol animé est ajouté dans `W.tooltip`).
 - **Consulter ses cartes** (`UI.deckView`, fin de `UI/Screens.lua`) : panneau de bois par-dessus
@@ -634,9 +634,8 @@ Les autres cartes ne changent que par leurs retours de clause (mots de la plaque
   « Consumées · … », grille de vraies cartes (`W.card`, 8 par rangée, 3 rangées visibles, ×0,72),
   triées par type (Sort offensif, Sort, Pouvoir), coût, nom (puis non améliorée avant améliorée) ;
   améliorées en vert comme ailleurs. Molette : une rangée par cran (indicateur à droite si ça déborde).
-  Fermeture : `Échap` (après les options), clic hors du panneau (voile), clic droit sur une carte,
-  « Fermer », ou nouveau clic sur ce qui l'a ouvert. Panneau ouvert : les touches ne vont pas à
-  l'écran dessous (rendues au jeu). Accès : tas du deck du plateau (récompense, feu de camp, marchand,
+  Fermeture : clic hors du panneau (voile), clic droit sur une carte, « Fermer », nouveau clic sur ce
+  qui l'a ouvert, ou `Échap` qui ferme la fenêtre entière. Accès : tas du deck du plateau (récompense, feu de camp, marchand,
   grilles) et deck du bandeau (dos de carte et nombre), désormais **aussi en combat** (deck complet) ; en combat,
   clic sur la pioche (**toujours triée**, jamais l'ordre de tirage), la défausse, et le nouveau tas
   violet des **consumées** (x 151–187, affiché dès qu'il y en a une).
@@ -789,7 +788,7 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
 | `UI/Widgets.lua` | Habillage WoW (pièces de `Media/WowUI` : cadres à pièces, trois et neuf tranches, dialogues, parchemins, boutons rouges, cases, curseurs, barres d'unité), peau des cartes (textures de `Media/`), polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes (améliorées d'abord), carte unique composée, jauges de vie, hexagone d'Absorption, jetons d'état, boutons, infobulles, textes flottants, modèles | oui |
 | `UI/Scene.lua` | Décor (fond embarqué cadré et teinté, voile du bas, décor peint dessous ; repli : candidat du client validé par l'essai manuel ; rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
-| `UI/Main.lua` | Fenêtre, bandeau, écrans, clavier, options, `/slay`, bouton de minimap | oui |
+| `UI/Main.lua` | Fenêtre, bandeau, écrans, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
 | `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta, panneau de consultation des cartes (`UI.deckView`) | oui |
 | `UI/Flight.lua` | Événements : chargement, vol en taxi, combat réel, déconnexion | oui |
@@ -822,7 +821,7 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `start` | **Rencontre** (`choice`) | bibelot de classe (Révéré) : bulle, une plaque par bibelot (icône, nom, effet), « Partir sans bibelot » |
 | `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss » et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
 | `combat` | **Combat** | voir plus bas |
-| `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic, `Entrée` ou `1`). Rencontre : bulle du texte après coup |
+| `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic). Rencontre : bulle du texte après coup |
 | `campfire` | **Feu de camp** | décor de nuit, feu qui vacille, couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle si `npc` est dans `Art.npcs`, sinon rien), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
@@ -830,8 +829,8 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan, barres de réputation ; « Nouvelle expédition », « Réputation et journal » |
 | vue méta | **Méta** | parchemin : barres par classe et Ligue, 8 dernières expéditions ; « Retour » |
 
-**Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi (ou `Entrée` sur la
-cible clavier) ; clic droit annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits
+**Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi ; clic droit
+annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits
 en 3 s = jeter.
 
 **Ramassage du butin** (récompense) : le moteur a déjà tout attribué ; l'interface retient à l'écran l'or,
@@ -849,8 +848,8 @@ de carte revient au même.
 - Ennemis à droite (x 470–1022, 1 à 5, légèrement décalés en profondeur, réduits à 86 % à partir de 5) :
   bulle d'intention au-dessus (icône + chiffres exacts de `Combat.calcDamage`, « ×N » pour les coups
   multiples, « Guette », « Étourdi »… ; liseré rouge = attaque, bleu = défense / renfort, violet = guet /
-  affaiblissement, vert = soin), modèle 3D avec ombre, anneau doré aux pieds de la cible (survol, ou cible
-  clavier pendant une visée) ; sous les pieds, dans un cadre d'infos au-dessus du personnage (aucun
+  affaiblissement, vert = soin), modèle 3D avec ombre, anneau doré aux pieds de la cible (survol, ou ennemi
+  retenu pendant une visée) ; sous les pieds, dans un cadre d'infos au-dessus du personnage (aucun
   modèle ni repli ne peut les recouvrir) : nom sur une pilule d'ardoise (élite violet, boss orangé ;
   réduit s'il est trop long), barre de vie (+ écusson d'Absorption), états en pastilles. Les pieds sont
   sur la même ligne quelle que soit la taille du personnage (`art.scale` : l'emplacement remonte), de
@@ -866,16 +865,22 @@ de carte revient au même.
 
 ### Contrôles
 
-- Souris : clic sur une carte (elle se lève), puis clic sur l'ennemi ; une carte sans cible se joue par un
-  second clic ou un clic dans le décor. Glisser-déposer : sur l'ennemi, ou n'importe où dans le décor pour
-  une carte sans cible. Clic droit : désélectionner.
-- Clavier (capté seulement fenêtre ouverte, `SetPropagateKeyboardInput`) : `1`…`0` choisit une carte
-  (même touche ou `Entrée` pour la jouer), `Tab` change de cible (`Maj+Tab` à rebours), `Espace` finit le
-  tour (et « Continuer » après un combat), `Échap` ferme (les options d'abord, puis le panneau des
-  cartes, puis la fenêtre). Ailleurs, `1`…`0` choisit
-  (parcours : étapes accessibles de haut en bas ; accueil : clé +0…+5 ; feu de camp : 1 repos, 2 grimoire ;
-  récompense : cartes, ou ouvrir le coffre), `Entrée`/`Espace` l'action par défaut. Toute autre touche est
-  rendue au jeu.
+- **Tout à la souris.** Clic sur une carte (elle se lève), puis clic sur l'ennemi ; une carte sans cible
+  se joue par un second clic ou un clic dans le décor. Une carte à cible cliquée deux fois se joue sur
+  l'ennemi retenu (le dernier ennemi cliqué, sinon le premier vivant ; anneau allumé pendant la visée).
+  Glisser-déposer : sur l'ennemi, ou n'importe où dans le décor pour une carte sans cible. Clic droit :
+  désélectionner. « Fin du tour », « Continuer » / « Voir le bilan », et ailleurs un bouton ou un clic par
+  action.
+- **Aucun raccourci clavier** (demande du joueur, 12/11/2026 : en vol, `Entrée` sert au chat, `Espace` au
+  saut, les chiffres aux barres d'action). Aucun cadre de l'addon n'appelle `EnableKeyboard` ni n'a de
+  script `OnKeyDown`/`OnKeyUp` : toutes les touches vont au jeu comme si la fenêtre n'était pas là. Les
+  anciens raccourcis (`1`…`0` cartes et choix, `Entrée`, `Espace` fin du tour et action par défaut, `Tab`
+  changement de cible) sont retirés ; le changement de cible se fait au clic sur l'ennemi.
+- Deux exceptions, qui ne captent rien : `Échap` ferme la fenêtre par le mécanisme standard du jeu
+  (`UISpecialFrames`, nom `SlayTheDragonFrame`), et avec elle les options et le panneau des cartes (ils ne
+  se ferment plus un par un ; leurs boutons de fermeture le font) ; **Maj tenue** au moment de jouer une
+  carte « Spend N » la joue sans dépenser (modificateur lu par `IsShiftKeyDown`, la main redessinée sur
+  `MODIFIER_STATE_CHANGED`).
 - `/slay` : ouvrir/fermer ; `/slay options` ; `/slay art` (fonds embarqués avec FileDataID et scènes,
   puis décor par décor : fond embarqué, candidat validé ou « peint », puis candidats du client validés /
   refusés / pas encore jugés ; puis icônes et modèles introuvables) ;
@@ -981,7 +986,7 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
   `SetShadowOffset`, `SetMaxLines`, `GetStringWidth`, `GetStringHeight`, `PlaySound` ; `CreateColor`
   (Lua de l'interface Blizzard, `Blizzard_SharedXMLBase/Color.lua`, appelé sous garde) ;
   `GameTooltip:NumLines` (employé par l'interface Blizzard). Plus celles de la piste D : `UnitOnTaxi`, les
-  événements de vol, `SetPropagateKeyboardInput`, `SetCreature`, `SetDisplayInfo`, `SetUnit`,
+  événements de vol, `SetCreature`, `SetDisplayInfo`, `SetUnit`,
   `SetAnimation`, `GetModelFileID`, `SetTexture -> success`, `SetDesaturated`, `CreateLine`,
   `IsMouseOver`, `C_Timer`, `C_Spell.GetSpellTexture`, `InCombatLockdown`, `GetCursorPosition`…
   Survols et panneau : `SetScale` (cadre), `SetHitRectInsets`, `EnableMouseWheel`, `GetChildren`,
@@ -1004,6 +1009,11 @@ facingEnemy, point` ; `artChecks` = verdicts de l'essai des décors, `tostring(f
 
 ### Non vérifié (à voir en jeu)
 
+- Le **clavier laissé au jeu** (12/11/2026) : fenêtre ouverte, `Entrée` ouvre le chat, `Espace` saute,
+  les chiffres lancent les barres d'action, et rien ne se passe dans l'addon ; `Échap` ferme la fenêtre
+  (avec options et panneau des cartes) par `UISpecialFrames` sur Forever, une seule pression, sans ouvrir
+  le menu du jeu ; Maj tenue au clic d'une carte « Spend N » la joue sans dépenser. Le harnais simule
+  `CloseSpecialWindows` d'après l'interface de Blizzard (retail ; celle de Forever n'est pas indexée).
 - Les **fonds embarqués** en jeu : chargement des TGA 1024 × 512 (même format que les autres TGA de
   `Media/`, qui s'affichent), netteté de la bande étirée, cadrage (`focus`), teinte (`tint`) et voile du
   bas derrière les vrais modèles ; à corriger dans `Art.scenes` ; repli immédiat : `/slay decor peint`.
@@ -1093,8 +1103,8 @@ for f in build/snap/*.svg; do rsvg-convert "$f" -o "${f%.svg}.png"; done
 Il charge tous les fichiers du TOC avec un faux client (cadres enregistreurs, horloge virtuelle,
 événements, infobulle, modèles, sons), refuse les modèles XML et événements inconnus et signale toute
 méthode d'API inconnue. Scénario : accueil, options, clé verrouillée ; **expédition complète de l'acte 1
-jouée par clics** (combats par le bot heuristique à travers l'interface : clics carte puis cible, touches,
-glisser-déposer ; récompenses (coffre ouvert d'abord s'il se présente), amélioration, retrait, achats) ; la file d'animations est
+jouée par clics** (combats par le bot heuristique à travers l'interface, à la souris seulement : clics carte puis cible,
+ennemi retenu puis double clic, clic dans le décor, glisser-déposer ; récompenses (coffre ouvert d'abord s'il se présente), amélioration, retrait, achats) ; la file d'animations est
 vidée (`H.settle`) avant de vérifier le bandeau de fin ; aller-retour de sauvegarde en combat et sur une
 récompense ; bilan, méta, nouvelle expédition à la clé +1 ; potions et bibelots ; marchand ; feu de camp ;
 rencontre ; bibelot de classe ; abandon ; vol ; sauvegardes anciennes, abîmées ou futures ; art manquant
@@ -1105,9 +1115,12 @@ TGA présent sur disque en 32 bits et puissances de deux, bande au format du dé
 précédent, ok, non, peint, illustre ; repli sur le premier validé d'une liste sans fond embarqué ; verdicts
 relus au rechargement ; rapport avec les fonds embarqués) ; survols (zone fixe, valeur
 intermédiaire, sortie réversible depuis la valeur courante, état final par les minuteurs, pilote coupé
-au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap,
-clic dehors, Fermer, pioche triée et ordre réel intact, défausse, consumées, deck en combat, touches
-bloquées) ; **peau** (U20 : chaque texture de `SkinData` présente dans `Media/`, TGA 32 bits non
+au repos, voisines, premier plan, ennemi visé) ; panneau des cartes (tri, compteur, molette, Échap
+qui ferme la fenêtre avec lui, clic dehors, Fermer, pioche triée et ordre réel intact, défausse, consumées,
+deck en combat, touches sans effet) ; **clavier laissé au jeu** (UK : sources de `UI/` sans capture
+ni nom de touche, aucun cadre qui capte le clavier, 52 touches sans effet sur 11 vues, Échap par
+`UISpecialFrames` avec options et panneau ouverts, aucun texte ni infobulle qui nomme une touche ou un
+raccourci, Maj au jeu d'une carte Spend) ; **peau** (U20 : chaque texture de `SkinData` présente dans `Media/`, TGA 32 bits non
 compressé à origine en bas, dimensions en puissances de deux identiques à `SkinData`, coordonnées de la
 zone utile cohérentes ; pièces attendues présentes ; icônes de `SkinData` présentes et toutes celles que
 nomme `Art.lua` copiées ; polices présentes ; carte composée : corps par couleur — ivoire, violet, bleu,
@@ -1235,7 +1248,7 @@ Ensuite (retours du premier essai) :
 5. **Panneau des cartes** : hors combat, clic sur le tas du deck (plateau) et sur le deck du bandeau ;
    en combat, clic sur la pioche (triée par type, coût, nom — pas l'ordre de tirage), la défausse, le tas
    violet des consumées (après une carte Consumée) et le deck du bandeau. Molette si le deck dépasse 24 cartes ;
-   fermeture par Échap, clic hors du panneau, « Fermer ». Cartes améliorées en vert.
+   fermeture par clic hors du panneau, « Fermer » (Échap ferme toute la fenêtre). Cartes améliorées en vert.
 6. **Bandeau** : en combat et sur la récompense, « Marche de l'Ouest » en haut au centre, points de
    progression en dessous, sans chevauchement, même avec 6 bibelots et une clé.
 7. **Langage des cartes** : mots-clés en or (Expiation, Douleur, Exécution, Déferlement…), chiffres
@@ -1246,7 +1259,8 @@ Ensuite (retours du premier essai) :
    intentions et des mots-clés). Les textes des cartes et des rencontres viennent de `Data/` (autre piste).
 
 Ensuite, la liste habituelle : `/reload` en combat et sur une récompense (même état), potions (boire, à
-cible, jeter), touches 1–0 / Tab / Espace / Entrée / Échap (une touche non gérée agit sur le jeu),
+cible, jeter), clavier fenêtre ouverte (Entrée ouvre le chat, Espace saute, les chiffres lancent les
+barres d'action, Échap ferme la fenêtre ; rien ne se passe dans l'addon),
 ouverture au décollage et fermeture à l'atterrissage, masquage en combat réel, `/slay modeles`
 (recopier ses lignes du chat), `/slay facing`.
 
