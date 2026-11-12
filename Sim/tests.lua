@@ -459,8 +459,8 @@ test("bibelots et potions respectent le contrat", function()
     assert(p.name and p.text and p.rarity and p.effects and type(p.tier) == "number", id)
     for _, e in ipairs(p.effects) do assert(ns.Effects[e[1]], id .. " : " .. e[1]) end
   end
-  -- 10 tirables d'origine + 19 de la fiche des bibelots communs (Traveler's Backpack laissé de côté)
-  eq(nr, 29, "bibelots"); eq(np, 5, "potions")
+  -- 10 tirables d'origine + 20 de la fiche des bibelots communs
+  eq(nr, 30, "bibelots"); eq(np, 5, "potions")
   eq(#ns.Rewards.relicPool({ maxTier = 0 }), 8, "bibelots neutres hors boss")
   eq(#ns.Rewards.relicPool({ boss = true }), 3, "bibelots de boss")
   ns.Relics.test_class = { name = "x", text = "x", rarity = "rare", tier = 0, class = "priest", hooks = {} }
@@ -2669,10 +2669,10 @@ do
     philosophers_stone = { "uncommon", 2 }, mark_of_the_champion = { "uncommon", 2 }, onyxia_scale_cloak = { "uncommon", 2 },
     hourglass_sand = { "uncommon", 2 }, bag_of_marbles = { "rare", 1 }, flint_and_tinder = { "rare", 2 },
     harm_prevention_belt = { "rare", 2 }, ironfoe = { "rare", 3 }, royal_seal_of_eldre_thalas = { "boss", 1 },
-    drake_fang_talisman = { "boss", 2 },
+    drake_fang_talisman = { "boss", 2 }, travelers_backpack = { "rare", 3 },
   }
 
-  test("bibelots communs : 19 de la fiche (rareté, palier), communs, tirables, 31 communs au total", function()
+  test("bibelots communs : 20 de la fiche (rareté, palier), communs, tirables, 32 communs au total", function()
     local n, total = 0, 0
     for id, want in pairs(SHEET) do
       local r = ns.Relics[id]
@@ -2682,9 +2682,9 @@ do
       assert(not r.class and not r.noPool, id .. " : commun et tirable")
       assert(not r.text:lower():find("%f[%a]you%f[%A]") and not r.text:lower():find("%f[%a]your%f[%A]"), id .. " : you")
     end
-    eq(n, 19)
+    eq(n, 20)
     for _, r in pairs(ns.Relics) do if not r.class then total = total + 1 end end
-    eq(total, 31, "12 d'origine + 19")
+    eq(total, 32, "12 d'origine + 20")
     eq(ns.Relics.hand_of_justice.class, "warrior", "bibelot du Guerrier intact")
     eq(ns.Relics.force_reactive_disk.class, "warrior", "bibelot du Guerrier intact")
   end)
@@ -2861,6 +2861,59 @@ do
     Combat.endTurn(c)
     local fb = Card.defById("fireball").effects[1][2]
     assert(hp - c.enemies[1].hp >= 2 * fb, "Fireball résolue deux fois : " .. (hp - c.enemies[1].hp))
+  end)
+
+  test("Traveler's Backpack : la carte choisie reste en main, une seule, le choix est effacé ; sans choix rien", function()
+    local c = withRelic("travelers_backpack", { "smite", "inner_fire", "rugged_armor_kit" }, nil, { "smite", "smite" })
+    eq(Combat.retainPicks(c), 1)
+    eq(#Combat.retainCandidates(c), 2, "Rugged Armor Kit (Retain) n'est pas proposée")
+    local fire = c.hand[2].uid
+    assert(not Combat.markRetain(c, c.hand[3].uid), "carte déjà Retain refusée")
+    assert(not Combat.markRetain(c, 999), "carte absente refusée")
+    assert(Combat.markRetain(c, fire))
+    Combat.endTurn(c)
+    local kept = 0
+    for _, x in ipairs(c.hand) do if x.uid == fire then kept = kept + 1 end end
+    eq(kept, 1, "Inner Fire gardée")
+    eq(c.player.retainPick, nil, "choix effacé")
+    local inDiscard = false
+    for _, x in ipairs(c.discard) do if x.uid == fire then inDiscard = true end end
+    assert(not inDiscard)
+    -- tour suivant sans choix : la carte part à la défausse
+    Combat.endPlayerTurn(c)
+    local back = false
+    for _, x in ipairs(c.discard) do if x.uid == fire then back = true end end
+    assert(back, "sans choix posé, rien n'est gardé")
+    -- sans le bibelot : marquer est refusé, un choix forcé est ignoré
+    local d = setup({ "smite", "inner_fire" })
+    eq(Combat.retainPicks(d), 0)
+    eq(#Combat.retainCandidates(d), 0)
+    assert(not Combat.markRetain(d, d.hand[2].uid))
+    local forced = d.hand[2].uid
+    d.player.retainPick = forced
+    Combat.endPlayerTurn(d)
+    eq(#d.hand, 0, "rien gardé sans le bibelot")
+    eq(d.player.retainPick, nil)
+    -- journal et copie (état de données simples)
+    c = withRelic("travelers_backpack", { "smite", "inner_fire" })
+    assert(Combat.markRetain(c, c.hand[1].uid))
+    local k = Combat.clone(c)
+    eq(k.player.retainPick, c.hand[1].uid, "copie")
+    c.events = {}
+    c.quiet = false
+    Combat.endPlayerTurn(c)
+    local seen = false
+    for _, ev in ipairs(c.events) do if ev.t == "retained" then seen = true end end
+    assert(seen, "journal retained")
+  end)
+
+  test("Traveler's Backpack : choix du bot (carte la mieux notée, jamais une carte Retain) dans le marqueur", function()
+    local c = withRelic("travelers_backpack", { "rugged_armor_kit", "smite", "holy_fire" })
+    local uid = ns.Bots.retainPick(c)
+    assert(uid and uid ~= c.hand[1].uid, "jamais la carte Retain")
+    eq(ns.Bots.markRetain(c), uid)
+    eq(c.player.retainPick, uid)
+    eq(ns.Bots.retainPick(setup({ "smite" })), nil, "sans bibelot : aucun choix")
   end)
 
   ns.Enemies.test_elite_dummy, ns.Enemies.test_boss_hitter = nil, nil

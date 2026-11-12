@@ -185,6 +185,7 @@ ns.Skin = {
     inv_misc_armorkit_09 = "Icons\\inv_misc_armorkit_09.tga",
     inv_misc_bag_10 = "Icons\\inv_misc_bag_10.tga",
     inv_misc_bag_10_blue = "Icons\\inv_misc_bag_10_blue.tga",
+    inv_misc_bag_11 = "Icons\\inv_misc_bag_11.tga",
     inv_misc_bag_13 = "Icons\\inv_misc_bag_13.tga",
     inv_misc_bag_herbpouch = "Icons\\inv_misc_bag_herbpouch.tga",
     inv_misc_bandage_01 = "Icons\\inv_misc_bandage_01.tga",

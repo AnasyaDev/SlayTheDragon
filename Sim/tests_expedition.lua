@@ -1508,7 +1508,7 @@ local NEW_RELICS = {
     "bag_of_marbles", "royal_seal_of_eldre_thalas" },
   { "philosophers_stone", "mark_of_the_champion", "onyxia_scale_cloak", "hourglass_sand", "flint_and_tinder",
     "harm_prevention_belt", "drake_fang_talisman" },
-  { "ironfoe" },
+  { "ironfoe", "travelers_backpack" },
 }
 
 test("bibelots communs : débloqués par palier de Ligue, jamais avant", function()

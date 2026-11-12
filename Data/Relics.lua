@@ -175,8 +175,9 @@ relic("mana_ruby", {
 -- (Expedition.usefulFor : « cast », « castDamage », « cooldown », « exhaust », « attack », « absorb »).
 -- Deux ids de la fiche étaient déjà pris par des bibelots du Guerrier (hand_of_justice,
 -- force_reactive_disk) : leurs équivalents communs s'appellent Ironfoe et Gnomish Harm Prevention Belt.
--- Traveler's Backpack (garder une carte au choix en fin de tour) attend une étape de choix en combat
--- (interface, bots) : laissé de côté.
+-- Traveler's Backpack (garder une carte au choix en fin de tour) : crochet « retainPicks », choix posé
+-- avant la fin du tour par Combat.markRetain (interface : « End Turn » puis clic sur la carte ; bots :
+-- Sim/bots.lua, Bots.retainPick).
 ---------------------------------------------------------------------------
 
 local Card = ns.Card
@@ -411,6 +412,15 @@ relic("ironfoe", {
       end
       return v
     end,
+  },
+})
+
+relic("travelers_backpack", {
+  name = "Traveler's Backpack", rarity = "rare", tier = 3,
+  text = "At the end of each turn, 1 chosen card stays in hand.",
+  hooks = {
+    -- une carte au choix gardée en fin de tour (choix posé par Combat.markRetain : interface, bots)
+    retainPicks = function(c, src, v) return v + 1 end,
   },
 })
 

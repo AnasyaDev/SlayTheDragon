@@ -129,11 +129,12 @@ return function(ns)
       steps = steps + 1
       if a[1] == "play" then
         local ok = Combat.play(c, a[2], a[3], a[4] == "nospend" and { spend = false } or nil)
-        if not ok then Combat.endTurn(c) end
+        if not ok then Bots.markRetain(c) Combat.endTurn(c) end
       elseif a[1] == "potion" then
         local ok = Combat.usePotion(c, a[2], a[3])
-        if not ok then Combat.endTurn(c) end
+        if not ok then Bots.markRetain(c) Combat.endTurn(c) end
       else
+        Bots.markRetain(c) -- carte gardée au choix (Traveler's Backpack), posée avant la fin du tour
         Combat.endTurn(c)
       end
       if steps > 2000 then c.result = "lost"; c.stalled = true end

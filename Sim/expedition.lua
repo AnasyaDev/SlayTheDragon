@@ -312,10 +312,11 @@ return function(ns)
       local a = bot:act(c)
       steps = steps + 1
       if a[1] == "play" then
-        if not X.act(exp, { "play", a[2], a[3], a[4] }) then X.act(exp, { "endTurn" }) end
+        if not X.act(exp, { "play", a[2], a[3], a[4] }) then Bots.markRetain(c) X.act(exp, { "endTurn" }) end
       elseif a[1] == "potion" then
-        if not X.act(exp, a) then X.act(exp, { "endTurn" }) end
+        if not X.act(exp, a) then Bots.markRetain(c) X.act(exp, { "endTurn" }) end
       else
+        Bots.markRetain(c) -- carte gardée au choix (Traveler's Backpack), posée avant la fin du tour
         X.act(exp, { "endTurn" })
       end
     end
