@@ -13,7 +13,16 @@ return function(ns)
   SE.VETERAN_FLAGS = { "event:tobin_thief" }
   SE.VETERAN_BRANCHES = { "tobin_spared", "tobin_jailed" }
 
-  local function rating(id) return ns.Run.RATING[id] or 3 end
+  -- path=<voie> (SE.play, opts.path) : les cartes de classe d'une autre voie et les cartes neutres valent 0,
+  -- donc ne sont jamais prises (voie jouée seule).
+  local onlyPath
+  local function rating(id)
+    if onlyPath then
+      local d = ns.Cards[id]
+      if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
+    end
+    return ns.Run.RATING[id] or 3
+  end
 
   -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
   local function botOf(exp)
@@ -238,10 +247,13 @@ return function(ns)
       end
       local w, wv = worstCard(exp)
       if w and wv <= 1.5 and #exp.deck > 8 and exp.gold >= X.removePrice(exp) then return { "remove", w } end
+      -- carte : celle dont la valeur dans le deck dépasse le plus son prix (0,03 par pièce, comme les
+      -- rencontres)
       local best, bestR
       for i, it in ipairs(s.cards) do
-        if not it.sold and exp.gold >= it.price and rating(it.id) >= 6 and (not bestR or rating(it.id) > bestR) then
-          best, bestR = i, rating(it.id)
+        local v = cardValue(exp, rating(it.id)) - it.price * 0.03
+        if not it.sold and exp.gold >= it.price and v > 0 and (not bestR or v > bestR) then
+          best, bestR = i, v
         end
       end
       if best then return { "buyCard", best } end
@@ -320,6 +332,7 @@ return function(ns)
 
   function SE.play(opts)
     local seed = opts.seed or 1
+    onlyPath = opts.path
     local level = opts.level or Meta.MAX_LEVEL
     local unlocks = opts.meta == "exalted" and Meta.allUnlocked(level) or { level = level, league = 0 }
     -- Drapeaux de compte : compte neuf pour « start » (premier temps des histoires possible),
@@ -337,6 +350,8 @@ return function(ns)
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false })
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
+    -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)
+    if opts.hp then exp.hp, exp.maxHp = opts.hp, opts.hp end
     local rng = Rng.stream(seed, "policy")
     local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
     local guard = 0

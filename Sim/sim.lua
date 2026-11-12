@@ -11,7 +11,11 @@
 --   relics=id,id : bibelots dès le départ        loot=0 : ni bibelot ni potion gagnés
 --   nointerrupt=1 : monde témoin où les ennemis n'interrompent jamais
 --   sweep=cards [only=id,id] : mesure chaque carte de la réserve, ajoutée de force au deck de départ,
---                 contre la même série sans elle (mêmes graines) ; sweep=relics de même.
+--                 contre la même série sans elle (mêmes graines) ; sweep=relics de même ; only= accepte
+--                 aussi des cartes hors réserve (neutres).
+--   oldstun=1 : ancienne règle de Stunned pendant le tour ennemi (l'action part, le tour suivant est perdu)
+--   hp=N : PV de départ de la classe remplacés (runner=expedition), pour mesurer l'effet des PV.
+--   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 local opts = {}
@@ -181,6 +185,7 @@ end
 ---------------------------------------------------------------------------
 local function runRange(from, to)
   local ns = dofile(root .. "/Sim/load.lua")(root)
+  if opts.oldstun == "1" then ns.Combat.STUN_STOPS_TURN = false end
   if opts.nointerrupt == "1" then
     -- Monde témoin sans interruption ennemie : mesure le poids des interruptions.
     for _, def in pairs(ns.Enemies) do
@@ -196,7 +201,8 @@ local function runRange(from, to)
     if opts.runner == "expedition" then
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
-        meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level) })
+        meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
+        hp = tonumber(opts.hp), path = opts.path })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),
@@ -265,11 +271,14 @@ if opts.sweep then
     list = ns.Rewards.cardPool(opts.class or "priest", tonumber(opts.level))
   end
   if opts.only then
-    -- only=id,id : ne mesure que ces éléments.
-    local keep = {}
-    for _, id in ipairs(idList(opts.only)) do keep[id] = true end
+    -- only=id,id : ne mesure que ces éléments, même hors de la réserve des récompenses (cartes neutres :
+    -- only=rough_dynamite,heavy_silk_bandage…).
     local l2 = {}
-    for _, id in ipairs(list) do if keep[id] then l2[#l2 + 1] = id end end
+    for _, id in ipairs(idList(opts.only)) do
+      local def = opts.sweep == "relics" and ns.Relics[id] or ns.Cards[id]
+      assert(def, "only= : élément inconnu " .. id)
+      l2[#l2 + 1] = id
+    end
     list = l2
   end
   table.sort(list, function(x, y)
