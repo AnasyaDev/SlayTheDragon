@@ -51,14 +51,60 @@ return function(ns)
     return worst, worstV
   end
 
-  local function pickCard(opts, rng, cards)
+  -- Valeur d'une carte ajoutée au deck, dans les unités des effets de rencontre (1 ≈ une potion,
+  -- 0,03 par pièce d'or, 0,12 par PV à pleine vie). La note vaut ≈ 5 + écart / 2, l'écart étant les
+  -- points de victoire gagnés en ajoutant la carte au deck de départ de 10 cartes (balayage sweep=cards,
+  -- docs/equilibrage.md) : 5 = carte neutre, en dessous elle nuit. Son effet se dilue avec la taille du
+  -- deck (elle est piochée moins souvent) : écart × 10 / taille. SE.POINTS_PER_UNIT = points de victoire
+  -- que vaut une unité (≈ une potion, ≈ 8 PV).
+  SE.POINTS_PER_UNIT = 3
+  SE.UPGRADED_BONUS = 0.5 -- note d'une carte déjà améliorée
+  local function cardValue(exp, r)
+    return 2 * (r - 5) * 10 / math.max(#exp.deck, 10) / SE.POINTS_PER_UNIT
+  end
+  SE.cardValue = cardValue
+
+  -- Note espérée de la meilleure de n cartes tirées sans remise dans pool (choix « une parmi n, ou passer ») :
+  -- la k-ième plus faible des N notes est la meilleure avec la probabilité C(k-1, n-1) / C(N, n).
+  local function expectedBest(pool, n)
+    local rs = {}
+    for i = 1, #pool do rs[i] = rating(pool[i]) end
+    table.sort(rs)
+    local N = #rs
+    if N == 0 then return 0 end
+    if n >= N then return rs[N] end
+    local function choose(a, b)
+      if b < 0 or b > a then return 0 end
+      local v = 1
+      for i = 1, b do v = v * (a - b + i) / i end
+      return v
+    end
+    local total, v = choose(N, n), 0
+    for k = n, N do v = v + rs[k] * choose(k - 1, n - 1) / total end
+    return v
+  end
+
+  -- Réserve d'un choix de cartes de rencontre (mêmes filtres que Core/Expedition : rareté, neutres).
+  local function choicePool(exp, e)
+    local pool = e.neutral and X.neutralPool(exp) or X.cardPool(exp)
+    if not e.rarity then return pool end
+    local out = {}
+    for i = 1, #pool do
+      if ns.Cards[pool[i]].rarity == e.rarity then out[#out + 1] = pool[i] end
+    end
+    return #out > 0 and out or pool
+  end
+
+  -- Choix d'une carte (récompense ou rencontre) : la mieux notée, ou aucune si l'ajouter nuirait au deck.
+  local function pickCard(exp, opts, rng, cards)
     if opts.pick == "skip" or #cards == 0 then return nil end
     if opts.pick == "random" then return Rng.int(rng, 1, #cards) end
-    local best, bestR = nil, -1
+    local best, bestR, bestRaw = nil, -1, nil
     for i = 1, #cards do
       local r = rating(cards[i]) + Rng.float(rng) * 0.5
-      if r > bestR then best, bestR = i, r end
+      if r > bestR then best, bestR, bestRaw = i, r, rating(cards[i]) end
     end
+    if opts.pick ~= "always" and cardValue(exp, bestRaw) < 0 then return nil end
     return best
   end
 
@@ -100,7 +146,6 @@ return function(ns)
 
   -- Valeur estimée d'une liste d'effets de rencontre (le bot ne regarde pas les tirages
   -- figés : un pari vaut son espérance).
-  local CARD_VALUE = { common = 1.0, uncommon = 1.6, rare = 2.2 }
   local function effectsValue(exp, effects)
     local hpRatio = exp.hp / exp.maxHp
     local v = 0
@@ -113,8 +158,12 @@ return function(ns)
       elseif k == "loseMaxHp" then v = v - e[2] * 0.25
       elseif k == "gold" then v = v + e[2] * 0.03
       elseif k == "pay" or k == "loseGold" then v = v - e[2] * 0.03
-      elseif k == "card" then v = v + 1.2
-      elseif k == "cardChoice" then v = v + (CARD_VALUE[e.rarity] or 1.2)
+      elseif k == "card" then
+        -- carte imposée : sa valeur dans ce deck, négative si elle l'affaiblit
+        v = v + cardValue(exp, rating(e[2]) + (e.up and SE.UPGRADED_BONUS or 0))
+      elseif k == "cardChoice" then
+        -- une parmi n, ou passer : la meilleure espérée, jamais moins que rien
+        v = v + math.max(0, cardValue(exp, expectedBest(choicePool(exp, e), e.n or 3)))
       elseif k == "relic" then v = v + 3
       elseif k == "potion" then v = v + (X.freeSlot(exp) and 1 or 0)
       elseif k == "losePotion" then v = v - 1
@@ -166,7 +215,7 @@ return function(ns)
     elseif ph == "reward" then
       local r = exp.reward
       if not r.cardsDone then
-        local i = pickCard(opts, rng, r.cards)
+        local i = pickCard(exp, opts, rng, r.cards)
         if i then return { "pickCard", i } end
         return { "skipCards" }
       end
