@@ -1154,5 +1154,24 @@ test("Guerrier : expédition simulée complète, reproductible", function()
   for _, card in ipairs(a.deck) do eq(ns.Cards[card.id].class, "warrior", card.id) end
 end)
 
+-- Chasseur ------------------------------------------------------------------
+
+test("Chasseur : expédition (deck, PV, Pet Whistle), pools de sa classe, expédition simulée reproductible", function()
+  local h = newExp({ class = "hunter", unlocks = { rep = 2, league = 3 } })
+  local cd = ns.Classes.hunter
+  eq(h.class, "hunter"); eq(h.hp, cd.hp); eq(#h.deck, 10); eq(h.relics[1], "pet_whistle")
+  eq(#X.cardPool(h), 30)
+  for _, id in ipairs(X.cardPool(h)) do eq(ns.Cards[id].class, "hunter", id) end
+  for _, id in ipairs(X.relicPool(h)) do
+    local r = ns.Relics[id]
+    assert(r.class == nil or r.class == "hunter", id)
+  end
+  eq(count(X.relicPool(h), "pet_whistle"), 0, "bibelot de départ jamais tiré")
+  local a = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "hunter" })
+  local b = ns.SimExpedition.play({ seed = 9, bot = "greedy", class = "hunter" })
+  eq(a.won, b.won); eq(a.floor, b.floor); eq(a.hp, b.hp)
+  for _, card in ipairs(a.deck) do eq(ns.Cards[card.id].class, "hunter", card.id) end
+end)
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

@@ -17,7 +17,8 @@ GDD : `docs/gdd-classes.md` (copie du Claude Doc) ; fiches de conception : `docs
 
 Un nouveau fichier dans le TOC impose de **relancer le client** (`/reload` ne suffit pas).
 Ordre de chargement actuel : `Core\*` (dont `Core\Language.lua`), `Data\Priest.lua`, `Data\Warrior.lua`,
-`Core\Classes\warrior.lua`, `Data\Act1.lua`… puis `UI\Art.lua`, `UI\Art\warrior.lua`, le reste de `UI\`.
+`Core\Classes\warrior.lua`, `Data\Hunter.lua`, `Core\Classes\hunter.lua`, `Data\Act1.lua`… puis `UI\Art.lua`,
+`UI\Art\warrior.lua`, `UI\Art\hunter.lua`, le reste de `UI\`.
 Fichiers communs que deux classes ajoutées en parallèle modifient toutes deux : le TOC et `UI/SkinData.lua`
 (table `icons`, triée : conflit de fusion trivial, ou relancer `--icons-only` après la fusion).
 
@@ -208,7 +209,8 @@ Art.relics.<bibelot> = { tga = "INV_Banner_02", … }
 Art.classes.<id> = { tga = "ClassIcon_Warrior", wow = "WARRIOR",           -- wow = UnitClass("player")
   resource = { tga = "Ability_Warrior_FocusedRage", color = "attackText" } } -- pastille, chiffres flottants
 Art.statusIcons.<clé> = { tga = … }        -- icône d'un état selon sa source (apply … icon = "bleed")
-ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte, combat, vue) end }
+ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte, combat, vue) end,
+  event = function(hôte, ev, vue) end }    -- facultatif : animations propres (vue:Push(délai, fn))
 ```
 
 - **Pastille de ressource** (générique, `UI/CombatView.lua`) : petit anneau doré près du mana, icône de la
@@ -216,6 +218,13 @@ ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte
 - **Zone libre de classe** : cadre de 300 × 40 sous les états du héros ; `build` une fois par classe,
   `render` à chaque rendu du combat (formes du Druid, totems du Shaman, Seal du Paladin, familier du
   Hunter). Pas de cadre enfant dans un visuel survolable (docs/interface.md) ; ne lire que `c`.
+  La vue peut aussi poser des éléments dans la scène (cadres ancrés au parent de l'écran, `vue.parent`,
+  personnage par `Scene.figure` : le familier du Hunter) et viser les ennemis par `vue.slotOf[uid]` ; ce qui
+  n'est pas enfant de l'hôte se cache avec lui (`OnHide` de l'hôte).
+- **Événements de la classe** (`event`, facultatif) : `CombatView:QueueEvent` appelle
+  `ns.ClassViews[classe].event(hôte, ev, vue)` pour CHAQUE événement du journal, avant le traitement commun ;
+  la vue y met ses animations dans la file commune par `vue:Push(délai, fn)` (bond du familier sur
+  `{ t = "pet_attack" }`, le chiffre de dégâts venant de l'événement « damage » qui suit).
 - **Portrait** : visage du personnage si sa classe de jeu (`UnitClass`) est celle de l'expédition, sinon
   l'icône de classe. Nom de classe dans le bandeau et sur le cadre du héros.
 - **Accueil** : une classe jouable apparaît d'office (ordre `order`) ; jusqu'à deux, grands boutons ; au-delà,
@@ -278,7 +287,7 @@ ns.ClassRules.rogue = { hooks = {
 | Instant, double Cast (Mage) | état commun `instant`, `castSlots` = 2, file `cast` + `castMore` (interruption : la plus récente), `onCastResolved`, `onCardCommitted` + `c.turn.bySchool` (Hot Streak), condition `school:fire` |
 | Pay N HP, démon (Warlock) | `payHp` (crochet `payHp`, `onPayHp`), Power `slot = "demon"`, `replacedTo = "exhaust"`, `onTurnEnd`, `c.player.lastTarget`, `dotDecay`, `onDotTick`, `onEnemyDeath` |
 | Powers de fin de tour | `onTurnEnd` sur le Power (avant la défausse) |
-| Familier (Hunter) | état de classe `c.cls.pet`, attaque dans `onTurnEnd` sur `c.player.lastTarget`, Frenzy = ressource ; affichage dans `ns.ClassViews.hunter` |
+| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
 | Traps (Hunter) | commun : `trap = true`, zone `c.traps`, déclenchement avant les coups de l'attaque (`Combat.triggerTrap`), `onTrapTriggered` |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
 | Maelstrom à 5 : Cast instantané | `onResource` + `instantCast` |

@@ -1,7 +1,7 @@
 -- Règles propres du Chasseur (fiche : docs/classes/hunter.md ; contrat : docs/classes.md).
 --
 -- Familier : pas une unité (ni PV, ni Absorb, ni états, jamais ciblé). Une attaque = un coup de
---   3 + Frenzy sur la cible du familier (c.player.lastTarget, posée par Combat.play dès qu'une carte à
+--   PET_BASE + Frenzy sur la cible du familier (c.player.lastTarget, posée par Combat.play dès qu'une carte à
 --   cible est jouée ; morte ou absente : l'ennemi vivant le plus à gauche), calculé comme un coup du
 --   Chasseur SANS carte (Strength et Demoralized du Chasseur, Sundered et Absorb de la cible ; les bonus
 --   « Attacks » des cartes, Powers et bibelots ne s'appliquent pas : cardDef nil), puis +1 Frenzy.
@@ -24,11 +24,13 @@ local L = ns.Language
 local Hunter = {}
 ns.Hunter = Hunter
 
-Hunter.PET_BASE = 3 -- dégâts d'une attaque du familier à Frenzy 0
+-- Dégâts d'une attaque du familier à Frenzy 0. Fiche : 3 ; ramené à 1 par la simulation de fumée
+-- (3 : 99 % de victoires à la clé 0, le deck de départ seul en gagnait 95 % ; voir le rapport du lot).
+Hunter.PET_BASE = 1
 
 -- Langage : condition Careful Aim, mot « Pet attacks », déclencheurs des Powers du Chasseur.
 L.condition("careful", { name = "Careful Aim", text = "if the target has more than half its HP." })
-L.keyword("pet", { name = "Pet attacks", pattern = "[Pp]%at attacks", text = "hits its target for 3 + Frenzy, then +1 Frenzy." })
+L.keyword("pet", { name = "Pet attacks", pattern = "[Pp]%at attacks", text = "hits its target for " .. Hunter.PET_BASE .. " + Frenzy, then +1 Frenzy." })
 L.trigger("Pet attacks")
 L.trigger("Traps")
 L.trigger("When a Trap triggers")

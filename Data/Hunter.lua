@@ -2,7 +2,7 @@
 -- Mêmes champs que Data/Warrior.lua ; règles propres (familier, Frenzy, Careful Aim, effets « pet » et
 -- « readiness ») : Core/Classes/hunter.lua ; art et vue de classe : UI/Art/hunter.lua.
 --
--- Familier : attaque seul à la fin de chaque tour (3 + Frenzy sur la dernière cible visée), puis +1 Frenzy.
+-- Familier : attaque seul à la fin de chaque tour (ns.Hunter.PET_BASE + Frenzy, soit 1 + Frenzy, sur la dernière cible visée), puis +1 Frenzy.
 -- « Pet attacks. » = effet { "pet", n } (n attaques tout de suite). Frenzy (0 à 5, ressource de classe)
 -- baisse de 1 à chaque tour sauf le premier. Traps : champ trap (mécanisme commun, Core/Combat.lua).
 -- Voies : Beast Mastery (Frenzy et ordres au familier), Marksmanship (gros tirs sur cible intacte, Careful
@@ -121,12 +121,13 @@ card("spirit_bond", {
   up = { cost = 1, text = "Power.\nPet attacks: gain 2 Absorb." },
 })
 
--- Bestial Wrath : une attaque par point de Frenzy, chacune à 3 + le Frenzy compté, sans en redonner.
+-- Bestial Wrath : une attaque par point de Frenzy, chacune à 1 + le Frenzy compté, sans en redonner ;
+-- coût 2 (fiche : 1, levier prévu par la fiche, risque 3).
 card("bestial_wrath", {
-  level = 1, rep = 0, name = "Bestial Wrath", cost = 1, type = "skill", rarity = "rare", path = "beast_mastery",
+  level = 1, rep = 0, name = "Bestial Wrath", cost = 2, type = "skill", rarity = "rare", path = "beast_mastery",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "pet", 0, per = { 1, "surge" }, surge = true } },
   text = "Surge: pet attacks once per Frenzy.",
-  up = { cost = 0, text = "Surge: pet attacks once per Frenzy." },
+  up = { cost = 1, text = "Surge: pet attacks once per Frenzy." },
 })
 
 -- The Beast Within : après la résolution de chaque carte Attack (une carte Cast : à sa résolution).
@@ -419,7 +420,8 @@ relic("rhokdelar", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.hunter = {
-  id = "hunter", name = "Hunter", order = 5, hp = 65,
+  -- PV : 65 dans la fiche et les décisions (« à régler par simulation ») ; 55 après la simulation de fumée
+  id = "hunter", name = "Hunter", order = 5, hp = 55,
   resource = { id = "frenzy", cap = 5, keep = true },
   deck = {
     "arcane_shot", "arcane_shot", "arcane_shot", "arcane_shot",
@@ -434,7 +436,7 @@ ns.Classes.hunter = {
     -- un point de Frenzy : +1 à chaque attaque du familier à venir, moins la baisse de 1 par tour
     resValue = 6,
     rating = {
-      kill_command = 7, bestial_wrath = 6.5, dire_beast = 6, barbed_shot = 6, cobra_shot = 5.5, growl = 5.5,
+      kill_command = 6, bestial_wrath = 6, dire_beast = 6, barbed_shot = 6, cobra_shot = 5.5, growl = 5.5,
       intimidation = 6, multi_shot = 6, spirit_bond = 6, the_beast_within = 6.5,
       aimed_shot = 6, steady_shot = 5.5, hunters_mark = 6, concussive_shot = 6, rapid_fire = 6, counter_shot = 6,
       volley = 6, readiness = 5, trueshot_aura = 5.5, wailing_arrow = 6.5,
