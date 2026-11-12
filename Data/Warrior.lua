@@ -255,9 +255,9 @@ card("thunder_clap", {
 
 card("devastate", {
   level = 1, name = "Devastate", cost = 1, type = "attack", rarity = "common", path = "protection",
-  target = "enemy", effects = { { "damage", 6 }, { "absorb", 3 } },
-  text = "Deal 6.\nGain 3 Absorb.",
-  up = { effects = { { "damage", 8 }, { "absorb", 5 } }, text = "Deal 8.\nGain 5 Absorb." },
+  target = "enemy", effects = { { "damage", 7 }, { "absorb", 3 } },
+  text = "Deal 7.\nGain 3 Absorb.",
+  up = { effects = { { "damage", 10 }, { "absorb", 5 } }, text = "Deal 10.\nGain 5 Absorb." },
 })
 
 card("demoralizing_shout", {
@@ -269,10 +269,10 @@ card("demoralizing_shout", {
 
 card("shield_slam", {
   level = 1, name = "Shield Slam", cost = 1, type = "attack", rarity = "uncommon", path = "protection",
-  target = "enemy", effects = { { "absorb", 3 }, { "damage", 0, per = { 1, "block" } } },
-  text = "Gain 3 Absorb.\nDeal damage equal to Absorb.",
-  up = { effects = { { "absorb", 5 }, { "damage", 0, per = { 1, "block" } } },
-    text = "Gain 5 Absorb.\nDeal damage equal to Absorb." },
+  target = "enemy", effects = { { "absorb", 4 }, { "damage", 0, per = { 1, "block" } } },
+  text = "Gain 4 Absorb.\nDeal damage equal to Absorb.",
+  up = { effects = { { "absorb", 6 }, { "damage", 0, per = { 1, "block" } } },
+    text = "Gain 6 Absorb.\nDeal damage equal to Absorb." },
 })
 
 card("ignore_pain", {
@@ -397,7 +397,7 @@ relic("skullflame_shield", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.warrior = {
-  id = "warrior", name = "Warrior", order = 2, hp = 74,
+  id = "warrior", name = "Warrior", order = 2, hp = 72,
   resource = { id = "rage", cap = 5, keep = true },
   deck = {
     "strike", "strike", "strike", "strike",
