@@ -333,6 +333,33 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
   arrondit au plus proche (l'arrondi par défaut annulait les soins de 2 d'Expiation dès le 1er coup).
 - **Révéré sans bibelot à proposer** : si la réserve est vide, la phase `start` est sautée.
 
+## Mesures de la progression par classe (12/11/2026, bot heuristique, clé 0, 1 000 expéditions, graine 1)
+
+`luajit Sim/sim.lua runs=1000 bot=heuristic jobs=8 runner=expedition key=0 class=<c> meta=<m> level=<n>`
+(intervalle ≈ ±2 points). « Avant » : code d'avant la progression (aae54aa), `meta=exalted`.
+
+| Classe | Avant (exalted) | Niveau 7, Ligue exaltée | Niveau 1, Ligue exaltée | Niveau 1, compte neuf (`meta=start`) |
+| --- | --- | --- | --- | --- |
+| Priest | 77,5 % | 90,0 % | 91,4 % | 87,8 % |
+| Warrior | 88,6 % | 85,7 % | 82,7 % | 68,3 % |
+| Mage | 93,4 % | 91,4 % | 91,9 % | 85,2 % |
+| Rogue | 93,0 % | 93,4 % | 92,4 % | 89,7 % |
+| Hunter | 89,6 % | 87,1 % | 91,1 % | 86,2 % |
+
+- **Expérience** : 72 à 75 par expédition à la clé 0 (victoire ≈ 77, défaite ≈ 41 ; compte neuf du
+  Warrior : 66), soit le niveau 2 à la 2e expédition et le niveau 7 vers la 19e–20e.
+- **Non-régression** : avec l'ancien choix de Révéré (bibelots de la classe seulement), le nouveau code
+  redonne exactement les chiffres d'avant : Warrior 88,6, Mage 93,4, Rogue 93,0, Hunter 89,6, et Priest sans
+  ses nouveaux bibelots 77,5. Les écarts du tableau viennent donc seulement du contenu : (1) le choix de
+  Révéré tire maintenant dans toute la réserve (communs compris) au lieu des seuls bibelots de classe :
+  −3 à +0,5 point (le bot prend le premier proposé) ; (2) le Priest a ses six bibelots : Sacred Candle seule
+  (portée à chaque expédition) +8,7 (86,2 %), les cinq autres dans la réserve +3,3 (89,5 %), le nouveau choix
+  de Révéré +0,5 (90,0 %).
+- **Niveau 1** : aucune classe sous 45 %, aucun échange de cartes entre niveaux. Le niveau 1 est parfois au
+  niveau du 7 ou au-dessus (Priest, Mage, Hunter) : moins de cartes, donc des récompenses plus souvent
+  parmi les meilleures communes ; à reprendre par le lot d'équilibrage (le Warrior perd 17 points du
+  niveau 7 en Ligue exaltée au compte neuf, dont 14 dus à la Ligue ; les autres 1 à 6).
+
 ## Mesures (bot heuristique, acte 1, 3 000 expéditions, graine 1)
 
 `luajit Sim/sim.lua runs=3000 jobs=16 runner=expedition key=N meta=start|exalted` (mesures d'avant la progression
