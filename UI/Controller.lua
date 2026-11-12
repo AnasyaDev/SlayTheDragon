@@ -71,7 +71,7 @@ function C.reasonText(why)
     local exp = C.exp()
     local cd = ns.Classes[exp and exp.class or "priest"]
     local rid = cd and cd.resource and cd.resource.id
-    t = t:gsub("%%s", rid and ns.Language.resourceName(rid) or "resource")
+    t = t:gsub("%%s", rid and ns.Language.resourceName(rid, 2) or "resource") -- pluriel : « Not enough Combo Points. »
   end
   return t
 end

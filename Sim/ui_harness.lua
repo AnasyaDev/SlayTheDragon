@@ -3461,8 +3461,27 @@ do
   end
   local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$" }
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
+  -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
+  -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle
+  local function stateBody(cl)
+    local lab, verb, rest = cl:match("^(%u[%a ]-): (%l%a*)( .*)$")
+    if lab and (verb == "apply" or verb == "gain") then
+      for _, s in pairs(ns.Statuses) do
+        if s.name == lab then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
+      end
+    end
+    return cl
+  end
+  -- libellé d'une condition d'effet (cond = "status:<id>", id d'état ou clé du registre du langage)
+  local function condLabel(k)
+    k = k:gsub("^status:", "")
+    if ns.Statuses[k] then return ns.Statuses[k].name end
+    local lc = ns.Language.conditionByKey(k)
+    return lc and lc.name or k
+  end
   -- ligne d'état : « Apply … », ou « Gain » suivi d'un nom (« Gain 5 Absorb. » est un effet)
   local function isStateCl(cl)
+    cl = stateBody(cl)
     return cl:find("^Apply ") ~= nil or (cl:find("^Gain %a") ~= nil and cl:find("^Gain %d") == nil)
   end
   -- 1. forme des textes, cohérence texte <-> effets
@@ -3477,7 +3496,8 @@ do
       for _, e in ipairs(d.effects or {}) do
         if e[1] == "apply" and ns.Statuses[e[2]] and ns.Statuses[e[2]].name ~= ns.Cards[id].name then
           local s = ns.Statuses[e[2]]
-          want[#want + 1] = { id = e[2], n = e[3], self = e.self, all = e.all, name = s.name }
+          want[#want + 1] = { id = e[2], n = e[3], self = e.self, all = e.all, name = s.name, flag = s.flag,
+            cond = e.cond and condLabel(e.cond) or nil }
         end
       end
       -- clauses d'état : en dernier (avant les seuls mots de la plaque), une par état, dans l'ordre
@@ -3499,7 +3519,9 @@ do
         for k, w in ipairs(want) do
           local cl = states[k]
           local verb = w.self and "Gain" or "Apply"
-          local expect = verb .. " " .. w.name .. " " .. tostring(w.n)
+          -- état à drapeau (Stealth) : sans nombre ; sous condition : « Name: apply … »
+          if w.cond then verb = w.cond .. ": " .. verb:lower() end
+          local expect = verb .. " " .. w.name .. (w.flag and "" or (" " .. tostring(w.n)))
             .. (W.isTurnStatus(w.id) and (" " .. HG) or "") .. (w.all and " to all" or "")
           nState = nState + 1
           if cl ~= expect then bad[#bad + 1] = ("%s : « %s » au lieu de « %s »"):format(label, cl, expect) end
@@ -3511,7 +3533,7 @@ do
         if cl:find(HG, 1, true) and not isState then bad[#bad + 1] = label .. " : sablier hors d'une ligne d'état" end
         if isState then
           if cl:find("%.$") then bad[#bad + 1] = label .. " : ligne d'état terminée par un point" end
-          local name = cl:match("^%S+ (.-) %d")
+          local name = stateBody(cl):match("^%S+ (.-) %d")
           for sid, s in pairs(ns.Statuses) do
             if s.name == name and (cl:find(HG, 1, true) ~= nil) ~= W.isTurnStatus(sid) then
               bad[#bad + 1] = label .. " : sablier " .. (W.isTurnStatus(sid) and "manquant" or "en trop") .. " (" .. name .. ")"
@@ -5357,12 +5379,18 @@ do
   H.slash("")
   local ns = H.ns
   local W, Art = ns.Widgets, ns.Art
-  -- accueil : Priest (order 1) choisi par défaut, Warrior proposé ; aucune autre classe
+  -- accueil : Priest (order 1) choisi par défaut, Warrior proposé, puis les autres classes jouables
+  -- dans l'ordre de leur champ order
   local ids = {}
   for _, o in ipairs(UI().step.options) do if o.group == "class" then ids[#ids + 1] = o.id end end
-  check("accueil : classes jouables dans l'ordre (Priest, Warrior), Priest choisi par défaut",
-    table.concat(ids, ",") == "class:priest,class:warrior" and option("class:priest").selected
-    and not option("class:warrior").selected, table.concat(ids, ","))
+  local playable = {}
+  for id, cd in pairs(ns.Classes) do if cd.playable ~= false then playable[#playable + 1] = cd end end
+  table.sort(playable, function(a, b) return (a.order or 99) < (b.order or 99) end)
+  local wantIds = {}
+  for i, cd in ipairs(playable) do wantIds[i] = "class:" .. cd.id end
+  check("accueil : classes jouables dans l'ordre (Priest, Warrior…), Priest choisi par défaut",
+    table.concat(ids, ",") == table.concat(wantIds, ",") and ids[1] == "class:priest" and ids[2] == "class:warrior"
+    and option("class:priest").selected and not option("class:warrior").selected, table.concat(ids, ","))
   local wb = button("class:warrior")
   check("accueil : bouton du Guerrier (PV, cartes, réputation)", wb and wb._shown and (wb.sub._text or ""):find(ns.Classes.warrior.hp .. " HP", 1, true)
     and (wb.sub._text or ""):find("10 cards", 1, true), wb and wb.sub._text)
@@ -5478,6 +5506,119 @@ if SNAP then
     W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
   end
   Render.svg(H, big, SNAP .. "/cartes_warrior.svg", "cartes du Guerrier (base, améliorée)")
+  big:Hide()
+end
+
+print("UR  Rogue : accueil, combat (Combo Points, Parry et Stealth sous le héros, modèle caché), planche des cartes")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W = ns.Widgets
+  local rb = button("class:rogue")
+  check("accueil : bouton du Voleur visible", rb and rb._shown, rb and rb._shown)
+  clickOption("class:rogue")
+  check("accueil : clic sur le Voleur, il devient le choix", option("class:rogue").selected
+    and not option("class:priest").selected)
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  check("départ : expédition du Voleur (classe, deck, Thieves' Tools)", e and e.class == "rogue"
+    and ns.Cards[e.deck[1].id].class == "rogue" and e.relics[1] == "thieves_tools")
+  check("bandeau : nom de la classe", UI().className._text == "Rogue", UI().className._text)
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  check("combat du Voleur : classe, Stealth posé, 6 cartes au premier tour (Thieves' Tools)",
+    c and c.class == "rogue" and c.player.st.stealth == 1 and #c.hand == 6, c and #c.hand)
+  v:Render(true)
+  check("cadre du héros : nom et portrait du Voleur", v.heroFrame.name._text == "Rogue"
+    and (v.heroFrame.portrait._texture or ""):lower():find("classicon_rogue", 1, true), tostring(v.heroFrame.portrait._texture))
+  -- états sous le héros : Stealth (sans nombre) et Parry (avec ses charges), explication au survol
+  ns.Combat.applyStatus(c, c.player, "parry", 2)
+  ns.Combat.gainRes(c, 3)
+  v:Render(true)
+  local tok = {}
+  for _, t in ipairs(v.playerSt.tokens) do
+    if t._shown and t.info and t.info.status then tok[t.info.status] = t end
+  end
+  local st, pa = tok.stealth, tok.parry
+  check("jeton Stealth : présent, icône, sans nombre", st and (st.medal.icon._texture or ""):lower():find("ability_stealth", 1, true)
+    and (st.count._text or "") == "", st and tostring(st.count._text))
+  check("jeton Parry : présent, icône, nombre de charges", pa and (pa.medal.icon._texture or ""):lower():find("ability_parry", 1, true)
+    and pa.count._text == "2", pa and tostring(pa.count._text))
+  local ts = st and table.concat(H.hover(st), " | ") or ""
+  local tp = pa and table.concat(H.hover(pa), " | ") or ""
+  check("survol de Stealth : nom sans nombre et explication", ts:find("Stealth", 1, true) and not ts:find("Stealth 1", 1, true)
+    and ts:find("Attack", 1, true), ts)
+  check("survol de Parry : nom, charges et explication", tp:find("Parry 2", 1, true) and tp:find("8 damage", 1, true), tp)
+  local r = v.resource
+  check("pastille de ressource : icône des Combo Points, nombre",
+    r._shown and (r.icon._texture or ""):lower():find("inv_throwingknife_04", 1, true) and r.text._text == "3",
+    tostring(r.icon._texture) .. " / " .. tostring(r.text._text))
+  local tt = table.concat(H.hover(r), " | ")
+  check("pastille de ressource : explication des Combo Points et plafond", tt:find("Combo Point", 1, true) and tt:find("3 / 5", 1, true), tt)
+  local m = v.playerModel
+  local function alpha() local k = m and m._calls and m._calls.SetModelAlpha return k and k[1] end
+  check("modèle du héros en semi-transparence sous Stealth", alpha() and alpha() < 1, alpha())
+  snap("combat-rogue", true)
+  -- première Attack jouée par l'interface : Stealth consommé, le jeton disparaît, le modèle redevient opaque
+  local hi
+  for i, inst in ipairs(c.hand) do if ns.Cards[inst.id].type == "attack" and ns.Combat.canPlay(c, i) then hi = i break end end
+  if hi then
+    H.ns.Controller.act({ "play", hi, 1 })
+    H.settle()
+    v:Render(true)
+    local still = false
+    for _, t in ipairs(v.playerSt.tokens) do if t._shown and t.info and t.info.status == "stealth" then still = true end end
+    check("Attack jouée : Stealth consommé, jeton retiré, modèle opaque", c.player.st.stealth == nil and not still and alpha() == 1, alpha())
+  end
+  -- carte Surge à 0 point : raison au pluriel
+  check("raison d'une carte Surge à 0 : « Not enough Combo Points. »",
+    ns.Controller.reasonText("resource") == "Not enough Combo Points.", ns.Controller.reasonText("resource"))
+  -- infobulle d'une carte : Stealth, Parry, condition Stealth et Combo Points expliqués
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  W.fillCardTooltip(tip, "backstab", false)
+  W.fillCardTooltip(tip, "shadowstep", false)
+  local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  check("infobulles des cartes : Stealth (condition et état), Parry, Combo Points",
+    all:find("Stealth: bonus effect", 1, true) and all:find("Stealth: the next Attack", 1, true)
+    and all:find("Parry: each charge", 1, true) and all:find("Combo Point", 1, true), all)
+end
+
+-- planche des cartes du Voleur (base et améliorée)
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local ids = {}
+  for id, d in pairs(ns.Cards) do if d.class == "rogue" then ids[#ids + 1] = id end end
+  local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
+  local PATH = { start = 0, assassination = 1, combat = 2, subtlety = 3 }
+  table.sort(ids, function(a, b)
+    local da, db = ns.Cards[a], ns.Cards[b]
+    if PATH[da.path] ~= PATH[db.path] then return PATH[da.path] < PATH[db.path] end
+    if RANK[da.rarity] ~= RANK[db.rarity] then return RANK[da.rarity] < RANK[db.rarity] end
+    return a < b
+  end)
+  local perRow, cw, ch = 10, 140, 230
+  local all = {}
+  for _, id in ipairs(ids) do all[#all + 1] = { id, false } all[#all + 1] = { id, true } end
+  local rows = math.ceil(#all / perRow)
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, rows * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, e in ipairs(all) do
+    local c = W.card(big)
+    c:SetCard(e[1], e[2], { playable = true })
+    W.placeCenter(c, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+  end
+  Render.svg(H, big, SNAP .. "/cartes_rogue.svg", "cartes du Voleur (base, améliorée)")
   big:Hide()
 end
 
