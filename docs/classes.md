@@ -314,8 +314,9 @@ cartes : `… sweep=cards runs=300` (chaque carte ajoutée de force au deck de d
 expédition au niveau N, 7 par défaut). Une seule
 simulation à la fois, `jobs=8` au plus. Les bots jouent les formes communes sans code de classe (ils
 simulent chaque coup sur une copie) ; une classe les guide par `bot` (définition), `botKey` et `botValue`
-(règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cible :
-60 à 80 % de victoires au bot heuristic, clé 0 (Priest ≈ 79 %, Warrior ≈ 73 %, Rogue ≈ 89 % à 60 PV, à régler).
+(règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cibles
+et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec la Ligue
+exaltée, clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
 
 ## Exemple minimal
 
