@@ -1341,5 +1341,164 @@ test("neutres : choix de rencontre parmi les cartes neutres (cardChoice neutral 
   for _, id in ipairs(exp.reward.cards) do assert(isNeutral(id) and ns.Cards[id].tier <= 1, id) end
 end)
 
+---------------------------------------------------------------------------
+-- Bibelots communs de la fiche (docs/bibelots-communs.md) : crochets d'expédition, paliers, utilité
+---------------------------------------------------------------------------
+
+local NEW_RELICS = {
+  [0] = { "scroll_of_intellect", "bloodsail_admirals_hat", "herb_pouch", "lifegiving_gem" },
+  { "darkmoon_prize_ticket", "head_of_onyxia", "demonic_rune", "brilliant_mana_oil", "talisman_of_ephemeral_power",
+    "bag_of_marbles", "royal_seal_of_eldre_thalas" },
+  { "philosophers_stone", "mark_of_the_champion", "onyxia_scale_cloak", "hourglass_sand", "flint_and_tinder",
+    "harm_prevention_belt", "drake_fang_talisman" },
+  { "ironfoe" },
+}
+
+test("bibelots communs : débloqués par palier de Ligue, jamais avant", function()
+  for lv = 0, 3 do
+    local exp = newExp({ unlocks = { rep = 0, league = lv } })
+    local pool = {}
+    for _, id in ipairs(X.relicPool(exp)) do pool[id] = true end
+    for t = 0, 3 do
+      for _, id in ipairs(NEW_RELICS[t]) do eq(pool[id] == true, t <= lv, id .. " au palier " .. lv) end
+    end
+  end
+end)
+
+test("bibelots communs : utiles à la classe (Rogue sans Cast ni Absorb : trois exclus), aucun ailleurs", function()
+  local excluded = { focus_talisman = true, talisman_of_ephemeral_power = true, harm_prevention_belt = true }
+  for _, cl in ipairs(NEUTRAL_CLASSES) do
+    local exp = newExp({ class = cl, unlocks = { rep = 2, league = 3 } })
+    local pool = {}
+    for _, id in ipairs(X.relicPool(exp)) do pool[id] = true end
+    for t = 0, 3 do
+      for _, id in ipairs(NEW_RELICS[t]) do
+        local want = not (cl == "rogue" and excluded[id])
+        eq(pool[id] == true, want, cl .. " : " .. id)
+      end
+    end
+    eq(pool.focus_talisman == true, cl ~= "rogue", cl .. " : Talisman of Focus")
+    -- les tirages passent par le même filtre
+    for _, id in ipairs(ns.Rewards.relicPool({ class = cl, maxTier = 3 })) do
+      assert(cl ~= "rogue" or not excluded[id], cl .. " Rewards : " .. id)
+    end
+  end
+  assert(X.classHas("mage", "cast") and not X.classHas("rogue", "cast") and X.classHas("warrior", "castDamage"))
+  assert(not X.classHas("rogue", "absorb") and X.classHas("hunter", "absorb"))
+end)
+
+test("Bloodsail Admiral's Hat : +20 po aux élites et boss, après les pourcentages, quel que soit l'ordre", function()
+  for _, order in ipairs({ { "defias_purse", "bloodsail_admirals_hat" }, { "bloodsail_admirals_hat", "defias_purse" } }) do
+    local exp = newExp()
+    for _, id in ipairs(order) do X.gainRelic(exp, id) end
+    eq(X.gainGold(exp, 30, "elite"), math.floor(30 * 1.25 + 0.5) + 20, order[1])
+    eq(X.gainGold(exp, 80, "boss"), 100 + 20)
+    eq(X.gainGold(exp, 16, "combat"), 20, "combat normal : pourcentage seul")
+  end
+  local e = newExp()
+  X.gainRelic(e, "bloodsail_admirals_hat")
+  enter(e, "elite")
+  local g = e.gold
+  winCombat(e)
+  eq(e.gold - g, e.reward.gold + 20, "récompense d'élite")
+end)
+
+test("Herb Pouch : un emplacement de potion de plus, en combat et à la sauvegarde", function()
+  local exp = newExp()
+  X.gainRelic(exp, "herb_pouch")
+  eq(#exp.potions, 4)
+  exp.potions = { "test_potion", "test_potion", "test_potion", false }
+  assert(X.gainPotion(exp, "test_potion"))
+  eq(X.gainPotion(exp, "test_potion"), false, "quatre pleins")
+  exp.potions[4] = "healing_potion"
+  enter(exp, "combat")
+  eq(#exp.combat.player.potions, 4)
+  assert(X.act(exp, { "potion", 4 }), "potion du 4e emplacement bue")
+  exp.fight.reward.potion = nil
+  winCombat(exp)
+  eq(#exp.potions, 4); eq(exp.potions[4], false)
+  assert(Save.isPlain(exp))
+  local r = reload(exp)
+  eq(#r.potions, 4, "sauvegarde relue")
+end)
+
+test("Lifegiving Gem : +8 PV max et +8 PV au ramassage", function()
+  local exp = newExp()
+  local mx = exp.maxHp
+  exp.hp = mx - 20
+  X.gainRelic(exp, "lifegiving_gem")
+  eq(exp.maxHp, mx + 8); eq(exp.hp, mx - 12)
+end)
+
+test("Darkmoon Faire Prize Ticket : premier retrait gratuit à chaque marchand, prix normal ensuite", function()
+  local exp = newExp()
+  X.gainRelic(exp, "darkmoon_prize_ticket")
+  eq(X.removePrice(exp), 75, "hors du marchand : prix normal")
+  enter(exp, "merchant")
+  exp.gold = 0
+  eq(X.removePrice(exp), 0)
+  assert(X.act(exp, { "remove", 1 }), "gratuit même sans or")
+  eq(exp.gold, 0)
+  eq(X.removePrice(exp), X.REMOVE_PRICE + X.REMOVE_STEP, "deuxième retrait payant (le premier compte)")
+  eq(X.act(exp, { "remove", 1 }), false, "pas assez d'or")
+  assert(X.act(exp, { "leave" }))
+  -- marchand suivant : de nouveau gratuit
+  exp.phase = "map"
+  local nx = ns.Map.nextNodes(exp.map, exp.node)[1]
+  exp.map.nodes[nx].kind = "merchant"
+  assert(X.act(exp, { "path", nx }))
+  eq(X.removePrice(exp), 0, "nouvelle visite")
+end)
+
+test("Head of Onyxia : une potion après chaque élite gagnée, rien si les emplacements sont pleins ni après un combat", function()
+  local exp = newExp()
+  X.gainRelic(exp, "head_of_onyxia")
+  enter(exp, "elite")
+  exp.fight.reward.potion = nil
+  winCombat(exp)
+  local n = 0
+  for _, p in ipairs(exp.potions) do if p then n = n + 1 end end
+  eq(n, 1, "élite : une potion")
+  local full = newExp({ seed = 12 })
+  X.gainRelic(full, "head_of_onyxia")
+  full.potions = { "test_potion", "test_potion", "test_potion" }
+  enter(full, "elite")
+  winCombat(full)
+  eq(full.potions[1], "test_potion"); eq(#full.potions, 3, "pleins : rien")
+  local c = newExp({ seed = 13 })
+  X.gainRelic(c, "head_of_onyxia")
+  enter(c, "combat")
+  c.fight.reward.potion = nil
+  winCombat(c)
+  eq(c.potions[1], false, "combat normal : rien")
+end)
+
+test("Flint and Tinder : le repos améliore aussi une carte ; Royal Seal : repos à moitié", function()
+  local exp = newExp()
+  X.gainRelic(exp, "flint_and_tinder")
+  enter(exp, "campfire")
+  exp.hp = 20
+  local up = exp.stats.upgraded
+  assert(X.act(exp, { "rest" }))
+  eq(exp.stats.upgraded, up + 1); eq(exp.hp, 20 + math.floor(exp.maxHp * 0.30))
+  -- deck entièrement amélioré : rien, sans erreur
+  local full = newExp({ seed = 14 })
+  X.gainRelic(full, "flint_and_tinder")
+  for _, card in ipairs(full.deck) do card.up = true end
+  enter(full, "campfire")
+  assert(X.act(full, { "rest" }))
+  local s = newExp({ seed = 15 })
+  X.gainRelic(s, "royal_seal_of_eldre_thalas")
+  enter(s, "campfire")
+  s.hp = 20
+  X.act(s, { "rest" })
+  eq(s.hp, 20 + math.floor(s.maxHp * 0.15))
+  enter(newExp(), "combat")
+  local m = newExp({ seed = 16 })
+  X.gainRelic(m, "royal_seal_of_eldre_thalas")
+  enter(m, "combat")
+  eq(m.combat.player.mana, 4, "+1 mana")
+end)
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

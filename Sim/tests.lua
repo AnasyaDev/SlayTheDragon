@@ -373,12 +373,13 @@ test("bibelots et potions respectent le contrat", function()
     assert(p.name and p.text and p.rarity and p.effects and type(p.tier) == "number", id)
     for _, e in ipairs(p.effects) do assert(ns.Effects[e[1]], id .. " : " .. e[1]) end
   end
-  eq(nr, 10, "bibelots"); eq(np, 5, "potions")
-  eq(#ns.Rewards.relicPool({ maxTier = 0 }), 4, "bibelots neutres hors boss")
-  eq(#ns.Rewards.relicPool({ boss = true }), 1, "bibelots de boss")
+  -- 10 tirables d'origine + 19 de la fiche des bibelots communs (Traveler's Backpack laissé de côté)
+  eq(nr, 29, "bibelots"); eq(np, 5, "potions")
+  eq(#ns.Rewards.relicPool({ maxTier = 0 }), 8, "bibelots neutres hors boss")
+  eq(#ns.Rewards.relicPool({ boss = true }), 3, "bibelots de boss")
   ns.Relics.test_class = { name = "x", text = "x", rarity = "rare", tier = 0, class = "priest", hooks = {} }
   ns.Relics.test_nopool = { name = "x", text = "x", rarity = "common", tier = 0, noPool = true, hooks = {} }
-  eq(#ns.Rewards.relicPool({ maxTier = 0 }), 4, "bibelots de classe et noPool exclus des tirages")
+  eq(#ns.Rewards.relicPool({ maxTier = 0 }), 8, "bibelots de classe et noPool exclus des tirages")
   ns.Relics.test_class, ns.Relics.test_nopool = nil, nil
   local ch = ns.Rewards.relicChoices(Rng.new(3), 2, { maxTier = 3, exclude = { hearthstone = true } })
   eq(#ch, 2)
@@ -2458,6 +2459,223 @@ do
       assert(not c.result, cl .. " : pas de défaite")
     end
   end)
+end
+
+---------------------------------------------------------------------------
+-- Bibelots communs de la fiche (docs/bibelots-communs.md) : crochets de combat et points d'extension
+---------------------------------------------------------------------------
+do
+  ns.Enemies.test_elite_dummy = { name = "Élite", hp = 100, elite = true,
+    moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
+  ns.Enemies.test_boss_hitter = { name = "Boss", hp = 100, boss = true,
+    moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10, times = 2 } } } }, pattern = { "hit" } }
+  local function withRelic(id, hand, enc, extra, more)
+    more = more or {}
+    more.relics = { id }
+    return setup(hand, enc, extra, more)
+  end
+  local SHEET = {
+    scroll_of_intellect = { "common", 0 }, bloodsail_admirals_hat = { "common", 0 }, herb_pouch = { "common", 0 },
+    lifegiving_gem = { "common", 0 }, darkmoon_prize_ticket = { "common", 1 }, head_of_onyxia = { "common", 1 },
+    demonic_rune = { "common", 1 }, brilliant_mana_oil = { "uncommon", 1 }, talisman_of_ephemeral_power = { "uncommon", 1 },
+    philosophers_stone = { "uncommon", 2 }, mark_of_the_champion = { "uncommon", 2 }, onyxia_scale_cloak = { "uncommon", 2 },
+    hourglass_sand = { "uncommon", 2 }, bag_of_marbles = { "rare", 1 }, flint_and_tinder = { "rare", 2 },
+    harm_prevention_belt = { "rare", 2 }, ironfoe = { "rare", 3 }, royal_seal_of_eldre_thalas = { "boss", 1 },
+    drake_fang_talisman = { "boss", 2 },
+  }
+
+  test("bibelots communs : 19 de la fiche (rareté, palier), communs, tirables, 31 communs au total", function()
+    local n, total = 0, 0
+    for id, want in pairs(SHEET) do
+      local r = ns.Relics[id]
+      assert(r, id)
+      n = n + 1
+      eq(r.rarity, want[1], id); eq(r.tier, want[2], id .. " palier")
+      assert(not r.class and not r.noPool, id .. " : commun et tirable")
+      assert(not r.text:lower():find("%f[%a]you%f[%A]") and not r.text:lower():find("%f[%a]your%f[%A]"), id .. " : you")
+    end
+    eq(n, 19)
+    for _, r in pairs(ns.Relics) do if not r.class then total = total + 1 end end
+    eq(total, 31, "12 d'origine + 19")
+    eq(ns.Relics.hand_of_justice.class, "warrior", "bibelot du Guerrier intact")
+    eq(ns.Relics.force_reactive_disk.class, "warrior", "bibelot du Guerrier intact")
+  end)
+
+  test("Scroll of Intellect : pioche 1 au remélange ; main pleine ; défausse d'une carte", function()
+    local c = withRelic("scroll_of_intellect", { "smite" }, nil, { "smite", "smite", "smite", "smite", "smite" })
+    for i = #c.draw, 1, -1 do c.discard[#c.discard + 1] = table.remove(c.draw, i) end
+    local h = #c.hand
+    Combat.drawCards(c, 1)
+    eq(#c.hand, h + 2, "1 + 1 au remélange")
+    -- défausse d'une seule carte : le crochet la pioche, la boucle s'arrête sans erreur
+    c = withRelic("scroll_of_intellect", { "smite" }, nil, { "smite" })
+    c.discard = { table.remove(c.draw) }
+    c.draw = {}
+    Combat.drawCards(c, 3)
+    eq(#c.hand, 2); eq(#c.draw, 0)
+    -- main pleine : rien de plus
+    c = withRelic("scroll_of_intellect", { "smite" }, nil, { "smite", "smite" })
+    for i = #c.draw, 1, -1 do c.discard[#c.discard + 1] = table.remove(c.draw, i) end
+    while #c.hand < Combat.HAND_MAX - 1 do c.hand[#c.hand + 1] = Card.new("smite", false, 900 + #c.hand) end
+    Combat.drawCards(c, 1)
+    eq(#c.hand, Combat.HAND_MAX)
+  end)
+
+  test("Demonic Rune : 3 Absorb par carte Exhaust jouée (une fois même copiée), rien sinon", function()
+    for _, cl in ipairs({ "priest", "warrior", "mage", "rogue", "hunter" }) do
+      local c = withRelic("demonic_rune", { "rough_dynamite", "heavy_silk_bandage" }, nil, nil, { class = cl })
+      Combat.play(c, 1)
+      eq(c.player.block, 3, cl)
+      Combat.play(c, 1)
+      eq(c.player.block, 6, cl)
+    end
+    local c = withRelic("demonic_rune", { "smite" })
+    Combat.play(c, 1, 1)
+    eq(c.player.block, 0, "Smite n'est pas Exhaust")
+    c = setup({ "rough_dynamite" }, nil, nil, { relics = { "demonic_rune", "ironfoe" } })
+    Combat.play(c, 1)
+    eq(c.player.block, 3, "copie d'Ironfoe : pas de seconde Absorb")
+  end)
+
+  test("Brilliant Mana Oil : +1 mana aux tours 3, 6, 9", function()
+    local c = withRelic("brilliant_mana_oil", { "smite" })
+    local seen = {}
+    for t = 1, 9 do
+      seen[t] = c.player.mana
+      Combat.endTurn(c)
+    end
+    eq(seen[1], 3); eq(seen[2], 3); eq(seen[3], 4); eq(seen[4], 3); eq(seen[6], 4); eq(seen[9], 4)
+  end)
+
+  test("Talisman of Ephemeral Power : +3 par coup des cartes Cast seulement", function()
+    local c = withRelic("talisman_of_ephemeral_power", { "fireball", "frostbolt" }, nil, nil, { class = "mage" })
+    local hp = c.enemies[1].hp
+    local fb = Card.defById("fireball")
+    Combat.resolveCard(c, c.hand[1], c.enemies[1], true)
+    eq(hp - c.enemies[1].hp, fb.effects[1][2] + 3, "Fireball (Cast)")
+    hp = c.enemies[1].hp
+    Combat.play(c, 2, 1)
+    eq(hp - c.enemies[1].hp, Card.defById("frostbolt").effects[1][2], "Frostbolt sans Cast")
+  end)
+
+  test("Bag of Marbles : Stunned 1 sur un ennemi au hasard, jamais un boss, reproductible", function()
+    local c = withRelic("bag_of_marbles", { "smite" }, { "test_boss", "test_dummy" })
+    eq(c.enemies[1].st.stunned, nil, "boss épargné"); eq(c.enemies[2].st.stunned, 1)
+    c = withRelic("bag_of_marbles", { "smite" }, { "test_boss" })
+    eq(c.enemies[1].st.stunned, nil, "boss seul : rien")
+    local a = withRelic("bag_of_marbles", { "smite" }, { "test_dummy", "test_dummy", "test_dummy" })
+    local b = withRelic("bag_of_marbles", { "smite" }, { "test_dummy", "test_dummy", "test_dummy" })
+    local n = 0
+    for i = 1, 3 do
+      eq(a.enemies[i].st.stunned, b.enemies[i].st.stunned, "même graine")
+      n = n + (a.enemies[i].st.stunned or 0)
+    end
+    eq(n, 1)
+    -- le tour perdu : l'ennemi étourdi ne frappe pas au premier tour
+    c = withRelic("bag_of_marbles", { "smite" }, { "test_hitter" })
+    Combat.endTurn(c)
+    eq(c.player.hp, 60, "premier coup perdu")
+  end)
+
+  test("Royal Seal of Eldre'Thalas : 4 mana par tour ; Drake Fang Talisman : Strength 2, 6 Absorb aux ennemis le premier tour", function()
+    local c = withRelic("royal_seal_of_eldre_thalas", { "smite" })
+    eq(c.player.mana, 4)
+    Combat.endTurn(c)
+    eq(c.player.mana, 4)
+    c = withRelic("drake_fang_talisman", { "smite" }, { "test_dummy", "test_dummy" })
+    eq(c.player.st.force, 2); eq(c.enemies[1].block, 6); eq(c.enemies[2].block, 6)
+    local hp = c.enemies[1].hp
+    Combat.play(c, 1, 1)
+    eq(hp - c.enemies[1].hp, 6 + 2 - 6, "Smite 6 + Strength 2, 6 absorbés")
+    Combat.endTurn(c)
+    eq(c.enemies[1].block, 0, "Absorb ennemie perdue à leur tour")
+    eq(c.player.st.force, 2, "Strength gardée")
+  end)
+
+  test("Philosopher's Stone : 6 Absorb par potion bue", function()
+    local c = withRelic("philosophers_stone", { "smite" }, nil, nil, { potions = { "healing_potion", false, false } })
+    assert(Combat.usePotion(c, 1))
+    eq(c.player.block, 6)
+  end)
+
+  test("Mark of the Champion : Attacks +3 contre élites et boss, rien contre un ennemi normal", function()
+    local c = withRelic("mark_of_the_champion", { "smite", "smite", "smite" }, { "test_elite_dummy", "test_boss", "test_dummy" })
+    local hps = { c.enemies[1].hp, c.enemies[2].hp, c.enemies[3].hp }
+    Combat.play(c, 1, 1); Combat.play(c, 1, 2); Combat.play(c, 1, 3)
+    eq(hps[1] - c.enemies[1].hp, 9, "élite"); eq(hps[2] - c.enemies[2].hp, 9, "boss"); eq(hps[3] - c.enemies[3].hp, 6, "normal")
+  end)
+
+  test("Onyxia Scale Cloak : -2 par coup de boss (intention comprise), jamais sous 0 ; ennemis normaux intacts", function()
+    local c = withRelic("onyxia_scale_cloak", { "smite" }, { "test_boss_hitter", "test_hitter" })
+    eq(Combat.intentInfo(c, c.enemies[1]).damage, 8, "intention du boss")
+    eq(Combat.intentInfo(c, c.enemies[2]).damage, 10, "intention normale")
+    Combat.endTurn(c)
+    eq(c.player.hp, 60 - 8 * 2 - 10)
+    eq(Combat.modify(c, "enemyDamage", 1, c.enemies[1], c.player), 0, "plancher 0")
+  end)
+
+  test("Hourglass Sand : Cooldown 2 devient 1, Cooldown 1 reste 1 ; carte revenue un tour plus tôt", function()
+    local c = withRelic("hourglass_sand", { "pw_shield", "kick" }, nil, nil, { class = "priest" })
+    Combat.play(c, 1)
+    eq(c.cooldown[1].turns, 1, "Cooldown 2 -> 1")
+    c.hand[#c.hand + 1] = Card.new("kick", true, 990)
+    c.player.mana = 3
+    Combat.play(c, #c.hand, 1)
+    eq(c.cooldown[2].turns, 1, "Kick+ Cooldown 1 reste 1")
+    local back = 0
+    for t = 1, 3 do
+      Combat.endTurn(c)
+      if handIndex(c, "pw_shield") and back == 0 then back = t end
+    end
+    eq(back, 2, "PW: Shield revient au 2e tour suivant (au 3e sans le bibelot)")
+    local d = setup({ "pw_shield" })
+    Combat.play(d, 1)
+    eq(d.cooldown[1].turns, 2, "sans bibelot : inchangé")
+  end)
+
+  test("Gnomish Harm Prevention Belt : jusqu'à 5 Absorb gardées au début du tour", function()
+    local c = withRelic("harm_prevention_belt", { "smite" })
+    c.player.block = 8
+    Combat.endTurn(c)
+    eq(c.player.block, 5)
+    c.player.block = 3
+    Combat.endTurn(c)
+    eq(c.player.block, 3)
+    local d = setup({ "smite" })
+    d.player.block = 8
+    Combat.endTurn(d)
+    eq(d.player.block, 0, "sans bibelot : remise à 0")
+  end)
+
+  test("Ironfoe : la première Attack jouée l'est deux fois (même cible, sans coût) ; Cast et cible morte", function()
+    local c = withRelic("ironfoe", { "inner_fire", "smite", "smite" }, { "test_dummy", "test_dummy" })
+    Combat.play(c, 1)
+    eq(c.player.block, 5, "une Skill ne consomme rien")
+    local hp, mana = c.enemies[1].hp, c.player.mana
+    Combat.play(c, 1, 1)
+    eq(hp - c.enemies[1].hp, 12, "deux fois 6"); eq(mana - c.player.mana, 1, "un seul coût")
+    eq(#c.discard, 2, "la carte ne part qu'une fois (+ Inner Fire)")
+    hp = c.enemies[1].hp
+    Combat.play(c, 1, 1)
+    eq(hp - c.enemies[1].hp, 6, "seconde Attack simple")
+    -- cible tuée par l'originale : la copie frappe le premier ennemi vivant
+    c = withRelic("ironfoe", { "smite" }, { "test_dummy", "test_dummy" })
+    c.enemies[1].hp = 4
+    Combat.play(c, 1, 1)
+    assert(c.enemies[1].dead); eq(c.enemies[2].hp, 94)
+    -- Attack Cast jouée en premier : doublée à sa résolution
+    c = withRelic("ironfoe", { "fireball", "frostbolt" }, nil, nil, { class = "mage" })
+    Combat.play(c, 1, 1)
+    hp = c.enemies[1].hp
+    Combat.play(c, 1, 1)
+    eq(hp - c.enemies[1].hp, Card.defById("frostbolt").effects[1][2], "Frostbolt simple : Fireball marquée")
+    hp = c.enemies[1].hp
+    Combat.endTurn(c)
+    local fb = Card.defById("fireball").effects[1][2]
+    assert(hp - c.enemies[1].hp >= 2 * fb, "Fireball résolue deux fois : " .. (hp - c.enemies[1].hp))
+  end)
+
+  ns.Enemies.test_elite_dummy, ns.Enemies.test_boss_hitter = nil, nil
 end
 
 print(("%d réussis, %d échoués"):format(passed, failed))

@@ -6712,6 +6712,70 @@ do
   end
 end
 
+-- UN (suite) : bibelots communs de la fiche (infobulles, icônes embarquées), Herb Pouch dans le bandeau
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, Art = ns.Widgets, ns.Art
+  H.ns.Controller.makeSeed = function() return SEED + 8 end
+  clickOption("go")
+  local e = EXP()
+  local NEW = { "scroll_of_intellect", "bloodsail_admirals_hat", "herb_pouch", "lifegiving_gem", "darkmoon_prize_ticket",
+    "head_of_onyxia", "demonic_rune", "brilliant_mana_oil", "talisman_of_ephemeral_power", "philosophers_stone",
+    "mark_of_the_champion", "onyxia_scale_cloak", "hourglass_sand", "bag_of_marbles", "flint_and_tinder",
+    "harm_prevention_belt", "ironfoe", "royal_seal_of_eldre_thalas", "drake_fang_talisman" }
+  local bad = {}
+  for _, id in ipairs(NEW) do
+    local r = ns.Relics[id]
+    local a = Art.relics[id]
+    if not (a and a.tga and ns.Skin.icons[a.tga:lower()]) then bad[#bad + 1] = id .. " : icône absente de Media/Icons" end
+    -- bibelot posé en dernier : la case la plus à droite du bandeau, infobulle = nom puis texte
+    e.relics[#e.relics + 1] = id
+    UI().refresh()
+    local b = UI().relicIcons[UI().RELICS_SHOWN]
+    local tt = H.hover(b)
+    local all = table.concat(tt, " ")
+    if not b._shown or tt[1] ~= r.name or not all:find(r.text, 1, true) then
+      bad[#bad + 1] = id .. " : « " .. table.concat(tt, " | ") .. " »"
+    end
+    if not (b.icon._texture or ""):lower():find(a.tga:lower(), 1, true) then bad[#bad + 1] = id .. " : icône " .. tostring(b.icon._texture) end
+    if #r.text > 80 then bad[#bad + 1] = id .. " : texte de " .. #r.text .. " caractères" end
+    table.remove(e.relics)
+  end
+  check(("bibelots communs : %d infobulles (nom, texte), icônes embarquées dans le bandeau"):format(#NEW), #bad == 0,
+    table.concat(bad, ", "))
+  -- Herb Pouch : quatre cases de potion calées à droite, séparateur et bibelots décalés, sans chevauchement
+  ns.Expedition.gainRelic(e, "herb_pouch")
+  for i = 4, 8 do e.relics[#e.relics + 1] = NEW[i] end
+  UI().refresh()
+  local slots = UI().potionSlots
+  local why = {}
+  if #e.potions ~= 4 then why[#why + 1] = "emplacements " .. #e.potions end
+  for i = 1, 4 do if not slots[i]._shown then why[#why + 1] = "case " .. i .. " cachée" end end
+  local band = R.vrect(UI().band)
+  local prev
+  for i = 1, 4 do
+    local q = R.vrect(slots[i])
+    if q[1] < band[1] or q[3] > band[3] then why[#why + 1] = "case " .. i .. " hors du bandeau" end
+    if prev and prev[3] > q[1] + 0.5 then why[#why + 1] = "case " .. i .. " chevauche" end
+    prev = q
+  end
+  local sepR, firstSlot = R.vrect(UI().sep), R.vrect(slots[1])
+  if sepR[3] > firstSlot[1] + 0.5 then why[#why + 1] = "séparateur sur la case 1" end
+  local lastRelic = R.vrect(UI().relicIcons[UI().RELICS_SHOWN])
+  if lastRelic[3] > sepR[1] + 0.5 then why[#why + 1] = "bibelot sur le séparateur" end
+  local gear = R.vrect(UI().gear)
+  if R.vrect(slots[4])[3] > gear[1] + 0.5 then why[#why + 1] = "case 4 sur le bouton Menu" end
+  check("Herb Pouch : quatre cases de potion dans le bandeau, alignées, sans chevauchement (séparateur, bibelots, Menu)",
+    #why == 0, table.concat(why, ", "))
+  H.hover(slots[4])
+  check("case 4 vide : survol sans erreur", slots[4]._shown)
+  snap("bandeau-herb-pouch", true)
+end
+
 -- planche des cartes neutres (base et améliorée)
 if SNAP then
   local ns = H.ns
