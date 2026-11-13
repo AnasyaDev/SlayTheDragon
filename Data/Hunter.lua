@@ -393,7 +393,7 @@ local EPIC_BOT = {
 }
 
 local function epic(id, t)
-  t.type, t.rarity, t.epic, t.power = "power", "epic", true, true
+  t.type, t.rarity, t.epic = "power", "epic", true
   t.effects = t.effects or {}
   t.whileInDeck = function(c, src) H().epicStart(c, src) end
   card(id, t)
@@ -429,7 +429,7 @@ epic("trap_launcher", {
       if why ~= "launch" or not enemy then return end
       for _ = 1, n2(EPIC.launcher, src) do
         if c.result or enemy.dead then return end
-        H().petAttack(c, "launch", nil, enemy)
+        H().petAttackOn(c, "launch", enemy)
       end
     end,
   },
@@ -519,7 +519,7 @@ epic("black_arrow", {
     onDotTick = function(c, src, unit)
       if c.result or unit.side ~= "enemy" or unit.dead then return end
       if src.up then Combat.gainRes(c, 1, "epic") end
-      H().petAttack(c, "dot", nil, unit)
+      H().petAttackOn(c, "dot", unit)
     end,
   },
 })

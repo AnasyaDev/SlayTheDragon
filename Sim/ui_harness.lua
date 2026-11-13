@@ -3325,7 +3325,7 @@ do
     for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
     return out
   end
-  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$" }
+  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$", "^Epic%.$" } -- Epic : mot de plaque des épiques
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
   -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
   -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle

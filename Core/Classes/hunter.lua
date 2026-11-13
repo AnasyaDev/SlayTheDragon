@@ -48,6 +48,12 @@ end
 
 -- Cible du familier : la dernière cible visée si elle vit, sinon l'ennemi vivant le plus à gauche.
 function Hunter.petTarget(c)
+  -- cible imposée le temps d'une attaque (Hunter.petAttackOn : Trap Launcher, Black Arrow)
+  local force = c.cls and c.cls.petForce
+  if force then
+    local e = Combat.enemyByUid(c, force)
+    if e and not e.dead then return e end
+  end
   local uid = c.player.lastTarget
   if uid then
     local e = Combat.enemyByUid(c, uid)
@@ -85,12 +91,10 @@ function Hunter.petAll(c)
   return Combat.modify(c, "petAll", false) and true or false
 end
 
--- target : cible imposée (Trap Launcher, Black Arrow), sans changer la cible du familier
--- (c.player.lastTarget) ; morte ou absente : sa cible habituelle.
-function Hunter.petAttack(c, why, frenzy, target)
+function Hunter.petAttack(c, why, frenzy)
   if c.result then return 0 end
   if not Hunter.petPresent(c) then return 0 end
-  local t = (target and not target.dead) and target or Hunter.petTarget(c)
+  local t = Hunter.petTarget(c)
   if not t then return 0 end
   local dmg = Hunter.petDamage(c, t, frenzy)
   if Hunter.petAll(c) then
@@ -120,6 +124,17 @@ function Hunter.petAttack(c, why, frenzy, target)
   if why ~= "surge" then Combat.gainRes(c, 1, "pet") end
   Combat.fire(c, "onPetAttack", t, dmg, why)
   return dmg
+end
+
+-- Une attaque du familier sur la cible imposée e (Trap Launcher, Black Arrow), sans changer sa cible
+-- (c.player.lastTarget) : c.cls.petForce = uid de e le temps de l'attaque, lu par Hunter.petTarget (donc aussi
+-- par les zones qui enveloppent petAttack / petTarget, Core/ZoneRules.lua) ; e mort : sa cible habituelle.
+function Hunter.petAttackOn(c, why, e)
+  local old = c.cls.petForce
+  c.cls.petForce = e and e.uid or nil
+  local r = Hunter.petAttack(c, why)
+  c.cls.petForce = old
+  return r
 end
 
 -- { "pet", n, per = …, surge = bool } : « Pet attacks. » / « twice » / « once per Frenzy » (Surge).

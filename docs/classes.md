@@ -388,7 +388,7 @@ ns.ClassRules.rogue = { hooks = {
 | Instant, double Cast (Mage) | état commun `instant`, `castSlots` = 2, file `cast` + `castMore` (interruption : la plus récente), `onCastResolved`, `onCardCommitted` + `c.turn.bySchool` (Hot Streak), condition `school:fire` |
 | Pay N HP, démon (Warlock) | `payHp` (crochet `payHp`, `onPayHp`), Power `slot = "demon"`, `replacedTo = "exhaust"`, `onTurnEnd`, `c.player.lastTarget`, `dotDecay`, `onDotTick`, `onEnemyDeath` |
 | Powers de fin de tour | `onTurnEnd` sur le Power (avant la défausse) |
-| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy, cible)` (Core/Classes/hunter.lua ; cible imposée facultative : Trap Launcher, Black Arrow) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
+| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua ; `Hunter.petAttackOn(c, why, ennemi)` : cible imposée le temps d'une attaque, Trap Launcher, Black Arrow) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
 | Traps (Hunter) | commun : `trap = true`, zone `c.traps`, déclenchement avant les coups de l'attaque (`Combat.triggerTrap`), `onTrapTriggered` |
 | Stunned pendant le tour ennemi (Trap, riposte) | commun : `Combat.applyStatus` pose `e.stopTurn` si l'ennemi est celui qui agit (`c.acting`) ; `executeMove` arrête le tour avant le coup suivant (aucun coup de l'attaque qui a déclenché l'effet), consomme une charge, journal `{ t = "stunned", stopped = true }` ; « act » n'est journalisé qu'à la première action qui part (`decisions.md`) |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
@@ -429,9 +429,12 @@ pile ; elle n'a pas de coût et ne se joue jamais. Contrat pour écrire une épi
 
 Données et règles dans `Data/Hunter.lua` (bloc « Cartes épiques », nombres réglés dans la table `EPIC`,
 exposée en `ns.HunterEpic`), tests `Sim/tests_epic_hunter.lua`, harnais « UEH ». Aucun crochet ajouté au
-moteur : tout passe par les crochets existants, en `deckHooks` (actifs où que soit la carte) ; `whileInDeck`
-= `ns.Hunter.epicStart(c, src)` retient l'épique en jeu (`c.cls.epic = { id, up }`, lu par la vue et les
-bots : `ns.Hunter.epic(c)`) et la sort de la pioche si le socle ne l'a pas déjà fait.
+moteur : tout passe par les crochets existants, en `deckHooks` de l'épique (`src` = `c.epic`, posée hors des
+piles par le socle, crochets en dernier) ; `whileInDeck` = `ns.Hunter.epicStart(c, src)` retient l'épique en
+jeu (`c.cls.epic = { id, up }`, lu par la vue et les bots : `ns.Hunter.epic(c)`). Nombres réglés par la
+simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 8 / 12 dégâts en
+plus ; Lone Wolf +1 → +2 par Frenzy (amélioré +3 au lieu de « Start of turn: +1 Frenzy. », trop long pour
+la carte) ; Chimaera Shot 3 / 3 (6) → 4 / 4 (7) ; Trap Launcher 1 / 2 (fiche).
 
 | Épique | Crochets | Remarques |
 |---|---|---|
@@ -443,7 +446,8 @@ bots : `ns.Hunter.epic(c)`) et la sort de la pioche si le socle ne l'a pas déj�
 | Black Arrow | `onDotTick` | familier sur l'ennemi qui tique, sans changer sa cible |
 | Lone Wolf | `petAbsent`, `damage`, `onTurnStart` ; `transforms` (9 variantes `variant = true`) | Pet Whistle : +1 Frenzy au lieu d'une attaque (règle du bibelot ; texte `loneText` montré par `UI/Art/hunter.lua`) |
 
-Ajouts de la classe : `Hunter.petAttack(c, why, frenzy, cible)` (cible imposée, sinon celle du familier) ;
+Ajouts de la classe : `Hunter.petAttackOn(c, why, ennemi)` (cible imposée par `c.cls.petForce`, lue par
+`Hunter.petTarget` : la signature de `petAttack` / `petTarget`, enveloppées par Core/ZoneRules.lua, ne change pas) ;
 effet `{ "damageOther", n }` (« Deal N to another enemy. », Chimaera Shot : l'ennemi vivant le plus à gauche
 autre que la cible) ; déclencheurs « Each enemy DoT tick », « Attack hits », « Each Attack hit ». Vue
 (`ns.ClassViews.hunter`) : figure et marqueur du familier cachés sans familier, « Roar » flottant.
@@ -452,7 +456,9 @@ marchand sous sa variante quand l'épique du deck la transforme (`shownCard`, `f
 prise entre au deck sous son id d'origine). Bots : `classDef.bot.epic(exp, id)` (note d'offre) et
 `classDef.bot.builds[id]` = `{ rating, upgrade, remove }`, notes qui priment tant que l'épique est dans le
 deck (`Sim/expedition.lua`, `SE.buildOf`, crochet générique utilisable par toute classe) ; en combat,
-`Hunter.EPIC_RES[id]` ajoute de la valeur au Frenzy gardé (Roar of Sacrifice, Lone Wolf) dans `botValue`.
+`Hunter.EPIC_RES[id]` ajoute de la valeur au Frenzy gardé (Roar of Sacrifice, Lone Wolf) dans `botValue` ;
+l'épique du deck vaut 5 de plus pour le bot (`EPIC_KEEP`) : il ne la remplace que pour bien mieux, et une
+épique imposée (`epic=<id>`) reste mesurée seule.
 
 ## Sauvegarde
 
