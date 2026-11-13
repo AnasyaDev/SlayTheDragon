@@ -757,3 +757,15 @@ Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic 
 15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
 ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
 `docs/zones/cartes-de-zone.md`, section « Rogue ».
+
+## Passe de difficulté de Stranglethorn Vale (14/11/2026)
+
+Cible : 64 % de victoires en moyenne (`runner=expedition zone=stranglethorn zones=3 level=7 key=0 bot=heuristic`,
+épiques gagnées en route), écart ≤ 10. Avant (800) : Priest 64,8, Warrior 71,2, Mage 74,2, Rogue 65,4, Hunter
+76,0 (moyenne 70,3, écart 11,2). Après (1500) : **60,4 / 63,6 / 69,0 / 64,1 / 64,4** (moyenne 64,3, écart 8,6) ;
+PV perdus par combat normal inchangés (9,8 / 11,4 / 7,2 / 7,6 / 7,8). Le Mage et le Hunter passaient les élites
+presque sans perte (contrôle) : élites adoucis (Priest, Warrior, Rogue +4 à 5 points d'élites), difficulté portée
+par Jin'do, plus robuste (134 → 176 PV : coûte plus au Warrior et au Mage) et moins pointu (le Priest à 36 PV
+craint les gros coups) ; son Shadow Bolt coupe le Cast à travers l'Absorb ; Delusions frappe par un coup ordinaire
+(Parry : Rogue +5,6). Reste : Mage 5 points devant, Priest 4 points derrière. Détail, essais écartés :
+`docs/zones/stranglethorn.md`, « Passe de difficulté ».

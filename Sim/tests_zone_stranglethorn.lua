@@ -276,12 +276,12 @@ return function(T)
     eq(b.intent, "roar", "deux tigres vivants : Roar")
   end)
 
-  test("Mokk : à 49 PV, Berserk (Strength 4), puis seulement Thrash et Pound", function()
+  test("Mokk : à 49 PV, Berserk (Strength 3), puis seulement Thrash et Pound", function()
     local c = combat({ zone = "stranglethorn", enemies = { "mokk_the_savage" }, hand = { "stv_hit" }, hp = 300 })
     local m = c.enemies[1]
     m.hp = 58
     play(c, "stv_hit", 1)
-    eq(m.mem.phase, 1); eq(m.st.force, 4)
+    eq(m.mem.phase, 1); eq(m.st.force, 3)
     local seen = {}
     for _ = 1, 4 do Combat.endTurn(c) seen[#seen + 1] = m.intent end
     for _, mv in ipairs(seen) do assert(mv == "thrash" or mv == "pound", mv) end
@@ -350,9 +350,23 @@ return function(T)
     force(d, d.enemies[1], "volley")
     Combat.endTurn(d)
     eq(d.player.cast, nil, "Volley : coupée malgré l'Absorb")
+    -- Shadow Bolt : coupe aussi à travers l'Absorb
+    local b = combat({ zone = "stranglethorn", kind = "boss", enemies = { "jindo" }, hand = { "stv_mana", "stv_cast" }, hp = 200 })
+    play(b, "stv_mana"); play(b, "stv_cast")
+    b.player.block = 99
+    force(b, b.enemies[1], "bolt")
+    Combat.endTurn(b)
+    eq(b.player.cast, nil, "Shadow Bolt : coupée malgré l'Absorb")
+    -- Delusions sans incantation : un coup ordinaire (Absorb, Parry, Trap)
+    local a = combat({ zone = "stranglethorn", kind = "boss", enemies = { "jindo" }, hp = 200 })
+    a.player.block = 99
+    local ahp = a.player.hp
+    force(a, a.enemies[1], "delusion")
+    Combat.endTurn(a)
+    eq(a.player.hp, ahp, "Delusions : arrêtée par l'Absorb")
   end)
 
-  test("Jin'do à 64 PV : Brain Wash Totem (« Your soul belongs to Hakkar! »), puis Volley, Hex, Bolt ; deux Hex", function()
+  test("Jin'do à 88 PV : Brain Wash Totem (« Your soul belongs to Hakkar! »), puis Volley, Hex, Bolt ; deux Hex", function()
     local c = setup({ "stv_hit", "stv_c3", "stv_c2", "stv_c1" }, { "jindo" }, { kind = "boss", hp = 300 })
     local j = c.enemies[1]
     j.hp = 70
