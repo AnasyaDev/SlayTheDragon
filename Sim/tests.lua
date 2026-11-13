@@ -105,7 +105,7 @@ test("dégâts, mana, défausse", function()
   local c = setup({ "smite", "smite", "smite", "smite" })
   local e = c.enemies[1]
   assert(Combat.play(c, 1, 1))
-  eq(e.hp, 94, "PV ennemi")
+  eq(e.hp, 100 - num("smite", 1), "PV ennemi")
   eq(c.player.mana, 2, "mana")
   eq(#c.discard, 1, "défausse")
 end)
@@ -113,9 +113,10 @@ end)
 test("l'Absorption encaisse puis tombe au début du tour", function()
   local c = setup({ "inner_fire" }, { "test_hitter" })
   assert(Combat.play(c, 1))
-  eq(c.player.block, 5)
+  local a = num("inner_fire", 1)
+  eq(c.player.block, a)
   Combat.endTurn(c)
-  eq(c.player.hp, 55, "10 - 5 absorbés")
+  eq(c.player.hp, 60 - (10 - a), "10 - Absorb absorbés")
   eq(c.player.block, 0, "Absorption retombée")
 end)
 
@@ -124,7 +125,7 @@ test("Armure fracassée : +25 % de dégâts subis", function()
   local e = c.enemies[1]
   Combat.applyStatus(c, e, "armor_broken", 1)
   Combat.play(c, 1, 1)
-  eq(e.hp, 100 - 7)
+  eq(e.hp, 100 - math.floor(num("smite", 1) * 1.25))
 end)
 
 test("Démoralisé posé par l'ennemi dure le tour du joueur suivant", function()
@@ -426,16 +427,16 @@ test("bibelots du Prêtre : Sacred Candle, Mindtap Talisman, Benediction, Robes,
   -- Robes of Prophecy : Absorb +2 sous Atonement seulement
   a = setup({ "inner_fire" }, { "test_dummy" }, nil, { relics = { "robes_of_prophecy" } })
   Combat.play(a, 1)
-  eq(a.player.block, 5, "sans Atonement")
+  eq(a.player.block, num("inner_fire", 1), "sans Atonement")
   b = setup({ "inner_fire" }, { "test_dummy" }, nil, { relics = { "robes_of_prophecy", "sacred_candle" } })
   Combat.play(b, 1)
-  eq(b.player.block, 7, "sous Atonement")
-  -- Anathema : un Surge compte 2 de plus (Void Eruption à 3 Insanity : 4 + 4 × 5), la dépense reste 3
+  eq(b.player.block, num("inner_fire", 1) + 2, "sous Atonement")
+  -- Anathema : un Surge compte 2 de plus (Void Eruption à 3 Insanity : base + par point × 5), la dépense reste 3
   a = setup({ "void_eruption" }, { "test_dummy" }, nil, { relics = { "anathema" } })
   a.player.res = 3
   local hp = a.enemies[1].hp
   Combat.play(a, 1, 1)
-  eq(hp - a.enemies[1].hp, 4 + 4 * 5); eq(a.player.res, 0)
+  eq(hp - a.enemies[1].hp, num("void_eruption", 2) + Card.defById("void_eruption").effects[2].per[1] * 5); eq(a.player.res, 0)
   -- Truefaith Vestments : Absorb 4 quand un Cast se résout
   a = setup({ "holy_fire" }, { "test_dummy" })
   b = setup({ "holy_fire" }, { "test_dummy" }, nil, { relics = { "truefaith_vestments" } })
@@ -551,10 +552,11 @@ end)
 
 test("Pierre à aiguiser : +1 par coup d'attaque seulement", function()
   local c = setup({ "smite", "penance", "sw_pain" }, { "test_dummy" }, nil, { relics = { "sharpening_stone" } })
+  local hp1 = 100 - (num("smite", 1) + 1)
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 93)
+  eq(c.enemies[1].hp, hp1)
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 93 - 3 * (num("penance", 1) + 1))
+  eq(c.enemies[1].hp, hp1 - 3 * (num("penance", 1) + 1))
 end)
 
 test("Coup qui interrompt : coupe l'incantation s'il fait perdre des PV", function()
@@ -595,11 +597,12 @@ end)
 
 test("Mot de l'ombre : Mort : double sous la moitié des PV", function()
   local c = setup({ "sw_death", "sw_death" })
+  local d = num("sw_death", 1)
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 94)
+  eq(c.enemies[1].hp, 100 - d)
   c.enemies[1].hp = 50
   Combat.play(c, 1, 1)
-  eq(c.enemies[1].hp, 38)
+  eq(c.enemies[1].hp, 50 - d - Card.defById("sw_death").effects[1].more[1][1])
 end)
 
 test("Éruption du Vide : base + bonus par Démence dépensée", function()
@@ -628,9 +631,10 @@ test("Guérison de l'ombre : soigne puis Douleur sur soi", function()
   local c = setup({ "shadow_mend" })
   c.player.hp = 30
   Combat.play(c, 1)
-  eq(c.player.hp, 40); eq(c.player.st.pain, 2); eq(c.player.res, 1)
+  local h = num("shadow_mend", 1)
+  eq(c.player.hp, 30 + h); eq(c.player.st.pain, 2); eq(c.player.res, 1)
   Combat.endTurn(c)
-  eq(c.player.hp, 38)
+  eq(c.player.hp, 30 + h - 2)
 end)
 
 test("Halo : incantation qui touche tous les ennemis", function()
@@ -2774,7 +2778,7 @@ do
     eq(c.player.st.force, 2); eq(c.enemies[1].block, 6); eq(c.enemies[2].block, 6)
     local hp = c.enemies[1].hp
     Combat.play(c, 1, 1)
-    eq(hp - c.enemies[1].hp, 6 + 2 - 6, "Smite 6 + Strength 2, 6 absorbés")
+    eq(hp - c.enemies[1].hp, num("smite", 1) + 2 - 6, "Smite + Strength 2, 6 absorbés")
     Combat.endTurn(c)
     eq(c.enemies[1].block, 0, "Absorb ennemie perdue à leur tour")
     eq(c.player.st.force, 2, "Strength gardée")
@@ -2790,7 +2794,8 @@ do
     local c = withRelic("mark_of_the_champion", { "smite", "smite", "smite" }, { "test_elite_dummy", "test_boss", "test_dummy" })
     local hps = { c.enemies[1].hp, c.enemies[2].hp, c.enemies[3].hp }
     Combat.play(c, 1, 1); Combat.play(c, 1, 2); Combat.play(c, 1, 3)
-    eq(hps[1] - c.enemies[1].hp, 9, "élite"); eq(hps[2] - c.enemies[2].hp, 9, "boss"); eq(hps[3] - c.enemies[3].hp, 6, "normal")
+    local s = num("smite", 1)
+    eq(hps[1] - c.enemies[1].hp, s + 3, "élite"); eq(hps[2] - c.enemies[2].hp, s + 3, "boss"); eq(hps[3] - c.enemies[3].hp, s, "normal")
   end)
 
   test("Onyxia Scale Cloak : -2 par coup de boss (intention comprise), jamais sous 0 ; ennemis normaux intacts", function()
@@ -2838,19 +2843,19 @@ do
   test("Ironfoe : la première Attack jouée l'est deux fois (même cible, sans coût) ; Cast et cible morte", function()
     local c = withRelic("ironfoe", { "inner_fire", "smite", "smite" }, { "test_dummy", "test_dummy" })
     Combat.play(c, 1)
-    eq(c.player.block, 5, "une Skill ne consomme rien")
+    eq(c.player.block, num("inner_fire", 1), "une Skill ne consomme rien")
     local hp, mana = c.enemies[1].hp, c.player.mana
     Combat.play(c, 1, 1)
-    eq(hp - c.enemies[1].hp, 12, "deux fois 6"); eq(mana - c.player.mana, 1, "un seul coût")
+    eq(hp - c.enemies[1].hp, 2 * num("smite", 1), "deux fois Smite"); eq(mana - c.player.mana, 1, "un seul coût")
     eq(#c.discard, 2, "la carte ne part qu'une fois (+ Inner Fire)")
     hp = c.enemies[1].hp
     Combat.play(c, 1, 1)
-    eq(hp - c.enemies[1].hp, 6, "seconde Attack simple")
+    eq(hp - c.enemies[1].hp, num("smite", 1), "seconde Attack simple")
     -- cible tuée par l'originale : la copie frappe le premier ennemi vivant
     c = withRelic("ironfoe", { "smite" }, { "test_dummy", "test_dummy" })
     c.enemies[1].hp = 4
     Combat.play(c, 1, 1)
-    assert(c.enemies[1].dead); eq(c.enemies[2].hp, 94)
+    assert(c.enemies[1].dead); eq(c.enemies[2].hp, 100 - num("smite", 1))
     -- Attack Cast jouée en premier : doublée à sa résolution
     c = withRelic("ironfoe", { "fireball", "frostbolt" }, nil, nil, { class = "mage" })
     Combat.play(c, 1, 1)

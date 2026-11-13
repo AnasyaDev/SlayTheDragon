@@ -1,4 +1,4 @@
-# Équilibrage des cinq classes (12/11/2026)
+# Équilibrage des cinq classes (12 et 13/11/2026)
 
 Priest, Warrior, Mage, Rogue, Hunter, clé 0 puis clés 1 à 5, bot `heuristic`, `runner=expedition`, graine 1.
 Rapports bruts dans `reports/` (non versionnés).
@@ -9,8 +9,8 @@ Rapports bruts dans `reports/` (non versionnés).
 |---|---|
 | Compte neuf, classe au niveau 1 (`meta=start level=1`) | 62–72 % pour chaque classe, écart max − min ≤ 6 points |
 | Niveau 7, Ligue exaltée (`meta=exalted level=7`) | 72–82 %, écart ≤ 6 points ; niveau 7 ≥ niveau 1 à Ligue égale (`meta=exalted level=1`) |
-| PV perdus par combat normal | Priest ≈ 15, Warrior 11–16, Rogue 12–16, Mage ≤ 11, Hunter ≤ 13 |
-| Durée | combat normal 3–5 tours, boss 5–8 |
+| PV perdus par combat normal | **6–9 pour toutes les classes** (passe 3, 13/11/2026 : le Rogue sert de référence) ; avant : Priest ≈ 15, Warrior 11–16, Rogue 12–16, Mage ≤ 11, Hunter ≤ 13 |
+| Durée | combat normal 2,7–4 tours (passe 3 ; avant 3–5), boss 5–8 |
 | Voies | chaque voie seule (`path=<voie>`, niveau 7) ≥ 50 % |
 
 ## Instrument : corrections du bot (étape 0)
@@ -205,14 +205,14 @@ Notes du bot (`bot.rating`) : toutes remplacées par celles des balayages (méth
 | L1 compte neuf 62–72 %, écart ≤ 6 | **Atteinte** : 65,2 à 70,0 %, écart 4,8 |
 | L7 exalté 72–82 %, écart ≤ 6 | **Atteinte** : 80,8 à 82,0 %, écart 1,2 (Hunter au bord : 82,0 ± 1,7) |
 | L7 ≥ L1 à Ligue égale | Atteinte pour Priest (+3,3), Mage (+4,6), Rogue (+2,7), Hunter (+10,4) ; **Warrior à égalité** (+0,3 ± 3,5, non significatif) |
-| PV perdus par combat normal | Priest 13,6 (≈ 15) ✓, Mage 6,2 (≤ 11) ✓, Hunter 4,5 (≤ 13) ✓ ; **Warrior 9,7** (11–16) ✗ de peu ; **Rogue 5,7** (12–16) ✗ |
+| PV perdus par combat normal (cibles de la passe 1, remplacées par 6–9 en passe 3) | Priest 13,6 (≈ 15) ✓, Mage 6,2 (≤ 11) ✓, Hunter 4,5 (≤ 13) ✓ ; **Warrior 9,7** (11–16) ✗ de peu ; **Rogue 5,7** (12–16) ✗ |
 | Combat normal 3–5 tours, boss 5–8 | ✓ sauf **Hunter : combat normal 2,86 tours** (boss 5,6 ✓) |
 | Chaque voie seule ≥ 50 % au niveau 7 | ✓ pour 14 voies sur 15 ; **Subtlety (Rogue) 19 à 26 %** ✗ |
 | Clés : ≈ −5 points par clé, classes à 10 points au plus | ✓ (écart max 9,8 à la clé 5) |
 
 Ce qui bloque, et ce que je recommande :
 
-- **Rogue, PV perdus (5,7 au lieu de 12–16)** : Parry (4 Feint au départ, une charge annule un coup jusqu'à
+- **Rogue, PV perdus (5,7 au lieu de 12–16 ; cible abandonnée en passe 3, le Rogue devient la référence)** : Parry (4 Feint au départ, une charge annule un coup jusqu'à
   8 dégâts, gardée d'un tour à l'autre) pare presque tous les coups des normaux (4 à 8 dégâts). Les règles
   tranchées (Parry gardé, 3 charges) et le « jusqu'à 8 » du GDD rendent la cible inatteignable par les
   nombres des cartes sans casser la classe : il faudrait abaisser le plafond d'un coup paré (8 → 5) ou
@@ -274,7 +274,7 @@ Fury 55,2, Protection 61,2 (500).
   presque pas plus de PV, il est donc plus fort, pas plus fragile. **PV 49 → 50** remet les cibles (70,0 /
   79,2 / 81,7). Les PV n'ont pas pu monter vers 60.
 - **PV perdus par combat normal : 6,3 au niveau 1 (5,7 avant), cible 12–16 non atteinte, à 6 à 10 PV
-  près.** Pourquoi : un combat normal dure 2,7 tours et ses coups (4 à 8) sont entièrement parés ; essai
+  près** (cible abandonnée en passe 3 : ce 6,3 devient la référence). Pourquoi : un combat normal dure 2,7 tours et ses coups (4 à 8) sont entièrement parés ; essai
   pour mesure (annulé) avec 2 Feint seulement : 7,1 PV par normal, mais 54 % au niveau 1 (−16 points). Le
   nombre de Feint pèse sur les élites et le boss, presque pas sur les normaux. Règle de Parry non touchée.
 
@@ -340,6 +340,141 @@ de toucher au commun : décision du joueur. L'écart entre classes au niveau 7 r
 - La voie Subtlety seule est juste au-dessus de 50 % (51,5 ± 2,2).
 - Écran de progression : 36 emplacements ; une rangée de plus de 10 cartes (Subtlety, 11) resserre son pas
   pour garder le même bord droit.
+
+
+## Passe 3 (13/11/2026) : 6 à 9 PV perdus par combat normal, avec le Rogue comme référence
+
+Décision du joueur : « Je trouve justement que le Rogue est le plus équilibré actuellement. On devrait
+construire autour de cette cible, peut-être 7 ou 8 PV perdus par combat normal. » L'ancienne cible (12–16 PV
+pour le Rogue, ≈ 15 pour le Priest…) est abandonnée. Nouvelle cible pour toutes les classes : **6 à 9 PV
+perdus par combat normal** et des combats normaux de **2,7 à 4 tours** (bot heuristic, clé 0). Le Rogue ne
+change pas.
+
+Le périmètre a été réduit en cours de passe (décision du joueur : la Ligue des explorateurs va être
+supprimée). Seuls comptent le niveau 1 compte neuf (`meta=start level=1`, 62–72 %, écart entre classes ≤ 6)
+et une vérification du niveau 7 `meta=start` (chaque classe doit encore gagner en montant de niveau). Les
+mesures `meta=exalted` et les clés 1 à 5 seront refaites après la suppression de la Ligue ; elles n'ont pas
+servi de critère ici.
+
+Même méthode (clé 0, graine 1) : 500 à 1 000 expéditions pour les essais, 2 000 pour les mesures finales.
+
+### Remesure de départ (main, 2 000 expéditions)
+
+Résultats identiques aux passes 1 et 2 (mêmes graines). PV perdus par combat normal au niveau 1 neuf :
+Priest 13,6, Warrior 9,0, Mage 6,2, Rogue 6,3, Hunter 4,3 (combats de 2,83 tours). Warrior et Mage sont
+déjà dans 6–9 : **non touchés**. Au niveau 7 exalté, le Mage (5,3) et le Rogue (5,8) sont un peu sous 6 ;
+cette mesure est abandonnée avec la Ligue.
+
+### Tableau final (clé 0, 2 000 expéditions, ± 2 points)
+
+| Classe | PV | L1 neuf | L7 neuf | Gain L1 → L7 (neuf) | Normal : tours / PV perdus | Élite : tours / PV perdus | Boss : victoires / tours / PV perdus |
+|---|---|---|---|---|---|---|---|
+| Priest | 52 → **36** | 70,0 → **69,3** | 76,4 | +7,1 | 4,35 / 13,6 → **3,58 / 7,4** | 5,93 / 20,0 → 5,20 / 13,7 | 71 % / 6,8 / 55,9 → 70 % / 6,4 / 43,5 |
+| Warrior | 74 | 65,2 | 77,8 | +12,6 | 3,15 / 9,0 | 5,24 / 22,8 | 68 % / 6,3 / 45,7 |
+| Mage | 42 | 65,2 | 71,5 | +6,3 | 3,32 / 6,2 | 4,55 / 9,4 | 69 % / 5,1 / 25,9 |
+| Rogue | 50 | 70,0 | 72,8 | +2,8 | 2,74 / 6,3 | 4,29 / 15,6 | 73 % / 4,6 / 31,2 |
+| Hunter | 41 → **50** | 67,4 → **65,0** | 76,3 | +11,3 | 2,86 / 4,5 → **2,77 / 6,1** | 4,01 / 3,3 → 3,85 / 5,4 | 68 % / 5,6 / 32,4 → 65 % / 5,1 / 38,9 |
+| écart max − min | | **5,0** | | | | | |
+
+Les colonnes « tours / PV perdus » et « Boss » sont mesurées au niveau 1 neuf. PV perdus par combat normal
+au niveau 7 neuf : Priest 7,9, Warrior 8,7, Mage 5,9, Rogue 6,6, Hunter 6,4.
+
+### Priest : tuer plus vite et encaisser un peu mieux, avec beaucoup moins de PV
+
+Changements (avant → après ; « a/b » = carte de base / améliorée) :
+- Départ : **Smite 6/9 → 8/11** ; **Inner Fire 5/8 → 6/9 Absorb**.
+- **PV 52 → 36**. Chaque PV vaut ≈ 1,5 point de victoire au niveau 1 neuf : 35 PV donnent 67,0 %, 36 PV
+  69,3 %, 38 PV 74,1 %, 42 PV 80,2 %.
+- Cartes du niveau 1 qui dominaient le balayage : Angelic Feather Cooldown 2 → 3 (écart +9,8 → +7,6) ; Pain
+  Suppression Cooldown 4/3 → 5/4.
+- Cartes débloquées aux niveaux 2 à 7, renforcées pour garder un gain en montant de niveau :
+  - Mind Sear DoT 4/6 → 5/7 à tous ;
+  - Luminous Barrier 12/16 → 14/18 Absorb ;
+  - SW: Death 6 (Execute 12) / 8 (17) → 7 (14) / 9 (18) ;
+  - Halo 18/22 → 22/26 à tous ;
+  - Shadow Mend soin 10/14 → 12/16 ;
+  - Empyreal Blaze 32/40 → 36/44 ;
+  - Void Eruption 4 + 4/4 + 5 par point → 6 + 5/6 + 6.
+- Notes du bot rebalayées avec ces nombres (`sweep=cards`, L7 neuf, PV 40, base 84,2 %, 500 expéditions).
+
+Pourquoi ces deux cartes de départ : le Priest perdait 3,1 PV par tour de combat normal, sur 4,35 tours.
+- Inner Fire 7 seul ramène la perte à 9,2 PV, mais les combats s'allongent (4,46 tours).
+- Smite 8 seul la ramène à 9,4 PV en 3,61 tours, mais elle remonte à 10,0 au niveau 1 une fois les PV
+  réglés pour retrouver le taux de victoire.
+- Les deux ensemble, chacun moins renforcé (Smite 8, Inner Fire 6) : 7,4 PV en 3,58 tours.
+
+Règles de classe (Atonement, Sacred Candle) non touchées.
+
+Essais annulés :
+- Inner Fire 7 seul : 91,4 % à 52 PV, combats plus longs.
+- Smite 8 seul : 10,0 PV par normal une fois les PV réglés.
+- Smite 7 + Inner Fire 6 : 9,2 PV par normal et 4,0 tours, au bord des deux cibles.
+- Inner Fire 7 + Smite 7 : 7,2 PV, mais 93,6 % à 52 PV ; il aurait fallu ≈ 30 PV.
+- Solace 4/6 → 3/5 : aucun effet au balayage (+9,4 dans les deux cas). Sa valeur vient du mana rendu, pas
+  des dégâts.
+
+Constat : un deck de départ plus fort réduit ce que tout le reste apporte.
+- Avec le nouveau deck et les anciennes notes, le Priest gagnait moins au niveau 7 exalté qu'au niveau 1
+  exalté (76,8 contre 79,4, 500 expéditions).
+- Avec les notes rebalayées et les cartes débloquées renforcées, le gain de niveau revient : +7,1 à Ligue
+  neuve.
+- Mesure intermédiaire à 38 PV (notes du 2e balayage) : L1 exalté 79,5, L7 exalté 81,5. L'apport de la Ligue
+  au Priest tombe de +7,3 à ≈ +5, et celui des niveaux à Ligue exaltée de +3,7 à ≈ +2.
+- Explication probable : les combats ordinaires coûtant peu, le Priest arrive presque intact au boss, qui
+  décide seul de l'expédition. Ce que la Ligue apporte entre les combats compte donc moins. À revoir sans la
+  Ligue.
+
+### Hunter : moins d'Absorb gratuit, plus de PV
+
+Changements : **Disengage 5/8 → 3/6 Absorb** ; **PV 41 → 50** ; notes du bot rebalayées (L7 neuf, PV 50,
+base 78,0 %). Les nouvelles notes font aussi bien que les anciennes : L1 neuf 65,0 contre 64,8, L7 neuf
+76,3 contre 76,9.
+
+Pourquoi l'Absorb plutôt que le contrôle : les combats normaux du Hunter sont déjà courts (2,8 tours), et
+c'est l'étourdissement de Freezing Trap (qui annule l'attaque qui la déclenche) qui lui évite les coups.
+Mais retoucher le contrôle coûte surtout contre le boss, immunisé à Stunned. Essais (1 000 expéditions,
+41 PV) :
+
+| Essai | L1 neuf | PV perdus par normal |
+|---|---|---|
+| départ | 67,1 | 4,3 |
+| Freezing Trap sans Demoralized (amélioration : Demoralized 1) | 50,3 | 4,4 |
+| Serpent Sting DoT 3/5 → 2/4 | 63,0 | 4,4 |
+| Disengage 4/7 | 55,2 | 5,1 |
+| Disengage 4/7 et Freezing Trap sans Demoralized | 37,1 | 5,1 |
+| **Disengage 3/6** | 40,6 | **6,2** |
+| **Disengage 3/6, 50 PV** | 66,7 | 6,2 |
+
+Le Demoralized de Freezing Trap est son seul effet contre le boss (−17 points sans lui) et ne change presque
+rien contre les normaux : il est gardé. Seul l'Absorb du deck de départ fait bouger les PV perdus par
+combat normal.
+
+### Cibles : bilan
+
+| Cible | Résultat |
+|---|---|
+| 6–9 PV perdus par combat normal (L1 neuf) | **Atteinte** : Priest 7,4, Warrior 9,0, Mage 6,2, Rogue 6,3, Hunter 6,1 |
+| Combat normal 2,7–4 tours | **Atteinte** : de 2,74 (Rogue) à 3,58 (Priest) |
+| L1 neuf 62–72 %, écart ≤ 6 | **Atteinte** : de 65,0 à 70,0 %, écart 5,0 |
+| Gain du niveau 1 au niveau 7 (Ligue neuve) | **Chaque classe gagne** : de +2,8 (Rogue) à +12,6 (Warrior) |
+| L7 exalté, clés 1 à 5 | Non mesurés (Ligue supprimée, à refaire) |
+
+### Limites propres à cette passe
+
+- **Priest à 36 PV** : c'est la classe la plus fragile sur le papier.
+  - Le boss lui coûte 43,5 PV en moyenne, plus que ses PV, car les défaites comptent tous les PV restants.
+  - Un combat normal lui coûte 21 % de ses PV, contre 13 % pour le Rogue et 12 % pour le Hunter.
+  - Un joueur qui lit moins bien les intentions que le bot le sentira davantage.
+- **Hunter** : il perd toujours très peu de PV par élite (5,4, contre 9 à 23 pour les autres classes), car
+  Freezing Trap arrête les gros coups des élites, qui ne sont pas immunisés. Ce point n'était pas visé par
+  cette passe.
+- **Mage** au niveau 7 neuf : 5,9 PV par combat normal, juste sous 6 (6,2 au niveau 1). Le Rogue de
+  référence est lui-même à 5,8 au niveau 7 exalté.
+- **Bruit du balayage** : à 500 expéditions, l'écart d'une carte bouge de ± 4 d'un balayage à l'autre sans
+  que la carte elle-même change (Devouring Plague +3,8 puis +8,8 ; Void Eruption +8,0 puis +0,2). Les notes sont donc à
+  ± 2.
+- Les tests (`Sim/tests.lua`, `Sim/tests_expedition.lua`, `Sim/ui_harness.lua`) lisent désormais les nombres
+  des cartes et les PV de départ dans les données au lieu de les recopier.
 
 
 # Équilibrage de l'acte 1 (piste A, historique : Prêtre seul, runner linéaire)

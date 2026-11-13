@@ -29,16 +29,16 @@ end
 
 card("smite", {
   level = 1, name = "Smite", cost = 1, type = "attack", school = "holy", rarity = "basic", path = "start",
-  target = "enemy", effects = { { "damage", 6 } },
-  text = "Deal 6.",
-  up = { effects = { { "damage", 9 } }, text = "Deal 9." },
+  target = "enemy", effects = { { "damage", 8 } },
+  text = "Deal 8.",
+  up = { effects = { { "damage", 11 } }, text = "Deal 11." },
 })
 
 card("inner_fire", {
   level = 1, name = "Inner Fire", cost = 1, type = "skill", school = "holy", rarity = "basic", path = "start",
-  effects = { { "absorb", 5 } },
-  text = "Gain 5 Absorb.",
-  up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
+  effects = { { "absorb", 6 } },
+  text = "Gain 6 Absorb.",
+  up = { effects = { { "absorb", 9 } }, text = "Gain 9 Absorb." },
 })
 
 card("pw_shield", {
@@ -79,9 +79,9 @@ card("penance", {
 
 card("pain_suppression", {
   level = 1, name = "Pain Suppression", cost = 1, type = "skill", school = "holy", rarity = "rare", path = "discipline",
-  cooldown = 4, effects = { { "apply", "halved", 1, self = true } },
-  text = "Damage taken halved until next turn.\nCooldown 4.",
-  up = { cooldown = 3, text = "Damage taken halved until next turn.\nCooldown 3." },
+  cooldown = 5, effects = { { "apply", "halved", 1, self = true } },
+  text = "Damage taken halved until next turn.\nCooldown 5.",
+  up = { cooldown = 4, text = "Damage taken halved until next turn.\nCooldown 4." },
 })
 
 local function solaceMana(c, ctx)
@@ -101,17 +101,17 @@ card("solace", {
 
 card("angelic_feather", {
   level = 1, name = "Angelic Feather", cost = 0, type = "skill", school = "holy", rarity = "common", path = "discipline",
-  cooldown = 2, effects = { { "absorb", 2 }, { "draw", 1 } },
-  text = "Gain 2 Absorb.\nDraw 1.\nCooldown 2.",
-  up = { effects = { { "absorb", 4 }, { "draw", 1 } }, text = "Gain 4 Absorb.\nDraw 1.\nCooldown 2." },
+  cooldown = 3, effects = { { "absorb", 2 }, { "draw", 1 } },
+  text = "Gain 2 Absorb.\nDraw 1.\nCooldown 3.",
+  up = { effects = { { "absorb", 4 }, { "draw", 1 } }, text = "Gain 4 Absorb.\nDraw 1.\nCooldown 3." },
 })
 
 card("luminous_barrier", {
   level = 4, name = "Luminous Barrier", cost = 2, type = "skill", school = "holy", rarity = "common", path = "discipline",
-  cooldown = 2, effects = { { "absorb", 12 }, { "apply", "atonement", 1, self = true } },
-  text = "Gain 12 Absorb.\nGain Atonement 1 ⌛\nCooldown 2.",
-  up = { effects = { { "absorb", 16 }, { "apply", "atonement", 1, self = true } },
-    text = "Gain 16 Absorb.\nGain Atonement 1 ⌛\nCooldown 2." },
+  cooldown = 2, effects = { { "absorb", 14 }, { "apply", "atonement", 1, self = true } },
+  text = "Gain 14 Absorb.\nGain Atonement 1 ⌛\nCooldown 2.",
+  up = { effects = { { "absorb", 18 }, { "apply", "atonement", 1, self = true } },
+    text = "Gain 18 Absorb.\nGain Atonement 1 ⌛\nCooldown 2." },
 })
 
 card("schism", {
@@ -125,10 +125,10 @@ card("schism", {
 
 card("shadow_mend", {
   level = 6, name = "Shadow Mend", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "discipline",
-  exhaust = true, effects = { { "heal", 10 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
-  text = "Heal 10.\n+1 Insanity.\nGain DoT 2\nExhaust.",
-  up = { effects = { { "heal", 14 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
-    text = "Heal 14.\n+1 Insanity.\nGain DoT 2\nExhaust." },
+  exhaust = true, effects = { { "heal", 12 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
+  text = "Heal 12.\n+1 Insanity.\nGain DoT 2\nExhaust.",
+  up = { effects = { { "heal", 16 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
+    text = "Heal 16.\n+1 Insanity.\nGain DoT 2\nExhaust." },
 })
 
 card("evangelism", {
@@ -226,17 +226,17 @@ card("vampiric_touch", {
 
 card("mind_sear", {
   level = 2, name = "Mind Sear", cost = 1, type = "skill", school = "shadow", rarity = "common", path = "shadow",
-  effects = { { "apply", "pain", 4, all = true }, { "res", 1 } },
-  text = "+1 Insanity.\nApply DoT 4 to all",
-  up = { effects = { { "apply", "pain", 6, all = true }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 6 to all" },
+  effects = { { "apply", "pain", 5, all = true }, { "res", 1 } },
+  text = "+1 Insanity.\nApply DoT 5 to all",
+  up = { effects = { { "apply", "pain", 7, all = true }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 7 to all" },
 })
 
 card("sw_death", {
   level = 4, name = "SW: Death", cost = 1, type = "attack", school = "shadow", rarity = "uncommon", path = "shadow",
-  target = "enemy", effects = { { "damage", 6, more = { { 6, "execute" } } }, { "res", 1 } },
-  text = "Deal 6.\nExecute: deal 12.\n+1 Insanity.",
-  up = { effects = { { "damage", 8, more = { { 9, "execute" } } }, { "res", 1 } },
-    text = "Deal 8.\nExecute: deal 17.\n+1 Insanity." },
+  target = "enemy", effects = { { "damage", 7, more = { { 7, "execute" } } }, { "res", 1 } },
+  text = "Deal 7.\nExecute: deal 14.\n+1 Insanity.",
+  up = { effects = { { "damage", 9, more = { { 9, "execute" } } }, { "res", 1 } },
+    text = "Deal 9.\nExecute: deal 18.\n+1 Insanity." },
 })
 
 card("psychic_scream", {
@@ -248,9 +248,9 @@ card("psychic_scream", {
 
 card("void_eruption", {
   level = 7, name = "Void Eruption", cost = 1, type = "attack", school = "shadow", rarity = "rare", path = "shadow",
-  target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 4, per = { 4, "surge" } } },
-  text = "Surge: deal 4 + 4 per Insanity.",
-  up = { effects = { { "surge" }, { "damage", 4, per = { 5, "surge" } } }, text = "Surge: deal 4 + 5 per Insanity." },
+  target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 6, per = { 5, "surge" } } },
+  text = "Surge: deal 6 + 5 per Insanity.",
+  up = { effects = { { "surge" }, { "damage", 6, per = { 6, "surge" } } }, text = "Surge: deal 6 + 6 per Insanity." },
 })
 
 -- Sacré -----------------------------------------------------------------------
@@ -313,10 +313,10 @@ card("renew", {
 
 card("halo", {
   level = 4, name = "Halo", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  cast = true, effects = { { "damage", 18, all = true }, { "apply", "regen", 3, self = true } },
-  text = "Cast.\nDeal 18 to all.\nGain Regen 3",
-  up = { effects = { { "damage", 22, all = true }, { "apply", "regen", 4, self = true } },
-    text = "Cast.\nDeal 22 to all.\nGain Regen 4" },
+  cast = true, effects = { { "damage", 22, all = true }, { "apply", "regen", 3, self = true } },
+  text = "Cast.\nDeal 22 to all.\nGain Regen 3",
+  up = { effects = { { "damage", 26, all = true }, { "apply", "regen", 4, self = true } },
+    text = "Cast.\nDeal 26 to all.\nGain Regen 4" },
 })
 
 card("flash_heal", {
@@ -328,9 +328,9 @@ card("flash_heal", {
 
 card("empyreal_blaze", {
   level = 6, name = "Empyreal Blaze", cost = 2, type = "attack", school = "holy", rarity = "uncommon", path = "holy",
-  target = "enemy", cast = true, effects = { { "damage", 32 }, { "apply", "armor_broken", 2 } },
-  text = "Cast.\nDeal 32.\nApply Sundered 2 ⌛",
-  up = { effects = { { "damage", 40 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 40.\nApply Sundered 2 ⌛" },
+  target = "enemy", cast = true, effects = { { "damage", 36 }, { "apply", "armor_broken", 2 } },
+  text = "Cast.\nDeal 36.\nApply Sundered 2 ⌛",
+  up = { effects = { { "damage", 44 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 44.\nApply Sundered 2 ⌛" },
 })
 
 -- Apothéose : une pioche en plus ne valait rien (3 mana pour 5 cartes à 1 mana : la main
@@ -425,7 +425,7 @@ relic("truefaith_vestments", {
 
 -- Définition de classe (contrat : docs/classes.md).
 ns.Classes.priest = {
-  id = "priest", name = "Priest", order = 1, hp = 52,
+  id = "priest", name = "Priest", order = 1, hp = 36,
   -- Insanity : sans plafond, gardée d'un tour à l'autre (GDD, décision du 11/11/2026)
   resource = { id = "insanity", cap = nil, keep = true },
   deck = {
@@ -442,12 +442,12 @@ ns.Classes.priest = {
   bot = {
     resValue = 1.5,
     rating = {
-      solace = 11, devouring_plague = 10, luminous_barrier = 9.5, psychic_scream = 8.5, mind_sear = 8,
-      angelic_feather = 8, rapture = 8, spirit_of_redemption = 8, pain_suppression = 8, chastise = 8,
-      schism = 7.5, shadowform = 7.5, radiance = 7.5, greater_heal = 7, void_eruption = 6.5,
-      mind_blast = 6.5, sw_death = 6, evangelism = 6, silence = 6, renew = 6, flash_heal = 6, mind_flay = 6,
-      vampiric_touch = 6, holy_nova = 6, penance = 5.5, halo = 5.5, shadow_mend = 5.5, empyreal_blaze = 5,
-      holy_fire = 5, apotheosis = 5,
+      angelic_feather = 9, solace = 9, psychic_scream = 8, mind_blast = 7.5, mind_sear = 7.5,
+      pain_suppression = 7.5, silence = 7.5, chastise = 7, greater_heal = 7, rapture = 7, flash_heal = 6.5,
+      luminous_barrier = 6.5, schism = 6.5, shadow_mend = 6, spirit_of_redemption = 6, apotheosis = 5.5,
+      devouring_plague = 5.5, mind_flay = 5.5, penance = 5.5, radiance = 5.5, vampiric_touch = 5.5,
+      empyreal_blaze = 5, shadowform = 5, sw_death = 5, void_eruption = 5, evangelism = 4.5, halo = 4.5,
+      holy_fire = 4, holy_nova = 4, renew = 3.5,
     },
     upgrade = { smite = 2.5, inner_fire = 2, pw_shield = 1.5, sw_pain = 1.5 },
     upgradeRun = { smite = 2.5, inner_fire = 2 }, -- ancien coureur (Sim/run.lua)

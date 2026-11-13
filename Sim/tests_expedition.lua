@@ -332,9 +332,9 @@ end
 test("rencontre : ferme des Saldean (soupe, recette)", function()
   local exp = newExp()
   enterEvent(exp, "saldean_farm")
-  exp.hp = 30
+  exp.hp = exp.maxHp - 15
   assert(X.act(exp, { "choose", 1 }))
-  eq(exp.hp, 40)
+  eq(exp.hp, exp.maxHp - 5)
   eq(X.act(exp, { "choose", 2 }), false, "un seul choix")
   assert(X.act(exp, { "leave" }))
   eq(exp.phase, "map")
@@ -870,7 +870,7 @@ test("rencontres : conditions de déclenchement (PV, étape, clé, drapeau)", fu
   eq(count(pool, "harvest_watcher"), 1, "PV pleins : moissonneur")
   eq(count(pool, "tobin_scout"), 0, "sans drapeau : pas de suite")
   eq(count(pool, "tobin_thief"), 1, "compte neuf : premier temps")
-  exp.hp, exp.floor, exp.key = 20, 5, 2
+  exp.hp, exp.floor, exp.key = math.floor(exp.maxHp * 0.4), 5, 2
   exp.flags.tobin_spared = true
   pool = X.eventPool(exp)
   eq(count(pool, "herbalist"), 1)

@@ -33,9 +33,9 @@ card("arcane_shot", {
 
 card("disengage", {
   level = 1, name = "Disengage", cost = 1, type = "skill", rarity = "basic", path = "start",
-  effects = { { "absorb", 5 } },
-  text = "Gain 5 Absorb.",
-  up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
+  effects = { { "absorb", 3 } },
+  text = "Gain 3 Absorb.",
+  up = { effects = { { "absorb", 6 } }, text = "Gain 6 Absorb." },
 })
 
 card("serpent_sting", {
@@ -420,7 +420,7 @@ relic("rhokdelar", {
 
 ns.Classes.hunter = {
   -- PV : 65 dans la fiche et les décisions (« à régler par simulation ») ; 55 après la simulation de fumée
-  id = "hunter", name = "Hunter", order = 5, hp = 41,
+  id = "hunter", name = "Hunter", order = 5, hp = 50,
   resource = { id = "frenzy", cap = 5, keep = true },
   deck = {
     "arcane_shot", "arcane_shot", "arcane_shot", "arcane_shot",
@@ -435,12 +435,12 @@ ns.Classes.hunter = {
     -- un point de Frenzy : +1 à chaque attaque du familier à venir, moins la baisse de 1 par tour
     resValue = 6,
     rating = {
-      spirit_bond = 13.5, the_beast_within = 13, dire_beast = 11.5, counter_shot = 10.5, feign_death = 10.5,
-      wyvern_sting = 8, growl = 7, intimidation = 6.5, explosive_trap = 6.5, multi_shot = 6, rapid_fire = 6,
-      barbed_shot = 6, hunters_mark = 5.5, kill_command = 5.5, wailing_arrow = 5, trueshot_aura = 5,
-      readiness = 4.5, immolation_trap = 4.5, bestial_wrath = 4, concussive_shot = 4, frost_trap = 3.5,
-      raptor_strike = 3, volley = 3, steady_shot = 3, aimed_shot = 3, counterattack = 3, cobra_shot = 3,
-      entrapment = 3, resourcefulness = 3, lock_and_load = 3,
+      dire_beast = 10.5, the_beast_within = 10.5, feign_death = 8.5, wyvern_sting = 8.5, counter_shot = 8,
+      growl = 8, multi_shot = 7.5, intimidation = 7, kill_command = 7, spirit_bond = 7, rapid_fire = 6.5,
+      explosive_trap = 5.5, counterattack = 5, wailing_arrow = 5, concussive_shot = 4.5, raptor_strike = 4.5,
+      cobra_shot = 4, trueshot_aura = 4, barbed_shot = 3.5, bestial_wrath = 3.5, aimed_shot = 3,
+      entrapment = 3, frost_trap = 3, hunters_mark = 3, immolation_trap = 3, lock_and_load = 3,
+      readiness = 3, resourcefulness = 3, steady_shot = 3, volley = 3,
     },
     upgrade = { arcane_shot = 2.5, disengage = 2, serpent_sting = 1.5, freezing_trap = 1.5 },
     remove = { disengage = 1, arcane_shot = 1.5 },
