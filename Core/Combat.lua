@@ -529,7 +529,16 @@ local function tickPeriodic(c, unit)
   end
   local regen = unit.st.regen
   if regen and regen > 0 then
-    Combat.heal(c, unit, regen)
+    -- Regen du joueur : valeur soignée (crochet « regenHeal », 0 = ne soigne pas : Echo of Light), puis
+    -- notification « onRegenTick » (valeur du tic) ; la Regen baisse ensuite de 1 comme d'habitude
+    if unit.side == "player" then
+      local h = Combat.modify(c, "regenHeal", regen)
+      if h > 0 then Combat.heal(c, unit, h) end
+      if not c.result then Combat.fire(c, "onRegenTick", regen) end
+      if c.result or unit.dead then return end
+    else
+      Combat.heal(c, unit, regen)
+    end
     if regen - 1 > 0 then unit.st.regen = regen - 1 else unit.st.regen = nil end
   end
 end
@@ -1473,7 +1482,14 @@ function Combat.canPlay(c, idx)
   if d.trap and #c.traps >= Combat.modify(c, "trapSlots", Combat.TRAP_SLOTS)
       and not Combat.trapLaunch(c, d, inst) then return false, "traps" end
   if not allowed(c, d) then return false, "forbidden" end
+  -- crochet « canPlay » (d, inst) : vrai par défaut ; une chaîne = injouable, avec cette raison (Titan's Grip)
+  local veto = Combat.modify(c, "canPlay", true, d, inst)
+  if veto ~= true then return false, veto or "forbidden" end
   if d.canPlay and not d.canPlay(c, inst) then return false, "condition" end
+  -- valeur modifiée « canPlay » (d, inst) : vrai par défaut ; une chaîne rend la carte injouable, avec
+  -- cette raison (Voidform)
+  local can = Combat.modify(c, "canPlay", true, d, inst)
+  if can ~= true then return false, can or "forbidden" end
   return true
 end
 
@@ -1506,7 +1522,7 @@ function Combat.legalPlays(c)
       local both = d.spend and (c.player.res or 0) >= d.spend
       if Combat.targetOf(c, d, c.hand[i]) == "enemy" then
         for j = 1, #c.enemies do
-          if not c.enemies[j].dead then
+          if not c.enemies[j].dead and Combat.castFits(c, d, c.hand[i], c.enemies[j]) then
             list[#list + 1] = { i, j }
             if both then list[#list + 1] = { i, j, true } end
           end
@@ -1520,10 +1536,10 @@ function Combat.legalPlays(c)
   return list
 end
 
--- Coût en PV d'une carte (champ payHp, crochet « payHp » : Demonic Rune…), 0 sans coût.
+-- Coût en PV d'une carte (champ payHp, crochet « payHp » : Demonic Rune… ; le crochet est aussi
+-- interrogé pour une carte sans payHp, à partir de 0 : Shadow Covenant), 0 sans coût.
 function Combat.payHpOf(c, d, inst)
-  if not d.payHp then return 0 end
-  return max(0, Combat.modify(c, "payHp", d.payHp, d, inst))
+  return max(0, Combat.modify(c, "payHp", d.payHp or 0, d, inst))
 end
 
 -- Retire le pouvoir n° i (fin de durée, remplacé dans son emplacement) : il part à la défausse, ou
@@ -1653,8 +1669,15 @@ end
 -- Instant (état commun : Mage, Shaman) : la prochaine carte Cast se résout tout de suite, sans
 -- emplacement, sans pouvoir être interrompue ; crochet « instantCast » pour une autre source.
 -- commit = vrai au jeu (consomme une charge d'Instant), faux pour une simple question (canPlay).
-function Combat.isInstant(c, d, inst, commit)
+-- target (facultatif) : l'ennemi visé, lu par le crochet dans c.aim (uid ; nil = cible encore inconnue).
+-- Le crochet passe AVANT l'état Instant, qui n'est pas consommé quand une règle fait partir la carte
+-- (Fingers of Frost).
+function Combat.isInstant(c, d, inst, commit, target)
   if not d.cast then return false end
+  c.aim = target and target.uid or nil
+  local rule = Combat.modify(c, "instantCast", false, d, inst, commit)
+  c.aim = nil
+  if rule then return true end
   local p = c.player
   if (p.st.instant or 0) > 0 then
     if commit then
@@ -1664,7 +1687,12 @@ function Combat.isInstant(c, d, inst, commit)
     end
     return true
   end
-  return Combat.modify(c, "instantCast", false, d, inst, commit) and true or false
+  return false
+end
+
+-- Une carte Cast tient-elle sur cette cible ? Emplacements libres, ou départ immédiat sur elle.
+function Combat.castFits(c, d, inst, target)
+  return not d.cast or Combat.castCount(c) < Combat.castSlots(c) or Combat.isInstant(c, d, inst, false, target)
 end
 
 -- Joue la carte n° idx de la main sur l'ennemi n° tIdx (si elle vise).
@@ -1687,12 +1715,16 @@ playBody = function(c, idx, tIdx, opts)
   local d = Card.def(inst)
   local target
   local launch = d.trap and Combat.trapLaunch(c, d, inst)
+  -- carte qui part en Cast sans l'être (crochet « castAs » (d, inst), faux par défaut : Inner Focus)
+  local castAs = not d.cast and not d.trap and not d.power and Combat.modify(c, "castAs", false, d, inst) or false
   if d.target == "enemy" or launch then
     target = c.enemies[tIdx or 0]
     if not target or target.dead then return false, "target" end
     -- ciblage : une classe peut rediriger la cible (crochet « target ») ; dernière cible retenue
     target = Combat.modify(c, "target", target, d, inst)
     if not target or target.dead then return false, "target" end
+    -- emplacements pleins : la carte Cast doit partir tout de suite sur CETTE cible
+    if not Combat.castFits(c, d, inst, target) then return false, "casting" end
     c.player.lastTarget = target.uid
   end
   local cost = Combat.cost(c, inst)
@@ -1732,7 +1764,7 @@ playBody = function(c, idx, tIdx, opts)
     Combat.fire(c, "onTrapSet", inst)
     return true
   end
-  if d.cast and not Combat.isInstant(c, d, inst, true) then
+  if castAs or (d.cast and not Combat.isInstant(c, d, inst, true, target)) then
     local entry = { card = inst, target = target and target.uid, spent = spent or nil }
     if c.player.cast then
       local more = c.player.castMore or {}

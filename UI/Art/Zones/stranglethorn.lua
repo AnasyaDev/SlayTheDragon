@@ -425,7 +425,7 @@ end
 -- ({ x, largeur, hauteur }), canopy = { far = { y, r, amp }, mid = { … } }, trees, palms, road, water, cliffs,
 -- deck (quai), props ({ genre, … }), bushes ({ x, y, r }), fronds ({ x, y, échelle, a0, a1, n }), vines,
 -- overhang, rays, flies (lucioles).
-local function jungle(f, g, K, sp, pal)
+local function jungle(K, f, g, sp, pal)
   local P = painter(f, g, K, pal)
   local box, vgrad, oval, blur, rgb, mix, hash = K.box, K.vgrad, K.oval, K.blur, K.rgb, K.mix, K.hash
   local Wd, Hd = K.W, K.H
@@ -572,10 +572,10 @@ local function jungle(f, g, K, sp, pal)
     elseif k == "ship" then P.ship(p[2], p[3], p[4], p[5] or "#1d1d22", { LV.canMidHi, LV.trunk, LV.crown })
     elseif k == "hut" then P.hut(p[2], p[3], p[4], PROP_LV)
     elseif k == "palm" then P.palm(p[2], p[3], p[4], p[5], p[6] or 1, pal.trunkNear or pal.trunk, pal.crownNear or pal.crown, LV.p1, LV.p2)
-    elseif K.props[k] then
+    elseif (ns.Scene and ns.Scene.PROPS or {})[k] then
       -- accessoires communs du peintre (tente, foyer, charrette) aux couleurs de la jungle
       blur(f, g, LV.groundHi, pal.groundDark[1], p[2] + 6, p[3] - 1, 90 * (p[4] or 1), 14 * (p[4] or 1), 0.5)
-      K.props[k](f, g, PROP_LV, pal.mid, pal, p[2], p[3], p[4] or 1, p[5])
+      ns.Scene.PROPS[k](f, g, PROP_LV, pal.mid, pal, p[2], p[3], p[4] or 1, p[5])
     end
   end
   -- voile du bas (sol des personnages)

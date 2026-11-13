@@ -367,18 +367,24 @@ local function fence(f, g, P, c, x, y, x2, y2)
   end
 end
 
--- Formes du peintre prêtées aux décors des zones (Art.paintings[clé].draw, UI/Art/Zones/<zone>.lua) : un
--- paysage qui n'est pas fait de champs (jungle, marais, montagne) se peint lui-même avec les mêmes formes,
--- les mêmes couches (LV) et la même suite fixe (hash), sans toucher à ce fichier.
-S.paintKit = { LV = LV, W = S.W, H = S.DECOR_H, hash = hash, rgb = rgb, mix = mix, withAlpha = withAlpha,
-  box = box, vgrad = vgrad, oval = oval, blur = blur, bar = bar, diamond = diamond, tri = tri, props = PROPS,
-  fence = fence }
+-- Plans propres à une zone : Art.paintings[clé].layers = { skyline = f, ground = f, front = f }, appelés
+-- avec (kit, cadre, g, entrée, palette) après les collines lointaines (skyline : montagnes), après la route
+-- (ground : coulées, rochers, au sol) et à la fin (front : premier plan). Le kit donne les formes et les
+-- niveaux du peintre ; S.PROPS est le registre des accessoires (une zone peut y ajouter les siens).
+-- `furrows = false` : pas de rangs de champ sur le sol proche (sol de cendres, marais…).
+S.PROPS = PROPS
+S.paintKit = { LV = LV, box = box, vgrad = vgrad, oval = oval, blur = blur, bar = bar, diamond = diamond,
+  tri = tri, hash = hash, rgb = rgb, mix = mix, withAlpha = withAlpha, W = S.W, H = S.DECOR_H }
+local function zoneLayer(sp, name, f, g, pal)
+  local fn = sp.layers and sp.layers[name]
+  if fn then fn(S.paintKit, f, g, sp, pal) end
+end
 
--- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions. sp.draw(f, g, kit, sp,
--- palette) : décor peint par sa zone avec S.paintKit, à la place des plans ci-dessous.
+-- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions. sp.draw(kit, f, g, sp,
+-- palette) : paysage peint en entier par sa zone (jungle de Stranglethorn), à la place des plans ci-dessous.
 function S.landscape(f, g, sp)
   local pal = Art.palettes[sp.pal] or Art.palettes.westfall
-  if sp.draw then return sp.draw(f, g, S.paintKit, sp, pal) end
+  if sp.draw then return sp.draw(S.paintKit, f, g, sp, pal) end
   local Wd, Hd, hz, fl = S.W, S.DECOR_H, sp.horizon or 190, sp.field or 228
   -- ciel : deux dégradés
   local sk = pal.sky
@@ -418,6 +424,7 @@ function S.landscape(f, g, sp)
       for _, b in ipairs(row[1]) do oval(f, g, row[2], row[3], b[1], hz, b[2], b[3] * 2) end
     end
   end
+  zoneLayer(sp, "skyline", f, g, pal)
   -- colline du plan moyen (Sentinel Hill) et son reflet
   if sp.mound then
     local m = sp.mound
@@ -474,7 +481,7 @@ function S.landscape(f, g, sp)
   local fd, fli = pal.furrowDark, pal.furrowLight
   for k = -24, 24 do
     local xa, xb = vx + k * 6, vx + k * 66
-    if k ~= 0 and xb > -260 and xb < Wd + 260 then
+    if k ~= 0 and xb > -260 and xb < Wd + 260 and sp.furrows ~= false then
       local segs = { { 0, 0.3, 0.9 }, { 0.3, 0.62, 1.6 }, { 0.62, 1.04, 2.6 } }
       for _, sg in ipairs(segs) do
         local x1, y1 = xa + (xb - xa) * sg[1], fl + (Hd - fl) * sg[1]
@@ -525,6 +532,7 @@ function S.landscape(f, g, sp)
       PROPS[kind](f, g, LV[p[5]] or LV.mid, pal[p[5]] or pal.mid, pal, p[2], p[3], p[4] or 1, p[6])
     end
   end
+  zoneLayer(sp, "ground", f, g, pal)
   -- voile du bas (sol des personnages) et épis du premier plan
   local gr = pal.ground
   vgrad(f, g, LV.ground, withAlpha(gr[1], 0), withAlpha(gr[1], gr[2]), 0, Hd - 128, Wd, 128)
@@ -550,6 +558,7 @@ function S.landscape(f, g, sp)
       end
     end
   end
+  zoneLayer(sp, "front", f, g, pal)
 end
 
 ---------------------------------------------------------------------------

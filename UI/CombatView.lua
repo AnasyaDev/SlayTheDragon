@@ -439,7 +439,7 @@ function V:Build(parent)
     local rd = c and ns.Classes[c.class] and ns.Classes[c.class].resource
     local rid = rd and rd.id or "insanity"
     tt:AddLine(Art.keywordLine("res:" .. rid), 1, 1, 1, true)
-    if rd and rd.cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, rd.cap), 0.8, 0.8, 0.8) end
+    if rd and rd.cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, Combat.resCap(c) or rd.cap), 0.8, 0.8, 0.8) end
   end, "ANCHOR_RIGHT")
   self.resource = dem
   self.demence = dem -- ancien nom
