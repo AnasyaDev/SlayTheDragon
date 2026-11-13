@@ -201,7 +201,7 @@ function Rogue.namesPlayed(c)
 end
 
 local function bossOrStun(c, t, d)
-  if t.boss then
+  if Combat.stunImmune(t) then
     local n = Combat.modify(c, "apply", 2, "demoralized", t, d)
     if n > 0 then Combat.applyStatus(c, t, "demoralized", n) end
   else
@@ -328,7 +328,7 @@ function Rogue.stealthLeft(c)
 end
 
 -- Kidney Shot : une carte à cible dont le Surge dépense N Combo ou plus pose ensuite Stunned 1 ⌛ sur sa
--- cible si elle vit ; un boss reçoit Demoralized 2 ⌛.
+-- cible si elle vit ; un ennemi qu'on ne peut pas étourdir (boss, Indomitable) reçoit Demoralized 2 ⌛.
 EH.kidney_shot = {
   onSurge = function(c, src, n, ctx)
     if n >= num("kidney_shot", src) and ctx and ctx.target and ctx.def and ctx.def.target == "enemy" then
@@ -391,7 +391,7 @@ for i, k in ipairs(Rogue.EPIC.deflection) do
     text = ("%d, then %d, %d, %d in a turn, even above Parry 3."):format(Rogue.riposteDamage(1, up),
       Rogue.riposteDamage(2, up), Rogue.riposteDamage(3, up), Rogue.riposteDamage(4, up)) })
 end
-L.keyword("kidneyBoss", { name = "Boss", pattern = "^Surge of %d%+? Combo: apply Stunned",
+L.keyword("kidneyBoss", { name = "Can't be Stunned", pattern = "^Surge of %d%+? Combo: apply Stunned",
   text = "gets Demoralized 2 ⌛ instead of Stunned." })
 L.keyword("danseNames", { name = "Names", pattern = "^Attack hits: %+%d per other card name",
   text = "each different card played this turn counts once." })

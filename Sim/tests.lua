@@ -31,6 +31,8 @@ ns.Enemies.test_pusher = { name = "Cogneur vif", hp = 100,
   pattern = { "kick" } }
 ns.Enemies.test_boss = { name = "Boss", hp = 100, boss = true,
   moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
+ns.Enemies.test_indomitable = { name = "Élite", hp = 100, elite = true, indomitable = true,
+  moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
 
 local function deckOf(...)
   local d = {}
@@ -2765,11 +2767,15 @@ do
     eq(hp - c.enemies[1].hp, Card.defById("frostbolt").effects[1][2], "Frostbolt sans Cast")
   end)
 
-  test("Bag of Marbles : Stunned 1 sur un ennemi au hasard, jamais un boss, reproductible", function()
+  test("Bag of Marbles : Stunned 1 sur un ennemi au hasard, jamais un boss ni un Indomitable, reproductible", function()
     local c = withRelic("bag_of_marbles", { "smite" }, { "test_boss", "test_dummy" })
     eq(c.enemies[1].st.stunned, nil, "boss épargné"); eq(c.enemies[2].st.stunned, 1)
     c = withRelic("bag_of_marbles", { "smite" }, { "test_boss" })
     eq(c.enemies[1].st.stunned, nil, "boss seul : rien")
+    c = withRelic("bag_of_marbles", { "smite" }, { "test_indomitable", "test_dummy" })
+    eq(c.enemies[1].st.stunned, nil, "Indomitable épargné"); eq(c.enemies[2].st.stunned, 1)
+    c = withRelic("bag_of_marbles", { "smite" }, { "test_indomitable" })
+    eq(c.enemies[1].st.stunned, nil, "Indomitable seul : rien")
     local a = withRelic("bag_of_marbles", { "smite" }, { "test_dummy", "test_dummy", "test_dummy" })
     local b = withRelic("bag_of_marbles", { "smite" }, { "test_dummy", "test_dummy", "test_dummy" })
     local n = 0

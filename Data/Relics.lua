@@ -292,14 +292,14 @@ relic("talisman_of_ephemeral_power", {
 
 relic("bag_of_marbles", {
   name = "Bag of Marbles", rarity = "rare", tier = 1,
-  text = "At the start of each combat, apply Stunned 1 to a random enemy (not a boss).",
+  text = "Start of each combat: apply Stunned 1 to a random enemy that can be Stunned.",
   hooks = {
     -- tirage par le flux « misc » du combat (sauvegardé, cloné)
     onCombatStart = function(c, src)
       local list = {}
       for i = 1, #c.enemies do
         local e = c.enemies[i]
-        if not e.dead and not e.boss then list[#list + 1] = e end
+        if not e.dead and not Combat.stunImmune(e) then list[#list + 1] = e end
       end
       if #list == 0 then return end
       Combat.applyStatus(c, list[ns.Rng.int(c.rng.misc, 1, #list)], "stunned", 1)

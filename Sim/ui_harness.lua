@@ -9483,7 +9483,7 @@ do
   local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
   local RD = ns.Rogue.riposteDamage
   check("infobulles : riposte détaillée (quatre premières du tour), boss de Kidney Shot, noms de Danse Macabre",
-    all:find(("Riposte: %d, then %d, %d, %d"):format(RD(1), RD(2), RD(3), RD(4)), 1, true) and all:find("Boss: gets Demoralized 2", 1, true)
+    all:find(("Riposte: %d, then %d, %d, %d"):format(RD(1), RD(2), RD(3), RD(4)), 1, true) and all:find("Can't be Stunned: gets Demoralized 2", 1, true)
     and all:find("each different card played this turn counts once", 1, true), all)
 
   -- 2. combat avec Deflection : l'épique en jeu dès la première main, ligne des ripostes du tour

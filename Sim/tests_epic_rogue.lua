@@ -30,6 +30,8 @@ ns.Enemies.ter_hitter = { name = "Cogneur", hp = 200,
   moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10 } } } }, pattern = { "hit" } }
 ns.Enemies.ter_boss = { name = "Chef", hp = 300, boss = true,
   moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
+ns.Enemies.ter_indomitable = { name = "Élite", hp = 200, elite = true, indomitable = true,
+  moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
 
 local EPICS = { "deflection", "doomblade", "atrophic_poison", "echoing_reprimand", "subterfuge", "kidney_shot",
   "danse_macabre" }
@@ -432,6 +434,13 @@ test("Kidney Shot : Surge du seuil étourdit la cible vivante ; un de moins ne f
   u.player.res = k2
   play(u, "rupture", 1)
   eq(u.enemies[1].st.stunned, 1, "Skill à cible aussi")
+end)
+
+test("Kidney Shot : élite Indomitable = Demoralized 2 ⌛, jamais Stunned (Combat.stunImmune)", function()
+  local c = setup("kidney_shot", { "eviscerate" }, { encounter = { "ter_indomitable" } })
+  c.player.res = 5
+  play(c, "eviscerate", 1)
+  eq(c.enemies[1].st.stunned, nil, "Indomitable épargné"); eq(c.enemies[1].st.demoralized, 2)
 end)
 
 test("Kidney Shot : boss = Demoralized 2 ⌛ ; Between the Eyes = Stunned 2 ; cible morte ou Surge sans cible : rien", function()
