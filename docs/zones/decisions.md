@@ -77,8 +77,13 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
   80 % à Westfall à environ 50 % à Blackrock Mountain, en descendant à chaque zone.
 - **Indomitable sur les élites de Blackrock Mountain**, décision du joueur du 14/11/2026 : Panzor, Gyth / Rend et
   Vaelastrasz ne peuvent pas être étourdis (trait affiché « Indomitable », `Can't be Stunned.`).
+- **Stun Resistant sur les élites des zones 1 à 6** (joueur, 14/11/2026) : Stunned 1 au plus, puis 2 tours de
+  résistance après un tour perdu ; sbires normaux, boss et Indomitable inchangés (`docs/classes/decisions.md`).
 
 - **Les PV perdus se lisent en PV nets** (joueur, 14/11/2026) : PV à l'entrée du combat moins PV à la sortie,
   soins déduits (colonne « PV nets » du rapport de simulation). « Perdre puis récupérer » est l'identité du
   Priest. Mesure à Westfall, combat normal : Priest 0,2 PV (1 % des PV max), Warrior 7,0 (9 %), Mage 5,3
   (12 %), Rogue 6,3 (13 %), Hunter 6,3 (13 %) : profils conformes, aucune carte de classe à changer.
+- **Zandalarian Hero Charm : la carte gardée coûte 1 de moins** (joueur, 14/11/2026 ; il doublait le Traveler's
+  Backpack). « At the end of your turn, you may keep 1 card in hand. It costs 1 less next turn. » : un choix de
+  carte gardée, réduction de 1 (minimum 0) au tour suivant seulement (`docs/zones/stranglethorn.md`).

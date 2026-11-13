@@ -16,6 +16,13 @@ Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est c
 - **Aucun garde-fou sur Stunned.** Un ennemi peut être étourdi plusieurs tours de suite ; seuls les boss sont
   immunisés. Conséquence pour l'équilibrage : limiter les étourdissements par le Cooldown et le coût des
   cartes, pas par une règle.
+  **Exception des élites (décision du joueur, 14/11/2026) : Stun Resistant.** Un élite des zones 1 à 6 (pas
+  ses sbires normaux) ne prend que Stunned 1 (Stunned 2 devient 1) ; quand ce Stunned lui a fait perdre son
+  tour (ou arrêté son tour en cours, Trap), il résiste à Stunned pendant ses 2 tours suivants (état
+  `stun_resist`, refus journalisé « immune » comme Indomitable), puis peut de nouveau être étourdi : au plus un
+  tour perdu sur trois. Garde Freezing Trap utile sans étourdir un ennemi seul en chaîne. Les élites de
+  Blackrock Mountain restent Indomitable, les boss immunisés. Badge « Stun Resistant » (« After being Stunned,
+  can't be Stunned for 2 turns. »). Moteur : `Combat.stunResistant`, `Combat.stunImmune`.
 
 ## Tranché par le concepteur
 - **Coût en PV : une seule formulation, `Pay N HP.`,** pour toutes les classes. Il compte comme une perte de

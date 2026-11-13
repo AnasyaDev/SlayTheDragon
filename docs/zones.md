@@ -54,6 +54,7 @@ ns.Enemies.vile_fang = {
   name = "Nightbane Vile Fang", hp = { 28, 31 },            -- nombre ou { min, max } (flux c.rng.ai)
   elite = false, boss = false, minion = false,               -- minion : fuit à la mort du dernier ennemi principal
   indomitable = false,                                       -- immunisé à Stunned comme un boss (Combat.stunImmune)
+  stunResist = nil,                                          -- false : élite sans Stun Resistant (rare ; ci-dessous)
   moves = { bite = { name = "Vile Bite", intent = "attack", cast = false, text = "…",
                      actions = { { "attack", 9, curse = "rabies" } } }, … },
   pattern = { "bite", "maul", "howl" }, randomStart = true,  -- ou ai = function(c, e, rng) return "move" end
@@ -64,6 +65,14 @@ ns.Enemies.vile_fang = {
   -- wildfire = 2…) : le moteur les ignore
 }
 ```
+
+**Stunned et les élites** (décision du joueur, 14/11/2026) : tout ennemi `elite = true` qui n'est ni boss ni
+`indomitable` est **Stun Resistant** d'office (`Combat.stunResistant`, aucun champ à poser ; `stunResist = false`
+l'en exempte) : Stunned 1 au plus ; quand ce Stunned lui fait perdre son tour (ou l'arrête, Trap), il prend l'état
+`stun_resist` 2 (décompté en fin de round, posé pendant la phase ennemie) et `Combat.stunImmune` répond vrai tant
+qu'il dure. Badge commun « Stun Resistant » sous l'intention (après ceux de la zone, `Art.stunResistBadge`), avec
+les tours restants pendant la résistance. Les sbires normaux d'un combat d'élite ne sont pas concernés ; les
+élites de Blackrock Mountain sont `indomitable` (immunité totale).
 
 `intent` (icône de la bulle) : `attack`, `defend`, `cast`, `watch`, `debuff`, `buff`, `heal`, `summon`, ou une
 intention de zone déclarée par `Art.intents.<clé>` et `Art.intentName.<clé>`. `cast = true` : incantation
@@ -237,7 +246,7 @@ ns.ZoneViews.swamp = {
   counter = function(c) return { icon = …, text = "Wildfire in 2", tip = "…", hot = false } end, -- en haut au centre
   intent = function(c, e) return { icon = …, text = "Asleep 2", color = "defend", title = "Asleep", tip = "…", showMove } end,
   intentBadge = function(c, e) return { icon = …, tip = "Bite: …" } end,  -- petite icône à droite du chiffre
-  enemyBadges = function(c, e) return { { icon, text = "+2 Str", tip, color, dim } } end,  -- sous l'intention (3 au plus)
+  enemyBadges = function(c, e) return { { icon, text = "+2 Str", tip, color, dim } } end,  -- sous l'intention (3 au plus, dont « Stun Resistant » d'un élite)
   marks = function(c, e) return { { at = 0.5, name, text, color } } end,   -- crans en plus (les phases sont d'office)
   handMark = function(c, i, inst) return { rim = { r, g, b, a }, icon = …, tip = "…" } end, -- carte visée (Hex)
   build = function(host, view) end, render = function(host, c, view) end, event = function(host, ev, view) end,
@@ -351,7 +360,7 @@ commun est au palier 3 ou moins (Duskwood, Wetlands) ; les zones 4 à 7 sont dé
 | 7. condition `Interrupted:`, Trap sur un Cast | `Combat.CONDITIONS.interrupted` (commune) ; Snake Trap : `enemyMove` (move `cast`, non interrompu) → `Combat.triggerTrap(c, e)` |
 | 8–9. statistiques, bots | `Combat.zstat`, `ZoneBots.stranglethorn` (`value`, `skip`) |
 | liseré vert et icône sur la carte visée, grenouille | `ZoneViews.stranglethorn.handMark` ; nom d'origine sur la Hexed : d'office |
-| Gurubashi Arena, Shrunken Head, Bag of Whammies, Nesingwary 4000, Hero Charm | case + rencontre `fight` (`group = true`, `hpMul = 1.15`, `reward = { shift = 1 }`, `gold = 25`, texte « %g ») ; `onEnemyCastStart` (`e.interrupted = true`) ; `onEnemyCastInterrupted` ; `onCombatStart` ; `retainPicks` |
+| Gurubashi Arena, Shrunken Head, Bag of Whammies, Nesingwary 4000, Hero Charm | case + rencontre `fight` (`group = true`, `hpMul = 1.15`, `reward = { shift = 1 }`, `gold = 25`, texte « %g ») ; `onEnemyCastStart` (`e.interrupted = true`) ; `onEnemyCastInterrupted` ; `onCombatStart` ; `retainPicks` + `onCardKept` + `cost` (réduction par uid dans `relicState`) |
 
 ### Swamp of Sorrows (Slumber)
 

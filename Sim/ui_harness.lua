@@ -9233,6 +9233,52 @@ do
   ns.Enemies.uz_phaser, ns.Cards.uz_token, ns.Cards.uz_hexed = nil, nil, nil
 end
 
+print("USR élites Stun Resistant : badge permanent sous l'intention, résistance en cours (compteur, état)")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function inside(r, box)
+    return r and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local _, c, v = zoneCombat("hunter")
+  local ns = H.ns
+  local Combat = ns.Combat
+  local normal = c.enemies[1]
+  for i = 2, #c.enemies do c.enemies[i].dead = true end
+  local g = Combat.spawn(c, "harvest_golem")
+  v:Render(true)
+  H.settle()
+  local function badgeOf(s)
+    for _, b in ipairs(s.badges) do if vis(b) and (b.text._text or ""):find("^Stun Resistant") then return b end end
+  end
+  local sg, sn = v.slotOf[g.uid], v.slotOf[normal.uid]
+  local b = sg and badgeOf(sg)
+  local content = R.rect(ns.UI.content)
+  check("élite (Harvest Golem) : badge « Stun Resistant » sous l'intention, infobulle de la règle",
+    b and b.text._text == "Stun Resistant" and H.hover(b)[1] == "After being Stunned, can't be Stunned for 2 turns."
+      and inside(R.rect(b), content), b and tostring(b.text._text))
+  check("ennemi normal : pas de badge « Stun Resistant »", sn and not badgeOf(sn))
+  -- résistance en cours : compteur sur le badge (doré), état à durée dans la rangée des états
+  Combat.applyStatus(c, g, "stun_resist", 2)
+  v:Render(true)
+  H.settle()
+  b = badgeOf(sg)
+  local tok
+  for _, t in ipairs(sg.st.tokens) do if vis(t) and t.info and t.info.status == "stun_resist" then tok = t end end
+  local tt = tok and table.concat(H.hover(tok), " | ") or ""
+  check("résistance : badge « Stun Resistant 2 », infobulle des tours restants, texte non tronqué",
+    b and b.text._text == "Stun Resistant 2" and (H.hover(b)[1] or ""):find("Resisting: 2 more turns.", 1, true) ~= nil
+      and not b.text:IsTruncated() and R.rect(b.text)[3] <= R.rect(b)[3] + 0.5,
+    b and (tostring(b.text._text) .. " " .. table.concat(R.rect(b.text), ",") .. " / " .. table.concat(R.rect(b), ",")))
+  check("résistance : état « Stun Resistant (2 turns) » dans la rangée des états", tok ~= nil
+    and tt:find("Stun Resistant (2 turns)", 1, true) ~= nil, tt)
+  snap("stun-resistant", true)
+end
+
 -- Harnais propres aux zones : Sim/ui_zone_<zone>.lua (return function(T) … end), dans l'ordre de la
 -- campagne s'ils existent. T = { H, ns = H.ns, check, snap, root, SEED, zoneCombat(classe) -> exp, combat,
 -- vue, UI, V, EXP, button, clickOption, option, currentKind, R = Sim/ui_render.lua }.

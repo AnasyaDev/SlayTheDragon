@@ -440,14 +440,15 @@ Première victoire de la classe à la clé +1, +3, +5 ; communs aux cinq classes
 |---|---|---|---|---|---|
 | +1 | `nesingwary_4000` | Nesingwary 4000 | rare | At the start of each combat, deal 10 to the enemy with the most HP. | `inv_weapon_rifle_04` |
 | +3 | `jindos_bag_of_whammies` | Jin'do's Bag of Whammies | rare | Whenever you interrupt an enemy cast: +1 mana, draw 1. | `inv_misc_bag_10` |
-| +5 | `zandalarian_hero_charm` | Zandalarian Hero Charm | rare | At the end of your turn, you may keep 1 card in your hand. | `inv_zulgurubtrinket` |
+| +5 | `zandalarian_hero_charm` | Zandalarian Hero Charm | rare | At the end of your turn, you may keep 1 card in hand. It costs 1 less next turn. | `inv_zulgurubtrinket` |
 
 - Nesingwary 4000 : dégâts hors carte (ni Strength ni Sundered), boss compris. Repère : Tobin's Pocketknife (DoT 3
   à tous, rare).
 - Bag of Whammies : avec les Interrupt à 0 mana et Cooldown 2, environ +1 mana tous les deux tours contre des
   lanceurs ; rien contre un groupe sans Cast.
-- Zandalarian Hero Charm : un Retain au choix par tour (la carte gardée reste exposée au Hex : c'est voulu). Les
-  bots choisissent la carte la mieux notée non jouable ce tour.
+- Zandalarian Hero Charm (décision du joueur du 14/11/2026) : un Retain au choix par tour, et la carte gardée
+  coûte 1 de moins (minimum 0) au tour suivant seulement (la carte gardée reste exposée au Hex : c'est voulu). Les
+  bots choisissent la carte la mieux notée non jouable ce tour, de préférence de coût 1 ou plus.
 
 ## 10. Modèles et icônes
 
@@ -552,8 +553,16 @@ de la zone), `Core/ZoneRules/stranglethorn.lua` (règle, `ns.Stranglethorn`, cas
   de l'action, l'Absorb ne protège plus le Cast ; Shadow Bolt des sorciers, Lightning Bolt du Mystic, Shadow Bolt de
   Zanzil interrompent s'ils font perdre des PV. Raison : sans cela le Mage, dont les Cast échappent au Hex par
   construction, dominait la zone de 15 à 20 points.
-- **Zandalarian Hero Charm** (+5) : `retainPicks`, identique au Traveler's Backpack (commun, palier 3) ; deux
-  `retainPicks` ne donnent qu'un choix. À revoir par le joueur (un bibelot de clé +5 devrait faire plus).
+- **Zandalarian Hero Charm** (+5, revu le 14/11/2026) : `retainPicks` comme le Traveler's Backpack (commun,
+  palier 3), plus une réduction : la carte gardée par ce choix (`onCardKept`, `"pick"`) coûte 1 de moins pendant le
+  tour suivant (crochet `cost`, minimum 0 par `Combat.cost`). Réduction portée par l'état du combat
+  (`relicState.hero_charm_uid` et `hero_charm_round`, données simples : clone et sauvegarde), jamais par
+  l'instance ; perdue au tour d'après, et effacée quand la carte est jouée, piochée de nouveau, transformée ou
+  retirée. Avec le Traveler's Backpack : `retainPicks` = 2 mais un seul choix géré ; la carte gardée reçoit la
+  réduction (−1, pas −2). Cas limites : carte gardée puis Hexed (verrouillée par le Hex au même tour) → la Hexed
+  coûte 1 sans réduction et l'originale rendue revient à plein coût ; carte Hexed gardée → 0 ; carte à 0 → 0 ;
+  aucune carte à coût X dans le jeu. Texte de 80 caractères (limite des bibelots du harnais). Bot : +2 à la note
+  des cartes de coût 1 ou plus quand le Charm est porté.
 - **Jin'do's Bag of Whammies** : seulement les interruptions faites par une carte pendant le tour du joueur (pas
   celle de la Shrunken Head). Icône `INV_Misc_Bag_10_Green` (la `INV_Misc_Bag_10` est déjà la Defias Purse).
 - **Shrunken Head** : la première incantation ennemie est interrompue dès son annonce (« Interrupted » visible, la
@@ -684,5 +693,4 @@ de Zul'Gurub sous un ciel rouge (boss, `mine`). 330 à 1000 régions chacun. Pla
 
 - Modèles (surtout gorilles et Zanzil Naga) et icônes : relancer le client (fichiers ajoutés), `/slay models`.
 - Écart des épiques (Rogue et Hunter à +20) : lot des épiques, pas de la zone.
-- Zandalarian Hero Charm identique au Traveler's Backpack : à repenser.
 - Animation du Hex (carte qui s'envole) non faite.

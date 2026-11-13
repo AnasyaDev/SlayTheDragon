@@ -456,7 +456,21 @@ Art.statuses = {
   force        = { icon = 132333, tga = "Ability_Warrior_BattleShout" }, -- ability_warrior_battleshout
   necrotic     = { icon = "Interface\\Icons\\spell_deathknight_necroticplague", tga = "Spell_Deathknight_Necroticplague" },
   instant      = { icon = "Interface\\Icons\\spell_nature_lightning", tga = "Spell_Nature_Lightning" },
+  stun_resist  = { icon = "Interface\\Icons\\spell_frost_stun", tga = "Spell_Frost_Stun" },
 }
+
+-- Trait des élites Stun Resistant (Combat.stunResistant) : badge permanent sous l'intention, au même endroit
+-- que les traits de zone (Indomitable) ; doré pendant la résistance (état stun_resist, tours restants).
+Art.STUN_RESIST_TIP = "After being Stunned, can't be Stunned for 2 turns."
+function Art.stunResistBadge(e)
+  local n = e.st and e.st.stun_resist or 0
+  if n > 0 then
+    return { icon = Art.statuses.stun_resist, key = "badge:stun_resist", text = "Stun Resistant " .. n,
+      color = "goldText", tip = Art.STUN_RESIST_TIP .. " Resisting: " .. n .. " more turn" .. (n > 1 and "s" or "") .. "." }
+  end
+  return { icon = Art.statuses.stun_resist, key = "badge:stun_resist", text = "Stun Resistant",
+    tip = Art.STUN_RESIST_TIP }
+end
 
 -- Icône d'un état selon sa source (Combat.applyStatus(c, unité, id, n, clé) → unit.stIcon[id] = clé) :
 -- Art.statusIcons[clé] remplace l'icône de l'état (DoT de poison, de saignement, de brûlure…).
@@ -661,6 +675,7 @@ Art.statusShort = {
   halved = "damage taken is halved.",
   force = "N more damage per hit.",
   instant = "the next Cast card resolves at once.",
+  stun_resist = "can't be Stunned.",
 }
 
 -- Ligne d'un état cité par une carte : nom en or, définition courte.
