@@ -447,34 +447,13 @@ Chacune a une réponse sans condition.
 
 ## 7. Cartes de zone (5, une par classe, épiques)
 
-Rareté **épique** (décision du joueur : nouvelle rareté au-dessus de rare). Débloquées par la première
-victoire de la classe dans Blackrock Mountain. Ce sont des cartes **pivot** : des Powers autour desquels on
-construit un deck et qui changent la façon de jouer la classe, partout. Chacune tire parti des phases
-(franchir un seuil, l'ouverture qui frappe fort, le trait de 50 %) sans en dépendre.
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| Classe | id | Nom | Voie | Coût | Type | Texte | Amélioré | Ce qu'elle change | Icône |
-|---|---|---|---|---|---|---|---|---|---|
-| Priest | `spirit_shell` | Spirit Shell | Discipline | 2 | Power | Healing beyond your max HP becomes Absorb. / Up to 15 Absorb carries over to your next turn. | Coût 1 | Le Priest soigne **à pleine vie** pour se blinder : Atonement, Renew, Holy Nova deviennent une défense qui s'accumule d'un tour à l'autre. On monte la coquille avant de faire franchir un seuil, puis on encaisse l'ouverture. | `ability_priest_reflectiveshield` |
-| Warrior | `avatar` | Avatar | Arms | 2 | Power | Your Rage can go up to 10. / Start of turn: +1 Rage. | Coût 1 | Toutes les cartes Surge et Spend doublent de plafond : Execute à 10 Rage = 5 + 40, Ignore Pain = 30 Absorb. Le Warrior **garde** sa Rage au lieu de la dépenser à 5 ; les ouvertures (gros coups) la remplissent, et le trait de 50 % des normaux est à la fois leur seuil et la ligne d'Execute. | `warrior_talent_icon_avatar` |
-| Mage | `fingers_of_frost` | Fingers of Frost | Frost | 1 | Power | Once per turn, when you Freeze an enemy or one changes phase: gain Instant 1. | Coût 0 | Le contrôle Frost (Stunned, Demoralized) alimente les gros Cast **instantanés** : un deck Frost + Pyroblast / Glacial Spike qui lance un sort lourd par tour sans pouvoir être interrompu. Faire franchir un seuil donne l'Instant pour achever avant l'ouverture. Demoralized compte : marche contre les boss. | `ability_mage_wintersgrasp` |
-| Rogue | `cold_blood` | Cold Blood | Assassination | 2 | Power | Your first Surge each turn counts 2 more Combo (up to 7). | Coût 1 | Le Rogue finit **à chaque tour** : 3 cartes d'ouverture suffisent pour un Eviscerate à 5 Combo (4 + 20), et à 5 Combo il frappe comme à 7 (4 + 28). Assez de dégâts concentrés pour tuer depuis le haut d'un seuil et sauter la phase. | `spell_ice_lament` |
-| Hunter | `lone_wolf` | Lone Wolf | Marksmanship | 1 | Power | Your pet leaves. / Your Attacks deal 4 more per hit. / Careful Aim is always met. | Coût 0 | Le Hunter renonce au familier pour un deck de tirs : Rapid Fire = 4 × 7, Aimed Shot toujours à plein. Careful Aim ne s'éteint plus quand l'ennemi passe sous 50 % (là où sa phase commence) ; en échange, plus d'attaque de fin de tour pour franchir un seuil « après ton tour ». | `spell_hunter_lonewolf` |
-
-Précisions :
-
-- **Spirit Shell** : vaut pour tout soin (cartes, Regen, Atonement, potions, bibelots). Le surplus est compté
-  après Veil of Shadow et Nécrotique. Report : 15 au plus au début du tour (crochet `blockKeep`, comme la
-  Gnomish Harm Prevention Belt ; les deux ne s'additionnent pas, on garde le plus grand).
-- **Avatar** : relève le plafond de Rage du Warrior à 10 pour le combat ; les cartes « Surge: … per Rage »
-  et `Spend N` lisent la Rage réelle. Le +1 au début du tour s'ajoute au gain habituel.
-- **Fingers of Frost** : « Freeze » = poser Stunned ou Demoralized sur un ennemi (même définition que la
-  condition Frozen, `Core/Classes/mage.lua`) ; sur un boss, Stunned ne prend pas mais Demoralized oui. Une
-  fois par tour, que l'Instant vienne d'un gel ou d'un changement de phase.
-- **Cold Blood** : la première carte Surge jouée dans le tour (Eviscerate, Envenom, Rupture, Secret Technique,
-  Nightblade, Between the Eyes, Exsanguinate) compte Combo + 2, 7 au plus ; la Surge reste injouable à 0 Combo.
-- **Lone Wolf** : le familier quitte le combat (plus d'attaque automatique ; les lignes « Pet attacks. » ne
-  font rien ; le Frenzy ne monte plus que par les cartes qui en donnent). +4 par coup des cartes Attack, Trap
-  comprise. Careful Aim est toujours vrai (Aimed Shot, Steady Shot, Trueshot Aura).
+- Spirit Shell (Priest)
+- Avatar (Warrior)
+- Fingers of Frost (Mage)
+- Cold Blood (Rogue)
+- Lone Wolf (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

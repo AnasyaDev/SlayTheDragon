@@ -390,31 +390,13 @@ event("bangalash_hunt", {
 
 ## 7. Cartes de zone (5, rares)
 
-Débloquées par la première victoire de la classe dans la zone. Toutes répondent au Hex en passant par le moteur
-de la classe (Insanity, Absorb, Instant, DoT, Traps), et restent utiles contre tout ennemi qui incante (Defias
-Conjurer, Zanzil, Jin'do, les zones suivantes). Plaque dans le texte, états en dernière ligne, comme dans
-`Data/<Classe>.lua`.
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| Classe | id | Nom | Voie | Coût | Type | Texte | Amélioré | Ce qu'elle permet | Icône |
-|---|---|---|---|---|---|---|---|---|---|
-| Priest | `hex_of_weakness` | Hex of Weakness | Shadow | 0 | Skill | Interrupt the target's cast. / +2 Insanity. / Apply Demoralized 2 ⌛ / Cooldown 2. | idem, Cooldown 1. | Le maléfice des prêtres trolls retourné contre eux : un Interrupt qui nourrit le Surge Shadow et affaiblit même un boss qui n'incante pas. | `spell_shadow_fingerofdeath` |
-| Warrior | `spell_reflection` | Spell Reflection | Protection | 1 | Skill | Gain 6 Absorb. / Interrupt all casts. / Deal 8 to each enemy interrupted. / Cooldown 3. | Gain 8 Absorb. / … / Deal 12 to each enemy interrupted. / Cooldown 3. | Un tour de défense qui coupe deux sorciers à la fois et les blesse ; utile contre Brain Wash Totem + Jin'do. | `ability_warrior_shieldreflection` |
-| Mage | `spellsteal` | Spellsteal | Arcane | 0 | Skill | Interrupt the target's cast. / Interrupted: gain Instant 1, +1 Charge. / Cooldown 2. | … / Interrupted: gain Instant 1, +1 Charge, draw 1. / Cooldown 2. | Chaque sort volé rend un Cast immédiat : le Mage transforme le Hex adverse en Pyroblast instantané. | `spell_arcane_arcane02` |
-| Rogue | `mind_numbing_poison` | Mind-numbing Poison | Assassination | 1 | Power | Power. / When you apply DoT to a casting enemy: interrupt it, +1 Combo. | idem, coût 0. | Le deck de poisons interrompt sans carte d'Interrupt : chaque Garrote ou Rupture sur un sorcier coupe son Hex. | `spell_nature_nullifydisease` |
-| Hunter | `snake_trap` | Snake Trap | Survival | 1 | Skill | Trap. / Also triggers on a Cast, and interrupts it. / Apply DoT 5 to all | Trap. / … / Apply DoT 7 to all | La seule Trap qui répond à un sort : posée d'avance, elle coupe le Hex que les autres Traps laissent passer. | `ability_hunter_snaketrap` |
-
-Précisions :
-- **Hex of Weakness** : Demoralized est posé même s'il n'y a rien à interrompre (Jin'do entre deux Hex). Repère :
-  Silence (inhabituelle) = Interrupt + Draw 1, Cooldown 2.
-- **Spell Reflection** : « Deal 8 » d'une Skill (Strength ne s'applique pas, comme les dégâts de Skill ailleurs).
-  Sans Cast à couper, reste 6 Absorb pour 1 mana, Cooldown 3.
-- **Spellsteal / `Interrupted:`** : nouvelle condition nommée, infobulle `Condition: this card stopped an enemy
-  cast.` Repère : Counterspell (inhabituelle) = Interrupt + 1 Charge.
-- **Mind-numbing Poison** : déclenché par toute pose de DoT par une carte ou un Power du Rogue (Deadly Poison
-  compris) sur un ennemi dont l'intention est un Cast non interrompu ; une fois par ennemi et par tour.
-- **Snake Trap** : sur une attaque, elle suit la règle des Traps (la plus ancienne d'abord). Sur un Cast (attaque
-  ou non), la plus ancienne Snake Trap posée se déclenche avant tout, même si d'autres Traps sont plus anciennes :
-  elle interrompt le Cast, puis pose le DoT à tous. Compte dans les trois Traps au plus.
+- Power Infusion (Priest)
+- Anger Management (Warrior)
+- Cold Snap (Mage)
+- Deathmark (Rogue)
+- Black Arrow (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

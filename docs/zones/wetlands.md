@@ -443,30 +443,13 @@ Chaque rencontre a une réponse sans condition.
 
 ## 7. Cartes de zone (5, une par classe)
 
-Rares ; débloquées par la première victoire de la classe dans les Wetlands. Chacune répond aux primes de
-meute et reste forte ailleurs (Strength de VanCleef, Absorb des élites, groupes de murlocs).
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| id | Classe | Nom | Voie | Coût | Type | Texte | Amélioré | Icône | Ce qu'elle permet |
-|---|---|---|---|---|---|---|---|---|---|
-| `mass_dispel` | Priest | Mass Dispel | Discipline | 1 | Skill | All enemies lose their Absorb and Strength.<br>They lose Pack.<br>Draw 1.<br>Exhaust. | coût 0 | `spell_arcane_massdispel` | Effacer d'un coup tout ce que la meute a accumulé et couper les primes suivantes. |
-| `shockwave` | Warrior | Shockwave | Arms | 2 | Attack | Deal 8 to all.<br>Execute: deal 8 more. | Deal 10 to all.<br>Execute: deal 10 more. | `ability_warrior_shockwave` | Achever tous les blessés dans le même effet (Execute lu cible par cible) : aucune prime. |
-| `spellsteal` | Mage | Spellsteal | Arcane | 1 | Skill | Take the target's Absorb and Strength.<br>+1 Charge. | coût 0 | `spell_arcane_arcane02` | Laisser la meute se renforcer, puis lui prendre sa Strength (gardée tout le combat) et son Absorb. |
-| `marked_for_death` | Rogue | Marked for Death | Subtlety | 0 | Skill | +2 Combo.<br>If the target dies this turn: +2 Combo, and it gives no Pack bonus.<br>Cooldown 2. | Cooldown 1 | `achievement_bg_killingblow_most` | Marquer le donneur de la prime la plus forte, le tuer sans rien laisser, et préparer le coup de grâce suivant. |
-| `aspect_of_the_pack` | Hunter | Aspect of the Pack | Beast Mastery | 1 | Power | Power.<br>Enemy dies: pet attacks. | coût 0 | `ability_mount_whitetiger` | Enchaîner les morts : l'attaque du familier fait partie de l'effet qui a tué, donc les morts en chaîne ne donnent aucune prime ; +1 Frenzy à chaque fois. |
-
-Précisions :
-- **Mass Dispel** : « They lose Pack » rend chaque ennemi `Scattered` sans Demoralized (ce n'est pas la
-  mort du chef). Hors Wetlands : retire le Parry de VanCleef (12 Absorb, Strength 3) et la Strength des
-  murlocs de Westfall.
-- **Shockwave** : la carte « to all » lit Execute pour chaque ennemi au moment de la résolution (PV
-  d'avant la carte). Proche de Bladestorm en budget (2 mana, 12 à tous), mais en deux paliers.
-- **Spellsteal** : le Mage gagne exactement ce qui est retiré (Strength : état `force` permanent ;
-  Absorb : la sienne, perdue au début de son tour). Sans Absorb ni Strength sur la cible, ne donne que la
-  Charge. À surveiller contre VanCleef (Strength 3 volée au 4e tour).
-- **Marked for Death** : état `Marked` sur la cible jusqu'à la fin du tour ; si la cible meurt de DoT
-  pendant la phase ennemie, la marque a expiré.
-- **Aspect of the Pack** : le familier attaque sa cible (ou l'ennemi vivant le plus à gauche) ; s'il
-  tue, la règle se redéclenche. Une Trap qui tue pendant la phase ennemie déclenche aussi l'attaque.
+- Mind Spike (Priest)
+- Sweeping Strikes (Warrior)
+- Water Elemental (Mage)
+- Subterfuge (Rogue)
+- Beast Cleave (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

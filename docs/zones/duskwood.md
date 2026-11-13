@@ -404,28 +404,13 @@ event("webbed_watcher", {
 
 ## 7. Cartes de zone (une par classe)
 
-Rareté **rare**, hors voie (`path = "zone"`), débloquée par la première victoire de la classe à Duskwood ;
-entre ensuite dans la réserve rare de la classe, dans toutes les zones. Noms : sorts réels de la classe,
-absents de `Data/<Classe>.lua`.
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| Classe | id | Nom | Coût | Type | Texte | Amélioré | Ce qu'elle permet | Icône |
-|---|---|---|---|---|---|---|---|---|
-| Priest | `mass_dispel` | Mass Dispel | 1 | Skill | Remove negative effects. / All enemies lose their Absorb and Strength. / Cooldown 3. | Remove negative effects. / All enemies lose their Absorb and Strength. / Draw 1. / Cooldown 3. | Nettoie ta main et défait les buffs ennemis : Howl, Bellow, Gorge de Stitches ici ; Parry de VanCleef (Absorb 12, Strength 3) ailleurs. | `spell_arcane_massdispel` |
-| Warrior | `spell_reflection` | Spell Reflection | 1 | Skill | Gain 6 Absorb. / Gain Reflect 1 | Gain 9 Absorb. / Gain Reflect 1 | Contre un Cast annoncé : le Shadow Bolt frappe le Shadow Weaver, le Hex est perdu. Ailleurs : Fireball du Defias Conjurer, sorts des Wetlands. | `ability_warrior_shieldreflection` |
-| Mage | `remove_curse` | Remove Curse | 0 | Skill | Remove negative effects. / +1 Charge, +1 more per effect removed. / Draw 1. / Cooldown 2. | idem, Cooldown 1. | Transforme chaque Curse en Charge (Arcane Barrage), pour 0 mana ; ailleurs, une Charge et une carte tous les deux tours. | `spell_nature_removecurse` |
-| Rogue | `ghostly_strike` | Ghostly Strike | 1 | Attack | Deal 6. / +1 Combo. / Gain Parry 2 | Deal 9. / +1 Combo. / Gain Parry 2 | Deux coups parés : les Bites ne passent pas, le Rogue garde son mana pour payer les Curses. Partout : Evasion et Sinister Strike en une carte. | `spell_shadow_curse` |
-| Hunter | `masters_call` | Master's Call | 1 | Skill | Remove negative effects. / Pet attacks twice. / +1 Frenzy per effect removed. / Cooldown 2. | idem, coût 0. | Le familier nettoie et frappe : chaque Curse retirée devient du Frenzy. Ailleurs : Kill Command à recharge plus courte. | `ability_hunter_masterscall` |
-
-Règles propres :
-- **Reflect** (`Reflect`, état joueur, retiré au début de ton tour) : `The next enemy Cast this round hits its caster.`
-  Le premier Cast ennemi résolu pendant le tour ennemi : ses actions `attack` frappent son lanceur (dégâts
-  calculés comme s'il se frappait, Strength et Demoralized du lanceur compris), ses actions `curse` et
-  `debuff` sont perdues, ses `block`/`buff`/`heal` s'appliquent normalement. Un Cast interrompu ne consomme
-  pas Reflect. Sur Unholy Shield (Cast sans attaque) : rien n'est renvoyé, Reflect est consommé.
-- **Mass Dispel** : « lose their Absorb and Strength » met Absorb et Strength de chaque ennemi vivant à 0 ;
-  Unholy Shield n'est pas touché (seule Morbent's Bane le retire).
-- **Remove Curse** : à 2 Curses en main, +3 Charges pour 0 mana ; plafond de Charges inchangé (4).
-- **Master's Call** : vise un ennemi (déplace la cible du familier) ; le Frenzy s'ajoute après les attaques.
+- Shadowy Apparitions (Priest)
+- Enraged Regeneration (Warrior)
+- Alter Time (Mage)
+- Sap (Rogue)
+- Trap Launcher (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 
