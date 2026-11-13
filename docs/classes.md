@@ -179,7 +179,9 @@ sans point final ; U27 la reconnaît par le libellé, nom d'un état). Raison «
 (« Not enough Combo Points. »).
 
 Une classe peut émettre ses propres événements (`Combat.fire(c, "onShift", forme)`) : Powers et bibelots
-de la classe s'y abonnent par le même mécanisme.
+de la classe s'y abonnent par le même mécanisme. Les règles de zone (`ns.ZoneRules`, `docs/zones.md`) passent
+après la classe et ajoutent leurs événements (`onEffectEnd`, `onEnemyDamaged`, `enemyMove`, `onHeal`…),
+auxquels Powers et bibelots peuvent aussi s'abonner.
 
 Ordre d'un coup joué (`Combat.play`) : cible (crochet `target`), coûts payés **maintenant** (mana, PV,
 Spend si la ressource suffit ; une carte Cast interrompue ne rend rien), compteurs du tour
