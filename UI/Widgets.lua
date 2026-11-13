@@ -1743,6 +1743,9 @@ function W.cardKeywords(d)
       for cl in (text .. "\n"):gmatch("(.-)\n") do
         if cl:find(kw.pattern) then add(key) end
       end
+    elseif kw.zone and W.hasPhrase(text, kw.name) then
+      -- mot-clé de zone (L.zoneKeyword) cité par la carte : Curse, Hex, Douse…
+      add(key)
     end
   end
   local ids = {}

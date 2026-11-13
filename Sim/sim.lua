@@ -20,6 +20,11 @@
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
+-- LuaJIT : plus de traces et de code machine que les réglages par défaut (1000 traces, 512 Ko) ; le
+-- moteur, les bots et les règles de zone en demandent plus, sinon le cache de traces se vide sans cesse
+-- (environ deux fois plus lent). Sans effet sur les résultats.
+if jit and jit.opt then pcall(jit.opt.start, "maxtrace=4000", "maxmcode=8192") end
+
 local opts = {}
 for _, a in ipairs(arg or {}) do
   local k, v = a:match("^([%w_]+)=(.*)$")

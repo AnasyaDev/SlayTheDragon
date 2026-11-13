@@ -64,6 +64,20 @@ function L.keyword(key, t)
   return t
 end
 
+-- Mot-clé d'une zone (Curse, Pack, Hex, Asleep, Wildfire, Phase…) : explication au survol (infobulles
+-- des cartes, des ennemis, des intentions), comme L.keyword, avec zone = id. L.zoneWords[zone] = clés.
+-- t = { name, text (60 caractères au plus), pattern facultatif }.
+L.zoneWords = {}
+function L.zoneKeyword(zone, key, t)
+  t.zone = zone
+  L.keyword(key, t)
+  local list = L.zoneWords[zone] or {}
+  L.zoneWords[zone] = list
+  for i = 1, #list do if list[i] == key then return t end end
+  list[#list + 1] = key
+  return t
+end
+
 local plateByKey = {}
 function L.plate(key, t)
   t.key = key
