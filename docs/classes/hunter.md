@@ -398,6 +398,9 @@ Plus les 4 cartes de départ au niveau 1 (22 cartes). Pourquoi cet ordre :
    `docs/equilibrage.md` : normal 15,4 ; élite 20,0 ; boss 51,6) : **normal ≤ 13, élite ≤ 18, boss ≤ 50**,
    victoires de l'expédition à ± 5 points du Priest. Le contrôle doit faire perdre moins de PV dans les
    combats ordinaires, pas plus contre le boss.
+   Cible remplacée le 13/11/2026 : 6 à 9 PV perdus par combat normal pour toutes les classes
+   (`decisions.md`) ; le Hunter en perdait 4,5, d'où Disengage 3/6 et 50 PV (`docs/equilibrage.md`,
+   « Passe 3 »).
 8. **Identité** : le DoT (Survival) est partagé avec Priest, Warlock, Rogue ; Hunter's Mark + gros tir
    rappelle le Warrior Arms (Sundered + gros coup). Ce qui doit rester propre : le familier, les Traps,
    Careful Aim (l'inverse d'Execute). Aucune carte Hunter ne dépend d'Execute.

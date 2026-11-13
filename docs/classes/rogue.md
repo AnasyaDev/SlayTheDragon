@@ -370,7 +370,7 @@ boss 51,6 PV et 6,9 tours) :
 
 | Mesure | Cible Rogue |
 |---|---|
-| Combat normal : tours / PV perdus | ≤ 4 tours / 12–16 PV |
+| Combat normal : tours / PV perdus | ≤ 4 tours / 12–16 PV (remplacé le 13/11/2026 par 6–9 pour toutes les classes, le Rogue servant de référence : `decisions.md`) |
 | Élite : tours / PV perdus | ≤ 5 tours / 18–22 PV |
 | Boss : victoires / tours / PV perdus | 70–80 % / ≤ 6 tours / ≤ 50 PV |
 | Part des dégâts entrants évités par Parry | 25–40 % |
@@ -452,7 +452,7 @@ section UR). Écarts avec la fiche, par ordre de priorité (decisions.md puis so
   le deck tue plus vite sans perdre plus de PV (6,3 PV par combat normal au niveau 1, contre 5,7), il est donc
   plus fort à PV égaux (86 % au niveau 1 à 60 PV) ; 50 PV le remettent dans les cibles (70,0 % au niveau 1,
   81,7 % au niveau 7). La cible 12–16 PV perdus par combat normal reste hors d'atteinte (règle de Parry
-  inchangée).
+  inchangée) ; elle est abandonnée en passe 3 (13/11/2026) : le Rogue devient la référence des 6–9 PV.
 - **Nightblade** (Subtlety, commune, niveau 3, coût 1, Attack) : `Surge: deal 6 per Combo.` / `Gain Stealth`
   (améliorée : 8 par point). Le coup de grâce mono-cible qui manquait à la voie ; il rend Stealth pour
   l'ouverture suivante. Icône `Ability_Rogue_Nightblade` (sort 195452). Subtlety jouée seule : 21 → 51,5 %

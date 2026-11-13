@@ -378,6 +378,7 @@ Au-delà des règles communes et de ce qu'apportent les classes précédentes (S
 combat normal ≤ 11 PV perdus (Priest 15,4), élite ≤ 15 (Priest 20), boss ≤ 42 (Priest 51,6 sur 65),
 victoires heuristic 65–80 %, combats normaux de 4 à 6 tours (le contrôle ne doit pas les allonger
 au-delà).
+Cible remplacée le 13/11/2026 : 6 à 9 PV perdus par combat normal pour toutes les classes (`decisions.md`).
 
 Risques :
 - **Ice Lance** (0 mana, 12 sur Frozen) avec trois Frostbolt au départ : la cible est presque toujours
