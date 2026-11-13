@@ -22,11 +22,9 @@ return function(T)
     H.ns.Controller.makeSeed = function() return seed or T.SEED end
     T.clickOption("go")
     local e = T.EXP()
-    -- choix de départ (épique, bibelot) : passés
-    for _ = 1, 3 do
-      if e.phase ~= "start" then break end
-      local ok = pcall(T.clickOption, "skipEpic")
-      if not ok then pcall(T.clickOption, "skipStartRelic") end
+    -- choix de départ (bibelot) : passé
+    if e.phase == "start" then
+      pcall(T.clickOption, "skipStartRelic")
       e = T.EXP()
     end
     if kind then

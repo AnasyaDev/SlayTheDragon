@@ -51,6 +51,7 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
   le premier tour, plaque « Epic », sans coût, jamais piochée ni jouée ; ni Hex ni Curse ne la touchent).
 - **Offre** : à l'étape 1 de l'expédition, un choix parmi 3 épiques débloquées (ou « Skip ») ; chaque élite gagnée
   propose une épique de remplacement ; le marchand en vend une à 150 po. Remplace l'offre « première élite ».
+  **Remplacé le 14/11/2026 par « l'épique se gagne »** (« Difficulté et épiques » ci-dessous).
 - **Amélioration** : une épique peut être améliorée au feu de camp ; l'amélioration est perdue si on la remplace.
 - **Riposte du Rogue** : l'épique s'appelle Deflection (« Riposte » est déjà une carte commune) ; chaque Parry
   GAGNÉ riposte (3, +3 par riposte précédente du tour), la charge de Parry reste pour parer.
@@ -66,7 +67,9 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
 - **L'épique se gagne, elle n'est plus donnée à l'étape 1** (joueur, 14/11/2026). Elle peut tomber sur un élite
   ou apparaître chez le marchand. Chance par élite proposée par le concepteur, à régler : 25 % à Westfall,
   +10 points par zone, 85 % à Blackrock Mountain. La part de rares dans les récompenses de cartes monte aussi
-  de zone en zone.
+  de zone en zone. Remplace l'offre de l'étape 1 et l'offre à chaque élite (tranchées par le concepteur
+  ci-dessus). Appliqué : `Expedition.EPIC.drop.elite` et `Expedition.RARE_BY_ZONE` (part de rares ×1 à
+  Westfall, ×2 à Blackrock Mountain, à régler par simulation ; `docs/expedition.md`, « Cartes épiques »).
 - **PV perdus par combat normal : selon la classe, plus de cible uniforme** (joueur, 14/11/2026 ; remplace
   « 6 à 9 PV pour tous »). Le Priest ne prend presque rien, le Warrior encaisse. Cibles du concepteur, en part
   des PV max : Priest ≤ 10 %, Rogue ≈ 13 % (référence), Warrior jusqu'à 15 %, Mage et Hunter entre les deux.

@@ -206,8 +206,6 @@ function C.validateExpedition(exp)
   if exp.event and exp.event.id and not (ns.Events and ns.Events[exp.event.id]) then
     return false, "unknown encounter"
   end
-  ok, why = knownIds(exp.startEpics, ns.Cards, "card")
-  if not ok then return false, why end
   return knownIds(exp.startRelics, ns.Relics, "relic")
 end
 
@@ -1041,7 +1039,7 @@ local function rewardStep(exp)
   end
   local opts = {}
   local after = text -- texte « après coup » d'une rencontre, sans la consigne des cartes
-  -- choix « Epic » (offre garantie, Expedition.offerEpic) : montré avant les cartes ordinaires
+  -- choix « Epic » (épique tombée sur un élite, Expedition.rollEpicDrop) : montré avant les cartes ordinaires
   local epicMode = r.epics ~= nil and not r.epicDone
   if epicMode then
     text = text .. (text ~= "" and "\n" or "") .. (X.epicIndex(exp) and "Epic card: replace yours, or skip."
@@ -1228,18 +1226,6 @@ local function selectStep(exp)
     text = eventResult(exp), options = opts, selectKind = sel.kind }
 end
 
--- Épique de l'expédition au choix, au départ (exp.startEpics ; écran de récompense, mode « Epic »).
-local function startEpicStep(exp)
-  local avail = available(exp)
-  local opts = {}
-  for i, id in ipairs(exp.startEpics) do
-    opts[#opts + 1] = actionOption(avail, { id = "pickEpic:" .. i, card = { id = id, up = false }, epic = true })
-  end
-  opts[#opts + 1] = actionOption(avail, { id = "skipEpic", label = "Skip", epic = true })
-  return { kind = "startEpic", title = "Epic card", rewardKind = "start", epicMode = true, options = opts,
-    text = "Choose the epic card of this expedition, or none.\nIts rule is in play from the start of each combat." }
-end
-
 local function startRelicStep(exp)
   local avail = available(exp)
   local opts = {}
@@ -1271,9 +1257,7 @@ function C.step()
     return { kind = "combat", title = exp.fight and FIGHT_TITLE[exp.fight.kind] or "Combat", options = {},
       state = exp.combat }
   elseif ph == "map" then return mapStep(exp)
-  elseif ph == "start" then
-    if exp.startEpics then return startEpicStep(exp) end
-    return startRelicStep(exp)
+  elseif ph == "start" then return startRelicStep(exp)
   elseif ph == "reward" then return rewardStep(exp)
   elseif ph == "campfire" then
     if C.ui.view == "upgrade" then return deckStep(exp, "upgrade") end

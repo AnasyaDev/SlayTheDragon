@@ -961,6 +961,11 @@ Pourquoi cette règle plutôt qu'Innate ou « tant qu'elle est dans le deck » :
 
 ## B. Une épique par expédition, et l'offre garantie
 
+> **Remplacé le 14/11/2026 (décision du joueur, `docs/zones/decisions.md`) : l'épique se gagne.** Plus d'offre
+> à l'étape 1 ni d'offre à chaque élite : une épique tombe sur un élite avec une chance qui monte de zone en
+> zone (25 % à Westfall, +10 points par zone, 85 % à Blackrock Mountain), ou s'achète chez le marchand.
+> Règle en vigueur : `docs/expedition.md`, « Cartes épiques ». Le reste de cette partie est l'historique.
+
 ### Règle de jeu
 
 1. **Le deck contient zéro ou une épique.** Les épiques ne sont jamais tirées dans les récompenses de

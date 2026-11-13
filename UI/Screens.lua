@@ -843,8 +843,7 @@ end
 -- Récompense : 3 cartes en grand, butin au sol, deck, « Reprendre la route » ; coffre à ouvrir
 ---------------------------------------------------------------------------
 
--- « startEpic » : épique de l'expédition au choix, au départ (même écran, mode « Epic », sans butin ni départ)
-local Reward = { kinds = { "reward", "startEpic" } }
+local Reward = { kinds = { "reward" } }
 UI.register("reward", Reward)
 
 -- Planche ecran_recompense.jpg : trois cartes ×1,08 (centres x 407 / 552 / 697, haut du corps y 147),
@@ -854,8 +853,8 @@ local REWARD_TOP = 147
 local REWARD_CARDS = { 407, 552, 697 }
 -- choix « Epic » : titre au-dessus des languettes de coût, consigne décalée à gauche du bouton « Skip »
 local REWARD_EPIC_TITLE_Y, REWARD_HINT_X, REWARD_HINT_EPIC_X = 98, 552, 470
--- « Skip » : à gauche de « Back on the road » après une élite ; à sa place au départ (aucun départ à prendre)
-local REWARD_SKIP_X, REWARD_SKIP_START_X, REWARD_SKIP_Y = 810 - 14 - 150, 913 - 75, 497
+-- « Skip » : à gauche de « Back on the road »
+local REWARD_SKIP_X, REWARD_SKIP_Y = 810 - 14 - 150, 497
 
 function Reward:Build(f)
   self.hero = heroFigure(f)
@@ -895,7 +894,7 @@ function Reward:Build(f)
   self.leave = W.button(f, "Back on the road", 206, 50, nil, "gold", 18)
   at(self.leave, f, 913 - 103, 519 - 25, 206, 50)
   self.leave:SetScript("OnClick", function() Reward:Leave() end)
-  -- choix « Epic » (première élite gagnée) : titre violet au-dessus des cartes, « Skip » à gauche du départ
+  -- choix « Epic » (épique tombée sur un élite) : titre violet au-dessus des cartes, « Skip » à gauche du départ
   self.epicTitle = W.label(f, "heavy", 20, W.EPIC_TEXT, "OVERLAY")
   self.epicTitle:SetPoint("CENTER", f, "TOPLEFT", 552, -REWARD_EPIC_TITLE_Y)
   self.epicTitle:SetText("Epic card")
@@ -940,8 +939,7 @@ function Reward:Show(step)
   self.pile:Sync()
   self.optionButtons = {}
   self.cardOptions = {}
-  local startMode = step.kind == "startEpic"
-  local closed = not self.opened and not startMode
+  local closed = not self.opened
   if closed then
     self.chest:Show()
     self.chest.info = { title = "Chest" }
@@ -1001,19 +999,16 @@ function Reward:Show(step)
   local anyCard = false
   for _, o in ipairs(step.options) do if o.card then anyCard = true end end
   if anyCard and not closed then self.hint:Show() else self.hint:Hide() end
-  -- choix « Epic » : consigne, titre violet, « Skip »
-  -- (départ : choix de l'épique de l'expédition, « Skip » à la place du départ ; élite : remplacement)
+  -- choix « Epic » (épique tombée sur un élite) : consigne, titre violet, « Skip » à gauche du départ
   local epic = step.epicMode and not closed
   local hint = "Choose one card, or none."
-  if startMode then hint = "Choose the epic card of this expedition, or none."
-  elseif epic then
+  if epic then
     hint = (exp and ns.Expedition.epicIndex(exp)) and "Replace your epic card, or skip it."
       or "Take this epic card, or skip it."
   end
   self.hint:SetText(hint)
   self.hint:ClearAllPoints()
-  self.hint:SetPoint("CENTER", self.frame, "TOPLEFT", (epic and not startMode) and REWARD_HINT_EPIC_X or REWARD_HINT_X, -519)
-  at(self.skip, self.frame, startMode and REWARD_SKIP_START_X or REWARD_SKIP_X, REWARD_SKIP_Y, 150, 44)
+  self.hint:SetPoint("CENTER", self.frame, "TOPLEFT", epic and REWARD_HINT_EPIC_X or REWARD_HINT_X, -519)
   if epic then self.epicTitle:Show() self.skip:Show() else self.epicTitle:Hide() self.skip:Hide() end
   if hold.gold and not closed then
     self.goldBag.big:SetText(tostring(hold.gold))

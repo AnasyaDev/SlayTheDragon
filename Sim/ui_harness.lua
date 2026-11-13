@@ -894,10 +894,7 @@ local function option(id)
   return nil
 end
 
--- Offre d'épique au départ (classe qui a débloqué des épiques réelles, Prêtre dès Westfall gagnée) : un
--- scénario qui ne la vise pas la refuse (« Skip ») et poursuit comme avant.
 local function clickOption(id)
-  if currentKind() == "startEpic" and not option(id) and option("skipEpic") then H.click(button("skipEpic")) end
   H.click(button(id))
 end
 
@@ -1396,8 +1393,8 @@ ns = H.ns
 ns.Controller.makeSeed = function() return SEED + 1 end
 H.click(UI().current.go)
 exp = EXP()
--- Westfall gagnée : le Prêtre a débloqué Prayer of Mending, offerte au départ ; refusée ici
-if currentKind() == "startEpic" then clickOption("skipEpic") end
+check("Westfall gagnée : aucune épique offerte au départ (elle se gagne)", currentKind() ~= "startEpic"
+  and exp and exp.startEpics == nil and ns.Expedition.epicIndex(exp) == nil, currentKind())
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
   check("clé mythique dans le bandeau (hexagone violet « +N »)", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
@@ -8698,7 +8695,7 @@ do
   local content
   local W
 
-  -- 0. Départ : l'épique de l'expédition au choix (trois débloquées), puis le bibelot au choix ----------
+  -- 0. Départ : aucune épique offerte (elle se gagne : élites, marchand), le bibelot au choix seul -------
   H.boot(nil)
   H.slash("")
   local ns = H.ns
@@ -8713,41 +8710,16 @@ do
   clickOption("go")
   local st, scr = UI().step, UI().current
   local e = EXP()
-  check("départ : choix « Epic » d'abord (trois épiques débloquées), le bibelot ensuite", currentKind() == "startEpic"
-    and e.phase == "start" and #e.startEpics == 3 and e.startRelics ~= nil and option("pickEpic:3") and option("skipEpic")
-    and not option("startRelic:1"), currentKind())
-  local shown, okFrames, okCost = 0, true, true
-  for _, card in ipairs(scr.cards) do
-    if vis(card) then
-      shown = shown + 1
-      if not epicFrame(card) then okFrames = false end
-      if not noCost(card) then okCost = false end
-    end
-  end
-  check("départ : trois cartes au cadre violet, sans coût (languette « Epic »), plaque « Epic »", shown == 3
-    and okFrames and okCost)
+  check("départ : aucune épique offerte (trois débloquées), le bibelot au choix seul", currentKind() == "startRelic"
+    and e.phase == "start" and e.startEpics == nil and e.startRelics ~= nil and option("startRelic:1") ~= nil
+    and not option("pickEpic:1") and not option("skipEpic") and ns.Expedition.epicIndex(e) == nil, currentKind())
   content = R.rect(ns.UI.content)
-  local hr, sr = R.rect(scr.hint), R.rect(scr.skip)
-  check("départ : titre « Epic card », consigne, « Skip » à la place du départ (pas de « Back on the road »)",
-    vis(scr.epicTitle) and scr.epicTitle._text == "Epic card" and vis(scr.skip) and button("skipEpic") == scr.skip
-    and scr.hint._text == "Choose the epic card of this expedition, or none." and not vis(scr.leave)
-    and not overlaps(hr, sr) and inside(sr, content) and inside(hr, content)
-    and not overlaps(R.rect(scr.epicTitle), R.rect(scr.cards[1].ribbon)), tostring(scr.hint._text))
+  local hr, sr
   local function plainText(t) return (t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
-  local ctt = plainText(table.concat(H.hover(scr.cards[1]), " | "))
-  check("départ : infobulle de la carte (Epic : en jeu dès le début de chaque combat, une par expédition)",
-    ctt:find("in play from the start of each combat", 1, true) and ctt:find("One epic card per expedition", 1, true), ctt)
-  H.settle()
-  check("départ : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
-  snap("ue-depart-epique", true)
-  local ia
-  for i, id in ipairs(e.startEpics) do if id == "ue_epic_a" then ia = i end end
-  H.click(scr.cards[ia])
-  H.settle()
-  check("départ : épique prise sans confirmation, puis le bibelot au choix", e.deck[ns.Expedition.epicIndex(e)].id == "ue_epic_a"
-    and currentKind() == "startRelic" and option("startRelic:1") ~= nil and not ns.UI.epicConfirm:IsShown(), currentKind())
   clickOption("skipStartRelic")
   check("départ : puis la carte", currentKind() == "map", currentKind())
+  -- épique gagnée plus tôt (simulée : elle tombe sur un élite, plus loin) : Test Epic dans le deck
+  ns.Expedition.addCard(e, "ue_epic_a")
 
   -- 1. Combat : l'épique est une règle en jeu (premier des Powers, liseré violet), hors de la main ----------
   local sm = e.deck[1] -- Smite améliorée : la variante hérite de l'amélioration
@@ -8806,7 +8778,9 @@ do
   snap("ue-carte-epique", true)
   dv:Close()
 
-  -- 2. Victoire sur l'élite : une épique de remplacement, avant les cartes ------------------------------
+  -- 2. Victoire sur l'élite : une épique tombe (chance imposée à 100 %), avant les cartes -----------------
+  local oldDrop = ns.Expedition.EPIC.drop.elite
+  ns.Expedition.EPIC.drop.elite = { 1 }
   for _, en in ipairs(c.enemies) do en.hp = 1 end
   local att
   for i, inst in ipairs(c.hand) do if ns.Card.def(inst).type == "attack" then att = i break end end
@@ -8825,6 +8799,7 @@ do
     ns.Controller.play(#c.hand, t)
   end
   H.settle()
+  ns.Expedition.EPIC.drop.elite = oldDrop
   check("élite vaincue", C().over() == "won", C().over())
   H.click(V().banner.button)
   H.settle()
@@ -8850,9 +8825,13 @@ do
     and math.abs(scr.cards[1].cx - 552) < 0.5, tostring(scr.hint._text))
   hr, sr = R.rect(scr.hint), R.rect(scr.skip)
   check("remplacement proposé : consigne, « Skip » et départ sans chevauchement, dans la fenêtre",
-    not overlaps(hr, sr) and not overlaps(sr, R.rect(scr.leave)) and inside(sr, content)
+    not overlaps(hr, sr) and not overlaps(sr, R.rect(scr.leave)) and inside(sr, content) and inside(hr, content)
     and inside(R.rect(scr.epicTitle), content) and not overlaps(R.rect(scr.epicTitle), R.rect(scr.cards[1].ribbon)))
+  local ctt = plainText(table.concat(H.hover(scr.cards[1]), " | "))
+  check("épique proposée : infobulle (Epic : en jeu dès le début de chaque combat, une par expédition)",
+    ctt:find("in play from the start of each combat", 1, true) and ctt:find("One epic card per expedition", 1, true), ctt)
   H.settle()
+  check("épique proposée : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("ue-choix-epic", true)
 
   -- 3. Remplacement : confirmation (« The upgrade is lost. »), « Keep » puis « Replace » -----------------

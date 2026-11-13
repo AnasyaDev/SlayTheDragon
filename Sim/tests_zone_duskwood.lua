@@ -388,7 +388,6 @@ return function(T)
     o = o or {}
     local exp = X.new({ seed = o.seed or 5, class = o.class or "priest", zone = "duskwood", quiet = true,
       unlocks = o.unlocks or { level = 7, common = 1, won = { westfall = 0 } } })
-    if exp.phase == "start" and exp.startEpics then X.act(exp, { "skipEpic" }) end
     if exp.phase == "start" then X.act(exp, { "skipStartRelic" }) end
     return exp
   end

@@ -52,8 +52,27 @@ return function(ns)
     return advised("upgrade", card.id) or up and up[card.id] or rating(card.id)
   end
 
+  -- Meilleure amélioration. L'épique du deck : sa table byEpic[id].upgrade la classe parmi quelques cartes
+  -- (le plus souvent celles du deck de départ), sur une échelle propre à chaque classe (Warrior et Priest ≈ 9
+  -- à 14, les autres ≈ 0 à 5) ; une carte absente de la table prend la note de choix (rating, ≈ 5 à 14), qui
+  -- passait devant l'épique dès qu'une bonne carte avait été prise : l'épique n'était presque jamais
+  -- améliorée. Elle passe donc devant toute carte que sa table ne classe pas au-dessus d'elle (elle est en
+  -- jeu à chaque combat, une carte du deck seulement quand elle est piochée) : tant qu'elle est à améliorer,
+  -- le choix se fait d'abord entre elle et les cartes que sa table classe au moins aussi haut, dans l'ordre
+  -- de la table ; ensuite, comme avant.
   local function bestUpgrade(exp)
+    local ei = X.epicIndex(exp)
+    local tbl = advice and type(advice.upgrade) == "table" and advice.upgrade
+    local epicV = ei and tbl and X.canUpgrade(exp, ei) and tbl[exp.deck[ei].id]
     local best, bestV = nil, -1
+    if epicV then
+      best, bestV = ei, epicV
+      for i = 1, #exp.deck do
+        local v = i ~= ei and X.canUpgrade(exp, i) and tbl[exp.deck[i].id]
+        if v and v > bestV then best, bestV = i, v end
+      end
+      return best
+    end
     for i = 1, #exp.deck do
       if X.canUpgrade(exp, i) then
         local v = upgradeValue(exp, exp.deck[i])
@@ -160,7 +179,7 @@ return function(ns)
   end
   SE.epicGain = epicGain
 
-  -- Choix « Epic » (départ, élites) : index de l'épique à prendre, ou nil (refus). Épique imposée (epic=) :
+  -- Choix « Epic » (épique tombée sur un élite) : index de l'épique à prendre, ou nil (refus). Épique imposée (epic=) :
   -- jamais remplacée, pour qu'elle soit mesurée sur toute l'expédition.
   local function pickEpic(exp, opts, rng, epics)
     if opts.pick == "skip" or opts.epic or #epics == 0 then return nil end
@@ -289,12 +308,6 @@ return function(ns)
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then
-      -- épique de l'expédition d'abord (exp.startEpics), puis le bibelot de départ
-      if exp.startEpics then
-        local i = pickEpic(exp, opts, rng, exp.startEpics)
-        if i then return { "pickEpic", i } end
-        return { "skipEpic" }
-      end
       return has(ch, "startRelic") or { "skipStartRelic" }
     elseif ph == "map" then
       local paths = {}
@@ -475,8 +488,6 @@ return function(ns)
           record.picks[#record.picks + 1] = exp.reward.cards[a[2]]
         elseif exp.phase == "reward" and a[1] == "pickEpic" then
           record.picks[#record.picks + 1] = exp.reward.epics[a[2]]
-        elseif exp.phase == "start" and a[1] == "pickEpic" then
-          record.picks[#record.picks + 1] = exp.startEpics[a[2]]
         elseif a[1] == "upgrade" then
           record.picks[#record.picks + 1] = "up:" .. exp.deck[a[2]].id
         elseif a[1] == "rest" then
@@ -499,6 +510,10 @@ return function(ns)
     record.xp = Meta.xpFor(exp)
     record.removed = exp.stats.removed
     record.upgraded = exp.stats.upgraded
+    -- épique du deck en fin d'expédition (gagnée, achetée ou imposée) et son amélioration
+    local ei = X.epicIndex(exp)
+    record.epicEnd = ei and 1 or 0
+    record.epicUp = ei and exp.deck[ei].up and 1 or 0
     record.events = exp.stats.events -- { id = réponse choisie }
     return record, exp
   end

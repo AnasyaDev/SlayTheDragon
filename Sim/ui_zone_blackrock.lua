@@ -54,11 +54,8 @@ local function body(T)
   -- Expédition à Blackrock ; combat de la route sur le Molten Span
   ns.Controller.makeSeed = function() return T.SEED end
   clickOption("go")
-  -- départ : épique ou bibelot au choix (zone 3 gagnée par le compte) passés
-  for _ = 1, 3 do
-    if T.option("skipEpic") then clickOption("skipEpic")
-    elseif T.option("skipStartRelic") then clickOption("skipStartRelic") end
-  end
+  -- départ : bibelot au choix (zone 3 gagnée par le compte) passé
+  if T.option("skipStartRelic") then clickOption("skipStartRelic") end
   local exp = EXP()
   check("expédition à Blackrock Mountain", exp and exp.zone == "blackrock", exp and exp.zone)
   local id = exp.map.start[1]

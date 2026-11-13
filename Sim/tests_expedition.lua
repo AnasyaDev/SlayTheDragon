@@ -93,7 +93,6 @@ local function newExp(opts)
   opts.seed = opts.seed or 11
   if opts.quiet == nil then opts.quiet = true end
   local exp = X.new(opts)
-  if exp.phase == "start" and exp.startEpics and not opts.keepStart then assert(X.act(exp, { "skipEpic" })) end
   if exp.phase == "start" and not opts.keepStart then assert(X.act(exp, { "skipStartRelic" })) end
   return exp
 end
@@ -1290,10 +1289,10 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 5); eq(Save.VERSION, 5); eq(X.VERSION, 6)
+  eq(note, "migrated"); eq(db.version, 5); eq(Save.VERSION, 5); eq(X.VERSION, 7)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 6); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
+  eq(m.version, X.VERSION); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
   eq(m.combat.class, "priest"); eq(type(m.combat.cls), "table")
   assert(Save.validate(db))
   -- le combat migré se joue tout de suite (compteurs du tour recréés), puis au tour suivant
@@ -1337,7 +1336,7 @@ test("sauvegarde v3 -> v5 : réputation de classe convertie en expérience, exp�
   eq(w.rep, 800, "ancienne réputation gardée"); eq(w.zones.westfall.keyMax, 1); eq(db.meta.league, nil)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 6); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
+  eq(m.version, X.VERSION); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
   eq(m.unlock.level, Meta.classLevel(w.xp), "niveau de sa classe après migration")
   eq(Meta.classLevel(w.xp), 4)
   assert(Save.validate(db))
@@ -1891,7 +1890,7 @@ test("sauvegarde v4 -> v5 : zones par classe et du compte, Ligue abandonnée, ex
   eq(m.flags.tobin_spared, true); eq(db.options.scale, 1.1); eq(db.journal[1].rep, 110, "journal intact")
   local x = db.current
   assert(x, "expédition gardée")
-  eq(x.version, 6); eq(x.zone, "westfall")
+  eq(x.version, X.VERSION); eq(x.zone, "westfall")
   eq(x.unlock.level, 2); eq(x.unlock.league, nil); eq(x.unlock.common, 1); eq(x.unlock.won.westfall, 1)
   assert(Save.validate(db))
   -- l'expédition continue : combat, puis fin et méta
@@ -1911,6 +1910,52 @@ test("sauvegarde v4 -> v5 : zones par classe et du compte, Ligue abandonnée, ex
     rogue = { xp = 20, runs = 1, wins = 0, keyMax = 0, bestKey = -1 } } }, journal = {} })
   eq(next(none.meta.zones), nil); eq(next(none.meta.classes.rogue.zones), nil)
   assert(Save.validate(none))
+end)
+
+test("récompenses de cartes : part de rares croissante par rang de zone (X.RARE_BY_ZONE)", function()
+  local t = X.RARE_BY_ZONE
+  eq(#t, ns.Zone.count()); eq(t[1], 1, "zone 1 : poids d'origine"); eq(t[#t], 2, "zone 7 : le double")
+  for rank = 2, #t do assert(t[rank] > t[rank - 1], "hausse régulière") end
+  local w1 = X.cardWeights(newExp({ zone = "westfall" }), "combat")
+  eq(w1, X.CARD_WEIGHTS.combat, "Westfall : la table d'origine elle-même (tirages inchangés)")
+  for rank, zone in ipairs(ns.Zone.ORDER) do
+    local exp = newExp({ zone = zone })
+    for _, kind in ipairs({ "combat", "elite", "shop" }) do
+      local base, w = X.CARD_WEIGHTS[kind], X.cardWeights(exp, kind)
+      local tb, tw = base.common + base.uncommon + base.rare, w.common + w.uncommon + w.rare
+      assert(math.abs(tb - tw) < 1e-9, "total inchangé")
+      eq(w.uncommon, base.uncommon)
+      assert(math.abs(w.rare / tw - t[rank] * base.rare / tb) < 1e-9, kind .. " rang " .. rank .. " : part de rares")
+      assert(w.common >= 0)
+    end
+    eq(X.cardWeights(exp, "boss"), X.CARD_WEIGHTS.boss, "boss : que des rares, inchangé")
+  end
+  -- tirages réels : la part de rares des récompenses de combat et d'élite double à peu près en zone 7
+  local function rareShare(zone, kind)
+    local exp = newExp({ zone = zone, unlocks = Meta.allUnlocked(7, 7) })
+    local rares, n = 0, 0
+    for _ = 1, 400 do
+      for _, id in ipairs(X.rollReward(exp, kind).cards) do
+        n = n + 1
+        if ns.Cards[id].rarity == "rare" then rares = rares + 1 end
+      end
+    end
+    return rares / n
+  end
+  for _, kind in ipairs({ "combat", "elite" }) do
+    local s1, s7 = rareShare("westfall", kind), rareShare("blackrock", kind)
+    assert(s7 > 1.5 * s1 and s7 < 2.6 * s1, kind .. " : " .. s1 .. " -> " .. s7)
+  end
+  -- marchand : mêmes poids (cartes de classe et emplacement « Neutral »)
+  local seen = {}
+  local orig = X.cardWeights
+  X.cardWeights = function(exp, kind) seen[kind] = true return orig(exp, kind) end
+  local exp = newExp({ zone = "blackrock" })
+  local id = X.choices(exp)[1][2]
+  exp.map.nodes[id].kind = "merchant"
+  local ok, err = pcall(X.act, exp, { "path", id })
+  X.cardWeights = orig
+  assert(ok, err); eq(exp.phase, "merchant"); assert(seen.shop, "marchand : part de rares de la zone")
 end)
 
 print(("%d réussis, %d échoués"):format(passed, failed))

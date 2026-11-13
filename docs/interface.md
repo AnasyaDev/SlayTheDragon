@@ -204,13 +204,9 @@ hors de toute pile, sans coût).
   expedition: a new one replaces it. » (`W.EPIC_HINT`) et une ligne par transformation (« While in the deck:
   Smite becomes … », `W.transformLines`) ; une variante montrée hors combat ajoute « Transformed Smite. » (option
   de carte `from`).
-- **Choix au départ** (étape `startEpic`, phase `"start"` avec `exp.startEpics`) : l'écran de récompense en
-  mode « Epic », sans butin : titre violet « Epic card » au-dessus des cartes (trois, ou centrées s'il y en a
-  moins), consigne « Choose the epic card of this expedition, or none. » au centre du plateau, bouton rouge
-  « Skip » (150 × 44) à la place de « Back on the road » (caché : rien d'autre à prendre). Prendre une épique ne
-  demande pas de confirmation (le deck n'en a pas). Puis, si la zone 3 est gagnée, le bibelot au choix (écran
-  de rencontre, étape `startRelic`) ; puis la carte.
-- **Récompense d'élite** (une épique de remplacement) : montrée AVANT les cartes ordinaires (étape `epicMode`) :
+- **Rien au départ** (règle du 14/11/2026 : l'épique se gagne) : l'écran de choix d'épique au départ (étape
+  `startEpic`) est retiré ; le départ ne propose que le bibelot au choix (zone 3 gagnée, étape `startRelic`).
+- **Récompense d'élite** (une épique tombée, `Expedition.rollEpicDrop`) : montrée AVANT les cartes ordinaires (étape `epicMode`) :
   titre violet « Epic card », la carte centrée, consigne « Replace your epic card, or skip it. » (« Take this
   epic card, or skip it. » sans épique dans le deck) décalée à gauche, « Skip » à gauche de « Back on the
   road ». Après le choix (ou « Skip ») : les cartes ordinaires, comme avant.
@@ -242,9 +238,10 @@ hors de toute pile, sans coût).
   montre l'aperçu à taille réelle (sous `W.PREVIEW_BELOW`).
 - **Bilan** : « New epic card: X. » en violet ; la carte est présentée à part (`unlocked.epic`) : à 0,72, à
   gauche de la rangée des déblocages, libellé violet « New epic card » au-dessus ; le panneau grandit d'autant.
-- Harnais : section **UE** (avant U16) ; planches `ue-depart-epique` (choix au départ), `ue-combat-epique`
+- Harnais : section **UE** (avant U16 ; départ sans épique, puis l'épique posée dans le deck comme gagnée, chute
+  imposée à 100 % pour l'élite) ; planches `ue-combat-epique`
   (l'épique parmi les Powers), `ue-carte-epique` (panneau du deck : carte sans coût, en tête), `ue-choix-epic`
-  (remplacement après une élite), `ue-remplacement` (confirmation, « The upgrade is lost. »),
+  (épique tombée après une élite, infobulle), `ue-remplacement` (confirmation, « The upgrade is lost. »),
   `ue-crans-rage-10` (deux arcs), `ue-progression-zones`, `ue-bilan-epique`. Les aperçus PNG des textures
   (`build/media_png`, copiés par le harnais) doivent contenir `card_cost_epic.png` et `card_ribbon_epic.png`.
 - Non vérifiable hors jeu : rendu réel du violet des pièces et des auras sur les décors, lisibilité de « Epic »

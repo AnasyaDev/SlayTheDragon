@@ -1,5 +1,5 @@
 -- Tests du socle des cartes épiques (rareté epic, une seule par expédition, transformations, règle en jeu
--- dès le début du combat, offres au départ et aux élites, Innate, effets passifs du deck) et des points
+-- dès le début du combat, chute par élite selon la zone et marchand, Innate, effets passifs du deck) et des points
 -- d'accroche de classe qu'elles demandent.
 -- Aucune carte réelle : des cartes factices (préfixe te_), retirées à la fin.
 -- Usage : lua5.1 Sim/tests_epic.lua   (ou luajit) — doit finir par ALL PASS.
@@ -141,9 +141,8 @@ local function newExp(zones, seed, extra)
   return X.new(o)
 end
 
--- Passe les choix de départ (épique, puis bibelot).
+-- Passe le choix de départ (bibelot).
 local function skipStart(exp)
-  if exp.phase == "start" and exp.startEpics then assert(X.act(exp, { "skipEpic" })) end
   if exp.phase == "start" then assert(X.act(exp, { "skipStartRelic" })) end
 end
 
@@ -261,110 +260,153 @@ test("transformations : appliquées à l'affichage et en combat, défaites quand
 end)
 
 ---------------------------------------------------------------------------
--- 4. Offre garantie
+-- 4. L'épique se gagne : chute par élite selon la zone, marchand
 ---------------------------------------------------------------------------
-test("départ : choix parmi 3 épiques débloquées (distinctes), avant le bibelot de départ, puis la carte", function()
+-- Chance de chute imposée le temps de f (X.EPIC.drop.elite), remise ensuite même en cas d'échec.
+local function withDrop(chances, f)
+  local old = X.EPIC.drop.elite
+  X.EPIC.drop.elite = chances
+  local ok, err = pcall(f)
+  X.EPIC.drop.elite = old
+  if not ok then error(err, 0) end
+end
+
+test("départ : aucune épique offerte (elle se gagne) ; seul le bibelot de départ, puis la carte", function()
   local exp = newExp(7, 5)
   eq(exp.phase, "start")
-  assert(exp.startEpics and exp.startRelics, "épique et bibelot au départ (zones=7)")
-  eq(#exp.startEpics, X.EPIC.start); eq(X.EPIC.start, 3)
-  local seen = {}
-  for _, id in ipairs(exp.startEpics) do
-    assert(not seen[id], "distinctes"); seen[id] = true
-    eq(Cards[id].rarity, "epic")
-  end
-  eq(exp.epicOffered, true)
+  assert(exp.startRelics, "bibelot au départ (zones=7)")
+  eq(exp.startEpics, nil); eq(exp.epicOffered, nil); eq(X.EPIC.start, nil); eq(X.EPIC.offerOn, nil)
+  eq(X.epicIndex(exp), nil, "aucune épique dans le deck")
+  eq(exp.rng.epic, nil, "aucun tirage d'épique au départ")
   local ch = X.choices(exp)
-  assert(has(ch, "pickEpic", 1) and has(ch, "pickEpic", 3) and has(ch, "skipEpic"))
-  assert(not has(ch, "startRelic") and not has(ch, "path"), "l'épique d'abord")
-  assert(not X.act(exp, { "startRelic", 1 }), "bibelot refusé avant l'épique")
-  local id = exp.startEpics[2]
-  local n = #exp.deck
-  assert(X.act(exp, { "pickEpic", 2 }))
-  eq(#exp.deck, n + 1); eq(exp.deck[X.epicIndex(exp)].id, id); eq(exp.deck[X.epicIndex(exp)].up, false)
-  eq(exp.startEpics, nil); eq(exp.startEpicPicked, id)
-  -- le bibelot ensuite, sur le même départ
-  eq(exp.phase, "start")
-  ch = X.choices(exp)
   assert(has(ch, "startRelic", 1) and has(ch, "skipStartRelic") and not has(ch, "pickEpic"))
-  assert(not X.act(exp, { "pickEpic", 1 }), "plus d'épique")
+  assert(not X.act(exp, { "pickEpic", 1 }), "pas d'épique au départ")
   assert(X.act(exp, { "startRelic", 1 }))
   eq(exp.phase, "map")
-  assert(Save.validateExpedition(reload(exp)))
-end)
-
-test("départ : une seule épique débloquée = elle seule, « Skip » = aucune épique ; aucune débloquée = rien", function()
-  local exp = newExp(1, 6)
-  eq(exp.phase, "start")
-  eq(#exp.startEpics, 1); eq(exp.startEpics[1], "te_epic_a")
-  eq(exp.startRelics, nil, "pas de bibelot de départ à zones=1")
-  assert(Save.validateExpedition(reload(exp)), "phase de départ sauvegardable")
-  assert(X.act(exp, { "skipEpic" }))
-  eq(exp.phase, "map"); eq(X.epicIndex(exp), nil)
-  -- sans épique débloquée : ni phase de départ, ni tirage (flux « epic » jamais créé)
-  local e0 = newExp(0, 6)
-  eq(e0.phase, "map"); eq(e0.startEpics, nil); eq(e0.epicOffered, false); eq(e0.rng.epic, nil)
-  enter(e0, "elite")
-  winFight(e0)
-  eq(e0.reward.epics, nil)
-  eq(e0.rng.epic, nil)
-  -- épique imposée (simulation : epic=) : pas d'offre de départ
+  -- sans bibelot de départ (zones=1) : la carte tout de suite
+  eq(newExp(1, 6).phase, "map")
+  -- épique imposée (simulation : epic=) : dans le deck dès le départ
   local ef = newExp(7, 6, { epic = "te_epic_c" })
-  eq(ef.startEpics, nil); eq(ef.deck[X.epicIndex(ef)].id, "te_epic_c")
-  -- X.EPIC.start = 0 : pas d'offre de départ
-  local old = X.EPIC.start
-  X.EPIC.start = 0
-  local ez = newExp(7, 6)
-  X.EPIC.start = old
-  eq(ez.startEpics, nil); eq(ez.epicOffered, false)
+  eq(ef.deck[X.epicIndex(ef)].id, "te_epic_c")
 end)
 
-test("élites : chaque élite gagnée propose UNE épique de remplacement (autre que celle du deck), refusable", function()
-  local exp = newExp(7, 5)
-  assert(X.act(exp, { "pickEpic", 1 }))
-  local mine = exp.deck[X.epicIndex(exp)].id
-  enter(exp, "combat")
-  winFight(exp)
-  eq(exp.reward.epics, nil, "combat normal : rien")
-  assert(X.act(exp, { "leave" }))
-  for k = 1, 2 do
+test("chute par élite : table par rang de zone, 25 % à Westfall, +10 points par zone, 85 % à Blackrock", function()
+  local t = X.EPIC.drop.elite
+  eq(#t, 7)
+  for rank = 1, 7 do
+    assert(math.abs(t[rank] - (0.25 + 0.10 * (rank - 1))) < 1e-9, "rang " .. rank)
+    local exp = newExp(0, 1, { zone = ns.Zone.ORDER[rank] })
+    eq(X.zoneRank(exp), rank)
+    eq(X.epicDropChance(exp, "elite"), t[rank])
+    eq(X.epicDropChance(exp, "combat"), 0, "combat normal : jamais")
+    eq(X.epicDropChance(exp, "boss"), 0, "boss : jamais")
+  end
+  -- table plus courte que la campagne : la dernière valeur au-delà
+  withDrop({ 0.5 }, function()
+    eq(X.epicDropChance(newExp(0, 1, { zone = "blackrock" }), "elite"), 0.5)
+  end)
+end)
+
+-- n élites gagnées (une par graine, graines 1..n) dans la zone : nombre d'épiques tombées ; chaque chute est
+-- vérifiée contre le premier tirage du flux « epic » de la graine.
+local function dropsIn(zone, n, zones)
+  local drops = 0
+  for seed = 1, n do
+    local exp = newExp(zones, seed, { zone = zone })
+    local p = X.epicDropChance(exp, "elite")
     enter(exp, "elite")
     winFight(exp)
-    local r = exp.reward
-    assert(r.epics, "élite " .. k .. " : offre")
-    eq(#r.epics, X.EPIC.choices); eq(X.EPIC.choices, 1)
-    assert(r.epics[1] ~= exp.deck[X.epicIndex(exp)].id, "pas celle du deck")
-    assert(r.cards and #r.cards > 0, "la récompense normale reste")
-    local ch = X.choices(exp)
-    assert(has(ch, "pickEpic", 1) and has(ch, "skipEpic") and has(ch, "pickCard", 1))
-    if k == 1 then
-      assert(X.act(exp, { "skipEpic" }))
-      eq(exp.deck[X.epicIndex(exp)].id, mine, "refusée : rien ne change")
-    else
-      exp.deck[X.epicIndex(exp)].up = true
-      assert(X.act(exp, { "pickEpic", 1 }))
-      eq(exp.deck[X.epicIndex(exp)].id, r.epics[1]); eq(exp.deck[X.epicIndex(exp)].up, false, "arrive non améliorée")
-      eq(exp.epicReplaced.oldUp, true)
+    local expected = Rng.float(Rng.stream(seed, "epic")) < p
+    eq(exp.reward.epics ~= nil, expected, zone .. " graine " .. seed)
+    if exp.reward.epics then
+      drops = drops + 1
+      eq(#exp.reward.epics, X.EPIC.choices)
+      assert(exp.reward.cards and #exp.reward.cards > 0, "la récompense normale reste")
     end
-    assert(not has(X.choices(exp), "pickEpic"))
-    assert(X.act(exp, { "leave" }))
   end
-  -- une seule épique débloquée, déjà dans le deck : rien à proposer
-  local e1 = newExp(1, 6)
-  assert(X.act(e1, { "pickEpic", 1 }))
-  enter(e1, "elite")
-  winFight(e1)
-  eq(e1.reward.epics, nil)
-  -- sans épique dans le deck (départ refusé) : l'élite en propose une
-  local e2 = newExp(1, 6)
-  enter(e2, "elite")
-  winFight(e2)
-  eq(#e2.reward.epics, 1); eq(e2.reward.epics[1], "te_epic_a")
+  return drops
+end
+
+test("chute par élite : graines fixées, zone 1 (Westfall) et zone 7 (Blackrock Mountain)", function()
+  local n = 200
+  local w = dropsIn("westfall", n, 7)
+  local b = dropsIn("blackrock", n, 7)
+  assert(w >= 0.15 * n and w <= 0.35 * n, "Westfall ≈ 25 % : " .. w .. " / " .. n)
+  assert(b >= 0.75 * n and b <= 0.95 * n, "Blackrock ≈ 85 % : " .. b .. " / " .. n)
+  -- mêmes graines, même résultat (tirage par le flux « epic » seul)
+  eq(dropsIn("westfall", 40, 7), dropsIn("westfall", 40, 7))
+end)
+
+test("chute par élite : aucune épique débloquée = rien ne tombe, aucun tirage (zone 1 et zone 7)", function()
+  for _, zone in ipairs({ "westfall", "blackrock" }) do
+    for seed = 1, 20 do
+      local exp = newExp(0, seed, { zone = zone })
+      eq(#X.epicPool(exp), 0)
+      enter(exp, "elite")
+      winFight(exp)
+      eq(exp.reward.epics, nil, zone)
+      eq(exp.rng.epic, nil, "flux « epic » jamais créé")
+    end
+  end
+  -- chance 100 % : rien non plus
+  withDrop({ 1 }, function()
+    local exp = newExp(0, 3)
+    enter(exp, "elite")
+    winFight(exp)
+    eq(exp.reward.epics, nil)
+  end)
+end)
+
+test("chute par élite : prendre (remplace celle du deck) ou garder l'actuelle ; combat normal : rien", function()
+  withDrop({ 1 }, function()
+    local exp = newExp(7, 5)
+    skipStart(exp)
+    enter(exp, "combat")
+    winFight(exp)
+    eq(exp.reward.epics, nil, "combat normal : rien")
+    assert(X.act(exp, { "leave" }))
+    -- sans épique dans le deck : l'élite en propose une
+    enter(exp, "elite")
+    winFight(exp)
+    assert(exp.reward.epics, "élite : offre")
+    assert(X.act(exp, { "pickEpic", 1 }))
+    local mine = exp.deck[X.epicIndex(exp)].id
+    eq(mine, exp.reward.epics[1])
+    assert(X.act(exp, { "leave" }))
+    for k = 1, 2 do
+      enter(exp, "elite")
+      winFight(exp)
+      local r = exp.reward
+      assert(r.epics, "élite " .. k .. " : offre")
+      eq(#r.epics, X.EPIC.choices); eq(X.EPIC.choices, 1)
+      assert(r.epics[1] ~= exp.deck[X.epicIndex(exp)].id, "pas celle du deck")
+      assert(r.cards and #r.cards > 0, "la récompense normale reste")
+      local ch = X.choices(exp)
+      assert(has(ch, "pickEpic", 1) and has(ch, "skipEpic") and has(ch, "pickCard", 1))
+      if k == 1 then
+        assert(X.act(exp, { "skipEpic" }))
+        eq(exp.deck[X.epicIndex(exp)].id, mine, "refusée : on garde l'actuelle")
+      else
+        exp.deck[X.epicIndex(exp)].up = true
+        assert(X.act(exp, { "pickEpic", 1 }))
+        eq(exp.deck[X.epicIndex(exp)].id, r.epics[1]); eq(exp.deck[X.epicIndex(exp)].up, false, "arrive non améliorée")
+        eq(exp.epicReplaced.oldUp, true)
+      end
+      assert(not has(X.choices(exp), "pickEpic"))
+      assert(X.act(exp, { "leave" }))
+    end
+    -- une seule épique débloquée, déjà dans le deck : rien à proposer
+    local e1 = newExp(1, 6)
+    X.addCard(e1, "te_epic_a")
+    enter(e1, "elite")
+    winFight(e1)
+    eq(e1.reward.epics, nil)
+  end)
 end)
 
 test("feu de camp : l'épique s'améliore au choix ; les améliorations au hasard l'évitent", function()
   local exp = newExp(7, 5)
-  assert(X.act(exp, { "pickEpic", 1 }))
+  X.addCard(exp, "te_epic_a")
   local i = X.epicIndex(exp)
   assert(X.canUpgrade(exp, i))
   -- au hasard : toutes les autres cartes d'abord, jamais l'épique
@@ -380,8 +422,7 @@ test("feu de camp : l'épique s'améliore au choix ; les améliorations au hasar
   eq(exp.deck[i].up, true)
 end)
 
-test("offre : un combat d'élite de rencontre compte aussi", function()
-  local exp = newExp(7, 8)
+test("chute : un combat d'élite de rencontre compte aussi", function()
   local function hasFight()
     for _, ev in pairs(ns.Events) do
       for _, ch in ipairs(ev.choices) do
@@ -390,11 +431,14 @@ test("offre : un combat d'élite de rencontre compte aussi", function()
     end
   end
   if not hasFight() then return end
-  -- simulé : la récompense d'un combat d'élite de rencontre a le genre « elite »
-  enter(exp, "elite")
-  eq(exp.fight.kind, "elite")
-  winFight(exp)
-  assert(exp.reward.epics)
+  withDrop({ 1 }, function()
+    local exp = newExp(7, 8)
+    -- simulé : la récompense d'un combat d'élite de rencontre a le genre « elite »
+    enter(exp, "elite")
+    eq(exp.fight.kind, "elite")
+    winFight(exp)
+    assert(exp.reward.epics)
+  end)
 end)
 
 test("marchand : une épique (prix élevé) à partir de la moitié du parcours, achat = remplacement", function()
@@ -733,25 +777,76 @@ end)
 ---------------------------------------------------------------------------
 -- 7. Sauvegarde, simulation
 ---------------------------------------------------------------------------
-test("sauvegarde : expédition v5 en cours migrée en v6, puis jouable (offre de remplacement à chaque élite)", function()
+test("sauvegarde : expédition v5 en cours migrée en v7, puis jouable (chute d'épique aux élites)", function()
   local exp = newExp(7, 11)
   skipStart(exp)
   exp.version = 5
-  exp.epicOffered = nil
   local db = Save.new()
   db.current = reload(exp)
   local out = Save.migrate(db)
   local m = out.current
   assert(m, "gardée")
-  eq(m.version, X.VERSION); eq(X.VERSION, 6); eq(m.epicOffered, false); eq(m.startEpics, nil)
+  eq(m.version, X.VERSION); eq(X.VERSION, 7); eq(m.epicOffered, nil); eq(m.startEpics, nil)
   assert(Save.validate(out))
-  enter(m, "elite")
-  winFight(m)
+  withDrop({ 1 }, function()
+    enter(m, "elite")
+    winFight(m)
+  end)
   assert(m.reward.epics, "offre")
   local again = reload(m)
   assert(Save.validateExpedition(again))
   assert(X.act(again, { "pickEpic", 1 }))
   eq(again.deck[X.epicIndex(again)].id, again.reward.epics[1])
+end)
+
+-- État v6 arrêté sur l'offre d'épique de l'ancienne règle (étape 1, phase « start »), avec ou sans bibelot de
+-- départ à choisir ensuite.
+local function oldStartState(seed, zones)
+  local exp = newExp(zones, seed)
+  exp.version = 6
+  exp.phase = "start"
+  exp.startEpics = { "te_epic_a", "te_epic_b", "te_epic_c" }
+  exp.epicOffered = true
+  return exp
+end
+
+test("sauvegarde : v6 arrêtée sur l'offre d'épique de l'étape 1 rechargée en v7 sans erreur", function()
+  -- sans bibelot de départ : l'offre disparaît, la carte tout de suite
+  local db = Save.new()
+  db.current = reload(oldStartState(13, 1))
+  eq(db.current.startRelics, nil)
+  local out, note = Save.migrate(db)
+  local m = out.current
+  assert(m, "gardée, pas en quarantaine : " .. tostring(note))
+  eq(#out.quarantine, 0)
+  eq(m.version, X.VERSION); eq(m.phase, "map")
+  eq(m.startEpics, nil); eq(m.startEpicPicked, nil); eq(m.epicOffered, nil); eq(X.epicIndex(m), nil)
+  assert(Save.validate(out))
+  assert(has(X.choices(m), "path"))
+  enter(m, "combat")
+  eq(m.phase, "combat")
+  -- avec le bibelot de départ encore à choisir : il reste, l'épique part
+  db = Save.new()
+  db.current = reload(oldStartState(13, 7))
+  assert(db.current.startRelics)
+  out = Save.migrate(db)
+  m = out.current
+  assert(m, "gardée")
+  eq(m.phase, "start"); eq(m.startEpics, nil)
+  assert(Save.validate(out))
+  local ch = X.choices(m)
+  assert(has(ch, "startRelic", 1) and not has(ch, "pickEpic"))
+  assert(X.act(m, { "startRelic", 1 }))
+  eq(m.phase, "map")
+  -- une épique déjà prise au départ (v6) reste dans le deck
+  local taken = newExp(7, 14)
+  skipStart(taken)
+  X.addCard(taken, "te_epic_b")
+  taken.version, taken.startEpicPicked, taken.epicOffered = 6, "te_epic_b", true
+  db = Save.new()
+  db.current = reload(taken)
+  m = Save.migrate(db).current
+  eq(m.deck[X.epicIndex(m)].id, "te_epic_b"); eq(m.startEpicPicked, nil); eq(m.epicOffered, nil)
 end)
 
 test("sauvegarde : v6 de l'ancienne règle (épique dans la pioche d'un combat en cours) reste jouable", function()
@@ -776,18 +871,32 @@ test("sauvegarde : v6 de l'ancienne règle (épique dans la pioche d'un combat e
   for _, inst in ipairs(allPiles(r.combat)) do assert(inst.id ~= "te_epic_b") end
 end)
 
-test("simulation : epic=<id> imposée et jamais remplacée ; le bot choisit au départ et aux élites ; epic=none", function()
+test("simulation : epic=<id> imposée et jamais remplacée ; sans option, l'épique se gagne ; epic=none", function()
   local rec, exp = ns.SimExpedition.play({ seed = 3, class = "rogue", epic = "te_epic_a", zones = 7 })
   eq(exp.deck[X.epicIndex(exp)].id, "te_epic_a")
   for _, p in ipairs(rec.picks) do assert(not (Cards[p] and Cards[p].rarity == "epic"), "aucune autre épique prise") end
-  -- avec des épiques débloquées : prise au départ (première décision)
-  local atStart = 0
-  for seed = 1, 6 do
-    local r = ns.SimExpedition.play({ seed = seed, class = "rogue", zones = 4 })
-    if r.picks[1] and Cards[r.picks[1]] and Cards[r.picks[1]].rarity == "epic" then atStart = atStart + 1 end
+  -- sans option, sans marchand d'épiques : une épique si et seulement si une élite est gagnée (chance 100 %)
+  local oldShop = X.EPIC.shop
+  X.EPIC.shop = 0
+  local ok, err = pcall(withDrop, { 1 }, function()
+    local got = 0
+    for seed = 1, 6 do
+      local _, e = ns.SimExpedition.play({ seed = seed, class = "rogue", zones = 4 })
+      eq(X.epicIndex(e) ~= nil, e.stats.elites > 0, "graine " .. seed)
+      if X.epicIndex(e) then got = got + 1 end
+    end
+    assert(got > 0, "des épiques gagnées")
+  end)
+  -- chance nulle : aucune épique
+  if ok then
+    ok, err = pcall(withDrop, { 0 }, function()
+      local _, e = ns.SimExpedition.play({ seed = 2, class = "rogue", zones = 7 })
+      eq(X.epicIndex(e), nil)
+    end)
   end
-  eq(atStart, 6, "épique prise au départ")
-  local rn, en = ns.SimExpedition.play({ seed = 4, class = "rogue", zones = 7, epic = "none" })
+  X.EPIC.shop = oldShop
+  if not ok then error(err, 0) end
+  local _, en = ns.SimExpedition.play({ seed = 4, class = "rogue", zones = 7, epic = "none" })
   eq(X.epicIndex(en), nil, "epic=none : aucune épique")
   eq(ns.SimExpedition.epicRating({ class = "rogue", deck = {} }, "te_epic_a"), ns.SimExpedition.EPIC_RATING)
 end)

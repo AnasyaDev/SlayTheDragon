@@ -97,6 +97,9 @@ local function addRecord(agg, rec)
     agg.cleared = agg.cleared + rec.cleared
     agg.removed = agg.removed + rec.removed
     agg.upgraded = agg.upgraded + rec.upgraded
+    agg.epicEnd = (agg.epicEnd or 0) + (rec.epicEnd or 0)
+    agg.epicUp = (agg.epicUp or 0) + (rec.epicUp or 0)
+    if rec.won and (rec.epicEnd or 0) > 0 then agg.epicWins = (agg.epicWins or 0) + 1 end
     for k, n in pairs(rec.visits) do agg.visits[k] = (agg.visits[k] or 0) + n end
   end
   for _, cb in ipairs(rec.combats) do
@@ -461,6 +464,11 @@ local function report(a, title)
     out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Étapes franchies : %.2f")
       :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.cleared / a.runs))
     out(("Cartes retirées : %.2f   améliorées : %.2f par expédition"):format(a.removed / a.runs, a.upgraded / a.runs))
+    -- épique en fin d'expédition (gagnée sur un élite, achetée, ou imposée par epic=) ; victoires avec / sans
+    local en, ew = a.epicEnd or 0, a.epicWins or 0
+    out(("Épique en fin d'expédition : %s (améliorée : %s)   victoires avec épique %s, sans %s")
+      :format(pct(en, a.runs), pct(a.epicUp or 0, a.runs), en > 0 and pct(ew, en) or "-",
+        a.runs > en and pct(a.wins - ew, a.runs - en) or "-"))
     local vs = {}
     for _, k in ipairs({ "combat", "elite", "campfire", "merchant", "event", "chest", "boss" }) do
       vs[#vs + 1] = ("%s %.2f"):format(k, (a.visits[k] or 0) / a.runs)

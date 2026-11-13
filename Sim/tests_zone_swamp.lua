@@ -441,7 +441,6 @@ return function(T)
     end
     eq(n, 8)
     local exp = X.new({ seed = 4, class = "warrior", zone = "swamp", unlocks = { level = 7, common = 7 }, quiet = true })
-    if exp.phase == "start" and exp.startEpics then X.act(exp, { "skipEpic" }) end
     if exp.phase == "start" then X.act(exp, { "skipStartRelic" }) end
     exp.node, exp.phase = exp.map.start[1], "map"
     X.openEvent(exp, "temple_steps")
