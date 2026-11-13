@@ -354,7 +354,7 @@ return function(T)
     Combat.chooseIntent(c, n)
     eq(n.intent, "call")
     n.mem.last = "call"
-    c.enemies[2].hp = 3
+    c.enemies[2].hp = c.enemies[2].maxHp - 8
     Combat.chooseIntent(c, n)
     eq(n.intent, "mending")
     n.mem.last = "call"

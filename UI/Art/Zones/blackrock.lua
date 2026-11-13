@@ -86,7 +86,7 @@ Art.statusShort.fire_shield = "each hit of your Attacks on it: you lose N."
 Art.statusShort.cracked = "takes 25% more damage."
 Art.statusShort.essence_of_red = "+2 mana each turn."
 Art.statusShort.burning_adrenaline = "Attacks deal 50% more, then lose 15 HP."
-Art.statusShort.shadowflame_fury = "at the end: Nefarian gains Strength 8."
+Art.statusShort.shadowflame_fury = "at the end: Nefarian gains Strength 10."
 Art.statusShort.veil_of_shadow = "heals and Regen are halved."
 
 Art.ui.map.grim_guzzler = I("INV_Drink_09")
@@ -138,7 +138,7 @@ ns.ZoneViews.blackrock = {
       local n = #ns.Enemies.nefarian.phases + 1
       local t = k == 1 and "Lord Victor Nefarius on his throne. Below 75%, Nefarian lands."
         or (k == 2 and "Nefarian calls on your class. Below 25%, the Drakonids slain rise again."
-        or "Last phase. Shadowflame Fury: Strength 8 when it runs out.")
+        or "Last phase. Shadowflame Fury: Strength 10 when it runs out.")
       list[#list + 1] = { icon = I("Achievement_Boss_Nefarion"), text = "Phase " .. k .. "/" .. n, tip = t,
         color = k == n and "attackText" or "goldText" }
     end

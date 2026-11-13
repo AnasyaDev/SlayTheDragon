@@ -74,7 +74,7 @@ local function isWhelp(id) return id == "rookery_whelp" or id == "rookery_whelpl
 E.firebrand_grunt = finish({
   name = "Firebrand Grunt", hp = { 23, 26 },
   moves = {
-    hack = { name = "Hack", intent = "attack", actions = { { "attack", 10 } } },
+    hack = { name = "Hack", intent = "attack", actions = { { "attack", 11 } } },
     sunder = { name = "Sunder Armor", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "hack", "sunder" }, randomStart = true,
@@ -101,7 +101,7 @@ E.anvilrage_guardsman = finish({
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 7, interrupts = true } } },
     guard = { name = "Guard", intent = "defend", actions = { { "block", 10 } } },
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 7, times = 2 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 8, times = 2 } } },
     shield_wall = { name = "Shield Wall", intent = "defend", actions = { { "block", 15 } } },
     shield_slam = { name = "Shield Slam", intent = "attack", actions = { { "attack", 8 }, { "block", 6 } } },
   },
@@ -113,7 +113,7 @@ E.anvilrage_medic = finish({
   name = "Anvilrage Medic", hp = { 19, 21 },
   moves = {
     heal = { name = "Heal", intent = "heal", actions = { { "heal_ally", 8 } } },
-    smite = { name = "Holy Smite", intent = "attack", actions = { { "attack", 6 } } },
+    smite = { name = "Holy Smite", intent = "attack", actions = { { "attack", 7 } } },
     prayer = { name = "Desperate Prayer", intent = "heal", actions = { { "heal_self", 10 } } },
   },
   ai = medicAi(8),
@@ -123,7 +123,7 @@ E.anvilrage_medic = finish({
 E.blazing_fireguard = finish({
   name = "Blazing Fireguard", hp = { 24, 27 },
   moves = {
-    lash = { name = "Flame Lash", intent = "attack", actions = { { "attack", 9 } } },
+    lash = { name = "Flame Lash", intent = "attack", actions = { { "attack", 10 } } },
     nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 4 }, { "debuff", "pain", 2 } } },
   },
   pattern = { "lash", "nova" }, randomStart = true,
@@ -134,7 +134,7 @@ E.blazing_fireguard = finish({
 E.firebrand_pyromancer = finish({
   name = "Firebrand Pyromancer", hp = { 22, 25 },
   moves = {
-    fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 19 } } },
+    fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 20 } } },
     scorch = { name = "Scorch", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
     flamestrike = { name = "Flamestrike", intent = "cast", cast = true,
       actions = { { "attack", 12 }, { "debuff", "pain", 3 } } },
@@ -146,7 +146,7 @@ E.firebrand_pyromancer = finish({
 E.blackhand_veteran = finish({
   name = "Blackhand Veteran", hp = { 32, 35 },
   moves = {
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 11 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 12 } } },
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 6, interrupts = true } } },
     shout = { name = "Battle Shout", intent = "buff", actions = { { "buff_allies", "force", 1 } } },
     whirlwind = { name = "Whirlwind", intent = "attack", actions = { { "attack", 6, times = 2 } } },
@@ -159,7 +159,7 @@ E.blackhand_veteran = finish({
 E.rage_talon_dragonspawn = finish({
   name = "Rage Talon Dragonspawn", hp = { 33, 36 },
   moves = {
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 13 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 14 } } },
     thunderclap = { name = "Thunderclap", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "demoralized", 1 } } },
     roar = { name = "Bellowing Roar", intent = "debuff",
       actions = { { "debuff", "armor_broken", 2 }, { "debuff", "demoralized", 2 } } },
@@ -171,7 +171,7 @@ E.rage_talon_dragonspawn = finish({
 E.rookery_hatcher = finish({
   name = "Rookery Hatcher", hp = { 28, 31 },
   moves = {
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 10 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 11 } } },
     tend = { name = "Tend Eggs", intent = "defend", actions = { { "block", 8 } } },
     hatch = { name = "Hatch the Eggs", intent = "summon", actions = { { "summon", "rookery_whelpling", count = 2 } } },
   },
@@ -188,7 +188,7 @@ E.rookery_hatcher = finish({
 E.panzor = finish({
   name = "Panzor the Invincible", hp = 88, elite = true, maxHit = 6,
   moves = {
-    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 7, times = 2 } } },
+    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 8, times = 2 } } },
     pulverize = { name = "Pulverize", intent = "attack", actions = { { "attack", 18, interrupts = true } } },
     overheat = { name = "Overheat", intent = "buff", actions = { { "buff", "force", 2 } } },
     rampage = { name = "Rampage", intent = "attack", actions = { { "attack", 6, times = 3 } } },
@@ -202,13 +202,13 @@ E.panzor = finish({
 E.rend_gyth = finish({
   name = "Gyth", hp = 100, elite = true,
   moves = {
-    flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 10 }, { "debuff", "pain", 3 } } },
+    flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 11 }, { "debuff", "pain", 3 } } },
     corrosive = { name = "Corrosive Acid", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "armor_broken", 2 } } },
     freeze = { name = "Freeze", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "demoralized", 1 } } },
     knock = { name = "Knock Away", intent = "attack", actions = { { "attack", 13, interrupts = true } } },
     cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 13 } } },
     whirlwind = { name = "Whirlwind", intent = "attack", actions = { { "attack", 6, times = 3 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 18 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 20 } } },
   },
   pattern = { "flame", "knock", "corrosive", "freeze" },
   phases = { { at = 0.5, name = "Rend Dismounts", rename = "Warchief Rend Blackhand", art = "rend_blackhand",
@@ -228,7 +228,7 @@ E.vaelastrasz = finish({
   moves = {
     adrenaline = { name = "Burning Adrenaline", intent = "debuff", actions = { { "debuff", "burning_adrenaline", 2 } } },
     flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 11 }, { "debuff", "pain", 3 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 16 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 18 } } },
     nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 7, times = 2 } } },
   },
   pattern = { "flame", "adrenaline", "cleave" },
@@ -252,24 +252,24 @@ local function drakonidFell(c, e)
   end
 end
 E.red_drakonid = {
-  name = "Red Drakonid", hp = 12, minion = true, drakonid = true,
+  name = "Red Drakonid", hp = 10, minion = true, drakonid = true,
   moves = {
-    claw = { name = "Claw", intent = "attack", actions = { { "attack", 7 } } },
+    claw = { name = "Claw", intent = "attack", actions = { { "attack", 8 } } },
     breath = { name = "Flame Breath", intent = "attack", actions = { { "attack", 3 }, { "debuff", "pain", 2 } } },
   },
   pattern = { "claw", "breath" }, onDeath = drakonidFell,
 }
 E.blue_drakonid = {
-  name = "Blue Drakonid", hp = 12, minion = true, drakonid = true,
+  name = "Blue Drakonid", hp = 10, minion = true, drakonid = true,
   moves = {
-    claw = { name = "Claw", intent = "attack", actions = { { "attack", 7 } } },
+    claw = { name = "Claw", intent = "attack", actions = { { "attack", 8 } } },
     breath = { name = "Frost Breath", intent = "debuff", actions = { { "attack", 3 }, { "debuff", "demoralized", 1 } } },
   },
   pattern = { "breath", "claw" }, onDeath = drakonidFell,
 }
 E.bone_construct = {
   name = "Bone Construct", hp = 8, minion = true,
-  moves = { strike = { name = "Bone Strike", intent = "attack", actions = { { "attack", 6 } } } },
+  moves = { strike = { name = "Bone Strike", intent = "attack", actions = { { "attack", 7 } } } },
   pattern = { "strike" },
 }
 
@@ -295,22 +295,22 @@ local function nefariusAi(c, e)
 end
 
 E.nefarian = finish({
-  name = "Lord Victor Nefarius", hp = 110, boss = true, throne = true,
+  name = "Lord Victor Nefarius", hp = 100, boss = true, throne = true,
   moves = {
     -- phase 1 : Lord Victor Nefarius
-    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 17 } } },
-    volley = { name = "Shadow Bolt Volley", intent = "attack", actions = { { "attack", 6, times = 2 } } },
+    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
+    volley = { name = "Shadow Bolt Volley", intent = "attack", actions = { { "attack", 7, times = 2 } } },
     fear = { name = "Fear", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "demoralized", 2 } } },
     mending = { name = "Dark Mending", intent = "heal", actions = { { "heal_ally", 8 } } },
     call = { name = "Call Drakonids", intent = "summon", actions = { { "call_drakonid" } } },
     -- phases 2 et 3 : Nefarian
     class_call = { name = "Class Call", intent = "debuff", actions = { { "class_call", 2 } } },
     shadow_flame = { name = "Shadow Flame", intent = "cast", cast = true,
-      actions = { { "attack", 20 }, { "debuff", "pain", 3, cond = "noOnyxiaCloak" } } },
-    tail_sweep = { name = "Tail Sweep", intent = "attack", actions = { { "attack", 8, times = 2 } } },
+      actions = { { "attack", 22 }, { "debuff", "pain", 3, cond = "noOnyxiaCloak" } } },
+    tail_sweep = { name = "Tail Sweep", intent = "attack", actions = { { "attack", 10, times = 2 } } },
     veil = { name = "Veil of Shadow", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "veil_of_shadow", 4 } } },
-    roar = { name = "Bellowing Roar", intent = "attack", actions = { { "attack", 5, times = 2 }, { "debuff", "demoralized", 1 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 16 } } },
+    roar = { name = "Bellowing Roar", intent = "attack", actions = { { "attack", 7, times = 2 }, { "debuff", "demoralized", 1 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 20 } } },
   },
   ai = nefariusAi,
   phases = {
@@ -322,7 +322,7 @@ E.nefarian = finish({
     { at = 0.25, cap = true, name = "Rise, My Minions",
       say = "Impossible! Rise, my minions! Serve your master once more!",
       enter = { { "raise_bones" }, { "buff", "force", 3 }, { "buff", "shadowflame_fury", 3 } }, open = "roar",
-      pattern = { "shadow_flame", "cleave", "tail_sweep" } },
+      pattern = { "veil", "shadow_flame", "cleave", "tail_sweep" } },
   },
   onDeath = function(c, e)
     Combat.log(c, { t = "say", unit = e.uid, text = "This cannot be! I am the master here! You mortals are "

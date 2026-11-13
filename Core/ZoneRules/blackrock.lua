@@ -21,9 +21,9 @@ local BR = {}
 ns.Blackrock = BR
 
 BR.ADRENALINE_LOSS = 15   -- PV perdus à la fin de Burning Adrenaline
-BR.FURY_STRENGTH = 8      -- Strength de Nefarian à la fin de Shadowflame Fury
+BR.FURY_STRENGTH = 10     -- Strength de Nefarian à la fin de Shadowflame Fury
 BR.ESSENCE_MANA = 2       -- mana en plus par tour sous Essence of the Red
-BR.CORRUPTED_DOT = 3      -- DoT posé par chaque soin sous Corrupted Healing
+BR.CORRUPTED_DOT = 4      -- DoT posé par chaque soin sous Corrupted Healing
 BR.BONES_MAX = 3          -- Bone Constructs relevés au plus
 BR.RALLY_HP = 6           -- Rallying Cry of the Dragonslayer
 BR.CALL_TURNS = 2         -- durée des états du Class Call
@@ -40,11 +40,11 @@ S.essence_of_red = { name = "Essence of the Red", flag = true, text = "+2 mana e
 S.burning_adrenaline = { name = "Burning Adrenaline", debuff = true, duration = true,
   text = "Your Attacks deal 50% more. When it ends, you lose 15 HP." }
 S.shadowflame_fury = { name = "Shadowflame Fury", duration = true,
-  text = "When this runs out: Nefarian gains Strength 8." }
+  text = "When this runs out: Nefarian gains Strength 10." }
 S.veil_of_shadow = { name = "Veil of Shadow", debuff = true, duration = true, text = "Heals and Regen are halved." }
 -- Class Call : un état par classe, 2 tours (décisions du 13/11/2026)
 S.corrupted_healing = { name = "Corrupted Healing", debuff = true, duration = true,
-  text = "Each heal also applies DoT 3 to you." }
+  text = "Each heal also applies DoT 4 to you." }
 S.berserker_stance = { name = "Berserker Stance", debuff = true, duration = true,
   text = "You are Sundered. Your Attacks deal 1 more." }
 S.wild_polymorph = { name = "Wild Polymorph", debuff = true, duration = true,
