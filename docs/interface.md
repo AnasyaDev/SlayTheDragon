@@ -162,6 +162,47 @@ Règles : `docs/zones.md`. La Ligue des explorateurs a disparu de tous les écra
   bouton rouge), lisibilité du petit « Coming later » (10) sur le bouton éteint, carte à 0,9 dans l'onglet
   Zones (aperçu au survol), place du message passager au-dessus de la rangée des zones.
 
+## Cartes épiques (13/11/2026)
+
+Règles : `docs/expedition.md`, « Cartes épiques ».
+
+- **Cadre** (`W.card`, `SetCard`) : une carte `rarity = "epic"` prend le ruban et la languette de coût violets
+  (`Media/card_ribbon_epic.tga`, `Media/card_cost_epic.tga`, même géométrie que les pièces de base), une aura
+  violette tenue derrière la carte (`b.epicGlow` : `card_glow` teinté `W.EPIC_COLOR` #a335ee, alpha
+  `W.EPIC_GLOW_ALPHA`, créée avec la carte) et la gemme épique (pentagone violet, `gem_epic`, déjà là). Les
+  pièces violettes sont générées par `tools/build_media.py` à partir des pièces du pack (teinte HSV fixe,
+  saturation qui baisse avec la clarté) ; `build/venv/bin/python -I tools/build_media.py --epic-only` les refait
+  seules depuis `Media/card_ribbon.tga` et `Media/card_cost.tga` (Pillow + numpy, sans le PSD) et ajoute leurs
+  entrées à `UI/SkinData.lua`. **Nouvelles textures : relancer le client** (pas un nouveau fichier du TOC).
+- **Infobulle** : « Epic: one per expedition, a new one replaces it. » (`W.EPIC_HINT`) et une ligne par
+  transformation (« While in the deck: Smite becomes … », `W.transformLines`) ; une variante montrée hors
+  combat ajoute « Transformed Smite. » (option de carte `from`). Mot de plaque `Innate` (« Innate: starts in the
+  opening hand. », registre du langage) : la plaque du bas dit « Power · Innate ».
+- **Récompense d'élite** (choix « Epic ») : montré AVANT les cartes ordinaires (étape `epicMode`) : titre violet
+  « Epic card » au-dessus des cartes, cartes centrées sous le titre s'il y en a moins de trois, consigne
+  « Choose an epic card, or none. » décalée à gauche, bouton rouge « Skip » (150 × 44) à gauche de « Back on the
+  road ». Après le choix (ou « Skip ») : les cartes ordinaires, comme avant.
+- **Remplacement** (`UI.epicConfirm`, construit au premier usage) : `UI.choose(id)` demande d'abord
+  `Controller.epicSwap(id)` (l'action rejouée sur une copie de l'expédition : vrai si elle ferait partir
+  l'épique du deck pour une autre ; récompense, marchand, rencontre). Si oui, panneau modal sur un voile : titre
+  « Epic card », question « Replace A with B? », note « Only one epic card per expedition: the current one leaves
+  the deck. », les deux cartes à 0,9 côte à côte (ancienne à gauche, telle qu'elle est ; nouvelle à droite), un
+  « > » entre elles, « Leaves the deck » (rouge) / « Joins the deck » (vert) dessous, boutons « Replace » (or) et
+  « Keep A » (rouge). Clic hors du panneau = « Keep ». Survol des cartes : halo seulement, ni levée ni aperçu.
+- **Marchand** : l'épique en vente se range à la suite des cartes (7 cartes au plus), cadre violet, prix sur sa
+  plaque ; l'achat passe par la même confirmation.
+- **Deck** : bandeau, panneau du deck, amélioration, retrait et sélection montrent le deck transformé
+  (`Expedition.shownDeck`).
+- **Progress, onglet Zones** : l'emplacement verrouillé d'une carte de zone est un dos de carte teinté de violet
+  avec l'aura épique (`lockedCard`, `SetEpic`) ; débloquée, la vraie carte (cadre violet) à 0,85 : son survol
+  montre l'aperçu à taille réelle (sous `W.PREVIEW_BELOW`).
+- **Bilan** : « New epic card: X. » en violet ; la carte est présentée à part (`unlocked.epic`) : à 0,72, à
+  gauche de la rangée des déblocages, libellé violet « New epic card » au-dessus ; le panneau grandit d'autant.
+- Harnais : section **UE** (avant U16) ; planches `ue-main-epique`, `ue-choix-epic`, `ue-remplacement`,
+  `ue-progression-zones`, `ue-bilan-epique`.
+- Non vérifiable hors jeu : rendu réel du violet des pièces (`card_*_epic.tga`) et de l'aura sur les décors,
+  lisibilité du nom blanc sur le ruban violet, le panneau de confirmation au-dessus des modèles 3D.
+
 ## Habillage WoW (direction B, mana et parcours façon C)
 
 État au 11/11/2026, choisi par le joueur sur maquettes (`build/wowui/direction_*.jpg`, générateurs
