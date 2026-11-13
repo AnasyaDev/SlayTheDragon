@@ -640,20 +640,20 @@ gnomes 12940 / 6973, nains de Forgefer 3411 / 3422, aubergiste 3047 (Plugger).
 | Red / Blue Drakonid | 10 | Claw 8, Breath 3 + DoT 2 / Demoralized 1 |
 | Bone Construct | 8 | Bone Strike 7 |
 
-### Mesures (1 000 expéditions par ligne, `zone=blackrock zones=6 level=7 key=0`, après la fusion des Burning Steppes et des épiques)
+### Mesures (1 000 expéditions par ligne, `zone=blackrock zones=6 level=7 key=0`, après la fusion des six zones)
 
-| Classe | Victoire `epic=none` | avec épique | PV perdus / combat normal | tours (normal) | boss : victoire, tours |
+| Classe | Victoire `epic=none` | avec épique (pour information, avant le réglage des épiques) | PV perdus / combat normal | tours (normal) | boss : victoire, tours |
 |---|---|---|---|---|---|
-| Priest | 70,6 % | 68,6 % | 10,1 | 3,85 | 78 %, 7,8 |
-| Warrior | 66,7 % | 78,9 % | 10,2 | 3,29 | 83 %, 6,5 |
-| Mage | 60,4 % | 66,0 % | 6,8 | 3,14 | 71 %, 5,9 |
-| Rogue | 75,1 % | 82,3 % | 7,3 | 2,97 | 86 %, 6,2 |
-| Hunter | 72,9 % | 89,7 % | 6,8 | 2,77 | 77 %, 5,6 |
+| Priest | 68,8 % | 68,6 % | 10,4 | 3,99 | 77 %, 8,0 |
+| Warrior | 68,4 % | 78,9 % | 10,3 | 3,36 | 82 %, 6,7 |
+| Mage | 61,1 % | 66,0 % | 7,0 | 3,23 | 70 %, 6,0 |
+| Rogue | 73,8 % | 82,3 % | 7,6 | 3,02 | 84 %, 6,0 |
+| Hunter | 73,8 % | 89,7 % | 6,9 | 2,86 | 77 %, 5,7 |
 
 Clés (Rogue, `epic=none`) : +0 75,1 %, +1 64,4 %, +3 52,6 %, +5 47,4 % (−5,5 points par niveau en moyenne).
 Référence Westfall (`zones=0 level=7 epic=none`, 300 par classe) : 81,7 / 81,3 / 71,0 / 71,0 / 73,7 % : l'écart
-entre classes y est déjà de 10,7 points, le Mage en bas. À Blackrock il est de 14,7 points sans épique (Mage
-60 %, Rogue 75 %), et de 24 points avec épique (Hunter 90 % : ses épiques, comme dans les Burning Steppes). Les
+entre classes y est déjà de 10,7 points, le Mage en bas. À Blackrock il est de 12,7 points sans épique (Mage
+61 %, Rogue et Hunter 74 %), et de 24 points avec épique (Hunter 90 % : ses épiques, comme dans les Burning Steppes). Les
 leviers propres à la zone (Class Call par classe, Veil, Throne, Drakonids) ont été réglés pour le resserrer ; le
 Mage meurt surtout au boss (71 %), sur les gros coups (Shadow Flame, Cleave) avec ses 42 PV. Statistiques de
 zone (par combat de boss, Mage) : 1,9 Bone Construct, 1,0 Class Call, 14 dégâts arrêtés par le Throne.
