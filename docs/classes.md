@@ -565,42 +565,59 @@ deck : une épique de même note n'en remplace jamais une autre).
 
 ### Épiques du Mage (14/11/2026)
 
-Données et nombres (`epicN`, `epicM`, `epicPeriod`, `epicEvery`, base et `up`, lus par les crochets) dans
-`Data/Mage.lua` (`epic(...)` : `cost = 0`, jamais payé) ; règles (`deckHooks`, src = `c.epic`) dans
+Données et nombres (`epicN`, `epicM`, `epicPct`, `epicBonus`, `epicCharge`, `epicEvery`, base et `up`, lus par les
+crochets) dans `Data/Mage.lua` (`epic(...)` : `cost = 0`, jamais payé) ; règles (`deckHooks`, src = `c.epic`) dans
 `Core/Classes/mage.lua` ; vue dans `UI/Art/mage.lua` ; tests `Sim/tests_epic_mage.lua`, harnais UEM ; bot :
-`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ≈ 5 + gain / 2 ; l'épique du deck vaut 3 de plus : le deck est construit autour).
-État de combat dans `c.cls` (`carry`, `fof`, `fofOn`, `r3`, `r3surge`). `epicPeriod = 3` : l'épique n'agit qu'aux
-tours 3, 6, 9… (`Combat.epicTurn(src, round)`, déclencheur « Every 3rd turn »).
-- **Mirror Image** : `afterCast` (`Combat.mirrorHit` : premier coup de la carte Cast, base + N, cible tirée par
-  `c.rng.cards`, coup de la même carte : Charges, Shatter, `onAttackHit`).
-- **Molten Armor** : `afterHit` (DoT N par coup, même absorbé, valeur passée par `apply`).
-- **Water Elemental** : `onTurnStart` des tours actifs (`Combat.elementalTarget` : dernière cible, sinon la plus à
-  gauche ; un dormeur `asleep` seulement si tous dorment), coup sans carte, Demoralized 1.
-- **Fingers of Frost** : crochet moteur `instantCast` lu avec la cible (`c.aim`, `Combat.castFits` ci-dessus) ;
-  amélioré : `damage` + N pendant la résolution de la carte partie ainsi.
-- **Arcane Meditation** : `onTurnEnd` garde `min(mana, N)` dans `c.cls.carry`, `onTurnStart` l'ajoute (au-delà du
-  maximum, affiché « 7/3 »).
+`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ≈ 5 + gain / 2 ; l'épique du deck vaut 3
+de plus : le deck est construit autour). Toutes les règles agissent à chaque tour (plus de « Every 3rd turn » ni de
+`Combat.epicTurn`). État de combat dans `c.cls` (`carry`, `molten`, `weChill`, `fof`, `fofOn`, `fofThaw`, `r3`,
+`r3surge`). Aucun point d'accroche ajouté au moteur ; déclencheur nouveau « When attacked » (`L.trigger`).
+- **Mirror Image** : `afterCast` (`Combat.mirrorHit` : premier coup de la carte Cast, dégâts calculés sur une cible
+  tirée par `c.rng.cards`, × `epicPct` / 100 arrondi bas ; coup de la même carte : Shatter, Ignite, `onAttackHit`).
+- **Molten Armor** : `afterHit`, une fois par attaque (`c.cls.molten[uid] = round`), DoT N même absorbé, par `apply`.
+- **Water Elemental** : `onTurnStart` à chaque tour (`Combat.elementalTarget` : dernière cible, sinon la plus à
+  gauche ; un dormeur `asleep` seulement si tous dorment), coup sans carte, Demoralized `epicM` ; `onTurnEnd` retire
+  ce Demoralized (`c.cls.weChill`) : Frozen pour les cartes du Mage, pas pour le tour ennemi.
+- **Fingers of Frost** : crochet moteur `instantCast` lu avec la cible (`c.aim`, `Combat.castFits` ci-dessus), qui
+  retient le gel de la cible (`fofThaw`) ; `onCardPlayed` retire ce Stunned et ce Demoralized après la résolution
+  (ceux que la carte pose restent) ; amélioré : `damage` + N pendant la résolution de la carte partie ainsi.
+- **Arcane Meditation** : `onTurnEnd` garde `min(mana, N)`, + `epicBonus` s'il en reste, dans `c.cls.carry` ;
+  `onTurnStart` l'ajoute (au-delà du maximum, affiché « 8/3 »).
 - **Conflagration** : `onEnemyDeath` (DoT du mort, lu avant tout nettoyage ; + N à chaque autre ennemi vivant, sans
   `apply`).
-- **Rule of Threes** : `onCardCommitted` marque la 3e carte du tour (améliorée : chaque 3e) si c'est une Attack et
-  si le tour est actif ; `replay` la double ; `beforeCard` donne à la copie le Surge de l'original.
-- Vue : ligne violette de l'épique (`Art.mageEpicText` : mana gardé, rang de la carte, cible ou repos de
+- **Rule of Threes** : `onCardCommitted` marque la 3e carte du tour (améliorée : chaque 3e), de tout type, si
+  `Combat.spendRes(c, epicCharge)` passe ; `replay` la double ; `beforeCard` donne à la copie le Surge de l'original.
+- Vue : ligne violette de l'épique (`Art.mageEpicText` : mana gardé et bonus, rang de la carte et sa Charge, cible de
   l'élémentaire, Frozen) ; nom flottant sur l'événement `{ t = "epic", id, dst|src|card }`.
 
-Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=mage zones=7
-level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 79,5 %, combat normal 3,04 tours et 5,3 PV ; ± 2,5 points) :
+**Réglage des zones dures (14/11/2026).** Mesure de référence commune aux cinq classes : `luajit Sim/sim.lua
+runs=600 bot=heuristic jobs=3 runner=expedition class=mage level=7 key=0 epic=<id>` avec `zone=duskwood zones=1`,
+`zone=stranglethorn zones=3`, `zone=steppes zones=5` (et `zones=7` à Westfall pour information) ; gain = victoires
+avec l'épique − victoires sans (`epic=none` : Duskwood 59,8 %, Stranglethorn 70,8 %, Steppes 70,8 %, Westfall 80,8 % ;
+combat normal 6,5 / 6,7 / 5,4 / 5,0 PV perdus) ; ± 3,9 points par mesure.
 
-| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
-|---|---|---|---|---|
-| Mirror Image | 89,7 % | +10,2 | 2,72 ; 6,1 | coup en plus = premier coup + 0 / + 4 → − 6 / − 2 (à 0 : +14,0) |
-| Molten Armor | 88,0 % | +8,5 | 3,10 ; 6,2 | DoT 3 / 5 → 1 / 3 (3 : +16,4 ; 2 : +13,6) |
-| Water Elemental | 88,9 % | +9,4 | 2,89 ; 6,1 | 3 / 5 chaque tour → 5 / 8 aux tours 3, 6, 9… (chaque tour : +17,6) |
-| Fingers of Frost | 90,2 % | +10,7 | 2,60 ; 3,8 | — |
-| Arcane Meditation | 84,0 % | +4,5 | 3,12 ; 6,1 | 3 / 5 → 4 / 6 (3 : +4,8 ; le bot garde peu de mana) |
-| Conflagration | 84,0 % | +4,5 | 2,52 ; 4,6 | + 0 / + 3 → + 8 / + 11 (à + 0 : −1,9) |
-| Rule of Threes | 88,0 % | +8,5 | 2,87 ; 5,6 | toute carte chaque tour → une Attack, aux tours 3, 6, 9… (toute carte : +20,4) |
+| Épique | Texte (base / amélioré) | Duskwood | Stranglethorn | Steppes | Moyenne | Westfall | PV perdus (normal, D / S / B) | Changé |
+|---|---|---|---|---|---|---|---|---|
+| Mirror Image | half their damage again / their damage again | +18,5 | +5,4 | +16,5 | +13,5 | +5,4 | 6,5 / 7,0 / 5,5 | « damage − 6 / − 2 » → la moitié / tout (la fiche, tout : +20 à Duskwood) |
+| Molten Armor | When attacked: DoT 2 / 4 | +18,7 | +4,7 | +11,2 | +11,5 | +12,0 | 7,1 / 7,4 / 6,3 | DoT 1 / 3 par coup (+5,0) → DoT 2 / 4 par attaque (DoT 2 par coup : +15, +25 à Duskwood) |
+| Water Elemental | Start of turn: 2 / 4 and Demoralized 1 for this turn | +16,4 | +8,4 | +14,4 | +13,1 | +8,5 | 6,7 / 6,9 / 5,5 | 5 / 8 un tour sur trois (+10,6) → chaque tour, gel du seul tour du Mage (Demoralized tenu au tour ennemi : +25 à 3, +21 à 1) |
+| Fingers of Frost | resolve at once and thaw it / + 4 more | +9,5 | +12,5 | +10,0 | +10,7 | +7,4 | 5,0 / 4,8 / 3,7 | dégel ajouté (sans : +18,3 ; « once per turn » : +16,6) |
+| Arcane Meditation | Up to 4 unspent mana carries over, +1 / 6, +2 | +12,2 | +10,2 | +13,5 | +12,0 | +7,2 | 6,5 / 7,2 / 5,2 | 4 / 6 sans bonus (+4,4) → « +1 / +2 » ; conseils de deck modérés |
+| Conflagration | DoT + 16 / + 20 to each other enemy | +14,7 | +8,4 | +6,0 | +9,7 | +6,2 | 5,2 / 5,5 / 4,2 | + 8 / + 11 (+6,7) → + 16 / + 20 ; conseils de deck modérés |
+| Rule of Threes | 3rd card each turn spends 1 Charge to resolve twice / every 3rd | +17,2 | +13,5 | +11,5 | +14,1 | +11,0 | 5,3 / 5,2 / 3,9 | une Attack un tour sur trois (+13,6) → toute carte chaque tour pour 1 Charge (sans coût : +31,9, 99 % ; « Pay 2 HP » : +22,3) |
 
-Les écarts se jouent presque tous au boss (VanCleef : 81 % sans épique) ; près du plafond, le gain sature.
+Moyenne des sept : **+12,1** (départ : +10,4, de +4,4 à +18,3). Hors cible de peu : Mirror Image et Molten Armor à
+Duskwood (+18,5, +18,7 pour +18 au plus, dans l'erreur de mesure), Rule of Threes (+14,1 pour +14). PV perdus sous 5 à
+Burning Steppes (Fingers of Frost, Conflagration, Rule of Threes : combats normaux courts) et pour Fingers of Frost
+partout (le gel tient l'ennemi).
+
+Bot (Arcane Meditation, Conflagration) : la valeur du mana gardé (`Combat.MAGE_CARRY_VALUE`) reste à 5 (8 : −5 points,
+12 : −30 : le bot garde trop) ; une valeur d'avance au DoT d'un ennemi près de mourir (Conflagration) n'apportait rien
+(−1 à −2) et a été retirée. Le vrai défaut était dans les conseils de construction (`bot.byEpic`) : à blanc (Arcane
+Meditation N = 0, Conflagration N = −99), les anciens conseils coûtaient −3,7 et −3,2 points ; modérés (gros sorts et
+cartes Fire moins poussés), le contrôle à blanc donne −1,7 et −1,4 (rien), et l'épique +12,0 et +9,7. Le bot ne sait
+toujours pas préparer sur deux tours (garder son mana pour un tour à deux gros sorts, poser le DoT sur la cible qu'il
+achèvera au tour suivant) : il ne regarde qu'un tour.
 
 ## Sauvegarde
 

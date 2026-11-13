@@ -396,12 +396,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Cast cards: deal their` / `damage again to a` / `random enemy.` | `Cast cards: deal their` / `damage + 4 again to a` / `random enemy.` |
+| —, Epic | `Epic.` / `Cast cards: deal half their` / `damage again to a` / `random enemy.` | `Cast cards: deal their` / `damage again to a` / `random enemy.` |
 
-- **Règle.** À la résolution d'une carte Cast (sous Instant comprise), le montant de base de son
-  **premier** coup est infligé une fois de plus (amélioré : + 4) à un ennemi vivant tiré par
-  `c.rng.cards` (le même possible), recalculé sur la nouvelle cible ; c'est un coup de la même carte
-  (Charges, Shatter, Ignite s'appliquent).
+- **Règle (réglée le 14/11/2026).** À la résolution d'une carte Cast (sous Instant comprise), son **premier**
+  coup frappe une fois de plus un ennemi vivant tiré par `c.rng.cards` (le même possible), pour la moitié
+  (arrondie bas ; amélioré : la totalité) des dégâts calculés sur la nouvelle cible, Charges comprises ; c'est
+  un coup de la même carte (Shatter, Ignite s'appliquent). Avant : « damage − 6 » ; la totalité dépasse +18 à
+  Duskwood.
 - **Cas limites.** Une carte « to all » ne rejoue qu'un coup. Cast sans dégâts (Evocation) : rien. Cast
   interrompu : rien. Dormeur : coup à une cible, donc bonus et réveil.
 - **Deck piloté.** Centrales : Fireball (deux de départ), Pyroblast, Flamestrike, Glacial Spike, Blizzard,
@@ -414,11 +415,12 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: apply DoT 3` / `to the attacker.` | `When hit: apply DoT 5` / `to the attacker.` |
+| —, Epic | `Epic.` / `When attacked: apply` / `DoT 2 to the attacker` | `When attacked: apply` / `DoT 4 to the attacker` |
 
-- **Règle.** Chaque coup ennemi sur le Mage, même entièrement absorbé, pose DoT 3 (amélioré : 5) à son
-  auteur, par le crochet `apply`.
-- **Cas limites.** Attaque à plusieurs coups : un DoT par coup. Auteur mort : rien. Le DoT ne se pose pas
+- **Règle (réglée le 14/11/2026).** Chaque attaque ennemie sur le Mage, même entièrement absorbée, pose DoT 2
+  (amélioré : 4) à son auteur, par le crochet `apply`. Avant : DoT 1 par coup (+5 points) ; DoT 2 par coup
+  donnait +25 à Duskwood (les attaques à plusieurs coups).
+- **Cas limites.** Attaque à plusieurs coups : un seul DoT (premier coup). Auteur mort : rien. Le DoT ne se pose pas
   sur un ennemi qui n'attaque pas. Un ennemi Stunned ne frappe pas : le contrôle va contre ce deck. Lien
   Duskwood : un Bite entièrement absorbé ne pose pas de Curse et brûle quand même.
 - **Deck piloté.** Centrales : les quatre Mana Shield de départ, Blazing Barrier, Ice Barrier (Retain),
@@ -431,11 +433,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Start of turn: deal 3` / `to the last target and` / `apply Demoralized 1 ⌛` | `Start of turn: deal 5` / `…` |
+| —, Epic | `Epic.` / `Start of turn: deal 2` / `to the last target and` / `apply Demoralized 1` / `for this turn.` | `Start of turn: deal 4` / `…` |
 
-- **Règle.** Au début de chaque tour du Mage (après la pioche), l'élémentaire inflige 3 (amélioré : 5),
-  sans carte, à la dernière cible du Mage, puis lui pose Demoralized 1 ⌛ (qui tient le tour du Mage et le
-  tour ennemi).
+- **Règle (réglée le 14/11/2026).** Au début de chaque tour du Mage (après la pioche, dès le tour 1),
+  l'élémentaire inflige 2 (amélioré : 4), sans carte, à la dernière cible du Mage, puis lui pose Demoralized 1
+  pour le tour du Mage seulement (retiré à la fin du tour : la cible est Frozen pour ses cartes, pas pour le
+  tour ennemi ; un Demoralized posé par une carte s'ajoute et reste). Avant : 5 / 8 un tour sur trois ; la
+  règle de la fiche (Demoralized tenu aussi pendant le tour ennemi) donnait +25 points.
 - **Cas limites.** Cible morte ou absente : l'ennemi vivant le plus à gauche. Swamp : même règle que le
   familier (pas de dormeur tant qu'un ennemi est éveillé). Boss : Demoralized prend, donc Frozen marche
   partout. Nom du familier ; le sort réel « Summon Water Elemental » est trop long pour le ruban. Lien
@@ -450,11 +454,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Cast cards aimed at a` / `Frozen enemy resolve` / `at once.` | `…` / `at once and deal 4` / `more.` |
+| —, Epic | `Epic.` / `Cast cards aimed at a` / `Frozen enemy resolve at` / `once and thaw it.` | `…` / `once, deal 4 more and` / `thaw it.` |
 
-- **Règle.** Une carte Cast à cible jouée sur un ennemi Frozen (Stunned ou Demoralized), lu au moment où
-  elle est jouée, se résout tout de suite : sans emplacement, sans interruption possible, sans consommer
-  d'Instant. Amélioré : ses coups infligent 4 de plus.
+- **Règle (réglée le 14/11/2026).** Une carte Cast à cible jouée sur un ennemi Frozen (Stunned ou
+  Demoralized), lu au moment où elle est jouée, se résout tout de suite : sans emplacement, sans interruption
+  possible, sans consommer d'Instant ; elle emploie le gel : le Stunned et le Demoralized que la cible portait
+  au jeu lui sont retirés après la résolution (ceux que la carte pose restent : Glacial Spike). Amélioré : ses
+  coups infligent 4 de plus. Sans le dégel : +18 points ; « une fois par tour » : +17.
 - **Cas limites.** Les Cast sans cible (Flamestrike, Blizzard, Evocation) restent des Cast. Boss :
   Demoralized suffit. La version 1 (« gain Instant 1, once per turn ») n'était qu'un état de plus ; ici le
   contrôle change la nature du Cast. Lien Stranglethorn : un Cast parti au jeu quitte la main et échappe
@@ -471,11 +477,14 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Unspent mana carries` / `over to the next turn,` / `up to 3.` | `…` / `up to 5.` |
+| —, Epic | `Epic.` / `Up to 4 unspent mana` / `carries over to the` / `next turn, +1.` | `Up to 6 unspent mana` / `…` / `next turn, +2.` |
 
-- **Règle.** À la fin du tour, le mana non dépensé (3 au plus ; amélioré : 5) est gardé ; il s'ajoute au
-  début du tour suivant, après la remise du mana à son maximum.
-- **Cas limites.** Le total peut dépasser le maximum (6 mana au tour suivant, 8 amélioré). Evocation, Arcane
+- **Règle (réglée le 14/11/2026).** À la fin du tour, le mana non dépensé (4 au plus ; amélioré : 6) est
+  gardé, plus 1 (amélioré : 2) s'il en reste ; il s'ajoute au début du tour suivant, après la remise du mana à
+  son maximum. Le report seul ne rapportait presque rien (+4) : la main de 5 cartes, pas le mana, borne le tour
+  suivant ; le « +1 » paie le tour d'attente.
+- **Cas limites.** Le total peut dépasser le maximum (8 mana au tour suivant, 11 amélioré). Rien gardé : pas
+  de bonus. Evocation, Arcane
   Surge, Mind Quickening Gem s'ajoutent. Seul le tour suivant profite du report (pas de cumul sur deux
   tours au-delà du plafond). Lien Swamp : les tours où les dormeurs dorment servent à économiser.
 - **Deck piloté.** Centrales : Pyroblast, Glacial Spike, Flamestrike, Blizzard, Polymorph, Evocation,
@@ -489,10 +498,11 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `An enemy dying with` / `DoT gives that DoT to` / `each other enemy.` | `…` / `each other enemy, +3.` |
+| —, Epic | `Epic.` / `An enemy dying with` / `DoT gives that DoT + 16` / `to each other enemy.` | `…` / `DoT + 20` / `…` |
 
-- **Règle.** Quand un ennemi meurt en portant du DoT, chaque autre ennemi vivant reçoit ce DoT (amélioré :
-  + 3), posé directement (sans le crochet `apply`).
+- **Règle (réglée le 14/11/2026).** Quand un ennemi meurt en portant du DoT, chaque autre ennemi vivant reçoit
+  ce DoT + 16 (amélioré : + 20), posé directement (sans le crochet `apply`). Fiche : + 0 / + 3 (−2 points) ;
+  avant : + 8 / + 11.
 - **Cas limites.** Valeur lue au moment de la mort ; mort par son propre tic : la valeur de ce tic. Les
   serviteurs comptent. Chaîne possible : un DoT transmis tue au tic suivant et se transmet encore. Seul en
   face : rien (la carte vit des groupes ; les boss de Westfall, Wetlands et Blackrock ont des sbires).
@@ -508,18 +518,23 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `The 3rd card played` / `each turn resolves` / `twice.` | `Every 3rd card played` / `each turn resolves` / `twice.` |
+| —, Epic | `Epic.` / `The 3rd card played` / `each turn spends 1` / `Charge to resolve` / `twice.` | `Every 3rd card played` / `…` |
 
-- **Règle.** La troisième carte jouée dans le tour (amélioré : la 3e, la 6e, la 9e…) se résout deux fois :
-  la copie suit tout de suite, même cible, sans coût.
+- **Règle (réglée le 14/11/2026).** La troisième carte jouée dans le tour (amélioré : la 3e, la 6e, la 9e…),
+  de tout type, se résout deux fois si le Mage a 1 Charge à dépenser au moment où elle est jouée (dépensée
+  avant sa résolution) : la copie suit tout de suite, même cible, sans coût en mana. Sans Charge : une fois.
+  Sans le coût : 99 % de victoires dans les trois zones dures (+32) ; « Pay 2 HP » : +22 ; avant : une Attack,
+  un tour sur trois.
 - **Cas limites.** Compteur `c.turn.played` : les Curses et les cartes Hexed comptent. La copie reprend la
-  dépense de l'original (Surge : même nombre de Charges compté). Une carte Cast en 3e position : les deux
+  dépense de l'original (Surge : même nombre de Charges compté, après la Charge de la règle). Une carte Cast en 3e position : les deux
   résolutions à son départ. Powers : la copie ne pose pas un second Power. Exhaust, Cooldown : après la
   copie. Lien Blackrock : la 3e carte du tour fait le gros coup qui traverse un seuil.
 - **Deck piloté.** Centrales : cartes à 0 pour atteindre la 3e (Ice Lance, Scorch, Counterspell, Presence
   of Mind, Evocation), puis Polymorph (Stunned 4 ⌛), Arcane Barrage (Surge compté deux fois), Frost Nova,
-  Pyroblast, Glacial Spike, Flurry. Mauvaises : les Powers chers, les cartes à 2 mana jouées en premier. À
-  retirer : Mana Shield, un Frostbolt. Feu de camp : Arcane Barrage.
+  Pyroblast, Glacial Spike, Flurry ; pour la Charge de chaque tour : Counterspell, Presence of Mind, Arcane
+  Blast, Arcane Missiles, Prismatic Barrier, Polymorph (+1 Charge, deux fois en 3e), bibelot Tome of Arcane
+  Brilliance. Mauvaises : les Powers chers, les cartes à 2 mana jouées en premier. À retirer : Mana Shield, un
+  Frostbolt. Feu de camp : Arcane Barrage.
 - **Moteur.** Crochet existant `replay` (inst, ctx), qui lit `c.turn.played`.
 
 ---

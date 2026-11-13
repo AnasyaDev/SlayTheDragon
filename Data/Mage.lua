@@ -500,11 +500,13 @@ relic("mind_quickening_gem", {
 })
 
 -- Bots : notes des épiques et construction autour de chacune ----------------------------------------
--- Note : ≈ 5 + écart / 2 (points de victoire gagnés à Westfall avec l'épique, Sim/sim.lua epic=). Conseils
--- (rating, upgrade, remove) : remplacent ceux de la classe tant que l'épique est dans le deck.
+-- Note : ≈ 5 + écart / 2 (points de victoire gagnés avec l'épique, moyenne de Duskwood, Stranglethorn et Burning
+-- Steppes, Sim/sim.lua epic=). Conseils (rating, upgrade, remove) : remplacent ceux de la classe tant que l'épique
+-- est dans le deck ; ceux d'Arcane Meditation et de Conflagration sont modérés (plus forts, ils coûtaient 3 à 4
+-- points : contrôle « à blanc », docs/classes.md).
 local MAGE_EPIC_NOTE = {
-  mirror_image = 10, molten_armor = 9.5, water_elemental = 9.5, fingers_of_frost = 10.5,
-  arcane_meditation = 7.5, conflagration = 7.5, rule_of_threes = 9.5, -- mesures du 14/11/2026, clé 0, zones=7
+  mirror_image = 11.5, molten_armor = 11, water_elemental = 11.5, fingers_of_frost = 10.5,
+  arcane_meditation = 11, conflagration = 10, rule_of_threes = 12, -- mesures du 14/11/2026, clé 0, zones dures
 }
 local MAGE_EPIC_ADVICE = {
   -- chaque Cast frappe deux fois : les gros Cast, de quoi tenir l'incantation, les Cast immédiats
