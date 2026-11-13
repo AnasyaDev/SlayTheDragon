@@ -887,13 +887,18 @@ local function button(id)
   return b
 end
 
-local function clickOption(id) H.click(button(id)) end
-
 local function option(id)
   for _, o in ipairs(UI().step.options or {}) do
     if o.id == id then return o end
   end
   return nil
+end
+
+-- Offre d'épique au départ (classe qui a débloqué des épiques réelles, Prêtre dès Westfall gagnée) : un
+-- scénario qui ne la vise pas la refuse (« Skip ») et poursuit comme avant.
+local function clickOption(id)
+  if currentKind() == "startEpic" and not option(id) and option("skipEpic") then H.click(button("skipEpic")) end
+  H.click(button(id))
 end
 
 local function enemySlot(t)
@@ -1388,6 +1393,8 @@ ns = H.ns
 ns.Controller.makeSeed = function() return SEED + 1 end
 H.click(UI().current.go)
 exp = EXP()
+-- Westfall gagnée : le Prêtre a débloqué Prayer of Mending, offerte au départ ; refusée ici
+if currentKind() == "startEpic" then clickOption("skipEpic") end
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
   check("clé mythique dans le bandeau (hexagone violet « +N »)", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
@@ -9242,8 +9249,8 @@ do
   local function line() return host and host.line._shown and host.line._text or nil end
   local function icon() return host and host.box._shown and (host.box.slot.icon._texture or ""):lower() or "" end
   check("combat : l'épique du deck est active dès le premier tour (Inner Focus)", P.epicOf(c) == "inner_focus")
-  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, +100% »",
-    line() == "Inner Focus: next card is Cast, +100%" and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
+  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, +75% »",
+    line() == "Inner Focus: next card is Cast, +75%" and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
   -- première carte jouée par l'interface : elle part en Cast, la vue le dit
   local hi
   for i, inst in ipairs(c.hand) do
@@ -9257,7 +9264,7 @@ do
     v:Render(true)
   end
   check("Inner Focus : la première carte part en Cast (barre d'incantation), la vue la nomme",
-    c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " +100%"), tostring(line()))
+    c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " +75%"), tostring(line()))
   local tt = table.concat(H.hover(host.box), " | ")
   check("vue de classe : survol = la carte épique (nom, texte, explication)", tt:find("Inner Focus", 1, true)
     and tt:find("First card", 1, true), tt)
@@ -9269,7 +9276,7 @@ do
   c.hand[#c.hand + 1] = Card.new("devouring_plague", false, 990)
   v:Render(true)
   local info = ns.Controller.handInfo(#c.hand)
-  check("Voidform : « Voidform: Shadow hits +2 » (5 Insanity), icône", line() == "Voidform: Shadow hits +2"
+  check("Voidform : « Voidform: Shadow hits +5 » (5 Insanity), icône", line() == "Voidform: Shadow hits +5"
     and icon():find("voidform", 1, true), tostring(line()))
   check("Voidform : carte à Surge injouable, raison lisible", info and not info.playable
     and ns.Controller.reasonText(info.why) == "Voidform: Surge cards can't be played.", info and tostring(info.why))
@@ -9278,10 +9285,10 @@ do
   setEpic("echo_of_light")
   c.player.st.regen = 3
   v:Render(true)
-  check("Echo of Light : « Regen 3: 5 to all next turn »", line() == "Regen 3: 5 to all next turn", tostring(line()))
+  check("Echo of Light : « Regen 3: 10 to all next turn »", line() == "Regen 3: 10 to all next turn", tostring(line()))
   setEpic("echo_of_light", true)
   v:Render(true)
-  check("Echo of Light amélioré : « Regen 3: 6 to all next turn »", line() == "Regen 3: 6 to all next turn", tostring(line()))
+  check("Echo of Light amélioré : « Regen 3: 12 to all next turn »", line() == "Regen 3: 12 to all next turn", tostring(line()))
   c.player.st.regen = nil
   setEpic("shadow_covenant")
   c.hand[#c.hand + 1] = Card.new("mind_blast", false, 991)
@@ -9308,7 +9315,7 @@ do
     tip.lines = {}
     W.fillCardTooltip(tip, eid, false, { full = true })
     local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    if not all:find("one per expedition", 1, true) then tbad[#tbad + 1] = eid .. " : épique" end
+    if not all:find("epic card per expedition", 1, true) then tbad[#tbad + 1] = eid .. " : épique" end
     if want[eid] and not all:find(want[eid], 1, true) then tbad[#tbad + 1] = eid .. " : " .. want[eid] end
   end
   check("infobulles des sept épiques : une seule par expédition, détail de la règle", #tbad == 0, table.concat(tbad, " ; "))

@@ -374,8 +374,8 @@ epic("misery", {
 
 epic("echo_of_light", {
   name = "Echo of Light", school = "holy", path = "holy", zone = "wetlands",
-  text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 2 to all.",
-  up = { text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 3 to all." },
+  text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 7 to all.",
+  up = { text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 9 to all." },
 })
 
 epic("shadow_covenant", {
@@ -386,20 +386,20 @@ epic("shadow_covenant", {
 
 epic("reflective_shield", {
   name = "Reflective Shield", school = "holy", path = "discipline", zone = "swamp",
-  text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 4.",
-  up = { text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 7." },
+  text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 2.",
+  up = { text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 4." },
 })
 
 epic("voidform", {
   name = "Voidform", school = "shadow", path = "shadow", zone = "steppes",
-  text = "Epic.\nSurge cards can't be played.\nPer 2 Insanity: Shadow hits +1.",
-  up = { text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1." },
+  text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1.",
+  up = { text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1.\nCombat start: +3 Insanity." },
 })
 
 epic("inner_focus", {
   name = "Inner Focus", school = "holy", path = "discipline", zone = "blackrock",
-  text = "Epic.\nFirst card each turn: Cast, values doubled.",
-  up = { text = "Epic.\nFirst card each turn: Cast, values +150%." },
+  text = "Epic.\nFirst card each turn: Cast, values +75%.",
+  up = { text = "Epic.\nFirst card each turn: Cast, values doubled." },
 })
 
 -- Bibelots du Prêtre (class = "priest" : tirés seulement pour lui) --------------------------------

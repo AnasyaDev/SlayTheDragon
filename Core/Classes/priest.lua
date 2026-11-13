@@ -8,14 +8,14 @@
 --   prayer_of_mending : onHeal → PV rendus (+2) à un ennemi vivant tiré par c.rng.cards (coup sans carte).
 --   misery            : un DoT posé par une carte sur SA cible (pas « to all ») est copié sur chaque autre
 --                       ennemi vivant (+1), par Combat.applyStatus (sans le crochet apply, sans boucle).
---   echo_of_light     : regenHeal → 0 ; onRegenTick → la valeur (+2) à chaque ennemi vivant (sans carte).
---   shadow_covenant   : cost → 0 pour une carte Shadow de coût final N ≥ 1, payHp → + 2N ; amélioré : la
+--   echo_of_light     : regenHeal → 0 ; onRegenTick → la valeur + 7 (+ 9) à chaque ennemi vivant (sans carte).
+--   shadow_covenant   : cost → 0 pour une carte Shadow de coût final N ≥ 1, payHp → + 3N ; amélioré : la
 --                       première carte Shadow du tour ne coûte rien.
---   reflective_shield : afterHit → l'Absorb perdue sur ce coup, au plus 4 (7), à l'attaquant (sans carte).
---   voidform          : canPlay → les cartes à Surge sont injouables ; damage → + Insanity / 3 (/ 2) par coup
---                       d'une carte Shadow.
+--   reflective_shield : afterHit → l'Absorb perdue sur ce coup, au plus 2 (4), à l'attaquant (sans carte).
+--   voidform          : canPlay → les cartes à Surge sont injouables ; damage → + 1 par Insanity par coup d'une
+--                       carte Shadow ; amélioré : +3 Insanity au début du combat.
 --   inner_focus       : castAs → la première carte Attack ou Skill du tour part en Cast ; à sa résolution,
---                       dégâts, Absorb, soin, DoT et Regen × 1,5 (× 2), arrondis au supérieur.
+--                       dégâts, Absorb, soin, DoT et Regen × 1,75 (× 2), arrondis au supérieur.
 -- État de classe c.cls : miseryT (uid de la cible de la carte en cours de résolution), miseryBusy,
 -- focusRound (round où la première carte a été prise), focus (uid de la carte incantée par Inner Focus),
 -- scale (facteur pendant la résolution de cette carte).
@@ -34,7 +34,7 @@ ns.Priest = Priest
 if not L.plateByKey("epic") then
   L.plate("epic", { word = "Epic", head = true, flag = "epic", text = "in play from the start of each combat." })
 end
-for _, label in ipairs({ "Each heal", "Each Regen tick", "Shadow cards", "Per 3 Insanity", "Per 2 Insanity", "Per Insanity",
+for _, label in ipairs({ "Each heal", "Each Regen tick", "Shadow cards", "Per 3 Insanity", "Per 2 Insanity", "Per Insanity", "Combat start",
   "First card each turn" }) do
   L.trigger(label)
 end
@@ -55,13 +55,16 @@ L.keyword("innerFocus", { name = "First card", pattern = "^First card each turn:
 Priest.EPICS = { "prayer_of_mending", "misery", "echo_of_light", "shadow_covenant", "reflective_shield",
   "voidform", "inner_focus" }
 
--- Réglages (nombres de la fiche, à régler par la simulation : docs/zones/cartes-de-zone.md).
+-- Réglages (fiche : docs/zones/cartes-de-zone.md ; réglés par la simulation le 14/11/2026, reports/priest-*-m*.txt :
+-- Echo of Light +0 → +7, Shadow Covenant 2 → 3 PV, Reflective Shield sans plafond → 2 par coup, Voidform
+-- 1 par 3 Insanity → 1 par Insanity, Inner Focus +50 % → +75 %).
 Priest.MENDING_UP = 2        -- Prayer of Mending amélioré : + 2 par soin
 Priest.MISERY_UP = 1         -- Misery amélioré : + 1 par copie
-Priest.ECHO_PLUS = { 5, 7 }  -- Echo of Light : + N par tic (base, amélioré)
+Priest.ECHO_PLUS = { 7, 9 }  -- Echo of Light : + N par tic (base, amélioré)
 Priest.COVENANT_HP = 3       -- Shadow Covenant : PV par point de mana
-Priest.REFLECT_CAP = { 4, 7 }  -- Reflective Shield : Absorb perdue renvoyée, au plus N par coup (base, amélioré)
-Priest.VOID_PER = { 1, 1 }   -- Voidform : + 1 par tranche de N Insanity (base, amélioré)
+Priest.REFLECT_CAP = { 2, 4 }  -- Reflective Shield : Absorb perdue renvoyée, au plus N par coup (base, amélioré)
+Priest.VOID_START = { 0, 3 } -- Voidform : Insanity gagnée au début de chaque combat (base, amélioré)
+Priest.VOID_PER = { 1, 1 }   -- Voidform : + 1 par tranche de N Insanity (base, amélioré : + Insanity de départ)
 Priest.FOCUS_SCALE = { 1.75, 2 } -- Inner Focus : facteur (base, amélioré)
 Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
 
@@ -191,6 +194,10 @@ H.reflective_shield = {
 }
 
 H.voidform = {
+  onCombatStart = function(c, src)
+    local n = Priest.VOID_START[src.up and 2 or 1]
+    if n > 0 then Combat.gainRes(c, n, "epic") end
+  end,
   canPlay = function(c, src, v, d)
     if v == true and hasSurge(d) then return Priest.VOIDFORM_REASON end
     return v

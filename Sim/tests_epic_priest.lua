@@ -104,13 +104,16 @@ test("données : sept épiques, une par zone, sans coût ni niveau, plaque Epic,
   eq(ns.Language.plateWord(ns.Language.plateByKey("epic"), ns.Cards.misery), "Epic")
 end)
 
-test("socle : une épique posée dans le deck de départ est active tout le combat (où qu'elle soit)", function()
+test("socle : une épique posée dans le deck de départ est en jeu (c.epic), dans aucune pile", function()
   for _, id in ipairs(P.EPICS) do
     local deck = deckOf({ "smite", "smite", "smite", "inner_fire", "inner_fire", "pw_shield", "sw_pain" })
     deck[#deck + 1] = { id = id, up = true }
     local c = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deck, encounter = { "tp_dummy" } })
     local got, up = P.epicOf(c)
     eq(got, id); eq(up, true)
+    for _, pile in ipairs({ c.hand, c.draw, c.discard, c.exhaust }) do
+      for _, inst in ipairs(pile) do assert(inst.id ~= id, id .. " : dans aucune pile") end
+    end
     assert(Save.isPlain(c), id .. " : combat sauvegardable")
   end
   local c = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deckOf({ "smite", "smite" }), encounter = { "tp_dummy" } })
@@ -227,18 +230,18 @@ end)
 ---------------------------------------------------------------------------
 -- Echo of Light
 ---------------------------------------------------------------------------
-test("Echo of Light : le tic de Regen ne soigne plus, il frappe chaque ennemi vivant, puis baisse de 1", function()
+test("Echo of Light : le tic de Regen ne soigne plus, il frappe chaque ennemi vivant (+ 7), puis baisse de 1", function()
   local c = setup({ "renew" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
   epic(c, "echo_of_light")
   play(c, "renew")
   Combat.endTurn(c)
-  eq(c.player.hp, 40, "aucun soin"); eq(c.enemies[1].hp, 97); eq(c.enemies[2].hp, 97)
+  eq(c.player.hp, 40, "aucun soin"); eq(c.enemies[1].hp, 90, "3 + 7"); eq(c.enemies[2].hp, 90)
   eq(c.player.st.regen, 2)
   local u = setup({ "renew" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
   epic(u, "echo_of_light", true)
   play(u, "renew")
   Combat.endTurn(u)
-  eq(u.enemies[1].hp, 95, "amélioré : 3 + 2")
+  eq(u.enemies[1].hp, 88, "amélioré : 3 + 9")
 end)
 
 test("Echo of Light : les autres soins soignent ; Sundered s'applique ; Spirit of Redemption frappe", function()
@@ -249,13 +252,13 @@ test("Echo of Light : les autres soins soignent ; Sundered s'applique ; Spirit o
   Combat.applyStatus(c, c.enemies[1], "armor_broken", 3)
   c.player.st.regen = 4
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 95, "4 × 1,25")
+  eq(c.enemies[1].hp, 87, "(4 + 7) × 1,25")
   -- Spirit of Redemption : Regen 6 au Last Breath, qui frappe au tic
   local s = setup({ "smite" }, { hp = 5, encounter = { "tp_hitter" } })
   epic(s, "echo_of_light")
   power(s, "spirit_of_redemption")
   Combat.endTurn(s)
-  eq(s.player.hp, 1, "sauvé, puis aucun soin"); eq(s.enemies[1].hp, 94, "Regen 6 frappe")
+  eq(s.player.hp, 1, "sauvé, puis aucun soin"); eq(s.enemies[1].hp, 87, "Regen 6 + 7 frappe")
 end)
 
 test("Echo of Light : un tic qui tue le dernier ennemi gagne le combat", function()
@@ -270,22 +273,22 @@ end)
 ---------------------------------------------------------------------------
 -- Shadow Covenant
 ---------------------------------------------------------------------------
-test("Shadow Covenant : une carte Shadow coûte 0 mana et 2 PV par point ; Holy et coût 0 inchangés", function()
+test("Shadow Covenant : une carte Shadow coûte 0 mana et 3 PV par point ; Holy et coût 0 inchangés", function()
   local c = setup({ "mind_blast", "smite", "devouring_plague" }, { hp = 50 })
   epic(c, "shadow_covenant")
   local i = hi(c, "mind_blast")
-  eq(Combat.cost(c, c.hand[i]), 0); eq(Combat.payHpOf(c, Card.def(c.hand[i]), c.hand[i]), 2)
+  eq(Combat.cost(c, c.hand[i]), 0); eq(Combat.payHpOf(c, Card.def(c.hand[i]), c.hand[i]), 3)
   play(c, "mind_blast", 1)
-  eq(c.player.mana, 3, "mana gardé"); eq(c.player.hp, 48, "2 PV payés")
+  eq(c.player.mana, 3, "mana gardé"); eq(c.player.hp, 47, "3 PV payés")
   play(c, "smite", 1)
-  eq(c.player.mana, 2, "Smite : 1 mana"); eq(c.player.hp, 48)
+  eq(c.player.mana, 2, "Smite : 1 mana"); eq(c.player.hp, 47)
   c.player.res = 2
   play(c, "devouring_plague", 1)
-  eq(c.player.hp, 48, "coût 0 : aucun PV")
+  eq(c.player.hp, 47, "coût 0 : aucun PV")
 end)
 
 test("Shadow Covenant : le paiement ignore l'Absorb, compte comme une perte de PV, jamais mortel", function()
-  local c = setup({ "mind_flay", "mind_flay" }, { hp = 3 })
+  local c = setup({ "mind_flay", "mind_flay" }, { hp = 4 })
   epic(c, "shadow_covenant")
   c.player.block = 10
   play(c, "mind_flay", 1)
@@ -300,7 +303,7 @@ test("Shadow Covenant amélioré : la première carte Shadow du tour ne coûte r
   play(c, "mind_blast", 1)
   eq(c.player.hp, 50, "gratuite"); eq(c.player.mana, 3)
   play(c, "mind_flay", 1)
-  eq(c.player.hp, 48, "la suivante paie")
+  eq(c.player.hp, 47, "la suivante paie")
   Combat.endTurn(c)
   c.hand[#c.hand + 1] = Card.new("sw_pain", false, 777)
   local hpNow = c.player.hp
@@ -323,17 +326,17 @@ end)
 ---------------------------------------------------------------------------
 -- Reflective Shield
 ---------------------------------------------------------------------------
-test("Reflective Shield : un coup qui entame l'Absorb renvoie l'Absorb perdue à son auteur (amélioré : +3)", function()
+test("Reflective Shield : un coup qui entame l'Absorb renvoie l'Absorb perdue à son auteur, au plus 2 (amélioré : 4)", function()
   local c = setup({ "inner_fire" }, { encounter = { "tp_hitter" } })
   epic(c, "reflective_shield")
   play(c, "inner_fire")
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 94, "6 absorbés"); eq(c.player.hp, 56)
+  eq(c.enemies[1].hp, 98, "6 absorbés, 2 au plus"); eq(c.player.hp, 56)
   local u = setup({ "inner_fire" }, { encounter = { "tp_hitter" } })
   epic(u, "reflective_shield", true)
   play(u, "inner_fire")
   Combat.endTurn(u)
-  eq(u.enemies[1].hp, 91, "6 + 3")
+  eq(u.enemies[1].hp, 96, "amélioré : 4 au plus")
 end)
 
 test("Reflective Shield : coup absorbé en entier ; sans Absorb rien ; coup par coup ; Pain Suppression", function()
@@ -341,7 +344,7 @@ test("Reflective Shield : coup absorbé en entier ; sans Absorb rien ; coup par 
   epic(c, "reflective_shield")
   c.player.block = 30
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 90, "10 absorbés en entier")
+  eq(c.enemies[1].hp, 98, "10 absorbés en entier, 2 renvoyés")
   local n = setup({ "smite" }, { encounter = { "tp_hitter" } })
   epic(n, "reflective_shield")
   Combat.endTurn(n)
@@ -350,13 +353,13 @@ test("Reflective Shield : coup absorbé en entier ; sans Absorb rien ; coup par 
   epic(t, "reflective_shield")
   t.player.block = 7
   Combat.endTurn(t)
-  eq(t.enemies[1].hp, 93, "5 puis 2")
+  eq(t.enemies[1].hp, 96, "5 puis 2 absorbés : 2 et 2")
   local h = setup({ "pain_suppression" }, { encounter = { "tp_hitter" } })
   epic(h, "reflective_shield")
   play(h, "pain_suppression")
   h.player.block = 30
   Combat.endTurn(h)
-  eq(h.enemies[1].hp, 95, "coup divisé avant l'Absorb : 5 renvoyés")
+  eq(h.enemies[1].hp, 98, "coup divisé avant l'Absorb : 5 absorbés, 2 renvoyés")
 end)
 
 test("Reflective Shield : le DoT n'est pas un coup ; un auteur qui n'attaque pas ne renvoie rien", function()
@@ -385,30 +388,32 @@ test("Voidform : les cartes à Surge sont injouables (raison Voidform)", functio
   end
 end)
 
-test("Voidform : chaque coup Shadow + 1 par tranche de 3 Insanity (amélioré : 2), lue au coup ; Holy et DoT rien", function()
+test("Voidform : chaque coup Shadow + 1 par Insanity, lue au coup ; Holy et DoT rien ; amélioré : +3 Insanity au départ", function()
   local c = setup({ "mind_blast", "smite" })
   epic(c, "voidform")
   c.player.res = 7
   play(c, "mind_blast", 1)
-  eq(c.enemies[1].hp, 100 - 12, "10 + 2 (7 Insanity)")
+  eq(c.enemies[1].hp, 100 - 17, "10 + 7 (7 Insanity)")
   eq(c.player.res, 9, "+2 Insanity, sans plafond")
   play(c, "smite", 1)
-  eq(c.enemies[1].hp, 88 - 8, "Holy : rien")
+  eq(c.enemies[1].hp, 83 - 8, "Holy : rien")
   c.enemies[1].st.pain = 5
   local before = c.enemies[1].hp
   Combat.endTurn(c)
   eq(before - c.enemies[1].hp, 5, "DoT : rien")
-  local u = setup({ "mind_blast" })
-  epic(u, "voidform", true)
-  u.player.res = 7
-  play(u, "mind_blast", 1)
-  eq(u.enemies[1].hp, 100 - 13, "amélioré : 10 + 3")
+  local deck = deckOf({ "mind_blast", "smite", "smite", "smite", "smite" })
+  deck[#deck + 1] = { id = "voidform", up = true }
+  local u = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deck, encounter = { "tp_dummy" } })
+  eq(u.player.res, 3, "amélioré : +3 Insanity au début du combat")
+  local b = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deckOf({ "mind_blast", "voidform" }),
+    encounter = { "tp_dummy" } })
+  eq(b.player.res, 0, "base : rien au départ")
 end)
 
 ---------------------------------------------------------------------------
 -- Inner Focus
 ---------------------------------------------------------------------------
-test("Inner Focus : la première carte du tour part en Cast et se résout au tour suivant, valeurs +50 %", function()
+test("Inner Focus : la première carte du tour part en Cast et se résout au tour suivant, valeurs +75 %", function()
   local c = setup({ "smite", "smite" })
   epic(c, "inner_focus")
   play(c, "smite", 1)
@@ -416,7 +421,7 @@ test("Inner Focus : la première carte du tour part en Cast et se résout au tou
   play(c, "smite", 1)
   eq(c.enemies[1].hp, 92, "la deuxième est normale")
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 92 - 12, "8 × 1,5")
+  eq(c.enemies[1].hp, 92 - 14, "8 × 1,75")
   eq(c.player.cast, nil)
   local u = setup({ "smite" })
   epic(u, "inner_focus", true)
@@ -433,7 +438,7 @@ test("Inner Focus : une carte déjà Cast reçoit le bonus (DoT arrondi au supé
   local ok, why = Combat.canPlay(c, hi(c, "halo"))
   assert(not ok); eq(why, "casting")
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 100 - 36, "24 × 1,5"); eq(c.enemies[1].st.pain, 5, "3 × 1,5 = 4,5 → 5")
+  eq(c.enemies[1].hp, 100 - 42, "24 × 1,75"); eq(c.enemies[1].st.pain, 6, "3 × 1,75 = 5,25 → 6")
 end)
 
 test("Inner Focus : Absorb incantée gagnée au tour suivant (protège ce tour-là) ; Regen et soin aussi", function()
@@ -443,12 +448,12 @@ test("Inner Focus : Absorb incantée gagnée au tour suivant (protège ce tour-l
   eq(c.player.block, 0, "rien ce tour")
   Combat.endTurn(c)
   eq(c.player.hp, 50, "le coup passe en entier")
-  eq(c.player.block, 9, "6 × 1,5 au début du tour suivant")
+  eq(c.player.block, 11, "6 × 1,75 = 10,5 → 11 au début du tour suivant")
   local h = setup({ "halo" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
   epic(h, "inner_focus")
   play(h, "halo")
   Combat.endTurn(h)
-  eq(h.enemies[1].hp, 67); eq(h.enemies[2].hp, 67, "22 × 1,5 à tous"); eq(h.player.st.regen, 5, "Regen 3 × 1,5")
+  eq(h.enemies[1].hp, 61); eq(h.enemies[2].hp, 61, "22 × 1,75 → 39 à tous"); eq(h.player.st.regen, 6, "Regen 3 × 1,75 → 6")
 end)
 
 test("Inner Focus : un Power ne compte pas, la carte suivante est la première ; Penance : Absorb par coup aussi", function()
@@ -460,8 +465,8 @@ test("Inner Focus : un Power ne compte pas, la carte suivante est la première ;
   play(c, "penance", 1)
   eq(c.player.cast.card.id, "penance")
   Combat.endTurn(c)
-  eq(c.enemies[1].hp, 100 - 3 * 8, "5 × 1,5 = 7,5 → 8 par coup")
-  eq(c.player.block, 9, "2 × 1,5 → 3 Absorb par coup")
+  eq(c.enemies[1].hp, 100 - 3 * 9, "5 × 1,75 = 8,75 → 9 par coup")
+  eq(c.player.block, 12, "2 × 1,75 → 4 Absorb par coup")
 end)
 
 test("Inner Focus : incantation coupée = carte perdue ; le tour suivant a de nouveau sa première carte", function()
