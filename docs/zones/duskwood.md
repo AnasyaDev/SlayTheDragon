@@ -406,10 +406,10 @@ event("webbed_watcher", {
 
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-- Shadowy Apparitions (Priest)
-- Enraged Regeneration (Warrior)
-- Alter Time (Mage)
-- Sap (Rogue)
+- Misery (Priest)
+- Thunderous Roar (Warrior)
+- Molten Armor (Mage)
+- Doomblade (Rogue)
 - Trap Launcher (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte

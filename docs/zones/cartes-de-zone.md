@@ -1,324 +1,1037 @@
 # Cartes de zone : les 35 cartes épiques
 
-Fiche de conception (13/11/2026). Rien n'est codé. Elle remplace les sections « Cartes de zone » des sept
-fiches `docs/zones/<id>.md`, écrites sans concertation (noms en double, cartes qui ne répondaient qu'à la
-mécanique de leur zone).
+Fiche de conception, version 2 (13/11/2026, après la relecture du joueur). Rien n'est codé. Elle remplace la
+version 1 du même jour et les sections « Cartes de zone » des sept fiches `docs/zones/<id>.md`, qui ne
+gardent qu'un renvoi.
+
+## Ce qui change par rapport à la version 1
+
+Le joueur a relevé la barre (`docs/zones/decisions.md`) : **une seule épique par expédition**, et chaque
+épique **pilote le build**. Une épique change une règle de la classe pour toute l'expédition et fait naître
+un deck qui n'existe pas sans elle. Deux tests, passés par chacune des 35 :
+
+1. *Avec cette carte, est-ce que je choisis mes récompenses, mes améliorations et mes retraits
+   différemment pendant toute l'expédition ?*
+2. *Deux expéditions de la même classe avec deux épiques différentes se jouent-elles de façon nettement
+   différente ?*
+
+Tout ce qui n'est qu'une bonne carte (pioche, mana, soin, dégâts en plus, réduction de coût, un état de
+plus) est refusé. Une épique n'a pas à se combiner avec les autres épiques : on n'en a jamais deux.
 
 ## Règles retenues
 
-- **Déblocage** : la première victoire d'une classe dans une zone débloque sa carte de cette zone, introuvable
-  autrement. Ensuite, la carte entre dans la réserve de la classe (récompenses, marchand, rencontres), dans
-  toutes les zones.
-- **Rareté `epic`** (décision du joueur du 13/11/2026), au-dessus de `rare`. Dans les données : `rarity = "epic"`,
-  `zone = "<id>"`, pas de `level` (champ prévu par `docs/zones.md`), `path` = la voie indiquée.
-- **Pivot** : chaque carte ouvre un deck qui n'existe pas sans elle, ou retourne une règle de la classe. Le lien
-  avec la mécanique de la zone est un bonus ; aucune ne perd sa valeur hors de sa zone.
-- **Un nom = une carte** : sorts ou talents réels de la classe, absents de `Data/<Classe>.lua` (vérifié) et
-  uniques dans les 35.
-- **Sept directions par classe**, réparties entre les trois voies ; **quatre Powers au plus** par classe
-  (20 Powers, 6 Attacks, 9 Skills en tout).
-- **Progression** : la carte de Westfall se comprend en une lecture ; celles des Steppes et de Blackrock
-  demandent de construire autour. Pas d'escalade de puissance : toutes sont épiques.
-- **Texte** : langage exact des cartes (« Power. » / « Cast. » en tête, « Cooldown N. » / « Exhaust. » en fin,
-  états en dernière ligne, aucun « you / your »). Le corps (sans les mots de plaque) tient en quatre lignes
-  d'environ 22 caractères. Les « / » des tableaux sont des retours à la ligne.
-- **Icônes** : présentes dans `~/Téléchargements/ICONS/` (source de `tools/build_media.py`), confirmées par
-  `wow_icon_search` quand le pack ne les avait pas, et **non employées** par une carte existante
-  (`UI/Art.lua`, `UI/Art/*.lua`). Huit icônes naturelles étaient déjà prises (par Slice and Dice, Defend,
-  Slam, Ice Barrier, Shatter, Blazing Barrier, Dire Beast et la pastille de Rage) : remplacées, voir chaque ligne.
-- **Statut** : *conservée* (carte d'une fiche gardée telle quelle, au texte près), *modifiée* (idée gardée,
-  règle ou chiffres changés), *nouvelle*.
-
-Colonne « Moteur » : crochet existant de `ns.ClassRules` / des Powers (`docs/classes.md`) ou point nouveau,
-en un mot. Les points nouveaux sont regroupés en fin de fiche.
+- **Arrivée en jeu : toutes les épiques sont des règles en jeu dès le début du combat** (règle complète en
+  fin de fiche, « A »). Elles ne se piochent pas, ne se jouent pas, n'ont pas de coût. Les 35 sont donc des
+  Powers à plaque « Epic » : `type = "power"`, `epic = true`, `rarity = "epic"`, `zone = "<id>"`,
+  `path = <voie>`, sans `cost` ni `level`.
+- **Déblocage** (inchangé) : la première victoire d'une classe dans une zone débloque sa carte de cette
+  zone, introuvable autrement. Ensuite l'épique entre dans la réserve d'épiques de la classe (offre
+  garantie, élites, marchand : fin de fiche, « B »).
+- **Westfall d'abord simple** : la carte de Westfall de chaque classe est la première épique débloquée ;
+  elle se comprend en une lecture. Celles des Steppes et de Blackrock demandent de construire autour.
+- **Un nom = une carte** : sorts ou talents réels de la classe, absents de `Data/<Classe>.lua`, uniques
+  dans les 35 et dans les variantes de Lone Wolf (vérifié dans `Data/`, `Core/`, `UI/` et `docs/`).
+- **Texte** : langage exact des cartes, « Epic. » en tête (mot de plaque, retiré à l'affichage comme
+  « Power. »), aucun « you / your ». Le corps tient en quatre lignes d'environ 22 caractères ; les « / »
+  sont des retours à la ligne. Quand la règle ne tient pas, la carte dit l'essentiel et l'**infobulle**
+  donne le détail.
+- **Lien avec la zone** : un bonus, jamais une condition. Aucune épique ne perd sa valeur ailleurs.
+- **Retraits** : le feu de camp ne retire rien (repos ou amélioration) ; « à retirer » vise le marchand et
+  les rencontres, « feu de camp » vise l'amélioration à faire en priorité.
+- **Statut** : *conservée* (règle de la version 1 gardée ; le coût disparaît d'office avec la règle
+  d'arrivée, l'amélioration « coût 1 » est remplacée), *modifiée* (idée gardée, règle changée),
+  *nouvelle*.
 
 ## Répartition par zone
 
 | Zone | Priest | Warrior | Mage | Rogue | Hunter |
 |---|---|---|---|---|---|
-| 1 Westfall | Prayer of Mending | Shockwave | Mirror Image | Ghostly Strike | Call of the Wild |
-| 2 Duskwood | Shadowy Apparitions | Enraged Regeneration | Alter Time | Sap | Trap Launcher |
-| 3 Wetlands | Mind Spike | Sweeping Strikes | Water Elemental | Subterfuge | Beast Cleave |
-| 4 Stranglethorn Vale | Power Infusion | Anger Management | Cold Snap | Deathmark | Black Arrow |
-| 5 Swamp of Sorrows | Reflective Shield | Defensive Stance | Molten Armor | Leeching Poison | Exhilaration |
-| 6 Burning Steppes | Vampiric Embrace | Death Wish | Touch of the Magi | Relentless Strikes | Kill Shot |
-| 7 Blackrock Mountain | Spirit Shell | Avatar | Fingers of Frost | Cold Blood | Lone Wolf |
+| 1 Westfall | Prayer of Mending | Death Wish | Mirror Image | Deflection | Call of the Wild |
+| 2 Duskwood | Misery | Thunderous Roar | Molten Armor | Doomblade | Trap Launcher |
+| 3 Wetlands | Echo of Light | Sweeping Strikes | Water Elemental | Atrophic Poison | Beast Cleave |
+| 4 Stranglethorn Vale | Shadow Covenant | Titan's Grip | Fingers of Frost | Echoing Reprimand | Roar of Sacrifice |
+| 5 Swamp of Sorrows | Reflective Shield | Shield Charge | Arcane Meditation | Subterfuge | Master Marksman |
+| 6 Burning Steppes | Voidform | Anger Management | Conflagration | Kidney Shot | Black Arrow |
+| 7 Blackrock Mountain | Inner Focus | Avatar | Rule of Threes | Danse Macabre | Lone Wolf |
+
+Par voie : Priest 2 Holy, 3 Discipline, 2 Shadow ; Warrior 3 Arms, 2 Fury, 2 Protection ; Mage 3 Fire,
+2 Frost, 2 Arcane ; Rogue 2 Assassination, 2 Combat, 3 Subtlety ; Hunter 3 Beast Mastery,
+2 Marksmanship, 2 Survival.
+
+---
 
 ## Priest
 
-Sept directions :
-1. **Le soin devient l'attaque** (Holy) — Prayer of Mending.
-2. **Le DoT nourrit l'Insanity**, sans attaque Shadow (Shadow) — Shadowy Apparitions.
-3. **Le DoT devient un coup immédiat** (Shadow) — Mind Spike.
-4. **Les Cast sacrés partent tout de suite** (Holy) — Power Infusion.
-5. **L'Absorb frappe l'attaquant** (Discipline) — Reflective Shield.
-6. **Le gros tour Shadow soigne** : le Shadow sans Discipline (Shadow) — Vampiric Embrace.
-7. **Le soin en trop devient un rempart qui dure** (Discipline) — Spirit Shell.
+Sept builds :
+1. **Le soin frappe** (Holy) — Prayer of Mending : Renew, Holy Nova, Flash Heal, Greater Heal, Atonement
+   soignent pour tuer ; le Priest accepte les coups.
+2. **Le DoT de tout le monde** (Shadow) — Misery : SW: Pain, Vampiric Touch, Devouring Plague posés sur une
+   cible couvrent la salle ; Mind Flay toujours allumé.
+3. **La Regen devient une nova** (Holy) — Echo of Light : Renew, Holy Nova, Halo, Vampiric Touch frappent
+   tous les ennemis à chaque début de tour ; la survie passe par l'Absorb.
+4. **Le Shadow payé en PV** (Discipline) — Shadow Covenant : Mind Blast, Mind Flay, SW: Death, Schism ne
+   coûtent que des PV, le mana sert à l'Atonement (Solace, Radiance, Penance) qui les rend.
+5. **L'Absorb renvoie les coups** (Discipline) — Reflective Shield : les quatre Inner Fire, PW: Shield,
+   Luminous Barrier, Rapture tuent ce qui frappe.
+6. **Le Shadow qui ne dépense jamais** (Shadow) — Voidform : plus aucun Surge, l'Insanity monte sans fin et
+   chaque coup de Mind Blast, Mind Flay, SW: Death grandit avec elle.
+7. **Un gros sort par tour** (Discipline, pilote le Cast) — Inner Focus : la première carte du tour devient
+   un Cast plus fort ; Holy Fire, Empyreal Blaze, Halo, Penance, Luminous Barrier en tête de tour.
 
-| Zone | Nom | Coût / type / voie | Texte de base | Amélioré | Icône | Le deck qu'elle fait naître | Moteur | Statut |
-|---|---|---|---|---|---|---|---|---|
-| Westfall | Prayer of Mending | 2, Power, Holy | Power. / Each heal: deal the HP restored to a random enemy. | coût 1 | `spell_holy_prayerofmendingtga` | Renew, Holy Nova, Flash Heal, Greater Heal et l'Atonement (Solace, Radiance) tuent : le Holy encaisse, puis soigne pour frapper, avec peu de Smite. | nouveau `onHeal` | conservée (Steppes → Westfall) ; plein montant au lieu de la moitié |
-| Duskwood | Shadowy Apparitions | 1, Power, Shadow | Power. / Each enemy DoT tick: +1 Insanity. | coût 0 | `ability_priest_shadowyapparition` | SW: Pain, Vampiric Touch, Mind Sear posent le DoT partout, puis Void Eruption ou Devouring Plague : un Shadow de Skills qui monte l'Insanity sans jouer Mind Blast ni Mind Flay. | `onDotTick` | nouvelle |
-| Wetlands | Mind Spike | 1, Attack, Shadow | Deal 4 + the target's DoT. / It loses its DoT. / +1 Insanity. | Deal 7 + the target's DoT. / … | `spell_priest_mindspike` | Mind Sear et Devouring Plague empilent, Mind Spike encaisse tout de suite (Shadowform ajoute +3) : le DoT devient une réserve qu'on vide au moment choisi. | nouveau montant `dot`, effet `strip` | nouvelle |
-| Stranglethorn | Power Infusion | 0, Skill, Holy | Draw 1. / Gain Instant 1 / Cooldown 2. | Draw 2. / Gain Instant 1 / Cooldown 2. | `spell_holy_powerinfusion` | Holy Fire, Halo, Empyreal Blaze et Greater Heal partent au jeu un tour sur deux, sans risque d'interruption ; avec Apotheosis, deux gros Cast par tour. | aucun (état `instant`) | modifiée (Westfall → STV ; Cooldown au lieu d'Exhaust, sans mana) |
-| Swamp | Reflective Shield | 1, Power, Discipline | Power. / When hit: deal the damage absorbed to the attacker. | coût 0 | `ability_priest_reflectiveshield` | Inner Fire, PW: Shield, Luminous Barrier, Radiance et Rapture : la Discipline tue en se protégeant, chaque coup ennemi absorbé revient à son auteur. | `afterHit` | nouvelle |
-| Steppes | Vampiric Embrace | 1, Skill, Shadow | Draw 1. / Until end of turn, Shadow damage heals half. / Cooldown 2. | coût 0 | `spell_shadow_unsummonbuilding` | Le tour de Void Eruption (6 + 5 par Insanity) ou de Mind Blast rend la moitié de ses dégâts : un Shadow qui se soigne sans Atonement. | nouveau `onDamageDealt` | nouvelle |
-| Blackrock | Spirit Shell | 2, Power, Discipline | Power. / Overhealing: gain as much Absorb. / Keep up to 15 Absorb each turn. | coût 1 | `ability_shaman_astralshift` | Renew, Holy Nova, Atonement soignent à pleine vie et montent un rempart qui passe d'un tour à l'autre : Holy et Discipline jouent ensemble la défense. | nouveau `onHeal`, `blockKeep` | conservée (texte réécrit sans « your » ; icône changée, l'ancienne va à Reflective Shield) |
+### Westfall — Prayer of Mending (Holy) · conservée
 
-Précisions :
-- **Prayer of Mending** : compte les PV réellement rendus (un soin à pleine vie ne fait rien), toutes sources
-  (cartes, Regen, Atonement, potions, bibelots). Les dégâts ne viennent pas d'une carte : ni Atonement, ni
-  Vampiric Embrace en retour, aucune boucle. Cible tirée par `c.rng.cards`.
-- **Shadowy Apparitions** : une fois par ennemi et par tick (au début de son tour) ; l'Insanity arrive pendant
-  le tour ennemi.
-- **Mind Spike** : dégâts = 4 + DoT de la cible lu à la résolution (Shadowform et Sundered s'appliquent), puis
-  le DoT de la cible tombe à 0.
-- **Power Infusion** : l'Instant est l'état commun (decisions.md) : il se garde, la prochaine carte Cast le
-  consomme. C'est la première source d'Instant hors Mage (question 3).
-- **Reflective Shield** : à chaque coup ennemi qui entame l'Absorb, même en entier ; dégâts sans carte
-  (comme Retaliation) égaux à l'Absorb perdue sur ce coup.
-- **Vampiric Embrace** : dégâts des cartes `school = "shadow"` jusqu'à la fin du tour, arrondis à l'inférieur ;
-  le DoT, qui se déclenche au tour ennemi, n'en profite pas.
-- **Spirit Shell** : le surplus de soin devient Absorb ; au début du tour, 15 Absorb au plus restent
-  (`blockKeep` : avec la Gnomish Harm Prevention Belt, on garde la plus grande des deux valeurs).
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Each heal: deal the HP` / `restored to a random` / `enemy.` | `Each heal: deal the HP` / `restored + 2 to a` / `random enemy.` |
+
+- **Règle.** Chaque soin qui rend au moins 1 PV au Priest inflige autant (amélioré : autant + 2) à un
+  ennemi vivant tiré par `c.rng.cards`. Toutes sources : cartes, chaque tic de Regen, Atonement, potions,
+  bibelots, Last Breath. Seuls les PV réellement rendus comptent : un soin à pleine vie ne fait rien, même
+  amélioré.
+- **Cas limites.** Dégâts sans carte (comme Retaliation) : Sundered de la cible et Demoralized du Priest
+  s'appliquent ; ni Atonement ni Shadowform, aucune boucle. Rendu pendant le tour ennemi (aucune source
+  aujourd'hui) : même règle. Boss : normal. Dormeur (Swamp) : coup à une cible, donc bonus Rude Awakening
+  et réveil. Cible tuée : le soin suivant tire une autre cible.
+- **Deck piloté.** Centrales : Renew, Holy Nova, Halo, Flash Heal, Greater Heal, Vampiric Touch, Shadow
+  Mend (soin 12), PW: Radiance et PW: Solace (Atonement), bibelot Benediction. Mauvaises : Inner Fire et
+  PW: Shield (l'Absorb empêche la perte de PV, donc le soin). À retirer : Inner Fire. Feu de camp :
+  Renew, puis Prayer of Mending.
+- **Moteur.** Nouveau : notification `onHeal(n, surplus, source)` (soin réellement rendu).
+
+### Duskwood — Misery (Shadow) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `DoT applied to an` / `enemy also goes to` / `every other enemy.` | `…` / `every other enemy, +1.` |
+
+- **Règle.** Quand le Priest pose du DoT sur **un** ennemi (carte à une cible, Surge de Devouring Plague,
+  ligne de DoT de Holy Fire), chaque autre ennemi vivant reçoit le même DoT (amélioré : +1 sur chaque
+  copie). La valeur copiée est la valeur finale posée sur la cible (Shadowform compris) ; les copies ne
+  repassent pas par le crochet `apply`.
+- **Cas limites.** Une carte « to all » (Mind Sear) ne copie rien. Le DoT posé sur soi (Shadow Mend) ne
+  compte pas. Les copies ne déclenchent pas Misery (pas de boucle). Un ennemi invoqué plus tard ne reçoit
+  rien. Boss seul : un deck de DoT ordinaire. Lien Duskwood : un lanceur de Curse fragile tué par son DoT
+  au début de son tour lève ses Curses avant d'agir.
+- **Deck piloté.** Centrales : SW: Pain (carte de départ, devient une carte de zone), Vampiric Touch,
+  Devouring Plague (DoT 2 par Insanity sur tous), Holy Fire, Mind Flay (sa ligne « DoT: » toujours vraie),
+  Void Eruption, Shadowform, Silence. Mauvaises : Mind Sear (fait double emploi), Holy Nova. À retirer :
+  Smite. Feu de camp : SW: Pain.
+- **Moteur.** Crochet existant `onStatusApplied` (unité, état, n) sur l'épique, avec un drapeau
+  anti-boucle et la source (carte du joueur, une cible).
+
+### Wetlands — Echo of Light (Holy) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Regen no longer heals.` / `Each Regen tick: deal` / `that much to all.` | `…` / `that much + 2 to all.` |
+
+- **Règle.** Au début du tour du Priest, le tic de Regen ne soigne plus : il inflige sa valeur (amélioré :
+  + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme d'habitude.
+- **Cas limites.** Toute Regen est concernée, Spirit of Redemption compris (sa Regen 6 frappe au lieu de
+  soigner : à dire dans l'infobulle). Les autres soins (Flash Heal, Atonement, potions) soignent toujours.
+  Dégâts sans carte, Sundered compris. Le tic a lieu au même moment qu'un Cast résolu en début de tour :
+  à Blackrock, il franchit les seuils « pendant ton tour ». Lien Wetlands : un seul effet frappe toute la
+  meute, les morts sont simultanées et ne donnent aucune prime. Swamp : réveille tous les dormeurs, sans
+  bonus.
+- **Deck piloté.** Centrales : Renew (Regen 3), Holy Nova (3 à tous, Regen 2), Halo (Cast, 22 à tous,
+  Regen 3), Vampiric Touch, Benediction (+1 par gain de Regen), et pour survivre Inner Fire, PW: Shield,
+  Luminous Barrier. Mauvaises : Smite, Mind Blast (une cible). À retirer : Smite. Feu de camp : Renew,
+  Holy Nova. À l'inverse de Prayer of Mending, ce Priest garde ses Inner Fire.
+- **Moteur.** Nouveau : valeur modifiée `regenHeal` (0 = le tic ne soigne pas) et notification
+  `onRegenTick(n)`.
+
+### Stranglethorn Vale — Shadow Covenant (Discipline) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Shadow cards: Pay 2 HP` / `per mana, not mana.` | `…` / `The first each turn` / `is free.` |
+
+- **Règle.** Une carte Shadow dont le coût en mana (tous modificateurs compris) vaut N ≥ 1 coûte 0 mana et
+  « Pay 2N HP. » à la place. Amélioré : la première carte Shadow jouée dans le tour ne coûte ni mana ni PV.
+- **Cas limites.** Règle commune de « Pay N HP » : payé au jeu, compte comme une perte de PV, ignore
+  l'Absorb, carte injouable si elle ferait tomber à 0. Les cartes Shadow à 0 (Devouring Plague, Silence)
+  ne changent pas. Curse of Tongues (+1 à la première carte) ajoute 2 PV. Lien Stranglethorn : le Hex vise
+  la carte la plus chère en mana ; les cartes Shadow coûtent 0, il frappe donc les cartes sacrées.
+- **Deck piloté.** Centrales : Mind Blast, Mind Flay, SW: Death, Schism, Vampiric Touch, Mind Sear,
+  Shadowform ; le mana va à PW: Solace, PW: Radiance, Penance, Evangelism (Atonement qui rend les PV) et à
+  PW: Shield. Mauvaises : Smite et Holy Fire (mana pour des dégâts). À retirer : Smite. Feu de camp : Mind
+  Blast, Solace.
+- **Moteur.** Crochets existants `cost` (→ 0) et `payHp` (+ 2N), l'épique passant **après** les autres
+  Powers et bibelots pour lire le coût final (ordre nouveau, voir « C »).
+
+### Swamp of Sorrows — Reflective Shield (Discipline) · conservée
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `When hit: deal the` / `damage absorbed to` / `the attacker.` | `…` / `damage absorbed + 3` / `to the attacker.` |
+
+- **Règle.** Chaque coup ennemi qui entame l'Absorb du Priest (même en entier) inflige à son auteur
+  l'Absorb perdue sur ce coup (amélioré : + 3), sans carte, comme Retaliation.
+- **Cas limites.** Une attaque à plusieurs coups renvoie coup par coup. Pain Suppression divise le coup
+  avant l'Absorb : seul ce qui est réellement absorbé revient. Le DoT et les Curses ne sont pas des coups.
+  Auteur mort en cours d'attaque : rien. Les ennemis qui n'attaquent pas (lanceurs, dormeurs) ne
+  renvoient rien : le deck garde des dégâts. Lien Swamp : les ouvertures de 20 à 26 absorbées reviennent
+  entières.
+- **Deck piloté.** Centrales : les quatre Inner Fire de départ, PW: Shield, Luminous Barrier, PW: Radiance,
+  Penance (Absorb sous Atonement), Rapture (+2 par gain d'Absorb), Angelic Feather, bibelots Robes of
+  Prophecy et Truefaith Vestments. Mauvaises : Renew, Flash Heal, Greater Heal. À retirer : un ou deux
+  Smite. Feu de camp : Inner Fire.
+- **Moteur.** Crochet existant `afterHit` (ennemi, PV perdus, absorbés).
+
+### Burning Steppes — Voidform (Shadow) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Surge cards can't be` / `played. Shadow hits:` / `+1 per 3 Insanity.` | `…` / `+1 per 2 Insanity.` |
+
+- **Règle.** Les cartes qui ont une clause Surge sont injouables (raison « Voidform »). Chaque coup d'une
+  carte Shadow inflige 1 de plus par tranche de 3 Insanity (amélioré : 2), lue au moment du coup.
+- **Cas limites.** Le DoT n'en profite pas (ce n'est pas un coup de carte). L'Insanity n'a pas de plafond
+  et vit le temps du combat : au 4e tour, 12 à 16 Insanity, soit +4 ou +5 par coup. Les cartes Holy n'ont
+  rien. Lien Steppes : un Shadow qui finit vite, avant que le feu ne brûle longtemps.
+- **Deck piloté.** Centrales : Mind Blast (+2 Insanity, Cooldown 1), Mind Flay, SW: Pain et Vampiric Touch
+  (+1 et la ligne « DoT: » de Mind Flay), Shadowform (+2 Insanity, +3), Schism, SW: Death, Psychic Scream
+  (+1), bibelot Mindtap Talisman. Mauvaises : Devouring Plague et Void Eruption (injouables), Anathema.
+  À retirer : Smite, puis les cartes Surge si on les a prises avant. Feu de camp : Mind Blast.
+- **Moteur.** Crochet existant `damage` (école shadow) ; nouveau : valeur modifiée `canPlay` (d, inst) qui
+  rend une carte injouable avec une raison.
+
+### Blackrock Mountain — Inner Focus (Discipline, pilote le Cast de Holy) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `First card each turn:` / `Cast, and its values` / `+50%.` | `First card each turn:` / `Cast, values doubled.` |
+
+Infobulle : `The first Attack or Skill each turn is cast: damage, Absorb, heal, DoT and Regen +50%.`
+
+- **Règle.** La première carte Attack ou Skill jouée dans le tour devient un Cast : elle prend
+  l'emplacement d'incantation et se résout au début du tour suivant, avec ses valeurs de dégâts, d'Absorb,
+  de soin, de DoT et de Regen multipliées par 1,5 (amélioré : 2), arrondies au supérieur. Une carte déjà
+  Cast reste Cast et reçoit le bonus.
+- **Cas limites.** Les Powers, Curses et cartes Hexed ne comptent pas (la suivante est « la première »).
+  Pas de bonus sur les durées (Atonement, Sundered, Stunned ⌛), la pioche, le mana, l'Insanity. Le Priest
+  n'a qu'un emplacement de Cast : une fois la première carte incantée, il ne peut plus jouer de carte Cast
+  dans ce tour, d'où la décision de commencer par Holy Fire. Interruption ou perte de PV qui coupe
+  l'incantation : la carte est perdue pour ce tour (règle commune). Absorb incantée : gagnée au début du
+  tour suivant, après la remise à 0, donc elle protège tout ce tour-là et le tour ennemi. Lien Blackrock :
+  un Cast résolu en début de tour franchit un seuil « pendant ton tour » et remplace l'intention ; on
+  choisit le moment.
+- **Deck piloté.** Centrales : Holy Fire (24 → 36), Empyreal Blaze (36 → 54), Halo (22 → 33 à tous),
+  Penance (5 → 8 par coup), Luminous Barrier (14 → 21), Greater Heal, Mind Blast ; Apotheosis (+1 mana,
+  Cast −1), bibelot Truefaith Vestments. Mauvaises : les cartes à 0 et les petites cartes jouées en
+  premier. À retirer : Smite. Feu de camp : Holy Fire ou Empyreal Blaze.
+- **Moteur.** Nouveau : valeur modifiée `castAs` (d, inst : la carte part en Cast) et facteur `ctx.scale`
+  lu par les effets `damage`, `absorb`, `heal`, `apply` (pain, regen).
+
+---
 
 ## Warrior
 
-Sept directions :
-1. **La Rage devient du contrôle de groupe** (Protection) — Shockwave.
-2. **La Rage devient des PV** : la Fury sans Absorb tient (Fury) — Enraged Regeneration.
-3. **Chaque gros coup touche deux ennemis** (Arms) — Sweeping Strikes.
-4. **La Rage paie le mana** des cartes lourdes (Arms et Fury) — Anger Management.
-5. **Bloquer paie aussi** : l'Absorb s'accumule et donne de la Rage (Protection) — Defensive Stance.
-6. **Plus aucun bouclier**, tout dans l'attaque (Fury) — Death Wish.
-7. **Garder sa Rage** jusqu'à 10 au lieu de la dépenser à 5 (Arms) — Avatar.
+Sept builds :
+1. **Plus aucun bouclier** (Fury) — Death Wish : Bloodthirst, Victory Rush, Rampage, Raging Blow,
+   Whirlwind, Battle Shout ; on retire les quatre Defend.
+2. **La Rage explose toute seule** (Protection) — Thunderous Roar : Bloodrage, Berserker Rage,
+   Demoralizing Shout, Revenge, Overpower, Rampage montent la Rage, qui frappe la salle à 5.
+3. **Chaque gros coup en touche deux** (Arms) — Sweeping Strikes : Mortal Strike, Execute, Raging Blow,
+   Rampage deviennent des cartes de groupe.
+4. **Deux attaques par tour, chacune deux fois** (Fury) — Titan's Grip : Mortal Strike, Rampage,
+   Bladestorm, Execute, Bloodthirst ; les Strike partent.
+5. **L'Absorb est l'attaque** (Protection) — Shield Charge : Defend, Shield Block, Shield Wall, Ignore
+   Pain, Shield Slam ; les Strike partent.
+6. **Dépenser recharge** (Arms) — Anger Management : Heroic Strike, Onslaught, Execute, Ignore Pain
+   dépensent, Bloodthirst, Shield Wall, Berserker Rage reviennent vite.
+7. **Garder sa Rage jusqu'à 10** (Arms) — Avatar : Execute à 45, Ignore Pain à 30.
 
-| Zone | Nom | Coût / type / voie | Texte de base | Amélioré | Icône | Le deck qu'elle fait naître | Moteur | Statut |
-|---|---|---|---|---|---|---|---|---|
-| Westfall | Shockwave | 1, Attack, Protection | Deal 7 to all. / Spend 3: apply Stunned 1 ⌛ to all / Cooldown 3. | Deal 10 to all. / … | `ability_warrior_shockwave` | Bloodrage, Berserker Rage, Demoralizing Shout gardent 3 Rage pour arrêter tout un groupe tous les trois tours : le Warrior contrôle au lieu d'encaisser. | aucun (`spend`, `apply … all`) | conservée (version de Westfall) |
-| Duskwood | Enraged Regeneration | 1, Skill, Fury | Surge: heal 3 per Rage. / Cooldown 3. | Surge: heal 4 per Rage. / Cooldown 3. | `ability_warrior_endlessrage` | Rampage, Recklessness, Bloodrage (PV payés) et les coups pris montent la Rage, qui revient en PV : la Fury retire ses Defend. | aucun (`surge`, `heal per`) | modifiée (Swamp → Duskwood ; sans Afflictions, Cooldown au lieu d'Exhaust) |
-| Wetlands | Sweeping Strikes | 1, Power, Arms | Power. / Targeted Attacks also hit another enemy for half. | coût 0 | `ability_warrior_weaponmastery` | Mortal Strike, Execute, Colossus Smash, Raging Blow frappent aussi un second ennemi : l'Arms devient un deck de groupe sans Cleave ni Whirlwind. | nouveau `onDamageDealt` | nouvelle |
-| Stranglethorn | Anger Management | 0, Skill, Arms | Draw 1. / Spend 3: +2 mana. / Cooldown 2. | Draw 2. / Spend 3: +2 mana. / Cooldown 2. | `warrior_talent_icon_angermanagement` | Mortal Strike, Bladestorm, Shield Wall (2 mana) deux par tour : la Rage paie les cartes lourdes au lieu de leurs bonus Spend. | aucun (`mana`, `spent`) | nouvelle |
-| Swamp | Defensive Stance | 1, Power, Protection | Power. / Keep half the Absorb each turn. / Fully absorbed hits: +1 Rage. | coût 0 | `ability_warrior_shieldguard` | Shield Block, Shield Wall, Ignore Pain remplissent une réserve qui dure ; Shield Slam (dégâts = Absorb) grandit d'un tour à l'autre. Bloquer ne prive plus de Rage. | `blockKeep`, `afterHit` | nouvelle |
-| Steppes | Death Wish | 2, Power, Fury | Power. / Can't gain Absorb. / Attacks deal 50% more. | coût 1 | `spell_shadow_deathpact` | Le deck retire Defend et Shield Block, vit de Bloodthirst, Victory Rush et de la Rage gagnée en prenant les coups, et finit vite. | `block`, `damage` | conservée |
-| Blackrock | Avatar | 2, Power, Arms | Power. / Rage can go up to 10. / Start of turn: +1 Rage. | coût 1 | `warrior_talent_icon_avatar` | Execute (5 + 4 par Rage), Ignore Pain, Enraged Regeneration lisent la Rage réelle : on la garde au lieu de la dépenser à 5, pour un coup de 45. | nouveau `resCap`, `onTurnStart` | conservée (texte sans « your ») |
+### Westfall — Death Wish (Fury) · conservée (Steppes → Westfall)
 
-Précisions :
-- **Shockwave** : Spend au choix ; la Rage est payée au jeu, puis la carte Attack donne +1 Rage. Boss immunisé
-  au Stunned, les dégâts s'appliquent.
-- **Enraged Regeneration** : injouable à 0 Rage (seul effet : son Surge).
-- **Sweeping Strikes** : à chaque coup d'une carte Attack qui a une cible, la moitié des dégâts infligés
-  (arrondie à l'inférieur) frappe un autre ennemi vivant tiré au hasard (`c.rng.cards`) ; ce n'est pas un coup
-  d'Attack (pas de Deep Wounds en plus). Seul en face : rien.
-- **Anger Management** : Spend au choix ; Avatar ne le rend pas plus fort (Spend fixe).
-- **Defensive Stance** : au début du tour, la moitié de l'Absorb (arrondie à l'inférieur) reste ; un coup
-  ennemi entièrement absorbé donne +1 Rage, comme une perte de PV.
-- **Death Wish** : +50 % après Strength, avant Sundered (crochet `damage`), arrondi à l'inférieur. Les cartes
-  d'Absorb se jouent mais ne donnent rien.
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Can't gain Absorb.` / `Attacks deal 50% more.` | `…` / `Kills: heal 3.` |
+
+- **Règle.** Tout gain d'Absorb du Warrior vaut 0 (cartes, bibelots, potions). Les coups des cartes Attack
+  infligent 50 % de plus, après Strength, avant Sundered, arrondi à l'inférieur. Amélioré : chaque ennemi
+  tué par le Warrior (toute source) le soigne de 3.
+- **Cas limites.** Les cartes d'Absorb se jouent mais ne donnent rien (Shield Slam : 0 + 50 % = 0).
+  Retaliation, Deep Wounds, dégâts sans carte : pas de bonus. La Rage monte plus (chaque coup reçu fait
+  perdre des PV). Carte la plus simple de la classe : un seul renoncement, un seul gain.
+- **Deck piloté.** Centrales : Bloodthirst, Victory Rush, Raging Blow, Whirlwind, Rampage, Battle Shout,
+  Recklessness, Enrage, Mortal Strike, Execute. Mauvaises : Defend, Shield Block, Shield Wall, Ignore Pain,
+  Shield Slam, Devastate, bibelot Skullflame Shield. À retirer : les quatre Defend. Feu de camp : Heroic
+  Strike, Bloodthirst.
+- **Moteur.** Crochets existants `block` (→ 0) et `damage` ; `onEnemyDeath` pour l'amélioration.
+
+### Duskwood — Thunderous Roar (Protection) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `At 5 Rage: spend it,` / `deal 6 to all, apply` / `Demoralized 1 ⌛ to all` | `…` / `deal 9 to all, apply` / `…` |
+
+- **Règle.** Dès que la Rage atteint 5, elle tombe à 0 et le Warrior inflige 6 (amélioré : 9) à chaque
+  ennemi vivant, sans carte (Strength comprise), puis pose Demoralized 1 ⌛ à tous.
+- **Cas limites.** Déclenché juste après le gain qui fait atteindre 5 (fin de la carte, coup reçu, perte de
+  PV d'une Curse). Pendant le tour ennemi, Demoralized 1 ⌛ ne dure que jusqu'à la fin du round : il
+  allège les coups restants de ce tour. Spend et Surge restent jouables avant 5 (Execute ne compte jamais
+  plus de 4 Rage). Battle Standard (+1 au début du combat) amorce. Boss : Demoralized prend. Dormeurs :
+  réveillés sans bonus (dégâts à tous). Lien Duskwood : Rabies, Fevered Plague et Web font perdre des PV,
+  donc gagner de la Rage ; les ondes tuent les lanceurs fragiles.
+- **Deck piloté.** Centrales : Bloodrage (+2), Berserker Rage (+2, pioche), Demoralizing Shout (+1),
+  Revenge, Overpower, Victory Rush (Attacks à 0), Rampage (PV payés et Attack), Raging Blow, Thunder Clap,
+  Battle Shout et Enrage (Strength dans l'onde). Mauvaises : Execute, Ignore Pain, Onslaught (Spend). À
+  retirer : Heroic Strike, un ou deux Defend (l'Absorb prive de Rage). Feu de camp : Bloodrage.
+- **Moteur.** Notification existante `onResource` (variation, raison) ; effet sans carte à tous.
+
+### Wetlands — Sweeping Strikes (Arms) · conservée
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Targeted Attack hits` / `also hit another` / `enemy for half.` | `…` / `also hit 2 other` / `enemies for half.` |
+
+- **Règle.** Chaque coup d'une carte Attack qui a une cible inflige aussi la moitié des dégâts réellement
+  infligés (arrondie à l'inférieur) à un autre ennemi vivant tiré par `c.rng.cards` (amélioré : deux
+  autres, tirés sans remise).
+- **Cas limites.** Le coup de rebond n'est pas un coup d'Attack (pas de Deep Wounds, pas de Rage), ni un
+  coup à une cible au sens du Swamp (réveille sans bonus). Seul en face : rien. Plusieurs coups (Raging
+  Blow, Rampage) : un rebond par coup. Lien Wetlands : rebond et coup principal sont le même effet, deux
+  ennemis tués ensemble ne se donnent aucune prime.
+- **Deck piloté.** Centrales : Mortal Strike, Execute, Raging Blow, Rampage, Heroic Strike, Overpower,
+  Colossus Smash, Slam, Bloodthirst. Mauvaises : Cleave, Whirlwind, Bladestorm, Thunder Clap (sans cible,
+  sans rebond, font double emploi). À retirer : un ou deux Defend. Feu de camp : Heroic Strike.
+- **Moteur.** Nouveau : notification `onDamageDealt(cible, n, def, ctx)` (dégâts réellement infligés).
+
+### Stranglethorn Vale — Titan's Grip (Fury) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Attacks resolve twice.` / `At most 2 Attacks per` / `turn.` | `…` / `turn, not counting` / `0-cost ones.` |
+
+- **Règle.** Chaque carte Attack se résout deux fois : la copie suit tout de suite, même cible (premier
+  ennemi vivant si elle est morte), sans coût. Au plus deux cartes Attack par tour ; la troisième est
+  injouable (raison « Titan's Grip »). Amélioré : les Attacks à 0 mana ne comptent pas dans la limite.
+- **Cas limites.** La copie reprend la dépense de l'original (Spend payé : bonus aux deux ; Surge : même
+  montant compté), sans rien payer. La Rage « +1 par Attack » ne vient qu'une fois par carte. Cast (Slam) :
+  les deux à la résolution. Exhaust et Cooldown après la copie. Pummel compte dans la limite. Hand of
+  Justice (3e Attack) ne se déclenche plus, sauf amélioré avec des Attacks à 0.
+- **Deck piloté.** Centrales : Mortal Strike (2 × 22), Rampage (8 coups pour un seul « Pay 3 HP »),
+  Bladestorm, Execute (deux fois le même Surge), Heroic Strike (Spend payé une fois), Onslaught (pioche 2
+  deux fois), Bloodthirst (Strength +2), Battle Shout et Recklessness (Strength comptée deux fois). Mauvaises :
+  Strike, Overpower, Revenge (une place d'Attack pour peu). À retirer : les quatre Strike. Feu de camp :
+  Mortal Strike, Bloodthirst.
+- **Moteur.** Crochet existant `replay` (Ironfoe) ; nouveau `canPlay` (limite par tour, comme Voidform).
+
+### Swamp of Sorrows — Shield Charge (Protection) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `End of turn: deal half` / `the Absorb to the last` / `target.` | `End of turn: deal 4 +` / `half the Absorb to the` / `last target.` |
+
+- **Règle.** À la fin du tour du Warrior (avant la défausse et le tour ennemi), il inflige la moitié de son
+  Absorb (arrondie à l'inférieur ; amélioré : 4 + la moitié) à sa dernière cible, sans carte. L'Absorb
+  reste entière pour le tour ennemi.
+- **Cas limites.** Dernière cible morte : l'ennemi vivant le plus à gauche. Comme l'attaque automatique
+  du familier, Shield Charge ne vise pas un dormeur tant qu'un ennemi est éveillé ; sinon le coup a le
+  bonus Rude Awakening et réveille (ouverture dans ce round : à dire dans l'infobulle). Ce n'est pas une
+  carte Attack : pas de Rage. Un tour sans Absorb ne fait rien. Lien Swamp : les ouvertures annoncées se
+  bloquent avec l'Absorb qui vient de frapper.
+- **Deck piloté.** Centrales : les quatre Defend, Shield Block (Cooldown 1), Shield Wall (18), Ignore Pain
+  (3 par Rage), Devastate, Shield Slam (dégâts = Absorb), Last Stand, bibelots Skullflame Shield et Gnomish
+  Harm Prevention Belt. Mauvaises : Rampage, Recklessness, Strike. À retirer : les Strike. Feu de camp :
+  Defend, Shield Block.
+- **Moteur.** Crochet existant `onTurnEnd` ; règle de cible du familier généralisée (Swamp).
+
+### Burning Steppes — Anger Management (Arms) · nouvelle (le nom de la version 1 est gardé, la règle est neuve)
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Each 3 Rage spent:` / `Cooldown cards return` / `1 turn sooner.` | `Each 2 Rage spent:` / `…` |
+
+- **Règle.** La Rage dépensée (Spend payé, montant d'un Surge) s'additionne dans un compteur du combat ;
+  chaque fois qu'il passe un multiple de 3 (amélioré : 2), chaque carte en recharge revient un tour plus
+  tôt. Une carte qui arrive à 0 revient en main aussitôt (main pleine : au début du tour suivant).
+- **Cas limites.** Le reste du compteur se garde d'un tour à l'autre. Berserker Rage (+2 Rage, Cooldown 2)
+  ne boucle pas : il faut 6 Rage dépensées pour la ramener aussitôt. Lien Steppes : la brûlure fait perdre
+  des PV, donc gagner de la Rage à dépenser.
+- **Deck piloté.** Centrales : Bloodthirst (Strength à chaque retour), Shield Wall, Shield Block, Berserker
+  Rage, Demoralizing Shout, Pummel ; dépenses : Heroic Strike, Onslaught (Spend 2), Execute et Ignore Pain
+  (Surge), Bloodrage pour remplir. Mauvaises : Battle Shout, Recklessness, Victory Rush (Exhaust, rien à
+  recharger). À retirer : Strike, Defend. Feu de camp : Bloodthirst, Onslaught.
+- **Moteur.** Notifications existantes `onSpend` et `onSurge` ; nouvel effet « recharges −1 »
+  (`cooldownTick`, voisin de `readiness`).
+
+### Blackrock Mountain — Avatar (Arms) · conservée
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Rage can go up to 10.` / `Start of turn: +1 Rage.` | `…` / `Start of turn: +2 Rage.` |
+
+- **Règle.** Plafond de Rage à 10. Au début de chaque tour, +1 Rage (amélioré : +2).
+- **Cas limites.** Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10 = 45, Ignore Pain 30
+  Absorb, Skullflame Shield 20 Absorb par tour). Spend N reste N. Lien Blackrock : garder la Rage pour
+  traverser un seuil d'un seul coup (« passer à travers » saute la phase).
+- **Deck piloté.** Centrales : Execute, Ignore Pain, Bloodrage, Berserker Rage, Colossus Smash et Mortal
+  Strike (Sundered pour l'Execute), bibelots Battle Standard et Skullflame Shield. Mauvaises : Heroic Strike
+  et Onslaught (Spend qui entament la réserve). À retirer : Heroic Strike, Strike. Feu de camp : Execute.
+- **Moteur.** Nouveau : valeur modifiée `resCap` (lue par `Combat.gainRes`) ; `onTurnStart`.
+
+---
 
 ## Mage
 
-Sept directions :
-1. **Chaque Cast frappe deux fois** (Fire) — Mirror Image.
-2. **Se défendre par le Cast** : annuler le tour ennemi (Arcane) — Alter Time.
-3. **Le gel vient tout seul**, les cartes Frozen toujours allumées (Frost) — Water Elemental.
-4. **Rejouer ses cartes à recharge** (Frost) — Cold Snap.
-5. **Brûler en se défendant** : l'Absorb du Mage devient de l'attaque (Fire) — Molten Armor.
-6. **Concentrer le gros tour Arcane** sur une cible (Arcane) — Touch of the Magi.
-7. **Le contrôle donne l'Instant** (Frost) — Fingers of Frost.
+Sept builds :
+1. **Chaque Cast frappe deux fois** (Fire) — Mirror Image : Fireball, Pyroblast, Flamestrike, Glacial
+   Spike, protégés par Mana Shield et Counterspell.
+2. **Le Mage qui se laisse frapper** (Fire) — Molten Armor : Mana Shield, Ice Barrier, Blazing Barrier,
+   Prismatic Barrier encaissent et brûlent ; Phoenix Flames et Ignite suivent.
+3. **Le gel vient tout seul** (Frost) — Water Elemental : Ice Lance, Shatter, Deep Freeze, Flurry toujours
+   sous Frozen, sans cartes de contrôle.
+4. **Le contrôle lance les sorts** (Frost) — Fingers of Frost : Frostbolt, Cone of Cold, Frost Nova
+   gèlent, puis Pyroblast et Glacial Spike partent aussitôt.
+5. **Économiser son mana** (Arcane) — Arcane Meditation : tours d'attente à 0 mana (Ice Lance, Scorch,
+   Counterspell), puis Pyroblast et Glacial Spike dans le même tour.
+6. **Le feu passe d'un mort à l'autre** (Fire) — Conflagration : Fireball, Living Bomb, Flamestrike, Ignite
+   posent le DoT, Scorch achève.
+7. **La troisième carte compte double** (Arcane) — Rule of Threes : cartes à 0 pour arriver à la
+   troisième, puis Polymorph, Arcane Barrage, Frost Nova deux fois.
 
-| Zone | Nom | Coût / type / voie | Texte de base | Amélioré | Icône | Le deck qu'elle fait naître | Moteur | Statut |
-|---|---|---|---|---|---|---|---|---|
-| Westfall | Mirror Image | 2, Power, Fire | Power. / Cast cards: deal their damage again to a random enemy. | coût 1 | `spell_magic_lesserinvisibilty` | Fireball, Pyroblast, Glacial Spike, Flamestrike : un deck tout en Cast qui protège ses incantations (Absorb, Counterspell) au lieu de chercher l'Instant. | `onCastResolved`, nouveau `onDamageDealt` | conservée (Steppes → Westfall) |
-| Duskwood | Alter Time | 1, Skill (Cast), Arcane | Cast. / Heal the HP lost since this was played. / Cooldown 3. | coût 0 | `spell_mage_altertime` | Le Mage retire ses Mana Shield : un tour sur trois, le tour ennemi est effacé ; il garde un emplacement de Cast pour Pyroblast ou Blizzard. | nouvel effet `healLost` | modifiée (Swamp → Duskwood ; sans Afflictions, Cooldown au lieu d'Exhaust) |
-| Wetlands | Water Elemental | 1, Power, Frost | Power. / Start of turn: deal 3 to the last target and apply Demoralized 1. | Start of turn: deal 5 … | `spell_frost_summonwaterelemental_2` | Ice Lance (+6), Shatter (+4 par coup), Deep Freeze toujours sous Frozen, même contre un boss : le Frost sans cartes de contrôle. | `onTurnStart`, `lastTarget` | nouvelle |
-| Stranglethorn | Cold Snap | 0, Skill, Frost | Return Cooldown cards to hand. / Cooldown 4. | Cooldown 3. | `spell_frost_coldhearted` | Frost Nova, Presence of Mind, Fire Blast, Cone of Cold, Counterspell deux fois de suite : un deck de recharges. | effet `readiness` rendu commun | nouvelle |
-| Swamp | Molten Armor | 1, Power, Fire | Power. / When hit: apply DoT 3 to the attacker. | When hit: apply DoT 4 … | `spell_fire_firearmor` | Les quatre Mana Shield de départ, Ice Barrier, Blazing Barrier : le Mage encaisse et brûle ; Phoenix Flames (DoT → Instant) et Ignite suivent. | `afterHit` | nouvelle |
-| Steppes | Touch of the Magi | 1, Attack, Arcane | Deal 6. / +1 Charge. / Apply Touch of the Magi | Deal 9. / … | `spell_arcane_arcanetactics` | Evocation, Arcane Missiles, Arcane Barrage, Arcane Surge : tout le tour à 6 mana sur une cible, qui reprend la moitié en fin de tour. | nouvel état `touch`, `onDamageDealt` | nouvelle |
-| Blackrock | Fingers of Frost | 1, Power, Frost | Power. / Applying Stunned or Demoralized: gain Instant 1, once per turn. | coût 0 | `ability_mage_wintersgrasp` | Frostbolt, Cone of Cold, Frost Nova donnent l'Instant à Pyroblast et Glacial Spike : un sort lourd par tour, jamais interrompu, même contre un boss (Demoralized). | `onStatusApplied` | modifiée (clause « change de phase » retirée : elle ne valait qu'à Blackrock) |
+### Westfall — Mirror Image (Fire) · conservée
 
-Précisions :
-- **Mirror Image** : à la résolution d'une carte Cast (Instant compris : `onCardPlayed` avec `ctx.def.cast`),
-  le montant de son **premier** coup est infligé une fois de plus à un ennemi vivant tiré au hasard (le même
-  possible), recalculé sur la nouvelle cible. Une carte « to all » ne rejoue donc qu'un coup.
-- **Alter Time** : les PV au moment du jeu sont gardés dans l'incantation (données simples) ; à la résolution,
-  soigne la différence si elle est positive. Interrompue, rien. Sous Instant, elle se résout au jeu et ne
-  soigne rien : à dire dans l'infobulle.
-- **Water Elemental** : nom du familier, le sort réel s'appelle « Summon Water Elemental » (trop long pour le
-  ruban). Frappe au début du tour du joueur, avant la pioche, sur `c.player.lastTarget` (premier ennemi vivant
-  sinon) : le Demoralized 1 tient tout le tour du joueur et le tour ennemi.
-- **Cold Snap** : toutes les cartes en recharge reviennent en main (main de 10 au plus), puis Cold Snap part en
-  recharge à son tour.
-- **Molten Armor** : à chaque coup ennemi, même entièrement absorbé ; le DoT passe par le crochet `apply`.
-- **Touch of the Magi** : état à drapeau sur l'ennemi. Infobulle : `End of turn: takes half the damage dealt to
-  it this turn.` À la fin du tour du joueur, la moitié (arrondie à l'inférieur) des dégâts subis depuis la pose
-  est infligée, sans carte, puis l'état tombe.
-- **Fingers of Frost** : sur un boss, Stunned ne prend pas mais Demoralized oui : la carte marche partout.
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Cast cards: deal their` / `damage again to a` / `random enemy.` | `Cast cards: deal their` / `damage + 4 again to a` / `random enemy.` |
+
+- **Règle.** À la résolution d'une carte Cast (sous Instant comprise), le montant de base de son
+  **premier** coup est infligé une fois de plus (amélioré : + 4) à un ennemi vivant tiré par
+  `c.rng.cards` (le même possible), recalculé sur la nouvelle cible ; c'est un coup de la même carte
+  (Charges, Shatter, Ignite s'appliquent).
+- **Cas limites.** Une carte « to all » ne rejoue qu'un coup. Cast sans dégâts (Evocation) : rien. Cast
+  interrompu : rien. Dormeur : coup à une cible, donc bonus et réveil.
+- **Deck piloté.** Centrales : Fireball (deux de départ), Pyroblast, Flamestrike, Glacial Spike, Blizzard,
+  et pour protéger l'incantation Mana Shield, Ice Barrier, Counterspell ; Fire Blast et Presence of Mind
+  pour les Cast immédiats. Mauvaises : Arcane Blast, Arcane Missiles, Ice Lance. À retirer : Arcane Blast,
+  un Frostbolt. Feu de camp : Fireball.
+- **Moteur.** `onCastResolved` existant, et `onCardPlayed` avec `ctx.def.cast` pour l'Instant.
+
+### Duskwood — Molten Armor (Fire) · conservée (Swamp → Duskwood)
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `When hit: apply DoT 3` / `to the attacker.` | `When hit: apply DoT 5` / `to the attacker.` |
+
+- **Règle.** Chaque coup ennemi sur le Mage, même entièrement absorbé, pose DoT 3 (amélioré : 5) à son
+  auteur, par le crochet `apply`.
+- **Cas limites.** Attaque à plusieurs coups : un DoT par coup. Auteur mort : rien. Le DoT ne se pose pas
+  sur un ennemi qui n'attaque pas. Un ennemi Stunned ne frappe pas : le contrôle va contre ce deck. Lien
+  Duskwood : un Bite entièrement absorbé ne pose pas de Curse et brûle quand même.
+- **Deck piloté.** Centrales : les quatre Mana Shield de départ, Blazing Barrier, Ice Barrier (Retain),
+  Prismatic Barrier, Phoenix Flames (« DoT: gain Instant 1 »), Ignite, Living Bomb, bibelot Robe of the
+  Archmage. Mauvaises : Frost Nova, Polymorph (un ennemi étourdi ne frappe pas). À retirer : Arcane Blast.
+  Feu de camp : Mana Shield.
+- **Moteur.** Crochet existant `afterHit`.
+
+### Wetlands — Water Elemental (Frost) · conservée
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Start of turn: deal 3` / `to the last target and` / `apply Demoralized 1 ⌛` | `Start of turn: deal 5` / `…` |
+
+- **Règle.** Au début de chaque tour du Mage (après la pioche), l'élémentaire inflige 3 (amélioré : 5),
+  sans carte, à la dernière cible du Mage, puis lui pose Demoralized 1 ⌛ (qui tient le tour du Mage et le
+  tour ennemi).
+- **Cas limites.** Cible morte ou absente : l'ennemi vivant le plus à gauche. Swamp : même règle que le
+  familier (pas de dormeur tant qu'un ennemi est éveillé). Boss : Demoralized prend, donc Frozen marche
+  partout. Nom du familier ; le sort réel « Summon Water Elemental » est trop long pour le ruban. Lien
+  Wetlands : Demoralized répond aux primes de Strength.
+- **Deck piloté.** Centrales : Ice Lance (+6 sous Frozen, à 0), Shatter (+4 par coup), Deep Freeze (Frozen :
+  Stunned), Flurry et Arcane Missiles (trois coups sous Shatter), Glacial Spike, Frostbolt. Mauvaises :
+  Frost Nova, Cone of Cold, Polymorph (contrôle en double). À retirer : deux Mana Shield. Feu de camp :
+  Ice Lance.
+- **Moteur.** Crochet existant `onTurnStart`, `c.player.lastTarget`.
+
+### Stranglethorn Vale — Fingers of Frost (Frost) · modifiée (Blackrock → Stranglethorn ; plus de gain d'Instant)
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Cast cards aimed at a` / `Frozen enemy resolve` / `at once.` | `…` / `at once and deal 4` / `more.` |
+
+- **Règle.** Une carte Cast à cible jouée sur un ennemi Frozen (Stunned ou Demoralized), lu au moment où
+  elle est jouée, se résout tout de suite : sans emplacement, sans interruption possible, sans consommer
+  d'Instant. Amélioré : ses coups infligent 4 de plus.
+- **Cas limites.** Les Cast sans cible (Flamestrike, Blizzard, Evocation) restent des Cast. Boss :
+  Demoralized suffit. La version 1 (« gain Instant 1, once per turn ») n'était qu'un état de plus ; ici le
+  contrôle change la nature du Cast. Lien Stranglethorn : un Cast parti au jeu quitte la main et échappe
+  au Hex.
+- **Deck piloté.** Centrales : les trois Frostbolt de départ (Demoralized, puis Fireball tout de suite),
+  Cone of Cold, Frost Nova, Flurry, Polymorph, Deep Freeze, puis Pyroblast, Glacial Spike, Fireball ;
+  bibelot Glacial Cloak (Demoralized à tous au début du combat). Mauvaises : Hot Streak, Fire Blast,
+  Combustion, Presence of Mind (l'Instant fait double emploi). À retirer : Arcane Blast, deux Mana Shield.
+  Feu de camp : Frostbolt, Pyroblast.
+- **Moteur.** Crochet existant `instantCast` (d, inst, commit), qui lit la cible posée juste avant par
+  `Combat.play` (`c.player.lastTarget`).
+
+### Swamp of Sorrows — Arcane Meditation (Arcane) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Unspent mana carries` / `over to the next turn,` / `up to 3.` | `…` / `up to 5.` |
+
+- **Règle.** À la fin du tour, le mana non dépensé (3 au plus ; amélioré : 5) est gardé ; il s'ajoute au
+  début du tour suivant, après la remise du mana à son maximum.
+- **Cas limites.** Le total peut dépasser le maximum (6 mana au tour suivant, 8 amélioré). Evocation, Arcane
+  Surge, Mind Quickening Gem s'ajoutent. Seul le tour suivant profite du report (pas de cumul sur deux
+  tours au-delà du plafond). Lien Swamp : les tours où les dormeurs dorment servent à économiser.
+- **Deck piloté.** Centrales : Pyroblast, Glacial Spike, Flamestrike, Blizzard, Polymorph, Evocation,
+  Arcane Surge, Ice Barrier (Retain : se joue au bon tour), et les cartes à 0 qui laissent passer un tour
+  sans rien dépenser : Ice Lance, Scorch, Counterspell, Presence of Mind. Mauvaises : Arcane Blast, Fire
+  Blast (petits coups à 1 mana). À retirer : Arcane Blast, un Frostbolt. Feu de camp : Pyroblast.
+- **Moteur.** Crochets existants `onTurnEnd` et `onTurnStart` ; valeur gardée dans l'état de l'épique
+  (`c.player.flags`) ; l'interface doit afficher un mana au-dessus du maximum.
+
+### Burning Steppes — Conflagration (Fire) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `An enemy dying with` / `DoT gives that DoT to` / `each other enemy.` | `…` / `each other enemy, +3.` |
+
+- **Règle.** Quand un ennemi meurt en portant du DoT, chaque autre ennemi vivant reçoit ce DoT (amélioré :
+  + 3), posé directement (sans le crochet `apply`).
+- **Cas limites.** Valeur lue au moment de la mort ; mort par son propre tic : la valeur de ce tic. Les
+  serviteurs comptent. Chaîne possible : un DoT transmis tue au tic suivant et se transmet encore. Seul en
+  face : rien (la carte vit des groupes ; les boss de Westfall, Wetlands et Blackrock ont des sbires).
+  Lien Steppes : chaque mort recule le feu d'un round, et une mort en appelle d'autres.
+- **Deck piloté.** Centrales : Fireball (DoT 2), Living Bomb et Flamestrike (DoT à tous), Ignite (DoT 3 par
+  coup Fire), Phoenix Flames, Scorch (achever le porteur), Cone of Cold et Arcane Explosion pour amener les
+  petits au seuil. Mauvaises : Glacial Spike, Polymorph (une cible, aucun DoT). À retirer : Arcane Blast,
+  un Mana Shield. Feu de camp : Fireball, Living Bomb.
+- **Moteur.** Notification existante `onEnemyDeath`, à condition que le DoT de l'ennemi soit encore lisible
+  à ce moment (avant le nettoyage de ses états).
+
+### Blackrock Mountain — Rule of Threes (Arcane) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `The 3rd card played` / `each turn resolves` / `twice.` | `Every 3rd card played` / `each turn resolves` / `twice.` |
+
+- **Règle.** La troisième carte jouée dans le tour (amélioré : la 3e, la 6e, la 9e…) se résout deux fois :
+  la copie suit tout de suite, même cible, sans coût.
+- **Cas limites.** Compteur `c.turn.played` : les Curses et les cartes Hexed comptent. La copie reprend la
+  dépense de l'original (Surge : même nombre de Charges compté). Une carte Cast en 3e position : les deux
+  résolutions à son départ. Powers : la copie ne pose pas un second Power. Exhaust, Cooldown : après la
+  copie. Lien Blackrock : la 3e carte du tour fait le gros coup qui traverse un seuil.
+- **Deck piloté.** Centrales : cartes à 0 pour atteindre la 3e (Ice Lance, Scorch, Counterspell, Presence
+  of Mind, Evocation), puis Polymorph (Stunned 4 ⌛), Arcane Barrage (Surge compté deux fois), Frost Nova,
+  Pyroblast, Glacial Spike, Flurry. Mauvaises : les Powers chers, les cartes à 2 mana jouées en premier. À
+  retirer : Mana Shield, un Frostbolt. Feu de camp : Arcane Barrage.
+- **Moteur.** Crochet existant `replay` (inst, ctx), qui lit `c.turn.played`.
+
+---
 
 ## Rogue
 
-Sept directions :
-1. **Le Parry devient l'attaque** (Combat) — Ghostly Strike.
-2. **Le Stealth sert à neutraliser** (Subtlety) — Sap.
-3. **Plusieurs ouvertures par tour** (Subtlety) — Subterfuge.
-4. **Empiler le DoT puis le doubler** (Assassination) — Deathmark.
-5. **Le Rogue qui se soigne en frappant** (Assassination) — Leeching Poison.
-6. **Plusieurs coups de grâce par tour** (Combat ; Combo) — Relentless Strikes.
-7. **Un coup de grâce plein à chaque tour** (Assassination ; Combo) — Cold Blood.
+Sept builds :
+1. **La parade riposte** (Combat) — Deflection : les trois Feint, Riposte, Evasion, Shadowstep, Cloak of
+   Shadows frappent à chaque Parry gagné ; les Sinister Strike partent.
+2. **Les coups de grâce deviennent poison** (Assassination) — Doomblade : Eviscerate, Nightblade, Secret
+   Technique posent du DoT, Envenom et Exsanguinate l'encaissent.
+3. **Le poison protège** (Assassination) — Atrophic Poison : Fan of Knives, Garrote, Deadly Poison, Rupture
+   gardent tous les ennemis sous DoT, donc Demoralized ; les Feint partent.
+4. **Finir à 2 points** (Combat) — Echoing Reprimand : Ambush, Cheap Shot, Premeditation, puis deux coups de
+   grâce par tour.
+5. **Plusieurs ouvertures par tour** (Subtlety) — Subterfuge : Backstab, Ambush, Secret Technique sous
+   Stealth tout le tour.
+6. **Le coup de grâce étourdit** (Subtlety) — Kidney Shot : monter à 5 chaque tour, Eviscerate et Between
+   the Eyes arrêtent leur cible.
+7. **Que des cartes différentes** (Subtlety) — Danse Macabre : un deck sans doublons, Killing Spree et Ambush
+   en fin de tour.
 
-Deux cartes seulement touchent au Combo (6 et 7) ; les cinq autres ouvrent le Parry, le Stealth, le DoT et le
-soin.
+### Westfall — Deflection (Combat) · nouvelle (la carte du joueur)
 
-| Zone | Nom | Coût / type / voie | Texte de base | Amélioré | Icône | Le deck qu'elle fait naître | Moteur | Statut |
-|---|---|---|---|---|---|---|---|---|
-| Westfall | Ghostly Strike | 1, Attack, Combat | Deal 3 + 4 per Parry. / +1 Combo. | Deal 5 + 5 per Parry. / +1 Combo. | `spell_shadow_curse` | Les trois Feint de départ, Evasion, Riposte, Shadowstep, Blinding Powder gardent 3 Parry, qui frappent sans être dépensés : le Rogue qui pare attaque. | nouveau montant `parry` | modifiée (Duskwood → Westfall ; dégâts par Parry au lieu de Parry 2) |
-| Duskwood | Sap | 1, Skill, Subtlety | Stealth: apply Stunned 2 ⌛ / Gain Stealth / Cooldown 3. | coût 0 | `ability_sap` | Vanish, Shadowstep, Smoke Bomb, Shadow Dance rendent le Stealth pour endormir un ennemi pendant qu'Ambush et Backstab tuent l'autre. | aucun (condition `stealth`) | nouvelle |
-| Wetlands | Subterfuge | 1, Power, Subtlety | Power. / Stealth ends at end of turn, not on the first Attack. | coût 0 | `rogue_subterfuge` | Backstab, Ambush, Secret Technique (deux fois à tous), Premeditation dans le même tour : chaque Vanish ou Shadowstep vaut trois ouvertures. | nouveau crochet `stealthBreak` | nouvelle |
-| Stranglethorn | Deathmark | 1, Attack, Assassination | Deal 4. / Double the target's DoT. / Cooldown 3. | Deal 7. / … / Cooldown 2. | `ability_rogue_deathmark` | Garrote, Rupture, Crippling Poison, Deadly Poison empilent sur une cible, Deathmark double, Envenom ou Exsanguinate encaissent. | nouvel effet `double` | nouvelle |
-| Swamp | Leeching Poison | 1, Power, Assassination | Power. / Each Attack hit: heal 1. | coût 0 | `rogue_leeching_poison` | Mutilate, Fan of Knives, Killing Spree, Riposte : beaucoup de coups, chacun soigne ; le Rogue tient les longs combats sans Parry. | `onAttackHit` | nouvelle |
-| Steppes | Relentless Strikes | 1, Power, Combat | Power. / Each Surge of 3+ Combo: +1 mana, draw 1. | coût 0 | `ability_rogue_ruthlessness` | Pistol Shot, Backstab, Sinister Strike à bas prix, puis deux ou trois Eviscerate, Between the Eyes ou Nightblade dans le même tour. | `onSurge` | conservée (icône changée : la sienne est celle de Slam) |
-| Blackrock | Cold Blood | 2, Power, Assassination | Power. / First Surge each turn counts 2 more Combo. | coût 1 | `ability_rogue_deadliness` | Trois cartes d'ouverture suffisent pour un Eviscerate à 5 Combo ; à 5, il frappe comme à 7 : un coup de grâce plein chaque tour. | `surge` | conservée (texte sans « your » ; icône changée : la sienne est celle d'Ice Barrier) |
+Le nom « Riposte » est pris par une carte commune du Rogue (`riposte`, Combat : `Deal 4.` / `Gain Parry 1`) ;
+l'épique prend celui d'un talent Combat de l'ère classique. Voir la question 1.
 
-Précisions :
-- **Ghostly Strike** : lit le Parry à la résolution, sans le consommer (3 au plus : 15 dégâts de base).
-- **Sap** : une Skill lit le Stealth sans le consommer (règle du Rogue) ; le Stunned est lu avant le « Gain
-  Stealth ». Sans Stealth, Sap ne fait que le rendre. Boss immunisés.
-- **Subterfuge** : la première Attack applique sa ligne « Stealth: » sans retirer le Stealth ; il tombe à la
-  fin du tour. Le Stealth du début de combat dure donc tout le premier tour.
-- **Deathmark** : pose sur la cible autant de DoT qu'elle en a déjà, sans passer par le crochet `apply`
-  (Crystal Vial ne s'y ajoute pas).
-- **Leeching Poison** : un coup d'Attack sur un ennemi (Blade Flurry n'en est pas un).
-- **Relentless Strikes** : après la résolution d'un Surge qui a dépensé 3 Combo ou plus (montant de `onSurge`).
-- **Cold Blood** : la première carte Surge jouée dans le tour compte Combo + 2 (7 au plus) ; injouable à
-  0 Combo comme avant.
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Each Parry gained:` / `deal 3, +3 per earlier` / `one this turn, to the` / `last target.` | `…` / `deal 4, +4 per earlier` / `…` |
+
+Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
+
+- **Règle.** Chaque charge de Parry gagnée fait une riposte : la k-ième riposte du tour inflige 3 × k
+  (amélioré : 4 × k), sans carte, à la dernière cible du Rogue. La charge est gagnée normalement : le Rogue
+  garde sa défense.
+- **Progression de X dans le tour.** Compteur remis à 0 au début de chaque tour du Rogue ; « Gain Parry 2 »
+  (Evasion) fait deux ripostes de suite. Trois Feint : 3 + 6 + 9 = 18 ; Evasion puis deux Feint : 3 + 6 +
+  9 + 12 = 30.
+- **Cas limites.** Au-dessus du plafond de 3 Parry, la charge est perdue mais la riposte a lieu : le deck
+  peut empiler sans gaspiller. Blinding Powder (Parry 1 au début du combat) riposte au tour 1 et compte.
+  Ravenholdt Signet (Parry 1 après chaque Surge), Cheat Death (Parry 3) ripostent aussi. Dernière cible
+  morte : l'ennemi vivant le plus à gauche. Sundered de la cible s'applique. Dormeur : coup à une cible
+  (bonus, réveil). Wetlands : les ripostes font partie de l'effet de la carte qui donne le Parry.
+- **Deck piloté.** Centrales : Feint (de départ, devient la carte phare), Riposte, Evasion, Shadowstep,
+  Cloak of Shadows, Hemorrhage (Sundered), Pistol Shot et Sprint (trouver les Feint), bibelots Blinding
+  Powder et Ravenholdt Signet. Mauvaises : Sinister Strike, Eviscerate (peu de Combo). À retirer : deux ou
+  trois Sinister Strike. Feu de camp : Feint (« Draw 1. »), puis Deflection.
+- **Moteur.** Notification existante `onStatusApplied` (unité, état, n), avec **n demandé avant le
+  plafond** (nouveau) ; compteur du tour dans l'état de l'épique.
+
+### Duskwood — Doomblade (Assassination) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Surge Attacks apply` / `half their damage as` / `DoT instead.` | `Surge Attacks apply` / `their damage as DoT` / `instead.` |
+
+- **Règle.** Les cartes Attack qui ont une clause Surge (Eviscerate, Between the Eyes, Nightblade, Secret
+  Technique) n'infligent plus leurs dégâts : chaque coup pose sur sa cible un DoT égal à la moitié de ce
+  qu'il aurait infligé (arrondie au supérieur ; amélioré : la totalité), par le crochet `apply`.
+- **Cas limites.** Montant calculé comme un coup (Combo, Stealth, Sundered), sans l'Absorb de l'ennemi : le
+  DoT l'ignore. Secret Technique : un DoT par ennemi, deux sous Stealth. Les autres lignes restent
+  (Stunned de Between the Eyes, Stealth de Nightblade). Envenom n'a pas de ligne de dégâts : inchangée. Pas
+  de coup, donc pas de réveil au Swamp (réveil doux au tic). Lien Duskwood : un lanceur tué par son DoT au
+  début de son tour lève ses Curses avant d'agir.
+- **Deck piloté.** Centrales : Eviscerate (24 → DoT 12), Nightblade, Secret Technique, Between the Eyes,
+  Envenom et Exsanguinate (encaisser), Garrote, Mutilate (« DoT: +1 Combo »), Venomous Wounds, Deadly
+  Poison, bibelot Crystal Vial. Mauvaises : Ambush et Backstab moins utiles, Killing Spree. À retirer :
+  deux Sinister Strike. Feu de camp : Eviscerate, Exsanguinate.
+- **Moteur.** Nouveau : valeur modifiée `convertHit` (cible, dégâts, def, ctx) qui renvoie les dégâts
+  infligés et peut poser un état à la place.
+
+### Wetlands — Atrophic Poison (Assassination) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Enemies with DoT count` / `as Demoralized.` | `…` / `as Demoralized and` / `Sundered.` |
+
+- **Règle.** Un ennemi qui porte du DoT inflige 25 % de dégâts en moins, comme sous Demoralized (amélioré :
+  il subit aussi 25 % de plus, comme sous Sundered). Ce n'est pas un état posé : il ne se cumule pas avec
+  un vrai Demoralized ou Sundered.
+- **Cas limites.** Le DoT tique au début du tour de l'ennemi, **avant** qu'il agisse : un DoT 1 tombe à 0
+  et l'ennemi frappe plein. Il faut finir son tour avec du DoT 2 ou plus sur chaque attaquant. Exsanguinate
+  et Envenom font baisser le DoT : tension entre défense et dégâts. Boss : marche. Affichage : jeton
+  Demoralized grisé avec l'icône du poison. Lien Wetlands : répond aux primes de Strength de la meute.
+- **Deck piloté.** Centrales : Fan of Knives (DoT à tous, chaque tour), Garrote, Crippling Poison, Deadly
+  Poison, Rupture, Mutilate, Venomous Wounds, bibelot Crystal Vial. Mauvaises : Feint, Evasion, Smoke Bomb
+  (défense en double), Exsanguinate. À retirer : les trois Feint. Feu de camp : Fan of Knives.
+- **Moteur.** Crochet existant `enemyDamage` (et `damage` pour l'amélioration) ; affichage du jeton.
+
+### Stranglethorn Vale — Echoing Reprimand (Combat) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `A Surge of 2 or 3` / `Combo counts as 5.` | `…` / `Combo counts as 6.` |
+
+- **Règle.** Un Surge qui dépense exactement 2 ou 3 Combo compte 5 (amélioré : 6) pour ses effets. 1, 4 et
+  5 Combo comptent leur valeur.
+- **Cas limites.** La dépense ne change pas (2 ou 3). Monter à 4 est une perte : il faut finir avant.
+  Shadowfang (+2 Combo au début du combat) rend le premier coup de grâce prêt. Deux coups de grâce pleins
+  par tour sont la norme. Lien Stranglethorn : des coups de grâce à 1 mana et des ouvertures à 0 laissent
+  peu de carte chère en main pour le Hex.
+- **Deck piloté.** Centrales : Ambush et Cheap Shot (+2 : un coup de grâce prêt), Premeditation, Mutilate,
+  Kick (+1), puis Eviscerate, Rupture, Envenom, Between the Eyes, Nightblade, Secret Technique, Exsanguinate.
+  Mauvaises : Sinister Strike en surnombre (on ne veut plus 5 ouvertures). À retirer : deux Sinister
+  Strike. Feu de camp : Eviscerate.
+- **Moteur.** Crochet existant `surge` (valeur, ctx), qui doit lire la dépense réelle dans `ctx`.
+
+### Swamp of Sorrows — Subterfuge (Subtlety) · conservée (Wetlands → Swamp)
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Stealth ends at end of` / `turn, not on Attacks.` | `…` / `Gaining Stealth:` / `+1 Combo.` |
+
+- **Règle.** Une carte Attack jouée sous Stealth applique sa ligne « Stealth: » sans retirer l'état ; le
+  Stealth tombe à la fin du tour du Rogue. Amélioré : chaque Stealth gagné (passage d'absent à présent)
+  donne +1 Combo.
+- **Cas limites.** Le Stealth du début de combat tient tout le premier tour. Vanish, Shadowstep, Smoke
+  Bomb, Nightblade (après son coup) le rendent pour le reste du tour ; Shadow Dance chaque tour. Flash
+  Powder : un gain sous Stealth n'en est pas un. Lien Swamp : Ambush sur un dormeur fait 27, et toutes les
+  ouvertures du tour ont le bonus.
+- **Deck piloté.** Centrales : Backstab (à 0, +7), Ambush (+12), Secret Technique (deux fois à tous),
+  Cheap Shot, Premeditation, Vanish, Shadowstep, Smoke Bomb, Shadow Dance, Nightblade, bibelot Flash
+  Powder. Mauvaises : Sinister Strike, Feint. À retirer : deux Sinister Strike. Feu de camp : Backstab.
+- **Moteur.** Nouveau : valeur modifiée `stealthBreak` (le Stealth tombe-t-il à la première Attack), dans
+  `Core/Classes/rogue.lua`.
+
+### Burning Steppes — Kidney Shot (Subtlety) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Surge of 5 Combo:` / `apply Stunned 1 ⌛ to` / `the target.` | `Surge of 4+ Combo:` / `…` |
+
+Infobulle : `A boss gets Demoralized 2 ⌛ instead.`
+
+- **Règle.** Une carte à cible dont le Surge dépense 5 Combo (amélioré : 4 ou plus) pose ensuite
+  Stunned 1 ⌛ sur sa cible si elle vit ; un boss reçoit Demoralized 2 ⌛.
+- **Cas limites.** Les Surge sans cible (Secret Technique) ne font rien de plus. Between the Eyes (déjà
+  Stunned 1) : Stunned 2. Atteindre 5 chaque tour coûte trois ou quatre cartes : un étourdissement un tour
+  sur deux en moyenne, borné par le mana (règle « aucun garde-fou » des décisions communes). Lien
+  Steppes : un attiseur étourdi perd son Stoke.
+- **Deck piloté.** Centrales : Ambush, Cheap Shot, Premeditation (+2), Backstab, Mutilate, Kick (+1),
+  puis Eviscerate, Between the Eyes, Rupture, Envenom, Nightblade, bibelot Shadowfang. Mauvaises : Secret
+  Technique, Fan of Knives, Feint. À retirer : les Feint. Feu de camp : Cheap Shot (coût 0).
+- **Moteur.** Notification existante `onSurge` (montant, ctx), avec la cible dans `ctx`.
+
+### Blackrock Mountain — Danse Macabre (Subtlety) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Attack hits: +2 per` / `other card name played` / `this turn.` | `Attack hits: +3 per` / `…` |
+
+- **Règle.** Chaque coup d'une carte Attack inflige 2 de plus (amélioré : 3) par nom de carte différent
+  déjà joué dans ce tour, son propre nom exclu, chaque nom compté une fois.
+- **Cas limites.** Compté à la résolution, comme Strength, avant Sundered et Rude Awakening. Les Curses et
+  les cartes Hexed comptent (un nom chacune). Les doublons ne comptent qu'une fois : le deck veut des
+  cartes toutes différentes. Lien Blackrock : un tour à six ou sept cartes différentes traverse un seuil
+  d'un coup.
+- **Deck piloté.** Centrales : une seule copie de chaque carte ; Backstab, Pistol Shot, Kick, Sprint,
+  Vanish, Premeditation (noms à 0 mana), puis Killing Spree (six coups), Ambush, Eviscerate, Hemorrhage ;
+  Adrenaline Rush pour allonger le tour. Mauvaises : les doublons. À retirer : quatre Sinister Strike et
+  deux Feint (ce Rogue retire plus que les autres : prévoir l'or). Feu de camp : Killing Spree.
+- **Moteur.** Nouveau : liste des noms joués dans le tour (`c.turn.names`) ; crochet existant `damage`.
+
+---
 
 ## Hunter
 
-Sept directions :
-1. **Le familier frappe deux fois par tour** (Beast Mastery) — Call of the Wild.
-2. **Les Traps deviennent des sorts visés** (Survival) — Trap Launcher.
-3. **Le familier frappe toute la salle** (Beast Mastery) — Beast Cleave.
-4. **Le DoT nourrit la pioche** (Survival) — Black Arrow.
-5. **Le Frenzy devient des PV** (Beast Mastery) — Exhilaration.
-6. **Achever en chaîne** : le Marksmanship tue aussi sous la moitié (Marksmanship) — Kill Shot.
-7. **Sans familier** : toute la puissance dans les tirs (Marksmanship) — Lone Wolf.
+Sept builds :
+1. **Le familier frappe deux fois par tour** (Beast Mastery) — Call of the Wild : Kill Command, Dire Beast,
+   Bestial Wrath, Spirit Bond, The Beast Within.
+2. **Les Traps sont des sorts et des ordres** (Survival) — Trap Launcher : toutes les Traps, Entrapment,
+   Lock and Load, Resourcefulness.
+3. **Le familier frappe toute la salle** (Beast Mastery) — Beast Cleave : Kill Command, Dire Beast, Bestial
+   Wrath sans Multi-Shot.
+4. **Le Frenzy protège** (Beast Mastery) — Roar of Sacrifice : Barbed Shot, Cobra Shot, Kill Command
+   tiennent le Frenzy haut ; les Disengage partent.
+5. **Tirer avant le premier coup, tout de suite** (Marksmanship) — Master Marksman : Aimed Shot, Steady
+   Shot, Hunter's Mark, Trueshot Aura partent au jeu sur une cible intacte.
+6. **Le DoT appelle le familier** (Survival) — Black Arrow : Serpent Sting, Barbed Shot, Immolation Trap,
+   Explosive Trap, Wyvern Sting.
+7. **Sans familier** (Marksmanship) — Lone Wolf : les cartes de familier deviennent des tirs, Rapid Fire et
+   Chimaera Shot portent le Frenzy.
 
-| Zone | Nom | Coût / type / voie | Texte de base | Amélioré | Icône | Le deck qu'elle fait naître | Moteur | Statut |
-|---|---|---|---|---|---|---|---|---|
-| Westfall | Call of the Wild | 1, Power, Beast Mastery | Power. / Start of turn: pet attacks. | coût 0 | `ability_hunter_callofthewild` | Le Frenzy monte seul à 5 ; Kill Command, Dire Beast, Bestial Wrath et Spirit Bond profitent d'un familier qui frappe au début et à la fin du tour. | `onTurnStart`, `petAttack` | conservée |
-| Duskwood | Trap Launcher | 1, Power, Survival | Power. / Traps trigger at once on a chosen enemy. | coût 0 | `ability_hunter_traplauncher` | Counterattack, Explosive Trap, Immolation Trap, Freezing Trap deviennent des sorts : le Survival attaque à son tour, même contre un ennemi qui n'attaque pas. | nouveau crochet `trapLaunch` | nouvelle |
-| Wetlands | Beast Cleave | 1, Power, Beast Mastery | Power. / Pet attacks hit all enemies. | coût 0 | `ability_hunter_pet_ravager` | Kill Command, Dire Beast, Bestial Wrath frappent tous les ennemis : le Beast Mastery devient un deck de groupe sans Multi-Shot. | `petAttack` (option `all`) | nouvelle |
-| Stranglethorn | Black Arrow | 1, Skill, Survival | Apply DoT 6 / Apply Black Arrow | Apply DoT 9 / Apply Black Arrow | `spell_shadow_painspike` | Serpent Sting, Immolation Trap, Wyvern Sting prolongent le DoT de la cible marquée ; chaque tick pioche : plus de Traps et de tirs par tour. | nouvel état `black_arrow`, `onDotTick` | nouvelle |
-| Swamp | Exhilaration | 1, Skill, Beast Mastery | Pet attacks. / Heal 2 per Frenzy. / Cooldown 3. | Pet attacks. / Heal 3 per Frenzy. / Cooldown 3. | `ability_hunter_onewithnature` | Barbed Shot, Cobra Shot, Kibler's Bits tiennent le Frenzy haut : il soigne au lieu de passer par Bestial Wrath, et le Beast Mastery retire ses Disengage. | aucun (`per res`) | modifiée (sans Afflictions ; soin par Frenzy) |
-| Steppes | Kill Shot | 1, Attack, Marksmanship | Deal 6. / Execute: deal 18. / Kill: return to hand. | Deal 8. / Execute: deal 24. / … | `ability_hunter_assassinate2` | Aimed Shot et Steady Shot (Careful Aim) entament, Kill Shot finit et revient : le Marksmanship tue plusieurs blessés dans le même tour. | nouvelle condition `kill` | nouvelle |
-| Blackrock | Lone Wolf | 1, Power, Marksmanship | Power. / The pet leaves. / Attacks: +1 Frenzy. / Attack hits deal Frenzy more. | coût 0 | `spell_hunter_lonewolf` | Rapid Fire, Arcane Shot, Concussive Shot, Raptor Strike : beaucoup de petites Attacks montent le Frenzy et le portent ; le deck abandonne le Beast Mastery. | `damage`, nouveau drapeau `noPet` | conservée (version des Steppes, placée à Blackrock) |
+### Westfall — Call of the Wild (Beast Mastery) · conservée
 
-Précisions :
-- **Call of the Wild** : au début du tour du joueur à partir du tour suivant, après DoT, Regen, Cast et baisse
-  du Frenzy ; +1 Frenzy comme toute attaque du familier. Deux exemplaires : deux attaques.
-- **Trap Launcher** : une Trap jouée demande une cible ; elle se déclenche aussitôt sur elle, comme si cet
-  ennemi attaquait (`Combat.triggerTrap`, `onTrapTriggered` : Entrapment, Lock and Load, Resourcefulness
-  s'appliquent), et ne prend pas d'emplacement de Trap. Freezing Trap posé ainsi suit la règle habituelle du
-  Stunned pendant le tour du joueur (l'ennemi perd son prochain tour). Question 2.
-- **Beast Cleave** : chaque attaque du familier (automatique, commandée, de Surge, de Call of the Wild) frappe
-  tous les ennemis vivants ; le Frenzy ne monte que de 1 par attaque.
-- **Black Arrow** : état à drapeau sur l'ennemi, infobulle `Each DoT tick on it: draw 1.` La carte piochée
-  arrive pendant le tour ennemi (comme Lock and Load) et reste en main au tour suivant.
-- **Exhilaration** : le familier frappe d'abord (+1 Frenzy), puis le soin lit le Frenzy.
-- **Kill Shot** : « Execute: deal 18. » = total (forme de Scorch). « Kill » : la cible est morte à la fin de la
-  résolution ; la carte revient alors de la défausse en main (main pleine : elle reste).
-- **Lone Wolf** : plus d'attaque automatique ; les lignes « Pet attacks » ne font rien ; Kill Command, Dire
-  Beast, Bestial Wrath deviennent injouables (raison « No pet »). Chaque carte Attack donne +1 Frenzy après sa
-  résolution ; chaque coup d'une carte Attack fait Frenzy de plus.
-  La baisse de 1 par tour reste. La version de Blackrock (« +4 par coup, Careful Aim toujours vrai ») est
-  écartée : elle rendait Careful Aim sans objet.
-
-## Cartes proposées et écartées
-
-| Nom | Fiche | Pourquoi |
+| Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| Mass Dispel (×3) | Duskwood, Wetlands, Swamp | Réponse aux buffs ennemis et aux cartes ennemies : sa valeur dépend de la zone, aucun deck ne naît d'elle. |
-| Spell Reflection (×2) | Duskwood, STV | Réponse aux Cast ennemis. |
-| Spellsteal (×3) | Westfall, Wetlands, STV | Interrupt ou vol de buff : réponse. |
-| Marked for Death (×2) | Westfall, Wetlands | +5 Combo en Exhaust : un tour fort, pas un deck ; la version des Wetlands lit les primes de meute. |
-| Remove Curse, Master's Call, Shiv | Duskwood, Swamp | Valeur liée aux Curses et aux Afflictions. |
-| Hex of Weakness, Mind-numbing Poison, Snake Trap | STV | Répondent aux Cast et au Hex. |
-| Aspect of the Pack | Wetlands | Morts en chaîne : faible contre un boss seul, et Beast Cleave couvre le groupe. |
-| Lone Wolf (version de Blackrock) | Blackrock | Doublon ; la version des Steppes est gardée. |
+| —, Epic | `Epic.` / `Start of turn: pet` / `attacks.` | `Start of turn: +1` / `Frenzy, pet attacks.` |
 
-## Points de moteur nouveaux
+- **Règle.** Au début de chaque tour du Hunter, premier compris (après la pioche et la baisse du Frenzy),
+  le familier attaque (+1 Frenzy, comme toute attaque). Amélioré : +1 Frenzy juste avant.
+- **Cas limites.** Avec Pet Whistle, deux attaques au premier tour. Swamp : la cible du familier saute les
+  dormeurs tant qu'un ennemi est éveillé. Blackrock : une attaque de début de tour franchit un seuil
+  « pendant ton tour ».
+- **Deck piloté.** Centrales : Kill Command, Dire Beast, Bestial Wrath (Frenzy à 5), Spirit Bond (Absorb
+  par attaque), The Beast Within, Barbed Shot, Intimidation, Arcane Shot, bibelots Kibler's Bits et
+  Devilsaur Eye. Mauvaises : Aimed Shot, Steady Shot, Volley (Cast sans familier). À retirer : deux
+  Disengage (Spirit Bond protège). Feu de camp : Kill Command.
+- **Moteur.** `onTurnStart`, `ns.Hunter.petAttack`.
 
-Rien n'est à faire pour Shockwave, Enraged Regeneration, Anger Management, Power Infusion, Sap, Exhilaration
-(effets et conditions existants). Le reste, regroupé :
+### Duskwood — Trap Launcher (Survival) · modifiée (toujours active ; ajoute une attaque du familier)
 
-1. **Rareté `epic`** : valeur de `rarity`, cadre et couleur de carte, place dans le tirage des récompenses et du
-   marchand (question 5), notes des bots (`bot.rating`). Champ `zone` déjà prévu (`docs/zones.md`).
-2. **Notifications nouvelles** :
-   - `onHeal(n, surplus)` : soin réellement rendu et surplus au-delà du maximum (Prayer of Mending,
-     Spirit Shell) ;
-   - `onDamageDealt(cible, n, carte)` : dégâts réellement infligés par un coup du joueur (Mirror Image,
-     Vampiric Embrace, Sweeping Strikes, Touch of the Magi).
-3. **Valeurs modifiées nouvelles** : `resCap` (plafond de la ressource, lu par `Combat.gainRes` : Avatar) ;
-   `stealthBreak` (le Stealth tombe-t-il à la première Attack : Subterfuge, dans `Core/Classes/rogue.lua`) ;
-   `trapLaunch` (une Trap se déclenche-t-elle au jeu, sur une cible choisie : Trap Launcher).
-4. **Montants, conditions, effets** :
-   - montants `dot` (DoT de la cible : Mind Spike) et `parry` (Parry du joueur : Ghostly Strike), dans
-     `Combat.AMOUNTS` ;
-   - condition `kill` (cible morte à la fin de la résolution) et effet « revenir en main » (Kill Shot), libellé
-     « Kill » au registre ;
-   - effets `strip` (retirer un état de la cible : Mind Spike), `double` (doubler un état de la cible :
-     Deathmark), `healLost` avec les PV notés dans l'incantation (Alter Time) ;
-   - effet `readiness` du Hunter rendu commun (`Core/Effects.lua`) pour Cold Snap.
-5. **États nouveaux** : `touch` (drapeau ennemi, dégâts comptés pendant le tour, résolu par `onTurnEnd`) ;
-   `black_arrow` (drapeau ennemi, lu par `onDotTick`) ; drapeau de tour de Vampiric Embrace (`c.turn`).
-6. **Familier** : `Hunter.petAttack` avec option « tous les ennemis » (Beast Cleave) ; drapeau « familier
-   absent » lu par l'attaque automatique, l'effet `pet` et `Combat.canPlay` (raison « No pet ») pour Lone Wolf.
-7. **Instant pour le Priest** : aucun code (état commun), mais l'infobulle et l'affichage de l'état doivent
-   exister dans la vue du Priest.
-8. **Langage** (`L.trigger`) : « Each heal », « Overhealing », « Each enemy DoT tick », « Fully absorbed hits »,
-   « Applying Stunned or Demoralized », « Each Surge of 3+ Combo » ; condition « Kill » ; infobulles des états
-   Touch of the Magi et Black Arrow. Tous les textes sont à passer par le harnais U22 et U27.
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Traps trigger at once` / `on a chosen enemy, and` / `the pet attacks it.` | `…` / `the pet attacks it` / `twice.` |
 
-## Risques d'équilibre
+- **Règle.** Une carte Trap demande une cible. Jouée, elle se déclenche aussitôt sur cet ennemi comme s'il
+  attaquait (`Combat.triggerTrap`, `onTrapTriggered` : Entrapment, Lock and Load s'appliquent), sans prendre
+  d'emplacement ; puis le familier attaque cet ennemi (amélioré : deux fois), ce qui en fait sa cible.
+- **Cas limites.** Plus aucune Trap n'attend le tour ennemi. Les Traps « to all » (Explosive Trap, Frost
+  Trap) touchent tous les ennemis ; le familier frappe la cible choisie. Freezing Trap lancée pendant le
+  tour du Hunter : l'ennemi perd son prochain tour (règle habituelle). **Resourcefulness** : la Trap lancée
+  revient en main à la fin du tour, pas tout de suite (sinon Freezing Trap étourdit toute la salle à
+  chaque tour pour 1 mana chacune). Net-o-Matic : la première coûte 0. Boss : Stunned ne prend pas. Lien
+  Duskwood : le Hex n'est pas une attaque et ne déclenche jamais une Trap posée ; lancée, elle frappe le
+  lanceur.
+- **Deck piloté.** Centrales : Freezing Trap, Immolation Trap, Counterattack (13), Explosive Trap, Frost
+  Trap, Entrapment, Lock and Load, Resourcefulness, Spirit Bond (Absorb à chaque attaque du familier),
+  bibelot Net-o-Matic. Mauvaises : Disengage, Raptor Strike. À retirer : deux Disengage. Feu de camp :
+  Counterattack, Freezing Trap.
+- **Moteur.** Nouveau : valeur modifiée `trapLaunch` (la Trap se déclenche au jeu, sur une cible) et
+  exception de moment pour Resourcefulness ; `petAttack` avec une cible imposée.
 
-1. **Avatar avec les cartes « per Rage »** : à 10 Rage, Enraged Regeneration soigne 30 (40 amélioré), Ignore
-   Pain donne 30 Absorb, Skullflame Shield 20 Absorb par tour, Execute 45. Deux épiques ensemble (Avatar et
-   Enraged Regeneration) font un Warrior qui ne meurt plus.
-2. **Deathmark, Rupture et Exsanguinate** : Rupture à 5 Combo (DoT 15), Deathmark (30), puis Exsanguinate à
-   5 Combo : 30 + 29 + 28 + 27 + 26 = 140 en deux tours. Le Cooldown 3 ne suffit peut-être pas ; repli : « add
-   half its DoT ».
-3. **Trap Launcher, Resourcefulness, Freezing Trap** : la Trap déclenchée au jeu revient en main ; Freezing
-   Trap étourdit un ennemi chaque tour pour 1 mana (hors boss), et Lock and Load pioche à chaque fois.
-4. **Shadowy Apparitions et Devouring Plague** : le Surge pose DoT 2 par Insanity, chaque tick en rend 1 ; sur
-   une élite à beaucoup de PV, l'Insanity revient presque entière tant que la cible vit.
-5. **Water Elemental et Fingers of Frost** : le gel automatique du début de tour donne l'Instant chaque tour ;
-   Pyroblast part tous les tours sans risque, et Shatter s'applique à tout.
-6. **Cold Snap et Frost Nova, Presence of Mind** : Frost Nova deux fois de suite étourdit deux tours sur trois ;
-   Presence of Mind deux fois donne deux Instant. Même famille : Sap avec Subterfuge et Shadow Dance (Stunned 2
-   tous les trois tours sur la même cible).
-7. **Defensive Stance et Shield Slam** : la moitié de l'Absorb restant chaque tour, Shield Wall (18) et Ignore
-   Pain montent une réserve que Shield Slam convertit (40 et plus vers le 4e tour), tout en gagnant de la Rage.
-8. **Beast Cleave et Bestial Wrath** : à Frenzy 5, cinq attaques de 6 sur chaque ennemi (30 à tous pour
-   2 mana) ; avec Call of the Wild, le familier frappe la salle deux fois par tour.
+### Wetlands — Beast Cleave (Beast Mastery) · conservée
 
-## Questions au joueur
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Pet attacks hit all` / `enemies.` | `Pet attacks hit all` / `enemies, +1 Frenzy.` |
 
-1. **Lone Wolf renvoie le familier.** Pris par un Hunter Beast Mastery, il rend injouables Kill Command, Dire
-   Beast et Bestial Wrath déjà dans le deck, et Arcane Shot (carte de départ) ne fait plus que 3 + Frenzy. Un
-   Hunter Marksmanship le prendra toujours, un Beast Mastery jamais. Le garder aussi tranché, ou laisser le
-   familier frapper 3 une fois par tour, sans Frenzy ?
-2. **Trap Launcher : toujours, ou au choix ?** Toujours : plus aucune Trap ne se pose pour le tour ennemi, et
-   Freezing Trap ne peut plus arrêter une attaque dès son premier coup (elle étourdit pendant ton tour : l'ennemi
-   perd son tour suivant, le résultat est le même, mais il faut savoir qui étourdir avant). Au choix (comme
-   Spend : clic gauche lance, clic droit pose) : la carte n'a plus de défaut, elle n'est plus qu'un gain.
-3. **Le Priest reçoit l'Instant (Power Infusion).** Ses Cast sacrés (Holy Fire 24, Empyreal Blaze 36, Halo 22 à
-   tous) partiraient au jeu un tour sur deux, sans pouvoir être interrompus. Le Mage perd l'exclusivité « seule
-   classe qui accélère le Cast ». Accepter, ou remplacer par « Cast cards cost 1 less this turn » ?
-4. **Defensive Stance retourne la règle du Warrior.** Le GDD dit « bloquer prive de Rage » ; avec cette carte, un
-   coup entièrement absorbé donne de la Rage, et Revenge (gratuite si l'on a perdu des PV) perd son intérêt dans
-   ce deck. C'est voulu (une carte pivot), mais c'est la seule des 35 qui annule le défaut central de sa classe.
-   Garder ?
-5. **Fréquence des cartes épiques dans les récompenses.** Si elles suivent la fréquence des rares, un joueur
-   qui vient de débloquer sa carte de Westfall peut ne pas la voir de toute l'expédition suivante. Si chaque
-   classe a une chance garantie (par exemple une carte épique proposée par expédition, au boss d'élite ou au
-   coffre), il la verra toujours, mais les sept zones gagnées rendent ce choix prévisible. Laquelle ?
+- **Règle.** Chaque attaque du familier (automatique, commandée, de Surge, de Call of the Wild) frappe tous
+  les ennemis vivants ; le Frenzy monte de 1 par attaque (amélioré : de 2).
+- **Cas limites.** Le Surge de Bestial Wrath donne une attaque à tous par point de Frenzy. Swamp : réveille
+  tous les dormeurs (sans bonus, dégâts à tous). Lien Wetlands : chaque attaque est un seul effet sur toute
+  la meute, les morts sont simultanées.
+- **Deck piloté.** Centrales : Kill Command, Dire Beast, Bestial Wrath, Barbed Shot, Cobra Shot, Arcane
+  Shot, Intimidation, The Beast Within, Spirit Bond. Mauvaises : Multi-Shot, Volley, Explosive Trap (zone en
+  double). À retirer : deux Disengage. Feu de camp : Dire Beast.
+- **Moteur.** `Hunter.petAttack` avec l'option « tous les ennemis ».
+
+### Stranglethorn Vale — Roar of Sacrifice (Beast Mastery) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `When hit: spend 1` / `Frenzy to stop up to 5` / `damage.` | `…` / `Frenzy to stop up to 8` / `damage.` |
+
+- **Règle.** À chaque coup ennemi, avant l'Absorb, si le Frenzy vaut 1 ou plus, il baisse de 1 et le coup
+  perd jusqu'à 5 dégâts (amélioré : 8).
+- **Cas limites.** Automatique, coup par coup ; un coup de 0 ne coûte rien. Pas contre le DoT, ni les
+  Curses, ni la brûlure des Steppes. Le Frenzy perdu affaiblit le familier : chaque coup reçu est un choix
+  déjà fait, d'où l'intérêt de le remonter vite. Lien Stranglethorn : les panthères ouvrent par leur plus
+  gros coup.
+- **Deck piloté.** Centrales : Barbed Shot (+2), Cobra Shot (+1), Kill Command et Dire Beast (+1 par
+  attaque), The Beast Within (une attaque par Attack), Intimidation, Spirit Bond, bibelots Kibler's Bits et
+  Devilsaur Eye. Mauvaises : Bestial Wrath et Growl (vident le Frenzy), Disengage. À retirer : les quatre
+  Disengage. Feu de camp : Barbed Shot.
+- **Moteur.** Crochet existant `beforeHit` (comme le Parry du Rogue).
+
+### Swamp of Sorrows — Master Marksman (Marksmanship) · nouvelle
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Careful Aim: Cast` / `Attacks resolve at` / `once.` | `…` / `Attacks resolve at` / `once, deal 4 more.` |
+
+- **Règle.** Une carte Attack Cast jouée sur une cible au-dessus de la moitié de ses PV (Careful Aim, lu au
+  jeu) se résout tout de suite : sans emplacement, sans interruption possible. Amélioré : ses coups
+  infligent 4 de plus.
+- **Cas limites.** Volley (sans cible) reste un Cast. Les lignes « Careful Aim: » se lisent au même moment,
+  donc vraies. Une cible déjà entamée sous la moitié : Cast normal. Lien Swamp : un dormeur est intact,
+  Aimed Shot part au jeu avec Rude Awakening ((24 + 10) × 1,5 = 51) et le tue avant son ouverture.
+- **Deck piloté.** Centrales : Aimed Shot, Steady Shot (pioche sous Careful Aim), Hunter's Mark, Trueshot
+  Aura (+5), Concussive Shot, Rapid Fire, bibelots Light Quiver et Rhok'delar. Mauvaises : Volley, Kill
+  Command, Dire Beast. À retirer : deux Arcane Shot. Feu de camp : Aimed Shot.
+- **Moteur.** Crochet existant `instantCast`, qui lit la cible (`c.player.lastTarget`).
+
+### Burning Steppes — Black Arrow (Survival) · nouvelle (le nom de la version 1 est gardé, la règle est neuve)
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `Each DoT tick on an` / `enemy: the pet attacks` / `it.` | `Each DoT tick on an` / `enemy: +1 Frenzy, the` / `pet attacks it.` |
+
+- **Règle.** Après chaque tic de DoT sur un ennemi qui survit, le familier attaque cet ennemi (+1 Frenzy
+  comme d'habitude ; amélioré : +1 Frenzy de plus avant l'attaque), sans changer la cible du familier.
+- **Cas limites.** Le tic a lieu au début du tour de l'ennemi : le familier peut le tuer **avant qu'il
+  agisse**. Un DoT à tous (Explosive Trap) donne une attaque par ennemi. Swamp : le tic réveille, l'attaque
+  touche un ennemi éveillé (pas de bonus). Lien Steppes : chaque mort recule le feu.
+- **Deck piloté.** Centrales : Serpent Sting (de départ), Barbed Shot (DoT 3, +2 Frenzy), Immolation Trap
+  (DoT 7), Explosive Trap (DoT à tous), Wyvern Sting, Spirit Bond, Kill Command, Bestial Wrath. Mauvaises :
+  Aimed Shot, Steady Shot, Volley. À retirer : deux Disengage. Feu de camp : Serpent Sting.
+- **Moteur.** Notification existante `onDotTick` (unité, n) ; `petAttack` avec une cible imposée (comme
+  Trap Launcher).
+
+### Blackrock Mountain — Lone Wolf (Marksmanship) · modifiée (cartes de familier transformées)
+
+| Coût / type | Texte de base | Amélioré |
+|---|---|---|
+| —, Epic | `Epic.` / `No pet. Pet cards` / `become shots. Attack` / `hits: +1 per Frenzy.` | `…` / `Start of turn: +1 Frenzy.` |
+
+Infobulle : `Kill Command becomes Kill Shot, Arcane Shot Chimaera Shot… (see the deck).`
+
+- **Règle.** Le familier n'existe pas : plus d'attaque automatique. Les cartes qui le nomment sont, tant que
+  Lone Wolf est dans le deck, jouées et montrées sous leur variante (table). Chaque coup d'une carte Attack
+  inflige le Frenzy de plus. Le Frenzy baisse de 1 par tour comme d'habitude (amélioré : +1 au début de
+  chaque tour, ce qui l'annule).
+- **Cas limites.** Le Frenzy vient des variantes (+1), de Barbed Shot (+2), de Cobra Shot, de Kibler's Bits,
+  de Devilsaur Eye. Cast (Aimed Shot) : Frenzy lu à la résolution. Les Skills qui infligent des dégâts
+  (Scatter Shot, Explosive Shot) n'ont pas le bonus. Growl ne nomme pas le familier : inchangée. Lien
+  Blackrock : toute la puissance tombe pendant le tour du Hunter, il choisit quand franchir un seuil.
+- **Cartes transformées** (coût, type, rareté, voie et amélioration gardés ; les instances ne changent
+  pas) :
+
+| Carte d'origine | Variante | Texte de base | Amélioré |
+|---|---|---|---|
+| Arcane Shot (1, Attack, départ) | Chimaera Shot | `Deal 3.` / `Deal 3 to another` / `enemy.` / `+1 Frenzy.` | `Deal 6.` / `…` |
+| Kill Command (1, Attack, Cooldown 3) | Kill Shot | `Deal 8.` / `Execute: deal 16.` / `+1 Frenzy.` / `Cooldown 3.` | `… Cooldown 2.` |
+| Dire Beast (0, Skill, Exhaust) | Double Tap | `Draw 1.` / `+2 Frenzy.` / `Exhaust.` | `Draw 1.` / `+3 Frenzy.` / `Exhaust.` |
+| Intimidation (1, Skill, Cooldown 4) | Scatter Shot | `Deal 3.` / `+1 Frenzy.` / `Apply Stunned 1 ⌛` / `Cooldown 4.` | `… Cooldown 3.` |
+| Multi-Shot (1, Attack) | Salvo | `Deal 5 to all.` / `+1 Frenzy.` | `Deal 7 to all.` / `+1 Frenzy.` |
+| Counter Shot (0, Skill, Cooldown 3) | Silencing Shot | `Interrupt the target's cast.` / `+1 Frenzy.` / `Cooldown 3.` | `… Cooldown 2.` |
+| Bestial Wrath (2, Skill, Surge) | Explosive Shot | `Surge: deal 6 per Frenzy.` | coût 1 |
+| The Beast Within (1, Power) | Trick Shots | `Power.` / `Attacks: +1 Frenzy.` | coût 0 |
+| Spirit Bond (2, Power) | Aspect of the Turtle | `Power.` / `Each Attack hit: gain` / `1 Absorb.` | coût 1 |
+| Pet Whistle (bibelot de départ) | Pet Whistle | `At the start of each combat, +1 Frenzy.` | — |
+
+- **Deck piloté.** Centrales : Rapid Fire (quatre coups, Frenzy à chacun), Chimaera Shot (les quatre de
+  départ), Trick Shots, Kill Shot, Salvo, Cobra Shot, Barbed Shot, Concussive Shot, Raptor Strike, Double
+  Tap. Mauvaises : Aimed Shot et Steady Shot (un seul coup pour 2 ou 1 mana), Volley. À retirer : les
+  Disengage. Feu de camp : Rapid Fire, Chimaera Shot.
+- **Moteur.** Drapeau « sans familier » (attaque automatique, effet `pet`) ; nouveau : **variantes de
+  cartes par épique** (`Card.def` consulte la table de l'épique du deck), lues partout : combat, deck,
+  récompenses, marchand.
+
+---
+
+## Cartes de la version 1 écartées
+
+| Carte (classe) | Pourquoi |
+|---|---|
+| Power Infusion (Priest), Defensive Stance (Warrior) | Refusées par le joueur : une bonne carte, pas un deck. |
+| Shadowy Apparitions, Mind Spike, Vampiric Embrace, Spirit Shell (Priest) | De l'Insanity, des dégâts plus tôt, du soin, de l'Absorb : des renforts du deck existant. Remplacées par Misery, Echo of Light, Shadow Covenant, Voidform, Inner Focus. |
+| Shockwave, Enraged Regeneration (Warrior) | Une carte de contrôle et une carte de soin ; aucune règle changée. |
+| Alter Time, Cold Snap, Touch of the Magi (Mage) | Soin, recharges, dégâts en plus. |
+| Ghostly Strike, Sap, Deathmark, Leeching Poison, Relentless Strikes, Cold Blood (Rogue) | Une bonne carte chacune (dégâts, contrôle, soin, mana et pioche, Combo en plus). L'idée de Ghostly Strike (le Parry attaque) revit dans Deflection. |
+| Exhilaration, Kill Shot (Hunter) | Soin ; une bonne carte d'achèvement. Kill Shot devient une variante de Lone Wolf. |
+
+---
+
+## A. Comment l'épique arrive en jeu (règle commune aux 35)
+
+**Une épique est une règle en jeu dès le début de chaque combat.**
+
+1. Au début de chaque combat, après `init` de la classe et avant `onCombatStart`, l'épique du deck est
+   posée en jeu comme un Power : son icône est sous le héros dès la première main, ses crochets sont
+   actifs pour tout le combat.
+2. Elle n'est jamais dans la pioche, la main, la défausse ni les recharges : ni piochée, ni jouée, ni
+   défaussée, ni épuisée, ni copiée. Elle n'a pas de coût.
+3. Aucun effet de combat ne la touche : Hex, Curses, « Remove negative effects. », retraits de Power.
+4. Elle compte dans le deck de l'expédition (en tête de la liste du deck, plaque « Epic »). Elle peut être
+   améliorée au feu de camp (choix volontaire ; les améliorations au hasard, `upgradeRandom`, l'évitent) et
+   retirée chez le marchand ou dans une rencontre (le deck n'a alors plus d'épique).
+5. Plaque « Epic » (mot de tête, comme « Power. ») : `Epic. — in play from the start of each combat.`
+
+Pourquoi cette règle plutôt qu'Innate ou « tant qu'elle est dans le deck » :
+- **Elle pilote dès le premier tour, à chaque combat.** Une carte en un exemplaire dans 15 à 25 cartes
+  n'arrive en main qu'un combat sur trois au premier tour ; Innate la met en main mais lui prend une
+  place et du mana au premier tour, la pire entrée possible pour un deck qui en dépend.
+- **Elle est à l'abri des mécaniques de zone** (Hex de Stranglethorn, Curses de Duskwood) : une épique
+  frappée par un Hex couperait le build pour un combat.
+- **Le moteur n'apprend presque rien** : c'est un Power posé d'office, dont les crochets (`def.hooks`)
+  existent déjà ; pas de logique de pioche ni de main.
+- **Le joueur l'a demandé pour Trap Launcher** (« toujours actif ») ; une seule règle pour les 35 évite
+  d'apprendre au joueur une exception par carte.
+
+## B. Une épique par expédition, et l'offre garantie
+
+### Règle de jeu
+
+1. **Le deck contient zéro ou une épique.** Les épiques ne sont jamais tirées dans les récompenses de
+   cartes ordinaires ni dans les emplacements de cartes du marchand.
+2. **Prendre une épique quand on en a une** ouvre une confirmation qui montre les deux cartes :
+   `Replace <old> with <new>?`. Oui : l'ancienne quitte le deck (elle reste débloquée pour les expéditions
+   suivantes), la nouvelle entre **non améliorée** (l'amélioration ne se transfère pas). Non : rien ne
+   change et l'offre reste ouverte tant que l'écran de récompense l'est.
+3. **Jamais en combat** : une épique ne change qu'entre deux combats (récompense, marchand, rencontre).
+4. **Marchand** : un emplacement « Epic » quand la classe a débloqué au moins une épique qui n'est pas celle
+   du deck : une épique tirée au hasard parmi elles, **150 po** (au-dessus des rares). L'acheter suit la
+   règle 2. Le marchand retire aussi l'épique du deck au prix habituel d'un retrait.
+5. **Rencontres** : une réponse qui donne « une carte de la classe » ne donne jamais une épique ; « dupe »
+   (copier une carte) ne peut pas viser l'épique ; « remove » le peut. Aucune rencontre ne donne d'épique
+   aujourd'hui ; une rencontre future qui en donnerait suivrait la règle 2.
+6. **Cartes transformées** (Lone Wolf) et règles des cartes (Trap Launcher, Voidform…) : la transformation
+   n'est pas écrite sur les cartes, c'est la règle de l'épique. Tant que l'épique est dans le deck, les
+   cartes concernées s'affichent et se jouent sous leur variante **partout** : deck, combat, récompenses
+   (un Kill Command proposé s'affiche « Kill Shot » avec un ruban « Lone Wolf »), marchand. Si l'épique est
+   remplacée ou retirée, les cartes redeviennent celles d'origine aussitôt, avec leur amélioration.
+
+### Offre garantie : à l'étape 1, pas au premier élite
+
+**Proposition : la récompense du premier combat (étape 1) commence par un choix d'épique, une parmi trois
+tirées dans celles que la classe a débloquées (toutes si elle en a trois ou moins), avec « Skip ». Le choix
+de cartes ordinaire vient ensuite, sur le même écran.** En plus, chaque récompense d'élite ajoute une épique
+au hasard (débloquée, autre que celle du deck), à prendre en remplacement ou à laisser.
+
+Pourquoi l'étape 1 plutôt que le premier élite (proposition du joueur) :
+- **La carte de l'expédition** (`docs/expedition.md`) : 8 étapes, l'étape 1 est toujours un combat, aucun
+  élite avant l'étape 3, 1 ou 2 élites par chemin (1,26 visite en moyenne), et le premier élite peut être
+  à l'étape 6. Une expédition donne 4 à 5 choix de cartes. Au premier élite, 1 à 4 de ces choix sont déjà
+  faits sans savoir quel deck on construit : le premier test (« je choisis mes récompenses différemment
+  pendant toute l'expédition ») échoue pour la moitié de l'expédition, et l'épique ne voit parfois que
+  deux combats.
+- **Le choix se fait après un vrai combat** : le joueur a vu la zone et sa main de départ, il ne choisit
+  pas à froid. Le départ porte déjà le bibelot au choix parmi 3 (zone 3) ; deux choix avant le premier
+  combat chargeraient l'écran de départ.
+- **L'épique avant les cartes, sur le même écran** : le premier choix de cartes se fait déjà avec la règle
+  en tête.
+- **Trois au hasard** répond à la question 5 de la version 1 : avec sept épiques débloquées, on ne
+  reprend pas toujours la même, et le build de l'expédition change d'une fois à l'autre.
+- **Les élites gardent un moment fort** : « en trouver une autre remplace la précédente » existe toujours,
+  au moment où le deck a pris forme (changer de build est alors un vrai pari).
+
+Cas : aucune épique débloquée (compte neuf, classe neuve) : pas d'écran. Une seule : elle est proposée
+seule, avec « Skip ». Défaite avant la fin de l'étape 1 : rien.
+
+## C. Points de moteur nouveaux, regroupés
+
+Rien n'est codé. Crochets déjà présents et réutilisés tels quels : `afterHit` (Reflective Shield, Molten
+Armor), `onTurnStart` / `onTurnEnd` (Water Elemental, Call of the Wild, Shield Charge, Arcane Meditation,
+Avatar), `onResource` (Thunderous Roar), `onSpend` / `onSurge` (Anger Management, Kidney Shot), `surge`
+(Echoing Reprimand), `replay` (Titan's Grip, Rule of Threes), `instantCast` (Fingers of Frost, Master
+Marksman), `enemyDamage` (Atrophic Poison), `beforeHit` (Roar of Sacrifice), `block` / `damage` (Death
+Wish, Voidform, Danse Macabre), `cost` / `payHp` (Shadow Covenant), `onStatusApplied` (Misery,
+Deflection), `onEnemyDeath` (Conflagration, Death Wish amélioré), `onDotTick` (Black Arrow).
+
+1. **Épiques** : rareté `epic`, champ `epic = true` ; plaque « Epic » au registre (`L.plate`, en tête, à la
+   place de « Power ») ; `Combat.new` pose l'épique du deck dans `c.player.powers` avant `onCombatStart`
+   et l'exclut de la pioche ; **ordre des crochets** : l'épique passe après les autres Powers et bibelots
+   (Shadow Covenant lit le coût final).
+2. **Expédition** : `exp.epic` (uid de l'instance), offre de l'étape 1 (trois parmi les débloquées),
+   emplacement d'épique des récompenses d'élite et du marchand (150 po), confirmation de remplacement,
+   exclusion de `cardPool`, de `upgradeRandom` et de « dupe » ; sauvegarde : un champ de plus, valeur par
+   défaut nil, rien à migrer.
+3. **Notifications nouvelles** : `onHeal(n, surplus, source)` (Prayer of Mending), `onDamageDealt(cible,
+   n, def, ctx)` (Sweeping Strikes), `onRegenTick(n)` (Echo of Light).
+4. **Valeurs modifiées nouvelles** : `canPlay(d, inst)` avec raison (Voidform, Titan's Grip) ; `resCap`
+   (Avatar) ; `stealthBreak` (Subterfuge) ; `trapLaunch` (Trap Launcher) ; `castAs` et facteur `ctx.scale`
+   des effets (Inner Focus) ; `regenHeal` (Echo of Light) ; `convertHit` (Doomblade).
+5. **Effets et compteurs** : effet `cooldownTick` (Anger Management, voisin de `readiness`) ; mana reporté
+   au-delà du maximum (Arcane Meditation, affichage compris) ; compteur de ripostes du tour et `n` demandé
+   avant plafond dans `onStatusApplied` (Deflection) ; `c.turn.names` (Danse Macabre) ; DoT encore lisible
+   dans `onEnemyDeath` (Conflagration) ; dépense réelle dans le `ctx` du crochet `surge` (Echoing
+   Reprimand) et cible dans celui d'`onSurge` (Kidney Shot) ; « compte comme Demoralized / Sundered » sans
+   état posé (Atrophic Poison).
+6. **Familier** : `petAttack(c, why, frenzy, cible)` avec cible imposée (Trap Launcher, Black Arrow) ;
+   option « tous les ennemis » (Beast Cleave) ; drapeau « sans familier » (Lone Wolf) ; règle « pas de
+   dormeur tant qu'un ennemi est éveillé » (Swamp) étendue aux frappes automatiques (Water Elemental,
+   Shield Charge).
+7. **Variantes de cartes par épique** (Lone Wolf) : définitions des variantes (hors réserve), table
+   d'origine → variante portée par l'épique, `Card.def` qui la consulte quand l'épique est dans le deck ;
+   affichage dans le deck, les récompenses, le marchand (ruban du nom de l'épique) ; Pet Whistle a la même
+   bascule.
+8. **Langage et harnais** : plaque Epic ; déclencheurs « Each heal », « Each Regen tick », « Each Parry
+   gained », « At 5 Rage », « Surge of 5 Combo », « Surge of 4+ Combo », « Each 3 Rage spent », « Each 2 Rage
+   spent », « Targeted Attack hits », « Attack hits », « Shadow hits », « Cast cards aimed at a Frozen
+   enemy » (forme à revoir avec U27) ; infobulles d'Inner Focus, Deflection, Kidney Shot, Lone Wolf ;
+   tous les textes passent U22 (panneau) et U27 (forme). Trois lignes dépassent 22 caractères d'un à trois
+   (`Start of turn: +1 Rage.`, `Start of turn: +2 Rage.`, `Start of turn: +1 Frenzy.`) : à vérifier au
+   harnais, la coupure se faisant au mot.
+9. **Bots** : note de chaque épique (`bot.rating`), choix à l'étape 1 et décision de remplacement (valeur
+   du deck actuel sous l'ancienne et la nouvelle règle), poids des cartes selon l'épique (une table de
+   cartes « centrales » par épique, tirée de cette fiche, suffit au début).
+
+## D. Risques d'équilibre
+
+1. **Danse Macabre et Killing Spree** : six coups de 4, chacun + 2 par nom ; après cinq noms différents,
+   6 × 14 = 84 pour 2 mana. Repli : bonus plafonné à + 10 par coup.
+2. **Trap Launcher et Freezing Trap** : un ennemi étourdi par carte et par tour (hors boss), plus une
+   attaque du familier ; avec Lock and Load, chaque Trap repioche. Resourcefulness est déjà retardée à la
+   fin du tour ; si ça ne suffit pas, la Trap lancée devient Exhaust pour le combat.
+3. **Misery et Devouring Plague** : à 10 Insanity, DoT 20 sur chaque ennemi (210 dégâts sur un groupe de
+   trois en dix tours). Repli : les copies valent la moitié.
+4. **Titan's Grip et la Strength** : Bloodthirst deux fois (+2 Strength par carte), Battle Shout puis
+   Rampage (8 coups) ; un tour à 100 dégâts dès le 3e tour. Repli : la copie n'applique pas les états sur
+   soi.
+5. **Rule of Threes et le contrôle** : Polymorph en 3e carte (Stunned 4 ⌛), Frost Nova deux fois, Arcane
+   Barrage à deux fois 24 à tous. Repli : la copie n'est faite que pour les cartes Attack.
+6. **Inner Focus amélioré** : Empyreal Blaze à 72, Halo à 44 à tous, Luminous Barrier à 28 chaque tour où
+   elle revient. À mesurer contre le risque d'interruption, qui est le vrai prix.
+7. **Les épiques de groupe contre un boss seul** : Conflagration, Sweeping Strikes, Beast Cleave, Misery
+   et Echo of Light ne font presque rien contre Grark Lorkrub ou Somnus sans sbires. Ce n'est pas un
+   défaut de zone (elles valent ailleurs), mais le taux de victoire au boss doit être mesuré par épique.
+8. **Deflection à Westfall** : la première épique du Rogue rend ses trois Feint de départ offensives (18
+   dégâts pour 3 mana, et 3 Parry gardés) ; sur un deck de départ, c'est peut-être la plus forte des cinq
+   cartes de Westfall. Repli : 2 + 2 par riposte.
+
+## E. Questions pour le joueur
+
+1. **Le nom « Riposte ».** Il est déjà pris par une carte commune du Rogue (`Deal 4.` / `Gain Parry 1`).
+   Soit l'épique s'appelle **Deflection** (talent de l'ère classique) et rien d'autre ne change ; soit la
+   commune est renommée (par exemple **Ghostly Strike**, libre maintenant) et l'épique prend « Riposte ».
+   Dans le second cas, les joueurs qui connaissent déjà la carte commune la verront changer de nom.
+2. **Deflection garde-t-elle la défense ?** Telle qu'écrite, chaque Feint pare un coup **et** frappe (3, 6,
+   9…). Si « chaque Parry devient une riposte » veut dire que la charge est **consommée** par la riposte,
+   le Rogue n'a plus de Parry : il frappe 18 avec trois Feint mais prend les coups en plein, et devra
+   retirer moins de Sinister Strike pour tuer avant d'être tué. Laquelle ?
+3. **Première épique du Warrior : Death Wish.** C'est la plus simple à lire, mais le premier Warrior qui la
+   prend doit retirer ses quatre Defend et jouer sans aucun Absorb dès sa deuxième expédition. Trop dur
+   pour une première épique, ou c'est justement la leçon (« le Warrior encaisse et frappe ») ?
+4. **Offre à l'étape 1 plutôt qu'au premier élite.** À l'étape 1, tu choisis ton build avant ta première
+   carte et toute l'expédition se construit autour ; au premier élite, tu as déjà pris deux à quatre cartes
+   au hasard du deck de départ, et l'épique ne sert parfois que pour deux combats et le boss. D'accord pour
+   l'étape 1, avec une épique de remplacement à chaque élite et une au marchand à 150 po ?
+5. **Améliorer l'épique au feu de camp.** Permis dans cette fiche : un feu de camp sur deux ira sans doute
+   à l'épique (Thunderous Roar 6 → 9, Arcane Meditation 3 → 5), au détriment des cartes de départ. Et si on
+   remplace une épique améliorée, l'amélioration est perdue. Garder ces deux règles, ou interdire
+   l'amélioration des épiques (elles restent telles qu'on les trouve) ?

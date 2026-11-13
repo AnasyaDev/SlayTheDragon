@@ -459,7 +459,13 @@ une réponse sans condition ni coût. `event_dragonkin` pose Asleep 3 dans sa co
 
 ## 7. Cartes de zone
 
-Voir docs/zones/cartes-de-zone.md
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
+
+- Reflective Shield (Priest)
+- Shield Charge (Warrior)
+- Arcane Meditation (Mage)
+- Subterfuge (Rogue)
+- Master Marksman (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 
