@@ -128,7 +128,7 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `apply` | état, cible, d | valeur d'un état posé sur un ennemi |
 | `block`, `heal` | — | Absorb gagné, soin reçu |
 | `target` | d, inst | cible d'une carte (rediriger) ; la cible retenue va dans `c.player.lastTarget` |
-| `instantCast` | d, inst, commit | une carte Cast part tout de suite (autre source que l'état Instant) ; ne rien consommer si commit est faux |
+| `instantCast` | d, inst, commit | une carte Cast part tout de suite (autre source que l'état Instant) ; ne rien consommer si commit est faux. Interrogé **avant** l'état Instant (qui n'est alors pas consommé) ; cible visée dans `c.aim` (uid, nil = inconnue : `canPlay`) ; `Combat.castFits(c, d, inst, cible)` : emplacements pleins, la carte n'est légale (`legalPlays`) et jouable (`play`, raison `casting`) que sur une cible où elle part tout de suite (Fingers of Frost) |
 | `trapSlots` | — | nombre de Traps posées au plus (3) |
 | `castSlots` | — | nombre d'incantations tenues à la fois (1 ; Mage : 2) |
 | `powerLasts` | d, inst | durée d'un Power à durée |
@@ -408,6 +408,23 @@ un événement nouveau en a trois au plus.
 
 L'agent de conception choisit, pour une épique « passive tant qu'elle est dans le deck », entre un Power à
 jouer (`hooks`), une carte `innate` (arrive en main) et `deckHooks` / `whileInDeck` (effet sans la jouer).
+
+Bots : `classDef.bot.epics[id] = { rating, upgrade, remove }` (lu par `Sim/expedition.lua`) remplace les notes
+de la classe tant que l'épique `id` est dans le deck : récompenses, marchand, améliorations et retraits se
+construisent autour d'elle. `classDef.bot.epic(exp, id)` note l'épique pour l'offre et le remplacement.
+
+### Mage (13/11/2026)
+Sept épiques (`Data/Mage.lua`, `epic(...)`) : Powers `epic = true` sans coût ni niveau, `unplayable = true` (garde-fou
+tant qu'une épique peut se trouver dans une pile), nombres dans `epicN` / `epicM` / `epicEvery` (base et `up`) ; leurs
+crochets (`deckHooks`) sont posés par `Core/Classes/mage.lua`. État de combat dans `c.cls` (`carry`, `fof`, `fofOn`,
+`r3`, `r3surge`). Mirror Image : `afterCast` (`Combat.mirrorHit`, cible par `c.rng.cards`) ; Molten Armor : `afterHit`
+(valeur passée par `apply`) ; Water Elemental : `onTurnStart` (`Combat.elementalTarget` : dernière cible, sinon la
+plus à gauche, un dormeur `asleep` seulement si tous dorment) ; Fingers of Frost : `instantCast` avec `c.aim`, + `damage`
+amélioré ; Arcane Meditation : `onTurnEnd` / `onTurnStart` (mana au-dessus du maximum, affiché « 6/3 ») ; Conflagration :
+`onEnemyDeath` (DoT lu avant tout nettoyage, posé sans `apply`) ; Rule of Threes : `onCardCommitted` (marque au jeu,
+`c.turn.played`), `replay`, `beforeCard` (la copie reprend le Surge). Vue de classe : ligne violette de l'épique
+(`Art.mageEpicText` : mana gardé, rang de la carte, cible de l'élémentaire, Frozen) et nom flottant sur l'événement
+`{ t = "epic", id, dst|src|card }`. Tests : `Sim/tests_epic_mage.lua` ; harnais : section UEM.
 
 ## Sauvegarde
 

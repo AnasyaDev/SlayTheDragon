@@ -18,18 +18,45 @@ return function(ns)
   -- path=<voie> (SE.play, opts.path) : les cartes de classe d'une autre voie et les cartes neutres valent 0,
   -- donc ne sont jamais prises (voie jouée seule).
   local onlyPath
+  -- Conseils propres à l'épique du deck : classDef.bot.epics[id] = { rating, upgrade, remove } (notes qui
+  -- remplacent celles de la classe tant que cette épique est dans le deck : le deck se construit autour).
+  local curExp -- expédition jouée (SE.play)
+  local function epicAdvice(exp)
+    local cd = exp and ns.Classes[exp.class]
+    local eps = cd and cd.bot and cd.bot.epics
+    local i = eps and X.epicIndex(exp)
+    return i and eps[exp.deck[i].id] or nil
+  end
   local function rating(id)
     if onlyPath then
       local d = ns.Cards[id]
       if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
     end
+    local adv = epicAdvice(curExp)
+    local r = adv and adv.rating and adv.rating[id]
+    if r then return r end
     return ns.Run.RATING[id] or 3
   end
 
-  -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
+  -- Conseils de la classe jouée (classDef.bot : upgrade, remove), et de son épique (bot.epics[id]).
+  local overlays = {}
   local function botOf(exp)
     local cd = ns.Classes[exp.class]
-    return cd and cd.bot or {}
+    local b = cd and cd.bot or {}
+    local adv = epicAdvice(exp)
+    if not adv then return b end
+    local m = overlays[adv]
+    if not m then
+      local function over(base, add)
+        local t = {}
+        for k, v in pairs(base or {}) do t[k] = v end
+        for k, v in pairs(add or {}) do t[k] = v end
+        return t
+      end
+      m = setmetatable({ upgrade = over(b.upgrade, adv.upgrade), remove = over(b.remove, adv.remove) }, { __index = b })
+      overlays[adv] = m
+    end
+    return m
   end
 
   -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
@@ -402,6 +429,7 @@ return function(ns)
     end
     local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false, epic = opts.epic })
+    curExp = exp
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)

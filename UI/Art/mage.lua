@@ -47,6 +47,14 @@ local cards = {
   presence_of_mind  = I("Spell_Nature_EnchantArmor", 205025),
   arcane_power      = I("Spell_Nature_Lightning", 12042),
   arcane_surge      = I("Ability_Mage_ArcaneSurge", 365350),
+  -- épiques (une par zone)
+  mirror_image      = I("Spell_Magic_LesserInvisibilty", 55342),
+  molten_armor      = I("Spell_Fire_FireArmor", 30482),
+  water_elemental   = I("Spell_Frost_SummonWaterElemental_2", 31687),
+  fingers_of_frost  = I("Ability_Mage_WintersGrasp", 44543),
+  arcane_meditation = I("Spell_Shadow_ManaBurn", 18462),
+  conflagration     = I("Ability_Mage_WorldInFlames", 205023),
+  rule_of_threes    = I("Spell_Arcane_ArcanePotency", 264354),
 }
 for id, e in pairs(cards) do Art.cards[id] = e end
 
@@ -115,6 +123,10 @@ ns.ClassViews.mage = {
     host.fire = W.label(host, "bold", 12.5, C.goldText)
     host.fire:SetPoint("RIGHT", host, "RIGHT", -4, 0)
     host.fire:SetJustifyH("RIGHT")
+    -- ce que l'épique change pendant le tour (mana gardé, rang de la carte, cible de l'élémentaire…)
+    host.epic = W.label(host, "bold", 12.5, Art.hex("#d9a6ff"))
+    host.epic:SetPoint("RIGHT", host, "RIGHT", -4, 0)
+    host.epic:SetJustifyH("RIGHT")
   end,
   render = function(host, c)
     local W = ns.Widgets
@@ -129,11 +141,69 @@ ns.ClassViews.mage = {
       host.box:Hide()
       host.name:Hide()
     end
-    if hotStreakInPlay(c) then
+    local hot = hotStreakInPlay(c)
+    if hot then
       host.fire:SetText("Fire " .. math.min(c.turn.bySchool.fire or 0, 2) .. "/2")
       host.fire:Show()
     else
       host.fire:Hide()
     end
+    -- ligne de l'épique : seule au milieu, ou sous la deuxième incantation et le compte Fire (deux lignes)
+    local text = Art.mageEpicText(c)
+    local two = text ~= nil and (hot or e ~= nil)
+    host.fire:ClearAllPoints()
+    host.fire:SetPoint("RIGHT", host, "RIGHT", -4, two and 9 or 0)
+    host.name:ClearAllPoints()
+    host.name:SetPoint("LEFT", host, "LEFT", 32, two and 9 or 0)
+    host.epic:ClearAllPoints()
+    host.epic:SetPoint("RIGHT", host, "RIGHT", -4, two and -11 or 0)
+    if text then
+      host.epic:SetText(text)
+      host.epic:Show()
+    else
+      host.epic:Hide()
+    end
+  end,
+  -- épiques : le nom de l'épique s'élève au-dessus de l'unité qu'elle touche (coup de l'élémentaire, image
+  -- miroir, feu transmis) ou du héros (Cast parti tout de suite, carte résolue deux fois)
+  event = function(host, ev, view)
+    if ev.t ~= "epic" then return end
+    local d = ns.Cards[ev.id]
+    if not d then return end
+    local ref = ev.dst or ev.src or "player"
+    view:Push(0.15, function()
+      local x, y = view:UnitPos(ref)
+      if not x then x, y = view:UnitPos("player") end
+      if x then ns.Widgets.float(view.parent, x, y - 95, d.name, Art.hex("#d9a6ff"), 15, 1.1, 22) end
+    end)
   end,
 }
+
+-- Texte de la vue du Mage pour son épique (nil : rien à montrer). Ne lit que le combat.
+function Art.mageEpicText(c)
+  if not ns.Combat.mageEpic then return nil end
+  local id, src = ns.Combat.mageEpic(c)
+  if not id then return nil end
+  local d = ns.Card.def(src)
+  if id == "arcane_meditation" then
+    return ("Mana kept: %d/%d"):format(math.min(math.max(c.player.mana or 0, 0), d.epicN), d.epicN)
+  elseif id == "rule_of_threes" then
+    if not ns.Combat.epicTurn(src, c.round) then return "Threes: next turn" end
+    if ns.Combat.ruleOfThreesNext(c, src) then return "Next Attack: twice" end
+    local n = c.turn.played
+    if d.epicEvery then n = n % 3 end
+    if not d.epicEvery and n >= 3 then return nil end
+    return ("Cards played: %d/3"):format(n)
+  elseif id == "water_elemental" then
+    -- le coup part au début du prochain tour : la vue dit s'il part et sur qui
+    if not ns.Combat.epicTurn(src, c.round + 1) then return "Elemental rests next turn" end
+    local t = ns.Combat.elementalTarget(c)
+    return t and ("Elemental: " .. ns.Enemies[t.id].name) or nil
+  elseif id == "fingers_of_frost" then
+    for i = 1, #c.enemies do
+      if ns.Combat.isFrozen(c.enemies[i]) then return "Frozen: Cast at once" end
+    end
+    return nil
+  end
+  return nil
+end
