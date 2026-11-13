@@ -374,7 +374,7 @@ local event = D.event
 
 event("dark_iron_legacy", {
   name = "The Dark Iron Legacy", zone = "blackrock", tier = 0,
-  speaker = "Franclorn Forgewright", npc = "franclorn_forgewright", scene = "blackrock_span",
+  speaker = "Franclorn Forgewright", npc = "franclorn_forgewright", scene = "road",
   text = "\"I built this city for the Dark Iron, and Fineous Darkvire took my hammer, Ironfel, when I died. "
     .. "Kill him and bring Ironfel to the Shrine of Thaurissan.\"",
   choices = {
@@ -384,10 +384,11 @@ event("dark_iron_legacy", {
     { label = "Rest at his statue", outcome = "Heal 25% of max HP",
       result = "You sleep at the foot of Franclorn's statue. The Dark Iron patrols do not come here.",
       effects = { { "healPct", 0.25 } } },
-    { label = "Ask for the Shadowforge Key", outcome = "Pay 60g, Shadowforge Key (relic)",
-      when = { { "relicUnlocked", "shadowforge_key", hide = true } },
-      result = "\"Darkvire sold a copy of the key to a goblin. I know which one.\" You buy it back.",
-      effects = { { "pay", 60 }, { "relic", "shadowforge_key" } } },
+    -- (fiche : la Shadowforge Key elle-même ; une rencontre ne donne un bibelot précis que s'il lui est propre,
+    -- noPool : un bibelot tiré à la place)
+    { label = "Ask about the Shadowforge vault", outcome = "Pay 60g, a relic",
+      result = "\"Darkvire sold what he took from the vault to a goblin. I know which one.\" You buy it back.",
+      effects = { { "pay", 60 }, { "relic" } } },
     { label = "Leave", outcome = "Nothing",
       result = "You leave the ghost on the bridge.", effects = {} },
   },
@@ -395,7 +396,7 @@ event("dark_iron_legacy", {
 
 event("thorium_brotherhood", {
   name = "The Thorium Brotherhood", zone = "blackrock", tier = 0,
-  speaker = "Lokhtos Darkbargainer", npc = "lokhtos_darkbargainer", scene = "blackrock_tavern",
+  speaker = "Lokhtos Darkbargainer", npc = "lokhtos_darkbargainer", scene = "shop",
   text = "\"The Thorium Brotherhood trades with anyone who pays. I have smithing plans, "
     .. "and a Dark Iron recipe that costs more than gold.\"",
   choices = {
@@ -412,7 +413,7 @@ event("thorium_brotherhood", {
 
 event("kharan_mighthammer", {
   name = "The Prisoner of Ironforge", zone = "blackrock", tier = 1,
-  speaker = "Kharan Mighthammer", npc = "kharan_mighthammer", scene = "blackrock_prison",
+  speaker = "Kharan Mighthammer", npc = "kharan_mighthammer", scene = "hill",
   text = "\"I'm Kharan Mighthammer, of Ironforge. Thaurissan has kept me in this cell for years. "
     .. "Give me a weapon and I'll break out on my own, or listen to what I know about this place.\"",
   choices = {
@@ -429,7 +430,7 @@ event("kharan_mighthammer", {
 
 event("jail_break", {
   name = "Jail Break!", zone = "blackrock", tier = 1,
-  speaker = "Marshal Windsor", npc = "marshal_windsor", scene = "blackrock_prison",
+  speaker = "Marshal Windsor", npc = "marshal_windsor", scene = "hill",
   text = "\"Get me out of here. The Anvilrage guards carry the cell keys. Help me break out "
     .. "and Stormwind will pay you.\"",
   choices = {
@@ -449,7 +450,7 @@ event("jail_break", {
 
 event("egg_collection", {
   name = "Egg Collection", zone = "blackrock", tier = 2,
-  speaker = "Tinkee Steamboil", npc = "tinkee_steamboil", scene = "blackrock_spire",
+  speaker = "Tinkee Steamboil", npc = "tinkee_steamboil", scene = "camp",
   text = "\"I need Rookery eggs from the Spire for my research. The whelps guard the nests. "
     .. "Bring me some and I'll pay you, or buy one of my potions and go around.\"",
   choices = {
@@ -470,7 +471,7 @@ event("egg_collection", {
 
 event("molten_core", {
   name = "The Molten Core", zone = "blackrock", tier = 2, rarity = "rare",
-  speaker = "Lothos Riftwaker", npc = "lothos_riftwaker", scene = "blackrock_span",
+  speaker = "Lothos Riftwaker", npc = "lothos_riftwaker", scene = "road",
   when = { { "hpAbove", 0.6 } },
   text = "\"I send those who are attuned down to the Molten Core. The fire elementals there are "
     .. "stronger than the ones in the Depths, and they guard Ragnaros's treasure.\"",
@@ -488,7 +489,7 @@ event("molten_core", {
 
 event("bodley", {
   name = "Bodley's Ghost", zone = "blackrock", tier = 1, rarity = "rare",
-  speaker = "Bodley", npc = "bodley", scene = "blackrock_spire",
+  speaker = "Bodley", npc = "bodley", scene = "camp",
   text = "You turn on the Extra-Dimensional Ghost Revealer and a gnome ghost appears. \"Finally! "
     .. "I'm Bodley. I died before I finished the Seal of Ascension. The gems I need are in the Spire.\"",
   choices = {
@@ -508,7 +509,7 @@ event("bodley", {
 
 event("lord_victor_nefarius", {
   name = "Lord Victor Nefarius", zone = "blackrock", tier = 0, rarity = "story", once = true,
-  speaker = "Lord Victor Nefarius", npc = "lord_victor_nefarius", scene = "blackrock_spire",
+  speaker = "Lord Victor Nefarius", npc = "lord_victor_nefarius", scene = "camp",
   when = { { "floor", 5 } },
   text = "A tall man in black and red waits at the top of the stairs. \"I am Lord Victor Nefarius. "
     .. "You have killed many of my servants. Serve me instead, and I will make you stronger.\"",
@@ -665,14 +666,14 @@ for _, d in ipairs(DRINKS) do
     result = "You leave the Grim Guzzler before Plugger fills another mug.", effects = {} }
   event("grim_guzzler_" .. d.id, {
     name = "The Grim Guzzler", zone = "blackrock", tier = 7, node = true,
-    speaker = "Plugger Spazzring", npc = "plugger_spazzring", scene = "blackrock_tavern",
+    speaker = "Plugger Spazzring", npc = "plugger_spazzring", scene = "shop",
     text = "\"Another round? The second one isn't free. Thirty gold, and I don't take promises.\"",
     choices = paid,
   })
 end
 event("grim_guzzler", {
   name = "The Grim Guzzler", zone = "blackrock", tier = 7, node = true,
-  speaker = "Plugger Spazzring", npc = "plugger_spazzring", scene = "blackrock_tavern",
+  speaker = "Plugger Spazzring", npc = "plugger_spazzring", scene = "shop",
   text = "\"Welcome to the Grim Guzzler. The first drink is on the house. Pick one, and don't "
     .. "start a fight with the Dark Iron at the bar.\"",
   choices = free,

@@ -80,7 +80,8 @@ end)
 
 test("toutes les cartes ont nom, coût, effets, texte et amélioration", function()
   for id, d in pairs(ns.Cards) do
-    assert(d.name and d.cost and d.effects and d.text and d.type and d.rarity, id)
+    -- carte épique : règle en jeu dès le début du combat, sans coût (docs/zones/cartes-de-zone.md)
+    assert(d.name and (d.cost or d.rarity == "epic") and d.effects and d.text and d.type and d.rarity, id)
     assert(d.up and d.up.text, id .. " : amélioration manquante")
     local u = Card.defById(id, true)
     assert(u.name:sub(-1) == "+", id)
@@ -349,7 +350,8 @@ test("progression : répartition exacte des cartes et bibelots par niveau, pour 
       local by = {} -- by[voie][niveau] = nombre
       local rare7 = {}
       for id, d in pairs(ns.Cards) do
-        if d.class == class then
+        -- cartes épiques (zone, hors de la grille des niveaux) et variantes : à part
+        if d.class == class and not d.zone and not d.variant then
           assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
           assert(d.rep == nil, id .. " : rep retiré")
           assert(paths[d.path], id .. " : voie")
@@ -449,12 +451,12 @@ end)
 test("bibelots et potions respectent le contrat", function()
   local nr, np = 0, 0
   for id, r in pairs(ns.Relics) do
-    -- contenu des fichiers de zone (palier 4 à 7, bibelots de clé) : compté par les tests de chaque zone
-    local zoneContent = r.key ~= nil or (r.tier or 0) > 3
-    if not r.noPool and not r.class and not zoneContent then nr = nr + 1 end -- communs (bibelots de rencontre et de classe à part)
+    -- communs des paliers 0 à 3 (bibelots de rencontre, de classe, de clé et commun des zones suivantes à part)
+    if not r.noPool and not r.class and not r.key and (r.tier or 0) <= 3 then nr = nr + 1 end
     assert(r.name and r.text and r.hooks, id)
     assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
-    -- communs : palier commun (tier, ordre de la zone) ; de classe : niveau de classe (test « progression »)
+    -- communs : palier de Ligue (tier) ; de classe : niveau de classe (test « progression »)
+    -- (bibelots de clé : champ key à la place ; commun d'une zone : tier = ordre de la zone, docs/zones.md)
     if not r.class and not r.key then assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= ns.Zone.count(), id) end
   end
   for id, p in pairs(ns.Potions) do
@@ -910,7 +912,7 @@ end)
 test("Warrior : chaque carte (base et améliorée) jouable sans erreur, texte et effets cohérents", function()
   local n = 0
   for id, d0 in pairs(ns.Cards) do
-    if d0.class == "warrior" then
+    if d0.class == "warrior" and not d0.zone then -- cartes de zone (épiques) : Sim/tests_epic_warrior.lua
       for _, up in ipairs({ false, true }) do
         local c = setup({ id }, { "test_dummy", "test_caster" }, { "strike", "strike", "strike", "strike" },
           { class = "warrior", hp = 60 })
@@ -932,7 +934,7 @@ end)
 test("Warrior : 34 cartes (4 de départ, 13/11/6), 10 par voie, 6 bibelots de classe, Interrupt et Last Breath", function()
   local r, paths, nInt, nLb = {}, {}, 0, 0
   for id, d in pairs(ns.Cards) do
-    if d.class == "warrior" then
+    if d.class == "warrior" and not d.zone then -- cartes de zone (épiques) : Sim/tests_epic_warrior.lua
       r[d.rarity] = (r[d.rarity] or 0) + 1
       paths[d.path] = (paths[d.path] or 0) + 1
       for _, e in ipairs(d.effects) do if e[1] == "interrupt" then nInt = nInt + 1 end end
@@ -1185,7 +1187,7 @@ local function hpOf(c, i) return c.enemies[i or 1].hp end
 test("Rogue : 35 cartes (4 de départ, 14/11/6), 10 par voie (11 en Subtlety), niveau 1 à 7, 6 bibelots, Kick et Cheat Death", function()
   local r, paths, nInt, nLb, lv = {}, {}, 0, 0, {}
   for id, d in pairs(ns.Cards) do
-    if d.class == "rogue" then
+    if d.class == "rogue" and not d.zone then -- épiques à part (Sim/tests_epic_rogue.lua)
       r[d.rarity] = (r[d.rarity] or 0) + 1
       paths[d.path] = (paths[d.path] or 0) + 1
       assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
@@ -1554,7 +1556,7 @@ end)
 test("Rogue : chaque carte (base et améliorée) jouable sans erreur, combat déroulé deux tours", function()
   local n = 0
   for id, d0 in pairs(ns.Cards) do
-    if d0.class == "rogue" then
+    if d0.class == "rogue" and not d0.zone then -- épiques : jamais jouées (Sim/tests_epic_rogue.lua)
       for _, up in ipairs({ false, true }) do
         local c = setup({ id }, { "test_dummy", "test_caster" }, { "feint", "feint", "feint", "feint" },
           { class = "rogue", hp = 60 })
@@ -1638,7 +1640,7 @@ local MAGE_SHEET = {
 test("Mage : 34 cartes conformes à la fiche (coût, type, voie, école, rareté, niveau), 13/11/6, 10 par voie", function()
   local n, r, paths = 0, {}, {}
   for id, d in pairs(ns.Cards) do
-    if d.class == "mage" then
+    if d.class == "mage" and not d.epic then -- épiques : Sim/tests_epic_mage.lua
       n = n + 1
       local s = MAGE_SHEET[id]
       assert(s, id .. " : absente de la fiche")
@@ -1714,7 +1716,7 @@ test("Mage : texte de chaque carte (base et améliorée) conforme à ses effets 
           end
         end
         if d.cast then eq(t:match("^[^\n]+"), "Cast.", label) end
-        if d.power then eq(t:match("^[^\n]+"), "Power.", label) end
+        if d.power then eq(t:match("^[^\n]+"), d.epic and "Epic." or "Power.", label) end
         if d.cooldown then has("Cooldown " .. d.cooldown .. ".") end
         if d.exhaust then has("Exhaust.") end
         if d.retain then has("Retain.") end
@@ -1727,7 +1729,7 @@ end)
 test("Mage : chaque carte (base et améliorée) jouable sans erreur, deux tours joués ensuite", function()
   local n = 0
   for id, d0 in pairs(ns.Cards) do
-    if d0.class == "mage" then
+    if d0.class == "mage" and not d0.epic then -- épiques : ni jouées ni piochées
       for _, up in ipairs({ false, true }) do
         local c = mageHand({ id }, { "test_dummy", "test_caster" })
         c.player.mana, c.player.res = 9, 4
@@ -2432,7 +2434,7 @@ do
     local n, bad = 0, {}
     local function has(t, s) return t:find(s, 1, true) ~= nil end
     for id, d0 in pairs(ns.Cards) do
-      if d0.class == "hunter" then
+      if d0.class == "hunter" and not d0.zone and not d0.variant then -- épiques et variantes : tests_epic_hunter
         for _, up in ipairs({ false, true }) do
           local d = Card.defById(id, up)
           local t, lab = d.text, id .. (up and "+" or "")
@@ -2482,7 +2484,7 @@ do
   test("Hunter : 34 cartes (4 de départ, 13/11/6), 10 par voie, niveaux 1 à 7, 6 bibelots, Interrupt et Last Breath", function()
     local r, paths, nInt, nLb = {}, {}, 0, 0
     for id, d in pairs(ns.Cards) do
-      if d.class == "hunter" then
+      if d.class == "hunter" and not d.zone and not d.variant then -- hors épiques et variantes
         r[d.rarity] = (r[d.rarity] or 0) + 1
         paths[d.path] = (paths[d.path] or 0) + 1
         assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
@@ -2543,7 +2545,8 @@ do
   test("neutres : 10 cartes de la fiche (palier, rareté, coût, type), sans classe ni ressource, amélioration", function()
     local n, byTier, byRarity = 0, {}, {}
     for id, d in pairs(ns.Cards) do
-      if d.neutral and (d.tier or 0) <= 3 then -- paliers 4 à 7 : cartes des fichiers de zone, testées par chaque zone
+      -- fiche des neutres (paliers 0 à 3) ; celles des zones suivantes sont testées par leur zone
+      if d.neutral and (d.tier or 0) <= 3 then
         n = n + 1
         local want = NEUTRAL[id]
         assert(want, id .. " : carte neutre hors fiche")
@@ -2695,6 +2698,7 @@ do
       assert(not r.text:lower():find("%f[%a]you%f[%A]") and not r.text:lower():find("%f[%a]your%f[%A]"), id .. " : you")
     end
     eq(n, 20)
+    -- (paliers 0 à 3 : le commun des zones suivantes et les bibelots de clé sont testés par leur zone)
     for _, r in pairs(ns.Relics) do if not r.class and not r.key and (r.tier or 0) <= 3 then total = total + 1 end end
     eq(total, 32, "12 d'origine + 20")
     eq(ns.Relics.hand_of_justice.class, "warrior", "bibelot du Guerrier intact")

@@ -165,7 +165,8 @@ local function body(T)
     UI().refresh()
     H.settle()
     local ev = ns.Events[eid]
-    check("rencontre " .. eid .. " : écran, décor " .. ev.scene, T.currentKind() == "event" and ns.Scene.scene == ev.scene,
+    local want = ns.Zones.blackrock.scenes[ev.scene]
+    check("rencontre " .. eid .. " : écran, décor " .. tostring(want), T.currentKind() == "event" and ns.Scene.scene == want,
       tostring(ns.Scene.scene))
     snap(name, true)
   end

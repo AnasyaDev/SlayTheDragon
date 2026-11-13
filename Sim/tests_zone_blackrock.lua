@@ -600,7 +600,8 @@ return function(T)
       if ev.zone == "blackrock" then
         n = n + 1
         assert(ev.name and ev.text and ev.speaker and ev.npc, id)
-        assert(type(ev.scene) == "string" and ev.scene:find("^blackrock_"), id .. " : décor " .. tostring(ev.scene))
+        local sc = ns.Zones.blackrock.scenes[ev.scene]
+        assert(sc and sc:find("^blackrock_"), id .. " : décor commun remplacé par celui de la zone " .. tostring(ev.scene))
         local free = false
         for ci, ch in ipairs(ev.choices) do
           assert(ch.label and ch.outcome, id .. " " .. ci)

@@ -157,12 +157,6 @@ Combat.ENEMY_CONDITIONS.noOnyxiaCloak = function(c)
   return true
 end
 
--- Condition de rencontre : bibelot débloqué pour cette expédition (Shadowforge Key de Franclorn).
-X.CONDITIONS.relicUnlocked = {
-  test = function(exp, id) local r = ns.Relics[id] return r ~= nil and X.unlocked(exp, r) end,
-  text = function(id) local r = ns.Relics[id] return "Not yet unlocked: " .. (r and r.name or tostring(id)) .. "." end,
-}
-
 ---------------------------------------------------------------------------
 -- Règle de la zone
 ---------------------------------------------------------------------------
