@@ -392,11 +392,11 @@ event("bangalash_hunt", {
 
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-- Power Infusion (Priest)
-- Anger Management (Warrior)
-- Cold Snap (Mage)
-- Deathmark (Rogue)
-- Black Arrow (Hunter)
+- Shadow Covenant (Priest)
+- Titan's Grip (Warrior)
+- Fingers of Frost (Mage)
+- Echoing Reprimand (Rogue)
+- Roar of Sacrifice (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

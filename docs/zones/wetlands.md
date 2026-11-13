@@ -445,10 +445,10 @@ Chaque rencontre a une réponse sans condition.
 
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-- Mind Spike (Priest)
+- Echo of Light (Priest)
 - Sweeping Strikes (Warrior)
 - Water Elemental (Mage)
-- Subterfuge (Rogue)
+- Atrophic Poison (Rogue)
 - Beast Cleave (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte

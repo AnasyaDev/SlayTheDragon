@@ -111,9 +111,9 @@ présent dans toute la Marche : rien à changer.
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
 - Prayer of Mending (Priest)
-- Shockwave (Warrior)
+- Death Wish (Warrior)
 - Mirror Image (Mage)
-- Ghostly Strike (Rogue)
+- Deflection (Rogue)
 - Call of the Wild (Hunter)
 
 ## 4. Commun de la première victoire du compte et bibelots de clé
