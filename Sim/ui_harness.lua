@@ -6325,7 +6325,7 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "hunter" then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.class == "hunter" and not d.zone and not d.variant then ids[#ids + 1] = id end end -- épiques et variantes : UEH
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, beast_mastery = 1, marksmanship = 2, survival = 3 }
   table.sort(ids, function(a, b)
@@ -9232,6 +9232,212 @@ do
       T.ns = H.ns
       dofile(path)(T)
     end
+  end
+end
+
+print("UEH Hunter, cartes épiques : Lone Wolf (variantes en main, au deck et en récompense, familier absent, Pet Whistle), Trap Launcher, Master Marksman, Roar of Sacrifice, planche")
+do
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local LW = { arcane_shot = "chimaera_shot", kill_command = "kill_shot", dire_beast = "double_tap",
+    intimidation = "scatter_shot", multi_shot = "salvo", counter_shot = "silencing_shot",
+    bestial_wrath = "explosive_shot", the_beast_within = "trick_shots", spirit_bond = "aspect_of_the_turtle" }
+  -- départ d'une expédition du Hunter avec l'épique id, premier combat (normal) ouvert
+  local function hunterCombat(epicId, hand)
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:hunter")
+    H.ns.Controller.makeSeed = function() return SEED end
+    clickOption("go")
+    local e = EXP()
+    H.ns.Expedition.addCard(e, epicId)
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+    e = EXP()
+    local c = C().combat()
+    for i, cid in ipairs(hand or {}) do c.hand[i] = H.ns.Card.new(cid, false, 9100 + i) end
+    c.player.mana = 3
+    V():Render(true)
+    return e, c, V()
+  end
+
+  -- 1. Lone Wolf : main, familier, Pet Whistle --------------------------------------------------------
+  local e, c, v = hunterCombat("lone_wolf")
+  local ns = H.ns
+  local host = v.classZone.views.hunter
+  local inHand, named = 0, true
+  for i, inst in ipairs(c.hand) do
+    local d = ns.Card.def(inst)
+    if d.variant then
+      inHand = inHand + 1
+      if v.cards[i].cardId ~= inst.id or v.cards[i].name._text ~= d.name then named = false end
+    end
+    if LW[inst.id] then named = false end
+  end
+  local all = 0
+  for _, pile in ipairs({ c.hand, c.draw }) do
+    for _, inst in ipairs(pile) do if inst.id == "chimaera_shot" then all = all + 1 end end
+  end
+  check("Lone Wolf : les quatre Arcane Shot du départ se jouent en Chimaera Shot, nom et carte de la variante en main",
+    all == 4 and named, all .. " / " .. tostring(named))
+  check("Lone Wolf : la figure du familier et son marqueur de cible ont disparu de l'écran", host and not vis(host.pet)
+    and not vis(host.mark) and not ns.Hunter.petPresent(c))
+  local lw = host.epic
+  check("ligne de l'épique sous le héros : icône de Lone Wolf et bonus actuel des coups (« No pet. Attack hits: +2 »)",
+    lw and vis(lw) and lw.epicId == "lone_wolf" and (lw.text._text or ""):find("No pet", 1, true)
+    and (lw.text._text or ""):find("+" .. ns.HunterEpic.lonePer[1] * c.player.res, 1, true), lw and lw.text._text)
+  local lines, nLines = {}, 0
+  for _, id in ipairs({ "call_of_the_wild", "trap_launcher", "beast_cleave", "roar_of_sacrifice", "master_marksman",
+    "black_arrow", "lone_wolf" }) do
+    c.cls.epic = { id = id, up = false }
+    local l = ns.Art.hunterEpicLine(c)
+    if l then nLines = nLines + 1 else lines[#lines + 1] = id end
+  end
+  c.cls.epic = { id = "lone_wolf", up = false }
+  check("ligne de l'épique : un texte pour chacune des sept épiques", nLines == 7, table.concat(lines, ","))
+  check("Lone Wolf : Pet Whistle montre sa variante (+1 Frenzy au début du combat), Frenzy 1",
+    ns.Relics.pet_whistle.text == ns.Relics.pet_whistle.loneText and c.player.res == 1, ns.Relics.pet_whistle.text)
+  local chim
+  for i, inst in ipairs(c.hand) do if inst.id == "chimaera_shot" then chim = v.cards[i] end end
+  if chim then
+    local tt = table.concat(H.hover(chim), " | ")
+    check("Lone Wolf : infobulle de la variante en main (mots-clés de Chimaera Shot : Frenzy)", tt:find("Frenzy", 1, true), tt)
+  end
+  snap("ueh-lone-wolf-main", true)
+  -- panneau du deck : variantes, amélioration de l'originale gardée, « Transformed … »
+  e.deck[1].up = true
+  UI().toggleDeckView("deck")
+  local dv = UI().deckView
+  local nVar, upOk, tip = 0, false, ""
+  for i, inst in ipairs(dv.list) do
+    if inst.id == "chimaera_shot" then
+      nVar = nVar + 1
+      if inst.up then upOk = dv.cards[i].cardUp == true tip = table.concat(H.hover(dv.cards[i]), " | ") end
+    end
+    if inst.id == "arcane_shot" then nVar = -99 end
+  end
+  check("Lone Wolf : deck montré transformé (4 Chimaera Shot, amélioration gardée, « Transformed Arcane Shot. »)",
+    nVar == 4 and upOk and tip:find("Transformed Arcane Shot.", 1, true), nVar .. " / " .. tip)
+  snap("ueh-lone-wolf-deck", true)
+  dv:Close()
+  e.deck[1].up = false
+  -- l'épique au survol : la table des transformations
+  local ett = {}
+  do
+    local pc = ns.Widgets.card(UI().content)
+    pc:SetCard("lone_wolf", false, { playable = true })
+    ett = H.hover(pc)
+    pc:Hide()
+  end
+  local et = table.concat(ett, " | ")
+  check("Lone Wolf : infobulle de l'épique = Kill Command devient Kill Shot, etc. (9 lignes)",
+    et:find("Kill Command becomes", 1, true) and et:find("Kill Shot", 1, true) and select(2, et:gsub("becomes", "")) == 9, et)
+  -- récompense : un Kill Command proposé s'affiche en Kill Shot (l'original entre au deck)
+  c.result = "won"
+  ns.Expedition.act(e, { "endTurn" })
+  ns.UI.refresh()
+  H.settle()
+  local r = e.reward
+  if r and r.cards then
+    r.cards[1] = "kill_command"
+    ns.UI.refresh()
+    H.settle()
+    local scr = UI().current
+    local shown
+    for _, card in ipairs(scr.cards) do
+      if vis(card) and card.option and card.option.id == "pickCard:1" then shown = card end
+    end
+    check("Lone Wolf : récompense — Kill Command proposé montré en Kill Shot", shown and shown.cardId == "kill_shot"
+      and shown.option.card.from == "kill_command", shown and shown.cardId)
+    snap("ueh-lone-wolf-recompense", true)
+    clickOption("pickCard:1")
+    local last = e.deck[#e.deck]
+    check("Lone Wolf : la carte prise entre au deck sous son id d'origine (Kill Command)", last.id == "kill_command"
+      or e.deck[#e.deck - 1].id == "kill_command")
+  else
+    check("Lone Wolf : écran de récompense", false, tostring(e.phase))
+  end
+
+  -- 2. Trap Launcher : la Trap demande une cible, rien de posé --------------------------------------
+  e, c, v = hunterCombat("trap_launcher", { "freezing_trap" })
+  ns = H.ns
+  host = v.classZone.views.hunter
+  local info = ns.Controller.handInfo(1)
+  local function dbg() return ("classe %s, épique %s, passifs %d, main %s"):format(tostring(e.class),
+    tostring(ns.Hunter.epic(c)), c.passives and #c.passives or 0, tostring(c.hand[1] and c.hand[1].id)) end
+  check("Trap Launcher : la Trap en main demande une cible", info and info.needsTarget == true, dbg())
+  local alive = C().aliveTargets()[1]
+  ns.Controller.play(1, alive)
+  H.settle()
+  v:Render(true)
+  check("Trap Launcher : déclenchée tout de suite (Stunned sur la cible), aucune case de Trap montrée",
+    #c.traps == 0 and not vis(host.traps[1]) and (c.enemies[alive] and (c.enemies[alive].st.stunned or 0) > 0 or c.result))
+  check("Trap Launcher : le familier reste en scène", vis(host.pet))
+  snap("ueh-trap-launcher", true)
+
+  -- 3. Master Marksman : Aimed Shot sur cible intacte = liseré Instant --------------------------------
+  e, c, v = hunterCombat("master_marksman", { "aimed_shot", "volley" })
+  ns = H.ns
+  info = ns.Controller.handInfo(1)
+  local info2 = ns.Controller.handInfo(2)
+  check("Master Marksman : Aimed Shot (cible intacte) annoncée Instant, Volley (sans cible) reste une Cast",
+    info and info.instant == true and info2 and not info2.instant, tostring(e.class) .. " " .. tostring(ns.Hunter.epic(c))
+    .. " " .. tostring(info and info.inst.id) .. " " .. tostring(info and info.instant))
+  local aimed = v.cards[1]
+  local at = table.concat(H.hover(aimed), " | ")
+  check("Master Marksman : infobulle « Instant » sur Aimed Shot", at:find("Instant", 1, true), at)
+
+  -- 4. Roar of Sacrifice : « Roar » flottant depuis le héros ---------------------------------------
+  e, c, v = hunterCombat("roar_of_sacrifice")
+  ns = H.ns
+  local floats = {}
+  local W2 = ns.Widgets
+  local old = W2.float
+  W2.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  H.settle()
+  v:OnEvents({ { t = "roar", prevented = 3 } })
+  H.advance(3)
+  W2.float = old
+  check("Roar of Sacrifice : « Roar » flottant depuis le héros", table.concat(floats, "|"):find("Roar", 1, true) ~= nil,
+    table.concat(floats, "|"))
+
+  -- 5. textes : épiques et variantes, base et améliorées, tiennent sans tronquer ------------------------
+  local ids = { "call_of_the_wild", "trap_launcher", "beast_cleave", "roar_of_sacrifice", "master_marksman",
+    "black_arrow", "lone_wolf", "chimaera_shot", "kill_shot", "double_tap", "scatter_shot", "salvo",
+    "silencing_shot", "explosive_shot", "trick_shots", "aspect_of_the_turtle" }
+  local card = ns.Widgets.card(UI().content)
+  local small = {}
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      if not fit or not fit.ok or (fit.size or 0) < 8.5 then small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) end
+    end
+  end
+  card:Hide()
+  check("épiques et variantes du Hunter (32 faces) : texte à 8,5 ou plus", #small == 0, table.concat(small, ", "))
+
+  -- 6. planche des épiques et des variantes (base, améliorée) -------------------------------------------
+  if SNAP then
+    local perRow, cw, ch = 8, 140, 230
+    local list = {}
+    for _, id in ipairs(ids) do list[#list + 1] = { id, false } list[#list + 1] = { id, true } end
+    local rows = math.ceil(#list / perRow)
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, rows * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, x in ipairs(list) do
+      local cc = ns.Widgets.card(big)
+      cc:SetCard(x[1], x[2], { playable = true })
+      ns.Widgets.placeCenter(cc, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+    end
+    Render.svg(H, big, SNAP .. "/cartes_hunter_epiques.svg", "épiques et variantes du Hunter (base, améliorée)")
+    big:Hide()
   end
 end
 

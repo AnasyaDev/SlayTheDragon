@@ -51,6 +51,10 @@ local added = {}
 local realRogue = {}
 for id, d in pairs(Cards) do if d.class == "rogue" and d.rarity == "epic" then realRogue[id] = d end end
 for id in pairs(realRogue) do Cards[id] = nil end
+-- de même pour celles du Hunter (règles réelles : Sim/tests_epic_hunter.lua)
+local realHunter = {}
+for id, d in pairs(Cards) do if d.class == "hunter" and d.rarity == "epic" then realHunter[id] = d end end
+for id in pairs(realHunter) do Cards[id] = nil end
 local function card(id, t)
   t.id = id
   Cards[id] = t
@@ -788,6 +792,7 @@ end)
 
 for _, id in ipairs(added) do Cards[id] = nil end
 for id, d in pairs(realRogue) do Cards[id] = d end
+for id, d in pairs(realHunter) do Cards[id] = d end
 ns.Enemies.te_dummy, ns.Enemies.te_hitter = nil, nil
 
 print(("%d réussis, %d échoués"):format(passed, failed))
