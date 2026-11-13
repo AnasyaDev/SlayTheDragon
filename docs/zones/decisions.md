@@ -63,3 +63,12 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
 - **Le gain d'une épique n'est pas plafonné** (+22 dans une zone tardive est acceptable). La contrainte est la
   parité : dans une même zone, les cinq classes gagnent à peu près autant avec leur épique (écart de taux de
   victoire ≤ 10 points, épique en jeu).
+- **L'épique se gagne, elle n'est plus donnée à l'étape 1** (joueur, 14/11/2026). Elle peut tomber sur un élite
+  ou apparaître chez le marchand. Chance par élite proposée par le concepteur, à régler : 25 % à Westfall,
+  +10 points par zone, 85 % à Blackrock Mountain. La part de rares dans les récompenses de cartes monte aussi
+  de zone en zone.
+- **PV perdus par combat normal : selon la classe, plus de cible uniforme** (joueur, 14/11/2026 ; remplace
+  « 6 à 9 PV pour tous »). Le Priest ne prend presque rien, le Warrior encaisse. Cibles du concepteur, en part
+  des PV max : Priest ≤ 10 %, Rogue ≈ 13 % (référence), Warrior jusqu'à 15 %, Mage et Hunter entre les deux.
+- **Courbe de difficulté** (concepteur, à valider) : taux de victoire du bot de référence, clé 0, d'environ
+  80 % à Westfall à environ 50 % à Blackrock Mountain, en descendant à chaque zone.
