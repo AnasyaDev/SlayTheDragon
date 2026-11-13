@@ -368,7 +368,16 @@ local function tickPeriodic(c, unit)
   end
   local regen = unit.st.regen
   if regen and regen > 0 then
-    Combat.heal(c, unit, regen)
+    -- Regen du joueur : valeur soignée (crochet « regenHeal », 0 = ne soigne pas : Echo of Light), puis
+    -- notification « onRegenTick » (valeur du tic) ; la Regen baisse ensuite de 1 comme d'habitude
+    if unit.side == "player" then
+      local h = Combat.modify(c, "regenHeal", regen)
+      if h > 0 then Combat.heal(c, unit, h) end
+      if not c.result then Combat.fire(c, "onRegenTick", regen) end
+      if c.result or unit.dead then return end
+    else
+      Combat.heal(c, unit, regen)
+    end
     if regen - 1 > 0 then unit.st.regen = regen - 1 else unit.st.regen = nil end
   end
 end
@@ -784,7 +793,8 @@ end
 function Combat.cost(c, inst)
   if c.player.flags.freeTurnActive then return 0 end
   local d = Card.def(inst)
-  return max(0, Combat.modify(c, "cost", d.cost, d, inst))
+  -- (une carte épique n'a pas de coût : 0 si elle se trouve encore dans une pile)
+  return max(0, Combat.modify(c, "cost", d.cost or 0, d, inst))
 end
 
 -- Nombre de sorts en cours et nombre de sorts tenus à la fois (crochet « castSlots », 1 par défaut).
@@ -829,6 +839,10 @@ function Combat.canPlay(c, idx)
       and not Combat.trapLaunch(c, d, inst) then return false, "traps" end
   if not allowed(c, d) then return false, "forbidden" end
   if d.canPlay and not d.canPlay(c, inst) then return false, "condition" end
+  -- valeur modifiée « canPlay » (d, inst) : vrai par défaut ; une chaîne rend la carte injouable, avec
+  -- cette raison (Voidform)
+  local can = Combat.modify(c, "canPlay", true, d, inst)
+  if can ~= true then return false, can or "forbidden" end
   return true
 end
 
@@ -875,10 +889,10 @@ function Combat.legalPlays(c)
   return list
 end
 
--- Coût en PV d'une carte (champ payHp, crochet « payHp » : Demonic Rune…), 0 sans coût.
+-- Coût en PV d'une carte (champ payHp, crochet « payHp » : Demonic Rune… ; le crochet est aussi
+-- interrogé pour une carte sans payHp, à partir de 0 : Shadow Covenant), 0 sans coût.
 function Combat.payHpOf(c, d, inst)
-  if not d.payHp then return 0 end
-  return max(0, Combat.modify(c, "payHp", d.payHp, d, inst))
+  return max(0, Combat.modify(c, "payHp", d.payHp or 0, d, inst))
 end
 
 -- Retire le pouvoir n° i (fin de durée, remplacé dans son emplacement) : il part à la défausse, ou
@@ -1014,6 +1028,8 @@ function Combat.play(c, idx, tIdx, opts)
   local d = Card.def(inst)
   local target
   local launch = d.trap and Combat.trapLaunch(c, d, inst)
+  -- carte qui part en Cast sans l'être (crochet « castAs » (d, inst), faux par défaut : Inner Focus)
+  local castAs = not d.cast and not d.trap and not d.power and Combat.modify(c, "castAs", false, d, inst) or false
   if d.target == "enemy" or launch then
     target = c.enemies[tIdx or 0]
     if not target or target.dead then return false, "target" end
@@ -1059,7 +1075,7 @@ function Combat.play(c, idx, tIdx, opts)
     Combat.fire(c, "onTrapSet", inst)
     return true
   end
-  if d.cast and not Combat.isInstant(c, d, inst, true) then
+  if castAs or (d.cast and not Combat.isInstant(c, d, inst, true)) then
     local entry = { card = inst, target = target and target.uid, spent = spent or nil }
     if c.player.cast then
       local more = c.player.castMore or {}

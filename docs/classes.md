@@ -147,6 +147,9 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `blockKeep` | Absorb actuelle | (rappel) la valeur gardée ; fraction et plafond se calculent sur le 2e argument (`max(v, min(15, floor(block / 2)))`) |
 | `retainPicks` | — | cartes gardées au choix en fin de tour (0 ; Traveler's Backpack : 1, une seule gérée) ; le choix est posé par `Combat.markRetain(c, uid)` avant la fin du tour (interface, `Bots.markRetain`), `Combat.retainCandidates(c)` = index proposés |
 | `surge` | ctx | montant compté par les effets d'un Surge qui a dépensé quelque chose (Anathema : +2) ; la dépense ne change pas |
+| `canPlay` | d, inst | vrai par défaut ; une chaîne rend la carte injouable avec cette raison (affichée telle quelle : Voidform), après les autres raisons de `Combat.canPlay` |
+| `castAs` | d, inst | faux par défaut ; vrai = une carte Attack ou Skill qui n'est pas Cast part en incantation (`c.player.cast`, résolue au début du tour suivant, interruptible ; Inner Focus) |
+| `regenHeal` | — | valeur soignée par le tic de Regen du joueur (la Regen elle-même ; 0 = ne soigne pas : Echo of Light) ; la Regen baisse ensuite de 1 comme d'habitude |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
 
 Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
@@ -176,6 +179,7 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | `afterHit` | ennemi, PV perdus, absorbés | après chaque coup ennemi, même absorbé (ripostes, Traps) |
 | `onStatusApplied` | unité, état, n | état posé |
 | `onDotTick` | unité, n | après le tick d'un DoT |
+| `onRegenTick` | n | tic de Regen du joueur (valeur avant la baisse), après le soin éventuel (`regenHeal`) : Echo of Light |
 | `onEnemyDeath` | ennemi | mort d'un ennemi (Soul Shards) |
 | `onPowerEnd` | inst, raison | Power remplacé (`replaced`) ou expiré (`expired`) |
 | `preventDeath` | — | le joueur tombe à 0 : true = sauvé (Last Breath) ; l'événement `saved` porte la source |
@@ -405,6 +409,18 @@ Nouveaux : `onHeal`, `onDamageDealt`, `onParry`, `afterCast` (notifications) ; `
 `deckHooks`, `whileInDeck`, `transforms`, `variant` (tableau « Cartes » ci-dessus). `Combat.dealDamage` prend un
 6e argument `ctx` (passé par l'effet `damage` et par `randomHits`). `Combat.fire` ne passe que trois arguments :
 un événement nouveau en a trois au plus.
+
+**Priest (14/11/2026)** : les sept épiques sont écrites (`Data/Priest.lua`, règles et crochets dans
+`Core/Classes/priest.lua` : `ns.Priest`, deckHooks posés sur les définitions, nombres réglables `ns.Priest.*`,
+`ns.ClassRules.priest` = `botValue` / `botKey` seulement ; vue `ns.ClassViews.priest` dans `UI/Art/priest.lua` ;
+tests `Sim/tests_epic_priest.lua`, harnais UEP). Points ajoutés au moteur : valeurs `canPlay`, `castAs`, `regenHeal`,
+notification `onRegenTick` ; le crochet `payHp` est interrogé aussi pour une carte sans `payHp` (base 0 : Shadow
+Covenant) ; `Combat.cost` lit 0 pour une carte sans coût (une épique encore dans une pile). Inner Focus multiplie
+dégâts, Absorb, soin, DoT et Regen pendant la résolution de la carte incantée par ses propres crochets (`beforeCard`
+/ `onCardPlayed` + `damage`, `block`, `heal`, `apply`, `applySelf`) : le soin d'Atonement de cette carte est
+multiplié aussi. Bots : `classDef.bot.epics[id] = { rating, upgrade, remove }` remplace les notes de la classe tant
+que l'épique est dans le deck (`Sim/expedition.lua`), `classDef.bot.epic(exp, id)` note l'épique selon les cartes
+centrales déjà prises.
 
 L'agent de conception choisit, pour une épique « passive tant qu'elle est dans le deck », entre un Power à
 jouer (`hooks`), une carte `innate` (arrive en main) et `deckHooks` / `whileInDeck` (effet sans la jouer).

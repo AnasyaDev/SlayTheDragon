@@ -80,7 +80,8 @@ end)
 
 test("toutes les cartes ont nom, coût, effets, texte et amélioration", function()
   for id, d in pairs(ns.Cards) do
-    assert(d.name and d.cost and d.effects and d.text and d.type and d.rarity, id)
+    -- une carte épique n'a pas de coût (règle en jeu dès le début du combat)
+    assert(d.name and (d.cost or d.rarity == "epic") and d.effects and d.text and d.type and d.rarity, id)
     assert(d.up and d.up.text, id .. " : amélioration manquante")
     local u = Card.defById(id, true)
     assert(u.name:sub(-1) == "+", id)
@@ -349,7 +350,8 @@ test("progression : répartition exacte des cartes et bibelots par niveau, pour 
       local by = {} -- by[voie][niveau] = nombre
       local rare7 = {}
       for id, d in pairs(ns.Cards) do
-        if d.class == class then
+        -- cartes épiques (zone) et leurs variantes : hors de la grille des niveaux
+        if d.class == class and not d.zone and not d.variant then
           assert(type(d.level) == "number" and d.level >= 1 and d.level <= 7, id .. " : level")
           assert(d.rep == nil, id .. " : rep retiré")
           assert(paths[d.path], id .. " : voie")

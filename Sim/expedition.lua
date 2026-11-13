@@ -18,22 +18,35 @@ return function(ns)
   -- path=<voie> (SE.play, opts.path) : les cartes de classe d'une autre voie et les cartes neutres valent 0,
   -- donc ne sont jamais prises (voie jouée seule).
   local onlyPath
-  local function rating(id)
-    if onlyPath then
-      local d = ns.Cards[id]
-      if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
-    end
-    return ns.Run.RATING[id] or 3
-  end
-
   -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
   local function botOf(exp)
     local cd = ns.Classes[exp.class]
     return cd and cd.bot or {}
   end
 
+  -- Conseils propres à l'épique du deck (classDef.bot.epics[id] = { rating, upgrade, remove } : notes qui
+  -- remplacent celles de la classe tant que cette épique est dans le deck ; l'épique pilote le build).
+  local curExp -- expédition dont le bot prend la décision en cours (decide)
+  local function epicBot(exp)
+    local eps = exp and botOf(exp).epics
+    local i = eps and X.epicIndex(exp)
+    return i and eps[exp.deck[i].id] or nil
+  end
+
+  local function rating(id)
+    if onlyPath then
+      local d = ns.Cards[id]
+      if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
+    end
+    local eb = epicBot(curExp)
+    if eb and eb.rating and eb.rating[id] then return eb.rating[id] end
+    return ns.Run.RATING[id] or 3
+  end
+
   -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
   local function upgradeValue(exp, card)
+    local eb = epicBot(exp)
+    if eb and eb.upgrade and eb.upgrade[card.id] then return eb.upgrade[card.id] end
     local up = botOf(exp).upgrade
     return up and up[card.id] or rating(card.id)
   end
@@ -53,9 +66,11 @@ return function(ns)
   local function worstCard(exp)
     local worst, worstV = nil, math.huge
     local rm = botOf(exp).remove or {}
+    local eb = epicBot(exp)
+    local erm = eb and eb.remove or {}
     for i = 1, #exp.deck do
       local card = exp.deck[i]
-      local v = rm[card.id] or rating(card.id) + 2
+      local v = erm[card.id] or rm[card.id] or rating(card.id) + 2
       if card.up then v = v + 1 end
       if v < worstV then worst, worstV = i, v end
     end
@@ -255,6 +270,7 @@ return function(ns)
 
   -- Action hors combat selon la phase.
   local function decide(exp, opts, rng)
+    curExp = exp
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then

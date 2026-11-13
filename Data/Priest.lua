@@ -350,6 +350,58 @@ card("apotheosis", {
   up = { cost = 1, text = "Power.\n+1 mana per turn.\nCast cards: cost −1." },
 })
 
+-- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Priest ») ------------------------------
+-- Règles en jeu dès le début de chaque combat : ni piochées, ni jouées, sans coût. Leurs crochets
+-- (deckHooks) et leurs règles sont dans Core/Classes/priest.lua ; le texte dit l'essentiel, l'infobulle
+-- le détail (mots-clés du langage déclarés au même endroit).
+
+local function epic(id, t)
+  t.type, t.rarity, t.epic, t.power, t.effects = "power", "epic", true, true, {}
+  card(id, t)
+end
+
+epic("prayer_of_mending", {
+  name = "Prayer of Mending", school = "holy", path = "holy", zone = "westfall",
+  text = "Epic.\nEach heal: deal the HP restored to a random enemy.",
+  up = { text = "Epic.\nEach heal: deal the HP restored + 2 to a random enemy." },
+})
+
+epic("misery", {
+  name = "Misery", school = "shadow", path = "shadow", zone = "duskwood",
+  text = "Epic.\nDoT applied to an enemy also goes to every other enemy.",
+  up = { text = "Epic.\nDoT applied to an enemy also goes to every other enemy, +1." },
+})
+
+epic("echo_of_light", {
+  name = "Echo of Light", school = "holy", path = "holy", zone = "wetlands",
+  text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 2 to all.",
+  up = { text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 3 to all." },
+})
+
+epic("shadow_covenant", {
+  name = "Shadow Covenant", school = "shadow", path = "discipline", zone = "stranglethorn",
+  text = "Epic.\nShadow cards: pay 3 HP per mana, not mana.",
+  up = { text = "Epic.\nShadow cards: pay 3 HP per mana, not mana.\nThe first each turn is free." },
+})
+
+epic("reflective_shield", {
+  name = "Reflective Shield", school = "holy", path = "discipline", zone = "swamp",
+  text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 4.",
+  up = { text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 7." },
+})
+
+epic("voidform", {
+  name = "Voidform", school = "shadow", path = "shadow", zone = "steppes",
+  text = "Epic.\nSurge cards can't be played.\nPer 2 Insanity: Shadow hits +1.",
+  up = { text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1." },
+})
+
+epic("inner_focus", {
+  name = "Inner Focus", school = "holy", path = "discipline", zone = "blackrock",
+  text = "Epic.\nFirst card each turn: Cast, values doubled.",
+  up = { text = "Epic.\nFirst card each turn: Cast, values +150%." },
+})
+
 -- Bibelots du Prêtre (class = "priest" : tirés seulement pour lui) --------------------------------
 -- docs/classes/priest-progression.md, § 2 : un bibelot par moteur (Atonement, Insanity, Regen, Cast).
 -- level = niveau de classe qui les débloque (dans la réserve de la classe ; la Ligue ne compte pas).
@@ -452,5 +504,70 @@ ns.Classes.priest = {
     upgrade = { smite = 2.5, inner_fire = 2, pw_shield = 1.5, sw_pain = 1.5 },
     upgradeRun = { smite = 2.5, inner_fire = 2 }, -- ancien coureur (Sim/run.lua)
     remove = { inner_fire = 1, smite = 1.5 },
+    -- Cartes épiques : chaque épique pilote le build (docs/zones/cartes-de-zone.md, « Deck piloté ») ; tant
+    -- qu'elle est dans le deck, ces notes remplacent celles de la classe (Sim/expedition.lua) : cartes
+    -- centrales, mauvaises, à retirer d'abord (remove : plus bas = retirée d'abord), améliorations du feu
+    -- de camp (upgrade, l'épique comprise).
+    epics = {
+      prayer_of_mending = {
+        rating = { renew = 8, flash_heal = 8, greater_heal = 8, shadow_mend = 8, holy_nova = 7.5, halo = 7,
+          vampiric_touch = 7.5, radiance = 6.5, solace = 9, evangelism = 6, luminous_barrier = 4.5,
+          rapture = 4.5, pain_suppression = 6, holy_fire = 4, mind_blast = 5.5 },
+        upgrade = { renew = 10, prayer_of_mending = 9.5, smite = 2, inner_fire = 0.5 },
+        remove = { inner_fire = 0.5, smite = 1.5 },
+      },
+      misery = {
+        rating = { vampiric_touch = 8.5, devouring_plague = 8.5, holy_fire = 7, mind_flay = 7.5, void_eruption = 7,
+          shadowform = 8.5, silence = 7.5, mind_sear = 4, holy_nova = 3.5, psychic_scream = 7.5 },
+        upgrade = { sw_pain = 9.5, misery = 9, smite = 1.5 },
+        remove = { smite = 1, inner_fire = 1.5 },
+      },
+      echo_of_light = {
+        rating = { renew = 6.5, holy_nova = 7, halo = 7, vampiric_touch = 6.5, luminous_barrier = 7,
+          mind_blast = 5, flash_heal = 4.5, greater_heal = 4.5, shadow_mend = 4 },
+        upgrade = { renew = 10, holy_nova = 9.5, echo_of_light = 9, inner_fire = 3, pw_shield = 2.5 },
+        remove = { smite = 0.5, inner_fire = 3 },
+      },
+      shadow_covenant = {
+        rating = { mind_blast = 8.5, mind_flay = 8, sw_death = 7.5, schism = 8, vampiric_touch = 7, mind_sear = 8,
+          shadowform = 8, solace = 9.5, radiance = 7, penance = 7, evangelism = 6.5, shadow_mend = 8,
+          holy_fire = 3, empyreal_blaze = 3.5, psychic_scream = 8.5 },
+        upgrade = { mind_blast = 9.5, solace = 9.5, shadow_covenant = 9, sw_pain = 3 },
+        remove = { smite = 0.5, inner_fire = 1.5 },
+      },
+      reflective_shield = {
+        rating = { luminous_barrier = 8, radiance = 7, penance = 7, rapture = 7.5,
+          renew = 3, flash_heal = 3.5, greater_heal = 4, holy_nova = 3.5, evangelism = 6 },
+        upgrade = { inner_fire = 8, pw_shield = 7, reflective_shield = 9, smite = 1 },
+        remove = { smite = 0.5, inner_fire = 4 },
+      },
+      voidform = {
+        rating = { mind_blast = 9, mind_flay = 8.5, vampiric_touch = 7, shadowform = 9, schism = 7, sw_death = 8.5,
+          psychic_scream = 8, mind_sear = 7, devouring_plague = 0, void_eruption = 0, holy_fire = 3.5,
+          empyreal_blaze = 3.5, halo = 3.5 },
+        upgrade = { mind_blast = 9.5, voidform = 9, sw_pain = 3, smite = 1 },
+        remove = { devouring_plague = 0.2, void_eruption = 0.2, smite = 1, inner_fire = 1.5 },
+      },
+      inner_focus = {
+        rating = { holy_fire = 8.5, empyreal_blaze = 8.5, halo = 8.5, penance = 7.5, luminous_barrier = 7.5,
+          greater_heal = 7, apotheosis = 8, mind_blast = 7 },
+        upgrade = { holy_fire = 9, empyreal_blaze = 9, inner_focus = 9.5, halo = 8.5 },
+        remove = { smite = 1, inner_fire = 1.5 },
+      },
+    },
   },
 }
+
+-- Note d'une épique pour le bot (Sim/expedition.lua, prise et remplacement) : 7, plus un peu par carte
+-- centrale de son build déjà dans le deck (note ≥ 7,5) : l'épique du deck construit vaut plus, un
+-- remplacement n'arrive que si le deck a déjà pris la forme d'une autre.
+ns.Classes.priest.bot.epic = function(exp, id)
+  local eb = ns.Classes.priest.bot.epics[id]
+  if not eb then return nil end
+  local n = 0
+  for _, cd in ipairs(exp.deck) do
+    local r = eb.rating[cd.id]
+    if r and r >= 7.5 then n = n + 1 end
+  end
+  return 7 + math.min(1.5, 0.25 * n)
+end

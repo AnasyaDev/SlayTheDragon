@@ -20,6 +20,7 @@ Core\Meta.lua
 Core\Expedition.lua
 Core\Save.lua
 Data\Priest.lua
+Core\Classes\priest.lua
 Data\Warrior.lua
 Core\Classes\warrior.lua
 Data\Rogue.lua
@@ -36,6 +37,7 @@ Data\Events.lua
 UI\SkinData.lua
 UI\WowSkin.lua
 UI\Art.lua
+UI\Art\priest.lua
 UI\Art\warrior.lua
 UI\Art\rogue.lua
 UI\Art\mage.lua
