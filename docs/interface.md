@@ -1165,50 +1165,6 @@ Les autres cartes ne changent que par leurs retours de clause (mots de la plaque
   boutons ; levée des cartes nette ; aperçu des petites cartes à côté (grille, panneau du deck,
   progression), jamais coupé par le bord ni sous un modèle 3D.
 
-## Espaces entre les mots des paragraphes (retour du 13/11/2026)
-
-- **Vu** (capture, rencontre « The Militia's Fish Traps ») : paragraphe centré sur trois lignes, espaces
-  inégaux (« fish traps » serré, « traps with » large), titre régulier.
-- **Établi par le code** : un seul texte (`bubble` de `UI/Screens.lua`), retour à la ligne du client,
-  `SetJustifyH("CENTER")` ; aucune mise en lignes à la main, aucune justification, aucun espace insécable ni
-  double (texte de `Data/Events.lua` à espaces simples), aucune table de largeurs ; `SetSpacing(3)` est
-  l'interligne seul. Le titre passe par le même chemin (même police, sans largeur posée).
-- **Établi par la capture** (bords gauches des 15 glyphes de « fish traps with it » ajustés aux avances de
-  la police) : le client pose les glyphes aux avances de Baloo, sans crénage, à 0,5 px près (≈ 18,1 px de la
-  capture par cadratin) ; aucun espace ajouté, aucune justification.
-- **Cause** (établie sur la police) : l'espace de Baloo Chettan 2 est étroit (0,20 cadratin) et son crénage
-  ne touche pas l'espace ; l'écart vu entre deux mots dépend donc surtout des lettres qui le bordent.
-  Écart optique (approche droite + approche gauche, moyenne sur la bande de la hauteur d'x, voir
-  ci-dessous) : de 0,125 (« fish feeds ») à 0,213 cadratin (« it. That ») en plus de l'espace dans ce
-  paragraphe ; les trois écarts du titre sont proches (0,143 / 0,144 / 0,184). **Hypothèse** non vérifiable
-  hors jeu : le client rend les traits plus fins que les rendus hors jeu (capture comparée à rsvg à la même
-  avance : glyphes plus maigres, l'aile du « t », du « r » et du « f » presque effacée), ce qui creuse les
-  approches et rend l'irrégularité plus visible qu'hors jeu.
-- **Correctif** (`W.evenSpaces`, `UI/Widgets.lua`) : avant chaque espace bordé de deux caractères connus,
-  une **cale** (glyphe vide ajouté aux trois polices, U+E001 à U+E00C, avance 10 × k millièmes de cadratin)
-  porte l'écart optique à `Skin.prose.target` = 0,190 cadratin (≈ 97e centile des écarts entre mots des
-  textes du jeu) : écarts égaux, en moyenne 0,04 cadratin plus larges. Un seul texte, retour à la ligne
-  du client inchangé (il coupe aux espaces ; la cale reste en fin de ligne, au plus 0,12 cadratin, soit
-  ≤ 2 px de décentrage). Codes `|c…|r` sautés ; rien autour d'une icône en ligne, d'un retour, d'un
-  double espace, d'un caractère hors table ; rien si la police de repli est posée (elle n'a pas les cales).
-  Idempotent (le caractère avant l'espace est alors la cale) : `W.refreshFonts` peut reposer le texte.
-- **Approches optiques** (`tools/build_media.py --prose-only`, table `prose` de `UI/SkinData.lua`, encodée
-  « c=gauche,droite; » par graisse) : glyphe rendu à 400 px par cadratin ; pour chaque ligne de pixels de la
-  ligne de base à la hauteur d'x, distance du bord de l'avance à l'encre, plafonnée à l'approche
-  géométrique + 0,1 cadratin (contreforme profonde, ligne vide) ; moyenne. ASCII imprimable (sauf « | »)
-  et ‘ ’ “ ” – — …. La fabrication complète ajoute aussi les cales (`add_pads`) et pose la table ;
-  `Sim/baloo_metrics.lua` contient les avances des cales.
-- **Textes concernés** : texte des rencontres et texte d'après (`bubble` : rencontres, choix de départ,
-  récompense), texte sous les plaques de réponse (rencontres, feu de camp : `b.sub._even`, mesures et pose
-  par `textWidth` / `setLines`), texte du bilan et de la méta (`Progress`), note de l'accueil. Non touchés :
-  libellés d'une ligne (boutons, plaques), journal (lignes alignées à gauche), texte des cartes (mise en
-  page propre, paliers mesurés), infobulles (`GameTooltip`, police du jeu, pas Baloo).
-- **Hors jeu** : le rendu SVG remplace chaque cale par un décalage `dx` de son avance (`Sim/ui_render.lua`) ;
-  harnais sans échec (1236 vérifications au 13/11/2026).
-- **À voir en jeu** (fichiers de police modifiés : relancer le client, `/reload` ne recharge pas une police
-  déjà chargée) : espaces réguliers dans le texte de « The Militia's Fish Traps » et sous les réponses ;
-  aucun carré ni caractère inconnu entre les mots (la cale doit être invisible).
-
 ## Retours du premier essai (survols, deck, paysages, bandeau, vouvoiement)
 
 - **Survols animés partout** (`W.hoverable`) : zone de survol fixe, visuel `face` animé, canaux réversibles

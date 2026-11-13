@@ -260,19 +260,8 @@ local function col(c)
   return string.format("#%02x%02x%02x", math.floor(r * 255 + 0.5), math.floor(g * 255 + 0.5), math.floor(b * 255 + 0.5))
 end
 
--- Cales d'espacement des polices de l'addon (W.evenSpaces : U+E001.., glyphes vides absents de la
--- police du système) : décalage de leur avance (step × k millièmes de cadratin) sur une espace sans
--- largeur.
-local function padSpan(ch)
-  local b2, b3 = ch:byte(2), ch:byte(3)
-  local cp = 0xE000 + (b2 - 0x80) * 64 + (b3 - 0x80)
-  local P = R.H and R.H.ns and R.H.ns.Skin and R.H.ns.Skin.prose
-  local step, base = P and P.step or 10, P and P.pad or 0xE000
-  return string.format('<tspan dx="%.3fem">&#8203;</tspan>', (cp - base) * step / 1000)
-end
-
 local function esc(t)
-  return (t:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"):gsub("\238\128[\129-\191]", padSpan))
+  return (t:gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;"))
 end
 
 -- Textures de l'addon (Media/) : aperçus PNG de tools/build_media.py, copiés à côté des SVG
