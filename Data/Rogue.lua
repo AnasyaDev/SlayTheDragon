@@ -362,6 +362,65 @@ card("shadow_dance", {
   up = { cost = 1, text = "Power.\nStart of turn: gain Stealth." },
 })
 
+-- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Rogue ») ------------------------------
+-- Règles en jeu dès le début de chaque combat (Combat.new : c.epic), jamais piochées ni jouées (cost 0 :
+-- contrat des données de Sim/tests.lua, jamais payé ni affiché). Leurs crochets (deckHooks, src = c.epic)
+-- sont posés par Core/Classes/rogue.lua ; « Epic. » = mot de plaque en tête.
+-- Nombres des épiques (base, amélioré), seule source : les textes ci-dessous et les règles
+-- (Core/Classes/rogue.lua, ns.Rogue.EPIC) les lisent. Fiche entre parenthèses ; réglés le 14/11/2026
+-- (simulation epic=<id>, docs/classes.md).
+local EPIC_N = {
+  deflection = { 2, 3 },          -- k-ième riposte du tour : k × N (fiche : 3 / 4)
+  doomblade = { 1, 1.5 },         -- part des dégâts d'un coup de grâce posée en DoT, arrondie au-dessus (fiche : ½ / 1)
+  echoing_reprimand = { 4, 5 },   -- un Surge de 2 ou 3 Combo compte N (fiche : 5 / 6)
+  subterfuge = { 2, 3 },          -- Combo par Stealth gagné (fiche : 0 / 1)
+  subterfugeTurns = { 2, 2 },     -- tours que dure un Stealth (le tour où il est gagné compris ; fiche : 1)
+  kidney_shot = { 4, 3 },         -- Combo dépensés au moins (fiche : 5 / 4)
+  danse_macabre = { 1, 1 },       -- dégâts par autre nom de carte joué dans le tour (fiche : 2 / 3)
+  danseCap = { 3, 5 },            -- bonus par coup au plus (fiche : aucun ; repli de la fiche : +10)
+}
+ns.RogueEpicNumbers = EPIC_N
+
+-- Déclencheur de Kidney Shot selon le seuil : « Surge of 5 Combo », « Surge of 4+ Combo ».
+local function kidneyLabel(k) return k >= 5 and "Surge of 5 Combo" or ("Surge of %d+ Combo"):format(k) end
+ns.RogueKidneyLabel = kidneyLabel
+
+local function epic(id, zone, path, name, text)
+  local function t(k) return "Epic.\n" .. (type(text) == "function" and text(k) or text[k]) end
+  card(id, { zone = zone, rarity = "epic", epic = true, name = name, cost = 0, type = "power", power = true,
+    path = path, effects = {}, text = t(1), up = { text = t(2) } })
+end
+local function n(id, k) return tostring(EPIC_N[id][k]) end
+
+epic("deflection", "westfall", "combat", "Deflection", function(k)
+  return ("Each Parry gained: deal %s, +%s per earlier one this turn, to the last target."):format(n("deflection", k),
+    n("deflection", k))
+end)
+epic("doomblade", "duskwood", "assassination", "Doomblade", function(k)
+  local f = EPIC_N.doomblade[k]
+  local what = f == 0.5 and "half their damage" or f == 1 and "their damage"
+    or ("their damage +%d%%"):format(math.floor((f - 1) * 100 + 0.5))
+  return "Surge Attacks apply " .. what .. " as DoT instead."
+end)
+epic("atrophic_poison", "wetlands", "assassination", "Atrophic Poison",
+  { "Enemies with DoT count as Demoralized.", "Enemies with DoT count as Demoralized and Sundered." })
+epic("echoing_reprimand", "stranglethorn", "combat", "Echoing Reprimand", function(k)
+  return "A Surge of 2 or 3 Combo counts as " .. n("echoing_reprimand", k) .. "."
+end)
+epic("subterfuge", "swamp", "subtlety", "Subterfuge", function(k)
+  local turns = EPIC_N.subterfugeTurns[k]
+  local first = turns == 1 and "Stealth ends at end of turn, not on Attacks."
+    or "Stealth ends at end of next turn, not on Attacks." -- T = 2 (au-delà : à reformuler)
+  return first .. "\nGaining Stealth: +" .. n("subterfuge", k) .. " Combo."
+end)
+epic("kidney_shot", "steppes", "subtlety", "Kidney Shot", function(k)
+  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": apply Stunned 1 ⌛"
+end)
+epic("danse_macabre", "blackrock", "subtlety", "Danse Macabre", function(k)
+  return "Attack hits: +" .. n("danse_macabre", k) .. " per other card name played this turn, up to +"
+    .. n("danseCap", k) .. "."
+end)
+
 -- Bibelots du Voleur (class = "rogue" : tirés seulement pour lui) ---------------------------------
 -- level = niveau de classe qui les débloque (dans la réserve de la classe ; la Ligue ne compte pas).
 
@@ -467,3 +526,88 @@ ns.Classes.rogue = {
     remove = { feint = 1.5, sinister_strike = 1 },
   },
 }
+
+-- Bots et cartes épiques : note de chaque épique (offre, marchand ; l'épique du deck vaut EPIC_KEEP de plus :
+-- le deck est déjà construit autour, en changer est un pari) et conseils du build qu'elle pilote
+-- (bot.byEpic, lus par Sim/expedition.lua : notes des cartes, améliorations, retraits ; fiche « Deck piloté »).
+do
+  local bot = ns.Classes.rogue.bot
+  local EPIC_RATING = { deflection = 9, doomblade = 9, atrophic_poison = 9, echoing_reprimand = 9,
+    subterfuge = 9, kidney_shot = 9, danse_macabre = 9 }
+  local EPIC_KEEP = 2
+  bot.epic = function(exp, id)
+    local v = EPIC_RATING[id]
+    if not v then return nil end
+    for _, cd in ipairs(exp.deck) do if cd.id == id then return v + EPIC_KEEP end end
+    return v
+  end
+  local function copies(exp, id)
+    local n = 0
+    for _, cd in ipairs(exp.deck) do if cd.id == id then n = n + 1 end end
+    return n
+  end
+  bot.byEpic = {
+    -- les Feint et toutes les cartes de Parry deviennent offensives ; Sinister Strike part
+    deflection = {
+      rating = { riposte = 9, evasion = 10, shadowstep = 9, cloak_of_shadows = 8.5, hemorrhage = 7.5,
+        pistol_shot = 8, sprint = 8.5, cheat_death = 7, smoke_bomb = 6.5, between_the_eyes = 5, envenom = 9,
+        rupture = 9, killing_spree = 4.5 },
+      upgrade = { feint = 4, deflection = 4.5, evasion = 3.5, riposte = 3, sinister_strike = 1.5 },
+      remove = { sinister_strike = 0.5, feint = 9 },
+    },
+    -- les coups de grâce posent du DoT, Envenom et Exsanguinate l'encaissent
+    doomblade = {
+      rating = { nightblade = 11, secret_technique = 10, between_the_eyes = 9, envenom = 13, exsanguinate = 10,
+        garrote = 7, mutilate = 7.5, venomous_wounds = 8, deadly_poison = 12, ambush = 6, killing_spree = 4 },
+      upgrade = { eviscerate = 5, doomblade = 4.5, exsanguinate = 4, envenom = 3.5 },
+      remove = { sinister_strike = 1 },
+    },
+    -- tous les ennemis sous DoT, donc Demoralized ; la défense en double part
+    atrophic_poison = {
+      rating = { fan_of_knives = 12, garrote = 8.5, crippling_poison = 9, deadly_poison = 13, rupture = 12.5,
+        mutilate = 6, venomous_wounds = 7, evasion = 4, smoke_bomb = 5, exsanguinate = 2, cloak_of_shadows = 3 },
+      upgrade = { fan_of_knives = 5, atrophic_poison = 4.5, garrote = 3.5, sinister_strike = 2.5 },
+      remove = { feint = 0.5, sinister_strike = 1.2 },
+    },
+    -- finir à 2 ou 3 Combo, deux coups de grâce par tour
+    echoing_reprimand = {
+      rating = { ambush = 9.5, cheap_shot = 9.5, premeditation = 8.5, mutilate = 7, kick = 7.5, rupture = 13,
+        envenom = 13, between_the_eyes = 8.5, nightblade = 11, secret_technique = 8.5, exsanguinate = 7,
+        slice_and_dice = 8 },
+      upgrade = { eviscerate = 5, echoing_reprimand = 4.5, sinister_strike = 2 },
+      remove = { sinister_strike = 0.8 },
+    },
+    -- plusieurs ouvertures par tour sous Stealth
+    subterfuge = {
+      rating = { ambush = 12, secret_technique = 10, cheap_shot = 9, premeditation = 8.5, vanish = 9,
+        shadowstep = 9.5, smoke_bomb = 9, shadow_dance = 9, nightblade = 10, killing_spree = 5 },
+      upgrade = { backstab = 5, subterfuge = 4.5, sinister_strike = 2 },
+      remove = { sinister_strike = 0.6, feint = 1.2 },
+    },
+    -- monter à 5 chaque tour, le coup de grâce étourdit
+    kidney_shot = {
+      rating = { ambush = 9.5, cheap_shot = 10, premeditation = 8.5, mutilate = 7, kick = 7.5,
+        between_the_eyes = 9.5, rupture = 12, envenom = 12, nightblade = 10, secret_technique = 4,
+        fan_of_knives = 5 },
+      upgrade = { cheap_shot = 5, kidney_shot = 4.5, eviscerate = 4 },
+      remove = { feint = 0.6, sinister_strike = 1.2 },
+    },
+    -- que des cartes différentes : un doublon vaut peu, le dernier exemplaire reste
+    danse_macabre = {
+      rating = function(exp, id)
+        local base = ns.Run and ns.Run.RATING and ns.Run.RATING[id] or 5
+        local bonus = { killing_spree = 4, pistol_shot = 2, kick = 2.5, sprint = 2, vanish = 2, premeditation = 2,
+          adrenaline_rush = 2, ambush = 1.5, hemorrhage = 2 }
+        if copies(exp, id) > 0 then return math.min(base, 4) end
+        return base + 1 + (bonus[id] or 0)
+      end,
+      upgrade = { killing_spree = 5, danse_macabre = 4.5 },
+      remove = function(exp, id)
+        if copies(exp, id) <= 1 then return nil end
+        if id == "sinister_strike" then return 0.5 end
+        if id == "feint" then return 0.8 end
+        return 1.4
+      end,
+    },
+  }
+end

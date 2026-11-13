@@ -127,6 +127,17 @@ ns.ClassViews.mage = {
     host.epic = W.label(host, "bold", 12.5, Art.hex("#d9a6ff"))
     host.epic:SetPoint("RIGHT", host, "RIGHT", -4, 0)
     host.epic:SetJustifyH("RIGHT")
+    -- icône de l'épique à gauche de sa ligne (infobulle = la carte)
+    local eb = CreateFrame("Frame", nil, host)
+    eb:SetSize(18, 18)
+    eb:SetPoint("RIGHT", host.epic, "LEFT", -5, 0)
+    eb:EnableMouse(true)
+    eb.slot = W.slotOn(eb, 18)
+    W.tooltip(eb, function(tt, f)
+      if f.epicId then W.fillCardTooltip(tt, f.epicId, f.epicUp, { full = true }) end
+    end, "ANCHOR_TOP")
+    eb:Hide()
+    host.epicBox = eb
   end,
   render = function(host, c)
     local W = ns.Widgets
@@ -157,11 +168,18 @@ ns.ClassViews.mage = {
     host.name:SetPoint("LEFT", host, "LEFT", 32, two and 9 or 0)
     host.epic:ClearAllPoints()
     host.epic:SetPoint("RIGHT", host, "RIGHT", -4, two and -11 or 0)
+    local eb = host.epicBox
     if text then
       host.epic:SetText(text)
       host.epic:Show()
+      local id, src = ns.Combat.mageEpic(c)
+      if eb.epicId ~= id then W.setIcon(eb.slot.icon, Art.cards[id], "card:" .. id) end
+      eb.epicId, eb.epicUp = id, src.up
+      eb:Show()
     else
       host.epic:Hide()
+      eb.epicId = nil
+      eb:Hide()
     end
   end,
   -- épiques : le nom de l'épique s'élève au-dessus de l'unité qu'elle touche (coup de l'élémentaire, image
@@ -203,7 +221,18 @@ function Art.mageEpicText(c)
     for i = 1, #c.enemies do
       if ns.Combat.isFrozen(c.enemies[i]) then return "Frozen: Cast at once" end
     end
-    return nil
+    return "No Frozen enemy"
+  elseif id == "mirror_image" then
+    return "Cast cards hit twice"
+  elseif id == "molten_armor" then
+    return ("When hit: DoT %d"):format(d.epicN)
+  elseif id == "conflagration" then
+    local n = 0
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      if not e.dead and (e.st.pain or 0) > 0 then n = n + 1 end
+    end
+    return n > 0 and ("DoT spreads on death: %d"):format(n) or "No enemy with DoT"
   end
   return nil
 end

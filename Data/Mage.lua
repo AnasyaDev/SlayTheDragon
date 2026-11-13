@@ -360,11 +360,11 @@ card("arcane_surge", {
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Mage ») -----------------------------
--- Règles en jeu dès le début du combat (c.epic) : ni piochées, ni jouées, sans coût. Les crochets (deckHooks)
+-- Règles en jeu dès le début du combat (c.epic) : ni piochées, ni jouées ; cost = 0, jamais payé ni affiché. Les crochets (deckHooks)
 -- sont posés par Core/Classes/mage.lua ; les nombres sont ici (epicN, epicM, epicPeriod, epicEvery, lus par
 -- les crochets, base et améliorée).
 local function epic(id, t)
-  t.type, t.power, t.epic, t.rarity, t.effects = "power", true, true, "epic", {}
+  t.type, t.power, t.epic, t.rarity, t.effects, t.cost = "power", true, true, "epic", {}, 0
   card(id, t)
 end
 
@@ -378,8 +378,8 @@ epic("mirror_image", {
 -- Duskwood : chaque coup ennemi sur le Mage, même absorbé, pose DoT epicN à son auteur.
 epic("molten_armor", {
   name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 1,
-  text = "Epic.\nWhen hit: apply DoT 1 to the attacker.",
-  up = { epicN = 3, text = "Epic.\nWhen hit: apply DoT 3 to the attacker." },
+  text = "Epic.\nWhen hit: apply DoT 1 to the attacker",
+  up = { epicN = 3, text = "Epic.\nWhen hit: apply DoT 3 to the attacker" },
 })
 
 -- Wetlands : un tour sur epicPeriod (3 : les tours 3, 6, 9…), au début du tour, l'élémentaire inflige epicN à la
@@ -585,9 +585,9 @@ ns.Classes.mage = {
     },
     upgrade = { fireball = 2.5, frostbolt = 2.5, mana_shield = 2, arcane_blast = 2 },
     remove = { mana_shield = 1, frostbolt = 1.5 },
-    -- Épiques : note (bot.epic) et conseils de construction tant qu'elle est dans le deck (bot.epics, lus par
+    -- Épiques : note (bot.epic) et conseils de construction tant qu'elle est dans le deck (bot.byEpic, lus par
     -- Sim/expedition.lua : notes des cartes, améliorations, retraits ; tirés de la fiche, « Deck piloté »).
-    epics = MAGE_EPIC_ADVICE,
+    byEpic = MAGE_EPIC_ADVICE,
     epic = function(exp, id)
       local n = MAGE_EPIC_NOTE[id]
       if not n then return nil end

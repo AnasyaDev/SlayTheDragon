@@ -18,51 +18,38 @@ return function(ns)
   -- path=<voie> (SE.play, opts.path) : les cartes de classe d'une autre voie et les cartes neutres valent 0,
   -- donc ne sont jamais prises (voie jouée seule).
   local onlyPath
-  -- Conseils propres à l'épique du deck : classDef.bot.epics[id] = { rating, upgrade, remove } (notes qui
-  -- remplacent celles de la classe tant que cette épique est dans le deck : le deck se construit autour).
-  local curExp -- expédition jouée (SE.play)
-  local function epicAdvice(exp)
-    local cd = exp and ns.Classes[exp.class]
-    local eps = cd and cd.bot and cd.bot.epics
-    local i = eps and X.epicIndex(exp)
-    return i and eps[exp.deck[i].id] or nil
+  -- Conseils propres à l'épique du deck (une épique pilote le build) : classDef.bot.byEpic[id] = { rating,
+  -- upgrade, remove }, chacun une table { [carte] = note } ou une fonction (exp, carte) -> note|nil ; ils
+  -- priment sur ceux de la classe tant que l'épique est dans le deck. Posés par decide (advice, adviceExp).
+  local advice, adviceExp
+  local function advised(key, id)
+    local a = advice and advice[key]
+    if type(a) == "function" then return a(adviceExp, id) end
+    return a and a[id]
   end
   local function rating(id)
     if onlyPath then
       local d = ns.Cards[id]
       if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
     end
-    local adv = epicAdvice(curExp)
-    local r = adv and adv.rating and adv.rating[id]
-    if r then return r end
-    return ns.Run.RATING[id] or 3
+    return advised("rating", id) or ns.Run.RATING[id] or 3
   end
 
-  -- Conseils de la classe jouée (classDef.bot : upgrade, remove), et de son épique (bot.epics[id]).
-  local overlays = {}
+  -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
   local function botOf(exp)
     local cd = ns.Classes[exp.class]
-    local b = cd and cd.bot or {}
-    local adv = epicAdvice(exp)
-    if not adv then return b end
-    local m = overlays[adv]
-    if not m then
-      local function over(base, add)
-        local t = {}
-        for k, v in pairs(base or {}) do t[k] = v end
-        for k, v in pairs(add or {}) do t[k] = v end
-        return t
-      end
-      m = setmetatable({ upgrade = over(b.upgrade, adv.upgrade), remove = over(b.remove, adv.remove) }, { __index = b })
-      overlays[adv] = m
-    end
-    return m
+    return cd and cd.bot or {}
+  end
+  local function adviceOf(exp)
+    local b = botOf(exp)
+    local i = b.byEpic and X.epicIndex(exp)
+    return i and b.byEpic[exp.deck[i].id] or nil
   end
 
   -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
   local function upgradeValue(exp, card)
     local up = botOf(exp).upgrade
-    return up and up[card.id] or rating(card.id)
+    return advised("upgrade", card.id) or up and up[card.id] or rating(card.id)
   end
 
   local function bestUpgrade(exp)
@@ -82,7 +69,7 @@ return function(ns)
     local rm = botOf(exp).remove or {}
     for i = 1, #exp.deck do
       local card = exp.deck[i]
-      local v = rm[card.id] or rating(card.id) + 2
+      local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
       if card.up then v = v + 1 end
       if v < worstV then worst, worstV = i, v end
     end
@@ -298,6 +285,7 @@ return function(ns)
 
   -- Action hors combat selon la phase.
   local function decide(exp, opts, rng)
+    advice, adviceExp = adviceOf(exp), exp
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then
@@ -465,7 +453,6 @@ return function(ns)
     local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
       epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
-    curExp = exp
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)

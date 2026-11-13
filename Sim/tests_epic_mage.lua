@@ -84,7 +84,7 @@ test("sept épiques : une par zone, epic, Power sans coût ni niveau, texte « E
     assert(d, id)
     eq(d.class, "mage", id); eq(d.zone, ZONES[i], id); eq(d.rarity, "epic", id); eq(d.type, "power", id)
     assert(d.epic and d.power and d.deckHooks, id .. " : épique, Power, crochets du deck")
-    eq(d.cost, nil, id .. " coût"); eq(d.level, nil, id .. " niveau")
+    eq(d.cost, 0, id .. " coût (jamais payé)"); eq(d.level, nil, id .. " niveau")
     assert(Card.isEpic(d) and not d.variant)
     for _, up in ipairs({ false, true }) do
       local u = Card.defById(id, up)
@@ -483,7 +483,7 @@ test("bots : note des épiques, l'épique du deck vaut plus ; conseils de constr
   local b = ns.Classes.mage.bot
   for _, id in ipairs(EPICS) do
     assert(b.epic({ deck = {} }, id), id .. " : note")
-    assert(b.epics[id] and b.epics[id].rating and b.epics[id].upgrade and b.epics[id].remove, id .. " : conseils")
+    assert(b.byEpic[id] and b.byEpic[id].rating and b.byEpic[id].upgrade and b.byEpic[id].remove, id .. " : conseils")
   end
   local exp = X.new({ seed = 2, class = "mage", unlocks = ns.Meta.allUnlocked(7, 7), epic = "rule_of_threes" })
   assert(b.epic(exp, "rule_of_threes") > b.epic(exp, "mirror_image"), "construit autour")
