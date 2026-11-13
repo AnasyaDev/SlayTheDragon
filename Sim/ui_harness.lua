@@ -6680,7 +6680,7 @@ do
   local classOk = card.bg._texture == ROOT .. ns.Skin.tex.card_body_blue.file and vc[1] == 1 and vc[2] == 1 and vc[3] == 1
   card:Hide()
   check(("textes : %d cartes neutres (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), langage, icônes, corps ivoire teinté vert sauge"):format(#ids, minSize),
-    #ids == 10 and #bad == 0, table.concat(bad, ", "))
+    #ids >= 10 and #bad == 0, table.concat(bad, ", ")) -- 10 de la fiche, plus le commun des zones
   check("carte de classe : corps et couleur inchangés (Inner Fire bleue, sans teinte)", classOk)
   -- infobulle : ligne « Neutral », explication de « Pay N HP. » (seule formulation d'un coût en PV)
   local tip = { lines = {} }
@@ -8162,11 +8162,18 @@ do
   end
   check("accueil : sept zones dans l'ordre de la campagne", table.concat(names, ", ") == ZONES, table.concat(names, ", "))
   local laterOk = true
+  -- zone suivante jouable (son fichier de données est écrit, docs/zones.md) : « Locked » pour un compte
+  -- neuf ; sinon « Coming later »
   for i = 2, #zopts do
     local o = zopts[i]
-    if not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then laterOk = false end
+    local zid = ns.Zone.ORDER[i]
+    if ns.Zone.playable(zid) then
+      if not (o.disabled and o.status == "locked" and o.statusLabel == "Locked") then laterOk = false end
+    elseif not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then
+      laterOk = false
+    end
   end
-  check("accueil : Westfall choisie et jouable, les six autres « Coming later », grisées",
+  check("accueil : Westfall choisie et jouable, les six autres « Coming later » (ou « Locked » si jouables), grisées",
     zopts[1].selected and not zopts[1].disabled and st.zone == "westfall" and laterOk)
   local scr = UI().current
   local content, panel = R.rect(ns.UI.content), R.rect(scr.panel)
@@ -8176,7 +8183,7 @@ do
     if not vis(b) then bad[#bad + 1] = "bouton " .. i .. " caché" end
     if not inside(r, panel) then bad[#bad + 1] = "bouton " .. i .. " hors du panneau " .. fmt(r) end
     if b.label._text ~= zopts[i].label then bad[#bad + 1] = "libellé " .. tostring(b.label._text) end
-    local want = i == 1 and "" or "Coming later"
+    local want = i == 1 and "" or (ns.Zone.playable(ns.Zone.ORDER[i]) and "Locked" or "Coming later")
     if (b.status._text or "") ~= want then bad[#bad + 1] = "état " .. tostring(b.status._text) end
     for j = i + 1, #scr.zoneButtons do
       if overlaps(r, R.rect(scr.zoneButtons[j])) then bad[#bad + 1] = ("boutons %d et %d se chevauchent"):format(i, j) end
