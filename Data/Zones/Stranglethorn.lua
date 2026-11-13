@@ -142,12 +142,12 @@ E.king_bangalash = {
   name = "King Bangalash", hp = 94, elite = true,
   moves = {
     pounce = { name = "Pounce", intent = "attack", text = "Interrupts your cast, even through Absorb.",
-      actions = { { "interrupt" }, { "attack", 20 } } },
+      actions = { { "interrupt" }, { "attack", 18 } } },
     rake = { name = "Rake", intent = "attack", actions = { { "attack", 4, times = 3 } } },
     call = { name = "Call the Pride", intent = "summon",
       actions = { { "summon", "young_stranglethorn_tiger", count = 2, max = 2 } } },
     roar = { name = "Roar", intent = "buff", actions = { { "buff_allies", "force", 2 } } },
-    maul = { name = "Maul", intent = "attack", actions = { { "attack", 14 } } },
+    maul = { name = "Maul", intent = "attack", actions = { { "attack", 13 } } },
   },
   ai = cycle({ "pounce", "rake", "call", "maul" }, function(c, e, mv)
     if mv == "call" and alive(c, "young_stranglethorn_tiger") >= 2 then return "roar" end
@@ -157,13 +157,13 @@ E.king_bangalash = {
 E.mokk_the_savage = {
   name = "Mokk the Savage", hp = 98, elite = true,
   moves = {
-    thrash = { name = "Thrash", intent = "attack", actions = { { "attack", 7, times = 2 } } },
-    pound = { name = "Pound", intent = "attack", actions = { { "attack", 17 } } },
+    thrash = { name = "Thrash", intent = "attack", actions = { { "attack", 6, times = 2 } } },
+    pound = { name = "Pound", intent = "attack", actions = { { "attack", 15 } } },
     beat_chest = { name = "Beat Chest", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
   },
   pattern = { "thrash", "pound", "beat_chest" },
   phases = {
-    { at = 0.5, name = "Berserk", text = "Gains Strength 4, then only attacks.", enter = { { "buff", "force", 4 } },
+    { at = 0.5, name = "Berserk", text = "Gains Strength 3, then only attacks.", enter = { { "buff", "force", 3 } },
       pattern = { "thrash", "pound" } },
   },
 }
@@ -181,7 +181,7 @@ E.zanzil_the_outcast = {
     hex = { name = "Hex", intent = "hex", cast = true,
       text = "Hexes the costliest card left in your hand. If it lands, raises a Zanzil Zombie.",
       actions = { { "hex", summon = "zanzil_zombie" } } },
-    bolt = { name = "Shadow Bolt", intent = "attack", actions = { { "attack", 18, interrupts = true } } },
+    bolt = { name = "Shadow Bolt", intent = "attack", actions = { { "attack", 16, interrupts = true } } },
     mixture = { name = "Zanzil's Mixture", intent = "buff", actions = { { "attack", 8 }, { "buff_allies", "force", 2 } } },
   },
   pattern = { "hex", "bolt", "hex", "mixture" },
@@ -204,19 +204,18 @@ E.brain_wash_totem = {
   pattern = { "wash" },
 }
 
--- Phase 1 : Hex, Shadow Bolt, Healing Ward (Shadow Bolt si un Ward vit déjà), Shadow Bolt. À 50 % (64 PV) :
+-- Phase 1 : Hex, Shadow Bolt, Healing Ward (Shadow Bolt si un Ward vit déjà), Delusions. À 50 % (88 PV) :
 -- Brain Wash Totem, puis Shadow Volley, Hex, Shadow Bolt. Immunisé à Stunned (boss) : seul l'Interrupt
 -- arrête ses Hex.
 E.jindo = {
-  name = "Jin'do the Hexxer", hp = 134, boss = true,
+  name = "Jin'do the Hexxer", hp = 176, boss = true,
   moves = {
     hex = HEX,
-    bolt = { name = "Shadow Bolt", intent = "attack", actions = { { "attack", 27, interrupts = true } } },
-    delusion = { name = "Delusions of Jin'do", intent = "watch", text = "Interrupts your cast; otherwise, deals 12.",
-      actions = { { "fn", function(c, e)
-        if c.player.cast then Combat.interruptPlayer(c, e) return end
-        Combat.dealDamage(c, e, c.player, Combat.calcDamage(c, e, c.player, 12))
-      end } } },
+    bolt = { name = "Shadow Bolt", intent = "attack", text = "Interrupts your cast, even through Absorb.",
+      actions = { { "interrupt" }, { "attack", 26 } } },
+    delusion = { name = "Delusions of Jin'do", intent = "watch", text = "Interrupts your cast; otherwise, deals 13.",
+      -- coup ordinaire (Parry, Absorb, Trap) seulement sans incantation ; sinon l'Interrupt seul
+      actions = { { "attack", 13, cond = function(c) return not c.player.cast end }, { "interrupt" } } },
     ward = { name = "Powerful Healing Ward", intent = "summon", text = "Summons a ward that heals him each turn.",
       actions = { { "summon", "healing_ward" } } },
     volley = { name = "Shadow Volley", intent = "attack", text = "Interrupts your cast, even through Absorb.",
