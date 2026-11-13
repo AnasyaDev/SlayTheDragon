@@ -9837,7 +9837,7 @@ do
     line(host) == ("Attacks this turn: 0/%d, each twice"):format(lim) and iconOk(host, "titans_grip"), line(host))
   c.hand = {}
   for k = 1, lim + 1 do c.hand[k] = ns.Card.new("strike", false, 900 + k) end
-  c.player.mana = lim + 1
+  c.player.mana = (lim + 1) * (1 + Wr.EPIC.titans_grip.extraCost)
   for _, en in ipairs(c.enemies) do en.hp, en.maxHp = 200, 200 end
   v:Render(true)
   for _ = 1, lim do ns.Combat.play(c, 1, 1) end
@@ -9872,6 +9872,10 @@ do
   e, c, v = uewCombat("avatar", true)
   host = v.classZone.views.warrior
   check("Avatar+ : « Rage up to 10, +3 next turn »", line(host) == "Rage up to 10, +3 next turn", line(host))
+  c.player.res = 10
+  v:Render(true)
+  check("Avatar+ à 10 Rage : « Rage 10: Attacks +1, +3 next turn », non tronquée",
+    line(host) == "Rage 10: Attacks +1, +3 next turn" and not host.epic.text:IsTruncated(), line(host))
   e, c, v = uewCombat("sweeping_strikes")
   host = v.classZone.views.warrior
   local alive = #ns.Combat.aliveEnemies(c)

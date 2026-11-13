@@ -342,7 +342,7 @@ epic("death_wish", {
 epic("thunderous_roar", {
   zone = "duskwood", name = "Thunderous Roar", path = "protection",
   text = "Epic.\nAt 5 Rage: spend it, deal 3 to all.",
-  up = { text = "Epic.\nAt 5 Rage: spend it, deal 5 to all." },
+  up = { text = "Epic.\nAt 5 Rage: spend it, deal 4 to all.\nAt 5 Rage: apply Demoralized 1 ⌛ to all" },
 })
 
 epic("sweeping_strikes", {
@@ -353,8 +353,8 @@ epic("sweeping_strikes", {
 
 epic("titans_grip", {
   zone = "stranglethorn", name = "Titan's Grip", path = "fury",
-  text = "Epic.\nAttacks resolve twice.\nAt most 1 Attack per turn.",
-  up = { text = "Epic.\nAttacks resolve twice.\nAt most 1 Attack per turn, 0-cost ones free." },
+  text = "Epic.\nAttacks: cost 1 more, resolve twice.\nAt most 2 per turn.",
+  up = { text = "Epic.\nAttacks: cost 1 more, resolve twice.\nAt most 2 per turn, 0-cost free." },
 })
 
 epic("shield_charge", {
@@ -365,14 +365,14 @@ epic("shield_charge", {
 
 epic("anger_management", {
   zone = "steppes", name = "Anger Management", path = "arms",
-  text = "Epic.\nEach Rage spent: all Cooldowns −1.",
-  up = { text = "Epic.\nEach Rage spent: all Cooldowns −2." },
+  text = "Epic.\nSpend and Surge cards: Cooldown 1.\nEach Rage spent: all Cooldowns −1.",
+  up = { text = "Epic.\nSpend and Surge cards: Cooldown 1.\nEach Rage spent: all Cooldowns −2." },
 })
 
 epic("avatar", {
   zone = "blackrock", name = "Avatar", path = "arms",
-  text = "Epic.\nRage can go up to 10.\nStart of turn: +2 Rage.",
-  up = { text = "Epic.\nRage can go up to 10.\nStart of turn: +3 Rage." },
+  text = "Epic.\nRage up to 10.\nStart of turn: +2 Rage.\nAt 10 Rage: Attacks deal 1 more.",
+  up = { text = "Epic.\nRage up to 10.\nStart of turn: +3 Rage.\nAt 10 Rage: Attacks deal 1 more." },
 })
 
 -- Bibelots du Guerrier (class = "warrior" : tirés seulement pour lui) ------------------------------
@@ -513,13 +513,16 @@ local ADVICE = {
     remove = { defend = 1, strike = 2.5, cleave = 1, whirlwind = 1.2, thunder_clap = 1.2, sweeping_strikes = 99 },
   },
   titans_grip = {
-    rating = { mortal_strike = 13.5, rampage = 12, bladestorm = 12, execute = 11.5, onslaught = 11.5,
-      bloodthirst = 13.5, battle_shout = 12, recklessness = 11, colossus_smash = 10, slam = 11, whirlwind = 11,
-      cleave = 10, shield_block = 10.5, shield_wall = 10.5, ignore_pain = 11, demoralizing_shout = 11,
-      berserker_rage = 9, last_stand = 10, strike = 2, overpower = 3, revenge = 4, pummel = 5,
-      victory_rush = 5, raging_blow = 7 },
-    upgrade = { mortal_strike = 13, bloodthirst = 13, heroic_strike = 11, titans_grip = 9, strike = 0.5 },
-    remove = { strike = 0, overpower = 0.5, revenge = 1, defend = 2, titans_grip = 99 },
+    -- chaque Attack coûte 1 de plus et frappe deux fois : les Attacks à 0 (1 pour deux coups) et celles qui
+    -- comptent double (Strength, Sundered, Spend, pioche) montent ; les Skills gardent le mana du tour
+    rating = { mortal_strike = 13, rampage = 12, bladestorm = 11.5, execute = 11.5, onslaught = 11.5,
+      bloodthirst = 13.5, battle_shout = 12, recklessness = 11, colossus_smash = 10.5, slam = 10, whirlwind = 10.5,
+      cleave = 9.5, shield_block = 10.5, shield_wall = 10, ignore_pain = 11, demoralizing_shout = 11.5,
+      berserker_rage = 10.5, last_stand = 10, overpower = 11, revenge = 11, pummel = 10.5, victory_rush = 10.5,
+      raging_blow = 9, enrage = 11, deep_wounds = 11.5 },
+    upgrade = { titans_grip = 12, mortal_strike = 13, bloodthirst = 13, heroic_strike = 11, overpower = 10,
+      strike = 2 },
+    remove = { strike = 1, defend = 2, titans_grip = 99 },
   },
   shield_charge = {
     rating = { shield_block = 12.5, shield_wall = 13, ignore_pain = 12.5, devastate = 11, shield_slam = 13,
@@ -530,9 +533,11 @@ local ADVICE = {
     remove = { strike = 0, rampage = 0.5, recklessness = 0.5, defend = 4, shield_charge = 99 },
   },
   anger_management = {
+    -- les cartes fortes sans recharge gardent leur rang (Deep Wounds, Enrage, Bladestorm relevées d'autant que
+    -- les cartes centrales ; Battle Shout, Recklessness, Victory Rush ne sont plus écartées : 15/11/2026)
     rating = { bloodthirst = 14, shield_wall = 11.5, shield_block = 11, berserker_rage = 11, demoralizing_shout = 12,
-      pummel = 11, onslaught = 11.5, execute = 11, ignore_pain = 11.5, mortal_strike = 11, bladestorm = 9.5,
-      battle_shout = 5, recklessness = 4, victory_rush = 5 },
+      pummel = 11, onslaught = 11.5, execute = 11, ignore_pain = 11.5, mortal_strike = 11, bladestorm = 10.5,
+      deep_wounds = 11, enrage = 10.5 },
     upgrade = { anger_management = 12, bloodthirst = 13, onslaught = 11, heroic_strike = 10, bloodrage = 8 },
     remove = { strike = 1, defend = 1.2, victory_rush = 1.5, anger_management = 99 },
   },

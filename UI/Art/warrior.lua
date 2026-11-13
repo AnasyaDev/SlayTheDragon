@@ -84,10 +84,10 @@ Art.classes.warrior.resource = { tga = "Ability_Warrior_FocusedRage", icon = "In
 --   Death Wish         « Attacks +50%, no Absorb »
 --   Thunderous Roar    « Roar in 3 Rage: 3 to all »
 --   Sweeping Strikes   « Targeted hits splash 1 other for half » (deux ennemis vivants au moins)
---   Titan's Grip       « Attacks this turn: 0/1, each twice »
+--   Titan's Grip       « Attacks this turn: 0/2, each twice »
 --   Shield Charge      « End of turn: 7 to Defias Thug » (avec de l'Absorb)
 --   Anger Management   « Each Rage spent: Cooldowns −1 » (une carte en recharge au moins)
---   Avatar             « Rage up to 10, +2 next turn »
+--   Avatar             « Rage up to 10, +2 next turn » ; à 10 Rage « Rage 10: Attacks +1, +2 next turn »
 -- Ne lit que le combat.
 local EPIC_ICON = 22
 local function n(v) return "|cffffffff" .. tostring(v) .. "|r" end
@@ -127,7 +127,10 @@ function Art.warriorEpicLine(c)
     end
     return ("Each Rage spent: Cooldowns %s"):format(n("−" .. steps))
   elseif id == "avatar" then
-    return ("Rage up to %s, %s next turn"):format(n(E.avatar.cap), n("+" .. (up and E.avatar.upGain or E.avatar.gain)))
+    local gain = n("+" .. (up and E.avatar.upGain or E.avatar.gain))
+    local bonus = Wr.avatarBonus(c)
+    if bonus > 0 then return ("Rage %s: Attacks %s, %s next turn"):format(n(c.player.res), n("+" .. bonus), gain) end
+    return ("Rage up to %s, %s next turn"):format(n(E.avatar.cap), gain)
   end
   return nil
 end
