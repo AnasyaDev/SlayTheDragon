@@ -95,6 +95,7 @@ test("textes : les nombres de Warrior.EPIC", function()
     has("thunderous_roar", true, "At " .. E.thunderous_roar.at .. " Rage: apply Demoralized " .. E.thunderous_roar.upDemoralized .. " ⌛ to all")
   end
   has("sweeping_strikes", true, "hit " .. E.sweeping_strikes.upTargets .. " other")
+  for _, up in ipairs({ false, true }) do has("sweeping_strikes", up, "for a third.") end
   has("titans_grip", false, "At most " .. E.titans_grip.limit .. " per turn")
   eq(E.titans_grip.copies, 1, "« resolve twice »")
   for _, up in ipairs({ false, true }) do has("titans_grip", up, "Attacks: cost " .. E.titans_grip.extraCost .. " more, resolve twice.") end
@@ -260,16 +261,19 @@ end)
 ---------------------------------------------------------------------------
 -- Wetlands — Sweeping Strikes
 ---------------------------------------------------------------------------
-test("Sweeping Strikes : un coup à cible rebondit pour la moitié des PV perdus, sans Rage", function()
+local function third(n) return math.floor(n / E.sweeping_strikes.div) end
+
+test("Sweeping Strikes : un coup à cible rebondit pour le tiers des PV perdus (arrondi à l'inférieur), sans Rage", function()
+  eq(E.sweeping_strikes.div, 3, "« for a third »")
   local c = setup({ "strike", "raging_blow" }, { epic = "sweeping_strikes", encounter = { "tw_dummy", "tw_dummy" } })
   local b = c.enemies[2].hp
   assert(play(c, "strike", 1))
-  eq(c.enemies[2].hp, b - 3)
+  eq(c.enemies[2].hp, b - third(6))
   eq(c.player.res, 1, "le rebond ne donne pas de Rage")
   c.enemies[1].block = 4
   assert(play(c, "raging_blow", 1))
-  -- premier coup : 5 - 4 absorbés = 1 PV perdu (rien), second : 5 (2)
-  eq(c.enemies[2].hp, b - 3 - 2, "moitié des PV réellement perdus, un rebond par coup")
+  -- premier coup : 5 - 4 absorbés = 1 PV perdu (rien), second : 5
+  eq(c.enemies[2].hp, b - third(6) - third(1) - third(5), "tiers des PV réellement perdus, un rebond par coup")
 end)
 
 test("Sweeping Strikes : seul en face rien ; sans cible rien ; le rebond ne pose pas Deep Wounds", function()
@@ -292,15 +296,15 @@ test("Sweeping Strikes amélioré : deux autres ennemis, sans remise ; coup qui 
     encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
   local b, d = c.enemies[2].hp, c.enemies[3].hp
   assert(play(c, "strike", 1))
-  eq(c.enemies[2].hp, b - 3); eq(c.enemies[3].hp, d - 3)
+  eq(c.enemies[2].hp, b - third(6)); eq(c.enemies[3].hp, d - third(6))
   c.enemies[1].hp = 2
   assert(play(c, "strike", 1))
   assert(c.enemies[1].dead)
-  eq(c.enemies[2].hp, b - 6, "PV perdus du coup qui tue : 6")
+  eq(c.enemies[2].hp, b - 2 * third(6), "PV perdus du coup qui tue : 6")
   local c2 = setup({ "strike" }, { epic = "sweeping_strikes", up = false, encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
   local h2, h3 = c2.enemies[2].hp, c2.enemies[3].hp
   assert(play(c2, "strike", 1))
-  eq((h2 - c2.enemies[2].hp) + (h3 - c2.enemies[3].hp), 3, "de base : un seul autre")
+  eq((h2 - c2.enemies[2].hp) + (h3 - c2.enemies[3].hp), third(6), "de base : un seul autre")
 end)
 
 ---------------------------------------------------------------------------

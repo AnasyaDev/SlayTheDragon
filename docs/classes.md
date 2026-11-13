@@ -527,41 +527,59 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
 - **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;
   `damage` ajoute N par autre id, au plus le plafond.
 
-### Épiques du Guerrier (14/11/2026)
+### Épiques du Guerrier (14/11/2026, réglées pour les zones dures le 14/11/2026)
 
 Sept épiques (`Data/Warrior.lua`, une par zone), règles et nombres dans `Core/Classes/warrior.lua`
 (`ns.Warrior.EPIC`, crochets `deckHooks`, `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
 `ns.Warrior.epicOf(c)` = épique en jeu (`c.epic`) : id, amélioré. Crochets employés : `canGainBlock`,
 `attackMult`, `onEnemyDeath` (Death Wish) ; `onResource` (Thunderous Roar) ; `onDamageDealt` (Sweeping Strikes,
-rebond sans ctx) ; `replay`, `canPlay` (nouveau), `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's Grip :
-la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne la
-Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge` et
-`ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main aussitôt) ;
-`resCap`, `onTurnStart` (Avatar). Événement de journal `epic_trigger` (card, unit) : sans animation propre.
-Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge ; Anger Management si une tranche dépasse 1).
+rebond sans ctx) ; `replay`, `canPlay` (nouveau), `cost`, `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's
+Grip : la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne
+la Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge`,
+`giveCooldown` et `ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main
+aussitôt) ; `resCap`, `onTurnStart`, `damage` (Avatar, `ns.Warrior.avatarBonus(c)`). Événement de journal
+`epic_trigger` (card, unit) : sans animation propre. Vue de classe : compteur de l'épique (Titan's Grip, Shield
+Charge ; Anger Management si une tranche dépasse 1 ; Avatar : « Rage 10: Attacks +1 » quand le bonus joue).
 Coups sans carte des épiques : genre « other » (`Combat.hitInfo`), à tous pour l'onde et le rebond, à une cible
 pour Shield Charge, dont la cible passe aussi par le crochet de zone `petTarget` (dormeurs du Swamp).
 
-Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=warrior
-zones=7 level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 85,8 %, combat normal 2,95 tours et 8,2 PV ;
-± 2,2 points) :
+**Point d'accroche ajouté au moteur (14/11/2026)** : `giveCooldown` (`Core/Combat.lua`, fin du jeu d'une carte),
+valeur `(c, src, nil, d, inst)` → nombre de tours de recharge posé sur une carte qui n'en a pas (`nil` : défausse
+comme avant). Anger Management y met les cartes qui dépensent la Rage.
 
-| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
-|---|---|---|---|---|
-| Death Wish | 92,3 % | +6,5 | 2,03 ; 8,7 | — |
-| Thunderous Roar | 93,2 % | +7,4 | 2,41 ; 7,5 | 6 / 9 + Demoralized 1 → 3 / 5 sans Demoralized |
-| Sweeping Strikes | 96,2 % | +10,4 | 2,10 ; 6,1 | — |
-| Titan's Grip | 96,6 % | +10,8 | 2,66 ; 6,3 | 2 Attacks par tour → 1 |
-| Shield Charge | 95,4 % | +9,6 | 3,05 ; 6,4 | moitié de l'Absorb → quart |
-| Anger Management | 91,8 % | +6,0 | 3,12 ; 7,7 | 3 / 2 Rage par cran → 1 Rage, −1 / −2 |
-| Avatar | 88,1 % | +2,3 | 3,01 ; 8,4 | +1 / +2 → +2 / +3 (+3 / +4 n'apporte rien) |
+Réglage des zones dures (14/11/2026, `luajit Sim/sim.lua runs=600 bot=heuristic jobs=3 runner=expedition key=0
+level=7 class=warrior epic=<id>` avec `zone=duskwood zones=1`, `zone=stranglethorn zones=3`, `zone=steppes
+zones=5` ; Westfall `zones=7` pour information ; mêmes graines, ± 3 à 4 points par mesure). Sans épique
+(`epic=none`) : Duskwood 66,2 %, Stranglethorn Vale 70,8 %, Burning Steppes 80,2 %, Westfall 86,0 %.
+Moyenne des sept épiques : +11,6 (départ : +12,0, de +6,1 à +23,8).
 
-Avatar reste sous la cible : sa Rage n'a presque pas de débouché dans un deck de Westfall (Execute, Ignore
-Pain, Onslaught à trouver en 4 ou 5 choix), le bot la dépense déjà dès qu'il peut ; à revoir avec la règle.
+| Épique | Duskwood | Stranglethorn | Steppes | Moyenne | Westfall | PV perdus (combat normal, D / S / B) | Changement |
+|---|---|---|---|---|---|---|---|
+| Death Wish | +22,0 | +3,5 | +13,1 | +12,9 | +7,5 | 10,3 / 11,3 / 7,7 | — |
+| Thunderous Roar | +16,6 | +3,5 | +7,3 | +9,1 | +8,0 | 8,9 / 10,9 / 8,4 | Demoralized 1 rendu sur l'amélioré (4 + Demoralized) |
+| Sweeping Strikes | +15,1 | +8,0 | +7,1 | +10,1 | +7,3 | 8,5 / 10,2 / 7,3 | moitié → tiers |
+| Titan's Grip | +14,6 | +9,2 | +6,8 | +10,2 | +2,3 | 10,2 / 11,2 / 9,0 | 2 Attacks par tour rendues, chacune coûte 1 de plus |
+| Shield Charge | +16,3 | +12,9 | +7,8 | +12,3 | +10,2 | 8,2 / 9,5 / 7,4 | — (quart) |
+| Anger Management | +17,0 | +14,2 | +8,1 | +13,1 | +7,0 | 9,3 / 10,3 / 8,4 | Spend et Surge en recharge 1 (débouché) |
+| Avatar | +16,8 | +15,0 | +8,6 | +13,5 | +6,7 | 9,6 / 11,1 / 8,8 | à 10 Rage, Attacks +1 (débouché) |
+
+Essais écartés (moyenne des trois zones) : Titan's Grip de la fiche (deux Attacks, sans coût) 100 % partout ;
+copie à moitié 97–100 % ; « Pay 2 HP » par Attack 94–99 %. Thunderous Roar avec Demoralized de base : 3 dégâts
++22,5, 1 dégât +15,3 (Duskwood +21) ; 4 dégâts sans Demoralized +15,8 (Duskwood +25). Avatar : +1 par Rage
+au-delà de 5 : 98–100 % ; au-delà de 7 (+1 / tour) +20,7 ; au-delà de 8 : +16,3 (+1 / tour), +19,4 (+2 / tour).
+Anger Management sans débouché, conseils corrigés : +7,2 (Steppes +1) ; recharge −2 / −3 par Rage : +6,5.
+
+Hors cible : Death Wish (Duskwood +22 au-delà de +18, Stranglethorn +3,5) et Thunderous Roar (Stranglethorn
++3,5) : écart de zone, pas de moyenne ; un nombre plus bas les ferait passer sous +3 à Stranglethorn. Les
+gains de Duskwood sont hauts pour toutes les épiques (sans épique, le Guerrier y gagne 66 %).
 
 Bots : `classDef.bot.byEpic[id]` (tables de notes, d'amélioration et de retrait tirées du « Deck piloté » de la
 fiche) ; `classDef.bot.epic(exp, id)` note une épique proposée (accord avec le deck, attachement à l'épique du
-deck : une épique de même note n'en remplace jamais une autre).
+deck : une épique de même note n'en remplace jamais une autre). Corrigés le 14/11/2026 : Titan's Grip (Attacks à
+0 et Skills relevées sous le surcoût), Anger Management (Deep Wounds, Enrage, Bladestorm gardent leur rang ;
+Battle Shout, Recklessness, Victory Rush ne sont plus écartées). Contrôles « à blanc » avec les mêmes conseils
+(`copies = 0, limit = 99, extraCost = 0` ; `steps = 0, give = 0`) : Titan's Grip −0,3, Anger Management −5,0 :
+les conseils seuls ne rapportent rien.
 
 ### Épiques du Mage (14/11/2026)
 

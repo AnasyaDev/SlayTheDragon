@@ -60,11 +60,12 @@ ns.ClassRules.warrior = {
 ---------------------------------------------------------------------------
 -- Règle en jeu pendant tout le combat, dès son début (c.epic, hors de toute pile) : deckHooks (src = c.epic,
 -- après classe, zones, Powers, bibelots et affixes) et whileInDeck (au début du combat). Nombres réglés par
--- la simulation dans les zones dures (15/11/2026 : Duskwood, Stranglethorn Vale, Burning Steppes ; docs/classes.md,
+-- la simulation dans les zones dures (14/11/2026 : Duskwood, Stranglethorn Vale, Burning Steppes ; docs/classes.md,
 -- « Épiques du Guerrier ») : ce tableau seul ; les textes de Data/Warrior.lua les disent (vérifié par
 -- Sim/tests_epic_warrior.lua). Écarts à la fiche : Thunderous Roar 3 sans Demoralized, amélioré 4 + Demoralized 1
 -- (Demoralized de base : +15 à +22 points quel que soit le nombre) ; Titan's Grip deux Attacks par tour comme la
--- fiche, mais chacune coûte 1 de plus (extraCost ; sans ce coût, 100 % de victoires) ; Shield Charge au quart ;
+-- fiche, mais chacune coûte 1 de plus (extraCost ; sans ce coût, 100 % de victoires) ; Sweeping Strikes au tiers
+-- (moitié : Duskwood +22) ; Shield Charge au quart ;
 -- Anger Management chaque Rage, et les cartes qui dépensent partent en recharge 1 (give : débouché du deck de
 -- départ) ; Avatar +2 / +3 et, à 10 Rage, Attacks +1 (over, bonus : débouché de la Rage gardée).
 -- demoralized = 0 : pas d'état posé ; selfStates = faux (repli de la fiche, non retenu) : la copie de Titan's Grip
@@ -72,7 +73,7 @@ ns.ClassRules.warrior = {
 Warrior.EPIC = {
   death_wish = { mult = 1.5, heal = 3 },
   thunderous_roar = { at = 5, damage = 3, upDamage = 4, demoralized = 0, upDemoralized = 1 },
-  sweeping_strikes = { targets = 1, upTargets = 2 },
+  sweeping_strikes = { targets = 1, upTargets = 2, div = 3 },
   titans_grip = { limit = 2, extraCost = 1, copies = 1, selfStates = true },
   shield_charge = { div = 4, upBonus = 4 },
   anger_management = { per = 1, upPer = 1, steps = 1, upSteps = 2, give = 1 },
@@ -181,15 +182,15 @@ do
   attach("thunderous_roar", hooks)
 end
 
--- Wetlands — Sweeping Strikes : chaque coup d'une carte Attack à cible inflige aussi la moitié des PV qu'il
--- a fait perdre (arrondie à l'inférieur) à un autre ennemi vivant tiré par c.rng.cards (amélioré : deux,
+-- Wetlands — Sweeping Strikes : chaque coup d'une carte Attack à cible inflige aussi le tiers (E.div) des PV qu'il
+-- a fait perdre (arrondi à l'inférieur) à un autre ennemi vivant tiré par c.rng.cards (amélioré : deux,
 -- sans remise). Le rebond est un coup sans carte (ctx nil) : ni Rage, ni Deep Wounds, ni nouveau rebond.
 local function sweepHooks(count)
   return {
     onDamageDealt = function(c, src, t, loss, ctx)
       if not ctx or not ctx.def or ctx.def.type ~= "attack" or ctx.def.target ~= "enemy" then return end
       if t ~= ctx.target then return end
-      local n = floor(loss / 2)
+      local n = floor(loss / E.sweeping_strikes.div)
       if n <= 0 then return end
       local others = {}
       for i = 1, #c.enemies do

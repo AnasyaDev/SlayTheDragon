@@ -347,8 +347,8 @@ epic("thunderous_roar", {
 
 epic("sweeping_strikes", {
   zone = "wetlands", name = "Sweeping Strikes", path = "arms",
-  text = "Epic.\nTargeted Attack hits: also hit another enemy for half.",
-  up = { text = "Epic.\nTargeted Attack hits: also hit 2 other enemies for half." },
+  text = "Epic.\nTargeted Attack hits: also hit another enemy for a third.",
+  up = { text = "Epic.\nTargeted Attack hits: also hit 2 other enemies for a third." },
 })
 
 epic("titans_grip", {
@@ -534,7 +534,7 @@ local ADVICE = {
   },
   anger_management = {
     -- les cartes fortes sans recharge gardent leur rang (Deep Wounds, Enrage, Bladestorm relevées d'autant que
-    -- les cartes centrales ; Battle Shout, Recklessness, Victory Rush ne sont plus écartées : 15/11/2026)
+    -- les cartes centrales ; Battle Shout, Recklessness, Victory Rush ne sont plus écartées : 14/11/2026)
     rating = { bloodthirst = 14, shield_wall = 11.5, shield_block = 11, berserker_rage = 11, demoralizing_shout = 12,
       pummel = 11, onslaught = 11.5, execute = 11, ignore_pain = 11.5, mortal_strike = 11, bladestorm = 10.5,
       deep_wounds = 11, enrage = 10.5 },

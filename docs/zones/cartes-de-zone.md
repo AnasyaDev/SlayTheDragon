@@ -234,13 +234,14 @@ Sept builds :
    Demoralizing Shout, Revenge, Overpower, Rampage montent la Rage, qui frappe la salle à 5.
 3. **Chaque gros coup en touche deux** (Arms) — Sweeping Strikes : Mortal Strike, Execute, Raging Blow,
    Rampage deviennent des cartes de groupe.
-4. **Deux attaques par tour, chacune deux fois** (Fury) — Titan's Grip : Mortal Strike, Rampage,
-   Bladestorm, Execute, Bloodthirst ; les Strike partent.
+4. **Deux attaques par tour, chacune deux fois** (Fury) — Titan's Grip : chaque Attack coûte 1 de plus ;
+   Mortal Strike, Rampage, Bladestorm, Execute, Bloodthirst, et les Attacks à 0 (deux coups pour 1).
 5. **L'Absorb est l'attaque** (Protection) — Shield Charge : Defend, Shield Block, Shield Wall, Ignore
    Pain, Shield Slam ; les Strike partent.
 6. **Dépenser recharge** (Arms) — Anger Management : Heroic Strike, Onslaught, Execute, Ignore Pain
-   dépensent, Bloodthirst, Shield Wall, Berserker Rage reviennent vite.
-7. **Garder sa Rage jusqu'à 10** (Arms) — Avatar : Execute à 45, Ignore Pain à 30.
+   dépensent et reviennent par la recharge, Bloodthirst, Shield Wall, Berserker Rage reviennent vite.
+7. **Garder sa Rage jusqu'à 10** (Arms) — Avatar : à 10 Rage les Attacks frappent plus fort ; ou Execute à
+   45, Ignore Pain à 30.
 
 ### Westfall — Death Wish (Fury) · conservée (Steppes → Westfall)
 
@@ -264,10 +265,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `At 5 Rage: spend it,` / `deal 6 to all, apply` / `Demoralized 1 ⌛ to all` | `…` / `deal 9 to all, apply` / `…` |
+| —, Epic | `Epic.` / `At 5 Rage: spend it, deal 3 to all.` | `Epic.` / `At 5 Rage: spend it, deal 4 to all.` / `At 5 Rage: apply Demoralized 1 ⌛ to all` |
 
-- **Règle.** Dès que la Rage atteint 5, elle tombe à 0 et le Warrior inflige 6 (amélioré : 9) à chaque
-  ennemi vivant, sans carte (Strength comprise), puis pose Demoralized 1 ⌛ à tous.
+- **Règle.** Dès que la Rage atteint 5, elle tombe à 0 et le Warrior inflige 3 (amélioré : 4) à chaque
+  ennemi vivant, sans carte (Strength comprise) ; amélioré : puis pose Demoralized 1 ⌛ à tous.
+- **Réglage (14/11/2026).** Le Demoralized de base de la fiche est hors cible quel que soit le nombre : +22 points
+  en moyenne des zones dures avec 3 dégâts, +15 avec 1 dégât (Duskwood +21) ; sans lui, 3 dégâts : +9. Il est
+  rendu sur l'amélioration (variante la moins dénaturante) ; 4 dégâts de base : +16 (Duskwood +25).
 - **Cas limites.** Déclenché juste après le gain qui fait atteindre 5 (fin de la carte, coup reçu, perte de
   PV d'une Curse). Pendant le tour ennemi, Demoralized 1 ⌛ ne dure que jusqu'à la fin du round : il
   allège les coups restants de ce tour. Spend et Surge restent jouables avant 5 (Execute ne compte jamais
@@ -284,11 +288,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Targeted Attack hits` / `also hit another` / `enemy for half.` | `…` / `also hit 2 other` / `enemies for half.` |
+| —, Epic | `Epic.` / `Targeted Attack hits: also hit another enemy for a third.` | `…` / `also hit 2 other enemies for a third.` |
 
-- **Règle.** Chaque coup d'une carte Attack qui a une cible inflige aussi la moitié des dégâts réellement
-  infligés (arrondie à l'inférieur) à un autre ennemi vivant tiré par `c.rng.cards` (amélioré : deux
+- **Règle.** Chaque coup d'une carte Attack qui a une cible inflige aussi le tiers des dégâts réellement
+  infligés (arrondi à l'inférieur) à un autre ennemi vivant tiré par `c.rng.cards` (amélioré : deux
   autres, tirés sans remise).
+- **Réglage (14/11/2026).** À la moitié (fiche) : +14 points en moyenne des zones dures, +22 à Duskwood ; au
+  tiers : +10, Duskwood +15.
 - **Cas limites.** Le coup de rebond n'est pas un coup d'Attack (pas de Deep Wounds, pas de Rage), ni un
   coup à une cible au sens du Swamp (réveille sans bonus). Seul en face : rien. Plusieurs coups (Raging
   Blow, Rampage) : un rebond par coup. Lien Wetlands : rebond et coup principal sont le même effet, deux
@@ -302,21 +308,26 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Attacks resolve twice.` / `At most 2 Attacks per` / `turn.` | `…` / `turn, not counting` / `0-cost ones.` |
+| —, Epic | `Epic.` / `Attacks: cost 1 more, resolve twice.` / `At most 2 per turn.` | `…` / `At most 2 per turn, 0-cost free.` |
 
-- **Règle.** Chaque carte Attack se résout deux fois : la copie suit tout de suite, même cible (premier
-  ennemi vivant si elle est morte), sans coût. Au plus deux cartes Attack par tour ; la troisième est
-  injouable (raison « Titan's Grip »). Amélioré : les Attacks à 0 mana ne comptent pas dans la limite.
+- **Règle.** Chaque carte Attack coûte 1 mana de plus et se résout deux fois : la copie suit tout de suite,
+  même cible (premier ennemi vivant si elle est morte), sans coût. Au plus deux cartes Attack par tour ; la
+  troisième est injouable (raison « Only 2 Attacks per turn. »). Amélioré : les Attacks qui coûtent 0 au
+  moment du jeu n'ont pas le surcoût et ne comptent pas dans la limite.
+- **Réglage (14/11/2026).** La règle de la fiche (deux Attacks, sans coût) gagne 100 % des expéditions dans
+  les trois zones dures ; avec la copie à moitié, 97 à 100 % ; avec « Pay 2 HP » par Attack, 94 à 99 %. Le
+  surcoût de 1 mana (l'arme à deux mains pèse) rend les deux Attacks par tour : +10 points en moyenne.
 - **Cas limites.** La copie reprend la dépense de l'original (Spend payé : bonus aux deux ; Surge : même
   montant compté), sans rien payer. La Rage « +1 par Attack » ne vient qu'une fois par carte. Cast (Slam) :
   les deux à la résolution. Exhaust et Cooldown après la copie. Pummel compte dans la limite. Hand of
   Justice (3e Attack) ne se déclenche plus, sauf amélioré avec des Attacks à 0.
-- **Deck piloté.** Centrales : Mortal Strike (2 × 22), Rampage (8 coups pour un seul « Pay 3 HP »),
-  Bladestorm, Execute (deux fois le même Surge), Heroic Strike (Spend payé une fois), Onslaught (pioche 2
-  deux fois), Bloodthirst (Strength +2), Battle Shout et Recklessness (Strength comptée deux fois). Mauvaises :
-  Strike, Overpower, Revenge (une place d'Attack pour peu). À retirer : les quatre Strike. Feu de camp :
-  Mortal Strike, Bloodthirst.
-- **Moteur.** Crochet existant `replay` (Ironfoe) ; nouveau `canPlay` (limite par tour, comme Voidform).
+- **Deck piloté.** Centrales : Mortal Strike (2 × 22 pour 3), Rampage (8 coups pour un seul « Pay 3 HP »),
+  Execute (deux fois le même Surge), Heroic Strike (Spend payé une fois), Onslaught (pioche 2 deux fois),
+  Bloodthirst (Strength +2), Battle Shout et Recklessness (Strength comptée deux fois), Overpower, Revenge,
+  Victory Rush, Pummel (deux coups pour 1 mana) ; les Skills gardent le mana du tour. À retirer : Strike
+  d'abord. Feu de camp : Titan's Grip (Attacks à 0 sans surcoût), Mortal Strike, Bloodthirst.
+- **Moteur.** Crochet existant `replay` (Ironfoe) ; nouveau `canPlay` (limite par tour, comme Voidform) ;
+  `cost` (surcoût).
 
 ### Swamp of Sorrows — Shield Charge (Protection) · nouvelle
 
@@ -342,31 +353,42 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each 3 Rage spent:` / `Cooldown cards return` / `1 turn sooner.` | `Each 2 Rage spent:` / `…` |
+| —, Epic | `Epic.` / `Spend and Surge cards: Cooldown 1.` / `Each Rage spent: all Cooldowns −1.` | `…` / `Each Rage spent: all Cooldowns −2.` |
 
-- **Règle.** La Rage dépensée (Spend payé, montant d'un Surge) s'additionne dans un compteur du combat ;
-  chaque fois qu'il passe un multiple de 3 (amélioré : 2), chaque carte en recharge revient un tour plus
-  tôt. Une carte qui arrive à 0 revient en main aussitôt (main pleine : au début du tour suivant).
+- **Règle.** Les cartes qui dépensent la Rage (Spend, Surge) partent en recharge 1 au lieu de la défausse,
+  qu'elles aient dépensé ou non. Chaque Rage dépensée (Spend payé, montant d'un Surge) avance chaque carte en
+  recharge d'un tour (amélioré : deux). Une carte qui arrive à 0 revient en main aussitôt (main pleine : au
+  début du tour suivant).
+- **Réglage (14/11/2026).** Sans carte à recharge dans le deck de départ, la règle seule ne rapportait rien
+  aux Steppes (+1) ; les cartes qui dépensent mises en recharge (Heroic Strike dès le départ) lui donnent un
+  débouché : elles reviennent au tour d'après, ou aussitôt par la dépense suivante. Tranche de 3 / 2 Rage de
+  la fiche → chaque Rage, −1 / −2.
 - **Cas limites.** Le reste du compteur se garde d'un tour à l'autre. Berserker Rage (+2 Rage, Cooldown 2)
   ne boucle pas : il faut 6 Rage dépensées pour la ramener aussitôt. Lien Steppes : la brûlure fait perdre
   des PV, donc gagner de la Rage à dépenser.
 - **Deck piloté.** Centrales : Bloodthirst (Strength à chaque retour), Shield Wall, Shield Block, Berserker
   Rage, Demoralizing Shout, Pummel ; dépenses : Heroic Strike, Onslaught (Spend 2), Execute et Ignore Pain
-  (Surge), Bloodrage pour remplir. Mauvaises : Battle Shout, Recklessness, Victory Rush (Exhaust, rien à
-  recharger). À retirer : Strike, Defend. Feu de camp : Bloodthirst, Onslaught.
+  (Surge), Bloodrage pour remplir. Battle Shout, Recklessness, Victory Rush (Exhaust) restent bonnes sans
+  rien recharger. À retirer : Strike, Defend. Feu de camp : Bloodthirst, Onslaught.
 - **Moteur.** Notifications existantes `onSpend` et `onSurge` ; nouvel effet « recharges −1 »
-  (`cooldownTick`, voisin de `readiness`).
+  (`cooldownTick`, voisin de `readiness`) ; nouveau crochet `giveCooldown` (recharge posée sur une carte qui
+  n'en a pas, `Core/Combat.lua`).
 
 ### Blackrock Mountain — Avatar (Arms) · conservée
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Rage can go up to 10.` / `Start of turn: +1 Rage.` | `…` / `Start of turn: +2 Rage.` |
+| —, Epic | `Epic.` / `Rage up to 10.` / `Start of turn: +2 Rage.` / `At 10 Rage: Attacks deal 1 more.` | `…` / `Start of turn: +3 Rage.` / `…` |
 
-- **Règle.** Plafond de Rage à 10. Au début de chaque tour, +1 Rage (amélioré : +2).
+- **Règle.** Plafond de Rage à 10. Au début de chaque tour, +2 Rage (amélioré : +3). Tant que la Rage est à
+  10, chaque coup d'une carte Attack inflige 1 de plus (lu au coup, après le Spend ou le Surge de la carte :
+  Execute, qui vide la Rage, n'en profite pas).
+- **Réglage (14/11/2026).** Sans débouché, +6 points (les Steppes : +1) : la Rage gardée ne servait qu'à
+  Execute et Ignore Pain, rares dans le deck. Le bonus à 10 Rage est le débouché inclus dans l'épique. Plus
+  large, il passe la cible : +1 par Rage au-delà de 5, 98 à 100 % ; au-delà de 7, +21 ; au-delà de 8, +16 à +19.
 - **Cas limites.** Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10 = 45, Ignore Pain 30
-  Absorb, Skullflame Shield 20 Absorb par tour). Spend N reste N. Lien Blackrock : garder la Rage pour
-  traverser un seuil d'un seul coup (« passer à travers » saute la phase).
+  Absorb, Skullflame Shield 20 Absorb par tour). Spend N reste N. Garder 10 Rage ou la dépenser d'un coup :
+  le choix de chaque tour. Lien Blackrock : garder la Rage pour traverser un seuil d'un seul coup.
 - **Deck piloté.** Centrales : Execute, Ignore Pain, Bloodrage, Berserker Rage, Colossus Smash et Mortal
   Strike (Sundered pour l'Execute), bibelots Battle Standard et Skullflame Shield. Mauvaises : Heroic Strike
   et Onslaught (Spend qui entament la réserve). À retirer : Heroic Strike, Strike. Feu de camp : Execute.

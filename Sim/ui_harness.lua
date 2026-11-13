@@ -9884,8 +9884,8 @@ do
   e, c, v = uewCombat("sweeping_strikes")
   host = v.classZone.views.warrior
   local alive = #ns.Combat.aliveEnemies(c)
-  check("Sweeping Strikes : « Targeted hits splash 1 other for half » à plusieurs, rien seul",
-    (alive >= 2 and line(host) == "Targeted hits splash 1 other for half") or (alive < 2 and line(host) == nil), line(host))
+  check("Sweeping Strikes : « Targeted hits splash 1 other for a third » à plusieurs, rien seul",
+    (alive >= 2 and line(host) == "Targeted hits splash 1 other for a third") or (alive < 2 and line(host) == nil), line(host))
   -- 5. Thunderous Roar : l'onde (journal epic_trigger, dégâts) passe par la file d'animations
   e, c, v = uewCombat("thunderous_roar")
   host = v.classZone.views.warrior
