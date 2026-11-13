@@ -757,3 +757,60 @@ Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic 
 15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
 ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
 `docs/zones/cartes-de-zone.md`, section « Rogue ».
+
+## Blackrock Mountain : passe de difficulté (14/11/2026)
+
+Cible : 50 % de victoires au bot de référence (clé 0, `zone=blackrock zones=6 level=7`, épique gagnée en jeu),
+écart entre classes ≤ 10 points, Nefarian combat le plus dur. Avant → après (1 500 expéditions) : Priest 69,0 →
+49,0 ; Warrior 71,5 → 49,1 ; Mage 68,5 → 46,5 ; Rogue 78,9 → 54,3 ; Hunter 80,8 → 54,1 ; moyenne 73,7 → **50,6**,
+écart 12,3 → **7,8**. PV perdus par combat normal : 10,0 / 10,2 / 6,8 / 7,4 / 7,1 → 12,3 / 12,8 / 8,4 / 9,0 / 8,2.
+Leviers : PV des normaux (+10 %), Vaelastrasz (40 % au départ, Cleave 20), Gyth 104 PV, Panzor 96 PV avec un
+plafond d'Invincible relevé à 10 (il punissait le Warrior), Nefarian 120 PV et ses gros coups +2 ; l'écart venait
+du boss, réglé par le Class Call : Called Out (Rogue) empêche aussi de regagner la Parry, sur 1 tour ; Broken Bow
+(Hunter) −5 sur 3 tours. Détail, essais écartés et ce qui reste (Hunter à 95 % contre les élites, qu'il
+étourdit) : `docs/zones/blackrock.md`, « Passe de difficulté ».
+## Passe de difficulté de Duskwood (14/11/2026)
+
+Cible de la zone 2 : 72 % de victoires en moyenne, écart ≤ 10 points (`runner=expedition key=0 zone=duskwood
+zones=1 level=7`, bot heuristique, épique gagnée sur les élites). Avant : 67,7 % (Priest 70,1, Warrior 70,5,
+Mage 65,9, Rogue 63,6, Hunter 68,4 ; 800 expéditions), 85 % des défaites au boss. Seul Morbent Fel change :
+Drain Life 14 / 16 → 12 / 14, Shadow Bolt 17 / 20 → 15 / 18 (Rogue et Mage n'interrompent presque rien),
+PV 92 → 96. Après (1500 expéditions) : **72,3 %**, écart 7,5 (Priest 76,8, Warrior 73,7, Mage 69,3, Rogue 71,4,
+Hunter 70,4) ; PV perdus par combat normal inchangés (6,6 à 10,5). Détail et essais écartés : `docs/zones/duskwood.md`,
+« Passe de difficulté ».
+## Swamp of Sorrows : passe de difficulté (14/11/2026)
+
+Cible de la zone 5 : 60 % de victoires en moyenne, écart entre classes ≤ 10 points (`runner=expedition key=0
+zone=swamp zones=4 level=7`, épique gagnée sur les élites). Avant (800 expéditions) : Priest 73,4, Warrior 64,2,
+Mage 62,0, Rogue 52,5, Hunter 59,4 % (moyenne 62,3, écart 21). Après (1 500) : Priest 64,5, Warrior 60,3, Mage
+60,3, Rogue 60,2, Hunter 57,1 % (moyenne **60,5**, écart **7,4**). Le Priest, qui se soigne en combat, atteignait
+Somnus dans 95 % des expéditions contre 69 % au Rogue (élites Gilmorian et Chieftain à 80 %) et ne perdait qu'au
+boss, où il est le plus lent. Changements, dans la zone seule : Death Roll 20 → 10 × 2 et Spear Thrust 13 → 7 × 2
+(deux coups que Parry arrête) ; Gilmorian Lightning Bolt 20 → 16, Healing Wave 20 → 24 ; soin de Slumber de Wyrmak
+6 → 9 ; Somnus 140 PV (135) et Wing Buffet donne Strength 3 (le boss coûte plus cher aux combats longs : Priest
+et Warrior). Détails, essais écartés et mesures par rencontre : `docs/zones/swamp.md`, « Passe de difficulté ».
+
+## Passe de difficulté de Stranglethorn Vale (14/11/2026)
+
+Cible : 64 % de victoires en moyenne (`runner=expedition zone=stranglethorn zones=3 level=7 key=0 bot=heuristic`,
+épiques gagnées en route), écart ≤ 10. Avant (800) : Priest 64,8, Warrior 71,2, Mage 74,2, Rogue 65,4, Hunter
+76,0 (moyenne 70,3, écart 11,2). Après (1500) : **60,4 / 63,6 / 69,0 / 64,1 / 64,4** (moyenne 64,3, écart 8,6) ;
+PV perdus par combat normal inchangés (9,8 / 11,4 / 7,2 / 7,6 / 7,8). Le Mage et le Hunter passaient les élites
+presque sans perte (contrôle) : élites adoucis (Priest, Warrior, Rogue +4 à 5 points d'élites), difficulté portée
+par Jin'do, plus robuste (134 → 176 PV : coûte plus au Warrior et au Mage) et moins pointu (le Priest à 36 PV
+craint les gros coups) ; son Shadow Bolt coupe le Cast à travers l'Absorb ; Delusions frappe par un coup ordinaire
+(Parry : Rogue +5,6). Reste : Mage 5 points devant, Priest 4 points derrière. Détail, essais écartés :
+`docs/zones/stranglethorn.md`, « Passe de difficulté ».
+
+## Wetlands : passe de difficulté (14/11/2026)
+
+Cible : 68 % de victoires en moyenne (± 2), écart entre classes ≤ 10 points (`runner=expedition key=0
+zone=wetlands zones=2 level=7 bot=heuristic`, épique gagnée en route). Avant (800 expéditions) : Priest 78,2,
+Warrior 76,8, Mage 64,9, Rogue 72,4, Hunter 70,6 ; moyenne 72,6, écart 13,3. Après (1 500) : Priest 72,7,
+Warrior 69,8, Mage 63,3, Rogue 65,5, Hunter 66,7 ; **moyenne 67,6, écart 9,4**. PV perdus par combat normal
+inchangés (Priest 9,2, Warrior 11,2, Mage 7,6, Rogue 8,0, Hunter 7,7). Un relevé des PV perdus par ennemi et par
+intention a montré que le Mage perdait d'abord aux sbires du boss (Bonewarders, Whelps, Shadow Bolt) et à la
+meute de raptors, que le Priest profitait de la durée de ses combats de boss (6,9 tours contre 4,9 au Mage) et
+que Modr usait les classes lentes (Warrior, Priest, Rogue). Sbires et raptors adoucis, Clan Command à
+Strength 3, Mortal Wound de 3 tours chez Nek'rosh et le Raider, Modr 110 PV et Stone Fist 15, Nek'rosh 84 PV.
+Nombres, essais écartés et tableau par classe : `docs/zones/wetlands.md`, « Passe de difficulté ».

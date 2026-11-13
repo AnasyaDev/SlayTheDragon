@@ -96,7 +96,7 @@ Art.actionText.class_call = function(a, c)
   local BR = ns.Blackrock
   local cc = BR.classCall(c and c.class)
   local s = ns.Statuses[cc.status]
-  return "Applies " .. s.name .. " " .. (a[2] or BR.CALL_TURNS) .. " to you: " .. s.text
+  return "Applies " .. s.name .. " " .. (cc.turns or a[2] or BR.CALL_TURNS) .. " to you: " .. s.text
 end
 Art.actionText.call_drakonid = function() return "Calls a Drakonid to his side." end
 Art.actionText.raise_bones = function(a, c, e)

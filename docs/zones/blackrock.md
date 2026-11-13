@@ -624,23 +624,23 @@ gnomes 12940 / 6973, nains de Forgefer 3411 / 3422, aubergiste 3047 (Plugger).
 
 | Ennemi | PV | Coups |
 |---|---|---|
-| Firebrand Grunt | 23–26 | Hack 11, Sunder Armor 5 + Sundered 1 |
-| Rookery Whelp (sbire : 7–8) | 12–14 | Bite 4 ; Strength 1 à la mort d'un autre |
-| Anvilrage Guardsman | 33–36 | Shield Bash 7 (interrompt), Guard 10, Strike 8 × 2 ; phase : Shield Wall 15, Shield Slam 8 + 6 Absorb |
-| Anvilrage Medic | 19–21 | Heal 8 (≥ 8 manquants), Holy Smite 7 ; phase : Desperate Prayer (soin 10) |
-| Blazing Fireguard | 24–27 | Flame Lash 10, Fire Nova 4 + DoT 2 ; phase : Fire Shield 2 |
-| Firebrand Pyromancer | 22–25 | Fireball (Cast) 20, Scorch 5 (interrompt) ; phase : Flamestrike (Cast) 12 + DoT 3 |
-| Blackhand Veteran | 32–35 | Strike 12, Shield Bash 6 (interrompt), Battle Shout ; phase : Strength 3, Whirlwind 6 × 2 |
-| Rage Talon Dragonspawn | 33–36 | Cleave 14, Thunderclap 6 + Demoralized 1 ; phase : Bellowing Roar (Sundered 2, Demoralized 2) |
-| Rookery Hatcher | 28–31 | Strike 11, Tend Eggs 8 ; phase : 2 Rookery Whelps |
-| Panzor | 88 | Stomp 8 × 2, Pulverize 18 (interrompt), Overheat Strength 2 ; 50 % : Rampage 6 × 3, +25 % subis |
-| Gyth / Rend | 100 | Flame Breath 11 + DoT 3, Knock Away 13, Corrosive Acid 6 + Sundered 2, Freeze 5 ; 50 % : Strength 2, Cleave 13, Whirlwind 6 × 3, Mortal Strike 20 |
-| Vaelastrasz | 200 (70 au départ) | Flame Breath 11 + DoT 3, Burning Adrenaline 2, Cleave 18 ; 15 % : Fire Nova 7 × 2 |
-| Nefarius / Nefarian | 100 | Shadow Bolt (Cast) 20, Volley 7 × 2, Fear 5 + Demoralized 2, Dark Mending 8 ; 75 % : Shadow Flame (Cast) 22 + DoT 3, Tail Sweep 10 × 2, Veil of Shadow 6 + Veil 4, Class Call ; 25 % : Strength 3, Fury 3 (Strength 10), Bellowing Roar 7 × 2, Cleave 20 |
+| Firebrand Grunt | 26–29 | Hack 11, Sunder Armor 5 + Sundered 1 |
+| Rookery Whelp (sbire : 7–8) | 13–15 | Bite 4 ; Strength 1 à la mort d'un autre |
+| Anvilrage Guardsman | 36–40 | Shield Bash 7 (interrompt), Guard 10, Strike 8 × 2 ; phase : Shield Wall 15, Shield Slam 8 + 6 Absorb |
+| Anvilrage Medic | 21–23 | Heal 8 (≥ 8 manquants), Holy Smite 7 ; phase : Desperate Prayer (soin 10) |
+| Blazing Fireguard | 27–30 | Flame Lash 10, Fire Nova 4 + DoT 2 ; phase : Fire Shield 2 |
+| Firebrand Pyromancer | 24–27 | Fireball (Cast) 20, Scorch 5 (interrompt) ; phase : Flamestrike (Cast) 12 + DoT 3 |
+| Blackhand Veteran | 35–38 | Strike 12, Shield Bash 6 (interrompt), Battle Shout ; phase : Strength 3, Whirlwind 6 × 2 |
+| Rage Talon Dragonspawn | 36–39 | Cleave 14, Thunderclap 6 + Demoralized 1 ; phase : Bellowing Roar (Sundered 2, Demoralized 2) |
+| Rookery Hatcher | 32–35 | Strike 11, Tend Eggs 8 ; phase : 2 Rookery Whelps |
+| Panzor | 96 (Invincible : 10 au plus par coup) | Stomp 8 × 2, Pulverize 18 (interrompt), Overheat Strength 2 ; 50 % : Rampage 6 × 3, +25 % subis |
+| Gyth / Rend | 104 | Flame Breath 11 + DoT 3, Knock Away 13, Corrosive Acid 6 + Sundered 2, Freeze 5 ; 50 % : Strength 2, Cleave 13, Whirlwind 6 × 3, Mortal Strike 20 |
+| Vaelastrasz | 200 (80 au départ) | Flame Breath 11 + DoT 3, Burning Adrenaline 2, Cleave 20 ; 15 % : Fire Nova 7 × 2 |
+| Nefarius / Nefarian | 120 | Shadow Bolt (Cast) 22, Volley 7 × 2, Fear 5 + Demoralized 2, Dark Mending 8 ; 75 % : Shadow Flame (Cast) 24 + DoT 3, Tail Sweep 11 × 2, Veil of Shadow 6 + Veil 4, Class Call (2 tours ; Called Out 1, Broken Bow 3) ; 25 % : Strength 3, Fury 3 (Strength 10), Bellowing Roar 7 × 2, Cleave 20 |
 | Red / Blue Drakonid | 10 | Claw 8, Breath 3 + DoT 2 / Demoralized 1 |
 | Bone Construct | 8 | Bone Strike 7 |
 
-### Mesures (1 000 expéditions par ligne, `zone=blackrock zones=6 level=7 key=0`, après la fusion des six zones)
+### Mesures de l'implémentation (1 000 expéditions par ligne, `zone=blackrock zones=6 level=7 key=0`, après la fusion des six zones ; avant la passe de difficulté du 14/11/2026, plus bas)
 
 | Classe | Victoire `epic=none` | avec épique (pour information, avant le réglage des épiques) | PV perdus / combat normal | tours (normal) | boss : victoire, tours |
 |---|---|---|---|---|---|
@@ -657,3 +657,43 @@ entre classes y est déjà de 10,7 points, le Mage en bas. À Blackrock il est d
 leviers propres à la zone (Class Call par classe, Veil, Throne, Drakonids) ont été réglés pour le resserrer ; le
 Mage meurt surtout au boss (71 %), sur les gros coups (Shadow Flame, Cleave) avec ses 42 PV. Statistiques de
 zone (par combat de boss, Mage) : 1,9 Bone Construct, 1,0 Class Call, 14 dégâts arrêtés par le Throne.
+
+### Passe de difficulté (14/11/2026)
+
+Cible (`docs/zones/decisions.md`, « Difficulté et épiques ») : **50 % de victoires** au bot de référence, clé 0,
+épique gagnée en jeu (pas d'`epic=`), écart entre classes ≤ 10 points ; Nefarian reste le combat le plus dur.
+Mesure : `luajit Sim/sim.lua runs=1500 bot=heuristic jobs=5 runner=expedition key=0 class=<c> zone=blackrock
+zones=6 level=7` (départ : 800).
+
+| Classe | Victoires avant → après | PV perdus / combat normal | Élites (victoires) | Boss : victoires, tours, PV perdus |
+|---|---|---|---|---|
+| Priest | 69,0 → **49,0** | 10,0 → 12,3 | 92,7 → 90,0 % | 77 → 58 %, 7,9, 34 |
+| Warrior | 71,5 → **49,1** | 10,2 → 12,8 | 88,6 → 84,7 % | 85 → 62 %, 6,5, 36 |
+| Mage | 68,5 → **46,5** | 6,8 → 8,4 | 93,6 → 89,1 % | 77 → 57 %, 6,0, 24 |
+| Rogue | 78,9 → **54,3** | 7,4 → 9,0 | 93,1 → 90,0 % | 89 → 65 %, 6,3, 25 |
+| Hunter | 80,8 → **54,1** | 7,1 → 8,2 | 97,3 → 95,3 % | 84 → 59 %, 5,8, 27 |
+| moyenne, écart | 73,7 / 12,3 → **50,6 / 7,8** | | | |
+
+Changements (nombres finaux dans le tableau plus haut) :
+- **Normaux** : PV +2 à +4 (≈ +10 %) ; dégâts inchangés (essai Hack 12, Flame Lash 11, Fireball 22, Cleave 15 :
+  Priest et Warrior à 13–14 PV perdus par combat normal, 3 points de victoire de moins ; remis).
+- **Élites** : Vaelastrasz commence à 40 % (80 PV) et Cleave 20 (il restait gagné à 95–99 % par toutes les
+  classes) ; Gyth 104 PV ; Panzor 96 PV mais plafond d'Invincible **6 → 10** : à 6, il punissait les gros coups
+  isolés du Warrior (65 % contre 98 % au Hunter) ; Rend à 112 PV et Mortal Strike 22 faisait tomber le Warrior à
+  64 %, écarté.
+- **Nefarian** : 100 → **120 PV**, Shadow Bolt 22, Shadow Flame 24, Tail Sweep 11 × 2. Il fait à présent
+  60 à 83 % des défaites (83 % pour le Hunter).
+- **Class Call** (la rencontre qui faisait l'écart : le Rogue gagnait 89 % du boss, le Hunter 84 %) :
+  - **Called Out** (Rogue) : on ne peut plus non plus *gagner* de Parry (texte `Lose all Parry and Stealth.
+    You can't gain them.`), mais **1 tour** (champ `turns` de `BR.CLASS_CALL`). Avant, la Parry revenait dès la
+    carte suivante : passer l'état de 2 à 3 tours n'avait rien changé (boss 73,6 %). Sans Parry pendant 2
+    tours, le Rogue tombait à 43 % ; 1 tour le met à 54 %.
+  - **Broken Bow** (Hunter) : **−5** par coup (au lieu de −3), **3 tours** (`BR.BROKEN_BOW`, texte composé). À −4
+    et 2 tours, l'effet ne se voyait pas à la mesure.
+
+Ce qui reste : Rogue et Hunter au-dessus de la moyenne (+4 points), Mage en dessous (−4), dans l'écart. Le
+Hunter gagne 95 % des élites (Freezing Trap étourdit Panzor, Gyth et Vaelastrasz, qui ne sont pas immunisés) :
+son avance vient d'avant le boss (il l'atteint 9 fois sur 10, le Warrior 7 sur 10) ; la règle de zone n'a pas de
+levier sur l'étourdissement sans changer le concept des élites. Sans épique, les classes gagnent 19 à 28 %
+(voulu). PV perdus par combat normal au-dessus des cibles par classe pour le Priest (12,3 sur 36 PV) et le
+Warrior (12,8 sur 74) : déjà au-dessus avant la passe (10,0 et 10,2).

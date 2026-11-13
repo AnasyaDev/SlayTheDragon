@@ -556,12 +556,12 @@ peints), `Sim/zones/wetlands.lua` (bot), `Sim/tests_zone_wetlands.lua` (32 tests
   dégâts au premier coup de chaque tour du joueur au lieu de l'annuler : annulé en entier, l'armure mangeait le
   gros sort du Mage chaque tour (élite la plus meurtrière pour lui).
 - **Mortal Wound** (ajout) : état « soins reçus divisés par deux » (crochet `heal` de la zone), posé par le
-  Mortal Strike du Dragonmaw Raider (2 tours), le Cleave du Centurion et le Cleave et le Sunder Armor de
+  Mortal Strike du Dragonmaw Raider (3 tours), le Cleave du Centurion et le Cleave et le Sunder Armor de
   Nek'rosh. Seule réponse trouvée à l'écart entre les classes qui se soignent (Priest) et les autres : sans
   elle, le Priest gagnait 87 % contre 57 % au Mage.
-- **Nek'rosh** : 80 PV (fiche 98) ; Sunder Armor pose **Sundered 1** (2 dans la fiche : +25 % de dégâts sur deux
-  tours faisait tomber le Mage de 16 points) ; Clan Command donne **Strength 2** à tous et 8 Absorb, en 3e
-  position (Cleave, Sunder, Command) ; phase 2 : Shadow Bolt **16** (fiche 28), motif Shadow Bolt, Cleave,
+- **Nek'rosh** : 84 PV (fiche 98) ; Sunder Armor pose **Sundered 1** (2 dans la fiche : +25 % de dégâts sur deux
+  tours faisait tomber le Mage de 16 points) ; Clan Command donne **Strength 3** à tous et 8 Absorb, en 3e
+  position (Cleave, Sunder, Command) ; phase 2 : Shadow Bolt **14** (fiche 28), motif Shadow Bolt, Cleave,
   **Call Whelps** (ajout : 2 Crimson Whelps, 4 au plus), Sunder. Bonewarders : prime heal **6** (fiche 10).
 - **Sarltooth** : Scytheclaws à +1 Strength (fiche +2), 2 au plus en vie : une carte de zone qui tue l'escorte
   renforçait trop Sarltooth (les classes à zone, le Mage d'abord, étaient punies de jouer leur force).
@@ -593,18 +593,18 @@ peints), `Sim/zones/wetlands.lua` (bot), `Sim/tests_zone_wetlands.lua` (32 tests
 |---|---|---|---|
 | Bluegill Raider | 11–13 | +3 Absorb | Spear Jab 5 ; Muck Toss 3 + Demoralized 1 |
 | Mosshide Brute | 19–22 | +2 Strength | Club 8 ; Knockdown 5 (interrompt) |
-| Mosshide Mystic | 15–17 | heal 6 | Healing Wave 6 (allié à −6 PV ou plus) ; Lightning Bolt 10 (Cast) |
+| Mosshide Mystic | 15–17 | heal 6 | Healing Wave 6 (allié à −6 PV ou plus) ; Lightning Bolt 8 (Cast) |
 | Mosshide Alpha | 24–27 | chef | Rally 4 Absorb à tous ; Maul 11 ; Savage Howl Strength 1 à tous |
 | Mottled Screecher | 13–15 | +1 Strength | Screech (Cast : un raptor, 3 au plus) ; Claw 3 × 2 |
-| Mottled Raptor | 13–15 | +2 Strength | Rake 3 × 2 ; Lunge 7 |
-| Dragonmaw Raider | 24–27 | +2 Strength | Shield Bash 5 (interrompt) ; Mortal Strike 11 + Mortal Wound 2 |
+| Mottled Raptor | 13–15 | +1 Strength | Rake 3 × 2 ; Lunge 7 |
+| Dragonmaw Raider | 24–27 | +2 Strength | Shield Bash 5 (interrompt) ; Mortal Strike 11 + Mortal Wound 3 |
 | Wetlands Crocolisk | 32–36 | — | Snap 10 ; Submerge 12 Absorb ; Death Roll 4 × 3 |
 | Black Ooze / Black Slime | 22–25 / 6–7 | — | Corrosive Acid 5 + Sundered 1 ; Ooze Slam 8 ; 2 Slimes à sa mort / Slime Bolt 3 |
 | Sarltooth (élite) + Scytheclaw | 66 + 12–14 | — / +1 Strength | Call the Pack (2 au plus) ; Rend 7 + DoT 3 ; Leap 16 (interrompt) / Slash 5 |
-| Modr (élite) | 90 | — | Stone Fist 12 ; Seismic Slam 6 + 8 par Charge (interrompt) ; Charge si < 15 PV perdus |
-| Dragonmaw Centurion (élite) | 56 | membre | Shield Bash 6 ; Cleave 8 × 2 + Mortal Wound 2 ; Demoralizing Shout 4 + Demoralized 2 ; armure −10 |
-| Chieftain Nek'rosh (boss) | 80 | membre | Cleave 9 × 2 + MW 2 ; Sunder 12 + Sundered 1 + MW 2 ; Clan Command ; phase 2 : Shadow Bolt 16 (Cast), Call Whelps |
-| Dragonmaw Bonewarder / Crimson Whelp | 13–15 / 8–10 | heal 6 / — | Bone Ward 6 sur le boss ; Shadow Bolt 6 / Fire Breath 4 |
+| Modr (élite) | 110 | — | Stone Fist 15 ; Seismic Slam 6 + 8 par Charge (interrompt) ; Charge si < 15 PV perdus |
+| Dragonmaw Centurion (élite) | 56 | membre | Shield Bash 6 ; Cleave 7 × 2 + Mortal Wound 2 ; Demoralizing Shout 4 + Demoralized 2 ; armure −10 |
+| Chieftain Nek'rosh (boss) | 84 | membre | Cleave 9 × 2 + MW 3 ; Sunder 12 + Sundered 1 + MW 3 ; Clan Command (Strength 3 à tous, 8 Absorb) ; phase 2 : Shadow Bolt 14 (Cast), Call Whelps |
+| Dragonmaw Bonewarder / Crimson Whelp | 13–15 / 8–10 | heal 6 / — | Bone Ward 6 sur le boss ; Shadow Bolt 3 / Fire Breath 3 |
 
 ### Mesures (heuristic, `runner=expedition zone=wetlands zones=2 level=7`, clé 0)
 
@@ -631,6 +631,41 @@ nombreuses. Ce qui a resserré : Mortal Wound (Priest −12), armure du Centurio
 moins forts, soins fixes des rencontres (Mage +2 à +6). Avec épique, le Mage reste à 66 % quand les autres
 dépassent 86 % : écart propre aux épiques (autre lot). Statistiques de zone (par combat normal, Hunter) : primes
 de Strength 1,9, soin de meute perdu sur un ennemi intact 2,6, chef tué en premier 0,01 contre 0,17 en dernier.
+
+### Passe de difficulté (14/11/2026)
+
+Cible de la campagne : 68 % de victoires en moyenne, écart entre classes ≤ 10 points (`docs/equilibrage.md`,
+« Wetlands : passe de difficulté »). Mesure : `runner=expedition key=0 zone=wetlands zones=2 level=7`, épique
+gagnée en route (sans `epic=`), avant 800 expéditions, après 1 500.
+
+| Classe | Victoires avant | après | PV perdus / combat normal avant | après | Boss avant | après |
+|---|---|---|---|---|---|---|
+| Priest | 78,2 % | 72,7 % | 9,4 | 9,2 | 80,6 % | 75,5 % |
+| Warrior | 76,8 % | 69,8 % | 11,3 | 11,2 | 82,0 % | 75,7 % |
+| Mage | 64,9 % | 63,3 % | 7,8 | 7,6 | 71,9 % | 68,7 % |
+| Rogue | 72,4 % | 65,5 % | 8,2 | 8,0 | 78,9 % | 74,4 % |
+| Hunter | 70,6 % | 66,7 % | 7,9 | 7,7 | 73,0 % | 69,3 % |
+| **Moyenne / écart** | **72,6 / 13,3** | **67,6 / 9,4** | | | | |
+
+Ce qui a changé, et pourquoi (relevé des PV perdus par ennemi et par intention, instrument temporaire) :
+- **Le Mage était puni par les sbires du boss** : il prenait 5,2 PV par combat des Bonewarders contre 2,9 au
+  Warrior, plus les Whelps et le Shadow Bolt de phase 2 (coups qui tuent une petite réserve de PV). Bonewarder
+  Shadow Bolt 6 → **3**, Crimson Whelp Fire Breath 4 → **3**, Shadow Bolt de Nek'rosh 16 → **14**. Dans les
+  combats normaux, la meute de raptors (95,5 % au Mage, 99,8 % au Hunter) : Mottled Raptor prime **+1 Strength**
+  (au lieu de +2) ; Mosshide Mystic Lightning Bolt 10 → **8**. Dragonmaw Centurion Cleave 8 × 2 → **7 × 2**
+  (l'élite la plus sensible pour le Mage : à 10 × 2, le Mage tombait à 80 % sur ce combat).
+- **Le Priest était épargné par la durée** : ses combats de boss durent 6,9 tours (Mage 4,9). Clan Command
+  donne **Strength 3** à tous (au lieu de 2) : la Strength pèse sur chaque tour qui reste. Mortal Wound de
+  Nek'rosh (Cleave, Sunder) et du Mortal Strike du Raider : **3 tours** (au lieu de 2).
+- **Warrior, Priest et Rogue lents sur Modr** (le test de rafale) : Modr **110 PV** (90), Stone Fist **15** (12).
+  Le Mage et le Hunter frappent assez fort par tour pour lui refuser ses Charges.
+- **Niveau moyen** : Nek'rosh **84 PV** (80). Le boss reste le combat le plus dur (68 à 76 % selon la classe,
+  élites 88 à 99 %) ; les combats « easy » restent à 100 %.
+- Écartés : Clan Command en phase 2 (la phase 2 dure moins de trois tours : sans effet) ; Wyrmscale Armor à 7
+  (sans effet mesurable, gardée à 10) ; Nek'rosh à 92 PV (−7 points à toutes les classes, écart inchangé) ;
+  Modr Charge sous 18 PV perdus (le Rogue tombait à 90 % sur Modr) ; Sarltooth et Centurion plus résistants
+  (punissaient d'abord le Mage).
+- Reste : Rogue 88 % sur Modr (son combat le plus risqué hors boss) ; le Priest reste en tête au boss.
 
 ### Modèles en repli
 

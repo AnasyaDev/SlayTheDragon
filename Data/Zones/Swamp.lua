@@ -17,7 +17,7 @@ local D = ns.Declare
 E.sawtooth_crocolisk = {
   name = "Sawtooth Crocolisk", hp = { 37, 42 }, asleep = 2, opener = "death_roll",
   moves = {
-    death_roll = { name = "Death Roll", intent = "attack", actions = { { "attack", 20 } } },
+    death_roll = { name = "Death Roll", intent = "attack", actions = { { "attack", 10, times = 2 } } },
     snap = { name = "Snap", intent = "attack", actions = { { "attack", 10 } } },
     submerge = { name = "Submerge", intent = "defend", actions = { { "block", 7 } } },
   },
@@ -116,7 +116,7 @@ E.lost_one_chieftain = {
   name = "Lost One Chieftain", hp = 108, elite = true, asleep = 2, opener = "spear",
   moves = {
     spear = { name = "Spear of the Lost", intent = "attack", actions = { { "attack", 24, interrupts = true } } },
-    thrust = { name = "Spear Thrust", intent = "attack", actions = { { "attack", 13 } } },
+    thrust = { name = "Spear Thrust", intent = "attack", actions = { { "attack", 7, times = 2 } } },
     rally = { name = "Rally", intent = "buff", actions = { { "block", 8 }, { "buff", "force", 2 } } },
     crush = { name = "Crushing Blow", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "armor_broken", 1 } } },
   },
@@ -136,7 +136,7 @@ E.lost_one_muckdweller = {
   end,
 }
 
--- À mi-vie, après l'effet en cours : Slumber 2, soin 6 par tour de sommeil, ouverture Dream Fury ; le
+-- À mi-vie, après l'effet en cours : Slumber 2, soin 9 par tour de sommeil, ouverture Dream Fury ; le
 -- motif reprend ensuite à Cleave.
 E.wyrmak = {
   name = "Lord Captain Wyrmak", hp = 116, elite = true,
@@ -148,18 +148,18 @@ E.wyrmak = {
   },
   pattern = { "cleave", "sweep", "buffet" },
   phases = {
-    { at = 0.5, name = "The Dream", text = "Falls asleep: Asleep 2, heals 6 each turn it sleeps.",
-      dream = { { "slumber", 2, mend = 6, opener = "dream_fury" } } },
+    { at = 0.5, name = "The Dream", text = "Falls asleep: Asleep 2, heals 9 each turn it sleeps.",
+      dream = { { "slumber", 2, mend = 9, opener = "dream_fury" } } },
   },
 }
 
 E.gilmorian = {
   name = "Gilmorian", hp = 108, elite = true,
   moves = {
-    bolt = { name = "Lightning Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
+    bolt = { name = "Lightning Bolt", intent = "cast", cast = true, actions = { { "attack", 16 } } },
     shock = { name = "Frost Shock", intent = "attack",
       actions = { { "attack", 6, interrupts = true }, { "debuff", "demoralized", 1 } } },
-    wave = { name = "Healing Wave", intent = "heal", cast = true, actions = { { "heal_ally", 20 } } },
+    wave = { name = "Healing Wave", intent = "heal", cast = true, actions = { { "heal_ally", 24 } } },
   },
   pattern = { "bolt", "shock", "wave" },
 }
@@ -176,12 +176,12 @@ E.somnus_whelp = {
 }
 
 E.somnus = {
-  name = "Somnus", hp = 135, boss = true, asleep = 2, opener = "roar",
+  name = "Somnus", hp = 140, boss = true, asleep = 2, opener = "roar",
   moves = {
     roar = { name = "Bellowing Roar", intent = "attack", actions = { { "attack", 16 }, { "debuff", "demoralized", 1 } } },
     breath = { name = "Noxious Breath", intent = "attack", actions = { { "attack", 6, times = 2 }, { "debuff", "pain", 3 } } },
     claw = { name = "Claw", intent = "attack", actions = { { "attack", 20 } } },
-    buffet = { name = "Wing Buffet", intent = "attack", actions = { { "attack", 10, interrupts = true }, { "block", 10 } } },
+    buffet = { name = "Wing Buffet", intent = "attack", actions = { { "attack", 10, interrupts = true }, { "block", 10 }, { "buff", "force", 3 } } },
     deep_breath = { name = "Deep Breath", intent = "attack", actions = { { "attack", 10, times = 2 } } },
     claw2 = { name = "Claw", intent = "attack", actions = { { "attack", 21 } } },
     breath2 = { name = "Noxious Breath", intent = "attack", actions = { { "attack", 7, times = 2 }, { "debuff", "pain", 3 } } },
