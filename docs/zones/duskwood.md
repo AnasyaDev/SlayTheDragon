@@ -521,3 +521,89 @@ leurs tableaux.
 5. **« Remove negative effects » épuise les Curses en main.** Oui (proposé) : Berserker Rage, Cloak of
    Shadows et Insignia of the Alliance prennent de la valeur ici et Anti-Venom a un rôle. Non : seules les
    cartes de zone nettoient, et ces trois cartes restent ce qu'elles sont.
+
+## Implémentation (14/11/2026)
+
+Fichiers : `Data/Zones/Duskwood.lua` (Curses, ennemis, groupes, rencontres, commun, bibelots de clé, décors de la
+zone), `Core/ZoneRules/duskwood.lua` (règle, `ns.Duskwood`), `UI/Art/Zones/duskwood.lua` (modèles, icônes, vue,
+décors peints), `Sim/zones/duskwood.lua` (bot), `Sim/tests_zone_duskwood.lua`, `Sim/ui_zone_duskwood.lua` (UZD).
+
+### La règle telle que codée
+- Curse = carte `token`, `curse = true`, type `curse` (ni Attack ni Skill), toujours épuisée quand on la joue ;
+  posée par `DW.add(c, id, lanceur, pile)` : plafond 6 (main, pioche, défausse, recharges ; au-delà journal
+  `curse_full`), crochet `preventCurse` (Ghoul Rib), puis `Combat.addCard` avec `src` = uid du lanceur et
+  `lift = true` (levée d'office par `Combat.kill`, boss compris).
+- Bite = drapeau `curse = id` sur une attaque, lu par `afterEnemyAttack` (total > 0, lanceur vivant, une fois par
+  action). Hex = action `{ "curse", id, n, to }`, sans condition ; en incantation, elle s'interrompt.
+- « In hand » : champs `weakness` (crochet `damage`, Attacks seulement, 0 au moins), `drawLess` (`drawPerTurn`),
+  `tongues` (`cost`, première carte jouée du tour, pas sur elle-même). « End of turn » : champ `endOfTurn` du moteur
+  (`loseHp`, why = `curse` : ni Absorb ni Parry, peut tuer, donne de la Rage).
+- « Remove negative effects. » : crochet `cleanse`, Curses de la main épuisées (`cleansed`) et comptées.
+- Unholy Shield : état à drapeau, crochet `enemyDamageTaken` (moitié arrondie en dessous, avant l'Absorb) ;
+  Morbent's Bane (champ d'ennemi `gift`) donnée en main par `onCombatStart`, effet `removeUnholyShield`.
+
+### Ce qui diffère de la fiche, et pourquoi
+- **Morbent Fel** : 92 PV (fiche 104), Shadow Bolt 17 puis 20 (fiche 20 / 24), Curse of Tongues 7 × 2 (fiche 6),
+  Drain Life 14 / soin 6 puis 16 / soin 8 (fiche 9 / 9, 11 / 11), phase 2 avec deux Curse of Tongues par cycle
+  (`unholy_shield, shadow_bolt2, tongues, drain_life2, tongues`). Un soin fort et un boss long donnaient 9 à 10 tours
+  au Priest et au Warrior ; un cycle de plus de Tongues taxe surtout les combats longs.
+- **Morbent's Bane** : Cooldown 2 (fiche 3) : la seconde levée du bouclier arrive à temps pour les classes rapides
+  (l'écart Rogue / Warrior se creusait au boss).
+- **Fetid Corpse** : 15–17 PV, Rotting Claw 6 (fiche 12–14, 5) : la phase 2 dure pour les classes lentes et à gros
+  PV ; c'est le levier qui a ramené le Warrior (74 PV) au niveau des autres (−10 points pour lui, −5 pour les
+  autres), plutôt que de monter tous les nombres.
+- **Ennemis normaux** : PV +8 % environ (Dark Runner 23–26, Vile Fang 30–33, Shadow Weaver 19–22, Plague Spreader
+  16–18, Venom Web Spider 21–24, Pygmy 10–12, Rotted One 37–41, Splinter Fist 39–43, Night Runner 23–26) pour
+  ramener les combats normaux du Hunter et du Rogue au-dessus de 2,7 tours. Élites inchangées.
+- **Affiche WANTED** : case de parcours `night_watch_poster` (rencontre du même id, Watcher Backus, 840) **de
+  Duskwood seulement** : les crochets d'expédition d'une zone ne sont actifs que dans sa zone (rendre l'affiche
+  « toutes zones » demanderait un crochet `run` actif partout, absent du socle). L'élite est tirée à l'entrée
+  (nom dans le texte), imposée à la prochaine élite du chemin (`run.onFightStart`), +50 po à sa récompense et une
+  carte améliorée au hasard à la victoire (`run.onCombatWon`). Id distinct de la rencontre WANTED des Steppes.
+- **Commun** : palier 2 pour tout (fiche : 1 ou 2) : palier = ordre de la zone (brief). Champ `sheet = "duskwood"`.
+- **Rencontres** : champ `zone = "duskwood"` (au lieu d'`act = 2`) ; décors `town`, `graveyard`, `woods` portés
+  par la zone (`ns.Zones.duskwood.scenes`) ; personnages : la créature puis deux affichages voisins de Darkshire.
+- **Naraxis** : sbires `pygmy_brood` (copie sbire du Pygmy), `max = 3` (4 ennemis vivants au plus).
+- Textes : « the first card played each turn costs 1 more » (sans « your », langage des cartes).
+
+### Interface
+Vue `ns.ZoneViews.duskwood` : petite icône de la Curse à droite d'une attaque à Bite (infobulle « Bite: if this
+attack costs you HP, adds Rabies to your discard. »), intention `curse` (« +N », infobulle de la Curse et de la pile
+visée), « Curse N » sous chaque lanceur (« levées à sa mort »), Curses de la main au liseré violet (infobulle : le
+lanceur), pastilles violettes sur la pioche et la défausse, jeton « Curses N/6 » en haut au centre. Mots-clés
+`curse`, `unplayable`, déclencheur « In hand ». Décors peints (planches `build/snap/decor-duskwood_*.png`) : route
+de Raven Hill (`road`), nuit (`night`), cimetière de Raven Hill (`hill`, `graveyard`), camp de Sven (`camp`),
+Darkshire (`shop`, `town`), Twilight Grove (`woods`), Tranquil Gardens (`mine` : boss) ; accessoires génériques
+ajoutés au peintre : voir docs/zones.md § 6.
+
+### Modèles en repli
+Naraxis : absente des caches ; Venom Web Spider (217 / 955) à l'échelle 1,4, puis Giant Webwood Spider (6808).
+Personnages : affichages de secours de gens de Darkshire (même cache). Tous les autres : créature et affichage
+de la fiche, confirmés dans le cache enUS.
+
+### Mesures (1000 expéditions par ligne, bot heuristique, `zones=1 level=7`)
+Clé 0, après la fusion des épiques. « Sans épique » = `epic=none` (cible du brief) ; « épique » = le bot choisit son
+épique au départ. Normal / élite / boss : tours moyens et PV perdus par combat.
+
+| Classe | Victoire sans épique | Normal (tours / PV) | Élite (victoire / PV) | Boss (victoire / tours / PV) | Victoire avec épique | Boss avec épique (victoire / tours) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Priest | 65,9 % | 3,73 / 9,4 | 96,3 % / 18,3 | 70,4 % / 8,33 / 39,8 | 77,5 % | 79,1 % / 6,88 |
+| Warrior | 66,3 % | 3,18 / 10,1 | 95,9 % / 23,6 | 71,6 % / 7,88 / 44,3 | 88,5 % | 90,9 % / 3,41 |
+| Mage | 60,2 % | 3,08 / 6,5 | 97,1 % / 7,5 | 63,4 % / 5,86 / 28,7 | 81,1 % | 84,2 % / 4,24 |
+| Hunter | 64,4 % | 2,73 / 7,0 | 98,2 % / 7,9 | 66,8 % / 5,48 / 34,4 | 92,1 % | 92,9 % / 4,47 |
+| Rogue | 61,9 % | 2,88 / 7,5 | 94,4 % / 14,2 | 68,1 % / 5,81 / 31,3 | 83,9 % | 85,7 % / 5,72 |
+
+Sans épique : 60 à 66 %, écart 6,1 points (Westfall, `zones=0` : 70,5 à 81,7 %, écart 11). Avec épique : 77 à
+92 %, écart 14,6 : les épiques ajoutent 11 à 28 points (Warrior et Hunter surtout), à régler par leur lot.
+Clés (Rogue, sans épique) : +0 61,9 %, +1 51,8 %, +3 43,2 %, +5 35,1 % (−5,4 points par niveau en moyenne ; la
+marche +0 → +1 est la plus forte, Fortified).
+Taxe des Curses par combat (statistiques de zone, sans épique) : posées 0,5 à 0,8 en combat normal (presque
+toutes levées : le lanceur meurt vite), 1,5 à 3,3 en élite (1,4 à 3,2 PV perdus), 2 à 3 au boss (1,8 à 3,3 mana pour
+payer Curse of Tongues). La fiche estimait 1,5 à 2,5 PV par combat : en combat normal la taxe est surtout le choix
+de la cible.
+Écart Warrior : sans la réforme des Fetid Corpses, le Warrior (74 PV) restait à 75 % quand les autres étaient à
+57–67 % ; la phase 2 plus longue et plus dure pour les classes lentes l'a ramené dans le groupe.
+
+### À vérifier en jeu
+Modèles (Naraxis en repli, Stitches à l'échelle 1,25, Morbent Fel), lisibilité des pastilles violettes sur les
+piles et du jeton « Curses N/6 », vol de la carte vers la pile (texte flottant), décors peints sur l'écran du jeu.
