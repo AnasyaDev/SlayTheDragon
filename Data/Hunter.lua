@@ -393,7 +393,7 @@ local EPIC_BOT = {
 }
 
 local function epic(id, t)
-  t.type, t.rarity, t.epic = "power", "epic", true
+  t.type, t.rarity, t.epic, t.cost = "power", "epic", true, 0 -- coût jamais payé ni affiché
   t.effects = t.effects or {}
   t.whileInDeck = function(c, src) H().epicStart(c, src) end
   card(id, t)
@@ -752,10 +752,10 @@ ns.Classes.hunter = {
       if i and exp.deck[i].id == id then v = v + EPIC_KEEP end
       return v
     end,
-    -- builds pilotés par l'épique du deck (Sim/expedition.lua, SE.buildOf) : notes qui priment tant que
+    -- builds pilotés par l'épique du deck (Sim/expedition.lua, byEpic) : notes qui priment tant que
     -- l'épique est dans le deck (« Deck piloté » de la fiche) ; variantes de Lone Wolf notées sous l'id
     -- d'origine (c'est lui que proposent les récompenses).
-    builds = {
+    byEpic = {
       call_of_the_wild = {
         rating = { kill_command = 8.5, dire_beast = 11, bestial_wrath = 6.5, spirit_bond = 8.5, the_beast_within = 11,
           barbed_shot = 6, intimidation = 7.5, cobra_shot = 5.5, aimed_shot = 1.5, steady_shot = 1.5, volley = 1.5 },

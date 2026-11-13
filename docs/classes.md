@@ -147,6 +147,7 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `blockKeep` | Absorb actuelle | (rappel) la valeur gardée ; fraction et plafond se calculent sur le 2e argument (`max(v, min(15, floor(block / 2)))`) |
 | `retainPicks` | — | cartes gardées au choix en fin de tour (0 ; Traveler's Backpack : 1, une seule gérée) ; le choix est posé par `Combat.markRetain(c, uid)` avant la fin du tour (interface, `Bots.markRetain`), `Combat.retainCandidates(c)` = index proposés |
 | `surge` | ctx | montant compté par les effets d'un Surge qui a dépensé quelque chose (Anathema : +2) ; la dépense ne change pas |
+| `convertHit` | cible, ctx | dégâts d'un coup de l'effet `damage` après `calcDamage` (`Core/Effects.lua`) ; `false` = coup non porté, le crochet a posé autre chose à la place (Doomblade : un DoT) : ni dégâts, ni `onHit`, ni `onAttackHit` |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
 
 Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
@@ -347,6 +348,10 @@ simulent chaque coup sur une copie) ; une classe les guide par `bot` (définitio
 (règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cibles
 et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec tout le
 commun, `zones=7` (ex-« Ligue exaltée »), clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
+Build piloté par l'épique du deck (`Sim/expedition.lua`) : `bot.byEpic[id] = { rating, upgrade, remove }`, chacun
+une table `{ [carte] = note }` ou une fonction `(exp, carte) -> note|nil`, prime sur `bot.rating` / `upgrade` /
+`remove` tant que l'épique est dans le deck (choix des récompenses, rencontres, marchand, feu de camp, retraits) ;
+`bot.epic(exp, id)` note les épiques proposées (exemple complet : `Data/Rogue.lua`).
 
 ## Exemple minimal
 
@@ -432,7 +437,7 @@ exposée en `ns.HunterEpic`), tests `Sim/tests_epic_hunter.lua`, harnais « UEH 
 moteur : tout passe par les crochets existants, en `deckHooks` de l'épique (`src` = `c.epic`, posée hors des
 piles par le socle, crochets en dernier) ; `whileInDeck` = `ns.Hunter.epicStart(c, src)` retient l'épique en
 jeu (`c.cls.epic = { id, up }`, lu par la vue et les bots : `ns.Hunter.epic(c)`). Nombres réglés par la
-simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 8 / 12 dégâts en
+simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 12 / 16 dégâts en
 plus ; Lone Wolf +1 → +2 par Frenzy (amélioré +3 au lieu de « Start of turn: +1 Frenzy. », trop long pour
 la carte) ; Chimaera Shot 3 / 3 (6) → 4 / 4 (7) ; Trap Launcher 1 / 2 (fiche).
 
@@ -454,11 +459,33 @@ autre que la cible) ; déclencheurs « Each enemy DoT tick », « Attack hits »
 Interface commune touchée au minimum : `UI/Controller.lua` montre une carte proposée en récompense ou chez le
 marchand sous sa variante quand l'épique du deck la transforme (`shownCard`, `from` = l'originale ; la carte
 prise entre au deck sous son id d'origine). Bots : `classDef.bot.epic(exp, id)` (note d'offre) et
-`classDef.bot.builds[id]` = `{ rating, upgrade, remove }`, notes qui priment tant que l'épique est dans le
-deck (`Sim/expedition.lua`, `SE.buildOf`, crochet générique utilisable par toute classe) ; en combat,
+`classDef.bot.byEpic[id]` = `{ rating, upgrade, remove }` (point d'accroche partagé de `Sim/expedition.lua`),
+notes qui priment tant que l'épique est dans le deck ; en combat,
 `Hunter.EPIC_RES[id]` ajoute de la valeur au Frenzy gardé (Roar of Sacrifice, Lone Wolf) dans `botValue` ;
 l'épique du deck vaut 5 de plus pour le bot (`EPIC_KEEP`) : il ne la remplace que pour bien mieux, et une
 épique imposée (`epic=<id>`) reste mesurée seule.
+
+### Épiques du Voleur (14/11/2026)
+
+Données et nombres (`EPIC_N`, seule source : textes et règles) dans `Data/Rogue.lua` ; règles (`deckHooks`,
+`ns.Rogue`) dans `Core/Classes/rogue.lua` ; vue (ligne de l'épique sous les états du héros, marques
+d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, harnais UER.
+- **Deflection** : `onStatusApplied` (Parry sur le héros, `n` demandé avant le plafond de 3) ; compteur
+  `c.cls.ripostes` du tour (`c.cls.riposteRound`, le début du combat compte pour le tour 1, le tour ennemi
+  continue le compte) ; coup sans carte (`calcDamage` avec `cardDef` nil) sur `c.player.lastTarget` ou l'ennemi
+  vivant le plus à gauche ; journal `{ t = "riposte", dst, n, base }`. `ns.Rogue.ripostes(c)`, `nextRiposte(c)`.
+- **Doomblade** : crochet moteur `convertHit` (ci-dessus), Attacks à effet `surge` seulement ; DoT par le crochet
+  `apply` (Crystal Vial), icône poison.
+- **Atrophic Poison** : `enemyDamage` (×0,75 si l'ennemi garde du DoT après son tick : hors du tour ennemi, on
+  retire la baisse `dotDecay`, l'intention affichée est juste ; pas de cumul avec un vrai Demoralized),
+  amélioré `damage` (×1,25, pas de cumul avec Sundered). `ns.Rogue.countsDemoralized(c, e)`.
+- **Echoing Reprimand** : `surge` (2 ou 3 -> N) ; aucune autre source du Voleur ne modifie `surge` avant.
+- **Subterfuge** : `stealthBreak` faux ; durée `c.cls.stealthUntil` (posée à chaque Stealth reçu, et par
+  `whileInDeck` pour celui du départ), retrait dans `onTurnEnd` ; Combo par Stealth gagné (`c.cls.stealthGained`).
+- **Kidney Shot** : `onSurge` (dépense réelle, carte à cible) marque le `ctx`, `onCardPlayed` étourdit la cible
+  vivante (boss : Demoralized 2).
+- **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;
+  `damage` ajoute N par autre id, au plus le plafond.
 
 ## Sauvegarde
 

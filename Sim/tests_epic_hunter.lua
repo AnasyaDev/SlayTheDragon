@@ -96,7 +96,7 @@ test("sept épiques : une par zone, rareté epic, Power sans coût, textes « Ep
     local d = Cards[id]
     assert(d, id)
     eq(d.class, "hunter", id); eq(d.zone, ZONES[i], id); eq(d.rarity, "epic", id); eq(d.epic, true, id)
-    eq(d.type, "power", id); eq(d.cost, nil, id .. " : sans coût"); eq(d.level, nil, id)
+    eq(d.type, "power", id); eq(d.cost, 0, id .. " : coût 0, jamais payé"); eq(d.level, nil, id)
     assert(Card.isEpic(d) and Card.collectible(d))
     assert(d.text:find("^Epic%.\n") and d.up and d.up.text:find("^Epic%.\n"), id .. " : texte")
     assert(d.deckHooks and d.whileInDeck, id .. " : règle en jeu")
@@ -539,15 +539,14 @@ test("bot : chaque épique imposée se joue sans erreur ; build piloté par l'é
       local i = X.epicIndex(exp)
       if i then eq(exp.deck[i].id, id, "épique imposée gardée (jamais remplacée par l'offre)") end
     end
-    local b = ns.Classes.hunter.bot.builds[id]
+    local b = ns.Classes.hunter.bot.byEpic[id]
     assert(b and b.rating, id .. " : build")
     assert(ns.Classes.hunter.bot.epic(nil, id), id .. " : note")
   end
-  -- buildOf : la note du deck change avec l'épique
+  -- l'épique du deck vaut plus pour le bot (elle n'est remplacée que par bien mieux)
   local exp = X.new({ seed = 1, class = "hunter", unlocks = Meta.allUnlocked(7, 7), epic = "master_marksman" })
-  eq(SE.buildOf(exp), ns.Classes.hunter.bot.builds.master_marksman)
-  local exp2 = X.new({ seed = 1, class = "hunter", unlocks = Meta.allUnlocked(7, 7) })
-  eq(SE.buildOf(exp2), nil)
+  local bot = ns.Classes.hunter.bot
+  assert(bot.epic(exp, "master_marksman") > bot.epic(exp, "call_of_the_wild"), "attachement à l'épique du deck")
 end)
 
 ns.Enemies.th_dummy, ns.Enemies.th_hitter, ns.Enemies.th_flurry, ns.Enemies.th_zero = nil, nil, nil, nil

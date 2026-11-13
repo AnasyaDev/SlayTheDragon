@@ -15,45 +15,41 @@ return function(ns)
   SE.VETERAN_FLAGS = { "event:tobin_thief" }
   SE.VETERAN_BRANCHES = { "tobin_spared", "tobin_jailed" }
 
-  -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
-  local function botOf(exp)
-    local cd = ns.Classes[exp.class]
-    return cd and cd.bot or {}
-  end
-
-  -- Build piloté par l'épique du deck : classDef.bot.builds[id de l'épique] = { rating, upgrade, remove }
-  -- (notes qui priment sur celles de la classe tant que cette épique est dans le deck). curExp = expédition
-  -- en cours de décision (posée par decide et SE.play).
-  local curExp
-  local function buildOf(exp)
-    exp = exp or curExp
-    local b = exp and botOf(exp).builds
-    local i = b and X.epicIndex(exp)
-    return i and b[exp.deck[i].id] or nil
-  end
-  SE.buildOf = buildOf
-
   -- path=<voie> (SE.play, opts.path) : les cartes de classe d'une autre voie et les cartes neutres valent 0,
   -- donc ne sont jamais prises (voie jouée seule).
   local onlyPath
+  -- Conseils propres à l'épique du deck (une épique pilote le build) : classDef.bot.byEpic[id] = { rating,
+  -- upgrade, remove }, chacun une table { [carte] = note } ou une fonction (exp, carte) -> note|nil ; ils
+  -- priment sur ceux de la classe tant que l'épique est dans le deck. Posés par decide (advice, adviceExp).
+  local advice, adviceExp
+  local function advised(key, id)
+    local a = advice and advice[key]
+    if type(a) == "function" then return a(adviceExp, id) end
+    return a and a[id]
+  end
   local function rating(id)
     if onlyPath then
       local d = ns.Cards[id]
       if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
     end
-    local bd = buildOf()
-    local r = bd and bd.rating and bd.rating[id]
-    if r then return r end
-    return ns.Run.RATING[id] or 3
+    return advised("rating", id) or ns.Run.RATING[id] or 3
+  end
+
+  -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
+  local function botOf(exp)
+    local cd = ns.Classes[exp.class]
+    return cd and cd.bot or {}
+  end
+  local function adviceOf(exp)
+    local b = botOf(exp)
+    local i = b.byEpic and X.epicIndex(exp)
+    return i and b.byEpic[exp.deck[i].id] or nil
   end
 
   -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
   local function upgradeValue(exp, card)
-    local bd = buildOf(exp)
-    local v = bd and bd.upgrade and bd.upgrade[card.id]
-    if v then return v end
     local up = botOf(exp).upgrade
-    return up and up[card.id] or rating(card.id)
+    return advised("upgrade", card.id) or up and up[card.id] or rating(card.id)
   end
 
   local function bestUpgrade(exp)
@@ -71,11 +67,9 @@ return function(ns)
   local function worstCard(exp)
     local worst, worstV = nil, math.huge
     local rm = botOf(exp).remove or {}
-    local bd = buildOf(exp)
-    local brm = bd and bd.remove or {}
     for i = 1, #exp.deck do
       local card = exp.deck[i]
-      local v = brm[card.id] or rm[card.id] or rating(card.id) + 2
+      local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
       if card.up then v = v + 1 end
       if v < worstV then worst, worstV = i, v end
     end
@@ -291,7 +285,7 @@ return function(ns)
 
   -- Action hors combat selon la phase.
   local function decide(exp, opts, rng)
-    curExp = exp
+    advice, adviceExp = adviceOf(exp), exp
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then
@@ -439,7 +433,6 @@ return function(ns)
   function SE.play(opts)
     local seed = opts.seed or 1
     onlyPath = opts.path
-    curExp = nil
     local level = opts.level or Meta.MAX_LEVEL
     -- zones=N : le compte et la classe ont gagné les N premières zones, à toutes les clés (commun, cartes
     -- de zone, bibelots de clé) ; meta=start = zones=0, meta=exalted = zones=7 (tout débloqué).
