@@ -6023,7 +6023,7 @@ do
   -- textes : les 34 cartes du Mage (base et améliorée) tiennent dans le panneau, une clause par ligne
   local card = W.card(UI().content)
   local ids, bad, minSize = {}, {}, 99
-  for id, d in pairs(ns.Cards) do if d.class == "mage" then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.class == "mage" and not d.epic then ids[#ids + 1] = id end end
   table.sort(ids)
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
@@ -6137,7 +6137,7 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "mage" then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.class == "mage" and not d.epic then ids[#ids + 1] = id end end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, fire = 1, frost = 2, arcane = 3 }
   table.sort(ids, function(a, b)
@@ -9876,6 +9876,166 @@ do
     and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.EPIC.thunderous_roar.demoralized > 0) and #W.truncatedNow() == 0,
     c.player.res .. " / " .. table.concat(W.truncatedNow(), ","))
   snap("uew-thunderous-roar", true)
+end
+
+print("UEM épiques du Mage : textes dans la zone (base et améliorée), icônes, vue de classe (mana gardé, 3e carte, élémentaire, Frozen), mana au-dessus du maximum, nom flottant, planche")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, Art = ns.Widgets, ns.Art
+  local EPICS = { "mirror_image", "molten_armor", "water_elemental", "fingers_of_frost", "arcane_meditation",
+    "conflagration", "rule_of_threes" }
+  -- textes : les sept épiques (base et améliorée) dans le panneau, une clause par ligne, taille 8,5 au moins
+  local card = W.card(UI().content)
+  local bad, minSize = {}, 99
+  for _, id in ipairs(EPICS) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      if not (fit and fit.ok and not fit.under and fit.mode == "clauses" and fit.size >= 8.5) then
+        bad[#bad + 1] = id .. (up and "+" or "") .. " : " .. tostring(fit and fit.mode) .. " " .. tostring(fit and fit.size)
+      else
+        minSize = math.min(minSize, fit.size)
+      end
+    end
+    if not Art.cards[id] or not ns.Skin.icons[(Art.cards[id].tga or ""):lower()] then bad[#bad + 1] = id .. " : icône absente" end
+  end
+  card:Hide()
+  check(("textes : 7 épiques du Mage (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), icônes embarquées")
+    :format(minSize), #bad == 0, table.concat(bad, ", "))
+  -- combat du Mage, Arcane Meditation dans le deck de l'expédition
+  clickOption("class:mage")
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  ns.Expedition.addCard(e, "arcane_meditation")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  local host = v.classZone.views.mage
+  check("combat : l'épique du deck est active (crochets du deck)", c and ns.Combat.mageEpic(c) == "arcane_meditation")
+  v:Render(true)
+  local cap = ns.Cards.arcane_meditation.epicN
+  local want = ("Mana kept: %d/%d"):format(math.min(3, cap), cap)
+  check("Arcane Meditation : « " .. want .. " » dans la vue du Mage (mana restant / plafond)",
+    host.epic._shown and host.epic._text == want, tostring(host.epic._text))
+  c.player.mana = 1
+  v:Render(true)
+  check("Arcane Meditation : le compte suit le mana restant", host.epic._text == "Mana kept: 1/" .. cap, host.epic._text)
+  c.player.mana = 6
+  v:Render(true)
+  check("mana au-dessus du maximum : « 6 » et « /3 » dans l'anneau", v.mana.text._text == "6" and v.mana.max._text == "/3",
+    tostring(v.mana.text._text) .. tostring(v.mana.max._text))
+  snap("uem-meditation", true)
+  -- les autres épiques : on change l'épique du combat (crochets du deck) pour lire la vue
+  local function use(epic, up)
+    c.epic = { id = epic, up = up or false, uid = 9990 }
+    v:Render(true)
+    return host.epic._shown and host.epic._text or nil
+  end
+  local round = c.round
+  c.round = 3
+  c.turn.played = 0
+  local t0 = use("rule_of_threes")
+  c.turn.played = 2
+  local t2 = use("rule_of_threes")
+  c.turn.played = 3
+  local t3 = use("rule_of_threes")
+  local t3u = use("rule_of_threes", true)
+  c.turn.played = 5
+  local t5u = use("rule_of_threes", true)
+  c.round = 4
+  local tOff = use("rule_of_threes")
+  check("Rule of Threes : « Cards played: 0/3 », « Next Attack: twice » avant la 3e, rien après (base), 0/3 puis twice (amélioré), « Threes: next turn » hors des tours 3, 6, 9",
+    t0 == "Cards played: 0/3" and t2 == "Next Attack: twice" and t3 == nil and t3u == "Cards played: 0/3"
+      and t5u == "Next Attack: twice" and tOff == "Threes: next turn",
+    table.concat({ tostring(t0), tostring(t2), tostring(t3), tostring(t3u), tostring(t5u), tostring(tOff) }, " | "))
+  c.turn.played = 0
+  local alive = ns.Combat.aliveEnemies(c)
+  c.player.lastTarget = alive[#alive].uid
+  c.round = 2
+  local tw = use("water_elemental")
+  c.round = 1
+  local twOff = use("water_elemental")
+  c.round = round
+  check("Water Elemental : la cible du prochain coup (dernière cible), ou « Elemental rests next turn »",
+    tw == "Elemental: " .. ns.Enemies[alive[#alive].id].name and twOff == "Elemental rests next turn",
+    tostring(tw) .. " | " .. tostring(twOff))
+  for _, en in ipairs(c.enemies) do en.st.demoralized, en.st.stunned = nil, nil end
+  local f0 = use("fingers_of_frost")
+  ns.Combat.applyStatus(c, alive[1], "demoralized", 1)
+  local f1 = use("fingers_of_frost")
+  check("Fingers of Frost : « Frozen: Cast at once » quand un ennemi est Frozen, sinon « No Frozen enemy »",
+    f0 == "No Frozen enemy" and f1 == "Frozen: Cast at once", tostring(f0) .. " | " .. tostring(f1))
+  for _, en in ipairs(c.enemies) do en.st.pain = nil end
+  local m1, m2, k0 = use("mirror_image"), use("molten_armor"), use("conflagration")
+  alive[1].st.pain = 3
+  local k1 = use("conflagration")
+  alive[1].st.pain = nil
+  check("Mirror Image, Molten Armor (DoT N), Conflagration (ennemis porteurs de DoT) : leur ligne",
+    m1 == "Cast cards hit twice" and m2 == "When hit: DoT " .. ns.Cards.molten_armor.epicN and k0 == "No enemy with DoT"
+      and k1 == "DoT spreads on death: 1", table.concat({ tostring(m1), tostring(m2), tostring(k0), tostring(k1) }, " | "))
+  use("rule_of_threes")
+  local eb = host.epicBox
+  local ett = table.concat(H.hover(eb), " | ")
+  check("icône de l'épique à gauche de sa ligne, infobulle = la carte", eb._shown and eb.epicId == "rule_of_threes"
+    and ett:find("Rule of Threes", 1, true), ett)
+  -- deuxième incantation et épique : deux lignes, sans chevauchement ni troncature
+  c.player.mana = 9
+  c.hand[#c.hand + 1] = ns.Card.new("fireball", false, 9201)
+  c.hand[#c.hand + 1] = ns.Card.new("pyroblast", false, 9202)
+  ns.Combat.play(c, #c.hand - 1, 1)
+  ns.Combat.play(c, #c.hand, 1)
+  use("water_elemental")
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local a, b = R.rect(host.name), R.rect(host.epic)
+  local apart = a and b and (a[4] <= b[2] + 0.5 or b[4] <= a[2] + 0.5)
+  check("deuxième incantation et ligne de l'épique : deux lignes séparées", host.name._shown and host.epic._shown and apart)
+  H.settle()
+  local cut = {}
+  for _, s in ipairs(W.truncatedNow()) do
+    if s:find(host.epic._text, 1, true) or s:find(host.name._text, 1, true) then cut[#cut + 1] = s end
+  end
+  check("vue du Mage : lignes de l'épique et de la deuxième incantation non tronquées", #cut == 0, table.concat(cut, " ; "))
+  snap("uem-deux-lignes", true)
+  -- nom de l'épique qui s'élève au-dessus de l'unité touchée
+  local floats = {}
+  local old = W.float
+  W.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  v:OnEvents({ { t = "epic", id = "mirror_image", dst = alive[1].uid }, { t = "epic", id = "rule_of_threes", card = 1 } })
+  H.advance(2)
+  W.float = old
+  local fl = table.concat(floats, "|")
+  check("événement d'épique : nom flottant (Mirror Image sur la cible, Rule of Threes sur le héros)",
+    fl:find("Mirror Image", 1, true) and fl:find("Rule of Threes", 1, true), fl)
+  c.epic = nil
+end
+
+-- planche des sept épiques du Mage (base et améliorée)
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local EPICS = { "mirror_image", "molten_armor", "water_elemental", "fingers_of_frost", "arcane_meditation",
+    "conflagration", "rule_of_threes" }
+  local perRow, cw, ch = 7, 140, 230
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, 2 * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, id in ipairs(EPICS) do
+    for r, up in ipairs({ false, true }) do
+      local c = W.card(big)
+      c:SetCard(id, up, { playable = true })
+      W.placeCenter(c, big, 80 + (i - 1) * cw, 125 + (r - 1) * ch, 1)
+    end
+  end
+  Render.svg(H, big, SNAP .. "/cartes_mage_epiques.svg", "épiques du Mage (base, améliorée)")
+  big:Hide()
 end
 
 print("U16 méthodes d'API inconnues appelées")

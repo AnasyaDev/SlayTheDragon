@@ -1522,7 +1522,7 @@ function Combat.legalPlays(c)
       local both = d.spend and (c.player.res or 0) >= d.spend
       if Combat.targetOf(c, d, c.hand[i]) == "enemy" then
         for j = 1, #c.enemies do
-          if not c.enemies[j].dead then
+          if not c.enemies[j].dead and Combat.castFits(c, d, c.hand[i], c.enemies[j]) then
             list[#list + 1] = { i, j }
             if both then list[#list + 1] = { i, j, true } end
           end
@@ -1669,8 +1669,15 @@ end
 -- Instant (état commun : Mage, Shaman) : la prochaine carte Cast se résout tout de suite, sans
 -- emplacement, sans pouvoir être interrompue ; crochet « instantCast » pour une autre source.
 -- commit = vrai au jeu (consomme une charge d'Instant), faux pour une simple question (canPlay).
-function Combat.isInstant(c, d, inst, commit)
+-- target (facultatif) : l'ennemi visé, lu par le crochet dans c.aim (uid ; nil = cible encore inconnue).
+-- Le crochet passe AVANT l'état Instant, qui n'est pas consommé quand une règle fait partir la carte
+-- (Fingers of Frost).
+function Combat.isInstant(c, d, inst, commit, target)
   if not d.cast then return false end
+  c.aim = target and target.uid or nil
+  local rule = Combat.modify(c, "instantCast", false, d, inst, commit)
+  c.aim = nil
+  if rule then return true end
   local p = c.player
   if (p.st.instant or 0) > 0 then
     if commit then
@@ -1680,7 +1687,12 @@ function Combat.isInstant(c, d, inst, commit)
     end
     return true
   end
-  return Combat.modify(c, "instantCast", false, d, inst, commit) and true or false
+  return false
+end
+
+-- Une carte Cast tient-elle sur cette cible ? Emplacements libres, ou départ immédiat sur elle.
+function Combat.castFits(c, d, inst, target)
+  return not d.cast or Combat.castCount(c) < Combat.castSlots(c) or Combat.isInstant(c, d, inst, false, target)
 end
 
 -- Joue la carte n° idx de la main sur l'ennemi n° tIdx (si elle vise).
@@ -1711,6 +1723,8 @@ playBody = function(c, idx, tIdx, opts)
     -- ciblage : une classe peut rediriger la cible (crochet « target ») ; dernière cible retenue
     target = Combat.modify(c, "target", target, d, inst)
     if not target or target.dead then return false, "target" end
+    -- emplacements pleins : la carte Cast doit partir tout de suite sur CETTE cible
+    if not Combat.castFits(c, d, inst, target) then return false, "casting" end
     c.player.lastTarget = target.uid
   end
   local cost = Combat.cost(c, inst)
@@ -1750,7 +1764,7 @@ playBody = function(c, idx, tIdx, opts)
     Combat.fire(c, "onTrapSet", inst)
     return true
   end
-  if castAs or (d.cast and not Combat.isInstant(c, d, inst, true)) then
+  if castAs or (d.cast and not Combat.isInstant(c, d, inst, true, target)) then
     local entry = { card = inst, target = target and target.uid, spent = spent or nil }
     if c.player.cast then
       local more = c.player.castMore or {}
