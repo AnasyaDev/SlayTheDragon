@@ -44,12 +44,17 @@ Effects.damage = function(c, ctx, e)
       if e.bonus then base = base + e.bonus(c, ctx, t) end
       if e.more or e.per then base = Combat.amount(c, ctx, e, base, t) end
       local dmg = Combat.calcDamage(c, c.player, t, base, ctx.def)
-      Combat.dealDamage(c, c.player, t, dmg, e.pierce, ctx)
-      ctx.dealt = true
-      ctx.hits = ctx.hits + 1
-      if e.onHit then e.onHit(c, ctx, t) end
-      -- chaque coup d'une carte Attack (poisons du Rogue, Ignite du Mage…)
-      if ctx.def and ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
+      -- crochet « convertHit » (c, src, dégâts, cible, ctx) : dégâts du coup, ou false = coup non porté (un
+      -- crochet a posé autre chose à la place : Doomblade) ; ni dégâts, ni onHit, ni onAttackHit
+      dmg = Combat.modify(c, "convertHit", dmg, t, ctx)
+      if dmg then
+        Combat.dealDamage(c, c.player, t, dmg, e.pierce, ctx)
+        ctx.dealt = true
+        ctx.hits = ctx.hits + 1
+        if e.onHit then e.onHit(c, ctx, t) end
+        -- chaque coup d'une carte Attack (poisons du Rogue, Ignite du Mage…)
+        if ctx.def and ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
+      end
       if c.result then break end
     end
     if c.result then break end
