@@ -428,16 +428,21 @@ return function(ns)
   -- Carte gardée au choix en fin de tour (Traveler's Backpack, Combat.retainPicks) : uid de la carte de la
   -- main (hors Retain) la mieux notée par la classe (bot.rating, 5 par défaut ; +1 améliorée, +0,5 par
   -- point de coût : une carte chère qui n'a pas pu partir), la première à égalité ; nil sans choix.
+  -- Zandalarian Hero Charm porté (la carte gardée coûte 1 de moins au tour suivant) : +2 aux cartes de coût 1
+  -- ou plus, pour que la réduction serve.
   function Bots.retainPick(c)
     local list = Combat.retainCandidates(c)
     if #list == 0 then return nil end
     local cd = ns.Classes[c.class]
     local rating = cd and cd.bot and cd.bot.rating or {}
+    local charm = false
+    for _, id in ipairs(c.relics) do if id == "zandalarian_hero_charm" then charm = true end end
     local best, bestUid
     for _, i in ipairs(list) do
       local inst = c.hand[i]
       local d = Card.def(inst)
       local v = (rating[inst.id] or 5) + (inst.up and 1 or 0) + 0.5 * (d.cost or 0)
+      if charm and (d.cost or 0) >= 1 then v = v + 2 end
       if not best or v > best then best, bestUid = v, inst.uid end
     end
     return bestUid
