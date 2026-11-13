@@ -372,15 +372,16 @@ card("resourcefulness", {
 -- en tête de chaque bloc (EPIC).
 
 -- Nombres des épiques, { base, amélioré } (fiche : roar 5 / 8, marksman 0 / 4, launcher 1 / 2, lonePer 1 / 1,
--- loneStart 0 / 1, chimaera 3, 3, 6) ; réglés par la simulation (Westfall, clé 0, zones=7, niveau 7 : rapport
--- de la nuit du 13 au 14/11/2026). Lone Wolf amélioré : +3 par Frenzy au lieu de « Start of turn: +1 Frenzy. »
--- (la ligne de plus faisait passer le texte sous le plancher de 8,5).
+-- loneStart 0 / 1, chimaera 3, 3, 6 ; Call of the Wild, Beast Cleave, Black Arrow sans nombre) ; réglés par la
+-- simulation dans les zones dures (14/11/2026 : gain moyen sur Duskwood, Stranglethorn, Steppes, clé 0,
+-- niveau 7 ; docs/classes.md, « Hunter : les sept épiques »). Lone Wolf amélioré : +3 par Frenzy au lieu de
+-- « Start of turn: +1 Frenzy. » (la ligne de plus faisait passer le texte sous le plancher de 8,5).
 local EPIC = {
   cotwCost = { 1, 0 },      -- Call of the Wild : Frenzy dépensé pour l'attaque du début du tour (0 : gratuite)
   cleaveLess = { 2, 2 },    -- Beast Cleave : dégâts en moins du familier sur les ennemis autres que sa cible
   blackCost = { 1, 0 },     -- Black Arrow : Frenzy dépensé pour l'attaque sur l'ennemi qui tique (0 : gratuite)
   roar = { 2, 4 },          -- Roar of Sacrifice : dégâts arrêtés par point de Frenzy dépensé
-  marksman = { 20, 24 },      -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
+  marksman = { 20, 24 },    -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
   launcher = { 1, 2 },      -- Trap Launcher : attaques du familier par Trap lancée
   lonePer = { 2, 3 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
   loneStart = { 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
@@ -388,11 +389,12 @@ local EPIC = {
 }
 ns.HunterEpic = EPIC
 
--- Note des épiques pour les bots (classDef.bot.epic) : ≈ 5 + gain mesuré / 2.
+-- Note des épiques pour les bots (classDef.bot.epic) : ≈ 5 + gain mesuré / 2 (gain moyen des zones dures,
+-- 14/11/2026).
 local EPIC_KEEP = 5
 local EPIC_BOT = {
-  call_of_the_wild = 11.9, trap_launcher = 8.9, beast_cleave = 11, roar_of_sacrifice = 8.2, master_marksman = 7.8,
-  black_arrow = 10.8, lone_wolf = 9.3,
+  call_of_the_wild = 9.6, trap_launcher = 10.6, beast_cleave = 10.3, roar_of_sacrifice = 10.7, master_marksman = 9.7,
+  black_arrow = 11.3, lone_wolf = 11.3,
 }
 
 local function epic(id, t)
@@ -456,7 +458,7 @@ epic("trap_launcher", {
 -- en plein, les autres pour EPIC.cleaveLess de moins (crochet petLess) ; amélioré : +1 Frenzy de plus par
 -- attaque (pas pour les attaques de Surge, qui n'en donnent pas).
 local function cleaveText(less)
-  if less > 0 then return "Pet attacks also hit the other enemies for " .. less .. " less." end
+  if less > 0 then return "Pet attacks hit all enemies, the others for " .. less .. " less." end
   return "Pet attacks hit all enemies."
 end
 epic("beast_cleave", {
