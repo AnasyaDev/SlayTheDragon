@@ -708,11 +708,18 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Start of turn: pet` / `attacks.` | `Start of turn: +1` / `Frenzy, pet attacks.` |
+| —, Epic | `Epic.` / `Start of turn: spend 1` / `Frenzy for a pet attack.` | `Start of turn: pet` / `attacks.` |
 
 - **Règle.** Au début de chaque tour du Hunter, premier compris (après la pioche et la baisse du Frenzy),
-  le familier attaque (+1 Frenzy, comme toute attaque). Amélioré : +1 Frenzy juste avant.
-- **Cas limites.** Avec Pet Whistle, deux attaques au premier tour. Swamp : la cible du familier saute les
+  si le Frenzy vaut 1 ou plus, il baisse de 1 et le familier attaque (+1 Frenzy, comme toute attaque : la
+  dépense est rendue, l'attaque frappe au Frenzy d'avant moins 1). Amélioré : sans dépense, premier tour
+  compris.
+- **Réglage (14/11/2026).** Version de la fiche (gratuite, amélioré +1 Frenzy avant) : +19 points en moyenne
+  sur Duskwood, Stranglethorn et Steppes (+26 à Duskwood). Le coût de 1 Frenzy, qui fait partie du build
+  (garder le Frenzy haut, ne pas le vider par Bestial Wrath ou Growl), la ramène dans la cible ; l'ancienne
+  base devient l'amélioration.
+- **Cas limites.** Sans Frenzy (premier tour sans Pet Whistle), rien. Avec Pet Whistle, deux attaques au
+  premier tour (le sifflet donne le Frenzy que l'épique dépense). Swamp : la cible du familier saute les
   dormeurs tant qu'un ennemi est éveillé. Blackrock : une attaque de début de tour franchit un seuil
   « pendant ton tour ».
 - **Deck piloté.** Centrales : Kill Command, Dire Beast, Bestial Wrath (Frenzy à 5), Spirit Bond (Absorb
@@ -748,10 +755,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Pet attacks hit all` / `enemies.` | `Pet attacks hit all` / `enemies, +1 Frenzy.` |
+| —, Epic | `Epic.` / `Pet attacks hit all` / `enemies, the others` / `for 2 less.` | `…` / `for 2 less.` / `Pet attacks: +1 Frenzy.` |
 
 - **Règle.** Chaque attaque du familier (automatique, commandée, de Surge, de Call of the Wild) frappe tous
-  les ennemis vivants ; le Frenzy monte de 1 par attaque (amélioré : de 2).
+  les ennemis vivants : sa cible en plein, les autres pour 2 de moins (jamais sous 0) ; le Frenzy monte de 1
+  par attaque (amélioré : de 2).
+- **Réglage (14/11/2026).** À tous en plein : +15,5 points en moyenne (+24 à Duskwood) ; « la moitié aux
+  autres » : +7,5 ; « 1 de moins » : +13 (+19,5 à Duskwood) ; « 2 de moins » retenu.
 - **Cas limites.** Le Surge de Bestial Wrath donne une attaque à tous par point de Frenzy. Swamp : réveille
   tous les dormeurs (sans bonus, dégâts à tous). Lien Wetlands : chaque attaque est un seul effet sur toute
   la meute, les morts sont simultanées.
@@ -764,10 +774,10 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: spend 1` / `Frenzy to stop up to 5` / `damage.` | `…` / `Frenzy to stop up to 8` / `damage.` |
+| —, Epic | `Epic.` / `When hit: spend 1` / `Frenzy to stop up to 2` / `damage.` | `…` / `Frenzy to stop up to 4` / `damage.` |
 
 - **Règle.** À chaque coup ennemi, avant l'Absorb, si le Frenzy vaut 1 ou plus, il baisse de 1 et le coup
-  perd jusqu'à 5 dégâts (amélioré : 8).
+  perd jusqu'à 2 dégâts (amélioré : 4 ; fiche : 5 et 8, réglés à Westfall et gardés dans les zones dures).
 - **Cas limites.** Automatique, coup par coup ; un coup de 0 ne coûte rien. Pas contre le DoT, ni les
   Curses, ni la brûlure des Steppes. Le Frenzy perdu affaiblit le familier : chaque coup reçu est un choix
   déjà fait, d'où l'intérêt de le remonter vite. Lien Stranglethorn : les panthères ouvrent par leur plus
@@ -782,11 +792,12 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Careful Aim: Cast` / `Attacks resolve at` / `once.` | `…` / `Attacks resolve at` / `once, deal 4 more.` |
+| —, Epic | `Epic.` / `Careful Aim: Cast` / `Attacks resolve at` / `once and deal 20 more.` | `…` / `once and deal 24 more.` |
 
 - **Règle.** Une carte Attack Cast jouée sur une cible au-dessus de la moitié de ses PV (Careful Aim, lu au
-  jeu) se résout tout de suite : sans emplacement, sans interruption possible. Amélioré : ses coups
-  infligent 4 de plus.
+  jeu) se résout tout de suite : sans emplacement, sans interruption possible, et ses coups infligent 20 de
+  plus (amélioré : 24 ; fiche : 0 et 4 ; 12 et 16 après Westfall : +6 points en moyenne dans les zones dures,
+  +1 aux Steppes ; 16 : +8 ; 20 retenu).
 - **Cas limites.** Volley (sans cible) reste un Cast. Les lignes « Careful Aim: » se lisent au même moment,
   donc vraies. Une cible déjà entamée sous la moitié : Cast normal. Lien Swamp : un dormeur est intact,
   Aimed Shot part au jeu avec Rude Awakening ((24 + 10) × 1,5 = 51) et le tue avant son ouverture.
@@ -799,11 +810,14 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each DoT tick on an` / `enemy: the pet attacks` / `it.` | `Each DoT tick on an` / `enemy: +1 Frenzy, the` / `pet attacks it.` |
+| —, Epic | `Epic.` / `Each enemy DoT tick:` / `spend 1 Frenzy for a` / `pet attack on it.` | `Each enemy DoT tick:` / `pet attacks it.` |
 
-- **Règle.** Après chaque tic de DoT sur un ennemi qui survit, le familier attaque cet ennemi (+1 Frenzy
-  comme d'habitude ; amélioré : +1 Frenzy de plus avant l'attaque), sans changer la cible du familier.
-- **Cas limites.** Le tic a lieu au début du tour de l'ennemi : le familier peut le tuer **avant qu'il
+- **Règle.** Après chaque tic de DoT sur un ennemi qui survit, si le Frenzy vaut 1 ou plus, il baisse de 1
+  et le familier attaque cet ennemi (+1 Frenzy comme d'habitude : la dépense est rendue), sans changer la
+  cible du familier. Amélioré : sans dépense.
+- **Réglage (14/11/2026).** Version gratuite (amélioré +1 Frenzy) : +17 points en moyenne, +26 à Duskwood ;
+  le coût de 1 Frenzy la ramène dans la cible et rend le Frenzy central dans le deck de DoT (Barbed Shot).
+- **Cas limites.** Sans Frenzy au tic : pas d'attaque. Le tic a lieu au début du tour de l'ennemi : le familier peut le tuer **avant qu'il
   agisse**. Un DoT à tous (Explosive Trap) donne une attaque par ennemi. Swamp : le tic réveille, l'attaque
   touche un ennemi éveillé (pas de bonus). Lien Steppes : chaque mort recule le feu.
 - **Deck piloté.** Centrales : Serpent Sting (de départ), Barbed Shot (DoT 3, +2 Frenzy), Immolation Trap
@@ -816,14 +830,17 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `No pet. Pet cards` / `become shots. Attack` / `hits: +1 per Frenzy.` | `…` / `Start of turn: +1 Frenzy.` |
+| —, Epic | `Epic.` / `Pet cards become shots.` / `Attack hits: +2 per` / `Frenzy.` | `…` / `Attack hits: +3 per` / `Frenzy.` |
 
 Infobulle : `Kill Command becomes Kill Shot, Arcane Shot Chimaera Shot… (see the deck).`
 
 - **Règle.** Le familier n'existe pas : plus d'attaque automatique. Les cartes qui le nomment sont, tant que
   Lone Wolf est dans le deck, jouées et montrées sous leur variante (table). Chaque coup d'une carte Attack
-  inflige le Frenzy de plus. Le Frenzy baisse de 1 par tour comme d'habitude (amélioré : +1 au début de
-  chaque tour, ce qui l'annule).
+  inflige 2 de plus par point de Frenzy (amélioré : 3 ; fiche : 1, amélioré « +1 Frenzy au début du tour »,
+  trop long pour la carte). Le Frenzy baisse de 1 par tour comme d'habitude.
+- **Réglage (14/11/2026).** +2 par Frenzy avec Chimaera Shot 4 / 4 : +7,8 points en moyenne dans les zones
+  dures ; +3 par Frenzy : +21 (le bonus se multiplie par les quatre coups de Rapid Fire) ; retenu : +2 et
+  Chimaera Shot 5 / 4 (amélioré 8), le tir de départ de la variante porte le deck sans familier (6 / 4 : +16,6).
 - **Cas limites.** Le Frenzy vient des variantes (+1), de Barbed Shot (+2), de Cobra Shot, de Kibler's Bits,
   de Devilsaur Eye. Cast (Aimed Shot) : Frenzy lu à la résolution. Les Skills qui infligent des dégâts
   (Scatter Shot, Explosive Shot) n'ont pas le bonus. Growl ne nomme pas le familier : inchangée. Lien
@@ -833,7 +850,7 @@ Infobulle : `Kill Command becomes Kill Shot, Arcane Shot Chimaera Shot… (see t
 
 | Carte d'origine | Variante | Texte de base | Amélioré |
 |---|---|---|---|
-| Arcane Shot (1, Attack, départ) | Chimaera Shot | `Deal 3.` / `Deal 3 to another` / `enemy.` / `+1 Frenzy.` | `Deal 6.` / `…` |
+| Arcane Shot (1, Attack, départ) | Chimaera Shot | `Deal 5.` / `Deal 4 to another` / `enemy.` / `+1 Frenzy.` | `Deal 8.` / `…` |
 | Kill Command (1, Attack, Cooldown 3) | Kill Shot | `Deal 8.` / `Execute: deal 16.` / `+1 Frenzy.` / `Cooldown 3.` | `… Cooldown 2.` |
 | Dire Beast (0, Skill, Exhaust) | Double Tap | `Draw 1.` / `+2 Frenzy.` / `Exhaust.` | `Draw 1.` / `+3 Frenzy.` / `Exhaust.` |
 | Intimidation (1, Skill, Cooldown 4) | Scatter Shot | `Deal 3.` / `+1 Frenzy.` / `Apply Stunned 1 ⌛` / `Cooldown 4.` | `… Cooldown 3.` |

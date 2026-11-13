@@ -9439,11 +9439,13 @@ do
     for _, up in ipairs({ false, true }) do
       card:SetCard(id, up, { playable = true })
       local fit = card.bodyFit
-      if not fit or not fit.ok or (fit.size or 0) < 8.5 then small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) end
+      if not fit or not fit.ok or (fit.size or 0) < 8.5 or fit.mode ~= "clauses" then
+        small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) .. " " .. tostring(fit and fit.mode)
+      end
     end
   end
   card:Hide()
-  check("épiques et variantes du Hunter (32 faces) : texte à 8,5 ou plus", #small == 0, table.concat(small, ", "))
+  check("épiques et variantes du Hunter (32 faces) : texte en clauses, à 8,5 ou plus", #small == 0, table.concat(small, ", "))
 
   -- 6. planche des épiques et des variantes (base, améliorée) -------------------------------------------
   if SNAP then

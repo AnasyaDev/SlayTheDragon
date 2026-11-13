@@ -158,10 +158,17 @@ function Art.hunterEpicLine(c)
   local alive = 0
   for i = 1, #c.enemies do if not c.enemies[i].dead then alive = alive + 1 end end
   if id == "call_of_the_wild" then
-    return "Start of turn: pet attacks for " .. num(H.petDamage(c, nil, math.min(5, res + (up and 1 or 0))))
+    -- Frenzy au prochain début de tour ≈ le Frenzy actuel (+1 de l'attaque de fin de tour, -1 de la baisse
+    -- du round), puis la dépense de l'épique
+    local cost = E.cotwCost[k]
+    if res < cost then return "Start of turn: " .. num(cost) .. " Frenzy needed for a pet attack" end
+    return "Start of turn: pet attacks for " .. num(H.petDamage(c, nil, res - cost))
+      .. (cost > 0 and (" (" .. num(-cost) .. " Frenzy)") or "")
   elseif id == "trap_launcher" then
     return "Traps hit at once, pet attacks " .. num(E.launcher[k]) .. "x"
   elseif id == "beast_cleave" then
+    local less = E.cleaveLess[k]
+    if alive > 1 and less > 0 then return "Pet hits all " .. num(alive) .. " enemies, the others for " .. num(-less) end
     return "Pet hits all " .. num(alive) .. " enemies"
   elseif id == "roar_of_sacrifice" then
     if res >= 1 then return "Next hit: " .. num(-E.roar[k]) .. " damage (" .. num(res) .. " Frenzy left)" end
@@ -179,6 +186,10 @@ function Art.hunterEpicLine(c)
     for i = 1, #c.enemies do
       local e = c.enemies[i]
       if not e.dead and (e.st.pain or 0) > 0 then n = n + 1 end
+    end
+    local cost = E.blackCost[k]
+    if cost > 0 then
+      return "Pet attacks on DoT ticks: " .. num(n) .. " enem" .. (n == 1 and "y" or "ies") .. ", " .. num(cost) .. " Frenzy each"
     end
     return "Pet attacks on DoT ticks: " .. num(n) .. " enem" .. (n == 1 and "y" or "ies")
   elseif id == "lone_wolf" then
