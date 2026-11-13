@@ -257,21 +257,21 @@ return function(T)
   -- Élites
   ---------------------------------------------------------------------------
 
-  test("Panzor : Invincible (6 par coup, DoT en entier), puis Cracked Plating (+25 %) et Rampage", function()
-    local c = bc({ enemies = { "panzor" }, hand = { "brt_hit", "brt_multi", "brt_dot", "brt_hit2" }, kind = "elite" })
+  test("Panzor : Invincible (plafond par coup, DoT en entier), puis Cracked Plating (+25 %) et Rampage", function()
+    local c = bc({ enemies = { "panzor" }, hand = { "brt_big", "brt_multi", "brt_dot", "brt_hit2" }, kind = "elite" })
     local e = c.enemies[1]
-    local m = E.panzor.hp
-    eq(e.maxHp, m)
-    play(c, "brt_hit", 1)
-    eq(e.hp, m - 6, "10 -> 6")
+    local m, cap = E.panzor.hp, E.panzor.maxHit
+    eq(e.maxHp, m); assert(cap and cap < 60 and cap >= 3)
+    play(c, "brt_big", 1)
+    eq(e.hp, m - cap, "60 -> plafond")
     play(c, "brt_multi", 1)
-    eq(e.hp, m - 15, "3 coups de 3")
+    eq(e.hp, m - cap - 9, "3 coups de 3")
     play(c, "brt_dot", 1)
     e.intent = "overheat"
     Combat.endTurn(c)
-    eq(e.hp, m - 20, "DoT 5 en entier")
+    eq(e.hp, m - cap - 14, "DoT 5 en entier")
     local thr = math.floor(m * 0.5)
-    e.hp = thr + 5
+    e.hp = thr + math.min(cap, 10) - 1 -- un coup de 10 (au plus cap) passe le seuil d'un PV
     c.hand[#c.hand + 1] = ns.Card.new("brt_hit", false, 901)
     play(c, "brt_hit", 1)
     eq(e.hp, thr - 1); eq(e.mem.phase, 1); eq(e.st.cracked, 1); eq(e.intent, "rampage"); eq(BR.maxHit(e), nil)
@@ -293,14 +293,14 @@ return function(T)
     assert((c.player.st.armor_broken or 0) > 0, "Sundered reste")
   end)
 
-  test("Vaelastrasz : 35 % des PV, Essence of the Red (+2 mana), Burning Adrenaline (+50 %, puis 15 PV), Essence Fades", function()
+  test("Vaelastrasz : 40 % des PV, Essence of the Red (+2 mana), Burning Adrenaline (+50 %, puis 15 PV), Essence Fades", function()
     local c = bc({ enemies = { "vaelastrasz" }, hand = { "brt_hit", "brt_hit2" }, kind = "elite", hp = 80 })
     local e = c.enemies[1]
-    eq(e.maxHp, 200); eq(e.hp, 70)
+    eq(e.maxHp, 200); eq(e.hp, 80)
     eq(c.player.st.essence_of_red, 1); eq(c.player.mana, 5)
     Combat.applyStatus(c, c.player, "burning_adrenaline", 2)
     play(c, "brt_hit", 1)
-    eq(e.hp, 55, "10 × 1,5")
+    eq(e.hp, 65, "10 × 1,5")
     -- Burning Adrenaline posée pendant le tour du joueur : 2 rounds, puis 15 PV (ennemi inerte)
     local d = bc({ enemies = { "zt_dummy" }, hp = 80 })
     Combat.applyStatus(d, d.player, "burning_adrenaline", 2)
@@ -380,7 +380,7 @@ return function(T)
     eq(n.st.stunned, nil, "immunisé à Stunned")
   end)
 
-  test("Class Call : un état par classe (2 tours), effets sur le moteur de chaque classe", function()
+  test("Class Call : un état par classe (2 tours, Rogue 1, Hunter 3), effets sur le moteur de chaque classe", function()
     local function called(cl, o)
       o = o or {}
       o.class = cl
@@ -410,27 +410,39 @@ return function(T)
     c = called("mage", { hand = { "brt_cast" }, deck = { "brt_cast", "brt_cast", "brt_cast", "brt_cast" } })
     eq(c.player.st.wild_polymorph, 2)
     eq(Combat.cost(c, c.hand[1]), 2)
-    -- Rogue : Parry et Stealth perdus, plus de Stealth
+    -- Rogue : Parry et Stealth perdus, ni l'un ni l'autre ne se regagne (1 tour)
     local cr = bc({ class = "rogue", enemies = { "nefarian" }, kind = "boss" })
     cr.player.st.parry = 2
     assert((cr.player.st.stealth or 0) > 0, "Stealth du début de combat")
     cr.enemies[1].mem.phase, cr.enemies[1].intent = 1, "class_call"
     Combat.endTurn(cr)
-    eq(cr.player.st.called_out, 2); eq(cr.player.st.parry, nil); eq(cr.player.st.stealth, nil)
+    eq(BR.classCall("rogue").turns, 1)
+    eq(cr.player.st.called_out, 1); eq(cr.player.st.parry, nil); eq(cr.player.st.stealth, nil)
     Combat.applyStatus(cr, cr.player, "stealth", 1)
     eq(cr.player.st.stealth, nil, "pas de Stealth")
-    -- Hunter : Attack cards -3, familier inchangé
+    Combat.applyStatus(cr, cr.player, "parry", 2)
+    eq(cr.player.st.parry, nil, "pas de Parry")
+    cr.enemies[1].intent = "veil"
+    Combat.endTurn(cr)
+    eq(cr.player.st.called_out, nil, "un seul tour")
+    Combat.applyStatus(cr, cr.player, "parry", 2)
+    eq(cr.player.st.parry, 2, "Parry de nouveau")
+    -- Hunter : Attack cards - BROKEN_BOW, familier inchangé (3 tours)
     c = called("hunter", { hand = { "brt_hit" }, deck = { "brt_hit", "brt_hit", "brt_hit", "brt_hit" } })
-    eq(c.player.st.broken_bow, 2)
+    eq(c.player.st.broken_bow, 3)
     n = c.enemies[1]
     hp = n.hp
     play(c, "brt_hit", 1)
-    eq(hp - n.hp, 7)
+    eq(hp - n.hp, 10 - BR.BROKEN_BOW)
     eq(Combat.calcDamage(c, c.player, n, 5, nil), 5, "coup sans carte (familier) : inchangé")
-    -- durée : 2 tours du joueur
+    -- durée : 3 tours du joueur
+    n.intent = "veil"
+    Combat.endTurn(c)
+    eq(c.player.st.broken_bow, 2)
     n.intent = "veil"
     Combat.endTurn(c)
     eq(c.player.st.broken_bow, 1)
+    n.intent = "veil"
     Combat.endTurn(c)
     eq(c.player.st.broken_bow, nil)
     -- classe sans état propre : Demoralized

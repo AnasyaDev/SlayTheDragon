@@ -585,10 +585,15 @@ Mots expliqués : Hex, Hexed (`L.zoneKeyword`).
 | Lashtail Raptor | 21–24 | Bite 10 ; Lashing Tail 4 × 2 |
 | Mistvale Gorilla | 36–40 | Pound 14 ; Beat Chest 8 Absorb, Strength 2 |
 | Bloodsail Swashbuckler | 29–32 | Cutlass 11 ; Dirty Trick 5 + Demoralized 1 ; Kick : coupe le Cast + 8 |
-| King Bangalash (élite) | 94 | Pounce : coupe le Cast + 20 ; Rake 4 × 3 ; Call the Pride (2 tigres 10–12 PV, Bite 6) / Roar ; Maul 14 |
-| Mokk the Savage (élite) | 98 | Thrash 7 × 2 ; Pound 17 ; Beat Chest 12 Absorb, Strength 2 ; à 49 PV Strength 4, Thrash / Pound |
-| Zanzil the Outcast (élite) | 96 | Hex (+ zombie 13–15 PV, Claw 7) ; Shadow Bolt 18 (interrompt) ; Mixture 8 + Strength 2 aux alliés |
-| Jin'do the Hexxer (boss) | 134 | Hex, Shadow Bolt 27 (interrompt), Powerful Healing Ward (16 PV, soin 8), Delusions (coupe le Cast, sinon 12) ; à 67 PV Brain Wash Totem (10 PV, Hex à chaque tour), puis Shadow Volley (coupe le Cast + 10 × 3), Hex, Shadow Bolt |
+| King Bangalash (élite) | 94 | Pounce : coupe le Cast + 18 ; Rake 4 × 3 ; Call the Pride (2 tigres 10–12 PV, Bite 6) / Roar ; Maul 13 |
+| Mokk the Savage (élite) | 98 | Thrash 6 × 2 ; Pound 15 ; Beat Chest 12 Absorb, Strength 2 ; à 49 PV Strength 3, Thrash / Pound |
+| Zanzil the Outcast (élite) | 96 | Hex (+ zombie 13–15 PV, Claw 7) ; Shadow Bolt 16 (interrompt) ; Mixture 8 + Strength 2 aux alliés |
+| Jin'do the Hexxer (boss) | 176 | Hex, Shadow Bolt (coupe le Cast même à travers l'Absorb + 26), Powerful Healing Ward (16 PV, soin 8), Delusions (coupe le Cast, sinon coup ordinaire de 13) ; à 88 PV Brain Wash Totem (10 PV, Hex à chaque tour), puis Shadow Volley (coupe le Cast + 10 × 3), Hex, Shadow Bolt |
+
+Passe de difficulté du 14/11/2026 (cible de la zone : 64 %, écart ≤ 10 ; détail plus bas, « Passe de difficulté ») :
+élites adoucis, Jin'do plus long (134 → 176 PV) et moins pointu (Shadow Bolt 27 → 26, Delusions 12 → 13 mais
+devenue un coup ordinaire), Shadow Bolt de Jin'do qui coupe à travers l'Absorb. Les mesures ci-dessous sont
+celles d'avant la passe.
 
 ### Mesures (`runner=expedition zone=stranglethorn zones=3 level=7 key=0`, 1000 expéditions par classe)
 
@@ -614,6 +619,43 @@ Hunter toujours 15 points devant ; le levier qui a resserré l'écart est le bos
 totem 10 PV : les classes lentes subissent moins de tours) avec des **interruptions directes** (le Mage perd enfin
 des Cast), puis +1 aux coups des ennemis normaux et Shadow Bolt 27 pour redescendre tout le monde. Monter les
 élites a fait l'inverse (Priest, Warrior, Rogue −10, Mage et Hunter −2) : rétabli.
+
+### Passe de difficulté (14/11/2026)
+
+Cible de la zone (`docs/zones/decisions.md`, « Difficulté et épiques ») : 64 % de victoires en moyenne au bot de
+référence, clé 0, écart entre classes ≤ 10 points. Mesure : `runner=expedition zone=stranglethorn zones=3 level=7
+key=0 bot=heuristic`, épiques gagnées en route (sans `epic=`).
+
+| Classe | Avant (800) | Après (1500) | PV perdus / combat normal avant → après | Boss gagné après | Tours boss après |
+|---|---|---|---|---|---|
+| Priest | 64,8 % | 60,4 % | 9,9 → 9,8 | 64,8 % | 9,0 |
+| Warrior | 71,2 % | 63,6 % | 11,1 → 11,4 | 68,4 % | 7,3 |
+| Mage | 74,2 % | 69,0 % | 7,0 → 7,2 | 72,7 % | 6,9 |
+| Rogue | 65,4 % | 64,1 % | 7,5 → 7,6 | 70,2 % | 6,7 |
+| Hunter | 76,0 % | 64,4 % | 8,1 → 7,8 | 66,3 % | 6,3 |
+| Moyenne / écart | 70,3 / 11,2 | **64,3 / 8,6** | | | |
+
+Changements :
+- **Élites adoucis** (Bangalash Pounce 20 → 18, Maul 14 → 13 ; Mokk Thrash 7 × 2 → 6 × 2, Pound 17 → 15, Berserk
+  Strength 4 → 3 ; Zanzil Shadow Bolt 18 → 16). Le Mage et le Hunter les passaient déjà à 94–97 % pour 8 à 12 PV
+  (contrôle : Stunned, Freezing Trap) ; Priest, Warrior et Rogue y perdaient 18 à 37 PV et 9 à 17 % des
+  expéditions. Ils gagnent 4 à 5 points d'élites, le Hunter 1.
+- **Jin'do plus long et moins pointu** : 134 → 176 PV (bascule à 88 PV), Shadow Bolt 27 → 26. Un boss plus
+  robuste coûte plus au Warrior qu'au Priest (+12 PV : Warrior −8, Priest −6), un coup plus fort coûte surtout au
+  Priest (36 PV max ; essai Bolt, Volley et Delusions +1 à +3 par coup : Priest −12, Warrior −9). D'où des PV
+  en plus et des coups un peu plus faibles ; au-delà de 160 PV, le Rogue décroche deux fois plus vite que le Mage.
+- **Shadow Bolt de Jin'do** : coupe le Cast même à travers l'Absorb (comme Volley), visible dans le texte.
+- **Delusions de Jin'do** : la branche « sinon » est un coup ordinaire de 13 (`attack` à condition, puis
+  `interrupt`) au lieu de dégâts directs : la Parry, les Traps et le crochet `beforeHit` s'y appliquent. Le Rogue
+  y gagne 5,6 points (sa Parry annulait déjà tout le reste), les autres classes rien.
+
+Essais écartés : DoT 4 sur le Shadow Bolt de Jin'do (Mage −11, mais Priest −14 : le DoT ignore son Absorb) ;
+Volley 15 × 2 au lieu de 10 × 3 (Rogue −9 : la Parry n'annule que 8 par coup) ; interruptions directes chez les
+lanceurs normaux et chez Mokk (Mage −1, dans le bruit : le bot n'incante pas sous la menace).
+
+Reste : le Mage garde 5 points d'avance (élites à 97 %, boss à 73 %) : son contrôle (Frost Nova, Demoralized) et
+ses Absorb couvrent la zone ; les leviers propres à la zone qui le visent (DoT, interruption) frappent plus fort le
+Priest ou ne mordent pas. Le combat de boss est long pour le Priest (9 tours en moyenne, p95 13).
 
 ### Modèles en repli
 

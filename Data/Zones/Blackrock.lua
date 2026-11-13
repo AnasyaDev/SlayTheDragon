@@ -72,7 +72,7 @@ local function isWhelp(id) return id == "rookery_whelp" or id == "rookery_whelpl
 ---------------------------------------------------------------------------
 
 E.firebrand_grunt = finish({
-  name = "Firebrand Grunt", hp = { 23, 26 },
+  name = "Firebrand Grunt", hp = { 26, 29 },
   moves = {
     hack = { name = "Hack", intent = "attack", actions = { { "attack", 11 } } },
     sunder = { name = "Sunder Armor", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
@@ -86,7 +86,7 @@ local function whelpRage(c, self, dead)
   if isWhelp(dead.id) then Combat.applyStatus(c, self, "force", 1) end
 end
 E.rookery_whelp = {
-  name = "Rookery Whelp", hp = { 12, 14 },
+  name = "Rookery Whelp", hp = { 13, 15 },
   moves = { bite = { name = "Bite", intent = "attack", actions = { { "attack", 4 } } } },
   pattern = { "bite" }, onAllyDeath = whelpRage,
 }
@@ -97,7 +97,7 @@ E.rookery_whelpling = {
 }
 
 E.anvilrage_guardsman = finish({
-  name = "Anvilrage Guardsman", hp = { 33, 36 },
+  name = "Anvilrage Guardsman", hp = { 36, 40 },
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 7, interrupts = true } } },
     guard = { name = "Guard", intent = "defend", actions = { { "block", 10 } } },
@@ -110,7 +110,7 @@ E.anvilrage_guardsman = finish({
 })
 
 E.anvilrage_medic = finish({
-  name = "Anvilrage Medic", hp = { 19, 21 },
+  name = "Anvilrage Medic", hp = { 21, 23 },
   moves = {
     heal = { name = "Heal", intent = "heal", actions = { { "heal_ally", 8 } } },
     smite = { name = "Holy Smite", intent = "attack", actions = { { "attack", 7 } } },
@@ -121,7 +121,7 @@ E.anvilrage_medic = finish({
 })
 
 E.blazing_fireguard = finish({
-  name = "Blazing Fireguard", hp = { 24, 27 },
+  name = "Blazing Fireguard", hp = { 27, 30 },
   moves = {
     lash = { name = "Flame Lash", intent = "attack", actions = { { "attack", 10 } } },
     nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 4 }, { "debuff", "pain", 2 } } },
@@ -132,7 +132,7 @@ E.blazing_fireguard = finish({
 })
 
 E.firebrand_pyromancer = finish({
-  name = "Firebrand Pyromancer", hp = { 22, 25 },
+  name = "Firebrand Pyromancer", hp = { 24, 27 },
   moves = {
     fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 20 } } },
     scorch = { name = "Scorch", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
@@ -144,7 +144,7 @@ E.firebrand_pyromancer = finish({
 })
 
 E.blackhand_veteran = finish({
-  name = "Blackhand Veteran", hp = { 32, 35 },
+  name = "Blackhand Veteran", hp = { 35, 38 },
   moves = {
     strike = { name = "Strike", intent = "attack", actions = { { "attack", 12 } } },
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 6, interrupts = true } } },
@@ -157,7 +157,7 @@ E.blackhand_veteran = finish({
 })
 
 E.rage_talon_dragonspawn = finish({
-  name = "Rage Talon Dragonspawn", hp = { 33, 36 },
+  name = "Rage Talon Dragonspawn", hp = { 36, 39 },
   moves = {
     cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 14 } } },
     thunderclap = { name = "Thunderclap", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "demoralized", 1 } } },
@@ -169,7 +169,7 @@ E.rage_talon_dragonspawn = finish({
 })
 
 E.rookery_hatcher = finish({
-  name = "Rookery Hatcher", hp = { 28, 31 },
+  name = "Rookery Hatcher", hp = { 32, 35 },
   moves = {
     strike = { name = "Strike", intent = "attack", actions = { { "attack", 11 } } },
     tend = { name = "Tend Eggs", intent = "defend", actions = { { "block", 8 } } },
@@ -183,10 +183,10 @@ E.rookery_hatcher = finish({
 -- Élites
 ---------------------------------------------------------------------------
 
--- Panzor the Invincible : phase 1, chaque coup lui fait 6 au plus (le DoT passe en entier : règle de
+-- Panzor the Invincible : phase 1, chaque coup lui fait 10 au plus (le DoT passe en entier : règle de
 -- zone « maxHit ») ; phase 2, plus de plafond, et il prend 25 % de plus (état Cracked Plating).
 E.panzor = finish({
-  name = "Panzor the Invincible", hp = 88, elite = true, maxHit = 6,
+  name = "Panzor the Invincible", hp = 96, elite = true, maxHit = 10,
   moves = {
     stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 8, times = 2 } } },
     pulverize = { name = "Pulverize", intent = "attack", actions = { { "attack", 18, interrupts = true } } },
@@ -200,7 +200,7 @@ E.panzor = finish({
 
 -- Warchief Rend Blackhand sur Gyth : une seule barre ; Gyth d'abord, Rend à pied sous la moitié.
 E.rend_gyth = finish({
-  name = "Gyth", hp = 100, elite = true,
+  name = "Gyth", hp = 104, elite = true,
   moves = {
     flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 11 }, { "debuff", "pain", 3 } } },
     corrosive = { name = "Corrosive Acid", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "armor_broken", 2 } } },
@@ -216,19 +216,19 @@ E.rend_gyth = finish({
     pattern = { "whirlwind", "mortal" } } },
 })
 
--- Vaelastrasz the Corrupt : 30 % de ses PV au départ, Essence of the Red sur le joueur (+2 mana) jusqu'au
+-- Vaelastrasz the Corrupt : 40 % de ses PV au départ, Essence of the Red sur le joueur (+2 mana) jusqu'au
 -- seuil de 15 % ; Burning Adrenaline : +50 % aux Attacks pendant 2 tours, puis 15 PV perdus.
 E.vaelastrasz = finish({
   name = "Vaelastrasz the Corrupt", hp = 200, elite = true, essence = true,
-  -- le combat commence à 35 % de ses PV ; il n'est pas « tombé à la moitié » (onEnemyBloodied ne part pas)
+  -- le combat commence à 40 % de ses PV ; il n'est pas « tombé à la moitié » (onEnemyBloodied ne part pas)
   init = function(c, e)
-    e.hp = floor(e.maxHp * 0.35)
+    e.hp = floor(e.maxHp * 0.40)
     e.mem.bloodied = true
   end,
   moves = {
     adrenaline = { name = "Burning Adrenaline", intent = "debuff", actions = { { "debuff", "burning_adrenaline", 2 } } },
     flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 11 }, { "debuff", "pain", 3 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 18 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 20 } } },
     nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 7, times = 2 } } },
   },
   pattern = { "flame", "adrenaline", "cleave" },
@@ -295,10 +295,10 @@ local function nefariusAi(c, e)
 end
 
 E.nefarian = finish({
-  name = "Lord Victor Nefarius", hp = 100, boss = true, throne = true,
+  name = "Lord Victor Nefarius", hp = 120, boss = true, throne = true,
   moves = {
     -- phase 1 : Lord Victor Nefarius
-    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
+    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 22 } } },
     volley = { name = "Shadow Bolt Volley", intent = "attack", actions = { { "attack", 7, times = 2 } } },
     fear = { name = "Fear", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "demoralized", 2 } } },
     mending = { name = "Dark Mending", intent = "heal", actions = { { "heal_ally", 8 } } },
@@ -306,8 +306,8 @@ E.nefarian = finish({
     -- phases 2 et 3 : Nefarian
     class_call = { name = "Class Call", intent = "debuff", actions = { { "class_call", 2 } } },
     shadow_flame = { name = "Shadow Flame", intent = "cast", cast = true,
-      actions = { { "attack", 22 }, { "debuff", "pain", 3, cond = "noOnyxiaCloak" } } },
-    tail_sweep = { name = "Tail Sweep", intent = "attack", actions = { { "attack", 10, times = 2 } } },
+      actions = { { "attack", 24 }, { "debuff", "pain", 3, cond = "noOnyxiaCloak" } } },
+    tail_sweep = { name = "Tail Sweep", intent = "attack", actions = { { "attack", 11, times = 2 } } },
     veil = { name = "Veil of Shadow", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "veil_of_shadow", 4 } } },
     roar = { name = "Bellowing Roar", intent = "attack", actions = { { "attack", 7, times = 2 }, { "debuff", "demoralized", 1 } } },
     cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 20 } } },

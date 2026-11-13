@@ -214,16 +214,16 @@ E.fetid_corpse = {
 }
 
 E.morbent_fel = {
-  name = "Morbent Fel", hp = 92, boss = true, gift = "morbents_bane",
+  name = "Morbent Fel", hp = 96, boss = true, gift = "morbents_bane",
   moves = {
-    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 17 } } },
+    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 15 } } },
     tongues = { name = "Curse of Tongues", intent = "curse",
       actions = { { "attack", 7, times = 2 }, { "curse", "curse_of_tongues", to = "hand" } } },
-    drain_life = { name = "Drain Life", intent = "attack", actions = { { "attack", 14 }, { "heal_self", 6 } } },
+    drain_life = { name = "Drain Life", intent = "attack", actions = { { "attack", 12 }, { "heal_self", 6 } } },
     unholy_shield = { name = "Unholy Shield", intent = "defend", cast = true,
       actions = { { "block", 10 }, { "buff", "unholy_shield", 1 } } },
-    shadow_bolt2 = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
-    drain_life2 = { name = "Drain Life", intent = "attack", actions = { { "attack", 16 }, { "heal_self", 8 } } },
+    shadow_bolt2 = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 18 } } },
+    drain_life2 = { name = "Drain Life", intent = "attack", actions = { { "attack", 14 }, { "heal_self", 8 } } },
   },
   pattern = { "shadow_bolt", "tongues", "drain_life" },
   init = function(c, e) Combat.applyStatus(c, e, "unholy_shield", 1) end,

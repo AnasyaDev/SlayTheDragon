@@ -33,7 +33,9 @@ return function(T)
   local Combat, Art = ns.Combat, ns.Art
   local oracle, croc, walker = c.enemies[1], c.enemies[2], c.enemies[3]
   local so, sc, sw = v.slotOf[oracle.uid], v.slotOf[croc.uid], v.slotOf[walker.uid]
-  local roll = Combat.calcDamage(c, croc, c.player, ns.Enemies.sawtooth_crocolisk.moves.death_roll.actions[1][2])
+  local rollA = ns.Enemies.sawtooth_crocolisk.moves.death_roll.actions[1]
+  local roll = tostring(Combat.calcDamage(c, croc, c.player, rollA[2]))
+  if (rollA.times or 1) > 1 then roll = roll .. "×" .. rollA.times end -- coups multiples : « 10×2 »
   check("dormeurs : bulle « Asleep 2 » / « Asleep 3 », icône du sommeil", sc.intent.text._text == "Asleep 2"
     and sw.intent.text._text == "Asleep 3", tostring(sc.intent.text._text) .. " / " .. tostring(sw.intent.text._text))
   check("ouverture annoncée en gris sous la bulle : « On waking: Death Roll " .. roll .. " »", vis(sc.next)
@@ -59,7 +61,7 @@ return function(T)
     v:Render(true)
   end
   check("réveil par un coup : bonus, ouverture devenue l'intention (« " .. roll .. " »), petite icône d'ouverture",
-    idx and croc.hp < hp0 and croc.st.asleep == nil and sc.intent.text._text == tostring(roll) and vis(sc.intent.badge)
+    idx and croc.hp < hp0 and croc.st.asleep == nil and sc.intent.text._text == roll and vis(sc.intent.badge)
     and not vis(sc.next), tostring(sc.intent.text._text))
   snap("zone-swamp-wake", true)
 
