@@ -40,25 +40,23 @@ end
 Combat.chargeBonus = perCharge
 
 ---------------------------------------------------------------------------
--- Cartes épiques du Mage (docs/zones/cartes-de-zone.md, « Mage ») : règles actives tout le combat (l'épique
--- du deck est posée dans c.epic, hors de toute pile), crochets deckHooks avec src = c.epic ({ id, up, uid } :
--- Card.def(src) donne les nombres de la carte, base ou améliorée). État de combat dans c.cls (données simples) :
---   carry  mana gardé pour le tour suivant (Arcane Meditation), posé en fin de tour ;
---   fof    uid de la carte Cast partie tout de suite par Fingers of Frost, fofOn pendant sa résolution ;
---   r3     { [uid] = true } cartes jouées en 3e position (Rule of Threes), r3surge : Surge de l'original.
+-- Cartes épiques du Mage (docs/zones/cartes-de-zone.md, « Mage ») : règles actives tout le combat, chaque tour
+-- (l'épique du deck est posée dans c.epic, hors de toute pile), crochets deckHooks avec src = c.epic ({ id, up,
+-- uid } : Card.def(src) donne les nombres de la carte, base ou améliorée). État de combat dans c.cls (données
+-- simples) :
+--   carry   mana gardé pour le tour suivant (Arcane Meditation), posé en fin de tour ;
+--   molten  { [uid ennemi] = round } attaque qui a déjà brûlé ce round (Molten Armor) ;
+--   weChill { uid, n } Demoralized posé par l'élémentaire au début du tour, retiré à la fin du tour ;
+--   fof     uid de la carte Cast partie tout de suite par Fingers of Frost, fofOn pendant sa résolution,
+--           fofThaw { uid, stunned, demoralized } : le gel employé, retiré après la résolution ;
+--   r3      { [uid] = true } cartes jouées en 3e position (Rule of Threes), r3surge : Surge de l'original.
 ---------------------------------------------------------------------------
-
-L.trigger("Every 3rd turn")
 
 local Rng = ns.Rng
 local Cards = ns.Cards
 local function num(src, k) return Card.def(src)[k] or 0 end
 
--- Tour où une épique à période (epicPeriod = 3 : « Every 3rd turn ») agit : un tour sur N (3 : les tours 3, 6, 9…).
-function Combat.epicTurn(src, round)
-  local p = Card.def(src).epicPeriod
-  return not p or round % p == 0
-end
+L.trigger("When attacked")
 
 local function firstDamage(d)
   for i = 1, #d.effects do
@@ -67,21 +65,22 @@ local function firstDamage(d)
   return nil
 end
 
--- Mirror Image : à la résolution d'une carte Cast (incantée ou partie tout de suite), le montant de base de
--- son premier coup (+ epicN) frappe une fois de plus un ennemi vivant tiré au hasard (flux des cartes, la
--- même cible possible) ; coup de la même carte (Charges, Shatter, Ignite). Une carte « to all » : un coup.
+-- Mirror Image : à la résolution d'une carte Cast (incantée ou partie tout de suite), son premier coup frappe
+-- une fois de plus un ennemi vivant tiré au hasard (flux des cartes, la même cible possible), pour epicPct % de
+-- ses dégâts (50 : la moitié, arrondie bas ; améliorée 100), Charges, Shatter et Demoralized compris ; coup de
+-- la même carte (Ignite, onAttackHit). Une carte « to all » : un coup.
 local function mirrorHit(c, src, ctx)
   local e = firstDamage(ctx.def)
   if not e or c.result then return end
   local alive = Combat.aliveEnemies(c)
   if #alive == 0 then return end
   local t = alive[Rng.int(c.rng.cards, 1, #alive)]
-  local base = e[2] + num(src, "epicN")
+  local base = e[2]
   if e.bonus then base = base + e.bonus(c, ctx, t) end
   if e.more or e.per then base = Combat.amount(c, ctx, e, base, t) end
-  if base < 0 then base = 0 end
+  local dmg = math.floor(Combat.calcDamage(c, c.player, t, base, ctx.def) * num(src, "epicPct") / 100)
   Combat.log(c, { t = "epic", id = "mirror_image", dst = t.uid })
-  Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, base, ctx.def), e.pierce, ctx)
+  Combat.dealDamage(c, c.player, t, math.max(0, dmg), e.pierce, ctx)
   if ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
 end
 Combat.mirrorHit = mirrorHit
@@ -90,11 +89,15 @@ Cards.mirror_image.deckHooks = {
   afterCast = function(c, src, inst, ctx) mirrorHit(c, src, ctx) end,
 }
 
--- Molten Armor : chaque coup ennemi sur le Mage, même absorbé, pose DoT epicN à son auteur (valeur passée
--- par le crochet « apply » comme un état posé par une carte).
+-- Molten Armor : chaque attaque ennemie sur le Mage, même absorbée, pose DoT epicN à son auteur, une fois par
+-- attaque (premier coup ; un ennemi n'attaque qu'une fois par round) ; valeur passée par le crochet « apply ».
 Cards.molten_armor.deckHooks = {
   afterHit = function(c, src, e)
     if not e or e.dead or e.side ~= "enemy" or c.result then return end
+    local m = c.cls.molten or {}
+    c.cls.molten = m
+    if m[e.uid] == c.round then return end
+    m[e.uid] = c.round
     local n = Combat.modify(c, "apply", num(src, "epicN"), "pain", e, nil)
     if n > 0 then Combat.applyStatus(c, e, "pain", n, "burn") end
   end,
@@ -113,20 +116,36 @@ function Combat.elementalTarget(c)
   return nil
 end
 
+-- Chaque tour, après la pioche : epicN à la cible, puis Demoralized epicM qui ne tient que le tour du Mage (retiré
+-- en fin de tour, « until end of turn ») : la cible est Frozen pour ses cartes, pas pour le tour ennemi. Un
+-- Demoralized posé par une carte s'ajoute et reste.
 Cards.water_elemental.deckHooks = {
   onTurnStart = function(c, src)
-    if not Combat.epicTurn(src, c.round) then return end
     local t = Combat.elementalTarget(c)
     if not t or c.result then return end
     Combat.log(c, { t = "epic", id = "water_elemental", dst = t.uid })
     Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, num(src, "epicN"), nil))
-    if not t.dead and not c.result then Combat.applyStatus(c, t, "demoralized", num(src, "epicM")) end
+    if not t.dead and not c.result then
+      Combat.applyStatus(c, t, "demoralized", num(src, "epicM"))
+      c.cls.weChill = { uid = t.uid, n = num(src, "epicM") }
+    end
+  end,
+  onTurnEnd = function(c)
+    local w = c.cls.weChill
+    c.cls.weChill = nil
+    local t = w and Combat.enemyByUid(c, w.uid)
+    if t and not t.dead and (t.st.demoralized or 0) > 0 then
+      local left = t.st.demoralized - w.n
+      t.st.demoralized = left > 0 and left or nil
+    end
   end,
 }
 
 -- Fingers of Frost : une carte Cast à cible jouée sur un ennemi Frozen part tout de suite (crochet
 -- « instantCast », cible dans c.aim ; sans cible connue, canPlay : vrai si un ennemi vivant est Frozen),
--- sans emplacement ni Instant consommé ; améliorée, ses coups font epicN de plus.
+-- sans emplacement ni Instant consommé, et emploie le gel : le Stunned et le Demoralized que la cible portait
+-- au jeu de la carte lui sont retirés après la résolution (ceux que la carte pose restent) ; améliorée, ses
+-- coups font epicN de plus.
 local function anyFrozen(c)
   for i = 1, #c.enemies do if Combat.isFrozen(c.enemies[i]) then return true end end
   return false
@@ -135,10 +154,12 @@ end
 Cards.fingers_of_frost.deckHooks = {
   instantCast = function(c, src, v, d, inst, commit)
     if v or not d.cast or d.target ~= "enemy" then return v end
+    local t = c.aim and Combat.enemyByUid(c, c.aim)
     local ok
-    if c.aim then ok = Combat.isFrozen(Combat.enemyByUid(c, c.aim)) else ok = anyFrozen(c) end
+    if c.aim then ok = Combat.isFrozen(t) else ok = anyFrozen(c) end
     if ok and commit then
       c.cls.fof = inst.uid
+      if t then c.cls.fofThaw = { uid = t.uid, stunned = t.st.stunned, demoralized = t.st.demoralized } end
       Combat.log(c, { t = "epic", id = "fingers_of_frost", card = inst.uid })
     end
     return ok and true or v
@@ -147,7 +168,15 @@ Cards.fingers_of_frost.deckHooks = {
     if c.cls.fof == inst.uid and not ctx.cast then c.cls.fofOn = true end
   end,
   onCardPlayed = function(c, src, inst)
-    if c.cls.fof == inst.uid then c.cls.fof, c.cls.fofOn = nil, nil end
+    if c.cls.fof ~= inst.uid then return end
+    local th = c.cls.fofThaw
+    c.cls.fof, c.cls.fofOn, c.cls.fofThaw = nil, nil, nil
+    local t = th and Combat.enemyByUid(c, th.uid)
+    if not t or t.dead then return end
+    for _, k in ipairs({ "stunned", "demoralized" }) do
+      local left = (t.st[k] or 0) - (th[k] or 0)
+      t.st[k] = left > 0 and left or nil
+    end
   end,
   damage = function(c, src, v, dst, cardDef)
     if c.cls.fofOn and cardDef and cardDef.cast then return v + num(src, "epicN") end
@@ -155,12 +184,13 @@ Cards.fingers_of_frost.deckHooks = {
   end,
 }
 
--- Arcane Meditation : à la fin du tour, le mana non dépensé (epicN au plus) est gardé ; il s'ajoute au début
--- du tour suivant, après la remise du mana à son maximum (le total peut dépasser le maximum).
+-- Arcane Meditation : à la fin du tour, le mana non dépensé (epicN au plus) est gardé, + epicBonus s'il en reste ;
+-- il s'ajoute au début du tour suivant, après la remise du mana à son maximum (le total peut dépasser le maximum).
+-- Seul le tour suivant en profite (rien ne se cumule au-delà du plafond).
 Cards.arcane_meditation.deckHooks = {
   onTurnEnd = function(c, src)
     local keep = math.min(math.max(c.player.mana or 0, 0), num(src, "epicN"))
-    c.cls.carry = keep > 0 and keep or nil
+    c.cls.carry = keep > 0 and keep + num(src, "epicBonus") or nil
   end,
   onTurnStart = function(c)
     local n = c.cls.carry
@@ -179,6 +209,7 @@ Cards.conflagration.deckHooks = {
     local n = dead.st.pain or 0
     if n <= 0 then return end
     n = n + num(src, "epicN")
+    if n <= 0 then return end
     local icon = dead.stIcon and dead.stIcon.pain or "burn"
     local spread = false
     for i = 1, #c.enemies do
@@ -194,25 +225,23 @@ Cards.conflagration.deckHooks = {
   end,
 }
 
--- Rule of Threes : la 3e carte jouée du tour (améliorée : chaque 3e) se résout deux fois si c'est une Attack
--- (repli de la fiche, « Risques d'équilibre » 5 : toutes les cartes, c'était 100 % de victoires), la copie tout de
--- suite après, même cible, sans coût (crochet « replay ») ; marquée au jeu (c.turn.played), donc une carte Cast
--- incantée se résout deux fois à son départ. La copie compte le même Surge que l'original.
-local function third(c, src, d)
-  local n = c.turn.played
-  return d.type == "attack" and Combat.epicTurn(src, c.round)
-    and (n == 3 or (Card.def(src).epicEvery and n > 0 and n % 3 == 0))
+-- Rule of Threes : la 3e carte jouée du tour (améliorée : chaque 3e), de tout type, se résout deux fois si le
+-- Mage dépense epicCharge Charges au moment où elle est jouée (sans assez de Charges : une fois, la carte compte) ;
+-- la copie tout de suite après, même cible, sans coût (crochet « replay ») ; marquée au jeu (c.turn.played), donc
+-- une carte Cast incantée se résout deux fois à son départ. La copie compte le même Surge que l'original.
+local function thirdRank(c, src, n)
+  return n == 3 or (Card.def(src).epicEvery and n > 0 and n % 3 == 0)
 end
-Combat.ruleOfThreesNext = function(c, src) -- la prochaine carte jouée sera-t-elle doublée (si Attack) ? (vue)
-  local n = c.turn.played + 1
-  return Combat.epicTurn(src, c.round) and (n == 3 or (Card.def(src).epicEvery and n % 3 == 0))
+Combat.ruleOfThreesNext = function(c, src) -- la prochaine carte jouée tombe-t-elle au rang doublé ? (vue, bots)
+  return thirdRank(c, src, c.turn.played + 1)
 end
 
 Cards.rule_of_threes.deckHooks = {
-  onCardCommitted = function(c, src, inst, d)
+  onCardCommitted = function(c, src, inst)
     local r = c.cls.r3 or {}
     c.cls.r3 = r
-    r[inst.uid] = third(c, src, d) or nil
+    r[inst.uid] = nil
+    if thirdRank(c, src, c.turn.played) and Combat.spendRes(c, num(src, "epicCharge")) then r[inst.uid] = true end
   end,
   replay = function(c, src, v, inst, ctx)
     local r = c.cls.r3
@@ -228,7 +257,8 @@ Cards.rule_of_threes.deckHooks = {
   end,
 }
 
--- Bots : valeur d'un point de mana gardé (Arcane Meditation), en PV ennemis (une carte à 1 mana ≈ 6).
+-- Bots : valeur d'un point de mana gardé (Arcane Meditation), en PV ennemis (une carte à 1 mana ≈ 6). Mesuré le
+-- 14/11/2026 : 8 ou 12 font garder trop de mana au bot (8 : -5 points, 12 : -30) ; 5 reste le meilleur.
 Combat.MAGE_CARRY_VALUE = 5
 
 -- Épique du Mage en jeu dans ce combat (c.epic : id, puis la source { id, up, uid }) ou nil (vue, bots).
@@ -305,7 +335,9 @@ ns.ClassRules.mage = {
       if id == "mirror_image" then
         local function mirror(entry)
           local e = entry and firstDamage(Card.def(entry.card))
-          if e then v = v + (e[2] + (p.res or 0) + num(src, "epicN")) * W.enemyHp * W.castRisk end
+          if e then
+            v = v + math.floor((e[2] + (p.res or 0)) * num(src, "epicPct") / 100) * W.enemyHp * W.castRisk
+          end
         end
         mirror(p.cast)
         for i = 1, #(more or {}) do mirror(more[i]) end

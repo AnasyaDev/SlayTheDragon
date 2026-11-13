@@ -557,3 +557,103 @@ piste pour l'affichage.
 5. **Titre « Dragonslayer »** : à la première victoire contre Nefarian avec la classe (proposé), ou rester au
    niveau 7 ? Dans le premier cas, quel titre pour le niveau 7, et Rallying Cry (+6 PV max à l'expédition
    suivante) est-il un cadeau acceptable ou un avantage à retirer ?
+
+## 13. Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Blackrock.lua` (ennemis, groupes, rencontres, commun, bibelots de clé, Grim Guzzler),
+`Core/ZoneRules/blackrock.lua` (règles, états, actions, titre, Rallying Cry ; table `ns.Blackrock`),
+`UI/Art/Zones/blackrock.lua` (modèles, icônes, vue de zone, peintre `cavern` et six décors), `Sim/zones/blackrock.lua`
+(bot), `Sim/tests_zone_blackrock.lua` (29 tests), `Sim/ui_zone_blackrock.lua` (section UZB du harnais).
+
+### La règle telle que codée
+
+- Phases : moteur commun (`def.phases`), seuil 50 % pour les sept normaux à phase, 50 % pour Panzor et Rend,
+  15 % pour Vaelastrasz, 75 % et 25 % pour Nefarian avec `cap = true` (les dégâts au-delà d'un seuil du boss sont
+  perdus, décision du 13/11). Ouverture tout de suite pendant le jeu (`c.step == "play"`), sinon intention
+  suivante en gris (« Next: … ») ; Stunned fait perdre l'ouverture (le motif de la phase reprend au 1er coup) ;
+  un coup mortel n'ouvre aucune phase. Texte du cran composé d'après les données (`finish` : « Below 50%:
+  Enraged. Gains Strength 3. Opens with Whirlwind. »).
+- Règles qui ne sont pas des états (crochet `enemyDamageTaken`) : Invincible (`maxHit = 6`, levé par la phase :
+  `maxHit = false`, le DoT passe en entier), Shadow of the Throne (`throne = true` : moitié, DoT compris, tant
+  qu'un Drakonid vit, en phase 1). États : Fire Shield (Attack, Cast résolue et Trap ; ni familier, ni DoT, ni le
+  coup qui ouvre la phase), Cracked Plating, Essence of the Red (`maxMana`), Burning Adrenaline (`attackMult`
+  +0,5 ; 15 PV à sa fin, `onRoundEnd`), Shadowflame Fury (Strength à sa fin), Veil of Shadow (`heal`), et un état
+  de Class Call par classe (Corrupted Healing, Berserker Stance, Wild Polymorph, Called Out, Broken Bow ;
+  Demoralized pour une classe à venir).
+- Badges de la vue : ouverture en cours, « Max 6 » (Invincible), « Half » (Throne, éteint sans Drakonid),
+  « Phase k/3 » du combat final (sous l'intention : le compteur du haut tombait sur le cadre du boss).
+
+### Ce qui diffère de la fiche, et pourquoi
+
+- Nombres : tous réglés par la simulation (tableau plus bas) ; ils sont bien plus bas que « Westfall × 1,72 »
+  parce que la mesure se fait avec ce qui existe aujourd'hui (commun et bibelots des zones 1 à 6, épiques).
+- Class Call : Berserker Stance donne +1 (pas +2) ; Wild Polymorph ne renchérit que la première carte Cast du
+  tour (avec « toutes les Cast + 1 », le Mage tombait 10 points sous les autres) ; Corrupted Healing pose DoT 4
+  (le Prêtre restait 10 points au-dessus) ; Veil of Shadow dure 4 tours et ouvre aussi le motif de la phase 3.
+- Shadowflame Fury : 3 rounds et Strength 10 (au lieu de 4 et 8), pour que la phase 3 reste courte.
+- Fire Shield : le coup qui fait entrer dans la phase ne le déclenche pas (sinon le bouclier punissait le coup
+  même qui l'a fait apparaître, sans que le joueur puisse le voir avant).
+- Shadowforge Key : « Treasure chests also hold a potion. » (la récompense n'offre pas de choix de bibelot,
+  docs/zones.md § 10). Franclorn ne la vend pas (une rencontre ne donne un bibelot précis que s'il lui est propre,
+  `noPool`) : « Ask about the Shadowforge vault », 60 po, un bibelot tiré.
+- Décors des rencontres : clés communes (`road`, `hill`, `camp`, `shop`) remplacées par la zone (`span`,
+  `prison`, `spire`, `tavern`) ; décor de nuit = la forge de la Black Anvil ; boss = salle du trône de Blackwing Lair.
+- Grim Guzzler : case du commun de la zone 7 (palier 7), à Blackrock seulement ; boisson offerte puis seconde à
+  30 po parmi les trois autres (quatre réponses au plus à l'écran : une étape par boisson prise, cinq étapes
+  `node = true`).
+- Titre : `ns.Blackrock.title` (« Dragonslayer » si drapeau `dragonslayer:<classe>`, sinon « Veteran » au
+  niveau 7), affiché sur l'accueil sous l'icône et sur l'écran Progress sous la barre de niveau. Le journal
+  (`UI/Controller.lua`, « Log ») lit encore `Meta.title` (« Dragonslayer » au niveau 7) : à aligner (fichiers
+  interdits, test `tests_expedition` qui fige `Meta.title`).
+- Rallying Cry : drapeau `rallying_cry` à la victoire contre Nefarian, +6 PV max à la première expédition qui
+  suit (toute classe, toute zone), drapeau `rallying_cry_used`.
+
+### Modèles (replis)
+
+Aucune créature de Blackrock dans les caches du client Forever (13/11/2026) : la créature de la version classique
+est en tête (Panzor 8923, Rend 10429, Gyth 10339, Vaelastrasz 13020, Nefarius 10162, Nefarian 11583, Drakonids
+14264 / 14261, Bone Construct 14605, PNJ 8888, 12944, 9021, 9023, 10267, 14387, 16033, 9499, ennemis 9045, 10161,
+8891, 8894, 8910, 10316, 9819, 9096, 10683 ; à vérifier en jeu), puis des affichages du cache, en repli : orcs
+rochenoires 6033 / 6044 / 6046 / 6047 / 6030, Sombrefer 825 / 7814 / 7798, Wyrmide Flammécaille 8309
+(drakônides, dragonspawn, Drakonids), Dragonnet noir 387, Drake noir insoumis 6374 (Gyth, Nefarian), Drake
+torride 6377 (Vaelastrasz), Flamme vive 1405 (Fireguard), golems de guerre 10801 / 5747 (Panzor), squelettes
+200 / 158, mage humain 5076 / 3585 (Nefarius, Lothos), fantôme 10700 (Franclorn), gobelins 7109 / 7110,
+gnomes 12940 / 6973, nains de Forgefer 3411 / 3422, aubergiste 3047 (Plugger).
+
+### Nombres finaux
+
+| Ennemi | PV | Coups |
+|---|---|---|
+| Firebrand Grunt | 23–26 | Hack 11, Sunder Armor 5 + Sundered 1 |
+| Rookery Whelp (sbire : 7–8) | 12–14 | Bite 4 ; Strength 1 à la mort d'un autre |
+| Anvilrage Guardsman | 33–36 | Shield Bash 7 (interrompt), Guard 10, Strike 8 × 2 ; phase : Shield Wall 15, Shield Slam 8 + 6 Absorb |
+| Anvilrage Medic | 19–21 | Heal 8 (≥ 8 manquants), Holy Smite 7 ; phase : Desperate Prayer (soin 10) |
+| Blazing Fireguard | 24–27 | Flame Lash 10, Fire Nova 4 + DoT 2 ; phase : Fire Shield 2 |
+| Firebrand Pyromancer | 22–25 | Fireball (Cast) 20, Scorch 5 (interrompt) ; phase : Flamestrike (Cast) 12 + DoT 3 |
+| Blackhand Veteran | 32–35 | Strike 12, Shield Bash 6 (interrompt), Battle Shout ; phase : Strength 3, Whirlwind 6 × 2 |
+| Rage Talon Dragonspawn | 33–36 | Cleave 14, Thunderclap 6 + Demoralized 1 ; phase : Bellowing Roar (Sundered 2, Demoralized 2) |
+| Rookery Hatcher | 28–31 | Strike 11, Tend Eggs 8 ; phase : 2 Rookery Whelps |
+| Panzor | 88 | Stomp 8 × 2, Pulverize 18 (interrompt), Overheat Strength 2 ; 50 % : Rampage 6 × 3, +25 % subis |
+| Gyth / Rend | 100 | Flame Breath 11 + DoT 3, Knock Away 13, Corrosive Acid 6 + Sundered 2, Freeze 5 ; 50 % : Strength 2, Cleave 13, Whirlwind 6 × 3, Mortal Strike 20 |
+| Vaelastrasz | 200 (70 au départ) | Flame Breath 11 + DoT 3, Burning Adrenaline 2, Cleave 18 ; 15 % : Fire Nova 7 × 2 |
+| Nefarius / Nefarian | 100 | Shadow Bolt (Cast) 20, Volley 7 × 2, Fear 5 + Demoralized 2, Dark Mending 8 ; 75 % : Shadow Flame (Cast) 22 + DoT 3, Tail Sweep 10 × 2, Veil of Shadow 6 + Veil 4, Class Call ; 25 % : Strength 3, Fury 3 (Strength 10), Bellowing Roar 7 × 2, Cleave 20 |
+| Red / Blue Drakonid | 10 | Claw 8, Breath 3 + DoT 2 / Demoralized 1 |
+| Bone Construct | 8 | Bone Strike 7 |
+
+### Mesures (1 000 expéditions par ligne, `zone=blackrock zones=6 level=7 key=0`, après la fusion des six zones)
+
+| Classe | Victoire `epic=none` | avec épique (pour information, avant le réglage des épiques) | PV perdus / combat normal | tours (normal) | boss : victoire, tours |
+|---|---|---|---|---|---|
+| Priest | 68,8 % | 68,6 % | 10,4 | 3,99 | 77 %, 8,0 |
+| Warrior | 68,4 % | 78,9 % | 10,3 | 3,36 | 82 %, 6,7 |
+| Mage | 61,1 % | 66,0 % | 7,0 | 3,23 | 70 %, 6,0 |
+| Rogue | 73,8 % | 82,3 % | 7,6 | 3,02 | 84 %, 6,0 |
+| Hunter | 73,8 % | 89,7 % | 6,9 | 2,86 | 77 %, 5,7 |
+
+Clés (Rogue, `epic=none`) : +0 75,1 %, +1 64,4 %, +3 52,6 %, +5 47,4 % (−5,5 points par niveau en moyenne).
+Référence Westfall (`zones=0 level=7 epic=none`, 300 par classe) : 81,7 / 81,3 / 71,0 / 71,0 / 73,7 % : l'écart
+entre classes y est déjà de 10,7 points, le Mage en bas. À Blackrock il est de 12,7 points sans épique (Mage
+61 %, Rogue et Hunter 74 %), et de 24 points avec épique (Hunter 90 % : ses épiques, comme dans les Burning Steppes). Les
+leviers propres à la zone (Class Call par classe, Veil, Throne, Drakonids) ont été réglés pour le resserrer ; le
+Mage meurt surtout au boss (71 %), sur les gros coups (Shadow Flame, Cleave) avec ses 42 PV. Statistiques de
+zone (par combat de boss, Mage) : 1,9 Bone Construct, 1,0 Class Call, 14 dégâts arrêtés par le Throne.

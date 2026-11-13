@@ -15,7 +15,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | jouable depuis le 14/11/2026 (Slumber : dormeurs, ouvertures, Rude Awakening ; boss Somnus ; sept décors peints) ; détails et mesures : `docs/zones/swamp.md`, « Implémentation » |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
-| 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
+| 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | jouable (14/11/2026) : phases (moteur commun) et règles propres (Invincible, Fire Shield, Shadow of the Throne, Class Call), boss Nefarian (3 phases), Grim Guzzler, titre « Dragonslayer » ; six décors peints (peintre `cavern`) ; implémentation : `docs/zones/blackrock.md` § 13 |
 
 ## 1. Fichiers d'une zone
 
@@ -267,7 +267,9 @@ Steppes, générique) : `layers = { skyline = f, ground = f, front = f }` dans l
 avec `(kit, cadre, g, entrée, palette)` après les collines lointaines, après la route et à la fin ;
 `S.paintKit` donne les formes et niveaux du peintre (`box`, `vgrad`, `oval`, `blur`, `bar`, `diamond`, `tri`,
 `hash`, `rgb`, `mix`, `LV`), `S.PROPS` le registre des accessoires ; `furrows = false` retire les rangs de champ
-du sol proche (exemple complet : `UI/Art/Zones/steppes.lua`). Fond embarqué : `tools/build_backgrounds.py` et
+du sol proche (exemple complet : `UI/Art/Zones/steppes.lua`). Décor qui n'est pas un paysage à ciel ouvert (intérieur de montagne) : `painter = "<nom>"` dans l'entrée
+d'`Art.paintings` et `Art.painters.<nom> = function(f, g, sp, K)` dans le fichier d'art de la zone (`K` =
+`S.paintKit`), choisi par `S.paint` (Blackrock : peintre `cavern`). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
 Paysage peint en entier par sa zone (ajout de Stranglethorn, générique) : `draw = function(kit, cadre, g, entrée,
 palette) … end` dans l'entrée d'`Art.paintings` remplace tous les plans de `S.landscape` (ciel, champs, route) ;
@@ -449,8 +451,9 @@ end
 - Aperçu au survol d'une carte sur les ennemis (primes de Pack, « Wake » du marais) : aucun aperçu de dégâts
   n'existe dans l'écran de combat ; une vue de zone peut l'approcher par `render` (carte choisie :
   `view.selected`), sinon c'est un lot d'interface commun.
-- Titres sur l'accueil et l'écran Progress (« Priest — Dragonslayer ») : drapeau posé, affichage à ajouter dans
-  `UI/Screens.lua` (lot commun).
+- Titres sur l'accueil et l'écran Progress (« Priest — Dragonslayer », « Veteran » au niveau 7) : faits par
+  Blackrock (`ns.Blackrock.title`, `UI/Screens.lua`) ; le journal (« Log », `UI/Controller.lua`) lit encore
+  `Meta.title` (« Dragonslayer » au niveau 7) : à aligner.
 - Coffre « choice of 2 relics » (Shadowforge Key) : la récompense n'offre pas de choix de bibelot.
 - Vol d'une carte de l'ennemi vers une pile : le texte flottant en tient lieu.
 

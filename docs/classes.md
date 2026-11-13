@@ -447,6 +447,61 @@ dégâts, Absorb, soin, DoT et Regen pendant la résolution de la carte incanté
 / `onCardPlayed` + `damage`, `block`, `heal`, `apply`, `applySelf`) : le soin d'Atonement de cette carte est
 multiplié aussi. Bots : `classDef.bot.byEpic[id]` (cartes centrales, améliorations, retraits de chaque build),
 `classDef.bot.epic(exp, id)` note l'épique selon les cartes centrales déjà prises.
+
+**Réglage par zones (14/11/2026, brief `build/brief-epiques-reglage.md`).** Mesure de référence : `runner=expedition
+class=priest level=7 key=0 bot=heuristic runs=600`, `zone=duskwood zones=1`, `zone=stranglethorn zones=3`,
+`zone=steppes zones=5` ; gain = victoires avec l'épique imposée (`epic=<id>`) − victoires `epic=none`
+(66,5 / 62,5 / 52,3 %). Outils : `build/prs_measure.sh`, `build/prs_table.py`, `build/prs_tune.lua` (réglages
+essayés par `PRS_TUNE`, sans toucher au code ; non versionnés). Rapports `reports/prs-*.txt`.
+
+| Épique | Règle (base / améliorée) | Duskwood | Stranglethorn | Steppes | Moyenne | PV perdus / combat normal | Changement |
+|---|---|---|---|---|---|---|---|
+| Prayer of Mending | PV rendus à un ennemi (+ 2) | +10,2 | +7,8 | +19,7 | +12,6 | 8,4–10,4 | aucun |
+| Misery | DoT copié sur les autres (+ 1) | +5,8 | +8,8 | +18,0 | +10,9 | 6,4–9,0 | aucun |
+| Echo of Light | Regen 4 au départ ; tic = sa valeur à tous (+ 2), sans soin | +8,7 | +3,8 | +23,9 | +12,1 | 3,8–6,3 | + 7 fixe par tic → Regen 4 de départ (règle de la fiche) |
+| Shadow Covenant | 2, 4, 6… PV par carte Shadow du tour (0, 4, 6…) | +11,8 | +5,8 | +22,9 | +13,5 | 11,5–12,5 | 3 PV par mana → 2 PV + 2 par carte Shadow déjà jouée |
+| Reflective Shield | le tiers (la moitié) de l'Absorb perdue renvoyé | +5,2 | +12,2 | +20,9 | +12,8 | 6,4–7,9 | plafond 2 (4) par coup retiré, part renvoyée |
+| Voidform | + 1 (+ 2) par Insanity aux coups Shadow | +6,2 | +8,2 | +20,0 | +11,5 | 8,1–9,8 | aucun |
+| Inner Focus | première carte en Cast, × 1,5 (× 2) | +10,3 | +2,8 | +24,4 | +12,5 | 10,5–12,5 | + 75 % → + 50 % (fiche) |
+
+Moyenne des sept : **+12,3** (départ : +12,2, mais Inner Focus à +21,9 et Echo of Light à +6,8 ; la cible
++10 à +12 est dépassée de 0,3, dans le bruit de mesure). Westfall (`zone=westfall zones=7`, pour information,
+sans épique 78,2 %) : Prayer of Mending +7,3, Misery +3,5, Echo of Light +9,5, Shadow Covenant +7,0,
+Reflective Shield +8,0, Voidform +5,6, Inner Focus +1,5.
+
+Mesures qui ont guidé les nombres (moyenne des trois zones) :
+- Reflective Shield : tout renvoyer +33,9, la moitié +22,0, le tiers (amélioré + 3) +15,3, le tiers / la
+  moitié +12,8, le tiers / le tiers +10,6, le quart / le tiers +7,2. Contrôle « à blanc » (rien renvoyé, mêmes
+  conseils de bot) : −4,5, les conseils seuls ne rapportent rien. « Absorb − 2 par gain » en contrepartie :
+  −3,8 (Duskwood −16), écarté.
+- Shadow Covenant : 3 PV par mana +9,3 (Stranglethorn +0,7, 13 PV perdus), 2 PV +25,3, 2 PV et −1 mana par tour
+  −38, 2 PV + 1 par carte du tour +20,1, 2 PV + 2 par carte du tour +13,5, 2 PV + 3 par carte du tour +10,4
+(Stranglethorn +1,8, 12–13 PV perdus : écarté). L'amélioration (première gratuite)
+  ne change presque rien (3 PV : 74,2 / 63,2 / 70,2 sans elle).
+- Echo of Light : sans Regen de départ, + 7 par tic +6,8 ; Regen 3 et + 0 / + 2 / + 4 : +4,7 / +15,1 / +21,3 ;
+  Regen 4 et + 0 / + 1 : +12,1 / +17,5.
+- Inner Focus : × 1,75 +21,9 (Steppes +34,7) ; × 1,5 +12,5 ; × 1,5 sans interruption possible +20,0
+  (Stranglethorn +15,0, Steppes +34,2) ; × 1,5 plafonné à + 10 par valeur +8,3 ; × 1,25 sans interruption +7,6
+  (Duskwood −4,5) ; « à blanc » × 1 : −25,6 (Duskwood −34, Steppes −17).
+
+Hors cible et pourquoi :
+- **Steppes au-delà de +18** pour cinq épiques sur sept (+19,7 à +24,4) : le Priest n'y gagne que 52 % sans
+  épique, et la zone se joue sur Grark Lorkrub (61 % au boss sans épique, 77 à 92 % avec) ; tout ce qui
+  tue plus vite ou garde des PV pour le boss y rapporte le double des autres zones. Baisser les nombres pour
+  passer sous +18 à Steppes ferait tomber Duskwood et Stranglethorn sous +3.
+- **Inner Focus** reste la plus dépendante des zones, quel que soit le nombre : le retard d'un tour coûte cher
+  contre Morbent Fel (Duskwood, à blanc 39 % au boss contre 72 %) et rien contre Grark ; à Stranglethorn les
+  interruptions coupent la carte incantée (15 % des incantations en combat normal) : +2,8. La variante « ne peut
+  pas être interrompue » remonte Stranglethorn (+15) mais pousse Steppes à +34 ; non retenue. PV perdus 10,5–12,5
+  (le premier Absorb du tour arrive un tour plus tard).
+- **Shadow Covenant** : 11,5–12,5 PV perdus par combat normal (c'est le prix de la règle) ; Stranglethorn +5,8
+  (cause probable, non vérifiée : le Hex vise la carte la plus chère, donc les cartes que le mana paie encore).
+- **Echo of Light** : 3,8 PV perdus à Steppes (sous 5 : l'épique tue les groupes avant qu'ils ne frappent).
+
+Bot : non modifié. Le contrôle à blanc de Reflective Shield montre que ses conseils (`byEpic`) ne rapportent
+rien seuls. Pistes non vérifiées : sous Inner Focus le bot perd des combats normaux (95 % contre 98,5 % sans
+épique, 12 PV perdus contre 9,6), signe probable d'un mauvais choix de la première carte (Absorb retardée) ;
+`botValue` ne donne aucune valeur propre à Shadow Covenant (la hausse dans le tour n'est vue que coup par coup).
 ### Hunter : les sept épiques (14/11/2026)
 
 Données et règles dans `Data/Hunter.lua` (bloc « Cartes épiques », nombres réglés dans la table `EPIC`,
@@ -454,19 +509,42 @@ exposée en `ns.HunterEpic`), tests `Sim/tests_epic_hunter.lua`, harnais « UEH 
 moteur : tout passe par les crochets existants, en `deckHooks` de l'épique (`src` = `c.epic`, posée hors des
 piles par le socle, crochets en dernier) ; `whileInDeck` = `ns.Hunter.epicStart(c, src)` retient l'épique en
 jeu (`c.cls.epic = { id, up }`, lu par la vue et les bots : `ns.Hunter.epic(c)`). Nombres réglés par la
-simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 12 / 16 dégâts en
+simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 20 / 24 dégâts en
 plus ; Lone Wolf +1 → +2 par Frenzy (amélioré +3 au lieu de « Start of turn: +1 Frenzy. », trop long pour
-la carte) ; Chimaera Shot 3 / 3 (6) → 4 / 4 (7) ; Trap Launcher 1 / 2 (fiche).
+la carte) ; Chimaera Shot 3 / 3 (6) → 5 / 4 (8) ; Trap Launcher 1 / 2 (fiche). Réglage des zones dures
+(14/11/2026) : Call of the Wild et Black Arrow coûtent 1 Frenzy par attaque (`cotwCost`, `blackCost` ; améliorées :
+gratuites), Beast Cleave frappe les autres ennemis pour 2 de moins (`cleaveLess`).
 
 | Épique | Crochets | Remarques |
 |---|---|---|
-| Call of the Wild | `onTurnStart` | `Hunter.petAttack(c, "epic")` après la pioche et la baisse du Frenzy |
+| Call of the Wild | `onTurnStart` | Frenzy ≥ `cotwCost` : −`cotwCost`, puis `Hunter.petAttack(c, "epic")`, après la pioche et la baisse du Frenzy |
 | Trap Launcher | `trapLaunch`, `onTrapTriggered` (why = `"launch"`) | familier sur la cible de la Trap ; Resourcefulness : une Trap lancée revient en main à la fin du round (`c.cls.trapBack`, `onRoundEnd` du Power), pas tout de suite |
-| Beast Cleave | `petAll`, `onPetAttack` (amélioré) | |
+| Beast Cleave | `petAll`, `petLess` (valeur de classe, lue par `Hunter.petLess`), `onPetAttack` (amélioré) | la cible du familier en plein, les autres `cleaveLess` de moins (jamais sous 0) |
 | Roar of Sacrifice | `beforeHit` | journal `{ t = "roar", prevented }` (« Roar » flottant de la vue), `c.stats.roarPrevented` |
 | Master Marksman | `instantCast` (cible = `c.player.lastTarget`), `damage`, `afterCast` | question de `canPlay` (commit faux) : vraie si un ennemi vivant est intact ; journal `cast_instant` |
-| Black Arrow | `onDotTick` | familier sur l'ennemi qui tique, sans changer sa cible |
+| Black Arrow | `onDotTick` | Frenzy ≥ `blackCost` : −`blackCost`, puis familier sur l'ennemi qui tique, sans changer sa cible |
 | Lone Wolf | `petAbsent`, `damage`, `onTurnStart` ; `transforms` (9 variantes `variant = true`) | Pet Whistle : +1 Frenzy au lieu d'une attaque (règle du bibelot ; texte `loneText` montré par `UI/Art/hunter.lua`) |
+
+Mesures des zones dures (14/11/2026, `luajit Sim/sim.lua runs=600 bot=heuristic jobs=3 runner=expedition
+class=hunter level=7 key=0 zone=<zone> zones=<N> epic=<id>`, Duskwood `zones=1`, Stranglethorn `zones=3`,
+Steppes `zones=5` ; sans épique : 64,7 / 70,8 / 83,0 % ; ± 3,5 points par zone) : gain en points de victoire
+contre `epic=none`, PV perdus par combat normal (moyenne des trois zones), Westfall (`zones=7`, sans épique
+77,8 %) pour information.
+
+| Épique | Duskwood | Stranglethorn | Steppes | Moyenne | PV normal | Westfall | Avant (moyenne) |
+|---|---|---|---|---|---|---|---|
+| Call of the Wild | +11,5 | +5,7 | +10,2 | +9,1 | 6,0 | +13,9 | +19,1 (gratuite) |
+| Trap Launcher | +17,3 | +7,2 | +9,0 | +11,2 | 5,3 | +12,4 | inchangée |
+| Beast Cleave | +16,0 | +7,9 | +8,0 | +10,6 | 5,5 | +13,7 | +15,5 (en plein) |
+| Roar of Sacrifice | +8,5 | +14,4 | +11,0 | +11,3 | 4,9 | +12,9 | inchangée |
+| Master Marksman | +17,6 | +7,0 | +3,7 | +9,4 | 5,6 | +10,9 | +6,1 (+12) |
+| Black Arrow | +17,0 | +7,7 | +12,7 | +12,5 | 6,1 | +13,4 | +16,9 (gratuite) |
+| Lone Wolf | +15,0 | +10,4 | +12,2 | +12,5 | 4,9 | +15,5 | +7,8 (Chimaera 4) |
+
+Moyenne de la classe : +10,9 (avant : +12,6, de +6,1 à +19,1). Essais : Beast Cleave « moitié aux autres »
++7,5, « 1 de moins » +13,1 ; Master Marksman +16 : +8,2 ; Lone Wolf +3 par Frenzy : +21,2, Chimaera Shot 6 / 4 :
++16,6. Les épiques imposées ne sont jamais améliorées par le bot (notes d'amélioration de `byEpic` ≈ 4, sous
+les notes des cartes ≈ 9 à 11) : les versions améliorées ne sont pas mesurées.
 
 Ajouts de la classe : `Hunter.petAttackOn(c, why, ennemi)` (cible imposée par `c.cls.petForce`, lue par
 `Hunter.petTarget` : la signature de `petAttack` / `petTarget`, enveloppées par Core/ZoneRules.lua, ne change pas) ;
@@ -514,80 +592,115 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
   Atrophic −2,9, Danse +3,4 (les retraits de doublons conseillés par `bot.byEpic.danse_macabre` rapportent
   un peu seuls, surtout à Duskwood).
 
-### Épiques du Guerrier (14/11/2026)
+### Épiques du Guerrier (14/11/2026, réglées pour les zones dures le 14/11/2026)
 
 Sept épiques (`Data/Warrior.lua`, une par zone), règles et nombres dans `Core/Classes/warrior.lua`
 (`ns.Warrior.EPIC`, crochets `deckHooks`, `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
 `ns.Warrior.epicOf(c)` = épique en jeu (`c.epic`) : id, amélioré. Crochets employés : `canGainBlock`,
 `attackMult`, `onEnemyDeath` (Death Wish) ; `onResource` (Thunderous Roar) ; `onDamageDealt` (Sweeping Strikes,
-rebond sans ctx) ; `replay`, `canPlay` (nouveau), `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's Grip :
-la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne la
-Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge` et
-`ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main aussitôt) ;
-`resCap`, `onTurnStart` (Avatar). Événement de journal `epic_trigger` (card, unit) : sans animation propre.
-Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge ; Anger Management si une tranche dépasse 1).
+rebond sans ctx) ; `replay`, `canPlay` (nouveau), `cost`, `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's
+Grip : la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne
+la Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge`,
+`giveCooldown` et `ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main
+aussitôt) ; `resCap`, `onTurnStart`, `damage` (Avatar, `ns.Warrior.avatarBonus(c)`). Événement de journal
+`epic_trigger` (card, unit) : sans animation propre. Vue de classe : compteur de l'épique (Titan's Grip, Shield
+Charge ; Anger Management si une tranche dépasse 1 ; Avatar : « Rage 10: Attacks +1 » quand le bonus joue).
 Coups sans carte des épiques : genre « other » (`Combat.hitInfo`), à tous pour l'onde et le rebond, à une cible
 pour Shield Charge, dont la cible passe aussi par le crochet de zone `petTarget` (dormeurs du Swamp).
 
-Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=warrior
-zones=7 level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 85,8 %, combat normal 2,95 tours et 8,2 PV ;
-± 2,2 points) :
+**Point d'accroche ajouté au moteur (14/11/2026)** : `giveCooldown` (`Core/Combat.lua`, fin du jeu d'une carte),
+valeur `(c, src, nil, d, inst)` → nombre de tours de recharge posé sur une carte qui n'en a pas (`nil` : défausse
+comme avant). Anger Management y met les cartes qui dépensent la Rage.
 
-| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
-|---|---|---|---|---|
-| Death Wish | 92,3 % | +6,5 | 2,03 ; 8,7 | — |
-| Thunderous Roar | 93,2 % | +7,4 | 2,41 ; 7,5 | 6 / 9 + Demoralized 1 → 3 / 5 sans Demoralized |
-| Sweeping Strikes | 96,2 % | +10,4 | 2,10 ; 6,1 | — |
-| Titan's Grip | 96,6 % | +10,8 | 2,66 ; 6,3 | 2 Attacks par tour → 1 |
-| Shield Charge | 95,4 % | +9,6 | 3,05 ; 6,4 | moitié de l'Absorb → quart |
-| Anger Management | 91,8 % | +6,0 | 3,12 ; 7,7 | 3 / 2 Rage par cran → 1 Rage, −1 / −2 |
-| Avatar | 88,1 % | +2,3 | 3,01 ; 8,4 | +1 / +2 → +2 / +3 (+3 / +4 n'apporte rien) |
+Réglage des zones dures (14/11/2026, `luajit Sim/sim.lua runs=600 bot=heuristic jobs=3 runner=expedition key=0
+level=7 class=warrior epic=<id>` avec `zone=duskwood zones=1`, `zone=stranglethorn zones=3`, `zone=steppes
+zones=5` ; Westfall `zones=7` pour information ; mêmes graines, ± 3 à 4 points par mesure). Sans épique
+(`epic=none`) : Duskwood 66,2 %, Stranglethorn Vale 70,8 %, Burning Steppes 80,2 %, Westfall 86,0 %.
+Moyenne des sept épiques : +11,6 (départ : +12,0, de +6,1 à +23,8).
 
-Avatar reste sous la cible : sa Rage n'a presque pas de débouché dans un deck de Westfall (Execute, Ignore
-Pain, Onslaught à trouver en 4 ou 5 choix), le bot la dépense déjà dès qu'il peut ; à revoir avec la règle.
+| Épique | Duskwood | Stranglethorn | Steppes | Moyenne | Westfall | PV perdus (combat normal, D / S / B) | Changement |
+|---|---|---|---|---|---|---|---|
+| Death Wish | +22,0 | +3,5 | +13,1 | +12,9 | +7,5 | 10,3 / 11,3 / 7,7 | — |
+| Thunderous Roar | +16,6 | +3,5 | +7,3 | +9,1 | +8,0 | 8,9 / 10,9 / 8,4 | Demoralized 1 rendu sur l'amélioré (4 + Demoralized) |
+| Sweeping Strikes | +15,1 | +8,0 | +7,1 | +10,1 | +7,3 | 8,5 / 10,2 / 7,3 | moitié → tiers |
+| Titan's Grip | +14,6 | +9,2 | +6,8 | +10,2 | +2,3 | 10,2 / 11,2 / 9,0 | 2 Attacks par tour rendues, chacune coûte 1 de plus |
+| Shield Charge | +16,3 | +12,9 | +7,8 | +12,3 | +10,2 | 8,2 / 9,5 / 7,4 | — (quart) |
+| Anger Management | +17,0 | +14,2 | +8,1 | +13,1 | +7,0 | 9,3 / 10,3 / 8,4 | Spend et Surge en recharge 1 (débouché) |
+| Avatar | +16,8 | +15,0 | +8,6 | +13,5 | +6,7 | 9,6 / 11,1 / 8,8 | à 10 Rage, Attacks +1 (débouché) |
+
+Essais écartés (moyenne des trois zones) : Titan's Grip de la fiche (deux Attacks, sans coût) 100 % partout ;
+copie à moitié 97–100 % ; « Pay 2 HP » par Attack 94–99 %. Thunderous Roar avec Demoralized de base : 3 dégâts
++22,5, 1 dégât +15,3 (Duskwood +21) ; 4 dégâts sans Demoralized +15,8 (Duskwood +25). Avatar : +1 par Rage
+au-delà de 5 : 98–100 % ; au-delà de 7 (+1 / tour) +20,7 ; au-delà de 8 : +16,3 (+1 / tour), +19,4 (+2 / tour).
+Anger Management sans débouché, conseils corrigés : +7,2 (Steppes +1) ; recharge −2 / −3 par Rage : +6,5.
+
+Hors cible : Death Wish (Duskwood +22 au-delà de +18, Stranglethorn +3,5) et Thunderous Roar (Stranglethorn
++3,5) : écart de zone, pas de moyenne ; un nombre plus bas les ferait passer sous +3 à Stranglethorn. Les
+gains de Duskwood sont hauts pour toutes les épiques (sans épique, le Guerrier y gagne 66 %).
 
 Bots : `classDef.bot.byEpic[id]` (tables de notes, d'amélioration et de retrait tirées du « Deck piloté » de la
 fiche) ; `classDef.bot.epic(exp, id)` note une épique proposée (accord avec le deck, attachement à l'épique du
-deck : une épique de même note n'en remplace jamais une autre).
+deck : une épique de même note n'en remplace jamais une autre). Corrigés le 14/11/2026 : Titan's Grip (Attacks à
+0 et Skills relevées sous le surcoût), Anger Management (Deep Wounds, Enrage, Bladestorm gardent leur rang ;
+Battle Shout, Recklessness, Victory Rush ne sont plus écartées). Contrôles « à blanc » avec les mêmes conseils
+(`copies = 0, limit = 99, extraCost = 0` ; `steps = 0, give = 0`) : Titan's Grip −0,3, Anger Management −5,0 :
+les conseils seuls ne rapportent rien.
 
 ### Épiques du Mage (14/11/2026)
 
-Données et nombres (`epicN`, `epicM`, `epicPeriod`, `epicEvery`, base et `up`, lus par les crochets) dans
-`Data/Mage.lua` (`epic(...)` : `cost = 0`, jamais payé) ; règles (`deckHooks`, src = `c.epic`) dans
+Données et nombres (`epicN`, `epicM`, `epicPct`, `epicBonus`, `epicCharge`, `epicEvery`, base et `up`, lus par les
+crochets) dans `Data/Mage.lua` (`epic(...)` : `cost = 0`, jamais payé) ; règles (`deckHooks`, src = `c.epic`) dans
 `Core/Classes/mage.lua` ; vue dans `UI/Art/mage.lua` ; tests `Sim/tests_epic_mage.lua`, harnais UEM ; bot :
-`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ≈ 5 + gain / 2 ; l'épique du deck vaut 3 de plus : le deck est construit autour).
-État de combat dans `c.cls` (`carry`, `fof`, `fofOn`, `r3`, `r3surge`). `epicPeriod = 3` : l'épique n'agit qu'aux
-tours 3, 6, 9… (`Combat.epicTurn(src, round)`, déclencheur « Every 3rd turn »).
-- **Mirror Image** : `afterCast` (`Combat.mirrorHit` : premier coup de la carte Cast, base + N, cible tirée par
-  `c.rng.cards`, coup de la même carte : Charges, Shatter, `onAttackHit`).
-- **Molten Armor** : `afterHit` (DoT N par coup, même absorbé, valeur passée par `apply`).
-- **Water Elemental** : `onTurnStart` des tours actifs (`Combat.elementalTarget` : dernière cible, sinon la plus à
-  gauche ; un dormeur `asleep` seulement si tous dorment), coup sans carte, Demoralized 1.
-- **Fingers of Frost** : crochet moteur `instantCast` lu avec la cible (`c.aim`, `Combat.castFits` ci-dessus) ;
-  amélioré : `damage` + N pendant la résolution de la carte partie ainsi.
-- **Arcane Meditation** : `onTurnEnd` garde `min(mana, N)` dans `c.cls.carry`, `onTurnStart` l'ajoute (au-delà du
-  maximum, affiché « 7/3 »).
+`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ≈ 5 + gain / 2 ; l'épique du deck vaut 3
+de plus : le deck est construit autour). Toutes les règles agissent à chaque tour (plus de « Every 3rd turn » ni de
+`Combat.epicTurn`). État de combat dans `c.cls` (`carry`, `molten`, `weChill`, `fof`, `fofOn`, `fofThaw`, `r3`,
+`r3surge`). Aucun point d'accroche ajouté au moteur ; déclencheur nouveau « When attacked » (`L.trigger`).
+- **Mirror Image** : `afterCast` (`Combat.mirrorHit` : premier coup de la carte Cast, dégâts calculés sur une cible
+  tirée par `c.rng.cards`, × `epicPct` / 100 arrondi bas ; coup de la même carte : Shatter, Ignite, `onAttackHit`).
+- **Molten Armor** : `afterHit`, une fois par attaque (`c.cls.molten[uid] = round`), DoT N même absorbé, par `apply`.
+- **Water Elemental** : `onTurnStart` à chaque tour (`Combat.elementalTarget` : dernière cible, sinon la plus à
+  gauche ; un dormeur `asleep` seulement si tous dorment), coup sans carte, Demoralized `epicM` ; `onTurnEnd` retire
+  ce Demoralized (`c.cls.weChill`) : Frozen pour les cartes du Mage, pas pour le tour ennemi.
+- **Fingers of Frost** : crochet moteur `instantCast` lu avec la cible (`c.aim`, `Combat.castFits` ci-dessus), qui
+  retient le gel de la cible (`fofThaw`) ; `onCardPlayed` retire ce Stunned et ce Demoralized après la résolution
+  (ceux que la carte pose restent) ; amélioré : `damage` + N pendant la résolution de la carte partie ainsi.
+- **Arcane Meditation** : `onTurnEnd` garde `min(mana, N)`, + `epicBonus` s'il en reste, dans `c.cls.carry` ;
+  `onTurnStart` l'ajoute (au-delà du maximum, affiché « 8/3 »).
 - **Conflagration** : `onEnemyDeath` (DoT du mort, lu avant tout nettoyage ; + N à chaque autre ennemi vivant, sans
   `apply`).
-- **Rule of Threes** : `onCardCommitted` marque la 3e carte du tour (améliorée : chaque 3e) si c'est une Attack et
-  si le tour est actif ; `replay` la double ; `beforeCard` donne à la copie le Surge de l'original.
-- Vue : ligne violette de l'épique (`Art.mageEpicText` : mana gardé, rang de la carte, cible ou repos de
+- **Rule of Threes** : `onCardCommitted` marque la 3e carte du tour (améliorée : chaque 3e), de tout type, si
+  `Combat.spendRes(c, epicCharge)` passe ; `replay` la double ; `beforeCard` donne à la copie le Surge de l'original.
+- Vue : ligne violette de l'épique (`Art.mageEpicText` : mana gardé et bonus, rang de la carte et sa Charge, cible de
   l'élémentaire, Frozen) ; nom flottant sur l'événement `{ t = "epic", id, dst|src|card }`.
 
-Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=mage zones=7
-level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 79,5 %, combat normal 3,04 tours et 5,3 PV ; ± 2,5 points) :
+**Réglage des zones dures (14/11/2026).** Mesure de référence commune aux cinq classes : `luajit Sim/sim.lua
+runs=600 bot=heuristic jobs=3 runner=expedition class=mage level=7 key=0 epic=<id>` avec `zone=duskwood zones=1`,
+`zone=stranglethorn zones=3`, `zone=steppes zones=5` (et `zones=7` à Westfall pour information) ; gain = victoires
+avec l'épique − victoires sans (`epic=none` : Duskwood 59,8 %, Stranglethorn 70,8 %, Steppes 70,8 %, Westfall 80,8 % ;
+combat normal 6,5 / 6,7 / 5,4 / 5,0 PV perdus) ; ± 3,9 points par mesure.
 
-| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
-|---|---|---|---|---|
-| Mirror Image | 89,7 % | +10,2 | 2,72 ; 6,1 | coup en plus = premier coup + 0 / + 4 → − 6 / − 2 (à 0 : +14,0) |
-| Molten Armor | 88,0 % | +8,5 | 3,10 ; 6,2 | DoT 3 / 5 → 1 / 3 (3 : +16,4 ; 2 : +13,6) |
-| Water Elemental | 88,9 % | +9,4 | 2,89 ; 6,1 | 3 / 5 chaque tour → 5 / 8 aux tours 3, 6, 9… (chaque tour : +17,6) |
-| Fingers of Frost | 90,2 % | +10,7 | 2,60 ; 3,8 | — |
-| Arcane Meditation | 84,0 % | +4,5 | 3,12 ; 6,1 | 3 / 5 → 4 / 6 (3 : +4,8 ; le bot garde peu de mana) |
-| Conflagration | 84,0 % | +4,5 | 2,52 ; 4,6 | + 0 / + 3 → + 8 / + 11 (à + 0 : −1,9) |
-| Rule of Threes | 88,0 % | +8,5 | 2,87 ; 5,6 | toute carte chaque tour → une Attack, aux tours 3, 6, 9… (toute carte : +20,4) |
+| Épique | Texte (base / amélioré) | Duskwood | Stranglethorn | Steppes | Moyenne | Westfall | PV perdus (normal, D / S / B) | Changé |
+|---|---|---|---|---|---|---|---|---|
+| Mirror Image | half their damage again / their damage again | +18,5 | +5,4 | +16,5 | +13,5 | +5,4 | 6,5 / 7,0 / 5,5 | « damage − 6 / − 2 » → la moitié / tout (la fiche, tout : +20 à Duskwood) |
+| Molten Armor | When attacked: DoT 2 / 4 | +18,7 | +4,7 | +11,2 | +11,5 | +12,0 | 7,1 / 7,4 / 6,3 | DoT 1 / 3 par coup (+5,0) → DoT 2 / 4 par attaque (DoT 2 par coup : +15, +25 à Duskwood) |
+| Water Elemental | Start of turn: 2 / 4 and Demoralized 1 for this turn | +16,4 | +8,4 | +14,4 | +13,1 | +8,5 | 6,7 / 6,9 / 5,5 | 5 / 8 un tour sur trois (+10,6) → chaque tour, gel du seul tour du Mage (Demoralized tenu au tour ennemi : +25 à 3, +21 à 1) |
+| Fingers of Frost | resolve at once and thaw it / + 4 more | +9,5 | +12,5 | +10,0 | +10,7 | +7,4 | 5,0 / 4,8 / 3,7 | dégel ajouté (sans : +18,3 ; « once per turn » : +16,6) |
+| Arcane Meditation | Up to 4 unspent mana carries over, +1 / 6, +2 | +12,2 | +10,2 | +13,5 | +12,0 | +7,2 | 6,5 / 7,2 / 5,2 | 4 / 6 sans bonus (+4,4) → « +1 / +2 » ; conseils de deck modérés |
+| Conflagration | DoT + 16 / + 20 to each other enemy | +14,7 | +8,4 | +6,0 | +9,7 | +6,2 | 5,2 / 5,5 / 4,2 | + 8 / + 11 (+6,7) → + 16 / + 20 ; conseils de deck modérés |
+| Rule of Threes | 3rd card each turn spends 1 Charge to resolve twice / every 3rd | +17,2 | +13,5 | +11,5 | +14,1 | +11,0 | 5,3 / 5,2 / 3,9 | une Attack un tour sur trois (+13,6) → toute carte chaque tour pour 1 Charge (sans coût : +31,9, 99 % ; « Pay 2 HP » : +22,3) |
 
-Les écarts se jouent presque tous au boss (VanCleef : 81 % sans épique) ; près du plafond, le gain sature.
+Moyenne des sept : **+12,1** (départ : +10,4, de +4,4 à +18,3). Hors cible de peu : Mirror Image et Molten Armor à
+Duskwood (+18,5, +18,7 pour +18 au plus, dans l'erreur de mesure), Rule of Threes (+14,1 pour +14). PV perdus sous 5 à
+Burning Steppes (Fingers of Frost, Conflagration, Rule of Threes : combats normaux courts) et pour Fingers of Frost
+partout (le gel tient l'ennemi).
+
+Bot (Arcane Meditation, Conflagration) : la valeur du mana gardé (`Combat.MAGE_CARRY_VALUE`) reste à 5 (8 : −5 points,
+12 : −30 : le bot garde trop) ; une valeur d'avance au DoT d'un ennemi près de mourir (Conflagration) n'apportait rien
+(−1 à −2) et a été retirée. Le vrai défaut était dans les conseils de construction (`bot.byEpic`) : à blanc (Arcane
+Meditation N = 0, Conflagration N = −99), les anciens conseils coûtaient −3,7 et −3,2 points ; modérés (gros sorts et
+cartes Fire moins poussés), le contrôle à blanc donne −1,7 et −1,4 (rien), et l'épique +12,0 et +9,7. Le bot ne sait
+toujours pas préparer sur deux tours (garder son mana pour un tour à deux gros sorts, poser le DoT sur la cible qu'il
+achèvera au tour suivant) : il ne regarde qu'un tour.
 
 ## Sauvegarde
 

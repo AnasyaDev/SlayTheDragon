@@ -204,17 +204,22 @@ function Art.mageEpicText(c)
   if not id then return nil end
   local d = ns.Card.def(src)
   if id == "arcane_meditation" then
-    return ("Mana kept: %d/%d"):format(math.min(math.max(c.player.mana or 0, 0), d.epicN), d.epicN)
+    -- mana gardé si le tour finit maintenant (plafond), et le bonus du report
+    local keep = math.min(math.max(c.player.mana or 0, 0), d.epicN)
+    if keep > 0 and (d.epicBonus or 0) > 0 then return ("Mana kept: %d/%d, +%d"):format(keep, d.epicN, d.epicBonus) end
+    return ("Mana kept: %d/%d"):format(keep, d.epicN)
   elseif id == "rule_of_threes" then
-    if not ns.Combat.epicTurn(src, c.round) then return "Threes: next turn" end
-    if ns.Combat.ruleOfThreesNext(c, src) then return "Next Attack: twice" end
+    if ns.Combat.ruleOfThreesNext(c, src) then
+      local k = d.epicCharge or 0
+      if (c.player.res or 0) < k then return ("Next card: needs %d %s"):format(k, k == 1 and "Charge" or "Charges") end
+      return "Next card: twice"
+    end
     local n = c.turn.played
     if d.epicEvery then n = n % 3 end
     if not d.epicEvery and n >= 3 then return nil end
     return ("Cards played: %d/3"):format(n)
   elseif id == "water_elemental" then
-    -- le coup part au début du prochain tour : la vue dit s'il part et sur qui
-    if not ns.Combat.epicTurn(src, c.round + 1) then return "Elemental rests next turn" end
+    -- le coup part au début du prochain tour : la vue dit sur qui
     local t = ns.Combat.elementalTarget(c)
     return t and ("Elemental: " .. ns.Enemies[t.id].name) or nil
   elseif id == "fingers_of_frost" then
@@ -223,9 +228,9 @@ function Art.mageEpicText(c)
     end
     return "No Frozen enemy"
   elseif id == "mirror_image" then
-    return "Cast cards hit twice"
+    return (d.epicPct or 100) >= 100 and "Cast cards hit twice" or "Cast cards: half again"
   elseif id == "molten_armor" then
-    return ("When hit: DoT %d"):format(d.epicN)
+    return ("When attacked: DoT %d"):format(d.epicN)
   elseif id == "conflagration" then
     local n = 0
     for i = 1, #c.enemies do

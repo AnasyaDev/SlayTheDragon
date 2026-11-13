@@ -375,20 +375,20 @@ epic("misery", {
 
 epic("echo_of_light", {
   name = "Echo of Light", school = "holy", path = "holy", zone = "wetlands",
-  text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 7 to all.",
-  up = { text = "Epic.\nRegen no longer heals.\nEach Regen tick: deal that much + 9 to all." },
+  text = "Epic.\nEach Regen tick: deal that much to all, no heal.\nStart of combat: gain Regen 4",
+  up = { text = "Epic.\nEach Regen tick: deal that much + 2 to all, no heal.\nStart of combat: gain Regen 4" },
 })
 
 epic("shadow_covenant", {
   name = "Shadow Covenant", school = "shadow", path = "discipline", zone = "stranglethorn",
-  text = "Epic.\nShadow cards: pay 3 HP per mana, not mana.",
-  up = { text = "Epic.\nShadow cards: pay 3 HP per mana, not mana.\nThe first each turn is free." },
+  text = "Epic.\nShadow cards: pay HP, not mana: 2, 4, 6... each turn.",
+  up = { text = "Epic.\nShadow cards: pay HP, not mana: 0, 4, 6... each turn." },
 })
 
 epic("reflective_shield", {
   name = "Reflective Shield", school = "holy", path = "discipline", zone = "swamp",
-  text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 2.",
-  up = { text = "Epic.\nWhen hit: deal the damage absorbed to the attacker, up to 4." },
+  text = "Epic.\nWhen hit: deal a third of the damage absorbed to the attacker.",
+  up = { text = "Epic.\nWhen hit: deal half the damage absorbed to the attacker." },
 })
 
 epic("voidform", {
@@ -399,7 +399,7 @@ epic("voidform", {
 
 epic("inner_focus", {
   name = "Inner Focus", school = "holy", path = "discipline", zone = "blackrock",
-  text = "Epic.\nFirst card each turn: Cast, values +75%.",
+  text = "Epic.\nFirst card each turn: Cast, values +50%.",
   up = { text = "Epic.\nFirst card each turn: Cast, values doubled." },
 })
 

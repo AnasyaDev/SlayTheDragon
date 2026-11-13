@@ -123,10 +123,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Regen no longer heals.` / `Each Regen tick: deal` / `that much to all.` | `…` / `that much + 2 to all.` |
+| —, Epic | `Epic.` / `Each Regen tick: deal` / `that much to all, no heal.` / `Start of combat:` / `gain Regen 4` | `…` / `that much + 2 to all, no heal.` / `…` |
 
-- **Règle.** Au début du tour du Priest, le tic de Regen ne soigne plus : il inflige sa valeur (amélioré :
-  + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme d'habitude.
+- **Règle.** Au début de chaque combat, le Priest gagne Regen 4. Au début de son tour, le tic de Regen ne
+  soigne plus : il inflige sa valeur (amélioré : + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme
+  d'habitude. Réglage par zones du 14/11/2026 : la Regen de départ donne à l'épique de quoi fonctionner seule
+  (4 + 3 + 2 + 1 à chaque ennemi sur quatre tours) ; elle remplace le bonus fixe (+ 7 par tic) de la version
+  réglée à Westfall.
 - **Cas limites.** Toute Regen est concernée, Spirit of Redemption compris (sa Regen 6 frappe au lieu de
   soigner : à dire dans l'infobulle). Les autres soins (Flash Heal, Atonement, potions) soignent toujours.
   Dégâts sans carte, Sundered compris. Le tic a lieu au même moment qu'un Cast résolu en début de tour :
@@ -144,10 +147,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Shadow cards: Pay 2 HP` / `per mana, not mana.` | `…` / `The first each turn` / `is free.` |
+| —, Epic | `Epic.` / `Shadow cards: pay HP,` / `not mana: 2, 4, 6...` / `each turn.` | `…` / `not mana: 0, 4, 6...` / `each turn.` |
 
 - **Règle.** Une carte Shadow dont le coût en mana (tous modificateurs compris) vaut N ≥ 1 coûte 0 mana et
-  « Pay 2N HP. » à la place. Amélioré : la première carte Shadow jouée dans le tour ne coûte ni mana ni PV.
+  « Pay 2N HP. » à la place, + 2 PV par carte Shadow déjà jouée dans le tour (toutes les cartes Shadow coûtent
+  1 : 2, 4, 6… PV). Amélioré : la première carte Shadow jouée dans le tour ne coûte ni mana ni PV (la suivante
+  paie 4). Réglage par zones du 14/11/2026 : 2 PV par carte rapportaient +25 points, 3 PV +9 avec 13 PV perdus
+  par combat normal et rien à Stranglethorn ; la hausse dans le tour est le plafond lisible entre les deux.
 - **Cas limites.** Règle commune de « Pay N HP » : payé au jeu, compte comme une perte de PV, ignore
   l'Absorb, carte injouable si elle ferait tomber à 0. Les cartes Shadow à 0 (Devouring Plague, Silence)
   ne changent pas. Curse of Tongues (+1 à la première carte) ajoute 2 PV. Lien Stranglethorn : le Hex vise
@@ -163,10 +169,12 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: deal the` / `damage absorbed to` / `the attacker.` | `…` / `damage absorbed + 3` / `to the attacker.` |
+| —, Epic | `Epic.` / `When hit: deal a third` / `of the damage absorbed` / `to the attacker.` | `When hit: deal half` / `the damage absorbed` / `to the attacker.` |
 
-- **Règle.** Chaque coup ennemi qui entame l'Absorb du Priest (même en entier) inflige à son auteur
-  l'Absorb perdue sur ce coup (amélioré : + 3), sans carte, comme Retaliation.
+- **Règle.** Chaque coup ennemi qui entame l'Absorb du Priest (même en entier) inflige à son auteur le tiers
+  (amélioré : la moitié) de l'Absorb perdue sur ce coup, arrondi au-dessous, sans carte, comme Retaliation.
+  Réglage par zones du 14/11/2026 : le plafond de 2 par coup (version réglée à Westfall) est retiré, la part
+  renvoyée grandit avec l'Absorb ; renvoyer tout rapportait +34 points, la moitié +22, le tiers +11 à +13.
 - **Cas limites.** Une attaque à plusieurs coups renvoie coup par coup. Pain Suppression divise le coup
   avant l'Absorb : seul ce qui est réellement absorbé revient. Le DoT et les Curses ne sont pas des coups.
   Auteur mort en cours d'attaque : rien. Les ennemis qui n'attaquent pas (lanceurs, dormeurs) ne
@@ -182,12 +190,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Surge cards can't be` / `played. Shadow hits:` / `+1 per 3 Insanity.` | `…` / `+1 per 2 Insanity.` |
+| —, Epic | `Epic.` / `Surge cards can't be` / `played.` / `Per Insanity:` / `Shadow hits +1.` | `…` / `Shadow hits +2.` |
 
 - **Règle.** Les cartes qui ont une clause Surge sont injouables (raison « Voidform »). Chaque coup d'une
-  carte Shadow inflige 1 de plus par tranche de 3 Insanity (amélioré : 2), lue au moment du coup.
+  carte Shadow inflige 1 de plus par point d'Insanity (amélioré : 2), lue au moment du coup (réglage du
+  14/11/2026 : + 1 par tranche de 3 ne rapportait rien ; gardé tel quel au réglage par zones).
 - **Cas limites.** Le DoT n'en profite pas (ce n'est pas un coup de carte). L'Insanity n'a pas de plafond
-  et vit le temps du combat : au 4e tour, 12 à 16 Insanity, soit +4 ou +5 par coup. Les cartes Holy n'ont
+  et vit le temps du combat : au 4e tour, 12 à 16 Insanity, soit +12 à +16 par coup. Les cartes Holy n'ont
   rien. Lien Steppes : un Shadow qui finit vite, avant que le feu ne brûle longtemps.
 - **Deck piloté.** Centrales : Mind Blast (+2 Insanity, Cooldown 1), Mind Flay, SW: Pain et Vampiric Touch
   (+1 et la ligne « DoT: » de Mind Flay), Shadowform (+2 Insanity, +3), Schism, SW: Death, Psychic Scream
@@ -207,7 +216,10 @@ Infobulle : `The first Attack or Skill each turn is cast: damage, Absorb, heal, 
 - **Règle.** La première carte Attack ou Skill jouée dans le tour devient un Cast : elle prend
   l'emplacement d'incantation et se résout au début du tour suivant, avec ses valeurs de dégâts, d'Absorb,
   de soin, de DoT et de Regen multipliées par 1,5 (amélioré : 2), arrondies au supérieur. Une carte déjà
-  Cast reste Cast et reçoit le bonus.
+  Cast reste Cast et reçoit le bonus. Réglage par zones du 14/11/2026 : retour à +50 % (la version réglée à
+  Westfall était à +75 %, +22 points dans les zones dures) ; l'épique dépend des boss plus qu'aucune autre
+  (le retard coûte cher contre Morbent Fel, rien contre Grark Lorkrub ; les interruptions de Stranglethorn
+  coupent la carte incantée), voir docs/classes.md, « Épiques du Prêtre ».
 - **Cas limites.** Les Powers, Curses et cartes Hexed ne comptent pas (la suivante est « la première »).
   Pas de bonus sur les durées (Atonement, Sundered, Stunned ⌛), la pioche, le mana, l'Insanity. Le Priest
   n'a qu'un emplacement de Cast : une fois la première carte incantée, il ne peut plus jouer de carte Cast
@@ -234,13 +246,14 @@ Sept builds :
    Demoralizing Shout, Revenge, Overpower, Rampage montent la Rage, qui frappe la salle à 5.
 3. **Chaque gros coup en touche deux** (Arms) — Sweeping Strikes : Mortal Strike, Execute, Raging Blow,
    Rampage deviennent des cartes de groupe.
-4. **Deux attaques par tour, chacune deux fois** (Fury) — Titan's Grip : Mortal Strike, Rampage,
-   Bladestorm, Execute, Bloodthirst ; les Strike partent.
+4. **Deux attaques par tour, chacune deux fois** (Fury) — Titan's Grip : chaque Attack coûte 1 de plus ;
+   Mortal Strike, Rampage, Bladestorm, Execute, Bloodthirst, et les Attacks à 0 (deux coups pour 1).
 5. **L'Absorb est l'attaque** (Protection) — Shield Charge : Defend, Shield Block, Shield Wall, Ignore
    Pain, Shield Slam ; les Strike partent.
 6. **Dépenser recharge** (Arms) — Anger Management : Heroic Strike, Onslaught, Execute, Ignore Pain
-   dépensent, Bloodthirst, Shield Wall, Berserker Rage reviennent vite.
-7. **Garder sa Rage jusqu'à 10** (Arms) — Avatar : Execute à 45, Ignore Pain à 30.
+   dépensent et reviennent par la recharge, Bloodthirst, Shield Wall, Berserker Rage reviennent vite.
+7. **Garder sa Rage jusqu'à 10** (Arms) — Avatar : à 10 Rage les Attacks frappent plus fort ; ou Execute à
+   45, Ignore Pain à 30.
 
 ### Westfall — Death Wish (Fury) · conservée (Steppes → Westfall)
 
@@ -264,10 +277,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `At 5 Rage: spend it,` / `deal 6 to all, apply` / `Demoralized 1 ⌛ to all` | `…` / `deal 9 to all, apply` / `…` |
+| —, Epic | `Epic.` / `At 5 Rage: spend it, deal 3 to all.` | `Epic.` / `At 5 Rage: spend it, deal 4 to all.` / `At 5 Rage: apply Demoralized 1 ⌛ to all` |
 
-- **Règle.** Dès que la Rage atteint 5, elle tombe à 0 et le Warrior inflige 6 (amélioré : 9) à chaque
-  ennemi vivant, sans carte (Strength comprise), puis pose Demoralized 1 ⌛ à tous.
+- **Règle.** Dès que la Rage atteint 5, elle tombe à 0 et le Warrior inflige 3 (amélioré : 4) à chaque
+  ennemi vivant, sans carte (Strength comprise) ; amélioré : puis pose Demoralized 1 ⌛ à tous.
+- **Réglage (14/11/2026).** Le Demoralized de base de la fiche est hors cible quel que soit le nombre : +22 points
+  en moyenne des zones dures avec 3 dégâts, +15 avec 1 dégât (Duskwood +21) ; sans lui, 3 dégâts : +9. Il est
+  rendu sur l'amélioration (variante la moins dénaturante) ; 4 dégâts de base : +16 (Duskwood +25).
 - **Cas limites.** Déclenché juste après le gain qui fait atteindre 5 (fin de la carte, coup reçu, perte de
   PV d'une Curse). Pendant le tour ennemi, Demoralized 1 ⌛ ne dure que jusqu'à la fin du round : il
   allège les coups restants de ce tour. Spend et Surge restent jouables avant 5 (Execute ne compte jamais
@@ -284,11 +300,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Targeted Attack hits` / `also hit another` / `enemy for half.` | `…` / `also hit 2 other` / `enemies for half.` |
+| —, Epic | `Epic.` / `Targeted Attack hits: also hit another enemy for a third.` | `…` / `also hit 2 other enemies for a third.` |
 
-- **Règle.** Chaque coup d'une carte Attack qui a une cible inflige aussi la moitié des dégâts réellement
-  infligés (arrondie à l'inférieur) à un autre ennemi vivant tiré par `c.rng.cards` (amélioré : deux
+- **Règle.** Chaque coup d'une carte Attack qui a une cible inflige aussi le tiers des dégâts réellement
+  infligés (arrondi à l'inférieur) à un autre ennemi vivant tiré par `c.rng.cards` (amélioré : deux
   autres, tirés sans remise).
+- **Réglage (14/11/2026).** À la moitié (fiche) : +14 points en moyenne des zones dures, +22 à Duskwood ; au
+  tiers : +10, Duskwood +15.
 - **Cas limites.** Le coup de rebond n'est pas un coup d'Attack (pas de Deep Wounds, pas de Rage), ni un
   coup à une cible au sens du Swamp (réveille sans bonus). Seul en face : rien. Plusieurs coups (Raging
   Blow, Rampage) : un rebond par coup. Lien Wetlands : rebond et coup principal sont le même effet, deux
@@ -302,21 +320,26 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Attacks resolve twice.` / `At most 2 Attacks per` / `turn.` | `…` / `turn, not counting` / `0-cost ones.` |
+| —, Epic | `Epic.` / `Attacks: cost 1 more, resolve twice.` / `At most 2 per turn.` | `…` / `At most 2 per turn, 0-cost free.` |
 
-- **Règle.** Chaque carte Attack se résout deux fois : la copie suit tout de suite, même cible (premier
-  ennemi vivant si elle est morte), sans coût. Au plus deux cartes Attack par tour ; la troisième est
-  injouable (raison « Titan's Grip »). Amélioré : les Attacks à 0 mana ne comptent pas dans la limite.
+- **Règle.** Chaque carte Attack coûte 1 mana de plus et se résout deux fois : la copie suit tout de suite,
+  même cible (premier ennemi vivant si elle est morte), sans coût. Au plus deux cartes Attack par tour ; la
+  troisième est injouable (raison « Only 2 Attacks per turn. »). Amélioré : les Attacks qui coûtent 0 au
+  moment du jeu n'ont pas le surcoût et ne comptent pas dans la limite.
+- **Réglage (14/11/2026).** La règle de la fiche (deux Attacks, sans coût) gagne 100 % des expéditions dans
+  les trois zones dures ; avec la copie à moitié, 97 à 100 % ; avec « Pay 2 HP » par Attack, 94 à 99 %. Le
+  surcoût de 1 mana (l'arme à deux mains pèse) rend les deux Attacks par tour : +10 points en moyenne.
 - **Cas limites.** La copie reprend la dépense de l'original (Spend payé : bonus aux deux ; Surge : même
   montant compté), sans rien payer. La Rage « +1 par Attack » ne vient qu'une fois par carte. Cast (Slam) :
   les deux à la résolution. Exhaust et Cooldown après la copie. Pummel compte dans la limite. Hand of
   Justice (3e Attack) ne se déclenche plus, sauf amélioré avec des Attacks à 0.
-- **Deck piloté.** Centrales : Mortal Strike (2 × 22), Rampage (8 coups pour un seul « Pay 3 HP »),
-  Bladestorm, Execute (deux fois le même Surge), Heroic Strike (Spend payé une fois), Onslaught (pioche 2
-  deux fois), Bloodthirst (Strength +2), Battle Shout et Recklessness (Strength comptée deux fois). Mauvaises :
-  Strike, Overpower, Revenge (une place d'Attack pour peu). À retirer : les quatre Strike. Feu de camp :
-  Mortal Strike, Bloodthirst.
-- **Moteur.** Crochet existant `replay` (Ironfoe) ; nouveau `canPlay` (limite par tour, comme Voidform).
+- **Deck piloté.** Centrales : Mortal Strike (2 × 22 pour 3), Rampage (8 coups pour un seul « Pay 3 HP »),
+  Execute (deux fois le même Surge), Heroic Strike (Spend payé une fois), Onslaught (pioche 2 deux fois),
+  Bloodthirst (Strength +2), Battle Shout et Recklessness (Strength comptée deux fois), Overpower, Revenge,
+  Victory Rush, Pummel (deux coups pour 1 mana) ; les Skills gardent le mana du tour. À retirer : Strike
+  d'abord. Feu de camp : Titan's Grip (Attacks à 0 sans surcoût), Mortal Strike, Bloodthirst.
+- **Moteur.** Crochet existant `replay` (Ironfoe) ; nouveau `canPlay` (limite par tour, comme Voidform) ;
+  `cost` (surcoût).
 
 ### Swamp of Sorrows — Shield Charge (Protection) · nouvelle
 
@@ -342,31 +365,42 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each 3 Rage spent:` / `Cooldown cards return` / `1 turn sooner.` | `Each 2 Rage spent:` / `…` |
+| —, Epic | `Epic.` / `Spend and Surge cards: Cooldown 1.` / `Each Rage spent: all Cooldowns −1.` | `…` / `Each Rage spent: all Cooldowns −2.` |
 
-- **Règle.** La Rage dépensée (Spend payé, montant d'un Surge) s'additionne dans un compteur du combat ;
-  chaque fois qu'il passe un multiple de 3 (amélioré : 2), chaque carte en recharge revient un tour plus
-  tôt. Une carte qui arrive à 0 revient en main aussitôt (main pleine : au début du tour suivant).
+- **Règle.** Les cartes qui dépensent la Rage (Spend, Surge) partent en recharge 1 au lieu de la défausse,
+  qu'elles aient dépensé ou non. Chaque Rage dépensée (Spend payé, montant d'un Surge) avance chaque carte en
+  recharge d'un tour (amélioré : deux). Une carte qui arrive à 0 revient en main aussitôt (main pleine : au
+  début du tour suivant).
+- **Réglage (14/11/2026).** Sans carte à recharge dans le deck de départ, la règle seule ne rapportait rien
+  aux Steppes (+1) ; les cartes qui dépensent mises en recharge (Heroic Strike dès le départ) lui donnent un
+  débouché : elles reviennent au tour d'après, ou aussitôt par la dépense suivante. Tranche de 3 / 2 Rage de
+  la fiche → chaque Rage, −1 / −2.
 - **Cas limites.** Le reste du compteur se garde d'un tour à l'autre. Berserker Rage (+2 Rage, Cooldown 2)
   ne boucle pas : il faut 6 Rage dépensées pour la ramener aussitôt. Lien Steppes : la brûlure fait perdre
   des PV, donc gagner de la Rage à dépenser.
 - **Deck piloté.** Centrales : Bloodthirst (Strength à chaque retour), Shield Wall, Shield Block, Berserker
   Rage, Demoralizing Shout, Pummel ; dépenses : Heroic Strike, Onslaught (Spend 2), Execute et Ignore Pain
-  (Surge), Bloodrage pour remplir. Mauvaises : Battle Shout, Recklessness, Victory Rush (Exhaust, rien à
-  recharger). À retirer : Strike, Defend. Feu de camp : Bloodthirst, Onslaught.
+  (Surge), Bloodrage pour remplir. Battle Shout, Recklessness, Victory Rush (Exhaust) restent bonnes sans
+  rien recharger. À retirer : Strike, Defend. Feu de camp : Bloodthirst, Onslaught.
 - **Moteur.** Notifications existantes `onSpend` et `onSurge` ; nouvel effet « recharges −1 »
-  (`cooldownTick`, voisin de `readiness`).
+  (`cooldownTick`, voisin de `readiness`) ; nouveau crochet `giveCooldown` (recharge posée sur une carte qui
+  n'en a pas, `Core/Combat.lua`).
 
 ### Blackrock Mountain — Avatar (Arms) · conservée
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Rage can go up to 10.` / `Start of turn: +1 Rage.` | `…` / `Start of turn: +2 Rage.` |
+| —, Epic | `Epic.` / `Rage up to 10.` / `Start of turn: +2 Rage.` / `At 10 Rage: Attacks deal 1 more.` | `…` / `Start of turn: +3 Rage.` / `…` |
 
-- **Règle.** Plafond de Rage à 10. Au début de chaque tour, +1 Rage (amélioré : +2).
+- **Règle.** Plafond de Rage à 10. Au début de chaque tour, +2 Rage (amélioré : +3). Tant que la Rage est à
+  10, chaque coup d'une carte Attack inflige 1 de plus (lu au coup, après le Spend ou le Surge de la carte :
+  Execute, qui vide la Rage, n'en profite pas).
+- **Réglage (14/11/2026).** Sans débouché, +6 points (les Steppes : +1) : la Rage gardée ne servait qu'à
+  Execute et Ignore Pain, rares dans le deck. Le bonus à 10 Rage est le débouché inclus dans l'épique. Plus
+  large, il passe la cible : +1 par Rage au-delà de 5, 98 à 100 % ; au-delà de 7, +21 ; au-delà de 8, +16 à +19.
 - **Cas limites.** Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10 = 45, Ignore Pain 30
-  Absorb, Skullflame Shield 20 Absorb par tour). Spend N reste N. Lien Blackrock : garder la Rage pour
-  traverser un seuil d'un seul coup (« passer à travers » saute la phase).
+  Absorb, Skullflame Shield 20 Absorb par tour). Spend N reste N. Garder 10 Rage ou la dépenser d'un coup :
+  le choix de chaque tour. Lien Blackrock : garder la Rage pour traverser un seuil d'un seul coup.
 - **Deck piloté.** Centrales : Execute, Ignore Pain, Bloodrage, Berserker Rage, Colossus Smash et Mortal
   Strike (Sundered pour l'Execute), bibelots Battle Standard et Skullflame Shield. Mauvaises : Heroic Strike
   et Onslaught (Spend qui entament la réserve). À retirer : Heroic Strike, Strike. Feu de camp : Execute.
@@ -396,12 +430,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Cast cards: deal their` / `damage again to a` / `random enemy.` | `Cast cards: deal their` / `damage + 4 again to a` / `random enemy.` |
+| —, Epic | `Epic.` / `Cast cards: deal half their` / `damage again to a` / `random enemy.` | `Cast cards: deal their` / `damage again to a` / `random enemy.` |
 
-- **Règle.** À la résolution d'une carte Cast (sous Instant comprise), le montant de base de son
-  **premier** coup est infligé une fois de plus (amélioré : + 4) à un ennemi vivant tiré par
-  `c.rng.cards` (le même possible), recalculé sur la nouvelle cible ; c'est un coup de la même carte
-  (Charges, Shatter, Ignite s'appliquent).
+- **Règle (réglée le 14/11/2026).** À la résolution d'une carte Cast (sous Instant comprise), son **premier**
+  coup frappe une fois de plus un ennemi vivant tiré par `c.rng.cards` (le même possible), pour la moitié
+  (arrondie bas ; amélioré : la totalité) des dégâts calculés sur la nouvelle cible, Charges comprises ; c'est
+  un coup de la même carte (Shatter, Ignite s'appliquent). Avant : « damage − 6 » ; la totalité dépasse +18 à
+  Duskwood.
 - **Cas limites.** Une carte « to all » ne rejoue qu'un coup. Cast sans dégâts (Evocation) : rien. Cast
   interrompu : rien. Dormeur : coup à une cible, donc bonus et réveil.
 - **Deck piloté.** Centrales : Fireball (deux de départ), Pyroblast, Flamestrike, Glacial Spike, Blizzard,
@@ -414,11 +449,12 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: apply DoT 3` / `to the attacker.` | `When hit: apply DoT 5` / `to the attacker.` |
+| —, Epic | `Epic.` / `When attacked: apply` / `DoT 2 to the attacker` | `When attacked: apply` / `DoT 4 to the attacker` |
 
-- **Règle.** Chaque coup ennemi sur le Mage, même entièrement absorbé, pose DoT 3 (amélioré : 5) à son
-  auteur, par le crochet `apply`.
-- **Cas limites.** Attaque à plusieurs coups : un DoT par coup. Auteur mort : rien. Le DoT ne se pose pas
+- **Règle (réglée le 14/11/2026).** Chaque attaque ennemie sur le Mage, même entièrement absorbée, pose DoT 2
+  (amélioré : 4) à son auteur, par le crochet `apply`. Avant : DoT 1 par coup (+5 points) ; DoT 2 par coup
+  donnait +25 à Duskwood (les attaques à plusieurs coups).
+- **Cas limites.** Attaque à plusieurs coups : un seul DoT (premier coup). Auteur mort : rien. Le DoT ne se pose pas
   sur un ennemi qui n'attaque pas. Un ennemi Stunned ne frappe pas : le contrôle va contre ce deck. Lien
   Duskwood : un Bite entièrement absorbé ne pose pas de Curse et brûle quand même.
 - **Deck piloté.** Centrales : les quatre Mana Shield de départ, Blazing Barrier, Ice Barrier (Retain),
@@ -431,11 +467,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Start of turn: deal 3` / `to the last target and` / `apply Demoralized 1 ⌛` | `Start of turn: deal 5` / `…` |
+| —, Epic | `Epic.` / `Start of turn: deal 2` / `to the last target and` / `apply Demoralized 1` / `for this turn.` | `Start of turn: deal 4` / `…` |
 
-- **Règle.** Au début de chaque tour du Mage (après la pioche), l'élémentaire inflige 3 (amélioré : 5),
-  sans carte, à la dernière cible du Mage, puis lui pose Demoralized 1 ⌛ (qui tient le tour du Mage et le
-  tour ennemi).
+- **Règle (réglée le 14/11/2026).** Au début de chaque tour du Mage (après la pioche, dès le tour 1),
+  l'élémentaire inflige 2 (amélioré : 4), sans carte, à la dernière cible du Mage, puis lui pose Demoralized 1
+  pour le tour du Mage seulement (retiré à la fin du tour : la cible est Frozen pour ses cartes, pas pour le
+  tour ennemi ; un Demoralized posé par une carte s'ajoute et reste). Avant : 5 / 8 un tour sur trois ; la
+  règle de la fiche (Demoralized tenu aussi pendant le tour ennemi) donnait +25 points.
 - **Cas limites.** Cible morte ou absente : l'ennemi vivant le plus à gauche. Swamp : même règle que le
   familier (pas de dormeur tant qu'un ennemi est éveillé). Boss : Demoralized prend, donc Frozen marche
   partout. Nom du familier ; le sort réel « Summon Water Elemental » est trop long pour le ruban. Lien
@@ -450,11 +488,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Cast cards aimed at a` / `Frozen enemy resolve` / `at once.` | `…` / `at once and deal 4` / `more.` |
+| —, Epic | `Epic.` / `Cast cards aimed at a` / `Frozen enemy resolve at` / `once and thaw it.` | `…` / `once, deal 4 more and` / `thaw it.` |
 
-- **Règle.** Une carte Cast à cible jouée sur un ennemi Frozen (Stunned ou Demoralized), lu au moment où
-  elle est jouée, se résout tout de suite : sans emplacement, sans interruption possible, sans consommer
-  d'Instant. Amélioré : ses coups infligent 4 de plus.
+- **Règle (réglée le 14/11/2026).** Une carte Cast à cible jouée sur un ennemi Frozen (Stunned ou
+  Demoralized), lu au moment où elle est jouée, se résout tout de suite : sans emplacement, sans interruption
+  possible, sans consommer d'Instant ; elle emploie le gel : le Stunned et le Demoralized que la cible portait
+  au jeu lui sont retirés après la résolution (ceux que la carte pose restent : Glacial Spike). Amélioré : ses
+  coups infligent 4 de plus. Sans le dégel : +18 points ; « une fois par tour » : +17.
 - **Cas limites.** Les Cast sans cible (Flamestrike, Blizzard, Evocation) restent des Cast. Boss :
   Demoralized suffit. La version 1 (« gain Instant 1, once per turn ») n'était qu'un état de plus ; ici le
   contrôle change la nature du Cast. Lien Stranglethorn : un Cast parti au jeu quitte la main et échappe
@@ -471,11 +511,14 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Unspent mana carries` / `over to the next turn,` / `up to 3.` | `…` / `up to 5.` |
+| —, Epic | `Epic.` / `Up to 4 unspent mana` / `carries over to the` / `next turn, +1.` | `Up to 6 unspent mana` / `…` / `next turn, +2.` |
 
-- **Règle.** À la fin du tour, le mana non dépensé (3 au plus ; amélioré : 5) est gardé ; il s'ajoute au
-  début du tour suivant, après la remise du mana à son maximum.
-- **Cas limites.** Le total peut dépasser le maximum (6 mana au tour suivant, 8 amélioré). Evocation, Arcane
+- **Règle (réglée le 14/11/2026).** À la fin du tour, le mana non dépensé (4 au plus ; amélioré : 6) est
+  gardé, plus 1 (amélioré : 2) s'il en reste ; il s'ajoute au début du tour suivant, après la remise du mana à
+  son maximum. Le report seul ne rapportait presque rien (+4) : la main de 5 cartes, pas le mana, borne le tour
+  suivant ; le « +1 » paie le tour d'attente.
+- **Cas limites.** Le total peut dépasser le maximum (8 mana au tour suivant, 11 amélioré). Rien gardé : pas
+  de bonus. Evocation, Arcane
   Surge, Mind Quickening Gem s'ajoutent. Seul le tour suivant profite du report (pas de cumul sur deux
   tours au-delà du plafond). Lien Swamp : les tours où les dormeurs dorment servent à économiser.
 - **Deck piloté.** Centrales : Pyroblast, Glacial Spike, Flamestrike, Blizzard, Polymorph, Evocation,
@@ -489,10 +532,11 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `An enemy dying with` / `DoT gives that DoT to` / `each other enemy.` | `…` / `each other enemy, +3.` |
+| —, Epic | `Epic.` / `An enemy dying with` / `DoT gives that DoT + 16` / `to each other enemy.` | `…` / `DoT + 20` / `…` |
 
-- **Règle.** Quand un ennemi meurt en portant du DoT, chaque autre ennemi vivant reçoit ce DoT (amélioré :
-  + 3), posé directement (sans le crochet `apply`).
+- **Règle (réglée le 14/11/2026).** Quand un ennemi meurt en portant du DoT, chaque autre ennemi vivant reçoit
+  ce DoT + 16 (amélioré : + 20), posé directement (sans le crochet `apply`). Fiche : + 0 / + 3 (−2 points) ;
+  avant : + 8 / + 11.
 - **Cas limites.** Valeur lue au moment de la mort ; mort par son propre tic : la valeur de ce tic. Les
   serviteurs comptent. Chaîne possible : un DoT transmis tue au tic suivant et se transmet encore. Seul en
   face : rien (la carte vit des groupes ; les boss de Westfall, Wetlands et Blackrock ont des sbires).
@@ -508,18 +552,23 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `The 3rd card played` / `each turn resolves` / `twice.` | `Every 3rd card played` / `each turn resolves` / `twice.` |
+| —, Epic | `Epic.` / `The 3rd card played` / `each turn spends 1` / `Charge to resolve` / `twice.` | `Every 3rd card played` / `…` |
 
-- **Règle.** La troisième carte jouée dans le tour (amélioré : la 3e, la 6e, la 9e…) se résout deux fois :
-  la copie suit tout de suite, même cible, sans coût.
+- **Règle (réglée le 14/11/2026).** La troisième carte jouée dans le tour (amélioré : la 3e, la 6e, la 9e…),
+  de tout type, se résout deux fois si le Mage a 1 Charge à dépenser au moment où elle est jouée (dépensée
+  avant sa résolution) : la copie suit tout de suite, même cible, sans coût en mana. Sans Charge : une fois.
+  Sans le coût : 99 % de victoires dans les trois zones dures (+32) ; « Pay 2 HP » : +22 ; avant : une Attack,
+  un tour sur trois.
 - **Cas limites.** Compteur `c.turn.played` : les Curses et les cartes Hexed comptent. La copie reprend la
-  dépense de l'original (Surge : même nombre de Charges compté). Une carte Cast en 3e position : les deux
+  dépense de l'original (Surge : même nombre de Charges compté, après la Charge de la règle). Une carte Cast en 3e position : les deux
   résolutions à son départ. Powers : la copie ne pose pas un second Power. Exhaust, Cooldown : après la
   copie. Lien Blackrock : la 3e carte du tour fait le gros coup qui traverse un seuil.
 - **Deck piloté.** Centrales : cartes à 0 pour atteindre la 3e (Ice Lance, Scorch, Counterspell, Presence
   of Mind, Evocation), puis Polymorph (Stunned 4 ⌛), Arcane Barrage (Surge compté deux fois), Frost Nova,
-  Pyroblast, Glacial Spike, Flurry. Mauvaises : les Powers chers, les cartes à 2 mana jouées en premier. À
-  retirer : Mana Shield, un Frostbolt. Feu de camp : Arcane Barrage.
+  Pyroblast, Glacial Spike, Flurry ; pour la Charge de chaque tour : Counterspell, Presence of Mind, Arcane
+  Blast, Arcane Missiles, Prismatic Barrier, Polymorph (+1 Charge, deux fois en 3e), bibelot Tome of Arcane
+  Brilliance. Mauvaises : les Powers chers, les cartes à 2 mana jouées en premier. À retirer : Mana Shield, un
+  Frostbolt. Feu de camp : Arcane Barrage.
 - **Moteur.** Crochet existant `replay` (inst, ctx), qui lit `c.turn.played`.
 
 ---
@@ -757,11 +806,18 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Start of turn: pet` / `attacks.` | `Start of turn: +1` / `Frenzy, pet attacks.` |
+| —, Epic | `Epic.` / `Start of turn: spend 1` / `Frenzy for a pet attack.` | `Start of turn: pet` / `attacks.` |
 
 - **Règle.** Au début de chaque tour du Hunter, premier compris (après la pioche et la baisse du Frenzy),
-  le familier attaque (+1 Frenzy, comme toute attaque). Amélioré : +1 Frenzy juste avant.
-- **Cas limites.** Avec Pet Whistle, deux attaques au premier tour. Swamp : la cible du familier saute les
+  si le Frenzy vaut 1 ou plus, il baisse de 1 et le familier attaque (+1 Frenzy, comme toute attaque : la
+  dépense est rendue, l'attaque frappe au Frenzy d'avant moins 1). Amélioré : sans dépense, premier tour
+  compris.
+- **Réglage (14/11/2026).** Version de la fiche (gratuite, amélioré +1 Frenzy avant) : +19 points en moyenne
+  sur Duskwood, Stranglethorn et Steppes (+26 à Duskwood). Le coût de 1 Frenzy, qui fait partie du build
+  (garder le Frenzy haut, ne pas le vider par Bestial Wrath ou Growl), la ramène dans la cible ; l'ancienne
+  base devient l'amélioration.
+- **Cas limites.** Sans Frenzy (premier tour sans Pet Whistle), rien. Avec Pet Whistle, deux attaques au
+  premier tour (le sifflet donne le Frenzy que l'épique dépense). Swamp : la cible du familier saute les
   dormeurs tant qu'un ennemi est éveillé. Blackrock : une attaque de début de tour franchit un seuil
   « pendant ton tour ».
 - **Deck piloté.** Centrales : Kill Command, Dire Beast, Bestial Wrath (Frenzy à 5), Spirit Bond (Absorb
@@ -797,10 +853,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Pet attacks hit all` / `enemies.` | `Pet attacks hit all` / `enemies, +1 Frenzy.` |
+| —, Epic | `Epic.` / `Pet attacks hit all` / `enemies, the others` / `for 2 less.` | `…` / `for 2 less.` / `Pet attacks: +1 Frenzy.` |
 
 - **Règle.** Chaque attaque du familier (automatique, commandée, de Surge, de Call of the Wild) frappe tous
-  les ennemis vivants ; le Frenzy monte de 1 par attaque (amélioré : de 2).
+  les ennemis vivants : sa cible en plein, les autres pour 2 de moins (jamais sous 0) ; le Frenzy monte de 1
+  par attaque (amélioré : de 2).
+- **Réglage (14/11/2026).** À tous en plein : +15,5 points en moyenne (+24 à Duskwood) ; « la moitié aux
+  autres » : +7,5 ; « 1 de moins » : +13 (+19,5 à Duskwood) ; « 2 de moins » retenu.
 - **Cas limites.** Le Surge de Bestial Wrath donne une attaque à tous par point de Frenzy. Swamp : réveille
   tous les dormeurs (sans bonus, dégâts à tous). Lien Wetlands : chaque attaque est un seul effet sur toute
   la meute, les morts sont simultanées.
@@ -813,10 +872,10 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: spend 1` / `Frenzy to stop up to 5` / `damage.` | `…` / `Frenzy to stop up to 8` / `damage.` |
+| —, Epic | `Epic.` / `When hit: spend 1` / `Frenzy to stop up to 2` / `damage.` | `…` / `Frenzy to stop up to 4` / `damage.` |
 
 - **Règle.** À chaque coup ennemi, avant l'Absorb, si le Frenzy vaut 1 ou plus, il baisse de 1 et le coup
-  perd jusqu'à 5 dégâts (amélioré : 8).
+  perd jusqu'à 2 dégâts (amélioré : 4 ; fiche : 5 et 8, réglés à Westfall et gardés dans les zones dures).
 - **Cas limites.** Automatique, coup par coup ; un coup de 0 ne coûte rien. Pas contre le DoT, ni les
   Curses, ni la brûlure des Steppes. Le Frenzy perdu affaiblit le familier : chaque coup reçu est un choix
   déjà fait, d'où l'intérêt de le remonter vite. Lien Stranglethorn : les panthères ouvrent par leur plus
@@ -831,11 +890,12 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Careful Aim: Cast` / `Attacks resolve at` / `once.` | `…` / `Attacks resolve at` / `once, deal 4 more.` |
+| —, Epic | `Epic.` / `Careful Aim: Cast` / `Attacks resolve at` / `once and deal 20 more.` | `…` / `once and deal 24 more.` |
 
 - **Règle.** Une carte Attack Cast jouée sur une cible au-dessus de la moitié de ses PV (Careful Aim, lu au
-  jeu) se résout tout de suite : sans emplacement, sans interruption possible. Amélioré : ses coups
-  infligent 4 de plus.
+  jeu) se résout tout de suite : sans emplacement, sans interruption possible, et ses coups infligent 20 de
+  plus (amélioré : 24 ; fiche : 0 et 4 ; 12 et 16 après Westfall : +6 points en moyenne dans les zones dures,
+  +1 aux Steppes ; 16 : +8 ; 20 retenu).
 - **Cas limites.** Volley (sans cible) reste un Cast. Les lignes « Careful Aim: » se lisent au même moment,
   donc vraies. Une cible déjà entamée sous la moitié : Cast normal. Lien Swamp : un dormeur est intact,
   Aimed Shot part au jeu avec Rude Awakening ((24 + 10) × 1,5 = 51) et le tue avant son ouverture.
@@ -848,11 +908,14 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each DoT tick on an` / `enemy: the pet attacks` / `it.` | `Each DoT tick on an` / `enemy: +1 Frenzy, the` / `pet attacks it.` |
+| —, Epic | `Epic.` / `Each enemy DoT tick:` / `spend 1 Frenzy for a` / `pet attack on it.` | `Each enemy DoT tick:` / `pet attacks it.` |
 
-- **Règle.** Après chaque tic de DoT sur un ennemi qui survit, le familier attaque cet ennemi (+1 Frenzy
-  comme d'habitude ; amélioré : +1 Frenzy de plus avant l'attaque), sans changer la cible du familier.
-- **Cas limites.** Le tic a lieu au début du tour de l'ennemi : le familier peut le tuer **avant qu'il
+- **Règle.** Après chaque tic de DoT sur un ennemi qui survit, si le Frenzy vaut 1 ou plus, il baisse de 1
+  et le familier attaque cet ennemi (+1 Frenzy comme d'habitude : la dépense est rendue), sans changer la
+  cible du familier. Amélioré : sans dépense.
+- **Réglage (14/11/2026).** Version gratuite (amélioré +1 Frenzy) : +17 points en moyenne, +26 à Duskwood ;
+  le coût de 1 Frenzy la ramène dans la cible et rend le Frenzy central dans le deck de DoT (Barbed Shot).
+- **Cas limites.** Sans Frenzy au tic : pas d'attaque. Le tic a lieu au début du tour de l'ennemi : le familier peut le tuer **avant qu'il
   agisse**. Un DoT à tous (Explosive Trap) donne une attaque par ennemi. Swamp : le tic réveille, l'attaque
   touche un ennemi éveillé (pas de bonus). Lien Steppes : chaque mort recule le feu.
 - **Deck piloté.** Centrales : Serpent Sting (de départ), Barbed Shot (DoT 3, +2 Frenzy), Immolation Trap
@@ -865,14 +928,17 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `No pet. Pet cards` / `become shots. Attack` / `hits: +1 per Frenzy.` | `…` / `Start of turn: +1 Frenzy.` |
+| —, Epic | `Epic.` / `Pet cards become shots.` / `Attack hits: +2 per` / `Frenzy.` | `…` / `Attack hits: +3 per` / `Frenzy.` |
 
 Infobulle : `Kill Command becomes Kill Shot, Arcane Shot Chimaera Shot… (see the deck).`
 
 - **Règle.** Le familier n'existe pas : plus d'attaque automatique. Les cartes qui le nomment sont, tant que
   Lone Wolf est dans le deck, jouées et montrées sous leur variante (table). Chaque coup d'une carte Attack
-  inflige le Frenzy de plus. Le Frenzy baisse de 1 par tour comme d'habitude (amélioré : +1 au début de
-  chaque tour, ce qui l'annule).
+  inflige 2 de plus par point de Frenzy (amélioré : 3 ; fiche : 1, amélioré « +1 Frenzy au début du tour »,
+  trop long pour la carte). Le Frenzy baisse de 1 par tour comme d'habitude.
+- **Réglage (14/11/2026).** +2 par Frenzy avec Chimaera Shot 4 / 4 : +7,8 points en moyenne dans les zones
+  dures ; +3 par Frenzy : +21 (le bonus se multiplie par les quatre coups de Rapid Fire) ; retenu : +2 et
+  Chimaera Shot 5 / 4 (amélioré 8), le tir de départ de la variante porte le deck sans familier (6 / 4 : +16,6).
 - **Cas limites.** Le Frenzy vient des variantes (+1), de Barbed Shot (+2), de Cobra Shot, de Kibler's Bits,
   de Devilsaur Eye. Cast (Aimed Shot) : Frenzy lu à la résolution. Les Skills qui infligent des dégâts
   (Scatter Shot, Explosive Shot) n'ont pas le bonus. Growl ne nomme pas le familier : inchangée. Lien
@@ -882,7 +948,7 @@ Infobulle : `Kill Command becomes Kill Shot, Arcane Shot Chimaera Shot… (see t
 
 | Carte d'origine | Variante | Texte de base | Amélioré |
 |---|---|---|---|
-| Arcane Shot (1, Attack, départ) | Chimaera Shot | `Deal 3.` / `Deal 3 to another` / `enemy.` / `+1 Frenzy.` | `Deal 6.` / `…` |
+| Arcane Shot (1, Attack, départ) | Chimaera Shot | `Deal 5.` / `Deal 4 to another` / `enemy.` / `+1 Frenzy.` | `Deal 8.` / `…` |
 | Kill Command (1, Attack, Cooldown 3) | Kill Shot | `Deal 8.` / `Execute: deal 16.` / `+1 Frenzy.` / `Cooldown 3.` | `… Cooldown 2.` |
 | Dire Beast (0, Skill, Exhaust) | Double Tap | `Draw 1.` / `+2 Frenzy.` / `Exhaust.` | `Draw 1.` / `+3 Frenzy.` / `Exhaust.` |
 | Intimidation (1, Skill, Cooldown 4) | Scatter Shot | `Deal 3.` / `+1 Frenzy.` / `Apply Stunned 1 ⌛` / `Cooldown 4.` | `… Cooldown 3.` |
