@@ -13,7 +13,8 @@
 --    tour 1 => jusqu'à la fin du tour 3 aussi.
 --    Les affaiblissements posés par le joueur sur les ennemis n'ont pas ce report.
 --  * pain / regen : se déclenchent au début du tour du porteur, puis baissent de 1.
---  * stunned : consommé quand le porteur perd son tour. Les boss y sont immunisés. Posé sur un ennemi
+--  * stunned : consommé quand le porteur perd son tour. Les boss et les Indomitable y sont immunisés ;
+--    un élite Stun Resistant n'en prend qu'1 et y résiste ensuite 2 tours (stun_resist). Posé sur un ennemi
 --    pendant SON propre tour (Trap, riposte, effet déclenché par son action), il arrête ce tour tout de
 --    suite : ses actions restantes sont annulées (aucun coup de l'attaque qui a déclenché l'effet) et la
 --    charge est consommée par ce tour-là (« Stunned 2 » = ce tour et le suivant). Combat.applyStatus
@@ -40,6 +41,10 @@ S.regen = { name = "Regen",
 -- les règles n'en tiennent pas compte.
 S.stunned = { name = "Stunned", debuff = true, turns = true,
   text = "Loses its next turn, or the rest of this one." }
+-- Stun Resistant (élites hors boss et Indomitable, Combat.stunResistant) : posé quand un Stunned lui a fait
+-- perdre son tour, pour ses 2 tours suivants ; Stunned refusé tant qu'il dure (Combat.stunImmune).
+S.stun_resist = { name = "Stun Resistant", duration = true,
+  text = "Can't be Stunned." }
 S.halved = { name = "Pain Suppression", clearAtTurnStart = true,
   text = "Damage taken halved until the next turn." }
 S.force = { name = "Strength",

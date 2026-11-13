@@ -901,6 +901,8 @@ end
 function V:RenderZoneEnemy(s, e)
   local c = self.c
   local list = (e.dead or c.result) and {} or ns.ZoneView.all(c, "enemyBadges", e)
+  -- trait commun des élites Stun Resistant, après ceux de la zone
+  if not (e.dead or c.result) and Combat.stunResistant(e) then list[#list + 1] = Art.stunResistBadge(e) end
   local anchor = s.next:IsShown() and s.next or s.intent
   for k, b in ipairs(s.badges) do
     local it = list[k]

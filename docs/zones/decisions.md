@@ -77,6 +77,8 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
   80 % à Westfall à environ 50 % à Blackrock Mountain, en descendant à chaque zone.
 - **Indomitable sur les élites de Blackrock Mountain**, décision du joueur du 14/11/2026 : Panzor, Gyth / Rend et
   Vaelastrasz ne peuvent pas être étourdis (trait affiché « Indomitable », `Can't be Stunned.`).
+- **Stun Resistant sur les élites des zones 1 à 6** (joueur, 14/11/2026) : Stunned 1 au plus, puis 2 tours de
+  résistance après un tour perdu ; sbires normaux, boss et Indomitable inchangés (`docs/classes/decisions.md`).
 
 - **Les PV perdus se lisent en PV nets** (joueur, 14/11/2026) : PV à l'entrée du combat moins PV à la sortie,
   soins déduits (colonne « PV nets » du rapport de simulation). « Perdre puis récupérer » est l'identité du
