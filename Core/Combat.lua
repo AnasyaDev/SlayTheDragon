@@ -433,12 +433,35 @@ end
 
 -- icon : clé d'art facultative de la source (l'icône d'un DoT peut varier : poison, saignement…),
 -- gardée dans unit.stIcon[id] pour l'affichage seulement ; la règle ne change pas.
--- Immunité à Stunned : les boss, et les ennemis dont la définition porte `indomitable = true` (trait
--- « Indomitable » affiché par la zone ; élites de Blackrock Mountain, décision du joueur du 14/11/2026).
+-- Stun Resistant (décision du joueur du 14/11/2026) : tout élite (`elite = true`) qui n'est ni boss ni
+-- Indomitable, sauf `stunResist = false` dans sa définition. Un Stunned posé sur lui vaut 1 au plus ; quand
+-- ce Stunned lui fait perdre son tour (ou arrête son tour en cours), il gagne l'état `stun_resist` pour ses
+-- Combat.STUN_RESIST_TURNS tours suivants (durée décomptée en fin de round comme les autres états), pendant
+-- lesquels Stunned est refusé (Combat.stunImmune). Au plus un tour perdu sur trois.
+Combat.STUN_RESIST_TURNS = 2
+function Combat.stunResistant(unit)
+  if unit.boss or unit.side ~= "enemy" then return false end
+  local def = ns.Enemies[unit.id]
+  if not def or not def.elite or def.indomitable or def.stunResist == false then return false end
+  return true
+end
+
+-- Immunité à Stunned : les boss, les ennemis dont la définition porte `indomitable = true` (trait
+-- « Indomitable » affiché par la zone ; élites de Blackrock Mountain, décision du joueur du 14/11/2026), et
+-- un élite Stun Resistant tant que dure son état `stun_resist`.
 function Combat.stunImmune(unit)
   if unit.boss then return true end
+  if (unit.st and unit.st.stun_resist or 0) > 0 then return true end
   local def = unit.side == "enemy" and ns.Enemies[unit.id]
   return def and def.indomitable or false
+end
+
+-- Charge de Stunned consommée par un ennemi (tour perdu, ou tour arrêté) : un élite Stun Resistant entre
+-- dans sa résistance (posée pendant la phase ennemie : ne décompte pas ce round-ci).
+local function stunSpent(c, e)
+  if Combat.stunResistant(e) and not e.dead then
+    Combat.applyStatus(c, e, "stun_resist", Combat.STUN_RESIST_TURNS)
+  end
 end
 
 function Combat.applyStatus(c, unit, id, n, icon)
@@ -473,6 +496,8 @@ function Combat.applyStatus(c, unit, id, n, icon)
   local v = old + n
   -- plafond de l'état (def.max : Parry 3 ; def.flag : présent ou non, valeur 1)
   local cap = def.max or (def.flag and 1) or nil
+  -- élite Stun Resistant : Stunned 1 au plus (Stunned 2 devient Stunned 1)
+  if id == "stunned" and Combat.stunResistant(unit) then cap = 1 end
   if cap and v > cap then v = cap end
   if v <= 0 then v = nil end
   unit.st[id] = v
@@ -1193,6 +1218,7 @@ local function executeMove(c, e)
     e.st.stunned = (e.st.stunned or 0) > 1 and e.st.stunned - 1 or nil
     log(c, { t = "stunned", unit = e.uid, stopped = true, move = e.intent })
     stat(c, "enemyTurnsStopped")
+    stunSpent(c, e)
     return true
   end
   -- « act » (élan de l'attaque à l'écran) seulement quand la première action part vraiment
@@ -2082,6 +2108,7 @@ local function enemyTurn(c, e)
     if (e.st.stunned or 0) > 0 then
       e.st.stunned = e.st.stunned > 1 and e.st.stunned - 1 or nil
       log(c, { t = "stunned", unit = e.uid })
+      stunSpent(c, e)
       Combat.zfire(c, "onEnemyStunned", e)
     else
       local move = Combat.zmodify(c, "enemyMove", e.intent, e)

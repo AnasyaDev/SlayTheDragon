@@ -22,6 +22,8 @@ Usage (depuis la racine du dépôt) :
   python3 -m venv build/venv && build/venv/bin/pip install pillow fonttools
   build/venv/bin/python tools/build_media.py [--psd CHEMIN] [--icons DOSSIER] [--font FICHIER] [--icons-only]
   --icons-only : ajoute seulement les icônes nouvellement nommées (nouvelle classe), rien d autre.
+  --prose-only : cales d'espacement des polices de Media/Fonts, Sim/baloo_metrics.lua et table `prose` de
+                 UI/SkinData.lua (espaces égaux entre les mots d'un paragraphe), rien d'autre.
   --epic-only : refait seulement les pièces violettes des cartes épiques (card_ribbon_epic, card_cost_epic) à
                 partir de Media/card_ribbon.tga et Media/card_cost.tga, et leurs entrées de UI/SkinData.lua.
 Rejouable : les rendus du PSD sont mis en cache dans build/media_cache (clé = commandes envoyées).
@@ -39,6 +41,8 @@ ap.add_argument("--epic-only", action="store_true",
                 help="refait seulement les pièces violettes des cartes épiques (ruban, languette de coût)")
 ap.add_argument("--icons-only", action="store_true",
                 help="n'ajoute que les icônes manquantes (Media/Icons, table icons de UI/SkinData.lua)")
+ap.add_argument("--prose-only", action="store_true",
+                help="cales des polices, Sim/baloo_metrics.lua et table prose de UI/SkinData.lua seulement")
 ARGS = ap.parse_args()
 
 MEDIA = ROOT / "Media"
@@ -162,6 +166,161 @@ def read_tga(path):
     im = Image.merge("RGBA", (r, g, b, a))
     return im if hdr[11] & 0x20 else im.transpose(Image.FLIP_TOP_BOTTOM)
 
+
+def lua(v, ind=""):
+    if isinstance(v, dict):
+        keys = sorted(v)
+        inner = ind + "  "
+        parts = []
+        for k in keys:
+            kk = k if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", k) else '["%s"]' % k
+            parts.append(f"{inner}{kk} = {lua(v[k], inner)},")
+        return "{\n" + "\n".join(parts) + "\n" + ind + "}"
+    if isinstance(v, (list, tuple)):
+        return "{ " + ", ".join(lua(x, ind) for x in v) + " }"
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        if isinstance(v, float):
+            return ("%.5f" % v).rstrip("0").rstrip(".") if v != int(v) else str(int(v))
+        return str(v)
+    return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+# ---------------------------------------------------------------------------
+# Police : cales d'espacement et approches optiques (espaces égaux entre les mots d'un paragraphe)
+# ---------------------------------------------------------------------------
+# L'espace de Baloo Chettan 2 est étroit (0,20 cadratin) et son crénage ne touche pas l'espace : l'écart
+# entre deux mots (approche droite du dernier glyphe + espace + approche gauche du suivant) varie d'un
+# mot à l'autre autant que l'espace lui-même (« fish traps » serré, « traps with » large). Le texte en
+# paragraphe (W.evenSpaces, UI/Widgets.lua) glisse avant chaque espace une cale (glyphe vide de la
+# police, U+E001.. : PAD_STEP × k millièmes de cadratin) qui porte l'écart optique à PAD_TARGET. Approche
+# optique d'un côté : moyenne, sur la bande de la ligne de base à la hauteur d'x, de la distance du
+# bord de l'avance à l'encre, plafonnée à l'approche géométrique + PAD_DEPTH (une contreforme
+# profonde ou une ligne vide ne compte pas au-delà). PAD_TARGET ≈ 97e centile des écarts optiques
+# entre mots des textes du jeu (gras) : presque tous les écarts sont portés à la même valeur, en
+# moyenne 0,04 cadratin plus larges qu'avant.
+PAD_BASE, PAD_STEP, PAD_COUNT, PAD_TARGET, PAD_DEPTH = 0xE000, 10, 12, 190, 100
+# Caractères couverts : ASCII imprimable (sauf « | », échappement du client) et ponctuation typographique ;
+# textes affichés en anglais (pas de lettres accentuées : un caractère absent n'a pas de cale).
+PROSE_CHARS = "".join(chr(c) for c in range(0x21, 0x7F) if chr(c) != "|") + "‘’“”–—…"
+FONT_LABELS = ("medium", "bold", "heavy")
+
+
+def add_pads(tt):
+    """Ajoute à la police les cales pad01..padNN (glyphes vides, avance k × PAD_STEP) en U+E001..
+    (zone privée) ; renvoie False si elles y sont déjà."""
+    from fontTools.ttLib.tables._g_l_y_f import Glyph
+    if PAD_BASE + 1 in tt.getBestCmap():       # noms des glyphes non gardés (post 3) : test par le cmap
+        return False
+    order = list(tt.getGlyphOrder())
+    names = ["pad%02d" % k for k in range(1, PAD_COUNT + 1)]
+    glyf, hmtx = tt["glyf"], tt["hmtx"]
+    for k, n in enumerate(names, 1):
+        glyf.glyphs[n] = Glyph()
+        hmtx.metrics[n] = (k * PAD_STEP, 0)
+    order += names
+    tt.setGlyphOrder(order)
+    glyf.glyphOrder = order
+    for t in tt["cmap"].tables:
+        if t.isUnicode():
+            for k, n in enumerate(names, 1):
+                t.cmap[PAD_BASE + k] = n
+    return True
+
+
+def prose_bearings(path):
+    """Approches optiques (millièmes de cadratin) des caractères de PROSE_CHARS, encodées « c=g,d; »."""
+    from fontTools.ttLib import TTFont as _TTFont
+    from PIL import ImageFont
+    tt = _TTFont(path)
+    cmap, hm, xh = tt.getBestCmap(), tt["hmtx"], tt["OS/2"].sxHeight
+    S = 400
+    font = ImageFont.truetype(str(path), S)
+    out = []
+    for ch in PROSE_CHARS:
+        g = cmap.get(ord(ch))
+        if g is None:
+            continue
+        adv = hm[g][0]
+        im = Image.new("L", (3 * S, 2 * S), 0)
+        x0, y0 = S // 2, int(S * 1.4)
+        ImageDraw.Draw(im).text((x0, y0), ch, font=font, fill=255, anchor="ls")
+        bb = im.getbbox()
+        if not bb:
+            continue
+        left = (bb[0] - x0) * 1000 / S
+        right = adv - (bb[2] - x0) * 1000 / S
+        band = im.crop((bb[0], y0 - round(xh * S / 1000), bb[2], y0))
+        w, data = band.width, band.tobytes()
+        ls = rs = 0.0
+        for y in range(band.height):
+            ink = [i for i, v in enumerate(data[y * w:(y + 1) * w]) if v > 127]
+            l = left + ink[0] * 1000 / S if ink else 1e9
+            r = right + (w - 1 - ink[-1]) * 1000 / S if ink else 1e9
+            ls += min(l, left + PAD_DEPTH)
+            rs += min(r, right + PAD_DEPTH)
+        out.append("%s=%d,%d;" % (ch, round(ls / band.height), round(rs / band.height)))
+    return "".join(out)
+
+
+def prose_table():
+    """Table `prose` de UI/SkinData.lua : cales et approches optiques des trois graisses."""
+    t = {"pad": PAD_BASE, "step": PAD_STEP, "count": PAD_COUNT, "target": PAD_TARGET}
+    for label in FONT_LABELS:
+        t[label] = prose_bearings(MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf")
+    return t
+
+
+def write_metrics():
+    """Sim/baloo_metrics.lua : avances des glyphes (cales comprises) pour le faux client du harnais."""
+    from fontTools.ttLib import TTFont as _TTFont
+    metrics = ["-- Fichier GÉNÉRÉ par tools/build_media.py : métriques de Baloo Chettan 2 (Media/Fonts) pour le",
+               "-- faux client de Sim/ui_harness.lua. adv[graisse][caractère UTF-8] = avance en millièmes de",
+               "-- cadratin (sans crénage) ; lineHeight = hauteur d'une ligne en cadratins (hhea).",
+               "return {"]
+    for label in FONT_LABELS:
+        ft = _TTFont(MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf")
+        upm, hm, hh = ft["head"].unitsPerEm, ft["hmtx"], ft["hhea"]
+        if label == "bold":
+            metrics.append(f"  lineHeight = {round((hh.ascent - hh.descent) / upm, 4)},")
+        items = []
+        for cp, g in sorted(ft.getBestCmap().items()):
+            ch = chr(cp)
+            key = ch.replace("\\", "\\\\").replace('"', '\\"')
+            items.append(f'["{key}"]={round(hm[g][0] * 1000 / upm)}')
+        metrics.append(f"  {label} = {{")
+        for i in range(0, len(items), 12):
+            metrics.append("    " + ", ".join(items[i:i + 12]) + ",")
+        metrics.append("  },")
+    metrics.append("}")
+    (ROOT / "Sim/baloo_metrics.lua").write_text("\n".join(metrics) + "\n", encoding="utf-8")
+
+
+# --prose-only : cales ajoutées aux polices de Media/Fonts (si absentes), Sim/baloo_metrics.lua refait et
+# table `prose` de UI/SkinData.lua posée, sans relire le PSD ni la police variable.
+if ARGS.prose_only:
+    from fontTools.ttLib import TTFont as _TTFont
+    for label in FONT_LABELS:
+        p = MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf"
+        tt = _TTFont(p)
+        if add_pads(tt):
+            tt.recalcTimestamp = False
+            tt.save(p)
+            print("cales ajoutées :", p.name)
+    write_metrics()
+    skin_path = ROOT / "UI/SkinData.lua"
+    skin_src = skin_path.read_text(encoding="utf-8")
+    block = "  prose = " + lua(prose_table(), "  ") + ",\n"
+    m = re.search(r"\n  prose = \{\n.*?\n  \},\n", skin_src, re.S)
+    if m:
+        skin_src = skin_src[:m.start() + 1] + block + skin_src[m.end():]
+    else:
+        i = skin_src.index("\n  root = ")
+        skin_src = skin_src[:i + 1] + block + skin_src[i + 1:]
+    skin_path.write_text(skin_src, encoding="utf-8")
+    print("UI/SkinData.lua : table prose posée")
+    sys.exit(0)
 
 if ARGS.epic_only:
     skin_path = ROOT / "UI/SkinData.lua"
@@ -566,6 +725,7 @@ for label, wght in (("medium", 500), ("bold", 700), ("heavy", 800)):
                  0x201D, 0x2022, 0x2026, 0x2212, 0x00D7, 0x00B7, 0x202F, 0x2009, 0x20AC])
     sub.subset(inst)
     out = MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf"
+    add_pads(inst)                       # cales d'espacement (texte en paragraphe)
     inst.recalcTimestamp = False         # fichier identique d'une fabrication à l'autre
     inst.save(out)
     cmap = TTFont(out).getBestCmap()
@@ -575,27 +735,8 @@ for label, wght in (("medium", 500), ("bold", 700), ("heavy", 800)):
     FONTS[label] = "Fonts\\" + out.name
 
 # Métriques pour le faux client du harnais (Sim/baloo_metrics.lua) : avance de chaque glyphe en
-# millièmes de cadratin (sans crénage), hauteur de ligne = (ascendante + descendante) / cadratin.
-metrics = ["-- Fichier GÉNÉRÉ par tools/build_media.py : métriques de Baloo Chettan 2 (Media/Fonts) pour le",
-           "-- faux client de Sim/ui_harness.lua. adv[graisse][caractère UTF-8] = avance en millièmes de",
-           "-- cadratin (sans crénage) ; lineHeight = hauteur d'une ligne en cadratins (hhea).",
-           "return {"]
-for label in ("medium", "bold", "heavy"):
-    ft = TTFont(MEDIA / "Fonts" / f"BalooChettan2-{label}.ttf")
-    upm, hm, hh = ft["head"].unitsPerEm, ft["hmtx"], ft["hhea"]
-    if label == "bold":
-        metrics.append(f"  lineHeight = {round((hh.ascent - hh.descent) / upm, 4)},")
-    items = []
-    for cp, g in sorted(ft.getBestCmap().items()):
-        ch = chr(cp)
-        key = ch.replace("\\", "\\\\").replace('"', '\\"')
-        items.append(f'["{key}"]={round(hm[g][0] * 1000 / upm)}')
-    metrics.append(f"  {label} = {{")
-    for i in range(0, len(items), 12):
-        metrics.append("    " + ", ".join(items[i:i + 12]) + ",")
-    metrics.append("  },")
-metrics.append("}")
-(ROOT / "Sim/baloo_metrics.lua").write_text("\n".join(metrics) + "\n", encoding="utf-8")
+# millièmes de cadratin (sans crénage, cales comprises), hauteur de ligne = (ascendante + descendante) / cadratin.
+write_metrics()
 
 # ===========================================================================
 # 5. Icônes : celles que nomment UI/Art.lua et UI/Art/*.lua (champ tga = "Nom", aide I("Nom"))
@@ -650,28 +791,9 @@ CARD = {
 # 7. UI/SkinData.lua
 # ===========================================================================
 
-def lua(v, ind=""):
-    if isinstance(v, dict):
-        keys = sorted(v)
-        inner = ind + "  "
-        parts = []
-        for k in keys:
-            kk = k if re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", k) else '["%s"]' % k
-            parts.append(f"{inner}{kk} = {lua(v[k], inner)},")
-        return "{\n" + "\n".join(parts) + "\n" + ind + "}"
-    if isinstance(v, (list, tuple)):
-        return "{ " + ", ".join(lua(x, ind) for x in v) + " }"
-    if isinstance(v, bool):
-        return "true" if v else "false"
-    if isinstance(v, (int, float)):
-        if isinstance(v, float):
-            return ("%.5f" % v).rstrip("0").rstrip(".") if v != int(v) else str(int(v))
-        return str(v)
-    return '"' + str(v).replace("\\", "\\\\").replace('"', '\\"') + '"'
-
 
 skin = {"root": LUA_ROOT, "tex": TEX, "card": CARD, "icons": ICONS, "fonts": FONTS,
-        "slateTile": 128, "slateBase": 0.8}
+        "slateTile": 128, "slateBase": 0.8, "prose": prose_table()}
 head = ("-- Fichier GÉNÉRÉ par tools/build_media.py : ne pas modifier à la main (relancer le script).\n"
         "-- Textures de Media/ (TGA 32 bits non compressé, toiles en puissances de deux, contenu calé en haut à\n"
         "-- gauche) : file, w × h (toile), cw × ch (zone utile, pixels), tc = coordonnées de texture de la zone\n"
