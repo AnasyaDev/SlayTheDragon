@@ -1358,7 +1358,9 @@ if won then
   check("victoire : clé +1 débloquée dans Westfall", Meta.keyMax(db.meta, "priest", "westfall") == 1
     and (step.text or ""):find("Mythic Keystone +1 unlocked in Westfall", 1, true), step.text)
   check("victoire : zone suivante annoncée (Duskwood, à venir), commun du compte annoncé",
-    (step.text or ""):find("Westfall won with the Priest: Duskwood is open to the Priest (coming later).", 1, true)
+    -- « (coming later) » tant que Duskwood n'est pas jouable
+    (step.text or ""):find("Westfall won with the Priest: Duskwood is open to the Priest" .. (ns.Zone.playable("duskwood")
+      and "." or " (coming later)."), 1, true)
     and (step.text or ""):find("First Westfall victory on this account", 1, true), step.text)
 else
   check("défaite : pas de nouvelle clé", Meta.keyMax(db.meta, "priest", "westfall") == 0)
@@ -1380,6 +1382,7 @@ clickOption("ui:back")
 check("retour au bilan", currentKind() == "end", currentKind())
 clickOption("ui:new")
 check("accueil", currentKind() == "start", currentKind())
+clickOption("zone:westfall") -- zone par défaut : la plus avancée ouverte (Duskwood une fois jouable)
 local keyMax = Meta.keyMax(db.meta, "priest", "westfall")
 
 check("clé par défaut = la plus haute ouverte", UI().step.key == keyMax and option("key:" .. keyMax).selected)
@@ -6616,7 +6619,13 @@ do
   -- langage (aucun « you / your », libellés connus, aucune ressource de classe), corps ivoire teinté
   local card = W.card(UI().content)
   local ids, bad, minSize = {}, {}, 99
-  for id, d in pairs(ns.Cards) do if d.neutral and not d.class then ids[#ids + 1] = id end end
+  local nSheet = 0 -- neutres d'une fiche de zone (sheet), en plus des 10 d'origine
+  for id, d in pairs(ns.Cards) do
+    if d.neutral and not d.class then
+      ids[#ids + 1] = id
+      if d.sheet then nSheet = nSheet + 1 end
+    end
+  end
   table.sort(ids)
   local tint = Art.bodyTints.neutral
   for _, id in ipairs(ids) do
@@ -6659,7 +6668,7 @@ do
   local classOk = card.bg._texture == ROOT .. ns.Skin.tex.card_body_blue.file and vc[1] == 1 and vc[2] == 1 and vc[3] == 1
   card:Hide()
   check(("textes : %d cartes neutres (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), langage, icônes, corps ivoire teinté vert sauge"):format(#ids, minSize),
-    #ids == 10 and #bad == 0, table.concat(bad, ", "))
+    #ids - nSheet == 10 and #bad == 0, table.concat(bad, ", "))
   check("carte de classe : corps et couleur inchangés (Inner Fire bleue, sans teinte)", classOk)
   -- infobulle : ligne « Neutral », explication de « Pay N HP. » (seule formulation d'un coût en PV)
   local tip = { lines = {} }

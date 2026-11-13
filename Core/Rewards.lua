@@ -59,7 +59,7 @@ end
 -- opts : { maxTier = n (nil = tous), boss = bool (bibelots de boss seulement, sinon exclus),
 --          exclude = { [id] = true } (déjà possédés), class = classe jouée, level = niveau de classe (nil = tous) }
 -- Bibelots communs (sans champ class, filtrés par maxTier) et ceux de la classe jouée (filtrés par
--- level) ; jamais ceux marqués noPool.
+-- level) ; jamais ceux marqués noPool, ni les bibelots de clé (key : clé gagnée, Expedition.unlocked).
 function Rewards.relicPool(opts)
   opts = opts or {}
   local list = {}
@@ -69,7 +69,7 @@ function Rewards.relicPool(opts)
     if r.class then open = opts.level == nil or (r.level or 1) <= opts.level
     else open = opts.maxTier == nil or (r.tier or 0) <= opts.maxTier end
     if open and (isBoss == (opts.boss or false))
-        and not r.noPool and (not r.class or r.class == opts.class)
+        and not r.noPool and not r.key and (not r.class or r.class == opts.class)
         and not (opts.class and ns.Expedition and not ns.Expedition.usefulFor(r, opts.class))
         and not (opts.exclude and opts.exclude[id]) then
       list[#list + 1] = id

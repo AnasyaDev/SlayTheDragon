@@ -793,7 +793,8 @@ local function forceEvent(exp, id)
   local ev = ns.Events[id]
   local when, once, tier = ev.when, ev.once, ev.tier
   ev.when, ev.once, ev.tier = nil, nil, 0
-  local ok, err = pcall(enterEvent, exp, id)
+  -- rencontre d'une case de parcours (node = true, jamais tirée) : ouverte directement
+  local ok, err = pcall(ev.node and function() exp.node = exp.map.start[1] X.openEvent(exp, id) end or enterEvent, exp, id)
   ev.when, ev.once, ev.tier = when, once, tier
   if not ok then error(err, 0) end
 end
@@ -808,7 +809,7 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   local fam, tier0, withWhen = { common = 0, rare = 0, story = 0 }, 0, 0
   local function checkEffects(id, effects)
     for _, e in ipairs(effects) do
-      assert(EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
+      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
       if e[1] == "fight" then
         local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
         assert(ns.Encounters[ns.Zones[ns.Events[id].zone or "westfall"].encounters][pool], id .. " : groupe " .. tostring(pool))
@@ -825,7 +826,9 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   end
   for id, ev in pairs(ns.Events) do
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
-    assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
+    -- décor commun, ou décor propre à la zone de la rencontre (ns.Zones[zone].scenes : town, woods…)
+    local zsc = ev.zone and ns.Zones[ev.zone].scenes
+    assert(SCENES[ev.scene] or (zsc and zsc[ev.scene]), id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
     assert(ev.tier >= 0 and ev.tier <= ns.Zone.count(), id .. " : tier")
     if ev.zone == "westfall" then fam[ev.rarity] = fam[ev.rarity] + 1 end
@@ -1090,7 +1093,7 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
   for id, ev in pairs(ns.Events) do
     for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
-        local exp = newExp()
+        local exp = newExp({ zone = ev.zone })
         forceEvent(exp, id)
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
         exp.unlock.common = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
@@ -1390,7 +1393,9 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
   local want = { [0] = 4, 6, 8, 10 }
   for lv = 0, 3 do
     local exp = newExp({ unlocks = { rep = 0, common = lv } })
-    local pool = X.neutralPool(exp)
+    local pool = {}
+    -- neutres d'une fiche de zone (sheet) à part : Sim/tests_zone_<zone>.lua
+    for _, id in ipairs(X.neutralPool(exp)) do if not ns.Cards[id].sheet then pool[#pool + 1] = id end end
     eq(#pool, want[lv], "palier " .. lv)
     for _, id in ipairs(pool) do
       assert(isNeutral(id) and ns.Cards[id].tier <= lv, id)
@@ -1400,7 +1405,11 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
     eq(X.check(exp, { { "unlocked", "elixir_of_superior_defense" } }), lv >= 2, "condition unlocked " .. lv)
   end
   -- Exalté (4) : comme Révéré
-  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } })), 10)
+  local n4 = 0
+  for _, id in ipairs(X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } }))) do
+    if not ns.Cards[id].sheet then n4 = n4 + 1 end
+  end
+  eq(n4, 10)
 end)
 
 test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 100 ±10 %), pour chaque classe", function()
@@ -1698,7 +1707,11 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
   eq(ns.Zone.FIRST, "westfall")
   assert(ns.Zone.playable("westfall"))
-  for i = 2, 7 do eq(ns.Zone.playable(ns.Zone.ORDER[i]), false, ns.Zone.ORDER[i] .. " : Coming later") end
+  -- jouable dès que son fichier de données pose encounters (zones codées), « Coming later » sinon
+  for i = 2, 7 do
+    local id = ns.Zone.ORDER[i]
+    eq(ns.Zone.playable(id), ns.Zones[id].encounters ~= nil, id .. " : Coming later")
+  end
   eq(ns.Zone.next("westfall"), "duskwood"); eq(ns.Zone.next("blackrock"), nil); eq(ns.Zone.prev("westfall"), nil)
   local exp = newExp()
   eq(exp.zone, "westfall"); eq(X.actName(exp), "Westfall"); eq(X.zoneDef(exp).encounters, "westfall")
@@ -1723,7 +1736,7 @@ test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule"
   local m = db.meta
   assert(Meta.zoneOpen(m, "mage", "westfall")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
   local e, why = Save.start(db, { seed = 1, class = "mage", zone = "duskwood" })
-  eq(e, nil); eq(why, "zone coming later", "Duskwood : déclarée, pas jouable")
+  eq(e, nil); eq(why, ns.Zone.playable("duskwood") and "zone locked" or "zone coming later", "Duskwood : fermée au Mage")
   finishIn(db, "mage", "westfall", 0, "lost")
   eq(Meta.zoneOpen(m, "mage", "duskwood"), false, "défaite : rien")
   local s = finishIn(db, "mage", "westfall", 0)

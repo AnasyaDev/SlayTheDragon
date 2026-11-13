@@ -177,6 +177,8 @@ local LV = {
   roadEdge = { "BACKGROUND", 5 }, road = { "BACKGROUND", 6 },
   mid = { { "BACKGROUND", 7 }, { "BORDER", -8 }, { "BORDER", -7 } },
   ground = { "BORDER", -6 }, stalks = { "BORDER", -5 }, ears = { "BORDER", -4 }, smoke = { "BORDER", -3 },
+  -- plan du fond (lisière de forêt derrière la brume de l'horizon : Duskwood), couleurs pal.back
+  back = { { "BACKGROUND", -3 }, { "BACKGROUND", -3 }, { "BACKGROUND", -3 } },
 }
 S.LANDSCAPE_LEVELS = LV
 
@@ -367,6 +369,155 @@ local function fence(f, g, P, c, x, y, x2, y2)
   end
 end
 
+-- Forêt, cimetière et bourg de nuit (Duskwood, 13/11/2026) : accessoires génériques. Couleurs du plan :
+-- main (masse), dark (ombres, troncs), light (lanternes, fenêtres), rim (liseré de lune, { couleur, alpha }) ;
+-- palette : glow (lueur des lanternes), web (toiles).
+-- Branche de (x, y) dans la direction ang (radians, 0 = droite, π/2 = haut), qui se divise depth fois.
+local function branch(f, g, lv, c, x, y, len, th, ang, depth, seed)
+  local dx, dy = cos(ang), -sin(ang)
+  bar(f, g, lv, c, x + dx * len / 2, y + dy * len / 2, len + th * 0.5, th, ang)
+  if depth > 0 then
+    local ex, ey = x + dx * len, y + dy * len
+    local spread = 0.4 + 0.35 * hash(seed, depth)
+    branch(f, g, lv, c, ex, ey, len * 0.66, math.max(1, th * 0.62), ang + spread, depth - 1, seed * 3 + 1)
+    branch(f, g, lv, c, ex, ey, len * 0.58, math.max(1, th * 0.58), ang - spread * 0.85, depth - 1, seed * 3 + 2)
+  end
+end
+
+-- Fût qui s'affine de bas en haut (trois tronçons).
+local function trunk(f, g, lv, c, x, y, w, h)
+  for i = 0, 2 do
+    local ww = w * (1 - 0.22 * i)
+    box(f, g, lv, c, x - ww / 2, y - h * (i + 1) / 3, ww, h / 3 + 1)
+  end
+end
+
+-- Arbre mort tordu : fût penché, trois branches maîtresses divisées deux fois.
+function PROPS.deadtree(f, g, P, c, pal, x, y, s, variant)
+  local seed = floor(x * 7 + y * 3)
+  local h = 96 * s
+  trunk(f, g, P[1], c.dark, x, y, 11 * s, h)
+  local tops = { { 0.95, 1.75 }, { 0.72, 0.62 }, { 0.82, 2.55 } }
+  for k, t in ipairs(tops) do
+    local ang = t[2] + (hash(seed, k) - 0.5) * 0.3
+    branch(f, g, P[2], c.dark, x + (k - 2) * 2 * s, y - h * t[1], (34 + 12 * hash(seed, k + 3)) * s, 4.2 * s, ang, 2, seed + k)
+  end
+  -- racines
+  bar(f, g, P[1], c.dark, x - 9 * s, y - 2 * s, 18 * s, 3 * s, 0.35)
+  bar(f, g, P[1], c.dark, x + 9 * s, y - 2 * s, 18 * s, 3 * s, -0.35)
+end
+
+-- Feuillu sombre : fût, houppier en disques qui se chevauchent, liseré de lune sur le haut.
+function PROPS.oak(f, g, P, c, pal, x, y, s)
+  local seed = floor(x * 5 + y)
+  trunk(f, g, P[1], c.dark, x, y, 10 * s, 70 * s)
+  bar(f, g, P[1], c.dark, x - 12 * s, y - 62 * s, 28 * s, 3.5 * s, 2.4)
+  bar(f, g, P[1], c.dark, x + 12 * s, y - 66 * s, 26 * s, 3.5 * s, 0.75)
+  local cy = y - 96 * s
+  for k = 1, 7 do
+    local a = k / 7 * 2 * PI
+    local r = (22 + 10 * hash(seed, k)) * s
+    oval(f, g, P[2], c.main, x + cos(a) * 26 * s, cy - sin(a) * 18 * s, r * 1.7, r * 1.4)
+  end
+  oval(f, g, P[2], c.main, x, cy, 70 * s, 56 * s)
+  if c.rim then
+    for k = 1, 3 do
+      local rx = x - 14 * s + (k - 2) * 18 * s
+      blur(f, g, P[3], c.rim[1], rx, cy - 30 * s + math.abs(k - 2) * 8 * s, 40 * s, 22 * s, c.rim[2])
+    end
+  end
+end
+
+-- Lisière de forêt : rangée de houppiers serrés de x à x2, haute de h (pied en y), et sa base pleine.
+function PROPS.treeline(f, g, P, c, pal, x, y, s, x2)
+  local h = 60 * s
+  x2 = x2 or x + 300
+  box(f, g, P[1], c.main, x, y - h * 0.45, x2 - x, h * 0.45 + 1)
+  local k, xx = 0, x
+  while xx < x2 do
+    k = k + 1
+    local w = (26 + 22 * hash(xx, 11)) * s
+    local hh = h * (0.7 + 0.5 * hash(xx, 12))
+    oval(f, g, P[1], c.main, xx + w / 2, y - hh * 0.55, w * 1.15, hh)
+    -- quelques sapins qui dépassent
+    if hash(xx, 13) > 0.72 then
+      box(f, g, P[1], c.main, xx + w / 2 - 1.5 * s, y - hh * 1.25, 3 * s, hh * 0.6)
+      diamond(f, g, P[1], c.main, xx + w / 2, y - hh * 0.95, 10 * s)
+    end
+    xx = xx + w * 0.62
+  end
+  if c.rim then blur(f, g, P[2], c.rim[1], (x + x2) / 2, y - h * 0.95, (x2 - x) * 1.05, h * 0.5, c.rim[2] * 0.6) end
+end
+
+-- Pierre tombale arrondie (variante « cross » : croix), légèrement penchée.
+function PROPS.tombstone(f, g, P, c, pal, x, y, s, variant)
+  local tilt = (hash(x, y) - 0.5) * 0.18
+  if variant == "cross" then
+    bar(f, g, P[2], c.main, x, y - 19 * s, 38 * s, 5 * s, PI / 2 + tilt)
+    bar(f, g, P[2], c.main, x - tilt * 20 * s, y - 27 * s, 20 * s, 5 * s, tilt)
+  else
+    local t = bar(f, g, P[2], c.main, x, y - 11 * s, 18 * s, 22 * s, tilt)
+    oval(f, g, P[2], c.main, x - tilt * 12 * s, y - 22 * s, 18 * s, 14 * s)
+    bar(f, g, P[3], c.dark, x - tilt * 10 * s, y - 15 * s, 9 * s, 1.6 * s, tilt)
+  end
+  if c.rim then blur(f, g, P[3], c.rim[1], x - 4 * s, y - 24 * s, 16 * s, 10 * s, c.rim[2]) end
+end
+
+-- Mausolée : marches, corps, colonnes, fronton en losange, porte (lueur facultative de la palette).
+function PROPS.crypt(f, g, P, c, pal, x, y, s, variant)
+  local w, h = 92 * s, 58 * s
+  diamond(f, g, P[1], c.dark, x, y - h, 50 * s)
+  box(f, g, P[2], c.main, x - w / 2 - 6 * s, y - 7 * s, w + 12 * s, 7 * s)
+  box(f, g, P[2], c.main, x - w / 2, y - h, w, h - 6 * s)
+  for k = -2, 2 do
+    if k ~= 0 then box(f, g, P[3], c.dark, x + k * 18 * s - 2.5 * s, y - h + 6 * s, 5 * s, h - 13 * s) end
+  end
+  box(f, g, P[3], c.dark, x - 10 * s, y - 34 * s, 20 * s, 27 * s)
+  if variant == "lit" and pal.glow then
+    box(f, g, P[3], pal.glow[1], x - 7 * s, y - 31 * s, 14 * s, 24 * s, 0.85)
+    blur(f, g, LV.smoke, pal.glow[1], x, y - 20 * s, 90 * s, 60 * s, pal.glow[2])
+  end
+  if c.rim then blur(f, g, P[3], c.rim[1], x - 18 * s, y - h - 20 * s, 70 * s, 26 * s, c.rim[2]) end
+end
+
+-- Réverbère : poteau, potence, lanterne allumée et halo.
+function PROPS.lamppost(f, g, P, c, pal, x, y, s)
+  box(f, g, P[1], c.dark, x - 2 * s, y - 92 * s, 4 * s, 92 * s)
+  box(f, g, P[1], c.dark, x - 5 * s, y - 6 * s, 10 * s, 6 * s)
+  bar(f, g, P[1], c.dark, x + 9 * s, y - 88 * s, 20 * s, 2.5 * s, 0)
+  box(f, g, P[2], c.dark, x + 13 * s, y - 86 * s, 12 * s, 14 * s)
+  local lt = c.light or "#ffd27a"
+  box(f, g, P[3], lt, x + 15 * s, y - 84 * s, 8 * s, 10 * s)
+  local gl = pal.glow or { "#ffb24a", 0.4 }
+  blur(f, g, LV.smoke, gl[1], x + 19 * s, y - 80 * s, 70 * s, 64 * s, gl[2])
+end
+
+-- Toile d'araignée entre deux branches : rayons et trois tours, translucides.
+function PROPS.web(f, g, P, c, pal, x, y, s)
+  local col = pal.web or { "#c9cede", 0.45 }
+  local r = 34 * s
+  for k = 0, 7 do
+    local a = k * PI / 4 + 0.2
+    bar(f, g, P[3], col[1], x + cos(a) * r / 2, y - sin(a) * r / 2, r, 1, a, col[2])
+  end
+  for ring = 1, 3 do
+    local rr = r * ring / 3.4
+    for k = 0, 7 do
+      local a = (k + 0.5) * PI / 4 + 0.2
+      bar(f, g, P[3], col[1], x + cos(a) * rr * 0.92, y - sin(a) * rr * 0.92, rr * 0.78, 1, a + PI / 2, col[2] * 0.8)
+    end
+  end
+end
+
+-- Banc de brume au ras du sol, devant le plan moyen.
+function PROPS.mist(f, g, P, c, pal, x, y, s, x2)
+  local hz = pal.haze
+  local w = (x2 or x + 400) - x
+  for k = 0, 2 do
+    blur(f, g, LV.smoke, hz[1], x + w * (0.2 + 0.3 * k), y - 6 * s - k * 4 * s, w * 0.55, 34 * s, hz[2] * 0.55)
+  end
+end
+
 -- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions.
 function S.landscape(f, g, sp)
   local pal = Art.palettes[sp.pal] or Art.palettes.westfall
@@ -463,7 +614,8 @@ function S.landscape(f, g, sp)
   vgrad(f, g, LV.fieldsNear, rgb(pal.fieldsNear[1]), rgb(pal.fieldsNear[2]), 0, fl, Wd, Hd - fl)
   local vx = sp.road and sp.road[1] or Wd / 2
   local fd, fli = pal.furrowDark, pal.furrowLight
-  for k = -24, 24 do
+  -- sp.furrows = false : sol sans rangs de blé (forêt, cimetière)
+  for k = -24, sp.furrows == false and -25 or 24 do
     local xa, xb = vx + k * 6, vx + k * 66
     if k ~= 0 and xb > -260 and xb < Wd + 260 then
       local segs = { { 0, 0.3, 0.9 }, { 0.3, 0.62, 1.6 }, { 0.62, 1.04, 2.6 } }
@@ -481,7 +633,7 @@ function S.landscape(f, g, sp)
   for _, sh in ipairs(sp.shadows or { { 250, fl + 70, 560, 64 }, { 860, fl + 26, 440, 30 }, { 640, Hd - 40, 520, 60 } }) do
     blur(f, g, LV.furrows, fd[1], sh[1], sh[2], sh[3], sh[4], fd[2] * 0.9)
   end
-  for k = 1, 5 do
+  for k = 1, sp.furrows == false and 0 or 5 do
     local t = (k / 6) ^ 1.6
     box(f, g, LV.furrows, fli[1], 0, fl + (Hd - fl) * t, Wd, 1 + 3 * t, fli[2] * 0.6)
   end
@@ -503,7 +655,8 @@ function S.landscape(f, g, sp)
     end
   end
   -- accessoires (bâtiments lointains, plan moyen) ; ombre fondue au pied de ceux du plan moyen
-  local GROUND_W = { scarecrow = 34, tent = 80, cart = 104 }
+  local GROUND_W = { scarecrow = 34, tent = 80, cart = 104, oak = 70, deadtree = 44, crypt = 120, tombstone = 24,
+    lamppost = 18 }
   for _, p in ipairs(sp.props or {}) do
     local kind = p[1]
     if GROUND_W[kind] and p[5] == "mid" then
