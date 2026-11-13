@@ -59,10 +59,11 @@ return function(T)
   end
 
   -- Combat de Stranglethorn à l'écran : une expédition ouverte, le combat remplacé par un groupe choisi.
-  local function stvCombat(cl, encounter, kind, hand)
+  local function stvCombat(cl, encounter, kind, hand, relics)
     local e = T.zoneCombat(cl)
     local ns = H.ns
     local Combat = ns.Combat
+    for _, id in ipairs(relics or {}) do e.relics[#e.relics + 1] = id end
     e.zone = "stranglethorn"
     e.fight.kind = kind or "combat"
     local c = Combat.new({ seed = 11, class = cl, hp = e.hp, maxHp = e.maxHp, deck = e.deck, encounter = encounter,
@@ -163,6 +164,29 @@ return function(T)
     check("carte Hexed en main : nom de la carte d'origine au-dessus, corps sobre", hexCard and hexCard.zoneTagPlate
       and vis(hexCard.zoneTagPlate.text) and hexCard.zoneTagPlate.text._text == ns.Card.def(h.orig).name)
     snap("zone-stranglethorn-hexed", true)
+  end
+
+  -- 2 bis. Zandalarian Hero Charm : texte au bandeau ; la carte gardée affiche son coût réduit au tour suivant
+  do
+    local e, c, v = stvCombat("priest", { "bloodscalp_headhunter" }, "combat", { "penance", "smite", "pw_shield" },
+      { "zandalarian_hero_charm" })
+    local ns = H.ns
+    local r = ns.Relics.zandalarian_hero_charm
+    local tt = table.concat(H.hover(ns.UI.relicIcons[ns.UI.RELICS_SHOWN]), " ")
+    check("Hero Charm au bandeau : nom et texte (80 caractères au plus)", tt:find(r.name, 1, true) ~= nil
+      and tt:find(r.text, 1, true) ~= nil and #r.text <= 80, tt)
+    local pen = c.hand[1]
+    local base = ns.Card.def(pen).cost
+    H.click(v.endTurn)
+    H.click(v.cards[1])
+    H.settle()
+    v:Render(true)
+    H.settle()
+    local shown
+    for i, x in ipairs(c.hand) do if x.uid == pen.uid and v.cards[i]._shown then shown = v.cards[i].cost._text end end
+    check("carte gardée par le Charm : coût affiché réduit de 1 au tour suivant (" .. (base - 1) .. ")",
+      c.result or shown == tostring(base - 1), tostring(shown))
+    snap("zone-stranglethorn-charm", true)
   end
 
   -- 3. Death Hex du Zanzil Naga, deux Hex

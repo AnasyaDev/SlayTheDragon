@@ -82,3 +82,6 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
   soins déduits (colonne « PV nets » du rapport de simulation). « Perdre puis récupérer » est l'identité du
   Priest. Mesure à Westfall, combat normal : Priest 0,2 PV (1 % des PV max), Warrior 7,0 (9 %), Mage 5,3
   (12 %), Rogue 6,3 (13 %), Hunter 6,3 (13 %) : profils conformes, aucune carte de classe à changer.
+- **Zandalarian Hero Charm : la carte gardée coûte 1 de moins** (joueur, 14/11/2026 ; il doublait le Traveler's
+  Backpack). « At the end of your turn, you may keep 1 card in hand. It costs 1 less next turn. » : un choix de
+  carte gardée, réduction de 1 (minimum 0) au tour suivant seulement (`docs/zones/stranglethorn.md`).

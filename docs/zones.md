@@ -351,7 +351,7 @@ commun est au palier 3 ou moins (Duskwood, Wetlands) ; les zones 4 à 7 sont dé
 | 7. condition `Interrupted:`, Trap sur un Cast | `Combat.CONDITIONS.interrupted` (commune) ; Snake Trap : `enemyMove` (move `cast`, non interrompu) → `Combat.triggerTrap(c, e)` |
 | 8–9. statistiques, bots | `Combat.zstat`, `ZoneBots.stranglethorn` (`value`, `skip`) |
 | liseré vert et icône sur la carte visée, grenouille | `ZoneViews.stranglethorn.handMark` ; nom d'origine sur la Hexed : d'office |
-| Gurubashi Arena, Shrunken Head, Bag of Whammies, Nesingwary 4000, Hero Charm | case + rencontre `fight` (`group = true`, `hpMul = 1.15`, `reward = { shift = 1 }`, `gold = 25`, texte « %g ») ; `onEnemyCastStart` (`e.interrupted = true`) ; `onEnemyCastInterrupted` ; `onCombatStart` ; `retainPicks` |
+| Gurubashi Arena, Shrunken Head, Bag of Whammies, Nesingwary 4000, Hero Charm | case + rencontre `fight` (`group = true`, `hpMul = 1.15`, `reward = { shift = 1 }`, `gold = 25`, texte « %g ») ; `onEnemyCastStart` (`e.interrupted = true`) ; `onEnemyCastInterrupted` ; `onCombatStart` ; `retainPicks` + `onCardKept` + `cost` (réduction par uid dans `relicState`) |
 
 ### Swamp of Sorrows (Slumber)
 

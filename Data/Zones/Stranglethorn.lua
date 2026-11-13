@@ -368,11 +368,36 @@ D.relic("jindos_bag_of_whammies", {
   },
 })
 
+-- Zandalarian Hero Charm : le choix de carte gardée du Traveler's Backpack (crochet « retainPicks » ; avec les
+-- deux bibelots, toujours un seul choix), et la carte gardée par CE choix (« onCardKept », "pick") coûte 1 de
+-- moins (minimum 0, Combat.cost) pendant le tour suivant seulement. Réduction portée par l'état du combat
+-- (relicState.hero_charm_uid / hero_charm_round : uid de la carte, round de la fin du tour où elle a été
+-- gardée), jamais par l'instance ; effacée quand la carte est jouée, piochée de nouveau, transformée (Hex :
+-- l'originale rendue par la Hexed revient sans réduction) ou retirée du combat.
+local function charmClear(c, src, inst)
+  if inst and inst.uid == c.relicState.hero_charm_uid then
+    c.relicState.hero_charm_uid, c.relicState.hero_charm_round = nil, nil
+  end
+end
+
 D.relic("zandalarian_hero_charm", {
   name = "Zandalarian Hero Charm", rarity = "rare", key = { zone = "stranglethorn", level = 5 },
-  text = "At the end of each turn, 1 chosen card stays in hand.",
+  text = "At the end of your turn, you may keep 1 card in hand. It costs 1 less next turn.",
   hooks = {
     retainPicks = function(c, src, v) return v + 1 end,
+    onCardKept = function(c, src, inst, how)
+      if how ~= "pick" then return end
+      c.relicState.hero_charm_uid, c.relicState.hero_charm_round = inst.uid, c.round
+    end,
+    cost = function(c, src, v, d, inst)
+      local rs = c.relicState
+      if inst and inst.uid == rs.hero_charm_uid and c.round == rs.hero_charm_round + 1 then return v - 1 end
+      return v
+    end,
+    onCardCommitted = charmClear,
+    onCardDrawn = charmClear,
+    onCardTransformed = charmClear,
+    onCardRemoved = charmClear,
   },
 })
 
