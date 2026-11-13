@@ -14,8 +14,9 @@ ns.Save = Save
 -- 1 : format initial ; 2 : drapeaux de compte (meta.flags) ; 3 : classes (expédition version 3 :
 -- ressource de combat générique) ; 4 : niveau de classe (meta.classes[id].xp, expédition version 4 :
 -- unlock.level) ; 5 : campagne par zones (meta.zones, meta.classes[id].zones, Ligue retirée ; expédition
--- version 5 : exp.zone, unlock.common, unlock.won). Expédition version 6 (cartes épiques) sans changement
--- de la méta : Save.VERSION reste 5, l'expédition en cours passe par EXP_MIGRATIONS[5].
+-- version 5 : exp.zone, unlock.common, unlock.won). Expéditions version 6 (cartes épiques) et 7 (l'épique se
+-- gagne) sans changement de la méta : Save.VERSION reste 5, l'expédition en cours passe par EXP_MIGRATIONS[5]
+-- puis [6].
 Save.VERSION = 5
 
 function Save.new()
@@ -171,11 +172,17 @@ Save.EXP_MIGRATIONS[4] = function(exp, db)
   exp.acts = 1
 end
 
--- Expédition 5 -> 6 : cartes épiques. Une expédition en cours a passé son départ : pas d'offre de départ
--- (exp.startEpics absent), chaque élite gagnée propose une épique de remplacement si la classe en a
--- débloqué ; le flux de hasard « epic » est créé à son premier usage.
-Save.EXP_MIGRATIONS[5] = function(exp)
-  if exp.epicOffered == nil then exp.epicOffered = false end
+-- Expédition 5 -> 6 : cartes épiques. Le flux de hasard « epic » est créé à son premier usage ; exp.epicOffered
+-- (offre de départ faite, champ de la v6) n'est plus lu depuis la v7 : rien à poser.
+Save.EXP_MIGRATIONS[5] = function() end
+
+-- Expédition 6 -> 7 : l'épique se gagne (chute par élite, marchand), plus d'offre au départ. Une expédition
+-- arrêtée sur l'offre de départ (exp.startEpics) la perd : elle passe au bibelot de départ s'il reste à
+-- choisir, sinon à la carte. exp.startEpicPicked et exp.epicOffered sont retirés ; une épique déjà prise reste
+-- dans le deck.
+Save.EXP_MIGRATIONS[6] = function(exp)
+  exp.startEpics, exp.startEpicPicked, exp.epicOffered = nil, nil, nil
+  if exp.phase == "start" and type(exp.startRelics) ~= "table" then exp.phase = "map" end
 end
 
 local function quarantine(db, state, reason)
@@ -276,7 +283,7 @@ function Save.validateExpedition(exp)
   if exp.phase == "reward" and type(exp.reward) ~= "table" then return false, "missing reward" end
   if exp.phase == "merchant" and type(exp.shop) ~= "table" then return false, "missing merchant" end
   if exp.phase == "event" and type(exp.event) ~= "table" then return false, "missing encounter" end
-  if exp.phase == "start" and type(exp.startEpics) ~= "table" and type(exp.startRelics) ~= "table" then
+  if exp.phase == "start" and type(exp.startRelics) ~= "table" then
     return false, "missing start choice"
   end
   return Save.isPlain(exp, "current")

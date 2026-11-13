@@ -23,29 +23,36 @@ ns.Expedition = X
 -- 5 : campagne par zones (exp.zone ; unlock.common et unlock.won au lieu de unlock.league).
 -- 6 : cartes épiques (exp.epicOffered, exp.rng.epic créé au besoin, reward.epics / epicDone, épique du
 --     marchand : shop.cards[i].epic). Règle finale du 14/11/2026 sans changement de version : champ
---     facultatif exp.startEpics (offre de départ, phase « start ») ; une v6 en cours reste jouable telle quelle.
-X.VERSION = 6
+--     facultatif exp.startEpics (offre de départ, phase « start »).
+-- 7 : l'épique se gagne (décision du joueur, 14/11/2026) : plus d'offre de départ (exp.startEpics,
+--     exp.startEpicPicked et exp.epicOffered retirés), chute d'épique par élite selon le rang de la zone.
+X.VERSION = 7
 
 -- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck, règle en
 -- jeu dès le début de chaque combat (Combat.new : c.epic) ; en prendre une autre remplace la précédente.
--- Offres et vente, réglables ici :
---   start     épiques proposées au départ (phase « start », avant le premier combat ; « Skip » possible) ;
---             0 = pas d'offre de départ
---   offerOn   genres de combat dont CHAQUE victoire propose des épiques de remplacement en plus de la
---             récompense normale (combats de rencontre compris), refusables
---   choices   épiques proposées à chacune de ces victoires (distinctes, débloquées, hors celle du deck)
+-- L'épique se GAGNE : rien au départ. Chute et vente, réglables ici :
+--   drop      [genre de combat] = chances, par rang de zone (ns.Zone.order : 1 = Westfall … 7 = Blackrock
+--             Mountain ; au-delà de la table, la dernière valeur), qu'une victoire de ce genre (combat de
+--             rencontre compris) propose une épique en plus de la récompense normale (prendre, ou garder
+--             l'actuelle ; refusable). Genres absents : jamais.
+--   choices   épiques proposées quand elle tombe (distinctes, débloquées, hors celle du deck)
 --   shop      chance qu'un marchand vende une épique (emplacement en plus des cartes), à partir de l'étape
 --             shopFloor (la moitié du parcours : étapes 1 à 7, boss en 8) ; 0 = jamais
 --   price     prix de base d'une épique chez le marchand (± X.PRICE_JITTER, crochet « price » genre "card")
--- Sans épique débloquée, aucun tirage n'est fait (l'expédition se déroule exactement comme avant).
+-- Sans épique débloquée, aucun tirage n'est fait (l'expédition se déroule exactement comme sans épiques).
 X.EPIC = {
-  start = 3,
-  offerOn = { elite = true },
+  drop = { elite = { 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85 } },
   choices = 1,
   shop = 0.5,
   shopFloor = 4,
   price = 150,
 }
+
+-- Part de rares des récompenses de cartes (combat, élite, marchand ; le boss n'offre que des rares), par rang
+-- de zone (ns.Zone.order ; au-delà de la table, la dernière valeur) : le poids « rare » de X.CARD_WEIGHTS est
+-- multiplié par ce facteur et pris sur le poids « common » (le total ne change pas : la part de rares est
+-- multipliée d'autant). Zone 1 = 1 (poids d'origine, tirages inchangés) ; à régler par simulation.
+X.RARE_BY_ZONE = { 1, 1.15, 1.3, 1.5, 1.65, 1.8, 2 }
 
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
@@ -80,6 +87,28 @@ X.EVENT_WEIGHT = { common = 10, rare = 3, story = 8 }
 
 X.PHASES = { start = true, map = true, combat = true, reward = true, campfire = true,
   merchant = true, event = true, select = true, done = true }
+
+-- Rang de la zone de l'expédition dans la campagne (1 = Westfall ; 1 si la zone est inconnue).
+function X.zoneRank(exp)
+  return ns.Zone.order(exp.zone) or 1
+end
+
+-- Valeur d'une table par rang de zone (X.EPIC.drop, X.RARE_BY_ZONE) : au-delà de la table, la dernière.
+local function byRank(t, exp)
+  if type(t) ~= "table" then return t end
+  return t[min(X.zoneRank(exp), #t)]
+end
+
+-- Poids de rareté d'une récompense de cartes de ce genre (X.CARD_WEIGHTS[genre]) dans la zone de l'expédition :
+-- part de rares multipliée par X.RARE_BY_ZONE, prise sur les communes. Renvoie la table d'origine si le facteur
+-- vaut 1 (zone 1), sinon une copie.
+function X.cardWeights(exp, kind)
+  local w = X.CARD_WEIGHTS[kind]
+  local m = byRank(X.RARE_BY_ZONE, exp) or 1
+  if m == 1 or not (w and w.rare and w.common) then return w end
+  local extra = min(w.rare * (m - 1), w.common)
+  return { common = w.common - extra, uncommon = w.uncommon, rare = w.rare + extra }
+end
 
 ---------------------------------------------------------------------------
 -- Crochets d'expédition des bibelots (relic.run) et des affixes (affix.run)
@@ -599,7 +628,7 @@ local function rollReward(exp, kind, opts)
   if g and kind ~= "chest" then r.gold = Rng.int(rng, g[1], g[2]) end
   if kind ~= "chest" then
     local n = X.modify(exp, "rewardCards", opts and opts.cards or 3, kind)
-    local w = X.CARD_WEIGHTS[kind]
+    local w = X.cardWeights(exp, kind)
     if opts and opts.shift then w = X.shiftWeights(w, opts.shift) end
     r.cards = drawCards(exp, rng, n, w)
   end
@@ -639,9 +668,8 @@ local function groupIds(group)
 end
 X.groupIds = groupIds
 
--- Offre de remplacement : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone) s'il reste une
--- épique à proposer (tirée par le flux « epic » ; n = X.EPIC.choices par défaut). Renvoie vrai si l'offre est
--- faite.
+-- Offre d'épique : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone) s'il reste une épique à
+-- proposer (tirée par le flux « epic » ; n = X.EPIC.choices par défaut). Renvoie vrai si l'offre est faite.
 function X.offerEpic(exp, r, n)
   local pool = X.epicPool(exp)
   if #pool == 0 or (n or X.EPIC.choices) <= 0 then return false end
@@ -650,14 +678,19 @@ function X.offerEpic(exp, r, n)
   return true
 end
 
--- Offre de départ (X.new) : exp.startEpics = jusqu'à X.EPIC.start épiques débloquées, phase « start ».
--- exp.epicOffered = vrai si elle a été faite. Renvoie vrai si l'offre est faite.
-local function offerStartEpic(exp)
-  local o = {}
-  if not X.offerEpic(exp, o, X.EPIC.start) then return false end
-  exp.startEpics = o.epics
-  exp.epicOffered = true
-  return true
+-- Chance qu'une victoire de ce genre fasse tomber une épique dans la zone de l'expédition (X.EPIC.drop).
+function X.epicDropChance(exp, kind)
+  return byRank(X.EPIC.drop[kind], exp) or 0
+end
+
+-- Chute d'épique après une victoire de ce genre (X.EPIC.drop) : tirage par le flux « epic », puis l'offre
+-- (X.offerEpic) dans la récompense r. Sans épique proposable ou à chance nulle : aucun tirage. Renvoie vrai
+-- si une épique est proposée.
+function X.rollEpicDrop(exp, r, kind)
+  local p = X.epicDropChance(exp, kind)
+  if p <= 0 or #X.epicPool(exp) == 0 then return false end
+  if Rng.float(epicRng(exp)) >= p then return false end
+  return X.offerEpic(exp, r)
 end
 
 local function endFight(exp)
@@ -672,7 +705,7 @@ local function endFight(exp)
     if f.kind == "elite" then exp.stats.elites = exp.stats.elites + 1 end
     if f.kind == "boss" then exp.stats.bosses = exp.stats.bosses + 1 end
     X.fire(exp, "onCombatWon", f.kind, f)
-    if X.EPIC.offerOn[f.kind] then X.offerEpic(exp, f.reward) end
+    X.rollEpicDrop(exp, f.reward, f.kind)
     openReward(exp, f.reward)
   else
     exp.killedBy = table.concat(groupIds(f.encounter), "+")
@@ -730,13 +763,14 @@ local function openShop(exp)
     return max(1, floor(p + 0.5))
   end
   local shop = { cards = {}, relics = {}, potions = {}, removed = 0 }
-  local cards = drawCards(exp, rng, X.SHOP.cards, X.CARD_WEIGHTS.shop, false)
+  local shopWeights = X.cardWeights(exp, "shop")
+  local cards = drawCards(exp, rng, X.SHOP.cards, shopWeights, false)
   for i = 1, #cards do
     local base = X.PRICES.card[ns.Cards[cards[i]].rarity] or X.PRICES.card.uncommon
     shop.cards[i] = { id = cards[i], price = price(base, "card"), sold = false }
   end
   -- emplacement « Neutral » : en plus des cartes de classe, à la suite (neutral = true)
-  local neutral = drawNeutral(exp, rng, X.SHOP.neutral, X.CARD_WEIGHTS.shop)
+  local neutral = drawNeutral(exp, rng, X.SHOP.neutral, shopWeights)
   for i = 1, #neutral do
     local base = X.PRICES.neutral[ns.Cards[neutral[i]].rarity] or X.PRICES.neutral.uncommon
     shop.cards[#shop.cards + 1] = { id = neutral[i], price = price(base, "card"), sold = false, neutral = true }
@@ -1285,7 +1319,7 @@ end
 --                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements),
---        epic = id d'une carte épique ajoutée au deck de départ (simulation ; pas d'offre de départ)
+--        epic = id d'une carte épique ajoutée au deck de départ (simulation)
 function X.new(opts)
   opts = opts or {}
   local seed = floor(opts.seed or 1)
@@ -1322,7 +1356,6 @@ function X.new(opts)
   }
   for i = 1, X.POTION_SLOTS do exp.potions[i] = false end
   for i = 1, #cdef.deck do exp.deck[i] = { id = cdef.deck[i], up = false } end
-  exp.epicOffered = false
   -- épique imposée au départ (simulation : epic=<id>), comme une épique prise
   if opts.epic then
     local d = ns.Cards[opts.epic]
@@ -1350,9 +1383,6 @@ function X.new(opts)
       exp.phase = "start"
     end
   end
-  -- Épique de l'expédition au choix (X.EPIC.start), avant le premier combat ; vient AVANT le bibelot de
-  -- départ (phase « start » : exp.startEpics, puis exp.startRelics). Rien si l'épique est imposée (epic=).
-  if not opts.epic and offerStartEpic(exp) then exp.phase = "start" end
   return exp
 end
 
@@ -1362,39 +1392,22 @@ end
 
 local H = {} -- H[phase][verbe] = function(exp, a) -> true | false, raison
 
--- Phase « start » : l'épique (exp.startEpics) d'abord, puis le bibelot (exp.startRelics) ; la carte ensuite.
-local function startNext(exp)
-  if not exp.startEpics and not exp.startRelics then exp.phase = "map" end
-  return true
-end
-
+-- Phase « start » : le bibelot de départ (exp.startRelics), puis la carte.
 H.start = {
   startRelic = function(exp, a)
-    if exp.startEpics or not exp.startRelics then return false, "index" end
+    if not exp.startRelics then return false, "index" end
     local id = exp.startRelics[a[2] or 0]
     if not id then return false, "index" end
     X.gainRelic(exp, id)
     exp.startRelics = nil
-    return startNext(exp)
+    exp.phase = "map"
+    return true
   end,
   skipStartRelic = function(exp)
-    if exp.startEpics or not exp.startRelics then return false, "index" end
+    if not exp.startRelics then return false, "index" end
     exp.startRelics = nil
-    return startNext(exp)
-  end,
-  -- épique de départ : mêmes verbes que le choix « Epic » d'une récompense
-  pickEpic = function(exp, a)
-    local id = exp.startEpics and exp.startEpics[a[2] or 0]
-    if not id then return false, "badCard" end
-    X.addCard(exp, id)
-    exp.startEpics = nil
-    exp.startEpicPicked = id
-    return startNext(exp)
-  end,
-  skipEpic = function(exp)
-    if not exp.startEpics then return false, "badCard" end
-    exp.startEpics = nil
-    return startNext(exp)
+    exp.phase = "map"
+    return true
   end,
 }
 
@@ -1655,10 +1668,7 @@ function X.choices(exp)
   local ph = exp.phase
   local function add(a) list[#list + 1] = a end
   if ph == "start" then
-    if exp.startEpics then
-      for i = 1, #exp.startEpics do add({ "pickEpic", i }) end
-      add({ "skipEpic" })
-    elseif exp.startRelics then
+    if exp.startRelics then
       for i = 1, #exp.startRelics do add({ "startRelic", i }) end
       add({ "skipStartRelic" })
     end

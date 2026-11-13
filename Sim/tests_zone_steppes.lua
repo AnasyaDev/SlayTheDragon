@@ -406,7 +406,6 @@ return function(T)
   local function newExp(seed, common)
     local exp = X.new({ seed = seed or 5, class = "priest", zone = "steppes",
       unlocks = { level = 7, common = common or 5, won = { westfall = 5, duskwood = 5, wetlands = 5, stranglethorn = 5, swamp = 5 } } })
-    if exp.phase == "start" and exp.startEpics then assert(X.act(exp, { "skipEpic" })) end
     if exp.phase == "start" then assert(X.act(exp, { "skipStartRelic" })) end
     return exp
   end

@@ -19,7 +19,6 @@ return function(T)
     local won = { westfall = 5, duskwood = 5, wetlands = 5, stranglethorn = 5, swamp = 5 }
     local exp = X.new({ seed = seed or T.SEED, class = cl or "priest", zone = "steppes",
       unlocks = { level = 7, common = 6, won = won } })
-    if exp.phase == "start" and exp.startEpics then X.act(exp, { "skipEpic" }) end
     if exp.phase == "start" then X.act(exp, { "skipStartRelic" }) end
     ns.Persist.db.current = exp
     ns.UI.refresh()
