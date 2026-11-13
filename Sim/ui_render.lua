@@ -497,8 +497,22 @@ function R.svg(H, root, path, label)
           out[#out + 1] = string.format('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s" fill-opacity="%.2f"%s/>',
             x, y, w, h, col(cc), (cc[4] or 1) * a, tf)
         elseif tex == WHITE and calls.SetGradient then
-          out[#out + 1] = string.format('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#fff" fill-opacity="%.2f"/>',
-            x, y, w, h, 0.04 * a)
+          -- dégradé du client (SetGradient(orientation, min, max), couleurs de CreateColor) : vertical =
+          -- min en bas, max en haut ; horizontal = min à gauche, max à droite
+          local gr = calls.SetGradient
+          local c0, c1 = gr[2], gr[3]
+          if type(c0) == "table" and type(c1) == "table" and c0.r then
+            local gid = newId("g")
+            local vert = gr[1] ~= "HORIZONTAL"
+            defs[#defs + 1] = string.format('<linearGradient id="%s" x1="0" y1="%d" x2="%d" y2="0">'
+              .. '<stop offset="0" stop-color="%s" stop-opacity="%.3f"/><stop offset="1" stop-color="%s" stop-opacity="%.3f"/></linearGradient>',
+              gid, vert and 1 or 0, vert and 0 or 1, col({ c0.r, c0.g, c0.b }), c0.a or 1, col({ c1.r, c1.g, c1.b }), c1.a or 1)
+            out[#out + 1] = string.format('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="url(#%s)" opacity="%.2f"%s/>',
+              x, y, w, h, gid, a, tf)
+          else
+            out[#out + 1] = string.format('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="#fff" fill-opacity="%.2f"/>',
+              x, y, w, h, 0.04 * a)
+          end
         elseif tex ~= nil then
           local desat = calls.SetDesaturated and calls.SetDesaturated[1]
           local big = w * h > 60000

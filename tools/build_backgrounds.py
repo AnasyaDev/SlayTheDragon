@@ -34,11 +34,9 @@ TEX_W, TEX_H = 1024, 512
 BAND = 1034 / 380  # format de la bande du décor (UI/Scene.lua : S.W / S.DECOR_H)
 
 # Fonds retenus : clé -> source. `scenes` = scènes d'Art.scenes qui l'emploient (planche, rapport).
+# (La route, la colline, le camp, le marchand et le feu de camp de Westfall sont des décors peints
+# depuis le 13/11/2026 : UI/Art.lua, Art.paintings ; l'illustration d'Elwynn n'est plus fabriquée.)
 BACKGROUNDS = {
-    "elwynn": dict(fdid=7377860, name="Forêt d'Elwynn (logement, Midnight)",
-                   path="interface/glues/loadingscreens/expansion10/main/loadscreen_housing_elwynnforest",
-                   aspect=2992 / 1684, box=(0, 0.06, 1, 0.94),
-                   scenes="road, hill, camp, shop, night"),
     "farm": dict(fdid=407226, name="Pics-Jumeaux (ferme et chemin)",
                  path="interface/glues/loadingscreens/loadscreentwinpeaksbg",
                  aspect=4 / 3, box=(0, 0.265, 1, 0.86), scenes="farm"),
@@ -55,6 +53,8 @@ BACKGROUNDS = {
 
 # Autres candidats examinés (planche seulement).
 OTHERS = {
+    "elwynn": dict(fdid=7377860, name="Forêt d'Elwynn (logement, Midnight)", aspect=2992 / 1684,
+                   box=(0, 0.06, 1, 0.94), scenes="retiré : pas Westfall"),
     "excavation": dict(fdid=7963777, name="Excavation (écran Forever)", aspect=2992 / 1684,
                        box=(0, 0.165, 1, 0.838), scenes="farm ?"),
     "arathi": dict(fdid=2820825, name="Bassin d'Arathi (BfA, large)", aspect=16 / 9,
@@ -74,7 +74,7 @@ OTHERS = {
 }
 
 # Cadrage par scène pour la planche (mêmes valeurs que `focus` dans UI/Art.lua).
-FOCUS = {"elwynn": 0.6, "farm": 0.55, "deadmines": 0.5, "ruins": 0.5, "coast": 0.45}
+FOCUS = {"farm": 0.55, "deadmines": 0.5, "ruins": 0.5, "coast": 0.45}
 
 
 def fetch(fdid):
@@ -181,8 +181,9 @@ def planche():
 
 
 def scenes():
-    """Aperçu des 9 scènes telles que l'interface les compose (bande cadrée par `focus`, teinte, voile
-    du bas), d'après Art.scenes relu dans UI/Art.lua : build/decors_scenes.jpg."""
+    """Aperçu des scènes illustrées telles que l'interface les compose (bande cadrée par `focus`,
+    teinte, voile du bas), d'après Art.scenes relu dans UI/Art.lua : build/decors_scenes.jpg. Les décors
+    peints (sans `art`) se voient dans les instantanés du harnais (Sim/ui_harness.lua, section UW)."""
     import re
     art = (ROOT / "UI/Art.lua").read_text(encoding="utf-8")
     block = art[art.index("Art.scenes = {"):]

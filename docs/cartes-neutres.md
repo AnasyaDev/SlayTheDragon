@@ -87,8 +87,8 @@ L'effet `{ "card", id }` existe déjà (`Data/Events.lua`) ; une réponse donne 
 | `defias_caravan` La carriole renversée (0) | « Fouiller la carriole » : -3 PV, Rough Dynamite | `rough_dynamite` | les Défias font sauter les portes des Mortemines |
 | `jangolode_prospector` Le filon de la mine de Jango (0) | « Lui acheter sa dynamite » : paie 20 po, Rough Dynamite (à la place de la flasque, ou en 4e réponse) | `rough_dynamite` | une mine |
 | `saldean_farm` La ferme des Saldean (0) | « Apprendre sa recette » : Smoked Desert Dumplings, ou une carte commune parmi 3 (choix gardé) | `smoked_desert_dumplings` | la recette d'une fermière |
-| `moonbrook_refugees` Les réfugiés de Ruisselune (1) | « Rouler des bandages avec Mère Hanna » : -4 PV, Heavy Silk Bandage | `heavy_silk_bandage` | les secours aux blessés |
-| `goblin_peddler` La roulotte de Grisette (1, rare) | 4e réponse : paie 35 po, Iron Grenade | `iron_grenade` | une marchande gobeline |
+| `moonbrook_refugees` Les réfugiés de Ruisselune (1) | « Rouler des bandages avec Verna Furlbrow » : -4 PV, Heavy Silk Bandage | `heavy_silk_bandage` | les secours aux blessés |
+| `goblin_peddler` Le profiteur défias (1, rare) | 4e réponse : paie 35 po, Iron Grenade | `iron_grenade` | un marchand défias (le matériel des mines) |
 | `herbalist` La cueilleuse de pacifiques (1) | « Lui acheter un élixir » : paie 30 po, Elixir of Superior Defense (si débloquée) | `elixir_of_superior_defense` | herboriste et alchimiste |
 | `lighthouse_keeper` Le gardien du phare (2) | « Fouiller la réserve du phare » : -6 PV, Arcane Bomb | `arcane_bomb` | réserve de matériel avant le boss |
 

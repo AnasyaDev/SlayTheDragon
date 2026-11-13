@@ -5,7 +5,7 @@ dans cet ordre :
 
 | Ordre | Id (`ns.Zones`) | Nom affiché | État |
 | --- | --- | --- | --- |
-| 1 | `westfall` | Westfall | jouable (`Data/Zones/Westfall.lua`, boss Edwin VanCleef) |
+| 1 | `westfall` | Westfall | jouable (`Data/Zones/Westfall.lua`, boss Edwin VanCleef ; décors et personnages de la Marche depuis le 13/11/2026) |
 | 2 | `duskwood` | Duskwood | déclarée, « Coming later » |
 | 3 | `wetlands` | Wetlands | déclarée, « Coming later » |
 | 4 | `stranglethorn` | Stranglethorn Vale | déclarée, « Coming later » |
@@ -39,9 +39,15 @@ dans cet ordre :
    un nouveau fichier demande de relancer le client, `/reload` ne suffit pas.
 3. **L'art** (`UI/Art.lua` ou un `UI/Art/<zone>.lua` ajouté au TOC) : modèles des ennemis
    (`Art.enemies[id]`), personnages des rencontres (`Art.npcs[npc]`), décors (`Art.scenes`, fonds
-   embarqués par `tools/build_backgrounds.py`). Pour remplacer un décor commun par celui de la zone :
+   embarqués par `tools/build_backgrounds.py`, ou paysages peints `Art.paintings` avec leur palette
+   `Art.palettes`). Pour remplacer un décor commun par celui de la zone :
    `ns.Zones.duskwood.scenes = { road = "duskwood_road", mine = "duskwood_crypt" }` (clé : décor commun
-   choisi par `Controller.scene()`, valeur : clé de `Art.scenes` qui doit exister).
+   demandé par un écran ou `Controller.scene()`, valeur : clé de `Art.scenes` qui doit exister ;
+   `UI.setStage` passe par `Controller.zoneScene`). Westfall le fait depuis le 13/11/2026
+   (`Data/Zones/Westfall.lua` : `road`, `hill`, `camp`, `shop`, `night` → `westfall_*`, décors peints
+   couleur blé) ; les décors communs `road`… `night` sont ceux de Westfall tant qu'une zone n'a pas les
+   siens. Un paysage peint d'une autre zone reprend les plans et accessoires d'`Art.paintings` avec sa
+   propre palette (ciel, collines, champs, silhouettes) ou ses propres accessoires (`UI/Scene.lua`, `PROPS`).
 4. Facultatif : les **cartes de zone** des classes et les **bibelots de clé** de la zone (ci-dessous).
 5. Tests : `Sim/tests_expedition.lua` vérifie que chaque zone référencée par une carte, un bibelot ou une
    rencontre existe ; ajouter au moins une expédition simulée de la zone (`… runner=expedition zone=duskwood`).

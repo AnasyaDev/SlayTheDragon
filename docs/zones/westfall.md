@@ -240,3 +240,35 @@ le pack d'icônes de `~/Téléchargements` peut ne pas les avoir (repli : `inv_m
 3. **Personnages des rencontres** : remplacés par des gens de Westfall, noms et modèles (les textes concernés sont réécrits).
 4. **Cartes de zone : rareté « épique », cartes pivot.** Elles ne sont pas ramenées au niveau des rares : chacune doit pouvoir servir de pivot à un deck (on construit autour d'elle). Vaut pour les sept zones.
 5. Captain Sander's Treasure Map : non tranché.
+
+## Appliqué le 13/11/2026 (décisions 1 à 3)
+
+Aucun chiffre de combat, d'ennemi, de carte ni de récompense ne change (empreintes vérifiées par le
+harnais, section UW).
+
+1. **Fonds** : route, colline (Sentinel Hill), camp, marchand et feu de camp sont des décors peints
+   couleur blé (`Art.paintings` / `Art.palettes`, peints par `S.landscape`), portés par la zone
+   (`ns.Zones.westfall.scenes`) ; `Media/Backgrounds/elwynn.tga` est supprimé, ainsi que sa fabrication.
+   Mine (Mortemines) gardée ; ferme (Pics-Jumeaux) et côte (Gilnéas) inchangées (hors décision).
+   Détail : `docs/interface.md`, « Décors peints de Westfall ».
+2. **Defias Highwayman** : `Data/Zones/Westfall.lua`, id `bandit` gardé ; modèle 122 / 2342, 2343.
+   Secours de l'Invocateur : le Sorcier-voleur défias d'Elwynn (2359 / 2360) laisse la place au Magicien
+   défias (2321 / 2322).
+3. **Personnages** (noms, modèles, textes ; ids des rencontres gardés) :
+
+| Rencontre | Avant | Maintenant | Créature / affichages |
+|---|---|---|---|
+| `defias_caravan` | The wagon driver (Brog Hamfist 151) | Farmer Furlbrow | 237 (hors caches) / 1943, 3614 (repli) |
+| `moonbrook_refugees` | Mother Hanna (Ma Stonefield 244) | Verna Furlbrow | 238 (hors caches) / 1691, 8185 (repli) |
+| `coast_murlocs` | Old Hank (Lee Brown 1651) | Scout Galiaan (milice) | 878 / 2373, 2374, 2368 |
+| `jangolode_prospector` | Grit (Prospector Stormpike 1356) | Thor, gryphon master | 523 / 3263, 3594 (repli d'apparence) |
+| `herbalist` | Aunt Mirelle (Alma Jainrose 812), route | Innkeeper Heather, colline | 8931 / 8185, 1691 |
+| `lighthouse_keeper` | Keeper Alden (Dockmaster Baren 381) | Captain Grayson (fantôme) | 392 (hors caches) / 2372, 2367 (repli) |
+| `goblin_peddler` | Grizzle Quickclick (Zixil 3537) | Defias Profiteer | 1669 / 4423, 2342 |
+| `harvest_watcher` | Tinker Bertil (Deek Fizzlebizz 3290) | Farmer Saldean | 233 / 1943, 3614 |
+| `tobin_defias` | modèle Defias Cutpurse 94 | Tobin (modèle Defias Pathstalker) | 121 / 2336, 2337, 2342, 2343 |
+
+Thor, Innkeeper Heather, Scout Galiaan et Defias Profiteer, « non trouvés » dans la fiche, sont dans le
+cache frFR (`tools/wdb_creatures.py`). Gardés : Salma Saldean, Gryan Stoutmantle, Farmer Molsen (nom tiré de
+la ferme Molsen ; modèle 232, zone non vérifiable), Graymaw, Tobin enfant (aucun enfant nommé de la Marche)
+et guetteur. Textes réécrits : `docs/rencontres.md` (en tête) et `Data/Events.lua`.
