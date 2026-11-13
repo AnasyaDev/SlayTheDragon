@@ -45,6 +45,14 @@ local cards = {
   retaliation        = I("Ability_Warrior_Challange", 20230),
   shield_wall        = I("Ability_Warrior_ShieldWall", 871),
   last_stand         = I("Spell_Holy_AshesToAshes", 12975),
+  -- cartes épiques (une par zone)
+  death_wish         = I("Spell_Shadow_DeathPact", 12292),
+  thunderous_roar    = I("Ability_Warrior_DragonRoar", 384318),
+  sweeping_strikes   = I("Ability_Rogue_SliceDice", 12328),
+  titans_grip        = I("Ability_Warrior_TitansGrip", 46917),
+  shield_charge      = I("Ability_Warrior_ShieldCharge", 385952),
+  anger_management   = I("Ability_Warrior_EndlessRage", 152278),
+  avatar             = I("Warrior_Talent_Icon_Avatar", 107574),
 }
 for id, e in pairs(cards) do Art.cards[id] = e end
 
@@ -70,3 +78,44 @@ Art.classes.warrior = I("ClassIcon_Warrior")
 Art.classes.warrior.wow = "WARRIOR"
 Art.classes.warrior.resource = { tga = "Ability_Warrior_FocusedRage", icon = "Interface\\Icons\\ability_warrior_focusedrage",
   color = "attackText" }
+
+-- Vue de classe (zone libre sous les états du héros, 300 × 40) : le compteur que l'épique demande pour jouer
+-- (son icône est posée parmi les Powers par le socle des épiques) :
+--   Titan's Grip       « Titan's Grip: 1/2 Attacks » (Attacks comptées du tour)
+--   Shield Charge      « Shield Charge: 7 » (coup de fin de tour avec l'Absorb actuelle)
+--   Anger Management   « Anger Management: 2/3 Rage » (Rage dépensée vers le prochain cran de recharge)
+-- Le plafond de Rage d'Avatar se lit sur les crans (Combat.resCap). Ne lit que le combat.
+function ns.Warrior.epicLabel(c)
+  local Wr = ns.Warrior
+  local id, up = Wr.epicOf(c)
+  if id == "titans_grip" then
+    local n = Wr.EPIC.titans_grip.limit
+    return ("Titan's Grip: %d/%d Attacks"):format(math.min(c.cls.tgAttacks or 0, n), n)
+  elseif id == "shield_charge" then
+    return "Shield Charge: " .. Wr.chargeDamage(c, up)
+  elseif id == "anger_management" then
+    local per = up and Wr.EPIC.anger_management.upPer or Wr.EPIC.anger_management.per
+    return ("Anger Management: %d/%d Rage"):format(c.cls.amSpent or 0, per)
+  end
+  return nil
+end
+
+ns.ClassViews.warrior = {
+  build = function(host)
+    local W, C = ns.Widgets, Art.C
+    host.count = W.label(host, "bold", 12.5, C.goldText)
+    host.count:SetPoint("LEFT", host, "LEFT", 4, 0)
+    host.count:SetWidth(290)
+    host.count:SetJustifyH("LEFT")
+    host.count:SetWordWrap(false)
+  end,
+  render = function(host, c)
+    local label = ns.Warrior.epicLabel(c)
+    if label then
+      host.count:SetText(label)
+      host.count:Show()
+    else
+      host.count:Hide()
+    end
+  end,
+}

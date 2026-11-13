@@ -3325,7 +3325,7 @@ do
     for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
     return out
   end
-  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$" }
+  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$", "^Epic%.$" }
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
   -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
   -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle
@@ -5557,10 +5557,15 @@ do
   check("chiffre flottant : « +2 Rage »", table.concat(floats, "|"):find("+2 Rage", 1, true), table.concat(floats, "|"))
   -- zone libre de la classe : ns.ClassViews appelé (build une fois, render à chaque rendu)
   local built, rendered = 0, 0
+  -- (la vue propre du Guerrier, UI/Art/warrior.lua, est mise de côté puis rendue)
+  local keepView, keepHost = ns.ClassViews.warrior, v.classZone.views.warrior
+  if keepHost then keepHost:Hide() end
+  v.classZone.views.warrior = nil
   ns.ClassViews.warrior = { build = function() built = built + 1 end, render = function() rendered = rendered + 1 end }
   v:Render(true)
   v:Render(true)
-  ns.ClassViews.warrior = nil
+  ns.ClassViews.warrior = keepView
+  v.classZone.views.warrior = keepHost
   check("zone libre de classe : build une fois, render à chaque rendu", built == 1 and rendered == 2, built .. "/" .. rendered)
   snap("combat-guerrier", true)
   -- carte du Guerrier jouée par l'interface (Strike) : Rage +1
@@ -5640,7 +5645,8 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "warrior" then ids[#ids + 1] = id end end
+  -- (cartes épiques : planche de la section UEW)
+  for id, d in pairs(ns.Cards) do if d.class == "warrior" and not d.epic then ids[#ids + 1] = id end end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, arms = 1, fury = 2, protection = 3 }
   table.sort(ids, function(a, b)
@@ -6893,7 +6899,8 @@ do
       -- cartes hors grille (Rogue : Nightblade, Subtlety niveau 3) comptées depuis les données
       local nAll, nOpen0 = 0, 0
       for _, d in pairs(ns.Cards) do
-        if d.class == cid then nAll = nAll + 1; if (d.level or 1) <= lv then nOpen0 = nOpen0 + 1 end end
+        -- (cartes de zone, épiques : onglet Zones, hors de la grille des niveaux)
+        if d.class == cid and not d.zone then nAll = nAll + 1; if (d.level or 1) <= lv then nOpen0 = nOpen0 + 1 end end
       end
       local xAll, xOpen = nAll - 34, nOpen0 - OPEN_CARDS[lv]
       check(tag .. (" : %d cartes, %d débloquées en vraies cartes, le reste en dos de carte"):format(34 + xAll, OPEN_CARDS[lv] + xOpen),
@@ -8883,6 +8890,151 @@ do
   H.settle()
   check("bilan : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("ue-bilan-epique", true)
+end
+
+print("UEW Warrior, cartes épiques : textes (taille, coupures), planche, crans jusqu'à 10 (Avatar), compteurs de la vue de classe, raison Titan's Grip")
+do
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function alphaOf(t) return t._calls.SetAlpha and t._calls.SetAlpha[1] or 1 end
+  -- combat du Guerrier, l'épique `epic` (améliorée si up) ajoutée au deck avant le premier combat
+  local function uewCombat(epic, up)
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:warrior")
+    H.ns.Controller.makeSeed = function() return SEED end
+    clickOption("go")
+    local e = EXP()
+    e.deck[#e.deck + 1] = { id = epic, up = up or false }
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+    local v = V()
+    v:Render(true)
+    return e, e.combat, v
+  end
+  local ns = H.ns
+  local W, Wr = ns.Widgets, ns.Warrior
+  -- 1. textes des sept épiques : « Epic. » sur la plaque, corps en clauses à 8,5 ou plus, jamais tronqué
+  local card = W.card(UI().content)
+  local tbad, sizes = {}, {}
+  for _, id in ipairs(Wr.EPICS) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      local label = id .. (up and "+" or "")
+      local shown = W.cardBodyText(card)
+      sizes[#sizes + 1] = label .. " " .. tostring(fit.size)
+      if fit.mode ~= "clauses" or not fit.ok or (fit.size or 0) < 8.5 then tbad[#tbad + 1] = label .. " (" .. tostring(fit.size) .. ")" end
+      if shown:find("Epic.", 1, true) then tbad[#tbad + 1] = label .. " : « Epic. » dans le texte" end
+      if not (card.plateText._text or ""):find("Epic", 1, true) then tbad[#tbad + 1] = label .. " : plaque sans « Epic »" end
+    end
+  end
+  check("textes des 7 épiques (base, améliorées) : clauses à 8,5 ou plus, « Epic » sur la plaque", #tbad == 0,
+    table.concat(tbad, ", ") .. " | " .. table.concat(sizes, ", "))
+  if SNAP then
+    local perRow, cw, ch = 7, 140, 230
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, 2 * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, id in ipairs(Wr.EPICS) do
+      for r, up in ipairs({ false, true }) do
+        local c = W.card(big)
+        c:SetCard(id, up, { playable = true })
+        W.placeCenter(c, big, 80 + (i - 1) * cw, 125 + (r - 1) * ch, 1)
+      end
+    end
+    Render.svg(H, big, SNAP .. "/cartes_warrior_epiques.svg", "épiques du Guerrier (base, améliorées)")
+    big:Hide()
+  end
+
+  -- 2. Avatar : crans jusqu'à 10 (second arc), remplis selon la Rage, infobulle « n / 10 »
+  local e, c, v = uewCombat("avatar")
+  local sockets = 0
+  for _, p in ipairs(v.resPips.list) do if vis(p.socket) then sockets = sockets + 1 end end
+  c.player.res = 8
+  v:Render(true)
+  H.advance(1)
+  local n = 0
+  for i = 1, 10 do if alphaOf(v.resPips.list[i].fill) == 1 then n = n + 1 end end
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local cardR, board = R.rect(v.cards[1]), R.rect(v.hz)
+  local pbad = {}
+  for i = 1, 10 do
+    local r = R.rect(v.resPips.list[i].socket)
+    if not (r and r[3] < cardR[1] and r[2] >= board[2] and r[4] <= board[4]) then pbad[#pbad + 1] = i end
+    -- gemmes en losange : centres à 0,9 cran l'un de l'autre au moins (les 5 premiers se touchent déjà)
+    for j = 1, i - 1 do
+      local q = R.rect(v.resPips.list[j].socket)
+      if r and q then
+        local dx, dy = (r[1] + r[3] - q[1] - q[3]) / 2, (r[2] + r[4] - q[2] - q[4]) / 2
+        if math.sqrt(dx * dx + dy * dy) < 0.9 * (r[3] - r[1]) then pbad[#pbad + 1] = i .. "×" .. j end
+      end
+    end
+  end
+  local tt = table.concat(H.hover(v.resource), " | ")
+  check(("Avatar : %d crans (plafond %d), 8 remplis, à gauche de la main, dans le plateau, sans chevauchement ; infobulle « 8 / 10 »"):format(sockets, ns.Combat.resCap(c)),
+    sockets == 10 and ns.Combat.resCap(c) == 10 and n == 8 and #pbad == 0 and tt:find("8 / 10", 1, true) ~= nil,
+    n .. " / " .. table.concat(pbad, ",") .. " / " .. tt)
+  snap("uew-avatar-crans", true)
+  -- sans épique : 5 crans (rien ne change)
+  local _, c0, v0 = uewCombat("strike")
+  local s0 = 0
+  for _, p in ipairs(v0.resPips.list) do if vis(p.socket) then s0 = s0 + 1 end end
+  check("sans épique : 5 crans, vue de classe muette", s0 == 5 and ns.Combat.resCap(c0) == 5
+    and not vis(v0.classZone.views.warrior and v0.classZone.views.warrior.count), s0)
+
+  -- 3. Titan's Grip : compteur du tour, troisième Attack grisée avec la raison
+  e, c, v = uewCombat("titans_grip")
+  local host = v.classZone.views.warrior
+  local lim = Wr.EPIC.titans_grip.limit
+  check(("Titan's Grip : vue de classe « Titan's Grip: 0/%d Attacks »"):format(lim), host and vis(host.count)
+    and host.count._text == ("Titan's Grip: 0/%d Attacks"):format(lim), host and host.count._text)
+  c.hand = {}
+  for k = 1, lim + 1 do c.hand[k] = ns.Card.new("strike", false, 900 + k) end
+  c.player.mana = lim + 1
+  for _, en in ipairs(c.enemies) do en.hp, en.maxHp = 200, 200 end
+  v:Render(true)
+  for _ = 1, lim do ns.Combat.play(c, 1, 1) end
+  v:Render(true)
+  H.settle()
+  local sc = v.cards[1]
+  check(("Titan's Grip : %d/%d Attacks, la suivante grisée avec « %s »"):format(lim, lim, Wr.TITAN_REASON),
+    host.count._text == ("Titan's Grip: %d/%d Attacks"):format(lim, lim) and vis(sc.reasonPlate) and sc.reasonPlate.text._text == Wr.TITAN_REASON
+      and not sc.reasonPlate.text:IsTruncated(), tostring(host.count._text) .. " / " .. tostring(sc.reasonPlate and sc.reasonPlate.text._text))
+  snap("uew-titans-grip", true)
+
+  -- 4. Shield Charge et Anger Management : compteurs ; Death Wish : rien à afficher
+  e, c, v = uewCombat("shield_charge", true)
+  host = v.classZone.views.warrior
+  c.player.block = 11
+  v:Render(true)
+  check("Shield Charge+ : « Shield Charge: " .. Wr.chargeDamage(c, true) .. " » (4 + Absorb divisée)",
+    host.count._text == "Shield Charge: " .. Wr.chargeDamage(c, true) and Wr.chargeDamage(c, true) > 4, host.count._text)
+  e, c, v = uewCombat("anger_management")
+  host = v.classZone.views.warrior
+  c.cls.amSpent = 1
+  v:Render(true)
+  check("Anger Management : « Anger Management: 1/" .. Wr.EPIC.anger_management.per .. " Rage »",
+    host.count._text == ("Anger Management: 1/%d Rage"):format(Wr.EPIC.anger_management.per), host.count._text)
+  e, c, v = uewCombat("death_wish")
+  host = v.classZone.views.warrior
+  check("Death Wish : vue de classe muette", host and not vis(host.count))
+  -- 5. Thunderous Roar : l'onde (journal epic_trigger, dégâts, Demoralized) passe par la file d'animations
+  e, c, v = uewCombat("thunderous_roar")
+  c.player.res = 4
+  ns.Combat.gainRes(c, 1, "test")
+  v:OnEvents(c.events)
+  H.advance(3)
+  check("Thunderous Roar : onde jouée par la vue (Rage à 0, Demoralized posé selon la règle)", c.player.res == 0
+    and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.EPIC.thunderous_roar.demoralized > 0) and #W.truncatedNow() == 0,
+    c.player.res .. " / " .. table.concat(W.truncatedNow(), ","))
+  snap("uew-thunderous-roar", true)
 end
 
 print("U16 méthodes d'API inconnues appelées")

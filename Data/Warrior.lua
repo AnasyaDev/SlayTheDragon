@@ -323,6 +323,58 @@ card("last_stand", {
   up = { cost = 0, text = "Power.\nLast Breath: stay at 1 HP, heal 15." },
 })
 
+-- Cartes épiques (cartes de zone, docs/zones/cartes-de-zone.md, « Warrior ») ------------------------------
+-- Une par zone, débloquée par la première victoire du Guerrier dans la zone ; une seule par expédition.
+-- Règle active dès le début de chaque combat (ni piochée, ni jouée, sans coût) : les crochets (deckHooks,
+-- whileInDeck) et les nombres (ns.Warrior.EPIC) sont posés par Core/Classes/warrior.lua ; les textes ici
+-- disent ces nombres. « Epic. » = mot de plaque (en tête, retiré à l'affichage comme « Power. »).
+local function epic(id, t)
+  t.type, t.power, t.epic, t.rarity, t.effects = "power", true, true, "epic", {}
+  card(id, t)
+end
+
+epic("death_wish", {
+  zone = "westfall", name = "Death Wish", path = "fury",
+  text = "Epic.\nCan't gain Absorb.\nAttacks: 50% more damage.",
+  up = { text = "Epic.\nCan't gain Absorb.\nAttacks: 50% more damage.\nKills: heal 3." },
+})
+
+epic("thunderous_roar", {
+  zone = "duskwood", name = "Thunderous Roar", path = "protection",
+  text = "Epic.\nAt 5 Rage: spend it, deal 3 to all.",
+  up = { text = "Epic.\nAt 5 Rage: spend it, deal 5 to all." },
+})
+
+epic("sweeping_strikes", {
+  zone = "wetlands", name = "Sweeping Strikes", path = "arms",
+  text = "Epic.\nTargeted Attack hits: also hit another enemy for half.",
+  up = { text = "Epic.\nTargeted Attack hits: also hit 2 other enemies for half." },
+})
+
+epic("titans_grip", {
+  zone = "stranglethorn", name = "Titan's Grip", path = "fury",
+  text = "Epic.\nAttacks resolve twice.\nAt most 1 Attack per turn.",
+  up = { text = "Epic.\nAttacks resolve twice.\nAt most 1 Attack per turn, 0-cost ones free." },
+})
+
+epic("shield_charge", {
+  zone = "swamp", name = "Shield Charge", path = "protection",
+  text = "Epic.\nEnd of turn: deal a quarter of the Absorb to the last target.",
+  up = { text = "Epic.\nEnd of turn: deal 4 + a quarter of the Absorb to the last target." },
+})
+
+epic("anger_management", {
+  zone = "steppes", name = "Anger Management", path = "arms",
+  text = "Epic.\nEach Rage spent: all Cooldowns −1.",
+  up = { text = "Epic.\nEach Rage spent: all Cooldowns −2." },
+})
+
+epic("avatar", {
+  zone = "blackrock", name = "Avatar", path = "arms",
+  text = "Epic.\nRage can go up to 10.\nStart of turn: +2 Rage.",
+  up = { text = "Epic.\nRage can go up to 10.\nStart of turn: +3 Rage." },
+})
+
 -- Bibelots du Guerrier (class = "warrior" : tirés seulement pour lui) ------------------------------
 -- level = niveau de classe qui les débloque (dans la réserve de la classe ; la Ligue ne compte pas).
 
@@ -427,4 +479,102 @@ ns.Classes.warrior = {
     remove = { defend = 1, strike = 1.5 },
   },
 }
+
+-- Bots : construire autour de l'épique du deck (docs/zones/cartes-de-zone.md, « Deck piloté » de chaque
+-- épique). Notes absolues qui remplacent celles de bot.rating tant que l'épique est dans le deck (centrales
+-- relevées, mauvaises sous 5 : jamais prises), valeurs d'amélioration (feu de camp) et de retrait (marchand,
+-- rencontres : les plus basses partent d'abord, à 1,5 ou moins chez le marchand). L'épique elle-même ne part
+-- jamais (retrait 99) ; son amélioration vaut ce que la règle y gagne.
+local ADVICE = {
+  death_wish = {
+    rating = { bloodthirst = 13.5, victory_rush = 11.5, raging_blow = 10.5, whirlwind = 12, rampage = 11.5,
+      battle_shout = 12, recklessness = 10.5, enrage = 11, mortal_strike = 12.5, execute = 11, bladestorm = 11,
+      cleave = 10, slam = 10.5, rend = 10.5, onslaught = 10.5, overpower = 9, colossus_smash = 9, revenge = 11.5,
+      thunder_clap = 9.5, deep_wounds = 10.5, demoralizing_shout = 11, last_stand = 10.5, devastate = 8,
+      shield_block = 2, shield_wall = 2, ignore_pain = 2, shield_slam = 2.5 },
+    upgrade = { heroic_strike = 12, bloodthirst = 13, strike = 5, defend = 0, death_wish = 11 },
+    remove = { defend = 0, shield_block = 0.5, shield_wall = 0.5, ignore_pain = 0.5, shield_slam = 0.5,
+      strike = 3, death_wish = 99 },
+  },
+  thunderous_roar = {
+    rating = { bloodrage = 11, berserker_rage = 12, demoralizing_shout = 12, revenge = 12, overpower = 10.5,
+      victory_rush = 11, rampage = 11, raging_blow = 10, thunder_clap = 11, battle_shout = 11.5, enrage = 11,
+      whirlwind = 11, cleave = 9.5, bladestorm = 9.5, pummel = 10.5, rend = 10, bloodthirst = 12,
+      execute = 4, ignore_pain = 4, onslaught = 4.5, shield_wall = 7, shield_block = 7 },
+    upgrade = { thunderous_roar = 14, bloodrage = 11, heroic_strike = 1, defend = 1.5 },
+    remove = { heroic_strike = 0.5, defend = 1.2, execute = 1, ignore_pain = 1, onslaught = 1.5, strike = 3,
+      thunderous_roar = 99 },
+  },
+  sweeping_strikes = {
+    rating = { mortal_strike = 12.5, execute = 11.5, raging_blow = 10.5, rampage = 11, overpower = 9,
+      colossus_smash = 9.5, slam = 10.5, bloodthirst = 13, onslaught = 10.5, revenge = 11.5, rend = 10,
+      cleave = 4, whirlwind = 4.5, bladestorm = 5, thunder_clap = 4.5 },
+    upgrade = { heroic_strike = 11, sweeping_strikes = 10, strike = 3.5, mortal_strike = 12 },
+    remove = { defend = 1, strike = 2.5, cleave = 1, whirlwind = 1.2, thunder_clap = 1.2, sweeping_strikes = 99 },
+  },
+  titans_grip = {
+    rating = { mortal_strike = 13.5, rampage = 12, bladestorm = 12, execute = 11.5, onslaught = 11.5,
+      bloodthirst = 13.5, battle_shout = 12, recklessness = 11, colossus_smash = 10, slam = 11, whirlwind = 11,
+      cleave = 10, shield_block = 10.5, shield_wall = 10.5, ignore_pain = 11, demoralizing_shout = 11,
+      berserker_rage = 9, last_stand = 10, strike = 2, overpower = 3, revenge = 4, pummel = 5,
+      victory_rush = 5, raging_blow = 7 },
+    upgrade = { mortal_strike = 13, bloodthirst = 13, heroic_strike = 11, titans_grip = 9, strike = 0.5 },
+    remove = { strike = 0, overpower = 0.5, revenge = 1, defend = 2, titans_grip = 99 },
+  },
+  shield_charge = {
+    rating = { shield_block = 12.5, shield_wall = 13, ignore_pain = 12.5, devastate = 11, shield_slam = 13,
+      last_stand = 10.5, demoralizing_shout = 11, thunder_clap = 9.5, bloodrage = 9, berserker_rage = 9,
+      revenge = 10, retaliation = 10, rampage = 3, recklessness = 3, raging_blow = 5, whirlwind = 7 },
+    upgrade = { defend = 9, shield_block = 12, shield_charge = 11, shield_wall = 11.5, ignore_pain = 11,
+      strike = 1 },
+    remove = { strike = 0, rampage = 0.5, recklessness = 0.5, defend = 4, shield_charge = 99 },
+  },
+  anger_management = {
+    rating = { bloodthirst = 14, shield_wall = 11.5, shield_block = 11, berserker_rage = 11, demoralizing_shout = 12,
+      pummel = 11, onslaught = 11.5, execute = 11, ignore_pain = 11.5, mortal_strike = 11, bladestorm = 9.5,
+      battle_shout = 5, recklessness = 4, victory_rush = 5 },
+    upgrade = { anger_management = 12, bloodthirst = 13, onslaught = 11, heroic_strike = 10, bloodrage = 8 },
+    remove = { strike = 1, defend = 1.2, victory_rush = 1.5, anger_management = 99 },
+  },
+  avatar = {
+    -- la Rage abonde : il faut de quoi la dépenser (Execute, Ignore Pain, puis Onslaught et Heroic Strike,
+    -- seules dépenses du deck de départ) ; Bloodrage et Berserker Rage n'apportent presque plus rien
+    rating = { execute = 13.5, ignore_pain = 13, colossus_smash = 10.5, mortal_strike = 12, rend = 10,
+      demoralizing_shout = 11, shield_slam = 11, onslaught = 12, bloodrage = 5, berserker_rage = 6 },
+    upgrade = { execute = 13, avatar = 12, ignore_pain = 12, heroic_strike = 11, onslaught = 10, bloodrage = 1,
+      strike = 2 },
+    remove = { bloodrage = 1, strike = 1.2, defend = 2, heroic_strike = 4, avatar = 99 },
+  },
+}
+ns.Classes.warrior.bot.advice = ADVICE
+
+-- Épique du deck d'une expédition (id) ou nil.
+local function deckEpic(exp)
+  for i = 1, #exp.deck do
+    local d = C[exp.deck[i].id]
+    if d and d.rarity == "epic" then return exp.deck[i].id end
+  end
+  return nil
+end
+
+ns.Classes.warrior.bot.deck = function(exp)
+  local id = deckEpic(exp)
+  return id and ADVICE[id] or nil
+end
+
+-- Note d'une épique proposée (offre, marchand) : une note commune, plus l'accord avec le deck (cartes
+-- centrales présentes, cartes mauvaises sous sa règle), plus un attachement à celle du deck (le build est
+-- déjà construit autour). Une épique de même note n'en remplace jamais une autre.
+ns.Classes.warrior.bot.EPIC_BASE = 10
+ns.Classes.warrior.bot.epic = function(exp, id)
+  local adv = ADVICE[id]
+  if not adv then return nil end
+  local v = ns.Classes.warrior.bot.EPIC_BASE
+  for i = 1, #exp.deck do
+    local r = adv.rating[exp.deck[i].id]
+    if r and r >= 10.5 then v = v + 0.25 elseif r and r < 5 then v = v - 0.4 end
+  end
+  if deckEpic(exp) == id then v = v + 1.5 end
+  return v
+end
 

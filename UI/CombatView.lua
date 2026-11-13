@@ -32,8 +32,10 @@ local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
 -- Crans de la ressource : gemmes de PIP unités en arc autour de l'anneau de mana (rayon PIP_R depuis
 -- son centre), du flanc droit sous la pastille (PIP_A0 degrés, 0 = à droite, sens horaire) vers le bas,
 -- un cran tous les PIP_DA degrés ; hors de la main (x 200 à 10 cartes) et au-dessus du libellé « Mana ».
-local PIP, PIPS_MAX = 12, 6
-local PIP_R, PIP_A0, PIP_DA = 49, -5, 14
+-- Au-delà de PIP_ROW crans (plafond modifié, Combat.resCap : Avatar 10), les suivants sur un second arc
+-- (rayon PIP_R2), aux mêmes angles.
+local PIP, PIPS_MAX, PIP_ROW = 12, 10, 5
+local PIP_R, PIP_A0, PIP_DA, PIP_R2 = 49, -5, 14, 66
 local PIP_SOCKET = { 0.3, 0.29, 0.28 }  -- alvéole : gemme désaturée assombrie
 local PIP_FADE, PIP_GLOW = 0.22, 0.45   -- fondu d'un cran, éclat au remplissage (secondes)
 -- Personnage d'un ennemi : 33 sous le haut de l'emplacement, pieds à 33 + FIG_H (193 à l'échelle 1) ;
@@ -401,7 +403,8 @@ function V:Build(parent)
     local rd = c and ns.Classes[c.class] and ns.Classes[c.class].resource
     local rid = rd and rd.id or "insanity"
     tt:AddLine(Art.keywordLine("res:" .. rid), 1, 1, 1, true)
-    if rd and rd.cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, rd.cap), 0.8, 0.8, 0.8) end
+    local cap = rd and rd.cap and Combat.resCap(c)
+    if cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, cap), 0.8, 0.8, 0.8) end
   end, "ANCHOR_RIGHT")
   self.resource = dem
   self.demence = dem -- ancien nom
@@ -414,7 +417,7 @@ function V:Build(parent)
   -- un plafond, même à 0 (les alvéoles disent le plafond). Cadre sans souris (il couvre l'anneau de mana,
   -- dont il ne doit pas voler l'infobulle) : l'infobulle de la ressource reste celle de la pastille.
   local pips = CreateFrame("Frame", nil, parent)
-  local box = 2 * (PIP_R + PIP)
+  local box = 2 * (PIP_R2 + PIP)
   at(pips, parent, MANA_X - box / 2, MANA_Y - box / 2, box, box)
   pips:SetFrameLevel(hz:GetFrameLevel() + 3)
   pips:EnableMouse(false)
@@ -430,8 +433,10 @@ function V:Build(parent)
     p.glow = W.skin(pips, "glow_round", "ARTWORK", 2)
     if p.glow.SetBlendMode then p.glow:SetBlendMode("ADD") end
     p.glow:SetAlpha(0)
-    local a = math.rad(PIP_A0 + (i - 1) * PIP_DA)
-    p.x, p.y = MANA_X + PIP_R * math.cos(a), MANA_Y + PIP_R * math.sin(a) -- centre (coordonnées du contenu)
+    local k, r = i, PIP_R
+    if i > PIP_ROW then k, r = i - PIP_ROW, PIP_R2 end
+    local a = math.rad(PIP_A0 + (k - 1) * PIP_DA)
+    p.x, p.y = MANA_X + r * math.cos(a), MANA_Y + r * math.sin(a) -- centre (coordonnées du contenu)
     for _, t in ipairs({ p.socket, p.fill }) do
       t:SetSize(PIP, PIP)
       t:SetPoint("CENTER", pips, "CENTER", p.x - MANA_X, -(p.y - MANA_Y))
@@ -865,7 +870,7 @@ function V:RenderPlayer(full)
   local dem = p.res or 0
   self.resource.text:SetText(tostring(dem))
   if dem > 0 then self.resource:Show() else self.resource:Hide() end
-  self:RenderPips(class, dem)
+  self:RenderPips(class, dem, Combat.resCap(c))
   -- zone libre de la classe
   local zone, cv = self.classZone, ns.ClassViews and ns.ClassViews[class]
   for k, f in pairs(zone.views) do if k ~= class then f:Hide() end end
@@ -937,10 +942,11 @@ local function pipTo(p, on, animate)
   end
 end
 
-function V:RenderPips(class, n)
+-- cap : plafond du combat (Combat.resCap, modifiable), sinon celui de la classe.
+function V:RenderPips(class, n, cap)
   local row = self.resPips
   local rd = ns.Classes[class] and ns.Classes[class].resource
-  local cap = rd and rd.cap
+  cap = rd and rd.cap and (cap or rd.cap)
   if not cap or cap < 1 then
     row:Hide()
     row.class, row.cap = nil, nil

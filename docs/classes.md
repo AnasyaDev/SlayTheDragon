@@ -137,8 +137,9 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `cooldown` | d, inst | durée d'une recharge posée (`d.cooldown` ; 1 au moins : Hourglass Sand) |
 | `replay` | inst, ctx | copies de la carte résolues tout de suite après elle, même cible (premier ennemi vivant si elle est morte), sans coût, la carte ne part qu'une fois ; `ctx.copy` vrai pour une copie, journal `replay` (Ironfoe ; Windfury Totem du Shaman) |
 | `applySelf` | état | valeur d'un état posé sur le héros, toutes sources (Benediction : Regen +1) |
-| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)` (l'affichage des crans ne le lit pas encore) |
+| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)`, lu aussi par les crans et l'infobulle de la pastille (`UI/CombatView.lua` : au-delà de 5 crans, second arc) |
 | `attackMult` | cible, d | multiplicateur des coups d'une carte Attack (1 ; Death Wish : 1,5), après `damage` (Strength et ajouts), avant Demoralized / Sundered, arrondi à l'inférieur |
+| `canPlay` | d, inst | vrai par défaut ; une chaîne = la carte est injouable, la chaîne est la raison affichée (Titan's Grip : `"Only 2 Attacks per turn."`) ; après `allow`, avant `d.canPlay` |
 | `canGainBlock` | — | vrai par défaut ; faux = aucun Absorb gagné (Death Wish), avant le crochet `block` ; un gain ≤ 0 après `block` ne fait rien |
 | `trapLaunch` | d, inst | faux par défaut ; vrai = la Trap demande une cible (`Combat.targetOf`, `Combat.needsTarget(inst, c)`) et se déclenche aussitôt sur elle (`Combat.launchTrap` : mêmes effets, `onTrapTriggered` avec why = `"launch"`), sans emplacement (jouable zone pleine) |
 | `stealthBreak` | inst, d | Rogue : vrai par défaut ; faux = la première Attack profite de Stealth (lignes « Stealth: ») sans le retirer (Subterfuge ; la carte dit quand il tombe) |
@@ -405,6 +406,24 @@ Nouveaux : `onHeal`, `onDamageDealt`, `onParry`, `afterCast` (notifications) ; `
 `deckHooks`, `whileInDeck`, `transforms`, `variant` (tableau « Cartes » ci-dessus). `Combat.dealDamage` prend un
 6e argument `ctx` (passé par l'effet `damage` et par `randomHits`). `Combat.fire` ne passe que trois arguments :
 un événement nouveau en a trois au plus.
+
+### Épiques du Guerrier (14/11/2026)
+
+Sept épiques (`Data/Warrior.lua`, une par zone), règles et nombres dans `Core/Classes/warrior.lua`
+(`ns.Warrior.EPIC`, crochets `deckHooks` + `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
+`ns.Warrior.epicOf(c)` = épique active (effets passifs du deck, puis Powers). Crochets employés : `canGainBlock`,
+`attackMult`, `onEnemyDeath` (Death Wish) ; `onResource` (Thunderous Roar) ; `onDamageDealt` (Sweeping Strikes,
+rebond sans ctx) ; `replay`, `canPlay` (nouveau), `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's Grip :
+la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne la
+Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge` et
+`ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main aussitôt) ;
+`resCap`, `onTurnStart` (Avatar). Événement de journal `epic_trigger` (card, unit) : sans animation propre.
+Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge, Anger Management). En attendant que le socle
+sorte l'épique des piles, son `whileInDeck` la retire de la pioche (sans effet ensuite).
+
+Bots : `classDef.bot.deck(exp)` (nouveau, lu par `Sim/expedition.lua`) renvoie des notes, valeurs
+d'amélioration et de retrait qui remplacent celles de la classe tant que l'épique est dans le deck ;
+`classDef.bot.epic(exp, id)` note une épique proposée (accord avec le deck, attachement à l'épique du deck).
 
 L'agent de conception choisit, pour une épique « passive tant qu'elle est dans le deck », entre un Power à
 jouer (`hooks`), une carte `innate` (arrive en main) et `deckHooks` / `whileInDeck` (effet sans la jouer).
