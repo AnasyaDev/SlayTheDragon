@@ -606,7 +606,31 @@ peints), `Sim/zones/wetlands.lua` (bot), `Sim/tests_zone_wetlands.lua` (32 tests
 | Chieftain Nek'rosh (boss) | 80 | membre | Cleave 9 × 2 + MW 2 ; Sunder 12 + Sundered 1 + MW 2 ; Clan Command ; phase 2 : Shadow Bolt 16 (Cast), Call Whelps |
 | Dragonmaw Bonewarder / Crimson Whelp | 13–15 / 8–10 | heal 6 / — | Bone Ward 6 sur le boss ; Shadow Bolt 6 / Fire Breath 4 |
 
-<<MESURES>>
+### Mesures (heuristic, `runner=expedition zone=wetlands zones=2 level=7`, clé 0)
+
+Sans épique (`epic=none`, 1 000 expéditions) et avec épique (sans `epic=` : le bot en choisit une, 500) :
+
+| Classe | Victoire sans épique | avec épique | PV perdus / combat normal | Tours (normal) | Boss : victoire, tours |
+|---|---|---|---|---|---|
+| Priest | 73,8 % | 86,6 % | 9,6 | 3,93 | 75,8 %, 7,17 |
+| Warrior | 74,5 % | 92,2 % | 11,1 | 3,49 | 79,1 %, 6,98 |
+| Mage | 58,6 % | 66,4 % | 7,6 | 3,38 | 65,0 %, 5,31 |
+| Rogue | 67,7 % | 90,8 % | 8,4 | 3,19 | 74,7 %, 5,40 |
+| Hunter | 67,7 % | 88,0 % | 7,8 | 2,96 | 70,3 %, 5,49 |
+
+Clés (Rogue, sans épique, 1 000) : +0 67,7 % ; +1 55,3 % ; +3 41,8 % ; +5 34,1 % (−6,7 points par niveau en
+moyenne ; le saut de +1 vient des affixes communs). Repères Westfall (même bot, `zones=0`, 300) : Priest 82 %,
+Warrior 81 %, Mage 71 %, Rogue 71 %, Hunter 74 %.
+
+**Écart entre classes : 16 points sans épique (Warrior 74,5 – Mage 58,6), au-dessus des 10 visés.** Il suit
+celui de Westfall (11 points, même ordre) et vient des réserves de PV : la zone coûte à chaque classe à peu près
+la même chose en PV (7,6 à 11 par combat normal), ce qui pèse plus sur le Mage (42 PV) que sur le Warrior (74) ou
+le Priest (36 PV mais soins en combat). Essayé sans effet ou à contre-sens : Strength des commandements plus
+tôt, montée de Strength par les primes, Mortal Strike en un seul coup (Warrior +6), invocations plus
+nombreuses. Ce qui a resserré : Mortal Wound (Priest −12), armure du Centurion plafonnée, Sundered 1, Scytheclaws
+moins forts, soins fixes des rencontres (Mage +2 à +6). Avec épique, le Mage reste à 66 % quand les autres
+dépassent 86 % : écart propre aux épiques (autre lot). Statistiques de zone (par combat normal, Hunter) : primes
+de Strength 1,9, soin de meute perdu sur un ennemi intact 2,6, chef tué en premier 0,01 contre 0,17 en dernier.
 
 ### Modèles en repli
 
