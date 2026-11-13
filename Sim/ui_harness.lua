@@ -2223,7 +2223,7 @@ do
   local artFiles = { "UI/Art.lua" }
   for line in io.lines(root .. "/SlayTheDragon.toc") do
     local f = line:gsub("\r", ""):match("^UI\\Art\\(.+%.lua)$")
-    if f then artFiles[#artFiles + 1] = "UI/Art/" .. f end
+    if f then artFiles[#artFiles + 1] = "UI/Art/" .. f:gsub("\\", "/") end -- UI\Art\Zones\<zone>.lua compris
   end
   for _, file in ipairs(artFiles) do
     local art = assert(io.open(root .. "/" .. file)):read("*a")
@@ -8376,6 +8376,187 @@ do
 
   check(("aucune mention de la Ligue ni de la réputation à l'écran (%d écrans)"):format(#screens), #seen == 0,
     table.concat(seen, " ; "))
+end
+
+print("UZG socle des zones : crans de vie, primes, intention remplacée et suivante, compteur, cartes de combat (corps, carte d'origine, marque), feu de camp, textes flottants")
+-- Combat de la zone 1 piloté par l'interface, avec une zone factice « uztest » pour les vues (c.zone).
+local function zoneCombat(cl)
+  H.boot(nil)
+  H.slash("")
+  clickOption("class:" .. (cl or "priest"))
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  v:Render(true)
+  return e, e.combat, v
+end
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function inside(r, box)
+    return r and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local function overlaps(a, b)
+    return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
+  end
+  local function fmt(r) return r and ("%.0f,%.0f,%.0f,%.0f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  local e, c, v = zoneCombat("priest")
+  local ns = H.ns
+  local Combat, Art = ns.Combat, ns.Art
+  -- données de test : un ennemi à deux seuils, une carte de combat et sa forme transformée
+  ns.Enemies.uz_phaser = { name = "Phase Tester", hp = 60,
+    moves = { hit = { name = "Hit", intent = "attack", actions = { { "attack", 6 } } } }, pattern = { "hit" },
+    phases = { { at = 0.5, name = "Enraged", text = "Gains Strength 2." }, { at = 0.25, name = "Last Stand" } } }
+  ns.Cards.uz_token = { id = "uz_token", name = "Test Curse", cost = 1, type = "skill", token = true, exhaust = true,
+    effects = {}, text = "Unplayable test card." }
+  ns.Cards.uz_hexed = { id = "uz_hexed", name = "Hexed", cost = 1, type = "skill", token = true, vanish = true,
+    effects = { { "restore" } }, text = "Turn back into the hexed card, in your hand." }
+  local e1 = c.enemies[1]
+  e1.id, e1.intent = "uz_phaser", "hit"
+  local s1 = v.slotOf[e1.uid]
+  local sleepIcon = { icon = 136090, tga = "Spell_Nature_Sleep" }
+  ns.ZoneViews.uztest = {
+    counter = function() return { icon = { icon = 135805 }, text = "Wildfire in 2", tip = "Ignites in 2 rounds.", hot = false } end,
+    intent = function(cc, en) if en == e1 then return { icon = sleepIcon, text = "Asleep 2", color = "defend",
+      title = "Asleep", tip = "Skips its next 2 turns. Damage wakes it up." } end end,
+    intentBadge = function(cc, en) if en ~= e1 then return { icon = { icon = 136139 }, tip = "Bite: adds a Curse." } end end,
+    enemyBadges = function(cc, en) return { { icon = { icon = 132203 }, text = "+2 Str", tip = "Pack: when it dies, the rest gains this." } } end,
+    handMark = function(cc, i) if i == 1 then return { rim = { 0.4, 1, 0.4, 1 }, icon = { icon = 136071 }, tip = "Hexed at the end of your turn." } end end,
+  }
+  c.zone = "uztest"
+  -- carte transformée en main, carte de combat en main
+  local orig = c.hand[2]
+  Combat.transformCard(c, orig, "uz_hexed")
+  Combat.addCard(c, "uz_token", "hand")
+  -- intention suivante d'un autre ennemi (s'il y en a un), sinon du premier
+  local e2 = c.enemies[2] or e1
+  Combat.forceIntent(c, e2, e2.intent, { now = false, label = "On waking" })
+  v:Render(true)
+  H.settle()
+  -- crans de vie
+  local hpw = s1.hp.w or s1.hp._w
+  local m1 = s1.marks[1]
+  local p = m1._points and m1._points[1]
+  check("crans de vie : deux traits sur la barre (50 % et 25 %), infobulle des phases",
+    vis(m1) and vis(s1.marks[2]) and not vis(s1.marks[3]) and p and math.abs((p[4] or 0) - hpw * 0.5) < 0.6,
+    p and tostring(p[4]) .. " / " .. tostring(hpw))
+  local tt = H.hover(s1.hp)
+  check("infobulle de la barre : « Below 50%: Enraged. Gains Strength 2. »",
+    table.concat(tt, " | "):find("Below 50%: Enraged. Gains Strength 2.", 1, true) ~= nil, table.concat(tt, " | "))
+  -- intention remplacée, primes, intention suivante, petite icône
+  check("intention remplacée par la zone : « Asleep 2 », infobulle de la zone",
+    s1.intent.text._text == "Asleep 2" and (H.hover(s1.intent)[1] or "") == "Asleep", s1.intent.text._text)
+  local b1 = s1.badges[1]
+  local content = R.rect(ns.UI.content)
+  local badBadge = {}
+  for _, s in pairs(v.slotOf) do
+    local b = s.badges[1]
+    if not vis(b) then badBadge[#badBadge + 1] = "prime cachée" end
+    if (b.text._text or "") ~= "+2 Str" then badBadge[#badBadge + 1] = tostring(b.text._text) end
+    if not inside(R.rect(b), content) then badBadge[#badBadge + 1] = "hors fenêtre " .. fmt(R.rect(b)) end
+    if overlaps(R.rect(b), R.rect(s.tag)) then badBadge[#badBadge + 1] = "sur le cadre" end
+  end
+  check("primes sous l'intention de chaque ennemi : « +2 Str », dans la fenêtre, hors du cadre", #badBadge == 0,
+    table.concat(badBadge, " ; "))
+  check("infobulle d'une prime", (H.hover(b1)[1] or ""):find("Pack:", 1, true) ~= nil)
+  local s2 = v.slotOf[e2.uid]
+  check("intention suivante en gris sous l'intention (« On waking: … »)", vis(s2.next)
+    and (s2.next._text or ""):find("^On waking: ") ~= nil, tostring(s2.next._text))
+  if e2 ~= e1 then
+    check("petite icône de zone à droite de l'intention", vis(s2.intent.badge) and not vis(s1.intent.badge))
+  end
+  -- compteur de combat
+  local cr = R.rect(v.counter)
+  local hf = R.rect(v.heroFrame)
+  local badC = {}
+  if not vis(v.counter) then badC[#badC + 1] = "caché" end
+  if overlaps(cr, hf) then badC[#badC + 1] = "sur le cadre du héros" end
+  for _, s in pairs(v.slotOf) do if overlaps(cr, R.rect(s.tag)) then badC[#badC + 1] = "sur un cadre d'ennemi" end end
+  check("compteur de combat en haut au centre : « Wildfire in 2 », hors des cadres", #badC == 0
+    and v.counter.text._text == "Wildfire in 2", table.concat(badC, " ; ") .. " " .. fmt(cr))
+  check("infobulle du compteur", (H.hover(v.counter)[1] or "") == "Ignites in 2 rounds.")
+  -- cartes de combat : corps teinté, carte d'origine, marque
+  local hexCard, tokCard, firstCard
+  for _, cd in ipairs(v.cards) do
+    if cd._shown and cd.cardId == "uz_hexed" then hexCard = cd end
+    if cd._shown and cd.cardId == "uz_token" then tokCard = cd end
+    if cd._shown and cd.index == 1 then firstCard = cd end
+  end
+  local tint = Art.bodyTints.token
+  local vc = tokCard and tokCard.bg._calls.SetVertexColor
+  check("carte de combat (token) : corps teinté sobre", vc and math.abs(vc[1] - tint[1]) < 1e-6 and math.abs(vc[3] - tint[3]) < 1e-6)
+  check("carte transformée : nom de la carte d'origine au-dessus de la carte, infobulle", hexCard and hexCard.zoneTagPlate
+    and vis(hexCard.zoneTagPlate.text) and hexCard.zoneTagPlate.text._text == ns.Card.def(orig).name
+    and table.concat(H.hover(hexCard), " | "):find(ns.Card.def(orig).name, 1, true) ~= nil)
+  check("carte marquée par la zone : liseré et icône, infobulle", firstCard and vis(firstCard.rim) and vis(firstCard.markIcon)
+    and firstCard.rimKind == "mark" and table.concat(H.hover(firstCard), " | "):find("Hexed at the end", 1, true) ~= nil)
+  -- jouer la carte transformée : la carte d'origine revient en main
+  local hi
+  for i, inst in ipairs(c.hand) do if inst.id == "uz_hexed" then hi = i end end
+  H.ns.Controller.act({ "play", hi })
+  H.settle()
+  local back = false
+  for _, inst in ipairs(c.hand) do if inst == orig then back = true end end
+  check("carte transformée jouée : la carte d'origine revient en main", back)
+  -- textes flottants (zone, phase, compteur, carte posée)
+  local ok, err = pcall(function()
+    v:OnEvents({ { t = "float", unit = e1.uid, text = "Wakes!", color = "attackText" },
+      { t = "phase", unit = e1.uid, n = 1, name = "Enraged" }, { t = "counter", zone = "uztest", key = "wildfire", n = 1, d = -1 },
+      { t = "card_added", card = 999, id = "uz_token", to = "discard", src = e1.uid }, { t = "cards_lifted", unit = e1.uid, n = 2 } })
+    H.settle()
+  end)
+  check("textes flottants des zones : float, phase, compteur, carte posée, cartes levées", ok, err)
+  snap("zone-socle", true)
+  ns.ZoneViews.uztest = nil
+  -- feu de camp : action de zone en bouton, au-dessus de « Back on the road »
+  local treat = { hooks = {}, campfire = { { id = "uz_treat", label = "Treat wounds", text = "Pay 10g: +1 max HP.",
+    can = function(x) if x.gold < 10 then return false, "gold" end return true end,
+    apply = function(x) x.gold = x.gold - 10 x.maxHp = x.maxHp + 1 end } } }
+  local exp = freshRun(SEED + 3, "campfire")
+  ns = H.ns
+  ns.ZoneRules.westfall = treat
+  ns.UI.refresh()
+  H.settle()
+  local ok2, b = pcall(button, "campAction:uz_treat")
+  local rb = ok2 and R.rect(b)
+  local leave = ok2 and R.rect(button("leave"))
+  check("feu de camp : action de zone en bouton (libellé), au-dessus de « Back on the road », dans la fenêtre",
+    ok2 and vis(b) and b.label._text == "Treat wounds" and inside(rb, R.rect(ns.UI.content)) and not overlaps(rb, leave),
+    ok2 and fmt(rb) or tostring(b))
+  local hp0 = exp.maxHp
+  if ok2 then H.click(b) end
+  check("feu de camp : action de zone appliquée, retour à la carte", EXP().maxHp == hp0 + 1 and EXP().phase == "map")
+  ns.ZoneRules.westfall = nil
+  ns.Enemies.uz_phaser, ns.Cards.uz_token, ns.Cards.uz_hexed = nil, nil, nil
+end
+
+-- Harnais propres aux zones : Sim/ui_zone_<zone>.lua (return function(T) … end), dans l'ordre de la
+-- campagne s'ils existent. T = { H, ns = H.ns, check, snap, root, SEED, zoneCombat(classe) -> exp, combat,
+-- vue, UI, V, EXP, button, clickOption, option, currentKind, R = Sim/ui_render.lua }.
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local T = { H = H, check = check, snap = snap, root = root, SEED = SEED, zoneCombat = zoneCombat, UI = UI, V = V,
+    EXP = EXP, button = button, clickOption = clickOption, option = option, currentKind = currentKind, R = R }
+  for _, id in ipairs(H.ns.Zone.ORDER) do
+    local path = root .. "/Sim/ui_zone_" .. id .. ".lua"
+    local f = io.open(path, "r")
+    if f then
+      f:close()
+      print("UZ" .. id:sub(1, 1):upper() .. "  " .. id)
+      T.ns = H.ns
+      dofile(path)(T)
+    end
+  end
 end
 
 print("U16 méthodes d'API inconnues appelées")

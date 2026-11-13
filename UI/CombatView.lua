@@ -45,6 +45,7 @@ local INFO_LEVEL = 10                    -- cadre des infos : au-dessus du perso
                                          -- étage d'interface fig.ui +8 : Scene.UI_LIFT)
 local ENEMY_TOP = 92                     -- haut de l'emplacement d'un ennemi à l'échelle 1
 local ENEMY_STAGGER = 26                 -- un ennemi sur deux, posé un peu plus bas
+local COUNTER_X = 517                    -- compteur de combat d'une zone (Wildfire) : centre x, haut du décor
 
 local function now() return GetTime and GetTime() or 0 end
 local function opts() return ns.Persist.options() end
@@ -196,6 +197,39 @@ local function buildSlot(self, i)
   s.block = W.shieldBadge(s.tag, 100, 8)
   s.intent = intentBubble(s.info)
   s.intent:SetFrameLevel(s.tag:GetFrameLevel() + 2)
+  -- Zones (UI/ZoneView.lua) : petite icône à droite de l'intention (Bite de Duskwood), intention
+  -- suivante en gris dessous (« On waking: Death Roll 20 »), primes sous l'intention (Pack), crans de vie.
+  s.intent.badge = W.noSnap(s.intent:CreateTexture(nil, "OVERLAY", nil, 1))
+  s.intent.badge:SetSize(14, 14)
+  s.intent.badge:Hide()
+  s.next = W.label(s.info, "bold", 10.5, C.textDim, "OVERLAY")
+  s.next:SetPoint("TOPLEFT", s.intent, "BOTTOMLEFT", 2, -1)
+  s.next:SetJustifyH("LEFT")
+  s.next:SetWordWrap(false)
+  s.next:Hide()
+  s.badges = {}
+  for k = 1, 3 do
+    local b = CreateFrame("Frame", nil, s.info)
+    b:SetSize(SLOT_W - 20, 16)
+    b:SetFrameLevel(s.tag:GetFrameLevel() + 1)
+    b:EnableMouse(true)
+    b.icon = W.noSnap(b:CreateTexture(nil, "ARTWORK", nil, 0))
+    b.icon:SetSize(14, 14)
+    b.icon:SetPoint("LEFT", 0, 0)
+    b.text = W.label(b, "bold", 10.5, C.text, "OVERLAY")
+    b.text:SetPoint("LEFT", b.icon, "RIGHT", 3, 0)
+    b.text:SetJustifyH("LEFT")
+    W.tooltip(b, function(tt, f) if f.tip then tt:AddLine(f.tip, 1, 1, 1, true) end end, "ANCHOR_TOP")
+    b:Hide()
+    s.badges[k] = b
+  end
+  s.marks = {}
+  for k = 1, 4 do
+    local m = W.rect(s.hp, "OVERLAY", 3, C.goldText, 0.95)
+    m:SetSize(2, 10)
+    m:Hide()
+    s.marks[k] = m
+  end
   s.st = W.tokenRow(s.info, 6, SLOT_W + 10, 24)
   setUnitFrame(s, false, FRAME_W)
   placeInfo(s)
@@ -520,6 +554,29 @@ function V:Build(parent)
   banner:Hide()
   self.banner = banner
 
+  -- Zones : compteur de combat en haut au centre du décor (Wildfire : ns.ZoneViews[zone].counter), calque
+  -- libre des vues de zone (build / render / event, comme ns.ClassViews), sans souris.
+  local counter = CreateFrame("Frame", nil, parent)
+  at(counter, parent, COUNTER_X - 70, Scene.TOP + 6, 140, 34)
+  counter:SetFrameLevel(bf:GetFrameLevel() + 16)
+  counter:EnableMouse(true)
+  local cbox = CreateFrame("Frame", nil, counter)
+  cbox:SetSize(30, 30)
+  cbox:SetPoint("LEFT", 0, 0)
+  counter.slot = W.slotOn(cbox, 30)
+  counter.text = W.label(counter, "heavy", 15, C.goldText, "OVERLAY")
+  counter.text:SetPoint("LEFT", cbox, "RIGHT", 5, 0.5)
+  counter.text:SetJustifyH("LEFT")
+  W.tooltip(counter, function(tt, f) if f.tip then tt:AddLine(f.tip, 1, 1, 1, true) end end, "ANCHOR_BOTTOM")
+  counter:Hide()
+  self.counter = counter
+  local zhost = CreateFrame("Frame", nil, parent)
+  at(zhost, parent, 0, Scene.TOP, Scene.W, Scene.DECOR_H)
+  zhost:SetFrameLevel(bf:GetFrameLevel() + 15)
+  zhost:EnableMouse(false)
+  zhost.views = {}
+  self.zoneHost = zhost
+
   self.queue = {}
   self.playing = false
   self.pendingDraw = {}
@@ -550,32 +607,64 @@ local ACTION_TEXT = {
     local d = ns.Enemies[a[2]]
     return "Summons " .. ((a.count or 1) > 1 and (a.count .. " × ") or "") .. (d and d.name or a[2]) .. "."
   end,
+  heal_allies = function(a) return "Heals each enemy for " .. a[2] .. "." end,
+  heal_self = function(a) return "Heals itself for " .. a[2] .. "." end,
+  block_allies = function(a) return "Gives " .. a[2] .. " Absorb to each enemy." end,
+  block_boss = function(a) return "Gives " .. a[2] .. " Absorb to its leader." end,
+  die = function() return "Destroys itself." end,
+  addCard = function(a)
+    local d = ns.Cards[a[2]]
+    local where = a.to == "hand" and "your hand" or (a.to == "draw" and "the top of your draw pile") or "your discard"
+    return "Adds " .. (d and d.name or a[2]) .. " to " .. where .. "."
+  end,
 }
+
+-- Texte d'une action d'intention : actions communes, puis celles des zones (Art.actionText).
+local function actionLine(c, e, a)
+  local f = ACTION_TEXT[a[1]] or Art.actionText[a[1]]
+  return f and f(a, c, e) or nil
+end
 
 function V.fillIntentTooltip(tt, e)
   local c = Controller.combat()
   if not c or not e or e.dead then return end
   local info = Combat.intentInfo(c, e)
   local mv = ns.Enemies[e.id].moves[e.intent]
-  tt:AddLine(info.name or e.intent, 1, 0.82, 0)
-  tt:AddLine(Art.intentName[info.kind] or info.kind or "", 0.7, 0.7, 0.7)
-  if info.stunned then tt:AddLine("Stunned: loses its next turn.", 0.4, 0.9, 1, true) end
-  if info.interrupted then tt:AddLine("Spell interrupted: it won't go off.", 0.4, 0.9, 1, true) end
-  if mv.text then tt:AddLine(mv.text, 1, 1, 1, true) end
-  for i = 1, #mv.actions do
-    local a = mv.actions[i]
-    if a[1] == "attack" then
-      local times = a.times or 1
-      tt:AddLine("Attack: " .. Combat.calcDamage(c, e, c.player, a[2])
-        .. (times > 1 and (" × " .. times) or "") .. " damage.", 1, 0.5, 0.5, true)
-      if a.interrupts then tt:AddLine("Interrupts your cast.", 1, 0.5, 0.5, true) end
-    elseif ACTION_TEXT[a[1]] then
-      tt:AddLine(ACTION_TEXT[a[1]](a), 1, 1, 1, true)
+  -- intention remplacée par une zone (dormeur) : son infobulle d'abord
+  local over = ns.ZoneView.first(c, "intent", e)
+  if over then
+    if over.title then tt:AddLine(over.title, 1, 0.82, 0) end
+    if over.tip then tt:AddLine(over.tip, 1, 1, 1, true) end
+  end
+  if not over or over.showMove then
+    tt:AddLine(info.name or e.intent, 1, 0.82, 0)
+    tt:AddLine(Art.intentName[info.kind] or info.kind or "", 0.7, 0.7, 0.7)
+    if info.stunned then tt:AddLine("Stunned: loses its next turn.", 0.4, 0.9, 1, true) end
+    if info.interrupted then tt:AddLine("Spell interrupted: it won't go off.", 0.4, 0.9, 1, true) end
+    if mv.text then tt:AddLine(mv.text, 1, 1, 1, true) end
+    for i = 1, #mv.actions do
+      local a = mv.actions[i]
+      if a[1] == "attack" then
+        local times = a.times or 1
+        tt:AddLine("Attack: " .. Combat.calcDamage(c, e, c.player, Combat.enemyBase(c, e, a))
+          .. (times > 1 and (" × " .. times) or "") .. " damage.", 1, 0.5, 0.5, true)
+        if a.interrupts then tt:AddLine("Interrupts your cast.", 1, 0.5, 0.5, true) end
+      else
+        local line = actionLine(c, e, a)
+        if line then tt:AddLine(line, 1, 1, 1, true) end
+      end
+    end
+    if info.cast and not info.interrupted then
+      tt:AddLine("Spell being cast: an Interrupt cancels it.", 1, 0.6, 0.2, true)
     end
   end
-  if info.cast and not info.interrupted then
-    tt:AddLine("Spell being cast: an Interrupt cancels it.", 1, 0.6, 0.2, true)
+  -- intention suivante imposée (ouverture d'une phase, d'un dormeur)
+  if info.forced then
+    local fm = ns.Enemies[e.id].moves[info.forced]
+    tt:AddLine((info.forcedLabel or "Next") .. ": " .. (fm and fm.name or info.forced) .. ".", 0.7, 0.7, 0.7, true)
   end
+  local badge = ns.ZoneView.first(c, "intentBadge", e)
+  if badge and badge.tip then tt:AddLine(badge.tip, 0.75, 0.6, 1, true) end
 end
 
 function V.fillPileTooltip(tt, key, label)
@@ -689,17 +778,23 @@ function V:LayoutEnemies()
       s.dying = false
       self.slotOf[e.uid] = s
       s:Show()
-      local art = Art.enemies[e.id] or {}
+      s.artKey = nil
+      W.animSet(s, "aim", 0)
+      s:SetAlpha(1)
+      s.hp:Set(e.hp, e.maxHp)
+      s.block:Set(e.block, e.maxHp)
+    end
+    -- modèle (e.art : modèle d'une phase, Nefarius -> Nefarian) : apparaît en fondu une fois chargé
+    -- (ombre avec lui) ; médaillon si aucun candidat ne charge
+    local artKey = e.art or e.id
+    if s.artKey ~= artKey then
+      s.artKey = artKey
+      local art = Art.enemies[artKey] or {}
       local sc = art.scale or 1
       s.fig:SetSize(150 * sc, 160 * sc)
       s.model:SetSize(150 * sc, 160 * sc)
       s.figH = FIG_H * sc
-      W.animSet(s, "aim", 0)
-      -- modèle : apparaît en fondu une fois chargé (ombre avec lui) ; médaillon si aucun candidat ne charge
-      Scene.enemyFigure(s.fig, e.id)
-      s:SetAlpha(1)
-      s.hp:Set(e.hp, e.maxHp)
-      s.block:Set(e.block, e.maxHp)
+      Scene.enemyFigure(s.fig, artKey)
     end
     s.enemyIndex = idx
     s.cx = cx0 + (k - 1) * spacing
@@ -723,6 +818,9 @@ end
 
 -- Bulle d'intention : icône + chiffres exacts (Combat.calcDamage).
 local function intentDisplay(c, e)
+  -- intention remplacée par une zone (dormeur : « Asleep 2 »), sinon la bulle commune
+  local over = ns.ZoneView.first(c, "intent", e)
+  if over then return over.icon or Art.intents.defend, over.text or "", over.color or "defend", over.key end
   local info = Combat.intentInfo(c, e)
   if info.stunned then return Art.intents.stunned, "Stunned", "defend" end
   if info.interrupted then return Art.intents.interrupted, "Interrupted", "defend" end
@@ -732,14 +830,17 @@ local function intentDisplay(c, e)
     local a = mv.actions[i]
     if a[1] == "attack" then
       local times = a.times or 1
-      local dmg = Combat.calcDamage(c, e, c.player, a[2])
+      local dmg = Combat.calcDamage(c, e, c.player, Combat.enemyBase(c, e, a))
       parts[#parts + 1] = dmg .. (times > 1 and ("×" .. times) or "")
-    elseif a[1] == "block" or a[1] == "block_ally" then
+    elseif a[1] == "block" or a[1] == "block_ally" or a[1] == "block_allies" or a[1] == "block_boss" then
       parts[#parts + 1] = (#parts > 0 and "+" or "") .. a[2]
-    elseif a[1] == "heal_ally" then
+    elseif a[1] == "heal_ally" or a[1] == "heal_allies" or a[1] == "heal_self" then
       parts[#parts + 1] = "+" .. a[2]
     elseif a[1] == "summon" then
       parts[#parts + 1] = "+" .. (a.count or 1)
+    elseif Art.intentParts[a[1]] then
+      local p = Art.intentParts[a[1]](c, e, a)
+      if p and p ~= "" then parts[#parts + 1] = p end
     end
   end
   local text = table.concat(parts, " ")
@@ -751,17 +852,136 @@ end
 function V:RenderIntent(s, e)
   local c = self.c
   s.intent.enemy = e
-  if e.dead or c.result then s.intent:Hide() return end
-  local entry, text, color = intentDisplay(c, e)
-  W.setIcon(s.intent.icon, entry, "intent:" .. tostring(Combat.intentInfo(c, e).kind))
+  if e.dead or c.result then
+    s.intent:Hide()
+    s.next:Hide()
+    return
+  end
+  local entry, text, color, key = intentDisplay(c, e)
+  W.setIcon(s.intent.icon, entry, key or ("intent:" .. tostring(Combat.intentInfo(c, e).kind)))
   s.intent:SetColor(C[(color or "attack") .. "Text"] or C.attackText)
   local big = W.utf8len(text) <= 3
   W.setSize(s.intent.text, big and 19 or 13.5)
   s.intent.text:SetText(text)
-  s.intent:SetWidth(30 + max(20, s.intent.text:GetStringWidth() or 20))
+  local w = 30 + max(20, s.intent.text:GetStringWidth() or 20)
+  -- petite icône d'une zone à droite du chiffre (Curse posée par un Bite)
+  local badge = ns.ZoneView.first(c, "intentBadge", e)
+  if badge and badge.icon then
+    W.setIcon(s.intent.badge, badge.icon, badge.key or "intent:badge")
+    s.intent.badge:ClearAllPoints()
+    s.intent.badge:SetPoint("LEFT", s.intent.text, "RIGHT", 3, 0)
+    s.intent.badge:Show()
+    w = w + 17
+  else
+    s.intent.badge:Hide()
+  end
+  s.intent:SetWidth(w)
   s.intent:SetAlpha(1)
   s.intent:SetScale(1)
   s.intent:Show()
+  -- intention suivante imposée, en gris (« On waking: Death Roll 20 »)
+  local info = Combat.intentInfo(c, e)
+  local fm = info.forced and ns.Enemies[e.id].moves[info.forced]
+  if fm and info.forcedLabel then
+    local dmg
+    for _, a in ipairs(fm.actions) do
+      if a[1] == "attack" then
+        dmg = Combat.calcDamage(c, e, c.player, Combat.enemyBase(c, e, a)) .. ((a.times or 1) > 1 and ("×" .. a.times) or "")
+        break
+      end
+    end
+    s.next:SetText(info.forcedLabel .. ": " .. fm.name .. (dmg and (" " .. dmg) or ""))
+    s.next:Show()
+  else
+    s.next:Hide()
+  end
+end
+
+-- Primes et crans d'une zone sur un ennemi (sous l'intention ; traits sur la barre de vie).
+function V:RenderZoneEnemy(s, e)
+  local c = self.c
+  local list = (e.dead or c.result) and {} or ns.ZoneView.all(c, "enemyBadges", e)
+  local anchor = s.next:IsShown() and s.next or s.intent
+  for k, b in ipairs(s.badges) do
+    local it = list[k]
+    if it then
+      W.setIcon(b.icon, it.icon or { icon = Art.QUESTION }, it.key or ("badge:" .. k))
+      b.icon:SetDesaturated(it.dim and true or false)
+      b.text:SetText(it.text or "")
+      local col = it.color and (C[it.color] or it.color) or C.text
+      b.text:SetTextColor(col[1], col[2], col[3])
+      b.tip = it.tip
+      b:ClearAllPoints()
+      b:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", k == 1 and 0 or 0, -2)
+      b:Show()
+      anchor = b
+    else
+      b.tip = nil
+      b:Hide()
+    end
+  end
+  -- crans de vie : phases (def.phases) puis ceux des zones ; infobulle de la barre
+  local marks = Combat.phaseMarks(e)
+  for _, m in ipairs(ns.ZoneView.all(c, "marks", e)) do marks[#marks + 1] = m end
+  local w = s.hp.w or s.hp:GetWidth() or 100
+  local h = s.hp:GetHeight() or 10
+  for k, t in ipairs(s.marks) do
+    local m = marks[k]
+    if m and not e.dead then
+      t:ClearAllPoints()
+      t:SetSize(2, h)
+      t:SetPoint("CENTER", s.hp, "LEFT", w * m.at, 0)
+      local col = m.passed and C.textDim or (m.color and (C[m.color] or m.color)) or C.goldText
+      t:SetVertexColor(col[1], col[2], col[3], 1)
+      t:Show()
+    else
+      t:Hide()
+    end
+  end
+  s.hp.extraTip = #marks > 0 and function(tt)
+    for _, m in ipairs(marks) do
+      local pct = math.floor(m.at * 100 + 0.5)
+      local line = "Below " .. pct .. "%: " .. (m.name or "") .. (m.text and (". " .. m.text) or "")
+      tt:AddLine(line, m.passed and 0.6 or 1, m.passed and 0.6 or 0.82, m.passed and 0.6 or 0, true)
+    end
+  end or nil
+end
+
+-- Compteur de combat d'une zone (Wildfire) et calque libre des vues de zone.
+function V:RenderZone()
+  local c = self.c
+  local spec = ns.ZoneView.first(c, "counter")
+  local f = self.counter
+  if spec and not c.result then
+    W.setIcon(f.slot.icon, spec.icon or { icon = Art.QUESTION }, spec.key or "zone:counter")
+    f.slot.icon:SetDesaturated(spec.hot == false)
+    f.text:SetText(spec.text or tostring(spec.value or ""))
+    local col = spec.hot and C.attackText or C.goldText
+    f.text:SetTextColor(col[1], col[2], col[3])
+    f.tip = spec.tip
+    f:Show()
+  else
+    f.tip = nil
+    f:Hide()
+  end
+  local host = self.zoneHost
+  local active = {}
+  for _, id in ipairs({ c.zone, unpack(c.zr or {}) }) do
+    local zv = id and ns.ZoneViews[id]
+    if zv and (zv.build or zv.render) and not active[id] then
+      active[id] = true
+      local h = host.views[id]
+      if not h then
+        h = CreateFrame("Frame", nil, host)
+        h:SetAllPoints()
+        if zv.build then zv.build(h, self) end
+        host.views[id] = h
+      end
+      h:Show()
+      if zv.render then zv.render(h, c, self) end
+    end
+  end
+  for id, h in pairs(host.views) do if not active[id] then h:Hide() end end
 end
 
 -- full = resynchroniser barres et états sur le moteur (hors animations).
@@ -771,9 +991,10 @@ function V:RenderEnemies(full)
   for uid, s in pairs(self.slotOf) do
     local e = enemyByUid(c, uid)
     local def = ns.Enemies[e.id]
-    if s.name:GetText() ~= def.name or s.nameFitW ~= s.nameW then
-      s.nameFitW = s.nameW
-      W.fitText(s.name, def.name, NAME_SIZE, s.nameW or (FRAME_W - 14), 8)
+    local name = Combat.enemyName(e) -- une phase peut renommer l'ennemi
+    if s.nameText ~= name or s.nameFitW ~= s.nameW then
+      s.nameFitW, s.nameText = s.nameW, name
+      W.fitText(s.name, name, NAME_SIZE, s.nameW or (FRAME_W - 14), 8)
     end
     local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.text)
     s.name:SetTextColor(nc[1], nc[2], nc[3])
@@ -783,6 +1004,7 @@ function V:RenderEnemies(full)
       s.st:Set(W.unitStatuses(e))
     end
     if not self.frozen or e.dead then self:RenderIntent(s, e) end
+    self:RenderZoneEnemy(s, e)
   end
   self:RenderTargets()
 end
@@ -844,7 +1066,7 @@ function V:RenderPlayer(full)
   if p.cast then
     local d = Card.def(p.cast.card)
     local tgt = p.cast.target and enemyByUid(c, p.cast.target)
-    self.cast.name:SetText(d.name .. (tgt and (" on " .. ns.Enemies[tgt.id].name) or ""))
+    self.cast.name:SetText(d.name .. (tgt and (" on " .. Combat.enemyName(tgt)) or ""))
     W.setIcon(self.cast.medal.icon, W.cardArt(p.cast.card.id), "card:" .. p.cast.card.id)
     self.cast:Show()
   else
@@ -1011,11 +1233,16 @@ function V:RenderHand()
     local card = self.cards[i]
     if i <= n then
       local info = Controller.handInfo(i)
+      -- marque d'une zone (Hex visé : liseré et icône) ; carte transformée : nom de la carte d'origine
+      local mark = ns.ZoneView.first(c, "handMark", i, info.inst)
+      local orig = info.inst.orig
       -- « Spend N: » allumée si la ressource suffit et que Maj n'est pas enfoncée, éteinte sinon ;
       -- carte Cast qui partira tout de suite (Instant) : liseré bleu et « Cast · Instant »
       card:SetCard(info.inst.id, info.inst.up, { cost = info.cost, playable = info.playable,
         manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil,
-        spendOff = info.spendOff, instant = info.instant, keepPick = keepable[i] or nil })
+        spendOff = info.spendOff, instant = info.instant, keepPick = keepable[i] or nil,
+        markRim = mark and mark.rim or nil, markIcon = mark and mark.icon or nil, markTip = mark and mark.tip or nil,
+        markKey = mark and mark.key or nil, zoneTag = orig and Card.def(orig).name or nil })
       card.uid = info.inst.uid
       card.baseX, card.baseY = self:HandSlot(i, n)
       self:PlaceCard(card)
@@ -1055,6 +1282,7 @@ function V:Render(full)
   self:RenderPlayer(full)
   self:RenderEnemies(full)
   self:RenderHand()
+  self:RenderZone()
   if full then self:RenderBanner() end
 end
 
@@ -1152,7 +1380,54 @@ function V:QueueEvent(ev)
   local cv = cls and ns.ClassViews and ns.ClassViews[cls]
   local host = cv and cv.event and self.classZone.views[cls]
   if host then cv.event(host, ev, self) end
-  if t == "play" then
+  -- vues de zone : leurs animations (ns.ZoneViews[zone].event(hôte, ev, vue)), hôte du calque des zones
+  if self.c then
+    for _, id in ipairs({ self.c.zone, unpack(self.c.zr or {}) }) do
+      local zv = id and ns.ZoneViews[id]
+      if zv and zv.event then zv.event(self.zoneHost.views[id] or self.zoneHost, ev, self) end
+    end
+  end
+  if t == "float" then
+    -- texte flottant d'une zone (ns.ZoneRule.float) : sur l'unité, couleur de Art.C
+    local col = C[ev.color or "watchText"] or C.watchText
+    self:Push(0.2, function()
+      local x, y = self_:UnitPos(ev.unit or "player")
+      if x then W.float(self_.parent, x, y - 70, ev.text or "", col, 17, 1.2, 14) end
+    end)
+  elseif t == "phase" then
+    -- seuil franchi : bandeau « Phase 2: Enraged » au-dessus de l'ennemi
+    self:Push(0.35, function()
+      local x, y = self_:UnitPos(ev.unit)
+      if x then W.float(self_.parent, x, y - 120, "Phase " .. (ev.n + 1) .. (ev.name and (": " .. ev.name) or ""),
+        C.goldText, 18, 1.6, 14) end
+    end)
+  elseif t == "counter" then
+    -- compteur de combat d'une zone : le jeton bat (sans échelle : fondu de l'icône)
+    self:Push(0.15, function()
+      local f = self_.counter
+      if f:IsShown() then
+        W.tween(0.4, function(p) f.slot.icon:SetAlpha(0.4 + 0.6 * p) end, function() f.slot.icon:SetAlpha(1) end, f, "pulse")
+        if ev.d and ev.d ~= 0 then
+          W.float(self_.parent, COUNTER_X, Scene.TOP + 52, (ev.d > 0 and "+" or "") .. ev.d, ev.d > 0 and C.defendText or C.attackText, 16, 1.0, 14)
+        end
+      end
+    end)
+  elseif t == "card_added" or t == "card_transformed" then
+    -- carte de combat posée (Curse) ou transformée (Hexed) : son nom part de l'ennemi qui l'a posée
+    local d = ns.Cards[ev.id]
+    local where = { hand = " (hand)", draw = " (draw pile)", drawRandom = " (draw pile)", discard = " (discard)" }
+    local name = (d and d.name or tostring(ev.id)) .. (t == "card_added" and (where[ev.to or ""] or "") or "!")
+    self:Push(0.25, function()
+      local x, y = self_:UnitPos(ev.src or "player")
+      if not x then x, y = self_:UnitPos("player") end
+      if x then W.float(self_.parent, x, y - 90, name, C.watchText, 15, 1.3, 16) end
+    end)
+  elseif t == "cards_lifted" then
+    self:Push(0.25, function()
+      local x, y = self_:UnitPos("player")
+      if x then W.float(self_.parent, x, y - 90, ev.n .. " lifted", C.healText, 15, 1.2, 16) end
+    end)
+  elseif t == "play" then
     local pp = self.pendingPlay
     self.pendingPlay = nil
     self:Push(0.3, function()

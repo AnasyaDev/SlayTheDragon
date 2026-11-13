@@ -914,7 +914,7 @@ function S.nextNeeds(exp, extra)
   local act = exp and ns.Zones[exp.zone or ns.Zone.FIRST]
   local pools = act and ns.Encounters and ns.Encounters[act.encounters]
   if exp and exp.map and Map.nextNodes and pools then
-    for _, id in ipairs(Map.nextNodes(exp.map, exp.node) or {}) do
+    for _, id in ipairs((ns.Expedition.nextNodes and ns.Expedition.nextNodes(exp)) or Map.nextNodes(exp.map, exp.node) or {}) do
       local node = exp.map.nodes[id]
       local k = node and node.kind
       if k == "combat" then

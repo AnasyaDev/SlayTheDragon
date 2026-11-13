@@ -762,6 +762,23 @@ function Camp:Build(f)
   self.leave = W.button(f, "Back on the road", 210, 44, nil, "red", 15)
   at(self.leave, f, 800, 497, 210, 44)
   self.leave:SetScript("OnClick", function(b) chooseOption(b.option) end)
+  -- actions de feu de camp des zones (« campAction:<id> », ns.ZoneRules[zone].campfire) : boutons
+  -- au-dessus de « Back on the road », texte et raison en infobulle
+  self.extra = {}
+  for k = 1, 2 do
+    local b = W.button(f, "", 210, 44, nil, "gold", 15)
+    at(b, f, 800, 497 - 52 * k, 210, 44)
+    b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    W.tooltip(b, function(tt, btn)
+      local o = btn.option
+      if not o then return end
+      tt:AddLine(o.label or "", 1, 0.82, 0)
+      if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
+      if o.disabled and o.reason then tt:AddLine(o.reason, 1, 0.3, 0.3, true) end
+    end, "ANCHOR_LEFT")
+    b:Hide()
+    self.extra[k] = b
+  end
   self.optionButtons = {}
 end
 
@@ -772,7 +789,18 @@ function Camp:Show(step)
   Scene.showCampfire(self.fire)
   self.pile:Sync()
   self.optionButtons = {}
+  local nExtra = 0
+  for _, b in ipairs(self.extra) do b.option = nil b:Hide() end
   for _, o in ipairs(step.options) do
+    if tostring(o.id):match("^campAction:") and nExtra < #self.extra then
+      nExtra = nExtra + 1
+      local b = self.extra[nExtra]
+      b.option = o
+      b:SetText(o.label or "")
+      if b.SetActive then b:SetActive(not o.disabled) end
+      b:Show()
+      self.optionButtons[o.id] = b
+    end
     if o.id == "rest" then
       self.rest.option = o
       local heal = (o.text or ""):match("(%d+)")

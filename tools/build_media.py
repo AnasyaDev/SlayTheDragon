@@ -96,9 +96,10 @@ def read_tga_header(path):
         return struct.unpack("<BBBHHBHHHHBB", f.read(18))
 
 
-# Icônes nommées par l'art (champ tga = "Nom") : UI/Art.lua et les fichiers d'art des classes UI/Art/*.lua.
+# Icônes nommées par l'art (champ tga = "Nom") : UI/Art.lua, les fichiers d'art des classes UI/Art/*.lua et
+# ceux des zones UI/Art/Zones/*.lua.
 def wanted_icons():
-    files = [ROOT / "UI/Art.lua"] + sorted((ROOT / "UI/Art").glob("*.lua"))
+    files = [ROOT / "UI/Art.lua"] + sorted((ROOT / "UI/Art").rglob("*.lua"))
     names = set()
     for f in files:
         names |= set(re.findall(r'tga\s*=\s*"([^"]+)"', f.read_text(encoding="utf-8")))
