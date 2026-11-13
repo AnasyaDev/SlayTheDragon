@@ -45,6 +45,11 @@ local function reload(v) local o = {}; ser(v, o); return assert(loadstring("retu
 ---------------------------------------------------------------------------
 local Cards = ns.Cards
 local added = {}
+-- épiques réelles du Rogue mises de côté le temps de ces tests (les épiques factices du Rogue les
+-- remplacent ; règles réelles : Sim/tests_epic_rogue.lua), remises à la fin
+local realRogue = {}
+for id, d in pairs(Cards) do if d.class == "rogue" and d.rarity == "epic" then realRogue[id] = d end end
+for id in pairs(realRogue) do Cards[id] = nil end
 local function card(id, t)
   t.id = id
   Cards[id] = t
@@ -591,6 +596,7 @@ test("simulation : epic=<id> imposée au départ, le bot prend une épique à la
 end)
 
 for _, id in ipairs(added) do Cards[id] = nil end
+for id, d in pairs(realRogue) do Cards[id] = d end
 ns.Enemies.te_dummy, ns.Enemies.te_hitter = nil, nil
 
 print(("%d réussis, %d échoués"):format(passed, failed))

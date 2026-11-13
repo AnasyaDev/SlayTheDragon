@@ -1,0 +1,430 @@
+-- Tests des sept cartes épiques du Voleur (fiche : docs/zones/cartes-de-zone.md, « Rogue » ; règles :
+-- Core/Classes/rogue.lua). Une épique = ses cas nominaux et ses cas limites. Les tests ne dépendent pas de
+-- la pile où se trouve l'épique : ses crochets sont ceux du deck (deckHooks), actifs partout.
+-- Usage : lua5.1 Sim/tests_epic_rogue.lua   (ou luajit) — doit finir par ALL PASS.
+local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
+local ns = dofile(root .. "/Sim/load.lua")(root)
+local Combat, Card, Save, R = ns.Combat, ns.Card, ns.Save, ns.Rogue
+local Cards = ns.Cards
+local E = R.EPIC -- nombres (base, amélioré) des épiques : Data/Rogue.lua
+local D1, D2 = E.deflection[1], E.deflection[2]
+
+local passed, failed = 0, 0
+local function test(name, f)
+  local ok, err = pcall(f)
+  if ok then
+    passed = passed + 1
+  else
+    failed = failed + 1
+    print("ÉCHEC  " .. name .. "\n       " .. tostring(err))
+  end
+end
+local function eq(a, b, msg)
+  if a ~= b then error((msg or "") .. " attendu " .. tostring(b) .. ", obtenu " .. tostring(a), 2) end
+end
+
+ns.Enemies.ter_dummy = { name = "Mannequin", hp = 200,
+  moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
+ns.Enemies.ter_hitter = { name = "Cogneur", hp = 200,
+  moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10 } } } }, pattern = { "hit" } }
+ns.Enemies.ter_boss = { name = "Chef", hp = 300, boss = true,
+  moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
+
+local EPICS = { "deflection", "doomblade", "atrophic_poison", "echoing_reprimand", "subterfuge", "kidney_shot",
+  "danse_macabre" }
+local ZONES = { "westfall", "duskwood", "wetlands", "stranglethorn", "swamp", "steppes", "blackrock" }
+
+-- Combat de test : main imposée, l'épique (améliorée si up) dans le deck, le reste en pioche.
+local function setup(epic, hand, opts)
+  opts = opts or {}
+  local deck = {}
+  for _, id in ipairs(hand) do deck[#deck + 1] = { id = id, up = false } end
+  for _, id in ipairs(opts.extra or { "sinister_strike", "sinister_strike", "sinister_strike" }) do
+    deck[#deck + 1] = { id = id, up = false }
+  end
+  if epic then deck[#deck + 1] = { id = epic, up = opts.up or false } end
+  local c = Combat.new({ seed = 7, class = "rogue", hp = 60, maxHp = 60, deck = deck, relics = opts.relics,
+    encounter = opts.encounter or { "ter_dummy" } })
+  local all = {}
+  for _, x in ipairs(c.hand) do all[#all + 1] = x end
+  for _, x in ipairs(c.draw) do all[#all + 1] = x end
+  c.hand, c.draw = {}, {}
+  local byId = {}
+  for _, x in ipairs(all) do byId[x.id] = byId[x.id] or {}; table.insert(byId[x.id], x) end
+  for _, id in ipairs(hand) do c.hand[#c.hand + 1] = table.remove(byId[id]) end
+  for _, list in pairs(byId) do for _, x in ipairs(list) do c.draw[#c.draw + 1] = x end end
+  c.player.mana = opts.mana or 9
+  return c
+end
+
+local function idx(c, id)
+  for i, x in ipairs(c.hand) do if x.id == id then return i end end
+  error("absente de la main : " .. id)
+end
+local function play(c, id, t) return assert(Combat.play(c, idx(c, id), t)) end
+local function hp(c, i) return c.enemies[i or 1].hp end
+local function dot(v, up) return math.ceil(v * E.doomblade[up and 2 or 1] - 1e-9) end
+
+---------------------------------------------------------------------------
+-- Commun aux sept
+---------------------------------------------------------------------------
+test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en tête, nombres du texte = Rogue.EPIC", function()
+  for i, id in ipairs(EPICS) do
+    local d = Cards[id]
+    assert(d, id)
+    eq(d.class, "rogue", id); eq(d.rarity, "epic", id); eq(d.zone, ZONES[i], id); eq(d.epic, true, id)
+    eq(d.level, nil, id .. " : hors grille"); eq(d.type, "power", id)
+    assert(d.deckHooks and d.whileInDeck, id .. " : crochets du deck")
+    assert(d.text:find("^Epic%.\n"), id); assert(d.up.text:find("^Epic%.\n"), id)
+    assert(Card.isEpic(d) and Card.collectible(d))
+    eq(ns.Meta.zoneCards("rogue", ZONES[i])[1], id)
+  end
+  for k, up in ipairs({ false, true }) do
+    local t = function(id) return Card.defById(id, up).text end
+    assert(t("deflection"):find("deal " .. E.deflection[k] .. ", %+" .. E.deflection[k] .. " per earlier"))
+    assert(t("echoing_reprimand"):find("counts as " .. E.echoing_reprimand[k] .. "%."))
+    local kl = E.kidney_shot[k]
+    assert(t("kidney_shot"):find("Surge of " .. kl .. (kl < 5 and "%+" or "") .. " Combo: apply Stunned 1"))
+    assert(t("subterfuge"):find("Gaining Stealth: %+" .. E.subterfuge[k] .. " Combo%."))
+    assert(t("danse_macabre"):find("%+" .. E.danse_macabre[k] .. " per other card name"))
+    local f = E.doomblade[k]
+    local what = f == 0.5 and "half their damage" or f == 1 and "their damage as"
+      or ("their damage %+" .. math.floor((f - 1) * 100 + 0.5) .. "%%")
+    assert(t("doomblade"):find(what), t("doomblade"))
+  end
+end)
+
+test("arrivée en jeu : l'épique n'est ni en main ni en pioche, posée parmi les Powers ; combat sauvegardable", function()
+  for _, id in ipairs(EPICS) do
+    for seed = 1, 5 do
+      local deck = {}
+      for _, x in ipairs(ns.Classes.rogue.deck) do deck[#deck + 1] = { id = x, up = false } end
+      deck[#deck + 1] = { id = id, up = seed % 2 == 0 }
+      local c = Combat.new({ seed = seed, class = "rogue", hp = 50, deck = deck, encounter = { "ter_dummy" } })
+      for _, pile in ipairs({ c.hand, c.draw, c.discard }) do
+        for _, inst in ipairs(pile) do assert(inst.id ~= id, id .. " dans une pile") end
+      end
+      eq(#c.hand, 5, "main de 5 cartes ordinaires")
+      eq(#c.hand + #c.draw, #ns.Classes.rogue.deck, "l'épique ne prend pas de place")
+      local n = 0
+      for _, p in ipairs(c.player.powers) do if p.id == id then n = n + 1 end end
+      eq(n, 1, id .. " parmi les Powers")
+      eq(R.epicOf(c), id)
+      assert(Save.isPlain(c), id .. " : combat sauvegardable")
+    end
+  end
+end)
+
+test("crochets indépendants de la pile : l'épique à la défausse agit encore", function()
+  local c = setup("deflection", { "feint" })
+  local inst = table.remove(c.player.powers)
+  c.discard[#c.discard + 1] = inst
+  local h = hp(c)
+  play(c, "feint")
+  eq(hp(c), h - D1)
+end)
+
+---------------------------------------------------------------------------
+-- Deflection
+---------------------------------------------------------------------------
+test("Deflection : trois Feint = k + 2k + 3k à la dernière cible, Parry gardé", function()
+  local c = setup("deflection", { "sinister_strike", "feint", "feint", "feint" }, { encounter = { "ter_dummy", "ter_dummy" } })
+  play(c, "sinister_strike", 2)
+  local h, h1 = hp(c, 2), hp(c, 1)
+  play(c, "feint"); play(c, "feint"); play(c, "feint")
+  eq(hp(c, 2), h - 6 * D1, "la dernière cible")
+  eq(hp(c, 1), h1, "l'autre ennemi rien")
+  eq(c.player.st.parry, 3, "la défense reste")
+  eq(R.ripostes(c), 3); eq(R.nextRiposte(c), 4 * D1)
+end)
+
+test("Deflection : Evasion (Parry 2) puis deux Feint = 3 + 6 + 9 + 12 ; au-dessus de Parry 3 la riposte a lieu", function()
+  local c = setup("deflection", { "evasion", "feint", "feint" })
+  local h = hp(c)
+  play(c, "evasion"); play(c, "feint"); play(c, "feint")
+  eq(hp(c), h - 10 * D1)
+  eq(c.player.st.parry, 3, "plafond 3, charge perdue")
+end)
+
+test("Deflection : compteur remis à 0 au début du tour du Voleur, continu pendant le tour ennemi", function()
+  local c = setup("deflection", { "feint", "feint" }, { extra = { "feint", "feint", "feint", "feint", "feint" } })
+  play(c, "feint"); play(c, "feint")
+  eq(R.ripostes(c), 2)
+  Combat.endPlayerTurn(c)
+  local h = hp(c)
+  Combat.applyStatus(c, c.player, "parry", 1) -- Cheat Death, effet pendant le tour ennemi
+  eq(hp(c), h - 3 * D1, "troisième riposte du tour")
+  Combat.enemyPhase(c); Combat.endRound(c); Combat.startPlayerTurn(c)
+  eq(R.ripostes(c), 0)
+  h = hp(c)
+  c.player.mana = 9
+  play(c, "feint")
+  eq(hp(c), h - D1, "nouveau tour : k")
+end)
+
+test("Deflection : Blinding Powder riposte au début du combat et compte pour le tour 1", function()
+  local c = setup("deflection", { "feint" }, { relics = { "blinding_powder" } })
+  eq(hp(c), 200 - D1)
+  eq(R.ripostes(c), 1)
+  play(c, "feint")
+  eq(hp(c), 200 - 3 * D1)
+end)
+
+test("Deflection : dernière cible morte = l'ennemi vivant le plus à gauche ; Sundered s'applique ; amélioré", function()
+  local c = setup("deflection", { "sinister_strike", "feint", "feint" }, { encounter = { "ter_dummy", "ter_dummy" } })
+  play(c, "sinister_strike", 2)
+  c.enemies[2].hp = 1
+  Combat.dealDamage(c, c.player, c.enemies[2], 5)
+  assert(c.enemies[2].dead)
+  local h = hp(c, 1)
+  play(c, "feint")
+  eq(hp(c, 1), h - D1, "repli sur l'ennemi de gauche")
+  Combat.applyStatus(c, c.enemies[1], "armor_broken", 2)
+  h = hp(c, 1)
+  play(c, "feint")
+  eq(hp(c, 1), h - math.floor(2 * D1 * 1.25), "2k × 1,25 arrondi à l'inférieur")
+  local u = setup("deflection", { "feint", "feint" }, { up = true })
+  play(u, "feint"); play(u, "feint")
+  eq(hp(u), 200 - 3 * D2)
+end)
+
+test("Deflection : Ravenholdt Signet (Parry après un Surge) riposte aussi", function()
+  local c = setup("deflection", { "eviscerate" }, { relics = { "ravenholdt_signet" } })
+  c.player.res = 2
+  play(c, "eviscerate", 1)
+  eq(hp(c), 200 - 12 - D1)
+end)
+
+---------------------------------------------------------------------------
+-- Doomblade
+---------------------------------------------------------------------------
+test("Doomblade : Eviscerate à 5 Combo = DoT (part de 24) au lieu de 24, sans Absorb ; amélioré", function()
+  local c = setup("doomblade", { "eviscerate" })
+  c.player.res = 5
+  c.enemies[1].block = 10
+  play(c, "eviscerate", 1)
+  eq(hp(c), 200); eq(c.enemies[1].block, 10, "le DoT ignore l'Absorb"); eq(c.enemies[1].st.pain, dot(24))
+  eq(c.player.res, 0)
+  local u = setup("doomblade", { "eviscerate" }, { up = true })
+  u.player.res = 5
+  play(u, "eviscerate", 1)
+  eq(u.enemies[1].st.pain, dot(24, true))
+end)
+
+test("Doomblade : arrondi au supérieur, Sundered compté, Crystal Vial +1 ; les autres Attacks frappent", function()
+  local c = setup("doomblade", { "eviscerate", "sinister_strike" }, { relics = { "crystal_vial" } })
+  c.player.res = 1
+  Combat.applyStatus(c, c.enemies[1], "armor_broken", 2)
+  play(c, "eviscerate", 1)
+  eq(c.enemies[1].st.pain, dot(10) + 1, "8 × 1,25 = 10, part posée, +1 (Crystal Vial)")
+  local h = hp(c)
+  play(c, "sinister_strike", 1)
+  eq(hp(c), h - 6, "Sinister Strike frappe (5 × 1,25)")
+end)
+
+test("Doomblade : Secret Technique sous Stealth = deux DoT par ennemi ; Between the Eyes garde Stunned ; Envenom inchangée", function()
+  local c = setup("doomblade", { "secret_technique" }, { encounter = { "ter_dummy", "ter_dummy" } })
+  c.player.res = 3
+  play(c, "secret_technique")
+  eq(c.enemies[1].st.pain, 2 * dot(12)); eq(c.enemies[2].st.pain, 2 * dot(12)); eq(hp(c, 1), 200)
+  local b = setup("doomblade", { "between_the_eyes" })
+  b.player.res = 2
+  play(b, "between_the_eyes", 1)
+  eq(b.enemies[1].st.pain, dot(8)); eq(b.enemies[1].st.stunned, 1); eq(hp(b), 200)
+  local e = setup("doomblade", { "envenom" })
+  e.player.res = 2
+  play(e, "envenom", 1)
+  eq(e.enemies[1].st.pain, 3, "DoT 4 posé, tic de 4 : reste 3")
+  eq(hp(e), 196)
+end)
+
+test("Doomblade : un coup converti n'est pas un coup (pas de Deadly Poison)", function()
+  local c = setup("doomblade", { "deadly_poison", "nightblade" })
+  play(c, "deadly_poison")
+  c.player.res = 2
+  play(c, "nightblade", 1)
+  eq(c.enemies[1].st.pain, dot(12), "12 → DoT, pas de +1 de Deadly Poison")
+  eq(c.player.st.stealth, 1, "Nightblade rend Stealth")
+end)
+
+---------------------------------------------------------------------------
+-- Atrophic Poison
+---------------------------------------------------------------------------
+test("Atrophic Poison : un ennemi qui garde du DoT frappe à -25 % ; DoT 1 tombe avant son coup", function()
+  local c = setup("atrophic_poison", { "garrote" }, { encounter = { "ter_hitter" } })
+  play(c, "garrote", 1) -- DoT 3
+  eq(Combat.intentInfo(c, c.enemies[1]).damage, 7, "intention : 10 → 7")
+  local h = c.player.hp
+  Combat.endTurn(c)
+  eq(c.player.hp, h - 7)
+  local d = setup("atrophic_poison", { "feint" }, { encounter = { "ter_hitter" } })
+  Combat.applyStatus(d, d.enemies[1], "pain", 1)
+  eq(Combat.intentInfo(d, d.enemies[1]).damage, 10, "DoT 1 : intention pleine")
+  h = d.player.hp
+  Combat.endTurn(d)
+  eq(d.player.hp, h - 10, "le DoT 1 tique avant le coup")
+end)
+
+test("Atrophic Poison : ne se cumule pas avec un vrai Demoralized ; amélioré : Sundered sans cumul", function()
+  local c = setup("atrophic_poison", { "crippling_poison" }, { encounter = { "ter_hitter" } })
+  play(c, "crippling_poison", 1)
+  eq(Combat.intentInfo(c, c.enemies[1]).damage, 7, "un seul -25 %")
+  local u = setup("atrophic_poison", { "sinister_strike", "sinister_strike" }, { up = true })
+  Combat.applyStatus(u, u.enemies[1], "pain", 4)
+  play(u, "sinister_strike", 1)
+  eq(hp(u), 200 - 6, "5 × 1,25")
+  Combat.applyStatus(u, u.enemies[1], "armor_broken", 2)
+  local h = hp(u)
+  play(u, "sinister_strike", 1)
+  eq(hp(u), h - 6, "vrai Sundered : pas de cumul")
+  local b = setup("atrophic_poison", { "sinister_strike" })
+  Combat.applyStatus(b, b.enemies[1], "pain", 4)
+  play(b, "sinister_strike", 1)
+  eq(hp(b), 200 - 5, "non amélioré : pas de Sundered")
+end)
+
+---------------------------------------------------------------------------
+-- Echoing Reprimand
+---------------------------------------------------------------------------
+test("Echoing Reprimand : un Surge de 2 ou 3 compte N, la dépense ne change pas ; 1, 4 et 5 comptent leur valeur", function()
+  local m = E.echoing_reprimand[1]
+  local want = { [1] = 8, [2] = 4 + 4 * m, [3] = 4 + 4 * m, [4] = 20, [5] = 24 }
+  for n = 1, 5 do
+    local c = setup("echoing_reprimand", { "eviscerate" })
+    c.player.res = n
+    play(c, "eviscerate", 1)
+    eq(200 - hp(c), want[n], n .. " Combo")
+    eq(c.player.res, 0)
+  end
+  local u = setup("echoing_reprimand", { "eviscerate", "rupture" }, { up = true })
+  u.player.res = 2
+  play(u, "eviscerate", 1)
+  local m2 = E.echoing_reprimand[2]
+  eq(hp(u), 200 - (4 + 4 * m2), "amélioré")
+  u.player.res = 3
+  play(u, "rupture", 1)
+  eq(u.enemies[1].st.pain, 3 * m2)
+end)
+
+---------------------------------------------------------------------------
+-- Subterfuge
+---------------------------------------------------------------------------
+test("Subterfuge : chaque Attack du tour profite de Stealth, qui tombe à la fin du tour", function()
+  local c = setup("subterfuge", { "backstab", "backstab", "ambush" })
+  play(c, "backstab", 1); play(c, "backstab", 1)
+  eq(hp(c), 200 - 20)
+  eq(c.player.st.stealth, 1)
+  play(c, "ambush", 1)
+  eq(hp(c), 200 - 38)
+  Combat.endTurn(c)
+  eq(c.player.st.stealth, nil, "tombé à la fin du tour")
+  eq(c.player.res, 4, "Combo des cartes seulement (aucun Stealth gagné)")
+end)
+
+test("Subterfuge : chaque Stealth gagné donne N Combo, pas un gain sous Stealth ni celui du départ", function()
+  local c = setup("subterfuge", { "vanish", "vanish", "backstab" })
+  eq(c.player.res, 0, "Stealth du début de combat : rien")
+  play(c, "vanish")
+  eq(c.player.res, 0, "déjà en Stealth : pas un gain")
+  Combat.endTurn(c)
+  c.player.mana = 9
+  c.hand[#c.hand + 1] = Card.new("vanish", false, 990)
+  local r = c.player.res
+  play(c, "vanish")
+  eq(c.player.res, r + E.subterfuge[1], "absent → présent")
+  local u = setup("subterfuge", { "backstab", "shadowstep" }, { up = true })
+  play(u, "backstab", 1)
+  Combat.endTurn(u)
+  u.player.mana = 9
+  u.hand[#u.hand + 1] = Card.new("shadowstep", false, 991)
+  r = u.player.res
+  play(u, "shadowstep")
+  eq(u.player.res, r + E.subterfuge[2], "amélioré")
+end)
+
+---------------------------------------------------------------------------
+-- Kidney Shot
+---------------------------------------------------------------------------
+test("Kidney Shot : Surge du seuil étourdit la cible vivante ; un de moins ne fait rien ; amélioré : seuil plus bas", function()
+  local k1, k2 = E.kidney_shot[1], E.kidney_shot[2]
+  local c = setup("kidney_shot", { "eviscerate" })
+  c.player.res = k1
+  play(c, "eviscerate", 1)
+  eq(c.enemies[1].st.stunned, 1)
+  local f = setup("kidney_shot", { "eviscerate" })
+  f.player.res = k1 - 1
+  play(f, "eviscerate", 1)
+  eq(f.enemies[1].st.stunned, nil)
+  local u = setup("kidney_shot", { "rupture" }, { up = true })
+  u.player.res = k2
+  play(u, "rupture", 1)
+  eq(u.enemies[1].st.stunned, 1, "Skill à cible aussi")
+end)
+
+test("Kidney Shot : boss = Demoralized 2 ⌛ ; Between the Eyes = Stunned 2 ; cible morte ou Surge sans cible : rien", function()
+  local c = setup("kidney_shot", { "eviscerate" }, { encounter = { "ter_boss" } })
+  c.player.res = 5
+  play(c, "eviscerate", 1)
+  eq(c.enemies[1].st.stunned, nil); eq(c.enemies[1].st.demoralized, 2)
+  local b = setup("kidney_shot", { "between_the_eyes" })
+  b.player.res = 5
+  play(b, "between_the_eyes", 1)
+  eq(b.enemies[1].st.stunned, 2)
+  local k = setup("kidney_shot", { "eviscerate" }, { encounter = { "ter_dummy", "ter_dummy" } })
+  k.player.res = 5
+  k.enemies[1].hp = 10
+  play(k, "eviscerate", 1)
+  assert(k.enemies[1].dead); eq(k.enemies[2].st.stunned, nil)
+  local s = setup("kidney_shot", { "secret_technique" })
+  s.player.res = 5
+  play(s, "secret_technique")
+  eq(s.enemies[1].st.stunned, nil)
+end)
+
+---------------------------------------------------------------------------
+-- Danse Macabre
+---------------------------------------------------------------------------
+test("Danse Macabre : +N par autre nom joué ce tour, doublons comptés une fois, son propre nom exclu", function()
+  local k = E.danse_macabre[1]
+  local c = setup("danse_macabre", { "kick", "sprint", "sinister_strike", "sinister_strike" })
+  play(c, "kick", 1); play(c, "sprint")
+  local h = hp(c)
+  play(c, "sinister_strike", 1)
+  eq(hp(c), h - (5 + 2 * k), "5 + 2 noms")
+  h = hp(c)
+  play(c, "sinister_strike", 1)
+  eq(hp(c), h - (5 + 2 * k), "le doublon ne compte pas, son nom exclu")
+  eq(R.namesPlayed(c), 3)
+  Combat.endTurn(c)
+  eq(R.namesPlayed(c), 0, "nouveau tour")
+end)
+
+test("Danse Macabre : chaque coup (Killing Spree), avant Sundered ; amélioré", function()
+  local k, k2 = E.danse_macabre[1], E.danse_macabre[2]
+  local c = setup("danse_macabre", { "kick", "pistol_shot", "killing_spree" })
+  play(c, "kick", 1); play(c, "pistol_shot", 1)
+  local h = hp(c)
+  play(c, "killing_spree")
+  eq(h - hp(c), 6 * (4 + 2 * k), "six coups de 4 + 2 noms")
+  local s = setup("danse_macabre", { "kick", "sinister_strike" }, { up = true })
+  Combat.applyStatus(s, s.enemies[1], "armor_broken", 2)
+  play(s, "kick", 1)
+  play(s, "sinister_strike", 1)
+  eq(hp(s), 200 - math.floor((5 + k2) * 1.25), "(5 + N) × 1,25")
+end)
+
+---------------------------------------------------------------------------
+-- Bots et simulation
+---------------------------------------------------------------------------
+test("simulation : chaque épique imposée tient l'expédition, sans erreur", function()
+  for _, id in ipairs(EPICS) do
+    local rec, exp = ns.SimExpedition.play({ seed = 2, class = "rogue", epic = id, zones = 7 })
+    eq(exp.deck[ns.Expedition.epicIndex(exp)].id, id, id .. " gardée")
+    assert(#rec.combats > 0)
+  end
+end)
+
+ns.Enemies.ter_dummy, ns.Enemies.ter_hitter, ns.Enemies.ter_boss = nil, nil, nil
+
+print(("%d réussis, %d échoués"):format(passed, failed))
+if failed == 0 then print("ALL PASS") else os.exit(1) end
