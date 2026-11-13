@@ -34,7 +34,7 @@ local function epicLine(c)
     return id, free and ("Shadow: first card free, then %d HP/mana"):format(n)
       or ("Shadow cards: %d HP per mana"):format(n)
   elseif id == "voidform" then
-    local b = math.floor((p.res or 0) / P.VOID_PER[up and 2 or 1])
+    local b = (p.res or 0) * P.VOID_BONUS[up and 2 or 1]
     return id, ("Voidform: Shadow hits +%d"):format(b)
   elseif id == "inner_focus" then
     local s = P.FOCUS_SCALE[up and 2 or 1]

@@ -150,6 +150,7 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `canPlay` | d, inst | vrai par défaut ; une chaîne rend la carte injouable avec cette raison (affichée telle quelle : Voidform), après les autres raisons de `Combat.canPlay` |
 | `castAs` | d, inst | faux par défaut ; vrai = une carte Attack ou Skill qui n'est pas Cast part en incantation (`c.player.cast`, résolue au début du tour suivant, interruptible ; Inner Focus) |
 | `regenHeal` | — | valeur soignée par le tic de Regen du joueur (la Regen elle-même ; 0 = ne soigne pas : Echo of Light) ; la Regen baisse ensuite de 1 comme d'habitude |
+| `convertHit` | cible, ctx | dégâts d'un coup de l'effet `damage` après `calcDamage` (`Core/Effects.lua`) ; `false` = coup non porté, le crochet a posé autre chose à la place (Doomblade : un DoT) : ni dégâts, ni `onHit`, ni `onAttackHit` |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
 
 Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
@@ -351,6 +352,10 @@ simulent chaque coup sur une copie) ; une classe les guide par `bot` (définitio
 (règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cibles
 et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec tout le
 commun, `zones=7` (ex-« Ligue exaltée »), clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
+Build piloté par l'épique du deck (`Sim/expedition.lua`) : `bot.byEpic[id] = { rating, upgrade, remove }`, chacun
+une table `{ [carte] = note }` ou une fonction `(exp, carte) -> note|nil`, prime sur `bot.rating` / `upgrade` /
+`remove` tant que l'épique est dans le deck (choix des récompenses, rencontres, marchand, feu de camp, retraits) ;
+`bot.epic(exp, id)` note les épiques proposées (exemple complet : `Data/Rogue.lua`).
 
 ## Exemple minimal
 
@@ -429,17 +434,40 @@ pile ; elle n'a pas de coût et ne se joue jamais. Contrat pour écrire une épi
 - Pas d'`innate` ni de logique de pioche ou de main pour une épique : elle n'est jamais dans une pile. Le mot
   `Innate` reste pour les cartes ordinaires.
 
-**Priest (14/11/2026)** : les sept épiques sont écrites (`Data/Priest.lua`, règles et crochets dans
+### Épiques du Prêtre (14/11/2026)
+
+Les sept épiques sont écrites (`Data/Priest.lua`, règles et crochets dans
 `Core/Classes/priest.lua` : `ns.Priest`, deckHooks posés sur les définitions, src = `c.epic`, nombres réglables `ns.Priest.*`,
 `ns.ClassRules.priest` = `botValue` / `botKey` seulement ; vue `ns.ClassViews.priest` dans `UI/Art/priest.lua` ;
 tests `Sim/tests_epic_priest.lua`, harnais UEP). Points ajoutés au moteur : valeurs `canPlay`, `castAs`, `regenHeal`,
 notification `onRegenTick` ; le crochet `payHp` est interrogé aussi pour une carte sans `payHp` (base 0 : Shadow
-Covenant) ; `Combat.cost` lit 0 pour une carte sans coût. Inner Focus multiplie
+Covenant). Inner Focus multiplie
 dégâts, Absorb, soin, DoT et Regen pendant la résolution de la carte incantée par ses propres crochets (`beforeCard`
 / `onCardPlayed` + `damage`, `block`, `heal`, `apply`, `applySelf`) : le soin d'Atonement de cette carte est
-multiplié aussi. Bots : `classDef.bot.epics[id] = { rating, upgrade, remove }` remplace les notes de la classe tant
-que l'épique est dans le deck (`Sim/expedition.lua`), `classDef.bot.epic(exp, id)` note l'épique selon les cartes
-centrales déjà prises.
+multiplié aussi. Bots : `classDef.bot.byEpic[id]` (cartes centrales, améliorations, retraits de chaque build),
+`classDef.bot.epic(exp, id)` note l'épique selon les cartes centrales déjà prises.
+
+### Épiques du Voleur (14/11/2026)
+
+Données et nombres (`EPIC_N`, seule source : textes et règles) dans `Data/Rogue.lua` ; règles (`deckHooks`,
+`ns.Rogue`) dans `Core/Classes/rogue.lua` ; vue (ligne de l'épique sous les états du héros, marques
+d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, harnais UER.
+- **Deflection** : `onStatusApplied` (Parry sur le héros, `n` demandé avant le plafond de 3) ; compteur
+  `c.cls.ripostes` du tour (`c.cls.riposteRound`, le début du combat compte pour le tour 1, le tour ennemi
+  continue le compte) ; coup sans carte (`calcDamage` avec `cardDef` nil) sur `c.player.lastTarget` ou l'ennemi
+  vivant le plus à gauche ; journal `{ t = "riposte", dst, n, base }`. `ns.Rogue.ripostes(c)`, `nextRiposte(c)`.
+- **Doomblade** : crochet moteur `convertHit` (ci-dessus), Attacks à effet `surge` seulement ; DoT par le crochet
+  `apply` (Crystal Vial), icône poison.
+- **Atrophic Poison** : `enemyDamage` (×0,75 si l'ennemi garde du DoT après son tick : hors du tour ennemi, on
+  retire la baisse `dotDecay`, l'intention affichée est juste ; pas de cumul avec un vrai Demoralized),
+  amélioré `damage` (×1,25, pas de cumul avec Sundered). `ns.Rogue.countsDemoralized(c, e)`.
+- **Echoing Reprimand** : `surge` (2 ou 3 -> N) ; aucune autre source du Voleur ne modifie `surge` avant.
+- **Subterfuge** : `stealthBreak` faux ; durée `c.cls.stealthUntil` (posée à chaque Stealth reçu, et par
+  `whileInDeck` pour celui du départ), retrait dans `onTurnEnd` ; Combo par Stealth gagné (`c.cls.stealthGained`).
+- **Kidney Shot** : `onSurge` (dépense réelle, carte à cible) marque le `ctx`, `onCardPlayed` étourdit la cible
+  vivante (boss : Demoralized 2).
+- **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;
+  `damage` ajoute N par autre id, au plus le plafond.
 
 ## Sauvegarde
 

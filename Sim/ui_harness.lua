@@ -3336,12 +3336,15 @@ do
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
   -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
   -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle
+  local epicCard -- carte épique en cours d'examen (ses déclencheurs peuvent poser un état)
   local function stateBody(cl)
-    local lab, verb, rest = cl:match("^(%u[%a ]-): (%l%a*)( .*)$")
+    local lab, verb, rest = cl:match("^(%u[%w %+]-): (%l%a*)( .*)$")
     if lab and (verb == "apply" or verb == "gain") then
       for _, s in pairs(ns.Statuses) do
         if s.name == lab then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
       end
+      -- règle d'une épique : déclencheur du registre (« Surge of 5 Combo: apply Stunned 1 ⌛ »)
+      if epicCard and ns.Language.triggers[lab] then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
     end
     return cl
   end
@@ -3362,6 +3365,7 @@ do
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
       local d = Card.defById(id, up)
+      epicCard = d.rarity == "epic"
       local label = id .. (up and "+" or "")
       local cls = clauses(d.text or "")
       -- états posés par les effets (un état qui porte le nom de la carte est décrit, pas nommé)
@@ -3384,7 +3388,8 @@ do
         end
       end
       if afterState then bad[#bad + 1] = label .. " : une clause suit les états posés" end
-      if #states ~= #want then
+      -- épique : règle écrite par ses crochets, pas par des effets (forme seule)
+      if #states ~= #want and not (d.rarity == "epic" and #want == 0) then
         bad[#bad + 1] = ("%s : %d état(s) posé(s) par les effets, %d ligne(s) Gain / Apply"):format(label, #want, #states)
       else
         -- ordre : ennemis (« Apply ») d'abord, puis soi (« Gain »)
@@ -3560,6 +3565,7 @@ do
     for _, up in ipairs({ false, true }) do
       card:SetCard(id, up, { playable = true })
       local d = Card.defById(id, up)
+      epicCard = d.rarity == "epic"
       local label = id .. (up and "+" or "")
       local fit = card.bodyFit
       local shown = W.cardBodyText(card)
@@ -5975,7 +5981,8 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "rogue" then ids[#ids + 1] = id end end
+  -- épiques à part (planche cartes_rogue_epiques, section UER)
+  for id, d in pairs(ns.Cards) do if d.class == "rogue" and not d.zone then ids[#ids + 1] = id end end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, assassination = 1, combat = 2, subtlety = 3 }
   table.sort(ids, function(a, b)
@@ -6901,7 +6908,7 @@ do
       -- cartes hors grille (Rogue : Nightblade, Subtlety niveau 3) comptées depuis les données
       local nAll, nOpen0 = 0, 0
       for _, d in pairs(ns.Cards) do
-        -- (cartes épiques et leurs variantes : hors de la grille, onglet Zones)
+        -- épiques (zone) : onglet Zones, pas la grille des niveaux
         if d.class == cid and not d.zone and not d.variant then
           nAll = nAll + 1; if (d.level or 1) <= lv then nOpen0 = nOpen0 + 1 end
         end
@@ -9225,6 +9232,155 @@ do
       T.ns = H.ns
       dofile(path)(T)
     end
+  end
+end
+
+print("UER épiques du Voleur : textes (plaque Epic, palier), en jeu dès la première main, ligne de l'épique (ripostes du tour, noms joués…), marques d'Atrophic Poison, planche")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local EPICS = { "deflection", "doomblade", "atrophic_poison", "echoing_reprimand", "subterfuge", "kidney_shot",
+    "danse_macabre" }
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W = ns.Widgets
+  local Combat = ns.Combat
+  -- 1. textes : plaque « Epic » (mot retiré du corps), pas de « Epic. » affiché, palier 8,5 ou plus
+  local card = W.card(UI().content)
+  local tbad = {}
+  for _, id in ipairs(EPICS) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local body = W.cardBodyText(card):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+      local pills = table.concat(W.cardPills(ns.Card.defById(id, up)), " ")
+      if body:find("Epic.", 1, true) then tbad[#tbad + 1] = id .. " : « Epic. » dans le corps" end
+      if not pills:find("Epic", 1, true) then tbad[#tbad + 1] = id .. " : plaque sans Epic (" .. pills .. ")" end
+      if (card.bodyFit.size or 0) < 8.5 then tbad[#tbad + 1] = id .. (up and "+" or "") .. " : palier " .. tostring(card.bodyFit.size) end
+      if card.bodyFit.mode ~= "clauses" then tbad[#tbad + 1] = id .. " : texte coulé" end
+    end
+  end
+  card:Hide()
+  check("textes des 7 épiques (base et améliorée) : plaque Epic, corps sans « Epic. », palier 8,5 ou plus, en clauses",
+    #tbad == 0, table.concat(tbad, " ; "))
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  W.fillCardTooltip(tip, "deflection", false)
+  W.fillCardTooltip(tip, "kidney_shot", true)
+  W.fillCardTooltip(tip, "danse_macabre", false)
+  local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  local k1 = ns.Rogue.EPIC.deflection[1]
+  check("infobulles : riposte détaillée (k, 2k, 3k, 4k), boss de Kidney Shot, noms de Danse Macabre",
+    all:find(("Riposte: %d, then %d, %d, %d"):format(k1, 2 * k1, 3 * k1, 4 * k1), 1, true) and all:find("Boss: gets Demoralized 2", 1, true)
+    and all:find("each different card played this turn counts once", 1, true), all)
+
+  -- 2. combat avec Deflection : l'épique en jeu dès la première main, ligne des ripostes du tour
+  clickOption("class:rogue")
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  ns.Expedition.addCard(e, "deflection")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  v:Render(true)
+  local inPile = false
+  for _, pile in ipairs({ c.hand, c.draw, c.discard }) do
+    for _, inst in ipairs(pile) do if inst.id == "deflection" then inPile = true end end
+  end
+  check("combat : Deflection en jeu dès la première main (c.epic), dans aucune pile, main de 6", not inPile
+    and c.epic and c.epic.id == "deflection" and #c.hand == 6, #c.hand)
+  local host = v.classZone.views.rogue
+  local ep = host and host.epic
+  local function line() return ep and ep.text._shown and (ep.text._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") or "" end
+  local EN = ns.Rogue.EPIC
+  local d1 = EN.deflection[1]
+  check("ligne de l'épique : icône de Deflection, « Ripostes this turn: 0   next: k »",
+    ep and ep._shown and (ep.slot.icon._texture or ""):lower():find("ability_rogue_dismantle", 1, true)
+    and line() == "Ripostes this turn: 0   next: " .. d1, line())
+  local hp0 = c.enemies[1].hp
+  c.hand[#c.hand + 1] = ns.Card.new("feint", false, 980)
+  c.hand[#c.hand + 1] = ns.Card.new("feint", false, 981)
+  c.player.mana = 3
+  ns.Controller.act({ "play", #c.hand - 1 })
+  ns.Controller.act({ "play", #c.hand })
+  H.settle()
+  v:Render(true)
+  check("deux Feint : ripostes k + 2k sur la cible, ligne « Ripostes this turn: 2   next: 3k »",
+    c.enemies[1].hp == hp0 - 3 * d1 and line() == "Ripostes this turn: 2   next: " .. 3 * d1, line() .. " / " .. (hp0 - c.enemies[1].hp))
+  local hv = table.concat(H.hover(ep), " | "):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  check("survol de l'icône : la carte Deflection et son texte", hv:find("Deflection", 1, true) and hv:find("Each Parry gained", 1, true), hv)
+  check("ligne dans la zone de classe, sans texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  snap("uer-deflection", true)
+
+  -- 3. autres épiques sur le même combat (passif remplacé) : lignes et marques d'Atrophic Poison
+  local function setEpic(eid, up)
+    c.epic = { id = eid, up = up or false, uid = 970 }
+    v:Render(true)
+  end
+  setEpic("danse_macabre")
+  c.cls.dmRound, c.cls.dmNames, c.cls.dmCount = c.round, { feint = true, kick = true }, 2
+  v:Render(true)
+  local dm = "Card names this turn: 2   +" .. 2 * EN.danse_macabre[1] .. " per hit"
+  check("Danse Macabre : « Card names this turn: 2   +2N per hit »", line() == dm, line())
+  setEpic("echoing_reprimand")
+  c.player.res = 3
+  v:Render(true)
+  check("Echoing Reprimand à 3 Combo : « Surge now counts as N Combo »",
+    line() == "Surge now counts as " .. EN.echoing_reprimand[1] .. " Combo", line())
+  c.player.res = 4
+  v:Render(true)
+  check("Echoing Reprimand à 4 Combo : ligne cachée", not ep._shown and line() == "")
+  setEpic("kidney_shot", true)
+  c.player.res = EN.kidney_shot[2]
+  v:Render(true)
+  check("Kidney Shot amélioré au seuil : « Surge now stuns the target »", line() == "Surge now stuns the target", line())
+  setEpic("atrophic_poison")
+  for _, en in ipairs(c.enemies) do en.st.pain = nil end
+  local tgt = c.enemies[1]
+  Combat.applyStatus(c, tgt, "pain", 3)
+  v:Render(true)
+  local shown, mk = 0, nil
+  for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 mk = m end end
+  local s = v.slotOf[tgt.uid]
+  local mr, tr = mk and R.rect(mk), s and R.rect(s.tag)
+  check("Atrophic Poison : une marque à droite du cadre de l'ennemi sous DoT (aucune ligne)",
+    shown == 1 and mr and tr and mr[1] >= tr[3] - 0.5 and not ep._shown, shown)
+  local mt = mk and table.concat(H.hover(mk), " | ") or ""
+  check("survol de la marque : compte comme Demoralized", mt:find("counts as Demoralized", 1, true), mt)
+  tgt.st.pain = 1
+  v:Render(true)
+  shown = 0
+  for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 end end
+  check("Atrophic Poison : DoT 1 (tombe avant son coup) : pas de marque", shown == 0, shown)
+  tgt.st.pain = 3
+  v:Render(true)
+  snap("uer-atrophic", true)
+  c.epic = nil
+  v:Render(true)
+  local anyMark = false
+  for _, m in ipairs(host.marks) do if m._shown then anyMark = true end end
+  check("sans épique : ni ligne ni marque", not ep._shown and not anyMark)
+
+  -- 4. planche des sept épiques (base, améliorée)
+  if SNAP then
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(7 * 140 + 20, 2 * 230 + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, eid in ipairs(EPICS) do
+      for k, up in ipairs({ false, true }) do
+        local cc = W.card(big)
+        cc:SetCard(eid, up, { playable = true })
+        W.placeCenter(cc, big, 80 + (i - 1) * 140, 125 + (k - 1) * 230, 1)
+      end
+    end
+    Render.svg(H, big, SNAP .. "/cartes_rogue_epiques.svg", "épiques du Voleur (base, améliorée)")
+    big:Hide()
   end
 end
 

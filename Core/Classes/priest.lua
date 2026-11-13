@@ -12,8 +12,8 @@
 --   shadow_covenant   : cost → 0 pour une carte Shadow de coût final N ≥ 1, payHp → + 3N ; amélioré : la
 --                       première carte Shadow du tour ne coûte rien.
 --   reflective_shield : afterHit → l'Absorb perdue sur ce coup, au plus 2 (4), à l'attaquant (sans carte).
---   voidform          : canPlay → les cartes à Surge sont injouables ; damage → + 1 par Insanity par coup d'une
---                       carte Shadow ; amélioré : +3 Insanity au début du combat.
+--   voidform          : canPlay → les cartes à Surge sont injouables ; damage → + 1 (+ 2) par Insanity par coup
+--                       d'une carte Shadow.
 --   inner_focus       : castAs → la première carte Attack ou Skill du tour part en Cast ; à sa résolution,
 --                       dégâts, Absorb, soin, DoT et Regen × 1,75 (× 2), arrondis au supérieur.
 -- État de classe c.cls : miseryT (uid de la cible de la carte en cours de résolution), miseryBusy,
@@ -34,7 +34,7 @@ ns.Priest = Priest
 if not L.plateByKey("epic") then
   L.plate("epic", { word = "Epic", head = true, flag = "epic", text = "in play from the start of each combat." })
 end
-for _, label in ipairs({ "Each heal", "Each Regen tick", "Shadow cards", "Per 3 Insanity", "Per 2 Insanity", "Per Insanity", "Combat start",
+for _, label in ipairs({ "Each heal", "Each Regen tick", "Shadow cards", "Per Insanity",
   "First card each turn" }) do
   L.trigger(label)
 end
@@ -57,14 +57,13 @@ Priest.EPICS = { "prayer_of_mending", "misery", "echo_of_light", "shadow_covenan
 
 -- Réglages (fiche : docs/zones/cartes-de-zone.md ; réglés par la simulation le 14/11/2026, reports/priest-*-m*.txt :
 -- Echo of Light +0 → +7, Shadow Covenant 2 → 3 PV, Reflective Shield sans plafond → 2 par coup, Voidform
--- 1 par 3 Insanity → 1 par Insanity, Inner Focus +50 % → +75 %).
+-- + 1 par 3 Insanity → + 1 par Insanity, Inner Focus +50 % → +75 %).
 Priest.MENDING_UP = 2        -- Prayer of Mending amélioré : + 2 par soin
 Priest.MISERY_UP = 1         -- Misery amélioré : + 1 par copie
 Priest.ECHO_PLUS = { 7, 9 }  -- Echo of Light : + N par tic (base, amélioré)
 Priest.COVENANT_HP = 3       -- Shadow Covenant : PV par point de mana
 Priest.REFLECT_CAP = { 2, 4 }  -- Reflective Shield : Absorb perdue renvoyée, au plus N par coup (base, amélioré)
-Priest.VOID_START = { 0, 3 } -- Voidform : Insanity gagnée au début de chaque combat (base, amélioré)
-Priest.VOID_PER = { 1, 1 }   -- Voidform : + 1 par tranche de N Insanity (base, amélioré : + Insanity de départ)
+Priest.VOID_BONUS = { 1, 2 } -- Voidform : dégâts en plus par point d'Insanity, par coup Shadow (base, amélioré)
 Priest.FOCUS_SCALE = { 1.75, 2 } -- Inner Focus : facteur (base, amélioré)
 Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
 
@@ -194,17 +193,13 @@ H.reflective_shield = {
 }
 
 H.voidform = {
-  onCombatStart = function(c, src)
-    local n = Priest.VOID_START[src.up and 2 or 1]
-    if n > 0 then Combat.gainRes(c, n, "epic") end
-  end,
   canPlay = function(c, src, v, d)
     if v == true and hasSurge(d) then return Priest.VOIDFORM_REASON end
     return v
   end,
   damage = function(c, src, v, dst, d)
     if d and d.school == "shadow" then
-      return v + floor((c.player.res or 0) / Priest.VOID_PER[src.up and 2 or 1])
+      return v + (c.player.res or 0) * Priest.VOID_BONUS[src.up and 2 or 1]
     end
     return v
   end,
@@ -296,7 +291,7 @@ function Priest.botValue(c, W)
   elseif id == "voidform" then
     -- chaque point d'Insanity grandit les coups Shadow à venir (environ 3 tours de 3,5 cartes)
     local hits = 3 * 3.5 * share(c, shadowHitter)
-    return (p.res or 0) / Priest.VOID_PER[up and 2 or 1] * hits * W.enemyHp
+    return (p.res or 0) * Priest.VOID_BONUS[up and 2 or 1] * hits * W.enemyHp
   elseif id == "inner_focus" and p.cast and c.cls.focus == p.cast.card.uid and ns.Bots then
     return ns.Bots.castValue(c) * (Priest.FOCUS_SCALE[up and 2 or 1] - 1)
   end

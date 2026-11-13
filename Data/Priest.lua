@@ -356,7 +356,8 @@ card("apotheosis", {
 -- le détail (mots-clés du langage déclarés au même endroit).
 
 local function epic(id, t)
-  t.type, t.rarity, t.epic, t.power, t.effects = "power", "epic", true, true, {}
+  -- cost = 0 : convention commune (jamais payé ni affiché, Sim/tests.lua exige un coût)
+  t.type, t.rarity, t.epic, t.power, t.effects, t.cost = "power", "epic", true, true, {}, 0
   card(id, t)
 end
 
@@ -393,7 +394,7 @@ epic("reflective_shield", {
 epic("voidform", {
   name = "Voidform", school = "shadow", path = "shadow", zone = "steppes",
   text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1.",
-  up = { text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1.\nCombat start: +3 Insanity." },
+  up = { text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +2." },
 })
 
 epic("inner_focus", {
@@ -505,10 +506,10 @@ ns.Classes.priest = {
     upgradeRun = { smite = 2.5, inner_fire = 2 }, -- ancien coureur (Sim/run.lua)
     remove = { inner_fire = 1, smite = 1.5 },
     -- Cartes épiques : chaque épique pilote le build (docs/zones/cartes-de-zone.md, « Deck piloté ») ; tant
-    -- qu'elle est dans le deck, ces notes remplacent celles de la classe (Sim/expedition.lua) : cartes
+    -- qu'elle est dans le deck, ces notes priment sur celles de la classe (byEpic, Sim/expedition.lua) : cartes
     -- centrales, mauvaises, à retirer d'abord (remove : plus bas = retirée d'abord), améliorations du feu
     -- de camp (upgrade, l'épique comprise).
-    epics = {
+    byEpic = {
       prayer_of_mending = {
         rating = { renew = 8, flash_heal = 8, greater_heal = 8, shadow_mend = 8, holy_nova = 7.5, halo = 7,
           vampiric_touch = 7.5, radiance = 6.5, solace = 9, evangelism = 6, luminous_barrier = 4.5,
@@ -562,7 +563,7 @@ ns.Classes.priest = {
 -- centrale de son build déjà dans le deck (note ≥ 7,5) : l'épique du deck construit vaut plus, un
 -- remplacement n'arrive que si le deck a déjà pris la forme d'une autre.
 ns.Classes.priest.bot.epic = function(exp, id)
-  local eb = ns.Classes.priest.bot.epics[id]
+  local eb = ns.Classes.priest.bot.byEpic[id]
   if not eb then return nil end
   local n = 0
   for _, cd in ipairs(exp.deck) do

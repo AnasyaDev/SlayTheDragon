@@ -85,13 +85,13 @@ local function hp(c) local t = {} for i, e in ipairs(c.enemies) do t[i] = e.hp e
 ---------------------------------------------------------------------------
 -- Données et socle
 ---------------------------------------------------------------------------
-test("données : sept épiques, une par zone, sans coût ni niveau, plaque Epic, améliorables", function()
+test("données : sept épiques, une par zone, coût 0 jamais payé, sans niveau, plaque Epic, améliorables", function()
   local zones = {}
   for _, id in ipairs(P.EPICS) do
     local d = ns.Cards[id]
     assert(d, id)
     eq(d.rarity, "epic", id); eq(d.class, "priest", id); eq(d.type, "power", id); eq(d.epic, true, id)
-    eq(d.cost, nil, id .. " : coût"); eq(d.level, nil, id .. " : niveau")
+    eq(d.cost, 0, id .. " : coût (jamais payé)"); eq(d.level, nil, id .. " : niveau")
     assert(d.deckHooks, id .. " : crochets")
     assert(d.text:find("^Epic%.\n"), id .. " : « Epic. » en tête")
     assert(d.up and d.up.text, id .. " : amélioration")
@@ -388,7 +388,7 @@ test("Voidform : les cartes à Surge sont injouables (raison Voidform)", functio
   end
 end)
 
-test("Voidform : chaque coup Shadow + 1 par Insanity, lue au coup ; Holy et DoT rien ; amélioré : +3 Insanity au départ", function()
+test("Voidform : chaque coup Shadow + 1 par Insanity, lue au coup ; Holy et DoT rien (amélioré : + 2)", function()
   local c = setup({ "mind_blast", "smite" })
   epic(c, "voidform")
   c.player.res = 7
@@ -401,13 +401,11 @@ test("Voidform : chaque coup Shadow + 1 par Insanity, lue au coup ; Holy et DoT 
   local before = c.enemies[1].hp
   Combat.endTurn(c)
   eq(before - c.enemies[1].hp, 5, "DoT : rien")
-  local deck = deckOf({ "mind_blast", "smite", "smite", "smite", "smite" })
-  deck[#deck + 1] = { id = "voidform", up = true }
-  local u = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deck, encounter = { "tp_dummy" } })
-  eq(u.player.res, 3, "amélioré : +3 Insanity au début du combat")
-  local b = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deckOf({ "mind_blast", "voidform" }),
-    encounter = { "tp_dummy" } })
-  eq(b.player.res, 0, "base : rien au départ")
+  local u = setup({ "mind_blast" })
+  epic(u, "voidform", true)
+  u.player.res = 7
+  play(u, "mind_blast", 1)
+  eq(u.enemies[1].hp, 100 - 24, "amélioré : 10 + 2 × 7")
 end)
 
 ---------------------------------------------------------------------------
@@ -498,7 +496,7 @@ end)
 
 test("bots : note des épiques et conseils du deck piloté", function()
   local b = ns.Classes.priest.bot
-  for _, id in ipairs(P.EPICS) do assert(b.epics[id], id) end
+  for _, id in ipairs(P.EPICS) do assert(b.byEpic[id], id) end
   local exp = { class = "priest", deck = deckOf({ "smite", "renew", "renew", "flash_heal" }) }
   assert(b.epic(exp, "prayer_of_mending") > b.epic(exp, "voidform"), "le deck soigne : Prayer of Mending")
   eq(ns.SimExpedition.epicRating(exp, "misery"), 7)
