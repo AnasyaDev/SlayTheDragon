@@ -3,7 +3,7 @@
 -- opts : seed, bot ("random"|"greedy"|"heuristic"), class, pick ("rated"|"random"|"skip"),
 --        force = { idCarte, ... } ajoutées au deck de départ, relics = { idBibelot, ... } au départ,
 --        level (niveau de classe : 1..7, nil = toutes les cartes et tous les bibelots de classe),
---        tier (palier de la Ligue des explorateurs : 0..3, nil = tout), loot (false = ni
+--        tier (palier commun : zones gagnées par le compte, 0..7, nil = tout), loot (false = ni
 --        bibelot ni potion gagnés), cap (nœuds de recherche), sequence (liste d'étapes), maxRounds.
 return function(ns)
   local Combat, Card, Rng, Rewards, Bots = ns.Combat, ns.Card, ns.Rng, ns.Rewards, ns.Bots
@@ -174,7 +174,7 @@ return function(ns)
     local rngMap = Rng.stream(seed, "map")
     local rngLoot = Rng.stream(seed, "loot")
     local rngTreasure = Rng.stream(seed, "treasure")
-    local pools = ns.Encounters.act1
+    local pools = ns.Encounters.westfall
     local lastEnc = {}
     local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {}, relicsGained = {} }
     local sequence = opts.sequence or Run.SEQUENCE_ACT1

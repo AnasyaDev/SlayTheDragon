@@ -38,8 +38,8 @@ end
 
 -- Une carte appartient à une classe (champ class) ou est commune (class absent : cartes neutres,
 -- prévues par le GDD, proposées seulement chez le marchand et dans les rencontres : neutral = true).
--- Pas de champ de niveau de déblocage aujourd'hui en dehors de rep (palier de réputation) ; un champ
--- `level` pourra s'y ajouter (progression par classe), lu par les mêmes filtres.
+-- Déblocage : level (niveau de classe), zone (carte de zone), tier (neutres : palier commun), lus par
+-- Expedition.unlocked (docs/zones.md).
 function Card.inClass(d, class, neutral)
   if d.class == nil then return neutral and d.neutral == true end
   return d.class == class

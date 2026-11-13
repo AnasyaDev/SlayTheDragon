@@ -13,8 +13,9 @@ ns.Save = Save
 
 -- 1 : format initial ; 2 : drapeaux de compte (meta.flags) ; 3 : classes (expédition version 3 :
 -- ressource de combat générique) ; 4 : niveau de classe (meta.classes[id].xp, expédition version 4 :
--- unlock.level).
-Save.VERSION = 4
+-- unlock.level) ; 5 : campagne par zones (meta.zones, meta.classes[id].zones, Ligue retirée ; expédition
+-- version 5 : exp.zone, unlock.common, unlock.won).
+Save.VERSION = 5
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -32,11 +33,28 @@ Save.MIGRATIONS = {}
 function Save.normalize(db)
   if type(db.meta) ~= "table" then db.meta = ns.Meta.new() end
   local m = db.meta
-  m.league = tonumber(m.league) or 0
   m.runs = tonumber(m.runs) or 0
+  if type(m.zones) ~= "table" then m.zones = {} end
+  for k, v in pairs(m.zones) do
+    if v ~= true then m.zones[k] = v and true or nil end
+  end
   if type(m.classes) ~= "table" then m.classes = {} end
   for _, cs in pairs(m.classes) do
-    if type(cs) == "table" then cs.xp = tonumber(cs.xp) or 0 end
+    if type(cs) == "table" then
+      cs.xp = tonumber(cs.xp) or 0
+      cs.runs = tonumber(cs.runs) or 0
+      cs.wins = tonumber(cs.wins) or 0
+      if type(cs.zones) ~= "table" then cs.zones = {} end
+      for zone, zs in pairs(cs.zones) do
+        if type(zs) ~= "table" then
+          cs.zones[zone] = nil
+        else
+          zs.won = zs.won == true
+          zs.keyMax = tonumber(zs.keyMax) or 0
+          zs.bestKey = tonumber(zs.bestKey) or -1
+        end
+      end
+    end
   end
   -- Drapeaux de compte : on ne garde que les entrées vraies, on n'en retire jamais une.
   if type(m.flags) ~= "table" then m.flags = {} end
@@ -59,16 +77,42 @@ Save.MIGRATIONS[1] = Save.normalize
 Save.MIGRATIONS[2] = Save.normalize
 
 -- 3 -> 4 : la réputation de classe (cs.rep, gardée) devient l'expérience de classe, au barème de
--- Meta.XP sans le bonus de clé : xp = rep × rate + victoires × win (même ordre de grandeur que si les
--- expéditions passées avaient déjà rapporté de l'expérience).
+-- l'expérience de la version 4 sans le bonus de clé : xp = rep × 0,5 + victoires × 15 (même ordre de
+-- grandeur que si les expéditions passées avaient déjà rapporté de l'expérience).
 Save.MIGRATIONS[3] = function(db)
   Save.normalize(db)
-  local P = ns.Meta.XP
   for _, cs in pairs(db.meta.classes) do
     if type(cs) == "table" and (cs.xp == nil or cs.xp == 0) and cs.rep then
-      cs.xp = math.floor((tonumber(cs.rep) or 0) * P.rate + (tonumber(cs.wins) or 0) * P.win + 0.5)
+      cs.xp = math.floor((tonumber(cs.rep) or 0) * 0.5 + (tonumber(cs.wins) or 0) * 15 + 0.5)
     end
   end
+end
+
+-- 4 -> 5 : campagne par zones. La seule zone jouable jusque-là était Westfall : une classe qui a au moins
+-- une victoire l'a gagnée et y garde sa clé max et sa meilleure clé (cs.keyMax, cs.bestKey déplacés dans
+-- cs.zones.westfall) ; le compte a gagné Westfall si une classe l'a gagnée. La réputation de la Ligue des
+-- explorateurs (meta.league) est abandonnée.
+Save.MIGRATIONS[4] = function(db)
+  Save.normalize(db)
+  local m = db.meta
+  local first = ns.Zone.FIRST
+  for _, cs in pairs(m.classes) do
+    if type(cs) == "table" then
+      local wins = tonumber(cs.wins) or 0
+      local keyMax = tonumber(cs.keyMax) or 0
+      local best = tonumber(cs.bestKey) or -1
+      if wins > 0 or best >= 0 or keyMax > 0 then
+        local zs = cs.zones[first] or {}
+        zs.won = true
+        zs.keyMax = math.max(tonumber(zs.keyMax) or 0, keyMax, 1)
+        zs.bestKey = math.max(tonumber(zs.bestKey) or -1, best, 0)
+        cs.zones[first] = zs
+        m.zones[first] = true
+      end
+      cs.keyMax, cs.bestKey = nil, nil
+    end
+  end
+  m.league = nil
 end
 
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp, db) de v à v + 1.
@@ -110,6 +154,20 @@ Save.EXP_MIGRATIONS[3] = function(exp, db)
   end
   exp.unlock.league = tonumber(exp.unlock.league) or 0
   exp.unlock.rep = nil
+end
+
+-- Expédition 4 -> 5 : campagne par zones. L'expédition en cours se joue dans Westfall (seule zone
+-- jusque-là) ; ses déblocages communs et de zone sont ceux du compte après la migration de la méta (le
+-- palier de Ligue figé, unlock.league, est abandonné ; ce qui a déjà été tiré reste dans l'état).
+Save.EXP_MIGRATIONS[4] = function(exp, db)
+  if exp.zone == nil then exp.zone = ns.Zone.FIRST end
+  if type(exp.unlock) ~= "table" then exp.unlock = { level = 1 } end
+  local meta = db and type(db.meta) == "table" and db.meta
+  local u = meta and ns.Meta.unlocks(meta, exp.class or "priest") or { common = 0, won = {} }
+  exp.unlock.common = u.common
+  exp.unlock.won = u.won
+  exp.unlock.league = nil
+  exp.acts = 1
 end
 
 local function quarantine(db, state, reason)
@@ -202,6 +260,7 @@ function Save.validateExpedition(exp)
   end
   if type(exp.hp) ~= "number" or type(exp.gold) ~= "number" then return false, "HP or gold" end
   if not ns.Classes[exp.class] then return false, "class " .. tostring(exp.class) end
+  if not ns.Zones[exp.zone] or not ns.Zone.playable(exp.zone) then return false, "zone " .. tostring(exp.zone) end
   for i = 1, #exp.deck do
     if not ns.Cards[exp.deck[i].id] then return false, "unknown card " .. tostring(exp.deck[i].id) end
   end
@@ -219,11 +278,19 @@ function Save.validate(db)
   if type(db) ~= "table" then return false, { "no save" } end
   if db.version ~= Save.VERSION then err("version " .. tostring(db.version)) end
   local m = db.meta
-  if type(m) ~= "table" or type(m.classes) ~= "table" or type(m.league) ~= "number" then
+  if type(m) ~= "table" or type(m.classes) ~= "table" or type(m.zones) ~= "table" then
     err("meta")
   else
     for class, cs in pairs(m.classes) do
-      if type(cs) ~= "table" or type(cs.xp) ~= "number" or type(cs.keyMax) ~= "number" then err("meta." .. tostring(class)) end
+      if type(cs) ~= "table" or type(cs.xp) ~= "number" or type(cs.zones) ~= "table" then
+        err("meta." .. tostring(class))
+      else
+        for zone, zs in pairs(cs.zones) do
+          if not ns.Zones[zone] or type(zs) ~= "table" or type(zs.keyMax) ~= "number" then
+            err("meta." .. tostring(class) .. ".zones." .. tostring(zone))
+          end
+        end
+      end
     end
     if type(m.flags) ~= "table" then err("meta.flags") end
   end
@@ -241,7 +308,7 @@ end
 -- Cycle de vie d'une expédition
 ---------------------------------------------------------------------------
 
--- Démarre une expédition (opts : seed, class, key). Renvoie exp ou nil, raison.
+-- Démarre une expédition (opts : seed, class, zone, key). Renvoie exp ou nil, raison.
 function Save.start(db, opts)
   if db.current then return nil, "running" end
   local exp, why = ns.Meta.newExpedition(db.meta, opts)
@@ -260,7 +327,6 @@ function Save.finish(db, date)
   local summary = ns.Meta.record(db.meta, exp)
   local entry = ns.Expedition.summary(exp)
   entry.date = date
-  entry.rep = summary.rep
   entry.xp = summary.xp
   db.journal[#db.journal + 1] = entry
   db.current = nil

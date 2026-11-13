@@ -304,10 +304,14 @@ test("marchand : achats, retrait au prix croissant, emplacements de potion", fun
   eq(exp.phase, "map")
 end)
 
-test("marchand : Ligue exaltée = un bibelot de plus", function()
-  local exp = newExp({ unlocks = { level = 1, league = Meta.EXALTED } })
+test("marchand : un bibelot de plus après la première victoire du compte dans la zone 6", function()
+  eq(Meta.PERKS.merchantRelic, 6)
+  local exp = newExp({ unlocks = { level = 1, common = Meta.PERKS.merchantRelic } })
   enter(exp, "merchant")
   eq(#exp.shop.relics, 4)
+  local b = newExp({ unlocks = { level = 1, common = Meta.PERKS.merchantRelic - 1 } })
+  enter(b, "merchant")
+  eq(#b.shop.relics, 3, "zone 5 : pas encore")
 end)
 
 test("coffre : un bibelot", function()
@@ -391,20 +395,24 @@ test("rencontre : carriole (combat avec bonus d'or, potion)", function()
   assert(b.potions[1], "potion reçue")
 end)
 
-test("rencontres : filtre de tier et pas de doublon", function()
-  ns.Events.test_league = { name = "Ligue", act = 1, tier = 2, text = "", choices = { { label = "Ok", effects = {} } } }
+test("rencontres : filtre de palier commun et de zone, pas de doublon", function()
+  ns.Events.test_league = { name = "Commun", zone = "westfall", tier = 2, text = "", choices = { { label = "Ok", effects = {} } } }
+  ns.Events.test_elsewhere = { name = "Ailleurs", zone = "duskwood", tier = 0, text = "", choices = { { label = "Ok", effects = {} } } }
+  ns.Events.test_anywhere = { name = "Partout", tier = 0, text = "", choices = { { label = "Ok", effects = {} } } }
   local exp = newExp()
   assert(not exp.seenEvents.test_league)
   local pool = X.eventPool(exp)
   eq(count(pool, "test_league"), 0, "tier 2 verrouillé")
-  local b = newExp({ unlocks = { rep = 0, league = 2 } })
+  eq(count(pool, "test_elsewhere"), 0, "rencontre d'une autre zone")
+  eq(count(pool, "test_anywhere"), 1, "rencontre sans zone : partout")
+  local b = newExp({ unlocks = { common = 2 } })
   eq(count(X.eventPool(b), "test_league"), 1)
-  ns.Events.test_league = nil
+  ns.Events.test_league, ns.Events.test_elsewhere, ns.Events.test_anywhere = nil, nil, nil
   enterEvent(exp, "saldean_farm")
   eq(count(X.eventPool(exp), "saldean_farm"), 0, "déjà vue")
 end)
 
-test("bibelots : crochets d'expédition (or, repos, ramassage) et pool de Ligue", function()
+test("bibelots : crochets d'expédition (or, repos, ramassage) et pool commun", function()
   local exp = newExp()
   X.gainRelic(exp, "test_purse")
   X.gainRelic(exp, "test_heart")
@@ -418,7 +426,7 @@ test("bibelots : crochets d'expédition (or, repos, ramassage) et pool de Ligue"
   eq(count(X.relicPool(exp), "test_purse"), 0, "déjà possédé")
   eq(count(X.relicPool(exp), "test_league"), 0, "tier 2 verrouillé")
   eq(count(X.relicPool(exp), "test_class"), 1, "bibelot de la classe jouée dans le pool")
-  local b = newExp({ unlocks = { rep = 0, league = 2 } })
+  local b = newExp({ unlocks = { common = 2 } })
   eq(count(X.relicPool(b), "test_league"), 1)
 end)
 
@@ -426,44 +434,45 @@ end)
 -- Méta-progression
 ---------------------------------------------------------------------------
 
-test("réputation : points par étape, élite et boss, paliers", function()
+test("expérience : avancée de l'expédition (étapes, élites, boss), plus de Ligue ni de réputation", function()
   local meta = Meta.new()
   local exp = newExp()
   exp.stats.cleared, exp.stats.elites, exp.stats.bosses = 5, 1, 0
   exp.result = "lost"
   local s = Meta.record(meta, exp)
-  eq(s.rep, 5 * Meta.REP.step + Meta.REP.elite)
+  eq(s.rep, nil, "plus de réputation")
+  eq(meta.league, nil, "plus de Ligue")
+  eq(Meta.LEVELS, nil); eq(Meta.REP, nil); eq(Meta.repFor, nil)
   eq(meta.classes.priest.rep, nil, "plus de réputation de classe")
-  eq(meta.league, s.rep)
-  eq(s.xp, math.floor(s.rep * Meta.XP.rate + 0.5), "défaite : expérience sans bonus de victoire")
+  eq(s.xp, 5 * Meta.XP.step + Meta.XP.elite, "défaite : expérience sans bonus de victoire")
   eq(meta.classes.priest.xp, s.xp)
-  eq(meta.classes.priest.keyMax, 0, "pas de clé sur une défaite")
-  eq(Meta.level(0), 0)
-  eq(Meta.level(Meta.LEVELS[2].at), 1)
-  eq(Meta.level(Meta.LEVELS[5].at + 1), 4)
-  eq(Meta.levelName(4), "Exalted")
-  local lv, inLv, size = Meta.progress(Meta.LEVELS[2].at + 3)
-  eq(lv, 1); eq(inLv, 3); eq(size, Meta.LEVELS[3].at - Meta.LEVELS[2].at)
+  eq(Meta.keyMax(meta, "priest", "westfall"), 0, "pas de clé sur une défaite")
+  eq(Meta.classWon(meta, "priest", "westfall"), false)
+  eq(next(meta.zones), nil, "défaite : aucune zone gagnée par le compte")
 end)
 
-test("déblocages : cartes par niveau de classe, bibelot au choix à Révéré (Ligue), titre au niveau 7", function()
+test("déblocages : cartes par niveau de classe, bibelot au choix (zone 3 du compte), titre au niveau 7", function()
   local lv0 = ns.Cards.radiance.level
   ns.Cards.radiance.level = 2
   local exp = newExp()
   eq(exp.unlock.level, 1, "niveau 1 par défaut")
   eq(count(X.cardPool(exp), "radiance"), 0, "verrouillée au départ")
-  local b = newExp({ unlocks = { level = 2, league = 0 } })
+  local b = newExp({ unlocks = { level = 2, common = 0 } })
   eq(count(X.cardPool(b), "radiance"), 1)
   ns.Cards.radiance.level = nil
   eq(count(X.cardPool(exp), "radiance"), 1, "level absent = 1")
   ns.Cards.radiance.level = lv0
-  -- la réputation de la Ligue ne débloque plus rien de la classe
-  local rich = newExp({ unlocks = { level = 1, league = Meta.EXALTED } })
-  eq(count(X.cardPool(rich), "rapture"), 0, "Rapture (niveau 7) verrouillée malgré la Ligue")
+  -- le palier commun ne débloque rien de la classe
+  local rich = newExp({ unlocks = { level = 1, common = 7 } })
+  eq(count(X.cardPool(rich), "rapture"), 0, "Rapture (niveau 7) verrouillée malgré le commun")
   eq(count(X.relicPool(rich), "anathema"), 0)
-  -- Révéré de la Ligue : un bibelot au choix parmi 3, tirés dans la réserve de l'expédition
+  -- première victoire du compte dans la zone 3 : un bibelot au choix parmi 3, tirés dans la réserve
+  eq(Meta.PERKS.startRelic, 3)
   local meta = Meta.new()
-  meta.league = Meta.LEVELS[4].at
+  meta.zones.westfall, meta.zones.duskwood = true, true
+  eq(Meta.newExpedition(meta, { seed = 3, class = "priest" }).phase, "map", "deux zones : pas encore")
+  meta.zones.wetlands = true
+  eq(Meta.commonTier(meta), 3)
   local r = Meta.newExpedition(meta, { seed = 3, class = "priest" })
   eq(r.phase, "start")
   eq(#r.startRelics, 3)
@@ -499,9 +508,16 @@ test("niveau de classe : seuils, progression, expérience gagnée (victoire, dé
     return Meta.xpFor(e)
   end
   local won, lost = xpOf("won", 0, 8, 1, 1), xpOf("lost", 0, 7, 1, 0)
-  eq(won, math.floor((8 * 10 + 12 + 30) * Meta.XP.rate + Meta.XP.win + 0.5))
+  eq(won, 8 * Meta.XP.step + Meta.XP.elite + Meta.XP.boss + Meta.XP.win)
+  eq(won, 76, "victoire à la clé 0 avec une élite : 76 (comme l'ancienne formule)")
+  eq(lost, 41, "défaite au boss avec une élite : 41")
+  eq(xpOf("lost", 0, 3, 0, 0), 15, "défaite précoce : moins")
   assert(won > lost, "une victoire rapporte plus")
-  assert(xpOf("won", 3, 8, 1, 1) > won, "une clé plus haute rapporte plus")
+  -- +15 % par niveau de clé
+  eq(Meta.XP.key, 0.15)
+  eq(xpOf("won", 1, 8, 1, 1), math.floor(76 * 1.15 + 0.5))
+  eq(xpOf("won", 3, 8, 1, 1), math.floor(76 * 1.45 + 0.5))
+  eq(xpOf("won", 5, 8, 1, 1), math.floor(76 * 1.75 + 0.5))
   eq(xpOf("abandoned", 0, 0, 0, 0), 0, "abandon immédiat : rien")
   -- cadence visée : 2 à 3 expéditions pour le niveau 2, de l'ordre de 20 pour le niveau 7
   -- (≈ 4 victoires pour 1 défaite au boss)
@@ -558,10 +574,10 @@ test("clés mythiques : +1 à la 1re victoire, +N ouvre +N+1, plafond +5", funct
   eq(finish(0, "won").keyUnlocked, nil, "rien de neuf")
   eq(finish(1, "won").keyUnlocked, 2)
   eq(finish(2, "lost").keyUnlocked, nil)
-  eq(Meta.keyMax(meta, "priest"), 2)
+  eq(Meta.keyMax(meta, "priest", "westfall"), 2)
   for k = 2, 6 do finish(math.min(k, 5), "won") end
-  eq(Meta.keyMax(meta, "priest"), 5)
-  eq(meta.classes.priest.bestKey, 5)
+  eq(Meta.keyMax(meta, "priest", "westfall"), 5)
+  eq(meta.classes.priest.zones.westfall.bestKey, 5)
   assert(Meta.newExpedition(meta, { key = 5 }))
 end)
 
@@ -688,7 +704,8 @@ test("migrate : options de l'interface gardées, méta incomplète réparée", f
   eq(m.options.autoOpen, false)
   eq(m.options.minimap.angle, 90)
   eq(m.options.point[3], 4)
-  eq(m.meta.league, 0)
+  eq(m.meta.league, nil)
+  eq(type(m.meta.zones), "table")
   eq(type(m.meta.classes), "table")
   eq(m.meta.saves, 12, "champs inconnus de la méta gardés")
   eq(m.current, nil)
@@ -793,7 +810,7 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
       assert(EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
       if e[1] == "fight" then
         local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
-        assert(ns.Encounters.act1[pool], id .. " : groupe " .. tostring(pool))
+        assert(ns.Encounters[ns.Zones[ns.Events[id].zone or "westfall"].encounters][pool], id .. " : groupe " .. tostring(pool))
       elseif e[1] == "relic" and e[2] then
         assert(ns.Relics[e[2]] and ns.Relics[e[2]].noPool, id .. " : bibelot propre " .. e[2])
       elseif e[1] == "potion" and e[2] then
@@ -809,8 +826,8 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
     assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
-    assert(ev.tier >= 0 and ev.tier <= 3, id .. " : tier")
-    if ev.act == 1 then fam[ev.rarity] = fam[ev.rarity] + 1 end
+    assert(ev.tier >= 0 and ev.tier <= ns.Zone.count(), id .. " : tier")
+    if ev.zone == "westfall" then fam[ev.rarity] = fam[ev.rarity] + 1 end
     if ev.rarity == "common" and ev.tier == 0 then tier0 = tier0 + 1 end
     if ev.rarity == "story" then assert(ev.once, id .. " : histoire unique") end
     if ev.when then
@@ -861,7 +878,7 @@ test("conditions : chaque condition et sa raison", function()
 end)
 
 test("rencontres : conditions de déclenchement (PV, étape, clé, drapeau)", function()
-  local exp = newExp({ unlocks = { level = 1, league = 3 } })
+  local exp = newExp({ unlocks = { level = 1, common = 3 } })
   exp.floor = 1
   local pool = X.eventPool(exp)
   eq(count(pool, "herbalist"), 0, "PV pleins : pas d'herboriste")
@@ -881,7 +898,7 @@ test("rencontres : conditions de déclenchement (PV, étape, clé, drapeau)", fu
   eq(count(pool, "tobin_defias"), 0, "branche exclusive")
   -- Le premier nœud d'une carte est à l'étape 1 : la rencontre tirée respecte les conditions.
   for s = 1, 40 do
-    local e = newExp({ seed = s, unlocks = { level = 1, league = 3 } })
+    local e = newExp({ seed = s, unlocks = { level = 1, common = 3 } })
     enter(e, "event")
     if e.event.id then
       local ev = ns.Events[e.event.id]
@@ -961,7 +978,7 @@ test("rencontre rare : poids faible, tirée rarement", function()
   assert(X.EVENT_WEIGHT.rare * 3 <= X.EVENT_WEIGHT.common)
   local n, seen = 0, {}
   for s = 1, 1500 do
-    local exp = newExp({ seed = s, unlocks = { level = 1, league = 3 } })
+    local exp = newExp({ seed = s, unlocks = { level = 1, common = 3 } })
     enter(exp, "event")
     if exp.event.id then
       n = n + 1
@@ -974,7 +991,7 @@ test("rencontre rare : poids faible, tirée rarement", function()
   assert(rare / 2 < common / 3 / 2, ("rares %d contre ordinaires %d"):format(rare, common))
   -- Poids explicite : remplace celui de la famille.
   ns.Events.goblin_peddler.weight = 1000
-  local exp = newExp({ unlocks = { level = 1, league = 3 } })
+  local exp = newExp({ unlocks = { level = 1, common = 3 } })
   enter(exp, "event")
   ns.Events.goblin_peddler.weight = nil
   eq(exp.event.id, "goblin_peddler")
@@ -1075,7 +1092,7 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
         local exp = newExp()
         forceEvent(exp, id)
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
-        exp.unlock.league = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
+        exp.unlock.common = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
         exp.potions[1] = "healing_potion"
         exp.relics[#exp.relics + 1] = "stormwind_tabard"
         for _, r in ipairs(exp.event.rolls[ci]) do
@@ -1101,7 +1118,7 @@ test("sauvegarde v1 -> v2 : drapeaux créés, gardés, expédition en cours migr
   local db, note = Save.migrate(reload(v1))
   eq(note, "migrated"); eq(db.version, Save.VERSION); assert(Save.VERSION >= 2)
   eq(type(db.meta.flags), "table")
-  eq(db.meta.league, 300)
+  eq(db.meta.league, nil, "réputation de Ligue abandonnée (v5)")
   assert(db.current, "expédition gardée")
   eq(db.current.version, X.VERSION)
   eq(type(db.current.flags), "table"); eq(type(db.current.newFlags), "table")
@@ -1130,7 +1147,7 @@ end)
 
 test("toutes les actions proposées sont acceptées (marche aléatoire)", function()
   for s = 1, 25 do
-    local exp = newExp({ seed = s, key = s % 6, unlocks = { level = s % 7 + 1, league = s % 5 }, keepStart = true })
+    local exp = newExp({ seed = s, key = s % 6, unlocks = { level = s % 7 + 1, common = s % 5 }, keepStart = true })
     local rng = Rng.new(s)
     for _ = 1, 3000 do
       if exp.phase == "done" then break end
@@ -1168,7 +1185,7 @@ end)
 
 test("classes : récompenses, marchand et rencontres tirés dans le pool de la classe jouée", function()
   for _, class in ipairs({ "priest", "warrior" }) do
-    local exp = newExp({ class = class, unlocks = { level = 7, league = 3 } })
+    local exp = newExp({ class = class, unlocks = { level = 7, common = 3 } })
     for _, id in ipairs(X.cardPool(exp)) do eq(ns.Cards[id].class, class, id) end
     eq(#X.cardPool(exp), 30)
     for _, id in ipairs(X.relicPool(exp)) do
@@ -1185,18 +1202,18 @@ test("classes : récompenses, marchand et rencontres tirés dans le pool de la c
       assert(ns.Relics[it.id].class == nil or ns.Relics[it.id].class == class, it.id)
     end
   end
-  local w = newExp({ class = "warrior", unlocks = { level = 1, league = 3 } })
+  local w = newExp({ class = "warrior", unlocks = { level = 1, common = 3 } })
   eq(count(X.relicPool(w), "battle_standard"), 0, "bibelot de départ jamais tiré (déjà possédé, noPool)")
   eq(count(X.relicPool(w), "hand_of_justice"), 1, "bibelot du Guerrier (niveau 1) dans son pool")
-  eq(count(X.relicPool(newExp({ class = "priest", unlocks = { level = 7, league = 3 } })), "hand_of_justice"), 0,
+  eq(count(X.relicPool(newExp({ class = "priest", unlocks = { level = 7, common = 3 } })), "hand_of_justice"), 0,
     "pas dans celui du Prêtre")
   local c = Combat.new({ class = "warrior", hp = 50, deck = {}, encounter = { "test_hitter" } })
   eq(c.class, "warrior")
 end)
 
-test("classes : bibelot au départ (Révéré de la Ligue) tiré dans la réserve de la classe, hors bibelot de départ", function()
+test("classes : bibelot au départ (zone 3 du compte) tiré dans la réserve de la classe, hors bibelot de départ", function()
   for s = 1, 30 do
-    local w = newExp({ seed = s, class = "warrior", unlocks = { level = 7, league = Meta.REVERED }, keepStart = true })
+    local w = newExp({ seed = s, class = "warrior", unlocks = { level = 7, common = Meta.PERKS.startRelic }, keepStart = true })
     eq(w.phase, "start")
     for _, id in ipairs(w.startRelics) do
       local r = ns.Relics[id]
@@ -1204,16 +1221,16 @@ test("classes : bibelot au départ (Révéré de la Ligue) tiré dans la réserv
       assert(id ~= "battle_standard" and not r.noPool and r.rarity ~= "boss", id)
     end
   end
-  eq(newExp({ class = "warrior", unlocks = { level = 7, league = 2 }, keepStart = true }).phase, "map", "Honoré : rien")
+  eq(newExp({ class = "warrior", unlocks = { level = 7, common = 2 }, keepStart = true }).phase, "map", "zone 2 : rien")
 end)
 
-test("classes : réserves par niveau de classe (cartes et bibelots), sans effet de la Ligue", function()
+test("classes : réserves par niveau de classe (cartes et bibelots), sans effet du palier commun", function()
   local CARDS = { 18, 21, 21, 24, 24, 27, 30 }
   local RELICS = { 1, 1, 2, 2, 3, 3, 5 } -- bibelots de classe tirables (hors bibelot de départ)
   for _, class in ipairs({ "priest", "warrior", "mage", "rogue", "hunter" }) do
     for lv = 1, 7 do
       for _, league in ipairs({ 0, 3 }) do
-        local e = newExp({ class = class, unlocks = { level = lv, league = league } })
+        local e = newExp({ class = class, unlocks = { level = lv, common = league } })
         -- Rogue : Nightblade (Subtlety, niveau 3) en plus de la grille commune
         local extra = (class == "rogue" and lv >= 3) and 1 or 0
         eq(#X.cardPool(e), CARDS[lv] + extra, class .. " niveau " .. lv .. " : cartes")
@@ -1257,13 +1274,14 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   -- état d'une sauvegarde v2 : Démence, ni classe ni état de classe dans le combat
   c.player.demence, c.player.res, c.class, c.cls, c.turn = 3, nil, nil, nil, nil
   cur.version = 2
+  cur.zone, cur.unlock = nil, { rep = 0, league = 0 }
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 4); eq(Save.VERSION, 4); eq(X.VERSION, 4)
+  eq(note, "migrated"); eq(db.version, 5); eq(Save.VERSION, 5); eq(X.VERSION, 5)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 4); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
+  eq(m.version, 5); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
   eq(m.combat.class, "priest"); eq(type(m.combat.cls), "table")
   assert(Save.validate(db))
   -- le combat migré se joue tout de suite (compteurs du tour recréés), puis au tour suivant
@@ -1289,24 +1307,25 @@ test("Guerrier : expédition simulée complète, reproductible", function()
   end
 end)
 
-test("sauvegarde v3 -> v4 : réputation de classe convertie en expérience, expédition au niveau de sa classe", function()
-  local cur = newExp({ seed = 8, class = "warrior", unlocks = { level = 1, league = 2 } })
+test("sauvegarde v3 -> v5 : réputation de classe convertie en expérience, expédition au niveau de sa classe", function()
+  local cur = newExp({ seed = 8, class = "warrior", unlocks = { level = 1, common = 2 } })
   enter(cur, "combat")
   cur.version = 3
+  cur.zone = nil
   cur.unlock = { rep = 2, league = 2 }
   local v3 = { version = 3, meta = { league = 900, runs = 9, flags = {}, classes = {
     priest = { rep = 300, runs = 3, wins = 2, keyMax = 2, bestKey = 1 },
     warrior = { rep = 800, runs = 6, wins = 4, keyMax = 1, bestKey = 0 } } },
     current = cur, journal = { { result = "won", class = "priest", rep = 110 } } }
   local db, note = Save.migrate(reload(v3))
-  eq(note, "migrated"); eq(db.version, 4)
+  eq(note, "migrated"); eq(db.version, 5)
   local w, p = db.meta.classes.warrior, db.meta.classes.priest
-  eq(w.xp, math.floor(800 * Meta.XP.rate + 4 * Meta.XP.win + 0.5))
-  eq(p.xp, math.floor(300 * Meta.XP.rate + 2 * Meta.XP.win + 0.5))
-  eq(w.rep, 800, "ancienne réputation gardée"); eq(w.keyMax, 1); eq(db.meta.league, 900)
+  eq(w.xp, math.floor(800 * 0.5 + 4 * 15 + 0.5))
+  eq(p.xp, math.floor(300 * 0.5 + 2 * 15 + 0.5))
+  eq(w.rep, 800, "ancienne réputation gardée"); eq(w.zones.westfall.keyMax, 1); eq(db.meta.league, nil)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 4); eq(m.unlock.rep, nil); eq(m.unlock.league, 2)
+  eq(m.version, 5); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
   eq(m.unlock.level, Meta.classLevel(w.xp), "niveau de sa classe après migration")
   eq(Meta.classLevel(w.xp), 4)
   assert(Save.validate(db))
@@ -1324,7 +1343,7 @@ end)
 -- Chasseur ------------------------------------------------------------------
 
 test("Chasseur : expédition (deck, PV, Pet Whistle), pools de sa classe, expédition simulée reproductible", function()
-  local h = newExp({ class = "hunter", unlocks = { level = 7, league = 3 } })
+  local h = newExp({ class = "hunter", unlocks = { level = 7, common = 3 } })
   local cd = ns.Classes.hunter
   eq(h.class, "hunter"); eq(h.hp, cd.hp); eq(#h.deck, 10); eq(h.relics[1], "pet_whistle")
   eq(#X.cardPool(h), 30)
@@ -1353,12 +1372,12 @@ local function isNeutral(id) local d = ns.Cards[id] return d and d.class == nil 
 
 test("neutres : jamais en récompense de combat (pool des cinq classes, 40 combats et élites tirés)", function()
   for _, cl in ipairs(NEUTRAL_CLASSES) do
-    local exp = newExp({ class = cl, unlocks = { rep = 2, league = 3 } })
+    local exp = newExp({ class = cl, unlocks = { rep = 2, common = 3 } })
     for _, id in ipairs(X.cardPool(exp)) do assert(not isNeutral(id), cl .. " : " .. id) end
     for _, id in ipairs(X.cardPool(exp, true)) do assert(not isNeutral(id), cl .. " (neutral) : " .. id) end
     for s = 1, 8 do
       for _, kind in ipairs({ "combat", "elite" }) do
-        local e = newExp({ class = cl, seed = 100 + s, unlocks = { rep = 2, league = 3 } })
+        local e = newExp({ class = cl, seed = 100 + s, unlocks = { rep = 2, common = 3 } })
         enter(e, kind)
         for _, id in ipairs(e.fight.reward.cards) do assert(not isNeutral(id), cl .. " " .. kind .. " : " .. id) end
       end
@@ -1369,7 +1388,7 @@ end)
 test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), condition « unlocked »", function()
   local want = { [0] = 4, 6, 8, 10 }
   for lv = 0, 3 do
-    local exp = newExp({ unlocks = { rep = 0, league = lv } })
+    local exp = newExp({ unlocks = { rep = 0, common = lv } })
     local pool = X.neutralPool(exp)
     eq(#pool, want[lv], "palier " .. lv)
     for _, id in ipairs(pool) do
@@ -1380,7 +1399,7 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
     eq(X.check(exp, { { "unlocked", "elixir_of_superior_defense" } }), lv >= 2, "condition unlocked " .. lv)
   end
   -- Exalté (4) : comme Révéré
-  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, league = 4 } })), 10)
+  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } })), 10)
 end)
 
 test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 100 ±10 %), pour chaque classe", function()
@@ -1389,7 +1408,7 @@ test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 
   for _, cl in ipairs(NEUTRAL_CLASSES) do
     for s = 1, 12 do
       local lv = s % 4
-      local exp = newExp({ class = cl, seed = 200 + s, unlocks = { rep = 0, league = lv } })
+      local exp = newExp({ class = cl, seed = 200 + s, unlocks = { rep = 0, common = lv } })
       enter(exp, "merchant")
       local cards = exp.shop.cards
       eq(#cards, 6, cl .. " : 5 + 1")
@@ -1428,7 +1447,7 @@ end)
 
 -- Choisit la réponse (label) d'une rencontre forcée ; renvoie l'expédition.
 local function neutralAnswer(evId, label, league, opts)
-  local exp = newExp({ unlocks = { rep = 0, league = league or 3 } })
+  local exp = newExp({ unlocks = { rep = 0, common = league or 3 } })
   local ev = ns.Events[evId]
   local id = exp.map.start[1]
   exp.map.nodes[id].kind = "event"
@@ -1460,7 +1479,7 @@ test("neutres : réponses de rencontres (carte donnée, coût payé, palier resp
     local exp, ci = neutralAnswer(k[1], k[2])
     local ev = ns.Events[k[1]]
     -- palier de la carte <= palier de la rencontre, sauf réponse cachée tant que non débloquée
-    local hidden = X.choiceHidden(newExp({ unlocks = { rep = 0, league = ev.tier } }), ev.choices[ci])
+    local hidden = X.choiceHidden(newExp({ unlocks = { rep = 0, common = ev.tier } }), ev.choices[ci])
     assert(ns.Cards[k[3]].tier <= ev.tier or ev.choices[ci].when, k[1] .. " : palier")
     assert(not hidden or ns.Cards[k[3]].tier > ev.tier, k[1])
     local n, gold, hp = #exp.deck, exp.gold, exp.hp
@@ -1513,7 +1532,7 @@ local NEW_RELICS = {
 
 test("bibelots communs : débloqués par palier de Ligue, jamais avant", function()
   for lv = 0, 3 do
-    local exp = newExp({ unlocks = { rep = 0, league = lv } })
+    local exp = newExp({ unlocks = { rep = 0, common = lv } })
     local pool = {}
     for _, id in ipairs(X.relicPool(exp)) do pool[id] = true end
     for t = 0, 3 do
@@ -1525,7 +1544,7 @@ end)
 test("bibelots communs : utiles à la classe (Rogue sans Cast ni Absorb : trois exclus), aucun ailleurs", function()
   local excluded = { focus_talisman = true, talisman_of_ephemeral_power = true, harm_prevention_belt = true }
   for _, cl in ipairs(NEUTRAL_CLASSES) do
-    local exp = newExp({ class = cl, unlocks = { rep = 2, league = 3 } })
+    local exp = newExp({ class = cl, unlocks = { rep = 2, common = 3 } })
     local pool = {}
     for _, id in ipairs(X.relicPool(exp)) do pool[id] = true end
     for t = 0, 3 do
@@ -1655,6 +1674,217 @@ test("Flint and Tinder : le repos améliore aussi une carte ; Royal Seal : repos
   X.gainRelic(m, "royal_seal_of_eldre_thalas")
   enter(m, "combat")
   eq(m.combat.player.mana, 4, "+1 mana")
+end)
+
+---------------------------------------------------------------------------
+-- Campagne par zones (13/11/2026)
+---------------------------------------------------------------------------
+
+-- Fin d'expédition simulée : la classe gagne (ou perd) la zone à cette clé.
+local function finishIn(db, class, zone, key, result)
+  local e = assert(Save.start(db, { seed = 30 + (key or 0), class = class, zone = zone, key = key or 0 }))
+  e.stats.cleared, e.stats.elites, e.stats.bosses = 8, 1, (result or "won") == "won" and 1 or 0
+  e.result, e.phase = result or "won", "done"
+  return (Save.finish(db, "t"))
+end
+
+test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, données de zone cohérentes", function()
+  local names = {}
+  for i, id in ipairs(ns.Zone.ORDER) do
+    eq(ns.Zones[id].order, i, id)
+    names[i] = ns.Zones[id].name
+  end
+  eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
+  eq(ns.Zone.FIRST, "westfall")
+  assert(ns.Zone.playable("westfall"))
+  for i = 2, 7 do eq(ns.Zone.playable(ns.Zone.ORDER[i]), false, ns.Zone.ORDER[i] .. " : Coming later") end
+  eq(ns.Zone.next("westfall"), "duskwood"); eq(ns.Zone.next("blackrock"), nil); eq(ns.Zone.prev("westfall"), nil)
+  local exp = newExp()
+  eq(exp.zone, "westfall"); eq(X.actName(exp), "Westfall"); eq(X.zoneDef(exp).encounters, "westfall")
+  -- données réelles : champs zone et key valides (cartes de zone et bibelots de clé à venir)
+  for id, d in pairs(ns.Cards) do
+    if d.zone then assert(ns.Zones[d.zone] and d.class, id .. " : carte de zone (zone connue, de classe)") end
+  end
+  for id, r in pairs(ns.Relics) do
+    if r.key then
+      assert(type(r.key) == "table" and ns.Zones[r.key.zone], id .. " : zone du bibelot de clé")
+      assert(r.key.level == 1 or r.key.level == 3 or r.key.level == 5, id .. " : clé +1, +3 ou +5")
+    end
+  end
+  for id, ev in pairs(ns.Events) do
+    assert(ev.zone == nil or ns.Zones[ev.zone], id .. " : zone de la rencontre")
+    eq(ev.act, nil, id .. " : plus de champ act")
+  end
+end)
+
+test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule", function()
+  local db = Save.new()
+  local m = db.meta
+  assert(Meta.zoneOpen(m, "mage", "westfall")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
+  local e, why = Save.start(db, { seed = 1, class = "mage", zone = "duskwood" })
+  eq(e, nil); eq(why, "zone coming later", "Duskwood : déclarée, pas jouable")
+  finishIn(db, "mage", "westfall", 0, "lost")
+  eq(Meta.zoneOpen(m, "mage", "duskwood"), false, "défaite : rien")
+  local s = finishIn(db, "mage", "westfall", 0)
+  eq(s.zoneWon, true); eq(s.zoneOpened, "duskwood"); eq(s.zone, "westfall")
+  assert(Meta.zoneOpen(m, "mage", "duskwood"), "Duskwood ouverte pour le Mage")
+  eq(Meta.zoneOpen(m, "mage", "wetlands"), false)
+  eq(Meta.zoneOpen(m, "priest", "duskwood"), false, "pas pour le Prêtre")
+  eq(Meta.classWon(m, "mage", "westfall"), true); eq(Meta.classWon(m, "priest", "westfall"), false)
+  local again = finishIn(db, "mage", "westfall", 0)
+  eq(again.zoneWon, nil, "deuxième victoire : plus une première"); eq(again.zoneOpened, nil)
+  -- zone fermée pour la classe : refusée même si elle devenait jouable
+  ns.Zones.wetlands.encounters = "westfall"
+  local x, w2 = Save.start(db, { seed = 2, class = "mage", zone = "wetlands" })
+  eq(x, nil); eq(w2, "zone locked")
+  ns.Zones.wetlands.encounters = nil
+  assert(Save.validate(db))
+end)
+
+test("zones : carte de zone introuvable avant la première victoire de la classe dans la zone", function()
+  ns.Cards.test_zone_card = { id = "test_zone_card", name = "Carte de zone", class = "priest", path = "discipline",
+    zone = "westfall", rarity = "rare", cost = 1, type = "skill", text = "", effects = {} }
+  local exp = newExp()
+  eq(X.unlocked(exp, ns.Cards.test_zone_card), false)
+  eq(count(X.cardPool(exp), "test_zone_card"), 0, "verrouillée")
+  eq(count(X.cardPool(newExp({ unlocks = { level = 7, common = 7, won = { duskwood = 5 } } })), "test_zone_card"), 0,
+    "une autre zone gagnée ne l'ouvre pas")
+  eq(count(Meta.classContent("priest").cards, "test_zone_card"), 0, "hors de la grille des niveaux")
+  local db = Save.new()
+  local s = finishIn(db, "priest", "westfall", 0)
+  eq(table.concat(s.zoneCards, ","), "test_zone_card", "annoncée en fin d'expédition")
+  local e = assert(Save.start(db, { seed = 3, class = "priest" }))
+  assert(X.unlocked(e, ns.Cards.test_zone_card))
+  eq(count(X.cardPool(e), "test_zone_card"), 1, "dans la réserve de la classe")
+  eq(count(X.cardPool(newExp({ class = "mage", unlocks = { level = 7, won = { westfall = 0 } } })), "test_zone_card"), 0,
+    "jamais pour une autre classe")
+  db.current = nil
+  eq(#finishIn(db, "priest", "westfall", 0).zoneCards, 0, "une seule fois")
+  ns.Cards.test_zone_card = nil
+end)
+
+test("zones : commun débloqué par la première victoire du compte dans une zone (toutes classes)", function()
+  -- table de répartition : tier N = zone d'ordre N
+  local c1 = Meta.commonContent(1)
+  local function has(list, id) return count(list, id) == 1 end
+  assert(has(c1.cards, "runecloth_bag") and has(c1.cards, "iron_grenade"), "neutres de l'ancien palier Amical")
+  assert(has(c1.relics, "darkmoon_prize_ticket") and has(c1.events, "moonbrook_refugees"))
+  eq(#c1.perks, 0)
+  eq(table.concat(Meta.commonContent(3).perks, ","), "startRelic")
+  eq(table.concat(Meta.commonContent(6).perks, ","), "merchantRelic")
+  eq(#Meta.commonContent(7).cards + #Meta.commonContent(7).relics, 0, "rien au-delà de l'ancien palier 3 aujourd'hui")
+  local db = Save.new()
+  eq(Meta.commonTier(db.meta), 0)
+  local fresh = assert(Save.start(db, { seed = 4, class = "warrior" }))
+  eq(fresh.unlock.common, 0)
+  eq(count(X.neutralPool(fresh), "runecloth_bag"), 0, "compte neuf : palier 0 seulement")
+  eq(count(X.relicPool(fresh), "darkmoon_prize_ticket"), 0)
+  db.current = nil
+  local s = finishIn(db, "warrior", "westfall", 0)
+  eq(s.accountZone, true); assert(s.common and has(s.common.cards, "runecloth_bag"), "annoncé en fin d'expédition")
+  eq(Meta.commonTier(db.meta), 1); eq(db.meta.zones.westfall, true)
+  -- une autre classe en profite tout de suite, sans avoir gagné la zone
+  local h = assert(Save.start(db, { seed = 5, class = "hunter" }))
+  eq(h.unlock.common, 1)
+  eq(count(X.neutralPool(h), "runecloth_bag"), 1)
+  eq(count(X.relicPool(h), "darkmoon_prize_ticket"), 1)
+  eq(Meta.zoneOpen(db.meta, "hunter", "duskwood"), false, "mais pas la zone suivante")
+  db.current = nil
+  local s2 = finishIn(db, "hunter", "westfall", 0)
+  eq(s2.zoneWon, true); eq(s2.accountZone, nil, "le compte avait déjà gagné Westfall"); eq(s2.common, nil)
+end)
+
+test("clés : une par zone et par classe, +N ouvre +N+1 dans cette zone pour cette classe", function()
+  local db = Save.new()
+  local m = db.meta
+  for k = 0, 2 do finishIn(db, "mage", "westfall", k) end
+  eq(Meta.keyMax(m, "mage", "westfall"), 3, "Mage : Westfall +3 ouverte")
+  eq(Meta.bestKey(m, "mage", "westfall"), 2)
+  eq(Meta.keyMax(m, "priest", "westfall"), 0, "rien pour le Prêtre")
+  eq(Meta.keyMax(m, "mage", "duskwood"), 0, "rien dans une autre zone")
+  local e, why = Save.start(db, { seed = 6, class = "priest", key = 1 })
+  eq(e, nil); eq(why, "key locked")
+  assert(Save.start(db, { seed = 7, class = "mage", key = 3 }))
+  db.current = nil
+  local s = finishIn(db, "mage", "westfall", 3)
+  eq(s.keyUnlocked, 4)
+  eq(m.classes.mage.zones.westfall.keyMax, 4)
+  eq(m.classes.mage.keyMax, nil, "plus de clé au niveau de la classe")
+  -- affixes inchangés
+  eq(#Meta.affixesFor(5), 5); eq(Meta.MAX_KEY, 5)
+end)
+
+test("clés : bibelot de clé débloqué par la première victoire de la classe à +1, +3, +5 dans la zone", function()
+  ns.Relics.test_key3 = { id = "test_key3", name = "Bibelot de clé", text = "", rarity = "rare",
+    key = { zone = "westfall", level = 3 } }
+  ns.Relics.test_key5_mage = { id = "test_key5_mage", name = "Bibelot de clé du Mage", text = "", rarity = "rare",
+    class = "mage", key = { zone = "westfall", level = 5 } }
+  eq(table.concat(Meta.KEY_RELIC_LEVELS, ","), "1,3,5")
+  local exp = newExp({ unlocks = { level = 7, common = 7, won = { westfall = 2 } } })
+  eq(X.unlocked(exp, ns.Relics.test_key3), false, "Westfall gagnée à +2 seulement")
+  eq(count(X.relicPool(exp), "test_key3"), 0)
+  local db = Save.new()
+  for k = 0, 2 do eq(#finishIn(db, "priest", "westfall", k).keyRelics, 0) end
+  local s = finishIn(db, "priest", "westfall", 3)
+  eq(table.concat(s.keyRelics, ","), "test_key3", "annoncé en fin d'expédition")
+  eq(#finishIn(db, "priest", "westfall", 3).keyRelics, 0, "une seule fois")
+  local p = assert(Save.start(db, { seed = 8, class = "priest", key = 4 }))
+  eq(count(X.relicPool(p), "test_key3"), 1, "dans le tirage du Prêtre")
+  eq(count(X.relicPool(p), "test_key5_mage"), 0, "bibelot réservé au Mage")
+  db.current = nil
+  local w = assert(Save.start(db, { seed = 9, class = "warrior" }))
+  eq(count(X.relicPool(w), "test_key3"), 0, "le Guerrier n'a pas gagné Westfall +3")
+  db.current = nil
+  eq(count(Meta.classContent("mage").relics, "test_key5_mage"), 0, "hors de la grille des niveaux")
+  -- simulation : zones=7 débloque tout
+  local all = newExp({ class = "mage", unlocks = Meta.allUnlocked(7) })
+  eq(count(X.relicPool(all), "test_key3"), 1); eq(count(X.relicPool(all), "test_key5_mage"), 1)
+  ns.Relics.test_key3, ns.Relics.test_key5_mage = nil, nil
+end)
+
+test("sauvegarde v4 -> v5 : zones par classe et du compte, Ligue abandonnée, expédition en cours jouable", function()
+  local cur = newExp({ seed = 12, class = "priest", unlocks = { level = 2, common = 3 } })
+  enter(cur, "combat")
+  -- état d'une sauvegarde v4 : ni zone ni déblocages de zone, palier de Ligue figé
+  cur.version, cur.zone, cur.unlock = 4, nil, { level = 2, league = 3 }
+  local v4 = { version = 4, meta = { league = 1500, runs = 9, flags = { tobin_spared = true }, classes = {
+      priest = { xp = 180, runs = 5, wins = 3, keyMax = 2, bestKey = 1 },
+      mage = { xp = 40, runs = 2, wins = 0, keyMax = 0, bestKey = -1 },
+    } }, current = cur, journal = { { result = "won", class = "priest", rep = 110, xp = 70 } },
+    options = { scale = 1.1 } }
+  local db, note = Save.migrate(reload(v4))
+  eq(note, "migrated"); eq(db.version, 5)
+  local m = db.meta
+  eq(m.league, nil, "réputation de Ligue abandonnée")
+  eq(m.zones.westfall, true, "le compte a gagné Westfall")
+  local pz = m.classes.priest.zones.westfall
+  eq(pz.won, true); eq(pz.keyMax, 2); eq(pz.bestKey, 1)
+  eq(m.classes.priest.keyMax, nil); eq(m.classes.priest.xp, 180, "expérience gardée")
+  eq(m.classes.mage.zones.westfall, nil, "Mage sans victoire : Westfall pas gagnée")
+  assert(Meta.zoneOpen(m, "priest", "duskwood")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
+  eq(m.flags.tobin_spared, true); eq(db.options.scale, 1.1); eq(db.journal[1].rep, 110, "journal intact")
+  local x = db.current
+  assert(x, "expédition gardée")
+  eq(x.version, 5); eq(x.zone, "westfall")
+  eq(x.unlock.level, 2); eq(x.unlock.league, nil); eq(x.unlock.common, 1); eq(x.unlock.won.westfall, 1)
+  assert(Save.validate(db))
+  -- l'expédition continue : combat, puis fin et méta
+  assert(X.act(x, { "endTurn" }))
+  winCombat(x)
+  if x.phase == "reward" then assert(X.act(x, { "leave" })) end
+  eq(x.phase, "map")
+  assert(X.act(x, { "abandon" }))
+  local s = Save.finish(db, "z")
+  assert(s and s.xp >= 0)
+  eq(m.classes.priest.runs, 6)
+  -- idempotente ; sauvegarde v4 sans victoire : le compte n'a rien gagné
+  local again = reload(db)
+  Save.migrate(again)
+  eq(serialize(again), serialize(db))
+  local none = Save.migrate({ version = 4, meta = { league = 50, runs = 1, flags = {}, classes = {
+    rogue = { xp = 20, runs = 1, wins = 0, keyMax = 0, bestKey = -1 } } }, journal = {} })
+  eq(next(none.meta.zones), nil); eq(next(none.meta.classes.rogue.zones), nil)
+  assert(Save.validate(none))
 end)
 
 print(("%d réussis, %d échoués"):format(passed, failed))

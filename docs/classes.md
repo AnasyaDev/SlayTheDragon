@@ -58,7 +58,7 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 | Champ | Règle |
 |---|---|
 | `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD ; `Data/Neutral.lua`) |
-| `neutral`, `tier` | carte neutre : `neutral = true`, `path = "neutral"`, `noReward = true`, `tier` = palier de Ligue (0..3) qui la débloque ; tirée par `Expedition.neutralPool` (emplacement « Neutral » du marchand, `{ "cardChoice", neutral = true }`), jamais par `cardPool` (récompenses) |
+| `neutral`, `tier` | carte neutre : `neutral = true`, `path = "neutral"`, `noReward = true`, `tier` = palier commun qui la débloque (0 d'emblée, N = première victoire du compte dans la zone N, `docs/zones.md`) ; tirée par `Expedition.neutralPool` (emplacement « Neutral » du marchand, `{ "cardChoice", neutral = true }`), jamais par `cardPool` (récompenses) |
 | `school` | champ libre (holy, shadow, fire, frost, arcane, nature…) : condition `school:<x>`, compteurs du tour, couleur |
 | `payHp = N` | « Pay N HP. » en première ligne ; payé au jeu (crochet `payHp` pour le modifier), injouable s'il ferait tomber à 0 (raison `hp`) ; compte comme une perte de PV (`onHpLost`), n'est pas une attaque, ignore l'Absorb |
 | `spend = N` | « Spend N: … » ; **au choix du joueur** : payé AU JEU si la ressource suffit (et si `spendNeed(c, inst)` le permet), sauf `Combat.play(c, i, t, { spend = false })` (action `{ "play", i, t, "nospend" }`, Maj enfoncée dans l'interface) ; `ctx.spent` à la résolution, gardé dans l'incantation ou la Trap |
@@ -67,7 +67,8 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 | `slot = "nom"` | Power unique par emplacement (Seal, Demon, totem d'un élément) : en jouer un autre remplace l'ancien |
 | `lasts = N` | Power à durée : retiré à la fin du N-ième round (crochet `powerLasts`) ; `c.player.powerTurns[uid]` |
 | `replacedTo = "exhaust"` | un Power remplacé ou expiré part aux consumées (défausse par défaut) |
-| `level` | niveau de classe (1 à 7) qui débloque la carte ou le bibelot (table du GDD, « Progression par classe » ci-dessous) ; lu par `Expedition.cardPool` / `relicPool` (`Expedition.unlocked`) et l'écran de progression. Plus de `rep` : la réputation (Ligue) ne débloque rien de la classe |
+| `level` | niveau de classe (1 à 7) qui débloque la carte ou le bibelot (table du GDD, « Progression par classe » ci-dessous) ; lu par `Expedition.cardPool` / `relicPool` (`Expedition.unlocked`) et l'écran de progression. Plus de `rep` ni de Ligue |
+| `zone = "<id>"` | carte de zone (avec `class`, sans `level`) : rare et forte, débloquée par la première victoire de la classe dans cette zone, introuvable autrement ; hors de la grille des niveaux (`Meta.classContent`), montrée par l'onglet « Zones » de l'écran Progress (`docs/zones.md`) |
 
 Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start"`, `level = 1`) + 13 communes,
 11 inhabituelles, 6 rares ; 10 par voie ; niveaux : voir « Progression par classe » (test « progression :
@@ -257,7 +258,8 @@ ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte
 ## Bibelots de classe
 
 `class = "<id>"` + `level` (1..7, pas de `tier`) : tirés seulement pour cette classe (récompenses, coffres,
-marchand, rencontres, choix du Révéré de la Ligue), dès que la classe a ce niveau. Le bibelot de départ
+marchand, rencontres, bibelot au choix du départ), dès que la classe a ce niveau. Bibelots de clé
+(`key = { zone, level }`, `class` facultatif) : `docs/zones.md`. Le bibelot de départ
 porte `noPool = true`, `level = 1` et `startRelic` dans la définition de classe : porté à chaque expédition.
 Six par classe (GDD) : niveau 1 = le bibelot de départ et un autre ; 3 et 5 = un ; 7 = deux.
 
@@ -268,6 +270,11 @@ répartition exacte » : niveau 1 = 4 cartes de départ + 6 par voie (22) et 2 b
 par voie ; 3 et 5 = un bibelot ; 7 = une rare par voie et 2 bibelots (34 cartes, 6 bibelots). Expérience,
 seuils et règles : `docs/expedition.md`, « Niveau de classe ». Mage, Rogue, Hunter : niveaux de leur fiche
 (`docs/classes/<classe>.md`, § Progression). Priest : `docs/classes/priest-progression.md`.
+
+En plus du niveau (campagne par zones, 13/11/2026, `docs/zones.md`) : chaque classe a **une carte de zone
+par zone** (`zone = "<id>"`, débloquée par sa première victoire dans la zone ; à écrire, aucune aujourd'hui),
+et les bibelots de clé (+1, +3, +5 de chaque zone) entrent dans son tirage à sa première victoire à cette
+clé. Gagner une zone avec une classe ouvre la zone suivante pour elle seule ; ses clés sont comptées par zone.
 
 | Niveau | Priest : Discipline / Shadow / Holy | Warrior : Arms / Fury / Protection |
 | --- | --- | --- |
@@ -319,8 +326,8 @@ expédition au niveau N, 7 par défaut). Une seule
 simulation à la fois, `jobs=8` au plus. Les bots jouent les formes communes sans code de classe (ils
 simulent chaque coup sur une copie) ; une classe les guide par `bot` (définition), `botKey` et `botValue`
 (règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cibles
-et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec la Ligue
-exaltée, clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
+et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec tout le
+commun, `zones=7` (ex-« Ligue exaltée »), clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
 
 ## Exemple minimal
 
@@ -372,8 +379,9 @@ ns.ClassRules.rogue = { hooks = {
 
 ## Sauvegarde
 
-`Save.VERSION` 4, `Expedition.VERSION` 4 : version 3, migration de la Démence du combat en cours
+`Save.VERSION` 5, `Expedition.VERSION` 5 : version 3, migration de la Démence du combat en cours
 (`c.player.demence` → `c.player.res`, `c.class`, `c.cls`) ; version 4, niveau de classe (`cs.xp` tiré de
-l'ancienne réputation de classe, `exp.unlock.level`, docs/expedition.md). Une classe qui ajoute un état de combat le
+l'ancienne réputation de classe, `exp.unlock.level`, docs/expedition.md) ; version 5, campagne par zones
+(`cs.zones`, `meta.zones`, `exp.zone`, `exp.unlock.common` et `won`, Ligue abandonnée, `docs/zones.md`). Une classe qui ajoute un état de combat le
 range dans `c.cls` (données simples) : rien à migrer tant que les champs absents ont une valeur par
 défaut. Une expédition d'une classe inconnue (fichier retiré) part en quarantaine (`Save.validateExpedition`).

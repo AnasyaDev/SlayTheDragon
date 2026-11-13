@@ -2,7 +2,7 @@
 -- toutes les classes, chez le marchand (emplacement « Neutral ») et dans quelques rencontres
 -- seulement, jamais en récompense de combat.
 -- Champs propres : pas de champ class (Card.inClass : carte commune), neutral = true, path = "neutral",
--- tier = palier de la Ligue des explorateurs qui la débloque (0 Neutre … 3 Révéré, comme les bibelots),
+-- tier = palier commun qui la débloque (0 d'emblée, N = première victoire du compte dans la zone N ; docs/zones.md),
 -- noReward = true (jamais dans X.cardPool : récompenses). Aucune ressource ni aucun état de classe :
 -- Absorb, DoT, Strength, Stunned, mana, pioche, Interrupt et les mots de plaque communs seulement.
 -- payHp = N : « Pay N HP. » en première ligne, coût payé au jeu, injouable s'il ferait tomber à 0 (décisions
@@ -21,7 +21,7 @@ local function card(id, t)
   C[id] = t
 end
 
--- Neutre (palier 0) ------------------------------------------------------------------------
+-- Disponible d'emblée (tier 0) ------------------------------------------------------------------------
 
 card("rough_dynamite", {
   tier = 0, name = "Rough Dynamite", cost = 1, type = "attack", rarity = "common",
@@ -51,7 +51,7 @@ card("smoked_desert_dumplings", {
   up = { effects = { { "apply", "force", 2, self = true } }, text = "Gain Strength 2\nExhaust." },
 })
 
--- Amical (palier 1) ------------------------------------------------------------------------
+-- Westfall, zone 1 (tier 1) ------------------------------------------------------------------------
 
 card("runecloth_bag", {
   tier = 1, name = "Runecloth Bag", cost = 1, type = "skill", rarity = "common",
@@ -67,7 +67,7 @@ card("iron_grenade", {
   up = { effects = { { "damage", 8 }, { "apply", "stunned", 1 } }, text = "Deal 8.\nApply Stunned 1 ⌛\nExhaust." },
 })
 
--- Honoré (palier 2) ------------------------------------------------------------------------
+-- Duskwood, zone 2 (tier 2) ------------------------------------------------------------------------
 
 card("arcane_bomb", {
   tier = 2, name = "Arcane Bomb", cost = 0, type = "skill", rarity = "uncommon",
@@ -90,7 +90,7 @@ card("elixir_of_superior_defense", {
   up = { turnAbsorb = 4, text = "Power.\nStart of turn: gain 4 Absorb." },
 })
 
--- Révéré (palier 3) ------------------------------------------------------------------------
+-- Wetlands, zone 3 (tier 3) ------------------------------------------------------------------------
 
 card("black_lotus", {
   tier = 3, name = "Black Lotus", cost = 0, type = "skill", rarity = "rare",

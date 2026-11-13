@@ -55,7 +55,7 @@ function Rewards.cardChoices(rng, class, n, weights, maxLevel)
     function(id) return ns.Cards[id].rarity end, weights or Rewards.RARITY_WEIGHT)
 end
 
--- Ids triés des bibelots débloqués au palier maxTier de la Ligue des explorateurs.
+-- Ids triés des bibelots débloqués au palier commun maxTier (zones gagnées par le compte).
 -- opts : { maxTier = n (nil = tous), boss = bool (bibelots de boss seulement, sinon exclus),
 --          exclude = { [id] = true } (déjà possédés), class = classe jouée, level = niveau de classe (nil = tous) }
 -- Bibelots communs (sans champ class, filtrés par maxTier) et ceux de la classe jouée (filtrés par

@@ -1337,41 +1337,47 @@ do
     .. nCombats .. " combats, " .. H.actions .. " actions" .. (e.killedBy and (", vaincu par " .. e.killedBy) or "") .. ")")
 end
 
-print("U7  bilan : Save.finish, réputation, journal, clé suivante")
+print("U7  bilan : Save.finish, expérience, déblocages de la campagne, journal, clé suivante")
 local db = _G.SlayTheDragonDB
+local Meta = H.ns.Meta
 check("expédition archivée (db.current = nil)", db.current == nil)
-check("une entrée au journal", #db.journal == 1 and db.journal[1].date ~= nil)
-check("réputation de la Ligue et expérience de classe gagnées", db.meta.league > 0 and db.meta.classes.priest.xp > 0
+check("une entrée au journal", #db.journal == 1 and db.journal[1].date ~= nil and db.journal[1].zone == "westfall")
+check("expérience de classe gagnée, plus de Ligue", db.meta.league == nil and db.meta.classes.priest.xp > 0
   and db.journal[1].xp == db.meta.classes.priest.xp)
-check("texte du bilan : expérience et réputation", (step.text or ""):find("Priest experience", 1, true)
-  and (step.text or ""):find("reputation", 1, true), step.text)
+check("texte du bilan : expérience, ni réputation ni Ligue", (step.text or ""):find("Priest experience", 1, true)
+  and not (step.text or ""):find("eputation", 1, true) and not (step.text or ""):find("League", 1, true), step.text)
 snap("bilan")
-check("barres de réputation affichées", UI().current.bars[1]._shown and UI().current.bars[2]._shown)
+check("une seule barre (niveau de la classe)", UI().current.bars[1]._shown and not UI().current.bars[2]._shown)
 tt = H.hover(UI().current.bars[1])
-check("infobulle d'une barre : palier", #tt >= 2, #tt)
+check("infobulle d'une barre : niveau", #tt >= 2 and table.concat(tt, " "):find("Level", 1, true), #tt)
 if won then
-  check("victoire : clé +1 débloquée", db.meta.classes.priest.keyMax == 1 and (step.text or ""):find("+1", 1, true))
+  check("victoire : clé +1 débloquée dans Westfall", Meta.keyMax(db.meta, "priest", "westfall") == 1
+    and (step.text or ""):find("Mythic Keystone +1 unlocked in Westfall", 1, true), step.text)
+  check("victoire : zone suivante annoncée (Duskwood, à venir), commun du compte annoncé",
+    (step.text or ""):find("Westfall won with the Priest: Duskwood is open to the Priest (coming later).", 1, true)
+    and (step.text or ""):find("First Westfall victory on this account", 1, true), step.text)
 else
-  check("défaite : pas de nouvelle clé", db.meta.classes.priest.keyMax == 0)
+  check("défaite : pas de nouvelle clé", Meta.keyMax(db.meta, "priest", "westfall") == 0)
 end
 clickOption("ui:progress")
 check("bilan -> progression de la classe jouée", currentKind() == "classProgress" and UI().step.class == "priest", currentKind())
 clickOption("ui:meta")
-check("écran méta", currentKind() == "meta", currentKind())
+check("écran du journal", currentKind() == "meta" and UI().step.title == "Expedition log", currentKind())
 snap("meta")
-check("méta : barres classe (niveau) et Ligue", UI().current.bars[1]._shown and UI().current.bars[2]._shown
-  and UI().current.bars[1].label._text == "Priest" and (UI().current.bars[1].value._text or ""):find("Level", 1, true)
-  and UI().current.bars[2].label._text == "Explorers' League")
-check("méta : journal", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Priest", 1, true)
+check("journal : barre de la classe (niveau) seulement", UI().current.bars[1]._shown and not UI().current.bars[2]._shown
+  and UI().current.bars[1].label._text == "Priest" and (UI().current.bars[1].value._text or ""):find("Level", 1, true))
+check("journal : lignes", UI().current.journal[1]._shown and (UI().current.journal[1]._text or ""):find("Priest · Westfall", 1, true)
   and (UI().current.journal[1]._text or ""):find("experience", 1, true), UI().current.journal[1]._text)
-check("méta : clés ouvertes", (UI().current.bars[1].detail._text or ""):find("Keys unlocked", 1, true))
+check("journal : zones gagnées", (UI().current.bars[1].detail._text or ""):find("Zones won: " .. (won and 1 or 0) .. " of 7", 1, true),
+  UI().current.bars[1].detail._text)
 clickOption("ui:progress")
-check("méta -> retour à la progression", currentKind() == "classProgress", currentKind())
+check("journal -> retour à la progression", currentKind() == "classProgress", currentKind())
 clickOption("ui:back")
 check("retour au bilan", currentKind() == "end", currentKind())
 clickOption("ui:new")
 check("accueil", currentKind() == "start", currentKind())
-local keyMax = db.meta.classes.priest.keyMax
+local keyMax = Meta.keyMax(db.meta, "priest", "westfall")
+
 check("clé par défaut = la plus haute ouverte", UI().step.key == keyMax and option("key:" .. keyMax).selected)
 check("dernière expédition rappelée", (UI().step.text or ""):find("Last expedition", 1, true))
 ns = H.ns
@@ -1551,13 +1557,14 @@ else
   check("rencontre vide : continuer", option("leave") ~= nil)
 end
 
-print("U12 Révéré de la Ligue : bibelot au choix au départ ; abandon")
-exp = freshRun(SEED + 5, nil, { league = 1100, runs = 3,
-  classes = { priest = { rep = 0, runs = 3, wins = 0, keyMax = 0, bestKey = -1 } } })
+print("U12 bibelot au choix au départ (zone 3 gagnée par le compte) ; abandon")
+exp = freshRun(SEED + 5, nil, { runs = 3, zones = { westfall = true, duskwood = true, wetlands = true },
+  classes = { priest = { xp = 0, runs = 3, wins = 0, zones = {} } } })
 check("phase de bibelot de départ", currentKind() == "startRelic", currentKind())
 snap("bibelot-de-classe")
 check("bibelot proposé avec icône", option("startRelic:1") and button("startRelic:1").icon._shown)
-check("texte : faveur de la Ligue", (UI().step.text or ""):find("Explorers' League", 1, true), UI().step.text)
+check("texte : choix d'un bibelot, sans la Ligue", UI().step.text == "Choose a relic for this expedition."
+  and UI().step.title == "Relic choice", UI().step.text)
 local offered = exp.startRelics[1]
 clickOption("startRelic:1")
 check("bibelot choisi pris après le bibelot de départ", exp.relics[1] == "sacred_candle" and exp.relics[2] == offered
@@ -6824,9 +6831,9 @@ do
   -- seuils d'expérience (Meta.XP_LEVELS, vérifiés par les tests de l'expédition)
   local XPL = { 0, 100, 250, 450, 700, 1000, 1400 }
   local function bootLevels(levels)
-    local db = { version = 4, meta = { league = 0, runs = 0, classes = {}, flags = {} }, journal = {} }
+    local db = { version = 5, meta = { runs = 0, zones = {}, classes = {}, flags = {} }, journal = {} }
     for cid, lv in pairs(levels) do
-      db.meta.classes[cid] = { xp = XPL[lv], runs = 0, wins = 0, keyMax = 0, bestKey = -1 }
+      db.meta.classes[cid] = { xp = XPL[lv], runs = 0, wins = 0, zones = {} }
     end
     H.boot(db)
     H.slash("")
@@ -6983,8 +6990,8 @@ do
   table.sort(shownIds)
   check("bilan : les 3 cartes du niveau 2 révélées (vraies cartes), dans la fenêtre, hors des boutons",
     table.concat(shownIds, ",") == "evangelism,flash_heal,mind_sear" and #out == 0, table.concat(shownIds, ",") .. " " .. table.concat(out, " "))
-  check("bilan : barres niveau de classe et Ligue", scr.bars[1]._shown and (scr.bars[1].value._text or ""):find("Level 2", 1, true)
-    and scr.bars[2].label._text == "Explorers' League")
+  check("bilan : barre du niveau de classe seule (plus de Ligue)", scr.bars[1]._shown and (scr.bars[1].value._text or ""):find("Level 2", 1, true)
+    and not scr.bars[2]._shown)
   H.settle()
   check("bilan : aucun texte tronqué", #ns.Widgets.truncatedNow() == 0, table.concat(ns.Widgets.truncatedNow(), " ; "))
   snap("bilan-montee-de-niveau", true)
@@ -7525,7 +7532,7 @@ do
     local npc = ns.Events[evId].npc
     if npc and not pre["npc:" .. npc] then poolOk = false end
   end
-  for _, group in ipairs(ns.Encounters.act1.easy) do
+  for _, group in ipairs(ns.Encounters.westfall.easy) do
     for _, id in ipairs(group) do if not pre[id] then poolOk = false end end
   end
   check("préchargement lancé au parcours : feu de camp, PNJ des rencontres possibles, ennemis des combats possibles", poolOk)
@@ -8056,6 +8063,319 @@ do
   H.click(v.endTurn)
   H.settle()
   check("sans Traveler's Backpack : « End Turn » finit le tour, aucun choix", not v.keepMode and (c.result or c.round == r0 + 1))
+end
+
+print("UZ  campagne par zones : accueil (sept zones, verrouillées ou à venir, clés par zone), Progress (onglet Zones), bilan (déblocages), sauvegarde v4 reprise, aucune mention de la Ligue")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function inside(r, box)
+    return r and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local function overlaps(a, b)
+    return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
+  end
+  local function fmt(r) return r and ("%.0f,%.0f,%.0f,%.0f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  -- textes visibles sous un cadre (descendants compris)
+  local function texts(f, out)
+    out = out or {}
+    for _, k in ipairs(rawget(f, "_kids") or {}) do
+      local tx = rawget(k, "_text")
+      if rawget(k, "_kind") == "FontString" and vis(k) and tx ~= nil and tostring(tx) ~= "" then out[#out + 1] = tostring(tx) end
+      texts(k, out)
+    end
+    return out
+  end
+  local BAD = { "League", "league", "Reputation", "reputation", "Explorers", "Revered", "Exalted" }
+  local seen, screens = {}, {}
+  local function noLeague(where, extra)
+    screens[#screens + 1] = where
+    local list = texts(_G.SlayTheDragonFrame)
+    for _, t in ipairs(extra or {}) do list[#list + 1] = tostring(t) end
+    for _, t in ipairs(list) do
+      for _, w in ipairs(BAD) do
+        if t:find(w, 1, true) then seen[#seen + 1] = where .. " : " .. t end
+      end
+    end
+  end
+  -- contenu de test : une carte de zone du Prêtre (Westfall) et un bibelot de clé (Westfall +1)
+  local function addTestContent(ns)
+    local d = {}
+    for k, v in pairs(ns.Cards.radiance) do d[k] = v end
+    d.id, d.name, d.zone, d.level, d.rarity = "uz_zone_card", "Westfall Test Card", "westfall", nil, "rare"
+    ns.Cards.uz_zone_card = d
+    ns.Relics.uz_key_relic = { id = "uz_key_relic", name = "Test Key Relic", text = "Harness relic (no effect).",
+      rarity = "rare", key = { zone = "westfall", level = 1 }, hooks = {} }
+  end
+  local ZONES = "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain"
+
+  -- 1. Accueil d'un compte neuf -------------------------------------------------------------------
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W = ns.Widgets
+  addTestContent(ns)
+  ns.UI.refresh()
+  local st = UI().step
+  local names, zopts = {}, {}
+  for _, o in ipairs(st.options) do
+    if o.group == "zone" then zopts[#zopts + 1] = o; names[#names + 1] = o.label end
+  end
+  check("accueil : sept zones dans l'ordre de la campagne", table.concat(names, ", ") == ZONES, table.concat(names, ", "))
+  local laterOk = true
+  for i = 2, #zopts do
+    local o = zopts[i]
+    if not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then laterOk = false end
+  end
+  check("accueil : Westfall choisie et jouable, les six autres « Coming later », grisées",
+    zopts[1].selected and not zopts[1].disabled and st.zone == "westfall" and laterOk)
+  local scr = UI().current
+  local content, panel = R.rect(ns.UI.content), R.rect(scr.panel)
+  local bad = {}
+  for i, b in ipairs(scr.zoneButtons) do
+    local r = R.rect(b)
+    if not vis(b) then bad[#bad + 1] = "bouton " .. i .. " caché" end
+    if not inside(r, panel) then bad[#bad + 1] = "bouton " .. i .. " hors du panneau " .. fmt(r) end
+    if b.label._text ~= zopts[i].label then bad[#bad + 1] = "libellé " .. tostring(b.label._text) end
+    local want = i == 1 and "" or "Coming later"
+    if (b.status._text or "") ~= want then bad[#bad + 1] = "état " .. tostring(b.status._text) end
+    for j = i + 1, #scr.zoneButtons do
+      if overlaps(r, R.rect(scr.zoneButtons[j])) then bad[#bad + 1] = ("boutons %d et %d se chevauchent"):format(i, j) end
+    end
+    for _, k in ipairs(scr.keyButtons) do
+      if vis(k) and overlaps(r, R.rect(k)) then bad[#bad + 1] = "bouton " .. i .. " sur une clé" end
+    end
+    if overlaps(r, R.rect(scr.keyLabel)) or overlaps(r, R.rect(scr.zoneLabel)) or overlaps(r, R.rect(scr.className)) then
+      bad[#bad + 1] = "bouton " .. i .. " sur un libellé"
+    end
+  end
+  if not inside(panel, content) then bad[#bad + 1] = "panneau hors de la fenêtre " .. fmt(panel) end
+  if overlaps(panel, R.rect(scr.note)) and (scr.note._text or "") ~= "" then bad[#bad + 1] = "panneau sur la note" end
+  for _, a in ipairs(scr.affixIcons) do
+    if vis(a) and not inside(R.rect(a), panel) then bad[#bad + 1] = "affixe hors du panneau" end
+  end
+  check("accueil : sept boutons de zone (4 puis 3) dans le panneau, sans chevauchement, nom et état", #bad == 0, table.concat(bad, " ; "))
+  H.settle()
+  check("accueil : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  local tt = H.hover(button("zone:duskwood"))
+  check("infobulle d'une zone à venir : nom et « Coming later. »", tt[1] == "Duskwood"
+    and table.concat(tt, " | "):find("Coming later.", 1, true) ~= nil, table.concat(tt, " | "))
+  H.click(button("zone:duskwood"))
+  check("clic sur une zone à venir : raison affichée, rien ne change", UI().err._shown
+    and (UI().err._text or "") == "Coming later." and UI().step.zone == "westfall", UI().err._text)
+  -- survol : surbrillance seulement (même rectangle), jamais sur une zone grisée
+  local wb = button("zone:westfall")
+  local r0 = fmt(R.vrect(wb))
+  wb:GetScript("OnEnter")(wb)
+  for _ = 1, 30 do H.advance(0.02) end
+  local r1 = fmt(R.vrect(wb))
+  wb:GetScript("OnLeave")(wb)
+  for _ = 1, 30 do H.advance(0.02) end
+  check("survol d'une zone : pas d'agrandissement ; zones grisées jamais allumées", r0 == r1
+    and button("zone:duskwood").active == false and wb.active == true, r0 .. " -> " .. r1)
+  H.advance(5) -- message passager effacé avant la planche
+  snap("accueil-zones", true)
+  noLeague("accueil", H.hover(button("class:priest")))
+
+  -- 2. Zone suivante verrouillée tant que la classe n'a pas gagné la précédente -------------------
+  ns.Zones.duskwood.encounters = "westfall" -- Duskwood jouable le temps du test
+  ns.UI.refresh()
+  local dz = option("zone:duskwood")
+  check("Duskwood jouable mais verrouillée : « Locked », raison", dz.disabled and dz.statusLabel == "Locked"
+    and dz.reason == "Win Westfall with the Priest to open it." and button("zone:duskwood").status._text == "Locked", dz.reason)
+  H.click(button("zone:duskwood"))
+  check("clic sur une zone verrouillée : raison affichée", (UI().err._text or "") == "Win Westfall with the Priest to open it.",
+    UI().err._text)
+  H.advance(5) -- message passager effacé avant les planches
+
+  -- 3. Victoire du Prêtre à Westfall : bilan des déblocages ---------------------------------------
+  ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  check("expédition dans Westfall", e and e.zone == "westfall" and UI().zone._text == "Westfall", UI().zone._text)
+  e.stats.cleared, e.stats.elites, e.stats.bosses = 8, 1, 1
+  e.result, e.phase = "won", "done"
+  ns.UI.refresh()
+  st = UI().step
+  local function missingIn(text, want)
+    local missing = {}
+    for _, w in ipairs(want) do if not text:find(w, 1, true) then missing[#missing + 1] = w end end
+    return missing
+  end
+  -- cartes et bibelots révélés : ids, et ce qui sort de la fenêtre ou recouvre un bouton, une barre
+  local function revealed()
+    scr = UI().current
+    local ids, rids, out = {}, {}, {}
+    content = R.rect(ns.UI.content)
+    for _, c in ipairs(scr.newCards) do
+      if vis(c) then
+        ids[#ids + 1] = c.cardId
+        if not inside(R.rect(c), content) then out[#out + 1] = "carte " .. fmt(R.rect(c)) end
+        for _, b in ipairs(scr.buttons) do if vis(b) and overlaps(R.rect(c), R.rect(b)) then out[#out + 1] = "carte sur un bouton" end end
+      end
+    end
+    for _, b in ipairs(scr.newRelics) do
+      if vis(b) then
+        rids[#rids + 1] = b.info and b.info.id or "?"
+        if not inside(R.rect(b), content) then out[#out + 1] = "bibelot " .. fmt(R.rect(b)) end
+      end
+    end
+    local pr = R.rect(scr.panel)
+    if not inside(pr, content) then out[#out + 1] = "panneau " .. fmt(pr) end
+    for _, b in ipairs(scr.buttons) do if vis(b) and overlaps(pr, R.rect(b)) then out[#out + 1] = "panneau sur un bouton" end end
+    local tb = R.rect(scr.text)
+    for _, b in ipairs(scr.bars) do if vis(b) and overlaps(tb, R.rect(b)) then out[#out + 1] = "texte sur la barre" end end
+    return table.concat(ids, ","), table.concat(rids, ","), out
+  end
+  local text = st.text or ""
+  local missing = missingIn(text, {
+    "Westfall won with the Priest: Duskwood is open to the Priest.",
+    "New Priest card: Westfall Test Card.",
+    "Mythic Keystone +1 unlocked in Westfall.",
+    "First Westfall victory on this account:",
+    "unlocked for every class.",
+  })
+  check("bilan : zone suivante, carte de zone, clé suivante, commun du compte annoncés",
+    currentKind() == "end" and #missing == 0 and not text:find("New relic", 1, true), table.concat(missing, " / ") .. " <- " .. text)
+  local ids, rids, out = revealed()
+  check("bilan : carte de zone révélée (vraie carte), dans la fenêtre, hors des boutons",
+    ids:find("uz_zone_card", 1, true) and rids == "" and #out == 0, ids .. " / " .. rids .. " / " .. table.concat(out, " ; "))
+  H.settle()
+  check("bilan : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  snap("bilan-campagne", true)
+  noLeague("bilan", H.hover(scr.bars[1]))
+  -- deuxième victoire, à +1 : bibelot de clé de Westfall +1, clé +2 ; plus de première victoire
+  clickOption("ui:new")
+  clickOption("zone:westfall")
+  clickOption("key:1")
+  clickOption("go")
+  e = EXP()
+  check("deuxième expédition : Westfall +1", e and e.zone == "westfall" and e.key == 1)
+  e.stats.cleared, e.stats.elites, e.stats.bosses = 8, 1, 1
+  e.result, e.phase = "won", "done"
+  ns.UI.refresh()
+  text = UI().step.text or ""
+  missing = missingIn(text, { "New relic: Test Key Relic.", "Mythic Keystone +2 unlocked in Westfall." })
+  check("bilan à +1 : bibelot de clé et clé +2 annoncés, rien d'autre de la campagne", #missing == 0
+    and not text:find("won with", 1, true) and not text:find("First Westfall", 1, true) and not text:find("New Priest card", 1, true),
+    table.concat(missing, " / ") .. " <- " .. text)
+  ids, rids, out = revealed()
+  check("bilan à +1 : bibelot de clé révélé (case du bibelot), dans la fenêtre", rids == "uz_key_relic" and #out == 0,
+    ids .. " / " .. rids .. " / " .. table.concat(out, " ; "))
+  snap("bilan-bibelot-de-cle", true)
+  noLeague("bilan à +1")
+
+
+  -- 4. Écran Progress, onglet « Zones » ------------------------------------------------------------
+  clickOption("ui:progress")
+  check("Progress : bouton d'onglet « Zones », « Log » (plus de « Reputation and log »)",
+    button("ptab:zones").label._text == "Zones" and button("ui:meta").label._text == "Log")
+  noLeague("progression (cartes)")
+  clickOption("ptab:zones")
+  st, scr = UI().step, UI().current
+  check("onglet Zones affiché, cartes de niveau masquées", st.tab == "zones" and button("ptab:cards").label._text == "Cards"
+    and not vis(scr.cards[1]) and not vis(scr.locks[1]) and not vis(scr.relics[1]))
+  local cols, bad2 = scr.zoneCols, {}
+  content = R.rect(ns.UI.content)
+  local cnames = {}
+  for i, col in ipairs(cols) do
+    cnames[i] = col.name._text
+    for _, o in ipairs({ col.name, col.status, col.keys }) do
+      if vis(o) and not inside(R.rect(o), content) then bad2[#bad2 + 1] = "texte " .. i end
+    end
+    local slot = vis(col.card) and col.card or col.lock
+    if not vis(slot) then bad2[#bad2 + 1] = "carte " .. i .. " absente" end
+    if not inside(R.rect(slot), content) then bad2[#bad2 + 1] = "carte " .. i .. " " .. fmt(R.rect(slot)) end
+    for k, b in ipairs(col.relics) do
+      if not vis(b) then bad2[#bad2 + 1] = ("bibelot %d.%d absent"):format(i, k) end
+      if not inside(R.rect(b), content) then bad2[#bad2 + 1] = ("bibelot %d.%d hors"):format(i, k) end
+      if overlaps(R.rect(b), R.rect(slot)) then bad2[#bad2 + 1] = ("bibelot %d.%d sur la carte"):format(i, k) end
+    end
+    if i > 1 and overlaps(R.rect(slot), R.rect(vis(cols[i - 1].card) and cols[i - 1].card or cols[i - 1].lock)) then
+      bad2[#bad2 + 1] = "cartes " .. (i - 1) .. " et " .. i .. " se chevauchent"
+    end
+  end
+  check("onglet Zones : sept colonnes dans l'ordre, tout dans la fenêtre, sans chevauchement",
+    table.concat(cnames, ", ") == ZONES and #bad2 == 0, table.concat(bad2, " ; "))
+  check("onglet Zones : Westfall gagnée (clés +0 à +2, meilleure +1), Duskwood ouverte, Wetlands à venir",
+    cols[1].status._text == "Won" and (cols[1].keys._text or ""):find("Keys +0 to +2 · best +1", 1, true)
+    and cols[2].status._text == "Open" and cols[3].status._text == "Coming later" and (cols[3].keys._text or "") == "",
+    tostring(cols[1].status._text) .. " / " .. tostring(cols[1].keys._text) .. " / " .. tostring(cols[2].status._text))
+  check("carte de zone de Westfall débloquée (vraie carte)", vis(cols[1].card) and cols[1].card.cardId == "uz_zone_card"
+    and not vis(cols[1].lock))
+  local ltt = H.hover(cols[2].lock)
+  check("carte de zone verrouillée : dos de carte, infobulle = « Win Duskwood to unlock » seule", vis(cols[2].lock)
+    and #ltt == 1 and ltt[1] == "Win Duskwood to unlock", table.concat(ltt, " | "))
+  local k1 = H.hover(cols[1].relics[1])
+  local k3 = H.hover(cols[1].relics[2])
+  check("bibelots de clé : +1 débloqué (infobulle du bibelot), +3 verrouillé (« Win Westfall +3 to unlock » seule)",
+    k1[1] == "Test Key Relic" and #k3 == 1 and k3[1] == "Win Westfall +3 to unlock"
+    and cols[1].relicLabels[1]._text == "+1" and cols[1].relicLabels[3]._text == "+5",
+    table.concat(k1, " | ") .. " / " .. table.concat(k3, " | "))
+  H.settle()
+  check("onglet Zones : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  snap("progression-zones", true)
+  noLeague("progression (zones)", ltt)
+  clickOption("ptab:cards")
+  scr = UI().current
+  check("retour à l'onglet Cards : cartes de niveau visibles, colonnes de zones masquées",
+    UI().step.tab == "cards" and (vis(scr.cards[1]) or vis(scr.locks[1])) and not vis(scr.zoneCols[1].name)
+    and not vis(scr.zoneCols[1].card) and not vis(scr.zoneCols[1].lock))
+  clickOption("ui:meta")
+  check("journal des expéditions", currentKind() == "meta")
+  noLeague("journal", H.hover(UI().current.bars[1]))
+  clickOption("ui:progress")
+  clickOption("ui:back")
+  clickOption("ui:new")
+
+  -- 5. Accueil après la victoire : Duskwood ouverte pour le Prêtre seulement, clés par zone --------
+  check("accueil : Duskwood ouverte au Prêtre", currentKind() == "start" and not option("zone:duskwood").disabled
+    and option("zone:duskwood").text == "Open to the Priest." and option("zone:westfall").text == "Won with the Priest, best key +1.",
+    tostring(option("zone:duskwood").text))
+  check("zone gardée : la dernière choisie (Westfall)", UI().step.zone == "westfall")
+  clickOption("zone:duskwood")
+  check("clic sur Duskwood : choisie", UI().step.zone == "duskwood" and option("zone:duskwood").selected)
+  check("Duskwood : clé +0 seulement", UI().step.keyMax == 0 and option("key:1").disabled
+    and (option("key:1").reason or ""):find("in Duskwood", 1, true), option("key:1").reason)
+  clickOption("zone:westfall")
+  check("Westfall : clé +2 ouverte, choisie par défaut", UI().step.zone == "westfall" and UI().step.keyMax == 2
+    and option("key:2").selected and not option("key:2").disabled)
+  clickOption("class:mage")
+  local md = option("zone:duskwood")
+  check("Mage : Duskwood verrouillée, Westfall à +0", md.disabled and md.statusLabel == "Locked"
+    and md.reason == "Win Westfall with the Mage to open it." and UI().step.zone == "westfall" and UI().step.keyMax == 0,
+    md.reason)
+  noLeague("accueil (Mage)")
+  ns.Zones.duskwood.encounters = nil
+
+  -- 6. Sauvegarde v4 avec une expédition en cours : reprise dans Westfall --------------------------
+  local tmp = ns.Save.new()
+  local cur = assert(ns.Save.start(tmp, { seed = 7, class = "priest" }))
+  local id = cur.map.start[1]
+  cur.map.nodes[id].kind = "combat"
+  assert(ns.Expedition.act(cur, { "path", id }))
+  cur.combat.events = {}
+  cur.version, cur.zone, cur.unlock = 4, nil, { level = 1, league = 3 }
+  local v4 = { version = 4, meta = { league = 1500, runs = 2, flags = {}, classes = {
+    priest = { xp = 150, runs = 2, wins = 1, keyMax = 1, bestKey = 0 } } }, current = cur, journal = {} }
+  H.boot(deepcopy(v4))
+  H.slash("")
+  local db = _G.SlayTheDragonDB
+  check("sauvegarde v4 reprise : version 5, rien en quarantaine, expédition dans Westfall", db.version == 5
+    and #db.quarantine == 0 and EXP() and EXP().zone == "westfall" and EXP().version == 5 and db.meta.league == nil
+    and db.meta.zones.westfall == true and db.meta.classes.priest.zones.westfall.keyMax == 1)
+  check("sauvegarde v4 reprise : combat en cours affiché, zone dans le bandeau", currentKind() == "combat"
+    and UI().zone._text == "Westfall", tostring(currentKind()) .. " / " .. tostring(UI().zone._text))
+  H.ns.Controller.act({ "endTurn" })
+  check("sauvegarde v4 reprise : le combat continue", EXP() ~= nil and (EXP().phase == "combat" or EXP().phase == "reward"))
+  noLeague("reprise v4")
+
+  check(("aucune mention de la Ligue ni de la réputation à l'écran (%d écrans)"):format(#screens), #seen == 0,
+    table.concat(seen, " ; "))
 end
 
 print("U16 méthodes d'API inconnues appelées")

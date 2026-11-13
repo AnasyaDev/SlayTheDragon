@@ -20,7 +20,8 @@ ns.Expedition = X
 -- 2 : drapeaux de compte (exp.flags, exp.newFlags) et journal des rencontres (stats.events).
 -- 3 : classe générique (ressource de combat c.player.res au lieu de demence, état de classe c.cls).
 -- 4 : déblocages par niveau de classe (unlock.level au lieu de unlock.rep).
-X.VERSION = 4
+-- 5 : campagne par zones (exp.zone ; unlock.common et unlock.won au lieu de unlock.league).
+X.VERSION = 5
 
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
@@ -102,7 +103,8 @@ end
 -- Tirages filtrés par les déblocages
 ---------------------------------------------------------------------------
 
-local function leagueTier(exp) return min(exp.unlock.league, 3) end
+-- Palier commun figé au départ : nombre de zones gagnées par le compte (ordre de la plus avancée).
+local function commonTier(exp) return exp.unlock.common or 0 end
 
 -- n ids distincts, rareté tirée selon weights parmi celles qui ont encore des candidats.
 local function drawFrom(rng, ids, rarityOf, n, weights, taken)
@@ -132,11 +134,16 @@ local function drawFrom(rng, ids, rarityOf, n, weights, taken)
   return out
 end
 
--- Déblocage d'une carte ou d'un bibelot pour cette expédition : ce qui est de classe suit le niveau de
--- classe figé au départ (level, absent = 1) ; le reste (commun, neutre) suit la Ligue (tier, absent = 0).
+-- Déblocage d'une carte ou d'un bibelot pour cette expédition, d'après les déblocages figés au départ :
+-- carte de zone (zone = id) : la classe a gagné cette zone ; bibelot de clé (key = { zone, level }) : la
+-- classe a gagné cette zone à cette clé ou plus ; de classe : niveau de classe (level, absent = 1) ; le
+-- reste (commun, neutre) : palier commun du compte (tier, absent = 0 ; docs/zones.md).
 function X.unlocked(exp, def)
+  local won = exp.unlock.won or {}
+  if def.zone then return won[def.zone] ~= nil end
+  if type(def.key) == "table" then return (won[def.key.zone] or -1) >= (def.key.level or 1) end
   if def.class then return (def.level or 1) <= exp.unlock.level end
-  return (def.tier or 0) <= leagueTier(exp)
+  return (def.tier or 0) <= commonTier(exp)
 end
 
 -- Cartes de la classe jouée (neutral : cartes neutres comprises, réservées au marchand et aux
@@ -152,12 +159,12 @@ function X.cardPool(exp, neutral)
   return list
 end
 
--- Cartes neutres (sans classe, neutral = true) débloquées par le palier de Ligue (champ tier) :
+-- Cartes neutres (sans classe, neutral = true) débloquées par le palier commun (champ tier) :
 -- emplacement « Neutral » du marchand, choix de rencontre { "cardChoice", neutral = true }.
 function X.neutralPool(exp)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if d.class == nil and d.neutral and d.rarity ~= "basic" and (d.tier or 0) <= leagueTier(exp) then
+    if d.class == nil and d.neutral and d.rarity ~= "basic" and (d.tier or 0) <= commonTier(exp) then
       list[#list + 1] = id
     end
   end
@@ -249,7 +256,7 @@ end
 function X.potionPool(exp)
   local list = {}
   for id, p in pairs(ns.Potions) do
-    if not p.noPool and (p.tier or 0) <= leagueTier(exp) then list[#list + 1] = id end
+    if not p.noPool and (p.tier or 0) <= commonTier(exp) then list[#list + 1] = id end
   end
   table.sort(list)
   return list
@@ -343,7 +350,9 @@ end
 -- Déroulé
 ---------------------------------------------------------------------------
 
-local function actDef(exp) return Map.ACTS[exp.act] end
+-- Zone de l'expédition (ns.Zones) : ses groupes de combats (encounters), son nom.
+function X.zoneDef(exp) return ns.Zones[exp.zone or ns.Zone.FIRST] end
+local actDef = X.zoneDef
 
 local function finish(exp, result)
   exp.result = result
@@ -483,7 +492,7 @@ local function openShop(exp)
     local base = X.PRICES.neutral[ns.Cards[neutral[i]].rarity] or X.PRICES.neutral.uncommon
     shop.cards[#shop.cards + 1] = { id = neutral[i], price = price(base, "card"), sold = false, neutral = true }
   end
-  local nRelics = X.SHOP.relics + (exp.unlock.league >= ns.Meta.EXALTED and 1 or 0)
+  local nRelics = X.SHOP.relics + (commonTier(exp) >= ns.Meta.PERKS.merchantRelic and 1 or 0)
   local relics = drawRelics(exp, rng, nRelics, X.RELIC_WEIGHTS.normal)
   for i = 1, #relics do
     local base = X.PRICES.relic[relicRarity(relics[i])] or X.PRICES.relic.uncommon
@@ -579,7 +588,7 @@ X.CONDITIONS = {
   floor = { -- étape courante (celle du nœud) au moins égale à arg
     test = function(exp, n) return (exp.floor or 0) >= n end,
     text = function(n) return ("From stage %d onward."):format(n) end },
-  unlocked = { -- carte débloquée (neutre : palier de Ligue) ; avec hide = true, réponse absente sinon
+  unlocked = { -- carte débloquée (neutre : palier commun) ; avec hide = true, réponse absente sinon
     test = function(exp, id) return X.cardUnlocked(exp, id) end,
     text = function(id)
       local d = ns.Cards[id]
@@ -625,12 +634,12 @@ function X.onceFlag(id)
   return "event:" .. id
 end
 
--- Rencontres possibles maintenant : acte, palier de Ligue, pas déjà vue (expédition ou
+-- Rencontres possibles maintenant : zone (champ zone, nil = toutes), palier commun, pas déjà vue (expédition ou
 -- compte pour les uniques), conditions de déclenchement remplies.
 function X.eventPool(exp)
   local list = {}
   for id, ev in pairs(ns.Events or {}) do
-    if (ev.act == nil or ev.act == exp.act) and (ev.tier or 0) <= leagueTier(exp) and not exp.seenEvents[id] then
+    if (ev.zone == nil or ev.zone == exp.zone) and (ev.tier or 0) <= commonTier(exp) and not exp.seenEvents[id] then
       local once = X.onceFlag(id)
       if not (once and X.hasFlag(exp, once)) and X.check(exp, ev.when) then
         list[#list + 1] = id
@@ -875,9 +884,10 @@ end
 -- Création
 ---------------------------------------------------------------------------
 
--- opts : seed, class ("priest"), key (0..5), unlocks = { level = 1..7 (niveau de classe), league = 0..4 },
+-- opts : seed, class ("priest"), zone (id de ns.Zones, défaut : la première), key (0..5),
+--        unlocks = { level = 1..7 (niveau de classe), common = 0..7 (palier commun du compte),
+--                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
---        acts (nombre d'actes, par défaut tous ceux de Map.ACTS),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements)
 function X.new(opts)
   opts = opts or {}
@@ -887,11 +897,13 @@ function X.new(opts)
   if not cdef then error("unknown class: " .. tostring(class)) end
   local unlock = opts.unlocks or {}
   local key = opts.key or 0
+  local zone = opts.zone or ns.Zone.FIRST
+  if not ns.Zones[zone] then error("unknown zone: " .. tostring(zone)) end
   local exp = {
-    version = X.VERSION, seed = seed, class = class, key = key,
+    version = X.VERSION, seed = seed, class = class, zone = zone, key = key,
     affixes = ns.Meta.affixesFor(key),
-    unlock = { level = unlock.level or 1, league = unlock.league or 0 },
-    acts = min(opts.acts or #Map.ACTS, #Map.ACTS), act = 0, floor = 0,
+    unlock = { level = unlock.level or 1, common = unlock.common or 0, won = U.copyMap(unlock.won or {}) },
+    acts = 1, act = 0, floor = 0, -- une zone = un acte
     hp = cdef.hp, maxHp = cdef.hp, gold = X.START_GOLD,
     deck = {}, relics = {}, potions = {},
     removals = 0, combatsInAct = 0, lastEnc = {}, seenEvents = {}, relicState = {},
@@ -916,10 +928,10 @@ function X.new(opts)
   -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
   if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end
   startAct(exp, 1)
-  -- Révéré de la Ligue : un bibelot au choix parmi 3, tirés dans la réserve de l'expédition (communs
-  -- et de classe débloqués, hors boss). Remplace le « bibelot de classe parmi 3 » de l'ancienne
-  -- réputation de classe : les bibelots de classe entrent dans la réserve avec le niveau de classe.
-  if exp.unlock.league >= ns.Meta.REVERED then
+  -- Un bibelot au choix parmi 3 (première victoire du compte dans la zone d'ordre Meta.PERKS.startRelic,
+  -- ex-Révéré de la Ligue), tirés dans la réserve de l'expédition (communs, de classe et de clé
+  -- débloqués, hors boss).
+  if commonTier(exp) >= ns.Meta.PERKS.startRelic then
     local list = drawFrom(exp.rng.loot, X.relicPool(exp), relicRarity, 3,
       { common = 1, uncommon = 1, rare = 1 })
     if #list > 0 then
@@ -1247,15 +1259,15 @@ function X.currentNode(exp)
 end
 
 function X.actName(exp)
-  local a = Map.ACTS[exp.act]
-  return a and a.name or ""
+  local z = X.zoneDef(exp)
+  return z and z.name or ""
 end
 
 -- Résumé archivable d'une expédition (journal).
 function X.summary(exp)
   local s = exp.stats
   return {
-    result = exp.result, class = exp.class, key = exp.key, seed = exp.seed,
+    result = exp.result, class = exp.class, zone = exp.zone, key = exp.key, seed = exp.seed,
     act = exp.act, floor = exp.floor, cleared = s.cleared, elites = s.elites, bosses = s.bosses,
     hp = exp.hp, maxHp = exp.maxHp, gold = exp.gold, goldEarned = s.goldEarned,
     deck = U.copy(exp.deck), relics = U.copyArr(exp.relics), killedBy = exp.killedBy,

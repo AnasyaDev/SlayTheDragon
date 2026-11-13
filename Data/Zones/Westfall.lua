@@ -1,4 +1,4 @@
--- Acte 1 : Marche de l'Ouest. Chiffres réglés par la simulation (voir docs/equilibrage.md).
+-- Zone 1 de la campagne : Marche de l'Ouest (Westfall). Contrat d'une zone : docs/zones.md. Chiffres réglés par la simulation (voir docs/equilibrage.md).
 -- Ennemi : name, hp (nombre ou {min, max}), moves, pattern (+ randomStart) ou ai,
 -- boss, minion, crochets onDamaged / onDeath / onAllyDeath.
 -- Intention : name, intent (attack|defend|cast|watch|debuff|buff|heal|summon), cast,
@@ -134,7 +134,7 @@ E.vancleef = {
   end,
 }
 
-ns.Encounters.act1 = {
+ns.Encounters.westfall = {
   easy = {
     { "gnoll", "gnoll" },
     { "murloc", "murloc", "murloc" },
@@ -161,3 +161,6 @@ ns.Encounters.act1 = {
   event_golem = { { "harvest_golem" } },
   event_tobin = { { "bandit", "defias_henchman", "defias_henchman" } },
 }
+
+-- La zone devient jouable : ses groupes de combats (docs/zones.md).
+ns.Zones.westfall.encounters = "westfall"

@@ -3,12 +3,13 @@
 -- les bots de Sim/bots.lua. Même API que l'interface : Expedition.choices / act.
 -- SimExpedition.play(opts) -> enregistrement compatible avec Sim/sim.lua
 -- opts : seed, bot, class, pick ("rated"|"random"|"skip"), cap, maxRounds,
---        key (niveau de clé mythique), meta ("start"|"exalted" : Ligue au palier 0 ou complète),
---        level (niveau de classe 1..7, défaut 7)
+--        key (niveau de clé mythique), zone (zone jouée, défaut : la première),
+--        zones (0..7 : zones gagnées par le compte et la classe, à toutes les clés),
+--        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (niveau de classe 1..7, défaut 7)
 return function(ns)
   local X, Rng, Bots, Meta = ns.Expedition, ns.Rng, ns.Bots, ns.Meta
   local SE = {}
-  -- Compte vétéran simulé (meta=exalted) : drapeaux toujours présents, et une branche
+  -- Compte vétéran simulé (au moins une zone gagnée) : drapeaux toujours présents, et une branche
   -- d'histoire choisie par la graine.
   SE.VETERAN_FLAGS = { "event:tobin_thief" }
   SE.VETERAN_BRANCHES = { "tobin_spared", "tobin_jailed" }
@@ -335,21 +336,23 @@ return function(ns)
     local seed = opts.seed or 1
     onlyPath = opts.path
     local level = opts.level or Meta.MAX_LEVEL
-    local unlocks = opts.meta == "exalted" and Meta.allUnlocked(level) or { level = level, league = 0 }
-    -- league=N : palier de Ligue imposé (0..4), pour mesurer ce que chaque palier apporte à une classe
-    if opts.league then unlocks.league = opts.league end
-    -- Drapeaux de compte : compte neuf pour « start » (premier temps des histoires possible),
-    -- compte vétéran pour « exalted » (premier temps vu, suite selon la parité de la graine).
+    -- zones=N : le compte et la classe ont gagné les N premières zones, à toutes les clés (commun, cartes
+    -- de zone, bibelots de clé) ; meta=start = zones=0, meta=exalted = zones=7 (tout débloqué).
+    local zones = opts.zones
+    if zones == nil then zones = opts.meta == "exalted" and ns.Zone.count() or 0 end
+    local unlocks = Meta.allUnlocked(level, zones)
+    -- Drapeaux de compte : compte neuf sans zone gagnée (premier temps des histoires possible),
+    -- compte vétéran dès une zone gagnée (premier temps vu, suite selon la parité de la graine).
     local flags = opts.flags
     if not flags then
       flags = {}
-      if opts.meta == "exalted" then
+      if zones > 0 then
         for _, f in ipairs(SE.VETERAN_FLAGS) do flags[f] = true end
         local branch = SE.VETERAN_BRANCHES[seed % #SE.VETERAN_BRANCHES + 1]
         flags[branch] = true
       end
     end
-    local exp = X.new({ seed = seed, class = opts.class or "priest", key = opts.key or 0,
+    local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false })
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
@@ -390,7 +393,6 @@ return function(ns)
     record.relics = exp.relics
     record.visits = exp.stats.visits
     record.cleared = exp.stats.cleared
-    record.rep = Meta.repFor(exp)
     record.xp = Meta.xpFor(exp)
     record.removed = exp.stats.removed
     record.upgraded = exp.stats.upgraded

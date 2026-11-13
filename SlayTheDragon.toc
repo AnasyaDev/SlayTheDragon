@@ -15,6 +15,7 @@ Core\Combat.lua
 Core\Effects.lua
 Core\Rewards.lua
 Core\Map.lua
+Core\Zones.lua
 Core\Meta.lua
 Core\Expedition.lua
 Core\Save.lua
@@ -28,7 +29,7 @@ Core\Classes\mage.lua
 Data\Hunter.lua
 Core\Classes\hunter.lua
 Data\Neutral.lua
-Data\Act1.lua
+Data\Zones\Westfall.lua
 Data\Relics.lua
 Data\Potions.lua
 Data\Events.lua

@@ -1,5 +1,9 @@
 # Bibelots communs
 
+> **13/11/2026** : la Ligue des explorateurs est supprimée (`docs/zones.md`). Le champ `tier` est gardé : le
+> « palier de Ligue » N de ce document se lit maintenant « première victoire du compte dans la zone d'ordre N »
+> (0 = d'emblée) ; le champ `act = 1` des rencontres est devenu `zone = "westfall"`.
+
 Décision du GDD des classes (11 novembre 2026) : une grande table de bibelots, une trentaine de
 **communs** (offerts à toutes les classes, débloqués par la Ligue des explorateurs) et **six par
 classe** (débloqués par le niveau de classe : `docs/classes/priest-progression.md`,

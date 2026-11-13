@@ -117,6 +117,50 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   sur une texture du pack), éclat en ADD, lisibilité des crans à 12 unités, intensité du liseré Instant
   sur la table sombre, nouvelle icône `Media/Icons/inv_misc_bag_11.tga` (nouveau fichier : relancer le
   client).
+## Campagne par zones (13/11/2026)
+
+Règles : `docs/zones.md`. La Ligue des explorateurs a disparu de tous les écrans (barre, textes, infobulles,
+« League Favor ») ; ce qui en parle plus haut est historique.
+
+- **Accueil** (`Start`) : panneau monté à y 44 et allongé à 392 (son bas reste au-dessus de la note, y 446).
+  Sous la rangée des classes, libellé « Zone » et sept boutons rouges (`W.button`, 126 × 34, 4 puis 3 par
+  rangée, centrés) dans l'ordre de la campagne : nom de la zone ; la zone choisie au liseré d'or
+  (`SetSelected`) ; une zone verrouillée (zone précédente pas gagnée par la classe) ou à venir (pas de
+  données) est éteinte (pièce désaturée, libellé gris, `active = false` : aucune surbrillance au survol), avec
+  dessous en petit « Locked » ou « Coming later » ; infobulle = nom, état (« Won with the Priest, best key
+  +1. », « Open to the Priest. ») ou raison en rouge ; clic = la raison en message passager. Survol des
+  zones jouables : surbrillance seulement (pas d'agrandissement). Puis « Mythic Keystone » : les clés de la
+  zone choisie pour la classe (raison « A victory at +1 in Westfall unlocks key +2. »). Zone par défaut : la
+  dernière choisie si la classe peut la jouer, sinon la plus avancée qu'elle peut jouer ; options
+  `zone:<id>` (contrôleur : `C.startInfo()` → `{ class, zone, key, keyMax }`, `C.zoneStatus`, `C.zoneReady`).
+  Pas de raccourci clavier.
+- **Écran Progress** : en-tête « Zones » / « Cards » (onglet, option `ptab:zones` / `ptab:cards`), « Log »
+  (ex-« Reputation and log ») et « Back ». Onglet « Zones » : sept colonnes de 140 (nom en or, état « Won »
+  vert / « Open » / « Locked » / « Coming later » gris, « Keys +0 to +2 · best +1 »), la carte de zone de la
+  classe à 0,9 (vraie carte débloquée, sinon dos de carte grisé, infobulle « Win Duskwood to unlock » seule,
+  même quand la carte n'est pas encore écrite), trois cases de bibelots de clé (36, pas de 40) libellées
+  +1 / +3 / +5 (point d'interrogation grisé, infobulle « Win Westfall +3 to unlock » seule). Contrôleur :
+  `step.tab`, `step.zones` (`C.zoneRows`).
+- **Journal** (« Log », ex-méta) : titre « Expedition log », une barre (niveau de la classe ; détail « Zones
+  won: 1 of 7 · 3 expedition(s), 2 victory(ies) »), journal (« Priest · Westfall +0 · victory · stage 8 · +76
+  experience »).
+- **Bilan** : « +76 Priest experience. » ; puis, selon le cas, « Westfall won with the Priest: Duskwood is open to
+  the Priest (coming later). », « New Priest card: … », « New relic: … », « Mythic Keystone +2 unlocked in
+  Westfall. », « First Westfall victory on this account: 2 neutral cards, 9 relics, 3 encounters unlocked for
+  every class. » (et « Every class: Choose a relic at the start of each expedition. » / « … One more relic at
+  the merchant. » aux zones 3 et 6). Une seule barre (niveau). Cartes de zone et bibelots de clé révélés avec
+  ceux de la montée de niveau ; sans révélation, le panneau s'allonge vers le bas si le texte l'exige.
+- **Bandeau** : le nom de la zone (plus « Act 1 · »).
+- **Bibelot au choix** (phase `start`, zone 3 du compte) : « Relic choice », « Choose a relic for this expedition. ».
+- Harnais : U4, U7, U12, UP adaptés ; section **UZ** (accueil : 7 zones dans l'ordre, états, raisons, boutons
+  dans le panneau sans chevauchement, survol sans agrandissement ; Duskwood rendue jouable le temps du test :
+  « Locked » puis ouverte au Prêtre seulement ; bilans (première victoire, puis +1 : carte de zone et bibelot
+  de clé de test révélés) ; onglet Zones ; clés par zone ; reprise d'une sauvegarde v4 avec un combat en
+  cours ; aucune chaîne « League », « Reputation », « Explorers », « Revered », « Exalted » à l'écran).
+  Aperçus : `accueil-zones`, `progression-zones`, `bilan-campagne`, `bilan-bibelot-de-cle`, `meta`.
+- Non vérifiable hors jeu : rendu de la pièce de bouton désaturée (`SetDesaturated` sur les tranches du
+  bouton rouge), lisibilité du petit « Coming later » (10) sur le bouton éteint, carte à 0,9 dans l'onglet
+  Zones (aperçu au survol), place du message passager au-dessus de la rangée des zones.
 
 ## Habillage WoW (direction B, mana et parcours façon C)
 
@@ -295,7 +339,7 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   dans le grand anneau), marchand (cases, étiquettes de prix dans un rail sombre, service en bouton rouge à
   case), feu de camp (couchage et grimoire dans le grand anneau, réponses en boutons), grille du deck,
   panneau des cartes, accueil (classes en icônes dans le grand anneau, la choisie au halo d'or ; clés en cases), bilan
-  et méta (dialogues, barres de réputation). Messages passagers : texte rouge des erreurs du jeu sur un
+  et journal (dialogues, barre de niveau). Messages passagers : texte rouge des erreurs du jeu sur un
   voile sombre léger.
 
 ### Écarts aux maquettes (et pourquoi)
@@ -1192,8 +1236,8 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 
 | Phase / vue | Écran | Contenu |
 | --- | --- | --- |
-| aucune expédition | **Accueil** (`start`) | décor voilé, héros ; parchemin : titre, classes (plaques), clé +0…+5 en gemmes (verrouillées sombres ; infobulle = affixes et raison), icônes d'affixes de la clé choisie ; plateau : « Réputation et journal », dernière expédition et avertissements de sauvegarde, « Partir en expédition » |
-| `start` | **Rencontre** (`choice`) | bibelot de classe (Révéré) : bulle, une plaque par bibelot (icône, nom, effet), « Partir sans bibelot » |
+| aucune expédition | **Accueil** (`start`) | décor voilé, héros ; parchemin : titre, classes (icônes), zones (sept boutons, « Campagne par zones »), clé +0…+5 de la zone (verrouillées sombres ; infobulle = affixes et raison), icônes d'affixes de la clé choisie ; plateau : « Progress », dernière expédition et avertissements de sauvegarde, « Partir en expédition » |
+| `start` | **Rencontre** (`choice`) | bibelot au choix (zone 3 gagnée par le compte) : bulle, une plaque par bibelot (icône, nom, effet), « Partir sans bibelot » |
 | `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss » et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
 | `combat` | **Combat** | voir plus bas |
 | `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic). Rencontre : bulle du texte après coup |
@@ -1201,8 +1245,8 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
-| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan, barres de réputation ; « Nouvelle expédition », « Réputation et journal » |
-| vue méta | **Méta** | parchemin : barres par classe et Ligue, 8 dernières expéditions ; « Retour » |
+| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan et déblocages, barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
+| vue méta | **Journal** (« Log ») | barre du niveau de la classe, zones gagnées, 8 dernières expéditions ; « Retour » |
 
 **Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi ; clic droit
 annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits
