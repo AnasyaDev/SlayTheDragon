@@ -911,7 +911,7 @@ function S.nextNeeds(exp, extra)
   out[#out + 1] = { key = "campfire", art = Art.campfire }
   if Art.pet and exp and exp.class == "hunter" then out[#out + 1] = { key = "pet:hunter", art = Art.pet } end
   local Map, X = ns.Map, ns.Expedition
-  local act = exp and Map and Map.ACTS and Map.ACTS[exp.act or 1]
+  local act = exp and ns.Zones[exp.zone or ns.Zone.FIRST]
   local pools = act and ns.Encounters and ns.Encounters[act.encounters]
   if exp and exp.map and Map.nextNodes and pools then
     for _, id in ipairs(Map.nextNodes(exp.map, exp.node) or {}) do
@@ -937,7 +937,7 @@ end
 -- Combats qu'une rencontre peut lancer (effet « fight » de ses réponses) : leurs ennemis.
 function S.eventFightNeeds(ev, exp)
   local out = {}
-  local act = exp and ns.Map and ns.Map.ACTS and ns.Map.ACTS[exp.act or 1]
+  local act = exp and ns.Zones[exp.zone or ns.Zone.FIRST]
   local pools = act and ns.Encounters and ns.Encounters[act.encounters] or {}
   local function scan(effects)
     for _, e in ipairs(effects or {}) do

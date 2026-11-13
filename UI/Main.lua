@@ -497,7 +497,6 @@ function UI.refreshInfo()
   UI.hpMax:SetText("/" .. r.maxHp)
   UI.goldText:SetText(tostring(math.max(0, r.gold - (hold.gold or 0))))
   local zone = r.act or ""
-  if UI.step and UI.step.kind == "map" then zone = "Act " .. (Controller.exp() and Controller.exp().act or 1) .. " · " .. zone end
   UI.zone:SetText(zone)
   layoutMid(rightW)
   layoutDots(r)

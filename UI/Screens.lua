@@ -6,7 +6,7 @@
 --   deck     : grille du deck (amélioration, retrait, sélection de rencontre)
 --   shop     : marchand (étal : cartes, bibelots, fioles, retrait)
 --   map      : carte de parcours (docs/maquette/Parcours.dc.html)
---   progress : bilan et « Réputation et journal »
+--   progress : bilan et journal des expéditions (« Log »)
 -- Aucun écran ne connaît les règles : chaque clic devient UI.choose(idOption) ; ce qui est grisé, les
 -- prix et les raisons viennent du contrôleur (donc de Core/Expedition.lua).
 local _, ns = ...
@@ -384,9 +384,14 @@ UI.register("start", Start)
 
 -- Rangée des classes : icônes de START_ICON unités (anneau compris) espacées de START_STEP, centrées dans
 -- START_ROW_W ; au-delà, pas et taille réduits pour tenir dans le panneau. Haut de la rangée à START_TOP
--- sous le haut du panneau, libellé des clés à START_KEYS.
-local START_ICON, START_STEP, START_ROW_W, START_TOP, START_KEYS, START_PANEL_H = 64, 92, 520, 56, 160, 300
-UI.START = { icon = START_ICON, step = START_STEP, rowW = START_ROW_W, top = START_TOP, keys = START_KEYS }
+-- sous le haut du panneau ; libellé des zones à START_ZONES (deux rangées de boutons : 4 puis 3, de
+-- START_ZONE_W × START_ZONE_H, pas START_ZONE_DX / START_ZONE_DY) ; libellé des clés à START_KEYS. Panneau
+-- en START_PANEL_Y, START_PANEL_H de haut (son bas reste au-dessus de la note, y 446).
+local START_ICON, START_STEP, START_ROW_W, START_TOP = 64, 92, 520, 56
+local START_ZONES, START_ZONE_W, START_ZONE_H, START_ZONE_DX, START_ZONE_DY = 150, 126, 34, 132, 38
+local START_KEYS, START_PANEL_Y, START_PANEL_H = 258, 44, 392
+UI.START = { icon = START_ICON, step = START_STEP, rowW = START_ROW_W, top = START_TOP, keys = START_KEYS,
+  zones = START_ZONES, zoneW = START_ZONE_W, zoneH = START_ZONE_H, panelY = START_PANEL_Y, panelH = START_PANEL_H }
 
 -- Infobulle d'une classe : nom, PV et cartes (accueil), niveau de classe.
 local function fillClassTooltip(tt, o)
@@ -437,15 +442,37 @@ end
 function Start:Build(f)
   self.hero = heroFigure(f)
   local panel = W.dialog(f, "Slay the Dragon", 18)
-  at(panel, f, 280, 74, 560, START_PANEL_H)
+  at(panel, f, 280, START_PANEL_Y, 560, START_PANEL_H)
   self.panel = panel
   self.title = panel.title
   -- Classes : une rangée d'icônes de classe dans le grand anneau doré, sans texte ; nom, PV, cartes et
-  -- réputation dans l'infobulle ; la classe choisie a son halo doré, les autres sont assombries, et son
+  -- niveau dans l'infobulle ; la classe choisie a son halo doré, les autres sont assombries, et son
   -- nom seul est écrit sous son icône. Autant d'icônes que de classes jouables (Start:Show).
   self.classIcons = {}
   self.className = W.label(panel, "bold", 14, C.wowGold)
   self.className:Hide()
+  -- Zones de la campagne : un bouton rouge par zone (nom ; dessous, en petit, « Locked » ou « Coming
+  -- later »), la choisie au liseré d'or ; verrouillées ou à venir : éteintes, sans surbrillance, raison en
+  -- infobulle et au clic.
+  self.zoneLabel = W.label(panel, "bold", 15, C.wowGold)
+  self.zoneLabel:SetPoint("TOP", 0, -START_ZONES)
+  self.zoneLabel:SetText("Zone")
+  self.zoneButtons = {}
+  for i = 1, #ns.Zone.ORDER do
+    local b = W.button(panel, "", START_ZONE_W, START_ZONE_H, nil, "red", 12.5)
+    b.status = W.label(b.face, "body", 10, C.textSoft, "OVERLAY")
+    b.status:SetPoint("CENTER", 0, -7.5)
+    b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    W.tooltip(b, function(tt, btn)
+      local o = btn.option
+      if not o then return end
+      tt:AddLine(o.label or "", 1, 0.82, 0)
+      if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
+      if o.disabled and o.reason then tt:AddLine(o.reason, 1, 0.3, 0.3, true) end
+    end, "ANCHOR_TOP")
+    b:Hide()
+    self.zoneButtons[i] = b
+  end
   self.keyLabel = W.label(panel, "bold", 15, C.wowGold)
   self.keyLabel:SetPoint("TOP", 0, -START_KEYS)
   self.keyLabel:SetText("Mythic Keystone")
@@ -502,9 +529,10 @@ function Start:Show(step)
   UI.setStage({ scene = "road", board = true, veil = 0.2 })
   Scene.playerFigure(self.hero)
   self.optionButtons = {}
-  local classes, keys, others = {}, {}, {}
+  local classes, zones, keys, others = {}, {}, {}, {}
   for _, o in ipairs(step.options) do
     if o.group == "class" then classes[#classes + 1] = o
+    elseif o.group == "zone" then zones[#zones + 1] = o
     elseif o.group == "key" then keys[#keys + 1] = o
     else others[#others + 1] = o end
   end
@@ -546,6 +574,34 @@ function Start:Show(step)
     self.className:Hide()
   end
   self.panel:SetHeight(START_PANEL_H)
+  -- zones : 4 puis 3 boutons, chaque rangée centrée
+  local perRow = 4
+  for i, b in ipairs(self.zoneButtons) do
+    local o = zones[i]
+    if o then
+      local row = floor((i - 1) / perRow)
+      local inRow = min(perRow, #zones - row * perRow)
+      local col = (i - 1) % perRow
+      b:ClearAllPoints()
+      b:SetPoint("TOP", self.panel, "TOP", (col - (inRow - 1) / 2) * START_ZONE_DX,
+        -START_ZONES - 24 - row * START_ZONE_DY)
+      b.option = o
+      local off = o.disabled and true or false
+      b:SetText(o.label)
+      b.label:ClearAllPoints()
+      b.label:SetPoint("CENTER", 0, off and 5.5 or 0.5)
+      b.status:SetText(off and (o.statusLabel or "") or "")
+      b.labelColor = off and C.textDim or C.wowGold
+      b.active = not off
+      b.base:SetDesaturated(off)
+      b:SetSelected(o.selected)
+      b:Show()
+      self.optionButtons[o.id] = b
+    else
+      b.option = nil
+      b:Hide()
+    end
+  end
   self.keyLabel:ClearAllPoints()
   self.keyLabel:SetPoint("TOP", 0, -START_KEYS)
   for i, b in ipairs(self.keyButtons) do
@@ -1527,7 +1583,7 @@ function Map:Show(step)
 end
 
 ---------------------------------------------------------------------------
--- Bilan et méta : panneau d'ardoise, barres (niveau de classe, Ligue), journal
+-- Bilan et journal : panneau d'ardoise, barre de niveau de la classe, journal
 ---------------------------------------------------------------------------
 -- Bilan avec montée de niveau : sous les barres, ce qui vient d'être débloqué, révélé tel quel (vraies
 -- cartes à petite échelle, agrandies au survol ; cases des bibelots), sans autre texte. Le panneau monte
@@ -1649,6 +1705,10 @@ function Progress:Show(step)
   if up then
     panelY = PG_UP_Y
     panelH = min(PG_BOTTOM - PG_UP_Y, max(PG_H, rowRel + half + 20))
+  else
+    -- bilan à plusieurs déblocages : le panneau s'allonge vers le bas sous la dernière barre et le journal
+    local need = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 40 + 16 * #(step.journal or {}) + 16
+    panelH = min(PG_BOTTOM - PG_Y, max(PG_H, need))
   end
   at(self.panel, self.frame, PG_X, panelY, PG_W, panelH)
   self:ShowUnlocked(up and step.unlocked or nil, panelY + rowRel)
@@ -1701,11 +1761,13 @@ end
 ---------------------------------------------------------------------------
 -- Une boîte DiamondMetal sur toute la scène. En-tête : icônes des classes (mêmes que l'accueil, la classe
 -- affichée au halo d'or ; infobulle = nom et niveau), barre d'expérience (« Level 3 · 20 / 150 »),
--- « Reputation and log » et « Back ». Dessous, une rangée par voie (départ, puis les trois voies), les cartes
+-- onglet « Zones » / « Cards », « Log » et « Back ». Dessous, une rangée par voie (départ, puis les trois voies), les cartes
 -- dans l'ordre de leur niveau ; les bibelots à droite des cartes de départ. Débloqué : la vraie carte (W.card)
 -- ou la case du bibelot, avec son infobulle, agrandie au survol. Verrouillé : dos de carte assombri et
 -- désaturé, ou case grisée au point d'interrogation ; l'infobulle ne dit que la condition (« Priest level 4 »).
--- Aucun texte permanent hors des noms de voies.
+-- Aucun texte permanent hors des noms de voies. Onglet « Zones » : une colonne par zone de la campagne (nom,
+-- état, clés ouvertes et meilleure clé, carte de zone, bibelots de clé +1 / +3 / +5), mêmes règles de verrou
+-- (« Win Westfall to unlock », « Win Westfall +3 to unlock »).
 
 local ClassProgress = { kinds = { "classProgress" } }
 UI.register("classProgress", ClassProgress)
@@ -1721,8 +1783,12 @@ local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 44, 56, 50, 76
 -- 36 emplacements : 34 de la grille commune, plus les cartes hors grille (Rogue : Nightblade). Une rangée
 -- de plus de CP_ROW_MAX cartes resserre son pas pour garder le même bord droit.
 local CP_SLOTS, CP_ROWS, CP_ROW_MAX = 36, 4, 10
+-- Onglet « Zones » : colonnes de CP_ZONE_DX à partir de CP_ZONE_TOP (nom, état, clés), carte de zone à
+-- CP_ZONE_SCALE, bibelots de clé en cases de CP_ZONE_RELIC au pas CP_ZONE_RELIC_DX.
+local CP_ZONE_DX, CP_ZONE_TOP, CP_ZONE_SCALE, CP_ZONE_RELIC, CP_ZONE_RELIC_DX = 140, 124, 0.9, 36, 40
 UI.CP = { scale = CP_SCALE, pitch = CP_PITCH, x0 = CP_X0, rowTop = CP_ROW_TOP, rowH = CP_ROW_H,
-  relic = CP_RELIC, relicDx = CP_RELIC_DX, relicX = CP_RELIC_X }
+  relic = CP_RELIC, relicDx = CP_RELIC_DX, relicX = CP_RELIC_X, zoneDx = CP_ZONE_DX, zoneTop = CP_ZONE_TOP,
+  zoneScale = CP_ZONE_SCALE, zoneRelic = CP_ZONE_RELIC }
 
 -- Infobulle d'un élément verrouillé : la condition seule.
 local function fillLocked(tt, cond)
@@ -1756,16 +1822,20 @@ function ClassProgress:Build(f)
   local lv = panel:GetFrameLevel()
   -- onglets : icônes des classes
   self.tabs = {}
-  -- barre d'expérience (même brique que les barres de réputation)
+  -- barre d'expérience (W.repBar)
   self.bar = W.repBar(panel, 290)
   at(self.bar, f, 318, 72, 290, 14)
-  self.metaBtn = W.button(f, "Reputation and log", 210, 44, nil, "red", 15)
-  at(self.metaBtn, f, 640, 52, 210, 44)
+  -- onglet (« Zones » ou « Cards » : l'autre vue), journal, retour
+  self.tabBtn = W.button(f, "Zones", 110, 44, nil, "red", 15)
+  at(self.tabBtn, f, 622, 52, 110, 44)
+  self.tabBtn:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+  self.metaBtn = W.button(f, "Log", 110, 44, nil, "red", 15)
+  at(self.metaBtn, f, 742, 52, 110, 44)
   self.metaBtn:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
   self.back = W.button(f, "Back", 150, 48, nil, "gold", 18)
   at(self.back, f, 866, 50, 150, 48)
   self.back:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  for _, b in ipairs({ self.metaBtn, self.back }) do b:SetFrameLevel(lv + 4) end
+  for _, b in ipairs({ self.tabBtn, self.metaBtn, self.back }) do b:SetFrameLevel(lv + 4) end
   -- noms des voies (colonne de gauche) et titre des bibelots
   self.rowLabels = {}
   for i = 1, CP_ROWS do
@@ -1795,7 +1865,125 @@ function ClassProgress:Build(f)
     b:Hide()
     self.relics[i] = b
   end
+  -- onglet « Zones » : une colonne par zone (nom, état, clés, carte de zone, bibelots de clé +1 / +3 / +5)
+  self.zoneCols = {}
+  for i = 1, #ns.Zone.ORDER do
+    local col = {}
+    col.name = W.label(panel, "bold", 14, C.wowGold, "OVERLAY")
+    col.name:SetWordWrap(false)
+    col.status = W.label(panel, "body", 11.5, C.text, "OVERLAY")
+    col.status:SetWordWrap(false)
+    col.keys = W.label(panel, "body", 11, C.textSoft, "OVERLAY")
+    col.keys:SetWordWrap(false)
+    col.card = W.card(f)
+    col.card:SetFrameLevel(lv + 5)
+    col.card:Hide()
+    col.lock = lockedCard(f)
+    col.lock:SetFrameLevel(lv + 5)
+    col.relics, col.relicLabels = {}, {}
+    for k = 1, #ns.Meta.KEY_RELIC_LEVELS do
+      local b = W.iconButton(f, CP_ZONE_RELIC, "square")
+      b:SetFrameLevel(lv + 5)
+      b:Hide()
+      col.relics[k] = b
+      col.relicLabels[k] = W.label(panel, "bold", 11, C.textSoft, "OVERLAY")
+    end
+    self.zoneCols[i] = col
+  end
   self.optionButtons = {}
+end
+
+-- Case de bibelot de l'écran de progression : débloqué (icône et infobulle du bibelot) ou verrouillé
+-- (point d'interrogation grisé, infobulle = la condition seule).
+local function paintRelicSlot(b, e)
+  b.entry = e
+  if e.unlocked then
+    b:SetItem("relic", e.id)
+    b.icon:SetVertexColor(1, 1, 1, 1)
+  else
+    b.info = { kind = "locked", condition = e.condition }
+    W.setIcon(b.icon, Art.ui.locked, "ui:locked")
+    b.icon:SetDesaturated(true)
+    b.icon:SetVertexColor(0.45, 0.45, 0.45, 1)
+    b.icon:Show()
+    b.case.frame:SetVertexColor(0.5, 0.5, 0.5, 1)
+  end
+end
+
+-- Vue « Zones » : colonnes de CP_ZONE_DX centrées dans le panneau ; carte de zone à CP_ZONE_SCALE.
+function ClassProgress:ShowZones(zones, shown)
+  local n = #ns.Zone.ORDER
+  local x0 = 6 + (1022 - n * CP_ZONE_DX) / 2 + CP_ZONE_DX / 2
+  local cardH = W.CARD_H * CP_ZONE_SCALE
+  local cardCy = CP_ZONE_TOP + 80 + cardH / 2
+  local relicY = CP_ZONE_TOP + 80 + cardH + 20
+  local STATUS_COLOR = { won = C.healGreen, open = C.text, locked = C.textDim, later = C.textDim }
+  for i, col in ipairs(self.zoneCols) do
+    local z = shown and zones and zones[i]
+    if z then
+      local cx = x0 + (i - 1) * CP_ZONE_DX
+      local function place(fs, y, text, size)
+        fs:ClearAllPoints()
+        fs:SetPoint("TOP", self.frame, "TOPLEFT", cx, -y)
+        fs:SetWidth(CP_ZONE_DX - 8)
+        fs:SetJustifyH("CENTER")
+        local s = size
+        while s > 9 and textWidth(fs, text, s) * W.TEXT_SAFE > CP_ZONE_DX - 8 do s = s - 0.5 end
+        setLines(fs, { text }, s, CP_ZONE_DX - 8)
+        fs:Show()
+      end
+      place(col.name, CP_ZONE_TOP, z.name, 14)
+      place(col.status, CP_ZONE_TOP + 20, z.statusLabel or "", 11.5)
+      local sc = STATUS_COLOR[z.status] or C.text
+      col.status:SetTextColor(sc[1], sc[2], sc[3])
+      local keyText = ""
+      if z.status == "won" or z.status == "open" then
+        keyText = "Keys +0 to +" .. (z.keyMax or 0)
+        if (z.bestKey or -1) >= 0 then keyText = keyText .. " · best +" .. z.bestKey end
+      end
+      place(col.keys, CP_ZONE_TOP + 36, keyText, 11)
+      local e = z.card
+      col.card.entry, col.lock.entry = e, e
+      if e.unlocked then
+        W.hideCard(col.lock)
+        col.lock:Hide()
+        col.card:SetCard(e.id, false, {})
+        col.card.cx, col.card.cy = cx, cardCy
+        W.placeCard(col.card, self.frame, cx, cardCy, CP_ZONE_SCALE, self.panel:GetFrameLevel() + 45 + i,
+          self.panel:GetFrameLevel() + 80)
+        col.card:Show()
+      else
+        W.hideCard(col.card)
+        col.lock.condition = e.condition
+        W.placeCenter(col.lock, self.frame, cx, cardCy, CP_ZONE_SCALE)
+        W.setLevel(col.lock, self.panel:GetFrameLevel() + 45 + i)
+        col.lock:Show()
+      end
+      local nk = #z.keys
+      for k, b in ipairs(col.relics) do
+        local ke = z.keys[k]
+        local lbl = col.relicLabels[k]
+        if ke then
+          local rx = cx + (k - (nk + 1) / 2) * CP_ZONE_RELIC_DX
+          at(b, self.frame, rx - CP_ZONE_RELIC / 2, relicY, CP_ZONE_RELIC, CP_ZONE_RELIC)
+          paintRelicSlot(b, ke)
+          b:Show()
+          lbl:ClearAllPoints()
+          lbl:SetPoint("TOP", self.frame, "TOPLEFT", rx, -(relicY + CP_ZONE_RELIC + 3))
+          lbl:SetText("+" .. ke.level)
+          lbl:Show()
+        else
+          b:Hide()
+          lbl:Hide()
+        end
+      end
+    else
+      col.name:Hide(); col.status:Hide(); col.keys:Hide()
+      W.hideCard(col.card)
+      col.lock:Hide()
+      for k, b in ipairs(col.relics) do b:Hide() col.relicLabels[k]:Hide() end
+    end
+  end
 end
 
 -- Pose une carte (vraie ou silhouette) au repos ; au survol : halo et aperçu à taille réelle à côté
@@ -1845,15 +2033,17 @@ function ClassProgress:Show(step)
   end
   self.bar:Set(step.bar)
   for _, o in ipairs(others) do
-    local b = o.id == "ui:meta" and self.metaBtn or self.back
+    local b = o.group == "tab" and self.tabBtn or (o.id == "ui:meta" and self.metaBtn or self.back)
     b.option = o
     b:SetText(o.label)
     self.optionButtons[o.id] = b
   end
-  -- rangées de cartes
+  local zonesTab = step.tab == "zones"
+  self:ShowZones(step.zones, zonesTab)
+  -- rangées de cartes (onglet « Cards » ; vides sur l'onglet « Zones »)
   local slot = 0
   for r = 1, CP_ROWS do
-    local row = step.rows and step.rows[r]
+    local row = not zonesTab and step.rows and step.rows[r]
     local l = self.rowLabels[r]
     local cy = CP_ROW_TOP + (r - 1) * CP_ROW_H + W.CARD_H * CP_SCALE / 2
     if row then
@@ -1900,22 +2090,12 @@ function ClassProgress:Show(step)
   W.looseBox(self.relicLabel, 1, 120)
   self.relicLabel:ClearAllPoints()
   self.relicLabel:SetPoint("RIGHT", self.frame, "TOPLEFT", CP_RELIC_LABEL_R, -cy)
+  if zonesTab then self.relicLabel:Hide() else self.relicLabel:Show() end
   for i, b in ipairs(self.relics) do
-    local e = step.relics and step.relics[i]
+    local e = not zonesTab and step.relics and step.relics[i]
     if e then
       at(b, self.frame, CP_RELIC_X + (i - 1) * CP_RELIC_DX - CP_RELIC / 2, cy - CP_RELIC / 2, CP_RELIC, CP_RELIC)
-      b.entry = e
-      if e.unlocked then
-        b:SetItem("relic", e.id)
-      else
-        b.info = { kind = "locked", condition = e.condition }
-        W.setIcon(b.icon, Art.ui.locked, "ui:locked")
-        b.icon:SetDesaturated(true)
-        b.icon:SetVertexColor(0.45, 0.45, 0.45, 1)
-        b.icon:Show()
-        b.case.frame:SetVertexColor(0.5, 0.5, 0.5, 1)
-      end
-      if e.unlocked then b.icon:SetVertexColor(1, 1, 1, 1) end
+      paintRelicSlot(b, e)
       b:Show()
     else
       b.entry = nil
@@ -1926,6 +2106,7 @@ end
 
 function ClassProgress:OnHide()
   for i = 1, CP_SLOTS do W.hideCard(self.cards[i]) end
+  for _, col in ipairs(self.zoneCols) do W.hideCard(col.card) end
 end
 
 ---------------------------------------------------------------------------

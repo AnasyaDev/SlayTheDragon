@@ -1917,7 +1917,7 @@ function W.iconButton(parent, size, shape)
   return b
 end
 
--- Barre de réputation : barre jaune du jeu dans un rail de curseur minimal ; bar = { label, levelName,
+-- Barre de progression (niveau de classe) : barre jaune du jeu dans un rail de curseur minimal ; bar = { label, levelName,
 -- cur, size, detail, hint } (UI/Controller.lua).
 function W.repBar(parent, w)
   local f = CreateFrame("Frame", nil, parent)

@@ -9,13 +9,14 @@
 -- État propre à l'interface (jamais sauvegardé) :
 --   C.ended  = { c, result, title } : combat tranché, bandeau de fin affiché sur l'écran de combat
 --   C.ending = { summary, entry }   : expédition archivée (Save.finish), bilan affiché
---   C.ui     = { view, class, key, progressClass } : sous-écran (amélioration, retrait, progression,
---              méta), choix de départ, classe affichée par l'écran de progression
+--   C.ui     = { view, class, zone, key, progressClass, progressTab } : sous-écran (amélioration, retrait,
+--              progression, journal), choix de départ, classe et onglet (cartes, zones) de l'écran de progression
 --
 -- Identifiants d'options : « verbe » ou « verbe:argument », où verbe est une action de
 -- Expedition.act (path:12, pickCard:2, buyRelic:1, remove:5, choose:1, leave…), ou une
 -- navigation de l'interface (ui:upgrade, ui:remove, ui:progress, ui:meta, ui:back, ui:new), un choix de
--- départ (class:priest, key:2, go) ou une classe de l'écran de progression (pclass:warrior).
+-- départ (class:priest, zone:westfall, key:2, go), une classe ou un onglet de l'écran de progression
+-- (pclass:warrior, ptab:zones, ptab:cards).
 local _, ns = ...
 
 local U, Combat, Card, X, Save, Meta, Map = ns.Util, ns.Combat, ns.Card, ns.Expedition, ns.Save, ns.Meta, ns.Map
@@ -62,6 +63,9 @@ C.REASONS = {
   relic = "Relic already owned.",
   ended = "The expedition is over.",
   ["key locked"] = "This key isn't unlocked yet.",
+  ["zone locked"] = "This zone isn't open to this class yet.",
+  ["zone coming later"] = "This zone is coming later.",
+  zone = "Unknown zone.",
   running = "An expedition is already in progress.",
 }
 
@@ -218,10 +222,10 @@ function C.restore()
   return C.exp() ~= nil
 end
 
--- Démarre une expédition (Save.start : clé vérifiée par Meta).
-function C.start(class, key, seed)
+-- Démarre une expédition (Save.start : zone et clé vérifiées par Meta ; zone absente = la première).
+function C.start(class, key, seed, zone)
   local db = ns.Persist.db
-  local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, key = key })
+  local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, zone = zone, key = key })
   if not exp then return false, why end
   C.ending, C.ended, C.ui.view = nil, nil, nil
   notify("step")
@@ -319,13 +323,20 @@ function C.choose(id)
   if not exp then
     if verb == "class" and ns.Classes[arg] then
       C.ui.class, C.ui.key = arg, nil
+    elseif verb == "zone" and ns.Zones[arg] then
+      -- zone verrouillée ou à venir : refusée (l'écran affiche la raison) ; sinon clé par défaut de la zone
+      local st = C.startInfo()
+      if not C.zoneReady(st.class, arg) then return false, ns.Zone.playable(arg) and "zone locked" or "zone coming later" end
+      C.ui.zone, C.ui.key = arg, nil
     elseif verb == "pclass" and ns.Classes[arg] then
       C.ui.progressClass = arg
+    elseif verb == "ptab" and (arg == "zones" or arg == "cards") then
+      C.ui.progressTab = arg
     elseif verb == "key" and type(arg) == "number" then
       C.ui.key = arg
     elseif verb == "go" then
       local st = C.startInfo()
-      return C.start(st.class, st.key)
+      return C.start(st.class, st.key, nil, st.zone)
     else
       return false, "action"
     end
@@ -444,9 +455,17 @@ function C.maxMana()
 end
 
 -- Décor de l'étape en cours (clé de UI/Art.lua : Art.scenes) : boss -> mine, feu de camp -> night,
--- rencontre -> champ `scene` facultatif de la rencontre (piste F), sinon route.
+-- rencontre -> champ `scene` facultatif de la rencontre (piste F), sinon route. Une zone peut remplacer un
+-- décor par le sien (champ scenes de ns.Zones[id], docs/zones.md).
+local baseScene
 function C.scene()
   local exp = C.exp()
+  local s = baseScene(exp)
+  local z = exp and ns.Zones[exp.zone or ""]
+  return z and z.scenes and z.scenes[s] or s
+end
+
+baseScene = function(exp)
   if not exp then return "road" end
   local f = (C.ended and C.ended.kind) or (exp.fight and exp.fight.kind) or C.lastFightKind
   if exp.phase == "campfire" then return "night" end
@@ -535,17 +554,7 @@ local function affixLine(affixes, key_)
 end
 C.affixLine = affixLine
 
--- Barre de réputation de la Ligue : { label, points, level, levelName, cur, size, hint } ; aide : une
--- ligne par palier.
-local LEAGUE_HINT = { "Each level: relics, potions and encounters.", "Revered: choose a relic at the start.",
-  "Exalted: one more relic at the merchant." }
-local function repBar(label, points)
-  local lv, cur, size = Meta.progress(points or 0)
-  return { label = label, points = points or 0, level = lv, levelName = Meta.levelName(lv), cur = cur,
-    size = size, hint = LEAGUE_HINT }
-end
-
--- Barre d'expérience d'une classe : même forme (W.repBar), « Level N » au lieu du palier.
+-- Barre d'expérience d'une classe (W.repBar) : { label, points, level, levelName = « Level N », cur, size }.
 local function levelBar(cid)
   local cs = ns.Persist.db.meta.classes[cid]
   local lv, cur, size = Meta.xpProgress(cs and cs.xp or 0)
@@ -569,29 +578,67 @@ local function sortedClasses()
 end
 C.sortedClasses = sortedClasses
 
+local function className(cid)
+  local cd = ns.Classes[cid]
+  return cd and cd.name or tostring(cid)
+end
+
 local RESULT = { won = "victory", lost = "defeat", abandoned = "abandoned", abandon = "abandoned" }
 
 local function journalLine(e)
   local parts = {}
   if e.date then parts[#parts + 1] = tostring(e.date) end
   local cls = e.class and ns.Classes[e.class]
-  parts[#parts + 1] = (cls and cls.name or "?") .. (e.key and (" +" .. e.key) or "")
+  local where = e.zone and ns.Zones[e.zone] and (" · " .. ns.Zones[e.zone].name) or ""
+  parts[#parts + 1] = (cls and cls.name or "?") .. where .. (e.key and (" +" .. e.key) or "")
   parts[#parts + 1] = RESULT[e.result] or tostring(e.result)
   if e.floor then parts[#parts + 1] = "stage " .. e.floor end
-  if e.xp then parts[#parts + 1] = "+" .. e.xp .. " experience"
-  elseif e.rep then parts[#parts + 1] = "+" .. e.rep .. " reputation" end
+  if e.xp then parts[#parts + 1] = "+" .. e.xp .. " experience" end
   return table.concat(parts, " · "), e.result == "won"
 end
 
--- Classe et clé choisies sur l'écran d'accueil (clé par défaut : la plus haute ouverte).
+-- Zone jouable par cette classe maintenant : ouverte pour elle et avec ses données.
+function C.zoneReady(class, zone)
+  return ns.Zone.playable(zone) and Meta.zoneOpen(ns.Persist.db.meta, class, zone)
+end
+
+-- Classe, zone et clé choisies sur l'écran d'accueil. Zone par défaut : la dernière choisie si elle est
+-- jouable par la classe, sinon la plus avancée qui l'est ; clé par défaut : la plus haute ouverte dans
+-- cette zone pour cette classe.
 function C.startInfo()
   local db = ns.Persist.db
   local classes = sortedClasses()
   local class = (C.ui.class and ns.Classes[C.ui.class]) and C.ui.class or classes[1]
-  local keyMax = Meta.keyMax(db.meta, class)
+  local zone = C.ui.zone
+  if not (zone and C.zoneReady(class, zone)) then
+    zone = ns.Zone.FIRST
+    for _, id in ipairs(ns.Zone.ORDER) do
+      if C.zoneReady(class, id) then zone = id end
+    end
+  end
+  local keyMax = Meta.keyMax(db.meta, class, zone)
   local k = C.ui.key
   if not k or k > keyMax or k < 0 then k = keyMax end
-  return { class = class, key = k, keyMax = keyMax, classes = classes }
+  return { class = class, zone = zone, key = k, keyMax = keyMax, classes = classes }
+end
+
+-- État d'une zone pour une classe, prêt à afficher : { status = "won" | "open" | "locked" | "later",
+-- label (« Won », « Open », « Locked », « Coming later »), reason (texte d'un refus) }.
+local ZONE_STATUS = { won = "Won", open = "Open", locked = "Locked", later = "Coming later" }
+function C.zoneStatus(class, zone)
+  local m = ns.Persist.db.meta
+  local st
+  if not ns.Zone.playable(zone) then st = "later"
+  elseif not Meta.zoneOpen(m, class, zone) then st = "locked"
+  elseif Meta.classWon(m, class, zone) then st = "won"
+  else st = "open" end
+  local reason
+  if st == "later" then
+    reason = "Coming later."
+  elseif st == "locked" then
+    reason = "Win " .. ns.Zone.name(ns.Zone.prev(zone)) .. " with the " .. className(class) .. " to open it."
+  end
+  return { status = st, label = ZONE_STATUS[st], reason = reason }
 end
 
 local function startStep()
@@ -614,19 +661,35 @@ local function startStep()
       text = (cd.hp or "?") .. " HP, " .. #(cd.deck or {}) .. " cards", level = Meta.levelOf(db.meta, cid),
       selected = cid == st.class }
   end
+  -- zones de la campagne, dans l'ordre : verrouillées (zone précédente pas gagnée par la classe) ou à
+  -- venir (pas encore de données), grisées avec leur raison
+  for _, zid in ipairs(ns.Zone.ORDER) do
+    local zs = C.zoneStatus(st.class, zid)
+    local o = { id = "zone:" .. zid, group = "zone", label = ns.Zone.name(zid), status = zs.status,
+      statusLabel = zs.label, selected = zid == st.zone }
+    if zs.status == "won" then
+      local best = Meta.bestKey(db.meta, st.class, zid)
+      o.text = "Won with the " .. className(st.class) .. (best > 0 and (", best key +" .. best) or "") .. "."
+    elseif zs.status == "open" then
+      o.text = "Open to the " .. className(st.class) .. "."
+    end
+    if zs.reason then o.disabled, o.reason = true, zs.reason end
+    opts[#opts + 1] = o
+  end
+  local zname = ns.Zone.name(st.zone)
   for k = 0, Meta.MAX_KEY do
     local o = { id = "key:" .. k, group = "key", label = "+" .. k, selected = k == st.key,
       text = affixLine(Meta.affixesFor(k), k) or "No affix." }
     if k > st.keyMax then
       o.disabled = true
-      o.reason = "A victory at +" .. st.keyMax .. " unlocks key +" .. (st.keyMax + 1) .. "."
+      o.reason = "A victory at +" .. st.keyMax .. " in " .. zname .. " unlocks key +" .. (st.keyMax + 1) .. "."
     end
     opts[#opts + 1] = o
   end
-  opts[#opts + 1] = { id = "go", label = "Start expedition", text = (Map.ACTS[1] and Map.ACTS[1].name or "") }
+  opts[#opts + 1] = { id = "go", label = "Start expedition", text = zname }
   opts[#opts + 1] = { id = "ui:progress", label = "Progress" }
   return { kind = "start", title = "Slay the Dragon", text = text, options = opts,
-    class = st.class, key = st.key, keyMax = st.keyMax, affixes = Meta.affixesFor(st.key) }
+    class = st.class, zone = st.zone, key = st.key, keyMax = st.keyMax, affixes = Meta.affixesFor(st.key) }
 end
 
 -- Classe affichée par l'écran de progression : choisie par ses onglets, sinon celle de l'expédition qui
@@ -640,14 +703,50 @@ local function progressClass()
 end
 C.progressClass = progressClass
 
--- Écran de progression d'une classe : niveau et barre d'expérience, cartes rangées par voie (départ puis
--- les trois voies, dans l'ordre des niveaux), bibelots de classe. Verrouillé : seulement la condition
--- (« Priest level 4 »), ni nom ni texte ni icône.
+-- Zones d'une classe pour l'écran de progression, dans l'ordre : { id, name, status, statusLabel, won,
+-- keyMax, bestKey, card = emplacement de la carte de zone, keys = { emplacements des bibelots de clé
+-- (+1, +3, +5) } }. Emplacement : { id (si débloqué), unlocked, condition (verrouillé), level (clé) } ;
+-- sans donnée encore écrite, l'emplacement est montré verrouillé avec sa condition.
+local function zoneRows(cid)
+  local m = ns.Persist.db.meta
+  local rows = {}
+  for _, zid in ipairs(ns.Zone.ORDER) do
+    local zs = C.zoneStatus(cid, zid)
+    local zname = ns.Zone.name(zid)
+    local won = Meta.classWon(m, cid, zid)
+    local best = Meta.bestKey(m, cid, zid)
+    local cards = Meta.zoneCards(cid, zid)
+    local card = { unlocked = false, condition = "Win " .. zname .. " to unlock" }
+    if cards[1] then
+      card.cardId = cards[1]
+      if won then card.unlocked, card.id, card.condition = true, cards[1], nil end
+    end
+    local byLevel = {}
+    for _, e in ipairs(Meta.keyRelics(cid, zid)) do byLevel[e.level] = byLevel[e.level] or e.id end
+    local keys = {}
+    for i, lv in ipairs(Meta.KEY_RELIC_LEVELS) do
+      local id = byLevel[lv]
+      local open = id ~= nil and best >= lv
+      keys[i] = { level = lv, id = open and id or nil, unlocked = open,
+        condition = not open and ("Win " .. zname .. " +" .. lv .. " to unlock") or nil }
+    end
+    rows[#rows + 1] = { id = zid, name = zname, status = zs.status, statusLabel = zs.label, won = won,
+      keyMax = Meta.keyMax(m, cid, zid), bestKey = best, card = card, keys = keys }
+  end
+  return rows
+end
+C.zoneRows = zoneRows
+
+-- Écran de progression d'une classe, deux onglets. Cartes : niveau et barre d'expérience, cartes rangées
+-- par voie (départ puis les trois voies, dans l'ordre des niveaux), bibelots de classe. Zones : les sept
+-- zones (gagnée, clé max, carte de zone, bibelots de clé). Verrouillé : seulement la condition
+-- (« Priest level 4 », « Win Westfall to unlock »), ni nom ni texte ni icône.
 local function progressStep()
   local db = ns.Persist.db
   local cid = progressClass()
   local cd = ns.Classes[cid]
   local level = Meta.levelOf(db.meta, cid)
+  local tab = C.ui.progressTab == "zones" and "zones" or "cards"
   local function entry(id, def)
     local lv = Meta.unlockLevel(def)
     local open = lv <= level
@@ -673,78 +772,124 @@ local function progressStep()
     opts[#opts + 1] = { id = "pclass:" .. c, group = "class", label = ns.Classes[c].name or c,
       level = Meta.levelOf(db.meta, c), selected = c == cid }
   end
-  opts[#opts + 1] = { id = "ui:meta", label = "Reputation and log" }
+  opts[#opts + 1] = tab == "zones" and { id = "ptab:cards", label = "Cards", group = "tab" }
+    or { id = "ptab:zones", label = "Zones", group = "tab" }
+  opts[#opts + 1] = { id = "ui:meta", label = "Log" }
   opts[#opts + 1] = { id = "ui:back", label = "Back" }
   return { kind = "classProgress", title = cd.name or cid, class = cid, level = level, bar = levelBar(cid),
-    rows = rows, relics = relics, options = opts }
+    tab = tab, rows = rows, relics = relics, zones = zoneRows(cid), options = opts }
 end
 
 local function metaStep()
   local db = ns.Persist.db
   local m = db.meta
   local bars, lines = {}, {}
-  -- une barre de classe (niveau) : celle de l'écran de progression ; puis la Ligue et le journal
+  -- une barre de classe (niveau) : celle de l'écran de progression ; puis le journal
   for _, cid in ipairs({ progressClass() }) do
     local cs = m.classes[cid]
     local b = levelBar(cid)
-    local km = Meta.keyMax(m, cid)
-    b.detail = "Keys unlocked: +0 to +" .. km
-      .. ((cs and cs.bestKey and cs.bestKey >= 0) and (" · best victory: +" .. cs.bestKey) or "")
+    local won = 0
+    for _, zid in ipairs(ns.Zone.ORDER) do if Meta.classWon(m, cid, zid) then won = won + 1 end end
+    b.detail = "Zones won: " .. won .. " of " .. ns.Zone.count()
       .. ((cs and cs.runs) and (" · " .. cs.runs .. " expedition(s), " .. (cs.wins or 0) .. " victory(ies)") or "")
     local title = Meta.title(m, cid)
     if title then b.detail = b.detail .. " · title: " .. title end
     bars[#bars + 1] = b
   end
-  local lb = repBar("Explorers' League", m.league)
-  lb.detail = (m.runs or 0) .. " expedition(s) in total"
-  bars[#bars + 1] = lb
   local j = db.journal
   for i = #j, max(1, #j - 7), -1 do
     local line, won = journalLine(j[i])
     lines[#lines + 1] = { text = line, won = won }
   end
-  return { kind = "meta", title = "Reputation and log",
-    text = #j == 0 and "No expedition finished yet." or "Last expeditions:",
+  return { kind = "meta", title = "Expedition log",
+    text = (#j == 0 and "No expedition finished yet." or "Last expeditions:")
+      .. "\n" .. (m.runs or 0) .. " expedition(s) in total.",
     bars = bars, journal = lines, options = { { id = "ui:progress", label = "Back" } } }
 end
 
+-- Ce que vient de débloquer la première victoire du compte dans une zone (commun, pour toutes les classes).
+local PERK_TEXT = { startRelic = "Choose a relic at the start of each expedition.",
+  merchantRelic = "One more relic at the merchant." }
+local function commonLine(zname, c)
+  local parts = {}
+  local function add(n, one, many)
+    if n > 0 then parts[#parts + 1] = n .. " " .. (n == 1 and one or many) end
+  end
+  add(#c.cards, "neutral card", "neutral cards")
+  add(#c.relics, "relic", "relics")
+  add(#c.potions, "potion", "potions")
+  add(#c.events, "encounter", "encounters")
+  local lines = {}
+  if #parts > 0 then
+    lines[1] = "First " .. zname .. " victory on this account: " .. table.concat(parts, ", ") .. " unlocked for every class."
+  else
+    lines[1] = "First " .. zname .. " victory on this account."
+  end
+  for _, k in ipairs(c.perks or {}) do lines[#lines + 1] = "Every class: " .. PERK_TEXT[k] end
+  return lines
+end
+
 local function endStep()
-  local db = ns.Persist.db
   local s, e = C.ending.summary, C.ending.entry
   local won = e.result == "won"
   local title = won and "Expedition complete!" or e.result == "lost" and "Expedition over"
     or "Expedition abandoned"
+  local zid = s.zone or e.zone or ns.Zone.FIRST
+  local zname = ns.Zone.name(zid)
+  local cname = className(e.class)
   local lines = {}
   if won then
-    lines[#lines + 1] = "The act's boss has fallen. Expedition ended with " .. e.hp .. " HP and " .. #e.deck .. " cards."
+    lines[#lines + 1] = "The boss of " .. zname .. " has fallen. Expedition ended with " .. e.hp .. " HP and "
+      .. #e.deck .. " cards."
   elseif e.result == "lost" then
     local names = {}
     for id in tostring(e.killedBy or ""):gmatch("[^+]+") do
       names[#names + 1] = ns.Enemies[id] and ns.Enemies[id].name or id
     end
-    lines[#lines + 1] = "Fell at stage " .. (e.floor or "?")
+    lines[#lines + 1] = "Fell at stage " .. (e.floor or "?") .. " of " .. zname
       .. (#names > 0 and (" against " .. table.concat(names, ", ")) or "") .. "."
   else
-    lines[#lines + 1] = "Turned back at stage " .. (e.floor or "?") .. "."
+    lines[#lines + 1] = "Turned back at stage " .. (e.floor or "?") .. " of " .. zname .. "."
   end
   lines[#lines + 1] = (e.cleared or 0) .. " stage(s) cleared, " .. (e.elites or 0) .. " elite(s), "
     .. (e.bosses or 0) .. " boss(es)."
-  local cname = ns.Classes[e.class] and ns.Classes[e.class].name or tostring(e.class)
-  lines[#lines + 1] = "|cffffd700+" .. (s.xp or 0) .. " " .. cname .. " experience, +" .. (s.rep or 0)
-    .. " reputation|r (Explorers' League)."
+  lines[#lines + 1] = "|cffffd700+" .. (s.xp or 0) .. " " .. cname .. " experience.|r"
   local up = s.levelAfter and s.levelBefore and s.levelAfter > s.levelBefore
   if up then
     lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. s.levelAfter .. "!|r"
   end
-  if s.leagueAfter ~= s.leagueBefore then
-    lines[#lines + 1] = "|cff40ff40Explorers' League: from " .. Meta.levelName(s.leagueBefore) .. " to "
-      .. Meta.levelName(s.leagueAfter) .. " !|r"
+  -- déblocages de la campagne : zone suivante, carte de zone, bibelots de clé, clé suivante, commun
+  if s.zoneWon then
+    if s.zoneOpened then
+      lines[#lines + 1] = "|cff40ff40" .. zname .. " won with the " .. cname .. ": " .. ns.Zone.name(s.zoneOpened)
+        .. " is open to the " .. cname .. (ns.Zone.playable(s.zoneOpened) and "" or " (coming later)") .. ".|r"
+    else
+      lines[#lines + 1] = "|cff40ff40" .. zname .. " won with the " .. cname .. ".|r"
+    end
   end
-  if s.keyUnlocked then lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked!|r" end
-  local bars = { levelBar(e.class), repBar("Explorers' League", db.meta.league) }
-  -- ce que la montée de niveau vient de débloquer (révélé : cartes et bibelots montrés tels quels)
-  local unlocked = up and s.unlocked or nil
-  if unlocked and #unlocked.cards + #unlocked.relics == 0 then unlocked = nil end
+  for _, id in ipairs(s.zoneCards or {}) do
+    lines[#lines + 1] = "|cff40ff40New " .. cname .. " card: " .. cardName(id) .. ".|r"
+  end
+  for _, id in ipairs(s.keyRelics or {}) do
+    lines[#lines + 1] = "|cff40ff40New relic: " .. relicName(id) .. ".|r"
+  end
+  if s.keyUnlocked then
+    lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked in " .. zname .. ".|r"
+  end
+  if s.accountZone and s.common then
+    for _, l in ipairs(commonLine(zname, s.common)) do lines[#lines + 1] = "|cff40c0ff" .. l .. "|r" end
+  end
+  local bars = { levelBar(e.class) }
+  -- ce que la fin d'expédition vient de débloquer pour la classe, révélé tel quel : cartes et bibelots du
+  -- niveau, carte de zone, bibelots de clé
+  local unlocked = { cards = {}, relics = {} }
+  if up and s.unlocked then
+    for _, id in ipairs(s.unlocked.cards) do unlocked.cards[#unlocked.cards + 1] = id end
+    for _, id in ipairs(s.unlocked.relics) do unlocked.relics[#unlocked.relics + 1] = id end
+  end
+  for _, id in ipairs(s.zoneCards or {}) do unlocked.cards[#unlocked.cards + 1] = id end
+  for _, id in ipairs(s.keyRelics or {}) do unlocked.relics[#unlocked.relics + 1] = id end
+  if #unlocked.cards + #unlocked.relics == 0 then unlocked = nil end
   return { kind = "end", won = won, result = e.result, title = title, text = table.concat(lines, "\n"),
     bars = bars, unlocked = unlocked, options = { { id = "ui:new", label = "New expedition" },
       { id = "ui:progress", label = "Progress" } } }
@@ -777,9 +922,9 @@ local function mapStep(exp)
   local text = "Choose the next stage."
   local al = affixLine(exp.affixes, exp.key)
   if al then text = text .. "\n" .. al end
-  -- Nom du boss de l'acte (si tous les groupes de boss ont le même chef).
+  -- Nom du boss de la zone (si tous les groupes de boss ont le même chef).
   local bossName
-  local act = Map.ACTS[exp.act or 1]
+  local act = X.zoneDef(exp)
   local groups = act and ns.Encounters[act.encounters] and ns.Encounters[act.encounters].boss
   if groups and groups[1] then
     local first = groups[1][1]
@@ -989,8 +1134,8 @@ local function startRelicStep(exp)
       item = { kind = "relic", id = id } })
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipStartRelic", label = "Leave without a relic" })
-  return { kind = "startRelic", title = "League Favor",
-    text = "Revered with the Explorers' League: choose a relic for this expedition.",
+  return { kind = "startRelic", title = "Relic choice",
+    text = "Choose a relic for this expedition.",
     options = opts }
 end
 
