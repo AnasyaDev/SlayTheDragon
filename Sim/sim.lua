@@ -10,7 +10,10 @@
 --   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
 --     avec key=N (clé mythique) et zones=0..7 (zones gagnées par le compte et la classe, à toutes les clés :
 --     commun, cartes de zone, bibelots de clé ; drapeaux d'histoire d'un vétéran dès 1) ; meta=start et
---     meta=exalted restent des alias de zones=0 et zones=7 ; zone=<id> : zone jouée (défaut : la première)
+--     meta=exalted restent des alias de zones=0 et zones=7. L'expédition traverse la campagne depuis Westfall
+--     (victoire = Nefarian battu ; tableau « Par zone »). Diagnostic : startzone=<id> (départ dans cette zone avec
+--     le deck de départ), maxzone=<id> (arrêt après le boss de cette zone) ; zone=<id> = startzone=<id>
+--     maxzone=<id> (une zone seule, comme avant le 14/11/2026)
 --   level=1..7 : niveau de classe (cartes et bibelots de classe débloqués) ; défaut 7 avec
 --     runner=expedition (tout débloqué, les mesures d'avant la progression par classe), toutes les cartes sinon
 --   tier=0..7 : bibelots/potions communs débloqués (palier commun : zones gagnées par le compte ; défaut : tous)
@@ -91,7 +94,18 @@ local function addRecord(agg, rec)
     agg.wins = agg.wins + 1
     agg.hpEndWin = agg.hpEndWin + rec.hp
   end
-  agg.floors[rec.floor] = (agg.floors[rec.floor] or 0) + (rec.won and 0 or 1)
+  -- étape de la défaite (expédition : « zone étape », la campagne a 56 étapes)
+  local fk = rec.zone and (rec.zone .. " " .. rec.floor) or rec.floor
+  agg.floors[fk] = (agg.floors[fk] or 0) + (rec.won and 0 or 1)
+  -- par zone (runner=expedition) : atteinte, battue, PV / PV max / deck / épique à l'entrée
+  for _, z in ipairs(rec.zones or {}) do
+    agg.zones = agg.zones or {}
+    local s = agg.zones[z.zone] or { reached = 0, beaten = 0, hp = 0, maxHp = 0, deck = 0, epic = 0 }
+    agg.zones[z.zone] = s
+    s.reached = s.reached + 1
+    if z.beaten then s.beaten = s.beaten + 1 end
+    s.hp, s.maxHp, s.deck, s.epic = s.hp + z.hp, s.maxHp + z.maxHp, s.deck + z.deck, s.epic + z.epic
+  end
   if rec.visits then
     agg.goldEarned = agg.goldEarned + rec.goldEarned
     agg.goldSpent = agg.goldSpent + rec.goldSpent
@@ -241,6 +255,7 @@ local function runRange(from, to)
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
         meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
         hp = tonumber(opts.hp), path = opts.path, zones = tonumber(opts.zones), zone = opts.zone,
+        startZone = opts.startzone, maxZone = opts.maxzone,
         epic = opts.epic ~= "" and opts.epic or nil, human = human, fightBot = opts.fightbot })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
@@ -419,12 +434,38 @@ local function report(a, title)
     for _, k in ipairs(keys) do parts[#parts + 1] = ("%s=%g"):format(k, H[k]) end
     out("Joueur humain : " .. table.concat(parts, " "))
   end
-  out(("Victoires   : %s (± %.1f)   PV moyens à la victoire : %.1f"):format(pct(a.wins, a.runs), 1.96 * se,
-    a.wins > 0 and a.hpEndWin / a.wins or 0))
+  -- runner=expedition : victoire = boss de la dernière zone de l'expédition battu (Nefarian, sauf maxzone=/zone=)
+  local lastZone = opts.runner == "expedition" and (opts.maxzone or opts.zone or ns.Zone.ORDER[#ns.Zone.ORDER]) or nil
+  out(("Victoires   : %s (± %.1f)   PV moyens à la victoire : %.1f%s"):format(pct(a.wins, a.runs), 1.96 * se,
+    a.wins > 0 and a.hpEndWin / a.wins or 0, lastZone and ("   (boss de " .. ns.Zone.name(lastZone) .. " battu)") or ""))
   local deaths = {}
-  for f, n in pairs(a.floors) do if n > 0 then deaths[#deaths + 1] = ("étape %d : %d"):format(f, n) end end
-  table.sort(deaths)
-  out("Défaites    : " .. table.concat(deaths, ", "))
+  for f, n in pairs(a.floors) do if n > 0 then deaths[#deaths + 1] = { key = f, n = n } end end
+  local function deathOrder(k)
+    if type(k) == "number" then return k end
+    local z, fl = tostring(k):match("^(%S+) (%d+)$")
+    return (ns.Zone.order(z) or 0) * 100 + (tonumber(fl) or 0)
+  end
+  table.sort(deaths, function(x, y) return deathOrder(x.key) < deathOrder(y.key) end)
+  local dl = {}
+  for _, d in ipairs(deaths) do
+    if type(d.key) == "number" then dl[#dl + 1] = ("étape %d : %d"):format(d.key, d.n)
+    else dl[#dl + 1] = ("%s : %d"):format(d.key, d.n) end
+  end
+  out("Défaites    : " .. table.concat(dl, ", "))
+  -- Par zone : part des expéditions qui atteignent la zone, qui battent son boss, taux conditionnel (battue /
+  -- atteinte), PV, PV max et taille du deck à l'entrée (après le soin du passage), part avec une épique à l'entrée
+  if a.zones then
+    out("")
+    out("Par zone                atteinte   battue   battue/atteinte   PV entrée   PV max   deck   épique entrée")
+    for _, zid in ipairs(ns.Zone.ORDER) do
+      local s = a.zones[zid]
+      if s and s.reached > 0 then
+        out(("  %-20s %s  %s   %s         %6.1f   %6.1f  %5.1f   %s"):format(ns.Zone.name(zid), pct(s.reached, a.runs),
+          pct(s.beaten, a.runs), pct(s.beaten, s.reached), s.hp / s.reached, s.maxHp / s.reached, s.deck / s.reached,
+          pct(s.epic, s.reached)))
+      end
+    end
+  end
   out("")
   -- PV nets (colonnes ajoutées en fin de ligne : des scripts lisent les autres par position) : PV à l'entrée
   -- moins PV à la sortie, soins du combat déduits ; % PV max = rapporté aux PV max à l'entrée du combat.
@@ -500,7 +541,8 @@ local function report(a, title)
   out("")
   if opts.runner == "expedition" then
     local zones = tonumber(opts.zones) or (opts.meta == "exalted" and 7 or 0)
-    out(("Expédition : %s, clé +%d, zones gagnées %d, niveau de classe %d"):format(opts.zone or "westfall",
+    local from = opts.startzone or opts.zone or ns.Zone.FIRST
+    out(("Expédition : %s -> %s, clé +%d, zones gagnées %d, niveau de classe %d"):format(from, lastZone,
       tonumber(opts.key or 0), zones, tonumber(opts.level or 7)))
     out(("Expérience de classe : %.1f par expédition (victoire %.1f, défaite %.1f)"):format(a.xp / a.runs,
       a.wins > 0 and a.xpWin / a.wins or 0, a.runs > a.wins and a.xpLoss / (a.runs - a.wins) or 0))

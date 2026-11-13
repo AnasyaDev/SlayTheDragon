@@ -16,8 +16,9 @@ ns.Save = Save
 -- unlock.level) ; 5 : campagne par zones (meta.zones, meta.classes[id].zones, Ligue retirée ; expédition
 -- version 5 : exp.zone, unlock.common, unlock.won). Expéditions version 6 (cartes épiques) et 7 (l'épique se
 -- gagne) sans changement de la méta : Save.VERSION reste 5, l'expédition en cours passe par EXP_MIGRATIONS[5]
--- puis [6].
-Save.VERSION = 5
+-- puis [6]. 6 : une expédition traverse toute la campagne (clé par classe cs.keyMax / cs.bestKey, zone la plus
+-- loin atteinte cs.farthest ; expédition version 8).
+Save.VERSION = 6
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -46,6 +47,13 @@ function Save.normalize(db)
       cs.xp = tonumber(cs.xp) or 0
       cs.runs = tonumber(cs.runs) or 0
       cs.wins = tonumber(cs.wins) or 0
+      -- clé et zone atteinte par classe (v6) ; avant la v6, cs.keyMax / cs.bestKey n'existaient plus (v5)
+      -- ou étaient ceux de Westfall (v1 à v4, déplacés par la migration 4 -> 5)
+      if (tonumber(db.version) or 0) >= 6 then
+        cs.keyMax = tonumber(cs.keyMax) or 0
+        cs.bestKey = tonumber(cs.bestKey) or -1
+        cs.farthest = tonumber(cs.farthest) or 0
+      end
       if type(cs.zones) ~= "table" then cs.zones = {} end
       for zone, zs in pairs(cs.zones) do
         if type(zs) ~= "table" then
@@ -117,6 +125,36 @@ Save.MIGRATIONS[4] = function(db)
   m.league = nil
 end
 
+-- 5 -> 6 : une expédition traverse toute la campagne (décision du joueur, 14/11/2026). Rien n'est retiré :
+-- cs.zones[zone].won (épique de la zone) et .bestKey (bibelots de clé) restent tels quels. Clé par classe : la
+-- plus haute clé ouverte dans une zone (cs.keyMax = max des zs.keyMax : toute clé jouable avant le reste) ;
+-- meilleure clé d'une victoire complète = celle de Blackrock Mountain si la classe l'a gagnée. Zone la plus loin
+-- atteinte (cs.farthest) : la plus avancée des zones gagnées par la classe ou jouées par elle (journal).
+Save.MIGRATIONS[5] = function(db)
+  Save.normalize(db)
+  local m = db.meta
+  local last = ns.Zone.ORDER[#ns.Zone.ORDER]
+  local played = {}
+  for _, e in ipairs(db.journal) do
+    local o = type(e) == "table" and e.class and ns.Zone.order(e.zone)
+    if o and o > (played[e.class] or 0) then played[e.class] = o end
+  end
+  for class, cs in pairs(m.classes) do
+    if type(cs) == "table" then
+      local keyMax, far = 0, played[class] or 0
+      for zone, zs in pairs(cs.zones) do
+        keyMax = math.max(keyMax, tonumber(zs.keyMax) or 0)
+        local o = zs.won and ns.Zone.order(zone)
+        if o and o > far then far = o end
+      end
+      cs.keyMax = math.max(tonumber(cs.keyMax) or 0, keyMax)
+      local br = cs.zones[last]
+      cs.bestKey = math.max(tonumber(cs.bestKey) or -1, br and br.won and tonumber(br.bestKey) or -1)
+      cs.farthest = math.max(tonumber(cs.farthest) or 0, far)
+    end
+  end
+end
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp, db) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
@@ -185,6 +223,25 @@ Save.EXP_MIGRATIONS[6] = function(exp)
   if exp.phase == "start" and type(exp.startRelics) ~= "table" then exp.phase = "map" end
 end
 
+-- Expédition 7 -> 8 : une expédition traverse toute la campagne. Une expédition d'une seule zone en cours continue
+-- dans sa zone, puis enchaîne normalement sur la suivante jusqu'à Blackrock Mountain (exp.startZone = sa zone,
+-- exp.act = 1, exp.acts = zones restantes). Arrêtée sur la récompense de son boss : ce boss est déjà battu
+-- (exp.beaten), il compte tout de suite (Save.settle, appelé par Save.migrate).
+Save.EXP_MIGRATIONS[7] = function(exp)
+  local zone = exp.zone or ns.Zone.FIRST
+  local last = ns.Zone.ORDER[#ns.Zone.ORDER]
+  exp.startZone = exp.startZone or zone
+  exp.lastZone = exp.lastZone or last
+  exp.act = tonumber(exp.act) or 1
+  exp.acts = (ns.Zone.order(last) or 1) - (ns.Zone.order(exp.startZone) or 1) + 1
+  if type(exp.beaten) ~= "table" then
+    exp.beaten = {}
+    if exp.phase == "reward" and type(exp.reward) == "table" and exp.reward.kind == "boss" then
+      exp.beaten[1] = zone
+    end
+  end
+end
+
 local function quarantine(db, state, reason)
   db.quarantine[#db.quarantine + 1] = { reason = reason, state = state }
 end
@@ -232,10 +289,20 @@ function Save.migrate(db)
         db.current = nil
         quarantine(db, exp, why)
         note = "expedition quarantined: " .. why
+      else
+        Save.settle(db)
       end
     end
   end
   return db, note
+end
+
+-- Reporte dans la méta ce que l'expédition en cours a déjà acquis (Meta.bank : boss battus, zone atteinte).
+-- L'interface l'appelle après chaque action ; idempotent. Renvoie les parts nouvellement reportées.
+function Save.settle(db)
+  local exp = db and db.current
+  if type(exp) ~= "table" or type(db.meta) ~= "table" then return {} end
+  return ns.Meta.bank(db.meta, exp)
 end
 
 ---------------------------------------------------------------------------
@@ -286,6 +353,8 @@ function Save.validateExpedition(exp)
   if exp.phase == "start" and type(exp.startRelics) ~= "table" then
     return false, "missing start choice"
   end
+  if exp.phase == "transit" and type(exp.transit) ~= "table" then return false, "missing zone change" end
+  if type(exp.beaten) ~= "table" then return false, "missing bosses" end
   return Save.isPlain(exp, "current")
 end
 
@@ -326,7 +395,7 @@ end
 -- Cycle de vie d'une expédition
 ---------------------------------------------------------------------------
 
--- Démarre une expédition (opts : seed, class, zone, key). Renvoie exp ou nil, raison.
+-- Démarre une expédition à Westfall (opts : seed, class, key). Renvoie exp ou nil, raison.
 function Save.start(db, opts)
   if db.current then return nil, "running" end
   local exp, why = ns.Meta.newExpedition(db.meta, opts)

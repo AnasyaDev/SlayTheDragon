@@ -3,7 +3,9 @@
 -- les bots de Sim/bots.lua. Même API que l'interface : Expedition.choices / act.
 -- SimExpedition.play(opts) -> enregistrement compatible avec Sim/sim.lua
 -- opts : seed, bot, class, pick ("rated"|"random"|"skip"), cap, maxRounds,
---        key (niveau de clé mythique), zone (zone jouée, défaut : la première),
+--        key (niveau de clé mythique) ; l'expédition traverse la campagne depuis Westfall (docs/expedition.md) :
+--        startZone (diagnostic : départ dans cette zone avec le deck de départ), maxZone (diagnostic : arrêt après
+--        le boss de cette zone), zone (alias : startZone = maxZone = zone, une zone seule),
 --        zones (0..7 : zones gagnées par le compte et la classe, à toutes les clés),
 --        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (niveau de classe 1..7, défaut 7),
 --        epic (id d'une carte épique imposée au deck de départ),
@@ -309,6 +311,7 @@ return function(ns)
     advice, adviceExp = adviceOf(exp), exp
     local ch = X.choices(exp)
     local ph = exp.phase
+    if ph == "transit" then return { "continue" } end
     if ph == "start" then
       return has(ch, "startRelic") or { "skipStartRelic" }
     elseif ph == "map" then
@@ -637,8 +640,14 @@ return function(ns)
         flags[branch] = true
       end
     end
-    local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
-      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
+    -- startZone / maxZone : diagnostic (départ ailleurs qu'à Westfall avec le deck de départ, arrêt après un
+    -- boss) ; zone = une zone seule (les deux)
+    local startZone = opts.startZone or opts.zone
+    local maxZone = opts.maxZone or opts.zone
+    local so, mo = ns.Zone.order(startZone), ns.Zone.order(maxZone)
+    if so and mo and mo < so then maxZone = startZone end
+    local exp = X.new({ seed = seed, class = opts.class or "priest", zone = startZone, lastZone = maxZone,
+      key = opts.key or 0, unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
       epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
@@ -653,11 +662,19 @@ return function(ns)
       hrng = Rng.stream(seed, "human")
       humanShop, humanRemove, humanRoute = nil, nil, nil
     end
-    local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
+    local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {}, zones = {} }
+    -- entrée dans chaque zone (après le soin du passage) : PV, PV max, taille du deck, épique au deck
+    local function enterZone()
+      record.zones[#record.zones + 1] = { zone = exp.zone, hp = exp.hp, maxHp = exp.maxHp, deck = #exp.deck,
+        epic = X.epicIndex(exp) and 1 or 0 }
+      humanRoute = nil -- route de l'ancienne carte
+    end
+    enterZone()
     local guard = 0
     while exp.phase ~= "done" do
+      if exp.zone ~= record.zones[#record.zones].zone then enterZone() end
       guard = guard + 1
-      if guard > 5000 then
+      if guard > 40000 then
         X.act(exp, { "abandon" })
         break
       end
@@ -681,6 +698,8 @@ return function(ns)
     end
     record.won = exp.result == "won"
     record.floor = exp.floor
+    record.zone = exp.zone
+    for i, z in ipairs(record.zones) do z.beaten = exp.beaten[i] == z.zone end
     record.hp = exp.hp
     record.deck = exp.deck
     record.gold = exp.gold
