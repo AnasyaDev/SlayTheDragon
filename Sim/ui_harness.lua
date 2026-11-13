@@ -2258,7 +2258,7 @@ do
     and card.reasonPlate and card.reasonPlate._shown and card.reasonPlate.text._text == "Not enough mana.")
   card:SetCard("smite", true, { cost = 1, playable = true })
   check("améliorée : nom vert, chiffre changé en vert", card.name._calls.SetTextColor[2] == H.ns.Art.C.upGreen[2]
-    and (card.body._text or ""):find("|cff7dff7d9|r", 1, true), card.body._text)
+    and (card.body._text or ""):find("|cff7dff7d" .. H.ns.Cards.smite.up.effects[1][2] .. "|r", 1, true), card.body._text)
   check("carte jouable : plus de plaque rouge", not card.reasonPlate._shown)
   local chat0 = #(_G.DEFAULT_CHAT_FRAME._lines)
   H.slash("ruban")
