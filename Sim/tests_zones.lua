@@ -210,10 +210,10 @@ test("ordre des crochets d'un round (début et fin de tour, phase ennemie, fin d
   noZone()
 end)
 
-test("hpLoss (perte hors coup annulée), onHeal (soin rendu), zstat (statistiques de zone)", function()
+test("hpLoss (perte hors coup annulée), onUnitHeal (soin rendu), zstat (statistiques de zone)", function()
   local healed = 0
   zone({ hooks = { hpLoss = function(c, z, n, why) if why == "wildfire" and not z.used then z.used = true return 0 end return n end,
-    onHeal = function(c, z, unit, n) healed = healed + n end } })
+    onUnitHeal = function(c, z, unit, n) healed = healed + n end } })
   local c = Combat.new({ seed = 1, class = "priest", hp = 60, maxHp = 60, deck = {}, encounter = { "zt_dummy" },
     zone = "testzone", stats = true })
   Combat.loseHp(c, 5, "wildfire")

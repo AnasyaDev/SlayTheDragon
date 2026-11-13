@@ -3,6 +3,15 @@
 > **13/11/2026** : la Ligue des explorateurs est supprimée (`docs/zones.md`). Le champ `tier` est gardé : le
 > « palier de Ligue » N de ce document se lit maintenant « première victoire du compte dans la zone d'ordre N »
 > (0 = d'emblée) ; le champ `act = 1` des rencontres est devenu `zone = "westfall"`.
+>
+> **13/11/2026 (décision 3 de `docs/zones/westfall.md`)** : les personnages qui n'étaient pas de la Marche de
+> l'Ouest sont remplacés par des gens de la Marche, noms et modèles ; les textes concernés sont réécrits, les
+> choix et leurs issues ne changent pas (empreinte vérifiée par le harnais, section UW). Les ids des
+> rencontres sont gardés (drapeaux `event:<id>`, statistiques). Ancien → nouveau : le cocher → Farmer
+> Furlbrow ; Old Hank → Scout Galiaan (milice) ; Grit → Thor (maître des gryphons de Sentinel Hill) ;
+> Mother Hanna → Verna Furlbrow ; Aunt Mirelle → Innkeeper Heather (décor colline) ; Keeper Alden →
+> Captain Grayson (fantôme du phare) ; Grizzle Quickclick → Defias Profiteer ; Tinker Bertil → Farmer
+> Saldean. Gardés : Salma Saldean, Gryan Stoutmantle, Farmer Molsen (ferme Molsen), Graymaw, Tobin.
 
 Étapes « Rencontre » de la carte. Données : `Data/Events.lua` ; moteur : `Core/Expedition.lua`
 (section Rencontres) ; format et API : `docs/expedition.md`. Contenu original, ancré dans la Marche
@@ -71,14 +80,14 @@ Notation : `-` perte, `+` gain ; « récompense habituelle » = celle d'un comba
 | Rencontre | Palier | Condition | Décor / personnage |
 | --- | --- | --- | --- |
 | `saldean_farm` La ferme des Saldean | 0 | — | farm, Salma Saldean |
-| `defias_caravan` La carriole renversée | 0 | — | road, le cocher |
+| `defias_caravan` La carriole renversée | 0 | — | road, Farmer Furlbrow |
 | `sentinel_hill` La Colline des sentinelles | 0 | réponse 4 : Tabard de Hurlevent | hill, Gryan Fortmanteau |
-| `coast_murlocs` Les nasses du vieux Hank | 0 | — | coast, vieux Hank |
-| `jangolode_prospector` Le filon de la mine de Jango | 0 | — | mine, Grenaille |
-| `moonbrook_refugees` Les réfugiés de Ruisselune | 1 | réponse 4 : une potion | camp, Mère Hanna |
-| `herbalist` La cueilleuse de pacifiques | 1 | PV < 50 % | road, Tante Mirelle |
+| `coast_murlocs` Les nasses de la milice | 0 | — | coast, l'éclaireur Galiaan |
+| `jangolode_prospector` Le filon de la mine de Jango | 0 | — | mine, Thor |
+| `moonbrook_refugees` Les réfugiés de Ruisselune | 1 | réponse 4 : une potion | camp, Verna Furlbrow |
+| `herbalist` Les remèdes de Heather | 1 | PV < 50 % | hill, l'aubergiste Heather |
 | `scarecrow_field` L'épouvantail qui grince | 2 | — | farm, fermier Molsen |
-| `lighthouse_keeper` Le gardien du phare | 2 | étape ≥ 4 | coast, gardien Alden |
+| `lighthouse_keeper` Le phare de la Marche | 2 | étape ≥ 4 | coast, le capitaine Grayson |
 | `gnoll_raiders` Les maraudeurs Rivepatte | 3 | clé ≥ +2 | camp, Grisgueule |
 
 **La ferme des Saldean** — la halte réconfortante du début.
@@ -98,7 +107,7 @@ Notation : `-` perte, `+` gain ; « récompense habituelle » = celle d'un comba
 4. *(Tabard de Hurlevent)* Montrer son tabard : une carte peu commune parmi 3.
 Intention : récompenser un bibelot commun sans le rendre obligatoire.
 
-**Les nasses du vieux Hank** — combat de murlocs, pari ou repas.
+**Les nasses de la milice** — combat de murlocs, pari ou repas.
 1. Reprendre le ponton : combat contre 4 murlocs, récompense habituelle + 15 po.
 2. Relever les nasses : 50 % : une potion et 20 po, sinon -7 PV.
 3. Partager sa friture : +8 PV.
@@ -118,7 +127,7 @@ emplacements.
 4. *(une potion)* Leur laisser une potion : perds une potion (le dernier emplacement occupé),
    2 cartes améliorées au hasard.
 
-**La cueilleuse de pacifiques** *(PV < 50 %)* — une main tendue quand ça va mal.
+**Les remèdes de Heather** *(PV < 50 %)* — une main tendue quand ça va mal.
 1. Payer ses remèdes : paie 25 po, soigne 35 % des PV max.
 2. Cueillir avec elle : +12 PV.
 Intention : rattraper une expédition mal engagée sans effacer l'erreur (les deux soins restent
@@ -129,7 +138,7 @@ inférieurs à un feu de camp, sauf à payer).
 2. Fouiller sa paille : -4 PV max, une carte rare parmi 3.
 3. Ne pas y toucher : rien.
 
-**Le gardien du phare** *(étape ≥ 4)* — veille ou repos, avant le boss.
+**Le phare de la Marche** *(étape ≥ 4)* — veille ou repos, avant le boss.
 1. Garder le feu toute la nuit : -10 PV, copie une carte du deck.
 2. Dormir au phare : soigne 30 % des PV max.
 Intention : le choix « renforcer le deck ou arriver en forme » juste avant VanCleef.
@@ -142,14 +151,15 @@ Intention : une rencontre qui coûte, propre aux clés hautes (le combat reste r
 
 ### Rares (2)
 
-**La roulotte de Grisette** (`goblin_peddler`, palier 1, road, Grisette Vifcliquet) — marché risqué.
+**Le profiteur défias** (`goblin_peddler`, palier 1, road, Defias Profiteer ; avant le 13/11/2026 : la
+roulotte de Grisette Vifcliquet, gobeline) — marché risqué.
 1. Prendre l'engrenage : -8 PV max, **Engrenage de moissonneur** (bibelot propre : au premier
    tour de chaque combat, pioche 2 cartes de plus).
 2. Jouer au bonneteau : paie 40 po ; 50 % : 100 po.
 3. Décliner poliment : rien.
 Intention : un bibelot fort hors du pool, payé en PV max ; un vrai pari d'or.
 
-**Le moissonneur endormi** (`harvest_watcher`, palier 0, farm, Bricoleur Bertil, *PV ≥ 60 %*) —
+**Le moissonneur endormi** (`harvest_watcher`, palier 0, farm, fermier Saldean, *PV ≥ 60 %*) —
 combat d'élite optionnel.
 1. Réveiller le golem : combat d'élite contre le Golem moissonneur, récompense d'élite + 40 po.
 2. Crocheter le coffre : 40 % : un bibelot (tiré), sinon -12 PV.
@@ -174,7 +184,7 @@ milice.
 Débloque un bibelot qu'on ne trouve nulle part ailleurs.
 
 *Le foulard rouge* (`tobin_defias`, *drapeau `tobin_jailed`*, road) — Tobin a rejoint les Défias.
-1. Le combattre : combat contre un bandit et deux sbires, récompense habituelle + 25 po.
+1. Le combattre : combat contre un malandrin (Defias Highwayman) et deux sbires, récompense habituelle + 25 po.
 2. Lui rendre la prime : paie 30 po.
 3. Lui parler du pain des Saldean : **cachée** (« ? ») — il baisse sa lame, rien à payer.
 La réponse cachée récompense l'empathie ; comme la rencontre n'arrive qu'une fois, la surprise

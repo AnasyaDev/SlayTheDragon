@@ -1791,6 +1791,20 @@ function W.keywordText(k)
   return W.inlineIcons(line, 12)
 end
 
+-- Lignes « While in the deck: A becomes B. » d'une épique (champ transforms), triées par nom d'origine.
+function W.transformLines(d)
+  local out = {}
+  local map = d and d.transforms
+  if not map then return out end
+  local froms = {}
+  for from in pairs(map) do if ns.Cards[from] and ns.Cards[map[from]] then froms[#froms + 1] = from end end
+  table.sort(froms, function(a, b) return ns.Cards[a].name < ns.Cards[b].name end)
+  for _, from in ipairs(froms) do
+    out[#out + 1] = "While in the deck: " .. ns.Cards[from].name .. " becomes |cffffd100" .. ns.Cards[map[from]].name .. "|r."
+  end
+  return out
+end
+
 -- Infobulle de carte : la carte se lit d'elle-même ; l'infobulle n'explique que les mots-clés,
 -- l'amélioration (aperçu) et la raison d'un refus. full = nom et texte en plus (pouvoirs, recharges).
 function W.fillCardTooltip(tt, id, up, extra)
@@ -1813,6 +1827,15 @@ function W.fillCardTooltip(tt, id, up, extra)
   end
   -- « Spend N » au choix : comment jouer la carte sans dépenser (une ligne)
   if d.spend then wrap(tt, W.SPEND_HINT, 0.85, 0.85, 0.85) end
+  -- épique : une seule par expédition ; cartes qu'elle transforme tant qu'elle est dans le deck ; variante :
+  -- la carte d'origine
+  if d.rarity == "epic" then
+    wrap(tt, W.EPIC_HINT, 0.85, 0.85, 0.85)
+    for _, l in ipairs(W.transformLines(d)) do wrap(tt, l, 0.85, 0.85, 0.85) end
+  end
+  if extra and extra.from and ns.Cards[extra.from] then
+    wrap(tt, "Transformed " .. ns.Cards[extra.from].name .. ".", 0.85, 0.85, 0.85)
+  end
   -- carte en main : Cast qui partira tout de suite (Instant), choix de la carte gardée en fin de tour
   if extra and extra.instant then wrap(tt, W.INSTANT_HINT, 0.85, 0.85, 0.85) end
   if extra and extra.keepPick then wrap(tt, W.KEEP_HINT, 1, 0.82, 0) end
@@ -3289,6 +3312,12 @@ function W.card(parent)
   local g = P.card_glow
   place(b.rim, org, { g[1] * k, g[2] * k, 1 + (g[3] - 1) * k, (g[4] + 2 * g[2]) - 2 * g[2] * k })
   b.rim:Hide()
+  -- aura des cartes épiques : même halo, violet des objets épiques, tenu (créée ici, cachée sinon)
+  b.epicGlow = W.skin(face, "card_glow", "BACKGROUND", -8)
+  place(b.epicGlow, org, P.card_glow)
+  b.epicGlow:SetVertexColor(W.EPIC_COLOR[1], W.EPIC_COLOR[2], W.EPIC_COLOR[3], 1)
+  b.epicGlow:SetAlpha(W.EPIC_GLOW_ALPHA)
+  b.epicGlow:Hide()
   b.plate = cardPlate(face)
   b.plate:Layout(org)
   -- médaillon : anneau, icône masquée, verre
@@ -3425,6 +3454,14 @@ function W.card(parent)
       self.plate:Hide()
       self.plateText:Hide()
     end
+    -- carte épique : ruban et languette de coût violets (Media/card_*_epic.tga), aura violette tenue
+    local epic = d.rarity == "epic"
+    if self.isEpic ~= epic then
+      self.isEpic = epic
+      W.setSkin(self.ribbon, epic and "card_ribbon_epic" or "card_ribbon")
+      W.setSkin(self.costTab, epic and "card_cost_epic" or "card_cost")
+      if epic then self.epicGlow:Show() else self.epicGlow:Hide() end
+    end
     -- gemme de rareté
     local gem = Art.gems[d.rarity or ""]
     if gem then
@@ -3556,6 +3593,11 @@ end
 -- Liseré d'état d'une carte (b.rim, W.card) : halo resserré (fraction CARD_RIM_K de la marge du halo
 -- doré), couleur et alpha ; Instant en bleu arcane, carte proposée au choix de fin de tour en or pâle.
 W.CARD_RIM_K = 0.85
+-- Cartes épiques : violet des objets épiques de WoW (#a335ee), aura tenue derrière la carte.
+W.EPIC_COLOR = { 0.64, 0.21, 0.93 }
+W.EPIC_TEXT = { 0.78, 0.5, 1 } -- titres et libellés (plus clair, lisible sur la roche)
+W.EPIC_GLOW_ALPHA = 0.75
+W.EPIC_HINT = "|cffa335eeEpic|r: one per expedition, a new one replaces it."
 W.INSTANT_COLOR = { 0.45, 0.85, 1 }
 W.INSTANT_RIM_COLOR = { 0.35, 0.8, 1, 1 }
 W.KEEP_RIM_COLOR = { 1, 0.9, 0.55, 0.9 }

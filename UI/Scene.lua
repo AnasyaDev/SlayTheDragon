@@ -156,22 +156,391 @@ function PAINT.coast(f, g)
   g[#g + 1] = ground
 end
 
-function PAINT.night(f, g)
-  sky(g, f, { 0.09, 0.1, 0.2 }, { 0.17, 0.2, 0.33 })
-  local moon = W.disc(f, "BACKGROUND", -7, Art.hex("#e8e2d0"))
-  at(moon, f, 820, 40, 56, 56)
-  g[#g + 1] = moon
-  local stars = { { 80, 40 }, { 200, 90 }, { 340, 30 }, { 470, 70 }, { 610, 24 }, { 700, 110 }, { 940, 60 }, { 990, 140 } }
-  for _, s in ipairs(stars) do
-    local st = W.disc(f, "BACKGROUND", -7, C.creamLight, 0.8)
-    at(st, f, s[1], s[2], 4, 4)
-    g[#g + 1] = st
+---------------------------------------------------------------------------
+-- Paysages peints par plans (Art.paintings, palettes Art.palettes) : décors à part entière
+---------------------------------------------------------------------------
+-- Formes : rectangles et dégradés unis, disques (Media/mask_disc), taches fondues (Media/shadow_soft,
+-- la texture de l'ombre de contact : nuages, halos, brume, fumée), rectangles tournés autour de leur
+-- centre (Texture:SetRotation : ailes, toits en losange, barrières), triangles en tranches (tentes).
+-- Ordre de dessin : chaque plan a sa couche et son sous-niveau (BACKGROUND -8 à 7, puis BORDER -8 à
+-- -3, sous l'illustration en BORDER 0, absente de ces décors) ; à niveau égal ne se chevauchent que des
+-- formes de même couleur, des voiles translucides ou des bords d'un pixel : l'ordre du client à niveau
+-- égal (non garanti) ne change donc rien de visible.
+-- Rien n'est tiré au hasard : les variations (épis, damier des champs, étoiles) viennent d'une suite
+-- fixe (hash), le décor est le même à chaque affichage.
+local LV = {
+  sky = { "BACKGROUND", -8 }, sun = { "BACKGROUND", -7 }, clouds = { "BACKGROUND", -6 },
+  hillsBack = { "BACKGROUND", -5 }, hillsFront = { "BACKGROUND", -4 }, trees = { "BACKGROUND", -3 },
+  fieldsFar = { "BACKGROUND", -2 }, haze = { "BACKGROUND", -1 },
+  far = { { "BACKGROUND", 0 }, { "BACKGROUND", 1 }, { "BACKGROUND", 2 } },
+  fieldsNear = { "BACKGROUND", 3 }, furrows = { "BACKGROUND", 4 },
+  roadEdge = { "BACKGROUND", 5 }, road = { "BACKGROUND", 6 },
+  mid = { { "BACKGROUND", 7 }, { "BORDER", -8 }, { "BORDER", -7 } },
+  ground = { "BORDER", -6 }, stalks = { "BORDER", -5 }, ears = { "BORDER", -4 }, smoke = { "BORDER", -3 },
+}
+S.LANDSCAPE_LEVELS = LV
+
+local sin, cos, floor, PI = math.sin, math.cos, math.floor, math.pi
+
+-- Suite fixe dans [0, 1[ (pas de hasard : même décor à chaque fois).
+local function hash(i, k)
+  local v = sin(i * 12.9898 + (k or 0) * 78.233) * 43758.5453
+  return v - floor(v)
+end
+
+local colors = {}
+local function rgb(c)
+  if type(c) ~= "string" then return c end
+  local v = colors[c]
+  if not v then v = Art.hex(c) colors[c] = v end
+  return v
+end
+local function mix(a, b, t)
+  a, b = rgb(a), rgb(b)
+  return { a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t, a[3] + (b[3] - a[3]) * t }
+end
+local function withAlpha(c, a)
+  c = rgb(c)
+  return { c[1], c[2], c[3], a }
+end
+
+local function put(g, t) g[#g + 1] = t return t end
+
+local function box(f, g, lv, c, x, y, w, h, a)
+  local t = put(g, W.rect(f, lv[1], lv[2], rgb(c), a))
+  at(t, f, x, y, w, h)
+  return t
+end
+
+local function vgrad(f, g, lv, top, bottom, x, y, w, h)
+  local t = put(g, f:CreateTexture(nil, lv[1], nil, lv[2]))
+  W.gradient(t, top, bottom)
+  at(t, f, x, y, w, h)
+  return t
+end
+
+local function oval(f, g, lv, c, cx, cy, w, h, a)
+  local t = put(g, W.disc(f, lv[1], lv[2], rgb(c), a))
+  at(t, f, cx - w / 2, cy - h / 2, w, h)
+  return t
+end
+
+local function blur(f, g, lv, c, cx, cy, w, h, a)
+  local t = put(g, f:CreateTexture(nil, lv[1], nil, lv[2]))
+  t:SetTexture(S.SHADOW, nil, nil, "TRILINEAR")
+  c = rgb(c)
+  t:SetVertexColor(c[1], c[2], c[3], a or 1)
+  at(t, f, cx - w / 2, cy - h / 2, w, h)
+  return t
+end
+
+-- Rectangle de len × th centré en (cx, cy), tourné de `angle` (radians, sens trigonométrique).
+local function bar(f, g, lv, c, cx, cy, len, th, angle, a)
+  local t = box(f, g, lv, c, cx - len / 2, cy - th / 2, len, th, a)
+  if angle and angle ~= 0 and t.SetRotation then t:SetRotation(angle) end
+  return t
+end
+
+-- Losange (carré tourné d'un quart) de demi-diagonale hd centré en (cx, cy) : toit à deux pans dont la
+-- moitié basse est cachée par le mur, dessiné au-dessus.
+local function diamond(f, g, lv, c, cx, cy, hd)
+  local side = hd * 1.41421356
+  return bar(f, g, lv, c, cx, cy, side, side, PI / 4)
+end
+
+-- Triangle isocèle (pointe en haut) de base w posée en (cx, by), hauteur h : tranches de 2 unités.
+local function tri(f, g, lv, c, cx, by, w, h)
+  local n = math.max(1, floor(h / 2 + 0.5))
+  local sh = h / n
+  for i = 1, n do
+    local ww = w * (i - 0.5) / n
+    box(f, g, lv, c, cx - ww / 2, by - h + (i - 1) * sh, ww, sh + 0.4)
   end
-  hills(g, f, 190, Art.hex("#202a2a"), { { 200, 520, 70 }, { 760, 520, 50 } }, -6)
-  hills(g, f, 250, Art.hex("#171f1d"), { { 400, 700, 40 } }, -4)
-  local ground = W.rect(f, "BACKGROUND", -2, Art.hex("#2a1d14"))
-  at(ground, f, 0, 300, S.W, 80)
-  g[#g + 1] = ground
+end
+
+-- Accessoires : (f, g, plan = niveaux { fond, masse, détails }, couleurs du plan, palette, x, y du pied,
+-- échelle, variante).
+local PROPS = {}
+
+-- Moulin : tour de pierre qui s'affine, chapeau, deux bras et quatre ailes à claire-voie.
+function PROPS.windmill(f, g, P, c, pal, x, y, s)
+  local hw = { 16, 13.5, 11 }
+  for i = 1, 3 do box(f, g, P[1], c.main, x - hw[i] * s, y - 22 * i * s, 2 * hw[i] * s, 22 * s + 1) end
+  box(f, g, P[3], c.dark, x - 4 * s, y - 14 * s, 8 * s, 14 * s)
+  diamond(f, g, P[2], c.dark, x, y - 66 * s, 10 * s)
+  local hx, hy, a0 = x, y - 60 * s, 0.38
+  for k = 0, 1 do bar(f, g, P[2], c.dark, hx, hy, 100 * s, 2.4 * s, a0 + k * PI / 2) end
+  for k = 0, 3 do
+    local th = a0 + k * PI / 2
+    local dx, dy, px, py = cos(th), -sin(th), sin(th), cos(th)
+    bar(f, g, P[2], c.dark, hx + dx * 29 * s + px * 4.5 * s, hy + dy * 29 * s + py * 4.5 * s, 36 * s, 9 * s, th, 0.75)
+  end
+  if c.light then box(f, g, P[3], c.light, x - 2.5 * s, y - 40 * s, 5 * s, 7 * s) end
+end
+
+-- Ferme : mur, toit en losange, cheminée, porte ; fenêtres éclairées la nuit.
+local function house(f, g, P, c, x, y, s, hw, wh, hd, chimney)
+  local eave = y - wh * s
+  diamond(f, g, P[1], c.dark, x, eave, hd * s)
+  if chimney then box(f, g, P[1], c.dark, x + 12 * s, eave - 30 * s, 6 * s, 18 * s) end
+  box(f, g, P[2], c.main, x - hw * s, eave, 2 * hw * s, wh * s + 1)
+  box(f, g, P[3], c.dark, x - 4 * s, y - 15 * s, 8 * s, 15 * s)
+  if c.light then
+    box(f, g, P[3], c.light, x - (hw - 7) * s, eave + 8 * s, 7 * s, 8 * s)
+    box(f, g, P[3], c.light, x + (hw - 14) * s, eave + 8 * s, 7 * s, 8 * s)
+  end
+end
+function PROPS.farmhouse(f, g, P, c, pal, x, y, s) house(f, g, P, c, x, y, s, 32, 35, 35, true) end
+function PROPS.shed(f, g, P, c, pal, x, y, s) house(f, g, P, c, x, y, s, 24, 25, 25, false) end
+
+-- Tour de Sentinel Hill : fût de pierre, chemin de ronde, toit pointu, meurtrières, bannière.
+function PROPS.tower(f, g, P, c, pal, x, y, s)
+  local top = y - 92 * s
+  diamond(f, g, P[1], c.dark, x, top - 5 * s, 19 * s)
+  box(f, g, P[2], c.main, x - 12 * s, top, 24 * s, 96 * s)
+  box(f, g, P[2], c.main, x - 16 * s, top - 6 * s, 32 * s, 8 * s)
+  for i = 0, 1 do
+    box(f, g, P[3], c.light or c.dark, x - 2 * s, top + (24 + 28 * i) * s, 4 * s, 9 * s)
+  end
+  box(f, g, P[3], c.dark, x - 0.8 * s, top - 40 * s, 1.6 * s, 22 * s)
+  box(f, g, P[3], pal.flag, x + 0.8 * s, top - 40 * s, 15 * s, 9 * s)
+end
+
+-- Tente : toile en triangle, ouverture sombre, mât.
+function PROPS.tent(f, g, P, c, pal, x, y, s)
+  tri(f, g, P[1], c.wood, x, y, 64 * s, 42 * s)
+  tri(f, g, P[2], c.dark, x + 5 * s, y, 20 * s, 26 * s)
+  box(f, g, P[3], c.dark, x - 1.2 * s, y - 49 * s, 2.4 * s, 9 * s)
+end
+
+-- Charrette : caisse, brancards, deux roues ; variante « crates » : chargée de caisses.
+function PROPS.cart(f, g, P, c, pal, x, y, s, variant)
+  bar(f, g, P[1], c.dark, x + 52 * s, y - 20 * s, 44 * s, 3 * s, -0.22)
+  box(f, g, P[2], c.wood, x - 36 * s, y - 38 * s, 72 * s, 20 * s)
+  box(f, g, P[3], c.dark, x - 36 * s, y - 30 * s, 72 * s, 1.5 * s)
+  oval(f, g, P[3], c.dark, x - 20 * s, y - 13 * s, 26 * s, 26 * s)
+  oval(f, g, P[3], c.dark, x + 20 * s, y - 13 * s, 26 * s, 26 * s)
+  if variant == "crates" then
+    box(f, g, P[2], c.crate, x - 32 * s, y - 56 * s, 20 * s, 17 * s)
+    box(f, g, P[2], c.crate, x - 9 * s, y - 52 * s, 16 * s, 13 * s)
+    box(f, g, P[2], c.crate, x + 10 * s, y - 60 * s, 22 * s, 21 * s)
+    box(f, g, P[2], c.crate, x - 25 * s, y - 70 * s, 14 * s, 12 * s)
+  end
+end
+
+-- Épouvantail : piquet, bras, manteau, tête, chapeau.
+function PROPS.scarecrow(f, g, P, c, pal, x, y, s)
+  box(f, g, P[1], c.dark, x - 1.5 * s, y - 72 * s, 3 * s, 72 * s)
+  bar(f, g, P[1], c.dark, x, y - 54 * s, 54 * s, 3 * s, 0.06)
+  box(f, g, P[2], c.main, x - 9 * s, y - 56 * s, 18 * s, 26 * s)
+  bar(f, g, P[2], c.main, x - 16 * s, y - 52 * s, 16 * s, 6 * s, 0.12)
+  bar(f, g, P[2], c.main, x + 16 * s, y - 54 * s, 16 * s, 6 * s, 0.02)
+  oval(f, g, P[2], c.main, x, y - 63 * s, 11 * s, 12 * s)
+  box(f, g, P[3], c.dark, x - 11 * s, y - 69 * s, 22 * s, 2.5 * s)
+  box(f, g, P[3], c.dark, x - 5 * s, y - 77 * s, 10 * s, 8 * s)
+end
+
+-- Foyer : bûches, braises, fumée en taches fondues qui s'élargissent et dérivent.
+function PROPS.smoke(f, g, P, c, pal, x, y, s)
+  bar(f, g, P[1], c.dark, x - 4 * s, y - 3 * s, 18 * s, 3 * s, 0.35)
+  bar(f, g, P[1], c.dark, x + 4 * s, y - 3 * s, 18 * s, 3 * s, -0.35)
+  blur(f, g, P[2], "#ff9a3c", x, y - 6 * s, 30 * s, 18 * s, 0.6)
+  oval(f, g, P[3], "#ffd27a", x, y - 6 * s, 7 * s, 9 * s, 0.9)
+  local sm = pal.smoke
+  for i = 1, 7 do
+    local t = i / 7
+    blur(f, g, LV.smoke, sm[1], x + 34 * t * t * s + 5 * sin(i * 2.1), y - 22 * s - 150 * t * s,
+      (14 + 64 * t) * s, (14 + 50 * t) * s, sm[2] * (0.45 + 0.4 * t) * (1.2 - t))
+  end
+end
+
+-- Barrière de (x, y) à (x2, y2) : deux lisses, poteaux tous les 34 environ.
+local function fence(f, g, P, c, x, y, x2, y2)
+  local dx, dy = x2 - x, y2 - y
+  local len = math.sqrt(dx * dx + dy * dy)
+  local ang = math.atan2(-dy, dx)
+  for _, h in ipairs({ 16, 8 }) do bar(f, g, P[1], c.dark, (x + x2) / 2, (y + y2) / 2 - h, len, 2, ang) end
+  local n = floor(len / 34)
+  for i = 0, n do
+    local t = n > 0 and i / n or 0
+    box(f, g, P[2], c.main, x + dx * t - 1.5, y + dy * t - 22, 3, 23)
+  end
+end
+
+-- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions.
+function S.landscape(f, g, sp)
+  local pal = Art.palettes[sp.pal] or Art.palettes.westfall
+  local Wd, Hd, hz, fl = S.W, S.DECOR_H, sp.horizon or 190, sp.field or 228
+  -- ciel : deux dégradés
+  local sk = pal.sky
+  local mid = floor(hz * 0.55)
+  vgrad(f, g, LV.sky, rgb(sk[1]), rgb(sk[2]), 0, 0, Wd, mid)
+  vgrad(f, g, LV.sky, rgb(sk[2]), rgb(sk[3]), 0, mid - 1, Wd, hz + 9 - mid)
+  -- soleil ou lune, halo ; étoiles la nuit
+  local orb, body, glow = sp.sun or sp.moon, pal.sun or pal.moon, pal.sunGlow or pal.moonGlow
+  if orb and body then
+    blur(f, g, LV.sun, glow[1], orb[1], orb[2], orb[3] * 18, orb[3] * 13, glow[2])
+    blur(f, g, LV.sun, glow[1], orb[1], orb[2], orb[3] * 6, orb[3] * 6, glow[2])
+    oval(f, g, LV.clouds, body, orb[1], orb[2], orb[3] * 2, orb[3] * 2)
+  end
+  if pal.stars then
+    for i = 1, 46 do
+      local x, y = hash(i, 1) * Wd, 8 + hash(i, 2) * (hz - 50)
+      if not (orb and math.abs(x - orb[1]) < 60 and math.abs(y - orb[2]) < 60) then
+        local d = 1.5 + hash(i, 3) * 1.8
+        oval(f, g, LV.sun, pal.stars, x, y, d, d, 0.35 + 0.55 * hash(i, 4))
+      end
+    end
+  end
+  -- nuages : quatre taches fondues chacun
+  local cl = pal.cloud
+  for _, c in ipairs(sp.clouds or {}) do
+    local x, y, w, h = c[1], c[2], c[3], c[4]
+    blur(f, g, LV.clouds, cl[1], x, y, w, h, cl[2])
+    blur(f, g, LV.clouds, cl[1], x - w * 0.22, y + h * 0.12, w * 0.55, h * 0.8, cl[2])
+    blur(f, g, LV.clouds, cl[1], x + w * 0.24, y + h * 0.1, w * 0.5, h * 0.75, cl[2])
+    blur(f, g, LV.clouds, cl[1], x - w * 0.04, y - h * 0.22, w * 0.42, h * 0.8, cl[2] * 0.9)
+  end
+  -- collines lointaines : deux rangées de bosses basses (horizon plat)
+  local hl = sp.hills or {}
+  for _, row in ipairs({ { hl.back, LV.hillsBack, pal.hillsBack }, { hl.front, LV.hillsFront, pal.hillsFront } }) do
+    if row[1] then
+      box(f, g, row[2], row[3], 0, hz - 4, Wd, 12)
+      for _, b in ipairs(row[1]) do oval(f, g, row[2], row[3], b[1], hz, b[2], b[3] * 2) end
+    end
+  end
+  -- colline du plan moyen (Sentinel Hill) et son reflet
+  if sp.mound then
+    local m = sp.mound
+    local cy = fl + 30
+    oval(f, g, LV.trees, pal.mound, m[1], cy, m[3], (cy - m[2]) * 2)
+    local ml = pal.moundLight
+    blur(f, g, LV.fieldsFar, ml[1], m[1] - m[3] * 0.1, m[2] + 34, m[3] * 0.5, 74, ml[2])
+  end
+  -- bosquets sur l'horizon
+  for _, t in ipairs(sp.trees or {}) do
+    for k = 1, t[2] do
+      local w = 11 + 6 * hash(t[1], k)
+      oval(f, g, LV.trees, pal.trees, t[1] + (k - 1) * 9 - (t[2] - 1) * 4.5, hz - 2 - (k % 2) * 2, w, w * 0.8)
+    end
+  end
+  -- champs lointains : damier en rangées de plus en plus hautes, haies sombres entre les rangées
+  local rows, sum = { 1, 1.4, 1.9, 2.6, 3.4 }, 10.3
+  local y = hz
+  for r, wgt in ipairs(rows) do
+    local h = (fl - hz) * wgt / sum
+    local x, k = -12, 0
+    local veil = 0.46 - 0.08 * r -- plus brumeux près de l'horizon
+    while x < Wd do
+      k = k + 1
+      local w = (90 + 260 * hash(r * 31 + k, 5)) * (0.6 + 0.12 * r)
+      local c = mix(pal.patches[1 + floor(hash(r * 17 + k, 6) * #pal.patches)], pal.patches[1], 0.4)
+      vgrad(f, g, LV.fieldsFar, mix(c, pal.haze[1], veil + 0.04), mix(c, pal.haze[1], veil - 0.04), x, y, w + 1, h + 1)
+      x = x + w
+    end
+    if r > 2 then box(f, g, LV.haze, pal.hedge[1], 0, y - 0.5, Wd, 1, pal.hedge[2] * 0.15 * r) end
+    y = y + h
+  end
+  -- colline du plan moyen : flanc à l'ombre, sentier en lacet de la route à la tour
+  if sp.mound then
+    local m = sp.mound
+    blur(f, g, LV.fieldsFar, pal.hedge[1], m[1] + m[3] * 0.24, m[2] + 62, m[3] * 0.55, 96, 0.22)
+    local x0 = sp.road and sp.road[1] or m[1]
+    local pts = { { x0, hz - 1 }, { m[1] + 70, m[2] + 46 }, { m[1] - 4, m[2] + 4 } }
+    for i = 1, #pts - 1 do
+      local a, b = pts[i], pts[i + 1]
+      local dx, dy = b[1] - a[1], b[2] - a[2]
+      bar(f, g, LV.fieldsFar, mix(pal.road[1], pal.mound, 0.25), (a[1] + b[1]) / 2, (a[2] + b[2]) / 2,
+        math.sqrt(dx * dx + dy * dy) + 1, 3.2 - i * 1.1, math.atan2(-dy, dx), 0.9)
+    end
+  end
+  -- brume de l'horizon
+  local hzc = pal.haze
+  blur(f, g, LV.haze, hzc[1], Wd / 2, hz + 2, Wd * 1.6, 70, hzc[2])
+  blur(f, g, LV.haze, hzc[1], Wd / 2, hz - 4, Wd * 1.6, 26, hzc[2] * 0.8)
+  -- champs proches : dégradé, rangs du blé qui fuient vers l'horizon (plus épais devant), ombres de
+  -- nuages fondues, quelques ondulations
+  vgrad(f, g, LV.fieldsNear, rgb(pal.fieldsNear[1]), rgb(pal.fieldsNear[2]), 0, fl, Wd, Hd - fl)
+  local vx = sp.road and sp.road[1] or Wd / 2
+  local fd, fli = pal.furrowDark, pal.furrowLight
+  for k = -24, 24 do
+    local xa, xb = vx + k * 6, vx + k * 66
+    if k ~= 0 and xb > -260 and xb < Wd + 260 then
+      local segs = { { 0, 0.3, 0.9 }, { 0.3, 0.62, 1.6 }, { 0.62, 1.04, 2.6 } }
+      for _, sg in ipairs(segs) do
+        local x1, y1 = xa + (xb - xa) * sg[1], fl + (Hd - fl) * sg[1]
+        local x2, y2 = xa + (xb - xa) * sg[2], fl + (Hd - fl) * sg[2]
+        local dx, dy = x2 - x1, y2 - y1
+        bar(f, g, LV.furrows, fd[1], (x1 + x2) / 2, (y1 + y2) / 2, math.sqrt(dx * dx + dy * dy), sg[3],
+          math.atan2(-dy, dx), fd[2])
+        bar(f, g, LV.furrows, fli[1], (x1 + x2) / 2 + sg[3] * 1.4, (y1 + y2) / 2, math.sqrt(dx * dx + dy * dy),
+          sg[3] * 0.7, math.atan2(-dy, dx), fli[2])
+      end
+    end
+  end
+  for _, sh in ipairs(sp.shadows or { { 250, fl + 70, 560, 64 }, { 860, fl + 26, 440, 30 }, { 640, Hd - 40, 520, 60 } }) do
+    blur(f, g, LV.furrows, fd[1], sh[1], sh[2], sh[3], sh[4], fd[2] * 0.9)
+  end
+  for k = 1, 5 do
+    local t = (k / 6) ^ 1.6
+    box(f, g, LV.furrows, fli[1], 0, fl + (Hd - fl) * t, Wd, 1 + 3 * t, fli[2] * 0.6)
+  end
+  -- route en perspective : tranches horizontales, largeur proportionnelle à la distance à l'horizon
+  if sp.road then
+    local r = sp.road
+    local y0 = hz + 3
+    local yy = y0
+    while yy < Hd do
+      local t = (yy - y0) / (Hd - y0)
+      local step = 1.2 + 1.6 * t
+      local tm = math.min(1, (yy + step / 2 - y0) / (Hd - y0))
+      local w = r[3] + (r[4] - r[3]) * tm
+      local cx = r[1] + (r[2] - r[1]) * tm + (r[5] or 0) * sin(PI * tm)
+      local edge = 1 + 4 * tm
+      box(f, g, LV.roadEdge, pal.roadEdge, cx - w / 2 - edge, yy, w + 2 * edge, step + 0.6)
+      box(f, g, LV.road, mix(pal.road[1], pal.road[2], tm), cx - w / 2, yy, w, step + 0.6)
+      yy = yy + step
+    end
+  end
+  -- accessoires (bâtiments lointains, plan moyen) ; ombre fondue au pied de ceux du plan moyen
+  local GROUND_W = { scarecrow = 34, tent = 80, cart = 104 }
+  for _, p in ipairs(sp.props or {}) do
+    local kind = p[1]
+    if GROUND_W[kind] and p[5] == "mid" then
+      local s = p[4] or 1
+      blur(f, g, LV.furrows, pal.ground[1], p[2] + 6 * s, p[3] - 1, GROUND_W[kind] * s * 1.3, 14 * s, 0.55)
+    end
+    if kind == "fence" then
+      fence(f, g, LV[p[6]] or LV.mid, pal[p[6]] or pal.mid, p[2], p[3], p[4], p[5])
+    elseif PROPS[kind] then
+      PROPS[kind](f, g, LV[p[5]] or LV.mid, pal[p[5]] or pal.mid, pal, p[2], p[3], p[4] or 1, p[6])
+    end
+  end
+  -- voile du bas (sol des personnages) et épis du premier plan
+  local gr = pal.ground
+  vgrad(f, g, LV.ground, withAlpha(gr[1], 0), withAlpha(gr[1], gr[2]), 0, Hd - 128, Wd, 128)
+  -- épis : tige, feuille, épi en deux grains allongés, à contre-jour (couleurs sombres de la palette)
+  for ci, cl2 in ipairs(sp.wheat or {}) do
+    for i = 1, cl2[3] do
+      local s0 = ci * 101 + i
+      local h1, h2, h3, h4 = hash(s0, 7), hash(s0, 8), hash(s0, 9), hash(s0, 10)
+      local bx, by = cl2[1] + (cl2[2] - cl2[1]) * h1, Hd + 4 + 10 * h4
+      local L, lean = 46 + 58 * h2, (h3 - 0.5) * 0.5
+      local dx, dy = sin(lean), -cos(lean)
+      local th = PI / 2 - lean
+      bar(f, g, LV.stalks, pal.stalk, bx + dx * L / 2, by + dy * L / 2, L, 1.6, th)
+      local side = (h3 < 0.5) and -1 or 1
+      local la = lean + side * (0.55 + 0.3 * h1)
+      local lx, ly = bx + dx * L * 0.35, by + dy * L * 0.35
+      bar(f, g, LV.stalks, pal.stalk, lx + sin(la) * 9, ly - cos(la) * 9, 20, 2.2, PI / 2 - la)
+      local ec = pal.ears[1 + floor(h4 * #pal.ears)]
+      for j = 0, 1 do
+        local d = L + 5 + j * 9
+        local ear = oval(f, g, LV.ears, ec, bx + dx * d, by + dy * d, 11 - j * 2, 4.4 - j * 0.6)
+        if ear.SetRotation then ear:SetRotation(th) end
+      end
+    end
+  end
 end
 
 ---------------------------------------------------------------------------
@@ -456,6 +825,13 @@ function S.set(stage)
     local entry = Art.scenes[id or Art.defaultScene] or Art.scenes[Art.defaultScene]
     S.entry = entry
     S.decor:Show()
+    -- paysage peint (Art.paintings) : construit à son premier affichage
+    local spec = entry.paint and not S.paints[entry.paint] and Art.paintings and Art.paintings[entry.paint]
+    if spec then
+      local g = {}
+      S.landscape(S.decor, g, spec)
+      S.paints[entry.paint] = g
+    end
     for name, g in pairs(S.paints) do
       local on = name == entry.paint
       for i = 1, #g do if on then g[i]:Show() else g[i]:Hide() end end

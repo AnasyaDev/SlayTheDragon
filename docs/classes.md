@@ -68,7 +68,12 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 | `lasts = N` | Power à durée : retiré à la fin du N-ième round (crochet `powerLasts`) ; `c.player.powerTurns[uid]` |
 | `replacedTo = "exhaust"` | un Power remplacé ou expiré part aux consumées (défausse par défaut) |
 | `level` | niveau de classe (1 à 7) qui débloque la carte ou le bibelot (table du GDD, « Progression par classe » ci-dessous) ; lu par `Expedition.cardPool` / `relicPool` (`Expedition.unlocked`) et l'écran de progression. Plus de `rep` ni de Ligue |
-| `zone = "<id>"` | carte de zone (avec `class`, sans `level`) : rare et forte, débloquée par la première victoire de la classe dans cette zone, introuvable autrement ; hors de la grille des niveaux (`Meta.classContent`), montrée par l'onglet « Zones » de l'écran Progress (`docs/zones.md`) |
+| `zone = "<id>"` | carte de zone (avec `class`, sans `level`) = **carte épique** (`rarity = "epic"`), débloquée par la première victoire de la classe dans cette zone, introuvable autrement ; hors de la grille des niveaux (`Meta.classContent`), montrée par l'onglet « Zones » de l'écran Progress (`docs/zones.md`) ; une seule par expédition (`docs/expedition.md`, « Cartes épiques ») |
+| `transforms = { [id] = id_variante }` | épique : tant qu'elle est dans le deck, ces cartes se jouent comme leur variante (`Card.applyTransforms`), avec l'état amélioré de l'originale |
+| `variant = true` | variante d'une épique : jamais collectionnable (récompenses, marchand, rencontres, progression) ; donner une amélioration (`up`) si l'originale en a une |
+| `innate = true` | « Innate. » (mot de plaque, en fin de texte) : la carte est dans la main de départ de chaque combat, **à la place** d'une carte piochée (main de 5 inchangée ; au-delà de 5 cartes Innate, les suivantes restent sur le dessus de la pioche) ; `Combat.placeInnate` |
+| `deckHooks = { nom = f(c, src, …) }` | effet passif **tant que la carte est dans le deck** : crochets actifs tout le combat, quelle que soit sa pile (même contrat que les Powers, `src = { id, up, uid }`, passent après les Powers et avant les bibelots ; `c.passives`) |
+| `whileInDeck = f(c, src)` | appelé une fois par exemplaire au début du combat (après `init` de la classe, avant `onCombatStart`) |
 
 Raretés et voies : 34 cartes = 4 de départ (`rarity = "basic"`, `path = "start"`, `level = 1`) + 13 communes,
 11 inhabituelles, 6 rares ; 10 par voie ; niveaux : voir « Progression par classe » (test « progression :
@@ -132,6 +137,14 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `cooldown` | d, inst | durée d'une recharge posée (`d.cooldown` ; 1 au moins : Hourglass Sand) |
 | `replay` | inst, ctx | copies de la carte résolues tout de suite après elle, même cible (premier ennemi vivant si elle est morte), sans coût, la carte ne part qu'une fois ; `ctx.copy` vrai pour une copie, journal `replay` (Ironfoe ; Windfury Totem du Shaman) |
 | `applySelf` | état | valeur d'un état posé sur le héros, toutes sources (Benediction : Regen +1) |
+| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)` (l'affichage des crans ne le lit pas encore) |
+| `attackMult` | cible, d | multiplicateur des coups d'une carte Attack (1 ; Death Wish : 1,5), après `damage` (Strength et ajouts), avant Demoralized / Sundered, arrondi à l'inférieur |
+| `canGainBlock` | — | vrai par défaut ; faux = aucun Absorb gagné (Death Wish), avant le crochet `block` ; un gain ≤ 0 après `block` ne fait rien |
+| `trapLaunch` | d, inst | faux par défaut ; vrai = la Trap demande une cible (`Combat.targetOf`, `Combat.needsTarget(inst, c)`) et se déclenche aussitôt sur elle (`Combat.launchTrap` : mêmes effets, `onTrapTriggered` avec why = `"launch"`), sans emplacement (jouable zone pleine) |
+| `stealthBreak` | inst, d | Rogue : vrai par défaut ; faux = la première Attack profite de Stealth (lignes « Stealth: ») sans le retirer (Subterfuge ; la carte dit quand il tombe) |
+| `petAbsent` | — | Hunter : faux par défaut ; vrai = plus d'attaque du familier (automatique, effet `pet`), pas de Frenzy gagné ; `Hunter.petPresent(c)` |
+| `petAll` | — | Hunter : faux par défaut ; vrai = chaque attaque du familier frappe tous les ennemis vivants (+1 Frenzy une fois) ; `Hunter.petAll(c)` |
+| `blockKeep` | Absorb actuelle | (rappel) la valeur gardée ; fraction et plafond se calculent sur le 2e argument (`max(v, min(15, floor(block / 2)))`) |
 | `retainPicks` | — | cartes gardées au choix en fin de tour (0 ; Traveler's Backpack : 1, une seule gérée) ; le choix est posé par `Combat.markRetain(c, uid)` avant la fin du tour (interface, `Bots.markRetain`), `Combat.retainCandidates(c)` = index proposés |
 | `surge` | ctx | montant compté par les effets d'un Surge qui a dépensé quelque chose (Anathema : +2) ; la dépense ne change pas |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
@@ -147,7 +160,11 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | `onCardCommitted` | inst, d, cible | carte jouée, tous ses coûts payés, avant incantation ou résolution (Hot Streak, baguette) |
 | `beforeCard` | inst, ctx | début de la résolution |
 | `onCardPlayed` | inst, ctx | fin de la résolution (Rage par Attack, Deep Wounds) |
-| `onCastStart` / `onCastResolved` | inst | incantation posée / résolue |
+| `onCastStart` / `onCastResolved` | inst | incantation posée / résolue (incantation tenue seulement) |
+| `afterCast` | inst, ctx, instantanée | toute carte Cast résolue, incantée ou sous Instant (Mirror Image) |
+| `onHeal` | PV rendus, surplus | soin tenté du joueur (n > 0), toutes sources : PV réellement rendus et part au-delà du maximum (Prayer of Mending, Spirit Shell) |
+| `onDamageDealt` | cible, PV perdus, ctx\|nil | coup du joueur qui fait perdre des PV à un ennemi (ctx de la carte, nil pour un coup sans carte : familier, riposte ; le DoT n'en est pas un). Un crochet qui inflige des dégâts doit filtrer sur ctx pour ne pas boucler |
+| `onParry` | attaquant, dégâts annulés, charges restantes | Rogue : une charge de Parry consommée |
 | `onTrapSet` / `onTrapTriggered` | inst (, attaquant) | Trap posée / déclenchée |
 | `onAttackHit` | cible, ctx | chaque coup d'une carte Attack (poisons, Ignite) |
 | `onSurge` | montant, ctx | Surge qui a dépensé quelque chose |
@@ -379,9 +396,24 @@ ns.ClassRules.rogue = { hooks = {
 | Formes et lignes « Forme: » (Druid) | état de classe `c.cls.form` ; conditions `bear`, `cat`, `moonkin`, `caster` (registre prêt) dans `Combat.CONDITIONS` ; `cond = "bear"` sur les effets ; événement propre `onShift` ; pastille : `resource = nil`, la forme dans `ns.ClassViews.druid` |
 | DoT selon la source | `apply … icon = "poison"` → `unit.stIcon`, `Art.statusIcons.poison` |
 
+## Cartes épiques : points d'accroche (13/11/2026)
+
+Socle posé pour les 35 épiques (`docs/zones/cartes-de-zone.md`), sans carte réelle ; chaque point a son test
+avec une carte factice dans `Sim/tests_epic.lua`. Existants et vérifiés : `onDotTick` (« quand un DoT tique »),
+`replay` et la nouvelle `Combat.copyCard(c, inst, cible)` (rejouer / copier un effet : résolution d'une copie,
+`ctx.copy`, la carte ne bouge pas), `blockKeep` (Absorb conservé, fraction et plafond), `onTrapTriggered`.
+Nouveaux : `onHeal`, `onDamageDealt`, `onParry`, `afterCast` (notifications) ; `resCap`, `attackMult`,
+`canGainBlock`, `trapLaunch`, `stealthBreak`, `petAbsent`, `petAll` (valeurs) ; champs de carte `innate`,
+`deckHooks`, `whileInDeck`, `transforms`, `variant` (tableau « Cartes » ci-dessus). `Combat.dealDamage` prend un
+6e argument `ctx` (passé par l'effet `damage` et par `randomHits`). `Combat.fire` ne passe que trois arguments :
+un événement nouveau en a trois au plus.
+
+L'agent de conception choisit, pour une épique « passive tant qu'elle est dans le deck », entre un Power à
+jouer (`hooks`), une carte `innate` (arrive en main) et `deckHooks` / `whileInDeck` (effet sans la jouer).
+
 ## Sauvegarde
 
-`Save.VERSION` 5, `Expedition.VERSION` 5 : version 3, migration de la Démence du combat en cours
+`Save.VERSION` 5, `Expedition.VERSION` 6 (version 6 : cartes épiques, `docs/expedition.md`) : version 3, migration de la Démence du combat en cours
 (`c.player.demence` → `c.player.res`, `c.class`, `c.cls`) ; version 4, niveau de classe (`cs.xp` tiré de
 l'ancienne réputation de classe, `exp.unlock.level`, docs/expedition.md) ; version 5, campagne par zones
 (`cs.zones`, `meta.zones`, `exp.zone`, `exp.unlock.common` et `won`, Ligue abandonnée, `docs/zones.md`). Une classe qui ajoute un état de combat le

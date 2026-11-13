@@ -84,9 +84,20 @@ function UI.setScale(s)
   f:SetPoint(pt[1], UIParent, pt[2], pt[3], pt[4])
 end
 
--- Décor et plateau (Scene.set) ; appelé par chaque écran.
+-- Décor et plateau (Scene.set) ; appelé par chaque écran. Le décor commun demandé (road, night, shop…)
+-- devient celui de la zone de l'expédition quand elle en déclare un (Controller.zoneScene).
 function UI.setStage(stage)
-  if Scene.decor then Scene.set(stage) end
+  if not Scene.decor then return end
+  if stage and stage.scene then
+    local id = Controller.zoneScene(stage.scene)
+    if id ~= stage.scene then
+      local copy = {}
+      for k, v in pairs(stage) do copy[k] = v end
+      copy.scene = id
+      stage = copy
+    end
+  end
+  Scene.set(stage)
 end
 
 local BAND_H = 31       -- bandeau : sous la barre de titre du cadre métal (centre à y 15,5)
@@ -558,8 +569,11 @@ function UI.refresh()
   UI.refreshInfo()
 end
 
--- Choix générique depuis un écran (bouton, carte, nœud de carte).
-function UI.choose(id)
+-- Choix générique depuis un écran (bouton, carte, nœud de carte). Une option qui remplacerait la carte
+-- épique du deck demande d'abord confirmation (UI.confirmEpic, UI/Screens.lua) : rien ne part, faux est
+-- renvoyé ; confirmed = vrai pour la rejouer après la réponse.
+function UI.choose(id, confirmed)
+  if not confirmed and UI.confirmEpic and UI.confirmEpic(id) then return false end
   local ok, why = Controller.choose(id)
   if not ok and why then UI.flash(Controller.reasonText(why) or "Choice not possible.") end
   return ok

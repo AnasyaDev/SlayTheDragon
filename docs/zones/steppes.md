@@ -385,11 +385,11 @@ Screwspigot », « A Taste of Flame ».
 
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-- Vampiric Embrace (Priest)
-- Death Wish (Warrior)
-- Touch of the Magi (Mage)
-- Relentless Strikes (Rogue)
-- Kill Shot (Hunter)
+- Voidform (Priest)
+- Anger Management (Warrior)
+- Conflagration (Mage)
+- Kidney Shot (Rogue)
+- Black Arrow (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

@@ -162,6 +162,68 @@ Règles : `docs/zones.md`. La Ligue des explorateurs a disparu de tous les écra
   bouton rouge), lisibilité du petit « Coming later » (10) sur le bouton éteint, carte à 0,9 dans l'onglet
   Zones (aperçu au survol), place du message passager au-dessus de la rangée des zones.
 
+## Westfall réelle (13/11/2026)
+
+Décisions du joueur (`docs/zones/westfall.md`, fin) : la zone 1 empruntait décors et personnages à Elwynn
+et ailleurs. Aucun chiffre ne change.
+- **Décors** : route, colline, camp, marchand et feu de camp en décors peints couleur blé, portés par la
+  zone (« Décors peints de Westfall », plus bas) ; `Media/Backgrounds/elwynn.tga` supprimé.
+- **Defias Highwayman** (créature 122, affichages 2342 / 2343) remplace le Defias Bandit (116) : même id
+  `bandit`, mêmes chiffres, aucune migration de sauvegarde.
+- **Personnages des rencontres** : gens de la Marche (« Personnages (`Art.npcs`) », plus bas ; textes dans
+  `docs/rencontres.md`). Clés d'`Art.npcs` renommées (`farmer_furlbrow`, `verna_furlbrow`, `scout_galiaan`,
+  `thor`, `innkeeper_heather`, `captain_grayson`, `defias_profiteer` ; `farmer_saldean` sert au moissonneur) :
+  les gagnants mémorisés sous les anciennes clés (`options.modelWins`) ne servent simplement plus.
+- Harnais : U17 adapté (fonds embarqués des scènes illustrées, paysage peint des autres, essai à 4
+  candidats), U21 (listes de candidats), faux client avec `CreateColor` et rendu des dégradés ; section
+  **UW** (zone porteuse des cinq décors, palette, couches, Elwynn retirée, Highwayman, empreintes des
+  chiffres des ennemis et des règles des rencontres d'avant le changement, plus aucun personnage ni lieu
+  d'ailleurs dans les textes, décor de la zone en combat, au feu de camp, chez le marchand et en rencontre).
+  Aperçus : `decor-westfall_road|hill|camp|shop|night`, `rencontre-furlbrow`, `rencontre-sentinel-hill`.
+- Non vérifiable hors jeu : rendu réel des rectangles tournés (`SetRotation` des ailes, des toits, des
+  rangs de blé) et des dégradés ; chargement des créatures 237, 238, 392 (absentes des caches) ; allure des
+  affichages de secours.
+## Cartes épiques (13/11/2026)
+
+Règles : `docs/expedition.md`, « Cartes épiques ».
+
+- **Cadre** (`W.card`, `SetCard`) : une carte `rarity = "epic"` prend le ruban et la languette de coût violets
+  (`Media/card_ribbon_epic.tga`, `Media/card_cost_epic.tga`, même géométrie que les pièces de base), une aura
+  violette tenue derrière la carte (`b.epicGlow` : `card_glow` teinté `W.EPIC_COLOR` #a335ee, alpha
+  `W.EPIC_GLOW_ALPHA`, créée avec la carte) et la gemme épique (pentagone violet, `gem_epic`, déjà là). Les
+  pièces violettes sont générées par `tools/build_media.py` à partir des pièces du pack (teinte HSV fixe,
+  saturation qui baisse avec la clarté) ; `build/venv/bin/python -I tools/build_media.py --epic-only` les refait
+  seules depuis `Media/card_ribbon.tga` et `Media/card_cost.tga` (Pillow + numpy, sans le PSD) et ajoute leurs
+  entrées à `UI/SkinData.lua`. **Nouvelles textures : relancer le client** (pas un nouveau fichier du TOC).
+- **Infobulle** : « Epic: one per expedition, a new one replaces it. » (`W.EPIC_HINT`) et une ligne par
+  transformation (« While in the deck: Smite becomes … », `W.transformLines`) ; une variante montrée hors
+  combat ajoute « Transformed Smite. » (option de carte `from`). Mot de plaque `Innate` (« Innate: starts in the
+  opening hand. », registre du langage) : la plaque du bas dit « Power · Innate ».
+- **Récompense d'élite** (choix « Epic ») : montré AVANT les cartes ordinaires (étape `epicMode`) : titre violet
+  « Epic card » au-dessus des cartes, cartes centrées sous le titre s'il y en a moins de trois, consigne
+  « Choose an epic card, or none. » décalée à gauche, bouton rouge « Skip » (150 × 44) à gauche de « Back on the
+  road ». Après le choix (ou « Skip ») : les cartes ordinaires, comme avant.
+- **Remplacement** (`UI.epicConfirm`, construit au premier usage) : `UI.choose(id)` demande d'abord
+  `Controller.epicSwap(id)` (l'action rejouée sur une copie de l'expédition : vrai si elle ferait partir
+  l'épique du deck pour une autre ; récompense, marchand, rencontre). Si oui, panneau modal sur un voile : titre
+  « Epic card », question « Replace A with B? », note « Only one epic card per expedition: the current one leaves
+  the deck. », les deux cartes à 0,9 côte à côte (ancienne à gauche, telle qu'elle est ; nouvelle à droite), un
+  « > » entre elles, « Leaves the deck » (rouge) / « Joins the deck » (vert) dessous, boutons « Replace » (or) et
+  « Keep A » (rouge). Clic hors du panneau = « Keep ». Survol des cartes : halo seulement, ni levée ni aperçu.
+- **Marchand** : l'épique en vente se range à la suite des cartes (7 cartes au plus), cadre violet, prix sur sa
+  plaque ; l'achat passe par la même confirmation.
+- **Deck** : bandeau, panneau du deck, amélioration, retrait et sélection montrent le deck transformé
+  (`Expedition.shownDeck`).
+- **Progress, onglet Zones** : l'emplacement verrouillé d'une carte de zone est un dos de carte teinté de violet
+  avec l'aura épique (`lockedCard`, `SetEpic`) ; débloquée, la vraie carte (cadre violet) à 0,85 : son survol
+  montre l'aperçu à taille réelle (sous `W.PREVIEW_BELOW`).
+- **Bilan** : « New epic card: X. » en violet ; la carte est présentée à part (`unlocked.epic`) : à 0,72, à
+  gauche de la rangée des déblocages, libellé violet « New epic card » au-dessus ; le panneau grandit d'autant.
+- Harnais : section **UE** (avant U16) ; planches `ue-main-epique`, `ue-choix-epic`, `ue-remplacement`,
+  `ue-progression-zones`, `ue-bilan-epique`.
+- Non vérifiable hors jeu : rendu réel du violet des pièces (`card_*_epic.tga`) et de l'aura sur les décors,
+  lisibilité du nom blanc sur le ruban violet, le panneau de confirmation au-dessus des modèles 3D.
+
 ## Habillage WoW (direction B, mana et parcours façon C)
 
 État au 11/11/2026, choisi par le joueur sur maquettes (`build/wowui/direction_*.jpg`, générateurs
@@ -455,7 +517,8 @@ rencontres ne chargent pas du tout » ; « on ne peut pas forcer le chargement e
   retentait que la créature.
 - Invocateur défias (619) : 2329 / 2330 sont bien ce que le serveur annonce (deux caches), mais rien ne
   s'affichait : affichages peut-être absents de ce client, ou lenteur. Candidats ajoutés : 2359 / 2360
-  (Sorcier-voleur défias, Elwynn), 4281 / 4282 (Enchanteur défias).
+  (Sorcier-voleur défias, Elwynn), 4281 / 4282 (Enchanteur défias). Le 13/11/2026, 2359 / 2360 sont
+  remplacés par 2321 / 2322 (Magicien défias, Mortemines).
 
 ### Cache de créatures (`tools/wdb_creatures.py`, lecture seule)
 
@@ -469,10 +532,28 @@ le cache dit l'affichage que CE serveur annonce.
 
 ### Personnages (`Art.npcs`)
 
-Chaque personnage : la créature citée (`SetCreature`), puis trois affichages ou plus (`SetDisplayInfo`),
-tous lus dans le cache : le sien, puis ceux de créatures du même genre (personnages inventés : une
-créature d'Elwynn ou de la Marche de l'Ouest du bon genre) ; une icône embarquée évoquant le personnage
-pour le médaillon. Détail et provenance dans les commentaires de `UI/Art.lua`.
+Chaque personnage : la créature citée (`SetCreature`), puis deux affichages ou plus (`SetDisplayInfo`),
+lus dans le cache : le sien, puis ceux de créatures du même genre ; une icône embarquée évoquant le
+personnage pour le médaillon. Détail et provenance dans les commentaires de `UI/Art.lua`.
+
+**Depuis le 13/11/2026, uniquement des gens de la Marche de l'Ouest** (décision 3 de
+`docs/zones/westfall.md`) :
+
+| Rencontre | Avant (modèle) | Maintenant | Créature / affichages | Provenance |
+|---|---|---|---|---|
+| `defias_caravan` | le cocher (Brog Hamfist 151) | Farmer Furlbrow | 237 / 1943, 3614 | 237 absent des caches (id classique) ; affichages : Saldean, Ray (repli) |
+| `moonbrook_refugees` | Mother Hanna (Ma Stonefield 244) | Verna Furlbrow | 238 / 1691, 8185 | 238 absent des caches ; affichages : Salma Saldean, Heather (repli) |
+| `coast_murlocs` | Old Hank (Lee Brown 1651) | Scout Galiaan | 878 / 2373, 2374, 2368 | cache frFR (milice du peuple) |
+| `jangolode_prospector` | Grit (Prospector Stormpike 1356) | Thor | 523 / 3263, 3594 | cache frFR ; 3594 (nain de Forgefer) = repli d'apparence |
+| `herbalist` | Aunt Mirelle (Alma Jainrose 812) | Innkeeper Heather | 8931 / 8185, 1691 | cache frFR |
+| `lighthouse_keeper` | Keeper Alden (Dockmaster Baren 381) | Captain Grayson | 392 / 2372, 2367 | 392 absent des caches ; affichages : Capitaine Danuvin, Protecteur Gariel (repli) |
+| `goblin_peddler` | Grizzle Quickclick (Zixil 3537) | Defias Profiteer | 1669 / 4423, 2342 | cache frFR |
+| `harvest_watcher` | Tinker Bertil (Deek Fizzlebizz 3290) | Farmer Saldean | 233 / 1943, 3614 | caches |
+| `tobin_defias` | modèle Defias Cutpurse 94 | (Tobin) | 121 / 2336, 2337, 2342, 2343 | Defias Pathstalker, caches |
+| `scarecrow_field` | Farmer Molsen (Farmer Ray 232) | inchangé | 232 / 3614, 3667, 1943 | zone de 232 non vérifiable |
+
+Gardés : Salma Saldean, Gryan Stoutmantle, Graymaw (Riverpaw Taskmaster 98), Tobin enfant (Tommy Joe
+Stonefield 252, Elwynn : aucun enfant nommé de la Marche connu) et Tobin guetteur (Scout Riell 820).
 
 ### Mécanisme (`UI/Scene.lua`)
 
@@ -1091,7 +1172,7 @@ des scènes sont donc des TGA livrés avec l'addon, affichés sans essai ni vali
   rapport réel (`ratio`, 2,0 à 2,6) est rétabli à l'affichage : `Scene.bandCoords` n'en montre qu'une
   bande au format du décor (1034 × 380 ≈ 2,72:1), placée en hauteur par le `focus` de la scène
   (0 = haut, 1 = bas). Une image sert ainsi plusieurs scènes avec des cadrages et teintes différents.
-  5 fonds × 2 Mo = 10,5 Mo.
+  4 fonds × 2 Mo ≈ 8,4 Mo (5 avant le retrait d'Elwynn, 13/11/2026).
 - **Affichage** : le fond embarqué est en tête de la liste de chaque illustration (`Art.illustrations`) ;
   `Scene.chosen` prend le premier candidat qui est embarqué ou validé. Teinte par scène (`tint`), voile
   sombre léger sur les 170 px du bas (sol des personnages, `Scene.ground`, 38 % au bas), décor peint
@@ -1100,19 +1181,59 @@ des scènes sont donc des TGA livrés avec l'addon, affichés sans essai ni vali
 
 | Fond (`Media/Backgrounds`) | FileDataID | Illustration | Scènes (`focus`) |
 |---|---|---|---|
-| `elwynn.tga` | 7377860 | Forêt d'Elwynn (logement, Midnight) | road 0,62 · hill 0,15 · camp 0,9 · shop 0,78 · night 0,55 (teinte nuit bleutée) |
 | `farm.tga` | 407226 | Pics-Jumeaux : chaumière, chemin, charrette | farm 0,55 |
 | `deadmines.tga` | 131833 | Mortemines (écran classique, navire dans la grotte) | mine 0,5 |
 | `ruins.tga` | 7963782 | Ruines de Lordaeron (écran Forever) | ruins 0,5 |
 | `coast.tga` | 427941 | Gilnéas : phare sur la côte | coast 0,45 |
 
+**13/11/2026 : `elwynn.tga` (7377860, forêt d'Elwynn) est supprimé** (fichier, entrée d'`Art.backgrounds`,
+liste d'`Art.illustrations` avec ses candidats du client 7377860, 7963776, 131839, et fabrication dans
+`tools/build_backgrounds.py`, où il ne reste qu'en « écarté » sur la planche). La route, la colline, le
+camp, le marchand et le feu de camp de Westfall sont des **décors peints** (ci-dessous). La liste d'essai
+`/slay scenery test` passe de 8 à 4 candidats (Mortemines, ruines). Les fonds embarqués passent à 4
+(≈ 8,4 Mo).
+
 Écartés (planche) : Excavation 7963777 (sépia, sans ferme), Bassin d'Arathi 2820825 et les autres
 écrans larges BfA (logo en haut), mine gobeline 2016712 (trop sombre, logo), cité en ruine 131866,
-Gilnéas la ville 405445 et Manoir Malvoie 1984118 (nuit : Elwynn assombri suffit), carte des royaumes
-de l'Est 7963776 (carte, pas paysage), Goulet des Chanteguerres 2827086 (personnages au premier plan).
-Limites : les cinq cadrages d'Elwynn diffèrent peu (zone de rapport 2,0) ; les Mortemines sont un
-croquis au trait, d'un autre style que les autres ; la côte est celle de Gilnéas (pins, gris-bleu), pas
-la Marche de l'Ouest dorée.
+Gilnéas la ville 405445 et Manoir Malvoie 1984118, carte des royaumes de l'Est 7963776 (carte, pas
+paysage), Goulet des Chanteguerres 2827086 (personnages au premier plan), Elwynn 7377860 (pas Westfall).
+Limites : les Mortemines sont un croquis au trait, d'un autre style que les autres ; la ferme (Pics-Jumeaux)
+et la côte (Gilnéas, pins, gris-bleu) ne sont pas de la Marche de l'Ouest (hors de la décision du
+13/11/2026, qui ne visait que la route, la colline, le camp, le marchand et la nuit).
+
+### Décors peints de Westfall (13/11/2026)
+
+Décision du joueur : pas d'illustration de la Marche dans les fichiers du jeu, donc un décor peint couleur
+blé, soigné. `Art.paintings` (UI/Art.lua) décrit cinq paysages, `Art.palettes` leurs couleurs (jour :
+blé jaune-ocre, ciel bleu pâle chaud, horizon plat et doré ; nuit : la même composition assombrie, ciel
+bleu nuit, étoiles, lune, fenêtres éclairées). `S.landscape` (UI/Scene.lua) les peint par plans, chacun
+à sa couche et son sous-niveau (`S.LANDSCAPE_LEVELS` ; BACKGROUND -8 à 7 puis BORDER -8 à -3, sous
+l'illustration) :
+
+1. ciel en deux dégradés ; soleil (disque, double halo fondu) ou lune et étoiles ; nuages en taches
+   fondues (texture de l'ombre de contact, `Media/shadow_soft`) ;
+2. deux rangées de collines basses, brumeuses ; la colline de Sentinel Hill (scène `westfall_hill`) avec
+   flanc à l'ombre et sentier en lacet ; bosquets sur l'horizon ;
+3. champs lointains en damier (rangées plus hautes vers l'avant, dégradés qui se raccordent, haies
+   légères) et brume de l'horizon ;
+4. silhouettes lointaines posées sur la ligne des champs proches : moulin (tour qui s'affine, ailes à
+   claire-voie tournées), ferme et grange (toit en losange caché à moitié par le mur), tour de Sentinel
+   Hill avec bannière ;
+5. champs proches : dégradé, rangs du blé qui fuient vers l'horizon (plus épais devant), ombres de nuages,
+   ondulations ; route en perspective (tranches fines, largeur proportionnelle à la distance) ;
+6. plan moyen : épouvantail, barrière, tentes (triangles en tranches), charrette (chargée de caisses chez le
+   marchand), foyer et fumée ; ombre fondue au pied ;
+7. voile sombre du bas (sol des personnages) ; épis à contre-jour dans les coins.
+
+Rien n'est tiré au hasard (suite fixe). Chaque paysage est construit à son premier affichage (300 à 700
+régions). Les scènes sont **portées par la zone** : `ns.Zones.westfall.scenes = { road = "westfall_road",
+hill = …, camp = …, shop = …, night = "westfall_night" }` (Data/Zones/Westfall.lua) ; `UI.setStage` et
+`Controller.scene()` passent par `Controller.zoneScene` ; les décors communs `road`, `hill`, `camp`,
+`shop`, `night` sont ceux de Westfall (accueil, zone sans décor propre). `/slay scenery` est sans effet sur
+ces décors (rien à illustrer). Planche : `lua5.1 Sim/ui_harness.lua 1 build/snap` écrit
+`build/snap/decor-westfall_*.svg` (section UW), puis `rsvg-convert` ; la planche assemblée du 13/11/2026
+est `build/decors_westfall.png` (hors dépôt). Le faux client du harnais connaît désormais `CreateColor` et
+le rendu SVG dessine les dégradés (`SetGradient`), comme le jeu.
 
 ### Diagnostic des paysages
 
@@ -1202,11 +1323,11 @@ entièrement redessinée en « table de jeu illustrée » d'après les maquettes
 | --- | --- | --- |
 | `UI/SkinData.lua` | GÉNÉRÉ par `tools/build_media.py` : textures de `Media/` (fichier, toile, zone utile, coordonnées), géométrie de la carte, icônes copiées, polices | non |
 | `UI/WowSkin.lua` | GÉNÉRÉ par `tools/build_wowui.py` : pièces de l'interface du jeu embarquées dans `Media/WowUI` (fichier, toile, taille, coordonnées, bouts, axe répété, FileDataID), mesures des filets et logements | non |
-| `UI/Art.lua` | Palette, textures, décors (`Art.scenes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours ; champ `tga` = icône améliorée), couleur du corps des cartes, gemmes, teintes des liserés, mots-clés, animations | non |
+| `UI/Art.lua` | Palette, textures, décors (`Art.scenes`, paysages peints `Art.paintings` et leurs palettes `Art.palettes`), personnages de rencontre (`Art.npcs`), sons, icônes (cartes, états, intentions, affixes, bibelots, potions, parcours ; champ `tga` = icône améliorée), couleur du corps des cartes, gemmes, teintes des liserés, mots-clés, animations | non |
 | `UI/Persist.lua` | Chargement de `SlayTheDragonDB` par `Save.migrate`, options de l'interface (`db.options`, dont `decor` et `artChecks`) | non |
 | `UI/Controller.lua` | Couche mince écrans ↔ `Core/Expedition` (étapes génériques, combat, potions, fin, validation, décor de l'étape, mana max, nom du boss) | non |
 | `UI/Widgets.lua` | Habillage WoW (pièces de `Media/WowUI` : cadres à pièces, trois et neuf tranches, dialogues, parchemins, boutons rouges, cases, curseurs, barres d'unité), peau des cartes (textures de `Media/`), polices, sons, pilote d'animations (interpolations, canaux animés), survols (zone fixe + visuel `face`), icônes (améliorées d'abord), carte unique composée, jauges de vie, hexagone d'Absorption, jetons d'état, boutons, infobulles, textes flottants, modèles | oui |
-| `UI/Scene.lua` | Décor (fond embarqué cadré et teinté, voile du bas, décor peint dessous ; repli : candidat du client validé par l'essai manuel ; rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
+| `UI/Scene.lua` | Décor (fond embarqué cadré et teinté, voile du bas, décor peint dessous ; paysages peints par plans, `S.landscape` ; repli : candidat du client validé par l'essai manuel ; rapport `/slay art`), plateau, personnages (modèle, ombre, anneau de cible) | oui |
 | `UI/Main.lua` | Fenêtre, bandeau, écrans, options, `/slay`, bouton de minimap | oui |
 | `UI/CombatView.lua` | Écran de combat et ses animations | oui |
 | `UI/Screens.lua` | Accueil, rencontre, feu de camp, récompense (et coffre), grille du deck, marchand, parcours, bilan et méta, panneau de consultation des cartes (`UI.deckView`) | oui |
@@ -1627,6 +1748,14 @@ Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/In
 `Media/` : relancer le client** (`/reload` ne suffit pas). Activer les erreurs Lua
 (`/console scriptErrors 1`) ou BugSack.
 
+Westfall réelle (13/11/2026 ; `Media/Backgrounds/elwynn.tga` supprimé : relancer le client pour que
+l'ancien fichier ne serve plus) : accueil, route, Sentinel Hill, camp, marchand et feu de camp en champs de
+blé peints (voir « Décors peints de Westfall ») ; l'ennemi « Defias Highwayman » à la place du Defias
+Bandit ; dans les rencontres, Farmer Furlbrow, Verna Furlbrow, Scout Galiaan, Thor, Innkeeper Heather,
+Captain Grayson, Defias Profiteer, Farmer Saldean. Puis `/slay models` : recopier les lignes `npc:` en
+« fallback » ou chargées par un affichage de secours (Furlbrow 237, Verna 238, Grayson 392 ne sont dans
+aucun cache : ils dépendent du serveur).
+
 Avant tout (survols sans agrandissement, 12/11/2026 ; `/reload` suffit) : fenêtre à 115 % puis à 100 % et
 150 %, survoler lentement les boutons (« Back on the road », « End Turn », « Menu », ×, réponses des
 rencontres, service du marchand) : **le texte ne bouge plus d'un pixel ni ne change d'espacement**, le
@@ -1680,11 +1809,13 @@ Ensuite (peau « Mechanized Magic », cartes) :
    tas du deck).
 
 Ensuite (retours du premier essai) :
-1. **Fonds embarqués** (rien à faire : relancer le client, nouveaux fichiers) : l'accueil montre-t-il la
-   forêt d'Elwynn peinte (pas d'aplat vert ni noir) ? Recopier `/slay art` (fonds embarqués et scènes).
-2. **Paysages** : sur la route, la ferme, le feu de camp, le marchand, la côte et le boss, l'illustration
-   a-t-elle du sens derrière les personnages (bien cadrée, personnages lisibles) ? Sinon dire laquelle et
-   ce qui cloche (trop haut / trop bas / trop clair) ; `/slay decor peint` revient au décor peint.
+1. **Décors de Westfall** (13/11/2026 : `elwynn.tga` supprimé, relancer le client) : l'accueil, la route,
+   la colline (Sentinel Hill), le camp, le marchand et le feu de camp montrent-ils les champs de blé peints
+   (ailes du moulin et toits bien tournés, dégradés du ciel, pas de rectangle noir ni de forme à plat) ?
+   La ferme, la côte et le boss gardent leur illustration. Recopier `/slay art` en cas de doute.
+2. **Paysages** : la ferme, la côte et le boss : l'illustration a-t-elle du sens derrière les personnages
+   (bien cadrée, personnages lisibles) ? Sinon dire laquelle et ce qui cloche (trop haut / trop bas / trop
+   clair) ; `/slay decor peint` revient au décor peint.
 3. **Survols** : passer lentement puis vite sur les cartes de la main : la carte se soulève et s'allume en
    ~0,1 s **sans que le nom, le coût ni le texte changent**, passe devant ; ressortir en cours de route la
    fait redescendre sans à-coup ; on peut monter le curseur sur la partie levée sans la perdre. Boutons,

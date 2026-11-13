@@ -67,8 +67,10 @@ E.murloc = {
   end,
 }
 
+-- Malandrin défias (Defias Highwayman), bandit de grand chemin de la Marche. Avant le 13/11/2026 :
+-- « Defias Bandit », d'Elwynn ; mêmes chiffres, id `bandit` gardé (sauvegardes).
 E.bandit = {
-  name = "Defias Bandit", hp = { 25, 28 },
+  name = "Defias Highwayman", hp = { 25, 28 },
   moves = {
     kick = { name = "Kick", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
     guard = { name = "Guard", intent = "defend", actions = { { "block", 8 } } },
@@ -160,6 +162,13 @@ ns.Encounters.westfall = {
   event_gnolls = { { "gnoll", "gnoll", "mystic" } },
   event_golem = { { "harvest_golem" } },
   event_tobin = { { "bandit", "defias_henchman", "defias_henchman" } },
+}
+
+-- Décors de la zone (clés d'Art.scenes, UI/Art.lua) à la place des décors communs : décors peints
+-- couleur blé (docs/zones.md, champ `scenes`).
+ns.Zones.westfall.scenes = {
+  road = "westfall_road", hill = "westfall_hill", camp = "westfall_camp", shop = "westfall_shop",
+  night = "westfall_night",
 }
 
 -- La zone devient jouable : ses groupes de combats (docs/zones.md).

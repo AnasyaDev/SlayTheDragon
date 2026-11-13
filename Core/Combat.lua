@@ -86,7 +86,7 @@ local Rules = ns.ClassRules
 -- l'expédition (c.zone) et toutes celles qui portent always = true (mécanique sortie de sa zone : Asleep).
 -- Liste figée à la création du combat dans c.zr (nil sans règle : aucun coût) ; état de chaque zone dans
 -- c.zs[id] (données simples, copiées en profondeur par Combat.clone). Leurs crochets passent APRÈS ceux
--- de la classe et AVANT ceux des pouvoirs, bibelots et affixes, avec src = c.zs[id]. Contrat : docs/zones.md.
+-- de la classe et AVANT ceux des passifs du deck (épiques), pouvoirs, bibelots et affixes, avec src = c.zs[id].
 ns.ZoneRules = ns.ZoneRules or {}
 local ZRules = ns.ZoneRules
 
@@ -101,6 +101,13 @@ function Combat.modify(c, name, v, a, b, d, x)
       local r = ZRules[zr[i]]
       local h = r and r.hooks and r.hooks[name]
       if h then v = h(c, c.zs[zr[i]], v, a, b, d, x) end
+    end
+  end
+  local ps = c.passives -- cartes du deck à effet passif (def.deckHooks, Combat.new), src = l'instance
+  if ps then
+    for i = 1, #ps do
+      local h = Card.def(ps[i]).deckHooks[name]
+      if h then v = h(c, ps[i], v, a, b, d, x) end
     end
   end
   local powers = c.player.powers
@@ -139,6 +146,13 @@ function Combat.fire(c, name, a, b, d, x)
       local r = ZRules[zr[i]]
       local h = r and r.hooks and r.hooks[name]
       if h and h(c, c.zs[zr[i]], a, b, d, x) then return true, c.zs[zr[i]] end
+    end
+  end
+  local ps = c.passives
+  if ps then
+    for i = 1, #ps do
+      local h = Card.def(ps[i]).deckHooks[name]
+      if h and h(c, ps[i], a, b, d, x) then return true, ps[i] end
     end
   end
   local powers = c.player.powers
@@ -181,7 +195,11 @@ local function cardHookNames(hk, id)
   local d = ns.Cards[id]
   if not d then return end
   addHookNames(hk, d.hooks)
-  if d.up then addHookNames(hk, d.up.hooks) end
+  addHookNames(hk, d.deckHooks)
+  if d.up then
+    addHookNames(hk, d.up.hooks)
+    addHookNames(hk, d.up.deckHooks)
+  end
 end
 
 function Combat.collectHooks(c, deck)
@@ -266,13 +284,20 @@ function Combat.resourceDef(c)
   return cd and cd.resource or nil
 end
 
+-- Plafond de la ressource : resource.cap, modifiable par le crochet « resCap » (Avatar : 10) ; nil = sans.
+function Combat.resCap(c)
+  local r = Combat.resourceDef(c)
+  if not (r and r.cap) then return nil end
+  return Combat.modify(c, "resCap", r.cap)
+end
+
 -- Ajoute n (négatif : retire) à la ressource, dans [0, plafond] ; renvoie la variation réelle.
 -- why : raison facultative, passée au crochet « onResource ».
 function Combat.gainRes(c, n, why)
   local p = c.player
-  local r = Combat.resourceDef(c)
   local v = (p.res or 0) + n
-  if r and r.cap and v > r.cap then v = r.cap end
+  local cap = Combat.resCap(c)
+  if cap and v > cap then v = cap end
   if v < 0 then v = 0 end
   local delta = v - (p.res or 0)
   p.res = v
@@ -512,7 +537,14 @@ function Combat.calcDamage(c, src, dst, base, cardDef)
   local dmg = base
   if src then
     dmg = dmg + (src.st.force or 0)
-    if src.side == "player" then dmg = Combat.modify(c, "damage", dmg, dst, cardDef)
+    if src.side == "player" then
+      dmg = Combat.modify(c, "damage", dmg, dst, cardDef)
+      -- multiplicateur des coups d'une carte Attack (crochet « attackMult », 1 par défaut ; Death Wish : 1,5),
+      -- après Strength et les ajouts, avant Demoralized et Sundered, arrondi à l'inférieur
+      if cardDef and cardDef.type == "attack" then
+        local m = Combat.modify(c, "attackMult", 1, dst, cardDef)
+        if m ~= 1 then dmg = floor(dmg * m) end
+      end
     else dmg = Combat.modify(c, "enemyDamage", dmg, src, dst) end
     if (src.st.demoralized or 0) > 0 then dmg = floor(dmg * 0.75) end
   end
@@ -595,7 +627,10 @@ end
 -- cap ; puis def.onDamaged, seuils franchis (def.phases), « onEnemyBloodied » (premier passage à ou
 -- sous la moitié), « onEnemyDamaged » (ennemi, PV perdus, absorbés, source) s'il survit et que le coup
 -- a porté (même entièrement absorbé).
-function Combat.dealDamage(c, src, dst, amount, pierce)
+-- ctx : contexte de la carte à l'origine du coup (Effects.damage), nil pour un coup sans carte (familier,
+-- riposte, bibelot) ; un coup du joueur qui fait perdre des PV à un ennemi émet « onDamageDealt » (cible,
+-- PV perdus, ctx|nil), le combat pas encore tranché.
+function Combat.dealDamage(c, src, dst, amount, pierce, ctx)
   if dst.dead or c.result then return 0, 0 end
   local foe = dst.side == "enemy"
   local info
@@ -633,9 +668,13 @@ function Combat.dealDamage(c, src, dst, amount, pierce)
   if foe and not dst.dead and not c.result and (loss > 0 or absorbed > 0) then
     Combat.zfire(c, "onEnemyDamaged", dst, loss, absorbed, hitInfo(c, src)) -- relue : la table est partagée
   end
+  if loss > 0 and src and src.side == "player" and dst.side == "enemy" and not c.result then
+    Combat.fire(c, "onDamageDealt", dst, loss, ctx)
+  end
   return loss, absorbed
 end
 
+-- Soin. Pour le joueur, un soin tenté (n > 0) émet « onHeal » (PV rendus, surplus au-delà du maximum).
 function Combat.heal(c, unit, n)
   if unit.dead then return 0 end
   if unit.side == "player" then n = Combat.modify(c, "heal", n) end
@@ -646,13 +685,20 @@ function Combat.heal(c, unit, n)
     log(c, { t = "heal", unit = uref(unit), amount = got })
     if unit.side == "player" then stat(c, "healed", got) end
     -- soin réellement rendu (unité, PV) : Prayer of Mending, Corrupted Healing, Volchan
-    if not c.result then Combat.zfire(c, "onHeal", unit, got) end
+    if not c.result then Combat.zfire(c, "onUnitHeal", unit, got) end
   end
+  if unit.side == "player" and n > 0 and not c.result then Combat.fire(c, "onHeal", got, n - got) end
   return got
 end
 
+-- Absorb gagné. Le joueur n'en gagne pas si le crochet « canGainBlock » (vrai par défaut) dit faux
+-- (Death Wish) ; un gain nul ou négatif après le crochet « block » ne fait rien.
 function Combat.gainBlock(c, unit, n)
-  if unit.side == "player" then n = Combat.modify(c, "block", n) end
+  if unit.side == "player" then
+    if not Combat.modify(c, "canGainBlock", true) then return end
+    n = Combat.modify(c, "block", n)
+    if n <= 0 then return end
+  end
   unit.block = unit.block + n
   log(c, { t = "block", unit = uref(unit), amount = n, total = unit.block })
 end
@@ -1395,15 +1441,31 @@ function Combat.canPlay(c, idx)
   if d.cast and Combat.castCount(c) >= Combat.castSlots(c) and not Combat.isInstant(c, d, inst, false) then
     return false, "casting"
   end
-  -- Trap : zone des pièges pleine (3 par défaut, crochet « trapSlots »)
-  if d.trap and #c.traps >= Combat.modify(c, "trapSlots", Combat.TRAP_SLOTS) then return false, "traps" end
+  -- Trap : zone des pièges pleine (3 par défaut, crochet « trapSlots »), sauf Trap lancée tout de suite
+  if d.trap and #c.traps >= Combat.modify(c, "trapSlots", Combat.TRAP_SLOTS)
+      and not Combat.trapLaunch(c, d, inst) then return false, "traps" end
   if not allowed(c, d) then return false, "forbidden" end
   if d.canPlay and not d.canPlay(c, inst) then return false, "condition" end
   return true
 end
 
-function Combat.needsTarget(inst)
-  return Card.def(inst).target == "enemy"
+-- Trap lancée au jeu (crochet « trapLaunch », faux par défaut ; Trap Launcher) : elle demande une cible
+-- et se déclenche aussitôt sur elle, sans prendre de place dans la zone des pièges (Combat.launchTrap).
+function Combat.trapLaunch(c, d, inst)
+  if not d.trap then return false end
+  return Combat.modify(c, "trapLaunch", false, d, inst) and true or false
+end
+
+-- Cible demandée par une carte : « enemy » (champ target, ou Trap lancée au jeu) ou nil.
+function Combat.targetOf(c, d, inst)
+  if d.target == "enemy" then return "enemy" end
+  if c and d.trap and Combat.trapLaunch(c, d, inst) then return "enemy" end
+  return d.target
+end
+
+-- c facultatif (sans lui, seule la définition compte : pas de Trap lancée).
+function Combat.needsTarget(inst, c)
+  return Combat.targetOf(c, Card.def(inst), inst) == "enemy"
 end
 
 -- Coups légaux : liste de { indexMain, indexCible|nil, sansDépense|nil }. Une carte « Spend N » dont
@@ -1414,7 +1476,7 @@ function Combat.legalPlays(c)
     if Combat.canPlay(c, i) then
       local d = Card.def(c.hand[i])
       local both = d.spend and (c.player.res or 0) >= d.spend
-      if d.target == "enemy" then
+      if Combat.targetOf(c, d, c.hand[i]) == "enemy" then
         for j = 1, #c.enemies do
           if not c.enemies[j].dead then
             list[#list + 1] = { i, j }
@@ -1543,6 +1605,21 @@ function Combat.resolveCard(c, inst, target, cast, spent)
     end
   end
   afterPlay(c, inst, d)
+  -- carte Cast résolue, incantée ou instantanée (onCastResolved ne vaut que pour une incantation tenue)
+  if d.cast and not c.result then Combat.fire(c, "afterCast", inst, ctx, not cast) end
+  return ctx
+end
+
+-- Copie d'une carte (rejouer ou copier un effet) : ses effets se résolvent tout de suite sur target (ou le
+-- premier ennemi vivant si elle doit viser et que la cible manque), sans coût, sans bouger la carte ;
+-- ctx.copy est vrai. Renvoie le contexte de la copie.
+function Combat.copyCard(c, inst, target)
+  if c.result then return nil end
+  local d = Card.def(inst)
+  local t = target
+  if d.target == "enemy" and (not t or t.dead) then t = firstAlive(c) end
+  log(c, { t = "replay", card = inst.uid })
+  return resolveEffects(c, inst, d, t, false, false, true)
 end
 
 -- Instant (état commun : Mage, Shaman) : la prochaine carte Cast se résout tout de suite, sans
@@ -1581,7 +1658,8 @@ playBody = function(c, idx, tIdx, opts)
   local inst = c.hand[idx]
   local d = Card.def(inst)
   local target
-  if d.target == "enemy" then
+  local launch = d.trap and Combat.trapLaunch(c, d, inst)
+  if d.target == "enemy" or launch then
     target = c.enemies[tIdx or 0]
     if not target or target.dead then return false, "target" end
     -- ciblage : une classe peut rediriger la cible (crochet « target ») ; dernière cible retenue
@@ -1614,6 +1692,11 @@ playBody = function(c, idx, tIdx, opts)
   if d.school then tu.bySchool[d.school] = (tu.bySchool[d.school] or 0) + 1 end
   Combat.fire(c, "onCardCommitted", inst, d, target)
   if c.result then return true end
+  -- Trap lancée (crochet « trapLaunch ») : déclenchée tout de suite sur la cible choisie
+  if launch then
+    Combat.launchTrap(c, inst, target, spent)
+    return true
+  end
   -- Trap : posée dans la zone des pièges, résolue à la prochaine attaque ennemie (sur l'attaquant)
   if d.trap then
     c.traps[#c.traps + 1] = { card = inst, spent = spent or nil }
@@ -1650,6 +1733,15 @@ function Combat.triggerTrap(c, e)
   Combat.resolveCard(c, trap.card, e, false, trap.spent)
   if not c.result then Combat.fire(c, "onTrapTriggered", trap.card, e) end
   fxEnd(c, tok)
+end
+
+-- Trap lancée au jeu (crochet « trapLaunch ») : se déclenche aussitôt sur la cible choisie, comme si elle
+-- attaquait (mêmes effets, même « onTrapTriggered » avec why = "launch"), sans place dans la zone des pièges.
+function Combat.launchTrap(c, inst, e, spent)
+  log(c, { t = "trap", card = inst.uid, id = inst.id, dst = e.uid, launched = true })
+  stat(c, "trapsTriggered")
+  Combat.resolveCard(c, inst, e, false, spent)
+  if not c.result then Combat.fire(c, "onTrapTriggered", inst, e, "launch") end
 end
 
 local function resolveOne(c, cast)
@@ -1784,8 +1876,9 @@ function Combat.startPlayerTurn(c)
   c.step = "turnStart"
   stat(c, "turns")
   local p = c.player
-  -- Absorb gardée d'un tour à l'autre (crochet « blockKeep », 0 par défaut : Absorb remise à 0)
-  p.block = min(p.block, max(0, Combat.modify(c, "blockKeep", 0)))
+  -- Absorb gardée d'un tour à l'autre (crochet « blockKeep » (v, Absorb actuelle), 0 par défaut : Absorb
+  -- remise à 0 ; une fraction se calcule sur le second argument, un plafond avec max/min)
+  p.block = min(p.block, max(0, Combat.modify(c, "blockKeep", 0, p.block)))
   p.st.halved = nil
   -- états retirés au début du tour (clearAtTurnStart : Pain Suppression, Ice Block…)
   for id in pairs(p.st) do
@@ -2013,6 +2106,25 @@ end
 -- Création et copie
 ---------------------------------------------------------------------------
 
+-- Innate (champ innate) : après le mélange, les cartes Innate passent sur le dessus de la pioche, dans
+-- leur ordre ; la première pioche les prend À LA PLACE d'autant de cartes (main de 5 inchangée ; au-delà
+-- de 5 Innate, les suivantes restent sur le dessus pour la pioche suivante). Sans Innate, rien ne bouge.
+function Combat.placeInnate(c)
+  local draw = c.draw
+  local innate
+  for i = 1, #draw do
+    if Card.def(draw[i]).innate then innate = true break end
+  end
+  if not innate then return end
+  local rest, top = {}, {}
+  for i = 1, #draw do
+    if Card.def(draw[i]).innate then top[#top + 1] = draw[i] else rest[#rest + 1] = draw[i] end
+  end
+  -- la pioche prend la fin de la liste : la première Innate doit être la dernière
+  for i = #top, 1, -1 do rest[#rest + 1] = top[i] end
+  c.draw = rest
+end
+
 function Combat.newStats()
   return { turns = 0, hpLost = 0, healed = 0, castsStarted = 0, castsInterrupted = 0,
     enemyCasts = 0, enemyCastsInterrupted = 0, played = {}, drawn = {}, unplayed = {}, potions = {} }
@@ -2086,10 +2198,28 @@ function Combat.new(opts)
   local potions = opts.potions or {}
   -- emplacements : 3, ou plus si l'expédition en a gagné (Herb Pouch : #exp.potions)
   for i = 1, max(Combat.POTION_SLOTS, #potions) do c.player.potions[i] = potions[i] or false end
-  for i = 1, #opts.deck do
-    local card = opts.deck[i]
-    c.draw[#c.draw + 1] = Card.new(card.id, card.up, c.nextUid)
+  -- deck transformé par son épique (Card.applyTransforms : le deck lui-même sans transformation)
+  local deck = Card.applyTransforms(opts.deck)
+  local starters
+  for i = 1, #deck do
+    local card = deck[i]
+    local inst = Card.new(card.id, card.up, c.nextUid)
+    c.draw[#c.draw + 1] = inst
     c.nextUid = c.nextUid + 1
+    -- effet passif tant que la carte est dans le deck (docs/classes.md, « Cartes épiques ») : deckHooks
+    -- (crochets actifs tout le combat, src = { id, up, uid }), whileInDeck(c, src) appelé au début du combat
+    local d = Card.def(inst)
+    if d.deckHooks or d.whileInDeck then
+      local src = { id = inst.id, up = inst.up, uid = inst.uid }
+      if d.deckHooks then
+        c.passives = c.passives or {}
+        c.passives[#c.passives + 1] = src
+      end
+      if d.whileInDeck then
+        starters = starters or {}
+        starters[#starters + 1] = src
+      end
+    end
   end
   Rng.shuffle(c.rng.draw, c.draw)
   -- règles de zone : liste et états posés avant l'arrivée des ennemis (leurs crochets peuvent déjà
@@ -2099,7 +2229,8 @@ function Combat.new(opts)
     c.zr, c.zs = zr, {}
     for i = 1, #zr do c.zs[zr[i]] = {} end
   end
-  c.hk = Combat.collectHooks(c, opts.deck)
+  c.hk = Combat.collectHooks(c, deck)
+  Combat.placeInnate(c)
   local mods = opts.mods
   for i = 1, #opts.encounter do
     local spec = opts.encounter[i]
@@ -2116,6 +2247,9 @@ function Combat.new(opts)
   end
   local cr = Rules[class]
   if cr and cr.init then cr.init(c, c.cls) end
+  if starters then
+    for i = 1, #starters do Card.def(starters[i]).whileInDeck(c, starters[i]) end
+  end
   if zr then
     for i = 1, #zr do
       local r = ZRules[zr[i]]
@@ -2179,6 +2313,7 @@ function Combat.clone(c)
   n.discard = copyArr(c.discard)
   n.exhaust = copyArr(c.exhaust)
   n.traps = copyArr(c.traps or {})
+  if c.passives then n.passives = copyArr(c.passives) end
   local cds = {}
   for i = 1, #c.cooldown do
     cds[i] = { card = c.cooldown[i].card, turns = c.cooldown[i].turns }

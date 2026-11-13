@@ -9,7 +9,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 
 | Ordre | Id (`ns.Zones`) | Nom affiché | Fichier de données | État |
 | --- | --- | --- | --- | --- |
-| 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef), sans règle de zone |
+| 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
 | 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
@@ -123,7 +123,7 @@ ZR.define("duskwood", {
 ```
 
 Zones actives dans un combat : celle de l'expédition (`c.zone`) puis celles qui portent `always` (`c.zr`, liste
-figée). Leurs crochets passent après la classe, avant les Pouvoirs, bibelots et affixes. `c.zs[id]` et
+figée). Ordre des crochets : classe, zones, cartes du deck à effet passif (épiques, `deckHooks`), Pouvoirs, bibelots, affixes. `c.zs[id]` et
 `e.zs[id]` (`ZR.unitState(e, id)`) : données simples, copiées en profondeur par `Combat.clone` (le bot clone
 les combats), sauvegardées. **Jamais de fonction ni de référence à une unité dans l'état** (uid seulement).
 Les mêmes noms de crochets servent aux bibelots (`relic.hooks`) et aux Pouvoirs : un bibelot de clé d'une zone
@@ -157,7 +157,7 @@ genre du combat : `c.kind` (`combat`, `elite`, `boss`).
 | `onEnemySpawn` | ennemi, invocateur | invocation en cours de combat |
 | `onEffectEnd` | genre, numéro | fin d'un effet (carte, incantation, Trap, potion, DoT, action ennemie, début / fin de tour, fin de round) : régler les primes groupées |
 | `onHpLost` | n, source (unité, `pay`, `effect`, why de `loseHp`, nil = DoT), PV d'avant | toute perte de PV du joueur |
-| `onHeal` | unité, PV rendus | soin réellement rendu (joueur ou ennemi) |
+| `onUnitHeal` | unité, PV rendus | soin réellement rendu (joueur ou ennemi ; `onHeal` (PV rendus, surplus) : soin tenté du joueur, socle épique) |
 | `onRoundEnd` | skipped | fin du round, avant les durées (Wildfire) |
 | `onStatusApplied`, `onDotTick`, `onPlayerHit`, `afterHit`, `onCardPlayed`, `onCardCommitted`, `beforeCard`, `onCastStart`, `onCastResolved`, `onTrapSet`, `onTrapTriggered`, `onAttackHit`, `preventDeath`… | | inchangés (`docs/classes.md`) |
 
@@ -252,7 +252,10 @@ Vérifier toute API WoW avec le MCP wow (`wow_api_search`, `wow_ui_grep`) et pas
 
 **Décors.** Une zone remplace les décors communs choisis par les écrans (`road`, `hill`, `camp`, `shop`,
 `night`, `mine`, `farm`, `ruins`, `coast`) par les siens : `ns.Zones.<zone>.scenes = { road = "duskwood_road", … }`
-(valeur : clé d'`Art.scenes`, déclarée dans `UI/Art/Zones/<zone>.lua`). Décor peint (comme Westfall) :
+(valeur : clé d'`Art.scenes`, déclarée dans `UI/Art/Zones/<zone>.lua` ; `UI.setStage` passe par
+`Controller.zoneScene`). Westfall le fait (`Data/Zones/Westfall.lua` : `road`, `hill`, `camp`, `shop`, `night` →
+`westfall_*`, décors peints couleur blé) ; les décors communs `road`… `night` sont ceux de Westfall tant qu'une
+zone n'a pas les siens. Décor peint (comme Westfall) :
 `Art.scenes.duskwood_road = { paint = "duskwood_road" }`, `Art.paintings.duskwood_road = { pal = "duskwood",
 horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (plans et accessoires de
 `UI/Scene.lua`, `S.landscape`, `PROPS`) et `Art.palettes.duskwood = { sky, sun, cloud, hillsBack, hillsFront,
@@ -336,7 +339,7 @@ mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (
 | 5. effet `douse` | `ns.Effects.douse` (rien hors de la zone : `ZR.active(c, "steppes")`) |
 | 6. `{ "attack", 10, lit = 5 }` | `{ "attack", 10, more = { { 5, "lit" } } }` + `Combat.ENEMY_CONDITIONS.lit` |
 | 7. action `ignite` | `Combat.ENEMY_ACTIONS.ignite` ; phases de Grark : `phases` |
-| 9. épiques (autre lot) | `onHeal`, `hpLoss`, `damage`, `block` |
+| 9. épiques (autre lot, fait) | `onHeal`, `canGainBlock`, `attackMult`, `afterCast`, `resCap` (socle épique) ; `hpLoss` |
 | 10. jeton de flamme, portion hachurée | `ZoneViews.steppes.counter` ; `ZR.counterChanged` (battement) ; hachure : `ZoneViews.steppes.render` sur `view.playerHp` |
 | 11–12. statistiques, bots | `Combat.zstat`, `ZoneBots.steppes.value` (brûlure à venir) |
 | WANTED, Libram of Resilience, Heart of the Mountain | rencontre `fight` `group = true`, texte « %s » ; `hpLoss` + `beforeHit` ; `onTurnStart` |
@@ -352,7 +355,7 @@ mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (
 | 8. bots, statistiques | clone suffit ; `Combat.zstat` (`onEnemyPhase`, `onEnemyStunned`) |
 | règle 7 (Stunned : ouverture perdue, reprise au 2e coup) | ouverture imposée perdue avec le tour ; `startAt = 2` |
 | Invincible (6 au plus par coup, pas le DoT), Fire Shield, Throne | `enemyDamageTaken` (`e.mem.phase`, `src.kind`) ; `onEnemyDamaged` (carte Attack ou Trap) → `Combat.loseHp` ; `enemyDamageTaken` |
-| Nefarian : plafond au seuil, Bone Constructs en embuscade, Class Call | `cap = true` ; `{ "summon", id, ambush = true }` ou `enter` + `Combat.spawn(c, { id, ambush = true }, e)` ; états de zone + `cost`, `damage`, `applySelf`, `onHeal` |
+| Nefarian : plafond au seuil, Bone Constructs en embuscade, Class Call | `cap = true` ; `{ "summon", id, ambush = true }` ou `enter` + `Combat.spawn(c, { id, ambush = true }, e)` ; états de zone + `cost`, `damage`, `applySelf`, `onUnitHeal` |
 | Grim Guzzler | `nodeKind` + rencontres `nextCombat` et `chain` (boisson achetée) |
 | Dragonslayer, Rallying Cry | `run.onCombatWon` + `Expedition.setFlag` ; `newExpedition(exp)` (`exp.maxHp`) |
 | Blood of the Mountain, Black Dragonscale, Draconic Infused Emblem, Neltharion's Tear | `onEnemyBloodied` ; `beforeHit` (move `cast`) ; `onEnemyPhase` + `onEnemyBloodied` ; `cost` |

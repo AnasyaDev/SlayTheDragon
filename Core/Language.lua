@@ -163,6 +163,9 @@ L.plate("cast", { word = "Cast", head = true, text = "resolves at the start of t
 L.plate("cooldown", { word = "Cooldown", n = true, text = "returns to hand after N." })
 L.plate("exhaust", { word = "Exhaust", text = "removed from combat once played." })
 L.plate("retain", { word = "Retain", text = "stays in hand at the end of the turn." })
+-- Innate (champ innate) : la carte est dans la main de départ de chaque combat, À LA PLACE d'une carte
+-- piochée (la main garde sa taille) ; règle dans Combat.new.
+L.plate("innate", { word = "Innate", text = "starts in the opening hand." })
 
 -- Mot de la plaque d'une carte : « Cooldown 2 », « Trap »… (nil si la carte n'a pas ce mot).
 function L.plateWord(p, d)

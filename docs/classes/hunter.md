@@ -262,9 +262,9 @@ plus ; Kill Command et Rapid Fire sous Readiness font un tour de rafale.
 **Avec Survival.** Frost Trap et Freezing Trap gardent l'incantation d'Aimed Shot à l'abri des coups qui
 interrompent ; Explosive Trap entame tout le groupe pendant que Volley se prépare.
 
-**Tour type** (tour 1, un Defias Bandit de 27 PV et un Conjurer) : Hunter's Mark sur le Bandit (0 mana,
-Sundered 3), Aimed Shot sur le Bandit (Cast), Concussive Shot sur le Conjurer (Demoralized 2). Le familier
-frappe le Conjurer (3). Au début du tour 2, Aimed Shot résout : (20 + 10) × 1,25 = 37, le Bandit meurt.
+**Tour type** (tour 1, un Defias Highwayman de 27 PV et un Conjurer) : Hunter's Mark sur le Highwayman (0 mana,
+Sundered 3), Aimed Shot sur le Highwayman (Cast), Concussive Shot sur le Conjurer (Demoralized 2). Le familier
+frappe le Conjurer (3). Au début du tour 2, Aimed Shot résout : (20 + 10) × 1,25 = 37, le Highwayman meurt.
 
 ### Survival — « Punir chaque attaque ennemie »
 

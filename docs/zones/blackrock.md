@@ -449,10 +449,10 @@ Chacune a une réponse sans condition.
 
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-- Spirit Shell (Priest)
+- Inner Focus (Priest)
 - Avatar (Warrior)
-- Fingers of Frost (Mage)
-- Cold Blood (Rogue)
+- Rule of Threes (Mage)
+- Danse Macabre (Rogue)
 - Lone Wolf (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte

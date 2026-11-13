@@ -842,6 +842,8 @@ UI.register("reward", Reward)
 local REWARD_SCALE = 1.08
 local REWARD_TOP = 147
 local REWARD_CARDS = { 407, 552, 697 }
+-- choix « Epic » : titre au-dessus des languettes de coût, consigne décalée à gauche du bouton « Skip »
+local REWARD_EPIC_TITLE_Y, REWARD_HINT_X, REWARD_HINT_EPIC_X = 98, 552, 470
 
 function Reward:Build(f)
   self.hero = heroFigure(f)
@@ -881,6 +883,15 @@ function Reward:Build(f)
   self.leave = W.button(f, "Back on the road", 206, 50, nil, "gold", 18)
   at(self.leave, f, 913 - 103, 519 - 25, 206, 50)
   self.leave:SetScript("OnClick", function() Reward:Leave() end)
+  -- choix « Epic » (première élite gagnée) : titre violet au-dessus des cartes, « Skip » à gauche du départ
+  self.epicTitle = W.label(f, "heavy", 20, W.EPIC_TEXT, "OVERLAY")
+  self.epicTitle:SetPoint("CENTER", f, "TOPLEFT", 552, -REWARD_EPIC_TITLE_Y)
+  self.epicTitle:SetText("Epic card")
+  self.epicTitle:Hide()
+  self.skip = W.button(f, "Skip", 150, 44, nil, "red", 15)
+  at(self.skip, f, 810 - 14 - 150, 497, 150, 44)
+  self.skip:SetScript("OnClick", function(b) chooseOption(b.option) end)
+  self.skip:Hide()
   self.optionButtons = {}
 end
 
@@ -932,6 +943,9 @@ function Reward:Show(step)
     self.bubble:Hide()
   end
   local k = 0
+  -- choix « Epic » de une ou deux cartes : centré sous son titre
+  local nCards = 0
+  for _, o in ipairs(step.options) do if o.card then nCards = nCards + 1 end end
   for _, o in ipairs(step.options) do
     if o.card then
       k = k + 1
@@ -940,6 +954,7 @@ function Reward:Show(step)
       if card and not closed then
         card.option, card.slot = o, k
         card.cx = REWARD_CARDS[k] or (407 + (k - 1) * 145)
+        if step.epicMode and nCards < 3 then card.cx = REWARD_CARDS[2] + (k - (nCards + 1) / 2) * 145 end
         card.cy = REWARD_TOP + W.CARD_H * REWARD_SCALE / 2
         card:SetCard(o.card.id, o.card.up, { playable = not o.disabled, reason = o.disabled and o.reason or nil })
         self:PlaceCard(card)
@@ -949,6 +964,9 @@ function Reward:Show(step)
       end
     elseif o.id == "takePotion" then
       self.optionButtons[o.id] = self.flask
+    elseif o.id == "skipEpic" then
+      self.skip.option = o
+      self.optionButtons[o.id] = self.skip
     elseif o.id == "leave" then
       self.leave.option = o
       self.optionButtons[o.id] = self.leave
@@ -967,6 +985,12 @@ function Reward:Show(step)
   local anyCard = false
   for _, o in ipairs(step.options) do if o.card then anyCard = true end end
   if anyCard and not closed then self.hint:Show() else self.hint:Hide() end
+  -- choix « Epic » : consigne, titre violet, « Skip »
+  local epic = step.epicMode and not closed
+  self.hint:SetText(epic and "Choose an epic card, or none." or "Choose one card, or none.")
+  self.hint:ClearAllPoints()
+  self.hint:SetPoint("CENTER", self.frame, "TOPLEFT", epic and REWARD_HINT_EPIC_X or REWARD_HINT_X, -519)
+  if epic then self.epicTitle:Show() self.skip:Show() else self.epicTitle:Hide() self.skip:Hide() end
   if hold.gold and not closed then
     self.goldBag.big:SetText(tostring(hold.gold))
     self.goldBag:Show()
@@ -1627,6 +1651,8 @@ local PG_X, PG_W, PG_Y, PG_H, PG_UP_Y, PG_BOTTOM = 167, 700, 64, 352, 40, 488
 local PG_BARS, PG_BARS_META, PG_BAR_DY = 170, 110, 54
 local PG_SCALE, PG_PITCH, PG_RELIC, PG_RELIC_DX = 0.5, 72, 44, 58
 local PG_MAX_CARDS, PG_MAX_RELICS = 9, 3
+-- épique débloquée au bilan : plus grande, à gauche de la rangée, libellé « New epic card » au-dessus
+local PG_EPIC_SCALE, PG_EPIC_GAP, PG_EPIC_LABEL = 0.72, 40, 20
 UI.PG = { scale = PG_SCALE, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS, bottom = PG_BOTTOM }
 
 function Progress:Build(f)
@@ -1674,6 +1700,13 @@ function Progress:Build(f)
     b:Hide()
     self.newRelics[i] = b
   end
+  -- carte épique débloquée (première victoire de la classe dans la zone) : à part, plus grande, libellé violet
+  self.epicCard = W.card(f)
+  self.epicCard:SetFrameLevel(panel:GetFrameLevel() + 5)
+  self.epicCard:Hide()
+  self.epicLabel = W.label(panel, "heavy", 13, W.EPIC_TEXT, "OVERLAY")
+  self.epicLabel:SetText("New epic card")
+  self.epicLabel:Hide()
   self.optionButtons = {}
 end
 
@@ -1685,8 +1718,25 @@ function Progress:ShowUnlocked(u, rowY)
   local nc, nr = math.min(#cards, PG_MAX_CARDS), math.min(#relics, PG_MAX_RELICS)
   local cw = W.CARD_W * PG_SCALE
   local width = (nc > 0 and ((nc - 1) * PG_PITCH + cw) or 0) + (nr > 0 and ((nc > 0 and 24 or 0) + (nr - 1) * PG_RELIC_DX + PG_RELIC) or 0)
+  -- épique : d'abord, à PG_EPIC_SCALE, séparée du reste par PG_EPIC_GAP, libellé au-dessus
+  local ew = W.CARD_W * PG_EPIC_SCALE
+  local epic = u and u.epic
+  if epic then width = width + ew + (width > 0 and PG_EPIC_GAP or 0) end
   local x = PG_X + PG_W / 2 - width / 2
   local lv = self.panel:GetFrameLevel()
+  if epic then
+    local ex = x + ew / 2
+    self.epicCard:SetCard(epic, false, {})
+    W.placeCard(self.epicCard, self.frame, ex, rowY, PG_EPIC_SCALE, lv + 5, lv + 60)
+    self.epicCard:Show()
+    self.epicLabel:ClearAllPoints()
+    self.epicLabel:SetPoint("BOTTOM", self.frame, "TOPLEFT", ex, -(rowY - W.CARD_H * PG_EPIC_SCALE / 2 - 22))
+    self.epicLabel:Show()
+    x = x + ew + (width > ew and PG_EPIC_GAP or 0)
+  else
+    W.hideCard(self.epicCard)
+    self.epicLabel:Hide()
+  end
   for i, c in ipairs(self.newCards) do
     if i <= nc then
       c:SetCard(cards[i], false, {})
@@ -1710,6 +1760,7 @@ end
 
 function Progress:OnHide()
   for _, c in ipairs(self.newCards) do W.hideCard(c) end
+  W.hideCard(self.epicCard)
 end
 
 function Progress:Show(step)
@@ -1729,7 +1780,9 @@ function Progress:Show(step)
   -- panneau : monté et agrandi pour la rangée des déblocages (centre sous la dernière barre et son détail)
   local panelY, panelH = PG_Y, PG_H
   local half = W.CARD_H * PG_SCALE / 2
-  local rowRel = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 58 + half
+  local epicUp = up and step.unlocked.epic
+  if epicUp then half = W.CARD_H * PG_EPIC_SCALE / 2 end
+  local rowRel = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 58 + half + (epicUp and PG_EPIC_LABEL or 0)
   if up then
     panelY = PG_UP_Y
     panelH = min(PG_BOTTOM - PG_UP_Y, max(PG_H, rowRel + half + 20))
@@ -1813,7 +1866,7 @@ local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 44, 56, 50, 76
 local CP_SLOTS, CP_ROWS, CP_ROW_MAX = 36, 4, 10
 -- Onglet « Zones » : colonnes de CP_ZONE_DX à partir de CP_ZONE_TOP (nom, état, clés), carte de zone à
 -- CP_ZONE_SCALE, bibelots de clé en cases de CP_ZONE_RELIC au pas CP_ZONE_RELIC_DX.
-local CP_ZONE_DX, CP_ZONE_TOP, CP_ZONE_SCALE, CP_ZONE_RELIC, CP_ZONE_RELIC_DX = 140, 124, 0.9, 36, 40
+local CP_ZONE_DX, CP_ZONE_TOP, CP_ZONE_SCALE, CP_ZONE_RELIC, CP_ZONE_RELIC_DX = 140, 124, 0.85, 36, 40
 UI.CP = { scale = CP_SCALE, pitch = CP_PITCH, x0 = CP_X0, rowTop = CP_ROW_TOP, rowH = CP_ROW_H,
   relic = CP_RELIC, relicDx = CP_RELIC_DX, relicX = CP_RELIC_X, zoneDx = CP_ZONE_DX, zoneTop = CP_ZONE_TOP,
   zoneScale = CP_ZONE_SCALE, zoneRelic = CP_ZONE_RELIC }
@@ -1834,9 +1887,24 @@ local function lockedCard(parent)
   b.back:SetPoint("CENTER")
   b.back:SetDesaturated(true)
   b.back:SetVertexColor(0.42, 0.42, 0.42, 1)
+  -- emplacement d'une carte épique (onglet Zones) : aura violette tenue, dos teinté de violet (SetEpic)
+  b.epicGlow = W.skin(face, "card_glow", "BACKGROUND", -8)
+  b.epicGlow:SetSize(W.CARD_W * 1.43, W.CARD_H * 1.31)
+  b.epicGlow:SetPoint("CENTER")
+  b.epicGlow:SetVertexColor(W.EPIC_COLOR[1], W.EPIC_COLOR[2], W.EPIC_COLOR[3], 1)
+  b.epicGlow:SetAlpha(W.EPIC_GLOW_ALPHA * 0.8)
+  b.epicGlow:Hide()
+  b.tint = { 1, 1, 1 }
+  b.SetEpic = function(self, on)
+    self.epic = on and true or false
+    self.tint = on and { 0.85, 0.55, 1 } or { 1, 1, 1 }
+    if on then self.epicGlow:Show() else self.epicGlow:Hide() end
+    self:hoverPaint(W.animValue(self, "hover"))
+  end
   W.hoverable(b, { paint = function(self, h)
     local k = 0.42 + 0.12 * h
-    self.back:SetVertexColor(k, k, k, 1)
+    local t = self.tint
+    self.back:SetVertexColor(k * t[1], k * t[2], k * t[3], 1)
   end })
   W.tooltip(b, function(tt, self) fillLocked(tt, self.condition) end, "ANCHOR_RIGHT")
   b:Hide()
@@ -1983,6 +2051,7 @@ function ClassProgress:ShowZones(zones, shown)
       else
         W.hideCard(col.card)
         col.lock.condition = e.condition
+        col.lock:SetEpic(e.epic)
         W.placeCenter(col.lock, self.frame, cx, cardCy, CP_ZONE_SCALE)
         W.setLevel(col.lock, self.panel:GetFrameLevel() + 45 + i)
         col.lock:Show()
@@ -2243,7 +2312,7 @@ function DV:Layout()
     local inst = self.list[first + i]
     if inst then
       local col, row = (i - 1) % DV_ROW, floor((i - 1) / DV_ROW)
-      card:SetCard(inst.id, inst.up, {})
+      card:SetCard(inst.id, inst.up, inst.from and { from = inst.from } or {})
       W.placeCard(card, UI.content, x0 + col * (cw + DV_GAPX) + cw / 2,
         DV_TOP + row * (ch + DV_GAPY) + ch / 2, DV_SCALE, level + i, level + 60)
       card:SetHot(card.hover and true or false)
@@ -2316,4 +2385,126 @@ end
 function UI.toggleDeckView(kind)
   if DV:IsShown() and DV.kind == kind then DV:Close() return end
   if not DV:Open(kind) then UI.flash("No cards to show.") end
+end
+
+---------------------------------------------------------------------------
+-- Remplacement d'une carte épique (une seule par expédition) : confirmation
+---------------------------------------------------------------------------
+-- Une option qui ferait partir l'épique du deck pour une autre (Controller.epicSwap : récompense « Epic »,
+-- épique du marchand, rencontre) ouvre ce panneau par-dessus l'écran : les deux cartes côte à côte (l'actuelle
+-- telle qu'elle est, améliorée ou non, à gauche ; la nouvelle, non améliorée, à droite), la question
+-- « Replace A with B? » et deux boutons : « Replace » (l'action part) et « Keep A » (rien ne change). Cartes à
+-- EC_SCALE, sans levée ni aperçu au survol (halo seulement) ; clic hors du panneau = « Keep ». Construit au
+-- premier usage (comme le panneau du deck), jamais pendant un survol.
+
+local EC = { pending = nil }
+UI.epicConfirm = EC
+
+local EC_W, EC_H, EC_SCALE = 520, 372, 0.9
+
+function EC:Build()
+  local content = UI.content
+  local base = content:GetFrameLevel() + 130
+  local veil = CreateFrame("Button", nil, content)
+  at(veil, content, 0, Scene.TOP, Scene.W, Scene.H - Scene.TOP)
+  veil:SetFrameLevel(base)
+  veil:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+  local shade = W.rect(veil, "BACKGROUND", 0, C.black, 0.55)
+  shade:SetAllPoints()
+  veil:SetScript("OnClick", function() EC:Answer(false) end)
+  veil:Hide()
+  self.frame = veil
+  local x, y = (Scene.W - EC_W) / 2, Scene.TOP + (Scene.H - Scene.TOP - EC_H) / 2
+  self.x, self.y = x, y
+  local panel = W.dialog(veil, "Epic card", 16)
+  at(panel, content, x, y, EC_W, EC_H)
+  panel:SetFrameLevel(base + 2)
+  self.panel = panel
+  self.question = W.label(panel, "heavy", 18, C.wowGold, "OVERLAY")
+  self.question:SetPoint("TOP", 0, -26)
+  self.question:SetWidth(EC_W - 40)
+  self.question:SetJustifyH("CENTER")
+  self.question:SetWordWrap(true)
+  self.note = W.label(panel, "body", 12.5, C.textSoft, "OVERLAY")
+  self.note:SetPoint("TOP", self.question, "BOTTOM", 0, -6)
+  self.note:SetWidth(EC_W - 40)
+  self.note:SetJustifyH("CENTER")
+  self.note:SetText("Only one epic card per expedition: the current one leaves the deck.")
+  self.arrow = W.label(panel, "heavy", 30, C.wowGold, "OVERLAY")
+  self.arrow:SetText(">")
+  self.cards = {}
+  for i = 1, 2 do
+    local c = W.card(veil)
+    c:SetFrameLevel(base + 6)
+    c:SetScript("OnClick", function() end)
+    c:Hide()
+    self.cards[i] = c
+  end
+  self.oldLabel = W.label(panel, "bold", 12, C.badText, "OVERLAY")
+  self.newLabel = W.label(panel, "bold", 12, C.healGreen, "OVERLAY")
+  self.oldLabel:SetText("Leaves the deck")
+  self.newLabel:SetText("Joins the deck")
+  self.replace = W.button(panel, "Replace", 200, 44, function() EC:Answer(true) end, "gold", 16)
+  self.replace:SetPoint("BOTTOMRIGHT", panel, "BOTTOM", -8, 16)
+  self.keep = W.button(panel, "Keep", 200, 40, function() EC:Answer(false) end, "red", 14)
+  self.keep:SetPoint("BOTTOMLEFT", panel, "BOTTOM", 8, 18)
+end
+
+function EC:IsShown() return self.frame ~= nil and self.frame:IsShown() and true or false end
+
+-- Ouvre la confirmation pour l'option id (swap = Controller.epicSwap(id)).
+function EC:Open(id, swap)
+  if not UI.content then return false end
+  if not self.frame then self:Build() end
+  if GameTooltip then GameTooltip:Hide() end
+  self.pending = id
+  local function name(c) return ns.Card.defById(c.id, c.up).name end
+  self.question:SetText("Replace " .. name(swap.old) .. " with " .. name(swap.new) .. "?")
+  self.keep:SetText("Keep " .. name(swap.old))
+  local cw = W.CARD_W * EC_SCALE
+  local cy = self.y + 104 + W.CARD_H * EC_SCALE / 2
+  local cx = { Scene.W / 2 - cw / 2 - 46, Scene.W / 2 + cw / 2 + 46 }
+  local lv = self.panel:GetFrameLevel()
+  for i, c in ipairs(self.cards) do
+    local e = i == 1 and swap.old or swap.new
+    c:SetCard(e.id, e.up, {})
+    W.placeCard(c, UI.content, cx[i], cy, EC_SCALE, lv + 4 + i, lv + 8)
+    c:Show()
+  end
+  self.arrow:ClearAllPoints()
+  self.arrow:SetPoint("CENTER", UI.content, "TOPLEFT", Scene.W / 2, -cy)
+  local ly = cy + W.CARD_H * EC_SCALE / 2 + 12
+  self.oldLabel:ClearAllPoints()
+  self.oldLabel:SetPoint("TOP", UI.content, "TOPLEFT", cx[1], -ly)
+  self.newLabel:ClearAllPoints()
+  self.newLabel:SetPoint("TOP", UI.content, "TOPLEFT", cx[2], -ly)
+  self.frame:Show()
+  W.sound("card")
+  return true
+end
+
+function EC:Close()
+  if not self:IsShown() then return end
+  for _, c in ipairs(self.cards) do W.hideCard(c) end
+  self.frame:Hide()
+  if GameTooltip then GameTooltip:Hide() end
+end
+
+-- Réponse : vrai = l'action part (l'épique est remplacée), faux = rien ne change.
+function EC:Answer(yes)
+  local id = self.pending
+  self.pending = nil
+  self:Close()
+  if yes and id then
+    W.sound("pick")
+    UI.choose(id, true)
+  end
+end
+
+-- Appelé par UI.choose : vrai si l'option id remplacerait l'épique du deck (la confirmation s'ouvre, l'action
+-- attend la réponse).
+function UI.confirmEpic(id)
+  local swap = Controller.epicSwap and Controller.epicSwap(id)
+  if not swap then return false end
+  return EC:Open(id, swap)
 end

@@ -22,6 +22,8 @@ Usage (depuis la racine du dépôt) :
   python3 -m venv build/venv && build/venv/bin/pip install pillow fonttools
   build/venv/bin/python tools/build_media.py [--psd CHEMIN] [--icons DOSSIER] [--font FICHIER] [--icons-only]
   --icons-only : ajoute seulement les icônes nouvellement nommées (nouvelle classe), rien d autre.
+  --epic-only : refait seulement les pièces violettes des cartes épiques (card_ribbon_epic, card_cost_epic) à
+                partir de Media/card_ribbon.tga et Media/card_cost.tga, et leurs entrées de UI/SkinData.lua.
 Rejouable : les rendus du PSD sont mis en cache dans build/media_cache (clé = commandes envoyées).
 """
 import argparse, hashlib, json, math, os, pathlib, re, shutil, struct, subprocess, sys
@@ -33,6 +35,8 @@ ap = argparse.ArgumentParser()
 ap.add_argument("--psd", default=str(HOME / "Téléchargements/1_Free Pack/PSD Card Constructor.psd"))
 ap.add_argument("--icons", default=str(HOME / "Téléchargements/ICONS"))
 ap.add_argument("--font", default=str(HOME / ".local/share/fonts/BalooChettan2.ttf"))
+ap.add_argument("--epic-only", action="store_true",
+                help="refait seulement les pièces violettes des cartes épiques (ruban, languette de coût)")
 ap.add_argument("--icons-only", action="store_true",
                 help="n'ajoute que les icônes manquantes (Media/Icons, table icons de UI/SkinData.lua)")
 ARGS = ap.parse_args()
@@ -126,6 +130,60 @@ def copy_icon(n, index):
     im.save(PREVIEW / "Icons" / (fname + ".png"))
     return "Icons\\" + fname + ".tga"
 
+
+# ---------------------------------------------------------------------------
+# Cartes épiques : ruban et languette de coût teints en violet (objets épiques de WoW, #a335ee), tirés des
+# pièces existantes (même géométrie, même zone utile) : le sombre devient violet profond, le liseré clair
+# un lilas pâle. Teinte HSV fixe, saturation qui baisse avec la clarté, gain de valeur.
+# ---------------------------------------------------------------------------
+EPIC_HUE = 0.775
+EPIC_PIECES = {"card_ribbon": dict(sat=0.62, gain=1.35, edge=0.25), "card_cost": dict(sat=0.75, gain=0.95, edge=0.1)}
+
+
+def epic_tint(im, sat, gain, edge):
+    import numpy as np
+    a = np.asarray(im.convert("RGBA")).astype(np.float32) / 255
+    rgb, al = a[..., :3], a[..., 3:]
+    hsv = np.asarray(Image.fromarray((rgb * 255).astype(np.uint8)).convert("HSV")).astype(np.float32) / 255
+    v = hsv[..., 2]
+    out = np.stack([np.full_like(v, EPIC_HUE), sat * (1 - edge * v), np.clip(v * gain, 0, 1)], -1)
+    o = np.asarray(Image.fromarray((out * 255).astype(np.uint8), "HSV").convert("RGB")).astype(np.float32) / 255
+    return Image.fromarray((np.concatenate([o, al], -1) * 255).astype(np.uint8), "RGBA")
+
+
+def read_tga(path):
+    """TGA 32 bits non compressé (format écrit par write_tga) -> image RGBA."""
+    with open(path, "rb") as f:
+        hdr = struct.unpack("<BBBHHBHHHHBB", f.read(18))
+        w, h = hdr[8], hdr[9]
+        f.read(hdr[0])
+        data = f.read(w * h * 4)
+    b, g, r, a = Image.frombytes("RGBA", (w, h), data).split()
+    im = Image.merge("RGBA", (r, g, b, a))
+    return im if hdr[11] & 0x20 else im.transpose(Image.FLIP_TOP_BOTTOM)
+
+
+if ARGS.epic_only:
+    skin_path = ROOT / "UI/SkinData.lua"
+    skin_src = skin_path.read_text(encoding="utf-8")
+    for base, opt in EPIC_PIECES.items():
+        name = base + "_epic"
+        im = bleed(epic_tint(read_tga(MEDIA / (base + ".tga")), **opt))
+        write_tga(im, MEDIA / (name + ".tga"))
+        im.save(PREVIEW / (name + ".png"))
+        # entrée de la table tex : copie de celle de la pièce de base, fichier changé
+        m = re.search(r"\n    %s = \{\n(.*?)\n    \},\n" % base, skin_src, re.S)
+        assert m, base + " introuvable dans UI/SkinData.lua"
+        entry = m.group(0).replace("    %s = {" % base, "    %s = {" % name).replace(
+            '"%s.tga"' % base, '"%s.tga"' % name)
+        old = re.search(r"\n    %s = \{\n(.*?)\n    \},\n" % name, skin_src, re.S)
+        if old:
+            skin_src = skin_src[:old.start()] + entry + skin_src[old.end():]
+        else:
+            skin_src = skin_src[:m.end()] + entry[1:] + skin_src[m.end():]
+        print("écrit :", name)
+    skin_path.write_text(skin_src, encoding="utf-8")
+    sys.exit(0)
 
 # --icons-only : n'ajoute que les icônes nouvellement nommées (classes ajoutées) dans Media/Icons et dans
 # la table `icons` de UI/SkinData.lua, sans relire le PSD ni régénérer les autres textures.
@@ -363,6 +421,7 @@ BX, BY, BW, BH = body_box
 
 im, box = piece("ribbon", [L["ribbon"]])
 emit("card_ribbon", im, box, maxw=512, canvas=(512, 256))
+emit("card_ribbon_epic", epic_tint(im, **EPIC_PIECES["card_ribbon"]), None, maxw=512, canvas=(512, 256))
 # Nom (ruban horizontal, redessiné dans le PSD) : centré à l'aplomb du corps, à la hauteur du calque de
 # texte « Name » du PSD ; longueur utile = largeur, symétrique autour du centre, où la bande du ruban
 # couvre toute la hauteur de ce calque (les replis et les queues sont exclus).
@@ -385,6 +444,7 @@ name_len = 2 * half
 
 im, box = piece("cost", [L["cost"]])
 emit("card_cost", im, box, maxw=256, canvas=(256, 128))
+emit("card_cost_epic", epic_tint(im, **EPIC_PIECES["card_cost"]), None, maxw=256, canvas=(256, 128))
 im, box = piece("panel", [L["panel"]])
 emit("card_panel", im, box, maxw=256, canvas=(256, 256))
 panel_img, panel_box = im, box

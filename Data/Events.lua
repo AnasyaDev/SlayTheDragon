@@ -89,18 +89,18 @@ event("saldean_farm", {
 
 event("defias_caravan", {
   name = "The Overturned Wagon", zone = "westfall", tier = 0,
-  speaker = "The wagon driver", npc = "wagon_driver", scene = "road",
-  text = "\"Help! Defias bandits overturned my wagon on the road to Moonbrook, and I'm "
-    .. "stuck under it. They're looting my crates!\"",
+  speaker = "Farmer Furlbrow", npc = "farmer_furlbrow", scene = "road",
+  text = "\"Help! The Defias who took our farm came back for our wagon. It turned over on me, "
+    .. "and they're looting the crates!\"",
   choices = {
     { label = "Charge the bandits", outcome = "Fight: usual reward + 20g",
       result = "You attack the Defias bandits.",
       effects = { { "fight", "normal", gold = 20 } } },
-    { label = "Free the driver", outcome = "-5 HP, a potion",
-      result = "You lift the wagon and free the driver. He gives you a potion as thanks.",
+    { label = "Free Furlbrow", outcome = "-5 HP, a potion",
+      result = "You lift the wagon and free Farmer Furlbrow. He gives you a potion from his crates.",
       effects = { { "loseHp", 5 }, { "potion" } } },
     { label = "Move on", outcome = "Nothing",
-      result = "You leave the driver and continue down the road.",
+      result = "You leave Farmer Furlbrow under his wagon and continue down the road.",
       effects = {} },
     -- carte neutre : les Défias font sauter les portes des Mortemines
     { label = "Search the wagon", outcome = "-3 HP, Rough Dynamite (card)",
@@ -133,10 +133,10 @@ event("sentinel_hill", {
 })
 
 event("coast_murlocs", {
-  name = "Old Hank's Traps", zone = "westfall", tier = 0,
-  speaker = "Old Hank", npc = "old_fisherman", scene = "coast",
-  text = "\"Those blasted murlocs took my dock, and my fish traps with it! Run them off, or "
-    .. "go pull up my traps yourself. I'm too old for that.\"",
+  name = "The Militia's Fish Traps", zone = "westfall", tier = 0,
+  speaker = "Scout Galiaan", npc = "scout_galiaan", scene = "coast",
+  text = "\"Murlocs took the militia's dock on the coast, and our fish traps with it. That fish "
+    .. "feeds Sentinel Hill. Run them off, or go pull up the traps yourself.\"",
   choices = {
     { label = "Retake the dock", outcome = "Fight 4 murlocs: usual reward + 15g",
       result = "You attack the murlocs on the dock.",
@@ -148,51 +148,51 @@ event("coast_murlocs", {
         lose = { { "loseHp", 7 } },
         loseText = "A murloc was hiding in a trap. It bites you and runs off." } } },
     { label = "Share his fried fish", outcome = "+8 HP",
-      result = "Hank shares his fried fish with you. \"Eat up, it'll get you back on your feet.\"",
+      result = "Galiaan shares his fried fish with you. \"Eat. There's enough for two.\"",
       effects = { { "heal", 8 } } },
   },
 })
 
 event("jangolode_prospector", {
   name = "The Jangolode Vein", zone = "westfall", tier = 0,
-  speaker = "Grit, gold prospector", npc = "gold_prospector", scene = "mine",
-  text = "\"There's still gold in this mine, I'm sure of it! The Defias have gone to eat. "
-    .. "Help me dig, or fund my claim, and we'll split it.\"",
+  speaker = "Thor, gryphon master", npc = "thor", scene = "mine",
+  text = "\"There's still gold in Jangolode Mine. The Defias have gone to eat, and my gryphons "
+    .. "can wait an hour. Help me dig, or fund my claim, and we'll split it.\"",
   choices = {
     { label = "Dig with him", outcome = "-8 HP, +45g",
-      result = "You dig for hours and find a nugget. Grit splits it with you.",
+      result = "You dig for hours and find a nugget. Thor splits it with you.",
       effects = { { "loseHp", 8 }, { "gold", 45 } } },
     { label = "Fund his claim", outcome = "Pay 30g. 50%: 80g",
       effects = { { "pay", 30 }, { "gamble", 0.5,
         win = { { "gold", 80 } },
-        winText = "Grit strikes gold and pays you back generously.",
+        winText = "Thor strikes gold and pays you back with interest.",
         lose = {},
-        loseText = "Grit finds nothing. \"Next time for sure!\"" } } },
+        loseText = "Thor finds nothing. \"Next time for sure!\"" } } },
     { label = "Buy his flask", outcome = "Pay 15g, a potion",
-      result = "\"A miner's pick-me-up. Drink it when things go bad.\"",
+      result = "\"Dwarven stout. Drink it when a fight goes badly.\"",
       effects = { { "pay", 15 }, { "potion" } } },
-    -- carte neutre : la dynamite du chercheur d'or
+    -- carte neutre : la dynamite des mineurs
     { label = "Buy his dynamite", outcome = "Pay 20g, Rough Dynamite (card)",
-      result = "\"Keep it away from the lantern.\" Grit hands you a stick of dynamite.",
+      result = "\"Keep it away from the lantern.\" Thor hands you a stick of dynamite.",
       effects = { { "pay", 20 }, { "card", "rough_dynamite" } } },
   },
 })
 
 event("moonbrook_refugees", {
   name = "The Moonbrook Refugees", zone = "westfall", tier = 1,
-  speaker = "Mother Hanna", npc = "moonbrook_refugee", scene = "camp",
-  text = "\"The Defias drove us out of Moonbrook. We have wounded, and nothing left to treat "
-    .. "them or to feed ourselves. Any help is welcome.\"",
+  speaker = "Verna Furlbrow", npc = "verna_furlbrow", scene = "camp",
+  text = "\"The Defias drove us off our farm, and the Moonbrook families with us. We have wounded, "
+    .. "and nothing left to treat them or to feed ourselves. Any help is welcome.\"",
   choices = {
     { label = "Tend to the wounded", outcome = "-6 HP, upgrade a card of your choice",
       result = "You spend the day tending to the wounded. You gain experience from it.",
       effects = { { "loseHp", 6 }, { "upgrade" } } },
     { label = "Give them 35g", outcome = "Pay 35g, +6 max HP",
-      result = "Mother Hanna thanks you and asks the Light to protect you.",
+      result = "Verna thanks you and asks the Light to protect you.",
       effects = { { "pay", 35 }, { "maxHp", 6 } } },
     -- carte neutre (remplace « Move on » : quatre réponses au plus à l'écran) : les secours aux blessés
     { label = "Roll bandages with her", outcome = "-4 HP, Heavy Silk Bandage (card)",
-      result = "You tear and roll silk bandages with Mother Hanna until nightfall. She lets you keep some.",
+      result = "You tear and roll silk bandages with Verna until nightfall. She lets you keep some.",
       effects = { { "loseHp", 4 }, { "card", "heavy_silk_bandage" } } },
     -- Réponse conditionnelle : il faut une potion à donner.
     { label = "Leave them a potion", outcome = "Lose a potion, upgrade 2 random cards",
@@ -203,24 +203,24 @@ event("moonbrook_refugees", {
 })
 
 event("herbalist", {
-  name = "The Peacebloom Picker", zone = "westfall", tier = 1,
-  speaker = "Aunt Mirelle", npc = "herbalist", scene = "road",
+  name = "Heather's Remedies", zone = "westfall", tier = 1,
+  speaker = "Innkeeper Heather", npc = "innkeeper_heather", scene = "hill",
   -- N'apparaît que si l'on est mal en point.
   when = { { "hpBelow", 0.5 } },
-  text = "\"By the Light, you can barely stand! Sit down. My remedies aren't free, but they "
-    .. "work. Otherwise, help me pick my peacebloom.\"",
+  text = "\"By the Light, you can barely stand! Sit down. I keep remedies for the militia; they "
+    .. "aren't free, but they work. Or help me pick peacebloom behind the inn.\"",
   choices = {
     { label = "Pay for her remedies", outcome = "Pay 25g, heal 35% of max HP",
-      result = "Aunt Mirelle puts a poultice on your wounds.",
+      result = "Heather puts a poultice on your wounds.",
       effects = { { "pay", 25 }, { "healPct", 0.35 } } },
     { label = "Pick with her", outcome = "+12 HP",
-      result = "You pick flowers with her, chewing the leaves she gives you.",
+      result = "You pick peacebloom with her and chew the leaves she gives you.",
       effects = { { "heal", 12 } } },
     -- carte neutre de palier 2 dans une rencontre de palier 1 : réponse absente tant qu'elle n'est pas
     -- débloquée (condition « unlocked », hide = true)
     { label = "Buy one of her elixirs", outcome = "Pay 30g, Elixir of Superior Defense (card)",
       when = { { "unlocked", "elixir_of_superior_defense", hide = true } },
-      result = "Aunt Mirelle corks a bottle of her best elixir. \"One sip each morning.\"",
+      result = "Heather corks a bottle of her best elixir. \"One sip each morning.\"",
       effects = { { "pay", 30 }, { "card", "elixir_of_superior_defense" } } },
   },
 })
@@ -244,18 +244,18 @@ event("scarecrow_field", {
 })
 
 event("lighthouse_keeper", {
-  name = "The Lighthouse Keeper", zone = "westfall", tier = 2,
-  speaker = "Keeper Alden", npc = "lighthouse_keeper", scene = "coast",
+  name = "The Westfall Lighthouse", zone = "westfall", tier = 2,
+  speaker = "Captain Grayson", npc = "captain_grayson", scene = "coast",
   -- Le phare est au bout de la côte : seulement après l'étape 4.
   when = { { "floor", 4 } },
-  text = "\"The light must burn all night, or ships will run aground on the reefs. I'm sick "
-    .. "and the murlocs are prowling. Can you keep watch for me?\"",
+  text = "\"The light must burn all night, or ships will run aground on the reefs. I'm dead, "
+    .. "I can't hold a blade, and the murlocs are prowling. Can you keep watch for me?\"",
   choices = {
     { label = "Tend the light all night", outcome = "-10 HP, copy a card in the deck",
       result = "You hold the murlocs off on the lighthouse stairs until dawn. The light stays lit.",
       effects = { { "loseHp", 10 }, { "dupe" } } },
     { label = "Sleep at the lighthouse", outcome = "Heal 30% of max HP",
-      result = "Alden gives you a bed near the fire. You sleep until morning.",
+      result = "Grayson shows you the old keeper's bed near the fire. You sleep until morning.",
       effects = { { "healPct", 0.30 } } },
     -- carte neutre : la réserve de matériel avant le boss
     { label = "Search the lighthouse stores", outcome = "-6 HP, Arcane Bomb (card)",
@@ -289,40 +289,40 @@ event("gnoll_raiders", {
 ---------------------------------------------------------------------------
 
 event("goblin_peddler", {
-  name = "Grizzle's Wagon", zone = "westfall", tier = 1, rarity = "rare",
-  speaker = "Grizzle Quickclick", npc = "goblin_peddler", scene = "road",
-  text = "\"Rare parts, unique prices, no refunds! This cog came off a real harvest golem. "
-    .. "Works like a charm, but it takes a bit of your health, friend.\"",
+  name = "The Defias Profiteer", zone = "westfall", tier = 1, rarity = "rare",
+  speaker = "Defias Profiteer", npc = "defias_profiteer", scene = "road",
+  text = "\"Parts from the Brotherhood's workshops, no questions asked. This cog came off a real "
+    .. "harvest golem. It works, but it takes a bit of your health.\"",
   choices = {
     { label = "Take the cog", outcome = "-8 max HP, Harvest Golem Cog (relic)",
-      result = "Grizzle fastens the cog to your chest. You feel weaker at once.",
+      result = "The profiteer fastens the cog to your chest. You feel weaker at once.",
       effects = { { "loseMaxHp", 8 }, { "relic", "harvest_cog" } } },
     { label = "Play the shell game", outcome = "Pay 40g. 50%: 100g",
       effects = { { "pay", 40 }, { "gamble", 0.5,
         win = { { "gold", 100 } },
-        winText = "You find the right cup. Grizzle grimaces and pays.",
+        winText = "You find the right cup. The profiteer grimaces and pays.",
         lose = {},
-        loseText = "The cup is empty. Grizzle pockets your gold." } } },
+        loseText = "The cup is empty. The profiteer pockets your gold." } } },
     { label = "Politely decline", outcome = "Nothing",
-      result = "\"Your loss!\" Grizzle leaves with her wagon.",
+      result = "\"Your loss.\" The profiteer walks off toward Moonbrook.",
       effects = {} },
-    -- carte neutre : une marchande gobeline
+    -- carte neutre : un marchand défias, le matériel des mines
     { label = "Buy an iron grenade", outcome = "Pay 35g, Iron Grenade (card)",
-      result = "\"Pull the pin, count to three. Or two. Never tested it.\"",
+      result = "\"Pull the pin and throw it. We use them to clear the mine tunnels.\"",
       effects = { { "pay", 35 }, { "card", "iron_grenade" } } },
   },
 })
 
 event("harvest_watcher", {
   name = "The Sleeping Harvester", zone = "westfall", tier = 0, rarity = "rare",
-  speaker = "Tinker Bertil", npc = "gnome_tinker", scene = "farm",
+  speaker = "Farmer Saldean", npc = "farmer_saldean", scene = "farm",
   -- Proposé seulement en bonne santé : la réponse principale est un combat d'élite.
   when = { { "hpAbove", 0.6 } },
-  text = "\"Not a sound! That harvest golem is guarding a chest. If it wakes up, it'll "
-    .. "attack us both. Can you pick a lock?\"",
+  text = "\"Quiet! The Defias left a chest in my field, and that harvest golem guards it. If it "
+    .. "wakes up, it'll attack us both. Can you pick a lock?\"",
   choices = {
     { label = "Wake the golem", outcome = "Elite fight: elite reward + 40g",
-      result = "The golem's eyes light up. Bertil dives into the hay.",
+      result = "The golem's eyes light up. Saldean dives into the hay.",
       effects = { { "fight", "event_golem", kind = "elite", gold = 40 } } },
     { label = "Quietly pick the chest", outcome = "40%: a relic, else -12 HP",
       effects = { { "gamble", 0.4,
@@ -331,7 +331,7 @@ event("harvest_watcher", {
         lose = { { "loseHp", 12 } },
         loseText = "The lock clicks loudly. The golem wakes up and hits you." } } },
     { label = "Tiptoe back out", outcome = "Nothing",
-      result = "Bertil watches you leave, disappointed.",
+      result = "Saldean watches you leave, disappointed.",
       effects = {} },
   },
 })

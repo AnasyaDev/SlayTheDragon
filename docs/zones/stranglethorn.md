@@ -10,7 +10,7 @@ Repères Westfall × 1,36 utilisés pour les chiffres :
 |---|---|---|
 | Riverpaw Gnoll | 19–22 PV, Bite 8 | 26–30 PV, 11 |
 | Riverpaw Mystic | 15–17 PV, Heal 6, Shock 5 | 20–23 PV, 8, 7 |
-| Defias Bandit | 25–28 PV, Kick 5 | 34–38 PV, 7 |
+| Defias Highwayman (ex-Defias Bandit) | 25–28 PV, Kick 5 | 34–38 PV, 7 |
 | Harvest Golem / Rhahk'Zor | 72 / 75 PV, Smash 19 / Slam 18 | 98 / 102 PV, 26 / 24 |
 | Edwin VanCleef | 92 PV, Mortal Strike 23 | 125 PV, 31 |
 
@@ -392,11 +392,11 @@ event("bangalash_hunt", {
 
 Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-- Power Infusion (Priest)
-- Anger Management (Warrior)
-- Cold Snap (Mage)
-- Deathmark (Rogue)
-- Black Arrow (Hunter)
+- Shadow Covenant (Priest)
+- Titan's Grip (Warrior)
+- Fingers of Frost (Mage)
+- Echoing Reprimand (Rogue)
+- Roar of Sacrifice (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

@@ -58,7 +58,8 @@ end
 
 -- Contenu d'une classe : { cards = { ids }, relics = { ids } } (cartes de départ comprises), triés par
 -- niveau, rareté, coût puis nom ; level = n : seulement ce qui se débloque au niveau n.
-local RARITY_ORDER = { basic = 0, common = 1, uncommon = 2, rare = 3, boss = 4 }
+local RARITY_ORDER = { basic = 0, common = 1, uncommon = 2, rare = 3, epic = 4, boss = 5 }
+Meta.RARITY_ORDER = RARITY_ORDER
 local function contentSort(reg)
   return function(a, b)
     local da, db = reg[a], reg[b]
@@ -76,7 +77,9 @@ end
 function Meta.classContent(class, level)
   local cards, relics = {}, {}
   for id, d in pairs(ns.Cards) do
-    if d.class == class and not d.zone and (not level or Meta.unlockLevel(d) == level) then cards[#cards + 1] = id end
+    if d.class == class and not d.zone and not d.variant and (not level or Meta.unlockLevel(d) == level) then
+      cards[#cards + 1] = id
+    end
   end
   for id, r in pairs(ns.Relics) do
     if r.class == class and not r.key and (not level or Meta.unlockLevel(r) == level) then relics[#relics + 1] = id end
@@ -333,7 +336,7 @@ end
 function Meta.zoneCards(class, zone)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if d.class == class and d.zone == zone then list[#list + 1] = id end
+    if d.class == class and d.zone == zone and not d.variant then list[#list + 1] = id end
   end
   table.sort(list, byName(ns.Cards))
   return list
