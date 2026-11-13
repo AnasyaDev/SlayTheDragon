@@ -311,14 +311,14 @@ return function(T)
     eq(z(d).blaze, 6)
   end)
 
-  test("Steppes : Grark, phase 3 sous 25 % (2 Ember Worgs, 12 Absorb) ; motif de phase 2 continué ; serviteurs", function()
+  test("Steppes : Grark, phase 3 sous 25 % (2 Ember Worgs, Absorb) ; motif de phase 2 continué ; serviteurs", function()
     local c = steppes({ kind = "boss", enemies = { "grark_lorkrub" }, hand = { "smite" }, hp = 300 })
     local g = c.enemies[1]
     g.mem.phase = 1
     g.intent, g.mem.last = "torch", "block"
     g.hp = math.floor(g.maxHp * 0.25) + 3
     play(c, "smite", 1)
-    eq(g.mem.phase, 2); eq(g.block, 12)
+    eq(g.mem.phase, 2); eq(g.block, E.grark_lorkrub.phases[2].enter[2][2])
     local worgs = 0
     for _, e in ipairs(c.enemies) do if e.id == "ember_worg" and not e.dead then worgs = worgs + 1 end end
     eq(worgs, 2)

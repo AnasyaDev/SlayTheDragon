@@ -41,9 +41,9 @@ end
 E.blackrock_soldier = {
   name = "Blackrock Soldier", hp = { 26, 29 },
   moves = {
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 9 } } },
-    bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
-    sunder = { name = "Sunder Armor", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 7 } } },
+    bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 5, interrupts = true }, { "block", 6 } } },
+    sunder = { name = "Sunder Armor", intent = "debuff", actions = { { "attack", 4 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "strike", "bash", "sunder" }, randomStart = true,
 }
@@ -52,8 +52,8 @@ E.blackrock_soldier = {
 E.blackrock_sorcerer = {
   name = "Blackrock Sorcerer", hp = { 17, 19 },
   moves = {
-    flamestrike = { name = "Flamestrike", intent = "cast", cast = true, actions = { { "attack", 9 }, { "stoke", 1 } } },
-    fireball = { name = "Fireball", intent = "attack", actions = { { "attack", 8 } } },
+    flamestrike = { name = "Flamestrike", intent = "cast", cast = true, actions = { { "attack", 7 }, { "stoke", 1 } } },
+    fireball = { name = "Fireball", intent = "attack", actions = { { "attack", 6 } } },
   },
   pattern = { "flamestrike", "fireball" }, randomStart = true,
 }
@@ -62,8 +62,8 @@ E.blackrock_sorcerer = {
 E.blackrock_worg = {
   name = "Blackrock Worg", hp = { 19, 21 },
   moves = {
-    bite = { name = "Bite", intent = "attack", actions = { { "attack", 7, more = { { 3, "lit" } } } } },
-    rend = { name = "Rend Flesh", intent = "attack", actions = { { "attack", 4, times = 2 } } },
+    bite = { name = "Bite", intent = "attack", actions = { { "attack", 5, more = { { 3, "lit" } } } } },
+    rend = { name = "Rend Flesh", intent = "attack", actions = { { "attack", 3, times = 2 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
 }
@@ -72,7 +72,7 @@ E.blackrock_worg = {
 E.black_dragonspawn = {
   name = "Black Dragonspawn", hp = { 34, 37 },
   moves = {
-    guard = { name = "Scale Guard", intent = "defend", actions = { { "block", 8 } } },
+    guard = { name = "Scale Guard", intent = "defend", actions = { { "block", 14 } } },
     roar = { name = "Searing Roar", intent = "attack", actions = { { "attack", 6 }, { "stoke", 1 } } },
     cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 12 } } },
   },
@@ -93,7 +93,7 @@ E.black_wyrmkin = {
 E.firegut_brute = {
   name = "Firegut Brute", hp = { 38, 41 },
   moves = {
-    bellow = { name = "Bellow", intent = "buff", actions = { { "block", 6 }, { "buff", "force", 2 } } },
+    bellow = { name = "Bellow", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
     smash = { name = "Smash", intent = "attack", actions = { { "attack", 15, interrupts = true } } },
     embers = { name = "Kick Embers", intent = "attack", actions = { { "attack", 6 }, { "stoke", 1 } } },
   },
@@ -131,7 +131,7 @@ E.flamekin_torcher = {
 E.thaurissan_firewalker = {
   name = "Thaurissan Firewalker", hp = { 28, 31 },
   moves = {
-    firewalk = { name = "Firewalk", intent = "defend", actions = { { "block", 6 }, { "stoke", 1 } } },
+    firewalk = { name = "Firewalk", intent = "defend", actions = { { "block", 12 }, { "stoke", 1 } } },
     nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 7, more = { { 6, "lit" } } } } },
   },
   pattern = { "firewalk", "nova" },
@@ -143,11 +143,11 @@ E.thaurissan_firewalker = {
 
 -- Le seuil : coupe un Cast sur trois, Frenzy sous la moitié.
 E.gruklash = {
-  name = "Gruklash", hp = 92, elite = true,
+  name = "Gruklash", hp = 100, elite = true,
   moves = {
-    pummel = { name = "Pummel", intent = "attack", actions = { { "attack", 9, interrupts = true } } },
-    backhand = { name = "Backhand", intent = "debuff", actions = { { "attack", 11 }, { "debuff", "demoralized", 2 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 20 } } },
+    pummel = { name = "Pummel", intent = "attack", actions = { { "attack", 10, interrupts = true } } },
+    backhand = { name = "Backhand", intent = "debuff", actions = { { "attack", 12 }, { "debuff", "demoralized", 2 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 22 } } },
   },
   ai = cycle({ "pummel", "backhand", "mortal" }),
   phases = {
@@ -158,11 +158,11 @@ E.gruklash = {
 -- Les mines : serviteurs à désamorcer, qui ne reculent pas le feu en mourant.
 local THAURIS = { "mine", "shoot", "net", "shoot" }
 E.thauris_balgarr = {
-  name = "Thauris Balgarr", hp = 92, elite = true,
+  name = "Thauris Balgarr", hp = 96, elite = true,
   moves = {
     mine = { name = "Dark Iron Land Mine", intent = "summon", actions = { { "summon", "dark_iron_land_mine" } } },
-    shoot = { name = "Shoot", intent = "attack", actions = { { "attack", 13 } } },
-    net = { name = "Net", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "demoralized", 2 } } },
+    shoot = { name = "Shoot", intent = "attack", actions = { { "attack", 14 } } },
+    net = { name = "Net", intent = "debuff", actions = { { "attack", 8 }, { "debuff", "demoralized", 2 } } },
   },
   ai = function(c, e)
     local k = (e.mem.k or 0) % #THAURIS + 1
@@ -174,11 +174,11 @@ E.thauris_balgarr = {
 }
 
 E.dark_iron_land_mine = {
-  name = "Dark Iron Land Mine", hp = 8, minion = true,
+  name = "Dark Iron Land Mine", hp = 10, minion = true,
   moves = {
     arm = { name = "Arming", intent = "buff", text = "Explodes on its next turn.", actions = {} },
     detonate = { name = "Detonate", intent = "attack", text = "Then the mine is destroyed.",
-      actions = { { "attack", 14 }, { "stoke", 1 }, { "die" } } },
+      actions = { { "attack", 16 }, { "stoke", 1 }, { "die" } } },
   },
   pattern = { "arm", "detonate" },
 }
@@ -187,9 +187,9 @@ E.dark_iron_land_mine = {
 E.volchan = {
   name = "Volchan", hp = 80, elite = true, wildfire = 2,
   moves = {
-    crack = { name = "Flamecrack", intent = "attack", actions = { { "attack", 8 }, { "stoke", 1 } } },
-    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 16, interrupts = true } } },
-    nova = { name = "Fire Nova", intent = "cast", cast = true, actions = { { "attack", 20 } } },
+    crack = { name = "Flamecrack", intent = "attack", actions = { { "attack", 7 }, { "stoke", 1 } } },
+    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 15, interrupts = true } } },
+    nova = { name = "Fire Nova", intent = "cast", cast = true, actions = { { "attack", 18 } } },
   },
   pattern = { "crack", "stomp", "nova" },
 }
@@ -211,11 +211,11 @@ E.grark_lorkrub = {
   name = "Grark Lorkrub", hp = 84, boss = true, wildfire = 4,
   moves = {
     orders = { name = "Call the Pack", intent = "summon", actions = { { "summon", "ember_worg", max = 2 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 15 } } },
-    strike = { name = "Heroic Strike", intent = "attack", actions = { { "attack", 22 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 13 } } },
+    strike = { name = "Heroic Strike", intent = "attack", actions = { { "attack", 19 } } },
     block = { name = "Shield Block", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
-    torch = { name = "Torch the Field", intent = "attack", actions = { { "attack", 9 }, { "stoke", 1 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 25, interrupts = true } } },
+    torch = { name = "Torch the Field", intent = "attack", actions = { { "attack", 8 }, { "stoke", 1 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 22, interrupts = true } } },
     rend = { name = "Rend", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "pain", 3 } } },
   },
   pattern = { "orders", "cleave", "strike", "block" },

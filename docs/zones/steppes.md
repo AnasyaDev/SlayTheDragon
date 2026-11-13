@@ -532,3 +532,59 @@ dans le pack), `inv_stone_15` pour Heart of the Mountain, `inv_jewelry_amulet_04
 5. **Volchan qui se soigne du feu.** Sur un combat de 6 tours, il regagne environ 12 PV (125 → 137
    effectifs) et le joueur en perd 12 ; c'est l'élite la plus dure de la zone pour un deck sans Douse ni
    gros dégâts. Le garder ainsi, ou remplacer le soin par « Wildfire 2 » seul ?
+
+## Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Steppes.lua` (ennemis, groupes, rencontres, commun, bibelots de clé, décors de la zone),
+`Core/ZoneRules/steppes.lua` (règle, actions `stoke` / `ignite`, condition `lit`, effet `douse`, mots du
+langage, `ns.Wildfire` : état, prévision), `UI/Art/Zones/steppes.lua` (modèles, icônes, vue, décors peints),
+`Sim/zones/steppes.lua` (bot), `Sim/tests_zone_steppes.lua` (33 tests), `Sim/ui_zone_steppes.lua` (UZS).
+
+### La règle telle que codée
+
+- État `c.zs.steppes = { left, max, blaze, step, lit }` posé à l'init : `left = max = T` selon le genre du combat
+  (`ns.Encounters.steppes.wildfire = { normal = 3, elite = 4, boss = 4, blaze = 2, step = 2 }`), ou le plus petit
+  champ `wildfire` des ennemis de départ (Volchan 2, Grark 4).
+- `onRoundEnd` (rien si le tour ennemi a été sauté) : compte ≥ 1 → −1 (à 0 : « The ground ignites! », sans
+  dégâts) ; compte déjà à 0 → `Combat.loseHp(c, blaze, "wildfire")`, puis Blaze + 2, puis `onWildfire` (n).
+- `onEnemyDeath` : compte + 1 (plafond T), sauf serviteur et sauf mort du dernier ennemi principal.
+- `{ "stoke", n }` : −n au compte, chaque point en trop + 2 à Blaze ; `{ "ignite", n }` : compte à 0, déjà à 0 :
+  Blaze + n ; `{ "douse", n }` : compte + n (plafond T), rien hors des Steppes.
+- Interface : jeton « Wildfire in 3 → 2 » (flamme grise) ou « Wildfire 4 → 6 » (rouge), infobulle qui dit ce
+  qui arrive à la fin du round ; flamme à droite de toute intention avec Stoke et « +1 » dans la bulle ; brûlure
+  de fin de round hachurée en rouge sur la barre de PV ; flamme grisée sous un serviteur (« its death does not
+  delay Wildfire ») ; mots Wildfire, Douse, Stoke expliqués au survol.
+
+### Ce qui diffère de la fiche, et pourquoi
+
+- **Décisions du 13/11** appliquées : Blaze + 2, une mort recule d'un round, boss Grark Lorkrub, Volchan sans
+  soin (« Wildfire 2 » seul ; le crochet d'ennemi `onWildfire` reste lu par la règle).
+- **Nombres** : la fiche visait Westfall + 60 %. À l'arrivée dans la zone, le deck n'a que les cartes de la classe
+  (cartes de zone pas encore écrites, `epic=none`) : la zone est réglée pour 55–70 % de victoires, ce qui ramène
+  les PV et les dégâts près de ceux de Westfall (tableau plus bas).
+- **Grark** : seuils à 50 % (phase 2, au lieu de 90/150 = 60 %) et 25 % (phase 3) ; à 60 %, la phase 2 tombait
+  trop tôt pour les classes lentes (Priest : 18 PV de brûlure sur le boss). Phases 2 et 3 par `phases` du moteur
+  (crans sur la barre, ouverture Torch the Field), motif de la phase 2 continué en phase 3 (IA `cycle`).
+  Call the Pack : deux loups au plus.
+- **Gruklash** : Frenzy en phase à 50 % (cran visible) plutôt qu'un `onDamaged` à 59 PV ; Strength 3.
+- **Thauris Balgarr** : motif mine, shoot, net, shoot, mine remplacée par Shoot si deux mines vivent.
+- **Blackrock Soldier** : Shield Bash gagne 6 Absorb (« le mur »).
+- **Rencontres** : `zone = "steppes"`, `tier = 0` (la zone n'est ouverte qu'après les cinq premières : les paliers
+  1–2 de la fiche ne servaient qu'à la Ligue, et compteraient dans le commun de Westfall et Duskwood). Décors :
+  `camp` (Morgan's Vigil), `shop` (Flame Crest), `hill` (Slither Rock), `road`. « Half cooked » retiré du texte de
+  Ragged John (figure de style).
+- **Fire Protection Potion** : nom raccourci (« Greater Fire Protection Potion » sort du ruban de la carte).
+- **WANTED** : rencontre commune (`zone = nil`, `tier = 6`), combat d'élite à groupe tiré à l'entrée ; le
+  personnage est le crieur du camp (Town Crier) qui lit l'affiche (le harnais exige une créature).
+- **Libram of Resilience** : `beforeHit` (coup qui passerait l'Absorb, après Parry) et `hpLoss` (brûlure, Pay N HP).
+
+### Moteur, peintre, tests partagés (modifications génériques, à signaler)
+
+- `UI/Scene.lua` : plans de zone `layers = { skyline, ground, front }` appelés par `S.landscape`, `S.paintKit`
+  (formes et niveaux), `S.PROPS` (registre), `furrows = false` (sol sans rangs de champ). Westfall inchangée.
+- `Core/Rewards.lua`, `Rewards.relicPool` : les bibelots de clé (champ `key`, sans `tier`) n'entrent plus dans
+  l'ancien tirage (ils passaient pour des communs de palier 0).
+- `Sim/tests.lua`, `Sim/tests_expedition.lua`, `Sim/ui_harness.lua` : les comptes de la fiche des neutres et des
+  communs (paliers 0 à 3) ne comptent plus le commun des zones suivantes ; une zone jouable n'est plus « Coming
+  later » mais « Locked » à l'accueil d'un compte neuf ; les rencontres d'une zone sont testées dans leur zone ;
+  décors `shop` et `night` permis pour une rencontre.

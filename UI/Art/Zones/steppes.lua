@@ -341,9 +341,15 @@ local function river(K, f, g, pal, pts, hz, k)
     local cx, cy = (a[1] + b[1]) / 2, (a[2] + b[2]) / 2
     local w = (1.5 + (cy - hz) * 0.11) * (k or 1)
     if i % 2 == 1 then K.blur(f, g, L.furrows, lv[3], cx, cy, len * 2.6, w * 5 + 12, 0.3) end
-    K.bar(f, g, L.furrows, lv[4], cx, cy, len, w * 1.7, ang, 0.75)
+    -- croûte, lave, cœur opaques (aucun recouvrement translucide aux jointures) ; jointures arrondies
+    K.bar(f, g, L.furrows, lv[4], cx, cy, len, w * 1.7, ang)
     K.bar(f, g, L.roadEdge, lv[2], cx, cy, len, w, ang)
-    K.bar(f, g, L.road, lv[1], cx, cy, len * 0.9, max(0.8, w * 0.38), ang, 0.9)
+    K.bar(f, g, L.road, lv[1], cx, cy, len, max(0.8, w * 0.38), ang)
+    if i > 1 then
+      K.oval(f, g, L.furrows, lv[4], a[1], a[2], w * 1.7, w * 1.7)
+      K.oval(f, g, L.roadEdge, lv[2], a[1], a[2], w, w)
+      K.oval(f, g, L.road, lv[1], a[1], a[2], max(0.8, w * 0.38), max(0.8, w * 0.38))
+    end
   end
 end
 
