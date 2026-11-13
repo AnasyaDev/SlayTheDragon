@@ -17,6 +17,10 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | jouable (14/11/2026) : phases (moteur commun) et règles propres (Invincible, Fire Shield, Shadow of the Throne, Class Call), boss Nefarian (3 phases), Grim Guzzler, titre « Dragonslayer » ; six décors peints (peintre `cavern`) ; implémentation : `docs/zones/blackrock.md` § 13 |
 
+Le rang d'une zone (colonne « Ordre », `ns.Zone.order`, `Expedition.zoneRank`) règle aussi, hors des fichiers de
+zone, la chance qu'une épique tombe sur un élite (`Expedition.EPIC.drop.elite`, 25 % à 85 %) et la part de rares
+des récompenses de cartes (`Expedition.RARE_BY_ZONE`, ×1 à ×2) : `docs/expedition.md`, « Cartes épiques ».
+
 ## 1. Fichiers d'une zone
 
 Déjà créés (vides) **et déjà au TOC** : ne pas toucher au TOC.
