@@ -339,6 +339,16 @@ return function(T)
     eq(n, 2, "max = 2")
   end)
 
+  test("Steppes : Grark réglé sur le bot human (116 PV, gros coups annoncés 20 / 23, Rend DoT 2)", function()
+    local c = steppes({ kind = "boss", enemies = { "grark_lorkrub" }, hp = 300 })
+    local g = c.enemies[1]
+    eq(g.maxHp, 116)
+    g.intent = "cleave"; eq(Combat.intentInfo(c, g).damage, 20)
+    g.intent = "strike"; eq(Combat.intentInfo(c, g).damage, 23)
+    local rend = E.grark_lorkrub.moves.rend.actions
+    eq(rend[1][2], 6); eq(rend[2][2], "pain"); eq(rend[2][3], 2, "DoT 2 : invisible dans l'intention, gardé petit")
+  end)
+
   ---------------------------------------------------------------------------
   -- Commun, bibelots de clé
   ---------------------------------------------------------------------------
