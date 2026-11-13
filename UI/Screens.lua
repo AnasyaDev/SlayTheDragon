@@ -106,12 +106,13 @@ local OPT_LABEL = { 19, 18, 17, 16, 15, 14 }
 local OPT_SUB = { 15, 14, 13.5, 13, 12.5 }
 UI.OPT = { btn = OPT_BTN, mx = OPT_MX, gap = OPT_GAP, icon = OPT_ICON, label = OPT_LABEL, sub = OPT_SUB }
 
--- Largeur d'un texte d'une ligne à la taille s (police du texte fs).
+-- Largeur d'un texte d'une ligne à la taille s (police du texte fs ; fs._even : espaces égaux entre les
+-- mots, W.evenSpaces, comme à la pose).
 local function textWidth(fs, t, s)
   W.setSize(fs, s)
   fs:SetWordWrap(false)
   fs:SetWidth(0)
-  fs:SetText(t)
+  fs:SetText(fs._even and W.evenSpaces(t, fs) or t)
   return (fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth()) or fs:GetStringWidth() or 0
 end
 
@@ -141,12 +142,14 @@ end
 
 -- Pose un texte : lignes explicites dans une boîte posée, bien plus large et plus haute que le texte
 -- (W.looseBox : le client ne recoupe ni ne tronque jamais, à aucune échelle) ; renvoie sa hauteur mesurée
--- (nombre de lignes × hauteur d'une ligne : la hauteur du texte, pas celle de la boîte).
+-- (nombre de lignes × hauteur d'une ligne : la hauteur du texte, pas celle de la boîte). fs._even : espaces
+-- égaux entre les mots (W.evenSpaces).
 local function setLines(fs, lines, s, zw)
   W.setSize(fs, s)
   fs:SetWordWrap(#lines > 1)
   W.looseBox(fs, #lines, zw)
-  fs:SetText(table.concat(lines, "\n"))
+  local t = table.concat(lines, "\n")
+  fs:SetText(fs._even and W.evenSpaces(t, fs) or t)
   return fs:GetStringHeight() or 0
 end
 
@@ -176,6 +179,7 @@ local function plaque(parent)
   b.sub:SetJustifyH("CENTER")
   b.sub:SetJustifyV("TOP") -- ancré par le haut dans une boîte plus haute que lui (W.looseBox)
   b.sub:SetWordWrap(true)
+  b.sub._even = true -- espaces égaux entre les mots (W.evenSpaces)
   -- Libellé dans le bouton, texte dessous ; renvoie la mise en page retenue.
   b.Layout = function(self, label, sub, w, h, withIcon)
     local cap = self.base.cap or (OPT_BTN * 0.36)
@@ -355,7 +359,8 @@ local function groundObject(parent, size, shape)
 end
 
 -- Texte d'une rencontre (direction B) : parchemin Dragonflight, titre et texte à l'encre sombre (sans
--- ombre), centrés ; edge = couleur du titre (rencontre rare : or sombre, histoire : violet sombre).
+-- ombre), centrés ; edge = couleur du titre (rencontre rare : or sombre, histoire : violet sombre). Texte :
+-- un seul texte, retour à la ligne du client, espaces égaux entre les mots (W.evenSpaces).
 local function bubble(parent)
   local f = W.parchment(parent)
   f:SetSize(470, 96)
@@ -376,7 +381,7 @@ local function bubble(parent)
     else
       self.text:SetPoint("TOP", 0, -20)
     end
-    self.text:SetText(text or "")
+    self.text:SetText(W.evenSpaces(text or "", self.text))
     local h = (self.text.GetStringHeight and self.text:GetStringHeight()) or 60
     if type(h) ~= "number" or h <= 0 then h = 60 end
     self:SetHeight(h + ((title and title ~= "") and 70 or 42))
@@ -646,7 +651,7 @@ function Start:Show(step)
       b:Hide()
     end
   end
-  self.note:SetText(step.text or "")
+  self.note:SetText(W.evenSpaces(step.text or "", self.note))
   for _, o in ipairs(others) do
     if o.id == "go" then
       self.go.option = o
@@ -1793,7 +1798,7 @@ function Progress:Show(step)
   local tc = C.wowGold
   if step.kind == "end" then tc = step.won and C.healGreen or C.badText end
   self.title:SetTextColor(tc[1], tc[2], tc[3])
-  self.text:SetText(inkText(step.text))
+  self.text:SetText(W.evenSpaces(inkText(step.text), self.text))
   local bars = step.bars or {}
   -- barres sous le texte (libellé de la barre au-dessus d'elle : 34 de marge)
   local textH = tonumber(self.text:GetStringHeight()) or 0
