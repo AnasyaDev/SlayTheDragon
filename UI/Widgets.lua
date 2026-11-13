@@ -1990,7 +1990,8 @@ end
 -- Jetons d'état : icônes d'aura (cadre de case du jeu, rouge pour un affaiblissement), nombre en bas à droite
 ---------------------------------------------------------------------------
 
--- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, rim = teinte, info = {...} } }.
+-- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, rim = teinte, info = {...},
+-- glow = couleur d'une aura tenue derrière le jeton (épique en jeu) } }.
 -- t.medal = { icon, ring (cadre), SetRing(teinte) } (régions du visuel du jeton : tout suit son animation).
 function W.tokenRow(parent, maxN, width, size)
   size = size or 30
@@ -2005,6 +2006,11 @@ function W.tokenRow(parent, maxN, width, size)
     local icon = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 0))
     local ring = W.wow(face, "slot_frame", "ARTWORK", 1)
     W.slotFit(face, size, icon, ring) -- icône = ouverture du cadre (liseré fin, comme les cases)
+    -- aura tenue (champ glow : épique en jeu), créée éteinte
+    t.aura = W.skin(face, "glow_round", "BACKGROUND", 0)
+    t.aura:SetSize(size * 1.7, size * 1.7)
+    t.aura:SetPoint("CENTER", face, "CENTER", 0, 0)
+    t.aura:Hide()
     t.medal = { icon = icon, ring = ring,
       SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end }
     t.count = W.label(face, "heavy", floor(size * 0.45), C.text, "OVERLAY")
@@ -2040,6 +2046,13 @@ function W.tokenRow(parent, maxN, width, size)
         t.info = it.info
         W.setIcon(t.medal.icon, it.icon, it.key)
         t.medal:SetRing(it.rim)
+        if it.glow then
+          t.aura:SetVertexColor(it.glow[1], it.glow[2], it.glow[3], 1)
+          t.aura:SetAlpha(it.glow[4] or 0.9)
+          t.aura:Show()
+        else
+          t.aura:Hide()
+        end
         t.count:SetText((it.n and it.n ~= 0 and it.n ~= true) and tostring(it.n) or "")
         local line, col = floor((i - 1) / perLine), (i - 1) % perLine
         local inLine = min(perLine, n - line * perLine)
@@ -2224,7 +2237,9 @@ W.SPEND_OFF_COLOR = C.textDim
 function W.cardBody(d, base, spendOff)
   local text = d.text or ""
   for _, k in ipairs(keywordStrip()) do
-    if ns.Language.plateWord(k.plate, d) then text = text:gsub(k.pat, "") end
+    if ns.Language.plateWord(k.plate, d) or (k.plate.key == "power" and d.rarity == "epic") then
+      text = text:gsub(k.pat, "")
+    end
   end
   -- (ligne d'état : le verbe et le nom de l'état peuvent se couper, coupure de second choix de la
   -- mise en page, W.clauseGroups ; plus d'insécable entre eux)
@@ -3339,6 +3354,11 @@ function W.card(parent)
   b.name:SetWidth(SC.name.len * CW)
   b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
   b.cost:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
+  -- carte épique : pas de coût (règle en jeu dès le début du combat) ; la languette violette porte « Epic »
+  b.epicMark = W.label(face, "bold", 10, W.EPIC_MARK_COLOR, "OVERLAY")
+  b.epicMark:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
+  b.epicMark:SetText("Epic")
+  b.epicMark:Hide()
   -- centré dans la zone utile du panneau, lignes posées par fitBody dans une boîte posée (W.looseBox) ;
   -- hauteur libre seulement au secours (un texte trop long déborde au lieu d'être tronqué en « … »).
   -- Blocs des clauses (écart entre clauses) : b.body puis W.BODY_PARTS - 1 autres, créés ici (jamais
@@ -3437,10 +3457,18 @@ function W.card(parent)
     else
       self.gem:Hide()
     end
-    -- coût
+    -- coût ; épique : sans coût, languette violette marquée « Epic »
     local cost = opts.cost or d.cost
     self.cost:SetText(tostring(cost))
-    if d.cost == nil or d.unplayable then self.cost:Hide() self.costTab:Hide() else self.cost:Show() self.costTab:Show() end
+    if epic then
+      self.cost:Hide()
+      self.costTab:Show()
+      self.epicMark:Show()
+    elseif d.cost == nil or d.unplayable then
+      self.cost:Hide() self.costTab:Hide() self.epicMark:Hide()
+    else
+      self.cost:Show() self.costTab:Show() self.epicMark:Hide()
+    end
     -- injouable : grisée, raison dans une plaque rouge au bas de la carte
     local k = dim and 0.62 or 1
     for _, t in ipairs({ self.bg, self.ribbon, self.costTab, self.panel, self.ring, self.plate, self.gem, self.glass }) do
@@ -3563,7 +3591,8 @@ W.CARD_RIM_K = 0.85
 W.EPIC_COLOR = { 0.64, 0.21, 0.93 }
 W.EPIC_TEXT = { 0.78, 0.5, 1 } -- titres et libellés (plus clair, lisible sur la roche)
 W.EPIC_GLOW_ALPHA = 0.75
-W.EPIC_HINT = "|cffa335eeEpic|r: one per expedition, a new one replaces it."
+W.EPIC_HINT = "One epic card per expedition: a new one replaces it."
+W.EPIC_MARK_COLOR = { 0.95, 0.88, 1 } -- « Epic » sur la languette violette (à la place du coût)
 W.INSTANT_COLOR = { 0.45, 0.85, 1 }
 W.INSTANT_RIM_COLOR = { 0.35, 0.8, 1, 1 }
 W.KEEP_RIM_COLOR = { 1, 0.9, 0.55, 0.9 }

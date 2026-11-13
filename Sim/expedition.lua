@@ -146,9 +146,10 @@ return function(ns)
   end
   SE.epicGain = epicGain
 
-  -- Choix « Epic » : index de l'épique à prendre, ou nil (refus).
+  -- Choix « Epic » (départ, élites) : index de l'épique à prendre, ou nil (refus). Épique imposée (epic=) :
+  -- jamais remplacée, pour qu'elle soit mesurée sur toute l'expédition.
   local function pickEpic(exp, opts, rng, epics)
-    if opts.pick == "skip" or #epics == 0 then return nil end
+    if opts.pick == "skip" or opts.epic or #epics == 0 then return nil end
     if opts.pick == "random" then return Rng.int(rng, 1, #epics) end
     local best, bestV
     for i = 1, #epics do
@@ -258,6 +259,12 @@ return function(ns)
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then
+      -- épique de l'expédition d'abord (exp.startEpics), puis le bibelot de départ
+      if exp.startEpics then
+        local i = pickEpic(exp, opts, rng, exp.startEpics)
+        if i then return { "pickEpic", i } end
+        return { "skipEpic" }
+      end
       return has(ch, "startRelic") or { "skipStartRelic" }
     elseif ph == "map" then
       local paths = {}
@@ -401,7 +408,8 @@ return function(ns)
       end
     end
     local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
-      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false, epic = opts.epic })
+      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
+      epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)
@@ -424,6 +432,8 @@ return function(ns)
           record.picks[#record.picks + 1] = exp.reward.cards[a[2]]
         elseif exp.phase == "reward" and a[1] == "pickEpic" then
           record.picks[#record.picks + 1] = exp.reward.epics[a[2]]
+        elseif exp.phase == "start" and a[1] == "pickEpic" then
+          record.picks[#record.picks + 1] = exp.startEpics[a[2]]
         elseif a[1] == "upgrade" then
           record.picks[#record.picks + 1] = "up:" .. exp.deck[a[2]].id
         elseif a[1] == "rest" then

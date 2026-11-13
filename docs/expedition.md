@@ -256,20 +256,34 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
 | +4 | Nécrotique | Chaque coup qui fait perdre des PV réduit tes soins de 5 %, 30 % au plus (état `necrotic` affiché sur le héros) |
 | +5 | Disette | Le feu de camp ne soigne plus que 20 % des PV |
 
-## Cartes épiques (socle du 13/11/2026)
+## Cartes épiques (socle du 13/11/2026, règle finale du 14/11/2026)
 
 Décision du joueur (`docs/zones/decisions.md`) : les cartes de zone sont des **cartes épiques**, une par
 classe et par zone, débloquées par la première victoire de la classe dans la zone (`zone = "<id>"`,
-`Expedition.unlocked`, `Meta.zoneCards`). Aucune carte réelle n'est écrite ; le socle :
+`Expedition.unlocked`, `Meta.zoneCards`). Règle d'arrivée en jeu et offres tranchées par le concepteur
+(`docs/zones/decisions.md`, « Cartes épiques : tranché par le concepteur » ; `docs/zones/cartes-de-zone.md`, A et B).
 
 - **Rareté `epic`** (`rarity = "epic"`, au-dessus de `rare`, sous `boss` : `Meta.RARITY_ORDER`). Une épique
   n'est **jamais** dans les récompenses ordinaires, les choix de rencontre ni l'étal des cartes de classe
-  (`Expedition.cardPool`, `Card.pool`, `Rewards.cardPool` l'excluent) : elle n'arrive que par l'offre
+  (`Expedition.cardPool`, `Card.pool`, `Rewards.cardPool` l'excluent) : elle n'arrive que par les offres
   ci-dessous, l'emplacement épique du marchand, ou un effet de rencontre `{ "card", id }` explicite.
+- **Une règle en jeu dès le début de chaque combat.** `Combat.new` pose l'épique du deck dans `c.epic =
+  { id, up, uid }` (instance de données simples, sauvegardée et clonée avec le combat) au lieu de la pioche :
+  elle n'entre dans **aucune pile** (pioche, main, défausse, consumées, recharges, pouvoirs joués) ; elle
+  n'est ni piochée, ni jouée, ni copiée ; ni Hex, ni Curse, ni « Remove negative effects. », ni un retrait de
+  Power ne la touche. Elle n'a pas de coût. La main de départ garde sa taille (5 cartes tirées du reste).
+  Ses crochets sont actifs tout le combat : `whileInDeck(c, src)` au début du combat (après `init` de la
+  classe, avant `onCombatStart`), `deckHooks` et `hooks` de sa définition (comme un Power posé d'office) dans
+  `Combat.modify` / `Combat.fire`, **après** pouvoirs, bibelots et affixes (Shadow Covenant lit le coût
+  final), et son crochet `allow` dans `Combat.canPlay`. `src` = `c.epic`. Les autres cartes à `deckHooks`
+  (non épiques) restent dans `c.passives`, comme avant.
+- **Carte du deck de l'expédition.** Elle compte dans le deck (affichée en tête), s'améliore au feu de camp
+  (choix volontaire, ou rencontre « upgrade » ; `Expedition.upgradeRandom` l'évite), se retire chez le
+  marchand ou en rencontre (le deck n'a alors plus d'épique).
 - **Une seule épique par expédition.** `Expedition.addCard` d'une épique retire celle du deck (améliorée ou
-  non ; la nouvelle arrive non améliorée) : `exp.stats.epicReplaced`, `exp.epicReplaced = { old, oldUp, new }`.
-  Récompense, marchand ou rencontre : même règle (c'est `addCard`). Une épique ne se copie pas (sélection
-  « dupe » : absente des choix, refus `"epic"`). La retirer chez le marchand ou en rencontre est permis.
+  non ; la nouvelle arrive non améliorée, l'amélioration est perdue) : `exp.stats.epicReplaced`,
+  `exp.epicReplaced = { old, oldUp, new }`. Récompense, marchand ou rencontre : même règle (c'est `addCard`).
+  Une épique ne se copie pas (sélection « dupe » : absente des choix, refus `"epic"`).
   `Expedition.epicIndex(exp)` = index de l'épique du deck ou nil.
 - **Transformations** : une épique peut porter `transforms = { [id_origine] = id_variante }` (sur sa définition
   de base ou améliorée) ; tant qu'elle est dans le deck, chaque carte d'origine se joue comme sa variante
@@ -278,33 +292,49 @@ classe et par zone, débloquées par la première victoire de la classe dans la 
   remplacer ou retirer l'épique défait tout. La variante garde l'état amélioré de l'originale si elle a une
   amélioration (`up`), sinon elle est de base ; elle porte `variant = true` (jamais collectionnable : ni
   récompense, ni marchand, ni progression, `Card.collectible`).
-- **Offre garantie** : à la PREMIÈRE victoire d'élite de l'expédition (combat d'élite de rencontre compris), la
-  récompense reçoit un choix « Epic » en plus de la récompense normale : `r.epics` = jusqu'à 3 épiques
-  distinctes débloquées par la classe (hors celle du deck ; une seule si elle seule existe), `r.epicDone`,
-  `r.epicPicked` ; actions `pickEpic` / `skipEpic` (refusable ; partir sans choisir = refuser). Une seule offre
-  par expédition (`exp.epicOffered`). Sans épique débloquée : aucune offre, aucun tirage.
+- **Offre de départ (étape 1, avant le premier combat).** `Expedition.new` tire jusqu'à `EPIC.start` (3)
+  épiques distinctes parmi celles que la classe a débloquées (toutes si elle en a 3 ou moins) :
+  `exp.startEpics`, phase `"start"`, actions `pickEpic` (index) / `skipEpic` (aucune). `exp.epicOffered` = vrai
+  si l'offre a été faite, `exp.startEpicPicked` = l'épique prise. **Enchaînement avec le bibelot de départ**
+  (avantage de la zone 3, `exp.startRelics`) : l'épique d'abord, le bibelot ensuite, sur la même phase
+  `"start"` (`startRelic` / `skipStartRelic` refusés tant que l'épique n'est pas choisie) ; la carte ensuite.
+  Rien si l'épique est imposée (`epic=<id>` de la simulation).
+- **Offre de remplacement aux élites.** **Chaque** victoire d'élite (combat d'élite de rencontre compris ;
+  `EPIC.offerOn`) ajoute à la récompense normale `EPIC.choices` (1) épique débloquée autre que celle du deck :
+  `r.epics`, `r.epicDone`, `r.epicPicked` ; actions `pickEpic` / `skipEpic` (refusable ; partir sans choisir =
+  refuser). Sans épique dans le deck (départ refusé), l'élite en propose une quand même.
 - **Marchand** : à partir de la moitié du parcours, une chance qu'il vende une épique (à la suite des cartes,
-  `shop.cards[i].epic = true`), prix élevé (± 10 %, crochet `price` genre `"card"`) ; achat = `addCard`.
-- **Hasard** : flux `exp.rng.epic` (créé au premier usage) ; les autres flux ne bougent pas. À graine égale et
-  sans épique débloquée, une expédition se déroule exactement comme avant (simulations comparées le
-  13/11/2026 : Priest, Rogue, Hunter `zones=7`, Warrior `zones=0 level=1`, 300 expéditions chacun, identiques).
+  `shop.cards[i].epic = true`), 150 po (± 10 %, crochet `price` genre `"card"`) ; achat = `addCard`.
+- **Hasard** : flux `exp.rng.epic` (créé au premier usage) ; les autres flux ne bougent pas. Sans épique
+  débloquée : ni phase de départ, ni offre, ni tirage, ni flux ; une expédition se déroule exactement comme
+  avant (simulations comparées le 14/11/2026 avant / après la règle finale, graine 1, 300 expéditions, jobs=4 :
+  Priest, Rogue, Hunter `zones=7`, Warrior `zones=0 level=1`, mêmes agrégats, à l'ordre des clés près).
 
-Paramètres (`Expedition.EPIC`, à changer en un endroit ; l'agent de conception peut proposer une autre règle) :
+Paramètres (`Expedition.EPIC`, à changer en un endroit) :
 
 | Clé | Défaut | Règle |
 | --- | --- | --- |
-| `offerOn` | `{ elite = true }` | genres de combat dont la première victoire porte l'offre (`combat`, `elite`, `boss`) |
-| `choices` | 3 | épiques proposées au plus dans l'offre |
+| `start` | 3 | épiques proposées au départ, avant le premier combat (0 = pas d'offre de départ) |
+| `offerOn` | `{ elite = true }` | genres de combat dont CHAQUE victoire propose des épiques (`combat`, `elite`, `boss`) |
+| `choices` | 1 | épiques proposées à chacune de ces victoires |
 | `shop` | 0,5 | chance qu'un marchand vende une épique (0 = jamais) |
 | `shopFloor` | 4 | étape à partir de laquelle le marchand peut en vendre (étapes 1 à 7, boss en 8) |
 | `price` | 150 | prix de base d'une épique chez le marchand |
 
-Dans le combat : mot-clé `Innate` (champ `innate`), effets passifs du deck (`deckHooks`, `whileInDeck`) et
-points d'accroche de classe : `docs/classes.md`, « Cartes épiques ». Simulation : `epic=<id>` (épique imposée au
-départ), `sweep=cards` mesure aussi les épiques de la classe ; le bot prend ou remplace une épique par note
-(`Sim/expedition.lua`, `SE.epicRating` : `classDef.bot.epic(exp, id)` si la classe le définit, sinon
-`classDef.bot.rating[id]`, sinon `SE.EPIC_RATING` = 7 ; remplacement si la nouvelle vaut mieux que l'actuelle
-de `SE.EPIC_MARGIN`). Tests : `Sim/tests_epic.lua` ; interface : `docs/interface.md`, « Cartes épiques ».
+Sauvegarde : pas de nouvelle version (`Expedition.VERSION` reste 6) ; champs facultatifs `exp.startEpics`,
+`exp.startEpicPicked` et `c.epic` (absents = rien à faire). Une expédition v6 en cours a passé son départ : elle
+reçoit les offres d'élite. Un combat sauvegardé par l'ancien socle (épique dans la pioche) se termine tel
+quel ; le combat suivant pose l'épique comme une règle (test dans `Sim/tests_epic.lua`).
+
+Dans le combat : mot-clé `Innate` (champ `innate`, pour les cartes ordinaires), effets passifs du deck
+(`deckHooks`, `whileInDeck`) et points d'accroche de classe : `docs/classes.md`, « Cartes épiques ».
+Simulation : `epic=<id>` (épique imposée au départ, sans offre de départ, jamais remplacée par le bot),
+`epic=none` (aucune épique : le bot refuse toutes les offres) ; `sweep=cards` mesure aussi les épiques de la
+classe, chacune imposée, contre une ligne « (sans) » et des cartes mesurées avec `epic=none`. Le bot choisit
+au départ et aux élites par note (`Sim/expedition.lua`, `SE.epicRating` : `classDef.bot.epic(exp, id)` si la
+classe le définit, sinon `classDef.bot.rating[id]`, sinon `SE.EPIC_RATING` = 7 ; remplacement si la nouvelle
+vaut mieux que l'actuelle de `SE.EPIC_MARGIN`). Tests : `Sim/tests_epic.lua` ; interface : `docs/interface.md`,
+« Cartes épiques ».
 
 ## Sauvegarde (`Core/Save.lua`)
 
