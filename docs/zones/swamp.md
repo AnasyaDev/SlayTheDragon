@@ -1,220 +1,313 @@
 # Swamp of Sorrows — fiche de zone (zone 5, id `swamp`)
 
-Fiche de conception, pas de code. Format et puissance de référence : `Data/Act1.lua` (Westfall). Difficulté
-visée : **Westfall + 48 %** (PV et dégâts ×1,48), sauf les ennemis qui posent une Affliction : ×1,40 sur leurs
-chiffres, l'Affliction comptant comme des dégâts différés. Tous les chiffres sont des points de départ ; la
-simulation les réglera.
+Fiche de conception (13/11/2026, deuxième version), pas de code. Format et puissance de référence :
+`Data/Act1.lua` (Westfall). Difficulté visée : **Westfall + 48 %** (PV et dégâts × 1,48). Les groupes qui
+comptent des dormeurs ont jusqu'à 10 % de PV en plus que ce repère : un dormeur ne frappe pas pendant ses
+tours de sommeil. Tous les chiffres sont des points de départ ; la simulation les réglera.
+
+La première version (Afflictions : cartes nuisibles qui restaient dans le deck) est abandonnée, trop proche
+de Curse (Duskwood). Disparaissent avec elle : les trois cartes Affliction, Lingering, l'action Treat au feu
+de camp, le prix du retrait chez le marchand, la Strength de Somnus par Affliction et le type de rencontre
+« marché ». La mécanique de la zone est désormais **Slumber**.
+
+Sources : noms, identifiants de créature et niveaux lus dans la base de PNJ de Questie installée avec le
+client Classic Era (`_classic_era_/Interface/AddOns/Questie/Database/Classic/classicNpcDB.lua`, zone 8 =
+Swamp of Sorrows) ; affichages dans les caches de créatures des clients (§ 10).
 
 ## 1. La zone en trois lignes
 
-- **Lieux** : route = la piste de Misty Valley entre les roseaux et l'eau ; camp = **Fallow Sanctuary** (huttes
-  des Lost Ones) ; marchand = **Stonard** (avant-poste orc) ; élites = **Misty Reed Strand** (côte), les marches
-  du **Temple of Atal'Hakkar**, le camp du chef des Lost Ones au-dessus de Fallow Sanctuary ; boss = la **Pool of Tears**, au pied du
-  temple englouti.
-- **Ambiance** : marais boisé, eau stagnante jusqu'aux genoux, crocolisks dans chaque mare, dragonkin verts qui
-  gardent le temple, draeneï exilés (Lost Ones) qui vivent en marge de Stonard.
-- **Ce que la zone enseigne** : un coup reçu peut coûter plus que des PV ; ce qu'on ne soigne pas aujourd'hui,
-  on le porte au combat suivant.
+- **Lieux** : route = la piste de Misty Valley entre les roseaux et l'eau ; camp = **Fallow Sanctuary**
+  (huttes des Lost Ones) ; marchand = **Stonard** (avant-poste orc) ; élites = **Misty Reed Strand** (côte),
+  les marches du **Temple of Atal'Hakkar**, le camp du chef des Lost Ones au-dessus de Fallow Sanctuary ;
+  boss = la **Pool of Tears**, au pied du temple englouti.
+- **Ambiance factuelle** : marais boisé, eau stagnante jusqu'aux genoux, crocolisks dans chaque mare,
+  dragonkin verts qui dorment autour du temple et le gardent, Lost Ones (draeneï exilés) qui vivent en
+  marge de Stonard. Niveaux 35 à 45 dans Classic.
+- **Fonds de scène** : `swamp` (route), `sanctuary` (camp), `stonard` (marchand), `coast` (Misty Reed
+  Strand, existe), `temple` (marches du temple), `pool` (boss).
+- **Ce que la zone enseigne** : le premier coup compte. Un ennemi endormi ne frappe pas, mais il se
+  réveille avec son plus gros coup ; le joueur choisit qui réveiller, quand et avec quelle carte.
 
-## 2. La mécanique : Afflictions (Lingering)
+## 2. La mécanique de la zone : Slumber
 
 ### Règle
 
-1. **Affliction** est un nouveau type de carte (à côté d'Attack, Skill, Power). Les ennemis de la zone en
-   ajoutent à tes piles pendant le combat. Une Affliction n'est jamais proposée en récompense, chez le
-   marchand ni dans une rencontre à choix de carte ; elle ne peut être ni améliorée ni copiée.
-2. Toutes les Afflictions ont le mot-clé **Lingering** (plaque du bas, comme Exhaust) : *si la carte est
-   encore dans ton deck à la fin du combat (pioche, main ou défausse), elle reste dans ton deck d'expédition.*
-3. Toutes les Afflictions ont **Exhaust** : la jouer la retire du combat **et du deck d'expédition**, pour de
-   bon. Soigner une Affliction en combat = payer son coût en mana.
-4. Il existe trois Afflictions :
+1. **Asleep N.** Certains ennemis commencent le combat avec l'état **Asleep N** (N = 2 ou 3, écrit dans
+   leur définition ou dans la composition du groupe). Un ennemi endormi ne fait rien à son tour : au lieu
+   d'agir, son compteur Asleep baisse de 1. Quand il atteint 0, l'ennemi se réveille (journal « X wakes
+   up. »), sans agir ce tour-là. Asleep N = N tours sans agir.
+2. **Ouverture (Opener).** Chaque ennemi qui peut dormir a une **ouverture** : une intention plus forte que
+   ses coups ordinaires. Elle est **annoncée dès le début du combat**, en gris sous l'icône de sommeil
+   (« On waking: Death Roll 20 »). Dès que l'ennemi se réveille, l'ouverture devient son intention. Il la
+   joue **à la première phase ennemie qui commence après son réveil**, puis reprend son motif au début.
+   - réveillé pendant le tour du joueur : ouverture dans la phase ennemie de ce round ;
+   - réveillé pendant la phase ennemie (son compteur à 0, un DoT au début de son tour, une Trap, une
+     riposte, une Alarm) : il n'agit plus dans cette phase, ouverture au round suivant.
+3. **Tout dégât réveille.** Un ennemi endormi qui subit des dégâts se réveille aussitôt, quelle que soit la
+   source : carte, Cast résolu, dégâts à tous, tic de DoT, familier, Trap, riposte, bibelot. Un coup
+   entièrement absorbé par l'Absorb de l'ennemi le réveille aussi. Un coup qui le tue ne le réveille pas :
+   il meurt sans avoir agi.
+4. **Rude Awakening (+50 %).** Le premier coup qui touche un ennemi endormi lui inflige **50 % de plus**
+   (arrondi au supérieur), s'il vient d'un effet qui **ne vise qu'un ennemi** : carte à une cible,
+   attaque du familier, Trap à une cible, bibelot à une cible, tir sur une cible au hasard (Killing
+   Spree). Le bonus se calcule en dernier (après Strength, Charges, Frenzy, Stealth, Sundered), avant
+   l'Absorb de l'ennemi. Une carte à plusieurs coups (Penance, Raging Blow) ne le donne qu'au premier.
+   **Pas de bonus** pour un effet « to all » ni pour un tic de DoT : ils réveillent sans bonus.
+5. **Ce qui ne réveille pas** : tout ce qui n'inflige pas de dégâts. Poser un DoT, Sundered, Demoralized,
+   Stunned, Hunter's Mark ou une Trap ne réveille pas ; seul le dégât compte (le premier tic de DoT
+   réveille donc, au début du tour de l'ennemi : règle 2, ouverture au round suivant).
+6. **Stunned sur un dormeur.** Le tour perdu est son tour de sommeil : le compteur Asleep ne baisse pas ce
+   tour-là. Polymorph (Stunned 2) sur un ennemi Asleep 2 le fait dormir quatre tours.
+7. **Stunned sur un ennemi qui doit jouer son ouverture.** Il perd son tour comme d'habitude, mais
+   l'ouverture **n'est pas consommée** : elle reste annoncée et part à son prochain tour joué. Même règle
+   pour Freezing Trap, qui arrête le tour pendant l'ouverture (décision commune du 12/11/2026).
+8. **Mort d'un allié.** Elle ne réveille personne (à l'inverse de Pack, la mort ne transmet rien). Seule
+   l'action **Alarm** réveille un groupe.
+9. **Victoire.** Il faut tuer tous les ennemis principaux, endormis compris. Aucun ennemi ne dort plus de
+   3 tours sans Stunned (4 avec Egg of Hakkar, § 9) ; un même ennemi ne peut être rendormi (Lull) qu'une fois par combat.
 
-| Id | Nom | Coût | Texte (plaque : Lingering, Exhaust) | Ce qu'elle demande | Icône |
-|---|---|---|---|---|---|
-| `festering_wound` | Festering Wound | 1 | `Draw 1.` | 1 mana pour la retirer ; elle se remplace en main. | `spell_deathknight_festering_strike` (879926) |
-| `creeping_venom` | Creeping Venom | 1 | `In hand, end of turn: lose 2 HP.` | 1 mana tout de suite, ou 2 PV à chaque tour où elle reste en main. | `spell_nature_corrosivebreath` (136016) |
-| `sleep` | Sleep | 2 | `Retain.` / `In hand, start of turn: lose 1 mana.` | 2 mana d'un coup, ou 1 mana à chaque tour suivant (elle reste en main). | `spell_nature_sleep` (136090) |
+### Actions ennemies liées
 
-5. **Comment elles arrivent** (deux voies, toujours annoncées par l'intention) :
-   - **Par un coup** : `{ "attack", n, afflict = id }` ; l'Affliction est mise dans ta **défausse** seulement si
-     ce coup te fait perdre des PV (même règle que `interrupts`). Coup multiple : une par coup qui touche.
-   - **Par une incantation** : `{ "afflict", id, n, pile = "discard" | "top" }`, sur une intention `cast` :
-     interrompue, elle ne pose rien. `top` = sur le dessus de la pioche (Sleep : tu la pioches au tour suivant).
-6. **Lose 2 HP** (Creeping Venom) : perte de PV qui n'est pas une attaque, ignore l'Absorb, compte comme une
-   perte de PV (Enrage, Healthstone) mais ne donne pas de Rage (la Rage vient des attaques). Ne tue pas : le
-   joueur reste à 1 PV au moins.
-7. **Sleep** : au début de ton tour, compte les Sleep déjà en main (gardées du tour d'avant) ; après le gain
-   de mana, retire 1 mana par Sleep (jamais sous 0). Une Sleep tout juste piochée ne coûte rien ce tour-là.
-8. **Plafond** : 6 Afflictions **portées** au plus (deck d'expédition + piles du combat). Au-delà, la nouvelle
-   n'entre pas (journal : « resisted »). Voir question 1.
-9. **Portée** (« carried ») : une Affliction dans la pioche, la main ou la défausse du combat en cours. Les
-   ennemis qui lisent ce nombre l'affichent sur leur intention, recalculé quand tu en joues une.
-10. **Hors combat** :
-    - **Feu de camp** : nouvelle action **Treat**, proposée dès qu'une Affliction est dans le deck : retire
-      toutes les Afflictions et soigne 10 % des PV max. Elle remplace le repos ou l'amélioration (une action par
-      feu, comme aujourd'hui). Camp Kettle et Flint and Tinder ne s'appliquent qu'au repos.
-    - **Marchand** : retirer une Affliction coûte 25 po et ne fait pas monter le prix du retrait.
-    - **Rencontres** : effets `treat` (toutes ou n) et `afflict` (prix d'une récompense), section 6.
-    - Fuir avec Cracked Hearthstone = fin de combat : les Afflictions portées restent.
+| Action | Type | Règle |
+|---|---|---|
+| **Lull** | Cast | À sa résolution : l'allié éveillé le plus blessé (pas le lanceur, pas un boss, pas un ennemi déjà rendormi dans ce combat, au moins 8 PV perdus) reçoit **Asleep 2** et se soigne de 8. Réveillé ensuite, il rejoue son ouverture (un ennemi sans ouverture reprend son motif). Interrompu, ou sans cible valable : rien. |
+| **Alarm** | Cast | À sa résolution : tous les alliés endormis se réveillent (pendant la phase ennemie, donc ouvertures au round suivant, toutes ensemble). Interrompue : rien. |
+| **Slumber N, mend X** | — | L'ennemi s'endort lui-même (Asleep N) ; à chacun de ses tours de sommeil, il se soigne de X. Un tour perdu par Stunned ne soigne pas. Utilisé par Wyrmak et Somnus. |
+| Attaque `perAsleep` | attack | `{ "attack", 6, perAsleep = 3, cap = 9 }` : +3 par allié endormi, affiché à jour. Wyrmkin Dreamwalker. |
+
+### Ce que voit le joueur
+
+- Sur l'ennemi endormi : à la place de l'intention, l'icône `spell_nature_sleep` et « Asleep 2 » ; dessous,
+  en gris, l'ouverture et ses chiffres (« On waking: Death Roll 20 »). Au réveil, l'ouverture passe en
+  couleur et devient l'intention, avec une courte animation (≤ 0,3 s) et le journal.
+- **Aperçu au survol d'une carte** : sur un dormeur visé par une carte à une cible, le chiffre de dégâts
+  prévu inclut le bonus et porte le mot « Wake » (« 33 Wake ») ; sur une carte « to all » ou un DoT, chaque
+  dormeur touché montre « Wakes » sans bonus.
+- Les intentions Lull et Alarm montrent le nombre de dormeurs concernés (Alarm : « Wakes 2 »).
+
+### Infobulles (≤ 60 caractères)
+
+| Terme | Infobulle |
+|---|---|
+| Asleep N | `Skips its next N turns. Damage wakes it up.` |
+| Opener (« On waking: ») | `Its first move after it wakes up.` |
+| Rude Awakening | `First single-target hit on a sleeper: +50% damage.` |
+| Lull (intention) | `Cast. Puts a wounded ally to sleep and heals it 8.` |
+| Alarm (intention) | `Cast. Wakes up all sleeping allies.` |
 
 ### Interactions
 
 | Avec | Règle |
 |---|---|
-| Absorb | Un coup entièrement absorbé ne fait pas perdre de PV : pas d'Affliction. C'est la réponse principale du Priest et du Mage. |
-| Parry | Le coup annulé ne touche pas : pas d'Affliction. Une charge par coup, donc Noxious Breath (2 coups) en demande deux. |
-| Stunned | L'ennemi perd son tour, rien n'est posé. Posé pendant son tour (Freezing Trap), l'attaque ne part pas. |
-| Cast / Interrupt | Les incantations qui posent une Affliction (Hex, Sleep, Lullaby) sont perdues si on les interrompt. Côté joueur, une Affliction n'est pas une carte Cast. |
-| Traps | La Trap se déclenche avant les coups (moteur actuel) ; si elle tue l'attaquant ou l'étourdit, rien n'est posé. |
-| DoT | Aucun lien de règle : Creeping Venom n'est pas un DoT (ni décroissance, ni Envenom). |
-| Familier du Hunter | Aucun lien de règle : le familier ne joue pas de carte. Il tue les poseurs entre deux tours. |
-| « Remove negative effects » | Étendu : exhauste aussi les Afflictions **en main** (Berserker Rage, Cloak of Shadows, Insignia of the Alliance, Elixir of Wisdom). Insignia agit au début du tour, avant la pioche : seulement les Sleep gardées. |
-| Demonic Rune | Une Affliction jouée est une carte Exhaust jouée : +3 Absorb. |
-| Slice and Dice, Ironfoe, Hand of Justice | Une Affliction n'est pas une Attack : rien. |
-
-### Infobulles (anglais)
-
-- **Affliction** : `Added by enemies. Lingering. Playing it removes it from your deck.`
-- **Lingering** : `If this card is still in your deck when the combat ends, it stays in your deck.`
-- **Treat** (feu de camp) : `Remove all Afflictions from your deck. Heal 10% of max HP.`
-- Compteur sur le bandeau de la carte de parcours : icône de Festering Wound + nombre d'Afflictions portées.
+| Absorb du joueur | Normale. L'ouverture est annoncée : le joueur pose son Absorb avant de réveiller. |
+| Absorb de l'ennemi | Un dormeur peut en recevoir (Bog Shield). Un coup entièrement absorbé le réveille ; le bonus s'applique avant l'Absorb. Il perd son Absorb au début de son tour, endormi ou non. |
+| Parry (Rogue) | Normale : une charge annule un coup jusqu'à 8. Les ouvertures (20 à 26) passent au-dessus : le Rogue préfère tuer avant l'ouverture. |
+| Stunned | Règles 6 et 7 : sur un dormeur, le compteur ne baisse pas ; sur une ouverture, elle est retardée, pas perdue. Boss immunisés : rien de cela contre Somnus. |
+| Cast du joueur | Le Cast se résout au début du tour suivant : si la cible dort encore, il a le bonus et la réveille (ouverture dans ce round) ; si son compteur l'a réveillée entre-temps, pas de bonus. Le compteur visible dit si le pari tient. |
+| Cast ennemi (Lull, Alarm) | Interruptibles comme tout Cast. Un lanceur étourdi ou tué avant sa résolution ne lance rien. |
+| Traps (Hunter) | Un dormeur n'attaque pas : il ne déclenche aucune Trap. Explosive Trap (à tous) déclenchée par un ennemi éveillé réveille les dormeurs sans bonus, ouvertures au round suivant. Freezing Trap sur une ouverture : règle 7. |
+| DoT | Poser un DoT ne réveille pas ; le premier tic, au début du tour du dormeur, le réveille sans bonus et sans qu'il agisse (ouverture au round suivant). C'est le réveil « doux » : pas de bonus, un round de répit. |
+| Familier du Hunter | L'attaque automatique de fin de tour vise la dernière cible **éveillée** du joueur ; elle ne vise un dormeur que si aucun ennemi n'est éveillé. Elle a alors le bonus. Les attaques commandées (« Pet attacks. ») frappent la cible de la carte, dormeur compris, avec le bonus au premier coup. |
+| Dégâts à tous | Holy Nova, Halo, Cleave, Whirlwind, Thunder Clap, Arcane Explosion, Flamestrike, Blizzard, Fan of Knives, Multi-Shot, Volley, Rough Dynamite, Crude Flint, Mor'Ladim's Skull : réveillent tous les dormeurs touchés, sans bonus. Blade Flurry : la cible principale a le bonus, les autres se réveillent sans. |
+| Mind Sear, Living Bomb, Fire Oil | DoT à tous : chaque dormeur se réveille à son tour, sans bonus, ouvertures au round suivant. |
+| Execute, Careful Aim | Aucune règle propre. Un dormeur est à pleins PV (Careful Aim vrai, Execute faux), sauf un ennemi rendormi par Lull après avoir été blessé. |
+| Frozen (Mage) | Asleep n'est pas Frozen (Frozen = Stunned ou Demoralized). |
+| Stealth (Rogue) | Se cumule : Ambush sur un dormeur = (6 + 12) × 1,5 = 27. |
+| Bibelots de début de combat | Nesingwary 4000 (10 au plus gros) : coup à une cible, bonus, réveil avant le tour 1, ouverture au round 1. |
+| Fuite (Hearthstone) | Inchangée. |
 
 ### Les décisions qu'elle crée
 
-- **Pendant le tour** : 1 ou 2 mana pour soigner maintenant, ou garder le tempo et porter l'Affliction.
-  Creeping Venom (2 PV par tour) et Sleep (1 mana par tour) poussent à payer ; Festering Wound se rembourse
-  par la pioche, donc la garder n'est jamais grave sauf contre ce qui compte les Afflictions portées.
-- **Avant le tour ennemi** : absorber entièrement le coup qui pose (Absorb, Parry, Stunned), ou tuer d'abord
-  l'ennemi qui pose. Le Warrior perd sa Rage s'il absorbe tout : il choisit entre Rage et Afflictions.
-- **Entre deux combats** : le feu de camp de l'étape 7 oppose Rest (30 %) à Treat (10 % + nettoyage), juste
-  avant Somnus qui gagne 1 Strength par Affliction portée.
+- **Qui réveiller et avec quoi.** Réveiller le Swampwalker avec Mortal Strike rapporte 11 dégâts de plus
+  mais lance Bog Crush (22) ce round ; le laisser dormir 3 tours coûte le bonus mais donne le temps de
+  tuer les éveillés.
+- **Tuer avant qu'il agisse.** Un dormeur tué dans le tour de son réveil ne joue jamais son ouverture :
+  garder son plus gros coup pour la fin du tour, après les coups qui l'ont réveillé.
+- **Éviter les dégâts à tous.** Avec deux dormeurs dans le groupe, Cleave ou Holy Nova lance deux
+  ouvertures sans bonus. Pack (Wetlands) récompensait les morts groupées ; ici, la zone pousse au coup
+  ciblé.
+- **Réveil doux ou réveil fort.** Un DoT réveille sans bonus et sans ouverture ce round ; un coup direct
+  donne le bonus et l'ouverture tout de suite. Stunned après un réveil retarde l'ouverture d'un round.
+- **Lanceurs.** Interrompre Lull (sinon un ennemi soigné rejoue son ouverture) ou Alarm (sinon toutes les
+  ouvertures arrivent ensemble au round suivant), ou tuer le lanceur.
 
-### Réponses de chaque classe
+### Écarts avec l'idée de départ
 
-| Classe | Prévenir | Soigner en combat | Carte de zone |
-|---|---|---|---|
-| Priest | Absorb (PW: Shield, Inner Fire), Silence sur Hex et Sleep | 1 mana par Affliction ; Atonement rend les PV du venin | Mass Dispel |
-| Warrior | Absorb s'il renonce à la Rage, Pummel, 74 PV | Berserker Rage (exhauste la main) | Enraged Regeneration |
-| Mage | Mana Shield, Ice Barrier, Counterspell, Frost Nova, Polymorph | 1 mana par Affliction | Alter Time |
-| Rogue | Parry (Feint, Evasion, Riposte), Kick à 0 mana | Cloak of Shadows ; cartes à 0 mana qui laissent du mana | Shiv |
-| Hunter | Freezing Trap, Wyvern Sting, Intimidation, Counter Shot, Disengage | 1 mana par Affliction | Exhilaration |
+1. **Le bonus ne vaut que pour un coup à une cible.** Sinon les cartes à tous étaient récompensées
+   (Halo 22 → 33 tuait tous les dormeurs de 30 PV), à l'inverse de ce qui était voulu.
+2. **Pas de bonus sur un tic de DoT.** Mind Sear aurait donné le bonus à tous ; le DoT devient le réveil
+   doux (ouverture retardée d'un round, sans bonus).
+3. **Compteur visible (Asleep 2 ou 3).** Un dormeur se réveille seul : impossible d'attendre sans fin, et le
+   combat reste borné.
+4. **Moment de l'ouverture fixé par une seule règle** (première phase ennemie après le réveil) : un réveil
+   pendant la phase ennemie (Trap, DoT, Alarm) la repousse au round suivant.
+5. **Stunned retarde l'ouverture sans l'annuler** ; sur un dormeur, il gèle le compteur. Sinon Freezing
+   Trap et Frost Nova effaçaient la menace de la zone.
+6. **Le familier ne réveille pas seul** tant qu'un ennemi est éveillé ; sinon le Hunter réveillait sans le
+   vouloir à chaque fin de tour.
+7. **Lull** soigne une fois (8) au lieu de soigner pendant le sommeil, une fois par ennemi et par combat ;
+   le soin pendant le sommeil est réservé aux deux ennemis qui s'endorment eux-mêmes (Wyrmak, Somnus).
+8. **La mort d'un allié ne réveille personne** (seule Alarm le fait), pour ne pas refaire Pack.
+
+### Aucune classe sans réponse
+
+| Classe | Réponse |
+|---|---|
+| Priest (36 PV) | SW: Pain réveille en douceur, Smite (12) et Holy Fire (36 en Cast) réveillent fort, Holy Word: Chastise réveille et retarde l'ouverture, Silence coupe Lull et Alarm ; Holy Nova et Halo sont à garder pour les groupes sans dormeur. |
+| Warrior (74 PV) | Mortal Strike réveille pour 33 et l'ouverture reçue donne de la Rage ; Rend réveille en douceur, Pummel coupe les lanceurs ; Cleave, Whirlwind, Thunder Clap et Bladestorm réveillent tout le groupe. |
+| Mage (42 PV) | Pyroblast (45) ou Glacial Spike (39) tuent un dormeur moyen avant qu'il agisse ; Polymorph le laisse dormir ou retarde son ouverture, Frost Nova gèle tous les compteurs ; Flamestrike, Blizzard et Arcane Explosion sont punis. |
+| Rogue (50 PV) | Stealth et bonus se cumulent (Ambush 27, Backstab 15) ; Garrote réveille en douceur, Cheap Shot retarde l'ouverture, Kick à 0 mana ; Parry pare mal les ouvertures, donc tuer avant qu'elles partent. |
+| Hunter (50 PV) | Aimed Shot avec Careful Aim (34 → 51) sur une cible intacte ; le familier n'éveille personne seul, Serpent Sting réveille en douceur, Freezing Trap retarde l'ouverture ; Multi-Shot, Volley et Explosive Trap réveillent tout le groupe. |
+
+Aucune ne trivialise la zone : les coups qui tuent un dormeur d'un coup coûtent 2 mana ou un Cast (pari sur
+le compteur), Polymorph est Exhaust, Frost Nova a Cooldown 4, et Somnus, immunisé à Stunned, dort et se
+réveille sur ses propres règles.
 
 ### Ce que le moteur doit apprendre
 
-1. Type de carte `affliction`, drapeau `lingering`, exclusion des réserves (récompense, marchand, `cardChoice`,
-   `upgrade`, `dupe`), cadre de carte propre et infobulles.
-2. `Combat.addCard(c, id, pile)` : crée une instance `{uid, id, up = false}` en cours de combat (compteur d'uid
-   dans l'état, sauvegardable), journal `{ t = "afflict", card, pile }` pour l'animation. Respecte le plafond.
-3. Actions ennemies : option `afflict = id` sur `attack` (après `dealDamage`, si `loss > 0`) et action
-   `{ "afflict", id, n, pile }`.
-4. Crochets de carte en main : `endTurnInHand` (Creeping Venom, avant la défausse) et `startTurnInHand` après
-   le gain de mana (Sleep).
-5. Fin de combat : renvoyer les Afflictions portées (à ajouter à `exp.deck`) et les uid d'Afflictions du deck
-   d'expédition exhaustées (à en retirer). Aujourd'hui le deck d'expédition ne change jamais pendant un combat.
-6. `Combat.cleanse` sur le joueur : exhauste aussi les Afflictions en main.
-7. Intention à valeur variable : `{ "attack", n, per = "afflictions", step = 3, cap = 9 }`, affichée à jour.
-8. Feu de camp : action `{"treat"}` ; marchand : prix fixe 25 po pour une Affliction ; rencontres : effets
-   `{"afflict", id}`, `{"treat", n}` (`n` absent = toutes), condition `{"afflictions", n}`.
-9. Bot : jouer une Affliction quand le mana restant ne sert à rien d'autre, toujours Creeping Venom avant la
-   fin du tour si 1 mana reste ; Treat au feu si 3 Afflictions ou plus, ou 2 avant le boss.
-10. Nouveaux décors de rencontre : `swamp`, `stonard`, `sanctuary`, `pool`, `temple` (`coast` existe).
+`Data/Act1.lua` sait déjà : intentions à actions multiples, Cast ennemi interruptible, `ai`, motifs,
+`summon`, `minion`, `block_ally`, `heal_ally`, `onDamaged`, Stunned qui arrête un tour. Il manque :
 
-## 3. Ennemis normaux (8)
+1. **État d'ennemi `asleep`** (intensité, dans `e.st`, sauvegardable), posé par la définition
+   (`asleep = 2`) ou par la composition (`{ "sawtooth_crocolisk", asleep = 3 }`) ; champ `opener =
+   "<id de move>"`.
+2. **`executeMove` d'un dormeur** : s'il est Stunned, le tour est perdu sans baisse ; sinon `asleep − 1`,
+   à 0 appel de `Combat.wake`. Aucune action, aucune Trap déclenchée. Effet `mend` (Slumber) avant la
+   baisse.
+3. **`Combat.wake(c, e, cause)`** : retire `asleep`, met l'ouverture comme intention, note
+   `e.mem.wokeInEnemyPhase` (pas d'action dans la phase en cours), journal `{ t = "wake", unit, by }`.
+4. **`Combat.dealDamage`** : si la cible dort, multiplier par 1,5 (arrondi au supérieur) quand l'effet est
+   marqué `single` et n'est pas un tic de DoT ; puis réveiller si la cible survit (même dégât absorbé).
+   Les effets doivent porter le drapeau `single` (cible unique, familier, Trap à une cible, bibelot).
+5. **Ouverture non consommée** quand l'ennemi est Stunned (l'intention ne passe pas au move suivant).
+6. **Familier** : `Hunter.petTarget` saute les dormeurs tant qu'un ennemi est éveillé.
+7. **Actions ennemies** `{ "lull", 2, heal = 8 }` (choix de la cible à la résolution, drapeau
+   `e.mem.lulled`), `{ "alarm" }`, `{ "slumber", n, mend = x, opener = id }`, attaque
+   `{ "attack", n, perAsleep = k, cap = m }` affichée par `Combat.intentInfo`.
+8. **Effet de carte et de bibelot** `{ "apply", "asleep", n }` (Dream Dust, Egg of Hakkar ; boss
+   immunisés) ; endormi en cours de combat, l'ennemi perd son intention annoncée.
+9. **Combat de rencontre** : `{ "fight", groupe, asleep = n }` pose Asleep n à chaque ennemi non boss
+   (type de rencontre du § 8).
+10. **Interface** : icône et compteur de sommeil, ouverture grisée, mot « Wake » dans l'aperçu de dégâts,
+    « Wakes » sur les dormeurs touchés par une carte à tous, animation de réveil.
+11. **Bots** : valeur d'un réveil (bonus − ouverture subie, nulle si le dormeur meurt dans le tour) ;
+    pénalité des cartes à tous selon les ouvertures déclenchées ; priorité aux lanceurs de Lull et Alarm.
+12. **Statistiques** : réveils par cause (coup à une cible, à tous, DoT, compteur, Alarm), dormeurs tués
+    avant d'agir, ouvertures subies et retardées, Lull et Alarm lancés et interrompus.
 
-Notation des actions : celle de `Data/Act1.lua`. « Wound » = `afflict = "festering_wound"`, « Venom » =
-`afflict = "creeping_venom"`, toujours conditionné à une perte de PV.
+## 3. Ennemis normaux (9)
 
-| Id | Nom (WoW) | PV | Intentions | Motif | Rôle | Mécanique |
-|---|---|---|---|---|---|---|
-| `sawtooth_crocolisk` | Sawtooth Crocolisk | 35–39 | **Snap** (attack) : 11. **Death Roll** (attack) : 8, Wound. **Submerge** (defend) : block 10. | snap, death_roll, submerge ; départ au hasard | Brute, tient la ligne | oui |
-| `deathstrike_tarantula` | Deathstrike Tarantula | 21–24 | **Venomous Bite** (attack) : 6, Venom. **Web** (debuff) : 4, Demoralized 1 sur le joueur. | bite, web | Poseur fragile, à tuer en premier | oui |
-| `marsh_inkspewer` | Marsh Inkspewer | 15–18 | **Claw** (attack) : 6. **Ink Spit** (debuff) : 4, Sundered 1 ⌛ sur le joueur. | ink, claw ; départ au hasard | Nuée ; le Sundered fait passer les coups des poseurs à travers l'Absorb | non |
-| `lost_one_hunter` | Lost One Hunter | 29–33 | **Spear Thrust** (attack) : 11. **Hunt the Wounded** (attack) : 6 + 3 par Affliction portée (+9 au plus). | thrust, hunt ; départ au hasard | Punit les Afflictions laissées dans le deck | oui (lit) |
-| `lost_one_seer` | Lost One Seer | 22–25 | **Mend** (heal) : soigne 9 l'allié le plus blessé. **Hex** (cast) : 2 Festering Wound dans la défausse. **Shadow Bolt** (attack) : 8. | ai : Mend si un allié a perdu 9 PV et que le dernier coup n'était pas Mend ; sinon Hex et Shadow Bolt en alternance | Soutien ; test d'Interrupt | oui |
-| `swampwalker` | Swampwalker | 42–46 | **Vine Lash** (attack) : 9. **Bog Shield** (defend) : block 8, block_ally 8. **Choke** (attack) : 5 deux fois. | lash, shield, choke | Mur qui protège les poseurs | non |
-| `nightmare_whelp` | Nightmare Whelp | 13–15 | **Bite** (attack) : 6. **Noxious Breath** (attack) : 4, Venom. | bite, breath ; départ au hasard | Petit poseur, par deux au plus | oui |
-| `nightmare_wyrmkin` | Nightmare Wyrmkin | 34–38 | **Sleep** (cast) : 1 Sleep sur la pioche. **Wing Buffet** (attack) : 9, interrupts. **Claw** (attack) : 12. | sleep, buffet, claw | Lanceur ; Wing Buffet coupe les Cast du joueur | oui |
+Repères Westfall × 1,48 : Riverpaw Gnoll 19–22 PV / 8 → 28–33 / 12 ; Defias Conjurer, Fireball 16 → 24.
+Six ennemis sur neuf utilisent Slumber (quatre dormeurs, un qui rendort, un qui donne l'alarme). Les
+ouvertures valent 1,6 à 1,9 fois le coup ordinaire du même ennemi.
 
-Six sur huit utilisent la mécanique (cinq posent, un lit). Les Lost Ones sont des draeneï exilés, Hunter et
-Seer sont leurs noms de créature dans la zone ; Swampwalker tient la place des « limons » (créature de vase et
-de lianes du marais). Nightmare Whelp et Nightmare Wyrmkin sont les dragonkin verts du Temple of Atal'Hakkar.
+| id | Nom (créature) | PV | Asleep | Ouverture | Intentions | Motif | Rôle |
+|---|---|---|---|---|---|---|---|
+| `sawtooth_crocolisk` | Sawtooth Crocolisk (1082) | 40–44 | 2 | **Death Roll** (attack) : 20. | **Snap** (attack) : 12. **Submerge** (defend) : block 10. | snap, submerge | Le dormeur de base : apprendre à réveiller avec le bon coup. |
+| `dreaming_whelp` | Dreaming Whelp (741) | 15–17 | 2 | **Dream Breath** (attack) : 10. | **Bite** (attack) : 6. | bite | Petit dormeur, par deux : une carte à tous les réveille ensemble sans les tuer. |
+| `swampwalker` | Swampwalker (764) | 48–52 | 3 | **Bog Crush** (attack) : 22, interrompt. | **Vine Lash** (attack) : 10. **Bog Shield** (defend) : block 8, block_ally 8 (l'allié le plus blessé, dormeur compris). | lash, shield | Le gros dormeur : on le garde pour la fin, ou on le réveille tôt pour le bonus. |
+| `green_scalebane` | Green Scalebane (744) | 44–48 | 2 | **Cleave** (attack) : 24. | **Strike** (attack) : 13. **Scale Guard** (defend) : block 12, Strength 1. | strike, guard | Dragonkin du temple : son ouverture est le plus gros coup des normaux. |
+| `wyrmkin_dreamwalker` | Wyrmkin Dreamwalker (743) | 30–33 | — | — | **Lull** (cast) : Lull 2, soin 8. **Dream Bolt** (attack) : 6, +3 par allié endormi (+9 au plus). | ia : Lull si un allié éveillé valable a perdu ≥ 8 PV et que le tour d'avant n'était pas Lull ; sinon Dream Bolt | Lanceur : rendort ceux qu'on a entamés et frappe plus fort tant que d'autres dorment. Pousse à réveiller. |
+| `marsh_oracle` | Marsh Oracle (752) | 24–27 | — | — | **Alarm Cry** (cast) : Alarm. **Lightning Bolt** (attack) : 10. | ia : Alarm Cry si un allié dort et que le tour d'avant n'était pas Alarm Cry ; sinon Lightning Bolt | Murloc qui réveille le groupe : l'interrompre, le tuer, ou réveiller soi-même avant lui. |
+| `deathstrike_tarantula` | Deathstrike Tarantula (769) | 30–33 | — | — | **Venomous Bite** (attack) : 7, puis DoT 3 sur le joueur. **Web** (debuff) : 5, puis Demoralized 1 ⌛ sur le joueur. | bite, web ; départ au hasard | Éveillée, elle frappe pendant que les autres dorment. |
+| `marsh_inkspewer` | Marsh Inkspewer (750) | 16–18 | — | — | **Claw** (attack) : 6. **Ink Spit** (debuff) : 4, puis Sundered 1 ⌛ sur le joueur. | ink, claw ; départ au hasard | Nuée éveillée ; son Sundered fait passer les ouvertures plus fort. |
+| `lost_one_hunter` | Lost One Hunter (759) | 32–36 | — | — | **Spear Thrust** (attack) : 13. **Net** (debuff) : 6, puis Demoralized 1 ⌛ sur le joueur. | thrust, net ; départ au hasard | Combattant éveillé, sans mécanique. |
+
+Retirés de la première version : Lost One Seer (son rôle de soutien passe au Dreamwalker), Nightmare Whelp
+et Nightmare Wyrmkin (absents de la base de la zone : remplacés par Dreaming Whelp et Wyrmkin Dreamwalker,
+créatures réelles du temple). Autres créatures de la zone non retenues : Adolescent Whelp (740), Green
+Wyrmkin (742), Scalebane Captain (745), Elder Dragonkin (746), Marsh Murloc (747), Marsh Flesheater (751),
+Lost One Mudlurker (755), Fisherman (757), Riftseeker (762), Swampwalker Elder (765), Tangled Horror (766),
+Swamp Jaguar (767), Shadow Panther (768), Sorrow Spinner (858), Young Sawtooth Crocolisk (1084), Sawtooth
+Snapper (1087), Mire Lord (1081).
 
 ### Groupes
 
-| Groupe | Composition | PV totaux | Idée |
+| Liste | Composition (de gauche à droite) | PV totaux | Idée |
 |---|---|---|---|
-| easy 1 | crocolisk | 35–39 | Apprendre Death Roll : absorber le coup annoncé. |
-| easy 2 | inkspewer ×3 | 45–54 | Nuée sans mécanique. |
-| easy 3 | tarantula, inkspewer | 36–42 | Premier venin. |
-| easy 4 | whelp ×2 | 26–30 | Deux petits poseurs. |
-| normal 1 | crocolisk, inkspewer ×3 | 80–93 | Le Sundered des murlocs fait passer Death Roll. |
-| normal 2 | lost_one_hunter, lost_one_seer, tarantula | 72–82 | Hex et Venom nourrissent Hunt the Wounded. |
-| normal 3 | swampwalker, tarantula, inkspewer | 78–88 | Le mur protège la tarentule. |
-| normal 4 | nightmare_wyrmkin, nightmare_whelp ×2 | 60–68 | Interrompre Sleep ou payer 2 mana. |
-| normal 5 | lost_one_hunter, sawtooth_crocolisk | 64–72 | Deux gros coups, dont un qui pose. |
-| normal 6 | swampwalker, lost_one_seer | 64–71 | Long : soins et blocs ; Hex à interrompre. |
-| event_crocs | crocolisk ×2 | 70–78 | Rencontre de Stonard. |
-| event_galen | inkspewer ×4 | 60–72 | Rencontre de Galen. |
-| event_dragonkin | nightmare_wyrmkin, nightmare_whelp ×2 | 60–68 | Rencontre des marches du temple. |
-| event_gilmorian | gilmorian (élite) | 104 | Rencontre de Misty Reed Strand. |
+| easy | Sawtooth Crocolisk | 40–44 | Réveiller avec son meilleur coup, puis encaisser Death Roll. |
+| easy | Marsh Inkspewer ×3 | 48–54 | Nuée sans dormeur : les cartes à tous servent. |
+| easy | Dreaming Whelp ×2, Marsh Inkspewer | 46–52 | Ne pas tout réveiller pour tuer un murloc. |
+| easy | Deathstrike Tarantula, Marsh Inkspewer | 46–51 | Sans dormeur. |
+| normal | Deathstrike Tarantula, Sawtooth Crocolisk, Marsh Inkspewer | 86–95 | Tuer les éveillés en 2 tours avant Death Roll, ou réveiller le crocolisk pour le bonus. |
+| normal | Wyrmkin Dreamwalker, Dreaming Whelp ×2, Marsh Inkspewer | 76–85 | Dream Bolt à 12 tant que les dragonnets dorment ; les réveiller d'un coup les fait souffler tous les deux. |
+| normal | Marsh Oracle, Swampwalker, Marsh Inkspewer | 88–97 | Couper Alarm Cry ou subir Bog Crush au round 2. |
+| normal | Green Scalebane, Wyrmkin Dreamwalker | 74–81 | Le Dreamwalker rendort le Scalebane entamé : Cleave deux fois. |
+| normal | Lost One Hunter, Deathstrike Tarantula | 62–69 | Combat éveillé, court. |
+| normal | Marsh Oracle, Sawtooth Crocolisk, Dreaming Whelp | 79–88 | Alarm réveille deux dormeurs : deux ouvertures au même round. |
+| elite | Lost One Chieftain + Lost One Muckdweller · Lord Captain Wyrmak · Gilmorian | § 4 | |
+| boss | Somnus | § 5 | |
+| `event_crocs` | Sawtooth Crocolisk ×2 | 80–88 | Rencontre de Stonard. |
+| `event_galen` | Marsh Inkspewer ×4 | 64–72 | Rencontre de Galen. |
+| `event_dragonkin` | Green Scalebane, Dreaming Whelp ×2 (tous Asleep 3) | 74–82 | Rencontre des marches du temple (type « Sleeping Camp »). |
+| `event_gilmorian` | Gilmorian | 104 | Rencontre de Misty Reed Strand. |
 
-Cible : 6 à 9 PV perdus par combat normal en comptant une Affliction emportée comme 3 PV ; 1 à 1,5 Affliction
-gagnée par combat normal sans réponse, environ 0,5 emportée.
+Cible : 6 à 9 PV perdus par combat normal, 2,7 à 4 tours. Repère de calcul : une ouverture subie par
+combat normal en moyenne (20 à 24, en partie absorbée), le reste des coups venant des éveillés.
 
 ## 4. Élites (3)
 
-| Id | Nom | PV | Intentions | Motif | Idée de combat |
-|---|---|---|---|---|---|
-| `wyrmak` | Lord Captain Wyrmak (rare, dragonkin) | 110 | **Lullaby** (cast) : 2 Sleep sur la pioche. **Cleave** (attack) : 17. **Wrath of the Dream** (attack) : 8 + 3 par Affliction portée (+12 au plus). **Tail Sweep** (attack) : 8, interrupts ; block 10. | lullaby, cleave, wrath, tail | Le maître du sommeil : chaque Lullaby non interrompue coûte 4 mana ou nourrit Wrath of the Dream deux tours plus tard. |
-| `gilmorian` | Gilmorian (rare, naga de la côte) | 104 | **Lightning Bolt** (cast) : 24. **Frost Shock** (attack) : 8, interrupts ; Demoralized 1 sur le joueur. **Healing Wave** (cast) : soigne 20 (elle-même, `heal_ally`). | bolt, shock, wave | Le duel d'interruptions : deux incantations sur trois tours ; un seul Interrupt à Cooldown 2 ne suffit pas, il faut choisir entre bloquer 24 et empêcher 20 PV de soin. Aucune Affliction : l'élite repos de la zone. |
-| `lost_one_chieftain` | Lost One Chieftain (chef des Lost Ones) | 96 | **Call the Lost** (summon) : 1 Lost One Refugee. **Brutal Strike** (attack) : 10, 2 Wound. **Spear of the Lost** (attack) : 15. | call, brutal, spear | La course : tuer le chef avant que les réfugiés s'accumulent, en absorbant Brutal Strike. |
-| `lost_one_refugee` (sbire) | Lost One Refugee | 12–14 | **Stab** (attack) : 5. | stab | Sbire du chef (`minion = true`). |
+| id | Nom (créature) | PV | Intentions et motif | Idée de combat |
+|---|---|---|---|---|
+| `lost_one_chieftain` | Lost One Chieftain (763), Lost One rare | 104, **Asleep 2** | Ouverture **Spear of the Lost** (attack) : 26, interrompt. Puis **Spear Thrust** (attack) : 15 · **Rally** (buff) : block 10, Strength 2 · **Crushing Blow** (debuff) : 9, puis Sundered 1 ⌛ sur le joueur ; motif thrust, rally, crush. | **La sentinelle.** Le chef dort dans sa hutte ; sa sentinelle sonne du cor dès le round 1. Le joueur l'interrompt ou la tue (20 PV), puis prépare son tour et réveille le chef avec son meilleur coup ; sinon le chef se réveille sans bonus et Spear of the Lost part au round 2. |
+| `lost_one_muckdweller` | Lost One Muckdweller (760), serviteur (`minion = true`) | 20–22 | **Warning Horn** (cast) : Alarm. **Stab** (attack) : 7. ia : Warning Horn si un allié dort et que le tour d'avant n'était pas Warning Horn ; sinon Stab. | Sentinelle du chef. Sa mort ne termine pas le combat ; celle du chef, si. |
+| `wyrmak` | Lord Captain Wyrmak (14445), dragonkin rare élite | 112 | **Cleave** (attack) : 18 · **Tail Sweep** (attack) : 9, interrompt ; block 10 · **Wing Buffet** (debuff) : 12, puis Demoralized 1 ⌛ sur le joueur ; motif cleave, sweep, buffet. **Dream** (`onDamaged`, une fois, après l'effet en cours) : à 56 PV ou moins, « Wyrmak falls into the Dream. » : Slumber 2, mend 12 ; ouverture **Dream Fury** (attack) : 14 deux fois ; puis le motif reprend à Cleave. | **Le dormeur qui se soigne.** À mi-vie il s'endort et regagne 12 PV par tour. Le réveiller tout de suite (bonus, Dream Fury 28 dans le round) ou le laisser regagner jusqu'à 24 PV et recevoir Dream Fury plus tard ; ou garder 56 dégâts pour le tuer dans son sommeil. Stunned sur lui endormi : compteur gelé, pas de soin. |
+| `gilmorian` | Gilmorian (14447), naga rare de la côte | 104 | **Lightning Bolt** (cast) : 24 · **Frost Shock** (attack) : 8, interrompt ; Demoralized 1 ⌛ sur le joueur · **Healing Wave** (cast) : soigne 20 (elle-même, `heal_ally`) ; motif bolt, shock, wave. | **Le duel d'interruptions**, sans Slumber : deux incantations sur trois tours ; un seul Interrupt à Cooldown 2 ne suffit pas, il faut choisir entre bloquer 24 et empêcher 20 PV de soin. L'élite où les cartes à tous et les gros Cast reprennent leur valeur. |
+
+Composition de l'élite du chef : {Lost One Muckdweller, Lost One Chieftain} (la sentinelle à gauche agit
+d'abord : son cor sonne avant le tour du chef).
 
 ## 5. Boss : Somnus (dragon vert)
 
-Somnus survole la Pool of Tears, devant le Temple of Atal'Hakkar. **140 PV**, immunisé à Stunned (règle des
-boss), pas aux Interrupts.
+Somnus (12900), dragon vert élite qui garde la Pool of Tears devant le Temple of Atal'Hakkar.
+**148 PV.** Immunisé à Stunned (règle des boss) et à tout effet qui endort (Dream Dust, Egg of Hakkar) ;
+pas aux Interrupts. Vise 6 à 7 tours (Edwin VanCleef : 92 PV).
 
-- **Passif, Nightmare** : au début du combat, Somnus gagne **1 Strength par Affliction portée** (5 au plus).
-  Affiché dès l'écran de combat. C'est l'enjeu du feu de camp de l'étape 7.
-- **Phase 1 (140 à 71 PV)** : motif fixe de 4 intentions.
-  1. **Noxious Breath** (attack) : 10 deux fois, Venom à chaque coup qui fait perdre des PV.
-  2. **Sleep** (cast) : 2 Sleep sur la pioche.
-  3. **Claw** (attack) : 28.
-  4. **Wing Buffet** (attack) : 12, interrupts ; block 12.
-- **Transition (70 PV ou moins, une fois, `onDamaged`)** : « Children of the Dream, to me! » ; invoque
-  2 **Nightmare Whelp** (sbires, 12 PV, **Bite** : 5 seulement). Le motif devient, à partir de l'intention suivante :
-  1. **Noxious Breath** : 10 deux fois, Venom.
-  2. **Dream Eater** (attack) : 6 + 4 par Affliction portée (+16 au plus).
-  3. **Claw** : 28.
-  4. **Sleep** (cast) : 2 Sleep sur la pioche.
-- **Durée visée** : phase 1 en 3 tours (environ 23 dégâts par tour à ce stade), phase 2 en 3 à 4 tours
-  (70 PV + 24 PV de dragonnets) : **6 à 7 tours**.
-- **Lecture** : chaque Sleep non interrompue renforce Dream Eater ; chaque souffle absorbé est un venin de
-  moins. Ce qu'on a soigné avant le combat compte deux fois (Strength au départ, Dream Eater en phase 2).
+| Phase | Déclencheur | Intentions et motif |
+|---|---|---|
+| 1 — Sleeping | début du combat | **Asleep 2.** Ouverture **Bellowing Roar** (attack) : 22, puis Demoralized 1 ⌛ sur le joueur. |
+| 2 — Awake | réveil (coup du joueur ou compteur) | Motif après l'ouverture : **Noxious Breath** (attack) : 8 deux fois, puis DoT 3 sur le joueur · **Claw** (attack) : 24 · **Wing Buffet** (attack) : 12, interrompt ; block 12 ; motif breath, claw, buffet. |
+| 3 — The Dream | 74 PV ou moins (`onDamaged`, une fois, après l'effet en cours) | « Children of the Dream, defend me! » : invoque 2 **Dreaming Whelp** éveillés (serviteurs, 14 PV, **Bite** 6). Somnus : **Slumber 2, mend 10**. Ouverture **Deep Breath** (attack) : 14 deux fois. Motif ensuite : **Claw** 26 · **Noxious Breath** 9 deux fois, puis DoT 3 · **Wing Buffet** 12, interrompt ; block 12. |
+
+Lecture du combat :
+- **Phase 1** : deux tours de sommeil. Le joueur choisit entre réveiller Somnus au tour 1 avec son meilleur
+  coup à une cible (bonus + 50 %, Bellowing Roar dans le round) et prendre deux tours pour poser Pouvoirs,
+  Sundered et Absorb (Bellowing Roar au round 3, sans bonus).
+- **Phase 2** : 148 → 74 PV en trois tours environ (≈ 24 dégâts par tour à ce stade).
+- **Phase 3** : Somnus se rendort à 74 PV et regagne 10 par tour de sommeil, pendant que deux dragonnets
+  mordent. Réveiller le dragon tout de suite (bonus, Deep Breath 28 dans le round, plus 12 des dragonnets)
+  ou tuer d'abord les dragonnets (28 PV) en le laissant regagner jusqu'à 20 PV. Le joueur choisit aussi
+  quelle carte fait franchir les 74 PV : le sommeil tombe après la carte entière, le coup suivant a le
+  bonus.
+- **Durée** : 1 à 2 tours de sommeil + 3 tours de phase 2 + 2 à 3 tours de phase 3 (74 PV, dragonnets,
+  soin) = **6 à 7 tours**.
 
 ## 6. Rencontres (8)
 
-Les nouveaux effets `afflict` et `treat` et la condition `afflictions` sont décrits en section 2. Les deux
-premières du palier 0 et celle des marches du temple sont aussi des exemples du type « marché » débloqué
-(section 8).
+Format de `Data/Events.lua`, `act = 5`. Les nouveaux décors sont ceux du § 1. Aucune rencontre ne dépend
+plus des Afflictions ; `temple_steps` est l'exemple du type « Sleeping Camp » débloqué (§ 8).
 
 ```lua
 event("stonard_outpost", {
   name = "Stonard", act = 5, tier = 0,
   speaker = "Dispatch Commander Ruag", npc = "dispatch_commander_ruag", scene = "stonard",
-  text = "\"Stonard does not turn away travelers who can fight. Our healer treats crocolisk bites and "
-    .. "spider venom, for a price. If you have no gold, my grunts need Sawtooth hides.\"",
+  text = "\"Stonard does not turn away travelers who can fight. Two Sawtooth crocolisks sleep on the "
+    .. "riverbank south of the outpost, and my grunts need their hides. If you want a bed, the inn is open.\"",
   choices = {
-    { label = "Pay the healer", outcome = "Pay 30g, remove all Afflictions, +6 HP",
-      result = "The healer cleans your wounds and gives you a bitter tea for the venom.",
-      effects = { { "pay", 30 }, { "treat" }, { "heal", 6 } } },
-    { label = "Hunt crocolisks for Ruag", outcome = "Fight 2 crocolisks: usual reward + 25g",
+    { label = "Hunt the crocolisks", outcome = "Fight 2 sleeping crocolisks: usual reward + 25g",
       result = "Ruag sends you to the riverbank south of the outpost.",
       effects = { { "fight", "event_crocs", gold = 25 } } },
+    { label = "Pay the healer", outcome = "Pay 30g, +18 HP",
+      result = "The healer cleans your wounds and gives you a bitter tea.",
+      effects = { { "pay", 30 }, { "heal", 18 } } },
     { label = "Rest at the inn", outcome = "+10 HP",
       result = "The innkeeper gives you a bed for the afternoon.",
       effects = { { "heal", 10 } } },
+    -- carte neutre débloquée par la zone (§ 8)
+    { label = "Visit the alchemist", outcome = "Pay 25g, Dreamless Sleep Potion (card)",
+      when = { { "unlocked", "dreamless_sleep_potion", hide = true } },
+      result = "Rartar sells you a vial from his shelf.",
+      effects = { { "pay", 25 }, { "card", "dreamless_sleep_potion" } } },
   },
 })
 
@@ -224,15 +317,15 @@ event("pool_of_tears", {
   text = "\"The Atal'ai threw their artifacts into the Pool of Tears when the temple sank. I want them "
     .. "back. The water is full of Sawtooth crocolisks, so I am not going in myself.\"",
   choices = {
-    { label = "Dive into the pool", outcome = "50%: a relic, else -8 HP and a Festering Wound",
+    { label = "Dive into the pool", outcome = "50%: a relic, else -10 HP",
       effects = { { "gamble", 0.5,
         win = { { "relic" } },
         winText = "You find an Atal'ai idol in the mud at the bottom. Fel'Zerul lets you keep it.",
-        lose = { { "loseHp", 8 }, { "afflict", "festering_wound" } },
+        lose = { { "loseHp", 10 } },
         loseText = "A crocolisk bites your leg before you reach the bottom." } } },
-    { label = "Search the shallows", outcome = "+35g, a Festering Wound",
+    { label = "Search the shallows", outcome = "+35g, -5 HP",
       result = "You pull two artifacts from the reeds and cut your hand on the second. Fel'Zerul pays you.",
-      effects = { { "gold", 35 }, { "afflict", "festering_wound" } } },
+      effects = { { "gold", 35 }, { "loseHp", 5 } } },
     { label = "Leave", outcome = "Nothing",
       result = "Fel'Zerul goes back to watching the water.",
       effects = {} },
@@ -248,11 +341,11 @@ event("galen_escape", {
     { label = "Escort Galen", outcome = "Fight 4 murlocs: usual reward + 30g",
       result = "The murlocs see you coming and charge.",
       effects = { { "fight", "event_galen", gold = 30 } } },
-    { label = "Take the strongbox back alone", outcome = "50%: 60g, else -6 HP and a Festering Wound",
+    { label = "Take the strongbox back alone", outcome = "50%: 60g, else -9 HP",
       effects = { { "gamble", 0.5,
         win = { { "gold", 60 } },
         winText = "The murlocs are fishing. You carry the strongbox out of the camp and Galen pays you.",
-        lose = { { "loseHp", 6 }, { "afflict", "festering_wound" } },
+        lose = { { "loseHp", 9 } },
         loseText = "A murloc spears you as you lift the strongbox. You drop it and run." } } },
     { label = "Show him the way to the road", outcome = "Nothing",
       result = "Galen thanks you and heads for the road on foot.",
@@ -262,24 +355,24 @@ event("galen_escape", {
 
 event("fallow_sanctuary", {
   name = "Fallow Sanctuary", act = 5, tier = 1,
-  speaker = "Lost One Refugee", npc = "lost_one_refugee", scene = "sanctuary",
-  text = "\"We are the Lost Ones. We came here from Draenor, and the dragons hunt us. Our seer can draw "
-    .. "venom out of a wound if you share your food with us.\"",
+  speaker = "Magtoor", npc = "magtoor", scene = "sanctuary",
+  text = "\"We are the Lost Ones. We came here from Draenor, and the dragons of the temple hunt us. "
+    .. "Share your food with us and our elders will teach you what they know.\"",
   choices = {
-    { label = "Share your rations", outcome = "Pay 20g, remove all Afflictions",
-      result = "The seer presses swamp moss on your wounds until the venom comes out.",
-      effects = { { "pay", 20 }, { "treat" } } },
+    { label = "Share your rations", outcome = "Pay 20g, remove a card from your deck",
+      result = "The elders eat with you and show you what to leave behind.",
+      effects = { { "pay", 20 }, { "remove" } } },
     { label = "Help them rebuild their huts", outcome = "-6 HP, upgrade a card of your choice",
       result = "You carry logs from the river all day and learn from the Lost Ones as you work.",
       effects = { { "loseHp", 6 }, { "upgrade" } } },
     { label = "Move on", outcome = "Nothing",
-      result = "The refugee goes back to his hut.",
+      result = "Magtoor goes back to his hut.",
       effects = {} },
-    -- carte neutre débloquée par la zone (section 8)
-    { label = "Ask for their remedy", outcome = "Pay 25g, Powerful Anti-Venom (card)",
-      when = { { "unlocked", "powerful_anti_venom", hide = true } },
-      result = "The seer fills a vial from his own supply.",
-      effects = { { "pay", 25 }, { "card", "powerful_anti_venom" } } },
+    -- carte neutre débloquée par la zone (§ 8)
+    { label = "Ask for their dust", outcome = "Pay 25g, Dream Dust (card)",
+      when = { { "unlocked", "dream_dust", hide = true } },
+      result = "Magtoor fills a pouch with green dust. The Lost Ones gather it where the dragonkin sleep.",
+      effects = { { "pay", 25 }, { "card", "dream_dust" } } },
   },
 })
 
@@ -295,28 +388,26 @@ event("lost_one_cook", {
     { label = "Catch a crocolisk for him", outcome = "-7 HP, one of 3 common cards",
       result = "The crocolisk bites you before you drag it to the pot. The cook keeps his word.",
       effects = { { "loseHp", 7 }, { "cardChoice", n = 3, rarity = "common" } } },
-    { label = "Let him clean your bites", outcome = "Pay 10g, remove an Affliction",
-      when = { { "afflictions", 1 } },
-      result = "He washes the wound with boiled water and salt.",
-      effects = { { "pay", 10 }, { "treat", 1 } } },
-    { label = "Buy a pot of gumbo", outcome = "Pay 30g, Crocolisk Gumbo (card)",
-      when = { { "unlocked", "crocolisk_gumbo", hide = true } },
-      result = "He seals the pot with a lid and a strip of hide.",
-      effects = { { "pay", 30 }, { "card", "crocolisk_gumbo" } } },
+    { label = "Buy smoked meat for the road", outcome = "Pay 20g, a potion",
+      result = "He wraps the meat in leaves and adds a flask of his broth.",
+      effects = { { "pay", 20 }, { "potion" } } },
   },
 })
 
 event("temple_steps", {
   name = "The Temple Steps", act = 5, tier = 2,
   speaker = "Temple of Atal'Hakkar", npc = nil, scene = "temple",
-  text = "Three Nightmare dragonkin sleep on the steps of the Temple of Atal'Hakkar. An Atal'ai offering "
-    .. "chest stands open between them.",
+  text = "A Green Scalebane and two Dreaming Whelps sleep on the steps of the Temple of Atal'Hakkar. "
+    .. "An Atal'ai offering chest stands open between them.",
   choices = {
-    { label = "Take from the chest quietly", outcome = "A relic and a Sleep (Affliction)",
-      result = "You take an idol from the chest. The wyrmkin wakes and breathes on you as you leave.",
-      effects = { { "relic" }, { "afflict", "sleep" } } },
-    { label = "Attack the sleepers", outcome = "Fight 3 dragonkin: usual reward + 30g",
-      result = "You strike the wyrmkin first.",
+    { label = "Take from the chest quietly", outcome = "50%: a relic, else -10 HP",
+      effects = { { "gamble", 0.5,
+        win = { { "relic" } },
+        winText = "You take an idol from the chest and walk back down the steps. The dragonkin do not move.",
+        lose = { { "loseHp", 10 } },
+        loseText = "A whelp wakes up and breathes on you. You drop the idol and run." } } },
+    { label = "Attack the sleepers", outcome = "Fight 3 sleeping dragonkin: usual reward + 30g",
+      result = "You choose which one to strike first.",
       effects = { { "fight", "event_dragonkin", gold = 30 } } },
     { label = "Go around the temple", outcome = "Nothing",
       result = "You take the long way through the water.",
@@ -330,10 +421,9 @@ event("cortello_riddle", {
   text = "In a dead adventurer's pack, you find a sealed scroll signed by Cortello. The riddle points to a "
     .. "cave in the hills of the swamp. Deathstrike tarantulas nest in that cave.",
   choices = {
-    { label = "Search the cave", outcome = "2 Creeping Venom, a relic and 40g",
+    { label = "Search the cave", outcome = "-10 HP, a relic and 40g",
       result = "You find Cortello's chest behind the webs. The tarantulas bite you twice on the way out.",
-      effects = { { "afflict", "creeping_venom" }, { "afflict", "creeping_venom" },
-        { "relic" }, { "gold", 40 } } },
+      effects = { { "loseHp", 10 }, { "relic" }, { "gold", 40 } } },
     { label = "Sell the scroll in Stonard", outcome = "+50g",
       result = "A goblin trader in Stonard buys the scroll without reading it.",
       effects = { { "gold", 50 } } },
@@ -364,49 +454,48 @@ event("misty_reed_strand", {
 })
 ```
 
-Paliers : 3 au palier 0, 3 au palier 1 (dont la rare), 2 au palier 2 (dont la rare). Chaque rencontre garde une
-réponse sans condition ni coût.
+Paliers : 3 au palier 0, 3 au palier 1 (dont la rare), 2 au palier 2 (dont la rare). Chaque rencontre garde
+une réponse sans condition ni coût. `event_dragonkin` pose Asleep 3 dans sa composition (§ 3).
 
-## 7. Cartes de zone (une par classe, rares)
+## 7. Cartes de zone
 
-Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
-
-- Reflective Shield (Priest)
-- Defensive Stance (Warrior)
-- Molten Armor (Mage)
-- Leeching Poison (Rogue)
-- Exhilaration (Hunter)
+Voir docs/zones/cartes-de-zone.md
 
 ## 8. Commun débloqué par la première victoire du compte
 
 ### Cartes neutres (2)
 
-| Id | Nom (objet WoW) | Rareté | Coût | Type | Base | Améliorée | Icône |
-|---|---|---|---|---|---|---|---|
-| `powerful_anti_venom` | Powerful Anti-Venom (Secourisme) | common | 0 | Skill | `Remove negative effects.` / `Exhaust Afflictions in your hand.` / `Draw 1.` / `Exhaust.` | `Draw 2.` | `spell_nature_nullifypoison` (136067) |
-| `crocolisk_gumbo` | Crocolisk Gumbo (Cuisine) | uncommon | 1 | Skill | `Draw 1.` / `Gain Regen 4` / `Exhaust.` | `Gain Regen 6` | `inv_misc_food_*` : non choisie, la recherche par nom ne dit pas laquelle est un bol (à regarder dans le jeu) |
+| Id | Nom (objet WoW) | Rareté | Coût | Type | Base | Améliorée | Icône | Où |
+|---|---|---|---|---|---|---|---|---|
+| `dream_dust` | Dream Dust (réactif d'enchantement) | uncommon | 1 | Skill, cible un ennemi | `Apply Asleep 2` / `Exhaust.` | coût 0 | `inv_enchant_dustdream` (132855) | marchand, rencontre `fallow_sanctuary` |
+| `dreamless_sleep_potion` | Dreamless Sleep Potion (Alchemy) | common | 0 | Skill | `Heal 10.` / `End your turn.` / `Exhaust.` | `Heal 14.` | `inv_potion_22` (134802), à vérifier dans le jeu | marchand, rencontre `stonard_outpost` |
 
-Ailleurs : l'Anti-Venom est un nettoyage à 0 mana (Sundered de VanCleef, DoT) ; le Gumbo est un soin étalé pour
-les classes sans soin.
+- **Dream Dust** porte Slumber dans toutes les zones : l'ennemi visé perd son intention et dort 2 tours ;
+  le premier coup à une cible a le bonus, et un ennemi sans ouverture reprend son motif au réveil. Boss
+  immunisés. Plus faible que Polymorph (2 mana, Stunned 2) parce que le moindre dégât le réveille, y compris
+  les cartes à tous du joueur.
+- **Dreamless Sleep Potion** : le soin le moins cher du jeu en mana, payé par la fin du tour (les cartes
+  restantes sont défaussées).
 
 ### Bibelots communs (3)
 
 | Id | Nom (objet WoW) | Rareté | Palier | Texte | Icône |
 |---|---|---|---|---|---|
-| `green_dragonscale` | Green Dragonscale | common | 1 | `The first Affliction gained in each combat is not added.` | `inv_misc_monsterscales_*` : couleur à vérifier dans le jeu (20 icônes, 134303 à 237405) |
-| `tender_crocolisk_meat` | Tender Crocolisk Meat | common | 1 | `After each elite combat won, heal 8 HP.` | idem, `inv_misc_food_*` à choisir |
-| `atalai_artifact` | Atal'ai Artifact | uncommon | 2 | `At the start of each combat, apply Sundered 1 to all enemies.` | `inv_misc_idol_03` (134232) |
+| `green_dragonscale` | Green Dragonscale (cuir des dragonkin verts) | common | 1 | `The first attack each enemy makes against you deals 3 less.` | `inv_misc_monsterscales_*` : couleur à vérifier dans le jeu (134303 à 237405) |
+| `tender_crocolisk_meat` | Tender Crocolisk Meat | common | 1 | `After each elite combat won, heal 8 HP.` | `inv_misc_food_*` : à choisir dans le jeu |
+| `atalai_artifact` | Atal'ai Artifact (quête de Fel'Zerul) | uncommon | 2 | `At the start of each combat, apply Sundered 1 to all enemies.` | `inv_misc_idol_03` (134232) |
 
-Green Dragonscale ne sert hors du marais qu'avec les marchés ci-dessous : c'est voulu, il donne au joueur une
-raison de les accepter.
+Green Dragonscale sert partout (le premier coup de chaque ennemi) et dans le marais sur chaque ouverture.
 
-### Type de rencontre : le marché (bargain)
+### Type de rencontre : Sleeping Camp
 
-Une rencontre dont le prix d'une réponse est une **Affliction** ajoutée au deck (`{"afflict", id}`), en échange
-d'une récompense au-dessus de la normale (bibelot, carte rare, or). Une fois débloqué, le type entre dans les
-autres zones (une rencontre de ce type par zone, à écrire dans chaque fiche) et l'action Treat apparaît au feu
-de camp dès qu'une Affliction est dans le deck. Exemples dans cette fiche : `pool_of_tears`, `temple_steps`,
-`cortello_riddle`.
+Une rencontre où un groupe ennemi dort sur le chemin. Trois réponses : prendre ce qu'il garde en silence
+(pari : bibelot ou or, sinon perte de PV), attaquer les dormeurs (combat `{ "fight", groupe, asleep = n }`,
+chaque ennemi non boss commence Asleep n), ou contourner. Une fois débloqué, le type entre dans les autres
+zones (une rencontre par zone, à écrire dans chaque fiche) avec un groupe de la zone : hors du marais, les
+ennemis n'ont pas d'ouverture et reprennent leur motif au réveil, mais Rude Awakening s'applique. Exemple
+dans cette fiche : `temple_steps`. Exemple pour Westfall : le Harvest Golem endormi de la rencontre du
+coffre (`Data/Events.lua`, « The golem is still asleep »).
 
 ## 9. Bibelots de clé (+1, +3, +5)
 
@@ -414,57 +503,66 @@ Communs aux classes, `rarity = "rare"`, `noPool` sauf déblocage ; plus forts qu
 
 | Clé | Id | Nom (objet WoW) | Texte | Icône | Note |
 |---|---|---|---|---|---|
-| +1 | `chained_essence_of_eranikus` | Chained Essence of Eranikus | `At the start of each combat, apply DoT 4 to all enemies.` | `spell_nature_corrosivebreath` (136016) | Récompense de quête du Temple of Atal'Hakkar. Tobin's Pocketknife fait DoT 3. |
-| +3 | `egg_of_hakkar` | Egg of Hakkar | `The first cast by an enemy in each combat is interrupted.` | `inv_misc_shadowegg` (134430) | Objet de quête du Temple. Utile partout (Conjurer, Seer, Wyrmkin, Gilmorian, Somnus). |
-| +5 | `fist_of_the_damned` | Fist of the Damned | `Attack cards heal 1 HP per hit.` | `inv_mace_*` : non choisie (`inv_mace_15` est déjà Ironfoe) | Masse du Temple, provenance à vérifier. Fort sur les coups multiples (Penance, Killing Spree, Rapid Fire). |
+| +1 | `chained_essence_of_eranikus` | Chained Essence of Eranikus (bijou, quête du Temple of Atal'Hakkar) | `The first time each enemy takes damage, it takes 4 more.` | `spell_nature_corrosivebreath` (136016) | Se cumule avec Rude Awakening (4 ajoutés avant le × 1,5). Ailleurs : +4 par ennemi et par combat. |
+| +3 | `egg_of_hakkar` | Egg of Hakkar (objet de quête du Temple) | `Start of each combat: the non-boss enemy with the most HP gains Asleep 1.` | `inv_misc_shadowegg` (134430) | Un tour de préparation ou un coup à + 50 % sur le plus gros ennemi, élites compris. Dans le marais, s'ajoute au sommeil d'un dormeur. |
+| +5 | `essence_of_eranikus` | Essence of Eranikus (objet de quête du Temple) | `Start of your turn: if an enemy is Asleep or Stunned, +1 mana.` | `inv_misc_gem_emerald_01` (134104), à vérifier | Récompense le contrôle partout (Frost Nova, Freezing Trap, Cheap Shot), et le sommeil ici. |
+
+Egg of Hakkar n'est plus « la première incantation échoue » : Shrunken Head (Stranglethorn) a déjà ce
+texte. Fist of the Damned (provenance non vérifiée) est retiré.
 
 ## 10. Modèles et icônes
 
-`wow_creature_search` n'a pas trouvé d'installation (« No World of Warcraft install found ») ; aucune
-synchronisation lancée. Identifiants relevés comme pour Westfall dans un cache de créatures du client, ici
-celui de `_classic_` (build 45613), par `tools/wdb_creatures.py`. Le cache de Forever ne contient aucune
-créature de la zone. Modèles : `wow_model_search` (liste des fichiers), utiles pour choisir un affichage.
+`wow_creature_search` ne trouve toujours aucune installation (« No World of Warcraft install found ») ;
+aucune synchronisation lancée. Identifiants de créature : base Questie de Classic Era (zone 8).
+Affichages : caches de créatures des clients `_classic_` (build 45613), `_classic_era_`, `_forever_`,
+`_anniversary_`, `_retail_`, lus par `tools/wdb_creatures.py` ; seuls ceux du tableau y figurent. Modèles :
+`wow_model_search` (première version de la fiche).
 
 | Unité | Créature | Affichage | Fichier modèle (FileDataID) | Icône de repli |
 |---|---|---|---|---|
-| Sawtooth Crocolisk | non trouvé | non trouvé | `creature/crocodile/crocodile.m2` (123324) | `ability_hunter_pet_crocolisk` (132187) |
-| Deathstrike Tarantula | non trouvé | non trouvé | `creature/tarantula/tarantula.m2` (126124) | `ability_hunter_pet_spider` (132196) |
-| Marsh Inkspewer | non trouvé | non trouvé | `creature/murloc/murloc.m2` (125024) | `inv_misc_head_murloc_01` (134169) |
-| Lost One Hunter | non trouvé | non trouvé | `creature/lostone/lostone.m2` (124809) | `inv_spear_04` (135127) |
-| Lost One Seer | non trouvé | non trouvé | `creature/lostone/lostone.m2` (124809) | `spell_shadow_curse` (136136) |
-| Swampwalker | non trouvé | non trouvé | `creature/bogbeast/bogbeast.m2` (123105) | `spell_nature_stranglevines` (136100) |
-| Nightmare Whelp | non trouvé | non trouvé | `creature/dragonwhelp/dragonwhelp.m2` (123610) | `inv_misc_head_dragon_green` (134157) |
-| Nightmare Wyrmkin | non trouvé | non trouvé | `creature/dragonspawn/dragonspawn.m2` (123543) | `spell_nature_sleep` (136090) |
+| Sawtooth Crocolisk | 1082 | non trouvé | `creature/crocodile/crocodile.m2` (123324) | `ability_hunter_pet_crocolisk` (132187) |
+| Dreaming Whelp | 741 | non trouvé | `creature/dragonwhelp/dragonwhelp.m2` (123610) | `inv_misc_head_dragon_green` (134157) |
+| Swampwalker | 764 | non trouvé | `creature/bogbeast/bogbeast.m2` (123105) | `spell_nature_stranglevines` (136100) |
+| Green Scalebane | 744 | non trouvé | `creature/dragonspawn/dragonspawn.m2` (123543) | `inv_misc_head_dragon_green` (134157) |
+| Wyrmkin Dreamwalker | 743 | non trouvé | `creature/dragonspawn/dragonspawn.m2` (123543) | `spell_nature_sleep` (136090) |
+| Marsh Oracle | 752 | non trouvé | `creature/murloc/murloc.m2` (125024) | `inv_misc_head_murloc_01` (134169) |
+| Deathstrike Tarantula | 769 | non trouvé | `creature/tarantula/tarantula.m2` (126124) | `ability_hunter_pet_spider` (132196) |
+| Marsh Inkspewer | 750 | non trouvé | `creature/murloc/murloc.m2` (125024) | `inv_misc_head_murloc_01` (134169) |
+| Lost One Hunter | 759 | non trouvé | `creature/lostone/lostone.m2` (124809) | `inv_spear_04` (135127) |
+| Lost One Chieftain | 763 | 10921 | — | `inv_spear_08` (135131) |
+| Lost One Muckdweller | 760 | non trouvé | `creature/lostone/lostone.m2` (124809) | `inv_misc_horn_01` (134227) |
 | Lord Captain Wyrmak | 14445 | 7976 | — | `inv_misc_head_dragon_green` (134157) |
 | Gilmorian | 14447 | 4920 | `creature/nagamale/nagamale.m2` (125078) si besoin | `inv_misc_nagamale` (1391617) |
-| Lost One Chieftain | 763 | 10921 | — | `inv_spear_08` (135131) |
-| Lost One Refugee | 19162 | 152, 11650 | — | `inv_spear_01` (135124) |
-| Somnus | non trouvé | non trouvé | `creature/dragon/dragon.m2` (123459) | `inv_misc_head_dragon_green` (134157) |
-| Dispatch Commander Ruag | non trouvé | non trouvé | — | — |
-| Fel'Zerul | non trouvé | non trouvé | — | — |
-| Galen Goodward | non trouvé | non trouvé | — | — |
-| Lost One Cook | 1106 | 152 (suspect : même affichage que le réfugié) | — | — |
+| Somnus | 12900 | non trouvé | `creature/dragon/dragon.m2` (123459) | `inv_misc_head_dragon_green_nightmare` (1354172) |
+| Dispatch Commander Ruag | 7623 | non trouvé | — | — |
+| Fel'Zerul | 1443 | non trouvé | — | — |
+| Galen Goodward | 5391 | non trouvé | — | — |
+| Magtoor | 1776 (amical aux deux factions) | non trouvé | `creature/lostone/lostone.m2` (124809) | — |
+| Lost One Cook | 1106 (rare dans le jeu, ici PNJ de rencontre) | 152 (suspect : affichage générique) | — | — |
 | Stonard fisherman | personnage plausible, pas de créature | — | — | — |
 
-Autres créatures de la zone vues dans ce cache, non retenues : Jade (1063, affichage 7975, dragonnet vert rare,
-candidat d'élite de rechange) et Fingat (14446, affichage 441). Icônes de cartes et bibelots : sections 2, 7, 8
-et 9 ; toutes confirmées par `wow_icon_search` sauf celles marquées « à choisir ».
+Icônes de l'état et des intentions : Asleep `spell_nature_sleep` (136090) ; Alarm `inv_misc_horn_01`
+(134227) ; Lull `spell_nature_sleep` (136090). Icônes des cartes et bibelots : § 8 et 9 ; toutes
+confirmées par `wow_icon_search` sauf celles marquées « à vérifier » ou « à choisir ». Autres créatures
+rares de la zone vues dans les caches, non retenues : Jade (1063, affichage 7975, dragonnet vert),
+Fingat (14446, affichage 441), Molt Thorn (14448, affichage 14497). Itharius (5353, dragon vert amical)
+pourrait parler dans une rencontre future.
 
 ## 11. Questions ouvertes
 
-1. **Plafond de 6 Afflictions portées.** Avec plafond, un joueur qui ne soigne rien arrive au 6e combat avec
-   6 cartes mortes, et les coups suivants ne lui coûtent plus rien de durable. Sans plafond, il peut arriver à
-   Somnus avec 10 Afflictions (Strength 5, Dream Eater à +16) et perdre l'expédition sur une seule négligence.
-2. **Treat au feu de camp.** Version proposée : Treat remplace le repos (10 % de PV et tout nettoyer, ou 30 %
-   de PV). Autre version : le repos retire aussi 2 Afflictions. La première fait du feu de l'étape 7 un vrai
-   choix avant Somnus ; la seconde rend la zone plus douce et la décision disparaît la plupart du temps.
-3. **Les orcs de Stonard.** Ici ils sont alliés (marchand, rencontres de Ruag et du pêcheur) et aucun
-   n'est un ennemi : un joueur Horde ne combat pas ses propres gardes, mais la faune annoncée perd les orcs.
-   En faire des ennemis demande une version Alliance et une version Horde des rencontres.
-4. **Sleep et le Mage.** Sleep coûte 2 mana ou 1 par tour, et Wing Buffet coupe les Cast. Le Mage (42 PV,
-   jeu de Cast) risque d'être la classe la plus gênée de la zone ; si la simulation le confirme, Sleep peut
-   coûter 1 au lieu de 2 pour toutes les classes, ce qui retire aussi de la pression au boss.
-5. **Les marchés dans les zones déjà gagnées.** Après une victoire dans le marais, une rencontre « marché »
-   peut apparaître à Westfall (un bibelot contre une Festering Wound). Le joueur qui refait Westfall aux clés
-   y gagne des bibelots plus tôt ; si on veut que Westfall reste la zone d'apprentissage, le type ne s'ouvre
-   qu'à partir de la zone 5.
+1. **Le bonus contre les gros coups.** Pyroblast (45), Aimed Shot avec Careful Aim (51) et Empyreal Blaze
+   (54) tuent un Swampwalker ou un Green Scalebane endormi d'un seul coup, sans subir l'ouverture. Garder
+   + 50 % sans plafond rend le Mage et le Hunter Marksmanship très à l'aise ici ; plafonner le bonus à
+   + 12 garde l'intérêt du réveil pour toutes les classes mais retire le « tuer dans son sommeil ».
+2. **Le familier et les dormeurs.** Version proposée : il ne réveille personne seul tant qu'un ennemi est
+   éveillé. Autre version : il suit la dernière cible, dormeur compris ; le Hunter qui pose Serpent Sting
+   sur un dormeur le réveillerait alors à la fin du même tour, sans l'avoir voulu.
+3. **Asleep 2 ou 3.** À 3, un joueur qui tue d'abord les éveillés finit souvent le combat avant la
+   première ouverture ; à 2, il la subit presque toujours. Le Swampwalker est à 3, les autres à 2 :
+   la simulation dira si 6 à 9 PV perdus tiennent.
+4. **Dream Dust hors du marais.** Sur une élite (Harvest Golem, Gruklash), elle donne deux tours sans coup
+   et un coup à + 50 % pour 1 mana. La garder « non boss » seulement, ou l'interdire aussi aux élites, ce
+   qui en fait une carte de combats normaux.
+5. **Les orcs de Stonard** restent alliés (marchand, Ruag, Rartar, le pêcheur) : un joueur Horde ne combat
+   pas ses propres gardes, mais la faune de la zone ne compte aucun orc. En faire des ennemis demande une
+   version Alliance et une version Horde des rencontres.
