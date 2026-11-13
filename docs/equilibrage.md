@@ -747,3 +747,13 @@ Compensation appliquée : Expiation −1 tour sur Radiance (2/3 → 1/2), Évang
   départ et les écarts pick=random ne mesurent pas la même chose.
 - Le bot n'utilise pas la Pierre de foyer ; la Bourse et la Marmite n'agissent que dans la
   couche expédition.
+
+## Épiques du Rogue dans les zones dures (14/11/2026)
+
+Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic runs=600`, épique imposée par
+`epic=<id>`) : Duskwood `zones=1`, Stranglethorn `zones=3`, Steppes `zones=5`. Sans épique : 60,0 / 61,2 / 74,3 %
+(Westfall `zones=7` : 78,7 %). Gain moyen sur les trois zones, avant → après : Deflection 17,1 → 11,1 ; Doomblade
+15,9 → 12,8 ; Atrophic Poison 18,5 → 11,4 ; Echoing Reprimand 18,9 → 8,0 ; Subterfuge 10,3 → 13,4 ; Kidney Shot
+15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
+ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
+`docs/zones/cartes-de-zone.md`, section « Rogue ».
