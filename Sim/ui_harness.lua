@@ -8206,16 +8206,18 @@ do
   check("accueil : sept boutons de zone (4 puis 3) dans le panneau, sans chevauchement, nom et état", #bad == 0, table.concat(bad, " ; "))
   H.settle()
   check("accueil : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
-  local laterZone = "blackrock" -- première zone pas encore jouable (infobulle et clic « Coming later »)
+  -- première zone pas encore jouable (« Coming later ») ; les sept jouables : la dernière, verrouillée
+  local laterZone, why = "blackrock", nil
   for i = #ns.Zone.ORDER, 2, -1 do
     if not ns.Zone.playable(ns.Zone.ORDER[i]) then laterZone = ns.Zone.ORDER[i] end
   end
+  why = ns.Zone.playable(laterZone) and option("zone:" .. laterZone).reason or "Coming later."
   local tt = H.hover(button("zone:" .. laterZone))
-  check("infobulle d'une zone à venir : nom et « Coming later. »", tt[1] == ns.Zone.name(laterZone)
-    and table.concat(tt, " | "):find("Coming later.", 1, true) ~= nil, table.concat(tt, " | "))
+  check("infobulle d'une zone à venir ou verrouillée : nom et raison", tt[1] == ns.Zone.name(laterZone)
+    and table.concat(tt, " | "):find(why, 1, true) ~= nil, table.concat(tt, " | "))
   H.click(button("zone:" .. laterZone))
-  check("clic sur une zone à venir : raison affichée, rien ne change", UI().err._shown
-    and (UI().err._text or "") == "Coming later." and UI().step.zone == "westfall", UI().err._text)
+  check("clic sur une zone à venir ou verrouillée : raison affichée, rien ne change", UI().err._shown
+    and (UI().err._text or "") == why and UI().step.zone == "westfall", UI().err._text)
   -- survol : surbrillance seulement (même rectangle), jamais sur une zone grisée
   local wb = button("zone:westfall")
   local r0 = fmt(R.vrect(wb))
@@ -8604,7 +8606,8 @@ do
   local function walk(where, v)
     if type(v) == "table" then for k, x in pairs(v) do walk(where .. "." .. tostring(k), x) end else words(where, v) end
   end
-  for id, ev in pairs(ns.Events) do walk(id, ev) end
+  -- rencontres de Westfall (et communes) : les autres zones ont leurs propres personnages et lieux
+  for id, ev in pairs(ns.Events) do if ev.zone == nil or ev.zone == "westfall" then walk(id, ev) end end
   for id, e in pairs(E) do words(id, e.name) end
   check("textes des rencontres et noms d'ennemis : aucun personnage ni lieu hors de la Marche", #found == 0,
     table.concat(found, "; "))
@@ -9436,11 +9439,13 @@ do
     for _, up in ipairs({ false, true }) do
       card:SetCard(id, up, { playable = true })
       local fit = card.bodyFit
-      if not fit or not fit.ok or (fit.size or 0) < 8.5 then small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) end
+      if not fit or not fit.ok or (fit.size or 0) < 8.5 or fit.mode ~= "clauses" then
+        small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) .. " " .. tostring(fit and fit.mode)
+      end
     end
   end
   card:Hide()
-  check("épiques et variantes du Hunter (32 faces) : texte à 8,5 ou plus", #small == 0, table.concat(small, ", "))
+  check("épiques et variantes du Hunter (32 faces) : texte en clauses, à 8,5 ou plus", #small == 0, table.concat(small, ", "))
 
   -- 6. planche des épiques et des variantes (base, améliorée) -------------------------------------------
   if SNAP then

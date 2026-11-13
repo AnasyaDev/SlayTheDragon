@@ -91,6 +91,12 @@ function Hunter.petAll(c)
   return Combat.modify(c, "petAll", false) and true or false
 end
 
+-- Avec petAll : les ennemis autres que la cible prennent N dégâts de moins du familier (crochet « petLess »,
+-- 0 par défaut = en plein ; Beast Cleave : 1), jamais moins de 0.
+function Hunter.petLess(c)
+  return math.max(0, Combat.modify(c, "petLess", 0) or 0)
+end
+
 function Hunter.petAttack(c, why, frenzy)
   if c.result then return 0 end
   if not Hunter.petPresent(c) then return 0 end
@@ -98,16 +104,19 @@ function Hunter.petAttack(c, why, frenzy)
   if not t then return 0 end
   local dmg = Hunter.petDamage(c, t, frenzy)
   if Hunter.petAll(c) then
-    -- tous les ennemis vivants, la cible du familier d'abord ; dmg rendu = celui de la cible
+    -- tous les ennemis vivants, la cible du familier d'abord ; dmg rendu = celui de la cible ; les autres
+    -- petLess de moins
     local list = { t }
     for i = 1, #c.enemies do
       local o = c.enemies[i]
       if o ~= t and not o.dead then list[#list + 1] = o end
     end
+    local less = Hunter.petLess(c)
     for i = 1, #list do
       local o = list[i]
       if not o.dead and not c.result then
         local d = Hunter.petDamage(c, o, frenzy)
+        if i > 1 then d = math.max(0, d - less) end
         Combat.log(c, { t = "pet_attack", dst = o.uid, dmg = d, why = why, all = true })
         stat(c, "petAttacks")
         stat(c, "petDamage", d)
