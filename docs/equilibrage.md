@@ -757,3 +757,13 @@ Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic 
 15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
 ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
 `docs/zones/cartes-de-zone.md`, section « Rogue ».
+
+## Passe de difficulté de Duskwood (14/11/2026)
+
+Cible de la zone 2 : 72 % de victoires en moyenne, écart ≤ 10 points (`runner=expedition key=0 zone=duskwood
+zones=1 level=7`, bot heuristique, épique gagnée sur les élites). Avant : 67,7 % (Priest 70,1, Warrior 70,5,
+Mage 65,9, Rogue 63,6, Hunter 68,4 ; 800 expéditions), 85 % des défaites au boss. Seul Morbent Fel change :
+Drain Life 14 / 16 → 12 / 14, Shadow Bolt 17 / 20 → 15 / 18 (Rogue et Mage n'interrompent presque rien),
+PV 92 → 96. Après (1500 expéditions) : **72,3 %**, écart 7,5 (Priest 76,8, Warrior 73,7, Mage 69,3, Rogue 71,4,
+Hunter 70,4) ; PV perdus par combat normal inchangés (6,6 à 10,5). Détail et essais écartés : `docs/zones/duskwood.md`,
+« Passe de difficulté ».
