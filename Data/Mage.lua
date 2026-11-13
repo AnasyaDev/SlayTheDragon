@@ -360,65 +360,68 @@ card("arcane_surge", {
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Mage ») -----------------------------
--- Règles en jeu dès le début du combat (c.epic) : ni piochées, ni jouées ; cost = 0, jamais payé ni affiché. Les crochets (deckHooks)
--- sont posés par Core/Classes/mage.lua ; les nombres sont ici (epicN, epicM, epicPeriod, epicEvery, lus par
--- les crochets, base et améliorée).
+-- Règles en jeu dès le début du combat (c.epic), actives à chaque tour : ni piochées, ni jouées ; cost = 0, jamais
+-- payé ni affiché. Les crochets (deckHooks) sont posés par Core/Classes/mage.lua ; les nombres sont ici (epicN,
+-- epicM, epicPct, epicBonus, epicCharge, epicEvery, lus par les crochets, base et améliorée). Réglage du 14/11/2026
+-- sur Duskwood, Stranglethorn et Burning Steppes (docs/classes.md, « Épiques du Mage »).
 local function epic(id, t)
   t.type, t.power, t.epic, t.rarity, t.effects, t.cost = "power", true, true, "epic", {}, 0
   card(id, t)
 end
 
--- Westfall : chaque Cast frappe une seconde fois (premier coup, base + epicN, au moins 0) un ennemi au hasard.
--- Fiche : 0 / + 4 ; à 0, + 14 points à Westfall ; à - 3, + 12,9 (réglage du 14/11/2026 : - 6 / - 2).
+-- Westfall : chaque Cast frappe une seconde fois un ennemi au hasard, pour epicPct % des dégâts de son premier coup
+-- (Charges comprises, arrondi bas). Fiche : 100 % ; réglé par la moitié (avant : « damage - 6 »).
 epic("mirror_image", {
-  name = "Mirror Image", zone = "westfall", path = "fire", school = "arcane", epicN = -6,
-  text = "Epic.\nCast cards: deal their damage - 6 again to a random enemy.",
-  up = { epicN = -2, text = "Epic.\nCast cards: deal their damage - 2 again to a random enemy." },
+  name = "Mirror Image", zone = "westfall", path = "fire", school = "arcane", epicPct = 50,
+  text = "Epic.\nCast cards: deal half their damage again to a random enemy.",
+  up = { epicPct = 100, text = "Epic.\nCast cards: deal their damage again to a random enemy." },
 })
 
--- Duskwood : chaque coup ennemi sur le Mage, même absorbé, pose DoT epicN à son auteur.
+-- Duskwood : chaque attaque ennemie sur le Mage, même absorbée, pose DoT epicN à son auteur (une fois par attaque :
+-- un DoT par coup, c'était trop pour les attaques à plusieurs coups ; DoT 1 par coup était trop peu).
 epic("molten_armor", {
-  name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 1,
-  text = "Epic.\nWhen hit: apply DoT 1 to the attacker",
-  up = { epicN = 3, text = "Epic.\nWhen hit: apply DoT 3 to the attacker" },
+  name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 2,
+  text = "Epic.\nWhen attacked: apply DoT 2 to the attacker",
+  up = { epicN = 4, text = "Epic.\nWhen attacked: apply DoT 4 to the attacker" },
 })
 
--- Wetlands : un tour sur epicPeriod (3 : les tours 3, 6, 9…), au début du tour, l'élémentaire inflige epicN à la
--- dernière cible, puis Demoralized epicM (chaque tour : 100 % de victoires, réglage du 13/11/2026).
+-- Wetlands : chaque tour, l'élémentaire inflige epicN à la dernière cible et lui pose Demoralized epicM pour le
+-- tour du Mage seulement (Frozen pour ses cartes ; tenu aussi pendant le tour ennemi, c'était +25 points).
 epic("water_elemental", {
-  name = "Water Elemental", zone = "wetlands", path = "frost", school = "frost", epicN = 5, epicM = 1, epicPeriod = 3,
-  text = "Epic.\nEvery 3rd turn: deal 5 to the last target and apply Demoralized 1.",
-  up = { epicN = 8, text = "Epic.\nEvery 3rd turn: deal 8 to the last target and apply Demoralized 1." },
+  name = "Water Elemental", zone = "wetlands", path = "frost", school = "frost", epicN = 2, epicM = 1,
+  text = "Epic.\nStart of turn: deal 2 to the last target and apply Demoralized 1 for this turn.",
+  up = { epicN = 4, text = "Epic.\nStart of turn: deal 4 to the last target and apply Demoralized 1 for this turn." },
 })
 
--- Stranglethorn : une carte Cast visant un ennemi Frozen part tout de suite (sans Instant) ; améliorée,
--- ses coups font epicN de plus.
+-- Stranglethorn : une carte Cast visant un ennemi Frozen part tout de suite (sans Instant) et emploie le gel
+-- (Stunned et Demoralized retirés après la résolution) ; améliorée, ses coups font epicN de plus.
 epic("fingers_of_frost", {
   name = "Fingers of Frost", zone = "stranglethorn", path = "frost", school = "frost", epicN = 0,
-  text = "Epic.\nCast cards aimed at a Frozen enemy resolve at once.",
-  up = { epicN = 4, text = "Epic.\nCast cards aimed at a Frozen enemy resolve at once and deal 4 more." },
+  text = "Epic.\nCast cards aimed at a Frozen enemy resolve at once and thaw it.",
+  up = { epicN = 4, text = "Epic.\nCast cards aimed at a Frozen enemy resolve at once, deal 4 more and thaw it." },
 })
 
--- Swamp of Sorrows : le mana non dépensé (epicN au plus) s'ajoute au tour suivant.
+-- Swamp of Sorrows : le mana non dépensé (epicN au plus) s'ajoute au tour suivant, + epicBonus s'il en reste (le
+-- report seul ne rapportait rien : la main de 5 cartes, pas le mana, borne le tour suivant).
 epic("arcane_meditation", {
-  name = "Arcane Meditation", zone = "swamp", path = "arcane", school = "arcane", epicN = 4,
-  text = "Epic.\nUnspent mana carries over to the next turn, up to 4.",
-  up = { epicN = 6, text = "Epic.\nUnspent mana carries over to the next turn, up to 6." },
+  name = "Arcane Meditation", zone = "swamp", path = "arcane", school = "arcane", epicN = 4, epicBonus = 1,
+  text = "Epic.\nUp to 4 unspent mana carries over to the next turn, +1.",
+  up = { epicN = 6, epicBonus = 2, text = "Epic.\nUp to 6 unspent mana carries over to the next turn, +2." },
 })
 
 -- Burning Steppes : un ennemi qui meurt avec du DoT le donne (+ epicN) à chaque autre ennemi.
 epic("conflagration", {
-  name = "Conflagration", zone = "steppes", path = "fire", school = "fire", epicN = 8,
-  text = "Epic.\nAn enemy dying with DoT gives that DoT + 8 to each other enemy.",
-  up = { epicN = 11, text = "Epic.\nAn enemy dying with DoT gives that DoT + 11 to each other enemy." },
+  name = "Conflagration", zone = "steppes", path = "fire", school = "fire", epicN = 16,
+  text = "Epic.\nAn enemy dying with DoT gives that DoT + 16 to each other enemy.",
+  up = { epicN = 20, text = "Epic.\nAn enemy dying with DoT gives that DoT + 20 to each other enemy." },
 })
 
--- Blackrock Mountain : un tour sur epicPeriod (3 : les tours 3, 6, 9…), la 3e carte jouée (améliorée : chaque 3e) se
--- résout deux fois si c'est une Attack.
+-- Blackrock Mountain : la 3e carte jouée de chaque tour (améliorée : chaque 3e), de tout type, se résout deux fois
+-- pour epicCharge Charges dépensées au jeu de la carte ; sans le coût, chaque tour : 99 % de victoires.
 epic("rule_of_threes", {
-  name = "Rule of Threes", zone = "blackrock", path = "arcane", school = "arcane", epicEvery = false, epicPeriod = 3,
-  text = "Epic.\nEvery 3rd turn: an Attack played 3rd resolves twice.",
-  up = { epicEvery = true, text = "Epic.\nEvery 3rd turn: Attacks played 3rd, 6th, 9th resolve twice." },
+  name = "Rule of Threes", zone = "blackrock", path = "arcane", school = "arcane", epicCharge = 1, epicEvery = false,
+  text = "Epic.\nThe 3rd card played each turn spends 1 Charge to resolve twice.",
+  up = { epicEvery = true, text = "Epic.\nEvery 3rd card played each turn spends 1 Charge to resolve twice." },
 })
 
 -- Bibelots du Mage (class = "mage" : tirés seulement pour lui) -------------------------------------
@@ -497,11 +500,13 @@ relic("mind_quickening_gem", {
 })
 
 -- Bots : notes des épiques et construction autour de chacune ----------------------------------------
--- Note : ≈ 5 + écart / 2 (points de victoire gagnés à Westfall avec l'épique, Sim/sim.lua epic=). Conseils
--- (rating, upgrade, remove) : remplacent ceux de la classe tant que l'épique est dans le deck.
+-- Note : ≈ 5 + écart / 2 (points de victoire gagnés avec l'épique, moyenne de Duskwood, Stranglethorn et Burning
+-- Steppes, Sim/sim.lua epic=). Conseils (rating, upgrade, remove) : remplacent ceux de la classe tant que l'épique
+-- est dans le deck ; ceux d'Arcane Meditation et de Conflagration sont modérés (plus forts, ils coûtaient 3 à 4
+-- points : contrôle « à blanc », docs/classes.md).
 local MAGE_EPIC_NOTE = {
-  mirror_image = 10, molten_armor = 9.5, water_elemental = 9.5, fingers_of_frost = 10.5,
-  arcane_meditation = 7.5, conflagration = 7.5, rule_of_threes = 9.5, -- mesures du 14/11/2026, clé 0, zones=7
+  mirror_image = 11.5, molten_armor = 11, water_elemental = 11.5, fingers_of_frost = 10.5,
+  arcane_meditation = 11, conflagration = 10, rule_of_threes = 12, -- mesures du 14/11/2026, clé 0, zones dures
 }
 local MAGE_EPIC_ADVICE = {
   -- chaque Cast frappe deux fois : les gros Cast, de quoi tenir l'incantation, les Cast immédiats
@@ -535,16 +540,16 @@ local MAGE_EPIC_ADVICE = {
   },
   -- économiser son mana : cartes à 0 pour les tours d'attente, puis deux gros sorts dans le même tour
   arcane_meditation = {
-    rating = { pyroblast = 11.5, glacial_spike = 11, flamestrike = 10.5, blizzard = 10, polymorph = 11, evocation = 10.5,
-      arcane_surge = 9, ice_barrier = 11, ice_lance = 11.5, scorch = 10.5, counterspell = 9.5, presence_of_mind = 14,
-      fire_blast = 5.5 },
+    rating = { pyroblast = 9, glacial_spike = 9, flamestrike = 8.5, blizzard = 8, polymorph = 10.5, evocation = 9,
+      arcane_surge = 7, ice_barrier = 10, ice_lance = 11, scorch = 10, counterspell = 8.5, presence_of_mind = 13.5,
+      fire_blast = 6 },
     upgrade = { arcane_meditation = 3.5, fireball = 3 },
     remove = { arcane_blast = 0.5, frostbolt = 1.4 },
   },
   -- le feu passe d'un mort à l'autre : poser le DoT partout, achever le porteur
   conflagration = {
-    rating = { living_bomb = 10.5, flamestrike = 9.5, ignite = 8, phoenix_flames = 8.5, scorch = 10, cone_of_cold = 10,
-      arcane_explosion = 6.5 },
+    rating = { living_bomb = 9.5, flamestrike = 8.5, ignite = 5.5, phoenix_flames = 8, scorch = 9.5, cone_of_cold = 9.5,
+      arcane_explosion = 5.5 },
     upgrade = { fireball = 3.5, conflagration = 3.5 },
     remove = { arcane_blast = 0.5, mana_shield = 1.3 },
   },

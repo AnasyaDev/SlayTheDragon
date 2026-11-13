@@ -9913,7 +9913,7 @@ do
   snap("uew-thunderous-roar", true)
 end
 
-print("UEM épiques du Mage : textes dans la zone (base et améliorée), icônes, vue de classe (mana gardé, 3e carte, élémentaire, Frozen), mana au-dessus du maximum, nom flottant, planche")
+print("UEM épiques du Mage : textes dans la zone (base et améliorée), icônes, vue de classe (mana gardé et bonus, 3e carte et sa Charge, élémentaire, Frozen), mana au-dessus du maximum, nom flottant, planche")
 do
   H.boot(nil)
   H.slash("")
@@ -9954,13 +9954,18 @@ do
   local host = v.classZone.views.mage
   check("combat : l'épique du deck est active (crochets du deck)", c and ns.Combat.mageEpic(c) == "arcane_meditation")
   v:Render(true)
-  local cap = ns.Cards.arcane_meditation.epicN
-  local want = ("Mana kept: %d/%d"):format(math.min(3, cap), cap)
-  check("Arcane Meditation : « " .. want .. " » dans la vue du Mage (mana restant / plafond)",
+  local cap, bonus = ns.Cards.arcane_meditation.epicN, ns.Cards.arcane_meditation.epicBonus
+  local want = ("Mana kept: %d/%d, +%d"):format(math.min(3, cap), cap, bonus)
+  check("Arcane Meditation : « " .. want .. " » dans la vue du Mage (mana restant / plafond, bonus du report)",
     host.epic._shown and host.epic._text == want, tostring(host.epic._text))
   c.player.mana = 1
   v:Render(true)
-  check("Arcane Meditation : le compte suit le mana restant", host.epic._text == "Mana kept: 1/" .. cap, host.epic._text)
+  local m1 = host.epic._text
+  c.player.mana = 0
+  v:Render(true)
+  local m0 = host.epic._text
+  check("Arcane Meditation : le compte suit le mana restant, sans bonus à 0",
+    m1 == ("Mana kept: 1/%d, +%d"):format(cap, bonus) and m0 == "Mana kept: 0/" .. cap, tostring(m1) .. " | " .. tostring(m0))
   c.player.mana = 6
   v:Render(true)
   check("mana au-dessus du maximum : « 6 » et « /3 » dans l'anneau", v.mana.text._text == "6" and v.mana.max._text == "/3",
@@ -9972,34 +9977,31 @@ do
     v:Render(true)
     return host.epic._shown and host.epic._text or nil
   end
-  local round = c.round
-  c.round = 3
+  local res = c.player.res
+  c.player.res = 1
   c.turn.played = 0
   local t0 = use("rule_of_threes")
   c.turn.played = 2
   local t2 = use("rule_of_threes")
+  c.player.res = 0
+  local t2n = use("rule_of_threes")
+  c.player.res = 1
   c.turn.played = 3
   local t3 = use("rule_of_threes")
   local t3u = use("rule_of_threes", true)
   c.turn.played = 5
   local t5u = use("rule_of_threes", true)
-  c.round = 4
-  local tOff = use("rule_of_threes")
-  check("Rule of Threes : « Cards played: 0/3 », « Next Attack: twice » avant la 3e, rien après (base), 0/3 puis twice (amélioré), « Threes: next turn » hors des tours 3, 6, 9",
-    t0 == "Cards played: 0/3" and t2 == "Next Attack: twice" and t3 == nil and t3u == "Cards played: 0/3"
-      and t5u == "Next Attack: twice" and tOff == "Threes: next turn",
-    table.concat({ tostring(t0), tostring(t2), tostring(t3), tostring(t3u), tostring(t5u), tostring(tOff) }, " | "))
+  c.player.res = res
+  check("Rule of Threes : « Cards played: 0/3 », « Next card: twice » avant la 3e (ou la Charge qui manque), rien après (base), 0/3 puis twice (amélioré)",
+    t0 == "Cards played: 0/3" and t2 == "Next card: twice" and t2n == "Next card: needs 1 Charge" and t3 == nil
+      and t3u == "Cards played: 0/3" and t5u == "Next card: twice",
+    table.concat({ tostring(t0), tostring(t2), tostring(t2n), tostring(t3), tostring(t3u), tostring(t5u) }, " | "))
   c.turn.played = 0
   local alive = ns.Combat.aliveEnemies(c)
   c.player.lastTarget = alive[#alive].uid
-  c.round = 2
   local tw = use("water_elemental")
-  c.round = 1
-  local twOff = use("water_elemental")
-  c.round = round
-  check("Water Elemental : la cible du prochain coup (dernière cible), ou « Elemental rests next turn »",
-    tw == "Elemental: " .. ns.Enemies[alive[#alive].id].name and twOff == "Elemental rests next turn",
-    tostring(tw) .. " | " .. tostring(twOff))
+  check("Water Elemental : la cible du prochain coup (dernière cible)",
+    tw == "Elemental: " .. ns.Enemies[alive[#alive].id].name, tostring(tw))
   for _, en in ipairs(c.enemies) do en.st.demoralized, en.st.stunned = nil, nil end
   local f0 = use("fingers_of_frost")
   ns.Combat.applyStatus(c, alive[1], "demoralized", 1)
@@ -10007,13 +10009,15 @@ do
   check("Fingers of Frost : « Frozen: Cast at once » quand un ennemi est Frozen, sinon « No Frozen enemy »",
     f0 == "No Frozen enemy" and f1 == "Frozen: Cast at once", tostring(f0) .. " | " .. tostring(f1))
   for _, en in ipairs(c.enemies) do en.st.pain = nil end
-  local m1, m2, k0 = use("mirror_image"), use("molten_armor"), use("conflagration")
+  local m1, m1u, m2, k0 = use("mirror_image"), use("mirror_image", true), use("molten_armor"), use("conflagration")
   alive[1].st.pain = 3
   local k1 = use("conflagration")
   alive[1].st.pain = nil
-  check("Mirror Image, Molten Armor (DoT N), Conflagration (ennemis porteurs de DoT) : leur ligne",
-    m1 == "Cast cards hit twice" and m2 == "When hit: DoT " .. ns.Cards.molten_armor.epicN and k0 == "No enemy with DoT"
-      and k1 == "DoT spreads on death: 1", table.concat({ tostring(m1), tostring(m2), tostring(k0), tostring(k1) }, " | "))
+  check("Mirror Image (moitié, puis tout), Molten Armor (DoT N), Conflagration (ennemis porteurs de DoT) : leur ligne",
+    m1 == "Cast cards: half again" and m1u == "Cast cards hit twice"
+      and m2 == "When attacked: DoT " .. ns.Cards.molten_armor.epicN and k0 == "No enemy with DoT"
+      and k1 == "DoT spreads on death: 1",
+    table.concat({ tostring(m1), tostring(m1u), tostring(m2), tostring(k0), tostring(k1) }, " | "))
   use("rule_of_threes")
   local eb = host.epicBox
   local ett = table.concat(H.hover(eb), " | ")

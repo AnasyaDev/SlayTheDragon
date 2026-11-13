@@ -51,8 +51,6 @@ local function setup(hand, opts)
   for _, x in ipairs(all) do byId[x.id] = byId[x.id] or {}; table.insert(byId[x.id], x) end
   for _, id in ipairs(hand) do c.hand[#c.hand + 1] = table.remove(byId[id]) end
   for _, list in pairs(byId) do for _, x in ipairs(list) do c.draw[#c.draw + 1] = x end end
-  -- Rule of Threes : on part d'un tour où elle agit (epicPeriod : le tour 3)
-  if opts.epic == "rule_of_threes" then c.round = ns.Cards.rule_of_threes.epicPeriod end
   return c
 end
 
@@ -118,23 +116,26 @@ end)
 ---------------------------------------------------------------------------
 -- Mirror Image (Westfall)
 ---------------------------------------------------------------------------
-local MN = N("mirror_image") -- dégâts de base du coup en plus : premier coup + MN (au moins 0)
-test("Mirror Image : Cast sous Instant, le premier coup frappe encore (base + N, Charges comprises)", function()
+-- coup en plus : epicPct % (50 : la moitié, amélioré 100) des dégâts du premier coup, Charges comprises, arrondi bas
+local function MI(full, up) return math.floor(full * Card.defById("mirror_image", up or false).epicPct / 100) end
+test("Mirror Image : Cast sous Instant, le premier coup frappe encore (moitié, Charges comprises)", function()
+  eq(Card.defById("mirror_image", false).epicPct, 50, "base : la moitié (texte « half »)")
+  eq(Card.defById("mirror_image", true).epicPct, 100, "amélioré : tout (texte sans « half »)")
   local c = setup({ "fireball" }, { epic = "mirror_image" })
   c.player.st.instant = 1
   play(c, "fireball", 1)
-  eq(hpLost(c, 1), 10 + (10 + MN), "10, puis 10 + N"); eq(c.enemies[1].st.pain, 2)
+  eq(hpLost(c, 1), 10 + MI(10), "10, puis la moitié"); eq(c.enemies[1].st.pain, 2)
   local c2 = setup({ "fireball" }, { epic = "mirror_image" })
-  c2.player.st.instant, c2.player.res = 1, 2
+  c2.player.st.instant, c2.player.res = 1, 3
   play(c2, "fireball", 1)
-  eq(hpLost(c2, 1), 12 + (12 + MN), "2 Charges sur les deux coups")
+  eq(hpLost(c2, 1), 13 + MI(13), "3 Charges : 13, puis la moitié de 13")
   local z = setup({ "scorch" }, { epic = "mirror_image" })
   ns.Cards.tm_tiny = { id = "tm_tiny", name = "Tiny", cost = 0, type = "attack", cast = true, target = "enemy",
     effects = { { "damage", 1 } }, text = "Cast.\nDeal 1." }
   z.hand[1] = Card.new("tm_tiny", false, 970)
   z.player.st.instant = 1
   play(z, "tm_tiny", 1)
-  eq(hpLost(z, 1), 1 + math.max(0, 1 + MN), "jamais négatif")
+  eq(hpLost(z, 1), 1 + MI(1), "arrondi bas")
   ns.Cards.tm_tiny = nil
 end)
 
@@ -143,19 +144,18 @@ test("Mirror Image : incantation tenue, le coup en plus part à sa résolution ;
   play(c, "pyroblast", 1)
   eq(hpLost(c, 1), 0, "incantation")
   Combat.endTurn(c)
-  eq(hpLost(c, 1), 30 + 30 + MN, "30, puis 30 + N")
+  eq(hpLost(c, 1), 30 + MI(30), "30, puis 15")
   local u = setup({ "fireball" }, { epic = "mirror_image", up = true })
   u.player.st.instant = 1
   play(u, "fireball", 1)
-  eq(hpLost(u, 1), 10 + 10 + N("mirror_image", true), "amélioré")
-  assert(N("mirror_image", true) > MN)
+  eq(hpLost(u, 1), 10 + MI(10, true), "amélioré : 10 encore")
 end)
 
 test("Mirror Image : « to all » ne rejoue qu'un coup ; Cast sans dégâts ou interrompu : rien", function()
   local c = setup({ "flamestrike" }, { epic = "mirror_image", encounter = { "tm_dummy", "tm_dummy" } })
   c.player.st.instant = 1
   play(c, "flamestrike")
-  eq(hpLost(c, 1) + hpLost(c, 2), 12 + 12 + 12 + MN, "12 + 12 + un coup de 12 + N")
+  eq(hpLost(c, 1) + hpLost(c, 2), 12 + 12 + MI(12), "12 + 12 + un coup de 6")
   local e = setup({ "evocation" }, { epic = "mirror_image" })
   e.player.st.instant = 1
   play(e, "evocation")
@@ -173,7 +173,7 @@ test("Mirror Image : coup de la même carte (Ignite) ; cible tirée au hasard pa
   c.player.st.instant = 1
   play(c, "fireball", 1)
   eq(c.enemies[1].st.pain, 3 + 2 + 3, "Ignite sur le coup de la carte et sur le coup en plus")
-  eq(hpLost(c, 1), 10 + 10 + MN)
+  eq(hpLost(c, 1), 10 + MI(10))
   local seen = {}
   for seed = 1, 30 do
     local m = setup({ "fireball" }, { epic = "mirror_image", seed = seed, encounter = { "tm_dummy", "tm_dummy", "tm_dummy" } })
@@ -181,7 +181,7 @@ test("Mirror Image : coup de la même carte (Ignite) ; cible tirée au hasard pa
     play(m, "fireball", 1)
     for j = 1, 3 do
       local extra = hpLost(m, j) - (j == 1 and 10 or 0)
-      if extra == 10 + MN then seen[j] = true end
+      if extra == MI(10) then seen[j] = true end
     end
   end
   assert(seen[1] and seen[2] and seen[3], "chaque ennemi peut être tiré, la cible comprise")
@@ -190,7 +190,7 @@ end)
 ---------------------------------------------------------------------------
 -- Molten Armor (Duskwood)
 ---------------------------------------------------------------------------
-test("Molten Armor : chaque coup ennemi, même absorbé, pose DoT N à son auteur ; un DoT par coup", function()
+test("Molten Armor : chaque attaque ennemie, même absorbée, pose DoT N à son auteur ; un DoT par attaque", function()
   local n, nu = N("molten_armor"), N("molten_armor", true)
   assert(n > 0 and nu > n)
   local c = setup({ "frostbolt" }, { epic = "molten_armor", encounter = { "tm_hitter" } })
@@ -198,9 +198,15 @@ test("Molten Armor : chaque coup ennemi, même absorbé, pose DoT N à son auteu
   Combat.endTurn(c)
   eq(c.player.hp, 60, "coup absorbé"); eq(c.enemies[1].st.pain, n, "brûle quand même")
   eq(c.enemies[1].stIcon.pain, "burn")
+  c.player.block = 30
+  Combat.endTurn(c)
+  eq(c.enemies[1].st.pain, n - 1 + n, "attaque suivante : un DoT de plus (après le tic)")
   local d = setup({ "frostbolt" }, { epic = "molten_armor", encounter = { "tm_double" } })
   Combat.endTurn(d)
-  eq(d.enemies[1].st.pain, 2 * n, "deux coups, deux DoT")
+  eq(d.enemies[1].st.pain, n, "deux coups, une attaque : un DoT")
+  local two = setup({ "frostbolt" }, { epic = "molten_armor", encounter = { "tm_hitter", "tm_double" } })
+  Combat.endTurn(two)
+  eq(two.enemies[1].st.pain, n); eq(two.enemies[2].st.pain, n, "chaque attaquant")
   local u = setup({ "frostbolt" }, { epic = "molten_armor", up = true, encounter = { "tm_hitter" } })
   Combat.endTurn(u)
   eq(u.enemies[1].st.pain, nu, "amélioré")
@@ -220,54 +226,46 @@ end)
 ---------------------------------------------------------------------------
 -- Water Elemental (Wetlands)
 ---------------------------------------------------------------------------
--- Fin du tour qui précède le prochain tour où l'épique agit (epicPeriod) : le tour suivant est actif.
-local function toActive(c)
-  local guard = 0
-  while not Combat.epicTurn(c.epic, c.round + 1) do
-    Combat.endTurn(c)
-    guard = guard + 1
-    assert(guard < 10)
-  end
-end
-
-test("Water Elemental : un tour sur epicPeriod (3, 6…), N à la dernière cible (sinon la plus à gauche), Demoralized 1", function()
-  local n, p = N("water_elemental"), ns.Cards.water_elemental.epicPeriod
-  assert(n > 0 and N("water_elemental", true) > n and p == 3)
-  assert(not Combat.epicTurn({ id = "water_elemental", up = false }, 1) and Combat.epicTurn({ id = "water_elemental", up = false }, 3))
+test("Water Elemental : chaque tour, N à la dernière cible (sinon la plus à gauche) et Demoralized 1 jusqu'à la fin du tour", function()
+  local n = N("water_elemental")
+  assert(n > 0 and N("water_elemental", true) > n)
+  eq(ns.Cards.water_elemental.epicPeriod, nil, "chaque tour")
   local c = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_dummy", "tm_dummy" } })
-  toActive(c)
-  eq(hpLost(c, 1) + hpLost(c, 2), 0, "rien avant le tour actif")
-  Combat.endTurn(c)
-  eq(hpLost(c, 1), n, "sans dernière cible : la plus à gauche"); eq(c.enemies[1].st.demoralized, 1)
-  toActive(c)
+  eq(hpLost(c, 1), n, "dès le premier tour ; sans dernière cible : la plus à gauche"); eq(hpLost(c, 2), 0)
+  eq(c.enemies[1].st.demoralized, 1, "Frozen pendant le tour")
+  assert(Combat.isFrozen(c.enemies[1]))
+  Combat.endPlayerTurn(c)
+  eq(c.enemies[1].st.demoralized, nil, "fin du tour : le gel de l'élémentaire s'en va")
+  Combat.enemyPhase(c); Combat.endRound(c); Combat.startPlayerTurn(c)
+  eq(hpLost(c, 1), 2 * n, "tour suivant : encore")
   c.hand[#c.hand + 1] = Card.new("frostbolt", false, 950)
   c.player.res, c.player.mana = 4, 3
   play(c, "frostbolt", 2)
   eq(hpLost(c, 2), 6 + 4)
   Combat.endTurn(c)
   eq(hpLost(c, 2), 6 + 4 + n, "dernière cible ; Charges sans effet sur l'élémentaire")
-  eq(c.enemies[2].st.demoralized, 1)
+  eq(c.enemies[2].st.demoralized, 1, "Frostbolt (1, retombé en fin de round), puis élémentaire (1)")
 end)
 
-test("Water Elemental : Demoralized tient le tour ennemi ; cible morte : le plus à gauche ; boss ; amélioré", function()
+test("Water Elemental : le tour ennemi garde le Demoralized des cartes, pas celui de l'élémentaire ; boss ; amélioré", function()
   local c = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_hitter" } })
-  toActive(c)
-  Combat.endTurn(c)
+  eq(c.enemies[1].st.demoralized, 1)
   local hp = c.player.hp
   Combat.endTurn(c)
-  eq(hp - c.player.hp, 7, "coup de 10 sous Demoralized")
+  eq(hp - c.player.hp, 10, "coup de 10 : le gel de l'élémentaire est parti")
+  c.hand[#c.hand + 1] = Card.new("frostbolt", false, 951)
+  play(c, "frostbolt", 1)
+  hp = c.player.hp
+  Combat.endTurn(c)
+  eq(hp - c.player.hp, 7, "Frostbolt : Demoralized tient le tour ennemi")
   local d = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_dummy", "tm_dummy", "tm_dummy" } })
   d.player.lastTarget = d.enemies[2].uid
   d.enemies[2].dead = true
   d.enemies[1].dead = true
   eq(Combat.elementalTarget(d), d.enemies[3])
   local b = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_boss" } })
-  toActive(b)
-  Combat.endTurn(b)
   eq(b.enemies[1].st.demoralized, 1, "Demoralized prend sur un boss"); eq(hpLost(b, 1), N("water_elemental"))
   local u = setup({ "frostbolt" }, { epic = "water_elemental", up = true })
-  toActive(u)
-  Combat.endTurn(u)
   eq(hpLost(u, 1), N("water_elemental", true), "amélioré")
 end)
 
@@ -291,6 +289,7 @@ test("Fingers of Frost : Cast sur un ennemi Frozen résolu tout de suite, sans I
   play(c, "fireball", 1)
   eq(hpLost(c, 1), 6 + 10, "Fireball partie"); eq(c.player.cast, nil, "aucune incantation tenue")
   eq(c.player.st.instant, 1, "Instant gardé")
+  eq(c.enemies[1].st.demoralized, nil, "le gel employé s'en va"); assert(not Combat.isFrozen(c.enemies[1]))
   play(c, "fireball", 2)
   eq(c.player.st.instant, nil, "cible non Frozen : l'Instant sert")
   eq(hpLost(c, 2), 10)
@@ -328,11 +327,11 @@ test("Fingers of Frost : Cast sans cible reste un Cast ; Stunned compte ; boss D
   local s = setup({ "fireball" }, { epic = "fingers_of_frost" })
   Combat.applyStatus(s, s.enemies[1], "stunned", 1)
   play(s, "fireball", 1)
-  eq(hpLost(s, 1), 10, "Stunned = Frozen")
+  eq(hpLost(s, 1), 10, "Stunned = Frozen"); eq(s.enemies[1].st.stunned, nil, "Stunned employé")
   local b = setup({ "glacial_spike" }, { epic = "fingers_of_frost", encounter = { "tm_boss" } })
   Combat.applyStatus(b, b.enemies[1], "demoralized", 1)
   play(b, "glacial_spike", 1)
-  eq(hpLost(b, 1), 26, "boss Demoralized")
+  eq(hpLost(b, 1), 26, "boss Demoralized"); eq(b.enemies[1].st.demoralized, 2, "le gel employé part, celui de la carte reste")
   local u = setup({ "fireball", "frostbolt" }, { epic = "fingers_of_frost", up = true })
   Combat.applyStatus(u, u.enemies[1], "demoralized", 1)
   play(u, "fireball", 1)
@@ -344,37 +343,43 @@ end)
 ---------------------------------------------------------------------------
 -- Arcane Meditation (Swamp of Sorrows)
 ---------------------------------------------------------------------------
-test("Arcane Meditation : le mana non dépensé s'ajoute au tour suivant, N au plus", function()
+local function AB(up) return Card.defById("arcane_meditation", up or false).epicBonus or 0 end
+test("Arcane Meditation : le mana non dépensé (N au plus) s'ajoute au tour suivant, + B s'il en reste", function()
   local k, ku = N("arcane_meditation"), N("arcane_meditation", true)
-  assert(k >= 3 and ku > k)
+  local b, bu = AB(), AB(true)
+  assert(k >= 3 and ku > k and b > 0 and bu > b)
+  for _, up in ipairs({ false, true }) do
+    local t = Card.defById("arcane_meditation", up).text
+    assert(t:find(tostring(up and ku or k), 1, true) and t:find("+" .. (up and bu or b), 1, true), "nombres dans le texte")
+  end
   local c = setup({ "frostbolt" }, { epic = "arcane_meditation" })
   Combat.endTurn(c)
-  eq(c.player.mana, 6, "3 gardés")
+  eq(c.player.mana, 3 + 3 + b, "3 gardés, + B")
   c.player.mana = 1
   Combat.endTurn(c)
-  eq(c.player.mana, 4, "1 gardé")
+  eq(c.player.mana, 3 + 1 + b, "1 gardé, + B")
   c.player.mana = k + 3
   Combat.endTurn(c)
-  eq(c.player.mana, 3 + k, "plafond, aucun cumul sur deux tours")
+  eq(c.player.mana, 3 + k + b, "plafond, aucun cumul sur deux tours")
   c.player.mana = 0
   Combat.endTurn(c)
-  eq(c.player.mana, 3, "rien gardé")
+  eq(c.player.mana, 3, "rien gardé : pas de bonus")
   local u = setup({ "frostbolt" }, { epic = "arcane_meditation", up = true })
   u.player.mana = ku + 2
   Combat.endTurn(u)
-  eq(u.player.mana, 3 + ku, "amélioré")
+  eq(u.player.mana, 3 + ku + bu, "amélioré")
 end)
 
 test("Arcane Meditation : Evocation s'ajoute ; état sauvegardable entre deux tours", function()
   local c = setup({ "evocation" }, { epic = "arcane_meditation" })
   play(c, "evocation")
   Combat.endPlayerTurn(c)
-  eq(c.cls.carry, 3)
+  eq(c.cls.carry, 3 + AB())
   assert(Save.isPlain(c))
   Combat.enemyPhase(c)
   Combat.endRound(c)
   Combat.startPlayerTurn(c)
-  eq(c.player.mana, 3 + 3 + 3, "maximum + Evocation + report"); eq(c.cls.carry, nil)
+  eq(c.player.mana, 3 + 3 + 3 + AB(), "maximum + Evocation + report"); eq(c.cls.carry, nil)
 end)
 
 ---------------------------------------------------------------------------
@@ -422,18 +427,24 @@ end)
 ---------------------------------------------------------------------------
 -- Rule of Threes (Blackrock Mountain)
 ---------------------------------------------------------------------------
-test("Rule of Threes : la 3e carte du tour se résout deux fois, sans coût ; pas la 6e ; compte remis à 0", function()
+local K3 = ns.Cards.rule_of_threes.epicCharge -- Charges dépensées par la copie
+test("Rule of Threes : la 3e carte de chaque tour se résout deux fois pour K Charges, sans coût en mana ; pas la 6e", function()
+  assert(K3 and K3 > 0)
+  eq(ns.Cards.rule_of_threes.epicPeriod, nil, "chaque tour")
   local c = setup({ "ice_lance", "ice_lance", "ice_lance", "scorch", "scorch", "scorch" }, { epic = "rule_of_threes" })
+  c.player.res = K3 + 1
   play(c, "ice_lance", 1); play(c, "ice_lance", 1)
-  eq(hpLost(c, 1), 6)
+  eq(hpLost(c, 1), 2 * (3 + K3 + 1))
   play(c, "ice_lance", 1)
-  eq(hpLost(c, 1), 12, "3e : deux fois"); eq(c.player.mana, 3, "sans coût")
+  eq(c.player.res, 1, "K Charges dépensées au jeu")
+  eq(hpLost(c, 1), 2 * (3 + K3 + 1) + 2 * (3 + 1), "3e : deux fois (avec la Charge restante)"); eq(c.player.mana, 3, "sans coût")
   play(c, "scorch", 1); play(c, "scorch", 1); play(c, "scorch", 1)
-  eq(hpLost(c, 1), 21, "6e : une fois (base)")
+  eq(hpLost(c, 1), 2 * (3 + K3 + 1) + 2 * 4 + 3 * 4, "6e : une fois (base)")
   local u = setup({ "ice_lance", "ice_lance", "ice_lance", "scorch", "scorch", "scorch" }, { epic = "rule_of_threes", up = true })
+  u.player.res = 2 * K3
   for _ = 1, 3 do play(u, "ice_lance", 1) end
   for _ = 1, 3 do play(u, "scorch", 1) end
-  eq(hpLost(u, 1), 12 + 12, "amélioré : la 6e aussi")
+  eq(u.player.res, 0, "amélioré : la 3e et la 6e")
   local r = setup({ "ice_lance", "ice_lance" }, { epic = "rule_of_threes", filler = { "ice_lance", "ice_lance", "ice_lance",
     "ice_lance", "ice_lance", "ice_lance" } })
   local function three(c)
@@ -444,47 +455,47 @@ test("Rule of Threes : la 3e carte du tour se résout deux fois, sans coût ; pa
   end
   play(r, "ice_lance", 1); play(r, "ice_lance", 1)
   Combat.endTurn(r)
-  eq(three(r), 9, "tour suivant : compte remis à 0, et pas de copie (un tour sur trois)")
-  toActive(r)
+  eq(three(r), 9, "sans Charge : une fois")
   Combat.endTurn(r)
-  eq(r.round % 3, 0)
-  eq(three(r), 12, "tour actif suivant : la 3e deux fois")
+  r.player.res = K3
+  eq(three(r), 2 * (3 + K3) + 3 + 3, "tour suivant : compte remis à 0, la 3e deux fois (Charges dépensées avant elle)")
 end)
 
 test("Rule of Threes : Cast en 3e, deux résolutions à son départ", function()
   local c = setup({ "ice_lance", "ice_lance", "fireball" }, { epic = "rule_of_threes" })
+  c.player.res = K3
   play(c, "ice_lance", 1); play(c, "ice_lance", 1); play(c, "fireball", 1)
-  eq(hpLost(c, 1), 6, "incantée")
+  eq(c.player.res, 0)
   Combat.endTurn(c)
-  eq(hpLost(c, 1), 6 + 20, "deux résolutions"); eq(c.enemies[1].st.pain, 2 + 2, "deux DoT")
+  eq(hpLost(c, 1), 2 * (3 + K3) + 20, "deux résolutions"); eq(c.enemies[1].st.pain, 2 + 2, "deux DoT")
 end)
 
-test("Rule of Threes : Arcane Barrage en 3e compte le même Surge ; Polymorph : Stunned 4, une Exhaust", function()
+test("Rule of Threes : Arcane Barrage en 3e compte le même Surge (après les K Charges) ; Polymorph : Stunned 4, une Exhaust", function()
   local c = setup({ "ice_lance", "ice_lance", "arcane_barrage" }, { epic = "rule_of_threes", encounter = { "tm_dummy", "tm_dummy" } })
-  c.player.res = 2
+  c.player.res = K3 + 2
   play(c, "ice_lance", 1); play(c, "ice_lance", 1)
   local a, b = hpLost(c, 1), hpLost(c, 2)
   play(c, "arcane_barrage")
   eq(hpLost(c, 1) - a, 24, "2 × 12 sur la cible"); eq(hpLost(c, 2) - b, 24, "à tous"); eq(c.player.res, 0)
-end)
-
-test("Rule of Threes : une Skill en 3e ne se résout qu'une fois (repli de la fiche), mais compte", function()
   local p = setup({ "ice_lance", "ice_lance", "polymorph", "scorch" }, { epic = "rule_of_threes", encounter = { "tm_dummy", "tm_dummy" } })
-  p.player.mana = 5
+  p.player.mana, p.player.res = 5, K3
   play(p, "ice_lance", 1); play(p, "ice_lance", 1); play(p, "polymorph", 2)
-  eq(p.enemies[2].st.stunned, 2, "une fois"); eq(p.player.res, 1)
+  eq(p.enemies[2].st.stunned, 4, "Skill en 3e : deux fois"); eq(p.player.res, 2, "+1 Charge deux fois")
   local n = 0
   for _, x in ipairs(p.exhaust) do if x.id == "polymorph" then n = n + 1 end end
   eq(n, 1, "consumée une fois")
+end)
+
+test("Rule of Threes : sans assez de Charges, la 3e ne se résout qu'une fois mais compte ; PV jamais payés", function()
+  local p = setup({ "ice_lance", "ice_lance", "polymorph", "scorch" }, { epic = "rule_of_threes", encounter = { "tm_dummy", "tm_dummy" } })
+  p.player.mana, p.player.res = 5, K3 - 1
+  local hp = p.player.hp
+  play(p, "ice_lance", 1); play(p, "ice_lance", 1); play(p, "polymorph", 2)
+  eq(p.enemies[2].st.stunned, 2, "une fois"); eq(p.player.res, K3, "Charges gardées, +1")
+  eq(p.player.hp, hp, "aucun PV payé")
   local before = hpLost(p, 1)
   play(p, "scorch", 1)
-  eq(hpLost(p, 1) - before, 3 + 1, "4e carte : une fois (1 Charge)")
-  local u = setup({ "frost_nova", "ice_lance", "ice_lance", "ice_lance", "ice_lance", "ice_lance" },
-    { epic = "rule_of_threes", up = true })
-  play(u, "frost_nova"); play(u, "ice_lance", 1)
-  local b2 = hpLost(u, 1)
-  play(u, "ice_lance", 1)
-  eq(hpLost(u, 1) - b2, 2 * (3 + 6), "3e (Attack, cible Frozen) : deux fois")
+  eq(hpLost(p, 1) - before, 3 + K3, "4e carte : une fois")
 end)
 
 ---------------------------------------------------------------------------
