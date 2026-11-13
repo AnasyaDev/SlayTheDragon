@@ -262,3 +262,10 @@ le pack d'icônes de `~/Téléchargements` peut ne pas les avoir (repli : `inv_m
    point de moteur gêne, l'échanger contre `Whenever you interrupt a cast, draw 1 card.`, plus lié à la leçon
    de la zone, mais qui demande lui aussi un crochet nouveau (`onInterrupt` n'existe pas : seuls `onCastStart`,
    `onCastResolved`, `onTurnStart`, `onEnemyDeath`… sont tirés par `Core/Combat.lua`).
+
+## Décisions du joueur (13/11/2026)
+1. **Fonds de scène** : décor peint couleur blé pour la route, la colline, le camp et le marchand ; l'illustration d'Elwynn est retirée.
+2. **Defias Bandit → Defias Highwayman** : nouveau nom et nouveau modèle, mêmes chiffres.
+3. **Personnages des rencontres** : remplacés par des gens de Westfall, noms et modèles (les textes concernés sont réécrits).
+4. **Cartes de zone : rareté « épique », cartes pivot.** Elles ne sont pas ramenées au niveau des rares : chacune doit pouvoir servir de pivot à un deck (on construit autour d'elle). Vaut pour les sept zones.
+5. Captain Sander's Treasure Map : non tranché.
