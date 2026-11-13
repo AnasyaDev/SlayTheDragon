@@ -21,7 +21,26 @@ ns.Expedition = X
 -- 3 : classe générique (ressource de combat c.player.res au lieu de demence, état de classe c.cls).
 -- 4 : déblocages par niveau de classe (unlock.level au lieu de unlock.rep).
 -- 5 : campagne par zones (exp.zone ; unlock.common et unlock.won au lieu de unlock.league).
-X.VERSION = 5
+-- 6 : cartes épiques (exp.epicOffered, exp.rng.epic créé au besoin, reward.epics / epicDone, épique du
+--     marchand : shop.cards[i].epic).
+X.VERSION = 6
+
+-- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck ; en
+-- prendre une autre remplace la précédente. Offre garantie et vente, réglables ici :
+--   offerOn   genres de combat dont la PREMIÈRE victoire de l'expédition propose un choix « Epic » en plus de
+--             la récompense normale (combats de rencontre compris) ; une seule offre par expédition
+--   choices   épiques proposées au plus dans ce choix (distinctes, débloquées, hors celle du deck)
+--   shop      chance qu'un marchand vende une épique (emplacement en plus des cartes), à partir de l'étape
+--             shopFloor (la moitié du parcours : étapes 1 à 7, boss en 8) ; 0 = jamais
+--   price     prix de base d'une épique chez le marchand (± X.PRICE_JITTER, crochet « price » genre "card")
+-- Sans épique débloquée, aucun tirage n'est fait (l'expédition se déroule exactement comme avant).
+X.EPIC = {
+  offerOn = { elite = true },
+  choices = 3,
+  shop = 0.5,
+  shopFloor = 4,
+  price = 150,
+}
 
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
@@ -147,11 +166,12 @@ function X.unlocked(exp, def)
 end
 
 -- Cartes de la classe jouée (neutral : cartes neutres comprises, réservées au marchand et aux
--- rencontres par le GDD).
+-- rencontres par le GDD). Jamais les épiques (X.epicPool) ni les variantes.
 function X.cardPool(exp, neutral)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and not d.noReward and X.unlocked(exp, d) then
+    if Card.inClass(d, exp.class, neutral) and d.rarity ~= "basic" and d.rarity ~= "epic" and not d.noReward
+        and not d.variant and X.unlocked(exp, d) then
       list[#list + 1] = id
     end
   end
@@ -164,12 +184,68 @@ end
 function X.neutralPool(exp)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if d.class == nil and d.neutral and d.rarity ~= "basic" and (d.tier or 0) <= commonTier(exp) then
+    if d.class == nil and d.neutral and d.rarity ~= "basic" and d.rarity ~= "epic" and not d.variant
+        and (d.tier or 0) <= commonTier(exp) then
       list[#list + 1] = id
     end
   end
   table.sort(list)
   return list
+end
+
+---------------------------------------------------------------------------
+-- Cartes épiques
+---------------------------------------------------------------------------
+
+-- Index de la carte épique du deck (la première ; il n'y en a jamais plus d'une), ou nil.
+function X.epicIndex(exp)
+  local deck = exp.deck
+  for i = 1, #deck do
+    local d = ns.Cards[deck[i].id]
+    if d and d.rarity == "epic" then return i end
+  end
+  return nil
+end
+
+-- Épiques proposables : de la classe jouée, débloquées (carte de zone : la classe a gagné la zone), hors
+-- variantes et hors celle déjà dans le deck. Triées.
+function X.epicPool(exp)
+  local i = X.epicIndex(exp)
+  local current = i and exp.deck[i].id
+  local list = {}
+  for id, d in pairs(ns.Cards) do
+    if d.rarity == "epic" and d.class == exp.class and not d.variant and id ~= current and X.unlocked(exp, d) then
+      list[#list + 1] = id
+    end
+  end
+  table.sort(list)
+  return list
+end
+
+-- Flux de hasard des épiques (créé au besoin : une expédition d'avant les épiques n'en a pas).
+local function epicRng(exp)
+  local r = exp.rng.epic
+  if not r then
+    r = Rng.stream(exp.seed or 1, "epic")
+    exp.rng.epic = r
+  end
+  return r
+end
+
+-- n épiques distinctes tirées dans pool (toutes si elles sont n ou moins), dans l'ordre du tirage.
+local function drawEpics(rng, pool, n)
+  local list = {}
+  for i = 1, #pool do list[i] = pool[i] end
+  if #list > n then
+    Rng.shuffle(rng, list)
+    for i = #list, n + 1, -1 do list[i] = nil end
+  end
+  return list
+end
+
+-- Deck tel qu'il se joue (transformations de l'épique appliquées, Card.applyTransforms) : affichage.
+function X.shownDeck(exp)
+  return Card.applyTransforms(exp.deck)
 end
 
 -- Une carte neutre est-elle débloquée pour cette expédition ? (condition de rencontre « unlocked »)
@@ -319,7 +395,19 @@ function X.addPotionSlot(exp)
   exp.potions[#exp.potions + 1] = false
 end
 
+-- Ajoute une carte au deck. Une épique remplace celle du deck (une seule par expédition) : l'ancienne part,
+-- améliorée ou non (stats.epicReplaced, exp.epicReplaced = { old, new } pour l'affichage).
 function X.addCard(exp, id, up)
+  local d = ns.Cards[id]
+  if d and d.rarity == "epic" then
+    local i = X.epicIndex(exp)
+    while i do
+      local old = table.remove(exp.deck, i)
+      exp.stats.epicReplaced = (exp.stats.epicReplaced or 0) + 1
+      exp.epicReplaced = { old = old.id, oldUp = old.up, new = id }
+      i = X.epicIndex(exp)
+    end
+  end
   exp.deck[#exp.deck + 1] = { id = id, up = up and true or false }
   exp.stats.cardsAdded = exp.stats.cardsAdded + 1
 end
@@ -423,6 +511,17 @@ local function openReward(exp, r)
   exp.phase = "reward"
 end
 
+-- Offre garantie : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone), une fois par expédition,
+-- s'il reste une épique à proposer (tirée par le flux « epic »). Renvoie vrai si l'offre est faite.
+function X.offerEpic(exp, r)
+  local pool = X.epicPool(exp)
+  if #pool == 0 then return false end
+  r.epics = drawEpics(epicRng(exp), pool, X.EPIC.choices)
+  r.epicDone = false
+  exp.epicOffered = true
+  return true
+end
+
 local function endFight(exp)
   local c, f = exp.combat, exp.fight
   local p = c.player
@@ -435,6 +534,7 @@ local function endFight(exp)
     if f.kind == "elite" then exp.stats.elites = exp.stats.elites + 1 end
     if f.kind == "boss" then exp.stats.bosses = exp.stats.bosses + 1 end
     X.fire(exp, "onCombatWon", f.kind)
+    if X.EPIC.offerOn[f.kind] and not exp.epicOffered then X.offerEpic(exp, f.reward) end
     openReward(exp, f.reward)
   else
     exp.killedBy = table.concat(f.encounter, "+")
@@ -502,6 +602,21 @@ local function openShop(exp)
   for i = 1, #potions do
     local base = X.PRICES.potion[potionRarity(potions[i])] or X.PRICES.potion.common
     shop.potions[i] = { id = potions[i], price = price(base, "potion"), sold = false }
+  end
+  -- épique (X.EPIC) : à partir de la moitié du parcours, une chance, à la suite des cartes (epic = true) ;
+  -- flux « epic » : les autres tirages du marchand ne changent pas
+  local node = X.currentNode(exp)
+  if X.EPIC.shop > 0 and node and node.floor >= X.EPIC.shopFloor then
+    local pool = X.epicPool(exp)
+    if #pool > 0 then
+      local erng = epicRng(exp)
+      if Rng.float(erng) < X.EPIC.shop then
+        local id = Rng.pick(erng, pool)
+        local p = X.EPIC.price * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(erng))
+        p = max(1, floor(X.modify(exp, "price", p, "card") + 0.5))
+        shop.cards[#shop.cards + 1] = { id = id, price = p, sold = false, epic = true }
+      end
+    end
   end
   exp.shop = shop
   exp.phase = "merchant"
@@ -718,6 +833,7 @@ X.EVENT_REASONS = {
   upgrade = "No card to upgrade.",
   potion = "Requires a potion.",
   relic = "Relic already owned.",
+  epic = "Only one epic card per expedition.",
 }
 
 -- Le choix ci de la rencontre est-il possible ? (true | false, raison)
@@ -888,7 +1004,8 @@ end
 --        unlocks = { level = 1..7 (niveau de classe), common = 0..7 (palier commun du compte),
 --                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
---        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements)
+--        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements),
+--        epic = id d'une carte épique ajoutée au deck de départ (simulation)
 function X.new(opts)
   opts = opts or {}
   local seed = floor(opts.seed or 1)
@@ -925,6 +1042,14 @@ function X.new(opts)
   }
   for i = 1, X.POTION_SLOTS do exp.potions[i] = false end
   for i = 1, #cdef.deck do exp.deck[i] = { id = cdef.deck[i], up = false } end
+  exp.epicOffered = false
+  -- épique imposée au départ (simulation : epic=<id>), comme une épique prise
+  if opts.epic then
+    local d = ns.Cards[opts.epic]
+    if not (d and d.rarity == "epic") then error("not an epic card: " .. tostring(opts.epic)) end
+    X.addCard(exp, opts.epic)
+    exp.stats.cardsAdded = exp.stats.cardsAdded - 1
+  end
   -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
   if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end
   startAct(exp, 1)
@@ -1007,6 +1132,22 @@ H.reward = {
   skipCards = function(exp)
     if exp.reward.cardsDone then return false, "badCard" end
     exp.reward.cardsDone = true
+    return true
+  end,
+  -- choix « Epic » (X.offerEpic) : une épique parmi r.epics (remplace celle du deck), ou aucune
+  pickEpic = function(exp, a)
+    local r = exp.reward
+    local id = r.epics and not r.epicDone and r.epics[a[2] or 0]
+    if not id then return false, "badCard" end
+    X.addCard(exp, id)
+    r.epicDone = true
+    r.epicPicked = id
+    return true
+  end,
+  skipEpic = function(exp)
+    local r = exp.reward
+    if not r.epics or r.epicDone then return false, "badCard" end
+    r.epicDone = true
     return true
   end,
   takePotion = function(exp)
@@ -1124,6 +1265,8 @@ H.select = {
     elseif kind == "dupe" then
       local card = exp.deck[i]
       if not card then return false, "badCard" end
+      -- une épique ne se copie pas (une seule par expédition)
+      if Card.isEpic(ns.Cards[card.id]) then return false, "epic" end
       X.addCard(exp, card.id, card.up)
     end
     endSelect(exp)
@@ -1203,6 +1346,10 @@ function X.choices(exp)
       for i = 1, #r.cards do add({ "pickCard", i }) end
       add({ "skipCards" })
     end
+    if r.epics and not r.epicDone then
+      for i = 1, #r.epics do add({ "pickEpic", i }) end
+      add({ "skipEpic" })
+    end
     if r.potion and not r.potionTaken and X.freeSlot(exp) then add({ "takePotion" }) end
     add({ "leave" })
   elseif ph == "campfire" then
@@ -1237,8 +1384,10 @@ function X.choices(exp)
       add({ "leave" })
     end
   elseif ph == "select" then
+    local kind = exp.select.kind
     for i = 1, #exp.deck do
-      if exp.select.kind ~= "upgrade" or X.canUpgrade(exp, i) then add({ "select", i }) end
+      if (kind ~= "upgrade" or X.canUpgrade(exp, i))
+          and not (kind == "dupe" and Card.isEpic(ns.Cards[exp.deck[i].id])) then add({ "select", i }) end
     end
     add({ "skipSelect" })
   end

@@ -1278,10 +1278,10 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 5); eq(Save.VERSION, 5); eq(X.VERSION, 5)
+  eq(note, "migrated"); eq(db.version, 5); eq(Save.VERSION, 5); eq(X.VERSION, 6)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 5); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
+  eq(m.version, 6); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
   eq(m.combat.class, "priest"); eq(type(m.combat.cls), "table")
   assert(Save.validate(db))
   -- le combat migré se joue tout de suite (compteurs du tour recréés), puis au tour suivant
@@ -1325,7 +1325,7 @@ test("sauvegarde v3 -> v5 : réputation de classe convertie en expérience, exp�
   eq(w.rep, 800, "ancienne réputation gardée"); eq(w.zones.westfall.keyMax, 1); eq(db.meta.league, nil)
   local m = db.current
   assert(m, "expédition gardée")
-  eq(m.version, 5); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
+  eq(m.version, 6); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
   eq(m.unlock.level, Meta.classLevel(w.xp), "niveau de sa classe après migration")
   eq(Meta.classLevel(w.xp), 4)
   assert(Save.validate(db))
@@ -1865,7 +1865,7 @@ test("sauvegarde v4 -> v5 : zones par classe et du compte, Ligue abandonnée, ex
   eq(m.flags.tobin_spared, true); eq(db.options.scale, 1.1); eq(db.journal[1].rep, 110, "journal intact")
   local x = db.current
   assert(x, "expédition gardée")
-  eq(x.version, 5); eq(x.zone, "westfall")
+  eq(x.version, 6); eq(x.zone, "westfall")
   eq(x.unlock.level, 2); eq(x.unlock.league, nil); eq(x.unlock.common, 1); eq(x.unlock.won.westfall, 1)
   assert(Save.validate(db))
   -- l'expédition continue : combat, puis fin et méta

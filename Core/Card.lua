@@ -45,12 +45,60 @@ function Card.inClass(d, class, neutral)
   return d.class == class
 end
 
--- Cartes proposables en récompense pour une classe (hors cartes de base) ; neutral = cartes neutres
--- comprises (marchand, rencontres).
+-- Carte épique (rarity = "epic", au-dessus de rare) : une seule par expédition (docs/expedition.md, « Cartes
+-- épiques »), jamais dans les récompenses ordinaires.
+function Card.isEpic(d)
+  return d ~= nil and d.rarity == "epic"
+end
+
+-- Carte collectionnable : proposable en récompense, chez le marchand, en rencontre, montrée par la
+-- progression. Une variante (variant = true : carte transformée par une épique, champ transforms) ne
+-- l'est jamais.
+function Card.collectible(d)
+  return d ~= nil and not d.variant
+end
+
+-- Transformations d'un deck { {id, up}, … } par son épique : la carte épique (la première du deck) peut
+-- porter transforms = { [id_origine] = id_variante } (sur sa définition de base ou améliorée) ; tant
+-- qu'elle est dans le deck, chaque carte d'origine est remplacée par sa variante, qui garde l'état
+-- amélioré de l'originale (si la variante a une amélioration). Renvoie le deck lui-même s'il n'y a rien à
+-- transformer (aucune copie : sans épique, rien ne change), sinon une copie alignée (même ordre, même
+-- longueur ; champ from = id d'origine).
+function Card.transformsOf(deck)
+  for i = 1, #deck do
+    local base = ns.Cards[deck[i].id]
+    if base and base.rarity == "epic" then
+      local d = Card.defById(deck[i].id, deck[i].up and base.up ~= nil)
+      return d.transforms
+    end
+  end
+  return nil
+end
+
+function Card.applyTransforms(deck)
+  local map = Card.transformsOf(deck)
+  if not map or next(map) == nil then return deck end
+  local out = {}
+  for i = 1, #deck do
+    local card = deck[i]
+    local v = map[card.id]
+    local vd = v and ns.Cards[v]
+    if vd then
+      out[i] = { id = v, up = (card.up and vd.up ~= nil) and true or false, from = card.id }
+    else
+      out[i] = card
+    end
+  end
+  return out
+end
+
+-- Cartes proposables en récompense pour une classe (hors cartes de base, épiques et variantes) ; neutral =
+-- cartes neutres comprises (marchand, rencontres).
 function Card.pool(class, neutral)
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if Card.inClass(d, class, neutral) and d.rarity ~= "basic" and not d.noReward then
+    if Card.inClass(d, class, neutral) and d.rarity ~= "basic" and d.rarity ~= "epic" and not d.noReward
+        and not d.variant then
       list[#list + 1] = id
     end
   end

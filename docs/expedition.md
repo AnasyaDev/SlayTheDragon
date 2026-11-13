@@ -73,7 +73,7 @@ rencontres) par le palier commun du compte (`tier` ≤ `exp.unlock.common`). Dé
 | `start` (bibelot au choix : zone 3 gagnée par le compte) | `{"startRelic", i}` (i dans `exp.startRelics`), `{"skipStartRelic"}` |
 | `map` | `{"path", idNoeud}` : un nœud de `Map.nextNodes(exp.map, exp.node)` |
 | `combat` | `{"play", indexMain, indexEnnemi?, "nospend"?}` (« nospend » : carte « Spend N » jouée sans dépenser), `{"endTurn"}`, `{"potion", emplacement, indexEnnemi?}` |
-| `reward` | `{"pickCard", i}`, `{"skipCards"}`, `{"takePotion"}`, `{"leave"}` |
+| `reward` | `{"pickCard", i}`, `{"skipCards"}`, `{"pickEpic", i}`, `{"skipEpic"}` (choix « Epic », `r.epics`), `{"takePotion"}`, `{"leave"}` |
 | `campfire` | `{"rest"}`, `{"upgrade", indexDeck}`, `{"leave"}` |
 | `merchant` | `{"buyCard", i}`, `{"buyRelic", i}`, `{"buyPotion", i}`, `{"remove", indexDeck}`, `{"leave"}` |
 | `event` | `{"choose", i}` puis `{"leave"}` (si le choix n'a pas de suite) ; une réponse indisponible n'est pas dans `choices` et `act` la refuse avec sa raison (texte) |
@@ -256,6 +256,56 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
 | +4 | Nécrotique | Chaque coup qui fait perdre des PV réduit tes soins de 5 %, 30 % au plus (état `necrotic` affiché sur le héros) |
 | +5 | Disette | Le feu de camp ne soigne plus que 20 % des PV |
 
+## Cartes épiques (socle du 13/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`) : les cartes de zone sont des **cartes épiques**, une par
+classe et par zone, débloquées par la première victoire de la classe dans la zone (`zone = "<id>"`,
+`Expedition.unlocked`, `Meta.zoneCards`). Aucune carte réelle n'est écrite ; le socle :
+
+- **Rareté `epic`** (`rarity = "epic"`, au-dessus de `rare`, sous `boss` : `Meta.RARITY_ORDER`). Une épique
+  n'est **jamais** dans les récompenses ordinaires, les choix de rencontre ni l'étal des cartes de classe
+  (`Expedition.cardPool`, `Card.pool`, `Rewards.cardPool` l'excluent) : elle n'arrive que par l'offre
+  ci-dessous, l'emplacement épique du marchand, ou un effet de rencontre `{ "card", id }` explicite.
+- **Une seule épique par expédition.** `Expedition.addCard` d'une épique retire celle du deck (améliorée ou
+  non ; la nouvelle arrive non améliorée) : `exp.stats.epicReplaced`, `exp.epicReplaced = { old, oldUp, new }`.
+  Récompense, marchand ou rencontre : même règle (c'est `addCard`). Une épique ne se copie pas (sélection
+  « dupe » : absente des choix, refus `"epic"`). La retirer chez le marchand ou en rencontre est permis.
+  `Expedition.epicIndex(exp)` = index de l'épique du deck ou nil.
+- **Transformations** : une épique peut porter `transforms = { [id_origine] = id_variante }` (sur sa définition
+  de base ou améliorée) ; tant qu'elle est dans le deck, chaque carte d'origine se joue comme sa variante
+  (`Card.applyTransforms(deck)`, appliqué par `Combat.new` et par l'affichage : `Expedition.shownDeck(exp)`,
+  bandeau, panneau du deck, amélioration, retrait, sélection). Le deck de l'expédition n'est jamais réécrit :
+  remplacer ou retirer l'épique défait tout. La variante garde l'état amélioré de l'originale si elle a une
+  amélioration (`up`), sinon elle est de base ; elle porte `variant = true` (jamais collectionnable : ni
+  récompense, ni marchand, ni progression, `Card.collectible`).
+- **Offre garantie** : à la PREMIÈRE victoire d'élite de l'expédition (combat d'élite de rencontre compris), la
+  récompense reçoit un choix « Epic » en plus de la récompense normale : `r.epics` = jusqu'à 3 épiques
+  distinctes débloquées par la classe (hors celle du deck ; une seule si elle seule existe), `r.epicDone`,
+  `r.epicPicked` ; actions `pickEpic` / `skipEpic` (refusable ; partir sans choisir = refuser). Une seule offre
+  par expédition (`exp.epicOffered`). Sans épique débloquée : aucune offre, aucun tirage.
+- **Marchand** : à partir de la moitié du parcours, une chance qu'il vende une épique (à la suite des cartes,
+  `shop.cards[i].epic = true`), prix élevé (± 10 %, crochet `price` genre `"card"`) ; achat = `addCard`.
+- **Hasard** : flux `exp.rng.epic` (créé au premier usage) ; les autres flux ne bougent pas. À graine égale et
+  sans épique débloquée, une expédition se déroule exactement comme avant (simulations comparées le
+  13/11/2026 : Priest, Rogue, Hunter `zones=7`, Warrior `zones=0 level=1`, 300 expéditions chacun, identiques).
+
+Paramètres (`Expedition.EPIC`, à changer en un endroit ; l'agent de conception peut proposer une autre règle) :
+
+| Clé | Défaut | Règle |
+| --- | --- | --- |
+| `offerOn` | `{ elite = true }` | genres de combat dont la première victoire porte l'offre (`combat`, `elite`, `boss`) |
+| `choices` | 3 | épiques proposées au plus dans l'offre |
+| `shop` | 0,5 | chance qu'un marchand vende une épique (0 = jamais) |
+| `shopFloor` | 4 | étape à partir de laquelle le marchand peut en vendre (étapes 1 à 7, boss en 8) |
+| `price` | 150 | prix de base d'une épique chez le marchand |
+
+Dans le combat : mot-clé `Innate` (champ `innate`), effets passifs du deck (`deckHooks`, `whileInDeck`) et
+points d'accroche de classe : `docs/classes.md`, « Cartes épiques ». Simulation : `epic=<id>` (épique imposée au
+départ), `sweep=cards` mesure aussi les épiques de la classe ; le bot prend ou remplace une épique par note
+(`Sim/expedition.lua`, `SE.epicRating` : `classDef.bot.epic(exp, id)` si la classe le définit, sinon
+`classDef.bot.rating[id]`, sinon `SE.EPIC_RATING` = 7 ; remplacement si la nouvelle vaut mieux que l'actuelle
+de `SE.EPIC_MARGIN`). Tests : `Sim/tests_epic.lua` ; interface : `docs/interface.md`, « Cartes épiques ».
+
 ## Sauvegarde (`Core/Save.lua`)
 
 `SlayTheDragonDB = { version = 5, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
@@ -284,6 +334,12 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   (`unlock.league` retiré ; ce qui était déjà tiré reste dans l'état), `acts = 1` ; elle reste jouable,
   combat en cours compris (test « sauvegarde v4 -> v5 », harnais UZ). Une expédition d'une zone inconnue ou
   plus jouable part en quarantaine.
+- Expédition version 6 (13/11/2026, cartes épiques ; `Save.VERSION` reste 5, la méta ne change pas) :
+  `exp.epicOffered`, `exp.rng.epic` (créé au premier usage), `reward.epics` / `epicDone` / `epicPicked`,
+  `shop.cards[i].epic`, `exp.epicReplaced`, `stats.epicReplaced`. Migration 5 → 6 : `epicOffered = false`
+  (la prochaine élite gagnée propose une épique si la classe en a) ; un combat en cours garde ses cartes telles
+  quelles. Combat : `c.passives` (cartes à `deckHooks`, entrées `{ id, up, uid }` séparées des piles : données
+  simples). Tests « sauvegarde : expédition v5 en cours migrée en v6 » (`Sim/tests_epic.lua`), harnais UZ.
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
 - Journal : `{ result, class, zone, key, seed, act, floor, cleared, elites, bosses, hp, maxHp, gold,

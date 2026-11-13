@@ -33,7 +33,7 @@ Effects.damage = function(c, ctx, e)
       if e.bonus then base = base + e.bonus(c, ctx, t) end
       if e.more or e.per then base = Combat.amount(c, ctx, e, base, t) end
       local dmg = Combat.calcDamage(c, c.player, t, base, ctx.def)
-      Combat.dealDamage(c, c.player, t, dmg, e.pierce)
+      Combat.dealDamage(c, c.player, t, dmg, e.pierce, ctx)
       ctx.dealt = true
       ctx.hits = ctx.hits + 1
       if e.onHit then e.onHit(c, ctx, t) end

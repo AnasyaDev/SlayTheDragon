@@ -5,7 +5,8 @@
 -- opts : seed, bot, class, pick ("rated"|"random"|"skip"), cap, maxRounds,
 --        key (niveau de clé mythique), zone (zone jouée, défaut : la première),
 --        zones (0..7 : zones gagnées par le compte et la classe, à toutes les clés),
---        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (niveau de classe 1..7, défaut 7)
+--        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (niveau de classe 1..7, défaut 7),
+--        epic (id d'une carte épique imposée au deck de départ)
 return function(ns)
   local X, Rng, Bots, Meta = ns.Expedition, ns.Rng, ns.Bots, ns.Meta
   local SE = {}
@@ -118,6 +119,46 @@ return function(ns)
     return best
   end
 
+  -- Cartes épiques (une seule dans le deck, docs/expedition.md) : note d'une épique dans ce deck. Extensible
+  -- par classe : classDef.bot.epic = function(exp, id) -> note (nil : défaut), sinon la note de la carte
+  -- (classDef.bot.rating), sinon SE.EPIC_RATING. Le bot prend la meilleure si elle vaut mieux que l'épique
+  -- du deck de SE.EPIC_MARGIN (note de l'actuelle + SE.UPGRADED_BONUS si elle est améliorée).
+  SE.EPIC_RATING = 7
+  SE.EPIC_MARGIN = 0.5
+  local function epicRating(exp, id)
+    local b = botOf(exp)
+    local v = b.epic and b.epic(exp, id)
+    if v then return v end
+    return ns.Run.RATING[id] or SE.EPIC_RATING
+  end
+  SE.epicRating = epicRating
+
+  -- Gain (unités des rencontres) à prendre l'épique id : sa valeur, moins celle de l'épique remplacée.
+  local function epicGain(exp, id)
+    local i = X.epicIndex(exp)
+    local v = cardValue(exp, epicRating(exp, id))
+    if i then
+      local cur = exp.deck[i]
+      v = v - cardValue(exp, epicRating(exp, cur.id) + (cur.up and SE.UPGRADED_BONUS or 0))
+        - SE.EPIC_MARGIN * 2 * 10 / math.max(#exp.deck, 10) / SE.POINTS_PER_UNIT
+    end
+    return v
+  end
+  SE.epicGain = epicGain
+
+  -- Choix « Epic » : index de l'épique à prendre, ou nil (refus).
+  local function pickEpic(exp, opts, rng, epics)
+    if opts.pick == "skip" or #epics == 0 then return nil end
+    if opts.pick == "random" then return Rng.int(rng, 1, #epics) end
+    local best, bestV
+    for i = 1, #epics do
+      local v = epicGain(exp, epics[i])
+      if not bestV or v > bestV then best, bestV = i, v end
+    end
+    if bestV < 0 then return nil end
+    return best
+  end
+
   -- Choix du chemin : meilleur score cumulé sur les chemins restants depuis chaque candidat.
   local function kindScore(kind, hpRatio, gold, removePrice)
     if kind == "combat" then return 1.0 end
@@ -224,6 +265,11 @@ return function(ns)
       return choosePath(exp, paths)
     elseif ph == "reward" then
       local r = exp.reward
+      if r.epics and not r.epicDone then
+        local i = pickEpic(exp, opts, rng, r.epics)
+        if i then return { "pickEpic", i } end
+        return { "skipEpic" }
+      end
       if not r.cardsDone then
         local i = pickCard(exp, opts, rng, r.cards)
         if i then return { "pickCard", i } end
@@ -252,7 +298,8 @@ return function(ns)
       -- rencontres)
       local best, bestR
       for i, it in ipairs(s.cards) do
-        local v = cardValue(exp, rating(it.id)) - it.price * 0.03
+        local v = (ns.Card.isEpic(ns.Cards[it.id]) and epicGain(exp, it.id) or cardValue(exp, rating(it.id)))
+          - it.price * 0.03
         if not it.sold and exp.gold >= it.price and v > 0 and (not bestR or v > bestR) then
           best, bestR = i, v
         end
@@ -286,7 +333,8 @@ return function(ns)
         local bestV = 0
         for j = 1, #exp.deck do
           local card = exp.deck[j]
-          local v = ns.Cards[card.id].rarity ~= "basic" and rating(card.id) + (card.up and 0.5 or 0) or 0
+          local r = ns.Cards[card.id].rarity
+          local v = r ~= "basic" and r ~= "epic" and rating(card.id) + (card.up and 0.5 or 0) or 0
           if v > bestV then i, bestV = j, v end
         end
       else
@@ -353,7 +401,7 @@ return function(ns)
       end
     end
     local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
-      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false })
+      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false, epic = opts.epic })
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)
@@ -374,6 +422,8 @@ return function(ns)
         local a = decide(exp, opts, rng)
         if exp.phase == "reward" and a[1] == "pickCard" then
           record.picks[#record.picks + 1] = exp.reward.cards[a[2]]
+        elseif exp.phase == "reward" and a[1] == "pickEpic" then
+          record.picks[#record.picks + 1] = exp.reward.epics[a[2]]
         elseif a[1] == "upgrade" then
           record.picks[#record.picks + 1] = "up:" .. exp.deck[a[2]].id
         elseif a[1] == "rest" then
