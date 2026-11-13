@@ -5,11 +5,14 @@
 --                est le meilleur.
 --   heuristic  : explore les suites de coups du tour (avec élimination des doublons),
 --                simule le tour ennemi au bout de chacune, garde la meilleure ; essaie aussi
---                de commencer le tour par chaque potion disponible.
+--                de commencer le tour par chaque potion disponible. Ne fait aucune erreur tactique.
+--   human      : joueur humain correct (recherche courte, intentions lues, erreurs tirées au flux du bot) ;
+--                la référence de la difficulté ressentie. Paramètres : Bots.humanParams (plus bas).
 -- Interface : local bot = Bots.new(nom, rng, opts) ;
 --   bot:act(c) -> { "play", idx, tIdx } | { "potion", emplacement, tIdx } | { "end" }
 -- opts : cap (nœuds de recherche), potionKeep (multiplicateur de la valeur de garder une
---        potion : 1 par défaut, 0 au dernier combat de l'expédition).
+--        potion : 1 par défaut, 0 au dernier combat de l'expédition), human (paramètres du bot human,
+--        Bots.humanParams ; défaut : skill par défaut).
 return function(ns)
   local Combat, Card, Rng = ns.Combat, ns.Card, ns.Rng
   local Bots = {}
@@ -455,16 +458,196 @@ return function(ns)
     return uid
   end
 
+  ---------------------------------------------------------------------------
+  -- Joueur humain correct (bot=human) : la référence de la difficulté ressentie (docs/equilibrage.md).
+  -- Il ne voit pas toutes les suites du tour : à chaque carte, il regarde les `width` meilleurs coups (au
+  -- coup d'œil), les suit sur `depth` cartes au plus, et joue le premier coup de la meilleure suite. Il lit
+  -- les intentions affichées (dégâts × coups contre son Block, interruption) au lieu de jouer le tour ennemi :
+  -- ni DoT, ni états, ni règles de zone, ni phases de boss, sauf aux tours où il réfléchit à fond (part
+  -- `foresight`). Il ne compte qu'en partie (`combo`) le Combo ou la ressource laissés pour le tour suivant.
+  -- Il se trompe parfois (`slip`) : un autre coup que le meilleur, tiré parmi ceux qui ne s'en écartent pas
+  -- de plus de `tol` (unités de W : 10 = 1 PV). Il garde ses potions (`hoard` × leur valeur de réserve).
+  -- Hors combat (Sim/expedition.lua) : notes des cartes bruitées (`pickNoise`), goût des rares (`rareBonus`)
+  -- et des cartes nouvelles (`newBonus`), carte prise dès que sa note perçue atteint `takeMin` (deck qui
+  -- grossit), chemin vu sur `pathDepth` étapes et bruité (`pathNoise`), route suivie sans la revoir sauf
+  -- une fois sur `1 / replan` (ou sous la moitié des PV), élites jugés comme s'il avait `daring` PV max de
+  -- plus, repos sous `restAt` des PV max (+0,25 avant le boss), amélioration bruitée (`upNoise`), retrait au
+  -- marchand une visite sur `1 / removeRate`, rencontres bruitées (`eventNoise`).
+  -- Tous se déduisent de `skill` (0 = débutant, 0,5 = joueur correct, 1 = expert ; HUMAN_RANGE : valeurs à
+  -- 0, 0,5 et 1, interpolées par morceaux) et chacun peut être imposé (sim.lua : skill=0.3 width=2 …). Hasard :
+  -- le flux du bot (combat) et le flux « human » de l'expédition, jamais math.random. Valeurs à 0,5 (défaut)
+  -- calées le 13/11/2026 sur le journal du joueur (Westfall clé 0 : ≈ 20–25 % de victoires pour les cinq
+  -- classes ; docs/equilibrage.md, « Bot human »).
+  Bots.HUMAN_SKILL = 0.5
+  Bots.HUMAN_RANGE = {
+    width = { 2, 3, 4 }, depth = { 2, 3, 5 }, foresight = { 0.2, 0.7, 1 }, slip = { 0.4, 0.25, 0 },
+    tol = { 80, 60, 20 }, combo = { 0.2, 0.6, 1 }, hoard = { 3, 1.75, 1 },
+    pickNoise = { 3, 1.65, 0.3 }, rareBonus = { 2, 1, 0 }, newBonus = { 1.5, 0.75, 0 }, takeMin = { 2, 3.5, 5 },
+    pathDepth = { 1, 5, 8 }, pathNoise = { 1.5, 0.8, 0.1 }, replan = { 0, 0.5, 1 }, daring = { 0.3, 0.15, 0 },
+    restAt = { 0.3, 0.4, 0.5 }, upNoise = { 3, 1.65, 0.3 }, removeRate = { 0, 0.5, 1 }, eventNoise = { 2, 1.1, 0.2 },
+  }
+  Bots.HUMAN_INT = { width = true, depth = true, pathDepth = true }
+
+  -- Paramètres du bot human : over = { skill = …, width = … } (nombres), le reste déduit de skill.
+  function Bots.humanParams(over)
+    over = over or {}
+    local s = tonumber(over.skill) or Bots.HUMAN_SKILL
+    if s < 0 then s = 0 elseif s > 1 then s = 1 end
+    local H = { skill = s }
+    for k, r in pairs(Bots.HUMAN_RANGE) do
+      local v = tonumber(over[k])
+      if not v then
+        if s <= 0.5 then v = r[1] + (r[2] - r[1]) * s * 2 else v = r[2] + (r[3] - r[2]) * (s - 0.5) * 2 end
+        if Bots.HUMAN_INT[k] then v = math.floor(v + 0.5) end
+      end
+      H[k] = v
+    end
+    return H
+  end
+
+  -- Tirage normal centré réduit (Box-Muller) sur un flux ns.Rng.
+  function Bots.gauss(rng)
+    local u = Rng.float(rng)
+    if u < 1e-9 then u = 1e-9 end
+    return math.sqrt(-2 * math.log(u)) * math.cos(2 * math.pi * Rng.float(rng))
+  end
+
+  -- Tour ennemi lu sur les intentions : chaque ennemi vivant et non étourdi frappe de ses dégâts affichés
+  -- (Combat.intentInfo) contre le Block, coupe l'incantation s'il l'annonce ; le Block ennemi tombe.
+  local function readIntents(t)
+    local p = t.player
+    local dmg = 0
+    for i = 1, #t.enemies do
+      local e = t.enemies[i]
+      if not e.dead then
+        e.block = 0
+        local def = ns.Enemies[e.id]
+        if (e.st.stunned or 0) == 0 and def and e.intent and def.moves[e.intent] then
+          local info = Combat.intentInfo(t, e)
+          dmg = dmg + info.damage * math.max(info.times, info.damage > 0 and 1 or 0)
+          if info.interrupts and not info.interrupted and p.cast then p.cast, p.castMore = nil, nil end
+        end
+      end
+    end
+    local through = dmg - p.block
+    if through > 0 then
+      p.block = 0
+      p.hp = p.hp - through
+      if p.hp <= 0 then t.result = "lost" end
+    else
+      p.block = -through
+    end
+  end
+  Bots.readIntents = readIntents
+
+  -- Score d'une fin de tour pour le joueur humain : real = tour ennemi joué (réflexion à fond), sinon lu.
+  local function humanLeaf(s, H, real)
+    if s.result then return evaluate(s) end
+    local t = Combat.clone(s)
+    Combat.endPlayerTurn(t)
+    if not t.result then
+      if real then Combat.enemyPhase(t) else readIntents(t) end
+    end
+    local v = evaluate(t)
+    if not t.result and H.combo < 1 then v = v - (1 - H.combo) * (t.player.res or 0) * resValue(t) end
+    return v
+  end
+  Bots.humanLeaf = humanLeaf
+
+  -- Coups d'une position (doublons et conseils de zone écartés comme planTurn), chacun avec son état et
+  -- le score de fin de tour juste après (coup d'œil), triés du meilleur au moins bon.
+  local function humanMoves(s, H, real, potions)
+    local out = {}
+    local acts = Combat.legalPlays(s)
+    local tried = {}
+    local zb = zoneBots(s)
+    for i = 1, #acts do
+      local a = acts[i]
+      local inst = s.hand[a[1]]
+      local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
+      if zb then
+        for j = 1, #zb do
+          if zb[j].skip and zb[j].skip(s, a) then tried[key] = true end
+        end
+      end
+      if not tried[key] then
+        tried[key] = true
+        local t = Combat.clone(s)
+        Combat.play(t, a[1], a[2], a[3] and { spend = false } or nil)
+        out[#out + 1] = { act = { "play", a[1], a[2], a[3] and "nospend" or nil }, s = t, v = humanLeaf(t, H, real) }
+      end
+    end
+    if potions then
+      local pots = Combat.legalPotions(s)
+      for i = 1, #pots do
+        local t = Combat.clone(s)
+        Combat.usePotion(t, pots[i][1], pots[i][2])
+        out[#out + 1] = { act = { "potion", pots[i][1], pots[i][2] }, s = t, v = humanLeaf(t, H, real) }
+      end
+    end
+    table.sort(out, function(x, y) return x.v > y.v end)
+    return out
+  end
+
+  -- Meilleur score atteignable depuis s en d coups de plus, parmi les width meilleurs coups à chaque pas.
+  local function humanBest(s, v0, d, H, real)
+    if d <= 0 or s.result then return v0 end
+    local best = v0
+    local moves = humanMoves(s, H, real, false)
+    for i = 1, math.min(H.width, #moves) do
+      local m = moves[i]
+      local w = humanBest(m.s, m.v, d - 1, H, real)
+      if w > best then best = w end
+    end
+    return best
+  end
+
+  -- Prochain coup du joueur humain : { "play", … } | { "potion", … } | { "end" }.
+  function Bots.humanAct(c, H, rng, real)
+    local cands = { { act = { "end" }, v = humanLeaf(c, H, real) } }
+    local moves = humanMoves(c, H, real, true)
+    -- les width meilleurs coups au coup d'œil, plus les potions qui n'y sont pas (il les a sous les yeux)
+    for i = 1, #moves do
+      local m = moves[i]
+      if i <= H.width or m.act[1] == "potion" then
+        cands[#cands + 1] = { act = m.act, v = humanBest(m.s, m.v, H.depth - 1, H, real) }
+      end
+    end
+    table.sort(cands, function(x, y) return x.v > y.v end)
+    local pick = cands[1]
+    if #cands > 1 and H.slip > 0 and Rng.float(rng) < H.slip then
+      local near = {}
+      for i = 2, #cands do
+        if cands[i].act[1] ~= "end" and cands[i].v >= cands[1].v - H.tol then near[#near + 1] = cands[i] end
+      end
+      if #near > 0 then pick = near[Rng.int(rng, 1, #near)] end
+    end
+    return pick.act
+  end
+
   local BotMT = {}
   BotMT.__index = BotMT
 
   function Bots.new(kind, rng, opts)
-    return setmetatable({ kind = kind, rng = rng, opts = opts or {}, plan = nil, planRound = -1 }, BotMT)
+    local b = setmetatable({ kind = kind, rng = rng, opts = opts or {}, plan = nil, planRound = -1 }, BotMT)
+    if kind == "human" then b.H = b.opts.human or Bots.humanParams() end
+    return b
   end
 
   function BotMT:act(c)
     Bots.potionKeep = self.opts.potionKeep or 1
-    if self.kind == "random" then
+    if self.kind == "human" then
+      local H = self.H
+      Bots.potionKeep = Bots.potionKeep * H.hoard
+      -- réflexion à fond (tour ennemi joué) : tirée une fois par tour
+      if self.thinkRound ~= c.round then
+        self.thinkRound = c.round
+        self.real = H.foresight > 0 and Rng.float(self.rng) < H.foresight
+      end
+      local a = Bots.humanAct(c, H, self.rng, self.real)
+      Bots.potionKeep = 1
+      return a
+    elseif self.kind == "random" then
       local pots = Combat.legalPotions(c)
       if #pots > 0 and Rng.float(self.rng) < 0.1 then
         local a = Rng.pick(self.rng, pots)

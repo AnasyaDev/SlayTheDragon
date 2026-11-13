@@ -1,7 +1,11 @@
 -- Simulation d'expéditions en masse.
 -- Usage : luajit Sim/sim.lua runs=2000 bot=heuristic seed=1 jobs=8 pick=rated cap=400 [class=priest|warrior]
 --         [force=penance,mind_blast] [save=rapport.lua] [compare=ancien.lua]
---   bot  : random | greedy | heuristic        pick : rated | random | skip
+--   bot  : random | greedy | heuristic | human        pick : rated | random | skip
+--   bot=human : skill=0..1 (défaut Bots.HUMAN_SKILL) et paramètres nommés de Bots.HUMAN_RANGE (width=, depth=,
+--     foresight=, slip=, tol=, combo=, hoard=, pickNoise=, rareBonus=, newBonus=, takeMin=, pathDepth=,
+--     pathNoise=, replan=, daring=, restAt=, upNoise=, removeRate=, eventNoise=) ; fightbot=<bot> : bot des
+--     combats seul remplacé (runner=expedition).
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
 --   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
 --     avec key=N (clé mythique) et zones=0..7 (zones gagnées par le compte et la classe, à toutes les clés :
@@ -163,6 +167,7 @@ local function addRecord(agg, rec)
       cs.unplayed = cs.unplayed + n
     end
   end
+  agg.deckSize = (agg.deckSize or 0) + #(rec.deck or {})
   local seen = {}
   for _, card in ipairs(rec.deck or {}) do
     if not seen[card.id] then
@@ -223,6 +228,12 @@ local function runRange(from, to)
     ns.Combat.interruptPlayer = function() end
   end
   local agg = newAgg()
+  -- bot=human : skill= et paramètres nommés (Bots.HUMAN_RANGE) passés tels quels
+  local human
+  if opts.bot == "human" then
+    human = { skill = opts.skill }
+    for k in pairs(ns.Bots.HUMAN_RANGE) do human[k] = opts[k] end
+  end
   for i = from, to do
     local rec
     if opts.runner == "expedition" then
@@ -230,7 +241,7 @@ local function runRange(from, to)
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
         meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
         hp = tonumber(opts.hp), path = opts.path, zones = tonumber(opts.zones), zone = opts.zone,
-        epic = opts.epic ~= "" and opts.epic or nil })
+        epic = opts.epic ~= "" and opts.epic or nil, human = human, fightBot = opts.fightbot })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),
@@ -397,6 +408,17 @@ local function report(a, title)
   out(("== %s =="):format(title))
   out(("Expéditions : %d   classe : %s   bot : %s   choix : %s   graine : %d%s"):format(a.runs, opts.class or "priest", opts.bot or "heuristic",
     opts.pick or "rated", seed0, #force > 0 and ("   forcées : " .. table.concat(force, ",")) or ""))
+  if (opts.bot or "heuristic") == "human" then
+    local over = { skill = opts.skill }
+    for k in pairs(ns.Bots.HUMAN_RANGE) do over[k] = opts[k] end
+    local H = ns.Bots.humanParams(over)
+    local keys = {}
+    for k in pairs(H) do keys[#keys + 1] = k end
+    table.sort(keys)
+    local parts = {}
+    for _, k in ipairs(keys) do parts[#parts + 1] = ("%s=%g"):format(k, H[k]) end
+    out("Joueur humain : " .. table.concat(parts, " "))
+  end
   out(("Victoires   : %s (± %.1f)   PV moyens à la victoire : %.1f"):format(pct(a.wins, a.runs), 1.96 * se,
     a.wins > 0 and a.hpEndWin / a.wins or 0))
   local deaths = {}
@@ -484,7 +506,8 @@ local function report(a, title)
       a.wins > 0 and a.xpWin / a.wins or 0, a.runs > a.wins and a.xpLoss / (a.runs - a.wins) or 0))
     out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Étapes franchies : %.2f")
       :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.cleared / a.runs))
-    out(("Cartes retirées : %.2f   améliorées : %.2f par expédition"):format(a.removed / a.runs, a.upgraded / a.runs))
+    out(("Cartes retirées : %.2f   améliorées : %.2f par expédition   deck en fin : %.1f cartes"):format(
+      a.removed / a.runs, a.upgraded / a.runs, (a.deckSize or 0) / a.runs))
     -- épique en fin d'expédition (gagnée sur un élite, achetée, ou imposée par epic=) ; victoires avec / sans
     local en, ew = a.epicEnd or 0, a.epicWins or 0
     out(("Épique en fin d'expédition : %s (améliorée : %s)   victoires avec épique %s, sans %s")

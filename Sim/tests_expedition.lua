@@ -1179,6 +1179,55 @@ test("expédition simulée reproductible", function()
   assert(a.visits.combat and a.visits.combat >= 1)
 end)
 
+test("bot human : reproductible à graine égale, paramètres de skill, intentions lues", function()
+  local Bots = ns.Bots
+  local function sig(r)
+    local ids = {}
+    for i, card in ipairs(r.deck) do ids[i] = card.id .. (card.up and "+" or "") end
+    return table.concat({ tostring(r.won), r.floor, r.hp, r.gold, table.concat(ids, ","),
+      table.concat(r.picks, ","), #r.combats }, "|")
+  end
+  for _, cls in ipairs({ "rogue", "priest" }) do
+    local a = ns.SimExpedition.play({ seed = 9, bot = "human", class = cls, level = 2 })
+    local b = ns.SimExpedition.play({ seed = 9, bot = "human", class = cls, level = 2 })
+    eq(sig(a), sig(b), cls .. " : ")
+    assert(#a.combats >= 1)
+  end
+  -- paramètres : skill interpole HUMAN_RANGE (0, 0,5, 1), un paramètre nommé l'emporte
+  local lo, hi = Bots.humanParams({ skill = 0 }), Bots.humanParams({ skill = 1 })
+  eq(lo.width, Bots.HUMAN_RANGE.width[1]); eq(hi.width, Bots.HUMAN_RANGE.width[3])
+  eq(Bots.humanParams({ skill = 0.5 }).tol, Bots.HUMAN_RANGE.tol[2])
+  eq(lo.slip, Bots.HUMAN_RANGE.slip[1]); eq(hi.slip, 0)
+  eq(Bots.humanParams({ skill = 1, width = 2 }).width, 2)
+  eq(Bots.humanParams().skill, Bots.HUMAN_SKILL)
+  local d = Bots.humanParams({ skill = "0.5" })
+  eq(d.skill, 0.5)
+  -- un autre jugement (skill) change la partie, à graine égale
+  local e1 = ns.SimExpedition.play({ seed = 9, bot = "human", class = "rogue", level = 2, human = { skill = 0 } })
+  local e2 = ns.SimExpedition.play({ seed = 9, bot = "human", class = "rogue", level = 2, human = { skill = 1 } })
+  assert(sig(e1) ~= sig(e2), "skill sans effet")
+  -- intentions lues : les dégâts affichés contre le Block ; mort si elles tuent
+  local deck = {}
+  for i = 1, 10 do deck[i] = { id = "sinister_strike", up = false } end
+  local c = Combat.new({ seed = 1, hp = 60, class = "rogue", deck = deck, encounter = { "rhahkzor" } })
+  local dmg = Combat.intentInfo(c, c.enemies[1]).damage
+  assert(dmg > 0)
+  local t = Combat.clone(c)
+  t.player.block = 3
+  Bots.readIntents(t)
+  eq(t.player.hp, 60 - (dmg - 3)); eq(t.player.block, 0)
+  t = Combat.clone(c)
+  t.player.hp = dmg
+  Bots.readIntents(t)
+  eq(t.result, "lost")
+  -- un coup du bot est toujours légal, et le même à flux égal
+  local H = Bots.humanParams()
+  local a1 = Bots.humanAct(c, H, Rng.stream(5, "bot"), false)
+  local a2 = Bots.humanAct(c, H, Rng.stream(5, "bot"), false)
+  eq(table.concat(a1, ":"), table.concat(a2, ":"))
+  assert(a1[1] == "end" or a1[1] == "potion" or Combat.canPlay(c, a1[2]))
+end)
+
 ---------------------------------------------------------------------------
 -- Classes : choix au départ, pools par classe, bibelot de départ, sauvegarde v3
 ---------------------------------------------------------------------------
