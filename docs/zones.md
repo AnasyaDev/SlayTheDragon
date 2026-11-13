@@ -14,7 +14,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | jouable (14/11/2026 : mécanique Pack, élites Sarltooth / Modr / Dragonmaw Centurion, boss Chieftain Nek'rosh, 8 rencontres, commun du tier 3, bibelots de clé, Gryphon Master, huit décors peints ; détails : `docs/zones/wetlands.md`, « Implémentation ») |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
-| 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | idem |
+| 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
 
 ## 1. Fichiers d'une zone
@@ -260,23 +260,24 @@ zone n'a pas les siens. Décor peint (comme Westfall) :
 horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (plans et accessoires de
 `UI/Scene.lua`, `S.landscape`, `PROPS`) et `Art.palettes.duskwood = { sky, sun, cloud, hillsBack, hillsFront,
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
-`westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
+`westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Plans propres à une zone (ajout des Burning
+Steppes, générique) : `layers = { skyline = f, ground = f, front = f }` dans l'entrée d'`Art.paintings`, appelés
+avec `(kit, cadre, g, entrée, palette)` après les collines lointaines, après la route et à la fin ;
+`S.paintKit` donne les formes et niveaux du peintre (`box`, `vgrad`, `oval`, `blur`, `bar`, `diamond`, `tri`,
+`hash`, `rgb`, `mix`, `LV`), `S.PROPS` le registre des accessoires ; `furrows = false` retire les rangs de champ
+du sol proche (exemple complet : `UI/Art/Zones/steppes.lua`). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
 
-**Formes propres à une zone** (ajout des Wetlands, 14/11/2026, `UI/Scene.lua`) : sans toucher au peintre, une
-zone déclare ses accessoires dans `Art.paintProps.<genre> = function(f, g, P, c, pal, x, y, s, variante, K)`
-(appelés comme les accessoires communs depuis `props`) et des plans libres `sp.before(f, g, K, sp)` (après le
-ciel) / `sp.after(f, g, K, sp)` (à la fin). `K = Scene.paintKit` : formes (`box`, `vgrad`, `oval`, `blur`,
-`bar`, `diamond`, `tri`), outils (`hash`, `mix`, `rgb`, `withAlpha`), plans `LV`, accessoires communs `PROPS`,
-et `K.W`, `K.H`, `K.hz`, `K.fl`, `K.pal` du décor en cours. Options : `sp.furrows = false` (pas de rangs de
-blé : marais, port) ; palette `cattail = true` (épis du premier plan en massettes). Les autres zones peuvent
-réutiliser les accessoires des Wetlands (`marsh_tree`, `rocks`, `ship`, `pier`, `keep`, `banner`, `ruin`,
-`orc_tent`, `scaffold`, `gate`, `harbor_house`, `cargo`).
+Les Wetlands (`UI/Art/Zones/wetlands.lua`) ajoutent leurs accessoires au registre `S.PROPS` sous le nom
+`wl_<genre>` au premier décor de la zone peint (UI/Scene.lua est chargé après les fichiers d'art), utilisables
+dans `props` par toute zone qui peint après eux : `wl_marsh_tree` (variante `dead`), `wl_rocks`, `wl_ship`
+(`small`), `wl_pier` (variante = x de fin), `wl_keep`, `wl_banner`, `wl_ruin`, `wl_orc_tent`, `wl_scaffold`,
+`wl_gate`, `wl_harbor_house`, `wl_cargo`.
 
 **Commun déclaré par une zone** : poser `fromZone = "<zone>"` sur les cartes neutres et bibelots déclarés par
-`ns.Declare.*` ; les tests du commun d'origine (`Sim/tests.lua`, `Sim/tests_expedition.lua`, harnais) ne
-comptent pas ces entrées (vérifiées par `Sim/tests_zone_<zone>.lua`). Bibelot de clé : `key`, sans `tier`
-(`Rewards.relicPool` ne le compte jamais au palier 0).
+`ns.Declare.*` ; les tests du commun d'origine (`Sim/tests.lua`, `Sim/tests_expedition.lua`, harnais : paliers
+0 à 3) ne comptent pas ces entrées (vérifiées par `Sim/tests_zone_<zone>.lua`). Nécessaire pour une zone dont le
+commun est au palier 3 ou moins (Wetlands) ; les zones 4 à 7 sont déjà hors de ces comptes.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 

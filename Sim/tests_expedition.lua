@@ -798,7 +798,9 @@ local function forceEvent(exp, id)
   if not ok then error(err, 0) end
 end
 
-local SCENES = { farm = true, road = true, coast = true, mine = true, hill = true, camp = true, ruins = true }
+-- décors communs (docs/zones.md, « Décors » : une zone les remplace par les siens)
+local SCENES = { farm = true, road = true, coast = true, mine = true, hill = true, camp = true, ruins = true,
+  shop = true, night = true }
 local EFFECTS = { heal = true, healPct = true, loseHp = true, maxHp = true, loseMaxHp = true, gold = true,
   pay = true, loseGold = true, card = true, cardChoice = true, relic = true, potion = true, losePotion = true,
   upgradeRandom = true, upgrade = true, remove = true, dupe = true, fight = true, gamble = true, flag = true }
@@ -1091,16 +1093,15 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
   for id, ev in pairs(ns.Events) do
     for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
-        -- rencontre d'une zone jouable : dans cette zone ; rencontre de case (node) : ouverte par sa case
-        local exp = newExp({ zone = ev.zone and ns.Zone.playable(ev.zone) and ev.zone or nil })
-        if ev.node then
+        local exp = newExp({ zone = ev.zone }) -- rencontre d'une zone : dans sa zone
+        if ev.node then -- rencontre de case (Gryphon Master) : ouverte par sa case, jamais tirée
           exp.node, exp.phase = exp.map.start[1], "map"
           X.openEvent(exp, id)
         else
           forceEvent(exp, id)
         end
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
-        exp.unlock.common = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
+        exp.unlock.common = ns.Zone.count() -- réponses à carte neutre débloquée (condition « unlocked », hide)
         exp.potions[1] = "healing_potion"
         exp.relics[#exp.relics + 1] = "stormwind_tabard"
         for _, r in ipairs(exp.event.rolls[ci]) do
@@ -1711,10 +1712,10 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
   eq(ns.Zone.FIRST, "westfall")
   assert(ns.Zone.playable("westfall"))
-  -- zones à venir : « Coming later » tant que leur fichier de données ne pose pas encounters
+  -- une zone est jouable dès que son fichier de données pose ses groupes (docs/zones.md), Coming later sinon
   for i = 2, 7 do
-    local z = ns.Zones[ns.Zone.ORDER[i]]
-    eq(ns.Zone.playable(z.id), z.encounters ~= nil, z.id .. " : Coming later")
+    local id = ns.Zone.ORDER[i]
+    eq(ns.Zone.playable(id), ns.Zones[id].encounters ~= nil, id .. " : Coming later")
   end
   eq(ns.Zone.next("westfall"), "duskwood"); eq(ns.Zone.next("blackrock"), nil); eq(ns.Zone.prev("westfall"), nil)
   local exp = newExp()
@@ -1752,11 +1753,10 @@ test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule"
   local again = finishIn(db, "mage", "westfall", 0)
   eq(again.zoneWon, nil, "deuxième victoire : plus une première"); eq(again.zoneOpened, nil)
   -- zone fermée pour la classe : refusée même si elle devenait jouable
-  local wetEnc = ns.Zones.wetlands.encounters
-  ns.Zones.wetlands.encounters = wetEnc or "westfall"
+  ns.Zones.wetlands.encounters = "westfall"
   local x, w2 = Save.start(db, { seed = 2, class = "mage", zone = "wetlands" })
   eq(x, nil); eq(w2, "zone locked")
-  ns.Zones.wetlands.encounters = wetEnc
+  ns.Zones.wetlands.encounters = nil
   assert(Save.validate(db))
 end)
 
@@ -1771,7 +1771,9 @@ test("zones : carte de zone introuvable avant la première victoire de la classe
   eq(count(Meta.classContent("priest").cards, "test_zone_card"), 0, "hors de la grille des niveaux")
   local db = Save.new()
   local s = finishIn(db, "priest", "westfall", 0)
-  eq(table.concat(s.zoneCards, ","), "test_zone_card", "annoncée en fin d'expédition")
+  -- (avec les cartes épiques réelles de la classe dans cette zone : Prayer of Mending)
+  eq(count(s.zoneCards, "test_zone_card"), 1, "annoncée en fin d'expédition")
+  eq(table.concat(s.zoneCards, ","), table.concat(Meta.zoneCards("priest", "westfall"), ","), "toutes celles de la zone")
   local e = assert(Save.start(db, { seed = 3, class = "priest" }))
   assert(X.unlocked(e, ns.Cards.test_zone_card))
   eq(count(X.cardPool(e), "test_zone_card"), 1, "dans la réserve de la classe")
