@@ -887,13 +887,18 @@ local function button(id)
   return b
 end
 
-local function clickOption(id) H.click(button(id)) end
-
 local function option(id)
   for _, o in ipairs(UI().step.options or {}) do
     if o.id == id then return o end
   end
   return nil
+end
+
+-- Offre d'épique au départ (classe qui a débloqué des épiques réelles, Prêtre dès Westfall gagnée) : un
+-- scénario qui ne la vise pas la refuse (« Skip ») et poursuit comme avant.
+local function clickOption(id)
+  if currentKind() == "startEpic" and not option(id) and option("skipEpic") then H.click(button("skipEpic")) end
+  H.click(button(id))
 end
 
 local function enemySlot(t)
@@ -1388,6 +1393,8 @@ ns = H.ns
 ns.Controller.makeSeed = function() return SEED + 1 end
 H.click(UI().current.go)
 exp = EXP()
+-- Westfall gagnée : le Prêtre a débloqué Prayer of Mending, offerte au départ ; refusée ici
+if currentKind() == "startEpic" then clickOption("skipEpic") end
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
   check("clé mythique dans le bandeau (hexagone violet « +N »)", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
@@ -3474,7 +3481,8 @@ do
       for _, cl in ipairs(cls) do if not cl:find("^Surge: ") then surgeOnly = false end end
       if surgeOnly ~= ((d.minRes or 0) >= 1) then cbad[#cbad + 1] = label .. " : Surge seul <-> minRes" end
       if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = label .. " : Last Breath" end
-      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
+      -- (une carte épique Shadow n'est pas un Pouvoir d'ombre : sa règle est son texte)
+      if not Card.isEpic(d) and has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
       -- Spend N : champ spend = n (payé au jeu) <-> clause « Spend n: … »
       local sp = d.spend and { "spend", d.spend } or nil
       local spendCl
@@ -8123,6 +8131,8 @@ do
   end
   -- contenu de test : une carte de zone du Prêtre (Westfall) et un bibelot de clé (Westfall +1)
   local function addTestContent(ns)
+    -- les épiques réelles du Prêtre retirées : la carte de test est la seule carte de zone de Westfall
+    for _, id in ipairs(ns.Priest.EPICS) do ns.Cards[id] = nil end
     local d = {}
     for k, v in pairs(ns.Cards.radiance) do d[k] = v end
     d.id, d.name, d.zone, d.level, d.rarity = "uz_zone_card", "Westfall Test Card", "westfall", nil, "rare"
@@ -8629,6 +8639,8 @@ do
   -- une variante ; une épique du Warrior qui porte la Rage à 10 ; aucune carte réelle
   local function addTestContent(ns)
     local C0 = ns.Cards
+    -- les épiques réelles du Prêtre retirées : seules les épiques de test sont débloquées (section UEP)
+    for _, id in ipairs(ns.Priest.EPICS) do C0[id] = nil end
     C0.ue_epic_a = { id = "ue_epic_a", class = "priest", zone = "westfall", rarity = "epic", name = "Test Epic",
       type = "power", path = "holy", school = "holy", effects = {}, text = "Epic.\nAttacks deal 1 more.",
       transforms = { smite = "ue_variant" }, up = { text = "Epic.\nAttacks deal 2 more." } }
@@ -9368,6 +9380,116 @@ do
       end
     end
     Render.svg(H, big, SNAP .. "/cartes_rogue_epiques.svg", "épiques du Voleur (base, améliorée)")
+    big:Hide()
+  end
+end
+
+print("UEP Prêtre, cartes épiques : actives dès le début du combat, vue de classe (Inner Focus, Voidform, Echo of Light, Shadow Covenant), raison Voidform, infobulles, planche")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, P, Card = ns.Widgets, ns.Priest, ns.Card
+  ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  ns.Expedition.addCard(e, "inner_focus")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  v:Render(true)
+  local host = v.classZone.views.priest
+  local function line() return host and host.line._shown and host.line._text or nil end
+  local function icon() return host and host.box._shown and (host.box.slot.icon._texture or ""):lower() or "" end
+  check("combat : l'épique du deck est active dès le premier tour (Inner Focus)", P.epicOf(c) == "inner_focus")
+  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, +75% »",
+    line() == "Inner Focus: next card is Cast, +75%" and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
+  -- première carte jouée par l'interface : elle part en Cast, la vue le dit
+  local hi
+  for i, inst in ipairs(c.hand) do
+    local d = Card.def(inst)
+    if (d.type == "attack" or d.type == "skill") and ns.Combat.canPlay(c, i) then hi = i break end
+  end
+  local name = hi and Card.def(c.hand[hi]).name
+  if hi then
+    ns.Controller.act({ "play", hi, Card.def(c.hand[hi]).target == "enemy" and 1 or nil })
+    H.settle()
+    v:Render(true)
+  end
+  check("Inner Focus : la première carte part en Cast (barre d'incantation), la vue la nomme",
+    c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " +75%"), tostring(line()))
+  local tt = table.concat(H.hover(host.box), " | ")
+  check("vue de classe : survol = la carte épique (nom, texte, explication)", tt:find("Inner Focus", 1, true)
+    and tt:find("First card", 1, true), tt)
+  snap("uep-inner-focus", true)
+  -- les autres épiques, posées dans le même combat (la vue ne lit que le combat)
+  local function setEpic(eid, up) c.epic.id, c.epic.up = eid, up or false end
+  setEpic("voidform")
+  c.player.res = 5
+  c.hand[#c.hand + 1] = Card.new("devouring_plague", false, 990)
+  v:Render(true)
+  local info = ns.Controller.handInfo(#c.hand)
+  check("Voidform : « Voidform: Shadow hits +5 » (5 Insanity), icône", line() == "Voidform: Shadow hits +5"
+    and icon():find("voidform", 1, true), tostring(line()))
+  check("Voidform : carte à Surge injouable, raison lisible", info and not info.playable
+    and ns.Controller.reasonText(info.why) == "Voidform: Surge cards can't be played.", info and tostring(info.why))
+  snap("uep-voidform", true)
+  table.remove(c.hand)
+  setEpic("echo_of_light")
+  c.player.st.regen = 3
+  v:Render(true)
+  check("Echo of Light : « Regen 3: 10 to all next turn »", line() == "Regen 3: 10 to all next turn", tostring(line()))
+  setEpic("echo_of_light", true)
+  v:Render(true)
+  check("Echo of Light amélioré : « Regen 3: 12 to all next turn »", line() == "Regen 3: 12 to all next turn", tostring(line()))
+  c.player.st.regen = nil
+  setEpic("shadow_covenant")
+  c.hand[#c.hand + 1] = Card.new("mind_blast", false, 991)
+  v:Render(true)
+  info = ns.Controller.handInfo(#c.hand)
+  check("Shadow Covenant : « Shadow cards: 3 HP per mana », Mind Blast à 0 mana", line() == "Shadow cards: 3 HP per mana"
+    and info and info.cost == 0, tostring(line()))
+  setEpic("shadow_covenant", true)
+  v:Render(true)
+  check("Shadow Covenant amélioré : première carte Shadow gratuite annoncée",
+    line() == "Shadow: first card free, then 3 HP/mana", tostring(line()))
+  table.remove(c.hand)
+  setEpic("prayer_of_mending")
+  v:Render(true)
+  check("Prayer of Mending : rien à afficher (zone de classe vide)", not host.box._shown and not host.line._shown)
+  -- infobulles des sept épiques : la plaque Epic et le détail de la règle
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  local want = { prayer_of_mending = "Each heal:", echo_of_light = "Regen tick:", shadow_covenant = "Shadow cards:",
+    voidform = "Voidform:", inner_focus = "First card:" }
+  local tbad = {}
+  for _, eid in ipairs(P.EPICS) do
+    tip.lines = {}
+    W.fillCardTooltip(tip, eid, false, { full = true })
+    local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    if not all:find("epic card per expedition", 1, true) then tbad[#tbad + 1] = eid .. " : épique" end
+    if want[eid] and not all:find(want[eid], 1, true) then tbad[#tbad + 1] = eid .. " : " .. want[eid] end
+  end
+  check("infobulles des sept épiques : une seule par expédition, détail de la règle", #tbad == 0, table.concat(tbad, " ; "))
+  -- planche des sept épiques (base, améliorée)
+  if SNAP then
+    local perRow, cw, ch = 7, 140, 230
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, 2 * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, eid in ipairs(P.EPICS) do
+      for r, up in ipairs({ false, true }) do
+        local cd = W.card(big)
+        cd:SetCard(eid, up, { playable = true })
+        W.placeCenter(cd, big, 80 + (i - 1) * cw, 125 + (r - 1) * ch, 1)
+      end
+    end
+    Render.svg(H, big, SNAP .. "/cartes_priest_epiques.svg", "épiques du Prêtre (base, améliorée)")
     big:Hide()
   end
 end
