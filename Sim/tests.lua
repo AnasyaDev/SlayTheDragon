@@ -2289,6 +2289,114 @@ do
     ns.Enemies.test_combo, ns.Enemies.test_boss_hitter, ns.Cards.test_stun2, ns.Cards.test_stun_all = nil, nil, nil, nil
   end)
 
+  -- Stun Resistant (décision du joueur du 14/11/2026) : élites des zones 1 à 6
+  do
+    ns.Enemies.test_elite_hitter = { name = "Élite", hp = 100, elite = true,
+      moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10 } } } }, pattern = { "hit" } }
+    ns.Cards.test_stun2p = { id = "test_stun2p", name = "s", cost = 0, type = "skill", rarity = "common",
+      target = "enemy", effects = { { "apply", "stunned", 2 } }, text = "Apply Stunned 2 ⌛" }
+    ns.Cards.test_stun2t = { id = "test_stun2t", name = "s", cost = 0, type = "skill", trap = true, rarity = "common",
+      effects = { { "apply", "stunned", 2 } }, text = "Trap.\nApply Stunned 2 ⌛" }
+    local function stunNow(c, e) Combat.applyStatus(c, e, "stunned", 2) end
+    local function immuneLogged(c, e)
+      for _, ev in ipairs(c.events) do if ev.t == "immune" and ev.unit == e.uid and ev.id == "stunned" then return true end end
+      return false
+    end
+
+    test("Stun Resistant : Stunned 2 devient 1 sur un élite ; tour perdu puis 2 tours de résistance, puis de nouveau", function()
+      local c = setup({ "test_stun2p" }, { "test_elite_hitter" })
+      local e = c.enemies[1]
+      assert(Combat.stunResistant(e), "élite : Stun Resistant"); assert(not Combat.stunImmune(e))
+      Combat.play(c, 1, 1)
+      eq(e.st.stunned, 1, "Stunned 2 -> 1")
+      local hp = c.player.hp
+      Combat.endTurn(c)
+      eq(c.player.hp, hp, "tour perdu"); eq(e.st.stunned, nil)
+      eq(e.st.stun_resist, 2, "résistance pour ses 2 tours suivants"); assert(Combat.stunImmune(e))
+      -- tour 2 : Stunned refusé (journal « immune »), il frappe
+      c.events = {}
+      stunNow(c, e)
+      eq(e.st.stunned, nil, "refusé"); assert(immuneLogged(c, e), "journal immune")
+      Combat.endTurn(c)
+      eq(c.player.hp, hp - 10, "2e tour : il frappe"); eq(e.st.stun_resist, 1)
+      -- tour 3 : encore refusé
+      stunNow(c, e)
+      eq(e.st.stunned, nil, "refusé au 3e tour")
+      Combat.endTurn(c)
+      eq(c.player.hp, hp - 20, "3e tour : il frappe"); eq(e.st.stun_resist, nil, "résistance finie")
+      assert(not Combat.stunImmune(e))
+      -- tour 4 : de nouveau étourdissable, 1 au plus
+      stunNow(c, e)
+      eq(e.st.stunned, 1, "de nouveau Stunned 1")
+      Combat.endTurn(c)
+      eq(c.player.hp, hp - 20, "4e tour perdu"); eq(e.st.stun_resist, 2, "nouvelle résistance")
+    end)
+
+    test("Stun Resistant : Stunned posé pendant le tour de l'élite (Trap) arrête ce tour, puis résistance", function()
+      local c = setup({ "test_stun2t", "freezing_trap" }, { "test_elite_hitter" }, nil, HU)
+      local e = c.enemies[1]
+      Combat.play(c, 1)
+      local hp = c.player.hp
+      Combat.endTurn(c)
+      eq(c.player.hp, hp, "tour arrêté : aucun coup"); eq(e.st.stunned, nil, "Stunned 2 -> 1, consommé par ce tour")
+      eq(e.st.stun_resist, 2)
+      -- Freezing Trap au tour suivant : Stunned refusé, l'attaque part (Demoralized la réduit)
+      local i = handIndex(c, "freezing_trap")
+      c.player.mana = 9
+      Combat.play(c, i)
+      c.events = {}
+      Combat.endTurn(c)
+      eq(e.st.stunned, nil); assert(immuneLogged(c, e), "journal immune")
+      eq(c.player.hp, hp - math.floor(10 * 0.75), "il frappe, affaibli")
+      eq(e.st.stun_resist, 1)
+    end)
+
+    test("Stun Resistant : le sbire normal d'un combat d'élite, les boss et les Indomitable ne changent pas", function()
+      local c = setup({ "test_stun2p" }, { "test_elite_hitter", "test_hitter" })
+      local m = c.enemies[2]
+      assert(not Combat.stunResistant(m), "sbire normal")
+      Combat.play(c, 1, 2)
+      eq(m.st.stunned, 2, "sbire : Stunned 2 entier")
+      Combat.endTurn(c)
+      eq(m.st.stunned, 1); eq(m.st.stun_resist, nil, "sbire : aucune résistance")
+      local b = setup({ "smite" }, { "test_boss", "test_indomitable" })
+      for _, x in ipairs(b.enemies) do
+        assert(not Combat.stunResistant(x), x.id .. " : pas Stun Resistant"); assert(Combat.stunImmune(x), x.id .. " : immunisé")
+        stunNow(b, x)
+        eq(x.st.stunned, nil, x.id); eq(x.st.stun_resist, nil, x.id)
+      end
+      -- données : un élite de chaque groupe d'élites des zones 1 à 6 est Stun Resistant, les autres non ;
+      -- Blackrock Mountain : aucun (Indomitable)
+      for k, z in ipairs(ns.Zone.ORDER) do
+        for _, grp in ipairs(ns.Encounters[z].elite) do
+          local n, ids = 0, {}
+          for _, spec in ipairs(grp) do
+            local id = type(spec) == "table" and spec[1] or spec
+            ids[#ids + 1] = id
+            local d = ns.Enemies[id]
+            local u = { side = "enemy", id = id, st = {} }
+            if Combat.stunResistant(u) then n = n + 1; assert(d.elite, id) end
+          end
+          eq(n, k <= 6 and 1 or 0, z .. " : " .. table.concat(ids, "+"))
+        end
+      end
+    end)
+
+    test("Stun Resistant : état clonable et sauvegardable, décompté sur le clone", function()
+      local c = setup({ "test_stun2p" }, { "test_elite_hitter" })
+      Combat.play(c, 1, 1)
+      Combat.endTurn(c)
+      eq(c.enemies[1].st.stun_resist, 2)
+      assert(ns.Save.isPlain(c), "sauvegardable")
+      local k = Combat.clone(c)
+      eq(k.enemies[1].st.stun_resist, 2, "copié")
+      Combat.endTurn(k)
+      eq(k.enemies[1].st.stun_resist, 1, "clone décompté"); eq(c.enemies[1].st.stun_resist, 2, "original intact")
+    end)
+
+    ns.Enemies.test_elite_hitter, ns.Cards.test_stun2p, ns.Cards.test_stun2t = nil, nil, nil
+  end
+
   test("Traps : deux attaquants, chacun la sienne ; l'attaquant tué par la Trap n'attaque pas ; tour sauté : rien", function()
     local c = setup({ "counterattack", "counterattack" }, { "test_hitter", "test_frail" }, nil, HU)
     c.player.mana = 9
