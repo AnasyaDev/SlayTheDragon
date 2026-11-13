@@ -8,14 +8,16 @@
 --   prayer_of_mending : onHeal → PV rendus (+2) à un ennemi vivant tiré par c.rng.cards (coup sans carte).
 --   misery            : un DoT posé par une carte sur SA cible (pas « to all ») est copié sur chaque autre
 --                       ennemi vivant (+1), par Combat.applyStatus (sans le crochet apply, sans boucle).
---   echo_of_light     : regenHeal → 0 ; onRegenTick → la valeur + 7 (+ 9) à chaque ennemi vivant (sans carte).
---   shadow_covenant   : cost → 0 pour une carte Shadow de coût final N ≥ 1, payHp → + 3N ; amélioré : la
---                       première carte Shadow du tour ne coûte rien.
---   reflective_shield : afterHit → l'Absorb perdue sur ce coup, au plus 2 (4), à l'attaquant (sans carte).
+--   echo_of_light     : whileInDeck → Regen 4 au début du combat ; regenHeal → 0 ; onRegenTick → la valeur
+--                       (+ 2) à chaque ennemi vivant (sans carte).
+--   shadow_covenant   : cost → 0 pour une carte Shadow de coût final N ≥ 1, payHp → + 2N, + 2 par carte Shadow
+--                       déjà jouée ce tour ; amélioré : la première carte Shadow du tour ne coûte rien.
+--   reflective_shield : afterHit → le tiers (la moitié) de l'Absorb perdue sur ce coup, au-dessous, à
+--                       l'attaquant (sans carte).
 --   voidform          : canPlay → les cartes à Surge sont injouables ; damage → + 1 (+ 2) par Insanity par coup
 --                       d'une carte Shadow.
 --   inner_focus       : castAs → la première carte Attack ou Skill du tour part en Cast ; à sa résolution,
---                       dégâts, Absorb, soin, DoT et Regen × 1,75 (× 2), arrondis au supérieur.
+--                       dégâts, Absorb, soin, DoT et Regen × 1,5 (× 2), arrondis au supérieur.
 -- État de classe c.cls : miseryT (uid de la cible de la carte en cours de résolution), miseryBusy,
 -- focusRound (round où la première carte a été prise), focus (uid de la carte incantée par Inner Focus),
 -- scale (facteur pendant la résolution de cette carte).
@@ -35,15 +37,15 @@ if not L.plateByKey("epic") then
   L.plate("epic", { word = "Epic", head = true, flag = "epic", text = "in play from the start of each combat." })
 end
 for _, label in ipairs({ "Each heal", "Each Regen tick", "Shadow cards", "Per Insanity",
-  "First card each turn" }) do
+  "First card each turn", "Start of combat" }) do
   L.trigger(label)
 end
 L.keyword("prayerOfMending", { name = "Each heal", pattern = "^Each heal:",
   text = "every source, Regen ticks too, real HP only." })
 L.keyword("echoOfLight", { name = "Regen tick", pattern = "^Each Regen tick:",
-  text = "start of turn, Spirit of Redemption's too." })
+  text = "start of turn, damage instead of healing." })
 L.keyword("shadowCovenant", { name = "Shadow cards", pattern = "^Shadow cards: pay",
-  text = "a card costing N mana costs 0 and pays 2N HP." })
+  text = "2 HP per mana, +2 per Shadow card before." })
 L.keyword("voidform", { name = "Voidform", pattern = "^Surge cards can't be played",
   text = "Insanity is never spent, Shadow hits grow." })
 L.keyword("innerFocus", { name = "First card", pattern = "^First card each turn:",
@@ -55,16 +57,17 @@ L.keyword("innerFocus", { name = "First card", pattern = "^First card each turn:
 Priest.EPICS = { "prayer_of_mending", "misery", "echo_of_light", "shadow_covenant", "reflective_shield",
   "voidform", "inner_focus" }
 
--- Réglages (fiche : docs/zones/cartes-de-zone.md ; réglés par la simulation le 14/11/2026, reports/priest-*-m*.txt :
--- Echo of Light +0 → +7, Shadow Covenant 2 → 3 PV, Reflective Shield sans plafond → 2 par coup, Voidform
--- + 1 par 3 Insanity → + 1 par Insanity, Inner Focus +50 % → +75 %).
-Priest.MENDING_UP = 2        -- Prayer of Mending amélioré : + 2 par soin
-Priest.MISERY_UP = 1         -- Misery amélioré : + 1 par copie
-Priest.ECHO_PLUS = { 7, 9 }  -- Echo of Light : + N par tic (base, amélioré)
-Priest.COVENANT_HP = 3       -- Shadow Covenant : PV par point de mana
-Priest.REFLECT_CAP = { 2, 4 }  -- Reflective Shield : Absorb perdue renvoyée, au plus N par coup (base, amélioré)
-Priest.VOID_BONUS = { 1, 2 } -- Voidform : dégâts en plus par point d'Insanity, par coup Shadow (base, amélioré)
-Priest.FOCUS_SCALE = { 1.75, 2 } -- Inner Focus : facteur (base, amélioré)
+-- Réglages (fiche : docs/zones/cartes-de-zone.md). Réglage par zones du 14/11/2026 (docs/classes.md,
+-- « Épiques du Prêtre ») : Duskwood, Stranglethorn, Steppes contre epic=none, cible +8 à +14 par épique.
+Priest.MENDING_UP = 2          -- Prayer of Mending amélioré : + 2 par soin
+Priest.MISERY_UP = 1           -- Misery amélioré : + 1 par copie
+Priest.ECHO_START = 4          -- Echo of Light : Regen gagnée au début de chaque combat
+Priest.ECHO_PLUS = { 0, 2 }    -- Echo of Light : + N par tic (base, amélioré)
+Priest.COVENANT_HP = { 2, 2 }  -- Shadow Covenant : PV par point de mana (base, amélioré)
+Priest.COVENANT_STEP = 2       -- Shadow Covenant : + N PV par carte Shadow déjà jouée ce tour
+Priest.REFLECT_PCT = { 1 / 3, 1 / 2 } -- Reflective Shield : part de l'Absorb perdue renvoyée, au-dessous (base, amélioré)
+Priest.VOID_BONUS = { 1, 2 }   -- Voidform : dégâts en plus par point d'Insanity, par coup Shadow (base, amélioré)
+Priest.FOCUS_SCALE = { 1.5, 2 } -- Inner Focus : facteur (base, amélioré)
 Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
 
 -- Épique du Prêtre active dans ce combat : id, amélioration (nil sans épique).
@@ -152,6 +155,7 @@ H.misery = {
   end,
 }
 
+-- Echo of Light : Regen de départ posée par whileInDeck (plus bas), au début du combat.
 H.echo_of_light = {
   regenHeal = function() return 0 end,
   onRegenTick = function(c, src, n)
@@ -167,20 +171,25 @@ local function covenantFree(c, src)
   return src.up and (c.turn.bySchool.shadow or 0) == 0
 end
 
+-- PV d'une carte Shadow de coût final n ≥ 1 : 2 par point, + 2 par carte Shadow déjà jouée ce tour.
+function Priest.covenantHp(c, up, n)
+  return Priest.COVENANT_HP[up and 2 or 1] * n + Priest.COVENANT_STEP * (c.turn.bySchool.shadow or 0)
+end
+
 H.shadow_covenant = {
   cost = function(c, src, v, d)
     if c.cls.peek or not v or d.school ~= "shadow" then return v end
     if v >= 1 then return 0 end
     return v
   end,
-  -- coût final en mana (autres Powers et bibelots compris) relu sans la conversion : PV = 2 par point
+  -- coût final en mana (autres Powers et bibelots compris) relu sans la conversion : Priest.covenantHp
   payHp = function(c, src, v, d, inst)
     if d.school ~= "shadow" or not d.cost or c.player.flags.freeTurnActive then return v end
     if covenantFree(c, src) then return v end
     c.cls.peek = true
     local n = math.max(0, Combat.modify(c, "cost", d.cost, d, inst))
     c.cls.peek = nil
-    if n >= 1 then return v + Priest.COVENANT_HP * n end
+    if n >= 1 then return v + Priest.covenantHp(c, src.up, n) end
     return v
   end,
 }
@@ -188,7 +197,7 @@ H.shadow_covenant = {
 H.reflective_shield = {
   afterHit = function(c, src, e, loss, absorbed)
     if not absorbed or absorbed <= 0 then return end
-    strike(c, e, math.min(absorbed, Priest.REFLECT_CAP[src.up and 2 or 1]))
+    strike(c, e, floor(absorbed * Priest.REFLECT_PCT[src.up and 2 or 1] + 1e-9))
   end,
 }
 
@@ -243,6 +252,14 @@ Priest.HOOKS = H
 for id, hooks in pairs(H) do
   local d = ns.Cards[id]
   if d then d.deckHooks = hooks end
+end
+
+-- Echo of Light : Regen de départ, une fois au début de chaque combat (après init de la classe, avant
+-- onCombatStart : le premier tic part au début du premier tour).
+if ns.Cards.echo_of_light then
+  ns.Cards.echo_of_light.whileInDeck = function(c)
+    if Priest.ECHO_START > 0 then Combat.applyStatus(c, c.player, "regen", Priest.ECHO_START) end
+  end
 end
 
 ---------------------------------------------------------------------------

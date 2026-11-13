@@ -447,6 +447,61 @@ dégâts, Absorb, soin, DoT et Regen pendant la résolution de la carte incanté
 / `onCardPlayed` + `damage`, `block`, `heal`, `apply`, `applySelf`) : le soin d'Atonement de cette carte est
 multiplié aussi. Bots : `classDef.bot.byEpic[id]` (cartes centrales, améliorations, retraits de chaque build),
 `classDef.bot.epic(exp, id)` note l'épique selon les cartes centrales déjà prises.
+
+**Réglage par zones (14/11/2026, brief `build/brief-epiques-reglage.md`).** Mesure de référence : `runner=expedition
+class=priest level=7 key=0 bot=heuristic runs=600`, `zone=duskwood zones=1`, `zone=stranglethorn zones=3`,
+`zone=steppes zones=5` ; gain = victoires avec l'épique imposée (`epic=<id>`) − victoires `epic=none`
+(66,5 / 62,5 / 52,3 %). Outils : `build/prs_measure.sh`, `build/prs_table.py`, `build/prs_tune.lua` (réglages
+essayés par `PRS_TUNE`, sans toucher au code ; non versionnés). Rapports `reports/prs-*.txt`.
+
+| Épique | Règle (base / améliorée) | Duskwood | Stranglethorn | Steppes | Moyenne | PV perdus / combat normal | Changement |
+|---|---|---|---|---|---|---|---|
+| Prayer of Mending | PV rendus à un ennemi (+ 2) | +10,2 | +7,8 | +19,7 | +12,6 | 8,4–10,4 | aucun |
+| Misery | DoT copié sur les autres (+ 1) | +5,8 | +8,8 | +18,0 | +10,9 | 6,4–9,0 | aucun |
+| Echo of Light | Regen 4 au départ ; tic = sa valeur à tous (+ 2), sans soin | +8,7 | +3,8 | +23,9 | +12,1 | 3,8–6,3 | + 7 fixe par tic → Regen 4 de départ (règle de la fiche) |
+| Shadow Covenant | 2, 4, 6… PV par carte Shadow du tour (0, 4, 6…) | +11,8 | +5,8 | +22,9 | +13,5 | 11,5–12,5 | 3 PV par mana → 2 PV + 2 par carte Shadow déjà jouée |
+| Reflective Shield | le tiers (la moitié) de l'Absorb perdue renvoyé | +5,2 | +12,2 | +20,9 | +12,8 | 6,4–7,9 | plafond 2 (4) par coup retiré, part renvoyée |
+| Voidform | + 1 (+ 2) par Insanity aux coups Shadow | +6,2 | +8,2 | +20,0 | +11,5 | 8,1–9,8 | aucun |
+| Inner Focus | première carte en Cast, × 1,5 (× 2) | +10,3 | +2,8 | +24,4 | +12,5 | 10,5–12,5 | + 75 % → + 50 % (fiche) |
+
+Moyenne des sept : **+12,3** (départ : +12,2, mais Inner Focus à +21,9 et Echo of Light à +6,8 ; la cible
++10 à +12 est dépassée de 0,3, dans le bruit de mesure). Westfall (`zone=westfall zones=7`, pour information,
+sans épique 78,2 %) : Prayer of Mending +7,3, Misery +3,5, Echo of Light +9,5, Shadow Covenant +7,0,
+Reflective Shield +8,0, Voidform +5,6, Inner Focus +1,5.
+
+Mesures qui ont guidé les nombres (moyenne des trois zones) :
+- Reflective Shield : tout renvoyer +33,9, la moitié +22,0, le tiers (amélioré + 3) +15,3, le tiers / la
+  moitié +12,8, le tiers / le tiers +10,6, le quart / le tiers +7,2. Contrôle « à blanc » (rien renvoyé, mêmes
+  conseils de bot) : −4,5, les conseils seuls ne rapportent rien. « Absorb − 2 par gain » en contrepartie :
+  −3,8 (Duskwood −16), écarté.
+- Shadow Covenant : 3 PV par mana +9,3 (Stranglethorn +0,7, 13 PV perdus), 2 PV +25,3, 2 PV et −1 mana par tour
+  −38, 2 PV + 1 par carte du tour +20,1, 2 PV + 2 par carte du tour +13,5, 2 PV + 3 par carte du tour +10,4
+(Stranglethorn +1,8, 12–13 PV perdus : écarté). L'amélioration (première gratuite)
+  ne change presque rien (3 PV : 74,2 / 63,2 / 70,2 sans elle).
+- Echo of Light : sans Regen de départ, + 7 par tic +6,8 ; Regen 3 et + 0 / + 2 / + 4 : +4,7 / +15,1 / +21,3 ;
+  Regen 4 et + 0 / + 1 : +12,1 / +17,5.
+- Inner Focus : × 1,75 +21,9 (Steppes +34,7) ; × 1,5 +12,5 ; × 1,5 sans interruption possible +20,0
+  (Stranglethorn +15,0, Steppes +34,2) ; × 1,5 plafonné à + 10 par valeur +8,3 ; × 1,25 sans interruption +7,6
+  (Duskwood −4,5) ; « à blanc » × 1 : −25,6 (Duskwood −34, Steppes −17).
+
+Hors cible et pourquoi :
+- **Steppes au-delà de +18** pour cinq épiques sur sept (+19,7 à +24,4) : le Priest n'y gagne que 52 % sans
+  épique, et la zone se joue sur Grark Lorkrub (61 % au boss sans épique, 77 à 92 % avec) ; tout ce qui
+  tue plus vite ou garde des PV pour le boss y rapporte le double des autres zones. Baisser les nombres pour
+  passer sous +18 à Steppes ferait tomber Duskwood et Stranglethorn sous +3.
+- **Inner Focus** reste la plus dépendante des zones, quel que soit le nombre : le retard d'un tour coûte cher
+  contre Morbent Fel (Duskwood, à blanc 39 % au boss contre 72 %) et rien contre Grark ; à Stranglethorn les
+  interruptions coupent la carte incantée (15 % des incantations en combat normal) : +2,8. La variante « ne peut
+  pas être interrompue » remonte Stranglethorn (+15) mais pousse Steppes à +34 ; non retenue. PV perdus 10,5–12,5
+  (le premier Absorb du tour arrive un tour plus tard).
+- **Shadow Covenant** : 11,5–12,5 PV perdus par combat normal (c'est le prix de la règle) ; Stranglethorn +5,8
+  (cause probable, non vérifiée : le Hex vise la carte la plus chère, donc les cartes que le mana paie encore).
+- **Echo of Light** : 3,8 PV perdus à Steppes (sous 5 : l'épique tue les groupes avant qu'ils ne frappent).
+
+Bot : non modifié. Le contrôle à blanc de Reflective Shield montre que ses conseils (`byEpic`) ne rapportent
+rien seuls. Pistes non vérifiées : sous Inner Focus le bot perd des combats normaux (95 % contre 98,5 % sans
+épique, 12 PV perdus contre 9,6), signe probable d'un mauvais choix de la première carte (Absorb retardée) ;
+`botValue` ne donne aucune valeur propre à Shadow Covenant (la hausse dans le tour n'est vue que coup par coup).
 ### Hunter : les sept épiques (14/11/2026)
 
 Données et règles dans `Data/Hunter.lua` (bloc « Cartes épiques », nombres réglés dans la table `EPIC`,

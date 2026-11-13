@@ -123,10 +123,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Regen no longer heals.` / `Each Regen tick: deal` / `that much to all.` | `…` / `that much + 2 to all.` |
+| —, Epic | `Epic.` / `Each Regen tick: deal` / `that much to all, no heal.` / `Start of combat:` / `gain Regen 4` | `…` / `that much + 2 to all, no heal.` / `…` |
 
-- **Règle.** Au début du tour du Priest, le tic de Regen ne soigne plus : il inflige sa valeur (amélioré :
-  + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme d'habitude.
+- **Règle.** Au début de chaque combat, le Priest gagne Regen 4. Au début de son tour, le tic de Regen ne
+  soigne plus : il inflige sa valeur (amélioré : + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme
+  d'habitude. Réglage par zones du 14/11/2026 : la Regen de départ donne à l'épique de quoi fonctionner seule
+  (4 + 3 + 2 + 1 à chaque ennemi sur quatre tours) ; elle remplace le bonus fixe (+ 7 par tic) de la version
+  réglée à Westfall.
 - **Cas limites.** Toute Regen est concernée, Spirit of Redemption compris (sa Regen 6 frappe au lieu de
   soigner : à dire dans l'infobulle). Les autres soins (Flash Heal, Atonement, potions) soignent toujours.
   Dégâts sans carte, Sundered compris. Le tic a lieu au même moment qu'un Cast résolu en début de tour :
@@ -144,10 +147,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Shadow cards: Pay 2 HP` / `per mana, not mana.` | `…` / `The first each turn` / `is free.` |
+| —, Epic | `Epic.` / `Shadow cards: pay HP,` / `not mana: 2, 4, 6...` / `each turn.` | `…` / `not mana: 0, 4, 6...` / `each turn.` |
 
 - **Règle.** Une carte Shadow dont le coût en mana (tous modificateurs compris) vaut N ≥ 1 coûte 0 mana et
-  « Pay 2N HP. » à la place. Amélioré : la première carte Shadow jouée dans le tour ne coûte ni mana ni PV.
+  « Pay 2N HP. » à la place, + 2 PV par carte Shadow déjà jouée dans le tour (toutes les cartes Shadow coûtent
+  1 : 2, 4, 6… PV). Amélioré : la première carte Shadow jouée dans le tour ne coûte ni mana ni PV (la suivante
+  paie 4). Réglage par zones du 14/11/2026 : 2 PV par carte rapportaient +25 points, 3 PV +9 avec 13 PV perdus
+  par combat normal et rien à Stranglethorn ; la hausse dans le tour est le plafond lisible entre les deux.
 - **Cas limites.** Règle commune de « Pay N HP » : payé au jeu, compte comme une perte de PV, ignore
   l'Absorb, carte injouable si elle ferait tomber à 0. Les cartes Shadow à 0 (Devouring Plague, Silence)
   ne changent pas. Curse of Tongues (+1 à la première carte) ajoute 2 PV. Lien Stranglethorn : le Hex vise
@@ -163,10 +169,12 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: deal the` / `damage absorbed to` / `the attacker.` | `…` / `damage absorbed + 3` / `to the attacker.` |
+| —, Epic | `Epic.` / `When hit: deal a third` / `of the damage absorbed` / `to the attacker.` | `When hit: deal half` / `the damage absorbed` / `to the attacker.` |
 
-- **Règle.** Chaque coup ennemi qui entame l'Absorb du Priest (même en entier) inflige à son auteur
-  l'Absorb perdue sur ce coup (amélioré : + 3), sans carte, comme Retaliation.
+- **Règle.** Chaque coup ennemi qui entame l'Absorb du Priest (même en entier) inflige à son auteur le tiers
+  (amélioré : la moitié) de l'Absorb perdue sur ce coup, arrondi au-dessous, sans carte, comme Retaliation.
+  Réglage par zones du 14/11/2026 : le plafond de 2 par coup (version réglée à Westfall) est retiré, la part
+  renvoyée grandit avec l'Absorb ; renvoyer tout rapportait +34 points, la moitié +22, le tiers +11 à +13.
 - **Cas limites.** Une attaque à plusieurs coups renvoie coup par coup. Pain Suppression divise le coup
   avant l'Absorb : seul ce qui est réellement absorbé revient. Le DoT et les Curses ne sont pas des coups.
   Auteur mort en cours d'attaque : rien. Les ennemis qui n'attaquent pas (lanceurs, dormeurs) ne
@@ -182,12 +190,13 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Surge cards can't be` / `played. Shadow hits:` / `+1 per 3 Insanity.` | `…` / `+1 per 2 Insanity.` |
+| —, Epic | `Epic.` / `Surge cards can't be` / `played.` / `Per Insanity:` / `Shadow hits +1.` | `…` / `Shadow hits +2.` |
 
 - **Règle.** Les cartes qui ont une clause Surge sont injouables (raison « Voidform »). Chaque coup d'une
-  carte Shadow inflige 1 de plus par tranche de 3 Insanity (amélioré : 2), lue au moment du coup.
+  carte Shadow inflige 1 de plus par point d'Insanity (amélioré : 2), lue au moment du coup (réglage du
+  14/11/2026 : + 1 par tranche de 3 ne rapportait rien ; gardé tel quel au réglage par zones).
 - **Cas limites.** Le DoT n'en profite pas (ce n'est pas un coup de carte). L'Insanity n'a pas de plafond
-  et vit le temps du combat : au 4e tour, 12 à 16 Insanity, soit +4 ou +5 par coup. Les cartes Holy n'ont
+  et vit le temps du combat : au 4e tour, 12 à 16 Insanity, soit +12 à +16 par coup. Les cartes Holy n'ont
   rien. Lien Steppes : un Shadow qui finit vite, avant que le feu ne brûle longtemps.
 - **Deck piloté.** Centrales : Mind Blast (+2 Insanity, Cooldown 1), Mind Flay, SW: Pain et Vampiric Touch
   (+1 et la ligne « DoT: » de Mind Flay), Shadowform (+2 Insanity, +3), Schism, SW: Death, Psychic Scream
@@ -207,7 +216,10 @@ Infobulle : `The first Attack or Skill each turn is cast: damage, Absorb, heal, 
 - **Règle.** La première carte Attack ou Skill jouée dans le tour devient un Cast : elle prend
   l'emplacement d'incantation et se résout au début du tour suivant, avec ses valeurs de dégâts, d'Absorb,
   de soin, de DoT et de Regen multipliées par 1,5 (amélioré : 2), arrondies au supérieur. Une carte déjà
-  Cast reste Cast et reçoit le bonus.
+  Cast reste Cast et reçoit le bonus. Réglage par zones du 14/11/2026 : retour à +50 % (la version réglée à
+  Westfall était à +75 %, +22 points dans les zones dures) ; l'épique dépend des boss plus qu'aucune autre
+  (le retard coûte cher contre Morbent Fel, rien contre Grark Lorkrub ; les interruptions de Stranglethorn
+  coupent la carte incantée), voir docs/classes.md, « Épiques du Prêtre ».
 - **Cas limites.** Les Powers, Curses et cartes Hexed ne comptent pas (la suivante est « la première »).
   Pas de bonus sur les durées (Atonement, Sundered, Stunned ⌛), la pioche, le mana, l'Insanity. Le Priest
   n'a qu'un emplacement de Cast : une fois la première carte incantée, il ne peut plus jouer de carte Cast
