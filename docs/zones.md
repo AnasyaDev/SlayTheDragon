@@ -1,6 +1,8 @@
 # Coder une zone (guide de l'agent de zone)
 
-Une expédition se joue dans **une zone** ; la campagne en compte sept (décisions du joueur du 13/11/2026).
+La campagne compte sept zones (décisions du joueur du 13/11/2026) ; **une expédition les traverse toutes**, de
+Westfall à Blackrock Mountain, comme les actes de Slay the Spire (décision du joueur du 14/11/2026 : « Une
+expédition traverse la campagne » plus bas, `docs/expedition.md`, « Campagne continue »).
 Ce document est le contrat d'une zone : ce qu'il faut écrire, où, avec quels crochets du moteur, et ce qu'il
 ne faut pas toucher. Une zone se code **dans ses propres fichiers** : le moteur, l'interface, le bot et les
 harnais savent déjà tout ce que les six fiches demandent (table « besoin → crochet » par zone, plus bas).
@@ -17,7 +19,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | jouable (14/11/2026) : phases (moteur commun) et règles propres (Invincible, Fire Shield, Shadow of the Throne, Class Call), boss Nefarian (3 phases), Grim Guzzler, titre « Dragonslayer » ; six décors peints (peintre `cavern`) ; implémentation : `docs/zones/blackrock.md` § 13 |
 
-Le rang d'une zone (colonne « Ordre », `ns.Zone.order`, `Expedition.zoneRank`) règle aussi, hors des fichiers de
+Le rang de la zone EN COURS (colonne « Ordre », `ns.Zone.order`, `Expedition.zoneRank`) règle aussi, hors des fichiers de
 zone, la chance qu'une épique tombe sur un élite (`Expedition.EPIC.drop.elite`, 25 % à 85 %) et la part de rares
 des récompenses de cartes (`Expedition.RARE_BY_ZONE`, ×1 à ×2) : `docs/expedition.md`, « Cartes épiques ».
 
@@ -439,9 +441,12 @@ end
 ## 9. Simuler et régler
 
 - `luajit Sim/sim.lua runs=300 bot=heuristic jobs=8 runner=expedition zone=<zone> zones=<N> level=1..7 key=0 class=<c>` :
-  la zone jouée (`zone=`) ; `zones=N` : le compte et la classe ont gagné les N premières zones (commun et cartes
-  de zone des N premières, bibelots de clé ; pour jouer la zone d'ordre N, `zones=N-1` est le cas « première
-  fois »). « Statistiques de zone (par combat) » : les `Combat.zstat`.
+  `zone=<id>` isole une zone (diagnostic : départ dans la zone avec le deck de départ, arrêt après son boss ;
+  alias de `startzone=<id> maxzone=<id>`) ; sans `zone=`, l'expédition traverse la campagne depuis Westfall et
+  le rapport donne le tableau « Par zone » (atteinte, battue, PV et deck à l'entrée) : la mesure d'une zone dans
+  la campagne (deck qui a traversé les précédentes). `zones=N` : le compte et la classe ont gagné les N premières
+  zones (commun et cartes de zone des N premières, bibelots de clé ; pour la zone d'ordre N, `zones=N-1` est le
+  cas « première fois »). « Statistiques de zone (par combat) » : les `Combat.zstat`.
 - Bot (`Sim/zones/<zone>.lua`) :
 
 ```lua
@@ -477,29 +482,44 @@ end
   (et facultativement `scenes`) : sans `encounters`, la zone est déclarée mais pas jouable.
 - `ns.Zone` : `ORDER`, `FIRST`, `get(id)`, `count()`, `byOrder(n)`, `order(id)`, `name(id)`, `next(id)`,
   `prev(id)`, `playable(id)` (vrai quand `ns.Encounters[zone.encounters].boss` existe).
-- Une expédition porte sa zone (`exp.zone`) ; `Expedition.zoneDef(exp)` rend sa définition,
-  `Expedition.actName(exp)` son nom (bandeau, carte). Une zone = un acte (`exp.acts = 1`).
+- `exp.zone` = la zone EN COURS de l'expédition : règle de zone (`ns.ZoneRules`), ennemis, rencontres, cases de
+  parcours, décors, marchand, chute d'épique et part de rares la lisent ; `Expedition.zoneDef(exp)` rend sa
+  définition, `Expedition.actName(exp)` son nom, `Expedition.campaignName(exp)` « Duskwood · 2/7 ».
 
-## Ouverture des zones (par classe)
+## Une expédition traverse la campagne (décision du joueur, 14/11/2026)
 
-- La zone 1 est ouverte à toutes les classes. **Gagner une zone avec une classe ouvre la zone suivante
-  pour cette classe seulement** (`Meta.zoneOpen(meta, classe, zone)`, `Meta.classWon`).
-- Une zone se joue si elle est ouverte pour la classe ET jouable (`Meta.newExpedition` refuse sinon :
-  `"zone locked"`, `"zone coming later"`).
-- À l'accueil, chaque zone est un bouton : jouable (ouverte), « Locked » (zone précédente pas gagnée par la
-  classe ; raison « Win <Zone> with the <Classe> to open it. ») ou « Coming later » (pas de données).
+- **Départ toujours à Westfall** avec le deck de départ (`Meta.newExpedition`, `Save.start` : plus de choix de
+  zone). Huit étapes par zone, boss en 8 ; 56 étapes pour une expédition complète.
+- **Boss battu** : récompense de boss habituelle, puis passage à la zone suivante (phase `transit`, écran
+  « entre deux zones », action `{ "continue" }`) avec le même deck, les mêmes bibelots, l'or, les potions,
+  l'épique et les PV max ; **soin de 50 % des PV max** au passage (`Expedition.ZONE_HEAL`, sans dépasser le
+  maximum ; crochet `healOut` des soins hors combat : Cursed Eye of Paleth le divise par deux) ; nouvelle carte
+  de 8 étapes, tirée d'un flux dérivé de la graine de l'expédition et de la zone (`map:<zone>` ; Westfall garde
+  le flux `map` de l'état : cartes de Westfall inchangées). La règle de zone, les ennemis, rencontres, décors et
+  marchand deviennent ceux de la nouvelle zone. Les deux premiers combats de chaque zone sont « easy », comme
+  avant ; le prix du retrait de carte monte sur toute l'expédition ; une rencontre vue ne revient pas dans la
+  même expédition.
+- **Battre Nefarian** (boss de Blackrock Mountain) = victoire de l'expédition (`result = "won"`).
+- **Chaque boss battu compte tout de suite**, même si l'expédition échoue plus loin (`exp.beaten`,
+  `Meta.bank` appelé par `Save.settle` après chaque action de l'interface) : boss de la zone battu par la classe
+  (son épique de la zone, `cs.zones[zone].won`), meilleure clé de ce boss (bibelots de clé), boss battu par le
+  compte (commun de la zone, `meta.zones[zone]`), expérience des étapes franchies jusque-là, drapeaux posés.
+  Les déblocages de l'expédition en cours restent figés au départ (`exp.unlock`, `exp.flags`) : ce qui est
+  gagné en route sert à l'expédition suivante.
+- **Zone la plus loin atteinte** par classe (`cs.farthest`, `Meta.farthest`, `Meta.zoneReached`) : montrée à
+  l'accueil avec les boss battus (`Meta.beatenCount`).
 
 ## Trois sources de déblocage
 
 1. **Niveau de classe (1 à 7)** : cartes et bibelots de la classe (`level`), inchangé
    (`docs/expedition.md`, « Niveau de classe »).
-2. **Première victoire d'une classe dans une zone** : une carte rare et forte de cette classe, liée à la
-   zone, introuvable autrement. Champ de la carte : `zone = "westfall"` (avec `class` ; pas de `level`).
-   `Expedition.unlocked` la refuse tant que la classe n'a pas gagné la zone (`exp.unlock.won[zone]`) ;
+2. **Premier boss d'une zone battu par une classe** (au cours de n'importe quelle expédition) : la carte épique
+   de cette classe liée à la zone, introuvable autrement. Champ de la carte : `zone = "westfall"` (avec `class` ;
+   pas de `level`). `Expedition.unlocked` la refuse tant que la classe n'a pas battu ce boss (`exp.unlock.won[zone]`) ;
    ensuite elle entre dans la réserve de la classe (récompenses, marchand, rencontres). Elle est hors de la
    grille des niveaux (`Meta.classContent` l'exclut) ; `Meta.zoneCards(classe, zone)`. **Données réelles
    vides aujourd'hui** (un autre lot les écrira) ; l'écran Progress montre déjà l'emplacement.
-3. **Première victoire du compte dans une zone, toutes classes confondues** : le commun (cartes neutres,
+3. **Premier boss d'une zone battu par le compte, toutes classes confondues** : le commun (cartes neutres,
    bibelots communs, potions, rencontres), par le champ `tier` (réutilisé) : `tier = N` = débloqué par la
    première victoire du compte dans la zone d'ordre N ; `tier = 0` (ou absent) = disponible d'emblée.
    Palier commun du compte : `Meta.commonTier(meta)` (ordre de la zone la plus avancée gagnée par le compte),
@@ -529,43 +549,52 @@ une seule donnée (champ `tier` gardé tel quel). Les avantages de la Ligue suiv
 **Conséquence assumée** : tant que seule Westfall existe, le commun des zones 2 et 3 et les deux avantages
 sont inaccessibles en jeu. La simulation garde `zones=7` (ou `meta=exalted`) pour tout débloquer.
 
-## Clés mythiques : une par zone et par classe
+## Clés mythiques : une par classe, pour toute l'expédition (concepteur, 14/11/2026)
 
-- `cs.zones[zone] = { won, keyMax, bestKey }` ; `Meta.keyMax(meta, classe, zone)`,
-  `Meta.bestKey(meta, classe, zone)`. Gagner Westfall +2 avec le Mage ouvre Westfall +3 pour le Mage,
-  rien d'autre. Niveaux +1 à +5, affixes inchangés (`docs/expedition.md`).
+- Tranché par le concepteur (à revoir par le joueur) : **une clé vaut pour toute l'expédition**, par classe
+  (`cs.keyMax`, `Meta.keyMax(meta, classe)`) ; **la clé +N s'ouvre en battant Nefarian à la clé +N−1** (plafond
+  `Meta.MAX_KEY` = 5) ; `cs.bestKey` = meilleure clé d'une victoire complète. Affixes inchangés
+  (`docs/expedition.md`).
 - **Expérience : +15 % par niveau de clé** (`Meta.XP.key = 0.15`).
-- **Bibelots de clé** : la première victoire d'une classe à +1, +3 et +5 dans une zone débloque un bibelot
-  plus fort que les communs (`Meta.KEY_RELIC_LEVELS`). Champ du bibelot : `key = { zone = "westfall",
-  level = 3 }` (sans `tier` ; `class` facultatif pour le réserver à une classe). `Expedition.unlocked` le
-  refuse tant que la classe n'a pas gagné la zone à cette clé ou plus (`exp.unlock.won[zone] >= level`) ;
-  ensuite il entre dans le tirage de la classe (récompenses, coffres, marchand, choix de départ).
-  `Meta.keyRelics(classe, zone)`. **Données réelles vides aujourd'hui.**
+- **Bibelots de clé d'une zone** : battre le boss de CETTE zone pendant une expédition à +1, +3, +5 débloque
+  son bibelot (`Meta.KEY_RELIC_LEVELS` ; `cs.zones[zone].bestKey` = meilleure clé où la classe a battu ce
+  boss, `Meta.bestKey(meta, classe, zone)`). Champ du bibelot : `key = { zone = "westfall", level = 3 }` (sans
+  `tier` ; `class` facultatif). `Expedition.unlocked` le refuse tant que `exp.unlock.won[zone] < level`.
+  `Meta.keyRelics(classe, zone)`.
+- Migration (sauvegarde v6) : la clé de la classe = la plus haute clé ouverte dans une zone avant (rien de
+  retiré) ; les victoires par zone (`won`, `bestKey`) restent telles quelles (épiques, bibelots de clé) ;
+  `zs.keyMax` n'est plus lu.
 - Pas de cote ni de classement.
 
 ## Fin d'expédition (`Meta.record`, `Save.finish`)
 
-Le résumé annonce, en plus de l'expérience et de la montée de niveau : `zoneWon` (première victoire de la
-classe dans la zone), `zoneOpened` (zone suivante, ouverte pour la classe), `zoneCards`, `keyRelics`,
-`keyUnlocked` (clé suivante de la zone), `accountZone` et `common` (commun débloqué pour toutes les
-classes, avantages compris). Le bilan les écrit (« Westfall won with the Priest: Duskwood is open to the
-Priest (coming later). », « New Priest card: … », « New relic: … », « Mythic Keystone +2 unlocked in
-Westfall. », « First Westfall victory on this account: 2 neutral cards, 9 relics, 3 encounters unlocked
-for every class. ») et révèle cartes de zone et bibelots de clé à côté de ceux du niveau.
+Le résumé couvre toute l'expédition : `xp` (total), `levelBefore` / `levelAfter`, `zone` (zone atteinte),
+`beaten` (boss battus), `zones` (un par boss battu : `zoneWon`, `zoneCards`, `keyRelics`, `accountZone`,
+`common`), `zoneCards` et `keyRelics` à plat, `keyUnlocked` (Nefarian), `flags`. Le bilan dit jusqu'où le joueur
+est allé (« Fell in Duskwood (2/7) at stage 3… », « Zones beaten: Westfall (1 of 7). ») et regroupe les
+déblocages des boss battus (« First bosses defeated with the Priest: … », « New epic card: … », « First Westfall
+boss on this account: … unlocked for every class. », « Mythic Keystone +2 unlocked. »). Écrans :
+`docs/interface.md`, « Campagne continue ».
 
 ## Écran Progress, onglet « Zones »
 
-Une colonne par zone : nom, état (Won / Open / Locked / Coming later), clés ouvertes et meilleure clé,
-emplacement de la carte de zone (dos de carte grisé tant qu'elle est verrouillée ou pas encore écrite ;
-infobulle = « Win <Zone> to unlock » seule), trois cases de bibelots de clé +1 / +3 / +5 (point
-d'interrogation grisé ; infobulle « Win <Zone> +3 to unlock »). Détails : `docs/interface.md`.
+Une colonne par zone : nom, état (Beaten / Reached / Not reached / Coming later), meilleure clé où la classe a
+battu ce boss, emplacement de la carte de zone (dos de carte grisé tant qu'elle est verrouillée ; infobulle =
+« Win <Zone> to unlock » seule), trois cases de bibelots de clé +1 / +3 / +5 (infobulle « Win <Zone> +3 to
+unlock »). Détails : `docs/interface.md`.
 
 ## Simulation
 
-`runner=expedition zones=0..7 [zone=westfall]` : le compte et la classe ont gagné les N premières zones, à
-toutes les clés (commun, cartes de zone, bibelots de clé) ; drapeaux d'histoire d'un vétéran dès N ≥ 1.
-`meta=start` = `zones=0`, `meta=exalted` = `zones=7` (mesures « exalté » antérieures).
+`runner=expedition zones=0..7` : l'expédition traverse la campagne depuis Westfall ; tableau « Par zone » :
+part des expéditions qui atteignent la zone, qui battent son boss, taux conditionnel (battue / atteinte), PV /
+PV max / taille du deck à l'entrée (après le soin du passage), part avec une épique à l'entrée. `zones=N` : le
+compte et la classe ont gagné les N premières zones, à toutes les clés (commun, cartes de zone, bibelots de
+clé) ; drapeaux d'histoire d'un vétéran dès N ≥ 1. `meta=start` = `zones=0`, `meta=exalted` = `zones=7`.
+Diagnostic : `startzone=<id>` (départ dans cette zone avec le deck de départ, pour isoler une zone),
+`maxzone=<id>` (arrêt après le boss de cette zone, pour mesurer vite le début de campagne) ; `zone=<id>` = les
+deux (une zone seule, comme avant le 14/11/2026). Victoire = boss de la dernière zone de l'expédition (Nefarian
+sans `maxzone=` ni `zone=`). Mesures du 14/11/2026 : `docs/expedition.md`, « Mesures de la campagne continue ».
 
 ## Sauvegarde
 
-`Save.VERSION` 5, `Expedition.VERSION` 5 : voir `docs/expedition.md`, « Sauvegarde ».
+`Save.VERSION` 6, `Expedition.VERSION` 8 : voir `docs/expedition.md`, « Sauvegarde ».

@@ -621,6 +621,9 @@ local function enterZone(exp, zone)
   exp.transit = { from = from, to = zone, healed = healed }
   exp.phase = "transit"
 end
+-- Passage à la zone `zone` (phase « transit ») : appelé à la sortie du boss ; les tests et le harnais
+-- d'interface s'en servent pour amener une expédition dans une zone plus loin.
+X.enterZone = enterZone
 
 local function clearNode(exp)
   if not exp.nodeCleared then

@@ -117,51 +117,63 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   sur une texture du pack), éclat en ADD, lisibilité des crans à 12 unités, intensité du liseré Instant
   sur la table sombre, nouvelle icône `Media/Icons/inv_misc_bag_11.tga` (nouveau fichier : relancer le
   client).
-## Campagne par zones (13/11/2026)
+## Campagne continue : une expédition traverse les sept zones (14/11/2026)
 
-Règles : `docs/zones.md`. La Ligue des explorateurs a disparu de tous les écrans (barre, textes, infobulles,
-« League Favor ») ; ce qui en parle plus haut est historique.
+Règles : `docs/zones.md` et `docs/expedition.md` (« Campagne continue »). Remplace le choix de la zone à
+l'accueil (13/11/2026). La Ligue des explorateurs a disparu de tous les écrans ; ce qui en parle plus haut est
+historique.
 
-- **Accueil** (`Start`) : panneau monté à y 44 et allongé à 392 (son bas reste au-dessus de la note, y 446).
-  Sous la rangée des classes, libellé « Zone » et sept boutons rouges (`W.button`, 126 × 34, 4 puis 3 par
-  rangée, centrés) dans l'ordre de la campagne : nom de la zone ; la zone choisie au liseré d'or
-  (`SetSelected`) ; une zone verrouillée (zone précédente pas gagnée par la classe) ou à venir (pas de
-  données) est éteinte (pièce désaturée, libellé gris, `active = false` : aucune surbrillance au survol), avec
-  dessous en petit « Locked » ou « Coming later » ; infobulle = nom, état (« Won with the Priest, best key
-  +1. », « Open to the Priest. ») ou raison en rouge ; clic = la raison en message passager. Survol des
-  zones jouables : surbrillance seulement (pas d'agrandissement). Puis « Mythic Keystone » : les clés de la
-  zone choisie pour la classe (raison « A victory at +1 in Westfall unlocks key +2. »). Zone par défaut : la
-  dernière choisie si la classe peut la jouer, sinon la plus avancée qu'elle peut jouer ; options
-  `zone:<id>` (contrôleur : `C.startInfo()` → `{ class, zone, key, keyMax }`, `C.zoneStatus`, `C.zoneReady`).
-  Pas de raccourci clavier.
-- **Écran Progress** : en-tête « Zones » / « Cards » (onglet, option `ptab:zones` / `ptab:cards`), « Log »
-  (ex-« Reputation and log ») et « Back ». Onglet « Zones » : sept colonnes de 140 (nom en or, état « Won »
-  vert / « Open » / « Locked » / « Coming later » gris, « Keys +0 to +2 · best +1 »), la carte de zone de la
-  classe à 0,9 (vraie carte débloquée, sinon dos de carte grisé, infobulle « Win Duskwood to unlock » seule,
-  même quand la carte n'est pas encore écrite), trois cases de bibelots de clé (36, pas de 40) libellées
-  +1 / +3 / +5 (point d'interrogation grisé, infobulle « Win Westfall +3 to unlock » seule). Contrôleur :
-  `step.tab`, `step.zones` (`C.zoneRows`).
-- **Journal** (« Log », ex-méta) : titre « Expedition log », une barre (niveau de la classe ; détail « Zones
-  won: 1 of 7 · 3 expedition(s), 2 victory(ies) », puis « · title: Veteran » ou « · title: Dragonslayer », le
-  même titre que l'accueil, `ns.Blackrock.title`), journal (« Priest · Westfall +0 · victory · stage 8 · +76
-  experience »).
-- **Bilan** : « +76 Priest experience. » ; puis, selon le cas, « Westfall won with the Priest: Duskwood is open to
-  the Priest (coming later). », « New Priest card: … », « New relic: … », « Mythic Keystone +2 unlocked in
-  Westfall. », « First Westfall victory on this account: 2 neutral cards, 9 relics, 3 encounters unlocked for
-  every class. » (et « Every class: Choose a relic at the start of each expedition. » / « … One more relic at
-  the merchant. » aux zones 3 et 6). Une seule barre (niveau). Cartes de zone et bibelots de clé révélés avec
-  ceux de la montée de niveau ; sans révélation, le panneau s'allonge vers le bas si le texte l'exige.
-- **Bandeau** : le nom de la zone (plus « Act 1 · »).
-- **Bibelot au choix** (phase `start`, zone 3 du compte) : « Relic choice », « Choose a relic for this expedition. ».
-- Harnais : U4, U7, U12, UP adaptés ; section **UZ** (accueil : 7 zones dans l'ordre, états, raisons, boutons
-  dans le panneau sans chevauchement, survol sans agrandissement ; Duskwood rendue jouable le temps du test :
-  « Locked » puis ouverte au Prêtre seulement ; bilans (première victoire, puis +1 : carte de zone et bibelot
-  de clé de test révélés) ; onglet Zones ; clés par zone ; reprise d'une sauvegarde v4 avec un combat en
-  cours ; aucune chaîne « League », « Reputation », « Explorers », « Revered », « Exalted » à l'écran).
-  Aperçus : `accueil-zones`, `progression-zones`, `bilan-campagne`, `bilan-bibelot-de-cle`, `meta`.
-- Non vérifiable hors jeu : rendu de la pièce de bouton désaturée (`SetDesaturated` sur les tranches du
-  bouton rouge), lisibilité du petit « Coming later » (10) sur le bouton éteint, carte à 0,9 dans l'onglet
-  Zones (aperçu au survol), place du message passager au-dessus de la rangée des zones.
+- **Accueil** (`Start`) : panneau monté à y 44 et allongé à 392. Sous la rangée des classes, libellé
+  « Campaign » et sept plaques rouges (`W.button`, 126 × 34, 4 puis 3 par rangée, centrées) dans l'ordre de la
+  campagne, **affichées, jamais choisies** (toute expédition part de Westfall) : nom de la zone, dessous en
+  petit « Beaten » (vert : boss battu par la classe), « Reached » (atteinte) ou « Not reached » (plaque
+  éteinte : pièce désaturée, libellé gris) ; la plus loin atteinte au liseré d'or (`SetSelected`) ; aucune
+  plaque ne s'allume au survol ni ne réagit au clic (`active = false`, pas de `OnClick`) ; infobulle = nom et
+  état (« Boss defeated by the Priest, best key +1. », « Reached by the Priest, boss not yet defeated. »,
+  « Not yet reached by the Priest. »). Puis « Mythic Keystone » : les clés de la classe (une clé vaut pour
+  toute l'expédition ; raison « Defeat Nefarian at +1 to unlock key +2. »). Sous le panneau, la note : la
+  campagne de la classe (« Farthest: Duskwood (2/7) · bosses defeated: 1 of 7 », ou « From Westfall to
+  Blackrock Mountain. ») puis la dernière expédition. « Start expedition » (option `go`, texte « Westfall »).
+  Options `zone:<id>` (`info = true`, `status` = `won` / `reached` / `ahead` / `later`, `farthest`) ;
+  contrôleur : `C.startInfo()` → `{ class, zone = Westfall, key, keyMax }`, `C.zoneStatus`, `step.campaign`.
+- **Entre deux zones** (écran `Transit`, étape `transit`, phase `transit` de l'expédition) : après la récompense
+  du boss. Décor de la zone suivante (la zone de l'expédition est déjà la nouvelle : `Controller.scene()`),
+  héros, panneau d'ardoise (`W.dialog`, x 280, y 70, 560 × 250) : nom de la zone en grand (28, or), sept
+  pastilles de carte de vol (zones franchies vertes, la suivante jaune et plus grande, à venir grises : mêmes
+  pièces que le bandeau), texte « Westfall is behind you. Zone 2 of 7. », « You recover 12 HP (36/36). »
+  (vert) et, si le boss vaincu a débloqué quelque chose, « Unlocked for your next expeditions (Priest): epic
+  card Prayer of Mending, new common content for every class. ». Bouton doré « Continue » (790, 494 ;
+  option `continue`) ; l'abandon reste au menu. Le bandeau montre « Duskwood · 2/7 », sans pastilles d'étape.
+- **Carte et bandeau** : la zone en cours et sa place dans la campagne, « Duskwood · 2/7 »
+  (`Expedition.campaignName`, `runInfo().act`, titre de l'étape `map`).
+- **Écran Progress** : onglet « Zones » : sept colonnes (nom en or, état « Beaten » vert / « Reached » /
+  « Not reached » / « Coming later » gris, « Best key +1 » = meilleure clé où la classe a battu ce boss), la
+  carte de zone de la classe à 0,9 (vraie carte débloquée, sinon dos de carte grisé, infobulle « Win Duskwood
+  to unlock » seule), trois cases de bibelots de clé +1 / +3 / +5 (infobulle « Win Westfall +3 to unlock »
+  seule : battre le boss de Westfall à +3). Contrôleur : `step.tab`, `step.zones` (`C.zoneRows`).
+- **Journal** (« Log ») : une barre (niveau de la classe ; détail « Bosses defeated: 1 of 7 · farthest:
+  Duskwood · 3 expedition(s), 0 victory(ies) », puis le titre) ; lignes « date · Priest +0 · defeat ·
+  Duskwood (2/7) stage 3 · 1 boss · +70 experience » (zone atteinte, boss battus ; les entrées d'avant la
+  campagne continue gardent leur zone seule).
+- **Bilan** : jusqu'où le joueur est allé : « Nefarian has fallen: the 7 zones are crossed. … » (victoire), sinon
+  « Fell in Duskwood (2/7) at stage 3 against … » / « Turned back in … » (« Turned back at the gates of
+  Duskwood (2/7). » avant sa première étape), puis « Zones beaten: Westfall (1 of 7). » (ou « No zone
+  beaten. ») ; étapes, élites, boss ; expérience de toute l'expédition, montée de niveau ; déblocages des boss
+  battus, **regroupés** (une expédition peut en battre sept) : « First bosses defeated with the Priest:
+  Duskwood, Wetlands. », « New epic card(s): … », « New relic(s): … », « First Duskwood, Wetlands bosses on
+  this account: 16 neutral cards, … unlocked for every class. » (et les avantages communs), « Mythic Keystone
+  +2 unlocked. » (Nefarian). Cartes épiques, cartes et bibelots révélés comme avant.
+- Harnais : U6 (le boss de Westfall mène à l'écran entre deux zones : textes, soin, épique débloquée tout de
+  suite dans la méta, bandeau, décor de Duskwood, rechargement sur cet écran, « Continue », carte de Duskwood,
+  puis abandon), U7 (bilan : jusqu'où, Westfall battue, déblocages ; journal), section **UZ** réécrite
+  (accueil : sept plaques non cliquables, états, infobulles, la plus loin ; écran entre deux zones ; bilans :
+  chute à Duskwood, +1 avec bibelot de clé, victoire complète regroupée et clé +2 ; onglet Zones ; Mage sans
+  rien ; reprise v4) ; les sections de zone amènent l'expédition dans leur zone par `T.toZone(zone)`
+  (`Expedition.enterZone`, écran entre deux zones, « Continue »). Aperçus : `accueil-zones`,
+  `accueil-campagne`, `entre-zones`, `entre-zones-campagne`, `parcours-duskwood`, `bilan`, `bilan-campagne`,
+  `bilan-bibelot-de-cle`, `bilan-victoire-complete`, `progression-zones`.
+- Non vérifiable hors jeu : rendu des plaques éteintes (`SetDesaturated`), lisibilité du petit état (10) sur
+  la plaque, pastilles du panneau entre deux zones sur l'ardoise.
 
 ## Westfall réelle (13/11/2026)
 
@@ -1391,14 +1403,14 @@ Coordonnées : celles des maquettes, depuis le coin haut gauche de la zone inté
 
 **Bandeau** (y 0–31, sur la barre de titre du cadre métal, sur tous les écrans ; on le saisit pour déplacer
 la fenêtre) : à gauche la classe, « HP 52/65 », l'or (pièce), le deck (dos de carte et nombre ; partout,
-combat compris ; infobulle = contenu du deck ; clic = panneau du deck) ; au centre la zone (« Act 1 ·
-Westfall » sur la carte) puis, ailleurs, les pastilles de progression de la carte de vol sur la même ligne ;
+combat compris ; infobulle = contenu du deck ; clic = panneau du deck) ; au centre la zone et sa place dans
+la campagne (« Duskwood · 2/7 ») puis, ailleurs, les pastilles de progression de la carte de vol sur la même ligne ;
 à droite la clé mythique (case à l'icône de la clé, « +N », infobulle = affixes), les bibelots (cases au
 cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture. Détail : « Habillage WoW ».
 
 | Phase / vue | Écran | Contenu |
 | --- | --- | --- |
-| aucune expédition | **Accueil** (`start`) | décor voilé, héros ; parchemin : titre, classes (icônes), zones (sept boutons, « Campagne par zones »), clé +0…+5 de la zone (verrouillées sombres ; infobulle = affixes et raison), icônes d'affixes de la clé choisie ; plateau : « Progress », dernière expédition et avertissements de sauvegarde, « Partir en expédition » |
+| aucune expédition | **Accueil** (`start`) | décor voilé, héros ; parchemin : titre, classes (icônes), la campagne (sept plaques non cliquables : boss battu, atteinte, pas atteinte ; « Campagne continue »), clé +0…+5 de la classe (verrouillées sombres ; infobulle = affixes et raison), icônes d'affixes de la clé choisie ; plateau : « Progress », dernière expédition et avertissements de sauvegarde, « Partir en expédition » |
 | `start` | **Rencontre** (`choice`) | bibelot au choix (zone 3 gagnée par le compte) : bulle, une plaque par bibelot (icône, nom, effet), « Partir sans bibelot » |
 | `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss », icône du boss de la zone (`Art.ui.mapBoss.<zone>`, repli VanCleef) et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
 | `combat` | **Combat** | voir plus bas |
@@ -1407,8 +1419,9 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
-| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan et déblocages (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
-| vue méta | **Journal** (« Log ») | barre du niveau de la classe, zones gagnées, 8 dernières expéditions ; « Retour » |
+| `transit` | **Entre deux zones** (`transit`) | décor de la zone suivante, héros ; panneau : nom de la zone, pastilles de la campagne, soin du passage, déblocages du boss vaincu ; « Continue » |
+| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), jusqu'où (zone atteinte, zones battues), déblocages des boss battus regroupés (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
+| vue méta | **Journal** (« Log ») | barre du niveau de la classe, boss battus, zone la plus loin, 8 dernières expéditions (zone atteinte, boss battus) ; « Retour » |
 
 **Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi ; clic droit
 annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits

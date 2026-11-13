@@ -370,7 +370,8 @@ local function layoutDots(r)
   local mid = UI.mid
   local midW = UI.midW or 300
   local floors = r and r.floors
-  local showDots = floors and UI.step and UI.step.kind ~= "map"
+  -- ni sur la carte (elle montre les étapes) ni entre deux zones (aucune étape commencée)
+  local showDots = floors and UI.step and UI.step.kind ~= "map" and UI.step.kind ~= "transit"
   local n = showDots and math.min(floors - 1, #UI.dots) or 0
   local pipsW = showDots and (n * PIP_STEP + PIP_CUR) or 0
   local gap = showDots and 10 or 0

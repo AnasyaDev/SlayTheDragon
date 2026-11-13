@@ -460,24 +460,23 @@ function Start:Build(f)
   self.classIcons = {}
   self.className = W.label(panel, "bold", 14, C.wowGold)
   self.className:Hide()
-  -- Zones de la campagne : un bouton rouge par zone (nom ; dessous, en petit, « Locked » ou « Coming
-  -- later »), la choisie au liseré d'or ; verrouillées ou à venir : éteintes, sans surbrillance, raison en
-  -- infobulle et au clic.
+  -- La campagne : une plaque rouge par zone, dans l'ordre (nom ; dessous, en petit, « Beaten », « Reached »,
+  -- « Not reached »), affichée et non choisie (toute expédition part de Westfall) : aucun clic, aucune
+  -- surbrillance ; la plus loin atteinte au liseré d'or ; pas encore atteinte : éteinte ; état en infobulle.
   self.zoneLabel = W.label(panel, "bold", 15, C.wowGold)
   self.zoneLabel:SetPoint("TOP", 0, -START_ZONES)
-  self.zoneLabel:SetText("Zone")
+  self.zoneLabel:SetText("Campaign")
   self.zoneButtons = {}
   for i = 1, #ns.Zone.ORDER do
     local b = W.button(panel, "", START_ZONE_W, START_ZONE_H, nil, "red", 12.5)
     b.status = W.label(b.face, "body", 10, C.textSoft, "OVERLAY")
     b.status:SetPoint("CENTER", 0, -7.5)
-    b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    b.active = false
     W.tooltip(b, function(tt, btn)
       local o = btn.option
       if not o then return end
       tt:AddLine(o.label or "", 1, 0.82, 0)
       if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
-      if o.disabled and o.reason then tt:AddLine(o.reason, 1, 0.3, 0.3, true) end
     end, "ANCHOR_TOP")
     b:Hide()
     self.zoneButtons[i] = b
@@ -583,7 +582,7 @@ function Start:Show(step)
     self.className:Hide()
   end
   self.panel:SetHeight(START_PANEL_H)
-  -- zones : 4 puis 3 boutons, chaque rangée centrée
+  -- campagne : 4 puis 3 plaques, chaque rangée centrée ; état sous le nom ; pas encore atteinte : éteinte
   local perRow = 4
   for i, b in ipairs(self.zoneButtons) do
     local o = zones[i]
@@ -595,15 +594,17 @@ function Start:Show(step)
       b:SetPoint("TOP", self.panel, "TOP", (col - (inRow - 1) / 2) * START_ZONE_DX,
         -START_ZONES - 24 - row * START_ZONE_DY)
       b.option = o
-      local off = o.disabled and true or false
+      local off = o.status == "ahead" or o.status == "later"
       b:SetText(o.label)
       b.label:ClearAllPoints()
-      b.label:SetPoint("CENTER", 0, off and 5.5 or 0.5)
-      b.status:SetText(off and (o.statusLabel or "") or "")
+      b.label:SetPoint("CENTER", 0, 5.5)
+      b.status:SetText(o.statusLabel or "")
+      local sc = o.status == "won" and C.healGreen or C.textSoft
+      b.status:SetTextColor(sc[1], sc[2], sc[3])
       b.labelColor = off and C.textDim or C.wowGold
-      b.active = not off
+      b.active = false
       b.base:SetDesaturated(off)
-      b:SetSelected(o.selected)
+      b:SetSelected(o.farthest and true or false)
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -646,7 +647,10 @@ function Start:Show(step)
       b:Hide()
     end
   end
-  self.note:SetText(step.text or "")
+  -- sous le panneau : la campagne de la classe (zone la plus loin, boss battus), puis la dernière expédition
+  local note = step.campaign or ""
+  if step.text and step.text ~= "" then note = note .. (note ~= "" and "\n" or "") .. step.text end
+  self.note:SetText(note)
   for _, o in ipairs(others) do
     if o.id == "go" then
       self.go.option = o
@@ -1657,6 +1661,74 @@ function Map:Show(step)
 end
 
 ---------------------------------------------------------------------------
+-- Entre deux zones : le décor de la zone suivante, le héros, un panneau (nom de la zone, sa place dans la
+-- campagne en pastilles de carte de vol, soin du passage, déblocages du boss vaincu), « Continue »
+---------------------------------------------------------------------------
+-- Pastilles : zones franchies vertes, zone suivante jaune (plus grande), à venir grises (mêmes pièces que le
+-- bandeau). Abandon : bouton Menu du bandeau, comme ailleurs.
+
+local Transit = { kinds = { "transit" } }
+UI.register("transit", Transit)
+
+local TR_X, TR_Y, TR_W, TR_H = 280, 70, 560, 250
+local TR_PIP, TR_PIP_CUR, TR_PIP_DX = 16, 20, 34
+UI.TR = { x = TR_X, y = TR_Y, w = TR_W, h = TR_H }
+
+function Transit:Build(f)
+  self.hero = heroFigure(f)
+  local panel = W.dialog(f, nil)
+  at(panel, f, TR_X, TR_Y, TR_W, TR_H)
+  self.panel = panel
+  self.title = W.label(panel, "heavy", 28, C.wowGold)
+  self.title:SetPoint("TOP", 0, -24)
+  self.pips = {}
+  for i = 1, #ns.Zone.ORDER do
+    local d = W.wow(panel, "pip_gray", "ARTWORK", 1)
+    d:Hide()
+    self.pips[i] = d
+  end
+  self.text = W.label(panel, "bold", 14, C.textSoft)
+  self.text:SetPoint("TOP", self.title, "BOTTOM", 0, -52)
+  self.text:SetWidth(TR_W - 60)
+  self.text:SetJustifyH("CENTER")
+  self.text:SetWordWrap(true)
+  self.go = W.button(f, "Continue", 230, 50, nil, "gold", 18)
+  at(self.go, f, 790, 494, 230, 50)
+  self.go:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+  self.optionButtons = {}
+end
+
+function Transit:Show(step)
+  self.step = step
+  -- décor de la zone suivante (la zone de l'expédition est déjà la nouvelle : Controller.zoneScene)
+  UI.setStage({ scene = Controller.scene(), board = true, veil = 0.2 })
+  Scene.playerFigure(self.hero)
+  self.title:SetText(step.title or "")
+  local n, total = step.pos or 1, step.count or #self.pips
+  for i, d in ipairs(self.pips) do
+    if i <= total then
+      local size = i == n and TR_PIP_CUR or TR_PIP
+      W.setWow(d, i < n and "pip_green" or (i == n and "pip_yellow" or "pip_gray"))
+      d:SetSize(size, size)
+      d:ClearAllPoints()
+      d:SetPoint("CENTER", self.panel, "TOP", (i - (total + 1) / 2) * TR_PIP_DX, -82)
+      d:Show()
+    else
+      d:Hide()
+    end
+  end
+  self.text:SetText(inkText(step.text))
+  self.optionButtons = {}
+  for _, o in ipairs(step.options or {}) do
+    if o.id == "continue" then
+      self.go.option = o
+      self.go:SetText(o.label or "Continue")
+      self.optionButtons[o.id] = self.go
+    end
+  end
+end
+
+---------------------------------------------------------------------------
 -- Bilan et journal : panneau d'ardoise, barre de niveau de la classe, journal
 ---------------------------------------------------------------------------
 -- Bilan avec montée de niveau : sous les barres, ce qui vient d'être débloqué, révélé tel quel (vraies
@@ -2035,7 +2107,7 @@ function ClassProgress:ShowZones(zones, shown)
   local cardH = W.CARD_H * CP_ZONE_SCALE
   local cardCy = CP_ZONE_TOP + 80 + cardH / 2
   local relicY = CP_ZONE_TOP + 80 + cardH + 20
-  local STATUS_COLOR = { won = C.healGreen, open = C.text, locked = C.textDim, later = C.textDim }
+  local STATUS_COLOR = { won = C.healGreen, reached = C.text, ahead = C.textDim, later = C.textDim }
   for i, col in ipairs(self.zoneCols) do
     local z = shown and zones and zones[i]
     if z then
@@ -2054,11 +2126,9 @@ function ClassProgress:ShowZones(zones, shown)
       place(col.status, CP_ZONE_TOP + 20, z.statusLabel or "", 11.5)
       local sc = STATUS_COLOR[z.status] or C.text
       col.status:SetTextColor(sc[1], sc[2], sc[3])
+      -- meilleure clé à laquelle la classe a battu le boss de la zone (bibelots de clé +1, +3, +5)
       local keyText = ""
-      if z.status == "won" or z.status == "open" then
-        keyText = "Keys +0 to +" .. (z.keyMax or 0)
-        if (z.bestKey or -1) >= 0 then keyText = keyText .. " · best +" .. z.bestKey end
-      end
+      if z.status == "won" and (z.bestKey or -1) >= 0 then keyText = "Best key +" .. z.bestKey end
       place(col.keys, CP_ZONE_TOP + 36, keyText, 11)
       local e = z.card
       col.card.entry, col.lock.entry = e, e
