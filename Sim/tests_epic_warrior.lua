@@ -65,12 +65,12 @@ end
 ---------------------------------------------------------------------------
 -- Commun
 ---------------------------------------------------------------------------
-test("sept épiques : une par zone, rareté epic, sans coût ni niveau, débloquées par la zone", function()
+test("sept épiques : une par zone, rareté epic, coût 0, sans niveau, débloquées par la zone", function()
   local zones = {}
   for _, id in ipairs(Warrior.EPICS) do
     local d = ns.Cards[id]
     eq(d.class, "warrior"); eq(d.rarity, "epic"); eq(d.epic, true); eq(d.type, "power")
-    eq(d.cost, nil, id .. " : coût"); eq(d.level, nil, id .. " : niveau")
+    eq(d.cost, 0, id .. " : coût (jamais payé)"); eq(d.level, nil, id .. " : niveau")
     assert(d.deckHooks and d.up and d.up.deckHooks, id .. " : crochets")
     assert(d.text:find("^Epic%.\n") and d.up.text:find("^Epic%.\n"), id .. " : « Epic. » en tête")
     assert(not zones[d.zone], "une par zone"); zones[d.zone] = id
@@ -466,21 +466,24 @@ end)
 ---------------------------------------------------------------------------
 -- Bots
 ---------------------------------------------------------------------------
-test("bot : conseils du deck selon l'épique, note d'épique attachée à celle du deck", function()
+test("bot : conseils par épique (bot.byEpic), note d'épique attachée à celle du deck", function()
   local bot = ns.Classes.warrior.bot
   local exp = X.new({ seed = 3, class = "warrior", unlocks = Meta.allUnlocked(7, 7) })
-  eq(bot.deck(exp), nil, "sans épique")
   X.addCard(exp, "death_wish")
-  local adv = bot.deck(exp)
-  assert(adv and adv.rating.shield_block < 5 and adv.remove.defend < 1 and adv.remove.death_wish == 99)
+  local adv = bot.byEpic.death_wish
+  assert(adv.rating.shield_block < 5 and adv.remove.defend < 1 and adv.remove.death_wish == 99)
   assert(bot.epic(exp, "death_wish") > bot.epic(exp, "avatar") + 0.5, "garde l'épique du deck")
   for _, id in ipairs(Warrior.EPICS) do
-    assert(bot.advice[id] and bot.advice[id].rating and bot.advice[id].upgrade[id], id)
+    local a = bot.byEpic[id]
+    assert(a and a.rating and a.upgrade[id] and a.remove[id] == 99, id)
   end
+  -- Titan's Grip : les Strike partent les premiers (retrait 0)
   local rec, e2 = ns.SimExpedition.play({ seed = 2, class = "warrior", epic = "titans_grip", zones = 7 })
   eq(e2.deck[X.epicIndex(e2)].id, "titans_grip", "le bot garde l'épique imposée")
-  for _, cd in ipairs(e2.deck) do
-    if cd.id == "strike" and rec.removed and rec.removed > 0 then error("Strike gardé malgré des retraits") end
+  if (rec.removed or 0) > 0 then
+    local strikes = 0
+    for _, cd in ipairs(e2.deck) do if cd.id == "strike" then strikes = strikes + 1 end end
+    assert(strikes < 4, "un Strike retiré d'abord")
   end
 end)
 

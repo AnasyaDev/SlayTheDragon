@@ -47,6 +47,14 @@ local cards = {
   cheat_death      = I("Ability_Rogue_CheatDeath", 31230),
   smoke_bomb       = I("ability_rogue_smoke", 76577),
   shadow_dance     = I("Ability_Rogue_ShadowDance", 185313),
+  -- cartes épiques (une par zone)
+  deflection        = I("Ability_Rogue_Dismantle", 13713),
+  doomblade         = I("Ability_Rogue_Deathmark", 381673),
+  atrophic_poison   = I("Rogue_Paralytic_Poison", 381637),
+  echoing_reprimand = I("INV_Ability_Rogue_EchoingReprimand", 323547),
+  subterfuge        = I("Rogue_Subterfuge", 108208),
+  kidney_shot       = I("Ability_Rogue_KidneyShot", 408),
+  danse_macabre     = I("Rogue_Shadow_Reflection", 382528),
 }
 for id, e in pairs(cards) do Art.cards[id] = e end
 
@@ -82,17 +90,118 @@ Art.classes.rogue.resource = { tga = "INV_ThrowingKnife_04", icon = "Interface\\
 
 -- Vue de classe : sous Stealth, le modèle du héros passe en semi-transparence (indice immédiat) ;
 -- rendu à pleine opacité dès que la vue est cachée (autre classe, fin du combat).
+-- Épique du combat (ns.Rogue, Core/Classes/rogue.lua) : une ligne sous les états du héros, icône de
+-- l'épique et ce qu'elle change maintenant (ripostes du tour et la suivante, noms joués, Surge qui compte
+-- 5, Surge qui étourdit, Stealth jusqu'à la fin du tour) ; Atrophic Poison : marque sur chaque ennemi qui
+-- compte comme Demoralized. N'applique aucune règle : lit le combat.
 local STEALTH_ALPHA = 0.45
+local EPIC_ICON, MARKS = 22, 6
+
+-- Texte de la ligne de l'épique (nil : rien à montrer). Lu aussi par le harnais.
+function Art.rogueEpicLine(c)
+  local R = ns.Rogue
+  if not R then return nil end
+  local id, up = R.epicOf(c)
+  if not id then return nil end
+  local E, res = R.EPIC, c.player.res or 0
+  local k = up and 2 or 1
+  if id == "deflection" then
+    return ("Ripostes this turn: |cffffffff%d|r   next: |cffffffff%d|r"):format(R.ripostes(c), R.nextRiposte(c))
+  elseif id == "danse_macabre" then
+    local n = R.namesPlayed(c)
+    return ("Card names this turn: |cffffffff%d|r   +%d per hit"):format(n, math.min(n * E.danse_macabre[k], E.danseCap[k]))
+  elseif id == "echoing_reprimand" then
+    if res == 2 or res == 3 then return ("Surge now counts as |cffffffff%d|r Combo"):format(E.echoing_reprimand[k]) end
+  elseif id == "kidney_shot" then
+    if res >= E.kidney_shot[k] then return "Surge now stuns the target" end
+  elseif id == "subterfuge" then
+    local left = R.stealthLeft(c)
+    if left == 1 then return "Stealth until the end of the turn" end
+    if left and left > 1 then return ("Stealth for |cffffffff%d|r turns"):format(left) end
+  end
+  return nil
+end
+
+-- L'ennemi compte-t-il comme Demoralized par Atrophic Poison (et pas par un vrai Demoralized) ?
+function Art.rogueAtrophic(c, e)
+  local R = ns.Rogue
+  if not (R and R.epicOf(c) == "atrophic_poison") or e.dead then return false end
+  return R.countsDemoralized(c, e)
+end
+
 ns.ClassViews.rogue = {
   build = function(host, view)
+    local W = ns.Widgets
     host:SetScript("OnHide", function()
       local m = view.playerModel
-      if m and not m.dead then ns.Widgets.modelAlpha(m, 1) end
+      if m and not m.dead then W.modelAlpha(m, 1) end
     end)
+    -- ligne de l'épique : icône (infobulle = la carte) et texte
+    local ep = CreateFrame("Frame", nil, host)
+    ep:SetSize(EPIC_ICON, EPIC_ICON)
+    ep:SetPoint("LEFT", host, "LEFT", 2, 0)
+    ep:EnableMouse(true)
+    ep.slot = W.slotOn(ep, EPIC_ICON)
+    W.tooltip(ep, function(tt, f)
+      if f.epicId then W.fillCardTooltip(tt, f.epicId, f.epicUp, { full = true }) end
+    end, "ANCHOR_RIGHT")
+    ep.text = W.label(host, "bold", 11, Art.C.goldText, "OVERLAY")
+    ep.text:SetPoint("LEFT", ep, "RIGHT", 6, 0)
+    ep:Hide()
+    ep.text:Hide()
+    host.epic = ep
+    -- marques d'Atrophic Poison (une par ennemi, à droite de son cadre)
+    host.marks = {}
+    for i = 1, MARKS do
+      local mk = CreateFrame("Frame", nil, host)
+      mk:SetSize(16, 16)
+      mk:SetFrameLevel(host:GetFrameLevel() + 30)
+      mk.icon = W.noSnap(mk:CreateTexture(nil, "ARTWORK", nil, 0))
+      mk.icon:SetAllPoints()
+      W.roundMask(mk, mk.icon)
+      W.setIcon(mk.icon, Art.cards.atrophic_poison, "card:atrophic_poison")
+      mk.icon:SetDesaturated(true)
+      mk:EnableMouse(true)
+      W.tooltip(mk, function(tt)
+        tt:AddLine("Atrophic Poison", 0.64, 0.21, 0.93)
+        tt:AddLine("Has DoT: counts as Demoralized.", 1, 1, 1, true)
+      end, "ANCHOR_RIGHT")
+      mk:Hide()
+      host.marks[i] = mk
+    end
   end,
   render = function(host, c, view)
+    local W = ns.Widgets
     local m = view.playerModel
-    if not m or m.dead then return end
-    ns.Widgets.modelAlpha(m, (c.player.st.stealth or 0) > 0 and STEALTH_ALPHA or 1)
+    if m and not m.dead then
+      W.modelAlpha(m, (c.player.st.stealth or 0) > 0 and STEALTH_ALPHA or 1)
+    end
+    local ep = host.epic
+    local id, up = ns.Rogue.epicOf(c)
+    local line = id and Art.rogueEpicLine(c)
+    if line then
+      if ep.epicId ~= id then W.setIcon(ep.slot.icon, Art.cards[id], "card:" .. id) end
+      ep.epicId, ep.epicUp = id, up
+      ep.text:SetText(line)
+      ep:Show()
+      ep.text:Show()
+    else
+      ep.epicId = nil
+      ep:Hide()
+      ep.text:Hide()
+    end
+    local k = 0
+    for i = 1, #c.enemies do
+      local e = c.enemies[i]
+      local s = view.slotOf and view.slotOf[e.uid]
+      if k < MARKS and s and s.tag and s:IsShown() and Art.rogueAtrophic(c, e) then
+        k = k + 1
+        local mk = host.marks[k]
+        mk:ClearAllPoints()
+        mk:SetPoint("LEFT", s.tag, "RIGHT", 2, 0)
+        mk:Show()
+      end
+    end
+    for i = k + 1, MARKS do host.marks[i]:Hide() end
   end,
 }

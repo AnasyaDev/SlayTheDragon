@@ -18,24 +18,21 @@ return function(ns)
   -- path=<voie> (SE.play, opts.path) : les cartes de classe d'une autre voie et les cartes neutres valent 0,
   -- donc ne sont jamais prises (voie jouée seule).
   local onlyPath
-  -- Conseils propres au deck de l'expédition jouée (épique qui pilote le build) : classDef.bot.deck(exp) ->
-  -- { rating = { id = note }, upgrade = { id = valeur }, remove = { id = valeur } } ou nil ; une entrée
-  -- présente remplace la note, la valeur d'amélioration ou de retrait habituelle (docs/classes.md, « Bots »).
-  local curExp
-  local function deckAdvice()
-    local cd = curExp and ns.Classes[curExp.class]
-    local f = cd and cd.bot and cd.bot.deck
-    return f and f(curExp) or nil
+  -- Conseils propres à l'épique du deck (une épique pilote le build) : classDef.bot.byEpic[id] = { rating,
+  -- upgrade, remove }, chacun une table { [carte] = note } ou une fonction (exp, carte) -> note|nil ; ils
+  -- priment sur ceux de la classe tant que l'épique est dans le deck. Posés par decide (advice, adviceExp).
+  local advice, adviceExp
+  local function advised(key, id)
+    local a = advice and advice[key]
+    if type(a) == "function" then return a(adviceExp, id) end
+    return a and a[id]
   end
   local function rating(id)
     if onlyPath then
       local d = ns.Cards[id]
       if d and d.path ~= onlyPath and d.path ~= "start" then return 0 end
     end
-    local adv = deckAdvice()
-    local v = adv and adv.rating and adv.rating[id]
-    if v then return v end
-    return ns.Run.RATING[id] or 3
+    return advised("rating", id) or ns.Run.RATING[id] or 3
   end
 
   -- Conseils de la classe jouée (classDef.bot : upgrade, remove).
@@ -43,13 +40,16 @@ return function(ns)
     local cd = ns.Classes[exp.class]
     return cd and cd.bot or {}
   end
+  local function adviceOf(exp)
+    local b = botOf(exp)
+    local i = b.byEpic and X.epicIndex(exp)
+    return i and b.byEpic[exp.deck[i].id] or nil
+  end
 
   -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
   local function upgradeValue(exp, card)
-    local adv = deckAdvice()
-    if adv and adv.upgrade and adv.upgrade[card.id] then return adv.upgrade[card.id] end
     local up = botOf(exp).upgrade
-    return up and up[card.id] or rating(card.id)
+    return advised("upgrade", card.id) or up and up[card.id] or rating(card.id)
   end
 
   local function bestUpgrade(exp)
@@ -67,11 +67,9 @@ return function(ns)
   local function worstCard(exp)
     local worst, worstV = nil, math.huge
     local rm = botOf(exp).remove or {}
-    local adv = deckAdvice()
-    local arm = adv and adv.remove or {}
     for i = 1, #exp.deck do
       local card = exp.deck[i]
-      local v = arm[card.id] or rm[card.id] or rating(card.id) + 2
+      local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
       if card.up then v = v + 1 end
       if v < worstV then worst, worstV = i, v end
     end
@@ -287,6 +285,7 @@ return function(ns)
 
   -- Action hors combat selon la phase.
   local function decide(exp, opts, rng)
+    advice, adviceExp = adviceOf(exp), exp
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then
@@ -454,7 +453,6 @@ return function(ns)
     local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
       unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
       epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
-    curExp = exp
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)

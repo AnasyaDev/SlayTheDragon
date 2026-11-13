@@ -329,7 +329,7 @@ card("last_stand", {
 -- whileInDeck) et les nombres (ns.Warrior.EPIC) sont posés par Core/Classes/warrior.lua ; les textes ici
 -- disent ces nombres. « Epic. » = mot de plaque (en tête, retiré à l'affichage comme « Power. »).
 local function epic(id, t)
-  t.type, t.power, t.epic, t.rarity, t.effects = "power", true, true, "epic", {}
+  t.type, t.power, t.epic, t.rarity, t.effects, t.cost = "power", true, true, "epic", {}, 0 -- coût jamais payé ni affiché
   card(id, t)
 end
 
@@ -546,7 +546,10 @@ local ADVICE = {
     remove = { bloodrage = 1, strike = 1.2, defend = 2, heroic_strike = 4, avatar = 99 },
   },
 }
-ns.Classes.warrior.bot.advice = ADVICE
+
+-- Conseils lus par Sim/expedition.lua tant que l'épique est dans le deck (classDef.bot.byEpic, priment sur
+-- rating / upgrade / remove de la classe).
+ns.Classes.warrior.bot.byEpic = ADVICE
 
 -- Épique du deck d'une expédition (id) ou nil.
 local function deckEpic(exp)
@@ -555,11 +558,6 @@ local function deckEpic(exp)
     if d and d.rarity == "epic" then return exp.deck[i].id end
   end
   return nil
-end
-
-ns.Classes.warrior.bot.deck = function(exp)
-  local id = deckEpic(exp)
-  return id and ADVICE[id] or nil
 end
 
 -- Note d'une épique proposée (offre, marchand) : une note commune, plus l'accord avec le deck (cartes
