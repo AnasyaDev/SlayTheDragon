@@ -4,7 +4,7 @@
 -- Wildfire est un compteur du champ de bataille, pas un état d'unité : z = c.zs.steppes =
 --   { left = compte à rebours, max = plafond (T), blaze = brûlure, step = hausse, lit = déjà embrasé une fois }.
 -- 1. T selon le genre du combat (ns.Encounters.steppes.wildfire), ou le plus petit champ `wildfire` des
---    ennemis de départ (Volchan 2, Grark 4). Blaze vaut 2 au premier embrasement.
+--    ennemis de départ (Volchan 3, Grark 5). Blaze vaut 1 au premier embrasement.
 -- 2. Fin de round (onRoundEnd, sauté si le tour ennemi l'a été) : compte >= 1 -> -1 (à 0 : « The ground
 --    ignites! », sans dégâts) ; compte déjà à 0 -> perte de Blaze PV (Combat.loseHp, « wildfire » : ni
 --    Absorb, ni Parry, ni Pain Suppression), puis Blaze + 2, puis notification « onWildfire » (n).
@@ -22,7 +22,7 @@ local min, max = math.min, math.max
 local Wildfire = {}
 ns.Wildfire = Wildfire
 
-local DEFAULT = { normal = 3, elite = 4, boss = 4, blaze = 2, step = 2 }
+local DEFAULT = { normal = 4, elite = 5, boss = 5, blaze = 1, step = 2 }
 
 -- Table de la zone (groupes de Data/Zones/Steppes.lua), valeurs par défaut sinon.
 function Wildfire.config()

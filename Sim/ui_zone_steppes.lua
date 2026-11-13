@@ -46,11 +46,11 @@ return function(T)
   for i = 2, #c.enemies do c.enemies[i].id, c.enemies[i].intent = "blackrock_worg", "bite" end
   v:Render(true)
   H.settle()
-  check("jeton : « Wildfire in 3 → 2 » (Stoke annoncé), flamme grise, infobulle",
-    vis(v.counter) and v.counter.text._text == "Wildfire in 3 → 2" and (H.hover(v.counter)[1] or ""):find("Ignites in 3 rounds", 1, true) ~= nil,
+  check("jeton : « Wildfire in 4 → 3 » (Stoke annoncé), flamme grise, infobulle",
+    vis(v.counter) and v.counter.text._text == "Wildfire in 4 → 3" and (H.hover(v.counter)[1] or ""):find("Ignites in 4 rounds", 1, true) ~= nil,
     tostring(v.counter.text._text))
   local s1 = v.slotOf[c.enemies[1].uid]
-  check("intention avec Stoke : « 6 +1 » et petite flamme à droite, infobulle Stoke",
+  check("intention avec Stoke : « 7 +1 » et petite flamme à droite, infobulle Stoke",
     s1 and (s1.intent.text._text or ""):find("+1", 1, true) and vis(s1.intent.badge)
     and table.concat(H.hover(s1.intent), " | "):find("Stoke 1:", 1, true) ~= nil,
     s1 and tostring(s1.intent.text._text))
@@ -61,8 +61,8 @@ return function(T)
   H.settle()
   local host = v.zoneHost.views.steppes
   local hatch = host and host.hatch
-  check("sol embrasé : « Wildfire 2 → 4 » (Stoke sur sol embrasé), infobulle de fin de round",
-    v.counter.text._text == "Wildfire 2 → 4" and (H.hover(v.counter)[1] or ""):find("End of round: you lose 4 HP", 1, true) ~= nil,
+  check("sol embrasé : « Wildfire 1 → 3 » (Stoke sur sol embrasé), infobulle de fin de round",
+    v.counter.text._text == "Wildfire 1 → 3" and (H.hover(v.counter)[1] or ""):find("End of round: you lose 3 HP", 1, true) ~= nil,
     tostring(v.counter.text._text))
   check("brûlure hachurée sur la barre de PV du joueur (rayures, dans la barre)",
     hatch and vis(hatch) and (hatch.shown or 0) >= 2)
@@ -91,8 +91,8 @@ return function(T)
   -- 2. Boss
   exp, ns = steppesRun("warrior", "boss")
   c, v = exp.combat, T.V()
-  check("boss : Grark Lorkrub, Wildfire 4, crans de phase (50 %, 25 %)", c and c.enemies[1].id == "grark_lorkrub"
-    and c.zs.steppes.left == 4 and #ns.Combat.phaseMarks(c.enemies[1]) == 2)
+  check("boss : Grark Lorkrub, Wildfire 5, crans de phase (30 %, 20 %)", c and c.enemies[1].id == "grark_lorkrub"
+    and c.zs.steppes.left == 5 and #ns.Combat.phaseMarks(c.enemies[1]) == 2)
   snap("zone-steppes-boss", true)
   check("décor du boss : Blackrock Stronghold peint", ns.Scene.scene == "steppes_boss", tostring(ns.Scene.scene))
 

@@ -543,8 +543,9 @@ langage, `ns.Wildfire` : état, prévision), `UI/Art/Zones/steppes.lua` (modèle
 ### La règle telle que codée
 
 - État `c.zs.steppes = { left, max, blaze, step, lit }` posé à l'init : `left = max = T` selon le genre du combat
-  (`ns.Encounters.steppes.wildfire = { normal = 3, elite = 4, boss = 4, blaze = 2, step = 2 }`), ou le plus petit
-  champ `wildfire` des ennemis de départ (Volchan 2, Grark 4).
+  (`ns.Encounters.steppes.wildfire = { normal = 4, elite = 5, boss = 5, blaze = 1, step = 2 }` depuis la passe de
+  difficulté du 14/11/2026 ; avant : 3, 4, 4, Blaze 2), ou le plus petit champ `wildfire` des ennemis de départ
+  (Volchan 3, Grark 5).
 - `onRoundEnd` (rien si le tour ennemi a été sauté) : compte ≥ 1 → −1 (à 0 : « The ground ignites! », sans
   dégâts) ; compte déjà à 0 → `Combat.loseHp(c, blaze, "wildfire")`, puis Blaze + 2, puis `onWildfire` (n).
 - `onEnemyDeath` : compte + 1 (plafond T), sauf serviteur et sauf mort du dernier ennemi principal.
@@ -589,27 +590,32 @@ langage, `ns.Wildfire` : état, prévision), `UI/Art/Zones/steppes.lua` (modèle
   later » mais « Locked » à l'accueil d'un compte neuf ; les rencontres d'une zone sont testées dans leur zone ;
   décors `shop` et `night` permis pour une rencontre.
 
-### Nombres finaux (`Data/Zones/Steppes.lua`)
+### Nombres finaux (`Data/Zones/Steppes.lua`, après la passe de difficulté du 14/11/2026)
+
+Wildfire : compte 4 (normal), 5 (élite, boss), Volchan 3, Grark 5 ; première brûlure 1, puis + 2 par brûlure et
+par point de Stoke sur sol embrasé (avant la passe : 3 / 4 / 4, Volchan 2, Grark 4, première brûlure 2).
 
 | Ennemi | PV | Coups |
 |---|---|---|
-| Blackrock Soldier | 26–29 | Strike 7 · Shield Bash 5 (interrompt) + 6 Absorb · Sunder 4 + Sundered 1 |
-| Blackrock Sorcerer | 17–19 | Flamestrike (Cast) 7 + Stoke 1 · Fireball 6 |
-| Blackrock Worg | 19–21 | Bite 5 (+3 lit) · Rend 3 × 2 |
-| Black Dragonspawn | 34–37 | Scale Guard 14 Absorb · Searing Roar 6 + Stoke 1 · Cleave 12 |
-| Black Wyrmkin | 21–24 | Fan the Flames (Cast) Stoke 2 · Flame Buffet 8 |
-| Firegut Brute | 38–41 | Bellow 12 Absorb + Strength 2 · Smash 15 (interrompt) · Kick Embers 6 + Stoke 1 |
-| Firegut Ogre Mage | 19–21 | Bloodlust Strength 1 à tous (2 fois) · Fireball 9 |
-| Flamekin Torcher | 9–10 | Torch (Cast) 3 + Stoke 1 · Ember 5 |
-| Thaurissan Firewalker | 28–31 | Firewalk 12 Absorb + Stoke 1 · Fire Nova 7 (+6 lit) |
-| Gruklash (élite, T 4) | 100 | Pummel 10 (interrompt) · Backhand 12 + Demoralized 2 · Mortal Strike 22 ; Frenzy sous 50 % : Strength 3 |
-| Thauris Balgarr (élite, T 4) | 96 | Mine (2 au plus) · Shoot 14 · Net 8 + Demoralized 2 |
+| Blackrock Soldier | 29–32 | Strike 7 · Shield Bash 5 (interrompt) + 6 Absorb · Sunder 4 + Sundered 1 |
+| Blackrock Sorcerer | 19–21 | Flamestrike (Cast) 7 + Stoke 1 · Fireball 7 |
+| Blackrock Worg | 21–23 | Bite 6 (+3 lit) · Rend 3 × 2 |
+| Black Dragonspawn | 36–39 | Scale Guard 14 Absorb · Searing Roar 7 + Stoke 1 · Cleave 11 |
+| Black Wyrmkin | 23–26 | Fan the Flames (Cast) Stoke 2 · Flame Buffet 9 |
+| Firegut Brute | 42–45 | Bellow 12 Absorb + Strength 2 · Smash 13 (interrompt) · Kick Embers 8 + Stoke 1 |
+| Firegut Ogre Mage | 21–23 | Bloodlust Strength 1 à tous (2 fois) · Fireball 9 |
+| Flamekin Torcher | 10–11 | Torch (Cast) 3 + Stoke 1 · Ember 6 |
+| Thaurissan Firewalker | 31–34 | Firewalk 12 Absorb + Stoke 1 · Fire Nova 9 (+5 lit) |
+| Gruklash (élite, T 5) | 100 | Pummel 13 (interrompt) · Backhand 14 + Demoralized 2 · Mortal Strike 18 ; Frenzy sous 50 % : Strength 2 |
+| Thauris Balgarr (élite, T 5) | 116 | Mine (2 au plus) · Shoot 16 · Net 11 + Demoralized 2 |
 | Dark Iron Land Mine (serviteur) | 10 | Arming · Detonate 16 + Stoke 1, puis se détruit |
-| Volchan (élite, T 2) | 80 | Flamecrack 7 + Stoke 1 · Stomp 15 (interrompt) · Fire Nova (Cast) 18 |
-| Grark Lorkrub (boss, T 4) | 84 | Call the Pack · Cleave 13 · Heroic Strike 19 · Shield Block 12 + Strength 2 ; sous 50 % : Ignite 4, Torch the Field 8 + Stoke 1 · Mortal Strike 22 (interrompt) · Rend 6 + DoT 3 · Shield Block ; sous 25 % : 2 Ember Worgs, 12 Absorb |
-| Ember Worg (serviteur) | 10 | Bite 5 |
+| Volchan (élite, T 3) | 90 | Flamecrack 8 + Stoke 1 · Stomp 16 (interrompt) · Fire Nova (Cast) 15 |
+| Grark Lorkrub (boss, T 5) | 123 | Call the Pack · Cleave 23 · Heroic Strike 26 · Shield Block 12 + Strength 1 ; sous 30 % : Ignite 4, Torch the Field 12 + Stoke 1 · Mortal Strike 22 (interrompt) · Rend 7 + DoT 3 · Shield Block ; sous 20 % : 2 Ember Worgs, 12 Absorb |
+| Ember Worg (serviteur) | 5 | Bite 3 |
 
-### Mesures (heuristic, 1 000 expéditions, `runner=expedition zone=steppes zones=5 level=7 epic=none`)
+### Mesures d'origine (heuristic, 1 000 expéditions, `runner=expedition zone=steppes zones=5 level=7 epic=none`)
+
+Avant la passe de difficulté (nombres de la nuit du 13 au 14/11/2026), épique imposée absente.
 
 | Classe | Victoire | Normal : victoires / tours / PV perdus | Élite : victoires / tours / PV perdus | Boss : victoires / tours / PV perdus | Brûlure par combat (normal / élite / boss) |
 |---|---|---|---|---|---|
@@ -637,6 +643,49 @@ au-dessus de 70 %. Ce que les mesures montrent :
 - Mage (5,5) et Hunter (4,7) restent sous 6 PV par combat normal.
 Pistes : l'épique de zone du Priest (Voidform) et, côté classes, un Priest plus rapide ; côté zone, des ennemis
 qui attisent sans attaquer (les Traps attendent) pour le Hunter.
+
+### Passe de difficulté (14/11/2026) : cible 55 %, écart ≤ 10
+
+Mesure : `luajit Sim/sim.lua bot=heuristic runner=expedition key=0 zone=steppes zones=5 level=7` (épique gagnée
+en route, sans `epic=`), avant 800 expéditions, après 1 500. PV perdus : par combat normal.
+
+| Classe | Victoires avant | après | PV perdus avant | après | Élites avant | après | Boss avant | après |
+|---|---|---|---|---|---|---|---|---|
+| Priest (36 PV) | 62,0 % | 51,3 % | 8,7 | 9,2 | 87,5 % | 91,7 % | 74,1 % | 57,3 % |
+| Warrior (74 PV) | 82,2 % | 58,5 % | 8,9 | 9,8 | 92,8 % | 92,9 % | 91,3 % | 65,2 % |
+| Mage (42 PV) | 79,2 % | 60,1 % | 5,6 | 6,6 | 95,3 % | 94,7 % | 85,0 % | 65,3 % |
+| Rogue (50 PV) | 78,1 % | 52,4 % | 6,2 | 7,1 | 91,6 % | 89,9 % | 88,3 % | 60,7 % |
+| Hunter (50 PV) | 87,1 % | 59,8 % | 4,9 | 6,2 | 98,9 % | 98,5 % | 88,6 % | 61,1 % |
+| **Moyenne / écart** | **77,7 / 25,1** | **56,4 / 8,8** | | | | | | |
+
+Brûlure par combat après la passe (normal / élite / boss) : Priest 0,5 / 3,2 / 6,3 ; Warrior 0,4 / 3,1 / 5,7 ;
+Mage 0,2 / 1,2 / 3,5 ; Rogue 0,1 / 0,8 / 2,4 ; Hunter 0,0 / 0,3 / 3,6 (avant : Priest 1,2 / 5,5 / 10,2).
+
+Ce qui a changé, et pourquoi (19 essais à 800 expéditions) :
+- **Moins de brûlure, qui pesait sur le Priest** (perte fixe, en part de ses 36 PV, et qui grandit avec la durée de
+  ses combats, les plus longs) : compte à rebours + 1 partout (4 / 5 / 5, Volchan 3, Grark 5) et première brûlure
+  à 1 (la hausse de 2 par brûlure, décision du 13/11, est gardée). Seul, cet essai donnait Priest + 11, les
+  autres + 2 à + 7 : l'écart venait d'abord de là.
+- **La difficulté portée par le boss**, que rien n'étourdit : le Hunter y est au niveau des autres, alors qu'il
+  passe les élites à 98–99 % (Freezing Trap, Intimidation, Wyvern Sting annulent le tour d'un élite seul). Grark
+  123 PV (84) ; coups de phase 1 en tête (Cleave 23, Heroic Strike 26) et Strength 1 par Shield Block (2), phase
+  2 plus douce (Torch 12, Mortal Strike 22, Rend 7) : les classes rapides (Mage, Warrior) prennent les gros coups,
+  les classes lentes ne paient plus une Strength qui monte. Phase 2 (Ignite) sous **30 %** (50 %) et phase 3
+  sous **20 %** (25 %) : moins de rounds de brûlure pour le Priest.
+- **Ember Worgs 5 PV, Bite 3** (10 PV, Bite 5) : les loups coûtaient au Priest, sans dégâts de zone, 6 points au
+  boss contre 1 au Rogue.
+- **Élites légèrement durcies, sans qu'aucune ne devienne un mur** : Gruklash Pummel 13, Backhand 14, Mortal
+  Strike 18 (22 : le gros coup punissait d'abord le Priest), Frenzy Strength 2 ; Thauris 116 PV, Shoot 16, Net
+  11 ; Volchan 90 PV, Fire Nova 15 (le Priest ne l'interrompt pas), Stomp 16, Flamecrack 8.
+- **Normaux** : PV + 8 à 10 % et + 1 aux petits coups ; Firegut Brute Smash 13 (15, coup qu'un Trap annule) et
+  Kick Embers 8 (6) ; Black Dragonspawn Cleave 11 (12). Les combats « easy » restent à 100 %.
+- **Écartés** : DoT avant le coup sur Gruklash (pour passer sous les Traps : Gruklash à 41 % pour le Priest, 86 %
+  pour le Hunter) ; coup d'entrée de phase sur Gruklash et Volchan (même effet, plus brutal pour le Warrior) ;
+  élites + 6 PV et + 1 dégât à la fois (Priest − 11) ; Grark + 1 à tous ses coups (Priest − 5, les autres − 1) ;
+  Cleave qui interrompt (Mage − 1 seulement).
+- **Reste** : le Hunter passe toujours les élites à 98,5 % (étourdissements sur un ennemi seul ; une élite
+  immunisée relèverait du socle) ; le Priest perd 9,2 PV par combat normal (26 % de ses PV, cible ≤ 10 %), surtout
+  contre Soldier + Sorcerer + Worg (14,3) et les deux Worgs + Sorcerer (11,3) ; 85 % des défaites ont lieu au boss.
 
 ### Modèles en repli
 
