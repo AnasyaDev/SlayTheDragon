@@ -814,3 +814,19 @@ meute de raptors, que le Priest profitait de la durée de ses combats de boss (6
 que Modr usait les classes lentes (Warrior, Priest, Rogue). Sbires et raptors adoucis, Clan Command à
 Strength 3, Mortal Wound de 3 tours chez Nek'rosh et le Raider, Modr 110 PV et Stone Fist 15, Nek'rosh 84 PV.
 Nombres, essais écartés et tableau par classe : `docs/zones/wetlands.md`, « Passe de difficulté ».
+
+## Burning Steppes : passe de difficulté (14/11/2026)
+
+Cible de la zone 6 : 55 % de victoires en moyenne, écart entre classes ≤ 10 points (`runner=expedition key=0
+zone=steppes zones=5 level=7 bot=heuristic`, épique gagnée en route). Avant (800 expéditions) : Priest 62,0,
+Warrior 82,2, Mage 79,2, Rogue 78,1, Hunter 87,1 % (moyenne 77,7, écart 25). Après (1 500) : Priest 51,3, Warrior
+58,5, Mage 60,1, Rogue 52,4, Hunter 59,8 % (moyenne **56,4**, écart **8,8**). PV perdus par combat normal : 8,7 /
+8,9 / 5,6 / 6,2 / 4,9 → 9,2 / 9,8 / 6,6 / 7,1 / 6,2. Deux causes d'écart : la brûlure du Wildfire, perte fixe
+qui pèse en part des 36 PV du Priest et grandit avec ses combats plus longs (compte à rebours + 1 partout, première
+brûlure 1 au lieu de 2, Ignite de Grark sous 30 % au lieu de 50 % : Priest + 11 à lui seul) ; les élites seules,
+que le Hunter étourdit (98–99 % contre 85–95 % aux autres). La difficulté est donc portée par le boss, qui est
+immunisé contre l'étourdissement : Grark 123 PV (84), gros coups en phase 1 (Cleave 23, Heroic Strike 26),
+Strength 1 par Shield Block (2), Ember Worgs 5 PV et Bite 3 (ils coûtaient 6 points de boss au Priest) ; élites
+et normaux un peu plus robustes. 85 % des défaites ont lieu au boss. Reste : Hunter à 98,5 % contre les élites,
+Priest à 9,2 PV par combat normal (26 % de ses PV). Nombres, essais écartés et tableau par classe :
+`docs/zones/steppes.md`, « Passe de difficulté ».
