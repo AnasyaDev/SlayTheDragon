@@ -450,6 +450,87 @@ return function(T)
     eq(Combat.retainPicks(e), 1)
   end)
 
+  test("Hero Charm : la carte gardée au choix coûte 1 de moins au tour suivant seulement (minimum 0)", function()
+    local charm = { relics = { "zandalarian_hero_charm" } }
+    local c = setup({ "stv_c3", "stv_c0", "stv_keep" }, { "stv_dummy" }, charm)
+    local c3, keep = c.hand[1], c.hand[3]
+    assert(#ns.Relics.zandalarian_hero_charm.text <= 80, "texte de 80 caractères au plus")
+    eq(Combat.cost(c, c3), 3, "rien avant d'être gardée")
+    assert(Combat.markRetain(c, c3.uid))
+    Combat.endTurn(c)
+    eq(Combat.findCard(c, c3), "hand")
+    eq(Combat.cost(c, c3), 2, "gardée au choix : -1 au tour suivant")
+    eq(Combat.cost(c, keep), 2, "carte Retain : pas de réduction")
+    eq(c.relicState.hero_charm_uid, c3.uid, "réduction portée par l'état du combat (uid)")
+    eq(c3.cost, nil, "instance inchangée")
+    -- clone et sauvegarde : données simples, la copie garde la réduction sans toucher l'originale
+    local ok, why = T.plainData(c.relicState); assert(ok, why)
+    local d = Combat.clone(c)
+    eq(Combat.cost(d, c3), 2, "clone : réduction gardée")
+    d.relicState.hero_charm_uid = nil
+    eq(Combat.cost(c, c3), 2, "clone indépendant")
+    -- pas jouée ce tour-là : perdue au tour d'après, même si la carte revient en main
+    Combat.endTurn(c)
+    eq(Combat.cost(c, c3), 3, "réduction perdue au tour d'après")
+    -- minimum 0 : une carte gratuite le reste
+    local z = hand(c, "stv_c0")
+    assert(z and Combat.markRetain(c, z.uid))
+    Combat.endTurn(c)
+    eq(Combat.findCard(c, z), "hand")
+    eq(Combat.cost(c, z), 0, "minimum 0")
+    eq(Combat.cost(c, c3), 3, "seule la carte choisie")
+  end)
+
+  test("Hero Charm : jouée, la réduction disparaît ; Traveler's Backpack en plus : un seul choix, -1", function()
+    local c = setup({ "stv_c3", "stv_c1" }, { "stv_dummy" }, { relics = { "zandalarian_hero_charm" } })
+    local c3 = c.hand[1]
+    assert(Combat.markRetain(c, c3.uid))
+    Combat.endTurn(c)
+    local mana = c.player.mana
+    play(c, "stv_c3")
+    eq(c.player.mana, mana - 2, "payée 2")
+    eq(c.relicState.hero_charm_uid, nil, "réduction consommée")
+    eq(Combat.cost(c, c3), 3, "ne suit pas la carte dans la défausse")
+    -- les deux bibelots : retainPicks = 2, mais un seul choix ; la carte gardée reçoit la réduction (-1)
+    local b = setup({ "stv_c3", "stv_c2" }, { "stv_dummy" }, { relics = { "travelers_backpack", "zandalarian_hero_charm" } })
+    eq(Combat.retainPicks(b), 2)
+    local b3, b2 = b.hand[1], b.hand[2]
+    assert(Combat.markRetain(b, b3.uid))
+    assert(Combat.markRetain(b, b2.uid), "le second choix remplace le premier")
+    Combat.endTurn(b)
+    eq(Combat.findCard(b, b2), "hand"); eq(Combat.findCard(b, b3), "discard", "une seule carte gardée")
+    eq(Combat.cost(b, b2), 1, "-1, pas -2")
+    -- Traveler's Backpack seul : aucune réduction
+    local t = setup({ "stv_c3" }, { "stv_dummy" }, { relics = { "travelers_backpack" } })
+    local t3 = t.hand[1]
+    assert(Combat.markRetain(t, t3.uid))
+    Combat.endTurn(t)
+    eq(Combat.findCard(t, t3), "hand"); eq(Combat.cost(t, t3), 3)
+  end)
+
+  test("Hero Charm : carte gardée puis Hexed, la Hexed coûte 1 et l'originale rendue n'a plus de réduction", function()
+    local c = setup({ "stv_c3", "stv_c1" }, nil, { relics = { "zandalarian_hero_charm" } })
+    local c3 = c.hand[1]
+    assert(Combat.markRetain(c, c3.uid))
+    Combat.endTurn(c)
+    local h = hand(c, "hexed")
+    assert(h and h.orig == c3, "la carte gardée est Hexed en main")
+    eq(Combat.cost(c, h), 1, "Hexed : coût 1, sans réduction")
+    eq(c.relicState.hero_charm_uid, nil, "réduction effacée par le Hex")
+    play(c, "hexed")
+    eq(Combat.findCard(c, c3), "hand"); eq(Combat.cost(c, c3), 3)
+  end)
+
+  test("Hero Charm : le bot garde de préférence une carte de coût 1 ou plus", function()
+    local function pick(relic)
+      local c = setup({ "stv_c1" }, { "stv_dummy" }, { relics = { relic } })
+      c.hand = { Card.new("stv_c0", true, 900), Card.new("stv_c1", false, 901) }
+      return ns.Bots.retainPick(c)
+    end
+    eq(pick("travelers_backpack"), 900, "sans le Charm : la carte améliorée à 0")
+    eq(pick("zandalarian_hero_charm"), 901, "avec le Charm : la carte de coût 1")
+  end)
+
   ---------------------------------------------------------------------------
   -- 6. Expédition : rencontres, Gurubashi Arena, décors, boss
   ---------------------------------------------------------------------------
