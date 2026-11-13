@@ -75,3 +75,6 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
   des PV max : Priest ≤ 10 %, Rogue ≈ 13 % (référence), Warrior jusqu'à 15 %, Mage et Hunter entre les deux.
 - **Courbe de difficulté** (concepteur, à valider) : taux de victoire du bot de référence, clé 0, d'environ
   80 % à Westfall à environ 50 % à Blackrock Mountain, en descendant à chaque zone.
+- **Indomitable sur les élites de Blackrock Mountain**, décision du joueur du 14/11/2026 : Panzor, Gyth / Rend et
+  Vaelastrasz ne peuvent pas être étourdis (trait affiché « Indomitable », `Can't be Stunned.`).
+

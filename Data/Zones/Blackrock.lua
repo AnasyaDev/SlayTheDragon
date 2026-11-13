@@ -74,7 +74,7 @@ local function isWhelp(id) return id == "rookery_whelp" or id == "rookery_whelpl
 E.firebrand_grunt = finish({
   name = "Firebrand Grunt", hp = { 26, 29 },
   moves = {
-    hack = { name = "Hack", intent = "attack", actions = { { "attack", 11 } } },
+    hack = { name = "Hack", intent = "attack", actions = { { "attack", 13 } } },
     sunder = { name = "Sunder Armor", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "hack", "sunder" }, randomStart = true,
@@ -101,7 +101,7 @@ E.anvilrage_guardsman = finish({
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 7, interrupts = true } } },
     guard = { name = "Guard", intent = "defend", actions = { { "block", 10 } } },
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 8, times = 2 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 9, times = 2 } } },
     shield_wall = { name = "Shield Wall", intent = "defend", actions = { { "block", 15 } } },
     shield_slam = { name = "Shield Slam", intent = "attack", actions = { { "attack", 8 }, { "block", 6 } } },
   },
@@ -113,7 +113,7 @@ E.anvilrage_medic = finish({
   name = "Anvilrage Medic", hp = { 21, 23 },
   moves = {
     heal = { name = "Heal", intent = "heal", actions = { { "heal_ally", 8 } } },
-    smite = { name = "Holy Smite", intent = "attack", actions = { { "attack", 7 } } },
+    smite = { name = "Holy Smite", intent = "attack", actions = { { "attack", 8 } } },
     prayer = { name = "Desperate Prayer", intent = "heal", actions = { { "heal_self", 10 } } },
   },
   ai = medicAi(8),
@@ -123,7 +123,7 @@ E.anvilrage_medic = finish({
 E.blazing_fireguard = finish({
   name = "Blazing Fireguard", hp = { 27, 30 },
   moves = {
-    lash = { name = "Flame Lash", intent = "attack", actions = { { "attack", 10 } } },
+    lash = { name = "Flame Lash", intent = "attack", actions = { { "attack", 12 } } },
     nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 4 }, { "debuff", "pain", 2 } } },
   },
   pattern = { "lash", "nova" }, randomStart = true,
@@ -134,7 +134,7 @@ E.blazing_fireguard = finish({
 E.firebrand_pyromancer = finish({
   name = "Firebrand Pyromancer", hp = { 24, 27 },
   moves = {
-    fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 20 } } },
+    fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 22 } } },
     scorch = { name = "Scorch", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
     flamestrike = { name = "Flamestrike", intent = "cast", cast = true,
       actions = { { "attack", 12 }, { "debuff", "pain", 3 } } },
@@ -146,7 +146,7 @@ E.firebrand_pyromancer = finish({
 E.blackhand_veteran = finish({
   name = "Blackhand Veteran", hp = { 35, 38 },
   moves = {
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 12 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 13 } } },
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 6, interrupts = true } } },
     shout = { name = "Battle Shout", intent = "buff", actions = { { "buff_allies", "force", 1 } } },
     whirlwind = { name = "Whirlwind", intent = "attack", actions = { { "attack", 6, times = 2 } } },
@@ -159,7 +159,7 @@ E.blackhand_veteran = finish({
 E.rage_talon_dragonspawn = finish({
   name = "Rage Talon Dragonspawn", hp = { 36, 39 },
   moves = {
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 14 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 16 } } },
     thunderclap = { name = "Thunderclap", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "demoralized", 1 } } },
     roar = { name = "Bellowing Roar", intent = "debuff",
       actions = { { "debuff", "armor_broken", 2 }, { "debuff", "demoralized", 2 } } },
@@ -171,7 +171,7 @@ E.rage_talon_dragonspawn = finish({
 E.rookery_hatcher = finish({
   name = "Rookery Hatcher", hp = { 32, 35 },
   moves = {
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 11 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 12 } } },
     tend = { name = "Tend Eggs", intent = "defend", actions = { { "block", 8 } } },
     hatch = { name = "Hatch the Eggs", intent = "summon", actions = { { "summon", "rookery_whelpling", count = 2 } } },
   },
@@ -180,18 +180,19 @@ E.rookery_hatcher = finish({
 })
 
 ---------------------------------------------------------------------------
--- Élites
+-- Élites : tous Indomitable (indomitable = true : immunisés à Stunned comme les boss, Combat.stunImmune ;
+-- décision du joueur du 14/11/2026)
 ---------------------------------------------------------------------------
 
--- Panzor the Invincible : phase 1, chaque coup lui fait 10 au plus (le DoT passe en entier : règle de
+-- Panzor the Invincible : phase 1, chaque coup lui fait 8 au plus (le DoT passe en entier : règle de
 -- zone « maxHit ») ; phase 2, plus de plafond, et il prend 25 % de plus (état Cracked Plating).
 E.panzor = finish({
-  name = "Panzor the Invincible", hp = 96, elite = true, maxHit = 10,
+  name = "Panzor the Invincible", hp = 110, elite = true, indomitable = true, maxHit = 8,
   moves = {
-    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 8, times = 2 } } },
-    pulverize = { name = "Pulverize", intent = "attack", actions = { { "attack", 18, interrupts = true } } },
-    overheat = { name = "Overheat", intent = "buff", actions = { { "buff", "force", 2 } } },
-    rampage = { name = "Rampage", intent = "attack", actions = { { "attack", 6, times = 3 } } },
+    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 5, times = 2 } } },
+    pulverize = { name = "Pulverize", intent = "attack", actions = { { "attack", 11, interrupts = true } } },
+    overheat = { name = "Overheat", intent = "buff", actions = { { "buff", "force", 1 } } },
+    rampage = { name = "Rampage", intent = "attack", actions = { { "attack", 4, times = 3 } } },
   },
   pattern = { "stomp", "pulverize", "overheat" },
   phases = { { at = 0.5, name = "Cracked Plating", maxHit = false, note = "Loses Invincible.",
@@ -200,36 +201,36 @@ E.panzor = finish({
 
 -- Warchief Rend Blackhand sur Gyth : une seule barre ; Gyth d'abord, Rend à pied sous la moitié.
 E.rend_gyth = finish({
-  name = "Gyth", hp = 104, elite = true,
+  name = "Gyth", hp = 106, elite = true, indomitable = true,
   moves = {
-    flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 11 }, { "debuff", "pain", 3 } } },
-    corrosive = { name = "Corrosive Acid", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "armor_broken", 2 } } },
-    freeze = { name = "Freeze", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "demoralized", 1 } } },
-    knock = { name = "Knock Away", intent = "attack", actions = { { "attack", 13, interrupts = true } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 13 } } },
-    whirlwind = { name = "Whirlwind", intent = "attack", actions = { { "attack", 6, times = 3 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 20 } } },
+    flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 8 }, { "debuff", "pain", 2 } } },
+    corrosive = { name = "Corrosive Acid", intent = "debuff", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
+    freeze = { name = "Freeze", intent = "debuff", actions = { { "attack", 4 }, { "debuff", "demoralized", 1 } } },
+    knock = { name = "Knock Away", intent = "attack", actions = { { "attack", 7, interrupts = true } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 9 } } },
+    whirlwind = { name = "Whirlwind", intent = "attack", actions = { { "attack", 4, times = 3 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 12 } } },
   },
   pattern = { "flame", "knock", "corrosive", "freeze" },
   phases = { { at = 0.5, name = "Rend Dismounts", rename = "Warchief Rend Blackhand", art = "rend_blackhand",
-    say = "I'll finish this myself!", enter = { { "buff", "force", 2 } }, open = "cleave",
+    say = "I'll finish this myself!", enter = { { "buff", "force", 1 } }, open = "cleave",
     pattern = { "whirlwind", "mortal" } } },
 })
 
--- Vaelastrasz the Corrupt : 40 % de ses PV au départ, Essence of the Red sur le joueur (+2 mana) jusqu'au
+-- Vaelastrasz the Corrupt : 45 % de ses PV au départ, Essence of the Red sur le joueur (+2 mana) jusqu'au
 -- seuil de 15 % ; Burning Adrenaline : +50 % aux Attacks pendant 2 tours, puis 15 PV perdus.
 E.vaelastrasz = finish({
-  name = "Vaelastrasz the Corrupt", hp = 200, elite = true, essence = true,
-  -- le combat commence à 40 % de ses PV ; il n'est pas « tombé à la moitié » (onEnemyBloodied ne part pas)
+  name = "Vaelastrasz the Corrupt", hp = 200, elite = true, indomitable = true, essence = true,
+  -- le combat commence à 45 % de ses PV ; il n'est pas « tombé à la moitié » (onEnemyBloodied ne part pas)
   init = function(c, e)
-    e.hp = floor(e.maxHp * 0.40)
+    e.hp = floor(e.maxHp * 0.45)
     e.mem.bloodied = true
   end,
   moves = {
     adrenaline = { name = "Burning Adrenaline", intent = "debuff", actions = { { "debuff", "burning_adrenaline", 2 } } },
-    flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 11 }, { "debuff", "pain", 3 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 20 } } },
-    nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 7, times = 2 } } },
+    flame = { name = "Flame Breath", intent = "attack", actions = { { "attack", 9 }, { "debuff", "pain", 2 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 13 } } },
+    nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 6, times = 2 } } },
   },
   pattern = { "flame", "adrenaline", "cleave" },
   phases = { { at = 0.15, name = "Essence Fades",
@@ -295,7 +296,7 @@ local function nefariusAi(c, e)
 end
 
 E.nefarian = finish({
-  name = "Lord Victor Nefarius", hp = 120, boss = true, throne = true,
+  name = "Lord Victor Nefarius", hp = 138, boss = true, throne = true,
   moves = {
     -- phase 1 : Lord Victor Nefarius
     shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 22 } } },

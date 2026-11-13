@@ -1,7 +1,7 @@
 -- Règles de la zone Blackrock Mountain (`blackrock`) : fiche docs/zones/blackrock.md, socle ns.ZoneRules
 -- (contrat et crochets : docs/zones.md). La mécanique de la zone, les phases, est celle du moteur commun
 -- (def.phases : seuils, entrée, ouverture imposée, plafond au seuil du boss). Ce fichier ajoute :
---   * les règles de phase qui ne sont pas des états (Invincible de Panzor : 10 au plus par coup hors DoT,
+--   * les règles de phase qui ne sont pas des états (Invincible de Panzor : 8 au plus par coup hors DoT,
 --     champ maxHit ; Shadow of the Throne de Nefarius : moitié des dégâts tant qu'un Drakonid vit) ;
 --   * les états de la zone (Fire Shield, Cracked Plating, Essence of the Red, Burning Adrenaline,
 --     Shadowflame Fury, Veil of Shadow) et les cinq états du Class Call de Nefarian (un par classe) ;
@@ -28,7 +28,7 @@ BR.BONES_MAX = 3          -- Bone Constructs relevés au plus
 BR.RALLY_HP = 6           -- Rallying Cry of the Dragonslayer
 BR.CALL_TURNS = 2         -- durée des états du Class Call
 BR.BERSERKER_BONUS = 1    -- Berserker Stance : dégâts en plus par coup des Attacks
-BR.BROKEN_BOW = 5         -- Broken Bow : dégâts en moins par coup des cartes Attack (pas le familier)
+BR.BROKEN_BOW = 2         -- Broken Bow : dégâts en moins par coup des cartes Attack (pas le familier)
 
 ---------------------------------------------------------------------------
 -- États
@@ -61,9 +61,9 @@ BR.CLASS_CALL = {
   priest = { status = "corrupted_healing",
     say = "Priests! If you're going to keep healing like that, we might as well make it a little more interesting!" },
   warrior = { status = "berserker_stance", say = "Warriors, I know you can hit harder than that! Let's see it!" },
-  mage = { status = "wild_polymorph", say = "Mages too? You should be more careful when you play with magic..." },
+  mage = { status = "wild_polymorph", turns = 1, say = "Mages too? You should be more careful when you play with magic..." },
   rogue = { status = "called_out", turns = 1, say = "Rogues? Stop hiding and face me!" },
-  hunter = { status = "broken_bow", turns = 3, say = "Hunters and your annoying pea-shooters!" },
+  hunter = { status = "broken_bow", turns = 1, say = "Hunters and your annoying pea-shooters!" },
 }
 BR.CLASS_CALL_DEFAULT = { status = "demoralized", say = "Let's see how you fare without your tricks!" }
 function BR.classCall(class) return BR.CLASS_CALL[class] or BR.CLASS_CALL_DEFAULT end

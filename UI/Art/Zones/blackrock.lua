@@ -118,7 +118,7 @@ ns.ZoneViews.blackrock = {
       return { icon = OPENING, tip = "Opening move of its new phase." }
     end
   end,
-  -- règles de phase qui ne sont pas des états : Invincible, Shadow of the Throne
+  -- règles qui ne sont pas des états : Invincible, Indomitable (élites), Shadow of the Throne
   enemyBadges = function(c, e)
     local BR = ns.Blackrock
     local list = {}
@@ -126,6 +126,10 @@ ns.ZoneViews.blackrock = {
     if cap then
       list[#list + 1] = { icon = I("Spell_Holy_PowerWordBarrier"), text = "Max " .. cap,
         tip = "Invincible: each hit deals at most " .. cap .. " to it. DoT is not a hit.", color = "goldText" }
+    end
+    if ns.Enemies[e.id].indomitable then
+      list[#list + 1] = { icon = I("Spell_Frost_Stun"), text = "Indomitable", tip = "Can't be Stunned.",
+        color = "goldText" }
     end
     if ns.Enemies[e.id].throne and (e.mem.phase or 0) == 0 then
       local on = BR.drakonidAlive(c)

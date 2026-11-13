@@ -433,6 +433,14 @@ end
 
 -- icon : clé d'art facultative de la source (l'icône d'un DoT peut varier : poison, saignement…),
 -- gardée dans unit.stIcon[id] pour l'affichage seulement ; la règle ne change pas.
+-- Immunité à Stunned : les boss, et les ennemis dont la définition porte `indomitable = true` (trait
+-- « Indomitable » affiché par la zone ; élites de Blackrock Mountain, décision du joueur du 14/11/2026).
+function Combat.stunImmune(unit)
+  if unit.boss then return true end
+  local def = unit.side == "enemy" and ns.Enemies[unit.id]
+  return def and def.indomitable or false
+end
+
 function Combat.applyStatus(c, unit, id, n, icon)
   if unit.dead then return end
   if icon then
@@ -446,7 +454,7 @@ function Combat.applyStatus(c, unit, id, n, icon)
     n = Combat.modify(c, "applySelf", n, id)
     if n <= 0 then return end
   end
-  if id == "stunned" and unit.boss then
+  if id == "stunned" and Combat.stunImmune(unit) then
     log(c, { t = "immune", unit = uref(unit), id = id })
     return
   end

@@ -257,6 +257,32 @@ return function(T)
   -- Élites
   ---------------------------------------------------------------------------
 
+  test("Indomitable : les élites de la zone sont immunisés à Stunned (Combat.stunImmune), les normaux non", function()
+    for id, d in pairs(E) do
+      if d.elite and (id == "panzor" or id == "rend_gyth" or id == "vaelastrasz") then
+        assert(d.indomitable, id .. " : Indomitable")
+      end
+    end
+    local c = bc({ enemies = { "rend_gyth", { "anvilrage_guardsman", hp = 40 } },
+      hand = { "brt_stun", "brt_stun" }, kind = "elite" })
+    local g, a = c.enemies[1], c.enemies[2]
+    assert(Combat.stunImmune(g)); assert(not Combat.stunImmune(a)); assert(not Combat.stunImmune(c.player))
+    play(c, "brt_stun", 1)
+    eq(g.st.stunned, nil, "Gyth : immunisé")
+    local seen = false
+    for _, ev in ipairs(c.events or {}) do if ev.t == "immune" and ev.id == "stunned" then seen = true end end
+    assert(seen, "journal : immune")
+    play(c, "brt_stun", 2)
+    eq(a.st.stunned, 1, "un normal reste étourdissable")
+    -- même règle que les boss, lue sur la définition (socle)
+    E.brt_indomitable = { name = "Test", hp = 20, indomitable = true,
+      moves = { hit = { name = "Hit", intent = "attack", actions = { { "attack", 1 } } } }, pattern = { "hit" } }
+    local d = bc({ enemies = { "brt_indomitable" } })
+    Combat.applyStatus(d, d.enemies[1], "stunned", 1)
+    eq(d.enemies[1].st.stunned, nil)
+    E.brt_indomitable = nil
+  end)
+
   test("Panzor : Invincible (plafond par coup, DoT en entier), puis Cracked Plating (+25 %) et Rampage", function()
     local c = bc({ enemies = { "panzor" }, hand = { "brt_big", "brt_multi", "brt_dot", "brt_hit2" }, kind = "elite" })
     local e = c.enemies[1]
@@ -279,28 +305,28 @@ return function(T)
     eq(e.hp, thr - 1 - 12, "10 × 1,25, sans plafond")
   end)
 
-  test("Rend et Gyth : Rend descend à la moitié (nom, modèle, Strength 2, Cleave) ; les états de Gyth restent", function()
+  test("Rend et Gyth : Rend descend à la moitié (nom, modèle, Strength, Cleave) ; les états de Gyth restent", function()
     local c = bc({ enemies = { "rend_gyth" }, hand = { "brt_hit" }, kind = "elite" })
     local e = c.enemies[1]
     e.intent = "corrosive"
     Combat.endTurn(c)
-    eq(c.player.st.armor_broken, 2)
+    eq(c.player.st.armor_broken, E.rend_gyth.moves.corrosive.actions[2][3])
     e.hp = 51
     c.hand[#c.hand + 1] = ns.Card.new("brt_hit", false, 902)
     play(c, "brt_hit", 1)
     eq(Combat.enemyName(e), "Warchief Rend Blackhand"); eq(e.art, "rend_blackhand")
-    eq(e.st.force, 2); eq(e.intent, "cleave")
+    eq(e.st.force, E.rend_gyth.phases[1].enter[1][3]); eq(e.intent, "cleave")
     assert((c.player.st.armor_broken or 0) > 0, "Sundered reste")
   end)
 
-  test("Vaelastrasz : 40 % des PV, Essence of the Red (+2 mana), Burning Adrenaline (+50 %, puis 15 PV), Essence Fades", function()
+  test("Vaelastrasz : 45 % des PV, Essence of the Red (+2 mana), Burning Adrenaline (+50 %, puis 15 PV), Essence Fades", function()
     local c = bc({ enemies = { "vaelastrasz" }, hand = { "brt_hit", "brt_hit2" }, kind = "elite", hp = 80 })
     local e = c.enemies[1]
-    eq(e.maxHp, 200); eq(e.hp, 80)
+    eq(e.maxHp, 200); eq(e.hp, 90)
     eq(c.player.st.essence_of_red, 1); eq(c.player.mana, 5)
     Combat.applyStatus(c, c.player, "burning_adrenaline", 2)
     play(c, "brt_hit", 1)
-    eq(e.hp, 65, "10 × 1,5")
+    eq(e.hp, 75, "10 × 1,5")
     -- Burning Adrenaline posée pendant le tour du joueur : 2 rounds, puis 15 PV (ennemi inerte)
     local d = bc({ enemies = { "zt_dummy" }, hp = 80 })
     Combat.applyStatus(d, d.player, "burning_adrenaline", 2)
@@ -380,7 +406,7 @@ return function(T)
     eq(n.st.stunned, nil, "immunisé à Stunned")
   end)
 
-  test("Class Call : un état par classe (2 tours, Rogue 1, Hunter 3), effets sur le moteur de chaque classe", function()
+  test("Class Call : un état par classe (durée propre à la classe, 2 par défaut), effets sur le moteur de chaque classe", function()
     local function called(cl, o)
       o = o or {}
       o.class = cl
@@ -399,7 +425,7 @@ return function(T)
     eq(c.player.st.pain, BR.CORRUPTED_DOT)
     -- Warrior : Attacks + BERSERKER_BONUS, coups reçus × 1,25
     c = called("warrior", { hand = { "brt_hit" }, deck = { "brt_hit", "brt_hit", "brt_hit", "brt_hit" } })
-    eq(c.player.st.berserker_stance, 2)
+    eq(c.player.st.berserker_stance, BR.classCall("warrior").turns or BR.CALL_TURNS)
     local n = c.enemies[1]
     local hp = n.hp
     play(c, "brt_hit", 1)
@@ -408,7 +434,7 @@ return function(T)
     eq(Combat.intentInfo(c, n).damage, math.floor(atk("nefarian", "tail_sweep") * 1.25))
     -- Mage : Cast cards +1
     c = called("mage", { hand = { "brt_cast" }, deck = { "brt_cast", "brt_cast", "brt_cast", "brt_cast" } })
-    eq(c.player.st.wild_polymorph, 2)
+    eq(c.player.st.wild_polymorph, BR.classCall("mage").turns or BR.CALL_TURNS)
     eq(Combat.cost(c, c.hand[1]), 2)
     -- Rogue : Parry et Stealth perdus, ni l'un ni l'autre ne se regagne (1 tour)
     local cr = bc({ class = "rogue", enemies = { "nefarian" }, kind = "boss" })
@@ -427,24 +453,20 @@ return function(T)
     eq(cr.player.st.called_out, nil, "un seul tour")
     Combat.applyStatus(cr, cr.player, "parry", 2)
     eq(cr.player.st.parry, 2, "Parry de nouveau")
-    -- Hunter : Attack cards - BROKEN_BOW, familier inchangé (3 tours)
+    -- Hunter : Attack cards - BROKEN_BOW, familier inchangé (durée : tours de l'état de la classe)
+    local bt = BR.classCall("hunter").turns or BR.CALL_TURNS
     c = called("hunter", { hand = { "brt_hit" }, deck = { "brt_hit", "brt_hit", "brt_hit", "brt_hit" } })
-    eq(c.player.st.broken_bow, 3)
+    eq(c.player.st.broken_bow, bt)
     n = c.enemies[1]
     hp = n.hp
     play(c, "brt_hit", 1)
     eq(hp - n.hp, 10 - BR.BROKEN_BOW)
     eq(Combat.calcDamage(c, c.player, n, 5, nil), 5, "coup sans carte (familier) : inchangé")
-    -- durée : 3 tours du joueur
-    n.intent = "veil"
-    Combat.endTurn(c)
-    eq(c.player.st.broken_bow, 2)
-    n.intent = "veil"
-    Combat.endTurn(c)
-    eq(c.player.st.broken_bow, 1)
-    n.intent = "veil"
-    Combat.endTurn(c)
-    eq(c.player.st.broken_bow, nil)
+    for k = bt - 1, 0, -1 do
+      n.intent = "veil"
+      Combat.endTurn(c)
+      eq(c.player.st.broken_bow, k > 0 and k or nil)
+    end
     -- classe sans état propre : Demoralized
     eq(BR.classCall("shaman").status, "demoralized")
   end)
