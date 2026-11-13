@@ -77,8 +77,6 @@ Art.tex = {
 -- À RÉÉVALUER avant toute publication de l'addon (droits de Blizzard).
 local BG = "Interface\\AddOns\\SlayTheDragon\\Media\\Backgrounds\\"
 Art.backgrounds = {
-  elwynn = { file = BG .. "elwynn.tga", embedded = true, key = "elwynn", ratio = 2.019, source = 7377860,
-    name = "Elwynn Forest (housing, Midnight)" },
   farm = { file = BG .. "farm.tga", embedded = true, key = "farm", ratio = 2.241, source = 407226,
     name = "Twin Peaks (farm and path)" },
   deadmines = { file = BG .. "deadmines.tga", embedded = true, key = "deadmines", ratio = 2.359, source = 131833,
@@ -102,18 +100,11 @@ local B = Art.backgrounds
 -- la liste d'une autre illustration (à la suite).
 -- FileDataID confirmés dans la liste de fichiers retail 12.1.5 (wow_file_search) ; leur présence
 -- dans le client Forever (« Camelot », 1.16) n'est PAS vérifiable hors jeu :
---   * 7377860 (logement d'Elwynn, Midnight) : très probablement absent de Forever ;
---   * camelot160/main/* (7963776, 7963777, 7963782) : écrans de chargement propres à Forever ;
---   * 131833, 131839 (Mortemines, royaumes de l'Est) : écrans de la version classique.
+--   * camelot160/main/* (7963777, 7963782) : écrans de chargement propres à Forever ;
+--   * 131833 (Mortemines) : écran de la version classique.
+-- (L'illustration d'Elwynn et les écrans des royaumes de l'Est, qui servaient à la route, ont été
+-- retirés le 13/11/2026 : la route de Westfall est un décor peint, Art.paintings.)
 Art.illustrations = {
-  elwynn = {
-    B.elwynn,
-    { file = 7377860, crop = { 0, 1, 0.16, 0.86 }, name = "Elwynn housing (Midnight)" },
-    { file = 7963776, crop = { 0, 1, 0.18, 0.83 }, name = "Eastern Kingdoms (Forever screen)" },
-    { file = 131839, crop = { 0, 1, 0.14, 0.64 }, name = "Eastern Kingdoms (classic screen)" },
-    { file = "Interface\\Glues\\LoadingScreens\\LoadScreenEasternKingdom", crop = { 0, 1, 0.14, 0.64 },
-      name = "Eastern Kingdoms (classic screen, by path)" },
-  },
   deadmines = {
     B.deadmines,
     { file = 131833, crop = { 0, 1, 0.22, 0.72 }, name = "The Deadmines (classic screen)" },
@@ -124,29 +115,125 @@ Art.illustrations = {
   ruins = {
     B.ruins,
     { file = 7963782, crop = { 0, 1, 0.18, 0.83 }, name = "Ruins of Lordaeron (Forever screen)" },
-    "elwynn",
   },
-  farm = { B.farm, "elwynn" },
+  farm = { B.farm },
   coast = { B.coast },
 }
 
 -- Décors : `art` = illustration (ci-dessus) posée sur la bande du haut, teintée par `tint` ; fond
 -- embarqué cadré par `focus` (hauteur de la bande montrée : 0 = haut de l'image, 1 = bas), candidat du
--- client décalé verticalement de `shift` (fraction) ; `paint` = décor peint en couches unies aux
--- couleurs des maquettes, toujours dessiné dessous (repli). Point d'extension : ajouter une entrée ici
--- (et `scene = "<clé>"` dans une rencontre) suffit ; `/slay scenery` bascule illustré / peint.
+-- client décalé verticalement de `shift` (fraction) ; `paint` = décor peint, toujours dessiné dessous :
+-- repli en couches unies (fonctions PAINT de UI/Scene.lua) sous une illustration, ou, sans `art`, décor
+-- à part entière (clé d'Art.paintings : paysage peint par plans, ci-dessous). Point d'extension :
+-- ajouter une entrée ici (et `scene = "<clé>"` dans une rencontre) suffit ; `/slay scenery` bascule
+-- illustré / peint (sans effet sur un décor peint seul).
 Art.scenes = {
-  road = { art = "elwynn", focus = 0.62, tint = { 1, 0.96, 0.88 }, paint = "fields" },   -- route et combats
   farm = { art = "farm", focus = 0.55, shift = -0.04, tint = { 1, 0.95, 0.82 }, paint = "farm" },
   mine = { art = "deadmines", focus = 0.5, tint = { 0.9, 0.9, 0.86 }, paint = "cave" },    -- boss
-  night = { art = "elwynn", focus = 0.55, tint = { 0.32, 0.34, 0.55 }, paint = "night" }, -- feu de camp
-  hill = { art = "elwynn", focus = 0.15, shift = -0.1, tint = { 1, 0.95, 0.85 }, paint = "fields" }, -- Colline
-  camp = { art = "elwynn", focus = 0.9, shift = 0.04, tint = { 0.95, 0.87, 0.74 }, paint = "fields" },
   ruins = { art = "ruins", focus = 0.5, shift = 0.04, tint = { 0.85, 0.82, 0.78 }, paint = "cave" },
   coast = { art = "coast", focus = 0.45, tint = { 1, 0.97, 0.9 }, paint = "coast" }, -- côte de la Marche
-  shop = { art = "elwynn", focus = 0.78, shift = 0.04, tint = { 1, 0.92, 0.8 }, paint = "fields" },
+  -- Westfall (zone 1) : décors peints couleur blé (décision du joueur du 13/11/2026), portés par la
+  -- zone (ns.Zones.westfall.scenes, Data/Zones/Westfall.lua).
+  westfall_road = { paint = "westfall_road" },   -- route et combats
+  westfall_hill = { paint = "westfall_hill" },   -- Sentinel Hill
+  westfall_camp = { paint = "westfall_camp" },   -- campement (réfugiés, gnolls)
+  westfall_shop = { paint = "westfall_shop" },   -- marchand
+  westfall_night = { paint = "westfall_night" }, -- feu de camp : la route, de nuit
 }
+-- Décors communs choisis par Controller.scene() et les écrans (road, hill, camp, shop, night) : une zone
+-- les remplace par les siens (champ `scenes` de la zone, docs/zones.md) ; sans expédition (accueil) ou
+-- pour une zone qui n'en déclare pas, ce sont ceux de Westfall, la zone 1.
+for _, id in ipairs({ "road", "hill", "camp", "shop", "night" }) do
+  Art.scenes[id] = Art.scenes["westfall_" .. id]
+end
 Art.defaultScene = "road"
+
+-- Palettes des décors peints (Art.paintings). Couleurs « #rrggbb » ; { couleur, alpha } pour un voile.
+-- Plans : `far` (bâtiments lointains, brumeux), `mid` (accessoires du plan moyen) ; chacun
+-- { main = masse, dark = toits et pales, light = fenêtres éclairées (nuit) ou nil, wood = toile et
+-- planches, crate = caisses }.
+Art.palettes = {
+  -- Marche de l'Ouest, plein jour : blé jaune-ocre, ciel bleu pâle chaud, horizon plat et doré.
+  westfall = {
+    sky = { "#8fb2cf", "#bfd1d8", "#ecdfb8" }, sun = "#fff6dc", sunGlow = { "#ffe9b0", 0.5 },
+    cloud = { "#fffaf0", 0.42 },
+    hillsBack = "#b7b39a", hillsFront = "#c4ad74", mound = "#b49a5c", moundLight = { "#d8c189", 0.55 },
+    trees = "#8e8a62", haze = { "#f3e4bc", 0.55 },
+    patches = { "#e2c987", "#d4ae5a", "#c99c47", "#b9a457", "#dcbf72" }, hedge = { "#7d6436", 0.35 },
+    fieldsNear = { "#d6aa4c", "#a9772c" }, furrowDark = { "#7a5420", 0.2 }, furrowLight = { "#f3d27e", 0.18 },
+    road = { "#dcc394", "#b48a55" }, roadEdge = "#8f6a3c",
+    far = { main = "#86735a", dark = "#6c5b47" },
+    mid = { main = "#4e3a26", dark = "#3a2a1a", wood = "#8a6942", crate = "#a7804c" },
+    flag = "#3f5a86", smoke = { "#efe8da", 0.5 },
+    ground = { "#3c2913", 0.5 }, stalk = "#5c421f", ears = { "#8f6a2e", "#7d5c27", "#a07a38" },
+  },
+  -- La même, de nuit (feu de camp) : ciel bleu nuit, champs éteints, fenêtres éclairées.
+  westfall_night = {
+    night = true,
+    sky = { "#0a1226", "#18233f", "#34405f" }, moon = "#ece8d6", moonGlow = { "#9db0d6", 0.32 },
+    stars = "#f2eedc", cloud = { "#56658a", 0.3 },
+    hillsBack = "#222b43", hillsFront = "#2a3047", mound = "#262b3d", moundLight = { "#3b4462", 0.5 },
+    trees = "#1a2033", haze = { "#3e4870", 0.38 },
+    patches = { "#3b3c47", "#34353f", "#393842", "#30323b", "#3d3d46" }, hedge = { "#14151b", 0.45 },
+    fieldsNear = { "#34343b", "#212127" }, furrowDark = { "#121216", 0.3 }, furrowLight = { "#5a6078", 0.12 },
+    road = { "#4d4e58", "#36363e" }, roadEdge = "#1d1d23",
+    far = { main = "#161a27", dark = "#10131d", light = "#f0c264" },
+    mid = { main = "#121219", dark = "#0b0b10", wood = "#1e1d26", crate = "#26242d" },
+    flag = "#1c2333", smoke = { "#5b6377", 0.4 },
+    ground = { "#050508", 0.62 }, stalk = "#16151b", ears = { "#2a2930", "#232229", "#302f37" },
+  },
+}
+
+-- Décors peints par plans (UI/Scene.lua, S.landscape) : ciel en dégradé, soleil ou lune et halo, nuages
+-- fondus, collines lointaines, champs lointains en damier, brume de l'horizon, silhouettes lointaines
+-- posées sur la ligne des champs proches, champs proches sillonnés, route en perspective, accessoires du
+-- plan moyen, voile du bas, épis du premier plan. Coordonnées du décor (1034 × 390, y vers le bas).
+--   pal = clé d'Art.palettes ; horizon = y de l'horizon ; field = y de la ligne des champs proches ;
+--   sun / moon = { x, y, rayon } ; clouds = { { x, y, largeur, hauteur } } ;
+--   hills = { back = { { x, largeur, hauteur } }, front = { … } } (bosses au-dessus de l'horizon) ;
+--   mound = { x, sommet, largeur } (colline du plan moyen) ; trees = { { x, nombre } } (bosquets) ;
+--   road = { x0, x1, w0, w1, bend } (centre et largeur à l'horizon / en bas, courbure) ;
+--   props = { { genre, x, y du pied, échelle, plan [, variante] } } : windmill, farmhouse, shed, tower,
+--     tent, cart (variante "crates" : chargée), scarecrow, smoke, fence (x, y, x2, y2, plan) ;
+--   wheat = { { x0, x1, nombre } } (épis du premier plan).
+local WF_SKY = { clouds = { { 180, 70, 280, 46 }, { 520, 40, 220, 32 }, { 730, 118, 300, 38 }, { 975, 58, 190, 30 } },
+  hills = { back = { { 110, 560, 44 }, { 540, 600, 30 }, { 940, 520, 48 } },
+    front = { { 300, 440, 20 }, { 770, 560, 16 } } },
+  trees = { { 58, 3 }, { 452, 2 }, { 618, 4 }, { 996, 3 } } }
+local function westfall(t, pal)
+  t.pal, t.horizon, t.field = pal or "westfall", t.horizon or 190, t.field or 228
+  t.clouds, t.hills, t.trees = t.clouds or WF_SKY.clouds, t.hills or WF_SKY.hills, t.trees or WF_SKY.trees
+  return t
+end
+local ROAD_PROPS = {
+  { "windmill", 228, 228, 1.0, "far" }, { "farmhouse", 748, 228, 0.9, "far" }, { "shed", 818, 228, 0.8, "far" },
+  { "scarecrow", 148, 304, 1.15, "mid" }, { "fence", 836, 296, 1034, 282, "mid" },
+}
+Art.paintings = {
+  westfall_road = westfall({ sun = { 840, 78, 24 }, road = { 596, 520, 10, 390, -70 }, props = ROAD_PROPS,
+    wheat = { { -6, 108, 24 }, { 934, 1040, 22 } } }),
+  westfall_night = westfall({ moon = { 832, 70, 18 }, road = { 596, 520, 10, 390, -70 }, props = ROAD_PROPS,
+    wheat = { { -6, 108, 24 }, { 934, 1040, 22 } } }, "westfall_night"),
+  -- Sentinel Hill : la colline et sa tour derrière les champs, la route qui y monte.
+  westfall_hill = westfall({ sun = { 190, 74, 22 }, mound = { 640, 132, 640 },
+    road = { 560, 470, 8, 360, 50 }, trees = { { 58, 3 }, { 996, 3 } },
+    props = { { "tower", 640, 136, 0.85, "far" }, { "farmhouse", 486, 228, 0.7, "far" },
+      { "shed", 790, 228, 0.65, "far" }, { "windmill", 952, 228, 0.75, "far" },
+      { "fence", 0, 286, 260, 300, "mid" } },
+    wheat = { { -6, 100, 22 }, { 942, 1040, 20 } } }),
+  -- Campement : tentes et charrette sur le chaume, fumée du foyer.
+  westfall_camp = westfall({ sun = { 860, 84, 22 },
+    props = { { "windmill", 120, 228, 0.8, "far" }, { "farmhouse", 912, 228, 0.75, "far" },
+      { "tent", 300, 292, 1.35, "mid" }, { "tent", 478, 270, 1.0, "mid" }, { "tent", 168, 274, 0.9, "mid" },
+      { "smoke", 400, 290, 1.0, "mid" }, { "cart", 760, 296, 1.15, "mid" } },
+    wheat = { { -6, 104, 22 }, { 936, 1040, 22 } } }),
+  -- Marchand : charrette chargée de caisses devant une ferme.
+  westfall_shop = westfall({ sun = { 860, 76, 24 }, road = { 470, 640, 8, 300, 40 },
+    props = { { "windmill", 960, 228, 0.8, "far" }, { "farmhouse", 300, 228, 1.0, "far" },
+      { "shed", 378, 228, 0.8, "far" }, { "cart", 740, 300, 1.3, "mid", "crates" },
+      { "fence", 0, 300, 220, 286, "mid" } },
+    wheat = { { -6, 104, 22 }, { 936, 1040, 22 } } }),
+}
 
 -- Personnages des rencontres : event.npc -> { creature = id, display = { id, … }, icon = repli }.
 -- Essais dans l'ordre (UI/Scene.lua, S.loadModel) : la créature, puis chaque affichage ; le candidat
@@ -155,61 +242,62 @@ Art.defaultScene = "road"
 -- tools/wdb_creatures.py le 12/11/2026) : la créature citée en commentaire, puis des affichages de
 -- créatures du même genre (même cache) en secours. Un affichage ne dépend pas du cache de créatures
 -- (SetDisplayInfo lit les données du client) : c'est le secours quand la créature n'est pas connue.
--- Personnages inventés : une créature de la Marche de l'Ouest ou d'Elwynn du bon genre.
+-- Depuis le 13/11/2026, tous les personnages sont des gens de la Marche de l'Ouest (décision du
+-- joueur, docs/zones/westfall.md) : la créature elle-même, puis des affichages de la Marche. Une
+-- créature absente des deux caches (Farmer Furlbrow 237, Verna Furlbrow 238, Captain Grayson 392 :
+-- identifiants de la version classique, non vérifiables hors jeu) reste en tête : le client la
+-- demande au serveur ; ses affichages de secours sont ceux d'un voisin plausible (noté « repli »).
 -- icon = médaillon de repli (icône embarquée de Media/Icons) quand aucun modèle ne se charge.
 Art.npcs = {
-  -- Salma Saldean (235) ; Ma Stonefield (244), Maybell Maclure (251)
-  salma_saldean = { creature = 235, display = { 1691, 3330, 3323 },
+  -- Salma Saldean (235) ; Aubergiste Heather (8931), fermière de la Marche en secours
+  salma_saldean = { creature = 235, display = { 1691, 8185 },
     icon = { icon = 236447, tga = "Achievement_Character_Human_Female" } },
-  -- Saldean le fermier (233) ; Ray le fermier (232), Getz le fermier (2403)
-  farmer_saldean = { creature = 233, display = { 1943, 3614, 3620 },
+  -- Saldean le fermier (233) ; repli : Ray le fermier (232, fermier humain, zone non vérifiable)
+  farmer_saldean = { creature = 233, display = { 1943, 3614 },
     icon = { icon = 134058, tga = "INV_Misc_Food_Wheat_01" } },
-  -- cocher : Brog Hamfist <General Supplies> (151) ; Mike Miller (1670), Greishan Ironstove,
-  -- marchand itinérant (3291)
-  wagon_driver = { creature = 151, display = { 1292, 3262, 1837 },
+  -- Farmer Furlbrow (237, absent des caches) ; repli : Saldean le fermier (233), Ray le fermier (232)
+  farmer_furlbrow = { creature = 237, display = { 1943, 3614 },
     icon = { icon = 236448, tga = "Achievement_Character_Human_Male" } },
+  -- Verna Furlbrow (238, absente des caches) ; repli : Salma Saldean (235), Aubergiste Heather (8931)
+  verna_furlbrow = { creature = 238, display = { 1691, 8185 },
+    icon = { icon = 133671, tga = "INV_Misc_Bandage_01" } },
   -- Gryan Stoutmantle (234) ; Capitaine Danuvin (821), Protecteur Gariel (490), Milice du peuple
   gryan_stoutmantle = { creature = 234, display = { 1690, 2372, 2367 },
     icon = { icon = 132483, tga = "INV_Banner_02" } },
-  -- Old Hank, pêcheur : Lee Brown <Fisherman> (1651) ; Harold Riggs (3179), Stuart Fleming (3178)
-  old_fisherman = { creature = 1651, display = { 3272, 3470, 3468 },
+  -- Éclaireur Galiaan <Milice du peuple> (878) ; Éclaireur Riell (820), Protecteur Bialon (487)
+  scout_galiaan = { creature = 878, display = { 2373, 2374, 2368 },
     icon = { icon = 132931, tga = "INV_Fishingpole_01" } },
-  -- Grit, prospecteur : Prospecteur Stormpike (1356) ; Prospecteurs Gehn (1255) et Ironband (1344)
-  gold_prospector = { creature = 1356, display = { 3594, 1623, 3437 },
+  -- Thor <Maître des gryphons> (523, Sentinel Hill ; cache frFR) ; repli d'apparence (aucun autre nain
+  -- de la Marche dans les caches) : Prospecteur Stormpike (1356, Forgefer)
+  thor = { creature = 523, display = { 3263, 3594 },
     icon = { icon = 134708, tga = "INV_Pick_02" } },
-  -- Mother Hanna, réfugiée : Ma Stonefield (244) ; « Auntie » Bernice Stonefield (246), Kalaba la
-  -- fermière (2451)
-  moonbrook_refugee = { creature = 244, display = { 3330, 3329, 3630 },
-    icon = { icon = 133671, tga = "INV_Misc_Bandage_01" } },
-  -- Aunt Mirelle, herboriste : Alma Jainrose <Herbalism Trainer> (812) ; Felicia Gump (1303),
-  -- « Auntie » Bernice Stonefield (246)
-  herbalist = { creature = 812, display = { 1745, 1441, 3329 },
+  -- Aubergiste Heather (8931, Sentinel Hill ; cache frFR) ; Salma Saldean (235) en secours
+  innkeeper_heather = { creature = 8931, display = { 8185, 1691 },
     icon = { icon = "Interface\\Icons\\inv_misc_flower_02", tga = "INV_Misc_Flower_02" } },
-  -- Farmer Molsen : Ray le fermier (232) ; Getz (2403), Kent (2436) le fermier
-  farmer_molsen = { creature = 232, display = { 3614, 3620, 3667 },
+  -- Farmer Molsen (inventé, d'après la ferme Molsen de la Marche) : Ray le fermier (232, fermier humain,
+  -- zone non vérifiable : le cache ne la donne pas) ; Kent le fermier (2436), Saldean le fermier (233)
+  farmer_molsen = { creature = 232, display = { 3614, 3667, 1943 },
     icon = { icon = 134059, tga = "INV_Misc_Food_Wheat_02" } },
-  -- Keeper Alden, gardien du phare : Chef des docks Baren (381) ; Harold Riggs (3179), Matthew Hooper (1680)
-  lighthouse_keeper = { creature = 381, display = { 3360, 3470, 3362 },
+  -- Captain Grayson, fantôme du phare (392, absent des caches) ; repli : Capitaine Danuvin (821),
+  -- Protecteur Gariel (490), Milice du peuple
+  captain_grayson = { creature = 392, display = { 2372, 2367 },
     icon = { icon = 134249, tga = "INV_Misc_Lantern_01" } },
   -- Graymaw, chef gnoll : Sous-chef Rivepatte (98) ; Brute Rivepatte (124), Gnoll Rivepatte (117)
   riverpaw_gnoll = { creature = 98, display = { 376, 384, 175 },
     icon = { icon = 134163, tga = "INV_Misc_Head_Gnoll_01" } },
-  -- Grizzle Quickclick, colporteur gobelin : Zixil <Merchant Supreme> (3537) ; Artisan (1731),
-  -- Ingénieur (622) et Sculpteur (641) gobelins
-  goblin_peddler = { creature = 3537, display = { 7133, 7110, 7109, 7111 },
-    icon = { icon = 463874, tga = "achievement_Goblinhead" } },
-  -- Tinker Bertil, gnome bricoleur : Deek Fizzlebizz <Journeyman Engineer> (3290) ; Bronk Guzzlegear
-  -- (1702), Loslor Rudge (1694)
-  gnome_tinker = { creature = 3290, display = { 1832, 3394, 3392 },
-    icon = { icon = 134520, tga = "INV_Misc_Wrench_01" } },
-  -- Tobin, gamin : Tommy Joe Stonefield (252) ; Thomas <Altar Boy> (4982), Nathan (847)
+  -- Profiteur défias <Marchand itinérant> (1669, cache frFR) ; Malandrin défias (122) en secours
+  defias_profiteer = { creature = 1669, display = { 4423, 2342 },
+    icon = { icon = 133639, tga = "INV_Misc_Bag_10" } },
+  -- Tobin, gamin : Tommy Joe Stonefield (252, Elwynn : aucun enfant nommé de la Marche connu, gardé) ;
+  -- Thomas <Altar Boy> (4982), Nathan (847)
   tobin_young = { creature = 252, display = { 3331, 262, 338 },
     icon = { icon = 133964, tga = "INV_Misc_Food_11" } },
   -- Tobin, guetteur de la Milice : Eclaireur Riell (820) ; Eclaireur Galiaan (878), Protecteur Bialon (487)
   tobin_scout = { creature = 820, display = { 2374, 2373, 2368 },
     icon = { icon = 134441, tga = "INV_Misc_Spyglass_02" } },
-  -- Tobin, coupe-jarret défias : Vide-gousset défias (94, homme / femme) ; Malandrin défias (122)
-  tobin_defias = { creature = 94, display = { 2361, 2362, 2342, 2343 },
+  -- Tobin, coupe-jarret défias : Éclaireur défias (Defias Pathstalker, 121, homme / femme) ; Malandrin
+  -- défias (122)
+  tobin_defias = { creature = 121, display = { 2336, 2337, 2342, 2343 },
     icon = { icon = 133694, tga = "INV_Misc_Bandana_03" } },
 }
 
@@ -337,12 +425,14 @@ Art.enemies = {
   gnoll           = { creature = 117, display = 175, icon = HEAD_GNOLL },   -- Riverpaw Gnoll
   mystic          = { creature = 453, display = 502, icon = HEAD_GNOLL },   -- Riverpaw Mystic
   murloc          = { creature = 126, display = 983, icon = HEAD_MURLOC },  -- Murloc Coastrunner
-  bandit          = { creature = 116, display = { 2357, 2358 }, icon = BANDANA }, -- Defias Bandit
+  -- Malandrin défias (Defias Highwayman, 122, Marche de l'Ouest ; avant le 13/11/2026 : Defias Bandit 116,
+  -- Elwynn, 2357 / 2358)
+  bandit          = { creature = 122, display = { 2342, 2343 }, icon = BANDANA },
   -- Invocateur défias (Defias Conjurer, 619, Marche de l'Ouest : affichages 2329 / 2330 dans les deux
   -- caches, mais rien ne s'affichait en jeu le 12/11/2026). Secours : d'autres lanceurs de sorts défias
-  -- du cache, Sorcier-voleur défias (474, Elwynn) 2359 / 2360, Enchanteur défias (910) 4281 / 4282
-  -- (Magicien défias 1726 : 2321 / 2322 et Sorcier défias 4418 : 2447 / 2448, non retenus : liste courte).
-  sorcerer        = { creature = 619, display = { 2329, 2330, 2359, 2360, 4281, 4282 },
+  -- du cache, Magicien défias (1726, Mortemines) 2321 / 2322, Enchanteur défias (910) 4281 / 4282
+  -- (le Sorcier-voleur défias 474, d'Elwynn, retiré le 13/11/2026).
+  sorcerer        = { creature = 619, display = { 2329, 2330, 2321, 2322, 4281, 4282 },
                       icon = { icon = 135812, tga = "Spell_Fire_FlameBolt" } }, -- spell_fire_flamebolt
   harvest_golem   = { creature = 36, display = 367, scale = 1.2, icon = { icon = 134063 } }, -- inv_misc_gear_01
   rhahkzor        = { creature = 644, display = 14403, scale = 1.2,

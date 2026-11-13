@@ -476,11 +476,16 @@ end
 -- rencontre -> champ `scene` facultatif de la rencontre (piste F), sinon route. Une zone peut remplacer un
 -- décor par le sien (champ scenes de ns.Zones[id], docs/zones.md).
 local baseScene
-function C.scene()
+
+-- Décor de la zone de l'expédition pour le décor commun s (road, night, shop…), sinon s lui-même.
+function C.zoneScene(s)
   local exp = C.exp()
-  local s = baseScene(exp)
   local z = exp and ns.Zones[exp.zone or ""]
   return z and z.scenes and z.scenes[s] or s
+end
+
+function C.scene()
+  return C.zoneScene(baseScene(C.exp()))
 end
 
 baseScene = function(exp)
