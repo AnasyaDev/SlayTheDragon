@@ -399,6 +399,25 @@ return function(T)
     eq(d.enemies[1].st.force, cmd); eq(d.enemies[2].st.force, cmd)
   end)
 
+  test("passe de difficulté (14/11/2026) : textes du boss alignés sur ses nombres, Mortal Wound 3 tours", function()
+    local cmd = E.nekrosh.moves.command
+    assert(cmd.text:find("Strength " .. cmd.actions[1][3] .. "%."), cmd.text)
+    assert(cmd.text:find(cmd.actions[2][2] .. " Absorb"), cmd.text)
+    local sb = E.nekrosh.moves.shadow_bolt.actions[1][2]
+    assert(E.nekrosh.phases[1].text:find("Shadow Bolt %(" .. sb .. "%)"), E.nekrosh.phases[1].text)
+    -- Mortal Wound de Nek'rosh et du Raider : 3 tours ; celle du Centurion : 2
+    for _, mv in ipairs({ E.nekrosh.moves.cleave, E.nekrosh.moves.sunder, E.dragonmaw_raider.moves.strike,
+      E.dragonmaw_centurion.moves.cleave }) do
+      local n
+      for _, a in ipairs(mv.actions) do if a[2] == "mortal_wound" then n = a[3] end end
+      eq(n, mv == E.dragonmaw_centurion.moves.cleave and 2 or 3, mv.name)
+    end
+    -- une Mortal Wound posée sur une autre s'additionne (la blessure tient la durée annoncée)
+    local c = boss({ hand = {}, intents = { "cleave" } })
+    Combat.endTurn(c)
+    assert((c.player.st.mortal_wound or 0) >= 2, "Mortal Wound encore là au tour du joueur")
+  end)
+
   ---------------------------------------------------------------------------
   -- Expédition : zone jouable, rencontres, commun, bibelots de clé, Gryphon Master
   ---------------------------------------------------------------------------
