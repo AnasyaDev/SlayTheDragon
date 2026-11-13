@@ -2,7 +2,7 @@
 
 Zone 4 de la campagne (id `stranglethorn`), après Wetlands, avant Swamp of Sorrows. Difficulté : Westfall + 36 %
 (PV et dégâts des ennemis × 1,36 par rapport à `Data/Act1.lua`, arrondis ; la simulation réglera). Fiche de
-conception, rien n'est codé. Textes affichés en anglais, explications en français.
+conception ; codée le 14/11/2026 (§ 12, « Implémentation »). Textes affichés en anglais, explications en français.
 
 Repères Westfall × 1,36 utilisés pour les chiffres :
 
@@ -510,3 +510,137 @@ Nesingwary 4000, The Green Hills of Stranglethorn. « Surveyor Brannock » est u
    un groupe de bêtes, Mind-numbing Poison et Snake Trap valent peu (Snake Trap reste un DoT 5 à tous). Accepter
    des rares situationnelles, ou en remplacer une par une carte forte partout (par exemple un Rogue qui gagne à
    vider sa main) ?
+
+## 12. Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Stranglethorn.lua` (ennemis, groupes, carte Hexed, commun, bibelots de clé, rencontres, décors
+de la zone), `Core/ZoneRules/stranglethorn.lua` (règle, `ns.Stranglethorn`, case Gurubashi Arena, mots du langage),
+`UI/Art/Zones/stranglethorn.lua` (modèles, icônes, vue de zone, six décors peints), `Sim/zones/stranglethorn.lua`
+(bot), `Sim/tests_zone_stranglethorn.lua` (34 tests), `Sim/ui_zone_stranglethorn.lua` (harnais « UZS »).
+
+### La règle telle que codée
+
+1. Un Hex est une incantation ennemie (move `cast = true`, action `{ "hex" }`), annoncée au début du tour,
+   résolue au tour du lanceur ; un Interrupt l'annule, un lanceur étourdi (Stunned) perd son tour.
+2. Carte visée : `ns.Stranglethorn.hexTarget` = la plus chère des cartes en main (coût actuel, égalité : la plus à
+   gauche) ; **jamais une carte Hexed** (ajout : hexer une grenouille ne ferait rien). Plusieurs lanceurs : cartes
+   différentes, dans l'ordre d'action (`ns.Stranglethorn.plan`, lu aussi par l'interface et les bots).
+3. Verrouillage au crochet `onHandEnd` (après le familier, avant la défausse) : `z.locks[uid de l'ennemi] = uid de
+   la carte` ; main vide : « No card » (journal `hex_fizzle`).
+4. Résolution : la carte verrouillée, retrouvée dans la main (Retain) ou la défausse, est transformée en Hexed
+   (`Combat.transformCard`) ; sinon le Hex échoue. Verrous non résolus (lanceur mort de son DoT, tour sauté) effacés
+   à la fin de la phase ennemie.
+5. Hexed : coût 1, Skill, `token`, `vanish`, `{ "restore" }` ; Death Hex (champ `deathHex` du Zanzil Naga) : mort
+   pendant le tour du joueur (étape `play` ou `turnEnd`, ni Trap ni DoT) → Hex immédiat (`hex_now`).
+
+### Écarts à la fiche, et pourquoi
+
+- **Rencontres** : `zone = "stranglethorn"` (plus de champ `act`) et `tier = 0` pour les huit : ce sont des
+  rencontres de la zone, pas du commun (avec les paliers 1 et 2 de la fiche, `Meta.commonContent` les aurait
+  annoncées comme débloquées par Westfall ou Duskwood).
+- **Textes impersonnels** (langage des cartes : aucun « your ») : Hexed « Return the original card to hand. » (le
+  nom de la carte d'origine est déjà écrit au-dessus par le socle) ; Jungle Remedy « Restore all Hexed cards to
+  hand. ».
+- **Mokk** : la rage à 49 PV est une phase du moteur commun (seuil à 50 %, cran sur la barre, bandeau « Berserk »),
+  sans réplique (un gorille ne parle pas).
+- **King Bangalash** : Call the Pride devient Roar quand les deux tigres vivent (IA à motif propre).
+- **Jin'do** : la bascule à 50 % est une phase (`phases`, cran affiché, réplique « Your soul belongs to Hakkar! »).
+  Ajouts d'équilibrage (voir plus bas) : Delusions of Jin'do (intention « watch » : coupe l'incantation en cours,
+  sinon 12 dégâts) à la place du second Shadow Bolt de la phase 1, Shadow Bolt qui interrompt (s'il fait perdre des
+  PV), Shadow Volley qui coupe l'incantation même à travers l'Absorb.
+- **Interruptions directes** (Kick du Swashbuckler, Pounce de Bangalash, Shadow Volley) : `{ "interrupt" }` en tête
+  de l'action, l'Absorb ne protège plus le Cast ; Shadow Bolt des sorciers, Lightning Bolt du Mystic, Shadow Bolt de
+  Zanzil interrompent s'ils font perdre des PV. Raison : sans cela le Mage, dont les Cast échappent au Hex par
+  construction, dominait la zone de 15 à 20 points.
+- **Zandalarian Hero Charm** (+5) : `retainPicks`, identique au Traveler's Backpack (commun, palier 3) ; deux
+  `retainPicks` ne donnent qu'un choix. À revoir par le joueur (un bibelot de clé +5 devrait faire plus).
+- **Jin'do's Bag of Whammies** : seulement les interruptions faites par une carte pendant le tour du joueur (pas
+  celle de la Shrunken Head). Icône `INV_Misc_Bag_10_Green` (la `INV_Misc_Bag_10` est déjà la Defias Purse).
+- **Shrunken Head** : la première incantation ennemie est interrompue dès son annonce (« Interrupted » visible, la
+  carte n'est jamais visée).
+- **Gurubashi Arena** : case commune à toutes les zones (palier 4), à la place d'une rencontre, une par expédition
+  dès l'étape 3 ; rencontre `node = true` à groupe tiré à l'entrée (texte « %g »), PV + 15 %, cartes d'un cran,
+  + 25 po.
+- **Animation** de la carte qui s'envole vers le lanceur : non faite ; texte flottant « Hexed: <carte> » sur le
+  héros et « No card » / « Hex fails » sur le lanceur, compteur « N Hexed » en haut.
+
+### Interface (ce qui se lit avant de jouer)
+
+Bulle « Hex » à l'icône `spell_shaman_hex` ; infobulle « Target now: <carte>. It changes as you play cards. » ;
+sous l'intention du lanceur, pastille au nom de la carte visée (« No card » grisée si la main est vide) ; dans la
+main, liseré vert et icône du Hex sur la carte visée (mise à jour à chaque rendu), infobulle « Hex: <lanceur> turns
+this card into a Hexed card at the end of your turn. Play it, or interrupt or stun the caster. » ; pastille
+« Death Hex » sous le Zanzil Naga ; compteur « N Hexed » en haut (Take a Trophy en dépend, sa bulle est recalculée).
+Mots expliqués : Hex, Hexed (`L.zoneKeyword`).
+
+### Nombres finaux (après réglage)
+
+| Unité | PV | Intentions |
+|---|---|---|
+| Bloodscalp Witch Doctor | 21–24 | Hex ; Shadow Bolt 9 (interrompt) |
+| Skullsplitter Mystic | 24–27 | Hex ; Healing Wave 10 ; Lightning Bolt 8 (interrompt) |
+| Bloodscalp Headhunter | 30–34 | Throw Spear 6 × 2 ; Take a Trophy 10 + 3 par Hexed |
+| Zanzil Naga | 30–34 | Trident 12 ; Coil 8 Absorb + 6 ; Death Hex |
+| Shadowmaw Panther | 26–29 | Ravage 15 ; Prowl 10 Absorb ; Claw 10 |
+| Lashtail Raptor | 21–24 | Bite 10 ; Lashing Tail 4 × 2 |
+| Mistvale Gorilla | 36–40 | Pound 14 ; Beat Chest 8 Absorb, Strength 2 |
+| Bloodsail Swashbuckler | 29–32 | Cutlass 11 ; Dirty Trick 5 + Demoralized 1 ; Kick : coupe le Cast + 8 |
+| King Bangalash (élite) | 94 | Pounce : coupe le Cast + 20 ; Rake 4 × 3 ; Call the Pride (2 tigres 10–12 PV, Bite 6) / Roar ; Maul 14 |
+| Mokk the Savage (élite) | 98 | Thrash 7 × 2 ; Pound 17 ; Beat Chest 12 Absorb, Strength 2 ; à 49 PV Strength 4, Thrash / Pound |
+| Zanzil the Outcast (élite) | 96 | Hex (+ zombie 13–15 PV, Claw 7) ; Shadow Bolt 18 (interrompt) ; Mixture 8 + Strength 2 aux alliés |
+| Jin'do the Hexxer (boss) | 134 | Hex, Shadow Bolt 27 (interrompt), Powerful Healing Ward (16 PV, soin 8), Delusions (coupe le Cast, sinon 12) ; à 67 PV Brain Wash Totem (10 PV, Hex à chaque tour), puis Shadow Volley (coupe le Cast + 10 × 3), Hex, Shadow Bolt |
+
+### Mesures (`runner=expedition zone=stranglethorn zones=3 level=7 key=0`, 1000 expéditions par classe)
+
+| Classe | Victoire sans épique | Victoire, épique au choix du bot | PV perdus / combat normal | Tours normal | Tours boss | Boss gagné (sans épique) |
+|---|---|---|---|---|---|---|
+| Priest | 61,6 % | 67,0 % | 10,0 | 4,2 | 8,1 | 72,6 % |
+| Warrior | 66,2 % | 72,7 % | 11,1 | 3,6 | 6,8 | 79,1 % |
+| Mage | 71,5 % | 76,4 % | 6,9 | 3,5 | 5,9 | 81,0 % |
+| Rogue | 60,8 % | 83,5 % | 7,6 | 3,2 | 5,4 | 74,5 % |
+| Hunter | 69,5 % | 88,6 % | 7,8 | 3,1 | 5,7 | 72,9 % |
+
+Écart entre classes sans épique : 10,7 points (Rogue 60,8 – Mage 71,5). Avec épique : 21,6 points, porté par
+les épiques du Rogue (+22,7) et du Hunter (+19,1) contre +5 pour le Priest : un écart des épiques, pas de la zone.
+Clés (Rogue, sans épique) : +0 60,8 %, +1 54,3 %, +3 43,7 %, +5 35,5 % (≈ 5 points par niveau).
+
+Hex (par combat normal / élite / boss, Priest) : annoncés 1,15 / 1,04 / 4,73, posés 0,74 / 0,75 / 2,90,
+interrompus 0,10 / 0,09 / 0,48, Hexed rejouées 0,17 / 0,21 / 1,12 ; le Mage en subit moins (posés 0,55 / 0,44 /
+2,27 : ses Cast quittent la main).
+
+Réglage, dans l'ordre (600 à 1000 expéditions par classe) : chiffres de la fiche → Priest 65, Mage 84, Hunter 86
+(Bangalash à 43 % pour le Priest, boss trop facile) ; Bangalash adouci, Jin'do et Zanzil plus durs → Mage et
+Hunter toujours 15 points devant ; le levier qui a resserré l'écart est le boss **moins usant** (soin du Ward 8,
+totem 10 PV : les classes lentes subissent moins de tours) avec des **interruptions directes** (le Mage perd enfin
+des Cast), puis +1 aux coups des ennemis normaux et Shadow Bolt 27 pour redescendre tout le monde. Monter les
+élites a fait l'inverse (Priest, Warrior, Rogue −10, Mage et Hunter −2) : rétabli.
+
+### Modèles en repli
+
+Créatures de la version classique (identifiants de mémoire, absents des caches du client : le client les demande au
+serveur) en tête, puis affichages du cache Forever de la même famille, puis le fichier de modèle de la fiche :
+trolls (Witherbark 3986 / 3990, Frostmane 5608, Frostmane Headhunter 5626) pour les sorciers, le Headhunter,
+Zanzil, Jin'do, Rin'wosho et Unbagwa ; Young Panther 2437 (panthère) ; Highland Lashtail 673, Mottled Raptor 960,
+Highland Raptor 138620 ; Young Stranglethorn Tiger 681 / 138617 (créature et affichage du cache) et Tigre 5556 pour
+Bangalash ; **Zanzil Naga** : créature inconnue, repli Daggerspine Shorehunter (2369, affichage 11255) puis Naga
+Siren 11263 ; **gorilles** (Mistvale Gorilla, Mokk) : aucun singe en cache, affichage 837 de mémoire non vérifiable,
+puis `gorilla.m2` ; Defias Pirate 2347 / 2348 et Bart Tidewater 4429 (pirates) ; goules 828 / 569 (zombie) ; totems
+Healing Stream 4587 (Ward), Grounding 4590 et Stoneclaw 4588 (Brain Wash Totem) ; gobelins de Booty Bay (Capitaine
+Vertepeau 7113, ingénieur 7109, artisan 7110, sculpteur 7111, constructeur naval 7112, cogneur 7102) ; nains
+(Grif Wildheart 3558, Torren Squarejaw 1153 / 1656, Jern Hornhelm 1572) ; Surveyor Brannock (inventé) = Torren
+Squarejaw. À vérifier en jeu : `/slay models`.
+
+### Décors
+
+Six paysages peints par la zone (fonction `jungle` d'`UI/Art/Zones/stranglethorn.lua`, `draw` de
+`Art.paintings`, formes de `S.paintKit`) : route de la jungle (jour), nuit (lune, lucioles, torche), campement de
+Nesingwary (tentes, foyer, charrette), ruines trolls (pyramide à degrés, colonnes, têtes de pierre ; décors `hill`
+et `ruins`), Booty Bay (baie entre deux falaises, navires, maisons sur pilotis, quai ; `shop` et `coast`), portes
+de Zul'Gurub sous un ciel rouge (boss, `mine`). 330 à 1000 régions chacun. Planches : `build/snap/decor-stranglethorn_*.svg`.
+
+### Reste à faire ou à vérifier en jeu
+
+- Modèles (surtout gorilles et Zanzil Naga) et icônes : relancer le client (fichiers ajoutés), `/slay models`.
+- Écart des épiques (Rogue et Hunter à +20) : lot des épiques, pas de la zone.
+- Zandalarian Hero Charm identique au Traveler's Backpack : à repenser.
+- Animation du Hex (carte qui s'envole) non faite.
