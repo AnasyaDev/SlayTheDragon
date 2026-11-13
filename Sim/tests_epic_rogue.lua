@@ -82,23 +82,40 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
     assert(Card.isEpic(d) and Card.collectible(d))
     eq(ns.Meta.zoneCards("rogue", ZONES[i])[1], id)
   end
+  -- texte de la carte (déclencheur, mot de règle et son nombre) et à-côté de ses mots de règle (L.rule)
+  local Lg = ns.Language
   for k, up in ipairs({ false, true }) do
-    local t = function(id) return Card.defById(id, up).text end
-    assert(t("deflection"):find("deal " .. E.deflection[k] .. ", %+" .. E.deflectionStep[k] .. " per earlier"))
-    assert(t("echoing_reprimand"):find("counts as " .. E.echoing_reprimand[k] .. "%."))
+    local function card(id) return Card.defById(id, up).text end
+    local function t(id)
+      local d = Card.defById(id, up)
+      local out = { d.text }
+      for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = r.kw.name .. ": " .. Lg.ruleText(r.kw, r.n, up) end
+      return table.concat(out, "\n")
+    end
+    assert(card("deflection"):find("Each Parry gained: Riposte " .. E.deflection[k] .. "%."))
+    assert(t("deflection"):find("Riposte: Deal " .. E.deflection[k] .. " damage to the last target, %+"
+      .. E.deflectionStep[k] .. " per earlier Riposte this turn%."), t("deflection"))
+    assert(card("echoing_reprimand"):find("Animacharge " .. E.echoing_reprimand[k] .. "%."))
+    assert(t("echoing_reprimand"):find("counts as a Surge of " .. E.echoing_reprimand[k] .. "%."))
+    assert(t("echoing_reprimand"):find("Surge of 2" .. (E.echoingMax[k] == 3 and " or 3" or "") .. " Combo", 1, true))
     local kl = E.kidney_shot[k]
-    assert(t("kidney_shot"):find("Surge of " .. kl .. (kl < 5 and "%+" or "") .. " Combo: apply Stunned 1"))
-    if E.subterfuge[k] > 0 then assert(t("subterfuge"):find("Gaining Stealth: %+" .. E.subterfuge[k] .. " Combo%."))
-    else assert(not t("subterfuge"):find("Gaining Stealth", 1, true)) end
-    assert((t("subterfuge"):find("Surge of 1+ Combo: gain Stealth", 1, true) ~= nil) == (E.subterfugeSurge[k] == true))
-    assert(t("danse_macabre"):find("%+" .. E.danse_macabre[k] .. " per other card name"))
+    assert(card("kidney_shot"):find("Surge of " .. kl .. "%+" .. " Combo: Gouge%."))
+    assert(t("kidney_shot"):find("Gouge: Apply Stunned 1", 1, true))
+    assert(card("subterfuge"):find("Shroud " .. E.subterfugeTurns[k] .. ".", 1, true))
+    assert(t("subterfuge"):find("Stealth lasts " .. E.subterfugeTurns[k] .. " turns", 1, true))
+    if E.subterfuge[k] > 0 then assert(t("subterfuge"):find("gives %+" .. E.subterfuge[k] .. " Combo"))
+    else assert(not t("subterfuge"):find("Combo%.")) end
+    assert((t("subterfuge"):find("Surge of 1+ Combo grants Stealth", 1, true) ~= nil) == (E.subterfugeSurge[k] == true))
+    assert(card("danse_macabre"):find("Flourish " .. E.danse_macabre[k] .. ".", 1, true))
+    assert(t("danse_macabre"):find("%+" .. E.danse_macabre[k] .. " damage per other card name"))
     if E.danseFree[k] > 1 then assert(t("danse_macabre"):find("after the first " .. E.danseFree[k], 1, true)) end
     assert((t("danse_macabre"):find("up to", 1, true) ~= nil) == (E.danseCap[k] > 0))
-    local f = E.doomblade[k]
-    local what = f == 0.5 and "half their damage" or f == 1 and "their damage as"
-      or f < 1 and (math.floor(f * 100 + 0.5) .. "%% of their damage")
-      or ("their damage %+" .. math.floor((f - 1) * 100 + 0.5) .. "%%")
-    assert(t("doomblade"):find(what), t("doomblade"))
+    local pct = math.floor(E.doomblade[k] * 100 + 0.5)
+    assert(card("doomblade"):find("Surge Attacks: Bleed " .. pct .. "%", 1, true), card("doomblade"))
+    assert(t("doomblade"):find("applies " .. pct .. "% of it as DoT", 1, true), t("doomblade"))
+    assert(card("atrophic_poison"):find("DoT " .. E.atrophic_poison[k] .. "+: Atrophy", 1, true))
+    assert(t("atrophic_poison"):find("with DoT " .. E.atrophic_poison[k] .. " or more count as Demoralized", 1, true))
+    assert((t("atrophic_poison"):find("Sundered", 1, true) ~= nil) == up)
   end
 end)
 

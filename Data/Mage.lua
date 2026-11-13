@@ -363,7 +363,8 @@ card("arcane_surge", {
 -- Règles en jeu dès le début du combat (c.epic), actives à chaque tour : ni piochées, ni jouées ; cost = 0, jamais
 -- payé ni affiché. Les crochets (deckHooks) sont posés par Core/Classes/mage.lua ; les nombres sont ici (epicN,
 -- epicM, epicPct, epicBonus, epicCharge, epicEvery, lus par les crochets, base et améliorée). Réglage du 14/11/2026
--- sur Duskwood, Stranglethorn et Burning Steppes (docs/classes.md, « Épiques du Mage »).
+-- sur Duskwood, Stranglethorn et Burning Steppes (docs/classes.md, « Épiques du Mage »). Textes : déclencheur et
+-- mot de règle (deux lignes au plus) ; la règle complète est l'à-côté du mot (L.rule, Core/Classes/mage.lua).
 local function epic(id, t)
   t.type, t.power, t.epic, t.rarity, t.effects, t.cost = "power", true, true, "epic", {}, 0
   card(id, t)
@@ -373,55 +374,55 @@ end
 -- (Charges comprises, arrondi bas). Fiche : 100 % ; réglé par la moitié (avant : « damage - 6 »).
 epic("mirror_image", {
   name = "Mirror Image", zone = "westfall", path = "fire", school = "arcane", epicPct = 50,
-  text = "Epic.\nCast cards: deal half their damage again to a random enemy.",
-  up = { epicPct = 100, text = "Epic.\nCast cards: deal their damage again to a random enemy." },
+  text = "Epic.\nCast cards: Image 50%.",
+  up = { epicPct = 100, text = "Epic.\nCast cards: Image 100%." },
 })
 
 -- Duskwood : chaque attaque ennemie sur le Mage, même absorbée, pose DoT epicN à son auteur (une fois par attaque :
 -- un DoT par coup, c'était trop pour les attaques à plusieurs coups ; DoT 1 par coup était trop peu).
 epic("molten_armor", {
   name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 2,
-  text = "Epic.\nWhen attacked: apply DoT 2 to the attacker",
-  up = { epicN = 4, text = "Epic.\nWhen attacked: apply DoT 4 to the attacker" },
+  text = "Epic.\nWhen attacked: Burn 2.",
+  up = { epicN = 4, text = "Epic.\nWhen attacked: Burn 4." },
 })
 
 -- Wetlands : chaque tour, l'élémentaire inflige epicN à la dernière cible et lui pose Demoralized epicM pour le
 -- tour du Mage seulement (Frozen pour ses cartes ; tenu aussi pendant le tour ennemi, c'était +25 points).
 epic("water_elemental", {
   name = "Water Elemental", zone = "wetlands", path = "frost", school = "frost", epicN = 2, epicM = 1,
-  text = "Epic.\nStart of turn: deal 2 to the last target and apply Demoralized 1 for this turn.",
-  up = { epicN = 4, text = "Epic.\nStart of turn: deal 4 to the last target and apply Demoralized 1 for this turn." },
+  text = "Epic.\nStart of turn: Waterbolt 2.",
+  up = { epicN = 4, text = "Epic.\nStart of turn: Waterbolt 4." },
 })
 
 -- Stranglethorn : une carte Cast visant un ennemi Frozen part tout de suite (sans Instant) et emploie le gel
 -- (Stunned et Demoralized retirés après la résolution) ; améliorée, ses coups font epicN de plus.
 epic("fingers_of_frost", {
   name = "Fingers of Frost", zone = "stranglethorn", path = "frost", school = "frost", epicN = 0,
-  text = "Epic.\nCast cards aimed at a Frozen enemy resolve at once and thaw it.",
-  up = { epicN = 4, text = "Epic.\nCast cards aimed at a Frozen enemy resolve at once, deal 4 more and thaw it." },
+  text = "Epic.\nFrozen: Brain Freeze.",
+  up = { epicN = 4, text = "Epic.\nFrozen: Brain Freeze +4." },
 })
 
 -- Swamp of Sorrows : le mana non dépensé (epicN au plus) s'ajoute au tour suivant, + epicBonus s'il en reste (le
 -- report seul ne rapportait rien : la main de 5 cartes, pas le mana, borne le tour suivant).
 epic("arcane_meditation", {
   name = "Arcane Meditation", zone = "swamp", path = "arcane", school = "arcane", epicN = 4, epicBonus = 1,
-  text = "Epic.\nUp to 4 unspent mana carries over to the next turn, +1.",
-  up = { epicN = 6, epicBonus = 2, text = "Epic.\nUp to 6 unspent mana carries over to the next turn, +2." },
+  text = "Epic.\nEnd of turn: Conserve 4.",
+  up = { epicN = 6, epicBonus = 2, text = "Epic.\nEnd of turn: Conserve 6." },
 })
 
 -- Burning Steppes : un ennemi qui meurt avec du DoT le donne (+ epicN) à chaque autre ennemi.
 epic("conflagration", {
   name = "Conflagration", zone = "steppes", path = "fire", school = "fire", epicN = 16,
-  text = "Epic.\nAn enemy dying with DoT gives that DoT + 16 to each other enemy.",
-  up = { epicN = 20, text = "Epic.\nAn enemy dying with DoT gives that DoT + 20 to each other enemy." },
+  text = "Epic.\nEnemy deaths: Pyroclasm 16.",
+  up = { epicN = 20, text = "Epic.\nEnemy deaths: Pyroclasm 20." },
 })
 
 -- Blackrock Mountain : la 3e carte jouée de chaque tour (améliorée : chaque 3e), de tout type, se résout deux fois
 -- pour epicCharge Charges dépensées au jeu de la carte ; sans le coût, chaque tour : 99 % de victoires.
 epic("rule_of_threes", {
   name = "Rule of Threes", zone = "blackrock", path = "arcane", school = "arcane", epicCharge = 1, epicEvery = false,
-  text = "Epic.\nThe 3rd card played each turn spends 1 Charge to resolve twice.",
-  up = { epicEvery = true, text = "Epic.\nEvery 3rd card played each turn spends 1 Charge to resolve twice." },
+  text = "Epic.\n3rd card each turn: Multistrike 1.",
+  up = { epicEvery = true, text = "Epic.\nEvery 3rd card: Multistrike 1." },
 })
 
 -- Bibelots du Mage (class = "mage" : tirés seulement pour lui) -------------------------------------

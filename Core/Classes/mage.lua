@@ -57,6 +57,36 @@ local Cards = ns.Cards
 local function num(src, k) return Card.def(src)[k] or 0 end
 
 L.trigger("When attacked")
+L.trigger("Enemy deaths")
+L.trigger("3rd card each turn")
+L.trigger("Every 3rd card")
+
+-- Mots de règle des épiques (L.rule) : la carte dit « Déclencheur: Mot N. », l'à-côté la règle complète, avec les
+-- nombres des cartes (Data/Mage.lua ; base, puis améliorée).
+do
+  -- (pas Card.defById : son cache garderait la définition d'avant les crochets posés plus bas)
+  local function up(id, k)
+    local u = Cards[id].up
+    if u[k] ~= nil then return u[k] end
+    return Cards[id][k]
+  end
+  local function base(id, k) return Cards[id][k] end
+  L.rule("image", { name = "Image",
+    text = "Their first hit strikes a random enemy again for N% of its damage, rounded down." })
+  L.rule("burn", { name = "Burn", text = "Apply DoT N to the attacker, once per attack, even if absorbed." })
+  local function bolt(m) return "Deal N to the last target and apply Demoralized " .. m .. " until the end of the turn." end
+  L.rule("waterbolt", { name = "Waterbolt", text = bolt(base("water_elemental", "epicM")),
+    upText = bolt(up("water_elemental", "epicM")) })
+  L.rule("brainFreeze", { name = "Brain Freeze",
+    text = "Cast cards on a Frozen enemy resolve at once. Its Stunned and Demoralized then end.",
+    upText = "Cast cards on a Frozen enemy resolve at once, +N damage. Its Stunned and Demoralized then end." })
+  local function carry(b) return "Up to N unspent mana carries over to the next turn, +" .. b .. " if any." end
+  L.rule("conserve", { name = "Conserve", text = carry(base("arcane_meditation", "epicBonus")),
+    upText = carry(up("arcane_meditation", "epicBonus")) })
+  L.rule("pyroclasm", { name = "Pyroclasm", text = "An enemy dying with DoT gives that DoT, +N, to each other enemy." })
+  L.rule("multistrike", { name = "Multistrike",
+    text = "Spend N Charge, if available, to make the card resolve twice." })
+end
 
 local function firstDamage(d)
   for i = 1, #d.effects do

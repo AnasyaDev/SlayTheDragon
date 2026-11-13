@@ -104,23 +104,35 @@ test("données : sept épiques, une par zone, coût 0 jamais payé, sans niveau,
   eq(ns.Language.plateWord(ns.Language.plateByKey("epic"), ns.Cards.misery), "Epic")
 end)
 
-test("textes : les nombres affichés sont ceux des réglages (ns.Priest)", function()
+test("textes : les nombres affichés (carte et à-côté de ses mots de règle) sont ceux des réglages (ns.Priest)", function()
+  local Lg = ns.Language
   local function has(id, up, s)
-    local t = Card.defById(id, up).text
+    local d = Card.defById(id, up)
+    local out = { d.text }
+    for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = r.kw.name .. ": " .. Lg.ruleText(r.kw, r.n, up) end
+    local t = table.concat(out, "\n")
     assert(t:find(s, 1, true), id .. (up and "+" or "") .. " : « " .. s .. " » absent de « " .. t .. " »")
   end
-  has("echo_of_light", false, "gain Regen " .. P.ECHO_START)
-  has("echo_of_light", true, "that much + " .. P.ECHO_PLUS[2] .. " to all")
+  has("echo_of_light", false, "Each Regen tick: Sanctify.")
+  has("echo_of_light", false, "starts with Regen " .. P.ECHO_START)
+  has("echo_of_light", true, "Sanctify +" .. P.ECHO_PLUS[2])
+  has("echo_of_light", true, "Deal the tick +" .. P.ECHO_PLUS[2] .. " to all enemies")
   eq(P.ECHO_PLUS[1], 0, "Echo of Light de base : la valeur seule")
-  has("shadow_covenant", false, ("%d, %d, %d"):format(P.COVENANT_HP[1], P.COVENANT_HP[1] + P.COVENANT_STEP,
-    P.COVENANT_HP[1] + 2 * P.COVENANT_STEP))
-  has("shadow_covenant", true, ("0, %d, %d"):format(P.COVENANT_HP[2] + P.COVENANT_STEP, P.COVENANT_HP[2] + 2 * P.COVENANT_STEP))
-  eq(P.REFLECT_PCT[1], 1 / 3); has("reflective_shield", false, "a third")
-  eq(P.REFLECT_PCT[2], 1 / 2); has("reflective_shield", true, "half")
-  has("inner_focus", false, ("+%d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
-  eq(P.FOCUS_SCALE[2], 2); has("inner_focus", true, "doubled")
-  has("voidform", false, "hits +" .. P.VOID_BONUS[1]); has("voidform", true, "hits +" .. P.VOID_BONUS[2])
-  has("prayer_of_mending", true, "+ " .. P.MENDING_UP)
+  has("shadow_covenant", false, "Life Tap " .. P.COVENANT_HP[1] .. ".")
+  has("shadow_covenant", false, ("Pay %d HP per mana instead of mana, +%d per Shadow card"):format(P.COVENANT_HP[1], P.COVENANT_STEP))
+  has("shadow_covenant", true, "Life Tap " .. P.COVENANT_HP[2] .. ", 1st free.")
+  has("shadow_covenant", true, ("The first one each turn is free. Others pay %d HP per mana, +%d"):format(P.COVENANT_HP[2], P.COVENANT_STEP))
+  eq(P.REFLECT_PCT[1], 1 / 3); has("reflective_shield", false, "Reflect a third.")
+  eq(P.REFLECT_PCT[2], 1 / 2); has("reflective_shield", true, "Reflect half.")
+  has("inner_focus", false, ("Empower %d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
+  has("inner_focus", false, ("its values +%d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
+  eq(P.FOCUS_SCALE[2], 2); has("inner_focus", true, "its values doubled")
+  has("voidform", false, "Madness " .. P.VOID_BONUS[1]); has("voidform", true, "Madness " .. P.VOID_BONUS[2])
+  has("voidform", true, "+" .. P.VOID_BONUS[2] .. " damage per Insanity. Surge cards can't be played.")
+  has("prayer_of_mending", true, "Divine Star +" .. P.MENDING_UP)
+  has("prayer_of_mending", true, "restored, +" .. P.MENDING_UP .. ", to a random enemy")
+  has("misery", true, "Contagion +" .. P.MISERY_UP)
+  has("misery", true, "every other enemy, +" .. P.MISERY_UP .. ".")
 end)
 
 test("socle : une épique posée dans le deck de départ est en jeu (c.epic), dans aucune pile", function()

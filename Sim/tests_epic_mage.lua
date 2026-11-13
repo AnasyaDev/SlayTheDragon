@@ -349,8 +349,12 @@ test("Arcane Meditation : le mana non dépensé (N au plus) s'ajoute au tour sui
   local b, bu = AB(), AB(true)
   assert(k >= 3 and ku > k and b > 0 and bu > b)
   for _, up in ipairs({ false, true }) do
-    local t = Card.defById("arcane_meditation", up).text
-    assert(t:find(tostring(up and ku or k), 1, true) and t:find("+" .. (up and bu or b), 1, true), "nombres dans le texte")
+    -- carte (« Conserve N ») et à-côté de son mot de règle (« … +B if any »)
+    local d = Card.defById("arcane_meditation", up)
+    local t = d.text
+    for _, r in ipairs(ns.Language.ruleWords(d)) do t = t .. "\n" .. ns.Language.ruleText(r.kw, r.n, up) end
+    assert(t:find("Conserve " .. (up and ku or k), 1, true) and t:find("+" .. (up and bu or b) .. " if any", 1, true),
+      "nombres dans le texte")
   end
   local c = setup({ "frostbolt" }, { epic = "arcane_meditation" })
   Combat.endTurn(c)

@@ -352,8 +352,8 @@ card("apotheosis", {
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Priest ») ------------------------------
 -- Règles en jeu dès le début de chaque combat : ni piochées, ni jouées, sans coût. Leurs crochets
--- (deckHooks) et leurs règles sont dans Core/Classes/priest.lua ; le texte dit l'essentiel, l'infobulle
--- le détail (mots-clés du langage déclarés au même endroit).
+-- (deckHooks) et leurs règles sont dans Core/Classes/priest.lua ; le texte dit le déclencheur et un mot de
+-- règle (deux lignes au plus), l'à-côté du mot la règle complète (L.rule, déclarés au même endroit).
 
 local function epic(id, t)
   -- cost = 0 : convention commune (jamais payé ni affiché, Sim/tests.lua exige un coût)
@@ -363,44 +363,44 @@ end
 
 epic("prayer_of_mending", {
   name = "Prayer of Mending", school = "holy", path = "holy", zone = "westfall",
-  text = "Epic.\nEach heal: deal the HP restored to a random enemy.",
-  up = { text = "Epic.\nEach heal: deal the HP restored + 2 to a random enemy." },
+  text = "Epic.\nEach heal: Divine Star.",
+  up = { text = "Epic.\nEach heal: Divine Star +2." },
 })
 
 epic("misery", {
   name = "Misery", school = "shadow", path = "shadow", zone = "duskwood",
-  text = "Epic.\nDoT applied to an enemy also goes to every other enemy.",
-  up = { text = "Epic.\nDoT applied to an enemy also goes to every other enemy, +1." },
+  text = "Epic.\nDoT applied: Contagion.",
+  up = { text = "Epic.\nDoT applied: Contagion +1." },
 })
 
 epic("echo_of_light", {
   name = "Echo of Light", school = "holy", path = "holy", zone = "wetlands",
-  text = "Epic.\nEach Regen tick: deal that much to all, no heal.\nStart of combat: gain Regen 4",
-  up = { text = "Epic.\nEach Regen tick: deal that much + 2 to all, no heal.\nStart of combat: gain Regen 4" },
+  text = "Epic.\nEach Regen tick: Sanctify.",
+  up = { text = "Epic.\nEach Regen tick: Sanctify +2." },
 })
 
 epic("shadow_covenant", {
   name = "Shadow Covenant", school = "shadow", path = "discipline", zone = "stranglethorn",
-  text = "Epic.\nShadow cards: pay HP, not mana: 2, 4, 6... each turn.",
-  up = { text = "Epic.\nShadow cards: pay HP, not mana: 0, 4, 6... each turn." },
+  text = "Epic.\nShadow cards: Life Tap 2.",
+  up = { text = "Epic.\nShadow cards: Life Tap 2, 1st free." },
 })
 
 epic("reflective_shield", {
   name = "Reflective Shield", school = "holy", path = "discipline", zone = "swamp",
-  text = "Epic.\nWhen hit: deal a third of the damage absorbed to the attacker.",
-  up = { text = "Epic.\nWhen hit: deal half the damage absorbed to the attacker." },
+  text = "Epic.\nWhen hit: Reflect a third.",
+  up = { text = "Epic.\nWhen hit: Reflect half." },
 })
 
 epic("voidform", {
   name = "Voidform", school = "shadow", path = "shadow", zone = "steppes",
-  text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +1.",
-  up = { text = "Epic.\nSurge cards can't be played.\nPer Insanity: Shadow hits +2." },
+  text = "Epic.\nShadow hits: Madness 1.",
+  up = { text = "Epic.\nShadow hits: Madness 2." },
 })
 
 epic("inner_focus", {
   name = "Inner Focus", school = "holy", path = "discipline", zone = "blackrock",
-  text = "Epic.\nFirst card each turn: Cast, values +50%.",
-  up = { text = "Epic.\nFirst card each turn: Cast, values doubled." },
+  text = "Epic.\n1st card each turn: Empower 50%.",
+  up = { text = "Epic.\n1st card each turn: Empower 100%." },
 })
 
 -- Bibelots du Prêtre (class = "priest" : tirés seulement pour lui) --------------------------------

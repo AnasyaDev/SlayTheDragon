@@ -11,6 +11,7 @@
 --   L.condition(key, { name, text, pattern }) condition nommée « Name: effet » (Execute, Surge…)
 --   L.trigger(label)                          libellé de déclencheur d'un Pouvoir (« When hit: … »)
 --   L.plate(key, { word, head, flag, n, text }) mot de la plaque du bas (Cast, Cooldown N, Trap…)
+--   L.rule(key, { name, text, upText, pattern }) mot de règle d'une épique (« Riposte 1 »), règle complète
 --
 -- Explications (`text`) : l'effet principal, une phrase de 60 caractères au plus avec le nom, sans
 -- « ; », ni parenthèse ; « %s » = nom de la ressource de la classe de la carte, « N » = nombre.
@@ -62,6 +63,46 @@ function L.keyword(key, t)
   t.key = key
   L.keywords[key] = t
   return t
+end
+
+-- Mot de règle d'une épique (14/11/2026 : une épique tient en deux lignes au plus) : la carte dit
+-- « Déclencheur: Nom N. » (« Each Parry gained: Riposte 1. »), l'à-côté donne la règle complète.
+-- t = { name, text, upText facultatif (carte améliorée), pattern facultatif (clause où le nom compte,
+-- quand deux épiques emploient le même nom) }. text : une ou deux phrases courtes, 110 caractères au
+-- plus avec le nom (harnais U27), majuscule en tête ; « N » = le nombre qui suit le nom sur la carte.
+-- Le nom est un mot-clé du texte : coloré, insécable s'il est en plusieurs mots, expliqué au survol.
+function L.rule(key, t)
+  t.rule = true
+  return L.keyword(key, t)
+end
+
+local function escape(s) return (s:gsub("[%^%$%(%)%%%.%[%]%*%+%-%?]", "%%%0")) end
+
+-- Mots de règle cités par le texte d'une carte : liste { key, kw, n } (n = nombre après le nom, ou nil),
+-- dans l'ordre des clauses, puis des clés.
+function L.ruleWords(d)
+  local out, seen = {}, {}
+  local keys = {}
+  for key, kw in pairs(L.keywords) do if kw.rule then keys[#keys + 1] = key end end
+  table.sort(keys)
+  for cl in ((d and d.text or "") .. "\n"):gmatch("(.-)\n") do
+    for _, key in ipairs(keys) do
+      local kw = L.keywords[key]
+      local _, e = cl:find("%f[%w]" .. escape(kw.name) .. "%f[^%w]")
+      if e and not seen[key] and (not kw.pattern or cl:find(kw.pattern)) then
+        seen[key] = true
+        out[#out + 1] = { key = key, kw = kw, n = tonumber((cl:sub(e + 1):match("^ %+?(%-?%d+)"))) }
+      end
+    end
+  end
+  return out
+end
+
+-- Règle d'un mot de règle (texte de l'à-côté, sans le nom) : upText sur une carte améliorée, N remplacé.
+function L.ruleText(kw, n, up)
+  local text = (up and kw.upText) or kw.text or ""
+  if n then text = text:gsub("%f[%w]N%f[%W]", tostring(n)) end
+  return text
 end
 
 -- Mot-clé d'une zone (Curse, Pack, Hex, Asleep, Wildfire, Phase…) : explication au survol (infobulles

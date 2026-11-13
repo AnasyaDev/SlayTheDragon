@@ -1717,10 +1717,10 @@ end
 function W.cardKeywords(d)
   local list, seen = {}, {}
   local res = W.cardResource(d)
-  local function add(k, label, n)
+  local function add(k, label, n, up)
     if seen[k] then return end
     seen[k] = true
-    list[#list + 1] = { key = k, label = label, n = n, res = res }
+    list[#list + 1] = { key = k, label = label, n = n, res = res, up = up }
   end
   -- carte neutre (sans classe) : utilisable par toutes les classes (Art.keywords.neutral)
   if d.neutral and not d.class and Art.keywords.neutral then add("neutral") end
@@ -1740,8 +1740,13 @@ function W.cardKeywords(d)
       end
     elseif W.hasPhrase(text, c.name .. ":") then add(c.key) end
   end
+  -- mots de règle des épiques (L.rule) : nombre de la carte et texte de la carte améliorée
+  for _, r in ipairs(L.ruleWords(d)) do
+    add(r.key, nil, r.n, d.isUp or nil)
+  end
   for key, kw in pairs(L.keywords) do
-    if kw.pattern then
+    if kw.rule then -- déjà vus
+    elseif kw.pattern then
       for cl in (text .. "\n"):gmatch("(.-)\n") do
         if cl:find(kw.pattern) then add(key) end
       end
@@ -1787,7 +1792,7 @@ function W.keywordText(k)
   local line
   if k.key:sub(1, 7) == "status:" then line = Art.statusLine(k.key:sub(8))
   elseif k.key:sub(1, 5) == "cond:" then line = Art.conditionLine(k.key:sub(6))
-  else line = Art.keywordLine(k.key, k.label, k.n, k.res) end
+  else line = Art.keywordLine(k.key, k.label, k.n, k.res, k.up) end
   return W.inlineIcons(line, 12)
 end
 
@@ -2186,6 +2191,14 @@ local function keywordList()
   keywordNames = {}
   for id, s in pairs(ns.Statuses) do keywordNames[#keywordNames + 1] = { name = s.name, status = id } end
   for _, c in ipairs(W.CONDITIONS) do keywordNames[#keywordNames + 1] = { name = c.name, cond = c.key } end
+  -- mots de règle des épiques (L.rule : Riposte, Bleed…), un par nom
+  local ruleNames = {}
+  for key, kw in pairs(ns.Language.keywords) do
+    if kw.rule and not ruleNames[kw.name] then
+      ruleNames[kw.name] = true
+      keywordNames[#keywordNames + 1] = { name = kw.name, rule = key }
+    end
+  end
   table.sort(keywordNames, function(a, b)
     if #a.name ~= #b.name then return #a.name > #b.name end
     return a.name < b.name
@@ -2332,6 +2345,16 @@ W.CARD_TEXT = TZ
 -- zone utile en repliant ses clauses sur autant de lignes que la zone en contient à ce palier
 -- (layoutBody) ; 7 = plancher lisible. Sous le plancher : secours signalé (bodyFit.under).
 W.BODY_SIZES = { 10, 9.5, 9, 8.5, 8, 7.5, 7 }
+-- Carte épique (14/11/2026) : deux lignes au plus. Elle prend le plus grand palier, jusqu'au plancher
+-- W.EPIC_FLOOR, où son texte tient en W.EPIC_LINES lignes (« Each Parry gained: Riposte 1. » : 9, trois
+-- lignes à 10) ; sinon la règle commune (texte trop long, signalé par le harnais).
+W.EPIC_LINES = 2
+W.EPIC_FLOOR = 8.5
+-- Lignes au plus du texte d'une carte (nil : celles que la zone contient).
+function W.cardMaxLines(d)
+  if d and d.rarity == "epic" then return W.EPIC_LINES end
+  return nil
+end
 -- Position verticale du bloc (retour en jeu du 12/11/2026, Frostbolt : « le texte est remonté, il ne
 -- devrait pas ») : le bloc est CENTRÉ sur le centre optique du panneau (TZ.optY : encre de la première
 -- ligne et ligne de base de la dernière à égale distance des bords de l'intérieur sombre). Il ne se
@@ -2637,7 +2660,7 @@ W.NOGAP_COST = 3
 -- Avec des lignes d'un cadratin, la dernière ligne peut arriver au bas de la zone : 0,5 unité de garde
 -- pour garder 4 unités sous la boîte de la ligne (vérifié sur les pixels, harnais U22).
 W.TEXT_BOTTOM_GUARD = 0.5
-local function layoutBody(paras, size, top, bottom)
+local function layoutBody(paras, size, top, bottom, maxLines)
   local CW = W.CARD_W
   local m = measureFS("bold", size)
   m:SetText("Ég")
@@ -2646,6 +2669,8 @@ local function layoutBody(paras, size, top, bottom)
   -- garde de W.TEXT_BOTTOM_GUARD au bas : la dernière ligne peut maintenant toucher le bas de la zone
   local H = bottom - top - W.TEXT_BOTTOM_GUARD
   local N = floor(H / lh + 1e-6)
+  -- lignes au plus (épique : W.EPIC_LINES), sans changer la zone ni le centrage
+  if maxLines and maxLines < N then N = maxLines end
   local C = #paras
   if C == 0 then return { lines = {}, y0 = top, clause = {} }, lh end
   if C > N then return nil, lh end
@@ -2844,7 +2869,7 @@ function W.cardBodyText(card)
   return table.concat(out, "\n")
 end
 
-local function fitBody(card, text, bottom)
+local function fitBody(card, text, bottom, maxLines)
   local CW = W.CARD_W
   local fs = card.body
   local parts = card.bodyParts or { fs }
@@ -2859,13 +2884,25 @@ local function fitBody(card, text, bottom)
   -- cap : palier interdit et au-dessus (garde-fou W.checkCardTexts : le client a tronqué ce texte)
   local cap = card.textCap and card.textCap.body
   local fit, fontErr
-  for _, t in ipairs(W.cardTries(text)) do
+  -- carte à lignes comptées (épique) : d'abord les essais en maxLines lignes, jusqu'à W.EPIC_FLOOR
+  local tries = W.cardTries(text)
+  if maxLines then
+    local limited = {}
+    for _, t in ipairs(tries) do
+      if t.mode == "clauses" and not t.under and t.size >= W.EPIC_FLOOR then
+        limited[#limited + 1] = { size = t.size, mode = t.mode, paras = t.paras, key = t.key, max = maxLines }
+      end
+    end
+    for _, t in ipairs(tries) do limited[#limited + 1] = t end
+    tries = limited
+  end
+  for _, t in ipairs(tries) do
     local s = t.size
-    local key = floor(bottom * 10 + 0.5) .. "|" .. t.key
+    local key = floor(bottom * 10 + 0.5) .. "|" .. (t.max or "") .. "|" .. t.key
     local lay = (not cap or s < cap) and layoutCache[key]
     local err, lh
     if lay == nil then
-      lay, err = layoutBody(t.paras, s, top, bottom)
+      lay, err = layoutBody(t.paras, s, top, bottom, t.max)
       if err == "font" then fontErr = true break end
       lh = err
       if lay then lay.lh = lh end
@@ -2904,7 +2941,7 @@ local function fitBody(card, text, bottom)
       end
       card.bodyUsed = max(1, #blocks)
       if ok then
-        fit = { size = s, lines = #lines, under = t.under or false, ok = true, mode = t.mode, y0 = lay.y0,
+        fit = { size = s, lines = #lines, under = t.under or false, ok = true, mode = t.mode, y0 = lay.y0, max = t.max,
           lh = lay.lh, clause = lay.clause, cost = lay.cost, gap = split and lay.gap or 0, blocks = #blocks }
         break
       end
@@ -3419,7 +3456,7 @@ function W.card(parent)
       reasonH = fitReason(cardPlaque(self, "reasonPlate", 0.84 * CW, REASON_H), opts.reason)
       bottom = min(bottom, REASON_Y * CW + REASON_H / 2 - reasonH - 1)
     end
-    local fit = fitBody(self, text, bottom)
+    local fit = fitBody(self, text, bottom, W.cardMaxLines(d))
     if fit.font and not self._refit then
       -- police pas encore chargée : nouvelle mise en page un peu plus tard
       self._refit = true

@@ -201,6 +201,16 @@ hors de toute pile, sans coût).
   10, `W.EPIC_MARK_COLOR`, créé avec la carte, au centre de la languette). Plaque du bas : « Epic » (mot du
   registre du langage, `L.plate("epic")`, en tête ; une épique ne dit jamais « Power », un « Epic. » ou
   « Power. » de tête est retiré du texte affiché).
+- **Texte : deux lignes au plus** (règle du 14/11/2026) : la carte dit le déclencheur et un mot de règle avec
+  son nombre (« Each Parry gained: Riposte 1. ») ; la règle complète est l'à-côté du mot dans l'infobulle
+  (« Riposte: Deal 1 damage to the last target, +2 per earlier Riposte this turn. »). Mise en page :
+  `W.cardMaxLines(d)` = `W.EPIC_LINES` (2) pour une épique ; `fitBody` essaie d'abord les paliers, du plus
+  grand jusqu'à `W.EPIC_FLOOR` (8,5), en deux lignes au plus (`layoutBody(…, maxLines)`), puis la règle
+  commune en secours (signalé par le harnais). Le texte de Deflection prend trois lignes à 10 : il est posé
+  à 9 en deux lignes. Mot de règle : `L.rule` (`Core/Language.lua`, voir « Langage des cartes ») ; textes
+  finaux et à-côtés des 35 : `docs/zones/cartes-de-zone.md`, « Textes en deux lignes et mots de règle ».
+  Harnais : section **UEL** et planche `epiques_mots_cles.svg` (cartes et à-côtés repliés à ~44 caractères,
+  base en gris, améliorée en vert).
 - **Infobulle** : « Epic: in play from the start of each combat. » (mot de plaque), « One epic card per
   expedition: a new one replaces it. » (`W.EPIC_HINT`) et une ligne par transformation (« While in the deck:
   Smite becomes … », `W.transformLines`) ; une variante montrée hors combat ajoute « Transformed Smite. » (option
@@ -987,6 +997,12 @@ Façon Hearthstone : les tournures deviennent des mots-clés visibles, en couleu
   puis « Donne ». Exceptions : un état posé sous condition (Récupération de Dernier souffle, Douleur de
   Déferlement) reste dans sa clause (« Déferlement : applique Douleur 2 par Démence. ») ; un état qui porte
   le nom de la carte (Suppression de la douleur) est décrit, pas nommé.
+- **Mots de règle des épiques** (`L.rule(key, { name, text, upText, pattern })`, 14/11/2026) : un nom court
+  (vocabulaire de WoW quand il existe ; ni état, ni condition, ni autre mot-clé, ni carte) suivi de son
+  nombre, après le déclencheur (« Surge Attacks: Bleed 90%. »). Coloré comme un mot-clé, insécable s'il est
+  en plusieurs mots ; à-côté = « Nom: règle complète », une ou deux phrases courtes, 110 caractères au plus,
+  majuscule en tête, « N » remplacé par le nombre de la carte, `upText` pour la carte améliorée, `pattern`
+  quand deux épiques emploient le même nom (Wild Call). Les autres explications gardent 60 caractères.
 - **Mots de la plaque du bas** : « Pouvoir. » et « Incantation. » en tête, « Recharge N. », « Consumée. »,
   « Conservée. » en dernier, chacun sur sa clause ; retirés à l'affichage (`KEYWORD_STRIP`).
 

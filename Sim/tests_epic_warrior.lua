@@ -83,37 +83,69 @@ test("sept épiques : une par zone, rareté epic, coût 0, sans niveau, débloqu
   for _, id in ipairs(Card.pool("warrior")) do assert(ns.Cards[id].rarity ~= "epic", "hors réserve : " .. id) end
 end)
 
-test("textes : les nombres de Warrior.EPIC", function()
-  local function has(id, up, s) assert(Card.defById(id, up).text:find(s, 1, true), id .. (up and "+" or "") .. " : " .. s) end
-  has("death_wish", false, "50% more"); has("death_wish", true, "heal " .. E.death_wish.heal)
+test("textes : les nombres de Warrior.EPIC (carte et à-côté de ses mots de règle)", function()
+  local Lg = ns.Language
+  local function has(id, up, s)
+    local d = Card.defById(id, up)
+    local out = { d.text }
+    for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = r.kw.name .. ": " .. Lg.ruleText(r.kw, r.n, up) end
+    local t = table.concat(out, "\n")
+    assert(t:find(s, 1, true), id .. (up and "+" or "") .. " : « " .. s .. " » absent de « " .. t .. " »")
+  end
+  local function hasNot(id, up, s)
+    local d = Card.defById(id, up)
+    local out = { d.text }
+    for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = Lg.ruleText(r.kw, r.n, up) end
+    assert(not table.concat(out, "\n"):find(s, 1, true), id .. (up and "+" or "") .. " : « " .. s .. " » en trop")
+  end
   eq(E.death_wish.mult, 1.5)
-  has("thunderous_roar", false, "At " .. E.thunderous_roar.at .. " Rage")
-  has("thunderous_roar", false, "deal " .. E.thunderous_roar.damage)
-  has("thunderous_roar", true, "deal " .. E.thunderous_roar.upDamage)
-  eq(Card.defById("thunderous_roar").text:find("Demoralized", 1, true) ~= nil, E.thunderous_roar.demoralized > 0)
-  if E.thunderous_roar.upDemoralized > 0 then
-    has("thunderous_roar", true, "At " .. E.thunderous_roar.at .. " Rage: apply Demoralized " .. E.thunderous_roar.upDemoralized .. " ⌛ to all")
-  end
-  has("sweeping_strikes", true, "hit " .. E.sweeping_strikes.upTargets .. " other")
-  for _, up in ipairs({ false, true }) do has("sweeping_strikes", up, "for a third.") end
-  has("titans_grip", false, "At most " .. E.titans_grip.limit .. " per turn")
-  eq(E.titans_grip.copies, 1, "« resolve twice »")
-  for _, up in ipairs({ false, true }) do has("titans_grip", up, "Attacks: cost " .. E.titans_grip.extraCost .. " more, resolve twice.") end
-  has("titans_grip", true, "At most " .. E.titans_grip.limit .. " per turn, 0-cost free.")
-  eq(Warrior.TITAN_REASON, ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or ""))
-  eq(E.shield_charge.div, 4); has("shield_charge", false, "a quarter of the Absorb")
-  has("shield_charge", true, "deal " .. E.shield_charge.upBonus .. " + a quarter")
-  eq(E.anger_management.per, 1); eq(E.anger_management.upPer, 1)
-  has("anger_management", false, "Each Rage spent: all Cooldowns −" .. E.anger_management.steps)
-  has("anger_management", true, "Each Rage spent: all Cooldowns −" .. E.anger_management.upSteps)
   for _, up in ipairs({ false, true }) do
-    has("anger_management", up, "Spend and Surge cards: Cooldown " .. E.anger_management.give .. ".")
+    has("death_wish", up, "Carnage 50%."); has("death_wish", up, "Attacks deal 50% more damage. Absorb can't be gained.")
   end
-  has("avatar", false, "Rage up to " .. E.avatar.cap .. "."); has("avatar", false, "+" .. E.avatar.gain .. " Rage")
-  has("avatar", true, "+" .. E.avatar.upGain .. " Rage")
+  has("death_wish", true, "Kills: heal " .. E.death_wish.heal .. ".")
+  local T = E.thunderous_roar
+  has("thunderous_roar", false, "At " .. T.at .. " Rage: Shockwave " .. T.damage .. ".")
+  has("thunderous_roar", false, "Spend all Rage")
+  has("thunderous_roar", false, "deal " .. T.damage .. " to all enemies")
+  has("thunderous_roar", true, "At " .. T.at .. " Rage: Shockwave " .. T.upDamage .. ".")
+  has("thunderous_roar", true, "deal " .. T.upDamage .. " to all enemies")
+  if T.demoralized > 0 then has("thunderous_roar", false, "Demoralized " .. T.demoralized)
+  else hasNot("thunderous_roar", false, "Demoralized") end
+  if T.upDemoralized > 0 then has("thunderous_roar", true, "apply Demoralized " .. T.upDemoralized .. " ⌛ to all") end
+  has("sweeping_strikes", false, "Targeted Attack hits: Sweep " .. E.sweeping_strikes.targets .. ".")
+  has("sweeping_strikes", false, "Also hit another random enemy")
+  has("sweeping_strikes", true, "Sweep " .. E.sweeping_strikes.upTargets .. ".")
+  has("sweeping_strikes", true, "Also hit " .. E.sweeping_strikes.upTargets .. " other random enemies")
+  eq(E.sweeping_strikes.div, 3)
+  for _, up in ipairs({ false, true }) do has("sweeping_strikes", up, "for a third of the HP") end
+  eq(E.titans_grip.copies, 1, "« resolve twice »")
+  for _, up in ipairs({ false, true }) do
+    has("titans_grip", up, "Dual Wield " .. E.titans_grip.limit)
+    has("titans_grip", up, "Attacks cost " .. E.titans_grip.extraCost .. " more and resolve twice, at most "
+      .. E.titans_grip.limit .. " per turn.")
+  end
+  has("titans_grip", true, "Dual Wield " .. E.titans_grip.limit .. ", 0-cost free.")
+  has("titans_grip", true, "0-cost ones skip the cost and limit.")
+  eq(Warrior.TITAN_REASON, ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or ""))
+  eq(E.shield_charge.div, 4); has("shield_charge", false, "End of turn: Punish.")
+  has("shield_charge", false, "deal a quarter of it to the last target")
+  has("shield_charge", true, "Punish +" .. E.shield_charge.upBonus .. ".")
+  has("shield_charge", true, "deal a quarter of it +" .. E.shield_charge.upBonus .. " to the last target")
+  eq(E.anger_management.per, 1); eq(E.anger_management.upPer, 1)
+  has("anger_management", false, "Each Rage spent: Haste " .. E.anger_management.steps .. ".")
+  has("anger_management", false, "return " .. E.anger_management.steps .. " turn sooner")
+  has("anger_management", true, "Each Rage spent: Haste " .. E.anger_management.upSteps .. ".")
+  has("anger_management", true, "return " .. E.anger_management.upSteps .. " turns sooner")
+  for _, up in ipairs({ false, true }) do
+    has("anger_management", up, "Spend and Surge cards go on Cooldown " .. E.anger_management.give .. ", not to the discard")
+  end
+  has("avatar", false, "Start of turn: Juggernaut " .. E.avatar.gain .. ".")
+  has("avatar", false, "Gain " .. E.avatar.gain .. " Rage. Rage goes up to " .. E.avatar.cap .. ",")
+  has("avatar", true, "Juggernaut " .. E.avatar.upGain .. ".")
+  has("avatar", true, "Gain " .. E.avatar.upGain .. " Rage.")
   eq(E.avatar.over, E.avatar.cap - 1, "« At 10 Rage »")
   for _, up in ipairs({ false, true }) do
-    has("avatar", up, "At " .. E.avatar.cap .. " Rage: Attacks deal " .. E.avatar.bonus .. " more.")
+    has("avatar", up, "at " .. E.avatar.cap .. " Rage Attacks deal " .. E.avatar.bonus .. " more.")
   end
 end)
 

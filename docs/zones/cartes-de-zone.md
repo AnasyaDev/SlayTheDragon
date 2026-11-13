@@ -32,15 +32,78 @@ plus) est refusé. Une épique n'a pas à se combiner avec les autres épiques :
 - **Un nom = une carte** : sorts ou talents réels de la classe, absents de `Data/<Classe>.lua`, uniques
   dans les 35 et dans les variantes de Lone Wolf (vérifié dans `Data/`, `Core/`, `UI/` et `docs/`).
 - **Texte** : langage exact des cartes, « Epic. » en tête (mot de plaque, retiré à l'affichage comme
-  « Power. »), aucun « you / your ». Le corps tient en quatre lignes d'environ 22 caractères ; les « / »
-  sont des retours à la ligne. Quand la règle ne tient pas, la carte dit l'essentiel et l'**infobulle**
-  donne le détail.
+  « Power. »), aucun « you / your ». **Deux lignes au plus** à l'affichage (règle du 14/11/2026, section
+  suivante) : la carte dit le déclencheur et un **mot de règle** avec son nombre (« Each Parry gained:
+  Riposte 1. »), l'à-côté du mot (infobulle) donne la règle complète. Dans les tableaux, les « / » sont les
+  retours à la ligne de l'affichage réel.
 - **Lien avec la zone** : un bonus, jamais une condition. Aucune épique ne perd sa valeur ailleurs.
 - **Retraits** : le feu de camp ne retire rien (repos ou amélioration) ; « à retirer » vise le marchand et
   les rencontres, « feu de camp » vise l'amélioration à faire en priorité.
 - **Statut** : *conservée* (règle de la version 1 gardée ; le coût disparaît d'office avec la règle
   d'arrivée, l'amélioration « coût 1 » est remplacée), *modifiée* (idée gardée, règle changée),
   *nouvelle*.
+
+## Textes en deux lignes et mots de règle (14/11/2026)
+
+Demande du joueur : une épique dit en peu de mots ce qu'elle déclenche (Deflection occupait cinq lignes). Les
+lignes sont celles que la carte rend (mise en page `W.layoutBody`, mesurée par le harnais), pas une estimation.
+Avant : 34 des 35 épiques dépassaient deux lignes en base ou améliorée (seule Call of the Wild améliorée tenait).
+
+- **Règle d'affichage** : une carte `rarity = "epic"` tient en `W.EPIC_LINES` = 2 lignes au plus ; elle prend le
+  plus grand palier, jusqu'au plancher `W.EPIC_FLOOR` = 8,5, où son texte tient en deux lignes
+  (`W.cardMaxLines`, `fitBody`). Le texte décidé de Deflection (« Each Parry gained: Riposte 1. ») prend trois
+  lignes à 10 : il est rendu à 9 en deux lignes. Paliers des 70 faces : 10 → 62, 9,5 → 2, 9 → 2, 8,5 → 4.
+- **Mot de règle** (`L.rule(key, { name, text, upText, pattern })`, `Core/Language.lua`) : déclaré par la classe
+  dans `Core/Classes/<classe>.lua`, avec les nombres des réglages. Sur la carte : coloré comme un mot-clé,
+  insécable s'il est en plusieurs mots. À-côté (infobulle de la carte) : « Nom: règle complète », une ou deux
+  phrases courtes, 110 caractères au plus, « N » = le nombre qui suit le nom sur la carte, `upText` pour la
+  carte améliorée. `L.ruleWords(d)` et `L.ruleText(kw, n, up)` servent à l'interface et aux tests.
+- **Aucun effet de jeu ne change** : seuls les textes et les déclarations ; les tests des épiques vérifient
+  les nombres sur le texte de la carte et sur l'à-côté.
+- Harnais : section **UEL** (35 épiques, base et améliorée : deux lignes au plus, palier 8,5 ou plus, rien de
+  tronqué ; chaque mot de règle employé, son à-côté présent, nom unique et coloré ; Deflection 1, 3, 5… /
+  2, 4, 6…) et planche `build/snap/epiques_mots_cles.svg` (cartes et à-côtés).
+
+Noms : vocabulaire de WoW quand il existe, aucun nom d'état, de condition, de mot-clé ni de carte, sauf
+**Riposte** (nom choisi par le joueur, aussi celui de la carte commune `riposte` du Rogue).
+
+| Classe | Épique | Ancien texte (lignes à l'affichage) | Nouveau texte : base / améliorée | Mot de règle | À-côté (base ; amélioré si différent) |
+|---|---|---|---|---|---|
+| Priest | Prayer of Mending | `Each heal: deal the HP restored to a random enemy.` (4) / `Each heal: deal the HP restored + 2 to a random enemy.` (5) | `Each heal: Divine Star.` / `Each heal: Divine Star +2.` | Divine Star | Deal the HP actually restored to a random enemy. Every heal counts, Regen ticks too. ; amélioré : Deal the HP actually restored, +2, to a random enemy. Every heal counts, Regen ticks too. |
+| Priest | Misery | `DoT applied to an enemy also goes to every other enemy.` (4) / `DoT applied to an enemy also goes to every other enemy, +1.` (4) | `DoT applied: Contagion.` / `DoT applied: Contagion +1.` | Contagion | A DoT a card applies to its target also goes to every other enemy. ; amélioré : A DoT a card applies to its target also goes to every other enemy, +1. |
+| Priest | Echo of Light | `Each Regen tick: deal that much to all, no heal. / Start of combat: gain Regen 4` (5) / `Each Regen tick: deal that much + 2 to all, no heal. / Start of combat: gain Regen 4` (5) | `Each Regen tick: Sanctify.` / `Each Regen tick: Sanctify +2.` | Sanctify | Deal the tick to all enemies instead of healing. Each combat starts with Regen 4. ; amélioré : Deal the tick +2 to all enemies instead of healing. Each combat starts with Regen 4. |
+| Priest | Shadow Covenant | `Shadow cards: pay HP, not mana: 2, 4, 6... each turn.` (4) / `Shadow cards: pay HP, not mana: 0, 4, 6... each turn.` (4) | `Shadow cards: Life Tap 2.` / `Shadow cards: Life Tap 2, 1st free.` | Life Tap | Pay 2 HP per mana instead of mana, +2 per Shadow card played before this turn. ; amélioré : The first one each turn is free. Others pay 2 HP per mana, +2 per Shadow card before. |
+| Priest | Reflective Shield | `When hit: deal a third of the damage absorbed to the attacker.` (4) / `When hit: deal half the damage absorbed to the attacker.` (4) | `When hit: Reflect a third.` / `When hit: Reflect half.` | Reflect | Deal that part of the Absorb lost on the hit to the attacker, rounded down. |
+| Priest | Voidform | `Surge cards can't be played. / Per Insanity: Shadow hits +1.` (4) / `Surge cards can't be played. / Per Insanity: Shadow hits +2.` (4) | `Shadow hits: Madness 1.` / `Shadow hits: Madness 2.` | Madness | +1 damage per Insanity. Surge cards can't be played. ; amélioré : +2 damage per Insanity. Surge cards can't be played. |
+| Priest | Inner Focus | `First card each turn: Cast, values +50%.` (3) / `First card each turn: Cast, values doubled.` (3) | `1st card each turn: Empower 50%.` / `1st card each turn: Empower 100%.` | Empower | The first Attack or Skill each turn becomes a Cast, its values +50%, rounded up. ; amélioré : The first Attack or Skill each turn becomes a Cast, its values doubled, rounded up. |
+| Warrior | Death Wish | `Can't gain Absorb. / Attacks: 50% more damage.` (4) / `Can't gain Absorb. / Attacks: 50% more damage. / Kills: heal 3.` (4) | `Carnage 50%.` / `Carnage 50%. / Kills: heal 3.` | Carnage | Attacks deal 50% more damage. Absorb can't be gained. |
+| Warrior | Thunderous Roar | `At 5 Rage: spend it, deal 3 to all.` (3) / `At 5 Rage: spend it, deal 4 to all. / At 5 Rage: apply Demoralized 1 ⌛ to all` (5) | `At 5 Rage: Shockwave 3.` / `At 5 Rage: Shockwave 4.` | Shockwave | Spend all Rage and deal 3 to all enemies. ; amélioré : Spend all Rage, deal 4 to all enemies and apply Demoralized 1 ⌛ to all. |
+| Warrior | Sweeping Strikes | `Targeted Attack hits: also hit another enemy for a third.` (4) / `Targeted Attack hits: also hit 2 other enemies for a third.` (4) | `Targeted Attack hits: Sweep 1.` / `Targeted Attack hits: Sweep 2.` | Sweep | Also hit another random enemy for a third of the HP the target lost, rounded down. ; amélioré : Also hit 2 other random enemies for a third of the HP the target lost, rounded down. |
+| Warrior | Titan's Grip | `Attacks: cost 1 more, resolve twice. / At most 2 per turn.` (5) / `Attacks: cost 1 more, resolve twice. / At most 2 per turn, 0-cost free.` (5) | `Dual Wield 2.` / `Dual Wield 2, 0-cost free.` | Dual Wield | Attacks cost 1 more and resolve twice, at most 2 per turn. ; amélioré : Attacks cost 1 more and resolve twice, at most 2 per turn. 0-cost ones skip the cost and limit. |
+| Warrior | Shield Charge | `End of turn: deal a quarter of the Absorb to the last target.` (4) / `End of turn: deal 4 + a quarter of the Absorb to the last target.` (4) | `End of turn: Punish.` / `End of turn: Punish +4.` | Punish | With Absorb, deal a quarter of it to the last target, rounded down. The Absorb stays. ; amélioré : With Absorb, deal a quarter of it +4 to the last target, rounded down. The Absorb stays. |
+| Warrior | Anger Management | `Spend and Surge cards: Cooldown 1. / Each Rage spent: all Cooldowns −1.` (4) / `Spend and Surge cards: Cooldown 1. / Each Rage spent: all Cooldowns −2.` (4) | `Each Rage spent: Haste 1.` / `Each Rage spent: Haste 2.` | Haste | Cards on Cooldown return 1 turn sooner. Spend and Surge cards go on Cooldown 1, not to the discard. ; amélioré : Cards on Cooldown return 2 turns sooner. Spend and Surge cards go on Cooldown 1, not to the discard. |
+| Warrior | Avatar | `Rage up to 10. / Start of turn: +2 Rage. / At 10 Rage: Attacks deal 1 more.` (5) / `Rage up to 10. / Start of turn: +3 Rage. / At 10 Rage: Attacks deal 1 more.` (5) | `Start of turn: Juggernaut 2.` / `Start of turn: Juggernaut 3.` | Juggernaut | Gain 2 Rage. Rage goes up to 10, and at 10 Rage Attacks deal 1 more. ; amélioré : Gain 3 Rage. Rage goes up to 10, and at 10 Rage Attacks deal 1 more. |
+| Mage | Mirror Image | `Cast cards: deal half their damage again to a random enemy.` (5) / `Cast cards: deal their damage again to a random enemy.` (4) | `Cast cards: Image 50%.` / `Cast cards: Image 100%.` | Image | Their first hit strikes a random enemy again for 50% of its damage, rounded down. ; amélioré : Their first hit strikes a random enemy again for 100% of its damage, rounded down. |
+| Mage | Molten Armor | `When attacked: apply DoT 2 to the attacker` (3) / `When attacked: apply DoT 4 to the attacker` (3) | `When attacked: Burn 2.` / `When attacked: Burn 4.` | Burn | Apply DoT 2 to the attacker, once per attack, even if absorbed. ; amélioré : Apply DoT 4 to the attacker, once per attack, even if absorbed. |
+| Mage | Water Elemental | `Start of turn: deal 2 to the last target and apply Demoralized 1 for this turn.` (5) / `Start of turn: deal 4 to the last target and apply Demoralized 1 for this turn.` (5) | `Start of turn: Waterbolt 2.` / `Start of turn: Waterbolt 4.` | Waterbolt | Deal 2 to the last target and apply Demoralized 1 until the end of the turn. ; amélioré : Deal 4 to the last target and apply Demoralized 1 until the end of the turn. |
+| Mage | Fingers of Frost | `Cast cards aimed at a Frozen enemy resolve at once and thaw it.` (5) / `Cast cards aimed at a Frozen enemy resolve at once, deal 4 more and thaw it.` (5) | `Frozen: Brain Freeze.` / `Frozen: Brain Freeze +4.` | Brain Freeze | Cast cards on a Frozen enemy resolve at once. Its Stunned and Demoralized then end. ; amélioré : Cast cards on a Frozen enemy resolve at once, +4 damage. Its Stunned and Demoralized then end. |
+| Mage | Arcane Meditation | `Up to 4 unspent mana carries over to the next turn, +1.` (4) / `Up to 6 unspent mana carries over to the next turn, +2.` (4) | `End of turn: Conserve 4.` / `End of turn: Conserve 6.` | Conserve | Up to 4 unspent mana carries over to the next turn, +1 if any. ; amélioré : Up to 6 unspent mana carries over to the next turn, +2 if any. |
+| Mage | Conflagration | `An enemy dying with DoT gives that DoT + 16 to each other enemy.` (5) / `An enemy dying with DoT gives that DoT + 20 to each other enemy.` (5) | `Enemy deaths: Pyroclasm 16.` / `Enemy deaths: Pyroclasm 20.` | Pyroclasm | An enemy dying with DoT gives that DoT, +16, to each other enemy. ; amélioré : An enemy dying with DoT gives that DoT, +20, to each other enemy. |
+| Mage | Rule of Threes | `The 3rd card played each turn spends 1 Charge to resolve twice.` (5) / `Every 3rd card played each turn spends 1 Charge to resolve twice.` (5) | `3rd card each turn: Multistrike 1.` / `Every 3rd card: Multistrike 1.` | Multistrike | Spend 1 Charge, if available, to make the card resolve twice. |
+| Rogue | Deflection | `Each Parry gained: deal 1, +2 per earlier one this turn, to the last target.` (5) / `Each Parry gained: deal 2, +2 per earlier one this turn, to the last target.` (5) | `Each Parry gained: Riposte 1.` / `Each Parry gained: Riposte 2.` | Riposte | Deal 1 damage to the last target, +2 per earlier Riposte this turn. ; amélioré : Deal 2 damage to the last target, +2 per earlier Riposte this turn. |
+| Rogue | Doomblade | `Surge Attacks apply 90% of their damage as DoT instead.` (4) / `Surge Attacks apply their damage as DoT instead.` (4) | `Surge Attacks: Bleed 90%.` / `Surge Attacks: Bleed 100%.` | Bleed | The hit deals no damage and applies 90% of it as DoT, rounded up. ; amélioré : The hit deals no damage and applies 100% of it as DoT, rounded up. |
+| Rogue | Atrophic Poison | `Enemies with DoT 5+ count as Demoralized.` (3) / `Enemies with DoT 5+ count as Demoralized and Sundered.` (4) | `DoT 5+: Atrophy.` / `DoT 5+: Atrophy, Sundered.` | Atrophy | Enemies with DoT 5 or more count as Demoralized. ; amélioré : Enemies with DoT 5 or more count as Demoralized and Sundered. |
+| Rogue | Echoing Reprimand | `A Surge of 2 Combo counts as 3.` (3) / `A Surge of 2 or 3 Combo counts as 4.` (3) | `Surge cards: Animacharge 3.` / `Surge cards: Animacharge 4.` | Animacharge | A Surge of 2 Combo counts as a Surge of 3. ; amélioré : A Surge of 2 or 3 Combo counts as a Surge of 4. |
+| Rogue | Subterfuge | `Stealth lasts two turns. / Surge of 1+ Combo: gain Stealth` (5) / `Stealth lasts three turns. / Surge of 1+ Combo: gain Stealth` (5) | `Surge cards: Shroud 2.` / `Surge cards: Shroud 3.` | Shroud | A Surge of 1+ Combo grants Stealth. Stealth lasts 2 turns, Attacks don't remove it. ; amélioré : A Surge of 1+ Combo grants Stealth. Stealth lasts 3 turns, Attacks don't remove it. |
+| Rogue | Kidney Shot | `Surge of 5 Combo: apply Stunned 1 ⌛` (4) / `Surge of 4+ Combo: apply Stunned 1 ⌛` (3) | `Surge of 5+ Combo: Gouge.` / `Surge of 4+ Combo: Gouge.` | Gouge | Apply Stunned 1 ⌛ to the target if it lives. Can't be Stunned: Demoralized 2 ⌛ instead. |
+| Rogue | Danse Macabre | `Attack hits: +2 per other card name played this turn after the first 2.` (5) / `Attack hits: +3 per other card name played this turn after the first 2.` (5) | `Attack hits: Flourish 2.` / `Attack hits: Flourish 3.` | Flourish | +2 damage per other card name played this turn, after the first 2. ; amélioré : +3 damage per other card name played this turn, after the first 2. |
+| Hunter | Call of the Wild | `Start of turn: spend 1 Frenzy for a pet attack.` (3) / `Start of turn: pet attacks.` (2) | `Start of turn: Wild Call 1.` / `Start of turn: pet attacks.` | Wild Call | Spend 1 Frenzy, if available, for a pet attack. ; amélioré : sans mot de règle (attaque gratuite, « pet attacks ») |
+| Hunter | Trap Launcher | `Traps trigger at once on a target. / Pet attacks it.` (4) / `Traps trigger at once on a target. / Pet attacks it twice.` (4) | `Traps: Launch 1.` / `Traps: Launch 2.` | Launch | The Trap triggers at once on a target, then the pet attacks it. ; amélioré : The Trap triggers at once on a target, then the pet attacks it twice. |
+| Hunter | Beast Cleave | `Pet attacks hit all enemies, the others for 2 less.` (4) / `Pet attacks hit all enemies, the others for 2 less. / Pet attacks: +1 Frenzy.` (5) | `Pet attacks: Stampede.` / `Pet attacks: Stampede +1.` | Stampede | Pet attacks also hit every other enemy, for 2 less. ; amélioré : Pet attacks also hit every other enemy, for 2 less. Each one gives 1 more Frenzy. |
+| Hunter | Roar of Sacrifice | `When hit: spend 1 Frenzy to stop up to 2 damage.` (4) / `When hit: spend 1 Frenzy to stop up to 4 damage.` (4) | `When hit: Intervene 2.` / `When hit: Intervene 4.` | Intervene | Spend 1 Frenzy, if available, to stop up to 2 damage of the hit. ; amélioré : Spend 1 Frenzy, if available, to stop up to 4 damage of the hit. |
+| Hunter | Master Marksman | `Careful Aim: Cast Attacks resolve at once and deal 20 more.` (4) / `Careful Aim: Cast Attacks resolve at once and deal 24 more.` (4) | `Careful Aim: Deadeye 20.` / `Careful Aim: Deadeye 24.` | Deadeye | Cast Attacks resolve at once and deal 20 more. ; amélioré : Cast Attacks resolve at once and deal 24 more. |
+| Hunter | Black Arrow | `Each enemy DoT tick: spend 1 Frenzy for a pet attack on it.` (5) / `Each enemy DoT tick: pet attacks it.` (3) | `Enemy DoT ticks: Wild Call 1.` / `Enemy DoT ticks: pet attacks it.` | Wild Call | Spend 1 Frenzy, if available: the pet attacks that enemy. ; amélioré : sans mot de règle (attaque gratuite, « pet attacks ») |
+| Hunter | Lone Wolf | `Pet cards become shots. / Attack hits: +2 per Frenzy.` (4) / `Pet cards become shots. / Attack hits: +3 per Frenzy.` (4) | `Attack hits: Ferocity 2.` / `Attack hits: Ferocity 3.` | Ferocity | +2 damage per Frenzy. The pet is gone: pet cards become shots. ; amélioré : +3 damage per Frenzy. The pet is gone: pet cards become shots. |
 
 ## Répartition par zone
 
@@ -82,7 +145,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each heal: deal the HP` / `restored to a random` / `enemy.` | `Each heal: deal the HP` / `restored + 2 to a` / `random enemy.` |
+| —, Epic | `Epic.` / `Each heal:` / `Divine Star.` | `Each heal:` / `Divine Star +2.` |
+
+À-côté (mot de règle) : `Divine Star: Deal the HP actually restored to a random enemy. Every heal counts, Regen ticks too.` ; amélioré : `Divine Star: Deal the HP actually restored, +2, to a random enemy. Every heal counts, Regen ticks too.`
 
 - **Règle.** Chaque soin qui rend au moins 1 PV au Priest inflige autant (amélioré : autant + 2) à un
   ennemi vivant tiré par `c.rng.cards`. Toutes sources : cartes, chaque tic de Regen, Atonement, potions,
@@ -102,7 +167,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `DoT applied to an` / `enemy also goes to` / `every other enemy.` | `…` / `every other enemy, +1.` |
+| —, Epic | `Epic.` / `DoT applied:` / `Contagion.` | `DoT applied:` / `Contagion +1.` |
+
+À-côté (mot de règle) : `Contagion: A DoT a card applies to its target also goes to every other enemy.` ; amélioré : `Contagion: A DoT a card applies to its target also goes to every other enemy, +1.`
 
 - **Règle.** Quand le Priest pose du DoT sur **un** ennemi (carte à une cible, Surge de Devouring Plague,
   ligne de DoT de Holy Fire), chaque autre ennemi vivant reçoit le même DoT (amélioré : +1 sur chaque
@@ -123,7 +190,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each Regen tick: deal` / `that much to all, no heal.` / `Start of combat:` / `gain Regen 4` | `…` / `that much + 2 to all, no heal.` / `…` |
+| —, Epic | `Epic.` / `Each Regen tick:` / `Sanctify.` | `Each Regen tick:` / `Sanctify +2.` |
+
+À-côté (mot de règle) : `Sanctify: Deal the tick to all enemies instead of healing. Each combat starts with Regen 4.` ; amélioré : `Sanctify: Deal the tick +2 to all enemies instead of healing. Each combat starts with Regen 4.`
 
 - **Règle.** Au début de chaque combat, le Priest gagne Regen 4. Au début de son tour, le tic de Regen ne
   soigne plus : il inflige sa valeur (amélioré : + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme
@@ -147,7 +216,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Shadow cards: pay HP,` / `not mana: 2, 4, 6...` / `each turn.` | `…` / `not mana: 0, 4, 6...` / `each turn.` |
+| —, Epic | `Epic.` / `Shadow cards:` / `Life Tap 2.` | `Shadow cards:` / `Life Tap 2, 1st free.` |
+
+À-côté (mot de règle) : `Life Tap: Pay 2 HP per mana instead of mana, +2 per Shadow card played before this turn.` ; amélioré : `Life Tap: The first one each turn is free. Others pay 2 HP per mana, +2 per Shadow card before.`
 
 - **Règle.** Une carte Shadow dont le coût en mana (tous modificateurs compris) vaut N ≥ 1 coûte 0 mana et
   « Pay 2N HP. » à la place, + 2 PV par carte Shadow déjà jouée dans le tour (toutes les cartes Shadow coûtent
@@ -169,7 +240,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: deal a third` / `of the damage absorbed` / `to the attacker.` | `When hit: deal half` / `the damage absorbed` / `to the attacker.` |
+| —, Epic | `Epic.` / `When hit:` / `Reflect a third.` | `When hit:` / `Reflect half.` |
+
+À-côté (mot de règle) : `Reflect: Deal that part of the Absorb lost on the hit to the attacker, rounded down.`
 
 - **Règle.** Chaque coup ennemi qui entame l'Absorb du Priest (même en entier) inflige à son auteur le tiers
   (amélioré : la moitié) de l'Absorb perdue sur ce coup, arrondi au-dessous, sans carte, comme Retaliation.
@@ -190,7 +263,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Surge cards can't be` / `played.` / `Per Insanity:` / `Shadow hits +1.` | `…` / `Shadow hits +2.` |
+| —, Epic | `Epic.` / `Shadow hits:` / `Madness 1.` | `Shadow hits:` / `Madness 2.` |
+
+À-côté (mot de règle) : `Madness: +1 damage per Insanity. Surge cards can't be played.` ; amélioré : `Madness: +2 damage per Insanity. Surge cards can't be played.`
 
 - **Règle.** Les cartes qui ont une clause Surge sont injouables (raison « Voidform »). Chaque coup d'une
   carte Shadow inflige 1 de plus par point d'Insanity (amélioré : 2), lue au moment du coup (réglage du
@@ -209,9 +284,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `First card each turn:` / `Cast, and its values` / `+50%.` | `First card each turn:` / `Cast, values doubled.` |
+| —, Epic | `Epic.` / `1st card each turn:` / `Empower 50%.` | `1st card each turn:` / `Empower 100%.` |
 
-Infobulle : `The first Attack or Skill each turn is cast: damage, Absorb, heal, DoT and Regen +50%.`
+À-côté (mot de règle) : `Empower: The first Attack or Skill each turn becomes a Cast, its values +50%, rounded up.` ; amélioré : `Empower: The first Attack or Skill each turn becomes a Cast, its values doubled, rounded up.`
 
 - **Règle.** La première carte Attack ou Skill jouée dans le tour devient un Cast : elle prend
   l'emplacement d'incantation et se résout au début du tour suivant, avec ses valeurs de dégâts, d'Absorb,
@@ -259,7 +334,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Can't gain Absorb.` / `Attacks deal 50% more.` | `…` / `Kills: heal 3.` |
+| —, Epic | `Epic.` / `Carnage 50%.` | `Carnage 50%.` / `Kills: heal 3.` |
+
+À-côté (mot de règle) : `Carnage: Attacks deal 50% more damage. Absorb can't be gained.`
 
 - **Règle.** Tout gain d'Absorb du Warrior vaut 0 (cartes, bibelots, potions). Les coups des cartes Attack
   infligent 50 % de plus, après Strength, avant Sundered, arrondi à l'inférieur. Amélioré : chaque ennemi
@@ -277,7 +354,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `At 5 Rage: spend it, deal 3 to all.` | `Epic.` / `At 5 Rage: spend it, deal 4 to all.` / `At 5 Rage: apply Demoralized 1 ⌛ to all` |
+| —, Epic | `Epic.` / `At 5 Rage:` / `Shockwave 3.` | `At 5 Rage:` / `Shockwave 4.` |
+
+À-côté (mot de règle) : `Shockwave: Spend all Rage and deal 3 to all enemies.` ; amélioré : `Shockwave: Spend all Rage, deal 4 to all enemies and apply Demoralized 1 ⌛ to all.`
 
 - **Règle.** Dès que la Rage atteint 5, elle tombe à 0 et le Warrior inflige 3 (amélioré : 4) à chaque
   ennemi vivant, sans carte (Strength comprise) ; amélioré : puis pose Demoralized 1 ⌛ à tous.
@@ -300,7 +379,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Targeted Attack hits: also hit another enemy for a third.` | `…` / `also hit 2 other enemies for a third.` |
+| —, Epic | `Epic.` / `Targeted Attack` / `hits: Sweep 1.` | `Targeted Attack` / `hits: Sweep 2.` |
+
+À-côté (mot de règle) : `Sweep: Also hit another random enemy for a third of the HP the target lost, rounded down.` ; amélioré : `Sweep: Also hit 2 other random enemies for a third of the HP the target lost, rounded down.`
 
 - **Règle.** Chaque coup d'une carte Attack qui a une cible inflige aussi le tiers des dégâts réellement
   infligés (arrondi à l'inférieur) à un autre ennemi vivant tiré par `c.rng.cards` (amélioré : deux
@@ -320,7 +401,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Attacks: cost 1 more, resolve twice.` / `At most 2 per turn.` | `…` / `At most 2 per turn, 0-cost free.` |
+| —, Epic | `Epic.` / `Dual Wield 2.` | `Dual Wield 2,` / `0-cost free.` |
+
+À-côté (mot de règle) : `Dual Wield: Attacks cost 1 more and resolve twice, at most 2 per turn.` ; amélioré : `Dual Wield: Attacks cost 1 more and resolve twice, at most 2 per turn. 0-cost ones skip the cost and limit.`
 
 - **Règle.** Chaque carte Attack coûte 1 mana de plus et se résout deux fois : la copie suit tout de suite,
   même cible (premier ennemi vivant si elle est morte), sans coût. Au plus deux cartes Attack par tour ; la
@@ -345,7 +428,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `End of turn: deal half` / `the Absorb to the last` / `target.` | `End of turn: deal 4 +` / `half the Absorb to the` / `last target.` |
+| —, Epic | `Epic.` / `End of turn:` / `Punish.` | `End of turn:` / `Punish +4.` |
+
+À-côté (mot de règle) : `Punish: With Absorb, deal a quarter of it to the last target, rounded down. The Absorb stays.` ; amélioré : `Punish: With Absorb, deal a quarter of it +4 to the last target, rounded down. The Absorb stays.`
 
 - **Règle.** À la fin du tour du Warrior (avant la défausse et le tour ennemi), il inflige la moitié de son
   Absorb (arrondie à l'inférieur ; amélioré : 4 + la moitié) à sa dernière cible, sans carte. L'Absorb
@@ -365,7 +450,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Spend and Surge cards: Cooldown 1.` / `Each Rage spent: all Cooldowns −1.` | `…` / `Each Rage spent: all Cooldowns −2.` |
+| —, Epic | `Epic.` / `Each Rage` / `spent: Haste 1.` | `Each Rage` / `spent: Haste 2.` |
+
+À-côté (mot de règle) : `Haste: Cards on Cooldown return 1 turn sooner. Spend and Surge cards go on Cooldown 1, not to the discard.` ; amélioré : `Haste: Cards on Cooldown return 2 turns sooner. Spend and Surge cards go on Cooldown 1, not to the discard.`
 
 - **Règle.** Les cartes qui dépensent la Rage (Spend, Surge) partent en recharge 1 au lieu de la défausse,
   qu'elles aient dépensé ou non. Chaque Rage dépensée (Spend payé, montant d'un Surge) avance chaque carte en
@@ -390,7 +477,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Rage up to 10.` / `Start of turn: +2 Rage.` / `At 10 Rage: Attacks deal 1 more.` | `…` / `Start of turn: +3 Rage.` / `…` |
+| —, Epic | `Epic.` / `Start of turn:` / `Juggernaut 2.` | `Start of turn:` / `Juggernaut 3.` |
+
+À-côté (mot de règle) : `Juggernaut: Gain 2 Rage. Rage goes up to 10, and at 10 Rage Attacks deal 1 more.` ; amélioré : `Juggernaut: Gain 3 Rage. Rage goes up to 10, and at 10 Rage Attacks deal 1 more.`
 
 - **Règle.** Plafond de Rage à 10. Au début de chaque tour, +2 Rage (amélioré : +3). Tant que la Rage est à
   10, chaque coup d'une carte Attack inflige 1 de plus (lu au coup, après le Spend ou le Surge de la carte :
@@ -430,7 +519,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Cast cards: deal half their` / `damage again to a` / `random enemy.` | `Cast cards: deal their` / `damage again to a` / `random enemy.` |
+| —, Epic | `Epic.` / `Cast cards:` / `Image 50%.` | `Cast cards:` / `Image 100%.` |
+
+À-côté (mot de règle) : `Image: Their first hit strikes a random enemy again for 50% of its damage, rounded down.` ; amélioré : `Image: Their first hit strikes a random enemy again for 100% of its damage, rounded down.`
 
 - **Règle (réglée le 14/11/2026).** À la résolution d'une carte Cast (sous Instant comprise), son **premier**
   coup frappe une fois de plus un ennemi vivant tiré par `c.rng.cards` (le même possible), pour la moitié
@@ -449,7 +540,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When attacked: apply` / `DoT 2 to the attacker` | `When attacked: apply` / `DoT 4 to the attacker` |
+| —, Epic | `Epic.` / `When attacked:` / `Burn 2.` | `When attacked:` / `Burn 4.` |
+
+À-côté (mot de règle) : `Burn: Apply DoT 2 to the attacker, once per attack, even if absorbed.` ; amélioré : `Burn: Apply DoT 4 to the attacker, once per attack, even if absorbed.`
 
 - **Règle (réglée le 14/11/2026).** Chaque attaque ennemie sur le Mage, même entièrement absorbée, pose DoT 2
   (amélioré : 4) à son auteur, par le crochet `apply`. Avant : DoT 1 par coup (+5 points) ; DoT 2 par coup
@@ -467,7 +560,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Start of turn: deal 2` / `to the last target and` / `apply Demoralized 1` / `for this turn.` | `Start of turn: deal 4` / `…` |
+| —, Epic | `Epic.` / `Start of turn:` / `Waterbolt 2.` | `Start of turn:` / `Waterbolt 4.` |
+
+À-côté (mot de règle) : `Waterbolt: Deal 2 to the last target and apply Demoralized 1 until the end of the turn.` ; amélioré : `Waterbolt: Deal 4 to the last target and apply Demoralized 1 until the end of the turn.`
 
 - **Règle (réglée le 14/11/2026).** Au début de chaque tour du Mage (après la pioche, dès le tour 1),
   l'élémentaire inflige 2 (amélioré : 4), sans carte, à la dernière cible du Mage, puis lui pose Demoralized 1
@@ -488,7 +583,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Cast cards aimed at a` / `Frozen enemy resolve at` / `once and thaw it.` | `…` / `once, deal 4 more and` / `thaw it.` |
+| —, Epic | `Epic.` / `Frozen:` / `Brain Freeze.` | `Frozen:` / `Brain Freeze +4.` |
+
+À-côté (mot de règle) : `Brain Freeze: Cast cards on a Frozen enemy resolve at once. Its Stunned and Demoralized then end.` ; amélioré : `Brain Freeze: Cast cards on a Frozen enemy resolve at once, +4 damage. Its Stunned and Demoralized then end.`
 
 - **Règle (réglée le 14/11/2026).** Une carte Cast à cible jouée sur un ennemi Frozen (Stunned ou
   Demoralized), lu au moment où elle est jouée, se résout tout de suite : sans emplacement, sans interruption
@@ -511,7 +608,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Up to 4 unspent mana` / `carries over to the` / `next turn, +1.` | `Up to 6 unspent mana` / `…` / `next turn, +2.` |
+| —, Epic | `Epic.` / `End of turn:` / `Conserve 4.` | `End of turn:` / `Conserve 6.` |
+
+À-côté (mot de règle) : `Conserve: Up to 4 unspent mana carries over to the next turn, +1 if any.` ; amélioré : `Conserve: Up to 6 unspent mana carries over to the next turn, +2 if any.`
 
 - **Règle (réglée le 14/11/2026).** À la fin du tour, le mana non dépensé (4 au plus ; amélioré : 6) est
   gardé, plus 1 (amélioré : 2) s'il en reste ; il s'ajoute au début du tour suivant, après la remise du mana à
@@ -532,7 +631,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `An enemy dying with` / `DoT gives that DoT + 16` / `to each other enemy.` | `…` / `DoT + 20` / `…` |
+| —, Epic | `Epic.` / `Enemy deaths:` / `Pyroclasm 16.` | `Enemy deaths:` / `Pyroclasm 20.` |
+
+À-côté (mot de règle) : `Pyroclasm: An enemy dying with DoT gives that DoT, +16, to each other enemy.` ; amélioré : `Pyroclasm: An enemy dying with DoT gives that DoT, +20, to each other enemy.`
 
 - **Règle (réglée le 14/11/2026).** Quand un ennemi meurt en portant du DoT, chaque autre ennemi vivant reçoit
   ce DoT + 16 (amélioré : + 20), posé directement (sans le crochet `apply`). Fiche : + 0 / + 3 (−2 points) ;
@@ -552,7 +653,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `The 3rd card played` / `each turn spends 1` / `Charge to resolve` / `twice.` | `Every 3rd card played` / `…` |
+| —, Epic | `Epic.` / `3rd card each turn:` / `Multistrike 1.` | `Every 3rd card:` / `Multistrike 1.` |
+
+À-côté (mot de règle) : `Multistrike: Spend 1 Charge, if available, to make the card resolve twice.`
 
 - **Règle (réglée le 14/11/2026).** La troisième carte jouée dans le tour (amélioré : la 3e, la 6e, la 9e…),
   de tout type, se résout deux fois si le Mage a 1 Charge à dépenser au moment où elle est jouée (dépensée
@@ -614,9 +717,9 @@ l'épique prend celui d'un talent Combat de l'ère classique. Voir la question 1
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each Parry gained:` / `deal 1, +2 per earlier` / `one this turn, to the` / `last target.` | `…` / `deal 2, +2 per earlier` / `…` |
+| —, Epic | `Epic.` / `Each Parry` / `gained: Riposte 1.` | `Each Parry` / `gained: Riposte 2.` |
 
-Infobulle : `Riposte: 1, then 3, 5, 7 in a turn, even above Parry 3.` (amélioré : 2, 4, 6, 8).
+À-côté (mot de règle) : `Riposte: Deal 1 damage to the last target, +2 per earlier Riposte this turn.` ; amélioré : `Riposte: Deal 2 damage to the last target, +2 per earlier Riposte this turn.`
 
 - **Réglé (14/11/2026).** Première riposte du tour et pas de la progression séparés : la k-ième riposte inflige
   N + S × (k − 1), N = 1, S = 2 (amélioré 2 / 2 ; fiche 3 × k, puis 2 × k à Westfall). La règle reste entière
@@ -644,7 +747,9 @@ Infobulle : `Riposte: 1, then 3, 5, 7 in a turn, even above Parry 3.` (amélior�
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Surge Attacks apply` / `90% of their damage` / `as DoT instead.` | `Surge Attacks apply` / `their damage as DoT` / `instead.` |
+| —, Epic | `Epic.` / `Surge Attacks:` / `Bleed 90%.` | `Surge Attacks:` / `Bleed 100%.` |
+
+À-côté (mot de règle) : `Bleed: The hit deals no damage and applies 90% of it as DoT, rounded up.` ; amélioré : `Bleed: The hit deals no damage and applies 100% of it as DoT, rounded up.`
 
 - **Réglé (14/11/2026).** 90 % (amélioré : la totalité). La moitié de la fiche fait PERDRE 12 points en moyenne
   (−16 à Duskwood) : le DoT met deux ou trois tours à rendre ses dégâts ; 75 % = +4,5, 100 % = +15,9.
@@ -668,7 +773,9 @@ Infobulle : `Riposte: 1, then 3, 5, 7 in a turn, even above Parry 3.` (amélior�
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Enemies with DoT 5+` / `count as Demoralized.` | `…` / `count as Demoralized` / `and Sundered.` |
+| —, Epic | `Epic.` / `DoT 5+:` / `Atrophy.` | `DoT 5+: Atrophy,` / `Sundered.` |
+
+À-côté (mot de règle) : `Atrophy: Enemies with DoT 5 or more count as Demoralized.` ; amélioré : `Atrophy: Enemies with DoT 5 or more count as Demoralized and Sundered.`
 
 - **Réglé (14/11/2026).** Un seuil de DoT, seul nombre de la carte : l'ennemi compte s'il montre au moins
   DoT 5 pendant le tour du Voleur (et qu'il lui en reste après son tic) ; amélioré, même seuil pour Sundered.
@@ -691,7 +798,9 @@ Infobulle : `Riposte: 1, then 3, 5, 7 in a turn, even above Parry 3.` (amélior�
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `A Surge of 2 Combo` / `counts as 3.` | `A Surge of 2 or 3` / `Combo counts as 4.` |
+| —, Epic | `Epic.` / `Surge cards:` / `Animacharge 3.` | `Surge cards:` / `Animacharge 4.` |
+
+À-côté (mot de règle) : `Animacharge: A Surge of 2 Combo counts as a Surge of 3.` ; amélioré : `Animacharge: A Surge of 2 or 3 Combo counts as a Surge of 4.`
 
 - **Réglé (14/11/2026).** Base : 2 Combo comptent 3 ; amélioré : 2 ou 3 comptent 4 (fiche 5 / 6). « 2 ou 3 → 4 »
   donnait +18,9, « 2 → 4 » +18,2 (le bot finit presque toujours à 2), « 2 → 3 » +8,0 : il n'y a pas de cran entre
@@ -713,9 +822,9 @@ Infobulle : `Riposte: 1, then 3, 5, 7 in a turn, even above Parry 3.` (amélior�
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Stealth lasts two turns.` / `Surge of 1+ Combo:` / `gain Stealth` | `Stealth lasts three` / `turns.` / `…` |
+| —, Epic | `Epic.` / `Surge cards:` / `Shroud 2.` | `Surge cards:` / `Shroud 3.` |
 
-Infobulle : `Lasts: Attacks use Stealth without removing it.`
+À-côté (mot de règle) : `Shroud: A Surge of 1+ Combo grants Stealth. Stealth lasts 2 turns, Attacks don't remove it.` ; amélioré : `Shroud: A Surge of 1+ Combo grants Stealth. Stealth lasts 3 turns, Attacks don't remove it.`
 
 - **Réglé (14/11/2026).** La carte manquait de sources de Stealth : elle a maintenant la sienne, chaque Surge
   (1 Combo ou plus) rend Stealth pour les cartes jouées après (pas pour la carte du Surge). Le Stealth dure deux
@@ -741,9 +850,9 @@ Infobulle : `Lasts: Attacks use Stealth without removing it.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Surge of 5 Combo:` / `apply Stunned 1 ⌛ to` / `the target.` | `Surge of 4+ Combo:` / `…` |
+| —, Epic | `Epic.` / `Surge of 5+` / `Combo: Gouge.` | `Surge of 4+` / `Combo: Gouge.` |
 
-Infobulle : `A boss gets Demoralized 2 ⌛ instead.`
+À-côté (mot de règle) : `Gouge: Apply Stunned 1 ⌛ to the target if it lives. Can't be Stunned: Demoralized 2 ⌛ instead.`
 
 - **Réglé (14/11/2026).** Les nombres de la fiche (5 ; amélioré 4+) : +10,4 (seuil 4 au lieu de 5 : +15,1).
 
@@ -762,7 +871,9 @@ Infobulle : `A boss gets Demoralized 2 ⌛ instead.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Attack hits: +2 per` / `other card name played` / `this turn after the` / `first 2.` | `Attack hits: +3 per` / `…` |
+| —, Epic | `Epic.` / `Attack hits:` / `Flourish 2.` | `Attack hits:` / `Flourish 3.` |
+
+À-côté (mot de règle) : `Flourish: +2 damage per other card name played this turn, after the first 2.` ; amélioré : `Flourish: +3 damage per other card name played this turn, after the first 2.`
 
 - **Réglé (14/11/2026).** Plafond retiré, +2 par nom de la fiche gardé ; les deux premiers autres noms du tour
   ne comptent pas (3 autres noms : +2, 4 : +4…). Avec +1 par nom et un plafond de +3 (réglage de Westfall) :
@@ -806,7 +917,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Start of turn: spend 1` / `Frenzy for a pet attack.` | `Start of turn: pet` / `attacks.` |
+| —, Epic | `Epic.` / `Start of turn:` / `Wild Call 1.` | `Start of turn:` / `pet attacks.` |
+
+À-côté (mot de règle) : `Wild Call: Spend 1 Frenzy, if available, for a pet attack.` ; amélioré : sans mot de règle (attaque gratuite, « pet attacks »).
 
 - **Règle.** Au début de chaque tour du Hunter, premier compris (après la pioche et la baisse du Frenzy),
   si le Frenzy vaut 1 ou plus, il baisse de 1 et le familier attaque (+1 Frenzy, comme toute attaque : la
@@ -830,7 +943,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Traps trigger at once` / `on a chosen enemy, and` / `the pet attacks it.` | `…` / `the pet attacks it` / `twice.` |
+| —, Epic | `Epic.` / `Traps: Launch 1.` | `Traps: Launch 2.` |
+
+À-côté (mot de règle) : `Launch: The Trap triggers at once on a target, then the pet attacks it.` ; amélioré : `Launch: The Trap triggers at once on a target, then the pet attacks it twice.`
 
 - **Règle.** Une carte Trap demande une cible. Jouée, elle se déclenche aussitôt sur cet ennemi comme s'il
   attaquait (`Combat.triggerTrap`, `onTrapTriggered` : Entrapment, Lock and Load s'appliquent), sans prendre
@@ -853,7 +968,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Pet attacks hit all` / `enemies, the others` / `for 2 less.` | `…` / `for 2 less.` / `Pet attacks: +1 Frenzy.` |
+| —, Epic | `Epic.` / `Pet attacks:` / `Stampede.` | `Pet attacks:` / `Stampede +1.` |
+
+À-côté (mot de règle) : `Stampede: Pet attacks also hit every other enemy, for 2 less.` ; amélioré : `Stampede: Pet attacks also hit every other enemy, for 2 less. Each one gives 1 more Frenzy.`
 
 - **Règle.** Chaque attaque du familier (automatique, commandée, de Surge, de Call of the Wild) frappe tous
   les ennemis vivants : sa cible en plein, les autres pour 2 de moins (jamais sous 0) ; le Frenzy monte de 1
@@ -872,7 +989,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `When hit: spend 1` / `Frenzy to stop up to 2` / `damage.` | `…` / `Frenzy to stop up to 4` / `damage.` |
+| —, Epic | `Epic.` / `When hit:` / `Intervene 2.` | `When hit:` / `Intervene 4.` |
+
+À-côté (mot de règle) : `Intervene: Spend 1 Frenzy, if available, to stop up to 2 damage of the hit.` ; amélioré : `Intervene: Spend 1 Frenzy, if available, to stop up to 4 damage of the hit.`
 
 - **Règle.** À chaque coup ennemi, avant l'Absorb, si le Frenzy vaut 1 ou plus, il baisse de 1 et le coup
   perd jusqu'à 2 dégâts (amélioré : 4 ; fiche : 5 et 8, réglés à Westfall et gardés dans les zones dures).
@@ -890,7 +1009,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Careful Aim: Cast` / `Attacks resolve at` / `once and deal 20 more.` | `…` / `once and deal 24 more.` |
+| —, Epic | `Epic.` / `Careful Aim:` / `Deadeye 20.` | `Careful Aim:` / `Deadeye 24.` |
+
+À-côté (mot de règle) : `Deadeye: Cast Attacks resolve at once and deal 20 more.` ; amélioré : `Deadeye: Cast Attacks resolve at once and deal 24 more.`
 
 - **Règle.** Une carte Attack Cast jouée sur une cible au-dessus de la moitié de ses PV (Careful Aim, lu au
   jeu) se résout tout de suite : sans emplacement, sans interruption possible, et ses coups infligent 20 de
@@ -908,7 +1029,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each enemy DoT tick:` / `spend 1 Frenzy for a` / `pet attack on it.` | `Each enemy DoT tick:` / `pet attacks it.` |
+| —, Epic | `Epic.` / `Enemy DoT` / `ticks: Wild Call 1.` | `Enemy DoT ticks:` / `pet attacks it.` |
+
+À-côté (mot de règle) : `Wild Call: Spend 1 Frenzy, if available: the pet attacks that enemy.` ; amélioré : sans mot de règle (attaque gratuite, « pet attacks »).
 
 - **Règle.** Après chaque tic de DoT sur un ennemi qui survit, si le Frenzy vaut 1 ou plus, il baisse de 1
   et le familier attaque cet ennemi (+1 Frenzy comme d'habitude : la dépense est rendue), sans changer la
@@ -928,7 +1051,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Pet cards become shots.` / `Attack hits: +2 per` / `Frenzy.` | `…` / `Attack hits: +3 per` / `Frenzy.` |
+| —, Epic | `Epic.` / `Attack hits:` / `Ferocity 2.` | `Attack hits:` / `Ferocity 3.` |
+
+À-côté (mot de règle) : `Ferocity: +2 damage per Frenzy. The pet is gone: pet cards become shots.` ; amélioré : `Ferocity: +3 damage per Frenzy. The pet is gone: pet cards become shots.`
 
 Infobulle : `Kill Command becomes Kill Shot, Arcane Shot Chimaera Shot… (see the deck).`
 

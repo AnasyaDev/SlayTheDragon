@@ -99,6 +99,43 @@ L.trigger("Targeted Attack hits")
 L.trigger("Each Rage spent")
 L.trigger("At 10 Rage")
 L.trigger("Spend and Surge cards")
+-- Mots de règle des épiques (L.rule) : la carte dit « Déclencheur: Mot N. », l'à-côté la règle complète avec les
+-- nombres de Warrior.EPIC (base, puis améliorée).
+do
+  local FRAC = { [2] = "half", [3] = "a third", [4] = "a quarter" }
+  local function turns(n) return n .. " turn" .. (n > 1 and "s" or "") end
+  L.rule("carnage", { name = "Carnage", text = "Attacks deal N% more damage. Absorb can't be gained." })
+  local T = E.thunderous_roar
+  local function roar(demo)
+    if (demo or 0) <= 0 then return "Spend all Rage and deal N to all enemies." end
+    return "Spend all Rage, deal N to all enemies and apply Demoralized " .. demo .. " ⌛ to all."
+  end
+  L.rule("shockwave", { name = "Shockwave", text = roar(T.demoralized), upText = roar(T.upDemoralized or T.demoralized) })
+  local S = E.sweeping_strikes
+  local function sweep(n)
+    return "Also hit " .. (n == 1 and "another random enemy" or (n .. " other random enemies")) .. " for "
+      .. (FRAC[S.div] or ("1/" .. S.div)) .. " of the HP the target lost, rounded down."
+  end
+  L.rule("sweep", { name = "Sweep", text = sweep(S.targets), upText = sweep(S.upTargets) })
+  local TG = E.titans_grip
+  L.rule("dualWield", { name = "Dual Wield",
+    text = "Attacks cost " .. TG.extraCost .. " more and resolve twice, at most N per turn.",
+    upText = "Attacks cost " .. TG.extraCost .. " more and resolve twice, at most N per turn. "
+      .. "0-cost ones skip the cost and limit." })
+  local SC = E.shield_charge
+  L.rule("punish", { name = "Punish",
+    text = "With Absorb, deal " .. FRAC[SC.div] .. " of it to the last target, rounded down. The Absorb stays.",
+    upText = "With Absorb, deal " .. FRAC[SC.div] .. " of it +N to the last target, rounded down. The Absorb stays." })
+  local A = E.anger_management
+  local function haste(steps)
+    return "Cards on Cooldown return " .. turns(steps) .. " sooner. Spend and Surge cards go on Cooldown "
+      .. A.give .. ", not to the discard."
+  end
+  L.rule("haste", { name = "Haste", text = haste(A.steps), upText = haste(A.upSteps) })
+  local AV = E.avatar
+  L.rule("juggernaut", { name = "Juggernaut", text = "Gain N Rage. Rage goes up to " .. AV.cap .. ", and at "
+    .. (AV.over + 1) .. " Rage Attacks deal " .. AV.bonus .. " more." })
+end
 do
   local has = false
   for _, p in ipairs(L.plates) do if p.word == "Epic" then has = true end end

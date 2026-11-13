@@ -375,26 +375,51 @@ EH.danse_macabre = {
 for id, hooks in pairs(EH) do C[id].deckHooks = hooks end
 C.subterfuge.whileInDeck = subterfugeStart
 
--- Mots du langage des épiques (déclencheurs « Name: », détails des infobulles ; plaque « Epic » : Core/Language.lua).
+-- Mots du langage des épiques (déclencheurs « Name: », plaque « Epic » : Core/Language.lua). Chaque épique dit
+-- « Déclencheur: Mot N. » ; le mot de règle (L.rule) donne la règle complète dans l'à-côté, avec les nombres de
+-- Rogue.EPIC (base, améliorée).
 L.trigger("Each Parry gained")
-L.trigger("Gaining Stealth")
-L.trigger("Surge of 1+ Combo")
-L.keyword("subterfugeLasts", { name = "Lasts", pattern = "^Stealth lasts ",
-  text = "Attacks use Stealth without removing it." })
+L.trigger("Surge Attacks")
+for _, t in ipairs(Rogue.EPIC.atrophic_poison) do L.trigger("DoT " .. t .. "+") end
+L.trigger("Surge cards")
 for _, k in ipairs(Rogue.EPIC.kidney_shot) do L.trigger(ns.RogueKidneyLabel(k)) end
 L.trigger("Attack hits")
--- détail des ripostes (infobulle), une explication par version de Deflection
-for i, k in ipairs(Rogue.EPIC.deflection) do
-  local up = i == 2
-  local s = Rogue.EPIC.deflectionStep[i]
-  L.keyword("riposte" .. i, { name = "Riposte", pattern = "^Each Parry gained: deal " .. k .. ", %+" .. s .. " ",
-    text = ("%d, then %d, %d, %d in a turn, even above Parry 3."):format(Rogue.riposteDamage(1, up),
-      Rogue.riposteDamage(2, up), Rogue.riposteDamage(3, up), Rogue.riposteDamage(4, up)) })
+do
+  local E = Rogue.EPIC
+  local function both(f) return f(1), f(2) end
+  -- Deflection : la k-ième riposte du tour inflige N + S × (k − 1)
+  local t1, t2 = both(function(i)
+    return "Deal N damage to the last target, +" .. E.deflectionStep[i] .. " per earlier Riposte this turn."
+  end)
+  L.rule("riposte", { name = "Riposte", text = t1, upText = t2 })
+  L.rule("bleed", { name = "Bleed", text = "The hit deals no damage and applies N% of it as DoT, rounded up." })
+  t1, t2 = both(function(i)
+    return "Enemies with DoT " .. E.atrophic_poison[i] .. " or more count as Demoralized"
+      .. (i == 2 and " and Sundered." or ".")
+  end)
+  L.rule("atrophy", { name = "Atrophy", text = t1, upText = t2 })
+  t1, t2 = both(function(i)
+    local m = E.echoingMax[i]
+    return "A Surge of " .. (m == 2 and "2" or m == 3 and "2 or 3" or ("2 to " .. m)) .. " Combo counts as a Surge of N."
+  end)
+  L.rule("animacharge", { name = "Animacharge", text = t1, upText = t2 })
+  t1, t2 = both(function(i)
+    local s = E.subterfugeSurge[i] and "A Surge of 1+ Combo grants Stealth. " or ""
+    s = s .. "Stealth lasts N turns, Attacks don't remove it"
+    if E.subterfuge[i] > 0 then s = s .. ", each new one gives +" .. E.subterfuge[i] .. " Combo" end
+    return s .. "."
+  end)
+  L.rule("shroud", { name = "Shroud", text = t1, upText = t2 })
+  L.rule("gouge", { name = "Gouge",
+    text = "Apply Stunned 1 ⌛ to the target if it lives. Can't be Stunned: Demoralized 2 ⌛ instead." })
+  t1, t2 = both(function(i)
+    local free = E.danseFree[i]
+    return "+N damage per other card name played this turn"
+      .. (free == 1 and ", after the first" or free > 1 and (", after the first " .. free) or "")
+      .. (E.danseCap[i] > 0 and (", up to +" .. E.danseCap[i] .. ".") or ".")
+  end)
+  L.rule("flourish", { name = "Flourish", text = t1, upText = t2 })
 end
-L.keyword("kidneyBoss", { name = "Can't be Stunned", pattern = "^Surge of %d%+? Combo: apply Stunned",
-  text = "gets Demoralized 2 ⌛ instead of Stunned." })
-L.keyword("danseNames", { name = "Names", pattern = "^Attack hits: %+%d per other card name",
-  text = "each different card played this turn counts once." })
 
 -- Bots : correction de la valeur d'une position selon l'épique du combat (ajoutée à botValue).
 --   Echoing Reprimand : 2 ou 3 Combo valent un Surge de 5 (monter à 4 est une perte).
