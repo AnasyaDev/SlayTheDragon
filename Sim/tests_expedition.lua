@@ -808,7 +808,8 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   local fam, tier0, withWhen = { common = 0, rare = 0, story = 0 }, 0, 0
   local function checkEffects(id, effects)
     for _, e in ipairs(effects) do
-      assert(EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
+      -- (effets de rencontre déclarés par le moteur ou une zone : X.EFFECTS, docs/zones.md)
+      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
       if e[1] == "fight" then
         local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
         assert(ns.Encounters[ns.Zones[ns.Events[id].zone or "westfall"].encounters][pool], id .. " : groupe " .. tostring(pool))
@@ -1090,8 +1091,14 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
   for id, ev in pairs(ns.Events) do
     for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
-        local exp = newExp()
-        forceEvent(exp, id)
+        -- rencontre d'une zone jouable : dans cette zone ; rencontre de case (node) : ouverte par sa case
+        local exp = newExp({ zone = ev.zone and ns.Zone.playable(ev.zone) and ev.zone or nil })
+        if ev.node then
+          exp.node, exp.phase = exp.map.start[1], "map"
+          X.openEvent(exp, id)
+        else
+          forceEvent(exp, id)
+        end
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
         exp.unlock.common = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
         exp.potions[1] = "healing_potion"
@@ -1391,7 +1398,9 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
   for lv = 0, 3 do
     local exp = newExp({ unlocks = { rep = 0, common = lv } })
     local pool = X.neutralPool(exp)
-    eq(#pool, want[lv], "palier " .. lv)
+    local fiche = 0 -- sans le commun déclaré par les fichiers de zone (fromZone)
+    for _, id in ipairs(pool) do if not ns.Cards[id].fromZone then fiche = fiche + 1 end end
+    eq(fiche, want[lv], "palier " .. lv)
     for _, id in ipairs(pool) do
       assert(isNeutral(id) and ns.Cards[id].tier <= lv, id)
       assert(X.cardUnlocked(exp, id), id)
@@ -1400,7 +1409,11 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
     eq(X.check(exp, { { "unlocked", "elixir_of_superior_defense" } }), lv >= 2, "condition unlocked " .. lv)
   end
   -- Exalté (4) : comme Révéré
-  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } })), 10)
+  local n4 = 0
+  for _, id in ipairs(X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } }))) do
+    if not ns.Cards[id].fromZone then n4 = n4 + 1 end
+  end
+  eq(n4, 10)
 end)
 
 test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 100 ±10 %), pour chaque classe", function()
@@ -1698,7 +1711,11 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
   eq(ns.Zone.FIRST, "westfall")
   assert(ns.Zone.playable("westfall"))
-  for i = 2, 7 do eq(ns.Zone.playable(ns.Zone.ORDER[i]), false, ns.Zone.ORDER[i] .. " : Coming later") end
+  -- zones à venir : « Coming later » tant que leur fichier de données ne pose pas encounters
+  for i = 2, 7 do
+    local z = ns.Zones[ns.Zone.ORDER[i]]
+    eq(ns.Zone.playable(z.id), z.encounters ~= nil, z.id .. " : Coming later")
+  end
   eq(ns.Zone.next("westfall"), "duskwood"); eq(ns.Zone.next("blackrock"), nil); eq(ns.Zone.prev("westfall"), nil)
   local exp = newExp()
   eq(exp.zone, "westfall"); eq(X.actName(exp), "Westfall"); eq(X.zoneDef(exp).encounters, "westfall")
@@ -1735,10 +1752,11 @@ test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule"
   local again = finishIn(db, "mage", "westfall", 0)
   eq(again.zoneWon, nil, "deuxième victoire : plus une première"); eq(again.zoneOpened, nil)
   -- zone fermée pour la classe : refusée même si elle devenait jouable
-  ns.Zones.wetlands.encounters = "westfall"
+  local wetEnc = ns.Zones.wetlands.encounters
+  ns.Zones.wetlands.encounters = wetEnc or "westfall"
   local x, w2 = Save.start(db, { seed = 2, class = "mage", zone = "wetlands" })
   eq(x, nil); eq(w2, "zone locked")
-  ns.Zones.wetlands.encounters = nil
+  ns.Zones.wetlands.encounters = wetEnc
   assert(Save.validate(db))
 end)
 

@@ -367,10 +367,21 @@ local function fence(f, g, P, c, x, y, x2, y2)
   end
 end
 
+-- Boîte à outils des décors de zone (docs/zones.md, « Décors ») : les formes ci-dessus, les plans (LV) et
+-- les accessoires communs, passés aux accessoires de zone (Art.paintProps[genre](f, g, P, c, pal, x, y, s,
+-- variante, K)) et aux plans libres d'un décor (sp.before / sp.after (f, g, K, sp), appelés après le ciel et
+-- à la fin). Une zone y peint ses formes propres (bateau, arbre mort, ruine…) sans toucher à ce fichier.
+local K = { box = box, vgrad = vgrad, oval = oval, blur = blur, bar = bar, diamond = diamond, tri = tri,
+  hash = hash, mix = mix, rgb = rgb, withAlpha = withAlpha, put = put, LV = LV, PROPS = PROPS }
+S.paintKit = K
+
 -- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions.
+-- Options de zone : sp.furrows = false (pas de rangs de blé : marais, port), sp.before / sp.after (plans
+-- libres), palette `cattail` (épis du premier plan en massettes : un seul épi long).
 function S.landscape(f, g, sp)
   local pal = Art.palettes[sp.pal] or Art.palettes.westfall
   local Wd, Hd, hz, fl = S.W, S.DECOR_H, sp.horizon or 190, sp.field or 228
+  K.W, K.H, K.hz, K.fl, K.pal = Wd, Hd, hz, fl, pal
   -- ciel : deux dégradés
   local sk = pal.sky
   local mid = floor(hz * 0.55)
@@ -401,6 +412,7 @@ function S.landscape(f, g, sp)
     blur(f, g, LV.clouds, cl[1], x + w * 0.24, y + h * 0.1, w * 0.5, h * 0.75, cl[2])
     blur(f, g, LV.clouds, cl[1], x - w * 0.04, y - h * 0.22, w * 0.42, h * 0.8, cl[2] * 0.9)
   end
+  if sp.before then sp.before(f, g, K, sp) end -- plans libres d'une zone (montagnes, mer…)
   -- collines lointaines : deux rangées de bosses basses (horizon plat)
   local hl = sp.hills or {}
   for _, row in ipairs({ { hl.back, LV.hillsBack, pal.hillsBack }, { hl.front, LV.hillsFront, pal.hillsFront } }) do
@@ -463,7 +475,7 @@ function S.landscape(f, g, sp)
   vgrad(f, g, LV.fieldsNear, rgb(pal.fieldsNear[1]), rgb(pal.fieldsNear[2]), 0, fl, Wd, Hd - fl)
   local vx = sp.road and sp.road[1] or Wd / 2
   local fd, fli = pal.furrowDark, pal.furrowLight
-  for k = -24, 24 do
+  for k = (sp.furrows == false) and 25 or -24, 24 do
     local xa, xb = vx + k * 6, vx + k * 66
     if k ~= 0 and xb > -260 and xb < Wd + 260 then
       local segs = { { 0, 0.3, 0.9 }, { 0.3, 0.62, 1.6 }, { 0.62, 1.04, 2.6 } }
@@ -481,7 +493,7 @@ function S.landscape(f, g, sp)
   for _, sh in ipairs(sp.shadows or { { 250, fl + 70, 560, 64 }, { 860, fl + 26, 440, 30 }, { 640, Hd - 40, 520, 60 } }) do
     blur(f, g, LV.furrows, fd[1], sh[1], sh[2], sh[3], sh[4], fd[2] * 0.9)
   end
-  for k = 1, 5 do
+  for k = 1, (sp.furrows == false) and 0 or 5 do
     local t = (k / 6) ^ 1.6
     box(f, g, LV.furrows, fli[1], 0, fl + (Hd - fl) * t, Wd, 1 + 3 * t, fli[2] * 0.6)
   end
@@ -510,10 +522,11 @@ function S.landscape(f, g, sp)
       local s = p[4] or 1
       blur(f, g, LV.furrows, pal.ground[1], p[2] + 6 * s, p[3] - 1, GROUND_W[kind] * s * 1.3, 14 * s, 0.55)
     end
+    local zp = not PROPS[kind] and Art.paintProps and Art.paintProps[kind] -- accessoire d'une zone
     if kind == "fence" then
       fence(f, g, LV[p[6]] or LV.mid, pal[p[6]] or pal.mid, p[2], p[3], p[4], p[5])
-    elseif PROPS[kind] then
-      PROPS[kind](f, g, LV[p[5]] or LV.mid, pal[p[5]] or pal.mid, pal, p[2], p[3], p[4] or 1, p[6])
+    elseif PROPS[kind] or zp then
+      (PROPS[kind] or zp)(f, g, LV[p[5]] or LV.mid, pal[p[5]] or pal.mid, pal, p[2], p[3], p[4] or 1, p[6], K)
     end
   end
   -- voile du bas (sol des personnages) et épis du premier plan
@@ -534,13 +547,25 @@ function S.landscape(f, g, sp)
       local lx, ly = bx + dx * L * 0.35, by + dy * L * 0.35
       bar(f, g, LV.stalks, pal.stalk, lx + sin(la) * 9, ly - cos(la) * 9, 20, 2.2, PI / 2 - la)
       local ec = pal.ears[1 + floor(h4 * #pal.ears)]
-      for j = 0, 1 do
-        local d = L + 5 + j * 9
-        local ear = oval(f, g, LV.ears, ec, bx + dx * d, by + dy * d, 11 - j * 2, 4.4 - j * 0.6)
-        if ear.SetRotation then ear:SetRotation(th) end
+      if pal.cattail then
+        -- massette : un épi long et brun en haut de la tige ; une sur trois n'a qu'une lame de feuille
+        if h2 > 0.35 then
+          local ear = oval(f, g, LV.ears, ec, bx + dx * (L - 6), by + dy * (L - 6), 17, 5)
+          if ear.SetRotation then ear:SetRotation(th) end
+          bar(f, g, LV.stalks, pal.stalk, bx + dx * (L + 6), by + dy * (L + 6), 9, 1, th)
+        end
+        local lb = lean - side * (0.25 + 0.2 * h4)
+        bar(f, g, LV.stalks, pal.stalk, bx + sin(lb) * L * 0.42, by - cos(lb) * L * 0.42, L * 0.85, 2.4, PI / 2 - lb)
+      else
+        for j = 0, 1 do
+          local d = L + 5 + j * 9
+          local ear = oval(f, g, LV.ears, ec, bx + dx * d, by + dy * d, 11 - j * 2, 4.4 - j * 0.6)
+          if ear.SetRotation then ear:SetRotation(th) end
+        end
       end
     end
   end
+  if sp.after then sp.after(f, g, K, sp) end -- plans libres d'une zone (premier plan)
 end
 
 ---------------------------------------------------------------------------

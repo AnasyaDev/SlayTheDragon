@@ -6658,8 +6658,10 @@ do
   local vc = card.bg._calls.SetVertexColor or {}
   local classOk = card.bg._texture == ROOT .. ns.Skin.tex.card_body_blue.file and vc[1] == 1 and vc[2] == 1 and vc[3] == 1
   card:Hide()
+  local fiche = 0 -- sans le commun déclaré par les fichiers de zone (fromZone), vérifié avec les autres
+  for _, id in ipairs(ids) do if not ns.Cards[id].fromZone then fiche = fiche + 1 end end
   check(("textes : %d cartes neutres (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), langage, icônes, corps ivoire teinté vert sauge"):format(#ids, minSize),
-    #ids == 10 and #bad == 0, table.concat(bad, ", "))
+    fiche == 10 and #bad == 0, table.concat(bad, ", "))
   check("carte de classe : corps et couleur inchangés (Inner Fire bleue, sans teinte)", classOk)
   -- infobulle : ligne « Neutral », explication de « Pay N HP. » (seule formulation d'un coût en PV)
   local tip = { lines = {} }
@@ -8138,7 +8140,12 @@ do
   local laterOk = true
   for i = 2, #zopts do
     local o = zopts[i]
-    if not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then laterOk = false end
+    -- zone jouable (fichier de données écrit) : « Locked » tant que la précédente n'est pas gagnée
+    if ns.Zone.playable(ns.Zone.ORDER[i]) then
+      if not (o.disabled and o.status == "locked") then laterOk = false end
+    elseif not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then
+      laterOk = false
+    end
   end
   check("accueil : Westfall choisie et jouable, les six autres « Coming later », grisées",
     zopts[1].selected and not zopts[1].disabled and st.zone == "westfall" and laterOk)
@@ -8150,7 +8157,7 @@ do
     if not vis(b) then bad[#bad + 1] = "bouton " .. i .. " caché" end
     if not inside(r, panel) then bad[#bad + 1] = "bouton " .. i .. " hors du panneau " .. fmt(r) end
     if b.label._text ~= zopts[i].label then bad[#bad + 1] = "libellé " .. tostring(b.label._text) end
-    local want = i == 1 and "" or "Coming later"
+    local want = i == 1 and "" or (ns.Zone.playable(ns.Zone.ORDER[i]) and "Locked" or "Coming later")
     if (b.status._text or "") ~= want then bad[#bad + 1] = "état " .. tostring(b.status._text) end
     for j = i + 1, #scr.zoneButtons do
       if overlaps(r, R.rect(scr.zoneButtons[j])) then bad[#bad + 1] = ("boutons %d et %d se chevauchent"):format(i, j) end
@@ -8312,7 +8319,8 @@ do
     table.concat(cnames, ", ") == ZONES and #bad2 == 0, table.concat(bad2, " ; "))
   check("onglet Zones : Westfall gagnée (clés +0 à +2, meilleure +1), Duskwood ouverte, Wetlands à venir",
     cols[1].status._text == "Won" and (cols[1].keys._text or ""):find("Keys +0 to +2 · best +1", 1, true)
-    and cols[2].status._text == "Open" and cols[3].status._text == "Coming later" and (cols[3].keys._text or "") == "",
+    and cols[2].status._text == "Open" and (cols[3].keys._text or "") == ""
+    and cols[3].status._text == (ns.Zone.playable("wetlands") and "Locked" or "Coming later"),
     tostring(cols[1].status._text) .. " / " .. tostring(cols[1].keys._text) .. " / " .. tostring(cols[2].status._text))
   check("carte de zone de Westfall débloquée (vraie carte)", vis(cols[1].card) and cols[1].card.cardId == "uz_zone_card"
     and not vis(cols[1].lock))

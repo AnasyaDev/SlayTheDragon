@@ -449,11 +449,13 @@ end)
 test("bibelots et potions respectent le contrat", function()
   local nr, np = 0, 0
   for id, r in pairs(ns.Relics) do
-    if not r.noPool and not r.class then nr = nr + 1 end -- communs (bibelots de rencontre et de classe à part)
+    -- communs (bibelots de rencontre et de classe à part ; fromZone : commun et bibelots de clé d'une zone)
+    if not r.noPool and not r.class and not r.fromZone then nr = nr + 1 end
     assert(r.name and r.text and r.hooks, id)
     assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
     -- communs : palier de Ligue (tier) ; de classe : niveau de classe (test « progression »)
-    if not r.class then assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id) end
+    -- (bibelots de clé : key = { zone, level }, sans tier ; docs/zones.md)
+    if not r.class and not r.key then assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id) end
   end
   for id, p in pairs(ns.Potions) do
     np = np + 1
@@ -2541,7 +2543,8 @@ do
   test("neutres : 10 cartes de la fiche (palier, rareté, coût, type), sans classe ni ressource, amélioration", function()
     local n, byTier, byRarity = 0, {}, {}
     for id, d in pairs(ns.Cards) do
-      if d.neutral then
+      -- fromZone : commun déclaré par le fichier d'une zone (testé par Sim/tests_zone_<zone>.lua)
+      if d.neutral and not d.fromZone then
         n = n + 1
         local want = NEUTRAL[id]
         assert(want, id .. " : carte neutre hors fiche")
@@ -2693,7 +2696,7 @@ do
       assert(not r.text:lower():find("%f[%a]you%f[%A]") and not r.text:lower():find("%f[%a]your%f[%A]"), id .. " : you")
     end
     eq(n, 20)
-    for _, r in pairs(ns.Relics) do if not r.class then total = total + 1 end end
+    for _, r in pairs(ns.Relics) do if not r.class and not r.fromZone then total = total + 1 end end
     eq(total, 32, "12 d'origine + 20")
     eq(ns.Relics.hand_of_justice.class, "warrior", "bibelot du Guerrier intact")
     eq(ns.Relics.force_reactive_disk.class, "warrior", "bibelot du Guerrier intact")
