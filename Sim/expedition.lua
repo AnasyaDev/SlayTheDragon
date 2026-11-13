@@ -411,7 +411,7 @@ return function(ns)
 
   local function fight(exp, opts, record)
     local f, c = exp.fight, exp.combat
-    local hpBefore = exp.hp
+    local hpBefore, maxHpBefore = exp.hp, exp.maxHp -- PV à l'entrée (avant les effets de début de combat)
     local bot = Bots.new(opts.bot or "heuristic", Rng.stream(f.seed, "bot"), { cap = opts.cap })
     local maxRounds = opts.maxRounds or 40
     local steps, stalled = 0, false
@@ -435,7 +435,7 @@ return function(ns)
     local st = c.stats
     record.combats[#record.combats + 1] = {
       kind = f.pool, encounter = table.concat(f.encounter, "+"), won = c.result == "won",
-      turns = st.turns, hpBefore = hpBefore, hpAfter = math.max(c.player.hp, 0),
+      turns = st.turns, hpBefore = hpBefore, hpAfter = math.max(c.player.hp, 0), maxHp = maxHpBefore,
       hpLost = st.hpLost, healed = st.healed, stalled = stalled,
       castsStarted = st.castsStarted, castsInterrupted = st.castsInterrupted,
       enemyCasts = st.enemyCasts, enemyCastsInterrupted = st.enemyCastsInterrupted,

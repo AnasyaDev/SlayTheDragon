@@ -103,6 +103,10 @@ local function addRecord(agg, rec)
     for k, n in pairs(rec.visits) do agg.visits[k] = (agg.visits[k] or 0) + n end
   end
   for _, cb in ipairs(rec.combats) do
+    -- PV nets : PV à l'entrée du combat moins PV à la sortie (soins, Last Breath et changements de PV max
+    -- du combat compris ; négatif si le combat rend plus qu'il ne coûte). stats.healed ne compte pas le
+    -- PV rendu par Last Breath (preventDeath) : la mesure directe fait foi.
+    local net = cb.hpBefore - cb.hpAfter
     local e = agg.enc[cb.encounter]
     if not e then
       e = { kind = cb.kind, n = 0, won = 0, turns = 0, turnsHist = {}, hpLost = 0, stalled = 0 }
@@ -113,10 +117,13 @@ local function addRecord(agg, rec)
     e.turns = e.turns + cb.turns
     e.turnsHist[cb.turns] = (e.turnsHist[cb.turns] or 0) + 1
     e.hpLost = e.hpLost + cb.hpLost
+    e.hpNet = (e.hpNet or 0) + net
     if cb.stalled then e.stalled = e.stalled + 1 end
     local k = agg.kinds[cb.kind] or { n = 0, won = 0, turns = 0, hpLost = 0 }
     agg.kinds[cb.kind] = k
     k.n = k.n + 1; k.turns = k.turns + cb.turns; k.hpLost = k.hpLost + cb.hpLost
+    k.hpNet = (k.hpNet or 0) + net
+    k.maxHp = (k.maxHp or 0) + (cb.maxHp or 0) -- PV max à l'entrée, sommés : « % PV max » = hpNet / maxHp
     if cb.won then k.won = k.won + 1 end
     agg.castsStarted = agg.castsStarted + cb.castsStarted
     agg.castsInterrupted = agg.castsInterrupted + cb.castsInterrupted
@@ -397,23 +404,37 @@ local function report(a, title)
   table.sort(deaths)
   out("Défaites    : " .. table.concat(deaths, ", "))
   out("")
-  out("Par type de combat        n   victoires  tours moy  PV perdus moy  incant./combat  coupées")
+  -- PV nets (colonnes ajoutées en fin de ligne : des scripts lisent les autres par position) : PV à l'entrée
+  -- moins PV à la sortie, soins du combat déduits ; % PV max = rapporté aux PV max à l'entrée du combat.
+  local function netCols(s, withPct)
+    if not s.hpNet then return withPct and "        -        -" or "        -" end
+    local col = ("  %7.1f"):format(s.hpNet / s.n)
+    if withPct then
+      col = col .. ((s.maxHp or 0) > 0 and ("  %6.1f %%"):format(100 * s.hpNet / s.maxHp) or "      -  ")
+    end
+    return col
+  end
+  local classDef = ns.Classes and ns.Classes[opts.class or "priest"]
+  local baseHp = tonumber(opts.hp) or (classDef and classDef.hp)
+  out(("Par type de combat        n   victoires  tours moy  PV perdus moy  incant./combat  coupées   PV nets  %% PV max%s")
+    :format(baseHp and ("   (PV max de départ : %d)"):format(baseHp) or ""))
   for _, k in ipairs({ "easy", "normal", "elite", "boss" }) do
     local s = a.kinds[k]
     if s then
-      out(("  %-20s %6d   %s   %8.2f   %8.1f   %12.2f   %s"):format(k, s.n, pct(s.won, s.n), s.turns / s.n,
-        s.hpLost / s.n, (s.castsStarted or 0) / s.n, pct(s.castsInterrupted or 0, s.castsStarted or 0)))
+      out(("  %-20s %6d   %s   %8.2f   %8.1f   %12.2f   %s%s"):format(k, s.n, pct(s.won, s.n), s.turns / s.n,
+        s.hpLost / s.n, (s.castsStarted or 0) / s.n, pct(s.castsInterrupted or 0, s.castsStarted or 0),
+        netCols(s, true)))
     end
   end
   out("")
-  out("Par rencontre                                   n   victoires  tours moy  p95  PV perdus  bloqués")
+  out("Par rencontre                                   n   victoires  tours moy  p95  PV perdus  bloqués  PV nets")
   local encs = {}
   for name, e in pairs(a.enc) do encs[#encs + 1] = { name = name, e = e } end
   table.sort(encs, function(x, y) if x.e.kind ~= y.e.kind then return x.e.kind < y.e.kind end return x.name < y.name end)
   for _, x in ipairs(encs) do
     local e = x.e
-    out(("  %-7s %-35s %6d   %s   %8.2f  %3d  %9.1f  %5d"):format(e.kind, x.name, e.n, pct(e.won, e.n),
-      e.turns / e.n, p95(e.turnsHist, e.n), e.hpLost / e.n, e.stalled))
+    out(("  %-7s %-35s %6d   %s   %8.2f  %3d  %9.1f  %5d%s"):format(e.kind, x.name, e.n, pct(e.won, e.n),
+      e.turns / e.n, p95(e.turnsHist, e.n), e.hpLost / e.n, e.stalled, netCols(e)))
   end
   out("")
   out("Cartes                   rareté    choisie  dans deck  vict. avec  vict. sans  écart  jouées/piochées  gardées en main")
@@ -543,8 +564,11 @@ if opts.compare then
   for _, k in ipairs({ "easy", "normal", "elite", "boss" }) do
     local o, n = old.kinds[k], agg.kinds[k]
     if o and n then
-      print(("  %-8s victoires %s -> %s   tours %.2f -> %.2f   PV perdus %.1f -> %.1f"):format(k,
-        pct(o.won, o.n), pct(n.won, n.n), o.turns / o.n, n.turns / n.n, o.hpLost / o.n, n.hpLost / n.n))
+      -- PV nets : absents des rapports enregistrés avant leur ajout (« - »)
+      local function net(s) return s.hpNet and ("%.1f"):format(s.hpNet / s.n) or "-" end
+      print(("  %-8s victoires %s -> %s   tours %.2f -> %.2f   PV perdus %.1f -> %.1f   PV nets %s -> %s"):format(k,
+        pct(o.won, o.n), pct(n.won, n.n), o.turns / o.n, n.turns / n.n, o.hpLost / o.n, n.hpLost / n.n,
+        net(o), net(n)))
     end
   end
 end

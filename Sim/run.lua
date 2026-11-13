@@ -141,7 +141,7 @@ return function(ns)
     end
     local rec = {
       kind = kind, encounter = table.concat(encounter, "+"), won = c.result == "won",
-      turns = c.stats.turns, hpBefore = run.hp, hpAfter = math.max(c.player.hp, 0),
+      turns = c.stats.turns, hpBefore = run.hp, hpAfter = math.max(c.player.hp, 0), maxHp = run.maxHp,
       hpLost = c.stats.hpLost, healed = c.stats.healed, stalled = c.stalled or false,
       castsStarted = c.stats.castsStarted, castsInterrupted = c.stats.castsInterrupted,
       enemyCasts = c.stats.enemyCasts, enemyCastsInterrupted = c.stats.enemyCastsInterrupted,
