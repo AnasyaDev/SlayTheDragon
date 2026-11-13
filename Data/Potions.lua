@@ -10,6 +10,8 @@ local function potion(id, t)
   t.id = id
   P[id] = t
 end
+ns.Declare = ns.Declare or {}
+ns.Declare.potion = potion -- fichiers de zone : ns.Declare.potion(id, t)
 
 -- Disponible d'emblée (tier 0) ---------------------------------------------------------
 

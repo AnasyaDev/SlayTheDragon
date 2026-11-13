@@ -360,12 +360,11 @@ card("arcane_surge", {
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Mage ») -----------------------------
--- Règles en jeu dès le début du combat : ni piochées, ni jouées, sans coût. Les crochets (deckHooks,
--- actifs tant que la carte est dans le deck) sont posés par Core/Classes/mage.lua ; les nombres sont ici
--- (champs epicN, epicM lus par les crochets, base et améliorée). unplayable : garde-fou tant qu'une
--- épique peut encore se trouver dans une pile (elle n'a pas de coût).
+-- Règles en jeu dès le début du combat (c.epic) : ni piochées, ni jouées, sans coût. Les crochets (deckHooks)
+-- sont posés par Core/Classes/mage.lua ; les nombres sont ici (epicN, epicM, epicPeriod, epicEvery, lus par
+-- les crochets, base et améliorée).
 local function epic(id, t)
-  t.type, t.power, t.epic, t.rarity, t.unplayable, t.effects = "power", true, true, "epic", true, {}
+  t.type, t.power, t.epic, t.rarity, t.effects = "power", true, true, "epic", {}
   card(id, t)
 end
 
@@ -383,7 +382,7 @@ epic("molten_armor", {
   up = { epicN = 3, text = "Epic.\nWhen hit: apply DoT 3 to the attacker." },
 })
 
--- Wetlands : un tour sur epicPeriod (le 1er, le 4e…), au début du tour, l'élémentaire inflige epicN à la
+-- Wetlands : un tour sur epicPeriod (3 : les tours 3, 6, 9…), au début du tour, l'élémentaire inflige epicN à la
 -- dernière cible, puis Demoralized epicM (chaque tour : 100 % de victoires, réglage du 13/11/2026).
 epic("water_elemental", {
   name = "Water Elemental", zone = "wetlands", path = "frost", school = "frost", epicN = 5, epicM = 1, epicPeriod = 3,
@@ -413,7 +412,7 @@ epic("conflagration", {
   up = { epicN = 8, text = "Epic.\nAn enemy dying with DoT gives that DoT + 8 to each other enemy." },
 })
 
--- Blackrock Mountain : un tour sur epicPeriod (le 1er, le 4e…), la 3e carte jouée (améliorée : chaque 3e) se
+-- Blackrock Mountain : un tour sur epicPeriod (3 : les tours 3, 6, 9…), la 3e carte jouée (améliorée : chaque 3e) se
 -- résout deux fois si c'est une Attack.
 epic("rule_of_threes", {
   name = "Rule of Threes", zone = "blackrock", path = "arcane", school = "arcane", epicEvery = false, epicPeriod = 3,

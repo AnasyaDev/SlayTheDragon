@@ -183,46 +183,73 @@ et ailleurs. Aucun chiffre ne change.
 - Non vérifiable hors jeu : rendu réel des rectangles tournés (`SetRotation` des ailes, des toits, des
   rangs de blé) et des dégradés ; chargement des créatures 237, 238, 392 (absentes des caches) ; allure des
   affichages de secours.
-## Cartes épiques (13/11/2026)
+## Cartes épiques (13/11/2026, règle finale du 14/11/2026)
 
-Règles : `docs/expedition.md`, « Cartes épiques ».
+Règles : `docs/expedition.md`, « Cartes épiques » (une épique est une règle en jeu dès le début de chaque combat,
+hors de toute pile, sans coût).
 
 - **Cadre** (`W.card`, `SetCard`) : une carte `rarity = "epic"` prend le ruban et la languette de coût violets
   (`Media/card_ribbon_epic.tga`, `Media/card_cost_epic.tga`, même géométrie que les pièces de base), une aura
   violette tenue derrière la carte (`b.epicGlow` : `card_glow` teinté `W.EPIC_COLOR` #a335ee, alpha
-  `W.EPIC_GLOW_ALPHA`, créée avec la carte) et la gemme épique (pentagone violet, `gem_epic`, déjà là). Les
-  pièces violettes sont générées par `tools/build_media.py` à partir des pièces du pack (teinte HSV fixe,
-  saturation qui baisse avec la clarté) ; `build/venv/bin/python -I tools/build_media.py --epic-only` les refait
-  seules depuis `Media/card_ribbon.tga` et `Media/card_cost.tga` (Pillow + numpy, sans le PSD) et ajoute leurs
-  entrées à `UI/SkinData.lua`. **Nouvelles textures : relancer le client** (pas un nouveau fichier du TOC).
-- **Infobulle** : « Epic: one per expedition, a new one replaces it. » (`W.EPIC_HINT`) et une ligne par
-  transformation (« While in the deck: Smite becomes … », `W.transformLines`) ; une variante montrée hors
-  combat ajoute « Transformed Smite. » (option de carte `from`). Mot de plaque `Innate` (« Innate: starts in the
-  opening hand. », registre du langage) : la plaque du bas dit « Power · Innate ».
-- **Récompense d'élite** (choix « Epic ») : montré AVANT les cartes ordinaires (étape `epicMode`) : titre violet
-  « Epic card » au-dessus des cartes, cartes centrées sous le titre s'il y en a moins de trois, consigne
-  « Choose an epic card, or none. » décalée à gauche, bouton rouge « Skip » (150 × 44) à gauche de « Back on the
+  `W.EPIC_GLOW_ALPHA`, créée avec la carte) et la gemme épique (pentagone violet, `gem_epic`). Les pièces violettes
+  sont générées par `tools/build_media.py` à partir des pièces du pack (teinte HSV fixe, saturation qui baisse
+  avec la clarté) ; `build/venv/bin/python -I tools/build_media.py --epic-only` les refait seules depuis
+  `Media/card_ribbon.tga` et `Media/card_cost.tga` (Pillow + numpy, sans le PSD) et ajoute leurs entrées à
+  `UI/SkinData.lua`. **Nouvelles textures : relancer le client** (pas un nouveau fichier du TOC).
+- **Sans coût** : le chiffre du coût est caché ; la languette violette porte le mot « Epic » (`b.epicMark`, gras
+  10, `W.EPIC_MARK_COLOR`, créé avec la carte, au centre de la languette). Plaque du bas : « Epic » (mot du
+  registre du langage, `L.plate("epic")`, en tête ; une épique ne dit jamais « Power », un « Epic. » ou
+  « Power. » de tête est retiré du texte affiché).
+- **Infobulle** : « Epic: in play from the start of each combat. » (mot de plaque), « One epic card per
+  expedition: a new one replaces it. » (`W.EPIC_HINT`) et une ligne par transformation (« While in the deck:
+  Smite becomes … », `W.transformLines`) ; une variante montrée hors combat ajoute « Transformed Smite. » (option
+  de carte `from`).
+- **Choix au départ** (étape `startEpic`, phase `"start"` avec `exp.startEpics`) : l'écran de récompense en
+  mode « Epic », sans butin : titre violet « Epic card » au-dessus des cartes (trois, ou centrées s'il y en a
+  moins), consigne « Choose the epic card of this expedition, or none. » au centre du plateau, bouton rouge
+  « Skip » (150 × 44) à la place de « Back on the road » (caché : rien d'autre à prendre). Prendre une épique ne
+  demande pas de confirmation (le deck n'en a pas). Puis, si la zone 3 est gagnée, le bibelot au choix (écran
+  de rencontre, étape `startRelic`) ; puis la carte.
+- **Récompense d'élite** (une épique de remplacement) : montrée AVANT les cartes ordinaires (étape `epicMode`) :
+  titre violet « Epic card », la carte centrée, consigne « Replace your epic card, or skip it. » (« Take this
+  epic card, or skip it. » sans épique dans le deck) décalée à gauche, « Skip » à gauche de « Back on the
   road ». Après le choix (ou « Skip ») : les cartes ordinaires, comme avant.
 - **Remplacement** (`UI.epicConfirm`, construit au premier usage) : `UI.choose(id)` demande d'abord
   `Controller.epicSwap(id)` (l'action rejouée sur une copie de l'expédition : vrai si elle ferait partir
   l'épique du deck pour une autre ; récompense, marchand, rencontre). Si oui, panneau modal sur un voile : titre
   « Epic card », question « Replace A with B? », note « Only one epic card per expedition: the current one leaves
   the deck. », les deux cartes à 0,9 côte à côte (ancienne à gauche, telle qu'elle est ; nouvelle à droite), un
-  « > » entre elles, « Leaves the deck » (rouge) / « Joins the deck » (vert) dessous, boutons « Replace » (or) et
+  « > » entre elles, « Leaves the deck » (rouge) / « Joins the deck » (vert) dessous ; si l'ancienne est
+  améliorée, une ligne « The upgrade is lost. » sous « Leaves the deck » (`EC.lost`). Boutons « Replace » (or) et
   « Keep A » (rouge). Clic hors du panneau = « Keep ». Survol des cartes : halo seulement, ni levée ni aperçu.
+- **En combat** : l'épique (`c.epic`) est le premier des Powers en jeu sous le héros (après les états) : jeton à
+  l'icône de la carte, liseré violet (`Art.rarityRim.epic`) et aura violette tenue derrière le jeton (champ
+  `glow` des jetons de `W.tokenRow` : `glow_round` teinté `W.EPIC_COLOR`, créé éteint avec le jeton) ; infobulle
+  complète (nom, texte, Epic, une par expédition, cartes transformées). Elle n'est ni dans la main ni dans les
+  piles.
+- **Crans de la ressource** (`V:RenderPips`) : le plafond lu est celui du combat, `Combat.resCap(c)` (une épique
+  peut porter la Rage à 10), sinon celui de la classe. Jusqu'à 6 crans : un arc (comme avant). Au-delà : deux
+  arcs concentriques, l'intérieur (rayon 49) prend la moitié haute des crans, l'extérieur (rayon 63) le reste,
+  décalé d'un demi-cran ; remplis dans l'ordre, l'arc intérieur d'abord ; 12 crans au plus (`PIPS_MAX`).
+  `V.layoutPips(pips, cap)` les repose quand le plafond change.
 - **Marchand** : l'épique en vente se range à la suite des cartes (7 cartes au plus), cadre violet, prix sur sa
   plaque ; l'achat passe par la même confirmation.
-- **Deck** : bandeau, panneau du deck, amélioration, retrait et sélection montrent le deck transformé
+- **Deck** : l'épique en tête du panneau du deck (`DV.sorted`) et des grilles d'amélioration et de retrait
+  (`epicFirst` du contrôleur) ; bandeau, panneau, amélioration, retrait et sélection montrent le deck transformé
   (`Expedition.shownDeck`).
 - **Progress, onglet Zones** : l'emplacement verrouillé d'une carte de zone est un dos de carte teinté de violet
   avec l'aura épique (`lockedCard`, `SetEpic`) ; débloquée, la vraie carte (cadre violet) à 0,85 : son survol
   montre l'aperçu à taille réelle (sous `W.PREVIEW_BELOW`).
 - **Bilan** : « New epic card: X. » en violet ; la carte est présentée à part (`unlocked.epic`) : à 0,72, à
   gauche de la rangée des déblocages, libellé violet « New epic card » au-dessus ; le panneau grandit d'autant.
-- Harnais : section **UE** (avant U16) ; planches `ue-main-epique`, `ue-choix-epic`, `ue-remplacement`,
-  `ue-progression-zones`, `ue-bilan-epique`.
-- Non vérifiable hors jeu : rendu réel du violet des pièces (`card_*_epic.tga`) et de l'aura sur les décors,
-  lisibilité du nom blanc sur le ruban violet, le panneau de confirmation au-dessus des modèles 3D.
+- Harnais : section **UE** (avant U16) ; planches `ue-depart-epique` (choix au départ), `ue-combat-epique`
+  (l'épique parmi les Powers), `ue-carte-epique` (panneau du deck : carte sans coût, en tête), `ue-choix-epic`
+  (remplacement après une élite), `ue-remplacement` (confirmation, « The upgrade is lost. »),
+  `ue-crans-rage-10` (deux arcs), `ue-progression-zones`, `ue-bilan-epique`. Les aperçus PNG des textures
+  (`build/media_png`, copiés par le harnais) doivent contenir `card_cost_epic.png` et `card_ribbon_epic.png`.
+- Non vérifiable hors jeu : rendu réel du violet des pièces et des auras sur les décors, lisibilité de « Epic »
+  sur la languette violette et du nom blanc sur le ruban violet, le panneau de confirmation au-dessus des modèles
+  3D, la lecture des deux arcs de crans à côté de l'anneau de mana.
 
 ## Habillage WoW (direction B, mana et parcours façon C)
 

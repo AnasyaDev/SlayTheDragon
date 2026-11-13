@@ -51,6 +51,8 @@ local function setup(hand, opts)
   for _, x in ipairs(all) do byId[x.id] = byId[x.id] or {}; table.insert(byId[x.id], x) end
   for _, id in ipairs(hand) do c.hand[#c.hand + 1] = table.remove(byId[id]) end
   for _, list in pairs(byId) do for _, x in ipairs(list) do c.draw[#c.draw + 1] = x end end
+  -- Rule of Threes : on part d'un tour où elle agit (epicPeriod : le tour 3)
+  if opts.epic == "rule_of_threes" then c.round = ns.Cards.rule_of_threes.epicPeriod end
   return c
 end
 
@@ -98,16 +100,18 @@ test("sept épiques : une par zone, epic, Power sans coût ni niveau, texte « E
   for _, id in ipairs(Card.pool("mage")) do assert(not ns.Cards[id].epic, "réserve : " .. id) end
 end)
 
-test("épique dans le deck : crochets actifs où qu'elle soit, combat sauvegardable, injouable si piochée", function()
+test("épique dans le deck : en jeu (c.epic), dans aucune pile, combat sauvegardable", function()
   for _, id in ipairs(EPICS) do
-    local c = setup({ "frostbolt" }, { epic = id })
-    eq(#c.passives, 1, id); eq(c.passives[1].id, id)
-    eq(Combat.mageEpic(c), id)
-    assert(Save.isPlain(c), id .. " : sauvegardable")
-    local inst = Card.new(id, false, 990)
-    c.hand[#c.hand + 1] = inst
-    local ok, why = Combat.canPlay(c, #c.hand)
-    assert(not ok and why == "unplayable", id .. " : jamais jouée")
+    for _, up in ipairs({ false, true }) do
+      local c = setup({ "frostbolt" }, { epic = id, up = up })
+      eq(c.epic.id, id); eq(c.epic.up, up)
+      eq(Combat.mageEpic(c), id)
+      eq(c.passives, nil, id .. " : pas un passif du deck")
+      for _, pile in ipairs({ c.hand, c.draw, c.discard, c.exhaust }) do
+        for _, x in ipairs(pile) do assert(x.id ~= id, id .. " : dans une pile") end
+      end
+      assert(Save.isPlain(c), id .. " : sauvegardable")
+    end
   end
 end)
 
@@ -198,42 +202,61 @@ test("Molten Armor : rien sur un ennemi qui n'attaque pas, Stunned, ou mort", fu
   eq(c.enemies[1].st.pain, nil, "n'attaque pas"); eq(c.enemies[2].st.pain, nil, "Stunned")
   local hook = ns.Cards.molten_armor.deckHooks.afterHit
   c.enemies[2].dead = true
-  hook(c, c.passives[1], c.enemies[2], 0, 10)
+  hook(c, c.epic, c.enemies[2], 0, 10)
   eq(c.enemies[2].st.pain, nil, "auteur mort")
 end)
 
 ---------------------------------------------------------------------------
 -- Water Elemental (Wetlands)
 ---------------------------------------------------------------------------
-test("Water Elemental : début du tour, N à l'ennemi le plus à gauche sans dernière cible, Demoralized 1", function()
-  local n = N("water_elemental")
-  assert(n > 0 and N("water_elemental", true) > n)
+-- Fin du tour qui précède le prochain tour où l'épique agit (epicPeriod) : le tour suivant est actif.
+local function toActive(c)
+  local guard = 0
+  while not Combat.epicTurn(c.epic, c.round + 1) do
+    Combat.endTurn(c)
+    guard = guard + 1
+    assert(guard < 10)
+  end
+end
+
+test("Water Elemental : un tour sur epicPeriod (3, 6…), N à la dernière cible (sinon la plus à gauche), Demoralized 1", function()
+  local n, p = N("water_elemental"), ns.Cards.water_elemental.epicPeriod
+  assert(n > 0 and N("water_elemental", true) > n and p == 3)
+  assert(not Combat.epicTurn({ id = "water_elemental", up = false }, 1) and Combat.epicTurn({ id = "water_elemental", up = false }, 3))
   local c = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_dummy", "tm_dummy" } })
-  eq(hpLost(c, 1), n); eq(hpLost(c, 2), 0)
-  eq(c.enemies[1].st.demoralized, 1)
-  c.player.res = 4
+  toActive(c)
+  eq(hpLost(c, 1) + hpLost(c, 2), 0, "rien avant le tour actif")
+  Combat.endTurn(c)
+  eq(hpLost(c, 1), n, "sans dernière cible : la plus à gauche"); eq(c.enemies[1].st.demoralized, 1)
+  toActive(c)
+  c.hand[#c.hand + 1] = Card.new("frostbolt", false, 950)
+  c.player.res, c.player.mana = 4, 3
   play(c, "frostbolt", 2)
+  eq(hpLost(c, 2), 6 + 4)
   Combat.endTurn(c)
-  eq(hpLost(c, 2), 6 + 4, "un tour sur deux : rien au 2e tour")
-  eq(c.enemies[2].st.demoralized, nil)
-  Combat.endTurn(c)
-  eq(hpLost(c, 2), 6 + 4 + n, "3e tour : dernière cible ; Charges sans effet sur l'élémentaire")
+  eq(hpLost(c, 2), 6 + 4 + n, "dernière cible ; Charges sans effet sur l'élémentaire")
   eq(c.enemies[2].st.demoralized, 1)
-  eq(ns.Cards.water_elemental.epicPeriod, 2)
 end)
 
 test("Water Elemental : Demoralized tient le tour ennemi ; cible morte : le plus à gauche ; boss ; amélioré", function()
   local c = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_hitter" } })
+  toActive(c)
   Combat.endTurn(c)
-  eq(c.player.hp, 60 - 7, "coup de 10 sous Demoralized")
+  local hp = c.player.hp
+  Combat.endTurn(c)
+  eq(hp - c.player.hp, 7, "coup de 10 sous Demoralized")
   local d = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_dummy", "tm_dummy", "tm_dummy" } })
   d.player.lastTarget = d.enemies[2].uid
   d.enemies[2].dead = true
   d.enemies[1].dead = true
   eq(Combat.elementalTarget(d), d.enemies[3])
   local b = setup({ "frostbolt" }, { epic = "water_elemental", encounter = { "tm_boss" } })
+  toActive(b)
+  Combat.endTurn(b)
   eq(b.enemies[1].st.demoralized, 1, "Demoralized prend sur un boss"); eq(hpLost(b, 1), N("water_elemental"))
   local u = setup({ "frostbolt" }, { epic = "water_elemental", up = true })
+  toActive(u)
+  Combat.endTurn(u)
   eq(hpLost(u, 1), N("water_elemental", true), "amélioré")
 end)
 
@@ -402,15 +425,19 @@ test("Rule of Threes : la 3e carte du tour se résout deux fois, sans coût ; pa
   eq(hpLost(u, 1), 12 + 12, "amélioré : la 6e aussi")
   local r = setup({ "ice_lance", "ice_lance" }, { epic = "rule_of_threes", filler = { "ice_lance", "ice_lance", "ice_lance",
     "ice_lance", "ice_lance", "ice_lance" } })
+  local function three(c)
+    c.hand = { Card.new("ice_lance", false, 960), Card.new("ice_lance", false, 961), Card.new("ice_lance", false, 962) }
+    local before = hpLost(c, 1)
+    for _ = 1, 3 do play(c, "ice_lance", 1) end
+    return hpLost(c, 1) - before
+  end
   play(r, "ice_lance", 1); play(r, "ice_lance", 1)
   Combat.endTurn(r)
-  local before = hpLost(r, 1)
-  for _ = 1, 3 do play(r, "ice_lance", 1) end
-  eq(hpLost(r, 1) - before, 9, "2e tour : compte remis à 0, et pas de copie (un tour sur deux)")
+  eq(three(r), 9, "tour suivant : compte remis à 0, et pas de copie (un tour sur trois)")
+  toActive(r)
   Combat.endTurn(r)
-  before = hpLost(r, 1)
-  for _ = 1, 3 do play(r, "ice_lance", 1) end
-  eq(hpLost(r, 1) - before, 12, "3e tour : la 3e deux fois")
+  eq(r.round % 3, 0)
+  eq(three(r), 12, "tour actif suivant : la 3e deux fois")
 end)
 
 test("Rule of Threes : Cast en 3e, deux résolutions à son départ", function()

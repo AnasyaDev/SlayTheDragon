@@ -40,18 +40,13 @@ end
 Combat.chargeBonus = perCharge
 
 ---------------------------------------------------------------------------
--- Cartes épiques du Mage (docs/zones/cartes-de-zone.md, « Mage ») : règles actives tout le combat, posées
--- en crochets du deck (deckHooks, src = { id, up, uid } : Card.def(src) donne les nombres de la carte,
--- base ou améliorée). État de combat dans c.cls (données simples) :
+-- Cartes épiques du Mage (docs/zones/cartes-de-zone.md, « Mage ») : règles actives tout le combat (l'épique
+-- du deck est posée dans c.epic, hors de toute pile), crochets deckHooks avec src = c.epic ({ id, up, uid } :
+-- Card.def(src) donne les nombres de la carte, base ou améliorée). État de combat dans c.cls (données simples) :
 --   carry  mana gardé pour le tour suivant (Arcane Meditation), posé en fin de tour ;
 --   fof    uid de la carte Cast partie tout de suite par Fingers of Frost, fofOn pendant sa résolution ;
 --   r3     { [uid] = true } cartes jouées en 3e position (Rule of Threes), r3surge : Surge de l'original.
 ---------------------------------------------------------------------------
-
--- Mot de plaque « Epic » (en tête, comme « Power ») ; déclaré par le socle quand il existe.
-if not L.plateByKey("epic") then
-  L.plate("epic", { word = "Epic", head = true, text = "in play from the start of each combat." })
-end
 
 L.trigger("Every 3rd turn")
 
@@ -59,10 +54,10 @@ local Rng = ns.Rng
 local Cards = ns.Cards
 local function num(src, k) return Card.def(src)[k] or 0 end
 
--- Tour où une épique à période (epicPeriod = 3 : « Every 3rd turn ») agit : le 1er, puis un tour sur N.
+-- Tour où une épique à période (epicPeriod = 3 : « Every 3rd turn ») agit : un tour sur N (3 : les tours 3, 6, 9…).
 function Combat.epicTurn(src, round)
   local p = Card.def(src).epicPeriod
-  return not p or (round - 1) % p == 0
+  return not p or round % p == 0
 end
 
 local function firstDamage(d)
@@ -235,14 +230,12 @@ Cards.rule_of_threes.deckHooks = {
 -- Bots : valeur d'un point de mana gardé (Arcane Meditation), en PV ennemis (une carte à 1 mana ≈ 6).
 Combat.MAGE_CARRY_VALUE = 5
 
--- Épique du Mage présente dans ce combat (id) ou nil (vue de classe, bots).
+-- Épique du Mage en jeu dans ce combat (c.epic : id, puis la source { id, up, uid }) ou nil (vue, bots).
 function Combat.mageEpic(c)
-  local ps = c.passives
-  if not ps then return nil end
-  for i = 1, #ps do
-    local d = Card.def(ps[i])
-    if d.epic and d.class == "mage" then return ps[i].id, ps[i] end
-  end
+  local e = c.epic
+  if not e then return nil end
+  local d = Card.def(e)
+  if d.epic and d.class == "mage" then return e.id, e end
   return nil
 end
 
@@ -267,7 +260,7 @@ ns.ClassRules.mage = {
     local k = more .. ":" .. (p.st.instant or 0) .. ":" .. (c.turn.bySchool.fire or 0) .. ":"
       .. (c.relicState.apprentice_wand and 1 or 0) .. ":" .. (p.st.ice_block or 0)
     -- épiques : rang de la prochaine carte (Rule of Threes), mana gardé (Arcane Meditation)
-    if c.passives then
+    if c.epic then
       local id = Combat.mageEpic(c)
       if id == "rule_of_threes" then k = k .. ":r" .. c.turn.played
       elseif id == "water_elemental" then k = k .. ":t" .. tostring(p.lastTarget) end
@@ -306,7 +299,7 @@ ns.ClassRules.mage = {
     end
     v = v + (p.st.instant or 0) * 30
     -- épiques : coup en plus des incantations tenues (Mirror Image), mana gardé (Arcane Meditation)
-    if c.passives then
+    if c.epic then
       local id, src = Combat.mageEpic(c)
       if id == "mirror_image" then
         local function mirror(entry)

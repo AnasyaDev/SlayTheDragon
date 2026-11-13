@@ -1549,6 +1549,8 @@ function W.hpBar(parent, w, h, textSize, piece)
   f:EnableMouse(true)
   W.tooltip(f, function(tt, self)
     if self.hp then tt:AddLine("Health: " .. self.hp .. " / " .. self.maxHp, 1, 0.5, 0.45) end
+    -- lignes en plus posées par l'écran (crans de vie d'un ennemi : phases, seuils de zone)
+    if self.extraTip then self.extraTip(tt, self) end
   end, "ANCHOR_TOP")
   f.ghost:Hide()
   return f
@@ -1743,6 +1745,9 @@ function W.cardKeywords(d)
       for cl in (text .. "\n"):gmatch("(.-)\n") do
         if cl:find(kw.pattern) then add(key) end
       end
+    elseif kw.zone and W.hasPhrase(text, kw.name) then
+      -- mot-clé de zone (L.zoneKeyword) cité par la carte : Curse, Hex, Douse…
+      add(key)
     end
   end
   local ids = {}
@@ -1834,6 +1839,9 @@ function W.fillCardTooltip(tt, id, up, extra)
   -- carte en main : Cast qui partira tout de suite (Instant), choix de la carte gardée en fin de tour
   if extra and extra.instant then wrap(tt, W.INSTANT_HINT, 0.85, 0.85, 0.85) end
   if extra and extra.keepPick then wrap(tt, W.KEEP_HINT, 1, 0.82, 0) end
+  -- carte de zone : carte d'origine d'une carte transformée, marque posée par une zone (Hex visé)
+  if extra and extra.zoneTag then wrap(tt, extra.zoneTag, 0.75, 0.6, 1) end
+  if extra and extra.markTip then wrap(tt, extra.markTip, 0.55, 1, 0.55) end
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
@@ -1990,7 +1998,8 @@ end
 -- Jetons d'état : icônes d'aura (cadre de case du jeu, rouge pour un affaiblissement), nombre en bas à droite
 ---------------------------------------------------------------------------
 
--- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, rim = teinte, info = {...} } }.
+-- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, rim = teinte, info = {...},
+-- glow = couleur d'une aura tenue derrière le jeton (épique en jeu) } }.
 -- t.medal = { icon, ring (cadre), SetRing(teinte) } (régions du visuel du jeton : tout suit son animation).
 function W.tokenRow(parent, maxN, width, size)
   size = size or 30
@@ -2005,6 +2014,11 @@ function W.tokenRow(parent, maxN, width, size)
     local icon = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 0))
     local ring = W.wow(face, "slot_frame", "ARTWORK", 1)
     W.slotFit(face, size, icon, ring) -- icône = ouverture du cadre (liseré fin, comme les cases)
+    -- aura tenue (champ glow : épique en jeu), créée éteinte
+    t.aura = W.skin(face, "glow_round", "BACKGROUND", 0)
+    t.aura:SetSize(size * 1.7, size * 1.7)
+    t.aura:SetPoint("CENTER", face, "CENTER", 0, 0)
+    t.aura:Hide()
     t.medal = { icon = icon, ring = ring,
       SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end }
     t.count = W.label(face, "heavy", floor(size * 0.45), C.text, "OVERLAY")
@@ -2040,6 +2054,13 @@ function W.tokenRow(parent, maxN, width, size)
         t.info = it.info
         W.setIcon(t.medal.icon, it.icon, it.key)
         t.medal:SetRing(it.rim)
+        if it.glow then
+          t.aura:SetVertexColor(it.glow[1], it.glow[2], it.glow[3], 1)
+          t.aura:SetAlpha(it.glow[4] or 0.9)
+          t.aura:Show()
+        else
+          t.aura:Hide()
+        end
         t.count:SetText((it.n and it.n ~= 0 and it.n ~= true) and tostring(it.n) or "")
         local line, col = floor((i - 1) / perLine), (i - 1) % perLine
         local inLine = min(perLine, n - line * perLine)
@@ -2224,7 +2245,9 @@ W.SPEND_OFF_COLOR = C.textDim
 function W.cardBody(d, base, spendOff)
   local text = d.text or ""
   for _, k in ipairs(keywordStrip()) do
-    if ns.Language.plateWord(k.plate, d) then text = text:gsub(k.pat, "") end
+    if ns.Language.plateWord(k.plate, d) or (k.plate.key == "power" and d.rarity == "epic") then
+      text = text:gsub(k.pat, "")
+    end
   end
   -- (ligne d'état : le verbe et le nom de l'état peuvent se couper, coupure de second choix de la
   -- mise en page, W.clauseGroups ; plus d'insécable entre eux)
@@ -3330,6 +3353,11 @@ function W.card(parent)
   place(b.ribbon, org, P.card_ribbon)
   b.gem = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 3))
   b.gem:Hide()
+  -- marque d'une zone (opts.markIcon : carte que vise un Hex), coin haut droit du corps, cachée
+  b.markIcon = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 6)) -- sous les textes (OVERLAY)
+  b.markIcon:SetSize(0.2 * CW, 0.2 * CW)
+  b.markIcon:SetPoint("CENTER", b.bg, "TOPRIGHT", -0.06 * CW, -0.06 * CW)
+  b.markIcon:Hide()
 
   -- textes
   b.name = W.label(face, "bold", 10, C.text, "OVERLAY")
@@ -3339,6 +3367,11 @@ function W.card(parent)
   b.name:SetWidth(SC.name.len * CW)
   b.cost = W.label(face, "heavy", 14, C.costText, "OVERLAY")
   b.cost:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
+  -- carte épique : pas de coût (règle en jeu dès le début du combat) ; la languette violette porte « Epic »
+  b.epicMark = W.label(face, "bold", 10, W.EPIC_MARK_COLOR, "OVERLAY")
+  b.epicMark:SetPoint("CENTER", org, "TOPLEFT", SC.cost.cx * CW, -SC.cost.cy * CW)
+  b.epicMark:SetText("Epic")
+  b.epicMark:Hide()
   -- centré dans la zone utile du panneau, lignes posées par fitBody dans une boîte posée (W.looseBox) ;
   -- hauteur libre seulement au secours (un texte trop long déborde au lieu d'être tronqué en « … »).
   -- Blocs des clauses (écart entre clauses) : b.body puis W.BODY_PARTS - 1 autres, créés ici (jamais
@@ -3403,7 +3436,9 @@ function W.card(parent)
       table.insert(pills, at, W.colorize("Instant", W.INSTANT_COLOR))
     end
     -- liseré tenu : Instant (bleu) ou choix de la carte gardée en fin de tour (or)
-    local rim = opts.keepPick and W.KEEP_RIM_COLOR or (opts.instant and not dim and W.INSTANT_RIM_COLOR) or nil
+    -- liseré d'une zone (opts.markRim : carte que vise un Hex), après les deux autres
+    local rim = opts.keepPick and W.KEEP_RIM_COLOR or (opts.instant and not dim and W.INSTANT_RIM_COLOR)
+      or opts.markRim or nil
     if rim then
       self.rim:SetVertexColor(rim[1], rim[2], rim[3], 1)
       self.rim:SetAlpha(rim[4] or 1)
@@ -3411,7 +3446,26 @@ function W.card(parent)
     else
       self.rim:Hide()
     end
-    self.rimKind = rim and (opts.keepPick and "keep" or "instant") or nil
+    self.rimKind = rim and (opts.keepPick and "keep" or ((opts.instant and not dim) and "instant") or "mark") or nil
+    if opts.markIcon then
+      W.setIcon(self.markIcon, opts.markIcon, "mark:" .. tostring(opts.markKey or id))
+      self.markIcon:Show()
+    else
+      self.markIcon:Hide()
+    end
+    -- plaque au-dessus de la carte (opts.zoneTag : nom de la carte d'origine d'une carte transformée)
+    if opts.zoneTag then
+      local zp = cardPlaque(self, "zoneTagPlate", 0.9 * CW, 18)
+      zp:ClearAllPoints()
+      zp:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, 4)
+      zp:SetIcon(nil)
+      zp.text:SetText(opts.zoneTag)
+      zp.text:SetTextColor(0.85, 0.75, 1)
+      zp.plaque:SetRim(Art.rim.violet)
+      zp:Show()
+    elseif self.zoneTagPlate then
+      self.zoneTagPlate:Hide()
+    end
     if #pills > 0 then
       fitPlate(self, pills)
       self.plate:Show()
@@ -3437,10 +3491,18 @@ function W.card(parent)
     else
       self.gem:Hide()
     end
-    -- coût
+    -- coût ; épique : sans coût, languette violette marquée « Epic »
     local cost = opts.cost or d.cost
     self.cost:SetText(tostring(cost))
-    if d.cost == nil or d.unplayable then self.cost:Hide() self.costTab:Hide() else self.cost:Show() self.costTab:Show() end
+    if epic then
+      self.cost:Hide()
+      self.costTab:Show()
+      self.epicMark:Show()
+    elseif d.cost == nil or d.unplayable then
+      self.cost:Hide() self.costTab:Hide() self.epicMark:Hide()
+    else
+      self.cost:Show() self.costTab:Show() self.epicMark:Hide()
+    end
     -- injouable : grisée, raison dans une plaque rouge au bas de la carte
     local k = dim and 0.62 or 1
     for _, t in ipairs({ self.bg, self.ribbon, self.costTab, self.panel, self.ring, self.plate, self.gem, self.glass }) do
@@ -3563,7 +3625,8 @@ W.CARD_RIM_K = 0.85
 W.EPIC_COLOR = { 0.64, 0.21, 0.93 }
 W.EPIC_TEXT = { 0.78, 0.5, 1 } -- titres et libellés (plus clair, lisible sur la roche)
 W.EPIC_GLOW_ALPHA = 0.75
-W.EPIC_HINT = "|cffa335eeEpic|r: one per expedition, a new one replaces it."
+W.EPIC_HINT = "One epic card per expedition: a new one replaces it."
+W.EPIC_MARK_COLOR = { 0.95, 0.88, 1 } -- « Epic » sur la languette violette (à la place du coût)
 W.INSTANT_COLOR = { 0.45, 0.85, 1 }
 W.INSTANT_RIM_COLOR = { 0.35, 0.8, 1, 1 }
 W.KEEP_RIM_COLOR = { 1, 0.9, 0.55, 0.9 }

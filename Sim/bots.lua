@@ -14,6 +14,30 @@ return function(ns)
   local Combat, Card, Rng = ns.Combat, ns.Card, ns.Rng
   local Bots = {}
 
+  -- Conseils des zones (Sim/zones/<zone>.lua, chargés par Sim/load.lua) : ns.ZoneBots[id] = {
+  --   value = f(c, W) -> nombre (ajouté à l'évaluation : Curse en main, dormeur, Wildfire…),
+  --   key = f(c) -> chaîne (état de zone qui distingue deux positions),
+  --   skip = f(c, a) -> vrai pour ne pas essayer le coup a = { indexMain, indexCible|nil, sansDépense }
+  --          (cible à éviter, carte nuisible ; le bot peut encore finir son tour sans) }.
+  -- Actifs pour un combat : sa zone (c.zone) et les zones dont les règles y sont actives (c.zr).
+  ns.ZoneBots = ns.ZoneBots or {}
+  local function zoneBots(c)
+    local list
+    local zr = c.zr
+    if c.zone and ns.ZoneBots[c.zone] then list = { ns.ZoneBots[c.zone] } end
+    if zr then
+      for i = 1, #zr do
+        local zb = ns.ZoneBots[zr[i]]
+        if zb and zr[i] ~= c.zone then
+          list = list or {}
+          list[#list + 1] = zb
+        end
+      end
+    end
+    return list
+  end
+  Bots.zoneBots = zoneBots
+
   -- Évaluation d'un état après le tour ennemi. Poids grossiers, à régler.
   local W = { hp = 10, enemyHp = 4, enemyAlive = 30, res = 1.5, atonement = 4,
     regen = 0.5, power = 25, castRisk = 0.95, force = 25 }
@@ -250,6 +274,11 @@ return function(ns)
     -- valeur propre à la classe (état de classe, familier, formes…) : ns.ClassRules[classe].botValue
     local cr = ns.ClassRules[c.class]
     if cr and cr.botValue then s = s + cr.botValue(c, W) end
+    -- valeur propre aux zones (ns.ZoneBots[zone].value)
+    local zb = zoneBots(c)
+    if zb then
+      for i = 1, #zb do if zb[i].value then s = s + zb[i].value(c, W) end end
+    end
     return s
   end
   Bots.evaluate = evaluate
@@ -286,6 +315,10 @@ return function(ns)
     -- état propre à la classe qui distingue deux positions (ns.ClassRules[classe].botKey)
     local cr = ns.ClassRules[c.class]
     if cr and cr.botKey then parts[#parts + 1] = cr.botKey(c) end
+    local zb = zoneBots(c)
+    if zb then
+      for i = 1, #zb do if zb[i].key then parts[#parts + 1] = zb[i].key(c) end end
+    end
     return table.concat(parts, "|")
   end
 
@@ -344,10 +377,16 @@ return function(ns)
       if s.result or nodes >= cap then return end
       local acts = Combat.legalPlays(s)
       local tried = {}
+      local zb = zoneBots(s)
       for i = 1, #acts do
         local a = acts[i]
         local inst = s.hand[a[1]]
         local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
+        if zb then
+          for j = 1, #zb do
+            if zb[j].skip and zb[j].skip(s, a) then tried[key] = true end
+          end
+        end
         if not tried[key] then
           tried[key] = true
           local t = Combat.clone(s)
