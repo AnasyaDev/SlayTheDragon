@@ -7,7 +7,8 @@ local ns = dofile(root .. "/Sim/load.lua")(root)
 local Combat, Card, Save, R = ns.Combat, ns.Card, ns.Save, ns.Rogue
 local Cards = ns.Cards
 local E = R.EPIC -- nombres (base, amélioré) des épiques : Data/Rogue.lua
-local D1, D2 = E.deflection[1], E.deflection[2]
+local RD = R.riposteDamage -- k-ième riposte du tour (Deflection)
+local function S(n, up) local t = 0 for k = 1, n do t = t + RD(k, up) end return t end
 
 local passed, failed = 0, 0
 local function test(name, f)
@@ -81,14 +82,19 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
   end
   for k, up in ipairs({ false, true }) do
     local t = function(id) return Card.defById(id, up).text end
-    assert(t("deflection"):find("deal " .. E.deflection[k] .. ", %+" .. E.deflection[k] .. " per earlier"))
+    assert(t("deflection"):find("deal " .. E.deflection[k] .. ", %+" .. E.deflectionStep[k] .. " per earlier"))
     assert(t("echoing_reprimand"):find("counts as " .. E.echoing_reprimand[k] .. "%."))
     local kl = E.kidney_shot[k]
     assert(t("kidney_shot"):find("Surge of " .. kl .. (kl < 5 and "%+" or "") .. " Combo: apply Stunned 1"))
-    assert(t("subterfuge"):find("Gaining Stealth: %+" .. E.subterfuge[k] .. " Combo%."))
+    if E.subterfuge[k] > 0 then assert(t("subterfuge"):find("Gaining Stealth: %+" .. E.subterfuge[k] .. " Combo%."))
+    else assert(not t("subterfuge"):find("Gaining Stealth", 1, true)) end
+    assert((t("subterfuge"):find("Surge of 1+ Combo: gain Stealth", 1, true) ~= nil) == (E.subterfugeSurge[k] == true))
     assert(t("danse_macabre"):find("%+" .. E.danse_macabre[k] .. " per other card name"))
+    if E.danseFree[k] > 1 then assert(t("danse_macabre"):find("after the first " .. E.danseFree[k], 1, true)) end
+    assert((t("danse_macabre"):find("up to", 1, true) ~= nil) == (E.danseCap[k] > 0))
     local f = E.doomblade[k]
     local what = f == 0.5 and "half their damage" or f == 1 and "their damage as"
+      or f < 1 and (math.floor(f * 100 + 0.5) .. "%% of their damage")
       or ("their damage %+" .. math.floor((f - 1) * 100 + 0.5) .. "%%")
     assert(t("doomblade"):find(what), t("doomblade"))
   end
@@ -118,32 +124,32 @@ test("crochets de l'épique : src = c.epic (amélioration lue sur c.epic.up), ap
   local c = setup("deflection", { "feint" })
   local h = hp(c)
   play(c, "feint")
-  eq(hp(c), h - D1)
+  eq(hp(c), h - RD(1))
   local u = setup("deflection", { "feint" }, { up = true })
   eq(u.epic.up, true)
   play(u, "feint")
-  eq(hp(u), 200 - D2)
+  eq(hp(u), 200 - RD(1, true))
 end)
 
 ---------------------------------------------------------------------------
 -- Deflection
 ---------------------------------------------------------------------------
-test("Deflection : trois Feint = k + 2k + 3k à la dernière cible, Parry gardé", function()
+test("Deflection : trois Feint = N, N+S, N+2S à la dernière cible, Parry gardé", function()
   local c = setup("deflection", { "sinister_strike", "feint", "feint", "feint" }, { encounter = { "ter_dummy", "ter_dummy" } })
   play(c, "sinister_strike", 2)
   local h, h1 = hp(c, 2), hp(c, 1)
   play(c, "feint"); play(c, "feint"); play(c, "feint")
-  eq(hp(c, 2), h - 6 * D1, "la dernière cible")
+  eq(hp(c, 2), h - S(3), "la dernière cible")
   eq(hp(c, 1), h1, "l'autre ennemi rien")
   eq(c.player.st.parry, 3, "la défense reste")
-  eq(R.ripostes(c), 3); eq(R.nextRiposte(c), 4 * D1)
+  eq(R.ripostes(c), 3); eq(R.nextRiposte(c), RD(4))
 end)
 
-test("Deflection : Evasion (Parry 2) puis deux Feint = 3 + 6 + 9 + 12 ; au-dessus de Parry 3 la riposte a lieu", function()
+test("Deflection : Evasion (Parry 2) puis deux Feint = quatre ripostes croissantes ; au-dessus de Parry 3 la riposte a lieu", function()
   local c = setup("deflection", { "evasion", "feint", "feint" })
   local h = hp(c)
   play(c, "evasion"); play(c, "feint"); play(c, "feint")
-  eq(hp(c), h - 10 * D1)
+  eq(hp(c), h - S(4))
   eq(c.player.st.parry, 3, "plafond 3, charge perdue")
 end)
 
@@ -154,21 +160,21 @@ test("Deflection : compteur remis à 0 au début du tour du Voleur, continu pend
   Combat.endPlayerTurn(c)
   local h = hp(c)
   Combat.applyStatus(c, c.player, "parry", 1) -- Cheat Death, effet pendant le tour ennemi
-  eq(hp(c), h - 3 * D1, "troisième riposte du tour")
+  eq(hp(c), h - RD(3), "troisième riposte du tour")
   Combat.enemyPhase(c); Combat.endRound(c); Combat.startPlayerTurn(c)
   eq(R.ripostes(c), 0)
   h = hp(c)
   c.player.mana = 9
   play(c, "feint")
-  eq(hp(c), h - D1, "nouveau tour : k")
+  eq(hp(c), h - RD(1), "nouveau tour : k")
 end)
 
 test("Deflection : Blinding Powder riposte au début du combat et compte pour le tour 1", function()
   local c = setup("deflection", { "feint" }, { relics = { "blinding_powder" } })
-  eq(hp(c), 200 - D1)
+  eq(hp(c), 200 - RD(1))
   eq(R.ripostes(c), 1)
   play(c, "feint")
-  eq(hp(c), 200 - 3 * D1)
+  eq(hp(c), 200 - S(2))
 end)
 
 test("Deflection : dernière cible morte = l'ennemi vivant le plus à gauche ; Sundered s'applique ; amélioré", function()
@@ -179,21 +185,21 @@ test("Deflection : dernière cible morte = l'ennemi vivant le plus à gauche ; S
   assert(c.enemies[2].dead)
   local h = hp(c, 1)
   play(c, "feint")
-  eq(hp(c, 1), h - D1, "repli sur l'ennemi de gauche")
+  eq(hp(c, 1), h - RD(1), "repli sur l'ennemi de gauche")
   Combat.applyStatus(c, c.enemies[1], "armor_broken", 2)
   h = hp(c, 1)
   play(c, "feint")
-  eq(hp(c, 1), h - math.floor(2 * D1 * 1.25), "2k × 1,25 arrondi à l'inférieur")
+  eq(hp(c, 1), h - math.floor(RD(2) * 1.25), "2k × 1,25 arrondi à l'inférieur")
   local u = setup("deflection", { "feint", "feint" }, { up = true })
   play(u, "feint"); play(u, "feint")
-  eq(hp(u), 200 - 3 * D2)
+  eq(hp(u), 200 - S(2, true))
 end)
 
 test("Deflection : Ravenholdt Signet (Parry après un Surge) riposte aussi", function()
   local c = setup("deflection", { "eviscerate" }, { relics = { "ravenholdt_signet" } })
   c.player.res = 2
   play(c, "eviscerate", 1)
-  eq(hp(c), 200 - 12 - D1)
+  eq(hp(c), 200 - 12 - RD(1))
 end)
 
 ---------------------------------------------------------------------------
@@ -251,9 +257,10 @@ end)
 ---------------------------------------------------------------------------
 -- Atrophic Poison
 ---------------------------------------------------------------------------
-test("Atrophic Poison : un ennemi qui garde du DoT frappe à -25 % ; DoT 1 tombe avant son coup", function()
+test("Atrophic Poison : un ennemi qui porte assez de DoT frappe à -25 % ; DoT 1 tombe avant son coup", function()
   local c = setup("atrophic_poison", { "garrote" }, { encounter = { "ter_hitter" } })
-  play(c, "garrote", 1) -- DoT 3
+  Combat.applyStatus(c, c.enemies[1], "pain", E.atrophic_poison[1] - 3)
+  play(c, "garrote", 1) -- DoT 3 de plus : le seuil
   eq(Combat.intentInfo(c, c.enemies[1]).damage, 7, "intention : 10 → 7")
   local h = c.player.hp
   Combat.endTurn(c)
@@ -266,12 +273,34 @@ test("Atrophic Poison : un ennemi qui garde du DoT frappe à -25 % ; DoT 1 tombe
   eq(d.player.hp, h - 10, "le DoT 1 tique avant le coup")
 end)
 
+test("Atrophic Poison : seuil de DoT (montré avant le tic) ; un de moins ne compte pas, ni pour l'intention ni pour le coup", function()
+  local T = E.atrophic_poison[1]
+  local c = setup("atrophic_poison", { "feint" }, { encounter = { "ter_hitter" } })
+  Combat.applyStatus(c, c.enemies[1], "pain", T)
+  eq(Combat.intentInfo(c, c.enemies[1]).damage, T > 1 and 7 or 10, "au seuil")
+  local h = c.player.hp
+  Combat.endTurn(c)
+  eq(c.player.hp, h - 7, "au seuil : le coup suit l'intention")
+  if T > 2 then
+    local d = setup("atrophic_poison", { "feint" }, { encounter = { "ter_hitter" } })
+    Combat.applyStatus(d, d.enemies[1], "pain", T - 1)
+    eq(Combat.intentInfo(d, d.enemies[1]).damage, 10, "sous le seuil")
+    h = d.player.hp
+    Combat.endTurn(d)
+    eq(d.player.hp, h - 10, "sous le seuil : coup plein")
+  end
+  local u = setup("atrophic_poison", { "sinister_strike" }, { up = true })
+  Combat.applyStatus(u, u.enemies[1], "pain", E.atrophic_poison[2] - 1)
+  play(u, "sinister_strike", 1)
+  eq(hp(u), 200 - 5, "amélioré sous le seuil : pas de Sundered")
+end)
+
 test("Atrophic Poison : ne se cumule pas avec un vrai Demoralized ; amélioré : Sundered sans cumul", function()
   local c = setup("atrophic_poison", { "crippling_poison" }, { encounter = { "ter_hitter" } })
   play(c, "crippling_poison", 1)
   eq(Combat.intentInfo(c, c.enemies[1]).damage, 7, "un seul -25 %")
   local u = setup("atrophic_poison", { "sinister_strike", "sinister_strike" }, { up = true })
-  Combat.applyStatus(u, u.enemies[1], "pain", 4)
+  Combat.applyStatus(u, u.enemies[1], "pain", E.atrophic_poison[2])
   play(u, "sinister_strike", 1)
   eq(hp(u), 200 - 6, "5 × 1,25")
   Combat.applyStatus(u, u.enemies[1], "armor_broken", 2)
@@ -279,7 +308,7 @@ test("Atrophic Poison : ne se cumule pas avec un vrai Demoralized ; amélioré :
   play(u, "sinister_strike", 1)
   eq(hp(u), h - 6, "vrai Sundered : pas de cumul")
   local b = setup("atrophic_poison", { "sinister_strike" })
-  Combat.applyStatus(b, b.enemies[1], "pain", 4)
+  Combat.applyStatus(b, b.enemies[1], "pain", E.atrophic_poison[1])
   play(b, "sinister_strike", 1)
   eq(hp(b), 200 - 5, "non amélioré : pas de Sundered")
 end)
@@ -289,7 +318,8 @@ end)
 ---------------------------------------------------------------------------
 test("Echoing Reprimand : un Surge de 2 ou 3 compte N, la dépense ne change pas ; 1, 4 et 5 comptent leur valeur", function()
   local m = E.echoing_reprimand[1]
-  local want = { [1] = 8, [2] = 4 + 4 * m, [3] = 4 + 4 * m, [4] = 20, [5] = 24 }
+  local top = E.echoingMax[1]
+  local want = { [1] = 8, [2] = 4 + 4 * m, [3] = top >= 3 and 4 + 4 * m or 16, [4] = 20, [5] = 24 }
   for n = 1, 5 do
     local c = setup("echoing_reprimand", { "eviscerate" })
     c.player.res = n
@@ -302,9 +332,9 @@ test("Echoing Reprimand : un Surge de 2 ou 3 compte N, la dépense ne change pas
   play(u, "eviscerate", 1)
   local m2 = E.echoing_reprimand[2]
   eq(hp(u), 200 - (4 + 4 * m2), "amélioré")
-  u.player.res = 3
+  u.player.res = E.echoingMax[2]
   play(u, "rupture", 1)
-  eq(u.enemies[1].st.pain, 3 * m2)
+  eq(u.enemies[1].st.pain, 3 * m2, "amélioré, haut de la plage")
 end)
 
 ---------------------------------------------------------------------------
@@ -357,6 +387,34 @@ test("Subterfuge : un Stealth posé repart pour T tours ; chaque Stealth gagné 
   eq(R.stealthLeft(u), E.subterfugeTurns[2])
 end)
 
+test("Subterfuge : chaque Surge rend Stealth (source incluse) ; la carte du Surge n'en profite pas, les suivantes oui", function()
+  local T = E.subterfugeTurns[1]
+  local c = setup("subterfuge", { "feint" }, { extra = { "feint", "feint", "feint", "feint", "feint",
+    "feint", "feint", "feint", "feint", "feint" } })
+  untilStealthFalls(c)
+  c.player.mana = 9
+  c.player.res = 2
+  c.hand[#c.hand + 1] = Card.new("eviscerate", false, 993)
+  c.hand[#c.hand + 1] = Card.new("backstab", false, 994)
+  local h = hp(c)
+  play(c, "eviscerate", 1)
+  eq(h - hp(c), 12, "Eviscerate sans bonus")
+  eq(c.player.st.stealth, 1, "Stealth rendu par le Surge")
+  eq(c.player.res, E.subterfuge[1], "gain réel : Combo de l'épique")
+  eq(R.stealthLeft(c), T)
+  h = hp(c)
+  play(c, "backstab", 1)
+  eq(h - hp(c), 10, "Backstab sous Stealth")
+  local z = setup("subterfuge", { "feint" }, { extra = { "feint", "feint", "feint", "feint", "feint",
+    "feint", "feint", "feint", "feint", "feint" } })
+  untilStealthFalls(z)
+  z.player.mana = 9
+  z.player.res = 0
+  z.hand[#z.hand + 1] = Card.new("envenom", false, 992)
+  play(z, "envenom", 1)
+  eq(z.player.st.stealth, nil, "Surge à 0 Combo : rien")
+end)
+
 ---------------------------------------------------------------------------
 -- Kidney Shot
 ---------------------------------------------------------------------------
@@ -399,33 +457,49 @@ end)
 ---------------------------------------------------------------------------
 -- Danse Macabre
 ---------------------------------------------------------------------------
-test("Danse Macabre : +N par autre nom joué ce tour, doublons comptés une fois, son propre nom exclu", function()
-  local k = E.danse_macabre[1]
-  local c = setup("danse_macabre", { "kick", "sprint", "sinister_strike", "sinister_strike" })
+-- bonus d'un coup quand n autres noms ont été joués ce tour
+local function DB(n, up)
+  local k = up and 2 or 1
+  local b = E.danse_macabre[k] * math.max(0, n - E.danseFree[k])
+  local cap = E.danseCap[k]
+  return (cap > 0 and b > cap) and cap or b
+end
+
+test("Danse Macabre : +N par autre nom joué ce tour au-delà des F premiers, doublons comptés une fois, son nom exclu", function()
+  local F = E.danseFree[1]
+  assert(F == 2, "test écrit pour F = 2")
+  local c = setup("danse_macabre", { "kick", "sprint", "pistol_shot", "sinister_strike", "sinister_strike" })
   play(c, "kick", 1); play(c, "sprint")
   local h = hp(c)
-  play(c, "sinister_strike", 1)
-  eq(hp(c), h - (5 + 2 * k), "5 + 2 noms")
+  play(c, "pistol_shot", 1)
+  eq(hp(c), h - (3 + DB(2)), "deux autres noms : rien encore")
+  eq(DB(2), 0)
   h = hp(c)
   play(c, "sinister_strike", 1)
-  eq(hp(c), h - (5 + 2 * k), "le doublon ne compte pas, son nom exclu")
-  eq(R.namesPlayed(c), 3)
+  eq(hp(c), h - (5 + DB(3)), "trois autres noms : N")
+  assert(DB(3) > 0)
+  h = hp(c)
+  play(c, "sinister_strike", 1)
+  eq(hp(c), h - (5 + DB(3)), "le doublon ne compte pas, son nom exclu")
+  eq(R.namesPlayed(c), 4)
+  eq(R.danseBonus(c, false), DB(4), "bonus d'un nom nouveau (ligne de l'épique)")
   Combat.endTurn(c)
   eq(R.namesPlayed(c), 0, "nouveau tour")
+  eq(R.danseBonus(c, false), 0)
 end)
 
 test("Danse Macabre : chaque coup (Killing Spree), avant Sundered ; amélioré", function()
-  local k, k2 = E.danse_macabre[1], E.danse_macabre[2]
-  local c = setup("danse_macabre", { "kick", "pistol_shot", "killing_spree" })
-  play(c, "kick", 1); play(c, "pistol_shot", 1)
+  local c = setup("danse_macabre", { "kick", "pistol_shot", "sprint", "killing_spree" })
+  play(c, "kick", 1); play(c, "pistol_shot", 1); play(c, "sprint")
   local h = hp(c)
   play(c, "killing_spree")
-  eq(h - hp(c), 6 * (4 + 2 * k), "six coups de 4 + 2 noms")
-  local s = setup("danse_macabre", { "kick", "sinister_strike" }, { up = true })
+  eq(h - hp(c), 6 * (4 + DB(3)), "six coups de 4 + bonus de trois noms")
+  local s = setup("danse_macabre", { "kick", "sprint", "pistol_shot", "sinister_strike" }, { up = true })
   Combat.applyStatus(s, s.enemies[1], "armor_broken", 2)
-  play(s, "kick", 1)
+  play(s, "kick", 1); play(s, "sprint"); play(s, "pistol_shot", 1)
+  local h2 = hp(s)
   play(s, "sinister_strike", 1)
-  eq(hp(s), 200 - math.floor((5 + k2) * 1.25), "(5 + N) × 1,25")
+  eq(h2 - hp(s), math.floor((5 + DB(3, true)) * 1.25), "(5 + bonus) × 1,25")
 end)
 
 ---------------------------------------------------------------------------

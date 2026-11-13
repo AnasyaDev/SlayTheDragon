@@ -108,10 +108,10 @@ function Art.rogueEpicLine(c)
   if id == "deflection" then
     return ("Ripostes this turn: |cffffffff%d|r   next: |cffffffff%d|r"):format(R.ripostes(c), R.nextRiposte(c))
   elseif id == "danse_macabre" then
-    local n = R.namesPlayed(c)
-    return ("Card names this turn: |cffffffff%d|r   +%d per hit"):format(n, math.min(n * E.danse_macabre[k], E.danseCap[k]))
+    -- bonus d'une Attack d'un nom pas encore joué ce tour
+    return ("Card names this turn: |cffffffff%d|r   +%d per hit"):format(R.namesPlayed(c), R.danseBonus(c, up))
   elseif id == "echoing_reprimand" then
-    if res == 2 or res == 3 then return ("Surge now counts as |cffffffff%d|r Combo"):format(E.echoing_reprimand[k]) end
+    if res >= 2 and res <= E.echoingMax[k] then return ("Surge now counts as |cffffffff%d|r Combo"):format(E.echoing_reprimand[k]) end
   elseif id == "kidney_shot" then
     if res >= E.kidney_shot[k] then return "Surge now stuns the target" end
   elseif id == "subterfuge" then

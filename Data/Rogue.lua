@@ -367,17 +367,22 @@ card("shadow_dance", {
 -- contrat des données de Sim/tests.lua, jamais payé ni affiché). Leurs crochets (deckHooks, src = c.epic)
 -- sont posés par Core/Classes/rogue.lua ; « Epic. » = mot de plaque en tête.
 -- Nombres des épiques (base, amélioré), seule source : les textes ci-dessous et les règles
--- (Core/Classes/rogue.lua, ns.Rogue.EPIC) les lisent. Fiche entre parenthèses ; réglés le 14/11/2026
--- (simulation epic=<id>, docs/classes.md).
+-- (Core/Classes/rogue.lua, ns.Rogue.EPIC) les lisent. Fiche entre parenthèses ; réglés le 14/11/2026 sur
+-- les zones dures (Duskwood, Stranglethorn, Steppes ; simulation epic=<id>, docs/classes.md).
 local EPIC_N = {
-  deflection = { 2, 3 },          -- k-ième riposte du tour : k × N (fiche : 3 / 4)
-  doomblade = { 1, 1.5 },         -- part des dégâts d'un coup de grâce posée en DoT, arrondie au-dessus (fiche : ½ / 1)
-  echoing_reprimand = { 4, 5 },   -- un Surge de 2 ou 3 Combo compte N (fiche : 5 / 6)
-  subterfuge = { 2, 3 },          -- Combo par Stealth gagné (fiche : 0 / 1)
-  subterfugeTurns = { 2, 2 },     -- tours que dure un Stealth (le tour où il est gagné compris ; fiche : 1)
-  kidney_shot = { 4, 3 },         -- Combo dépensés au moins (fiche : 5 / 4)
-  danse_macabre = { 1, 1 },       -- dégâts par autre nom de carte joué dans le tour (fiche : 2 / 3)
-  danseCap = { 3, 5 },            -- bonus par coup au plus (fiche : aucun ; repli de la fiche : +10)
+  deflection = { 1, 2 },          -- première riposte du tour (fiche : 3 / 4)
+  deflectionStep = { 2, 2 },      -- de plus par riposte précédente du tour : k-ième = N + S × (k − 1) (fiche : 3 / 4)
+  doomblade = { 0.9, 1 },         -- part des dégâts d'un coup de grâce posée en DoT, arrondie au-dessus (fiche : ½ / 1)
+  atrophic_poison = { 5, 5 },     -- DoT montré (avant son tic) qu'il faut au moins (fiche : 2, « garde du DoT après son tic »)
+  echoing_reprimand = { 3, 4 },   -- un Surge de 2 (à M) Combo compte N (fiche : 5 / 6)
+  echoingMax = { 2, 3 },          -- M : dépense la plus haute qui compte N (fiche : 3)
+  subterfuge = { 0, 0 },          -- Combo par Stealth gagné (fiche : 0 / 1 ; la ligne ne tient plus sur la carte)
+  subterfugeTurns = { 2, 3 },     -- tours que dure un Stealth (le tour où il est gagné compris ; fiche : 1)
+  subterfugeSurge = { true, true }, -- chaque Surge rend Stealth (source incluse ; fiche : aucune)
+  kidney_shot = { 5, 4 },         -- Combo dépensés au moins (fiche : 5 / 4)
+  danse_macabre = { 2, 3 },       -- par autre nom joué dans le tour, au-delà des F premiers (fiche : 2 / 3)
+  danseFree = { 2, 2 },           -- F : autres noms joués qui ne comptent pas encore (fiche : 0)
+  danseCap = { 0, 0 },            -- bonus par coup au plus, 0 = sans plafond (fiche : aucun ; repli de la fiche : +10)
 }
 ns.RogueEpicNumbers = EPIC_N
 
@@ -394,31 +399,42 @@ local function n(id, k) return tostring(EPIC_N[id][k]) end
 
 epic("deflection", "westfall", "combat", "Deflection", function(k)
   return ("Each Parry gained: deal %s, +%s per earlier one this turn, to the last target."):format(n("deflection", k),
-    n("deflection", k))
+    n("deflectionStep", k))
 end)
 epic("doomblade", "duskwood", "assassination", "Doomblade", function(k)
   local f = EPIC_N.doomblade[k]
   local what = f == 0.5 and "half their damage" or f == 1 and "their damage"
+    or f < 1 and ("%d%% of their damage"):format(math.floor(f * 100 + 0.5))
     or ("their damage +%d%%"):format(math.floor((f - 1) * 100 + 0.5))
   return "Surge Attacks apply " .. what .. " as DoT instead."
 end)
-epic("atrophic_poison", "wetlands", "assassination", "Atrophic Poison",
-  { "Enemies with DoT count as Demoralized.", "Enemies with DoT count as Demoralized and Sundered." })
+epic("atrophic_poison", "wetlands", "assassination", "Atrophic Poison", function(k)
+  local t = EPIC_N.atrophic_poison[k]
+  return "Enemies with DoT " .. (t > 1 and (t .. "+ ") or "") .. "count as Demoralized"
+    .. (k == 2 and " and Sundered." or ".")
+end)
 epic("echoing_reprimand", "stranglethorn", "combat", "Echoing Reprimand", function(k)
-  return "A Surge of 2 or 3 Combo counts as " .. n("echoing_reprimand", k) .. "."
+  local m = EPIC_N.echoingMax[k]
+  return "A Surge of " .. (m == 2 and "2" or m == 3 and "2 or 3" or ("2 to " .. m)) .. " Combo counts as "
+    .. n("echoing_reprimand", k) .. "."
 end)
 epic("subterfuge", "swamp", "subtlety", "Subterfuge", function(k)
+  -- « lasts » : les Attacks ne le retirent pas (infobulle, Core/Classes/rogue.lua) ; l'état posé en dernier
   local turns = EPIC_N.subterfugeTurns[k]
-  local first = turns == 1 and "Stealth ends at end of turn, not on Attacks."
-    or "Stealth ends at end of next turn, not on Attacks." -- T = 2 (au-delà : à reformuler)
-  return first .. "\nGaining Stealth: +" .. n("subterfuge", k) .. " Combo."
+  local t = turns == 1 and "Stealth lasts all turn." or turns == 2 and "Stealth lasts two turns." or "Stealth lasts three turns."
+  if EPIC_N.subterfuge[k] > 0 then t = t .. "\nGaining Stealth: +" .. n("subterfuge", k) .. " Combo." end
+  if EPIC_N.subterfugeSurge[k] then t = t .. "\nSurge of 1+ Combo: gain Stealth" end
+  return t
 end)
 epic("kidney_shot", "steppes", "subtlety", "Kidney Shot", function(k)
   return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": apply Stunned 1 ⌛"
 end)
 epic("danse_macabre", "blackrock", "subtlety", "Danse Macabre", function(k)
-  return "Attack hits: +" .. n("danse_macabre", k) .. " per other card name played this turn, up to +"
-    .. n("danseCap", k) .. "."
+  local cap = EPIC_N.danseCap[k]
+  local free = EPIC_N.danseFree[k]
+  return "Attack hits: +" .. n("danse_macabre", k) .. " per other card name played this turn"
+    .. (free == 1 and " after the first" or free > 1 and (" after the first " .. free) or "")
+    .. (cap > 0 and (", up to +" .. cap .. ".") or ".")
 end)
 
 -- Bibelots du Voleur (class = "rogue" : tirés seulement pour lui) ---------------------------------
