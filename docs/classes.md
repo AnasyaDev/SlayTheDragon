@@ -455,7 +455,7 @@ Ajouts de la classe : `Hunter.petAttackOn(c, why, ennemi)` (cible imposée par `
 `Hunter.petTarget` : la signature de `petAttack` / `petTarget`, enveloppées par Core/ZoneRules.lua, ne change pas) ;
 effet `{ "damageOther", n }` (« Deal N to another enemy. », Chimaera Shot : l'ennemi vivant le plus à gauche
 autre que la cible) ; déclencheurs « Each enemy DoT tick », « Attack hits », « Each Attack hit ». Vue
-(`ns.ClassViews.hunter`) : figure et marqueur du familier cachés sans familier, « Roar » flottant.
+(`ns.ClassViews.hunter`) : figure et marqueur du familier cachés sans familier, « Roar » flottant, ligne de l'épique sous les états du héros (icône, infobulle = la carte, et ce qu'elle change maintenant : `Art.hunterEpicLine(c)`, lue par le harnais).
 Interface commune touchée au minimum : `UI/Controller.lua` montre une carte proposée en récompense ou chez le
 marchand sous sa variante quand l'épique du deck la transforme (`shownCard`, `from` = l'originale ; la carte
 prise entre au deck sous son id d'origine). Bots : `classDef.bot.epic(exp, id)` (note d'offre) et
