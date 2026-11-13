@@ -62,6 +62,7 @@ C.REASONS = {
   deck = "Deck too small.",
   upgrade = "No card to upgrade.",
   relic = "Relic already owned.",
+  epic = "Only one epic card per expedition.",
   ended = "The expedition is over.",
   ["key locked"] = "This key isn't unlocked yet.",
   ["zone locked"] = "This zone isn't open to this class yet.",
@@ -279,6 +280,27 @@ function C.act(a)
   return true, nil, evs
 end
 
+-- Épique remplacée par l'option id (récompense, marchand, rencontre) : rejouée sur une copie ; renvoie
+-- { old = { id, up }, new = { id, up } } si l'action ferait partir l'épique du deck pour une autre, sinon
+-- nil. L'interface demande alors confirmation (« Replace A with B? » / « Keep A »).
+function C.epicSwap(id)
+  local exp = C.exp()
+  if not exp or C.ended or exp.phase == "combat" then return nil end
+  local verb, arg = tostring(id):match("^([%a_]+):(.+)$")
+  if not verb then verb = id end
+  if verb == "ui" then return nil end
+  local i = X.epicIndex(exp)
+  if not i then return nil end
+  local copy = U.copy(exp)
+  local before = copy.stats.epicReplaced or 0
+  if not X.act(copy, { verb, tonumber(arg) or arg }) then return nil end
+  if (copy.stats.epicReplaced or 0) <= before then return nil end
+  local j = X.epicIndex(copy)
+  if not j then return nil end
+  local old = exp.deck[i]
+  return { old = { id = old.id, up = old.up }, new = { id = copy.deck[j].id, up = copy.deck[j].up } }
+end
+
 -- Rejoue une action sur une copie : raison du refus, sans rien changer.
 function C.reasonFor(a)
   local exp = C.exp()
@@ -443,7 +465,7 @@ function C.handInfo(i)
   -- carte Cast qui partira tout de suite (état Instant ou crochet instantCast ; question sans rien consommer)
   local instant = d.cast and not d.trap and Combat.isInstant(c, d, inst, false) or false
   return { inst = inst, def = d, cost = Combat.cost(c, inst), playable = ok, why = why,
-    needsTarget = Combat.needsTarget(inst), spendOff = spendOff or nil, instant = instant or nil }
+    needsTarget = Combat.needsTarget(inst, c), spendOff = spendOff or nil, instant = instant or nil }
 end
 
 -- Carte gardée au choix en fin de tour (Traveler's Backpack) : index des cartes proposées (vide sans le
@@ -507,7 +529,7 @@ function C.runInfo()
   local c = exp.combat or (C.ended and C.ended.c)
   local hp, maxHp = exp.hp, exp.maxHp
   if exp.combat then hp, maxHp = max(0, c.player.hp), c.player.maxHp end
-  return { hp = hp, maxHp = maxHp, gold = exp.gold, deck = exp.deck, floor = exp.floor,
+  return { hp = hp, maxHp = maxHp, gold = exp.gold, deck = X.shownDeck(exp), floor = exp.floor,
     floors = exp.map and exp.map.floors, relics = exp.relics, key = exp.key or 0,
     affixes = exp.affixes or {}, act = X.actName(exp) }
 end
@@ -734,7 +756,7 @@ local function zoneRows(cid)
     local won = Meta.classWon(m, cid, zid)
     local best = Meta.bestKey(m, cid, zid)
     local cards = Meta.zoneCards(cid, zid)
-    local card = { unlocked = false, condition = "Win " .. zname .. " to unlock" }
+    local card = { unlocked = false, condition = "Win " .. zname .. " to unlock", epic = true }
     if cards[1] then
       card.cardId = cards[1]
       if won then card.unlocked, card.id, card.condition = true, cards[1], nil end
@@ -886,7 +908,9 @@ local function endStep()
     end
   end
   for _, id in ipairs(s.zoneCards or {}) do
-    lines[#lines + 1] = "|cff40ff40New " .. cname .. " card: " .. cardName(id) .. ".|r"
+    local epic = ns.Cards[id] and ns.Cards[id].rarity == "epic"
+    lines[#lines + 1] = (epic and "|cffc070ffNew epic card: " or ("|cff40ff40New " .. cname .. " card: "))
+      .. cardName(id) .. ".|r"
   end
   for _, id in ipairs(s.keyRelics or {}) do
     lines[#lines + 1] = "|cff40ff40New relic: " .. relicName(id) .. ".|r"
@@ -905,9 +929,17 @@ local function endStep()
     for _, id in ipairs(s.unlocked.cards) do unlocked.cards[#unlocked.cards + 1] = id end
     for _, id in ipairs(s.unlocked.relics) do unlocked.relics[#unlocked.relics + 1] = id end
   end
-  for _, id in ipairs(s.zoneCards or {}) do unlocked.cards[#unlocked.cards + 1] = id end
+  -- épique (carte de zone) : présentée à part, mise en avant (unlocked.epic) ; les autres cartes de zone
+  -- (s'il y en avait sans rareté épique) avec les déblocages de la montée de niveau
+  for _, id in ipairs(s.zoneCards or {}) do
+    if ns.Cards[id] and ns.Cards[id].rarity == "epic" and not unlocked.epic then
+      unlocked.epic = id
+    else
+      unlocked.cards[#unlocked.cards + 1] = id
+    end
+  end
   for _, id in ipairs(s.keyRelics or {}) do unlocked.relics[#unlocked.relics + 1] = id end
-  if #unlocked.cards + #unlocked.relics == 0 then unlocked = nil end
+  if #unlocked.cards + #unlocked.relics == 0 and not unlocked.epic then unlocked = nil end
   return { kind = "end", won = won, result = e.result, title = title, text = table.concat(lines, "\n"),
     bars = bars, unlocked = unlocked, options = { { id = "ui:new", label = "New expedition" },
       { id = "ui:progress", label = "Progress" } } }
@@ -990,7 +1022,18 @@ local function rewardStep(exp)
   end
   local opts = {}
   local after = text -- texte « après coup » d'une rencontre, sans la consigne des cartes
-  if not r.cardsDone then
+  -- choix « Epic » (offre garantie, Expedition.offerEpic) : montré avant les cartes ordinaires
+  local epicMode = r.epics ~= nil and not r.epicDone
+  if epicMode then
+    text = text .. (text ~= "" and "\n" or "") .. "Epic card: choose one, or none."
+    for i, id in ipairs(r.epics) do
+      opts[#opts + 1] = actionOption(avail, { id = "pickEpic:" .. i, card = { id = id, up = false }, epic = true })
+    end
+    opts[#opts + 1] = actionOption(avail, { id = "skipEpic", label = "Skip", epic = true })
+  elseif r.epicPicked then
+    text = text .. (text ~= "" and "\n" or "") .. "Epic card added: " .. cardName(r.epicPicked) .. "."
+  end
+  if not r.cardsDone and not epicMode then
     text = text .. (text ~= "" and "\n" or "") .. "Choose a card to add to the deck."
     for i, id in ipairs(r.cards) do
       opts[#opts + 1] = actionOption(avail, { id = "pickCard:" .. i, card = { id = id, up = false } })
@@ -1006,7 +1049,8 @@ local function rewardStep(exp)
   end
   opts[#opts + 1] = actionOption(avail, { id = "leave", label = "Continue" })
   return { kind = "reward", title = title, text = text, loot = loot, options = opts, rewardKind = r.kind,
-    picked = r.picked, cardsDone = r.cardsDone, after = (r.kind == "event") and after or nil }
+    picked = r.picked, cardsDone = r.cardsDone, after = (r.kind == "event") and after or nil,
+    epicMode = epicMode or nil }
 end
 
 local function campfireStep(exp)
@@ -1030,17 +1074,19 @@ local function deckStep(exp, view)
   local avail = available(exp)
   local opts = {}
   local title
+  local shown = X.shownDeck(exp)
   if view == "upgrade" then
     title = "Meditate: choose a card to upgrade"
-    for i, card in ipairs(exp.deck) do
+    for i, card in ipairs(shown) do
       if avail["upgrade:" .. i] then
-        opts[#opts + 1] = { id = "upgrade:" .. i, card = { id = card.id, up = card.up }, preview = true }
+        opts[#opts + 1] = { id = "upgrade:" .. i, card = { id = card.id, up = card.up, from = card.from },
+          preview = ns.Cards[card.id].up ~= nil }
       end
     end
   else
     title = "Remove a card from the deck (" .. X.removePrice(exp) .. "g)"
-    for i, card in ipairs(exp.deck) do
-      opts[#opts + 1] = actionOption(avail, { id = "remove:" .. i, card = { id = card.id, up = card.up } })
+    for i, card in ipairs(shown) do
+      opts[#opts + 1] = actionOption(avail, { id = "remove:" .. i, card = { id = card.id, up = card.up, from = card.from } })
     end
   end
   opts[#opts + 1] = { id = "ui:back", label = "Back" }
@@ -1057,7 +1103,7 @@ local function merchantStep(exp)
     if it.sold then o.disabled, o.reason = true, "Sold." end
     opts[#opts + 1] = actionOption(avail, o)
   end
-  for i, it in ipairs(s.cards) do item("buyCard", i, it, { card = { id = it.id, up = false } }) end
+  for i, it in ipairs(s.cards) do item("buyCard", i, it, { card = { id = it.id, up = false }, epic = it.epic }) end
   for i, it in ipairs(s.relics) do
     local def = ns.Relics[it.id]
     item("buyRelic", i, it, { item = { kind = "relic", id = it.id }, label = relicName(it.id), text = def and def.text })
@@ -1130,10 +1176,11 @@ local function selectStep(exp)
   local sel = exp.select
   local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
   local opts = {}
-  for i, card in ipairs(exp.deck) do
+  for i, card in ipairs(X.shownDeck(exp)) do
     local id = "select:" .. i
     if avail[id] then
-      opts[#opts + 1] = { id = id, card = { id = card.id, up = card.up }, preview = sel.kind == "upgrade" or nil }
+      opts[#opts + 1] = { id = id, card = { id = card.id, up = card.up, from = card.from },
+        preview = (sel.kind == "upgrade" and ns.Cards[card.id].up ~= nil) or nil }
     end
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipSelect", label = "Skip" })

@@ -558,8 +558,11 @@ function UI.refresh()
   UI.refreshInfo()
 end
 
--- Choix générique depuis un écran (bouton, carte, nœud de carte).
-function UI.choose(id)
+-- Choix générique depuis un écran (bouton, carte, nœud de carte). Une option qui remplacerait la carte
+-- épique du deck demande d'abord confirmation (UI.confirmEpic, UI/Screens.lua) : rien ne part, faux est
+-- renvoyé ; confirmed = vrai pour la rejouer après la réponse.
+function UI.choose(id, confirmed)
+  if not confirmed and UI.confirmEpic and UI.confirmEpic(id) then return false end
   local ok, why = Controller.choose(id)
   if not ok and why then UI.flash(Controller.reasonText(why) or "Choice not possible.") end
   return ok
