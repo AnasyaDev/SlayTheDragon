@@ -9635,8 +9635,9 @@ do
   local function line() return host and host.line._shown and host.line._text or nil end
   local function icon() return host and host.box._shown and (host.box.slot.icon._texture or ""):lower() or "" end
   check("combat : l'épique du deck est active dès le premier tour (Inner Focus)", P.epicOf(c) == "inner_focus")
-  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, +75% »",
-    line() == "Inner Focus: next card is Cast, +75%" and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
+  local pct = ("+%d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5))
+  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, " .. pct .. " »",
+    line() == "Inner Focus: next card is Cast, " .. pct and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
   -- première carte jouée par l'interface : elle part en Cast, la vue le dit
   local hi
   for i, inst in ipairs(c.hand) do
@@ -9650,7 +9651,7 @@ do
     v:Render(true)
   end
   check("Inner Focus : la première carte part en Cast (barre d'incantation), la vue la nomme",
-    c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " +75%"), tostring(line()))
+    c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " " .. pct), tostring(line()))
   local tt = table.concat(H.hover(host.box), " | ")
   check("vue de classe : survol = la carte épique (nom, texte, explication)", tt:find("Inner Focus", 1, true)
     and tt:find("First card", 1, true), tt)
@@ -9671,21 +9672,31 @@ do
   setEpic("echo_of_light")
   c.player.st.regen = 3
   v:Render(true)
-  check("Echo of Light : « Regen 3: 10 to all next turn »", line() == "Regen 3: 10 to all next turn", tostring(line()))
+  local echo1 = ("Regen 3: %d to all next turn"):format(3 + P.ECHO_PLUS[1])
+  check("Echo of Light : « " .. echo1 .. " »", line() == echo1, tostring(line()))
   setEpic("echo_of_light", true)
   v:Render(true)
-  check("Echo of Light amélioré : « Regen 3: 12 to all next turn »", line() == "Regen 3: 12 to all next turn", tostring(line()))
+  local echo2 = ("Regen 3: %d to all next turn"):format(3 + P.ECHO_PLUS[2])
+  check("Echo of Light amélioré : « " .. echo2 .. " »", line() == echo2, tostring(line()))
   c.player.st.regen = nil
   setEpic("shadow_covenant")
   c.hand[#c.hand + 1] = Card.new("mind_blast", false, 991)
+  local shadowBefore = c.turn.bySchool.shadow
+  c.turn.bySchool.shadow = nil
   v:Render(true)
   info = ns.Controller.handInfo(#c.hand)
-  check("Shadow Covenant : « Shadow cards: 3 HP per mana », Mind Blast à 0 mana", line() == "Shadow cards: 3 HP per mana"
-    and info and info.cost == 0, tostring(line()))
+  local cov1 = ("Next Shadow card: %d HP"):format(P.COVENANT_HP[1])
+  check("Shadow Covenant : « " .. cov1 .. " », Mind Blast à 0 mana", line() == cov1 and info and info.cost == 0, tostring(line()))
+  c.turn.bySchool.shadow = 1
+  v:Render(true)
+  local cov2 = ("Next Shadow card: %d HP"):format(P.COVENANT_HP[1] + P.COVENANT_STEP)
+  check("Shadow Covenant : une carte Shadow déjà jouée ce tour, « " .. cov2 .. " »", line() == cov2, tostring(line()))
+  c.turn.bySchool.shadow = nil
   setEpic("shadow_covenant", true)
   v:Render(true)
-  check("Shadow Covenant amélioré : première carte Shadow gratuite annoncée",
-    line() == "Shadow: first card free, then 3 HP/mana", tostring(line()))
+  local cov3 = ("Shadow: first card free, then %d HP"):format(P.COVENANT_HP[2] + P.COVENANT_STEP)
+  check("Shadow Covenant amélioré : première carte Shadow gratuite annoncée", line() == cov3, tostring(line()))
+  c.turn.bySchool.shadow = shadowBefore
   table.remove(c.hand)
   setEpic("prayer_of_mending")
   v:Render(true)

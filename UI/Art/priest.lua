@@ -29,10 +29,12 @@ local function epicLine(c)
     if r <= 0 then return id, "Echo of Light: Regen deals damage" end
     return id, ("Regen %d: %d to all next turn"):format(r, r + P.ECHO_PLUS[up and 2 or 1])
   elseif id == "shadow_covenant" then
-    local free = up and (c.turn.bySchool.shadow or 0) == 0
-    local n = P.COVENANT_HP
-    return id, free and ("Shadow: first card free, then %d HP/mana"):format(n)
-      or ("Shadow cards: %d HP per mana"):format(n)
+    -- PV de la prochaine carte Shadow à 1 mana (toutes les cartes Shadow coûtent 1)
+    local played = c.turn.bySchool.shadow or 0
+    if up and played == 0 then
+      return id, ("Shadow: first card free, then %d HP"):format(P.COVENANT_HP[2] + P.COVENANT_STEP)
+    end
+    return id, ("Next Shadow card: %d HP"):format(P.covenantHp(c, up, 1))
   elseif id == "voidform" then
     local b = (p.res or 0) * P.VOID_BONUS[up and 2 or 1]
     return id, ("Voidform: Shadow hits +%d"):format(b)
