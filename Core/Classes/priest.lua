@@ -36,20 +36,11 @@ ns.Priest = Priest
 if not L.plateByKey("epic") then
   L.plate("epic", { word = "Epic", head = true, flag = "epic", text = "in play from the start of each combat." })
 end
-for _, label in ipairs({ "Each heal", "Each Regen tick", "Shadow cards", "Per Insanity",
-  "First card each turn", "Start of combat" }) do
+for _, label in ipairs({ "Each heal", "DoT applied", "Each Regen tick", "Shadow cards", "Shadow hits",
+  "1st card each turn" }) do
   L.trigger(label)
 end
-L.keyword("prayerOfMending", { name = "Each heal", pattern = "^Each heal:",
-  text = "every source, Regen ticks too, real HP only." })
-L.keyword("echoOfLight", { name = "Regen tick", pattern = "^Each Regen tick:",
-  text = "start of turn, damage instead of healing." })
-L.keyword("shadowCovenant", { name = "Shadow cards", pattern = "^Shadow cards: pay",
-  text = "2 HP per mana, +2 per Shadow card before." })
-L.keyword("voidform", { name = "Voidform", pattern = "^Surge cards can't be played",
-  text = "Insanity is never spent, Shadow hits grow." })
-L.keyword("innerFocus", { name = "First card", pattern = "^First card each turn:",
-  text = "the first Attack or Skill, resolves next turn." })
+-- mots de règle des épiques (L.rule) : déclarés plus bas, avec les réglages
 
 ---------------------------------------------------------------------------
 -- Aides
@@ -69,6 +60,33 @@ Priest.REFLECT_PCT = { 1 / 3, 1 / 2 } -- Reflective Shield : part de l'Absorb pe
 Priest.VOID_BONUS = { 1, 2 }   -- Voidform : dégâts en plus par point d'Insanity, par coup Shadow (base, amélioré)
 Priest.FOCUS_SCALE = { 1.5, 2 } -- Inner Focus : facteur (base, amélioré)
 Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
+
+-- Mots de règle des épiques (L.rule) : la carte dit « Déclencheur: Mot N. », l'à-côté la règle complète (mêmes
+-- nombres que les réglages ci-dessus ; base, puis améliorée).
+L.rule("divineStar", { name = "Divine Star",
+  text = "Deal the HP actually restored to a random enemy. Every heal counts, Regen ticks too.",
+  upText = "Deal the HP actually restored, +N, to a random enemy. Every heal counts, Regen ticks too." })
+L.rule("contagion", { name = "Contagion",
+  text = "A DoT a card applies to its target also goes to every other enemy.",
+  upText = "A DoT a card applies to its target also goes to every other enemy, +N." })
+L.rule("sanctify", { name = "Sanctify",
+  text = "Deal the tick to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. ".",
+  upText = "Deal the tick +N to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. "." })
+L.rule("lifeTap", { name = "Life Tap",
+  text = "Pay N HP per mana instead of mana, +" .. Priest.COVENANT_STEP .. " per Shadow card played before this turn.",
+  upText = "The first one each turn is free. Others pay N HP per mana, +" .. Priest.COVENANT_STEP
+    .. " per Shadow card before." })
+L.rule("reflect", { name = "Reflect",
+  text = "Deal that part of the Absorb lost on the hit to the attacker, rounded down." })
+L.rule("madness", { name = "Madness", text = "+N damage per Insanity. Surge cards can't be played." })
+do
+  local function focus(i)
+    local f = Priest.FOCUS_SCALE[i]
+    return "The first Attack or Skill each turn becomes a Cast, its values "
+      .. (f == 2 and "doubled" or "+N%") .. ", rounded up."
+  end
+  L.rule("empower", { name = "Empower", text = focus(1), upText = focus(2) })
+end
 
 -- Épique du Prêtre active dans ce combat : id, amélioration (nil sans épique).
 function Priest.epicOf(c)

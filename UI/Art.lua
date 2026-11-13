@@ -697,9 +697,11 @@ end
 
 -- Ligne d'un mot-clé : nom en or, effet ; n = nombre de tours d'une Recharge ; res = id de la ressource
 -- de la classe de la carte (« %s » de l'explication : « Surge: spends all Rage for the effect. »).
-function Art.keywordLine(key, label, n, res)
+function Art.keywordLine(key, label, n, res, up)
   local kw = Art.keyword(key)
   if not kw then return label or key end
+  -- mot de règle d'une épique (L.rule) : la règle complète, nombre de la carte, texte amélioré
+  if kw.rule then return "|cffffd100" .. (label or kw.name) .. "|r: " .. ns.Language.ruleText(kw, n, up) end
   local text = kw.text or ""
   if text:find("%s", 1, true) then
     local L = ns.Language

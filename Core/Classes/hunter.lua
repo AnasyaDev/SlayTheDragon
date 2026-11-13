@@ -34,12 +34,35 @@ L.keyword("pet", { name = "Pet attacks", pattern = "[Pp]%at attacks", text = "hi
 L.trigger("Pet attacks")
 L.trigger("Traps")
 L.trigger("When a Trap triggers")
--- cartes épiques (docs/zones/cartes-de-zone.md, Hunter) : Black Arrow, Lone Wolf, Aspect of the Turtle
+-- cartes épiques (docs/zones/cartes-de-zone.md, Hunter) : déclencheurs, puis mots de règle (L.rule : la carte dit
+-- « Déclencheur: Mot N. », l'à-côté la règle complète, avec les nombres de ns.HunterEpic, base puis améliorée)
 L.trigger("Each enemy DoT tick")
+L.trigger("Enemy DoT ticks")
 L.trigger("Attack hits")
 L.trigger("Each Attack hit")
-L.keyword("loneWolf", { name = "Pet cards become shots", pattern = "^Pet cards become shots%.$",
-  text = "the pet is gone for the expedition." })
+do
+  local E = ns.HunterEpic
+  local TIMES = { [1] = "", [2] = " twice", [3] = " three times", [4] = " four times" }
+  L.rule("wildCall", { name = "Wild Call", pattern = "^Start of turn:",
+    text = "Spend N Frenzy, if available, for a pet attack." })
+  L.rule("wildCallTick", { name = "Wild Call", pattern = "^Enemy DoT ticks:",
+    text = "Spend N Frenzy, if available: the pet attacks that enemy." })
+  local function launch(n) return "The Trap triggers at once on a target, then the pet attacks it" .. TIMES[n] .. "." end
+  L.rule("launch", { name = "Launch", text = launch(E.launcher[1]), upText = launch(E.launcher[2]) })
+  local function stampede(less)
+    return "Pet attacks also hit every other enemy" .. (less > 0 and (", for " .. less .. " less.") or ".")
+  end
+  L.rule("stampede", { name = "Stampede", text = stampede(E.cleaveLess[1]),
+    upText = stampede(E.cleaveLess[2]) .. " Each one gives N more Frenzy." })
+  L.rule("intervene", { name = "Intervene", text = "Spend 1 Frenzy, if available, to stop up to N damage of the hit." })
+  local function deadeye(n) return "Cast Attacks resolve at once" .. (n > 0 and " and deal N more." or ".") end
+  L.rule("deadeye", { name = "Deadeye", text = deadeye(E.marksman[1]), upText = deadeye(E.marksman[2]) })
+  local function ferocity(start)
+    return "+N damage per Frenzy. The pet is gone: pet cards become shots"
+      .. (start > 0 and (", and each turn starts with +" .. start .. " Frenzy.") or ".")
+  end
+  L.rule("ferocity", { name = "Ferocity", text = ferocity(E.loneStart[1]), upText = ferocity(E.loneStart[2]) })
+end
 
 Combat.CONDITIONS.careful = function(c, ctx, t)
   if ctx and ctx.careful ~= nil and t == ctx.target then return ctx.careful end

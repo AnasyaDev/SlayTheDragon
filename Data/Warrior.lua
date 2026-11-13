@@ -327,7 +327,8 @@ card("last_stand", {
 -- Une par zone, débloquée par la première victoire du Guerrier dans la zone ; une seule par expédition.
 -- Règle active dès le début de chaque combat (ni piochée, ni jouée, sans coût) : les crochets (deckHooks,
 -- whileInDeck) et les nombres (ns.Warrior.EPIC) sont posés par Core/Classes/warrior.lua ; les textes ici
--- disent ces nombres. « Epic. » = mot de plaque (en tête, retiré à l'affichage comme « Power. »).
+-- disent ces nombres : déclencheur et mot de règle (deux lignes au plus), la règle complète est l'à-côté du
+-- mot (L.rule, Core/Classes/warrior.lua). « Epic. » = mot de plaque (en tête, retiré à l'affichage comme « Power. »).
 local function epic(id, t)
   t.type, t.power, t.epic, t.rarity, t.effects, t.cost = "power", true, true, "epic", {}, 0 -- coût jamais payé ni affiché
   card(id, t)
@@ -335,44 +336,44 @@ end
 
 epic("death_wish", {
   zone = "westfall", name = "Death Wish", path = "fury",
-  text = "Epic.\nCan't gain Absorb.\nAttacks: 50% more damage.",
-  up = { text = "Epic.\nCan't gain Absorb.\nAttacks: 50% more damage.\nKills: heal 3." },
+  text = "Epic.\nCarnage 50%.",
+  up = { text = "Epic.\nCarnage 50%.\nKills: heal 3." },
 })
 
 epic("thunderous_roar", {
   zone = "duskwood", name = "Thunderous Roar", path = "protection",
-  text = "Epic.\nAt 5 Rage: spend it, deal 3 to all.",
-  up = { text = "Epic.\nAt 5 Rage: spend it, deal 4 to all.\nAt 5 Rage: apply Demoralized 1 ⌛ to all" },
+  text = "Epic.\nAt 5 Rage: Shockwave 3.",
+  up = { text = "Epic.\nAt 5 Rage: Shockwave 4." },
 })
 
 epic("sweeping_strikes", {
   zone = "wetlands", name = "Sweeping Strikes", path = "arms",
-  text = "Epic.\nTargeted Attack hits: also hit another enemy for a third.",
-  up = { text = "Epic.\nTargeted Attack hits: also hit 2 other enemies for a third." },
+  text = "Epic.\nTargeted Attack hits: Sweep 1.",
+  up = { text = "Epic.\nTargeted Attack hits: Sweep 2." },
 })
 
 epic("titans_grip", {
   zone = "stranglethorn", name = "Titan's Grip", path = "fury",
-  text = "Epic.\nAttacks: cost 1 more, resolve twice.\nAt most 2 per turn.",
-  up = { text = "Epic.\nAttacks: cost 1 more, resolve twice.\nAt most 2 per turn, 0-cost free." },
+  text = "Epic.\nDual Wield 2.",
+  up = { text = "Epic.\nDual Wield 2, 0-cost free." },
 })
 
 epic("shield_charge", {
   zone = "swamp", name = "Shield Charge", path = "protection",
-  text = "Epic.\nEnd of turn: deal a quarter of the Absorb to the last target.",
-  up = { text = "Epic.\nEnd of turn: deal 4 + a quarter of the Absorb to the last target." },
+  text = "Epic.\nEnd of turn: Punish.",
+  up = { text = "Epic.\nEnd of turn: Punish +4." },
 })
 
 epic("anger_management", {
   zone = "steppes", name = "Anger Management", path = "arms",
-  text = "Epic.\nSpend and Surge cards: Cooldown 1.\nEach Rage spent: all Cooldowns −1.",
-  up = { text = "Epic.\nSpend and Surge cards: Cooldown 1.\nEach Rage spent: all Cooldowns −2." },
+  text = "Epic.\nEach Rage spent: Haste 1.",
+  up = { text = "Epic.\nEach Rage spent: Haste 2." },
 })
 
 epic("avatar", {
   zone = "blackrock", name = "Avatar", path = "arms",
-  text = "Epic.\nRage up to 10.\nStart of turn: +2 Rage.\nAt 10 Rage: Attacks deal 1 more.",
-  up = { text = "Epic.\nRage up to 10.\nStart of turn: +3 Rage.\nAt 10 Rage: Attacks deal 1 more." },
+  text = "Epic.\nStart of turn: Juggernaut 2.",
+  up = { text = "Epic.\nStart of turn: Juggernaut 3." },
 })
 
 -- Bibelots du Guerrier (class = "warrior" : tirés seulement pour lui) ------------------------------

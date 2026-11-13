@@ -386,8 +386,9 @@ local EPIC_N = {
 }
 ns.RogueEpicNumbers = EPIC_N
 
--- Déclencheur de Kidney Shot selon le seuil : « Surge of 5 Combo », « Surge of 4+ Combo ».
-local function kidneyLabel(k) return k >= 5 and "Surge of 5 Combo" or ("Surge of %d+ Combo"):format(k) end
+-- Déclencheur de Kidney Shot selon le seuil : « Surge of 5+ Combo », « Surge of 4+ Combo » (« 5+ » même au
+-- plafond de 5 : « Surge of 5 Combo » se coupait entre « of » et « 5 » pour tenir en deux lignes).
+local function kidneyLabel(k) return ("Surge of %d+ Combo"):format(k) end
 ns.RogueKidneyLabel = kidneyLabel
 
 local function epic(id, zone, path, name, text)
@@ -397,44 +398,28 @@ local function epic(id, zone, path, name, text)
 end
 local function n(id, k) return tostring(EPIC_N[id][k]) end
 
+-- Textes : déclencheur et mot de règle (deux lignes au plus) ; la règle complète est l'à-côté du mot
+-- (L.rule, Core/Classes/rogue.lua), écrite avec les mêmes nombres.
 epic("deflection", "westfall", "combat", "Deflection", function(k)
-  return ("Each Parry gained: deal %s, +%s per earlier one this turn, to the last target."):format(n("deflection", k),
-    n("deflectionStep", k))
+  return "Each Parry gained: Riposte " .. n("deflection", k) .. "."
 end)
 epic("doomblade", "duskwood", "assassination", "Doomblade", function(k)
-  local f = EPIC_N.doomblade[k]
-  local what = f == 0.5 and "half their damage" or f == 1 and "their damage"
-    or f < 1 and ("%d%% of their damage"):format(math.floor(f * 100 + 0.5))
-    or ("their damage +%d%%"):format(math.floor((f - 1) * 100 + 0.5))
-  return "Surge Attacks apply " .. what .. " as DoT instead."
+  return "Surge Attacks: Bleed " .. math.floor(EPIC_N.doomblade[k] * 100 + 0.5) .. "%."
 end)
 epic("atrophic_poison", "wetlands", "assassination", "Atrophic Poison", function(k)
-  local t = EPIC_N.atrophic_poison[k]
-  return "Enemies with DoT " .. (t > 1 and (t .. "+ ") or "") .. "count as Demoralized"
-    .. (k == 2 and " and Sundered." or ".")
+  return "DoT " .. n("atrophic_poison", k) .. "+: Atrophy" .. (k == 2 and ", Sundered." or ".")
 end)
 epic("echoing_reprimand", "stranglethorn", "combat", "Echoing Reprimand", function(k)
-  local m = EPIC_N.echoingMax[k]
-  return "A Surge of " .. (m == 2 and "2" or m == 3 and "2 or 3" or ("2 to " .. m)) .. " Combo counts as "
-    .. n("echoing_reprimand", k) .. "."
+  return "Surge cards: Animacharge " .. n("echoing_reprimand", k) .. "."
 end)
 epic("subterfuge", "swamp", "subtlety", "Subterfuge", function(k)
-  -- « lasts » : les Attacks ne le retirent pas (infobulle, Core/Classes/rogue.lua) ; l'état posé en dernier
-  local turns = EPIC_N.subterfugeTurns[k]
-  local t = turns == 1 and "Stealth lasts all turn." or turns == 2 and "Stealth lasts two turns." or "Stealth lasts three turns."
-  if EPIC_N.subterfuge[k] > 0 then t = t .. "\nGaining Stealth: +" .. n("subterfuge", k) .. " Combo." end
-  if EPIC_N.subterfugeSurge[k] then t = t .. "\nSurge of 1+ Combo: gain Stealth" end
-  return t
+  return "Surge cards: Shroud " .. n("subterfugeTurns", k) .. "."
 end)
 epic("kidney_shot", "steppes", "subtlety", "Kidney Shot", function(k)
-  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": apply Stunned 1 ⌛"
+  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": Gouge."
 end)
 epic("danse_macabre", "blackrock", "subtlety", "Danse Macabre", function(k)
-  local cap = EPIC_N.danseCap[k]
-  local free = EPIC_N.danseFree[k]
-  return "Attack hits: +" .. n("danse_macabre", k) .. " per other card name played this turn"
-    .. (free == 1 and " after the first" or free > 1 and (" after the first " .. free) or "")
-    .. (cap > 0 and (", up to +" .. cap .. ".") or ".")
+  return "Attack hits: Flourish " .. n("danse_macabre", k) .. "."
 end)
 
 -- Bibelots du Voleur (class = "rogue" : tirés seulement pour lui) ---------------------------------

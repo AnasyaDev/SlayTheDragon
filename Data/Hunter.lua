@@ -405,10 +405,9 @@ local function epic(id, t)
 end
 
 local function n2(pair, src) return src.up and pair[2] or pair[1] end
-local TIMES = { [1] = "", [2] = " twice", [3] = " three times", [4] = " four times" }
 
 -- Attaque du familier payée en Frenzy (Call of the Wild, Black Arrow) : rien sans assez de Frenzy ; cost 0 :
--- gratuite. Texte : « spend N Frenzy for a pet attack » (comme Roar of Sacrifice), sinon « pet attacks ».
+-- gratuite. Texte : « Wild Call N » (mot de règle, Core/Classes/hunter.lua), sinon « pet attacks ».
 local function paidPet(c, cost)
   if cost > 0 then
     if (c.player.res or 0) < cost then return false end
@@ -421,7 +420,7 @@ end
 -- Frenzy vaut EPIC.cotwCost ou plus, il baisse d'autant et le familier attaque (+1 Frenzy comme toute
 -- attaque : la dépense de 1 est rendue) ; amélioré : sans dépense.
 local function cotwText(cost)
-  if cost > 0 then return "Epic.\nStart of turn: spend " .. cost .. " Frenzy for a pet attack." end
+  if cost > 0 then return "Epic.\nStart of turn: Wild Call " .. cost .. "." end
   return "Epic.\nStart of turn: pet attacks."
 end
 epic("call_of_the_wild", {
@@ -440,8 +439,8 @@ epic("call_of_the_wild", {
 -- familier attaque cet ennemi EPIC.launcher fois (fiche : 1, amélioré 2), qui devient sa cible.
 epic("trap_launcher", {
   zone = "duskwood", path = "survival", name = "Trap Launcher",
-  text = "Epic.\nTraps trigger at once on a target.\nPet attacks it" .. TIMES[EPIC.launcher[1]] .. ".",
-  up = { text = "Epic.\nTraps trigger at once on a target.\nPet attacks it" .. TIMES[EPIC.launcher[2]] .. "." },
+  text = "Epic.\nTraps: Launch " .. EPIC.launcher[1] .. ".",
+  up = { text = "Epic.\nTraps: Launch " .. EPIC.launcher[2] .. "." },
   deckHooks = {
     trapLaunch = function(c, src, v) return true end,
     onTrapTriggered = function(c, src, inst, enemy, why)
@@ -457,14 +456,11 @@ epic("trap_launcher", {
 -- Wetlands — Beast Cleave : chaque attaque du familier frappe tous les ennemis vivants (petAll) : sa cible
 -- en plein, les autres pour EPIC.cleaveLess de moins (crochet petLess) ; amélioré : +1 Frenzy de plus par
 -- attaque (pas pour les attaques de Surge, qui n'en donnent pas).
-local function cleaveText(less)
-  if less > 0 then return "Pet attacks hit all enemies, the others for " .. less .. " less." end
-  return "Pet attacks hit all enemies."
-end
+-- (dégâts en moins : à-côté du mot Stampede, Core/Classes/hunter.lua)
 epic("beast_cleave", {
   zone = "wetlands", path = "beast_mastery", name = "Beast Cleave",
-  text = "Epic.\n" .. cleaveText(EPIC.cleaveLess[1]),
-  up = { text = "Epic.\n" .. cleaveText(EPIC.cleaveLess[2]) .. "\nPet attacks: +1 Frenzy." },
+  text = "Epic.\nPet attacks: Stampede.",
+  up = { text = "Epic.\nPet attacks: Stampede +1." },
   deckHooks = {
     petAll = function(c, src, v) return true end,
     petLess = function(c, src, v) return v + n2(EPIC.cleaveLess, src) end,
@@ -479,8 +475,8 @@ epic("beast_cleave", {
 -- coûte rien.
 epic("roar_of_sacrifice", {
   zone = "stranglethorn", path = "beast_mastery", name = "Roar of Sacrifice",
-  text = "Epic.\nWhen hit: spend 1 Frenzy to stop up to " .. EPIC.roar[1] .. " damage.",
-  up = { text = "Epic.\nWhen hit: spend 1 Frenzy to stop up to " .. EPIC.roar[2] .. " damage." },
+  text = "Epic.\nWhen hit: Intervene " .. EPIC.roar[1] .. ".",
+  up = { text = "Epic.\nWhen hit: Intervene " .. EPIC.roar[2] .. "." },
   deckHooks = {
     beforeHit = function(c, src, dmg, enemy)
       if dmg <= 0 or (c.player.res or 0) < 1 or c.result then return dmg end
@@ -499,7 +495,7 @@ epic("roar_of_sacrifice", {
 -- de plus (fiche : 0, amélioré 4 ; c.cls.marksman = uid de la carte en cours). Sans cible connue (question de
 -- canPlay) : vrai si un ennemi vivant est intact.
 local function marksmanText(n)
-  return "Epic.\nCareful Aim: Cast Attacks resolve at once" .. (n > 0 and (" and deal " .. n .. " more.") or ".")
+  return "Epic.\nCareful Aim: Deadeye" .. (n > 0 and (" " .. n) or "") .. "."
 end
 local function carefulTarget(t) return t ~= nil and not t.dead and t.hp * 2 > t.maxHp end
 epic("master_marksman", {
@@ -538,8 +534,8 @@ epic("master_marksman", {
 -- EPIC.blackCost ou plus, il baisse d'autant et le familier attaque cet ennemi (+1 Frenzy comme d'habitude),
 -- sans changer sa cible ; amélioré : sans dépense.
 local function blackText(cost)
-  if cost > 0 then return "Epic.\nEach enemy DoT tick: spend " .. cost .. " Frenzy for a pet attack on it." end
-  return "Epic.\nEach enemy DoT tick: pet attacks it."
+  if cost > 0 then return "Epic.\nEnemy DoT ticks: Wild Call " .. cost .. "." end
+  return "Epic.\nEnemy DoT ticks: pet attacks it."
 end
 epic("black_arrow", {
   zone = "steppes", path = "survival", name = "Black Arrow",
@@ -558,14 +554,14 @@ epic("black_arrow", {
 -- EPIC.lonePer par point de Frenzy de plus (fiche : 1 ; crochet damage, lu coup par coup ; une Cast le lit à
 -- sa résolution) ; EPIC.loneStart Frenzy au début de chaque tour (fiche : 0, amélioré 1 ; la baisse de 1 par
 -- round reste).
-local function loneText(per, start)
-  return "Epic.\nPet cards become shots.\nAttack hits: +" .. per .. " per Frenzy."
-    .. (start > 0 and ("\nStart of turn: +" .. start .. " Frenzy.") or "")
+local function loneText(per)
+  -- (cartes de familier changées et Frenzy du début du tour : à-côté du mot Ferocity, Core/Classes/hunter.lua)
+  return "Epic.\nAttack hits: Ferocity " .. per .. "."
 end
 epic("lone_wolf", {
   zone = "blackrock", path = "marksmanship", name = "Lone Wolf",
-  text = loneText(EPIC.lonePer[1], EPIC.loneStart[1]),
-  up = { text = loneText(EPIC.lonePer[2], EPIC.loneStart[2]) },
+  text = loneText(EPIC.lonePer[1]),
+  up = { text = loneText(EPIC.lonePer[2]) },
   transforms = {
     arcane_shot = "chimaera_shot", kill_command = "kill_shot", dire_beast = "double_tap",
     intimidation = "scatter_shot", multi_shot = "salvo", counter_shot = "silencing_shot",

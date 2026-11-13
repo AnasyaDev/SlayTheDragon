@@ -581,7 +581,7 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
 - **Subterfuge** : `stealthBreak` faux ; durée `c.cls.stealthUntil` (posée à chaque Stealth reçu, et par
   `whileInDeck` pour celui du départ), retrait dans `onTurnEnd` ; source incluse : `onSurge` (dépense de 1 ou
   plus) pose Stealth (`EPIC_N.subterfugeSurge`) ; Combo par Stealth gagné (`c.cls.stealthGained`, 0 depuis le
-  réglage). Infobulle « Lasts » (`L.keyword("subterfugeLasts")`).
+  réglage). Mot de règle « Shroud » (`L.rule("shroud")`, 14/11/2026 : textes en deux lignes, `docs/zones/cartes-de-zone.md`).
 - **Kidney Shot** : `onSurge` (dépense réelle, carte à cible) marque le `ctx`, `onCardPlayed` étourdit la cible
   vivante (boss : Demoralized 2).
 - **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;

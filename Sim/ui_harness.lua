@@ -3346,7 +3346,7 @@ do
       for _, s in pairs(ns.Statuses) do
         if s.name == lab then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
       end
-      -- règle d'une épique : déclencheur du registre (« Surge of 5 Combo: apply Stunned 1 ⌛ »)
+      -- règle d'une épique : déclencheur du registre (« Déclencheur: apply État N ⌛ »)
       if epicCard and ns.Language.triggers[lab] then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
     end
     return cl
@@ -3723,19 +3723,27 @@ do
       for _, res in pairs(ns.Language.resources) do
         if W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural) then need(res.name, res.name .. ": ") end
       end
+      -- à-côté d'un mot de règle d'épique (L.rule) : la règle complète, une ou deux phrases, 110 caractères au plus
+      -- (vérifié en détail par UEL)
+      local ruleLine = {}
+      for _, r in ipairs(ns.Language.ruleWords(d)) do
+        ruleLine[plain(W.inlineIcons(r.kw.name .. ": " .. ns.Language.ruleText(r.kw, r.n, up), 12))] = true
+      end
       for _, l in ipairs(tt.lines) do
         local p = plain(l)
         if p ~= " " then
           nLines = nLines + 1
           local len = W.utf8len(p)
-          if len > 60 or p:find("[;()]") or select(2, p:gsub("%. ", "")) > 0 then
+          local long, sentences = 60, 0
+          if ruleLine[p] then long, sentences = 110, 1 end
+          if len > long or p:find("[;()]") or select(2, p:gsub("%. ", "")) > sentences then
             ebad[#ebad + 1] = label .. " : « " .. p .. " » (" .. len .. ")"
           end
         end
       end
     end
   end
-  check(("explications : chaque mot-clé, état et condition des textes expliqué, %d lignes de 60 caractères au plus"):format(nLines),
+  check(("explications : chaque mot-clé, état et condition des textes expliqué, %d lignes de 60 caractères au plus (110 et deux phrases pour la règle d'une épique)"):format(nLines),
     #ebad == 0, table.concat(ebad, "\n        "))
   -- explications du registre du langage (conditions, plaque, mots, ressources) : présentes, une
   -- phrase courte, la ressource de chaque classe substituée
@@ -3758,7 +3766,8 @@ do
   end
   for _, c in ipairs(ns.Language.conditions) do okLine(c.key, 2) end
   for _, p in ipairs(ns.Language.plates) do okLine(p.key, 2) end
-  for key in pairs(ns.Language.keywords) do okLine(key, 2) end
+  -- (mots de règle des épiques, L.rule : une ou deux phrases, 110 caractères au plus, vérifiés par UEL)
+  for key, kw in pairs(ns.Language.keywords) do if not kw.rule then okLine(key, 2) end end
   for _, rid in ipairs(reslist) do okLine("res:" .. rid) end
   for sid in pairs(Art.statusShort) do
     if not ns.Statuses[sid] or W.utf8len(plain(Art.statusLine(sid))) > 60 then kbad[#kbad + 1] = "état " .. sid end
@@ -3866,10 +3875,11 @@ do
       dist[cls] = dist[cls] or {}
       dist[cls][fit.size] = (dist[cls][fit.size] or 0) + 1
       if not fit.ok or (fit.size < FLOOR and not EXCEPT[label]) then under[#under + 1] = label .. " (" .. tostring(fit.size) .. ")" end
-      -- palier maximal : aucun palier plus grand ne tient, quelle que soit la coupure permise
+      -- palier maximal : aucun palier plus grand ne tient, quelle que soit la coupure permise (épique : en
+      -- W.EPIC_LINES lignes au plus, W.cardMaxLines)
       local paras = W.cardParagraphs(W.cardBody(d), "clauses")
       for _, s in ipairs(W.BODY_SIZES) do
-        if s > fit.size and W.layoutBody(paras, s, top, bottom) then
+        if s > fit.size and W.layoutBody(paras, s, top, bottom, W.cardMaxLines(d)) then
           notMax[#notMax + 1] = ("%s : %s choisi, %s tient"):format(label, tostring(fit.size), tostring(s))
         end
       end
@@ -9533,9 +9543,10 @@ do
   W.fillCardTooltip(tip, "danse_macabre", false)
   local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
   local RD = ns.Rogue.riposteDamage
-  check("infobulles : riposte détaillée (quatre premières du tour), boss de Kidney Shot, noms de Danse Macabre",
-    all:find(("Riposte: %d, then %d, %d, %d"):format(RD(1), RD(2), RD(3), RD(4)), 1, true) and all:find("Can't be Stunned: gets Demoralized 2", 1, true)
-    and all:find("each different card played this turn counts once", 1, true), all)
+  check("infobulles (à-côté des mots de règle) : Riposte, Gouge (boss : Demoralized 2), Flourish",
+    all:find(("Riposte: Deal %d damage to the last target, +%d per earlier Riposte this turn."):format(RD(1), RD(2) - RD(1)), 1, true)
+    and all:find("Gouge: Apply Stunned 1", 1, true) and all:find("Can't be Stunned: Demoralized 2", 1, true)
+    and all:find("Flourish: +2 damage per other card name played this turn", 1, true), all)
 
   -- 2. combat avec Deflection : l'épique en jeu dès la première main, ligne des ripostes du tour
   clickOption("class:rogue")
@@ -9688,7 +9699,7 @@ do
     c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " " .. pct), tostring(line()))
   local tt = table.concat(H.hover(host.box), " | ")
   check("vue de classe : survol = la carte épique (nom, texte, explication)", tt:find("Inner Focus", 1, true)
-    and tt:find("First card", 1, true), tt)
+    and tt:find("Empower", 1, true) and tt:find("The first Attack or Skill each turn becomes a Cast", 1, true), tt)
   snap("uep-inner-focus", true)
   -- les autres épiques, posées dans le même combat (la vue ne lit que le combat)
   local function setEpic(eid, up) c.epic.id, c.epic.up = eid, up or false end
@@ -9739,8 +9750,8 @@ do
   local tip = { lines = {} }
   function tip:AddLine(t) self.lines[#self.lines + 1] = t end
   function tip:NumLines() return #self.lines end
-  local want = { prayer_of_mending = "Each heal:", echo_of_light = "Regen tick:", shadow_covenant = "Shadow cards:",
-    voidform = "Voidform:", inner_focus = "First card:" }
+  local want = { prayer_of_mending = "Divine Star:", misery = "Contagion:", echo_of_light = "Sanctify:",
+    shadow_covenant = "Life Tap:", reflective_shield = "Reflect:", voidform = "Madness:", inner_focus = "Empower:" }
   local tbad = {}
   for _, eid in ipairs(P.EPICS) do
     tip.lines = {}
@@ -10107,6 +10118,168 @@ if SNAP then
   end
   Render.svg(H, big, SNAP .. "/cartes_mage_epiques.svg", "épiques du Mage (base, améliorée)")
   big:Hide()
+end
+
+print("UEL épiques en deux lignes au plus : les 35 (base, améliorée) mesurées par la mise en page, mots de règle et leur à-côté, planche")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, L, Card = ns.Widgets, ns.Language, ns.Card
+  local function plain(t)
+    return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR))
+  end
+  local CLASSES = { priest = 1, warrior = 2, mage = 3, rogue = 4, hunter = 5 }
+  local ids = {}
+  for id, d in pairs(ns.Cards) do
+    if d.rarity == "epic" and d.zone and not d.variant and CLASSES[d.class] then ids[#ids + 1] = id end
+  end
+  table.sort(ids, function(a, b)
+    local A, B = ns.Cards[a], ns.Cards[b]
+    if A.class ~= B.class then return CLASSES[A.class] < CLASSES[B.class] end
+    return a < b
+  end)
+  check("35 épiques de classe (7 par classe)", #ids == 35, #ids)
+  -- 1. lignes du texte tel que la carte le rend (W.cardMaxLines : 2), palier 8,5 ou plus, jamais tronqué
+  local card = W.card(UI().content)
+  local bad, dist = {}, {}
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit, label = card.bodyFit, id .. (up and "+" or "")
+      local shown = 0
+      for l in (W.cardBodyText(card) .. "\n"):gmatch("(.-)\n") do if l ~= "" then shown = shown + 1 end end
+      if not fit.ok or (fit.lines or 99) > W.EPIC_LINES or shown ~= fit.lines or fit.size < W.EPIC_FLOOR
+        or fit.mode ~= "clauses" then
+        bad[#bad + 1] = ("%s : %s lignes (%d affichées), palier %s, %s"):format(label, tostring(fit.lines), shown,
+          tostring(fit.size), tostring(fit.mode))
+      end
+      dist[fit.size] = (dist[fit.size] or 0) + 1
+    end
+  end
+  local ds = {}
+  for _, s in ipairs(W.BODY_SIZES) do if dist[s] then ds[#ds + 1] = s .. " → " .. dist[s] end end
+  print("      paliers des 70 faces : " .. table.concat(ds, ", "))
+  check(("textes des 35 épiques (base, améliorée) : %d lignes au plus, palier %s ou plus, en clauses, rien de tronqué")
+    :format(W.EPIC_LINES, tostring(W.EPIC_FLOOR)), #bad == 0, table.concat(bad, " ; "))
+  -- témoin : sans la limite, Deflection prendrait trois lignes à 10 (le texte du joueur, « Each Parry gained: »)
+  local paras = W.cardParagraphs(W.cardBody(Card.defById("deflection")), "clauses")
+  local TZ, CW = W.CARD_TEXT, W.CARD_W
+  local free = W.layoutBody(paras, 10, TZ.top * CW, TZ.bottom * CW)
+  local two = W.layoutBody(paras, 10, TZ.top * CW, TZ.bottom * CW, 2)
+  check("témoin : Deflection tiendrait en 3 lignes à 10, pas en 2 (la limite des épiques choisit un palier plus petit)",
+    free and #free.lines == 3 and two == nil, free and #free.lines)
+  -- 2. mots de règle (L.rule) : chacun employé par une épique, son à-côté dans l'infobulle de la carte, une ou deux
+  -- phrases courtes, 110 caractères au plus avec le nom, sans N laissé, sans « ; » ni parenthèse
+  local used, kbad = {}, {}
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  local sheets = {}
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      local d = Card.defById(id, up)
+      local label = id .. (up and "+" or "")
+      tip.lines = {}
+      W.fillCardTooltip(tip, id, up)
+      local all = {}
+      for _, l in ipairs(tip.lines) do all[#all + 1] = plain(l) end
+      sheets[label] = all
+      local words = L.ruleWords(d)
+      for _, r in ipairs(words) do
+        used[r.key] = true
+        local want = r.kw.name .. ": " .. plain(W.inlineIcons(L.ruleText(r.kw, r.n, up), 12))
+        local line
+        for _, l in ipairs(all) do if l == want then line = l end end
+        if not line then kbad[#kbad + 1] = label .. " : pas d'à-côté « " .. want .. " »"
+        else
+          local len = W.utf8len(line)
+          local sentences = select(2, line:gsub("[.!?]$", "")) + select(2, line:gsub("[.!?] ", ""))
+          if len > 110 or sentences > 2 or line:find("[;()]") or line:find("%f[%w]N%f[%W]")
+            or not line:find("^[^:]+: [%u+%d]") then
+            kbad[#kbad + 1] = label .. " : « " .. line .. " » (" .. len .. ")"
+          end
+        end
+        -- le nom est un mot-clé de la carte : coloré sur la carte
+        local body = W.cardBody(d)
+        if not body:find(W.colorize(r.kw.name, W.KEYWORD_COLOR), 1, true) then
+          kbad[#kbad + 1] = label .. " : « " .. r.kw.name .. " » pas en couleur sur la carte"
+        end
+      end
+    end
+  end
+  local nRules = 0
+  for key, kw in pairs(L.keywords) do
+    if kw.rule then
+      nRules = nRules + 1
+      if not used[key] then kbad[#kbad + 1] = key .. " : mot de règle employé par aucune épique" end
+      -- nom unique : ni état, ni condition, ni autre mot-clé, ni carte (sauf Riposte, nom choisi par le joueur)
+      for _, s in pairs(ns.Statuses) do if s.name == kw.name then kbad[#kbad + 1] = key .. " : nom d'état" end end
+      for _, c in ipairs(L.conditions) do if c.name == kw.name then kbad[#kbad + 1] = key .. " : nom de condition" end end
+      for k2, o in pairs(L.keywords) do
+        if k2 ~= key and o.name == kw.name and not o.rule then kbad[#kbad + 1] = key .. " : nom d'un mot-clé" end
+      end
+      for cid, c in pairs(ns.Cards) do
+        if c.name == kw.name and cid ~= "riposte" then kbad[#kbad + 1] = key .. " : nom de la carte " .. cid end
+      end
+    end
+  end
+  check(("mots de règle des épiques (%d) : employés, à-côté dans l'infobulle (une ou deux phrases, 110 caractères au plus), nom en couleur sur la carte, nom unique")
+    :format(nRules), #kbad == 0, table.concat(kbad, "\n        "))
+  local rip = table.concat(sheets["deflection"], "\n")
+  local RD = ns.Rogue.riposteDamage
+  check("Deflection : « Riposte 1 » / « Riposte 2 », à-côté du joueur, nombres de l'effet codé (1, 3, 5… ; 2, 4, 6…)",
+    Card.defById("deflection").text == "Epic.\nEach Parry gained: Riposte 1."
+    and Card.defById("deflection", true).text == "Epic.\nEach Parry gained: Riposte 2."
+    and rip:find("Riposte: Deal 1 damage to the last target, +2 per earlier Riposte this turn.", 1, true)
+    and table.concat(sheets["deflection+"], "\n"):find("Riposte: Deal 2 damage to the last target, +2 per earlier", 1, true)
+    and RD(1) == 1 and RD(2) == 3 and RD(3) == 5 and RD(1, true) == 2 and RD(2, true) == 4 and RD(3, true) == 6, rip)
+  card:Hide()
+  -- 3. planche : chaque épique (base, améliorée) et son à-côté (lignes de l'infobulle, repliées comme dans le jeu)
+  if SNAP then
+    local perRow, cw, ch = 3, 490, 160
+    local rows = math.ceil(#ids / perRow)
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, rows * ch + 20)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    for i, id in ipairs(ids) do
+      local col, row = (i - 1) % perRow, math.floor((i - 1) / perRow)
+      local x0, y0 = 10 + col * cw, 10 + row * ch
+      for r, up in ipairs({ false, true }) do
+        local cd = W.card(big)
+        cd:SetCard(id, up, { playable = true })
+        W.placeCenter(cd, big, x0 + 42 + (r - 1) * 82, y0 + 72, 0.62)
+      end
+      -- nom, puis à-côté de la carte de base (gris) et de l'améliorée (vert), lignes repliées à ~44 caractères
+      local name = W.label(big, "bold", 11, { 0.64, 0.21, 0.93 })
+      name:SetPoint("TOPLEFT", big, "TOPLEFT", x0 + 195, -(y0 + 4))
+      name:SetText(ns.Cards[id].name)
+      local y = y0 + 20
+      for r, up in ipairs({ false, true }) do
+        local label = id .. (up and "+" or "")
+        for _, l in ipairs(sheets[label]) do
+          if not l:find("^Epic:") and not l:find("^One epic card") and not l:find("^While in the deck") and l ~= " " then
+            local rest = l
+            while rest ~= "" do
+              local piece = rest
+              if W.utf8len(rest) > 44 then
+                local cut = 44
+                while cut > 1 and rest:sub(cut, cut) ~= " " do cut = cut - 1 end
+                piece, rest = rest:sub(1, cut - 1), rest:sub(cut + 1)
+              else rest = "" end
+              local fs = W.label(big, "regular", 10, r == 1 and { 0.85, 0.85, 0.85 } or { 0.5, 1, 0.5 })
+              fs:SetPoint("TOPLEFT", big, "TOPLEFT", x0 + 195, -y)
+              fs:SetText(piece)
+              y = y + 12
+            end
+          end
+        end
+        y = y + 4
+      end
+    end
+    Render.svg(H, big, SNAP .. "/epiques_mots_cles.svg", "épiques : texte en deux lignes, mot de règle et son à-côté (gris : base, vert : améliorée)")
+    big:Hide()
+  end
 end
 
 print("U16 méthodes d'API inconnues appelées")
