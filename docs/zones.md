@@ -10,7 +10,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | Ordre | Id (`ns.Zones`) | Nom affiché | Fichier de données | État |
 | --- | --- | --- | --- | --- |
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
-| 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
+| 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | jouable (Curse, boss Morbent Fel ; décors peints forêt noire, cimetière, Darkshire ; 14/11/2026, docs/zones/duskwood.md « Implémentation ») |
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
@@ -262,6 +262,16 @@ horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
 `westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
+
+Accessoires génériques ajoutés par Duskwood (14/11/2026, `UI/Scene.lua`, `PROPS`) : `deadtree` (arbre mort tordu),
+`oak` (feuillu sombre, liseré de lune `rim`), `pine` (sapin), `treeline` (lisière de x à x2 : `{ "treeline", x, y,
+échelle, plan, x2 }`), `bush`, `tombstone` (variante `cross`), `crypt` (variante `lit` : porte éclairée, `pal.glow`),
+`lamppost`, `web` (`pal.web`), `mist` (banc de brume de x à x2), `glow` (flaque de lumière : `pal.glow`, variante
+`moon` : `rim` du plan) ; plan `back` (lisière derrière la brume de l'horizon, couleurs `pal.back`). Couleurs de
+plan en plus : `light`, `rim = { couleur, alpha }`.
+
+Contenu d'une fiche de zone (commun, bibelots de clé) : champ libre `sheet = "<zone>"` ; les listes d'origine des
+tests communs (`Sim/tests.lua`, `Sim/tests_expedition.lua`, `UN` du harnais) le laissent à part, la zone le teste.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 

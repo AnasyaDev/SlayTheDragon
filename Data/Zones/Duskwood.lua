@@ -66,7 +66,7 @@ C.morbents_bane.up = { text = C.morbents_bane.text }
 ---------------------------------------------------------------------------
 
 E.dark_runner = {
-  name = "Nightbane Dark Runner", hp = { 21, 24 },
+  name = "Nightbane Dark Runner", hp = { 23, 26 },
   moves = {
     bite = { name = "Bite", intent = "attack", actions = { { "attack", 7, curse = "rabies" } } },
     pounce = { name = "Pounce", intent = "attack", actions = { { "attack", 4, times = 2 } } },
@@ -75,7 +75,7 @@ E.dark_runner = {
 }
 
 E.vile_fang = {
-  name = "Nightbane Vile Fang", hp = { 28, 31 },
+  name = "Nightbane Vile Fang", hp = { 30, 33 },
   moves = {
     vile_bite = { name = "Vile Bite", intent = "attack", actions = { { "attack", 9, curse = "rabies" } } },
     maul = { name = "Maul", intent = "attack", actions = { { "attack", 12 } } },
@@ -85,7 +85,7 @@ E.vile_fang = {
 }
 
 E.shadow_weaver = {
-  name = "Nightbane Shadow Weaver", hp = { 18, 21 },
+  name = "Nightbane Shadow Weaver", hp = { 19, 22 },
   moves = {
     hex = { name = "Curse of Weakness", intent = "curse", cast = true,
       actions = { { "curse", "curse_of_weakness", to = "draw" } } },
@@ -95,7 +95,7 @@ E.shadow_weaver = {
 }
 
 E.plague_spreader = {
-  name = "Plague Spreader", hp = { 15, 17 },
+  name = "Plague Spreader", hp = { 16, 18 },
   moves = {
     cloud = { name = "Plague Cloud", intent = "curse", actions = { { "curse", "fevered_plague", to = "discard" } } },
     claw = { name = "Claw", intent = "attack", actions = { { "attack", 6 } } },
@@ -104,7 +104,7 @@ E.plague_spreader = {
 }
 
 E.venom_spider = {
-  name = "Venom Web Spider", hp = { 19, 22 },
+  name = "Venom Web Spider", hp = { 21, 24 },
   moves = {
     web = { name = "Web", intent = "curse", actions = { { "curse", "web", to = "hand" } } },
     venom_bite = { name = "Venom Bite", intent = "attack", actions = { { "attack", 6 }, { "debuff", "pain", 2 } } },
@@ -113,7 +113,7 @@ E.venom_spider = {
 }
 
 E.pygmy_spider = {
-  name = "Pygmy Venom Web Spider", hp = { 9, 11 },
+  name = "Pygmy Venom Web Spider", hp = { 10, 12 },
   moves = {
     nip = { name = "Nip", intent = "attack", actions = { { "attack", 3 }, { "debuff", "pain", 1 } } },
   },
@@ -121,7 +121,7 @@ E.pygmy_spider = {
 }
 
 E.rotted_one = {
-  name = "Rotted One", hp = { 34, 38 },
+  name = "Rotted One", hp = { 37, 41 },
   moves = {
     claw = { name = "Putrid Claw", intent = "attack", actions = { { "attack", 10 } } },
     shamble = { name = "Shamble", intent = "defend", actions = { { "block_ally", 9 } } },
@@ -130,7 +130,7 @@ E.rotted_one = {
 }
 
 E.splinter_fist = {
-  name = "Splinter Fist Warrior", hp = { 36, 40 },
+  name = "Splinter Fist Warrior", hp = { 39, 43 },
   moves = {
     club = { name = "Club", intent = "attack", actions = { { "attack", 9 } } },
     bellow = { name = "Bellow", intent = "buff", actions = { { "block", 8 }, { "buff", "force", 2 } } },
@@ -141,7 +141,7 @@ E.splinter_fist = {
 
 -- Ouverture violente (Ambush au premier tour), puis Stab et Kick en alternance.
 E.night_runner = {
-  name = "Defias Night Runner", hp = { 21, 24 },
+  name = "Defias Night Runner", hp = { 23, 26 },
   moves = {
     ambush = { name = "Ambush", intent = "attack", actions = { { "attack", 13 } } },
     stab = { name = "Stab", intent = "attack", actions = { { "attack", 7 } } },
@@ -206,9 +206,9 @@ E.morladim = {
 
 -- Goule relevée par Morbent (sbire) : Bite qui pose Fevered Plague.
 E.fetid_corpse = {
-  name = "Fetid Corpse", hp = { 12, 14 }, minion = true,
+  name = "Fetid Corpse", hp = { 15, 17 }, minion = true,
   moves = {
-    rotting_claw = { name = "Rotting Claw", intent = "attack", actions = { { "attack", 5, curse = "fevered_plague" } } },
+    rotting_claw = { name = "Rotting Claw", intent = "attack", actions = { { "attack", 6, curse = "fevered_plague" } } },
   },
   pattern = { "rotting_claw" },
 }
@@ -216,13 +216,13 @@ E.fetid_corpse = {
 E.morbent_fel = {
   name = "Morbent Fel", hp = 92, boss = true, gift = "morbents_bane",
   moves = {
-    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
+    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 17 } } },
     tongues = { name = "Curse of Tongues", intent = "curse",
       actions = { { "attack", 7, times = 2 }, { "curse", "curse_of_tongues", to = "hand" } } },
     drain_life = { name = "Drain Life", intent = "attack", actions = { { "attack", 14 }, { "heal_self", 6 } } },
     unholy_shield = { name = "Unholy Shield", intent = "defend", cast = true,
       actions = { { "block", 10 }, { "buff", "unholy_shield", 1 } } },
-    shadow_bolt2 = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 23 } } },
+    shadow_bolt2 = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
     drain_life2 = { name = "Drain Life", intent = "attack", actions = { { "attack", 16 }, { "heal_self", 8 } } },
   },
   pattern = { "shadow_bolt", "tongues", "drain_life" },
@@ -230,7 +230,7 @@ E.morbent_fel = {
   phases = {
     { at = 0.5, name = "Raise Dead", text = "Summons 2 Fetid Corpses, then casts Unholy Shield again.",
       say = "Rise, and serve your master!", enter = { { "summon", "fetid_corpse", count = 2 } },
-      open = "unholy_shield", pattern = { "unholy_shield", "shadow_bolt2", "tongues", "drain_life2" }, startAt = 2 },
+      open = "unholy_shield", pattern = { "unholy_shield", "shadow_bolt2", "tongues", "drain_life2", "tongues" }, startAt = 2 },
   },
 }
 
