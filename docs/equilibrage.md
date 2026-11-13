@@ -757,3 +757,15 @@ Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic 
 15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
 ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
 `docs/zones/cartes-de-zone.md`, section « Rogue ».
+
+## Swamp of Sorrows : passe de difficulté (14/11/2026)
+
+Cible de la zone 5 : 60 % de victoires en moyenne, écart entre classes ≤ 10 points (`runner=expedition key=0
+zone=swamp zones=4 level=7`, épique gagnée sur les élites). Avant (800 expéditions) : Priest 73,4, Warrior 64,2,
+Mage 62,0, Rogue 52,5, Hunter 59,4 % (moyenne 62,3, écart 21). Après (1 500) : Priest 64,5, Warrior 60,3, Mage
+60,3, Rogue 60,2, Hunter 57,1 % (moyenne **60,5**, écart **7,4**). Le Priest, qui se soigne en combat, atteignait
+Somnus dans 95 % des expéditions contre 69 % au Rogue (élites Gilmorian et Chieftain à 80 %) et ne perdait qu'au
+boss, où il est le plus lent. Changements, dans la zone seule : Death Roll 20 → 10 × 2 et Spear Thrust 13 → 7 × 2
+(deux coups que Parry arrête) ; Gilmorian Lightning Bolt 20 → 16, Healing Wave 20 → 24 ; soin de Slumber de Wyrmak
+6 → 9 ; Somnus 140 PV (135) et Wing Buffet donne Strength 3 (le boss coûte plus cher aux combats longs : Priest
+et Warrior). Détails, essais écartés et mesures par rencontre : `docs/zones/swamp.md`, « Passe de difficulté ».

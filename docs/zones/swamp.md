@@ -639,7 +639,7 @@ harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg
 
 | Ennemi | PV | Coups |
 |---|---|---|
-| Sawtooth Crocolisk | 37–42, Asleep 2 | Death Roll 20 · Snap 10 · Submerge block 7 |
+| Sawtooth Crocolisk | 37–42, Asleep 2 | Death Roll 10 × 2 · Snap 10 · Submerge block 7 |
 | Dreaming Whelp | 15–16, Asleep 2 | Dream Breath 10 · Bite 4 |
 | Swampwalker | 45–49, Asleep 3 | Bog Crush 22 (interrompt) · Vine Lash 7 · Bog Shield 6 + 6 au plus blessé |
 | Green Scalebane | 42–45, Asleep 2 | Cleave 23 · Strike 10 · Scale Guard block 10, Strength 1 |
@@ -648,11 +648,11 @@ harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg
 | Deathstrike Tarantula | 28–31 | Venomous Bite 5 + DoT 3 · Web 4 + Demoralized 1 |
 | Marsh Inkspewer | 15–17 | Claw 4 · Ink Spit 3 + Sundered 1 |
 | Lost One Hunter | 30–33 | Spear Thrust 10 · Net 4 + Demoralized 1 |
-| Lost One Chieftain (élite) | 108, Asleep 2 | Spear of the Lost 24 · Thrust 13 · Rally block 8 + Strength 2 · Crushing Blow 7 + Sundered 1 |
+| Lost One Chieftain (élite) | 108, Asleep 2 | Spear of the Lost 24 · Thrust 7 × 2 · Rally block 8 + Strength 2 · Crushing Blow 7 + Sundered 1 |
 | Lost One Muckdweller (serviteur) | 21–23 | Warning Horn (Alarm) · Stab 5 |
-| Lord Captain Wyrmak (élite) | 116 | Cleave 15 · Tail Sweep 7 + block 8 · Wing Buffet 10 + Demoralized ; à 58 : Slumber 2, soin 6, Dream Fury 14 × 2 |
-| Gilmorian (élite) | 108 | Lightning Bolt 20 (Cast) · Frost Shock 6 + Demoralized · Healing Wave 20 (Cast) |
-| Somnus (boss) | 135, Asleep 2 | Bellowing Roar 16 + Demoralized ; Noxious Breath 6 × 2 + DoT 3 · Claw 20 · Wing Buffet 10 + block 10 ; à 67 : 2 dragonnets (14 PV, Bite 4), Slumber 2, soin 5, Deep Breath 10 × 2, puis Claw 21 · Breath 7 × 2 + DoT 3 · Buffet |
+| Lord Captain Wyrmak (élite) | 116 | Cleave 15 · Tail Sweep 7 + block 8 · Wing Buffet 10 + Demoralized ; à 58 : Slumber 2, soin 9, Dream Fury 14 × 2 |
+| Gilmorian (élite) | 108 | Lightning Bolt 16 (Cast) · Frost Shock 6 + Demoralized · Healing Wave 24 (Cast) |
+| Somnus (boss) | 140, Asleep 2 | Bellowing Roar 16 + Demoralized ; Noxious Breath 6 × 2 + DoT 3 · Claw 20 · Wing Buffet 10 + block 10 + Strength 3 ; à 67 : 2 dragonnets (14 PV, Bite 4), Slumber 2, soin 5, Deep Breath 10 × 2, puis Claw 21 · Breath 7 × 2 + DoT 3 · Buffet |
 
 ### Mesures (14/11/2026, après la fusion des épiques ; 400 expéditions par classe et par colonne,
 `runner=expedition key=0 zone=swamp zones=4 level=7`, avec `epic=none` et sans `epic=` : le bot choisit une épique)
@@ -671,6 +671,47 @@ et Warrior (12 à 14 PV, pour 36 et 74 PV max), un peu longs pour le Priest sans
 Clés (Rogue avec épique) : +0 65,8 %, +1 58,8 %, +3 49,8 %, +5 43,0 % (−7, puis −4,5 et −3,4 par niveau ; affixes
 communs). Statistiques de zone : `reports/final.txt` (avant la fusion : 0,55 ouverture subie par combat normal,
 0,45 dormeur tué avant son ouverture, 0,44 Rude Awakening, 0,32 Alarm).
+
+### Passe de difficulté (14/11/2026) : cible 60 %, écart ≤ 10
+
+Mesure : `luajit Sim/sim.lua runs=1500 bot=heuristic jobs=5 runner=expedition key=0 class=<c> zone=swamp zones=4
+level=7` (épique gagnée sur les élites, sans `epic=`). Avant : 800 expéditions.
+
+| Classe | Victoires avant → après | Somnus avant → après | PV perdus / normal avant → après |
+|---|---|---|---|
+| Priest | 73,4 → 64,5 % | 76,8 → 68,0 % (7,4 tours) | 14,4 → 13,9 |
+| Warrior | 64,2 → 60,3 % | 76,1 → 69,2 % (6,3 tours) | 13,8 → 13,8 |
+| Mage | 62,0 → 60,3 % | 69,4 → 66,7 % (5,5 tours) | 8,6 → 8,6 |
+| Rogue | 52,5 → 60,2 % | 76,1 → 73,2 % (6,1 tours) | 11,5 → 10,8 |
+| Hunter | 59,4 → 57,1 % | 61,9 → 59,2 % (6,0 tours) | 7,6 → 7,6 |
+| **Moyenne, écart** | 62,3 (21 points) → **60,5 (7,4 points)** | | |
+
+Diagnostic : victoire ≈ (part des expéditions qui atteignent Somnus) × (victoire contre Somnus). Le Priest, qui se
+soigne en combat, atteignait le boss dans 95 % des expéditions ; le Rogue, sans soin, dans 69 % seulement (élites
+Gilmorian 79 %, Chieftain 80 %, Wyrmak 86 % ; normal tarentule + crocolisk + murloc 85 %). Le Priest ne perdait
+qu'au boss, où il est le plus lent (7,4 tours). Changements (concept et identités gardés, nombres et nombre de
+coups seulement) :
+
+1. **Death Roll 20 → 10 × 2** (Sawtooth Crocolisk) et **Spear Thrust 13 → 7 × 2** (Lost One Chieftain) : deux
+   coups que chaque charge de Parry arrête presque entiers (8 au plus par coup) ; neutre pour l'Absorb, le Block
+   et les Traps des autres classes. Rogue : tarentule + crocolisk 85 → 89 %, Chieftain 80 → 87 %.
+2. **Gilmorian : Lightning Bolt 20 → 16, Healing Wave 20 → 24.** Moins de dégâts aide les classes qui les
+   encaissent (Rogue, Warrior) ; plus de soin coûte aux classes lentes. Rogue 79 → 91 %, Warrior 89 → 93 %.
+3. **Wyrmak : soin de Slumber 6 → 9** par tour de sommeil (règle de la fiche : 12) : les combats longs (Priest,
+   Warrior) paient plus.
+4. **Somnus : Wing Buffet donne Strength 3** (comme Scale Guard du Green Scalebane), **PV 135 → 140.** Le
+   boss frappe plus fort à chaque cycle : le coût croît avec la durée du combat, donc pèse surtout sur le Priest
+   (7,4 tours) et le Warrior (6,3), peu sur le Mage, le Rogue et le Hunter (5,5 à 6,1). Mesuré à 800 : Strength
+   2 seule, Priest boss 76,8 → 73,0 %, Rogue 76,1 → 76,6 %.
+
+Essais écartés (800 expéditions, Rogue et Priest) : soin de Somnus 5 → 9 et PV 145 (Rogue boss 76 → 70 %,
+Priest 77 → 72 % : pas assez sélectif) ; Claw 20 → 10 × 2, Deep Breath 10 × 2 → 7 × 4, Noxious Breath 5 × 3
+(Rogue boss 70 → 57 %, Priest 72 → 60 % : les charges de Parry, une à trois, ne couvrent pas quatre coups ; les
+coups multiples n'aident le Rogue que par deux).
+
+Reste : le Hunter est le plus bas (57,1 %) et le perd presque tout au boss (59 %, 30 PV perdus) ; le Priest
+reste le plus haut (64,5 %) parce qu'il atteint le boss 19 fois sur 20. Combat le plus dur : Somnus pour toutes
+les classes ; les combats « easy » restent à 100 %.
 
 ### Modèles en repli
 

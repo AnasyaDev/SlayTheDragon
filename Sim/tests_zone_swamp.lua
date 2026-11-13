@@ -16,6 +16,11 @@ return function(T)
     for _, a in ipairs(ns.Enemies[id].moves[mv].actions) do if a[1] == "attack" then return a[2], a.times or 1 end end
     return 0, 0
   end
+  -- dégâts totaux des coups d'un move (coup × nombre de coups)
+  local function total(id, mv)
+    local n, k = atk(id, mv)
+    return n * k
+  end
   local function block(id, mv, k)
     local n = 0
     for _, a in ipairs(ns.Enemies[id].moves[mv].actions) do if a[1] == k then n = a[2] end end
@@ -48,7 +53,7 @@ return function(T)
     Combat.endTurn(c)
     eq(c.player.hp, 80, "réveil sans agir"); eq(e.st.asleep, nil); eq(e.intent, "death_roll", "ouverture annoncée")
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll"), "Death Roll"); eq(e.intent, "snap", "le motif reprend au début")
+    eq(c.player.hp, 80 - total("sawtooth_crocolisk", "death_roll"), "Death Roll"); eq(e.intent, "snap", "le motif reprend au début")
   end)
 
   test("Swamp : Rude Awakening (+50 % arrondi au supérieur, coup à une cible), réveil, ouverture dans ce round", function()
@@ -58,7 +63,7 @@ return function(T)
     play(c, "smite", 1)
     eq(hp - e.hp, ceil(8 * 1.5)); eq(e.st.asleep, nil); eq(e.intent, "death_roll"); eq(e.mem.forced, nil)
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll"), "ouverture jouée dans la phase ennemie de ce round")
+    eq(c.player.hp, 80 - total("sawtooth_crocolisk", "death_roll"), "ouverture jouée dans la phase ennemie de ce round")
     eq(e.intent, "snap")
   end)
 
@@ -122,7 +127,7 @@ return function(T)
     Combat.endTurn(d)
     eq(d.player.hp, 80, "tour perdu"); eq(x.intent, "death_roll", "ouverture gardée")
     Combat.endTurn(d)
-    eq(d.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll"))
+    eq(d.player.hp, 80 - total("sawtooth_crocolisk", "death_roll"))
   end)
 
   test("Swamp : Freezing Trap pendant l'ouverture : tour arrêté, ouverture rejouée ; un dormeur ne déclenche pas de Trap", function()
@@ -222,7 +227,7 @@ return function(T)
     eq(croc.intent, "death_roll"); eq(wh.intent, "dream_breath")
     eq(o.intent, "bolt")
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll") - atk("dreaming_whelp", "dream_breath") - atk("marsh_oracle", "bolt"), "deux ouvertures et Lightning Bolt")
+    eq(c.player.hp, 80 - total("sawtooth_crocolisk", "death_roll") - atk("dreaming_whelp", "dream_breath") - atk("marsh_oracle", "bolt"), "deux ouvertures et Lightning Bolt")
   end)
 
   test("Swamp : Alarm interrompue ne réveille personne", function()
@@ -281,7 +286,7 @@ return function(T)
     eq(c.player.hp, 80 - atk("lost_one_chieftain", "spear") - atk("lost_one_muckdweller", "stab"))
   end)
 
-  test("Swamp : Wyrmak à mi-vie s'endort APRÈS la carte (Slumber 2, soin 6 par tour de sommeil, Dream Fury)", function()
+  test("Swamp : Wyrmak à mi-vie s'endort APRÈS la carte (Slumber 2, soin 9 par tour de sommeil, Dream Fury)", function()
     local c = sw({ enemies = { "wyrmak" }, kind = "elite", hand = { "penance" }, hp = 90 })
     local w = c.enemies[1]
     w.hp = 60
@@ -289,13 +294,13 @@ return function(T)
     eq(w.hp, 60 - 15, "les trois coups sans bonus : le sommeil tombe après la carte")
     eq(w.st.asleep, 2); eq(w.intent, "asleep"); eq(w.mem.forced, "dream_fury"); eq(w.mem.phase, 1)
     Combat.endTurn(c)
-    eq(w.hp, 45 + 6); eq(w.st.asleep, 1); eq(c.player.hp, 90)
+    eq(w.hp, 45 + 9); eq(w.st.asleep, 1); eq(c.player.hp, 90)
     -- Stunned sur lui endormi : compteur gelé, pas de soin
     Combat.applyStatus(c, w, "stunned", 1)
     Combat.endTurn(c)
-    eq(w.hp, 51); eq(w.st.asleep, 1)
+    eq(w.hp, 54); eq(w.st.asleep, 1)
     Combat.endTurn(c)
-    eq(w.hp, 57); eq(w.st.asleep, nil); eq(w.intent, "dream_fury")
+    eq(w.hp, 63); eq(w.st.asleep, nil); eq(w.intent, "dream_fury")
     Combat.endTurn(c)
     eq(c.player.hp, 90 - 2 * atk("wyrmak", "dream_fury")); eq(w.intent, "cleave", "le motif reprend à Cleave")
   end)
@@ -309,7 +314,23 @@ return function(T)
     g.hp = 50
     g.intent = "wave"
     Combat.endTurn(c)
-    eq(g.hp, 70)
+    eq(g.hp, 50 + block("gilmorian", "wave", "heal_ally"))
+  end)
+
+  test("Swamp : Somnus — Wing Buffet lui donne Strength (un combat long coûte plus cher)", function()
+    local str
+    for _, a in ipairs(ns.Enemies.somnus.moves.buffet.actions) do if a[1] == "buff" then str = a[3] end end
+    assert(str and str > 0, "Wing Buffet donne Strength")
+    local c = sw({ enemies = { "somnus" }, kind = "boss", hp = 90 })
+    local s = c.enemies[1]
+    S.wake(c, s, "test")
+    s.intent = "buffet"
+    Combat.endTurn(c)
+    eq(s.st.force, str)
+    eq(c.player.hp, 90 - atk("somnus", "buffet"))
+    s.intent = "claw"
+    Combat.endTurn(c)
+    eq(c.player.hp, 90 - atk("somnus", "buffet") - atk("somnus", "claw") - str, "Claw + Strength")
   end)
 
   test("Swamp : Somnus — Asleep 2 et Bellowing Roar ; immunisé à Stunned et à Dream Dust", function()
