@@ -910,7 +910,7 @@ end)
 test("Warrior : chaque carte (base et améliorée) jouable sans erreur, texte et effets cohérents", function()
   local n = 0
   for id, d0 in pairs(ns.Cards) do
-    if d0.class == "warrior" then
+    if d0.class == "warrior" and not d0.zone then -- cartes de zone (épiques) : Sim/tests_epic_warrior.lua
       for _, up in ipairs({ false, true }) do
         local c = setup({ id }, { "test_dummy", "test_caster" }, { "strike", "strike", "strike", "strike" },
           { class = "warrior", hp = 60 })
@@ -932,7 +932,7 @@ end)
 test("Warrior : 34 cartes (4 de départ, 13/11/6), 10 par voie, 6 bibelots de classe, Interrupt et Last Breath", function()
   local r, paths, nInt, nLb = {}, {}, 0, 0
   for id, d in pairs(ns.Cards) do
-    if d.class == "warrior" then
+    if d.class == "warrior" and not d.zone then -- cartes de zone (épiques) : Sim/tests_epic_warrior.lua
       r[d.rarity] = (r[d.rarity] or 0) + 1
       paths[d.path] = (paths[d.path] or 0) + 1
       for _, e in ipairs(d.effects) do if e[1] == "interrupt" then nInt = nInt + 1 end end

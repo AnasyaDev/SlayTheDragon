@@ -137,8 +137,9 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `cooldown` | d, inst | durée d'une recharge posée (`d.cooldown` ; 1 au moins : Hourglass Sand) |
 | `replay` | inst, ctx | copies de la carte résolues tout de suite après elle, même cible (premier ennemi vivant si elle est morte), sans coût, la carte ne part qu'une fois ; `ctx.copy` vrai pour une copie, journal `replay` (Ironfoe ; Windfury Totem du Shaman) |
 | `applySelf` | état | valeur d'un état posé sur le héros, toutes sources (Benediction : Regen +1) |
-| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)` (l'affichage des crans ne le lit pas encore) |
+| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)`, lu aussi par les crans et l'infobulle de la pastille (`UI/CombatView.lua` : au-delà de 5 crans, second arc) |
 | `attackMult` | cible, d | multiplicateur des coups d'une carte Attack (1 ; Death Wish : 1,5), après `damage` (Strength et ajouts), avant Demoralized / Sundered, arrondi à l'inférieur |
+| `canPlay` | d, inst | vrai par défaut ; une chaîne = la carte est injouable, la chaîne est la raison affichée (Titan's Grip : `"Only 1 Attack per turn."`) ; après `allow`, avant `d.canPlay` |
 | `canGainBlock` | — | vrai par défaut ; faux = aucun Absorb gagné (Death Wish), avant le crochet `block` ; un gain ≤ 0 après `block` ne fait rien |
 | `trapLaunch` | d, inst | faux par défaut ; vrai = la Trap demande une cible (`Combat.targetOf`, `Combat.needsTarget(inst, c)`) et se déclenche aussitôt sur elle (`Combat.launchTrap` : mêmes effets, `onTrapTriggered` avec why = `"launch"`), sans emplacement (jouable zone pleine) |
 | `stealthBreak` | inst, d | Rogue : vrai par défaut ; faux = la première Attack profite de Stealth (lignes « Stealth: ») sans le retirer (Subterfuge ; la carte dit quand il tombe) |
@@ -502,6 +503,42 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
   vivante (boss : Demoralized 2).
 - **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;
   `damage` ajoute N par autre id, au plus le plafond.
+
+### Épiques du Guerrier (14/11/2026)
+
+Sept épiques (`Data/Warrior.lua`, une par zone), règles et nombres dans `Core/Classes/warrior.lua`
+(`ns.Warrior.EPIC`, crochets `deckHooks`, `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
+`ns.Warrior.epicOf(c)` = épique en jeu (`c.epic`) : id, amélioré. Crochets employés : `canGainBlock`,
+`attackMult`, `onEnemyDeath` (Death Wish) ; `onResource` (Thunderous Roar) ; `onDamageDealt` (Sweeping Strikes,
+rebond sans ctx) ; `replay`, `canPlay` (nouveau), `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's Grip :
+la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne la
+Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge` et
+`ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main aussitôt) ;
+`resCap`, `onTurnStart` (Avatar). Événement de journal `epic_trigger` (card, unit) : sans animation propre.
+Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge ; Anger Management si une tranche dépasse 1).
+Coups sans carte des épiques : genre « other » (`Combat.hitInfo`), à tous pour l'onde et le rebond, à une cible
+pour Shield Charge, dont la cible passe aussi par le crochet de zone `petTarget` (dormeurs du Swamp).
+
+Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=warrior
+zones=7 level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 85,8 %, combat normal 2,95 tours et 8,2 PV ;
+± 2,2 points) :
+
+| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
+|---|---|---|---|---|
+| Death Wish | 92,3 % | +6,5 | 2,03 ; 8,7 | — |
+| Thunderous Roar | 93,2 % | +7,4 | 2,41 ; 7,5 | 6 / 9 + Demoralized 1 → 3 / 5 sans Demoralized |
+| Sweeping Strikes | 96,2 % | +10,4 | 2,10 ; 6,1 | — |
+| Titan's Grip | 96,6 % | +10,8 | 2,66 ; 6,3 | 2 Attacks par tour → 1 |
+| Shield Charge | 95,4 % | +9,6 | 3,05 ; 6,4 | moitié de l'Absorb → quart |
+| Anger Management | 91,8 % | +6,0 | 3,12 ; 7,7 | 3 / 2 Rage par cran → 1 Rage, −1 / −2 |
+| Avatar | 88,1 % | +2,3 | 3,01 ; 8,4 | +1 / +2 → +2 / +3 (+3 / +4 n'apporte rien) |
+
+Avatar reste sous la cible : sa Rage n'a presque pas de débouché dans un deck de Westfall (Execute, Ignore
+Pain, Onslaught à trouver en 4 ou 5 choix), le bot la dépense déjà dès qu'il peut ; à revoir avec la règle.
+
+Bots : `classDef.bot.byEpic[id]` (tables de notes, d'amélioration et de retrait tirées du « Deck piloté » de la
+fiche) ; `classDef.bot.epic(exp, id)` note une épique proposée (accord avec le deck, attachement à l'épique du
+deck : une épique de même note n'en remplace jamais une autre).
 
 ## Sauvegarde
 

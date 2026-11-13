@@ -50,6 +50,8 @@ local added = {}
 -- remplacent ; règles réelles : Sim/tests_epic_rogue.lua), remises à la fin
 local realRogue = {}
 for id, d in pairs(Cards) do if d.class == "rogue" and d.rarity == "epic" then realRogue[id] = d end end
+-- de même pour celles du Guerrier (règles réelles : Sim/tests_epic_warrior.lua), remises avec elles
+for id, d in pairs(Cards) do if d.class == "warrior" and d.rarity == "epic" then realRogue[id] = d end end
 for id in pairs(realRogue) do Cards[id] = nil end
 -- de même pour celles du Hunter (règles réelles : Sim/tests_epic_hunter.lua)
 local realHunter = {}

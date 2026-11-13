@@ -1482,6 +1482,9 @@ function Combat.canPlay(c, idx)
   if d.trap and #c.traps >= Combat.modify(c, "trapSlots", Combat.TRAP_SLOTS)
       and not Combat.trapLaunch(c, d, inst) then return false, "traps" end
   if not allowed(c, d) then return false, "forbidden" end
+  -- crochet « canPlay » (d, inst) : vrai par défaut ; une chaîne = injouable, avec cette raison (Titan's Grip)
+  local veto = Combat.modify(c, "canPlay", true, d, inst)
+  if veto ~= true then return false, veto or "forbidden" end
   if d.canPlay and not d.canPlay(c, inst) then return false, "condition" end
   -- valeur modifiée « canPlay » (d, inst) : vrai par défaut ; une chaîne rend la carte injouable, avec
   -- cette raison (Voidform)
