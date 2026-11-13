@@ -10,11 +10,9 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | Ordre | Id (`ns.Zones`) | Nom affiché | Fichier de données | État |
 | --- | --- | --- | --- | --- |
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
-| 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
+| 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | jouable (Curse, boss Morbent Fel ; décors peints forêt noire, cimetière, Darkshire ; 14/11/2026, docs/zones/duskwood.md « Implémentation ») |
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | jouable (14/11/2026 : mécanique Pack, élites Sarltooth / Modr / Dragonmaw Centurion, boss Chieftain Nek'rosh, 8 rencontres, commun du tier 3, bibelots de clé, Gryphon Master, huit décors peints ; détails : `docs/zones/wetlands.md`, « Implémentation ») |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
-| 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
-| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | jouable depuis le 14/11/2026 (Slumber : dormeurs, ouvertures, Rude Awakening ; boss Somnus ; sept décors peints) ; détails et mesures : `docs/zones/swamp.md`, « Implémentation » |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
@@ -282,6 +280,13 @@ huttes, tour de guet, temple, roseaux) et ses mares sont peints par son plan `la
 PNG de `Media/` dans `build/media_png` (`tools/build_media.py`, ou une conversion des TGA) ; sans eux, taches fondues
 et disques sont dessinés en rectangles dans les SVG du harnais.
 
+Accessoires génériques ajoutés par Duskwood (14/11/2026, `UI/Scene.lua`, `PROPS`) : `deadtree` (arbre mort tordu),
+`oak` (feuillu sombre, liseré de lune `rim`), `pine` (sapin), `treeline` (lisière de x à x2 : `{ "treeline", x, y,
+échelle, plan, x2 }`), `bush`, `tombstone` (variante `cross`), `crypt` (variante `lit` : porte éclairée, `pal.glow`),
+`lamppost`, `web` (`pal.web`), `mist` (banc de brume de x à x2), `glow` (flaque de lumière : `pal.glow`, variante
+`moon` : `rim` du plan) ; plan `back` (lisière derrière la brume de l'horizon, couleurs `pal.back`). Couleurs de
+plan en plus : `light`, `rim = { couleur, alpha }`.
+
 Les Wetlands (`UI/Art/Zones/wetlands.lua`) ajoutent leurs accessoires au registre `S.PROPS` sous le nom
 `wl_<genre>` au premier décor de la zone peint (UI/Scene.lua est chargé après les fichiers d'art), utilisables
 dans `props` par toute zone qui peint après eux : `wl_marsh_tree` (variante `dead`), `wl_rocks`, `wl_ship`
@@ -291,7 +296,7 @@ dans `props` par toute zone qui peint après eux : `wl_marsh_tree` (variante `de
 **Commun déclaré par une zone** : poser `fromZone = "<zone>"` sur les cartes neutres et bibelots déclarés par
 `ns.Declare.*` ; les tests du commun d'origine (`Sim/tests.lua`, `Sim/tests_expedition.lua`, harnais : paliers
 0 à 3) ne comptent pas ces entrées (vérifiées par `Sim/tests_zone_<zone>.lua`). Nécessaire pour une zone dont le
-commun est au palier 3 ou moins (Wetlands) ; les zones 4 à 7 sont déjà hors de ces comptes.
+commun est au palier 3 ou moins (Duskwood, Wetlands) ; les zones 4 à 7 sont déjà hors de ces comptes.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 

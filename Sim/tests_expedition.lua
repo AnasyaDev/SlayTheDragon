@@ -834,7 +834,9 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   end
   for id, ev in pairs(ns.Events) do
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
-    assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
+    -- décor commun, ou décor propre à la zone de la rencontre (ns.Zones[zone].scenes : town, woods…)
+    local zsc = ev.zone and ns.Zones[ev.zone].scenes
+    assert(SCENES[ev.scene] or (zsc and zsc[ev.scene]), id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
     assert(ev.tier >= 0 and ev.tier <= ns.Zone.count(), id .. " : tier")
     if ev.zone == "westfall" then fam[ev.rarity] = fam[ev.rarity] + 1 end
@@ -1740,7 +1742,7 @@ test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule"
   local m = db.meta
   assert(Meta.zoneOpen(m, "mage", "westfall")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
   local e, why = Save.start(db, { seed = 1, class = "mage", zone = "duskwood" })
-  eq(e, nil); eq(why, "zone coming later", "Duskwood : déclarée, pas jouable")
+  eq(e, nil); eq(why, ns.Zone.playable("duskwood") and "zone locked" or "zone coming later", "Duskwood : fermée au Mage")
   finishIn(db, "mage", "westfall", 0, "lost")
   eq(Meta.zoneOpen(m, "mage", "duskwood"), false, "défaite : rien")
   local s = finishIn(db, "mage", "westfall", 0)
