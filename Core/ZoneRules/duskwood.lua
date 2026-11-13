@@ -16,7 +16,7 @@
 -- une carte de moins), cost (Curse of Tongues : +1 à la première carte jouée du tour, pas sur elle-même).
 -- Boss : Unholy Shield (dégâts subis divisés par 2, sans durée) retiré par Morbent's Bane, carte donnée en
 -- main au début du combat (champ d'ennemi `gift`).
--- Commun de la zone 2 : l'affiche WANTED (case de parcours « wanted_poster », effet de rencontre « wanted »).
+-- Commun de la zone 2 : l'affiche WANTED (case de parcours « night_watch_poster », effet de rencontre « wanted »).
 local _, ns = ...
 
 local Combat, Card, ZR, X = ns.Combat, ns.Card, ns.ZoneRule, ns.Expedition
@@ -238,5 +238,5 @@ X.EFFECTS.wanted = {
   end,
 }
 
-X.nodeKind("wanted_poster", { name = "Wanted Poster", tier = 2, zone = "duskwood", event = "wanted_poster",
+X.nodeKind("night_watch_poster", { name = "Wanted Poster", tier = 2, zone = "duskwood", event = "night_watch_poster",
   replaces = { "event" }, minFloor = 2, maxFloor = 5 })

@@ -92,7 +92,7 @@ return function(T)
     local c = dusk({ enemies = { "fetid_corpse", "dark_runner" }, intents = { "rotting_claw", "pounce" } })
     Combat.endTurn(c)
     eq(DW.count(c, nil, "fevered_plague"), 1); eq(DW.count(c, nil, "rabies"), 0, "Pounce n'est pas un Bite")
-    eq(c.player.hp, 60 - 5 - 8)
+    eq(c.player.hp, 60 - 6 - 8)
   end)
 
   test("Hex en incantation (Shadow Weaver) : Curse of Weakness sur la pioche ; interrompue : rien", function()
@@ -414,7 +414,7 @@ return function(T)
       local ev = ns.Events[id]
       assert(ns.Zones.duskwood.scenes[ev.scene] or ev.scene == "road", id .. " : décor")
     end
-    assert(not pool.wanted_poster, "affiche : jamais tirée")
+    assert(not pool.night_watch_poster, "affiche : jamais tirée")
     assert(not pool.saldean_farm, "pas de rencontre de Westfall")
     -- combat de Sven : deux worgens
     exp.node, exp.phase = exp.map.start[1], "map"
@@ -426,12 +426,12 @@ return function(T)
   test("affiche WANTED (commun de la zone 2) : case placée, élite nommée, prochaine élite imposée, +50 po, amélioration", function()
     local exp = newExp({ unlocks = { level = 7, common = 2, won = { westfall = 0 } } })
     local id
-    for _, n in ipairs(exp.map.nodes) do if n.kind == "wanted_poster" then id = n.id end end
+    for _, n in ipairs(exp.map.nodes) do if n.kind == "night_watch_poster" then id = n.id end end
     assert(id, "case placée")
     local e1 = newExp({ unlocks = { level = 7, common = 1, won = { westfall = 0 } } })
-    for _, n in ipairs(e1.map.nodes) do assert(n.kind ~= "wanted_poster", "pas avant la première victoire du compte") end
+    for _, n in ipairs(e1.map.nodes) do assert(n.kind ~= "night_watch_poster", "pas avant la première victoire du compte") end
     exp.node, exp.phase = exp.map.start[1], "map"
-    X.openEvent(exp, "wanted_poster")
+    X.openEvent(exp, "night_watch_poster")
     local text = X.eventText(exp)
     local roll = exp.event.rolls[1][1]
     local name = ns.Enemies[ns.Encounters.duskwood.elite[roll.group.idx][1]].name
@@ -458,7 +458,7 @@ return function(T)
     local function has(list, id) for _, x in ipairs(list) do if x == id then return true end end return false end
     assert(has(cc.cards, "anti_venom") and has(cc.cards, "zombie_juice"))
     for _, r in ipairs({ "ogres_monocle", "night_watch_shortsword", "mistmantle_family_ring" }) do assert(has(cc.relics, r), r) end
-    assert(has(cc.events, "wanted_poster"))
+    assert(has(cc.events, "night_watch_poster"))
     local keys = Meta.keyRelics("priest", "duskwood")
     local byLevel = {}
     for _, k in ipairs(keys) do byLevel[k.level] = k.id end

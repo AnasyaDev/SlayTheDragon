@@ -128,7 +128,7 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `apply` | état, cible, d | valeur d'un état posé sur un ennemi |
 | `block`, `heal` | — | Absorb gagné, soin reçu |
 | `target` | d, inst | cible d'une carte (rediriger) ; la cible retenue va dans `c.player.lastTarget` |
-| `instantCast` | d, inst, commit | une carte Cast part tout de suite (autre source que l'état Instant) ; ne rien consommer si commit est faux |
+| `instantCast` | d, inst, commit | une carte Cast part tout de suite (autre source que l'état Instant) ; ne rien consommer si commit est faux. Interrogé **avant** l'état Instant (qui n'est alors pas consommé) ; cible visée dans `c.aim` (uid, nil = inconnue : `canPlay`) ; `Combat.castFits(c, d, inst, cible)` : emplacements pleins, la carte n'est légale (`legalPlays`) et jouable (`play`, raison `casting`) que sur une cible où elle part tout de suite (Fingers of Frost) |
 | `trapSlots` | — | nombre de Traps posées au plus (3) |
 | `castSlots` | — | nombre d'incantations tenues à la fois (1 ; Mage : 2) |
 | `powerLasts` | d, inst | durée d'un Power à durée |
@@ -137,8 +137,9 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `cooldown` | d, inst | durée d'une recharge posée (`d.cooldown` ; 1 au moins : Hourglass Sand) |
 | `replay` | inst, ctx | copies de la carte résolues tout de suite après elle, même cible (premier ennemi vivant si elle est morte), sans coût, la carte ne part qu'une fois ; `ctx.copy` vrai pour une copie, journal `replay` (Ironfoe ; Windfury Totem du Shaman) |
 | `applySelf` | état | valeur d'un état posé sur le héros, toutes sources (Benediction : Regen +1) |
-| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)` (l'affichage des crans ne le lit pas encore) |
+| `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)`, lu aussi par les crans et l'infobulle de la pastille (`UI/CombatView.lua` : au-delà de 5 crans, second arc) |
 | `attackMult` | cible, d | multiplicateur des coups d'une carte Attack (1 ; Death Wish : 1,5), après `damage` (Strength et ajouts), avant Demoralized / Sundered, arrondi à l'inférieur |
+| `canPlay` | d, inst | vrai par défaut ; une chaîne = la carte est injouable, la chaîne est la raison affichée (Titan's Grip : `"Only 1 Attack per turn."`) ; après `allow`, avant `d.canPlay` |
 | `canGainBlock` | — | vrai par défaut ; faux = aucun Absorb gagné (Death Wish), avant le crochet `block` ; un gain ≤ 0 après `block` ne fait rien |
 | `trapLaunch` | d, inst | faux par défaut ; vrai = la Trap demande une cible (`Combat.targetOf`, `Combat.needsTarget(inst, c)`) et se déclenche aussitôt sur elle (`Combat.launchTrap` : mêmes effets, `onTrapTriggered` avec why = `"launch"`), sans emplacement (jouable zone pleine) |
 | `stealthBreak` | inst, d | Rogue : vrai par défaut ; faux = la première Attack profite de Stealth (lignes « Stealth: ») sans le retirer (Subterfuge ; la carte dit quand il tombe) |
@@ -147,6 +148,10 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `blockKeep` | Absorb actuelle | (rappel) la valeur gardée ; fraction et plafond se calculent sur le 2e argument (`max(v, min(15, floor(block / 2)))`) |
 | `retainPicks` | — | cartes gardées au choix en fin de tour (0 ; Traveler's Backpack : 1, une seule gérée) ; le choix est posé par `Combat.markRetain(c, uid)` avant la fin du tour (interface, `Bots.markRetain`), `Combat.retainCandidates(c)` = index proposés |
 | `surge` | ctx | montant compté par les effets d'un Surge qui a dépensé quelque chose (Anathema : +2) ; la dépense ne change pas |
+| `canPlay` | d, inst | vrai par défaut ; une chaîne rend la carte injouable avec cette raison (affichée telle quelle : Voidform), après les autres raisons de `Combat.canPlay` |
+| `castAs` | d, inst | faux par défaut ; vrai = une carte Attack ou Skill qui n'est pas Cast part en incantation (`c.player.cast`, résolue au début du tour suivant, interruptible ; Inner Focus) |
+| `regenHeal` | — | valeur soignée par le tic de Regen du joueur (la Regen elle-même ; 0 = ne soigne pas : Echo of Light) ; la Regen baisse ensuite de 1 comme d'habitude |
+| `convertHit` | cible, ctx | dégâts d'un coup de l'effet `damage` après `calcDamage` (`Core/Effects.lua`) ; `false` = coup non porté, le crochet a posé autre chose à la place (Doomblade : un DoT) : ni dégâts, ni `onHit`, ni `onAttackHit` |
 | `maxMana`, `drawPerTurn`, `enemyHp`, `canFlee` | — | inchangés |
 
 Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
@@ -176,6 +181,7 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | `afterHit` | ennemi, PV perdus, absorbés | après chaque coup ennemi, même absorbé (ripostes, Traps) |
 | `onStatusApplied` | unité, état, n | état posé |
 | `onDotTick` | unité, n | après le tick d'un DoT |
+| `onRegenTick` | n | tic de Regen du joueur (valeur avant la baisse), après le soin éventuel (`regenHeal`) : Echo of Light |
 | `onEnemyDeath` | ennemi | mort d'un ennemi (Soul Shards) |
 | `onPowerEnd` | inst, raison | Power remplacé (`replaced`) ou expiré (`expired`) |
 | `preventDeath` | — | le joueur tombe à 0 : true = sauvé (Last Breath) ; l'événement `saved` porte la source |
@@ -347,6 +353,10 @@ simulent chaque coup sur une copie) ; une classe les guide par `bot` (définitio
 (règles), et `Bots.POWER_VALUE[id]` pour un Power dont la valeur n'est pas la valeur par défaut. Cibles
 et mesures (12/11/2026 : 62–72 % au niveau 1 sur un compte neuf, 72–82 % au niveau 7 avec tout le
 commun, `zones=7` (ex-« Ligue exaltée »), clé 0) : `docs/equilibrage.md` ; notes des cartes du bot tirées des balayages (méthode au même endroit).
+Build piloté par l'épique du deck (`Sim/expedition.lua`) : `bot.byEpic[id] = { rating, upgrade, remove }`, chacun
+une table `{ [carte] = note }` ou une fonction `(exp, carte) -> note|nil`, prime sur `bot.rating` / `upgrade` /
+`remove` tant que l'épique est dans le deck (choix des récompenses, rencontres, marchand, feu de camp, retraits) ;
+`bot.epic(exp, id)` note les épiques proposées (exemple complet : `Data/Rogue.lua`).
 
 ## Exemple minimal
 
@@ -388,7 +398,7 @@ ns.ClassRules.rogue = { hooks = {
 | Instant, double Cast (Mage) | état commun `instant`, `castSlots` = 2, file `cast` + `castMore` (interruption : la plus récente), `onCastResolved`, `onCardCommitted` + `c.turn.bySchool` (Hot Streak), condition `school:fire` |
 | Pay N HP, démon (Warlock) | `payHp` (crochet `payHp`, `onPayHp`), Power `slot = "demon"`, `replacedTo = "exhaust"`, `onTurnEnd`, `c.player.lastTarget`, `dotDecay`, `onDotTick`, `onEnemyDeath` |
 | Powers de fin de tour | `onTurnEnd` sur le Power (avant la défausse) |
-| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
+| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua ; `Hunter.petAttackOn(c, why, ennemi)` : cible imposée le temps d'une attaque, Trap Launcher, Black Arrow) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
 | Traps (Hunter) | commun : `trap = true`, zone `c.traps`, déclenchement avant les coups de l'attaque (`Combat.triggerTrap`), `onTrapTriggered` |
 | Stunned pendant le tour ennemi (Trap, riposte) | commun : `Combat.applyStatus` pose `e.stopTurn` si l'ennemi est celui qui agit (`c.acting`) ; `executeMove` arrête le tour avant le coup suivant (aucun coup de l'attaque qui a déclenché l'effet), consomme une charge, journal `{ t = "stunned", stopped = true }` ; « act » n'est journalisé qu'à la première action qui part (`decisions.md`) |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
@@ -424,6 +434,150 @@ pile ; elle n'a pas de coût et ne se joue jamais. Contrat pour écrire une épi
   (`Combat.resCap(c)`, deux arcs au-delà de 6).
 - Pas d'`innate` ni de logique de pioche ou de main pour une épique : elle n'est jamais dans une pile. Le mot
   `Innate` reste pour les cartes ordinaires.
+
+### Épiques du Prêtre (14/11/2026)
+
+Les sept épiques sont écrites (`Data/Priest.lua`, règles et crochets dans
+`Core/Classes/priest.lua` : `ns.Priest`, deckHooks posés sur les définitions, src = `c.epic`, nombres réglables `ns.Priest.*`,
+`ns.ClassRules.priest` = `botValue` / `botKey` seulement ; vue `ns.ClassViews.priest` dans `UI/Art/priest.lua` ;
+tests `Sim/tests_epic_priest.lua`, harnais UEP). Points ajoutés au moteur : valeurs `canPlay`, `castAs`, `regenHeal`,
+notification `onRegenTick` ; le crochet `payHp` est interrogé aussi pour une carte sans `payHp` (base 0 : Shadow
+Covenant). Inner Focus multiplie
+dégâts, Absorb, soin, DoT et Regen pendant la résolution de la carte incantée par ses propres crochets (`beforeCard`
+/ `onCardPlayed` + `damage`, `block`, `heal`, `apply`, `applySelf`) : le soin d'Atonement de cette carte est
+multiplié aussi. Bots : `classDef.bot.byEpic[id]` (cartes centrales, améliorations, retraits de chaque build),
+`classDef.bot.epic(exp, id)` note l'épique selon les cartes centrales déjà prises.
+### Hunter : les sept épiques (14/11/2026)
+
+Données et règles dans `Data/Hunter.lua` (bloc « Cartes épiques », nombres réglés dans la table `EPIC`,
+exposée en `ns.HunterEpic`), tests `Sim/tests_epic_hunter.lua`, harnais « UEH ». Aucun crochet ajouté au
+moteur : tout passe par les crochets existants, en `deckHooks` de l'épique (`src` = `c.epic`, posée hors des
+piles par le socle, crochets en dernier) ; `whileInDeck` = `ns.Hunter.epicStart(c, src)` retient l'épique en
+jeu (`c.cls.epic = { id, up }`, lu par la vue et les bots : `ns.Hunter.epic(c)`). Nombres réglés par la
+simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 12 / 16 dégâts en
+plus ; Lone Wolf +1 → +2 par Frenzy (amélioré +3 au lieu de « Start of turn: +1 Frenzy. », trop long pour
+la carte) ; Chimaera Shot 3 / 3 (6) → 4 / 4 (7) ; Trap Launcher 1 / 2 (fiche).
+
+| Épique | Crochets | Remarques |
+|---|---|---|
+| Call of the Wild | `onTurnStart` | `Hunter.petAttack(c, "epic")` après la pioche et la baisse du Frenzy |
+| Trap Launcher | `trapLaunch`, `onTrapTriggered` (why = `"launch"`) | familier sur la cible de la Trap ; Resourcefulness : une Trap lancée revient en main à la fin du round (`c.cls.trapBack`, `onRoundEnd` du Power), pas tout de suite |
+| Beast Cleave | `petAll`, `onPetAttack` (amélioré) | |
+| Roar of Sacrifice | `beforeHit` | journal `{ t = "roar", prevented }` (« Roar » flottant de la vue), `c.stats.roarPrevented` |
+| Master Marksman | `instantCast` (cible = `c.player.lastTarget`), `damage`, `afterCast` | question de `canPlay` (commit faux) : vraie si un ennemi vivant est intact ; journal `cast_instant` |
+| Black Arrow | `onDotTick` | familier sur l'ennemi qui tique, sans changer sa cible |
+| Lone Wolf | `petAbsent`, `damage`, `onTurnStart` ; `transforms` (9 variantes `variant = true`) | Pet Whistle : +1 Frenzy au lieu d'une attaque (règle du bibelot ; texte `loneText` montré par `UI/Art/hunter.lua`) |
+
+Ajouts de la classe : `Hunter.petAttackOn(c, why, ennemi)` (cible imposée par `c.cls.petForce`, lue par
+`Hunter.petTarget` : la signature de `petAttack` / `petTarget`, enveloppées par Core/ZoneRules.lua, ne change pas) ;
+effet `{ "damageOther", n }` (« Deal N to another enemy. », Chimaera Shot : l'ennemi vivant le plus à gauche
+autre que la cible) ; déclencheurs « Each enemy DoT tick », « Attack hits », « Each Attack hit ». Vue
+(`ns.ClassViews.hunter`) : figure et marqueur du familier cachés sans familier, « Roar » flottant, ligne de l'épique sous les états du héros (icône, infobulle = la carte, et ce qu'elle change maintenant : `Art.hunterEpicLine(c)`, lue par le harnais).
+Interface commune touchée au minimum : `UI/Controller.lua` montre une carte proposée en récompense ou chez le
+marchand sous sa variante quand l'épique du deck la transforme (`shownCard`, `from` = l'originale ; la carte
+prise entre au deck sous son id d'origine). Bots : `classDef.bot.epic(exp, id)` (note d'offre) et
+`classDef.bot.byEpic[id]` = `{ rating, upgrade, remove }` (point d'accroche partagé de `Sim/expedition.lua`),
+notes qui priment tant que l'épique est dans le deck ; en combat,
+`Hunter.EPIC_RES[id]` ajoute de la valeur au Frenzy gardé (Roar of Sacrifice, Lone Wolf) dans `botValue` ;
+l'épique du deck vaut 5 de plus pour le bot (`EPIC_KEEP`) : il ne la remplace que pour bien mieux, et une
+épique imposée (`epic=<id>`) reste mesurée seule.
+
+### Épiques du Voleur (14/11/2026)
+
+Données et nombres (`EPIC_N`, seule source : textes et règles) dans `Data/Rogue.lua` ; règles (`deckHooks`,
+`ns.Rogue`) dans `Core/Classes/rogue.lua` ; vue (ligne de l'épique sous les états du héros, marques
+d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, harnais UER.
+- **Deflection** : `onStatusApplied` (Parry sur le héros, `n` demandé avant le plafond de 3) ; compteur
+  `c.cls.ripostes` du tour (`c.cls.riposteRound`, le début du combat compte pour le tour 1, le tour ennemi
+  continue le compte) ; coup sans carte (`calcDamage` avec `cardDef` nil) sur `c.player.lastTarget` ou l'ennemi
+  vivant le plus à gauche ; journal `{ t = "riposte", dst, n, base }`. `ns.Rogue.ripostes(c)`, `nextRiposte(c)`.
+- **Doomblade** : crochet moteur `convertHit` (ci-dessus), Attacks à effet `surge` seulement ; DoT par le crochet
+  `apply` (Crystal Vial), icône poison.
+- **Atrophic Poison** : `enemyDamage` (×0,75 si l'ennemi garde du DoT après son tick : hors du tour ennemi, on
+  retire la baisse `dotDecay`, l'intention affichée est juste ; pas de cumul avec un vrai Demoralized),
+  amélioré `damage` (×1,25, pas de cumul avec Sundered). `ns.Rogue.countsDemoralized(c, e)`.
+- **Echoing Reprimand** : `surge` (2 ou 3 -> N) ; aucune autre source du Voleur ne modifie `surge` avant.
+- **Subterfuge** : `stealthBreak` faux ; durée `c.cls.stealthUntil` (posée à chaque Stealth reçu, et par
+  `whileInDeck` pour celui du départ), retrait dans `onTurnEnd` ; Combo par Stealth gagné (`c.cls.stealthGained`).
+- **Kidney Shot** : `onSurge` (dépense réelle, carte à cible) marque le `ctx`, `onCardPlayed` étourdit la cible
+  vivante (boss : Demoralized 2).
+- **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;
+  `damage` ajoute N par autre id, au plus le plafond.
+
+### Épiques du Guerrier (14/11/2026)
+
+Sept épiques (`Data/Warrior.lua`, une par zone), règles et nombres dans `Core/Classes/warrior.lua`
+(`ns.Warrior.EPIC`, crochets `deckHooks`, `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
+`ns.Warrior.epicOf(c)` = épique en jeu (`c.epic`) : id, amélioré. Crochets employés : `canGainBlock`,
+`attackMult`, `onEnemyDeath` (Death Wish) ; `onResource` (Thunderous Roar) ; `onDamageDealt` (Sweeping Strikes,
+rebond sans ctx) ; `replay`, `canPlay` (nouveau), `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's Grip :
+la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne la
+Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge` et
+`ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main aussitôt) ;
+`resCap`, `onTurnStart` (Avatar). Événement de journal `epic_trigger` (card, unit) : sans animation propre.
+Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge ; Anger Management si une tranche dépasse 1).
+Coups sans carte des épiques : genre « other » (`Combat.hitInfo`), à tous pour l'onde et le rebond, à une cible
+pour Shield Charge, dont la cible passe aussi par le crochet de zone `petTarget` (dormeurs du Swamp).
+
+Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=warrior
+zones=7 level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 85,8 %, combat normal 2,95 tours et 8,2 PV ;
+± 2,2 points) :
+
+| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
+|---|---|---|---|---|
+| Death Wish | 92,3 % | +6,5 | 2,03 ; 8,7 | — |
+| Thunderous Roar | 93,2 % | +7,4 | 2,41 ; 7,5 | 6 / 9 + Demoralized 1 → 3 / 5 sans Demoralized |
+| Sweeping Strikes | 96,2 % | +10,4 | 2,10 ; 6,1 | — |
+| Titan's Grip | 96,6 % | +10,8 | 2,66 ; 6,3 | 2 Attacks par tour → 1 |
+| Shield Charge | 95,4 % | +9,6 | 3,05 ; 6,4 | moitié de l'Absorb → quart |
+| Anger Management | 91,8 % | +6,0 | 3,12 ; 7,7 | 3 / 2 Rage par cran → 1 Rage, −1 / −2 |
+| Avatar | 88,1 % | +2,3 | 3,01 ; 8,4 | +1 / +2 → +2 / +3 (+3 / +4 n'apporte rien) |
+
+Avatar reste sous la cible : sa Rage n'a presque pas de débouché dans un deck de Westfall (Execute, Ignore
+Pain, Onslaught à trouver en 4 ou 5 choix), le bot la dépense déjà dès qu'il peut ; à revoir avec la règle.
+
+Bots : `classDef.bot.byEpic[id]` (tables de notes, d'amélioration et de retrait tirées du « Deck piloté » de la
+fiche) ; `classDef.bot.epic(exp, id)` note une épique proposée (accord avec le deck, attachement à l'épique du
+deck : une épique de même note n'en remplace jamais une autre).
+
+### Épiques du Mage (14/11/2026)
+
+Données et nombres (`epicN`, `epicM`, `epicPeriod`, `epicEvery`, base et `up`, lus par les crochets) dans
+`Data/Mage.lua` (`epic(...)` : `cost = 0`, jamais payé) ; règles (`deckHooks`, src = `c.epic`) dans
+`Core/Classes/mage.lua` ; vue dans `UI/Art/mage.lua` ; tests `Sim/tests_epic_mage.lua`, harnais UEM ; bot :
+`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ≈ 5 + gain / 2 ; l'épique du deck vaut 3 de plus : le deck est construit autour).
+État de combat dans `c.cls` (`carry`, `fof`, `fofOn`, `r3`, `r3surge`). `epicPeriod = 3` : l'épique n'agit qu'aux
+tours 3, 6, 9… (`Combat.epicTurn(src, round)`, déclencheur « Every 3rd turn »).
+- **Mirror Image** : `afterCast` (`Combat.mirrorHit` : premier coup de la carte Cast, base + N, cible tirée par
+  `c.rng.cards`, coup de la même carte : Charges, Shatter, `onAttackHit`).
+- **Molten Armor** : `afterHit` (DoT N par coup, même absorbé, valeur passée par `apply`).
+- **Water Elemental** : `onTurnStart` des tours actifs (`Combat.elementalTarget` : dernière cible, sinon la plus à
+  gauche ; un dormeur `asleep` seulement si tous dorment), coup sans carte, Demoralized 1.
+- **Fingers of Frost** : crochet moteur `instantCast` lu avec la cible (`c.aim`, `Combat.castFits` ci-dessus) ;
+  amélioré : `damage` + N pendant la résolution de la carte partie ainsi.
+- **Arcane Meditation** : `onTurnEnd` garde `min(mana, N)` dans `c.cls.carry`, `onTurnStart` l'ajoute (au-delà du
+  maximum, affiché « 7/3 »).
+- **Conflagration** : `onEnemyDeath` (DoT du mort, lu avant tout nettoyage ; + N à chaque autre ennemi vivant, sans
+  `apply`).
+- **Rule of Threes** : `onCardCommitted` marque la 3e carte du tour (améliorée : chaque 3e) si c'est une Attack et
+  si le tour est actif ; `replay` la double ; `beforeCard` donne à la copie le Surge de l'original.
+- Vue : ligne violette de l'épique (`Art.mageEpicText` : mana gardé, rang de la carte, cible ou repos de
+  l'élémentaire, Frozen) ; nom flottant sur l'événement `{ t = "epic", id, dst|src|card }`.
+
+Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=mage zones=7
+level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 79,5 %, combat normal 3,04 tours et 5,3 PV ; ± 2,5 points) :
+
+| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
+|---|---|---|---|---|
+| Mirror Image | 89,7 % | +10,2 | 2,72 ; 6,1 | coup en plus = premier coup + 0 / + 4 → − 6 / − 2 (à 0 : +14,0) |
+| Molten Armor | 88,0 % | +8,5 | 3,10 ; 6,2 | DoT 3 / 5 → 1 / 3 (3 : +16,4 ; 2 : +13,6) |
+| Water Elemental | 88,9 % | +9,4 | 2,89 ; 6,1 | 3 / 5 chaque tour → 5 / 8 aux tours 3, 6, 9… (chaque tour : +17,6) |
+| Fingers of Frost | 90,2 % | +10,7 | 2,60 ; 3,8 | — |
+| Arcane Meditation | 84,0 % | +4,5 | 3,12 ; 6,1 | 3 / 5 → 4 / 6 (3 : +4,8 ; le bot garde peu de mana) |
+| Conflagration | 84,0 % | +4,5 | 2,52 ; 4,6 | + 0 / + 3 → + 8 / + 11 (à + 0 : −1,9) |
+| Rule of Threes | 88,0 % | +8,5 | 2,87 ; 5,6 | toute carte chaque tour → une Attack, aux tours 3, 6, 9… (toute carte : +20,4) |
+
+Les écarts se jouent presque tous au boss (VanCleef : 81 % sans épique) ; près du plafond, le gain sature.
 
 ## Sauvegarde
 

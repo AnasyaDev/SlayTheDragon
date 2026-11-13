@@ -427,10 +427,10 @@ event("webbed_watcher", {
   },
 })
 
--- Affiche de la Night Watch (case de parcours « wanted_poster », Core/ZoneRules/duskwood.lua) : l'élite
+-- Affiche de la Night Watch (case de parcours « night_watch_poster », Core/ZoneRules/duskwood.lua) : l'élite
 -- nommée (tirée à l'entrée) sera la prochaine élite du chemin ; la battre rapporte 50 po et une carte
 -- améliorée au hasard. Jamais tirée au hasard (node = true).
-event("wanted_poster", {
+event("night_watch_poster", {
   name = "Wanted Poster", zone = "duskwood", tier = 2, node = true,
   speaker = "Watcher Backus", npc = "watcher_backus", scene = "road",
   text = "Watcher Backus nails a poster to a post by the road: \"WANTED: %s. The Night Watch pays 50 gold "

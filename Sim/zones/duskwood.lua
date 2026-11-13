@@ -84,7 +84,7 @@ return function(ns, Bots, SE)
 
   -- Affiche WANTED : un peu mieux qu'une rencontre si l'on compte affronter une élite ; la prendre si les
   -- PV le permettent (50 po et une amélioration contre une élite qu'on aurait de toute façon).
-  SE.KIND_SCORE.wanted_poster = function(exp, hpRatio, gold) return 1.3 end
+  SE.KIND_SCORE.night_watch_poster = function(exp, hpRatio, gold) return 1.3 end
   SE.EFFECT_VALUE.wanted = function(exp, e)
     if exp.hp / exp.maxHp < 0.45 then return 0.2 end
     return 1.5 + 0.8

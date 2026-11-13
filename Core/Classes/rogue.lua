@@ -128,9 +128,257 @@ ns.ClassRules.rogue = {
     return (c.player.st.parry or 0) .. ":" .. (c.player.st.stealth or 0)
   end,
   -- Valeur des charges de Parry restantes après le tour ennemi (un coup paré plus tard, environ 5 PV)
-  -- et de Stealth (bonus de la prochaine Attack, environ 8 dégâts).
+  -- et de Stealth (bonus de la prochaine Attack, environ 8 dégâts) ; correction propre à l'épique du deck
+  -- (Rogue.epicBotValue, plus bas).
   botValue = function(c, W)
     local p = c.player
     return (p.st.parry or 0) * 5 * W.hp * 0.8 + (p.st.stealth or 0) * 8 * W.enemyHp
+      + ns.Rogue.epicBotValue(c, W)
   end,
 }
+
+---------------------------------------------------------------------------
+-- Cartes épiques (fiche : docs/zones/cartes-de-zone.md, « Rogue » ; données : Data/Rogue.lua)
+---------------------------------------------------------------------------
+-- Chaque épique est une règle active tout le combat, posée par Combat.new dans c.epic = { id, up, uid }
+-- (hors de toute pile) : crochets « deckHooks », src = c.epic, passés après classe, zones, Powers, bibelots
+-- et affixes (docs/classes.md, « Cartes épiques »). Leur état vit dans c.cls (copié par Combat.clone, sauvegardé), jamais
+-- dans src (partagé entre les copies des bots). Nombres : Rogue.EPIC (base, amélioré), à garder
+-- d'accord avec les textes de Data/Rogue.lua (vérifié par Sim/tests_epic_rogue.lua).
+local Rogue = {}
+ns.Rogue = Rogue
+local C = ns.Cards
+
+Rogue.EPIC = ns.RogueEpicNumbers -- nombres des épiques (Data/Rogue.lua)
+local function num(id, src) return Rogue.EPIC[id][src.up and 2 or 1] end
+
+-- id (et amélioration) de l'épique du Voleur en jeu (c.epic), ou nil.
+function Rogue.epicOf(c)
+  local e = c.epic
+  local d = e and C[e.id]
+  if d and d.class == "rogue" and d.rarity == "epic" then return e.id, e.up end
+  return nil
+end
+
+local function hasSurge(d)
+  local es = d.effects
+  for i = 1, #es do if es[i][1] == "surge" then return true end end
+  return false
+end
+
+-- Cible des ripostes : la dernière cible du Voleur, sinon l'ennemi vivant le plus à gauche.
+function Rogue.riposteTarget(c)
+  local t = c.player.lastTarget and Combat.enemyByUid(c, c.player.lastTarget)
+  if t and not t.dead then return t end
+  return Combat.aliveEnemies(c)[1]
+end
+
+-- Ripostes du tour : remises à 0 au début de chaque tour du Voleur (le début du combat compte pour le
+-- premier tour : Blinding Powder) ; le tour ennemi qui suit continue le compte.
+local function turnKey(c) return c.round > 0 and c.round or 1 end
+function Rogue.ripostes(c)
+  local cls = c.cls
+  if cls.riposteRound ~= turnKey(c) then return 0 end
+  return cls.ripostes or 0
+end
+-- Dégâts de base de la prochaine riposte (nil sans Deflection).
+function Rogue.nextRiposte(c)
+  local id, up = Rogue.epicOf(c)
+  if id ~= "deflection" then return nil end
+  return Rogue.EPIC.deflection[up and 2 or 1] * (Rogue.ripostes(c) + 1)
+end
+
+-- Noms de cartes joués ce tour (Danse Macabre) : c.cls.dmNames, compte c.cls.dmCount, tour c.cls.dmRound.
+function Rogue.namesPlayed(c)
+  local cls = c.cls
+  if cls.dmRound ~= c.round then return 0 end
+  return cls.dmCount or 0
+end
+
+local function bossOrStun(c, t, d)
+  if t.boss then
+    local n = Combat.modify(c, "apply", 2, "demoralized", t, d)
+    if n > 0 then Combat.applyStatus(c, t, "demoralized", n) end
+  else
+    local n = Combat.modify(c, "apply", 1, "stunned", t, d)
+    if n > 0 then Combat.applyStatus(c, t, "stunned", n) end
+  end
+end
+
+local EH = {}
+
+-- Deflection : chaque charge de Parry gagnée (n demandé, avant le plafond de 3) riposte : la k-ième du
+-- tour inflige k × N (coup sans carte : Strength, Sundered comptent) à la dernière cible.
+EH.deflection = {
+  onStatusApplied = function(c, src, unit, id, n)
+    if id ~= "parry" or unit ~= c.player or (n or 0) <= 0 or c.result then return end
+    local cls = c.cls
+    local key = turnKey(c)
+    if cls.riposteRound ~= key then cls.riposteRound, cls.ripostes = key, 0 end
+    local step = num("deflection", src)
+    for _ = 1, n do
+      local t = Rogue.riposteTarget(c)
+      if not t then return end
+      cls.ripostes = cls.ripostes + 1
+      local base = step * cls.ripostes
+      Combat.log(c, { t = "riposte", dst = t.uid, n = cls.ripostes, base = base })
+      stat(c, "ripostes")
+      Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, base, nil))
+      if c.result then return end
+    end
+  end,
+}
+
+-- Doomblade : un coup d'une carte Attack à clause Surge n'est pas porté ; sa cible reçoit un DoT égal aux
+-- dégâts calculés (amélioré : +50 %, arrondi au-dessus) (Combo, Stealth, Sundered),
+-- sans l'Absorb, par le crochet « apply ». Crochet moteur « convertHit » (Core/Effects.lua).
+EH.doomblade = {
+  convertHit = function(c, src, v, t, ctx)
+    local d = ctx and ctx.def
+    if not v or v <= 0 or not d or d.type ~= "attack" or not hasSurge(d) then return v end
+    local n = math.ceil(v * num("doomblade", src) - 1e-9)
+    n = Combat.modify(c, "apply", n, "pain", t, d)
+    if n > 0 then Combat.applyStatus(c, t, "pain", n, "poison") end
+    stat(c, "doombladeDot", n)
+    return false
+  end,
+}
+
+-- Atrophic Poison : un ennemi qui porte du DoT frappe comme sous Demoralized (sans se cumuler avec lui) ;
+-- amélioré, il subit les coups du Voleur comme sous Sundered. Hors du tour ennemi (intentions affichées),
+-- on lit le DoT qui restera après son tick de début de tour.
+local function dotAtHit(c, e)
+  local pain = e.st.pain or 0
+  if pain > 0 and c.phase ~= "enemy" then pain = pain - Combat.modify(c, "dotDecay", 1, e) end
+  return pain > 0
+end
+-- L'ennemi e compte-t-il comme Demoralized (porte du DoT, pas de vrai Demoralized) ? Lu aussi par l'interface.
+function Rogue.countsDemoralized(c, e)
+  return e ~= nil and e.side == "enemy" and not e.dead and (e.st.demoralized or 0) <= 0 and dotAtHit(c, e)
+end
+EH.atrophic_poison = {
+  enemyDamage = function(c, src, v, e)
+    if Rogue.countsDemoralized(c, e) then
+      return math.floor(v * 0.75)
+    end
+    return v
+  end,
+  damage = function(c, src, v, t)
+    if src.up and t and t.side == "enemy" and (t.st.armor_broken or 0) <= 0 and (t.st.pain or 0) > 0 then
+      return math.floor(v * 1.25)
+    end
+    return v
+  end,
+}
+
+-- Echoing Reprimand : un Surge qui dépense 2 ou 3 Combo compte N pour ses effets (la dépense ne change pas).
+-- Le crochet « surge » reçoit la dépense réelle : aucune autre source du Voleur ne le modifie avant.
+EH.echoing_reprimand = {
+  surge = function(c, src, v)
+    if v == 2 or v == 3 then return num("echoing_reprimand", src) end
+    return v
+  end,
+}
+
+-- Subterfuge : les Attacks profitent de Stealth sans le retirer ; il dure T tours (le tour où il est posé
+-- compris : T = 1, il tombe à la fin de ce tour du Voleur ; réglage : T = 2), c.cls.stealthUntil = tour à la
+-- fin duquel il tombe ; un Stealth posé de nouveau repart pour T tours. Chaque Stealth gagné (absent ->
+-- présent, c.cls.stealthGained) donne N Combo (réglage : la fiche le réservait à l'amélioration, +1).
+local function stealthTurns(src) return Rogue.EPIC.subterfugeTurns[src.up and 2 or 1] end
+EH.subterfuge = {
+  stealthBreak = function() return false end,
+  onTurnEnd = function(c)
+    if (c.player.st.stealth or 0) > 0 and c.round >= (c.cls.stealthUntil or 0) then
+      c.player.st.stealth = nil
+      c.cls.hidden = false
+      Combat.log(c, { t = "stealth_end" })
+    end
+  end,
+  onStatusApplied = function(c, src, unit, id)
+    if id ~= "stealth" or unit ~= c.player then return end
+    c.cls.stealthUntil = turnKey(c) + stealthTurns(src) - 1
+    if c.cls.stealthGained then Combat.gainRes(c, num("subterfuge", src), "epic") end
+  end,
+}
+-- Stealth du début de combat (posé par la règle de classe, sans événement) : T tours dès le premier.
+local function subterfugeStart(c, src)
+  if (c.player.st.stealth or 0) > 0 then c.cls.stealthUntil = stealthTurns(src) end
+end
+-- Tours de Stealth restants, ce tour compris (0 sans Stealth ; nil sans Subterfuge). Lu par l'interface.
+function Rogue.stealthLeft(c)
+  if Rogue.epicOf(c) ~= "subterfuge" then return nil end
+  if (c.player.st.stealth or 0) <= 0 then return 0 end
+  return math.max(1, (c.cls.stealthUntil or 0) - turnKey(c) + 1)
+end
+
+-- Kidney Shot : une carte à cible dont le Surge dépense N Combo ou plus pose ensuite Stunned 1 ⌛ sur sa
+-- cible si elle vit ; un boss reçoit Demoralized 2 ⌛.
+EH.kidney_shot = {
+  onSurge = function(c, src, n, ctx)
+    if n >= num("kidney_shot", src) and ctx and ctx.target and ctx.def and ctx.def.target == "enemy" then
+      ctx.kidney = true
+    end
+  end,
+  onCardPlayed = function(c, src, inst, ctx)
+    local t = ctx and ctx.kidney and ctx.target
+    if t and not t.dead and not c.result then
+      ctx.kidney = nil
+      bossOrStun(c, t, ctx.def)
+      stat(c, "kidneyShots")
+    end
+  end,
+}
+
+-- Danse Macabre : chaque coup d'une carte Attack inflige N de plus par nom de carte différent joué dans
+-- ce tour, le sien exclu, au plus C (réglage) ; compté à la résolution, comme Strength, avant Sundered.
+EH.danse_macabre = {
+  onCardCommitted = function(c, src, inst)
+    local cls = c.cls
+    if cls.dmRound ~= c.round then cls.dmRound, cls.dmNames, cls.dmCount = c.round, {}, 0 end
+    if not cls.dmNames[inst.id] then
+      cls.dmNames[inst.id] = true
+      cls.dmCount = cls.dmCount + 1
+    end
+  end,
+  damage = function(c, src, v, t, d)
+    if not d or d.type ~= "attack" then return v end
+    local cls = c.cls
+    if cls.dmRound ~= c.round then return v end
+    local n = (cls.dmCount or 0) - ((cls.dmNames[d.id]) and 1 or 0)
+    if n <= 0 then return v end
+    return v + math.min(num("danse_macabre", src) * n, num("danseCap", src))
+  end,
+}
+
+for id, hooks in pairs(EH) do C[id].deckHooks = hooks end
+C.subterfuge.whileInDeck = subterfugeStart
+
+-- Mots du langage des épiques (déclencheurs « Name: », détails des infobulles ; plaque « Epic » : Core/Language.lua).
+L.trigger("Each Parry gained")
+L.trigger("Gaining Stealth")
+for _, k in ipairs(Rogue.EPIC.kidney_shot) do L.trigger(ns.RogueKidneyLabel(k)) end
+L.trigger("Attack hits")
+-- détail des ripostes (infobulle), une explication par version de Deflection
+for _, k in ipairs(Rogue.EPIC.deflection) do
+  L.keyword("riposte" .. k, { name = "Riposte", pattern = "^Each Parry gained: deal " .. k .. ",",
+    text = ("%d, then %d, %d, %d in a turn, even above Parry 3."):format(k, 2 * k, 3 * k, 4 * k) })
+end
+L.keyword("kidneyBoss", { name = "Boss", pattern = "^Surge of %d%+? Combo: ",
+  text = "gets Demoralized 2 ⌛ instead of Stunned." })
+L.keyword("danseNames", { name = "Names", pattern = "^Attack hits: %+%d per other card name",
+  text = "each different card played this turn counts once." })
+
+-- Bots : correction de la valeur d'une position selon l'épique du combat (ajoutée à botValue).
+--   Echoing Reprimand : 2 ou 3 Combo valent un Surge de 5 (monter à 4 est une perte).
+function Rogue.epicBotValue(c, W)
+  local id, up = Rogue.epicOf(c)
+  if not id then return 0 end
+  if id == "echoing_reprimand" then
+    local r = c.player.res or 0
+    if r == 2 or r == 3 then
+      local cd = ns.Classes.rogue
+      return (Rogue.EPIC.echoing_reprimand[up and 2 or 1] - r) * cd.bot.resValue * 0.8
+    end
+  end
+  return 0
+end

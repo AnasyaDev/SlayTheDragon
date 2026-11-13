@@ -196,7 +196,7 @@ return function(T)
     local e, ns = duskwoodRun(T.SEED + 13)
     local X = ns.Expedition
     local bad = {}
-    for _, id in ipairs({ "sven_camp", "scarlet_raven_tavern", "weathered_grave", "abercrombie_shack", "wanted_poster" }) do
+    for _, id in ipairs({ "sven_camp", "scarlet_raven_tavern", "weathered_grave", "abercrombie_shack", "night_watch_poster" }) do
       e.phase, e.node = "map", e.map.start[1]
       X.openEvent(e, id)
       ns.UI.refresh()
@@ -205,7 +205,7 @@ return function(T)
       local want = ns.Zones.duskwood.scenes[ev.scene] or ev.scene
       if ns.Controller.scene() ~= want then bad[#bad + 1] = id .. " : décor " .. tostring(ns.Controller.scene()) end
       if T.currentKind() ~= "event" then bad[#bad + 1] = id .. " : écran " .. tostring(T.currentKind()) end
-      if id == "wanted_poster" then
+      if id == "night_watch_poster" then
         local text = X.eventText(e)
         if not text:find("WANTED: ", 1, true) or text:find("%s", 1, true) then bad[#bad + 1] = "affiche : " .. text end
         snap("zone-duskwood-wanted", true)

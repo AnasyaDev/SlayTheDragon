@@ -98,7 +98,7 @@ Art.statuses.unholy_shield = I("Spell_Shadow_AntiMagicShell")
 Art.statusShort.unholy_shield = "takes half damage until Morbent's Bane."
 Art.intents.curse = { tga = "Spell_Shadow_Curse", icon = "Interface\\Icons\\spell_shadow_curse", color = "watch" }
 Art.intentName.curse = "Curse"
-Art.ui.map.wanted_poster = I("INV_Misc_Note_01")
+Art.ui.map.night_watch_poster = I("INV_Misc_Note_01")
 
 local PILE = { discard = "your discard", draw = "the top of your draw pile", hand = "your hand" }
 local function curseName(id, n)

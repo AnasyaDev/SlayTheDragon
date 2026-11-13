@@ -14,7 +14,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
-| 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | idem |
+| 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
 
 ## 1. Fichiers d'une zone
@@ -260,7 +260,12 @@ zone n'a pas les siens. Décor peint (comme Westfall) :
 horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (plans et accessoires de
 `UI/Scene.lua`, `S.landscape`, `PROPS`) et `Art.palettes.duskwood = { sky, sun, cloud, hillsBack, hillsFront,
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
-`westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
+`westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Plans propres à une zone (ajout des Burning
+Steppes, générique) : `layers = { skyline = f, ground = f, front = f }` dans l'entrée d'`Art.paintings`, appelés
+avec `(kit, cadre, g, entrée, palette)` après les collines lointaines, après la route et à la fin ;
+`S.paintKit` donne les formes et niveaux du peintre (`box`, `vgrad`, `oval`, `blur`, `bar`, `diamond`, `tri`,
+`hash`, `rgb`, `mix`, `LV`), `S.PROPS` le registre des accessoires ; `furrows = false` retire les rangs de champ
+du sol proche (exemple complet : `UI/Art/Zones/steppes.lua`). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
 
 Accessoires génériques ajoutés par Duskwood (14/11/2026, `UI/Scene.lua`, `PROPS`) : `deadtree` (arbre mort tordu),

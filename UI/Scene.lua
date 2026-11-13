@@ -554,6 +554,19 @@ function PROPS.mist(f, g, P, c, pal, x, y, s, x2)
   end
 end
 
+-- Plans propres à une zone : Art.paintings[clé].layers = { skyline = f, ground = f, front = f }, appelés
+-- avec (kit, cadre, g, entrée, palette) après les collines lointaines (skyline : montagnes), après la route
+-- (ground : coulées, rochers, au sol) et à la fin (front : premier plan). Le kit donne les formes et les
+-- niveaux du peintre ; S.PROPS est le registre des accessoires (une zone peut y ajouter les siens).
+-- `furrows = false` : pas de rangs de champ sur le sol proche (sol de cendres, marais…).
+S.PROPS = PROPS
+S.paintKit = { LV = LV, box = box, vgrad = vgrad, oval = oval, blur = blur, bar = bar, diamond = diamond,
+  tri = tri, hash = hash, rgb = rgb, mix = mix, withAlpha = withAlpha, W = S.W, H = S.DECOR_H }
+local function zoneLayer(sp, name, f, g, pal)
+  local fn = sp.layers and sp.layers[name]
+  if fn then fn(S.paintKit, f, g, sp, pal) end
+end
+
 -- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions.
 function S.landscape(f, g, sp)
   local pal = Art.palettes[sp.pal] or Art.palettes.westfall
@@ -596,6 +609,7 @@ function S.landscape(f, g, sp)
       for _, b in ipairs(row[1]) do oval(f, g, row[2], row[3], b[1], hz, b[2], b[3] * 2) end
     end
   end
+  zoneLayer(sp, "skyline", f, g, pal)
   -- colline du plan moyen (Sentinel Hill) et son reflet
   if sp.mound then
     local m = sp.mound
@@ -650,10 +664,9 @@ function S.landscape(f, g, sp)
   vgrad(f, g, LV.fieldsNear, rgb(pal.fieldsNear[1]), rgb(pal.fieldsNear[2]), 0, fl, Wd, Hd - fl)
   local vx = sp.road and sp.road[1] or Wd / 2
   local fd, fli = pal.furrowDark, pal.furrowLight
-  -- sp.furrows = false : sol sans rangs de blé (forêt, cimetière)
-  for k = -24, sp.furrows == false and -25 or 24 do
+  for k = -24, 24 do
     local xa, xb = vx + k * 6, vx + k * 66
-    if k ~= 0 and xb > -260 and xb < Wd + 260 then
+    if k ~= 0 and xb > -260 and xb < Wd + 260 and sp.furrows ~= false then
       local segs = { { 0, 0.3, 0.9 }, { 0.3, 0.62, 1.6 }, { 0.62, 1.04, 2.6 } }
       for _, sg in ipairs(segs) do
         local x1, y1 = xa + (xb - xa) * sg[1], fl + (Hd - fl) * sg[1]
@@ -705,6 +718,7 @@ function S.landscape(f, g, sp)
       PROPS[kind](f, g, LV[p[5]] or LV.mid, pal[p[5]] or pal.mid, pal, p[2], p[3], p[4] or 1, p[6])
     end
   end
+  zoneLayer(sp, "ground", f, g, pal)
   -- voile du bas (sol des personnages) et épis du premier plan
   local gr = pal.ground
   vgrad(f, g, LV.ground, withAlpha(gr[1], 0), withAlpha(gr[1], gr[2]), 0, Hd - 128, Wd, 128)
@@ -730,6 +744,7 @@ function S.landscape(f, g, sp)
       end
     end
   end
+  zoneLayer(sp, "front", f, g, pal)
 end
 
 ---------------------------------------------------------------------------

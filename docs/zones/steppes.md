@@ -532,3 +532,133 @@ dans le pack), `inv_stone_15` pour Heart of the Mountain, `inv_jewelry_amulet_04
 5. **Volchan qui se soigne du feu.** Sur un combat de 6 tours, il regagne environ 12 PV (125 → 137
    effectifs) et le joueur en perd 12 ; c'est l'élite la plus dure de la zone pour un deck sans Douse ni
    gros dégâts. Le garder ainsi, ou remplacer le soin par « Wildfire 2 » seul ?
+
+## Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Steppes.lua` (ennemis, groupes, rencontres, commun, bibelots de clé, décors de la zone),
+`Core/ZoneRules/steppes.lua` (règle, actions `stoke` / `ignite`, condition `lit`, effet `douse`, mots du
+langage, `ns.Wildfire` : état, prévision), `UI/Art/Zones/steppes.lua` (modèles, icônes, vue, décors peints),
+`Sim/zones/steppes.lua` (bot), `Sim/tests_zone_steppes.lua` (33 tests), `Sim/ui_zone_steppes.lua` (UZS).
+
+### La règle telle que codée
+
+- État `c.zs.steppes = { left, max, blaze, step, lit }` posé à l'init : `left = max = T` selon le genre du combat
+  (`ns.Encounters.steppes.wildfire = { normal = 3, elite = 4, boss = 4, blaze = 2, step = 2 }`), ou le plus petit
+  champ `wildfire` des ennemis de départ (Volchan 2, Grark 4).
+- `onRoundEnd` (rien si le tour ennemi a été sauté) : compte ≥ 1 → −1 (à 0 : « The ground ignites! », sans
+  dégâts) ; compte déjà à 0 → `Combat.loseHp(c, blaze, "wildfire")`, puis Blaze + 2, puis `onWildfire` (n).
+- `onEnemyDeath` : compte + 1 (plafond T), sauf serviteur et sauf mort du dernier ennemi principal.
+- `{ "stoke", n }` : −n au compte, chaque point en trop + 2 à Blaze ; `{ "ignite", n }` : compte à 0, déjà à 0 :
+  Blaze + n ; `{ "douse", n }` : compte + n (plafond T), rien hors des Steppes.
+- Interface : jeton « Wildfire in 3 → 2 » (flamme grise) ou « Wildfire 4 → 6 » (rouge), infobulle qui dit ce
+  qui arrive à la fin du round ; flamme à droite de toute intention avec Stoke et « +1 » dans la bulle ; brûlure
+  de fin de round hachurée en rouge sur la barre de PV ; flamme grisée sous un serviteur (« its death does not
+  delay Wildfire ») ; mots Wildfire, Douse, Stoke expliqués au survol.
+
+### Ce qui diffère de la fiche, et pourquoi
+
+- **Décisions du 13/11** appliquées : Blaze + 2, une mort recule d'un round, boss Grark Lorkrub, Volchan sans
+  soin (« Wildfire 2 » seul ; le crochet d'ennemi `onWildfire` reste lu par la règle).
+- **Nombres** : la fiche visait Westfall + 60 %. À l'arrivée dans la zone, le deck n'a que les cartes de la classe
+  (cartes de zone pas encore écrites, `epic=none`) : la zone est réglée pour 55–70 % de victoires, ce qui ramène
+  les PV et les dégâts près de ceux de Westfall (tableau plus bas).
+- **Grark** : seuils à 50 % (phase 2, au lieu de 90/150 = 60 %) et 25 % (phase 3) ; à 60 %, la phase 2 tombait
+  trop tôt pour les classes lentes (Priest : 18 PV de brûlure sur le boss). Phases 2 et 3 par `phases` du moteur
+  (crans sur la barre, ouverture Torch the Field), motif de la phase 2 continué en phase 3 (IA `cycle`).
+  Call the Pack : deux loups au plus.
+- **Gruklash** : Frenzy en phase à 50 % (cran visible) plutôt qu'un `onDamaged` à 59 PV ; Strength 3.
+- **Thauris Balgarr** : motif mine, shoot, net, shoot, mine remplacée par Shoot si deux mines vivent.
+- **Blackrock Soldier** : Shield Bash gagne 6 Absorb (« le mur »).
+- **Rencontres** : `zone = "steppes"`, `tier = 0` (la zone n'est ouverte qu'après les cinq premières : les paliers
+  1–2 de la fiche ne servaient qu'à la Ligue, et compteraient dans le commun de Westfall et Duskwood). Décors :
+  `camp` (Morgan's Vigil), `shop` (Flame Crest), `hill` (Slither Rock), `road`. « Half cooked » retiré du texte de
+  Ragged John (figure de style).
+- **Fire Protection Potion** : nom raccourci (« Greater Fire Protection Potion » sort du ruban de la carte).
+- **WANTED** : rencontre commune (`zone = nil`, `tier = 6`), combat d'élite à groupe tiré à l'entrée ; le
+  personnage est le crieur du camp (Town Crier) qui lit l'affiche (le harnais exige une créature).
+- **Libram of Resilience** : `beforeHit` (coup qui passerait l'Absorb, après Parry) et `hpLoss` (brûlure, Pay N HP).
+
+### Moteur, peintre, tests partagés (modifications génériques, à signaler)
+
+- `UI/Scene.lua` : plans de zone `layers = { skyline, ground, front }` appelés par `S.landscape`, `S.paintKit`
+  (formes et niveaux), `S.PROPS` (registre), `furrows = false` (sol sans rangs de champ). Westfall inchangée.
+- `Core/Rewards.lua`, `Rewards.relicPool` : les bibelots de clé (champ `key`, sans `tier`) n'entrent plus dans
+  l'ancien tirage (ils passaient pour des communs de palier 0).
+- `Sim/tests.lua`, `Sim/tests_expedition.lua`, `Sim/ui_harness.lua` : les comptes de la fiche des neutres et des
+  communs (paliers 0 à 3) ne comptent plus le commun des zones suivantes ; une zone jouable n'est plus « Coming
+  later » mais « Locked » à l'accueil d'un compte neuf ; les rencontres d'une zone sont testées dans leur zone ;
+  décors `shop` et `night` permis pour une rencontre.
+
+### Nombres finaux (`Data/Zones/Steppes.lua`)
+
+| Ennemi | PV | Coups |
+|---|---|---|
+| Blackrock Soldier | 26–29 | Strike 7 · Shield Bash 5 (interrompt) + 6 Absorb · Sunder 4 + Sundered 1 |
+| Blackrock Sorcerer | 17–19 | Flamestrike (Cast) 7 + Stoke 1 · Fireball 6 |
+| Blackrock Worg | 19–21 | Bite 5 (+3 lit) · Rend 3 × 2 |
+| Black Dragonspawn | 34–37 | Scale Guard 14 Absorb · Searing Roar 6 + Stoke 1 · Cleave 12 |
+| Black Wyrmkin | 21–24 | Fan the Flames (Cast) Stoke 2 · Flame Buffet 8 |
+| Firegut Brute | 38–41 | Bellow 12 Absorb + Strength 2 · Smash 15 (interrompt) · Kick Embers 6 + Stoke 1 |
+| Firegut Ogre Mage | 19–21 | Bloodlust Strength 1 à tous (2 fois) · Fireball 9 |
+| Flamekin Torcher | 9–10 | Torch (Cast) 3 + Stoke 1 · Ember 5 |
+| Thaurissan Firewalker | 28–31 | Firewalk 12 Absorb + Stoke 1 · Fire Nova 7 (+6 lit) |
+| Gruklash (élite, T 4) | 100 | Pummel 10 (interrompt) · Backhand 12 + Demoralized 2 · Mortal Strike 22 ; Frenzy sous 50 % : Strength 3 |
+| Thauris Balgarr (élite, T 4) | 96 | Mine (2 au plus) · Shoot 14 · Net 8 + Demoralized 2 |
+| Dark Iron Land Mine (serviteur) | 10 | Arming · Detonate 16 + Stoke 1, puis se détruit |
+| Volchan (élite, T 2) | 80 | Flamecrack 7 + Stoke 1 · Stomp 15 (interrompt) · Fire Nova (Cast) 18 |
+| Grark Lorkrub (boss, T 4) | 84 | Call the Pack · Cleave 13 · Heroic Strike 19 · Shield Block 12 + Strength 2 ; sous 50 % : Ignite 4, Torch the Field 8 + Stoke 1 · Mortal Strike 22 (interrompt) · Rend 6 + DoT 3 · Shield Block ; sous 25 % : 2 Ember Worgs, 12 Absorb |
+| Ember Worg (serviteur) | 10 | Bite 5 |
+
+### Mesures (heuristic, 1 000 expéditions, `runner=expedition zone=steppes zones=5 level=7 epic=none`)
+
+| Classe | Victoire | Normal : victoires / tours / PV perdus | Élite : victoires / tours / PV perdus | Boss : victoires / tours / PV perdus | Brûlure par combat (normal / élite / boss) |
+|---|---|---|---|---|---|
+| Priest | 54,7 % | 98,8 % / 3,83 / 8,8 | 87,8 % / 5,42 / 24,1 | 65,2 % / 5,45 / 32,2 | 1,1 / 5,3 / 12,6 |
+| Warrior | 77,9 % | 98,4 % / 3,40 / 8,5 | 90,9 % / 5,22 / 28,8 | 88,8 % / 4,82 / 28,6 | 0,9 / 4,8 / 9,6 |
+| Mage | 71,7 % | 98,3 % / 3,34 / 5,5 | 94,3 % / 4,59 / 11,3 | 78,5 % / 4,31 / 19,4 | 0,6 / 2,6 / 7,9 |
+| Rogue | 73,0 % | 98,5 % / 3,12 / 6,1 | 89,3 % / 4,38 / 19,6 | 85,4 % / 3,98 / 16,3 | 0,5 / 2,0 / 5,8 |
+| Hunter | 82,6 % | 99,8 % / 2,97 / 4,7 | 98,9 % / 4,20 / 9,8 | 83,9 % / 4,40 / 25,1 | 0,1 / 1,1 / 7,6 |
+
+Clés (Rogue) : +0 73,0 % ; +1 67,6 % ; +3 59,8 % ; +5 53,7 % (−5,4 puis ≈ −4 points par niveau).
+
+Repère, mêmes réglages dans Westfall (300 expéditions) : Priest 75 %, Warrior 86 %, Mage 77 %, Rogue 81 %,
+Hunter 83 % (écart 11 points). Les Steppes retirent 20 points au Priest, 6 à 11 aux autres, presque rien au
+Hunter.
+
+**Hors cibles, à revoir** : écart entre classes 28 points (Priest 55, Hunter 83) au lieu de 10 ; Warrior et Hunter
+au-dessus de 70 %. Ce que les mesures montrent :
+- la brûlure est une perte fixe qui grandit avec la durée du combat : elle pèse sur la classe la plus lente et la
+  moins pourvue en PV (Priest, 36 PV, 5,5 tours contre Grark, 12,6 PV de brûlure) et nourrit la Rage du Warrior
+  (74 PV) ;
+- chaque hausse des dégâts du boss ou de Volchan coûtait au Priest deux à trois fois plus qu'aux autres ;
+  Gruklash (gros coups) est la seule élite qui pèse plus sur Warrior et Rogue que sur le Priest ; l'Absorb des
+  ennemis (essayé à 14–18) allongeait les combats et pénalisait d'abord le Priest ;
+- le familier et les Traps du Hunter règlent les petits groupes (4,7 PV par combat normal) ;
+- Mage (5,5) et Hunter (4,7) restent sous 6 PV par combat normal.
+Pistes : l'épique de zone du Priest (Voidform) et, côté classes, un Priest plus rapide ; côté zone, des ennemis
+qui attisent sans attaquer (les Traps attendent) pour le Hunter.
+
+### Modèles en repli
+
+Créatures de la fiche en tête (le client les demande au serveur), puis affichages voisins du cache Forever
+(`tools/wdb_creatures.py`) : Blackrock Soldier → Pourfendeur / Grunt / Champion rochenoire (6047, 6033, 6044) ;
+Blackrock Sorcerer : 6046 (la créature est dans le cache) ; Blackrock Worg → Noirworg affamé 780, Worg 11421 ;
+Black Dragonspawn et Black Wyrmkin → Draconide et Wyrmide Flammécaille (2554, 8309, famille rouge) ; Firegut
+Brute → ogres Boulderfist / Splinter Fist (1054, 1052, 415) ; Firegut Ogre Mage → Splinter Fist Fire Weaver 326 ;
+Flamekin Torcher : 10817 (la créature) ; Thaurissan Firewalker → Forge-vapeur Sombrefer 7796 / 7797, Dark Iron
+Dwarf 825 ; Gruklash et Grark → Champion / Pourfendeur rochenoire ; Thauris Balgarr → Dark Iron Bombardier 3954 ;
+Ember Worg → Worg de braise géant 9370 ; Volchan → élémentaire de feu 1070, puis le modèle du géant de lave
+(fichier 524124) ; Dark Iron Land Mine → aucun affichage, modèles de mine (fichiers 126022, 201156) puis médaillon.
+Personnages : Oralius → Captain Nials 4147 ; Marshal Maxwell → Marshal Marris 3454 ; Ragged John → fermiers ;
+Mathredis Firestar → Andromath 5076 ; Tinkee Steamboil et Yuka Screwspigot → artisans gobelins 7110, 7109, 7111 ;
+Helendis Riverhorn → Lieutenant Valorcall 4141 ; Cyrus Therepentous → Bishop DeLavey 2961 ; WANTED → Town Crier
+468 (4310), puis l'affiche (fichiers 199473, 199428). Tout est à vérifier en jeu (`/slay models`).
+
+### Décors
+
+Six décors peints (`steppes_road`, `steppes_night`, `steppes_hill`, `steppes_camp`, `steppes_shop`,
+`steppes_boss`) : ciel de fumée rouge, Blackrock Mountain et son cratère, chaînes de crêtes à arêtes éclairées,
+plaine de cendres sans rangs de champ, coulées de lave lissées (lueur, croûte, lave, cœur), fissures, rochers à
+reflet de lave, herbes sèches aux pointes en feu, braises ; Morgan's Vigil (tentes claires, tour, bannières
+bleues), Flame Crest (tentes rouges, charrette, braseros), Slither Rock (affleurement et aiguilles), Blackrock
+Stronghold (muraille, tours, porte rougeoyante, braseros). Planches : `build/snap/decor-steppes_*.svg`.
