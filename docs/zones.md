@@ -53,6 +53,7 @@ Déjà créés (vides) **et déjà au TOC** : ne pas toucher au TOC.
 ns.Enemies.vile_fang = {
   name = "Nightbane Vile Fang", hp = { 28, 31 },            -- nombre ou { min, max } (flux c.rng.ai)
   elite = false, boss = false, minion = false,               -- minion : fuit à la mort du dernier ennemi principal
+  indomitable = false,                                       -- immunisé à Stunned comme un boss (Combat.stunImmune)
   moves = { bite = { name = "Vile Bite", intent = "attack", cast = false, text = "…",
                      actions = { { "attack", 9, curse = "rabies" } } }, … },
   pattern = { "bite", "maul", "howl" }, randomStart = true,  -- ou ai = function(c, e, rng) return "move" end
