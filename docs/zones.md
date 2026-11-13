@@ -14,6 +14,8 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
+| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
+| 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | jouable depuis le 14/11/2026 (Slumber : dormeurs, ouvertures, Rude Awakening ; boss Somnus ; sept décors peints) ; détails et mesures : `docs/zones/swamp.md`, « Implémentation » |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
 
@@ -113,7 +115,9 @@ spec `{ "sawtooth_crocolisk", st = { asleep = 3 }, hp = 40, hpMul = 1.15, ambush
 local _, ns = ...
 local Combat, ZR = ns.Combat, ns.ZoneRule
 ZR.define("duskwood", {
-  always = false,                -- vrai : crochets actifs dans TOUTES les zones (Asleep de Dream Dust)
+  always = false,                -- vrai : crochets actifs dans TOUTES les zones ; ou function(opts) -> bool : actifs
+                                 -- hors de leur zone pour un combat qui en a besoin (opts de Combat.new : deck,
+                                 -- relics, encounter, mods ; nil hors combat) — Swamp : deck qui pose Asleep, Egg of Hakkar
   init = function(c, z) z.curses = 0 end,           -- z = c.zs.duskwood (après l'init de la classe)
   hooks = { … },                 -- crochets de combat (ci-dessous), src = z
   run = { … },                   -- crochets d'expédition (§ 5)
@@ -272,6 +276,11 @@ palette) … end` dans l'entrée d'`Art.paintings` remplace tous les plans de `S
 mêmes formes et niveaux (`S.paintKit`), accessoires communs par `ns.Scene.PROPS` ; chaque région va dans `g`, sous
 `BORDER 0` (exemple : `UI/Art/Zones/stranglethorn.lua`, fonction `jungle` : collines boisées, canopées, palmiers,
 sous-bois, côte de Booty Bay, pyramides trolls).
+Swamp of Sorrows (14/11/2026) : rien d'ajouté à `UI/Scene.lua` ; ses accessoires (arbres morts à mousse,
+huttes, tour de guet, temple, roseaux) et ses mares sont peints par son plan `layers.ground` avec `S.paintKit`
+(`UI/Art/Zones/swamp.lua` : `items`, `pools`, palette `water`, `waterEdge`, `moss`). Planches : il faut les aperçus
+PNG de `Media/` dans `build/media_png` (`tools/build_media.py`, ou une conversion des TGA) ; sans eux, taches fondues
+et disques sont dessinés en rectangles dans les SVG du harnais.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 

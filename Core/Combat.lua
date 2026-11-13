@@ -2199,13 +2199,17 @@ local function byCampaign(a, b)
   return a < b
 end
 
-function Combat.zoneRulesFor(zone)
+-- always peut être une fonction (opts) -> bool : règles actives hors de leur zone seulement pour un combat qui
+-- en a besoin (opts de Combat.new : deck, bibelots, groupe, mods ; nil hors combat : expédition).
+function Combat.zoneRulesFor(zone, opts)
   if next(ZRules) == nil then return nil end -- aucune règle de zone chargée (cas courant : rapide)
   local list
   if zone and ZRules[zone] then list = { zone } end
   local others
   for id, r in pairs(ZRules) do
-    if r.always and id ~= zone then
+    local al = r.always
+    if type(al) == "function" then al = al(opts) end
+    if al and id ~= zone then
       others = others or {}
       others[#others + 1] = id
     end
@@ -2287,7 +2291,7 @@ function Combat.new(opts)
   Rng.shuffle(c.rng.draw, c.draw)
   -- règles de zone : liste et états posés avant l'arrivée des ennemis (leurs crochets peuvent déjà
   -- servir), init appelé après celui de la classe
-  local zr = Combat.zoneRulesFor(opts.zone)
+  local zr = Combat.zoneRulesFor(opts.zone, opts)
   if zr then
     c.zr, c.zs = zr, {}
     for i = 1, #zr do c.zs[zr[i]] = {} end
