@@ -18,6 +18,8 @@ local function relic(id, t)
   t.hooks = t.hooks or {}
   R[id] = t
 end
+ns.Declare = ns.Declare or {}
+ns.Declare.relic = relic -- fichiers de zone : ns.Declare.relic(id, t)
 
 -- Disponible d'emblée (tier 0) ---------------------------------------------------------
 

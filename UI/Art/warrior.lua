@@ -81,20 +81,22 @@ Art.classes.warrior.resource = { tga = "Ability_Warrior_FocusedRage", icon = "In
 
 -- Vue de classe (zone libre sous les états du héros, 300 × 40) : le compteur que l'épique demande pour jouer
 -- (son icône est posée parmi les Powers par le socle des épiques) :
---   Titan's Grip       « Titan's Grip: 1/2 Attacks » (Attacks comptées du tour)
+--   Titan's Grip       « Titan's Grip: 0/1 Attack » (Attacks comptées du tour)
 --   Shield Charge      « Shield Charge: 7 » (coup de fin de tour avec l'Absorb actuelle)
---   Anger Management   « Anger Management: 2/3 Rage » (Rage dépensée vers le prochain cran de recharge)
+--   Anger Management   « Anger Management: 2/3 Rage » (Rage dépensée vers le prochain cran de recharge, seulement
+--                      si une tranche dépasse 1 Rage)
 -- Le plafond de Rage d'Avatar se lit sur les crans (Combat.resCap). Ne lit que le combat.
 function ns.Warrior.epicLabel(c)
   local Wr = ns.Warrior
   local id, up = Wr.epicOf(c)
   if id == "titans_grip" then
     local n = Wr.EPIC.titans_grip.limit
-    return ("Titan's Grip: %d/%d Attacks"):format(math.min(c.cls.tgAttacks or 0, n), n)
+    return ("Titan's Grip: %d/%d Attack%s"):format(math.min(c.cls.tgAttacks or 0, n), n, n > 1 and "s" or "")
   elseif id == "shield_charge" then
     return "Shield Charge: " .. Wr.chargeDamage(c, up)
   elseif id == "anger_management" then
     local per = up and Wr.EPIC.anger_management.upPer or Wr.EPIC.anger_management.per
+    if per <= 1 then return nil end
     return ("Anger Management: %d/%d Rage"):format(c.cls.amSpent or 0, per)
   end
   return nil

@@ -58,9 +58,14 @@ ns.ClassRules.warrior = {
 ---------------------------------------------------------------------------
 -- Cartes épiques du Guerrier (docs/zones/cartes-de-zone.md, « Warrior »)
 ---------------------------------------------------------------------------
--- Règle active pendant tout le combat, dès son début : deckHooks (crochets actifs où que soit la carte,
--- src = { id, up, uid }) et whileInDeck (au début du combat). Nombres réglés par la simulation (rapport du
--- 14/11/2026) : ce tableau seul, les textes de Data/Warrior.lua les disent.
+-- Règle en jeu pendant tout le combat, dès son début (c.epic, hors de toute pile) : deckHooks (src = c.epic,
+-- après classe, zones, Powers, bibelots et affixes) et whileInDeck (au début du combat). Nombres réglés par
+-- la simulation (14/11/2026, docs/classes.md, « Épiques du Guerrier ») : ce tableau seul ; les textes de
+-- Data/Warrior.lua les disent (vérifié par Sim/tests_epic_warrior.lua). Écarts à la fiche : Thunderous Roar
+-- 3 / 5 sans Demoralized (6 / 9 + Demoralized 1 : +14 points), Titan's Grip 1 Attack par tour (2 : +14),
+-- Shield Charge au quart (moitié : +13), Anger Management chaque Rage (3 / 2 : +2), Avatar +2 / +3 (+1 / +2 : +0).
+-- demoralized = 0 : pas d'état posé ; selfStates = faux (repli de la fiche, non retenu) : la copie de Titan's Grip
+-- ne poserait rien sur le héros.
 Warrior.EPIC = {
   death_wish = { mult = 1.5, heal = 3 },
   thunderous_roar = { at = 5, damage = 3, upDamage = 5, demoralized = 0 },
@@ -76,15 +81,10 @@ Warrior.EPICS = { "death_wish", "thunderous_roar", "sweeping_strikes", "titans_g
 local IS_EPIC = {}
 for _, id in ipairs(Warrior.EPICS) do IS_EPIC[id] = true end
 
--- Épique du Guerrier active dans ce combat : id, amélioré (nil sans épique). Lit les effets passifs du deck
--- (c.passives), puis les Powers (une épique posée parmi eux par le socle).
+-- Épique du Guerrier en jeu dans ce combat (c.epic, posée par Combat.new) : id, amélioré ; nil sans épique.
 function Warrior.epicOf(c)
-  local ps = c.passives
-  if ps then
-    for i = 1, #ps do if IS_EPIC[ps[i].id] then return ps[i].id, ps[i].up end end
-  end
-  local pw = c.player.powers
-  for i = 1, #pw do if IS_EPIC[pw[i].id] then return pw[i].id, pw[i].up end end
+  local e = c.epic
+  if e and IS_EPIC[e.id] then return e.id, e.up end
   return nil
 end
 
@@ -101,29 +101,22 @@ do
   end
 end
 
--- Début de combat : l'épique n'est ni piochée ni jouée. Tant que le socle la laisse dans la pioche, on l'en
--- sort ici (provisoire : sans effet quand le socle la pose ailleurs).
-local function settle(c, src)
-  for _, pile in ipairs({ c.draw, c.hand }) do
-    for i = #pile, 1, -1 do
-      if pile[i].uid == src.uid then table.remove(pile, i) end
-    end
-  end
+-- Genre du coup sans carte d'une épique (Combat.hitInfo : règles de zone, Rude Awakening du Swamp) : posé le
+-- temps du coup puis remis. all = vrai : coup « à tous » (onde, rebond), faux : à une cible (Shield Charge).
+local function hitAs(c, all, f, ...)
+  local k0, a0 = c.hitKind, c.hitAll
+  c.hitKind, c.hitAll = "other", all
+  f(...)
+  c.hitKind, c.hitAll = k0, a0
 end
 
-local function withSettle(f)
-  return function(c, src)
-    settle(c, src)
-    if f then f(c, src) end
-  end
-end
-
+-- Crochets d'une épique (deckHooks, src = c.epic) et mise en place au début du combat (whileInDeck).
 local function attach(id, hooks, upHooks, start)
   local d = ns.Cards[id]
   d.deckHooks = hooks
-  d.whileInDeck = withSettle(start)
+  d.whileInDeck = start
   d.up.deckHooks = upHooks or hooks
-  d.up.whileInDeck = d.whileInDeck
+  d.up.whileInDeck = start
 end
 
 local function hasEffect(d, kind)
@@ -147,9 +140,9 @@ do
 end
 
 -- Duskwood — Thunderous Roar : dès que la Rage atteint 5 (juste après le gain, quelle qu'en soit la source),
--- elle tombe à 0, le Guerrier inflige 6 (amélioré : 9) à chaque ennemi vivant, sans carte (Strength
--- comprise), puis pose Demoralized 1 sur chacun. Pendant le tour ennemi, Demoralized ne dure que jusqu'à la
--- fin du round (il allège les coups restants de ce tour) : l'état posé n'est pas protégé de la baisse.
+-- elle tombe à 0, le Guerrier inflige 3 (amélioré : 5) à chaque ennemi vivant, sans carte (Strength
+-- comprise), coup « à tous ». Demoralized (E.demoralized, 0 aujourd'hui) : posé ensuite sur chacun ; pendant le
+-- tour ennemi, il ne dure que jusqu'à la fin du round (l'état posé n'est pas protégé de la baisse).
 function Warrior.roar(c, up)
   local p = c.player
   Combat.gainRes(c, -(p.res or 0), "roar")
@@ -158,7 +151,7 @@ function Warrior.roar(c, up)
   local list = Combat.aliveEnemies(c)
   for i = 1, #list do
     local e = list[i]
-    if not e.dead and not c.result then Combat.dealDamage(c, p, e, Combat.calcDamage(c, p, e, n)) end
+    if not e.dead and not c.result then hitAs(c, true, Combat.dealDamage, c, p, e, Combat.calcDamage(c, p, e, n)) end
   end
   if c.result then return end
   if E.thunderous_roar.demoralized <= 0 then return end
@@ -200,7 +193,7 @@ local function sweepHooks(count)
         if #others == 0 or c.result then return end
         local e = table.remove(others, Rng.int(c.rng.cards, 1, #others))
         Combat.log(c, { t = "epic_trigger", card = "sweeping_strikes", unit = e.uid })
-        Combat.dealDamage(c, c.player, e, n)
+        hitAs(c, true, Combat.dealDamage, c, c.player, e, n)
       end
     end,
   }
@@ -209,8 +202,8 @@ attach("sweeping_strikes", sweepHooks(E.sweeping_strikes.targets), sweepHooks(E.
 
 -- Stranglethorn Vale — Titan's Grip : chaque carte Attack se résout deux fois (crochet replay : la copie
 -- suit, même cible ou premier ennemi vivant, sans coût, reprend le Spend payé et le montant du Surge de
--- l'original sans rien dépenser) ; la Rage « +1 par Attack » une fois par carte ; au plus deux cartes
--- Attack par tour (crochet canPlay ; amélioré : celles qui coûtent 0 au moment du jeu ne comptent pas).
+-- l'original sans rien dépenser) ; la Rage « +1 par Attack » une fois par carte ; au plus une carte Attack
+-- par tour (E.limit, crochet canPlay ; amélioré : celles qui coûtent 0 au moment du jeu ne comptent pas).
 Warrior.TITAN_REASON = "Only 1 Attack per turn."
 
 local function titanCounts(c, src, inst)
@@ -257,8 +250,8 @@ local titanHooks = {
 }
 attach("titans_grip", titanHooks, nil, function(c) c.cls.titan = true c.cls.tgAttacks = 0 end)
 
--- Swamp of Sorrows — Shield Charge : à la fin du tour du Guerrier (avant la défausse), la moitié de son
--- Absorb (arrondie à l'inférieur ; amélioré : 4 + la moitié) frappe sa dernière cible, sans carte
+-- Swamp of Sorrows — Shield Charge : à la fin du tour du Guerrier (avant la défausse), le quart de son
+-- Absorb (arrondi à l'inférieur ; amélioré : 4 + le quart) frappe sa dernière cible, sans carte
 -- (Strength comprise) ; dernière cible morte : l'ennemi vivant le plus à gauche ; un dormeur (état asleep,
 -- Swamp) n'est visé que s'il ne reste aucun ennemi éveillé. L'Absorb reste entière. Sans Absorb : rien.
 local function asleep(e) return (e.st.asleep or 0) > 0 end
@@ -273,8 +266,10 @@ function Warrior.chargeTarget(c)
       if not awake and not asleep(e) then awake = e end
     end
   end
-  if last and not last.dead and (not asleep(last) or not awake) then return last end
-  return awake or first
+  local t = awake or first
+  if last and not last.dead and (not asleep(last) or not awake) then t = last end
+  -- même règle de cible que le familier : une zone peut la changer (crochet « petTarget »)
+  return t and Combat.zmodify(c, "petTarget", t) or nil
 end
 
 function Warrior.chargeDamage(c, up)
@@ -291,15 +286,15 @@ do
       local t = n > 0 and Warrior.chargeTarget(c)
       if not t then return end
       Combat.log(c, { t = "epic_trigger", card = "shield_charge", unit = t.uid })
-      Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, n))
+      hitAs(c, false, Combat.dealDamage, c, c.player, t, Combat.calcDamage(c, c.player, t, n))
     end,
   }
   attach("shield_charge", hooks)
 end
 
 -- Burning Steppes — Anger Management : la Rage dépensée (Spend payé, montant d'un Surge) s'ajoute à un
--- compteur du combat (c.cls.amSpent, reste gardé d'un tour à l'autre) ; à chaque tranche de 3 (amélioré :
--- 2), chaque carte en recharge revient un tour plus tôt (Warrior.cooldownTick). Une carte dont la recharge
+-- compteur du combat (c.cls.amSpent, reste gardé d'un tour à l'autre) ; à chaque tranche (E.per : 1), chaque
+-- carte en recharge revient un tour plus tôt (amélioré : deux, Warrior.cooldownTick). Une carte dont la recharge
 -- arrive à 0 revient en main aussitôt ; main pleine : au début du tour suivant.
 function Warrior.cooldownTick(c)
   local keep = {}
@@ -316,8 +311,11 @@ function Warrior.cooldownTick(c)
   c.cooldown = keep
 end
 
-local function angerHooks(per, steps)
+-- (nombres lus à chaque dépense : Warrior.EPIC reste réglable)
+local function angerHooks(up)
   local function spent(c, n)
+    local A = E.anger_management
+    local per, steps = up and A.upPer or A.per, up and A.upSteps or A.steps
     local cls = c.cls
     cls.amSpent = (cls.amSpent or 0) + n
     while cls.amSpent >= per do
@@ -331,12 +329,11 @@ local function angerHooks(per, steps)
     onSurge = function(c, src, n) spent(c, n) end,
   }
 end
-attach("anger_management", angerHooks(E.anger_management.per, E.anger_management.steps),
-  angerHooks(E.anger_management.upPer, E.anger_management.upSteps),
+attach("anger_management", angerHooks(false), angerHooks(true),
   function(c) c.cls.amSpent = 0 end)
 
--- Blackrock Mountain — Avatar : plafond de Rage à 10 (crochet resCap) ; au début de chaque tour, +1 Rage
--- (amélioré : +2). Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10).
+-- Blackrock Mountain — Avatar : plafond de Rage à 10 (crochet resCap) ; au début de chaque tour, +2 Rage
+-- (amélioré : +3). Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10).
 local function avatarHooks(gain)
   return {
     resCap = function(c, src, v) return math.max(v, E.avatar.cap) end,

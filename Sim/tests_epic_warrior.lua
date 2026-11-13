@@ -71,7 +71,7 @@ test("sept épiques : une par zone, rareté epic, sans coût ni niveau, débloqu
     local d = ns.Cards[id]
     eq(d.class, "warrior"); eq(d.rarity, "epic"); eq(d.epic, true); eq(d.type, "power")
     eq(d.cost, nil, id .. " : coût"); eq(d.level, nil, id .. " : niveau")
-    assert(d.deckHooks and d.whileInDeck and d.up and d.up.deckHooks, id .. " : crochets")
+    assert(d.deckHooks and d.up and d.up.deckHooks, id .. " : crochets")
     assert(d.text:find("^Epic%.\n") and d.up.text:find("^Epic%.\n"), id .. " : « Epic. » en tête")
     assert(not zones[d.zone], "une par zone"); zones[d.zone] = id
     eq(Meta.zoneCards("warrior", d.zone)[1], id)
@@ -90,12 +90,15 @@ test("textes : les nombres de Warrior.EPIC", function()
   has("thunderous_roar", false, "At " .. E.thunderous_roar.at .. " Rage")
   has("thunderous_roar", false, "deal " .. E.thunderous_roar.damage)
   has("thunderous_roar", true, "deal " .. E.thunderous_roar.upDamage)
-  has("thunderous_roar", false, "Demoralized " .. E.thunderous_roar.demoralized)
+  eq(Card.defById("thunderous_roar").text:find("Demoralized", 1, true) ~= nil, E.thunderous_roar.demoralized > 0)
   has("sweeping_strikes", true, "hit " .. E.sweeping_strikes.upTargets .. " other")
-  has("titans_grip", false, "At most " .. E.titans_grip.limit .. " Attacks")
-  has("shield_charge", true, "deal " .. E.shield_charge.upBonus .. " + half")
-  has("anger_management", false, "Each " .. E.anger_management.per .. " Rage spent")
-  has("anger_management", true, "Each " .. E.anger_management.upPer .. " Rage spent")
+  has("titans_grip", false, "At most " .. E.titans_grip.limit .. " Attack")
+  eq(Warrior.TITAN_REASON, ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or ""))
+  eq(E.shield_charge.div, 4); has("shield_charge", false, "a quarter of the Absorb")
+  has("shield_charge", true, "deal " .. E.shield_charge.upBonus .. " + a quarter")
+  eq(E.anger_management.per, 1); eq(E.anger_management.upPer, 1)
+  has("anger_management", false, "Each Rage spent: all Cooldowns −" .. E.anger_management.steps)
+  has("anger_management", true, "Each Rage spent: all Cooldowns −" .. E.anger_management.upSteps)
   has("avatar", false, "up to " .. E.avatar.cap); has("avatar", false, "+" .. E.avatar.gain .. " Rage")
   has("avatar", true, "+" .. E.avatar.upGain .. " Rage")
 end)
@@ -170,25 +173,26 @@ end)
 ---------------------------------------------------------------------------
 -- Duskwood — Thunderous Roar
 ---------------------------------------------------------------------------
-test("Thunderous Roar : à 5 Rage (fin de l'Attack), Rage à 0, 6 à tous, Demoralized 1 à tous", function()
+test("Thunderous Roar : à 5 Rage (fin de l'Attack), Rage à 0, dégâts à tous, Demoralized selon la règle", function()
+  local n = E.thunderous_roar.damage
   local c = setup({ "strike" }, { epic = "thunderous_roar", encounter = { "tw_dummy", "tw_dummy" } })
   c.player.res = 4
   local a, b = c.enemies[1].hp, c.enemies[2].hp
   assert(play(c, "strike", 1))
   eq(c.player.res, 0)
-  eq(c.enemies[1].hp, a - 6 - E.thunderous_roar.damage); eq(c.enemies[2].hp, b - E.thunderous_roar.damage)
-  eq(c.enemies[1].st.demoralized, 1); eq(c.enemies[2].st.demoralized, 1)
-  -- posé pendant le tour du joueur : couvre le tour ennemi, retiré à la fin du round
+  eq(c.enemies[1].hp, a - 6 - n); eq(c.enemies[2].hp, b - n)
+  local demo = E.thunderous_roar.demoralized > 0 and E.thunderous_roar.demoralized or nil
+  eq(c.enemies[1].st.demoralized, demo); eq(c.enemies[2].st.demoralized, demo)
   Combat.endTurn(c)
-  eq(c.enemies[1].st.demoralized, nil)
+  eq(c.enemies[1].st.demoralized, nil, "jamais au-delà du round")
 end)
 
-test("Thunderous Roar : sous 5 rien ; Strength comprise ; amélioré 9 ; gain par paiement de PV", function()
+test("Thunderous Roar : sous 5 rien ; Strength comprise ; amélioré ; gain par paiement de PV", function()
   local c = setup({ "strike" }, { epic = "thunderous_roar" })
   c.player.res = 2
   local hp = c.enemies[1].hp
   assert(play(c, "strike", 1))
-  eq(c.player.res, 3); eq(c.enemies[1].hp, hp - 6); eq(c.enemies[1].st.demoralized, nil)
+  eq(c.player.res, 3); eq(c.enemies[1].hp, hp - 6)
   local c2 = setup({ "bloodrage" }, { epic = "thunderous_roar", up = true })
   Combat.applyStatus(c2, c2.player, "force", 2)
   c2.player.res = 2
@@ -198,18 +202,23 @@ test("Thunderous Roar : sous 5 rien ; Strength comprise ; amélioré 9 ; gain pa
   eq(c2.enemies[1].hp, hp - (E.thunderous_roar.upDamage + 2))
 end)
 
-test("Thunderous Roar : coup reçu pendant le tour ennemi, Demoralized seulement jusqu'à la fin du round", function()
-  local c = setup({ "defend" }, { epic = "thunderous_roar", encounter = { "tw_double" } })
-  c.player.res = 4
-  local hp = c.enemies[1].hp
-  Combat.endPlayerTurn(c)
-  Combat.enemyPhase(c)
-  -- premier coup (3) : +1 Rage, onde ; le second coup est allégé (3 × 0,75 = 2)
-  eq(c.enemies[1].hp, hp - E.thunderous_roar.damage)
-  eq(c.player.hp, 60 - 3 - 2)
-  eq(c.enemies[1].st.demoralized, 1)
-  Combat.endRound(c)
-  eq(c.enemies[1].st.demoralized, nil, "retiré à la fin du round")
+test("Thunderous Roar : coup reçu pendant le tour ennemi ; Demoralized (si posé) seulement jusqu'à la fin du round", function()
+  local old = E.thunderous_roar.demoralized
+  for _, demo in ipairs({ 0, 1 }) do
+    E.thunderous_roar.demoralized = demo
+    local c = setup({ "defend" }, { epic = "thunderous_roar", encounter = { "tw_double" } })
+    c.player.res = 4
+    local hp = c.enemies[1].hp
+    Combat.endPlayerTurn(c)
+    Combat.enemyPhase(c)
+    -- premier coup (3) : +1 Rage, onde ; le second coup est allégé par Demoralized (3 × 0,75 = 2)
+    eq(c.enemies[1].hp, hp - E.thunderous_roar.damage)
+    eq(c.player.hp, 60 - 3 - (demo > 0 and 2 or 3))
+    eq(c.enemies[1].st.demoralized, demo > 0 and 1 or nil)
+    Combat.endRound(c)
+    eq(c.enemies[1].st.demoralized, nil, "retiré à la fin du round")
+  end
+  E.thunderous_roar.demoralized = old
 end)
 
 test("Thunderous Roar : Execute ne compte jamais plus de 4 Rage ; Battle Standard amorce", function()
@@ -280,10 +289,13 @@ test("Titan's Grip : chaque Attack deux fois, Rage +1 une fois par carte", funct
   eq(#c.discard, 1, "la carte ne part qu'une fois")
 end)
 
-test("Titan's Grip : au plus deux Attacks par tour (raison), Skills libres, compte remis au tour suivant", function()
-  local c = setup({ "strike", "strike", "strike", "defend" }, { epic = "titans_grip" })
+test("Titan's Grip : au plus une Attack par tour (raison), Skills libres, compte remis au tour suivant", function()
+  local lim = E.titans_grip.limit
+  local hand = { "defend" }
+  for _ = 1, lim + 1 do hand[#hand + 1] = "strike" end
+  local c = setup(hand, { epic = "titans_grip" })
   c.player.mana = 9
-  assert(play(c, "strike", 1)); assert(play(c, "strike", 1))
+  for _ = 1, lim do assert(play(c, "strike", 1)) end
   local ok, why = Combat.canPlay(c, idx(c, "strike"))
   assert(not ok); eq(why, Warrior.TITAN_REASON)
   assert(play(c, "defend"))
@@ -295,33 +307,40 @@ test("Titan's Grip : au plus deux Attacks par tour (raison), Skills libres, comp
 end)
 
 test("Titan's Grip : Spend payé une fois, bonus aux deux ; Surge : même montant, rien de plus dépensé", function()
-  local c = setup({ "heroic_strike", "execute" }, { epic = "titans_grip" })
+  local c = setup({ "heroic_strike" }, { epic = "titans_grip" })
   c.player.res = 3
   local hp = c.enemies[1].hp
   assert(play(c, "heroic_strike", 1))
   eq(c.enemies[1].hp, hp - 2 * 12); eq(c.player.res, 2, "3 - 2 + 1")
-  c.enemies[1].hp = 40
-  c.player.res = 3
-  assert(play(c, "execute", 1))
-  eq(c.enemies[1].hp, 40 - 2 * (5 + 4 * 3)); eq(c.player.res, 1, "Surge 3 une fois, +1 Rage")
+  local c2 = setup({ "execute" }, { epic = "titans_grip" })
+  c2.enemies[1].hp = 40
+  c2.player.res = 3
+  assert(play(c2, "execute", 1))
+  eq(c2.enemies[1].hp, 40 - 2 * (5 + 4 * 3)); eq(c2.player.res, 1, "Surge 3 une fois, +1 Rage")
 end)
 
 test("Titan's Grip : cible morte, la copie va au premier ennemi vivant ; Cast résolu deux fois", function()
-  local c = setup({ "strike", "slam" }, { epic = "titans_grip", encounter = { "tw_dummy", "tw_dummy" } })
+  local c = setup({ "strike" }, { epic = "titans_grip", encounter = { "tw_dummy", "tw_dummy" } })
   c.enemies[2].hp = 4
   local a = c.enemies[1].hp
   assert(play(c, "strike", 2))
   assert(c.enemies[2].dead); eq(c.enemies[1].hp, a - 6)
-  assert(play(c, "slam", 1))
-  eq(c.enemies[1].hp, a - 6, "incantée")
-  Combat.endTurn(c)
-  eq(c.enemies[1].hp, a - 6 - 32)
+  local c2 = setup({ "slam" }, { epic = "titans_grip" })
+  local b = c2.enemies[1].hp
+  assert(play(c2, "slam", 1))
+  eq(c2.enemies[1].hp, b, "incantée")
+  Combat.endTurn(c2)
+  eq(c2.enemies[1].hp, b - 32)
 end)
 
 test("Titan's Grip amélioré : les Attacks à 0 ne comptent pas ; de base, si", function()
   for _, up in ipairs({ false, true }) do
-    local c = setup({ "overpower", "strike", "strike" }, { epic = "titans_grip", up = up })
-    assert(play(c, "overpower", 1)); assert(play(c, "strike", 1))
+    local hand = { "overpower" }
+    for _ = 1, E.titans_grip.limit + 1 do hand[#hand + 1] = "strike" end
+    local c = setup(hand, { epic = "titans_grip", up = up })
+    c.player.mana = 9
+    assert(play(c, "overpower", 1))
+    for _ = 1, E.titans_grip.limit - 1 do assert(play(c, "strike", 1)) end
     eq(Combat.canPlay(c, idx(c, "strike")), up, up and "amélioré" or "de base")
   end
 end)
@@ -329,27 +348,27 @@ end)
 ---------------------------------------------------------------------------
 -- Swamp of Sorrows — Shield Charge
 ---------------------------------------------------------------------------
-test("Shield Charge : fin du tour, moitié de l'Absorb sur la dernière cible, Absorb gardée pour le tour ennemi", function()
+test("Shield Charge : fin du tour, quart de l'Absorb sur la dernière cible, Absorb gardée pour le tour ennemi", function()
   local c = setup({ "strike", "defend", "defend" }, { epic = "shield_charge", encounter = { "tw_hitter", "tw_dummy" } })
   assert(play(c, "strike", 2)); assert(play(c, "defend")); assert(play(c, "defend"))
   eq(c.player.block, 10)
   local a, b = c.enemies[1].hp, c.enemies[2].hp
   local res = c.player.res
   Combat.endPlayerTurn(c)
-  eq(c.enemies[2].hp, b - 5); eq(c.enemies[1].hp, a)
+  eq(c.enemies[2].hp, b - math.floor(10 / E.shield_charge.div)); eq(c.enemies[1].hp, a)
   eq(c.player.block, 10); eq(c.player.res, res, "pas de Rage")
   Combat.enemyPhase(c)
   eq(c.player.hp, 60, "le coup de 10 absorbé")
 end)
 
-test("Shield Charge : cible morte -> le plus à gauche ; sans Absorb rien ; amélioré 4 + moitié ; dormeur évité", function()
+test("Shield Charge : cible morte -> le plus à gauche ; sans Absorb rien ; amélioré 4 + quart ; dormeur évité", function()
   local c = setup({ "strike", "defend" }, { epic = "shield_charge", encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
   c.enemies[3].hp = 3
   assert(play(c, "strike", 3)); assert(c.enemies[3].dead)
   assert(play(c, "defend"))
   local a = c.enemies[1].hp
   Combat.endPlayerTurn(c)
-  eq(c.enemies[1].hp, a - 2)
+  eq(c.enemies[1].hp, a - math.floor(5 / E.shield_charge.div))
   local c2 = setup({ "strike" }, { epic = "shield_charge", up = true })
   assert(play(c2, "strike", 1))
   local h = c2.enemies[1].hp
@@ -360,38 +379,45 @@ test("Shield Charge : cible morte -> le plus à gauche ; sans Absorb rien ; amé
   c3.enemies[1].st.asleep = 2 -- dormeur (Swamp) : évité tant qu'un ennemi est éveillé
   local b3 = c3.enemies[2].hp
   Combat.endPlayerTurn(c3)
-  eq(c3.enemies[2].hp, b3 - (E.shield_charge.upBonus + 2))
-  eq(Warrior.chargeDamage(c3, true), E.shield_charge.upBonus + 2)
+  local want = E.shield_charge.upBonus + math.floor(5 / E.shield_charge.div)
+  eq(c3.enemies[2].hp, b3 - want)
+  eq(Warrior.chargeDamage(c3, true), want)
 end)
 
 ---------------------------------------------------------------------------
 -- Burning Steppes — Anger Management
 ---------------------------------------------------------------------------
-test("Anger Management : chaque 3 Rage dépensées, les recharges avancent ; à 0, retour en main aussitôt", function()
-  local c = setup({ "berserker_rage", "ignore_pain", "heroic_strike", "execute" }, { epic = "anger_management" })
+test("Anger Management : chaque Rage dépensée, les recharges avancent ; à 0, retour en main aussitôt", function()
+  local c = setup({ "berserker_rage", "heroic_strike", "shield_wall" }, { epic = "anger_management" })
   c.player.mana = 9
   assert(play(c, "berserker_rage")) -- +2 Rage, recharge 2
-  eq(#c.cooldown, 1); eq(c.cooldown[1].turns, 2)
-  c.player.res = 3
-  assert(play(c, "ignore_pain")) -- Surge 3
-  eq(c.cooldown[1].turns, 1); eq(c.cls.amSpent, 0)
+  assert(play(c, "shield_wall")) -- recharge 3
+  eq(#c.cooldown, 2); eq(c.cooldown[1].turns, 2); eq(c.cooldown[2].turns, 3)
   c.player.res = 2
-  assert(play(c, "heroic_strike", 1)) -- Spend 2 : reste 2
-  eq(c.cooldown[1].turns, 1); eq(c.cls.amSpent, 2)
-  c.player.res = 1
-  c.enemies[1].hp = 40
-  assert(play(c, "execute", 1)) -- Surge 1 : 3 -> recharge à 0, retour en main
-  eq(#c.cooldown, 0); assert(idx(c, "berserker_rage"), "revenue en main"); eq(c.cls.amSpent, 0)
+  assert(play(c, "heroic_strike", 1)) -- Spend 2 : deux crans
+  eq(#c.cooldown, 1, "Berserker Rage : 2 -> 0, revenue")
+  assert(idx(c, "berserker_rage"), "revenue en main aussitôt")
+  eq(c.cooldown[1].card.id, "shield_wall"); eq(c.cooldown[1].turns, 1)
+  eq(c.cls.amSpent, 0)
 end)
 
-test("Anger Management : reste gardé d'un tour à l'autre ; main pleine, retour au début du tour suivant", function()
-  local c = setup({ "berserker_rage", "heroic_strike" }, { epic = "anger_management" })
+test("Anger Management : Surge compté ; reste gardé ; main pleine, retour au début du tour suivant", function()
+  local old = E.anger_management.per
+  local c = setup({ "berserker_rage", "ignore_pain" }, { epic = "anger_management" })
   assert(play(c, "berserker_rage"))
-  c.player.res = 2
-  assert(play(c, "heroic_strike", 1))
-  eq(c.cls.amSpent, 2)
-  Combat.endTurn(c)
-  eq(c.cls.amSpent, 2, "gardé")
+  c.player.res = 1
+  assert(play(c, "ignore_pain")) -- Surge 1
+  eq(c.cooldown[1].turns, 1)
+  -- reste gardé d'un tour à l'autre (tranche de 3 essayée)
+  E.anger_management.per = 3
+  local c2 = setup({ "heroic_strike" }, { epic = "anger_management" })
+  c2.player.res = 2
+  assert(play(c2, "heroic_strike", 1))
+  eq(c2.cls.amSpent, 2)
+  Combat.endTurn(c2)
+  eq(c2.cls.amSpent, 2, "gardé")
+  E.anger_management.per = old
+  -- main pleine : gardée à 0, revenue au début du tour suivant
   c.cooldown[1].turns = 1
   while #c.hand < Combat.HAND_MAX do c.hand[#c.hand + 1] = Card.new("strike", false, 800 + #c.hand) end
   Warrior.cooldownTick(c)
@@ -401,14 +427,18 @@ test("Anger Management : reste gardé d'un tour à l'autre ; main pleine, retour
   assert(idx(c, "berserker_rage"), "revenue au début du tour suivant")
 end)
 
-test("Anger Management amélioré : chaque 2 Rage dépensées", function()
+test("Anger Management amélioré : deux crans par Rage dépensée", function()
   local c = setup({ "shield_wall", "heroic_strike" }, { epic = "anger_management", up = true })
   c.player.mana = 9
   assert(play(c, "shield_wall"))
   eq(c.cooldown[1].turns, 3)
-  c.player.res = 2
-  assert(play(c, "heroic_strike", 1))
-  eq(c.cooldown[1].turns, 2)
+  c.player.res = 1
+  assert(play(c, "heroic_strike", 1, { spend = false }))
+  eq(c.cooldown[1].turns, 3, "sans dépense : rien")
+  c.hand[#c.hand + 1] = Card.new("execute", false, 801)
+  c.enemies[1].hp = 40
+  assert(play(c, "execute", 1)) -- Surge 2 (1 + 1 de l'Attack) : 4 crans
+  eq(#c.cooldown, 0); assert(idx(c, "shield_wall"))
 end)
 
 ---------------------------------------------------------------------------

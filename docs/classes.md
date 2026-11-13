@@ -139,7 +139,7 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `applySelf` | état | valeur d'un état posé sur le héros, toutes sources (Benediction : Regen +1) |
 | `resCap` | — | plafond de la ressource (`resource.cap` ; Avatar : 10) ; `Combat.resCap(c)`, lu aussi par les crans et l'infobulle de la pastille (`UI/CombatView.lua` : au-delà de 5 crans, second arc) |
 | `attackMult` | cible, d | multiplicateur des coups d'une carte Attack (1 ; Death Wish : 1,5), après `damage` (Strength et ajouts), avant Demoralized / Sundered, arrondi à l'inférieur |
-| `canPlay` | d, inst | vrai par défaut ; une chaîne = la carte est injouable, la chaîne est la raison affichée (Titan's Grip : `"Only 2 Attacks per turn."`) ; après `allow`, avant `d.canPlay` |
+| `canPlay` | d, inst | vrai par défaut ; une chaîne = la carte est injouable, la chaîne est la raison affichée (Titan's Grip : `"Only 1 Attack per turn."`) ; après `allow`, avant `d.canPlay` |
 | `canGainBlock` | — | vrai par défaut ; faux = aucun Absorb gagné (Death Wish), avant le crochet `block` ; un gain ≤ 0 après `block` ne fait rien |
 | `trapLaunch` | d, inst | faux par défaut ; vrai = la Trap demande une cible (`Combat.targetOf`, `Combat.needsTarget(inst, c)`) et se déclenche aussitôt sur elle (`Combat.launchTrap` : mêmes effets, `onTrapTriggered` avec why = `"launch"`), sans emplacement (jouable zone pleine) |
 | `stealthBreak` | inst, d | Rogue : vrai par défaut ; faux = la première Attack profite de Stealth (lignes « Stealth: ») sans le retirer (Subterfuge ; la carte dit quand il tombe) |
@@ -197,7 +197,9 @@ sans point final ; U27 la reconnaît par le libellé, nom d'un état). Raison «
 (« Not enough Combo Points. »).
 
 Une classe peut émettre ses propres événements (`Combat.fire(c, "onShift", forme)`) : Powers et bibelots
-de la classe s'y abonnent par le même mécanisme.
+de la classe s'y abonnent par le même mécanisme. Les règles de zone (`ns.ZoneRules`, `docs/zones.md`) passent
+après la classe et ajoutent leurs événements (`onEffectEnd`, `onEnemyDamaged`, `enemyMove`, `onHeal`…),
+auxquels Powers et bibelots peuvent aussi s'abonner.
 
 Ordre d'un coup joué (`Combat.play`) : cible (crochet `target`), coûts payés **maintenant** (mana, PV,
 Spend si la ressource suffit ; une carte Cast interrompue ne rend rien), compteurs du tour
@@ -407,30 +409,62 @@ Nouveaux : `onHeal`, `onDamageDealt`, `onParry`, `afterCast` (notifications) ; `
 6e argument `ctx` (passé par l'effet `damage` et par `randomHits`). `Combat.fire` ne passe que trois arguments :
 un événement nouveau en a trois au plus.
 
+**Règle finale (14/11/2026) : une épique est une règle en jeu dès le début de chaque combat**
+(`docs/expedition.md`, « Cartes épiques »). `Combat.new` la pose dans `c.epic = { id, up, uid }`, hors de toute
+pile ; elle n'a pas de coût et ne se joue jamais. Contrat pour écrire une épique :
+- **Crochets** : `deckHooks` (même nom, même signature qu'avant : `(c, src, ...)`) et/ou `hooks` (comme un
+  Power) ; les deux sont actifs tout le combat, `src = c.epic`, et passent **après** les pouvoirs, les bibelots et
+  les affixes (`Combat.modify`, `Combat.fire`) ; `hooks.allow` / `deckHooks.allow` comptent dans
+  `Combat.canPlay` (raison `"forbidden"`). `whileInDeck(c, src)` : une fois au début du combat, après `init` de la
+  classe, avant `onCombatStart`. Les crochets de classe (`ns.ClassRules`) passent toujours en premier.
+- **Champs** : `rarity = "epic"`, `class`, `zone`, `name`, `type` (libre, `"power"` conseillé), `effects = {}`
+  (jamais résolus), `text` (commence par « Epic. », retiré à l'affichage et montré sur la plaque du bas ; jamais
+  « Power. »), `up` (amélioration au feu de camp : texte et valeurs lus par les crochets via `src.up` ou
+  `Card.def(src)`), `transforms` / variantes (`variant = true`) inchangés. `cost` facultatif (jamais payé ni affiché).
+- **Plafond de ressource** : le crochet `resCap` (Avatar : 10) est lu par les crans de l'interface
+  (`Combat.resCap(c)`, deux arcs au-delà de 6).
+- Pas d'`innate` ni de logique de pioche ou de main pour une épique : elle n'est jamais dans une pile. Le mot
+  `Innate` reste pour les cartes ordinaires.
+
 ### Épiques du Guerrier (14/11/2026)
 
 Sept épiques (`Data/Warrior.lua`, une par zone), règles et nombres dans `Core/Classes/warrior.lua`
-(`ns.Warrior.EPIC`, crochets `deckHooks` + `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
-`ns.Warrior.epicOf(c)` = épique active (effets passifs du deck, puis Powers). Crochets employés : `canGainBlock`,
+(`ns.Warrior.EPIC`, crochets `deckHooks`, `whileInDeck`), tests `Sim/tests_epic_warrior.lua`, harnais « UEW ».
+`ns.Warrior.epicOf(c)` = épique en jeu (`c.epic`) : id, amélioré. Crochets employés : `canGainBlock`,
 `attackMult`, `onEnemyDeath` (Death Wish) ; `onResource` (Thunderous Roar) ; `onDamageDealt` (Sweeping Strikes,
 rebond sans ctx) ; `replay`, `canPlay` (nouveau), `onCardCommitted`, `beforeCard` / `onCardPlayed` (Titan's Grip :
 la copie d'un Surge reprend le montant de l'original, Rage prêtée puis rendue ; la règle de classe ne donne la
 Rage d'une Attack qu'une fois quand `c.cls.titan`) ; `onTurnEnd` (Shield Charge) ; `onSpend` / `onSurge` et
 `ns.Warrior.cooldownTick(c)` (Anger Management : une recharge qui arrive à 0 revient en main aussitôt) ;
 `resCap`, `onTurnStart` (Avatar). Événement de journal `epic_trigger` (card, unit) : sans animation propre.
-Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge, Anger Management). En attendant que le socle
-sorte l'épique des piles, son `whileInDeck` la retire de la pioche (sans effet ensuite).
+Vue de classe : compteur de l'épique (Titan's Grip, Shield Charge ; Anger Management si une tranche dépasse 1).
+Coups sans carte des épiques : genre « other » (`Combat.hitInfo`), à tous pour l'onde et le rebond, à une cible
+pour Shield Charge, dont la cible passe aussi par le crochet de zone `petTarget` (dormeurs du Swamp).
+
+Mesures (14/11/2026, `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=4 runner=expedition key=0 class=warrior
+zones=7 level=7 epic=<id>`, Westfall ; sans épique, `epic=none` : 85,8 %, combat normal 2,95 tours et 8,2 PV ;
+± 2,2 points) :
+
+| Épique | Victoires | Écart | Combat normal (tours, PV perdus) | Nombres changés (fiche → retenu) |
+|---|---|---|---|---|
+| Death Wish | 92,3 % | +6,5 | 2,03 ; 8,7 | — |
+| Thunderous Roar | 93,2 % | +7,4 | 2,41 ; 7,5 | 6 / 9 + Demoralized 1 → 3 / 5 sans Demoralized |
+| Sweeping Strikes | 96,2 % | +10,4 | 2,10 ; 6,1 | — |
+| Titan's Grip | 96,6 % | +10,8 | 2,66 ; 6,3 | 2 Attacks par tour → 1 |
+| Shield Charge | 95,4 % | +9,6 | 3,05 ; 6,4 | moitié de l'Absorb → quart |
+| Anger Management | 91,8 % | +6,0 | 3,12 ; 7,7 | 3 / 2 Rage par cran → 1 Rage, −1 / −2 |
+| Avatar | 88,1 % | +2,3 | 3,01 ; 8,4 | +1 / +2 → +2 / +3 (+3 / +4 n'apporte rien) |
+
+Avatar reste sous la cible : sa Rage n'a presque pas de débouché dans un deck de Westfall (Execute, Ignore
+Pain, Onslaught à trouver en 4 ou 5 choix), le bot la dépense déjà dès qu'il peut ; à revoir avec la règle.
 
 Bots : `classDef.bot.deck(exp)` (nouveau, lu par `Sim/expedition.lua`) renvoie des notes, valeurs
 d'amélioration et de retrait qui remplacent celles de la classe tant que l'épique est dans le deck ;
 `classDef.bot.epic(exp, id)` note une épique proposée (accord avec le deck, attachement à l'épique du deck).
 
-L'agent de conception choisit, pour une épique « passive tant qu'elle est dans le deck », entre un Power à
-jouer (`hooks`), une carte `innate` (arrive en main) et `deckHooks` / `whileInDeck` (effet sans la jouer).
-
 ## Sauvegarde
 
-`Save.VERSION` 5, `Expedition.VERSION` 6 (version 6 : cartes épiques, `docs/expedition.md`) : version 3, migration de la Démence du combat en cours
+`Save.VERSION` 5, `Expedition.VERSION` 6 (version 6 : cartes épiques, `docs/expedition.md` ; épique en jeu : `c.epic`, champ facultatif) : version 3, migration de la Démence du combat en cours
 (`c.player.demence` → `c.player.res`, `c.class`, `c.cls`) ; version 4, niveau de classe (`cs.xp` tiré de
 l'ancienne réputation de classe, `exp.unlock.level`, docs/expedition.md) ; version 5, campagne par zones
 (`cs.zones`, `meta.zones`, `exp.zone`, `exp.unlock.common` et `won`, Ligue abandonnée, `docs/zones.md`). Une classe qui ajoute un état de combat le
