@@ -24,29 +24,33 @@ return function(T)
     return combat(o)
   end
   local function z(c) return c.zs.steppes end
+  -- Nombres de la zone (Data/Zones/Steppes.lua) : compte d'un combat normal, première brûlure, hausse.
+  local CFG = ns.Encounters.steppes.wildfire
+  local T0, B, S = CFG.normal, CFG.blaze, CFG.step
   local function rounds(c, n) for _ = 1, n do Combat.endTurn(c) end end
 
   ---------------------------------------------------------------------------
   -- Règle
   ---------------------------------------------------------------------------
 
-  test("Steppes : compte de départ selon le genre (3, 4, 4), champ wildfire d'un ennemi (Volchan 2) ; données simples", function()
-    eq(z(steppes()).left, 3); eq(z(steppes()).max, 3)
-    eq(z(steppes({ kind = "elite" })).left, 4)
-    eq(z(steppes({ kind = "boss", enemies = { "grark_lorkrub" } })).left, 4)
+  test("Steppes : compte de départ selon le genre (4, 5, 5), champ wildfire d'un ennemi (Volchan 3) ; données simples", function()
+    eq(T0, 4); eq(CFG.elite, 5); eq(B, 1); eq(S, 2)
+    eq(z(steppes()).left, T0); eq(z(steppes()).max, T0)
+    eq(z(steppes({ kind = "elite" })).left, CFG.elite)
+    eq(z(steppes({ kind = "boss", enemies = { "grark_lorkrub" } })).left, 5)
     local v = steppes({ kind = "elite", enemies = { "volchan" } })
-    eq(z(v).left, 2); eq(z(v).max, 2); eq(z(v).blaze, 2)
+    eq(z(v).left, 3); eq(z(v).max, 3); eq(z(v).blaze, B)
     local ok, why = T.plainData(v.zs); assert(ok, why)
     local cl = Combat.clone(v)
     cl.zs.steppes.left = 0
-    eq(z(v).left, 2, "clone profond")
+    eq(z(v).left, 3, "clone profond")
     local w = combat({ zone = "westfall" })
     eq(w.zs, nil, "Westfall : aucune règle de zone")
   end)
 
-  test("Steppes : 3, 2, 1, embrasement sans dégâts, puis brûle 2, 4, 6 (Blaze + 2 après chaque brûlure)", function()
+  test("Steppes : 4, 3, 2, 1, embrasement sans dégâts, puis brûle 1, 3, 5 (Blaze + 2 après chaque brûlure)", function()
     local c = steppes()
-    rounds(c, 2)
+    rounds(c, T0 - 1)
     eq(z(c).left, 1); eq(c.player.hp, 60)
     Combat.endTurn(c)
     eq(z(c).left, 0); eq(z(c).lit, true); eq(c.player.hp, 60, "embrasement : pas de dégâts ce round")
@@ -54,11 +58,11 @@ return function(T)
     for _, ev in ipairs(c.events) do if ev.t == "wildfire" and ev.ignite then ign = true end end
     assert(ign, "journal : embrasement")
     Combat.endTurn(c)
-    eq(c.player.hp, 58); eq(z(c).blaze, 4)
+    eq(c.player.hp, 59); eq(z(c).blaze, 3)
     Combat.endTurn(c)
-    eq(c.player.hp, 54); eq(z(c).blaze, 6)
+    eq(c.player.hp, 56); eq(z(c).blaze, 5)
     Combat.endTurn(c)
-    eq(c.player.hp, 48)
+    eq(c.player.hp, 51)
   end)
 
   test("Steppes : la brûlure ignore l'Absorb, Parry et Pain Suppression ; elle peut tuer", function()
@@ -66,8 +70,8 @@ return function(T)
     z(c).left = 0
     c.player.block, c.player.st.parry, c.player.st.halved = 30, 2, 1
     Combat.endRound(c)
-    eq(c.player.hp, 58); eq(c.player.st.parry, 2, "Parry intacte")
-    local d = steppes({ hp = 2 })
+    eq(c.player.hp, 60 - B); eq(c.player.st.parry, 2, "Parry intacte")
+    local d = steppes({ hp = B })
     z(d).left = 0
     Combat.endTurn(d)
     eq(d.result, "lost")
@@ -88,7 +92,7 @@ return function(T)
     eq(c.enemies[1].dead, true); eq(z(c).left, 3)
     local d = steppes({ enemies = { "sz_small", "sz_small", "sz_idle" }, hand = { "smite", "smite" } })
     play(d, "smite", 1)
-    eq(z(d).left, 3, "plafond T")
+    eq(z(d).left, T0, "plafond T")
     z(d).left, z(d).blaze = 0, 6
     play(d, "smite", 2)
     eq(z(d).left, 1)
@@ -124,13 +128,14 @@ return function(T)
 
   test("Steppes : Stoke retire au compte ; à 0, +2 Blaze par point ; Stoke qui amène à 0 brûle dès ce round", function()
     local c = steppes({ enemies = { "sz_stoker" } })
-    eq(z(c).left, 3)
+    eq(z(c).left, T0)
+    z(c).left = 3
     Combat.endTurn(c) -- Stoke 1 puis fin de round : 3 -> 2 -> 1
     eq(z(c).left, 1); eq(c.player.hp, 55)
-    Combat.endTurn(c) -- Stoke 1 : 1 -> 0, fin de round : brûle 2
-    eq(c.player.hp, 55 - 5 - 2); eq(z(c).blaze, 4)
-    Combat.endTurn(c) -- Stoke sur sol embrasé : Blaze 4 + 2 = 6, brûle 6
-    eq(c.player.hp, 48 - 5 - 6); eq(z(c).blaze, 8)
+    Combat.endTurn(c) -- Stoke 1 : 1 -> 0, fin de round : brûle 1
+    eq(c.player.hp, 55 - 5 - B); eq(z(c).blaze, B + S)
+    Combat.endTurn(c) -- Stoke sur sol embrasé : Blaze 3 + 2 = 5, brûle 5
+    eq(c.player.hp, 55 - 5 - B - 5 - (B + 2 * S)); eq(z(c).blaze, B + 3 * S)
     local s = 0
     for _, ev in ipairs(c.events) do if ev.t == "counter" and ev.zone == "steppes" then s = s + 1 end end
     assert(s > 0, "journal counter")
@@ -143,15 +148,15 @@ return function(T)
     play(c, "zt_interrupt", 1)
     eq(c.enemies[1].interrupted, true)
     Combat.endTurn(c)
-    eq(z(c).left, 2, "Stoke perdu : seule la fin de round baisse")
+    eq(z(c).left, T0 - 1, "Stoke perdu : seule la fin de round baisse")
     local d = steppes({ enemies = { "sz_stoker" } })
     Combat.applyStatus(d, d.enemies[1], "stunned", 1)
     Combat.endTurn(d)
-    eq(z(d).left, 2); eq(d.player.hp, 60)
+    eq(z(d).left, T0 - 1); eq(d.player.hp, 60)
     local h = steppes({ class = "hunter", enemies = { "sz_stoker" }, hand = { "freezing_trap" } })
     play(h, "freezing_trap")
     Combat.endTurn(h)
-    eq(z(h).left, 2, "Trap : le tour s'arrête avant le Stoke"); eq(h.player.hp, 60)
+    eq(z(h).left, T0 - 1, "Trap : le tour s'arrête avant le Stoke"); eq(h.player.hp, 60)
   end)
 
   test("Steppes : une intention sans attaque (Fan the Flames) ne déclenche pas de Trap", function()
@@ -159,13 +164,13 @@ return function(T)
     h.enemies[1].intent = "fan"
     play(h, "freezing_trap")
     Combat.endTurn(h)
-    eq(#h.traps, 1, "la Trap attend"); eq(z(h).left, 0, "Stoke 2 puis fin de round")
+    eq(#h.traps, 1, "la Trap attend"); eq(z(h).left, T0 - 3, "Stoke 2 puis fin de round")
   end)
 
   test("Steppes : Douse N (plafond T, sur sol embrasé repasse à N) ; hors des Steppes, rien", function()
     local c = steppes({ hand = { "greater_fire_protection_potion", "greater_fire_protection_potion" } })
     play(c, "greater_fire_protection_potion")
-    eq(z(c).left, 3, "plafond"); eq(c.player.block, 6)
+    eq(z(c).left, T0, "plafond"); eq(c.player.block, 6)
     z(c).left, z(c).blaze = 0, 8
     play(c, "greater_fire_protection_potion")
     eq(z(c).left, 3); eq(z(c).blaze, 8)
@@ -179,11 +184,11 @@ return function(T)
     z(c).left = 0
     c.player.flags.skipEnemyTurn = true
     Combat.endTurn(c)
-    eq(c.player.hp, 60); eq(z(c).blaze, 2)
+    eq(c.player.hp, 60); eq(z(c).blaze, B)
     local d = steppes()
     d.player.flags.skipEnemyTurn = true
     Combat.endTurn(d)
-    eq(z(d).left, 3)
+    eq(z(d).left, T0)
   end)
 
   test("Steppes : condition lit (Bite + 3, Fire Nova + 6), affichée par intentInfo", function()
@@ -202,14 +207,14 @@ return function(T)
   test("Steppes : prévision (Stoke annoncés, ennemi étourdi ou interrompu exclu), burnNow", function()
     local c = steppes({ enemies = { "sz_stoker", "sz_stoker" } })
     local fc = WF.forecast(c)
-    eq(fc.left, 1); eq(fc.stoke, 2); eq(fc.burnNow, false)
+    eq(fc.left, T0 - 2); eq(fc.stoke, 2); eq(fc.burnNow, false)
     Combat.applyStatus(c, c.enemies[2], "stunned", 1)
-    eq(WF.forecast(c).left, 2)
+    eq(WF.forecast(c).left, T0 - 1)
     z(c).left = 1
     eq(WF.forecast(c).burnNow, true)
     z(c).left = 0
     fc = WF.forecast(c)
-    eq(fc.blaze, 4); eq(fc.burnNow, true)
+    eq(fc.blaze, B + S); eq(fc.burnNow, true)
   end)
 
   ---------------------------------------------------------------------------
@@ -250,7 +255,7 @@ return function(T)
     eq(d.enemies[1].intent, "fireball", "seul : Fireball")
   end)
 
-  test("Steppes : Gruklash, Frenzy sous la moitié (Strength 3), motif qui reprend où il en était", function()
+  test("Steppes : Gruklash, Frenzy sous la moitié (Strength 2), motif qui reprend où il en était", function()
     local c = steppes({ kind = "elite", enemies = { "gruklash" }, hand = { "smite" }, hp = 300 })
     local e = c.enemies[1]
     eq(e.intent, "pummel")
@@ -260,7 +265,7 @@ return function(T)
     c.hand = {}
     c.hand[1] = ns.Card.new("smite", false, 9001)
     play(c, "smite", 1)
-    eq(e.mem.phase, 1); eq(e.st.force, 3)
+    eq(e.mem.phase, 1); eq(e.st.force, 2)
     Combat.endTurn(c)
     eq(e.intent, "mortal", "après Backhand : Mortal Strike")
   end)
@@ -286,37 +291,38 @@ return function(T)
     eq(E.thauris_balgarr.ai(d, d.enemies[1]), "shoot")
   end)
 
-  test("Steppes : Volchan, Wildfire 2, pas de soin par la brûlure", function()
+  test("Steppes : Volchan, Wildfire 3, pas de soin par la brûlure", function()
     local c = steppes({ kind = "elite", enemies = { "volchan" }, hp = 300 })
-    eq(z(c).left, 2)
+    eq(z(c).left, 3)
     c.enemies[1].hp = 50
     z(c).left = 0
     Combat.endRound(c)
     eq(c.enemies[1].hp, 50)
   end)
 
-  test("Steppes : Grark, phase 2 sous 50 % (sol embrasé, Torch puis Mortal Strike), déjà embrasé : Blaze + 4", function()
+  test("Steppes : Grark, phase 2 sous 30 % (sol embrasé, Torch puis Mortal Strike), déjà embrasé : Blaze + 4", function()
     local c = steppes({ kind = "boss", enemies = { "grark_lorkrub" }, hand = { "smite" }, hp = 300 })
     local g = c.enemies[1]
-    eq(z(c).left, 4)
-    g.hp = math.floor(g.maxHp / 2) + 3
+    eq(z(c).left, 5); eq(E.grark_lorkrub.phases[1].at, 0.3)
+    g.hp = Combat.phaseHp(g, E.grark_lorkrub.phases[1]) + 3
     play(c, "smite", 1)
     eq(g.mem.phase, 1); eq(z(c).left, 0); eq(g.intent, "torch")
     Combat.endTurn(c)
     eq(g.intent, "mortal")
     local d = steppes({ kind = "boss", enemies = { "grark_lorkrub" }, hand = { "smite" }, hp = 300 })
     z(d).left = 0
-    d.enemies[1].hp = math.floor(d.enemies[1].maxHp / 2) + 3
+    d.enemies[1].hp = Combat.phaseHp(d.enemies[1], E.grark_lorkrub.phases[1]) + 3
     play(d, "smite", 1)
-    eq(z(d).blaze, 6)
+    eq(z(d).blaze, B + 4)
   end)
 
-  test("Steppes : Grark, phase 3 sous 25 % (2 Ember Worgs, Absorb) ; motif de phase 2 continué ; serviteurs", function()
+  test("Steppes : Grark, phase 3 sous 20 % (2 Ember Worgs, Absorb) ; motif de phase 2 continué ; serviteurs", function()
     local c = steppes({ kind = "boss", enemies = { "grark_lorkrub" }, hand = { "smite" }, hp = 300 })
     local g = c.enemies[1]
     g.mem.phase = 1
     g.intent, g.mem.last = "torch", "block"
-    g.hp = math.floor(g.maxHp * 0.25) + 3
+    eq(E.grark_lorkrub.phases[2].at, 0.2)
+    g.hp = Combat.phaseHp(g, E.grark_lorkrub.phases[2]) + 3
     play(c, "smite", 1)
     eq(g.mem.phase, 2); eq(g.block, E.grark_lorkrub.phases[2].enter[2][2])
     local worgs = 0
@@ -359,10 +365,11 @@ return function(T)
 
   test("Steppes : Libram of Resilience annule la première perte de PV (coup, brûlure ou Pay N HP)", function()
     local c = steppes({ enemies = { "sz_stoker" }, relics = { "libram_of_resilience" } })
+    z(c).left = 3
     Combat.endTurn(c)
     eq(c.player.hp, 60, "premier coup annulé")
     Combat.endTurn(c)
-    eq(c.player.hp, 53, "coup de 5, puis brûle 2 (Stoke à 0)")
+    eq(c.player.hp, 60 - 5 - B, "coup de 5, puis brûle 1 (Stoke à 0)")
     local d = steppes({ relics = { "libram_of_resilience" } })
     z(d).left = 0
     Combat.endRound(d)
@@ -468,7 +475,7 @@ return function(T)
     z(c).left = 0
     local v1 = zb.value(c, ns.Bots.W)
     assert(v1 < v0, "sol embrasé : pire")
-    eq(zb.key(c), "0:2")
+    eq(zb.key(c), "0:" .. B)
     local rec, exp = ns.SimExpedition.play({ seed = 4, class = "rogue", zone = "steppes", zones = 5, level = 7, bot = "greedy" })
     eq(exp.phase, "done"); eq(exp.zone, "steppes")
   end)

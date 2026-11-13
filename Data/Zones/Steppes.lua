@@ -1,7 +1,7 @@
 -- Zone 6 de la campagne : Burning Steppes (`steppes`). Fiche : docs/zones/steppes.md ; décisions :
 -- docs/zones/decisions.md ; guide de l'agent de zone : docs/zones.md. Mécanique Wildfire (compte à rebours du
 -- champ de bataille, puis brûlure qui monte) : Core/ZoneRules/steppes.lua.
--- Champs propres aux ennemis lus par la règle : wildfire = N (compte à rebours du combat, Volchan 2).
+-- Champs propres aux ennemis lus par la règle : wildfire = N (compte à rebours du combat, Volchan 3).
 -- Actions de zone : { "stoke", n } (Wildfire n rounds plus tôt ; sol déjà embrasé : Blaze + 2 par point),
 -- { "ignite", n } (sol embrasé tout de suite ; déjà embrasé : Blaze + n). Condition « lit » : le sol brûle
 -- (attaque { "attack", 10, more = { { 5, "lit" } } }).
@@ -39,7 +39,7 @@ end
 
 -- Le mur : coupe les Cast du joueur, protège les attiseurs.
 E.blackrock_soldier = {
-  name = "Blackrock Soldier", hp = { 26, 29 },
+  name = "Blackrock Soldier", hp = { 29, 32 },
   moves = {
     strike = { name = "Strike", intent = "attack", actions = { { "attack", 7 } } },
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 5, interrupts = true }, { "block", 6 } } },
@@ -50,19 +50,19 @@ E.blackrock_soldier = {
 
 -- Cible d'interruption : un Interrupt annule les dégâts et le Stoke.
 E.blackrock_sorcerer = {
-  name = "Blackrock Sorcerer", hp = { 17, 19 },
+  name = "Blackrock Sorcerer", hp = { 19, 21 },
   moves = {
     flamestrike = { name = "Flamestrike", intent = "cast", cast = true, actions = { { "attack", 7 }, { "stoke", 1 } } },
-    fireball = { name = "Fireball", intent = "attack", actions = { { "attack", 6 } } },
+    fireball = { name = "Fireball", intent = "attack", actions = { { "attack", 7 } } },
   },
   pattern = { "flamestrike", "fireball" }, randomStart = true,
 }
 
 -- Punit les combats longs : plus fort sur sol embrasé.
 E.blackrock_worg = {
-  name = "Blackrock Worg", hp = { 19, 21 },
+  name = "Blackrock Worg", hp = { 21, 23 },
   moves = {
-    bite = { name = "Bite", intent = "attack", actions = { { "attack", 5, more = { { 3, "lit" } } } } },
+    bite = { name = "Bite", intent = "attack", actions = { { "attack", 6, more = { { 3, "lit" } } } } },
     rend = { name = "Rend Flesh", intent = "attack", actions = { { "attack", 3, times = 2 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
@@ -70,39 +70,39 @@ E.blackrock_worg = {
 
 -- Gros PV : l'étourdir avant Searing Roar arrête le Stoke.
 E.black_dragonspawn = {
-  name = "Black Dragonspawn", hp = { 34, 37 },
+  name = "Black Dragonspawn", hp = { 36, 39 },
   moves = {
     guard = { name = "Scale Guard", intent = "defend", actions = { { "block", 14 } } },
-    roar = { name = "Searing Roar", intent = "attack", actions = { { "attack", 6 }, { "stoke", 1 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 12 } } },
+    roar = { name = "Searing Roar", intent = "attack", actions = { { "attack", 7 }, { "stoke", 1 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 11 } } },
   },
   pattern = { "guard", "roar", "cleave" },
 }
 
 -- L'attiseur pur : Stoke 2 en Cast sans attaque (ne déclenche pas les Traps), frappe un tour sur deux.
 E.black_wyrmkin = {
-  name = "Black Wyrmkin", hp = { 21, 24 },
+  name = "Black Wyrmkin", hp = { 23, 26 },
   moves = {
     fan = { name = "Fan the Flames", intent = "cast", cast = true, actions = { { "stoke", 2 } } },
-    buffet = { name = "Flame Buffet", intent = "attack", actions = { { "attack", 8 } } },
+    buffet = { name = "Flame Buffet", intent = "attack", actions = { { "attack", 9 } } },
   },
   pattern = { "fan", "buffet" }, randomStart = true,
 }
 
 -- Le gros coup qui interrompt ; Strength qui monte si le combat dure.
 E.firegut_brute = {
-  name = "Firegut Brute", hp = { 38, 41 },
+  name = "Firegut Brute", hp = { 42, 45 },
   moves = {
     bellow = { name = "Bellow", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
-    smash = { name = "Smash", intent = "attack", actions = { { "attack", 15, interrupts = true } } },
-    embers = { name = "Kick Embers", intent = "attack", actions = { { "attack", 6 }, { "stoke", 1 } } },
+    smash = { name = "Smash", intent = "attack", actions = { { "attack", 13, interrupts = true } } },
+    embers = { name = "Kick Embers", intent = "attack", actions = { { "attack", 8 }, { "stoke", 1 } } },
   },
   pattern = { "bellow", "smash", "embers" },
 }
 
 -- Soutien : Bloodlust si un autre ennemi vit et qu'il ne l'a pas lancé au tour d'avant, deux fois au plus.
 E.firegut_ogre_mage = {
-  name = "Firegut Ogre Mage", hp = { 19, 21 },
+  name = "Firegut Ogre Mage", hp = { 21, 23 },
   moves = {
     bloodlust = { name = "Bloodlust", intent = "buff", actions = { { "buff_allies", "force", 1 }, { "fn", function(c, e)
       e.mem.lusts = (e.mem.lusts or 0) + 1
@@ -119,20 +119,20 @@ E.firegut_ogre_mage = {
 
 -- Par trois : chaque mort recule le feu.
 E.flamekin_torcher = {
-  name = "Flamekin Torcher", hp = { 9, 10 },
+  name = "Flamekin Torcher", hp = { 10, 11 },
   moves = {
     torch = { name = "Torch", intent = "cast", cast = true, actions = { { "attack", 3 }, { "stoke", 1 } } },
-    ember = { name = "Ember", intent = "attack", actions = { { "attack", 5 } } },
+    ember = { name = "Ember", intent = "attack", actions = { { "attack", 6 } } },
   },
   pattern = { "torch", "ember" }, randomStart = true,
 }
 
 -- Le Dark Iron isolé : il attise sans attaquer, puis frappe fort sur sol embrasé.
 E.thaurissan_firewalker = {
-  name = "Thaurissan Firewalker", hp = { 28, 31 },
+  name = "Thaurissan Firewalker", hp = { 31, 34 },
   moves = {
     firewalk = { name = "Firewalk", intent = "defend", actions = { { "block", 12 }, { "stoke", 1 } } },
-    nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 7, more = { { 6, "lit" } } } } },
+    nova = { name = "Fire Nova", intent = "attack", actions = { { "attack", 9, more = { { 5, "lit" } } } } },
   },
   pattern = { "firewalk", "nova" },
 }
@@ -145,24 +145,24 @@ E.thaurissan_firewalker = {
 E.gruklash = {
   name = "Gruklash", hp = 100, elite = true,
   moves = {
-    pummel = { name = "Pummel", intent = "attack", actions = { { "attack", 10, interrupts = true } } },
-    backhand = { name = "Backhand", intent = "debuff", actions = { { "attack", 12 }, { "debuff", "demoralized", 2 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 22 } } },
+    pummel = { name = "Pummel", intent = "attack", actions = { { "attack", 13, interrupts = true } } },
+    backhand = { name = "Backhand", intent = "debuff", actions = { { "attack", 14 }, { "debuff", "demoralized", 2 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 18 } } },
   },
   ai = cycle({ "pummel", "backhand", "mortal" }),
   phases = {
-    { at = 0.5, name = "Frenzy", text = "Gains Strength 3.", enter = { { "buff", "force", 3 } } },
+    { at = 0.5, name = "Frenzy", text = "Gains Strength 2.", enter = { { "buff", "force", 2 } } },
   },
 }
 
 -- Les mines : serviteurs à désamorcer, qui ne reculent pas le feu en mourant.
 local THAURIS = { "mine", "shoot", "net", "shoot" }
 E.thauris_balgarr = {
-  name = "Thauris Balgarr", hp = 96, elite = true,
+  name = "Thauris Balgarr", hp = 116, elite = true,
   moves = {
     mine = { name = "Dark Iron Land Mine", intent = "summon", actions = { { "summon", "dark_iron_land_mine" } } },
-    shoot = { name = "Shoot", intent = "attack", actions = { { "attack", 14 } } },
-    net = { name = "Net", intent = "debuff", actions = { { "attack", 8 }, { "debuff", "demoralized", 2 } } },
+    shoot = { name = "Shoot", intent = "attack", actions = { { "attack", 16 } } },
+    net = { name = "Net", intent = "debuff", actions = { { "attack", 11 }, { "debuff", "demoralized", 2 } } },
   },
   ai = function(c, e)
     local k = (e.mem.k or 0) % #THAURIS + 1
@@ -183,13 +183,13 @@ E.dark_iron_land_mine = {
   pattern = { "arm", "detonate" },
 }
 
--- La course perdue d'avance : seul, Wildfire 2 (décision du 13/11 : pas de soin par la brûlure).
+-- La course perdue d'avance : seul, le compte le plus court (Wildfire 3 ; décision du 13/11 : pas de soin par la brûlure).
 E.volchan = {
-  name = "Volchan", hp = 80, elite = true, wildfire = 2,
+  name = "Volchan", hp = 90, elite = true, wildfire = 3,
   moves = {
-    crack = { name = "Flamecrack", intent = "attack", actions = { { "attack", 7 }, { "stoke", 1 } } },
-    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 15, interrupts = true } } },
-    nova = { name = "Fire Nova", intent = "cast", cast = true, actions = { { "attack", 18 } } },
+    crack = { name = "Flamecrack", intent = "attack", actions = { { "attack", 8 }, { "stoke", 1 } } },
+    stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 16, interrupts = true } } },
+    nova = { name = "Fire Nova", intent = "cast", cast = true, actions = { { "attack", 15 } } },
   },
   pattern = { "crack", "stomp", "nova" },
 }
@@ -199,31 +199,31 @@ E.volchan = {
 ---------------------------------------------------------------------------
 
 E.ember_worg = {
-  name = "Ember Worg", hp = 10, minion = true,
+  name = "Ember Worg", hp = 5, minion = true,
   moves = {
-    bite = { name = "Bite", intent = "attack", actions = { { "attack", 5 } } },
+    bite = { name = "Bite", intent = "attack", actions = { { "attack", 3 } } },
   },
   pattern = { "bite" },
 }
 
 local GRARK2 = { "torch", "mortal", "rend", "block" }
 E.grark_lorkrub = {
-  name = "Grark Lorkrub", hp = 84, boss = true, wildfire = 4,
+  name = "Grark Lorkrub", hp = 123, boss = true, wildfire = 5,
   moves = {
     orders = { name = "Call the Pack", intent = "summon", actions = { { "summon", "ember_worg", max = 2 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 13 } } },
-    strike = { name = "Heroic Strike", intent = "attack", actions = { { "attack", 19 } } },
-    block = { name = "Shield Block", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 2 } } },
-    torch = { name = "Torch the Field", intent = "attack", actions = { { "attack", 8 }, { "stoke", 1 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 23 } } },
+    strike = { name = "Heroic Strike", intent = "attack", actions = { { "attack", 26 } } },
+    block = { name = "Shield Block", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 1 } } },
+    torch = { name = "Torch the Field", intent = "attack", actions = { { "attack", 12 }, { "stoke", 1 } } },
     mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 22, interrupts = true } } },
-    rend = { name = "Rend", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "pain", 3 } } },
+    rend = { name = "Rend", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "pain", 3 } } },
   },
   pattern = { "orders", "cleave", "strike", "block" },
   phases = {
-    { at = 0.5, name = "Burn them out", text = "Wildfire ignites at once.",
+    { at = 0.3, name = "Burn them out", text = "Wildfire ignites at once.",
       say = "Burn them out! Let the Steppes take them!",
       enter = { { "ignite", 4 } }, open = "torch", ai = cycle(GRARK2) },
-    { at = 0.25, name = "Blackrock, to me", text = "Summons 2 Ember Worgs, gains 12 Absorb.",
+    { at = 0.2, name = "Blackrock, to me", text = "Summons 2 Ember Worgs, gains 12 Absorb.",
       say = "Blackrock, to me!",
       enter = { { "summon", "ember_worg", count = 2 }, { "block", 12 } }, ai = cycle(GRARK2) },
   },
@@ -261,7 +261,7 @@ ns.Encounters.steppes = {
   event_volchan = { { "volchan" } },
   -- Compte à rebours du Wildfire selon le genre du combat ; blaze = première brûlure ; step = hausse de la
   -- brûlure après chaque brûlure, et par point de Stoke qui tombe sur un sol déjà embrasé.
-  wildfire = { normal = 3, elite = 4, boss = 4, blaze = 2, step = 2 },
+  wildfire = { normal = 4, elite = 5, boss = 5, blaze = 1, step = 2 },
 }
 
 ---------------------------------------------------------------------------
