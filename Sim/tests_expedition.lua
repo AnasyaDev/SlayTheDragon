@@ -793,8 +793,11 @@ local function forceEvent(exp, id)
   local ev = ns.Events[id]
   local when, once, tier = ev.when, ev.once, ev.tier
   ev.when, ev.once, ev.tier = nil, nil, 0
-  -- rencontre d'une case de parcours (node = true, jamais tirée) : ouverte directement
-  local ok, err = pcall(ev.node and function() exp.node = exp.map.start[1] X.openEvent(exp, id) end or enterEvent, exp, id)
+  -- rencontre de case de parcours (node = true, jamais tirée : Gurubashi Arena) : ouverte comme par sa case
+  local ok, err = pcall(ev.node and function()
+    exp.node, exp.phase = exp.map.start[1], "map"
+    X.openEvent(exp, id)
+  end or enterEvent, exp, id)
   ev.when, ev.once, ev.tier = when, once, tier
   if not ok then error(err, 0) end
 end
@@ -811,12 +814,14 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   local fam, tier0, withWhen = { common = 0, rare = 0, story = 0 }, 0, 0
   local function checkEffects(id, effects)
     for _, e in ipairs(effects) do
-      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
+      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1])) -- effets déclarés par une zone
       if e[1] == "fight" then
         local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
         assert(ns.Encounters[ns.Zones[ns.Events[id].zone or "westfall"].encounters][pool], id .. " : groupe " .. tostring(pool))
       elseif e[1] == "relic" and e[2] then
-        assert(ns.Relics[e[2]] and ns.Relics[e[2]].noPool, id .. " : bibelot propre " .. e[2])
+        -- bibelot propre (noPool), ou bibelot commun d'une zone vendu par sa rencontre (Shrunken Head)
+        local r = ns.Relics[e[2]]
+        assert(r and (r.noPool or (ns.Events[id].zone and not r.class and (r.tier or 0) >= 4)), id .. " : bibelot propre " .. e[2])
       elseif e[1] == "potion" and e[2] then
         assert(ns.Potions[e[2]], id .. " : potion " .. e[2])
       elseif e[1] == "gamble" then
@@ -1396,7 +1401,7 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
   for lv = 0, 3 do
     local exp = newExp({ unlocks = { rep = 0, common = lv } })
     local pool = {}
-    -- neutres d'une fiche de zone (sheet) à part : Sim/tests_zone_<zone>.lua
+    -- neutres d'une fiche de zone des paliers 0 à 3 (champ sheet, Duskwood) : testés par leur zone
     for _, id in ipairs(X.neutralPool(exp)) do if not ns.Cards[id].sheet then pool[#pool + 1] = id end end
     eq(#pool, want[lv], "palier " .. lv)
     for _, id in ipairs(pool) do
@@ -1407,11 +1412,9 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
     eq(X.check(exp, { { "unlocked", "elixir_of_superior_defense" } }), lv >= 2, "condition unlocked " .. lv)
   end
   -- Exalté (4) : comme Révéré
-  local n4 = 0
-  for _, id in ipairs(X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } }))) do
-    if not ns.Cards[id].sheet then n4 = n4 + 1 end
-  end
-  eq(n4, 10)
+  local upTo4 = 0 -- neutres des paliers 0 à 4 (la zone 4 en ajoute)
+  for _, d in pairs(ns.Cards) do if d.neutral and d.tier <= 4 then upTo4 = upTo4 + 1 end end
+  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } })), upTo4)
 end)
 
 test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 100 ±10 %), pour chaque classe", function()

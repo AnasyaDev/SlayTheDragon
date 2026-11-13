@@ -567,9 +567,11 @@ local function zoneLayer(sp, name, f, g, pal)
   if fn then fn(S.paintKit, f, g, sp, pal) end
 end
 
--- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions.
+-- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions. sp.draw(kit, f, g, sp,
+-- palette) : paysage peint en entier par sa zone (jungle de Stranglethorn), à la place des plans ci-dessous.
 function S.landscape(f, g, sp)
   local pal = Art.palettes[sp.pal] or Art.palettes.westfall
+  if sp.draw then return sp.draw(S.paintKit, f, g, sp, pal) end
   local Wd, Hd, hz, fl = S.W, S.DECOR_H, sp.horizon or 190, sp.field or 228
   -- ciel : deux dégradés
   local sk = pal.sky
