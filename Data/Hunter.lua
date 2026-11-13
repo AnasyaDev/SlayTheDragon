@@ -324,17 +324,37 @@ card("feign_death", {
 })
 
 -- Resourcefulness : la Trap déclenchée revient en main tout de suite (main pleine : reste en défausse).
-local resourcefulnessHooks = {
-  onTrapTriggered = function(c, power, inst)
-    if #c.hand >= Combat.HAND_MAX then return end
-    for i = #c.discard, 1, -1 do
-      if c.discard[i].uid == inst.uid then
-        table.remove(c.discard, i)
-        c.hand[#c.hand + 1] = inst
-        Combat.log(c, { t = "cooldown_back", card = inst.uid })
-        return
-      end
+-- Trap lancée au jeu (Trap Launcher, why = "launch") : elle revient à la fin du round, après le tour
+-- ennemi (sinon une Freezing Trap étourdirait toute la salle à chaque tour) ; uid gardés dans
+-- c.cls.trapBack.
+local function trapToHand(c, uid)
+  if #c.hand >= Combat.HAND_MAX then return end
+  for i = #c.discard, 1, -1 do
+    local inst = c.discard[i]
+    if inst.uid == uid then
+      table.remove(c.discard, i)
+      c.hand[#c.hand + 1] = inst
+      Combat.log(c, { t = "cooldown_back", card = inst.uid })
+      return
     end
+  end
+end
+
+local resourcefulnessHooks = {
+  onTrapTriggered = function(c, power, inst, enemy, why)
+    if why == "launch" then
+      local back = c.cls.trapBack or {}
+      c.cls.trapBack = back
+      back[#back + 1] = inst.uid
+      return
+    end
+    trapToHand(c, inst.uid)
+  end,
+  onRoundEnd = function(c)
+    local back = c.cls.trapBack
+    if not back then return end
+    c.cls.trapBack = nil
+    for i = 1, #back do trapToHand(c, back[i]) end
   end,
 }
 
@@ -343,6 +363,279 @@ card("resourcefulness", {
   power = true, effects = {}, hooks = resourcefulnessHooks,
   text = "Power.\nTriggered Traps return to hand.",
   up = { cost = 0, text = "Power.\nTriggered Traps return to hand." },
+})
+
+-- Cartes épiques (cartes de zone, docs/zones/cartes-de-zone.md, « Hunter ») ------------------------
+-- Une épique est une règle en jeu dès le début de chaque combat : jamais piochée ni jouée, sans coût.
+-- Ses crochets sont des deckHooks (actifs où que soit la carte, src = { id, up, uid } : src.up = améliorée) ;
+-- whileInDeck = ns.Hunter.epicStart (Core/Classes/hunter.lua). Les nombres réglés par la simulation sont
+-- en tête de chaque bloc (EPIC).
+
+-- Nombres des épiques, { base, amélioré } (fiche : roar 5 / 8, marksman 0 / 4, launcher 1 / 2, lonePer 1 / 1,
+-- loneStart 0 / 1, chimaera 3, 3, 6) ; réglés par la simulation (Westfall, clé 0, zones=7, niveau 7 : rapport
+-- de la nuit du 13 au 14/11/2026). Lone Wolf amélioré : +3 par Frenzy au lieu de « Start of turn: +1 Frenzy. »
+-- (la ligne de plus faisait passer le texte sous le plancher de 8,5).
+local EPIC = {
+  roar = { 2, 4 },          -- Roar of Sacrifice : dégâts arrêtés par point de Frenzy dépensé
+  marksman = { 8, 12 },      -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
+  launcher = { 1, 2 },      -- Trap Launcher : attaques du familier par Trap lancée
+  lonePer = { 2, 3 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
+  loneStart = { 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
+  chimaera = { 4, 4, 7 },   -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée (fiche : 3, 3, 6)
+}
+ns.HunterEpic = EPIC
+
+-- Note des épiques pour les bots (classDef.bot.epic) : ≈ 5 + gain mesuré / 2.
+local EPIC_KEEP = 5
+local EPIC_BOT = {
+  call_of_the_wild = 11.9, trap_launcher = 8.9, beast_cleave = 11, roar_of_sacrifice = 8.2, master_marksman = 7.8,
+  black_arrow = 10.8, lone_wolf = 9.3,
+}
+
+local function epic(id, t)
+  t.type, t.rarity, t.epic, t.power = "power", "epic", true, true
+  t.effects = t.effects or {}
+  t.whileInDeck = function(c, src) H().epicStart(c, src) end
+  card(id, t)
+end
+
+local function n2(pair, src) return src.up and pair[2] or pair[1] end
+local TIMES = { [1] = "", [2] = " twice", [3] = " three times", [4] = " four times" }
+
+-- Westfall — Call of the Wild : au début de chaque tour (après la pioche et la baisse du Frenzy), le
+-- familier attaque ; amélioré : +1 Frenzy juste avant.
+epic("call_of_the_wild", {
+  zone = "westfall", path = "beast_mastery", name = "Call of the Wild",
+  text = "Epic.\nStart of turn: pet attacks.",
+  up = { text = "Epic.\nStart of turn: +1 Frenzy, pet attacks." },
+  deckHooks = {
+    onTurnStart = function(c, src)
+      if c.result then return end
+      if src.up then Combat.gainRes(c, 1, "epic") end
+      H().petAttack(c, "epic")
+    end,
+  },
+})
+
+-- Duskwood — Trap Launcher : une Trap demande une cible et s'y déclenche aussitôt (trapLaunch), puis le
+-- familier attaque cet ennemi EPIC.launcher fois (fiche : 1, amélioré 2), qui devient sa cible.
+epic("trap_launcher", {
+  zone = "duskwood", path = "survival", name = "Trap Launcher",
+  text = "Epic.\nTraps trigger at once on a target.\nPet attacks it" .. TIMES[EPIC.launcher[1]] .. ".",
+  up = { text = "Epic.\nTraps trigger at once on a target.\nPet attacks it" .. TIMES[EPIC.launcher[2]] .. "." },
+  deckHooks = {
+    trapLaunch = function(c, src, v) return true end,
+    onTrapTriggered = function(c, src, inst, enemy, why)
+      if why ~= "launch" or not enemy then return end
+      for _ = 1, n2(EPIC.launcher, src) do
+        if c.result or enemy.dead then return end
+        H().petAttack(c, "launch", nil, enemy)
+      end
+    end,
+  },
+})
+
+-- Wetlands — Beast Cleave : chaque attaque du familier frappe tous les ennemis vivants (petAll) ;
+-- amélioré : +1 Frenzy de plus par attaque (pas pour les attaques de Surge, qui n'en donnent pas).
+epic("beast_cleave", {
+  zone = "wetlands", path = "beast_mastery", name = "Beast Cleave",
+  text = "Epic.\nPet attacks hit all enemies.",
+  up = { text = "Epic.\nPet attacks hit all enemies.\nPet attacks: +1 Frenzy." },
+  deckHooks = {
+    petAll = function(c, src, v) return true end,
+    onPetAttack = function(c, src, t, dmg, why)
+      if src.up and why ~= "surge" and not c.result then Combat.gainRes(c, 1, "epic") end
+    end,
+  },
+})
+
+-- Stranglethorn Vale — Roar of Sacrifice : à chaque coup ennemi (avant l'Absorb), si le Frenzy vaut 1 ou
+-- plus, il baisse de 1 et le coup perd jusqu'à EPIC.roar dégâts (fiche : 5, amélioré 8). Un coup de 0 ne
+-- coûte rien.
+epic("roar_of_sacrifice", {
+  zone = "stranglethorn", path = "beast_mastery", name = "Roar of Sacrifice",
+  text = "Epic.\nWhen hit: spend 1 Frenzy to stop up to " .. EPIC.roar[1] .. " damage.",
+  up = { text = "Epic.\nWhen hit: spend 1 Frenzy to stop up to " .. EPIC.roar[2] .. " damage." },
+  deckHooks = {
+    beforeHit = function(c, src, dmg, enemy)
+      if dmg <= 0 or (c.player.res or 0) < 1 or c.result then return dmg end
+      local stop = math.min(dmg, n2(EPIC.roar, src))
+      Combat.gainRes(c, -1, "roar")
+      Combat.log(c, { t = "roar", src = enemy and Combat.uref(enemy), prevented = stop })
+      if c.stats then c.stats.roarPrevented = (c.stats.roarPrevented or 0) + stop end
+      return dmg - stop
+    end,
+  },
+})
+
+-- Swamp of Sorrows — Master Marksman : une carte Attack Cast à cible jouée sur un ennemi au-dessus de la
+-- moitié de ses PV (Careful Aim, lu au jeu) se résout tout de suite, sans emplacement ni interruption
+-- (crochet instantCast, cible = c.player.lastTarget posée par Combat.play) ; ses coups infligent EPIC.marksman
+-- de plus (fiche : 0, amélioré 4 ; c.cls.marksman = uid de la carte en cours). Sans cible connue (question de
+-- canPlay) : vrai si un ennemi vivant est intact.
+local function marksmanText(n)
+  return "Epic.\nCareful Aim: Cast Attacks resolve at once" .. (n > 0 and (" and deal " .. n .. " more.") or ".")
+end
+local function carefulTarget(t) return t ~= nil and not t.dead and t.hp * 2 > t.maxHp end
+epic("master_marksman", {
+  zone = "swamp", path = "marksmanship", name = "Master Marksman",
+  text = marksmanText(EPIC.marksman[1]),
+  up = { text = marksmanText(EPIC.marksman[2]) },
+  deckHooks = {
+    instantCast = function(c, src, v, d, inst, commit)
+      if v or d.type ~= "attack" or not d.cast or d.target ~= "enemy" then return v end
+      if commit then
+        local uid = c.player.lastTarget
+        if not carefulTarget(uid and Combat.enemyByUid(c, uid)) then return v end
+        Combat.log(c, { t = "cast_instant", card = inst.uid, by = "master_marksman" })
+        if c.stats then c.stats.castsInstant = (c.stats.castsInstant or 0) + 1 end
+        if n2(EPIC.marksman, src) > 0 then c.cls.marksman = inst.uid end
+        return true
+      end
+      for i = 1, #c.enemies do
+        if carefulTarget(c.enemies[i]) then return true end
+      end
+      return v
+    end,
+    damage = function(c, src, v, dst, cardDef)
+      if c.cls.marksman and cardDef and cardDef.type == "attack" and cardDef.cast then
+        return v + n2(EPIC.marksman, src)
+      end
+      return v
+    end,
+    afterCast = function(c, src, inst)
+      if c.cls.marksman == inst.uid then c.cls.marksman = nil end
+    end,
+  },
+})
+
+-- Burning Steppes — Black Arrow : après chaque tic de DoT sur un ennemi qui survit, le familier attaque cet
+-- ennemi (+1 Frenzy comme d'habitude ; amélioré : +1 Frenzy de plus avant), sans changer sa cible.
+epic("black_arrow", {
+  zone = "steppes", path = "survival", name = "Black Arrow",
+  text = "Epic.\nEach enemy DoT tick: pet attacks it.",
+  up = { text = "Epic.\nEach enemy DoT tick: +1 Frenzy, pet attacks it." },
+  deckHooks = {
+    onDotTick = function(c, src, unit)
+      if c.result or unit.side ~= "enemy" or unit.dead then return end
+      if src.up then Combat.gainRes(c, 1, "epic") end
+      H().petAttack(c, "dot", nil, unit)
+    end,
+  },
+})
+
+-- Blackrock Mountain — Lone Wolf : plus de familier (petAbsent) ; les cartes qui le nomment se jouent et
+-- s'affichent sous leur variante (transforms, variantes ci-dessous) ; chaque coup d'une carte Attack inflige
+-- EPIC.lonePer par point de Frenzy de plus (fiche : 1 ; crochet damage, lu coup par coup ; une Cast le lit à
+-- sa résolution) ; EPIC.loneStart Frenzy au début de chaque tour (fiche : 0, amélioré 1 ; la baisse de 1 par
+-- round reste).
+local function loneText(per, start)
+  return "Epic.\nPet cards become shots.\nAttack hits: +" .. per .. " per Frenzy."
+    .. (start > 0 and ("\nStart of turn: +" .. start .. " Frenzy.") or "")
+end
+epic("lone_wolf", {
+  zone = "blackrock", path = "marksmanship", name = "Lone Wolf",
+  text = loneText(EPIC.lonePer[1], EPIC.loneStart[1]),
+  up = { text = loneText(EPIC.lonePer[2], EPIC.loneStart[2]) },
+  transforms = {
+    arcane_shot = "chimaera_shot", kill_command = "kill_shot", dire_beast = "double_tap",
+    intimidation = "scatter_shot", multi_shot = "salvo", counter_shot = "silencing_shot",
+    bestial_wrath = "explosive_shot", the_beast_within = "trick_shots", spirit_bond = "aspect_of_the_turtle",
+  },
+  deckHooks = {
+    petAbsent = function(c, src, v) return true end,
+    damage = function(c, src, v, dst, cardDef)
+      if cardDef and cardDef.type == "attack" then return v + n2(EPIC.lonePer, src) * (c.player.res or 0) end
+      return v
+    end,
+    onTurnStart = function(c, src)
+      local n = n2(EPIC.loneStart, src)
+      if n > 0 and not c.result then Combat.gainRes(c, n, "epic") end
+    end,
+  },
+})
+
+-- Variantes de Lone Wolf (variant = true : jamais collectionnables) : coût, type, rareté, voie et
+-- amélioration de la carte d'origine gardés.
+local function variant(id, t)
+  t.variant = true
+  card(id, t)
+end
+
+variant("chimaera_shot", {
+  name = "Chimaera Shot", cost = 1, type = "attack", rarity = "basic", path = "start",
+  target = "enemy", effects = { { "damage", EPIC.chimaera[1] }, { "damageOther", EPIC.chimaera[2] }, { "res", 1 } },
+  text = "Deal " .. EPIC.chimaera[1] .. ".\nDeal " .. EPIC.chimaera[2] .. " to another enemy.\n+1 Frenzy.",
+  up = { effects = { { "damage", EPIC.chimaera[3] }, { "damageOther", EPIC.chimaera[2] }, { "res", 1 } },
+    text = "Deal " .. EPIC.chimaera[3] .. ".\nDeal " .. EPIC.chimaera[2] .. " to another enemy.\n+1 Frenzy." },
+})
+
+variant("kill_shot", {
+  name = "Kill Shot", cost = 1, type = "attack", rarity = "common", path = "beast_mastery",
+  target = "enemy", cooldown = 3, effects = { { "damage", 8, more = { { 8, "execute" } } }, { "res", 1 } },
+  text = "Deal 8.\nExecute: deal 16.\n+1 Frenzy.\nCooldown 3.",
+  up = { cooldown = 2, text = "Deal 8.\nExecute: deal 16.\n+1 Frenzy.\nCooldown 2." },
+})
+
+variant("double_tap", {
+  name = "Double Tap", cost = 0, type = "skill", rarity = "common", path = "beast_mastery",
+  exhaust = true, effects = { { "draw", 1 }, { "res", 2 } },
+  text = "Draw 1.\n+2 Frenzy.\nExhaust.",
+  up = { effects = { { "draw", 1 }, { "res", 3 } }, text = "Draw 1.\n+3 Frenzy.\nExhaust." },
+})
+
+variant("scatter_shot", {
+  name = "Scatter Shot", cost = 1, type = "skill", rarity = "uncommon", path = "beast_mastery",
+  target = "enemy", cooldown = 4, effects = { { "damage", 3 }, { "res", 1 }, { "apply", "stunned", 1 } },
+  text = "Deal 3.\n+1 Frenzy.\nApply Stunned 1 ⌛\nCooldown 4.",
+  up = { cooldown = 3, text = "Deal 3.\n+1 Frenzy.\nApply Stunned 1 ⌛\nCooldown 3." },
+})
+
+variant("salvo", {
+  name = "Salvo", cost = 1, type = "attack", rarity = "uncommon", path = "beast_mastery",
+  effects = { { "damage", 5, all = true }, { "res", 1 } },
+  text = "Deal 5 to all.\n+1 Frenzy.",
+  up = { effects = { { "damage", 7, all = true }, { "res", 1 } }, text = "Deal 7 to all.\n+1 Frenzy." },
+})
+
+variant("silencing_shot", {
+  name = "Silencing Shot", cost = 0, type = "skill", rarity = "uncommon", path = "marksmanship",
+  target = "enemy", cooldown = 3, effects = { { "interrupt" }, { "res", 1 } },
+  text = "Interrupt the target's cast.\n+1 Frenzy.\nCooldown 3.",
+  up = { cooldown = 2, text = "Interrupt the target's cast.\n+1 Frenzy.\nCooldown 2." },
+})
+
+variant("explosive_shot", {
+  name = "Explosive Shot", cost = 2, type = "skill", rarity = "rare", path = "beast_mastery",
+  target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } } },
+  text = "Surge: deal 6 per Frenzy.",
+  up = { cost = 1, text = "Surge: deal 6 per Frenzy." },
+})
+
+-- Trick Shots : après la résolution de chaque carte Attack, +1 Frenzy (comme The Beast Within).
+local trickShotsHooks = {
+  onCardPlayed = function(c, power, inst, ctx)
+    if ctx.def.type == "attack" and not c.result then Combat.gainRes(c, 1, "card") end
+  end,
+}
+
+variant("trick_shots", {
+  name = "Trick Shots", cost = 1, type = "power", rarity = "rare", path = "beast_mastery",
+  power = true, effects = {}, hooks = trickShotsHooks,
+  text = "Power.\nAttacks: +1 Frenzy.",
+  up = { cost = 0, text = "Power.\nAttacks: +1 Frenzy." },
+})
+
+-- Aspect of the Turtle : chaque coup d'une carte Attack donne 1 Absorb (onAttackHit).
+local turtleHooks = {
+  onAttackHit = function(c) if not c.result then Combat.gainBlock(c, c.player, 1) end end,
+}
+
+variant("aspect_of_the_turtle", {
+  name = "Aspect of the Turtle", cost = 2, type = "power", rarity = "uncommon", path = "beast_mastery",
+  power = true, effects = {}, hooks = turtleHooks,
+  text = "Power.\nEach Attack hit: gain 1 Absorb.",
+  up = { cost = 1, text = "Power.\nEach Attack hit: gain 1 Absorb." },
 })
 
 -- Bibelots du Chasseur (class = "hunter" : tirés seulement pour lui) -------------------------------
@@ -357,11 +650,16 @@ local function relic(id, t)
 end
 
 -- Bibelot de départ : le familier frappe dès le début du premier tour (Frenzy 1 au premier tour).
+-- Sans familier (Lone Wolf) : +1 Frenzy à la place (loneText, montré par UI/Art/hunter.lua).
 relic("pet_whistle", {
   level = 1, name = "Pet Whistle", rarity = "common", noPool = true,
   text = "At the start of the first turn, the pet attacks.",
+  loneText = "At the start of each combat, +1 Frenzy.",
   hooks = {
-    onTurnStart = function(c) if c.round == 1 then H().petAttack(c, "relic") end end,
+    onTurnStart = function(c)
+      if c.round ~= 1 then return end
+      if H().petPresent(c) then H().petAttack(c, "relic") else Combat.gainRes(c, 1, "relic") end
+    end,
   },
 })
 
@@ -444,5 +742,63 @@ ns.Classes.hunter = {
     },
     upgrade = { arcane_shot = 2.5, disengage = 2, serpent_sting = 1.5, freezing_trap = 1.5 },
     remove = { disengage = 1, arcane_shot = 1.5 },
+    -- note d'une épique pour l'offre et le remplacement (Sim/expedition.lua, SE.epicRating) : ≈ 5 + gain / 2
+    -- mesuré (epic=<id> contre sans, Westfall, clé 0, zones=7)
+    -- l'épique du deck vaut EPIC_KEEP de plus : le deck est construit autour, la remplacer est un pari (et
+    -- une épique imposée par epic=<id> reste mesurée seule)
+    epic = function(exp, id)
+      local v = EPIC_BOT[id]
+      local i = v and exp and ns.Expedition.epicIndex(exp)
+      if i and exp.deck[i].id == id then v = v + EPIC_KEEP end
+      return v
+    end,
+    -- builds pilotés par l'épique du deck (Sim/expedition.lua, SE.buildOf) : notes qui priment tant que
+    -- l'épique est dans le deck (« Deck piloté » de la fiche) ; variantes de Lone Wolf notées sous l'id
+    -- d'origine (c'est lui que proposent les récompenses).
+    builds = {
+      call_of_the_wild = {
+        rating = { kill_command = 8.5, dire_beast = 11, bestial_wrath = 6.5, spirit_bond = 8.5, the_beast_within = 11,
+          barbed_shot = 6, intimidation = 7.5, cobra_shot = 5.5, aimed_shot = 1.5, steady_shot = 1.5, volley = 1.5 },
+        upgrade = { call_of_the_wild = 4, kill_command = 3.5 },
+        remove = { disengage = 0.5 },
+      },
+      trap_launcher = {
+        rating = { immolation_trap = 6.5, counterattack = 8, explosive_trap = 8, frost_trap = 4, entrapment = 4,
+          lock_and_load = 3, resourcefulness = 4.5, spirit_bond = 8, raptor_strike = 3 },
+        upgrade = { trap_launcher = 4, counterattack = 3.5, freezing_trap = 3.5 },
+        remove = { disengage = 0.5 },
+      },
+      beast_cleave = {
+        rating = { kill_command = 8.5, dire_beast = 11.5, bestial_wrath = 7, barbed_shot = 5.5, cobra_shot = 5.5,
+          intimidation = 7.5, the_beast_within = 11, spirit_bond = 8, multi_shot = 4, volley = 2, explosive_trap = 4 },
+        upgrade = { beast_cleave = 4, dire_beast = 3.5 },
+        remove = { disengage = 0.5 },
+      },
+      roar_of_sacrifice = {
+        rating = { barbed_shot = 7.5, cobra_shot = 7, kill_command = 8, dire_beast = 11, the_beast_within = 11,
+          intimidation = 7.5, spirit_bond = 8, bestial_wrath = 1.5, growl = 4 },
+        upgrade = { roar_of_sacrifice = 4, barbed_shot = 3.5 },
+        remove = { disengage = 0.3 },
+      },
+      master_marksman = {
+        rating = { aimed_shot = 10.5, trueshot_aura = 8.5, steady_shot = 8, volley = 2 },
+        upgrade = { master_marksman = 4, aimed_shot = 3.5 },
+        remove = { arcane_shot = 0.8, disengage = 1 },
+      },
+      black_arrow = {
+        rating = { barbed_shot = 7.5, immolation_trap = 7.5, explosive_trap = 7.5, wyvern_sting = 9, spirit_bond = 8,
+          kill_command = 7.5, bestial_wrath = 6, aimed_shot = 1.5, steady_shot = 1.5, volley = 1.5 },
+        upgrade = { black_arrow = 4, serpent_sting = 3.5 },
+        remove = { disengage = 0.5 },
+      },
+      lone_wolf = {
+        rating = { rapid_fire = 10, kill_command = 8.5, multi_shot = 7.5, the_beast_within = 10, cobra_shot = 6,
+          barbed_shot = 7.5, concussive_shot = 5, raptor_strike = 4, dire_beast = 9, bestial_wrath = 8.5,
+          spirit_bond = 3, intimidation = 4.5, counter_shot = 4, growl = 3, counterattack = 3, explosive_trap = 3,
+          wyvern_sting = 5, aimed_shot = 2, steady_shot = 2, volley = 2 },
+        upgrade = { lone_wolf = 4, rapid_fire = 3.5, arcane_shot = 3 },
+        remove = { disengage = 0.5 },
+      },
+    },
   },
 }

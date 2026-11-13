@@ -98,6 +98,15 @@ function C.exp()
   return db and db.current or nil
 end
 
+-- Carte proposée (récompense, marchand) telle qu'elle se jouerait dans ce deck : variante de l'épique du
+-- deck (transforms, Lone Wolf) avec from = l'originale, sinon la carte elle-même.
+local function shownCard(exp, id)
+  local map = Card.transformsOf(exp.deck)
+  local v = map and map[id]
+  if v and ns.Cards[v] then return { id = v, up = false, from = id } end
+  return { id = id, up = false }
+end
+
 -- Date affichée dans le journal (date() existe en jeu ; repli : horodatage).
 function C.date()
   if type(date) == "function" then
@@ -1041,7 +1050,7 @@ local function rewardStep(exp)
   if not r.cardsDone and not epicMode then
     text = text .. (text ~= "" and "\n" or "") .. "Choose a card to add to the deck."
     for i, id in ipairs(r.cards) do
-      opts[#opts + 1] = actionOption(avail, { id = "pickCard:" .. i, card = { id = id, up = false } })
+      opts[#opts + 1] = actionOption(avail, { id = "pickCard:" .. i, card = shownCard(exp, id) })
     end
     opts[#opts + 1] = actionOption(avail, { id = "skipCards", label = "Skip the cards" })
   elseif r.picked then
@@ -1108,7 +1117,7 @@ local function merchantStep(exp)
     if it.sold then o.disabled, o.reason = true, "Sold." end
     opts[#opts + 1] = actionOption(avail, o)
   end
-  for i, it in ipairs(s.cards) do item("buyCard", i, it, { card = { id = it.id, up = false }, epic = it.epic }) end
+  for i, it in ipairs(s.cards) do item("buyCard", i, it, { card = shownCard(exp, it.id), epic = it.epic }) end
   for i, it in ipairs(s.relics) do
     local def = ns.Relics[it.id]
     item("buyRelic", i, it, { item = { kind = "relic", id = it.id }, label = relicName(it.id), text = def and def.text })

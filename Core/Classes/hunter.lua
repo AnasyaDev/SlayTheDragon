@@ -34,6 +34,12 @@ L.keyword("pet", { name = "Pet attacks", pattern = "[Pp]%at attacks", text = "hi
 L.trigger("Pet attacks")
 L.trigger("Traps")
 L.trigger("When a Trap triggers")
+-- cartes épiques (docs/zones/cartes-de-zone.md, Hunter) : Black Arrow, Lone Wolf, Aspect of the Turtle
+L.trigger("Each enemy DoT tick")
+L.trigger("Attack hits")
+L.trigger("Each Attack hit")
+L.keyword("loneWolf", { name = "Pet cards become shots", pattern = "^Pet cards become shots%.$",
+  text = "the pet is gone for the expedition." })
 
 Combat.CONDITIONS.careful = function(c, ctx, t)
   if ctx and ctx.careful ~= nil and t == ctx.target then return ctx.careful end
@@ -79,10 +85,12 @@ function Hunter.petAll(c)
   return Combat.modify(c, "petAll", false) and true or false
 end
 
-function Hunter.petAttack(c, why, frenzy)
+-- target : cible imposée (Trap Launcher, Black Arrow), sans changer la cible du familier
+-- (c.player.lastTarget) ; morte ou absente : sa cible habituelle.
+function Hunter.petAttack(c, why, frenzy, target)
   if c.result then return 0 end
   if not Hunter.petPresent(c) then return 0 end
-  local t = Hunter.petTarget(c)
+  local t = (target and not target.dead) and target or Hunter.petTarget(c)
   if not t then return 0 end
   local dmg = Hunter.petDamage(c, t, frenzy)
   if Hunter.petAll(c) then
@@ -140,9 +148,44 @@ ns.Effects.readiness = function(c, ctx, e)
   c.cooldown = keep
 end
 
+-- { "damageOther", n } : « Deal N to another enemy. » (Chimaera Shot) : un coup de la carte sur l'ennemi
+-- vivant le plus à gauche autre que la cible (rien s'il n'y en a pas) ; mêmes règles qu'un coup de
+-- « damage » (Attack hit, Lone Wolf, Sundered…).
+ns.Effects.damageOther = function(c, ctx, e)
+  local main = ctx.target
+  local other
+  for i = 1, #c.enemies do
+    local o = c.enemies[i]
+    if o ~= main and not o.dead then other = o break end
+  end
+  if not other then return end
+  ctx.target = other
+  ns.Effects.damage(c, ctx, { "damage", e[2] })
+  ctx.target = main
+end
+
+-- Cartes épiques (Data/Hunter.lua, docs/zones/cartes-de-zone.md) : règles en jeu dès le début du combat,
+-- par deckHooks (où que soit la carte). whileInDeck = Hunter.epicStart : retient l'épique en jeu dans
+-- c.cls.epic = { id, up } (vue de classe, bots) et la sort de la pioche si elle y est encore (une épique
+-- n'est ni piochée ni jouée ; sans effet quand le socle la pose déjà hors des piles).
+function Hunter.epicStart(c, src)
+  c.cls.epic = { id = src.id, up = src.up and true or false }
+  for i = #c.draw, 1, -1 do
+    if c.draw[i].uid == src.uid then table.remove(c.draw, i) break end
+  end
+end
+
+-- Épique en jeu dans ce combat (id) ou nil ; up = vrai si améliorée.
+function Hunter.epic(c)
+  local e = c.cls and c.cls.epic
+  if not e then return nil end
+  return e.id, e.up
+end
+
 -- Valeur estimée d'une Trap encore posée après le tour ennemi (bots) : elle partira à la prochaine
 -- attaque. Unités de Bots.W (10 = 1 PV).
 Hunter.TRAP_VALUE = 25
+Hunter.EPIC_RES = { roar_of_sacrifice = 12, lone_wolf = 6 }
 
 ns.ClassRules.hunter = {
   init = function(c, cls) end,
@@ -169,6 +212,11 @@ ns.ClassRules.hunter = {
   -- incantation en cours (Bots.castValue ne compte que la valeur de base).
   botValue = function(c, W)
     local v = #c.traps * Hunter.TRAP_VALUE
+    -- épique en jeu : le Frenzy gardé vaut plus quand il protège (Roar of Sacrifice) ou s'ajoute à chaque
+    -- coup des Attacks (Lone Wolf) ; Hunter.EPIC_RES[id] = valeur en plus d'un point (unités de Bots.W)
+    local ep = Hunter.epic(c)
+    local k = ep and Hunter.EPIC_RES[ep]
+    if k then v = v + (c.player.res or 0) * k end
     local cast = c.player.cast
     if cast then
       local d = ns.Card.def(cast.card)

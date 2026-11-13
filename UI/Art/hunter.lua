@@ -46,6 +46,24 @@ local cards = {
   lock_and_load    = I("Ability_Hunter_LockAndLoad"),
   feign_death      = I("Ability_Rogue_FeignDeath"),
   resourcefulness  = I("Ability_Hunter_Resourcefulness"),
+  -- cartes épiques (cartes de zone)
+  call_of_the_wild  = I("Ability_Hunter_CalloftheWild"),
+  trap_launcher     = I("Ability_Hunter_TrapLauncher"),
+  beast_cleave      = I("Ability_Hunter_Carve"),
+  roar_of_sacrifice = I("Ability_Hunter_Fervor"),
+  master_marksman   = I("Ability_Hunter_MasterMarksman"),
+  black_arrow       = I("Spell_Shadow_PainSpike"),
+  lone_wolf         = I("Spell_Hunter_LoneWolf"),
+  -- variantes de Lone Wolf
+  chimaera_shot        = I("Ability_Hunter_ChimeraShot2"),
+  kill_shot            = I("Ability_Hunter_Assassinate2"),
+  double_tap           = I("Ability_Hunter_FocusedAim"),
+  scatter_shot         = I("Ability_GolemStormBolt"),
+  salvo                = I("Ability_Hunter_Crossfire"),
+  silencing_shot       = I("Ability_TheBlackArrow"),
+  explosive_shot       = I("Ability_Hunter_ExplosiveShot"),
+  trick_shots          = I("INV_TrickShot"),
+  aspect_of_the_turtle = I("Ability_Hunter_Pet_Turtle"),
 }
 for id, e in pairs(cards) do Art.cards[id] = e end
 
@@ -75,6 +93,25 @@ Art.classes.hunter.resource = { tga = "Ability_Hunter_FerociousInspiration",
 -- Cache/WDB/enUS/creaturecache.wdb du client Forever), repli en médaillon à l'icône du loup.
 Art.pet = { creature = 299, display = { 447, 903 }, icon = I("Ability_Hunter_Pet_Wolf"), name = "Wolf" }
 Art.petMark = I("Ability_Hunter_Pet_Wolf") -- marqueur de la cible du familier
+
+-- Pet Whistle sous une épique qui retire le familier (Lone Wolf, deckHooks.petAbsent) : le bibelot montre
+-- le texte de sa variante (loneText) tant que l'expédition en cours a cette épique (règle : Data/Hunter.lua).
+do
+  local whistle = ns.Relics.pet_whistle
+  if whistle and whistle.loneText and rawget(whistle, "text") then
+    local base = whistle.text
+    whistle.text = nil
+    setmetatable(whistle, { __index = function(_, k)
+      if k ~= "text" then return nil end
+      local Ctl = ns.Controller
+      local exp = Ctl and Ctl.exp and Ctl.exp()
+      local i = exp and exp.deck and ns.Expedition.epicIndex(exp)
+      local d = i and ns.Card.defById(exp.deck[i].id)
+      if d and d.deckHooks and d.deckHooks.petAbsent then return whistle.loneText end
+      return base
+    end })
+  end
+end
 
 ---------------------------------------------------------------------------
 -- Vue de classe (ns.ClassViews.hunter, docs/classes.md) : familier à droite du héros, un peu plus bas,
@@ -131,7 +168,12 @@ function V.build(host, view)
   -- modèle : apparaît une fois chargé (candidat gagnant mémorisé, préchargé dès le parcours) ; médaillon
   -- si aucun candidat ne charge
   local function showPet() Scene.showModel(pet, Art.pet, "pet:hunter", { facing = 0.9 }) end
-  host:SetScript("OnShow", function() pet:Show() showPet() end)
+  host:SetScript("OnShow", function()
+    local c = ns.Controller.combat and ns.Controller.combat()
+    if c and c.class == "hunter" and not ns.Hunter.petPresent(c) then pet:Hide() return end
+    pet:Show()
+    showPet()
+  end)
   showPet()
   -- marqueur de la cible du familier : petite icône ronde à gauche du cadre de l'ennemi visé
   local mark = CreateFrame("Frame", nil, host)
@@ -171,7 +213,9 @@ end
 
 function V.render(host, c, view)
   local W = ns.Widgets
-  host.pet:Show()
+  -- sans familier (Lone Wolf) : ni figure, ni nom, ni marqueur de cible
+  local present = ns.Hunter.petPresent(c)
+  if present then host.pet:Show() else host.pet:Hide() end
   -- Traps
   for i = 1, #host.traps do
     local tk, tr = host.traps[i], c.traps[i]
@@ -185,7 +229,7 @@ function V.render(host, c, view)
     end
   end
   -- cible du familier
-  local t = (not c.result) and ns.Hunter.petTarget(c) or nil
+  local t = (present and not c.result) and ns.Hunter.petTarget(c) or nil
   local s = t and view.slotOf and view.slotOf[t.uid]
   if s and s.tag and s:IsShown() then
     host.mark:ClearAllPoints()
@@ -199,8 +243,18 @@ end
 -- Événements du moteur (file d'animations de CombatView) : le familier bondit vers sa cible ; le chiffre
 -- de dégâts vient de l'événement « damage » qui suit (mécanisme commun).
 function V.event(host, ev, view)
-  if ev.t ~= "pet_attack" then return end
   local W, Scene = ns.Widgets, ns.Scene
+  if ev.t == "roar" then
+    -- Roar of Sacrifice : le nom part du héros (comme « Parry »), le chiffre des PV perdus suit
+    view:Push(0.18, function()
+      local x, y = view:UnitPos("player")
+      if not x then return end
+      W.sound("block")
+      W.float(view.parent, x - 44, y - 40, "Roar", Art.C.goldText, 22, 1.1)
+    end)
+    return
+  end
+  if ev.t ~= "pet_attack" then return end
   view:Push(0.16, function()
     local pet = host.pet
     if not pet then return end
