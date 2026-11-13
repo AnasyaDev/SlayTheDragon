@@ -140,8 +140,9 @@ ns.ClassRules.rogue = {
 ---------------------------------------------------------------------------
 -- Cartes épiques (fiche : docs/zones/cartes-de-zone.md, « Rogue » ; données : Data/Rogue.lua)
 ---------------------------------------------------------------------------
--- Chaque épique est une règle active tout le combat : crochets « deckHooks » (src = { id, up, uid },
--- actifs où que soit la carte). Leur état vit dans c.cls (copié par Combat.clone, sauvegardé), jamais
+-- Chaque épique est une règle active tout le combat, posée par Combat.new dans c.epic = { id, up, uid }
+-- (hors de toute pile) : crochets « deckHooks », src = c.epic, passés après classe, zones, Powers, bibelots
+-- et affixes (docs/classes.md, « Cartes épiques »). Leur état vit dans c.cls (copié par Combat.clone, sauvegardé), jamais
 -- dans src (partagé entre les copies des bots). Nombres : Rogue.EPIC (base, amélioré), à garder
 -- d'accord avec les textes de Data/Rogue.lua (vérifié par Sim/tests_epic_rogue.lua).
 local Rogue = {}
@@ -151,29 +152,12 @@ local C = ns.Cards
 Rogue.EPIC = ns.RogueEpicNumbers -- nombres des épiques (Data/Rogue.lua)
 local function num(id, src) return Rogue.EPIC[id][src.up and 2 or 1] end
 
--- id de l'épique du combat (la première carte épique du Voleur trouvée dans les passifs), ou nil.
+-- id (et amélioration) de l'épique du Voleur en jeu (c.epic), ou nil.
 function Rogue.epicOf(c)
-  local ps = c.passives
-  if not ps then return nil end
-  for i = 1, #ps do
-    local d = C[ps[i].id]
-    if d and d.rarity == "epic" and d.class == "rogue" then return ps[i].id, ps[i].up end
-  end
+  local e = c.epic
+  local d = e and C[e.id]
+  if d and d.class == "rogue" and d.rarity == "epic" then return e.id, e.up end
   return nil
-end
-
--- Arrivée en jeu (docs/zones/cartes-de-zone.md, « A ») : l'épique quitte la pioche et rejoint les Powers
--- avant la première main. Sans effet si le socle l'a déjà posée (aucune pile ne la contient).
-local function enterPlay(c, src)
-  for i = #c.draw, 1, -1 do
-    if c.draw[i].uid == src.uid then
-      local inst = table.remove(c.draw, i)
-      local powers = c.player.powers
-      for j = 1, #powers do if powers[j].uid == inst.uid then return end end
-      powers[#powers + 1] = inst
-      return
-    end
-  end
 end
 
 local function hasSurge(d)
@@ -318,7 +302,6 @@ EH.subterfuge = {
 }
 -- Stealth du début de combat (posé par la règle de classe, sans événement) : T tours dès le premier.
 local function subterfugeStart(c, src)
-  enterPlay(c, src)
   if (c.player.st.stealth or 0) > 0 then c.cls.stealthUntil = stealthTurns(src) end
 end
 -- Tours de Stealth restants, ce tour compris (0 sans Stealth ; nil sans Subterfuge). Lu par l'interface.
@@ -367,15 +350,10 @@ EH.danse_macabre = {
   end,
 }
 
-for id, hooks in pairs(EH) do
-  C[id].deckHooks = hooks
-  C[id].whileInDeck = id == "subterfuge" and subterfugeStart or enterPlay
-end
+for id, hooks in pairs(EH) do C[id].deckHooks = hooks end
+C.subterfuge.whileInDeck = subterfugeStart
 
--- Mots du langage des épiques (déclencheurs « Name: », plaque « Epic » si le socle ne l'a pas encore).
-if not L.plateByKey("epic") then
-  L.plate("epic", { word = "Epic", head = true, flag = "epic", text = "in play from the start of each combat." })
-end
+-- Mots du langage des épiques (déclencheurs « Name: », détails des infobulles ; plaque « Epic » : Core/Language.lua).
 L.trigger("Each Parry gained")
 L.trigger("Gaining Stealth")
 for _, k in ipairs(Rogue.EPIC.kidney_shot) do L.trigger(ns.RogueKidneyLabel(k)) end

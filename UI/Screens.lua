@@ -762,6 +762,23 @@ function Camp:Build(f)
   self.leave = W.button(f, "Back on the road", 210, 44, nil, "red", 15)
   at(self.leave, f, 800, 497, 210, 44)
   self.leave:SetScript("OnClick", function(b) chooseOption(b.option) end)
+  -- actions de feu de camp des zones (« campAction:<id> », ns.ZoneRules[zone].campfire) : boutons
+  -- au-dessus de « Back on the road », texte et raison en infobulle
+  self.extra = {}
+  for k = 1, 2 do
+    local b = W.button(f, "", 210, 44, nil, "gold", 15)
+    at(b, f, 800, 497 - 52 * k, 210, 44)
+    b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    W.tooltip(b, function(tt, btn)
+      local o = btn.option
+      if not o then return end
+      tt:AddLine(o.label or "", 1, 0.82, 0)
+      if o.text then tt:AddLine(o.text, 1, 1, 1, true) end
+      if o.disabled and o.reason then tt:AddLine(o.reason, 1, 0.3, 0.3, true) end
+    end, "ANCHOR_LEFT")
+    b:Hide()
+    self.extra[k] = b
+  end
   self.optionButtons = {}
 end
 
@@ -772,7 +789,18 @@ function Camp:Show(step)
   Scene.showCampfire(self.fire)
   self.pile:Sync()
   self.optionButtons = {}
+  local nExtra = 0
+  for _, b in ipairs(self.extra) do b.option = nil b:Hide() end
   for _, o in ipairs(step.options) do
+    if tostring(o.id):match("^campAction:") and nExtra < #self.extra then
+      nExtra = nExtra + 1
+      local b = self.extra[nExtra]
+      b.option = o
+      b:SetText(o.label or "")
+      if b.SetActive then b:SetActive(not o.disabled) end
+      b:Show()
+      self.optionButtons[o.id] = b
+    end
     if o.id == "rest" then
       self.rest.option = o
       local heal = (o.text or ""):match("(%d+)")
@@ -806,7 +834,8 @@ end
 -- Récompense : 3 cartes en grand, butin au sol, deck, « Reprendre la route » ; coffre à ouvrir
 ---------------------------------------------------------------------------
 
-local Reward = { kinds = { "reward" } }
+-- « startEpic » : épique de l'expédition au choix, au départ (même écran, mode « Epic », sans butin ni départ)
+local Reward = { kinds = { "reward", "startEpic" } }
 UI.register("reward", Reward)
 
 -- Planche ecran_recompense.jpg : trois cartes ×1,08 (centres x 407 / 552 / 697, haut du corps y 147),
@@ -816,6 +845,8 @@ local REWARD_TOP = 147
 local REWARD_CARDS = { 407, 552, 697 }
 -- choix « Epic » : titre au-dessus des languettes de coût, consigne décalée à gauche du bouton « Skip »
 local REWARD_EPIC_TITLE_Y, REWARD_HINT_X, REWARD_HINT_EPIC_X = 98, 552, 470
+-- « Skip » : à gauche de « Back on the road » après une élite ; à sa place au départ (aucun départ à prendre)
+local REWARD_SKIP_X, REWARD_SKIP_START_X, REWARD_SKIP_Y = 810 - 14 - 150, 913 - 75, 497
 
 function Reward:Build(f)
   self.hero = heroFigure(f)
@@ -861,7 +892,7 @@ function Reward:Build(f)
   self.epicTitle:SetText("Epic card")
   self.epicTitle:Hide()
   self.skip = W.button(f, "Skip", 150, 44, nil, "red", 15)
-  at(self.skip, f, 810 - 14 - 150, 497, 150, 44)
+  at(self.skip, f, REWARD_SKIP_X, REWARD_SKIP_Y, 150, 44)
   self.skip:SetScript("OnClick", function(b) chooseOption(b.option) end)
   self.skip:Hide()
   self.optionButtons = {}
@@ -900,7 +931,8 @@ function Reward:Show(step)
   self.pile:Sync()
   self.optionButtons = {}
   self.cardOptions = {}
-  local closed = not self.opened
+  local startMode = step.kind == "startEpic"
+  local closed = not self.opened and not startMode
   if closed then
     self.chest:Show()
     self.chest.info = { title = "Chest" }
@@ -915,6 +947,8 @@ function Reward:Show(step)
     self.bubble:Hide()
   end
   local k = 0
+  self.leave.option = nil
+  self.leave:Hide()
   -- choix « Epic » de une ou deux cartes : centré sous son titre
   local nCards = 0
   for _, o in ipairs(step.options) do if o.card then nCards = nCards + 1 end end
@@ -941,6 +975,7 @@ function Reward:Show(step)
       self.optionButtons[o.id] = self.skip
     elseif o.id == "leave" then
       self.leave.option = o
+      self.leave:Show()
       self.optionButtons[o.id] = self.leave
     end
   end
@@ -958,10 +993,18 @@ function Reward:Show(step)
   for _, o in ipairs(step.options) do if o.card then anyCard = true end end
   if anyCard and not closed then self.hint:Show() else self.hint:Hide() end
   -- choix « Epic » : consigne, titre violet, « Skip »
+  -- (départ : choix de l'épique de l'expédition, « Skip » à la place du départ ; élite : remplacement)
   local epic = step.epicMode and not closed
-  self.hint:SetText(epic and "Choose an epic card, or none." or "Choose one card, or none.")
+  local hint = "Choose one card, or none."
+  if startMode then hint = "Choose the epic card of this expedition, or none."
+  elseif epic then
+    hint = (exp and ns.Expedition.epicIndex(exp)) and "Replace your epic card, or skip it."
+      or "Take this epic card, or skip it."
+  end
+  self.hint:SetText(hint)
   self.hint:ClearAllPoints()
-  self.hint:SetPoint("CENTER", self.frame, "TOPLEFT", epic and REWARD_HINT_EPIC_X or REWARD_HINT_X, -519)
+  self.hint:SetPoint("CENTER", self.frame, "TOPLEFT", (epic and not startMode) and REWARD_HINT_EPIC_X or REWARD_HINT_X, -519)
+  at(self.skip, self.frame, startMode and REWARD_SKIP_START_X or REWARD_SKIP_X, REWARD_SKIP_Y, 150, 44)
   if epic then self.epicTitle:Show() self.skip:Show() else self.epicTitle:Hide() self.skip:Hide() end
   if hold.gold and not closed then
     self.goldBag.big:SetText(tostring(hold.gold))
@@ -2195,13 +2238,15 @@ local DV_TOP = DV_Y + 58
 local DV_TITLE = { deck = "Deck", draw = "Draw pile", discard = "Discard pile", exhaust = "Exhausted" }
 local TYPE_ORDER = { attack = 1, skill = 2, power = 3 }
 
--- Copie triée : type, coût, nom, puis non améliorée avant améliorée (l'ordre réel est perdu).
+-- Copie triée : l'épique, puis type, coût, nom, puis non améliorée avant améliorée (l'ordre réel est perdu).
 function DV.sorted(list)
   local out = {}
   for i = 1, #(list or {}) do
     local inst = list[i]
     local d = ns.Card.defById(inst.id, inst.up)
-    out[i] = { inst = inst, t = TYPE_ORDER[d.type] or 9, cost = d.cost or 99, name = d.name or inst.id,
+    -- l'épique en tête (règle de l'expédition, docs/expedition.md, « Cartes épiques »)
+    out[i] = { inst = inst, t = d.rarity == "epic" and 0 or TYPE_ORDER[d.type] or 9, cost = d.cost or 99,
+      name = d.name or inst.id,
       up = inst.up and 1 or 0, uid = tostring(inst.uid or "") }
   end
   table.sort(out, function(a, b)
@@ -2416,6 +2461,10 @@ function EC:Build()
   self.newLabel = W.label(panel, "bold", 12, C.healGreen, "OVERLAY")
   self.oldLabel:SetText("Leaves the deck")
   self.newLabel:SetText("Joins the deck")
+  -- l'épique actuelle est améliorée : l'amélioration ne passe pas à la nouvelle (une ligne sous « Leaves »)
+  self.lost = W.label(panel, "body", 12, C.textSoft, "OVERLAY")
+  self.lost:SetText("The upgrade is lost.")
+  self.lost:Hide()
   self.replace = W.button(panel, "Replace", 200, 44, function() EC:Answer(true) end, "gold", 16)
   self.replace:SetPoint("BOTTOMRIGHT", panel, "BOTTOM", -8, 16)
   self.keep = W.button(panel, "Keep", 200, 40, function() EC:Answer(false) end, "red", 14)
@@ -2450,6 +2499,9 @@ function EC:Open(id, swap)
   self.oldLabel:SetPoint("TOP", UI.content, "TOPLEFT", cx[1], -ly)
   self.newLabel:ClearAllPoints()
   self.newLabel:SetPoint("TOP", UI.content, "TOPLEFT", cx[2], -ly)
+  self.lost:ClearAllPoints()
+  self.lost:SetPoint("TOP", self.oldLabel, "BOTTOM", 0, -2)
+  if swap.old.up then self.lost:Show() else self.lost:Hide() end
   self.frame:Show()
   W.sound("card")
   return true

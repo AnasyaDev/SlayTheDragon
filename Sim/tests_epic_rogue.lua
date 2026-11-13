@@ -74,7 +74,7 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
     assert(d, id)
     eq(d.class, "rogue", id); eq(d.rarity, "epic", id); eq(d.zone, ZONES[i], id); eq(d.epic, true, id)
     eq(d.level, nil, id .. " : hors grille"); eq(d.type, "power", id)
-    assert(d.deckHooks and d.whileInDeck, id .. " : crochets du deck")
+    assert(d.deckHooks, id .. " : crochets de l'épique")
     assert(d.text:find("^Epic%.\n"), id); assert(d.up.text:find("^Epic%.\n"), id)
     assert(Card.isEpic(d) and Card.collectible(d))
     eq(ns.Meta.zoneCards("rogue", ZONES[i])[1], id)
@@ -94,7 +94,7 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
   end
 end)
 
-test("arrivée en jeu : l'épique n'est ni en main ni en pioche, posée parmi les Powers ; combat sauvegardable", function()
+test("arrivée en jeu : l'épique n'est dans aucune pile ni parmi les Powers, posée dans c.epic ; combat sauvegardable", function()
   for _, id in ipairs(EPICS) do
     for seed = 1, 5 do
       local deck = {}
@@ -106,22 +106,23 @@ test("arrivée en jeu : l'épique n'est ni en main ni en pioche, posée parmi le
       end
       eq(#c.hand, 5, "main de 5 cartes ordinaires")
       eq(#c.hand + #c.draw, #ns.Classes.rogue.deck, "l'épique ne prend pas de place")
-      local n = 0
-      for _, p in ipairs(c.player.powers) do if p.id == id then n = n + 1 end end
-      eq(n, 1, id .. " parmi les Powers")
+      eq(#c.player.powers, 0, id .. " : pas un Power joué")
+      eq(c.epic.id, id); eq(c.epic.up, seed % 2 == 0)
       eq(R.epicOf(c), id)
       assert(Save.isPlain(c), id .. " : combat sauvegardable")
     end
   end
 end)
 
-test("crochets indépendants de la pile : l'épique à la défausse agit encore", function()
+test("crochets de l'épique : src = c.epic (amélioration lue sur c.epic.up), après les bibelots", function()
   local c = setup("deflection", { "feint" })
-  local inst = table.remove(c.player.powers)
-  c.discard[#c.discard + 1] = inst
   local h = hp(c)
   play(c, "feint")
   eq(hp(c), h - D1)
+  local u = setup("deflection", { "feint" }, { up = true })
+  eq(u.epic.up, true)
+  play(u, "feint")
+  eq(hp(u), 200 - D2)
 end)
 
 ---------------------------------------------------------------------------
@@ -309,37 +310,51 @@ end)
 ---------------------------------------------------------------------------
 -- Subterfuge
 ---------------------------------------------------------------------------
-test("Subterfuge : chaque Attack du tour profite de Stealth, qui tombe à la fin du tour", function()
+-- fin des tours jusqu'à la chute de Stealth ; renvoie le nombre de fins de tour
+local function untilStealthFalls(c)
+  local n = 0
+  while (c.player.st.stealth or 0) > 0 and n < 10 do Combat.endTurn(c) n = n + 1 end
+  return n
+end
+
+test("Subterfuge : chaque Attack profite de Stealth sans le retirer ; il dure T tours (celui du départ aussi)", function()
+  local T = E.subterfugeTurns[1]
   local c = setup("subterfuge", { "backstab", "backstab", "ambush" })
   play(c, "backstab", 1); play(c, "backstab", 1)
   eq(hp(c), 200 - 20)
   eq(c.player.st.stealth, 1)
   play(c, "ambush", 1)
   eq(hp(c), 200 - 38)
-  Combat.endTurn(c)
-  eq(c.player.st.stealth, nil, "tombé à la fin du tour")
   eq(c.player.res, 4, "Combo des cartes seulement (aucun Stealth gagné)")
+  eq(R.stealthLeft(c), T)
+  eq(untilStealthFalls(c), T, "tombé à la fin du T-ième tour")
+  eq(R.stealthLeft(c), 0)
 end)
 
-test("Subterfuge : chaque Stealth gagné donne N Combo, pas un gain sous Stealth ni celui du départ", function()
-  local c = setup("subterfuge", { "vanish", "vanish", "backstab" })
+test("Subterfuge : un Stealth posé repart pour T tours ; chaque Stealth gagné donne N Combo, pas un gain sous Stealth ni celui du départ", function()
+  local T = E.subterfugeTurns[1]
+  local c = setup("subterfuge", { "vanish", "backstab" }, { extra = { "feint", "feint", "feint", "feint", "feint",
+    "feint", "feint", "feint", "feint", "feint" } })
   eq(c.player.res, 0, "Stealth du début de combat : rien")
   play(c, "vanish")
   eq(c.player.res, 0, "déjà en Stealth : pas un gain")
-  Combat.endTurn(c)
+  eq(R.stealthLeft(c), T, "reparti pour T tours")
+  untilStealthFalls(c)
   c.player.mana = 9
   c.hand[#c.hand + 1] = Card.new("vanish", false, 990)
   local r = c.player.res
   play(c, "vanish")
   eq(c.player.res, r + E.subterfuge[1], "absent → présent")
-  local u = setup("subterfuge", { "backstab", "shadowstep" }, { up = true })
-  play(u, "backstab", 1)
-  Combat.endTurn(u)
+  eq(untilStealthFalls(c), T)
+  local u = setup("subterfuge", { "backstab" }, { up = true, extra = { "feint", "feint", "feint", "feint", "feint",
+    "feint", "feint", "feint", "feint", "feint" } })
+  untilStealthFalls(u)
   u.player.mana = 9
   u.hand[#u.hand + 1] = Card.new("shadowstep", false, 991)
   r = u.player.res
   play(u, "shadowstep")
   eq(u.player.res, r + E.subterfuge[2], "amélioré")
+  eq(R.stealthLeft(u), E.subterfugeTurns[2])
 end)
 
 ---------------------------------------------------------------------------

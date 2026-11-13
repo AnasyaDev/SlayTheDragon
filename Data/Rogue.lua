@@ -363,10 +363,9 @@ card("shadow_dance", {
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Rogue ») ------------------------------
--- Règles en jeu dès le début de chaque combat : jamais piochées ni jouées (cost 0 pour le contrat des
--- données, sans effet). Leurs crochets (deckHooks, actifs où que soit la carte) sont posés par
--- Core/Classes/rogue.lua ; « Epic. » = mot de plaque en tête. Nombres de la fiche, réglés par la
--- simulation (epic=<id>, docs/classes.md).
+-- Règles en jeu dès le début de chaque combat (Combat.new : c.epic), jamais piochées ni jouées (cost 0 :
+-- contrat des données de Sim/tests.lua, jamais payé ni affiché). Leurs crochets (deckHooks, src = c.epic)
+-- sont posés par Core/Classes/rogue.lua ; « Epic. » = mot de plaque en tête.
 -- Nombres des épiques (base, amélioré), seule source : les textes ci-dessous et les règles
 -- (Core/Classes/rogue.lua, ns.Rogue.EPIC) les lisent. Fiche entre parenthèses ; réglés le 14/11/2026
 -- (simulation epic=<id>, docs/classes.md).

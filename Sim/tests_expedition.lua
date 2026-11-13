@@ -93,6 +93,7 @@ local function newExp(opts)
   opts.seed = opts.seed or 11
   if opts.quiet == nil then opts.quiet = true end
   local exp = X.new(opts)
+  if exp.phase == "start" and exp.startEpics and not opts.keepStart then assert(X.act(exp, { "skipEpic" })) end
   if exp.phase == "start" and not opts.keepStart then assert(X.act(exp, { "skipStartRelic" })) end
   return exp
 end

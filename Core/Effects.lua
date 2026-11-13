@@ -23,10 +23,21 @@ Effects.targetsOf = targetsOf
 
 -- { "damage", n, times = k, all = bool, pierce = bool, onHit = function(c, ctx, cible),
 --   bonus = function(c, ctx, cible) -> dégâts de base en plus, more = …, per = … }
+-- Genre du coup pour les crochets de dégâts sur un ennemi (Combat.hitInfo) : potion, Trap, incantation
+-- résolue, carte.
+local function hitKindOf(c, ctx)
+  if ctx.potion then return "potion" end
+  if c.fxKind == "trap" then return "trap" end
+  if ctx.cast then return "cast" end
+  return "card"
+end
+
 Effects.damage = function(c, ctx, e)
+  local k0, a0 = c.hitKind, c.hitAll
+  c.hitKind, c.hitAll = hitKindOf(c, ctx), e.all and true or false
   for _ = 1, (e.times or 1) do
     local targets = targetsOf(c, ctx, e)
-    if #targets == 0 then return end
+    if #targets == 0 then break end
     for i = 1, #targets do
       local t = targets[i]
       local base = e[2]
@@ -44,9 +55,11 @@ Effects.damage = function(c, ctx, e)
         -- chaque coup d'une carte Attack (poisons du Rogue, Ignite du Mage…)
         if ctx.def and ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
       end
-      if c.result then return end
+      if c.result then break end
     end
+    if c.result then break end
   end
+  c.hitKind, c.hitAll = k0, a0
 end
 
 -- { "absorb", n }
@@ -113,7 +126,7 @@ end
 Effects.loseHp = function(c, ctx, e)
   local n = e[2]
   if e.safe then n = math.min(n, c.player.hp - 1) end
-  Combat.loseHp(c, n, "effect")
+  Combat.loseHp(c, n, e.why or "effect") -- why : raison transmise à onHpLost (« curse »)
 end
 
 -- { "interrupt", all = bool } : annule le sort que la cible (ou chaque ennemi) s'apprête à lancer.
@@ -124,8 +137,38 @@ Effects.interrupt = function(c, ctx, e)
     local mv = t and not t.dead and ns.Enemies[t.id].moves[t.intent]
     if mv and mv.cast and not t.interrupted then
       t.interrupted = true
+      ctx.interrupted = (ctx.interrupted or 0) + 1 -- condition « interrupted »
       Combat.log(c, { t = "interrupt", src = "player", dst = t.uid, move = t.intent })
+      Combat.zfire(c, "onEnemyCastInterrupted", t, t.intent, "player")
     end
+  end
+end
+
+-- { "restore" } : la carte jouée est une carte transformée (Hexed) : sa carte d'origine revient en main
+-- (Combat.restoreCard) ; la carte jouée porte vanish = true (elle disparaît).
+Effects.restore = function(c, ctx, e)
+  local inst = ctx.card
+  if inst and inst.orig then Combat.restoreCard(c, inst, e.to) end
+end
+
+-- { "restoreAll", id = "hexed" } : toutes les cartes transformées (de cet id) de la main, de la pioche et
+-- de la défausse rendent leur carte d'origine (en main ; pleine : défausse).
+Effects.restoreAll = function(c, ctx, e)
+  local list = {}
+  for _, key in ipairs({ "hand", "draw", "discard" }) do
+    for _, inst in ipairs(c[key]) do
+      if inst.orig and (not e.id or inst.id == e.id) then list[#list + 1] = inst end
+    end
+  end
+  for i = 1, #list do Combat.restoreCard(c, list[i]) end
+end
+
+-- { "addCard", id, to = "hand" | "draw" | "drawRandom" | "discard", n = 1, up = bool } : carte de combat
+-- ajoutée aux piles du joueur (Combat.addCard).
+Effects.addCard = function(c, ctx, e)
+  for _ = 1, (e.n or 1) do
+    Combat.addCard(c, e[2], e.to or "hand", { up = e.up })
+    if c.result then return end
   end
 end
 

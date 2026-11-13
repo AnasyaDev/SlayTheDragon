@@ -196,7 +196,9 @@ sans point final ; U27 la reconnaît par le libellé, nom d'un état). Raison «
 (« Not enough Combo Points. »).
 
 Une classe peut émettre ses propres événements (`Combat.fire(c, "onShift", forme)`) : Powers et bibelots
-de la classe s'y abonnent par le même mécanisme.
+de la classe s'y abonnent par le même mécanisme. Les règles de zone (`ns.ZoneRules`, `docs/zones.md`) passent
+après la classe et ajoutent leurs événements (`onEffectEnd`, `onEnemyDamaged`, `enemyMove`, `onHeal`…),
+auxquels Powers et bibelots peuvent aussi s'abonner.
 
 Ordre d'un coup joué (`Combat.play`) : cible (crochet `target`), coûts payés **maintenant** (mana, PV,
 Spend si la ressource suffit ; une carte Cast interrompue ne rend rien), compteurs du tour
@@ -406,12 +408,26 @@ Nouveaux : `onHeal`, `onDamageDealt`, `onParry`, `afterCast` (notifications) ; `
 6e argument `ctx` (passé par l'effet `damage` et par `randomHits`). `Combat.fire` ne passe que trois arguments :
 un événement nouveau en a trois au plus.
 
-L'agent de conception choisit, pour une épique « passive tant qu'elle est dans le deck », entre un Power à
-jouer (`hooks`), une carte `innate` (arrive en main) et `deckHooks` / `whileInDeck` (effet sans la jouer).
+**Règle finale (14/11/2026) : une épique est une règle en jeu dès le début de chaque combat**
+(`docs/expedition.md`, « Cartes épiques »). `Combat.new` la pose dans `c.epic = { id, up, uid }`, hors de toute
+pile ; elle n'a pas de coût et ne se joue jamais. Contrat pour écrire une épique :
+- **Crochets** : `deckHooks` (même nom, même signature qu'avant : `(c, src, ...)`) et/ou `hooks` (comme un
+  Power) ; les deux sont actifs tout le combat, `src = c.epic`, et passent **après** les pouvoirs, les bibelots et
+  les affixes (`Combat.modify`, `Combat.fire`) ; `hooks.allow` / `deckHooks.allow` comptent dans
+  `Combat.canPlay` (raison `"forbidden"`). `whileInDeck(c, src)` : une fois au début du combat, après `init` de la
+  classe, avant `onCombatStart`. Les crochets de classe (`ns.ClassRules`) passent toujours en premier.
+- **Champs** : `rarity = "epic"`, `class`, `zone`, `name`, `type` (libre, `"power"` conseillé), `effects = {}`
+  (jamais résolus), `text` (commence par « Epic. », retiré à l'affichage et montré sur la plaque du bas ; jamais
+  « Power. »), `up` (amélioration au feu de camp : texte et valeurs lus par les crochets via `src.up` ou
+  `Card.def(src)`), `transforms` / variantes (`variant = true`) inchangés. `cost` facultatif (jamais payé ni affiché).
+- **Plafond de ressource** : le crochet `resCap` (Avatar : 10) est lu par les crans de l'interface
+  (`Combat.resCap(c)`, deux arcs au-delà de 6).
+- Pas d'`innate` ni de logique de pioche ou de main pour une épique : elle n'est jamais dans une pile. Le mot
+  `Innate` reste pour les cartes ordinaires.
 
 ## Sauvegarde
 
-`Save.VERSION` 5, `Expedition.VERSION` 6 (version 6 : cartes épiques, `docs/expedition.md`) : version 3, migration de la Démence du combat en cours
+`Save.VERSION` 5, `Expedition.VERSION` 6 (version 6 : cartes épiques, `docs/expedition.md` ; épique en jeu : `c.epic`, champ facultatif) : version 3, migration de la Démence du combat en cours
 (`c.player.demence` → `c.player.res`, `c.class`, `c.cls`) ; version 4, niveau de classe (`cs.xp` tiré de
 l'ancienne réputation de classe, `exp.unlock.level`, docs/expedition.md) ; version 5, campagne par zones
 (`cs.zones`, `meta.zones`, `exp.zone`, `exp.unlock.common` et `won`, Ligue abandonnée, `docs/zones.md`). Une classe qui ajoute un état de combat le

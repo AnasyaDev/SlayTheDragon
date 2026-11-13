@@ -160,9 +160,10 @@ return function(ns)
   end
   SE.epicGain = epicGain
 
-  -- Choix « Epic » : index de l'épique à prendre, ou nil (refus).
+  -- Choix « Epic » (départ, élites) : index de l'épique à prendre, ou nil (refus). Épique imposée (epic=) :
+  -- jamais remplacée, pour qu'elle soit mesurée sur toute l'expédition.
   local function pickEpic(exp, opts, rng, epics)
-    if opts.pick == "skip" or #epics == 0 then return nil end
+    if opts.pick == "skip" or opts.epic or #epics == 0 then return nil end
     if opts.pick == "random" then return Rng.int(rng, 1, #epics) end
     local best, bestV
     for i = 1, #epics do
@@ -173,8 +174,21 @@ return function(ns)
     return best
   end
 
+  -- Points d'extension des zones (Sim/zones/<zone>.lua) pour le bot hors combat :
+  --   SE.KIND_SCORE[genre] = f(exp, hpRatio, gold) -> score d'une case de parcours de zone (X.NODE_KINDS ;
+  --     repères : combat 1, rencontre 1,2, coffre 2 ; défaut : 1,2) ;
+  --   SE.EFFECT_VALUE[nom] = f(exp, e) -> valeur d'un effet de rencontre ajouté (X.EFFECTS ; unités de
+  --     effectsValue : 1 ≈ une potion) ;
+  --   SE.CAMP_ACTION[id] = f(exp) -> valeur d'une action de feu de camp de zone, comparée au repos
+  --     (≈ PV soignés × 0,15) et à l'amélioration (≈ 1) : prise si elle vaut plus.
+  SE.KIND_SCORE, SE.EFFECT_VALUE, SE.CAMP_ACTION = {}, {}, {}
+  local kindExp -- expédition en cours de choix (cases de zone)
+
   -- Choix du chemin : meilleur score cumulé sur les chemins restants depuis chaque candidat.
   local function kindScore(kind, hpRatio, gold, removePrice)
+    local ext = SE.KIND_SCORE[kind]
+    if ext then return ext(kindExp, hpRatio, gold) end
+    if ns.Expedition.NODE_KINDS[kind] then return 1.2 end
     if kind == "combat" then return 1.0 end
     if kind == "elite" then
       if hpRatio > 0.7 then return 2.0 end
@@ -201,6 +215,7 @@ return function(ns)
   end
 
   local function choosePath(exp, choices)
+    kindExp = exp
     local best, bestV
     for i = 1, #choices do
       local v = pathValue(exp, choices[i][2], 0)
@@ -216,7 +231,8 @@ return function(ns)
     local v = 0
     for _, e in ipairs(effects) do
       local k = e[1]
-      if k == "heal" then v = v + math.min(e[2], exp.maxHp - exp.hp) * 0.15
+      if SE.EFFECT_VALUE[k] then v = v + SE.EFFECT_VALUE[k](exp, e)
+      elseif k == "heal" then v = v + math.min(e[2], exp.maxHp - exp.hp) * 0.15
       elseif k == "healPct" then v = v + math.min(math.floor(exp.maxHp * e[2]), exp.maxHp - exp.hp) * 0.15
       elseif k == "loseHp" then v = v - math.min(e[2], exp.hp - 1) * 0.12 / math.max(hpRatio, 0.2)
       elseif k == "maxHp" then v = v + e[2] * 0.2
@@ -273,6 +289,12 @@ return function(ns)
     local ch = X.choices(exp)
     local ph = exp.phase
     if ph == "start" then
+      -- épique de l'expédition d'abord (exp.startEpics), puis le bibelot de départ
+      if exp.startEpics then
+        local i = pickEpic(exp, opts, rng, exp.startEpics)
+        if i then return { "pickEpic", i } end
+        return { "skipEpic" }
+      end
       return has(ch, "startRelic") or { "skipStartRelic" }
     elseif ph == "map" then
       local paths = {}
@@ -300,6 +322,19 @@ return function(ns)
       end
       local ratio = exp.hp / exp.maxHp
       local up = bestUpgrade(exp)
+      -- action de zone (SE.CAMP_ACTION) : prise si elle vaut plus que le repos et l'amélioration
+      local bestA, bestAV
+      for i = 1, #ch do
+        local f = ch[i][1] == "campAction" and SE.CAMP_ACTION[ch[i][2]]
+        if f then
+          local v = f(exp)
+          if not bestAV or v > bestAV then bestA, bestAV = ch[i], v end
+        end
+      end
+      if bestA then
+        local restV = math.min(math.floor(exp.maxHp * X.REST_FRACTION), exp.maxHp - exp.hp) * 0.15
+        if bestAV > math.max(restV, up and 1 or 0) then return bestA end
+      end
       if ratio < 0.5 or (nextBoss and ratio < 0.7) or not up then return { "rest" } end
       return { "upgrade", up }
     elseif ph == "merchant" then
@@ -391,7 +426,7 @@ return function(ns)
       hpLost = st.hpLost, healed = st.healed, stalled = stalled,
       castsStarted = st.castsStarted, castsInterrupted = st.castsInterrupted,
       enemyCasts = st.enemyCasts, enemyCastsInterrupted = st.enemyCastsInterrupted,
-      played = st.played, drawn = st.drawn, unplayed = st.unplayed,
+      played = st.played, drawn = st.drawn, unplayed = st.unplayed, zoneStats = st.zone,
     }
   end
 
@@ -416,7 +451,8 @@ return function(ns)
       end
     end
     local exp = X.new({ seed = seed, class = opts.class or "priest", zone = opts.zone, key = opts.key or 0,
-      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false, epic = opts.epic })
+      unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
+      epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)
@@ -439,6 +475,8 @@ return function(ns)
           record.picks[#record.picks + 1] = exp.reward.cards[a[2]]
         elseif exp.phase == "reward" and a[1] == "pickEpic" then
           record.picks[#record.picks + 1] = exp.reward.epics[a[2]]
+        elseif exp.phase == "start" and a[1] == "pickEpic" then
+          record.picks[#record.picks + 1] = exp.startEpics[a[2]]
         elseif a[1] == "upgrade" then
           record.picks[#record.picks + 1] = "up:" .. exp.deck[a[2]].id
         elseif a[1] == "rest" then

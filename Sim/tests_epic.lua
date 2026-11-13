@@ -1,5 +1,6 @@
--- Tests du socle des cartes épiques (rareté epic, une seule par expédition, transformations, offre
--- garantie, Innate, effets passifs du deck) et des points d'accroche de classe qu'elles demandent.
+-- Tests du socle des cartes épiques (rareté epic, une seule par expédition, transformations, règle en jeu
+-- dès le début du combat, offres au départ et aux élites, Innate, effets passifs du deck) et des points
+-- d'accroche de classe qu'elles demandent.
 -- Aucune carte réelle : des cartes factices (préfixe te_), retirées à la fin.
 -- Usage : lua5.1 Sim/tests_epic.lua   (ou luajit) — doit finir par ALL PASS.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
@@ -77,6 +78,12 @@ card("te_variant_feint", { class = "rogue", variant = true, rarity = "basic", na
 card("te_innate", { class = "rogue", rarity = "common", name = "Test Innate", cost = 0, type = "skill",
   path = "combat", innate = true, effects = { { "draw", 0 } }, text = "Draw 0.\nInnate.", noReward = true })
 card("te_passive", { class = "rogue", rarity = "epic", zone = "swamp", name = "Test Passive", cost = 1,
+  type = "skill", path = "combat", effects = {}, text = "Epic.\nTest.",
+  whileInDeck = function(c, src) c.cls.teStart = (c.cls.teStart or 0) + 1 end,
+  deckHooks = { maxMana = function(c, src, v) return v + 1 end },
+  hooks = { allow = function(c, src, d) return d.id ~= "backstab" end }, up = { text = "Epic.\nTest+." } })
+-- carte ordinaire à effet passif du deck (deckHooks hors épique : chaque exemplaire compte)
+card("te_deckpassive", { class = "rogue", rarity = "common", name = "Test Deck Passive", cost = 1, noReward = true,
   type = "skill", path = "combat", effects = {}, text = "Test.",
   whileInDeck = function(c, src) c.cls.teStart = (c.cls.teStart or 0) + 1 end,
   deckHooks = { maxMana = function(c, src, v) return v + 1 end } })
@@ -128,9 +135,15 @@ local function newExp(zones, seed, extra)
   return X.new(o)
 end
 
+-- Passe les choix de départ (épique, puis bibelot).
+local function skipStart(exp)
+  if exp.phase == "start" and exp.startEpics then assert(X.act(exp, { "skipEpic" })) end
+  if exp.phase == "start" then assert(X.act(exp, { "skipStartRelic" })) end
+end
+
 -- Entre dans un nœud de départ transformé en `kind` (étape `floor`) ; le combat est gagné aussitôt.
 local function enter(exp, kind, floor)
-  if exp.phase == "start" then X.act(exp, { "skipStartRelic" }) end
+  skipStart(exp)
   local id = X.choices(exp)[1][2]
   local node = exp.map.nodes[id]
   node.kind = kind
@@ -244,53 +257,121 @@ end)
 ---------------------------------------------------------------------------
 -- 4. Offre garantie
 ---------------------------------------------------------------------------
-test("offre : la première élite gagnée propose un choix « Epic » (3 au plus, distinctes), une seule fois", function()
+test("départ : choix parmi 3 épiques débloquées (distinctes), avant le bibelot de départ, puis la carte", function()
   local exp = newExp(7, 5)
-  enter(exp, "elite")
-  winFight(exp)
-  local r = exp.reward
-  assert(r.epics, "choix Epic")
-  eq(#r.epics, X.EPIC.choices)
+  eq(exp.phase, "start")
+  assert(exp.startEpics and exp.startRelics, "épique et bibelot au départ (zones=7)")
+  eq(#exp.startEpics, X.EPIC.start); eq(X.EPIC.start, 3)
   local seen = {}
-  for _, id in ipairs(r.epics) do
+  for _, id in ipairs(exp.startEpics) do
     assert(not seen[id], "distinctes"); seen[id] = true
     eq(Cards[id].rarity, "epic")
   end
   eq(exp.epicOffered, true)
-  assert(r.cards and #r.cards > 0, "la récompense normale reste")
   local ch = X.choices(exp)
-  assert(has(ch, "pickEpic", 1) and has(ch, "skipEpic") and has(ch, "pickCard", 1))
+  assert(has(ch, "pickEpic", 1) and has(ch, "pickEpic", 3) and has(ch, "skipEpic"))
+  assert(not has(ch, "startRelic") and not has(ch, "path"), "l'épique d'abord")
+  assert(not X.act(exp, { "startRelic", 1 }), "bibelot refusé avant l'épique")
+  local id = exp.startEpics[2]
+  local n = #exp.deck
   assert(X.act(exp, { "pickEpic", 2 }))
-  eq(exp.deck[X.epicIndex(exp)].id, r.epics[2])
-  assert(not has(X.choices(exp), "pickEpic"), "une seule fois")
-  assert(X.act(exp, { "leave" }))
-  -- seconde élite : pas d'offre
-  enter(exp, "elite")
-  winFight(exp)
-  eq(exp.reward.epics, nil, "une offre par expédition")
+  eq(#exp.deck, n + 1); eq(exp.deck[X.epicIndex(exp)].id, id); eq(exp.deck[X.epicIndex(exp)].up, false)
+  eq(exp.startEpics, nil); eq(exp.startEpicPicked, id)
+  -- le bibelot ensuite, sur le même départ
+  eq(exp.phase, "start")
+  ch = X.choices(exp)
+  assert(has(ch, "startRelic", 1) and has(ch, "skipStartRelic") and not has(ch, "pickEpic"))
+  assert(not X.act(exp, { "pickEpic", 1 }), "plus d'épique")
+  assert(X.act(exp, { "startRelic", 1 }))
+  eq(exp.phase, "map")
+  assert(Save.validateExpedition(reload(exp)))
 end)
 
-test("offre : refusable, une seule épique débloquée = elle seule, combat normal sans offre", function()
+test("départ : une seule épique débloquée = elle seule, « Skip » = aucune épique ; aucune débloquée = rien", function()
   local exp = newExp(1, 6)
+  eq(exp.phase, "start")
+  eq(#exp.startEpics, 1); eq(exp.startEpics[1], "te_epic_a")
+  eq(exp.startRelics, nil, "pas de bibelot de départ à zones=1")
+  assert(Save.validateExpedition(reload(exp)), "phase de départ sauvegardable")
+  assert(X.act(exp, { "skipEpic" }))
+  eq(exp.phase, "map"); eq(X.epicIndex(exp), nil)
+  -- sans épique débloquée : ni phase de départ, ni tirage (flux « epic » jamais créé)
+  local e0 = newExp(0, 6)
+  eq(e0.phase, "map"); eq(e0.startEpics, nil); eq(e0.epicOffered, false); eq(e0.rng.epic, nil)
+  enter(e0, "elite")
+  winFight(e0)
+  eq(e0.reward.epics, nil)
+  eq(e0.rng.epic, nil)
+  -- épique imposée (simulation : epic=) : pas d'offre de départ
+  local ef = newExp(7, 6, { epic = "te_epic_c" })
+  eq(ef.startEpics, nil); eq(ef.deck[X.epicIndex(ef)].id, "te_epic_c")
+  -- X.EPIC.start = 0 : pas d'offre de départ
+  local old = X.EPIC.start
+  X.EPIC.start = 0
+  local ez = newExp(7, 6)
+  X.EPIC.start = old
+  eq(ez.startEpics, nil); eq(ez.epicOffered, false)
+end)
+
+test("élites : chaque élite gagnée propose UNE épique de remplacement (autre que celle du deck), refusable", function()
+  local exp = newExp(7, 5)
+  assert(X.act(exp, { "pickEpic", 1 }))
+  local mine = exp.deck[X.epicIndex(exp)].id
   enter(exp, "combat")
   winFight(exp)
-  eq(exp.reward.epics, nil, "combat normal")
+  eq(exp.reward.epics, nil, "combat normal : rien")
   assert(X.act(exp, { "leave" }))
-  enter(exp, "elite")
-  winFight(exp)
-  eq(#exp.reward.epics, 1); eq(exp.reward.epics[1], "te_epic_a")
-  assert(X.act(exp, { "skipEpic" }))
-  eq(X.epicIndex(exp), nil)
-  assert(not X.act(exp, { "pickEpic", 1 }), "refusée : plus de choix")
+  for k = 1, 2 do
+    enter(exp, "elite")
+    winFight(exp)
+    local r = exp.reward
+    assert(r.epics, "élite " .. k .. " : offre")
+    eq(#r.epics, X.EPIC.choices); eq(X.EPIC.choices, 1)
+    assert(r.epics[1] ~= exp.deck[X.epicIndex(exp)].id, "pas celle du deck")
+    assert(r.cards and #r.cards > 0, "la récompense normale reste")
+    local ch = X.choices(exp)
+    assert(has(ch, "pickEpic", 1) and has(ch, "skipEpic") and has(ch, "pickCard", 1))
+    if k == 1 then
+      assert(X.act(exp, { "skipEpic" }))
+      eq(exp.deck[X.epicIndex(exp)].id, mine, "refusée : rien ne change")
+    else
+      exp.deck[X.epicIndex(exp)].up = true
+      assert(X.act(exp, { "pickEpic", 1 }))
+      eq(exp.deck[X.epicIndex(exp)].id, r.epics[1]); eq(exp.deck[X.epicIndex(exp)].up, false, "arrive non améliorée")
+      eq(exp.epicReplaced.oldUp, true)
+    end
+    assert(not has(X.choices(exp), "pickEpic"))
+    assert(X.act(exp, { "leave" }))
+  end
+  -- une seule épique débloquée, déjà dans le deck : rien à proposer
+  local e1 = newExp(1, 6)
+  assert(X.act(e1, { "pickEpic", 1 }))
+  enter(e1, "elite")
+  winFight(e1)
+  eq(e1.reward.epics, nil)
+  -- sans épique dans le deck (départ refusé) : l'élite en propose une
+  local e2 = newExp(1, 6)
+  enter(e2, "elite")
+  winFight(e2)
+  eq(#e2.reward.epics, 1); eq(e2.reward.epics[1], "te_epic_a")
 end)
 
-test("offre : sans épique débloquée, aucun tirage (flux « epic » jamais créé)", function()
-  local exp = newExp(0, 6)
-  enter(exp, "elite")
-  winFight(exp)
-  eq(exp.reward.epics, nil)
-  eq(exp.epicOffered, false)
-  eq(exp.rng.epic, nil)
+test("feu de camp : l'épique s'améliore au choix ; les améliorations au hasard l'évitent", function()
+  local exp = newExp(7, 5)
+  assert(X.act(exp, { "pickEpic", 1 }))
+  local i = X.epicIndex(exp)
+  assert(X.canUpgrade(exp, i))
+  -- au hasard : toutes les autres cartes d'abord, jamais l'épique
+  local n = X.upgradeRandom(exp, 99, Rng.stream(1, "t"))
+  eq(n, #exp.deck - 1); eq(exp.deck[i].up, false)
+  for _, cd in ipairs(exp.deck) do cd.up = false end
+  skipStart(exp)
+  local id = X.choices(exp)[1][2]
+  exp.map.nodes[id].kind = "campfire"
+  assert(X.act(exp, { "path", id }))
+  assert(has(X.choices(exp), "upgrade", i), "épique proposée au feu de camp")
+  assert(X.act(exp, { "upgrade", i }))
+  eq(exp.deck[i].up, true)
 end)
 
 test("offre : un combat d'élite de rencontre compte aussi", function()
@@ -349,6 +430,12 @@ test("Innate : dans la main de départ à la place d'une pioche (main de 5), tou
   for _, inst in ipairs(c.hand) do eq(inst.id, "te_innate") end
   eq(c.draw[#c.draw].id, "te_innate")
   eq(ns.Language.plateByKey("innate").word, "Innate")
+  -- plaque « Epic » (en tête) à la place de « Power » sur une épique
+  local Lg = ns.Language
+  eq(Lg.plates[1].key, "epic")
+  eq(Lg.plateWord(Lg.plateByKey("epic"), Cards.te_epic_a), "Epic")
+  eq(Lg.plateWord(Lg.plateByKey("power"), Cards.te_epic_a), nil, "une épique ne dit pas « Power »")
+  eq(Lg.plateWord(Lg.plateByKey("epic"), Cards.feint), nil)
   eq(ns.Language.plateWord(ns.Language.plateByKey("innate"), Cards.te_innate), "Innate")
 end)
 
@@ -368,7 +455,7 @@ test("Innate : sans carte Innate, la pioche ne change pas", function()
 end)
 
 test("effet passif du deck : whileInDeck au début du combat, deckHooks actifs où que soit la carte", function()
-  local deck = deckOf("feint", "feint", "feint", "feint", "feint", "feint", "te_passive", "te_passive")
+  local deck = deckOf("feint", "feint", "feint", "feint", "feint", "feint", "te_deckpassive", "te_deckpassive")
   local c = Combat.new({ seed = 2, class = "rogue", hp = 50, deck = deck, encounter = { "te_dummy" } })
   eq(c.cls.teStart, 2, "une fois par exemplaire")
   eq(c.player.mana, Combat.BASE_MANA + 2, "deux exemplaires : +2 mana, même en pioche")
@@ -380,6 +467,84 @@ test("effet passif du deck : whileInDeck au début du combat, deckHooks actifs o
   eq(r.player.mana, Combat.BASE_MANA + 2, "après rechargement")
   local c2 = Combat.new({ seed = 2, class = "rogue", hp = 50, deck = deckOf("feint", "feint"), encounter = { "te_dummy" } })
   eq(c2.passives, nil, "sans carte passive : rien")
+  eq(c2.epic, nil, "sans épique : rien")
+end)
+
+-- Toutes les instances des piles d'un combat (pioche, main, défausse, consumées, recharges, pouvoirs).
+local function allPiles(c)
+  local out = {}
+  for _, pile in ipairs({ c.draw, c.hand, c.discard, c.exhaust, c.player.powers }) do
+    for _, inst in ipairs(pile) do out[#out + 1] = inst end
+  end
+  for _, cd in ipairs(c.cooldown) do out[#out + 1] = cd.card end
+  return out
+end
+
+test("épique en combat : posée avant le premier tour, dans aucune pile, main de 5, une seule fois", function()
+  for seed = 1, 20 do
+    local deck = deckOf("sinister_strike", "sinister_strike", "sinister_strike", "feint", "feint", "te_passive",
+      "backstab", "eviscerate")
+    deck[6].up = true
+    local c = Combat.new({ seed = seed, class = "rogue", hp = 50, deck = deck, encounter = { "te_dummy" } })
+    assert(c.epic, "c.epic")
+    eq(c.epic.id, "te_passive"); eq(c.epic.up, true, "amélioration gardée")
+    eq(#c.hand, 5, "la main de départ ne change pas")
+    eq(#c.hand + #c.draw, #deck - 1, "l'épique n'est pas piochée")
+    for _, inst in ipairs(allPiles(c)) do assert(inst.id ~= "te_passive", "épique dans une pile") end
+    eq(c.cls.teStart, 1, "whileInDeck une fois")
+    eq(c.player.mana, Combat.BASE_MANA + 1, "deckHooks actifs dès le premier tour")
+    eq(c.passives, nil, "l'épique n'est pas un passif ordinaire")
+  end
+  -- toute la partie : jamais piochée, même en vidant la pioche plusieurs fois
+  local c = Combat.new({ seed = 3, class = "rogue", hp = 50, deck = deckOf("feint", "feint", "te_passive"),
+    encounter = { "te_dummy" } })
+  for _ = 1, 6 do
+    Combat.endTurn(c)
+    for _, inst in ipairs(allPiles(c)) do assert(inst.id ~= "te_passive") end
+  end
+  eq(c.player.mana, Combat.BASE_MANA + 1)
+end)
+
+test("épique en combat : ses crochets (deckHooks puis hooks) passent après pouvoirs, bibelots et affixes", function()
+  local order = {}
+  card("te_epic_order", { class = "rogue", zone = "steppes", rarity = "epic", name = "Order", effects = {},
+    text = "Epic.\nTest.", type = "power",
+    deckHooks = { teV = function(c, src, v) order[#order + 1] = "deck" return v + 1 end,
+      teN = function(c, src) order[#order + 1] = "deckN" end },
+    hooks = { teV = function(c, src, v) order[#order + 1] = "hooks" return v * 10 end } })
+  local c = Combat.new({ seed = 1, class = "rogue", hp = 50, deck = deckOf("feint", "feint", "te_epic_order"),
+    encounter = { "te_dummy" } })
+  power(c, { name = "P", type = "power", effects = {}, hooks = {
+    teV = function(c, src, v) order[#order + 1] = "power" return v * 2 end,
+    teN = function(c, src) order[#order + 1] = "powerN" end } })
+  ns.Relics.te_relic = { name = "R", hooks = { teV = function(c, src, v) order[#order + 1] = "relic" return v + 100 end } }
+  c.relics[#c.relics + 1] = "te_relic"
+  -- (3 × 2 + 100 + 1) × 10
+  eq(Combat.modify(c, "teV", 3), 1070)
+  eq(table.concat(order, ","), "power,relic,deck,hooks")
+  order = {}
+  local stop, src = Combat.fire(c, "teN")
+  eq(stop, false); eq(table.concat(order, ","), "powerN,deckN")
+  ns.Relics.te_relic = nil
+  -- src = c.epic ; clone et sauvegarde gardent l'épique
+  local cl = Combat.clone(c)
+  eq(cl.epic.id, "te_epic_order")
+  local r = reload(c)
+  eq(r.epic.id, "te_epic_order"); eq(Combat.modify(r, "teV", 3), 70, "(3 × 2 + 1) × 10 sans le bibelot retiré")
+end)
+
+test("épique en combat : son crochet « allow » interdit des cartes ; Hex, défausse et retraits ne la touchent pas", function()
+  local c = setup({ "backstab", "feint" }, { extra = { "te_passive" } })
+  -- setup refait la main : l'épique n'est pas dans les piles
+  for _, inst in ipairs(allPiles(c)) do assert(inst.id ~= "te_passive") end
+  local ok, why = Combat.canPlay(c, 1)
+  assert(not ok); eq(why, "forbidden")
+  assert(Combat.canPlay(c, 2))
+  -- défausse de toute la main, fin de tour, retrait des pouvoirs : l'épique reste
+  Combat.endTurn(c)
+  for i = #c.player.powers, 1, -1 do Combat.removePower(c, i, "test") end
+  eq(c.epic.id, "te_passive")
+  for _, inst in ipairs(allPiles(c)) do assert(inst.id ~= "te_passive") end
 end)
 
 ---------------------------------------------------------------------------
@@ -562,8 +727,9 @@ end)
 ---------------------------------------------------------------------------
 -- 7. Sauvegarde, simulation
 ---------------------------------------------------------------------------
-test("sauvegarde : expédition v5 en cours migrée en v6, puis jouable (offre à la prochaine élite)", function()
+test("sauvegarde : expédition v5 en cours migrée en v6, puis jouable (offre de remplacement à chaque élite)", function()
   local exp = newExp(7, 11)
+  skipStart(exp)
   exp.version = 5
   exp.epicOffered = nil
   local db = Save.new()
@@ -571,7 +737,7 @@ test("sauvegarde : expédition v5 en cours migrée en v6, puis jouable (offre à
   local out = Save.migrate(db)
   local m = out.current
   assert(m, "gardée")
-  eq(m.version, X.VERSION); eq(X.VERSION, 6); eq(m.epicOffered, false)
+  eq(m.version, X.VERSION); eq(X.VERSION, 6); eq(m.epicOffered, false); eq(m.startEpics, nil)
   assert(Save.validate(out))
   enter(m, "elite")
   winFight(m)
@@ -582,16 +748,41 @@ test("sauvegarde : expédition v5 en cours migrée en v6, puis jouable (offre à
   eq(again.deck[X.epicIndex(again)].id, again.reward.epics[1])
 end)
 
-test("simulation : epic=<id> imposée au départ, le bot prend une épique à la première élite", function()
-  local rec, exp = ns.SimExpedition.play({ seed = 3, class = "rogue", epic = "te_epic_a", zones = 0 })
+test("sauvegarde : v6 de l'ancienne règle (épique dans la pioche d'un combat en cours) reste jouable", function()
+  -- combat sauvegardé par l'ancien socle : l'épique est une carte de la pioche ; il se termine tel quel
+  local exp = newExp(7, 12)
+  skipStart(exp)
+  X.addCard(exp, "te_epic_b")
+  enter(exp, "combat")
+  local c = exp.combat
+  assert(c.epic and c.epic.id == "te_epic_b")
+  c.draw[#c.draw + 1] = Card.new("te_epic_b", false, 777)
+  c.epic = nil
+  local r = reload(exp)
+  assert(Save.validateExpedition(r))
+  for _ = 1, 3 do assert(X.act(r, { "endTurn" })) if r.phase ~= "combat" then break end end
+  -- le combat suivant pose l'épique comme une règle
+  r.combat.result = "won"
+  X.act(r, { "endTurn" })
+  assert(X.act(r, { "leave" }))
+  enter(r, "combat")
+  eq(r.combat.epic.id, "te_epic_b")
+  for _, inst in ipairs(allPiles(r.combat)) do assert(inst.id ~= "te_epic_b") end
+end)
+
+test("simulation : epic=<id> imposée et jamais remplacée ; le bot choisit au départ et aux élites ; epic=none", function()
+  local rec, exp = ns.SimExpedition.play({ seed = 3, class = "rogue", epic = "te_epic_a", zones = 7 })
   eq(exp.deck[X.epicIndex(exp)].id, "te_epic_a")
-  -- avec des épiques débloquées, une offre faite et prise au moins une fois sur quelques expéditions
-  local took = 0
+  for _, p in ipairs(rec.picks) do assert(not (Cards[p] and Cards[p].rarity == "epic"), "aucune autre épique prise") end
+  -- avec des épiques débloquées : prise au départ (première décision)
+  local atStart = 0
   for seed = 1, 6 do
     local r = ns.SimExpedition.play({ seed = seed, class = "rogue", zones = 4 })
-    for _, p in ipairs(r.picks) do if Cards[p] and Cards[p].rarity == "epic" then took = took + 1 end end
+    if r.picks[1] and Cards[r.picks[1]] and Cards[r.picks[1]].rarity == "epic" then atStart = atStart + 1 end
   end
-  assert(took > 0, "épique prise")
+  eq(atStart, 6, "épique prise au départ")
+  local rn, en = ns.SimExpedition.play({ seed = 4, class = "rogue", zones = 7, epic = "none" })
+  eq(X.epicIndex(en), nil, "epic=none : aucune épique")
   eq(ns.SimExpedition.epicRating({ class = "rogue", deck = {} }, "te_epic_a"), ns.SimExpedition.EPIC_RATING)
 end)
 

@@ -171,8 +171,9 @@ Save.EXP_MIGRATIONS[4] = function(exp, db)
   exp.acts = 1
 end
 
--- Expédition 5 -> 6 : cartes épiques. Aucune offre faite encore (la prochaine élite gagnée en propose une
--- si la classe en a débloqué) ; le flux de hasard « epic » est créé à son premier usage.
+-- Expédition 5 -> 6 : cartes épiques. Une expédition en cours a passé son départ : pas d'offre de départ
+-- (exp.startEpics absent), chaque élite gagnée propose une épique de remplacement si la classe en a
+-- débloqué ; le flux de hasard « epic » est créé à son premier usage.
 Save.EXP_MIGRATIONS[5] = function(exp)
   if exp.epicOffered == nil then exp.epicOffered = false end
 end
@@ -275,6 +276,9 @@ function Save.validateExpedition(exp)
   if exp.phase == "reward" and type(exp.reward) ~= "table" then return false, "missing reward" end
   if exp.phase == "merchant" and type(exp.shop) ~= "table" then return false, "missing merchant" end
   if exp.phase == "event" and type(exp.event) ~= "table" then return false, "missing encounter" end
+  if exp.phase == "start" and type(exp.startEpics) ~= "table" and type(exp.startRelics) ~= "table" then
+    return false, "missing start choice"
+  end
   return Save.isPlain(exp, "current")
 end
 
