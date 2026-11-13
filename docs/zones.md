@@ -33,6 +33,8 @@ Déjà créés (vides) **et déjà au TOC** : ne pas toucher au TOC.
 | `Core/ZoneRules/<zone>.lua` | la mécanique : `ns.ZoneRule.define("<zone>", { … })` (§ 3), états (`ns.Statuses`), effets de carte (`ns.Effects`), actions, conditions et montants d'ennemis (`Combat.ENEMY_ACTIONS`, `ENEMY_CONDITIONS`, `ENEMY_AMOUNTS`), effets de rencontre (`Expedition.EFFECTS`), cases de parcours (`Expedition.nodeKind`), mots du langage (`ns.Language.zoneKeyword`, `L.trigger`, `L.condition`). Lua 5.1 pur, aucune API WoW. |
 | `UI/Art/Zones/<zone>.lua` | art et affichage : `Art.enemies`, `Art.npcs`, `Art.cards`, `Art.relics`, `Art.statuses`, `Art.statusShort`, `Art.intents` / `Art.intentName` (intention propre : `hex`, `curse`…), `Art.actionText`, `Art.intentParts`, `Art.ui.map[case]`, `Art.ui.mapBoss.<zone>` (icône du boss sur le parcours, repli : VanCleef), décors (`Art.scenes`, `Art.paintings`, `Art.palettes`), vue `ns.ZoneViews.<zone>` (§ 6). |
 
+`Art.enemies[id].wide` (facultatif, 1,3 à 1,6 ; jamais un humanoïde) : quadrupède long (crocilisque, raptor, worg, félin) dont la queue serait rognée par le cadre de 150 × 160 : cadre du modèle élargi en largeur seulement, centré, taille apparente égale (`Scene.setWide`, `docs/interface.md`).
+
 À créer par l'agent de zone (lus d'office s'ils existent, hors TOC) :
 
 | Fichier | Contenu |

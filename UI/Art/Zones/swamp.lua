@@ -20,7 +20,8 @@ local WHELP = { icon = 134157, tga = "INV_Misc_Head_Dragon_Green" }
 local MURLOC = { icon = 134169, tga = "INV_Misc_Head_Murloc_01" }
 local E = Art.enemies
 -- Sawtooth Crocolisk (1082) ; repli : Wetlands Crocolisk (1036), Loch Crocolisk (1034), Large Loch (831)
-E.sawtooth_crocolisk = { creature = 1082, display = { 1036, 1034, 831 }, icon = CROC }
+-- (wide : cadre du modèle élargi, la queue d'un crocilisque de trois quarts sortait du cadre)
+E.sawtooth_crocolisk = { creature = 1082, display = { 1036, 1034, 831 }, wide = 1.6, icon = CROC }
 -- Dreaming Whelp (741) ; repli : Jade (1063, dragonnet vert du marais, 7975), Black Dragon Whelp (387)
 E.dreaming_whelp = { creature = 741, display = { 7975, 387 }, scale = 0.85, icon = WHELP }
 E.somnus_whelp = { creature = 741, display = { 7975, 387 }, scale = 0.8, icon = WHELP }

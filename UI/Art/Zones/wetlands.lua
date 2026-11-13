@@ -33,19 +33,21 @@ local enemies = {
   -- Mosshide Alpha (1014) ; Mosshide Brute (1012)
   mosshide_alpha = { creature = 1014, display = { 543, 3196 }, scale = 1.1, icon = GNOLL },
   -- Mottled Screecher (1021) ; Mottled Raptor (1020)
-  mottled_screecher = { creature = 1021, display = { 677, 960 }, icon = RAPTOR },
-  mottled_raptor = { creature = 1020, display = { 960, 677 }, icon = RAPTOR },
+  -- wide = cadre du modèle élargi (quadrupède long : Scene.setWide, docs/zones.md)
+  mottled_screecher = { creature = 1021, display = { 677, 960 }, wide = 1.3, icon = RAPTOR },
+  mottled_raptor = { creature = 1020, display = { 960, 677 }, wide = 1.3, icon = RAPTOR },
   -- Mottled Scytheclaw (1022)
-  mottled_scytheclaw = { creature = 1022, display = { 648, 960 }, icon = RAPTOR },
+  mottled_scytheclaw = { creature = 1022, display = { 648, 960 }, wide = 1.3, icon = RAPTOR },
   -- Sarltooth (absent des caches) : repli Mottled Scytheclaw (1022) agrandi, puis Mottled Raptor (1020)
-  sarltooth = { creature = 1022, display = { 648, 960 }, scale = 1.3, icon = RAPTOR },
+  sarltooth = { creature = 1022, display = { 648, 960 }, scale = 1.3, wide = 1.3, icon = RAPTOR },
   -- Dragonmaw Raider (1034) ; Dragonmaw Swamprunner (1035)
   dragonmaw_raider = { creature = 1034, display = { 4916, 4917 }, icon = ORC },
   -- Dragonmaw Centurion (1036 : l'armure de Ma'ruk Wyrmscale, décisions du 13/11/2026) ; Raider (1034)
   dragonmaw_centurion = { creature = 1036, display = { 4919, 4916 }, scale = 1.15,
     icon = I("INV_Misc_MonsterScales_08") },
   -- Wetlands Crocolisk (1400) ; Young (1417), Giant Wetlands Crocolisk (2089)
-  wetlands_crocolisk = { creature = 1400, display = { 1036, 1035, 925 }, icon = CROC },
+  -- (de trois quarts, la queue sortait du cadre de 150 : rognée net)
+  wetlands_crocolisk = { creature = 1400, display = { 1036, 1035, 925 }, wide = 1.6, icon = CROC },
   -- Black Ooze (1032) ; Crimson Ooze (1031), Monstrous Ooze (1033)
   black_ooze = { creature = 1032, display = { 767, 11138, 11139 }, icon = I("INV_Misc_Food_Legion_gooSlime_chunk") },
   -- Black Slime (1030)
