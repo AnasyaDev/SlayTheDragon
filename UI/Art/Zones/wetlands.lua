@@ -202,9 +202,9 @@ ns.ZoneViews.wetlands = {
 -- Décors peints (UI/Scene.lua, S.landscape ; boîte à outils K = S.paintKit) : marais des Wetlands
 ---------------------------------------------------------------------------
 -- Ciel couvert gris-bleu, brume basse, eau entre les touffes d'herbe, roseaux à massettes au premier plan ;
--- accessoires propres à la zone (Art.paintProps) : arbre des marais, bateau, ponton, donjon de Menethil,
--- bannière, ruine, rochers, tente orque, échafaudage de fouilles, porte de Grim Batol. Plans libres
--- (sp.before) : mer, montagnes, mares, bancs de brume, pluie.
+-- accessoires propres à la zone (registre Scene.PROPS, « wl_<genre> ») : arbre des marais, bateau, ponton,
+-- donjon de Menethil, bannière, ruine, rochers, tente orque, échafaudage de fouilles, porte de Grim Batol.
+-- Plans propres (layers) : mer, montagnes, mares, bancs de brume, pluie ; roseaux au premier plan.
 
 Art.palettes.wetlands = {
   sky = { "#6f7f8b", "#9aa6a8", "#c5c8b9" }, sun = "#c6cbc1", sunGlow = { "#dfe3d0", 0.3 },
@@ -265,7 +265,6 @@ local sin, cos = math.sin, math.cos
 local WATER = { mud = { "BACKGROUND", 3 }, water = { "BACKGROUND", 4 }, shine = { "BACKGROUND", 5 } }
 
 local P = {}
-Art.paintProps = Art.paintProps or {}
 
 -- Arbre des marais : tronc tordu en trois tronçons, branches, houppier de taches fondues et de masses,
 -- mousse qui pend. Variante « dead » : nu.
@@ -516,7 +515,20 @@ function P.cargo(f, g, Pl, c, pal, x, y, s, variant, K)
   for _, bx in ipairs({ -40, -12 }) do K.box(f, g, Pl[3], c.dark, x + bx * s, y - 13 * s, 24 * s, 1.5 * s, 0.7) end
 end
 
-for k, fn in pairs(P) do Art.paintProps[k] = fn end
+-- Les accessoires des Wetlands entrent au registre commun du peintre (Scene.PROPS) sous le nom « wl_<genre> »,
+-- au premier décor de la zone peint (UI/Scene.lua est chargé après ce fichier) ; ils reçoivent la boîte à
+-- outils étendue du décor en cours (KW : kit du peintre + horizon, ligne des champs, palette).
+local KW
+local function registerProps()
+  local reg = ns.Scene and ns.Scene.PROPS
+  if not reg or reg.wl_keep then return end
+  for k, fn in pairs(P) do
+    reg["wl_" .. k] = function(f, g, Pl, c, pal, x, y, s, v) return fn(f, g, Pl, c, pal, x, y, s, v, KW) end
+  end
+end
+local function extend(kit, sp, pal)
+  return setmetatable({ hz = sp.horizon or 190, fl = sp.field or 228, pal = pal }, { __index = kit })
+end
 
 -- Plans libres -------------------------------------------------------------------------------------------
 
@@ -602,8 +614,49 @@ local function tufts(f, g, K, pal, n)
   end
 end
 
+-- Roseaux à massettes du premier plan : tige, longue lame de feuille, épi brun allongé (deux sur trois).
+local function reeds(f, g, K, pal, list)
+  for ci, cl in ipairs(list or {}) do
+    for i = 1, cl[3] do
+      local s0 = ci * 101 + i
+      local h1, h2, h3, h4 = K.hash(s0, 7), K.hash(s0, 8), K.hash(s0, 9), K.hash(s0, 10)
+      local bx, by = cl[1] + (cl[2] - cl[1]) * h1, K.H + 4 + 10 * h4
+      local L, lean = 46 + 58 * h2, (h3 - 0.5) * 0.5
+      local dx, dy = sin(lean), -cos(lean)
+      local th = PI / 2 - lean
+      K.bar(f, g, K.LV.stalks, pal.stalk, bx + dx * L / 2, by + dy * L / 2, L, 1.6, th)
+      local side = (h3 < 0.5) and -1 or 1
+      local lb = lean - side * (0.25 + 0.2 * h4)
+      K.bar(f, g, K.LV.stalks, pal.stalk, bx + sin(lb) * L * 0.42, by - cos(lb) * L * 0.42, L * 0.85, 2.4, PI / 2 - lb)
+      if h2 > 0.35 then
+        local ec = pal.ears[1 + math.floor(h4 * #pal.ears)]
+        local ear = K.oval(f, g, K.LV.ears, ec, bx + dx * (L - 6), by + dy * (L - 6), 17, 5)
+        if ear.SetRotation then ear:SetRotation(th) end
+        K.bar(f, g, K.LV.stalks, pal.stalk, bx + dx * (L + 6), by + dy * (L + 6), 9, 1, th)
+      end
+    end
+  end
+end
+
+-- Plans propres de la zone (Scene : layers) : skyline = plans libres du décor (zone.before : ciel couvert,
+-- mares, mer, montagnes, brume, pluie) ; front = roseaux.
+local LAYERS = {
+  skyline = function(kit, f, g, sp, pal)
+    KW = extend(kit, sp, pal)
+    registerProps()
+    if sp.zone and sp.zone.before then sp.zone.before(f, g, KW, sp) end
+  end,
+  front = function(kit, f, g, sp, pal) reeds(f, g, KW or extend(kit, sp, pal), pal, sp.zone and sp.zone.reeds) end,
+}
+
+-- Un décor des Wetlands : sol sans rangs, plans propres ; t.before (plans libres), t.wheat (roseaux) et les
+-- accessoires de la zone (renommés « wl_<genre> ») passent par les plans propres et le registre commun.
 local function wl(t, pal)
   t.pal, t.horizon, t.field, t.furrows = pal or "wetlands", t.horizon or 186, t.field or 226, false
+  t.zone = { before = t.before, reeds = t.wheat }
+  t.before, t.wheat = nil, nil
+  for _, p in ipairs(t.props or {}) do if P[p[1]] then p[1] = "wl_" .. p[1] end end
+  t.layers = LAYERS
   return t
 end
 
