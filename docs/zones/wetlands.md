@@ -527,3 +527,99 @@ cartes de classe sont les icônes des sorts (`wow_icon_search` : `spell_arcane_m
    qui comptait sur le feu de camp arrive au boss avec ≈ 15 PV de moins ; un deck qui se soigne en
    combat (Priest) n'y perd presque rien. Garder ce prix, ou le remplacer par « Draw 1 less each turn »
    (même coût pour toutes les classes).
+
+## Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Wetlands.lua` (ennemis, groupes, rencontres, commun, bibelots de clé, décors),
+`Core/ZoneRules/wetlands.lua` (règle), `UI/Art/Zones/wetlands.lua` (modèles, icônes, vue de zone, huit décors
+peints), `Sim/zones/wetlands.lua` (bot), `Sim/tests_zone_wetlands.lua` (32 tests),
+`Sim/ui_zone_wetlands.lua` (section « UZW » du harnais).
+
+### La règle telle que codée
+
+- Champs d'ennemi : `pack = { "force" | "heal" | "absorb", n }` (membre qui donne), `pack = true` (membre sans
+  prime : Sarltooth, Dragonmaw Centurion, Nek'rosh), `packLeader = true` (Mosshide Alpha).
+- Mort d'un membre (`onEnemyDeath`) : sa prime entre dans une file avec le numéro de l'effet en cours ; la file
+  est réglée à la fin de cet effet (`onEffectEnd` : carte, incantation, Trap, DoT, potion, action ennemie,
+  début / fin de tour, donc l'attaque automatique du familier) : chaque membre encore vivant reçoit chaque
+  prime, de gauche à droite. Les morts du même effet ne reçoivent rien (la règle de la fiche, gardée).
+- Chef tué dans l'effet : primes de cet effet annulées, la meute se disperse (`e.zs.wetlands.scattered`) ; plus
+  rien n'est donné ni reçu ; un membre invoqué ensuite arrive dispersé. Pas de Demoralized (décisions).
+- Victoire : le combat s'arrête, la file est perdue. Filet : la file est aussi vidée au début de la phase ennemie
+  et du tour du joueur.
+- Journal `{ t = "pack", src, dst, bonus, n, got }` et `{ t = "scatter", by }`, textes flottants
+  (« +2 Strength », « +6 HP », « +3 Absorb », « Scattered »), statistiques `Combat.zstat`.
+
+### Ce qui diffère de la fiche, et pourquoi
+
+- **Ma'ruk Wyrmscale → Dragonmaw Centurion** (décisions : créature réelle 1036). Wyrmscale Armor retire **10**
+  dégâts au premier coup de chaque tour du joueur au lieu de l'annuler : annulé en entier, l'armure mangeait le
+  gros sort du Mage chaque tour (élite la plus meurtrière pour lui).
+- **Mortal Wound** (ajout) : état « soins reçus divisés par deux » (crochet `heal` de la zone), posé par le
+  Mortal Strike du Dragonmaw Raider (2 tours), le Cleave du Centurion et le Cleave et le Sunder Armor de
+  Nek'rosh. Seule réponse trouvée à l'écart entre les classes qui se soignent (Priest) et les autres : sans
+  elle, le Priest gagnait 87 % contre 57 % au Mage.
+- **Nek'rosh** : 80 PV (fiche 98) ; Sunder Armor pose **Sundered 1** (2 dans la fiche : +25 % de dégâts sur deux
+  tours faisait tomber le Mage de 16 points) ; Clan Command donne **Strength 2** à tous et 8 Absorb, en 3e
+  position (Cleave, Sunder, Command) ; phase 2 : Shadow Bolt **16** (fiche 28), motif Shadow Bolt, Cleave,
+  **Call Whelps** (ajout : 2 Crimson Whelps, 4 au plus), Sunder. Bonewarders : prime heal **6** (fiche 10).
+- **Sarltooth** : Scytheclaws à +1 Strength (fiche +2), 2 au plus en vie : une carte de zone qui tue l'escorte
+  renforçait trop Sarltooth (les classes à zone, le Mage d'abord, étaient punies de jouer leur force).
+- **Rencontres** : Ormer Ironbraid se tient sur la colline (`scene = "hill"`, les fouilles de Whelgar), le décor
+  « mine » étant celui du boss ; soins fixes plutôt qu'en pour-cent (Deepwater Tavern : +16 PV au lieu de 30 %,
+  Greenwarden +15, rations de Longbraid +12) : un soin fixe profite davantage aux classes à peu de PV.
+- **Gryphon Master** : rencontre de case (`node = true`) et case `gryphon_master` déclarées par la zone, tier 3,
+  posées dans toutes les zones une fois débloquées.
+- **Non codé** : effets `strip`, `steal`, `unpack`, `marked` (destinés aux cartes de zone, autre lot) ; aperçu
+  des primes au survol d'une carte (aucun aperçu de dégâts dans l'écran de combat : lot d'interface commun).
+  La prime est écrite sous chaque ennemi (« Pack: +2 Str », couronne « Pack Leader », patte grisée
+  « Scattered ») et la bulle d'intention montre la Strength reçue.
+- Libellés : bibelots de clé reformulés sans « you » (convention des bibelots communs).
+
+### Moteur, peintre, tests partagés
+
+- Aucun crochet nouveau : la file passe par `onEnemyDeath` / `onEffectEnd`, Modr par `onEnemyDamaged`,
+  `enemyMove`, `onEnemyStunned` et un montant `ENEMY_AMOUNTS.earthen_charge` (Charges + celle qui viendra au
+  début de son tour : la bulle de Seismic Slam annonce le vrai coup et baisse quand on le frappe assez).
+- Décors : plans propres `layers` et registre `S.PROPS` de `UI/Scene.lua` (apportés par Steppes) ; les
+  accessoires des Wetlands y entrent sous `wl_<genre>` (voir `docs/zones.md`, « Décors »).
+- Tests partagés : `fromZone = "wetlands"` sur le commun déclaré par la zone ; `Sim/tests.lua`,
+  `Sim/tests_expedition.lua` (comptes des paliers 0 à 3 sans `fromZone`, effets de `X.EFFECTS` admis, rencontre de
+  case ouverte par sa case) et `Sim/ui_harness.lua` (onglet Zones : Wetlands « Locked » une fois jouable).
+
+### Nombres finaux (`Data/Zones/Wetlands.lua`)
+
+| Ennemi | PV | Prime | Intentions |
+|---|---|---|---|
+| Bluegill Raider | 11–13 | +3 Absorb | Spear Jab 5 ; Muck Toss 3 + Demoralized 1 |
+| Mosshide Brute | 19–22 | +2 Strength | Club 8 ; Knockdown 5 (interrompt) |
+| Mosshide Mystic | 15–17 | heal 6 | Healing Wave 6 (allié à −6 PV ou plus) ; Lightning Bolt 10 (Cast) |
+| Mosshide Alpha | 24–27 | chef | Rally 4 Absorb à tous ; Maul 11 ; Savage Howl Strength 1 à tous |
+| Mottled Screecher | 13–15 | +1 Strength | Screech (Cast : un raptor, 3 au plus) ; Claw 3 × 2 |
+| Mottled Raptor | 13–15 | +2 Strength | Rake 3 × 2 ; Lunge 7 |
+| Dragonmaw Raider | 24–27 | +2 Strength | Shield Bash 5 (interrompt) ; Mortal Strike 11 + Mortal Wound 2 |
+| Wetlands Crocolisk | 32–36 | — | Snap 10 ; Submerge 12 Absorb ; Death Roll 4 × 3 |
+| Black Ooze / Black Slime | 22–25 / 6–7 | — | Corrosive Acid 5 + Sundered 1 ; Ooze Slam 8 ; 2 Slimes à sa mort / Slime Bolt 3 |
+| Sarltooth (élite) + Scytheclaw | 66 + 12–14 | — / +1 Strength | Call the Pack (2 au plus) ; Rend 7 + DoT 3 ; Leap 16 (interrompt) / Slash 5 |
+| Modr (élite) | 90 | — | Stone Fist 12 ; Seismic Slam 6 + 8 par Charge (interrompt) ; Charge si < 15 PV perdus |
+| Dragonmaw Centurion (élite) | 56 | membre | Shield Bash 6 ; Cleave 8 × 2 + Mortal Wound 2 ; Demoralizing Shout 4 + Demoralized 2 ; armure −10 |
+| Chieftain Nek'rosh (boss) | 80 | membre | Cleave 9 × 2 + MW 2 ; Sunder 12 + Sundered 1 + MW 2 ; Clan Command ; phase 2 : Shadow Bolt 16 (Cast), Call Whelps |
+| Dragonmaw Bonewarder / Crimson Whelp | 13–15 / 8–10 | heal 6 / — | Bone Ward 6 sur le boss ; Shadow Bolt 6 / Fire Breath 4 |
+
+<<MESURES>>
+
+### Modèles en repli
+
+Toutes les créatures de la fiche sont dans le cache du client (`tools/wdb_creatures.py`, 13/11/2026), sauf :
+**Sarltooth** → Mottled Scytheclaw (1022, affichage 648) agrandi ×1,3 ; **Ormer Ironbraid** → Longbraid the Grim
+(1071, 1671), puis Prospector Stormpike (3594). Chaque personnage a deux affichages voisins de secours
+(commentaires de `UI/Art/Zones/wetlands.lua`) ; Modr (271460, contenu Forever) a pour secours son affichage 473
+puis le Fen Creeper (2023).
+
+### Décors
+
+Huit décors peints (`Art.paintings.wetlands_*`) : route des marais (`road`), fouilles de Whelgar (`hill`),
+Angerfang (`camp`), marché de Menethil (`shop`), route de nuit (`night`), portes de Grim Batol (`mine` : boss),
+quais de Menethil (`coast`), Dun Modr (`ruins`). Ciel couvert gris-bleu, pluie fine, brume basse, mares,
+roseaux à massettes au premier plan ; accessoires propres (arbre des marais, bateau, ponton, donjon, ruine, tente
+orque, échafaudage, porte, bannière). Planches : `build/snap/decor-wetlands_*.svg` du harnais.

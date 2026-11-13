@@ -88,7 +88,7 @@ E.dragonmaw_raider = {
   name = "Dragonmaw Raider", hp = { 24, 27 }, pack = { "force", 2 },
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
-    strike = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 11 }, { "debuff", "mortal_wound", 1 } } },
+    strike = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 11 }, { "debuff", "mortal_wound", 2 } } },
   },
   pattern = { "bash", "strike" }, randomStart = true,
 }
@@ -173,7 +173,7 @@ E.dragonmaw_centurion = {
   name = "Dragonmaw Centurion", hp = 56, elite = true, pack = true, wyrmscale = 10,
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 6, interrupts = true } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 8, times = 2 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 8, times = 2 }, { "debuff", "mortal_wound", 2 } } },
     shout = { name = "Demoralizing Shout", intent = "debuff", actions = { { "attack", 4 }, { "debuff", "demoralized", 2 } } },
   },
   pattern = { "bash", "cleave", "shout" },
