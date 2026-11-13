@@ -367,9 +367,18 @@ local function fence(f, g, P, c, x, y, x2, y2)
   end
 end
 
--- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions.
+-- Formes du peintre prêtées aux décors des zones (Art.paintings[clé].draw, UI/Art/Zones/<zone>.lua) : un
+-- paysage qui n'est pas fait de champs (jungle, marais, montagne) se peint lui-même avec les mêmes formes,
+-- les mêmes couches (LV) et la même suite fixe (hash), sans toucher à ce fichier.
+S.paintKit = { LV = LV, W = S.W, H = S.DECOR_H, hash = hash, rgb = rgb, mix = mix, withAlpha = withAlpha,
+  box = box, vgrad = vgrad, oval = oval, blur = blur, bar = bar, diamond = diamond, tri = tri, props = PROPS,
+  fence = fence }
+
+-- Peint le paysage `sp` (entrée d'Art.paintings) dans f ; g reçoit toutes les régions. sp.draw(f, g, kit, sp,
+-- palette) : décor peint par sa zone avec S.paintKit, à la place des plans ci-dessous.
 function S.landscape(f, g, sp)
   local pal = Art.palettes[sp.pal] or Art.palettes.westfall
+  if sp.draw then return sp.draw(f, g, S.paintKit, sp, pal) end
   local Wd, Hd, hz, fl = S.W, S.DECOR_H, sp.horizon or 190, sp.field or 228
   -- ciel : deux dégradés
   local sk = pal.sky

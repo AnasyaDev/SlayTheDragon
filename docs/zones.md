@@ -12,7 +12,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
 | 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
-| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
+| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | idem |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
@@ -262,6 +262,11 @@ horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
 `westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
+Paysage qui n'est pas fait de champs (jungle, marais, montagne) : `Art.paintings.<clé>.draw = function(f, g, K, sp,
+pal) … end` le peint lui-même, à la place des plans de `S.landscape`, avec les formes du peintre prêtées par
+`UI/Scene.lua` (`S.paintKit` = `K` : `LV` (couches), `W`, `H`, `hash`, `rgb`, `mix`, `withAlpha`, `box`, `vgrad`,
+`oval`, `blur`, `bar`, `diamond`, `tri`, `props` (accessoires communs : tente, foyer, charrette…), `fence`) ; chaque
+région va dans `g`, sous `BORDER 0` (exemple : `UI/Art/Zones/stranglethorn.lua`, fonction `jungle`).
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 
