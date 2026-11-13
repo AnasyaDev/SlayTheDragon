@@ -8144,12 +8144,22 @@ do
     if o.group == "zone" then zopts[#zopts + 1] = o; names[#names + 1] = o.label end
   end
   check("accueil : sept zones dans l'ordre de la campagne", table.concat(names, ", ") == ZONES, table.concat(names, ", "))
+  -- zone codée (jouable) : « Locked » pour un compte neuf ; zone pas encore codée : « Coming later »
+  local function laterWant(i) return ns.Zone.playable(ns.Zone.ORDER[i]) and "Locked" or "Coming later" end
+  local laterZone -- première zone pas encore codée (infobulle et clic « Coming later »)
+  for i = 2, #ns.Zone.ORDER do
+    if not laterZone and not ns.Zone.playable(ns.Zone.ORDER[i]) then laterZone = ns.Zone.ORDER[i] end
+  end
   local laterOk = true
   for i = 2, #zopts do
     local o = zopts[i]
-    if not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then laterOk = false end
+    if laterWant(i) == "Locked" then
+      if not (o.disabled and o.status == "locked" and o.statusLabel == "Locked") then laterOk = false end
+    elseif not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then
+      laterOk = false
+    end
   end
-  check("accueil : Westfall choisie et jouable, les six autres « Coming later », grisées",
+  check("accueil : Westfall choisie et jouable, les six autres « Coming later » (« Locked » une fois codées), grisées",
     zopts[1].selected and not zopts[1].disabled and st.zone == "westfall" and laterOk)
   local scr = UI().current
   local content, panel = R.rect(ns.UI.content), R.rect(scr.panel)
@@ -8159,7 +8169,7 @@ do
     if not vis(b) then bad[#bad + 1] = "bouton " .. i .. " caché" end
     if not inside(r, panel) then bad[#bad + 1] = "bouton " .. i .. " hors du panneau " .. fmt(r) end
     if b.label._text ~= zopts[i].label then bad[#bad + 1] = "libellé " .. tostring(b.label._text) end
-    local want = i == 1 and "" or "Coming later"
+    local want = i == 1 and "" or laterWant(i)
     if (b.status._text or "") ~= want then bad[#bad + 1] = "état " .. tostring(b.status._text) end
     for j = i + 1, #scr.zoneButtons do
       if overlaps(r, R.rect(scr.zoneButtons[j])) then bad[#bad + 1] = ("boutons %d et %d se chevauchent"):format(i, j) end
@@ -8179,10 +8189,10 @@ do
   check("accueil : sept boutons de zone (4 puis 3) dans le panneau, sans chevauchement, nom et état", #bad == 0, table.concat(bad, " ; "))
   H.settle()
   check("accueil : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
-  local tt = H.hover(button("zone:duskwood"))
-  check("infobulle d'une zone à venir : nom et « Coming later. »", tt[1] == "Duskwood"
+  local tt = H.hover(button("zone:" .. laterZone))
+  check("infobulle d'une zone à venir : nom et « Coming later. »", tt[1] == ns.Zone.name(laterZone)
     and table.concat(tt, " | "):find("Coming later.", 1, true) ~= nil, table.concat(tt, " | "))
-  H.click(button("zone:duskwood"))
+  H.click(button("zone:" .. laterZone))
   check("clic sur une zone à venir : raison affichée, rien ne change", UI().err._shown
     and (UI().err._text or "") == "Coming later." and UI().step.zone == "westfall", UI().err._text)
   -- survol : surbrillance seulement (même rectangle), jamais sur une zone grisée

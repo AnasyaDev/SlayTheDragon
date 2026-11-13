@@ -428,25 +428,61 @@ function PROPS.oak(f, g, P, c, pal, x, y, s)
   end
 end
 
--- Lisière de forêt : rangée de houppiers serrés de x à x2, haute de h (pied en y), et sa base pleine.
+-- Sapin : triangle en tranches (pointe en haut) aux bords lissés par deux barres tournées, sur un fût court.
+local function spire(f, g, lv, c, cx, by, w, h)
+  local n = 8
+  for i = 1, n do
+    local ww = w * (i - 0.35) / n
+    box(f, g, lv, c, cx - ww / 2, by - h + (i - 1) * h / n, ww, h / n + 0.6)
+  end
+  local side = math.sqrt(h * h + w * w / 4)
+  local ang = math.atan2(h, w / 2)
+  bar(f, g, lv, c, cx - w / 4, by - h / 2, side, 2.2, ang)
+  bar(f, g, lv, c, cx + w / 4, by - h / 2, side, 2.2, -ang)
+end
+PROPS.pine = function(f, g, P, c, pal, x, y, s)
+  box(f, g, P[1], c.dark, x - 2 * s, y - 12 * s, 4 * s, 12 * s)
+  spire(f, g, P[2], c.main, x, y - 8 * s, 34 * s, 92 * s)
+end
+
+-- Lisière de forêt : rangée de houppiers serrés de x à x2, haute de h (pied en y), sapins qui dépassent,
+-- base pleine resserrée (pas de bord droit aux extrémités).
 function PROPS.treeline(f, g, P, c, pal, x, y, s, x2)
   local h = 60 * s
   x2 = x2 or x + 300
-  box(f, g, P[1], c.main, x, y - h * 0.45, x2 - x, h * 0.45 + 1)
-  local k, xx = 0, x
+  box(f, g, P[1], c.main, x + 18 * s, y - h * 0.42, x2 - x - 36 * s, h * 0.42 + 1)
+  local xx = x
   while xx < x2 do
-    k = k + 1
     local w = (26 + 22 * hash(xx, 11)) * s
-    local hh = h * (0.7 + 0.5 * hash(xx, 12))
+    local edge = math.min(1, (xx - x) / (60 * s) + 0.35, (x2 - xx) / (60 * s) + 0.35)
+    local hh = h * (0.62 + 0.5 * hash(xx, 12)) * edge
     oval(f, g, P[1], c.main, xx + w / 2, y - hh * 0.55, w * 1.15, hh)
-    -- quelques sapins qui dépassent
-    if hash(xx, 13) > 0.72 then
-      box(f, g, P[1], c.main, xx + w / 2 - 1.5 * s, y - hh * 1.25, 3 * s, hh * 0.6)
-      diamond(f, g, P[1], c.main, xx + w / 2, y - hh * 0.95, 10 * s)
+    if hash(xx, 14) > 0.5 then
+      oval(f, g, P[1], c.main, xx + w * (0.2 + 0.6 * hash(xx, 15)), y - hh * 0.95, w * 0.6, hh * 0.5)
+    end
+    -- sapins qui dépassent
+    if hash(xx, 13) > 0.7 and edge >= 1 then
+      spire(f, g, P[1], c.main, xx + w / 2, y - hh * 0.5, 22 * s, hh * 1.05)
     end
     xx = xx + w * 0.62
   end
   if c.rim then blur(f, g, P[2], c.rim[1], (x + x2) / 2, y - h * 0.95, (x2 - x) * 1.05, h * 0.5, c.rim[2] * 0.6) end
+end
+
+-- Buisson du sous-bois : quatre disques bas qui se chevauchent, liseré de lune.
+function PROPS.bush(f, g, P, c, pal, x, y, s)
+  for k = 0, 3 do
+    local w = (24 + 14 * hash(x + k, 21)) * s
+    oval(f, g, P[2], c.main, x + (k - 1.5) * 15 * s, y - (10 + 7 * hash(x + k, 22)) * s, w, w * 0.8)
+  end
+  if c.rim then blur(f, g, P[3], c.rim[1], x - 6 * s, y - 22 * s, 50 * s, 16 * s, c.rim[2] * 0.8) end
+end
+
+-- Flaque de lumière au sol (clair de lune, feu de camp) : taches fondues, couleur pal.glow ou c.rim.
+function PROPS.glow(f, g, P, c, pal, x, y, s, variant)
+  local col = variant == "moon" and c.rim or pal.glow or { "#ffb24a", 0.3 }
+  blur(f, g, LV.furrows, col[1], x, y, 260 * s, 70 * s, col[2])
+  blur(f, g, LV.furrows, col[1], x, y, 120 * s, 34 * s, col[2])
 end
 
 -- Pierre tombale arrondie (variante « cross » : croix), légèrement penchée.
@@ -656,7 +692,7 @@ function S.landscape(f, g, sp)
   end
   -- accessoires (bâtiments lointains, plan moyen) ; ombre fondue au pied de ceux du plan moyen
   local GROUND_W = { scarecrow = 34, tent = 80, cart = 104, oak = 70, deadtree = 44, crypt = 120, tombstone = 24,
-    lamppost = 18 }
+    lamppost = 18, pine = 30, bush = 60 }
   for _, p in ipairs(sp.props or {}) do
     local kind = p[1]
     if GROUND_W[kind] and p[5] == "mid" then

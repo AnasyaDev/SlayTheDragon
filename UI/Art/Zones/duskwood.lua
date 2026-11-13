@@ -95,7 +95,7 @@ for id, e in pairs(relics) do Art.relics[id] = e end
 
 local CURSE_ICON = I("Spell_Shadow_Curse")
 Art.statuses.unholy_shield = I("Spell_Shadow_AntiMagicShell")
-Art.statusShort.unholy_shield = "takes half damage. Morbent's Bane removes it."
+Art.statusShort.unholy_shield = "takes half damage until Morbent's Bane."
 Art.intents.curse = { tga = "Spell_Shadow_Curse", icon = "Interface\\Icons\\spell_shadow_curse", color = "watch" }
 Art.intentName.curse = "Curse"
 Art.ui.map.wanted_poster = I("INV_Misc_Note_01")
@@ -217,11 +217,11 @@ Art.palettes.duskwood = {
   night = true,
   sky = { "#121731", "#2a3157", "#605d7c" }, moon = "#ebe8da", moonGlow = { "#a9b4d8", 0.34 },
   stars = "#cfd6ea", cloud = { "#3a4264", 0.34 },
-  hillsBack = "#252b45", hillsFront = "#1d2236", mound = "#1d2230", moundLight = { "#3c4763", 0.42 },
+  hillsBack = "#252b45", hillsFront = "#1d2236", mound = "#272d40", moundLight = { "#4a5677", 0.5 },
   trees = "#151a28", haze = { "#4d5574", 0.46 },
   patches = { "#262c33", "#20262c", "#2a2f33", "#1d2328", "#2c3134" }, hedge = { "#0b0d12", 0.4 },
   fieldsNear = { "#22272b", "#101215" }, furrowDark = { "#060709", 0.32 }, furrowLight = { "#4a5268", 0.1 },
-  road = { "#4f4a45", "#2c2825" }, roadEdge = "#15130f",
+  road = { "#45403b", "#24201d" }, roadEdge = "#110f0c",
   back = { main = "#262d45", dark = "#1d2338" },
   far = { main = "#1a1f2f", dark = "#121622", light = "#e8b860", rim = { "#6f7ea8", 0.2 } },
   mid = { main = "#0f1217", dark = "#08090c", wood = "#2a2522", crate = "#3a3129", light = "#ffcf7a",
@@ -253,7 +253,7 @@ Art.palettes.duskwood_boss = {
   night = true,
   sky = { "#0f0a1f", "#2a1c42", "#5a4568" }, moon = "#dfe9d6", moonGlow = { "#9fc4a8", 0.3 },
   stars = "#d8e2d6", cloud = { "#3a2c56", 0.34 },
-  hillsBack = "#231c38", hillsFront = "#1b1630", mound = "#1a1628", moundLight = { "#3b3258", 0.42 },
+  hillsBack = "#231c38", hillsFront = "#1b1630", mound = "#241e36", moundLight = { "#4a3f6c", 0.5 },
   trees = "#130f20", haze = { "#5a4a7a", 0.48 },
   patches = { "#241f2e", "#1f1b28", "#28222f", "#1c1925", "#2a2431" }, hedge = { "#09070e", 0.4 },
   fieldsNear = { "#1f1b26", "#0e0c12" }, furrowDark = { "#050408", 0.32 }, furrowLight = { "#4a4268", 0.1 },
@@ -282,13 +282,17 @@ end
 local ROAD_PROPS = {
   { "treeline", -10, 198, 1.1, "back", 1044 },
   { "treeline", -20, 214, 1.7, "far", 330 }, { "treeline", 700, 214, 1.8, "far", 1060 },
+  { "pine", 352, 216, 0.8, "far" }, { "pine", 700, 214, 0.9, "far" },
   { "deadtree", 412, 214, 0.55, "far" }, { "deadtree", 648, 210, 0.5, "far" },
-  { "mist", 60, 240, 1.0, "mid", 980 },
+  { "glow", 560, 268, 1.0, "mid", "moon" },
+  { "mist", 60, 244, 1.0, "mid", 980 },
+  { "bush", 300, 262, 0.9, "mid" }, { "bush", 760, 258, 0.8, "mid" },
   { "oak", 46, 310, 1.55, "mid" }, { "oak", 990, 306, 1.6, "mid" },
+  { "pine", 120, 300, 1.5, "mid" }, { "pine", 930, 292, 1.4, "mid" },
   { "deadtree", 196, 292, 1.25, "mid" }, { "deadtree", 846, 284, 1.05, "mid" },
   { "lamppost", 676, 268, 0.85, "mid" }, { "fence", 730, 290, 880, 278, "mid" },
 }
-local ROAD = { 517, 470, 7, 330, 46 }
+local ROAD = { 517, 470, 6, 270, 46 }
 local GRASS = { { -6, 104, 18 }, { 936, 1040, 18 } }
 
 Art.paintings = Art.paintings or {}
@@ -308,7 +312,9 @@ P.duskwood_graveyard = dusk({ moon = { 214, 66, 22 }, mound = { 590, 150, 720 },
     { "tombstone", 712, 200, 0.6, "far" }, { "tombstone", 790, 212, 0.62, "far", "cross" },
     { "tombstone", 350, 222, 0.7, "far" }, { "tombstone", 838, 226, 0.7, "far" },
     { "mist", 140, 246, 1.0, "mid", 1000 },
+    { "glow", 590, 250, 1.1, "mid", "moon" },
     { "deadtree", 70, 300, 1.45, "mid" }, { "deadtree", 978, 296, 1.35, "mid" },
+    { "bush", 330, 296, 0.8, "mid" }, { "bush", 720, 300, 0.9, "mid" },
     { "tombstone", 190, 302, 1.15, "mid", "cross" }, { "tombstone", 262, 290, 1.0, "mid" },
     { "tombstone", 790, 296, 1.1, "mid" }, { "tombstone", 870, 306, 1.2, "mid", "cross" },
     { "fence", -6, 288, 300, 298, "mid" }, { "fence", 752, 300, 1040, 288, "mid" },
@@ -322,8 +328,11 @@ P.duskwood_camp = dusk({ moon = { 880, 70, 18 },
     { "treeline", -20, 214, 1.6, "far", 420 }, { "treeline", 640, 214, 1.7, "far", 1060 },
     { "deadtree", 520, 210, 0.55, "far" },
     { "oak", 60, 306, 1.5, "mid" }, { "oak", 980, 304, 1.55, "mid" },
+    { "pine", 470, 218, 0.8, "far" }, { "pine", 590, 216, 0.9, "far" },
+    { "glow", 430, 296, 1.2, "mid" },
     { "tent", 312, 290, 1.3, "mid" }, { "tent", 196, 274, 0.9, "mid" },
-    { "smoke", 430, 292, 1.0, "mid" }, { "cart", 770, 296, 1.1, "mid" },
+    { "smoke", 430, 292, 1.2, "mid" }, { "cart", 770, 296, 1.1, "mid" },
+    { "bush", 620, 274, 0.9, "mid" }, { "pine", 900, 300, 1.4, "mid" },
     { "deadtree", 870, 280, 0.95, "mid" },
   },
   wheat = GRASS })
@@ -336,6 +345,7 @@ P.duskwood_shop = dusk({ moon = { 150, 64, 20 }, road = { 470, 610, 8, 290, 30 }
     { "farmhouse", 300, 232, 1.0, "far" }, { "shed", 382, 232, 0.8, "far" },
     { "farmhouse", 600, 232, 0.85, "far" }, { "shed", 900, 232, 0.8, "far" },
     { "farmhouse", 120, 232, 0.75, "far" },
+    { "glow", 250, 296, 0.6, "mid" }, { "glow", 694, 288, 0.55, "mid" },
     { "lamppost", 230, 290, 1.1, "mid" }, { "lamppost", 676, 282, 1.0, "mid" },
     { "cart", 790, 304, 1.25, "mid", "crates" },
     { "oak", 40, 306, 1.4, "mid" }, { "fence", 880, 296, 1040, 286, "mid" },
@@ -352,6 +362,9 @@ P.duskwood_woods = dusk({ moon = { 520, 52, 16 },
     { "oak", 40, 312, 1.7, "mid" }, { "oak", 1000, 308, 1.7, "mid" },
     { "deadtree", 182, 296, 1.35, "mid" }, { "deadtree", 860, 292, 1.3, "mid" },
     { "deadtree", 560, 268, 0.9, "mid" },
+    { "pine", 400, 262, 1.1, "mid" }, { "pine", 690, 258, 1.0, "mid" }, { "pine", 110, 296, 1.5, "mid" },
+    { "bush", 300, 300, 1.1, "mid" }, { "bush", 760, 296, 1.0, "mid" }, { "bush", 520, 282, 0.8, "mid" },
+    { "glow", 520, 300, 1.0, "mid", "moon" },
     { "web", 230, 200, 1.1, "mid" }, { "web", 818, 196, 1.0, "mid" }, { "web", 560, 176, 0.7, "mid" },
   },
   wheat = GRASS })
@@ -364,6 +377,7 @@ P.duskwood_boss = dusk({ moon = { 830, 60, 20 }, mound = { 520, 170, 640 },
     { "tombstone", 370, 214, 0.65, "far", "cross" }, { "tombstone", 420, 204, 0.6, "far" },
     { "tombstone", 640, 202, 0.6, "far" }, { "tombstone", 700, 214, 0.66, "far", "cross" },
     { "deadtree", 300, 214, 0.7, "far" }, { "deadtree", 760, 210, 0.65, "far" },
+    { "glow", 520, 232, 1.0, "mid" },
     { "mist", 40, 250, 1.2, "mid", 1000 },
     { "deadtree", 64, 300, 1.5, "mid" }, { "deadtree", 980, 296, 1.45, "mid" },
     { "tombstone", 180, 300, 1.2, "mid" }, { "tombstone", 250, 290, 1.0, "mid", "cross" },
