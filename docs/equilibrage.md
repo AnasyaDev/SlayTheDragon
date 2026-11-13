@@ -757,3 +757,15 @@ Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic 
 15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
 ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
 `docs/zones/cartes-de-zone.md`, section « Rogue ».
+
+## Blackrock Mountain : passe de difficulté (14/11/2026)
+
+Cible : 50 % de victoires au bot de référence (clé 0, `zone=blackrock zones=6 level=7`, épique gagnée en jeu),
+écart entre classes ≤ 10 points, Nefarian combat le plus dur. Avant → après (1 500 expéditions) : Priest 69,0 →
+49,0 ; Warrior 71,5 → 49,1 ; Mage 68,5 → 46,5 ; Rogue 78,9 → 54,3 ; Hunter 80,8 → 54,1 ; moyenne 73,7 → **50,6**,
+écart 12,3 → **7,8**. PV perdus par combat normal : 10,0 / 10,2 / 6,8 / 7,4 / 7,1 → 12,3 / 12,8 / 8,4 / 9,0 / 8,2.
+Leviers : PV des normaux (+10 %), Vaelastrasz (40 % au départ, Cleave 20), Gyth 104 PV, Panzor 96 PV avec un
+plafond d'Invincible relevé à 10 (il punissait le Warrior), Nefarian 120 PV et ses gros coups +2 ; l'écart venait
+du boss, réglé par le Class Call : Called Out (Rogue) empêche aussi de regagner la Parry, sur 1 tour ; Broken Bow
+(Hunter) −5 sur 3 tours. Détail, essais écartés et ce qui reste (Hunter à 95 % contre les élites, qu'il
+étourdit) : `docs/zones/blackrock.md`, « Passe de difficulté ».

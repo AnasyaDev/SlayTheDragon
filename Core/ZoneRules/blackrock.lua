@@ -1,7 +1,7 @@
 -- Règles de la zone Blackrock Mountain (`blackrock`) : fiche docs/zones/blackrock.md, socle ns.ZoneRules
 -- (contrat et crochets : docs/zones.md). La mécanique de la zone, les phases, est celle du moteur commun
 -- (def.phases : seuils, entrée, ouverture imposée, plafond au seuil du boss). Ce fichier ajoute :
---   * les règles de phase qui ne sont pas des états (Invincible de Panzor : 6 au plus par coup hors DoT,
+--   * les règles de phase qui ne sont pas des états (Invincible de Panzor : 10 au plus par coup hors DoT,
 --     champ maxHit ; Shadow of the Throne de Nefarius : moitié des dégâts tant qu'un Drakonid vit) ;
 --   * les états de la zone (Fire Shield, Cracked Plating, Essence of the Red, Burning Adrenaline,
 --     Shadowflame Fury, Veil of Shadow) et les cinq états du Class Call de Nefarian (un par classe) ;
@@ -28,6 +28,7 @@ BR.BONES_MAX = 3          -- Bone Constructs relevés au plus
 BR.RALLY_HP = 6           -- Rallying Cry of the Dragonslayer
 BR.CALL_TURNS = 2         -- durée des états du Class Call
 BR.BERSERKER_BONUS = 1    -- Berserker Stance : dégâts en plus par coup des Attacks
+BR.BROKEN_BOW = 5         -- Broken Bow : dégâts en moins par coup des cartes Attack (pas le familier)
 
 ---------------------------------------------------------------------------
 -- États
@@ -50,9 +51,9 @@ S.berserker_stance = { name = "Berserker Stance", debuff = true, duration = true
 S.wild_polymorph = { name = "Wild Polymorph", debuff = true, duration = true,
   text = "Your first Cast card each turn costs 1 more." }
 S.called_out = { name = "Called Out", debuff = true, duration = true,
-  text = "Lose all Parry and Stealth. You can't gain Stealth." }
+  text = "Lose all Parry and Stealth. You can't gain them." }
 S.broken_bow = { name = "Broken Bow", debuff = true, duration = true,
-  text = "Your Attack cards deal 3 less. Your pet is unaffected." }
+  text = "Your Attack cards deal " .. BR.BROKEN_BOW .. " less. Your pet is unaffected." }
 
 -- Class Call de Nefarian : état et réplique (cris du raid) par classe ; une classe à venir reçoit
 -- Demoralized (repli).
@@ -61,8 +62,8 @@ BR.CLASS_CALL = {
     say = "Priests! If you're going to keep healing like that, we might as well make it a little more interesting!" },
   warrior = { status = "berserker_stance", say = "Warriors, I know you can hit harder than that! Let's see it!" },
   mage = { status = "wild_polymorph", say = "Mages too? You should be more careful when you play with magic..." },
-  rogue = { status = "called_out", say = "Rogues? Stop hiding and face me!" },
-  hunter = { status = "broken_bow", say = "Hunters and your annoying pea-shooters!" },
+  rogue = { status = "called_out", turns = 1, say = "Rogues? Stop hiding and face me!" },
+  hunter = { status = "broken_bow", turns = 3, say = "Hunters and your annoying pea-shooters!" },
 }
 BR.CLASS_CALL_DEFAULT = { status = "demoralized", say = "Let's see how you fare without your tricks!" }
 function BR.classCall(class) return BR.CLASS_CALL[class] or BR.CLASS_CALL_DEFAULT end
@@ -113,7 +114,7 @@ end
 Combat.ENEMY_ACTIONS.class_call = function(c, e, a)
   local cc = BR.classCall(c.class)
   Combat.log(c, { t = "say", unit = e.uid, text = cc.say })
-  Combat.applyStatus(c, c.player, cc.status, a[2] or BR.CALL_TURNS)
+  Combat.applyStatus(c, c.player, cc.status, cc.turns or a[2] or BR.CALL_TURNS)
   stat(c, "classCalls")
 end
 
@@ -274,7 +275,7 @@ ZR.define("blackrock", {
       if cardDef and cardDef.type == "attack" then
         local st = c.player.st
         if (st.berserker_stance or 0) > 0 then v = v + BR.BERSERKER_BONUS end
-        if (st.broken_bow or 0) > 0 then v = v - 3 end
+        if (st.broken_bow or 0) > 0 then v = v - BR.BROKEN_BOW end
       end
       return v
     end,
@@ -291,8 +292,8 @@ ZR.define("blackrock", {
     onCardCommitted = function(c, z, inst, d)
       if d.cast then z.castRound = c.round end
     end,
-    applySelf = function(c, z, n, id) -- Called Out (Rogue) : plus de Stealth
-      if id == "stealth" and (c.player.st.called_out or 0) > 0 then return 0 end
+    applySelf = function(c, z, n, id) -- Called Out (Rogue) : ni Parry ni Stealth
+      if (id == "stealth" or id == "parry") and (c.player.st.called_out or 0) > 0 then return 0 end
       return n
     end,
     onStatusApplied = function(c, z, unit, id)

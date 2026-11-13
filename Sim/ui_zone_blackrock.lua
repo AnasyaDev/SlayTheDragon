@@ -112,8 +112,8 @@ local function body(T)
   H.settle()
   local sp = v.slotOf[pz.uid]
   local b1 = sp and sp.badges[1]
-  check("Panzor : badge « Max 6 » sous l'intention, infobulle d'Invincible",
-    b1 and vis(b1) and b1.text._text == "Max 6" and (b1.tip or ""):find("Invincible", 1, true) ~= nil,
+  check("Panzor : badge « Max " .. ns.Enemies.panzor.maxHit .. " » sous l'intention, infobulle d'Invincible",
+    b1 and vis(b1) and b1.text._text == "Max " .. ns.Enemies.panzor.maxHit and (b1.tip or ""):find("Invincible", 1, true) ~= nil,
     b1 and tostring(b1.text._text))
   snap("zone-blackrock-panzor", true)
 
