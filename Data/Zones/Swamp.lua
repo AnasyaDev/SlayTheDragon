@@ -351,7 +351,7 @@ D.relic("essence_of_eranikus", {
 
 D.event("stonard_outpost", {
   name = "Stonard", zone = "swamp", tier = 0,
-  speaker = "Dispatch Commander Ruag", npc = "dispatch_commander_ruag", scene = "swamp_shop",
+  speaker = "Dispatch Commander Ruag", npc = "dispatch_commander_ruag", scene = "shop",
   text = "\"Stonard does not turn away travelers who can fight. Two Sawtooth crocolisks sleep on the "
     .. "riverbank south of the outpost, and my grunts need their hides. If you want a bed, the inn is open.\"",
   choices = {
@@ -373,7 +373,7 @@ D.event("stonard_outpost", {
 
 D.event("pool_of_tears", {
   name = "The Pool of Tears", zone = "swamp", tier = 0,
-  speaker = "Fel'Zerul", npc = "fel_zerul", scene = "swamp_pool",
+  speaker = "Fel'Zerul", npc = "fel_zerul", scene = "mine",
   text = "\"The Atal'ai threw their artifacts into the Pool of Tears when the temple sank. I want them "
     .. "back. The water is full of Sawtooth crocolisks, so I am not going in myself.\"",
   choices = {
@@ -394,7 +394,7 @@ D.event("pool_of_tears", {
 
 D.event("galen_escape", {
   name = "Galen's Escape", zone = "swamp", tier = 0,
-  speaker = "Galen Goodward", npc = "galen_goodward", scene = "swamp_road",
+  speaker = "Galen Goodward", npc = "galen_goodward", scene = "road",
   text = "\"Marsh murlocs dragged me to their camp and took my strongbox. I got loose, but I can't get "
     .. "past them alone. Get me to the road and we split what's in the box.\"",
   choices = {
@@ -415,7 +415,7 @@ D.event("galen_escape", {
 
 D.event("fallow_sanctuary", {
   name = "Fallow Sanctuary", zone = "swamp", tier = 1,
-  speaker = "Magtoor", npc = "magtoor", scene = "swamp_camp",
+  speaker = "Magtoor", npc = "magtoor", scene = "camp",
   text = "\"We are the Lost Ones. We came here from Draenor, and the dragons of the temple hunt us. "
     .. "Share your food with us and our elders will teach you what they know.\"",
   choices = {
@@ -437,7 +437,7 @@ D.event("fallow_sanctuary", {
 
 D.event("lost_one_cook", {
   name = "The Lost One Cook", zone = "swamp", tier = 1,
-  speaker = "Lost One Cook", npc = "lost_one_cook", scene = "swamp_camp",
+  speaker = "Lost One Cook", npc = "lost_one_cook", scene = "camp",
   text = "\"I cook what the swamp gives me. Today it is crocolisk. Sit and eat, or catch me a fresh "
     .. "Sawtooth and I will show you my recipes.\"",
   choices = {
@@ -456,7 +456,7 @@ D.event("lost_one_cook", {
 -- Type « Sleeping Camp » : un groupe endormi garde quelque chose sur le chemin.
 D.event("temple_steps", {
   name = "The Temple Steps", zone = "swamp", tier = 2,
-  speaker = "Temple of Atal'Hakkar", npc = "atalai_chest", scene = "swamp_temple",
+  speaker = "Temple of Atal'Hakkar", npc = "atalai_chest", scene = "hill",
   text = "A Green Scalebane and two Dreaming Whelps sleep on the steps of the Temple of Atal'Hakkar. "
     .. "An Atal'ai offering chest stands open between them.",
   choices = {
@@ -477,7 +477,7 @@ D.event("temple_steps", {
 
 D.event("cortello_riddle", {
   name = "Cortello's Riddle", zone = "swamp", tier = 1, rarity = "rare",
-  speaker = "Cortello's Riddle", npc = "cortello_scroll", scene = "swamp_road",
+  speaker = "Cortello's Riddle", npc = "cortello_scroll", scene = "road",
   text = "In a dead adventurer's pack, you find a sealed scroll signed by Cortello. The riddle points to a "
     .. "cave in the hills of the swamp. Deathstrike tarantulas nest in that cave.",
   choices = {
@@ -495,7 +495,7 @@ D.event("cortello_riddle", {
 
 D.event("misty_reed_strand", {
   name = "Misty Reed Strand", zone = "swamp", tier = 2, rarity = "rare",
-  speaker = "Stonard fisherman", npc = "stonard_fisherman", scene = "swamp_strand",
+  speaker = "Stonard fisherman", npc = "stonard_fisherman", scene = "coast",
   -- proposée seulement en bonne santé : la réponse principale est un combat d'élite
   when = { { "hpAbove", 0.6 } },
   text = "\"A naga called Gilmorian came up from the sea and took the Misty Reed Strand. She drowned two "

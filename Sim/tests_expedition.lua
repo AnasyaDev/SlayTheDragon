@@ -798,7 +798,9 @@ local function forceEvent(exp, id)
   if not ok then error(err, 0) end
 end
 
-local SCENES = { farm = true, road = true, coast = true, mine = true, hill = true, camp = true, ruins = true }
+-- décors communs (docs/zones.md, « Décors » : une zone les remplace par les siens)
+local SCENES = { farm = true, road = true, coast = true, mine = true, hill = true, camp = true, ruins = true,
+  shop = true, night = true }
 local EFFECTS = { heal = true, healPct = true, loseHp = true, maxHp = true, loseMaxHp = true, gold = true,
   pay = true, loseGold = true, card = true, cardChoice = true, relic = true, potion = true, losePotion = true,
   upgradeRandom = true, upgrade = true, remove = true, dupe = true, fight = true, gamble = true, flag = true }
@@ -825,11 +827,7 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   end
   for id, ev in pairs(ns.Events) do
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
-    -- décor commun, ou décor propre à la zone de la rencontre (valeurs de ns.Zones[zone].scenes)
-    local zsc = ev.zone and ns.Zones[ev.zone] and ns.Zones[ev.zone].scenes or {}
-    local own = false
-    for _, v in pairs(zsc) do if v == ev.scene then own = true end end
-    assert(SCENES[ev.scene] or own, id .. " : décor " .. tostring(ev.scene))
+    assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
     assert(ev.tier >= 0 and ev.tier <= ns.Zone.count(), id .. " : tier")
     if ev.zone == "westfall" then fam[ev.rarity] = fam[ev.rarity] + 1 end
@@ -1094,7 +1092,7 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
   for id, ev in pairs(ns.Events) do
     for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
-        local exp = newExp({ zone = ev.zone }) -- rencontre d'une zone : expédition dans cette zone
+        local exp = newExp({ zone = ev.zone }) -- rencontre d'une zone : dans sa zone
         forceEvent(exp, id)
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
         exp.unlock.common = ns.Zone.count() -- réponses à carte neutre débloquée (condition « unlocked », hide)
@@ -1702,7 +1700,7 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
   eq(ns.Zone.FIRST, "westfall")
   assert(ns.Zone.playable("westfall"))
-  -- les autres : jouables dès que leur fichier de données pose leurs groupes, « Coming later » sinon
+  -- une zone est jouable dès que son fichier de données pose ses groupes (docs/zones.md), Coming later sinon
   for i = 2, 7 do
     local id = ns.Zone.ORDER[i]
     eq(ns.Zone.playable(id), ns.Zones[id].encounters ~= nil, id .. " : Coming later")
@@ -1761,7 +1759,9 @@ test("zones : carte de zone introuvable avant la première victoire de la classe
   eq(count(Meta.classContent("priest").cards, "test_zone_card"), 0, "hors de la grille des niveaux")
   local db = Save.new()
   local s = finishIn(db, "priest", "westfall", 0)
-  eq(table.concat(s.zoneCards, ","), "test_zone_card", "annoncée en fin d'expédition")
+  -- (avec les cartes épiques réelles de la classe dans cette zone : Prayer of Mending)
+  eq(count(s.zoneCards, "test_zone_card"), 1, "annoncée en fin d'expédition")
+  eq(table.concat(s.zoneCards, ","), table.concat(Meta.zoneCards("priest", "westfall"), ","), "toutes celles de la zone")
   local e = assert(Save.start(db, { seed = 3, class = "priest" }))
   assert(X.unlocked(e, ns.Cards.test_zone_card))
   eq(count(X.cardPool(e), "test_zone_card"), 1, "dans la réserve de la classe")

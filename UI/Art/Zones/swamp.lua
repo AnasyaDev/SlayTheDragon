@@ -220,6 +220,169 @@ for i = 0, 15 do
   h = h - math.floor(h)
   CANOPY[#CANOPY + 1] = { i * 70 - 10 + 20 * h, 70 + 70 * h, 9 + 16 * h }
 end
+---------------------------------------------------------------------------
+-- Accessoires et mares du marais, peints par le plan « ground » de la zone (S.landscape, layers ; kit du
+-- peintre S.paintKit) : arbres morts à mousse pendante, huttes des Lost Ones, huttes et tour de guet orques,
+-- temple englouti, touffes de roseaux, mares à reflets. Entrée d'Art.paintings : `pools = { { cx, cy, l, h } }`,
+-- `items = { { genre, x, y du pied, échelle, plan ("far" | "mid"), variante } }` ; palette : water, waterEdge, moss.
+---------------------------------------------------------------------------
+local sin, cos, floor, PI = math.sin, math.cos, math.floor, math.pi
+local SP = {}
+-- Arbre mort (marais) : fût penché, branches nues qui se divisent, mousse pendante (pal.moss), racines.
+-- Variante 1 à 3 : forme des branches (suite fixe).
+function SP.deadtree(K, f, g, P, c, pal, x, y, s, variant)
+  local v = tonumber(variant) or 1
+  local lean = (K.hash(v, 11) - 0.5) * 0.18
+  local H = (88 + 30 * K.hash(v, 12)) * s
+  local tx, ty = x + sin(lean) * H, y - cos(lean) * H
+  -- racines et fût (plus épais en bas)
+  K.bar(f, g, P[1], c.dark, x - 7 * s, y - 3 * s, 18 * s, 3 * s, 0.5)
+  K.bar(f, g, P[1], c.dark, x + 8 * s, y - 3 * s, 20 * s, 3 * s, -0.45)
+  K.bar(f, g, P[1], c.dark, (x + tx) / 2, (y + ty) / 2 - 2 * s, H, 7 * s, PI / 2 - lean)
+  K.bar(f, g, P[1], c.dark, x + sin(lean) * H * 0.2, y - H * 0.2, H * 0.4, 10 * s, PI / 2 - lean)
+  -- branches : trois étages, chacune avec une fourche
+  for k = 1, 3 do
+    local t = 0.45 + 0.17 * k
+    local bx, by = x + sin(lean) * H * t, y - cos(lean) * H * t
+    local side = ((k + v) % 2 == 0) and 1 or -1
+    local a = PI / 2 - lean - side * (0.7 + 0.35 * K.hash(v * 7 + k, 13))
+    local L = (34 - 6 * k + 14 * K.hash(v * 5 + k, 14)) * s
+    local ex, ey = bx + cos(a) * L, by - sin(a) * L
+    K.bar(f, g, P[2], c.dark, (bx + ex) / 2, (by + ey) / 2, L, (3.6 - 0.6 * k) * s, a)
+    local a2 = a + side * 0.55
+    K.bar(f, g, P[2], c.dark, ex + cos(a2) * 7 * s, ey - sin(a2) * 7 * s, 15 * s, 1.6 * s, a2)
+    K.bar(f, g, P[2], c.dark, ex + cos(a - side * 0.4) * 6 * s, ey - sin(a - side * 0.4) * 6 * s, 12 * s, 1.4 * s, a - side * 0.4)
+    -- mousse qui pend de la branche
+    if pal.moss then
+      for m = 1, 3 do
+        local mx = bx + (ex - bx) * (0.3 + 0.25 * m)
+        local my = by + (ey - by) * (0.3 + 0.25 * m)
+        local ml = (10 + 12 * K.hash(v * 13 + k * 3 + m, 15)) * s
+        K.bar(f, g, P[3], pal.moss[1], mx, my + ml / 2, ml, 1.4 * s, PI / 2, pal.moss[2])
+      end
+    end
+  end
+  -- cime cassée
+  K.bar(f, g, P[2], c.dark, tx, ty - 6 * s, 14 * s, 3 * s, PI / 2 - lean - 0.3)
+end
+
+-- Hutte des Lost Ones (Fallow Sanctuary) : panse ronde en terre, toit de roseaux en cône, porte sombre.
+function SP.hut(K, f, g, P, c, pal, x, y, s)
+  K.oval(f, g, P[1], c.main, x, y - 16 * s, 58 * s, 36 * s)
+  K.box(f, g, P[1], c.main, x - 29 * s, y - 16 * s, 58 * s, 16 * s)
+  K.tri(f, g, P[2], c.wood, x, y - 26 * s, 74 * s, 40 * s)
+  K.box(f, g, P[2], c.dark, x - 37 * s, y - 28 * s, 74 * s, 2.5 * s)
+  K.oval(f, g, P[3], c.dark, x + 8 * s, y - 11 * s, 14 * s, 22 * s)
+  K.box(f, g, P[3], c.dark, x + 1 * s, y - 11 * s, 14 * s, 11 * s)
+  if c.light then K.box(f, g, P[3], c.light, x - 16 * s, y - 20 * s, 6 * s, 5 * s) end
+end
+
+-- Hutte orque de Stonard : murs de rondins, toit de peaux en triangle hérissé de piques, bannière.
+function SP.orchut(K, f, g, P, c, pal, x, y, s)
+  K.box(f, g, P[1], c.wood, x - 38 * s, y - 30 * s, 76 * s, 30 * s + 1)
+  for i = 0, 5 do K.box(f, g, P[2], c.dark, x - 36 * s + i * 14.4 * s, y - 30 * s, 1.2 * s, 30 * s) end
+  K.tri(f, g, P[2], c.main, x, y - 28 * s, 96 * s, 36 * s)
+  for k = -1, 1, 2 do
+    K.bar(f, g, P[3], c.dark, x + k * 40 * s, y - 34 * s, 22 * s, 2.4 * s, k * 0.75)
+    K.bar(f, g, P[3], c.dark, x + k * 22 * s, y - 50 * s, 18 * s, 2 * s, k * 0.9)
+  end
+  K.box(f, g, P[3], c.dark, x - 8 * s, y - 20 * s, 16 * s, 20 * s)
+  if c.light then K.box(f, g, P[3], c.light, x - 6 * s, y - 18 * s, 12 * s, 16 * s) end
+  K.box(f, g, P[3], c.dark, x + 30 * s, y - 70 * s, 1.6 * s, 40 * s)
+  K.box(f, g, P[3], pal.flag, x + 31.6 * s, y - 70 * s, 11 * s, 18 * s)
+end
+
+-- Tour de guet orque : quatre poteaux en biais, plate-forme, toit pointu hérissé.
+function SP.watchtower(K, f, g, P, c, pal, x, y, s)
+  K.bar(f, g, P[1], c.wood, x - 12 * s, y - 40 * s, 82 * s, 3 * s, PI / 2 - 0.12)
+  K.bar(f, g, P[1], c.wood, x + 12 * s, y - 40 * s, 82 * s, 3 * s, PI / 2 + 0.12)
+  K.bar(f, g, P[1], c.wood, x, y - 44 * s, 30 * s, 2 * s, 0.9)
+  K.bar(f, g, P[1], c.wood, x, y - 44 * s, 30 * s, 2 * s, -0.9)
+  K.box(f, g, P[2], c.main, x - 20 * s, y - 88 * s, 40 * s, 12 * s)
+  K.tri(f, g, P[2], c.dark, x, y - 88 * s, 46 * s, 28 * s)
+  for k = -1, 1, 2 do K.bar(f, g, P[3], c.dark, x + k * 24 * s, y - 90 * s, 14 * s, 1.8 * s, k * 0.6) end
+  if c.light then K.box(f, g, P[3], c.light, x - 4 * s, y - 86 * s, 8 * s, 7 * s) end
+end
+
+-- Touffe de roseaux au bord d'une mare : tiges fines penchées (pal.stalk), massettes brunes (pal.ears).
+function SP.reeds(K, f, g, P, c, pal, x, y, s, variant)
+  local n = tonumber(variant) or 9
+  for i = 1, n do
+    local h1, h2, h3 = K.hash(x + i, 21), K.hash(y + i, 22), K.hash(i * 3 + x, 23)
+    local bx = x + (h1 - 0.5) * 46 * s
+    local L, lean = (22 + 26 * h2) * s, (h3 - 0.5) * 0.6
+    local th = PI / 2 - lean
+    K.bar(f, g, P[2], pal.stalk, bx + sin(lean) * L / 2, y - cos(lean) * L / 2, L, 1.3 * s, th)
+    if h2 > 0.35 then
+      local ear = K.oval(f, g, P[3], pal.ears[1 + floor(h1 * #pal.ears)], bx + sin(lean) * (L + 3 * s), y - cos(lean) * (L + 3 * s),
+        8 * s, 3.4 * s)
+      if ear.SetRotation then ear:SetRotation(th) end
+    end
+  end
+end
+
+-- Temple d'Atal'Hakkar à demi englouti : gradins de pierre moussue, sanctuaire au sommet, porte sombre.
+function SP.temple(K, f, g, P, c, pal, x, y, s)
+  local widths = { 230, 186, 144, 104 }
+  local yy = y
+  for i, w in ipairs(widths) do
+    local h = 22 * s
+    K.box(f, g, P[1], c.main, x - w / 2 * s, yy - h, w * s, h + 1)
+    -- flanc droit à l'ombre (volume), arête claire du gradin, joints des blocs
+    K.box(f, g, P[2], c.dark, x + w * 0.18 * s, yy - h, w * 0.32 * s, h + 1, 0.35)
+    K.box(f, g, P[2], c.dark, x - w / 2 * s, yy - h, w * s, 2.2 * s)
+    for j = 1, floor(w / 26) do
+      K.box(f, g, P[2], c.dark, x - w / 2 * s + j * 26 * s, yy - h + 3 * s, 1 * s, h - 4 * s, 0.4)
+    end
+    if pal.moss then
+      -- mousse en coulures fondues et lianes qui pendent des arêtes
+      for m = 1, 3 do
+        local mx = x - w / 2 * s + w * s * K.hash(i * 9 + m, 16)
+        K.blur(f, g, P[2], pal.moss[1], mx, yy - h + 6 * s, (18 + 16 * K.hash(i + m, 17)) * s, (10 + 8 * K.hash(m, i)) * s, 0.55)
+        local vl = (8 + 14 * K.hash(i * 5 + m, 24)) * s
+        K.bar(f, g, P[3], pal.moss[1], mx + 6 * s, yy - h + 2 * s + vl / 2, vl, 1.2 * s, PI / 2, pal.moss[2])
+      end
+    end
+    yy = yy - h
+  end
+  -- escalier central
+  K.box(f, g, P[2], c.dark, x - 14 * s, yy, 28 * s, (y - yy), 0.35)
+  for k = 1, 8 do K.box(f, g, P[3], c.main, x - 14 * s, yy + k * 11 * s, 28 * s, 1.4 * s, 0.5) end
+  -- sanctuaire
+  K.box(f, g, P[1], c.main, x - 34 * s, yy - 30 * s, 68 * s, 31 * s)
+  K.box(f, g, P[2], c.dark, x - 38 * s, yy - 36 * s, 76 * s, 7 * s)
+  K.box(f, g, P[3], c.dark, x - 10 * s, yy - 24 * s, 20 * s, 24 * s)
+  if c.light then K.blur(f, g, P[3], c.light, x, yy - 12 * s, 44 * s, 30 * s, 0.55) end
+end
+
+
+local GROUND_W = { deadtree = 44, hut = 74, orchut = 96, watchtower = 54 }
+local function swampGround(K, f, g, sp, pal)
+  local LV = K.LV
+  local wt = pal.water
+  for i, p in ipairs(wt and sp.pools or {}) do
+    local cx, cy, w, h = p[1], p[2], p[3], p[4]
+    K.blur(f, g, LV.furrows, pal.waterEdge or wt[1], cx, cy + h * 0.1, w * 1.2, h * 1.7, 0.5)
+    K.oval(f, g, LV.furrows, wt[1], cx, cy, w, h)
+    K.oval(f, g, LV.furrows, K.mix(wt[1], wt[2], 0.35), cx - w * 0.04, cy - h * 0.12, w * 0.84, h * 0.6, 0.8)
+    K.blur(f, g, LV.furrows, wt[2], cx - w * 0.08, cy - h * 0.22, w * 0.6, h * 0.5, 0.35)
+    for k = 1, 4 do
+      local yy2 = cy - h * 0.3 + h * 0.18 * k
+      local ww = w * (0.18 + 0.32 * K.hash(i * 7 + k, 18))
+      K.box(f, g, LV.furrows, wt[2], cx - w * 0.3 + w * 0.5 * K.hash(i + k, 19) - ww / 2, yy2, ww, 1.2, 0.35)
+    end
+  end
+  for _, p in ipairs(sp.items or {}) do
+    local kind, plan, s = p[1], p[5] or "mid", p[4] or 1
+    if GROUND_W[kind] and plan == "mid" then
+      K.blur(f, g, LV.furrows, pal.ground[1], p[2] + 6 * s, p[3] - 1, GROUND_W[kind] * s * 1.3, 14 * s, 0.55)
+    end
+    local fn = SP[kind]
+    if fn then fn(K, f, g, LV[plan], pal[plan], pal, p[2], p[3], s, p[6]) end
+  end
+end
+local SWAMP_LAYERS = { ground = swampGround }
+
 local SW_SKY = {
   clouds = { { 160, 64, 300, 40 }, { 470, 36, 240, 28 }, { 760, 96, 320, 36 }, { 990, 52, 200, 26 } },
   hills = { back = { { 120, 520, 30 }, { 560, 640, 22 }, { 960, 540, 34 } }, front = CANOPY },
@@ -229,6 +392,13 @@ local function swamp(t, pal)
   t.pal, t.horizon, t.field = pal or "swamp", t.horizon or 198, t.field or 232
   t.clouds, t.hills, t.trees = t.clouds or SW_SKY.clouds, t.hills or SW_SKY.hills, t.trees or SW_SKY.trees
   t.furrows = false
+  t.layers = SWAMP_LAYERS
+  -- accessoires du marais (plan « ground » de la zone) ; les accessoires communs (cart, smoke) restent à props
+  local props, items = {}, {}
+  for _, p in ipairs(t.props or {}) do
+    if SP[p[1]] then items[#items + 1] = p else props[#props + 1] = p end
+  end
+  t.props, t.items = props, items
   t.shadows = t.shadows or { { 260, 300, 520, 50 }, { 840, 262, 420, 30 } }
   return t
 end

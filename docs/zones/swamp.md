@@ -681,4 +681,6 @@ Sept décors peints (`swamp_road`, `swamp_night`, `swamp_camp` Fallow Sanctuary,
 `swamp_temple` marches du temple = « hill », `swamp_pool` boss, `swamp_strand` côte) : ciel gris-vert voilé,
 lisière sombre de saules sur l'horizon, brume, mares à reflets, arbres morts à mousse pendante, roseaux et massettes
 au premier plan, huttes des Lost Ones, huttes et tour de guet orques, temple englouti à gradins moussus.
-Formes ajoutées au peintre : voir `docs/zones.md`, « Décors ».
+Formes propres au marais peintes par le plan `layers.ground` de la zone (`S.paintKit`), sans rien ajouter à
+`UI/Scene.lua` ; scènes des rencontres par les noms communs (`road`, `camp`, `shop`, `hill`, `mine`, `coast`), que
+`ns.Zones.swamp.scenes` remplace.

@@ -887,13 +887,18 @@ local function button(id)
   return b
 end
 
-local function clickOption(id) H.click(button(id)) end
-
 local function option(id)
   for _, o in ipairs(UI().step.options or {}) do
     if o.id == id then return o end
   end
   return nil
+end
+
+-- Offre d'épique au départ (classe qui a débloqué des épiques réelles, Prêtre dès Westfall gagnée) : un
+-- scénario qui ne la vise pas la refuse (« Skip ») et poursuit comme avant.
+local function clickOption(id)
+  if currentKind() == "startEpic" and not option(id) and option("skipEpic") then H.click(button("skipEpic")) end
+  H.click(button(id))
 end
 
 local function enemySlot(t)
@@ -1388,6 +1393,8 @@ ns = H.ns
 ns.Controller.makeSeed = function() return SEED + 1 end
 H.click(UI().current.go)
 exp = EXP()
+-- Westfall gagnée : le Prêtre a débloqué Prayer of Mending, offerte au départ ; refusée ici
+if currentKind() == "startEpic" then clickOption("skipEpic") end
 check("nouvelle expédition à la clé " .. keyMax, exp and exp.key == keyMax and #exp.affixes == keyMax)
 if keyMax > 0 then
   check("clé mythique dans le bandeau (hexagone violet « +N »)", UI().keystone._shown and UI().keystone.count._text == "+" .. keyMax)
@@ -3325,16 +3332,19 @@ do
     for l in (t .. "\n"):gmatch("(.-)\n") do if l ~= "" then out[#out + 1] = l end end
     return out
   end
-  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$" }
+  local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$", "^Epic%.$" }
   local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
   -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
   -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle
+  local epicCard -- carte épique en cours d'examen (ses déclencheurs peuvent poser un état)
   local function stateBody(cl)
-    local lab, verb, rest = cl:match("^(%u[%a ]-): (%l%a*)( .*)$")
+    local lab, verb, rest = cl:match("^(%u[%w %+]-): (%l%a*)( .*)$")
     if lab and (verb == "apply" or verb == "gain") then
       for _, s in pairs(ns.Statuses) do
         if s.name == lab then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
       end
+      -- règle d'une épique : déclencheur du registre (« Surge of 5 Combo: apply Stunned 1 ⌛ »)
+      if epicCard and ns.Language.triggers[lab] then return verb:sub(1, 1):upper() .. verb:sub(2) .. rest, lab end
     end
     return cl
   end
@@ -3355,6 +3365,7 @@ do
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
       local d = Card.defById(id, up)
+      epicCard = d.rarity == "epic"
       local label = id .. (up and "+" or "")
       local cls = clauses(d.text or "")
       -- états posés par les effets (un état qui porte le nom de la carte est décrit, pas nommé)
@@ -3377,7 +3388,8 @@ do
         end
       end
       if afterState then bad[#bad + 1] = label .. " : une clause suit les états posés" end
-      if #states ~= #want then
+      -- épique : règle écrite par ses crochets, pas par des effets (forme seule)
+      if #states ~= #want and not (d.rarity == "epic" and #want == 0) then
         bad[#bad + 1] = ("%s : %d état(s) posé(s) par les effets, %d ligne(s) Gain / Apply"):format(label, #want, #states)
       else
         -- ordre : ennemis (« Apply ») d'abord, puis soi (« Gain »)
@@ -3469,7 +3481,8 @@ do
       for _, cl in ipairs(cls) do if not cl:find("^Surge: ") then surgeOnly = false end end
       if surgeOnly ~= ((d.minRes or 0) >= 1) then cbad[#cbad + 1] = label .. " : Surge seul <-> minRes" end
       if has("Last Breath") ~= (d.hooks ~= nil and d.hooks.preventDeath ~= nil) then cbad[#cbad + 1] = label .. " : Last Breath" end
-      if has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
+      -- (une carte épique Shadow n'est pas un Pouvoir d'ombre : sa règle est son texte)
+      if not Card.isEpic(d) and has("Shadow") ~= (d.power == true and d.school == "shadow") then cbad[#cbad + 1] = label .. " : Shadow" end
       -- Spend N : champ spend = n (payé au jeu) <-> clause « Spend n: … »
       local sp = d.spend and { "spend", d.spend } or nil
       local spendCl
@@ -3552,6 +3565,7 @@ do
     for _, up in ipairs({ false, true }) do
       card:SetCard(id, up, { playable = true })
       local d = Card.defById(id, up)
+      epicCard = d.rarity == "epic"
       local label = id .. (up and "+" or "")
       local fit = card.bodyFit
       local shown = W.cardBodyText(card)
@@ -5557,10 +5571,15 @@ do
   check("chiffre flottant : « +2 Rage »", table.concat(floats, "|"):find("+2 Rage", 1, true), table.concat(floats, "|"))
   -- zone libre de la classe : ns.ClassViews appelé (build une fois, render à chaque rendu)
   local built, rendered = 0, 0
+  -- (la vue propre du Guerrier, UI/Art/warrior.lua, est mise de côté puis rendue)
+  local keepView, keepHost = ns.ClassViews.warrior, v.classZone.views.warrior
+  if keepHost then keepHost:Hide() end
+  v.classZone.views.warrior = nil
   ns.ClassViews.warrior = { build = function() built = built + 1 end, render = function() rendered = rendered + 1 end }
   v:Render(true)
   v:Render(true)
-  ns.ClassViews.warrior = nil
+  ns.ClassViews.warrior = keepView
+  v.classZone.views.warrior = keepHost
   check("zone libre de classe : build une fois, render à chaque rendu", built == 1 and rendered == 2, built .. "/" .. rendered)
   snap("combat-guerrier", true)
   -- carte du Guerrier jouée par l'interface (Strike) : Rage +1
@@ -5640,7 +5659,8 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "warrior" then ids[#ids + 1] = id end end
+  -- (cartes épiques : planche de la section UEW)
+  for id, d in pairs(ns.Cards) do if d.class == "warrior" and not d.epic then ids[#ids + 1] = id end end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, arms = 1, fury = 2, protection = 3 }
   table.sort(ids, function(a, b)
@@ -5967,7 +5987,8 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "rogue" then ids[#ids + 1] = id end end
+  -- épiques à part (planche cartes_rogue_epiques, section UER)
+  for id, d in pairs(ns.Cards) do if d.class == "rogue" and not d.zone then ids[#ids + 1] = id end end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, assassination = 1, combat = 2, subtlety = 3 }
   table.sort(ids, function(a, b)
@@ -6002,7 +6023,7 @@ do
   -- textes : les 34 cartes du Mage (base et améliorée) tiennent dans le panneau, une clause par ligne
   local card = W.card(UI().content)
   local ids, bad, minSize = {}, {}, 99
-  for id, d in pairs(ns.Cards) do if d.class == "mage" then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.class == "mage" and not d.epic then ids[#ids + 1] = id end end
   table.sort(ids)
   for _, id in ipairs(ids) do
     for _, up in ipairs({ false, true }) do
@@ -6116,7 +6137,7 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "mage" then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.class == "mage" and not d.epic then ids[#ids + 1] = id end end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, fire = 1, frost = 2, arcane = 3 }
   table.sort(ids, function(a, b)
@@ -6310,7 +6331,7 @@ if SNAP then
   local ns = H.ns
   local W = ns.Widgets
   local ids = {}
-  for id, d in pairs(ns.Cards) do if d.class == "hunter" then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.class == "hunter" and not d.zone and not d.variant then ids[#ids + 1] = id end end -- épiques et variantes : UEH
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
   local PATH = { start = 0, beast_mastery = 1, marksmanship = 2, survival = 3 }
   table.sort(ids, function(a, b)
@@ -6893,7 +6914,10 @@ do
       -- cartes hors grille (Rogue : Nightblade, Subtlety niveau 3) comptées depuis les données
       local nAll, nOpen0 = 0, 0
       for _, d in pairs(ns.Cards) do
-        if d.class == cid then nAll = nAll + 1; if (d.level or 1) <= lv then nOpen0 = nOpen0 + 1 end end
+        -- épiques (zone) : onglet Zones, pas la grille des niveaux
+        if d.class == cid and not d.zone and not d.variant then
+          nAll = nAll + 1; if (d.level or 1) <= lv then nOpen0 = nOpen0 + 1 end
+        end
       end
       local xAll, xOpen = nAll - 34, nOpen0 - OPEN_CARDS[lv]
       check(tag .. (" : %d cartes, %d débloquées en vraies cartes, le reste en dos de carte"):format(34 + xAll, OPEN_CARDS[lv] + xOpen),
@@ -8113,6 +8137,8 @@ do
   end
   -- contenu de test : une carte de zone du Prêtre (Westfall) et un bibelot de clé (Westfall +1)
   local function addTestContent(ns)
+    -- les épiques réelles du Prêtre retirées : la carte de test est la seule carte de zone de Westfall
+    for _, id in ipairs(ns.Priest.EPICS) do ns.Cards[id] = nil end
     local d = {}
     for k, v in pairs(ns.Cards.radiance) do d[k] = v end
     d.id, d.name, d.zone, d.level, d.rarity = "uz_zone_card", "Westfall Test Card", "westfall", nil, "rare"
@@ -8136,17 +8162,18 @@ do
   end
   check("accueil : sept zones dans l'ordre de la campagne", table.concat(names, ", ") == ZONES, table.concat(names, ", "))
   local laterOk = true
-  -- une zone dont les données existent (ns.Zone.playable) est « Locked » pour un compte neuf, les autres
-  -- « Coming later » ; toutes grisées
+  -- zone suivante jouable (son fichier de données est écrit, docs/zones.md) : « Locked » pour un compte
+  -- neuf ; sinon « Coming later »
   for i = 2, #zopts do
     local o = zopts[i]
-    if ns.Zone.playable(ns.Zone.ORDER[i]) then
-      if not (o.disabled and o.statusLabel == "Locked") then laterOk = false end
+    local zid = ns.Zone.ORDER[i]
+    if ns.Zone.playable(zid) then
+      if not (o.disabled and o.status == "locked" and o.statusLabel == "Locked") then laterOk = false end
     elseif not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then
       laterOk = false
     end
   end
-  check("accueil : Westfall choisie et jouable, les six autres « Locked » (données présentes) ou « Coming later », grisées",
+  check("accueil : Westfall choisie et jouable, les six autres « Coming later » (ou « Locked » si jouables), grisées",
     zopts[1].selected and not zopts[1].disabled and st.zone == "westfall" and laterOk)
   local scr = UI().current
   local content, panel = R.rect(ns.UI.content), R.rect(scr.panel)
@@ -8625,6 +8652,8 @@ do
   -- une variante ; une épique du Warrior qui porte la Rage à 10 ; aucune carte réelle
   local function addTestContent(ns)
     local C0 = ns.Cards
+    -- les épiques réelles du Prêtre retirées : seules les épiques de test sont débloquées (section UEP)
+    for _, id in ipairs(ns.Priest.EPICS) do C0[id] = nil end
     C0.ue_epic_a = { id = "ue_epic_a", class = "priest", zone = "westfall", rarity = "epic", name = "Test Epic",
       type = "power", path = "holy", school = "holy", effects = {}, text = "Epic.\nAttacks deal 1 more.",
       transforms = { smite = "ue_variant" }, up = { text = "Epic.\nAttacks deal 2 more." } }
@@ -9217,6 +9246,803 @@ do
       dofile(path)(T)
     end
   end
+end
+
+print("UEH Hunter, cartes épiques : Lone Wolf (variantes en main, au deck et en récompense, familier absent, Pet Whistle), Trap Launcher, Master Marksman, Roar of Sacrifice, planche")
+do
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local LW = { arcane_shot = "chimaera_shot", kill_command = "kill_shot", dire_beast = "double_tap",
+    intimidation = "scatter_shot", multi_shot = "salvo", counter_shot = "silencing_shot",
+    bestial_wrath = "explosive_shot", the_beast_within = "trick_shots", spirit_bond = "aspect_of_the_turtle" }
+  -- départ d'une expédition du Hunter avec l'épique id, premier combat (normal) ouvert
+  local function hunterCombat(epicId, hand)
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:hunter")
+    H.ns.Controller.makeSeed = function() return SEED end
+    clickOption("go")
+    local e = EXP()
+    H.ns.Expedition.addCard(e, epicId)
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+    e = EXP()
+    local c = C().combat()
+    for i, cid in ipairs(hand or {}) do c.hand[i] = H.ns.Card.new(cid, false, 9100 + i) end
+    c.player.mana = 3
+    V():Render(true)
+    return e, c, V()
+  end
+
+  -- 1. Lone Wolf : main, familier, Pet Whistle --------------------------------------------------------
+  local e, c, v = hunterCombat("lone_wolf")
+  local ns = H.ns
+  local host = v.classZone.views.hunter
+  local inHand, named = 0, true
+  for i, inst in ipairs(c.hand) do
+    local d = ns.Card.def(inst)
+    if d.variant then
+      inHand = inHand + 1
+      if v.cards[i].cardId ~= inst.id or v.cards[i].name._text ~= d.name then named = false end
+    end
+    if LW[inst.id] then named = false end
+  end
+  local all = 0
+  for _, pile in ipairs({ c.hand, c.draw }) do
+    for _, inst in ipairs(pile) do if inst.id == "chimaera_shot" then all = all + 1 end end
+  end
+  check("Lone Wolf : les quatre Arcane Shot du départ se jouent en Chimaera Shot, nom et carte de la variante en main",
+    all == 4 and named, all .. " / " .. tostring(named))
+  check("Lone Wolf : la figure du familier et son marqueur de cible ont disparu de l'écran", host and not vis(host.pet)
+    and not vis(host.mark) and not ns.Hunter.petPresent(c))
+  local lw = host.epic
+  check("ligne de l'épique sous le héros : icône de Lone Wolf et bonus actuel des coups (« No pet. Attack hits: +2 »)",
+    lw and vis(lw) and lw.epicId == "lone_wolf" and (lw.text._text or ""):find("No pet", 1, true)
+    and (lw.text._text or ""):find("+" .. ns.HunterEpic.lonePer[1] * c.player.res, 1, true), lw and lw.text._text)
+  local lines, nLines = {}, 0
+  for _, id in ipairs({ "call_of_the_wild", "trap_launcher", "beast_cleave", "roar_of_sacrifice", "master_marksman",
+    "black_arrow", "lone_wolf" }) do
+    c.cls.epic = { id = id, up = false }
+    local l = ns.Art.hunterEpicLine(c)
+    if l then nLines = nLines + 1 else lines[#lines + 1] = id end
+  end
+  c.cls.epic = { id = "lone_wolf", up = false }
+  check("ligne de l'épique : un texte pour chacune des sept épiques", nLines == 7, table.concat(lines, ","))
+  check("Lone Wolf : Pet Whistle montre sa variante (+1 Frenzy au début du combat), Frenzy 1",
+    ns.Relics.pet_whistle.text == ns.Relics.pet_whistle.loneText and c.player.res == 1, ns.Relics.pet_whistle.text)
+  local chim
+  for i, inst in ipairs(c.hand) do if inst.id == "chimaera_shot" then chim = v.cards[i] end end
+  if chim then
+    local tt = table.concat(H.hover(chim), " | ")
+    check("Lone Wolf : infobulle de la variante en main (mots-clés de Chimaera Shot : Frenzy)", tt:find("Frenzy", 1, true), tt)
+  end
+  snap("ueh-lone-wolf-main", true)
+  -- panneau du deck : variantes, amélioration de l'originale gardée, « Transformed … »
+  e.deck[1].up = true
+  UI().toggleDeckView("deck")
+  local dv = UI().deckView
+  local nVar, upOk, tip = 0, false, ""
+  for i, inst in ipairs(dv.list) do
+    if inst.id == "chimaera_shot" then
+      nVar = nVar + 1
+      if inst.up then upOk = dv.cards[i].cardUp == true tip = table.concat(H.hover(dv.cards[i]), " | ") end
+    end
+    if inst.id == "arcane_shot" then nVar = -99 end
+  end
+  check("Lone Wolf : deck montré transformé (4 Chimaera Shot, amélioration gardée, « Transformed Arcane Shot. »)",
+    nVar == 4 and upOk and tip:find("Transformed Arcane Shot.", 1, true), nVar .. " / " .. tip)
+  snap("ueh-lone-wolf-deck", true)
+  dv:Close()
+  e.deck[1].up = false
+  -- l'épique au survol : la table des transformations
+  local ett = {}
+  do
+    local pc = ns.Widgets.card(UI().content)
+    pc:SetCard("lone_wolf", false, { playable = true })
+    ett = H.hover(pc)
+    pc:Hide()
+  end
+  local et = table.concat(ett, " | ")
+  check("Lone Wolf : infobulle de l'épique = Kill Command devient Kill Shot, etc. (9 lignes)",
+    et:find("Kill Command becomes", 1, true) and et:find("Kill Shot", 1, true) and select(2, et:gsub("becomes", "")) == 9, et)
+  -- récompense : un Kill Command proposé s'affiche en Kill Shot (l'original entre au deck)
+  c.result = "won"
+  ns.Expedition.act(e, { "endTurn" })
+  ns.UI.refresh()
+  H.settle()
+  local r = e.reward
+  if r and r.cards then
+    r.cards[1] = "kill_command"
+    ns.UI.refresh()
+    H.settle()
+    local scr = UI().current
+    local shown
+    for _, card in ipairs(scr.cards) do
+      if vis(card) and card.option and card.option.id == "pickCard:1" then shown = card end
+    end
+    check("Lone Wolf : récompense — Kill Command proposé montré en Kill Shot", shown and shown.cardId == "kill_shot"
+      and shown.option.card.from == "kill_command", shown and shown.cardId)
+    snap("ueh-lone-wolf-recompense", true)
+    clickOption("pickCard:1")
+    local last = e.deck[#e.deck]
+    check("Lone Wolf : la carte prise entre au deck sous son id d'origine (Kill Command)", last.id == "kill_command"
+      or e.deck[#e.deck - 1].id == "kill_command")
+  else
+    check("Lone Wolf : écran de récompense", false, tostring(e.phase))
+  end
+
+  -- 2. Trap Launcher : la Trap demande une cible, rien de posé --------------------------------------
+  e, c, v = hunterCombat("trap_launcher", { "freezing_trap" })
+  ns = H.ns
+  host = v.classZone.views.hunter
+  local info = ns.Controller.handInfo(1)
+  local function dbg() return ("classe %s, épique %s, passifs %d, main %s"):format(tostring(e.class),
+    tostring(ns.Hunter.epic(c)), c.passives and #c.passives or 0, tostring(c.hand[1] and c.hand[1].id)) end
+  check("Trap Launcher : la Trap en main demande une cible", info and info.needsTarget == true, dbg())
+  local alive = C().aliveTargets()[1]
+  ns.Controller.play(1, alive)
+  H.settle()
+  v:Render(true)
+  check("Trap Launcher : déclenchée tout de suite (Stunned sur la cible), aucune case de Trap montrée",
+    #c.traps == 0 and not vis(host.traps[1]) and (c.enemies[alive] and (c.enemies[alive].st.stunned or 0) > 0 or c.result))
+  check("Trap Launcher : le familier reste en scène", vis(host.pet))
+  snap("ueh-trap-launcher", true)
+
+  -- 3. Master Marksman : Aimed Shot sur cible intacte = liseré Instant --------------------------------
+  e, c, v = hunterCombat("master_marksman", { "aimed_shot", "volley" })
+  ns = H.ns
+  info = ns.Controller.handInfo(1)
+  local info2 = ns.Controller.handInfo(2)
+  check("Master Marksman : Aimed Shot (cible intacte) annoncée Instant, Volley (sans cible) reste une Cast",
+    info and info.instant == true and info2 and not info2.instant, tostring(e.class) .. " " .. tostring(ns.Hunter.epic(c))
+    .. " " .. tostring(info and info.inst.id) .. " " .. tostring(info and info.instant))
+  local aimed = v.cards[1]
+  local at = table.concat(H.hover(aimed), " | ")
+  check("Master Marksman : infobulle « Instant » sur Aimed Shot", at:find("Instant", 1, true), at)
+
+  -- 4. Roar of Sacrifice : « Roar » flottant depuis le héros ---------------------------------------
+  e, c, v = hunterCombat("roar_of_sacrifice")
+  ns = H.ns
+  local floats = {}
+  local W2 = ns.Widgets
+  local old = W2.float
+  W2.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  H.settle()
+  v:OnEvents({ { t = "roar", prevented = 3 } })
+  H.advance(3)
+  W2.float = old
+  check("Roar of Sacrifice : « Roar » flottant depuis le héros", table.concat(floats, "|"):find("Roar", 1, true) ~= nil,
+    table.concat(floats, "|"))
+
+  -- 5. textes : épiques et variantes, base et améliorées, tiennent sans tronquer ------------------------
+  local ids = { "call_of_the_wild", "trap_launcher", "beast_cleave", "roar_of_sacrifice", "master_marksman",
+    "black_arrow", "lone_wolf", "chimaera_shot", "kill_shot", "double_tap", "scatter_shot", "salvo",
+    "silencing_shot", "explosive_shot", "trick_shots", "aspect_of_the_turtle" }
+  local card = ns.Widgets.card(UI().content)
+  local small = {}
+  for _, id in ipairs(ids) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      if not fit or not fit.ok or (fit.size or 0) < 8.5 then small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) end
+    end
+  end
+  card:Hide()
+  check("épiques et variantes du Hunter (32 faces) : texte à 8,5 ou plus", #small == 0, table.concat(small, ", "))
+
+  -- 6. planche des épiques et des variantes (base, améliorée) -------------------------------------------
+  if SNAP then
+    local perRow, cw, ch = 8, 140, 230
+    local list = {}
+    for _, id in ipairs(ids) do list[#list + 1] = { id, false } list[#list + 1] = { id, true } end
+    local rows = math.ceil(#list / perRow)
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, rows * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, x in ipairs(list) do
+      local cc = ns.Widgets.card(big)
+      cc:SetCard(x[1], x[2], { playable = true })
+      ns.Widgets.placeCenter(cc, big, 80 + ((i - 1) % perRow) * cw, 125 + math.floor((i - 1) / perRow) * ch, 1)
+    end
+    Render.svg(H, big, SNAP .. "/cartes_hunter_epiques.svg", "épiques et variantes du Hunter (base, améliorée)")
+    big:Hide()
+  end
+end
+
+print("UER épiques du Voleur : textes (plaque Epic, palier), en jeu dès la première main, ligne de l'épique (ripostes du tour, noms joués…), marques d'Atrophic Poison, planche")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local EPICS = { "deflection", "doomblade", "atrophic_poison", "echoing_reprimand", "subterfuge", "kidney_shot",
+    "danse_macabre" }
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W = ns.Widgets
+  local Combat = ns.Combat
+  -- 1. textes : plaque « Epic » (mot retiré du corps), pas de « Epic. » affiché, palier 8,5 ou plus
+  local card = W.card(UI().content)
+  local tbad = {}
+  for _, id in ipairs(EPICS) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local body = W.cardBodyText(card):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+      local pills = table.concat(W.cardPills(ns.Card.defById(id, up)), " ")
+      if body:find("Epic.", 1, true) then tbad[#tbad + 1] = id .. " : « Epic. » dans le corps" end
+      if not pills:find("Epic", 1, true) then tbad[#tbad + 1] = id .. " : plaque sans Epic (" .. pills .. ")" end
+      if (card.bodyFit.size or 0) < 8.5 then tbad[#tbad + 1] = id .. (up and "+" or "") .. " : palier " .. tostring(card.bodyFit.size) end
+      if card.bodyFit.mode ~= "clauses" then tbad[#tbad + 1] = id .. " : texte coulé" end
+    end
+  end
+  card:Hide()
+  check("textes des 7 épiques (base et améliorée) : plaque Epic, corps sans « Epic. », palier 8,5 ou plus, en clauses",
+    #tbad == 0, table.concat(tbad, " ; "))
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  W.fillCardTooltip(tip, "deflection", false)
+  W.fillCardTooltip(tip, "kidney_shot", true)
+  W.fillCardTooltip(tip, "danse_macabre", false)
+  local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  local k1 = ns.Rogue.EPIC.deflection[1]
+  check("infobulles : riposte détaillée (k, 2k, 3k, 4k), boss de Kidney Shot, noms de Danse Macabre",
+    all:find(("Riposte: %d, then %d, %d, %d"):format(k1, 2 * k1, 3 * k1, 4 * k1), 1, true) and all:find("Boss: gets Demoralized 2", 1, true)
+    and all:find("each different card played this turn counts once", 1, true), all)
+
+  -- 2. combat avec Deflection : l'épique en jeu dès la première main, ligne des ripostes du tour
+  clickOption("class:rogue")
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  ns.Expedition.addCard(e, "deflection")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  v:Render(true)
+  local inPile = false
+  for _, pile in ipairs({ c.hand, c.draw, c.discard }) do
+    for _, inst in ipairs(pile) do if inst.id == "deflection" then inPile = true end end
+  end
+  check("combat : Deflection en jeu dès la première main (c.epic), dans aucune pile, main de 6", not inPile
+    and c.epic and c.epic.id == "deflection" and #c.hand == 6, #c.hand)
+  local host = v.classZone.views.rogue
+  local ep = host and host.epic
+  local function line() return ep and ep.text._shown and (ep.text._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") or "" end
+  local EN = ns.Rogue.EPIC
+  local d1 = EN.deflection[1]
+  check("ligne de l'épique : icône de Deflection, « Ripostes this turn: 0   next: k »",
+    ep and ep._shown and (ep.slot.icon._texture or ""):lower():find("ability_rogue_dismantle", 1, true)
+    and line() == "Ripostes this turn: 0   next: " .. d1, line())
+  local hp0 = c.enemies[1].hp
+  c.hand[#c.hand + 1] = ns.Card.new("feint", false, 980)
+  c.hand[#c.hand + 1] = ns.Card.new("feint", false, 981)
+  c.player.mana = 3
+  ns.Controller.act({ "play", #c.hand - 1 })
+  ns.Controller.act({ "play", #c.hand })
+  H.settle()
+  v:Render(true)
+  check("deux Feint : ripostes k + 2k sur la cible, ligne « Ripostes this turn: 2   next: 3k »",
+    c.enemies[1].hp == hp0 - 3 * d1 and line() == "Ripostes this turn: 2   next: " .. 3 * d1, line() .. " / " .. (hp0 - c.enemies[1].hp))
+  local hv = table.concat(H.hover(ep), " | "):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  check("survol de l'icône : la carte Deflection et son texte", hv:find("Deflection", 1, true) and hv:find("Each Parry gained", 1, true), hv)
+  check("ligne dans la zone de classe, sans texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  snap("uer-deflection", true)
+
+  -- 3. autres épiques sur le même combat (passif remplacé) : lignes et marques d'Atrophic Poison
+  local function setEpic(eid, up)
+    c.epic = { id = eid, up = up or false, uid = 970 }
+    v:Render(true)
+  end
+  setEpic("danse_macabre")
+  c.cls.dmRound, c.cls.dmNames, c.cls.dmCount = c.round, { feint = true, kick = true }, 2
+  v:Render(true)
+  local dm = "Card names this turn: 2   +" .. 2 * EN.danse_macabre[1] .. " per hit"
+  check("Danse Macabre : « Card names this turn: 2   +2N per hit »", line() == dm, line())
+  setEpic("echoing_reprimand")
+  c.player.res = 3
+  v:Render(true)
+  check("Echoing Reprimand à 3 Combo : « Surge now counts as N Combo »",
+    line() == "Surge now counts as " .. EN.echoing_reprimand[1] .. " Combo", line())
+  c.player.res = 4
+  v:Render(true)
+  check("Echoing Reprimand à 4 Combo : ligne cachée", not ep._shown and line() == "")
+  setEpic("kidney_shot", true)
+  c.player.res = EN.kidney_shot[2]
+  v:Render(true)
+  check("Kidney Shot amélioré au seuil : « Surge now stuns the target »", line() == "Surge now stuns the target", line())
+  setEpic("atrophic_poison")
+  for _, en in ipairs(c.enemies) do en.st.pain = nil end
+  local tgt = c.enemies[1]
+  Combat.applyStatus(c, tgt, "pain", 3)
+  v:Render(true)
+  local shown, mk = 0, nil
+  for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 mk = m end end
+  local s = v.slotOf[tgt.uid]
+  local mr, tr = mk and R.rect(mk), s and R.rect(s.tag)
+  check("Atrophic Poison : une marque à droite du cadre de l'ennemi sous DoT (aucune ligne)",
+    shown == 1 and mr and tr and mr[1] >= tr[3] - 0.5 and not ep._shown, shown)
+  local mt = mk and table.concat(H.hover(mk), " | ") or ""
+  check("survol de la marque : compte comme Demoralized", mt:find("counts as Demoralized", 1, true), mt)
+  tgt.st.pain = 1
+  v:Render(true)
+  shown = 0
+  for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 end end
+  check("Atrophic Poison : DoT 1 (tombe avant son coup) : pas de marque", shown == 0, shown)
+  tgt.st.pain = 3
+  v:Render(true)
+  snap("uer-atrophic", true)
+  c.epic = nil
+  v:Render(true)
+  local anyMark = false
+  for _, m in ipairs(host.marks) do if m._shown then anyMark = true end end
+  check("sans épique : ni ligne ni marque", not ep._shown and not anyMark)
+
+  -- 4. planche des sept épiques (base, améliorée)
+  if SNAP then
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(7 * 140 + 20, 2 * 230 + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, eid in ipairs(EPICS) do
+      for k, up in ipairs({ false, true }) do
+        local cc = W.card(big)
+        cc:SetCard(eid, up, { playable = true })
+        W.placeCenter(cc, big, 80 + (i - 1) * 140, 125 + (k - 1) * 230, 1)
+      end
+    end
+    Render.svg(H, big, SNAP .. "/cartes_rogue_epiques.svg", "épiques du Voleur (base, améliorée)")
+    big:Hide()
+  end
+end
+
+print("UEP Prêtre, cartes épiques : actives dès le début du combat, vue de classe (Inner Focus, Voidform, Echo of Light, Shadow Covenant), raison Voidform, infobulles, planche")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, P, Card = ns.Widgets, ns.Priest, ns.Card
+  ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  ns.Expedition.addCard(e, "inner_focus")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  v:Render(true)
+  local host = v.classZone.views.priest
+  local function line() return host and host.line._shown and host.line._text or nil end
+  local function icon() return host and host.box._shown and (host.box.slot.icon._texture or ""):lower() or "" end
+  check("combat : l'épique du deck est active dès le premier tour (Inner Focus)", P.epicOf(c) == "inner_focus")
+  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, +75% »",
+    line() == "Inner Focus: next card is Cast, +75%" and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
+  -- première carte jouée par l'interface : elle part en Cast, la vue le dit
+  local hi
+  for i, inst in ipairs(c.hand) do
+    local d = Card.def(inst)
+    if (d.type == "attack" or d.type == "skill") and ns.Combat.canPlay(c, i) then hi = i break end
+  end
+  local name = hi and Card.def(c.hand[hi]).name
+  if hi then
+    ns.Controller.act({ "play", hi, Card.def(c.hand[hi]).target == "enemy" and 1 or nil })
+    H.settle()
+    v:Render(true)
+  end
+  check("Inner Focus : la première carte part en Cast (barre d'incantation), la vue la nomme",
+    c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " +75%"), tostring(line()))
+  local tt = table.concat(H.hover(host.box), " | ")
+  check("vue de classe : survol = la carte épique (nom, texte, explication)", tt:find("Inner Focus", 1, true)
+    and tt:find("First card", 1, true), tt)
+  snap("uep-inner-focus", true)
+  -- les autres épiques, posées dans le même combat (la vue ne lit que le combat)
+  local function setEpic(eid, up) c.epic.id, c.epic.up = eid, up or false end
+  setEpic("voidform")
+  c.player.res = 5
+  c.hand[#c.hand + 1] = Card.new("devouring_plague", false, 990)
+  v:Render(true)
+  local info = ns.Controller.handInfo(#c.hand)
+  check("Voidform : « Voidform: Shadow hits +5 » (5 Insanity), icône", line() == "Voidform: Shadow hits +5"
+    and icon():find("voidform", 1, true), tostring(line()))
+  check("Voidform : carte à Surge injouable, raison lisible", info and not info.playable
+    and ns.Controller.reasonText(info.why) == "Voidform: Surge cards can't be played.", info and tostring(info.why))
+  snap("uep-voidform", true)
+  table.remove(c.hand)
+  setEpic("echo_of_light")
+  c.player.st.regen = 3
+  v:Render(true)
+  check("Echo of Light : « Regen 3: 10 to all next turn »", line() == "Regen 3: 10 to all next turn", tostring(line()))
+  setEpic("echo_of_light", true)
+  v:Render(true)
+  check("Echo of Light amélioré : « Regen 3: 12 to all next turn »", line() == "Regen 3: 12 to all next turn", tostring(line()))
+  c.player.st.regen = nil
+  setEpic("shadow_covenant")
+  c.hand[#c.hand + 1] = Card.new("mind_blast", false, 991)
+  v:Render(true)
+  info = ns.Controller.handInfo(#c.hand)
+  check("Shadow Covenant : « Shadow cards: 3 HP per mana », Mind Blast à 0 mana", line() == "Shadow cards: 3 HP per mana"
+    and info and info.cost == 0, tostring(line()))
+  setEpic("shadow_covenant", true)
+  v:Render(true)
+  check("Shadow Covenant amélioré : première carte Shadow gratuite annoncée",
+    line() == "Shadow: first card free, then 3 HP/mana", tostring(line()))
+  table.remove(c.hand)
+  setEpic("prayer_of_mending")
+  v:Render(true)
+  check("Prayer of Mending : rien à afficher (zone de classe vide)", not host.box._shown and not host.line._shown)
+  -- infobulles des sept épiques : la plaque Epic et le détail de la règle
+  local tip = { lines = {} }
+  function tip:AddLine(t) self.lines[#self.lines + 1] = t end
+  function tip:NumLines() return #self.lines end
+  local want = { prayer_of_mending = "Each heal:", echo_of_light = "Regen tick:", shadow_covenant = "Shadow cards:",
+    voidform = "Voidform:", inner_focus = "First card:" }
+  local tbad = {}
+  for _, eid in ipairs(P.EPICS) do
+    tip.lines = {}
+    W.fillCardTooltip(tip, eid, false, { full = true })
+    local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    if not all:find("epic card per expedition", 1, true) then tbad[#tbad + 1] = eid .. " : épique" end
+    if want[eid] and not all:find(want[eid], 1, true) then tbad[#tbad + 1] = eid .. " : " .. want[eid] end
+  end
+  check("infobulles des sept épiques : une seule par expédition, détail de la règle", #tbad == 0, table.concat(tbad, " ; "))
+  -- planche des sept épiques (base, améliorée)
+  if SNAP then
+    local perRow, cw, ch = 7, 140, 230
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, 2 * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, eid in ipairs(P.EPICS) do
+      for r, up in ipairs({ false, true }) do
+        local cd = W.card(big)
+        cd:SetCard(eid, up, { playable = true })
+        W.placeCenter(cd, big, 80 + (i - 1) * cw, 125 + (r - 1) * ch, 1)
+      end
+    end
+    Render.svg(H, big, SNAP .. "/cartes_priest_epiques.svg", "épiques du Prêtre (base, améliorée)")
+    big:Hide()
+  end
+end
+
+print("UEW épiques du Guerrier : textes (plaque Epic, palier), planche, crans jusqu'à 10 (Avatar), ligne de l'épique, raison Titan's Grip")
+do
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function alphaOf(t) return t._calls.SetAlpha and t._calls.SetAlpha[1] or 1 end
+  -- combat du Guerrier, l'épique `epic` (améliorée si up) ajoutée au deck avant le premier combat
+  local function uewCombat(epic, up)
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:warrior")
+    H.ns.Controller.makeSeed = function() return SEED end
+    clickOption("go")
+    local e = EXP()
+    e.deck[#e.deck + 1] = { id = epic, up = up or false }
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+    local v = V()
+    v:Render(true)
+    return e, e.combat, v
+  end
+  local ns = H.ns
+  local W, Wr = ns.Widgets, ns.Warrior
+  -- 1. textes des sept épiques : « Epic. » sur la plaque, corps en clauses à 8,5 ou plus, jamais tronqué
+  local card = W.card(UI().content)
+  local tbad, sizes = {}, {}
+  for _, id in ipairs(Wr.EPICS) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      local label = id .. (up and "+" or "")
+      local shown = W.cardBodyText(card)
+      sizes[#sizes + 1] = label .. " " .. tostring(fit.size)
+      if fit.mode ~= "clauses" or not fit.ok or (fit.size or 0) < 8.5 then tbad[#tbad + 1] = label .. " (" .. tostring(fit.size) .. ")" end
+      if shown:find("Epic.", 1, true) then tbad[#tbad + 1] = label .. " : « Epic. » dans le texte" end
+      if not (card.plateText._text or ""):find("Epic", 1, true) then tbad[#tbad + 1] = label .. " : plaque sans « Epic »" end
+    end
+  end
+  check("textes des 7 épiques (base, améliorées) : clauses à 8,5 ou plus, « Epic » sur la plaque", #tbad == 0,
+    table.concat(tbad, ", ") .. " | " .. table.concat(sizes, ", "))
+  if SNAP then
+    local perRow, cw, ch = 7, 140, 230
+    local big = CreateFrame("Frame", nil, _G.UIParent)
+    big:SetSize(perRow * cw + 20, 2 * ch + 10)
+    big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+    big:SetScale(1.5)
+    for i, id in ipairs(Wr.EPICS) do
+      for r, up in ipairs({ false, true }) do
+        local c = W.card(big)
+        c:SetCard(id, up, { playable = true })
+        W.placeCenter(c, big, 80 + (i - 1) * cw, 125 + (r - 1) * ch, 1)
+      end
+    end
+    Render.svg(H, big, SNAP .. "/cartes_warrior_epiques.svg", "épiques du Guerrier (base, améliorées)")
+    big:Hide()
+  end
+
+  -- 2. Avatar : crans jusqu'à 10 (second arc), remplis selon la Rage, infobulle « n / 10 »
+  local e, c, v = uewCombat("avatar")
+  local sockets = 0
+  for _, p in ipairs(v.resPips.list) do if vis(p.socket) then sockets = sockets + 1 end end
+  c.player.res = 8
+  v:Render(true)
+  H.advance(1)
+  local n = 0
+  for i = 1, 10 do if alphaOf(v.resPips.list[i].fill) == 1 then n = n + 1 end end
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local cardR, board = R.rect(v.cards[1]), R.rect(v.hz)
+  local pbad = {}
+  for i = 1, 10 do
+    local r = R.rect(v.resPips.list[i].socket)
+    if not (r and r[3] < cardR[1] and r[2] >= board[2] and r[4] <= board[4]) then pbad[#pbad + 1] = i end
+    -- gemmes en losange : centres à 0,9 cran l'un de l'autre au moins (les 5 premiers se touchent déjà)
+    for j = 1, i - 1 do
+      local q = R.rect(v.resPips.list[j].socket)
+      if r and q then
+        local dx, dy = (r[1] + r[3] - q[1] - q[3]) / 2, (r[2] + r[4] - q[2] - q[4]) / 2
+        if math.sqrt(dx * dx + dy * dy) < 0.9 * (r[3] - r[1]) then pbad[#pbad + 1] = i .. "×" .. j end
+      end
+    end
+  end
+  local tt = table.concat(H.hover(v.resource), " | ")
+  check(("Avatar : %d crans (plafond %d), 8 remplis, à gauche de la main, dans le plateau, sans chevauchement ; infobulle « 8 / 10 »"):format(sockets, ns.Combat.resCap(c)),
+    sockets == 10 and ns.Combat.resCap(c) == 10 and n == 8 and #pbad == 0 and tt:find("8 / 10", 1, true) ~= nil,
+    n .. " / " .. table.concat(pbad, ",") .. " / " .. tt)
+  snap("uew-avatar-crans", true)
+  -- sans épique : 5 crans (rien ne change), ligne de l'épique cachée
+  local _, c0, v0 = uewCombat("strike")
+  local s0 = 0
+  for _, p in ipairs(v0.resPips.list) do if vis(p.socket) then s0 = s0 + 1 end end
+  local h0 = v0.classZone.views.warrior
+  check("sans épique : 5 crans, ligne de l'épique cachée", s0 == 5 and ns.Combat.resCap(c0) == 5
+    and not (h0 and vis(h0.epic)), s0)
+
+  -- ligne de l'épique (icône, texte) : texte sans couleurs, icône de la carte, infobulle = la carte
+  local function line(host)
+    if not (host and vis(host.epic) and vis(host.epic.text)) then return nil end
+    return ((host.epic.text._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
+  end
+  local function iconOk(host, id)
+    return (host.epic.slot.icon._texture or ""):lower():find(H.ns.Art.cards[id].tga:lower(), 1, true) ~= nil
+      and table.concat(H.hover(host.epic), " | "):find(H.ns.Cards[id].name, 1, true) ~= nil
+  end
+
+  -- 3. Titan's Grip : compteur du tour, Attack suivante grisée avec la raison
+  e, c, v = uewCombat("titans_grip")
+  local host = v.classZone.views.warrior
+  local lim = Wr.EPIC.titans_grip.limit
+  check(("Titan's Grip : ligne « Attacks this turn: 0/%d, each twice », icône et infobulle de la carte"):format(lim),
+    line(host) == ("Attacks this turn: 0/%d, each twice"):format(lim) and iconOk(host, "titans_grip"), line(host))
+  c.hand = {}
+  for k = 1, lim + 1 do c.hand[k] = ns.Card.new("strike", false, 900 + k) end
+  c.player.mana = lim + 1
+  for _, en in ipairs(c.enemies) do en.hp, en.maxHp = 200, 200 end
+  v:Render(true)
+  for _ = 1, lim do ns.Combat.play(c, 1, 1) end
+  v:Render(true)
+  H.settle()
+  local sc = v.cards[1]
+  check(("Titan's Grip : %d/%d, la suivante grisée avec « %s »"):format(lim, lim, Wr.TITAN_REASON),
+    line(host) == ("Attacks this turn: %d/%d, each twice"):format(lim, lim) and vis(sc.reasonPlate)
+      and sc.reasonPlate.text._text == Wr.TITAN_REASON and not sc.reasonPlate.text:IsTruncated(),
+    tostring(line(host)) .. " / " .. tostring(sc.reasonPlate and sc.reasonPlate.text._text))
+  snap("uew-titans-grip", true)
+
+  -- 4. lignes des autres épiques
+  e, c, v = uewCombat("shield_charge", true)
+  host = v.classZone.views.warrior
+  check("Shield Charge : sans Absorb, ligne cachée", line(host) == nil)
+  c.player.block = 11
+  v:Render(true)
+  local t = Wr.chargeTarget(c)
+  local want = ("End of turn: %d to %s"):format(ns.Combat.calcDamage(c, c.player, t, Wr.chargeDamage(c, true)),
+    H.ns.Enemies[t.id].name)
+  check("Shield Charge+ : « " .. want .. " »", line(host) == want and Wr.chargeDamage(c, true) > 4, line(host))
+  e, c, v = uewCombat("anger_management")
+  host = v.classZone.views.warrior
+  check("Anger Management : sans recharge, ligne cachée", line(host) == nil)
+  c.cooldown[1] = { card = ns.Card.new("shield_block", false, 950), turns = 1 }
+  v:Render(true)
+  check("Anger Management : « Each Rage spent: Cooldowns −1 »", line(host) == "Each Rage spent: Cooldowns −1", line(host))
+  e, c, v = uewCombat("death_wish")
+  host = v.classZone.views.warrior
+  check("Death Wish : « Attacks +50%, no Absorb »", line(host) == "Attacks +50%, no Absorb", line(host))
+  e, c, v = uewCombat("avatar", true)
+  host = v.classZone.views.warrior
+  check("Avatar+ : « Rage up to 10, +3 next turn »", line(host) == "Rage up to 10, +3 next turn", line(host))
+  e, c, v = uewCombat("sweeping_strikes")
+  host = v.classZone.views.warrior
+  local alive = #ns.Combat.aliveEnemies(c)
+  check("Sweeping Strikes : « Targeted hits splash 1 other for half » à plusieurs, rien seul",
+    (alive >= 2 and line(host) == "Targeted hits splash 1 other for half") or (alive < 2 and line(host) == nil), line(host))
+  -- 5. Thunderous Roar : l'onde (journal epic_trigger, dégâts) passe par la file d'animations
+  e, c, v = uewCombat("thunderous_roar")
+  host = v.classZone.views.warrior
+  c.player.res = 2
+  v:Render(true)
+  check("Thunderous Roar : « Roar in 3 Rage: 3 to all »", line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.EPIC.thunderous_roar.damage), line(host))
+  c.player.res = 4
+  ns.Combat.gainRes(c, 1, "test")
+  v:OnEvents(c.events)
+  H.advance(3)
+  check("Thunderous Roar : onde jouée par la vue (Rage à 0, Demoralized posé selon la règle)", c.player.res == 0
+    and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.EPIC.thunderous_roar.demoralized > 0) and #W.truncatedNow() == 0,
+    c.player.res .. " / " .. table.concat(W.truncatedNow(), ","))
+  snap("uew-thunderous-roar", true)
+end
+
+print("UEM épiques du Mage : textes dans la zone (base et améliorée), icônes, vue de classe (mana gardé, 3e carte, élémentaire, Frozen), mana au-dessus du maximum, nom flottant, planche")
+do
+  H.boot(nil)
+  H.slash("")
+  local ns = H.ns
+  local W, Art = ns.Widgets, ns.Art
+  local EPICS = { "mirror_image", "molten_armor", "water_elemental", "fingers_of_frost", "arcane_meditation",
+    "conflagration", "rule_of_threes" }
+  -- textes : les sept épiques (base et améliorée) dans le panneau, une clause par ligne, taille 8,5 au moins
+  local card = W.card(UI().content)
+  local bad, minSize = {}, 99
+  for _, id in ipairs(EPICS) do
+    for _, up in ipairs({ false, true }) do
+      card:SetCard(id, up, { playable = true })
+      local fit = card.bodyFit
+      if not (fit and fit.ok and not fit.under and fit.mode == "clauses" and fit.size >= 8.5) then
+        bad[#bad + 1] = id .. (up and "+" or "") .. " : " .. tostring(fit and fit.mode) .. " " .. tostring(fit and fit.size)
+      else
+        minSize = math.min(minSize, fit.size)
+      end
+    end
+    if not Art.cards[id] or not ns.Skin.icons[(Art.cards[id].tga or ""):lower()] then bad[#bad + 1] = id .. " : icône absente" end
+  end
+  card:Hide()
+  check(("textes : 7 épiques du Mage (base et améliorée) dans le panneau, une clause par ligne (taille mini %.1f), icônes embarquées")
+    :format(minSize), #bad == 0, table.concat(bad, ", "))
+  -- combat du Mage, Arcane Meditation dans le deck de l'expédition
+  clickOption("class:mage")
+  H.ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  local e = EXP()
+  ns.Expedition.addCard(e, "arcane_meditation")
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "combat"
+  clickOption("path:" .. id)
+  H.settle()
+  local v = V()
+  local c = e.combat
+  local host = v.classZone.views.mage
+  check("combat : l'épique du deck est active (crochets du deck)", c and ns.Combat.mageEpic(c) == "arcane_meditation")
+  v:Render(true)
+  local cap = ns.Cards.arcane_meditation.epicN
+  local want = ("Mana kept: %d/%d"):format(math.min(3, cap), cap)
+  check("Arcane Meditation : « " .. want .. " » dans la vue du Mage (mana restant / plafond)",
+    host.epic._shown and host.epic._text == want, tostring(host.epic._text))
+  c.player.mana = 1
+  v:Render(true)
+  check("Arcane Meditation : le compte suit le mana restant", host.epic._text == "Mana kept: 1/" .. cap, host.epic._text)
+  c.player.mana = 6
+  v:Render(true)
+  check("mana au-dessus du maximum : « 6 » et « /3 » dans l'anneau", v.mana.text._text == "6" and v.mana.max._text == "/3",
+    tostring(v.mana.text._text) .. tostring(v.mana.max._text))
+  snap("uem-meditation", true)
+  -- les autres épiques : on change l'épique du combat (crochets du deck) pour lire la vue
+  local function use(epic, up)
+    c.epic = { id = epic, up = up or false, uid = 9990 }
+    v:Render(true)
+    return host.epic._shown and host.epic._text or nil
+  end
+  local round = c.round
+  c.round = 3
+  c.turn.played = 0
+  local t0 = use("rule_of_threes")
+  c.turn.played = 2
+  local t2 = use("rule_of_threes")
+  c.turn.played = 3
+  local t3 = use("rule_of_threes")
+  local t3u = use("rule_of_threes", true)
+  c.turn.played = 5
+  local t5u = use("rule_of_threes", true)
+  c.round = 4
+  local tOff = use("rule_of_threes")
+  check("Rule of Threes : « Cards played: 0/3 », « Next Attack: twice » avant la 3e, rien après (base), 0/3 puis twice (amélioré), « Threes: next turn » hors des tours 3, 6, 9",
+    t0 == "Cards played: 0/3" and t2 == "Next Attack: twice" and t3 == nil and t3u == "Cards played: 0/3"
+      and t5u == "Next Attack: twice" and tOff == "Threes: next turn",
+    table.concat({ tostring(t0), tostring(t2), tostring(t3), tostring(t3u), tostring(t5u), tostring(tOff) }, " | "))
+  c.turn.played = 0
+  local alive = ns.Combat.aliveEnemies(c)
+  c.player.lastTarget = alive[#alive].uid
+  c.round = 2
+  local tw = use("water_elemental")
+  c.round = 1
+  local twOff = use("water_elemental")
+  c.round = round
+  check("Water Elemental : la cible du prochain coup (dernière cible), ou « Elemental rests next turn »",
+    tw == "Elemental: " .. ns.Enemies[alive[#alive].id].name and twOff == "Elemental rests next turn",
+    tostring(tw) .. " | " .. tostring(twOff))
+  for _, en in ipairs(c.enemies) do en.st.demoralized, en.st.stunned = nil, nil end
+  local f0 = use("fingers_of_frost")
+  ns.Combat.applyStatus(c, alive[1], "demoralized", 1)
+  local f1 = use("fingers_of_frost")
+  check("Fingers of Frost : « Frozen: Cast at once » quand un ennemi est Frozen, sinon « No Frozen enemy »",
+    f0 == "No Frozen enemy" and f1 == "Frozen: Cast at once", tostring(f0) .. " | " .. tostring(f1))
+  for _, en in ipairs(c.enemies) do en.st.pain = nil end
+  local m1, m2, k0 = use("mirror_image"), use("molten_armor"), use("conflagration")
+  alive[1].st.pain = 3
+  local k1 = use("conflagration")
+  alive[1].st.pain = nil
+  check("Mirror Image, Molten Armor (DoT N), Conflagration (ennemis porteurs de DoT) : leur ligne",
+    m1 == "Cast cards hit twice" and m2 == "When hit: DoT " .. ns.Cards.molten_armor.epicN and k0 == "No enemy with DoT"
+      and k1 == "DoT spreads on death: 1", table.concat({ tostring(m1), tostring(m2), tostring(k0), tostring(k1) }, " | "))
+  use("rule_of_threes")
+  local eb = host.epicBox
+  local ett = table.concat(H.hover(eb), " | ")
+  check("icône de l'épique à gauche de sa ligne, infobulle = la carte", eb._shown and eb.epicId == "rule_of_threes"
+    and ett:find("Rule of Threes", 1, true), ett)
+  -- deuxième incantation et épique : deux lignes, sans chevauchement ni troncature
+  c.player.mana = 9
+  c.hand[#c.hand + 1] = ns.Card.new("fireball", false, 9201)
+  c.hand[#c.hand + 1] = ns.Card.new("pyroblast", false, 9202)
+  ns.Combat.play(c, #c.hand - 1, 1)
+  ns.Combat.play(c, #c.hand, 1)
+  use("water_elemental")
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local a, b = R.rect(host.name), R.rect(host.epic)
+  local apart = a and b and (a[4] <= b[2] + 0.5 or b[4] <= a[2] + 0.5)
+  check("deuxième incantation et ligne de l'épique : deux lignes séparées", host.name._shown and host.epic._shown and apart)
+  H.settle()
+  local cut = {}
+  for _, s in ipairs(W.truncatedNow()) do
+    if s:find(host.epic._text, 1, true) or s:find(host.name._text, 1, true) then cut[#cut + 1] = s end
+  end
+  check("vue du Mage : lignes de l'épique et de la deuxième incantation non tronquées", #cut == 0, table.concat(cut, " ; "))
+  snap("uem-deux-lignes", true)
+  -- nom de l'épique qui s'élève au-dessus de l'unité touchée
+  local floats = {}
+  local old = W.float
+  W.float = function(parent, x, y, text, ...) floats[#floats + 1] = text return old(parent, x, y, text, ...) end
+  v:OnEvents({ { t = "epic", id = "mirror_image", dst = alive[1].uid }, { t = "epic", id = "rule_of_threes", card = 1 } })
+  H.advance(2)
+  W.float = old
+  local fl = table.concat(floats, "|")
+  check("événement d'épique : nom flottant (Mirror Image sur la cible, Rule of Threes sur le héros)",
+    fl:find("Mirror Image", 1, true) and fl:find("Rule of Threes", 1, true), fl)
+  c.epic = nil
+end
+
+-- planche des sept épiques du Mage (base et améliorée)
+if SNAP then
+  local ns = H.ns
+  local W = ns.Widgets
+  local EPICS = { "mirror_image", "molten_armor", "water_elemental", "fingers_of_frost", "arcane_meditation",
+    "conflagration", "rule_of_threes" }
+  local perRow, cw, ch = 7, 140, 230
+  local big = CreateFrame("Frame", nil, _G.UIParent)
+  big:SetSize(perRow * cw + 20, 2 * ch + 10)
+  big:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  big:SetScale(1.5)
+  for i, id in ipairs(EPICS) do
+    for r, up in ipairs({ false, true }) do
+      local c = W.card(big)
+      c:SetCard(id, up, { playable = true })
+      W.placeCenter(c, big, 80 + (i - 1) * cw, 125 + (r - 1) * ch, 1)
+    end
+  end
+  Render.svg(H, big, SNAP .. "/cartes_mage_epiques.svg", "épiques du Mage (base, améliorée)")
+  big:Hide()
 end
 
 print("U16 méthodes d'API inconnues appelées")
