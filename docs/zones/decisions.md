@@ -44,3 +44,14 @@ fiche qui n'est pas tranchée ici, on prend la version que la fiche propose.
   au-delà d'un seuil de Nefarian sont perdus pour ce coup) ; autant de Bone Constructs que de drakônides tués ; Class
   Call : un état par classe ; « Dragonslayer » à la première victoire contre Nefarian avec la classe, le niveau 7
   donne « Veteran » ; Rallying Cry accepté.
+
+## Cartes épiques : tranché par le concepteur (nuit du 13 au 14/11/2026, à revoir par le joueur)
+La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « épiques qui pilotent le build »).
+- **Arrivée en jeu** : une épique est une règle active dès le début de chaque combat (posée comme un Power avant
+  le premier tour, plaque « Epic », sans coût, jamais piochée ni jouée ; ni Hex ni Curse ne la touchent).
+- **Offre** : à l'étape 1 de l'expédition, un choix parmi 3 épiques débloquées (ou « Skip ») ; chaque élite gagnée
+  propose une épique de remplacement ; le marchand en vend une à 150 po. Remplace l'offre « première élite ».
+- **Amélioration** : une épique peut être améliorée au feu de camp ; l'amélioration est perdue si on la remplace.
+- **Riposte du Rogue** : l'épique s'appelle Deflection (« Riposte » est déjà une carte commune) ; chaque Parry
+  GAGNÉ riposte (3, +3 par riposte précédente du tour), la charge de Parry reste pour parer.
+- **Death Wish** reste la première épique du Warrior (Westfall).
