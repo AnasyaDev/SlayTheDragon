@@ -2,8 +2,9 @@
 -- docs/classes.md, « Cartes épiques »). Le reste du Prêtre (Insanity, Atonement, Regen, Cast) est le socle
 -- commun du moteur.
 --
--- Une épique est une règle active tout le combat : ses crochets sont des deckHooks (src = { id, up, uid },
--- actifs où que soit la carte), posés ici sur les définitions de Data/Priest.lua. Amélioration : src.up.
+-- Une épique est une règle active tout le combat, hors de toute pile (c.epic) : ses crochets sont des deckHooks
+-- (src = c.epic = { id, up, uid }, passent après classe, Powers, bibelots et affixes), posés ici sur les
+-- définitions de Data/Priest.lua. Amélioration : src.up.
 --   prayer_of_mending : onHeal → PV rendus (+2) à un ennemi vivant tiré par c.rng.cards (coup sans carte).
 --   misery            : un DoT posé par une carte sur SA cible (pas « to all ») est copié sur chaque autre
 --                       ennemi vivant (+1), par Combat.applyStatus (sans le crochet apply, sans boucle).
@@ -66,12 +67,9 @@ Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
 
 -- Épique du Prêtre active dans ce combat : id, amélioration (nil sans épique).
 function Priest.epicOf(c)
-  local ps = c.passives
-  if not ps then return nil end
-  for i = 1, #ps do
-    local d = ns.Cards[ps[i].id]
-    if d and d.rarity == "epic" and d.class == "priest" then return ps[i].id, ps[i].up end
-  end
+  local e = c.epic
+  local d = e and ns.Cards[e.id]
+  if d and d.class == "priest" then return e.id, e.up end
   return nil
 end
 

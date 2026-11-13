@@ -1,7 +1,6 @@
 -- Tests des sept cartes épiques du Prêtre (docs/zones/cartes-de-zone.md, « Priest ») : cas nominaux et cas
--- limites de la fiche. Les tests ne dépendent pas de la pile où se trouve l'épique : ses crochets sont
--- activés comme ceux d'une carte du deck (c.passives, src = { id, up, uid }), et un test vérifie qu'une épique
--- posée dans le deck de départ est active.
+-- limites de la fiche. L'épique est posée en jeu (c.epic) comme le fait Combat.new, et un test vérifie qu'une
+-- épique placée dans le deck de départ est active et dans aucune pile.
 -- Usage : lua5.1 Sim/tests_epic_priest.lua   (ou luajit) — doit finir par ALL PASS.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 local ns = dofile(root .. "/Sim/load.lua")(root)
@@ -60,12 +59,11 @@ local function setup(hand, opts)
   return c
 end
 
--- Active l'épique comme une carte du deck (crochets deckHooks, quelle que soit sa pile).
+-- Pose l'épique en jeu comme Combat.new le fait pour l'épique du deck (c.epic, hors de toute pile).
 local function epic(c, id, up)
-  c.passives = c.passives or {}
-  c.passives[#c.passives + 1] = { id = id, up = up or false, uid = 900 + #c.passives }
+  c.epic = { id = id, up = up or false, uid = 900 }
   local d = Card.defById(id, up)
-  if d.whileInDeck then d.whileInDeck(c, c.passives[#c.passives]) end
+  if d.whileInDeck then d.whileInDeck(c, c.epic) end
 end
 
 local function hi(c, id)

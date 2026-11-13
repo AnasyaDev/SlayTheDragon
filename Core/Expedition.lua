@@ -22,21 +22,26 @@ ns.Expedition = X
 -- 4 : déblocages par niveau de classe (unlock.level au lieu de unlock.rep).
 -- 5 : campagne par zones (exp.zone ; unlock.common et unlock.won au lieu de unlock.league).
 -- 6 : cartes épiques (exp.epicOffered, exp.rng.epic créé au besoin, reward.epics / epicDone, épique du
---     marchand : shop.cards[i].epic).
+--     marchand : shop.cards[i].epic). Règle finale du 14/11/2026 sans changement de version : champ
+--     facultatif exp.startEpics (offre de départ, phase « start ») ; une v6 en cours reste jouable telle quelle.
 X.VERSION = 6
 
--- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck ; en
--- prendre une autre remplace la précédente. Offre garantie et vente, réglables ici :
---   offerOn   genres de combat dont la PREMIÈRE victoire de l'expédition propose un choix « Epic » en plus de
---             la récompense normale (combats de rencontre compris) ; une seule offre par expédition
---   choices   épiques proposées au plus dans ce choix (distinctes, débloquées, hors celle du deck)
+-- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck, règle en
+-- jeu dès le début de chaque combat (Combat.new : c.epic) ; en prendre une autre remplace la précédente.
+-- Offres et vente, réglables ici :
+--   start     épiques proposées au départ (phase « start », avant le premier combat ; « Skip » possible) ;
+--             0 = pas d'offre de départ
+--   offerOn   genres de combat dont CHAQUE victoire propose des épiques de remplacement en plus de la
+--             récompense normale (combats de rencontre compris), refusables
+--   choices   épiques proposées à chacune de ces victoires (distinctes, débloquées, hors celle du deck)
 --   shop      chance qu'un marchand vende une épique (emplacement en plus des cartes), à partir de l'étape
 --             shopFloor (la moitié du parcours : étapes 1 à 7, boss en 8) ; 0 = jamais
 --   price     prix de base d'une épique chez le marchand (± X.PRICE_JITTER, crochet « price » genre "card")
 -- Sans épique débloquée, aucun tirage n'est fait (l'expédition se déroule exactement comme avant).
 X.EPIC = {
+  start = 3,
   offerOn = { elite = true },
-  choices = 3,
+  choices = 1,
   shop = 0.5,
   shopFloor = 4,
   price = 150,
@@ -80,10 +85,25 @@ X.PHASES = { start = true, map = true, combat = true, reward = true, campfire = 
 -- Crochets d'expédition des bibelots (relic.run) et des affixes (affix.run)
 ---------------------------------------------------------------------------
 
+-- Règles de zone actives dans l'expédition (ns.ZoneRules : la zone de l'expédition, puis celles qui
+-- portent always = true) : leurs crochets d'expédition `run` passent avant ceux des bibelots et affixes.
+local function zoneRuns(exp)
+  return ns.Combat.zoneRulesFor(exp.zone)
+end
+
 -- Valeur modifiée : chaque crochet reçoit (exp, v, a, b) et renvoie la nouvelle valeur.
 -- Noms utilisés : gold (v, source), goldBonus (v, source : ajouts fixes, après tous les « gold »),
--- restFraction (v), restHeal (v), price (v, genre), removePrice (v : prix du retrait chez le marchand).
+-- restFraction (v), restHeal (v), price (v, genre), removePrice (v : prix du retrait chez le marchand),
+-- rewardCards (v = 3, genre : cartes offertes par une récompense de combat).
 function X.modify(exp, name, v, a, b)
+  local zr = zoneRuns(exp)
+  if zr then
+    for i = 1, #zr do
+      local r = ns.ZoneRules[zr[i]]
+      local h = r.run and r.run[name]
+      if h then v = h(exp, v, a, b) end
+    end
+  end
   local relics = exp.relics
   for i = 1, #relics do
     local r = ns.Relics[relics[i]]
@@ -100,9 +120,18 @@ function X.modify(exp, name, v, a, b)
 end
 
 -- Notification : chaque crochet reçoit (exp, a, b) ; true arrête la chaîne.
--- Noms utilisés : onNodeEnter (nœud), onCombatWon (genre), onRest.
+-- Noms utilisés : onNodeEnter (nœud), onCombatWon (genre), onRest, onRewardRolled (récompense, genre :
+-- tirée à l'entrée de l'étape, modifiable), onFightStart (exp.fight, options du combat).
 -- Bibelot « utile à cette classe » : champ `needs` (voir X.usefulFor), sinon toujours proposé.
 function X.fire(exp, name, a, b)
+  local zr = zoneRuns(exp)
+  if zr then
+    for i = 1, #zr do
+      local r = ns.ZoneRules[zr[i]]
+      local h = r.run and r.run[name]
+      if h and h(exp, a, b) then return true end
+    end
+  end
   local relics = exp.relics
   for i = 1, #relics do
     local r = ns.Relics[relics[i]]
@@ -422,7 +451,10 @@ local function upgrade(exp, i)
   exp.stats.upgraded = exp.stats.upgraded + 1
 end
 
+-- Soin hors combat (repos, rencontres) : crochet healOut (v) des zones, bibelots, affixes (Cursed Eye of
+-- Paleth : divisé par deux).
 local function heal(exp, n)
+  n = floor(X.modify(exp, "healOut", n))
   local before = exp.hp
   exp.hp = min(exp.maxHp, exp.hp + max(0, n))
   return exp.hp - before
@@ -442,15 +474,82 @@ end
 function X.zoneDef(exp) return ns.Zones[exp.zone or ns.Zone.FIRST] end
 local actDef = X.zoneDef
 
+-- État d'expédition propre à une zone (données simples, sauvegardées) : exp.zs[id], créé au besoin
+-- (affiche WANTED posée sur une élite, boissons achetées…).
+function X.zoneState(exp, id)
+  exp.zs = exp.zs or {}
+  local s = exp.zs[id or exp.zone]
+  if not s then
+    s = {}
+    exp.zs[id or exp.zone] = s
+  end
+  return s
+end
+
 local function finish(exp, result)
   exp.result = result
   exp.phase = "done"
   exp.combat, exp.fight, exp.reward, exp.shop, exp.event, exp.select = nil, nil, nil, nil, nil, nil
 end
 
+-- Cases de parcours déclarées par les zones (Gryphon Master, Gurubashi Arena, Grim Guzzler…) :
+-- X.NODE_KINDS[genre] = { name (affiché), tier = palier commun qui la débloque (0 : d'emblée),
+--   zone = id (seulement dans cette zone ; nil : toutes les zones une fois débloquée),
+--   event = id de rencontre ouverte à l'entrée (la rencontre porte node = true : jamais tirée au hasard),
+--   enter = f(exp, nœud) (à la place d'event : doit poser exp.phase), replaces = { genres remplaçables }
+--   (défaut { "event" }), minFloor (3), maxFloor (Map.FLOORS - 1), chance (1 : probabilité par carte),
+--   count (1 : cases au plus par carte) }.
+-- Placées après le tirage de la carte (flux à part, « nodes:<acte> » : la carte d'une zone sans case
+-- nouvelle ne change pas), en remplaçant des nœuds existants ; ordre : par genre trié.
+X.NODE_KINDS = {}
+
+function X.nodeKind(kind, def)
+  def.kind = kind
+  X.NODE_KINDS[kind] = def
+  Map.KINDS[kind] = def.name or kind
+  return def
+end
+
+-- Cases débloquées pour cette expédition.
+function X.nodeKindsFor(exp)
+  local list = {}
+  for kind, def in pairs(X.NODE_KINDS) do
+    if (def.tier or 0) <= commonTier(exp) and (def.zone == nil or def.zone == exp.zone) then list[#list + 1] = kind end
+  end
+  table.sort(list)
+  return list
+end
+
+local function placeNodeKinds(exp)
+  local kinds = X.nodeKindsFor(exp)
+  if #kinds == 0 then return end
+  local rng = Rng.stream(exp.seed, "nodes:" .. tostring(exp.act))
+  for _, kind in ipairs(kinds) do
+    local def = X.NODE_KINDS[kind]
+    if Rng.float(rng) < (def.chance or 1) then
+      local repl = {}
+      for _, k in ipairs(def.replaces or { "event" }) do repl[k] = true end
+      for _ = 1, (def.count or 1) do
+        local cands = {}
+        for _, node in ipairs(exp.map.nodes) do
+          if repl[node.kind] and node.floor >= (def.minFloor or 3) and node.floor <= (def.maxFloor or Map.FLOORS - 1) then
+            cands[#cands + 1] = node
+          end
+        end
+        if #cands == 0 then break end
+        local node = cands[Rng.int(rng, 1, #cands)]
+        node.base = node.kind
+        node.kind = kind
+      end
+    end
+  end
+end
+X.placeNodeKinds = placeNodeKinds
+
 local function startAct(exp, act)
   exp.act = act
   exp.map = Map.generate(exp.rng.map, act)
+  placeNodeKinds(exp)
   exp.node = nil
   exp.path = {} -- nœuds visités dans l'acte, dans l'ordre (chemin parcouru, pour l'affichage)
   exp.floor = 0
@@ -480,13 +579,30 @@ local function leaveNode(exp)
   end
 end
 
+-- Poids de rareté décalés d'un cran vers le haut (commune -> inhabituelle, inhabituelle -> rare) :
+-- récompense « une rareté au-dessus » (Gurubashi Arena).
+function X.shiftWeights(w, n)
+  local out = { common = w.common or 0, uncommon = w.uncommon or 0, rare = w.rare or 0 }
+  for _ = 1, (n or 1) do
+    out = { common = 0, uncommon = out.common, rare = out.uncommon + out.rare }
+  end
+  return out
+end
+
 -- Récompense tirée à l'entrée de l'étape. genre : combat | elite | boss | chest.
-local function rollReward(exp, kind)
+-- opts (combats de rencontre, cases de zone) : cards = nombre de cartes offertes, shift = crans de rareté
+-- en plus. Crochet rewardCards (v = 3, genre) ; notification onRewardRolled (récompense, genre).
+local function rollReward(exp, kind, opts)
   local rng = exp.rng.loot
   local r = { kind = kind }
   local g = X.GOLD[kind]
   if g and kind ~= "chest" then r.gold = Rng.int(rng, g[1], g[2]) end
-  if kind ~= "chest" then r.cards = drawCards(exp, rng, 3, X.CARD_WEIGHTS[kind]) end
+  if kind ~= "chest" then
+    local n = X.modify(exp, "rewardCards", opts and opts.cards or 3, kind)
+    local w = X.CARD_WEIGHTS[kind]
+    if opts and opts.shift then w = X.shiftWeights(w, opts.shift) end
+    r.cards = drawCards(exp, rng, n, w)
+  end
   if kind == "elite" or kind == "chest" then
     r.relic = drawRelics(exp, rng, 1, X.RELIC_WEIGHTS.normal)[1]
   elseif kind == "boss" then
@@ -496,8 +612,10 @@ local function rollReward(exp, kind)
   if (kind == "combat" or kind == "elite") and Rng.float(rng) < X.POTION_DROP then
     r.potion = drawPotions(exp, rng, 1)[1]
   end
+  X.fire(exp, "onRewardRolled", r, kind)
   return r
 end
+X.rollReward = rollReward
 
 local function openReward(exp, r)
   if r.gold and r.gold > 0 then r.goldGained = X.gainGold(exp, r.gold, r.kind) end
@@ -510,14 +628,34 @@ local function openReward(exp, r)
   exp.reward = r
   exp.phase = "reward"
 end
+X.openReward = openReward
+X.leaveNode = function(exp) return leaveNode(exp) end
 
--- Offre garantie : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone), une fois par expédition,
--- s'il reste une épique à proposer (tirée par le flux « epic »). Renvoie vrai si l'offre est faite.
-function X.offerEpic(exp, r)
+-- Ids d'un groupe (entrées « id » ou spec { id, st = … }, Combat.spawn).
+local function groupIds(group)
+  local ids = {}
+  for i = 1, #group do ids[i] = Combat.specId(group[i]) end
+  return ids
+end
+X.groupIds = groupIds
+
+-- Offre de remplacement : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone) s'il reste une
+-- épique à proposer (tirée par le flux « epic » ; n = X.EPIC.choices par défaut). Renvoie vrai si l'offre est
+-- faite.
+function X.offerEpic(exp, r, n)
   local pool = X.epicPool(exp)
-  if #pool == 0 then return false end
-  r.epics = drawEpics(epicRng(exp), pool, X.EPIC.choices)
+  if #pool == 0 or (n or X.EPIC.choices) <= 0 then return false end
+  r.epics = drawEpics(epicRng(exp), pool, n or X.EPIC.choices)
   r.epicDone = false
+  return true
+end
+
+-- Offre de départ (X.new) : exp.startEpics = jusqu'à X.EPIC.start épiques débloquées, phase « start ».
+-- exp.epicOffered = vrai si elle a été faite. Renvoie vrai si l'offre est faite.
+local function offerStartEpic(exp)
+  local o = {}
+  if not X.offerEpic(exp, o, X.EPIC.start) then return false end
+  exp.startEpics = o.epics
   exp.epicOffered = true
   return true
 end
@@ -533,18 +671,20 @@ local function endFight(exp)
     clearNode(exp)
     if f.kind == "elite" then exp.stats.elites = exp.stats.elites + 1 end
     if f.kind == "boss" then exp.stats.bosses = exp.stats.bosses + 1 end
-    X.fire(exp, "onCombatWon", f.kind)
-    if X.EPIC.offerOn[f.kind] and not exp.epicOffered then X.offerEpic(exp, f.reward) end
+    X.fire(exp, "onCombatWon", f.kind, f)
+    if X.EPIC.offerOn[f.kind] then X.offerEpic(exp, f.reward) end
     openReward(exp, f.reward)
   else
-    exp.killedBy = table.concat(f.encounter, "+")
+    exp.killedBy = table.concat(groupIds(f.encounter), "+")
     finish(exp, "lost")
   end
 end
 
 -- genre : combat | elite | boss ; pool : groupe de ns.Encounters (sinon déduit) ;
--- reward : récompense déjà tirée (sinon tirée maintenant).
-local function startFight(exp, kind, pool, reward)
+-- reward : récompense déjà tirée (sinon tirée maintenant) ; extra (rencontres, cases de zone) :
+-- { idx = groupe déjà tiré, mods = { st, hpMul } (Combat.new) }. Le combat reçoit la zone et le genre
+-- (règles de zone), et exp.nextCombat (effets de départ : boissons du Grim Guzzler), consommé.
+local function startFight(exp, kind, pool, reward, extra)
   local pools = ns.Encounters[actDef(exp).encounters]
   if not pool then
     if kind == "combat" then
@@ -556,22 +696,31 @@ local function startFight(exp, kind, pool, reward)
   if kind == "combat" then exp.combatsInAct = exp.combatsInAct + 1 end
   local list = pools[pool]
   local rng = exp.rng.combat
-  local idx
-  for _ = 1, 5 do
-    idx = Rng.int(rng, 1, #list)
-    if idx ~= exp.lastEnc[pool] then break end
+  local idx = extra and extra.idx
+  if not idx then
+    for _ = 1, 5 do
+      idx = Rng.int(rng, 1, #list)
+      if idx ~= exp.lastEnc[pool] then break end
+    end
   end
   exp.lastEnc[pool] = idx
   local seed = Rng.int(rng, 1, 2147483646)
-  exp.fight = { kind = kind, pool = pool, encounter = U.copyArr(list[idx]), seed = seed,
+  exp.fight = { kind = kind, pool = pool, encounter = groupIds(list[idx]), seed = seed,
     reward = reward or rollReward(exp, kind) }
   exp.stats.combats = exp.stats.combats + 1
   exp.phase = "combat"
-  exp.combat = Combat.new({ seed = seed, class = exp.class, hp = exp.hp, maxHp = exp.maxHp, deck = exp.deck,
+  local opts = { seed = seed, class = exp.class, hp = exp.hp, maxHp = exp.maxHp, deck = exp.deck,
     encounter = list[idx], relics = exp.relics, potions = U.copy(exp.potions), affixes = exp.affixes,
-    stats = exp.combatStats, quiet = exp.quiet })
+    stats = exp.combatStats, quiet = exp.quiet, zone = exp.zone, kind = kind,
+    mods = extra and extra.mods or nil, start = exp.nextCombat }
+  exp.nextCombat = nil
+  X.fire(exp, "onFightStart", exp.fight, opts)
+  exp.combat = Combat.new(opts)
   if exp.combat.result then endFight(exp) end
 end
+-- Pour une case de zone qui lance un combat elle-même (X.NODE_KINDS[genre].enter) :
+-- X.startFight(exp, genre, groupe, récompense|nil, { idx, mods }) ; X.rollReward(exp, genre, { cards, shift }).
+X.startFight = startFight
 
 local function openShop(exp)
   local rng = exp.rng.merchant
@@ -754,7 +903,9 @@ end
 function X.eventPool(exp)
   local list = {}
   for id, ev in pairs(ns.Events or {}) do
-    if (ev.zone == nil or ev.zone == exp.zone) and (ev.tier or 0) <= commonTier(exp) and not exp.seenEvents[id] then
+    -- node = vrai : rencontre ouverte seulement par sa case de parcours (X.NODE_KINDS), jamais tirée
+    if not ev.node and (ev.zone == nil or ev.zone == exp.zone) and (ev.tier or 0) <= commonTier(exp)
+        and not exp.seenEvents[id] then
       local once = X.onceFlag(id)
       if not (once and X.hasFlag(exp, once)) and X.check(exp, ev.when) then
         list[#list + 1] = id
@@ -765,13 +916,87 @@ function X.eventPool(exp)
   return list
 end
 
+-- Effets de rencontre ajoutés par une zone (ou un autre fichier) sans toucher à ce fichier :
+-- X.EFFECTS[nom] = { roll = f(exp, rng, e) -> tirage figé à l'entrée (facultatif),
+--                    check = f(exp, e) -> ok, raison (facultatif : réponse grisée sinon),
+--                    apply = f(exp, e, tirage, ctx) (ctx.reward = récompense à ouvrir, ctx.texts) }.
+-- Effets génériques fournis ici : nextCombat (effets du prochain combat), skipFloors (vol : sauter une étape).
+X.EFFECTS = {}
+
+-- { "nextCombat", { effets de carte } } : résolus au début du prochain combat (Combat.new, opts.start ;
+-- « Next combat: start with Strength 2 » = { "apply", "force", 2, self = true }).
+X.EFFECTS.nextCombat = {
+  apply = function(exp, e)
+    exp.nextCombat = exp.nextCombat or {}
+    for _, fx in ipairs(e[2] or {}) do exp.nextCombat[#exp.nextCombat + 1] = U.copy(fx) end
+  end,
+}
+
+-- { "skipFloors", n } : la prochaine étape choisie sur la carte est à n + 1 étapes (Gryphon Master :
+-- « Fly ahead ») ; les nœuds atteignables sont ceux reliés aux nœuds sautés (X.nextNodes).
+X.EFFECTS.skipFloors = {
+  check = function(exp, e)
+    local node = exp.node and exp.map.nodes[exp.node]
+    if not node then return true end
+    if node.floor + (e[2] or 1) + 1 >= exp.map.floors then return false, "Too close to the boss." end
+    return true
+  end,
+  apply = function(exp, e) exp.skip = e[2] or 1 end,
+}
+
+-- { "chain", id } : après cette réponse, la rencontre id s'ouvre à la place (deuxième étape d'une même
+-- case : la boisson achetée du Grim Guzzler après la boisson offerte).
+X.EFFECTS.chain = {
+  apply = function(exp, e, roll, ctx) ctx.follow = { kind = "event", id = e[2] } end,
+}
+
+-- Nœuds accessibles maintenant : successeurs du nœud courant ; après un vol (exp.skip = n), les
+-- successeurs des nœuds sautés, n étapes plus loin.
+function X.nextNodes(exp)
+  local list = Map.nextNodes(exp.map, exp.node)
+  local skip = exp.skip or 0
+  for _ = 1, skip do
+    local seen, nx = {}, {}
+    for _, id in ipairs(list) do
+      for _, n2 in ipairs(exp.map.nodes[id].next) do
+        if not seen[n2] then seen[n2] = true nx[#nx + 1] = n2 end
+      end
+    end
+    table.sort(nx)
+    if #nx == 0 then break end
+    list = nx
+  end
+  return list
+end
+
+-- Groupe d'un combat de rencontre tiré à l'entrée (fight avec group = true) : { pool, idx, names }.
+local function rollGroup(exp, rng, e)
+  local pools = ns.Encounters[actDef(exp).encounters]
+  local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
+  local list = pools and pools[pool]
+  if not list or #list == 0 then return nil end
+  local idx = Rng.int(rng, 1, #list)
+  local names = {}
+  for i, spec in ipairs(list[idx]) do
+    local d = ns.Enemies[Combat.specId(spec)]
+    names[i] = d and d.name or tostring(Combat.specId(spec))
+  end
+  return { pool = pool, idx = idx, names = names }
+end
+
 -- Tirages d'une liste d'effets, faits à l'entrée de la rencontre (r[i] pour l'effet i).
 local function rollEffects(exp, rng, effects)
   local r = {}
   for ei, e in ipairs(effects) do
     local k = e[1]
     r[ei] = false
-    if k == "cardChoice" then
+    local ext = X.EFFECTS[k]
+    if ext then
+      if ext.roll then
+        local v = ext.roll(exp, rng, e)
+        if v ~= nil then r[ei] = v end
+      end
+    elseif k == "cardChoice" then
       -- neutral = true : choix parmi les cartes neutres débloquées ; sinon cartes de la classe
       local w = e.rarity and { [e.rarity] = 1 } or X.CARD_WEIGHTS.combat
       if e.neutral then r[ei] = drawNeutral(exp, rng, e.n or 3, w)
@@ -781,7 +1006,9 @@ local function rollEffects(exp, rng, effects)
     elseif k == "potion" and not e[2] then
       r[ei] = drawPotions(exp, rng, 1)[1] or false
     elseif k == "fight" then
-      r[ei] = rollReward(exp, e.kind == "elite" and "elite" or "combat")
+      r[ei] = rollReward(exp, e.kind == "elite" and "elite" or "combat", e.reward)
+      -- group = true : groupe tiré dès l'entrée (nom de l'élite affiché : WANTED, Gurubashi Arena)
+      if e.group then r[ei].group = rollGroup(exp, rng, e) end
     elseif k == "gamble" then
       r[ei] = { won = Rng.float(rng) < e[2], win = rollEffects(exp, rng, e.win or {}),
         lose = rollEffects(exp, rng, e.lose or {}) }
@@ -790,15 +1017,19 @@ local function rollEffects(exp, rng, effects)
   return r
 end
 
-local function openEvent(exp)
+-- forced : id d'une rencontre imposée (case de parcours d'une zone, X.NODE_KINDS[genre].event).
+local function openEvent(exp, forced)
   local rng = exp.rng.events
-  local pool = X.eventPool(exp)
   exp.phase = "event"
-  if #pool == 0 then
-    exp.event = { id = false, rolls = {}, chosen = false }
-    return
+  local id = forced
+  if not id then
+    local pool = X.eventPool(exp)
+    if #pool == 0 then
+      exp.event = { id = false, rolls = {}, chosen = false }
+      return
+    end
+    id = Rng.weighted(rng, pool, function(x) return X.eventWeight(ns.Events[x]) end)
   end
-  local id = Rng.weighted(rng, pool, function(x) return X.eventWeight(ns.Events[x]) end)
   exp.seenEvents[id] = true
   local once = X.onceFlag(id)
   if once then X.setFlag(exp, once) end
@@ -808,6 +1039,28 @@ local function openEvent(exp)
   local rolls = {}
   for ci, ch in ipairs(ev.choices) do rolls[ci] = rollEffects(exp, rng, ch.effects) end
   exp.event = { id = id, rolls = rolls, chosen = false }
+end
+X.openEvent = openEvent
+
+-- Texte de la rencontre en cours : ev.text, où « %s » est remplacé par le nom du premier ennemi du
+-- groupe tiré à l'entrée (fight avec group = true : « WANTED: %s. »).
+function X.eventText(exp)
+  local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
+  if not ev then return "" end
+  local text = ev.text or ""
+  if not text:find("%s", 1, true) and not text:find("%g", 1, true) then return text end
+  local names
+  for _, rolls in ipairs(exp.event.rolls or {}) do
+    for _, r in ipairs(rolls) do
+      if not names and type(r) == "table" and r.group and r.group.names then names = r.group.names end
+    end
+  end
+  names = names or { "someone" }
+  local all = names[1]
+  if #names > 1 then all = table.concat(names, ", ", 1, #names - 1) .. " and " .. names[#names] end
+  text = text:gsub("%%s", (names[1]:gsub("%%", "%%%%")))
+  text = text:gsub("%%g", (all:gsub("%%", "%%%%")))
+  return text
 end
 
 local function upgradable(exp)
@@ -819,8 +1072,14 @@ local function upgradable(exp)
 end
 
 -- Améliore n cartes au hasard parmi celles qui peuvent l'être (rng : flux de l'état) ; renvoie le nombre.
+-- L'épique n'est jamais améliorée au hasard (choix volontaire au feu de camp ou en rencontre « upgrade »).
 function X.upgradeRandom(exp, n, rng)
-  local list = Rng.shuffle(rng, upgradable(exp))
+  local list = upgradable(exp)
+  local ei = X.epicIndex(exp)
+  if ei then
+    for k = #list, 1, -1 do if list[k] == ei then table.remove(list, k) end end
+  end
+  list = Rng.shuffle(rng, list)
   local k = min(n, #list)
   for i = 1, k do upgrade(exp, list[i]) end
   return k
@@ -847,6 +1106,11 @@ function X.eventChoiceOk(exp, ci)
   if not ok then return false, why end
   for _, e in ipairs(ch.effects) do
     local k = e[1]
+    local ext = X.EFFECTS[k]
+    if ext and ext.check then
+      local okx, whyx = ext.check(exp, e)
+      if not okx then return false, whyx end
+    end
     if k == "pay" and exp.gold < e[2] then return false, "gold" end
     if (k == "remove" or k == "dupe") and #exp.deck <= 1 then return false, "deck" end
     if k == "upgrade" and #upgradable(exp) == 0 then return false, "upgrade" end
@@ -883,7 +1147,10 @@ local function applyEffects(exp, effects, rolls, ctx)
   end
   for ei, e in ipairs(effects) do
     local k = e[1]
-    if k == "heal" then
+    local ext = X.EFFECTS[k]
+    if ext then
+      ext.apply(exp, e, rolls[ei], ctx)
+    elseif k == "heal" then
       heal(exp, e[2])
     elseif k == "healPct" then
       heal(exp, floor(exp.maxHp * e[2]))
@@ -922,8 +1189,15 @@ local function applyEffects(exp, effects, rolls, ctx)
     elseif k == "upgrade" or k == "remove" or k == "dupe" then
       ctx.follow = { kind = k }
     elseif k == "fight" then
-      ctx.follow = { kind = "fight", fight = e.kind == "elite" and "elite" or "combat", pool = e[2],
-        reward = U.copy(rolls[ei]), bonus = e.gold }
+      -- st = { asleep = 3 } (Sleeping Camp), hpMul (Gurubashi Arena) : posés sur les ennemis hors boss ;
+      -- group : groupe tiré à l'entrée (rolls) ; reward = { cards, shift } : récompense déjà tirée ainsi
+      local reward = U.copy(rolls[ei])
+      local group = reward and reward.group
+      if reward then reward.group = nil end
+      local mods = (e.st or e.hpMul) and { st = e.st and U.copy(e.st) or nil, hpMul = e.hpMul } or nil
+      ctx.follow = { kind = "fight", fight = e.kind == "elite" and "elite" or "combat",
+        pool = group and group.pool or e[2], reward = reward, bonus = e.gold,
+        extra = (group or mods) and { idx = group and group.idx or nil, mods = mods } or nil }
     elseif k == "gamble" then
       local r = rolls[ei]
       exp.event.lucky = r.won
@@ -952,12 +1226,15 @@ local function applyEvent(exp, ci)
   applyEffects(exp, ch.effects, exp.event.rolls[ci], ctx)
   exp.event.result = table.concat(ctx.texts, " ")
   local follow, reward = ctx.follow, ctx.reward
-  if follow and follow.kind == "fight" then
+  if follow and follow.kind == "event" then
+    -- rencontre enchaînée : une réponse qui enchaîne ne donne pas de récompense (la mettre dans la suivante)
+    openEvent(exp, follow.id)
+  elseif follow and follow.kind == "fight" then
     -- Récompense du combat : tirée à l'entrée, plus le bonus et l'or de la réponse.
     local r = follow.reward
     local bonus = (follow.bonus or 0) + (reward and reward.gold or 0)
     if bonus > 0 then r.gold = (r.gold or 0) + bonus end
-    startFight(exp, follow.fight, follow.pool, r)
+    startFight(exp, follow.fight, follow.pool, r, follow.extra)
   elseif follow then
     -- Sélection d'une carte ; une récompense de la même réponse s'ouvre après.
     follow.reward = reward
@@ -991,6 +1268,9 @@ local function enterNode(exp, id)
     openEvent(exp)
   elseif k == "chest" then
     openReward(exp, rollReward(exp, "chest"))
+  elseif X.NODE_KINDS[k] then
+    local def = X.NODE_KINDS[k]
+    if def.enter then def.enter(exp, node) else openEvent(exp, def.event) end
   else
     error("unknown node kind: " .. tostring(k))
   end
@@ -1005,7 +1285,7 @@ end
 --                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements),
---        epic = id d'une carte épique ajoutée au deck de départ (simulation)
+--        epic = id d'une carte épique ajoutée au deck de départ (simulation ; pas d'offre de départ)
 function X.new(opts)
   opts = opts or {}
   local seed = floor(opts.seed or 1)
@@ -1052,6 +1332,12 @@ function X.new(opts)
   end
   -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
   if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end
+  -- toutes les zones (quelle que soit celle jouée) : effets de compte sur la nouvelle expédition
+  -- (Rallying Cry of the Dragonslayer : +6 PV max) ; ns.ZoneRules[id].newExpedition(exp), ordre des ids
+  local zids = {}
+  for zid, r in pairs(ns.ZoneRules) do if r.newExpedition then zids[#zids + 1] = zid end end
+  table.sort(zids)
+  for _, zid in ipairs(zids) do ns.ZoneRules[zid].newExpedition(exp) end
   startAct(exp, 1)
   -- Un bibelot au choix parmi 3 (première victoire du compte dans la zone d'ordre Meta.PERKS.startRelic,
   -- ex-Révéré de la Ligue), tirés dans la réserve de l'expédition (communs, de classe et de clé
@@ -1064,6 +1350,9 @@ function X.new(opts)
       exp.phase = "start"
     end
   end
+  -- Épique de l'expédition au choix (X.EPIC.start), avant le premier combat ; vient AVANT le bibelot de
+  -- départ (phase « start » : exp.startEpics, puis exp.startRelics). Rien si l'épique est imposée (epic=).
+  if not opts.epic and offerStartEpic(exp) then exp.phase = "start" end
   return exp
 end
 
@@ -1073,26 +1362,47 @@ end
 
 local H = {} -- H[phase][verbe] = function(exp, a) -> true | false, raison
 
+-- Phase « start » : l'épique (exp.startEpics) d'abord, puis le bibelot (exp.startRelics) ; la carte ensuite.
+local function startNext(exp)
+  if not exp.startEpics and not exp.startRelics then exp.phase = "map" end
+  return true
+end
+
 H.start = {
   startRelic = function(exp, a)
+    if exp.startEpics or not exp.startRelics then return false, "index" end
     local id = exp.startRelics[a[2] or 0]
     if not id then return false, "index" end
     X.gainRelic(exp, id)
     exp.startRelics = nil
-    exp.phase = "map"
-    return true
+    return startNext(exp)
   end,
   skipStartRelic = function(exp)
+    if exp.startEpics or not exp.startRelics then return false, "index" end
     exp.startRelics = nil
-    exp.phase = "map"
-    return true
+    return startNext(exp)
+  end,
+  -- épique de départ : mêmes verbes que le choix « Epic » d'une récompense
+  pickEpic = function(exp, a)
+    local id = exp.startEpics and exp.startEpics[a[2] or 0]
+    if not id then return false, "badCard" end
+    X.addCard(exp, id)
+    exp.startEpics = nil
+    exp.startEpicPicked = id
+    return startNext(exp)
+  end,
+  skipEpic = function(exp)
+    if not exp.startEpics then return false, "badCard" end
+    exp.startEpics = nil
+    return startNext(exp)
   end,
 }
 
 H.map = {
   path = function(exp, a)
     local id = a[2]
-    if not U.indexOf(Map.nextNodes(exp.map, exp.node), id) then return false, "path" end
+    if not U.indexOf(X.nextNodes(exp), id) then return false, "path" end
+    exp.skip = nil
     enterNode(exp, id)
     return true
   end,
@@ -1163,7 +1473,38 @@ H.reward = {
   end,
 }
 
+-- Actions du feu de camp déclarées par les zones actives (ns.ZoneRules[id].campfire = { { id, label,
+-- text, can = f(exp) -> ok, raison, apply = f(exp) -> "stay" pour rester au feu } }) : liste
+-- { id, label, text, def }.
+function X.campActions(exp)
+  local list = {}
+  local zr = zoneRuns(exp)
+  for _, zid in ipairs(zr or {}) do
+    for _, a in ipairs(ns.ZoneRules[zid].campfire or {}) do
+      list[#list + 1] = { id = a.id, label = a.label, text = a.text, def = a }
+    end
+  end
+  return list
+end
+
+local function campAction(exp, id)
+  for _, a in ipairs(X.campActions(exp)) do
+    if a.id == id then return a.def end
+  end
+  return nil
+end
+
 H.campfire = {
+  campAction = function(exp, a)
+    local def = campAction(exp, a[2])
+    if not def then return false, "action" end
+    if def.can then
+      local ok, why = def.can(exp)
+      if not ok then return false, why or "action" end
+    end
+    if def.apply(exp) ~= "stay" then leaveNode(exp) end
+    return true
+  end,
   rest = function(exp)
     local frac = X.modify(exp, "restFraction", X.REST_FRACTION)
     local n = floor(X.modify(exp, "restHeal", floor(exp.maxHp * frac)))
@@ -1314,10 +1655,15 @@ function X.choices(exp)
   local ph = exp.phase
   local function add(a) list[#list + 1] = a end
   if ph == "start" then
-    for i = 1, #exp.startRelics do add({ "startRelic", i }) end
-    add({ "skipStartRelic" })
+    if exp.startEpics then
+      for i = 1, #exp.startEpics do add({ "pickEpic", i }) end
+      add({ "skipEpic" })
+    elseif exp.startRelics then
+      for i = 1, #exp.startRelics do add({ "startRelic", i }) end
+      add({ "skipStartRelic" })
+    end
   elseif ph == "map" then
-    local nx = Map.nextNodes(exp.map, exp.node)
+    local nx = X.nextNodes(exp)
     for i = 1, #nx do add({ "path", nx[i] }) end
   elseif ph == "combat" then
     local c = exp.combat
@@ -1356,6 +1702,9 @@ function X.choices(exp)
     add({ "rest" })
     for i = 1, #exp.deck do
       if X.canUpgrade(exp, i) then add({ "upgrade", i }) end
+    end
+    for _, ca in ipairs(X.campActions(exp)) do
+      if not ca.def.can or ca.def.can(exp) then add({ "campAction", ca.id }) end
     end
     add({ "leave" })
   elseif ph == "merchant" then
