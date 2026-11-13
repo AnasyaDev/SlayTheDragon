@@ -48,6 +48,23 @@ local function body(T)
   check("Progress : « Priest — Dragonslayer » sous la barre de niveau", T.currentKind() == "classProgress"
     and cp.bar and cp.bar.detail._text == "Priest — Dragonslayer" and vis(cp.bar.detail), cp and cp.bar and tostring(cp.bar.detail._text))
   snap("zone-blackrock-progress", true)
+  -- Journal (« Log ») : même titre que l'accueil et Progress (Dragonslayer contre Nefarian, Veteran au niveau 7)
+  clickOption("ui:meta")
+  local function logDetail()
+    local lb = UI().current.bars and UI().current.bars[1]
+    return lb and vis(lb) and tostring(lb.detail._text) or "?"
+  end
+  local d = logDetail()
+  check("journal : « title: Dragonslayer » (Nefarian vaincu avec la classe)", T.currentKind() == "meta"
+    and d:find("title: Dragonslayer", 1, true) ~= nil, d)
+  meta.flags["dragonslayer:priest"] = nil
+  UI().refresh()
+  d = logDetail()
+  check("journal : niveau 7 sans victoire contre Nefarian, « title: Veteran » (pas Dragonslayer)",
+    d:find("title: Veteran", 1, true) ~= nil and not d:find("Dragonslayer", 1, true), d)
+  snap("zone-blackrock-journal", true)
+  meta.flags["dragonslayer:priest"] = true
+  clickOption("ui:progress")
   clickOption("ui:back")
   clickOption("zone:blackrock")
 
@@ -58,6 +75,29 @@ local function body(T)
   if T.option("skipStartRelic") then clickOption("skipStartRelic") end
   local exp = EXP()
   check("expédition à Blackrock Mountain", exp and exp.zone == "blackrock", exp and exp.zone)
+  -- Parcours : icône du boss de la zone (Art.ui.mapBoss), plus celle de VanCleef
+  local bossNode
+  for _, nd in ipairs(UI().step.nodes or {}) do if nd.kind == "boss" then bossNode = nd end end
+  local btex = bossNode and T.button(bossNode.id) and tostring(T.button(bossNode.id).icon._texture) or "?"
+  check("parcours de Blackrock : icône de Nefarian sur le boss (pas VanCleef)", T.currentKind() == "map"
+    and btex:lower():find("achievement_boss_nefarion", 1, true) ~= nil, btex)
+  snap("zone-blackrock-parcours", true)
+  -- les sept zones portent l'icône de leur boss (boss des groupes de la zone, icône embarquée)
+  local Art, Skin = ns.Art, ns.Skin
+  local WANT = { westfall = "vancleef", duskwood = "morbent_fel", wetlands = "nekrosh", stranglethorn = "jindo",
+    swamp = "somnus", steppes = "grark_lorkrub", blackrock = "nefarian" }
+  local badZ = {}
+  for _, z in ipairs(ns.Zone.ORDER) do
+    local e = Art.ui.mapBoss[z]
+    local def = ns.Zones[z]
+    local groups = def and ns.Encounters[def.encounters] and ns.Encounters[def.encounters].boss
+    local bid = groups and groups[1] and groups[1][1]
+    if not e then badZ[#badZ + 1] = z .. " : pas d'icône"
+    elseif bid ~= WANT[z] or e ~= Art.enemies[bid].icon then badZ[#badZ + 1] = z .. " : " .. tostring(bid)
+    elseif Skin and Skin.icons and not Skin.icons[tostring(e.tga):lower()] then badZ[#badZ + 1] = z .. " : " .. tostring(e.tga) .. " non embarquée"
+    end
+  end
+  check("Art.ui.mapBoss : le boss de chacune des sept zones, icône embarquée", #badZ == 0, table.concat(badZ, " ; "))
   local id = exp.map.start[1]
   exp.map.nodes[id].kind = "combat"
   clickOption("path:" .. id)
@@ -202,6 +242,26 @@ local function body(T)
   local zs = ns.Zones.blackrock.scenes
   check("la zone porte ses décors (route, nuit, marchand, boss…)", zs.road == "blackrock_span" and zs.night == "blackrock_forge"
     and zs.shop == "blackrock_tavern" and zs.mine == "blackrock_lair")
+
+  -- Bilan de la première victoire contre Nefarian (compte et classe) : titre de victoire, titre Dragonslayer,
+  -- Rallying Cry of the Dragonslayer (docs/zones/blackrock.md § 10)
+  meta.flags["dragonslayer:priest"], meta.flags.rallying_cry = nil, nil
+  local x = EXP()
+  x.combat, x.fight = nil, nil
+  ns.Expedition.fire(x, "onCombatWon", "boss")
+  x.stats.cleared, x.stats.elites, x.stats.bosses = 8, 1, 1
+  x.result, x.phase = "won", "done"
+  UI().refresh()
+  H.settle()
+  local es, pg = UI().step, UI().current
+  local txt = es and es.text or ""
+  check("bilan : titre « Expedition complete! » affiché, en vert", T.currentKind() == "end" and pg.title._text == "Expedition complete!"
+    and vis(pg.title), pg and pg.title and tostring(pg.title._text))
+  check("bilan : « The Priest earns the title Dragonslayer. »", txt:find("The Priest earns the title Dragonslayer.", 1, true) ~= nil, txt)
+  check("bilan : ligne Rallying Cry (+6 PV max à l'expédition suivante)",
+    txt:find("Rallying Cry of the Dragonslayer: the next expedition (any class) starts with +6 max HP.", 1, true) ~= nil, txt)
+  check("bilan : aucun texte tronqué", #ns.Widgets.truncatedNow() == 0, table.concat(ns.Widgets.truncatedNow(), " ; "))
+  snap("zone-blackrock-bilan", true)
 end
 
 -- erreur Lua : affichée et comptée comme un échec (le harnais continue)

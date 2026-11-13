@@ -332,10 +332,9 @@ ZR.define("blackrock", {
 })
 
 -- Titre d'une classe pour l'accueil et l'écran Progress : « Dragonslayer » (Nefarian vaincu avec la
--- classe), sinon « Veteran » au niveau 7, sinon nil. meta = compte (Meta).
+-- classe), sinon le titre du niveau (Meta.title : « Veteran » au niveau 7), sinon nil. meta = compte (Meta).
 function BR.title(meta, class)
   if not meta then return nil end
   if ns.Meta.hasFlag(meta, "dragonslayer:" .. tostring(class)) then return "Dragonslayer" end
-  if ns.Meta.isMaxLevel(meta, class) then return "Veteran" end
-  return nil
+  return ns.Meta.title(meta, class)
 end

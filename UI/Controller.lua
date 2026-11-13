@@ -849,7 +849,9 @@ local function metaStep()
     for _, zid in ipairs(ns.Zone.ORDER) do if Meta.classWon(m, cid, zid) then won = won + 1 end end
     b.detail = "Zones won: " .. won .. " of " .. ns.Zone.count()
       .. ((cs and cs.runs) and (" · " .. cs.runs .. " expedition(s), " .. (cs.wins or 0) .. " victory(ies)") or "")
-    local title = Meta.title(m, cid)
+    -- même titre que l'accueil et l'écran Progress (« Dragonslayer » : Nefarian ; « Veteran » : niveau 7)
+    local BR = ns.Blackrock
+    local title = (BR and BR.title or Meta.title)(m, cid)
     if title then b.detail = b.detail .. " · title: " .. title end
     bars[#bars + 1] = b
   end
@@ -938,6 +940,18 @@ local function endStep()
   if s.accountZone and s.common then
     for _, l in ipairs(commonLine(zname, s.common)) do lines[#lines + 1] = "|cff40c0ff" .. l .. "|r" end
   end
+  -- fin de campagne (Blackrock, docs/zones/blackrock.md § 10) : titre de la classe, Rallying Cry du compte,
+  -- d'après les drapeaux de compte posés par cette expédition (summary.flags)
+  local newFlag = {}
+  for _, name in ipairs(s.flags or {}) do newFlag[name] = true end
+  if newFlag["dragonslayer:" .. tostring(e.class)] then
+    lines[#lines + 1] = "|cffffd700The " .. cname .. " earns the title Dragonslayer.|r"
+  end
+  if newFlag.rallying_cry then
+    local hp = ns.Blackrock and ns.Blackrock.RALLY_HP or 6
+    lines[#lines + 1] = "|cff40c0ffRallying Cry of the Dragonslayer: the next expedition (any class) starts with +"
+      .. hp .. " max HP.|r"
+  end
   local bars = { levelBar(e.class) }
   -- ce que la fin d'expédition vient de débloquer pour la classe, révélé tel quel : cartes et bibelots du
   -- niveau, carte de zone, bibelots de clé
@@ -1000,7 +1014,7 @@ local function mapStep(exp)
     if same and ns.Enemies[first] then bossName = ns.Enemies[first].name end
   end
   return { kind = "map", title = X.actName(exp) .. " · stage " .. min(exp.floor + 1, floors) .. " of " .. floors,
-    text = text, nodes = nodes, options = opts, affixes = exp.affixes, key = exp.key, bossName = bossName,
+    text = text, nodes = nodes, options = opts, affixes = exp.affixes, key = exp.key, bossName = bossName, zone = exp.zone,
     floor = exp.floor, floors = floors }
 end
 

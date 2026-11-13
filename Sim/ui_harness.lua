@@ -1213,6 +1213,9 @@ check("nœuds accessibles = Map.nextNodes", avail == #ns.Map.nextNodes(exp.map, 
 local boss
 for _, n in ipairs(st.nodes) do if n.kind == "boss" then boss = n end end
 check("boss à droite, icône de boss", boss and boss.x > 0.9 and button(boss.id).icon._texture ~= ns.Art.QUESTION)
+check("icône du boss de Westfall : VanCleef (Art.ui.mapBoss.westfall)", st.zone == "westfall"
+  and (button(boss.id).icon._texture or ""):lower():find("achievement_boss_edwinvancleef", 1, true) ~= nil,
+  tostring(button(boss.id).icon._texture))
 H.click(button(boss.id))
 check("nœud inaccessible : refus", EXP().node == nil and UI().err._text == "Stage out of reach.", UI().err._text)
 check("liens tracés", (UI().current.linkCount or 0) >= #exp.map.nodes - 1, UI().current.linkCount)
@@ -8295,6 +8298,8 @@ do
   H.settle()
   check("bilan : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("bilan-campagne", true)
+  check("bilan de Westfall : ni titre Dragonslayer ni Rallying Cry (réservés à Nefarian)",
+    not text:find("Dragonslayer", 1, true) and not text:find("Rallying Cry", 1, true), text)
   noLeague("bilan", H.hover(scr.bars[1]))
   -- deuxième victoire, à +1 : bibelot de clé de Westfall +1, clé +2 ; plus de première victoire
   clickOption("ui:new")

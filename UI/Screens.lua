@@ -1529,8 +1529,10 @@ local function nodePos(node, floors)
   return x, y
 end
 
-local function paintNode(b, node, bossName)
+-- step : étape « map » (bossName ; zone : icône du boss de la zone, Art.ui.mapBoss, repli Art.ui.map.boss).
+local function paintNode(b, node, step)
   local st, kind = node.state, node.kind
+  local bossName = step.bossName
   local boss = kind == "boss"
   local elite = kind == "elite"
   local cur = st == "current"
@@ -1541,7 +1543,8 @@ local function paintNode(b, node, bossName)
   local inset = boss and size * 0.12 or size * 0.16
   b.icon:SetPoint("TOPLEFT", inset, -inset)
   b.icon:SetPoint("BOTTOMRIGHT", -inset, inset)
-  W.setIcon(b.icon, Art.ui.map[kind] or Art.ui.map.event, "map:" .. tostring(kind))
+  local zoneBoss = boss and step.zone and Art.ui.mapBoss and Art.ui.mapBoss[step.zone]
+  W.setIcon(b.icon, zoneBoss or Art.ui.map[kind] or Art.ui.map.event, "map:" .. tostring(kind))
   b.ring:SetSize(size * 1.04, size * 1.04)
   b.big:SetSize(size, size)
   b.elite:SetSize(size, size * W.Wow.pieces.elite_node.ph / W.Wow.pieces.elite_node.pw)
@@ -1616,7 +1619,7 @@ function Map:Show(step)
       stateOf[node.id] = node.state
       local x, y = nodePos(node, floors)
       pos[node.id] = { x, y }
-      paintNode(b, node, step.bossName)
+      paintNode(b, node, step)
       b:ClearAllPoints()
       b:SetPoint("CENTER", self.frame, "TOPLEFT", x, -y)
       b:Show()

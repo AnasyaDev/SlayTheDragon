@@ -39,6 +39,7 @@ Art.enemies.dark_iron_land_mine = { creature = 8035, display = {}, files = { { 1
 Art.enemies.volchan = { creature = 10119, display = { 1070 }, files = { { 524124, "molten giant" } }, scale = 1.25,
   icon = I("Spell_Fire_Volcano") }
 Art.enemies.grark_lorkrub = { creature = 9520, display = { 6044, 6047 }, scale = 1.2, icon = I("INV_Misc_Head_Orc_02") } -- repli : Champion rochenoire
+Art.ui.mapBoss.steppes = Art.enemies.grark_lorkrub.icon -- boss du parcours : Grark Lorkrub
 Art.enemies.ember_worg = { creature = 9690, display = { 9370, 780 }, icon = I("Spell_Fire_LavaSpawn") } -- repli : Worg de braise géant
 
 -- Personnages des rencontres (repli : voisins de même apparence du cache)

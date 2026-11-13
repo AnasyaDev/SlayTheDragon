@@ -97,6 +97,7 @@ Art.relics.zandalarian_hero_charm = I("INV_ZulGurubTrinket")
 Art.intents.hex = { tga = "Spell_Shaman_Hex", icon = "Interface\\Icons\\spell_shaman_hex", color = "watch" }
 Art.intentName.hex = "Hex"
 Art.ui.map.gurubashi_arena = I("ACHIEVEMENT_ARENA_2V2_1")
+Art.ui.mapBoss.stranglethorn = Art.enemies.jindo.icon -- boss du parcours : Jin'do the Hexxer
 
 ---------------------------------------------------------------------------
 -- Vue de zone : ce que le Hex va faire, lisible avant de jouer

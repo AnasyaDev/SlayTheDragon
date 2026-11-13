@@ -29,7 +29,7 @@ Déjà créés (vides) **et déjà au TOC** : ne pas toucher au TOC.
 | --- | --- |
 | `Data/Zones/<Zone>.lua` | ennemis (`ns.Enemies`), groupes (`ns.Encounters.<zone>`), rencontres (`ns.Declare.event`, `zone = "<zone>"`), commun débloqué par la zone (`ns.Declare.neutralCard`, `ns.Declare.relic`, `ns.Declare.potion`, rencontres et cases communes : `tier = <ordre>`), bibelots de clé (`key = { zone, level }`), cartes de combat (`token = true`), puis **en dernier** `ns.Zones.<zone>.encounters = "<zone>"` (la zone devient jouable) et `ns.Zones.<zone>.scenes` (décors). Chargé après `Data/Events.lua`. |
 | `Core/ZoneRules/<zone>.lua` | la mécanique : `ns.ZoneRule.define("<zone>", { … })` (§ 3), états (`ns.Statuses`), effets de carte (`ns.Effects`), actions, conditions et montants d'ennemis (`Combat.ENEMY_ACTIONS`, `ENEMY_CONDITIONS`, `ENEMY_AMOUNTS`), effets de rencontre (`Expedition.EFFECTS`), cases de parcours (`Expedition.nodeKind`), mots du langage (`ns.Language.zoneKeyword`, `L.trigger`, `L.condition`). Lua 5.1 pur, aucune API WoW. |
-| `UI/Art/Zones/<zone>.lua` | art et affichage : `Art.enemies`, `Art.npcs`, `Art.cards`, `Art.relics`, `Art.statuses`, `Art.statusShort`, `Art.intents` / `Art.intentName` (intention propre : `hex`, `curse`…), `Art.actionText`, `Art.intentParts`, `Art.ui.map[case]`, décors (`Art.scenes`, `Art.paintings`, `Art.palettes`), vue `ns.ZoneViews.<zone>` (§ 6). |
+| `UI/Art/Zones/<zone>.lua` | art et affichage : `Art.enemies`, `Art.npcs`, `Art.cards`, `Art.relics`, `Art.statuses`, `Art.statusShort`, `Art.intents` / `Art.intentName` (intention propre : `hex`, `curse`…), `Art.actionText`, `Art.intentParts`, `Art.ui.map[case]`, `Art.ui.mapBoss.<zone>` (icône du boss sur le parcours, repli : VanCleef), décors (`Art.scenes`, `Art.paintings`, `Art.palettes`), vue `ns.ZoneViews.<zone>` (§ 6). |
 
 À créer par l'agent de zone (lus d'office s'ils existent, hors TOC) :
 
@@ -456,9 +456,6 @@ end
 - Aperçu au survol d'une carte sur les ennemis (primes de Pack, « Wake » du marais) : aucun aperçu de dégâts
   n'existe dans l'écran de combat ; une vue de zone peut l'approcher par `render` (carte choisie :
   `view.selected`), sinon c'est un lot d'interface commun.
-- Titres sur l'accueil et l'écran Progress (« Priest — Dragonslayer », « Veteran » au niveau 7) : faits par
-  Blackrock (`ns.Blackrock.title`, `UI/Screens.lua`) ; le journal (« Log », `UI/Controller.lua`) lit encore
-  `Meta.title` (« Dragonslayer » au niveau 7) : à aligner.
 - Coffre « choice of 2 relics » (Shadowforge Key) : la récompense n'offre pas de choix de bibelot.
 - Vol d'une carte de l'ennemi vers une pile : le texte flottant en tient lieu.
 

@@ -489,7 +489,7 @@ test("déblocages : cartes par niveau de classe, bibelot au choix (zone 3 du com
   Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7] - 1
   eq(Meta.title(meta, "priest"), nil)
   Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7]
-  eq(Meta.title(meta, "priest"), "Dragonslayer")
+  eq(Meta.title(meta, "priest"), "Veteran")
 end)
 
 test("niveau de classe : seuils, progression, expérience gagnée (victoire, défaite, clé)", function()

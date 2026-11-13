@@ -577,7 +577,11 @@ Art.ui = {
     event    = { icon = 134400, tga = "INV_Misc_QuestionMark" },  -- inv_misc_questionmark
     chest    = { icon = 132594, tga = "INV_Box_01" },  -- inv_box_01
   },
+  -- Icône du boss sur le parcours, par zone (UI/Art/Zones/<zone>.lua : Art.ui.mapBoss.<zone>) ; repli :
+  -- map.boss (VanCleef).
+  mapBoss = {},
 }
+Art.ui.mapBoss.westfall = Art.enemies.vancleef.icon
 
 ---------------------------------------------------------------------------
 -- Peau (pack Mechanized Magic) : couleur du corps des cartes, gemmes, teintes des liserés
