@@ -108,42 +108,13 @@ présent dans toute la Marche : rien à changer.
 
 ## 3. Cartes de zone (une par classe)
 
-Débloquées par la première victoire de la classe à Westfall (première récompense de la campagne). Rareté rare,
-noms de sorts réels de la classe absents de `Data/<Classe>.lua`. Texte dans la forme des données (mots de plaque
-compris), une ligne par « / ». Chaque carte répond à une leçon de la section 2 et sert dans toutes les zones.
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| Classe | id | Nom | Voie | Coût | Type | Texte | Amélioré | Icône | Ce qu'elle permet |
-|---|---|---|---|---|---|---|---|---|---|
-| Priest | `power_infusion` | Power Infusion | Holy | 0 | Skill | +1 mana. / Draw 1. / Gain Instant 1 / Exhaust. | +2 mana. / Draw 1. / Gain Instant 1 / Exhaust. | `spell_holy_powerinfusion` (135939) | Un tour de Holy à 4 mana dont le gros sort part tout de suite, sans pouvoir être coupé par Watch, Kick ou Smash. |
-| Warrior | `shockwave` | Shockwave | Protection | 1 | Attack | Deal 7 to all. / Spend 3: apply Stunned 1 ⌛ to all / Cooldown 3. | Deal 10 to all. / Spend 3: apply Stunned 1 ⌛ to all / Cooldown 3. | `ability_warrior_shockwave` (236312) | Arrêter tout un groupe (Fireball, Heal, meute de murlocs, sbires du boss) en vidant sa Rage, ou frapper tout le monde en la gardant. |
-| Mage | `spellsteal` | Spellsteal | Arcane | 0 | Skill | Interrupt the target's cast. / Draw 1. / Gain Instant 1 / Cooldown 2. | Interrupt the target's cast. / Draw 2. / Gain Instant 1 / Cooldown 2. | `spell_arcane_arcane02` (135729) | Couper la Fireball du Conjurer et lancer la sienne aussitôt ; sans incantation ennemie, un Pyroblast instantané tous les deux tours. |
-| Rogue | `marked_for_death` | Marked for Death | Combat | 0 | Skill | +5 Combo. / Exhaust. | Draw 1. / +5 Combo. / Exhaust. | `achievement_bg_killingblow_berserker` (236364) | Un Eviscerate à 24 dès le premier tour : le Mystic ou le Conjurer meurt avant d'agir. |
-| Hunter | `call_of_the_wild` | Call of the Wild | Beast Mastery | 1 | Power | Power. / Start of turn: pet attacks. | (coût 0) | `ability_hunter_callofthewild` (4667415) | Le familier frappe deux fois par tour et son Frenzy monte seul jusqu'à 5 : il achève les murlocs et les sbires sans carte. |
-
-Précisions de règle :
-
-- **Power Infusion** : Instant est l'état commun (décisions du 12/11/2026) : il se garde d'un tour à l'autre et la
-  prochaine carte Cast le consomme (Holy Fire, Greater Heal, Halo, Empyreal Blaze). Sans carte Cast en main, il
-  attend : la carte n'est jamais perdue. Le Mystic regarde les cartes Cast **en main** : jouer la carte Cast
-  avec Instant la sort de la main avant le tour ennemi, donc plus de Watch ce tour-là. Aucun point de moteur
-  nouveau (`p.st.instant` existe).
-- **Shockwave** : Spend au choix (clic gauche dépense, clic droit non). La Rage est payée au jeu, puis la carte
-  Attack donne +1 Rage comme toute Attack. Boss immunisé à Stunned (les dégâts s'appliquent) ; les deux Defias
-  Henchman de VanCleef ne le sont pas. Repère : Frost Nova (Mage, commune) donne Stunned à tous sans dégâts,
-  Cooldown 4 ; Bladestorm (rare) 12 à tous pour 2 mana.
-- **Spellsteal** : vise un ennemi même sans incantation (l'interruption ne fait alors rien, la pioche et
-  l'Instant restent). Pas de Charge, contrairement à Counterspell (inhabituelle, 0 mana, Interrupt + 1 Charge,
-  Cooldown 2) : la différence est l'Instant et la pioche.
-- **Marked for Death** : Combo plafonné à 5, le surplus est perdu ; la carte vaut le plus à 0 Combo. Repère :
-  Adrenaline Rush (rare, +2 mana, Draw 2, Exhaust) ; Shadowfang (+2 Combo au début du combat).
-- **Call of the Wild** : l'attaque a lieu au début de chaque tour du joueur **à partir du tour suivant**, après
-  DoT, Regen, résolution des Cast et baisse du Frenzy, sur la cible du familier (ennemi le plus à gauche si elle
-  est morte) ; elle donne +1 Frenzy comme toute attaque du familier. Deux exemplaires : deux attaques. Spirit
-  Bond la compte. Point de moteur : crochet `onTurnStart` qui appelle `Combat.petAttack` (déjà employé par Pet
-  Whistle au premier tour). Repère : The Beast Within (rare, coût 2) fait attaquer le familier après chaque Attack.
-
-Rangement proposé : champ `zone = "westfall"` à la place de `level` (débloquée par la victoire, pas par le
-niveau de classe) ; une fois débloquée, la carte entre dans la réserve des rares de la classe.
+- Prayer of Mending (Priest)
+- Shockwave (Warrior)
+- Mirror Image (Mage)
+- Ghostly Strike (Rogue)
+- Call of the Wild (Hunter)
 
 ## 4. Commun de la première victoire du compte et bibelots de clé
 

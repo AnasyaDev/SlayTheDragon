@@ -369,20 +369,13 @@ réponse sans condition ni coût.
 
 ## 7. Cartes de zone (une par classe, rares)
 
-Débloquées par la première victoire de la classe dans la zone. Toutes répondent aux Afflictions et restent
-utiles ailleurs (colonne de droite).
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| Classe | Carte (sort réel) | Voie | Coût | Type | Base | Améliorée | Ce qu'elle permet | Ailleurs |
-|---|---|---|---|---|---|---|---|---|
-| Priest | **Mass Dispel** | Holy | 1 | Skill | `Remove negative effects.` / `Exhaust Afflictions in your hand and discard pile: heal 3 each.` / `Enemies lose all Strength and Absorb.` / `Exhaust.` | coût 0, `heal 5 each` | Nettoie toute la défausse d'un coup et transforme les Afflictions en soin. | Retire Sundered, Demoralized, DoT ; efface Strength (Galvanisant, murlocs, Parry de VanCleef) et l'Absorb ennemi (Harden, Guard). |
-| Warrior | **Enraged Regeneration** | Fury | 1 | Skill | `Exhaust Afflictions in your hand: +1 Rage each.` / `Surge: heal 3 per Rage.` / `Exhaust.` | `heal 4 per Rage` | Les Afflictions deviennent de la Rage, la Rage devient du soin : le Warrior accepte les coups, puis se soigne. | Le seul gros soin du Warrior : 15 PV (20 amélioré) à 5 Rage, une fois par combat. |
-| Mage | **Alter Time** | Arcane | 2 | Skill (Cast) | `Cast.` / `Heal the HP lost since this was played.` / `Exhaust Afflictions added since this was played.` / `Exhaust.` | coût 1 | Annule le tour ennemi qui suit : PV et Afflictions. Peut être interrompu par un coup `interrupts` qui touche, comme tout Cast. | Annule un Claw de boss ou un Smash d'élite. Avec Instant, elle se résout tout de suite et ne rend rien : piège à signaler dans l'infobulle. |
-| Rogue | **Shiv** | Assassination | 0 | Attack | `Deal 4.` / `+1 Combo.` / `Affliction in hand: exhaust one, apply DoT 6.` / `Apply DoT 2` | `Deal 6.`, `apply DoT 8`, `Apply DoT 3` | Retourne le venin du marais contre l'ennemi, sans mana. | Un Garrote à 0 mana : ouverture de Combo et DoT pour Envenom et Exsanguinate. |
-| Hunter | **Exhilaration** | Beast Mastery | 1 | Skill | `Heal 4.` / `Pet attacks.` / `Exhaust Afflictions in your hand: pet attacks once each.` / `Cooldown 3.` | `Heal 6.` | Chaque Affliction soignée fait attaquer le familier et monte le Frenzy. | Le seul soin répétable du Hunter (41 PV). |
-
-Icônes : Mass Dispel `spell_arcane_massdispel` (135739) ; Enraged Regeneration `ability_warrior_focusedrage`
-(132345) ; Alter Time `spell_mage_altertime` (609811) ; Shiv `inv_throwingknife_04` (135428) ; Exhilaration
-`ability_hunter_onewithnature` (461117). Aucun de ces noms n'est pris dans `Data/<Classe>.lua`.
+- Reflective Shield (Priest)
+- Defensive Stance (Warrior)
+- Molten Armor (Mage)
+- Leeching Poison (Rogue)
+- Exhilaration (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 

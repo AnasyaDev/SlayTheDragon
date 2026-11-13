@@ -383,49 +383,13 @@ Screwspigot », « A Taste of Flame ».
 
 ## 7. Cartes de zone (5, épiques, pivots)
 
-Décision du joueur (13/11/2026) : rareté **épique**, au-dessus de rare ; chaque carte est un **pivot**,
-une carte autour de laquelle on construit un deck et qui change la façon de jouer la classe. Débloquées
-par la première victoire de la classe dans la zone. Toutes sont des Powers : elles changent une règle de
-la classe pour le reste du combat. Plaque séparée du texte (comme `docs/classes/hunter.md`) ; dans `Data/`,
-« Power. » en tête du texte. Aucune n'ajoute de carte au deck.
+Cartes définitives (épiques, pivots) : voir `docs/zones/cartes-de-zone.md`.
 
-| id | Classe, voie | Nom | Coût | Type | Texte | Amélioré | Icône |
-|---|---|---|---|---|---|---|---|
-| `prayer_of_mending` | Priest, Holy | Prayer of Mending | 2 | Power | Whenever you heal: deal half as much to a random enemy. | idem (coût 1) | `spell_holy_prayerofmendingtga` |
-| `death_wish` | Warrior, Fury | Death Wish | 2 | Power | You can't gain Absorb. / Your Attacks deal 50% more damage. | idem (coût 1) | `spell_shadow_deathpact` |
-| `mirror_image` | Mage, Fire | Mirror Image | 2 | Power | When a Cast card resolves: deal its damage again to a random enemy. | idem (coût 1) | `spell_magic_lesserinvisibilty` |
-| `relentless_strikes` | Rogue, Combat | Relentless Strikes | 1 | Power | After a Surge of 3+ Combo: +1 mana, draw 1. | idem (coût 0) | `ability_warrior_decisivestrike` |
-| `lone_wolf` | Hunter, Marksmanship | Lone Wolf | 1 | Power | Your pet leaves. / Attacks: +1 Frenzy. / Frenzy adds to your Attack hits. | idem (coût 0) | `spell_hunter_lonewolf` |
-
-Ce que chacune change, et son lien avec le feu :
-
-- **Prayer of Mending** — *le soin devient l'attaque.* Le Priest Holy frappe avec Renew, Flash Heal, la
-  Regen et Atonement : chaque PV réellement rendu (le soin au-delà du maximum ne compte pas) inflige la
-  moitié, arrondie au supérieur, à un ennemi vivant tiré au hasard (flux du combat). Le deck se construit
-  autour de la Regen et des soins répétés, plus des attaques. Les dégâts ne viennent pas d'une carte :
-  pas d'Atonement en retour, pas de boucle. **Feu** : la brûlure ouvre de la place à soigner, et ce soin
-  tue les petits, qui reculent le feu. Un Priest au maximum de ses PV n'en tire rien : il gagne à encaisser.
-- **Death Wish** — *le Warrior sans bouclier.* Plus aucune Absorb (Defend, Shield Block, Ignore Pain se
-  jouent mais ne donnent rien) ; toutes les cartes Attack font +50 % (après Strength, avant Sundered de la
-  cible, arrondi à l'inférieur). Le deck retire ses défenses et vit de Bloodthirst, Victory Rush et de la
-  Rage gagnée en prenant les coups (+1 par perte de PV). **Feu** : l'Absorb ne protège pas de la brûlure ;
-  Death Wish assume la course et la Rage que la brûlure donne.
-- **Mirror Image** — *chaque sort en Cast touche deux fois.* À la résolution d'une carte Cast (Instant
-  compris), les dégâts qu'elle a infligés à sa cible principale sont infligés une seconde fois à un ennemi
-  vivant tiré au hasard (peut être le même) ; une carte « to all » rejoue une fois son montant par cible.
-  Les dégâts du second coup sont recalculés sur la nouvelle cible (Absorb, Sundered). Le Mage construit un
-  deck tout en Cast (Pyroblast, Fireball en Cast, Glacial Spike) et protège ses incantations au lieu de
-  chercher Instant. **Feu** : le second coup achève les Torchers et les serviteurs ; chaque mort recule le feu.
-- **Relentless Strikes** — *plusieurs coups de grâce par tour.* Après la résolution d'un Surge qui a dépensé
-  3 Combo ou plus : +1 mana et pioche 1, aussitôt. Le Rogue Combat enchaîne bâtisseurs à 0 mana et deux ou
-  trois Surge dans le même tour au lieu d'un. **Feu** : la vitesse est la seule défense du Rogue contre la
-  brûlure (Parry n'y fait rien) ; Relentless Strikes en fait un plan de deck.
-- **Lone Wolf** — *le Hunter sans familier.* Le familier quitte le combat : plus d'attaque automatique,
-  les lignes « Your pet attacks » ne font rien, Bestial Wrath et Kill Command deviennent injouables (raison
-  « No pet »). En échange, chaque carte Attack donne +1 Frenzy après sa résolution, et chaque coup d'une carte
-  Attack inflige Frenzy de plus (Rapid Fire à Frenzy 5 : 4 coups de 8). La baisse de 1 par tour reste. Le
-  deck Marksmanship et Survival abandonne le Beast Mastery et joue beaucoup de petites Attacks. **Feu** :
-  toute la puissance part dans le tour du joueur, au lieu d'attendre le coup de fin de tour du familier.
+- Vampiric Embrace (Priest)
+- Death Wish (Warrior)
+- Touch of the Magi (Mage)
+- Relentless Strikes (Rogue)
+- Kill Shot (Hunter)
 
 ## 8. Commun débloqué par la première victoire du compte
 
