@@ -560,7 +560,7 @@ décors peints), `Sim/zones/duskwood.lua` (bot), `Sim/tests_zone_duskwood.lua`, 
   « toutes zones » demanderait un crochet `run` actif partout, absent du socle). L'élite est tirée à l'entrée
   (nom dans le texte), imposée à la prochaine élite du chemin (`run.onFightStart`), +50 po à sa récompense et une
   carte améliorée au hasard à la victoire (`run.onCombatWon`). Id distinct de la rencontre WANTED des Steppes.
-- **Commun** : palier 2 pour tout (fiche : 1 ou 2) : palier = ordre de la zone (brief). Champ `sheet = "duskwood"`.
+- **Commun** : palier 2 pour tout (fiche : 1 ou 2) : palier = ordre de la zone (brief). Champ `fromZone = "duskwood"` (convention de main).
 - **Rencontres** : champ `zone = "duskwood"` (au lieu d'`act = 2`) ; décors `town`, `graveyard`, `woods` portés
   par la zone (`ns.Zones.duskwood.scenes`) ; personnages : la créature puis deux affichages voisins de Darkshire.
 - **Naraxis** : sbires `pygmy_brood` (copie sbire du Pygmy), `max = 3` (4 ennemis vivants au plus).

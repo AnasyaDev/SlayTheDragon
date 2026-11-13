@@ -814,7 +814,8 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   local fam, tier0, withWhen = { common = 0, rare = 0, story = 0 }, 0, 0
   local function checkEffects(id, effects)
     for _, e in ipairs(effects) do
-      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1])) -- effets déclarés par une zone
+      -- (effets de rencontre déclarés par le moteur ou une zone : X.EFFECTS, docs/zones.md)
+      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
       if e[1] == "fight" then
         local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
         assert(ns.Encounters[ns.Zones[ns.Events[id].zone or "westfall"].encounters][pool], id .. " : groupe " .. tostring(pool))
@@ -1400,10 +1401,10 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
   local want = { [0] = 4, 6, 8, 10 }
   for lv = 0, 3 do
     local exp = newExp({ unlocks = { rep = 0, common = lv } })
-    local pool = {}
-    -- neutres d'une fiche de zone des paliers 0 à 3 (champ sheet, Duskwood) : testés par leur zone
-    for _, id in ipairs(X.neutralPool(exp)) do if not ns.Cards[id].sheet then pool[#pool + 1] = id end end
-    eq(#pool, want[lv], "palier " .. lv)
+    local pool = X.neutralPool(exp)
+    local fiche = 0 -- sans le commun déclaré par les fichiers de zone (fromZone)
+    for _, id in ipairs(pool) do if not ns.Cards[id].fromZone then fiche = fiche + 1 end end
+    eq(fiche, want[lv], "palier " .. lv)
     for _, id in ipairs(pool) do
       assert(isNeutral(id) and ns.Cards[id].tier <= lv, id)
       assert(X.cardUnlocked(exp, id), id)

@@ -448,11 +448,11 @@ event("night_watch_poster", {
 ---------------------------------------------------------------------------
 -- Commun débloqué par la première victoire du compte à Duskwood (palier 2)
 ---------------------------------------------------------------------------
--- sheet = "duskwood" : contenu venu de la fiche de la zone (les tests des listes d'origine, cartes neutres et
+-- fromZone = "duskwood" : contenu venu de la fiche de la zone (les tests des listes d'origine, cartes neutres et
 -- bibelots communs de Sim/tests.lua, le laissent à part).
 
 D.neutralCard("anti_venom", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   tier = 2, name = "Anti-Venom", cost = 0, type = "skill", rarity = "common",
   exhaust = true, effects = { { "cleanse" }, { "draw", 1 } },
   text = "Remove negative effects.\nDraw 1.\nExhaust.",
@@ -460,7 +460,7 @@ D.neutralCard("anti_venom", {
 })
 
 D.neutralCard("zombie_juice", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   tier = 2, name = "Zombie Juice", cost = 0, type = "skill", rarity = "uncommon",
   exhaust = true, effects = { { "mana", 1 }, { "draw", 1 } },
   text = "+1 mana.\nDraw 1.\nExhaust.",
@@ -468,7 +468,7 @@ D.neutralCard("zombie_juice", {
 })
 
 D.relic("ogres_monocle", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   name = "Ogre's Monocle", rarity = "common", tier = 2,
   text = "Card rewards offer 4 cards instead of 3.",
   run = {
@@ -479,7 +479,7 @@ D.relic("ogres_monocle", {
 -- L'épée courte de la Night Watch : la première Attack jouée dans le tour (marquée au jeu, comme Ironfoe)
 -- porte 2 dégâts de plus par coup, même résolue plus tard (Cast).
 D.relic("night_watch_shortsword", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   name = "Night Watch Shortsword", rarity = "uncommon", tier = 2, needs = "attack",
   text = "The first Attack played each turn deals 2 more damage per hit.",
   hooks = {
@@ -500,7 +500,7 @@ D.relic("night_watch_shortsword", {
 })
 
 D.relic("mistmantle_family_ring", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   name = "Mistmantle Family Ring", rarity = "uncommon", tier = 2,
   text = "Whenever an enemy dies, gain 4 Absorb.",
   hooks = {
@@ -521,7 +521,7 @@ local function ribReady(c)
   return true
 end
 D.relic("ghoul_rib", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   name = "Ghoul Rib", rarity = "rare", key = { zone = "duskwood", level = 1 },
   text = "The first negative effect or Curse put on you each turn is prevented.",
   hooks = {
@@ -540,7 +540,7 @@ D.relic("ghoul_rib", {
 -- Crâne de Mor'Ladim (quête de Jonathan Carevin) : chaque carte épuisée en étant jouée (Exhaust, Curse
 -- payée) inflige 3 à tous les ennemis ; une carte levée ou nettoyée ne compte pas.
 D.relic("morladims_skull", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   name = "Mor'Ladim's Skull", rarity = "rare", key = { zone = "duskwood", level = 3 },
   text = "Whenever an Exhaust card is played, deal 3 to all enemies.",
   hooks = {
@@ -559,7 +559,7 @@ D.relic("morladims_skull", {
 
 -- Préparation de Madame Eva : +1 mana les tours où un ennemi annonce une incantation (intentions posées).
 D.relic("morbents_bane_relic", {
-  sheet = "duskwood",
+  fromZone = "duskwood",
   name = "Morbent's Bane", rarity = "rare", key = { zone = "duskwood", level = 5 },
   text = "+1 mana on turns when an enemy announces a Cast.",
   hooks = {
