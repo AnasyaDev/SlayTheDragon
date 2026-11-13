@@ -240,6 +240,8 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   **15–20**. Clé : +1 → 87, +3 → 110, +5 → 133 pour la victoire type. Avec ≈ 4 victoires pour 1 défaite
   (≈ 70 en moyenne) : niveau 2 à la 2e expédition, puis 2, 3, 3, 4 et 6 expéditions par niveau (niveaux 3 à
   7 aux 4e, 7e, 10e, 14e et 20e ; mesuré avant le changement : 72 à 75 par expédition au bot heuristique).
+  **Campagne continue (14/11/2026)** : une expédition traverse jusqu'à 56 étapes et 7 boss ; ≈ 200 à 450
+  d'expérience par expédition, niveau 7 en ≈ 6 expéditions (« Mesures de la campagne continue »).
 - Ce que débloque le niveau entre dans la réserve de la classe : récompenses, marchand, rencontres
   (cartes) et bibelots de récompense, de coffre et du marchand. Le bibelot de départ (`startRelic`,
   `noPool`) est porté à chaque expédition.
@@ -536,6 +538,106 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
   n'affecte pas les boss (sinon chaque sbire tué de VanCleef le rendait injouable), Nécrotique
   arrondit au plus proche (l'arrondi par défaut annulait les soins de 2 d'Expiation dès le 1er coup).
 - **Bibelot au choix sans bibelot à proposer** : si la réserve est vide, la phase `start` est sautée.
+
+## Mesures de la campagne continue (14/11/2026, clé 0, 1 000 expéditions, graine 1)
+
+`luajit Sim/sim.lua runs=1000 bot=<bot> jobs=8 runner=expedition key=0 zones=<z> level=<l> class=<c>` ;
+`zones=0 level=2` = compte presque neuf (aucune épique débloquée : colonne épique à 0), `zones=7 level=7` = tout
+débloqué. Aucun nombre d'équilibrage changé : les zones 2 à 7 avaient été réglées pour un deck neuf ; un deck
+qui a traversé les zones précédentes (15 à 45 cartes, PV max en hausse, épique) les passe presque toujours. Cellule
+« a→b (c) » : a = % des expéditions qui atteignent la zone, b = % qui battent son boss, c = b / a. Tableau
+« entrée de zone » : PV / PV max · taille du deck (· part avec une épique) à l'entrée, après le soin du passage.
+Intervalle ≈ ±3 points.
+
+**`bot=human`, `zones=0 level=2`** — battue / atteinte (taux conditionnel) par zone ; victoires = Nefarian
+
+| Classe | WF | DW | WL | STV | SoS | BS | BRM | Victoires | XP / exp. | étapes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 100→74 (74) | 74→68 (93) | 68→61 (90) | 61→60 (98) | 60→55 (92) | 55→53 (95) | 53→42 (81) | 42.4 % | 286 | 36.9 |
+| Warrior | 100→72 (72) | 72→66 (91) | 66→64 (96) | 64→62 (98) | 62→62 (100) | 62→62 (100) | 62→62 (100) | 61.8 % | 302 | 38.3 |
+| Mage | 100→70 (70) | 70→54 (77) | 54→46 (85) | 46→39 (86) | 39→38 (98) | 38→37 (97) | 37→34 (92) | 33.9 % | 225 | 29.4 |
+| Rogue | 100→68 (68) | 68→48 (71) | 48→39 (82) | 39→32 (81) | 32→30 (94) | 30→29 (97) | 29→25 (86) | 25.0 % | 197 | 26.1 |
+| Hunter | 100→69 (69) | 69→56 (80) | 56→46 (82) | 46→36 (78) | 36→32 (90) | 32→31 (97) | 31→27 (87) | 27.2 % | 217 | 28.6 |
+
+| Classe (entrée de zone) | WF | DW | WL | STV | SoS | BS | BRM |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 36/36 · 10 | 32/37 · 16 | 38/40 · 21 | 37/42 · 27 | 42/44 · 32 | 44/45 · 37 | 44/45 · 42 |
+| Warrior | 74/74 · 10 | 54/75 · 16 | 65/77 · 21 | 68/79 · 27 | 70/82 · 32 | 78/82 · 38 | 80/82 · 43 |
+| Mage | 42/42 · 10 | 33/43 · 16 | 38/46 · 21 | 40/48 · 27 | 40/50 · 33 | 45/50 · 38 | 47/50 · 43 |
+| Rogue | 50/50 · 10 | 42/51 · 16 | 46/54 · 21 | 49/56 · 26 | 50/58 · 32 | 54/58 · 37 | 53/58 · 42 |
+| Hunter | 50/50 · 10 | 37/51 · 15 | 43/53 · 20 | 44/56 · 26 | 43/58 · 30 | 48/58 · 35 | 53/59 · 39 |
+
+**`bot=human`, `zones=7 level=7`** — battue / atteinte (taux conditionnel) par zone ; victoires = Nefarian
+
+| Classe | WF | DW | WL | STV | SoS | BS | BRM | Victoires | XP / exp. | étapes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 100→83 (83) | 83→78 (94) | 78→76 (96) | 76→74 (98) | 74→71 (96) | 71→71 (99) | 71→67 (94) | 66.7 % | 344 | 43.5 |
+| Warrior | 100→91 (91) | 91→88 (96) | 88→87 (99) | 87→86 (99) | 86→86 (100) | 86→86 (100) | 86→86 (100) | 86.4 % | 396 | 49.5 |
+| Mage | 100→85 (85) | 85→79 (93) | 79→78 (98) | 78→76 (98) | 76→76 (100) | 76→76 (100) | 76→76 (100) | 76.0 % | 357 | 44.8 |
+| Rogue | 100→78 (78) | 78→65 (83) | 65→62 (96) | 62→60 (96) | 60→59 (98) | 59→59 (100) | 59→59 (100) | 58.9 % | 296 | 37.7 |
+| Hunter | 100→84 (84) | 84→77 (92) | 77→75 (98) | 75→72 (97) | 72→71 (98) | 71→71 (100) | 71→71 (100) | 71.1 % | 343 | 43.2 |
+
+| Classe (entrée de zone) | WF | DW | WL | STV | SoS | BS | BRM |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 36/36 · 10 · 0 % | 32/36 · 16 · 29 % | 36/37 · 22 · 55 % | 36/38 · 28 · 77 % | 37/38 · 34 · 90 % | 38/39 · 39 · 97 % | 39/40 · 44 · 99 % |
+| Warrior | 74/74 · 10 · 0 % | 60/74 · 16 · 28 % | 68/75 · 22 · 55 % | 72/75 · 28 · 77 % | 73/76 · 34 · 91 % | 76/76 · 40 · 96 % | 77/77 · 45 · 99 % |
+| Mage | 42/42 · 10 · 0 % | 35/42 · 16 · 28 % | 38/43 · 22 · 55 % | 40/44 · 28 · 78 % | 39/44 · 34 · 90 % | 42/44 · 39 · 96 % | 44/45 · 45 · 99 % |
+| Rogue | 50/50 · 10 · 0 % | 42/50 · 16 · 29 % | 44/51 · 22 · 54 % | 47/52 · 28 · 78 % | 48/52 · 33 · 91 % | 52/53 · 39 · 97 % | 53/53 · 44 · 98 % |
+| Hunter | 50/50 · 10 · 0 % | 39/50 · 16 · 28 % | 44/51 · 22 · 56 % | 47/51 · 27 · 76 % | 45/52 · 33 · 90 % | 49/52 · 38 · 96 % | 52/53 · 44 · 99 % |
+
+**`bot=heuristic`, `zones=0 level=2`** — battue / atteinte (taux conditionnel) par zone ; victoires = Nefarian
+
+| Classe | WF | DW | WL | STV | SoS | BS | BRM | Victoires | XP / exp. | étapes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 100→97 (97) | 97→96 (99) | 96→96 (100) | 96→96 (100) | 96→94 (98) | 94→94 (100) | 94→90 (96) | 89.9 % | 433 | 53.7 |
+| Warrior | 100→96 (96) | 96→96 (100) | 96→96 (100) | 96→96 (100) | 96→96 (100) | 96→96 (100) | 96→96 (100) | 95.8 % | 436 | 54.0 |
+| Mage | 100→93 (93) | 93→88 (95) | 88→86 (97) | 86→83 (97) | 83→82 (99) | 82→81 (99) | 81→78 (96) | 77.7 % | 388 | 48.7 |
+| Rogue | 100→96 (96) | 96→92 (96) | 92→86 (94) | 86→85 (98) | 85→83 (98) | 83→82 (99) | 82→78 (94) | 77.6 % | 395 | 49.5 |
+| Hunter | 100→94 (94) | 94→93 (98) | 93→92 (100) | 92→89 (96) | 89→88 (99) | 88→88 (100) | 88→88 (100) | 87.9 % | 413 | 51.4 |
+
+| Classe (entrée de zone) | WF | DW | WL | STV | SoS | BS | BRM |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 36/36 · 10 | 35/37 · 16 | 39/39 · 21 | 41/42 · 27 | 43/44 · 32 | 44/44 · 36 | 44/44 · 40 |
+| Warrior | 74/74 · 10 | 66/75 · 16 | 74/77 · 21 | 77/80 · 27 | 77/82 · 32 | 81/82 · 36 | 82/82 · 41 |
+| Mage | 42/42 · 10 | 38/43 · 16 | 41/45 · 21 | 44/48 · 27 | 42/50 · 32 | 47/50 · 36 | 48/50 · 40 |
+| Rogue | 50/50 · 10 | 45/51 · 16 | 47/53 · 21 | 50/56 · 26 | 52/58 · 31 | 56/58 · 35 | 54/58 · 40 |
+| Hunter | 50/50 · 10 | 43/51 · 14 | 50/53 · 17 | 52/56 · 21 | 49/58 · 24 | 54/58 · 26 | 57/58 · 29 |
+
+**`bot=heuristic`, `zones=7 level=7`** — battue / atteinte (taux conditionnel) par zone ; victoires = Nefarian
+
+| Classe | WF | DW | WL | STV | SoS | BS | BRM | Victoires | XP / exp. | étapes |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 100→98 (98) | 98→97 (99) | 97→96 (99) | 96→95 (99) | 95→92 (96) | 92→91 (99) | 91→88 (97) | 88.3 % | 429 | 53.3 |
+| Warrior | 100→99 (99) | 99→98 (100) | 98→98 (100) | 98→98 (100) | 98→98 (100) | 98→98 (100) | 98→98 (100) | 98.1 % | 446 | 55.1 |
+| Mage | 100→98 (98) | 98→98 (99) | 98→97 (100) | 97→97 (100) | 97→97 (100) | 97→97 (100) | 97→97 (100) | 97.0 % | 442 | 54.7 |
+| Rogue | 100→98 (98) | 98→95 (97) | 95→94 (99) | 94→94 (100) | 94→94 (100) | 94→94 (100) | 94→94 (100) | 93.7 % | 430 | 53.3 |
+| Hunter | 100→97 (97) | 97→96 (99) | 96→96 (100) | 96→96 (99) | 96→95 (99) | 95→95 (100) | 95→95 (100) | 94.9 % | 435 | 54.0 |
+
+| Classe (entrée de zone) | WF | DW | WL | STV | SoS | BS | BRM |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 36/36 · 10 · 0 % | 35/36 · 16 · 29 % | 37/37 · 22 · 56 % | 37/38 · 28 · 80 % | 37/38 · 33 · 92 % | 39/39 · 39 · 97 % | 39/40 · 44 · 99 % |
+| Warrior | 74/74 · 10 · 0 % | 70/74 · 16 · 28 % | 73/75 · 22 · 55 % | 75/75 · 28 · 80 % | 75/76 · 34 · 92 % | 76/77 · 39 · 97 % | 77/77 · 45 · 99 % |
+| Mage | 42/42 · 10 · 0 % | 39/42 · 16 · 28 % | 41/43 · 22 · 54 % | 42/43 · 28 · 78 % | 41/44 · 34 · 91 % | 44/44 · 39 · 97 % | 45/45 · 44 · 99 % |
+| Rogue | 50/50 · 10 · 0 % | 46/50 · 16 · 29 % | 47/51 · 22 · 55 % | 49/51 · 27 · 78 % | 50/52 · 33 · 91 % | 52/52 · 38 · 96 % | 53/53 · 43 · 99 % |
+| Hunter | 50/50 · 10 · 0 % | 43/50 · 15 · 29 % | 47/51 · 20 · 54 % | 49/51 · 26 · 78 % | 48/52 · 31 · 91 % | 51/52 · 36 · 97 % | 53/53 · 40 · 99 % |
+
+Lecture :
+- **Westfall et Duskwood font l'essentiel du tri** (bot `human`, compte neuf : 26 à 32 % des expéditions meurent
+  à Westfall, surtout contre VanCleef ; Duskwood en retire encore 6 à 20 points) ; à partir des Swamp of Sorrows,
+  le deck de campagne passe à 90–100 %. Blackrock Mountain retire encore 0 à 11 points (Nefarian ; 11 au Priest).
+  Le Warrior ne perd plus rien après les Wetlands (PV à l'entrée ≈ 80/82).
+- Le bot `heuristic` traverse presque tout (78 à 96 % au compte neuf, 88 à 98 % tout débloqué) : à régler zone par
+  zone d'après ces lignes (lot d'équilibrage à venir, `docs/zones/decisions.md`, « Courbe de difficulté »).
+- L'épique arrive en route : 28 % à l'entrée de Duskwood, 55 % aux Wetlands, 78 % à Stranglethorn, > 90 % ensuite
+  (tout débloqué).
+
+**Expérience et niveau 7** (seuils inchangés : 1 400 au niveau 7). Une expédition rapporte maintenant
+≈ 7,7 à 8 d'expérience par étape franchie (contre ≈ 9,6 quand une zone faisait une expédition : moins de
+bonus de victoire par étape) et beaucoup plus d'étapes : bot `human` au compte neuf 197 à 302 par expédition
+(26 à 38 étapes), tout débloqué 297 à 396 ; bot `heuristic` 388 à 446. **Niveau 7 en ≈ 6 expéditions typiques**
+pour un joueur humain qui commence (1 400 / 245 en moyenne des cinq classes : 4,6 Warrior à 7,1 Rogue ; 3,5 à 4,7
+une fois tout débloqué ; 3,1 à 3,6 au bot heuristique), soit ≈ 180 étapes (≈ 150 avant, en ≈ 20 expéditions
+d'une zone). Niveau 2 dès la première expédition.
 
 ## Mesures de la progression par classe (12/11/2026, bot heuristique, clé 0, 1 000 expéditions, graine 1)
 
