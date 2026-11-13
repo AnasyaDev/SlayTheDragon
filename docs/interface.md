@@ -77,6 +77,47 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   des cartes à 0,6 au repos sur l'ardoise, aperçu à côté de la carte survolée, nouvelles icônes des bibelots du Priest
   (`Media/Icons`, nouveaux fichiers : relancer le client).
 
+## Écran de combat : crans, annulations, Instant, Traveler's Backpack (13/11/2026)
+
+- **Crans de la ressource** : petites gemmes en losange (12 unités) en arc autour de l'anneau de mana
+  (rayon 49 depuis son centre, de -5° sous la pastille vers le bas, un cran tous les 14°), une par point
+  du plafond : Rage 5, Combo 5, Charge 4, Frenzy 5 ; aucune pour l'Insanity (sans plafond). Alvéole =
+  gemme désaturée assombrie, cran plein = la même gemme désaturée puis teinte à la couleur de la
+  ressource (`Art.classes[id].resource.color`). Style des points de combo du jeu (alvéole sombre, gemme
+  pleine) ; pièce : `Media/gem_rare.tga` du pack, déjà embarquée (aucune texture ni fichier du TOC
+  ajouté ; les pièces `uf-roguecp-*` du jeu ne sont pas extraites). Visibles même à 0 (les alvéoles
+  disent le plafond) ; la pastille et son nombre restent cachés à 0. Un cran qui se remplit passe en
+  fondu (0,22 s) avec un éclat doux (`glow_round` en ADD, 0,45 s) ; un cran qui se vide passe en fondu,
+  sans éclat ; aucune échelle. Cadre sans souris (il couvre l'anneau de mana) : l'infobulle de la
+  ressource reste celle de la pastille. `V:RenderPips` dans `UI/CombatView.lua`.
+- **Textes flottants des annulations** (journal du moteur) : `parry` → « Parry » (or) part du héros, à
+  gauche du chiffre des PV perdus s'il en reste ; `trap` → nom de la Trap (« Freezing Trap! ») sur
+  l'ennemi qui l'a déclenchée, avant ses effets (l'événement porte maintenant `id`) ;
+  `interrupt_prevented` → nom de ce qui l'a empêchée (« Talisman of Focus! », champ `by` ajouté au
+  journal ; « Not interrupted » sinon) ; `enemy_turn_skipped` (Feign Death) → « Skips its turn » sur
+  chaque ennemi vivant. Existaient déjà : Absorb (chiffre bleu « -N », aussi pour un coup entièrement
+  absorbé), Stunned qui arrête le tour (« Stunned »), Cast interrompu (« Interrupted! » sur le héros ou
+  l'ennemi, « Spell lost » pour l'incantation ennemie perdue).
+- **Instant** : sous l'état Instant (ou le crochet `instantCast`), chaque carte Cast de la main porte un
+  liseré bleu arcane tenu (`b.rim` : le halo des cartes resserré à 85 % de sa marge, sous le halo doré du
+  survol qui reste visible autour) et sa plaque dit « Cast · Instant » (« Instant » en bleu) ; infobulle
+  « Instant: this Cast resolves at once. ». Lu par `Controller.handInfo` (`Combat.isInstant` sans rien
+  consommer). Plaque vérifiée pour toutes les cartes Cast, base et améliorée.
+- **Spend N** : déjà fait (ligne « Spend N: » au mot-clé doré si les points sont là, grise sinon ou Maj
+  tenue) ; `handInfo` lit aussi `spendNeed` comme `Combat.play`.
+- **Traveler's Backpack** : « End Turn » ouvre le choix s'il y a une carte à garder (hors Retain) :
+  message « Choose a card to keep in hand. », cartes proposées au liseré d'or pâle, infobulle « Click:
+  keep this card in hand for the next turn. », bouton devenu « Keep none ». Un clic sur une carte finit
+  le tour en la gardant ; « Keep none » finit sans rien garder ; un clic droit annule le choix. Le choix
+  est posé par `Combat.markRetain` juste avant l'action « endTurn » (`Controller.endTurn(uid)`), l'action
+  de l'expédition ne portant pas d'argument.
+- Harnais : section UG. Planches : `ug-crans-<classe>`, `ug-parry-rogue`, `ug-trap-hunter`,
+  `ug-instant-mage`, `ug-spend-warrior`, `ug-spend-off-warrior`, `ug-backpack-choix-<classe>`.
+- Non vérifiable hors jeu : teinte réelle des gemmes désaturées (`SetDesaturated` puis `SetVertexColor`
+  sur une texture du pack), éclat en ADD, lisibilité des crans à 12 unités, intensité du liseré Instant
+  sur la table sombre, nouvelle icône `Media/Icons/inv_misc_bag_11.tga` (nouveau fichier : relancer le
+  client).
+
 ## Habillage WoW (direction B, mana et parcours façon C)
 
 État au 11/11/2026, choisi par le joueur sur maquettes (`build/wowui/direction_*.jpg`, générateurs
@@ -1239,6 +1280,10 @@ de carte revient au même.
 | `status`, `demence`, `mana` | petit texte flottant | — |
 | `death` | modèle : mort, fondu de l'ennemi puis retrait ; héros : à terre | `enemyDeath` / `playerDeath` |
 | `interrupt`, `cast_lost`, `stunned`, `say`… | texte flottant | `interrupt` |
+| `parry` | « Parry » au héros | `block` |
+| `trap` | nom de la Trap sur l'ennemi qui l'a déclenchée | `interrupt` |
+| `interrupt_prevented` | nom du bibelot qui l'a empêchée, au héros | `block` |
+| `enemy_turn_skipped` | « Skips its turn » sur chaque ennemi vivant | — |
 | `turn` | « Tour N » en haut du décor | — |
 | `result` | bandeau de fin en fondu (à la fin de la file) | `victory` / `defeat` |
 
@@ -1509,6 +1554,15 @@ petit vu en jeu le 12/11/2026), et simule les animations Scale. Il gère aussi `
 lignes, base et améliorées, avec un témoin (l'ancienne position de Frostbolt, refusée) ; chaque sablier
 posé (fenêtre 1, 1,15 et 0,6) d'au moins 90 % de la hauteur de capitale, posé sur la ligne de base, avec
 un témoin (l'ancienne séquence à 1,15 : 51 %) ; planche `texte_centre.svg`.
+**UG** (avant U16) : crans de la ressource pour les cinq classes (aucun pour le Priest, alvéoles = plafond,
+visibles à 0, remplissage et vidage en fondu avec valeur intermédiaire au pilote, éclat au remplissage
+seulement, aucune échelle, gemme embarquée teinte de la ressource, à gauche de la main) ; textes
+flottants (Parry par le vrai tour ennemi du Rogue, nom de la Freezing Trap posée par l'interface,
+interruption sans effet, tour sauté, retours existants) ; liseré Instant et « Cast · Instant » (toutes
+les cartes Cast sans coupure de plaque, carte jouée résolue tout de suite) ; « Spend 2: » allumée,
+éteinte, éteinte sous Maj ; Traveler's Backpack (Warrior et Priest : choix ouvert, liserés, infobulle,
+clic droit, carte gardée, « Keep none », sans bibelot pas de choix). Le jeu par clics du harnais
+choisit la carte gardée du bot quand le choix s'ouvre.
 
 `Sim/ui_render.lua` résout ancres, tailles, échelles, couleurs, disques, rotations et textes des cadres du
 faux client et écrit un SVG par écran (accueil, parcours, parcours en route, combat, combat-survol, combat

@@ -1004,7 +1004,7 @@ end
 function Combat.triggerTrap(c, e)
   local trap = table.remove(c.traps, 1)
   if not trap then return end
-  log(c, { t = "trap", card = trap.card.uid, dst = e.uid })
+  log(c, { t = "trap", card = trap.card.uid, id = trap.card.id, dst = e.uid })
   stat(c, "trapsTriggered")
   Combat.resolveCard(c, trap.card, e, false, trap.spent)
   if not c.result then Combat.fire(c, "onTrapTriggered", trap.card, e) end

@@ -572,9 +572,15 @@ end)
 
 test("Talisman de concentration : la première interruption est sans effet", function()
   local c = setup({ "holy_fire" }, { "test_watcher" }, nil, { relics = { "focus_talisman" } })
+  c.events = {}
   Combat.play(c, 1, 1)
+  local seenBy
+  local logged = c.events
   Combat.endTurn(c)
   eq(c.enemies[1].hp, 100 - num("holy_fire", 1))
+  -- journal : ce qui a empêché l'interruption (nom affiché par l'interface)
+  for _, ev in ipairs(logged) do if ev.t == "interrupt_prevented" then seenBy = ev.by end end
+  eq(seenBy, "focus_talisman")
 end)
 
 test("Rubis de mana : 4 mana au premier tour seulement", function()

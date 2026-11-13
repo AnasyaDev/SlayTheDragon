@@ -1808,6 +1808,9 @@ function W.fillCardTooltip(tt, id, up, extra)
   end
   -- « Spend N » au choix : comment jouer la carte sans dépenser (une ligne)
   if d.spend then wrap(tt, W.SPEND_HINT, 0.85, 0.85, 0.85) end
+  -- carte en main : Cast qui partira tout de suite (Instant), choix de la carte gardée en fin de tour
+  if extra and extra.instant then wrap(tt, W.INSTANT_HINT, 0.85, 0.85, 0.85) end
+  if extra and extra.keepPick then wrap(tt, W.KEEP_HINT, 1, 0.82, 0) end
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
@@ -3270,6 +3273,14 @@ function W.card(parent)
   b.halo:SetVertexColor(C.gold[1], C.gold[2], C.gold[3], 1)
   b.halo:SetAlpha(0)
   b.halo:Hide()
+  -- liseré d'état (carte Cast qui partira tout de suite sous Instant ; carte proposée au choix de fin de
+  -- tour) : même halo, plus serré (il reste visible sous le halo doré du survol), teinté, tenu sans
+  -- animation ; créé ici (jamais pendant un survol)
+  b.rim = W.skin(face, "card_glow", "BACKGROUND", -7)
+  local k = W.CARD_RIM_K
+  local g = P.card_glow
+  place(b.rim, org, { g[1] * k, g[2] * k, 1 + (g[3] - 1) * k, (g[4] + 2 * g[2]) - 2 * g[2] * k })
+  b.rim:Hide()
   b.plate = cardPlate(face)
   b.plate:Layout(org)
   -- médaillon : anneau, icône masquée, verre
@@ -3355,8 +3366,23 @@ function W.card(parent)
         if self.cardId == id and self.cardUp == up and self.opts == opts then self:SetCard(id, up, opts) end
       end)
     end
-    -- plaque du bas : mots-clés
+    -- plaque du bas : mots-clés ; Instant (la prochaine carte Cast part tout de suite) : « Cast · Instant »
     local pills = W.cardPills(d)
+    if opts.instant then
+      local at = #pills + 1
+      for i = 1, #pills do if pills[i] == "Cast" then at = i + 1 break end end
+      table.insert(pills, at, W.colorize("Instant", W.INSTANT_COLOR))
+    end
+    -- liseré tenu : Instant (bleu) ou choix de la carte gardée en fin de tour (or)
+    local rim = opts.keepPick and W.KEEP_RIM_COLOR or (opts.instant and not dim and W.INSTANT_RIM_COLOR) or nil
+    if rim then
+      self.rim:SetVertexColor(rim[1], rim[2], rim[3], 1)
+      self.rim:SetAlpha(rim[4] or 1)
+      self.rim:Show()
+    else
+      self.rim:Hide()
+    end
+    self.rimKind = rim and (opts.keepPick and "keep" or "instant") or nil
     if #pills > 0 then
       fitPlate(self, pills)
       self.plate:Show()
@@ -3493,6 +3519,14 @@ end
 -- Une seule instance pour tout l'addon, construite avec la fenêtre (W.buildCardPreview) et réutilisée :
 -- rien n'est créé pendant un survol. Position : coordonnées de pose de la carte (W.placeCenter), dans un
 -- conteneur qui couvre le contenu (écrans, panneau du deck) — mêmes unités que la couche du dessus.
+-- Liseré d'état d'une carte (b.rim, W.card) : halo resserré (fraction CARD_RIM_K de la marge du halo
+-- doré), couleur et alpha ; Instant en bleu arcane, carte proposée au choix de fin de tour en or pâle.
+W.CARD_RIM_K = 0.85
+W.INSTANT_COLOR = { 0.45, 0.85, 1 }
+W.INSTANT_RIM_COLOR = { 0.35, 0.8, 1, 1 }
+W.KEEP_RIM_COLOR = { 1, 0.9, 0.55, 0.9 }
+W.INSTANT_HINT = "|cff73d9ffInstant|r: this Cast resolves at once."
+W.KEEP_HINT = "Click: keep this card in hand for the next turn."
 W.CARD_LIFT = 12         -- levée d'une carte lisible survolée, en unités de la scène (écran : W.CARD_LIFT / échelle)
 W.PREVIEW_BELOW = 0.9
 W.PREVIEW_GAP = 10       -- écart entre la petite carte et l'aperçu

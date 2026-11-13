@@ -135,14 +135,22 @@ et potions », et `Core/Combat.lua`).
 ## 5. État de l'implémentation (12/11/2026)
 
 Bloc à part en fin de `Data/Relics.lua`, art dans `UI/Art/neutral.lua`, icônes de la fiche embarquées.
-**19 bibelots sur 20** : la table commune passe à 31 (12 d'origine + 19), 29 tirables.
+**19 bibelots sur 20** : la table commune passe à 31 (12 d'origine + 19), 29 tirables ; 20 sur 20
+(32, 30 tirables) avec Traveler's Backpack le 13/11/2026.
 
 - **Ids renommés** : `hand_of_justice` et `force_reactive_disk` sont des bibelots du Guerrier (autres
   effets). Les équivalents communs : `ironfoe` « Ironfoe » (`inv_mace_15`, masse qui donne des attaques
   en plus) et `harm_prevention_belt` « Gnomish Harm Prevention Belt » (`inv_belt_29`, ingénierie).
-- **Laissé de côté : Traveler's Backpack** (garder une carte au choix en fin de tour) : il faut une
-  étape de choix en combat (interface du combat, action, bot, harnais) que rien d'autre ne demande ;
-  disproportionné pour un bibelot. Les six autres points d'extension sont faits (`docs/classes.md`).
+- **Traveler's Backpack, ajouté le 13/11/2026** (20 sur 20 : 32 communs, 30 tirables) : rare, palier 3,
+  « At the end of each turn, 1 chosen card stays in hand. », icône `inv_misc_bag_11`. Crochet
+  `retainPicks` (0 par défaut) ; le choix est posé avant la fin du tour par `Combat.markRetain(c, uid)`
+  (refusé sans le bibelot, hors du tour du joueur, pour une carte absente ou déjà Retain), lu et effacé
+  par `Combat.endPlayerTurn` (journal `retained`) ; sans choix posé, rien n'est gardé. Interface :
+  « End Turn » ouvre le choix (`docs/interface.md`, « Écran de combat ») ; bots : `Bots.retainPick` (la
+  carte la mieux notée par la classe, +1 améliorée, +0,5 par point de coût), posé par les deux
+  simulateurs avant chaque fin de tour. L'action « endTurn » de l'expédition ne porte pas le choix
+  (`Core/Expedition.lua` intouché) : à y ajouter (`{ "endTurn", uid }`) si l'on veut la rejouer.
+  Les six autres points d'extension sont faits (`docs/classes.md`).
 - **Textes impersonnels** (règle du langage) : « Whenever the draw pile is reshuffled… », « Whenever an
   Exhaust card is played… », « Whenever a potion is drunk… », « Up to 5 Absorb carries over to the next
   turn. », « The first Attack played in each combat is played twice. ».
