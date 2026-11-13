@@ -454,19 +454,42 @@ exposée en `ns.HunterEpic`), tests `Sim/tests_epic_hunter.lua`, harnais « UEH 
 moteur : tout passe par les crochets existants, en `deckHooks` de l'épique (`src` = `c.epic`, posée hors des
 piles par le socle, crochets en dernier) ; `whileInDeck` = `ns.Hunter.epicStart(c, src)` retient l'épique en
 jeu (`c.cls.epic = { id, up }`, lu par la vue et les bots : `ns.Hunter.epic(c)`). Nombres réglés par la
-simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 12 / 16 dégâts en
+simulation (fiche → réglé) : Roar of Sacrifice 5 / 8 → 2 / 4 ; Master Marksman 0 / 4 → 20 / 24 dégâts en
 plus ; Lone Wolf +1 → +2 par Frenzy (amélioré +3 au lieu de « Start of turn: +1 Frenzy. », trop long pour
-la carte) ; Chimaera Shot 3 / 3 (6) → 4 / 4 (7) ; Trap Launcher 1 / 2 (fiche).
+la carte) ; Chimaera Shot 3 / 3 (6) → 5 / 4 (8) ; Trap Launcher 1 / 2 (fiche). Réglage des zones dures
+(14/11/2026) : Call of the Wild et Black Arrow coûtent 1 Frenzy par attaque (`cotwCost`, `blackCost` ; améliorées :
+gratuites), Beast Cleave frappe les autres ennemis pour 2 de moins (`cleaveLess`).
 
 | Épique | Crochets | Remarques |
 |---|---|---|
-| Call of the Wild | `onTurnStart` | `Hunter.petAttack(c, "epic")` après la pioche et la baisse du Frenzy |
+| Call of the Wild | `onTurnStart` | Frenzy ≥ `cotwCost` : −`cotwCost`, puis `Hunter.petAttack(c, "epic")`, après la pioche et la baisse du Frenzy |
 | Trap Launcher | `trapLaunch`, `onTrapTriggered` (why = `"launch"`) | familier sur la cible de la Trap ; Resourcefulness : une Trap lancée revient en main à la fin du round (`c.cls.trapBack`, `onRoundEnd` du Power), pas tout de suite |
-| Beast Cleave | `petAll`, `onPetAttack` (amélioré) | |
+| Beast Cleave | `petAll`, `petLess` (valeur de classe, lue par `Hunter.petLess`), `onPetAttack` (amélioré) | la cible du familier en plein, les autres `cleaveLess` de moins (jamais sous 0) |
 | Roar of Sacrifice | `beforeHit` | journal `{ t = "roar", prevented }` (« Roar » flottant de la vue), `c.stats.roarPrevented` |
 | Master Marksman | `instantCast` (cible = `c.player.lastTarget`), `damage`, `afterCast` | question de `canPlay` (commit faux) : vraie si un ennemi vivant est intact ; journal `cast_instant` |
-| Black Arrow | `onDotTick` | familier sur l'ennemi qui tique, sans changer sa cible |
+| Black Arrow | `onDotTick` | Frenzy ≥ `blackCost` : −`blackCost`, puis familier sur l'ennemi qui tique, sans changer sa cible |
 | Lone Wolf | `petAbsent`, `damage`, `onTurnStart` ; `transforms` (9 variantes `variant = true`) | Pet Whistle : +1 Frenzy au lieu d'une attaque (règle du bibelot ; texte `loneText` montré par `UI/Art/hunter.lua`) |
+
+Mesures des zones dures (14/11/2026, `luajit Sim/sim.lua runs=600 bot=heuristic jobs=3 runner=expedition
+class=hunter level=7 key=0 zone=<zone> zones=<N> epic=<id>`, Duskwood `zones=1`, Stranglethorn `zones=3`,
+Steppes `zones=5` ; sans épique : 64,7 / 70,8 / 83,0 % ; ± 3,5 points par zone) : gain en points de victoire
+contre `epic=none`, PV perdus par combat normal (moyenne des trois zones), Westfall (`zones=7`, sans épique
+77,8 %) pour information.
+
+| Épique | Duskwood | Stranglethorn | Steppes | Moyenne | PV normal | Westfall | Avant (moyenne) |
+|---|---|---|---|---|---|---|---|
+| Call of the Wild | +11,5 | +5,7 | +10,2 | +9,1 | 6,0 | +13,9 | +19,1 (gratuite) |
+| Trap Launcher | +17,3 | +7,2 | +9,0 | +11,2 | 5,3 | +12,4 | inchangée |
+| Beast Cleave | +16,0 | +7,9 | +8,0 | +10,6 | 5,5 | +13,7 | +15,5 (en plein) |
+| Roar of Sacrifice | +8,5 | +14,4 | +11,0 | +11,3 | 4,9 | +12,9 | inchangée |
+| Master Marksman | +17,6 | +7,0 | +3,7 | +9,4 | 5,6 | +10,9 | +6,1 (+12) |
+| Black Arrow | +17,0 | +7,7 | +12,7 | +12,5 | 6,1 | +13,4 | +16,9 (gratuite) |
+| Lone Wolf | +15,0 | +10,4 | +12,2 | +12,5 | 4,9 | +15,5 | +7,8 (Chimaera 4) |
+
+Moyenne de la classe : +10,9 (avant : +12,6, de +6,1 à +19,1). Essais : Beast Cleave « moitié aux autres »
++7,5, « 1 de moins » +13,1 ; Master Marksman +16 : +8,2 ; Lone Wolf +3 par Frenzy : +21,2, Chimaera Shot 6 / 4 :
++16,6. Les épiques imposées ne sont jamais améliorées par le bot (notes d'amélioration de `byEpic` ≈ 4, sous
+les notes des cartes ≈ 9 à 11) : les versions améliorées ne sont pas mesurées.
 
 Ajouts de la classe : `Hunter.petAttackOn(c, why, ennemi)` (cible imposée par `c.cls.petForce`, lue par
 `Hunter.petTarget` : la signature de `petAttack` / `petTarget`, enveloppées par Core/ZoneRules.lua, ne change pas) ;

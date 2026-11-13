@@ -1794,7 +1794,11 @@ test("zones : commun débloqué par la première victoire du compte dans une zon
   eq(#c1.perks, 0)
   eq(table.concat(Meta.commonContent(3).perks, ","), "startRelic")
   eq(table.concat(Meta.commonContent(6).perks, ","), "merchantRelic")
-  eq(#Meta.commonContent(7).cards + #Meta.commonContent(7).relics, 0, "rien au-delà de l'ancien palier 3 aujourd'hui")
+  -- palier 7 : seulement le commun déclaré par Blackrock (fromZone), testé par Sim/tests_zone_blackrock.lua
+  local c7, other = Meta.commonContent(7), 0
+  for _, id in ipairs(c7.cards) do if not ns.Cards[id].fromZone then other = other + 1 end end
+  for _, id in ipairs(c7.relics) do if not ns.Relics[id].fromZone then other = other + 1 end end
+  eq(other, 0, "rien d'autre que le commun de la zone au palier 7")
   local db = Save.new()
   eq(Meta.commonTier(db.meta), 0)
   local fresh = assert(Save.start(db, { seed = 4, class = "warrior" }))

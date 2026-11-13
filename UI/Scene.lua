@@ -749,6 +749,15 @@ function S.landscape(f, g, sp)
   zoneLayer(sp, "front", f, g, pal)
 end
 
+-- Autres peintres (décor peint qui n'est pas un paysage à ciel ouvert : intérieur de montagne, crypte…) :
+-- Art.painters[nom] = function(f, g, sp, K), choisi par le champ `painter` de l'entrée d'Art.paintings ;
+-- K = S.paintKit (formes et niveaux du peintre), pour qu'un fichier d'art de zone peigne sans toucher à ce fichier.
+function S.paint(f, g, sp)
+  local painter = sp.painter and Art.painters and Art.painters[sp.painter]
+  if painter then return painter(f, g, sp, S.paintKit) end
+  return S.landscape(f, g, sp)
+end
+
 ---------------------------------------------------------------------------
 -- Construction
 ---------------------------------------------------------------------------
@@ -1035,7 +1044,7 @@ function S.set(stage)
     local spec = entry.paint and not S.paints[entry.paint] and Art.paintings and Art.paintings[entry.paint]
     if spec then
       local g = {}
-      S.landscape(S.decor, g, spec)
+      S.paint(S.decor, g, spec)
       S.paints[entry.paint] = g
     end
     for name, g in pairs(S.paints) do

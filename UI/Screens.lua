@@ -17,6 +17,15 @@ local C = Art.C
 local at = Scene.at
 local max, min, floor = math.max, math.min, math.floor
 
+-- Titre d'une classe après son nom (« Priest — Dragonslayer » : Nefarian vaincu avec la classe ; « Veteran » au
+-- niveau 7) : règle ns.Blackrock.title (Core/ZoneRules/blackrock.lua), lue sur le compte ; nom seul sinon.
+local function withTitle(name, cid)
+  local BR = ns.Blackrock
+  local db = ns.Persist and ns.Persist.db
+  local t = BR and BR.title and cid and db and BR.title(db.meta, cid)
+  return t and ((name or "") .. " — " .. t) or (name or "")
+end
+
 local function chooseOption(o)
   if not o then return end
   if o.disabled then UI.flash(o.reason or "Unavailable.") return end
@@ -568,7 +577,7 @@ function Start:Show(step)
   self.className:ClearAllPoints()
   if chosen then
     self.className:SetPoint("TOP", self.panel, "TOP", chosen.x, -START_TOP - START_ICON - 6)
-    self.className:SetText(chosen.option.label or "")
+    self.className:SetText(withTitle(chosen.option.label, chosen.cid))
     self.className:Show()
   else
     self.className:Hide()
@@ -2144,6 +2153,9 @@ function ClassProgress:Show(step)
     end
   end
   self.bar:Set(step.bar)
+  -- titre de la classe sous la barre de niveau (« Priest — Dragonslayer »)
+  local named = withTitle(step.bar and step.bar.label, step.class)
+  if named ~= (step.bar and step.bar.label or "") then self.bar.detail:SetText(named) end
   for _, o in ipairs(others) do
     local b = o.group == "tab" and self.tabBtn or (o.id == "ui:meta" and self.metaBtn or self.back)
     b.option = o
