@@ -46,6 +46,7 @@ E.gilmorian = { creature = 14447, display = 4920, scale = 1.15, icon = { icon = 
 -- Somnus (12900) ; repli : Sleeping Dragon (9417, 8574), Veridian Netherwing Drake (21522), Rogue Black Drake (6374)
 E.somnus = { creature = 12900, display = { 8574, 21522, 6374 }, scale = 1.35,
   icon = { icon = 1354172, tga = "INV_Misc_Head_Dragon_Green_Nightmare" } }
+Art.ui.mapBoss.swamp = E.somnus.icon -- boss du parcours : Somnus
 
 ---------------------------------------------------------------------------
 -- Personnages des rencontres

@@ -113,6 +113,7 @@ Art.statusShort.earthen_charge = "Seismic Slam deals 8 more per Charge."
 Art.statusShort.wyrmscale = "the next hit it takes deals 10 less damage."
 
 Art.ui.map.gryphon_master = I("Ability_Mount_Gryphon_01")
+Art.ui.mapBoss.wetlands = Art.enemies.nekrosh.icon -- boss du parcours : Chieftain Nek'rosh
 
 -- Infobulle de l'action « discharge » (Seismic Slam de Modr).
 Art.actionText.discharge = function() return "Earthen Charges drop to 0." end

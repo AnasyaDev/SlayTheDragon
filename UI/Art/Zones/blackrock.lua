@@ -90,6 +90,7 @@ Art.statusShort.shadowflame_fury = "at the end: Nefarian gains Strength 10."
 Art.statusShort.veil_of_shadow = "heals and Regen are halved."
 
 Art.ui.map.grim_guzzler = I("INV_Drink_09")
+Art.ui.mapBoss.blackrock = Art.enemies.nefarian.icon -- boss du parcours : Nefarian
 
 -- Infobulles des actions de zone (intentions)
 Art.actionText.class_call = function(a, c)

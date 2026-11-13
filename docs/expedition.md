@@ -207,8 +207,12 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
 | 4 | 450 | une carte par voie |
 | 5 | 700 | un bibelot de classe |
 | 6 | 1 000 | une carte par voie |
-| 7 | 1 400 | une rare par voie et 2 bibelots (34 cartes, 6 bibelots) ; titre « Dragonslayer » (`Meta.title`) |
+| 7 | 1 400 | une rare par voie et 2 bibelots (34 cartes, 6 bibelots) ; titre « Veteran » (`Meta.title`) |
 
+- Titre : « Veteran » au niveau 7 (`Meta.title`) ; « Dragonslayer » à la première victoire contre Nefarian
+  avec la classe (`ns.Blackrock.title`, qui retombe sur `Meta.title`), seul titre lu par l'interface (accueil,
+  Progress, journal). Décision du concepteur (`docs/zones/decisions.md`, nuit du 13 au 14/11/2026, à revoir
+  par le joueur) ; `docs/classes/decisions.md` (12/11/2026) dit encore « Dragonslayer » au niveau 7.
 - `Meta.XP_LEVELS`, `Meta.classLevel(xp)`, `Meta.xpProgress(xp)` → niveau, expérience dans le niveau,
   taille du niveau (nil au 7) ; `Meta.levelOf(meta, classe)` ; `Meta.isMaxLevel` ;
   `Meta.classContent(classe[, niveau])` → `{ cards, relics }` (tout, ou ce qui se débloque à ce niveau),

@@ -314,9 +314,11 @@ function Meta.isMaxLevel(meta, class)
   return Meta.levelOf(meta, class) >= Meta.MAX_LEVEL
 end
 
--- Titre cosmétique du niveau 7.
+-- Titre cosmétique du niveau 7 (« Veteran », docs/expedition.md, « Niveau de classe »). « Dragonslayer »
+-- se gagne contre Nefarian (ns.Blackrock.title, qui retombe sur celui-ci) : c'est ns.Blackrock.title que
+-- l'interface affiche (accueil, Progress, journal).
 function Meta.title(meta, class)
-  if Meta.isMaxLevel(meta, class) then return "Dragonslayer" end
+  if Meta.isMaxLevel(meta, class) then return "Veteran" end
   return nil
 end
 

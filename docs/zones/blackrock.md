@@ -602,11 +602,13 @@ Fichiers : `Data/Zones/Blackrock.lua` (ennemis, groupes, rencontres, commun, bib
   30 po parmi les trois autres (quatre réponses au plus à l'écran : une étape par boisson prise, cinq étapes
   `node = true`).
 - Titre : `ns.Blackrock.title` (« Dragonslayer » si drapeau `dragonslayer:<classe>`, sinon « Veteran » au
-  niveau 7), affiché sur l'accueil sous l'icône et sur l'écran Progress sous la barre de niveau. Le journal
-  (`UI/Controller.lua`, « Log ») lit encore `Meta.title` (« Dragonslayer » au niveau 7) : à aligner (fichiers
-  interdits, test `tests_expedition` qui fige `Meta.title`).
+  niveau 7, `Meta.title`), affiché sur l'accueil sous l'icône, sur l'écran Progress sous la barre de niveau et
+  dans le journal (« Log » : « · title: Veteran »). Le bilan de la victoire annonce « The Priest earns the
+  title Dragonslayer. » (drapeau nouvellement posé, `summary.flags`).
 - Rallying Cry : drapeau `rallying_cry` à la victoire contre Nefarian, +6 PV max à la première expédition qui
-  suit (toute classe, toute zone), drapeau `rallying_cry_used`.
+  suit (toute classe, toute zone), drapeau `rallying_cry_used`. Bilan de la première victoire du compte :
+  « Rallying Cry of the Dragonslayer: the next expedition (any class) starts with +6 max HP. ».
+- Parcours : icône du boss = Nefarian (`Art.ui.mapBoss.blackrock`).
 
 ### Modèles (replis)
 

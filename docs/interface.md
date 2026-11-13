@@ -142,7 +142,8 @@ Règles : `docs/zones.md`. La Ligue des explorateurs a disparu de tous les écra
   +1 / +3 / +5 (point d'interrogation grisé, infobulle « Win Westfall +3 to unlock » seule). Contrôleur :
   `step.tab`, `step.zones` (`C.zoneRows`).
 - **Journal** (« Log », ex-méta) : titre « Expedition log », une barre (niveau de la classe ; détail « Zones
-  won: 1 of 7 · 3 expedition(s), 2 victory(ies) »), journal (« Priest · Westfall +0 · victory · stage 8 · +76
+  won: 1 of 7 · 3 expedition(s), 2 victory(ies) », puis « · title: Veteran » ou « · title: Dragonslayer », le
+  même titre que l'accueil, `ns.Blackrock.title`), journal (« Priest · Westfall +0 · victory · stage 8 · +76
   experience »).
 - **Bilan** : « +76 Priest experience. » ; puis, selon le cas, « Westfall won with the Priest: Duskwood is open to
   the Priest (coming later). », « New Priest card: … », « New relic: … », « Mythic Keystone +2 unlocked in
@@ -1383,14 +1384,14 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | --- | --- | --- |
 | aucune expédition | **Accueil** (`start`) | décor voilé, héros ; parchemin : titre, classes (icônes), zones (sept boutons, « Campagne par zones »), clé +0…+5 de la zone (verrouillées sombres ; infobulle = affixes et raison), icônes d'affixes de la clé choisie ; plateau : « Progress », dernière expédition et avertissements de sauvegarde, « Partir en expédition » |
 | `start` | **Rencontre** (`choice`) | bibelot au choix (zone 3 gagnée par le compte) : bulle, une plaque par bibelot (icône, nom, effet), « Partir sans bibelot » |
-| `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss » et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
+| `map` | **Parcours** | parchemin sans décor ; étapes en symboles (icône du type dans un disque, « ? » pour une rencontre) ; accessibles : halo doré, couleur du type ; franchies : disque rouge coché ; position actuelle : plus grande, bord doré, anneau crème ; à venir : disque beige, icône ternie (élite : bord violet) ; boss : losange rouge « Boss », icône du boss de la zone (`Art.ui.mapBoss.<zone>`, repli VanCleef) et nom du boss ; chemin parcouru en trait rouge plein, départs possibles en pointillés dorés, le reste en pointillés bruns. Aucune légende ; infobulle = nom du type |
 | `combat` | **Combat** | voir plus bas |
 | `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic). Rencontre : bulle du texte après coup |
 | `campfire` | **Feu de camp** | décor de nuit, modèle 3D d'un feu de camp du jeu (`Art.campfire`, lueur orange au sol, médaillon du feu de camp en repli), couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
-| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan et déblocages, barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
+| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), bilan et déblocages (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
 | vue méta | **Journal** (« Log ») | barre du niveau de la classe, zones gagnées, 8 dernières expéditions ; « Retour » |
 
 **Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi ; clic droit
