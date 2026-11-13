@@ -12,7 +12,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
 | 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | jouable (14/11/2026 : mécanique Pack, élites Sarltooth / Modr / Dragonmaw Centurion, boss Chieftain Nek'rosh, 8 rencontres, commun du tier 3, bibelots de clé, Gryphon Master, huit décors peints ; détails : `docs/zones/wetlands.md`, « Implémentation ») |
-| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
+| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
@@ -267,6 +267,11 @@ avec `(kit, cadre, g, entrée, palette)` après les collines lointaines, après 
 `hash`, `rgb`, `mix`, `LV`), `S.PROPS` le registre des accessoires ; `furrows = false` retire les rangs de champ
 du sol proche (exemple complet : `UI/Art/Zones/steppes.lua`). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
+Paysage peint en entier par sa zone (ajout de Stranglethorn, générique) : `draw = function(kit, cadre, g, entrée,
+palette) … end` dans l'entrée d'`Art.paintings` remplace tous les plans de `S.landscape` (ciel, champs, route) ;
+mêmes formes et niveaux (`S.paintKit`), accessoires communs par `ns.Scene.PROPS` ; chaque région va dans `g`, sous
+`BORDER 0` (exemple : `UI/Art/Zones/stranglethorn.lua`, fonction `jungle` : collines boisées, canopées, palmiers,
+sous-bois, côte de Booty Bay, pyramides trolls).
 
 Les Wetlands (`UI/Art/Zones/wetlands.lua`) ajoutent leurs accessoires au registre `S.PROPS` sous le nom
 `wl_<genre>` au premier décor de la zone peint (UI/Scene.lua est chargé après les fichiers d'art), utilisables
