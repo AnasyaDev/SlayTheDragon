@@ -793,7 +793,11 @@ local function forceEvent(exp, id)
   local ev = ns.Events[id]
   local when, once, tier = ev.when, ev.once, ev.tier
   ev.when, ev.once, ev.tier = nil, nil, 0
-  local ok, err = pcall(enterEvent, exp, id)
+  -- rencontre de case de parcours (node = true, jamais tirée : Gurubashi Arena) : ouverte comme par sa case
+  local ok, err = pcall(ev.node and function()
+    exp.node, exp.phase = exp.map.start[1], "map"
+    X.openEvent(exp, id)
+  end or enterEvent, exp, id)
   ev.when, ev.once, ev.tier = when, once, tier
   if not ok then error(err, 0) end
 end
@@ -810,12 +814,15 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   local fam, tier0, withWhen = { common = 0, rare = 0, story = 0 }, 0, 0
   local function checkEffects(id, effects)
     for _, e in ipairs(effects) do
-      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1])) -- effets génériques de rencontre (X.EFFECTS)
+      -- (effets de rencontre déclarés par le moteur ou une zone : X.EFFECTS, docs/zones.md)
+      assert(EFFECTS[e[1]] or X.EFFECTS[e[1]], id .. " : effet " .. tostring(e[1]))
       if e[1] == "fight" then
         local pool = e[2] or (e.kind == "elite" and "elite" or "normal")
         assert(ns.Encounters[ns.Zones[ns.Events[id].zone or "westfall"].encounters][pool], id .. " : groupe " .. tostring(pool))
       elseif e[1] == "relic" and e[2] then
-        assert(ns.Relics[e[2]] and ns.Relics[e[2]].noPool, id .. " : bibelot propre " .. e[2])
+        -- bibelot propre (noPool), ou bibelot commun d'une zone vendu par sa rencontre (Shrunken Head)
+        local r = ns.Relics[e[2]]
+        assert(r and (r.noPool or (ns.Events[id].zone and not r.class and (r.tier or 0) >= 4)), id .. " : bibelot propre " .. e[2])
       elseif e[1] == "potion" and e[2] then
         assert(ns.Potions[e[2]], id .. " : potion " .. e[2])
       elseif e[1] == "gamble" then
@@ -827,7 +834,9 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   end
   for id, ev in pairs(ns.Events) do
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
-    assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
+    -- décor commun, ou décor propre à la zone de la rencontre (ns.Zones[zone].scenes : town, woods…)
+    local zsc = ev.zone and ns.Zones[ev.zone].scenes
+    assert(SCENES[ev.scene] or (zsc and zsc[ev.scene]), id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
     assert(ev.tier >= 0 and ev.tier <= ns.Zone.count(), id .. " : tier")
     if ev.zone == "westfall" then fam[ev.rarity] = fam[ev.rarity] + 1 end
@@ -1090,8 +1099,7 @@ end)
 
 test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
   for id, ev in pairs(ns.Events) do
-    -- étape d'une case de parcours (node = true : jamais tirée, ouverte par sa case) : testée par sa zone
-    for ci = 1, ev.node and 0 or #ev.choices do
+    for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
         local exp = newExp({ zone = ev.zone }) -- rencontre d'une zone : dans sa zone
         forceEvent(exp, id)
@@ -1394,7 +1402,9 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
   for lv = 0, 3 do
     local exp = newExp({ unlocks = { rep = 0, common = lv } })
     local pool = X.neutralPool(exp)
-    eq(#pool, want[lv], "palier " .. lv)
+    local fiche = 0 -- sans le commun déclaré par les fichiers de zone (fromZone)
+    for _, id in ipairs(pool) do if not ns.Cards[id].fromZone then fiche = fiche + 1 end end
+    eq(fiche, want[lv], "palier " .. lv)
     for _, id in ipairs(pool) do
       assert(isNeutral(id) and ns.Cards[id].tier <= lv, id)
       assert(X.cardUnlocked(exp, id), id)
@@ -1403,7 +1413,9 @@ test("neutres : déblocage par palier de Ligue (4 / 6 / 8 / 10 cartes), conditio
     eq(X.check(exp, { { "unlocked", "elixir_of_superior_defense" } }), lv >= 2, "condition unlocked " .. lv)
   end
   -- Exalté (4) : comme Révéré
-  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } })), 10)
+  local upTo4 = 0 -- neutres des paliers 0 à 4 (la zone 4 en ajoute)
+  for _, d in pairs(ns.Cards) do if d.neutral and d.tier <= 4 then upTo4 = upTo4 + 1 end end
+  eq(#X.neutralPool(newExp({ unlocks = { rep = 0, common = 4 } })), upTo4)
 end)
 
 test("neutres : emplacement « Neutral » du marchand (6e carte, prix 45 / 65 / 100 ±10 %), pour chaque classe", function()
@@ -1730,7 +1742,7 @@ test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule"
   local m = db.meta
   assert(Meta.zoneOpen(m, "mage", "westfall")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
   local e, why = Save.start(db, { seed = 1, class = "mage", zone = "duskwood" })
-  eq(e, nil); eq(why, "zone coming later", "Duskwood : déclarée, pas jouable")
+  eq(e, nil); eq(why, ns.Zone.playable("duskwood") and "zone locked" or "zone coming later", "Duskwood : fermée au Mage")
   finishIn(db, "mage", "westfall", 0, "lost")
   eq(Meta.zoneOpen(m, "mage", "duskwood"), false, "défaite : rien")
   local s = finishIn(db, "mage", "westfall", 0)
@@ -1782,12 +1794,11 @@ test("zones : commun débloqué par la première victoire du compte dans une zon
   eq(#c1.perks, 0)
   eq(table.concat(Meta.commonContent(3).perks, ","), "startRelic")
   eq(table.concat(Meta.commonContent(6).perks, ","), "merchantRelic")
-  -- paliers 4 à 7 : commun ajouté par les fichiers de zone, chacun au palier de sa zone
-  for n = 4, 7 do
-    local cn = Meta.commonContent(n)
-    for _, id in ipairs(cn.cards) do eq(ns.Cards[id].tier, n, id) end
-    for _, id in ipairs(cn.relics) do eq(ns.Relics[id].tier, n, id) end
-  end
+  -- palier 7 : seulement le commun déclaré par Blackrock (fromZone), testé par Sim/tests_zone_blackrock.lua
+  local c7, other = Meta.commonContent(7), 0
+  for _, id in ipairs(c7.cards) do if not ns.Cards[id].fromZone then other = other + 1 end end
+  for _, id in ipairs(c7.relics) do if not ns.Relics[id].fromZone then other = other + 1 end end
+  eq(other, 0, "rien d'autre que le commun de la zone au palier 7")
   local db = Save.new()
   eq(Meta.commonTier(db.meta), 0)
   local fresh = assert(Save.start(db, { seed = 4, class = "warrior" }))

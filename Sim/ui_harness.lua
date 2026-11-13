@@ -1363,7 +1363,9 @@ if won then
   check("victoire : clé +1 débloquée dans Westfall", Meta.keyMax(db.meta, "priest", "westfall") == 1
     and (step.text or ""):find("Mythic Keystone +1 unlocked in Westfall", 1, true), step.text)
   check("victoire : zone suivante annoncée (Duskwood, à venir), commun du compte annoncé",
-    (step.text or ""):find("Westfall won with the Priest: Duskwood is open to the Priest (coming later).", 1, true)
+    -- « (coming later) » tant que Duskwood n'est pas jouable
+    (step.text or ""):find("Westfall won with the Priest: Duskwood is open to the Priest" .. (ns.Zone.playable("duskwood")
+      and "." or " (coming later)."), 1, true)
     and (step.text or ""):find("First Westfall victory on this account", 1, true), step.text)
 else
   check("défaite : pas de nouvelle clé", Meta.keyMax(db.meta, "priest", "westfall") == 0)
@@ -1385,6 +1387,7 @@ clickOption("ui:back")
 check("retour au bilan", currentKind() == "end", currentKind())
 clickOption("ui:new")
 check("accueil", currentKind() == "start", currentKind())
+clickOption("zone:westfall") -- zone par défaut : la plus avancée ouverte (Duskwood une fois jouable)
 local keyMax = Meta.keyMax(db.meta, "priest", "westfall")
 
 check("clé par défaut = la plus haute ouverte", UI().step.key == keyMax and option("key:" .. keyMax).selected)
@@ -8203,12 +8206,18 @@ do
   check("accueil : sept boutons de zone (4 puis 3) dans le panneau, sans chevauchement, nom et état", #bad == 0, table.concat(bad, " ; "))
   H.settle()
   check("accueil : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
-  local tt = H.hover(button("zone:duskwood"))
-  check("infobulle d'une zone à venir : nom et « Coming later. »", tt[1] == "Duskwood"
-    and table.concat(tt, " | "):find("Coming later.", 1, true) ~= nil, table.concat(tt, " | "))
-  H.click(button("zone:duskwood"))
-  check("clic sur une zone à venir : raison affichée, rien ne change", UI().err._shown
-    and (UI().err._text or "") == "Coming later." and UI().step.zone == "westfall", UI().err._text)
+  -- première zone pas encore jouable (« Coming later ») ; les sept jouables : la dernière, verrouillée
+  local laterZone, why = "blackrock", nil
+  for i = #ns.Zone.ORDER, 2, -1 do
+    if not ns.Zone.playable(ns.Zone.ORDER[i]) then laterZone = ns.Zone.ORDER[i] end
+  end
+  why = ns.Zone.playable(laterZone) and option("zone:" .. laterZone).reason or "Coming later."
+  local tt = H.hover(button("zone:" .. laterZone))
+  check("infobulle d'une zone à venir ou verrouillée : nom et raison", tt[1] == ns.Zone.name(laterZone)
+    and table.concat(tt, " | "):find(why, 1, true) ~= nil, table.concat(tt, " | "))
+  H.click(button("zone:" .. laterZone))
+  check("clic sur une zone à venir ou verrouillée : raison affichée, rien ne change", UI().err._shown
+    and (UI().err._text or "") == why and UI().step.zone == "westfall", UI().err._text)
   -- survol : surbrillance seulement (même rectangle), jamais sur une zone grisée
   local wb = button("zone:westfall")
   local r0 = fmt(R.vrect(wb))
@@ -8345,7 +8354,8 @@ do
     table.concat(cnames, ", ") == ZONES and #bad2 == 0, table.concat(bad2, " ; "))
   check("onglet Zones : Westfall gagnée (clés +0 à +2, meilleure +1), Duskwood ouverte, Wetlands à venir",
     cols[1].status._text == "Won" and (cols[1].keys._text or ""):find("Keys +0 to +2 · best +1", 1, true)
-    and cols[2].status._text == "Open" and cols[3].status._text == "Coming later" and (cols[3].keys._text or "") == "",
+    and cols[2].status._text == "Open" and (cols[3].keys._text or "") == ""
+    and cols[3].status._text == (H.ns.Zone.playable("wetlands") and "Locked" or "Coming later"),
     tostring(cols[1].status._text) .. " / " .. tostring(cols[1].keys._text) .. " / " .. tostring(cols[2].status._text))
   check("carte de zone de Westfall débloquée (vraie carte)", vis(cols[1].card) and cols[1].card.cardId == "uz_zone_card"
     and not vis(cols[1].lock))

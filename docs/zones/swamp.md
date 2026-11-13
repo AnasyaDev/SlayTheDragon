@@ -572,3 +572,122 @@ pourrait parler dans une rencontre future.
 5. **Les orcs de Stonard** restent alliés (marchand, Ruag, Rartar, le pêcheur) : un joueur Horde ne combat
    pas ses propres gardes, mais la faune de la zone ne compte aucun orc. En faire des ennemis demande une
    version Alliance et une version Horde des rencontres.
+
+## 12. Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Swamp.lua` (ennemis, groupes, rencontres, commun, bibelots de clé, décors de la zone),
+`Core/ZoneRules/swamp.lua` (Slumber), `UI/Art/Zones/swamp.lua` (modèles, icônes, vue, sept décors peints),
+`Sim/zones/swamp.lua` (bot), `Sim/tests_zone_swamp.lua` (27 tests), `Sim/ui_zone_swamp.lua` (section « UZS » du
+harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg`.
+
+### La règle telle que codée
+
+- Asleep (état d'ennemi, `ns.Statuses.asleep`, 4 au plus) : l'intention d'un dormeur est le move « asleep »
+  (ajouté à la définition de l'ennemi au besoin, aucune action) ; son ouverture (`opener`, ou celle de Slumber) est
+  annoncée en gris (« On waking: »). À son tour (crochet `enemyMove`) : soin de Slumber, compteur -1, réveil à 0 sans
+  agir. Stunned : le moteur consomme le tour sans passer par `enemyMove`, le compteur gèle.
+- Réveil (`ns.Swamp.wake`) par tout dégât qui ne tue pas (`onEnemyDamaged`, Absorb compris), le compteur ou Alarm.
+  Coup à une cible pendant le tour du joueur (jeu, fin de tour) : l'ouverture devient l'intention tout de suite ; effet à tous,
+  DoT, compteur, Alarm, ou réveil hors du tour du joueur : elle sera la
+  prochaine (l'ennemi n'agit plus dans la phase en cours). Stunned sur une ouverture (y compris Freezing Trap qui
+  arrête le tour pendant l'ouverture) : elle est annoncée de nouveau.
+- Rude Awakening : `enemyDamageLast` ×1,5 arrondi au supérieur, coup à une cible (`src.single`), jamais un tic de DoT,
+  après les ajouts des bibelots (Chained Essence +4 avant), avant l'Absorb.
+- Slumber de Wyrmak et Somnus : `phases` (seuil à 50 %, cran sur la barre) dont les actions `dream` partent APRÈS
+  l'effet qui a franchi le seuil (`onEffectEnd`, ou après le tour de l'ennemi qui agit) : le sommeil tombe après la
+  carte entière.
+- Hors du marais, les règles ne sont actives que pour un combat qui peut endormir (deck avec une carte qui pose
+  Asleep, Egg of Hakkar, groupe ou rencontre avec Asleep) : Westfall reste identique à graine égale.
+
+### Ce qui diffère de la fiche, et pourquoi
+
+1. **Réveil doux par un effet à tous** (`Swamp.SOFT_ALL`) : un effet « to all » réveille sans bonus ET l'ouverture
+   part au round suivant, comme un tic de DoT (la fiche la faisait partir dans le round). Mesuré après la fusion
+   des épiques : le Warrior (Cleave, Whirlwind, Thunder Clap) tombait à 64 % quand les autres classes étaient à
+   78-87 % ; avec le réveil doux, 67-78 % pour toutes (écart 12 points au lieu de 22). Le choix de la zone reste :
+   coup à une cible = bonus + ouverture tout de suite ; effet à tous ou DoT = pas de bonus, un round de répit.
+2. **Soin de Slumber réduit** : Wyrmak 6 par tour de sommeil (fiche : 12), Somnus 5 (fiche : 10) ; le soin punissait
+   surtout les classes lentes (Warrior, Priest).
+3. **Nombres** réglés par la simulation (la fiche visait Westfall × 1,48, mais le deck repart de zéro à chaque
+   expédition : à ces chiffres, 4 à 10 % de victoire) : normaux ≈ PV × 0,94, coups × 0,76 ; élites PV × 1,04, coups
+   × 0,83 ; Somnus 135 PV, coups × 0,83, ouvertures × 0,7. Tableau ci-dessous.
+4. **Le familier ne réveille jamais seul** : l'attaque automatique vise un éveillé, et attend quand tous dorment
+   (décision : « évite les dormeurs tant qu'un ennemi est éveillé »). Sans cela, Somnus se réveillait à la fin du
+   tour 1 contre le Hunter (−8 points de victoire au boss). Les attaques commandées frappent la cible de la carte.
+5. **Dreamless Sleep Potion** : « Lose all mana. » au lieu de « End your turn. » (aucun effet ne termine le tour
+   depuis une carte sans toucher au moteur et aux bots).
+6. **Lull pendant la phase ennemie** : un ennemi rendormi avant son tour dans la même phase y passe déjà un tour de
+   sommeil (« Skips its next 2 turns ») ; le soin de 8 est immédiat.
+7. **Sleeping Camp** (`temple_steps`) : Asleep 3 posé par la rencontre (`{ "fight", "event_dragonkin", st =
+   { asleep = 3 } }`), pas dans la composition du groupe (le test commun des groupes ne lit que des ids).
+8. **Egg of Hakkar** : « the enemy with the most HP, bosses excepted » (le harnais U29 lit « non-boss » comme du
+   français). **Scènes des rencontres** : noms communs (`road`, `camp`, `shop`, `hill`, `mine`, `coast`) remplacés
+   par ceux de la zone.
+9. **Rencontres sans personnage** : `temple_steps` montre le Green Scalebane endormi, `cortello_riddle` une
+   Deathstrike Tarantula (le harnais demande trois candidats de modèle par rencontre).
+10. **Bot** : la vue courte est la bonne stratégie de base (un dormeur ne frappe pas ; tuer les éveillés, puis tuer
+    le dormeur réveillé par son compteur avant son ouverture). Compter d'avance les ouvertures (0,6 × leurs dégâts)
+    faisait réveiller trop tôt : 91 % → 71 % (Rogue). Le bot garde la clé (compteurs, ouvertures en attente) et le
+    soin de Slumber à venir.
+11. Non fourni (lot d'interface commun) : l'aperçu « 33 Wake » / « Wakes » au survol d'une carte (aucun aperçu de
+    dégâts dans l'écran de combat). À la place : infobulle du dormeur (tours, réveil fort ou doux, Rude Awakening,
+    ouverture et ses chiffres), petite icône d'ouverture à droite d'une ouverture annoncée, pastilles « +6 » (soin de
+    Slumber) et « Lulled » sous la bulle, bulles « Wakes 2 » (Alarm) et « +8 » (Lull, « - » sans cible), bulle
+    « Waking » d'un ennemi réveillé qui n'agit pas ce round.
+
+### Nombres finaux
+
+| Ennemi | PV | Coups |
+|---|---|---|
+| Sawtooth Crocolisk | 37–42, Asleep 2 | Death Roll 20 · Snap 10 · Submerge block 7 |
+| Dreaming Whelp | 15–16, Asleep 2 | Dream Breath 10 · Bite 4 |
+| Swampwalker | 45–49, Asleep 3 | Bog Crush 22 (interrompt) · Vine Lash 7 · Bog Shield 6 + 6 au plus blessé |
+| Green Scalebane | 42–45, Asleep 2 | Cleave 23 · Strike 10 · Scale Guard block 10, Strength 1 |
+| Wyrmkin Dreamwalker | 28–31 | Lull (Asleep 2, soin 8) · Dream Bolt 4 +3 par dormeur (+9 au plus) |
+| Marsh Oracle | 23–25 | Alarm Cry · Lightning Bolt 7 |
+| Deathstrike Tarantula | 28–31 | Venomous Bite 5 + DoT 3 · Web 4 + Demoralized 1 |
+| Marsh Inkspewer | 15–17 | Claw 4 · Ink Spit 3 + Sundered 1 |
+| Lost One Hunter | 30–33 | Spear Thrust 10 · Net 4 + Demoralized 1 |
+| Lost One Chieftain (élite) | 108, Asleep 2 | Spear of the Lost 24 · Thrust 13 · Rally block 8 + Strength 2 · Crushing Blow 7 + Sundered 1 |
+| Lost One Muckdweller (serviteur) | 21–23 | Warning Horn (Alarm) · Stab 5 |
+| Lord Captain Wyrmak (élite) | 116 | Cleave 15 · Tail Sweep 7 + block 8 · Wing Buffet 10 + Demoralized ; à 58 : Slumber 2, soin 6, Dream Fury 14 × 2 |
+| Gilmorian (élite) | 108 | Lightning Bolt 20 (Cast) · Frost Shock 6 + Demoralized · Healing Wave 20 (Cast) |
+| Somnus (boss) | 135, Asleep 2 | Bellowing Roar 16 + Demoralized ; Noxious Breath 6 × 2 + DoT 3 · Claw 20 · Wing Buffet 10 + block 10 ; à 67 : 2 dragonnets (14 PV, Bite 4), Slumber 2, soin 5, Deep Breath 10 × 2, puis Claw 21 · Breath 7 × 2 + DoT 3 · Buffet |
+
+### Mesures (14/11/2026, après la fusion des épiques ; 400 expéditions par classe et par colonne,
+`runner=expedition key=0 zone=swamp zones=4 level=7`, avec `epic=none` et sans `epic=` : le bot choisit une épique)
+
+| Classe | Victoire sans épique | Victoire avec épique | PV perdus / normal (avec) | Tours / normal (avec) | Boss avec épique : victoire, tours, PV perdus |
+|---|---|---|---|---|---|
+| Priest | 75,0 % | 71,2 % | 13,9 | 4,21 | 78,7 %, 6,73, 35,9 |
+| Warrior | 61,5 % | 67,5 % | 12,5 | 3,42 | 80,6 %, 6,18, 35,3 |
+| Mage | 55,0 % | 78,0 % | 6,0 | 3,35 | 83,0 %, 5,03, 22,5 |
+| Rogue | 52,5 % | 65,8 % | 10,1 | 3,49 | 87,1 %, 5,32, 18,3 |
+| Hunter | 53,5 % | 74,5 % | 5,7 | 2,81 | 78,2 %, 5,86, 27,3 |
+
+Écart : avec épique 65,8 à 78,0 % (12 points) ; sans épique 52,5 à 61,5 % pour quatre classes, Priest 75 % (il est
+aussi le plus haut en Westfall sans épique : 81 % contre 70,5 % au Rogue). Combats normaux un peu chers pour Priest
+et Warrior (12 à 14 PV, pour 36 et 74 PV max), un peu longs pour le Priest sans épique (4,9 tours).
+Clés (Rogue avec épique) : +0 65,8 %, +1 58,8 %, +3 49,8 %, +5 43,0 % (−7, puis −4,5 et −3,4 par niveau ; affixes
+communs). Statistiques de zone : `reports/final.txt` (avant la fusion : 0,55 ouverture subie par combat normal,
+0,45 dormeur tué avant son ouverture, 0,44 Rude Awakening, 0,32 Alarm).
+
+### Modèles en repli
+
+Aucune créature du marais dans les caches des clients (Forever, Classic Era, Classic, Anniversary, Retail) sauf
+Lost One Chieftain (10921), Wyrmak (7976), Gilmorian (4920), Lost One Cook (152) : chaque entrée garde la créature
+de la fiche en tête, puis des affichages de la même famille (commentés dans `UI/Art/Zones/swamp.lua`) : crocolisks
+des Wetlands et du Loch Modan, Jade (7975) pour les dragonnets, Timberling Mire Beast (863) pour le Swampwalker,
+Wyrmak et Flamescale Wyrmkin pour les dragonkin, murlocs de la Marche, tarentules, Lost One Refugee, Sleeping Dragon
+(8574) puis Veridian Netherwing Drake pour Somnus, Orc Refugee pour Ruag et le pêcheur, Witherbark Troll pour
+Fel'Zerul, fermiers de la Marche pour Galen. À vérifier en jeu (`/slay models`).
+
+### Décors
+
+Sept décors peints (`swamp_road`, `swamp_night`, `swamp_camp` Fallow Sanctuary, `swamp_shop` Stonard,
+`swamp_temple` marches du temple = « hill », `swamp_pool` boss, `swamp_strand` côte) : ciel gris-vert voilé,
+lisière sombre de saules sur l'horizon, brume, mares à reflets, arbres morts à mousse pendante, roseaux et massettes
+au premier plan, huttes des Lost Ones, huttes et tour de guet orques, temple englouti à gradins moussus.
+Formes propres au marais peintes par le plan `layers.ground` de la zone (`S.paintKit`), sans rien ajouter à
+`UI/Scene.lua` ; scènes des rencontres par les noms communs (`road`, `camp`, `shop`, `hill`, `mine`, `coast`), que
+`ns.Zones.swamp.scenes` remplace.

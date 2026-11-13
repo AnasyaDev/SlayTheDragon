@@ -452,7 +452,8 @@ test("bibelots et potions respectent le contrat", function()
   local nr, np = 0, 0
   for id, r in pairs(ns.Relics) do
     -- communs des paliers 0 à 3 (bibelots de rencontre, de classe, de clé et commun des zones suivantes à part)
-    if not r.noPool and not r.class and not r.key and (r.tier or 0) <= 3 then nr = nr + 1 end
+    -- (fromZone : commun déclaré par le fichier d'une zone, testé par Sim/tests_zone_<zone>.lua)
+    if not r.noPool and not r.class and not r.key and not r.fromZone and (r.tier or 0) <= 3 then nr = nr + 1 end
     assert(r.name and r.text and r.hooks, id)
     assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
     -- communs : palier de Ligue (tier) ; de classe : niveau de classe (test « progression »)
@@ -2546,7 +2547,7 @@ do
     local n, byTier, byRarity = 0, {}, {}
     for id, d in pairs(ns.Cards) do
       -- fiche des neutres (paliers 0 à 3) ; celles des zones suivantes sont testées par leur zone
-      if d.neutral and (d.tier or 0) <= 3 then
+      if d.neutral and (d.tier or 0) <= 3 and not d.fromZone then
         n = n + 1
         local want = NEUTRAL[id]
         assert(want, id .. " : carte neutre hors fiche")
@@ -2699,7 +2700,9 @@ do
     end
     eq(n, 20)
     -- (paliers 0 à 3 : le commun des zones suivantes et les bibelots de clé sont testés par leur zone)
-    for _, r in pairs(ns.Relics) do if not r.class and not r.key and (r.tier or 0) <= 3 then total = total + 1 end end
+    for _, r in pairs(ns.Relics) do
+      if not r.class and not r.key and not r.fromZone and (r.tier or 0) <= 3 then total = total + 1 end
+    end
     eq(total, 32, "12 d'origine + 20")
     eq(ns.Relics.hand_of_justice.class, "warrior", "bibelot du Guerrier intact")
     eq(ns.Relics.force_reactive_disk.class, "warrior", "bibelot du Guerrier intact")

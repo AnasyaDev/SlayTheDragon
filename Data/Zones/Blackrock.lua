@@ -530,7 +530,7 @@ event("lord_victor_nefarius", {
 ---------------------------------------------------------------------------
 
 D.neutralCard("dark_iron_bomb", {
-  tier = 7, name = "Dark Iron Bomb", cost = 2, type = "attack", rarity = "rare",
+  tier = 7, fromZone = "blackrock", name = "Dark Iron Bomb", cost = 2, type = "attack", rarity = "rare",
   exhaust = true, effects = { { "damage", 4, all = true }, { "apply", "stunned", 1, all = true } },
   text = "Deal 4 to all.\nApply Stunned 1 ⌛ to all\nExhaust.",
   up = { effects = { { "damage", 8, all = true }, { "apply", "stunned", 1, all = true } },
@@ -538,14 +538,14 @@ D.neutralCard("dark_iron_bomb", {
 })
 
 D.neutralCard("dark_iron_ale_mug", {
-  tier = 7, name = "Dark Iron Ale Mug", cost = 0, type = "skill", rarity = "uncommon",
+  tier = 7, fromZone = "blackrock", name = "Dark Iron Ale Mug", cost = 0, type = "skill", rarity = "uncommon",
   exhaust = true, payHp = 3, effects = { { "apply", "force", 2, self = true } },
   text = "Pay 3 HP.\nGain Strength 2\nExhaust.",
   up = { payHp = 2, text = "Pay 2 HP.\nGain Strength 2\nExhaust." },
 })
 
 D.relic("blood_of_the_mountain", {
-  name = "Blood of the Mountain", rarity = "common", tier = 7,
+  name = "Blood of the Mountain", rarity = "common", tier = 7, fromZone = "blackrock",
   text = "The first time each enemy drops to half HP, gain 4 Absorb.",
   hooks = {
     onEnemyBloodied = function(c, src, e)
@@ -555,7 +555,7 @@ D.relic("blood_of_the_mountain", {
 })
 
 D.relic("black_dragonscale", {
-  name = "Black Dragonscale", rarity = "uncommon", tier = 7,
+  name = "Black Dragonscale", rarity = "uncommon", tier = 7, fromZone = "blackrock",
   text = "Enemy Cast attacks deal 4 less damage.",
   hooks = {
     beforeHit = function(c, src, dmg, enemy)
@@ -569,7 +569,7 @@ D.relic("black_dragonscale", {
 -- « Treasure chests offer a choice of 2 relics » (fiche) : la récompense n'offre pas de choix de bibelot
 -- (docs/zones.md § 10) ; à la place, le coffre contient aussi une potion (tirée du flux du butin).
 D.relic("shadowforge_key", {
-  name = "Shadowforge Key", rarity = "uncommon", tier = 7,
+  name = "Shadowforge Key", rarity = "uncommon", tier = 7, fromZone = "blackrock",
   text = "Treasure chests also hold a potion.",
   run = {
     onRewardRolled = function(exp, r, kind)
@@ -583,7 +583,7 @@ D.relic("shadowforge_key", {
 ---------------------------------------------------------------------------
 
 D.relic("blackhands_breadth", {
-  name = "Blackhand's Breadth", rarity = "rare", key = { zone = "blackrock", level = 1 },
+  name = "Blackhand's Breadth", rarity = "rare", key = { zone = "blackrock", level = 1 }, fromZone = "blackrock",
   text = "Attacks deal 4 more damage per hit to enemies at half HP or less.",
   hooks = {
     damage = function(c, src, v, dst, cardDef)
@@ -597,7 +597,7 @@ D.relic("blackhands_breadth", {
 
 -- Une seule pioche quand le seuil de phase et la moitié des PV tombent sur le même coup (normaux à 50 %).
 D.relic("draconic_infused_emblem", {
-  name = "Draconic Infused Emblem", rarity = "rare", key = { zone = "blackrock", level = 3 },
+  name = "Draconic Infused Emblem", rarity = "rare", key = { zone = "blackrock", level = 3 }, fromZone = "blackrock",
   text = "Whenever an enemy changes phase or first drops to half HP, draw 1.",
   hooks = {
     onEnemyPhase = function(c, src, e)
@@ -613,7 +613,7 @@ D.relic("draconic_infused_emblem", {
 })
 
 D.relic("neltharions_tear", {
-  name = "Neltharion's Tear", rarity = "rare", key = { zone = "blackrock", level = 5 },
+  name = "Neltharion's Tear", rarity = "rare", key = { zone = "blackrock", level = 5 }, fromZone = "blackrock",
   text = "The first card played each turn costs 1 less.",
   hooks = {
     cost = function(c, src, v)

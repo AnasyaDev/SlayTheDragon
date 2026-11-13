@@ -10,10 +10,10 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | Ordre | Id (`ns.Zones`) | Nom affiché | Fichier de données | État |
 | --- | --- | --- | --- | --- |
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
-| 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
-| 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
-| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
-| 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
+| 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | jouable (Curse, boss Morbent Fel ; décors peints forêt noire, cimetière, Darkshire ; 14/11/2026, docs/zones/duskwood.md « Implémentation ») |
+| 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | jouable (14/11/2026 : mécanique Pack, élites Sarltooth / Modr / Dragonmaw Centurion, boss Chieftain Nek'rosh, 8 rencontres, commun du tier 3, bibelots de clé, Gryphon Master, huit décors peints ; détails : `docs/zones/wetlands.md`, « Implémentation ») |
+| 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
+| 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | jouable depuis le 14/11/2026 (Slumber : dormeurs, ouvertures, Rude Awakening ; boss Somnus ; sept décors peints) ; détails et mesures : `docs/zones/swamp.md`, « Implémentation » |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | jouable (Wildfire, boss Grark Lorkrub ; décors peints roche brûlée et lave ; 14/11/2026, `docs/zones/steppes.md` « Implémentation ») |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | jouable (14/11/2026) : phases (moteur commun) et règles propres (Invincible, Fire Shield, Shadow of the Throne, Class Call), boss Nefarian (3 phases), Grim Guzzler, titre « Dragonslayer » ; six décors peints (peintre `cavern`) ; implémentation : `docs/zones/blackrock.md` § 13 |
 
@@ -113,7 +113,9 @@ spec `{ "sawtooth_crocolisk", st = { asleep = 3 }, hp = 40, hpMul = 1.15, ambush
 local _, ns = ...
 local Combat, ZR = ns.Combat, ns.ZoneRule
 ZR.define("duskwood", {
-  always = false,                -- vrai : crochets actifs dans TOUTES les zones (Asleep de Dream Dust)
+  always = false,                -- vrai : crochets actifs dans TOUTES les zones ; ou function(opts) -> bool : actifs
+                                 -- hors de leur zone pour un combat qui en a besoin (opts de Combat.new : deck,
+                                 -- relics, encounter, mods ; nil hors combat) — Swamp : deck qui pose Asleep, Egg of Hakkar
   init = function(c, z) z.curses = 0 end,           -- z = c.zs.duskwood (après l'init de la classe)
   hooks = { … },                 -- crochets de combat (ci-dessous), src = z
   run = { … },                   -- crochets d'expédition (§ 5)
@@ -269,6 +271,34 @@ du sol proche (exemple complet : `UI/Art/Zones/steppes.lua`). Décor qui n'est p
 d'`Art.paintings` et `Art.painters.<nom> = function(f, g, sp, K)` dans le fichier d'art de la zone (`K` =
 `S.paintKit`), choisi par `S.paint` (Blackrock : peintre `cavern`). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
+Paysage peint en entier par sa zone (ajout de Stranglethorn, générique) : `draw = function(kit, cadre, g, entrée,
+palette) … end` dans l'entrée d'`Art.paintings` remplace tous les plans de `S.landscape` (ciel, champs, route) ;
+mêmes formes et niveaux (`S.paintKit`), accessoires communs par `ns.Scene.PROPS` ; chaque région va dans `g`, sous
+`BORDER 0` (exemple : `UI/Art/Zones/stranglethorn.lua`, fonction `jungle` : collines boisées, canopées, palmiers,
+sous-bois, côte de Booty Bay, pyramides trolls).
+Swamp of Sorrows (14/11/2026) : rien d'ajouté à `UI/Scene.lua` ; ses accessoires (arbres morts à mousse,
+huttes, tour de guet, temple, roseaux) et ses mares sont peints par son plan `layers.ground` avec `S.paintKit`
+(`UI/Art/Zones/swamp.lua` : `items`, `pools`, palette `water`, `waterEdge`, `moss`). Planches : il faut les aperçus
+PNG de `Media/` dans `build/media_png` (`tools/build_media.py`, ou une conversion des TGA) ; sans eux, taches fondues
+et disques sont dessinés en rectangles dans les SVG du harnais.
+
+Accessoires génériques ajoutés par Duskwood (14/11/2026, `UI/Scene.lua`, `PROPS`) : `deadtree` (arbre mort tordu),
+`oak` (feuillu sombre, liseré de lune `rim`), `pine` (sapin), `treeline` (lisière de x à x2 : `{ "treeline", x, y,
+échelle, plan, x2 }`), `bush`, `tombstone` (variante `cross`), `crypt` (variante `lit` : porte éclairée, `pal.glow`),
+`lamppost`, `web` (`pal.web`), `mist` (banc de brume de x à x2), `glow` (flaque de lumière : `pal.glow`, variante
+`moon` : `rim` du plan) ; plan `back` (lisière derrière la brume de l'horizon, couleurs `pal.back`). Couleurs de
+plan en plus : `light`, `rim = { couleur, alpha }`.
+
+Les Wetlands (`UI/Art/Zones/wetlands.lua`) ajoutent leurs accessoires au registre `S.PROPS` sous le nom
+`wl_<genre>` au premier décor de la zone peint (UI/Scene.lua est chargé après les fichiers d'art), utilisables
+dans `props` par toute zone qui peint après eux : `wl_marsh_tree` (variante `dead`), `wl_rocks`, `wl_ship`
+(`small`), `wl_pier` (variante = x de fin), `wl_keep`, `wl_banner`, `wl_ruin`, `wl_orc_tent`, `wl_scaffold`,
+`wl_gate`, `wl_harbor_house`, `wl_cargo`.
+
+**Commun déclaré par une zone** : poser `fromZone = "<zone>"` sur les cartes neutres et bibelots déclarés par
+`ns.Declare.*` ; les tests du commun d'origine (`Sim/tests.lua`, `Sim/tests_expedition.lua`, harnais : paliers
+0 à 3) ne comptent pas ces entrées (vérifiées par `Sim/tests_zone_<zone>.lua`). Nécessaire pour une zone dont le
+commun est au palier 3 ou moins (Duskwood, Wetlands) ; les zones 4 à 7 sont déjà hors de ces comptes.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 
