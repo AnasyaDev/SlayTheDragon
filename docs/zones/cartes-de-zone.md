@@ -591,6 +591,22 @@ Sept builds :
 7. **Que des cartes différentes** (Subtlety) — Danse Macabre : un deck sans doublons, Killing Spree et Ambush
    en fin de tour.
 
+**Réglage du 14/11/2026 (zones dures).** Mesure commune aux cinq classes : `runner=expedition level=7 key=0
+bot=heuristic runs=600`, Duskwood (`zones=1`), Stranglethorn (`zones=3`), Steppes (`zones=5`) ; gain = victoires avec
+l'épique imposée − victoires sans épique (60,0 / 61,2 / 74,3 %). Au départ, gains moyens de 10 à 22 points (Danse
+Macabre 22,3, Echoing Reprimand 18,9, Atrophic Poison 18,5, Deflection 17,1) ; après réglage, 8,0 à 13,4, moyenne
+de la classe **11,2**. Les textes ci-dessous sont les textes finaux (nombres : `EPIC_N` de `Data/Rogue.lua`).
+
+| Épique | Duskwood | Stranglethorn | Steppes | Moyenne | Westfall (info) | PV perdus / combat normal |
+|---|---|---|---|---|---|---|
+| Deflection | +17,2 | +10,1 | +6,0 | **+11,1** | +7,3 | 5,5–6,6 |
+| Doomblade | +15,8 | +6,1 | +16,4 | **+12,8** | +5,5 | 6,6–8,4 |
+| Atrophic Poison | +8,3 | +16,5 | +9,4 | **+11,4** | +8,5 | 6,7–7,9 |
+| Echoing Reprimand | +10,3 | +6,1 | +7,7 | **+8,0** | +5,1 | 5,9–6,8 |
+| Subterfuge | +14,2 | +13,3 | +12,7 | **+13,4** | +6,6 | 5,4–6,2 |
+| Kidney Shot | +9,0 | +12,3 | +9,9 | **+10,4** | +3,6 | 6,4–7,4 |
+| Danse Macabre | +13,7 | +10,6 | +9,7 | **+11,3** | +4,1 | 5,6–6,8 |
+
 ### Westfall — Deflection (Combat) · nouvelle (la carte du joueur)
 
 Le nom « Riposte » est pris par une carte commune du Rogue (`riposte`, Combat : `Deal 4.` / `Gain Parry 1`) ;
@@ -598,9 +614,13 @@ l'épique prend celui d'un talent Combat de l'ère classique. Voir la question 1
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each Parry gained:` / `deal 3, +3 per earlier` / `one this turn, to the` / `last target.` | `…` / `deal 4, +4 per earlier` / `…` |
+| —, Epic | `Epic.` / `Each Parry gained:` / `deal 1, +2 per earlier` / `one this turn, to the` / `last target.` | `…` / `deal 2, +2 per earlier` / `…` |
 
-Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
+Infobulle : `Riposte: 1, then 3, 5, 7 in a turn, even above Parry 3.` (amélioré : 2, 4, 6, 8).
+
+- **Réglé (14/11/2026).** Première riposte du tour et pas de la progression séparés : la k-ième riposte inflige
+  N + S × (k − 1), N = 1, S = 2 (amélioré 2 / 2 ; fiche 3 × k, puis 2 × k à Westfall). La règle reste entière
+  (chaque Parry gagné riposte, en crescendo dans le tour) ; la progression pèse plus que la première riposte.
 
 - **Règle.** Chaque charge de Parry gagnée fait une riposte : la k-ième riposte du tour inflige 3 × k
   (amélioré : 4 × k), sans carte, à la dernière cible du Rogue. La charge est gagnée normalement : le Rogue
@@ -624,7 +644,10 @@ Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Surge Attacks apply` / `half their damage as` / `DoT instead.` | `Surge Attacks apply` / `their damage as DoT` / `instead.` |
+| —, Epic | `Epic.` / `Surge Attacks apply` / `90% of their damage` / `as DoT instead.` | `Surge Attacks apply` / `their damage as DoT` / `instead.` |
+
+- **Réglé (14/11/2026).** 90 % (amélioré : la totalité). La moitié de la fiche fait PERDRE 12 points en moyenne
+  (−16 à Duskwood) : le DoT met deux ou trois tours à rendre ses dégâts ; 75 % = +4,5, 100 % = +15,9.
 
 - **Règle.** Les cartes Attack qui ont une clause Surge (Eviscerate, Between the Eyes, Nightblade, Secret
   Technique) n'infligent plus leurs dégâts : chaque coup pose sur sa cible un DoT égal à la moitié de ce
@@ -645,7 +668,12 @@ Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Enemies with DoT count` / `as Demoralized.` | `…` / `as Demoralized and` / `Sundered.` |
+| —, Epic | `Epic.` / `Enemies with DoT 5+` / `count as Demoralized.` | `…` / `count as Demoralized` / `and Sundered.` |
+
+- **Réglé (14/11/2026).** Un seuil de DoT, seul nombre de la carte : l'ennemi compte s'il montre au moins
+  DoT 5 pendant le tour du Voleur (et qu'il lui en reste après son tic) ; amélioré, même seuil pour Sundered.
+  Sans seuil (« garde du DoT après son tic ») : +18,5 (+23,8 à Stranglethorn) ; DoT 3+ : +15,0 ; DoT 4+ : +13,6
+  (+18,8 à Stranglethorn) ; DoT 5+ : +11,4. Le deck doit empiler le poison sur chaque attaquant.
 
 - **Règle.** Un ennemi qui porte du DoT inflige 25 % de dégâts en moins, comme sous Demoralized (amélioré :
   il subit aussi 25 % de plus, comme sous Sundered). Ce n'est pas un état posé : il ne se cumule pas avec
@@ -663,7 +691,11 @@ Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `A Surge of 2 or 3` / `Combo counts as 5.` | `…` / `Combo counts as 6.` |
+| —, Epic | `Epic.` / `A Surge of 2 Combo` / `counts as 3.` | `A Surge of 2 or 3` / `Combo counts as 4.` |
+
+- **Réglé (14/11/2026).** Base : 2 Combo comptent 3 ; amélioré : 2 ou 3 comptent 4 (fiche 5 / 6). « 2 ou 3 → 4 »
+  donnait +18,9, « 2 → 4 » +18,2 (le bot finit presque toujours à 2), « 2 → 3 » +8,0 : il n'y a pas de cran entre
+  les deux. Le build reste « finir à 2 points ».
 
 - **Règle.** Un Surge qui dépense exactement 2 ou 3 Combo compte 5 (amélioré : 6) pour ses effets. 1, 4 et
   5 Combo comptent leur valeur.
@@ -681,7 +713,16 @@ Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Stealth ends at end of` / `turn, not on Attacks.` | `…` / `Gaining Stealth:` / `+1 Combo.` |
+| —, Epic | `Epic.` / `Stealth lasts two turns.` / `Surge of 1+ Combo:` / `gain Stealth` | `Stealth lasts three` / `turns.` / `…` |
+
+Infobulle : `Lasts: Attacks use Stealth without removing it.`
+
+- **Réglé (14/11/2026).** La carte manquait de sources de Stealth : elle a maintenant la sienne, chaque Surge
+  (1 Combo ou plus) rend Stealth pour les cartes jouées après (pas pour la carte du Surge). Le Stealth dure deux
+  tours (celui où il est gagné compris ; amélioré : trois). La boucle du build : ouvertures sous Stealth, coup de
+  grâce, nouvelles ouvertures. Mesures : fiche seule (1 tour, sans source) + 2 Combo par Stealth gagné : +10,3 ;
+  source + 1 tour : +5,4 ; source + 1 tour + 1 Combo : +12,4 ; source + 2 tours : +13,4 (retenu : la ligne
+  « Gaining Stealth: +1 Combo. » ne tient plus sur la carte avec la source).
 
 - **Règle.** Une carte Attack jouée sous Stealth applique sa ligne « Stealth: » sans retirer l'état ; le
   Stealth tombe à la fin du tour du Rogue. Amélioré : chaque Stealth gagné (passage d'absent à présent)
@@ -704,6 +745,8 @@ Infobulle : `Riposte: 3, then 6, 9, 12… each turn, even above Parry 3.`
 
 Infobulle : `A boss gets Demoralized 2 ⌛ instead.`
 
+- **Réglé (14/11/2026).** Les nombres de la fiche (5 ; amélioré 4+) : +10,4 (seuil 4 au lieu de 5 : +15,1).
+
 - **Règle.** Une carte à cible dont le Surge dépense 5 Combo (amélioré : 4 ou plus) pose ensuite
   Stunned 1 ⌛ sur sa cible si elle vit ; un boss reçoit Demoralized 2 ⌛.
 - **Cas limites.** Les Surge sans cible (Secret Technique) ne font rien de plus. Between the Eyes (déjà
@@ -719,7 +762,13 @@ Infobulle : `A boss gets Demoralized 2 ⌛ instead.`
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Attack hits: +2 per` / `other card name played` / `this turn.` | `Attack hits: +3 per` / `…` |
+| —, Epic | `Epic.` / `Attack hits: +2 per` / `other card name played` / `this turn after the` / `first 2.` | `Attack hits: +3 per` / `…` |
+
+- **Réglé (14/11/2026).** Plafond retiré, +2 par nom de la fiche gardé ; les deux premiers autres noms du tour
+  ne comptent pas (3 autres noms : +2, 4 : +4…). Avec +1 par nom et un plafond de +3 (réglage de Westfall) :
+  +22,3 ; le plafond ne bridait presque rien (+2 : +21,8). Après les deux premiers noms : +1 par nom = +6,9,
+  +2 par nom = +11,3 (avec ou sans plafond de +4). Essayé et écarté : « une Attack de chaque nom par tour »
+  (−4 à +20 selon le nombre, s'effondre à Stranglethorn où les cartes Hexed bloquent la main).
 
 - **Règle.** Chaque coup d'une carte Attack inflige 2 de plus (amélioré : 3) par nom de carte différent
   déjà joué dans ce tour, son propre nom exclu, chaque nom compté une fois.

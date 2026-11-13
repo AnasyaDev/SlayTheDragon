@@ -9502,9 +9502,9 @@ do
   W.fillCardTooltip(tip, "kidney_shot", true)
   W.fillCardTooltip(tip, "danse_macabre", false)
   local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-  local k1 = ns.Rogue.EPIC.deflection[1]
-  check("infobulles : riposte détaillée (k, 2k, 3k, 4k), boss de Kidney Shot, noms de Danse Macabre",
-    all:find(("Riposte: %d, then %d, %d, %d"):format(k1, 2 * k1, 3 * k1, 4 * k1), 1, true) and all:find("Boss: gets Demoralized 2", 1, true)
+  local RD = ns.Rogue.riposteDamage
+  check("infobulles : riposte détaillée (quatre premières du tour), boss de Kidney Shot, noms de Danse Macabre",
+    all:find(("Riposte: %d, then %d, %d, %d"):format(RD(1), RD(2), RD(3), RD(4)), 1, true) and all:find("Boss: gets Demoralized 2", 1, true)
     and all:find("each different card played this turn counts once", 1, true), all)
 
   -- 2. combat avec Deflection : l'épique en jeu dès la première main, ligne des ripostes du tour
@@ -9530,8 +9530,8 @@ do
   local ep = host and host.epic
   local function line() return ep and ep.text._shown and (ep.text._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") or "" end
   local EN = ns.Rogue.EPIC
-  local d1 = EN.deflection[1]
-  check("ligne de l'épique : icône de Deflection, « Ripostes this turn: 0   next: k »",
+  local d1 = RD(1)
+  check("ligne de l'épique : icône de Deflection, « Ripostes this turn: 0   next: N »",
     ep and ep._shown and (ep.slot.icon._texture or ""):lower():find("ability_rogue_dismantle", 1, true)
     and line() == "Ripostes this turn: 0   next: " .. d1, line())
   local hp0 = c.enemies[1].hp
@@ -9542,8 +9542,8 @@ do
   ns.Controller.act({ "play", #c.hand })
   H.settle()
   v:Render(true)
-  check("deux Feint : ripostes k + 2k sur la cible, ligne « Ripostes this turn: 2   next: 3k »",
-    c.enemies[1].hp == hp0 - 3 * d1 and line() == "Ripostes this turn: 2   next: " .. 3 * d1, line() .. " / " .. (hp0 - c.enemies[1].hp))
+  check("deux Feint : deux ripostes sur la cible, ligne « Ripostes this turn: 2   next: » la troisième",
+    c.enemies[1].hp == hp0 - RD(1) - RD(2) and line() == "Ripostes this turn: 2   next: " .. RD(3), line() .. " / " .. (hp0 - c.enemies[1].hp))
   local hv = table.concat(H.hover(ep), " | "):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
   check("survol de l'icône : la carte Deflection et son texte", hv:find("Deflection", 1, true) and hv:find("Each Parry gained", 1, true), hv)
   check("ligne dans la zone de classe, sans texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
@@ -9555,14 +9555,16 @@ do
     v:Render(true)
   end
   setEpic("danse_macabre")
-  c.cls.dmRound, c.cls.dmNames, c.cls.dmCount = c.round, { feint = true, kick = true }, 2
+  c.cls.dmRound, c.cls.dmNames, c.cls.dmCount = c.round, { feint = true, kick = true, sprint = true }, 3
   v:Render(true)
-  local dm = "Card names this turn: 2   +" .. 2 * EN.danse_macabre[1] .. " per hit"
-  check("Danse Macabre : « Card names this turn: 2   +2N per hit »", line() == dm, line())
+  local dmb = EN.danse_macabre[1] * (3 - EN.danseFree[1])
+  local dm = "Card names this turn: 3   +" .. dmb .. " per hit"
+  check("Danse Macabre : « Card names this turn: 3   +N per hit » (noms au-delà des F premiers)",
+    line() == dm and dmb > 0, line())
   setEpic("echoing_reprimand")
-  c.player.res = 3
+  c.player.res = EN.echoingMax[1]
   v:Render(true)
-  check("Echoing Reprimand à 3 Combo : « Surge now counts as N Combo »",
+  check("Echoing Reprimand au haut de la plage (2 ou 3 Combo) : « Surge now counts as N Combo »",
     line() == "Surge now counts as " .. EN.echoing_reprimand[1] .. " Combo", line())
   c.player.res = 4
   v:Render(true)
@@ -9574,7 +9576,7 @@ do
   setEpic("atrophic_poison")
   for _, en in ipairs(c.enemies) do en.st.pain = nil end
   local tgt = c.enemies[1]
-  Combat.applyStatus(c, tgt, "pain", 3)
+  Combat.applyStatus(c, tgt, "pain", EN.atrophic_poison[1])
   v:Render(true)
   local shown, mk = 0, nil
   for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 mk = m end end
@@ -9589,7 +9591,7 @@ do
   shown = 0
   for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 end end
   check("Atrophic Poison : DoT 1 (tombe avant son coup) : pas de marque", shown == 0, shown)
-  tgt.st.pain = 3
+  tgt.st.pain = EN.atrophic_poison[1]
   v:Render(true)
   snap("uer-atrophic", true)
   c.epic = nil

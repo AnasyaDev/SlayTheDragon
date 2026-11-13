@@ -568,19 +568,29 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
 - **Deflection** : `onStatusApplied` (Parry sur le héros, `n` demandé avant le plafond de 3) ; compteur
   `c.cls.ripostes` du tour (`c.cls.riposteRound`, le début du combat compte pour le tour 1, le tour ennemi
   continue le compte) ; coup sans carte (`calcDamage` avec `cardDef` nil) sur `c.player.lastTarget` ou l'ennemi
-  vivant le plus à gauche ; journal `{ t = "riposte", dst, n, base }`. `ns.Rogue.ripostes(c)`, `nextRiposte(c)`.
+  vivant le plus à gauche ; journal `{ t = "riposte", dst, n, base }`. `ns.Rogue.ripostes(c)`, `nextRiposte(c)`,
+  `riposteDamage(k, up)` = N + S × (k − 1) (`EPIC_N.deflection`, `deflectionStep`).
 - **Doomblade** : crochet moteur `convertHit` (ci-dessus), Attacks à effet `surge` seulement ; DoT par le crochet
   `apply` (Crystal Vial), icône poison.
-- **Atrophic Poison** : `enemyDamage` (×0,75 si l'ennemi garde du DoT après son tick : hors du tour ennemi, on
-  retire la baisse `dotDecay`, l'intention affichée est juste ; pas de cumul avec un vrai Demoralized),
-  amélioré `damage` (×1,25, pas de cumul avec Sundered). `ns.Rogue.countsDemoralized(c, e)`.
-- **Echoing Reprimand** : `surge` (2 ou 3 -> N) ; aucune autre source du Voleur ne modifie `surge` avant.
+- **Atrophic Poison** : `enemyDamage` (×0,75 si l'ennemi montre au moins le seuil de DoT `EPIC_N.atrophic_poison`
+  pendant le tour du Voleur et en garde après son tic ; pendant le tour ennemi, on lui rend la baisse `dotDecay` ;
+  l'intention affichée est juste ; pas de cumul avec un vrai Demoralized), amélioré `damage` (×1,25 au même seuil,
+  pas de cumul avec Sundered). `ns.Rogue.countsDemoralized(c, e)`.
+- **Echoing Reprimand** : `surge` (2 à M -> N, `EPIC_N.echoingMax`) ; aucune autre source du Voleur ne modifie
+  `surge` avant.
 - **Subterfuge** : `stealthBreak` faux ; durée `c.cls.stealthUntil` (posée à chaque Stealth reçu, et par
-  `whileInDeck` pour celui du départ), retrait dans `onTurnEnd` ; Combo par Stealth gagné (`c.cls.stealthGained`).
+  `whileInDeck` pour celui du départ), retrait dans `onTurnEnd` ; source incluse : `onSurge` (dépense de 1 ou
+  plus) pose Stealth (`EPIC_N.subterfugeSurge`) ; Combo par Stealth gagné (`c.cls.stealthGained`, 0 depuis le
+  réglage). Infobulle « Lasts » (`L.keyword("subterfugeLasts")`).
 - **Kidney Shot** : `onSurge` (dépense réelle, carte à cible) marque le `ctx`, `onCardPlayed` étourdit la cible
   vivante (boss : Demoralized 2).
 - **Danse Macabre** : `onCardCommitted` tient les ids joués du tour (`c.cls.dmNames`, `dmCount`, `dmRound`) ;
-  `damage` ajoute N par autre id, au plus le plafond.
+  `damage` ajoute `ns.Rogue.danseBonus(c, up, id)` = N par autre id au-delà des F premiers (`EPIC_N.danseFree`),
+  plafond facultatif (`danseCap`, 0 = aucun).
+- **Réglage (14/11/2026, zones dures)** : tableau et essais dans `docs/zones/cartes-de-zone.md` (« Rogue »).
+  Contrôle « à blanc » (nombre nul, mêmes conseils du bot) : Deflection −3,1, Echoing −1,2, Kidney +0,9,
+  Atrophic −2,9, Danse +3,4 (les retraits de doublons conseillés par `bot.byEpic.danse_macabre` rapportent
+  un peu seuls, surtout à Duskwood).
 
 ### Épiques du Guerrier (14/11/2026, réglées pour les zones dures le 14/11/2026)
 

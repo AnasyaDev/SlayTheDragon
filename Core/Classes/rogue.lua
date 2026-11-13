@@ -181,11 +181,16 @@ function Rogue.ripostes(c)
   if cls.riposteRound ~= turnKey(c) then return 0 end
   return cls.ripostes or 0
 end
+-- Dégâts de base de la k-ième riposte du tour : N + S × (k − 1) (Deflection, amélioré si up).
+function Rogue.riposteDamage(k, up)
+  local i = up and 2 or 1
+  return Rogue.EPIC.deflection[i] + Rogue.EPIC.deflectionStep[i] * (k - 1)
+end
 -- Dégâts de base de la prochaine riposte (nil sans Deflection).
 function Rogue.nextRiposte(c)
   local id, up = Rogue.epicOf(c)
   if id ~= "deflection" then return nil end
-  return Rogue.EPIC.deflection[up and 2 or 1] * (Rogue.ripostes(c) + 1)
+  return Rogue.riposteDamage(Rogue.ripostes(c) + 1, up)
 end
 
 -- Noms de cartes joués ce tour (Danse Macabre) : c.cls.dmNames, compte c.cls.dmCount, tour c.cls.dmRound.
@@ -215,12 +220,11 @@ EH.deflection = {
     local cls = c.cls
     local key = turnKey(c)
     if cls.riposteRound ~= key then cls.riposteRound, cls.ripostes = key, 0 end
-    local step = num("deflection", src)
     for _ = 1, n do
       local t = Rogue.riposteTarget(c)
       if not t then return end
       cls.ripostes = cls.ripostes + 1
-      local base = step * cls.ripostes
+      local base = Rogue.riposteDamage(cls.ripostes, src.up)
       Combat.log(c, { t = "riposte", dst = t.uid, n = cls.ripostes, base = base })
       stat(c, "ripostes")
       Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, base, nil))
@@ -244,17 +248,22 @@ EH.doomblade = {
   end,
 }
 
--- Atrophic Poison : un ennemi qui porte du DoT frappe comme sous Demoralized (sans se cumuler avec lui) ;
--- amélioré, il subit les coups du Voleur comme sous Sundered. Hors du tour ennemi (intentions affichées),
--- on lit le DoT qui restera après son tick de début de tour.
-local function dotAtHit(c, e)
+-- Atrophic Poison : un ennemi qui porte au moins T de DoT (le DoT montré pendant le tour du Voleur, avant
+-- son tic) frappe comme sous Demoralized (sans se cumuler avec lui) ; amélioré, il subit les coups du Voleur
+-- comme sous Sundered (même seuil). Pendant le tour ennemi, le DoT a déjà tiqué : on lui rend la baisse du
+-- tic. Il faut aussi qu'il en reste après le tic (un DoT 1 tombe à 0 avant le coup).
+local function dotAtHit(c, e, up)
   local pain = e.st.pain or 0
-  if pain > 0 and c.phase ~= "enemy" then pain = pain - Combat.modify(c, "dotDecay", 1, e) end
-  return pain > 0
+  if pain <= 0 then return false end
+  local need = Rogue.EPIC.atrophic_poison[up and 2 or 1]
+  if c.phase == "enemy" then return pain + Combat.modify(c, "dotDecay", 1, e) >= need end
+  return pain >= need and pain - Combat.modify(c, "dotDecay", 1, e) > 0
 end
--- L'ennemi e compte-t-il comme Demoralized (porte du DoT, pas de vrai Demoralized) ? Lu aussi par l'interface.
+-- L'ennemi e compte-t-il comme Demoralized (porte assez de DoT, pas de vrai Demoralized) ? Lu aussi par
+-- l'interface.
 function Rogue.countsDemoralized(c, e)
-  return e ~= nil and e.side == "enemy" and not e.dead and (e.st.demoralized or 0) <= 0 and dotAtHit(c, e)
+  local _, up = Rogue.epicOf(c)
+  return e ~= nil and e.side == "enemy" and not e.dead and (e.st.demoralized or 0) <= 0 and dotAtHit(c, e, up)
 end
 EH.atrophic_poison = {
   enemyDamage = function(c, src, v, e)
@@ -264,7 +273,8 @@ EH.atrophic_poison = {
     return v
   end,
   damage = function(c, src, v, t)
-    if src.up and t and t.side == "enemy" and (t.st.armor_broken or 0) <= 0 and (t.st.pain or 0) > 0 then
+    if src.up and t and t.side == "enemy" and (t.st.armor_broken or 0) <= 0
+      and (t.st.pain or 0) >= num("atrophic_poison", src) then
       return math.floor(v * 1.25)
     end
     return v
@@ -275,7 +285,7 @@ EH.atrophic_poison = {
 -- Le crochet « surge » reçoit la dépense réelle : aucune autre source du Voleur ne le modifie avant.
 EH.echoing_reprimand = {
   surge = function(c, src, v)
-    if v == 2 or v == 3 then return num("echoing_reprimand", src) end
+    if v >= 2 and v <= num("echoingMax", src) then return num("echoing_reprimand", src) end
     return v
   end,
 }
@@ -297,7 +307,13 @@ EH.subterfuge = {
   onStatusApplied = function(c, src, unit, id)
     if id ~= "stealth" or unit ~= c.player then return end
     c.cls.stealthUntil = turnKey(c) + stealthTurns(src) - 1
-    if c.cls.stealthGained then Combat.gainRes(c, num("subterfuge", src), "epic") end
+    local n = num("subterfuge", src)
+    if c.cls.stealthGained and n > 0 then Combat.gainRes(c, n, "epic") end
+  end,
+  -- source de Stealth incluse : chaque Surge (dépense de 1 ou plus) rend Stealth, pour les cartes jouées après
+  onSurge = function(c, src)
+    if c.result or not Rogue.EPIC.subterfugeSurge[src.up and 2 or 1] then return end
+    Combat.applyStatus(c, c.player, "stealth", 1)
   end,
 }
 -- Stealth du début de combat (posé par la règle de classe, sans événement) : T tours dès le premier.
@@ -330,7 +346,17 @@ EH.kidney_shot = {
 }
 
 -- Danse Macabre : chaque coup d'une carte Attack inflige N de plus par nom de carte différent joué dans
--- ce tour, le sien exclu, au plus C (réglage) ; compté à la résolution, comme Strength, avant Sundered.
+-- ce tour, le sien exclu, au-delà des F premiers (réglage : F = 2), au plus C si C > 0 (réglage : sans
+-- plafond) ; compté à la résolution, comme Strength, avant Sundered.
+-- Bonus d'un coup de la carte id (nil : un nom pas encore joué) ce tour-ci. Lu aussi par l'interface.
+function Rogue.danseBonus(c, up, id)
+  local cls, k = c.cls, up and 2 or 1
+  if cls.dmRound ~= c.round then return 0 end
+  local n = (cls.dmCount or 0) - ((id and cls.dmNames[id]) and 1 or 0) - Rogue.EPIC.danseFree[k]
+  if n <= 0 then return 0 end
+  local cap, bonus = Rogue.EPIC.danseCap[k], Rogue.EPIC.danse_macabre[k] * n
+  return (cap > 0 and bonus > cap) and cap or bonus
+end
 EH.danse_macabre = {
   onCardCommitted = function(c, src, inst)
     local cls = c.cls
@@ -342,11 +368,7 @@ EH.danse_macabre = {
   end,
   damage = function(c, src, v, t, d)
     if not d or d.type ~= "attack" then return v end
-    local cls = c.cls
-    if cls.dmRound ~= c.round then return v end
-    local n = (cls.dmCount or 0) - ((cls.dmNames[d.id]) and 1 or 0)
-    if n <= 0 then return v end
-    return v + math.min(num("danse_macabre", src) * n, num("danseCap", src))
+    return v + Rogue.danseBonus(c, src.up, d.id)
   end,
 }
 
@@ -356,14 +378,20 @@ C.subterfuge.whileInDeck = subterfugeStart
 -- Mots du langage des épiques (déclencheurs « Name: », détails des infobulles ; plaque « Epic » : Core/Language.lua).
 L.trigger("Each Parry gained")
 L.trigger("Gaining Stealth")
+L.trigger("Surge of 1+ Combo")
+L.keyword("subterfugeLasts", { name = "Lasts", pattern = "^Stealth lasts ",
+  text = "Attacks use Stealth without removing it." })
 for _, k in ipairs(Rogue.EPIC.kidney_shot) do L.trigger(ns.RogueKidneyLabel(k)) end
 L.trigger("Attack hits")
 -- détail des ripostes (infobulle), une explication par version de Deflection
-for _, k in ipairs(Rogue.EPIC.deflection) do
-  L.keyword("riposte" .. k, { name = "Riposte", pattern = "^Each Parry gained: deal " .. k .. ",",
-    text = ("%d, then %d, %d, %d in a turn, even above Parry 3."):format(k, 2 * k, 3 * k, 4 * k) })
+for i, k in ipairs(Rogue.EPIC.deflection) do
+  local up = i == 2
+  local s = Rogue.EPIC.deflectionStep[i]
+  L.keyword("riposte" .. i, { name = "Riposte", pattern = "^Each Parry gained: deal " .. k .. ", %+" .. s .. " ",
+    text = ("%d, then %d, %d, %d in a turn, even above Parry 3."):format(Rogue.riposteDamage(1, up),
+      Rogue.riposteDamage(2, up), Rogue.riposteDamage(3, up), Rogue.riposteDamage(4, up)) })
 end
-L.keyword("kidneyBoss", { name = "Boss", pattern = "^Surge of %d%+? Combo: ",
+L.keyword("kidneyBoss", { name = "Boss", pattern = "^Surge of %d%+? Combo: apply Stunned",
   text = "gets Demoralized 2 ⌛ instead of Stunned." })
 L.keyword("danseNames", { name = "Names", pattern = "^Attack hits: %+%d per other card name",
   text = "each different card played this turn counts once." })
@@ -375,7 +403,7 @@ function Rogue.epicBotValue(c, W)
   if not id then return 0 end
   if id == "echoing_reprimand" then
     local r = c.player.res or 0
-    if r == 2 or r == 3 then
+    if r >= 2 and r <= Rogue.EPIC.echoingMax[up and 2 or 1] then
       local cd = ns.Classes.rogue
       return (Rogue.EPIC.echoing_reprimand[up and 2 or 1] - r) * cd.bot.resValue * 0.8
     end
