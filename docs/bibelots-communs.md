@@ -32,7 +32,7 @@ Cooldown, Exhaust, Retain, Attack.
 | `sharpening_stone` | Coarse Sharpening Stone | uncommon | 1 | Attacks +1 par coup | commun | |
 | `focus_talisman` | Talisman of Focus | uncommon | 2 | la 1re interruption subie par combat est sans effet | commun | Cast = mot-clé commun ; faible pour une classe sans Cast (Warrior, Rogue) |
 | `camp_kettle` | Camp Kettle | common | 2 | repos +10 PV | commun | |
-| `harvest_cog` | Harvest Golem Cog | rare | 0 | pioche 2 de plus au premier tour | commun (rencontre) | `noPool` : donné par la roulotte de Grisette |
+| `harvest_cog` | Harvest Golem Cog | rare | 0 | pioche 2 de plus au premier tour | commun (rencontre) | `noPool` : donné par le profiteur défias (`goblin_peddler`) |
 | `tobin_knife` | Tobin's Pocketknife | rare | 0 | DoT 3 à tous au début du combat | commun (rencontre) | `noPool` ; le DoT est un état commun |
 | `mana_ruby` | Mana Ruby | rare | 3 | +1 mana au premier tour | commun | |
 
