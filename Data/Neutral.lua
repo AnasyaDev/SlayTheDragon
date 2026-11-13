@@ -20,6 +20,8 @@ local function card(id, t)
   t.noReward = true
   C[id] = t
 end
+ns.Declare = ns.Declare or {}
+ns.Declare.neutralCard = card -- fichiers de zone : ns.Declare.neutralCard(id, t) (carte neutre, tier = ordre de la zone)
 
 -- Disponible d'emblée (tier 0) ------------------------------------------------------------------------
 

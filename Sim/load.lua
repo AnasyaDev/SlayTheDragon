@@ -18,5 +18,15 @@ return function(root)
   ns.Bots = dofile(root .. "/Sim/bots.lua")(ns)
   ns.Run = dofile(root .. "/Sim/run.lua")(ns)
   ns.SimExpedition = dofile(root .. "/Sim/expedition.lua")(ns)
+  -- Conseils de simulation des zones (Sim/zones/<zone>.lua, facultatif : docs/zones.md) :
+  -- return function(ns, Bots, SE) … end — ns.ZoneBots[zone], SE.KIND_SCORE, SE.EFFECT_VALUE, SE.CAMP_ACTION.
+  for _, id in ipairs(ns.Zone.ORDER) do
+    local path = root .. "/Sim/zones/" .. id .. ".lua"
+    local f = io.open(path, "r")
+    if f then
+      f:close()
+      dofile(path)(ns, ns.Bots, ns.SimExpedition)
+    end
+  end
   return ns
 end
