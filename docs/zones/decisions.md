@@ -78,3 +78,7 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
 - **Indomitable sur les élites de Blackrock Mountain**, décision du joueur du 14/11/2026 : Panzor, Gyth / Rend et
   Vaelastrasz ne peuvent pas être étourdis (trait affiché « Indomitable », `Can't be Stunned.`).
 
+- **Les PV perdus se lisent en PV nets** (joueur, 14/11/2026) : PV à l'entrée du combat moins PV à la sortie,
+  soins déduits (colonne « PV nets » du rapport de simulation). « Perdre puis récupérer » est l'identité du
+  Priest. Mesure à Westfall, combat normal : Priest 0,2 PV (1 % des PV max), Warrior 7,0 (9 %), Mage 5,3
+  (12 %), Rogue 6,3 (13 %), Hunter 6,3 (13 %) : profils conformes, aucune carte de classe à changer.
