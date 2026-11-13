@@ -57,13 +57,31 @@ Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est c
 ## Fixé avec la progression par classe (12/11/2026)
 - **Niveaux de classe** : seuils cumulés 100 / 250 / 450 / 700 / 1 000 / 1 400 ; expérience par expédition
   = (réputation × 0,5 + 15 si gagnée) × (1 + 0,1 × clé) : niveau 2 à la 2e expédition, niveau 7 vers la 20e
-  (`docs/expedition.md`, « Niveau de classe »).
+  (`docs/expedition.md`, « Niveau de classe ») ; formule revue le 13/11/2026 (voir « Campagne par zones »).
 - **Réputation de classe supprimée** : la Ligue, commune au compte, ne débloque que le commun. Révéré de la
   Ligue : un bibelot au choix parmi 3 au départ, tiré dans la réserve de l'expédition (remplace « un bibelot
   de classe parmi 3 », sans objet) ; Exalté : un bibelot de plus chez le marchand (inchangé). Le titre
   « Dragonslayer » passe au niveau 7 de la classe.
 - **Répartition** : Priest d'après `priest-progression.md` ; Warrior réparti dans `docs/classes.md`
   (« Progression par classe ») ; Mage, Rogue, Hunter d'après leur fiche.
+
+## Campagne par zones (décisions du joueur, 13/11/2026 ; remplace la Ligue)
+Contrat et détails : `docs/zones.md`.
+- **Sept zones dans l'ordre** : Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning
+  Steppes, Blackrock Mountain. Westfall (l'acte actuel) est la zone 1 ; les six autres sont déclarées,
+  « Coming later ». Une expédition se joue dans une zone.
+- **Gagner une zone avec une classe ouvre la zone suivante pour cette classe seulement.**
+- **Trois sources de déblocage** : niveau de classe (cartes de la classe, inchangé) ; première victoire d'une
+  classe dans une zone (une carte rare et forte de la classe, liée à la zone, introuvable autrement) ;
+  première victoire du compte dans une zone (le commun : cartes neutres, bibelots communs, rencontres).
+- **La Ligue des explorateurs est supprimée** (réputation, paliers, affichages, titre lié). Ses avantages :
+  bibelot au choix parmi 3 au départ = première victoire du compte dans la zone 3 ; un bibelot de plus chez le
+  marchand = zone 6. Les anciens paliers 1, 2, 3 tombent sur les zones 1, 2, 3 (choix du concepteur, le plus
+  simple « dans l'ordre »).
+- **Expérience** fondée sur l'avancée (étapes, élites, boss), mêmes gains qu'avant à la clé 0, **+15 % par
+  niveau de clé**.
+- **Clés par zone et par classe** (+1 à +5, affixes inchangés) ; **bibelots de clé** débloqués par la première
+  victoire d'une classe à +1, +3 et +5 dans une zone. Pas de cote ni de classement.
 
 ## Encore ouvert
 - Cible de PV perdus par combat pour chaque style de survie : à mesurer classe par classe.

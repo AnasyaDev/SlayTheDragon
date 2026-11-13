@@ -5,11 +5,13 @@ et les bots de simulation passent par la même API.
 
 | Fichier | Rôle |
 | --- | --- |
-| `Core/Map.lua` | Carte ramifiée d'un acte, générée par graine |
-| `Core/Meta.lua` | Niveau de classe (expérience), Ligue des explorateurs (réputation), clés mythiques, affixes |
+| `Core/Map.lua` | Carte ramifiée d'une zone, générée par graine |
+| `Core/Zones.lua` | Registre des sept zones de la campagne (`ns.Zones`, `ns.Zone`) : `docs/zones.md` |
+| `Core/Meta.lua` | Niveau de classe (expérience), zones gagnées (par classe et par le compte), clés par zone et par classe, affixes |
 | `Core/Expedition.lua` | Machine à états d'une expédition |
 | `Core/Save.lua` | Format de `SlayTheDragonDB`, migrations, validation, journal |
-| `Data/Events.lua` | Rencontres de la Marche de l'Ouest (liste et intentions : `docs/rencontres.md`) |
+| `Data/Zones/Westfall.lua` | Zone 1 : ennemis et groupes de combats de la Marche de l'Ouest (ex-`Data/Act1.lua`) |
+| `Data/Events.lua` | Rencontres de la Marche de l'Ouest (`zone = "westfall"` ; liste et intentions : `docs/rencontres.md`) |
 | `Sim/expedition.lua` | Bot hors combat, `runner=expedition` dans `Sim/sim.lua` |
 | `Sim/tests_expedition.lua` | Tests (`lua5.1` et `luajit`, `ALL PASS`) |
 
@@ -20,8 +22,9 @@ et les bots de simulation passent par la même API.
 SlayTheDragonDB = ns.Save.migrate(SlayTheDragonDB)   -- nil -> sauvegarde neuve ; jamais d'effacement
 local db = SlayTheDragonDB
 
--- Nouvelle expédition (choix de classe et de clé : 0..ns.Meta.keyMax(db.meta, classe))
-local exp, why = ns.Save.start(db, { seed = graine, class = "priest", key = 0 })
+-- Nouvelle expédition (classe, zone ouverte et jouable pour elle, clé 0..ns.Meta.keyMax(db.meta, classe, zone))
+local exp, why = ns.Save.start(db, { seed = graine, class = "priest", zone = "westfall", key = 0 })
+-- why : "zone locked", "zone coming later", "key locked", "running"
 
 -- À chaque action du joueur
 local ok, why = ns.Expedition.act(db.current, { "path", idNoeud })
@@ -30,10 +33,11 @@ local ok, why = ns.Expedition.act(db.current, { "path", idNoeud })
 
 -- Quand db.current.phase == "done"
 local summary, entry = ns.Save.finish(db, date("%Y-%m-%d %H:%M"))
--- summary = { rep, xp, levelBefore, levelAfter, unlocked = { cards, relics }, leagueBefore, leagueAfter,
---             keyUnlocked, flags }
+-- summary = { xp, levelBefore, levelAfter, unlocked = { cards, relics }, zone, zoneWon, zoneOpened,
+--             zoneCards, keyRelics, keyUnlocked, accountZone, common, flags }
 --           xp = expérience de la classe jouée ; unlocked = ce que la montée de niveau vient de débloquer ;
---           flags = noms des drapeaux de compte nouvellement posés (histoires), triés
+--           zone… = déblocages de la campagne (docs/zones.md) ; flags = noms des drapeaux de compte
+--           nouvellement posés (histoires), triés
 -- entry   = ligne ajoutée à db.journal
 
 -- Abandon volontaire
@@ -49,14 +53,13 @@ L'expédition est celle d'une classe (`exp.class`, contrat complet : `docs/class
 départ, bibelot de départ (`startRelic`, jamais tiré), combats (`c.class`, ressource `c.player.res`).
 Récompenses, marchand et rencontres tirent dans le pool de la classe jouée : cartes de cette classe
 (`Card.inClass`) et bibelots communs (sans champ `class`, utiles à la classe : champ `needs`) ou de cette
-classe ; les cartes neutres (`Data/Neutral.lua`, palier de Ligue `tier`) seulement dans l'emplacement
-« Neutral » du marchand (`X.neutralPool`) et dans les réponses de rencontres (`docs/cartes-neutres.md`) ; le choix de Révéré
-propose les bibelots de la classe hors bibelot de départ. Les douze bibelots actuels sont communs
-(rapport du socle multi-classes, docs/classes.md).
-débloquées par son niveau (`Card.inClass`, `level` ≤ `exp.unlock.level` ; les cartes neutres prévues par le
-GDD, `neutral = true`, seulement chez le marchand et dans les rencontres, suivent la Ligue par `tier`) et
-bibelots communs (sans champ `class`, `tier` ≤ palier de Ligue) ou de cette classe (`level` ≤ niveau de
-classe). `Expedition.unlocked(exp, def)` dit si une carte ou un bibelot est débloqué pour l'expédition.
+classe ; les cartes neutres (`Data/Neutral.lua`, palier commun `tier`) seulement dans l'emplacement
+« Neutral » du marchand (`X.neutralPool`) et dans les réponses de rencontres (`docs/cartes-neutres.md`) ; le
+bibelot au choix du départ (zone 3 gagnée par le compte) tire dans la réserve hors bibelot de départ.
+Déblocages (`Expedition.unlocked(exp, def)`, figés au départ dans `exp.unlock`) : cartes et bibelots de
+classe par niveau (`level` ≤ `exp.unlock.level`) ; cartes de zone (`zone`) et bibelots de clé (`key`) par
+les zones gagnées par la classe (`exp.unlock.won`) ; commun (cartes neutres, bibelots communs, potions,
+rencontres) par le palier commun du compte (`tier` ≤ `exp.unlock.common`). Détails : `docs/zones.md`.
 
 ## API d'expédition
 
@@ -67,7 +70,7 @@ classe). `Expedition.unlocked(exp, def)` dit si une carte ou un bibelot est déb
 
 | Phase (`exp.phase`) | Actions |
 | --- | --- |
-| `start` (Révéré de la Ligue : bibelot au choix) | `{"startRelic", i}` (i dans `exp.startRelics`), `{"skipStartRelic"}` |
+| `start` (bibelot au choix : zone 3 gagnée par le compte) | `{"startRelic", i}` (i dans `exp.startRelics`), `{"skipStartRelic"}` |
 | `map` | `{"path", idNoeud}` : un nœud de `Map.nextNodes(exp.map, exp.node)` |
 | `combat` | `{"play", indexMain, indexEnnemi?, "nospend"?}` (« nospend » : carte « Spend N » jouée sans dépenser), `{"endTurn"}`, `{"potion", emplacement, indexEnnemi?}` |
 | `reward` | `{"pickCard", i}`, `{"skipCards"}`, `{"takePotion"}`, `{"leave"}` |
@@ -94,9 +97,9 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | Champ | Contenu |
 | --- | --- |
 | `phase` | voir ci-dessus |
-| `class`, `seed`, `key`, `affixes` | classe (id de `ns.Classes`, choisie sur l'accueil), graine, niveau de clé, ids d'affixes actifs (`ns.Affixes[id].name/.text`) |
-| `unlock` | `{ level = niveau de la classe 1..7, league = palier de Ligue 0..4 }`, figé au départ : une montée de niveau pendant l'expédition ne change rien avant la suivante |
-| `act`, `acts` | acte courant, nombre d'actes de l'expédition |
+| `class`, `zone`, `seed`, `key`, `affixes` | classe (id de `ns.Classes`, choisie sur l'accueil), zone (id de `ns.Zones`), graine, niveau de clé, ids d'affixes actifs (`ns.Affixes[id].name/.text`) |
+| `unlock` | `{ level = niveau de la classe 1..7, common = palier commun du compte 0..7, won = { [zone] = meilleure clé gagnée par la classe } }`, figé au départ : un déblocage pendant l'expédition ne change rien avant la suivante |
+| `act`, `acts` | 1 et 1 (une zone = un acte ; gardés pour la carte et l'affichage) |
 | `map` | carte de l'acte (voir plus bas) |
 | `node`, `floor` | nœud courant (nil avant le premier choix), étape 1..8 |
 | `hp`, `maxHp`, `gold` | |
@@ -138,7 +141,7 @@ de `Data/Events.lua`) :
 
 ```lua
 ns.Events[id] = {
-  name, act, tier,                 -- tier = palier de Ligue qui la débloque (0..3)
+  name, zone, tier,                -- zone (nil = toutes) ; tier = palier commun qui la débloque (docs/zones.md)
   rarity = "common" | "rare" | "story", weight, once, when,
   speaker, npc, scene,             -- personnage affiché, identifiant de modèle, décor
   text,
@@ -162,7 +165,7 @@ ns.Events[id] = {
 - Effets (données) : `heal`, `healPct`, `loseHp`, `maxHp`, `loseMaxHp`, `gold`, `pay`, `loseGold`,
   `card`, `cardChoice` (`neutral = true` : parmi les cartes neutres), `relic` (tiré ou précis), `potion` (tirée ou précise), `losePotion`,
   `upgradeRandom`, `upgrade`, `remove`, `dupe`, `fight` (`kind = "elite"` possible, groupe
-  `ns.Encounters.act1.event_*`), `gamble` (pari), `flag` (drapeau de compte).
+  `event_*` des combats de la zone, `ns.Encounters.westfall.event_*`), `gamble` (pari), `flag` (drapeau de compte).
 - Tout le hasard est tiré à l'entrée (`exp.event.rolls`, une liste par réponse ; un pari y stocke
   `{ won, win = tirages, lose = tirages }`) : recharger ou choisir une autre réponse ne change rien.
 
@@ -183,7 +186,13 @@ peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau 
 
 ## Méta-progression (`Core/Meta.lua`)
 
-`db.meta = { league, runs, classes = { priest = { xp, runs, wins, keyMax, bestKey } }, flags = { [nom] = true } }`
+`db.meta = { runs, zones = { westfall = true }, classes = { priest = { xp, runs, wins,
+zones = { westfall = { won, keyMax, bestKey } } } }, flags = { [nom] = true } }`
+
+Campagne par zones (13/11/2026, remplace la Ligue des explorateurs) : contrat et règles dans
+`docs/zones.md`. Trois sources de déblocage : niveau de classe (ci-dessous), première victoire d'une classe
+dans une zone (carte de zone, zone suivante pour cette classe), première victoire du compte dans une zone
+(commun, avantages) ; plus les bibelots de clé (première victoire d'une classe à +1, +3, +5 dans une zone).
 
 ### Niveau de classe (progression par classe, 12/11/2026)
 
@@ -204,38 +213,40 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   taille du niveau (nil au 7) ; `Meta.levelOf(meta, classe)` ; `Meta.isMaxLevel` ;
   `Meta.classContent(classe[, niveau])` → `{ cards, relics }` (tout, ou ce qui se débloque à ce niveau),
   triés par niveau, rareté, coût, nom ; `Meta.unlockLevel(def)` (champ `level`, absent = 1).
-- **Expérience gagnée** en fin d'expédition, gagnée, perdue ou abandonnée (`Meta.xpFor`, `Meta.XP`) :
-  `(réputation × 0,5 + 15 si gagnée) × (1 + 0,1 × clé)`, arrondi ; la réputation est celle de
-  `Meta.repFor` ci-dessous. Clé 0 : ≈ 76 pour une victoire, ≈ 40 pour une défaite au boss, moins pour une
-  défaite plus tôt (mesures plus bas). Avec ≈ 4 victoires pour 1 défaite (≈ 70 en moyenne) : niveau 2 à la
-  2e expédition, puis 2, 3, 3, 4 et 6 expéditions par niveau (niveaux 3 à 7 aux 4e, 7e, 10e, 14e et
-  20e ; mesuré : 72 à 75 par expédition au bot heuristique).
+- **Expérience gagnée** en fin d'expédition, gagnée, perdue ou abandonnée (`Meta.xpFor`, `Meta.XP`),
+  tirée de l'avancée de l'expédition (13/11/2026, plus de réputation) :
+  `(5 × étapes franchies + 6 × élites + 15 × boss + 15 si gagnée) × (1 + 0,15 × clé)`, arrondi
+  (`Meta.XP = { step = 5, elite = 6, boss = 15, win = 15, key = 0.15 }`). Mêmes gains qu'avant à la clé 0
+  (c'était la moitié de la réputation 10 / 12 / 30, + 15) : victoire avec une élite 8 × 5 + 6 + 15 + 15 =
+  **76** (deux élites : 82), défaite au boss avec une élite 7 × 5 + 6 = **41**, défaite à l'étape 4 sans élite
+  **15–20**. Clé : +1 → 87, +3 → 110, +5 → 133 pour la victoire type. Avec ≈ 4 victoires pour 1 défaite
+  (≈ 70 en moyenne) : niveau 2 à la 2e expédition, puis 2, 3, 3, 4 et 6 expéditions par niveau (niveaux 3 à
+  7 aux 4e, 7e, 10e, 14e et 20e ; mesuré avant le changement : 72 à 75 par expédition au bot heuristique).
 - Ce que débloque le niveau entre dans la réserve de la classe : récompenses, marchand, rencontres
   (cartes) et bibelots de récompense, de coffre et du marchand. Le bibelot de départ (`startRelic`,
   `noPool`) est porté à chaque expédition.
 - Une expédition garde les déblocages de son départ (`exp.unlock.level`) ; `Meta.record` rend ce que la
   montée vient de débloquer (`summary.unlocked`), montré par le bilan.
 
-### Ligue des explorateurs (réputation commune au compte)
+### Zones, commun du compte et clés (13/11/2026 ; la Ligue des explorateurs est supprimée)
 
-- `Meta.level(points)` → 0 Neutre, 1 Amical, 2 Honoré, 3 Révéré, 4 Exalté ; `Meta.levelName(lv)` ;
-  `Meta.progress(points)` → palier, points dans le palier, taille du palier (barre de progression).
-- Seuils (`Meta.LEVELS`) : 200 / 550 / 1 100 / 1 900.
-- Gain en fin d'expédition, gagnée ou perdue (`Meta.REP`) : 10 par étape franchie, +12 par élite,
-  +30 par boss, divisé par le nombre d'actes de l'expédition (la cadence ne dépend pas du
-  nombre d'actes). Une expédition d'acte 1 complète rapporte ≈ 110 à 120 points.
-- Déblocages (`Meta.unlocks(meta, classe)` → `{ level, league }`), appliqués à tous les tirages
-  (récompenses, marchand, rencontres, coffres). La Ligue ne débloque que ce qui est commun :
-  bibelots communs, potions, rencontres (et les cartes neutres à venir) dont `tier` (0..3) ≤ palier ;
-  Révéré : un bibelot au choix parmi 3 au départ, tirés dans la réserve de l'expédition (communs et de
-  classe débloqués, hors boss) ; Exalté : un bibelot de plus chez le marchand.
-- Ce que donnait l'ancienne réputation **de classe** (supprimée) : cartes par `rep` 0..2 → niveau de
-  classe ; « un bibelot de classe parmi 3 au départ » (Révéré de classe), devenu sans objet puisque les
-  bibelots de classe sont dans la réserve dès leur niveau → remplacé par l'équivalent commun le plus
-  simple, « un bibelot au choix parmi 3 de la réserve » au Révéré de la Ligue ; le titre d'Exalté de
-  classe → niveau 7.
-- Clés mythiques : `Meta.keyMax(meta, classe)` ; une victoire à +N ouvre +N+1 (plafond
-  `Meta.MAX_KEY` = 5). `Meta.affixesFor(key)` ; `ns.Affixes[id] = { name, level, text }`.
+- `Meta.unlocks(meta, classe)` → `{ level, common = Meta.commonTier(meta), won = { [zone] = meilleure clé } }`,
+  appliqués à tous les tirages (récompenses, marchand, rencontres, coffres) ; `Meta.allUnlocked(niveau,
+  zones)` pour la simulation.
+- Commun (cartes neutres, bibelots communs, potions, rencontres) : `tier = N` = débloqué par la première
+  victoire du compte dans la zone d'ordre N (0 = d'emblée). Les anciens paliers de Ligue 1, 2, 3 tombent sur
+  les zones 1, 2, 3 ; « un bibelot au choix parmi 3 au départ » (ex-Révéré, tiré dans la réserve de
+  l'expédition, hors boss) = zone 3 ; « un bibelot de plus chez le marchand » (ex-Exalté) = zone 6
+  (`Meta.PERKS`). Table complète : `docs/zones.md`.
+- Ouverture des zones par classe (`Meta.zoneOpen`), cartes de zone (`zone`), bibelots de clé (`key`) :
+  `docs/zones.md`.
+- Ce que donnait l'ancienne réputation **de classe** (supprimée le 12/11/2026) : cartes par `rep` 0..2 →
+  niveau de classe ; « un bibelot de classe parmi 3 au départ » → le bibelot au choix commun ; le titre
+  d'Exalté de classe → niveau 7. La réputation de Ligue (`meta.league`) est abandonnée par la migration v5.
+- Clés mythiques **par zone et par classe** : `Meta.keyMax(meta, classe, zone)`, `Meta.bestKey(…)` ; une
+  victoire à +N dans une zone ouvre +N+1 dans cette zone pour cette classe (plafond `Meta.MAX_KEY` = 5).
+  `Meta.affixesFor(key)` ; `ns.Affixes[id] = { name, level, text }`.
+
 
 | Clé | Affixe | Effet (réglé par simulation, `Meta.AFFIX`) |
 | --- | --- | --- |
@@ -247,7 +258,7 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
 
 ## Sauvegarde (`Core/Save.lua`)
 
-`SlayTheDragonDB = { version = 4, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
+`SlayTheDragonDB = { version = 5, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
 
 - `Save.new()`, `Save.migrate(db)` (une migration par version dans `Save.MIGRATIONS`, état
   d'expédition migré par `Save.EXP_MIGRATIONS`), `Save.validate(db)` → `ok, erreurs`.
@@ -261,13 +272,22 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   compteurs du tour `turn`, sa zone de Traps `traps = {}` et le flux de hasard des cartes `rng.cards`
   (test « sauvegarde v2 -> v3 »).
 - Version 4 (12/11/2026, progression par classe) : chaque classe reçoit son expérience, convertie de son
-  ancienne réputation (gardée telle quelle dans `cs.rep`, plus lue) au barème de `Meta.XP` sans bonus de
+  ancienne réputation (gardée telle quelle dans `cs.rep`, plus lue) au barème de l'expérience de la v4 sans bonus de
   clé : `xp = rep × 0,5 + victoires × 15` ; l'expédition en cours passe de 3 à 4 (`unlock.rep` retiré,
-  `unlock.level` = niveau de sa classe après la migration) (test « sauvegarde v3 -> v4 »).
+  `unlock.level` = niveau de sa classe après la migration) (test « sauvegarde v3 -> v5 »).
+- Version 5 (13/11/2026, campagne par zones) : par classe `cs.zones = { westfall = { won, keyMax,
+  bestKey } }`, au compte `meta.zones = { westfall = true }`. Migration 4 → 5 : une classe qui a au moins
+  une victoire (ou une clé au-delà de +0) a gagné Westfall et y garde sa clé max et sa meilleure clé
+  (`cs.keyMax`, `cs.bestKey` déplacés ; clé max au moins +1) ; le compte a gagné Westfall si une classe l'a
+  gagnée ; la réputation de Ligue (`meta.league`) est abandonnée. L'expédition en cours passe de 4 à 5 :
+  `zone = "westfall"`, `unlock.common` et `unlock.won` = ceux de sa classe après la migration de la méta
+  (`unlock.league` retiré ; ce qui était déjà tiré reste dans l'état), `acts = 1` ; elle reste jouable,
+  combat en cours compris (test « sauvegarde v4 -> v5 », harnais UZ). Une expédition d'une zone inconnue ou
+  plus jouable part en quarantaine.
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
-- Journal : `{ result, class, key, seed, act, floor, cleared, elites, bosses, hp, maxHp, gold,
-  goldEarned, deck, relics, killedBy, date, rep, xp }`.
+- Journal : `{ result, class, zone, key, seed, act, floor, cleared, elites, bosses, hp, maxHp, gold,
+  goldEarned, deck, relics, killedBy, date, xp }` (les entrées d'avant la v5 gardent `rep`, sans `zone`).
 
 ## Contrat avec les bibelots et potions (piste A)
 
@@ -277,8 +297,9 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   (valeurs), `onPickup(exp)` (au ramassage), `onNodeEnter(exp, nœud)`, `onCombatWon(exp, genre)`,
   `onRest(exp)` (notifications). `exp.relicState` est libre pour un compteur d'expédition.
 - `rarity` : `common`, `uncommon`, `rare` (récompenses, coffres, marchand), `boss` (boss
-  uniquement) ; `tier` 0..3 (communs : palier de Ligue) ; `class = "priest"` + `level` 1..7 = bibelot de
-  classe (dans la réserve de cette classe seulement, dès ce niveau ; pas de `tier`) ;
+  uniquement) ; `tier` 0..7 (communs : palier commun, zone dont la 1re victoire du compte le débloque) ;
+  `class = "priest"` + `level` 1..7 = bibelot de classe (dans la réserve de cette classe seulement, dès ce
+  niveau ; pas de `tier`) ; `key = { zone, level }` = bibelot de clé (`docs/zones.md`) ;
   `noPool = true` = jamais tiré (bibelot de départ, bibelots de rencontre).
 - Potions : `Combat.new` reçoit `opts.potions` (3 emplacements, `false` = vide) ; l'état final est lu
   dans `c.player.potions` ; l'action `{"potion", emplacement, cible}` appelle
@@ -330,21 +351,23 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
 - **Rencontres** : les PV perdus ne tuent jamais (plancher à 1 PV, PV max au moins 1) ; une
   rencontre déjà vue ne revient pas dans la même expédition ; si aucune n'est disponible, l'étape
   est « rien à signaler ». Familles, conditions, paris et histoires : `docs/rencontres.md`.
-- **Réputation** : celle de la Ligue seulement, commune au compte ; seuils calés pour Exalté vers la
-  16e–19e expédition (≈ 100–120 points par expédition d'un acte).
-- **Niveau de classe** (12/11/2026) : seuils 100 / 250 / 450 / 700 / 1 000 / 1 400 ; expérience =
-  la moitié de la réputation, +15 pour une victoire, ×(1 + 0,1 × clé) : 2 expéditions pour le niveau 2,
-  ≈ 20 pour le 7 (voir « Niveau de classe »).
-- **Clés** : `keyMax` par classe ; jouer une clé inférieure reste possible.
+- **Ligue des explorateurs supprimée** (13/11/2026) : remplacée par la campagne par zones
+  (`docs/zones.md`).
+- **Niveau de classe** (12/11/2026, formule revue le 13/11/2026) : seuils 100 / 250 / 450 / 700 / 1 000 /
+  1 400 ; expérience = 5 par étape, 6 par élite, 15 par boss, +15 pour une victoire, ×(1 + 0,15 × clé) :
+  2 expéditions pour le niveau 2, ≈ 20 pour le 7 (voir « Niveau de classe »).
+- **Clés** : une par zone et par classe (`cs.zones[zone].keyMax`) ; jouer une clé inférieure reste possible.
 - **Affixes** : intensités ajustées (voir tableau ; recalées le 12/11/2026 après l'équilibrage des cinq classes, `docs/equilibrage.md`) pour ≈ −5 points par niveau ; Galvanisant
   n'affecte pas les boss (sinon chaque sbire tué de VanCleef le rendait injouable), Nécrotique
   arrondit au plus proche (l'arrondi par défaut annulait les soins de 2 d'Expiation dès le 1er coup).
-- **Révéré sans bibelot à proposer** : si la réserve est vide, la phase `start` est sautée.
+- **Bibelot au choix sans bibelot à proposer** : si la réserve est vide, la phase `start` est sautée.
 
 ## Mesures de la progression par classe (12/11/2026, bot heuristique, clé 0, 1 000 expéditions, graine 1)
 
 `luajit Sim/sim.lua runs=1000 bot=heuristic jobs=8 runner=expedition key=0 class=<c> meta=<m> level=<n>`
 (intervalle ≈ ±2 points). « Avant » : code d'avant la progression (aae54aa), `meta=exalted`.
+Mesures d'avant la campagne par zones : « Ligue exaltée » = `zones=7` aujourd'hui, « compte neuf » =
+`zones=0` (`docs/zones.md`, « Simulation »).
 
 | Classe | Avant (exalted) | Niveau 7, Ligue exaltée | Niveau 1, Ligue exaltée | Niveau 1, compte neuf (`meta=start`) |
 | --- | --- | --- | --- | --- |

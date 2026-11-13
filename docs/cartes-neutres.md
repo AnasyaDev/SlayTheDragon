@@ -1,5 +1,9 @@
 # Cartes neutres
 
+> **13/11/2026** : la Ligue des explorateurs est supprimée (`docs/zones.md`). Le champ `tier` est gardé : le
+> « palier de Ligue » N de ce document se lit maintenant « première victoire du compte dans la zone d'ordre N »
+> (0 = d'emblée) ; le champ `act = 1` des rencontres est devenu `zone = "westfall"`.
+
 Décision du GDD des classes (11 novembre 2026) : une dizaine de cartes neutres, tirées des métiers et
 des objets de WoW, offertes à toutes les classes, **chez le marchand et dans les rencontres
 seulement**, jamais en récompense de combat. Elles se débloquent par la réputation de la Ligue des

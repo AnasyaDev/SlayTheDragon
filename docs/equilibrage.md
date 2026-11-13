@@ -1,5 +1,12 @@
 # Équilibrage des cinq classes (12/11/2026)
 
+> **Note (13/11/2026, campagne par zones, `docs/zones.md`)** : la Ligue des explorateurs est supprimée. Les
+> mesures « Ligue exaltée » / `meta=exalted` ci-dessous correspondent à `zones=7` (tout le commun et les
+> deux avantages débloqués) et `meta=start` à `zones=0` ; les deux alias restent acceptés par `Sim/sim.lua`.
+> Les anciens `league=N` correspondent à `zones=N` (N ≤ 3 ; Exalté = `zones=6`), aux drapeaux d'histoire près
+> (vétéran dès `zones=1`). L'expérience gagne maintenant +15 % par niveau de clé (au lieu de 10 %).
+> L'équilibrage est à refaire avec la nouvelle structure.
+
 Priest, Warrior, Mage, Rogue, Hunter, clé 0 puis clés 1 à 5, bot `heuristic`, `runner=expedition`, graine 1.
 Rapports bruts dans `reports/` (non versionnés).
 

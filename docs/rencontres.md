@@ -1,5 +1,9 @@
 # Rencontres de l'acte 1 — la Marche de l'Ouest
 
+> **13/11/2026** : la Ligue des explorateurs est supprimée (`docs/zones.md`). Le champ `tier` est gardé : le
+> « palier de Ligue » N de ce document se lit maintenant « première victoire du compte dans la zone d'ordre N »
+> (0 = d'emblée) ; le champ `act = 1` des rencontres est devenu `zone = "westfall"`.
+
 Étapes « Rencontre » de la carte. Données : `Data/Events.lua` ; moteur : `Core/Expedition.lua`
 (section Rencontres) ; format et API : `docs/expedition.md`. Contenu original, ancré dans la Marche
 de l'Ouest (Défias, Rivepatte, murlocs, fermes, Colline des sentinelles, Ruisselune, phare,

@@ -383,7 +383,7 @@ Le Druid a une forme active, et la même carte ne fait pas la même chose selon 
 Toutes les classes sont jouables dès le départ, mais chacune commence avec une partie seulement de ses cartes et de ses bibelots. Jouer une classe la fait monter en niveau et débloque le reste.
 
 - **Niveau de classe :** de 1 à 7, propre à chaque classe. Chaque expédition donne de l'expérience à la classe jouée, gagnée ou perdue.
-- **Réputation :** celle de la Ligue des explorateurs reste commune au compte. Elle débloque ce qui est commun : bibelots communs, cartes neutres, rencontres, clés.
+- **Réputation :** ~~celle de la Ligue des explorateurs reste commune au compte~~ — remplacée le 13/11/2026 par la campagne par zones (`docs/zones.md`) : la première victoire du compte dans une zone débloque le commun (bibelots communs, cartes neutres, rencontres) ; les clés sont comptées par zone et par classe.
 
 | Niveau | Déblocage |
 |---|---|
