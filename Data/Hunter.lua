@@ -377,7 +377,7 @@ card("resourcefulness", {
 -- (la ligne de plus faisait passer le texte sous le plancher de 8,5).
 local EPIC = {
   roar = { 2, 4 },          -- Roar of Sacrifice : dégâts arrêtés par point de Frenzy dépensé
-  marksman = { 8, 12 },      -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
+  marksman = { 12, 16 },      -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
   launcher = { 1, 2 },      -- Trap Launcher : attaques du familier par Trap lancée
   lonePer = { 2, 3 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
   loneStart = { 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
