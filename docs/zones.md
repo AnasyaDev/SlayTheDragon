@@ -11,7 +11,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | --- | --- | --- | --- | --- |
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
 | 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
-| 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
+| 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | jouable (14/11/2026 : mécanique Pack, élites Sarltooth / Modr / Dragonmaw Centurion, boss Chieftain Nek'rosh, 8 rencontres, commun du tier 3, bibelots de clé, Gryphon Master, huit décors peints ; détails : `docs/zones/wetlands.md`, « Implémentation ») |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | jouable (13-14/11/2026) : Hex (seul), boss Jin'do the Hexxer, six décors peints de la jungle, Gurubashi Arena ; détails et mesures : `docs/zones/stranglethorn.md`, « Implémentation » |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
@@ -281,6 +281,17 @@ huttes, tour de guet, temple, roseaux) et ses mares sont peints par son plan `la
 (`UI/Art/Zones/swamp.lua` : `items`, `pools`, palette `water`, `waterEdge`, `moss`). Planches : il faut les aperçus
 PNG de `Media/` dans `build/media_png` (`tools/build_media.py`, ou une conversion des TGA) ; sans eux, taches fondues
 et disques sont dessinés en rectangles dans les SVG du harnais.
+
+Les Wetlands (`UI/Art/Zones/wetlands.lua`) ajoutent leurs accessoires au registre `S.PROPS` sous le nom
+`wl_<genre>` au premier décor de la zone peint (UI/Scene.lua est chargé après les fichiers d'art), utilisables
+dans `props` par toute zone qui peint après eux : `wl_marsh_tree` (variante `dead`), `wl_rocks`, `wl_ship`
+(`small`), `wl_pier` (variante = x de fin), `wl_keep`, `wl_banner`, `wl_ruin`, `wl_orc_tent`, `wl_scaffold`,
+`wl_gate`, `wl_harbor_house`, `wl_cargo`.
+
+**Commun déclaré par une zone** : poser `fromZone = "<zone>"` sur les cartes neutres et bibelots déclarés par
+`ns.Declare.*` ; les tests du commun d'origine (`Sim/tests.lua`, `Sim/tests_expedition.lua`, harnais : paliers
+0 à 3) ne comptent pas ces entrées (vérifiées par `Sim/tests_zone_<zone>.lua`). Nécessaire pour une zone dont le
+commun est au palier 3 ou moins (Wetlands) ; les zones 4 à 7 sont déjà hors de ces comptes.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 

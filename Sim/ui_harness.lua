@@ -8345,7 +8345,8 @@ do
     table.concat(cnames, ", ") == ZONES and #bad2 == 0, table.concat(bad2, " ; "))
   check("onglet Zones : Westfall gagnée (clés +0 à +2, meilleure +1), Duskwood ouverte, Wetlands à venir",
     cols[1].status._text == "Won" and (cols[1].keys._text or ""):find("Keys +0 to +2 · best +1", 1, true)
-    and cols[2].status._text == "Open" and cols[3].status._text == "Coming later" and (cols[3].keys._text or "") == "",
+    and cols[2].status._text == "Open" and (cols[3].keys._text or "") == ""
+    and cols[3].status._text == (H.ns.Zone.playable("wetlands") and "Locked" or "Coming later"),
     tostring(cols[1].status._text) .. " / " .. tostring(cols[1].keys._text) .. " / " .. tostring(cols[2].status._text))
   check("carte de zone de Westfall débloquée (vraie carte)", vis(cols[1].card) and cols[1].card.cardId == "uz_zone_card"
     and not vis(cols[1].lock))
