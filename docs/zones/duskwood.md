@@ -543,8 +543,9 @@ décors peints), `Sim/zones/duskwood.lua` (bot), `Sim/tests_zone_duskwood.lua`, 
   Morbent's Bane (champ d'ennemi `gift`) donnée en main par `onCombatStart`, effet `removeUnholyShield`.
 
 ### Ce qui diffère de la fiche, et pourquoi
-- **Morbent Fel** : 92 PV (fiche 104), Shadow Bolt 17 puis 20 (fiche 20 / 24), Curse of Tongues 7 × 2 (fiche 6),
-  Drain Life 14 / soin 6 puis 16 / soin 8 (fiche 9 / 9, 11 / 11), phase 2 avec deux Curse of Tongues par cycle
+- **Morbent Fel** : 96 PV (fiche 104), Shadow Bolt 15 puis 18 (fiche 20 / 24), Curse of Tongues 7 × 2 (fiche 6),
+  Drain Life 12 / soin 6 puis 14 / soin 8 (fiche 9 / 9, 11 / 11 ; nombres de la passe de difficulté du
+  14/11/2026, ci-dessous ; avant : 92 PV, Shadow Bolt 17 / 20, Drain Life 14 / 16), phase 2 avec deux Curse of Tongues par cycle
   (`unholy_shield, shadow_bolt2, tongues, drain_life2, tongues`). Un soin fort et un boss long donnaient 9 à 10 tours
   au Priest et au Warrior ; un cycle de plus de Tongues taxe surtout les combats longs.
 - **Morbent's Bane** : Cooldown 2 (fiche 3) : la seconde levée du bouclier arrive à temps pour les classes rapides
@@ -603,6 +604,28 @@ payer Curse of Tongues). La fiche estimait 1,5 à 2,5 PV par combat : en combat 
 de la cible.
 Écart Warrior : sans la réforme des Fetid Corpses, le Warrior (74 PV) restait à 75 % quand les autres étaient à
 57–67 % ; la phase 2 plus longue et plus dure pour les classes lentes l'a ramené dans le groupe.
+
+### Passe de difficulté (14/11/2026)
+Cible : 72 % de victoires en moyenne, écart entre classes ≤ 10 points (`runner=expedition key=0 zones=1 level=7`,
+bot heuristique, épique gagnée sur les élites). Avant la passe, 85 % des défaites venaient du boss (69 % de
+victoires au boss pour Rogue et Mage, 75–76 % pour Priest et Warrior). Seul Morbent Fel change : Drain Life
+14 / 16 → 12 / 14 (coup qu'aucune classe n'arrête : aide surtout les petits PV), Shadow Bolt 17 / 20 → 15 / 18
+(Incantation : Rogue et Mage n'interrompent que 1,5 à 1,7 % des sorts ennemis, contre 7 à 12 % pour les autres), PV 92 → 96 (rallonge
+d'abord les combats lents). Ennemis normaux, élites, Fetid Corpses et Curses inchangés ; le boss reste le combat
+le plus dur, les combats « easy » restent à 100 %.
+
+| Classe | Victoires avant (800) | Victoires après (1500) | Boss avant → après | PV perdus par combat normal |
+| --- | --- | --- | --- | --- |
+| Priest | 70,1 % | 76,8 % | 74,6 → 81,7 % | 9,2 |
+| Warrior | 70,5 % | 73,7 % | 76,1 → 79,8 % | 10,5 |
+| Mage | 65,9 % | 69,3 % | 69,5 → 73,1 % | 6,6 |
+| Rogue | 63,6 % | 71,4 % | 69,2 → 77,3 % | 7,4 |
+| Hunter | 68,4 % | 70,4 % | 70,9 → 72,8 % | 7,0 |
+| Moyenne / écart | 67,7 % / 7,0 | **72,3 % / 7,5** | | |
+
+Essais écartés : Drain Life seul à 11 / 13 (71,1 %, mais Priest +6 et écart 8,5) ; soin de Drain Life 9 / 11 pour
+taxer les combats longs (−0,7 point en moyenne seulement). L'écart restant (Priest 76,8, Mage 69,3) se joue au
+boss : le Priest, lent mais soigné et protégé par l'Absorb, y gagne 8 points de plus que le Mage et le Hunter.
 
 ### À vérifier en jeu
 Modèles (Naraxis en repli, Stitches à l'échelle 1,25, Morbent Fel), lisibilité des pastilles violettes sur les
