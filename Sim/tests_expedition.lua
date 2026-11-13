@@ -825,7 +825,11 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
   end
   for id, ev in pairs(ns.Events) do
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
-    assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
+    -- décor commun, ou décor propre à la zone de la rencontre (valeurs de ns.Zones[zone].scenes)
+    local zsc = ev.zone and ns.Zones[ev.zone] and ns.Zones[ev.zone].scenes or {}
+    local own = false
+    for _, v in pairs(zsc) do if v == ev.scene then own = true end end
+    assert(SCENES[ev.scene] or own, id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
     assert(ev.tier >= 0 and ev.tier <= ns.Zone.count(), id .. " : tier")
     if ev.zone == "westfall" then fam[ev.rarity] = fam[ev.rarity] + 1 end
@@ -1090,10 +1094,10 @@ test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
   for id, ev in pairs(ns.Events) do
     for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
-        local exp = newExp()
+        local exp = newExp({ zone = ev.zone }) -- rencontre d'une zone : expédition dans cette zone
         forceEvent(exp, id)
         exp.hp, exp.maxHp, exp.gold = 1, 6, 500
-        exp.unlock.common = 3 -- réponses à carte neutre débloquée (condition « unlocked », hide)
+        exp.unlock.common = ns.Zone.count() -- réponses à carte neutre débloquée (condition « unlocked », hide)
         exp.potions[1] = "healing_potion"
         exp.relics[#exp.relics + 1] = "stormwind_tabard"
         for _, r in ipairs(exp.event.rolls[ci]) do
@@ -1698,7 +1702,11 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
   eq(ns.Zone.FIRST, "westfall")
   assert(ns.Zone.playable("westfall"))
-  for i = 2, 7 do eq(ns.Zone.playable(ns.Zone.ORDER[i]), false, ns.Zone.ORDER[i] .. " : Coming later") end
+  -- les autres : jouables dès que leur fichier de données pose leurs groupes, « Coming later » sinon
+  for i = 2, 7 do
+    local id = ns.Zone.ORDER[i]
+    eq(ns.Zone.playable(id), ns.Zones[id].encounters ~= nil, id .. " : Coming later")
+  end
   eq(ns.Zone.next("westfall"), "duskwood"); eq(ns.Zone.next("blackrock"), nil); eq(ns.Zone.prev("westfall"), nil)
   local exp = newExp()
   eq(exp.zone, "westfall"); eq(X.actName(exp), "Westfall"); eq(X.zoneDef(exp).encounters, "westfall")
