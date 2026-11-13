@@ -11,7 +11,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | --- | --- | --- | --- | --- |
 | 1 | `westfall` | Westfall | `Data/Zones/Westfall.lua` | jouable (boss Edwin VanCleef ; décors peints et personnages de la Marche depuis le 13/11/2026), sans règle de zone |
 | 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
-| 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
+| 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | jouable (14/11/2026 : mécanique Pack, élites Sarltooth / Modr / Dragonmaw Centurion, boss Chieftain Nek'rosh, 8 rencontres, commun du tier 3, bibelots de clé, Gryphon Master, huit décors peints ; détails : `docs/zones/wetlands.md`, « Implémentation ») |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | idem |
@@ -262,6 +262,21 @@ horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
 `westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
+
+**Formes propres à une zone** (ajout des Wetlands, 14/11/2026, `UI/Scene.lua`) : sans toucher au peintre, une
+zone déclare ses accessoires dans `Art.paintProps.<genre> = function(f, g, P, c, pal, x, y, s, variante, K)`
+(appelés comme les accessoires communs depuis `props`) et des plans libres `sp.before(f, g, K, sp)` (après le
+ciel) / `sp.after(f, g, K, sp)` (à la fin). `K = Scene.paintKit` : formes (`box`, `vgrad`, `oval`, `blur`,
+`bar`, `diamond`, `tri`), outils (`hash`, `mix`, `rgb`, `withAlpha`), plans `LV`, accessoires communs `PROPS`,
+et `K.W`, `K.H`, `K.hz`, `K.fl`, `K.pal` du décor en cours. Options : `sp.furrows = false` (pas de rangs de
+blé : marais, port) ; palette `cattail = true` (épis du premier plan en massettes). Les autres zones peuvent
+réutiliser les accessoires des Wetlands (`marsh_tree`, `rocks`, `ship`, `pier`, `keep`, `banner`, `ruin`,
+`orc_tent`, `scaffold`, `gate`, `harbor_house`, `cargo`).
+
+**Commun déclaré par une zone** : poser `fromZone = "<zone>"` sur les cartes neutres et bibelots déclarés par
+`ns.Declare.*` ; les tests du commun d'origine (`Sim/tests.lua`, `Sim/tests_expedition.lua`, harnais) ne
+comptent pas ces entrées (vérifiées par `Sim/tests_zone_<zone>.lua`). Bibelot de clé : `key`, sans `tier`
+(`Rewards.relicPool` ne le compte jamais au palier 0).
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 

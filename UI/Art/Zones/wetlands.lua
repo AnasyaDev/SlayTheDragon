@@ -107,6 +107,8 @@ for id, e in pairs(relics) do Art.relics[id] = e end
 
 Art.statuses.earthen_charge = I("Spell_Nature_Earthquake")
 Art.statuses.wyrmscale = I("INV_Misc_MonsterScales_08")
+Art.statuses.mortal_wound = I("Ability_Warrior_SavageBlow")
+Art.statusShort.mortal_wound = "healing received is halved."
 Art.statusShort.earthen_charge = "Seismic Slam deals 8 more per Charge."
 Art.statusShort.wyrmscale = "the next hit it takes deals 10 less damage."
 
@@ -284,28 +286,32 @@ function P.marsh_tree(f, g, Pl, c, pal, x, y, s, variant, K)
     K.bar(f, g, Pl[1], c.dark, tx + cos(a) * L / 2, ty - sin(a) * L / 2 + 10 * s, L, 3.2 * s, a)
   end
   if variant == "dead" then return end
-  -- houppier en ombrelle : masses sombres en arc (plus larges que hautes), dessous plus sombre, reflets
-  -- clairs sur le dessus des masses
+  -- houppier en dôme de saule des marais : deux rangées de masses (la plus haute au centre), dessous plus
+  -- sombre, reflets clairs sur le dessus, longs rideaux de mousse qui pendent des bords
   local cp = pal.canopy
-  local n = 9
-  for k = 1, n do
-    local t = (k - 0.5) / n
-    local hx = tx + (t - 0.5) * 118 * s + (K.hash(x, k) - 0.5) * 14 * s
-    local hy = ty - 8 * s - sin(t * PI) * 24 * s + (K.hash(y, k) - 0.5) * 10 * s
-    local w = (34 + 18 * K.hash(x + 7, k)) * s
-    K.blur(f, g, Pl[2], cp[1], hx, hy, w * 1.7, w * 1.05, 0.8)
-    K.oval(f, g, Pl[2], cp[1], hx, hy, w, w * 0.58)
+  local rows = { { n = 7, w = 112, lift = 6, arc = 26, size = 30 }, { n = 4, w = 64, lift = 34, arc = 16, size = 28 } }
+  for r, row in ipairs(rows) do
+    for k = 1, row.n do
+      local t = (k - 0.5) / row.n
+      local hx = tx + (t - 0.5) * row.w * s + (K.hash(x + r, k) - 0.5) * 12 * s
+      local hy = ty - row.lift * s - sin(t * PI) * row.arc * s + (K.hash(y + r, k) - 0.5) * 8 * s
+      local w = (row.size + 14 * K.hash(x + 7 * r, k)) * s
+      K.blur(f, g, Pl[2], cp[1], hx, hy, w * 1.6, w * 1.3, 0.8)
+      K.oval(f, g, Pl[2], cp[1], hx, hy, w, w * 0.78)
+    end
   end
-  K.blur(f, g, Pl[3], pal.ground[1], tx, ty + 2 * s, 110 * s, 16 * s, 0.35)
-  for k = 1, 5 do
-    local t = (k - 0.5) / 5
-    K.blur(f, g, Pl[3], cp[2], tx + (t - 0.5) * 96 * s, ty - 18 * s - sin(t * PI) * 22 * s, 30 * s, 11 * s, 0.55)
+  K.blur(f, g, Pl[3], pal.ground[1], tx, ty + 4 * s, 104 * s, 18 * s, 0.4)
+  for k = 1, 6 do
+    local t = (k - 0.5) / 6
+    K.blur(f, g, Pl[3], cp[2], tx + (t - 0.5) * 84 * s, ty - 30 * s - sin(t * PI) * 30 * s, 26 * s, 12 * s, 0.5)
   end
   local ms = pal.moss
-  for k = 1, 7 do
-    local mx = tx + (K.hash(x * 3, k) - 0.5) * 70 * s
-    local L = (10 + 18 * K.hash(y * 3, k)) * s
-    K.box(f, g, Pl[3], ms[1], mx, ty + 4 * s, 1.6 * s, L, ms[2])
+  for k = 1, 11 do
+    local t = (k - 0.5) / 11
+    local mx = tx + (t - 0.5) * 108 * s + (K.hash(x * 3, k) - 0.5) * 6 * s
+    local top = ty - 2 * s - sin(t * PI) * 10 * s
+    local L = (16 + 26 * K.hash(y * 3, k)) * (0.6 + 0.4 * math.abs(t - 0.5) * 2) * s
+    K.box(f, g, Pl[3], ms[1], mx, top, 1.4 * s, L, ms[2] * 0.8)
   end
 end
 
@@ -429,9 +435,10 @@ function P.ruin(f, g, Pl, c, pal, x, y, s, variant, K)
   for k = 1, 4 do
     K.blur(f, g, Pl[3], ms[1], x + (k - 2.5) * 30 * s, y - 10 * s - 14 * s * K.hash(x, k + 9), 26 * s, 22 * s, 0.45)
   end
-  for k = 1, 5 do
-    local bx = x + (k * 17 + 30) * s
-    K.oval(f, g, Pl[2], st, bx, y - 4 * s, (10 + 6 * K.hash(y, k)) * s, (7 + 3 * K.hash(x, k)) * s)
+  for k = 1, 4 do
+    local bx = x + (28 + k * 13 + 14 * K.hash(x, k + 20)) * s
+    local bw = (6 + 12 * K.hash(y, k)) * s
+    K.oval(f, g, Pl[2], st, bx, y - 3 * s - 5 * K.hash(x + 3, k) * s, bw, bw * (0.55 + 0.3 * K.hash(x, k)))
   end
   K.blur(f, g, Pl[1], pal.ground[1], x, y, 170 * s, 14 * s, 0.45)
 end
@@ -550,12 +557,12 @@ local function peaks(f, g, K, pal, list, lv, col, shade)
     local x, w, h = p[1], p[2], p[3]
     local base = K.hz + 6
     K.tri(f, g, lv, col, x, base, w, h)
-    for k = 1, 4 do
+    for k = 1, 6 do
       local side = (k % 2 == 1) and -1 or 1
-      local d = (0.16 + 0.14 * math.floor((k + 1) / 2)) * w * side + (K.hash(x, k) - 0.5) * 0.06 * w
-      local sh = h * (0.42 + 0.22 * K.hash(w, k))
-      local sw = w * (0.22 + 0.12 * K.hash(h, k))
-      local by = base - (h * (1 - math.abs(d) / (w / 2))) + sh * 0.95
+      local d = (0.08 + 0.11 * math.floor((k + 1) / 2)) * w * side + (K.hash(x, k) - 0.5) * 0.05 * w
+      local sh = h * (0.26 + 0.16 * K.hash(w, k))
+      local sw = w * (0.16 + 0.1 * K.hash(h, k))
+      local by = base - (h * (1 - math.abs(d) / (w / 2))) + sh * 0.62
       K.tri(f, g, lv, col, x + d, by, sw, sh)
     end
     K.blur(f, g, lv, shade or "#000000", x + w * 0.2, base - h * 0.42, w * 0.5, h * 0.95, 0.24)
