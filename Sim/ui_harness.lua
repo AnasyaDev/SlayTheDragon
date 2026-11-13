@@ -8537,8 +8537,9 @@ do
   for _, id in ipairs({ "gnoll", "mystic", "murloc", "bandit", "sorcerer", "harvest_golem", "rhahkzor",
     "defias_henchman", "vancleef" }) do zoneE[id] = E[id] end
   local sig = ser(zoneE, { name = true }) .. ser({ westfall = ns.Encounters.westfall }, { name = true })
-  check("ennemis et groupes de Westfall : chiffres inchangés (empreinte d'avant le 13/11/2026)",
-    djb(sig) == 3796836427 and #sig == 2741, djb(sig) .. " " .. #sig)
+  -- empreinte du réglage sur le bot human (14/11/2026, docs/zones/westfall.md) ; avant : 3796836427 / 2741
+  check("ennemis et groupes de Westfall : chiffres du réglage du 14/11/2026 (empreinte)",
+    djb(sig) == 1688472287 and #sig == 2905, djb(sig) .. " " .. #sig)
   local stale = {}
   for id, e in pairs(E) do if e.name == "Defias Bandit" then stale[#stale + 1] = id end end
   check("plus aucun « Defias Bandit »", #stale == 0, table.concat(stale, ", "))

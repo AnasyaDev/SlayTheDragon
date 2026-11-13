@@ -14,6 +14,9 @@ Icônes et fichiers : `wow_icon_search` / `wow_file_search` (liste de fichiers r
 
 ## 1. État des lieux
 
+Les nombres de cette section sont ceux d'avant le 14/11/2026 ; les nombres en vigueur sont à la fin de la
+fiche, « Réglage sur le bot human (14/11/2026) ».
+
 ### Ennemis (tirés de `Data/Act1.lua`)
 
 | id | Nom | PV | Intentions (actions) | Motif | Rôle | De la Marche ? |
@@ -272,3 +275,59 @@ Thor, Innkeeper Heather, Scout Galiaan et Defias Profiteer, « non trouvés » d
 cache frFR (`tools/wdb_creatures.py`). Gardés : Salma Saldean, Gryan Stoutmantle, Farmer Molsen (nom tiré de
 la ferme Molsen ; modèle 232, zone non vérifiable), Graymaw, Tobin enfant (aucun enfant nommé de la Marche)
 et guetteur. Textes réécrits : `docs/rencontres.md` (en tête) et `Data/Events.lua`.
+
+## Réglage sur le bot human (14/11/2026)
+
+Brief : `build/brief-zone-passe-humain.md`. Cible : 70 % de victoires en moyenne avec `bot=human` (clé 0,
+`zones=0`, niveau 2, Priest niveau 3 comme la sauvegarde du joueur), écart entre classes ≤ 10.
+
+**Le mur était l'appel de VanCleef, pas ses nombres.** À 50 % de PV, deux Defias Henchman apparaissaient sans
+préavis au coup qui franchissait le seuil, et frappaient dès le tour ennemi, en plus de VanCleef. Le bot `human`
+(qui lit les intentions sans jouer le tour ennemi) ne le voit pas venir, le joueur non plus. L'appel est
+maintenant une phase du moteur commun (`def.phases`) : cran à 50 % sur la barre de vie (infobulle « Below 50%:
+Brotherhood. Calls 2 Defias Henchmen instead of his next attack. »), intention remplacée tout de suite par
+« To me, Brotherhood! » (Summon +2), sbires à son tour, puis le motif repart de Combo. Ce seul changement, avec
+les nombres d'origine, faisait passer le boss d'environ 30 % à plus de 80 % de victoires : il a fallu ensuite
+rendre au boss une partie de sa force (PV) pour tenir la cible.
+
+**Le Mystic** : Watch était une fonction (coupe à coup sûr, sinon 3) sans dégâts affichés ; c'est maintenant
+un coup affiché, `Watch` 3, qui coupe l'incantation si le joueur perd des PV (l'Absorb la protège, comme Kick),
+jamais deux tours de suite (le Mage pouvait ne plus jamais incanter contre un Mystic).
+
+| Ennemi | Avant | Maintenant |
+|---|---|---|
+| Edwin VanCleef | 92 PV ; Combo 11 × 2 + Sundered 1 ; Mortal Strike 23 ; sbires sans préavis à 50 % | **98 PV** ; Combo **10 × 2** + Sundered 1 ; Kick 9 ; Mortal Strike **22** ; Parry 12 + Strength 3 ; **phase à 50 %** : « To me, Brotherhood! » remplace son coup |
+| Defias Henchman | 11–13 PV, Stab 5 | **10–12** PV, Stab 5 |
+| Harvest Golem | Reap 8 × 3 | 72 PV, Harden 12, Smash 19, Reap **7 × 3** |
+| Rhahk'Zor | Slam 18, Punch 12 | 75 PV, Roar 7 + Demoralized 2, Slam **17**, Punch **11** |
+| Riverpaw Gnoll | Bite 8, Rend 5 + Sundered 1 | Bite **7**, Rend **4** + Sundered 1 |
+| Riverpaw Mystic | 15–17 PV ; Watch (coupe à coup sûr, sinon 3, rien d'affiché) ; Heal 6 ; Shock 5 | **14–16** PV ; **Watch 3, interrompt** (pas deux fois de suite) ; Heal **5** (allié à −5 PV) ; Shock **4** |
+| Defias Conjurer | Fireball 16 | Fireball **12** |
+
+Murlocs et Defias Highwayman inchangés.
+
+Mesures (`bot=human`, clé 0, `zones=0`, niveau 2, Priest niveau 3 ; graine 1, 3 000 expéditions par classe ;
+« boss » = part des défaites au boss ; « PV nets » = combat normal, en part des PV max) :
+
+| Classe | avant | maintenant | graine 2 (1 000) | niveau 1 | niveau 7 | boss (avant → maintenant) | PV nets normal (avant → maintenant) |
+|---|---|---|---|---|---|---|---|
+| Rogue | 26,4 | **67,2** | 69,6 | 66,8 | 69,1 | 67 → 59 % | 9,2 (18 %) → 7,6 (15 %) |
+| Priest | 25,7 | **75,0** | 74,6 | 72,4 | 77,5 | 88 → 92 % | 2,8 (8 %) → 1,3 (4 %) |
+| Warrior | 23,8 | **73,8** | 75,2 | 70,9 | 85,0 | 78 → 73 % | 11,2 (15 %) → 9,7 (13 %) |
+| Mage | 26,7 | **70,4** | 68,6 | 72,5 | 77,5 | 72 → 68 % | 7,9 (19 %) → 7,1 (17 %) |
+| Hunter | 21,2 | **69,5** | 71,7 | 66,9 | 78,0 | 85 → 80 % | 8,4 (17 %) → 7,3 (15 %) |
+| Moyenne | 24,8 | **71,2** | 71,9 | 69,9 | 77,4 | | |
+| Écart | 5,5 | **7,8** | 6,6 | 5,7 | 15,9 | | |
+
+(« avant » : 1 000 expéditions, mêmes réglages.) Niveaux 1 et 7 : 1 000 expéditions, Priest compris au même
+niveau que les autres. Victoires par rencontre (graine 1) : VanCleef 74–79 % (24–35 % avant), élites 91–100 %
+(84–98 %), groupes avec un Mystic 95–100 % (86–100 %), autres groupes normaux 97–100 %, faciles 100 %.
+Contrôle `bot=heuristic` (800 expéditions, niveau 2, Priest 3) : Rogue 96,0, Priest 97,1, Warrior 96,1, Mage 92,9,
+Hunter 94,8 (moyenne 95,4, écart 4,2).
+
+Hors cible : la part des défaites au boss reste au-dessus de 65 % pour le Priest (92 %), le Hunter (80 %) et le
+Warrior (73 %). Ces classes se soignent ou étourdissent et arrivent presque entières au boss : leurs défaites
+avant le boss sont rares quel que soit le réglage des élites (durcir les élites ne fait perdre que le Rogue et
+le Mage et creuse l'écart). Le Rogue (59 %) et le Mage (68 %) sont dans la fourchette ou près. L'écart au
+niveau 7 (15,9, Warrior 85,0) dépasse 10 : le Warrior gagne beaucoup à ses cartes des niveaux 3 à 7 ; mesure
+hors cible du brief (seule la moyenne niveau 1 / niveau 7 y est bornée : 69,9 / 77,4).

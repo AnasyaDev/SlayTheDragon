@@ -12,44 +12,35 @@ local _, ns = ...
 local Combat, Card = ns.Combat, ns.Card
 local E = ns.Enemies
 
--- Guette : coupe l'incantation du joueur ; s'il n'y en a pas, lui inflige n.
--- (Une version qui soignait un allié à la place rendait le Mystique trop fort contre un
--- deck d'incantations : il guette à chaque tour où tu as une incantation en main.)
-local function watchOrZap(n)
-  return function(c, e)
-    if c.player.cast then
-      Combat.interruptPlayer(c, e)
-      return
-    end
-    Combat.dealDamage(c, e, c.player, Combat.calcDamage(c, e, c.player, n))
-  end
-end
-
 E.gnoll = {
   name = "Riverpaw Gnoll", hp = { 19, 22 },
   moves = {
-    bite = { name = "Bite", intent = "attack", actions = { { "attack", 8 } } },
-    rend = { name = "Rend", intent = "attack", actions = { { "attack", 5 }, { "debuff", "armor_broken", 1 } } },
+    bite = { name = "Bite", intent = "attack", actions = { { "attack", 7 } } },
+    rend = { name = "Rend", intent = "attack", actions = { { "attack", 4 }, { "debuff", "armor_broken", 1 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
 }
 
 E.mystic = {
-  name = "Riverpaw Mystic", hp = { 15, 17 },
+  name = "Riverpaw Mystic", hp = { 14, 16 },
   moves = {
-    watch = { name = "Watch", intent = "watch", text = "Interrupts your cast; otherwise, deals 3.",
-      actions = { { "fn", watchOrZap(3) } } },
-    mend = { name = "Heal", intent = "heal", actions = { { "heal_ally", 6 } } },
-    zap = { name = "Shock", intent = "attack", actions = { { "attack", 5 } } },
+    -- Guette (réglage du 14/11/2026, bot human) : un coup affiché qui coupe l'incantation si tu perds des
+    -- PV, comme Kick (l'Absorb la protège), jamais deux tours de suite. Avant : coupait à coup sûr à chaque
+    -- tour où tu avais une incantation en main, sinon 3, sans dégâts affichés.
+    watch = { name = "Watch", intent = "attack", actions = { { "attack", 3, interrupts = true } } },
+    mend = { name = "Heal", intent = "heal", actions = { { "heal_ally", 5 } } },
+    zap = { name = "Shock", intent = "attack", actions = { { "attack", 4 } } },
   },
   ai = function(c, e, rng)
-    for i = 1, #c.hand do
-      if Card.def(c.hand[i]).cast then return "watch" end
+    if e.mem.last ~= "watch" then
+      for i = 1, #c.hand do
+        if Card.def(c.hand[i]).cast then return "watch" end
+      end
     end
     if e.mem.last ~= "mend" then
       for i = 1, #c.enemies do
         local o = c.enemies[i]
-        if not o.dead and o.maxHp - o.hp >= 6 then return "mend" end
+        if not o.dead and o.maxHp - o.hp >= 5 then return "mend" end
       end
     end
     return "zap"
@@ -82,7 +73,7 @@ E.bandit = {
 E.sorcerer = {
   name = "Defias Conjurer", hp = { 18, 21 },
   moves = {
-    fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 16 } } },
+    fireball = { name = "Fireball", intent = "cast", cast = true, actions = { { "attack", 12 } } },
     shards = { name = "Frost Shards", intent = "attack", actions = { { "attack", 4, interrupts = true } } },
   },
   pattern = { "fireball", "shards" }, randomStart = true,
@@ -93,7 +84,7 @@ E.harvest_golem = {
   moves = {
     harden = { name = "Harden", intent = "defend", actions = { { "block", 12 } } },
     smash = { name = "Smash", intent = "attack", actions = { { "attack", 19, interrupts = true } } },
-    reap = { name = "Reap", intent = "attack", actions = { { "attack", 8, times = 3 } } },
+    reap = { name = "Reap", intent = "attack", actions = { { "attack", 7, times = 3 } } },
   },
   pattern = { "harden", "smash", "reap" },
 }
@@ -102,38 +93,38 @@ E.rhahkzor = {
   name = "Rhahk'Zor", hp = 75, elite = true,
   moves = {
     roar = { name = "Roar", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "demoralized", 2 } } },
-    slam = { name = "Slam", intent = "attack", actions = { { "attack", 18, interrupts = true } } },
-    punch = { name = "Punch", intent = "attack", actions = { { "attack", 12 } } },
+    slam = { name = "Slam", intent = "attack", actions = { { "attack", 17, interrupts = true } } },
+    punch = { name = "Punch", intent = "attack", actions = { { "attack", 11 } } },
   },
   pattern = { "roar", "slam", "punch", "slam" },
 }
 
 E.defias_henchman = {
-  name = "Defias Henchman", hp = { 11, 13 }, minion = true,
+  name = "Defias Henchman", hp = { 10, 12 }, minion = true,
   moves = {
     stab = { name = "Stab", intent = "attack", actions = { { "attack", 5 } } },
   },
   pattern = { "stab" },
 }
 
+-- Edwin VanCleef. Réglage du 14/11/2026 (bot human) : l'appel des sbires à 50 % est une phase (cran sur la
+-- barre de vie, infobulle) qui remplace son intention par « To me, Brotherhood! » : visible dès le seuil
+-- franchi, sans coup ce tour-là, sbires à son tour. Avant : deux sbires apparus sans préavis au coup qui
+-- franchissait le seuil.
 E.vancleef = {
-  name = "Edwin VanCleef", hp = 92, boss = true,
+  name = "Edwin VanCleef", hp = 98, boss = true,
   moves = {
     combo = { name = "Combo", intent = "attack",
-      actions = { { "attack", 11, times = 2 }, { "debuff", "armor_broken", 1 } } },
+      actions = { { "attack", 10, times = 2 }, { "debuff", "armor_broken", 1 } } },
     kick = { name = "Kick", intent = "attack", actions = { { "attack", 9, interrupts = true } } },
-    strike = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 23 } } },
+    strike = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 22 } } },
     guard = { name = "Parry", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 3 } } },
+    call = { name = "To me, Brotherhood!", intent = "summon",
+      actions = { { "summon", "defias_henchman", count = 2 } } },
   },
   pattern = { "combo", "kick", "strike", "guard" },
-  onDamaged = function(c, e, loss)
-    if not e.mem.summoned and e.hp <= e.maxHp / 2 then
-      e.mem.summoned = true
-      Combat.log(c, { t = "say", unit = e.uid, text = "To me, Brotherhood!" })
-      Combat.spawn(c, "defias_henchman")
-      Combat.spawn(c, "defias_henchman")
-    end
-  end,
+  phases = { { at = 0.5, name = "Brotherhood", say = "To me, Brotherhood!", open = "call", label = "Next",
+    text = "Calls 2 Defias Henchmen instead of his next attack." } },
 }
 
 ns.Encounters.westfall = {
