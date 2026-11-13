@@ -739,7 +739,5 @@ Ce qui reste :
 - Nefarian est de loin le combat le plus dur (54–59 % de victoires, contre 91–98 % aux élites).
 - PV perdus par combat normal : Priest 14,7 sur 36 PV et Warrior 14,7 sur 74, au-dessus des cibles par classe
   (`decisions.md`) ; c'est le prix du resserrement entre classes.
-- Kidney Shot (épique du Rogue) pose Demoralized aux boss mais tente Stunned sur un élite Indomitable, sans
-  effet : `bossOrStun` (`Core/Classes/rogue.lua`, fichier de classe, non touché) ne teste que `t.boss`. À
-  passer par `Combat.stunImmune` dans le lot du Rogue. Même chose pour le bibelot qui étourdit un ennemi au
-  hasard au début du combat (`Data/Relics.lua`, « not a boss »).
+- Kidney Shot (épique du Rogue) et le bibelot Bag of Marbles passent par `Combat.stunImmune` (14/11/2026) :
+  Kidney Shot pose Demoralized 2 à un élite Indomitable, le bibelot ne le tire plus comme cible.
