@@ -8600,7 +8600,7 @@ do
   snap("rencontre-sentinel-hill", true)
 end
 
-print("UE  cartes épiques : cadre violet, choix « Epic » après une élite, remplacement confirmé, variantes, marchand, Innate, Progress (Zones), bilan")
+print("UE  cartes épiques : choix au départ (puis bibelot), règle en jeu parmi les Powers, carte sans coût, remplacement après une élite, variantes, marchand, crans à 10, Progress (Zones), bilan")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
@@ -8615,43 +8615,95 @@ do
     return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
   end
   local function tex(t) return (rawget(t, "_texture") or ""):match("([%w_]+)%.tga$") or "" end
-  -- contenu de test (Prêtre) : trois épiques (Westfall, Duskwood, Wetlands), la première Innate et qui
-  -- transforme Smite en une variante ; aucune carte réelle
+  -- contenu de test (Prêtre) : trois épiques (Westfall, Duskwood, Wetlands), la première transforme Smite en
+  -- une variante ; une épique du Warrior qui porte la Rage à 10 ; aucune carte réelle
   local function addTestContent(ns)
     local C0 = ns.Cards
     C0.ue_epic_a = { id = "ue_epic_a", class = "priest", zone = "westfall", rarity = "epic", name = "Test Epic",
-      cost = 1, type = "power", path = "holy", school = "holy", power = true, innate = true, effects = {},
-      text = "Power.\nAttacks deal 1 more.\nInnate.", transforms = { smite = "ue_variant" }, up = { cost = 0 } }
+      type = "power", path = "holy", school = "holy", effects = {}, text = "Epic.\nAttacks deal 1 more.",
+      transforms = { smite = "ue_variant" }, up = { text = "Epic.\nAttacks deal 2 more." } }
     C0.ue_epic_b = { id = "ue_epic_b", class = "priest", zone = "duskwood", rarity = "epic", name = "Second Epic",
-      cost = 1, type = "skill", path = "shadow", school = "shadow", effects = { { "draw", 1 } }, text = "Draw 1.",
-      up = { cost = 0 } }
+      type = "power", path = "shadow", school = "shadow", effects = {}, text = "Epic.\nStart of turn: draw 1.",
+      up = { text = "Epic.\nStart of turn: draw 2." } }
     C0.ue_epic_c = { id = "ue_epic_c", class = "priest", zone = "wetlands", rarity = "epic", name = "Third Epic",
-      cost = 1, type = "skill", path = "discipline", effects = { { "absorb", 5 } }, text = "Gain 5 Absorb.",
-      up = { cost = 0 } }
+      type = "power", path = "discipline", effects = {}, text = "Epic.\nStart of turn: gain 5 Absorb.",
+      up = { text = "Epic.\nStart of turn: gain 8 Absorb." } }
     C0.ue_variant = { id = "ue_variant", class = "priest", variant = true, rarity = "basic", name = "Test Smite",
       cost = 1, type = "attack", school = "holy", path = "start", target = "enemy", effects = { { "damage", 10 } },
       text = "Deal 10.", up = { effects = { { "damage", 13 } }, text = "Deal 13." } }
+    C0.ue_epic_w = { id = "ue_epic_w", class = "warrior", zone = "westfall", rarity = "epic", name = "Test Fury",
+      type = "power", path = "fury", effects = {}, text = "Epic.\nRage goes up to 10.",
+      deckHooks = { resCap = function(c, src, v) return 10 end } }
   end
   local function epicFrame(card)
     return tex(card.ribbon) == "card_ribbon_epic" and tex(card.costTab) == "card_cost_epic"
       and vis(card.epicGlow) and vis(card.gem) and tex(card.gem) == "gem_epic"
   end
+  -- carte épique sans coût : languette violette marquée « Epic », chiffre caché, plaque du bas « Epic »
+  local function noCost(card)
+    return vis(card.costTab) and not vis(card.cost) and vis(card.epicMark) and card.epicMark._text == "Epic"
+      and (card.plateText._text or ""):find("Epic", 1, true) ~= nil
+      and not (card.plateText._text or ""):find("Power", 1, true)
+  end
   local function plainFrame(card)
     return tex(card.ribbon) == "card_ribbon" and tex(card.costTab) == "card_cost" and not vis(card.epicGlow)
+      and not vis(card.epicMark) and vis(card.cost)
   end
   local content
+  local W
 
-  -- 1. Combat : épique Innate en main (cadre violet), Smite transformé ---------------------------
+  -- 0. Départ : l'épique de l'expédition au choix (trois débloquées), puis le bibelot au choix ----------
   H.boot(nil)
   H.slash("")
   local ns = H.ns
-  local W = ns.Widgets
+  W = ns.Widgets
   addTestContent(ns)
   ns.Controller.makeSeed = function() return SEED end
+  local db = _G.SlayTheDragonDB
+  for _, z in ipairs({ "westfall", "duskwood", "wetlands" }) do
+    ns.Meta.zoneState(db.meta, "priest", z).won = true
+    db.meta.zones[z] = true -- zone 3 gagnée par le compte : bibelot au choix au départ
+  end
   clickOption("go")
+  local st, scr = UI().step, UI().current
   local e = EXP()
-  e.unlock.won = { westfall = 0, duskwood = 0, wetlands = 0 }
-  ns.Expedition.addCard(e, "ue_epic_a")
+  check("départ : choix « Epic » d'abord (trois épiques débloquées), le bibelot ensuite", currentKind() == "startEpic"
+    and e.phase == "start" and #e.startEpics == 3 and e.startRelics ~= nil and option("pickEpic:3") and option("skipEpic")
+    and not option("startRelic:1"), currentKind())
+  local shown, okFrames, okCost = 0, true, true
+  for _, card in ipairs(scr.cards) do
+    if vis(card) then
+      shown = shown + 1
+      if not epicFrame(card) then okFrames = false end
+      if not noCost(card) then okCost = false end
+    end
+  end
+  check("départ : trois cartes au cadre violet, sans coût (languette « Epic »), plaque « Epic »", shown == 3
+    and okFrames and okCost)
+  content = R.rect(ns.UI.content)
+  local hr, sr = R.rect(scr.hint), R.rect(scr.skip)
+  check("départ : titre « Epic card », consigne, « Skip » à la place du départ (pas de « Back on the road »)",
+    vis(scr.epicTitle) and scr.epicTitle._text == "Epic card" and vis(scr.skip) and button("skipEpic") == scr.skip
+    and scr.hint._text == "Choose the epic card of this expedition, or none." and not vis(scr.leave)
+    and not overlaps(hr, sr) and inside(sr, content) and inside(hr, content)
+    and not overlaps(R.rect(scr.epicTitle), R.rect(scr.cards[1].ribbon)), tostring(scr.hint._text))
+  local function plainText(t) return (t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+  local ctt = plainText(table.concat(H.hover(scr.cards[1]), " | "))
+  check("départ : infobulle de la carte (Epic : en jeu dès le début de chaque combat, une par expédition)",
+    ctt:find("in play from the start of each combat", 1, true) and ctt:find("One epic card per expedition", 1, true), ctt)
+  H.settle()
+  check("départ : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  snap("ue-depart-epique", true)
+  local ia
+  for i, id in ipairs(e.startEpics) do if id == "ue_epic_a" then ia = i end end
+  H.click(scr.cards[ia])
+  H.settle()
+  check("départ : épique prise sans confirmation, puis le bibelot au choix", e.deck[ns.Expedition.epicIndex(e)].id == "ue_epic_a"
+    and currentKind() == "startRelic" and option("startRelic:1") ~= nil and not ns.UI.epicConfirm:IsShown(), currentKind())
+  clickOption("skipStartRelic")
+  check("départ : puis la carte", currentKind() == "map", currentKind())
+
+  -- 1. Combat : l'épique est une règle en jeu (premier des Powers, liseré violet), hors de la main ----------
   local sm = e.deck[1] -- Smite améliorée : la variante hérite de l'amélioration
   sm.up = true
   local id = e.map.start[1]
@@ -8661,30 +8713,54 @@ do
   local v = V()
   v:Render(true)
   local c = EXP().combat
-  local epicCard, plainCard, variantInDeck
+  local inHand, plainCard, variantInDeck = false, nil, nil
   for i, inst in ipairs(c.hand) do
-    if inst.id == "ue_epic_a" then epicCard = v.cards[i] elseif not plainCard then plainCard = v.cards[i] end
+    if inst.id == "ue_epic_a" then inHand = true elseif not plainCard then plainCard = v.cards[i] end
   end
   for _, pile in ipairs({ c.hand, c.draw }) do
     for _, inst in ipairs(pile) do
+      if inst.id == "ue_epic_a" then inHand = true end
       if inst.id == "smite" then variantInDeck = false end
       if inst.id == "ue_variant" and variantInDeck == nil then variantInDeck = true end
     end
   end
-  check("combat : l'épique Innate est dans la main de départ (5 cartes)", epicCard ~= nil and #c.hand == 5)
-  check("combat : carte épique au cadre violet (ruban, languette de coût, aura, gemme épique)",
-    epicCard and epicFrame(epicCard), epicCard and (tex(epicCard.ribbon) .. " / " .. tex(epicCard.costTab)))
-  check("combat : carte ordinaire au cadre habituel (aura cachée)", plainCard and plainFrame(plainCard))
+  check("combat : l'épique n'est dans aucune pile, main de 5, c.epic posé", not inHand and #c.hand == 5
+    and c.epic and c.epic.id == "ue_epic_a")
+  check("combat : carte ordinaire au cadre habituel (coût, aura cachée)", plainCard and plainFrame(plainCard))
   check("combat : Smite transformé en sa variante tant que l'épique est dans le deck", variantInDeck == true)
-  local ett = epicCard and H.hover(epicCard) or {}
-  local ettText = table.concat(ett, " | ")
-  check("infobulle de l'épique : Innate, une seule par expédition, transformation", ettText:find("Innate", 1, true)
-    and ettText:find("one per expedition", 1, true) and ettText:find("While in the deck: Smite becomes", 1, true), ettText)
-  check("plaque du bas de l'épique : « Power · Innate »", epicCard and (epicCard.plateText._text or ""):find("Innate", 1, true),
-    epicCard and epicCard.plateText._text)
-  snap("ue-main-epique", true)
+  local tokens = {}
+  for _, t in ipairs(v.playerSt.tokens) do if vis(t) and t.info and t.info.power then tokens[#tokens + 1] = t end end
+  local etok = tokens[1]
+  local rimOk = etok and etok.medal.ring._calls.SetVertexColor
+  local er = ns.Art.rarityRim.epic
+  check("combat : l'épique est le premier des Powers en jeu, liseré violet", etok and etok.info.power.id == "ue_epic_a"
+    and rimOk and math.abs(rimOk[1] - er[1]) < 1e-6 and math.abs(rimOk[2] - er[2]) < 1e-6)
+  local ett = etok and plainText(table.concat(H.hover(etok), " | ")) or ""
+  check("combat : infobulle complète (nom, texte, Epic, une par expédition, transformation)",
+    ett:find("Test Epic", 1, true) and ett:find("Attacks deal 1 more.", 1, true)
+    and ett:find("in play from the start of each combat", 1, true) and ett:find("One epic card per expedition", 1, true)
+    and ett:find("While in the deck: Smite becomes", 1, true) and not ett:find("Power", 1, true), ett)
+  -- un pouvoir joué se range après l'épique
+  c.player.powers[#c.player.powers + 1] = { uid = 9901, id = "shadowform", up = false }
+  v:Render(true)
+  tokens = {}
+  for _, t in ipairs(v.playerSt.tokens) do if vis(t) and t.info and t.info.power then tokens[#tokens + 1] = t end end
+  check("combat : un Power joué vient après l'épique", #tokens == 2 and tokens[1].info.power.id == "ue_epic_a"
+    and tokens[2].info.power.id == "shadowform")
+  H.settle()
+  snap("ue-combat-epique", true)
+  c.player.powers[#c.player.powers] = nil
+  v:Render(true)
+  -- deck : l'épique en tête, sans coût
+  UI().toggleDeckView("deck")
+  local dv = UI().deckView
+  check("deck : l'épique en tête, cadre violet, sans coût", dv.list[1] and dv.list[1].id == "ue_epic_a"
+    and epicFrame(dv.cards[1]) and noCost(dv.cards[1]))
+  H.settle()
+  snap("ue-carte-epique", true)
+  dv:Close()
 
-  -- 2. Victoire sur l'élite : choix « Epic » d'abord ----------------------------------------------
+  -- 2. Victoire sur l'élite : une épique de remplacement, avant les cartes ------------------------------
   for _, en in ipairs(c.enemies) do en.hp = 1 end
   local att
   for i, inst in ipairs(c.hand) do if ns.Card.def(inst).type == "attack" then att = i break end end
@@ -8706,31 +8782,34 @@ do
   check("élite vaincue", C().over() == "won", C().over())
   H.click(V().banner.button)
   H.settle()
-  local st = UI().step
-  local scr = UI().current
+  -- l'épique du deck est améliorée : le remplacement le dira
+  EXP().deck[ns.Expedition.epicIndex(EXP())].up = true
+  ns.UI.refresh()
+  st = UI().step
+  scr = UI().current
   local r = EXP().reward
-  check("récompense d'élite : choix « Epic » (deux épiques débloquées hors celle du deck), avant les cartes",
-    currentKind() == "reward" and st.epicMode and r.epics and #r.epics == 2 and option("pickEpic:1") and option("skipEpic")
-    and not option("pickCard:1"), r.epics and table.concat(r.epics, ","))
-  local shownEpic, okFrames = 0, true
+  check("récompense d'élite : UNE épique de remplacement (hors celle du deck), avant les cartes",
+    currentKind() == "reward" and st.epicMode and r.epics and #r.epics == 1 and r.epics[1] ~= "ue_epic_a"
+    and option("pickEpic:1") and option("skipEpic") and not option("pickCard:1"), r.epics and table.concat(r.epics, ","))
+  local shownEpic, okF = 0, true
   for _, card in ipairs(scr.cards) do
     if vis(card) then
       shownEpic = shownEpic + 1
-      if not epicFrame(card) then okFrames = false end
+      if not epicFrame(card) or not noCost(card) then okF = false end
     end
   end
-  check("choix « Epic » : cartes au cadre violet, titre « Epic card », consigne, bouton « Skip »", shownEpic == 2 and okFrames
-    and vis(scr.epicTitle) and scr.epicTitle._text == "Epic card" and vis(scr.skip)
-    and scr.hint._text == "Choose an epic card, or none." and button("skipEpic") == scr.skip)
-  content = R.rect(ns.UI.content)
-  local hr, sr = R.rect(scr.hint), R.rect(scr.skip)
-  check("choix « Epic » : consigne et « Skip » sans chevauchement, dans la fenêtre",
-    not overlaps(hr, sr) and inside(sr, content) and inside(R.rect(scr.epicTitle), content)
-    and not overlaps(R.rect(scr.epicTitle), R.rect(scr.cards[1].ribbon)))
+  check("remplacement proposé : carte centrée au cadre violet, titre « Epic card », consigne, « Skip »", shownEpic == 1
+    and okF and vis(scr.epicTitle) and scr.epicTitle._text == "Epic card" and vis(scr.skip) and vis(scr.leave)
+    and scr.hint._text == "Replace your epic card, or skip it." and button("skipEpic") == scr.skip
+    and math.abs(scr.cards[1].cx - 552) < 0.5, tostring(scr.hint._text))
+  hr, sr = R.rect(scr.hint), R.rect(scr.skip)
+  check("remplacement proposé : consigne, « Skip » et départ sans chevauchement, dans la fenêtre",
+    not overlaps(hr, sr) and not overlaps(sr, R.rect(scr.leave)) and inside(sr, content)
+    and inside(R.rect(scr.epicTitle), content) and not overlaps(R.rect(scr.epicTitle), R.rect(scr.cards[1].ribbon)))
   H.settle()
   snap("ue-choix-epic", true)
 
-  -- 3. Remplacement : confirmation, « Keep » puis « Replace » ---------------------------------------
+  -- 3. Remplacement : confirmation (« The upgrade is lost. »), « Keep » puis « Replace » -----------------
   local before = #EXP().deck
   H.click(scr.cards[1])
   local ec = UI().epicConfirm
@@ -8738,19 +8817,22 @@ do
   local newName = ns.Cards[newId].name
   check("prendre une autre épique : confirmation, l'action attend", ec:IsShown() and #EXP().deck == before
     and ns.Expedition.epicIndex(EXP()) and EXP().deck[ns.Expedition.epicIndex(EXP())].id == "ue_epic_a")
-  check("confirmation : « Replace Test Epic with " .. newName .. "? » / « Keep Test Epic »",
-    ec.question._text == "Replace Test Epic with " .. newName .. "?" and ec.keep.label._text == "Keep Test Epic"
+  check("confirmation : « Replace Test Epic+ with " .. newName .. "? » / « Keep Test Epic+ »",
+    ec.question._text == "Replace Test Epic+ with " .. newName .. "?" and ec.keep.label._text == "Keep Test Epic+"
     and ec.replace.label._text == "Replace", tostring(ec.question._text) .. " / " .. tostring(ec.keep.label._text))
+  check("confirmation : épique améliorée = « The upgrade is lost. » sous « Leaves the deck »", vis(ec.lost)
+    and ec.lost._text == "The upgrade is lost." and R.rect(ec.lost)[4] <= R.rect(ec.oldLabel)[2] + 0.5)
   check("confirmation : les deux cartes côte à côte (ancienne à gauche, nouvelle à droite), cadre violet",
     vis(ec.cards[1]) and vis(ec.cards[2]) and ec.cards[1].cardId == "ue_epic_a" and ec.cards[2].cardId == newId
     and epicFrame(ec.cards[1]) and epicFrame(ec.cards[2]) and R.rect(ec.cards[1])[3] < R.rect(ec.cards[2])[1]
     and not overlaps(R.rect(ec.cards[1]), R.rect(ec.panel.title)))
   local inPanel = true
-  for _, o in ipairs({ ec.cards[1], ec.cards[2], ec.replace, ec.keep, ec.question, ec.note, ec.oldLabel, ec.newLabel }) do
+  for _, o in ipairs({ ec.cards[1], ec.cards[2], ec.replace, ec.keep, ec.question, ec.note, ec.oldLabel, ec.newLabel, ec.lost }) do
     if not inside(R.rect(o), R.rect(ec.panel)) then inPanel = false end
   end
-  check("confirmation : tout dans le panneau, boutons sous les cartes", inPanel
+  check("confirmation : tout dans le panneau, boutons sous les cartes et les libellés", inPanel
     and not overlaps(R.rect(ec.replace), R.rect(ec.oldLabel)) and not overlaps(R.rect(ec.keep), R.rect(ec.newLabel))
+    and not overlaps(R.rect(ec.replace), R.rect(ec.lost)) and not overlaps(R.rect(ec.keep), R.rect(ec.lost))
     and not overlaps(R.rect(ec.replace), R.rect(ec.cards[1])) and not overlaps(R.rect(ec.keep), R.rect(ec.cards[2])))
   -- survol : halo seulement (ni levée, ni aperçu à taille réelle)
   local r0 = R.vrect(ec.cards[2])
@@ -8773,9 +8855,14 @@ do
   check("« Replace » : la nouvelle épique remplace l'ancienne (non améliorée), les cartes ordinaires suivent",
     not ec:IsShown() and #EXP().deck == before and EXP().deck[ep].id == newId and EXP().deck[ep].up == false
     and EXP().stats.epicReplaced == 1 and not UI().step.epicMode and option("pickCard:1") ~= nil)
+  -- une épique non améliorée remplacée : pas de ligne « The upgrade is lost. »
+  ns.UI.epicConfirm:Open("pickCard:1", { old = { id = newId, up = false }, new = { id = "ue_epic_a", up = false } })
+  check("confirmation d'une épique non améliorée : pas de « The upgrade is lost. »", not vis(ec.lost))
+  ns.UI.epicConfirm.pending = nil
+  ns.UI.epicConfirm:Close()
   -- l'épique partie : plus de transformation (panneau du deck)
   UI().toggleDeckView("deck")
-  local dv = UI().deckView
+  dv = UI().deckView
   local hasSmite, hasVariant = false, false
   for _, inst in ipairs(dv.list) do
     if inst.id == "smite" then hasSmite = true end
@@ -8824,6 +8911,8 @@ do
   -- 5. Progress, onglet Zones : emplacement épique, carte lisible une fois débloquée ----------------
   local db = _G.SlayTheDragonDB
   ns.Meta.zoneState(db.meta, "priest", "westfall").won = true
+  -- (le départ du 0. avait gagné Duskwood et Wetlands : seule Westfall reste gagnée ici)
+  for _, z in ipairs({ "duskwood", "wetlands" }) do ns.Meta.zoneState(db.meta, "priest", z).won = false end
   db.current = nil
   ns.Controller.ending = nil
   ns.UI.refresh()
@@ -8883,6 +8972,64 @@ do
   H.settle()
   check("bilan : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("ue-bilan-epique", true)
+
+  -- 7. Crans de la ressource : plafond du combat (Combat.resCap), Rage à 10 par une épique : deux arcs ------
+  H.boot(nil)
+  H.slash("")
+  ns = H.ns
+  addTestContent(ns)
+  clickOption("class:warrior")
+  ns.Controller.makeSeed = function() return SEED end
+  clickOption("go")
+  e = EXP()
+  ns.Expedition.addCard(e, "ue_epic_w")
+  local nid = e.map.start[1]
+  e.map.nodes[nid].kind = "combat"
+  clickOption("path:" .. nid)
+  H.settle()
+  v = V()
+  c = EXP().combat
+  c.player.res = 7
+  v:Render(true)
+  H.advance(1)
+  local pips = v.resPips
+  local sockets, full = 0, 0
+  for _, p in ipairs(pips.list) do
+    if vis(p.socket) then sockets = sockets + 1 end
+    if vis(p.socket) and (p.fill._calls.SetAlpha and p.fill._calls.SetAlpha[1] or 0) == 1 then full = full + 1 end
+  end
+  check("crans : plafond du combat (Combat.resCap = 10), 10 alvéoles, 7 pleines", ns.Combat.resCap(c) == 10
+    and sockets == 10 and full == 7 and vis(pips), sockets .. " / " .. full)
+  -- lisibles : aucun cran sur un autre, à gauche de la main, dans le plateau, hors de l'anneau de mana
+  local pbad = {}
+  local rects = {}
+  for i = 1, 10 do rects[i] = R.rect(pips.list[i].socket) end
+  -- (gemmes en losange : écart des centres d'au moins 0,9 cran)
+  local function center(r) return (r[1] + r[3]) / 2, (r[2] + r[4]) / 2 end
+  for i = 1, 10 do
+    for j = i + 1, 10 do
+      local xi, yi = center(rects[i])
+      local xj, yj = center(rects[j])
+      if math.sqrt((xi - xj) ^ 2 + (yi - yj) ^ 2) < 0.9 * (rects[i][3] - rects[i][1]) then pbad[#pbad + 1] = i .. "/" .. j end
+    end
+    if rects[i][3] >= R.rect(v.cards[1])[1] then pbad[#pbad + 1] = i .. " sur la main" end
+    if not inside(rects[i], R.rect(v.hz)) then pbad[#pbad + 1] = i .. " hors du plateau" end
+  end
+  check("crans à 10 : deux arcs, aucun chevauchement, hors de la main, dans le plateau", #pbad == 0,
+    table.concat(pbad, ", "))
+  H.settle()
+  snap("ue-crans-rage-10", true)
+  -- sans l'épique : retour à un arc de 5
+  local deck = {}
+  for _, cd in ipairs(e.deck) do if cd.id ~= "ue_epic_w" then deck[#deck + 1] = cd end end
+  e.deck = deck
+  c.epic = nil
+  c.player.res = 2
+  v:Render(true)
+  H.advance(1)
+  sockets = 0
+  for _, p in ipairs(pips.list) do if vis(p.socket) then sockets = sockets + 1 end end
+  check("crans : sans l'épique, plafond de la classe (5)", sockets == 5 and ns.Combat.resCap(c) == 5, sockets)
 end
 
 print("U16 méthodes d'API inconnues appelées")

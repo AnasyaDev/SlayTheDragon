@@ -32,8 +32,12 @@ local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
 -- Crans de la ressource : gemmes de PIP unités en arc autour de l'anneau de mana (rayon PIP_R depuis
 -- son centre), du flanc droit sous la pastille (PIP_A0 degrés, 0 = à droite, sens horaire) vers le bas,
 -- un cran tous les PIP_DA degrés ; hors de la main (x 200 à 10 cartes) et au-dessus du libellé « Mana ».
-local PIP, PIPS_MAX = 12, 6
+-- Plafond au-delà de PIPS_ROW (Combat.resCap : une épique peut porter la Rage à 10) : deux arcs, le
+-- premier (intérieur) prend la moitié haute des crans, le second (rayon PIP_R2) le reste, décalé d'un
+-- demi-cran ; PIPS_MAX crans au plus.
+local PIP, PIPS_MAX, PIPS_ROW = 12, 12, 6
 local PIP_R, PIP_A0, PIP_DA = 49, -5, 14
+local PIP_R2 = PIP_R + PIP + 2
 local PIP_SOCKET = { 0.3, 0.29, 0.28 }  -- alvéole : gemme désaturée assombrie
 local PIP_FADE, PIP_GLOW = 0.22, 0.45   -- fondu d'un cran, éclat au remplissage (secondes)
 -- Personnage d'un ennemi : 33 sous le haut de l'emplacement, pieds à 33 + FIG_H (193 à l'échelle 1) ;
@@ -414,7 +418,7 @@ function V:Build(parent)
   -- un plafond, même à 0 (les alvéoles disent le plafond). Cadre sans souris (il couvre l'anneau de mana,
   -- dont il ne doit pas voler l'infobulle) : l'infobulle de la ressource reste celle de la pastille.
   local pips = CreateFrame("Frame", nil, parent)
-  local box = 2 * (PIP_R + PIP)
+  local box = 2 * (PIP_R2 + PIP)
   at(pips, parent, MANA_X - box / 2, MANA_Y - box / 2, box, box)
   pips:SetFrameLevel(hz:GetFrameLevel() + 3)
   pips:EnableMouse(false)
@@ -430,16 +434,12 @@ function V:Build(parent)
     p.glow = W.skin(pips, "glow_round", "ARTWORK", 2)
     if p.glow.SetBlendMode then p.glow:SetBlendMode("ADD") end
     p.glow:SetAlpha(0)
-    local a = math.rad(PIP_A0 + (i - 1) * PIP_DA)
-    p.x, p.y = MANA_X + PIP_R * math.cos(a), MANA_Y + PIP_R * math.sin(a) -- centre (coordonnées du contenu)
-    for _, t in ipairs({ p.socket, p.fill }) do
-      t:SetSize(PIP, PIP)
-      t:SetPoint("CENTER", pips, "CENTER", p.x - MANA_X, -(p.y - MANA_Y))
-    end
+    for _, t in ipairs({ p.socket, p.fill }) do t:SetSize(PIP, PIP) end
     p.glow:SetSize(PIP * 2.2, PIP * 2.2)
     p.glow:SetPoint("CENTER", p.socket, "CENTER", 0, 0)
     pips.list[i] = p
   end
+  V.layoutPips(pips, PIPS_ROW)
   pips:Hide()
   self.resPips = pips
 
@@ -834,6 +834,12 @@ function V:RenderPlayer(full)
     self.playerHp:Set(p.hp, p.maxHp)
     self.playerBlock:Set(p.block, p.maxHp)
     local list = W.unitStatuses(p)
+    -- épique en jeu (c.epic) : le premier des pouvoirs, liseré violet, infobulle complète
+    if c.epic then
+      list[#list + 1] = { icon = W.cardArt(c.epic.id), text = Card.def(c.epic).name,
+        rim = Art.rarityRim.epic or Art.rim.violet, glow = W.EPIC_COLOR, info = { power = c.epic },
+        key = "epic:" .. c.epic.id }
+    end
     for i = 1, #p.powers do
       local inst = p.powers[i]
       list[#list + 1] = { icon = W.cardArt(inst.id), text = Card.def(inst).name, rim = Art.rim.gold,
@@ -937,10 +943,28 @@ local function pipTo(p, on, animate)
   end
 end
 
+-- Pose des crans pour un plafond cap : un arc jusqu'à PIPS_ROW, deux au-delà (voir PIPS_ROW).
+function V.layoutPips(pips, cap)
+  local inner = cap <= PIPS_ROW and cap or math.ceil(cap / 2)
+  for i, p in ipairs(pips.list) do
+    local r, a = PIP_R, PIP_A0 + (i - 1) * PIP_DA
+    if i > inner then r, a = PIP_R2, PIP_A0 + PIP_DA / 2 + (i - inner - 1) * PIP_DA end
+    a = math.rad(a)
+    p.x, p.y = MANA_X + r * math.cos(a), MANA_Y + r * math.sin(a) -- centre (coordonnées du contenu)
+    for _, t in ipairs({ p.socket, p.fill }) do
+      t:ClearAllPoints()
+      t:SetPoint("CENTER", pips, "CENTER", p.x - MANA_X, -(p.y - MANA_Y))
+    end
+  end
+  pips.layoutCap = cap
+end
+
 function V:RenderPips(class, n)
   local row = self.resPips
   local rd = ns.Classes[class] and ns.Classes[class].resource
-  local cap = rd and rd.cap
+  -- plafond du combat (crochet « resCap » : épique, pouvoir), sinon celui de la classe
+  local c = self.c
+  local cap = (c and c.class == class and Combat.resCap(c)) or (rd and rd.cap)
   if not cap or cap < 1 then
     row:Hide()
     row.class, row.cap = nil, nil
@@ -950,6 +974,7 @@ function V:RenderPips(class, n)
   local fresh = row.class ~= class or row.cap ~= cap or not row:IsShown()
   if fresh then
     row.class, row.cap = class, cap
+    if row.layoutCap ~= cap then V.layoutPips(row, cap) end
     local ra = Art.classResource(class)
     local col = ra.color and C[ra.color] or C.watchText
     for i, p in ipairs(row.list) do

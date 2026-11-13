@@ -70,6 +70,15 @@ end
 ns.ClassRules = ns.ClassRules or {}
 local Rules = ns.ClassRules
 
+-- Crochets de l'épique en jeu (c.epic, Combat.new) : deckHooks puis hooks de sa définition, src = c.epic.
+-- Ils passent en DERNIER (après pouvoirs, bibelots et affixes : docs/zones/cartes-de-zone.md, C.1).
+local function epicHooks(c)
+  local e = c.epic
+  if not e then return nil end
+  local d = Card.def(e)
+  return d.deckHooks, d.hooks
+end
+
 -- Valeur modifiée : chaque crochet reçoit (c, src, v, ...) et renvoie la nouvelle valeur.
 function Combat.modify(c, name, v, a, b, d)
   local cr = Rules[c.class]
@@ -101,6 +110,13 @@ function Combat.modify(c, name, v, a, b, d)
       local h = af and af.hooks and af.hooks[name]
       if h then v = h(c, affixes[i], v, a, b, d) end
     end
+  end
+  if c.epic then
+    local dh, ph = epicHooks(c)
+    local h = dh and dh[name]
+    if h then v = h(c, c.epic, v, a, b, d) end
+    h = ph and ph[name]
+    if h then v = h(c, c.epic, v, a, b, d) end
   end
   return v
 end
@@ -138,6 +154,13 @@ function Combat.fire(c, name, a, b, d)
       local h = af and af.hooks and af.hooks[name]
       if h and h(c, affixes[i], a, b, d) then return true, affixes[i] end
     end
+  end
+  if c.epic then
+    local dh, ph = epicHooks(c)
+    local h = dh and dh[name]
+    if h and h(c, c.epic, a, b, d) then return true, c.epic end
+    h = ph and ph[name]
+    if h and h(c, c.epic, a, b, d) then return true, c.epic end
   end
   return false
 end
@@ -804,6 +827,12 @@ local function allowed(c, d)
     h = h and h.allow
     if h and not h(c, powers[i], d) then return false end
   end
+  if c.epic then -- épique en jeu : son crochet « allow » (deckHooks ou hooks), comme un pouvoir
+    local dh, ph = epicHooks(c)
+    for _, t in ipairs({ dh or false, ph or false }) do
+      if t and t.allow and not t.allow(c, c.epic, d) then return false end
+    end
+  end
   return true
 end
 
@@ -1434,14 +1463,17 @@ function Combat.new(opts)
   for i = 1, #deck do
     local card = deck[i]
     local inst = Card.new(card.id, card.up, c.nextUid)
-    c.draw[#c.draw + 1] = inst
     c.nextUid = c.nextUid + 1
+    local d = Card.def(inst)
+    -- épique (docs/expedition.md, « Cartes épiques ») : règle en jeu dès le début du combat, dans AUCUNE
+    -- pile (c.epic = { id, up, uid }) ; ses crochets (deckHooks, hooks) passent après bibelots et affixes
+    local epic = d.rarity == "epic" and not c.epic
+    if epic then c.epic = { id = inst.id, up = inst.up, uid = inst.uid } else c.draw[#c.draw + 1] = inst end
     -- effet passif tant que la carte est dans le deck (docs/classes.md, « Cartes épiques ») : deckHooks
     -- (crochets actifs tout le combat, src = { id, up, uid }), whileInDeck(c, src) appelé au début du combat
-    local d = Card.def(inst)
     if d.deckHooks or d.whileInDeck then
-      local src = { id = inst.id, up = inst.up, uid = inst.uid }
-      if d.deckHooks then
+      local src = epic and c.epic or { id = inst.id, up = inst.up, uid = inst.uid }
+      if d.deckHooks and not epic then
         c.passives = c.passives or {}
         c.passives[#c.passives + 1] = src
       end

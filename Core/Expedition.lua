@@ -22,21 +22,26 @@ ns.Expedition = X
 -- 4 : déblocages par niveau de classe (unlock.level au lieu de unlock.rep).
 -- 5 : campagne par zones (exp.zone ; unlock.common et unlock.won au lieu de unlock.league).
 -- 6 : cartes épiques (exp.epicOffered, exp.rng.epic créé au besoin, reward.epics / epicDone, épique du
---     marchand : shop.cards[i].epic).
+--     marchand : shop.cards[i].epic). Règle finale du 14/11/2026 sans changement de version : champ
+--     facultatif exp.startEpics (offre de départ, phase « start ») ; une v6 en cours reste jouable telle quelle.
 X.VERSION = 6
 
--- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck ; en
--- prendre une autre remplace la précédente. Offre garantie et vente, réglables ici :
---   offerOn   genres de combat dont la PREMIÈRE victoire de l'expédition propose un choix « Epic » en plus de
---             la récompense normale (combats de rencontre compris) ; une seule offre par expédition
---   choices   épiques proposées au plus dans ce choix (distinctes, débloquées, hors celle du deck)
+-- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck, règle en
+-- jeu dès le début de chaque combat (Combat.new : c.epic) ; en prendre une autre remplace la précédente.
+-- Offres et vente, réglables ici :
+--   start     épiques proposées au départ (phase « start », avant le premier combat ; « Skip » possible) ;
+--             0 = pas d'offre de départ
+--   offerOn   genres de combat dont CHAQUE victoire propose des épiques de remplacement en plus de la
+--             récompense normale (combats de rencontre compris), refusables
+--   choices   épiques proposées à chacune de ces victoires (distinctes, débloquées, hors celle du deck)
 --   shop      chance qu'un marchand vende une épique (emplacement en plus des cartes), à partir de l'étape
 --             shopFloor (la moitié du parcours : étapes 1 à 7, boss en 8) ; 0 = jamais
 --   price     prix de base d'une épique chez le marchand (± X.PRICE_JITTER, crochet « price » genre "card")
 -- Sans épique débloquée, aucun tirage n'est fait (l'expédition se déroule exactement comme avant).
 X.EPIC = {
+  start = 3,
   offerOn = { elite = true },
-  choices = 3,
+  choices = 1,
   shop = 0.5,
   shopFloor = 4,
   price = 150,
@@ -511,13 +516,23 @@ local function openReward(exp, r)
   exp.phase = "reward"
 end
 
--- Offre garantie : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone), une fois par expédition,
--- s'il reste une épique à proposer (tirée par le flux « epic »). Renvoie vrai si l'offre est faite.
-function X.offerEpic(exp, r)
+-- Offre de remplacement : choix « Epic » ajouté à la récompense r (r.epics, r.epicDone) s'il reste une
+-- épique à proposer (tirée par le flux « epic » ; n = X.EPIC.choices par défaut). Renvoie vrai si l'offre est
+-- faite.
+function X.offerEpic(exp, r, n)
   local pool = X.epicPool(exp)
-  if #pool == 0 then return false end
-  r.epics = drawEpics(epicRng(exp), pool, X.EPIC.choices)
+  if #pool == 0 or (n or X.EPIC.choices) <= 0 then return false end
+  r.epics = drawEpics(epicRng(exp), pool, n or X.EPIC.choices)
   r.epicDone = false
+  return true
+end
+
+-- Offre de départ (X.new) : exp.startEpics = jusqu'à X.EPIC.start épiques débloquées, phase « start ».
+-- exp.epicOffered = vrai si elle a été faite. Renvoie vrai si l'offre est faite.
+local function offerStartEpic(exp)
+  local o = {}
+  if not X.offerEpic(exp, o, X.EPIC.start) then return false end
+  exp.startEpics = o.epics
   exp.epicOffered = true
   return true
 end
@@ -534,7 +549,7 @@ local function endFight(exp)
     if f.kind == "elite" then exp.stats.elites = exp.stats.elites + 1 end
     if f.kind == "boss" then exp.stats.bosses = exp.stats.bosses + 1 end
     X.fire(exp, "onCombatWon", f.kind)
-    if X.EPIC.offerOn[f.kind] and not exp.epicOffered then X.offerEpic(exp, f.reward) end
+    if X.EPIC.offerOn[f.kind] then X.offerEpic(exp, f.reward) end
     openReward(exp, f.reward)
   else
     exp.killedBy = table.concat(f.encounter, "+")
@@ -819,8 +834,14 @@ local function upgradable(exp)
 end
 
 -- Améliore n cartes au hasard parmi celles qui peuvent l'être (rng : flux de l'état) ; renvoie le nombre.
+-- L'épique n'est jamais améliorée au hasard (choix volontaire au feu de camp ou en rencontre « upgrade »).
 function X.upgradeRandom(exp, n, rng)
-  local list = Rng.shuffle(rng, upgradable(exp))
+  local list = upgradable(exp)
+  local ei = X.epicIndex(exp)
+  if ei then
+    for k = #list, 1, -1 do if list[k] == ei then table.remove(list, k) end end
+  end
+  list = Rng.shuffle(rng, list)
   local k = min(n, #list)
   for i = 1, k do upgrade(exp, list[i]) end
   return k
@@ -1005,7 +1026,7 @@ end
 --                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements),
---        epic = id d'une carte épique ajoutée au deck de départ (simulation)
+--        epic = id d'une carte épique ajoutée au deck de départ (simulation ; pas d'offre de départ)
 function X.new(opts)
   opts = opts or {}
   local seed = floor(opts.seed or 1)
@@ -1064,6 +1085,9 @@ function X.new(opts)
       exp.phase = "start"
     end
   end
+  -- Épique de l'expédition au choix (X.EPIC.start), avant le premier combat ; vient AVANT le bibelot de
+  -- départ (phase « start » : exp.startEpics, puis exp.startRelics). Rien si l'épique est imposée (epic=).
+  if not opts.epic and offerStartEpic(exp) then exp.phase = "start" end
   return exp
 end
 
@@ -1073,19 +1097,39 @@ end
 
 local H = {} -- H[phase][verbe] = function(exp, a) -> true | false, raison
 
+-- Phase « start » : l'épique (exp.startEpics) d'abord, puis le bibelot (exp.startRelics) ; la carte ensuite.
+local function startNext(exp)
+  if not exp.startEpics and not exp.startRelics then exp.phase = "map" end
+  return true
+end
+
 H.start = {
   startRelic = function(exp, a)
+    if exp.startEpics or not exp.startRelics then return false, "index" end
     local id = exp.startRelics[a[2] or 0]
     if not id then return false, "index" end
     X.gainRelic(exp, id)
     exp.startRelics = nil
-    exp.phase = "map"
-    return true
+    return startNext(exp)
   end,
   skipStartRelic = function(exp)
+    if exp.startEpics or not exp.startRelics then return false, "index" end
     exp.startRelics = nil
-    exp.phase = "map"
-    return true
+    return startNext(exp)
+  end,
+  -- épique de départ : mêmes verbes que le choix « Epic » d'une récompense
+  pickEpic = function(exp, a)
+    local id = exp.startEpics and exp.startEpics[a[2] or 0]
+    if not id then return false, "badCard" end
+    X.addCard(exp, id)
+    exp.startEpics = nil
+    exp.startEpicPicked = id
+    return startNext(exp)
+  end,
+  skipEpic = function(exp)
+    if not exp.startEpics then return false, "badCard" end
+    exp.startEpics = nil
+    return startNext(exp)
   end,
 }
 
@@ -1314,8 +1358,13 @@ function X.choices(exp)
   local ph = exp.phase
   local function add(a) list[#list + 1] = a end
   if ph == "start" then
-    for i = 1, #exp.startRelics do add({ "startRelic", i }) end
-    add({ "skipStartRelic" })
+    if exp.startEpics then
+      for i = 1, #exp.startEpics do add({ "pickEpic", i }) end
+      add({ "skipEpic" })
+    elseif exp.startRelics then
+      for i = 1, #exp.startRelics do add({ "startRelic", i }) end
+      add({ "skipStartRelic" })
+    end
   elseif ph == "map" then
     local nx = Map.nextNodes(exp.map, exp.node)
     for i = 1, #nx do add({ "path", nx[i] }) end

@@ -139,6 +139,9 @@ end
 -- porte le nombre du champ (« Cooldown 2 »). Ordre = ordre sur la plaque.
 ---------------------------------------------------------------------------
 
+-- Epic (rareté epic) : en tête de la plaque, à la place de « Power » ; la carte n'a pas de coût, elle est en
+-- jeu dès le début de chaque combat (Combat.new : c.epic). Mot de tête facultatif « Epic. » dans le texte.
+L.plate("epic", { word = "Epic", head = true, text = "in play from the start of each combat." })
 L.plate("power", { word = "Power", head = true, text = "stays active until the end of combat." })
 L.plate("trap", { word = "Trap", head = true, text = "triggers on the next enemy attack." })
 L.plate("seal", { word = "Seal", head = true, text = "only one Seal at a time, a new one replaces it." })
@@ -157,6 +160,8 @@ L.plate("innate", { word = "Innate", text = "starts in the opening hand." })
 function L.plateWord(p, d)
   local v = d[p.flag]
   if p.key == "power" and d.type == "power" then v = true end
+  if p.key == "epic" then v = d.rarity == "epic" end
+  if p.key == "power" and d.rarity == "epic" then v = nil end -- une épique dit « Epic », jamais « Power »
   if not v then return nil end
   if p.n then return p.word .. " " .. tostring(v) end
   return p.word

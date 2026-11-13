@@ -20,7 +20,8 @@
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
 --   epic=<id> : carte épique imposée au deck de départ (runner=expedition ; comme une épique prise : une seule
 --     dans le deck, ses transformations s'appliquent). sweep=cards mesure aussi les épiques de la classe, chacune
---     imposée ainsi (runner=expedition ; sinon ajoutée de force).
+--     imposée ainsi (runner=expedition ; sinon ajoutée de force). epic=none : aucune épique (offres refusées) ;
+--     sweep=cards mesure tout (la ligne « (sans) » comprise) avec epic=none, sauf l'épique imposée de sa ligne.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 local opts = {}
@@ -297,7 +298,9 @@ if opts.sweep then
     if dx.rarity ~= dy.rarity then return dx.rarity < dy.rarity end
     return x < y
   end)
-  local base = runAll({})
+  -- runner=expedition : mesures sans épique (epic=none), sauf l'épique imposée de sa ligne
+  local noEpic = opts.runner == "expedition" and "none" or nil
+  local base = runAll({ epic = noEpic })
   local function line(name, rarity, a)
     local parts = {}
     for _, k in ipairs({ "easy", "normal", "elite", "boss" }) do
@@ -315,7 +318,7 @@ if opts.sweep then
   print(line("(sans)", "-", base))
   local rows = {}
   for _, id in ipairs(list) do
-    local over = {}
+    local over = { epic = noEpic }
     if opts.sweep == "relics" then
       local rl = {}
       for _, r in ipairs(startRelics) do rl[#rl + 1] = r end
