@@ -26,7 +26,14 @@ ns.Expedition = X
 --     facultatif exp.startEpics (offre de départ, phase « start »).
 -- 7 : l'épique se gagne (décision du joueur, 14/11/2026) : plus d'offre de départ (exp.startEpics,
 --     exp.startEpicPicked et exp.epicOffered retirés), chute d'épique par élite selon le rang de la zone.
-X.VERSION = 7
+-- 8 : une expédition traverse toute la campagne (décision du joueur, 14/11/2026) : exp.startZone, exp.lastZone,
+--     exp.beaten (boss battus), phase « transit » entre deux zones (exp.transit), exp.banked (ce que la méta a
+--     déjà reçu : Meta.bank) ; exp.act = rang de la zone dans l'expédition, exp.acts = nombre de zones.
+X.VERSION = 8
+
+-- Entre deux zones : soin de cette part des PV max (sans dépasser le maximum ; crochet healOut des soins hors
+-- combat : Cursed Eye of Paleth le divise par deux). Lecture du concepteur de « soin partiel, 50 % des PV max ».
+X.ZONE_HEAL = 0.5
 
 -- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck, règle en
 -- jeu dès le début de chaque combat (Combat.new : c.epic) ; en prendre une autre remplace la précédente.
@@ -86,9 +93,10 @@ X.SHOP = { cards = 5, neutral = 1, relics = 3, potions = 3 }
 X.EVENT_WEIGHT = { common = 10, rare = 3, story = 8 }
 
 X.PHASES = { start = true, map = true, combat = true, reward = true, campfire = true,
-  merchant = true, event = true, select = true, done = true }
+  merchant = true, event = true, select = true, transit = true, done = true }
 
--- Rang de la zone de l'expédition dans la campagne (1 = Westfall ; 1 si la zone est inconnue).
+-- Rang de la zone EN COURS de l'expédition dans la campagne (1 = Westfall ; 1 si la zone est inconnue) : il
+-- règle la chute d'épique et la part de rares (X.EPIC.drop, X.RARE_BY_ZONE).
 function X.zoneRank(exp)
   return ns.Zone.order(exp.zone) or 1
 end
@@ -480,8 +488,8 @@ local function upgrade(exp, i)
   exp.stats.upgraded = exp.stats.upgraded + 1
 end
 
--- Soin hors combat (repos, rencontres) : crochet healOut (v) des zones, bibelots, affixes (Cursed Eye of
--- Paleth : divisé par deux).
+-- Soin hors combat (repos, rencontres, passage d'une zone à l'autre) : crochet healOut (v) des zones,
+-- bibelots, affixes (Cursed Eye of Paleth : divisé par deux).
 local function heal(exp, n)
   n = floor(X.modify(exp, "healOut", n))
   local before = exp.hp
@@ -575,16 +583,47 @@ local function placeNodeKinds(exp)
 end
 X.placeNodeKinds = placeNodeKinds
 
+-- Carte de la zone en cours (exp.zone), act = rang de la zone dans l'expédition. Graine : la première zone tire
+-- dans le flux « map » de l'état (cartes de Westfall inchangées) ; les suivantes dans un flux dérivé de la graine
+-- de l'expédition et de la zone (« map:<zone> ») : la carte d'une zone ne dépend pas de ce qui s'est passé avant.
 local function startAct(exp, act)
   exp.act = act
-  exp.map = Map.generate(exp.rng.map, act)
+  local rng = act <= 1 and exp.rng.map or Rng.stream(exp.seed, "map:" .. tostring(exp.zone))
+  exp.map = Map.generate(rng, act)
   placeNodeKinds(exp)
   exp.node = nil
   exp.path = {} -- nœuds visités dans l'acte, dans l'ordre (chemin parcouru, pour l'affichage)
   exp.floor = 0
   exp.combatsInAct = 0
+  exp.lastEnc = {}
+  exp.skip = nil
   exp.phase = "map"
 end
+
+-- Zone qui suit la zone en cours dans cette expédition (nil : la zone en cours est la dernière, ou la suivante
+-- n'est pas jouable).
+function X.nextZone(exp)
+  if exp.zone == (exp.lastZone or ns.Zone.ORDER[#ns.Zone.ORDER]) then return nil end
+  local nx = ns.Zone.next(exp.zone)
+  if nx and ns.Zone.playable(nx) then return nx end
+  return nil
+end
+
+-- Boss de la zone battu, récompense prise : passage à la zone suivante. Même deck, bibelots, or, potions,
+-- épique, PV max ; soin de X.ZONE_HEAL des PV max (crochet healOut) ; nouvelle carte ; la règle de zone, les
+-- ennemis, rencontres, décors et marchand deviennent ceux de la nouvelle zone (tout lit exp.zone). Phase
+-- « transit » : l'écran annonce la zone et le soin, { "continue" } mène à la carte.
+local function enterZone(exp, zone)
+  local from = exp.zone
+  exp.zone = zone
+  startAct(exp, (exp.act or 1) + 1)
+  local healed = heal(exp, floor(exp.maxHp * X.ZONE_HEAL))
+  exp.transit = { from = from, to = zone, healed = healed }
+  exp.phase = "transit"
+end
+-- Passage à la zone `zone` (phase « transit ») : appelé à la sortie du boss ; les tests et le harnais
+-- d'interface s'en servent pour amener une expédition dans une zone plus loin.
+X.enterZone = enterZone
 
 local function clearNode(exp)
   if not exp.nodeCleared then
@@ -598,8 +637,9 @@ local function leaveNode(exp)
   exp.reward, exp.shop, exp.event, exp.select = nil, nil, nil, nil
   local node = exp.map.nodes[exp.node]
   if node.kind == "boss" then
-    if exp.act < exp.acts then
-      startAct(exp, exp.act + 1)
+    local nx = X.nextZone(exp)
+    if nx then
+      enterZone(exp, nx)
     else
       finish(exp, "won")
     end
@@ -703,7 +743,13 @@ local function endFight(exp)
   if c.result == "won" then
     clearNode(exp)
     if f.kind == "elite" then exp.stats.elites = exp.stats.elites + 1 end
-    if f.kind == "boss" then exp.stats.bosses = exp.stats.bosses + 1 end
+    if f.kind == "boss" then
+      exp.stats.bosses = exp.stats.bosses + 1
+      -- boss de la zone battu : compté tout de suite (Meta.bank : épique, commun, expérience, drapeaux),
+      -- même si l'expédition échoue plus loin
+      exp.beaten = exp.beaten or {}
+      exp.beaten[#exp.beaten + 1] = exp.zone
+    end
     X.fire(exp, "onCombatWon", f.kind, f)
     X.rollEpicDrop(exp, f.reward, f.kind)
     openReward(exp, f.reward)
@@ -1314,7 +1360,10 @@ end
 -- Création
 ---------------------------------------------------------------------------
 
--- opts : seed, class ("priest"), zone (id de ns.Zones, défaut : la première), key (0..5),
+-- Une expédition commence à Westfall et traverse les zones dans l'ordre de la campagne jusqu'à la dernière
+-- (décision du joueur, 14/11/2026). zone et lastZone ne servent qu'aux tests et à la simulation (isoler une zone).
+-- opts : seed, class ("priest"), zone (zone de départ, défaut : la première), lastZone (zone dont le boss
+--        termine l'expédition, défaut : la dernière de la campagne), key (0..5),
 --        unlocks = { level = 1..7 (niveau de classe), common = 0..7 (palier commun du compte),
 --                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
@@ -1330,11 +1379,18 @@ function X.new(opts)
   local key = opts.key or 0
   local zone = opts.zone or ns.Zone.FIRST
   if not ns.Zones[zone] then error("unknown zone: " .. tostring(zone)) end
+  -- zone hors de la campagne (zone factice des tests) : elle seule
+  local zo = ns.Zone.order(zone)
+  local lastZone = opts.lastZone or (zo and ns.Zone.ORDER[#ns.Zone.ORDER] or zone)
+  local lo = ns.Zone.order(lastZone)
+  if not ns.Zones[lastZone] or (zo and lo and lo < zo) then error("bad last zone: " .. tostring(lastZone)) end
   local exp = {
     version = X.VERSION, seed = seed, class = class, zone = zone, key = key,
+    startZone = zone, lastZone = lastZone, beaten = {},
     affixes = ns.Meta.affixesFor(key),
     unlock = { level = unlock.level or 1, common = unlock.common or 0, won = U.copyMap(unlock.won or {}) },
-    acts = 1, act = 0, floor = 0, -- une zone = un acte
+    -- act : rang de la zone en cours dans l'expédition (1 = la zone de départ) ; acts : zones à traverser
+    acts = (zo and lo) and (lo - zo + 1) or 1, act = 0, floor = 0,
     hp = cdef.hp, maxHp = cdef.hp, gold = X.START_GOLD,
     deck = {}, relics = {}, potions = {},
     removals = 0, combatsInAct = 0, lastEnc = {}, seenEvents = {}, relicState = {},
@@ -1632,6 +1688,15 @@ H.select = {
   end,
 }
 
+-- Entre deux zones (exp.transit : zone quittée, zone suivante, PV rendus) : la carte de la zone suivante.
+H.transit = {
+  continue = function(exp)
+    exp.transit = nil
+    exp.phase = "map"
+    return true
+  end,
+}
+
 -- Actions possibles dans toutes les phases (sauf « done » ; jeter une potion : hors combat).
 local COMMON = {
   discardPotion = function(exp, a)
@@ -1749,6 +1814,8 @@ function X.choices(exp)
           and not (kind == "dupe" and Card.isEpic(ns.Cards[exp.deck[i].id])) then add({ "select", i }) end
     end
     add({ "skipSelect" })
+  elseif ph == "transit" then
+    add({ "continue" })
   end
   if ph ~= "done" and ph ~= "combat" then
     for s = 1, #exp.potions do
@@ -1771,12 +1838,24 @@ function X.actName(exp)
   return z and z.name or ""
 end
 
--- Résumé archivable d'une expédition (journal).
+-- Position de la zone en cours dans la campagne : rang, nombre de zones (« Duskwood · 2/7 »).
+function X.campaignPos(exp)
+  return ns.Zone.order(exp.zone) or 1, ns.Zone.count()
+end
+
+-- Nom de la zone en cours et sa place dans la campagne : « Duskwood · 2/7 » (bandeau, carte).
+function X.campaignName(exp)
+  local n, total = X.campaignPos(exp)
+  return X.actName(exp) .. " · " .. n .. "/" .. total
+end
+
+-- Résumé archivable d'une expédition (journal) : zone atteinte (zone), boss battus (beaten, ids de zone).
 function X.summary(exp)
   local s = exp.stats
   return {
     result = exp.result, class = exp.class, zone = exp.zone, key = exp.key, seed = exp.seed,
     act = exp.act, floor = exp.floor, cleared = s.cleared, elites = s.elites, bosses = s.bosses,
+    beaten = U.copyArr(exp.beaten or {}),
     hp = exp.hp, maxHp = exp.maxHp, gold = exp.gold, goldEarned = s.goldEarned,
     deck = U.copy(exp.deck), relics = U.copyArr(exp.relics), killedBy = exp.killedBy,
   }

@@ -28,9 +28,9 @@ local function body(T)
   meta.flags["dragonslayer:priest"] = true
   H.slash("")
   clickOption("class:priest")
-  local o = T.option("zone:blackrock")
-  check("accueil : Blackrock Mountain ouverte pour le Prêtre (six zones gagnées)", o and not o.disabled, o and o.reason)
-  clickOption("zone:blackrock")
+  local o, so = T.option("zone:blackrock"), T.option("zone:steppes")
+  check("accueil : campagne du Prêtre, six boss battus, Blackrock Mountain pas encore atteinte",
+    o and o.status == "ahead" and so and so.status == "won" and so.farthest, o and o.status)
   local st = UI().current
   check("accueil : titre sous l'icône de la classe, « Priest — Dragonslayer »",
     st.className and st.className._text == "Priest — Dragonslayer", st.className and st.className._text)
@@ -66,14 +66,12 @@ local function body(T)
   meta.flags["dragonslayer:priest"] = true
   clickOption("ui:progress")
   clickOption("ui:back")
-  clickOption("zone:blackrock")
 
-  -- Expédition à Blackrock ; combat de la route sur le Molten Span
+  -- Expédition amenée à Blackrock (T.toZone : bibelot au choix du départ passé) ; combat de la route sur le
+  -- Molten Span
   ns.Controller.makeSeed = function() return T.SEED end
   clickOption("go")
-  -- départ : bibelot au choix (zone 3 gagnée par le compte) passé
-  if T.option("skipStartRelic") then clickOption("skipStartRelic") end
-  local exp = EXP()
+  local exp = T.toZone("blackrock")
   check("expédition à Blackrock Mountain", exp and exp.zone == "blackrock", exp and exp.zone)
   -- Parcours : icône du boss de la zone (Art.ui.mapBoss), plus celle de VanCleef
   local bossNode

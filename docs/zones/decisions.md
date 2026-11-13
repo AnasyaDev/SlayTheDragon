@@ -104,3 +104,6 @@ Remplace « une expédition se joue dans une zone » et le choix de la zone à l
   pour un deck qui a déjà traversé les zones précédentes.
 - **Bot de référence** : `human`, calé sur les résultats réels du joueur ; le bot `heuristic` (joueur parfait)
   ne sert plus qu'à comparer les classes.
+- **Appliqué le 14/11/2026** : `docs/expedition.md`, « Campagne continue » (règles, décisions de détail,
+  migration v6 / expédition v8) et « Mesures de la campagne continue » (tableau par zone, bots `human` et
+  `heuristic`) ; écrans : `docs/interface.md`, « Campagne continue ». Aucun nombre d'équilibrage changé.

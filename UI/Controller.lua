@@ -9,14 +9,15 @@
 -- État propre à l'interface (jamais sauvegardé) :
 --   C.ended  = { c, result, title } : combat tranché, bandeau de fin affiché sur l'écran de combat
 --   C.ending = { summary, entry }   : expédition archivée (Save.finish), bilan affiché
---   C.ui     = { view, class, zone, key, progressClass, progressTab } : sous-écran (amélioration, retrait,
+--   C.ui     = { view, class, key, progressClass, progressTab } : sous-écran (amélioration, retrait,
 --              progression, journal), choix de départ, classe et onglet (cartes, zones) de l'écran de progression
 --
 -- Identifiants d'options : « verbe » ou « verbe:argument », où verbe est une action de
--- Expedition.act (path:12, pickCard:2, buyRelic:1, remove:5, choose:1, leave…), ou une
+-- Expedition.act (path:12, pickCard:2, buyRelic:1, remove:5, choose:1, leave, continue…), ou une
 -- navigation de l'interface (ui:upgrade, ui:remove, ui:progress, ui:meta, ui:back, ui:new), un choix de
--- départ (class:priest, zone:westfall, key:2, go), une classe ou un onglet de l'écran de progression
--- (pclass:warrior, ptab:zones, ptab:cards).
+-- départ (class:priest, key:2, go), une classe ou un onglet de l'écran de progression
+-- (pclass:warrior, ptab:zones, ptab:cards). Accueil : les zones de la campagne (zone:<id>) sont affichées, pas
+-- choisies (toute expédition part de Westfall).
 local _, ns = ...
 
 local U, Combat, Card, X, Save, Meta, Map = ns.Util, ns.Combat, ns.Card, ns.Expedition, ns.Save, ns.Meta, ns.Map
@@ -236,10 +237,10 @@ function C.restore()
   return C.exp() ~= nil
 end
 
--- Démarre une expédition (Save.start : zone et clé vérifiées par Meta ; zone absente = la première).
-function C.start(class, key, seed, zone)
+-- Démarre une expédition à Westfall (Save.start : clé vérifiée par Meta).
+function C.start(class, key, seed)
   local db = ns.Persist.db
-  local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, zone = zone, key = key })
+  local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, key = key })
   if not exp then return false, why end
   C.ending, C.ended, C.ui.view = nil, nil, nil
   notify("step")
@@ -274,6 +275,8 @@ function C.act(a)
   local kindBefore = exp.fight and exp.fight.kind
   local ok, why = X.act(exp, a)
   if not ok then return false, why end
+  -- boss battu, zone atteinte : reportés tout de suite dans la méta (épique, commun, expérience, drapeaux)
+  Save.settle(ns.Persist.db)
   local evs = {}
   if c then
     evs = c.events or {}
@@ -358,11 +361,6 @@ function C.choose(id)
   if not exp then
     if verb == "class" and ns.Classes[arg] then
       C.ui.class, C.ui.key = arg, nil
-    elseif verb == "zone" and ns.Zones[arg] then
-      -- zone verrouillée ou à venir : refusée (l'écran affiche la raison) ; sinon clé par défaut de la zone
-      local st = C.startInfo()
-      if not C.zoneReady(st.class, arg) then return false, ns.Zone.playable(arg) and "zone locked" or "zone coming later" end
-      C.ui.zone, C.ui.key = arg, nil
     elseif verb == "pclass" and ns.Classes[arg] then
       C.ui.progressClass = arg
     elseif verb == "ptab" and (arg == "zones" or arg == "cards") then
@@ -371,7 +369,7 @@ function C.choose(id)
       C.ui.key = arg
     elseif verb == "go" then
       local st = C.startInfo()
-      return C.start(st.class, st.key, nil, st.zone)
+      return C.start(st.class, st.key)
     else
       return false, "action"
     end
@@ -546,9 +544,10 @@ function C.runInfo()
   local c = exp.combat or (C.ended and C.ended.c)
   local hp, maxHp = exp.hp, exp.maxHp
   if exp.combat then hp, maxHp = max(0, c.player.hp), c.player.maxHp end
+  -- act : zone en cours et sa place dans la campagne (« Duskwood · 2/7 »)
   return { hp = hp, maxHp = maxHp, gold = exp.gold, deck = X.shownDeck(exp), floor = exp.floor,
     floors = exp.map and exp.map.floors, relics = exp.relics, key = exp.key or 0,
-    affixes = exp.affixes or {}, act = X.actName(exp) }
+    affixes = exp.affixes or {}, act = X.campaignName(exp) }
 end
 
 -- Copie de l'expédition (comparaisons du harnais).
@@ -642,60 +641,63 @@ end
 
 local RESULT = { won = "victory", lost = "defeat", abandoned = "abandoned", abandon = "abandoned" }
 
+-- « Duskwood (2/7) » : zone et sa place dans la campagne.
+local function zonePos(zid)
+  return ns.Zone.name(zid) .. " (" .. (ns.Zone.order(zid) or "?") .. "/" .. ns.Zone.count() .. ")"
+end
+
+-- Ligne du journal : date, classe et clé, résultat, zone atteinte (et étape), boss battus, expérience.
+-- Les entrées d'avant la campagne continue (sans beaten) gardent leur zone seule.
 local function journalLine(e)
   local parts = {}
   if e.date then parts[#parts + 1] = tostring(e.date) end
   local cls = e.class and ns.Classes[e.class]
-  local where = e.zone and ns.Zones[e.zone] and (" · " .. ns.Zones[e.zone].name) or ""
-  parts[#parts + 1] = (cls and cls.name or "?") .. where .. (e.key and (" +" .. e.key) or "")
+  parts[#parts + 1] = (cls and cls.name or "?") .. (e.key and (" +" .. e.key) or "")
   parts[#parts + 1] = RESULT[e.result] or tostring(e.result)
-  if e.floor then parts[#parts + 1] = "stage " .. e.floor end
+  local where = e.zone and ns.Zones[e.zone] and (e.beaten and zonePos(e.zone) or ns.Zones[e.zone].name)
+  local stage = (e.floor or 0) > 0 and ("stage " .. e.floor) or nil
+  if where then parts[#parts + 1] = where .. (stage and (" " .. stage) or "")
+  elseif stage then parts[#parts + 1] = stage end
+  if e.beaten then parts[#parts + 1] = #e.beaten .. (#e.beaten == 1 and " boss" or " bosses") end
   if e.xp then parts[#parts + 1] = "+" .. e.xp .. " experience" end
   return table.concat(parts, " · "), e.result == "won"
 end
 
--- Zone jouable par cette classe maintenant : ouverte pour elle et avec ses données.
-function C.zoneReady(class, zone)
-  return ns.Zone.playable(zone) and Meta.zoneOpen(ns.Persist.db.meta, class, zone)
-end
-
--- Classe, zone et clé choisies sur l'écran d'accueil. Zone par défaut : la dernière choisie si elle est
--- jouable par la classe, sinon la plus avancée qui l'est ; clé par défaut : la plus haute ouverte dans
--- cette zone pour cette classe.
+-- Classe et clé choisies sur l'écran d'accueil (toute expédition part de Westfall). Clé par défaut : la plus
+-- haute ouverte pour cette classe.
 function C.startInfo()
   local db = ns.Persist.db
   local classes = sortedClasses()
   local class = (C.ui.class and ns.Classes[C.ui.class]) and C.ui.class or classes[1]
-  local zone = C.ui.zone
-  if not (zone and C.zoneReady(class, zone)) then
-    zone = ns.Zone.FIRST
-    for _, id in ipairs(ns.Zone.ORDER) do
-      if C.zoneReady(class, id) then zone = id end
-    end
-  end
-  local keyMax = Meta.keyMax(db.meta, class, zone)
+  local keyMax = Meta.keyMax(db.meta, class)
   local k = C.ui.key
   if not k or k > keyMax or k < 0 then k = keyMax end
-  return { class = class, zone = zone, key = k, keyMax = keyMax, classes = classes }
+  return { class = class, zone = ns.Zone.FIRST, key = k, keyMax = keyMax, classes = classes }
 end
 
--- État d'une zone pour une classe, prêt à afficher : { status = "won" | "open" | "locked" | "later",
--- label (« Won », « Open », « Locked », « Coming later »), reason (texte d'un refus) }.
-local ZONE_STATUS = { won = "Won", open = "Open", locked = "Locked", later = "Coming later" }
+-- État d'une zone de la campagne pour une classe, prêt à afficher : { status = "won" (boss battu par la classe) |
+-- "reached" (atteinte) | "ahead" (pas encore atteinte) | "later" (pas de données), label, text (infobulle) }.
+local ZONE_STATUS = { won = "Beaten", reached = "Reached", ahead = "Not reached", later = "Coming later" }
 function C.zoneStatus(class, zone)
   local m = ns.Persist.db.meta
   local st
   if not ns.Zone.playable(zone) then st = "later"
-  elseif not Meta.zoneOpen(m, class, zone) then st = "locked"
   elseif Meta.classWon(m, class, zone) then st = "won"
-  else st = "open" end
-  local reason
-  if st == "later" then
-    reason = "Coming later."
-  elseif st == "locked" then
-    reason = "Win " .. ns.Zone.name(ns.Zone.prev(zone)) .. " with the " .. className(class) .. " to open it."
+  elseif Meta.zoneReached(m, class, zone) then st = "reached"
+  else st = "ahead" end
+  local cname = className(class)
+  local text
+  if st == "won" then
+    local best = Meta.bestKey(m, class, zone)
+    text = "Boss defeated by the " .. cname .. (best > 0 and (", best key +" .. best) or "") .. "."
+  elseif st == "reached" then
+    text = "Reached by the " .. cname .. ", boss not yet defeated."
+  elseif st == "ahead" then
+    text = "Not yet reached by the " .. cname .. "."
+  else
+    text = "Coming later."
   end
-  return { status = st, label = ZONE_STATUS[st], reason = reason }
+  return { status = st, label = ZONE_STATUS[st], text = text }
 end
 
 local function startStep()
@@ -718,34 +720,31 @@ local function startStep()
       text = (cd.hp or "?") .. " HP, " .. #(cd.deck or {}) .. " cards", level = Meta.levelOf(db.meta, cid),
       selected = cid == st.class }
   end
-  -- zones de la campagne, dans l'ordre : verrouillées (zone précédente pas gagnée par la classe) ou à
-  -- venir (pas encore de données), grisées avec leur raison
+  -- la campagne, dans l'ordre (affichée, pas choisie : toute expédition part de Westfall et traverse les sept
+  -- zones) : boss battu par la classe, zone atteinte, pas encore atteinte ; la plus loin atteinte est marquée
+  local far = Meta.farthest(db.meta, st.class)
   for _, zid in ipairs(ns.Zone.ORDER) do
     local zs = C.zoneStatus(st.class, zid)
-    local o = { id = "zone:" .. zid, group = "zone", label = ns.Zone.name(zid), status = zs.status,
-      statusLabel = zs.label, selected = zid == st.zone }
-    if zs.status == "won" then
-      local best = Meta.bestKey(db.meta, st.class, zid)
-      o.text = "Won with the " .. className(st.class) .. (best > 0 and (", best key +" .. best) or "") .. "."
-    elseif zs.status == "open" then
-      o.text = "Open to the " .. className(st.class) .. "."
-    end
-    if zs.reason then o.disabled, o.reason = true, zs.reason end
-    opts[#opts + 1] = o
+    opts[#opts + 1] = { id = "zone:" .. zid, group = "zone", info = true, label = ns.Zone.name(zid),
+      status = zs.status, statusLabel = zs.label, text = zs.text, farthest = ns.Zone.order(zid) == far or nil }
   end
-  local zname = ns.Zone.name(st.zone)
+  local lastName = ns.Zone.name(ns.Zone.ORDER[#ns.Zone.ORDER])
+  local boss = "Nefarian" -- boss de la dernière zone (phase 2 de Lord Victor Nefarius)
   for k = 0, Meta.MAX_KEY do
     local o = { id = "key:" .. k, group = "key", label = "+" .. k, selected = k == st.key,
       text = affixLine(Meta.affixesFor(k), k) or "No affix." }
     if k > st.keyMax then
       o.disabled = true
-      o.reason = "A victory at +" .. st.keyMax .. " in " .. zname .. " unlocks key +" .. (st.keyMax + 1) .. "."
+      o.reason = "Defeat " .. boss .. " at +" .. st.keyMax .. " to unlock key +" .. (st.keyMax + 1) .. "."
     end
     opts[#opts + 1] = o
   end
-  opts[#opts + 1] = { id = "go", label = "Start expedition", text = zname }
+  opts[#opts + 1] = { id = "go", label = "Start expedition", text = ns.Zone.name(st.zone) }
   opts[#opts + 1] = { id = "ui:progress", label = "Progress" }
-  return { kind = "start", title = "Slay the Dragon", text = text, options = opts,
+  local beaten = Meta.beatenCount(db.meta, st.class)
+  local campaign = far > 0 and ("Farthest: " .. zonePos(ns.Zone.ORDER[far]) .. " · bosses defeated: " .. beaten
+    .. " of " .. ns.Zone.count()) or ("From " .. ns.Zone.name(ns.Zone.FIRST) .. " to " .. lastName .. ".")
+  return { kind = "start", title = "Slay the Dragon", text = text, options = opts, campaign = campaign,
     class = st.class, zone = st.zone, key = st.key, keyMax = st.keyMax, affixes = Meta.affixesFor(st.key) }
 end
 
@@ -761,7 +760,7 @@ end
 C.progressClass = progressClass
 
 -- Zones d'une classe pour l'écran de progression, dans l'ordre : { id, name, status, statusLabel, won,
--- keyMax, bestKey, card = emplacement de la carte de zone, keys = { emplacements des bibelots de clé
+-- bestKey (meilleure clé où la classe a battu le boss de la zone), card = emplacement de la carte de zone, keys = { emplacements des bibelots de clé
 -- (+1, +3, +5) } }. Emplacement : { id (si débloqué), unlocked, condition (verrouillé), level (clé) } ;
 -- sans donnée encore écrite, l'emplacement est montré verrouillé avec sa condition.
 local function zoneRows(cid)
@@ -788,7 +787,7 @@ local function zoneRows(cid)
         condition = not open and ("Win " .. zname .. " +" .. lv .. " to unlock") or nil }
     end
     rows[#rows + 1] = { id = zid, name = zname, status = zs.status, statusLabel = zs.label, won = won,
-      keyMax = Meta.keyMax(m, cid, zid), bestKey = best, card = card, keys = keys }
+      bestKey = best, card = card, keys = keys }
   end
   return rows
 end
@@ -845,9 +844,10 @@ local function metaStep()
   for _, cid in ipairs({ progressClass() }) do
     local cs = m.classes[cid]
     local b = levelBar(cid)
-    local won = 0
-    for _, zid in ipairs(ns.Zone.ORDER) do if Meta.classWon(m, cid, zid) then won = won + 1 end end
-    b.detail = "Zones won: " .. won .. " of " .. ns.Zone.count()
+    local won = Meta.beatenCount(m, cid)
+    local far = Meta.farthest(m, cid)
+    b.detail = "Bosses defeated: " .. won .. " of " .. ns.Zone.count()
+      .. (far > 0 and (" · farthest: " .. ns.Zone.name(ns.Zone.ORDER[far])) or "")
       .. ((cs and cs.runs) and (" · " .. cs.runs .. " expedition(s), " .. (cs.wins or 0) .. " victory(ies)") or "")
     -- même titre que l'accueil et l'écran Progress (« Dragonslayer » : Nefarian ; « Veteran » : niveau 7)
     local BR = ns.Blackrock
@@ -866,10 +866,12 @@ local function metaStep()
     bars = bars, journal = lines, options = { { id = "ui:progress", label = "Back" } } }
 end
 
--- Ce que vient de débloquer la première victoire du compte dans une zone (commun, pour toutes les classes).
+-- Ce que vient de débloquer le premier boss battu par le compte dans une ou plusieurs zones (commun, pour toutes
+-- les classes) : zname = nom(s) des zones, n = nombre de zones.
 local PERK_TEXT = { startRelic = "Choose a relic at the start of each expedition.",
   merchantRelic = "One more relic at the merchant." }
-local function commonLine(zname, c)
+local function commonLine(zname, c, n)
+  local boss = (n or 1) > 1 and " bosses" or " boss"
   local parts = {}
   local function add(n, one, many)
     if n > 0 then parts[#parts + 1] = n .. " " .. (n == 1 and one or many) end
@@ -880,9 +882,9 @@ local function commonLine(zname, c)
   add(#c.events, "encounter", "encounters")
   local lines = {}
   if #parts > 0 then
-    lines[1] = "First " .. zname .. " victory on this account: " .. table.concat(parts, ", ") .. " unlocked for every class."
+    lines[1] = "First " .. zname .. boss .. " on this account: " .. table.concat(parts, ", ") .. " unlocked for every class."
   else
-    lines[1] = "First " .. zname .. " victory on this account."
+    lines[1] = "First " .. zname .. boss .. " on this account."
   end
   for _, k in ipairs(c.perks or {}) do lines[#lines + 1] = "Every class: " .. PERK_TEXT[k] end
   return lines
@@ -893,22 +895,37 @@ local function endStep()
   local won = e.result == "won"
   local title = won and "Expedition complete!" or e.result == "lost" and "Expedition over"
     or "Expedition abandoned"
+  -- zone atteinte (où l'expédition s'est arrêtée) et boss battus en chemin
   local zid = s.zone or e.zone or ns.Zone.FIRST
   local zname = ns.Zone.name(zid)
   local cname = className(e.class)
+  local beaten = s.beaten or e.beaten or {}
   local lines = {}
   if won then
-    lines[#lines + 1] = "The boss of " .. zname .. " has fallen. Expedition ended with " .. e.hp .. " HP and "
-      .. #e.deck .. " cards."
+    lines[#lines + 1] = "Nefarian has fallen: the " .. ns.Zone.count() .. " zones are crossed. Expedition ended with "
+      .. e.hp .. " HP and " .. #e.deck .. " cards."
   elseif e.result == "lost" then
     local names = {}
     for id in tostring(e.killedBy or ""):gmatch("[^+]+") do
       names[#names + 1] = ns.Enemies[id] and ns.Enemies[id].name or id
     end
-    lines[#lines + 1] = "Fell at stage " .. (e.floor or "?") .. " of " .. zname
+    lines[#lines + 1] = "Fell in " .. zonePos(zid) .. " at stage " .. (e.floor or "?")
       .. (#names > 0 and (" against " .. table.concat(names, ", ")) or "") .. "."
+  elseif (e.floor or 0) == 0 then
+    -- abandon avant la première étape d'une zone (écran entre deux zones, carte)
+    lines[#lines + 1] = "Turned back at the gates of " .. zonePos(zid) .. "."
   else
-    lines[#lines + 1] = "Turned back at stage " .. (e.floor or "?") .. " of " .. zname .. "."
+    lines[#lines + 1] = "Turned back in " .. zonePos(zid) .. " at stage " .. e.floor .. "."
+  end
+  if not won then
+    if #beaten > 0 then
+      local names = {}
+      for i, z in ipairs(beaten) do names[i] = ns.Zone.name(z) end
+      lines[#lines + 1] = "Zones beaten: " .. table.concat(names, ", ") .. " (" .. #beaten .. " of "
+        .. ns.Zone.count() .. ")."
+    else
+      lines[#lines + 1] = "No zone beaten."
+    end
   end
   lines[#lines + 1] = (e.cleared or 0) .. " stage(s) cleared, " .. (e.elites or 0) .. " elite(s), "
     .. (e.bosses or 0) .. " boss(es)."
@@ -917,28 +934,43 @@ local function endStep()
   if up then
     lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. s.levelAfter .. "!|r"
   end
-  -- déblocages de la campagne : zone suivante, carte de zone, bibelots de clé, clé suivante, commun
-  if s.zoneWon then
-    if s.zoneOpened then
-      lines[#lines + 1] = "|cff40ff40" .. zname .. " won with the " .. cname .. ": " .. ns.Zone.name(s.zoneOpened)
-        .. " is open to the " .. cname .. (ns.Zone.playable(s.zoneOpened) and "" or " (coming later)") .. ".|r"
-    else
-      lines[#lines + 1] = "|cff40ff40" .. zname .. " won with the " .. cname .. ".|r"
+  -- déblocages de la campagne, acquis à chaque boss battu : premiers boss de la classe (épiques), bibelots de
+  -- clé, commun du compte ; regroupés (une expédition peut en battre sept d'un coup) ; clé suivante (Nefarian)
+  local firsts, epics, others, relics, account = {}, {}, {}, {}, {}
+  local common = { cards = {}, relics = {}, potions = {}, events = {}, perks = {} }
+  for _, p in ipairs(s.zones or {}) do
+    if p.zoneWon then firsts[#firsts + 1] = ns.Zone.name(p.zone) end
+    for _, id in ipairs(p.zoneCards or {}) do
+      if ns.Cards[id] and ns.Cards[id].rarity == "epic" then epics[#epics + 1] = cardName(id)
+      else others[#others + 1] = cardName(id) end
+    end
+    for _, id in ipairs(p.keyRelics or {}) do relics[#relics + 1] = relicName(id) end
+    if p.accountZone and p.common then
+      account[#account + 1] = ns.Zone.name(p.zone)
+      for k, list in pairs(common) do
+        for _, v in ipairs(p.common[k] or {}) do list[#list + 1] = v end
+      end
     end
   end
-  for _, id in ipairs(s.zoneCards or {}) do
-    local epic = ns.Cards[id] and ns.Cards[id].rarity == "epic"
-    lines[#lines + 1] = (epic and "|cffc070ffNew epic card: " or ("|cff40ff40New " .. cname .. " card: "))
-      .. cardName(id) .. ".|r"
+  local function plural(n, one, many) return n == 1 and one or many end
+  if #firsts > 0 then
+    lines[#lines + 1] = "|cff40ff40First " .. plural(#firsts, "boss", "bosses") .. " defeated with the " .. cname .. ": "
+      .. table.concat(firsts, ", ") .. ".|r"
   end
-  for _, id in ipairs(s.keyRelics or {}) do
-    lines[#lines + 1] = "|cff40ff40New relic: " .. relicName(id) .. ".|r"
+  if #epics > 0 then
+    lines[#lines + 1] = "|cffc070ff" .. plural(#epics, "New epic card: ", "New epic cards: ") .. table.concat(epics, ", ") .. ".|r"
+  end
+  if #others > 0 then
+    lines[#lines + 1] = "|cff40ff40New " .. cname .. " " .. plural(#others, "card", "cards") .. ": " .. table.concat(others, ", ") .. ".|r"
+  end
+  if #relics > 0 then
+    lines[#lines + 1] = "|cff40ff40" .. plural(#relics, "New relic: ", "New relics: ") .. table.concat(relics, ", ") .. ".|r"
+  end
+  if #account > 0 then
+    for _, l in ipairs(commonLine(table.concat(account, ", "), common, #account)) do lines[#lines + 1] = "|cff40c0ff" .. l .. "|r" end
   end
   if s.keyUnlocked then
-    lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked in " .. zname .. ".|r"
-  end
-  if s.accountZone and s.common then
-    for _, l in ipairs(commonLine(zname, s.common)) do lines[#lines + 1] = "|cff40c0ff" .. l .. "|r" end
+    lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked.|r"
   end
   -- fin de campagne (Blackrock, docs/zones/blackrock.md § 10) : titre de la classe, Rallying Cry du compte,
   -- d'après les drapeaux de compte posés par cette expédition (summary.flags)
@@ -1013,7 +1045,7 @@ local function mapStep(exp)
     for _, g in ipairs(groups) do if g[1] ~= first then same = false end end
     if same and ns.Enemies[first] then bossName = ns.Enemies[first].name end
   end
-  return { kind = "map", title = X.actName(exp) .. " · stage " .. min(exp.floor + 1, floors) .. " of " .. floors,
+  return { kind = "map", title = X.campaignName(exp) .. " · stage " .. min(exp.floor + 1, floors) .. " of " .. floors,
     text = text, nodes = nodes, options = opts, affixes = exp.affixes, key = exp.key, bossName = bossName, zone = exp.zone,
     floor = exp.floor, floors = floors }
 end
@@ -1254,6 +1286,39 @@ local function startRelicStep(exp)
     options = opts }
 end
 
+-- Entre deux zones (phase « transit ») : la zone suivante (nom, décor, place dans la campagne), le soin du
+-- passage, ce que le boss vaincu vient de débloquer pour les expéditions suivantes ; « Continue » ou l'abandon.
+local function transitStep(exp)
+  local t = exp.transit or {}
+  local avail = available(exp)
+  local n, total = X.campaignPos(exp)
+  local cname = className(exp.class)
+  local lines = {}
+  lines[#lines + 1] = ns.Zone.name(t.from) .. " is behind you. Zone " .. n .. " of " .. total .. "."
+  lines[#lines + 1] = "|cff40ff40You recover " .. (t.healed or 0) .. " HP (" .. exp.hp .. "/" .. exp.maxHp .. ").|r"
+  -- déblocages reportés au boss (Meta.bank) : ils servent à la prochaine expédition
+  local part
+  for _, p in ipairs(exp.banked and exp.banked.zones or {}) do
+    if p.zone == t.from then part = p end
+  end
+  if part then
+    local unlocked = {}
+    if part.zoneWon then
+      for _, id in ipairs(Meta.zoneCards(exp.class, part.zone)) do
+        unlocked[#unlocked + 1] = "|cffc070ffepic card " .. cardName(id) .. "|r"
+      end
+    end
+    for _, id in ipairs(part.keyRelics or {}) do unlocked[#unlocked + 1] = "relic " .. relicName(id) end
+    if part.accountZone then unlocked[#unlocked + 1] = "new common content for every class" end
+    if #unlocked > 0 then
+      lines[#lines + 1] = "Unlocked for your next expeditions (" .. cname .. "): " .. table.concat(unlocked, ", ") .. "."
+    end
+  end
+  return { kind = "transit", title = X.actName(exp), text = table.concat(lines, "\n"), zone = exp.zone,
+    from = t.from, healed = t.healed, pos = n, count = total,
+    options = { actionOption(avail, { id = "continue", label = "Continue" }) } }
+end
+
 -- Étape courante.
 function C.step()
   if C.ended then
@@ -1281,6 +1346,7 @@ function C.step()
     return merchantStep(exp)
   elseif ph == "event" then return eventStep(exp)
   elseif ph == "select" then return selectStep(exp)
+  elseif ph == "transit" then return transitStep(exp)
   end
   -- « done » : déjà archivée par C.act ; filet de sécurité.
   C.finish()

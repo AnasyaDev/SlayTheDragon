@@ -988,8 +988,9 @@ function Combat.phaseMarks(e)
   if not def.phases or e.minion then return list end
   for k, ph in ipairs(def.phases) do
     local hp = Combat.phaseHp(e, ph)
+    -- frac : seuil nominal de la phase (0,5 = « Below 50% », même quand les PV max sont impairs)
     list[#list + 1] = { at = e.maxHp > 0 and hp / e.maxHp or 0, hp = hp, name = ph.name, text = ph.text,
-      passed = (e.mem.phase or 0) >= k }
+      frac = not ph.hp and ph.at or nil, passed = (e.mem.phase or 0) >= k }
   end
   return list
 end

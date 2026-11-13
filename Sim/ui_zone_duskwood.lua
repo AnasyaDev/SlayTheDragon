@@ -17,17 +17,16 @@ return function(T)
     return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
   end
 
-  -- Compte où le Prêtre a gagné Westfall : Duskwood ouverte, choisie, expédition lancée.
+  -- Compte où le Prêtre a battu le boss de Westfall ; expédition lancée à Westfall, amenée à Duskwood (T.toZone).
   local function duskwoodRun(seed)
     H.boot(nil)
     local ns = H.ns
     ns.Meta.zoneState(ns.Persist.db.meta, "priest", "westfall").won = true
     H.slash("")
     T.clickOption("class:priest")
-    T.clickOption("zone:duskwood")
     ns.Controller.makeSeed = function() return seed or T.SEED end
     T.clickOption("go")
-    local e = T.EXP()
+    local e = T.toZone("duskwood")
     return e, ns
   end
 
@@ -35,8 +34,8 @@ return function(T)
   do
     local e, ns = duskwoodRun()
     local Art, Sc, Z = ns.Art, ns.Scene, ns.Zones.duskwood
-    check("expédition à Duskwood (zone choisie à l'accueil, bandeau)", e and e.zone == "duskwood"
-      and T.UI().zone._text == "Duskwood", T.UI().zone and T.UI().zone._text)
+    check("expédition à Duskwood (après Westfall, bandeau « Duskwood · 2/7 »)", e and e.zone == "duskwood"
+      and T.UI().zone._text == "Duskwood · 2/7", T.UI().zone and T.UI().zone._text)
     local KEYS = { "road", "night", "graveyard", "camp", "shop", "woods", "boss" }
     local okScenes = true
     for _, k in ipairs(KEYS) do

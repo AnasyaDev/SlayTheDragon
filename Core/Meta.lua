@@ -1,9 +1,14 @@
--- Méta-progression du compte : niveau de classe (expérience), campagne par zones (zones gagnées par
--- classe et par le compte), clés mythiques par zone et par classe, affixes. Données simples :
--- meta = { runs = n, zones = { [zone] = true } (zones gagnées par le compte, toutes classes),
---          classes = { [classe] = { xp, runs, wins,
---                                   zones = { [zone] = { won, keyMax, bestKey } } } },
+-- Méta-progression du compte : niveau de classe (expérience), campagne (boss de zone battus par classe et par
+-- le compte, zone la plus loin atteinte par classe), clés mythiques par classe, affixes. Données simples :
+-- meta = { runs = n, zones = { [zone] = true } (boss de zone battus par le compte, toutes classes),
+--          classes = { [classe] = { xp, runs, wins (Nefarian battu), keyMax (clé la plus haute ouverte),
+--                                   bestKey (meilleure clé d'une victoire complète, -1 : aucune),
+--                                   farthest (rang de la zone la plus loin atteinte, 0 : aucune),
+--                                   zones = { [zone] = { won (boss battu), keyMax (plus lu depuis la v6),
+--                                                        bestKey (meilleure clé où ce boss est battu) } } } },
 --          flags = { [nom] = true } }
+-- Une expédition traverse toute la campagne (décision du joueur, 14/11/2026) : chaque boss battu compte tout de
+-- suite (Meta.bank), la fin d'expédition ajoute le reste (Meta.record).
 -- (cs.rep : ancienne réputation de classe des sauvegardes 1 à 3, gardée telle quelle, plus lue.)
 -- Contrat des zones : docs/zones.md ; détails : docs/expedition.md.
 local _, ns = ...
@@ -214,7 +219,7 @@ end
 function Meta.classState(meta, class)
   local cs = meta.classes[class]
   if not cs then
-    cs = { xp = 0, runs = 0, wins = 0, zones = {} }
+    cs = { xp = 0, runs = 0, wins = 0, keyMax = 0, bestKey = -1, farthest = 0, zones = {} }
     meta.classes[class] = cs
   end
   if type(cs.zones) ~= "table" then cs.zones = {} end
@@ -240,18 +245,34 @@ function Meta.zoneInfo(meta, class, zone)
   return type(zs) == "table" and zs or nil
 end
 
--- La classe a-t-elle gagné la zone ?
+-- La classe a-t-elle battu le boss de la zone ?
 function Meta.classWon(meta, class, zone)
   local zs = Meta.zoneInfo(meta, class, zone)
   return zs ~= nil and zs.won == true
 end
 
--- Zone ouverte pour une classe : la première toujours, les suivantes quand la classe a gagné la
--- précédente (gagner une zone avec une classe n'ouvre la suivante que pour elle).
-function Meta.zoneOpen(meta, class, zone)
-  if not ns.Zones[zone] then return false end
-  local prev = ns.Zone.prev(zone)
-  return prev == nil or Meta.classWon(meta, class, prev)
+-- Rang de la zone la plus loin atteinte par la classe (0 : aucune expédition) : une zone battue est atteinte.
+function Meta.farthest(meta, class)
+  local cs = meta.classes[class]
+  local n = cs and tonumber(cs.farthest) or 0
+  for zone, zs in pairs(cs and type(cs.zones) == "table" and cs.zones or {}) do
+    local o = type(zs) == "table" and zs.won and ns.Zone.order(zone)
+    if o and o > n then n = o end
+  end
+  return n
+end
+
+-- La classe a-t-elle déjà atteint la zone (au cours d'une expédition) ?
+function Meta.zoneReached(meta, class, zone)
+  local o = ns.Zone.order(zone)
+  return o ~= nil and o <= Meta.farthest(meta, class)
+end
+
+-- Nombre de boss de zone battus par la classe.
+function Meta.beatenCount(meta, class)
+  local n = 0
+  for _, zid in ipairs(ns.Zone.ORDER) do if Meta.classWon(meta, class, zid) then n = n + 1 end end
+  return n
 end
 
 -- Le compte a-t-il gagné la zone (avec n'importe quelle classe) ?
@@ -277,16 +298,22 @@ end
 Meta.PERKS = { startRelic = 3, merchantRelic = 6 }
 Meta.PERK_ORDER = { "startRelic", "merchantRelic" }
 
--- Clés ouvertes pour une classe dans une zone : 0..keyMax.
-function Meta.keyMax(meta, class, zone)
-  local zs = Meta.zoneInfo(meta, class, zone or ns.Zone.FIRST)
-  return zs and zs.keyMax or 0
+-- Clés ouvertes pour une classe : 0..keyMax. Une clé vaut pour toute l'expédition ; +N s'ouvre en battant le
+-- dernier boss de la campagne (Nefarian) à +N−1 (décision du concepteur, 14/11/2026).
+function Meta.keyMax(meta, class)
+  local cs = meta.classes[class]
+  return cs and tonumber(cs.keyMax) or 0
 end
 
--- Meilleure clé gagnée par une classe dans une zone (-1 : jamais gagnée).
+-- Meilleure clé : sans zone, celle d'une victoire complète de la classe (-1 : jamais) ; avec une zone, la
+-- meilleure clé à laquelle la classe a battu le boss de cette zone (bibelots de clé, écran Progress).
 function Meta.bestKey(meta, class, zone)
-  local zs = Meta.zoneInfo(meta, class, zone or ns.Zone.FIRST)
-  return zs and zs.bestKey or -1
+  if zone then
+    local zs = Meta.zoneInfo(meta, class, zone)
+    return zs and zs.bestKey or -1
+  end
+  local cs = meta.classes[class]
+  return cs and tonumber(cs.bestKey) or -1
 end
 
 -- Déblocages d'une classe : { level = niveau de classe 1..7, common = palier commun 0..7,
@@ -394,69 +421,147 @@ end
 -- Fin d'expédition
 ---------------------------------------------------------------------------
 
--- Expérience de classe gagnée par une expédition terminée (Meta.XP).
-function Meta.xpFor(exp)
+-- Expérience de classe d'une expédition (Meta.XP), sur toute la campagne : étapes franchies (56 au plus), élites,
+-- boss (7 au plus), +win seulement pour une victoire complète (Nefarian). partial = vrai : sans le bonus de
+-- victoire (expérience acquise à un boss, Meta.bank).
+function Meta.xpFor(exp, partial)
   local P, s = Meta.XP, exp.stats
-  local v = s.cleared * P.step + s.elites * P.elite + s.bosses * P.boss + (exp.result == "won" and P.win or 0)
+  local v = s.cleared * P.step + s.elites * P.elite + s.bosses * P.boss
+    + ((not partial and exp.result == "won") and P.win or 0)
   return floor(v * (1 + P.key * (exp.key or 0)) + 0.5)
 end
 
--- Crée une expédition pour ce compte (zone ouverte et jouable, clé ouverte dans cette zone).
--- opts : seed, class, zone (défaut : la première), key ; renvoie exp ou nil, raison.
+-- Crée une expédition pour ce compte : toujours à Westfall (première zone), clé ouverte pour la classe.
+-- opts : seed, class, key ; renvoie exp ou nil, raison.
 function Meta.newExpedition(meta, opts)
   local class = opts.class or "priest"
-  local zone = opts.zone or ns.Zone.FIRST
+  local zone = ns.Zone.FIRST
   local key = opts.key or 0
-  if not ns.Zones[zone] then return nil, "zone" end
   if not ns.Zone.playable(zone) then return nil, "zone coming later" end
-  if not Meta.zoneOpen(meta, class, zone) then return nil, "zone locked" end
-  if key < 0 or key > Meta.keyMax(meta, class, zone) then return nil, "key locked" end
+  if key < 0 or key > Meta.keyMax(meta, class) then return nil, "key locked" end
   return ns.Expedition.new({ seed = opts.seed, class = class, zone = zone, key = key,
     unlocks = Meta.unlocks(meta, class), flags = meta.flags, stats = opts.stats, quiet = opts.quiet })
 end
 
--- Applique le résultat d'une expédition terminée au compte. Renvoie un résumé :
--- { xp (classe), levelBefore, levelAfter, unlocked = { cards = {ids}, relics = {ids} } (ce que la montée de
---   niveau vient de débloquer), zone,
---   zoneWon (première victoire de la classe dans la zone), zoneOpened (zone suivante, ouverte pour la classe),
---   zoneCards = {ids} (cartes de zone débloquées), keyRelics = {ids} (bibelots de clé débloqués),
---   keyUnlocked (niveau de clé ouvert dans la zone, ou nil),
---   accountZone (première victoire du compte dans la zone), common = Meta.commonContent(ordre) (commun
---   débloqué pour toutes les classes, avantages compris), flags (drapeaux de compte nouvellement posés, triés) }
-function Meta.record(meta, exp)
-  local cs = Meta.classState(meta, exp.class)
+-- Boss d'une zone battu par une classe à cette clé : boss de la zone battu par la classe (carte épique de la
+-- classe liée à la zone), meilleure clé de la zone (bibelots de clé +1, +3, +5), boss battu par le compte
+-- (commun de la zone). Renvoie { zone, zoneWon, keyRelics = {ids}, accountZone } (données simples).
+function Meta.recordBoss(meta, class, zone, key)
   if type(meta.zones) ~= "table" then meta.zones = {} end
-  local zone = exp.zone or ns.Zone.FIRST
-  local xp = Meta.xpFor(exp)
-  local before = Meta.classLevel(cs.xp)
-  local summary = { xp = xp, levelBefore = before, zone = zone, zoneCards = {}, keyRelics = {} }
+  local zs = Meta.zoneState(meta, class, zone)
+  local part = { zone = zone, keyRelics = {} }
+  key = key or 0
+  local oldBest = zs.bestKey or -1
+  if not zs.won then
+    zs.won = true
+    part.zoneWon = true
+  end
+  if key > oldBest then zs.bestKey = key end
+  for _, e in ipairs(Meta.keyRelics(class, zone)) do
+    if e.level > oldBest and e.level <= zs.bestKey then part.keyRelics[#part.keyRelics + 1] = e.id end
+  end
+  if not meta.zones[zone] then
+    meta.zones[zone] = true
+    part.accountZone = true
+  end
+  return part
+end
+
+-- Drapeaux posés par l'expédition et pas encore reportés : reportés dans la méta, noms ajoutés à into.
+local function bankFlags(meta, exp, into)
+  if type(meta.flags) ~= "table" then meta.flags = {} end
+  local names = {}
+  for name in pairs(exp.newFlags or {}) do
+    if not meta.flags[name] then names[#names + 1] = name end
+    meta.flags[name] = true
+  end
+  table.sort(names)
+  for _, n in ipairs(names) do into[#into + 1] = n end
+end
+
+-- Ce que la méta a déjà reçu de l'expédition (exp.banked, données simples, créé au besoin) :
+-- { n = boss reportés, xp = expérience reportée, levelBefore = niveau de la classe avant le premier report,
+--   zones = { parts de Meta.recordBoss }, flags = { noms } }.
+local function banked(exp)
+  local b = exp.banked
+  if type(b) ~= "table" then
+    b = { n = 0, xp = 0, zones = {}, flags = {} }
+    exp.banked = b
+  end
+  return b
+end
+
+-- Reporte tout de suite dans la méta ce que l'expédition a déjà acquis (Save.settle après chaque action,
+-- Save.finish) : zone la plus loin atteinte, et pour chaque boss battu pas encore reporté : épique de la classe
+-- liée à la zone, bibelots de clé, commun du compte (Meta.recordBoss), expérience des étapes franchies jusque-là
+-- (sans le bonus de victoire) et drapeaux posés. Idempotent. Les déblocages figés au départ de l'expédition
+-- (exp.unlock, exp.flags) ne changent pas : ils servent à l'expédition suivante. Renvoie la liste des parts
+-- nouvellement reportées.
+function Meta.bank(meta, exp)
+  if type(exp) ~= "table" or not exp.class then return {} end
+  local cs = Meta.classState(meta, exp.class)
+  local o = ns.Zone.order(exp.zone)
+  if o and o > (tonumber(cs.farthest) or 0) then cs.farthest = o end
+  local b = banked(exp)
+  local beaten = exp.beaten or {}
+  local new = {}
+  if b.n >= #beaten then return new end
+  if b.levelBefore == nil then b.levelBefore = Meta.classLevel(cs.xp) end
+  while b.n < #beaten do
+    b.n = b.n + 1
+    local part = Meta.recordBoss(meta, exp.class, beaten[b.n], exp.key)
+    b.zones[#b.zones + 1] = part
+    new[#new + 1] = part
+  end
+  local xp = Meta.xpFor(exp, true) - b.xp
+  if xp > 0 then
+    cs.xp = (cs.xp or 0) + xp
+    b.xp = b.xp + xp
+  end
+  bankFlags(meta, exp, b.flags)
+  return new
+end
+
+-- Applique le résultat d'une expédition terminée au compte (après Meta.bank : ce qu'elle a acquis à chaque boss
+-- est déjà reporté). Renvoie un résumé de TOUTE l'expédition :
+-- { xp (classe, total de l'expédition), levelBefore (avant l'expédition), levelAfter, unlocked = { cards = {ids},
+--   relics = {ids} } (ce que la montée de niveau vient de débloquer), zone (zone atteinte), beaten = {zones},
+--   zones = { { zone, zoneWon (premier boss de la zone battu par la classe), zoneCards = {ids} (épiques
+--     débloquées), keyRelics = {ids}, accountZone, common = Meta.commonContent(ordre) (si accountZone) } }
+--     (un par boss battu, dans l'ordre), zoneCards et keyRelics (toutes zones, à plat),
+--   keyUnlocked (clé ouverte par une victoire complète, ou nil), flags (drapeaux nouvellement posés, triés) }
+function Meta.record(meta, exp)
+  Meta.bank(meta, exp)
+  local cs = Meta.classState(meta, exp.class)
+  local b = banked(exp)
+  local before = b.levelBefore or Meta.classLevel(cs.xp)
+  local total = Meta.xpFor(exp)
+  local xp = max(0, total - b.xp)
   cs.xp = (cs.xp or 0) + xp
+  b.xp = b.xp + xp
   cs.runs = (cs.runs or 0) + 1
   meta.runs = (meta.runs or 0) + 1
+  local summary = { xp = b.xp, levelBefore = before, zone = exp.zone or ns.Zone.FIRST, result = exp.result,
+    beaten = {}, zones = {}, zoneCards = {}, keyRelics = {} }
+  for i, z in ipairs(exp.beaten or {}) do summary.beaten[i] = z end
+  for _, p in ipairs(b.zones) do
+    local part = { zone = p.zone, zoneWon = p.zoneWon, accountZone = p.accountZone, zoneCards = {},
+      keyRelics = {} }
+    if p.zoneWon then part.zoneCards = Meta.zoneCards(exp.class, p.zone) end
+    for _, id in ipairs(p.keyRelics or {}) do part.keyRelics[#part.keyRelics + 1] = id end
+    if p.accountZone then part.common = Meta.commonContent(ns.Zone.order(p.zone) or 0) end
+    for _, id in ipairs(part.zoneCards) do summary.zoneCards[#summary.zoneCards + 1] = id end
+    for _, id in ipairs(part.keyRelics) do summary.keyRelics[#summary.keyRelics + 1] = id end
+    summary.zones[#summary.zones + 1] = part
+  end
   if exp.result == "won" then
     cs.wins = (cs.wins or 0) + 1
-    local zs = Meta.zoneState(meta, exp.class, zone)
     local key = exp.key or 0
-    local oldBest = zs.bestKey or -1
-    if not zs.won then
-      zs.won = true
-      summary.zoneWon = true
-      summary.zoneCards = Meta.zoneCards(exp.class, zone)
-      summary.zoneOpened = ns.Zone.next(zone)
-    end
-    if key > oldBest then zs.bestKey = key end
-    for _, e in ipairs(Meta.keyRelics(exp.class, zone)) do
-      if e.level > oldBest and e.level <= zs.bestKey then summary.keyRelics[#summary.keyRelics + 1] = e.id end
-    end
+    if key > (tonumber(cs.bestKey) or -1) then cs.bestKey = key end
     local open = min(key + 1, Meta.MAX_KEY)
-    if open > (zs.keyMax or 0) then
-      zs.keyMax = open
+    if open > (tonumber(cs.keyMax) or 0) then
+      cs.keyMax = open
       summary.keyUnlocked = open
-    end
-    if not meta.zones[zone] then
-      meta.zones[zone] = true
-      summary.accountZone = true
-      summary.common = Meta.commonContent(ns.Zone.order(zone) or 0)
     end
   end
   summary.levelAfter = Meta.classLevel(cs.xp)
@@ -467,13 +572,11 @@ function Meta.record(meta, exp)
     for _, id in ipairs(got.relics) do unlocked.relics[#unlocked.relics + 1] = id end
   end
   summary.unlocked = unlocked
-  -- Drapeaux de compte posés pendant l'expédition (quel que soit le résultat).
-  if type(meta.flags) ~= "table" then meta.flags = {} end
+  -- Drapeaux de compte posés pendant l'expédition (quel que soit le résultat) : ceux déjà reportés à un boss
+  -- et les autres.
   local names = {}
-  for name in pairs(exp.newFlags or {}) do
-    if not meta.flags[name] then names[#names + 1] = name end
-    meta.flags[name] = true
-  end
+  for _, n in ipairs(b.flags) do names[#names + 1] = n end
+  bankFlags(meta, exp, names)
   table.sort(names)
   summary.flags = names
   return summary

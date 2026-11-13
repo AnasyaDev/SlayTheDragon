@@ -562,7 +562,7 @@ test("montée de niveau : résumé, ce qui vient d'être débloqué, expédition
   eq(s3.levelBefore, s3.levelAfter); eq(#s3.unlocked.cards, 0); eq(#s3.unlocked.relics, 0)
 end)
 
-test("clés mythiques : +1 à la 1re victoire, +N ouvre +N+1, plafond +5", function()
+test("clés mythiques : +1 à la 1re victoire complète, +N ouvre +N+1, plafond +5", function()
   local meta = Meta.new()
   local function finish(key, result)
     local exp = newExp({ key = key })
@@ -574,10 +574,10 @@ test("clés mythiques : +1 à la 1re victoire, +N ouvre +N+1, plafond +5", funct
   eq(finish(0, "won").keyUnlocked, nil, "rien de neuf")
   eq(finish(1, "won").keyUnlocked, 2)
   eq(finish(2, "lost").keyUnlocked, nil)
-  eq(Meta.keyMax(meta, "priest", "westfall"), 2)
+  eq(Meta.keyMax(meta, "priest"), 2)
   for k = 2, 6 do finish(math.min(k, 5), "won") end
-  eq(Meta.keyMax(meta, "priest", "westfall"), 5)
-  eq(meta.classes.priest.zones.westfall.bestKey, 5)
+  eq(Meta.keyMax(meta, "priest"), 5)
+  eq(Meta.bestKey(meta, "priest"), 5); eq(meta.classes.priest.bestKey, 5)
   assert(Meta.newExpedition(meta, { key = 5 }))
 end)
 
@@ -1338,7 +1338,7 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 5); eq(Save.VERSION, 5); eq(X.VERSION, 7)
+  eq(note, "migrated"); eq(db.version, 6); eq(Save.VERSION, 6); eq(X.VERSION, 8)
   local m = db.current
   assert(m, "expédition gardée")
   eq(m.version, X.VERSION); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
@@ -1378,11 +1378,13 @@ test("sauvegarde v3 -> v5 : réputation de classe convertie en expérience, exp�
     warrior = { rep = 800, runs = 6, wins = 4, keyMax = 1, bestKey = 0 } } },
     current = cur, journal = { { result = "won", class = "priest", rep = 110 } } }
   local db, note = Save.migrate(reload(v3))
-  eq(note, "migrated"); eq(db.version, 5)
+  eq(note, "migrated"); eq(db.version, Save.VERSION)
   local w, p = db.meta.classes.warrior, db.meta.classes.priest
   eq(w.xp, math.floor(800 * 0.5 + 4 * 15 + 0.5))
   eq(p.xp, math.floor(300 * 0.5 + 2 * 15 + 0.5))
   eq(w.rep, 800, "ancienne réputation gardée"); eq(w.zones.westfall.keyMax, 1); eq(db.meta.league, nil)
+  eq(w.keyMax, 1, "v6 : clé de la classe = la plus haute ouverte dans une zone"); eq(p.keyMax, 2)
+  eq(w.farthest, 1, "Westfall gagnée : atteinte")
   local m = db.current
   assert(m, "expédition gardée")
   eq(m.version, X.VERSION); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
@@ -1744,11 +1746,22 @@ end)
 -- Campagne par zones (13/11/2026)
 ---------------------------------------------------------------------------
 
--- Fin d'expédition simulée : la classe gagne (ou perd) la zone à cette clé.
+-- Fin d'expédition simulée (une expédition traverse la campagne depuis Westfall) : result « won » (défaut) = la
+-- classe bat les boss de Westfall à `zone` à cette clé, puis l'expédition est gagnée si `zone` est la dernière
+-- (Nefarian), sinon elle tombe dans la zone suivante ; « lost » = elle tombe dans `zone` sans battre son boss.
+-- La clé est posée après Save.start (le test ne s'occupe pas du verrou de clé).
+local LAST = ns.Zone.ORDER[#ns.Zone.ORDER]
 local function finishIn(db, class, zone, key, result)
-  local e = assert(Save.start(db, { seed = 30 + (key or 0), class = class, zone = zone, key = key or 0 }))
-  e.stats.cleared, e.stats.elites, e.stats.bosses = 8, 1, (result or "won") == "won" and 1 or 0
-  e.result, e.phase = result or "won", "done"
+  result = result or "won"
+  local e = assert(Save.start(db, { seed = 30 + (key or 0), class = class }))
+  e.key = key or 0
+  local n = ns.Zone.order(zone)
+  local upTo = result == "won" and n or n - 1
+  for i = 1, upTo do e.beaten[i] = ns.Zone.ORDER[i] end
+  e.zone = (result == "won" and zone ~= LAST) and ns.Zone.ORDER[n + 1] or zone
+  e.stats.cleared, e.stats.elites, e.stats.bosses = 8 * upTo + 3, upTo + 1, upTo
+  e.result = (result == "won" and zone == LAST) and "won" or "lost"
+  e.phase = "done"
   return (Save.finish(db, "t"))
 end
 
@@ -1785,28 +1798,269 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   end
 end)
 
-test("zones : gagner une zone avec une classe ouvre la suivante pour elle seule", function()
+test("campagne : toute expédition part de Westfall ; boss battus et zone atteinte par classe", function()
   local db = Save.new()
   local m = db.meta
-  assert(Meta.zoneOpen(m, "mage", "westfall")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
-  local e, why = Save.start(db, { seed = 1, class = "mage", zone = "duskwood" })
-  eq(e, nil); eq(why, ns.Zone.playable("duskwood") and "zone locked" or "zone coming later", "Duskwood : fermée au Mage")
+  eq(Meta.farthest(m, "mage"), 0); eq(Meta.zoneReached(m, "mage", "westfall"), false)
+  local e = assert(Save.start(db, { seed = 1, class = "mage", zone = "duskwood" }))
+  eq(e.zone, "westfall", "zone demandée ignorée : départ à Westfall"); eq(e.startZone, "westfall")
+  eq(e.lastZone, LAST); eq(e.act, 1); eq(e.acts, 7)
+  db.current = nil
   finishIn(db, "mage", "westfall", 0, "lost")
-  eq(Meta.zoneOpen(m, "mage", "duskwood"), false, "défaite : rien")
+  eq(Meta.classWon(m, "mage", "westfall"), false, "défaite à Westfall : boss pas battu")
+  eq(Meta.farthest(m, "mage"), 1); assert(Meta.zoneReached(m, "mage", "westfall"))
   local s = finishIn(db, "mage", "westfall", 0)
-  eq(s.zoneWon, true); eq(s.zoneOpened, "duskwood"); eq(s.zone, "westfall")
-  assert(Meta.zoneOpen(m, "mage", "duskwood"), "Duskwood ouverte pour le Mage")
-  eq(Meta.zoneOpen(m, "mage", "wetlands"), false)
-  eq(Meta.zoneOpen(m, "priest", "duskwood"), false, "pas pour le Prêtre")
+  eq(#s.zones, 1); eq(s.zones[1].zone, "westfall"); eq(s.zones[1].zoneWon, true)
+  eq(s.zone, "duskwood", "zone atteinte"); eq(table.concat(s.beaten, ","), "westfall")
+  eq(Meta.farthest(m, "mage"), 2); assert(Meta.zoneReached(m, "mage", "duskwood"))
+  eq(Meta.zoneReached(m, "mage", "wetlands"), false)
+  eq(Meta.farthest(m, "priest"), 0, "pas pour le Prêtre")
   eq(Meta.classWon(m, "mage", "westfall"), true); eq(Meta.classWon(m, "priest", "westfall"), false)
-  local again = finishIn(db, "mage", "westfall", 0)
-  eq(again.zoneWon, nil, "deuxième victoire : plus une première"); eq(again.zoneOpened, nil)
-  -- zone fermée pour la classe : refusée même si elle devenait jouable
-  ns.Zones.wetlands.encounters = "westfall"
-  local x, w2 = Save.start(db, { seed = 2, class = "mage", zone = "wetlands" })
-  eq(x, nil); eq(w2, "zone locked")
-  ns.Zones.wetlands.encounters = nil
+  eq(Meta.beatenCount(m, "mage"), 1)
+  local again = finishIn(db, "mage", "wetlands", 0)
+  eq(again.zones[1].zoneWon, nil, "Westfall : plus une première"); eq(again.zones[2].zoneWon, true)
+  eq(again.zones[3].zone, "wetlands"); eq(Meta.beatenCount(m, "mage"), 3); eq(Meta.farthest(m, "mage"), 4)
   assert(Save.validate(db))
+end)
+
+test("campagne : boss battu -> zone suivante (même deck, or, bibelots, épique), soin de 50 %, nouvelle carte", function()
+  local exp = newExp({ seed = 41, class = "priest", unlocks = Meta.allUnlocked(7, 7) })
+  eq(exp.zone, "westfall"); eq(exp.act, 1)
+  local mapW = exp.map
+  enter(exp, "boss")
+  eq(exp.fight.kind, "boss")
+  exp.combat.player.hp = 20
+  winCombat(exp)
+  eq(exp.phase, "reward"); eq(table.concat(exp.beaten, ","), "westfall")
+  exp.gold = 123
+  X.addCard(exp, "prayer_of_mending")
+  local deck, relics, maxHp, hp = #exp.deck, #exp.relics, exp.maxHp, exp.hp
+  exp.potions[1] = "healing_potion"
+  assert(X.act(exp, { "leave" }))
+  eq(exp.phase, "transit"); eq(exp.zone, "duskwood"); eq(exp.act, 2)
+  eq(exp.transit.from, "westfall"); eq(exp.transit.to, "duskwood")
+  local want = math.min(maxHp, hp + math.floor(maxHp * 0.5))
+  eq(exp.hp, want, "soin de 50 % des PV max"); eq(exp.transit.healed, want - hp)
+  eq(#exp.deck, deck); eq(#exp.relics, relics); eq(exp.gold, 123); eq(exp.maxHp, maxHp)
+  eq(exp.potions[1], "healing_potion"); assert(X.epicIndex(exp), "épique gardée")
+  assert(exp.map ~= mapW, "nouvelle carte"); eq(exp.floor, 0); eq(exp.node, nil)
+  eq(X.campaignName(exp), "Duskwood · 2/7")
+  -- choix : continuer (ou abandonner) ; la carte de Duskwood ensuite, ses ennemis et sa règle
+  local ch = X.choices(exp)
+  eq(ch[1][1], "continue")
+  eq(X.act(exp, { "path", exp.map.start[1] }), false)
+  assert(X.act(exp, { "continue" }))
+  eq(exp.phase, "map"); eq(exp.transit, nil)
+  enter(exp, "combat")
+  for _, en in ipairs(exp.combat.enemies) do
+    local found = false
+    for _, kind in ipairs({ "easy", "normal" }) do
+      for _, g in ipairs(ns.Encounters.duskwood[kind]) do
+        for _, spec in ipairs(g) do if ns.Combat.specId(spec) == en.id then found = true end end
+      end
+    end
+    assert(found, en.id .. " : ennemi de Duskwood")
+  end
+  eq(exp.combat.zone, "duskwood", "règle de zone de Duskwood")
+  -- soin plafonné : sans dépasser le maximum
+  local full = newExp({ seed = 42 })
+  enter(full, "boss")
+  winCombat(full)
+  full.hp = full.maxHp - 3
+  assert(X.act(full, { "leave" }))
+  eq(full.hp, full.maxHp); eq(full.transit.healed, 3)
+end)
+
+test("campagne : carte de chaque zone dérivée de la graine (reproductible), Westfall inchangée", function()
+  local function walk(seed)
+    local exp = newExp({ seed = seed })
+    local maps = { serialize(exp.map) } -- avant de forcer le type du premier nœud
+    for _ = 1, 3 do
+      enter(exp, "boss")
+      winCombat(exp)
+      assert(X.act(exp, { "leave" }))
+      assert(X.act(exp, { "continue" }))
+      maps[#maps + 1] = serialize(exp.map)
+    end
+    return maps, exp
+  end
+  local a, ea = walk(77)
+  local b = walk(77)
+  for i = 1, #a do eq(a[i], b[i], "zone " .. i) end
+  eq(ea.zone, "stranglethorn"); eq(ea.act, 4)
+  -- Westfall : même carte qu'avant la campagne continue (flux « map » de l'état)
+  local one = X.new({ seed = 77, quiet = true, lastZone = "westfall" })
+  eq(serialize(one.map), a[1])
+  assert(a[2] ~= walk(78)[2], "autre graine, autre carte")
+end)
+
+test("campagne : boss de la dernière zone = victoire ; lastZone (diagnostic) arrête l'expédition", function()
+  local exp = newExp({ seed = 43, zone = "blackrock" })
+  eq(exp.acts, 1)
+  enter(exp, "boss")
+  winCombat(exp)
+  assert(X.act(exp, { "leave" }))
+  eq(exp.phase, "done"); eq(exp.result, "won"); eq(table.concat(exp.beaten, ","), "blackrock")
+  local d = newExp({ seed = 44, lastZone = "duskwood" })
+  eq(d.acts, 2)
+  for _ = 1, 2 do
+    enter(d, "boss")
+    winCombat(d)
+    assert(X.act(d, { "leave" }))
+    if d.phase == "transit" then assert(X.act(d, { "continue" })) end
+  end
+  eq(d.phase, "done"); eq(d.result, "won"); eq(table.concat(d.beaten, ","), "westfall,duskwood")
+end)
+
+test("campagne : chaque boss compte tout de suite, même si l'expédition échoue plus loin", function()
+  local db = Save.new()
+  local m = db.meta
+  local exp = assert(Save.start(db, { seed = 45, class = "priest" }))
+  exp.quiet = true
+  eq(exp.unlock.won.westfall, nil)
+  enter(exp, "boss")
+  winCombat(exp)
+  local new = Save.settle(db)
+  eq(#new, 1); eq(new[1].zone, "westfall"); eq(new[1].zoneWon, true); eq(new[1].accountZone, true)
+  eq(Meta.classWon(m, "priest", "westfall"), true, "épique de Westfall débloquée au boss")
+  eq(m.zones.westfall, true, "commun du compte débloqué au boss"); eq(Meta.commonTier(m), 1)
+  local xp = m.classes.priest.xp
+  eq(xp, Meta.xpFor(exp, true), "expérience des étapes franchies"); assert(xp > 0)
+  eq(#Save.settle(db), 0, "idempotent"); eq(m.classes.priest.xp, xp)
+  -- l'expédition en cours garde ses déblocages de départ (la suivante en profitera)
+  eq(exp.unlock.won.westfall, nil); eq(exp.unlock.common, 0)
+  eq(#X.epicPool(exp), 0, "épique de Westfall : pas dans cette expédition")
+  assert(X.act(exp, { "leave" }))
+  eq(exp.phase, "transit"); Save.settle(db)
+  eq(Meta.farthest(m, "priest"), 2, "Duskwood atteinte")
+  assert(X.act(exp, { "continue" }))
+  -- défaite à Duskwood
+  enter(exp, "combat")
+  exp.combat.player.hp = 0
+  exp.combat.result = "lost"
+  assert(X.act(exp, { "endTurn" }))
+  eq(exp.phase, "done"); eq(exp.result, "lost")
+  local s = Save.finish(db, "t")
+  eq(Meta.classWon(m, "priest", "westfall"), true, "rien n'est repris")
+  eq(s.zone, "duskwood"); eq(table.concat(s.beaten, ","), "westfall"); eq(#s.zones, 1)
+  eq(table.concat(s.zoneCards, ","), table.concat(Meta.zoneCards("priest", "westfall"), ","))
+  assert(s.zones[1].common, "commun annoncé au bilan")
+  eq(s.xp, Meta.xpFor(exp), "bilan : expérience de toute l'expédition"); eq(m.classes.priest.xp, s.xp)
+  eq(s.keyUnlocked, nil, "pas de clé sans Nefarian")
+  eq(db.journal[1].zone, "duskwood"); eq(table.concat(db.journal[1].beaten, ","), "westfall")
+  -- l'expédition suivante profite de l'épique et du commun
+  local nx = assert(Save.start(db, { seed = 46, class = "priest" }))
+  eq(nx.unlock.won.westfall, 0); eq(nx.unlock.common, 1)
+  assert(#X.epicPool(nx) > 0)
+  -- abandon sur la récompense d'un boss : le boss compte
+  local db2 = Save.new()
+  local ab = assert(Save.start(db2, { seed = 47, class = "rogue" }))
+  enter(ab, "boss")
+  winCombat(ab)
+  local s2 = Save.abandon(db2, "t")
+  eq(Meta.classWon(db2.meta, "rogue", "westfall"), true); eq(s2.zones[1].zoneWon, true)
+end)
+
+-- Passe le boss de la zone en cours (combat gagné, récompense quittée) : phase « transit » ou « done ».
+local function clearZone(exp)
+  local id = X.nextNodes(exp)[1]
+  exp.map.nodes[id].kind = "boss"
+  assert(X.act(exp, { "path", id }))
+  winCombat(exp)
+  assert(X.act(exp, { "leave" }))
+end
+
+test("sauvegarde : rechargement en plein milieu de la zone 3 et sur l'écran entre deux zones", function()
+  local db = Save.new()
+  local exp = assert(Save.start(db, { seed = 51, class = "warrior" }))
+  exp.quiet = true
+  for _ = 1, 2 do
+    clearZone(exp)
+    Save.settle(db)
+    -- rechargement sur l'écran entre deux zones : même écran, même soin, puis la suite
+    eq(exp.phase, "transit")
+    local back = Save.migrate(reload(db))
+    eq(back.current.phase, "transit"); eq(back.current.zone, exp.zone)
+    eq(serialize(back.current.transit), serialize(exp.transit)); eq(back.current.hp, exp.hp)
+    assert(Save.validate(back))
+    assert(X.act(exp, { "continue" }))
+  end
+  eq(exp.zone, "wetlands"); eq(exp.act, 3)
+  -- zone 3 : quelques étapes, puis rechargement en plein combat ; les deux copies jouent la même suite
+  enter(exp, "combat")
+  local saved = reload(db)
+  local copy = Save.migrate(saved).current
+  eq(copy.phase, "combat"); eq(copy.zone, "wetlands"); eq(copy.combat.zone, "wetlands")
+  local function play(e)
+    for _ = 1, 6 do
+      if e.phase ~= "combat" then break end
+      local ch = X.choices(e)
+      assert(X.act(e, ch[1]))
+    end
+    return serialize(e)
+  end
+  eq(play(copy), play(exp), "même suite après rechargement")
+  eq(db.meta.classes.warrior.farthest, 3)
+end)
+
+test("sauvegarde v7 -> v8 : expédition d'une seule zone en cours, continue dans sa zone puis enchaîne", function()
+  -- expédition v7 dans la zone 3 (Wetlands), arrêtée en plein parcours
+  local cur = X.new({ seed = 52, class = "rogue", zone = "wetlands", quiet = true })
+  enter(cur, "combat")
+  winCombat(cur)
+  if cur.phase == "reward" then assert(X.act(cur, { "leave" })) end
+  cur.version, cur.startZone, cur.lastZone, cur.beaten, cur.acts = 7, nil, nil, nil, 1
+  local v5 = { version = 5, meta = { runs = 3, zones = { westfall = true, duskwood = true }, flags = {}, classes = {
+    rogue = { xp = 300, runs = 3, wins = 2, zones = { westfall = { won = true, keyMax = 3, bestKey = 2 },
+      duskwood = { won = true, keyMax = 1, bestKey = 0 } } } } }, current = cur,
+    journal = { { result = "won", class = "rogue", zone = "duskwood", xp = 70 } } }
+  local db, note = Save.migrate(reload(v5))
+  eq(note, "migrated"); eq(db.version, Save.VERSION)
+  local m, x = db.meta, db.current
+  assert(x, "expédition gardée")
+  eq(x.version, X.VERSION); eq(x.zone, "wetlands"); eq(x.startZone, "wetlands"); eq(x.lastZone, LAST)
+  eq(x.act, 1); eq(x.acts, 5); eq(#x.beaten, 0)
+  -- méta : rien de retiré ; clé de la classe = la plus haute ouverte dans une zone ; zone la plus loin atteinte
+  local cs = m.classes.rogue
+  eq(cs.zones.westfall.won, true); eq(cs.zones.westfall.bestKey, 2); eq(cs.zones.duskwood.won, true)
+  eq(cs.keyMax, 3); eq(cs.bestKey, -1, "Nefarian jamais battu"); eq(cs.farthest, 3, "Wetlands en cours")
+  eq(Meta.keyMax(m, "rogue"), 3)
+  assert(Save.validate(db))
+  -- elle continue dans les Wetlands, puis enchaîne sur Stranglethorn Vale
+  clearZone(x)
+  eq(x.phase, "transit"); eq(x.zone, "stranglethorn"); eq(x.act, 2)
+  Save.settle(db)
+  eq(Meta.classWon(m, "rogue", "wetlands"), true, "boss des Wetlands compté")
+  -- idempotente
+  local again = reload(db)
+  Save.migrate(again)
+  eq(serialize(again), serialize(db))
+  -- arrêtée sur la récompense de son boss : le boss compte tout de suite
+  local r = X.new({ seed = 53, class = "mage", zone = "duskwood", quiet = true })
+  enter(r, "boss")
+  winCombat(r)
+  eq(r.phase, "reward")
+  r.version, r.beaten, r.startZone, r.lastZone = 7, nil, nil, nil
+  local db2 = Save.migrate(reload({ version = 5, meta = { runs = 0, zones = {}, flags = {}, classes = {} },
+    current = r, journal = {} }))
+  eq(table.concat(db2.current.beaten, ","), "duskwood")
+  eq(Meta.classWon(db2.meta, "mage", "duskwood"), true, "compté à la migration")
+  assert(X.act(db2.current, { "leave" }))
+  eq(db2.current.phase, "transit"); eq(db2.current.zone, "wetlands")
+end)
+
+test("campagne : drapeaux posés avant un boss reportés au boss, jamais dans l'expédition qui les pose", function()
+  local db = Save.new()
+  local exp = assert(Save.start(db, { seed = 48, class = "priest" }))
+  X.setFlag(exp, "test_story")
+  enter(exp, "boss")
+  winCombat(exp)
+  Save.settle(db)
+  eq(db.meta.flags.test_story, true); eq(X.hasFlag(exp, "test_story"), false)
+  X.setFlag(exp, "test_later")
+  assert(X.act(exp, { "abandon" }))
+  local s = Save.finish(db, "t")
+  eq(table.concat(s.flags, ","), "test_later,test_story"); eq(db.meta.flags.test_later, true)
 end)
 
 test("zones : carte de zone introuvable avant la première victoire de la classe dans la zone", function()
@@ -1854,7 +2108,7 @@ test("zones : commun débloqué par la première victoire du compte dans une zon
   eq(count(X.neutralPool(fresh), "runecloth_bag"), 0, "compte neuf : palier 0 seulement")
   eq(count(X.relicPool(fresh), "darkmoon_prize_ticket"), 0)
   db.current = nil
-  local s = finishIn(db, "warrior", "westfall", 0)
+  local s = finishIn(db, "warrior", "westfall", 0).zones[1]
   eq(s.accountZone, true); assert(s.common and has(s.common.cards, "runecloth_bag"), "annoncé en fin d'expédition")
   eq(Meta.commonTier(db.meta), 1); eq(db.meta.zones.westfall, true)
   -- une autre classe en profite tout de suite, sans avoir gagné la zone
@@ -1862,33 +2116,36 @@ test("zones : commun débloqué par la première victoire du compte dans une zon
   eq(h.unlock.common, 1)
   eq(count(X.neutralPool(h), "runecloth_bag"), 1)
   eq(count(X.relicPool(h), "darkmoon_prize_ticket"), 1)
-  eq(Meta.zoneOpen(db.meta, "hunter", "duskwood"), false, "mais pas la zone suivante")
+  eq(Meta.classWon(db.meta, "hunter", "westfall"), false, "mais pas l'épique de Westfall")
   db.current = nil
-  local s2 = finishIn(db, "hunter", "westfall", 0)
+  local s2 = finishIn(db, "hunter", "westfall", 0).zones[1]
   eq(s2.zoneWon, true); eq(s2.accountZone, nil, "le compte avait déjà gagné Westfall"); eq(s2.common, nil)
 end)
 
-test("clés : une par zone et par classe, +N ouvre +N+1 dans cette zone pour cette classe", function()
+test("clés : une par classe pour toute l'expédition, +N ouverte en battant Nefarian à +N−1", function()
   local db = Save.new()
   local m = db.meta
-  for k = 0, 2 do finishIn(db, "mage", "westfall", k) end
-  eq(Meta.keyMax(m, "mage", "westfall"), 3, "Mage : Westfall +3 ouverte")
-  eq(Meta.bestKey(m, "mage", "westfall"), 2)
-  eq(Meta.keyMax(m, "priest", "westfall"), 0, "rien pour le Prêtre")
-  eq(Meta.keyMax(m, "mage", "duskwood"), 0, "rien dans une autre zone")
+  -- boss de zone battus, Nefarian pas : aucune clé
+  local s0 = finishIn(db, "mage", "steppes", 0)
+  eq(s0.keyUnlocked, nil); eq(Meta.keyMax(m, "mage"), 0)
+  for k = 0, 2 do finishIn(db, "mage", LAST, k) end
+  eq(Meta.keyMax(m, "mage"), 3, "Mage : +3 ouverte")
+  eq(Meta.bestKey(m, "mage"), 2); eq(Meta.bestKey(m, "mage", "westfall"), 2, "meilleure clé du boss de Westfall")
+  eq(Meta.keyMax(m, "priest"), 0, "rien pour le Prêtre")
   local e, why = Save.start(db, { seed = 6, class = "priest", key = 1 })
   eq(e, nil); eq(why, "key locked")
-  assert(Save.start(db, { seed = 7, class = "mage", key = 3 }))
+  local x = assert(Save.start(db, { seed = 7, class = "mage", key = 3 }))
+  eq(x.zone, "westfall"); eq(table.concat(x.affixes, ","), "fortified,tyrannical,bolstering")
   db.current = nil
-  local s = finishIn(db, "mage", "westfall", 3)
-  eq(s.keyUnlocked, 4)
-  eq(m.classes.mage.zones.westfall.keyMax, 4)
-  eq(m.classes.mage.keyMax, nil, "plus de clé au niveau de la classe")
+  -- défaite à Blackrock à +3 : pas de +4
+  eq(finishIn(db, "mage", LAST, 3, "lost").keyUnlocked, nil); eq(Meta.keyMax(m, "mage"), 3)
+  local s = finishIn(db, "mage", LAST, 3)
+  eq(s.keyUnlocked, 4); eq(m.classes.mage.keyMax, 4); eq(m.classes.mage.bestKey, 3)
   -- affixes inchangés
   eq(#Meta.affixesFor(5), 5); eq(Meta.MAX_KEY, 5)
 end)
 
-test("clés : bibelot de clé débloqué par la première victoire de la classe à +1, +3, +5 dans la zone", function()
+test("clés : bibelot de clé d'une zone débloqué en battant le boss de CETTE zone à +1, +3, +5", function()
   ns.Relics.test_key3 = { id = "test_key3", name = "Bibelot de clé", text = "", rarity = "rare",
     key = { zone = "westfall", level = 3 } }
   ns.Relics.test_key5_mage = { id = "test_key5_mage", name = "Bibelot de clé du Mage", text = "", rarity = "rare",
@@ -1899,10 +2156,13 @@ test("clés : bibelot de clé débloqué par la première victoire de la classe 
   eq(count(X.relicPool(exp), "test_key3"), 0)
   local db = Save.new()
   for k = 0, 2 do eq(#finishIn(db, "priest", "westfall", k).keyRelics, 0) end
+  -- à +3, mort à Westfall : son boss n'est pas battu, rien
+  eq(#finishIn(db, "priest", "westfall", 3, "lost").keyRelics, 0)
   local s = finishIn(db, "priest", "westfall", 3)
   eq(table.concat(s.keyRelics, ","), "test_key3", "annoncé en fin d'expédition")
+  eq(table.concat(s.zones[1].keyRelics, ","), "test_key3", "au boss de Westfall")
   eq(#finishIn(db, "priest", "westfall", 3).keyRelics, 0, "une seule fois")
-  local p = assert(Save.start(db, { seed = 8, class = "priest", key = 4 }))
+  local p = assert(Save.start(db, { seed = 8, class = "priest" }))
   eq(count(X.relicPool(p), "test_key3"), 1, "dans le tirage du Prêtre")
   eq(count(X.relicPool(p), "test_key5_mage"), 0, "bibelot réservé au Mage")
   db.current = nil
@@ -1927,15 +2187,15 @@ test("sauvegarde v4 -> v5 : zones par classe et du compte, Ligue abandonnée, ex
     } }, current = cur, journal = { { result = "won", class = "priest", rep = 110, xp = 70 } },
     options = { scale = 1.1 } }
   local db, note = Save.migrate(reload(v4))
-  eq(note, "migrated"); eq(db.version, 5)
+  eq(note, "migrated"); eq(db.version, Save.VERSION)
   local m = db.meta
   eq(m.league, nil, "réputation de Ligue abandonnée")
   eq(m.zones.westfall, true, "le compte a gagné Westfall")
   local pz = m.classes.priest.zones.westfall
   eq(pz.won, true); eq(pz.keyMax, 2); eq(pz.bestKey, 1)
-  eq(m.classes.priest.keyMax, nil); eq(m.classes.priest.xp, 180, "expérience gardée")
+  eq(m.classes.priest.keyMax, 2, "v6 : clé de la classe"); eq(m.classes.priest.xp, 180, "expérience gardée")
   eq(m.classes.mage.zones.westfall, nil, "Mage sans victoire : Westfall pas gagnée")
-  assert(Meta.zoneOpen(m, "priest", "duskwood")); eq(Meta.zoneOpen(m, "mage", "duskwood"), false)
+  assert(Meta.zoneReached(m, "priest", "westfall")); eq(Meta.zoneReached(m, "mage", "westfall"), false)
   eq(m.flags.tobin_spared, true); eq(db.options.scale, 1.1); eq(db.journal[1].rep, 110, "journal intact")
   local x = db.current
   assert(x, "expédition gardée")

@@ -942,7 +942,7 @@ function V:RenderZoneEnemy(s, e)
   end
   s.hp.extraTip = #marks > 0 and function(tt)
     for _, m in ipairs(marks) do
-      local pct = math.floor(m.at * 100 + 0.5)
+      local pct = math.floor((m.frac or m.at) * 100 + 0.5)
       local line = "Below " .. pct .. "%: " .. (m.name or "") .. (m.text and (". " .. m.text) or "")
       tt:AddLine(line, m.passed and 0.6 or 1, m.passed and 0.6 or 0.82, m.passed and 0.6 or 0, true)
     end

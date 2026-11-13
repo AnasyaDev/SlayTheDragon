@@ -18,10 +18,9 @@ return function(T)
     H.boot(meta(cl or "priest"))
     H.slash("")
     T.clickOption("class:" .. (cl or "priest"))
-    T.clickOption("zone:wetlands")
     H.ns.Controller.makeSeed = function() return seed or T.SEED end
     T.clickOption("go")
-    local e = T.EXP()
+    local e = T.toZone("wetlands")
     -- choix de départ (bibelot) : passé
     if e.phase == "start" then
       pcall(T.clickOption, "skipStartRelic")

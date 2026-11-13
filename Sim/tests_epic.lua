@@ -777,7 +777,7 @@ end)
 ---------------------------------------------------------------------------
 -- 7. Sauvegarde, simulation
 ---------------------------------------------------------------------------
-test("sauvegarde : expédition v5 en cours migrée en v7, puis jouable (chute d'épique aux élites)", function()
+test("sauvegarde : expédition v5 en cours migrée en v8, puis jouable (chute d'épique aux élites)", function()
   local exp = newExp(7, 11)
   skipStart(exp)
   exp.version = 5
@@ -786,7 +786,7 @@ test("sauvegarde : expédition v5 en cours migrée en v7, puis jouable (chute d'
   local out = Save.migrate(db)
   local m = out.current
   assert(m, "gardée")
-  eq(m.version, X.VERSION); eq(X.VERSION, 7); eq(m.epicOffered, nil); eq(m.startEpics, nil)
+  eq(m.version, X.VERSION); eq(X.VERSION, 8); eq(m.epicOffered, nil); eq(m.startEpics, nil)
   assert(Save.validate(out))
   withDrop({ 1 }, function()
     enter(m, "elite")
