@@ -15,28 +15,28 @@ local D = ns.Declare
 ---------------------------------------------------------------------------
 
 E.sawtooth_crocolisk = {
-  name = "Sawtooth Crocolisk", hp = { 36, 40 }, asleep = 2, opener = "death_roll",
+  name = "Sawtooth Crocolisk", hp = { 37, 42 }, asleep = 2, opener = "death_roll",
   moves = {
-    death_roll = { name = "Death Roll", intent = "attack", actions = { { "attack", 19 } } },
-    snap = { name = "Snap", intent = "attack", actions = { { "attack", 9 } } },
+    death_roll = { name = "Death Roll", intent = "attack", actions = { { "attack", 20 } } },
+    snap = { name = "Snap", intent = "attack", actions = { { "attack", 10 } } },
     submerge = { name = "Submerge", intent = "defend", actions = { { "block", 7 } } },
   },
   pattern = { "snap", "submerge" },
 }
 
 E.dreaming_whelp = {
-  name = "Dreaming Whelp", hp = { 14, 15 }, asleep = 2, opener = "dream_breath",
+  name = "Dreaming Whelp", hp = { 15, 16 }, asleep = 2, opener = "dream_breath",
   moves = {
-    dream_breath = { name = "Dream Breath", intent = "attack", actions = { { "attack", 9 } } },
+    dream_breath = { name = "Dream Breath", intent = "attack", actions = { { "attack", 10 } } },
     bite = { name = "Bite", intent = "attack", actions = { { "attack", 4 } } },
   },
   pattern = { "bite" },
 }
 
 E.swampwalker = {
-  name = "Swampwalker", hp = { 43, 47 }, asleep = 3, opener = "bog_crush",
+  name = "Swampwalker", hp = { 45, 49 }, asleep = 3, opener = "bog_crush",
   moves = {
-    bog_crush = { name = "Bog Crush", intent = "attack", actions = { { "attack", 21, interrupts = true } } },
+    bog_crush = { name = "Bog Crush", intent = "attack", actions = { { "attack", 22, interrupts = true } } },
     lash = { name = "Vine Lash", intent = "attack", actions = { { "attack", 7 } } },
     shield = { name = "Bog Shield", intent = "defend", actions = { { "block", 6 }, { "block_wounded", 6 } } },
   },
@@ -44,11 +44,11 @@ E.swampwalker = {
 }
 
 E.green_scalebane = {
-  name = "Green Scalebane", hp = { 40, 43 }, asleep = 2, opener = "cleave",
+  name = "Green Scalebane", hp = { 42, 45 }, asleep = 2, opener = "cleave",
   moves = {
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 22 } } },
-    strike = { name = "Strike", intent = "attack", actions = { { "attack", 9 } } },
-    guard = { name = "Scale Guard", intent = "defend", actions = { { "block", 9 }, { "buff", "force", 1 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 23 } } },
+    strike = { name = "Strike", intent = "attack", actions = { { "attack", 10 } } },
+    guard = { name = "Scale Guard", intent = "defend", actions = { { "block", 10 }, { "buff", "force", 1 } } },
   },
   pattern = { "strike", "guard" },
 }
@@ -56,7 +56,7 @@ E.green_scalebane = {
 -- Lull si un allié éveillé valable (au moins 8 PV perdus, jamais rendormi) existe et que le tour d'avant
 -- n'était pas Lull ; sinon Dream Bolt (+3 par allié endormi, +9 au plus).
 E.wyrmkin_dreamwalker = {
-  name = "Wyrmkin Dreamwalker", hp = { 27, 30 },
+  name = "Wyrmkin Dreamwalker", hp = { 28, 31 },
   moves = {
     lull = { name = "Lull", intent = "lull", cast = true, actions = { { "lull", 2, heal = 8 } } },
     bolt = { name = "Dream Bolt", intent = "attack",
@@ -70,7 +70,7 @@ E.wyrmkin_dreamwalker = {
 
 -- Alarm Cry si un allié dort et que le tour d'avant n'était pas Alarm Cry ; sinon Lightning Bolt.
 E.marsh_oracle = {
-  name = "Marsh Oracle", hp = { 22, 24 },
+  name = "Marsh Oracle", hp = { 23, 25 },
   moves = {
     alarm_cry = { name = "Alarm Cry", intent = "alarm", cast = true, actions = { { "alarm" } } },
     bolt = { name = "Lightning Bolt", intent = "attack", actions = { { "attack", 7 } } },
@@ -82,7 +82,7 @@ E.marsh_oracle = {
 }
 
 E.deathstrike_tarantula = {
-  name = "Deathstrike Tarantula", hp = { 27, 30 },
+  name = "Deathstrike Tarantula", hp = { 28, 31 },
   moves = {
     bite = { name = "Venomous Bite", intent = "attack", actions = { { "attack", 5 }, { "debuff", "pain", 3 } } },
     web = { name = "Web", intent = "debuff", actions = { { "attack", 4 }, { "debuff", "demoralized", 1 } } },
@@ -91,7 +91,7 @@ E.deathstrike_tarantula = {
 }
 
 E.marsh_inkspewer = {
-  name = "Marsh Inkspewer", hp = { 14, 16 },
+  name = "Marsh Inkspewer", hp = { 15, 17 },
   moves = {
     claw = { name = "Claw", intent = "attack", actions = { { "attack", 4 } } },
     ink = { name = "Ink Spit", intent = "debuff", actions = { { "attack", 3 }, { "debuff", "armor_broken", 1 } } },
@@ -100,9 +100,9 @@ E.marsh_inkspewer = {
 }
 
 E.lost_one_hunter = {
-  name = "Lost One Hunter", hp = { 29, 32 },
+  name = "Lost One Hunter", hp = { 30, 33 },
   moves = {
-    thrust = { name = "Spear Thrust", intent = "attack", actions = { { "attack", 9 } } },
+    thrust = { name = "Spear Thrust", intent = "attack", actions = { { "attack", 10 } } },
     net = { name = "Net", intent = "debuff", actions = { { "attack", 4 }, { "debuff", "demoralized", 1 } } },
   },
   pattern = { "thrust", "net" }, randomStart = true,
@@ -113,10 +113,10 @@ E.lost_one_hunter = {
 ---------------------------------------------------------------------------
 
 E.lost_one_chieftain = {
-  name = "Lost One Chieftain", hp = 104, elite = true, asleep = 2, opener = "spear",
+  name = "Lost One Chieftain", hp = 108, elite = true, asleep = 2, opener = "spear",
   moves = {
-    spear = { name = "Spear of the Lost", intent = "attack", actions = { { "attack", 23, interrupts = true } } },
-    thrust = { name = "Spear Thrust", intent = "attack", actions = { { "attack", 12 } } },
+    spear = { name = "Spear of the Lost", intent = "attack", actions = { { "attack", 24, interrupts = true } } },
+    thrust = { name = "Spear Thrust", intent = "attack", actions = { { "attack", 13 } } },
     rally = { name = "Rally", intent = "buff", actions = { { "block", 8 }, { "buff", "force", 2 } } },
     crush = { name = "Crushing Blow", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "armor_broken", 1 } } },
   },
@@ -125,7 +125,7 @@ E.lost_one_chieftain = {
 
 -- Sentinelle du chef (serviteur : sa mort ne termine pas le combat).
 E.lost_one_muckdweller = {
-  name = "Lost One Muckdweller", hp = { 20, 22 }, minion = true,
+  name = "Lost One Muckdweller", hp = { 21, 23 }, minion = true,
   moves = {
     horn = { name = "Warning Horn", intent = "alarm", cast = true, actions = { { "alarm" } } },
     stab = { name = "Stab", intent = "attack", actions = { { "attack", 5 } } },
@@ -136,27 +136,27 @@ E.lost_one_muckdweller = {
   end,
 }
 
--- À mi-vie, après l'effet en cours : Slumber 2, soin 12 par tour de sommeil, ouverture Dream Fury ; le
+-- À mi-vie, après l'effet en cours : Slumber 2, soin 6 par tour de sommeil, ouverture Dream Fury ; le
 -- motif reprend ensuite à Cleave.
 E.wyrmak = {
-  name = "Lord Captain Wyrmak", hp = 112, elite = true,
+  name = "Lord Captain Wyrmak", hp = 116, elite = true,
   moves = {
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 14 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 15 } } },
     sweep = { name = "Tail Sweep", intent = "attack", actions = { { "attack", 7, interrupts = true }, { "block", 8 } } },
-    buffet = { name = "Wing Buffet", intent = "debuff", actions = { { "attack", 9 }, { "debuff", "demoralized", 1 } } },
-    dream_fury = { name = "Dream Fury", intent = "attack", actions = { { "attack", 13, times = 2 } } },
+    buffet = { name = "Wing Buffet", intent = "debuff", actions = { { "attack", 10 }, { "debuff", "demoralized", 1 } } },
+    dream_fury = { name = "Dream Fury", intent = "attack", actions = { { "attack", 14, times = 2 } } },
   },
   pattern = { "cleave", "sweep", "buffet" },
   phases = {
-    { at = 0.5, name = "The Dream", text = "Falls asleep: Asleep 2, heals 12 each turn it sleeps.",
-      dream = { { "slumber", 2, mend = 12, opener = "dream_fury" } } },
+    { at = 0.5, name = "The Dream", text = "Falls asleep: Asleep 2, heals 6 each turn it sleeps.",
+      dream = { { "slumber", 2, mend = 6, opener = "dream_fury" } } },
   },
 }
 
 E.gilmorian = {
-  name = "Gilmorian", hp = 104, elite = true,
+  name = "Gilmorian", hp = 108, elite = true,
   moves = {
-    bolt = { name = "Lightning Bolt", intent = "cast", cast = true, actions = { { "attack", 19 } } },
+    bolt = { name = "Lightning Bolt", intent = "cast", cast = true, actions = { { "attack", 20 } } },
     shock = { name = "Frost Shock", intent = "attack",
       actions = { { "attack", 6, interrupts = true }, { "debuff", "demoralized", 1 } } },
     wave = { name = "Healing Wave", intent = "heal", cast = true, actions = { { "heal_ally", 20 } } },
@@ -170,30 +170,30 @@ E.gilmorian = {
 
 -- Dragonnets de Somnus (phase 3) : éveillés, serviteurs.
 E.somnus_whelp = {
-  name = "Dreaming Whelp", hp = 13, minion = true,
+  name = "Dreaming Whelp", hp = 14, minion = true,
   moves = { bite = { name = "Bite", intent = "attack", actions = { { "attack", 4 } } } },
   pattern = { "bite" },
 }
 
 E.somnus = {
-  name = "Somnus", hp = 130, boss = true, asleep = 2, opener = "roar",
+  name = "Somnus", hp = 135, boss = true, asleep = 2, opener = "roar",
   moves = {
-    roar = { name = "Bellowing Roar", intent = "attack", actions = { { "attack", 15 }, { "debuff", "demoralized", 1 } } },
+    roar = { name = "Bellowing Roar", intent = "attack", actions = { { "attack", 16 }, { "debuff", "demoralized", 1 } } },
     breath = { name = "Noxious Breath", intent = "attack", actions = { { "attack", 6, times = 2 }, { "debuff", "pain", 3 } } },
-    claw = { name = "Claw", intent = "attack", actions = { { "attack", 19 } } },
-    buffet = { name = "Wing Buffet", intent = "attack", actions = { { "attack", 9, interrupts = true }, { "block", 9 } } },
-    deep_breath = { name = "Deep Breath", intent = "attack", actions = { { "attack", 9, times = 2 } } },
-    claw2 = { name = "Claw", intent = "attack", actions = { { "attack", 20 } } },
+    claw = { name = "Claw", intent = "attack", actions = { { "attack", 20 } } },
+    buffet = { name = "Wing Buffet", intent = "attack", actions = { { "attack", 10, interrupts = true }, { "block", 10 } } },
+    deep_breath = { name = "Deep Breath", intent = "attack", actions = { { "attack", 10, times = 2 } } },
+    claw2 = { name = "Claw", intent = "attack", actions = { { "attack", 21 } } },
     breath2 = { name = "Noxious Breath", intent = "attack", actions = { { "attack", 7, times = 2 }, { "debuff", "pain", 3 } } },
   },
   pattern = { "breath", "claw", "buffet" },
   phases = {
-    { at = 0.5, name = "The Dream", text = "Summons 2 Dreaming Whelps, then sleeps: Asleep 2, heals 10 each turn it sleeps.",
+    { at = 0.5, name = "The Dream", text = "Summons 2 Dreaming Whelps, then sleeps: Asleep 2, heals 5 each turn it sleeps.",
       pattern = { "claw2", "breath2", "buffet" },
       dream = {
         { "say", "Children of the Dream, defend me!" },
         { "summon", "somnus_whelp", count = 2 },
-        { "slumber", 2, mend = 10, opener = "deep_breath" },
+        { "slumber", 2, mend = 5, opener = "deep_breath" },
       } },
   },
 }

@@ -140,11 +140,12 @@ ns.ZoneViews.swamp = {
       return { icon = Art.intents.sleep, key = "intent:sleep", text = "Asleep " .. n, color = "defend",
         title = "Asleep " .. n,
         tip = "Skips its next " .. n .. " turn" .. (n > 1 and "s" or "") .. ". Damage wakes it up.\n"
-          .. "Rude Awakening: the first single-target hit on it deals +50%.\n" .. openerLine(c, e) }
+          .. "Rude Awakening: the first single-target hit on it deals +50%, and it acts this round.\n"
+          .. "Hits to all and DoT wake it without the bonus: it acts next round.\n" .. openerLine(c, e) }
     end
     if e.intent == S.SLEEP then
       return { icon = Art.intents.sleep, key = "intent:sleep", text = "Waking", color = "watch",
-        title = "Waking up", tip = "It woke up during the enemy turn and acts next turn.\n" .. openerLine(c, e) }
+        title = "Waking up", tip = "It woke up too late to act this round: it acts next turn.\n" .. openerLine(c, e) }
     end
     return nil
   end,

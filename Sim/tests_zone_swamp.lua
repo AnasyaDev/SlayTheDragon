@@ -70,15 +70,18 @@ return function(T)
     eq(hp - e.hp, ceil(5 * 1.5) + 5 + 5)
   end)
 
-  test("Swamp : un effet « to all » réveille sans bonus ; un tic de DoT réveille sans bonus et sans action", function()
+  test("Swamp : un effet « to all » réveille en douceur (sans bonus, ouvertures au round suivant) ; un tic de DoT aussi", function()
     local c = sw({ enemies = { "dreaming_whelp", "dreaming_whelp" }, hand = { "holy_nova" }, hp = 80 })
     local a, b = c.enemies[1], c.enemies[2]
     local ha, hb = a.hp, b.hp
     play(c, "holy_nova")
     eq(ha - a.hp, 3); eq(hb - b.hp, 3); eq(a.st.asleep, nil); eq(b.st.asleep, nil)
-    eq(a.intent, "dream_breath"); eq(b.intent, "dream_breath")
+    eq(a.intent, "asleep", "réveil doux : n'agit pas ce round"); eq(a.mem.forced, "dream_breath")
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - 2 * atk("dreaming_whelp", "dream_breath") + 2, "deux ouvertures (Regen 2 de Holy Nova au début du tour)")
+    eq(c.player.hp, 80, "aucune ouverture ce round"); eq(a.intent, "dream_breath"); eq(b.intent, "dream_breath")
+    local hp1 = c.player.hp
+    Combat.endTurn(c)
+    eq(c.player.hp, hp1 - 2 * atk("dreaming_whelp", "dream_breath") + 1, "deux ouvertures au round suivant (Regen 1)")
     -- DoT : poser ne réveille pas, le tic (début de son tour) réveille sans bonus, pas d'action ce round
     local d = sw({ enemies = { "sawtooth_crocolisk" }, hand = { "sw_pain" }, hp = 80 })
     local e = d.enemies[1]
@@ -278,7 +281,7 @@ return function(T)
     eq(c.player.hp, 80 - atk("lost_one_chieftain", "spear") - atk("lost_one_muckdweller", "stab"))
   end)
 
-  test("Swamp : Wyrmak à mi-vie s'endort APRÈS la carte (Slumber 2, soin 12 par tour de sommeil, Dream Fury)", function()
+  test("Swamp : Wyrmak à mi-vie s'endort APRÈS la carte (Slumber 2, soin 6 par tour de sommeil, Dream Fury)", function()
     local c = sw({ enemies = { "wyrmak" }, kind = "elite", hand = { "penance" }, hp = 90 })
     local w = c.enemies[1]
     w.hp = 60
@@ -286,13 +289,13 @@ return function(T)
     eq(w.hp, 60 - 15, "les trois coups sans bonus : le sommeil tombe après la carte")
     eq(w.st.asleep, 2); eq(w.intent, "asleep"); eq(w.mem.forced, "dream_fury"); eq(w.mem.phase, 1)
     Combat.endTurn(c)
-    eq(w.hp, 45 + 12); eq(w.st.asleep, 1); eq(c.player.hp, 90)
+    eq(w.hp, 45 + 6); eq(w.st.asleep, 1); eq(c.player.hp, 90)
     -- Stunned sur lui endormi : compteur gelé, pas de soin
     Combat.applyStatus(c, w, "stunned", 1)
     Combat.endTurn(c)
-    eq(w.hp, 57); eq(w.st.asleep, 1)
+    eq(w.hp, 51); eq(w.st.asleep, 1)
     Combat.endTurn(c)
-    eq(w.hp, 69); eq(w.st.asleep, nil); eq(w.intent, "dream_fury")
+    eq(w.hp, 57); eq(w.st.asleep, nil); eq(w.intent, "dream_fury")
     Combat.endTurn(c)
     eq(c.player.hp, 90 - 2 * atk("wyrmak", "dream_fury")); eq(w.intent, "cleave", "le motif reprend à Cleave")
   end)
@@ -322,7 +325,7 @@ return function(T)
     eq(s.intent, "breath")
   end)
 
-  test("Swamp : Somnus à 74 PV — deux dragonnets éveillés, Slumber 2 (soin 10), Deep Breath, motif de la phase 3", function()
+  test("Swamp : Somnus à 74 PV — deux dragonnets éveillés, Slumber 2 (soin 5), Deep Breath, motif de la phase 3", function()
     local c = sw({ enemies = { "somnus" }, kind = "boss", hand = { "smite" }, hp = 90 })
     local s = c.enemies[1]
     S.wake(c, s, "test")
@@ -333,9 +336,9 @@ return function(T)
     eq(c.enemies[2].st.asleep, nil, "dragonnets éveillés"); eq(c.enemies[2].intent, "bite")
     eq(s.st.asleep, 2); eq(s.mem.forced, "deep_breath")
     Combat.endTurn(c)
-    eq(c.player.hp, 90 - 2 * atk("somnus_whelp", "bite"), "les dragonnets mordent"); eq(s.hp, at - 3 + 10)
+    eq(c.player.hp, 90 - 2 * atk("somnus_whelp", "bite"), "les dragonnets mordent"); eq(s.hp, at - 3 + 5)
     Combat.endTurn(c)
-    eq(s.hp, at - 3 + 20); eq(s.st.asleep, nil); eq(s.intent, "deep_breath")
+    eq(s.hp, at - 3 + 10); eq(s.st.asleep, nil); eq(s.intent, "deep_breath")
     Combat.endTurn(c)
     eq(s.intent, "claw2")
     -- tuer Somnus fait fuir les dragonnets

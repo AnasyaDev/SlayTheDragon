@@ -79,8 +79,8 @@ return function(T)
   v2:Render(true)
   H.settle()
   local mend = ss.badges[1]
-  check("The Dream : deux dragonnets, Somnus endormi (« Asleep 2 »), soin de Slumber sous la bulle (« +10 »)",
-    #c2.enemies == 3 and ss.intent.text._text == "Asleep 2" and vis(mend) and mend.text._text == "+10"
+  check("The Dream : deux dragonnets, Somnus endormi (« Asleep 2 »), soin de Slumber sous la bulle (« +5 »)",
+    #c2.enemies == 3 and ss.intent.text._text == "Asleep 2" and vis(mend) and mend.text._text == "+5"
     and (ss.next._text or ""):find("Deep Breath", 1, true) ~= nil, tostring(mend and mend.text._text))
   check("décor du boss : Pool of Tears (zone)", ns.Controller.scene() == "swamp_pool", ns.Controller.scene())
   snap("zone-swamp-boss", true)

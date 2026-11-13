@@ -587,7 +587,8 @@ harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg
   annoncée en gris (« On waking: »). À son tour (crochet `enemyMove`) : soin de Slumber, compteur -1, réveil à 0 sans
   agir. Stunned : le moteur consomme le tour sans passer par `enemyMove`, le compteur gèle.
 - Réveil (`ns.Swamp.wake`) par tout dégât qui ne tue pas (`onEnemyDamaged`, Absorb compris), le compteur ou Alarm.
-  Pendant le tour du joueur (jeu, fin de tour) : l'ouverture devient l'intention tout de suite ; sinon elle sera la
+  Coup à une cible pendant le tour du joueur (jeu, fin de tour) : l'ouverture devient l'intention tout de suite ; effet à tous,
+  DoT, compteur, Alarm, ou réveil hors du tour du joueur : elle sera la
   prochaine (l'ennemi n'agit plus dans la phase en cours). Stunned sur une ouverture (y compris Freezing Trap qui
   arrête le tour pendant l'ouverture) : elle est annoncée de nouveau.
 - Rude Awakening : `enemyDamageLast` ×1,5 arrondi au supérieur, coup à une cible (`src.single`), jamais un tic de DoT,
@@ -600,70 +601,76 @@ harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg
 
 ### Ce qui diffère de la fiche, et pourquoi
 
-1. **Nombres** réglés par la simulation (la fiche visait Westfall × 1,48, mais le deck repart de zéro à chaque
-   expédition : à ces chiffres, 4 à 10 % de victoire). Normaux ≈ PV × 0,9, coups × 0,72 (ouvertures × 0,94) ; élites :
-   PV inchangés, coups × 0,78 (ouvertures × 0,9) ; Somnus 130 PV, coups × 0,78, ouvertures × 0,66. Tableau
-   ci-dessous.
-2. **Le familier ne réveille jamais seul** : l'attaque automatique vise un éveillé, et attend quand tous dorment
+1. **Réveil doux par un effet à tous** (`Swamp.SOFT_ALL`) : un effet « to all » réveille sans bonus ET l'ouverture
+   part au round suivant, comme un tic de DoT (la fiche la faisait partir dans le round). Mesuré après la fusion
+   des épiques : le Warrior (Cleave, Whirlwind, Thunder Clap) tombait à 64 % quand les autres classes étaient à
+   78-87 % ; avec le réveil doux, 67-78 % pour toutes (écart 12 points au lieu de 22). Le choix de la zone reste :
+   coup à une cible = bonus + ouverture tout de suite ; effet à tous ou DoT = pas de bonus, un round de répit.
+2. **Soin de Slumber réduit** : Wyrmak 6 par tour de sommeil (fiche : 12), Somnus 5 (fiche : 10) ; le soin punissait
+   surtout les classes lentes (Warrior, Priest).
+3. **Nombres** réglés par la simulation (la fiche visait Westfall × 1,48, mais le deck repart de zéro à chaque
+   expédition : à ces chiffres, 4 à 10 % de victoire) : normaux ≈ PV × 0,94, coups × 0,76 ; élites PV × 1,04, coups
+   × 0,83 ; Somnus 135 PV, coups × 0,83, ouvertures × 0,7. Tableau ci-dessous.
+4. **Le familier ne réveille jamais seul** : l'attaque automatique vise un éveillé, et attend quand tous dorment
    (décision : « évite les dormeurs tant qu'un ennemi est éveillé »). Sans cela, Somnus se réveillait à la fin du
    tour 1 contre le Hunter (−8 points de victoire au boss). Les attaques commandées frappent la cible de la carte.
-3. **Dreamless Sleep Potion** : « Lose all mana. » au lieu de « End your turn. » (aucun effet ne termine le tour
+5. **Dreamless Sleep Potion** : « Lose all mana. » au lieu de « End your turn. » (aucun effet ne termine le tour
    depuis une carte sans toucher au moteur et aux bots).
-4. **Lull pendant la phase ennemie** : un ennemi rendormi avant son tour dans la même phase y passe déjà un tour de
+6. **Lull pendant la phase ennemie** : un ennemi rendormi avant son tour dans la même phase y passe déjà un tour de
    sommeil (« Skips its next 2 turns ») ; le soin de 8 est immédiat.
-5. **Sleeping Camp** (`temple_steps`) : Asleep 3 posé par la rencontre (`{ "fight", "event_dragonkin", st =
+7. **Sleeping Camp** (`temple_steps`) : Asleep 3 posé par la rencontre (`{ "fight", "event_dragonkin", st =
    { asleep = 3 } }`), pas dans la composition du groupe (le test commun des groupes ne lit que des ids).
-6. **Egg of Hakkar** : « the enemy with the most HP, bosses excepted » (le harnais U29 lit « non-boss » comme du
-   français).
-7. **Rencontres sans personnage** : `temple_steps` montre le Green Scalebane endormi, `cortello_riddle` une
+8. **Egg of Hakkar** : « the enemy with the most HP, bosses excepted » (le harnais U29 lit « non-boss » comme du
+   français). **Scènes des rencontres** : noms communs (`road`, `camp`, `shop`, `hill`, `mine`, `coast`) remplacés
+   par ceux de la zone.
+9. **Rencontres sans personnage** : `temple_steps` montre le Green Scalebane endormi, `cortello_riddle` une
    Deathstrike Tarantula (le harnais demande trois candidats de modèle par rencontre).
-8. **Bot** : la vue courte est la bonne stratégie de base (un dormeur ne frappe pas ; tuer les éveillés, puis tuer
-   le dormeur réveillé par son compteur avant son ouverture). Compter d'avance les ouvertures (0,6 × leurs dégâts)
-   faisait réveiller trop tôt : 91 % → 71 % (Rogue). Le bot garde la clé (compteurs, ouvertures en attente) et le
-   soin de Slumber à venir.
-9. Non fourni (lot d'interface commun) : l'aperçu « 33 Wake » / « Wakes » au survol d'une carte (aucun aperçu de
-   dégâts dans l'écran de combat). À la place : infobulle du dormeur (tours, réveil, Rude Awakening, ouverture et ses
-   chiffres), petite icône d'ouverture à droite d'une ouverture annoncée, pastilles « +12 » (soin de Slumber) et
-   « Lulled » sous la bulle, bulles « Wakes 2 » (Alarm) et « +8 » (Lull, « - » sans cible).
+10. **Bot** : la vue courte est la bonne stratégie de base (un dormeur ne frappe pas ; tuer les éveillés, puis tuer
+    le dormeur réveillé par son compteur avant son ouverture). Compter d'avance les ouvertures (0,6 × leurs dégâts)
+    faisait réveiller trop tôt : 91 % → 71 % (Rogue). Le bot garde la clé (compteurs, ouvertures en attente) et le
+    soin de Slumber à venir.
+11. Non fourni (lot d'interface commun) : l'aperçu « 33 Wake » / « Wakes » au survol d'une carte (aucun aperçu de
+    dégâts dans l'écran de combat). À la place : infobulle du dormeur (tours, réveil fort ou doux, Rude Awakening,
+    ouverture et ses chiffres), petite icône d'ouverture à droite d'une ouverture annoncée, pastilles « +6 » (soin de
+    Slumber) et « Lulled » sous la bulle, bulles « Wakes 2 » (Alarm) et « +8 » (Lull, « - » sans cible), bulle
+    « Waking » d'un ennemi réveillé qui n'agit pas ce round.
 
 ### Nombres finaux
 
 | Ennemi | PV | Coups |
 |---|---|---|
-| Sawtooth Crocolisk | 36–40, Asleep 2 | Death Roll 19 · Snap 9 · Submerge block 7 |
-| Dreaming Whelp | 14–15, Asleep 2 | Dream Breath 9 · Bite 4 |
-| Swampwalker | 43–47, Asleep 3 | Bog Crush 21 (interrompt) · Vine Lash 7 · Bog Shield 6 + 6 au plus blessé |
-| Green Scalebane | 40–43, Asleep 2 | Cleave 22 · Strike 9 · Scale Guard block 9, Strength 1 |
-| Wyrmkin Dreamwalker | 27–30 | Lull (Asleep 2, soin 8) · Dream Bolt 4 +3 par dormeur (+9 au plus) |
-| Marsh Oracle | 22–24 | Alarm Cry · Lightning Bolt 7 |
-| Deathstrike Tarantula | 27–30 | Venomous Bite 5 + DoT 3 · Web 4 + Demoralized 1 |
-| Marsh Inkspewer | 14–16 | Claw 4 · Ink Spit 3 + Sundered 1 |
-| Lost One Hunter | 29–32 | Spear Thrust 9 · Net 4 + Demoralized 1 |
-| Lost One Chieftain (élite) | 104, Asleep 2 | Spear of the Lost 23 · Thrust 12 · Rally block 8 + Strength 2 · Crushing Blow 7 + Sundered 1 |
-| Lost One Muckdweller (serviteur) | 20–22 | Warning Horn (Alarm) · Stab 5 |
-| Lord Captain Wyrmak (élite) | 112 | Cleave 14 · Tail Sweep 7 + block 8 · Wing Buffet 9 + Demoralized ; à 56 : Slumber 2, soin 12, Dream Fury 13 × 2 |
-| Gilmorian (élite) | 104 | Lightning Bolt 19 (Cast) · Frost Shock 6 + Demoralized · Healing Wave 20 (Cast) |
-| Somnus (boss) | 130, Asleep 2 | Bellowing Roar 15 + Demoralized ; Noxious Breath 6 × 2 + DoT 3 · Claw 19 · Wing Buffet 9 + block 9 ; à 65 : 2 dragonnets (13 PV, Bite 4), Slumber 2, soin 10, Deep Breath 9 × 2, puis Claw 20 · Breath 7 × 2 + DoT 3 · Buffet |
+| Sawtooth Crocolisk | 37–42, Asleep 2 | Death Roll 20 · Snap 10 · Submerge block 7 |
+| Dreaming Whelp | 15–16, Asleep 2 | Dream Breath 10 · Bite 4 |
+| Swampwalker | 45–49, Asleep 3 | Bog Crush 22 (interrompt) · Vine Lash 7 · Bog Shield 6 + 6 au plus blessé |
+| Green Scalebane | 42–45, Asleep 2 | Cleave 23 · Strike 10 · Scale Guard block 10, Strength 1 |
+| Wyrmkin Dreamwalker | 28–31 | Lull (Asleep 2, soin 8) · Dream Bolt 4 +3 par dormeur (+9 au plus) |
+| Marsh Oracle | 23–25 | Alarm Cry · Lightning Bolt 7 |
+| Deathstrike Tarantula | 28–31 | Venomous Bite 5 + DoT 3 · Web 4 + Demoralized 1 |
+| Marsh Inkspewer | 15–17 | Claw 4 · Ink Spit 3 + Sundered 1 |
+| Lost One Hunter | 30–33 | Spear Thrust 10 · Net 4 + Demoralized 1 |
+| Lost One Chieftain (élite) | 108, Asleep 2 | Spear of the Lost 24 · Thrust 13 · Rally block 8 + Strength 2 · Crushing Blow 7 + Sundered 1 |
+| Lost One Muckdweller (serviteur) | 21–23 | Warning Horn (Alarm) · Stab 5 |
+| Lord Captain Wyrmak (élite) | 116 | Cleave 15 · Tail Sweep 7 + block 8 · Wing Buffet 10 + Demoralized ; à 58 : Slumber 2, soin 6, Dream Fury 14 × 2 |
+| Gilmorian (élite) | 108 | Lightning Bolt 20 (Cast) · Frost Shock 6 + Demoralized · Healing Wave 20 (Cast) |
+| Somnus (boss) | 135, Asleep 2 | Bellowing Roar 16 + Demoralized ; Noxious Breath 6 × 2 + DoT 3 · Claw 20 · Wing Buffet 10 + block 10 ; à 67 : 2 dragonnets (14 PV, Bite 4), Slumber 2, soin 5, Deep Breath 10 × 2, puis Claw 21 · Breath 7 × 2 + DoT 3 · Buffet |
 
-### Mesures (14/11/2026, 400 expéditions par classe, `runner=expedition key=0 zone=swamp zones=4 level=7 epic=none`)
+### Mesures (14/11/2026, après la fusion des épiques ; 400 expéditions par classe et par colonne,
+`runner=expedition key=0 zone=swamp zones=4 level=7`, avec `epic=none` et sans `epic=` : le bot choisit une épique)
 
-| Classe | Victoire | PV perdus / combat normal | Tours (normal) | Boss : victoire, tours, PV perdus |
-|---|---|---|---|---|
-| Priest | 82,5 % | 12,0 | 4,67 | 84,2 %, 7,77, 34,8 |
-| Warrior | 66,5 % | 12,5 | 4,12 | 75,4 %, 7,48, 41,0 |
-| Mage | 67,2 % | 7,3 | 3,79 | 73,7 %, 5,84, 26,3 |
-| Rogue | 61,8 % | 10,1 | 3,72 | 79,4 %, 6,01, 23,2 |
-| Hunter | 59,5 % | 5,8 | 3,49 | 60,4 %, 6,51, 32,2 |
+| Classe | Victoire sans épique | Victoire avec épique | PV perdus / normal (avec) | Tours / normal (avec) | Boss avec épique : victoire, tours, PV perdus |
+|---|---|---|---|---|---|
+| Priest | 75,0 % | 71,2 % | 13,9 | 4,21 | 78,7 %, 6,73, 35,9 |
+| Warrior | 61,5 % | 67,5 % | 12,5 | 3,42 | 80,6 %, 6,18, 35,3 |
+| Mage | 55,0 % | 78,0 % | 6,0 | 3,35 | 83,0 %, 5,03, 22,5 |
+| Rogue | 52,5 % | 65,8 % | 10,1 | 3,49 | 87,1 %, 5,32, 18,3 |
+| Hunter | 53,5 % | 74,5 % | 5,7 | 2,81 | 78,2 %, 5,86, 27,3 |
 
-Clés (Rogue) : +0 61,8 %, +1 51,5 %, +3 38,2 %, +5 30,0 % (−10 à +1, puis −6,5 et −4 par niveau : affixes communs).
-Statistiques de zone (Rogue, par combat normal) : 0,55 ouverture subie, 0,45 dormeur tué avant son ouverture, 0,15
-tué endormi, 0,44 Rude Awakening (+2,05 dégâts), 0,32 Alarm (0,34 réveillés) ; boss : 1,77 ouverture, 0,97 Slumber.
-
-Écart entre classes : 59,5 à 67,2 % pour quatre classes ; **le Priest reste au-dessus (82,5 %)**. Westfall a le même
-écart (Priest 81 %, Rogue 70,5 % au 14/11) : il vient de la classe (soins sur les combats longs), pas de la zone ;
-renforcer les ouvertures pour punir ses 36 PV (essai « opn 1,45 ») baissait toutes les classes d'autant. À régler
-côté classes, ou avec les épiques. Combats normaux un peu longs pour le Priest (4,7 tours) et coûteux pour Priest
-et Warrior (12 PV, mais 36 et 74 PV max).
+Écart : avec épique 65,8 à 78,0 % (12 points) ; sans épique 52,5 à 61,5 % pour quatre classes, Priest 75 % (il est
+aussi le plus haut en Westfall sans épique : 81 % contre 70,5 % au Rogue). Combats normaux un peu chers pour Priest
+et Warrior (12 à 14 PV, pour 36 et 74 PV max), un peu longs pour le Priest sans épique (4,9 tours).
+Clés (Rogue avec épique) : +0 65,8 %, +1 58,8 %, +3 49,8 %, +5 43,0 % (−7, puis −4,5 et −3,4 par niveau ; affixes
+communs). Statistiques de zone : `reports/final.txt` (avant la fusion : 0,55 ouverture subie par combat normal,
+0,45 dormeur tué avant son ouverture, 0,44 Rude Awakening, 0,32 Alarm).
 
 ### Modèles en repli
 

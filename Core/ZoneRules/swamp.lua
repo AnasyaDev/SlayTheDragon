@@ -5,7 +5,8 @@
 -- d'abord de `mend`) ; à 0 il se réveille sans agir. Tout dégât le réveille (même absorbé, pas un coup
 -- mortel) ; le premier coup À UNE CIBLE (pas un tic de DoT) a +50 % (Rude Awakening, en dernier, avant son
 -- Absorb). Au réveil, son ouverture (def.opener, ou celle posée par Slumber) devient son intention : jouée à
--- la phase ennemie de ce round s'il se réveille pendant le tour du joueur, au round suivant sinon. Stunned
+-- la phase ennemie de ce round s'il est réveillé par un coup à une cible pendant le tour du joueur, au round
+-- suivant sinon (effet à tous ou DoT : réveil doux, SOFT_ALL ; compteur, Alarm). Stunned
 -- sur un dormeur gèle son compteur ; sur une ouverture, la retarde sans la perdre.
 --
 -- Mise en œuvre : un dormeur a pour intention le move « asleep » (Swamp.SLEEP, ajouté à la définition de
@@ -28,6 +29,7 @@ Swamp.SLEEP = "asleep"          -- move d'un dormeur (intention « sleep »)
 Swamp.BONUS = 1.5               -- Rude Awakening
 Swamp.LULL_MIN_LOST = 8         -- Lull : PV perdus au moins par la cible
 Swamp.SLEEP_RELICS = { egg_of_hakkar = true }
+Swamp.SOFT_ALL = true           -- un effet à tous réveille en douceur (ouverture au round suivant)
 Swamp.PET_WAITS = true          -- familier : aucune attaque automatique quand tous les ennemis dorment
 
 ns.Statuses.asleep = { name = "Asleep", debuff = true, turns = true, max = 4,
@@ -93,7 +95,8 @@ function Swamp.wake(c, e, cause)
   ZR.float(c, e.uid, "Wakes up!", "attackText")
   stat(c, "wake_" .. (cause or "effect"))
   local op = opener(e)
-  local now = c.step == "play" or c.step == "turnEnd"
+  -- réveil « doux » (effet à tous, comme un DoT) : ouverture au round suivant, même pendant le tour du joueur
+  local now = (c.step == "play" or c.step == "turnEnd") and not (Swamp.SOFT_ALL and cause == "all")
   e.mem.forced, e.mem.forcedLabel = nil, nil
   if op then
     s.pending = true
