@@ -11,6 +11,16 @@ return function(T)
     return combat(o)
   end
   local function zstat(c, k) return c.stats and c.stats.zone and c.stats.zone[k] or 0 end
+  -- premier coup d'attaque (base) d'un move, et nombre de coups
+  local function atk(id, mv)
+    for _, a in ipairs(ns.Enemies[id].moves[mv].actions) do if a[1] == "attack" then return a[2], a.times or 1 end end
+    return 0, 0
+  end
+  local function block(id, mv, k)
+    local n = 0
+    for _, a in ipairs(ns.Enemies[id].moves[mv].actions) do if a[1] == k then n = a[2] end end
+    return n
+  end
   local function idOf(c, id)
     for i, e in ipairs(c.enemies) do if e.id == id then return e, i end end
   end
@@ -38,7 +48,7 @@ return function(T)
     Combat.endTurn(c)
     eq(c.player.hp, 80, "réveil sans agir"); eq(e.st.asleep, nil); eq(e.intent, "death_roll", "ouverture annoncée")
     Combat.endTurn(c)
-    eq(c.player.hp, 60, "Death Roll 20"); eq(e.intent, "snap", "le motif reprend au début")
+    eq(c.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll"), "Death Roll"); eq(e.intent, "snap", "le motif reprend au début")
   end)
 
   test("Swamp : Rude Awakening (+50 % arrondi au supérieur, coup à une cible), réveil, ouverture dans ce round", function()
@@ -48,7 +58,7 @@ return function(T)
     play(c, "smite", 1)
     eq(hp - e.hp, ceil(8 * 1.5)); eq(e.st.asleep, nil); eq(e.intent, "death_roll"); eq(e.mem.forced, nil)
     Combat.endTurn(c)
-    eq(c.player.hp, 60, "ouverture jouée dans la phase ennemie de ce round")
+    eq(c.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll"), "ouverture jouée dans la phase ennemie de ce round")
     eq(e.intent, "snap")
   end)
 
@@ -68,7 +78,7 @@ return function(T)
     eq(ha - a.hp, 3); eq(hb - b.hp, 3); eq(a.st.asleep, nil); eq(b.st.asleep, nil)
     eq(a.intent, "dream_breath"); eq(b.intent, "dream_breath")
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - 20 + 2, "deux ouvertures (Regen 2 de Holy Nova au début du tour)")
+    eq(c.player.hp, 80 - 2 * atk("dreaming_whelp", "dream_breath") + 2, "deux ouvertures (Regen 2 de Holy Nova au début du tour)")
     -- DoT : poser ne réveille pas, le tic (début de son tour) réveille sans bonus, pas d'action ce round
     local d = sw({ enemies = { "sawtooth_crocolisk" }, hand = { "sw_pain" }, hp = 80 })
     local e = d.enemies[1]
@@ -109,7 +119,7 @@ return function(T)
     Combat.endTurn(d)
     eq(d.player.hp, 80, "tour perdu"); eq(x.intent, "death_roll", "ouverture gardée")
     Combat.endTurn(d)
-    eq(d.player.hp, 60)
+    eq(d.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll"))
   end)
 
   test("Swamp : Freezing Trap pendant l'ouverture : tour arrêté, ouverture rejouée ; un dormeur ne déclenche pas de Trap", function()
@@ -152,14 +162,13 @@ return function(T)
     local hp = croc.hp
     play(c, "arcane_shot", 1)
     eq(hp - croc.hp, ceil(3 * 1.5) + (ns.Hunter.PET_BASE + 0), "tir avec bonus, puis le familier sans bonus")
-    -- seul un dormeur : l'attaque automatique le vise (avec le bonus)
+    -- seuls des dormeurs : l'attaque automatique attend (le familier ne réveille jamais seul)
     local d = sw({ class = "hunter", enemies = { "sawtooth_crocolisk" }, hand = {} })
     local x = d.enemies[1]
     d.player.res = 3
     local hx = x.hp
     Combat.endTurn(d)
-    eq(hx - x.hp, ceil((ns.Hunter.PET_BASE + 3) * 1.5)); eq(x.st.asleep, nil)
-    eq(d.player.hp, 40, "réveillé en fin de tour du joueur : ouverture dans ce round")
+    eq(x.hp, hx); eq(x.st.asleep, 1); eq(d.player.hp, 60)
   end)
 
   ---------------------------------------------------------------------------
@@ -169,7 +178,7 @@ return function(T)
   test("Swamp : Wyrmkin Dreamwalker — Dream Bolt +3 par allié endormi (+9 au plus) ; Lull sur l'éveillé blessé", function()
     local c = sw({ enemies = { "wyrmkin_dreamwalker", "dreaming_whelp", "dreaming_whelp", "marsh_inkspewer" }, hp = 80 })
     local dw = c.enemies[1]
-    eq(dw.intent, "bolt"); eq(Combat.intentInfo(c, dw).damage, 6 + 6)
+    eq(dw.intent, "bolt"); eq(Combat.intentInfo(c, dw).damage, atk("wyrmkin_dreamwalker", "bolt") + 6)
     -- Lull : l'inkspewer blessé de 8 est rendormi et soigné
     local ink = c.enemies[4]
     ink.hp = ink.maxHp - 9
@@ -210,7 +219,7 @@ return function(T)
     eq(croc.intent, "death_roll"); eq(wh.intent, "dream_breath")
     eq(o.intent, "bolt")
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - 20 - 10 - 10, "deux ouvertures et Lightning Bolt")
+    eq(c.player.hp, 80 - atk("sawtooth_crocolisk", "death_roll") - atk("dreaming_whelp", "dream_breath") - atk("marsh_oracle", "bolt"), "deux ouvertures et Lightning Bolt")
   end)
 
   test("Swamp : Alarm interrompue ne réveille personne", function()
@@ -226,7 +235,7 @@ return function(T)
     eq(w.st.asleep, 3); eq(w.mem.forced, "bog_crush")
     croc.hp = croc.maxHp - 5
     for _, a in ipairs(ns.Enemies.swampwalker.moves.shield.actions) do Combat.enemyAction(c, w, a) end
-    eq(w.block, 8); eq(croc.block, 8)
+    eq(w.block, block("swampwalker", "shield", "block")); eq(croc.block, block("swampwalker", "shield", "block_wounded"))
     assert(ns.Enemies.swampwalker.moves.bog_crush.actions[1].interrupts)
   end)
 
@@ -252,7 +261,7 @@ return function(T)
     local c = sw({ enemies = { "deathstrike_tarantula" }, hp = 80 })
     c.enemies[1].intent = "bite"
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - 7 - 3, "Venomous Bite puis le tic du DoT au début du tour");
+    eq(c.player.hp, 80 - atk("deathstrike_tarantula", "bite") - 3, "Venomous Bite puis le tic du DoT au début du tour");
   end)
 
   ---------------------------------------------------------------------------
@@ -266,7 +275,7 @@ return function(T)
     Combat.endTurn(c)
     eq(ch.st.asleep, nil); eq(ch.intent, "spear"); eq(c.player.hp, 80)
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - 26 - 7)
+    eq(c.player.hp, 80 - atk("lost_one_chieftain", "spear") - atk("lost_one_muckdweller", "stab"))
   end)
 
   test("Swamp : Wyrmak à mi-vie s'endort APRÈS la carte (Slumber 2, soin 12 par tour de sommeil, Dream Fury)", function()
@@ -285,7 +294,7 @@ return function(T)
     Combat.endTurn(c)
     eq(w.hp, 69); eq(w.st.asleep, nil); eq(w.intent, "dream_fury")
     Combat.endTurn(c)
-    eq(c.player.hp, 90 - 28); eq(w.intent, "cleave", "le motif reprend à Cleave")
+    eq(c.player.hp, 90 - 2 * atk("wyrmak", "dream_fury")); eq(w.intent, "cleave", "le motif reprend à Cleave")
   end)
 
   test("Swamp : Gilmorian — deux incantations (Lightning Bolt, Healing Wave), Frost Shock interrompt", function()
@@ -293,7 +302,7 @@ return function(T)
     local g = c.enemies[1]
     eq(g.intent, "bolt"); assert(Combat.intentInfo(c, g).cast)
     Combat.endTurn(c)
-    eq(c.player.hp, 56)
+    eq(c.player.hp, 80 - atk("gilmorian", "bolt"))
     g.hp = 50
     g.intent = "wave"
     Combat.endTurn(c)
@@ -303,13 +312,13 @@ return function(T)
   test("Swamp : Somnus — Asleep 2 et Bellowing Roar ; immunisé à Stunned et à Dream Dust", function()
     local c = sw({ enemies = { "somnus" }, kind = "boss", hand = { "dream_dust", "chastise" }, hp = 90 })
     local s = c.enemies[1]
-    eq(s.st.asleep, 2); eq(s.mem.forced, "roar"); eq(s.maxHp, 148)
+    eq(s.st.asleep, 2); eq(s.mem.forced, "roar"); eq(s.maxHp, ns.Enemies.somnus.hp)
     play(c, "dream_dust", 1)
     eq(s.st.asleep, 2, "Dream Dust sans effet sur un boss")
     play(c, "chastise", 1)
     eq(s.st.stunned, nil); eq(s.st.asleep, nil, "réveillé par le coup"); eq(s.intent, "roar")
     Combat.endTurn(c)
-    eq(c.player.hp, 90 - 22); eq(c.player.st.demoralized ~= nil, true)
+    eq(c.player.hp, 90 - atk("somnus", "roar")); eq(c.player.st.demoralized ~= nil, true)
     eq(s.intent, "breath")
   end)
 
@@ -317,15 +326,16 @@ return function(T)
     local c = sw({ enemies = { "somnus" }, kind = "boss", hand = { "smite" }, hp = 90 })
     local s = c.enemies[1]
     S.wake(c, s, "test")
-    s.hp = 80
+    local at = math.floor(s.maxHp * 0.5)
+    s.hp = at + 5
     play(c, "smite", 1)
-    eq(s.hp, 72); eq(#c.enemies, 3); eq(c.enemies[2].id, "somnus_whelp"); eq(c.enemies[2].minion, true)
+    eq(s.hp, at - 3); eq(#c.enemies, 3); eq(c.enemies[2].id, "somnus_whelp"); eq(c.enemies[2].minion, true)
     eq(c.enemies[2].st.asleep, nil, "dragonnets éveillés"); eq(c.enemies[2].intent, "bite")
     eq(s.st.asleep, 2); eq(s.mem.forced, "deep_breath")
     Combat.endTurn(c)
-    eq(c.player.hp, 90 - 12, "les dragonnets mordent"); eq(s.hp, 82)
+    eq(c.player.hp, 90 - 2 * atk("somnus_whelp", "bite"), "les dragonnets mordent"); eq(s.hp, at - 3 + 10)
     Combat.endTurn(c)
-    eq(s.hp, 92); eq(s.st.asleep, nil); eq(s.intent, "deep_breath")
+    eq(s.hp, at - 3 + 20); eq(s.st.asleep, nil); eq(s.intent, "deep_breath")
     Combat.endTurn(c)
     eq(s.intent, "claw2")
     -- tuer Somnus fait fuir les dragonnets
@@ -381,10 +391,10 @@ return function(T)
     local h = c.enemies[1]
     h.intent = "thrust"
     Combat.endTurn(c)
-    eq(c.player.hp, 80 - 10, "premier coup -3")
+    eq(c.player.hp, 80 - (atk("lost_one_hunter", "thrust") - 3), "premier coup -3")
     h.intent = "thrust"
     Combat.endTurn(c)
-    eq(c.player.hp, 70 - 13)
+    eq(c.player.hp, 80 - (atk("lost_one_hunter", "thrust") - 3) - atk("lost_one_hunter", "thrust"))
     local d = sw({ enemies = { "lost_one_hunter" }, relics = { "tender_crocolisk_meat" }, kind = "elite", hand = { "smite" } })
     d.player.hp = 30
     d.enemies[1].hp = 1

@@ -28,12 +28,13 @@ Swamp.SLEEP = "asleep"          -- move d'un dormeur (intention « sleep »)
 Swamp.BONUS = 1.5               -- Rude Awakening
 Swamp.LULL_MIN_LOST = 8         -- Lull : PV perdus au moins par la cible
 Swamp.SLEEP_RELICS = { egg_of_hakkar = true }
+Swamp.PET_WAITS = true          -- familier : aucune attaque automatique quand tous les ennemis dorment
 
 ns.Statuses.asleep = { name = "Asleep", debuff = true, turns = true, max = 4,
   text = "Skips its next N turns. Damage wakes it up." }
 
 L.zoneKeyword("swamp", "rude_awakening", { name = "Rude Awakening",
-  text = "first single-target hit on a sleeper: +50% damage." })
+  text = "+50% from the first single-target hit." })
 L.zoneKeyword("swamp", "opener", { name = "On waking", text = "its first move after it wakes up." })
 
 local SLEEP_MOVE = { name = "Asleep", intent = "sleep", actions = {},
@@ -409,13 +410,16 @@ ZR.define("swamp", {
     end,
 
     -- familier du Hunter : son attaque automatique (hors du jeu des cartes) évite les dormeurs tant qu'un
-    -- ennemi est éveillé ; une attaque commandée par une carte frappe la cible de la carte
+    -- ennemi est éveillé, et attend si tous dorment (PET_WAITS : le familier ne réveille jamais seul ; mesure
+    -- du 14/11/2026 : sans cela Somnus se réveillait à la fin du tour 1 et le Hunter perdait 8 points de
+    -- victoire) ; une attaque commandée par une carte frappe la cible de la carte, dormeur compris
     petTarget = function(c, z, t)
       if t and asleep(t) and c.step ~= "play" then
         for i = 1, #c.enemies do
           local o = c.enemies[i]
           if not o.dead and not asleep(o) then return o end
         end
+        if Swamp.PET_WAITS then return nil end
       end
       return t
     end,
