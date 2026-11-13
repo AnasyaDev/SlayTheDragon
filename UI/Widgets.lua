@@ -1549,6 +1549,8 @@ function W.hpBar(parent, w, h, textSize, piece)
   f:EnableMouse(true)
   W.tooltip(f, function(tt, self)
     if self.hp then tt:AddLine("Health: " .. self.hp .. " / " .. self.maxHp, 1, 0.5, 0.45) end
+    -- lignes en plus posées par l'écran (crans de vie d'un ennemi : phases, seuils de zone)
+    if self.extraTip then self.extraTip(tt, self) end
   end, "ANCHOR_TOP")
   f.ghost:Hide()
   return f
@@ -1743,6 +1745,9 @@ function W.cardKeywords(d)
       for cl in (text .. "\n"):gmatch("(.-)\n") do
         if cl:find(kw.pattern) then add(key) end
       end
+    elseif kw.zone and W.hasPhrase(text, kw.name) then
+      -- mot-clé de zone (L.zoneKeyword) cité par la carte : Curse, Hex, Douse…
+      add(key)
     end
   end
   local ids = {}
@@ -1834,6 +1839,9 @@ function W.fillCardTooltip(tt, id, up, extra)
   -- carte en main : Cast qui partira tout de suite (Instant), choix de la carte gardée en fin de tour
   if extra and extra.instant then wrap(tt, W.INSTANT_HINT, 0.85, 0.85, 0.85) end
   if extra and extra.keepPick then wrap(tt, W.KEEP_HINT, 1, 0.82, 0) end
+  -- carte de zone : carte d'origine d'une carte transformée, marque posée par une zone (Hex visé)
+  if extra and extra.zoneTag then wrap(tt, extra.zoneTag, 0.75, 0.6, 1) end
+  if extra and extra.markTip then wrap(tt, extra.markTip, 0.55, 1, 0.55) end
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
@@ -3345,6 +3353,11 @@ function W.card(parent)
   place(b.ribbon, org, P.card_ribbon)
   b.gem = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 3))
   b.gem:Hide()
+  -- marque d'une zone (opts.markIcon : carte que vise un Hex), coin haut droit du corps, cachée
+  b.markIcon = W.noSnap(face:CreateTexture(nil, "ARTWORK", nil, 6)) -- sous les textes (OVERLAY)
+  b.markIcon:SetSize(0.2 * CW, 0.2 * CW)
+  b.markIcon:SetPoint("CENTER", b.bg, "TOPRIGHT", -0.06 * CW, -0.06 * CW)
+  b.markIcon:Hide()
 
   -- textes
   b.name = W.label(face, "bold", 10, C.text, "OVERLAY")
@@ -3423,7 +3436,9 @@ function W.card(parent)
       table.insert(pills, at, W.colorize("Instant", W.INSTANT_COLOR))
     end
     -- liseré tenu : Instant (bleu) ou choix de la carte gardée en fin de tour (or)
-    local rim = opts.keepPick and W.KEEP_RIM_COLOR or (opts.instant and not dim and W.INSTANT_RIM_COLOR) or nil
+    -- liseré d'une zone (opts.markRim : carte que vise un Hex), après les deux autres
+    local rim = opts.keepPick and W.KEEP_RIM_COLOR or (opts.instant and not dim and W.INSTANT_RIM_COLOR)
+      or opts.markRim or nil
     if rim then
       self.rim:SetVertexColor(rim[1], rim[2], rim[3], 1)
       self.rim:SetAlpha(rim[4] or 1)
@@ -3431,7 +3446,26 @@ function W.card(parent)
     else
       self.rim:Hide()
     end
-    self.rimKind = rim and (opts.keepPick and "keep" or "instant") or nil
+    self.rimKind = rim and (opts.keepPick and "keep" or ((opts.instant and not dim) and "instant") or "mark") or nil
+    if opts.markIcon then
+      W.setIcon(self.markIcon, opts.markIcon, "mark:" .. tostring(opts.markKey or id))
+      self.markIcon:Show()
+    else
+      self.markIcon:Hide()
+    end
+    -- plaque au-dessus de la carte (opts.zoneTag : nom de la carte d'origine d'une carte transformée)
+    if opts.zoneTag then
+      local zp = cardPlaque(self, "zoneTagPlate", 0.9 * CW, 18)
+      zp:ClearAllPoints()
+      zp:SetPoint("CENTER", self.bg, "TOPLEFT", CW / 2, 4)
+      zp:SetIcon(nil)
+      zp.text:SetText(opts.zoneTag)
+      zp.text:SetTextColor(0.85, 0.75, 1)
+      zp.plaque:SetRim(Art.rim.violet)
+      zp:Show()
+    elseif self.zoneTagPlate then
+      self.zoneTagPlate:Hide()
+    end
     if #pills > 0 then
       fitPlate(self, pills)
       self.plate:Show()

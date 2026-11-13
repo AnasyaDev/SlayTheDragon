@@ -49,6 +49,17 @@ local function stat(c, key, n)
   if s then s[key] = (s[key] or 0) + (n or 1) end
 end
 
+Combat.stat = stat
+
+-- Statistique propre à une zone (simulation) : c.stats.zone[clé] += n ; Sim/sim.lua additionne et affiche
+-- ces compteurs par type de combat (« Statistiques de zone »).
+function Combat.zstat(c, key, n)
+  local s = c.stats
+  if not s then return end
+  s.zone = s.zone or {}
+  s.zone[key] = (s.zone[key] or 0) + (n or 1)
+end
+
 local function statById(c, key, id, n)
   local s = c.stats
   if s then
@@ -78,37 +89,53 @@ local function epicHooks(c)
   local d = Card.def(e)
   return d.deckHooks, d.hooks
 end
+-- Règles de zone (Core/ZoneRules/<zone>.lua) : ns.ZoneRules[id] = { hooks = {...}, init = f(c, z),
+-- always = bool, run = {...}, campfire = {...}, botKey, botValue }. Actives dans un combat : la zone de
+-- l'expédition (c.zone) et toutes celles qui portent always = true (mécanique sortie de sa zone : Asleep).
+-- Liste figée à la création du combat dans c.zr (nil sans règle : aucun coût) ; état de chaque zone dans
+-- c.zs[id] (données simples, copiées en profondeur par Combat.clone). Leurs crochets passent APRÈS ceux
+-- de la classe et AVANT ceux des passifs du deck (épiques), pouvoirs, bibelots et affixes, avec src = c.zs[id].
+ns.ZoneRules = ns.ZoneRules or {}
+local ZRules = ns.ZoneRules
 
 -- Valeur modifiée : chaque crochet reçoit (c, src, v, ...) et renvoie la nouvelle valeur.
-function Combat.modify(c, name, v, a, b, d)
+function Combat.modify(c, name, v, a, b, d, x)
   local cr = Rules[c.class]
   local ch = cr and cr.hooks and cr.hooks[name]
-  if ch then v = ch(c, c.cls, v, a, b, d) end
-  local powers = c.player.powers
-  for i = 1, #powers do
-    local h = Card.def(powers[i]).hooks
-    h = h and h[name]
-    if h then v = h(c, powers[i], v, a, b, d) end
+  if ch then v = ch(c, c.cls, v, a, b, d, x) end
+  local zr = c.zr
+  if zr then
+    for i = 1, #zr do
+      local r = ZRules[zr[i]]
+      local h = r and r.hooks and r.hooks[name]
+      if h then v = h(c, c.zs[zr[i]], v, a, b, d, x) end
+    end
   end
   local ps = c.passives -- cartes du deck à effet passif (def.deckHooks, Combat.new), src = l'instance
   if ps then
     for i = 1, #ps do
       local h = Card.def(ps[i]).deckHooks[name]
-      if h then v = h(c, ps[i], v, a, b, d) end
+      if h then v = h(c, ps[i], v, a, b, d, x) end
     end
+  end
+  local powers = c.player.powers
+  for i = 1, #powers do
+    local h = Card.def(powers[i]).hooks
+    h = h and h[name]
+    if h then v = h(c, powers[i], v, a, b, d, x) end
   end
   local relics = c.relics
   for i = 1, #relics do
     local r = ns.Relics[relics[i]]
     local h = r and r.hooks and r.hooks[name]
-    if h then v = h(c, relics[i], v, a, b, d) end
+    if h then v = h(c, relics[i], v, a, b, d, x) end
   end
   local affixes = c.affixes -- affixes mythiques (ns.Affixes), mêmes crochets
   if affixes then
     for i = 1, #affixes do
       local af = ns.Affixes[affixes[i]]
       local h = af and af.hooks and af.hooks[name]
-      if h then v = h(c, affixes[i], v, a, b, d) end
+      if h then v = h(c, affixes[i], v, a, b, d, x) end
     end
   end
   if c.epic then
@@ -123,36 +150,44 @@ end
 
 -- Notification : chaque crochet reçoit (c, src, ...) ; s'il renvoie true, on s'arrête
 -- et fire renvoie true (sert à « empêcher la mort », par exemple) et la source qui l'a arrêtée
--- (l'état de classe, l'instance du pouvoir, l'id du bibelot ou de l'affixe).
-function Combat.fire(c, name, a, b, d)
+-- (l'état de classe ou de zone, l'instance du pouvoir, l'id du bibelot ou de l'affixe).
+function Combat.fire(c, name, a, b, d, x)
   local cr = Rules[c.class]
   local ch = cr and cr.hooks and cr.hooks[name]
-  if ch and ch(c, c.cls, a, b, d) then return true, c.cls end
-  local powers = c.player.powers
-  for i = 1, #powers do
-    local h = Card.def(powers[i]).hooks
-    h = h and h[name]
-    if h and h(c, powers[i], a, b, d) then return true, powers[i] end
+  if ch and ch(c, c.cls, a, b, d, x) then return true, c.cls end
+  local zr = c.zr
+  if zr then
+    for i = 1, #zr do
+      local r = ZRules[zr[i]]
+      local h = r and r.hooks and r.hooks[name]
+      if h and h(c, c.zs[zr[i]], a, b, d, x) then return true, c.zs[zr[i]] end
+    end
   end
   local ps = c.passives
   if ps then
     for i = 1, #ps do
       local h = Card.def(ps[i]).deckHooks[name]
-      if h and h(c, ps[i], a, b, d) then return true, ps[i] end
+      if h and h(c, ps[i], a, b, d, x) then return true, ps[i] end
     end
+  end
+  local powers = c.player.powers
+  for i = 1, #powers do
+    local h = Card.def(powers[i]).hooks
+    h = h and h[name]
+    if h and h(c, powers[i], a, b, d, x) then return true, powers[i] end
   end
   local relics = c.relics
   for i = 1, #relics do
     local r = ns.Relics[relics[i]]
     local h = r and r.hooks and r.hooks[name]
-    if h and h(c, relics[i], a, b, d) then return true, relics[i] end
+    if h and h(c, relics[i], a, b, d, x) then return true, relics[i] end
   end
   local affixes = c.affixes
   if affixes then
     for i = 1, #affixes do
       local af = ns.Affixes[affixes[i]]
       local h = af and af.hooks and af.hooks[name]
-      if h and h(c, affixes[i], a, b, d) then return true, affixes[i] end
+      if h and h(c, affixes[i], a, b, d, x) then return true, affixes[i] end
     end
   end
   if c.epic then
@@ -163,6 +198,97 @@ function Combat.fire(c, name, a, b, d)
     if h and h(c, c.epic, a, b, d) then return true, c.epic end
   end
   return false
+end
+
+-- État d'une zone dans ce combat (nil si ses règles ne sont pas actives).
+function Combat.zoneState(c, id)
+  return c.zs and c.zs[id] or nil
+end
+
+-- Noms de crochets écoutés dans ce combat (c.hk, posé par Combat.new : classe, zones actives, bibelots,
+-- affixes, toutes les cartes du deck ; complété par Combat.addCard). Les notifications ajoutées pour les
+-- zones (onEffectEnd, onCardDiscarded, enemyMove…) ne parcourent les crochets que si leur nom y figure :
+-- le moteur reste aussi rapide sans zone. c.hk absent (ancienne sauvegarde) = tout est écouté.
+local function addHookNames(hk, hooks)
+  if hooks then for k in pairs(hooks) do hk[k] = true end end
+end
+
+local function cardHookNames(hk, id)
+  local d = ns.Cards[id]
+  if not d then return end
+  addHookNames(hk, d.hooks)
+  addHookNames(hk, d.deckHooks)
+  if d.up then
+    addHookNames(hk, d.up.hooks)
+    addHookNames(hk, d.up.deckHooks)
+  end
+end
+
+function Combat.collectHooks(c, deck)
+  local hk = {}
+  local cr = Rules[c.class]
+  addHookNames(hk, cr and cr.hooks)
+  for _, id in ipairs(c.zr or {}) do addHookNames(hk, ZRules[id] and ZRules[id].hooks) end
+  for _, id in ipairs(c.relics) do addHookNames(hk, ns.Relics[id] and ns.Relics[id].hooks) end
+  for _, id in ipairs(c.affixes or {}) do addHookNames(hk, ns.Affixes[id] and ns.Affixes[id].hooks) end
+  for _, card in ipairs(deck or {}) do cardHookNames(hk, card.id) end
+  return hk
+end
+
+local function hooked(c, name)
+  local hk = c.hk
+  return hk == nil or hk[name] == true
+end
+Combat.hooked = hooked
+
+-- Combat.fire / Combat.modify, seulement si le nom est écouté dans ce combat.
+local function zfire(c, name, a, b, d, x)
+  if not hooked(c, name) then return false end
+  return Combat.fire(c, name, a, b, d, x)
+end
+local function zmodify(c, name, v, a, b, d, x)
+  if not hooked(c, name) then return v end
+  return Combat.modify(c, name, v, a, b, d, x)
+end
+Combat.zfire, Combat.zmodify = zfire, zmodify
+
+---------------------------------------------------------------------------
+-- Effets : unité de résolution (« même effet que »)
+---------------------------------------------------------------------------
+-- Un effet = la résolution d'une carte jouée (« card »), d'une incantation au début du tour (« cast »),
+-- d'une Trap (« trap »), d'une potion (« potion »), d'un tic de DoT (« dot »), de l'action d'un ennemi
+-- (« enemy »), du début du combat (« start »), du début ou de la fin du tour du joueur (« turnStart »,
+-- « turnEnd » : familier automatique, Pouvoirs, cartes « End of turn »), de la fin du round
+-- (« roundEnd »). Chaque effet a un numéro (c.fxId) et un genre (c.fxKind) ; Trap et DoT ouvrent toujours
+-- un effet à eux, même pendant un autre ; le reste s'emboîte dans l'effet en cours. À la fin de chaque
+-- effet : notification « onEffectEnd » (genre, numéro), si le combat continue (primes de Pack).
+-- c.fxDepth, c.fxSeq : compteurs (données simples).
+local function fxBegin(c, kind, own)
+  local depth = c.fxDepth or 0
+  c.fxDepth = depth + 1
+  if depth == 0 or own then
+    local outer = depth > 0 and { c.fxId, c.fxKind } or true
+    c.fxSeq = (c.fxSeq or 0) + 1
+    c.fxId, c.fxKind = c.fxSeq, kind
+    return outer
+  end
+  return false
+end
+
+local function fxEnd(c, tok)
+  c.fxDepth = (c.fxDepth or 1) - 1
+  if not tok then return end
+  if not c.result then Combat.zfire(c, "onEffectEnd", c.fxKind, c.fxId) end
+  if tok == true then c.fxId, c.fxKind = nil, nil else c.fxId, c.fxKind = tok[1], tok[2] end
+end
+Combat.fxBegin, Combat.fxEnd = fxBegin, fxEnd
+
+-- Exécute fn(...) comme un effet du genre kind (own : effet à part même s'il est emboîté).
+function Combat.asEffect(c, kind, own, fn, ...)
+  local tok = fxBegin(c, kind, own)
+  local r1, r2 = fn(...)
+  fxEnd(c, tok)
+  return r1, r2
 end
 
 ---------------------------------------------------------------------------
@@ -218,10 +344,14 @@ function Combat.surge(c)
   return n
 end
 
--- Perte de PV hors attaque (coût « Pay N HP », effets) : ni Absorption, ni crochet de coup reçu.
+-- Perte de PV hors attaque (coût « Pay N HP », effets, terrain d'une zone : why = "wildfire", "curse"…) :
+-- ni Absorption, ni Parry (crochet beforeHit), ni crochet de coup reçu ; peut tuer (Last Breath).
 function Combat.loseHp(c, n, why)
   local p = c.player
   if n <= 0 or p.dead or c.result then return 0 end
+  -- crochet « hpLoss » (c, src, n, why) : perte hors coup réduite ou annulée (Libram of Resilience)
+  n = Combat.zmodify(c, "hpLoss", n, why)
+  if n <= 0 then return 0 end
   stat(c, "hpLost", min(n, max(p.hp, 0)))
   p.hp = p.hp - n
   log(c, { t = "damage", dst = "player", amount = n, absorbed = 0, loss = n, why = why })
@@ -250,6 +380,8 @@ Combat.CONDITIONS = {
   execute = function(c, ctx, t) return t ~= nil and not t.dead and t.hp * 2 <= t.maxHp end,
   spent = function(c, ctx) return ctx.spent == true end,
   surged = function(c, ctx) return (ctx.surge or 0) > 0 end,
+  -- la carte a déjà interrompu au moins une incantation ennemie (effet « interrupt » plus haut)
+  interrupted = function(c, ctx) return (ctx.interrupted or 0) > 0 end,
 }
 -- AMOUNTS[nom](c, ctx, cible) -> nombre ; « per = { k, nom } » ajoute k × ce nombre à la valeur.
 Combat.AMOUNTS = {
@@ -354,7 +486,8 @@ function Combat.hasDebuff(unit)
   return false
 end
 
--- Retire tous les états négatifs de l'unité ; renvoie le nombre d'états retirés.
+-- Retire tous les états négatifs de l'unité ; renvoie le nombre d'effets retirés : états, plus ce que
+-- le crochet « cleanse » (c, src, n, unité) ajoute (Duskwood : Curses de la main épuisées, comptées).
 function Combat.cleanse(c, unit)
   local ids = {}
   for id in pairs(unit.st) do
@@ -366,20 +499,25 @@ function Combat.cleanse(c, unit)
     unit.fresh[ids[i]] = nil
   end
   if #ids > 0 then log(c, { t = "cleanse", unit = uref(unit), n = #ids }) end
-  return #ids
+  return Combat.zmodify(c, "cleanse", #ids, unit)
 end
 
 -- Déclenche le DoT de l'unité : dégâts égaux à sa valeur (sans Absorb), puis baisse (crochet
 -- « dotDecay »). Appelé au début du tour du porteur, et tout de suite par une carte (Envenom :
--- « trigger the target's DoT »). Renvoie les dégâts.
+-- « trigger the target's DoT »). Renvoie les dégâts. Toujours un effet à part (genre « dot »).
 function Combat.tickDot(c, unit)
   local pain = unit.st.pain
   if not pain or pain <= 0 or unit.dead then return 0 end
+  local tok = fxBegin(c, "dot", true)
+  local k0, a0 = c.hitKind, c.hitAll
+  c.hitKind, c.hitAll = "dot", true
   log(c, { t = "tick", unit = uref(unit), id = "pain", n = pain })
   Combat.dealDamage(c, nil, unit, pain, true)
+  c.hitKind, c.hitAll = k0, a0
   local left = pain - Combat.modify(c, "dotDecay", 1, unit)
   if left > 0 then unit.st.pain = left else unit.st.pain = nil end
   if not c.result then Combat.fire(c, "onDotTick", unit, pain) end
+  fxEnd(c, tok)
   return pain
 end
 
@@ -440,29 +578,117 @@ function Combat.calcDamage(c, src, dst, base, cardDef)
   return dmg
 end
 
--- Applique des dégâts déjà calculés. pierce = ignore l'Absorption. ctx : contexte de la carte à l'origine
--- du coup (Effects.damage), nil pour un coup sans carte (familier, riposte, bibelot).
--- Renvoie (PV perdus, absorbés). Un coup du joueur qui fait perdre des PV à un ennemi émet
--- « onDamageDealt » (cible, PV perdus, ctx|nil), le combat pas encore tranché.
+-- Source du coup porté à un ennemi (crochets « enemyDamageTaken », « onEnemyDamaged ») : table
+-- RÉUTILISÉE d'un coup à l'autre (copier ce qu'on veut garder) :
+--   kind   = "card" | "cast" (incantation résolue) | "trap" | "potion" | "dot" | "pet" (familier) |
+--            "enemy" (coup d'un ennemi : sort renvoyé) | "other" (bibelot, effet sans carte)
+--   single = vrai pour un effet qui ne vise qu'un ennemi (faux : « to all », DoT)
+--   ctx    = contexte de la carte en cours (nil hors carte) ; effect = numéro de l'effet (c.fxId) ;
+--   src    = unité à l'origine du coup (le joueur, un ennemi, nil pour un DoT)
+-- Le genre vient de c.hitKind / c.hitAll, posés le temps d'un coup par Effects.damage, Combat.tickDot et
+-- l'attaque du familier (Core/ZoneRules.lua), puis remis ; une carte qui appelle Combat.dealDamage
+-- elle-même (fn) compte comme « card », à une cible.
+local HIT = {}
+local function hitInfo(c, src)
+  local h = HIT
+  if src and src.side == "enemy" then
+    h.kind, h.single = "enemy", true
+  elseif c.hitKind then
+    h.kind, h.single = c.hitKind, not c.hitAll
+  elseif src == nil then
+    h.kind, h.single = "dot", false
+  elseif c.cardCtx then
+    h.kind, h.single = c.cardCtx.cast and "cast" or "card", true
+  else
+    h.kind, h.single = "other", true
+  end
+  h.ctx, h.effect, h.src = c.cardCtx, c.fxId, src
+  return h
+end
+Combat.hitInfo = hitInfo
+
+-- Seuils de PV d'un ennemi (def.phases, liste triée du plus haut au plus bas) : { at = fraction des PV
+-- max (0.5) ou hp = PV, name, say, enter = { actions }, open = move, pattern = {...} | ai = f,
+-- randomStart, startAt, rename, art, cap = bool, text }. PV du seuil k :
+function Combat.phaseHp(e, ph)
+  if ph.hp then return ph.hp end
+  return floor(e.maxHp * ph.at)
+end
+
+-- Plafond au seuil (phase cap = true : boss qui ne peut pas sauter une phase) : les dégâts au-delà du
+-- prochain seuil sont perdus pour ce coup.
+local function capAtPhase(c, e, loss)
+  local def = ns.Enemies[e.id]
+  local phases = def.phases
+  local nx = phases and phases[(e.mem.phase or 0) + 1]
+  if nx and nx.cap then
+    local floorHp = Combat.phaseHp(e, nx)
+    if e.hp > floorHp and e.hp - loss < floorHp then
+      log(c, { t = "capped", unit = e.uid, lost = loss - (e.hp - floorHp) })
+      return e.hp - floorHp
+    end
+  end
+  return loss
+end
+
+-- Seuils franchis par un ennemi encore vivant (une seule fois chacun, dans l'ordre).
+local function checkPhases(c, e)
+  local phases = ns.Enemies[e.id].phases
+  if not phases or e.minion then return end
+  local k = (e.mem.phase or 0) + 1
+  while phases[k] and not e.dead and not c.result and e.hp <= Combat.phaseHp(e, phases[k]) do
+    Combat.enterPhase(c, e, k)
+    k = k + 1
+  end
+end
+
+-- Applique des dégâts déjà calculés. pierce = ignore l'Absorption.
+-- Renvoie (PV perdus, absorbés).
+-- Ennemi touché : crochet « enemyDamageTaken » (c, src, v, ennemi, source du coup) avant l'Absorb
+-- (modifier, plafonner : Unholy Shield, Rude Awakening, Invincible) ; plafond au seuil d'une phase
+-- cap ; puis def.onDamaged, seuils franchis (def.phases), « onEnemyBloodied » (premier passage à ou
+-- sous la moitié), « onEnemyDamaged » (ennemi, PV perdus, absorbés, source) s'il survit et que le coup
+-- a porté (même entièrement absorbé).
+-- ctx : contexte de la carte à l'origine du coup (Effects.damage), nil pour un coup sans carte (familier,
+-- riposte, bibelot) ; un coup du joueur qui fait perdre des PV à un ennemi émet « onDamageDealt » (cible,
+-- PV perdus, ctx|nil), le combat pas encore tranché.
 function Combat.dealDamage(c, src, dst, amount, pierce, ctx)
   if dst.dead or c.result then return 0, 0 end
+  local foe = dst.side == "enemy"
+  local info
+  if foe then
+    info = hitInfo(c, src)
+    amount = Combat.zmodify(c, "enemyDamageTaken", amount, dst, info)
+    -- multiplicateurs « en dernier » (Rude Awakening : après les ajouts des bibelots), avant l'Absorb
+    amount = Combat.zmodify(c, "enemyDamageLast", amount, dst, hitInfo(c, src))
+    if amount < 0 then amount = 0 end
+  end
   local absorbed = 0
   if not pierce then
     absorbed = min(dst.block, amount)
     dst.block = dst.block - absorbed
   end
   local loss = amount - absorbed
+  if foe and loss > 0 then loss = capAtPhase(c, dst, loss) end
   if dst.side == "player" then stat(c, "hpLost", min(loss, max(dst.hp, 0))) end
   dst.hp = dst.hp - loss
   log(c, { t = "damage", src = uref(src), dst = uref(dst), amount = amount, absorbed = absorbed, loss = loss })
   if dst.hp <= 0 then
     Combat.kill(c, dst)
-  elseif loss > 0 and dst.side == "enemy" then
+  elseif loss > 0 and foe then
     local def = ns.Enemies[dst.id]
     if def.onDamaged then def.onDamaged(c, dst, loss) end
+    if def.phases then checkPhases(c, dst) end
+    if not dst.mem.bloodied and dst.hp * 2 <= dst.maxHp and not dst.dead then
+      dst.mem.bloodied = true
+      if not c.result then Combat.zfire(c, "onEnemyBloodied", dst) end
+    end
   elseif loss > 0 and dst.side == "player" then
     if src then Combat.fire(c, "onPlayerHit", src, loss) end
     Combat.fire(c, "onHpLost", loss, src, dst.hp + loss)
+  end
+  if foe and not dst.dead and not c.result and (loss > 0 or absorbed > 0) then
+    Combat.zfire(c, "onEnemyDamaged", dst, loss, absorbed, hitInfo(c, src)) -- relue : la table est partagée
   end
   if loss > 0 and src and src.side == "player" and dst.side == "enemy" and not c.result then
     Combat.fire(c, "onDamageDealt", dst, loss, ctx)
@@ -480,6 +706,8 @@ function Combat.heal(c, unit, n)
   if got > 0 then
     log(c, { t = "heal", unit = uref(unit), amount = got })
     if unit.side == "player" then stat(c, "healed", got) end
+    -- soin réellement rendu (unité, PV) : Prayer of Mending, Corrupted Healing, Volchan
+    if not c.result then Combat.zfire(c, "onUnitHeal", unit, got) end
   end
   if unit.side == "player" and n > 0 and not c.result then Combat.fire(c, "onHeal", got, n - got) end
   return got
@@ -530,6 +758,7 @@ local function checkVictory(c)
   c.result = "won"
   Combat.fire(c, "onVictory")
   log(c, { t = "result", result = "won" })
+  Combat.zfire(c, "onCombatEnd", "won")
 end
 
 function Combat.kill(c, unit)
@@ -545,6 +774,7 @@ function Combat.kill(c, unit)
     c.result = "lost"
     log(c, { t = "death", unit = "player" })
     log(c, { t = "result", result = "lost" })
+    Combat.zfire(c, "onCombatEnd", "lost")
     return
   end
   unit.hp = 0
@@ -560,7 +790,13 @@ function Combat.kill(c, unit)
       if od.onAllyDeath then od.onAllyDeath(c, o, unit) end
     end
   end
-  Combat.fire(c, "onEnemyDeath", unit)
+  -- cartes de combat posées par cet ennemi et levées à sa mort (Curses : Combat.addCard, lift = true)
+  if (c.lifts or 0) > 0 then Combat.liftCards(c, unit.uid) end
+  -- info : effet en cours (c.fxId : deux morts du même numéro = « en même temps »), genre de l'effet,
+  -- source du coup (kind, single)
+  local kind = c.hitKind or (c.cardCtx and (c.cardCtx.cast and "cast" or "card")) or c.fxKind or "other"
+  Combat.fire(c, "onEnemyDeath", unit, { effect = c.fxId, fx = c.fxKind, kind = kind,
+    single = not (c.hitKind and c.hitAll), minion = unit.minion or false })
   checkVictory(c)
 end
 
@@ -568,12 +804,26 @@ end
 -- Ennemis
 ---------------------------------------------------------------------------
 
-function Combat.spawn(c, id)
+-- Id d'une entrée de groupe : "gnoll" ou { "gnoll", st = { asleep = 3 }, … } (spec, voir Combat.spawn).
+function Combat.specId(spec)
+  if type(spec) == "table" then return spec.id or spec[1] end
+  return spec
+end
+
+-- Fait apparaître un ennemi. spec = id, ou table { id | [1], st = { état = n } (posés à l'arrivée),
+-- hp = PV fixes, hpMul = facteur de PV, ambush = true (agit dès la phase ennemie en cours), zs = état de
+-- zone propre à l'unité (copié) } ; by = ennemi qui l'invoque (nil : groupe de départ). Invocation en
+-- cours de combat : notification « onEnemySpawn » (ennemi, by).
+function Combat.spawn(c, spec, by)
   if #Combat.aliveEnemies(c) >= Combat.MAX_ENEMIES then return nil end
+  local id = Combat.specId(spec)
+  local opt = type(spec) == "table" and spec or nil
   local def = ns.Enemies[id]
   if not def then error("unknown enemy: " .. tostring(id)) end
   local hp = def.hp
   if type(hp) == "table" then hp = Rng.int(c.rng.ai, hp[1], hp[2]) end
+  if opt and opt.hp then hp = opt.hp end
+  if opt and opt.hpMul then hp = floor(hp * opt.hpMul + 0.5) end
   hp = Combat.modify(c, "enemyHp", hp, def)
   local e = {
     side = "enemy", uid = c.nextUid, id = id,
@@ -584,32 +834,178 @@ function Combat.spawn(c, id)
   c.nextUid = c.nextUid + 1
   c.enemies[#c.enemies + 1] = e
   if def.init then def.init(c, e) end
+  if opt then
+    if opt.zs then e.zs = U.copy(opt.zs) end
+    if opt.st then
+      local ids = {}
+      for k in pairs(opt.st) do ids[#ids + 1] = k end
+      table.sort(ids)
+      for i = 1, #ids do Combat.applyStatus(c, e, ids[i], opt.st[ids[i]]) end
+    end
+    if opt.ambush and c.phase == "enemy" then e.ambush = true end
+  end
   log(c, { t = "spawn", unit = e.uid, id = id })
-  if c.phase == "player" then Combat.chooseIntent(c, e) end
+  if c.phase == "player" or e.ambush then Combat.chooseIntent(c, e) end
+  if by ~= nil or c.phase ~= "start" then Combat.zfire(c, "onEnemySpawn", e, by) end
   return e
 end
 
--- IA par défaut : boucle sur def.pattern (départ au hasard si def.randomStart).
+-- Nom affiché d'un ennemi (une phase peut le renommer : Nefarius -> Nefarian).
+function Combat.enemyName(e)
+  return e.name or ns.Enemies[e.id].name
+end
+
+-- Intention suivante imposée (ouverture d'une phase, ouverture d'un dormeur) : now = vrai (défaut :
+-- pendant le jeu du joueur, c.step == "play") remplace l'intention annoncée tout de suite (incantation
+-- comprise, interruption effacée) ; sinon elle sera la prochaine intention choisie (e.mem.forced),
+-- annoncée en gris sous l'intention si label est donné (« On waking: »).
+function Combat.forceIntent(c, e, move, opts)
+  if e.dead then return end
+  local def = ns.Enemies[e.id]
+  if not def.moves[move] then error(e.id .. ": unknown move " .. tostring(move)) end
+  local now = opts and opts.now
+  if now == nil then now = c.step == "play" end
+  if now then
+    e.intent = move
+    e.interrupted = false
+    e.mem.forced, e.mem.forcedLabel = nil, nil
+    log(c, { t = "intent", unit = e.uid, move = move, forced = true })
+    if def.moves[move].cast then Combat.zfire(c, "onEnemyCastStart", e, move) end
+  else
+    e.mem.forced = move
+    e.mem.forcedLabel = opts and opts.label or nil
+  end
+end
+
+-- Choix de l'intention : intention imposée (e.mem.forced), sinon ouverture du combat (def.open, une
+-- fois : annoncée au premier tour), sinon IA ou motif de la phase en cours (def.phases[k].ai / pattern),
+-- sinon def.ai, sinon boucle sur def.pattern (départ au hasard si randomStart). Puis crochet « intent »
+-- (c, src, move, ennemi) ; une incantation annoncée notifie « onEnemyCastStart » (ennemi, move).
 function Combat.chooseIntent(c, e)
   local def = ns.Enemies[e.id]
   local move
-  if def.ai then
-    move = def.ai(c, e, c.rng.ai)
+  local mem = e.mem
+  if mem.forced then
+    move = mem.forced
+    mem.forced, mem.forcedLabel = nil, nil
+  elseif def.open and not mem.opened then
+    move = def.open
+    mem.opened = true
   else
-    local pat = def.pattern
-    local idx = e.mem.idx
-    if not idx then
-      idx = def.randomStart and Rng.int(c.rng.ai, 1, #pat) or 1
+    local ai, pat, rs = def.ai, def.pattern, def.randomStart
+    local ph = mem.phase and def.phases and def.phases[mem.phase]
+    if ph and (ph.ai or ph.pattern) then ai, pat, rs = ph.ai, ph.pattern, ph.randomStart end
+    if ai then
+      move = ai(c, e, c.rng.ai)
     else
-      idx = idx % #pat + 1
+      local idx = mem.idx
+      if not idx then
+        idx = rs and Rng.int(c.rng.ai, 1, #pat) or 1
+      else
+        idx = idx % #pat + 1
+      end
+      mem.idx = idx
+      move = pat[idx]
     end
-    e.mem.idx = idx
-    move = pat[idx]
   end
+  move = Combat.zmodify(c, "intent", move, e)
   if not def.moves[move] then error(e.id .. ": unknown move " .. tostring(move)) end
   e.intent = move
   e.interrupted = false
   log(c, { t = "intent", unit = e.uid, move = move })
+  if def.moves[move].cast then Combat.zfire(c, "onEnemyCastStart", e, move) end
+end
+
+-- Entrée dans la phase k d'un ennemi (seuil franchi, Combat.dealDamage) : journal « phase », réplique,
+-- nom et modèle (rename, art), actions d'entrée (mêmes actions que les intentions), motif de la phase
+-- (startAt : premier coup joué du motif), intention d'ouverture (open) imposée — tout de suite pendant
+-- le jeu du joueur, sinon à son prochain choix —, puis notification « onEnemyPhase » (ennemi, k, phase).
+function Combat.enterPhase(c, e, k)
+  local def = ns.Enemies[e.id]
+  local ph = def.phases[k]
+  e.mem.phase = k
+  e.mem.idx = ph.startAt and ph.startAt > 1 and ph.startAt - 1 or nil
+  if ph.rename then e.name = ph.rename end
+  if ph.art then e.art = ph.art end
+  log(c, { t = "phase", unit = e.uid, n = k, name = ph.name })
+  if ph.say then log(c, { t = "say", unit = e.uid, text = ph.say }) end
+  if ph.enter then
+    for i = 1, #ph.enter do
+      Combat.enemyAction(c, e, ph.enter[i])
+      if c.result or e.dead then return end
+    end
+  end
+  if ph.open then Combat.forceIntent(c, e, ph.open, { label = ph.label }) end
+  Combat.zfire(c, "onEnemyPhase", e, k, ph)
+end
+
+-- Crans de vie d'un ennemi pour l'affichage : { { at = fraction, hp, name, text, passed } }.
+function Combat.phaseMarks(e)
+  local def = ns.Enemies[e.id]
+  local list = {}
+  if not def.phases or e.minion then return list end
+  for k, ph in ipairs(def.phases) do
+    local hp = Combat.phaseHp(e, ph)
+    list[#list + 1] = { at = e.maxHp > 0 and hp / e.maxHp or 0, hp = hp, name = ph.name, text = ph.text,
+      passed = (e.mem.phase or 0) >= k }
+  end
+  return list
+end
+
+-- Conditions et montants des actions ennemies (cond = "nom" | fonction ; more = { { k, "cond" } } ;
+-- per = { k, "montant" }, cap = plafond du bonus) : une zone ajoute les siens
+-- (Combat.ENEMY_CONDITIONS.lit = function(c, e, a) … end ; Combat.ENEMY_AMOUNTS.hexed = …).
+Combat.ENEMY_CONDITIONS = {
+  -- au moins un autre ennemi vivant
+  allies = function(c, e)
+    for i = 1, #c.enemies do
+      local o = c.enemies[i]
+      if o ~= e and not o.dead then return true end
+    end
+    return false
+  end,
+  -- le joueur incante
+  casting = function(c) return c.player.cast ~= nil end,
+}
+Combat.ENEMY_AMOUNTS = {
+  -- autres ennemis vivants
+  allies = function(c, e)
+    local n = 0
+    for i = 1, #c.enemies do
+      local o = c.enemies[i]
+      if o ~= e and not o.dead then n = n + 1 end
+    end
+    return n
+  end,
+}
+
+function Combat.enemyTest(c, e, cond, a)
+  if type(cond) == "function" then return cond(c, e, a) and true or false end
+  local f = Combat.ENEMY_CONDITIONS[cond]
+  if not f then error("unknown enemy condition: " .. tostring(cond)) end
+  return f(c, e, a) and true or false
+end
+
+-- Base d'une attaque ennemie : a[2] + more + per (+ bonus(c, e, a)), bonus plafonné par a.cap.
+function Combat.enemyBase(c, e, a)
+  local v = a[2]
+  if a.more or a.per or a.bonus then
+    local extra = 0
+    if a.more then
+      for i = 1, #a.more do
+        if Combat.enemyTest(c, e, a.more[i][2], a) then extra = extra + a.more[i][1] end
+      end
+    end
+    if a.per then
+      local f = Combat.ENEMY_AMOUNTS[a.per[2]]
+      if not f then error("unknown enemy amount: " .. tostring(a.per[2])) end
+      extra = extra + a.per[1] * f(c, e, a)
+    end
+    if a.bonus then extra = extra + a.bonus(c, e, a) end
+    if a.cap and extra > a.cap then extra = a.cap end
+    v = v + extra
+  end
+  return v
 end
 
 -- Résumé d'intention pour l'affichage et les bots.
@@ -617,11 +1013,12 @@ function Combat.intentInfo(c, e)
   local def = ns.Enemies[e.id]
   local mv = def.moves[e.intent]
   local info = { move = e.intent, name = mv.name, kind = mv.intent, cast = mv.cast or false,
-    interrupted = e.interrupted, stunned = (e.st.stunned or 0) > 0, damage = 0, times = 0 }
+    interrupted = e.interrupted, stunned = (e.st.stunned or 0) > 0, damage = 0, times = 0,
+    forced = e.mem.forced, forcedLabel = e.mem.forcedLabel }
   for i = 1, #mv.actions do
     local a = mv.actions[i]
     if a[1] == "attack" then
-      info.damage = Combat.calcDamage(c, e, c.player, a[2])
+      info.damage = Combat.calcDamage(c, e, c.player, Combat.enemyBase(c, e, a))
       info.times = a.times or 1
       if a.interrupts then info.interrupts = true end
     end
@@ -661,9 +1058,102 @@ local function interruptPlayer(c, by)
   c.discard[#c.discard + 1] = cast.card
   stat(c, "castsInterrupted")
   log(c, { t = "interrupt", src = uref(by), dst = "player", card = cast.card.id })
+  Combat.zfire(c, "onCardDiscarded", cast.card, "interrupted")
 end
 
 Combat.interruptPlayer = interruptPlayer
+
+-- Actions ennemies hors attaque. Une zone ajoute les siennes : Combat.ENEMY_ACTIONS.stoke =
+-- function(c, e, a) … end (a = la table de l'action : { "stoke", 1 }).
+Combat.ENEMY_ACTIONS = {}
+
+local function aliveOf(c, id)
+  local n = 0
+  for i = 1, #c.enemies do
+    local o = c.enemies[i]
+    if not o.dead and o.id == id then n = n + 1 end
+  end
+  return n
+end
+
+local function actionBody(c, e, a)
+  local k = a[1]
+  local p = c.player
+  if k == "attack" then
+    -- hors d'une intention (entrée de phase) : coups simples, sans Trap ni interruption
+    for _ = 1, (a.times or 1) do
+      local dmg = Combat.modify(c, "beforeHit", Combat.calcDamage(c, e, p, Combat.enemyBase(c, e, a)), e, a)
+      if c.result or e.dead then return end
+      Combat.dealDamage(c, e, p, dmg)
+      if c.result or e.dead then return end
+    end
+  elseif k == "block" then
+    Combat.gainBlock(c, e, a[2])
+  elseif k == "debuff" then
+    Combat.applyStatus(c, p, a[2], a[3])
+  elseif k == "buff" then
+    Combat.applyStatus(c, e, a[2], a[3])
+  elseif k == "buff_allies" then
+    for j = 1, #c.enemies do
+      local o = c.enemies[j]
+      if not o.dead then Combat.applyStatus(c, o, a[2], a[3]) end
+    end
+  elseif k == "heal_ally" then
+    local o = mostDamagedAlly(c)
+    if o then Combat.heal(c, o, a[2]) end
+  elseif k == "heal_allies" then -- soin de groupe : chaque ennemi vivant, lui compris
+    for j = 1, #c.enemies do
+      local o = c.enemies[j]
+      if not o.dead then Combat.heal(c, o, a[2]) end
+    end
+  elseif k == "heal_self" then
+    Combat.heal(c, e, a[2])
+  elseif k == "block_ally" then
+    local list = Combat.aliveEnemies(c)
+    local o = list[Rng.int(c.rng.ai, 1, #list)]
+    Combat.gainBlock(c, o, a[2])
+  elseif k == "block_allies" then -- tous les ennemis vivants, lui compris
+    for j = 1, #c.enemies do
+      local o = c.enemies[j]
+      if not o.dead then Combat.gainBlock(c, o, a[2]) end
+    end
+  elseif k == "block_boss" then -- le boss du combat (lui-même s'il n'y en a pas)
+    local o = e
+    for j = 1, #c.enemies do
+      if c.enemies[j].boss and not c.enemies[j].dead then o = c.enemies[j] break end
+    end
+    Combat.gainBlock(c, o, a[2])
+  elseif k == "interrupt" then
+    interruptPlayer(c, e)
+  elseif k == "summon" then
+    -- count = nombre ; max = seulement tant qu'il en vit moins ; ambush = agit dès cette phase ennemie ;
+    -- st = états posés à l'arrivée
+    local n = a.count or 1
+    if a.max then n = min(n, a.max - aliveOf(c, a[2])) end
+    local spec = (a.ambush or a.st) and { a[2], ambush = a.ambush, st = a.st } or a[2]
+    for _ = 1, n do Combat.spawn(c, spec, e) end
+  elseif k == "say" then
+    log(c, { t = "say", unit = e.uid, text = a[2] })
+  elseif k == "die" then -- l'ennemi se détruit (mine qui explose) : mort ordinaire
+    Combat.kill(c, e)
+  elseif k == "addCard" then -- carte de combat dans les piles du joueur (Combat.addCard)
+    for _ = 1, (a.n or 1) do
+      Combat.addCard(c, a[2], a.to or "discard", { src = e.uid, lift = a.lift ~= false })
+    end
+  elseif k == "fn" then
+    a[2](c, e)
+  else
+    local f = Combat.ENEMY_ACTIONS[k]
+    if not f then error("unknown enemy action: " .. tostring(k)) end
+    f(c, e, a)
+  end
+end
+
+-- Une action (aussi : actions d'entrée d'une phase), sautée si sa condition cond est fausse.
+function Combat.enemyAction(c, e, a)
+  if a.cond and not Combat.enemyTest(c, e, a.cond, a) then return end
+  actionBody(c, e, a)
+end
 
 local function executeMove(c, e)
   local def = ns.Enemies[e.id]
@@ -694,62 +1184,47 @@ local function executeMove(c, e)
   for i = 1, #mv.actions do
     local a = mv.actions[i]
     local k = a[1]
-    if k == "attack" and #c.traps > 0 then
-      -- Trap : la plus ancienne se déclenche avant les coups de cette attaque, sur l'attaquant
-      Combat.triggerTrap(c, e)
-    end
-    if c.result or e.dead or stopped() then break end
-    if not acted then
-      acted = true
-      log(c, { t = "act", unit = e.uid, move = e.intent })
-    end
-    local halt = false
-    if k == "attack" then
-      for _ = 1, (a.times or 1) do
-        local dmg = Combat.calcDamage(c, e, p, a[2])
-        -- coup subi avant réduction, coup par coup (Parry : avant l'Absorb) : le crochet peut réduire
-        -- ou annuler le coup
-        dmg = Combat.modify(c, "beforeHit", dmg, e, a)
-        if c.result or e.dead then break end
-        local loss, absorbed = Combat.dealDamage(c, e, p, dmg)
-        if not c.result then Combat.fire(c, "afterHit", e, loss, absorbed) end
-        if c.result or e.dead then break end
-        -- Coup qui interrompt : coupe l'incantation s'il fait perdre des PV.
-        if a.interrupts and loss > 0 then interruptPlayer(c, e) end
-        if stopped() then halt = true break end
+    -- action conditionnelle (cond) : sautée, sans Trap ni élan, si la condition est fausse
+    if not a.cond or Combat.enemyTest(c, e, a.cond, a) then
+      if k == "attack" and #c.traps > 0 then
+        -- Trap : la plus ancienne se déclenche avant les coups de cette attaque, sur l'attaquant
+        Combat.triggerTrap(c, e)
       end
-      if halt then break end
-    elseif k == "block" then
-      Combat.gainBlock(c, e, a[2])
-    elseif k == "debuff" then
-      Combat.applyStatus(c, p, a[2], a[3])
-    elseif k == "buff" then
-      Combat.applyStatus(c, e, a[2], a[3])
-    elseif k == "buff_allies" then
-      for j = 1, #c.enemies do
-        local o = c.enemies[j]
-        if not o.dead then Combat.applyStatus(c, o, a[2], a[3]) end
+      if c.result or e.dead or stopped() then break end
+      if not acted then
+        acted = true
+        log(c, { t = "act", unit = e.uid, move = e.intent })
       end
-    elseif k == "heal_ally" then
-      local o = mostDamagedAlly(c)
-      if o then Combat.heal(c, o, a[2]) end
-    elseif k == "block_ally" then
-      local list = Combat.aliveEnemies(c)
-      local o = list[Rng.int(c.rng.ai, 1, #list)]
-      Combat.gainBlock(c, o, a[2])
-    elseif k == "interrupt" then
-      interruptPlayer(c, e)
-    elseif k == "summon" then
-      for _ = 1, (a.count or 1) do Combat.spawn(c, a[2]) end
-    elseif k == "fn" then
-      a[2](c, e)
-    else
-      error("unknown enemy action: " .. tostring(k))
+      local halt = false
+      if k == "attack" then
+        local total = 0
+        for _ = 1, (a.times or 1) do
+          local dmg = Combat.calcDamage(c, e, p, Combat.enemyBase(c, e, a))
+          -- coup subi avant réduction, coup par coup (Parry : avant l'Absorb) : le crochet peut réduire
+          -- ou annuler le coup
+          dmg = Combat.modify(c, "beforeHit", dmg, e, a)
+          if c.result or e.dead then break end
+          local loss, absorbed = Combat.dealDamage(c, e, p, dmg)
+          total = total + loss
+          if not c.result then Combat.fire(c, "afterHit", e, loss, absorbed) end
+          if c.result or e.dead then break end
+          -- Coup qui interrompt : coupe l'incantation s'il fait perdre des PV.
+          if a.interrupts and loss > 0 then interruptPlayer(c, e) end
+          if stopped() then halt = true break end
+        end
+        -- fin de l'action d'attaque (tous ses coups) : PV perdus au total (Bite de Duskwood : une Curse
+        -- si total > 0)
+        if not c.result then Combat.zfire(c, "afterEnemyAttack", e, a, total) end
+        if halt then break end
+      else
+        actionBody(c, e, a)
+      end
+      if c.result or e.dead or stopped() then break end
     end
-    if c.result or e.dead or stopped() then break end
   end
   e.stopTurn = nil
   e.mem.last = e.intent
+  if mv.cast and not c.result then Combat.zfire(c, "onEnemyCastResolved", e, e.intent) end
 end
 
 ---------------------------------------------------------------------------
@@ -777,7 +1252,148 @@ function Combat.drawCards(c, n)
     hand[#hand + 1] = inst
     statById(c, "drawn", inst.id)
     log(c, { t = "draw", card = inst.uid })
+    Combat.zfire(c, "onCardDrawn", inst)
+    hand, draw = c.hand, c.draw -- un crochet peut avoir remplacé une carte (transformation)
   end
+end
+
+---------------------------------------------------------------------------
+-- Cartes de combat (cartes de zone non collectionnables : Curse, Hexed, carte donnée par un boss)
+---------------------------------------------------------------------------
+-- Une carte de combat est une instance neuve { uid, id, up, src = uid de l'ennemi qui l'a posée,
+-- lift = vrai si elle part à la mort de src, orig = instance d'origine (carte transformée) } : jamais
+-- modifiée ensuite (Combat.clone la partage), jamais dans le deck de l'expédition. Sa définition
+-- (ns.Cards) porte token = true (hors de toute réserve : récompenses, marchand, rencontres), et peut
+-- porter vanish = true (jouée, elle disparaît : ni défausse ni consumées) et endOfTurn = { effets }
+-- (résolus si elle est en main à la fin du tour, avant la défausse, de gauche à droite).
+
+local PILES = { "hand", "draw", "discard", "exhaust" }
+
+-- Pile et index d'une instance (hand, draw, discard, exhaust, cooldown), ou nil.
+function Combat.findCard(c, inst)
+  for _, key in ipairs(PILES) do
+    local list = c[key]
+    for i = 1, #list do if list[i] == inst then return key, i end end
+  end
+  for i = 1, #c.cooldown do if c.cooldown[i].card == inst then return "cooldown", i end end
+  return nil
+end
+
+-- Nombre de cartes du combat (main, pioche, défausse, recharges) qui vérifient pred(inst, def).
+function Combat.countCards(c, pred)
+  local n = 0
+  for _, key in ipairs({ "hand", "draw", "discard" }) do
+    local list = c[key]
+    for i = 1, #list do if pred(list[i], Card.def(list[i])) then n = n + 1 end end
+  end
+  for i = 1, #c.cooldown do
+    if pred(c.cooldown[i].card, Card.def(c.cooldown[i].card)) then n = n + 1 end
+  end
+  return n
+end
+
+-- Ajoute une carte de combat. to = "hand" (main pleine : défausse), "draw" (dessus de la pioche),
+-- "drawRandom" (au hasard dans la pioche, flux c.rng.misc), "discard", "exhaust". opts = { src = uid
+-- d'ennemi, lift = bool, up = bool }. Journal { t = "card_added", card, id, to, src } ; notification
+-- « onCardAdded » (instance, pile, src). Renvoie l'instance.
+function Combat.addCard(c, id, to, opts)
+  if not ns.Cards[id] then error("unknown card: " .. tostring(id)) end
+  local inst = Card.new(id, opts and opts.up, c.nextUid)
+  c.nextUid = c.nextUid + 1
+  if opts and opts.src then inst.src = opts.src end
+  if opts and opts.lift then
+    inst.lift = true
+    c.lifts = (c.lifts or 0) + 1
+  end
+  -- crochets d'une carte nouvelle (Pouvoir donné en combat) : ajoutés aux noms écoutés (copie)
+  local d = ns.Cards[id]
+  if c.hk and (d.hooks or (d.up and d.up.hooks)) then
+    local hk = U.copyMap(c.hk)
+    cardHookNames(hk, id)
+    c.hk = hk
+  end
+  to = to or "discard"
+  if to == "hand" and #c.hand >= Combat.HAND_MAX then to = "discard" end
+  if to == "hand" then
+    c.hand[#c.hand + 1] = inst
+  elseif to == "draw" then
+    c.draw[#c.draw + 1] = inst -- le dessus de la pioche est la fin de la liste
+  elseif to == "drawRandom" then
+    table.insert(c.draw, Rng.int(c.rng.misc, 1, #c.draw + 1), inst)
+  elseif to == "exhaust" then
+    c.exhaust[#c.exhaust + 1] = inst
+  else
+    to = "discard"
+    c.discard[#c.discard + 1] = inst
+  end
+  log(c, { t = "card_added", card = inst.uid, id = id, to = to, src = opts and opts.src })
+  Combat.zfire(c, "onCardAdded", inst, to, opts and opts.src)
+  return inst
+end
+
+-- Retire une instance de sa pile : to = "exhaust" (défaut : aux consumées, notification « onExhaust »
+-- (instance, why)) ou "vanish" (disparaît). Journal { t = "card_removed", card, id, why, to }.
+function Combat.removeCard(c, inst, why, to)
+  local key, i = Combat.findCard(c, inst)
+  if not key then return false end
+  if key == "cooldown" then table.remove(c.cooldown, i) else table.remove(c[key], i) end
+  to = to or "exhaust"
+  if to == "exhaust" and key ~= "exhaust" then c.exhaust[#c.exhaust + 1] = inst end
+  log(c, { t = "card_removed", card = inst.uid, id = inst.id, why = why, to = to, from = key })
+  if to == "exhaust" then Combat.zfire(c, "onExhaust", inst, why or "removed") end
+  Combat.zfire(c, "onCardRemoved", inst, why, to)
+  return true
+end
+
+-- Lève les cartes de combat posées par l'ennemi uid (lift = true) : épuisées (Combat.kill le fait à la
+-- mort de l'ennemi). Renvoie le nombre de cartes levées.
+function Combat.liftCards(c, uid, why)
+  local list = {}
+  for _, key in ipairs({ "hand", "draw", "discard" }) do
+    for _, inst in ipairs(c[key]) do
+      if inst.lift and inst.src == uid then list[#list + 1] = inst end
+    end
+  end
+  for i = 1, #c.cooldown do
+    local inst = c.cooldown[i].card
+    if inst.lift and inst.src == uid then list[#list + 1] = inst end
+  end
+  for i = 1, #list do Combat.removeCard(c, list[i], why or "lifted") end
+  if #list > 0 then log(c, { t = "cards_lifted", unit = uid, n = #list }) end
+  return #list
+end
+
+-- Transforme une carte du combat sur place (main, pioche, défausse) : nouvelle instance de newId qui
+-- garde l'originale dans orig (Hex de Stranglethorn ; l'originale n'est pas modifiée). opts = { src }.
+-- Journal { t = "card_transformed", card = uid de l'originale, into = uid, id }. Renvoie la nouvelle.
+function Combat.transformCard(c, inst, newId, opts)
+  local key, i = Combat.findCard(c, inst)
+  if not key or key == "cooldown" or key == "exhaust" then return nil end
+  local n = Card.new(newId, false, c.nextUid)
+  c.nextUid = c.nextUid + 1
+  n.orig = inst
+  if opts and opts.src then n.src = opts.src end
+  c[key][i] = n
+  log(c, { t = "card_transformed", card = inst.uid, into = n.uid, id = newId, from = key })
+  Combat.zfire(c, "onCardTransformed", inst, n, key)
+  return n
+end
+
+-- Rend la carte d'origine d'une carte transformée : l'originale va en main (pleine : défausse), la
+-- transformée disparaît. Journal { t = "card_restored", card = uid de l'originale, from = uid }.
+function Combat.restoreCard(c, inst, to)
+  local orig = inst.orig
+  if not orig then return nil end
+  local key, i = Combat.findCard(c, inst)
+  if key then
+    if key == "cooldown" then table.remove(c.cooldown, i) else table.remove(c[key], i) end
+  end
+  to = to or "hand"
+  if to == "hand" and #c.hand >= Combat.HAND_MAX then to = "discard" end
+  local list = to == "hand" and c.hand or c.discard
+  list[#list + 1] = orig
+  log(c, { t = "card_restored", card = orig.uid, from = inst.uid, to = to })
+  return orig
 end
 
 local function returnCooldowns(c)
@@ -924,7 +1540,10 @@ function Combat.removePower(c, i, why)
 end
 
 local function afterPlay(c, inst, d)
-  if d.power then
+  if d.vanish then
+    -- carte de combat qui disparaît une fois jouée (Hexed : la carte d'origine est déjà rendue)
+    log(c, { t = "card_removed", card = inst.uid, id = inst.id, why = "played", to = "vanish" })
+  elseif d.power then
     local powers = c.player.powers
     -- emplacement unique (Seal, totem d'un élément) : le pouvoir du même emplacement est remplacé
     if d.slot then
@@ -942,6 +1561,7 @@ local function afterPlay(c, inst, d)
     log(c, { t = "power", card = inst.id })
   elseif d.exhaust then
     c.exhaust[#c.exhaust + 1] = inst
+    Combat.zfire(c, "onExhaust", inst, "played")
   elseif d.cooldown then
     -- durée de la recharge (crochet « cooldown » : Hourglass Sand), 1 au moins
     local turns = max(1, Combat.modify(c, "cooldown", d.cooldown, d, inst))
@@ -965,6 +1585,8 @@ end
 local function resolveEffects(c, inst, d, target, cast, spent, copy)
   local ctx = { card = inst, def = d, target = target, dealt = false, hits = 0, cast = cast or false,
     spent = spent or false, copy = copy or nil }
+  local outerCtx = c.cardCtx
+  c.cardCtx = ctx -- carte en cours (source des coups portés par une carte « fn », Combat.hitInfo)
   Combat.fire(c, "beforeCard", inst, ctx)
   local effects = d.effects
   for i = 1, #effects do
@@ -978,7 +1600,21 @@ local function resolveEffects(c, inst, d, target, cast, spent, copy)
     Combat.heal(c, c.player, Combat.ATONEMENT_HEAL)
   end
   if not c.result then Combat.fire(c, "onCardPlayed", inst, ctx) end
+  c.cardCtx = outerCtx
   return ctx
+end
+
+-- Effets « End of turn » d'une carte en main (champ endOfTurn), ctx.endOfTurn = vrai.
+local function resolveEndOfTurn(c, inst, d)
+  local ctx = { card = inst, def = d, dealt = false, hits = 0, endOfTurn = true }
+  local list = d.endOfTurn
+  for i = 1, #list do
+    local e = list[i]
+    local h = ns.Effects[e[1]]
+    if not h then error(inst.id .. ": unknown effect " .. tostring(e[1])) end
+    if not e.cond or Combat.test(c, ctx, e.cond, nil) then h(c, ctx, e) end
+    if c.result then break end
+  end
 end
 
 function Combat.resolveCard(c, inst, target, cast, spent)
@@ -1036,9 +1672,17 @@ end
 -- Ordre : cible, puis tous les coûts payés maintenant (mana, « Pay N HP », « Spend N » si la
 -- ressource suffit et que le joueur le veut) — une carte Cast interrompue ne rend rien —, compteurs du
 -- tour, événement « onCardCommitted », puis Trap posée, incantation ou résolution (conditions lues là).
+local playBody
 function Combat.play(c, idx, tIdx, opts)
   local ok, why = Combat.canPlay(c, idx)
   if not ok then return false, why end
+  local tok = fxBegin(c, "card")
+  local r1, r2 = playBody(c, idx, tIdx, opts)
+  fxEnd(c, tok)
+  return r1, r2
+end
+
+playBody = function(c, idx, tIdx, opts)
   local inst = c.hand[idx]
   local d = Card.def(inst)
   local target
@@ -1111,10 +1755,12 @@ end
 function Combat.triggerTrap(c, e)
   local trap = table.remove(c.traps, 1)
   if not trap then return end
+  local tok = fxBegin(c, "trap", true)
   log(c, { t = "trap", card = trap.card.uid, id = trap.card.id, dst = e.uid })
   stat(c, "trapsTriggered")
   Combat.resolveCard(c, trap.card, e, false, trap.spent)
   if not c.result then Combat.fire(c, "onTrapTriggered", trap.card, e) end
+  fxEnd(c, tok)
 end
 
 -- Trap lancée au jeu (crochet « trapLaunch ») : se déclenche aussitôt sur la cible choisie, comme si elle
@@ -1132,9 +1778,11 @@ local function resolveOne(c, cast)
     target = cast.target and Combat.enemyByUid(c, cast.target)
     if not target or target.dead then target = firstAlive(c) end
   end
+  local tok = fxBegin(c, "cast")
   log(c, { t = "cast_resolve", card = cast.card.uid })
   Combat.resolveCard(c, cast.card, target, true, cast.spent)
   if not c.result then Combat.fire(c, "onCastResolved", cast.card) end
+  fxEnd(c, tok)
 end
 
 local function resolveCast(c)
@@ -1196,9 +1844,17 @@ function Combat.legalPotions(c)
   return list
 end
 
+local potionBody
 function Combat.usePotion(c, slot, tIdx)
   local ok, why = Combat.canUsePotion(c, slot, tIdx)
   if not ok then return false, why end
+  local tok = fxBegin(c, "potion")
+  local r1, r2 = potionBody(c, slot, tIdx)
+  fxEnd(c, tok)
+  return r1, r2
+end
+
+potionBody = function(c, slot, tIdx)
   local id = c.player.potions[slot]
   local def = ns.Potions[id]
   local target = def.target and c.enemies[tIdx] or nil
@@ -1232,6 +1888,7 @@ function Combat.flee(c)
   Combat.fire(c, "onFlee")
   c.result = "fled"
   log(c, { t = "result", result = "fled" })
+  Combat.zfire(c, "onCombatEnd", "fled")
   return true
 end
 
@@ -1239,9 +1896,12 @@ end
 -- Tours
 ---------------------------------------------------------------------------
 
+-- Moment du round (c.step) : "turnStart" (début du tour du joueur, avant les intentions), "play" (le
+-- joueur joue), "turnEnd" (fin de son tour), "enemy" (phase ennemie), "roundEnd" (fin du round).
 function Combat.startPlayerTurn(c)
   c.round = c.round + 1
   c.phase = "player"
+  c.step = "turnStart"
   stat(c, "turns")
   local p = c.player
   -- Absorb gardée d'un tour à l'autre (crochet « blockKeep » (v, Absorb actuelle), 0 par défaut : Absorb
@@ -1268,11 +1928,16 @@ function Combat.startPlayerTurn(c)
     p.flags.freeTurn = nil
     p.flags.freeTurnActive = true
   end
+  local tok = fxBegin(c, "turnStart")
   Combat.fire(c, "onTurnStart")
+  fxEnd(c, tok)
   for i = 1, #c.enemies do
     local e = c.enemies[i]
     if not e.dead then Combat.chooseIntent(c, e) end
   end
+  c.step = "play"
+  -- intentions annoncées (Morbent's Bane : +1 mana si un ennemi annonce une incantation)
+  Combat.zfire(c, "onIntents")
 end
 
 -- Carte gardée au choix en fin de tour (Traveler's Backpack) : crochet « retainPicks » (nombre de cartes
@@ -1309,61 +1974,131 @@ function Combat.markRetain(c, uid)
   return false
 end
 
+-- Fin du tour du joueur : « onTurnEnd » (familier, Pouvoirs), lignes « End of turn » des cartes en main
+-- (champ endOfTurn, de gauche à droite), « onHandEnd » (main encore entière : verrouillage du Hex), puis
+-- la défausse : « onCardKept » (instance, "retain" | "pick") pour chaque carte gardée, « onCardDiscarded »
+-- (instance, "turn") pour les autres. Le tout est un effet (« turnEnd »).
 function Combat.endPlayerTurn(c)
+  c.step = "turnEnd"
+  local tok = fxBegin(c, "turnEnd")
   Combat.fire(c, "onTurnEnd")
+  local eot
+  for i = 1, #c.hand do
+    if Card.def(c.hand[i]).endOfTurn then eot = true break end
+  end
+  if eot and not c.result then
+    local list = {}
+    for i = 1, #c.hand do list[i] = c.hand[i] end
+    for i = 1, #list do
+      local d = Card.def(list[i])
+      if d.endOfTurn and Combat.findCard(c, list[i]) == "hand" then resolveEndOfTurn(c, list[i], d) end
+      if c.result then break end
+    end
+  end
+  if not c.result then Combat.zfire(c, "onHandEnd") end
   local pick = c.player.retainPick
   c.player.retainPick = nil
   if pick and Combat.retainPicks(c) <= 0 then pick = nil end
   local keep = {}
-  for i = 1, #c.hand do
-    local inst = c.hand[i]
+  local hand = c.hand
+  for i = 1, #hand do
+    local inst = hand[i]
     if Card.def(inst).retain then
       keep[#keep + 1] = inst
+      Combat.zfire(c, "onCardKept", inst, "retain")
     elseif inst.uid == pick then
       keep[#keep + 1] = inst
       log(c, { t = "retained", card = inst.uid })
       stat(c, "retainPicked")
+      Combat.zfire(c, "onCardKept", inst, "pick")
     else
       statById(c, "unplayed", inst.id)
       c.discard[#c.discard + 1] = inst
+      Combat.zfire(c, "onCardDiscarded", inst, "turn")
     end
   end
   c.hand = keep
   c.player.flags.freeTurnActive = nil
   c.phase = "enemy"
+  fxEnd(c, tok)
 end
 
+-- Tour d'un ennemi : Absorb à 0, DoT et Regen, puis Stunned (tour perdu : « onEnemyStunned ») ou son
+-- action. Crochet « enemyMove » (c, src, move, ennemi) avant l'action : renvoyer un autre move le remplace,
+-- false le saute (dormeur) ; après : « afterEnemyMove » (ennemi, move). L'action est un effet (« enemy »).
+-- Renvoie vrai si le combat est tranché.
+local function enemyTurn(c, e)
+  e.block = 0
+  tickPeriodic(c, e)
+  if c.result then return true end
+  if not e.dead then
+    if (e.st.stunned or 0) > 0 then
+      e.st.stunned = e.st.stunned > 1 and e.st.stunned - 1 or nil
+      log(c, { t = "stunned", unit = e.uid })
+      Combat.zfire(c, "onEnemyStunned", e)
+    else
+      local move = Combat.zmodify(c, "enemyMove", e.intent, e)
+      if move then
+        if move ~= e.intent then
+          e.intent = move
+          log(c, { t = "intent", unit = e.uid, move = move, replaced = true })
+        end
+        c.acting = e.uid -- ennemi dont c'est le tour (Stunned posé pendant ce tour : arrêt immédiat)
+        local tok = fxBegin(c, "enemy")
+        executeMove(c, e)
+        fxEnd(c, tok)
+        c.acting = nil
+        if not c.result then Combat.zfire(c, "afterEnemyMove", e, move) end
+      end
+    end
+  end
+  return c.result ~= nil
+end
+
+-- Phase ennemie : « onEnemyPhaseStart », chaque ennemi présent au début de la phase (les invocations
+-- n'agissent pas, sauf celles qui portent ambush), puis « onEnemyPhaseEnd » (skipped = tour ennemi
+-- sauté : Feign Death).
 function Combat.enemyPhase(c)
+  c.step = "enemy"
+  c.turnSkipped = nil
+  Combat.zfire(c, "onEnemyPhaseStart")
   local n = #c.enemies -- les invocations de ce tour n'agissent pas
+  local skipped = false
   for i = 1, n do
     local e = c.enemies[i]
     -- tour ennemi sauté (Feign Death) : drapeau posé avant ou pendant la phase
     if c.player.flags.skipEnemyTurn then
       c.player.flags.skipEnemyTurn = nil
       log(c, { t = "enemy_turn_skipped" })
-      return
+      skipped = true
+      break
     end
     if not e.dead then
-      e.block = 0
-      tickPeriodic(c, e)
-      if c.result then return end
-      if not e.dead then
-        if (e.st.stunned or 0) > 0 then
-          e.st.stunned = e.st.stunned > 1 and e.st.stunned - 1 or nil
-          log(c, { t = "stunned", unit = e.uid })
-        else
-          c.acting = e.uid -- ennemi dont c'est le tour (Stunned posé pendant ce tour : arrêt immédiat)
-          executeMove(c, e)
-          c.acting = nil
-        end
-      end
-      if c.result then return end
+      if enemyTurn(c, e) then return end
     end
   end
+  -- invocations en embuscade (ambush) : agissent dès cette phase, après les autres
+  if not skipped then
+    local i = n + 1
+    while i <= #c.enemies do
+      local e = c.enemies[i]
+      if e.ambush and not e.dead then
+        e.ambush = nil
+        if enemyTurn(c, e) then return end
+      end
+      i = i + 1
+    end
+  end
+  c.turnSkipped = skipped or nil
+  if not c.result then Combat.zfire(c, "onEnemyPhaseEnd", skipped) end
 end
 
+-- Fin du round : « onRoundEnd » (skipped : le tour ennemi a été sauté), durées des Pouvoirs et des états.
 function Combat.endRound(c)
-  Combat.fire(c, "onRoundEnd")
+  c.step = "roundEnd"
+  local tok = fxBegin(c, "roundEnd")
+  Combat.fire(c, "onRoundEnd", c.turnSkipped or false)
+  fxEnd(c, tok)
   -- pouvoirs à durée : un round de moins, retirés à 0 (dans l'ordre de la liste)
   local pt = c.player.powerTurns
   if pt then
@@ -1390,6 +2125,7 @@ function Combat.endTurn(c)
   Combat.enemyPhase(c)
   if c.result then return true end
   Combat.endRound(c)
+  if c.result then return true end -- perte de PV de fin de round (Wildfire)
   Combat.startPlayerTurn(c)
   return true
 end
@@ -1422,19 +2158,52 @@ function Combat.newStats()
     enemyCasts = 0, enemyCastsInterrupted = 0, played = {}, drawn = {}, unplayed = {}, potions = {} }
 end
 
+-- Règles de zone actives pour un combat de la zone `zone` : la sienne, puis celles qui portent
+-- always = true (ordre de la campagne, puis les autres par id). nil s'il n'y en a aucune.
+local function byCampaign(a, b)
+  local order = ns.Zone and ns.Zone.order
+  local oa, ob = order and order(a) or 99, order and order(b) or 99
+  if oa ~= ob then return oa < ob end
+  return a < b
+end
+
+function Combat.zoneRulesFor(zone)
+  if next(ZRules) == nil then return nil end -- aucune règle de zone chargée (cas courant : rapide)
+  local list
+  if zone and ZRules[zone] then list = { zone } end
+  local others
+  for id, r in pairs(ZRules) do
+    if r.always and id ~= zone then
+      others = others or {}
+      others[#others + 1] = id
+    end
+  end
+  if others then
+    if #others > 1 then table.sort(others, byCampaign) end
+    list = list or {}
+    for i = 1, #others do list[#list + 1] = others[i] end
+  end
+  return list
+end
+
 -- opts : seed, class (id de ns.Classes, « priest » par défaut), hp, maxHp,
---        deck = { {id=, up=}, ... }, encounter = { idEnnemi, ... },
+--        deck = { {id=, up=}, ... }, encounter = { idEnnemi | spec (Combat.spawn), ... },
 --        relics = { id, ... }, potions = { id|false, ... } (POTION_SLOTS emplacements au moins),
 --        charges = { clé = valeur } (état de bibelots propre à l'expédition, relu après le combat),
---        affixes = { id de ns.Affixes, ... } (clés mythiques), stats = bool, quiet = bool
+--        affixes = { id de ns.Affixes, ... } (clés mythiques), stats = bool, quiet = bool,
+--        zone = id de ns.Zones (règles de zone), kind = "combat" | "elite" | "boss" (genre du combat),
+--        mods = { st = { état = n }, hpMul } (posés sur chaque ennemi de départ hors boss : rencontre
+--        « Sleeping Camp », Gurubashi Arena), start = { effets } (résolus après le début du premier tour,
+--        l'Absorb tient donc ce tour : boissons du Grim Guzzler, exp.nextCombat)
 -- État propre à la classe : c.cls (table de données simples, vide au départ, remplie par
--- ns.ClassRules[classe].init) ; ressource : c.player.res.
+-- ns.ClassRules[classe].init) ; ressource : c.player.res. États des zones : c.zs[id] (ZoneRules.init).
 function Combat.new(opts)
   local seed = opts.seed or 1
   local class = opts.class or "priest"
   if not ns.Classes[class] then error("unknown class: " .. tostring(class)) end
   local c = {
     seed = seed, round = 0, phase = "start", result = nil, class = class, cls = {},
+    zone = opts.zone, kind = opts.kind,
     turn = { played = 0, byType = {}, bySchool = {} }, -- compteurs du tour (Combat.play)
     events = {}, quiet = opts.quiet or false, nextUid = 1,
     rng = {
@@ -1484,15 +2253,57 @@ function Combat.new(opts)
     end
   end
   Rng.shuffle(c.rng.draw, c.draw)
+  -- règles de zone : liste et états posés avant l'arrivée des ennemis (leurs crochets peuvent déjà
+  -- servir), init appelé après celui de la classe
+  local zr = Combat.zoneRulesFor(opts.zone)
+  if zr then
+    c.zr, c.zs = zr, {}
+    for i = 1, #zr do c.zs[zr[i]] = {} end
+  end
+  c.hk = Combat.collectHooks(c, deck)
   Combat.placeInnate(c)
-  for i = 1, #opts.encounter do Combat.spawn(c, opts.encounter[i]) end
+  local mods = opts.mods
+  for i = 1, #opts.encounter do
+    local spec = opts.encounter[i]
+    if mods and not (ns.Enemies[Combat.specId(spec)] or {}).boss then
+      local s = type(spec) == "table" and U.copy(spec) or { spec }
+      if mods.hpMul then s.hpMul = (s.hpMul or 1) * mods.hpMul end
+      if mods.st then
+        s.st = s.st or {}
+        for k, v in pairs(mods.st) do s.st[k] = (s.st[k] or 0) + v end
+      end
+      spec = s
+    end
+    Combat.spawn(c, spec)
+  end
   local cr = Rules[class]
   if cr and cr.init then cr.init(c, c.cls) end
   if starters then
     for i = 1, #starters do Card.def(starters[i]).whileInDeck(c, starters[i]) end
   end
+  if zr then
+    for i = 1, #zr do
+      local r = ZRules[zr[i]]
+      if r.init then r.init(c, c.zs[zr[i]]) end
+    end
+  end
+  local tok = fxBegin(c, "start")
   Combat.fire(c, "onCombatStart")
+  fxEnd(c, tok)
   Combat.startPlayerTurn(c)
+  -- effets de départ (opts.start) : après le début du premier tour (l'Absorb gagnée tient ce tour-là)
+  if opts.start and not c.result then
+    tok = fxBegin(c, "start")
+    local ctx = { dealt = false, hits = 0, start = true }
+    for i = 1, #opts.start do
+      local e = opts.start[i]
+      local h = ns.Effects[e[1]]
+      if not h then error("start: unknown effect " .. tostring(e[1])) end
+      h(c, ctx, e)
+      if c.result then break end
+    end
+    fxEnd(c, tok)
+  end
   return c
 end
 
@@ -1509,6 +2320,7 @@ local function copyUnit(u)
   if u.castMore then r.castMore = copyArr(u.castMore) end
   if u.powerTurns then r.powerTurns = copyMap(u.powerTurns) end
   if u.stIcon then r.stIcon = copyMap(u.stIcon) end
+  if u.zs then r.zs = U.copy(u.zs) end -- état de zone propre à l'unité (copie profonde)
   return r
 end
 
@@ -1521,6 +2333,7 @@ function Combat.clone(c)
   n.stats = nil
   n.relicState = copyMap(c.relicState)
   n.cls = U.copy(c.cls) -- état de classe : copie profonde (totems, familier… peuvent être des tables)
+  if c.zs then n.zs = U.copy(c.zs) end -- états des zones : copie profonde (c.zr, liste figée, partagée)
   n.turn = { played = c.turn.played, byType = copyMap(c.turn.byType), bySchool = copyMap(c.turn.bySchool) }
   n.charges = copyMap(c.charges)
   n.rng = { draw = copyMap(c.rng.draw), ai = copyMap(c.rng.ai), misc = copyMap(c.rng.misc),

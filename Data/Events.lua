@@ -57,6 +57,9 @@ local function event(id, t)
   end
   E[id] = t
 end
+-- Pour les fichiers de zone (Data/Zones/<Zone>.lua, chargés après ce fichier) : ns.Declare.event(id, t).
+ns.Declare = ns.Declare or {}
+ns.Declare.event = event
 
 ---------------------------------------------------------------------------
 -- Ordinaires

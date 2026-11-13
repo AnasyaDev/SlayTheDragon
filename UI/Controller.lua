@@ -974,7 +974,7 @@ local function mapStep(exp)
       x = (n.floor - 0.5) / floors, y = n.x, links = links, state = state }
   end
   local opts = {}
-  local nx = U.copyArr(Map.nextNodes(map, exp.node))
+  local nx = U.copyArr(X.nextNodes and X.nextNodes(exp) or Map.nextNodes(map, exp.node))
   table.sort(nx, function(a, b) return map.nodes[a].x < map.nodes[b].x end)
   for _, id in ipairs(nx) do
     opts[#opts + 1] = actionOption(avail, { id = "path:" .. id, label = Map.KINDS[map.nodes[id].kind] })
@@ -1077,6 +1077,10 @@ local function campfireStep(exp)
       disabled = not canUp, reason = not canUp and C.reasonText("upgrade") or nil },
     actionOption(avail, { id = "leave", label = "Move on", text = "Without stopping." }),
   }
+  -- actions de feu de camp des zones (ns.ZoneRules[id].campfire) : options « campAction:<id> »
+  for _, ca in ipairs(X.campActions and X.campActions(exp) or {}) do
+    opts[#opts + 1] = actionOption(avail, { id = "campAction:" .. ca.id, label = ca.label, text = ca.text })
+  end
   return { kind = "campfire", title = "Campfire",
     text = "You have " .. exp.hp .. " of " .. exp.maxHp .. " HP.", options = opts }
 end
@@ -1190,7 +1194,8 @@ local function eventStep(exp)
         hidden = ch.hidden })
     end
   end
-  base.text = def.text
+  -- « %s » / « %g » : nom de l'ennemi ou du groupe tiré à l'entrée (X.eventText)
+  base.text = X.eventText and X.eventText(exp) or def.text
   base.options = opts
   return base
 end
