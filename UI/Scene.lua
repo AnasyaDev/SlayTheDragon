@@ -1102,7 +1102,11 @@ local function contactShadow(f, w)
     sh.parts[i] = t
   end
   sh:Place(w)
-  f:SetScript("OnSizeChanged", function(self, nw) if nw and nw > 0 then sh:Place(nw) end end)
+  -- cadre élargi (S.setWide) : l'ombre suit la largeur de base (figW), pas la largeur élargie
+  f:SetScript("OnSizeChanged", function(self, nw)
+    nw = self.figW or nw
+    if nw and nw > 0 then sh:Place(nw) end
+  end)
   return sh
 end
 
@@ -1128,9 +1132,11 @@ S.NAME_GAP = 8
 function S.figure(parent, w, h)
   local f = CreateFrame("Frame", nil, parent)
   f:SetSize(w, h)
+  f.figW, f.figH, f.wideW = w, h, w
   f.shadow = contactShadow(f, w)
   f.model = W.model(f, w, h)
   f.model:SetPoint("BOTTOM", 0, 0)
+  f.model:EnableMouse(false)
   -- repli sans modèle : médaillon argenté (icône de l'ennemi ou disque sombre), W.setFallbackArt
   f.fallback = W.medallion(f, math.max(40, math.floor(math.min(w, h) * 0.42)))
   f.fallback:SetPoint("CENTER", 0, h * 0.08)
@@ -1157,6 +1163,45 @@ function S.figure(parent, w, h)
     end
   end
   return f
+end
+
+-- Personnage large (art.wide, quadrupède long : crocilisque, raptor, worg…) : un PlayerModel rogne ce qui
+-- sort de son cadre (queue d'un crocilisque de trois quarts coupée net). Le cadre (et son modèle) est
+-- élargi de wide en largeur seulement, centré, même hauteur ; la taille apparente du modèle ne doit pas
+-- changer. Or la projection d'un cadre de modèle dépend de toute sa taille, pas de sa seule hauteur :
+-- l'interface de Blizzard (ScriptAnimatedModelScene.lua, CalculatePixelsPerSceneUnit) mesure l'échelle par
+-- la DIAGONALE de la vue (« experimentally determined ») ; élargir 150 × 160 à 240 × 160 grossirait le
+-- modèle d'environ 31 %. D'où les marges de vue (SetViewInsets, API des modèles : SimpleModelAPI, client
+-- Forever compris) : (largeur élargie - largeur de base) / 2 de chaque côté, la vue projetée reste
+-- exactement le cadre de base, centrée (même mécanisme que ScriptAnimatedModelScene, qui ramène toute vue à
+-- 600 × 680). Les marges ne rognent pas le dessin : les scènes plein écran de Blizzard (GlobalFX*ModelScene,
+-- UIParent entier, ramenées à 600 × 680 par ces marges) dessinent leurs effets partout dans le cadre ; le
+-- modèle déborde donc de la vue jusqu'au bord du cadre élargi. Sans SetViewInsets : aucun élargissement.
+-- Ombre, anneau de cible, repli et éclat restent à la taille de base (f.figW) ; le cadre et son étage
+-- d'interface ne prennent jamais la souris. maxW : largeur au plus (grille de /slay models).
+function S.setWide(f, wide, maxW)
+  local m = f.model
+  local w, h = f.figW, f.figH
+  local ww = w
+  if wide and wide > 1 and m.SetViewInsets then
+    ww = w * wide
+    if maxW and ww > maxW then ww = math.max(w, maxW) end
+  end
+  f.wideW = ww
+  f:SetSize(ww, h)
+  m:SetSize(ww, h)
+  if m.SetViewInsets then
+    local inset = (ww - w) / 2
+    m:SetViewInsets(inset, inset, 0, 0)
+  end
+  if f.shadow then f.shadow:Place(w) end
+end
+
+-- Taille de base d'un personnage (ennemi agrandi par art.scale) ; l'élargissement en cours est gardé.
+function S.setFigureSize(f, w, h)
+  local wide = (f.wideW or f.figW) / f.figW
+  f.figW, f.figH = w, h
+  S.setWide(f, wide)
 end
 
 -- Nom au-dessus de la tête du personnage f (créé à la demande, sur f.ui) ; texte vide = rien d'affiché.
@@ -1387,6 +1432,8 @@ function S.showModel(f, art, key, o)
   m:Show()
   m:SetAlpha(0)
   if f.shadow then f.shadow:Hide() end
+  -- personnage de S.figure : élargi selon art.wide (S.setWide), remis à la largeur de base sinon
+  if f.figW then S.setWide(f, art and art.wide, f.wideMax) end
   W.setFallbackArt(f.fallback, art and art.icon)
   if S.lost[key] then f.fallback:Show() else f.fallback:Hide() end
   if o.facing and m.SetFacing then m:SetFacing(o.facing) end

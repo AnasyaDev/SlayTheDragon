@@ -34,19 +34,20 @@ Art.enemies.bloodscalp_headhunter = { creature = 671, display = { 5626, 3986, 39
 -- Zanzil Naga : créature de la version classique inconnue ; repli : Daggerspine Shorehunter (naga mâle, cache)
 Art.enemies.zanzil_naga = { creature = 2369, display = { 11255, 11263 }, files = { { 125078, "naga male" } },
   icon = I("Achievement_Boss_EliteNagaMale") }
+-- wide = cadre du modèle élargi (félins, raptors : quadrupèdes longs, Scene.setWide)
 Art.enemies.shadowmaw_panther = { creature = 684, display = { 2437 }, files = { { 126171, "tiger" } },
-  icon = I("Ability_Mount_BlackPanther") }
+  wide = 1.3, icon = I("Ability_Mount_BlackPanther") }
 Art.enemies.lashtail_raptor = { creature = 686, display = { 673, 960, 138620 }, files = { { 125559, "raptor" } },
-  icon = I("Ability_Hunter_Pet_Raptor") }
+  wide = 1.3, icon = I("Ability_Hunter_Pet_Raptor") }
 -- Mistvale Gorilla : aucun singe dans les caches ; 837 = affichage de mémoire (non vérifiable hors jeu)
 Art.enemies.mistvale_gorilla = { creature = 1557, display = { 837 }, files = { { 124263, "gorilla" } }, scale = 1.1,
   icon = I("Ability_Hunter_Pet_Gorilla") }
 Art.enemies.bloodsail_swashbuckler = { creature = 1563, display = { 2347, 2348, 4429 },
   icon = I("INV_Misc_Bandana_01") }
 Art.enemies.king_bangalash = { creature = 731, display = { 5556, 138617 }, files = { { 126171, "tiger" } }, scale = 1.25,
-  icon = I("Ability_Mount_JungleTiger") }
+  wide = 1.3, icon = I("Ability_Mount_JungleTiger") }
 Art.enemies.young_stranglethorn_tiger = { creature = 681, display = { 138617, 5556 }, files = { { 126173, "tiger cub" } },
-  scale = 0.85, icon = I("Ability_Mount_JungleTiger") }
+  scale = 0.85, wide = 1.3, icon = I("Ability_Mount_JungleTiger") }
 Art.enemies.mokk_the_savage = { creature = 1514, display = { 837 }, files = { { 124263, "gorilla" } }, scale = 1.3,
   icon = I("Ability_Hunter_Pet_Gorilla") }
 Art.enemies.zanzil_the_outcast = { creature = 2534, display = { 3990, 3986 }, files = { { 126248, "jungle troll caster" } },

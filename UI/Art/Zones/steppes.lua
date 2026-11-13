@@ -22,7 +22,7 @@ local HEAD_DRAGON = I("INV_Misc_Head_Dragon_Black")
 local WORG = I("Ability_Mount_BlackDireWolf")
 Art.enemies.blackrock_soldier = { creature = 7025, display = { 6047, 6033, 6044 }, icon = HEAD_ORC } -- repli : Pourfendeur, Grunt, Champion rochenoire
 Art.enemies.blackrock_sorcerer = { creature = 7026, display = { 6046, 6030, 6048 }, icon = I("Spell_Fire_FlameBolt") } -- 6046 : la créature
-Art.enemies.blackrock_worg = { creature = 7055, display = { 780, 11421 }, icon = WORG } -- repli : Noirworg affamé, Worg
+Art.enemies.blackrock_worg = { creature = 7055, display = { 780, 11421 }, wide = 1.3, icon = WORG } -- repli : Noirworg affamé, Worg
 Art.enemies.black_dragonspawn = { creature = 7040, display = { 2554 }, scale = 1.1, icon = HEAD_DRAGON } -- repli : Draconide Flammécaille
 Art.enemies.black_wyrmkin = { creature = 7041, display = { 8309, 2554 }, icon = HEAD_DRAGON } -- repli : Wyrmide Flammécaille
 Art.enemies.firegut_brute = { creature = 7035, display = { 1054, 1052, 415 }, scale = 1.1, icon = I("INV_Misc_MonsterHead_03") } -- repli : ogres Boulderfist, Splinter Fist
@@ -40,7 +40,7 @@ Art.enemies.volchan = { creature = 10119, display = { 1070 }, files = { { 524124
   icon = I("Spell_Fire_Volcano") }
 Art.enemies.grark_lorkrub = { creature = 9520, display = { 6044, 6047 }, scale = 1.2, icon = I("INV_Misc_Head_Orc_02") } -- repli : Champion rochenoire
 Art.ui.mapBoss.steppes = Art.enemies.grark_lorkrub.icon -- boss du parcours : Grark Lorkrub
-Art.enemies.ember_worg = { creature = 9690, display = { 9370, 780 }, icon = I("Spell_Fire_LavaSpawn") } -- repli : Worg de braise géant
+Art.enemies.ember_worg = { creature = 9690, display = { 9370, 780 }, wide = 1.3, icon = I("Spell_Fire_LavaSpawn") } -- repli : Worg de braise géant
 
 -- Personnages des rencontres (repli : voisins de même apparence du cache)
 Art.npcs.oralius = { creature = 9177, display = { 4147, 4141 }, icon = I("INV_Misc_Note_06") } -- repli : Captain Nials, Lieutenant Valorcall

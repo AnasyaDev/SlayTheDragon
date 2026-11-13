@@ -84,7 +84,7 @@ SetEndPoint SetVertexColor StartMoving StopMovingOrSizing SetCamDistanceScale Se
 SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlpha AddMaskTexture
 SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
 SetScaleAnimationMode SetSmoothScaling SetOrigin SetSmoothing SetSnapToPixelGrid SetTexelSnappingBias
-SetTextureSliceMargins SetTextureSliceMode SetModelScale SetPosition SetKeepModelOnHide
+SetTextureSliceMargins SetTextureSliceMode SetModelScale SetPosition SetKeepModelOnHide SetViewInsets
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -4083,13 +4083,15 @@ do
     okTex and why == nil, why)
 
   -- une ombre par personnage affiché (héros + ennemis), centrée sous les pieds, aplatie, noire, sans
-  -- accrochage au pixel, proportionnelle au cadre (ennemi agrandi compris)
+  -- accrochage au pixel, proportionnelle au cadre (ennemi agrandi compris ; cadre élargi par art.wide :
+  -- proportionnelle à la largeur de base, fig.figW)
   local function shadowBad(fig, label, bad)
     local sh = fig.shadow
     if not (sh and sh.parts and #sh.parts == #Sc.SHADOW_LAYERS) then bad[#bad + 1] = label .. " : pas d'ombre" return end
     local fr = R.rect(fig)
     local fx = (fr[1] + fr[3]) / 2
     local k = (fr[3] - fr[1]) / fig._w
+    local baseW = fig.figW or fig._w
     for i, t in ipairs(sh.parts) do
       local r = R.rect(t)
       local w, h = r[3] - r[1], r[4] - r[2]
@@ -4101,7 +4103,7 @@ do
       if vc[1] ~= 0 or vc[2] ~= 0 or vc[3] ~= 0 or vc[4] ~= Sc.SHADOW_LAYERS[i].a then problems[#problems + 1] = "teinte" end
       if not (snap and snap[1] == false) then problems[#problems + 1] = "accrochage au pixel" end
       if math.abs(w / h - Sc.SHADOW_RATIO) > 0.01 then problems[#problems + 1] = ("rapport %.2f"):format(w / h) end
-      if math.abs(w - fig._w * Sc.SHADOW_LAYERS[i].w * k) > 0.01 then problems[#problems + 1] = ("largeur %.1f"):format(w) end
+      if math.abs(w - baseW * Sc.SHADOW_LAYERS[i].w * k) > 0.01 then problems[#problems + 1] = ("largeur %.1f"):format(w) end
       if math.abs((r[1] + r[3]) / 2 - fx) > 0.01 then problems[#problems + 1] = "décentrée" end
       local cy = (r[2] + r[4]) / 2 - fr[2]
       if cy <= 0 or cy > 20 * k then problems[#problems + 1] = ("hauteur des pieds %.1f"):format(cy) end
@@ -4157,6 +4159,166 @@ do
   if loadedNpc() then shadowBad(ch.npc, "PNJ", ebad) end
   check("rencontre : ombre du héros sous les pieds ; ombre du PNJ affichée avec son modèle chargé",
     #ebad == 0 and loadedNpc() and ch.npc.shadow:IsShown(), table.concat(ebad, " ; "))
+end
+
+print("U28W modèle large (art.wide) : cadre élargi, même hauteur, centré ; vue projetée = cadre de base ; souris et ordre des voisins intacts")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local Sc, Art = ns.Scene, ns.Art
+  -- déclarations : les deux crocilisques au moins, valeurs prudentes (1 < wide <= 1.6)
+  local wides, badDecl = {}, {}
+  for id, a in pairs(Art.enemies) do
+    if a.wide ~= nil then
+      wides[#wides + 1] = id
+      if type(a.wide) ~= "number" or a.wide <= 1 or a.wide > 1.6 then badDecl[#badDecl + 1] = id end
+    end
+  end
+  check("art.wide : crocilisques des Wetlands et du marais à 1.6, toute valeur dans ]1 ; 1.6]",
+    Art.enemies.wetlands_crocolisk.wide == 1.6 and Art.enemies.sawtooth_crocolisk.wide == 1.6 and #badDecl == 0,
+    table.concat(badDecl, ", "))
+
+  local c = C().combat()
+  c.enemies = {}
+  for _, id in ipairs({ "murloc", "wetlands_crocolisk", "murloc" }) do ns.Combat.spawn(c, id) end
+  local v = V()
+  v.c = nil
+  v:Show({ state = c })
+  H.advance(0.5)
+  local croc, others = nil, {}
+  for _, s in pairs(v.slotOf) do
+    if s:IsVisible() then
+      if s.artKey == "wetlands_crocolisk" then croc = s else others[#others + 1] = s end
+    end
+  end
+  check("combat : crocilisque et deux voisins affichés", croc ~= nil and #others == 2)
+  if croc and #others == 2 then
+    local f, m = croc.fig, croc.model
+    local W0, H0 = 150, 160
+    local fr, sr, mr = R.rect(f), R.rect(croc), R.rect(m)
+    local ins = m._calls.SetViewInsets or {}
+    local inset = (W0 * 1.6 - W0) / 2
+    check("cadre et modèle élargis de 1.6 en largeur seulement (240 × 160), base gardée (figW 150)",
+      f._w == W0 * 1.6 and f._h == H0 and m._w == W0 * 1.6 and m._h == H0 and f.figW == W0 and f.figH == H0,
+      ("%s × %s, modèle %s × %s"):format(f._w, f._h, m._w, m._h))
+    check("vue projetée = cadre de base : SetViewInsets(45, 45, 0, 0), taille apparente inchangée",
+      ins[1] == inset and ins[2] == inset and ins[3] == 0 and ins[4] == 0, table.concat(ins, ", "))
+    local scx = (sr[1] + sr[3]) / 2
+    local feet = sr[4] - (33 + H0) * (sr[4] - sr[2]) / croc._h
+    check("cadre élargi centré sur l'emplacement, pieds sur la même ligne (33 + 160 sous le haut)",
+      math.abs((fr[1] + fr[3]) / 2 - scx) < 0.01 and math.abs((mr[1] + mr[3]) / 2 - scx) < 0.01
+      and math.abs(fr[2] - feet) < 0.01 and math.abs(mr[2] - feet) < 0.01 and croc.figH == H0,
+      ("centre %.1f / %.1f, bas %.1f / %.1f"):format((fr[1] + fr[3]) / 2, scx, fr[2], feet))
+    -- cadre d'unité, intention, états : placés comme ceux d'un voisin ordinaire (relatifs à l'emplacement)
+    local function rel(s, o) local r, q = R.rect(o), R.rect(s) return r[4] - q[4], (r[1] + r[3]) / 2 - (q[1] + q[3]) / 2 end
+    local nb = others[1]
+    local same = true
+    for _, k in ipairs({ "tag", "st" }) do
+      local y1, x1 = rel(croc, croc[k])
+      local y2, x2 = rel(nb, nb[k])
+      if math.abs(y1 - y2) > 0.01 or math.abs(x1 - x2) > 0.01 then same = false end
+    end
+    local iy1 = rel(croc, croc.intent)
+    local iy2 = rel(nb, nb.intent)
+    check("cadre d'unité, intention et états à la même place que chez un voisin ordinaire",
+      same and math.abs(iy1 - iy2) < 0.01)
+    local sbad = {}
+    for i, t in ipairs(f.shadow.parts) do
+      if math.abs(t._w - W0 * Sc.SHADOW_LAYERS[i].w) > 0.01 then sbad[#sbad + 1] = i .. " : " .. t._w end
+    end
+    check("ombre de contact à la largeur de base (pas élargie)", #sbad == 0, table.concat(sbad, " ; "))
+    -- souris : le cadre élargi déborde sur l'emplacement voisin, mais ni lui ni rien dessous ne capte la
+    -- souris ; les emplacements (zones de clic) gardent leur taille et leurs scripts
+    local over = false
+    for _, s in ipairs(others) do
+      local r = R.rect(s)
+      if fr[1] < r[3] and r[1] < fr[3] then over = true end
+    end
+    local function under(o, top)
+      while o do if o == top then return true end o = rawget(o, "_parent") end
+      return false
+    end
+    local mbad = {}
+    for _, o in ipairs(H.objects) do
+      if under(o, f) then
+        local em = o._calls and o._calls.EnableMouse
+        local sc = rawget(o, "_scripts") or {}
+        if (em and em[1]) or sc.OnEnter or sc.OnMouseDown or sc.OnClick then
+          mbad[#mbad + 1] = tostring(rawget(o, "_kind"))
+        end
+      end
+    end
+    local off = f._calls.EnableMouse and f._calls.EnableMouse[1] == false
+      and m._calls.EnableMouse and m._calls.EnableMouse[1] == false
+      and f.ui._calls.EnableMouse and f.ui._calls.EnableMouse[1] == false
+    local slotsOk = true
+    for _, s in ipairs({ croc, others[1], others[2] }) do
+      if s._w ~= v.slots[1]._w or s._h ~= v.slots[1]._h or not s._scripts.OnClick or not s._scripts.OnEnter then slotsOk = false end
+    end
+    check("souris : cadre élargi (débordant sur un voisin) sans souris, ni lui ni ses enfants ; emplacements intacts",
+      over and off and #mbad == 0 and slotsOk, table.concat(mbad, ", "))
+    -- ciblage et infobulle d'un voisin : son emplacement réagit au survol, son intention a son infobulle
+    run(nb, "OnEnter")
+    local hov = nb.hover
+    run(nb, "OnLeave")
+    local tip = H.hover(nb.intent)
+    check("voisin : survol de son emplacement (ciblage) et infobulle de son intention intacts",
+      hov == true and nb.hover == false and #tip > 0, #tip)
+    -- ordre de dessin : le modèle élargi passe sous le cadre d'unité, l'intention et les états des voisins
+    local function above(o, t) return R.drawnBefore(R.drawKey(t), R.drawKey(o)) end
+    local obad = {}
+    for _, s in ipairs(others) do
+      for _, o in ipairs({ s.name, s.intent.text }) do
+        if o and not above(o, m) then obad[#obad + 1] = tostring(rawget(o, "_text") or rawget(o, "_kind")) end
+      end
+      if not (s.info:GetFrameLevel() > m:GetFrameLevel()) then obad[#obad + 1] = "niveau des infos" end
+    end
+    check("ordre : cadres d'unité et intentions des voisins au-dessus du modèle élargi", #obad == 0,
+      table.concat(obad, ", "))
+    if Render then Render.svg(H, _G.SlayTheDragonFrame, SNAP .. "/combat_modele_large.svg", "modèle large (crocilisque)") end
+    -- même emplacement repris par un ennemi ordinaire : largeur de base, marges à zéro
+    Sc.enemyFigure(f, "murloc")
+    local ins2 = m._calls.SetViewInsets or {}
+    check("ennemi ordinaire dans le même cadre : largeur de base, marges de vue à zéro",
+      f._w == W0 and m._w == W0 and ins2[1] == 0 and ins2[2] == 0, f._w)
+    -- client sans SetViewInsets : aucun élargissement (la taille apparente ne doit jamais changer)
+    rawset(m, "SetViewInsets", false)
+    Sc.enemyFigure(f, "wetlands_crocolisk")
+    check("client sans SetViewInsets : cadre laissé à la largeur de base", f._w == W0 and m._w == W0, f._w)
+    rawset(m, "SetViewInsets", nil)
+    Sc.enemyFigure(f, "wetlands_crocolisk")
+    -- agrandi (art.scale) et large : base = 150 × scale, élargie de wide, hauteur 160 × scale
+    local sar = Art.enemies.sarltooth
+    Sc.setFigureSize(f, W0 * sar.scale, H0 * sar.scale)
+    Sc.enemyFigure(f, "sarltooth")
+    check("agrandi et large (Sarltooth) : largeur 150 × scale × wide, hauteur 160 × scale",
+      math.abs(f._w - W0 * sar.scale * sar.wide) < 1e-9 and math.abs(f._h - H0 * sar.scale) < 1e-9
+      and math.abs((m._calls.SetViewInsets or {})[1] - (W0 * sar.scale * (sar.wide - 1) / 2)) < 1e-9, f._w)
+  end
+
+  -- hors combat : la grille /slay models élargit aussi, jamais au-delà de sa case
+  v:PreviewEnemies()
+  H.advance(0.2)
+  local pbad, seen = {}, 0
+  for _, pm in ipairs(v.preview.models) do
+    local fig = pm.fig
+    if fig and fig.figW and not pm.fire then
+      local wide = pm.art and pm.art.wide
+      if wide then
+        seen = seen + 1
+        local want = math.min(fig.figW * wide, math.max(fig.figW, fig.wideMax))
+        if math.abs(fig._w - want) > 1e-9 or fig._h ~= fig.figH then pbad[#pbad + 1] = pm.key .. " " .. fig._w end
+      elseif fig._w ~= fig.figW then
+        pbad[#pbad + 1] = pm.key .. " élargi"
+      end
+    end
+  end
+  check("grille des modèles : ennemis larges élargis (bornés à leur case), les autres à leur largeur",
+    seen >= 2 and #pbad == 0, table.concat(pbad, " ; "))
+  v.preview:Hide()
 end
 
 print("U29 textes affichés en anglais : aucune chaîne française dans Core/, Data/, UI/ ni le TOC")

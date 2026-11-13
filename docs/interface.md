@@ -1448,6 +1448,9 @@ de carte revient au même.
   réduit s'il est trop long), barre de vie (+ écusson d'Absorption), états en pastilles. Les pieds sont
   sur la même ligne quelle que soit la taille du personnage (`art.scale` : l'emplacement remonte), de
   sorte que nom et états restent au-dessus du plateau (vérifié par le harnais pour 1 à 6 ennemis).
+  Quadrupède long (`art.wide`, crocilisques 1,6) : `Scene.setWide` élargit cadre et modèle en largeur seulement
+  (centrés, même hauteur) et pose `SetViewInsets` de l'excédent : vue projetée = cadre de base, taille apparente
+  inchangée (raison et sources dans le commentaire de `Scene.setWide` ; harnais U28W).
   Sans modèle : médaillon argenté à l'icône de l'ennemi (`Art.enemies[id].icon`), ou disque sombre.
 - Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
   (cachée à 0), pioche, défausse et consumées (tas avec nombre ; infobulles : contenu trié ; clic =

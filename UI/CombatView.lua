@@ -791,8 +791,9 @@ function V:LayoutEnemies()
       s.artKey = artKey
       local art = Art.enemies[artKey] or {}
       local sc = art.scale or 1
-      s.fig:SetSize(150 * sc, 160 * sc)
-      s.model:SetSize(150 * sc, 160 * sc)
+      -- taille de base ; art.wide (quadrupède long) l'élargit, centrée, à hauteur égale (Scene.setWide,
+      -- dans Scene.showModel) : pieds, cadre d'unité, intention et ombre ne bougent pas
+      Scene.setFigureSize(s.fig, 150 * sc, 160 * sc)
       s.figH = FIG_H * sc
       Scene.enemyFigure(s.fig, artKey)
     end
@@ -1942,6 +1943,8 @@ function V:PreviewEnemies()
       local col, row = (k - 1) % cols, floor((k - 1) / cols)
       local fig = e.fire and Scene.campfire(p, figW, figH) or Scene.figure(p, figW, figH)
       fig:SetPoint("TOP", p, "TOPLEFT", 12 + (col + 0.5) * cellW, -36 - row * rowH)
+      -- modèle large (art.wide) : élargi par Scene.showModel, jamais au-delà de sa case
+      fig.wideMax = cellW - 4
       -- textes au-dessus du modèle et du repli : jamais sous un modèle
       local top = fig.ui
       if not top then
