@@ -410,7 +410,7 @@ end)
 epic("subterfuge", "swamp", "subtlety", "Subterfuge", function(k)
   local turns = EPIC_N.subterfugeTurns[k]
   local first = turns == 1 and "Stealth ends at end of turn, not on Attacks."
-    or ("Stealth lasts %d turns, not ended by Attacks."):format(turns)
+    or "Stealth ends at end of next turn, not on Attacks." -- T = 2 (au-delà : à reformuler)
   return first .. "\nGaining Stealth: +" .. n("subterfuge", k) .. " Combo."
 end)
 epic("kidney_shot", "steppes", "subtlety", "Kidney Shot", function(k)
