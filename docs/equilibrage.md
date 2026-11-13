@@ -884,3 +884,16 @@ Usage : `bot=human` est désormais la référence de la difficulté ressentie (u
 juge avec lui) ; `bot=heuristic` reste l'instrument des comparaisons fines entre cartes, classes et zones (il est
 inchangé : mêmes résultats à graine égale avant et après l'ajout).
 
+## Burning Steppes : réglage sur le bot human (14/11/2026)
+
+Cible de la zone 6 : 45 % de victoires en moyenne au bot `human` (`runner=expedition key=0 zone=steppes zones=5
+level=7 bot=human`), écart ≤ 10. Avant (1 000 expéditions) : Priest 25,2, Warrior 27,8, Mage 31,1, Rogue 25,3,
+Hunter 26,5 % (moyenne 27,2, écart 5,9 ; boss gagné 31 à 41 %). Après (3 000, graine 1) : 42,9 / 46,3 / 46,7 /
+44,9 / 45,5 % (moyenne **45,3**, écart **3,8** ; graine 2 : 45,6 et 4,4). PV nets par combat normal : 3,1 / 11,0 /
+6,9 / 8,4 / 6,9. Grark 116 PV (123), Cleave 20 (23), Heroic Strike 23 (26), phase 2 Torch 10, Mortal Strike 19,
+Rend 6 + DoT 2 (DoT 3, que le joueur ne voit pas dans l'intention) ; Gruklash, élite piège du Warrior et du Rogue
+(56–62 %), Pummel 11, Backhand 12, Mortal Strike 16 ; Worgs 19–21 PV, Bite 4 (+ 3 sur sol embrasé) et Sorcerer 6 /
+6 (groupes de Worgs à 91–95 % pour le Rogue, le Mage et le Hunter) ; Volchan 94 PV ; Wildfire inchangé. Part des
+défaites au boss : 57 à 59 % (Priest, Warrior, Rogue), mais 71 % (Mage) et 78 % (Hunter), qui passent les élites
+par le contrôle ; durcir les élites coûtait deux à trois fois plus au Priest. Contrôle `heuristic` (800) : Priest 69,2, Warrior 77,4, Mage 74,5, Rogue 72,1, Hunter 66,0 % (moyenne 71,8, écart 11,4 ; élites 92 à 98 %, boss 68 à 83 %).
+Détail et essais écartés : `docs/zones/steppes.md`, « Réglage sur le bot human ».

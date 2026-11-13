@@ -52,17 +52,17 @@ E.blackrock_soldier = {
 E.blackrock_sorcerer = {
   name = "Blackrock Sorcerer", hp = { 19, 21 },
   moves = {
-    flamestrike = { name = "Flamestrike", intent = "cast", cast = true, actions = { { "attack", 7 }, { "stoke", 1 } } },
-    fireball = { name = "Fireball", intent = "attack", actions = { { "attack", 7 } } },
+    flamestrike = { name = "Flamestrike", intent = "cast", cast = true, actions = { { "attack", 6 }, { "stoke", 1 } } },
+    fireball = { name = "Fireball", intent = "attack", actions = { { "attack", 6 } } },
   },
   pattern = { "flamestrike", "fireball" }, randomStart = true,
 }
 
 -- Punit les combats longs : plus fort sur sol embrasé.
 E.blackrock_worg = {
-  name = "Blackrock Worg", hp = { 21, 23 },
+  name = "Blackrock Worg", hp = { 19, 21 },
   moves = {
-    bite = { name = "Bite", intent = "attack", actions = { { "attack", 6, more = { { 3, "lit" } } } } },
+    bite = { name = "Bite", intent = "attack", actions = { { "attack", 4, more = { { 3, "lit" } } } } },
     rend = { name = "Rend Flesh", intent = "attack", actions = { { "attack", 3, times = 2 } } },
   },
   pattern = { "bite", "rend" }, randomStart = true,
@@ -145,9 +145,9 @@ E.thaurissan_firewalker = {
 E.gruklash = {
   name = "Gruklash", hp = 100, elite = true,
   moves = {
-    pummel = { name = "Pummel", intent = "attack", actions = { { "attack", 13, interrupts = true } } },
-    backhand = { name = "Backhand", intent = "debuff", actions = { { "attack", 14 }, { "debuff", "demoralized", 2 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 18 } } },
+    pummel = { name = "Pummel", intent = "attack", actions = { { "attack", 11, interrupts = true } } },
+    backhand = { name = "Backhand", intent = "debuff", actions = { { "attack", 12 }, { "debuff", "demoralized", 2 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 16 } } },
   },
   ai = cycle({ "pummel", "backhand", "mortal" }),
   phases = {
@@ -185,7 +185,7 @@ E.dark_iron_land_mine = {
 
 -- La course perdue d'avance : seul, le compte le plus court (Wildfire 3 ; décision du 13/11 : pas de soin par la brûlure).
 E.volchan = {
-  name = "Volchan", hp = 90, elite = true, wildfire = 3,
+  name = "Volchan", hp = 94, elite = true, wildfire = 3,
   moves = {
     crack = { name = "Flamecrack", intent = "attack", actions = { { "attack", 8 }, { "stoke", 1 } } },
     stomp = { name = "Stomp", intent = "attack", actions = { { "attack", 16, interrupts = true } } },
@@ -208,15 +208,15 @@ E.ember_worg = {
 
 local GRARK2 = { "torch", "mortal", "rend", "block" }
 E.grark_lorkrub = {
-  name = "Grark Lorkrub", hp = 123, boss = true, wildfire = 5,
+  name = "Grark Lorkrub", hp = 116, boss = true, wildfire = 5,
   moves = {
     orders = { name = "Call the Pack", intent = "summon", actions = { { "summon", "ember_worg", max = 2 } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 23 } } },
-    strike = { name = "Heroic Strike", intent = "attack", actions = { { "attack", 26 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 20 } } },
+    strike = { name = "Heroic Strike", intent = "attack", actions = { { "attack", 23 } } },
     block = { name = "Shield Block", intent = "buff", actions = { { "block", 12 }, { "buff", "force", 1 } } },
-    torch = { name = "Torch the Field", intent = "attack", actions = { { "attack", 12 }, { "stoke", 1 } } },
-    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 22, interrupts = true } } },
-    rend = { name = "Rend", intent = "debuff", actions = { { "attack", 7 }, { "debuff", "pain", 3 } } },
+    torch = { name = "Torch the Field", intent = "attack", actions = { { "attack", 10 }, { "stoke", 1 } } },
+    mortal = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 19, interrupts = true } } },
+    rend = { name = "Rend", intent = "debuff", actions = { { "attack", 6 }, { "debuff", "pain", 2 } } },
   },
   pattern = { "orders", "cleave", "strike", "block" },
   phases = {
