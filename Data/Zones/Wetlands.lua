@@ -39,7 +39,7 @@ E.mosshide_mystic = {
   name = "Mosshide Mystic", hp = { 15, 17 }, pack = { "heal", 6 },
   moves = {
     wave = { name = "Healing Wave", intent = "heal", actions = { { "heal_ally", 6 } } },
-    bolt = { name = "Lightning Bolt", intent = "cast", cast = true, actions = { { "attack", 10 } } },
+    bolt = { name = "Lightning Bolt", intent = "cast", cast = true, actions = { { "attack", 8 } } },
   },
   ai = function(c, e)
     if e.mem.last ~= "wave" then
@@ -76,7 +76,7 @@ E.mottled_screecher = {
 }
 
 E.mottled_raptor = {
-  name = "Mottled Raptor", hp = { 13, 15 }, pack = { "force", 2 },
+  name = "Mottled Raptor", hp = { 13, 15 }, pack = { "force", 1 },
   moves = {
     rake = { name = "Rake", intent = "attack", actions = { { "attack", 3, times = 2 } } },
     lunge = { name = "Lunge", intent = "attack", actions = { { "attack", 7 } } },
@@ -88,7 +88,7 @@ E.dragonmaw_raider = {
   name = "Dragonmaw Raider", hp = { 24, 27 }, pack = { "force", 2 },
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 5, interrupts = true } } },
-    strike = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 11 }, { "debuff", "mortal_wound", 2 } } },
+    strike = { name = "Mortal Strike", intent = "attack", actions = { { "attack", 11 }, { "debuff", "mortal_wound", 3 } } },
   },
   pattern = { "bash", "strike" }, randomStart = true,
 }
@@ -156,9 +156,9 @@ E.sarltooth = {
 -- a perdu moins de 15 PV depuis son tour précédent, il gagne 1 Charge (Core/ZoneRules/wetlands.lua) ;
 -- Seismic Slam : 6 + 8 par Charge, puis les Charges retombent à 0.
 E.modr = {
-  name = "Modr", hp = 90, elite = true, chargeAt = 15,
+  name = "Modr", hp = 110, elite = true, chargeAt = 15,
   moves = {
-    fist = { name = "Stone Fist", intent = "attack", actions = { { "attack", 12 } } },
+    fist = { name = "Stone Fist", intent = "attack", actions = { { "attack", 15 } } },
     slam = { name = "Seismic Slam", intent = "attack",
       text = "Deals 6, plus 8 per Earthen Charge. Charges drop to 0.",
       actions = { { "attack", 6, per = { 8, "earthen_charge" }, interrupts = true }, { "discharge" } } },
@@ -173,7 +173,7 @@ E.dragonmaw_centurion = {
   name = "Dragonmaw Centurion", hp = 56, elite = true, pack = true, wyrmscale = 10,
   moves = {
     bash = { name = "Shield Bash", intent = "attack", actions = { { "attack", 6, interrupts = true } } },
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 8, times = 2 }, { "debuff", "mortal_wound", 2 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 7, times = 2 }, { "debuff", "mortal_wound", 2 } } },
     shout = { name = "Demoralizing Shout", intent = "debuff", actions = { { "attack", 4 }, { "debuff", "demoralized", 2 } } },
   },
   pattern = { "bash", "cleave", "shout" },
@@ -189,7 +189,7 @@ E.dragonmaw_bonewarder = {
   moves = {
     ward = { name = "Bone Ward", intent = "defend", text = "Chieftain Nek'rosh gains 6 Absorb.",
       actions = { { "block_boss", 6 } } },
-    bolt = { name = "Shadow Bolt", intent = "attack", actions = { { "attack", 6 } } },
+    bolt = { name = "Shadow Bolt", intent = "attack", actions = { { "attack", 3 } } },
   },
   pattern = { "ward", "bolt" }, randomStart = true,
 }
@@ -197,26 +197,26 @@ E.dragonmaw_bonewarder = {
 E.crimson_whelp = {
   name = "Crimson Whelp", hp = { 8, 10 }, minion = true,
   moves = {
-    breath = { name = "Fire Breath", intent = "attack", actions = { { "attack", 4 } } },
+    breath = { name = "Fire Breath", intent = "attack", actions = { { "attack", 3 } } },
   },
   pattern = { "breath" },
 }
 
 E.nekrosh = {
-  name = "Chieftain Nek'rosh", hp = 80, boss = true, pack = true,
+  name = "Chieftain Nek'rosh", hp = 84, boss = true, pack = true,
   moves = {
-    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 9, times = 2 }, { "debuff", "mortal_wound", 2 } } },
-    command = { name = "Clan Command", intent = "buff", text = "All enemies gain Strength 2. Nek'rosh gains 8 Absorb.",
-      actions = { { "buff_allies", "force", 2 }, { "block", 8 } } },
+    cleave = { name = "Cleave", intent = "attack", actions = { { "attack", 9, times = 2 }, { "debuff", "mortal_wound", 3 } } },
+    command = { name = "Clan Command", intent = "buff", text = "All enemies gain Strength 3. Nek'rosh gains 8 Absorb.",
+      actions = { { "buff_allies", "force", 3 }, { "block", 8 } } },
     sunder = { name = "Sunder Armor", intent = "attack", actions = { { "attack", 12 }, { "debuff", "armor_broken", 1 },
-      { "debuff", "mortal_wound", 2 } } },
-    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 16 } } },
+      { "debuff", "mortal_wound", 3 } } },
+    shadow_bolt = { name = "Shadow Bolt", intent = "cast", cast = true, actions = { { "attack", 14 } } },
     whelps = { name = "Call Whelps", intent = "summon", text = "Calls 2 Crimson Whelps (4 at most).",
       actions = { { "summon", "crimson_whelp", count = 2, max = 4 } } },
   },
   pattern = { "cleave", "sunder", "command" },
   phases = {
-    { at = 0.5, name = "Whelps", text = "Calls 2 Crimson Whelps. Casts Shadow Bolt (16).",
+    { at = 0.5, name = "Whelps", text = "Calls 2 Crimson Whelps. Casts Shadow Bolt (14).",
       say = "Whelps! Burn them!", enter = { { "summon", "crimson_whelp", count = 2 } },
       pattern = { "shadow_bolt", "cleave", "whelps", "sunder" } },
   },

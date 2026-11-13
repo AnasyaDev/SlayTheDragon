@@ -757,3 +757,16 @@ Mesure commune aux cinq classes (`runner=expedition level=7 key=0 bot=heuristic 
 15,1 → 10,4 ; Danse Macabre 22,3 → 11,3. Moyenne de la classe : 16,9 → **11,2** ; aucune zone au-delà de +17,2
 ni sous +6,0 ; PV perdus par combat normal 5,4 à 8,4. Textes, nombres, essais écartés et tableau par zone :
 `docs/zones/cartes-de-zone.md`, section « Rogue ».
+
+## Wetlands : passe de difficulté (14/11/2026)
+
+Cible : 68 % de victoires en moyenne (± 2), écart entre classes ≤ 10 points (`runner=expedition key=0
+zone=wetlands zones=2 level=7 bot=heuristic`, épique gagnée en route). Avant (800 expéditions) : Priest 78,2,
+Warrior 76,8, Mage 64,9, Rogue 72,4, Hunter 70,6 ; moyenne 72,6, écart 13,3. Après (1 500) : Priest 72,7,
+Warrior 69,8, Mage 63,3, Rogue 65,5, Hunter 66,7 ; **moyenne 67,6, écart 9,4**. PV perdus par combat normal
+inchangés (Priest 9,2, Warrior 11,2, Mage 7,6, Rogue 8,0, Hunter 7,7). Un relevé des PV perdus par ennemi et par
+intention a montré que le Mage perdait d'abord aux sbires du boss (Bonewarders, Whelps, Shadow Bolt) et à la
+meute de raptors, que le Priest profitait de la durée de ses combats de boss (6,9 tours contre 4,9 au Mage) et
+que Modr usait les classes lentes (Warrior, Priest, Rogue). Sbires et raptors adoucis, Clan Command à
+Strength 3, Mortal Wound de 3 tours chez Nek'rosh et le Raider, Modr 110 PV et Stone Fist 15, Nek'rosh 84 PV.
+Nombres, essais écartés et tableau par classe : `docs/zones/wetlands.md`, « Passe de difficulté ».
