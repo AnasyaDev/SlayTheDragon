@@ -87,3 +87,20 @@ La liste et les règles sont dans `docs/zones/cartes-de-zone.md` (version « ép
 - **Zandalarian Hero Charm : la carte gardée coûte 1 de moins** (joueur, 14/11/2026 ; il doublait le Traveler's
   Backpack). « At the end of your turn, you may keep 1 card in hand. It costs 1 less next turn. » : un choix de
   carte gardée, réduction de 1 (minimum 0) au tour suivant seulement (`docs/zones/stranglethorn.md`).
+
+## Une expédition traverse toute la campagne (décision du joueur, 14/11/2026)
+Remplace « une expédition se joue dans une zone » et le choix de la zone à l'accueil.
+- **Une expédition commence toujours à Westfall** avec le deck de départ et continue de zone en zone jusqu'à
+  Blackrock Mountain. Battre le boss d'une zone mène à la zone suivante avec le même deck, les mêmes bibelots,
+  l'or, les potions et l'épique.
+- **Entre deux zones : soin de 50 % des PV max** (lecture du concepteur de « soin partiel, 50 % des PV
+  maximums » : on rend la moitié des PV max, sans dépasser le maximum).
+- **Zones entières** : 8 étapes par zone, 56 pour une expédition complète.
+- **Chaque boss battu compte** : l'épique de la classe liée à la zone, le commun du compte et l'expérience sont
+  acquis dès la victoire sur le boss, même si l'expédition échoue plus loin. La victoire complète est Nefarian.
+- Conséquences tranchées par le concepteur, à revoir par le joueur : une clé vaut pour toute l'expédition
+  (par classe ; +N ouverte en battant Nefarian à +N−1) ; les bibelots de clé d'une zone s'obtiennent en battant
+  le boss de cette zone à +1, +3, +5 ; les réglages de zone faits sur un deck neuf (zones 2 à 7) sont à refaire
+  pour un deck qui a déjà traversé les zones précédentes.
+- **Bot de référence** : `human`, calé sur les résultats réels du joueur ; le bot `heuristic` (joueur parfait)
+  ne sert plus qu'à comparer les classes.
