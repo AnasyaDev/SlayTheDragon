@@ -572,3 +572,113 @@ pourrait parler dans une rencontre future.
 5. **Les orcs de Stonard** restent alliés (marchand, Ruag, Rartar, le pêcheur) : un joueur Horde ne combat
    pas ses propres gardes, mais la faune de la zone ne compte aucun orc. En faire des ennemis demande une
    version Alliance et une version Horde des rencontres.
+
+## 12. Implémentation (nuit du 13 au 14/11/2026)
+
+Fichiers : `Data/Zones/Swamp.lua` (ennemis, groupes, rencontres, commun, bibelots de clé, décors de la zone),
+`Core/ZoneRules/swamp.lua` (Slumber), `UI/Art/Zones/swamp.lua` (modèles, icônes, vue, sept décors peints),
+`Sim/zones/swamp.lua` (bot), `Sim/tests_zone_swamp.lua` (27 tests), `Sim/ui_zone_swamp.lua` (section « UZS » du
+harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg`.
+
+### La règle telle que codée
+
+- Asleep (état d'ennemi, `ns.Statuses.asleep`, 4 au plus) : l'intention d'un dormeur est le move « asleep »
+  (ajouté à la définition de l'ennemi au besoin, aucune action) ; son ouverture (`opener`, ou celle de Slumber) est
+  annoncée en gris (« On waking: »). À son tour (crochet `enemyMove`) : soin de Slumber, compteur -1, réveil à 0 sans
+  agir. Stunned : le moteur consomme le tour sans passer par `enemyMove`, le compteur gèle.
+- Réveil (`ns.Swamp.wake`) par tout dégât qui ne tue pas (`onEnemyDamaged`, Absorb compris), le compteur ou Alarm.
+  Pendant le tour du joueur (jeu, fin de tour) : l'ouverture devient l'intention tout de suite ; sinon elle sera la
+  prochaine (l'ennemi n'agit plus dans la phase en cours). Stunned sur une ouverture (y compris Freezing Trap qui
+  arrête le tour pendant l'ouverture) : elle est annoncée de nouveau.
+- Rude Awakening : `enemyDamageLast` ×1,5 arrondi au supérieur, coup à une cible (`src.single`), jamais un tic de DoT,
+  après les ajouts des bibelots (Chained Essence +4 avant), avant l'Absorb.
+- Slumber de Wyrmak et Somnus : `phases` (seuil à 50 %, cran sur la barre) dont les actions `dream` partent APRÈS
+  l'effet qui a franchi le seuil (`onEffectEnd`, ou après le tour de l'ennemi qui agit) : le sommeil tombe après la
+  carte entière.
+- Hors du marais, les règles ne sont actives que pour un combat qui peut endormir (deck avec une carte qui pose
+  Asleep, Egg of Hakkar, groupe ou rencontre avec Asleep) : Westfall reste identique à graine égale.
+
+### Ce qui diffère de la fiche, et pourquoi
+
+1. **Nombres** réglés par la simulation (la fiche visait Westfall × 1,48, mais le deck repart de zéro à chaque
+   expédition : à ces chiffres, 4 à 10 % de victoire). Normaux ≈ PV × 0,9, coups × 0,72 (ouvertures × 0,94) ; élites :
+   PV inchangés, coups × 0,78 (ouvertures × 0,9) ; Somnus 130 PV, coups × 0,78, ouvertures × 0,66. Tableau
+   ci-dessous.
+2. **Le familier ne réveille jamais seul** : l'attaque automatique vise un éveillé, et attend quand tous dorment
+   (décision : « évite les dormeurs tant qu'un ennemi est éveillé »). Sans cela, Somnus se réveillait à la fin du
+   tour 1 contre le Hunter (−8 points de victoire au boss). Les attaques commandées frappent la cible de la carte.
+3. **Dreamless Sleep Potion** : « Lose all mana. » au lieu de « End your turn. » (aucun effet ne termine le tour
+   depuis une carte sans toucher au moteur et aux bots).
+4. **Lull pendant la phase ennemie** : un ennemi rendormi avant son tour dans la même phase y passe déjà un tour de
+   sommeil (« Skips its next 2 turns ») ; le soin de 8 est immédiat.
+5. **Sleeping Camp** (`temple_steps`) : Asleep 3 posé par la rencontre (`{ "fight", "event_dragonkin", st =
+   { asleep = 3 } }`), pas dans la composition du groupe (le test commun des groupes ne lit que des ids).
+6. **Egg of Hakkar** : « the enemy with the most HP, bosses excepted » (le harnais U29 lit « non-boss » comme du
+   français).
+7. **Rencontres sans personnage** : `temple_steps` montre le Green Scalebane endormi, `cortello_riddle` une
+   Deathstrike Tarantula (le harnais demande trois candidats de modèle par rencontre).
+8. **Bot** : la vue courte est la bonne stratégie de base (un dormeur ne frappe pas ; tuer les éveillés, puis tuer
+   le dormeur réveillé par son compteur avant son ouverture). Compter d'avance les ouvertures (0,6 × leurs dégâts)
+   faisait réveiller trop tôt : 91 % → 71 % (Rogue). Le bot garde la clé (compteurs, ouvertures en attente) et le
+   soin de Slumber à venir.
+9. Non fourni (lot d'interface commun) : l'aperçu « 33 Wake » / « Wakes » au survol d'une carte (aucun aperçu de
+   dégâts dans l'écran de combat). À la place : infobulle du dormeur (tours, réveil, Rude Awakening, ouverture et ses
+   chiffres), petite icône d'ouverture à droite d'une ouverture annoncée, pastilles « +12 » (soin de Slumber) et
+   « Lulled » sous la bulle, bulles « Wakes 2 » (Alarm) et « +8 » (Lull, « - » sans cible).
+
+### Nombres finaux
+
+| Ennemi | PV | Coups |
+|---|---|---|
+| Sawtooth Crocolisk | 36–40, Asleep 2 | Death Roll 19 · Snap 9 · Submerge block 7 |
+| Dreaming Whelp | 14–15, Asleep 2 | Dream Breath 9 · Bite 4 |
+| Swampwalker | 43–47, Asleep 3 | Bog Crush 21 (interrompt) · Vine Lash 7 · Bog Shield 6 + 6 au plus blessé |
+| Green Scalebane | 40–43, Asleep 2 | Cleave 22 · Strike 9 · Scale Guard block 9, Strength 1 |
+| Wyrmkin Dreamwalker | 27–30 | Lull (Asleep 2, soin 8) · Dream Bolt 4 +3 par dormeur (+9 au plus) |
+| Marsh Oracle | 22–24 | Alarm Cry · Lightning Bolt 7 |
+| Deathstrike Tarantula | 27–30 | Venomous Bite 5 + DoT 3 · Web 4 + Demoralized 1 |
+| Marsh Inkspewer | 14–16 | Claw 4 · Ink Spit 3 + Sundered 1 |
+| Lost One Hunter | 29–32 | Spear Thrust 9 · Net 4 + Demoralized 1 |
+| Lost One Chieftain (élite) | 104, Asleep 2 | Spear of the Lost 23 · Thrust 12 · Rally block 8 + Strength 2 · Crushing Blow 7 + Sundered 1 |
+| Lost One Muckdweller (serviteur) | 20–22 | Warning Horn (Alarm) · Stab 5 |
+| Lord Captain Wyrmak (élite) | 112 | Cleave 14 · Tail Sweep 7 + block 8 · Wing Buffet 9 + Demoralized ; à 56 : Slumber 2, soin 12, Dream Fury 13 × 2 |
+| Gilmorian (élite) | 104 | Lightning Bolt 19 (Cast) · Frost Shock 6 + Demoralized · Healing Wave 20 (Cast) |
+| Somnus (boss) | 130, Asleep 2 | Bellowing Roar 15 + Demoralized ; Noxious Breath 6 × 2 + DoT 3 · Claw 19 · Wing Buffet 9 + block 9 ; à 65 : 2 dragonnets (13 PV, Bite 4), Slumber 2, soin 10, Deep Breath 9 × 2, puis Claw 20 · Breath 7 × 2 + DoT 3 · Buffet |
+
+### Mesures (14/11/2026, 400 expéditions par classe, `runner=expedition key=0 zone=swamp zones=4 level=7 epic=none`)
+
+| Classe | Victoire | PV perdus / combat normal | Tours (normal) | Boss : victoire, tours, PV perdus |
+|---|---|---|---|---|
+| Priest | 82,5 % | 12,0 | 4,67 | 84,2 %, 7,77, 34,8 |
+| Warrior | 66,5 % | 12,5 | 4,12 | 75,4 %, 7,48, 41,0 |
+| Mage | 67,2 % | 7,3 | 3,79 | 73,7 %, 5,84, 26,3 |
+| Rogue | 61,8 % | 10,1 | 3,72 | 79,4 %, 6,01, 23,2 |
+| Hunter | 59,5 % | 5,8 | 3,49 | 60,4 %, 6,51, 32,2 |
+
+Clés (Rogue) : +0 61,8 %, +1 51,5 %, +3 38,2 %, +5 30,0 % (−10 à +1, puis −6,5 et −4 par niveau : affixes communs).
+Statistiques de zone (Rogue, par combat normal) : 0,55 ouverture subie, 0,45 dormeur tué avant son ouverture, 0,15
+tué endormi, 0,44 Rude Awakening (+2,05 dégâts), 0,32 Alarm (0,34 réveillés) ; boss : 1,77 ouverture, 0,97 Slumber.
+
+Écart entre classes : 59,5 à 67,2 % pour quatre classes ; **le Priest reste au-dessus (82,5 %)**. Westfall a le même
+écart (Priest 81 %, Rogue 70,5 % au 14/11) : il vient de la classe (soins sur les combats longs), pas de la zone ;
+renforcer les ouvertures pour punir ses 36 PV (essai « opn 1,45 ») baissait toutes les classes d'autant. À régler
+côté classes, ou avec les épiques. Combats normaux un peu longs pour le Priest (4,7 tours) et coûteux pour Priest
+et Warrior (12 PV, mais 36 et 74 PV max).
+
+### Modèles en repli
+
+Aucune créature du marais dans les caches des clients (Forever, Classic Era, Classic, Anniversary, Retail) sauf
+Lost One Chieftain (10921), Wyrmak (7976), Gilmorian (4920), Lost One Cook (152) : chaque entrée garde la créature
+de la fiche en tête, puis des affichages de la même famille (commentés dans `UI/Art/Zones/swamp.lua`) : crocolisks
+des Wetlands et du Loch Modan, Jade (7975) pour les dragonnets, Timberling Mire Beast (863) pour le Swampwalker,
+Wyrmak et Flamescale Wyrmkin pour les dragonkin, murlocs de la Marche, tarentules, Lost One Refugee, Sleeping Dragon
+(8574) puis Veridian Netherwing Drake pour Somnus, Orc Refugee pour Ruag et le pêcheur, Witherbark Troll pour
+Fel'Zerul, fermiers de la Marche pour Galen. À vérifier en jeu (`/slay models`).
+
+### Décors
+
+Sept décors peints (`swamp_road`, `swamp_night`, `swamp_camp` Fallow Sanctuary, `swamp_shop` Stonard,
+`swamp_temple` marches du temple = « hill », `swamp_pool` boss, `swamp_strand` côte) : ciel gris-vert voilé,
+lisière sombre de saules sur l'horizon, brume, mares à reflets, arbres morts à mousse pendante, roseaux et massettes
+au premier plan, huttes des Lost Ones, huttes et tour de guet orques, temple englouti à gradins moussus.
+Formes ajoutées au peintre : voir `docs/zones.md`, « Décors ».

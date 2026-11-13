@@ -13,7 +13,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 2 | `duskwood` | Duskwood | `Data/Zones/Duskwood.lua` | fichiers vides au TOC, « Coming later » |
 | 3 | `wetlands` | Wetlands | `Data/Zones/Wetlands.lua` | idem |
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
-| 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
+| 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | jouable depuis le 14/11/2026 (Slumber : dormeurs, ouvertures, Rude Awakening ; boss Somnus ; sept décors peints) ; détails et mesures : `docs/zones/swamp.md`, « Implémentation » |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | idem |
 | 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
 
@@ -113,7 +113,9 @@ spec `{ "sawtooth_crocolisk", st = { asleep = 3 }, hp = 40, hpMul = 1.15, ambush
 local _, ns = ...
 local Combat, ZR = ns.Combat, ns.ZoneRule
 ZR.define("duskwood", {
-  always = false,                -- vrai : crochets actifs dans TOUTES les zones (Asleep de Dream Dust)
+  always = false,                -- vrai : crochets actifs dans TOUTES les zones ; ou function(opts) -> bool : actifs
+                                 -- hors de leur zone pour un combat qui en a besoin (opts de Combat.new : deck,
+                                 -- relics, encounter, mods ; nil hors combat) — Swamp : deck qui pose Asleep, Egg of Hakkar
   init = function(c, z) z.curses = 0 end,           -- z = c.zs.duskwood (après l'init de la classe)
   hooks = { … },                 -- crochets de combat (ci-dessous), src = z
   run = { … },                   -- crochets d'expédition (§ 5)
@@ -262,6 +264,13 @@ horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
 `westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
+Ajouts du marais au peintre (14/11/2026, génériques) : `furrows = false` (sol sans rangs de culture), `pools =
+{ { cx, cy, largeur, hauteur } }` (mares : palette `water = { eau, reflet }`, `waterEdge`), palette `moss = { couleur,
+alpha }` (mousse pendante), accessoires `deadtree` (variante 1 à 3), `hut`, `orchut`, `watchtower`, `temple`,
+`reeds` (variante = nombre de tiges ; massettes `ears`, tiges `stalk`). Les épis `wheat` aux couleurs brunes font
+des roseaux au premier plan. Planches : il faut les aperçus PNG de `Media/` dans `build/media_png` (fabriqués par
+`tools/build_media.py`, ou une simple conversion des TGA) ; sans eux, taches fondues et disques sont dessinés en
+rectangles dans les SVG du harnais.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
 
