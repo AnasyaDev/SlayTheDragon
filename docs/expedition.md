@@ -5,10 +5,10 @@ et les bots de simulation passent par la même API.
 
 | Fichier | Rôle |
 | --- | --- |
-| `Core/Map.lua` | Carte ramifiée d'une zone, générée par graine |
+| `Core/Map.lua` | Carte ramifiée d'une zone (8 étapes), générée par graine |
 | `Core/Zones.lua` | Registre des sept zones de la campagne (`ns.Zones`, `ns.Zone`) : `docs/zones.md` |
-| `Core/Meta.lua` | Niveau de classe (expérience), zones gagnées (par classe et par le compte), clés par zone et par classe, affixes |
-| `Core/Expedition.lua` | Machine à états d'une expédition |
+| `Core/Meta.lua` | Niveau de classe (expérience), boss de zone battus (par classe et par le compte), zone la plus loin atteinte, clé par classe, affixes ; report au boss (`Meta.bank`) |
+| `Core/Expedition.lua` | Machine à états d'une expédition (qui traverse les sept zones) |
 | `Core/Save.lua` | Format de `SlayTheDragonDB`, migrations, validation, journal |
 | `Data/Zones/Westfall.lua` | Zone 1 : ennemis et groupes de combats de la Marche de l'Ouest (ex-`Data/Act1.lua`) |
 | `Data/Events.lua` | Rencontres de la Marche de l'Ouest (`zone = "westfall"` ; liste et intentions : `docs/rencontres.md`) |
@@ -22,22 +22,23 @@ et les bots de simulation passent par la même API.
 SlayTheDragonDB = ns.Save.migrate(SlayTheDragonDB)   -- nil -> sauvegarde neuve ; jamais d'effacement
 local db = SlayTheDragonDB
 
--- Nouvelle expédition (classe, zone ouverte et jouable pour elle, clé 0..ns.Meta.keyMax(db.meta, classe, zone))
-local exp, why = ns.Save.start(db, { seed = graine, class = "priest", zone = "westfall", key = 0 })
--- why : "zone locked", "zone coming later", "key locked", "running"
+-- Nouvelle expédition : toujours à Westfall (classe, clé 0..ns.Meta.keyMax(db.meta, classe))
+local exp, why = ns.Save.start(db, { seed = graine, class = "priest", key = 0 })
+-- why : "key locked", "running"
 
 -- À chaque action du joueur
 local ok, why = ns.Expedition.act(db.current, { "path", idNoeud })
--- rien d'autre à faire : l'état est modifié sur place dans db.current, donc déjà « sauvegardé »
+ns.Save.settle(db) -- boss battu, zone atteinte : reportés tout de suite dans la méta (Meta.bank)
+-- l'état est modifié sur place dans db.current, donc déjà « sauvegardé »
 -- (WoW écrit les SavedVariables au /reload, à la déconnexion et à la fermeture).
 
 -- Quand db.current.phase == "done"
 local summary, entry = ns.Save.finish(db, date("%Y-%m-%d %H:%M"))
--- summary = { xp, levelBefore, levelAfter, unlocked = { cards, relics }, zone, zoneWon, zoneOpened,
---             zoneCards, keyRelics, keyUnlocked, accountZone, common, flags }
---           xp = expérience de la classe jouée ; unlocked = ce que la montée de niveau vient de débloquer ;
---           zone… = déblocages de la campagne (docs/zones.md) ; flags = noms des drapeaux de compte
---           nouvellement posés (histoires), triés
+-- summary = { xp, levelBefore, levelAfter, unlocked = { cards, relics }, zone, beaten, zones = { { zone,
+--             zoneWon, zoneCards, keyRelics, accountZone, common } }, zoneCards, keyRelics, keyUnlocked, flags }
+--           xp = expérience de toute l'expédition ; unlocked = ce que la montée de niveau vient de débloquer ;
+--           zone = zone atteinte, beaten = boss battus, zones = déblocages de chaque boss (docs/zones.md) ;
+--           flags = noms des drapeaux de compte nouvellement posés (histoires), triés
 -- entry   = ligne ajoutée à db.journal
 
 -- Abandon volontaire
@@ -78,6 +79,7 @@ rencontres) par le palier commun du compte (`tier` ≤ `exp.unlock.common`). Dé
 | `merchant` | `{"buyCard", i}`, `{"buyRelic", i}`, `{"buyPotion", i}`, `{"remove", indexDeck}`, `{"leave"}` |
 | `event` | `{"choose", i}` puis `{"leave"}` (si le choix n'a pas de suite) ; une réponse indisponible n'est pas dans `choices` et `act` la refuse avec sa raison (texte) |
 | `select` (suite de rencontre) | `{"select", indexDeck}`, `{"skipSelect"}` ; ensuite la récompense de la même réponse s'il y en a une, sinon la carte |
+| `transit` (entre deux zones, après la récompense d'un boss) | `{"continue"}` : la carte de la zone suivante |
 | `done` | aucune |
 | toutes sauf `done` | `{"abandon"}` ; hors combat : `{"discardPotion", emplacement}` |
 
@@ -97,11 +99,15 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | Champ | Contenu |
 | --- | --- |
 | `phase` | voir ci-dessus |
-| `class`, `zone`, `seed`, `key`, `affixes` | classe (id de `ns.Classes`, choisie sur l'accueil), zone (id de `ns.Zones`), graine, niveau de clé, ids d'affixes actifs (`ns.Affixes[id].name/.text`) |
-| `unlock` | `{ level = niveau de la classe 1..7, common = palier commun du compte 0..7, won = { [zone] = meilleure clé gagnée par la classe } }`, figé au départ : un déblocage pendant l'expédition ne change rien avant la suivante |
-| `act`, `acts` | 1 et 1 (une zone = un acte ; gardés pour la carte et l'affichage) |
-| `map` | carte de l'acte (voir plus bas) |
-| `node`, `floor` | nœud courant (nil avant le premier choix), étape 1..8 |
+| `class`, `zone`, `seed`, `key`, `affixes` | classe (id de `ns.Classes`, choisie sur l'accueil), zone EN COURS (id de `ns.Zones`), graine, niveau de clé (toute l'expédition), ids d'affixes actifs (`ns.Affixes[id].name/.text`) |
+| `startZone`, `lastZone` | zone de départ (Westfall) et zone dont le boss termine l'expédition (Blackrock Mountain) ; autres valeurs : tests et diagnostic de simulation |
+| `beaten` | ids des zones dont le boss est battu, dans l'ordre (comptés tout de suite : `Meta.bank`) |
+| `transit` | phase `transit` : `{ from, to, healed }` (zone quittée, zone suivante, PV rendus par le passage) |
+| `banked` | ce que la méta a déjà reçu (`Meta.bank`) : `{ n, xp, levelBefore, zones, flags }` |
+| `unlock` | `{ level = niveau de la classe 1..7, common = palier commun du compte 0..7, won = { [zone] = meilleure clé où la classe a battu ce boss } }`, figé au départ : un déblocage pendant l'expédition (boss battu en route) ne change rien avant la suivante |
+| `act`, `acts` | rang de la zone en cours dans l'expédition (1 = Westfall) et nombre de zones à traverser (7) |
+| `map` | carte de la zone en cours (voir plus bas) |
+| `node`, `floor` | nœud courant (nil avant le premier choix), étape 1..8 de la zone en cours |
 | `hp`, `maxHp`, `gold` | |
 | `deck` | `{ {id, up}, ... }` (`ns.Card.defById(id, up)` pour l'affichage) |
 | `relics` | ids de `ns.Relics` (le bibelot de départ de la classe, `startRelic`, en tête) |
@@ -113,13 +119,14 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | `event` | phase `event` : `{ id (false = rien à signaler), chosen (false ou index), rolls, result, lucky }` ; texte dans `ns.Events[id]` ; `result` = texte après le choix (réponse + issue du pari) ; `lucky` = issue d'un pari (true/false, nil sans pari) |
 | `select` | phase `select` : `{ kind = "upgrade" | "remove" | "dupe", reward? }` |
 | `flags` | drapeaux de compte connus au départ (copie de `meta.flags`, sert aux conditions) |
-| `newFlags` | drapeaux posés pendant l'expédition, reportés dans `meta.flags` par `Save.finish` |
+| `newFlags` | drapeaux posés pendant l'expédition, reportés dans `meta.flags` à chaque boss battu et en fin d'expédition |
 | `startRelics` | phase `start` : ids proposés |
 | `lastRest` | PV rendus par le dernier repos |
 | `stats` | `{ cleared, elites, bosses, combats, goldEarned, goldSpent, cardsAdded, removed, upgraded, visits = {type = n}, events = {id = réponse (0 = pas encore choisi)} }` |
-| `result` | `won`, `lost`, `abandoned` (phase `done`) ; `killedBy` en cas de défaite |
+| `result` | `won` (Nefarian battu), `lost`, `abandoned` (phase `done`) ; `killedBy` en cas de défaite |
 
-Aides de lecture : `Expedition.currentNode(exp)`, `Expedition.actName(exp)`,
+Aides de lecture : `Expedition.currentNode(exp)`, `Expedition.actName(exp)` (nom de la zone en cours),
+`Expedition.campaignPos(exp)` (rang, 7), `Expedition.campaignName(exp)` (« Duskwood · 2/7 »), `Expedition.nextZone(exp)`,
 `Expedition.canUpgrade(exp, i)`, `Expedition.freeSlot(exp)`, `Expedition.eventChoiceOk(exp, i)`
 (griser un choix de rencontre), `Expedition.eventOptions(exp)` (réponses prêtes à afficher, voir
 plus bas), `Expedition.removePrice(exp)`.
@@ -128,7 +135,9 @@ plus bas), `Expedition.removePrice(exp)`.
 
 `exp.map = { act, floors = 8, start = {ids}, nodes = { [id] = { id, floor, x, kind, next = {ids} } } }`
 
-- `floor` 1..7 puis 8 (boss) ; `x` dans ]0, 1[ = position horizontale (2 à 3 nœuds par étape).
+- Une carte par zone : `floor` 1..7 puis 8 (boss) ; `x` dans ]0, 1[ = position horizontale (2 à 3 nœuds par étape).
+  Graine : Westfall tire dans le flux `map` de l'état (cartes de Westfall inchangées) ; chaque zone suivante dans
+  `Rng.stream(graine, "map:<zone>")` (reproductible, indépendante de ce qui s'est passé avant).
 - `kind` : `combat`, `elite`, `campfire`, `merchant`, `event`, `chest`, `boss` (noms affichés :
   `ns.Map.KINDS`).
 - Les traits ne se croisent pas : relier chaque nœud à ses `next` suffit pour dessiner.
@@ -179,15 +188,18 @@ Tabard de Hurlevent. ») ou code d'effet (`"or"`, `"deck"`, `"amélioration"`, `
 
 `db.meta.flags = { [nom] = true }`. Une expédition reçoit une copie figée au départ
 (`exp.flags`, lue par les conditions `flag` / `noFlag`) ; les drapeaux posés pendant l'expédition
-vont dans `exp.newFlags` et ne sont reportés dans la méta qu'**à la fin de l'expédition**
-(`Meta.record`, appelé par `Save.finish` et `Save.abandon`), quel que soit le résultat. Une suite ne
-peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau n'est jamais retiré.
+vont dans `exp.newFlags` et sont reportés dans la méta **à chaque boss battu** (`Meta.bank`) et **en fin
+d'expédition** (`Meta.record`, appelé par `Save.finish` et `Save.abandon`), quel que soit le résultat. La copie
+`exp.flags` ne change pas : une suite ne peut donc jamais apparaître dans l'expédition qui l'a débloquée. Un drapeau n'est jamais retiré.
 `Meta.hasFlag(meta, nom)`.
 
 ## Méta-progression (`Core/Meta.lua`)
 
-`db.meta = { runs, zones = { westfall = true }, classes = { priest = { xp, runs, wins,
-zones = { westfall = { won, keyMax, bestKey } } } }, flags = { [nom] = true } }`
+`db.meta = { runs, zones = { westfall = true }, classes = { priest = { xp, runs, wins, keyMax, bestKey,
+farthest, zones = { westfall = { won, keyMax (plus lu), bestKey } } } }, flags = { [nom] = true } }`
+
+`zones` = boss de zone battus (compte, par classe) ; `wins` = victoires complètes (Nefarian) ; `keyMax` /
+`bestKey` = clé de la classe pour toute l'expédition ; `farthest` = rang de la zone la plus loin atteinte.
 
 Campagne par zones (13/11/2026, remplace la Ligue des explorateurs) : contrat et règles dans
 `docs/zones.md`. Trois sources de déblocage : niveau de classe (ci-dessous), première victoire d'une classe
@@ -217,8 +229,10 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
   taille du niveau (nil au 7) ; `Meta.levelOf(meta, classe)` ; `Meta.isMaxLevel` ;
   `Meta.classContent(classe[, niveau])` → `{ cards, relics }` (tout, ou ce qui se débloque à ce niveau),
   triés par niveau, rareté, coût, nom ; `Meta.unlockLevel(def)` (champ `level`, absent = 1).
-- **Expérience gagnée** en fin d'expédition, gagnée, perdue ou abandonnée (`Meta.xpFor`, `Meta.XP`),
-  tirée de l'avancée de l'expédition (13/11/2026, plus de réputation) :
+- **Expérience gagnée** sur toute l'expédition (campagne continue, 14/11/2026) : celle des étapes franchies est
+  acquise à chaque boss battu (`Meta.bank`, `Meta.xpFor(exp, true)` sans le bonus de victoire), le reste en fin
+  d'expédition, gagnée, perdue ou abandonnée (`Meta.xpFor`, `Meta.XP`) ; même formule (13/11/2026), sur 56
+  étapes et 7 boss au plus, +15 seulement pour Nefarian :
   `(5 × étapes franchies + 6 × élites + 15 × boss + 15 si gagnée) × (1 + 0,15 × clé)`, arrondi
   (`Meta.XP = { step = 5, elite = 6, boss = 15, win = 15, key = 0.15 }`). Mêmes gains qu'avant à la clé 0
   (c'était la moitié de la réputation 10 / 12 / 30, + 15) : victoire avec une élite 8 × 5 + 6 + 15 + 15 =
@@ -247,8 +261,9 @@ Toutes les classes sont jouables dès le départ ; chacune a son niveau, de 1 à
 - Ce que donnait l'ancienne réputation **de classe** (supprimée le 12/11/2026) : cartes par `rep` 0..2 →
   niveau de classe ; « un bibelot de classe parmi 3 au départ » → le bibelot au choix commun ; le titre
   d'Exalté de classe → niveau 7. La réputation de Ligue (`meta.league`) est abandonnée par la migration v5.
-- Clés mythiques **par zone et par classe** : `Meta.keyMax(meta, classe, zone)`, `Meta.bestKey(…)` ; une
-  victoire à +N dans une zone ouvre +N+1 dans cette zone pour cette classe (plafond `Meta.MAX_KEY` = 5).
+- Clés mythiques **par classe, pour toute l'expédition** (concepteur, 14/11/2026) : `Meta.keyMax(meta, classe)`,
+  `Meta.bestKey(meta, classe)` ; battre Nefarian à +N ouvre +N+1 pour cette classe (plafond `Meta.MAX_KEY` = 5) ;
+  `Meta.bestKey(meta, classe, zone)` = meilleure clé où la classe a battu le boss de cette zone (bibelots de clé).
   `Meta.affixesFor(key)` ; `ns.Affixes[id] = { name, level, text }`.
 
 
@@ -301,7 +316,7 @@ obtention : l'épique se gagne (`docs/zones/decisions.md`, « Difficulté et ép
   de choix, ni tirage ; le départ ne propose que le bibelot au choix de la zone 3). Elle tombe sur un élite ou
   s'achète chez le marchand.
 - **Chute par élite, selon la zone.** Après **chaque** victoire d'élite (combat d'élite de rencontre compris),
-  `Expedition.rollEpicDrop(exp, r, genre)` tire une chance qui dépend du rang de la zone (`ns.Zone.order`) :
+  `Expedition.rollEpicDrop(exp, r, genre)` tire une chance qui dépend du rang de la zone EN COURS (`ns.Zone.order`) :
   `EPIC.drop.elite[rang]`, 25 % à Westfall, +10 points par zone, 85 % à Blackrock Mountain
   (`Expedition.epicDropChance(exp, genre)` ; une table plus courte que la campagne garde sa dernière valeur ;
   un genre absent de `EPIC.drop` ne fait jamais rien tomber : combats normaux et boss). Quand elle tombe :
@@ -341,7 +356,7 @@ rencontres gardent leurs poids. Facteurs proposés, à régler par simulation :
 
 Zone 1 : poids d'origine, tirages identiques à avant.
 
-Sauvegarde : expédition version 7 (`Expedition.VERSION`, voir « Sauvegarde ») ; `c.epic` facultatif (absent =
+Sauvegarde : expédition version 7 (aujourd'hui 8, `Expedition.VERSION`, voir « Sauvegarde ») ; `c.epic` facultatif (absent =
 rien à faire). Un combat sauvegardé par l'ancien socle (épique dans la pioche) se termine tel quel ; le combat
 suivant pose l'épique comme une règle (test dans `Sim/tests_epic.lua`).
 Dans le combat : mot-clé `Innate` (champ `innate`, pour les cartes ordinaires), effets passifs du deck
@@ -360,7 +375,7 @@ devant : l'épique n'était presque jamais améliorée). Tests : `Sim/tests_epic
 
 ## Sauvegarde (`Core/Save.lua`)
 
-`SlayTheDragonDB = { version = 5, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
+`SlayTheDragonDB = { version = 6, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
 
 - `Save.new()`, `Save.migrate(db)` (une migration par version dans `Save.MIGRATIONS`, état
   d'expédition migré par `Save.EXP_MIGRATIONS`), `Save.validate(db)` → `ok, erreurs`.
@@ -398,10 +413,53 @@ devant : l'épique n'était presque jamais améliorée). Tests : `Sim/tests_epic
   départ s'il reste à choisir, sinon à la carte (l'offre est perdue, rien n'est effacé) ; une épique déjà prise
   reste dans le deck. Tests « sauvegarde : expédition v5 en cours migrée en v7 » et « v6 arrêtée sur l'offre
   d'épique de l'étape 1 rechargée en v7 sans erreur » (`Sim/tests_epic.lua`), harnais UZ.
+- Version 6 (14/11/2026, une expédition traverse la campagne ; expédition version 8). Méta 5 → 6
+  (`Save.MIGRATIONS[5]`) : rien n'est retiré (`cs.zones[zone].won` et `.bestKey` gardés : épiques et bibelots de
+  clé acquis) ; clé de la classe `cs.keyMax` = la plus haute clé ouverte dans une zone (toute clé jouable avant le
+  reste) ; `cs.bestKey` = celle de Blackrock Mountain si la classe l'a gagnée, sinon -1 ; `cs.farthest` = rang de
+  la plus avancée des zones gagnées par la classe ou jouées par elle (journal). Expédition 7 → 8
+  (`Save.EXP_MIGRATIONS[7]`) : une expédition d'une seule zone en cours **continue dans sa zone** puis enchaîne
+  normalement jusqu'à Blackrock Mountain (`startZone` = sa zone, `lastZone` = Blackrock Mountain, `act` = 1,
+  `acts` = zones restantes, `beaten` = {}) ; arrêtée sur la récompense de son boss, ce boss est déjà battu
+  (`beaten` = { sa zone }) et compte tout de suite (`Save.migrate` appelle `Save.settle`). Tests « sauvegarde v7
+  -> v8 » et « rechargement en plein milieu de la zone 3 et sur l'écran entre deux zones »
+  (`Sim/tests_expedition.lua`), harnais U6 et UZ.
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
-- Journal : `{ result, class, zone, key, seed, act, floor, cleared, elites, bosses, hp, maxHp, gold,
-  goldEarned, deck, relics, killedBy, date, xp }` (les entrées d'avant la v5 gardent `rep`, sans `zone`).
+- Journal : une entrée par expédition `{ result, class, zone (zone atteinte), beaten (boss battus), key, seed, act,
+  floor, cleared, elites, bosses, hp, maxHp, gold, goldEarned, deck, relics, killedBy, date, xp }` (les entrées
+  d'avant la v5 gardent `rep`, sans `zone` ; celles d'avant la v6, sans `beaten`).
+
+## Campagne continue (décision du joueur, 14/11/2026)
+
+Une expédition commence toujours à Westfall avec le deck de départ et traverse les sept zones dans l'ordre
+(`docs/zones/decisions.md`, dernière section ; règles détaillées : `docs/zones.md`, « Une expédition traverse la
+campagne »).
+
+- **Boss d'une zone battu** (`exp.beaten`) : récompense de boss, puis `{"leave"}` mène à la phase `transit`
+  (`Expedition.enterZone`) : `exp.zone` devient la zone suivante, nouvelle carte, soin de `Expedition.ZONE_HEAL`
+  (50 %) des PV max sans dépasser le maximum (crochet `healOut`), `exp.transit = { from, to, healed }` ;
+  `{"continue"}` ouvre la carte. Deck, bibelots, or, potions, épique et PV max sont gardés ; règle de zone,
+  ennemis, rencontres, décors, marchand, chute d'épique et part de rares suivent la zone en cours.
+- **Nefarian battu** = `result = "won"` ; `Meta.record` ouvre alors la clé suivante de la classe.
+- **Report immédiat** (`Meta.bank`, `Save.settle`) : à chaque boss battu, la méta reçoit l'épique de la classe
+  liée à la zone, le commun du compte, les bibelots de clé, l'expérience des étapes franchies et les drapeaux ;
+  rien n'attend la fin de l'expédition. `exp.unlock` et `exp.flags` restent figés au départ (un déblocage gagné
+  en route ne sert qu'à l'expédition suivante, comme avant).
+- **Zone la plus loin atteinte** : `cs.farthest` (l'entrée en phase `transit` compte comme atteinte).
+- **Diagnostic** (tests, simulation) : `Expedition.new{ zone = <départ>, lastZone = <arrêt> }` ; une zone hors
+  de la campagne (zone factice des tests) est jouée seule.
+
+Décisions de détail (concepteur, 14/11/2026, à revoir par le joueur) :
+- le soin du passage passe par `healOut` (soin hors combat : Cursed Eye of Paleth le divise par deux) ;
+- la zone suivante est « atteinte » dès l'écran entre deux zones (un abandon sur cet écran compte comme arrivé) ;
+  le bilan dit alors « Turned back at the gates of Duskwood (2/7). » ;
+- abandonner sur la récompense d'un boss ne retire rien : le boss est déjà battu ;
+- les deux premiers combats de chaque zone sont « easy » (comme le premier acte), le prix du retrait de carte
+  continue de monter sur toute l'expédition, une rencontre vue ne revient pas dans la même expédition ;
+- le bilan regroupe les déblocages (une expédition peut battre sept boss d'un coup) ;
+- `Expedition.enterZone` est public : les tests et le harnais d'interface s'en servent pour amener une expédition
+  dans une zone plus loin.
 
 ## Contrat avec les bibelots et potions (piste A)
 
@@ -472,7 +530,8 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
 - **Niveau de classe** (12/11/2026, formule revue le 13/11/2026) : seuils 100 / 250 / 450 / 700 / 1 000 /
   1 400 ; expérience = 5 par étape, 6 par élite, 15 par boss, +15 pour une victoire, ×(1 + 0,15 × clé) :
   2 expéditions pour le niveau 2, ≈ 20 pour le 7 (voir « Niveau de classe »).
-- **Clés** : une par zone et par classe (`cs.zones[zone].keyMax`) ; jouer une clé inférieure reste possible.
+- **Clés** : une par classe pour toute l'expédition (`cs.keyMax`, 14/11/2026) ; jouer une clé inférieure reste
+  possible.
 - **Affixes** : intensités ajustées (voir tableau ; recalées le 12/11/2026 après l'équilibrage des cinq classes, `docs/equilibrage.md`) pour ≈ −5 points par niveau ; Galvanisant
   n'affecte pas les boss (sinon chaque sbire tué de VanCleef le rendait injouable), Nécrotique
   arrondit au plus proche (l'arrondi par défaut annulait les soins de 2 d'Expiation dès le 1er coup).
