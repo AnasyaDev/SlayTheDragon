@@ -60,20 +60,24 @@ ns.ClassRules.warrior = {
 ---------------------------------------------------------------------------
 -- Règle en jeu pendant tout le combat, dès son début (c.epic, hors de toute pile) : deckHooks (src = c.epic,
 -- après classe, zones, Powers, bibelots et affixes) et whileInDeck (au début du combat). Nombres réglés par
--- la simulation (14/11/2026, docs/classes.md, « Épiques du Guerrier ») : ce tableau seul ; les textes de
--- Data/Warrior.lua les disent (vérifié par Sim/tests_epic_warrior.lua). Écarts à la fiche : Thunderous Roar
--- 3 / 5 sans Demoralized (6 / 9 + Demoralized 1 : +14 points), Titan's Grip 1 Attack par tour (2 : +14),
--- Shield Charge au quart (moitié : +13), Anger Management chaque Rage (3 / 2 : +2), Avatar +2 / +3 (+1 / +2 : +0).
+-- la simulation dans les zones dures (14/11/2026 : Duskwood, Stranglethorn Vale, Burning Steppes ; docs/classes.md,
+-- « Épiques du Guerrier ») : ce tableau seul ; les textes de Data/Warrior.lua les disent (vérifié par
+-- Sim/tests_epic_warrior.lua). Écarts à la fiche : Thunderous Roar 3 sans Demoralized, amélioré 4 + Demoralized 1
+-- (Demoralized de base : +15 à +22 points quel que soit le nombre) ; Titan's Grip deux Attacks par tour comme la
+-- fiche, mais chacune coûte 1 de plus (extraCost ; sans ce coût, 100 % de victoires) ; Sweeping Strikes au tiers
+-- (moitié : Duskwood +22) ; Shield Charge au quart ;
+-- Anger Management chaque Rage, et les cartes qui dépensent partent en recharge 1 (give : débouché du deck de
+-- départ) ; Avatar +2 / +3 et, à 10 Rage, Attacks +1 (over, bonus : débouché de la Rage gardée).
 -- demoralized = 0 : pas d'état posé ; selfStates = faux (repli de la fiche, non retenu) : la copie de Titan's Grip
--- ne poserait rien sur le héros.
+-- ne poserait rien sur le héros ; copies = copies de chaque Attack (0 : contrôle « à blanc »).
 Warrior.EPIC = {
   death_wish = { mult = 1.5, heal = 3 },
-  thunderous_roar = { at = 5, damage = 3, upDamage = 5, demoralized = 0 },
-  sweeping_strikes = { targets = 1, upTargets = 2 },
-  titans_grip = { limit = 1, selfStates = true },
+  thunderous_roar = { at = 5, damage = 3, upDamage = 4, demoralized = 0, upDemoralized = 1 },
+  sweeping_strikes = { targets = 1, upTargets = 2, div = 3 },
+  titans_grip = { limit = 2, extraCost = 1, copies = 1, selfStates = true },
   shield_charge = { div = 4, upBonus = 4 },
-  anger_management = { per = 1, upPer = 1, steps = 1, upSteps = 2 },
-  avatar = { cap = 10, gain = 2, upGain = 3 },
+  anger_management = { per = 1, upPer = 1, steps = 1, upSteps = 2, give = 1 },
+  avatar = { cap = 10, gain = 2, upGain = 3, over = 9, bonus = 1 },
 }
 local E = Warrior.EPIC
 Warrior.EPICS = { "death_wish", "thunderous_roar", "sweeping_strikes", "titans_grip", "shield_charge",
@@ -93,6 +97,8 @@ L.trigger("Kills")
 L.trigger("At 5 Rage")
 L.trigger("Targeted Attack hits")
 L.trigger("Each Rage spent")
+L.trigger("At 10 Rage")
+L.trigger("Spend and Surge cards")
 do
   local has = false
   for _, p in ipairs(L.plates) do if p.word == "Epic" then has = true end end
@@ -140,8 +146,8 @@ do
 end
 
 -- Duskwood — Thunderous Roar : dès que la Rage atteint 5 (juste après le gain, quelle qu'en soit la source),
--- elle tombe à 0, le Guerrier inflige 3 (amélioré : 5) à chaque ennemi vivant, sans carte (Strength
--- comprise), coup « à tous ». Demoralized (E.demoralized, 0 aujourd'hui) : posé ensuite sur chacun ; pendant le
+-- elle tombe à 0, le Guerrier inflige 3 (amélioré : 4) à chaque ennemi vivant, sans carte (Strength
+-- comprise), coup « à tous ». Demoralized (E.demoralized, 0 ; amélioré E.upDemoralized, 1) : posé ensuite sur chacun ; pendant le
 -- tour ennemi, il ne dure que jusqu'à la fin du round (l'état posé n'est pas protégé de la baisse).
 function Warrior.roar(c, up)
   local p = c.player
@@ -154,12 +160,14 @@ function Warrior.roar(c, up)
     if not e.dead and not c.result then hitAs(c, true, Combat.dealDamage, c, p, e, Combat.calcDamage(c, p, e, n)) end
   end
   if c.result then return end
-  if E.thunderous_roar.demoralized <= 0 then return end
+  local T = E.thunderous_roar
+  local demo = up and (T.upDemoralized or T.demoralized) or T.demoralized
+  if demo <= 0 then return end
   list = Combat.aliveEnemies(c)
   for i = 1, #list do
     local e = list[i]
     local fresh = e.fresh.demoralized
-    Combat.applyStatus(c, e, "demoralized", E.thunderous_roar.demoralized)
+    Combat.applyStatus(c, e, "demoralized", demo)
     if c.phase == "enemy" then e.fresh.demoralized = fresh end
   end
 end
@@ -174,15 +182,15 @@ do
   attach("thunderous_roar", hooks)
 end
 
--- Wetlands — Sweeping Strikes : chaque coup d'une carte Attack à cible inflige aussi la moitié des PV qu'il
--- a fait perdre (arrondie à l'inférieur) à un autre ennemi vivant tiré par c.rng.cards (amélioré : deux,
+-- Wetlands — Sweeping Strikes : chaque coup d'une carte Attack à cible inflige aussi le tiers (E.div) des PV qu'il
+-- a fait perdre (arrondi à l'inférieur) à un autre ennemi vivant tiré par c.rng.cards (amélioré : deux,
 -- sans remise). Le rebond est un coup sans carte (ctx nil) : ni Rage, ni Deep Wounds, ni nouveau rebond.
 local function sweepHooks(count)
   return {
     onDamageDealt = function(c, src, t, loss, ctx)
       if not ctx or not ctx.def or ctx.def.type ~= "attack" or ctx.def.target ~= "enemy" then return end
       if t ~= ctx.target then return end
-      local n = floor(loss / 2)
+      local n = floor(loss / E.sweeping_strikes.div)
       if n <= 0 then return end
       local others = {}
       for i = 1, #c.enemies do
@@ -202,9 +210,10 @@ attach("sweeping_strikes", sweepHooks(E.sweeping_strikes.targets), sweepHooks(E.
 
 -- Stranglethorn Vale — Titan's Grip : chaque carte Attack se résout deux fois (crochet replay : la copie
 -- suit, même cible ou premier ennemi vivant, sans coût, reprend le Spend payé et le montant du Surge de
--- l'original sans rien dépenser) ; la Rage « +1 par Attack » une fois par carte ; au plus une carte Attack
--- par tour (E.limit, crochet canPlay ; amélioré : celles qui coûtent 0 au moment du jeu ne comptent pas).
-Warrior.TITAN_REASON = "Only 1 Attack per turn."
+-- l'original sans rien dépenser) ; la Rage « +1 par Attack » une fois par carte ; chaque carte Attack coûte
+-- 1 de plus (E.extraCost, crochet cost) ; au plus deux cartes Attack par tour (E.limit, crochet canPlay) ;
+-- amélioré : celles qui coûtent 0 au moment du jeu n'ont pas le surcoût et ne comptent pas.
+Warrior.TITAN_REASON = ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or "")
 
 local function titanCounts(c, src, inst)
   return not (src.up and Combat.cost(c, inst) == 0)
@@ -214,11 +223,18 @@ local titanHooks = {
   replay = function(c, src, v, inst, ctx)
     if ctx.def.type ~= "attack" then return v end
     c.cls.tgSurge = hasEffect(ctx.def, "surge") and (ctx.surge or 0) or nil
-    return v + 1
+    return v + E.titans_grip.copies
   end,
   canPlay = function(c, src, v, d, inst)
     if v ~= true or d.type ~= "attack" or not titanCounts(c, src, inst) then return v end
     if (c.cls.tgAttacks or 0) >= E.titans_grip.limit then return Warrior.TITAN_REASON end
+    return v
+  end,
+  -- poids de l'arme à deux mains (E.extraCost) : chaque carte Attack coûte plus de mana ; amélioré : pas
+  -- celles qui coûtent 0 (après les règles de classe : Revenge touché), qui ne comptent pas non plus
+  cost = function(c, src, v, d)
+    local x = E.titans_grip.extraCost
+    if x > 0 and d.type == "attack" and not (src.up and v == 0) then return v + x end
     return v
   end,
   onCardCommitted = function(c, src, inst, d)
@@ -295,7 +311,9 @@ end
 -- Burning Steppes — Anger Management : la Rage dépensée (Spend payé, montant d'un Surge) s'ajoute à un
 -- compteur du combat (c.cls.amSpent, reste gardé d'un tour à l'autre) ; à chaque tranche (E.per : 1), chaque
 -- carte en recharge revient un tour plus tôt (amélioré : deux, Warrior.cooldownTick). Une carte dont la recharge
--- arrive à 0 revient en main aussitôt ; main pleine : au début du tour suivant.
+-- arrive à 0 revient en main aussitôt ; main pleine : au début du tour suivant. Débouché du deck de départ : une
+-- carte qui dépense (Spend, Surge) part en recharge E.give (1) au lieu de la défausse (crochet moteur
+-- giveCooldown), qu'elle ait dépensé ou non ; elle revient au tour suivant, ou aussitôt par la dépense suivante.
 function Warrior.cooldownTick(c)
   local keep = {}
   for i = 1, #c.cooldown do
@@ -327,17 +345,42 @@ local function angerHooks(up)
   return {
     onSpend = function(c, src, n) spent(c, n) end,
     onSurge = function(c, src, n) spent(c, n) end,
+    -- débouché de départ : les cartes qui dépensent (Spend, Surge : Heroic Strike dès le deck de départ) partent
+    -- en recharge (E.give tours, 0 : à la défausse) au lieu de la défausse
+    giveCooldown = function(c, src, v, d)
+      local g = E.anger_management.give or 0
+      if v == nil and g > 0 and Warrior.spends(d) then return g end
+      return v
+    end,
   }
+end
+
+-- Carte qui dépense la Rage (Spend N ou Surge).
+function Warrior.spends(d)
+  return d.spend ~= nil or hasEffect(d, "surge")
 end
 attach("anger_management", angerHooks(false), angerHooks(true),
   function(c) c.cls.amSpent = 0 end)
 
 -- Blackrock Mountain — Avatar : plafond de Rage à 10 (crochet resCap) ; au début de chaque tour, +2 Rage
--- (amélioré : +3). Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10).
-local function avatarHooks(gain)
+-- (amélioré : +3). Les cartes « per Rage » lisent la Rage réelle (Execute 5 + 4 × 10). Débouché de la Rage
+-- gardée : à 10 Rage (E.over = 9 : chaque Rage au-delà de 9), chaque coup d'une carte Attack +1 (E.bonus), lu au
+-- coup, après le Spend ou le Surge de la carte (crochet damage, avant Death Wish, Demoralized et Sundered).
+function Warrior.avatarBonus(c)
+  local A = E.avatar
+  local over = (c.player.res or 0) - A.over
+  return over > 0 and over * A.bonus or 0
+end
+
+local function avatarHooks(up)
   return {
     resCap = function(c, src, v) return math.max(v, E.avatar.cap) end,
-    onTurnStart = function(c) Combat.gainRes(c, gain, "avatar") end,
+    onTurnStart = function(c) Combat.gainRes(c, up and E.avatar.upGain or E.avatar.gain, "avatar") end,
+    -- débouché de la Rage gardée : les coups des cartes Attack +bonus par Rage au-delà de over (lue au coup)
+    damage = function(c, src, v, dst, d)
+      if d and d.type == "attack" then return v + Warrior.avatarBonus(c) end
+      return v
+    end,
   }
 end
-attach("avatar", avatarHooks(E.avatar.gain), avatarHooks(E.avatar.upGain))
+attach("avatar", avatarHooks(false), avatarHooks(true))
