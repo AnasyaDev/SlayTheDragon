@@ -457,7 +457,7 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
 Données et nombres (`epicN`, `epicM`, `epicPeriod`, `epicEvery`, base et `up`, lus par les crochets) dans
 `Data/Mage.lua` (`epic(...)` : `cost = 0`, jamais payé) ; règles (`deckHooks`, src = `c.epic`) dans
 `Core/Classes/mage.lua` ; vue dans `UI/Art/mage.lua` ; tests `Sim/tests_epic_mage.lua`, harnais UEM ; bot :
-`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ; l'épique du deck vaut 1,5 de plus).
+`bot.byEpic` (conseils de construction de chaque épique) et `bot.epic` (note ≈ 5 + gain / 2 ; l'épique du deck vaut 3 de plus : le deck est construit autour).
 État de combat dans `c.cls` (`carry`, `fof`, `fofOn`, `r3`, `r3surge`). `epicPeriod = 3` : l'épique n'agit qu'aux
 tours 3, 6, 9… (`Combat.epicTurn(src, round)`, déclencheur « Every 3rd turn »).
 - **Mirror Image** : `afterCast` (`Combat.mirrorHit` : premier coup de la carte Cast, base + N, cible tirée par

@@ -368,11 +368,12 @@ local function epic(id, t)
   card(id, t)
 end
 
--- Westfall : chaque Cast frappe une seconde fois (premier coup, base + epicN) un ennemi au hasard.
+-- Westfall : chaque Cast frappe une seconde fois (premier coup, base + epicN, au moins 0) un ennemi au hasard.
+-- Fiche : 0 / + 4 ; à 0, + 14 points à Westfall ; à - 3, + 12,9 (réglage du 14/11/2026 : - 6 / - 2).
 epic("mirror_image", {
-  name = "Mirror Image", zone = "westfall", path = "fire", school = "arcane", epicN = 0,
-  text = "Epic.\nCast cards: deal their damage again to a random enemy.",
-  up = { epicN = 4, text = "Epic.\nCast cards: deal their damage + 4 again to a random enemy." },
+  name = "Mirror Image", zone = "westfall", path = "fire", school = "arcane", epicN = -6,
+  text = "Epic.\nCast cards: deal their damage - 6 again to a random enemy.",
+  up = { epicN = -2, text = "Epic.\nCast cards: deal their damage - 2 again to a random enemy." },
 })
 
 -- Duskwood : chaque coup ennemi sur le Mage, même absorbé, pose DoT epicN à son auteur.
@@ -407,9 +408,9 @@ epic("arcane_meditation", {
 
 -- Burning Steppes : un ennemi qui meurt avec du DoT le donne (+ epicN) à chaque autre ennemi.
 epic("conflagration", {
-  name = "Conflagration", zone = "steppes", path = "fire", school = "fire", epicN = 5,
-  text = "Epic.\nAn enemy dying with DoT gives that DoT + 5 to each other enemy.",
-  up = { epicN = 8, text = "Epic.\nAn enemy dying with DoT gives that DoT + 8 to each other enemy." },
+  name = "Conflagration", zone = "steppes", path = "fire", school = "fire", epicN = 8,
+  text = "Epic.\nAn enemy dying with DoT gives that DoT + 8 to each other enemy.",
+  up = { epicN = 11, text = "Epic.\nAn enemy dying with DoT gives that DoT + 11 to each other enemy." },
 })
 
 -- Blackrock Mountain : un tour sur epicPeriod (3 : les tours 3, 6, 9…), la 3e carte jouée (améliorée : chaque 3e) se
@@ -499,8 +500,8 @@ relic("mind_quickening_gem", {
 -- Note : ≈ 5 + écart / 2 (points de victoire gagnés à Westfall avec l'épique, Sim/sim.lua epic=). Conseils
 -- (rating, upgrade, remove) : remplacent ceux de la classe tant que l'épique est dans le deck.
 local MAGE_EPIC_NOTE = {
-  mirror_image = 9, molten_armor = 9, water_elemental = 9, fingers_of_frost = 9,
-  arcane_meditation = 9, conflagration = 9, rule_of_threes = 9,
+  mirror_image = 10, molten_armor = 9.5, water_elemental = 9.5, fingers_of_frost = 10.5,
+  arcane_meditation = 7.5, conflagration = 7.5, rule_of_threes = 9.5, -- mesures du 14/11/2026, clé 0, zones=7
 }
 local MAGE_EPIC_ADVICE = {
   -- chaque Cast frappe deux fois : les gros Cast, de quoi tenir l'incantation, les Cast immédiats
@@ -593,7 +594,7 @@ ns.Classes.mage = {
       if not n then return nil end
       -- l'épique du deck vaut plus : le deck est déjà construit autour (changer de build coûte)
       local i = ns.Expedition.epicIndex(exp)
-      if i and exp.deck[i].id == id then n = n + 1.5 end
+      if i and exp.deck[i].id == id then n = n + 3 end
       return n
     end,
   },

@@ -118,34 +118,44 @@ end)
 ---------------------------------------------------------------------------
 -- Mirror Image (Westfall)
 ---------------------------------------------------------------------------
-test("Mirror Image : Cast sous Instant, le premier coup frappe encore (même dégâts, Charges comprises)", function()
+local MN = N("mirror_image") -- dégâts de base du coup en plus : premier coup + MN (au moins 0)
+test("Mirror Image : Cast sous Instant, le premier coup frappe encore (base + N, Charges comprises)", function()
   local c = setup({ "fireball" }, { epic = "mirror_image" })
   c.player.st.instant = 1
   play(c, "fireball", 1)
-  eq(hpLost(c, 1), 20, "10 + 10"); eq(c.enemies[1].st.pain, 2)
+  eq(hpLost(c, 1), 10 + (10 + MN), "10, puis 10 + N"); eq(c.enemies[1].st.pain, 2)
   local c2 = setup({ "fireball" }, { epic = "mirror_image" })
   c2.player.st.instant, c2.player.res = 1, 2
   play(c2, "fireball", 1)
-  eq(hpLost(c2, 1), 24, "12 + 12 (2 Charges)")
+  eq(hpLost(c2, 1), 12 + (12 + MN), "2 Charges sur les deux coups")
+  local z = setup({ "scorch" }, { epic = "mirror_image" })
+  ns.Cards.tm_tiny = { id = "tm_tiny", name = "Tiny", cost = 0, type = "attack", cast = true, target = "enemy",
+    effects = { { "damage", 1 } }, text = "Cast.\nDeal 1." }
+  z.hand[1] = Card.new("tm_tiny", false, 970)
+  z.player.st.instant = 1
+  play(z, "tm_tiny", 1)
+  eq(hpLost(z, 1), 1 + math.max(0, 1 + MN), "jamais négatif")
+  ns.Cards.tm_tiny = nil
 end)
 
-test("Mirror Image : incantation tenue, le coup en plus part à sa résolution ; amélioré + 4", function()
+test("Mirror Image : incantation tenue, le coup en plus part à sa résolution ; amélioré", function()
   local c = setup({ "pyroblast" }, { epic = "mirror_image" })
   play(c, "pyroblast", 1)
   eq(hpLost(c, 1), 0, "incantation")
   Combat.endTurn(c)
-  eq(hpLost(c, 1), 60, "30 + 30")
+  eq(hpLost(c, 1), 30 + 30 + MN, "30, puis 30 + N")
   local u = setup({ "fireball" }, { epic = "mirror_image", up = true })
   u.player.st.instant = 1
   play(u, "fireball", 1)
-  eq(hpLost(u, 1), 24, "10 + 14")
+  eq(hpLost(u, 1), 10 + 10 + N("mirror_image", true), "amélioré")
+  assert(N("mirror_image", true) > MN)
 end)
 
 test("Mirror Image : « to all » ne rejoue qu'un coup ; Cast sans dégâts ou interrompu : rien", function()
   local c = setup({ "flamestrike" }, { epic = "mirror_image", encounter = { "tm_dummy", "tm_dummy" } })
   c.player.st.instant = 1
   play(c, "flamestrike")
-  eq(hpLost(c, 1) + hpLost(c, 2), 36, "12 + 12 + un coup de 12")
+  eq(hpLost(c, 1) + hpLost(c, 2), 12 + 12 + 12 + MN, "12 + 12 + un coup de 12 + N")
   local e = setup({ "evocation" }, { epic = "mirror_image" })
   e.player.st.instant = 1
   play(e, "evocation")
@@ -163,6 +173,7 @@ test("Mirror Image : coup de la même carte (Ignite) ; cible tirée au hasard pa
   c.player.st.instant = 1
   play(c, "fireball", 1)
   eq(c.enemies[1].st.pain, 3 + 2 + 3, "Ignite sur le coup de la carte et sur le coup en plus")
+  eq(hpLost(c, 1), 10 + 10 + MN)
   local seen = {}
   for seed = 1, 30 do
     local m = setup({ "fireball" }, { epic = "mirror_image", seed = seed, encounter = { "tm_dummy", "tm_dummy", "tm_dummy" } })
@@ -170,7 +181,7 @@ test("Mirror Image : coup de la même carte (Ignite) ; cible tirée au hasard pa
     play(m, "fireball", 1)
     for j = 1, 3 do
       local extra = hpLost(m, j) - (j == 1 and 10 or 0)
-      if extra == 10 then seen[j] = true end
+      if extra == 10 + MN then seen[j] = true end
     end
   end
   assert(seen[1] and seen[2] and seen[3], "chaque ennemi peut être tiré, la cible comprise")

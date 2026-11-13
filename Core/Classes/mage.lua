@@ -79,6 +79,7 @@ local function mirrorHit(c, src, ctx)
   local base = e[2] + num(src, "epicN")
   if e.bonus then base = base + e.bonus(c, ctx, t) end
   if e.more or e.per then base = Combat.amount(c, ctx, e, base, t) end
+  if base < 0 then base = 0 end
   Combat.log(c, { t = "epic", id = "mirror_image", dst = t.uid })
   Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, base, ctx.def), e.pierce, ctx)
   if ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
