@@ -29,6 +29,13 @@ local DISCARD_PILE = { 95, 554 }
 local EXHAUST_PILE = { 145, 554 }
 local MANA_X, MANA_Y = 76, 466           -- anneau de mana (76) ; libellé « Mana » dessous
 local COOLDOWN_X, COOLDOWN_Y = 940, 467  -- recharges (cases de 46)
+-- Crans de la ressource : gemmes de PIP unités en arc autour de l'anneau de mana (rayon PIP_R depuis
+-- son centre), du flanc droit sous la pastille (PIP_A0 degrés, 0 = à droite, sens horaire) vers le bas,
+-- un cran tous les PIP_DA degrés ; hors de la main (x 200 à 10 cartes) et au-dessus du libellé « Mana ».
+local PIP, PIPS_MAX = 12, 6
+local PIP_R, PIP_A0, PIP_DA = 49, -5, 14
+local PIP_SOCKET = { 0.3, 0.29, 0.28 }  -- alvéole : gemme désaturée assombrie
+local PIP_FADE, PIP_GLOW = 0.22, 0.45   -- fondu d'un cran, éclat au remplissage (secondes)
 -- Personnage d'un ennemi : 33 sous le haut de l'emplacement, pieds à 33 + FIG_H (193 à l'échelle 1) ;
 -- cadre compact au-dessus de la tête, états ST_DY sous les pieds.
 local FIG_H = 160
@@ -399,6 +406,43 @@ function V:Build(parent)
   self.resource = dem
   self.demence = dem -- ancien nom
 
+  -- Crans de la ressource (Rage 5, Combo 5, Charge 4, Frenzy 5 ; aucun sans plafond, Insanity) : petites
+  -- gemmes en losange en arc autour de l'anneau de mana, sous la pastille, comme les points de combo du
+  -- jeu (alvéole sombre, gemme pleine à la couleur de la ressource). Gemme de rareté du pack embarquée
+  -- (Media/gem_rare.tga) désaturée puis teintée : aucune texture de plus. Un cran qui se remplit ou se
+  -- vide passe en fondu (éclat doux en plus au remplissage), sans échelle. Visibles dès que la classe a
+  -- un plafond, même à 0 (les alvéoles disent le plafond). Cadre sans souris (il couvre l'anneau de mana,
+  -- dont il ne doit pas voler l'infobulle) : l'infobulle de la ressource reste celle de la pastille.
+  local pips = CreateFrame("Frame", nil, parent)
+  local box = 2 * (PIP_R + PIP)
+  at(pips, parent, MANA_X - box / 2, MANA_Y - box / 2, box, box)
+  pips:SetFrameLevel(hz:GetFrameLevel() + 3)
+  pips:EnableMouse(false)
+  pips.list = {}
+  for i = 1, PIPS_MAX do
+    local p = {}
+    p.socket = W.skin(pips, "gem_rare", "ARTWORK", 0)
+    p.socket:SetDesaturated(true)
+    p.socket:SetVertexColor(PIP_SOCKET[1], PIP_SOCKET[2], PIP_SOCKET[3], 1)
+    p.fill = W.skin(pips, "gem_rare", "ARTWORK", 1)
+    p.fill:SetDesaturated(true)
+    p.fill:SetAlpha(0)
+    p.glow = W.skin(pips, "glow_round", "ARTWORK", 2)
+    if p.glow.SetBlendMode then p.glow:SetBlendMode("ADD") end
+    p.glow:SetAlpha(0)
+    local a = math.rad(PIP_A0 + (i - 1) * PIP_DA)
+    p.x, p.y = MANA_X + PIP_R * math.cos(a), MANA_Y + PIP_R * math.sin(a) -- centre (coordonnées du contenu)
+    for _, t in ipairs({ p.socket, p.fill }) do
+      t:SetSize(PIP, PIP)
+      t:SetPoint("CENTER", pips, "CENTER", p.x - MANA_X, -(p.y - MANA_Y))
+    end
+    p.glow:SetSize(PIP * 2.2, PIP * 2.2)
+    p.glow:SetPoint("CENTER", p.socket, "CENTER", 0, 0)
+    pips.list[i] = p
+  end
+  pips:Hide()
+  self.resPips = pips
+
   -- Zone libre de la classe (formes, totems, Seal, familier…) : cadre vide sous les états du héros,
   -- rempli par ns.ClassViews[classe] (build(zone, vue) une fois, render(zone, combat, vue) à chaque
   -- rendu). Contrat : docs/classes.md.
@@ -444,7 +488,7 @@ function V:Build(parent)
     self.cdCards[i] = m
   end
 
-  self.endTurn = W.button(parent, "End Turn", 168, 50, function() V:EndTurn() end, "gold", 20)
+  self.endTurn = W.button(parent, "End Turn", 168, 50, function(_, button) V:EndTurn(button) end, "gold", 20)
   at(self.endTurn, parent, 852, 520, 168, 50)
   self.endTurn:SetFrameLevel(hz:GetFrameLevel() + 2)
 
@@ -589,6 +633,8 @@ function V:Show(step)
     end
     Scene.playerFigure(self.hero)
     self.shownHand = {}
+    self.resPips.class = nil -- nouveau combat : crans posés sans animation
+    self.keepMode = nil
   end
   self:ApplyFacing()
   self:Render(true)
@@ -598,6 +644,7 @@ function V:OnHide()
   self.queue = {}
   self.playing = false
   self.frozen = false
+  self:ExitKeep(true)
   if self.dragging then self:StopDrag(self.dragging, true) end
 end
 
@@ -818,6 +865,7 @@ function V:RenderPlayer(full)
   local dem = p.res or 0
   self.resource.text:SetText(tostring(dem))
   if dem > 0 then self.resource:Show() else self.resource:Hide() end
+  self:RenderPips(class, dem)
   -- zone libre de la classe
   local zone, cv = self.classZone, ns.ClassViews and ns.ClassViews[class]
   for k, f in pairs(zone.views) do if k ~= class then f:Hide() end end
@@ -859,6 +907,65 @@ function V:RenderPlayer(full)
   end
 end
 
+-- Crans de la ressource : autant d'alvéoles que le plafond, les n premières pleines. Un changement de n
+-- fait passer les crans touchés en fondu (et un éclat doux sur ceux qui se remplissent) ; un changement
+-- de classe ou un premier rendu les pose sans animation.
+local function pipTo(p, on, animate)
+  local target = on and 1 or 0
+  if p.on == on then return end
+  p.on = on
+  W.cancel(p, "fill")
+  W.cancel(p, "glow")
+  if not animate then
+    p.alpha = target
+    p.fill:SetAlpha(target)
+    p.glow:SetAlpha(0)
+    return
+  end
+  -- fondu depuis la valeur courante (un cran repris en route ne saute pas)
+  local from = p.alpha or (1 - target)
+  W.tween(PIP_FADE, function(t)
+    p.alpha = from + (target - from) * t
+    p.fill:SetAlpha(p.alpha)
+  end, function()
+    p.alpha = target
+    p.fill:SetAlpha(target)
+  end, p, "fill", W.ease.linear)
+  if on then
+    W.tween(PIP_GLOW, function(t) p.glow:SetAlpha(0.85 * (1 - t)) end, function() p.glow:SetAlpha(0) end, p, "glow",
+      W.ease.linear)
+  end
+end
+
+function V:RenderPips(class, n)
+  local row = self.resPips
+  local rd = ns.Classes[class] and ns.Classes[class].resource
+  local cap = rd and rd.cap
+  if not cap or cap < 1 then
+    row:Hide()
+    row.class, row.cap = nil, nil
+    return
+  end
+  cap = min(cap, PIPS_MAX)
+  local fresh = row.class ~= class or row.cap ~= cap or not row:IsShown()
+  if fresh then
+    row.class, row.cap = class, cap
+    local ra = Art.classResource(class)
+    local col = ra.color and C[ra.color] or C.watchText
+    for i, p in ipairs(row.list) do
+      local used = i <= cap
+      p.fill:SetVertexColor(col[1], col[2], col[3], 1)
+      p.glow:SetVertexColor(col[1], col[2], col[3], 1)
+      p.on = nil
+      for _, t in ipairs({ p.socket, p.fill, p.glow }) do if used then t:Show() else t:Hide() end end
+    end
+    row:Show()
+  end
+  n = max(0, min(n or 0, cap))
+  for i = 1, cap do pipTo(row.list[i], i <= n, not fresh) end
+  row.n = n
+end
+
 -- Position d'une carte de la main (centre x, haut y), sans survol.
 function V:HandSlot(i, n)
   local spacing = n > 1 and min(130, (HAND_W - W.CARD_W) / (n - 1)) or 0
@@ -895,14 +1002,20 @@ function V:RenderHand()
   if self.selected and self.selected > n then self.selected = nil end
   local mana = c.player.mana
   self.shownHand = {}
+  -- choix de la carte gardée en fin de tour (Traveler's Backpack) : cartes proposées au liseré d'or
+  local keepable = {}
+  if self.keepMode then
+    for _, k in ipairs(Controller.retainCandidates()) do keepable[k] = true end
+  end
   for i = 1, #self.cards do
     local card = self.cards[i]
     if i <= n then
       local info = Controller.handInfo(i)
-      -- « Spend N: » allumée si la ressource suffit et que Maj n'est pas enfoncée, éteinte sinon
+      -- « Spend N: » allumée si la ressource suffit et que Maj n'est pas enfoncée, éteinte sinon ;
+      -- carte Cast qui partira tout de suite (Instant) : liseré bleu et « Cast · Instant »
       card:SetCard(info.inst.id, info.inst.up, { cost = info.cost, playable = info.playable,
         manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil,
-        spendOff = info.spendOff })
+        spendOff = info.spendOff, instant = info.instant, keepPick = keepable[i] or nil })
       card.uid = info.inst.uid
       card.baseX, card.baseY = self:HandSlot(i, n)
       self:PlaceCard(card)
@@ -1138,6 +1251,40 @@ function V:QueueEvent(ev)
       W.sound("interrupt")
       if x then W.float(self_.parent, x, y - 60, "Interrupted!", C.defendText, 20, 1.3) end
     end)
+  elseif t == "parry" then
+    -- charge de Parry (Rogue) : « Parry » part du héros, à gauche du chiffre des PV perdus s'il en reste
+    self:Push(0.18, function()
+      local x, y = self_:UnitPos("player")
+      W.sound("block")
+      W.float(self_.parent, x - 44, y - 40, "Parry", C.goldText, 22, 1.1)
+    end)
+  elseif t == "trap" then
+    -- Trap déclenchée : son nom part de l'ennemi qui l'a déclenchée, avant ses effets
+    local d = ev.id and ns.Cards[ev.id]
+    local name = d and d.name or "Trap"
+    self:Push(0.3, function()
+      local x, y = self_:UnitPos(ev.dst)
+      W.sound("interrupt")
+      if x then W.float(self_.parent, x, y - 92, name .. "!", C.goldText, 18, 1.3) end
+    end)
+  elseif t == "interrupt_prevented" then
+    -- interruption sans effet (Talisman of Focus) : le nom de ce qui l'a empêchée part du héros
+    local by = ev.by and (ns.Relics[ev.by] or ns.Cards[ev.by])
+    local label = by and (by.name .. "!") or "Not interrupted"
+    self:Push(0.3, function()
+      local x, y = self_:UnitPos("player")
+      W.sound("block")
+      W.float(self_.parent, x, y - 60, label, C.defendText, 17, 1.4)
+    end)
+  elseif t == "enemy_turn_skipped" then
+    -- tour ennemi sauté (Feign Death) : « Skips its turn » sur chaque ennemi vivant
+    self:Push(0.3, function()
+      for uid, s in pairs(self_.slotOf) do
+        local e = self_.c and enemyByUid(self_.c, uid)
+        local x, y = self_:UnitPos(uid)
+        if x and e and not e.dead then W.float(self_.parent, x, y - 60, "Skips its turn", C.defendText, 16) end
+      end
+    end)
   elseif t == "cast_start" then
     self:Push(0.2, function() W.anim(self_.playerModel, A.ready, 1.2) end)
   elseif t == "cast_resolve" then
@@ -1236,6 +1383,7 @@ end
 function V:Deselect()
   self.selected = nil
   self.potionSlot = nil
+  self:ExitKeep(true)
   self:RenderHand()
   self:RenderTargets()
 end
@@ -1276,6 +1424,15 @@ function V:ClickCard(i, button)
   if self.justDragged and now() - self.justDragged < 0.15 then return end
   if button == "RightButton" then self:Deselect() return end
   if Controller.over() then return end
+  if self.keepMode then
+    -- choix de fin de tour : la carte cliquée est gardée (une carte Retain l'est déjà)
+    local card = self.cards[i]
+    local ok = false
+    for _, k in ipairs(Controller.retainCandidates()) do if k == i then ok = true end end
+    if ok and card and card.uid then self:FinishTurn(card.uid)
+    else UI.flash(Controller.reasonText("keep")) end
+    return
+  end
   if self.selected == i then self:Confirm() else self:Select(i) end
 end
 
@@ -1295,6 +1452,7 @@ end
 
 -- Potion à cible (bandeau) : la prochaine cible cliquée la reçoit.
 function V:SelectPotion(slot)
+  self:ExitKeep(true)
   self.selected = nil
   self.potionSlot = slot
   self:RenderHand()
@@ -1318,8 +1476,42 @@ function V:ClickField(button)
   if info and not info.needsTarget then self:Play(self.selected) end
 end
 
-function V:EndTurn()
+-- Choix de la carte gardée en fin de tour (Traveler's Backpack) : « End Turn » ouvre le choix s'il y a une
+-- carte à garder ; les cartes proposées portent un liseré d'or, un clic sur l'une d'elles finit le tour en
+-- la gardant ; le bouton, devenu « Keep none », finit le tour sans rien garder ; un clic droit annule.
+V.KEEP_PROMPT = "Choose a card to keep in hand."
+V.KEEP_NONE = "Keep none"
+
+function V:EnterKeep()
+  self.keepMode = true
+  self.selected = nil
+  self.potionSlot = nil
+  self.endTurn:SetText(V.KEEP_NONE)
+  UI.flash(V.KEEP_PROMPT)
+  self:RenderHand()
+  self:RenderTargets()
+end
+
+function V:ExitKeep(quiet)
+  if not self.keepMode then return end
+  self.keepMode = nil
+  self.endTurn:SetText("End Turn")
+  if not quiet and self.c then self:RenderHand() end
+end
+
+function V:EndTurn(button)
   if Controller.over() then Controller.finishCombat() return end
+  if self.keepMode then
+    if button == "RightButton" then self:ExitKeep() return end
+    return self:FinishTurn(nil) -- « Keep none »
+  end
+  if #Controller.retainCandidates() > 0 then return self:EnterKeep() end
+  return self:FinishTurn(nil)
+end
+
+-- Fin du tour (keep : uid de la carte gardée au choix, ou nil).
+function V:FinishTurn(keep)
+  self:ExitKeep(true)
   self.selected = nil
   local before = {}
   for i = 1, #self.cards do
@@ -1331,11 +1523,18 @@ function V:EndTurn()
   end
   self.frozen = true
   W.sound("endTurn")
-  local ok = Controller.endTurn()
-  if ok then self:FlyDiscard(before) else self.frozen = false end
+  local ok, why = Controller.endTurn(keep)
+  if ok then
+    self:FlyDiscard(before)
+  else
+    self.frozen = false
+    if why == "keep" then UI.flash(Controller.reasonText(why)) self:Render() end
+  end
+  return ok
 end
 
 function V:StartDrag(card)
+  if self.keepMode then return end -- choix de fin de tour : un clic, pas de glisser
   local info = Controller.handInfo(card.index)
   if not info or not info.playable or Controller.over() then return end
   if GameTooltip then GameTooltip:Hide() end

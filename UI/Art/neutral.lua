@@ -57,5 +57,6 @@ local relics = {
   ironfoe                      = I("INV_Mace_15"),
   royal_seal_of_eldre_thalas   = I("INV_Jewelry_Ring_27"),
   drake_fang_talisman          = I("INV_Misc_Bone_09"),
+  travelers_backpack           = I("INV_Misc_Bag_11"),
 }
 for id, e in pairs(relics) do Art.relics[id] = e end

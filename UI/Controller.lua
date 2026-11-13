@@ -35,6 +35,7 @@ C.REASONS = {
   phase = "It's not your turn.",
   card = "Card not found.",
   unplayable = "This card can't be played.",
+  keep = "This card can't be kept.",
   mana = "Not enough mana.",
   casting = "A cast is already in progress.",
   forbidden = "Forbidden by an active Power.",
@@ -396,7 +397,11 @@ function C.play(handIdx, targetIdx, nospend)
   return combatAct({ "play", handIdx, targetIdx, nospend and "nospend" or nil })
 end
 
-function C.endTurn()
+-- keep : uid de la carte gardée au choix en fin de tour (Traveler's Backpack) ; le choix est posé par
+-- Combat.markRetain juste avant l'action (l'action « endTurn » de l'expédition ne porte pas d'argument).
+function C.endTurn(keep)
+  local c = C.combat()
+  if keep and c and C.inCombat() and not Combat.markRetain(c, keep) then return false, "keep" end
   return combatAct({ "endTurn" })
 end
 
@@ -420,9 +425,22 @@ function C.handInfo(i)
   if ok and C.over() then ok, why = false, "over" end
   local d = Card.def(inst)
   local shift = IsShiftKeyDown and IsShiftKeyDown() and true or false
-  local spendOff = d.spend ~= nil and ((c.player.res or 0) < d.spend or shift)
+  -- « Spend N: » éteinte quand le bonus ne sera pas payé : ressource insuffisante, condition propre de la
+  -- carte (spendNeed, lue comme Combat.play) ou Maj enfoncée
+  local spendOff = d.spend ~= nil and ((c.player.res or 0) < d.spend or shift
+    or (d.spendNeed ~= nil and not d.spendNeed(c, inst)))
+  -- carte Cast qui partira tout de suite (état Instant ou crochet instantCast ; question sans rien consommer)
+  local instant = d.cast and not d.trap and Combat.isInstant(c, d, inst, false) or false
   return { inst = inst, def = d, cost = Combat.cost(c, inst), playable = ok, why = why,
-    needsTarget = Combat.needsTarget(inst), spendOff = spendOff or nil }
+    needsTarget = Combat.needsTarget(inst), spendOff = spendOff or nil, instant = instant or nil }
+end
+
+-- Carte gardée au choix en fin de tour (Traveler's Backpack) : index des cartes proposées (vide sans le
+-- bibelot ou sans carte à garder). Lecture du moteur.
+function C.retainCandidates()
+  local c = C.combat()
+  if not c or C.over() or c.phase ~= "player" then return {} end
+  return Combat.retainCandidates(c)
 end
 
 function C.aliveTargets()

@@ -911,6 +911,13 @@ local function playAction(bot)
   end
   if a[1] ~= "play" then
     H.click(v.endTurn)
+    -- Traveler's Backpack : choix de la carte gardée (celle du bot), sinon « Keep none »
+    if v.keepMode then
+      local uid = H.ns.Bots.retainPick(c)
+      local kc
+      for _, cd in ipairs(v.cards) do if uid and cd.uid == uid and cd._shown then kc = cd end end
+      H.click(kc or v.endTurn)
+    end
     playStyle = playStyle + 1
     return "end"
   end
@@ -7744,6 +7751,311 @@ do
     Render.svg(H, zoom, SNAP .. "/texte_centre.svg", "texte centré, sablier : " .. table.concat(list, ", "))
     zoom:Hide()
   end
+end
+
+print("UG  combat : crans de la ressource, textes flottants des annulations, liseré Instant et Spend N, Traveler's Backpack")
+do
+  -- combat de l'acte 1 pour une classe (bibelots ajoutés avant le combat)
+  local function ugCombat(cl, relics)
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:" .. cl)
+    H.ns.Controller.makeSeed = function() return SEED end
+    clickOption("go")
+    local e = EXP()
+    for _, r in ipairs(relics or {}) do e.relics[#e.relics + 1] = r end
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+    local v = V()
+    v:Render(true)
+    return e, e.combat, v
+  end
+  local function alphaOf(t) return t._calls.SetAlpha and t._calls.SetAlpha[1] or 1 end
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function hexOf(col) return H.ns.Widgets.hexOf(col) end
+  local function stepDriver(dt) run(H.ns.Widgets.driver, "OnUpdate", dt) end
+  local function filled(v, cap)
+    local n, bad = 0, {}
+    for i = 1, cap do
+      local a = alphaOf(v.resPips.list[i].fill)
+      if a == 1 then n = n + 1 elseif a ~= 0 then bad[#bad + 1] = i .. "=" .. a end
+    end
+    return n, table.concat(bad, ",")
+  end
+
+  -- 1. Crans : aucun pour l'Insanity (sans plafond), autant que le plafond sinon, remplis selon la ressource
+  local _, cp, vp = ugCombat("priest")
+  check("crans : aucun pour le Priest (Insanity sans plafond)", not vis(vp.resPips))
+  local CAPS = { warrior = 5, rogue = 5, mage = 4, hunter = 5 }
+  for _, cl in ipairs({ "warrior", "rogue", "mage", "hunter" }) do
+    local _, c, v = ugCombat(cl)
+    local cap = CAPS[cl]
+    local eqCap = H.ns.Classes[cl].resource.cap
+    local sockets = 0
+    for i, p in ipairs(v.resPips.list) do if vis(p.socket) then sockets = sockets + 1 end end
+    c.player.res = 0
+    v:Render(true)
+    H.advance(1)
+    local n0 = filled(v, cap)
+    check(("crans du %s : %d alvéoles (plafond %d), visibles à 0, aucun rempli"):format(cl, sockets, cap),
+      vis(v.resPips) and sockets == cap and eqCap == cap and n0 == 0 and not v.resource._shown, sockets .. " / " .. n0)
+    -- remplissage : 0 -> 3, fondu (valeur intermédiaire au pilote), éclat qui s'éteint, sans échelle
+    c.player.res = 3
+    v:Render(true)
+    local p3 = v.resPips.list[3]
+    local a0 = alphaOf(p3.fill)
+    stepDriver(0.1)
+    local mid = alphaOf(p3.fill)
+    local g = alphaOf(p3.glow)
+    H.advance(1)
+    local n3, bad3 = filled(v, cap)
+    check(("crans du %s : 3 remplis en fondu (%.2f -> %.2f -> 1), éclat %.2f puis éteint, aucune échelle"):format(cl, a0, mid, g),
+      a0 == 0 and mid > 0 and mid < 1 and g > 0 and n3 == 3 and bad3 == "" and alphaOf(p3.glow) == 0
+      and not p3.fill._calls.SetScale and not v.resPips._calls.SetScale, bad3)
+    -- vidage : 3 -> 1, fondu sans éclat
+    c.player.res = 1
+    v:Render(true)
+    stepDriver(0.1)
+    local m2 = alphaOf(v.resPips.list[2].fill)
+    local g2 = alphaOf(v.resPips.list[2].glow)
+    H.advance(1)
+    local n1 = filled(v, cap)
+    check(("crans du %s : vidés en fondu jusqu'à 1 (%.2f en route), sans éclat"):format(cl, m2), n1 == 1 and m2 > 0 and m2 < 1 and g2 == 0)
+    -- couleur de la ressource (Art.classes[cl].resource.color), gemme désaturée puis teinte
+    local ra = H.ns.Art.classResource(cl)
+    local col = H.ns.Art.C[ra.color]
+    local vc = v.resPips.list[1].fill._calls.SetVertexColor
+    check(("crans du %s : gemme embarquée (Media), désaturée, teinte de la ressource"):format(cl),
+      (v.resPips.list[1].fill._texture or ""):find("gem_rare", 1, true) and v.resPips.list[1].fill._calls.SetDesaturated[1] == true
+      and vc and math.abs(vc[1] - col[1]) < 1e-6 and math.abs(vc[3] - col[3]) < 1e-6, tostring(v.resPips.list[1].fill._texture))
+    -- placement : hors de la main (bord gauche des cartes) et dans le plateau
+    local R = dofile(root .. "/Sim/ui_render.lua")
+    R.H = H
+    local lastR = R.rect(v.resPips.list[cap].socket)
+    local firstR = R.rect(v.resPips.list[1].socket)
+    local cardR = R.rect(v.cards[1])
+    local board = R.rect(v.hz)
+    check(("crans du %s : en arc à droite de l'anneau de mana, à gauche de la main, dans le plateau"):format(cl),
+      lastR and cardR and firstR[3] < cardR[1] and lastR[3] < cardR[1] and firstR[2] >= board[2] and lastR[4] <= board[4],
+      firstR and cardR and (firstR[3] .. " < " .. cardR[1]))
+    c.player.res = math.min(3, cap)
+    v:Render(true)
+    H.advance(1)
+    snap("ug-crans-" .. cl, true)
+  end
+
+  -- 2. Textes flottants des annulations : Parry (héros), Trap (son nom, sur l'ennemi), interruption sans
+  -- effet (nom du bibelot), tour ennemi sauté ; les retours qui existaient restent (Absorb, Stunned, Interrupted)
+  local floats = {}
+  -- relevé des textes flottants (à reposer après chaque H.boot : nouveaux modules)
+  local function hookFloats()
+    local Wg = H.ns.Widgets
+    local old = Wg.float
+    Wg.float = function(parent, x, y, text, ...) floats[#floats + 1] = { text = text, x = x, y = y } return old(parent, x, y, text, ...) end
+  end
+  local function seen(txt)
+    for _, f in ipairs(floats) do if f.text == txt then return f end end
+  end
+  local e, c, v = ugCombat("rogue")
+  hookFloats()
+  H.ns.Combat.applyStatus(c, c.player, "parry", 3)
+  c.events = {} -- (le gain posé à la main n'est pas rejoué : son nom flotterait aussi)
+  v:Render(true)
+  floats = {}
+  H.click(v.endTurn)
+  local evs = H.ns.Controller.lastEvents or {}
+  local nParry = 0
+  for _, ev in ipairs(evs) do if ev.t == "parry" then nParry = nParry + 1 end end
+  -- instantané quand « Parry » est à l'écran
+  local shot = false
+  for _ = 1, 80 do
+    H.advance(0.1)
+    if not shot and seen("Parry") then H.advance(0.25) snap("ug-parry-rogue", true) shot = true end
+    if not v.playing then break end
+  end
+  H.settle()
+  local pf = seen("Parry")
+  local hx = select(1, v:UnitPos("player"))
+  local nf = 0
+  for _, f in ipairs(floats) do if f.text == "Parry" then nf = nf + 1 end end
+  check(("Parry : « Parry » flottant au héros, un par charge employée (%d coups parés)"):format(nParry),
+    nParry > 0 and nf == nParry and pf and math.abs(pf.x - hx) < 60, nf .. " / " .. nParry)
+  -- Trap déclenchée (Hunter, Freezing Trap posée par l'interface) : son nom part de l'ennemi
+  e, c, v = ugCombat("hunter")
+  hookFloats()
+  c.hand[1] = H.ns.Card.new("freezing_trap", false, 9301)
+  c.player.mana = 3
+  v:Render(true)
+  H.ns.Controller.play(1)
+  H.settle()
+  floats = {}
+  H.click(v.endTurn)
+  local trapEv
+  for _, ev in ipairs(H.ns.Controller.lastEvents or {}) do if ev.t == "trap" then trapEv = ev end end
+  shot = false
+  for _ = 1, 80 do
+    H.advance(0.1)
+    if not shot and seen("Freezing Trap!") then H.advance(0.25) snap("ug-trap-hunter", true) shot = true end
+    if not v.playing then break end
+  end
+  H.settle()
+  local tf = seen("Freezing Trap!")
+  local ex = trapEv and select(1, v:UnitPos(trapEv.dst))
+  check("Trap déclenchée : « Freezing Trap! » flottant sur l'ennemi qui l'a déclenchée (journal : id de la carte)",
+    trapEv and trapEv.id == "freezing_trap" and tf and ex and math.abs(tf.x - ex) < 1, trapEv and tostring(trapEv.id))
+  check("Stunned qui arrête le tour ennemi : « Stunned » (existait)", seen("Stunned") ~= nil)
+  -- événements synthétiques : interruption sans effet, tour sauté, et retours qui existaient
+  floats = {}
+  local alive = {}
+  for _, en in ipairs(c.enemies) do if not en.dead then alive[#alive + 1] = en end end
+  v:OnEvents({ { t = "interrupt_prevented", src = alive[1].uid, dst = "player", card = "fireball", by = "focus_talisman" },
+    { t = "interrupt_prevented", src = alive[1].uid, dst = "player", card = "fireball" },
+    { t = "enemy_turn_skipped" },
+    { t = "damage", src = alive[1].uid, dst = "player", amount = 5, absorbed = 5, loss = 0 },
+    { t = "interrupt", src = alive[1].uid, dst = "player", card = "fireball" },
+    { t = "stunned", unit = alive[1].uid, stopped = true } })
+  H.settle()
+  local nSkip = 0
+  for _, f in ipairs(floats) do if f.text == "Skips its turn" then nSkip = nSkip + 1 end end
+  check("interruption sans effet : nom du bibelot (« Talisman of Focus! »), sinon « Not interrupted »",
+    seen("Talisman of Focus!") and seen("Not interrupted"))
+  check(("tour ennemi sauté (Feign Death) : « Skips its turn » sur chaque ennemi vivant (%d)"):format(#alive), nSkip == #alive and #alive > 0)
+  check("retours existants : coup absorbé « -5 », « Interrupted! », « Stunned »", seen("-5") and seen("Interrupted!") and seen("Stunned"))
+  local W
+
+  -- 3. Liseré Instant et « Cast · Instant » ; ligne « Spend N: » allumée / éteinte
+  e, c, v = ugCombat("mage")
+  W = H.ns.Widgets
+  c.hand[1] = H.ns.Card.new("fireball", false, 9401)
+  c.hand[2] = H.ns.Card.new("frostbolt", false, 9402)
+  c.player.mana = 3
+  c.player.st.instant = nil
+  v:Render(true)
+  local fb = v.cards[1]
+  check("sans Instant : Fireball sans liseré, plaque « Cast »", not vis(fb.rim) and fb.plateText._text == "Cast", fb.plateText._text)
+  H.ns.Combat.applyStatus(c, c.player, "instant", 1)
+  v:Render(true)
+  local plain = (fb.plateText._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  local rc = fb.rim._calls.SetVertexColor or {}
+  check("Instant : Fireball au liseré bleu (sous le halo, devant rien), plaque « Cast · Instant »",
+    vis(fb.rim) and plain == "Cast · Instant" and math.abs(rc[1] - W.INSTANT_RIM_COLOR[1]) < 1e-6
+    and fb.rim._layer == "BACKGROUND" and fb.halo._sub < fb.rim._sub and fb.rim._sub < fb.bg._sub, plain)
+  local fr = v.cards[2]
+  check("Instant : une carte qui n'est pas Cast (Frostbolt) n'a ni liseré ni « Instant »",
+    not vis(fr.rim) and not (fr.plateText._text or ""):find("Instant", 1, true), fr.plateText._text)
+  local tt = table.concat(H.hover(fb), " | ")
+  check("Instant : infobulle « Instant: this Cast resolves at once. »", tt:find("this Cast resolves at once", 1, true), tt)
+  -- survol : le liseré reste visible avec le halo doré, et ne bouge pas sans la carte (même visuel)
+  H.hover(fb)
+  check("liseré dans le visuel de la carte (suit la levée), aucune échelle", rawget(fb.rim, "_parent") == fb.face
+    and not fb.rim._calls.SetScale)
+  -- toutes les cartes Cast, base et améliorée, sous Instant : plaque qui tient (jamais coupée)
+  local probe = W.card(UI().content)
+  local pbad, np = {}, 0
+  for id, d in pairs(H.ns.Cards) do
+    if d.cast then
+      for _, up in ipairs({ false, true }) do
+        probe:SetCard(id, up, { playable = true, instant = true })
+        np = np + 1
+        local f = probe.plateFit
+        if not (f and f.ok and not f.cut) then pbad[#pbad + 1] = id .. (up and "+" or "") end
+      end
+    end
+  end
+  probe:Hide()
+  check(("plaque « Cast · Instant » : %d cartes Cast (base, améliorée) qui tiennent sans coupure"):format(np), np > 0 and #pbad == 0,
+    table.concat(pbad, ", "))
+  snap("ug-instant-mage", true)
+  -- la carte jouée sous Instant part tout de suite (le moteur ; l'affichage ne ment pas)
+  local ok = H.ns.Controller.play(1, 1)
+  H.settle()
+  check("Fireball jouée sous Instant : résolue tout de suite, aucune incantation", ok and c.player.cast == nil and not c.player.st.instant)
+  v:Render(true)
+  check("Instant consommé : plus de liseré sur les cartes Cast restantes", not vis(v.cards[1].rim))
+  -- Spend N (Warrior, Heroic Strike) : allumée si les points sont là, éteinte sinon ou Maj tenue
+  e, c, v = ugCombat("warrior")
+  W = H.ns.Widgets
+  c.hand[1] = H.ns.Card.new("heroic_strike", false, 9501)
+  c.player.mana = 3
+  local off = "|cff" .. hexOf(W.SPEND_OFF_COLOR) .. "Spend 2:"
+  local function bodyText(card)
+    local t = {}
+    for _, p in ipairs(card.bodyParts) do if p._shown and p._text then t[#t + 1] = p._text end end
+    return table.concat(t, "\n")
+  end
+  c.player.res = 0
+  v:Render(true)
+  local t0 = bodyText(v.cards[1])
+  c.player.res = 2
+  v:Render(true)
+  local t2 = bodyText(v.cards[1])
+  H.shift = true
+  run(v.classZone, "OnEvent", "MODIFIER_STATE_CHANGED", "LSHIFT", 1)
+  local ts = bodyText(v.cards[1])
+  H.shift = false
+  run(v.classZone, "OnEvent", "MODIFIER_STATE_CHANGED", "LSHIFT", 0)
+  check("Spend 2 : éteinte à 0 Rage, allumée à 2 (mot-clé en couleur), éteinte sous Maj, rallumée au relâchement",
+    t0:find(off, 1, true) and not t2:find(off, 1, true) and t2:find("Spend", 1, true) and t2:find("|cff" .. hexOf(W.KEYWORD_COLOR), 1, true)
+    and ts:find(off, 1, true) and not bodyText(v.cards[1]):find(off, 1, true), t2)
+  snap("ug-spend-warrior", true)
+  c.player.res = 0
+  v:Render(true)
+  snap("ug-spend-off-warrior", true)
+
+  -- 4. Traveler's Backpack : « End Turn » ouvre le choix, liseré d'or, clic = carte gardée, clic droit annule,
+  -- « Keep none » finit sans garder ; sans carte à garder, le tour finit tout de suite
+  for _, cl in ipairs({ "warrior", "priest" }) do
+    e, c, v = ugCombat(cl, { "travelers_backpack" })
+    check(cl .. " : Traveler's Backpack porté (bandeau), icône embarquée", e.relics[#e.relics] == "travelers_backpack"
+      and H.ns.Skin.icons[H.ns.Art.relics.travelers_backpack.tga:lower()] ~= nil)
+    local round = c.round
+    local flashed
+    local oldFlash = UI().flash
+    UI().flash = function(msg, ...) flashed = msg return oldFlash(msg, ...) end
+    H.click(v.endTurn)
+    local rims, cands = 0, #H.ns.Combat.retainCandidates(c)
+    for i = 1, #c.hand do if vis(v.cards[i].rim) and v.cards[i].rimKind == "keep" then rims = rims + 1 end end
+    check(cl .. " : « End Turn » ouvre le choix (tour en cours, bouton « Keep none », message, liseré d'or sur chaque carte proposée)",
+      v.keepMode and c.round == round and v.endTurn:GetText() == "Keep none" and flashed == "Choose a card to keep in hand."
+      and rims == cands and cands > 0, rims .. " / " .. cands)
+    local ktt = table.concat(H.hover(v.cards[1]), " | ")
+    check(cl .. " : infobulle d'une carte proposée « Click: keep this card in hand… »", ktt:find("keep this card in hand", 1, true), ktt)
+    snap("ug-backpack-choix-" .. cl, true)
+    H.click(v.cards[1], "RightButton")
+    check(cl .. " : clic droit : choix annulé, liserés éteints, « End Turn », tour en cours",
+      not v.keepMode and not vis(v.cards[1].rim) and v.endTurn:GetText() == "End Turn" and c.round == round)
+    H.click(v.endTurn)
+    local keepUid = c.hand[2].uid
+    H.click(v.cards[2])
+    H.settle()
+    local kept = false
+    for _, x in ipairs(c.hand) do if x.uid == keepUid then kept = true end end
+    local retained = false
+    for _, ev in ipairs(H.ns.Controller.lastEvents or {}) do if ev.t == "retained" and ev.card == keepUid then retained = true end end
+    check(cl .. " : clic sur une carte proposée : tour fini, elle reste en main (journal « retained »), bouton rendu",
+      c.result or (c.round == round + 1 and kept and retained and not v.keepMode and v.endTurn:GetText() == "End Turn"))
+    if not c.result then
+      round = c.round
+      H.click(v.endTurn)
+      H.click(v.endTurn) -- « Keep none »
+      H.settle()
+      local any = false
+      for _, ev in ipairs(H.ns.Controller.lastEvents or {}) do if ev.t == "retained" then any = true end end
+      check(cl .. " : « Keep none » : tour fini sans carte gardée", c.result or (c.round == round + 1 and not any))
+    end
+    UI().flash = oldFlash
+  end
+  -- sans le bibelot : « End Turn » finit le tour tout de suite (aucun choix)
+  e, c, v = ugCombat("warrior")
+  local r0 = c.round
+  H.click(v.endTurn)
+  H.settle()
+  check("sans Traveler's Backpack : « End Turn » finit le tour, aucun choix", not v.keepMode and (c.result or c.round == r0 + 1))
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -386,6 +386,31 @@ return function(ns)
     return bestSeq, nodes, best
   end
 
+  -- Carte gardée au choix en fin de tour (Traveler's Backpack, Combat.retainPicks) : uid de la carte de la
+  -- main (hors Retain) la mieux notée par la classe (bot.rating, 5 par défaut ; +1 améliorée, +0,5 par
+  -- point de coût : une carte chère qui n'a pas pu partir), la première à égalité ; nil sans choix.
+  function Bots.retainPick(c)
+    local list = Combat.retainCandidates(c)
+    if #list == 0 then return nil end
+    local cd = ns.Classes[c.class]
+    local rating = cd and cd.bot and cd.bot.rating or {}
+    local best, bestUid
+    for _, i in ipairs(list) do
+      local inst = c.hand[i]
+      local d = Card.def(inst)
+      local v = (rating[inst.id] or 5) + (inst.up and 1 or 0) + 0.5 * (d.cost or 0)
+      if not best or v > best then best, bestUid = v, inst.uid end
+    end
+    return bestUid
+  end
+
+  -- Fin du tour par un bot : pose d'abord son choix de carte gardée, s'il y en a un.
+  function Bots.markRetain(c)
+    local uid = Bots.retainPick(c)
+    if uid then Combat.markRetain(c, uid) end
+    return uid
+  end
+
   local BotMT = {}
   BotMT.__index = BotMT
 

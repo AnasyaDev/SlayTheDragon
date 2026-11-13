@@ -581,8 +581,11 @@ local function interruptPlayer(c, by)
   -- file d'incantations (crochet « castSlots ») : l'interruption coupe la plus récente
   local more = p.castMore
   if more and #more > 0 then cast = more[#more] end
-  if Combat.fire(c, "preventInterrupt", by) then
-    log(c, { t = "interrupt_prevented", src = uref(by), dst = "player", card = cast.card.id })
+  local prevented, pby = Combat.fire(c, "preventInterrupt", by)
+  if prevented then
+    -- by : ce qui a empêché l'interruption (id du bibelot ou de la carte de Power), pour l'affichage
+    log(c, { t = "interrupt_prevented", src = uref(by), dst = "player", card = cast.card.id,
+      by = type(pby) == "table" and pby.id or pby })
     return
   end
   if cast == p.cast then
@@ -1001,7 +1004,7 @@ end
 function Combat.triggerTrap(c, e)
   local trap = table.remove(c.traps, 1)
   if not trap then return end
-  log(c, { t = "trap", card = trap.card.uid, dst = e.uid })
+  log(c, { t = "trap", card = trap.card.uid, id = trap.card.id, dst = e.uid })
   stat(c, "trapsTriggered")
   Combat.resolveCard(c, trap.card, e, false, trap.spent)
   if not c.result then Combat.fire(c, "onTrapTriggered", trap.card, e) end
@@ -1155,13 +1158,54 @@ function Combat.startPlayerTurn(c)
   end
 end
 
+-- Carte gardée au choix en fin de tour (Traveler's Backpack) : crochet « retainPicks » (nombre de cartes
+-- que le joueur peut garder en plus des cartes Retain, 0 par défaut ; une seule est gérée). Le choix est
+-- posé AVANT la fin du tour par Combat.markRetain (interface : clic sur la carte après « End Turn » ;
+-- bots : Sim), lu et effacé par Combat.endPlayerTurn. Sans choix posé, rien n'est gardé.
+function Combat.retainPicks(c)
+  return Combat.modify(c, "retainPicks", 0)
+end
+
+-- Index des cartes de la main que le choix peut garder (celles qui ne sont pas déjà Retain).
+function Combat.retainCandidates(c)
+  local list = {}
+  if Combat.retainPicks(c) <= 0 then return list end
+  for i = 1, #c.hand do
+    if not Card.def(c.hand[i]).retain then list[#list + 1] = i end
+  end
+  return list
+end
+
+-- Pose (uid) ou retire (nil) le choix ; false si le choix n'est pas permis (pas de crochet, pas le tour
+-- du joueur, carte absente de la main ou déjà Retain).
+function Combat.markRetain(c, uid)
+  if uid == nil then c.player.retainPick = nil return true end
+  if c.phase ~= "player" or c.result or Combat.retainPicks(c) <= 0 then return false end
+  for i = 1, #c.hand do
+    local inst = c.hand[i]
+    if inst.uid == uid then
+      if Card.def(inst).retain then return false end
+      c.player.retainPick = uid
+      return true
+    end
+  end
+  return false
+end
+
 function Combat.endPlayerTurn(c)
   Combat.fire(c, "onTurnEnd")
+  local pick = c.player.retainPick
+  c.player.retainPick = nil
+  if pick and Combat.retainPicks(c) <= 0 then pick = nil end
   local keep = {}
   for i = 1, #c.hand do
     local inst = c.hand[i]
     if Card.def(inst).retain then
       keep[#keep + 1] = inst
+    elseif inst.uid == pick then
+      keep[#keep + 1] = inst
+      log(c, { t = "retained", card = inst.uid })
+      stat(c, "retainPicked")
     else
       statById(c, "unplayed", inst.id)
       c.discard[#c.discard + 1] = inst
