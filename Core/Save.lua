@@ -14,7 +14,8 @@ ns.Save = Save
 -- 1 : format initial ; 2 : drapeaux de compte (meta.flags) ; 3 : classes (expédition version 3 :
 -- ressource de combat générique) ; 4 : niveau de classe (meta.classes[id].xp, expédition version 4 :
 -- unlock.level) ; 5 : campagne par zones (meta.zones, meta.classes[id].zones, Ligue retirée ; expédition
--- version 5 : exp.zone, unlock.common, unlock.won).
+-- version 5 : exp.zone, unlock.common, unlock.won). Expédition version 6 (cartes épiques) sans changement
+-- de la méta : Save.VERSION reste 5, l'expédition en cours passe par EXP_MIGRATIONS[5].
 Save.VERSION = 5
 
 function Save.new()
@@ -168,6 +169,12 @@ Save.EXP_MIGRATIONS[4] = function(exp, db)
   exp.unlock.won = u.won
   exp.unlock.league = nil
   exp.acts = 1
+end
+
+-- Expédition 5 -> 6 : cartes épiques. Aucune offre faite encore (la prochaine élite gagnée en propose une
+-- si la classe en a débloqué) ; le flux de hasard « epic » est créé à son premier usage.
+Save.EXP_MIGRATIONS[5] = function(exp)
+  if exp.epicOffered == nil then exp.epicOffered = false end
 end
 
 local function quarantine(db, state, reason)

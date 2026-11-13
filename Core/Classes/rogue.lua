@@ -62,7 +62,7 @@ ns.Effects.randomHits = function(c, ctx, e)
     local list = Combat.aliveEnemies(c)
     if #list == 0 or c.result then return end
     local t = list[Rng.int(c.rng.cards, 1, #list)]
-    Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, e[2], ctx.def))
+    Combat.dealDamage(c, c.player, t, Combat.calcDamage(c, c.player, t, e[2], ctx.def), false, ctx)
     ctx.dealt = true
     ctx.hits = ctx.hits + 1
     if ctx.def and ctx.def.type == "attack" and not c.result then Combat.fire(c, "onAttackHit", t, ctx) end
@@ -94,11 +94,19 @@ ns.ClassRules.rogue = {
       Combat.log(c, { t = "parry", src = Combat.uref(enemy), prevented = stop, left = n })
       stat(c, "parried")
       stat(c, "parryPrevented", stop)
+      -- une charge consommée (ripostes des épiques) : attaquant, dégâts annulés, charges restantes
+      Combat.fire(c, "onParry", enemy, stop, n)
       return dmg - stop
     end,
     -- Stealth consommé au jeu par la première carte Attack (même à 0 mana, même sans ligne Stealth:).
+    -- Crochet « stealthBreak » (v = vrai, inst, d) : faux = l'Attack profite de Stealth (lignes « Stealth: »)
+    -- sans le retirer (Subterfuge ; la carte qui le pose dit quand il tombe).
     onCardCommitted = function(c, cls, inst, d)
       if d.type ~= "attack" or (c.player.st.stealth or 0) <= 0 then return end
+      if not Combat.modify(c, "stealthBreak", true, inst, d) then
+        cls.openers[tostring(inst.uid)] = true
+        return
+      end
       c.player.st.stealth = nil
       cls.hidden = false
       cls.openers[tostring(inst.uid)] = true

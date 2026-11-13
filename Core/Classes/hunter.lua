@@ -67,15 +67,47 @@ end
 
 -- Une attaque du familier. why : "auto" (fin de tour), "card", "relic", "surge" (pas de Frenzy gagné) ;
 -- frenzy : valeur comptée (Surge), sinon le Frenzy actuel. Renvoie les dégâts.
+-- Familier présent ? Crochet « petAbsent » (faux par défaut ; Lone Wolf) : absent, il n'attaque plus (ni
+-- attaque automatique, ni effet « pet »), sans Frenzy gagné.
+function Hunter.petPresent(c)
+  return not Combat.modify(c, "petAbsent", false)
+end
+
+-- Le familier frappe-t-il tous les ennemis ? Crochet « petAll » (faux par défaut ; Beast Cleave) : chaque
+-- attaque touche chaque ennemi vivant (dégâts calculés pour chacun), +1 Frenzy une seule fois.
+function Hunter.petAll(c)
+  return Combat.modify(c, "petAll", false) and true or false
+end
+
 function Hunter.petAttack(c, why, frenzy)
   if c.result then return 0 end
+  if not Hunter.petPresent(c) then return 0 end
   local t = Hunter.petTarget(c)
   if not t then return 0 end
   local dmg = Hunter.petDamage(c, t, frenzy)
-  Combat.log(c, { t = "pet_attack", dst = t.uid, dmg = dmg, why = why })
-  stat(c, "petAttacks")
-  stat(c, "petDamage", dmg)
-  Combat.dealDamage(c, c.player, t, dmg)
+  if Hunter.petAll(c) then
+    -- tous les ennemis vivants, la cible du familier d'abord ; dmg rendu = celui de la cible
+    local list = { t }
+    for i = 1, #c.enemies do
+      local o = c.enemies[i]
+      if o ~= t and not o.dead then list[#list + 1] = o end
+    end
+    for i = 1, #list do
+      local o = list[i]
+      if not o.dead and not c.result then
+        local d = Hunter.petDamage(c, o, frenzy)
+        Combat.log(c, { t = "pet_attack", dst = o.uid, dmg = d, why = why, all = true })
+        stat(c, "petAttacks")
+        stat(c, "petDamage", d)
+        Combat.dealDamage(c, c.player, o, d)
+      end
+    end
+  else
+    Combat.log(c, { t = "pet_attack", dst = t.uid, dmg = dmg, why = why })
+    stat(c, "petAttacks")
+    stat(c, "petDamage", dmg)
+    Combat.dealDamage(c, c.player, t, dmg)
+  end
   if c.result then return dmg end
   if why ~= "surge" then Combat.gainRes(c, 1, "pet") end
   Combat.fire(c, "onPetAttack", t, dmg, why)

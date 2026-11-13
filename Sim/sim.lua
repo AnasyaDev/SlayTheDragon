@@ -18,6 +18,9 @@
 --   oldstun=1 : ancienne règle de Stunned pendant le tour ennemi (l'action part, le tour suivant est perdu)
 --   hp=N : PV de départ de la classe remplacés (runner=expedition), pour mesurer l'effet des PV.
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
+--   epic=<id> : carte épique imposée au deck de départ (runner=expedition ; comme une épique prise : une seule
+--     dans le deck, ses transformations s'appliquent). sweep=cards mesure aussi les épiques de la classe, chacune
+--     imposée ainsi (runner=expedition ; sinon ajoutée de force).
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 local opts = {}
@@ -203,7 +206,8 @@ local function runRange(from, to)
       rec = ns.SimExpedition.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
         meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
-        hp = tonumber(opts.hp), path = opts.path, zones = tonumber(opts.zones), zone = opts.zone })
+        hp = tonumber(opts.hp), path = opts.path, zones = tonumber(opts.zones), zone = opts.zone,
+        epic = opts.epic ~= "" and opts.epic or nil })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
         pick = opts.pick or "rated", force = force, cap = tonumber(opts.cap or 400),
@@ -224,11 +228,12 @@ end
 local function runAll(over)
   over = over or {}
   if jobs <= 1 then
-    local f0, r0 = force, startRelics
+    local f0, r0, e0 = force, startRelics, opts.epic
     if over.force then force = idList(over.force) end
     if over.relics then startRelics = idList(over.relics) end
+    if over.epic then opts.epic = over.epic end
     local a = runRange(1, runs)
-    force, startRelics = f0, r0
+    force, startRelics, opts.epic = f0, r0, e0
     return a
   end
   local exe = opts.exe or "luajit"
@@ -270,6 +275,10 @@ if opts.sweep then
     for id in pairs(ns.Relics) do list[#list + 1] = id end
   else
     list = ns.Rewards.cardPool(opts.class or "priest", tonumber(opts.level))
+    -- épiques de la classe (hors réserve des récompenses), mesurées imposées au départ (epic=)
+    for id, d in pairs(ns.Cards) do
+      if d.rarity == "epic" and d.class == (opts.class or "priest") and not d.variant then list[#list + 1] = id end
+    end
   end
   if opts.only then
     -- only=id,id : ne mesure que ces éléments, même hors de la réserve des récompenses (cartes neutres :
@@ -312,6 +321,8 @@ if opts.sweep then
       for _, r in ipairs(startRelics) do rl[#rl + 1] = r end
       rl[#rl + 1] = id
       over.relics = table.concat(rl, ",")
+    elseif ns.Cards[id].rarity == "epic" and opts.runner == "expedition" then
+      over.epic = id
     else
       local fl = {}
       for _, f in ipairs(force) do fl[#fl + 1] = f end
@@ -390,7 +401,7 @@ local function report(a, title)
   out("Cartes                   rareté    choisie  dans deck  vict. avec  vict. sans  écart  jouées/piochées  gardées en main")
   local ids = {}
   for id in pairs(a.cards) do ids[#ids + 1] = id end
-  local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3 }
+  local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3, epic = 4 }
   local function rarityOf(id) return ns.Cards[id] and ns.Cards[id].rarity or "?" end
   table.sort(ids, function(x, y)
     local rx, ry = RANK[rarityOf(x)] or 9, RANK[rarityOf(y)] or 9

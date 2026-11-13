@@ -320,7 +320,7 @@ return function(ns)
       local e, j = Combat.enemyByUid(c, ref.target)
       if not e or e.dead then return nil end
       tIdx = j
-    elseif Combat.needsTarget(c.hand[idx]) then
+    elseif Combat.needsTarget(c.hand[idx], c) then
       return nil
     end
     return { "play", idx, tIdx, ref.nospend and "nospend" or nil }
