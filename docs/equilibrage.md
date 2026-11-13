@@ -884,3 +884,17 @@ Usage : `bot=human` est désormais la référence de la difficulté ressentie (u
 juge avec lui) ; `bot=heuristic` reste l'instrument des comparaisons fines entre cartes, classes et zones (il est
 inchangé : mêmes résultats à graine égale avant et après l'ajout).
 
+## Westfall réglée sur le bot human (14/11/2026)
+
+Cible du joueur : 70 % de victoires avec `bot=human` à Westfall clé 0 (niveau 2, Priest niveau 3). Le mur était
+l'appel de VanCleef à 50 % : deux sbires sans préavis, qui frappaient dès le tour ennemi en plus de lui. Devenu
+une phase annoncée (cran sur la barre de vie, intention « To me, Brotherhood! » qui remplace son coup), il
+suffisait à faire passer le boss d'environ 30 % à plus de 80 % avec les nombres d'origine. Watch du Riverpaw
+Mystic est devenue un coup affiché (3, interrompt si le coup porte, pas deux fois de suite). Nombres : VanCleef
+98 PV, Combo 10 × 2, Mortal Strike 22, sbires 10–12 PV ; Reap 7 × 3, Slam 17, Punch 11 ; Bite 7, Rend 4 ; Mystic
+14–16 PV, Heal 5, Shock 4 ; Fireball 12. Résultat (3 000 expéditions, graine 1) : Rogue 67,2 ; Priest 75,0 ;
+Warrior 73,8 ; Mage 70,4 ; Hunter 69,5 ; moyenne **71,2** (24,8 avant), écart **7,8** ; graine 2 : 71,9 ;
+niveau 1 : 69,9 ; niveau 7 : 77,4. `heuristic` : 95,4 de moyenne (écart 4,2). Part des défaites au boss : 59 à
+92 % selon la classe (67 à 88 % avant) : le Priest et le Hunter arrivent presque entiers au boss. Détail :
+`docs/zones/westfall.md`, « Réglage sur le bot human ».
+
