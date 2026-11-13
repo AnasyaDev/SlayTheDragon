@@ -769,3 +769,12 @@ plafond d'Invincible relevé à 10 (il punissait le Warrior), Nefarian 120 PV et
 du boss, réglé par le Class Call : Called Out (Rogue) empêche aussi de regagner la Parry, sur 1 tour ; Broken Bow
 (Hunter) −5 sur 3 tours. Détail, essais écartés et ce qui reste (Hunter à 95 % contre les élites, qu'il
 étourdit) : `docs/zones/blackrock.md`, « Passe de difficulté ».
+## Passe de difficulté de Duskwood (14/11/2026)
+
+Cible de la zone 2 : 72 % de victoires en moyenne, écart ≤ 10 points (`runner=expedition key=0 zone=duskwood
+zones=1 level=7`, bot heuristique, épique gagnée sur les élites). Avant : 67,7 % (Priest 70,1, Warrior 70,5,
+Mage 65,9, Rogue 63,6, Hunter 68,4 ; 800 expéditions), 85 % des défaites au boss. Seul Morbent Fel change :
+Drain Life 14 / 16 → 12 / 14, Shadow Bolt 17 / 20 → 15 / 18 (Rogue et Mage n'interrompent presque rien),
+PV 92 → 96. Après (1500 expéditions) : **72,3 %**, écart 7,5 (Priest 76,8, Warrior 73,7, Mage 69,3, Rogue 71,4,
+Hunter 70,4) ; PV perdus par combat normal inchangés (6,6 à 10,5). Détail et essais écartés : `docs/zones/duskwood.md`,
+« Passe de difficulté ».

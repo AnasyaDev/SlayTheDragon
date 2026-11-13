@@ -364,6 +364,12 @@ return function(T)
     d.enemies[1].hp = 50
     Combat.endTurn(d)
     assert(d.enemies[1].hp > 50, "Drain Life soigne")
+    -- Nombres de la passe de difficulté (14/11/2026, cible 72 %) : docs/zones/duskwood.md.
+    local M = ns.Enemies.morbent_fel
+    eq(M.hp, 96, "PV de Morbent Fel")
+    eq(M.moves.shadow_bolt.actions[1][2], 15); eq(M.moves.shadow_bolt2.actions[1][2], 18)
+    eq(M.moves.drain_life.actions[1][2], 12); eq(M.moves.drain_life2.actions[1][2], 14)
+    eq(M.moves.drain_life.actions[2][2], 6); eq(M.moves.drain_life2.actions[2][2], 8)
   end)
 
   test("Morbent Fel : Unholy Shield (phase 2) interrompu : ni Absorb ni bouclier ; sa mort lève tout", function()
