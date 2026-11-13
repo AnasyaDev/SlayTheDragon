@@ -799,6 +799,13 @@ local function forceEvent(exp, id)
 end
 
 local SCENES = { farm = true, road = true, coast = true, mine = true, hill = true, camp = true, ruins = true }
+-- Rencontres de Westfall et communes à toutes les zones ; celles des autres zones (Data/Zones/<Zone>.lua) sont
+-- testées par Sim/tests_zone_<zone>.lua.
+local function baseEvents()
+  local t = {}
+  for id, ev in pairs(ns.Events) do if ev.zone == nil or ev.zone == "westfall" then t[id] = ev end end
+  return t
+end
 local EFFECTS = { heal = true, healPct = true, loseHp = true, maxHp = true, loseMaxHp = true, gold = true,
   pay = true, loseGold = true, card = true, cardChoice = true, relic = true, potion = true, losePotion = true,
   upgradeRandom = true, upgrade = true, remove = true, dupe = true, fight = true, gamble = true, flag = true }
@@ -823,7 +830,7 @@ test("rencontres : données complètes (familles, décor, réponses, effets, con
       end
     end
   end
-  for id, ev in pairs(ns.Events) do
+  for id, ev in pairs(baseEvents()) do
     assert(ev.name and ev.text and ev.speaker and ev.npc, id .. " : name/text/speaker/npc")
     assert(SCENES[ev.scene], id .. " : décor " .. tostring(ev.scene))
     assert(fam[ev.rarity] ~= nil, id .. " : famille " .. tostring(ev.rarity))
@@ -1087,7 +1094,7 @@ test("carte copiée (phare) puis récompense en attente après une sélection", 
 end)
 
 test("rencontres : PV jamais sous 1 hors combat, PV max cohérents", function()
-  for id, ev in pairs(ns.Events) do
+  for id, ev in pairs(baseEvents()) do
     for ci = 1, #ev.choices do
       for _, lucky in ipairs({ true, false }) do
         local exp = newExp()
@@ -1698,7 +1705,11 @@ test("zones : registre (sept zones dans l'ordre), Westfall seule jouable, donné
   eq(table.concat(names, ", "), "Westfall, Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain")
   eq(ns.Zone.FIRST, "westfall")
   assert(ns.Zone.playable("westfall"))
-  for i = 2, 7 do eq(ns.Zone.playable(ns.Zone.ORDER[i]), false, ns.Zone.ORDER[i] .. " : Coming later") end
+  -- une zone devient jouable quand son fichier de données pose ses groupes (encounters) ; sinon « Coming later »
+  for i = 2, 7 do
+    local id = ns.Zone.ORDER[i]
+    eq(ns.Zone.playable(id), ns.Zones[id].encounters ~= nil, id .. " : Coming later")
+  end
   eq(ns.Zone.next("westfall"), "duskwood"); eq(ns.Zone.next("blackrock"), nil); eq(ns.Zone.prev("westfall"), nil)
   local exp = newExp()
   eq(exp.zone, "westfall"); eq(X.actName(exp), "Westfall"); eq(X.zoneDef(exp).encounters, "westfall")
@@ -1773,7 +1784,12 @@ test("zones : commun débloqué par la première victoire du compte dans une zon
   eq(#c1.perks, 0)
   eq(table.concat(Meta.commonContent(3).perks, ","), "startRelic")
   eq(table.concat(Meta.commonContent(6).perks, ","), "merchantRelic")
-  eq(#Meta.commonContent(7).cards + #Meta.commonContent(7).relics, 0, "rien au-delà de l'ancien palier 3 aujourd'hui")
+  -- paliers 4 à 7 : commun ajouté par les fichiers de zone, chacun au palier de sa zone
+  for n = 4, 7 do
+    local cn = Meta.commonContent(n)
+    for _, id in ipairs(cn.cards) do eq(ns.Cards[id].tier, n, id) end
+    for _, id in ipairs(cn.relics) do eq(ns.Relics[id].tier, n, id) end
+  end
   local db = Save.new()
   eq(Meta.commonTier(db.meta), 0)
   local fresh = assert(Save.start(db, { seed = 4, class = "warrior" }))

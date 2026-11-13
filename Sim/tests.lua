@@ -449,11 +449,13 @@ end)
 test("bibelots et potions respectent le contrat", function()
   local nr, np = 0, 0
   for id, r in pairs(ns.Relics) do
-    if not r.noPool and not r.class then nr = nr + 1 end -- communs (bibelots de rencontre et de classe à part)
+    -- contenu des fichiers de zone (palier 4 à 7, bibelots de clé) : compté par les tests de chaque zone
+    local zoneContent = r.key ~= nil or (r.tier or 0) > 3
+    if not r.noPool and not r.class and not zoneContent then nr = nr + 1 end -- communs (bibelots de rencontre et de classe à part)
     assert(r.name and r.text and r.hooks, id)
     assert(r.rarity == "common" or r.rarity == "uncommon" or r.rarity == "rare" or r.rarity == "boss", id)
-    -- communs : palier de Ligue (tier) ; de classe : niveau de classe (test « progression »)
-    if not r.class then assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= 3, id) end
+    -- communs : palier commun (tier, ordre de la zone) ; de classe : niveau de classe (test « progression »)
+    if not r.class and not r.key then assert(type(r.tier) == "number" and r.tier >= 0 and r.tier <= ns.Zone.count(), id) end
   end
   for id, p in pairs(ns.Potions) do
     np = np + 1
@@ -2541,7 +2543,7 @@ do
   test("neutres : 10 cartes de la fiche (palier, rareté, coût, type), sans classe ni ressource, amélioration", function()
     local n, byTier, byRarity = 0, {}, {}
     for id, d in pairs(ns.Cards) do
-      if d.neutral then
+      if d.neutral and (d.tier or 0) <= 3 then -- paliers 4 à 7 : cartes des fichiers de zone, testées par chaque zone
         n = n + 1
         local want = NEUTRAL[id]
         assert(want, id .. " : carte neutre hors fiche")
@@ -2693,7 +2695,7 @@ do
       assert(not r.text:lower():find("%f[%a]you%f[%A]") and not r.text:lower():find("%f[%a]your%f[%A]"), id .. " : you")
     end
     eq(n, 20)
-    for _, r in pairs(ns.Relics) do if not r.class then total = total + 1 end end
+    for _, r in pairs(ns.Relics) do if not r.class and not r.key and (r.tier or 0) <= 3 then total = total + 1 end end
     eq(total, 32, "12 d'origine + 20")
     eq(ns.Relics.hand_of_justice.class, "warrior", "bibelot du Guerrier intact")
     eq(ns.Relics.force_reactive_disk.class, "warrior", "bibelot du Guerrier intact")

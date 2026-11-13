@@ -6616,7 +6616,7 @@ do
   -- langage (aucun « you / your », libellés connus, aucune ressource de classe), corps ivoire teinté
   local card = W.card(UI().content)
   local ids, bad, minSize = {}, {}, 99
-  for id, d in pairs(ns.Cards) do if d.neutral and not d.class then ids[#ids + 1] = id end end
+  for id, d in pairs(ns.Cards) do if d.neutral and not d.class and (d.tier or 0) <= 3 then ids[#ids + 1] = id end end
   table.sort(ids)
   local tint = Art.bodyTints.neutral
   for _, id in ipairs(ids) do
@@ -8138,7 +8138,12 @@ do
   local laterOk = true
   for i = 2, #zopts do
     local o = zopts[i]
-    if not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then laterOk = false end
+    local zid = o.id:match("^zone:(.+)$")
+    if ns.Zone.playable(zid) then
+      if not (o.disabled and o.status == "locked" and o.statusLabel == "Locked") then laterOk = false end
+    elseif not (o.disabled and o.status == "later" and o.statusLabel == "Coming later" and o.reason == "Coming later.") then
+      laterOk = false
+    end
   end
   check("accueil : Westfall choisie et jouable, les six autres « Coming later », grisées",
     zopts[1].selected and not zopts[1].disabled and st.zone == "westfall" and laterOk)
@@ -8150,7 +8155,7 @@ do
     if not vis(b) then bad[#bad + 1] = "bouton " .. i .. " caché" end
     if not inside(r, panel) then bad[#bad + 1] = "bouton " .. i .. " hors du panneau " .. fmt(r) end
     if b.label._text ~= zopts[i].label then bad[#bad + 1] = "libellé " .. tostring(b.label._text) end
-    local want = i == 1 and "" or "Coming later"
+    local want = i == 1 and "" or (ns.Zone.playable(ns.Zone.ORDER[i]) and "Locked" or "Coming later")
     if (b.status._text or "") ~= want then bad[#bad + 1] = "état " .. tostring(b.status._text) end
     for j = i + 1, #scr.zoneButtons do
       if overlaps(r, R.rect(scr.zoneButtons[j])) then bad[#bad + 1] = ("boutons %d et %d se chevauchent"):format(i, j) end
@@ -8563,8 +8568,12 @@ do
   local function walk(where, v)
     if type(v) == "table" then for k, x in pairs(v) do walk(where .. "." .. tostring(k), x) end else words(where, v) end
   end
-  for id, ev in pairs(ns.Events) do walk(id, ev) end
-  for id, e in pairs(E) do words(id, e.name) end
+  local wfEnemies = {}
+  for _, list in pairs(ns.Encounters.westfall) do
+    for _, g in ipairs(list) do for _, spec in ipairs(g) do wfEnemies[ns.Combat.specId(spec)] = true end end
+  end
+  for id, ev in pairs(ns.Events) do if ev.zone == nil or ev.zone == "westfall" then walk(id, ev) end end
+  for id, e in pairs(E) do if wfEnemies[id] then words(id, e.name) end end
   check("textes des rencontres et noms d'ennemis : aucun personnage ni lieu hors de la Marche", #found == 0,
     table.concat(found, "; "))
 

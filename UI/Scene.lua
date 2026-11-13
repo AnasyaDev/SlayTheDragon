@@ -543,6 +543,18 @@ function S.landscape(f, g, sp)
   end
 end
 
+-- Autres peintres (décor peint qui n'est pas un paysage à ciel ouvert : intérieur de montagne, crypte…) :
+-- Art.painters[nom] = function(f, g, sp, K), choisi par le champ `painter` de l'entrée d'Art.paintings ;
+-- K = formes du peintre ci-dessus (mêmes niveaux LV, mêmes couleurs « #rrggbb » ou { r, g, b[, a] }), pour
+-- qu'un fichier d'art de zone peigne sans toucher à ce fichier.
+S.kit = { LV = LV, box = box, vgrad = vgrad, oval = oval, blur = blur, bar = bar, diamond = diamond, tri = tri,
+  hash = hash, rgb = rgb, mix = mix, withAlpha = withAlpha, W = S.W, H = S.DECOR_H }
+function S.paint(f, g, sp)
+  local painter = sp.painter and Art.painters and Art.painters[sp.painter]
+  if painter then return painter(f, g, sp, S.kit) end
+  return S.landscape(f, g, sp)
+end
+
 ---------------------------------------------------------------------------
 -- Construction
 ---------------------------------------------------------------------------
@@ -829,7 +841,7 @@ function S.set(stage)
     local spec = entry.paint and not S.paints[entry.paint] and Art.paintings and Art.paintings[entry.paint]
     if spec then
       local g = {}
-      S.landscape(S.decor, g, spec)
+      S.paint(S.decor, g, spec)
       S.paints[entry.paint] = g
     end
     for name, g in pairs(S.paints) do

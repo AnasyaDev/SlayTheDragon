@@ -15,7 +15,7 @@ Fiches : `docs/zones/<zone>.md` ; `docs/zones/decisions.md` prime sur les fiches
 | 4 | `stranglethorn` | Stranglethorn Vale | `Data/Zones/Stranglethorn.lua` | idem |
 | 5 | `swamp` | Swamp of Sorrows | `Data/Zones/Swamp.lua` | idem |
 | 6 | `steppes` | Burning Steppes | `Data/Zones/Steppes.lua` | idem |
-| 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | idem |
+| 7 | `blackrock` | Blackrock Mountain | `Data/Zones/Blackrock.lua` | jouable (14/11/2026) : phases (moteur commun) et règles propres (Invincible, Fire Shield, Shadow of the Throne, Class Call), boss Nefarian (3 phases), Grim Guzzler, titre « Dragonslayer » ; six décors peints (peintre `cavern`) ; implémentation : `docs/zones/blackrock.md` § 13 |
 
 ## 1. Fichiers d'une zone
 
@@ -260,7 +260,10 @@ zone n'a pas les siens. Décor peint (comme Westfall) :
 horizon, field, sun | moon, clouds, hills, mound, trees, road, props, wheat }` (plans et accessoires de
 `UI/Scene.lua`, `S.landscape`, `PROPS`) et `Art.palettes.duskwood = { sky, sun, cloud, hillsBack, hillsFront,
 mound, trees, haze, patches, hedge, fieldsNear, road, far, mid, ground, … }` (mêmes clés que la palette
-`westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Fond embarqué : `tools/build_backgrounds.py` et
+`westfall` d'`UI/Art.lua`, `night = true` pour une nuit). Décor qui n'est pas un paysage à ciel ouvert
+(intérieur de montagne…) : `Art.paintings.<clé> = { painter = "<nom>", … }` et `Art.painters.<nom> = function(f, g,
+sp, K)` dans le fichier d'art de la zone ; `K` = formes du peintre de `UI/Scene.lua` (`S.kit` : `box`, `vgrad`,
+`oval`, `blur`, `bar`, `tri`, `hash`, `mix`, `LV`…), choisi par `S.paint` (Blackrock : peintre `cavern`). Fond embarqué : `tools/build_backgrounds.py` et
 `Art.backgrounds` / `Art.illustrations`. Rencontre : `scene = "<clé>"`.
 
 ## 7. Tables par zone : besoin de la fiche → crochet
@@ -414,8 +417,9 @@ end
 - Aperçu au survol d'une carte sur les ennemis (primes de Pack, « Wake » du marais) : aucun aperçu de dégâts
   n'existe dans l'écran de combat ; une vue de zone peut l'approcher par `render` (carte choisie :
   `view.selected`), sinon c'est un lot d'interface commun.
-- Titres sur l'accueil et l'écran Progress (« Priest — Dragonslayer ») : drapeau posé, affichage à ajouter dans
-  `UI/Screens.lua` (lot commun).
+- Titres sur l'accueil et l'écran Progress (« Priest — Dragonslayer », « Veteran » au niveau 7) : faits par
+  Blackrock (`ns.Blackrock.title`, `UI/Screens.lua`) ; le journal (« Log », `UI/Controller.lua`) lit encore
+  `Meta.title` (« Dragonslayer » au niveau 7) : à aligner.
 - Coffre « choice of 2 relics » (Shadowforge Key) : la récompense n'offre pas de choix de bibelot.
 - Vol d'une carte de l'ennemi vers une pile : le texte flottant en tient lieu.
 

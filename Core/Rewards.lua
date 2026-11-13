@@ -67,6 +67,7 @@ function Rewards.relicPool(opts)
     local isBoss = r.rarity == "boss"
     local open
     if r.class then open = opts.level == nil or (r.level or 1) <= opts.level
+    elseif r.key then open = false -- bibelot de clé (zone et clé gagnées) : seulement par l'expédition (X.relicPool)
     else open = opts.maxTier == nil or (r.tier or 0) <= opts.maxTier end
     if open and (isBoss == (opts.boss or false))
         and not r.noPool and (not r.class or r.class == opts.class)
