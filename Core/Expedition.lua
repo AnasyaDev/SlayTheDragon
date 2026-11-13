@@ -358,7 +358,10 @@ local function upgrade(exp, i)
   exp.stats.upgraded = exp.stats.upgraded + 1
 end
 
+-- Soin hors combat (repos, rencontres) : crochet healOut (v) des zones, bibelots, affixes (Cursed Eye of
+-- Paleth : divisé par deux).
 local function heal(exp, n)
+  n = floor(X.modify(exp, "healOut", n))
   local before = exp.hp
   exp.hp = min(exp.maxHp, exp.hp + max(0, n))
   return exp.hp - before
@@ -811,6 +814,12 @@ X.EFFECTS.skipFloors = {
   apply = function(exp, e) exp.skip = e[2] or 1 end,
 }
 
+-- { "chain", id } : après cette réponse, la rencontre id s'ouvre à la place (deuxième étape d'une même
+-- case : la boisson achetée du Grim Guzzler après la boisson offerte).
+X.EFFECTS.chain = {
+  apply = function(exp, e, roll, ctx) ctx.follow = { kind = "event", id = e[2] } end,
+}
+
 -- Nœuds accessibles maintenant : successeurs du nœud courant ; après un vol (exp.skip = n), les
 -- successeurs des nœuds sautés, n étapes plus loin.
 function X.nextNodes(exp)
@@ -909,15 +918,19 @@ function X.eventText(exp)
   local ev = exp.event and exp.event.id and ns.Events[exp.event.id]
   if not ev then return "" end
   local text = ev.text or ""
-  if not text:find("%s", 1, true) then return text end
+  if not text:find("%s", 1, true) and not text:find("%g", 1, true) then return text end
+  local names
   for _, rolls in ipairs(exp.event.rolls or {}) do
     for _, r in ipairs(rolls) do
-      if type(r) == "table" and r.group and r.group.names then
-        return (text:gsub("%%s", (r.group.names[1]:gsub("%%", "%%%%"))))
-      end
+      if not names and type(r) == "table" and r.group and r.group.names then names = r.group.names end
     end
   end
-  return (text:gsub("%%s", "someone"))
+  names = names or { "someone" }
+  local all = names[1]
+  if #names > 1 then all = table.concat(names, ", ", 1, #names - 1) .. " and " .. names[#names] end
+  text = text:gsub("%%s", (names[1]:gsub("%%", "%%%%")))
+  text = text:gsub("%%g", (all:gsub("%%", "%%%%")))
+  return text
 end
 
 local function upgradable(exp)
@@ -1076,7 +1089,10 @@ local function applyEvent(exp, ci)
   applyEffects(exp, ch.effects, exp.event.rolls[ci], ctx)
   exp.event.result = table.concat(ctx.texts, " ")
   local follow, reward = ctx.follow, ctx.reward
-  if follow and follow.kind == "fight" then
+  if follow and follow.kind == "event" then
+    -- rencontre enchaînée : une réponse qui enchaîne ne donne pas de récompense (la mettre dans la suivante)
+    openEvent(exp, follow.id)
+  elseif follow and follow.kind == "fight" then
     -- Récompense du combat : tirée à l'entrée, plus le bonus et l'or de la réponse.
     local r = follow.reward
     local bonus = (follow.bonus or 0) + (reward and reward.gold or 0)
@@ -1170,6 +1186,12 @@ function X.new(opts)
   for i = 1, #cdef.deck do exp.deck[i] = { id = cdef.deck[i], up = false } end
   -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
   if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end
+  -- toutes les zones (quelle que soit celle jouée) : effets de compte sur la nouvelle expédition
+  -- (Rallying Cry of the Dragonslayer : +6 PV max) ; ns.ZoneRules[id].newExpedition(exp), ordre des ids
+  local zids = {}
+  for zid, r in pairs(ns.ZoneRules) do if r.newExpedition then zids[#zids + 1] = zid end end
+  table.sort(zids)
+  for _, zid in ipairs(zids) do ns.ZoneRules[zid].newExpedition(exp) end
   startAct(exp, 1)
   -- Un bibelot au choix parmi 3 (première victoire du compte dans la zone d'ordre Meta.PERKS.startRelic,
   -- ex-Révéré de la Ligue), tirés dans la réserve de l'expédition (communs, de classe et de clé

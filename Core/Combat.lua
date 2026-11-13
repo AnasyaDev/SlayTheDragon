@@ -49,6 +49,17 @@ local function stat(c, key, n)
   if s then s[key] = (s[key] or 0) + (n or 1) end
 end
 
+Combat.stat = stat
+
+-- Statistique propre à une zone (simulation) : c.stats.zone[clé] += n ; Sim/sim.lua additionne et affiche
+-- ces compteurs par type de combat (« Statistiques de zone »).
+function Combat.zstat(c, key, n)
+  local s = c.stats
+  if not s then return end
+  s.zone = s.zone or {}
+  s.zone[key] = (s.zone[key] or 0) + (n or 1)
+end
+
 local function statById(c, key, id, n)
   local s = c.stats
   if s then
@@ -291,6 +302,9 @@ end
 function Combat.loseHp(c, n, why)
   local p = c.player
   if n <= 0 or p.dead or c.result then return 0 end
+  -- crochet « hpLoss » (c, src, n, why) : perte hors coup réduite ou annulée (Libram of Resilience)
+  n = Combat.zmodify(c, "hpLoss", n, why)
+  if n <= 0 then return 0 end
   stat(c, "hpLost", min(n, max(p.hp, 0)))
   p.hp = p.hp - n
   log(c, { t = "damage", dst = "player", amount = n, absorbed = 0, loss = n, why = why })
@@ -588,6 +602,8 @@ function Combat.dealDamage(c, src, dst, amount, pierce)
   if foe then
     info = hitInfo(c, src)
     amount = Combat.zmodify(c, "enemyDamageTaken", amount, dst, info)
+    -- multiplicateurs « en dernier » (Rude Awakening : après les ajouts des bibelots), avant l'Absorb
+    amount = Combat.zmodify(c, "enemyDamageLast", amount, dst, hitInfo(c, src))
     if amount < 0 then amount = 0 end
   end
   local absorbed = 0
@@ -629,6 +645,8 @@ function Combat.heal(c, unit, n)
   if got > 0 then
     log(c, { t = "heal", unit = uref(unit), amount = got })
     if unit.side == "player" then stat(c, "healed", got) end
+    -- soin réellement rendu (unité, PV) : Prayer of Mending, Corrupted Healing, Volchan
+    if not c.result then Combat.zfire(c, "onHeal", unit, got) end
   end
   return got
 end
@@ -2035,8 +2053,8 @@ end
 --        affixes = { id de ns.Affixes, ... } (clés mythiques), stats = bool, quiet = bool,
 --        zone = id de ns.Zones (règles de zone), kind = "combat" | "elite" | "boss" (genre du combat),
 --        mods = { st = { état = n }, hpMul } (posés sur chaque ennemi de départ hors boss : rencontre
---        « Sleeping Camp », Gurubashi Arena), start = { effets } (résolus au début du combat, après
---        « onCombatStart » : boissons du Grim Guzzler, exp.nextCombat)
+--        « Sleeping Camp », Gurubashi Arena), start = { effets } (résolus après le début du premier tour,
+--        l'Absorb tient donc ce tour : boissons du Grim Guzzler, exp.nextCombat)
 -- État propre à la classe : c.cls (table de données simples, vide au départ, remplie par
 -- ns.ClassRules[classe].init) ; ressource : c.player.res. États des zones : c.zs[id] (ZoneRules.init).
 function Combat.new(opts)
@@ -2106,7 +2124,11 @@ function Combat.new(opts)
   end
   local tok = fxBegin(c, "start")
   Combat.fire(c, "onCombatStart")
+  fxEnd(c, tok)
+  Combat.startPlayerTurn(c)
+  -- effets de départ (opts.start) : après le début du premier tour (l'Absorb gagnée tient ce tour-là)
   if opts.start and not c.result then
+    tok = fxBegin(c, "start")
     local ctx = { dealt = false, hits = 0, start = true }
     for i = 1, #opts.start do
       local e = opts.start[i]
@@ -2115,9 +2137,8 @@ function Combat.new(opts)
       h(c, ctx, e)
       if c.result then break end
     end
+    fxEnd(c, tok)
   end
-  fxEnd(c, tok)
-  Combat.startPlayerTurn(c)
   return c
 end
 

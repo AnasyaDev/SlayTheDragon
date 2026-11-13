@@ -121,6 +121,13 @@ local function addRecord(agg, rec)
     end
     k.castsStarted = (k.castsStarted or 0) + cb.castsStarted
     k.castsInterrupted = (k.castsInterrupted or 0) + cb.castsInterrupted
+    -- statistiques des zones (Combat.zstat) : par type de combat
+    for key, n in pairs(cb.zoneStats or {}) do
+      agg.zoneStats = agg.zoneStats or {}
+      local zs = agg.zoneStats[key] or {}
+      agg.zoneStats[key] = zs
+      zs[cb.kind] = (zs[cb.kind] or 0) + n
+    end
     for id, n in pairs(cb.potions or {}) do
       local ps = agg.potions[id] or {}
       agg.potions[id] = ps
@@ -476,6 +483,21 @@ local function report(a, title)
   out(("  dont Guette %d (incanté %s), coup qui interrompt %d (incanté %s)"):format(cst.watchTurns or 0,
     pct(cst.watchCasts or 0, cst.watchTurns or 0), cst.pushTurns or 0, pct(cst.pushCasts or 0, cst.pushTurns or 0)))
   out(("Sorts ennemis : %d, interrompus par le joueur : %s"):format(a.enemyCasts, pct(a.enemyCastsInterrupted, a.enemyCasts)))
+  -- statistiques des zones (Combat.zstat) : moyenne par combat de chaque type
+  if a.zoneStats then
+    local keys = {}
+    for key in pairs(a.zoneStats) do keys[#keys + 1] = key end
+    table.sort(keys)
+    out("Statistiques de zone (par combat)  easy    normal   elite    boss")
+    for _, key in ipairs(keys) do
+      local zs, cols = a.zoneStats[key], {}
+      for _, kd in ipairs({ "easy", "normal", "elite", "boss" }) do
+        local k = a.kinds[kd]
+        cols[#cols + 1] = (k and k.n > 0) and ("%7.2f"):format((zs[kd] or 0) / k.n) or "     - "
+      end
+      out(("  %-30s %s"):format(key, table.concat(cols, "  ")))
+    end
+  end
   out(("Durée : %d s (CPU du parent %.1f s)"):format(elapsed, os.clock() - clock0))
   return table.concat(lines, "\n")
 end

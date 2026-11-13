@@ -121,7 +121,7 @@ end
 Effects.loseHp = function(c, ctx, e)
   local n = e[2]
   if e.safe then n = math.min(n, c.player.hp - 1) end
-  Combat.loseHp(c, n, "effect")
+  Combat.loseHp(c, n, e.why or "effect") -- why : raison transmise à onHpLost (« curse »)
 end
 
 -- { "interrupt", all = bool } : annule le sort que la cible (ou chaque ennemi) s'apprête à lancer.

@@ -356,7 +356,7 @@ return function(ns)
       hpLost = st.hpLost, healed = st.healed, stalled = stalled,
       castsStarted = st.castsStarted, castsInterrupted = st.castsInterrupted,
       enemyCasts = st.enemyCasts, enemyCastsInterrupted = st.enemyCastsInterrupted,
-      played = st.played, drawn = st.drawn, unplayed = st.unplayed,
+      played = st.played, drawn = st.drawn, unplayed = st.unplayed, zoneStats = st.zone,
     }
   end
 

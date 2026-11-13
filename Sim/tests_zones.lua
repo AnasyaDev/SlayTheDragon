@@ -210,6 +210,34 @@ test("ordre des crochets d'un round (début et fin de tour, phase ennemie, fin d
   noZone()
 end)
 
+test("hpLoss (perte hors coup annulée), onHeal (soin rendu), zstat (statistiques de zone)", function()
+  local healed = 0
+  zone({ hooks = { hpLoss = function(c, z, n, why) if why == "wildfire" and not z.used then z.used = true return 0 end return n end,
+    onHeal = function(c, z, unit, n) healed = healed + n end } })
+  local c = Combat.new({ seed = 1, class = "priest", hp = 60, maxHp = 60, deck = {}, encounter = { "zt_dummy" },
+    zone = "testzone", stats = true })
+  Combat.loseHp(c, 5, "wildfire")
+  eq(c.player.hp, 60, "première annulée")
+  Combat.loseHp(c, 5, "wildfire")
+  eq(c.player.hp, 55)
+  Combat.heal(c, c.player, 10)
+  eq(healed, 5, "soin réellement rendu")
+  Combat.zstat(c, "burns", 2)
+  eq(c.stats.zone.burns, 2)
+  noZone()
+end)
+
+test("enemyDamageLast : après enemyDamageTaken des zones et des bibelots (Rude Awakening après +4)", function()
+  zone({ hooks = { enemyDamageLast = function(c, z, v) return math.ceil(v * 1.5) end } })
+  ns.Relics.zt_relic = { id = "zt_relic", name = "Test", text = "", rarity = "common", noPool = true,
+    hooks = { enemyDamageTaken = function(c, src, v) return v + 4 end } }
+  local c = combat({ zone = "testzone", hand = { "zt_strike" }, relics = { "zt_relic" } })
+  play(c, "zt_strike", 1)
+  eq(c.enemies[1].hp, 50 - 15, "(6 + 4) × 1,5")
+  ns.Relics.zt_relic = nil
+  noZone()
+end)
+
 test("onCombatEnd : victoire, défaite", function()
   local got
   zone({ hooks = { onCombatEnd = function(c, z, r) got = r end } })
@@ -756,6 +784,29 @@ test("feu de camp : action de zone proposée (can), appliquée, puis départ", f
   eq(exp.maxHp, hp + 1); eq(exp.phase, "map")
   exp.phase, exp.gold = "campfire", 0
   for _, a in ipairs(X.choices(exp)) do assert(a[1] ~= "campAction", "refusée sans or") end
+  noZone()
+end)
+
+test("rencontre enchaînée (chain), soin hors combat (healOut), texte %g, newExpedition (toutes zones)", function()
+  ns.Events.zt_bar = { name = "Bar", zone = "testzone", node = true, text = "Free drink.",
+    choices = { { label = "Ale", effects = { { "nextCombat", { { "absorb", 5 } } }, { "chain", "zt_bar2" } } } } }
+  ns.Events.zt_bar2 = { name = "Bar 2", zone = "testzone", node = true, text = "Against %g.",
+    choices = { { label = "Pay", effects = { { "heal", 10 }, { "fight", "normal", group = true } } } } }
+  zone({ run = { healOut = function(exp, v) return v / 2 end },
+    newExpedition = function(exp) exp.maxHp = exp.maxHp + 6 end })
+  local exp = newExp()
+  local cd = ns.Classes.priest
+  eq(exp.maxHp, cd.hp + 6, "newExpedition")
+  exp.node, exp.phase = exp.map.start[1], "map"
+  X.openEvent(exp, "zt_bar")
+  assert(X.act(exp, { "choose", 1 }))
+  eq(exp.phase, "event"); eq(exp.event.id, "zt_bar2"); eq(#exp.nextCombat, 1)
+  eq(X.eventText(exp), "Against Dummy and Dummy.")
+  exp.hp = 20
+  assert(X.act(exp, { "choose", 1 }))
+  eq(exp.hp, 25, "soin divisé par deux")
+  eq(exp.phase, "combat"); eq(exp.combat.player.block, 5)
+  ns.Events.zt_bar, ns.Events.zt_bar2 = nil, nil
   noZone()
 end)
 
