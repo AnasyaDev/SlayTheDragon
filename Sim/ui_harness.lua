@@ -9439,11 +9439,13 @@ do
     for _, up in ipairs({ false, true }) do
       card:SetCard(id, up, { playable = true })
       local fit = card.bodyFit
-      if not fit or not fit.ok or (fit.size or 0) < 8.5 then small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) end
+      if not fit or not fit.ok or (fit.size or 0) < 8.5 or fit.mode ~= "clauses" then
+        small[#small + 1] = id .. (up and "+" or "") .. " " .. tostring(fit and fit.size) .. " " .. tostring(fit and fit.mode)
+      end
     end
   end
   card:Hide()
-  check("épiques et variantes du Hunter (32 faces) : texte à 8,5 ou plus", #small == 0, table.concat(small, ", "))
+  check("épiques et variantes du Hunter (32 faces) : texte en clauses, à 8,5 ou plus", #small == 0, table.concat(small, ", "))
 
   -- 6. planche des épiques et des variantes (base, améliorée) -------------------------------------------
   if SNAP then
@@ -9851,7 +9853,7 @@ do
     line(host) == ("Attacks this turn: 0/%d, each twice"):format(lim) and iconOk(host, "titans_grip"), line(host))
   c.hand = {}
   for k = 1, lim + 1 do c.hand[k] = ns.Card.new("strike", false, 900 + k) end
-  c.player.mana = lim + 1
+  c.player.mana = (lim + 1) * (1 + Wr.EPIC.titans_grip.extraCost)
   for _, en in ipairs(c.enemies) do en.hp, en.maxHp = 200, 200 end
   v:Render(true)
   for _ = 1, lim do ns.Combat.play(c, 1, 1) end
@@ -9886,11 +9888,15 @@ do
   e, c, v = uewCombat("avatar", true)
   host = v.classZone.views.warrior
   check("Avatar+ : « Rage up to 10, +3 next turn »", line(host) == "Rage up to 10, +3 next turn", line(host))
+  c.player.res = 10
+  v:Render(true)
+  check("Avatar+ à 10 Rage : « Rage 10: Attacks +1, +3 next turn », non tronquée",
+    line(host) == "Rage 10: Attacks +1, +3 next turn" and not host.epic.text:IsTruncated(), line(host))
   e, c, v = uewCombat("sweeping_strikes")
   host = v.classZone.views.warrior
   local alive = #ns.Combat.aliveEnemies(c)
-  check("Sweeping Strikes : « Targeted hits splash 1 other for half » à plusieurs, rien seul",
-    (alive >= 2 and line(host) == "Targeted hits splash 1 other for half") or (alive < 2 and line(host) == nil), line(host))
+  check("Sweeping Strikes : « Targeted hits splash 1 other for a third » à plusieurs, rien seul",
+    (alive >= 2 and line(host) == "Targeted hits splash 1 other for a third") or (alive < 2 and line(host) == nil), line(host))
   -- 5. Thunderous Roar : l'onde (journal epic_trigger, dégâts) passe par la file d'animations
   e, c, v = uewCombat("thunderous_roar")
   host = v.classZone.views.warrior

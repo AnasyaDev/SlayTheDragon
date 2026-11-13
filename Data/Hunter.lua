@@ -372,24 +372,29 @@ card("resourcefulness", {
 -- en tête de chaque bloc (EPIC).
 
 -- Nombres des épiques, { base, amélioré } (fiche : roar 5 / 8, marksman 0 / 4, launcher 1 / 2, lonePer 1 / 1,
--- loneStart 0 / 1, chimaera 3, 3, 6) ; réglés par la simulation (Westfall, clé 0, zones=7, niveau 7 : rapport
--- de la nuit du 13 au 14/11/2026). Lone Wolf amélioré : +3 par Frenzy au lieu de « Start of turn: +1 Frenzy. »
--- (la ligne de plus faisait passer le texte sous le plancher de 8,5).
+-- loneStart 0 / 1, chimaera 3, 3, 6 ; Call of the Wild, Beast Cleave, Black Arrow sans nombre) ; réglés par la
+-- simulation dans les zones dures (14/11/2026 : gain moyen sur Duskwood, Stranglethorn, Steppes, clé 0,
+-- niveau 7 ; docs/classes.md, « Hunter : les sept épiques »). Lone Wolf amélioré : +3 par Frenzy au lieu de
+-- « Start of turn: +1 Frenzy. » (la ligne de plus faisait passer le texte sous le plancher de 8,5).
 local EPIC = {
+  cotwCost = { 1, 0 },      -- Call of the Wild : Frenzy dépensé pour l'attaque du début du tour (0 : gratuite)
+  cleaveLess = { 2, 2 },    -- Beast Cleave : dégâts en moins du familier sur les ennemis autres que sa cible
+  blackCost = { 1, 0 },     -- Black Arrow : Frenzy dépensé pour l'attaque sur l'ennemi qui tique (0 : gratuite)
   roar = { 2, 4 },          -- Roar of Sacrifice : dégâts arrêtés par point de Frenzy dépensé
-  marksman = { 12, 16 },      -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
+  marksman = { 20, 24 },    -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
   launcher = { 1, 2 },      -- Trap Launcher : attaques du familier par Trap lancée
   lonePer = { 2, 3 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
   loneStart = { 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
-  chimaera = { 4, 4, 7 },   -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée (fiche : 3, 3, 6)
+  chimaera = { 5, 4, 8 },   -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée (fiche : 3, 3, 6)
 }
 ns.HunterEpic = EPIC
 
--- Note des épiques pour les bots (classDef.bot.epic) : ≈ 5 + gain mesuré / 2.
+-- Note des épiques pour les bots (classDef.bot.epic) : ≈ 5 + gain mesuré / 2 (gain moyen des zones dures,
+-- 14/11/2026).
 local EPIC_KEEP = 5
 local EPIC_BOT = {
-  call_of_the_wild = 11.9, trap_launcher = 8.9, beast_cleave = 11, roar_of_sacrifice = 8.2, master_marksman = 7.8,
-  black_arrow = 10.8, lone_wolf = 9.3,
+  call_of_the_wild = 9.6, trap_launcher = 10.6, beast_cleave = 10.3, roar_of_sacrifice = 10.7, master_marksman = 9.7,
+  black_arrow = 11.3, lone_wolf = 11.3,
 }
 
 local function epic(id, t)
@@ -402,17 +407,31 @@ end
 local function n2(pair, src) return src.up and pair[2] or pair[1] end
 local TIMES = { [1] = "", [2] = " twice", [3] = " three times", [4] = " four times" }
 
--- Westfall — Call of the Wild : au début de chaque tour (après la pioche et la baisse du Frenzy), le
--- familier attaque ; amélioré : +1 Frenzy juste avant.
+-- Attaque du familier payée en Frenzy (Call of the Wild, Black Arrow) : rien sans assez de Frenzy ; cost 0 :
+-- gratuite. Texte : « spend N Frenzy for a pet attack » (comme Roar of Sacrifice), sinon « pet attacks ».
+local function paidPet(c, cost)
+  if cost > 0 then
+    if (c.player.res or 0) < cost then return false end
+    Combat.gainRes(c, -cost, "epic")
+  end
+  return true
+end
+
+-- Westfall — Call of the Wild : au début de chaque tour (après la pioche et la baisse du Frenzy), si le
+-- Frenzy vaut EPIC.cotwCost ou plus, il baisse d'autant et le familier attaque (+1 Frenzy comme toute
+-- attaque : la dépense de 1 est rendue) ; amélioré : sans dépense.
+local function cotwText(cost)
+  if cost > 0 then return "Epic.\nStart of turn: spend " .. cost .. " Frenzy for a pet attack." end
+  return "Epic.\nStart of turn: pet attacks."
+end
 epic("call_of_the_wild", {
   zone = "westfall", path = "beast_mastery", name = "Call of the Wild",
-  text = "Epic.\nStart of turn: pet attacks.",
-  up = { text = "Epic.\nStart of turn: +1 Frenzy, pet attacks." },
+  text = cotwText(EPIC.cotwCost[1]),
+  up = { text = cotwText(EPIC.cotwCost[2]) },
   deckHooks = {
     onTurnStart = function(c, src)
-      if c.result then return end
-      if src.up then Combat.gainRes(c, 1, "epic") end
-      H().petAttack(c, "epic")
+      if c.result or not H().petPresent(c) or not H().petTarget(c) then return end
+      if paidPet(c, n2(EPIC.cotwCost, src)) then H().petAttack(c, "epic") end
     end,
   },
 })
@@ -435,14 +454,20 @@ epic("trap_launcher", {
   },
 })
 
--- Wetlands — Beast Cleave : chaque attaque du familier frappe tous les ennemis vivants (petAll) ;
--- amélioré : +1 Frenzy de plus par attaque (pas pour les attaques de Surge, qui n'en donnent pas).
+-- Wetlands — Beast Cleave : chaque attaque du familier frappe tous les ennemis vivants (petAll) : sa cible
+-- en plein, les autres pour EPIC.cleaveLess de moins (crochet petLess) ; amélioré : +1 Frenzy de plus par
+-- attaque (pas pour les attaques de Surge, qui n'en donnent pas).
+local function cleaveText(less)
+  if less > 0 then return "Pet attacks hit all enemies, the others for " .. less .. " less." end
+  return "Pet attacks hit all enemies."
+end
 epic("beast_cleave", {
   zone = "wetlands", path = "beast_mastery", name = "Beast Cleave",
-  text = "Epic.\nPet attacks hit all enemies.",
-  up = { text = "Epic.\nPet attacks hit all enemies.\nPet attacks: +1 Frenzy." },
+  text = "Epic.\n" .. cleaveText(EPIC.cleaveLess[1]),
+  up = { text = "Epic.\n" .. cleaveText(EPIC.cleaveLess[2]) .. "\nPet attacks: +1 Frenzy." },
   deckHooks = {
     petAll = function(c, src, v) return true end,
+    petLess = function(c, src, v) return v + n2(EPIC.cleaveLess, src) end,
     onPetAttack = function(c, src, t, dmg, why)
       if src.up and why ~= "surge" and not c.result then Combat.gainRes(c, 1, "epic") end
     end,
@@ -509,17 +534,21 @@ epic("master_marksman", {
   },
 })
 
--- Burning Steppes — Black Arrow : après chaque tic de DoT sur un ennemi qui survit, le familier attaque cet
--- ennemi (+1 Frenzy comme d'habitude ; amélioré : +1 Frenzy de plus avant), sans changer sa cible.
+-- Burning Steppes — Black Arrow : après chaque tic de DoT sur un ennemi qui survit, si le Frenzy vaut
+-- EPIC.blackCost ou plus, il baisse d'autant et le familier attaque cet ennemi (+1 Frenzy comme d'habitude),
+-- sans changer sa cible ; amélioré : sans dépense.
+local function blackText(cost)
+  if cost > 0 then return "Epic.\nEach enemy DoT tick: spend " .. cost .. " Frenzy for a pet attack on it." end
+  return "Epic.\nEach enemy DoT tick: pet attacks it."
+end
 epic("black_arrow", {
   zone = "steppes", path = "survival", name = "Black Arrow",
-  text = "Epic.\nEach enemy DoT tick: pet attacks it.",
-  up = { text = "Epic.\nEach enemy DoT tick: +1 Frenzy, pet attacks it." },
+  text = blackText(EPIC.blackCost[1]),
+  up = { text = blackText(EPIC.blackCost[2]) },
   deckHooks = {
     onDotTick = function(c, src, unit)
-      if c.result or unit.side ~= "enemy" or unit.dead then return end
-      if src.up then Combat.gainRes(c, 1, "epic") end
-      H().petAttackOn(c, "dot", unit)
+      if c.result or unit.side ~= "enemy" or unit.dead or not H().petPresent(c) then return end
+      if paidPet(c, n2(EPIC.blackCost, src)) then H().petAttackOn(c, "dot", unit) end
     end,
   },
 })

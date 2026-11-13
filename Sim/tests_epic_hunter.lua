@@ -127,27 +127,39 @@ end)
 ---------------------------------------------------------------------------
 -- Westfall — Call of the Wild
 ---------------------------------------------------------------------------
-test("Call of the Wild : le familier attaque au début de chaque tour, premier compris", function()
+-- Call of the Wild : coût en Frenzy de l'attaque du début du tour (base, amélioré)
+local K1, K2 = E.cotwCost[1], E.cotwCost[2]
+test("Call of the Wild : au début de chaque tour, N Frenzy dépensés pour une attaque du familier ; sans Frenzy : rien", function()
+  assert(K1 > 0 and K2 == 0, "base payée, améliorée gratuite")
   local c = setup({ "disengage" }, { epic = "call_of_the_wild" })
   local e = c.enemies[1]
-  eq(dealt(e), H.PET_BASE, "tour 1 : 1 + Frenzy 0")
+  eq(dealt(e), 0, "tour 1 : Frenzy 0, pas d'attaque")
+  eq(c.player.res, 0)
+  Combat.endTurn(c)
+  -- fin du tour 1 : attaque automatique (1 + 0, Frenzy 1), baisse (0) : rien au début du tour 2
+  eq(dealt(e), H.PET_BASE)
+  c.player.res = 3
+  Combat.endTurn(c)
+  -- fin du tour 2 : auto 1 + 3 (F 4), baisse (3) ; début du tour 3 : -K1, attaque à 1 + (3 - K1), +1
+  eq(dealt(e), H.PET_BASE + (H.PET_BASE + 3) + (H.PET_BASE + 3 - K1))
+  eq(c.player.res, 3 - K1 + 1)
+end)
+
+test("Call of the Wild amélioré : attaque gratuite au début de chaque tour, premier compris", function()
+  local c = setup({ "disengage" }, { epic = { "call_of_the_wild", true } })
+  eq(dealt(c.enemies[1]), H.PET_BASE, "tour 1 : 1 + Frenzy 0")
   eq(c.player.res, 1)
   Combat.endTurn(c)
-  -- fin du tour 1 : attaque automatique (1 + 1), baisse du Frenzy (2 -> 1), début du tour 2 : 1 + 1
-  eq(dealt(e), H.PET_BASE + (H.PET_BASE + 1) + (H.PET_BASE + 1))
+  -- fin du tour 1 : auto (1 + 1), baisse (2 -> 1), début du tour 2 : 1 + 1
+  eq(dealt(c.enemies[1]), H.PET_BASE + (H.PET_BASE + 1) + (H.PET_BASE + 1))
   eq(c.player.res, 2)
 end)
 
-test("Call of the Wild amélioré : +1 Frenzy juste avant l'attaque", function()
-  local c = setup({ "disengage" }, { epic = { "call_of_the_wild", true } })
-  eq(dealt(c.enemies[1]), H.PET_BASE + 1)
-  eq(c.player.res, 2)
-end)
-
-test("Call of the Wild + Pet Whistle : deux attaques au premier tour", function()
+test("Call of the Wild + Pet Whistle : le sifflet donne le Frenzy, deux attaques au premier tour", function()
   local c = setup({ "disengage" }, { epic = "call_of_the_wild", relics = { "pet_whistle" } })
-  eq(dealt(c.enemies[1]), H.PET_BASE + (H.PET_BASE + 1))
-  eq(c.player.res, 2)
+  -- sifflet : 1 + 0 (F 1) ; épique : -K1 puis 1 + (1 - K1) (+1)
+  eq(dealt(c.enemies[1]), H.PET_BASE + (H.PET_BASE + 1 - K1))
+  eq(c.player.res, 1 - K1 + 1)
 end)
 
 ---------------------------------------------------------------------------
@@ -225,12 +237,24 @@ end)
 ---------------------------------------------------------------------------
 -- Wetlands — Beast Cleave
 ---------------------------------------------------------------------------
-test("Beast Cleave : chaque attaque du familier frappe tous les ennemis, +1 Frenzy une fois", function()
+-- Beast Cleave : les autres ennemis prennent S dégâts de moins du familier (jamais sous 0)
+local S1, S2 = E.cleaveLess[1], E.cleaveLess[2]
+local function share(d, s) return math.max(0, d - s) end
+test("Beast Cleave : chaque attaque du familier frappe tous les ennemis (les autres moins fort), +1 Frenzy une fois", function()
   local c = setup({ "kill_command" }, { epic = "beast_cleave", encounter = { "th_dummy", "th_dummy", "th_dummy" } })
+  c.player.res = 3
   assert(Combat.play(c, 1, 2))
-  -- deux attaques : 1 + 0 puis 1 + 1, sur chacun
-  for i = 1, 3 do eq(dealt(c.enemies[i]), H.PET_BASE + H.PET_BASE + 1, "ennemi " .. i) end
-  eq(c.player.res, 2)
+  -- deux attaques : 1 + 3 puis 1 + 4 ; la cible en plein, les autres divisés par S1
+  eq(dealt(c.enemies[2]), (H.PET_BASE + 3) + (H.PET_BASE + 4), "cible")
+  for _, i in ipairs({ 1, 3 }) do
+    eq(dealt(c.enemies[i]), share(H.PET_BASE + 3, S1) + share(H.PET_BASE + 4, S1), "ennemi " .. i)
+  end
+  eq(c.player.res, 5)
+  eq(H.petLess(setup({ "disengage" })), 0, "sans l'épique : en plein")
+  -- coup nul : jamais de dégâts négatifs (Frenzy 0 : 1 - S1)
+  local z = setup({ "disengage" }, { epic = "beast_cleave", encounter = { "th_dummy", "th_dummy" } })
+  Combat.endTurn(z)
+  eq(dealt(z.enemies[2]), share(H.PET_BASE, S1), "autre ennemi au Frenzy 0")
 end)
 
 test("Beast Cleave amélioré : +2 Frenzy par attaque ; Surge (Bestial Wrath) : à tous, sans Frenzy", function()
@@ -240,7 +264,8 @@ test("Beast Cleave amélioré : +2 Frenzy par attaque ; Surge (Bestial Wrath) : 
   local c2 = setup({ "bestial_wrath" }, { epic = { "beast_cleave", true }, encounter = { "th_dummy", "th_dummy" } })
   c2.player.res = 3
   assert(Combat.play(c2, 1, 1))
-  for i = 1, 2 do eq(dealt(c2.enemies[i]), 3 * (H.PET_BASE + 3), "Surge à tous") end
+  eq(dealt(c2.enemies[1]), 3 * (H.PET_BASE + 3), "Surge : la cible")
+  eq(dealt(c2.enemies[2]), 3 * share(H.PET_BASE + 3, S2), "Surge : les autres")
   eq(c2.player.res, 0, "Surge : ni Frenzy du familier ni bonus de l'épique")
 end)
 
@@ -343,24 +368,36 @@ end)
 ---------------------------------------------------------------------------
 -- Burning Steppes — Black Arrow
 ---------------------------------------------------------------------------
-test("Black Arrow : chaque tic de DoT sur un ennemi vivant appelle une attaque du familier sur lui", function()
+-- Black Arrow : coût en Frenzy de l'attaque sur l'ennemi qui tique (base, amélioré)
+local B1, B2 = E.blackCost[1], E.blackCost[2]
+test("Black Arrow : chaque tic de DoT sur un ennemi vivant : N Frenzy pour une attaque du familier sur lui", function()
+  assert(B1 > 0 and B2 == 0, "base payée, améliorée gratuite")
   local c = setup({ "serpent_sting" }, { epic = "black_arrow", encounter = { "th_dummy", "th_dummy" } })
   assert(Combat.play(c, 1, 2))
   local e1, e2 = c.enemies[1], c.enemies[2]
   c.player.lastTarget = e1.uid -- la cible du familier n'est pas l'ennemi qui tique
+  c.player.res = 2
   Combat.endTurn(c)
-  -- fin du tour : familier sur e1 (1 + 0) ; tour ennemi : tic 3 sur e2 puis familier sur e2 (1 + 1)
-  eq(dealt(e1), H.PET_BASE)
-  eq(dealt(e2), 3 + H.PET_BASE + 1)
+  -- fin du tour : familier sur e1 (1 + 2, F 3) ; tour ennemi : tic 3 sur e2, -B1, familier sur e2 (1 + 3 - B1)
+  eq(dealt(e1), H.PET_BASE + 2)
+  eq(dealt(e2), 3 + H.PET_BASE + 3 - B1)
   eq(c.player.lastTarget, e1.uid, "cible inchangée")
+  -- sans Frenzy au tic : pas d'attaque
+  local z = setup({ "disengage" }, { epic = "black_arrow", extra = { "disengage" } })
+  Combat.applyStatus(z, z.enemies[1], "pain", 3)
+  local before = z.stats.petAttacks or 0
+  z.player.res = 0
+  ns.Combat.fire(z, "onDotTick", z.enemies[1], 3)
+  eq((z.stats.petAttacks or 0) - before, B1 > 0 and 0 or 1, "Frenzy 0 : rien")
 end)
 
-test("Black Arrow : le familier tue avant que l'ennemi agisse ; mort par le DoT : rien ; amélioré : +1 Frenzy", function()
+test("Black Arrow : le familier tue avant que l'ennemi agisse ; mort par le DoT : rien ; amélioré : gratuit", function()
   local c = setup({ "disengage" }, { epic = "black_arrow", encounter = { "th_hitter", "th_dummy" } })
   local e = c.enemies[1]
   e.hp = 5
   Combat.applyStatus(c, e, "pain", 3)
   c.player.lastTarget = c.enemies[2].uid
+  c.player.res = 3
   local hp = c.player.hp
   Combat.endTurn(c)
   assert(e.dead, "tué par le familier après le tic")
@@ -369,23 +406,26 @@ test("Black Arrow : le familier tue avant que l'ennemi agisse ; mort par le DoT 
   d.enemies[1].hp = 2
   Combat.applyStatus(d, d.enemies[1], "pain", 3)
   d.player.lastTarget = d.enemies[2].uid
+  d.player.res = 3
   Combat.endTurn(d)
   assert(d.enemies[1].dead)
-  eq(dealt(d.enemies[2]), H.PET_BASE, "seule l'attaque automatique")
+  eq(dealt(d.enemies[2]), H.PET_BASE + 3, "seule l'attaque automatique")
   local u = setup({ "disengage" }, { epic = { "black_arrow", true } })
   Combat.applyStatus(u, u.enemies[1], "pain", 3)
   Combat.endTurn(u)
-  -- auto : 1 + 0 (F 1) ; tic 3, +1 (F 2), familier 1 + 2 (F 3) ; baisse de round : 2
-  eq(dealt(u.enemies[1]), H.PET_BASE + 3 + H.PET_BASE + 2)
-  eq(u.player.res, 2)
+  -- auto : 1 + 0 (F 1) ; tic 3, familier 1 + 1 (F 2) ; baisse de round : 1
+  eq(dealt(u.enemies[1]), H.PET_BASE + 3 + H.PET_BASE + 1)
+  eq(u.player.res, 1)
 end)
 
-test("Black Arrow : DoT à tous (Explosive Trap) = une attaque par ennemi", function()
+test("Black Arrow : DoT à tous (Explosive Trap) = une attaque par ennemi tant que le Frenzy suit", function()
   local c = setup({ "disengage" }, { epic = "black_arrow", encounter = { "th_dummy", "th_dummy", "th_dummy" } })
   for i = 1, 3 do Combat.applyStatus(c, c.enemies[i], "pain", 3) end
   c.player.lastTarget = c.enemies[1].uid
+  c.player.res = 2
   local before = c.stats.petAttacks or 0
   Combat.endTurn(c)
+  -- auto : F 3 ; chaque tic coûte B1 et l'attaque en rend 1
   eq((c.stats.petAttacks or 0) - before, 1 + 3)
 end)
 

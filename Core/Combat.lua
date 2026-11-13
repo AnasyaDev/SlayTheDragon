@@ -1583,7 +1583,14 @@ local function afterPlay(c, inst, d)
     local turns = max(1, Combat.modify(c, "cooldown", d.cooldown, d, inst))
     c.cooldown[#c.cooldown + 1] = { card = inst, turns = turns }
   else
-    c.discard[#c.discard + 1] = inst
+    -- recharge posée par une règle sur une carte qui n'en a pas (crochet « giveCooldown » (d, inst), nil par
+    -- défaut : Anger Management)
+    local give = Combat.modify(c, "giveCooldown", nil, d, inst)
+    if give then
+      c.cooldown[#c.cooldown + 1] = { card = inst, turns = max(1, give) }
+    else
+      c.discard[#c.discard + 1] = inst
+    end
   end
 end
 
