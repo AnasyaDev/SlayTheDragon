@@ -6,7 +6,9 @@
 --        key (niveau de clé mythique), zone (zone jouée, défaut : la première),
 --        zones (0..7 : zones gagnées par le compte et la classe, à toutes les clés),
 --        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (niveau de classe 1..7, défaut 7),
---        epic (id d'une carte épique imposée au deck de départ)
+--        epic (id d'une carte épique imposée au deck de départ),
+--        human (bot=human : { skill = …, width = … }, Bots.humanParams ; hors combat aussi, humanDecide),
+--        fightBot (bot des combats à la place de bot : bot=human fightBot=heuristic isole le jeu hors combat)
 return function(ns)
   local X, Rng, Bots, Meta = ns.Expedition, ns.Rng, ns.Bots, ns.Meta
   local SE = {}
@@ -409,10 +411,182 @@ return function(ns)
     return ch[1]
   end
 
+  ---------------------------------------------------------------------------
+  -- Joueur humain hors combat (bot=human ; paramètres : Bots.humanParams, Sim/bots.lua). Mêmes repères que
+  -- decide, avec un jugement approximatif : notes bruitées, goût des rares et des nouveautés, deck qui
+  -- grossit, chemin vu de près, repos et amélioration au jugé, retrait rare. Hasard : flux « human ».
+  local RARE_RANK = { common = 0, uncommon = 0.5, rare = 1, epic = 1 }
+  local humanShop, humanRemove -- boutique en cours et décision de retrait tirée pour elle
+  local humanRoute -- cases suivantes de la route qu'il s'est fixée (ids), ou nil
+
+  -- Note perçue d'une carte offerte : note du bot de référence + bruit + goût des rares et des nouveautés.
+  local function humanRating(exp, H, hrng, id)
+    local d = ns.Cards[id]
+    local r = rating(id) + H.pickNoise * Bots.gauss(hrng) + H.rareBonus * (RARE_RANK[d and d.rarity] or 0)
+    local owned = false
+    for i = 1, #exp.deck do if exp.deck[i].id == id then owned = true break end end
+    if not owned then r = r + H.newBonus end
+    return r
+  end
+
+  local function humanPickCard(exp, opts, H, hrng, cards)
+    if opts.pick == "skip" or #cards == 0 then return nil end
+    if opts.pick == "random" then return Rng.int(hrng, 1, #cards) end
+    local best, bestR
+    for i = 1, #cards do
+      local r = humanRating(exp, H, hrng, cards[i])
+      if not bestR or r > bestR then best, bestR = i, r end
+    end
+    if opts.pick ~= "always" and bestR < H.takeMin then return nil end
+    return best
+  end
+
+  -- Chemin : valeur des pathDepth étapes à venir (mêmes repères que pathValue) et la suite de cases qui la
+  -- donne (sa route). Il se voit plus frais qu'il n'est (daring : part des PV max ajoutée à ses PV pour juger
+  -- un élite) : il prend les élites plus tard dans la descente de ses PV.
+  local function humanPathValue(exp, id, depth, H)
+    local node = exp.map.nodes[id]
+    local ratio = exp.hp / exp.maxHp
+    if node.kind == "elite" then ratio = ratio + H.daring end
+    local v = kindScore(node.kind, ratio, exp.gold, X.removePrice(exp)) * (0.85 ^ depth)
+    if depth + 1 >= H.pathDepth then return v, { id } end
+    local best, bestRoute = 0, nil
+    for i = 1, #node.next do
+      local w, r = humanPathValue(exp, node.next[i], depth + 1, H)
+      if i == 1 or w > best then best, bestRoute = w, r end
+    end
+    local route = { id }
+    for i = 1, #(bestRoute or {}) do route[i + 1] = bestRoute[i] end
+    return v + best, route
+  end
+
+  local function humanUpgrade(exp, H, hrng)
+    local best, bestV
+    for i = 1, #exp.deck do
+      if X.canUpgrade(exp, i) then
+        local v = upgradeValue(exp, exp.deck[i]) + H.upNoise * Bots.gauss(hrng)
+        if not bestV or v > bestV then best, bestV = i, v end
+      end
+    end
+    return best
+  end
+
+  local function humanDecide(exp, opts, H, hrng)
+    advice, adviceExp = adviceOf(exp), exp
+    local ph = exp.phase
+    if ph == "map" then
+      kindExp = exp
+      local ch = X.choices(exp)
+      -- il suit la route choisie plus tôt, sans la revoir à chaque pas (replan : part des pas où il la revoit ;
+      -- toujours sous la moitié de ses PV, moins daring)
+      if humanRoute and Rng.float(hrng) >= H.replan and exp.hp >= exp.maxHp * (0.5 - H.daring) then
+        local nextId = humanRoute[1]
+        for i = 1, #ch do
+          if ch[i][1] == "path" and ch[i][2] == nextId then
+            table.remove(humanRoute, 1)
+            if #humanRoute == 0 then humanRoute = nil end
+            return ch[i]
+          end
+        end
+      end
+      local best, bestV, bestRoute
+      for i = 1, #ch do
+        if ch[i][1] == "path" then
+          local v, route = humanPathValue(exp, ch[i][2], 0, H)
+          v = v + H.pathNoise * Bots.gauss(hrng)
+          if not bestV or v > bestV then best, bestV, bestRoute = ch[i], v, route end
+        end
+      end
+      humanRoute = nil
+      if bestRoute and #bestRoute > 1 then
+        humanRoute = {}
+        for i = 2, #bestRoute do humanRoute[i - 1] = bestRoute[i] end
+      end
+      return best
+    elseif ph == "reward" then
+      local r = exp.reward
+      if r.epics and not r.epicDone then return nil end -- épique : comme le bot de référence
+      if not r.cardsDone then
+        local i = humanPickCard(exp, opts, H, hrng, r.cards)
+        if i then return { "pickCard", i } end
+        return { "skipCards" }
+      end
+      return nil
+    elseif ph == "campfire" then
+      local ch = X.choices(exp)
+      for i = 1, #ch do
+        if ch[i][1] == "campAction" then return nil end -- action de zone : jugée comme le bot de référence
+      end
+      local up = humanUpgrade(exp, H, hrng)
+      local ratio = exp.hp / exp.maxHp
+      -- seuil de repos au jugé ; le boss en vue, il se repose plus volontiers (+0,25)
+      local at = H.restAt + 0.1 * Bots.gauss(hrng)
+      for _, nx in ipairs(X.currentNode(exp).next) do
+        if exp.map.nodes[nx].kind == "boss" then at = at + 0.25 end
+      end
+      if not up or ratio < at then return { "rest" } end
+      return { "upgrade", up }
+    elseif ph == "merchant" then
+      local s = exp.shop
+      for i, it in ipairs(s.relics) do
+        if not it.sold and exp.gold >= it.price then return { "buyRelic", i } end
+      end
+      -- retrait : seulement s'il y pense (removeRate, tiré une fois par visite)
+      if humanShop ~= s then
+        humanShop = s
+        humanRemove = Rng.float(hrng) < H.removeRate
+      end
+      local w, wv = worstCard(exp)
+      if humanRemove and w and wv <= 1.5 and #exp.deck > 8 and exp.gold >= X.removePrice(exp) then
+        return { "remove", w }
+      end
+      local best, bestR
+      for i, it in ipairs(s.cards) do
+        if not it.sold and exp.gold >= it.price then
+          local v
+          if ns.Card.isEpic(ns.Cards[it.id]) then
+            v = epicGain(exp, it.id)
+          else
+            local r = humanRating(exp, H, hrng, it.id)
+            v = r >= H.takeMin and cardValue(exp, math.max(r, 5.5)) or -1
+          end
+          v = v - it.price * 0.03
+          if v > 0 and (not bestR or v > bestR) then best, bestR = i, v end
+        end
+      end
+      if best then return { "buyCard", best } end
+      if X.freeSlot(exp) then
+        for i, it in ipairs(s.potions) do
+          if not it.sold and exp.gold >= it.price then return { "buyPotion", i } end
+        end
+      end
+      return { "leave" }
+    elseif ph == "event" then
+      local ev = exp.event
+      if not ev.id or ev.chosen then return { "leave" } end
+      local def = ns.Events[ev.id]
+      local ch = X.choices(exp)
+      local best, bestV
+      for i = 1, #ch do
+        if ch[i][1] == "choose" then
+          local v = eventValue(exp, def, ch[i][2]) + H.eventNoise * Bots.gauss(hrng)
+          if not bestV or v > bestV then best, bestV = ch[i], v end
+        end
+      end
+      return best or { "leave" }
+    elseif ph == "select" and exp.select.kind == "upgrade" then
+      local i = humanUpgrade(exp, H, hrng)
+      if i then return { "select", i } end
+      return { "skipSelect" }
+    end
+    return nil -- le reste : comme le bot de référence
+  end
+
   local function fight(exp, opts, record)
     local f, c = exp.fight, exp.combat
     local hpBefore, maxHpBefore = exp.hp, exp.maxHp -- PV à l'entrée (avant les effets de début de combat)
-    local bot = Bots.new(opts.bot or "heuristic", Rng.stream(f.seed, "bot"), { cap = opts.cap })
+    local bot = Bots.new(opts.fightBot or opts.bot or "heuristic", Rng.stream(f.seed, "bot"),
+      { cap = opts.cap, human = opts.humanH })
     local maxRounds = opts.maxRounds or 40
     local steps, stalled = 0, false
     while exp.phase == "combat" and exp.combat == c do
@@ -439,7 +613,7 @@ return function(ns)
       hpLost = st.hpLost, healed = st.healed, stalled = stalled,
       castsStarted = st.castsStarted, castsInterrupted = st.castsInterrupted,
       enemyCasts = st.enemyCasts, enemyCastsInterrupted = st.enemyCastsInterrupted,
-      played = st.played, drawn = st.drawn, unplayed = st.unplayed, zoneStats = st.zone,
+      played = st.played, drawn = st.drawn, unplayed = st.unplayed, zoneStats = st.zone, potions = st.potions,
     }
   end
 
@@ -471,6 +645,14 @@ return function(ns)
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)
     if opts.hp then exp.hp, exp.maxHp = opts.hp, opts.hp end
     local rng = Rng.stream(seed, "policy")
+    -- bot=human : paramètres (opts.human = { skill = …, width = … }, Bots.humanParams) et flux de son jugement
+    local H, hrng
+    if opts.bot == "human" then
+      H = opts.humanH or Bots.humanParams(opts.human)
+      opts.humanH = H
+      hrng = Rng.stream(seed, "human")
+      humanShop, humanRemove, humanRoute = nil, nil, nil
+    end
     local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {} }
     local guard = 0
     while exp.phase ~= "done" do
@@ -483,7 +665,7 @@ return function(ns)
         fight(exp, opts, record)
       else
         local before = exp.phase
-        local a = decide(exp, opts, rng)
+        local a = H and humanDecide(exp, opts, H, hrng) or decide(exp, opts, rng)
         if exp.phase == "reward" and a[1] == "pickCard" then
           record.picks[#record.picks + 1] = exp.reward.cards[a[2]]
         elseif exp.phase == "reward" and a[1] == "pickEpic" then

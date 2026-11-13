@@ -840,3 +840,46 @@ plafond d'Invincible 8. Résultat (1 500 expéditions) : Priest 48,1 ; Warrior 5
 Hunter 47,5 ; moyenne **49,7**, écart **5,4**. PV perdus par combat normal : 14,7 / 14,7 / 9,3 / 10,8 / 8,8.
 Détail : `docs/zones/blackrock.md`, « Indomitable sur les élites ».
 
+## Bot human : la difficulté ressentie (13/11/2026)
+
+Toute la difficulté était réglée sur `bot=heuristic`, qui explore toutes les suites de cartes du tour et joue le
+tour ennemi au bout de chacune : il ne fait aucune erreur tactique (≈ 70 % à Westfall clé 0, niveau 2) quand le
+joueur, qui joue correctement, en gagne à peine une sur quatre (journal de sa sauvegarde : Rogue 1/5, Priest 2/8,
+1/3 chacun à la clé 0 ; défaites au boss VanCleef, aux élites Rhahk'Zor et Harvest Golem des étapes 3 à 6, et à
+des combats normaux avec un Riverpaw Mystic). Le bot `human` (`Sim/bots.lua`, `Bots.humanParams` ; hors combat
+`humanDecide` de `Sim/expedition.lua`) joue comme un humain correct : il ne regarde que les 3 meilleurs coups au
+coup d'œil et les suit sur 3 cartes ; il lit les intentions affichées au lieu de jouer le tour ennemi (ni DoT, ni
+états, ni « Watch » du Mystic, ni invocation de VanCleef à 50 %), sauf 7 tours sur 10 où il réfléchit à fond ; il
+compte mal le Combo laissé ; un coup sur quatre il joue un autre bon coup (à 6 PV près du meilleur ; jamais une
+fin de tour) ; il garde ses potions ; hors combat, notes de cartes bruitées, goût des rares et des nouveautés
+(deck de 14,5 cartes en fin), route fixée d'avance, repos et amélioration au jugé, retrait au marchand une visite
+sur deux. `skill=0..1` règle le tout (0 débutant ≈ 3–5 %, 0,5 défaut, 1 expert ≈ 68 % au Rogue, presque
+`heuristic`) ; chaque paramètre s'impose aussi par son nom (`Bots.HUMAN_RANGE`).
+
+Westfall clé 0 (`runner=expedition zone=westfall zones=0`, niveau 2, Priest niveau 3 comme la sauvegarde,
+600 expéditions, graine 1, ± 3,5) :
+
+| Classe | `human` | `heuristic` | `greedy` | défaites de `human` : normal / élite / boss |
+|---|---|---|---|---|
+| Rogue | **25,7** | 72,3 | 8,3 | 10 / 21 / 68 % |
+| Priest | **27,2** | 72,7 | 4,0 | 3 / 8 / 89 % |
+| Warrior | **23,3** | 66,7 | 0,8 | 5 / 18 / 77 % |
+| Mage | **28,7** | 65,0 | 11,8 | 10 / 17 / 73 % |
+| Hunter | **28,2** | 69,7 | 9,8 | 3 / 6 / 91 % |
+
+Graine 2 (1 200) : Rogue 28,4, Priest 28,6. Clé +1 : Rogue 19,3, Priest 23,7 (`heuristic` 69,3 et 70,8). Les six
+autres zones tournent (règles de zone, épiques ; 200 expéditions chacune à `zones=N-1 level=7` : 16 à 31 %). Son
+jeu hors combat seul coûte ≈ 12 points (`bot=human fightbot=heuristic` : Rogue 60,5 au lieu de 72,3).
+
+Où il perd, comparé au joueur : comme lui au boss d'abord, puis aux élites des étapes 3 à 6 et aux combats
+normaux avec un Mystic (son « Watch » n'affiche pas de dégâts : 87–94 % de victoires contre ces groupes, 97–100 %
+contre les autres ; trois des quatre défaites du joueur en combat normal). Mais le joueur perd à peu près autant
+avant le boss qu'au boss (5 défaites sur 14 au boss, toutes classes et clés), le bot `human` 10 à 30 % avant le
+boss selon la classe : les classes qui se soignent ou étourdissent (Priest, Hunter) arrivent presque toujours
+entières au boss. Le journal est minuscule et mêle plusieurs équilibrages (Priest à 65 PV max avant le 12/11) :
+les défaites du joueur aux élites ne se reproduisent qu'en partie.
+
+Usage : `bot=human` est désormais la référence de la difficulté ressentie (une zone ou une clé « trop dure » se
+juge avec lui) ; `bot=heuristic` reste l'instrument des comparaisons fines entre cartes, classes et zones (il est
+inchangé : mêmes résultats à graine égale avant et après l'ajout).
+
