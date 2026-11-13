@@ -624,19 +624,19 @@ gnomes 12940 / 6973, nains de Forgefer 3411 / 3422, aubergiste 3047 (Plugger).
 
 | Ennemi | PV | Coups |
 |---|---|---|
-| Firebrand Grunt | 26–29 | Hack 11, Sunder Armor 5 + Sundered 1 |
+| Firebrand Grunt | 26–29 | Hack 13, Sunder Armor 5 + Sundered 1 |
 | Rookery Whelp (sbire : 7–8) | 13–15 | Bite 4 ; Strength 1 à la mort d'un autre |
-| Anvilrage Guardsman | 36–40 | Shield Bash 7 (interrompt), Guard 10, Strike 8 × 2 ; phase : Shield Wall 15, Shield Slam 8 + 6 Absorb |
-| Anvilrage Medic | 21–23 | Heal 8 (≥ 8 manquants), Holy Smite 7 ; phase : Desperate Prayer (soin 10) |
-| Blazing Fireguard | 27–30 | Flame Lash 10, Fire Nova 4 + DoT 2 ; phase : Fire Shield 2 |
-| Firebrand Pyromancer | 24–27 | Fireball (Cast) 20, Scorch 5 (interrompt) ; phase : Flamestrike (Cast) 12 + DoT 3 |
-| Blackhand Veteran | 35–38 | Strike 12, Shield Bash 6 (interrompt), Battle Shout ; phase : Strength 3, Whirlwind 6 × 2 |
-| Rage Talon Dragonspawn | 36–39 | Cleave 14, Thunderclap 6 + Demoralized 1 ; phase : Bellowing Roar (Sundered 2, Demoralized 2) |
-| Rookery Hatcher | 32–35 | Strike 11, Tend Eggs 8 ; phase : 2 Rookery Whelps |
-| Panzor | 96 (Invincible : 10 au plus par coup) | Stomp 8 × 2, Pulverize 18 (interrompt), Overheat Strength 2 ; 50 % : Rampage 6 × 3, +25 % subis |
-| Gyth / Rend | 104 | Flame Breath 11 + DoT 3, Knock Away 13, Corrosive Acid 6 + Sundered 2, Freeze 5 ; 50 % : Strength 2, Cleave 13, Whirlwind 6 × 3, Mortal Strike 20 |
-| Vaelastrasz | 200 (80 au départ) | Flame Breath 11 + DoT 3, Burning Adrenaline 2, Cleave 20 ; 15 % : Fire Nova 7 × 2 |
-| Nefarius / Nefarian | 120 | Shadow Bolt (Cast) 22, Volley 7 × 2, Fear 5 + Demoralized 2, Dark Mending 8 ; 75 % : Shadow Flame (Cast) 24 + DoT 3, Tail Sweep 11 × 2, Veil of Shadow 6 + Veil 4, Class Call (2 tours ; Called Out 1, Broken Bow 3) ; 25 % : Strength 3, Fury 3 (Strength 10), Bellowing Roar 7 × 2, Cleave 20 |
+| Anvilrage Guardsman | 36–40 | Shield Bash 7 (interrompt), Guard 10, Strike 9 × 2 ; phase : Shield Wall 15, Shield Slam 8 + 6 Absorb |
+| Anvilrage Medic | 21–23 | Heal 8 (≥ 8 manquants), Holy Smite 8 ; phase : Desperate Prayer (soin 10) |
+| Blazing Fireguard | 27–30 | Flame Lash 12, Fire Nova 4 + DoT 2 ; phase : Fire Shield 2 |
+| Firebrand Pyromancer | 24–27 | Fireball (Cast) 22, Scorch 5 (interrompt) ; phase : Flamestrike (Cast) 12 + DoT 3 |
+| Blackhand Veteran | 35–38 | Strike 13, Shield Bash 6 (interrompt), Battle Shout ; phase : Strength 3, Whirlwind 6 × 2 |
+| Rage Talon Dragonspawn | 36–39 | Cleave 16, Thunderclap 6 + Demoralized 1 ; phase : Bellowing Roar (Sundered 2, Demoralized 2) |
+| Rookery Hatcher | 32–35 | Strike 12, Tend Eggs 8 ; phase : 2 Rookery Whelps |
+| Panzor (Indomitable) | 110 (Invincible : 8 au plus par coup) | Stomp 5 × 2, Pulverize 11 (interrompt), Overheat Strength 1 ; 50 % : Rampage 4 × 3, +25 % subis |
+| Gyth / Rend (Indomitable) | 106 | Flame Breath 8 + DoT 2, Knock Away 7, Corrosive Acid 5 + Sundered 1, Freeze 4 ; 50 % : Strength 1, Cleave 9, Whirlwind 4 × 3, Mortal Strike 12 |
+| Vaelastrasz (Indomitable) | 200 (90 au départ) | Flame Breath 9 + DoT 2, Burning Adrenaline 2, Cleave 13 ; 15 % : Fire Nova 6 × 2 |
+| Nefarius / Nefarian | 138 | Shadow Bolt (Cast) 22, Volley 7 × 2, Fear 5 + Demoralized 2, Dark Mending 8 ; 75 % : Shadow Flame (Cast) 24 + DoT 3, Tail Sweep 11 × 2, Veil of Shadow 6 + Veil 4, Class Call (2 tours ; Wild Polymorph, Called Out et Broken Bow 1) ; 25 % : Strength 3, Fury 3 (Strength 10), Bellowing Roar 7 × 2, Cleave 20 |
 | Red / Blue Drakonid | 10 | Claw 8, Breath 3 + DoT 2 / Demoralized 1 |
 | Bone Construct | 8 | Bone Strike 7 |
 
@@ -697,3 +697,49 @@ son avance vient d'avant le boss (il l'atteint 9 fois sur 10, le Warrior 7 sur 1
 levier sur l'étourdissement sans changer le concept des élites. Sans épique, les classes gagnent 19 à 28 %
 (voulu). PV perdus par combat normal au-dessus des cibles par classe pour le Priest (12,3 sur 36 PV) et le
 Warrior (12,8 sur 74) : déjà au-dessus avant la passe (10,0 et 10,2).
+
+### Indomitable sur les élites (décision du joueur, 14/11/2026)
+
+Panzor, Gyth / Rend et Vaelastrasz portent **Indomitable** : ils ne peuvent pas être étourdis, comme les boss.
+Champ de définition `indomitable = true`, lu par `Combat.stunImmune` (socle : boss ou ennemi indomitable),
+là où l'immunité des boss était testée ; badge « Indomitable » (survol `Can't be Stunned.`) dans la vue de zone,
+sous l'intention, à côté de « Max N » de Panzor. Les Fireguards du Molten Core (combat d'élite d'une rencontre)
+sont des ennemis normaux : ils restent étourdissables.
+
+Effet brut (1 500 expéditions, nombres de la passe précédente) : Priest 49,0 → 47,8 ; Warrior 49,1 → 49,0 ;
+Mage 46,5 → **39,8** ; Rogue 54,3 → 52,8 ; Hunter 54,1 → **31,9** (élites 95 → 73 %, Rend 56 %). Freezing
+Trap était toute la défense du Hunter contre les élites ; un essai avec les dégâts des élites divisés par deux
+remontait ses élites à 95 % : le levier est bien la quantité de dégâts des élites, pas leurs PV.
+
+Réglage (nombres finaux dans le tableau plus haut) :
+- **Élites : environ −35 % de dégâts, plus de PV.** Panzor 110 PV, Stomp 5 × 2, Pulverize 11, Overheat 1,
+  Rampage 4 × 3, plafond d'Invincible 10 → 8 (il retient le Warrior, peu le Hunter) ; Gyth 106 PV, Flame Breath
+  8 + DoT 2, Knock Away 7, Corrosive Acid 5 + Sundered 1, Freeze 4 ; Rend Strength 1, Cleave 9, Whirlwind 4 × 3,
+  Mortal Strike 12 ; Vaelastrasz 45 % au départ (90 PV), Flame Breath 9 + DoT 2, Cleave 13, Fire Nova 6 × 2. Les
+  classes à défense propre (Priest, Warrior, Rogue) gagnaient déjà 92–97 % des élites : la baisse profite
+  surtout au Hunter et au Mage.
+- **Normaux : +1 ou +2 aux coups** (Hack 13, Strike 9 × 2, Holy Smite 8, Flame Lash 12, Fireball 22, Strike 13,
+  Cleave 16, Strike 12) : ce qui pèse le plus sur Priest et Warrior (ils les finissent en 4 à 5 tours), le moins
+  sur le Hunter, qui y garde Freezing Trap.
+- **Nefarian : 138 PV** (avant 120), coups inchangés.
+- **Class Call** : Broken Bow −5 sur 3 tours → **−2 sur 1 tour** (il compensait l'avance du Hunter aux élites,
+  qui n'existe plus) ; Wild Polymorph **1 tour** (le Mage était le plus bas) ; Berserker Stance 2 tours (3
+  tours : aucun effet mesurable) ; Called Out inchangé (sans Parry ni Stealth, 1 tour).
+
+| Classe | Avant Indomitable | Indomitable seul | Final | PV perdus / normal | Élites | Boss : victoires, tours, PV perdus |
+|---|---|---|---|---|---|---|
+| Priest | 49,0 | 47,8 | **48,1** | 14,7 | 98,4 % | 54 %, 8,5, 37 |
+| Warrior | 49,1 | 49,0 | **52,5** | 14,7 | 97,1 % | 57 %, 7,3, 44 |
+| Mage | 46,5 | 39,8 | **47,5** | 9,3 | 95,2 % | 54 %, 6,5, 25 |
+| Rogue | 54,3 | 52,8 | **52,9** | 10,8 | 95,9 % | 59 %, 6,9, 29 |
+| Hunter | 54,1 | 31,9 | **47,5** | 8,8 | 91,3 % | 55 %, 5,9, 25 |
+| moyenne / écart | 50,6 / 7,8 | 44,3 / 20,9 | **49,7 / 5,4** | | | |
+
+Ce qui reste :
+- Nefarian est de loin le combat le plus dur (54–59 % de victoires, contre 91–98 % aux élites).
+- PV perdus par combat normal : Priest 14,7 sur 36 PV et Warrior 14,7 sur 74, au-dessus des cibles par classe
+  (`decisions.md`) ; c'est le prix du resserrement entre classes.
+- Kidney Shot (épique du Rogue) pose Demoralized aux boss mais tente Stunned sur un élite Indomitable, sans
+  effet : `bossOrStun` (`Core/Classes/rogue.lua`, fichier de classe, non touché) ne teste que `t.boss`. À
+  passer par `Combat.stunImmune` dans le lot du Rogue. Même chose pour le bibelot qui étourdit un ennemi au
+  hasard au début du combat (`Data/Relics.lua`, « not a boss »).

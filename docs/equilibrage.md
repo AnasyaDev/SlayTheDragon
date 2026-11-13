@@ -830,3 +830,13 @@ Strength 1 par Shield Block (2), Ember Worgs 5 PV et Bite 3 (ils coûtaient 6 po
 et normaux un peu plus robustes. 85 % des défaites ont lieu au boss. Reste : Hunter à 98,5 % contre les élites,
 Priest à 9,2 PV par combat normal (26 % de ses PV). Nombres, essais écartés et tableau par classe :
 `docs/zones/steppes.md`, « Passe de difficulté ».
+### Blackrock Mountain : Indomitable sur les élites (14/11/2026)
+
+Décision du joueur : les élites de Blackrock Mountain sont immunisés à Stunned (trait « Indomitable »,
+`Combat.stunImmune`). Effet brut : Hunter 54,1 → 31,9 (Freezing Trap ne protège plus des élites), Mage 46,5 →
+39,8 ; moyenne 44,3, écart 20,9. Réglage par les nombres de la zone seulement : dégâts des élites environ −35 %
+avec plus de PV, normaux +1 ou +2 aux coups, Nefarian 138 PV, Broken Bow −2 sur 1 tour, Wild Polymorph 1 tour,
+plafond d'Invincible 8. Résultat (1 500 expéditions) : Priest 48,1 ; Warrior 52,5 ; Mage 47,5 ; Rogue 52,9 ;
+Hunter 47,5 ; moyenne **49,7**, écart **5,4**. PV perdus par combat normal : 14,7 / 14,7 / 9,3 / 10,8 / 8,8.
+Détail : `docs/zones/blackrock.md`, « Indomitable sur les élites ».
+

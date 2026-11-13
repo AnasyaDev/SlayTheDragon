@@ -115,6 +115,10 @@ local function body(T)
   check("Panzor : badge « Max " .. ns.Enemies.panzor.maxHit .. " » sous l'intention, infobulle d'Invincible",
     b1 and vis(b1) and b1.text._text == "Max " .. ns.Enemies.panzor.maxHit and (b1.tip or ""):find("Invincible", 1, true) ~= nil,
     b1 and tostring(b1.text._text))
+  local b2 = sp and sp.badges[2]
+  check("Panzor : badge « Indomitable » (Can't be Stunned.)",
+    b2 and vis(b2) and b2.text._text == "Indomitable" and b2.tip == "Can't be Stunned.",
+    b2 and tostring(b2.text._text))
   snap("zone-blackrock-panzor", true)
 
   -- Combat final (même expédition : combat de boss lancé directement)
