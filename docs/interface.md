@@ -395,7 +395,7 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 - `W.button` : bouton rouge (128-RedButton) ou, style `"gold"`, rouge et or (128-GoldRedButton, action
   principale) ; libellé doré (NORMAL_FONT_COLOR) ; survol : surbrillance sans échelle (voir « Survols ») ;
   `SetSelected` tient le liseré (classe choisie). `W.roundButton("×")` / `W.closeButton` : bouton de
-  fermeture rouge ; autre glyphe : petit bouton rouge (pages de la grille).
+  fermeture rouge ; autre glyphe : petit bouton rouge (plus employé depuis la grille du deck défilante).
 - `W.check` (checkbox-minimal, coche jaune), `W.slider` (Minimal_SliderBar : rail, poignée, flèches = un
   cran, clic ou glisser sur le rail), `W.slotOn` (case de barre d'action : fond, icône, cadre, cadre doré au
   survol ; cadre teint à la qualité d'un bibelot), `W.iconButton` (case, ou icône dans le grand anneau),
@@ -1186,12 +1186,29 @@ Les autres cartes ne changent que par leurs retours de clause (mots de la plaque
   l'écran (sous le bandeau), titre court « Deck · 18 cartes » / « Pioche · … » / « Défausse · … » /
   « Consumées · … », grille de vraies cartes (`W.card`, 8 par rangée, 3 rangées visibles, ×0,72),
   triées par type (Sort offensif, Sort, Pouvoir), coût, nom (puis non améliorée avant améliorée) ;
-  améliorées en vert comme ailleurs. Molette : une rangée par cran (indicateur à droite si ça déborde).
+  améliorées en vert comme ailleurs. Molette : une rangée par cran (indicateur à droite si ça déborde) ;
+  défilement partagé avec la grille du deck (`RowScroll`, voir « Grille du deck défilante »).
   Fermeture : clic hors du panneau (voile), clic droit sur une carte, « Fermer », nouveau clic sur ce
   qui l'a ouvert, ou `Échap` qui ferme la fenêtre entière. Accès : tas du deck du plateau (récompense, feu de camp, marchand,
   grilles) et deck du bandeau (dos de carte et nombre), désormais **aussi en combat** (deck complet) ; en combat,
   clic sur la pioche (**toujours triée**, jamais l'ordre de tirage), la défausse, et le nouveau tas
   violet des **consumées** (x 151–187, affiché dès qu'il y en a une).
+- **Grille du deck défilante** (écran `deck` de `UI/Screens.lua` : amélioration ou copie d'une rencontre,
+  méditation au feu de camp, retrait chez le marchand ; 14/11/2026, remplace les pages à flèches « < » « > ») :
+  8 cartes par rangée à ×0,75, 2 rangées visibles dans le panneau ; au-delà de 16 cartes, la molette (sur
+  l'écran, le panneau ou une carte) avance d'une rangée par cran. Mécanisme commun avec le panneau des cartes :
+  `RowScroll` (haut de `UI/Screens.lua` : `new(panel, parRangée, rangées, réserve, layout)`, `Hook`, `SetCount`,
+  `First`, `Scroll`, `PlaceBar`). Défilement **par rangées entières** : les cartes hors de la fenêtre sont
+  cachées, aucune n'est rognée, donc aucune moitié de carte ne capte la souris hors du panneau, et le halo, la
+  carte au premier plan et l'aperçu à taille réelle restent entiers. Indicateur commun aux deux écrans : rail
+  sombre et curseur doré au bord droit du panneau, seulement si tout ne tient pas (16 cartes ou moins : rien ne
+  change à l'œil). Carte survolée pendant un cran : sa sortie puis son entrée sont rejouées, l'aperçu de
+  l'amélioration (`Deck:Preview`), l'aperçu à taille réelle et l'infobulle suivent la nouvelle carte. Position
+  gardée tant que l'étape est la même (rafraîchissement, fenêtre fermée puis rouverte) ; en haut pour une
+  nouvelle étape (autre titre ou sorte, ou écran quitté entre-temps : `Deck:OnHide`). Harnais : section UDP
+  (deck de 28 cartes : molette, carte de la 3e rangée choisie au clic souris réel `H.mouseClick`, feu de camp
+  et marchand jusqu'à la dernière rangée, aucune carte hors du panneau, position gardée après `UI.refresh()`,
+  retour en haut après « Back » ; aperçus `grille-deck-defilante-haut` / `-bas`) ; U19 pour le panneau des cartes.
 - **Paysages** : voir « Fonds embarqués » plus bas. Chaque décor affiche **par défaut, sans
   validation**, une illustration embarquée dans l'addon (`Media/Backgrounds/*.tga`) ; le décor peint
   reste dessous en repli et `/slay decor peint` y revient. Les anciens candidats du client (FileDataID,
@@ -1418,7 +1435,7 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `campfire` | **Feu de camp** | décor de nuit, modèle 3D d'un feu de camp du jeu (`Art.campfire`, lueur orange au sol, médaillon du feu de camp en repli), couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
-| `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 80 % (16 par page, flèches) ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
+| `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 75 % (8 par rangée, 2 rangées visibles, défilement à la molette au-delà de 16 : « Grille du deck défilante ») ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
 | `transit` | **Entre deux zones** (`transit`) | décor de la zone suivante, héros ; panneau : nom de la zone, pastilles de la campagne, soin du passage, déblocages du boss vaincu ; « Continue » |
 | `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), jusqu'où (zone atteinte, zones battues), déblocages des boss battus regroupés (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
 | vue méta | **Journal** (« Log ») | barre du niveau de la classe, boss battus, zone la plus loin, 8 dernières expéditions (zone atteinte, boss battus) ; « Retour » |

@@ -2258,16 +2258,16 @@ do
     and math.abs(upShown.name._calls.SetTextColor[2] - H.ns.Art.C.upGreen[2]) < 1e-9)
   check("plus de cartes que de places : défilement possible", Dv:MaxOffset() > 0, Dv:MaxOffset())
   run(Dv.panel, "OnMouseWheel", -1)
-  check("molette : une rangée plus bas", Dv.offset == 1)
+  check("molette : une rangée plus bas", Dv.scroll.offset == 1)
   for _ = 1, 10 do run(Dv.cards[1], "OnMouseWheel", -1) end
   local last = Dv.list[#Dv.list]
   local lastShown = false
   for _, cd in ipairs(Dv.cards) do
     if cd._shown and cd.cardId == last.id and (cd.cardUp or false) == (last.up or false) then lastShown = true end
   end
-  check("molette jusqu'au bout : dernière carte visible", Dv.offset == Dv:MaxOffset() and lastShown)
+  check("molette jusqu'au bout : dernière carte visible", Dv.scroll.offset == Dv:MaxOffset() and lastShown)
   run(Dv.frame, "OnMouseWheel", 5)
-  check("molette vers le haut", Dv.offset == Dv:MaxOffset() - 1)
+  check("molette vers le haut", Dv.scroll.offset == Dv:MaxOffset() - 1)
   local prop = H.key("1")
   check("panneau ouvert : la touche 1 va au jeu, rien ne change", prop == true and Dv:IsShown()
     and currentKind() == "map")
@@ -10632,9 +10632,11 @@ do
   end
 end
 
-print("UDP grille du deck à plusieurs pages : flèches cliquées par le chemin de la souris (rencontre, feu de camp, marchand)")
+print("UDP grille du deck défilante : molette, rangées cachées, clic souris réel (rencontre, feu de camp, marchand)")
 do
-  -- deck de 20 cartes améliorables au moins : copies non améliorées d'une carte qui s'améliore
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  -- deck de n cartes améliorables au moins : copies non améliorées d'une carte qui s'améliore
   local function bigDeck(e, n)
     local id
     for _, c in ipairs(e.deck) do if H.ns.Cards[c.id].up ~= nil and H.ns.Cards[c.id].rarity ~= "epic" then id = c.id end end
@@ -10645,90 +10647,164 @@ do
     for i = 1, #s.cards do if s.cards[i]._shown and s.cards[i].option then out[#out + 1] = s.cards[i] end end
     return out
   end
-  -- page affichée : cartes visibles = options de la page, dans l'ordre
-  local function onPage(s, p)
+  -- fenêtre affichée : cartes visibles = options de la rangée off + 1 et suivantes (16 au plus), dans l'ordre
+  local function atRow(s, off)
     local cards = visCards(s)
-    local want = math.min(16, #s.cardOptions - (p - 1) * 16)
-    if s.page ~= p or #cards ~= want then return false end
+    local first = off * 8
+    local want = math.min(16, #s.cardOptions - first)
+    if s.scroll.offset ~= off or #cards ~= want then return false end
     for i, c in ipairs(cards) do
-      local o = s.cardOptions[(p - 1) * 16 + i]
+      local o = s.cardOptions[first + i]
       if c.option ~= o or c.cardId ~= o.card.id then return false end
     end
     return true
   end
-  -- tout ce qui se clique sur l'écran (flèches visibles, cartes, boutons) a la souris à son centre, seul
+  -- indicateur : rail et curseur montrés, curseur en haut (off 0) ou en bas (dernière rangée)
+  local function bar(s)
+    if not (s.scroll.track._shown and s.scroll.thumb._shown) then return "absent" end
+    local t, b = R.rect(s.scroll.track), R.rect(s.scroll.thumb)
+    -- (rectangles du rendu : y vers le haut, r[4] = bord du haut)
+    if math.abs(b[4] - t[4]) < 0.5 then return "haut" end
+    if math.abs(b[2] - t[2]) < 0.5 then return "bas" end
+    return "milieu"
+  end
+  -- tout ce qui se clique (cartes visibles, boutons) a la souris à son centre, seul ; aucune carte ne sort
+  -- du panneau (ni ne capte donc la souris hors de lui) ; sous et au-dessus du panneau, aucune carte
   local function reachable(s)
     local bad = {}
     local list = {}
     for _, c in ipairs(visCards(s)) do list[#list + 1] = c end
     for _, b in ipairs(s.buttons) do if b._shown then list[#list + 1] = b end end
-    if s.prev._shown then list[#list + 1] = s.prev end
-    if s.next._shown then list[#list + 1] = s.next end
-    local R = dofile(root .. "/Sim/ui_render.lua")
-    R.H = H
     for _, o in ipairs(list) do
       local r = R.rect(o)
       local focus, ties = H.mouseFocus((r[1] + r[3]) / 2, (r[2] + r[4]) / 2)
-      if focus ~= o or #ties > 0 then
-        bad[#bad + 1] = (o == s.prev and "<" or o == s.next and ">" or (o.option and o.option.id) or "?")
-          .. " (" .. #ties .. " ex aequo)"
+      if focus ~= o or #ties > 0 then bad[#bad + 1] = ((o.option and o.option.id) or "?") .. " (" .. #ties .. " ex aequo)" end
+    end
+    local p = R.rect(s.panel)
+    for _, c in ipairs(s.cards) do
+      if c:IsVisible() then
+        local r = R.rect(c)
+        if r[1] < p[1] or r[3] > p[3] or r[2] < p[2] or r[4] > p[4] then
+          bad[#bad + 1] = "carte hors du panneau " .. tostring(c.option and c.option.id)
+        end
+        for _, y in ipairs({ p[2] - 4, p[4] + 4 }) do
+          local focus = H.mouseFocus((r[1] + r[3]) / 2, y)
+          if focus and focus.cardId and focus.option then bad[#bad + 1] = "carte sous la souris hors du panneau" end
+        end
       end
     end
     return bad
   end
+  local function wheel(obj, d) run(obj, "OnMouseWheel", d) end
 
-  -- 1. rencontre « The Frog in the Satchel » : améliorer une carte au choix
-  local e = freshRun(SEED + 41, "event")
-  bigDeck(e, 20)
+  -- 0. 16 cartes ou moins : rien ne défile, rien de nouveau à l'œil
+  local e = freshRun(SEED + 42, "campfire")
+  UI().refresh()
+  clickOption("ui:upgrade")
+  local s = UI().current
+  check("deck de départ (feu de camp) : 16 options ou moins, pas de défilement ni d'indicateur",
+    s == UI().screens.deck and #s.cardOptions <= 16 and s.scroll:MaxOffset() == 0 and bar(s) == "absent"
+    and atRow(s, 0), #s.cardOptions)
+  wheel(s.panel, -1)
+  check("16 cartes ou moins : la molette ne bouge rien", atRow(s, 0))
+  check("plus de flèches de page", s.prev == nil and s.next == nil and s.page == nil)
+
+  -- 1. rencontre « The Frog in the Satchel » : améliorer une carte au choix, deck de 28 cartes
+  e = freshRun(SEED + 41, "event")
+  bigDeck(e, 28)
   H.ns.Expedition.openEvent(e, "hexed_partner")
   UI().refresh()
   check("rencontre forcée : The Frog in the Satchel", currentKind() == "event" and UI().step.title == "The Frog in the Satchel",
     UI().step.title)
   clickOption("choose:2")
-  local s = UI().current
+  s = UI().current
   check("étape de sélection (améliorer) sur la grille du deck, plus de 16 cartes",
     currentKind() == "select" and s == UI().screens.deck and #s.cardOptions > 16, #s.cardOptions)
-  check("page 1 : « > » seule, 16 cartes", onPage(s, 1) and s.next._shown and not s.prev._shown)
+  check("en haut : rangées 1 et 2 (16 cartes), indicateur montré, curseur en haut",
+    atRow(s, 0) and bar(s) == "haut" and s.scroll:MaxOffset() >= 1, bar(s))
   local bad = reachable(s)
-  check("page 1 : flèche, cartes et boutons ont la souris à leur centre (aucun cadre au même niveau)",
+  check("en haut : cartes et boutons ont la souris à leur centre, aucune carte hors du panneau",
     #bad == 0, table.concat(bad, ", "))
-  local ok, why = H.mouseClick(s.next)
-  check("clic sur « > » reçu par la flèche", ok, why)
-  check("page 2 : cartes 17 et suivantes, « < » seule", onPage(s, 2) and s.prev._shown and not s.next._shown,
-    s.page)
+  snap("grille-deck-defilante-haut", true)
+  wheel(s.panel, -1)
+  check("molette sur le panneau : une rangée plus bas", atRow(s, 1) and bar(s) ~= "absent", s.scroll.offset)
+  wheel(s.panel, 1)
+  check("molette vers le haut : retour en haut", atRow(s, 0))
+  -- survol pendant le défilement : la carte sous la souris change, l'aperçu suit la nouvelle carte
+  local hc = visCards(s)[2]
+  run(hc, "OnEnter")
+  local before = hc.option
+  wheel(hc, -1)
+  local pv = H.ns.Widgets.preview
+  check("molette sur une carte survolée : nouvelle option sous la souris, survol et aperçu sur elle",
+    atRow(s, 1) and hc.option ~= before and hc.hover and pv and pv.of == hc and pv.cardId == hc.cardId,
+    tostring(hc.option and hc.option.id))
+  run(hc, "OnLeave")
+  for _ = 1, 10 do wheel(s.frame, -1) end
+  local maxOff = s.scroll:MaxOffset()
+  check("molette jusqu'au bout (sur l'écran) : dernière rangée, curseur en bas", atRow(s, maxOff) and bar(s) == "bas",
+    s.scroll.offset)
   bad = reachable(s)
-  check("page 2 : flèche, cartes et boutons ont la souris à leur centre", #bad == 0, table.concat(bad, ", "))
+  check("défilé : cartes et boutons ont la souris à leur centre, aucune carte hors du panneau",
+    #bad == 0, table.concat(bad, ", "))
+  snap("grille-deck-defilante-bas", true)
   UI().refresh()
-  check("rafraîchissement de l'écran : page 2 gardée", onPage(s, 2), s.page)
-  ok, why = H.mouseClick(s.prev)
-  check("clic sur « < » : retour à la page 1", ok and onPage(s, 1), why or s.page)
-  ok, why = H.mouseClick(s.next)
-  check("de nouveau « > » : page 2", ok and onPage(s, 2), why or s.page)
-  local card = visCards(s)[1]
-  local oid = card.option.id
-  local idx = tonumber(oid:match("^select:(%d+)$"))
-  local shown = H.ns.Expedition.shownDeck(e)[idx]
-  local before = e.deck[idx] and e.deck[idx].up
-  ok, why = H.mouseClick(card)
-  check("carte de la page 2 cliquée : c'est la carte du deck affichée qui est améliorée",
-    ok and idx and idx > 16 and card.cardId == shown.id and not before and e.deck[idx].up == true
+  check("rafraîchissement de l'écran : position gardée", atRow(s, maxOff), s.scroll.offset)
+  wheel(s.panel, 1)
+  check("une rangée plus haut : 3e rangée en bas de la fenêtre", atRow(s, 1), s.scroll.offset)
+  -- carte de la 3e rangée (option 17 et suivantes), choisie par la souris
+  local card
+  for _, c in ipairs(visCards(s)) do if c.option == s.cardOptions[17] then card = c end end
+  local oid = card and card.option.id
+  local idx = oid and tonumber(oid:match("^select:(%d+)$"))
+  local shownCard = idx and H.ns.Expedition.shownDeck(e)[idx]
+  local wasUp = idx and e.deck[idx].up
+  local ok, why = H.mouseClick(card)
+  check("carte de la 3e rangée cliquée à la souris : c'est la carte du deck affichée qui est améliorée",
+    ok and idx and idx > 16 and card.cardId == shownCard.id and not wasUp and e.deck[idx].up == true
     and currentKind() ~= "select", tostring(why) .. " " .. tostring(oid) .. " " .. tostring(currentKind()))
 
-  -- 2. feu de camp (méditation) et 3. marchand (retrait) : même grille, mêmes flèches
-  for _, case in ipairs({ { "campfire", "ui:upgrade" }, { "merchant", "ui:remove" } }) do
+  -- 2. feu de camp (méditation) et 3. marchand (retrait) : même grille, même défilement
+  for _, case in ipairs({ { "campfire", "ui:upgrade", "upgrade" }, { "merchant", "ui:remove", "remove" } }) do
     e = freshRun(SEED + 42, case[1])
-    bigDeck(e, 20)
+    bigDeck(e, 28)
+    e.gold = 999
     UI().refresh()
     clickOption(case[2])
     s = UI().current
-    local many = currentKind() == "deck" and #s.cardOptions > 16
-    ok, why = H.mouseClick(s.next)
-    local p2 = ok and onPage(s, 2)
-    local ok2, why2 = H.mouseClick(s.prev)
-    check(case[1] .. " : grille à deux pages, « > » puis « < » par la souris",
-      many and p2 and ok2 and onPage(s, 1), tostring(why or why2) .. " " .. tostring(s.page))
+    check(case[1] .. " : grille de plus de 16 cartes, en haut", currentKind() == "deck" and #s.cardOptions > 16
+      and atRow(s, 0) and bar(s) == "haut", #s.cardOptions)
+    for _ = 1, 10 do wheel(visCards(s)[1], -1) end
+    maxOff = s.scroll:MaxOffset()
+    check(case[1] .. " : molette sur une carte jusqu'en bas", atRow(s, maxOff) and bar(s) == "bas", s.scroll.offset)
     bad = reachable(s)
-    check(case[1] .. " : flèche, cartes et boutons ont la souris à leur centre", #bad == 0, table.concat(bad, ", "))
+    check(case[1] .. " : cartes et boutons ont la souris à leur centre, aucune carte hors du panneau",
+      #bad == 0, table.concat(bad, ", "))
+    UI().refresh()
+    check(case[1] .. " : rafraîchissement, position gardée", atRow(s, maxOff), s.scroll.offset)
+    -- Back puis de nouveau la grille : nouvelle étape, en haut
+    H.mouseClick(button("ui:back"))
+    local away = currentKind() ~= "deck"
+    clickOption(case[2])
+    check(case[1] .. " : retour puis nouvelle grille : en haut", away and UI().current == s and atRow(s, 0),
+      s.scroll.offset)
+    for _ = 1, 10 do wheel(s.panel, -1) end
+    local vc = visCards(s)
+    card = vc[#vc]
+    oid = card.option.id
+    idx = tonumber(oid:match("^" .. case[3] .. ":(%d+)$"))
+    local inst = idx and e.deck[idx]
+    local n = #e.deck
+    ok, why = H.mouseClick(card)
+    local done
+    if case[3] == "upgrade" then
+      done = inst and inst.up == true and #e.deck == n
+    else
+      done = #e.deck == n - 1
+      for _, c in ipairs(e.deck) do if c == inst then done = false end end
+    end
+    check(case[1] .. " : dernière carte de la dernière rangée cliquée à la souris : la bonne carte du deck",
+      ok and idx and idx > 16 and card.cardId == inst.id and done, tostring(why) .. " " .. tostring(oid))
   end
 end
 

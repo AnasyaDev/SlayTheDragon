@@ -94,6 +94,80 @@ local function deckPile(f)
   return p
 end
 
+-- Défilement par rangées entières d'une grille de cartes (panneau des cartes UI.deckView, grille du deck) :
+-- `rows` rangées de `perRow` cartes visibles ; molette = une rangée par cran. Les cartes hors de la fenêtre
+-- sont cachées, jamais rognées : aucune carte à moitié visible ne capte la souris, et le halo et l'aperçu
+-- au survol restent entiers. Indicateur : rail sombre et curseur doré sur le bord droit du panneau, montrés
+-- seulement si tout ne tient pas. `layout()` repose la grille après un cran ; `cards` : la réserve de cartes
+-- de la grille (celle qui est survolée au moment du cran change de contenu sous la souris : sortie puis
+-- entrée rejouées, pour que l'aperçu et l'infobulle suivent la nouvelle carte).
+local RowScroll = {}
+RowScroll.__index = RowScroll
+
+function RowScroll.new(panel, perRow, rows, cards, layout)
+  local s = setmetatable({ offset = 0, count = 0, perRow = perRow, rows = rows, cards = cards,
+    layout = layout }, RowScroll)
+  s.track = W.rect(panel, "ARTWORK", 0, C.barTrack)
+  s.thumb = W.rect(panel, "ARTWORK", 1, C.wowGold)
+  s.track:Hide()
+  s.thumb:Hide()
+  s.wheel = function(_, delta) s:Scroll(-delta) end
+  return s
+end
+
+-- La molette sur ce cadre fait défiler la grille.
+function RowScroll:Hook(frame)
+  frame:EnableMouseWheel(true)
+  frame:SetScript("OnMouseWheel", self.wheel)
+end
+
+function RowScroll:Rows() return math.ceil(self.count / self.perRow) end
+function RowScroll:MaxOffset() return max(0, self:Rows() - self.rows) end
+-- Rang (base 0) de la première carte visible.
+function RowScroll:First() return self.offset * self.perRow end
+
+-- Nombre de cartes de la liste ; position bornée (gardée si elle tient encore). reset : retour en haut.
+function RowScroll:SetCount(n, reset)
+  self.count = n
+  if reset then self.offset = 0 end
+  self.offset = max(0, min(self.offset, self:MaxOffset()))
+end
+
+-- delta > 0 : vers le bas (une rangée par cran).
+function RowScroll:Scroll(delta)
+  local off = max(0, min(self:MaxOffset(), self.offset + (delta > 0 and 1 or -1)))
+  if off == self.offset then return end
+  local hovered = {}
+  for _, c in ipairs(self.cards) do
+    if c.hover and c:IsShown() then
+      hovered[#hovered + 1] = c
+      local leave = c:GetScript("OnLeave")
+      if leave then leave(c) end
+    end
+  end
+  self.offset = off
+  self.layout()
+  for _, c in ipairs(hovered) do
+    local enter = c:GetScript("OnEnter")
+    if enter and c:IsShown() then enter(c) end
+  end
+end
+
+-- Indicateur : rail de hauteur h à (x, y) du panneau (coordonnées du panneau), curseur proportionnel.
+function RowScroll:PlaceBar(panel, x, y, h)
+  local maxOff = self:MaxOffset()
+  if maxOff == 0 then
+    self.track:Hide()
+    self.thumb:Hide()
+    return
+  end
+  local thumbH = max(24, h * self.rows / self:Rows())
+  at(self.track, panel, x, y, 6, h)
+  at(self.thumb, panel, x, y + (h - thumbH) * self.offset / maxOff, 6, thumbH)
+  self.track:Show()
+  self.thumb:Show()
+end
+
 -- Réponse (rencontre, bibelot, feu de camp) à la façon B : gros bouton rouge du jeu portant le libellé
 -- (icône de l'objet dans une case à gauche), et sous le bouton ce que la réponse donne ou coûte (vert
 -- pour un gain, rouge pour une perte ou la raison d'un refus). Survol : liseré d'or, bouton éclairci,
@@ -1146,19 +1220,27 @@ end
 local Deck = { kinds = { "deck", "select" } }
 UI.register("deck", Deck)
 
-local PER_PAGE, PER_ROW, GRID_SCALE = 16, 8, 0.75
+-- 8 cartes par rangée, 2 rangées visibles ; au-delà, la grille défile à la molette (RowScroll, comme le
+-- panneau des cartes) : 16 cartes ou moins, rien ne défile.
+local PER_ROW, GRID_ROWS, GRID_SCALE = 8, 2, 0.75
+local GRID_SLOTS = PER_ROW * GRID_ROWS
 local GRID_TOP, GRID_GAPY = 100, 28 -- haut du corps de la 1re rangée ; écart (languette et plaque du bas)
+local GRID_X, GRID_Y, GRID_W, GRID_H = 16, 58, 1002, 358 -- panneau
 
 function Deck:Build(f)
   local panel = W.dialog(f, "", 16)
-  at(panel, f, 16, 58, 1002, 358)
+  at(panel, f, GRID_X, GRID_Y, GRID_W, GRID_H)
   self.panel = panel
   self.title = panel.title
   self.cards = {}
-  for i = 1, PER_PAGE do
+  self.scroll = RowScroll.new(panel, PER_ROW, GRID_ROWS, self.cards, function() self:Layout() end)
+  self.scroll:Hook(f)
+  self.scroll:Hook(panel)
+  for i = 1, GRID_SLOTS do
     local c = W.card(f)
     c:SetFrameLevel(panel:GetFrameLevel() + 5)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
+    self.scroll:Hook(c)
     -- survol : halo et aperçu à taille réelle (petite carte, W.cardPreviewShow) + aperçu de l'amélioration
     local enter, leave = c.onEnterExtra, c.onLeaveExtra
     c.onEnterExtra = function(card) enter(card) Deck:Preview(card) end
@@ -1166,16 +1248,6 @@ function Deck:Build(f)
     c:Hide()
     self.cards[i] = c
   end
-  -- Flèches de page : posées sur le panneau (qui capte la souris), donc à un niveau explicitement
-  -- au-dessus de lui et des cartes levées (panneau + 5 + case + 40) ; au même niveau que le panneau (leur
-  -- niveau par défaut), le client ne garantissait pas qui recevait le clic : « > » restait sans effet.
-  local arrowLevel = panel:GetFrameLevel() + 5 + PER_PAGE + 50
-  self.prev = W.roundButton(f, "<", 30, 1, nil, function() self.page = self.page - 1 self:Layout() end)
-  at(self.prev, f, 26, 220, 30, 30)
-  W.setLevel(self.prev, arrowLevel)
-  self.next = W.roundButton(f, ">", 30, 1, nil, function() self.page = self.page + 1 self:Layout() end)
-  at(self.next, f, 978, 220, 30, 30)
-  W.setLevel(self.next, arrowLevel)
   self.pile = deckPile(f)
   self.buttons = {}
   for i = 1, 2 do
@@ -1184,7 +1256,6 @@ function Deck:Build(f)
     b:Hide()
     self.buttons[i] = b
   end
-  self.page = 1
   self.optionButtons = {}
 end
 
@@ -1205,8 +1276,10 @@ function Deck:Preview(card)
   card:SetHot(up)
 end
 
+-- Position de défilement gardée tant que l'étape reste la même (rafraîchissement, fenêtre fermée puis
+-- rouverte) ; en haut pour une nouvelle étape (autre titre ou autre sorte, ou écran quitté entre-temps).
 function Deck:Show(step)
-  if not self.step or self.step.title ~= step.title or self.step.kind ~= step.kind then self.page = 1 end
+  local fresh = not self.step or self.step.title ~= step.title or self.step.kind ~= step.kind
   self.step = step
   UI.setStage({ scene = Controller.scene(), board = true, veil = 0.35 })
   self.panel:SetTitle(step.title or "")
@@ -1216,25 +1289,27 @@ function Deck:Show(step)
     local o = step.options[i]
     if o.card then self.cardOptions[#self.cardOptions + 1] = o else self.otherOptions[#self.otherOptions + 1] = o end
   end
+  self.scroll:SetCount(#self.cardOptions, fresh)
   self:Layout()
+end
+
+-- Écran quitté pour un autre (son cadre caché ; pas la fenêtre seule) : la prochaine étape repart en haut.
+function Deck:OnHide()
+  if not self.frame:IsShown() then self.step = nil end
 end
 
 function Deck:Layout()
   local list = self.cardOptions
-  local pages = max(1, math.ceil(#list / PER_PAGE))
-  if self.page > pages then self.page = pages end
-  if self.page < 1 then self.page = 1 end
-  local first = (self.page - 1) * PER_PAGE
-  local count = min(PER_PAGE, #list - first)
+  local first = self.scroll:First()
   local cw, ch = W.CARD_W * GRID_SCALE, W.CARD_H * GRID_SCALE
   local gapX = 16
-  local rowW = min(PER_ROW, count) * (cw + gapX) - gapX
+  local rowW = min(PER_ROW, #list) * (cw + gapX) - gapX -- une seule rangée incomplète : centrée
   local x0 = (Scene.W - rowW) / 2
   self.optionButtons = {}
-  for i = 1, PER_PAGE do
+  for i = 1, GRID_SLOTS do
     local card = self.cards[i]
     local o = list[first + i]
-    if o and i <= count then
+    if o then
       local col, row = (i - 1) % PER_ROW, floor((i - 1) / PER_ROW)
       card.cx = x0 + col * (cw + gapX) + cw / 2
       card.cy = GRID_TOP + row * (ch + GRID_GAPY) + ch / 2
@@ -1263,13 +1338,7 @@ function Deck:Layout()
       b:Hide()
     end
   end
-  if pages > 1 then
-    if self.page > 1 then self.prev:Show() else self.prev:Hide() end
-    if self.page < pages then self.next:Show() else self.next:Hide() end
-  else
-    self.prev:Hide()
-    self.next:Hide()
-  end
+  self.scroll:PlaceBar(self.panel, GRID_W - 22, GRID_TOP - GRID_Y, GRID_ROWS * (ch + GRID_GAPY) - GRID_GAPY)
 end
 
 ---------------------------------------------------------------------------
@@ -2314,7 +2383,7 @@ end
 -- dans l'ordre de tirage. Défilement à la molette ; fermeture par clic hors du panneau, « Fermer », ou
 -- avec la fenêtre (Échap). Aucune règle : ne fait que lire l'état.
 
-local DV = { kind = nil, offset = 0, list = {} }
+local DV = { kind = nil, list = {} }
 UI.deckView = DV
 
 local DV_X, DV_Y, DV_W, DV_H = 52, 58, 930, 540
@@ -2356,8 +2425,6 @@ function DV.source(kind)
   return c and c[kind]
 end
 
-local function wheel(_, delta) DV:Scroll(-delta) end
-
 function DV:Build()
   local content = UI.content
   local base = content:GetFrameLevel() + 110
@@ -2369,47 +2436,42 @@ function DV:Build()
   local shade = W.rect(veil, "BACKGROUND", 0, C.black, 0.5)
   shade:SetAllPoints()
   veil:SetScript("OnClick", function() DV:Close() end)
-  veil:EnableMouseWheel(true)
-  veil:SetScript("OnMouseWheel", wheel)
   veil:Hide()
   self.frame = veil
 
   local panel = W.dialog(veil, "", 16)
   at(panel, content, DV_X, DV_Y, DV_W, DV_H)
   panel:SetFrameLevel(base + 2)
-  panel:EnableMouseWheel(true)
-  panel:SetScript("OnMouseWheel", wheel)
   self.panel = panel
+  -- défilement par rangées et son indicateur (RowScroll, partagé avec la grille du deck)
+  self.cards = {}
+  self.scroll = RowScroll.new(panel, DV_ROW, DV_ROWS, self.cards, function() DV:Layout() end)
+  self.scroll:Hook(veil)
+  self.scroll:Hook(panel)
   self.title = panel.title
   self.empty = W.label(panel, "body", 14, C.textSoft)
   self.empty:SetPoint("CENTER", 0, 10)
   self.empty:SetText("No cards.")
   self.close = W.button(panel, "Close", 120, 34, function() DV:Close() end, "red", 14)
   self.close:SetPoint("BOTTOMRIGHT", -16, 14)
-  -- indicateur de défilement
-  self.track = W.rect(panel, "ARTWORK", 0, C.barTrack)
-  self.thumb = W.rect(panel, "ARTWORK", 1, C.wowGold)
 
-  self.cards = {}
   for i = 1, DV_ROW * DV_ROWS do
     local c = W.card(veil)
-    c:EnableMouseWheel(true)
-    c:SetScript("OnMouseWheel", wheel)
+    self.scroll:Hook(c)
     c:SetScript("OnClick", function(_, button) if button == "RightButton" then DV:Close() end end)
     c:Hide()
     self.cards[i] = c
   end
 end
 
-function DV:Rows() return math.ceil(#self.list / DV_ROW) end
-function DV:MaxOffset() return max(0, self:Rows() - DV_ROWS) end
+function DV:MaxOffset() return self.scroll:MaxOffset() end
 
 function DV:Layout()
   local cw, ch = W.CARD_W * DV_SCALE, W.CARD_H * DV_SCALE
   local perRow = max(1, min(DV_ROW, #self.list)) -- une seule rangée incomplète : centrée
   local rowW = perRow * (cw + DV_GAPX) - DV_GAPX
   local x0 = DV_X + (DV_W - rowW) / 2
-  local first = self.offset * DV_ROW
+  local first = self.scroll:First()
   local level = self.panel:GetFrameLevel() + 5
   for i, card in ipairs(self.cards) do
     local inst = self.list[first + i]
@@ -2425,19 +2487,7 @@ function DV:Layout()
     end
   end
   if #self.list == 0 then self.empty:Show() else self.empty:Hide() end
-  -- indicateur de défilement : seulement si tout ne tient pas
-  local maxOff = self:MaxOffset()
-  if maxOff > 0 then
-    local trackH = DV_ROWS * (ch + DV_GAPY) - DV_GAPY
-    local thumbH = max(24, trackH * DV_ROWS / self:Rows())
-    at(self.track, self.panel, DV_W - 22, DV_TOP - DV_Y, 6, trackH)
-    at(self.thumb, self.panel, DV_W - 22, DV_TOP - DV_Y + (trackH - thumbH) * self.offset / maxOff, 6, thumbH)
-    self.track:Show()
-    self.thumb:Show()
-  else
-    self.track:Hide()
-    self.thumb:Hide()
-  end
+  self.scroll:PlaceBar(self.panel, DV_W - 22, DV_TOP - DV_Y, DV_ROWS * (ch + DV_GAPY) - DV_GAPY)
 end
 
 -- Relit la source (l'état a pu changer : potion bue, combat fini…).
@@ -2448,7 +2498,8 @@ function DV:Refresh()
   self.list = DV.sorted(src)
   local n = #self.list
   self.panel:SetTitle((DV_TITLE[self.kind] or "Cards") .. " · " .. n .. " card" .. (n ~= 1 and "s" or ""))
-  if self.offset > self:MaxOffset() then self.offset = self:MaxOffset() end
+  self.scroll:SetCount(n, self.reset)
+  self.reset = false
   self:Layout()
 end
 
@@ -2457,7 +2508,7 @@ function DV:Open(kind)
   if not self.frame then self:Build() end
   if GameTooltip then GameTooltip:Hide() end
   self.kind = kind
-  self.offset = 0
+  self.reset = true
   self.frame:Show()
   self:Refresh()
   W.sound("card")
@@ -2475,14 +2526,7 @@ end
 function DV:IsShown() return self.frame ~= nil and self.frame:IsShown() and true or false end
 
 -- delta > 0 : vers le bas (une rangée par cran de molette).
-function DV:Scroll(delta)
-  local off = self.offset + (delta > 0 and 1 or -1)
-  if off < 0 then off = 0 end
-  if off > self:MaxOffset() then off = self:MaxOffset() end
-  if off == self.offset then return end
-  self.offset = off
-  self:Layout()
-end
+function DV:Scroll(delta) self.scroll:Scroll(delta) end
 
 -- Ouvre la source demandée, ou ferme si elle est déjà affichée.
 function UI.toggleDeckView(kind)
