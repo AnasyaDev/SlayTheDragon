@@ -1166,10 +1166,16 @@ function Deck:Build(f)
     c:Hide()
     self.cards[i] = c
   end
+  -- Flèches de page : posées sur le panneau (qui capte la souris), donc à un niveau explicitement
+  -- au-dessus de lui et des cartes levées (panneau + 5 + case + 40) ; au même niveau que le panneau (leur
+  -- niveau par défaut), le client ne garantissait pas qui recevait le clic : « > » restait sans effet.
+  local arrowLevel = panel:GetFrameLevel() + 5 + PER_PAGE + 50
   self.prev = W.roundButton(f, "<", 30, 1, nil, function() self.page = self.page - 1 self:Layout() end)
   at(self.prev, f, 26, 220, 30, 30)
+  W.setLevel(self.prev, arrowLevel)
   self.next = W.roundButton(f, ">", 30, 1, nil, function() self.page = self.page + 1 self:Layout() end)
   at(self.next, f, 978, 220, 30, 30)
+  W.setLevel(self.next, arrowLevel)
   self.pile = deckPile(f)
   self.buttons = {}
   for i = 1, 2 do

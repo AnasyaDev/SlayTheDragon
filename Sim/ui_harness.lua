@@ -823,6 +823,120 @@ function H.hover(obj)
   return lines
 end
 
+-- Souris, à la façon du client : sous un point de l'écran, le cadre visible de la fenêtre qui capte la
+-- souris (EnableMouse, sinon bouton ou script de souris) le plus haut (strate, puis niveau), le point
+-- étant dans son rectangle (rentré de SetHitRectInsets) et dans celui de ses ancêtres qui rognent. Deux
+-- cadres au même niveau qui se recouvrent (aucun n'étant l'ancêtre de l'autre) : le client ne garantit
+-- pas lequel reçoit la souris (le dessin et la souris peuvent même ne pas s'accorder) ; ils sont rendus
+-- comme ex aequo. Renvoie le cadre (ou nil) et la liste des ex aequo.
+local STRATA = { BACKGROUND = 1, LOW = 2, MEDIUM = 3, HIGH = 4, DIALOG = 5, FULLSCREEN = 6,
+  FULLSCREEN_DIALOG = 7, TOOLTIP = 8 }
+local MOUSE_SCRIPTS = { "OnEnter", "OnLeave", "OnMouseDown", "OnMouseUp", "OnClick" }
+local mouseRender
+local function strataOf(o)
+  while o do
+    local c = rawget(o, "_calls").SetFrameStrata
+    if c then return STRATA[c[1]] or 3 end
+    o = rawget(o, "_parent")
+  end
+  return 3
+end
+local function takesMouse(o)
+  local c = rawget(o, "_calls").EnableMouse
+  if c then return c[1] and true or false end
+  local k = rawget(o, "_kind")
+  if k == "Button" or k == "CheckButton" then return true end
+  local sc = rawget(o, "_scripts")
+  for _, s in ipairs(MOUSE_SCRIPTS) do if sc[s] then return true end end
+  return false
+end
+local function isAncestor(a, o)
+  o = rawget(o, "_parent")
+  while o do if o == a then return true end o = rawget(o, "_parent") end
+  return false
+end
+local function hitRect(o, memo)
+  local r = mouseRender.rect(o, memo)
+  if not r then return nil end
+  local ins = rawget(o, "_calls").SetHitRectInsets
+  if ins then
+    local s = o:GetEffectiveScale()
+    r = { r[1] + (ins[1] or 0) * s, r[2] + (ins[4] or 0) * s, r[3] - (ins[2] or 0) * s, r[4] - (ins[3] or 0) * s }
+  end
+  return r
+end
+local function inside(r, x, y) return r and x >= r[1] and x <= r[3] and y >= r[2] and y <= r[4] end
+function H.mouseFocus(x, y)
+  if not mouseRender then
+    mouseRender = dofile(root .. "/Sim/ui_render.lua")
+    mouseRender.H = H
+  end
+  local top = _G.SlayTheDragonFrame
+  local memo, cands = {}, {}
+  for _, o in ipairs(H.objects) do
+    if isFrameKind(o) and (o == top or isAncestor(top, o)) and o:IsVisible() and takesMouse(o)
+        and inside(hitRect(o, memo), x, y) then
+      local clipped = false
+      local a = rawget(o, "_parent")
+      while a and not clipped do
+        local c = rawget(a, "_calls").SetClipsChildren
+        if c and c[1] and not inside(mouseRender.rect(a, memo), x, y) then clipped = true end
+        a = rawget(a, "_parent")
+      end
+      if not clipped then cands[#cands + 1] = o end
+    end
+  end
+  local best
+  local function above(a, b)
+    local sa, sb = strataOf(a), strataOf(b)
+    if sa ~= sb then return sa > sb end
+    if a:GetFrameLevel() ~= b:GetFrameLevel() then return a:GetFrameLevel() > b:GetFrameLevel() end
+    return isAncestor(b, a)
+  end
+  for _, o in ipairs(cands) do if not best or above(o, best) then best = o end end
+  local ties = {}
+  for _, o in ipairs(cands) do
+    if o ~= best and strataOf(o) == strataOf(best) and o:GetFrameLevel() == best:GetFrameLevel()
+        and not isAncestor(o, best) and not isAncestor(best, o) then
+      ties[#ties + 1] = o
+    end
+  end
+  return best, ties
+end
+
+local function describe(o)
+  if not o then return "rien" end
+  local r = mouseRender and mouseRender.rect(o)
+  return ("%s niveau %d%s"):format(tostring(rawget(o, "_kind")), o:GetFrameLevel(),
+    r and (" [%.0f %.0f %.0f %.0f]"):format(r[1], r[2], r[3], r[4]) or "")
+end
+
+-- Clic au centre d'un cadre par le chemin du client : le cadre qui a la souris à cet endroit (H.mouseFocus)
+-- reçoit OnMouseDown, OnMouseUp puis OnClick (bouton activé, inscrit au clic gauche relâché :
+-- LeftButtonUp par défaut). Renvoie vrai si le clic est bien allé à obj, sinon faux et le cadre en cause.
+function H.mouseClick(obj)
+  assert(obj, "clic sur un objet nil")
+  if not obj:IsVisible() then return false, "cadre caché" end
+  if not mouseRender then H.mouseFocus(0, 0) end
+  local r = hitRect(obj, {})
+  if not r then return false, "cadre sans rectangle" end
+  local x, y = (r[1] + r[3]) / 2, (r[2] + r[4]) / 2
+  local focus, ties = H.mouseFocus(x, y)
+  if #ties > 0 then
+    local t = {}
+    for _, o in ipairs(ties) do t[#t + 1] = describe(o) end
+    return false, "ex aequo sous la souris : " .. describe(focus) .. " ; " .. table.concat(t, " ; ")
+  end
+  if focus ~= obj then return false, "souris prise par " .. describe(focus) end
+  run(obj, "OnMouseDown", "LeftButton")
+  run(obj, "OnMouseUp", "LeftButton")
+  local reg = rawget(obj, "_calls").RegisterForClicks
+  local up = not reg
+  for _, v in ipairs(reg or {}) do if v == "LeftButtonUp" or v == "AnyUp" then up = true end end
+  if up and obj:IsEnabled() and obj:IsVisible() then run(obj, "OnClick", "LeftButton", false) end
+  return true
+end
+
 
 ---------------------------------------------------------------------------
 -- Contenu de test : bibelots et potions (registres vides tant que la piste A n'a pas fusionné)
@@ -10515,6 +10629,106 @@ do
     end
     Render.svg(H, big, SNAP .. "/epiques_mots_cles.svg", "épiques : texte en deux lignes, mot de règle et son à-côté (gris : base, vert : améliorée)")
     big:Hide()
+  end
+end
+
+print("UDP grille du deck à plusieurs pages : flèches cliquées par le chemin de la souris (rencontre, feu de camp, marchand)")
+do
+  -- deck de 20 cartes améliorables au moins : copies non améliorées d'une carte qui s'améliore
+  local function bigDeck(e, n)
+    local id
+    for _, c in ipairs(e.deck) do if H.ns.Cards[c.id].up ~= nil and H.ns.Cards[c.id].rarity ~= "epic" then id = c.id end end
+    while #e.deck < n do H.ns.Expedition.addCard(e, id, false) end
+  end
+  local function visCards(s)
+    local out = {}
+    for i = 1, #s.cards do if s.cards[i]._shown and s.cards[i].option then out[#out + 1] = s.cards[i] end end
+    return out
+  end
+  -- page affichée : cartes visibles = options de la page, dans l'ordre
+  local function onPage(s, p)
+    local cards = visCards(s)
+    local want = math.min(16, #s.cardOptions - (p - 1) * 16)
+    if s.page ~= p or #cards ~= want then return false end
+    for i, c in ipairs(cards) do
+      local o = s.cardOptions[(p - 1) * 16 + i]
+      if c.option ~= o or c.cardId ~= o.card.id then return false end
+    end
+    return true
+  end
+  -- tout ce qui se clique sur l'écran (flèches visibles, cartes, boutons) a la souris à son centre, seul
+  local function reachable(s)
+    local bad = {}
+    local list = {}
+    for _, c in ipairs(visCards(s)) do list[#list + 1] = c end
+    for _, b in ipairs(s.buttons) do if b._shown then list[#list + 1] = b end end
+    if s.prev._shown then list[#list + 1] = s.prev end
+    if s.next._shown then list[#list + 1] = s.next end
+    local R = dofile(root .. "/Sim/ui_render.lua")
+    R.H = H
+    for _, o in ipairs(list) do
+      local r = R.rect(o)
+      local focus, ties = H.mouseFocus((r[1] + r[3]) / 2, (r[2] + r[4]) / 2)
+      if focus ~= o or #ties > 0 then
+        bad[#bad + 1] = (o == s.prev and "<" or o == s.next and ">" or (o.option and o.option.id) or "?")
+          .. " (" .. #ties .. " ex aequo)"
+      end
+    end
+    return bad
+  end
+
+  -- 1. rencontre « The Frog in the Satchel » : améliorer une carte au choix
+  local e = freshRun(SEED + 41, "event")
+  bigDeck(e, 20)
+  H.ns.Expedition.openEvent(e, "hexed_partner")
+  UI().refresh()
+  check("rencontre forcée : The Frog in the Satchel", currentKind() == "event" and UI().step.title == "The Frog in the Satchel",
+    UI().step.title)
+  clickOption("choose:2")
+  local s = UI().current
+  check("étape de sélection (améliorer) sur la grille du deck, plus de 16 cartes",
+    currentKind() == "select" and s == UI().screens.deck and #s.cardOptions > 16, #s.cardOptions)
+  check("page 1 : « > » seule, 16 cartes", onPage(s, 1) and s.next._shown and not s.prev._shown)
+  local bad = reachable(s)
+  check("page 1 : flèche, cartes et boutons ont la souris à leur centre (aucun cadre au même niveau)",
+    #bad == 0, table.concat(bad, ", "))
+  local ok, why = H.mouseClick(s.next)
+  check("clic sur « > » reçu par la flèche", ok, why)
+  check("page 2 : cartes 17 et suivantes, « < » seule", onPage(s, 2) and s.prev._shown and not s.next._shown,
+    s.page)
+  bad = reachable(s)
+  check("page 2 : flèche, cartes et boutons ont la souris à leur centre", #bad == 0, table.concat(bad, ", "))
+  UI().refresh()
+  check("rafraîchissement de l'écran : page 2 gardée", onPage(s, 2), s.page)
+  ok, why = H.mouseClick(s.prev)
+  check("clic sur « < » : retour à la page 1", ok and onPage(s, 1), why or s.page)
+  ok, why = H.mouseClick(s.next)
+  check("de nouveau « > » : page 2", ok and onPage(s, 2), why or s.page)
+  local card = visCards(s)[1]
+  local oid = card.option.id
+  local idx = tonumber(oid:match("^select:(%d+)$"))
+  local shown = H.ns.Expedition.shownDeck(e)[idx]
+  local before = e.deck[idx] and e.deck[idx].up
+  ok, why = H.mouseClick(card)
+  check("carte de la page 2 cliquée : c'est la carte du deck affichée qui est améliorée",
+    ok and idx and idx > 16 and card.cardId == shown.id and not before and e.deck[idx].up == true
+    and currentKind() ~= "select", tostring(why) .. " " .. tostring(oid) .. " " .. tostring(currentKind()))
+
+  -- 2. feu de camp (méditation) et 3. marchand (retrait) : même grille, mêmes flèches
+  for _, case in ipairs({ { "campfire", "ui:upgrade" }, { "merchant", "ui:remove" } }) do
+    e = freshRun(SEED + 42, case[1])
+    bigDeck(e, 20)
+    UI().refresh()
+    clickOption(case[2])
+    s = UI().current
+    local many = currentKind() == "deck" and #s.cardOptions > 16
+    ok, why = H.mouseClick(s.next)
+    local p2 = ok and onPage(s, 2)
+    local ok2, why2 = H.mouseClick(s.prev)
+    check(case[1] .. " : grille à deux pages, « > » puis « < » par la souris",
+      many and p2 and ok2 and onPage(s, 1), tostring(why or why2) .. " " .. tostring(s.page))
+    bad = reachable(s)
+    check(case[1] .. " : flèche, cartes et boutons ont la souris à leur centre", #bad == 0, table.concat(bad, ", "))
   end
 end
 
