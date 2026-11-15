@@ -32,6 +32,9 @@ card("fireball", {
   target = "enemy", cast = true, effects = { { "damage", 10 }, { "apply", "pain", 2, icon = "burn" } },
   text = "Cast.\nDeal 10.\nApply DoT 2",
   up = { effects = { { "damage", 14 }, { "apply", "pain", 3, icon = "burn" } }, text = "Cast.\nDeal 14.\nApply DoT 3" },
+  up2 = { effects = { { "damage", 16 }, { "apply", "pain", 3, icon = "burn" } }, text = "Cast.\nDeal 16.\nApply DoT 3" },
+  up3 = { effects = { { "damage", 16 }, { "apply", "pain", 3, icon = "burn" }, { "apply", "instant", 1, self = true } },
+    text = "Cast.\nDeal 16.\nApply DoT 3\nGain Instant 1" },
 })
 
 card("frostbolt", {
@@ -39,6 +42,8 @@ card("frostbolt", {
   target = "enemy", effects = { { "damage", 6 }, { "apply", "demoralized", 1 } },
   text = "Deal 6.\nApply Demoralized 1 ⌛",
   up = { effects = { { "damage", 9 }, { "apply", "demoralized", 1 } }, text = "Deal 9.\nApply Demoralized 1 ⌛" },
+  up2 = { effects = { { "damage", 9 }, { "apply", "demoralized", 2 } }, text = "Deal 9.\nApply Demoralized 2 ⌛" },
+  up3 = { effects = { { "damage", 11 }, { "apply", "demoralized", 2 } }, text = "Deal 11.\nApply Demoralized 2 ⌛" },
 })
 
 card("mana_shield", {
@@ -46,6 +51,8 @@ card("mana_shield", {
   effects = { { "absorb", 5 } },
   text = "Gain 5 Absorb.",
   up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
+  up2 = { effects = { { "absorb", 10 } }, text = "Gain 10 Absorb." },
+  up3 = { retain = true, text = "Gain 10 Absorb.\nRetain." },
 })
 
 card("arcane_blast", {
@@ -53,6 +60,8 @@ card("arcane_blast", {
   target = "enemy", effects = { { "damage", 6 }, { "res", 1 } },
   text = "Deal 6.\n+1 Charge.",
   up = { effects = { { "damage", 9 }, { "res", 1 } }, text = "Deal 9.\n+1 Charge." },
+  up2 = { effects = { { "damage", 11 }, { "res", 1 } }, text = "Deal 11.\n+1 Charge." },
+  up3 = { effects = { { "damage", 13 }, { "res", 1 } }, text = "Deal 13.\n+1 Charge." },
 })
 
 -- Fire : les petites cartes Fire remplissent le compte du tour, l'Instant fait partir les gros Cast ----
@@ -62,6 +71,8 @@ card("fire_blast", {
   target = "enemy", cooldown = 2, effects = { { "damage", 5 }, { "apply", "instant", 1, self = true } },
   text = "Deal 5.\nGain Instant 1\nCooldown 2.",
   up = { effects = { { "damage", 8 }, { "apply", "instant", 1, self = true } }, text = "Deal 8.\nGain Instant 1\nCooldown 2." },
+  up2 = { effects = { { "damage", 10 }, { "apply", "instant", 1, self = true } }, text = "Deal 10.\nGain Instant 1\nCooldown 2." },
+  up3 = { cooldown = 1, text = "Deal 10.\nGain Instant 1\nCooldown 1." },
 })
 
 -- Execute : forme du socle (« Execute: deal X. » = total), la fiche écrivait « deal 4 more ».
@@ -70,6 +81,9 @@ card("scorch", {
   target = "enemy", effects = { { "damage", 3, more = { { 4, "execute" } } } },
   text = "Deal 3.\nExecute: deal 7.",
   up = { effects = { { "damage", 5, more = { { 5, "execute" } } } }, text = "Deal 5.\nExecute: deal 10." },
+  up2 = { effects = { { "damage", 5, more = { { 8, "execute" } } } }, text = "Deal 5.\nExecute: deal 13." },
+  up3 = { effects = { { "damage", 5, more = { { 8, "execute" } } }, { "apply", "pain", 2, icon = "burn" } },
+    text = "Deal 5.\nExecute: deal 13.\nApply DoT 2" },
 })
 
 card("flamestrike", {
@@ -78,6 +92,10 @@ card("flamestrike", {
   text = "Cast.\nDeal 12 to all.\nApply DoT 3 to all",
   up = { effects = { { "damage", 16, all = true }, { "apply", "pain", 4, all = true, icon = "burn" } },
     text = "Cast.\nDeal 16 to all.\nApply DoT 4 to all" },
+  up2 = { effects = { { "damage", 16, all = true }, { "apply", "pain", 5, all = true, icon = "burn" } },
+    text = "Cast.\nDeal 16 to all.\nApply DoT 5 to all" },
+  up3 = { effects = { { "damage", 19, all = true }, { "apply", "pain", 5, all = true, icon = "burn" } },
+    text = "Cast.\nDeal 19 to all.\nApply DoT 5 to all" },
 })
 
 card("blazing_barrier", {
@@ -85,6 +103,10 @@ card("blazing_barrier", {
   effects = { { "absorb", 7 } },
   text = "Gain 7 Absorb.",
   up = { effects = { { "absorb", 10 } }, text = "Gain 10 Absorb." },
+  up2 = { effects = { { "absorb", 10 }, { "apply", "pain", 2, all = true, icon = "burn" } },
+    text = "Gain 10 Absorb.\nApply DoT 2 to all" },
+  up3 = { effects = { { "absorb", 13 }, { "apply", "pain", 2, all = true, icon = "burn" } },
+    text = "Gain 13 Absorb.\nApply DoT 2 to all" },
 })
 
 card("pyroblast", {
@@ -92,6 +114,8 @@ card("pyroblast", {
   target = "enemy", cast = true, effects = { { "damage", 30 } },
   text = "Cast.\nDeal 30.",
   up = { effects = { { "damage", 38 } }, text = "Cast.\nDeal 38." },
+  up2 = { effects = { { "damage", 38 }, { "apply", "pain", 4, icon = "burn" } }, text = "Cast.\nDeal 38.\nApply DoT 4" },
+  up3 = { effects = { { "damage", 44 }, { "apply", "pain", 4, icon = "burn" } }, text = "Cast.\nDeal 44.\nApply DoT 4" },
 })
 
 -- Hot Streak : quand la deuxième carte Fire du tour a fini d'être jouée (résolue, ou posée dans un
@@ -118,6 +142,9 @@ card("hot_streak", {
   power = true, effects = {}, hooks = hotStreakHooks,
   text = "Power.\n2nd Fire card each turn: gain Instant 1.",
   up = { cost = 0, text = "Power.\n2nd Fire card each turn: gain Instant 1." },
+  up2 = { innate = true, text = "Power.\n2nd Fire card each turn: gain Instant 1.\nInnate." },
+  up3 = { effects = { { "apply", "instant", 1, self = true } },
+    text = "Power.\nGain Instant 1\n2nd Fire card each turn: gain Instant 1.\nInnate." },
 })
 
 card("living_bomb", {
@@ -126,6 +153,10 @@ card("living_bomb", {
   text = "Deal 3 to all.\nApply DoT 3 to all",
   up = { effects = { { "damage", 4, all = true }, { "apply", "pain", 5, all = true, icon = "burn" } },
     text = "Deal 4 to all.\nApply DoT 5 to all" },
+  up2 = { effects = { { "damage", 4, all = true }, { "apply", "pain", 6, all = true, icon = "burn" } },
+    text = "Deal 4 to all.\nApply DoT 6 to all" },
+  up3 = { effects = { { "damage", 6, all = true }, { "apply", "pain", 6, all = true, icon = "burn" } },
+    text = "Deal 6 to all.\nApply DoT 6 to all" },
 })
 
 -- « DoT: gain Instant 1. » : lu après le coup (Ignite peut avoir posé le DoT). Effet sur mesure : un
@@ -139,6 +170,10 @@ card("phoenix_flames", {
   target = "enemy", cooldown = 1, effects = { { "damage", 8 }, { "apply", "instant", 1, self = true, cond = "status:pain" } },
   text = "Deal 8.\nDoT: gain Instant 1\nCooldown 1.",
   up = { effects = { { "damage", 11 }, { "apply", "instant", 1, self = true, cond = "status:pain" } }, text = "Deal 11.\nDoT: gain Instant 1\nCooldown 1." },
+  up2 = { effects = { { "damage", 11 }, { "apply", "instant", 1, self = true, cond = "status:pain" },
+      { "apply", "pain", 3, icon = "burn" } }, text = "Deal 11.\nDoT: gain Instant 1\nApply DoT 3\nCooldown 1." },
+  up3 = { effects = { { "damage", 14 }, { "apply", "instant", 1, self = true, cond = "status:pain" },
+      { "apply", "pain", 3, icon = "burn" } }, text = "Deal 14.\nDoT: gain Instant 1\nApply DoT 3\nCooldown 1." },
 })
 
 -- Ignite : chaque coup d'une carte Attack Fire pose aussi un DoT sur la cible touchée.
@@ -155,6 +190,8 @@ card("ignite", {
   power = true, effects = {}, hooks = igniteHooks(3),
   text = "Power.\nFire hits: apply DoT 3.",
   up = { hooks = igniteHooks(4), text = "Power.\nFire hits: apply DoT 4." },
+  up2 = { innate = true, text = "Power.\nFire hits: apply DoT 4.\nInnate." },
+  up3 = { hooks = igniteHooks(5), text = "Power.\nFire hits: apply DoT 5.\nInnate." },
 })
 
 card("combustion", {
@@ -162,6 +199,8 @@ card("combustion", {
   exhaust = true, effects = { { "draw", 2 }, { "apply", "instant", 2, self = true } },
   text = "Draw 2.\nGain Instant 2\nExhaust.",
   up = { effects = { { "draw", 3 }, { "apply", "instant", 2, self = true } }, text = "Draw 3.\nGain Instant 2\nExhaust." },
+  up2 = { effects = { { "draw", 3 }, { "apply", "instant", 3, self = true } }, text = "Draw 3.\nGain Instant 3\nExhaust." },
+  up3 = { retain = true, text = "Draw 3.\nGain Instant 3\nExhaust.\nRetain." },
 })
 
 -- Frost : contrôle (Stunned, Demoralized), puis la condition Frozen fait payer ce contrôle ---------------
@@ -171,6 +210,8 @@ card("ice_lance", {
   target = "enemy", effects = { { "damage", 3, more = { { 6, "frozen" } } } },
   text = "Deal 3.\nFrozen: deal 6 more.",
   up = { effects = { { "damage", 4, more = { { 8, "frozen" } } } }, text = "Deal 4.\nFrozen: deal 8 more." },
+  up2 = { effects = { { "damage", 4, more = { { 11, "frozen" } } } }, text = "Deal 4.\nFrozen: deal 11 more." },
+  up3 = { effects = { { "damage", 6, more = { { 11, "frozen" } } } }, text = "Deal 6.\nFrozen: deal 11 more." },
 })
 
 card("frost_nova", {
@@ -179,6 +220,9 @@ card("frost_nova", {
   text = "Gain 2 Absorb.\nApply Stunned 1 ⌛ to all\nCooldown 4.",
   up = { cooldown = 3, effects = { { "absorb", 4 }, { "apply", "stunned", 1, all = true } },
     text = "Gain 4 Absorb.\nApply Stunned 1 ⌛ to all\nCooldown 3." },
+  up2 = { effects = { { "absorb", 7 }, { "apply", "stunned", 1, all = true } },
+    text = "Gain 7 Absorb.\nApply Stunned 1 ⌛ to all\nCooldown 3." },
+  up3 = { retain = true, text = "Gain 7 Absorb.\nApply Stunned 1 ⌛ to all\nCooldown 3.\nRetain." },
 })
 
 card("ice_barrier", {
@@ -186,6 +230,8 @@ card("ice_barrier", {
   retain = true, effects = { { "absorb", 8 } },
   text = "Gain 8 Absorb.\nRetain.",
   up = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb.\nRetain." },
+  up2 = { effects = { { "absorb", 13 } }, text = "Gain 13 Absorb.\nRetain." },
+  up3 = { innate = true, text = "Gain 13 Absorb.\nRetain.\nInnate." },
 })
 
 card("cone_of_cold", {
@@ -194,6 +240,10 @@ card("cone_of_cold", {
   text = "Deal 4 to all.\nApply Demoralized 1 ⌛ to all\nCooldown 2.",
   up = { effects = { { "damage", 6, all = true }, { "apply", "demoralized", 1, all = true } },
     text = "Deal 6 to all.\nApply Demoralized 1 ⌛ to all\nCooldown 2." },
+  up2 = { effects = { { "damage", 6, all = true }, { "apply", "demoralized", 2, all = true } },
+    text = "Deal 6 to all.\nApply Demoralized 2 ⌛ to all\nCooldown 2." },
+  up3 = { effects = { { "damage", 8, all = true }, { "apply", "demoralized", 2, all = true } },
+    text = "Deal 8 to all.\nApply Demoralized 2 ⌛ to all\nCooldown 2." },
 })
 
 card("flurry", {
@@ -202,6 +252,10 @@ card("flurry", {
   text = "Deal 3 three times.\nApply Demoralized 1 ⌛",
   up = { effects = { { "damage", 4, times = 3 }, { "apply", "demoralized", 1 } },
     text = "Deal 4 three times.\nApply Demoralized 1 ⌛" },
+  up2 = { effects = { { "damage", 4, times = 3 }, { "apply", "demoralized", 2 } },
+    text = "Deal 4 three times.\nApply Demoralized 2 ⌛" },
+  up3 = { effects = { { "damage", 5, times = 3 }, { "apply", "demoralized", 2 } },
+    text = "Deal 5 three times.\nApply Demoralized 2 ⌛" },
 })
 
 card("blizzard", {
@@ -210,6 +264,8 @@ card("blizzard", {
   text = "Cast.\nDeal 12 to all.\nApply Demoralized 2 ⌛ to all",
   up = { effects = { { "damage", 15, all = true }, { "apply", "demoralized", 2, all = true } },
     text = "Cast.\nDeal 15 to all.\nApply Demoralized 2 ⌛ to all" },
+  up2 = { retain = true, text = "Cast.\nDeal 15 to all.\nApply Demoralized 2 ⌛ to all\nRetain." },
+  up3 = { cast = false, text = "Deal 15 to all.\nApply Demoralized 2 ⌛ to all\nRetain." },
 })
 
 card("glacial_spike", {
@@ -217,25 +273,32 @@ card("glacial_spike", {
   target = "enemy", cast = true, effects = { { "damage", 26 }, { "apply", "demoralized", 2 } },
   text = "Cast.\nDeal 26.\nApply Demoralized 2 ⌛",
   up = { effects = { { "damage", 32 }, { "apply", "demoralized", 2 } }, text = "Cast.\nDeal 32.\nApply Demoralized 2 ⌛" },
+  up2 = { retain = true, text = "Cast.\nDeal 32.\nApply Demoralized 2 ⌛\nRetain." },
+  up3 = { cast = false, text = "Deal 32.\nApply Demoralized 2 ⌛\nRetain." },
 })
 
 -- Ice Block : Last Breath ; PV remis à 0 puis soignés de 10 (Combat.heal), état Ice Block (aucun dégât
 -- de coup ennemi jusqu'au début du prochain tour : Core/Classes/mage.lua, crochet enemyDamage).
-local iceBlockHooks = {
-  preventDeath = function(c, power)
-    if not Combat.lastBreath(c, "ice_block") then return false end
-    c.player.hp = 0
-    Combat.heal(c, c.player, 10)
-    Combat.applyStatus(c, c.player, "ice_block", 1)
-    return true
-  end,
-}
+local function iceBlockHooks(heal)
+  return {
+    preventDeath = function(c, power)
+      if not Combat.lastBreath(c, "ice_block") then return false end
+      c.player.hp = 0
+      Combat.heal(c, c.player, heal)
+      Combat.applyStatus(c, c.player, "ice_block", 1)
+      return true
+    end,
+  }
+end
 
+-- Paliers 2 et 3 (15/11/2026, docs/ameliorations.md) : soin 14, puis Innate (en main dès le début du combat).
 card("ice_block", {
   level = 4, name = "Ice Block", cost = 1, type = "power", school = "frost", rarity = "rare", path = "frost",
-  power = true, effects = {}, hooks = iceBlockHooks,
+  power = true, effects = {}, hooks = iceBlockHooks(10),
   text = "Power.\nLast Breath: heal 10, no damage until next turn.",
   up = { cost = 0, text = "Power.\nLast Breath: heal 10, no damage until next turn." },
+  up2 = { hooks = iceBlockHooks(14), text = "Power.\nLast Breath: heal 14, no damage until next turn." },
+  up3 = { innate = true, text = "Power.\nLast Breath: heal 14, no damage until next turn.\nInnate." },
 })
 
 -- Deep Freeze : « Frozen: apply Stunned 1. » lu après le coup, sur la cible (effet sur mesure : un état
@@ -250,6 +313,8 @@ card("deep_freeze", {
   target = "enemy", cooldown = 2, effects = { { "damage", 8 }, { "fn", deepFreeze } },
   text = "Deal 8.\nFrozen: apply Stunned 1.\nCooldown 2.",
   up = { effects = { { "damage", 11 }, { "fn", deepFreeze } }, text = "Deal 11.\nFrozen: apply Stunned 1.\nCooldown 2." },
+  up2 = { effects = { { "damage", 14 }, { "fn", deepFreeze } }, text = "Deal 14.\nFrozen: apply Stunned 1.\nCooldown 2." },
+  up3 = { retain = true, text = "Deal 14.\nFrozen: apply Stunned 1.\nCooldown 2.\nRetain." },
 })
 
 -- Shatter : chaque coup d'une carte Attack sur une cible Frozen fait N de plus (testé coup par coup).
@@ -267,6 +332,8 @@ card("shatter", {
   power = true, effects = {}, hooks = shatterHooks(4),
   text = "Power.\nFrozen: Attack hits deal 4 more.",
   up = { hooks = shatterHooks(5), text = "Power.\nFrozen: Attack hits deal 5 more." },
+  up2 = { innate = true, text = "Power.\nFrozen: Attack hits deal 5 more.\nInnate." },
+  up3 = { hooks = shatterHooks(6), text = "Power.\nFrozen: Attack hits deal 6 more.\nInnate." },
 })
 
 -- Arcane : monter les charges, les vider d'un Surge ; Evocation prépare un tour à 6 mana ----------------
@@ -276,6 +343,8 @@ card("arcane_missiles", {
   target = "enemy", effects = { { "damage", 3, times = 3 }, { "res", 1 } },
   text = "Deal 3 three times.\n+1 Charge.",
   up = { effects = { { "damage", 4, times = 3 }, { "res", 1 } }, text = "Deal 4 three times.\n+1 Charge." },
+  up2 = { effects = { { "damage", 5, times = 3 }, { "res", 1 } }, text = "Deal 5 three times.\n+1 Charge." },
+  up3 = { effects = { { "damage", 5, times = 3 }, { "res", 2 } }, text = "Deal 5 three times.\n+2 Charge." },
 })
 
 card("arcane_explosion", {
@@ -283,6 +352,8 @@ card("arcane_explosion", {
   effects = { { "damage", 4, all = true }, { "res", 1 } },
   text = "Deal 4 to all.\n+1 Charge.",
   up = { effects = { { "damage", 6, all = true }, { "res", 1 } }, text = "Deal 6 to all.\n+1 Charge." },
+  up2 = { effects = { { "damage", 8, all = true }, { "res", 1 } }, text = "Deal 8 to all.\n+1 Charge." },
+  up3 = { retain = true, text = "Deal 8 to all.\n+1 Charge.\nRetain." },
 })
 
 card("prismatic_barrier", {
@@ -290,6 +361,8 @@ card("prismatic_barrier", {
   effects = { { "absorb", 5 }, { "res", 1 } },
   text = "Gain 5 Absorb.\n+1 Charge.",
   up = { effects = { { "absorb", 8 }, { "res", 1 } }, text = "Gain 8 Absorb.\n+1 Charge." },
+  up2 = { retain = true, text = "Gain 8 Absorb.\n+1 Charge.\nRetain." },
+  up3 = { effects = { { "absorb", 11 }, { "res", 1 } }, text = "Gain 11 Absorb.\n+1 Charge.\nRetain." },
 })
 
 -- Surge : les charges sont lues puis remises à 0 avant le coup, le bonus passif ne s'y ajoute donc pas.
@@ -299,6 +372,10 @@ card("arcane_barrage", {
   text = "Surge: deal 6 per Charge to all.",
   up = { effects = { { "surge" }, { "damage", 0, all = true, per = { 8, "surge" } } },
     text = "Surge: deal 8 per Charge to all." },
+  up2 = { effects = { { "surge" }, { "damage", 0, all = true, per = { 8, "surge" } }, { "res", 1 } },
+    text = "Surge: deal 8 per Charge to all.\n+1 Charge." },
+  up3 = { effects = { { "surge" }, { "damage", 0, all = true, per = { 9, "surge" } }, { "res", 1 } },
+    text = "Surge: deal 9 per Charge to all.\n+1 Charge." },
 })
 
 card("counterspell", {
@@ -306,6 +383,8 @@ card("counterspell", {
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "res", 1 } },
   text = "Interrupt the target's cast.\n+1 Charge.\nCooldown 2.",
   up = { cooldown = 1, text = "Interrupt the target's cast.\n+1 Charge.\nCooldown 1." },
+  up2 = { retain = true, text = "Interrupt the target's cast.\n+1 Charge.\nCooldown 1.\nRetain." },
+  up3 = { effects = { { "interrupt", all = true }, { "res", 1 } }, text = "Interrupt all casts.\n+1 Charge.\nCooldown 1.\nRetain." },
 })
 
 -- Evocation : Cast à 0 mana ; le mana est remis au maximum AVANT la résolution des incantations (socle),
@@ -322,6 +401,8 @@ card("evocation", {
   cast = true, exhaust = true, evoMana = 3, effects = { { "fn", manaGain(3) } },
   text = "Cast.\n+3 mana.\nExhaust.",
   up = { evoMana = 4, effects = { { "fn", manaGain(4) } }, text = "Cast.\n+4 mana.\nExhaust." },
+  up2 = { effects = { { "fn", manaGain(4) }, { "res", 1 } }, text = "Cast.\n+4 mana.\n+1 Charge.\nExhaust." },
+  up3 = { evoMana = 5, effects = { { "fn", manaGain(5) }, { "res", 1 } }, text = "Cast.\n+5 mana.\n+1 Charge.\nExhaust." },
 })
 
 card("polymorph", {
@@ -329,6 +410,8 @@ card("polymorph", {
   target = "enemy", exhaust = true, effects = { { "res", 1 }, { "apply", "stunned", 2 } },
   text = "+1 Charge.\nApply Stunned 2 ⌛\nExhaust.",
   up = { cost = 1, text = "+1 Charge.\nApply Stunned 2 ⌛\nExhaust." },
+  up2 = { retain = true, text = "+1 Charge.\nApply Stunned 2 ⌛\nExhaust.\nRetain." },
+  up3 = { effects = { { "res", 2 }, { "apply", "stunned", 2 } }, text = "+2 Charge.\nApply Stunned 2 ⌛\nExhaust.\nRetain." },
 })
 
 card("presence_of_mind", {
@@ -336,6 +419,9 @@ card("presence_of_mind", {
   cooldown = 4, effects = { { "draw", 1 }, { "res", 1 }, { "apply", "instant", 1, self = true } },
   text = "Draw 1.\n+1 Charge.\nGain Instant 1\nCooldown 4.",
   up = { cooldown = 3, text = "Draw 1.\n+1 Charge.\nGain Instant 1\nCooldown 3." },
+  up2 = { retain = true, text = "Draw 1.\n+1 Charge.\nGain Instant 1\nCooldown 3.\nRetain." },
+  up3 = { effects = { { "draw", 1 }, { "res", 2 }, { "apply", "instant", 1, self = true } },
+    text = "Draw 1.\n+2 Charge.\nGain Instant 1\nCooldown 3.\nRetain." },
 })
 
 -- Arcane Power : chaque charge ajoute 2 au lieu de 1 (lu par la règle de classe ; deux exemplaires
@@ -345,6 +431,8 @@ card("arcane_power", {
   power = true, effects = {}, chargeBonus = 2,
   text = "Power.\n+2 damage per Charge, not +1.",
   up = { cost = 0, text = "Power.\n+2 damage per Charge, not +1." },
+  up2 = { innate = true, text = "Power.\n+2 damage per Charge, not +1.\nInnate." },
+  up3 = { effects = { { "res", 1 } }, text = "Power.\n+1 Charge.\n+2 damage per Charge, not +1.\nInnate." },
 })
 
 local function surgeMana(c, ctx)
@@ -357,6 +445,9 @@ card("arcane_surge", {
   minRes = 1, effects = { { "surge" }, { "fn", surgeMana }, { "draw", 0, per = { 1, "surge" } } },
   text = "Surge: +1 mana, draw 1 per Charge.",
   up = { cost = 0, text = "Surge: +1 mana, draw 1 per Charge." },
+  up2 = { retain = true, text = "Surge: +1 mana, draw 1 per Charge.\nRetain." },
+  up3 = { effects = { { "surge" }, { "fn", surgeMana }, { "draw", 0, per = { 1, "surge" } }, { "res", 1 } },
+    text = "Surge: +1 mana, draw 1 per Charge.\n+1 Charge.\nRetain." },
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Mage ») -----------------------------
@@ -376,6 +467,8 @@ epic("mirror_image", {
   name = "Mirror Image", zone = "westfall", path = "fire", school = "arcane", epicPct = 50,
   text = "Epic.\nCast cards: Image 50%.",
   up = { epicPct = 100, text = "Epic.\nCast cards: Image 100%." },
+  up2 = { epicPct = 125, text = "Epic.\nCast cards: Image 125%." },
+  up3 = { epicPct = 150, text = "Epic.\nCast cards: Image 150%." },
 })
 
 -- Duskwood : chaque attaque ennemie sur le Mage, même absorbée, pose DoT epicN à son auteur (une fois par attaque :
@@ -384,6 +477,8 @@ epic("molten_armor", {
   name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 2,
   text = "Epic.\nWhen attacked: Burn 2.",
   up = { epicN = 4, text = "Epic.\nWhen attacked: Burn 4." },
+  up2 = { epicN = 5, text = "Epic.\nWhen attacked: Burn 5." },
+  up3 = { epicN = 6, text = "Epic.\nWhen attacked: Burn 6." },
 })
 
 -- Wetlands : chaque tour, l'élémentaire inflige epicN à la dernière cible et lui pose Demoralized epicM pour le
@@ -392,6 +487,8 @@ epic("water_elemental", {
   name = "Water Elemental", zone = "wetlands", path = "frost", school = "frost", epicN = 2, epicM = 1,
   text = "Epic.\nStart of turn: Waterbolt 2.",
   up = { epicN = 4, text = "Epic.\nStart of turn: Waterbolt 4." },
+  up2 = { epicN = 5, text = "Epic.\nStart of turn: Waterbolt 5." },
+  up3 = { epicN = 6, text = "Epic.\nStart of turn: Waterbolt 6." },
 })
 
 -- Stranglethorn : une carte Cast visant un ennemi Frozen part tout de suite (sans Instant) et emploie le gel
@@ -400,6 +497,8 @@ epic("fingers_of_frost", {
   name = "Fingers of Frost", zone = "stranglethorn", path = "frost", school = "frost", epicN = 0,
   text = "Epic.\nFrozen: Brain Freeze.",
   up = { epicN = 4, text = "Epic.\nFrozen: Brain Freeze +4." },
+  up2 = { epicN = 6, text = "Epic.\nFrozen: Brain Freeze +6." },
+  up3 = { epicN = 8, text = "Epic.\nFrozen: Brain Freeze +8." },
 })
 
 -- Swamp of Sorrows : le mana non dépensé (epicN au plus) s'ajoute au tour suivant, + epicBonus s'il en reste (le
@@ -408,6 +507,8 @@ epic("arcane_meditation", {
   name = "Arcane Meditation", zone = "swamp", path = "arcane", school = "arcane", epicN = 4, epicBonus = 1,
   text = "Epic.\nEnd of turn: Conserve 4.",
   up = { epicN = 6, epicBonus = 2, text = "Epic.\nEnd of turn: Conserve 6." },
+  up2 = { epicN = 9, epicBonus = 3, text = "Epic.\nEnd of turn: Conserve 9." },
+  up3 = { epicN = 12, epicBonus = 4, text = "Epic.\nEnd of turn: Conserve 12." },
 })
 
 -- Burning Steppes : un ennemi qui meurt avec du DoT le donne (+ epicN) à chaque autre ennemi.
@@ -415,6 +516,8 @@ epic("conflagration", {
   name = "Conflagration", zone = "steppes", path = "fire", school = "fire", epicN = 16,
   text = "Epic.\nEnemy deaths: Pyroclasm 16.",
   up = { epicN = 20, text = "Epic.\nEnemy deaths: Pyroclasm 20." },
+  up2 = { epicN = 22, text = "Epic.\nEnemy deaths: Pyroclasm 22." },
+  up3 = { epicN = 25, text = "Epic.\nEnemy deaths: Pyroclasm 25." },
 })
 
 -- Blackrock Mountain : la 3e carte jouée de chaque tour (améliorée : chaque 3e), de tout type, se résout deux fois
@@ -423,6 +526,8 @@ epic("rule_of_threes", {
   name = "Rule of Threes", zone = "blackrock", path = "arcane", school = "arcane", epicCharge = 1, epicEvery = false,
   text = "Epic.\n3rd card each turn: Multistrike 1.",
   up = { epicEvery = true, text = "Epic.\nEvery 3rd card: Multistrike 1." },
+  up2 = { epicAt = 2, epicEvery = false, text = "Epic.\n2nd card each turn: Multistrike 1." },
+  up3 = { epicEvery = true, text = "Epic.\nEvery 2nd card: Multistrike 1." },
 })
 
 -- Bibelots du Mage (class = "mage" : tirés seulement pour lui) -------------------------------------

@@ -523,9 +523,12 @@ Le +1 ne change pas ; chaque colonne ne dit que ce que le palier ajoute. Règles
 
 Nombres dans `EPIC_N` (`Data/Rogue.lua`, quatre valeurs : base, +1, +2, +3), lus par `Rogue.tier(src)` =
 `Card.level(src) + 1` (`Core/Classes/rogue.lua`, aussi `UI/Art/rogue.lua` pour la ligne de l'épique). L'à-côté
-(`L.rule`, `upText`) vaut pour les paliers 1 à 3 : seuls le nombre écrit sur la carte et un ajout en fin de ligne
-changent. L'à-côté d'Atrophy ne cite plus le seuil (« Enemies with at least that much DoT count as Demoralized »),
-lu sur la carte.
+(`L.rule`, `upText`) vaut pour les paliers 1 à 3 : seul le nombre écrit sur la carte change. L'à-côté d'Atrophy ne
+cite plus le seuil (« Enemies with at least that much DoT count as Demoralized »), lu sur la carte. Une épique tient
+en deux lignes à chaque palier (harnais, 16/11/2026) : Subterfuge +2/+3 « Surge cards: Shroud 3, Parry 1. » (puis
+Parry 2) et Kidney Shot +2/+3 « Surge of 4+: Gouge, +1 Combo. » (puis +2 ; déclencheur court « Surge of 4+ »
+enregistré pour ces paliers), au lieu de « Shroud 3, gain Parry 1 » et « Surge of 4+ Combo: Gouge, +1 Combo »
+(trois lignes) ; règles inchangées.
 
 | Épique | +1 (inchangé) | +2 | +3 |
 |---|---|---|---|
@@ -533,8 +536,8 @@ lu sur la carte.
 | Doomblade | Bleed 100% | Bleed 105% | Bleed 110% |
 | Atrophic Poison | DoT 5+, Sundered | DoT 4+ | DoT 3+ |
 | Echoing Reprimand | Animacharge 4 (2 ou 3 Combo) | Animacharge 5 | Animacharge 6 |
-| Subterfuge | Shroud 3 | chaque Surge : gain Parry 1 | Parry 2 |
-| Kidney Shot | seuil 4+ Combo | Gouge, +1 Combo (rendu après le Surge) | +2 Combo |
+| Subterfuge | Shroud 3 | `Surge cards: Shroud 3, Parry 1.` (Parry 1 à chaque Surge) | `Shroud 3, Parry 2.` |
+| Kidney Shot | seuil 4+ Combo | `Surge of 4+: Gouge, +1 Combo.` (Combo rendu après le Surge) | `Surge of 4+: Gouge, +2 Combo.` |
 | Danse Macabre | Flourish 3 | Flourish 4 | Flourish 5 |
 
 Mesures : paliers 2 et 3 non mesurés carte par carte (balayages abandonnés) ; campagne `human` clé 0 tout débloqué

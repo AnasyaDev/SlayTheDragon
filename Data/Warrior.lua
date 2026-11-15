@@ -35,6 +35,8 @@ card("strike", {
   target = "enemy", effects = { { "damage", 6 } },
   text = "Deal 6.",
   up = { effects = { { "damage", 9 } }, text = "Deal 9." },
+  up2 = { effects = { { "damage", 11 } }, text = "Deal 11." },
+  up3 = { effects = { { "damage", 11, more = { { 3, "status:armor_broken" } } } }, text = "Deal 11.\nSundered: deal 3 more." },
 })
 
 card("defend", {
@@ -42,6 +44,8 @@ card("defend", {
   effects = { { "absorb", 5 } },
   text = "Gain 5 Absorb.",
   up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
+  up2 = { effects = { { "absorb", 10 } }, text = "Gain 10 Absorb." },
+  up3 = { retain = true, text = "Gain 10 Absorb.\nRetain." },
 })
 
 card("heroic_strike", {
@@ -49,6 +53,9 @@ card("heroic_strike", {
   target = "enemy", spend = 2, effects = { { "damage", 7, more = { { 5, "spent" } } } },
   text = "Deal 7.\nSpend 2: deal 5 more.",
   up = { effects = { { "damage", 9, more = { { 7, "spent" } } } }, text = "Deal 9.\nSpend 2: deal 7 more." },
+  up2 = { effects = { { "damage", 10, more = { { 9, "spent" } } } }, text = "Deal 10.\nSpend 2: deal 9 more." },
+  up3 = { effects = { { "damage", 10, more = { { 9, "spent" } } }, { "draw", 1, cond = "spent" } },
+    text = "Deal 10.\nSpend 2: deal 9 more, draw 1." },
 })
 
 card("bloodrage", {
@@ -56,6 +63,8 @@ card("bloodrage", {
   payHp = 2, effects = { { "res", 2 }, { "draw", 1 } },
   text = "Pay 2 HP.\n+2 Rage.\nDraw 1.",
   up = { effects = { { "res", 3 }, { "draw", 1 } }, text = "Pay 2 HP.\n+3 Rage.\nDraw 1." },
+  up2 = { innate = true, text = "Pay 2 HP.\n+3 Rage.\nDraw 1.\nInnate." },
+  up3 = { payHp = 1, text = "Pay 1 HP.\n+3 Rage.\nDraw 1.\nInnate." },
 })
 
 -- Arms : Sundered, puis un seul gros coup ; Execute sur les cibles entamées ---------------------
@@ -65,6 +74,8 @@ card("rend", {
   target = "enemy", effects = { { "damage", 3 }, { "apply", "pain", 4, icon = "bleed" } },
   text = "Deal 3.\nApply DoT 4",
   up = { effects = { { "damage", 4 }, { "apply", "pain", 6, icon = "bleed" } }, text = "Deal 4.\nApply DoT 6" },
+  up2 = { effects = { { "damage", 4 }, { "apply", "pain", 7, icon = "bleed" } }, text = "Deal 4.\nApply DoT 7" },
+  up3 = { effects = { { "damage", 7 }, { "apply", "pain", 7, icon = "bleed" } }, text = "Deal 7.\nApply DoT 7" },
 })
 
 card("overpower", {
@@ -72,6 +83,8 @@ card("overpower", {
   target = "enemy", effects = { { "damage", 3, more = { { 4, "status:armor_broken" } } } },
   text = "Deal 3.\nSundered: deal 4 more.",
   up = { effects = { { "damage", 5, more = { { 5, "status:armor_broken" } } } }, text = "Deal 5.\nSundered: deal 5 more." },
+  up2 = { effects = { { "damage", 6, more = { { 6, "status:armor_broken" } } } }, text = "Deal 6.\nSundered: deal 6 more." },
+  up3 = { effects = { { "damage", 6, more = { { 8, "status:armor_broken" } } } }, text = "Deal 6.\nSundered: deal 8 more." },
 })
 
 card("slam", {
@@ -79,6 +92,9 @@ card("slam", {
   target = "enemy", cast = true, effects = { { "damage", 16 } },
   text = "Cast.\nDeal 16.",
   up = { effects = { { "damage", 20 } }, text = "Cast.\nDeal 20." },
+  up2 = { effects = { { "damage", 23 } }, text = "Cast.\nDeal 23." },
+  up3 = { effects = { { "damage", 23, more = { { 6, "status:armor_broken" } } } },
+    text = "Cast.\nDeal 23.\nSundered: deal 6 more." },
 })
 
 card("cleave", {
@@ -86,6 +102,8 @@ card("cleave", {
   effects = { { "damage", 8, all = true } },
   text = "Deal 8 to all.",
   up = { effects = { { "damage", 11, all = true } }, text = "Deal 11 to all." },
+  up2 = { effects = { { "damage", 13, all = true } }, text = "Deal 13 to all." },
+  up3 = { effects = { { "damage", 15, all = true } }, text = "Deal 15 to all." },
 })
 
 card("mortal_strike", {
@@ -93,6 +111,8 @@ card("mortal_strike", {
   target = "enemy", effects = { { "damage", 22 }, { "apply", "armor_broken", 2 } },
   text = "Deal 22.\nApply Sundered 2 ⌛",
   up = { effects = { { "damage", 28 }, { "apply", "armor_broken", 3 } }, text = "Deal 28.\nApply Sundered 3 ⌛" },
+  up2 = { effects = { { "damage", 32 }, { "apply", "armor_broken", 3 } }, text = "Deal 32.\nApply Sundered 3 ⌛" },
+  up3 = { effects = { { "damage", 32 }, { "apply", "armor_broken", 4 } }, text = "Deal 32.\nApply Sundered 4 ⌛" },
 })
 
 -- Execute : la Rage n'est dépensée que si la cible est entamée (condition lue à la résolution).
@@ -102,6 +122,9 @@ card("execute", {
   text = "Deal 5.\nExecute: Surge: deal 4 per Rage.",
   up = { effects = { { "surge", cond = "execute" }, { "damage", 7, per = { 5, "surge" } } },
     text = "Deal 7.\nExecute: Surge: deal 5 per Rage." },
+  up2 = { retain = true, text = "Deal 7.\nExecute: Surge: deal 5 per Rage.\nRetain." },
+  up3 = { effects = { { "surge", cond = "execute" }, { "damage", 10, per = { 5, "surge" } } },
+    text = "Deal 10.\nExecute: Surge: deal 5 per Rage.\nRetain." },
 })
 
 card("colossus_smash", {
@@ -109,6 +132,9 @@ card("colossus_smash", {
   target = "enemy", effects = { { "damage", 6 }, { "apply", "armor_broken", 3 } },
   text = "Deal 6.\nApply Sundered 3 ⌛",
   up = { effects = { { "damage", 8 }, { "apply", "armor_broken", 4 } }, text = "Deal 8.\nApply Sundered 4 ⌛" },
+  up2 = { effects = { { "damage", 11 }, { "apply", "armor_broken", 4 } }, text = "Deal 11.\nApply Sundered 4 ⌛" },
+  up3 = { effects = { { "damage", 11 }, { "apply", "armor_broken", 4 }, { "draw", 1 } },
+    text = "Deal 11.\nApply Sundered 4 ⌛\nDraw 1." },
 })
 
 card("pummel", {
@@ -117,6 +143,8 @@ card("pummel", {
   text = "Interrupt the target's cast.\nDeal 3.\nCooldown 2.",
   up = { cooldown = 1, effects = { { "interrupt" }, { "damage", 5 } },
     text = "Interrupt the target's cast.\nDeal 5.\nCooldown 1." },
+  up2 = { effects = { { "interrupt" }, { "damage", 7 } }, text = "Interrupt the target's cast.\nDeal 7.\nCooldown 1." },
+  up3 = { effects = { { "interrupt", all = true }, { "damage", 7 } }, text = "Interrupt all casts.\nDeal 7.\nCooldown 1." },
 })
 
 card("bladestorm", {
@@ -124,6 +152,8 @@ card("bladestorm", {
   effects = { { "damage", 4, all = true, times = 3 } },
   text = "Deal 4 to all three times.",
   up = { effects = { { "damage", 6, all = true, times = 3 } }, text = "Deal 6 to all three times." },
+  up2 = { effects = { { "damage", 7, all = true, times = 3 } }, text = "Deal 7 to all three times." },
+  up3 = { effects = { { "damage", 8, all = true, times = 3 } }, text = "Deal 8 to all three times." },
 })
 
 -- Deep Wounds : chaque carte Attack jouée pose un DoT (saignement) sur sa cible, ou sur tous les
@@ -143,6 +173,8 @@ card("deep_wounds", {
   power = true, effects = {}, hooks = deepWoundsHooks(1),
   text = "Power.\nAttacks: apply DoT 1.",
   up = { hooks = deepWoundsHooks(2), text = "Power.\nAttacks: apply DoT 2." },
+  up2 = { cost = 0, text = "Power.\nAttacks: apply DoT 2." },
+  up3 = { innate = true, text = "Power.\nAttacks: apply DoT 2.\nInnate." },
 })
 
 -- Fury : beaucoup de petites attaques, Strength qui monte, cartes payées en PV ---------------------
@@ -152,6 +184,8 @@ card("raging_blow", {
   target = "enemy", effects = { { "damage", 5, times = 2 } },
   text = "Deal 5 twice.",
   up = { effects = { { "damage", 7, times = 2 } }, text = "Deal 7 twice." },
+  up2 = { effects = { { "damage", 8, times = 2 } }, text = "Deal 8 twice." },
+  up3 = { effects = { { "damage", 9, times = 2 } }, text = "Deal 9 twice." },
 })
 
 card("whirlwind", {
@@ -159,6 +193,8 @@ card("whirlwind", {
   effects = { { "damage", 4, all = true, times = 2 } },
   text = "Deal 4 to all twice.",
   up = { effects = { { "damage", 5, all = true, times = 2 } }, text = "Deal 5 to all twice." },
+  up2 = { retain = true, text = "Deal 5 to all twice.\nRetain." },
+  up3 = { effects = { { "damage", 6, all = true, times = 2 } }, text = "Deal 6 to all twice.\nRetain." },
 })
 
 card("victory_rush", {
@@ -166,6 +202,8 @@ card("victory_rush", {
   target = "enemy", exhaust = true, effects = { { "damage", 3 }, { "heal", 4 } },
   text = "Deal 3.\nHeal 4.\nExhaust.",
   up = { effects = { { "damage", 5 }, { "heal", 6 } }, text = "Deal 5.\nHeal 6.\nExhaust." },
+  up2 = { effects = { { "damage", 5 }, { "heal", 8 } }, text = "Deal 5.\nHeal 8.\nExhaust." },
+  up3 = { effects = { { "damage", 8 }, { "heal", 8 } }, text = "Deal 8.\nHeal 8.\nExhaust." },
 })
 
 card("berserker_rage", {
@@ -174,6 +212,9 @@ card("berserker_rage", {
   text = "+2 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.",
   up = { effects = { { "res", 3 }, { "cleanse" }, { "draw", 1 } },
     text = "+3 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2." },
+  up2 = { innate = true, text = "+3 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.\nInnate." },
+  up3 = { effects = { { "res", 4 }, { "cleanse" }, { "draw", 1 } },
+    text = "+4 Rage.\nRemove negative effects.\nDraw 1.\nCooldown 2.\nInnate." },
 })
 
 card("bloodthirst", {
@@ -183,6 +224,10 @@ card("bloodthirst", {
   text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 4.",
   up = { effects = { { "damage", 8 }, { "heal", 3 }, { "apply", "force", 1, self = true } },
     text = "Deal 8.\nHeal 3.\nGain Strength 1\nCooldown 4." },
+  up2 = { effects = { { "damage", 10 }, { "heal", 3 }, { "apply", "force", 1, self = true } },
+    text = "Deal 10.\nHeal 3.\nGain Strength 1\nCooldown 4." },
+  up3 = { effects = { { "damage", 10 }, { "heal", 5 }, { "apply", "force", 1, self = true } },
+    text = "Deal 10.\nHeal 5.\nGain Strength 1\nCooldown 4." },
 })
 
 card("rampage", {
@@ -190,6 +235,8 @@ card("rampage", {
   target = "enemy", payHp = 3, effects = { { "damage", 4, times = 4 } },
   text = "Pay 3 HP.\nDeal 4 four times.",
   up = { effects = { { "damage", 5, times = 4 } }, text = "Pay 3 HP.\nDeal 5 four times." },
+  up2 = { payHp = 2, text = "Pay 2 HP.\nDeal 5 four times." },
+  up3 = { payHp = 1, text = "Pay 1 HP.\nDeal 5 four times." },
 })
 
 card("battle_shout", {
@@ -197,6 +244,8 @@ card("battle_shout", {
   exhaust = true, effects = { { "apply", "force", 2, self = true } },
   text = "Gain Strength 2\nExhaust.",
   up = { effects = { { "apply", "force", 3, self = true } }, text = "Gain Strength 3\nExhaust." },
+  up2 = { innate = true, text = "Gain Strength 3\nExhaust.\nInnate." },
+  up3 = { cost = 0, text = "Gain Strength 3\nExhaust.\nInnate." },
 })
 
 card("onslaught", {
@@ -204,6 +253,8 @@ card("onslaught", {
   target = "enemy", spend = 2, effects = { { "damage", 10 }, { "draw", 2, cond = "spent" } },
   text = "Deal 10.\nSpend 2: draw 2.",
   up = { effects = { { "damage", 13 }, { "draw", 2, cond = "spent" } }, text = "Deal 13.\nSpend 2: draw 2." },
+  up2 = { effects = { { "damage", 15 }, { "draw", 2, cond = "spent" } }, text = "Deal 15.\nSpend 2: draw 2." },
+  up3 = { spend = 1, text = "Deal 15.\nSpend 1: draw 2." },
 })
 
 -- Enrage : chaque perte de PV donne Strength 1, une fois par tour (par round).
@@ -221,6 +272,8 @@ card("enrage", {
   power = true, effects = {}, hooks = enrageHooks,
   text = "Power.\nHP lost: gain Strength 1, once per turn.",
   up = { cost = 0, text = "Power.\nHP lost: gain Strength 1, once per turn." },
+  up2 = { innate = true, text = "Power.\nHP lost: gain Strength 1, once per turn.\nInnate." },
+  up3 = { effects = { { "res", 2 } }, text = "Power.\n+2 Rage.\nHP lost: gain Strength 1, once per turn.\nInnate." },
 })
 
 card("recklessness", {
@@ -228,6 +281,8 @@ card("recklessness", {
   payHp = 3, exhaust = true, effects = { { "apply", "force", 3, self = true } },
   text = "Pay 3 HP.\nGain Strength 3\nExhaust.",
   up = { effects = { { "apply", "force", 4, self = true } }, text = "Pay 3 HP.\nGain Strength 4\nExhaust." },
+  up2 = { cost = 0, text = "Pay 3 HP.\nGain Strength 4\nExhaust." },
+  up3 = { payHp = 1, text = "Pay 1 HP.\nGain Strength 4\nExhaust." },
 })
 
 -- Protection : Absorb converti en dégâts, ripostes quand il est frappé ------------------------------
@@ -237,6 +292,8 @@ card("shield_block", {
   cooldown = 1, effects = { { "absorb", 8 } },
   text = "Gain 8 Absorb.\nCooldown 1.",
   up = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb.\nCooldown 1." },
+  up2 = { effects = { { "absorb", 13 } }, text = "Gain 13 Absorb.\nCooldown 1." },
+  up3 = { effects = { { "absorb", 15 } }, text = "Gain 15 Absorb.\nCooldown 1." },
 })
 
 -- Revenge : coûte 0 si des PV ont été perdus au tour précédent (règle de classe, champ hurtCost).
@@ -245,6 +302,8 @@ card("revenge", {
   target = "enemy", retain = true, hurtCost = 0, effects = { { "damage", 6 } },
   text = "Deal 6.\nCosts 0 if hit last turn.\nRetain.",
   up = { effects = { { "damage", 9 } }, text = "Deal 9.\nCosts 0 if hit last turn.\nRetain." },
+  up2 = { effects = { { "damage", 11 } }, text = "Deal 11.\nCosts 0 if hit last turn.\nRetain." },
+  up3 = { effects = { { "damage", 11, all = true } }, text = "Deal 11 to all.\nCosts 0 if hit last turn.\nRetain." },
 })
 
 card("thunder_clap", {
@@ -253,6 +312,10 @@ card("thunder_clap", {
   text = "Deal 3 to all.\nApply Demoralized 1 ⌛ to all",
   up = { effects = { { "damage", 5, all = true }, { "apply", "demoralized", 2, all = true } },
     text = "Deal 5 to all.\nApply Demoralized 2 ⌛ to all" },
+  up2 = { effects = { { "damage", 7, all = true }, { "apply", "demoralized", 2, all = true } },
+    text = "Deal 7 to all.\nApply Demoralized 2 ⌛ to all" },
+  up3 = { effects = { { "damage", 7, all = true }, { "apply", "demoralized", 3, all = true } },
+    text = "Deal 7 to all.\nApply Demoralized 3 ⌛ to all" },
 })
 
 card("devastate", {
@@ -260,6 +323,9 @@ card("devastate", {
   target = "enemy", effects = { { "damage", 7 }, { "absorb", 3 } },
   text = "Deal 7.\nGain 3 Absorb.",
   up = { effects = { { "damage", 10 }, { "absorb", 5 } }, text = "Deal 10.\nGain 5 Absorb." },
+  up2 = { effects = { { "damage", 12 }, { "absorb", 6 } }, text = "Deal 12.\nGain 6 Absorb." },
+  up3 = { effects = { { "damage", 12 }, { "absorb", 6 }, { "apply", "armor_broken", 1 } },
+    text = "Deal 12.\nGain 6 Absorb.\nApply Sundered 1 ⌛" },
 })
 
 card("demoralizing_shout", {
@@ -267,6 +333,9 @@ card("demoralizing_shout", {
   cooldown = 4, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
   text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 4.",
   up = { cooldown = 3, text = "+1 Rage.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
+  up2 = { effects = { { "apply", "demoralized", 3, all = true }, { "res", 1 } },
+    text = "+1 Rage.\nApply Demoralized 3 ⌛ to all\nCooldown 3." },
+  up3 = { innate = true, text = "+1 Rage.\nApply Demoralized 3 ⌛ to all\nCooldown 3.\nInnate." },
 })
 
 card("shield_slam", {
@@ -275,6 +344,9 @@ card("shield_slam", {
   text = "Gain 4 Absorb.\nDeal damage equal to Absorb.",
   up = { effects = { { "absorb", 6 }, { "damage", 0, per = { 1, "block" } } },
     text = "Gain 6 Absorb.\nDeal damage equal to Absorb." },
+  up2 = { effects = { { "absorb", 7 }, { "damage", 0, per = { 1, "block" } } },
+    text = "Gain 7 Absorb.\nDeal damage equal to Absorb." },
+  up3 = { retain = true, text = "Gain 7 Absorb.\nDeal damage equal to Absorb.\nRetain." },
 })
 
 card("ignore_pain", {
@@ -282,6 +354,9 @@ card("ignore_pain", {
   minRes = 1, effects = { { "surge" }, { "absorb", 0, per = { 3, "surge" } } },
   text = "Surge: gain 3 Absorb per Rage.",
   up = { effects = { { "surge" }, { "absorb", 0, per = { 4, "surge" } } }, text = "Surge: gain 4 Absorb per Rage." },
+  up2 = { effects = { { "surge" }, { "absorb", 3, per = { 4, "surge" } } },
+    text = "Gain 3 Absorb.\nSurge: gain 4 Absorb per Rage." },
+  up3 = { retain = true, text = "Gain 3 Absorb.\nSurge: gain 4 Absorb per Rage.\nRetain." },
 })
 
 -- Retaliation : chaque coup ennemi (même absorbé) renvoie des dégâts à l'attaquant.
@@ -299,6 +374,8 @@ card("retaliation", {
   power = true, effects = {}, hooks = retaliationHooks(4),
   text = "Power.\nWhen hit: deal 4 to the attacker.",
   up = { hooks = retaliationHooks(6), text = "Power.\nWhen hit: deal 6 to the attacker." },
+  up2 = { cost = 0, text = "Power.\nWhen hit: deal 6 to the attacker." },
+  up3 = { innate = true, text = "Power.\nWhen hit: deal 6 to the attacker.\nInnate." },
 })
 
 card("shield_wall", {
@@ -306,21 +383,28 @@ card("shield_wall", {
   cooldown = 3, effects = { { "absorb", 18 } },
   text = "Gain 18 Absorb.\nCooldown 3.",
   up = { effects = { { "absorb", 24 } }, text = "Gain 24 Absorb.\nCooldown 3." },
+  up2 = { effects = { { "absorb", 28 } }, text = "Gain 28 Absorb.\nCooldown 3." },
+  up3 = { retain = true, text = "Gain 28 Absorb.\nCooldown 3.\nRetain." },
 })
 
-card("last_stand", {
-  level = 1, name = "Last Stand", cost = 1, type = "power", rarity = "rare", path = "protection",
-  power = true, effects = {},
-  hooks = {
+local function lastStandHooks(n)
+  return {
     preventDeath = function(c, power)
       if not Combat.lastBreath(c, "last_stand") then return false end
       c.player.hp = 1
-      Combat.heal(c, c.player, 15)
+      Combat.heal(c, c.player, n)
       return true
     end,
-  },
+  }
+end
+
+card("last_stand", {
+  level = 1, name = "Last Stand", cost = 1, type = "power", rarity = "rare", path = "protection",
+  power = true, effects = {}, hooks = lastStandHooks(15),
   text = "Power.\nLast Breath: stay at 1 HP, heal 15.",
   up = { cost = 0, text = "Power.\nLast Breath: stay at 1 HP, heal 15." },
+  up2 = { hooks = lastStandHooks(20), text = "Power.\nLast Breath: stay at 1 HP, heal 20." },
+  up3 = { innate = true, text = "Power.\nLast Breath: stay at 1 HP, heal 20.\nInnate." },
 })
 
 -- Cartes épiques (cartes de zone, docs/zones/cartes-de-zone.md, « Warrior ») ------------------------------
@@ -338,42 +422,56 @@ epic("death_wish", {
   zone = "westfall", name = "Death Wish", path = "fury",
   text = "Epic.\nCarnage 50%.",
   up = { text = "Epic.\nCarnage 50%.\nKills: heal 3." },
+  up2 = { text = "Epic.\nCarnage 50%.\nKills: heal 5." },
+  up3 = { text = "Epic.\nCarnage 60%.\nKills: heal 5." },
 })
 
 epic("thunderous_roar", {
   zone = "duskwood", name = "Thunderous Roar", path = "protection",
   text = "Epic.\nAt 5 Rage: Shockwave 3.",
   up = { text = "Epic.\nAt 5 Rage: Shockwave 4." },
+  up2 = { text = "Epic.\nAt 5 Rage: Shockwave 5." },
+  up3 = { text = "Epic.\nAt 5 Rage: Shockwave 6." },
 })
 
 epic("sweeping_strikes", {
   zone = "wetlands", name = "Sweeping Strikes", path = "arms",
   text = "Epic.\nTargeted Attack hits: Sweep 1.",
   up = { text = "Epic.\nTargeted Attack hits: Sweep 2." },
+  up2 = { text = "Epic.\nAttacks: Sweep 2." },
+  up3 = { text = "Epic.\nAttacks: Sweep 2.\nKills: +1 Rage." },
 })
 
 epic("titans_grip", {
   zone = "stranglethorn", name = "Titan's Grip", path = "fury",
   text = "Epic.\nDual Wield 2.",
   up = { text = "Epic.\nDual Wield 2, 0-cost free." },
+  up2 = { text = "Epic.\nDual Wield 2.\nKills: heal 4." },
+  up3 = { text = "Epic.\nDual Wield 2.\nKills: heal 6." },
 })
 
 epic("shield_charge", {
   zone = "swamp", name = "Shield Charge", path = "protection",
   text = "Epic.\nEnd of turn: Punish.",
   up = { text = "Epic.\nEnd of turn: Punish +4." },
+  up2 = { text = "Epic.\nEnd of turn: Punish +6." },
+  up3 = { text = "Epic.\nEnd of turn: Punish +8." },
 })
 
 epic("anger_management", {
   zone = "steppes", name = "Anger Management", path = "arms",
   text = "Epic.\nEach Rage spent: Haste 1.",
   up = { text = "Epic.\nEach Rage spent: Haste 2." },
+  up2 = { text = "Epic.\nEach Rage spent: Haste 3." },
+  up3 = { text = "Epic.\nEach Rage spent: Haste 4." },
 })
 
 epic("avatar", {
   zone = "blackrock", name = "Avatar", path = "arms",
   text = "Epic.\nStart of turn: Juggernaut 2.",
   up = { text = "Epic.\nStart of turn: Juggernaut 3." },
+  up2 = { text = "Epic.\nStart of turn: Juggernaut 4." },
+  up3 = { text = "Epic.\nStart of turn: Juggernaut 5." },
 })
 
 -- Bibelots du Guerrier (class = "warrior" : tirés seulement pour lui) ------------------------------

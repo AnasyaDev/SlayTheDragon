@@ -353,8 +353,10 @@ test("Arcane Meditation : le mana non dépensé (N au plus) s'ajoute au tour sui
     local d = Card.defById("arcane_meditation", up)
     local t = d.text
     for _, r in ipairs(ns.Language.ruleWords(d)) do t = t .. "\n" .. ns.Language.ruleText(r.kw, r.n, up) end
-    assert(t:find("Conserve " .. (up and ku or k), 1, true) and t:find("+" .. (up and bu or b) .. " if any", 1, true),
-      "nombres dans le texte")
+    -- améliorée (paliers 1 à 3) : « plus a third of N » (bonus = N / 3, tests des paliers plus bas)
+    assert(t:find("Conserve " .. (up and ku or k), 1, true) and (up and t:find("plus a third of " .. ku .. " if any", 1, true)
+      or not up and t:find("+" .. b .. " if any", 1, true)), "nombres dans le texte")
+    if up then eq(bu * 3, ku, "bonus = tiers de N") end
   end
   local c = setup({ "frostbolt" }, { epic = "arcane_meditation" })
   Combat.endTurn(c)
@@ -515,6 +517,87 @@ test("bots : note des épiques, l'épique du deck vaut plus ; conseils de constr
   assert(b.epic(exp, "rule_of_threes") > b.epic(exp, "mirror_image"), "construit autour")
   local rec, e2 = ns.SimExpedition.play({ seed = 4, class = "mage", epic = "water_elemental", zones = 7 })
   assert(rec and e2.phase == "done")
+end)
+
+---------------------------------------------------------------------------
+-- Paliers 2 et 3 des épiques (15/11/2026, docs/ameliorations.md ; tableau : docs/classes/mage.md) : les crochets
+-- lisent leurs nombres dans Card.def(src), fiche effective au palier de src (Card.level).
+---------------------------------------------------------------------------
+test("paliers : sept épiques à trois paliers, nombres croissants lus au palier de la source", function()
+  local field = { mirror_image = "epicPct", molten_armor = "epicN", water_elemental = "epicN", fingers_of_frost = "epicN",
+    arcane_meditation = "epicBonus", conflagration = "epicN" }
+  for _, id in ipairs(EPICS) do
+    eq(Card.tiers(id), 3, id)
+    local k = field[id]
+    if k then
+      for n = 1, 3 do
+        local a, b = Card.defById(id, n - 1)[k] or 0, Card.defById(id, n)[k] or 0
+        assert(b > a, id .. "+" .. n .. " : " .. k .. " " .. a .. " -> " .. b)
+        eq(Card.def({ id = id, up = n, uid = 1 })[k], b, id .. " : lu au palier de l'instance")
+      end
+    end
+  end
+end)
+
+test("paliers : Mirror Image +2 / +3 (125 %, 150 %), Molten Armor +3, Water Elemental +3, Conflagration +3", function()
+  for n = 2, 3 do
+    local c = setup({ "fireball" }, { epic = "mirror_image", up = n })
+    c.player.st.instant = 1
+    play(c, "fireball", 1)
+    local pct = Card.defById("mirror_image", n).epicPct
+    eq(hpLost(c, 1), 10 + math.floor(10 * pct / 100), "Mirror Image+" .. n)
+  end
+  local m = setup({ "frostbolt" }, { epic = "molten_armor", up = 3, encounter = { "tm_hitter" } })
+  Combat.endTurn(m)
+  eq(m.enemies[1].st.pain, N("molten_armor", 3))
+  local w = setup({ "frostbolt" }, { epic = "water_elemental", up = 3 })
+  eq(hpLost(w, 1), N("water_elemental", 3)); eq(w.enemies[1].st.demoralized, 1)
+  local f = setup({ "scorch" }, { epic = "conflagration", up = 3, encounter = { "tm_dummy", "tm_dummy" } })
+  f.enemies[1].hp, f.enemies[1].st.pain = 2, 4
+  play(f, "scorch", 1)
+  eq(f.enemies[2].st.pain, 4 + N("conflagration", 3))
+end)
+
+test("paliers : Fingers of Frost +3 (+8), Arcane Meditation +2 (Conserve 9, +3) et +3 (Conserve 12, +4)", function()
+  local u = setup({ "fireball" }, { epic = "fingers_of_frost", up = 3 })
+  Combat.applyStatus(u, u.enemies[1], "demoralized", 1)
+  play(u, "fireball", 1)
+  eq(hpLost(u, 1), 10 + N("fingers_of_frost", 3))
+  for n = 2, 3 do
+    local d = Card.defById("arcane_meditation", n)
+    eq(d.epicBonus * 3, d.epicN, "bonus = tiers de N (texte amélioré)")
+    local c = setup({ "frostbolt" }, { epic = "arcane_meditation", up = n })
+    c.player.mana = d.epicN + 2
+    Combat.endTurn(c)
+    eq(c.player.mana, 3 + d.epicN + d.epicBonus, "Arcane Meditation+" .. n)
+  end
+end)
+
+test("paliers : Rule of Threes +2 double la 2e carte du tour (pas la 4e), +3 chaque 2e (2e, 4e)", function()
+  local function run(n)
+    local c = setup({ "ice_lance", "ice_lance", "ice_lance", "ice_lance" }, { epic = "rule_of_threes", up = n })
+    c.player.res = 4
+    local res = {}
+    for i = 1, 4 do
+      play(c, "ice_lance", 1)
+      res[i] = c.player.res
+    end
+    return res
+  end
+  local r2, r3 = run(2), run(3)
+  eq(table.concat(r2, ","), "4,3,3,3", "+2 : la 2e seulement")
+  eq(table.concat(r3, ","), "4,3,3,2", "+3 : la 2e et la 4e")
+  local c = setup({ "ice_lance", "ice_lance" }, { epic = "rule_of_threes", up = 2 })
+  c.player.res = 1
+  play(c, "ice_lance", 1)
+  local before = hpLost(c, 1)
+  play(c, "ice_lance", 1)
+  eq(hpLost(c, 1) - before, 2 * (3 + 0), "2e carte jouée deux fois (Charge dépensée avant)")
+  local src = { id = "rule_of_threes", up = 3, uid = 1 }
+  c.turn.played = 3
+  assert(Combat.ruleOfThreesNext(c, src), "vue : la 4e sera doublée")
+  c.turn.played = 2
+  assert(not Combat.ruleOfThreesNext(c, src))
 end)
 
 ns.Cards.tm_apply_x10 = nil

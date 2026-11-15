@@ -392,7 +392,10 @@ L.trigger("Each Parry gained")
 L.trigger("Surge Attacks")
 for _, t in ipairs(Rogue.EPIC.atrophic_poison) do L.trigger("DoT " .. t .. "+") end
 L.trigger("Surge cards")
-for _, k in ipairs(Rogue.EPIC.kidney_shot) do L.trigger(ns.RogueKidneyLabel(k)) end
+for i, k in ipairs(Rogue.EPIC.kidney_shot) do
+  L.trigger(ns.RogueKidneyLabel(k))
+  if Rogue.EPIC.kidneyCombo[i] > 0 then L.trigger(ns.RogueKidneyShort(k)) end -- « Surge of 4+: » (+2, +3)
+end
 L.trigger("Attack hits")
 do
   local E = Rogue.EPIC
