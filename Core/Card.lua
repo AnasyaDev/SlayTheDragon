@@ -94,8 +94,14 @@ function Card.clearCache()
 end
 Card.clearCache()
 
+-- Fiche effective d'une instance (chemin rapide : fiche déjà en cache, sans passer par Card.defById).
 function Card.def(inst)
-  return Card.defById(inst.id, inst.up)
+  local up = inst.up
+  local n
+  if not up then n = 0 elseif up == true then n = 1 else n = Card.level(up) end
+  local d = cache[n][inst.id]
+  if d then return d end
+  return Card.defById(inst.id, up)
 end
 
 function Card.new(id, up, uid)
