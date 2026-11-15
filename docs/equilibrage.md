@@ -940,3 +940,12 @@ Poison +5, le reste à ± 4 points). Compte neuf avant (`zones=0 level=1`) : 21,
 seront mesurés : Killing Spree +2 (coût 2 → 1), Adrenaline Rush +3 (+3 mana, Draw 3), Echoing Reprimand +3
 (Animacharge 6), Danse Macabre +3 (Flourish 5, multiplié par coup), Kidney Shot +2/+3 (Combo rendus), Shadow Dance
 +3 (+1 Combo par tour), Premeditation +3 (carte à 0, +3 Combo sous Stealth).
+## Paliers +2 et +3 du Guerrier (15/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`, « Améliorer une carte plusieurs fois ») : paliers 2 et 3 écrits à la
+main pour les 34 cartes et les sept épiques du Guerrier (tableau : `docs/classes/warrior-paliers.md`). Classe déjà la
+plus forte : gains dans le bas de la fourchette, rien de multiplié sur Strength, la Rage ou les cartes à plusieurs
+coups (Rampage paie moins de PV, Battle Shout et Recklessness passent à 0 ou Innate, Powers à 0 puis Innate) ; épiques :
+nombres par palier dans `ns.Warrior.EPIC`, ou une ligne « Kills: ». Paliers non mesurés carte par carte (balayages
+abandonnés sur consigne). Campagne bot `human`, clé 0, `zones=7 level=7`, 600 expéditions : 86,2 → 85,8 % ; le bot
+n'atteint le palier 2 que 0,08 fois par expédition (le palier 3 jamais), l'effet en campagne reste donc nul à ce jour.
