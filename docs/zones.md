@@ -574,8 +574,8 @@ Le résumé couvre toute l'expédition : `xp` (total), `levelBefore` / `levelAft
 `beaten` (boss battus), `zones` (un par boss battu : `zoneWon`, `zoneCards`, `keyRelics`, `accountZone`,
 `common`), `zoneCards` et `keyRelics` à plat, `keyUnlocked` (Nefarian), `flags`. Le bilan dit jusqu'où le joueur
 est allé (« Fell in Duskwood (2/7) at stage 3… », « Zones beaten: Westfall (1 of 7). ») et regroupe les
-déblocages des boss battus (« First bosses defeated with the Priest: … », « New epic card: … », « First Westfall
-boss on this account: … unlocked for every class. », « Mythic Keystone +2 unlocked. »). Écrans :
+déblocages des boss battus (« First bosses defeated with the Priest: … », « Mythic Keystone +2 unlocked. » ; épiques, cartes,
+bibelots et commun du compte montrés dans la vitrine des déblocages, 15/11/2026). Écrans :
 `docs/interface.md`, « Campagne continue ».
 
 ## Écran Progress, onglet « Zones »

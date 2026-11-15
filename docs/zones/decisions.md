@@ -108,6 +108,16 @@ Remplace « une expédition se joue dans une zone » et le choix de la zone à l
   migration v6 / expédition v8) et « Mesures de la campagne continue » (tableau par zone, bots `human` et
   `heuristic`) ; écrans : `docs/interface.md`, « Campagne continue ». Aucun nombre d'équilibrage changé.
 
+## Améliorer une carte plusieurs fois (décision du joueur, 15/11/2026)
+
+- Une carte peut être améliorée **jusqu'à trois fois** (+1, +2, +3).
+- Les paliers 2 et 3 sont **écrits à la main, carte par carte** (nouvel effet, coût réduit, nombres), comme le
+  premier ; pas de gain répété automatiquement.
+- Une carte dont le palier suivant n'est pas encore écrit ne peut pas être améliorée au-delà du dernier palier
+  écrit (le contenu arrive classe par classe).
+- Lecture du concepteur, à valider : le joueur a choisi « un 2e palier écrit à la main » et « 3 fois » ; je lis
+  « trois paliers écrits à la main ».
+
 ## Or et marchands sur sept zones (décision du joueur du 15/11/2026)
 - **Constat** : une expédition traverse sept zones avec le même or, mais gains, prix et étal dataient d'une zone par
   expédition ; le joueur a pu acheter tout l'étal dès la zone 2, et la moitié de l'or gagné restait inutilisée

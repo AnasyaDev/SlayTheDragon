@@ -866,28 +866,54 @@ local function metaStep()
     bars = bars, journal = lines, options = { { id = "ui:progress", label = "Back" } } }
 end
 
--- Ce que vient de débloquer le premier boss battu par le compte dans une ou plusieurs zones (commun, pour toutes
--- les classes) : zname = nom(s) des zones, n = nombre de zones.
+-- Déblocages montrés par la vitrine (UI/Screens.lua, Shelf : écran entre deux zones, bilan) : un groupe par
+-- destinataire, { label, cards = {ids} (épiques d'abord), relics = {ids}, potions = {ids}, notes = {textes} } ;
+-- ce qui n'est ni carte ni objet (rencontres, avantages du compte) en notes courtes.
 local PERK_TEXT = { startRelic = "Choose a relic at the start of each expedition.",
   merchantRelic = "One more relic at the merchant." }
-local function commonLine(zname, c, n)
-  local boss = (n or 1) > 1 and " bosses" or " boss"
-  local parts = {}
-  local function add(n, one, many)
-    if n > 0 then parts[#parts + 1] = n .. " " .. (n == 1 and one or many) end
+
+local function epicsFirst(ids)
+  local out = {}
+  for _, id in ipairs(ids) do
+    if ns.Cards[id] and ns.Cards[id].rarity == "epic" then out[#out + 1] = id end
   end
-  add(#c.cards, "neutral card", "neutral cards")
-  add(#c.relics, "relic", "relics")
-  add(#c.potions, "potion", "potions")
-  add(#c.events, "encounter", "encounters")
-  local lines = {}
-  if #parts > 0 then
-    lines[1] = "First " .. zname .. boss .. " on this account: " .. table.concat(parts, ", ") .. " unlocked for every class."
-  else
-    lines[1] = "First " .. zname .. boss .. " on this account."
+  for _, id in ipairs(ids) do
+    if not (ns.Cards[id] and ns.Cards[id].rarity == "epic") then out[#out + 1] = id end
   end
-  for _, k in ipairs(c.perks or {}) do lines[#lines + 1] = "Every class: " .. PERK_TEXT[k] end
-  return lines
+  return out
+end
+
+-- Groupe de la classe (cartes, bibelots) ; nil s'il est vide.
+local function classGroup(cname, cards, relics)
+  if #cards + #relics == 0 then return nil end
+  return { label = cname, cards = epicsFirst(cards), relics = relics, potions = {}, notes = {} }
+end
+
+-- Groupe du compte (« All classes ») : contenu commun d'une ou plusieurs zones (Meta.commonContent) ; nil s'il
+-- est vide.
+local function commonGroup(list)
+  local g = { label = "All classes", cards = {}, relics = {}, potions = {}, notes = {} }
+  local events, perks = 0, {}
+  for _, c in ipairs(list) do
+    for _, id in ipairs(c.cards or {}) do g.cards[#g.cards + 1] = id end
+    for _, id in ipairs(c.relics or {}) do g.relics[#g.relics + 1] = id end
+    for _, id in ipairs(c.potions or {}) do g.potions[#g.potions + 1] = id end
+    events = events + #(c.events or {})
+    for _, k in ipairs(c.perks or {}) do perks[#perks + 1] = k end
+  end
+  if events > 0 then
+    g.notes[#g.notes + 1] = events .. (events == 1 and " new encounter." or " new encounters.")
+  end
+  for _, k in ipairs(perks) do g.notes[#g.notes + 1] = PERK_TEXT[k] end
+  if #g.cards + #g.relics + #g.potions + #g.notes == 0 then return nil end
+  return g
+end
+
+local function unlockGroups(class, common)
+  local groups = {}
+  if class then groups[#groups + 1] = class end
+  if common then groups[#groups + 1] = common end
+  return #groups > 0 and groups or nil
 end
 
 local function endStep()
@@ -935,39 +961,16 @@ local function endStep()
     lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. s.levelAfter .. "!|r"
   end
   -- déblocages de la campagne, acquis à chaque boss battu : premiers boss de la classe (épiques), bibelots de
-  -- clé, commun du compte ; regroupés (une expédition peut en battre sept d'un coup) ; clé suivante (Nefarian)
-  local firsts, epics, others, relics, account = {}, {}, {}, {}, {}
-  local common = { cards = {}, relics = {}, potions = {}, events = {}, perks = {} }
+  -- clé, commun du compte ; regroupés (une expédition peut en battre sept d'un coup) et montrés par la vitrine
+  -- (unlocks, plus bas) ; en texte : les premiers boss de la classe, la clé suivante (Nefarian)
+  local firsts, commons = {}, {}
   for _, p in ipairs(s.zones or {}) do
     if p.zoneWon then firsts[#firsts + 1] = ns.Zone.name(p.zone) end
-    for _, id in ipairs(p.zoneCards or {}) do
-      if ns.Cards[id] and ns.Cards[id].rarity == "epic" then epics[#epics + 1] = cardName(id)
-      else others[#others + 1] = cardName(id) end
-    end
-    for _, id in ipairs(p.keyRelics or {}) do relics[#relics + 1] = relicName(id) end
-    if p.accountZone and p.common then
-      account[#account + 1] = ns.Zone.name(p.zone)
-      for k, list in pairs(common) do
-        for _, v in ipairs(p.common[k] or {}) do list[#list + 1] = v end
-      end
-    end
+    if p.accountZone and p.common then commons[#commons + 1] = p.common end
   end
-  local function plural(n, one, many) return n == 1 and one or many end
   if #firsts > 0 then
-    lines[#lines + 1] = "|cff40ff40First " .. plural(#firsts, "boss", "bosses") .. " defeated with the " .. cname .. ": "
+    lines[#lines + 1] = "|cff40ff40First " .. (#firsts == 1 and "boss" or "bosses") .. " defeated with the " .. cname .. ": "
       .. table.concat(firsts, ", ") .. ".|r"
-  end
-  if #epics > 0 then
-    lines[#lines + 1] = "|cffc070ff" .. plural(#epics, "New epic card: ", "New epic cards: ") .. table.concat(epics, ", ") .. ".|r"
-  end
-  if #others > 0 then
-    lines[#lines + 1] = "|cff40ff40New " .. cname .. " " .. plural(#others, "card", "cards") .. ": " .. table.concat(others, ", ") .. ".|r"
-  end
-  if #relics > 0 then
-    lines[#lines + 1] = "|cff40ff40" .. plural(#relics, "New relic: ", "New relics: ") .. table.concat(relics, ", ") .. ".|r"
-  end
-  if #account > 0 then
-    for _, l in ipairs(commonLine(table.concat(account, ", "), common, #account)) do lines[#lines + 1] = "|cff40c0ff" .. l .. "|r" end
   end
   if s.keyUnlocked then
     lines[#lines + 1] = "|cff40c0ffMythic Keystone +" .. s.keyUnlocked .. " unlocked.|r"
@@ -985,26 +988,19 @@ local function endStep()
       .. hp .. " max HP.|r"
   end
   local bars = { levelBar(e.class) }
-  -- ce que la fin d'expédition vient de débloquer pour la classe, révélé tel quel : cartes et bibelots du
-  -- niveau, carte de zone, bibelots de clé
-  local unlocked = { cards = {}, relics = {} }
+  -- ce que l'expédition vient de débloquer, montré tel quel (vitrine) : pour la classe, cartes de zone
+  -- (épiques d'abord), cartes et bibelots de la montée de niveau, bibelots de clé ; pour toutes les classes,
+  -- le commun des zones dont le compte bat le boss pour la première fois
+  local cards, relics = {}, {}
+  for _, id in ipairs(s.zoneCards or {}) do cards[#cards + 1] = id end
   if up and s.unlocked then
-    for _, id in ipairs(s.unlocked.cards) do unlocked.cards[#unlocked.cards + 1] = id end
-    for _, id in ipairs(s.unlocked.relics) do unlocked.relics[#unlocked.relics + 1] = id end
+    for _, id in ipairs(s.unlocked.cards) do cards[#cards + 1] = id end
+    for _, id in ipairs(s.unlocked.relics) do relics[#relics + 1] = id end
   end
-  -- épique (carte de zone) : présentée à part, mise en avant (unlocked.epic) ; les autres cartes de zone
-  -- (s'il y en avait sans rareté épique) avec les déblocages de la montée de niveau
-  for _, id in ipairs(s.zoneCards or {}) do
-    if ns.Cards[id] and ns.Cards[id].rarity == "epic" and not unlocked.epic then
-      unlocked.epic = id
-    else
-      unlocked.cards[#unlocked.cards + 1] = id
-    end
-  end
-  for _, id in ipairs(s.keyRelics or {}) do unlocked.relics[#unlocked.relics + 1] = id end
-  if #unlocked.cards + #unlocked.relics == 0 and not unlocked.epic then unlocked = nil end
+  for _, id in ipairs(s.keyRelics or {}) do relics[#relics + 1] = id end
+  local unlocks = unlockGroups(classGroup(cname, cards, relics), commonGroup(commons))
   return { kind = "end", won = won, result = e.result, title = title, text = table.concat(lines, "\n"),
-    bars = bars, unlocked = unlocked, options = { { id = "ui:new", label = "New expedition" },
+    bars = bars, unlocks = unlocks, options = { { id = "ui:new", label = "New expedition" },
       { id = "ui:progress", label = "Progress" } } }
 end
 
@@ -1301,26 +1297,22 @@ local function transitStep(exp)
   local lines = {}
   lines[#lines + 1] = ns.Zone.name(t.from) .. " is behind you. Zone " .. n .. " of " .. total .. "."
   lines[#lines + 1] = "|cff40ff40You recover " .. (t.healed or 0) .. " HP (" .. exp.hp .. "/" .. exp.maxHp .. ").|r"
-  -- déblocages reportés au boss (Meta.bank) : ils servent à la prochaine expédition
+  -- déblocages reportés au boss (Meta.bank) : ils servent aux prochaines expéditions ; montrés par la vitrine
+  -- (unlocks) : épique et cartes de zone, bibelots de clé (la classe), commun de la zone (le compte)
   local part
   for _, p in ipairs(exp.banked and exp.banked.zones or {}) do
     if p.zone == t.from then part = p end
   end
+  local unlocks
   if part then
-    local unlocked = {}
-    if part.zoneWon then
-      for _, id in ipairs(Meta.zoneCards(exp.class, part.zone)) do
-        unlocked[#unlocked + 1] = "|cffc070ffepic card " .. cardName(id) .. "|r"
-      end
-    end
-    for _, id in ipairs(part.keyRelics or {}) do unlocked[#unlocked + 1] = "relic " .. relicName(id) end
-    if part.accountZone then unlocked[#unlocked + 1] = "new common content for every class" end
-    if #unlocked > 0 then
-      lines[#lines + 1] = "Unlocked for your next expeditions (" .. cname .. "): " .. table.concat(unlocked, ", ") .. "."
-    end
+    local cards, relics = {}, {}
+    if part.zoneWon then cards = Meta.zoneCards(exp.class, part.zone) end
+    for _, id in ipairs(part.keyRelics or {}) do relics[#relics + 1] = id end
+    unlocks = unlockGroups(classGroup(cname, cards, relics),
+      part.accountZone and commonGroup({ Meta.commonContent(ns.Zone.order(part.zone) or 0) }) or nil)
   end
   return { kind = "transit", title = X.actName(exp), text = table.concat(lines, "\n"), zone = exp.zone,
-    from = t.from, healed = t.healed, pos = n, count = total,
+    from = t.from, healed = t.healed, pos = n, count = total, unlocks = unlocks,
     options = { actionOption(avail, { id = "continue", label = "Continue" }) } }
 end
 

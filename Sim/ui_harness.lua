@@ -1235,6 +1235,121 @@ local function snap(name, force)
   if content then Render.svg(H, _G.SlayTheDragonFrame, SNAP .. "/" .. name .. ".svg", name) end
 end
 
+-- Vitrine des déblocages (UI/Screens.lua, Shelf) de l'écran affiché (entre deux zones, bilan) : ids des
+-- cartes et des cases visibles, et problèmes de place : élément hors du panneau ou de la fenêtre, cartes ou
+-- cases qui se chevauchent, visuel d'une carte (languette, plaque) sur un texte de la vitrine ou de l'écran,
+-- élément sur un cadre de `avoid` (titre, pastilles, texte, boutons, barres…). Renvoie { cards = {ids},
+-- icons = {ids}, cardFrames, iconFrames, problems = {textes} }.
+local ShelfR
+local function shelfReport(scr, avoid)
+  if not ShelfR then
+    ShelfR = dofile(root .. "/Sim/ui_render.lua")
+    ShelfR.H = H
+  end
+  local R = ShelfR
+  local function fmt(r) return r and ("%.0f,%.0f,%.0f,%.0f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  local function inside(r, box)
+    return r and box and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local function overlaps(a, b)
+    return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
+  end
+  -- visuel d'une carte : corps et débords (languette et ruban en haut, plaque en bas, ruban sur les côtés)
+  local function padded(r)
+    local w, pad = r[3] - r[1], H.ns.Widgets.PREVIEW_PAD
+    return { r[1] - pad.side * w, r[2] - pad.bottom * w, r[3] + pad.side * w, r[4] + pad.top * w }
+  end
+  local sh = scr.shelf
+  local cards, icons = sh:Visible()
+  local out = { cards = {}, icons = {}, cardFrames = cards, iconFrames = icons, problems = {} }
+  local bad = out.problems
+  local content, outer = R.rect(H.ns.UI.content), R.rect(scr.panel)
+  -- intérieur du panneau : 12 unités de la scène sous ses bords (filets du cadre)
+  local m = 12 * (content[3] - content[1]) / H.ns.UI.CONTENT_W
+  local panel = { outer[1] + m, outer[2] + m, outer[3] - m, outer[4] - m }
+  local items = {}
+  for _, c in ipairs(cards) do
+    if visibleChain(c) then
+      out.cards[#out.cards + 1] = c.cardId
+      items[#items + 1] = { "carte " .. tostring(c.cardId), R.rect(c), padded(R.rect(c)) }
+    end
+  end
+  for _, b in ipairs(icons) do
+    if visibleChain(b) then
+      out.icons[#out.icons + 1] = b.info and b.info.id or "?"
+      items[#items + 1] = { "case " .. tostring(b.info and b.info.id), R.rect(b), R.rect(b) }
+    end
+  end
+  local texts = { { "titre de la vitrine", sh.head } }
+  for i, fs in ipairs(sh.labels) do texts[#texts + 1] = { "nom " .. i, fs } end
+  for i, fs in ipairs(sh.notes) do texts[#texts + 1] = { "note " .. i, fs } end
+  local nShelf = #texts
+  for _, a in ipairs(avoid or {}) do texts[#texts + 1] = a end
+  for i, it in ipairs(items) do
+    if not inside(it[3], panel) then bad[#bad + 1] = it[1] .. " hors du panneau " .. fmt(it[3]) .. " / " .. fmt(panel) end
+    if not inside(it[3], content) then bad[#bad + 1] = it[1] .. " hors de la fenêtre" end
+    for j = i + 1, #items do
+      if overlaps(it[2], items[j][2]) then bad[#bad + 1] = it[1] .. " sur " .. items[j][1] end
+    end
+    for _, t in ipairs(texts) do
+      if visibleChain(t[2]) and overlaps(it[3], R.rect(t[2])) then bad[#bad + 1] = it[1] .. " sur " .. t[1] end
+    end
+  end
+  -- textes de la vitrine : dans le panneau, ni les uns sur les autres ni sur ceux de l'écran
+  if not inside(outer, content) then bad[#bad + 1] = "panneau hors de la fenêtre " .. fmt(outer) end
+  for i = 1, nShelf do
+    local t = texts[i]
+    if visibleChain(t[2]) then
+      local r = R.rect(t[2])
+      if not inside(r, panel) then bad[#bad + 1] = t[1] .. " hors du panneau" end
+      for j = i + 1, #texts do
+        if visibleChain(texts[j][2]) and overlaps(r, R.rect(texts[j][2])) then bad[#bad + 1] = t[1] .. " sur " .. texts[j][1] end
+      end
+    end
+  end
+  return out
+end
+
+-- Survols de la vitrine (rapport de shelfReport) : chaque carte montre son aperçu à taille réelle (la même
+-- carte, échelle 1, dans la fenêtre), chaque case l'infobulle de son objet (nom en première ligne).
+-- Renvoie les problèmes.
+local function shelfHovers(rep)
+  local R, W, bad = ShelfR, H.ns.Widgets, {}
+  local content = R.rect(H.ns.UI.content)
+  local ws = (content[3] - content[1]) / H.ns.UI.CONTENT_W
+  for _, c in ipairs(rep.cardFrames) do
+    c:GetScript("OnEnter")(c)
+    for _ = 1, 30 do H.advance(0.02) end
+    local pv = W.preview
+    local pr = pv and pv:IsVisible() and R.vrect(pv.bg)
+    local k = pr and (pr[3] - pr[1]) / ws / W.CARD_W or 0
+    if not (pr and pv.of == c and pv.cardId == c.cardId and math.abs(k - 1) < 1e-6) then
+      bad[#bad + 1] = "carte " .. tostring(c.cardId) .. " : pas d'aperçu à taille réelle"
+    elseif not (pr[1] >= content[1] - 0.5 and pr[2] >= content[2] - 0.5 and pr[3] <= content[3] + 0.5
+      and pr[4] <= content[4] + 0.5) then
+      bad[#bad + 1] = "carte " .. tostring(c.cardId) .. " : aperçu hors de la fenêtre"
+    end
+    c:GetScript("OnLeave")(c)
+    for _ = 1, 30 do H.advance(0.02) end
+  end
+  for _, b in ipairs(rep.iconFrames) do
+    local id, kind = b.info and b.info.id, b.info and b.info.kind
+    local def = kind == "potion" and H.ns.Potions[id] or H.ns.Relics[id]
+    local tt = H.hover(b)
+    if not (def and tt[1] == def.name) then
+      bad[#bad + 1] = "case " .. tostring(id) .. " : infobulle « " .. tostring(tt[1]) .. " »"
+    end
+  end
+  return bad
+end
+
+-- Cadres de l'écran entre deux zones que la vitrine ne doit pas recouvrir.
+local function transitAvoid(scr)
+  local out = { { "nom de la zone", scr.title }, { "texte (soin)", scr.text }, { "Continue", scr.go } }
+  for i, p in ipairs(scr.pips) do out[#out + 1] = { "pastille " .. i, p } end
+  return out
+end
+
 print("U1  chargement de tous les fichiers du TOC et premier lancement")
 local ns = H.boot(nil)
 check("SlayTheDragonDB créée par Save au format courant", _G.SlayTheDragonDB and _G.SlayTheDragonDB.version == ns.Save.VERSION
@@ -1447,9 +1562,47 @@ while guard < 400 do
       and st.count == 7 and x.zone == "duskwood" and x.transit.from == "westfall"
       and (st.text or ""):find("You recover " .. x.transit.healed .. " HP", 1, true)
       and (st.text or ""):find("Westfall is behind you", 1, true), st.text)
-    check("entre deux zones : épique de Westfall débloquée tout de suite (méta), annoncée",
-      _G.SlayTheDragonDB.meta.classes.priest.zones.westfall.won == true
-      and (st.text or ""):find("next expeditions", 1, true), st.text)
+    -- compte neuf, premier boss : l'épique du Prêtre liée à Westfall et le commun de Westfall, montrés (vitrine)
+    local M = H.ns.Meta
+    local epic = M.zoneCards("priest", "westfall")[1]
+    local common = M.commonContent(1)
+    local scr = UI().current
+    H.settle()
+    local rep = shelfReport(scr, transitAvoid(scr))
+    local want = { epic }
+    for _, id in ipairs(common.cards) do want[#want + 1] = id end
+    local wantIcons = {}
+    for _, id in ipairs(common.relics) do wantIcons[#wantIcons + 1] = id end
+    for _, id in ipairs(common.potions) do wantIcons[#wantIcons + 1] = id end
+    check("entre deux zones : épique de Westfall débloquée tout de suite (méta), plus de phrase",
+      _G.SlayTheDragonDB.meta.classes.priest.zones.westfall.won == true and H.ns.Cards[epic].rarity == "epic"
+      and not (st.text or ""):find("Unlocked", 1, true) and not (st.text or ""):find("common content", 1, true), st.text)
+    check("entre deux zones : vitrine « Unlocked for your next expeditions », groupes « Priest » et « All classes »",
+      visibleChain(scr.shelf.head) and scr.shelf.head._text == "Unlocked for your next expeditions"
+      and visibleChain(scr.shelf.labels[1]) and scr.shelf.labels[1]._text == "Priest"
+      and visibleChain(scr.shelf.labels[2]) and scr.shelf.labels[2]._text == "All classes",
+      tostring(scr.shelf.labels[1] and scr.shelf.labels[1]._text))
+    check("entre deux zones : l'épique en tête (vraie carte, cadre violet), puis les cartes du commun",
+      table.concat(rep.cards, ",") == table.concat(want, ",") and rep.cardFrames[1]
+      and ((rawget(rep.cardFrames[1].ribbon, "_texture") or ""):match("card_ribbon_epic") ~= nil)
+      and visibleChain(rep.cardFrames[1].epicGlow),
+      table.concat(rep.cards, ",") .. " / attendu " .. table.concat(want, ","))
+    check("entre deux zones : bibelots et potions du commun en cases", table.concat(rep.icons, ",") == table.concat(wantIcons, ","),
+      table.concat(rep.icons, ",") .. " / attendu " .. table.concat(wantIcons, ","))
+    check("entre deux zones : rencontres du commun en une ligne courte",
+      #common.events > 0 and visibleChain(scr.shelf.notes[1])
+      and scr.shelf.notes[1]._text == "All classes: " .. #common.events .. " new encounters.", scr.shelf.notes[1]._text)
+    local hb = shelfHovers(rep)
+    check("entre deux zones : survol des cartes = aperçu à taille réelle, des cases = infobulle de l'objet", #hb == 0,
+      table.concat(hb, " ; "))
+    local probs = rep.problems
+    local R6 = ShelfR
+    local pr, gr = R6.rect(scr.panel), R6.rect(scr.go)
+    if pr[1] < gr[3] and gr[1] < pr[3] and pr[2] < gr[4] and gr[2] < pr[4] then probs[#probs + 1] = "panneau sur Continue" end
+    check("entre deux zones : tout dans le panneau, sans chevauchement (nom, pastilles, soin, Continue), sans défilement",
+      #probs == 0 and not visibleChain(scr.shelf.scroll.track), table.concat(probs, " ; "))
+    check("entre deux zones : aucun texte tronqué", #H.ns.Widgets.truncatedNow() == 0,
+      table.concat(H.ns.Widgets.truncatedNow(), " ; "))
     check("entre deux zones : bouton Continue, bandeau « Duskwood · 2/7 »", UI().current.go._shown
       and UI().current.go.option.id == "continue" and UI().zone._text == "Duskwood · 2/7", UI().zone._text)
     check("entre deux zones : décor de Duskwood", (H.ns.Controller.scene() or ""):find("duskwood", 1, true),
@@ -1508,10 +1661,27 @@ if state.crossed then
   check("bilan : jusqu'où (abandon à Duskwood, zone 2 de 7), Westfall battue",
     (step.text or ""):find("Turned back at the gates of Duskwood (2/7)", 1, true)
     and (step.text or ""):find("Zones beaten: Westfall (1 of 7)", 1, true), step.text)
-  check("bilan : déblocages du boss de Westfall (épique, commun du compte)",
+  check("bilan : premier boss de la classe en texte ; épique et commun du compte plus décrits en texte",
     (step.text or ""):find("First boss defeated with the Priest: Westfall.", 1, true)
-    and (step.text or ""):find("New epic card", 1, true)
-    and (step.text or ""):find("First Westfall boss on this account", 1, true), step.text)
+    and not (step.text or ""):find("New epic card", 1, true)
+    and not (step.text or ""):find("on this account", 1, true), step.text)
+  -- vitrine du bilan : épique du Prêtre, commun de Westfall (cartes, cases), tout visible sans défilement
+  local scr = UI().current
+  local avoid = {}
+  for i, b in ipairs(scr.bars) do avoid[#avoid + 1] = { "barre " .. i, b } end
+  for i, b in ipairs(scr.buttons) do avoid[#avoid + 1] = { "bouton " .. i, b } end
+  avoid[#avoid + 1] = { "texte du bilan", scr.text }
+  local rep = shelfReport(scr, avoid)
+  local common = Meta.commonContent(1)
+  local want = { Meta.zoneCards("priest", "westfall")[1] }
+  for _, id in ipairs(common.cards) do want[#want + 1] = id end
+  check("bilan : vitrine (épique puis cartes du commun, " .. (#common.relics + #common.potions) .. " cases), sans défilement",
+    table.concat(rep.cards, ",") == table.concat(want, ",") and #rep.icons == #common.relics + #common.potions
+    and not visibleChain(scr.shelf.scroll.track), table.concat(rep.cards, ",") .. " / " .. #rep.icons)
+  check("bilan : vitrine dans le panneau, sans chevauchement (texte, barre, boutons)", #rep.problems == 0,
+    table.concat(rep.problems, " ; "))
+  local hb = shelfHovers(rep)
+  check("bilan : survols de la vitrine (aperçu, infobulles)", #hb == 0, table.concat(hb, " ; "))
 else
   check("défaite à Westfall : aucune zone battue", (step.text or ""):find("No zone beaten", 1, true), step.text)
 end
@@ -7330,7 +7500,7 @@ do
     and (st.text or ""):find("Priest experience", 1, true), st.text)
   local scr = UI().current
   local shownIds, content, out = {}, R.rect(ns.UI.content), {}
-  for _, c in ipairs(scr.newCards) do
+  for _, c in ipairs(scr.shelf.cards) do
     if vis(c) then
       shownIds[#shownIds + 1] = c.cardId
       if not inside(R.rect(c), content) then out[#out + 1] = fmt(R.rect(c)) end
@@ -7358,10 +7528,11 @@ do
   e.result, e.phase = "won", "done"
   ns.UI.refresh()
   scr = UI().current
-  local rb = scr.newRelics[1]
-  local rtt = vis(rb) and table.concat(H.hover(rb), " | ") or ""
-  check("bilan niveau 3 : Benediction révélée, aucune carte", vis(rb) and rtt:find("Benediction", 1, true) ~= nil
-    and not vis(scr.newCards[1]), rtt)
+  local shownCards, shownIcons = scr.shelf:Visible()
+  local rb = shownIcons[1]
+  local rtt = rb and vis(rb) and table.concat(H.hover(rb), " | ") or ""
+  check("bilan niveau 3 : Benediction révélée, aucune carte", rb and vis(rb) and rtt:find("Benediction", 1, true) ~= nil
+    and #shownIcons == 1 and #shownCards == 0, rtt)
   -- sans montée : rangée cachée, panneau à sa place
   clickOption("ui:new")
   clickOption("go")
@@ -7369,7 +7540,9 @@ do
   e.result, e.phase = "lost", "done"
   ns.UI.refresh()
   scr = UI().current
-  check("bilan sans montée : rien de révélé", not vis(scr.newCards[1]) and not vis(scr.newRelics[1]))
+  shownCards, shownIcons = scr.shelf:Visible()
+  check("bilan sans montée : rien de révélé, pas de vitrine", #shownCards == 0 and #shownIcons == 0
+    and not vis(scr.shelf.head))
 end
 
 print("UX survols sans agrandissement : texte immobile au pixel, surbrillance, cartes levées ou aperçu à taille réelle")
@@ -8554,9 +8727,15 @@ do
   ns.Expedition.enterZone(e, "duskwood")
   ns.UI.refresh()
   st = UI().step
-  check("entre deux zones : épique et commun du compte annoncés pour les prochaines expéditions", currentKind() == "transit"
-    and (st.text or ""):find("Westfall Test Card", 1, true) and (st.text or ""):find("new common content for every class", 1, true),
+  local u = st.unlocks or {}
+  check("entre deux zones : carte de zone (Priest) et commun du compte montrés (vitrine), plus en texte",
+    currentKind() == "transit" and u[1] and u[1].label == "Priest" and u[1].cards[1] == "uz_zone_card"
+    and u[2] and u[2].label == "All classes" and #u[2].cards == #ns.Meta.commonContent(1).cards
+    and not (st.text or ""):find("Westfall Test Card", 1, true) and not (st.text or ""):find("common content", 1, true),
     st.text)
+  local trep = shelfReport(UI().current, transitAvoid(UI().current))
+  check("entre deux zones : la carte de zone à l'écran (vraie carte), sans chevauchement",
+    trep.cards[1] == "uz_zone_card" and #trep.problems == 0, table.concat(trep.problems, " ; "))
   H.settle()
   check("entre deux zones : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("entre-zones-campagne", true)
@@ -8573,43 +8752,39 @@ do
   -- cartes et bibelots révélés : ids, et ce qui sort de la fenêtre ou recouvre un bouton, une barre
   local function revealed()
     scr = UI().current
-    local ids, rids, out = {}, {}, {}
     content = R.rect(ns.UI.content)
-    for _, c in ipairs(scr.newCards) do
-      if vis(c) then
-        ids[#ids + 1] = c.cardId
-        if not inside(R.rect(c), content) then out[#out + 1] = "carte " .. fmt(R.rect(c)) end
-        for _, b in ipairs(scr.buttons) do if vis(b) and overlaps(R.rect(c), R.rect(b)) then out[#out + 1] = "carte sur un bouton" end end
-      end
-    end
-    for _, b in ipairs(scr.newRelics) do
-      if vis(b) then
-        rids[#rids + 1] = b.info and b.info.id or "?"
-        if not inside(R.rect(b), content) then out[#out + 1] = "bibelot " .. fmt(R.rect(b)) end
-      end
-    end
+    local avoid = { { "texte du bilan", scr.text } }
+    for i, b in ipairs(scr.buttons) do avoid[#avoid + 1] = { "bouton " .. i, b } end
+    for i, b in ipairs(scr.bars) do avoid[#avoid + 1] = { "barre " .. i, b } end
+    local rep = shelfReport(scr, avoid)
+    local ids, rids, out = rep.cards, rep.icons, rep.problems
     local pr = R.rect(scr.panel)
     if not inside(pr, content) then out[#out + 1] = "panneau " .. fmt(pr) end
     for _, b in ipairs(scr.buttons) do if vis(b) and overlaps(pr, R.rect(b)) then out[#out + 1] = "panneau sur un bouton" end end
     local tb = R.rect(scr.text)
     for _, b in ipairs(scr.bars) do if vis(b) and overlaps(tb, R.rect(b)) then out[#out + 1] = "texte sur la barre" end end
-    return table.concat(ids, ","), table.concat(rids, ","), out
+    return ids, rids, out
   end
   local text = st.text or ""
   local missing = missingIn(text, {
     "Fell in Duskwood (2/7) at stage 0 against Nightbane Dark Runner.",
     "Zones beaten: Westfall (1 of 7).",
     "First boss defeated with the Priest: Westfall.",
-    "New Priest card: Westfall Test Card.",
-    "First Westfall boss on this account:",
-    "unlocked for every class.",
   })
-  check("bilan : jusqu'où, zone battue, carte de zone, commun du compte annoncés ; pas de clé sans Nefarian",
+  check("bilan : jusqu'où, zone battue, premier boss ; cartes et bibelots plus en texte ; pas de clé sans Nefarian",
     currentKind() == "end" and #missing == 0 and not text:find("New relic", 1, true)
+    and not text:find("New Priest card", 1, true) and not text:find("on this account", 1, true)
     and not text:find("Mythic Keystone", 1, true), table.concat(missing, " / ") .. " <- " .. text)
   local ids, rids, out = revealed()
-  check("bilan : carte de zone révélée (vraie carte), dans la fenêtre, hors des boutons",
-    ids:find("uz_zone_card", 1, true) and rids == "" and #out == 0, ids .. " / " .. rids .. " / " .. table.concat(out, " ; "))
+  local wc = ns.Meta.commonContent(1)
+  local wantIds = { "uz_zone_card" }
+  for _, id in ipairs(wc.cards) do wantIds[#wantIds + 1] = id end
+  local wantR = {}
+  for _, id in ipairs(wc.relics) do wantR[#wantR + 1] = id end
+  for _, id in ipairs(wc.potions) do wantR[#wantR + 1] = id end
+  check("bilan : carte de zone (Priest) puis commun de Westfall (cartes, cases), dans la fenêtre, hors des boutons",
+    table.concat(ids, ",") == table.concat(wantIds, ",") and table.concat(rids, ",") == table.concat(wantR, ",") and #out == 0,
+    table.concat(ids, ",") .. " / " .. table.concat(rids, ",") .. " / " .. table.concat(out, " ; "))
   H.settle()
   check("bilan : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("bilan-campagne", true)
@@ -8632,13 +8807,18 @@ do
   e.result, e.phase = "abandoned", "done"
   ns.UI.refresh()
   text = UI().step.text or ""
-  missing = missingIn(text, { "New relic: Test Key Relic.", "Turned back at the gates of Duskwood (2/7)" })
-  check("bilan à +1 : bibelot de clé annoncé, rien d'autre de la campagne", #missing == 0
+  missing = missingIn(text, { "Turned back at the gates of Duskwood (2/7)" })
+  check("bilan à +1 : rien d'autre de la campagne en texte", #missing == 0 and not text:find("New relic", 1, true)
     and not text:find("First", 1, true) and not text:find("New Priest card", 1, true) and not text:find("Mythic Keystone", 1, true),
     table.concat(missing, " / ") .. " <- " .. text)
   ids, rids, out = revealed()
-  check("bilan à +1 : bibelot de clé révélé (case du bibelot), dans la fenêtre", rids == "uz_key_relic" and #out == 0,
-    ids .. " / " .. rids .. " / " .. table.concat(out, " ; "))
+  local ksh = UI().current.shelf
+  local _, kicons = ksh:Visible()
+  local ktt = kicons[1] and H.hover(kicons[1]) or {}
+  check("bilan à +1 : bibelot de clé (case du bibelot, groupe Priest seul, infobulle), dans la fenêtre",
+    table.concat(rids, ",") == "uz_key_relic" and #out == 0 and ktt[1] == "Test Key Relic"
+    and ksh.labels[1]._text == "Priest" and vis(ksh.labels[1]) and not (ksh.labels[2] and vis(ksh.labels[2])),
+    table.concat(ids, ",") .. " / " .. table.concat(rids, ",") .. " / " .. table.concat(out, " ; "))
   snap("bilan-bibelot-de-cle", true)
   noLeague("bilan à +1")
 
@@ -8729,15 +8909,53 @@ do
   text = UI().step.text or ""
   missing = missingIn(text, { "Nefarian has fallen: the 7 zones are crossed.",
     "First bosses defeated with the Priest: Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain.",
-    "First Duskwood, Wetlands, Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain bosses on this account:",
     "Mythic Keystone +2 unlocked." })
-  check("bilan d'une victoire complète : boss regroupés, commun du compte regroupé, clé +2", #missing == 0
-    and not text:find("Zones beaten", 1, true), table.concat(missing, " / ") .. " <- " .. text)
+  check("bilan d'une victoire complète : boss regroupés, clé +2, commun du compte plus en texte", #missing == 0
+    and not text:find("Zones beaten", 1, true) and not text:find("on this account", 1, true),
+    table.concat(missing, " / ") .. " <- " .. text)
+  -- commun des six zones regroupé dans « All classes » : cartes, cases, rencontres et avantages en une ligne
+  local wantC, wantR2, wantP, nev, perks = 0, 0, 0, 0, {}
+  for i = 2, #ns.Zone.ORDER do
+    local c = ns.Meta.commonContent(i)
+    wantC, wantR2, wantP, nev = wantC + #c.cards, wantR2 + #c.relics, wantP + #c.potions, nev + #c.events
+    for _, k in ipairs(c.perks) do perks[#perks + 1] = k end
+  end
+  local ug = UI().step.unlocks or {}
+  local allG = ug[#ug] or {}
+  local noteTxt = table.concat(allG.notes or {}, " ")
+  check("bilan d'une victoire complète : « All classes » regroupe le commun des six zones, rencontres et avantages en note",
+    allG.label == "All classes" and #allG.cards == wantC and #allG.relics == wantR2 and #allG.potions == wantP
+    and noteTxt:find(nev .. " new encounters.", 1, true) ~= nil and #perks == 2
+    and noteTxt:find("Choose a relic at the start of each expedition.", 1, true) ~= nil
+    and noteTxt:find("One more relic at the merchant.", 1, true) ~= nil, noteTxt)
   H.settle()
   check("bilan d'une victoire complète : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   ids, rids, out = revealed()
   check("bilan d'une victoire complète : panneau et déblocages dans la fenêtre", #out == 0, table.concat(out, " ; "))
   snap("bilan-victoire-complete", true)
+  -- trop pour tenir : les rangées défilent à la molette (RowScroll) ; chaque position est propre, tout est vu
+  local vsh = UI().current.shelf
+  local seen, nWant, sbad = {}, 0, {}
+  for _, g in ipairs(ug) do
+    for _, list in ipairs({ g.cards, g.relics, g.potions }) do
+      for _, id in ipairs(list) do if not seen[id] then seen[id] = false nWant = nWant + 1 end end
+    end
+  end
+  check("bilan d'une victoire complète : vitrine défilante (indicateur montré)", vsh.scroll:MaxOffset() > 0
+    and vis(vsh.scroll.track), vsh.scroll:MaxOffset())
+  for pos = 0, vsh.scroll:MaxOffset() do
+    if vsh.scroll.offset ~= pos then sbad[#sbad + 1] = "position " .. vsh.scroll.offset .. " au lieu de " .. pos end
+    ids, rids, out = revealed()
+    for _, o in ipairs(out) do sbad[#sbad + 1] = pos .. " : " .. o end
+    for _, id in ipairs(ids) do seen[id] = true end
+    for _, id in ipairs(rids) do seen[id] = true end
+    if pos == 1 then snap("bilan-victoire-complete-defile", true) end
+    vsh.panel:GetScript("OnMouseWheel")(vsh.panel, -1)
+  end
+  local nSeen = 0
+  for _, v in pairs(seen) do if v then nSeen = nSeen + 1 end end
+  check("bilan d'une victoire complète : toutes les positions dans le panneau, sans chevauchement, tout vu une fois",
+    #sbad == 0 and nSeen == nWant, nSeen .. "/" .. nWant .. " " .. table.concat(sbad, " ; "))
   clickOption("ui:new")
   check("accueil : clé +2 ouverte après Nefarian à +1", UI().step.keyMax == 2 and not option("key:2").disabled and option("key:3").disabled)
   clickOption("class:mage")
@@ -8986,6 +9204,138 @@ do
   check("rencontre de la colline : Sentinel Hill peinte", e2.event.id == "sentinel_hill"
     and H.ns.Scene.scene == "westfall_hill", tostring(e2.event.id) .. " " .. tostring(H.ns.Scene.scene))
   snap("rencontre-sentinel-hill", true)
+end
+
+print("UTR écran entre deux zones : vitrine des déblocages (compte neuf à +5 après chaque zone, épique seule, rien)")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local vis = visibleChain
+  local function fmt(r) return r and ("%.0f,%.0f,%.0f,%.0f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  -- boss de `zone` (et ceux d'avant) battus à la clé `key`, écran entre deux zones vers la suivante
+  local function transitAfter(class, zone, key)
+    local ns = H.ns
+    if class ~= "priest" then clickOption("class:" .. class) end
+    ns.Controller.makeSeed = function() return SEED end
+    clickOption("go")
+    local e = EXP()
+    if e.phase == "start" then clickOption("skipStartRelic") end
+    e.key = key
+    local n = ns.Zone.order(zone)
+    for i = 1, n do e.beaten[i] = ns.Zone.ORDER[i] end
+    e.zone = zone
+    e.stats.cleared, e.stats.bosses = 8 * n, n
+    ns.Save.settle(_G.SlayTheDragonDB)
+    ns.Expedition.enterZone(e, ns.Zone.ORDER[n + 1])
+    ns.UI.refresh()
+    H.settle()
+    return UI().step, UI().current
+  end
+  -- tout ce que la vitrine doit montrer (ids des groupes)
+  local function wanted(groups)
+    local cards, icons = {}, {}
+    for _, g in ipairs(groups or {}) do
+      for _, id in ipairs(g.cards) do cards[#cards + 1] = id end
+      for _, id in ipairs(g.relics) do icons[#icons + 1] = id end
+      for _, id in ipairs(g.potions) do icons[#icons + 1] = id end
+    end
+    return cards, icons
+  end
+  -- toutes les positions de défilement : problèmes de place, ids vus, survols
+  local function sweep(scr)
+    local sh = scr.shelf
+    local seenC, seenI, bad = {}, {}, {}
+    for pos = 0, sh.scroll:MaxOffset() do
+      if sh.scroll.offset ~= pos then bad[#bad + 1] = "position " .. sh.scroll.offset .. " au lieu de " .. pos end
+      local rep = shelfReport(scr, transitAvoid(scr))
+      for _, p in ipairs(rep.problems) do bad[#bad + 1] = pos .. " : " .. p end
+      for _, p in ipairs(shelfHovers(rep)) do bad[#bad + 1] = pos .. " : " .. p end
+      for _, id in ipairs(rep.cards) do seenC[#seenC + 1] = id end
+      for _, id in ipairs(rep.icons) do seenI[#seenI + 1] = id end
+      sh.panel:GetScript("OnMouseWheel")(sh.panel, -1)
+    end
+    for _ = 0, sh.scroll:MaxOffset() do sh.panel:GetScript("OnMouseWheel")(sh.panel, 1) end
+    local pr, gr = R.rect(scr.panel), R.rect(scr.go)
+    if pr[1] < gr[3] and gr[1] < pr[3] and pr[2] < gr[4] and gr[2] < pr[4] then bad[#bad + 1] = "panneau sur Continue" end
+    return seenC, seenI, bad
+  end
+
+  -- 1. Pire cas, pour chaque zone suivie d'une autre : compte neuf, première victoire du Voleur, à +5 (épique
+  --    et cartes de zone, trois bibelots de clé, tout le commun de la zone : cartes, bibelots, potions, rencontres)
+  for n = 1, #H.ns.Zone.ORDER - 1 do
+    H.boot(nil)
+    H.slash("")
+    local zone = H.ns.Zone.ORDER[n]
+    local st, scr = transitAfter("rogue", zone, 5)
+    local groups = st.unlocks or {}
+    local M = H.ns.Meta
+    local c = M.commonContent(n)
+    local tag = "entre deux zones après " .. zone .. " (compte neuf, +5)"
+    check(tag .. " : groupes « Rogue » (épique, 3 bibelots de clé) et « All classes » (commun de la zone)",
+      #groups == 2 and groups[1].label == "Rogue" and groups[1].cards[1] == M.zoneCards("rogue", zone)[1]
+      and H.ns.Cards[groups[1].cards[1]].rarity == "epic" and #groups[1].relics == #M.keyRelics("rogue", zone)
+      and groups[2].label == "All classes" and #groups[2].cards == #c.cards and #groups[2].relics == #c.relics
+      and #groups[2].potions == #c.potions and not (st.text or ""):find("Unlocked", 1, true),
+      #groups .. " " .. tostring(groups[1] and groups[1].label))
+    local wc, wi = wanted(groups)
+    local seenC, seenI, bad = sweep(scr)
+    check(tag .. " : chaque carte et chaque case montrée une fois, l'épique d'abord ; survols ; rien ne chevauche "
+      .. "(nom, pastilles, soin, Continue) ; panneau dans la fenêtre",
+      table.concat(seenC, ",") == table.concat(wc, ",") and table.concat(seenI, ",") == table.concat(wi, ",") and #bad == 0,
+      table.concat(seenC, ",") .. " | " .. table.concat(seenI, ",") .. " | " .. table.concat(bad, " ; "))
+    local note = scr.shelf.notes[1]
+    local evs = #c.events
+    check(tag .. " : rencontres (et avantages) en une ligne courte, ou rien",
+      (evs == 0 and #c.perks == 0 and not (note and vis(note))) or (note and vis(note) and (note._text or ""):find("^All classes: ") ~= nil
+        and (evs == 0 or (note._text or ""):find(evs .. " new encounter", 1, true) ~= nil)), tostring(note and note._text))
+    check(tag .. " : sans défilement", scr.shelf.scroll:MaxOffset() == 0 and not vis(scr.shelf.scroll.track),
+      scr.shelf.scroll:MaxOffset())
+    check(tag .. " : aucun texte tronqué", #H.ns.Widgets.truncatedNow() == 0, table.concat(H.ns.Widgets.truncatedNow(), " ; "))
+    if zone == "westfall" then snap("entre-zones-compte-neuf", true) end
+    if zone == "duskwood" then snap("entre-zones-maximal", true) end
+  end
+
+  -- 2. Épique seule (commun de Westfall déjà au compte, première victoire du Guerrier) : plus grande, panneau
+  --    de largeur ordinaire, un seul groupe, pas de note
+  local base = { version = H.ns.Save.VERSION, meta = { runs = 1, zones = { westfall = true }, classes = {}, flags = {} },
+    journal = {} }
+  H.boot(deepcopy(base))
+  H.slash("")
+  local st, scr = transitAfter("warrior", "westfall", 0)
+  local rep = shelfReport(scr, transitAvoid(scr))
+  local SH = H.ns.UI.SH
+  local pr = R.rect(scr.panel)
+  local content = R.rect(H.ns.UI.content)
+  local ws = (content[3] - content[1]) / H.ns.UI.CONTENT_W
+  check("épique seule : groupe « Warrior », la carte épique à " .. SH.density[1].epic .. ", pas de note, pas de défilement",
+    st.unlocks and #st.unlocks == 1 and st.unlocks[1].label == "Warrior" and #rep.cards == 1 and #rep.icons == 0
+    and rep.cards[1] == H.ns.Meta.zoneCards("warrior", "westfall")[1]
+    and math.abs(rep.cardFrames[1]:GetScale() - SH.density[1].epic) < 1e-6
+    and not (scr.shelf.notes[1] and vis(scr.shelf.notes[1]))
+    and not vis(scr.shelf.scroll.track), tostring(rep.cardFrames[1] and rep.cardFrames[1]:GetScale()))
+  check("épique seule : panneau de largeur ordinaire, rien ne chevauche", #rep.problems == 0
+    and math.abs((pr[3] - pr[1]) / ws - H.ns.UI.TR.w) < 0.5, fmt(pr) .. " " .. table.concat(rep.problems, " ; "))
+  local hb = shelfHovers(rep)
+  check("épique seule : survol = aperçu à taille réelle", #hb == 0, table.concat(hb, " ; "))
+  snap("entre-zones-epique", true)
+
+  -- 3. Rien de débloqué (Guerrier qui a déjà battu Westfall à +0, commun déjà au compte) : pas de vitrine,
+  --    panneau et texte comme avant
+  base.meta.classes.warrior = { xp = 100, runs = 1, wins = 0, zones = { westfall = { won = true, keyMax = 0, bestKey = 0 } } }
+  H.boot(deepcopy(base))
+  H.slash("")
+  st, scr = transitAfter("warrior", "westfall", 0)
+  pr = R.rect(scr.panel)
+  local TR = H.ns.UI.TR
+  local want = { content[1] + TR.x * ws, content[4] - (TR.y + TR.h) * ws, content[1] + (TR.x + TR.w) * ws, content[4] - TR.y * ws }
+  local cards, icons = scr.shelf:Visible()
+  check("rien de débloqué : pas de vitrine (ni titre, ni nom, ni note), panneau à sa place d'origine",
+    st.unlocks == nil and #cards == 0 and #icons == 0 and not vis(scr.shelf.head) and not vis(scr.shelf.labels[1] or scr.shelf.head)
+    and fmt(pr) == fmt(want), fmt(pr) .. " / " .. fmt(want))
+  local tx = st.text or ""
+  check("rien de débloqué : texte « … is behind you », soin, rien d'autre", tx:find("Westfall is behind you", 1, true) ~= nil
+    and tx:find("You recover", 1, true) ~= nil and select(2, tx:gsub("\n", "")) == 1, tx)
+  snap("entre-zones-sans-deblocage", true)
 end
 
 print("UE  cartes épiques : choix au départ (puis bibelot), règle en jeu parmi les Powers, carte sans coût, remplacement après une élite, variantes, marchand, crans à 10, Progress (Zones), bilan")
@@ -9325,25 +9675,22 @@ do
   ns.UI.refresh()
   st, scr = UI().step, UI().current
   content = R.rect(ns.UI.content)
-  check("bilan : « New epic card: Test Epic. », carte à part (unlocked.epic)", currentKind() == "end"
-    and (st.text or ""):find("New epic card: Test Epic.", 1, true) and st.unlocked and st.unlocked.epic == "ue_epic_a",
+  local u1 = st.unlocks and st.unlocks[1]
+  check("bilan : l'épique en tête du groupe de la classe (unlocks), plus décrite en texte", currentKind() == "end"
+    and not (st.text or ""):find("New epic card", 1, true) and u1 and u1.label == "Priest" and u1.cards[1] == "ue_epic_a",
     st.text)
-  local ebad = {}
-  if not vis(scr.epicCard) or scr.epicCard.cardId ~= "ue_epic_a" then ebad[#ebad + 1] = "carte absente" end
-  if not epicFrame(scr.epicCard) then ebad[#ebad + 1] = "cadre" end
-  if not vis(scr.epicLabel) or scr.epicLabel._text ~= "New epic card" then ebad[#ebad + 1] = "libellé" end
-  if scr.epicCard:GetScale() <= 0.5 + 1e-6 then ebad[#ebad + 1] = "pas plus grande" end
-  for _, o in ipairs({ scr.epicCard, scr.epicLabel }) do
-    if not inside(R.rect(o), content) then ebad[#ebad + 1] = "hors de la fenêtre" end
-    if not inside(R.rect(o), R.rect(scr.panel)) then ebad[#ebad + 1] = "hors du panneau" end
-    for _, b in ipairs(scr.buttons) do if vis(b) and overlaps(R.rect(o), R.rect(b)) then ebad[#ebad + 1] = "sur un bouton" end end
-    for _, b in ipairs(scr.bars) do if vis(b) and overlaps(R.rect(o), R.rect(b)) then ebad[#ebad + 1] = "sur une barre" end end
-  end
-  for _, nc in ipairs(scr.newCards) do
-    if vis(nc) and overlaps(R.rect(nc), R.rect(scr.epicCard)) then ebad[#ebad + 1] = "sur une autre carte" end
-    if vis(nc) and nc.cardId == "ue_epic_a" then ebad[#ebad + 1] = "en double dans la rangée" end
-  end
-  check("bilan : épique plus grande, libellée, dans le panneau, sans chevauchement", #ebad == 0, table.concat(ebad, " ; "))
+  local avoid = { { "texte du bilan", scr.text } }
+  for i, b in ipairs(scr.buttons) do avoid[#avoid + 1] = { "bouton " .. i, b } end
+  for i, b in ipairs(scr.bars) do avoid[#avoid + 1] = { "barre " .. i, b } end
+  local erep = shelfReport(scr, avoid)
+  local ebad = erep.problems
+  local ec = erep.cardFrames[1]
+  if not ec or ec.cardId ~= "ue_epic_a" then ebad[#ebad + 1] = "épique absente ou pas en tête" end
+  if ec and not epicFrame(ec) then ebad[#ebad + 1] = "cadre" end
+  local nEpic = 0
+  for _, id in ipairs(erep.cards) do if id == "ue_epic_a" then nEpic = nEpic + 1 end end
+  if nEpic ~= 1 then ebad[#ebad + 1] = "épique montrée " .. nEpic .. " fois" end
+  check("bilan : épique (cadre violet) en tête, une fois, dans le panneau, sans chevauchement", #ebad == 0, table.concat(ebad, " ; "))
   H.settle()
   check("bilan : aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("ue-bilan-epique", true)
