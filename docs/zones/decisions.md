@@ -117,3 +117,18 @@ Remplace « une expédition se joue dans une zone » et le choix de la zone à l
   écrit (le contenu arrive classe par classe).
 - Lecture du concepteur, à valider : le joueur a choisi « un 2e palier écrit à la main » et « 3 fois » ; je lis
   « trois paliers écrits à la main ».
+
+## Or et marchands sur sept zones (décision du joueur du 15/11/2026)
+- **Constat** : une expédition traverse sept zones avec le même or, mais gains, prix et étal dataient d'une zone par
+  expédition ; le joueur a pu acheter tout l'étal dès la zone 2, et la moitié de l'or gagné restait inutilisée
+  (simulation, bot `human`).
+- **Décision** : « Équilibrer. Pour les marchands des zones plus hautes : augmenter les prix, MAIS augmenter la chance d'y
+  trouver des cartes déjà améliorées et plus rares. »
+- **Appliqué le 15/11/2026** (`docs/expedition.md`, « Économie sur sept zones ») : prix de l'étal × 1 (Westfall) à 2,2
+  (Blackrock Mountain), épique comprise (150 → 330 po), retrait non (il monte déjà à chaque retrait) ; cartes vendues
+  déjà améliorées 0 à 60 % (prix × 1,25) ; cartes rares de l'étal 13 → 36 %, bibelots rares 15 → 33 %. Westfall
+  inchangée. Or inutilisé en fin d'expédition ≈ 50 → 23–29 % (compte neuf), 36–40 → 23–25 % (tout débloqué) ; l'étal
+  entier n'est plus jamais achetable ; taux de victoire inchangés.
+- **À décider par le joueur** : la part d'or gagnée après le dernier marchand (18 à 25 % du gagné) ne dépend que de la
+  fréquence des marchands ; un marchand sur l'écran entre deux zones la réduirait (proposition), une récompense de
+  Nefarian sans or retirerait l'or jamais dépensable.

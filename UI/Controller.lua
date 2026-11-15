@@ -1180,7 +1180,12 @@ local function merchantStep(exp)
     if it.sold then o.disabled, o.reason = true, "Sold." end
     opts[#opts + 1] = actionOption(avail, o)
   end
-  for i, it in ipairs(s.cards) do item("buyCard", i, it, { card = shownCard(exp, it.id), epic = it.epic }) end
+  for i, it in ipairs(s.cards) do
+    -- carte vendue déjà améliorée (zones hautes, X.SHOP_UPGRADED) : affichée améliorée
+    local card = shownCard(exp, it.id)
+    if it.up then card.up = true end
+    item("buyCard", i, it, { card = card, epic = it.epic })
+  end
   for i, it in ipairs(s.relics) do
     local def = ns.Relics[it.id]
     item("buyRelic", i, it, { item = { kind = "relic", id = it.id }, label = relicName(it.id), text = def and def.text })

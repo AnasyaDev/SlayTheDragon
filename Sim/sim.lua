@@ -98,18 +98,48 @@ local function addRecord(agg, rec)
   local fk = rec.zone and (rec.zone .. " " .. rec.floor) or rec.floor
   agg.floors[fk] = (agg.floors[fk] or 0) + (rec.won and 0 or 1)
   -- par zone (runner=expedition) : atteinte, battue, PV / PV max / deck / épique à l'entrée
-  for _, z in ipairs(rec.zones or {}) do
+  for zi, z in ipairs(rec.zones or {}) do
     agg.zones = agg.zones or {}
     local s = agg.zones[z.zone] or { reached = 0, beaten = 0, hp = 0, maxHp = 0, deck = 0, epic = 0 }
     agg.zones[z.zone] = s
     s.reached = s.reached + 1
     if z.beaten then s.beaten = s.beaten + 1 end
     s.hp, s.maxHp, s.deck, s.epic = s.hp + z.hp, s.maxHp + z.maxHp, s.deck + z.deck, s.epic + z.epic
+    -- or à l'entrée de la zone, or gagné dans la zone (jusqu'à l'entrée de la suivante ou la fin)
+    if z.gold then
+      local nx = rec.zones[zi + 1]
+      s.gold = (s.gold or 0) + z.gold
+      s.earned = (s.earned or 0) + ((nx and nx.earned or rec.goldEarned or z.earned) - z.earned)
+    end
+  end
+  -- visites du marchand, par zone (Sim/expedition.lua, record.shops)
+  for _, v in ipairs(rec.shops or {}) do
+    agg.shops = agg.shops or {}
+    local s = agg.shops[v.zone] or { n = 0, gold = 0, total = 0, share = 0, full = 0, bought = 0, removed = 0,
+      spent = 0, items = 0, up = 0, none = 0, afford = 0, epic = 0, epicBought = 0, upBought = 0 }
+    agg.shops[v.zone] = s
+    s.n = s.n + 1
+    s.gold, s.total, s.items, s.up = s.gold + v.gold, s.total + v.total, s.items + v.items, s.up + v.up
+    s.share = s.share + (v.total > 0 and math.min(1, v.gold / v.total) or 1)
+    if v.gold >= v.total then s.full = s.full + 1 end
+    s.bought, s.removed, s.spent = s.bought + (v.bought or 0), s.removed + (v.removed or 0), s.spent + (v.spent or 0)
+    if (v.bought or 0) + (v.removed or 0) == 0 then s.none = s.none + 1 end
+    -- articles abordables : or à l'entrée / prix moyen d'un article de l'étal
+    if v.items > 0 and v.total > 0 then s.afford = s.afford + v.gold * v.items / v.total end
+    s.epic, s.epicBought, s.upBought = s.epic + (v.epic or 0), s.epicBought + (v.epicBought or 0),
+      s.upBought + (v.upBought or 0)
   end
   if rec.visits then
     agg.goldEarned = agg.goldEarned + rec.goldEarned
     agg.goldSpent = agg.goldSpent + rec.goldSpent
     agg.goldEnd = agg.goldEnd + rec.gold
+    -- or gagné après la sortie du dernier marchand (aucun marchand : tout l'or gagné) : il ne pouvait plus servir
+    agg.goldAfterShop = (agg.goldAfterShop or 0) + rec.goldEarned - (rec.earnedAtLastShop or 0)
+    if rec.won then
+      agg.goldAfterShopWin = (agg.goldAfterShopWin or 0) + rec.goldEarned - (rec.earnedAtLastShop or 0)
+      agg.goldEndWin = (agg.goldEndWin or 0) + rec.gold
+      agg.goldEarnedWin = (agg.goldEarnedWin or 0) + rec.goldEarned
+    end
     agg.xp = agg.xp + (rec.xp or 0)
     if rec.won then agg.xpWin = agg.xpWin + (rec.xp or 0) else agg.xpLoss = agg.xpLoss + (rec.xp or 0) end
     agg.cleared = agg.cleared + rec.cleared
@@ -466,6 +496,29 @@ local function report(a, title)
       end
     end
   end
+  -- Économie par zone : or à l'entrée et gagné dans la zone ; visites du marchand (par expédition qui atteint la
+  -- zone), or à l'entrée du marchand, prix de l'étal entier (cartes, bibelots, potions), part achetable (or /
+  -- prix, plafonnée à 100 %), visites où tout l'étal est achetable, articles achetés et retraits par visite,
+  -- visites sans rien acheter, or dépensé par visite, articles vendus améliorés par étal.
+  if a.zones and a.shops then
+    out("")
+    out("Or et marchand par zone  or entrée  gagné  visites  or marchand  étal   achetable  étal entier"
+      .. "  articles  retraits  rien   dépensé  améliorées  abordables  art./étal  amél. ach.  épique (vente/achat)")
+    for _, zid in ipairs(ns.Zone.ORDER) do
+      local z, s = a.zones[zid], a.shops[zid]
+      if z and z.reached > 0 and z.gold then
+        local cols = "        -"
+        if s and s.n > 0 then
+          cols = ("   %4.2f     %6.1f  %6.1f   %s    %s     %5.2f     %5.2f  %s  %6.1f    %5.2f"):format(
+            s.n / z.reached, s.gold / s.n, s.total / s.n, pct(s.share, s.n), pct(s.full, s.n), s.bought / s.n,
+            s.removed / s.n, pct(s.none, s.n), s.spent / s.n, s.up / s.n)
+            .. ("       %5.2f      %5.2f      %5.2f       %4.2f / %4.2f"):format(s.afford / s.n, s.items / s.n,
+              s.upBought / s.n, s.epic / s.n, s.epicBought / s.n)
+        end
+        out(("  %-20s %8.1f %6.1f%s"):format(ns.Zone.name(zid), z.gold / z.reached, (z.earned or 0) / z.reached, cols))
+      end
+    end
+  end
   out("")
   -- PV nets (colonnes ajoutées en fin de ligne : des scripts lisent les autres par position) : PV à l'entrée
   -- moins PV à la sortie, soins du combat déduits ; % PV max = rapporté aux PV max à l'entrée du combat.
@@ -546,8 +599,16 @@ local function report(a, title)
       tonumber(opts.key or 0), zones, tonumber(opts.level or 7)))
     out(("Expérience de classe : %.1f par expédition (victoire %.1f, défaite %.1f)"):format(a.xp / a.runs,
       a.wins > 0 and a.xpWin / a.wins or 0, a.runs > a.wins and a.xpLoss / (a.runs - a.wins) or 0))
-    out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Étapes franchies : %.2f")
-      :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.cleared / a.runs))
+    out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Étapes franchies : %.2f   or inutilisé : %s du gagné")
+      :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.cleared / a.runs,
+        pct(a.goldEnd, a.goldEarned)))
+    out(("Or gagné après le dernier marchand : %.1f (%s du gagné)"):format((a.goldAfterShop or 0) / a.runs,
+      pct(a.goldAfterShop or 0, a.goldEarned)))
+    if a.wins > 0 then
+      out(("Or des victoires : gagné %.1f, restant %.1f (inutilisé : %s du gagné), gagné après le dernier marchand %.1f")
+        :format((a.goldEarnedWin or 0) / a.wins, (a.goldEndWin or 0) / a.wins, pct(a.goldEndWin or 0, a.goldEarnedWin or 0),
+          (a.goldAfterShopWin or 0) / a.wins))
+    end
     out(("Cartes retirées : %.2f   améliorées : %.2f par expédition   deck en fin : %.1f cartes"):format(
       a.removed / a.runs, a.upgraded / a.runs, (a.deckSize or 0) / a.runs))
     -- épique en fin d'expédition (gagnée sur un élite, achetée, ou imposée par epic=) ; victoires avec / sans

@@ -61,6 +61,24 @@ X.EPIC = {
 -- multipliée d'autant). Zone 1 = 1 (poids d'origine, tirages inchangés) ; à régler par simulation.
 X.RARE_BY_ZONE = { 1, 1.15, 1.3, 1.5, 1.65, 1.8, 2 }
 
+-- Marchand selon le rang de la zone (décision du joueur du 15/11/2026 : « prix plus hauts dans les zones hautes,
+-- mais plus de cartes déjà améliorées et plus rares » ; docs/expedition.md, « Économie sur sept zones »). Tables
+-- par rang de zone (ns.Zone.order ; au-delà de la table, la dernière valeur) ; rang 1 (Westfall) = étal
+-- d'origine, mêmes tirages et mêmes prix.
+--   PRICE_BY_ZONE        multiplicateur des prix de l'étal (cartes, cartes neutres, bibelots, potions, épique),
+--                        appliqué avant le crochet « price » des bibelots ; le retrait garde sa propre hausse
+--   SHOP_UPGRADED        chance qu'une carte de l'étal (classe ou neutre, améliorable, pas l'épique) soit vendue
+--                        déjà améliorée (tirage du flux « merchant », seulement si la chance dépasse 0)
+--   UPGRADED_PRICE       facteur de prix d'une carte vendue améliorée
+--   SHOP_RARE_BY_ZONE    part de rares des cartes de l'étal (comme X.RARE_BY_ZONE, propre au marchand)
+--   SHOP_RELIC_RARE_BY_ZONE  part de bibelots rares de l'étal (poids « rare » de X.RELIC_WEIGHTS.normal
+--                        multiplié, pris sur « common » ; récompenses, coffres et rencontres inchangés)
+X.PRICE_BY_ZONE = { 1, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2 }
+X.SHOP_UPGRADED = { 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6 }
+X.UPGRADED_PRICE = 1.25
+X.SHOP_RARE_BY_ZONE = { 1, 1.3, 1.6, 1.9, 2.2, 2.5, 2.8 }
+X.SHOP_RELIC_RARE_BY_ZONE = { 1, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2 }
+
 -- Paramètres de la couche expédition (réglés par la simulation).
 X.START_GOLD = 50
 X.POTION_SLOTS = 3
@@ -107,15 +125,37 @@ local function byRank(t, exp)
   return t[min(X.zoneRank(exp), #t)]
 end
 
--- Poids de rareté d'une récompense de cartes de ce genre (X.CARD_WEIGHTS[genre]) dans la zone de l'expédition :
--- part de rares multipliée par X.RARE_BY_ZONE, prise sur les communes. Renvoie la table d'origine si le facteur
--- vaut 1 (zone 1), sinon une copie.
-function X.cardWeights(exp, kind)
-  local w = X.CARD_WEIGHTS[kind]
-  local m = byRank(X.RARE_BY_ZONE, exp) or 1
+-- Poids « rare » multipliés par m, pris sur « common » (total inchangé) ; la table d'origine si m vaut 1.
+local function moreRares(w, m)
   if m == 1 or not (w and w.rare and w.common) then return w end
   local extra = min(w.rare * (m - 1), w.common)
-  return { common = w.common - extra, uncommon = w.uncommon, rare = w.rare + extra }
+  local out = {}
+  for k, v in pairs(w) do out[k] = v end
+  out.common, out.rare = w.common - extra, w.rare + extra
+  return out
+end
+
+-- Poids de rareté d'une récompense de cartes de ce genre (X.CARD_WEIGHTS[genre]) dans la zone de l'expédition :
+-- part de rares multipliée par X.RARE_BY_ZONE (marchand, genre "shop" : X.SHOP_RARE_BY_ZONE), prise sur les
+-- communes. Renvoie la table d'origine si le facteur vaut 1 (zone 1), sinon une copie.
+function X.cardWeights(exp, kind)
+  local m = byRank(kind == "shop" and X.SHOP_RARE_BY_ZONE or X.RARE_BY_ZONE, exp) or 1
+  return moreRares(X.CARD_WEIGHTS[kind], m)
+end
+
+-- Poids de rareté des bibelots de l'étal (X.RELIC_WEIGHTS.normal, part de rares × X.SHOP_RELIC_RARE_BY_ZONE).
+function X.shopRelicWeights(exp)
+  return moreRares(X.RELIC_WEIGHTS.normal, byRank(X.SHOP_RELIC_RARE_BY_ZONE, exp) or 1)
+end
+
+-- Multiplicateur des prix de l'étal dans la zone de l'expédition (X.PRICE_BY_ZONE ; 1 à Westfall).
+function X.priceFactor(exp)
+  return byRank(X.PRICE_BY_ZONE, exp) or 1
+end
+
+-- Chance qu'une carte de l'étal soit vendue déjà améliorée dans la zone de l'expédition (X.SHOP_UPGRADED).
+function X.shopUpgradeChance(exp)
+  return byRank(X.SHOP_UPGRADED, exp) or 0
 end
 
 ---------------------------------------------------------------------------
@@ -803,26 +843,38 @@ X.startFight = startFight
 
 local function openShop(exp)
   local rng = exp.rng.merchant
-  local function price(base, kind)
-    local p = base * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(rng))
+  -- prix : base × rang de zone (X.PRICE_BY_ZONE) × amélioration (X.UPGRADED_PRICE) ± X.PRICE_JITTER, puis le
+  -- crochet « price » des bibelots ; à Westfall (facteur 1), le calcul d'origine
+  local factor = X.priceFactor(exp)
+  local function price(base, kind, up)
+    local p = base * factor * (up and X.UPGRADED_PRICE or 1) * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(rng))
     p = X.modify(exp, "price", p, kind)
     return max(1, floor(p + 0.5))
+  end
+  -- carte vendue déjà améliorée (X.SHOP_UPGRADED) : tirée avant son prix, jamais si la chance est nulle
+  local upChance = X.shopUpgradeChance(exp)
+  local function rollUp(id)
+    local d = ns.Cards[id]
+    return upChance > 0 and d.up ~= nil and Rng.float(rng) < upChance or false
   end
   local shop = { cards = {}, relics = {}, potions = {}, removed = 0 }
   local shopWeights = X.cardWeights(exp, "shop")
   local cards = drawCards(exp, rng, X.SHOP.cards, shopWeights, false)
   for i = 1, #cards do
     local base = X.PRICES.card[ns.Cards[cards[i]].rarity] or X.PRICES.card.uncommon
-    shop.cards[i] = { id = cards[i], price = price(base, "card"), sold = false }
+    local up = rollUp(cards[i])
+    shop.cards[i] = { id = cards[i], price = price(base, "card", up), sold = false, up = up or nil }
   end
   -- emplacement « Neutral » : en plus des cartes de classe, à la suite (neutral = true)
   local neutral = drawNeutral(exp, rng, X.SHOP.neutral, shopWeights)
   for i = 1, #neutral do
     local base = X.PRICES.neutral[ns.Cards[neutral[i]].rarity] or X.PRICES.neutral.uncommon
-    shop.cards[#shop.cards + 1] = { id = neutral[i], price = price(base, "card"), sold = false, neutral = true }
+    local up = rollUp(neutral[i])
+    shop.cards[#shop.cards + 1] = { id = neutral[i], price = price(base, "card", up), sold = false, neutral = true,
+      up = up or nil }
   end
   local nRelics = X.SHOP.relics + (commonTier(exp) >= ns.Meta.PERKS.merchantRelic and 1 or 0)
-  local relics = drawRelics(exp, rng, nRelics, X.RELIC_WEIGHTS.normal)
+  local relics = drawRelics(exp, rng, nRelics, X.shopRelicWeights(exp))
   for i = 1, #relics do
     local base = X.PRICES.relic[relicRarity(relics[i])] or X.PRICES.relic.uncommon
     shop.relics[i] = { id = relics[i], price = price(base, "relic"), sold = false }
@@ -841,7 +893,7 @@ local function openShop(exp)
       local erng = epicRng(exp)
       if Rng.float(erng) < X.EPIC.shop then
         local id = Rng.pick(erng, pool)
-        local p = X.EPIC.price * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(erng))
+        local p = X.EPIC.price * factor * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(erng))
         p = max(1, floor(X.modify(exp, "price", p, "card") + 0.5))
         shop.cards[#shop.cards + 1] = { id = id, price = p, sold = false, epic = true }
       end
@@ -1607,7 +1659,8 @@ end
 
 H.merchant = {
   buyCard = function(exp, a)
-    return buy(exp, exp.shop.cards, a[2], function(id) X.addCard(exp, id) end)
+    local it = exp.shop.cards[a[2] or 0]
+    return buy(exp, exp.shop.cards, a[2], function(id) X.addCard(exp, id, it and it.up) end)
   end,
   buyRelic = function(exp, a)
     return buy(exp, exp.shop.relics, a[2], function(id) X.gainRelic(exp, id) end)
