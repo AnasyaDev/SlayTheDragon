@@ -107,3 +107,18 @@ Remplace « une expédition se joue dans une zone » et le choix de la zone à l
 - **Appliqué le 14/11/2026** : `docs/expedition.md`, « Campagne continue » (règles, décisions de détail,
   migration v6 / expédition v8) et « Mesures de la campagne continue » (tableau par zone, bots `human` et
   `heuristic`) ; écrans : `docs/interface.md`, « Campagne continue ». Aucun nombre d'équilibrage changé.
+
+## Or et marchands sur sept zones (décision du joueur du 15/11/2026)
+- **Constat** : une expédition traverse sept zones avec le même or, mais gains, prix et étal dataient d'une zone par
+  expédition ; le joueur a pu acheter tout l'étal dès la zone 2, et la moitié de l'or gagné restait inutilisée
+  (simulation, bot `human`).
+- **Décision** : « Équilibrer. Pour les marchands des zones plus hautes : augmenter les prix, MAIS augmenter la chance d'y
+  trouver des cartes déjà améliorées et plus rares. »
+- **Appliqué le 15/11/2026** (`docs/expedition.md`, « Économie sur sept zones ») : prix de l'étal × 1 (Westfall) à 2,2
+  (Blackrock Mountain), épique comprise (150 → 330 po), retrait non (il monte déjà à chaque retrait) ; cartes vendues
+  déjà améliorées 0 à 60 % (prix × 1,25) ; cartes rares de l'étal 13 → 36 %, bibelots rares 15 → 33 %. Westfall
+  inchangée. Or inutilisé en fin d'expédition ≈ 50 → 23–29 % (compte neuf), 36–40 → 23–25 % (tout débloqué) ; l'étal
+  entier n'est plus jamais achetable ; taux de victoire inchangés.
+- **À décider par le joueur** : la part d'or gagnée après le dernier marchand (18 à 25 % du gagné) ne dépend que de la
+  fréquence des marchands ; un marchand sur l'écran entre deux zones la réduirait (proposition), une récompense de
+  Nefarian sans or retirerait l'or jamais dépensable.

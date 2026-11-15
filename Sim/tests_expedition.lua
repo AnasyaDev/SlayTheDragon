@@ -2234,7 +2234,8 @@ test("récompenses de cartes : part de rares croissante par rang de zone (X.RARE
       local tb, tw = base.common + base.uncommon + base.rare, w.common + w.uncommon + w.rare
       assert(math.abs(tb - tw) < 1e-9, "total inchangé")
       eq(w.uncommon, base.uncommon)
-      assert(math.abs(w.rare / tw - t[rank] * base.rare / tb) < 1e-9, kind .. " rang " .. rank .. " : part de rares")
+      local m = kind == "shop" and X.SHOP_RARE_BY_ZONE[rank] or t[rank] -- marchand : sa propre progression
+      assert(math.abs(w.rare / tw - m * base.rare / tb) < 1e-9, kind .. " rang " .. rank .. " : part de rares")
       assert(w.common >= 0)
     end
     eq(X.cardWeights(exp, "boss"), X.CARD_WEIGHTS.boss, "boss : que des rares, inchangé")
@@ -2265,6 +2266,236 @@ test("récompenses de cartes : part de rares croissante par rang de zone (X.RARE
   local ok, err = pcall(X.act, exp, { "path", id })
   X.cardWeights = orig
   assert(ok, err); eq(exp.phase, "merchant"); assert(seen.shop, "marchand : part de rares de la zone")
+end)
+
+---------------------------------------------------------------------------
+-- Or et marchands sur sept zones (décision du joueur du 15/11/2026, docs/expedition.md)
+---------------------------------------------------------------------------
+
+-- Marchand ouvert dans une zone de la campagne (tout débloqué) ; floor : étape du nœud (épique dès X.EPIC.shopFloor).
+local function shopIn(zone, seed, opts)
+  opts = opts or {}
+  local exp = newExp({ zone = zone, seed = seed or 61, class = opts.class, unlocks = Meta.allUnlocked(7, 7) })
+  for _, r in ipairs(opts.relics or {}) do X.gainRelic(exp, r) end
+  local id = exp.map.start[1]
+  exp.map.nodes[id].kind = "merchant"
+  if opts.floor then exp.map.nodes[id].floor = opts.floor end
+  assert(X.act(exp, { "path", id }))
+  eq(exp.phase, "merchant")
+  return exp
+end
+
+-- Bornes d'un prix tiré : base × facteur ± X.PRICE_JITTER, arrondi.
+local function inRange(price, base, f)
+  return price >= math.floor(base * f * (1 - X.PRICE_JITTER)) and price <= math.ceil(base * f * (1 + X.PRICE_JITTER))
+end
+
+-- Bornes attendues de chaque article de l'étal (prix d'origine × rang de zone × amélioration × facteur extra).
+local function checkPrices(exp, extra)
+  local f = X.priceFactor(exp) * (extra or 1)
+  for _, it in ipairs(exp.shop.cards) do
+    local d = ns.Cards[it.id]
+    local base = it.epic and X.EPIC.price or (it.neutral and X.PRICES.neutral or X.PRICES.card)[d.rarity]
+    if it.up then base = base * X.UPGRADED_PRICE end
+    assert(inRange(it.price, base, f), exp.zone .. " " .. it.id .. " " .. it.price .. " (base " .. base .. " × " .. f .. ")")
+  end
+  for _, k in ipairs({ "relics", "potions" }) do
+    for _, it in ipairs(exp.shop[k]) do
+      local def = (k == "relics" and ns.Relics or ns.Potions)[it.id]
+      local base = X.PRICES[k == "relics" and "relic" or "potion"][def.rarity or "common"]
+      assert(inRange(it.price, base, f), exp.zone .. " " .. it.id .. " " .. it.price .. " (base " .. base .. " × " .. f .. ")")
+    end
+  end
+end
+
+test("marchand : tables par rang de zone (prix, cartes améliorées, rares, bibelots rares), Westfall = étal d'origine", function()
+  for name, t in pairs({ PRICE_BY_ZONE = X.PRICE_BY_ZONE, SHOP_UPGRADED = X.SHOP_UPGRADED,
+      SHOP_RARE_BY_ZONE = X.SHOP_RARE_BY_ZONE, SHOP_RELIC_RARE_BY_ZONE = X.SHOP_RELIC_RARE_BY_ZONE }) do
+    eq(#t, ns.Zone.count(), name .. " : une valeur par zone")
+    for r = 2, #t do assert(t[r] > t[r - 1], name .. " : hausse à chaque zone") end
+  end
+  eq(X.PRICE_BY_ZONE[1], 1); eq(X.SHOP_UPGRADED[1], 0); eq(X.SHOP_RARE_BY_ZONE[1], 1); eq(X.SHOP_RELIC_RARE_BY_ZONE[1], 1)
+  assert(X.UPGRADED_PRICE > 1, "carte améliorée plus chère")
+  for r = 1, #X.SHOP_RARE_BY_ZONE do
+    assert(X.SHOP_RARE_BY_ZONE[r] >= X.RARE_BY_ZONE[r], "marchand au moins aussi riche en rares que les récompenses")
+  end
+  local wf = newExp({ zone = "westfall" })
+  eq(X.cardWeights(wf, "shop"), X.CARD_WEIGHTS.shop, "Westfall : table d'origine (tirages inchangés)")
+  eq(X.shopRelicWeights(wf), X.RELIC_WEIGHTS.normal, "Westfall : table d'origine (tirages inchangés)")
+  eq(X.priceFactor(wf), 1); eq(X.shopUpgradeChance(wf), 0)
+  for rank, zone in ipairs(ns.Zone.ORDER) do
+    local exp = newExp({ zone = zone })
+    eq(X.priceFactor(exp), X.PRICE_BY_ZONE[rank]); eq(X.shopUpgradeChance(exp), X.SHOP_UPGRADED[rank])
+    local w, b = X.shopRelicWeights(exp), X.RELIC_WEIGHTS.normal
+    assert(math.abs(w.common + w.uncommon + w.rare - (b.common + b.uncommon + b.rare)) < 1e-9, "total inchangé")
+    eq(w.uncommon, b.uncommon)
+    assert(math.abs(w.rare - b.rare * X.SHOP_RELIC_RARE_BY_ZONE[rank]) < 1e-9, zone .. " : bibelots rares")
+    local c, cb = X.cardWeights(exp, "shop"), X.CARD_WEIGHTS.shop
+    assert(math.abs(c.rare - cb.rare * X.SHOP_RARE_BY_ZONE[rank]) < 1e-9, zone .. " : cartes rares")
+    eq(X.RELIC_WEIGHTS.normal.rare, 15, "récompenses, coffres, rencontres : table d'origine")
+  end
+end)
+
+test("marchand de Westfall inchangé : mêmes articles et mêmes prix que sans aucun effet de zone", function()
+  -- étals de Westfall (cinq classes, 12 graines, épique possible) avec les tables par défaut, puis avec des tables
+  -- sans aucun effet de zone (le marchand d'avant le 15/11/2026) : identiques, tirage par tirage
+  local function shops()
+    local parts = {}
+    for _, cl in ipairs({ "priest", "warrior", "mage", "rogue", "hunter" }) do
+      for seed = 1, 12 do
+        local exp = shopIn("westfall", seed, { class = cl, floor = X.EPIC.shopFloor })
+        for _, k in ipairs({ "cards", "relics", "potions" }) do
+          for _, it in ipairs(exp.shop[k]) do
+            assert(not it.up, "Westfall : aucune carte améliorée")
+            parts[#parts + 1] = it.id .. ":" .. it.price .. (it.epic and "e" or "")
+          end
+        end
+        parts[#parts + 1] = "|" .. exp.rng.merchant.s -- état du flux après l'étal : aucun tirage en plus
+      end
+    end
+    return table.concat(parts, ",")
+  end
+  local now = shops()
+  local saved = { X.PRICE_BY_ZONE, X.SHOP_UPGRADED, X.SHOP_RARE_BY_ZONE, X.SHOP_RELIC_RARE_BY_ZONE }
+  X.PRICE_BY_ZONE, X.SHOP_UPGRADED, X.SHOP_RARE_BY_ZONE, X.SHOP_RELIC_RARE_BY_ZONE = { 1 }, { 0 }, X.RARE_BY_ZONE, { 1 }
+  local ok, before = pcall(shops)
+  X.PRICE_BY_ZONE, X.SHOP_UPGRADED, X.SHOP_RARE_BY_ZONE, X.SHOP_RELIC_RARE_BY_ZONE = saved[1], saved[2], saved[3], saved[4]
+  assert(ok, before)
+  eq(now, before, "étals de Westfall")
+end)
+
+test("marchand : prix multipliés par le rang de la zone (cartes, neutres, bibelots, potions, épique)", function()
+  local oldShop = X.EPIC.shop
+  X.EPIC.shop = 1
+  local ok, err = pcall(function()
+    for _, zone in ipairs(ns.Zone.ORDER) do
+      for seed = 1, 6 do checkPrices(shopIn(zone, 300 + seed, { floor = X.EPIC.shopFloor })) end
+    end
+    -- un étal de Blackrock Mountain coûte plus du double de celui de Westfall
+    local function total(e)
+      local t = 0
+      for _, k in ipairs({ "cards", "relics", "potions" }) do for _, it in ipairs(e.shop[k]) do t = t + it.price end end
+      return t
+    end
+    local a, b = 0, 0
+    for seed = 1, 20 do a, b = a + total(shopIn("westfall", seed)), b + total(shopIn("blackrock", seed)) end
+    assert(b > 2 * a, "étal de Blackrock " .. b .. " contre " .. a)
+  end)
+  X.EPIC.shop = oldShop
+  assert(ok, err)
+end)
+
+test("marchand : carte vendue déjà améliorée (zones hautes), prix majoré, achetée améliorée", function()
+  local old = X.SHOP_UPGRADED
+  X.SHOP_UPGRADED = { 0, 1, 1, 1, 1, 1, 1 }
+  local ok, err = pcall(function()
+    local exp = shopIn("stranglethorn", 71)
+    local nUp = 0
+    for _, it in ipairs(exp.shop.cards) do
+      local d = ns.Cards[it.id]
+      if it.epic or d.up == nil then eq(it.up, nil, it.id .. " : pas améliorable") else eq(it.up, true, it.id); nUp = nUp + 1 end
+    end
+    assert(nUp >= 5, "cartes améliorées : " .. nUp)
+    checkPrices(exp)
+    exp.gold = 9999
+    local i
+    for j, it in ipairs(exp.shop.cards) do if it.up and not i then i = j end end
+    local id = exp.shop.cards[i].id
+    assert(X.act(exp, { "buyCard", i }))
+    eq(exp.deck[#exp.deck].id, id); eq(exp.deck[#exp.deck].up, true, "achetée améliorée")
+    assert(not X.canUpgrade(exp, #exp.deck), "plus rien à améliorer")
+    -- Westfall : jamais, même à chance forcée ailleurs
+    for _, it in ipairs(shopIn("westfall", 71).shop.cards) do eq(it.up, nil) end
+  end)
+  X.SHOP_UPGRADED = old
+  assert(ok, err)
+  -- chances réelles : aucune à Westfall, X.SHOP_UPGRADED[7] à Blackrock Mountain (cartes améliorables)
+  local up, n = 0, 0
+  for seed = 1, 60 do
+    for _, it in ipairs(shopIn("blackrock", seed).shop.cards) do
+      if not it.epic and ns.Cards[it.id].up ~= nil then
+        n = n + 1
+        if it.up then up = up + 1 end
+      end
+    end
+  end
+  local p = X.SHOP_UPGRADED[#X.SHOP_UPGRADED]
+  assert(math.abs(up / n - p) < 0.1, ("Blackrock : %d / %d améliorées (attendu ≈ %.2f)"):format(up, n, p))
+end)
+
+test("marchand : cartes et bibelots plus rares dans les zones hautes (tirages réels)", function()
+  local function shares(zone)
+    local rc, nc, rr, nr = 0, 0, 0, 0
+    for seed = 1, 150 do
+      local s = shopIn(zone, 1000 + seed).shop
+      for _, it in ipairs(s.cards) do
+        if not it.epic then nc = nc + 1; if ns.Cards[it.id].rarity == "rare" then rc = rc + 1 end end
+      end
+      for _, it in ipairs(s.relics) do
+        nr = nr + 1
+        if ns.Relics[it.id].rarity == "rare" then rr = rr + 1 end
+      end
+    end
+    return rc / nc, rr / nr
+  end
+  local c1, r1 = shares("westfall")
+  local c7, r7 = shares("blackrock")
+  assert(c7 > 1.8 * c1, ("cartes rares : %.2f -> %.2f"):format(c1, c7))
+  assert(r7 > 1.4 * r1, ("bibelots rares : %.2f -> %.2f"):format(r1, r7))
+end)
+
+test("marchand : crochets « price » et « removePrice » des bibelots toujours appliqués, après le rang de zone", function()
+  ns.Relics.test_discount = { name = "Rabais", text = "Prix ÷ 2.", rarity = "common", tier = 0, noPool = true,
+    run = { price = function(run, v, kind) return v * 0.5 end } }
+  local ok, err = pcall(function()
+    for _, zone in ipairs({ "westfall", "stranglethorn", "blackrock" }) do
+      checkPrices(shopIn(zone, 81, { relics = { "test_discount" } }), 0.5)
+    end
+    local exp = shopIn("blackrock", 82, { relics = { "darkmoon_prize_ticket" } })
+    eq(X.removePrice(exp), 0, "Darkmoon Faire Prize Ticket : premier retrait gratuit à Blackrock Mountain")
+    exp.gold = 1000
+    assert(X.act(exp, { "remove", 1 }))
+    eq(exp.gold, 1000)
+    eq(X.removePrice(exp), X.REMOVE_PRICE + X.REMOVE_STEP, "retrait : sa propre hausse, sans le rang de zone")
+  end)
+  ns.Relics.test_discount = nil
+  assert(ok, err)
+end)
+
+test("sauvegarde : étal ouvert d'une zone haute (carte améliorée) rechargé ; étal sans champ up toujours valide", function()
+  local old = X.SHOP_UPGRADED
+  X.SHOP_UPGRADED = { 0, 1, 1, 1, 1, 1, 1 }
+  local ok, err = pcall(function()
+    local db = Save.new()
+    local exp = assert(Save.start(db, { seed = 91, class = "warrior" }))
+    exp.quiet = true
+    if exp.phase == "start" then assert(X.act(exp, { "skipStartRelic" })) end
+    X.enterZone(exp, "stranglethorn")
+    assert(X.act(exp, { "continue" }))
+    enter(exp, "merchant")
+    local i
+    for j, it in ipairs(exp.shop.cards) do if it.up and not i then i = j end end
+    assert(i, "une carte améliorée en vente")
+    -- rechargement : même étal, achat de la carte améliorée
+    local back = Save.migrate(reload(db))
+    assert(Save.validate(back))
+    eq(serialize(back.current.shop), serialize(exp.shop))
+    local cur = back.current
+    cur.gold = 9999
+    assert(X.act(cur, { "buyCard", i }))
+    eq(cur.deck[#cur.deck].up, true)
+    -- étal ouvert avant le changement (aucun champ up) : valide, la carte s'achète telle quelle
+    local saved = reload(db)
+    for _, it in ipairs(saved.current.shop.cards) do it.up = nil end
+    local old2 = Save.migrate(saved)
+    assert(Save.validate(old2))
+    eq(old2.current.version, X.VERSION, "format de l'étal compatible : pas de nouvelle version d'expédition")
+    old2.current.gold = 9999
+    assert(X.act(old2.current, { "buyCard", i }))
+    eq(old2.current.deck[#old2.current.deck].up, false)
+  end)
+  X.SHOP_UPGRADED = old
+  assert(ok, err)
 end)
 
 print(("%d réussis, %d échoués"):format(passed, failed))
