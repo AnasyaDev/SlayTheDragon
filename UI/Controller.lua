@@ -1193,9 +1193,10 @@ local function merchantStep(exp)
     opts[#opts + 1] = actionOption(avail, o)
   end
   for i, it in ipairs(s.cards) do
-    -- carte vendue déjà améliorée (zones hautes, X.SHOP_UPGRADED) : affichée améliorée
+    -- carte vendue déjà améliorée (zones hautes, X.SHOP_UPGRADED) : affichée à son palier (variante : borné à ses
+    -- paliers écrits)
     local card = shownCard(exp, it.id)
-    if it.up then card.up = true end
+    if it.up then card.up = Card.upValue(math.min(Card.level(it.up), Card.tiers(card.id))) end
     item("buyCard", i, it, { card = card, epic = it.epic })
   end
   for i, it in ipairs(s.relics) do

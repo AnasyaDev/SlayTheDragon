@@ -11155,57 +11155,6 @@ do
   end
 end
 
-print("UOR marchand des zones hautes (15/11/2026) : cartes vendues améliorées, prix du rang de la zone")
-do
-  local function vis(o)
-    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
-    return true
-  end
-  local X = H.ns.Expedition
-  for _, zone in ipairs({ "stranglethorn", "blackrock" }) do
-    H.boot(nil)
-    H.slash("")
-    clickOption("class:warrior")
-    H.ns.Controller.makeSeed = function() return SEED + 3 end
-    clickOption("go")
-    local e = toZone(zone)
-    local id = H.ns.Map.nextNodes(e.map, e.node)[1]
-    e.map.nodes[id].kind = "merchant"
-    e.gold = 400
-    local old = X.SHOP_UPGRADED
-    X.SHOP_UPGRADED = { 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 } -- au moins une carte améliorée et une normale
-    clickOption("path:" .. id)
-    X.SHOP_UPGRADED = old
-    H.settle()
-    check(zone .. " : écran du marchand", currentKind() == "merchant", currentKind())
-    local s = UI().current
-    local upCard, plainCard, why = nil, nil, {}
-    for i, it in ipairs(e.shop.cards) do
-      local card = s.cards[i]
-      if not (card and vis(card) and card.option) then why[#why + 1] = i .. " absente"
-      else
-        if H.ns.Card.upValue(card.cardUp) ~= H.ns.Card.upValue(it.up) then why[#why + 1] = it.id .. " amélioration affichée" end
-        if (card.tag and card.tag.text._text) ~= tostring(it.price) then why[#why + 1] = it.id .. " prix" end
-        if it.up then upCard = upCard or card elseif not it.epic then plainCard = plainCard or card end
-      end
-    end
-    check(zone .. " : cartes de l'étal affichées telles qu'en vente (améliorées en vert, prix de la zone)",
-      upCard and plainCard and #why == 0, table.concat(why, ", "))
-    local relic = e.shop.relics[1]
-    local f = X.priceFactor(e)
-    check(zone .. " : bibelot au prix de la zone (" .. f .. " × l'origine)", relic and relic.price
-      >= math.floor(X.PRICES.relic.common * f * 0.9), relic and relic.price)
-    snap("marchand-" .. zone .. "-ameliorees", true)
-    local n = #e.deck
-    local o = upCard.option
-    local i = tonumber(o.id:match("^buyCard:(%d+)$"))
-    local cid = e.shop.cards[i].id
-    clickOption(o.id)
-    check(zone .. " : carte améliorée achetée, au deck améliorée, marquée vendue",
-      #e.deck == n + 1 and e.deck[#e.deck].id == cid and e.deck[#e.deck].up == 1 and option(o.id).sold)
-  end
-end
-
 print("UUP paliers d'amélioration : nom +2 / +3 sur le ruban, aperçu du palier suivant, carte au plafond grisée, infobulle, deck")
 do
   local e = freshRun(SEED + 61, "campfire") -- (recharge l'addon : H.ns lu après)
@@ -11294,6 +11243,61 @@ do
   card:Hide()
   check(("noms au palier 3 : les %d cartes tiennent sur le ruban (une ligne, taille de repli comprise)"):format(n),
     #bad == 0, table.concat(bad, ", "))
+end
+
+print("UOR marchand des zones hautes (15/11/2026) : cartes vendues améliorées, prix du rang de la zone")
+do
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local X = H.ns.Expedition
+  for _, zone in ipairs({ "stranglethorn", "blackrock" }) do
+    H.boot(nil)
+    H.slash("")
+    clickOption("class:warrior")
+    H.ns.Controller.makeSeed = function() return SEED + 3 end
+    clickOption("go")
+    local e = toZone(zone)
+    local id = H.ns.Map.nextNodes(e.map, e.node)[1]
+    e.map.nodes[id].kind = "merchant"
+    e.gold = 400
+    local old = X.SHOP_UPGRADED
+    X.SHOP_UPGRADED = { 0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 } -- au moins une carte améliorée et une normale
+    clickOption("path:" .. id)
+    X.SHOP_UPGRADED = old
+    H.settle()
+    check(zone .. " : écran du marchand", currentKind() == "merchant", currentKind())
+    local s = UI().current
+    local upCard, plainCard, why = nil, nil, {}
+    for i, it in ipairs(e.shop.cards) do
+      local card = s.cards[i]
+      if not (card and vis(card) and card.option) then why[#why + 1] = i .. " absente"
+      else
+        if (card.cardUp or false) ~= (it.up or false) then why[#why + 1] = it.id .. " amélioration affichée" end
+        -- palier vendu (1 aujourd'hui) : nom « Card+ »
+        if it.up and card.name._text ~= H.ns.Card.defById(card.cardId, it.up).name then
+          why[#why + 1] = it.id .. " nom " .. tostring(card.name._text)
+        end
+        if (card.tag and card.tag.text._text) ~= tostring(it.price) then why[#why + 1] = it.id .. " prix" end
+        if it.up then upCard = upCard or card elseif not it.epic then plainCard = plainCard or card end
+      end
+    end
+    check(zone .. " : cartes de l'étal affichées telles qu'en vente (améliorées en vert, prix de la zone)",
+      upCard and plainCard and #why == 0, table.concat(why, ", "))
+    local relic = e.shop.relics[1]
+    local f = X.priceFactor(e)
+    check(zone .. " : bibelot au prix de la zone (" .. f .. " × l'origine)", relic and relic.price
+      >= math.floor(X.PRICES.relic.common * f * 0.9), relic and relic.price)
+    snap("marchand-" .. zone .. "-ameliorees", true)
+    local n = #e.deck
+    local o = upCard.option
+    local i = tonumber(o.id:match("^buyCard:(%d+)$"))
+    local cid = e.shop.cards[i].id
+    clickOption(o.id)
+    check(zone .. " : carte améliorée achetée, au deck améliorée, marquée vendue",
+      #e.deck == n + 1 and e.deck[#e.deck].id == cid and e.deck[#e.deck].up == 1 and option(o.id).sold)
+  end
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -57,10 +57,13 @@ Règles de forme (contrôlées par `Sim/upgrades.lua`, test « paliers : contrô
 - Améliorer monte **d'un palier** ; `stats.upgraded` (toutes) et `stats.upTiers[n]` (celles qui ont atteint n).
 - Refus : `X.upgradeRefusal(exp, i)` → `"maxed"` (« Fully upgraded. »), `"noUpgrade"` (« Can't be upgraded. »).
 - Tranché « palier 1 » : carte offerte améliorée par une rencontre (`{ "card", id, up = true }`), carte de combat
-  donnée améliorée (`{ "addCard", id, up = true }`), conditions « améliorée » (vérité de `up`), carte vendue
-  améliorée par le marchand (en cours dans une autre branche : `X.addCard(exp, id, true)` ou `{ id, up = true }`
-  dans `shop.cards`, lus comme le palier 1 ; aujourd'hui `buyCard` ajoute la carte de base). Un nombre (`up = 2`) donne ce palier, borné aux
-  paliers écrits (`X.addCard`).
+  donnée améliorée (`{ "addCard", id, up = true }`), conditions « améliorée » (vérité de `up`). Un nombre
+  (`up = 2`) donne ce palier, borné aux paliers écrits (`X.addCard`).
+- Marchand des zones hautes : `shop.cards[i].up` = palier vendu (nombre), tiré avec la chance `X.SHOP_UPGRADED` ;
+  le palier vient de `X.SHOP_UP_TIER` (nombre, ou table par rang de zone, `X.shopUpgradeTier`, borné aux paliers
+  écrits), **1 aujourd'hui** ; l'achat ajoute la carte à ce palier ; prix × `X.UPGRADED_PRICE` à tout palier ; bot :
+  `SE.shopCardValue` (bonus par palier). Vendre des +2 / +3 plus tard : `X.SHOP_UP_TIER = { 1, 1, 1, 2, 2, 2, 3 }`
+  (et, si voulu, un prix par palier dans `price` d'`openShop`).
 - Copie (`dupe`) : même palier. Épique remplacée : ses améliorations sont perdues (`exp.epicReplaced.oldUp`).
 - L'épique n'est jamais améliorée au hasard (inchangé).
 
