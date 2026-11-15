@@ -3744,5 +3744,207 @@ do
   ns.Enemies.test_wall, ns.Enemies.test_volley = nil, nil
 end
 
+---------------------------------------------------------------------------
+-- Mage : paliers 2 et 3 (15/11/2026, docs/ameliorations.md ; tableau : docs/classes/mage.md, « Paliers 2 et 3 »)
+---------------------------------------------------------------------------
+do
+  local function mageAt(id, n, hand, encounter)
+    local c = mageHand(hand or {}, encounter)
+    c.player.mana = 9
+    table.insert(c.hand, 1, Card.new(id, n, 990))
+    return c
+  end
+
+  test("Mage : paliers 0 à 3, texte conforme aux effets et à la plaque, coût jamais en hausse", function()
+    local n = 0
+    for id, d0 in pairs(ns.Cards) do
+      if d0.class == "mage" then
+        eq(Card.tiers(id), 3, id .. " : trois paliers")
+        local prev
+        for up = 0, 3 do
+          local d = Card.defById(id, up)
+          local t, label = d.text, id .. Card.suffix(up)
+          local function has(s) assert(t:find(s, 1, true), label .. " : « " .. s .. " » absent de « " .. t:gsub("\n", " / ") .. " »") end
+          for _, e in ipairs(d.effects) do
+            local k = e[1]
+            if k == "damage" and e[2] > 0 then
+              has("Deal " .. e[2] .. (e.times == 3 and " three times" or "") .. (e.all and " to all" or ""))
+              for _, m in ipairs(e.more or {}) do
+                if m[2] == "frozen" then has("Frozen: deal " .. m[1] .. " more.") end
+                if m[2] == "execute" then has("Execute: deal " .. (e[2] + m[1]) .. ".") end
+              end
+            elseif k == "damage" then has("deal " .. e.per[1] .. " per Charge" .. (e.all and " to all" or ""))
+            elseif k == "absorb" then has("Gain " .. e[2] .. " Absorb.")
+            elseif k == "res" then has("+" .. e[2] .. " Charge.")
+            elseif k == "draw" and e[2] > 0 then has("Draw " .. e[2] .. ".")
+            elseif k == "apply" then
+              local line = (e.self and "Gain " or "Apply ") .. ns.Statuses[e[2]].name .. " " .. e[3]
+              if e.cond then line = line:sub(1, 1):lower() .. line:sub(2) end
+              has(line)
+            elseif k == "interrupt" then has(e.all and "Interrupt all casts." or "Interrupt the target's cast.")
+            end
+          end
+          -- « Cast. » en tête si et seulement si la carte est en Cast (Blizzard+3, Glacial Spike+3 : plus de Cast)
+          eq(t:match("^[^\n]+") == "Cast.", d.cast == true, label .. " : ligne Cast.")
+          if d.power then eq(t:match("^[^\n]+"), d.epic and "Epic." or "Power.", label) end
+          if d.cooldown then has("Cooldown " .. d.cooldown .. ".") end
+          if d.exhaust then has("Exhaust.") end
+          eq(t:find("Retain.", 1, true) ~= nil, d.retain == true, label .. " : Retain.")
+          eq(t:find("Innate.", 1, true) ~= nil, d.innate == true, label .. " : Innate.")
+          if d.evoMana then has("+" .. d.evoMana .. " mana.") end
+          if prev then assert(d.cost <= prev.cost, label .. " : coût en hausse") end
+          if up >= 2 then assert(d.text ~= prev.text or d.cost < prev.cost, label .. " : rien de visible ne change") end
+          prev = d
+          n = n + 1
+        end
+      end
+    end
+    eq(n, 41 * 4)
+  end)
+
+  test("Mage : chaque carte aux paliers 2 et 3 jouable sans erreur, deux tours joués ensuite", function()
+    local n = 0
+    for id, d0 in pairs(ns.Cards) do
+      if d0.class == "mage" and not d0.epic then
+        for up = 2, 3 do
+          local c = mageAt(id, up, {}, { "test_dummy", "test_caster" })
+          c.player.res = 4
+          c.enemies[1].hp = 40
+          Combat.applyStatus(c, c.enemies[1], "demoralized", 1)
+          local ok, why = Combat.play(c, 1, 1)
+          assert(ok, id .. "+" .. up .. " : " .. tostring(why))
+          Combat.endTurn(c)
+          Combat.endTurn(c)
+          n = n + 1
+        end
+      end
+    end
+    eq(n, 34 * 2)
+  end)
+
+  test("Mage, paliers : Blizzard+3 et Glacial Spike+3 sans Cast (tout de suite, sans emplacement), +2 encore en Cast", function()
+    local g2 = mageAt("glacial_spike", 2)
+    Combat.play(g2, 1, 1)
+    eq(Combat.castCount(g2), 1, "Glacial Spike+2 incantée"); eq(g2.enemies[1].hp, 100)
+    local g3 = mageAt("glacial_spike", 3, { "pyroblast", "fireball" })
+    Combat.play(g3, 2, 1); Combat.play(g3, 2, 1) -- deux incantations : emplacements pleins
+    eq(Combat.castCount(g3), 2)
+    assert(Combat.play(g3, 1, 1), "Glacial Spike+3 jouable emplacements pleins")
+    eq(g3.enemies[1].hp, 100 - 32, "32 tout de suite"); eq(g3.enemies[1].st.demoralized, 2)
+    local b = mageAt("blizzard", 3, {}, { "test_dummy", "test_dummy" })
+    Combat.play(b, 1)
+    eq(Combat.castCount(b), 0); eq(b.enemies[1].hp, 100 - 15); eq(b.enemies[2].hp, 100 - 15)
+    -- +2 : Retain, encore en Cast
+    local r = mageAt("blizzard", 2)
+    Combat.endTurn(r)
+    assert(handIndex(r, "blizzard"), "Blizzard+2 gardée en main")
+  end)
+
+  test("Mage, paliers : Fireball+3 donne Instant 1 à sa résolution, la Fireball suivante part tout de suite", function()
+    local c = mageAt("fireball", 3, {}, { "test_dummy" })
+    c.hand[2] = Card.new("fireball", 3, 991)
+    Combat.play(c, 1, 1)
+    eq(c.player.st.instant, nil, "rien au jeu")
+    Combat.endTurn(c)
+    eq(c.enemies[1].hp, 100 - 16); eq(c.player.st.instant, 1, "Instant à la résolution")
+    table.insert(c.hand, 1, Card.new("fireball", 3, 993))
+    Combat.play(c, 1, 1)
+    eq(Combat.castCount(c), 0, "partie tout de suite"); eq(c.player.st.instant, 1, "Instant consommé puis regagné")
+    eq(c.enemies[1].hp, 100 - 32, "deux Fireball (le DoT n'a pas encore compté)")
+  end)
+
+  test("Mage, paliers : Arcane Explosion+3 et Mana Shield+3 Retain ; Fire Blast+3 Cooldown 1 ; Presence of Mind+3 +2 Charge, Retain, Cooldown inchangé", function()
+    local c = mageAt("arcane_explosion", 3)
+    c.hand[2] = Card.new("mana_shield", 3, 994)
+    eq(Combat.cost(c, c.hand[1]), 1, "coût inchangé")
+    Combat.endTurn(c)
+    assert(handIndex(c, "arcane_explosion") and handIndex(c, "mana_shield") and #c.hand == 7, "gardées en main")
+    eq(Card.defById("fire_blast", 3).cooldown, 1); eq(Card.defById("fire_blast", 2).cooldown, 2)
+    for up = 2, 3 do -- Cooldown 1 : de retour un tour plus tôt que Cooldown 2
+      local f = mageAt("fire_blast", up)
+      Combat.play(f, 1, 1)
+      Combat.endTurn(f); Combat.endTurn(f)
+      eq(handIndex(f, "fire_blast") ~= nil, up == 3, "Fire Blast+" .. up .. " de retour deux tours après")
+    end
+    local p = Card.defById("presence_of_mind", 3)
+    eq(p.cooldown, 3); eq(p.retain, true); eq(p.cost, 0)
+    local m = mageAt("presence_of_mind", 3)
+    Combat.play(m, 1)
+    eq(m.player.res, 2); eq(m.player.st.instant, 1)
+  end)
+
+  test("Mage, paliers : Retain (Counterspell+2, Polymorph+2) gardée en main ; Counterspell+3 interrompt tous les sorts", function()
+    local c = mageAt("counterspell", 2, {}, { "test_caster" })
+    c.hand[2] = Card.new("polymorph", 2, 992)
+    Combat.endTurn(c)
+    assert(handIndex(c, "counterspell") and handIndex(c, "polymorph"), "gardées en main")
+    local k = mageAt("counterspell", 3, {}, { "test_caster", "test_caster", "test_dummy" })
+    Combat.play(k, 1, 3)
+    assert(k.enemies[1].interrupted and k.enemies[2].interrupted, "les deux sorts coupés"); eq(k.player.res, 1)
+  end)
+
+  test("Mage, paliers : Innate (Hot Streak+2, Ice Barrier+3) en main de départ ; Hot Streak+3 et Arcane Power+3 au jeu", function()
+    for _, x in ipairs({ { "hot_streak", 2 }, { "ice_barrier", 3 }, { "shatter", 2 }, { "ignite", 2 }, { "arcane_power", 2 },
+        { "ice_block", 3 } }) do
+      for seed = 1, 4 do
+        local deck = {}
+        for _ = 1, 12 do deck[#deck + 1] = { id = "mana_shield", up = false } end
+        deck[#deck + 1] = { id = x[1], up = x[2] }
+        local c = Combat.new({ seed = seed, class = "mage", hp = 60, maxHp = 60, deck = deck, encounter = { "test_dummy" } })
+        assert(handIndex(c, x[1]), x[1] .. "+" .. x[2] .. " en main de départ (graine " .. seed .. ")")
+      end
+      assert(not Card.defById(x[1], x[2] - 1).innate, x[1] .. " : Innate seulement à ce palier")
+    end
+    local h = mageAt("hot_streak", 3)
+    Combat.play(h, 1)
+    eq(h.player.st.instant, 1); eq(#h.player.powers, 1)
+    local a = mageAt("arcane_power", 3)
+    Combat.play(a, 1)
+    eq(a.player.res, 1); eq(Combat.chargeBonus(a), 2)
+  end)
+
+  test("Mage, paliers : Ice Block+2 soigne 14 ; Ignite+3 DoT 5 ; Shatter+3 +6 ; Phoenix Flames+2 pose son DoT après le test", function()
+    local c = mageHand({ "frostbolt" }, { "test_hitter" })
+    power(c, "ice_block", 2)
+    c.player.hp = 5
+    Combat.endTurn(c)
+    eq(c.result, nil); eq(c.player.hp, 14)
+    local g = mageHand({ "fire_blast" })
+    power(g, "ignite", 3)
+    Combat.play(g, 1, 1)
+    eq(g.enemies[1].st.pain, 5)
+    local s = mageHand({ "frostbolt", "ice_lance" })
+    power(s, "shatter", 3)
+    Combat.play(s, 1, 1)
+    local hp = s.enemies[1].hp
+    Combat.play(s, 1, 1)
+    eq(hp - s.enemies[1].hp, num("ice_lance", 1) + Card.defById("ice_lance").effects[1].more[1][1] + 6, "Ice Lance Frozen + 6")
+    local p = mageAt("phoenix_flames", 2)
+    Combat.play(p, 1, 1)
+    eq(p.player.st.instant, nil, "pas de DoT avant le coup : pas d'Instant"); eq(p.enemies[1].st.pain, 3)
+    local q = mageAt("phoenix_flames", 3)
+    q.enemies[1].st.pain = 1
+    Combat.play(q, 1, 1)
+    eq(q.player.st.instant, 1); eq(q.enemies[1].hp, 100 - 14)
+  end)
+
+  test("Mage, paliers : Arcane Barrage+2 et Arcane Surge+3 regagnent 1 Charge après le Surge ; Evocation+3 +5 mana, +1 Charge", function()
+    local c = mageAt("arcane_barrage", 2, {}, { "test_dummy", "test_dummy" })
+    c.player.res = 3
+    Combat.play(c, 1)
+    eq(c.enemies[1].hp, 100 - 24, "8 par Charge, sans bonus passif"); eq(c.player.res, 1, "1 Charge regagnée")
+    local s = mageAt("arcane_surge", 3, { "frostbolt", "frostbolt", "frostbolt" })
+    s.player.res = 2
+    local mana = s.player.mana
+    Combat.play(s, 1)
+    eq(s.player.mana, mana + 2); eq(s.player.res, 1)
+    local e = mageAt("evocation", 3)
+    Combat.play(e, 1)
+    assert(e.player.cast ~= nil, "Evocation reste en Cast")
+    Combat.endTurn(e)
+    eq(e.player.mana, Combat.BASE_MANA + 5); eq(e.player.res, 1)
+  end)
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

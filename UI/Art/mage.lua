@@ -214,10 +214,10 @@ function Art.mageEpicText(c)
       if (c.player.res or 0) < k then return ("Next card: needs %d %s"):format(k, k == 1 and "Charge" or "Charges") end
       return "Next card: twice"
     end
-    local n = c.turn.played
-    if d.epicEvery then n = n % 3 end
-    if not d.epicEvery and n >= 3 then return nil end
-    return ("Cards played: %d/3"):format(n)
+    local n, at = c.turn.played, d.epicAt or 3 -- rang doublé : 3, ou 2 aux paliers 2 et 3
+    if d.epicEvery then n = n % at end
+    if not d.epicEvery and n >= at then return nil end
+    return ("Cards played: %d/%d"):format(n, at)
   elseif id == "water_elemental" then
     -- le coup part au début du prochain tour : la vue dit sur qui
     local t = ns.Combat.elementalTarget(c)
