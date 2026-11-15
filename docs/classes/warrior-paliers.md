@@ -67,6 +67,22 @@ qu'un texte amélioré (`L.ruleText`) : les nombres qui changent aux paliers 2 e
 | Anger Management | Haste 2 | Kills : +1 Rage | Haste 3 |
 | Avatar | Juggernaut 3 | Juggernaut 4 | Kills : soin 3 |
 
-## Mesures
+## Mesures (15/11/2026)
 
-(à compléter)
+**Les paliers n'ont pas été mesurés carte par carte** : les balayages `sweep=cards up=2` / `up=3` ont été abandonnés sur
+consigne (≈ 25 000 campagnes par classe). Seuls repères partiels :
+- balayage `up=1` au bot `heuristic`, Duskwood seule (300 par ligne, sans carte 77 %) : référence du palier 1 ;
+- balayage `up=2` au bot `human`, campagne complète, interrompu après 23 cartes sur 34 (200 par ligne, ± 7 points,
+  sans carte 80,5 %) : aucun palier 2 hors norme ; les plus faibles sont Berserker Rage+2 (+1,0, Innate) et Slam+2
+  (+2,0), les plus forts Victory Rush+2 (+18,0), Devastate+2 (+17,0), Bloodthirst+2, Shield Block+2, Thunder Clap+2
+  (+16,0), dans la fourchette des cartes au palier 1.
+
+Campagne (bot `human`, clé 0, `zones=7 level=7`, 600 expéditions), avant → après : **86,2 → 85,8 %** (± 2,8, écart
+nul) ; PV perdus par type de combat inchangés. Améliorations par palier : +1 4,60, **+2 0,08**, +3 0,00 par
+expédition : le bot `human` améliore presque toujours une nouvelle carte (note du palier 2 × 0,8) et n'atteint
+presque jamais le palier 2 ; l'effet des paliers 2 et 3 sur la campagne n'est donc pas mesurable ainsi. Écarts
+« vict. avec / sans » du tableau des cartes : dans la norme du rapport d'avant (biais de survie), rien d'anormal.
+
+À surveiller si le joueur monte souvent ses cartes : Revenge+3 (11 à tous pour 0 après un coup reçu), Battle Shout+3
+(Strength 3 gratuite en main de départ), Deep Wounds+3 et Retaliation+3 (Power gratuit en main de départ),
+Death Wish+3 (Carnage 60 %), Avatar+2 (+4 Rage par tour).

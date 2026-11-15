@@ -927,3 +927,13 @@ abordables par visite tout débloqué (3,6 à 4,4 au compte neuf, étals sans bi
 victoire inchangés à ± 4 points. Hors cible : 18 à 25 points du gagné tombent après le dernier marchand visité (≈ 0,6
 marchand par zone), ce que les prix ne changent pas ; pistes (marchand entre deux zones, pas d'or sur Nefarian) dans
 `docs/expedition.md`.
+
+## Paliers +2 et +3 du Guerrier (15/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`, « Améliorer une carte plusieurs fois ») : paliers 2 et 3 écrits à la
+main pour les 34 cartes et les sept épiques du Guerrier (tableau : `docs/classes/warrior-paliers.md`). Classe déjà la
+plus forte : gains dans le bas de la fourchette, rien de multiplié sur Strength, la Rage ou les cartes à plusieurs
+coups (Rampage paie moins de PV, Battle Shout et Recklessness passent à 0 ou Innate, Powers à 0 puis Innate) ; épiques :
+nombres par palier dans `ns.Warrior.EPIC`, ou une ligne « Kills: ». Paliers non mesurés carte par carte (balayages
+abandonnés sur consigne). Campagne bot `human`, clé 0, `zones=7 level=7`, 600 expéditions : 86,2 → 85,8 % ; le bot
+n'atteint le palier 2 que 0,08 fois par expédition (le palier 3 jamais), l'effet en campagne reste donc nul à ce jour.
