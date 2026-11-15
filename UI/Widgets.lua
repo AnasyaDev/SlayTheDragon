@@ -1819,10 +1819,12 @@ function W.fillCardTooltip(tt, id, up, extra)
     tt:AddLine(d.name, rc[1], rc[2], rc[3])
     for _, l in ipairs(W.cardTextLines(d)) do wrap(tt, l) end
   end
-  if extra and extra.preview and not up and ns.Cards[id].up then
-    local u = Card.defById(id, true)
-    gold(tt, "Upgraded:")
-    for _, l in ipairs(W.cardTextLines(u, ns.Cards[id])) do wrap(tt, l, 0.5, 1, 0.5) end
+  -- aperçu de l'amélioration : le palier suivant de cette carte, chiffres qui changent en vert
+  if extra and extra.preview and Card.canUp(id, up) then
+    local lv = Card.level(up)
+    local u = Card.defById(id, lv + 1)
+    gold(tt, lv == 0 and "Upgraded:" or ("Upgraded" .. Card.suffix(lv + 1) .. ":"))
+    for _, l in ipairs(W.cardTextLines(u, Card.defById(id, lv))) do wrap(tt, l, 0.5, 1, 0.5) end
   end
   -- mots-clés : une ligne chacun, en bloc (séparé du reste par une ligne vide)
   local kws = W.cardKeywords(d)
@@ -3430,15 +3432,21 @@ function W.card(parent)
   b.kind = b.plateText -- compatibilité
 
   -- opts : cost, playable, reason, manaShort, price, sold, tooPoor, preview, showUp
+  -- up : palier de la carte (false, true = 1, 1..3 ; Card.level) ; showUp : montre le palier suivant s'il est
+  -- écrit (aperçu de l'amélioration au survol), chiffres qui changent en vert par rapport au palier actuel ;
+  -- sinon, carte améliorée : chiffres qui diffèrent de la carte de base en vert, nom en vert suivi de +, +2, +3.
   b.SetCard = function(self, id, up, opts)
     opts = opts or {}
+    up = Card.upValue(up) -- false ou palier 1..3 (0 et true acceptés)
     self.cardId, self.cardUp, self.opts = id, up, opts
-    local showUp = up or opts.showUp
-    local d = Card.defById(id, showUp)
-    local base = showUp and ns.Cards[id] or nil
+    local lv = Card.level(up)
+    local shown = (opts.showUp and Card.canUp(id, lv)) and lv + 1 or lv
+    local showUp = shown > 0
+    local d = Card.defById(id, shown)
+    local base = (shown > lv and lv > 0) and Card.defById(id, lv) or (showUp and ns.Cards[id] or nil)
     local dim = opts.playable == false
     -- paliers interdits par le garde-fou (W.checkCardTexts) : propres à une carte
-    local capFor = id .. (showUp and "+" or "")
+    local capFor = id .. Card.suffix(shown)
     if self.textCapFor ~= capFor then self.textCap, self.textCapFor = nil, capFor end
     -- corps à la couleur de la carte
     W.setSkin(self.bg, "card_body_" .. Art.cardBody(id, ns.Cards[id] or d))

@@ -132,7 +132,7 @@ test("arrivée en jeu : l'épique n'est dans aucune pile ni parmi les Powers, po
       eq(#c.hand, 5, "main de 5 cartes ordinaires")
       eq(#c.hand + #c.draw, #ns.Classes.rogue.deck, "l'épique ne prend pas de place")
       eq(#c.player.powers, 0, id .. " : pas un Power joué")
-      eq(c.epic.id, id); eq(c.epic.up, seed % 2 == 0)
+      eq(c.epic.id, id); eq(c.epic.up, ns.Card.upValue(seed % 2 == 0))
       eq(R.epicOf(c), id)
       assert(Save.isPlain(c), id .. " : combat sauvegardable")
     end
@@ -145,7 +145,7 @@ test("crochets de l'épique : src = c.epic (amélioration lue sur c.epic.up), ap
   play(c, "feint")
   eq(hp(c), h - RD(1))
   local u = setup("deflection", { "feint" }, { up = true })
-  eq(u.epic.up, true)
+  eq(u.epic.up, 1)
   play(u, "feint")
   eq(hp(u), 200 - RD(1, true))
 end)

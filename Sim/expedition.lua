@@ -12,7 +12,7 @@
 --        human (bot=human : { skill = …, width = … }, Bots.humanParams ; hors combat aussi, humanDecide),
 --        fightBot (bot des combats à la place de bot : bot=human fightBot=heuristic isole le jeu hors combat)
 return function(ns)
-  local X, Rng, Bots, Meta = ns.Expedition, ns.Rng, ns.Bots, ns.Meta
+  local X, Rng, Bots, Meta, Card = ns.Expedition, ns.Rng, ns.Bots, ns.Meta, ns.Card
   local SE = {}
   -- Compte vétéran simulé (au moins une zone gagnée) : drapeaux toujours présents, et une branche
   -- d'histoire choisie par la graine.
@@ -50,10 +50,22 @@ return function(ns)
     return i and b.byEpic[exp.deck[i].id] or nil
   end
 
-  -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises).
+  -- Amélioration vers le palier suivant (docs/ameliorations.md) : une note d'amélioration (tables upgrade de la
+  -- classe ou de l'épique) est celle du palier 1 ; un nombre vaut × SE.UPGRADE_TIER[palier visé] pour les paliers
+  -- 2 et 3 (un palier de plus rapporte d'ordinaire moins que le premier) ; une table { p1, p2, p3 } donne la
+  -- note de chaque palier.
+  SE.UPGRADE_TIER = { 1, 0.8, 0.6 }
+  local function tierValue(v, card)
+    local n = Card.level(card) + 1
+    if type(v) == "table" then return v[n] or v[#v] or 0 end
+    return v * (SE.UPGRADE_TIER[n] or SE.UPGRADE_TIER[#SE.UPGRADE_TIER])
+  end
+  SE.tierValue = tierValue
+
+  -- Valeur d'une carte du deck pour l'amélioration (cartes de base comprises) vers son palier suivant.
   local function upgradeValue(exp, card)
     local up = botOf(exp).upgrade
-    return advised("upgrade", card.id) or up and up[card.id] or rating(card.id)
+    return tierValue(advised("upgrade", card.id) or up and up[card.id] or rating(card.id), card)
   end
 
   -- Meilleure amélioration. L'épique du deck : sa table byEpic[id].upgrade la classe parmi quelques cartes
@@ -70,9 +82,10 @@ return function(ns)
     local epicV = ei and tbl and X.canUpgrade(exp, ei) and tbl[exp.deck[ei].id]
     local best, bestV = nil, -1
     if epicV then
-      best, bestV = ei, epicV
+      best, bestV = ei, tierValue(epicV, exp.deck[ei])
       for i = 1, #exp.deck do
         local v = i ~= ei and X.canUpgrade(exp, i) and tbl[exp.deck[i].id]
+        if v then v = tierValue(v, exp.deck[i]) end
         if v and v > bestV then best, bestV = i, v end
       end
       return best
@@ -93,7 +106,7 @@ return function(ns)
     for i = 1, #exp.deck do
       local card = exp.deck[i]
       local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
-      if card.up then v = v + 1 end
+      v = v + Card.level(card) -- carte améliorée : +1 par palier
       if v < worstV then worst, worstV = i, v end
     end
     return worst, worstV
@@ -434,7 +447,7 @@ return function(ns)
         for j = 1, #exp.deck do
           local card = exp.deck[j]
           local r = ns.Cards[card.id].rarity
-          local v = r ~= "basic" and r ~= "epic" and rating(card.id) + (card.up and 0.5 or 0) or 0
+          local v = r ~= "basic" and r ~= "epic" and rating(card.id) + 0.5 * Card.level(card) or 0
           if v > bestV then i, bestV = j, v end
         end
       else
@@ -682,7 +695,11 @@ return function(ns)
       key = opts.key or 0, unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
       epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
-    for _, id in ipairs(opts.force or {}) do exp.deck[#exp.deck + 1] = { id = id, up = false } end
+    -- (force=id+2 : la carte au palier 2, SE.forced)
+    for _, f in ipairs(opts.force or {}) do
+      local id, n = SE.forced(f)
+      exp.deck[#exp.deck + 1] = { id = id, up = Card.upValue(n) }
+    end
     -- PV de départ essayés sans toucher aux données (hp=N : mesure de l'effet des PV de la classe)
     if opts.hp then exp.hp, exp.maxHp = opts.hp, opts.hp end
     local rng = Rng.stream(seed, "policy")
@@ -783,12 +800,30 @@ return function(ns)
     record.xp = Meta.xpFor(exp)
     record.removed = exp.stats.removed
     record.upgraded = exp.stats.upgraded
+    -- améliorations par palier atteint (stats.upTiers) et cartes du deck final par palier
+    record.upTiers = { 0, 0, 0 }
+    for n = 1, Card.MAX_UP do record.upTiers[n] = (exp.stats.upTiers or {})[n] or 0 end
+    record.deckTiers = { 0, 0, 0 }
+    for _, card in ipairs(exp.deck) do
+      local n = Card.level(card)
+      if n > 0 then record.deckTiers[n] = record.deckTiers[n] + 1 end
+    end
     -- épique du deck en fin d'expédition (gagnée, achetée ou imposée) et son amélioration
     local ei = X.epicIndex(exp)
     record.epicEnd = ei and 1 or 0
     record.epicUp = ei and exp.deck[ei].up and 1 or 0
     record.events = exp.stats.events -- { id = réponse choisie }
     return record, exp
+  end
+
+  -- Carte forcée au départ : "id" (palier 0), "id+" (palier 1) ou "id+N" (palier N, écrit) ; renvoie id, palier.
+  function SE.forced(f)
+    local id, plus = f:match("^(.-)%+(%d*)$")
+    local n = 0
+    if id then n = tonumber(plus) or 1 else id = f end
+    assert(ns.Cards[id], "carte forcée inconnue : " .. id)
+    assert(n <= Card.tiers(id), "palier " .. n .. " non écrit : " .. id)
+    return id, n
   end
 
   return SE

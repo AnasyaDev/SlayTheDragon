@@ -163,7 +163,7 @@ Effects.restoreAll = function(c, ctx, e)
   for i = 1, #list do Combat.restoreCard(c, list[i]) end
 end
 
--- { "addCard", id, to = "hand" | "draw" | "drawRandom" | "discard", n = 1, up = bool } : carte de combat
+-- { "addCard", id, to = "hand" | "draw" | "drawRandom" | "discard", n = 1, up = palier (true = 1) } : carte de combat
 -- ajoutée aux piles du joueur (Combat.addCard).
 Effects.addCard = function(c, ctx, e)
   for _ = 1, (e.n or 1) do
