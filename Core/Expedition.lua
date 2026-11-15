@@ -71,13 +71,17 @@ X.RARE_BY_ZONE = { 1, 1.15, 1.3, 1.5, 1.65, 1.8, 2 }
 --                        appliqué avant le crochet « price » des bibelots ; le retrait garde sa propre hausse
 --   SHOP_UPGRADED        chance qu'une carte de l'étal (classe ou neutre, améliorable, pas l'épique) soit vendue
 --                        déjà améliorée (tirage du flux « merchant », seulement si la chance dépasse 0)
---   UPGRADED_PRICE       facteur de prix d'une carte vendue améliorée
+--   UPGRADED_PRICE       facteur de prix d'une carte vendue améliorée (quel que soit son palier)
+--   SHOP_UP_TIER         palier d'une carte vendue améliorée (docs/ameliorations.md) : nombre, ou table par rang de
+--                        zone ; borné aux paliers écrits de la carte. 1 aujourd'hui (le marchand ne vend que le +1) :
+--                        une table { 1, 1, 1, 2, 2, 2, 3 } suffira quand les paliers 2 et 3 seront écrits
 --   SHOP_RARE_BY_ZONE    part de rares des cartes de l'étal (comme X.RARE_BY_ZONE, propre au marchand)
 --   SHOP_RELIC_RARE_BY_ZONE  part de bibelots rares de l'étal (poids « rare » de X.RELIC_WEIGHTS.normal
 --                        multiplié, pris sur « common » ; récompenses, coffres et rencontres inchangés)
 X.PRICE_BY_ZONE = { 1, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2 }
 X.SHOP_UPGRADED = { 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6 }
 X.UPGRADED_PRICE = 1.25
+X.SHOP_UP_TIER = 1
 X.SHOP_RARE_BY_ZONE = { 1, 1.3, 1.6, 1.9, 2.2, 2.5, 2.8 }
 X.SHOP_RELIC_RARE_BY_ZONE = { 1, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2 }
 
@@ -158,6 +162,11 @@ end
 -- Chance qu'une carte de l'étal soit vendue déjà améliorée dans la zone de l'expédition (X.SHOP_UPGRADED).
 function X.shopUpgradeChance(exp)
   return byRank(X.SHOP_UPGRADED, exp) or 0
+end
+
+-- Palier d'une carte id vendue améliorée dans la zone de l'expédition (X.SHOP_UP_TIER, borné aux paliers écrits).
+function X.shopUpgradeTier(exp, id)
+  return min(byRank(X.SHOP_UP_TIER, exp) or 1, Card.tiers(id))
 end
 
 ---------------------------------------------------------------------------
@@ -870,15 +879,17 @@ local function openShop(exp)
   -- crochet « price » des bibelots ; à Westfall (facteur 1), le calcul d'origine
   local factor = X.priceFactor(exp)
   local function price(base, kind, up)
-    local p = base * factor * (up and X.UPGRADED_PRICE or 1) * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(rng))
+    local p = base * factor * (Card.level(up) > 0 and X.UPGRADED_PRICE or 1)
+      * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(rng))
     p = X.modify(exp, "price", p, kind)
     return max(1, floor(p + 0.5))
   end
-  -- carte vendue déjà améliorée (X.SHOP_UPGRADED) : tirée avant son prix, jamais si la chance est nulle
+  -- carte vendue déjà améliorée (X.SHOP_UPGRADED) : tirée avant son prix, jamais si la chance est nulle ; renvoie
+  -- son palier (X.shopUpgradeTier) ou false
   local upChance = X.shopUpgradeChance(exp)
   local function rollUp(id)
-    local d = ns.Cards[id]
-    return upChance > 0 and d.up ~= nil and Rng.float(rng) < upChance or false
+    if upChance > 0 and Card.tiers(id) > 0 and Rng.float(rng) < upChance then return X.shopUpgradeTier(exp, id) end
+    return false
   end
   local shop = { cards = {}, relics = {}, potions = {}, removed = 0 }
   local shopWeights = X.cardWeights(exp, "shop")
@@ -1683,6 +1694,7 @@ end
 H.merchant = {
   buyCard = function(exp, a)
     local it = exp.shop.cards[a[2] or 0]
+    -- carte vendue améliorée : ajoutée à son palier (it.up : nombre ; true d'avant les paliers = 1)
     return buy(exp, exp.shop.cards, a[2], function(id) X.addCard(exp, id, it and it.up) end)
   end,
   buyRelic = function(exp, a)
