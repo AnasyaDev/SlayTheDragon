@@ -164,10 +164,11 @@ end
 
 -- Genre du coup sans carte d'une épique (Combat.hitInfo : règles de zone, Rude Awakening du Swamp) : posé le
 -- temps du coup puis remis. all = vrai : coup « à tous » (onde, rebond), faux : à une cible (Shield Charge).
-local function hitAs(c, all, f, ...)
+-- (sans vararg : coup de Combat.dealDamage, seul usage)
+local function hitAs(c, all, src, dst, amount)
   local k0, a0 = c.hitKind, c.hitAll
   c.hitKind, c.hitAll = "other", all
-  f(...)
+  Combat.dealDamage(c, src, dst, amount)
   c.hitKind, c.hitAll = k0, a0
 end
 
@@ -220,7 +221,7 @@ function Warrior.roar(c, up)
   local list = Combat.aliveEnemies(c)
   for i = 1, #list do
     local e = list[i]
-    if not e.dead and not c.result then hitAs(c, true, Combat.dealDamage, c, p, e, Combat.calcDamage(c, p, e, n)) end
+    if not e.dead and not c.result then hitAs(c, true, p, e, Combat.calcDamage(c, p, e, n)) end
   end
   if c.result then return end
   local demo = num("thunderous_roar", "demoralized", up)
@@ -265,7 +266,7 @@ attach("sweeping_strikes", {
       if #others == 0 or c.result then return end
       local e = table.remove(others, Rng.int(c.rng.cards, 1, #others))
       Combat.log(c, { t = "epic_trigger", card = "sweeping_strikes", unit = e.uid })
-      hitAs(c, true, Combat.dealDamage, c, c.player, e, n)
+      hitAs(c, true, c.player, e, n)
     end
   end,
   onEnemyDeath = onKill("sweeping_strikes"),
@@ -367,7 +368,7 @@ do
       local t = n > 0 and Warrior.chargeTarget(c)
       if not t then return end
       Combat.log(c, { t = "epic_trigger", card = "shield_charge", unit = t.uid })
-      hitAs(c, false, Combat.dealDamage, c, c.player, t, Combat.calcDamage(c, c.player, t, n))
+      hitAs(c, false, c.player, t, Combat.calcDamage(c, c.player, t, n))
     end,
   }
   attach("shield_charge", hooks)
