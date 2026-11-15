@@ -94,7 +94,7 @@ Règles de forme (contrôlées par `Sim/upgrades.lua`, test « paliers : contrô
   `upgrade = { backstab = { 2.5, 2, 1.5 } }`. Valeur des Powers en combat (`Sim/bots.lua`, `Bots.POWER_VALUE`) :
   `up(inst, base, +1, +2, +3)` pour un Power dont le palier 2 ou 3 change la valeur.
 - Bot `human`, `upfocus=0..1` : 0 (défaut) étale, 1 concentre (meilleures cartes jusqu'à +3 d'abord, épique en
-  tête) ; mesure du 15/11/2026 dans `docs/equilibrage.md`, « Bot human : améliorer plusieurs fois ».
+  tête) ; mesure du 16/11/2026 dans `docs/equilibrage.md`, « Bot human : améliorer plusieurs fois ».
 
 ## Tester
 

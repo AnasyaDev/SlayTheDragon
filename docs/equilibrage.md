@@ -1012,3 +1012,70 @@ coordinateur), seul un début de `up=1` au bot human a tourné (18 cartes, `repo
 À surveiller en jeu : Shadow Covenant+3 (deux cartes Shadow gratuites par tour, gain ≈ 1,5 fois celui du +1),
 Inner Focus+2/+3 (multiplicateur), Misery+2/+3 (+ 1 par copie, autant que le +1), Rapture+3 et Renew+3
 (Innate), les paliers « Retain » (le bot n'en tire presque rien).
+
+## Bot human : améliorer plusieurs fois (16/11/2026)
+
+Demande du joueur : faire monter ses cartes au bot `human` (il n'atteignait le +2 que 0,1 fois par expédition) et
+voir ce que donnent les paliers +2 et +3. Paramètre `upfocus=0..1` (`Sim/expedition.lua`, `humanUpgrade`) :
+**0** (défaut) étale comme avant (note du palier visé × 0,8 puis × 0,6 : une carte neuve passe devant) ; **1**
+concentre : l'épique du deck d'abord (jouée à chaque combat), puis la carte déjà la plus montée, puis la meilleure note
+sans la décote des paliers, donc ses meilleures cartes jusqu'à +3 avant d'en améliorer d'autres ; entre les deux,
+chaque choix concentre avec la chance `upfocus` (un tirage de plus). Même règle au feu de camp et dans les rencontres
+« Upgrade » ; aucune zone ne déclare encore d'action de feu de camp (le cas où le bot `human` s'en remet au bot de
+référence). `upfocus=0` donne le rapport de main ligne pour ligne (hors lignes ajoutées ; 300 expéditions Warrior et
+Priest, `jobs=8`, comparées à 15eea91 puis à bb9e071). Rapport : « Feu de camp » (repos / amélioration), « Cartes
+montées le plus haut » (top 10 des cartes finies à +2/+3) et colonnes « palier moy », « vict. à +2/+3 » du tableau
+des cartes. Rapports bruts : `reports/upfocus/` (`z7_*`, `z0_*`, `t_*` : 600 ; `c3k_*` : 3 000).
+
+Tout débloqué (`key=0 zones=7 level=7`, 600 expéditions, ± 2,7 à 3,9 ; améliorations +1 / +2 / +3 par expédition ;
+dernière colonne : 3 000 expéditions, ± 1,2 à 1,7, mêmes graines) :
+
+| Classe | `upfocus=0` | | `0.5` | | `1` | | 3 000 : 0 → 1 |
+|---|---|---|---|---|---|---|---|
+| Warrior | 85,8 | 4,60 / 0,08 / 0 | 86,5 | 3,41 / 0,89 / 0,39 | 86,3 | 1,95 / 1,63 / 1,22 | 87,0 → 87,1 |
+| Mage | 74,8 | 3,90 / 0,14 / 0 | 74,3 | 3,00 / 0,72 / 0,31 | 76,3 | 1,69 / 1,40 / 1,05 | 76,2 → 76,4 |
+| Hunter | 71,2 | 3,69 / 0,14 / 0 | 70,5 | 2,80 / 0,64 / 0,29 | 72,5 | 1,67 / 1,31 / 0,95 | 73,6 → 74,6 |
+| Priest | 64,2 | 4,87 / 0,14 / 0 | 67,8 | 3,53 / 1,03 / 0,49 | 67,5 | 2,10 / 1,65 / 1,28 | **64,6 → 68,2** |
+| Rogue | 62,8 | 3,33 / 0,14 / 0 | 62,2 | 2,49 / 0,61 / 0,28 | 62,0 | 1,41 / 1,15 / 0,85 | 61,7 → 62,1 |
+
+Compte neuf (`zones=0 level=2`, sans épique, 600) : Warrior 63,7 → 63,7 ; Priest 43,0 → 43,5 ; Mage 34,7 → 33,3 ;
+Hunter 26,5 → 26,0 ; Rogue 25,3 → 24,7 % (`upfocus=0` → `1` ; améliorations +1/+2/+3 de 3,23/0,08/0 → 1,18/1,21/0,92
+au Warrior, 1,81/0,05/0 → 0,83/0,61/0,39 au Rogue : moitié moins de feux choisis pour améliorer qu'avec tout débloqué).
+
+Par zone (battue / atteinte), `0` → `1` : identique à ± 1,5 point partout, **Westfall comprise** (Warrior, Mage, Hunter, Priest, Rogue : 90,8 / 85,4 / 84,4 /
+83,1 / 78,4 % tout débloqué, 3 000 ; 71,7 / 68,7 / 68,7 / 75,2 / 67,5 % au compte neuf), sauf le Priest à Blackrock
+Mountain (92,4 → 95,2 %, 3 000) et Duskwood à Hunter Lone Wolf (89,9 → 91,6). C'est Westfall qui fait l'écart entre
+classes (9 à 22 % de défaites sur 13 à 38 % au total), et on y arrive au boss avec 0 à 2 améliorations : la
+politique ne peut rien y changer. Feu de camp : part des feux choisis pour améliorer identique dans les deux modes
+(Warrior 69,7 / 70,5 %, Mage 65,1 / 65,2, Hunter 63,4 / 65,4, Priest 83,5 / 84,4, Rogue 64,0 / 64,4 ; compte neuf
+39 à 80 %, ± 1) : le seuil de repos ne bouge pas ; il ne monte qu'avec les PV quand la politique rend le deck plus
+fort (Lone Wolf imposée 59,5 → 67,3 %, Mage Arcane Blast+3 imposée 66,5 → 70,2 %).
+
+Cartes montées le plus haut (`upfocus=1`, 3 000 ; expéditions finies à +2/+3) : les épiques d'abord (palier moyen
+2,3 à 2,9 quand elles sont au deck), puis une carte de classe par deck : Warrior Bloodthirst (425 ; +2 Deal 10, +3
+Heal 5), Mage Presence of Mind (589 ; +2 Retain, +3 +2 Charge), Priest Solace (482 ; +2 Atonement 2, +3 Deal 8) et
+Angelic Feather (376 ; +2 Atonement 1), Rogue Blade Flurry (458 ; +2 coût 0, +3 4 à tous), Hunter The Beast Within
+(549 ; +2 Innate, +3 +2 Frenzy) et Dire Beast (509 ; +2 +1 Frenzy, +3 Retain). Les colonnes « vict. à +2/+3 contre
++0/+1 » du rapport (+3 à +100 points) mesurent surtout la survie : une carte finit haut parce que l'expédition a duré.
+Mesure moins biaisée, victoires des expéditions qui finissent avec l'épique, `0` → `1` (même graine, 300 à 770 par
+épique, ± 5) : **Shadow Covenant 51,5 → 69,7** et Echo of Light 39,5 → 58,1 (62 expéditions) au Priest, **Lone Wolf
+78,2 → 82,6** au Hunter, Echoing Reprimand +3,2 et Doomblade +2,0 au Rogue ; toutes les autres épiques des cinq
+classes à ± 2 points (Warrior et Mage : aucune épique ne gagne à monter, alors qu'elles finissent à +2,4 à +2,9).
+
+Mesures ciblées (tout débloqué ; 600 sauf mention) :
+- Warrior, Sweeping Strikes imposée : 91,8 % (`upfocus=0`, épique améliorée dans 7 % des expéditions) → 91,5 %
+  (`1`, 93 %) : ses +2/+3 (Sweep sur toutes les attaques, Rage au kill) ne rapportent rien de mesurable.
+- Hunter, Lone Wolf imposée : 66,2 → 72,0 % (3 000 : **68,0 → 75,1**, épique améliorée 0,6 → 79 %) : le seul gain net
+  de la politique ; Lone Wolf au +0 est sous les autres épiques du Hunter (87 à 93 % « avec ») et le reste au +3 (83 %).
+- Mage, carte de départ en plus imposée, 3 000 (base 76,2) : Arcane Blast +0 76,4, +1 81,8, +2 85,1, **+3 88,2** ;
+  Mana Shield +0 74,8, +1 84,3, +2 87,4, **+3 90,0**. Gain par palier : +5,4 / +3,3 / +3,1 et +9,5 / +3,1 / +2,6 :
+  chaque palier rapporte moins que le +1, comme le veut la règle ; +3 contre +1 : +6,4 et +5,7, deux améliorations
+  gratuites dès Westfall (où se joue l'expédition) ; la copie au +0 ne rapporte rien (Arcane Blast est la carte
+  que le bot retire en premier : absente du deck final dans 29 % des expéditions de base).
+
+Conclusions : concentrer ses améliorations ne vaut ni plus ni moins que les étaler pour le Warrior, le Mage et le
+Rogue (± 0,5 à 3 000), un peu mieux pour le Hunter (+1,0), nettement mieux pour le Priest (+3,6, Shadow Covenant) et
+pour Lone Wolf (+7,1). L'écart entre classes ne bouge presque pas (Warrior 87, Mage 76, Hunter 75, Priest 68, Rogue
+62 % ; compte neuf inchangé) : il se fait à Westfall, avant toute amélioration. Paliers à revoir : aucun « trop
+fort » en campagne ; les +2/+3 de Shadow Covenant et de Lone Wolf réparent une épique faible au +0 ; les épiques du
+Warrior et du Mage montées à +3 ne changent rien (paliers inutiles pour ce bot, ou épiques déjà au plafond).
