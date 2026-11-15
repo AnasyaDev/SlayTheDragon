@@ -168,6 +168,385 @@ function RowScroll:PlaceBar(panel, x, y, h)
   self.thumb:Show()
 end
 
+-- Vitrine des déblocages (écran entre deux zones, bilan) : ce qu'une expédition vient de débloquer pour les
+-- suivantes, montré tel quel. Titre court (« Unlocked for your next expeditions »), puis un groupe par
+-- destinataire (la classe jouée, « All classes » pour le commun du compte), son nom dans une colonne à gauche
+-- de sa première rangée ; dans le groupe : vraies cartes (épiques d'abord, plus grandes si la place le permet ;
+-- survol = halo et aperçu à taille réelle, comme toute petite carte), puis bibelots et potions en cases
+-- (infobulle de l'objet), en colonnes de 1 à 3 cases. Sous les rangées, une ligne par groupe pour ce qui
+-- n'est ni carte ni objet (« All classes: 15 new encounters. »). groups = { { label, cards = {ids},
+-- relics = {ids}, potions = {ids}, notes = {textes} } } (UI/Controller.lua).
+-- Mise en page : la densité la plus aérée qui tient dans la hauteur donnée (SH_DENSITY : échelle des cartes,
+-- de l'épique, taille et empilement des cases) ; si rien ne tient, la plus serrée, et les rangées défilent à
+-- la molette (RowScroll, une rangée par cran, rangées entières seulement).
+local Shelf = {}
+Shelf.__index = Shelf
+UI.Shelf = Shelf
+-- colonne des noms : SH_LABEL_W, texte du nom dans SH_LABEL_TEXT_W (le ruban de la première carte, jusqu'à
+-- 0,12 × sa largeur, déborde à gauche de la colonne des éléments) ; côte à côte : SH_LABEL_GAP après le nom
+local SH_LABEL_W, SH_LABEL_TEXT_W, SH_LABEL_GAP, SH_HEAD, SH_ROW_GAP, SH_BAR_W = 96, 84, 14, 26, 8, 14
+local SH_CARD_GAP, SH_SET_GAP, SH_ICON_GAPX, SH_ICON_GAPY, SH_GROUP_SEP = 10, 16, 6, 4, 30
+local SH_NOTE_SIZE, SH_NOTE_GAP = 12.5, 6
+local SH_DENSITY = {
+  { scale = 0.5, epic = 0.72, icon = 44, stack = 1 },
+  { scale = 0.5, epic = 0.72, icon = 44, stack = 2 },
+  { scale = 0.5, epic = 0.5, icon = 44, stack = 2 },
+  { scale = 0.5, epic = 0.5, icon = 32, stack = 3 },
+  { scale = 0.42, epic = 0.42, icon = 28, stack = 3 },
+}
+UI.SH = { density = SH_DENSITY, labelW = SH_LABEL_W }
+
+-- Hauteur visible d'une carte à l'échelle s (languette et plaque du bas comprises) et position de son
+-- centre sous le haut de ce visuel.
+local function shCardH(s)
+  local pad = W.PREVIEW_PAD
+  return (W.CARD_H + (pad.top + pad.bottom) * W.CARD_W) * s, (pad.top * W.CARD_W + W.CARD_H / 2) * s
+end
+
+-- Rangées d'un groupe à la densité d dans la largeur maxW (nom non compris) : { items, right, h } ;
+-- item = { kind = "card" | "relic" | "potion", id, x, w, h, s (carte), top } (x depuis le début des éléments).
+local function groupRows(g, d, maxW)
+  local rows = {}
+  local row, last
+  local function newRow()
+    row = { items = {}, right = 0, h = 0 }
+    rows[#rows + 1] = row
+    last = nil
+  end
+  -- place un élément de largeur w (écart selon le précédent) ; nouvelle rangée s'il ne tient pas
+  local function put(kind, w)
+    if not row then newRow() end
+    local lead = 0
+    if last then lead = (last == "card" and kind == "card") and SH_CARD_GAP or (last ~= kind and SH_SET_GAP or SH_ICON_GAPX) end
+    if last and row.right + lead + w > maxW then
+      newRow()
+      lead = 0
+    end
+    local x = row.right + lead
+    row.right = x + w
+    last = kind
+    return x
+  end
+  for _, id in ipairs(g.cards or {}) do
+    local def = ns.Cards[id]
+    local s = (def and def.rarity == "epic") and d.epic or d.scale
+    local h, top = shCardH(s)
+    local w = W.CARD_W * s
+    local x = put("card", w)
+    row.items[#row.items + 1] = { kind = "card", id = id, x = x, w = w, h = h, s = s, top = top }
+    row.h = max(row.h, h)
+  end
+  local icons = {}
+  for _, id in ipairs(g.relics or {}) do icons[#icons + 1] = { "relic", id } end
+  for _, id in ipairs(g.potions or {}) do icons[#icons + 1] = { "potion", id } end
+  local i = 1
+  while i <= #icons do
+    local n = min(d.stack, #icons - i + 1)
+    local x = put("icon", d.icon)
+    local colH = n * d.icon + (n - 1) * SH_ICON_GAPY
+    for j = 0, n - 1 do
+      local it = icons[i + j]
+      row.items[#row.items + 1] = { kind = it[1], id = it[2], x = x, w = d.icon, h = colH,
+        top = j * (d.icon + SH_ICON_GAPY) }
+    end
+    row.h = max(row.h, colH)
+    i = i + n
+  end
+  return rows
+end
+
+-- Décale les éléments d'une rangée de dx.
+local function shiftItems(row, dx)
+  for _, it in ipairs(row.items) do it.x = it.x + dx end
+end
+
+-- Mise en page empilée : chaque groupe sur ses rangées, son nom dans la colonne de gauche (SH_LABEL_W).
+-- Rangée = { items (x depuis le bord gauche de la vitrine), labels = { { group, x } }, right, h }.
+local function shelfStacked(groups, d, maxW)
+  local rows = {}
+  for gi, g in ipairs(groups) do
+    for _, r in ipairs(groupRows(g, d, maxW - SH_LABEL_W)) do
+      shiftItems(r, SH_LABEL_W)
+      r.right = r.right + SH_LABEL_W
+      r.labels = { { group = gi, x = 0 } }
+      rows[#rows + 1] = r
+    end
+  end
+  return rows
+end
+
+-- Mise en page côte à côte : tous les groupes sur une seule rangée (chacun son nom, à sa largeur, devant ses
+-- éléments) ; nil si ça ne tient pas dans maxW. labelW(texte) : largeur d'un nom.
+local function shelfSideBySide(groups, d, maxW, labelW)
+  local row = { items = {}, labels = {}, right = 0, h = 0 }
+  local x = 0
+  for gi, g in ipairs(groups) do
+    local rs = groupRows(g, d, math.huge)
+    if #rs > 1 then return nil end
+    local r = rs[1]
+    if r then
+      if #row.labels > 0 then x = x + SH_GROUP_SEP end
+      row.labels[#row.labels + 1] = { group = gi, x = x }
+      x = x + labelW(g.label or "") + SH_LABEL_GAP
+      shiftItems(r, x)
+      for _, it in ipairs(r.items) do row.items[#row.items + 1] = it end
+      x = x + r.right
+      row.h = max(row.h, r.h)
+    end
+  end
+  row.right = x
+  if x > maxW then return nil end
+  return { row }
+end
+
+local function rowsHeight(rows, from, to)
+  local h = 0
+  for i = from or 1, to or #rows do h = h + rows[i].h + (i > (from or 1) and SH_ROW_GAP or 0) end
+  return h
+end
+
+-- Vrai si les groupes ont quelque chose à montrer (carte, objet ou note).
+function Shelf.any(groups)
+  for _, g in ipairs(groups or {}) do
+    if #(g.cards or {}) + #(g.relics or {}) + #(g.potions or {}) + #(g.notes or {}) > 0 then return true end
+  end
+  return false
+end
+
+-- f : cadre de l'écran (coordonnées de la scène) ; panel : le panneau qui porte la vitrine.
+function Shelf.new(f, panel)
+  local s = setmetatable({ frame = f, panel = panel, cards = {}, icons = {}, labels = {}, notes = {}, items = {} }, Shelf)
+  s.head = W.label(panel, "heavy", 15, C.wowGold)
+  s.head:SetText("Unlocked for your next expeditions")
+  s.head:Hide()
+  -- mesure des noms (côte à côte : chaque nom à sa largeur), jamais montré
+  s.measure = W.label(panel, "heavy", 13.5, C.wowGold)
+  s.measure:Hide()
+  s.scroll = RowScroll.new(panel, 1, 1, s.items, function() s:Place() end)
+  s.scroll:Hook(panel)
+  return s
+end
+
+-- Largeur d'un nom de groupe sur une ligne.
+function Shelf:LabelWidth(t)
+  self.measure:SetText(t)
+  return tonumber(self.measure:GetStringWidth()) or 0
+end
+
+-- Carte n de la réserve (créée au besoin, hors de tout survol).
+function Shelf:Card(n)
+  local c = self.cards[n]
+  if not c then
+    c = W.card(self.frame)
+    c:SetFrameLevel(self.panel:GetFrameLevel() + 5)
+    self.scroll:Hook(c)
+    c:Hide()
+    self.cards[n] = c
+    self.items[#self.items + 1] = c
+  end
+  return c
+end
+
+-- Case n de la réserve de cette taille (une case garde sa taille : une réserve par taille).
+function Shelf:Icon(size, n)
+  local pool = self.icons[size]
+  if not pool then
+    pool = {}
+    self.icons[size] = pool
+  end
+  local b = pool[n]
+  if not b then
+    b = W.iconButton(self.frame, size, "square")
+    b:SetFrameLevel(self.panel:GetFrameLevel() + 5)
+    -- drapeau de survol (RowScroll rejoue la sortie puis l'entrée de l'élément survolé pendant un cran)
+    local enter, leave = b:GetScript("OnEnter"), b:GetScript("OnLeave")
+    b:SetScript("OnEnter", function(self, ...) self.hover = true if enter then enter(self, ...) end end)
+    b:SetScript("OnLeave", function(self, ...) self.hover = false if leave then leave(self, ...) end end)
+    self.scroll:Hook(b)
+    b:Hide()
+    pool[n] = b
+    self.items[#self.items + 1] = b
+  end
+  return b
+end
+
+function Shelf:Label(pool, n, kind, size, color)
+  local fs = pool[n]
+  if not fs then
+    fs = W.label(self.panel, kind, size, color)
+    pool[n] = fs
+  end
+  return fs
+end
+
+-- Cartes et cases visibles (harnais) : listes de cadres.
+function Shelf:Visible()
+  local cards, icons = {}, {}
+  for _, c in ipairs(self.cards) do if c:IsShown() then cards[#cards + 1] = c end end
+  local pool = self.d and self.icons[self.d.icon] or {} -- une seule taille de case montrée à la fois
+  for _, b in ipairs(pool) do if b:IsShown() then icons[#icons + 1] = b end end
+  return cards, icons
+end
+
+function Shelf:Hide()
+  self.rows = nil
+  self.head:Hide()
+  for _, fs in ipairs(self.labels) do fs:Hide() end
+  for _, fs in ipairs(self.notes) do fs:Hide() end
+  for _, c in ipairs(self.cards) do W.hideCard(c) end
+  for _, pool in pairs(self.icons) do for _, b in ipairs(pool) do b:Hide() end end
+  self.scroll:SetCount(0, true)
+  self.scroll:PlaceBar(self.panel, 0, 0, 0)
+end
+
+-- Montre les groupes : o = { cx (centre), top (haut du titre), maxW, maxH (titre, rangées et lignes de
+-- note compris), px, py (coin du panneau), reset (retour à la première rangée) }, coordonnées de la scène.
+-- Renvoie la largeur et la hauteur occupées (0, 0 : rien à montrer, tout est caché).
+function Shelf:Show(groups, o)
+  if not Shelf.any(groups) then
+    self:Hide()
+    return 0, 0
+  end
+  self.o = o
+  -- lignes de note sous les rangées (une par groupe qui en a)
+  local noteH, noteW, nn = 0, 0, 0
+  for _, g in ipairs(groups) do
+    if g.notes and #g.notes > 0 then
+      nn = nn + 1
+      local fs = self:Label(self.notes, nn, "body", SH_NOTE_SIZE, C.textSoft)
+      fs:SetWidth(o.maxW)
+      fs:SetJustifyH("CENTER")
+      fs:SetWordWrap(true)
+      fs:SetText((g.label and (g.label .. ": ") or "") .. table.concat(g.notes, " "))
+      fs:Show()
+      noteH = noteH + SH_NOTE_GAP + (tonumber(fs:GetStringHeight()) or 15)
+      noteW = max(noteW, min(o.maxW, tonumber(fs:GetStringWidth()) or 0))
+    end
+  end
+  for i = nn + 1, #self.notes do self.notes[i]:Hide() end
+  -- densité la plus aérée qui tient (groupes empilés, sinon côte à côte sur une rangée), sinon la plus
+  -- serrée, empilée, et défilement
+  local rowW = o.maxW - SH_BAR_W
+  local winH = o.maxH - SH_HEAD - noteH
+  local function labelW(t) return self:LabelWidth(t) end
+  local rows, d
+  for _, dd in ipairs(SH_DENSITY) do
+    local r = shelfStacked(groups, dd, rowW)
+    if rowsHeight(r) > winH then r = shelfSideBySide(groups, dd, rowW, labelW) end
+    if r and rowsHeight(r) <= winH then rows, d = r, dd break end
+  end
+  local scrolling = rows == nil
+  if scrolling then
+    d = SH_DENSITY[#SH_DENSITY]
+    rows = shelfStacked(groups, d, rowW)
+  end
+  self.groups, self.rows, self.d = groups, rows, d
+  -- rangées visibles : toutes, ou celles qui tiennent depuis la fin (la dernière position montre la fin)
+  local fit = #rows
+  if scrolling then
+    fit = 0
+    for i = #rows, 1, -1 do
+      if fit > 0 and rowsHeight(rows, i, #rows) > winH then break end
+      fit = fit + 1
+    end
+  end
+  self.scroll.rows = max(1, fit)
+  self.scroll:SetCount(#rows, o.reset)
+  -- fenêtre : la hauteur de la plus haute des positions (rangées entières), pas toute la place offerte
+  local winShown = 0
+  if scrolling then
+    for first = 1, self.scroll:MaxOffset() + 1 do
+      local last = first
+      while last < #rows and rowsHeight(rows, first, last + 1) <= winH do last = last + 1 end
+      winShown = max(winShown, rowsHeight(rows, first, last))
+    end
+  end
+  self.winH = scrolling and winShown or rowsHeight(rows)
+  local inner = 0
+  for _, r in ipairs(rows) do inner = max(inner, r.right) end
+  self.blockW = inner + (scrolling and SH_BAR_W or 0)
+  self.noteH = noteH
+  local headW = tonumber(self.head:GetStringWidth()) or 0
+  self.w = max(self.blockW, headW, noteW)
+  self.h = SH_HEAD + self.winH + noteH
+  self:Place()
+  return self.w, self.h
+end
+
+-- Recentre la vitrine (largeur du panneau connue après Show) et la repose.
+function Shelf:SetCenter(cx, px)
+  self.o.cx, self.o.px = cx, px or self.o.px
+  self:Place()
+end
+
+-- Pose le titre, les rangées visibles (à partir de la position de défilement), les noms, les notes et
+-- l'indicateur de défilement.
+function Shelf:Place()
+  local o, rows, d = self.o, self.rows, self.d
+  if not rows then return end
+  local f, lv = self.frame, self.panel:GetFrameLevel()
+  self.head:ClearAllPoints()
+  self.head:SetPoint("TOP", f, "TOPLEFT", o.cx, -o.top)
+  self.head:Show()
+  local x0, y0 = o.cx - self.blockW / 2, o.top + SH_HEAD
+  local nc, ni, nl = 0, 0, 0
+  local labelled = {}
+  local y = y0
+  for i = self.scroll:First() + 1, #rows do
+    local r = rows[i]
+    if y - y0 + r.h > self.winH + 0.5 then break end
+    -- nom de chaque groupe sur sa première rangée visible
+    for _, lab in ipairs(r.labels) do
+      local g = self.groups[lab.group]
+      if not labelled[lab.group] and g.label then
+        labelled[lab.group] = true
+        nl = nl + 1
+        local fs = self:Label(self.labels, nl, "heavy", 13.5, C.wowGold)
+        fs:SetWidth(#r.labels > 1 and (self:LabelWidth(g.label) + 2) or SH_LABEL_TEXT_W)
+        fs:SetJustifyH("LEFT")
+        fs:SetText(g.label)
+        fs:ClearAllPoints()
+        fs:SetPoint("LEFT", f, "TOPLEFT", x0 + lab.x, -(y + r.h / 2))
+        fs:Show()
+      end
+    end
+    for _, it in ipairs(r.items) do
+      local x = x0 + it.x
+      if it.kind == "card" then
+        nc = nc + 1
+        local c = self:Card(nc)
+        c:SetCard(it.id, false, {})
+        W.placeCard(c, f, x + it.w / 2, y + (r.h - it.h) / 2 + it.top, it.s, lv + 5 + nc, lv + 90)
+        c:Show()
+      else
+        ni = ni + 1
+        local b = self:Icon(d.icon, ni)
+        at(b, f, x, y + (r.h - it.h) / 2 + it.top, d.icon, d.icon)
+        b:SetItem(it.kind, it.id)
+        b:Show()
+      end
+    end
+    y = y + r.h + SH_ROW_GAP
+  end
+  for i = nc + 1, #self.cards do W.hideCard(self.cards[i]) end
+  for size, pool in pairs(self.icons) do
+    for i, b in ipairs(pool) do
+      if size ~= d.icon or i > ni then b:Hide() end
+    end
+  end
+  for i = nl + 1, #self.labels do self.labels[i]:Hide() end
+  local ny = y0 + self.winH
+  for _, fs in ipairs(self.notes) do
+    if fs:IsShown() then
+      fs:SetWidth(self.w) -- largeur de la vitrine (le texte a été coupé à maxW, au plus aussi large)
+      fs:ClearAllPoints()
+      fs:SetPoint("TOP", f, "TOPLEFT", o.cx, -(ny + SH_NOTE_GAP))
+      ny = ny + SH_NOTE_GAP + (tonumber(fs:GetStringHeight()) or 15)
+    end
+  end
+  self.scroll:PlaceBar(self.panel, x0 + self.blockW - 6 - o.px, y0 - o.py, self.winH)
+end
+
 -- Réponse (rencontre, bibelot, feu de camp) à la façon B : gros bouton rouge du jeu portant le libellé
 -- (icône de l'objet dans une case à gauche), et sous le bouton ce que la réponse donne ou coûte (vert
 -- pour un gain, rouge pour une perte ou la raison d'un refus). Survol : liseré d'or, bouton éclairci,
@@ -1741,13 +2120,18 @@ end
 ---------------------------------------------------------------------------
 -- Pastilles : zones franchies vertes, zone suivante jaune (plus grande), à venir grises (mêmes pièces que le
 -- bandeau). Abandon : bouton Menu du bandeau, comme ailleurs.
+-- Déblocages du boss vaincu (step.unlocks, vitrine partagée avec le bilan : Shelf) : le panneau monte
+-- (TR_UY), s'élargit vers la droite (le héros est à gauche) de TR_W à TR_UW_MAX selon la vitrine et grandit
+-- vers le bas sans descendre sous TR_BOTTOM (bouton « Continue » à y 494) ; nom, pastilles et texte resserrés
+-- en haut. Rien de débloqué : panneau et textes comme avant.
 
 local Transit = { kinds = { "transit" } }
 UI.register("transit", Transit)
 
 local TR_X, TR_Y, TR_W, TR_H = 280, 70, 560, 250
 local TR_PIP, TR_PIP_CUR, TR_PIP_DX = 16, 20, 34
-UI.TR = { x = TR_X, y = TR_Y, w = TR_W, h = TR_H }
+local TR_UY, TR_UW_MAX, TR_BOTTOM, TR_PAD, TR_PAD_B = 44, 700, 486, 24, 20
+UI.TR = { x = TR_X, y = TR_Y, w = TR_W, h = TR_H, uy = TR_UY, uwMax = TR_UW_MAX, bottom = TR_BOTTOM }
 
 function Transit:Build(f)
   self.hero = heroFigure(f)
@@ -1755,7 +2139,6 @@ function Transit:Build(f)
   at(panel, f, TR_X, TR_Y, TR_W, TR_H)
   self.panel = panel
   self.title = W.label(panel, "heavy", 28, C.wowGold)
-  self.title:SetPoint("TOP", 0, -24)
   self.pips = {}
   for i = 1, #ns.Zone.ORDER do
     local d = W.wow(panel, "pip_gray", "ARTWORK", 1)
@@ -1763,14 +2146,20 @@ function Transit:Build(f)
     self.pips[i] = d
   end
   self.text = W.label(panel, "bold", 14, C.textSoft)
-  self.text:SetPoint("TOP", self.title, "BOTTOM", 0, -52)
   self.text:SetWidth(TR_W - 60)
   self.text:SetJustifyH("CENTER")
   self.text:SetWordWrap(true)
+  self.shelf = Shelf.new(f, panel)
+  self.shelf.scroll:Hook(f)
   self.go = W.button(f, "Continue", 230, 50, nil, "gold", 18)
   at(self.go, f, 790, 494, 230, 50)
   self.go:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
   self.optionButtons = {}
+end
+
+function Transit:OnHide()
+  for _, c in ipairs(self.shelf.cards) do W.hideCard(c) end
+  if not self.frame:IsShown() then self.shelfKey = nil end
 end
 
 function Transit:Show(step)
@@ -1779,6 +2168,39 @@ function Transit:Show(step)
   UI.setStage({ scene = Controller.scene(), board = true, veil = 0.2 })
   Scene.playerFigure(self.hero)
   self.title:SetText(step.title or "")
+  self.text:SetText(inkText(step.text))
+  -- avec des déblocages : haut resserré (nom, pastilles, texte), vitrine dessous
+  local groups = step.unlocks
+  local tight = Shelf.any(groups)
+  local titleY, pipY = tight and -18 or -24, tight and -66 or -82
+  self.title:ClearAllPoints()
+  self.title:SetPoint("TOP", self.panel, "TOP", 0, titleY)
+  self.text:ClearAllPoints()
+  if tight then
+    self.text:SetPoint("TOP", self.panel, "TOP", 0, pipY - 20)
+  else
+    self.text:SetPoint("TOP", self.title, "BOTTOM", 0, -52)
+  end
+  local px, py, pw, ph = TR_X, TR_Y, TR_W, TR_H
+  local sw, sh = 0, 0
+  if tight then
+    py = TR_UY
+    local textH = tonumber(self.text:GetStringHeight()) or 36
+    local top = -pipY + 20 + textH + 14
+    local key = tostring(step.from) .. "|" .. tostring(step.title)
+    sw, sh = self.shelf:Show(groups, { cx = TR_X + TR_UW_MAX / 2, top = py + top, maxW = TR_UW_MAX - 2 * TR_PAD,
+      maxH = TR_BOTTOM - py - top - TR_PAD_B, px = px, py = py, reset = key ~= self.shelfKey })
+    self.shelfKey = key
+    if sh > 0 then
+      pw = max(TR_W, min(TR_UW_MAX, sw + 2 * TR_PAD))
+      ph = top + sh + TR_PAD_B
+      self.shelf:SetCenter(px + pw / 2, px)
+    end
+  else
+    self.shelf:Hide()
+    self.shelfKey = nil
+  end
+  at(self.panel, self.frame, px, py, pw, ph)
   local n, total = step.pos or 1, step.count or #self.pips
   for i, d in ipairs(self.pips) do
     if i <= total then
@@ -1786,13 +2208,12 @@ function Transit:Show(step)
       W.setWow(d, i < n and "pip_green" or (i == n and "pip_yellow" or "pip_gray"))
       d:SetSize(size, size)
       d:ClearAllPoints()
-      d:SetPoint("CENTER", self.panel, "TOP", (i - (total + 1) / 2) * TR_PIP_DX, -82)
+      d:SetPoint("CENTER", self.panel, "TOP", (i - (total + 1) / 2) * TR_PIP_DX, pipY)
       d:Show()
     else
       d:Hide()
     end
   end
-  self.text:SetText(inkText(step.text))
   self.optionButtons = {}
   for _, o in ipairs(step.options or {}) do
     if o.id == "continue" then
@@ -1806,23 +2227,20 @@ end
 ---------------------------------------------------------------------------
 -- Bilan et journal : panneau d'ardoise, barre de niveau de la classe, journal
 ---------------------------------------------------------------------------
--- Bilan avec montée de niveau : sous les barres, ce qui vient d'être débloqué, révélé tel quel (vraies
--- cartes à petite échelle, agrandies au survol ; cases des bibelots), sans autre texte. Le panneau monte
--- et grandit pour les accueillir (jamais sur les boutons du bas).
+-- Bilan : sous les barres, ce que l'expédition vient de débloquer (vitrine partagée avec l'écran entre deux
+-- zones : Shelf ; step.unlocks), montré tel quel (vraies cartes, cases des bibelots et potions, groupes de la
+-- classe et du compte). Le panneau monte et grandit pour l'accueillir (jamais sur les boutons du bas) ; si
+-- tout ne tient pas, les rangées défilent.
 
 local Progress = { kinds = { "end", "meta" } }
 UI.register("progress", Progress)
 
 -- Panneau : PG_X, PG_Y, PG_W × PG_H au moins ; monté à PG_UP_Y avec des déblocages, son bas jamais sous
 -- PG_BOTTOM (boutons du bas à y 494). Barres sous le texte (au moins à PG_BARS de son haut, la méta à
--- PG_BARS_META), rangée des déblocages sous les barres.
+-- PG_BARS_META), vitrine des déblocages sous les barres (PG_SHELF sous le haut de la dernière barre).
 local PG_X, PG_W, PG_Y, PG_H, PG_UP_Y, PG_BOTTOM = 167, 700, 64, 352, 40, 488
-local PG_BARS, PG_BARS_META, PG_BAR_DY = 170, 110, 54
-local PG_SCALE, PG_PITCH, PG_RELIC, PG_RELIC_DX = 0.5, 72, 44, 58
-local PG_MAX_CARDS, PG_MAX_RELICS = 9, 3
--- épique débloquée au bilan : plus grande, à gauche de la rangée, libellé « New epic card » au-dessus
-local PG_EPIC_SCALE, PG_EPIC_GAP, PG_EPIC_LABEL = 0.72, 40, 20
-UI.PG = { scale = PG_SCALE, maxCards = PG_MAX_CARDS, maxRelics = PG_MAX_RELICS, bottom = PG_BOTTOM }
+local PG_BARS, PG_BARS_META, PG_BAR_DY, PG_SHELF, PG_PAD, PG_PAD_B = 170, 110, 54, 40, 30, 22
+UI.PG = { bottom = PG_BOTTOM }
 
 function Progress:Build(f)
   local panel = W.dialog(f, nil)
@@ -1855,87 +2273,21 @@ function Progress:Build(f)
     b:Hide()
     self.buttons[i] = b
   end
-  -- déblocages révélés (bilan avec montée de niveau)
-  self.newCards, self.newRelics = {}, {}
-  for i = 1, PG_MAX_CARDS do
-    local c = W.card(f)
-    c:SetFrameLevel(panel:GetFrameLevel() + 5)
-    c:Hide()
-    self.newCards[i] = c
-  end
-  for i = 1, PG_MAX_RELICS do
-    local b = W.iconButton(f, PG_RELIC, "square")
-    b:SetFrameLevel(panel:GetFrameLevel() + 5)
-    b:Hide()
-    self.newRelics[i] = b
-  end
-  -- carte épique débloquée (première victoire de la classe dans la zone) : à part, plus grande, libellé violet
-  self.epicCard = W.card(f)
-  self.epicCard:SetFrameLevel(panel:GetFrameLevel() + 5)
-  self.epicCard:Hide()
-  self.epicLabel = W.label(panel, "heavy", 13, W.EPIC_TEXT, "OVERLAY")
-  self.epicLabel:SetText("New epic card")
-  self.epicLabel:Hide()
+  -- déblocages du bilan (vitrine partagée)
+  self.shelf = Shelf.new(f, panel)
+  self.shelf.scroll:Hook(f)
   self.optionButtons = {}
 end
 
--- Rangée des déblocages, centrée sous les barres (centre à rowY, coordonnées de la scène) ; cachée sans
--- montée de niveau.
-function Progress:ShowUnlocked(u, rowY)
-  local cards = u and u.cards or {}
-  local relics = u and u.relics or {}
-  local nc, nr = math.min(#cards, PG_MAX_CARDS), math.min(#relics, PG_MAX_RELICS)
-  local cw = W.CARD_W * PG_SCALE
-  local width = (nc > 0 and ((nc - 1) * PG_PITCH + cw) or 0) + (nr > 0 and ((nc > 0 and 24 or 0) + (nr - 1) * PG_RELIC_DX + PG_RELIC) or 0)
-  -- épique : d'abord, à PG_EPIC_SCALE, séparée du reste par PG_EPIC_GAP, libellé au-dessus
-  local ew = W.CARD_W * PG_EPIC_SCALE
-  local epic = u and u.epic
-  if epic then width = width + ew + (width > 0 and PG_EPIC_GAP or 0) end
-  local x = PG_X + PG_W / 2 - width / 2
-  local lv = self.panel:GetFrameLevel()
-  if epic then
-    local ex = x + ew / 2
-    self.epicCard:SetCard(epic, false, {})
-    W.placeCard(self.epicCard, self.frame, ex, rowY, PG_EPIC_SCALE, lv + 5, lv + 60)
-    self.epicCard:Show()
-    self.epicLabel:ClearAllPoints()
-    self.epicLabel:SetPoint("BOTTOM", self.frame, "TOPLEFT", ex, -(rowY - W.CARD_H * PG_EPIC_SCALE / 2 - 22))
-    self.epicLabel:Show()
-    x = x + ew + (width > ew and PG_EPIC_GAP or 0)
-  else
-    W.hideCard(self.epicCard)
-    self.epicLabel:Hide()
-  end
-  for i, c in ipairs(self.newCards) do
-    if i <= nc then
-      c:SetCard(cards[i], false, {})
-      W.placeCard(c, self.frame, x + cw / 2 + (i - 1) * PG_PITCH, rowY, PG_SCALE, lv + 5 + i, lv + 60)
-      c:Show()
-    else
-      W.hideCard(c)
-    end
-  end
-  x = x + (nc > 0 and ((nc - 1) * PG_PITCH + cw + 24) or 0)
-  for i, b in ipairs(self.newRelics) do
-    if i <= nr then
-      at(b, self.frame, x + (i - 1) * PG_RELIC_DX, rowY - PG_RELIC / 2, PG_RELIC, PG_RELIC)
-      b:SetItem("relic", relics[i])
-      b:Show()
-    else
-      b:Hide()
-    end
-  end
-end
-
 function Progress:OnHide()
-  for _, c in ipairs(self.newCards) do W.hideCard(c) end
-  W.hideCard(self.epicCard)
+  for _, c in ipairs(self.shelf.cards) do W.hideCard(c) end
+  if not self.frame:IsShown() then self.shelfKey = nil end
 end
 
 function Progress:Show(step)
   self.step = step
   UI.setStage({ scene = step.kind == "end" and Controller.scene() or "road", board = true, veil = 0.45 })
-  local up = step.kind == "end" and step.unlocked ~= nil
+  local up = step.kind == "end" and Shelf.any(step.unlocks)
   self.title:SetText(step.title or "")
   local tc = C.wowGold
   if step.kind == "end" then tc = step.won and C.healGreen or C.badText end
@@ -1946,22 +2298,24 @@ function Progress:Show(step)
   local textH = tonumber(self.text:GetStringHeight()) or 0
   local titleH = tonumber(self.title:GetStringHeight()) or 34
   local y0 = -max(step.kind == "end" and PG_BARS or PG_BARS_META, 20 + titleH + 10 + textH + 34)
-  -- panneau : monté et agrandi pour la rangée des déblocages (centre sous la dernière barre et son détail)
+  -- panneau : monté et agrandi pour la vitrine des déblocages (sous la dernière barre et son détail)
   local panelY, panelH = PG_Y, PG_H
-  local half = W.CARD_H * PG_SCALE / 2
-  local epicUp = up and step.unlocked.epic
-  if epicUp then half = W.CARD_H * PG_EPIC_SCALE / 2 end
-  local rowRel = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 58 + half + (epicUp and PG_EPIC_LABEL or 0)
   if up then
     panelY = PG_UP_Y
-    panelH = min(PG_BOTTOM - PG_UP_Y, max(PG_H, rowRel + half + 20))
+    local top = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + PG_SHELF
+    local key = tostring(step.title) .. "|" .. tostring(step.text)
+    local _, sh = self.shelf:Show(step.unlocks, { cx = PG_X + PG_W / 2, top = panelY + top, maxW = PG_W - 2 * PG_PAD,
+      maxH = PG_BOTTOM - panelY - top - PG_PAD_B, px = PG_X, py = panelY, reset = key ~= self.shelfKey })
+    self.shelfKey = key
+    panelH = min(PG_BOTTOM - PG_UP_Y, max(PG_H, top + sh + PG_PAD_B))
   else
-    -- bilan à plusieurs déblocages : le panneau s'allonge vers le bas sous la dernière barre et le journal
+    self.shelf:Hide()
+    self.shelfKey = nil
+    -- journal : le panneau s'allonge vers le bas sous la dernière barre et le journal
     local need = -y0 + (max(#bars, 1) - 1) * PG_BAR_DY + 40 + 16 * #(step.journal or {}) + 16
     panelH = min(PG_BOTTOM - PG_Y, max(PG_H, need))
   end
   at(self.panel, self.frame, PG_X, panelY, PG_W, panelH)
-  self:ShowUnlocked(up and step.unlocked or nil, panelY + rowRel)
   for i, b in ipairs(self.bars) do
     local data = bars[i]
     if data then
