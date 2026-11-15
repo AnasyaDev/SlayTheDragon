@@ -927,3 +927,23 @@ abordables par visite tout débloqué (3,6 à 4,4 au compte neuf, étals sans bi
 victoire inchangés à ± 4 points. Hors cible : 18 à 25 points du gagné tombent après le dernier marchand visité (≈ 0,6
 marchand par zone), ce que les prix ne changent pas ; pistes (marchand entre deux zones, pas d'or sur Nefarian) dans
 `docs/expedition.md`.
+
+## Paliers +2 et +3 des cartes neutres et des cartes de zone (15/11/2026)
+
+Les 22 cartes neutres (dix de `Data/Neutral.lua`, deux par zone) ont leurs paliers 2 et 3, écrits dans le bas de la
+fourchette (tableau et règles : `docs/cartes-neutres.md`, « Paliers +2 et +3 ») : Retain, Innate, coût ou prix en PV
+assoupli, ou un nombre ; jamais de pioche ni de mana en plus, jamais plus de Stunned, Exhaust toujours là. Les sept
+cartes de combat posées par les zones (Curses, Hexed, Morbent's Bane) restent sans palier 2 : jamais dans le deck.
+
+**Non mesurées carte par carte** : les balayages `sweep=cards up=1/2/3` ont été arrêtés sur consigne (coût en
+campagnes, machine partagée). Seul repère : le balayage `up=1` du Warrior (bot `human`, 200 expéditions par ligne,
+± 7 points, base 80,5 %) place déjà au palier 1 les soins en tête (Dreamless Sleep Potion +17,5, Crocolisk Gumbo +16,
+Heavy Silk Bandage +13,5, Dark Iron Bomb +13,5, Black Lotus +12,5) et Goblin Sapper Charge, Arcane Bomb, Elixir à 0
+ou dessous. Les paliers 2 et 3 des trois soins restent petits (Heal +2, puis Regen 2, Retain ou coût 0) ; à
+surveiller pour le Warrior, qui n'a pas d'autre soin.
+
+Campagne Mage (bot `human`, clé 0, `zones=7 level=7`, 600 expéditions, graine 1), avant → après : **74,8 → 74,8 %**,
+rapport identique ligne pour ligne. « Améliorations par palier » : +1 4,06, +2 0,00, +3 0,00 avant et après : le bot
+`human` du Mage n'a une carte neutre dans son deck final que dans 1 à 3 expéditions sur 600 et ne l'améliore jamais
+deux fois ; les paliers neutres n'ont donc aucun effet mesurable sur la campagne tant que les cartes de classe n'ont
+pas leurs propres paliers 2 et 3 (le bot répartit ses quatre améliorations sur des cartes différentes).
