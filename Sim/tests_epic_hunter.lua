@@ -591,7 +591,12 @@ test("paliers : sept épiques et neuf variantes à +2 / +3 ; textes en deux lign
     eq(Card.tiers(vid), 3, vid)
   end
   eq(Card.defById("trap_launcher", 2).text, "Epic.\nTraps: +1 Frenzy, Launch 2.")
-  eq(Card.defById("beast_cleave", 3).text, "Epic.\nPet attacks: Stampede +2, in full.")
+  eq(Card.defById("beast_cleave", 3).text, "Epic.\nPet attacks: Trample +2.")
+  eq(Card.defById("call_of_the_wild", 2).text, "Epic.\nStart of turn: Hunt 1.")
+  eq(Card.defById("black_arrow", 3).text, "Epic.\nEnemy DoT ticks: Prey 2.")
+  eq(Card.defById("lone_wolf", 3).text, "Epic.\nAttack hits: Ferocity 5.")
+  local tr = Lg.ruleWords(Card.defById("beast_cleave", 2))[1]
+  eq(tr.key, "trample"); eq(Lg.ruleText(tr.kw, tr.n, true), "Pet attacks also hit every other enemy, in full. Each one gives 1 more Frenzy.")
   local launch = Lg.ruleWords(Card.defById("trap_launcher", 3))[1]
   eq(Lg.ruleText(launch.kw, launch.n, true), "The Trap triggers at once on a target, then the pet attacks it 3 times.")
 end)
@@ -638,7 +643,7 @@ test("paliers : Beast Cleave +2 (en plein) / +3 (+2 Frenzy) ; Roar +2 / +3 ; Bla
   eq(u.player.res, 2)
 end)
 
-test("paliers : Master Marksman +3, Lone Wolf +2 (Ferocity 4) / +3 (+1 Frenzy au début du tour), variantes au palier", function()
+test("paliers : Master Marksman +3, Lone Wolf +2 (Ferocity 4) / +3 (Ferocity 5), variantes au palier", function()
   local m = setup({ "aimed_shot" }, { epic = { "master_marksman", 3 } })
   assert(Combat.play(m, 1, 1))
   eq(dealt(m.enemies[1]), 24 + 10 + E.marksman[4])
@@ -646,10 +651,11 @@ test("paliers : Master Marksman +3, Lone Wolf +2 (Ferocity 4) / +3 (+1 Frenzy au
   l.player.res = 2
   assert(Combat.play(l, 1, 1))
   eq(dealt(l.enemies[1]), E.chimaera[1] + 2 * E.lonePer[3])
-  local s = setup({ "disengage" }, { epic = { "lone_wolf", 3 } })
-  eq(s.player.res, E.loneStart[4], "tour 1")
-  local s2 = setup({ "disengage" }, { epic = { "lone_wolf", 2 } })
-  eq(s2.player.res, 0, "+2 : pas de Frenzy au début du tour")
+  local s = setup({ "chimaera_shot" }, { epic = { "lone_wolf", 3 }, extra = { "arcane_shot" } })
+  s.player.res = 2
+  assert(Combat.play(s, 1, 1))
+  eq(dealt(s.enemies[1]), E.chimaera[1] + 2 * E.lonePer[4], "Ferocity 5")
+  eq(E.lonePer[4], 5); eq(E.loneStart[4], 0, "pas de Frenzy au début du tour")
   -- variantes : palier de la carte d'origine (Chimaera Shot+3 : 8, 6 à un autre, +2 Frenzy ; Kill Shot+2 : coût 0)
   local deck = deckOf({ { "arcane_shot", 3 }, { "kill_command", 2 }, "lone_wolf", "disengage", "disengage", "disengage" })
   local c = Combat.new({ seed = 3, class = "hunter", hp = 50, deck = deck, encounter = { "th_dummy", "th_dummy" } })

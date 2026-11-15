@@ -493,8 +493,8 @@ local EPIC = {
   marksman = { 20, 24, 27, 30 },  -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
   launcher = { 1, 2, 2, 3 },      -- Trap Launcher : attaques du familier par Trap lancée
   launchRes = { 0, 0, 1, 1 },     -- Trap Launcher : Frenzy gagné par Trap lancée, avant les attaques
-  lonePer = { 2, 3, 4, 4 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
-  loneStart = { 0, 0, 0, 1 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
+  lonePer = { 2, 3, 4, 5 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
+  loneStart = { 0, 0, 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
   chimaera = { 5, 4, 8, 6 },      -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée, autre ennemi
                                   -- au palier 2 (fiche : 3, 3, 6)
 }
@@ -531,10 +531,10 @@ end
 -- Westfall — Call of the Wild : au début de chaque tour (après la pioche et la baisse du Frenzy), si le
 -- Frenzy vaut EPIC.cotwCost ou plus, il baisse d'autant et le familier attaque (+1 Frenzy comme toute
 -- attaque : la dépense de 1 est rendue) ; amélioré : sans dépense ; paliers 2 et 3 : EPIC.cotwRes Frenzy
--- gagné juste avant l'attaque.
+-- gagné juste avant l'attaque (« Hunt N », mot de règle : la carte tient en deux lignes).
 local function cotwText(cost, res)
   if cost > 0 then return "Epic.\nStart of turn: Wild Call " .. cost .. "." end
-  if res > 0 then return "Epic.\nStart of turn: +" .. res .. " Frenzy, pet attacks." end
+  if res > 0 then return "Epic.\nStart of turn: Hunt " .. res .. "." end -- mot de règle (Frenzy, puis attaque)
   return "Epic.\nStart of turn: pet attacks."
 end
 epic("call_of_the_wild", {
@@ -586,8 +586,10 @@ epic("trap_launcher", {
 -- attaque (pas pour les attaques de Surge, qui n'en donnent pas) ; palier 2 : les autres en plein (« in
 -- full ») ; palier 3 : +2 Frenzy de plus par attaque (EPIC.cleaveRes).
 -- (dégâts en moins : à-côté du mot Stampede, Core/Classes/hunter.lua)
+-- (paliers 2 et 3 : « Trample +N », mot de règle à part : les autres en plein ; la carte tient en deux lignes)
 local function cleaveText(less, res)
-  return "Epic.\nPet attacks: Stampede" .. (res > 0 and (" +" .. res) or "") .. (less == 0 and ", in full." or ".")
+  if less == 0 then return "Epic.\nPet attacks: Trample +" .. res .. "." end
+  return "Epic.\nPet attacks: Stampede" .. (res > 0 and (" +" .. res) or "") .. "."
 end
 epic("beast_cleave", {
   zone = "wetlands", path = "beast_mastery", name = "Beast Cleave",
@@ -675,7 +677,7 @@ epic("master_marksman", {
 -- l'attaque.
 local function blackText(cost, res)
   if cost > 0 then return "Epic.\nEnemy DoT ticks: Wild Call " .. cost .. "." end
-  if res > 0 then return "Epic.\nEnemy DoT ticks: pet attacks it, +" .. res .. " Frenzy." end
+  if res > 0 then return "Epic.\nEnemy DoT ticks: Prey " .. res .. "." end -- mot de règle (attaque, puis Frenzy)
   return "Epic.\nEnemy DoT ticks: pet attacks it."
 end
 epic("black_arrow", {
@@ -701,10 +703,8 @@ epic("black_arrow", {
 -- EPIC.lonePer par point de Frenzy de plus (fiche : 1 ; crochet damage, lu coup par coup ; une Cast le lit à
 -- sa résolution) ; EPIC.loneStart Frenzy au début de chaque tour (fiche : 0, amélioré 1 ; la baisse de 1 par
 -- round reste).
--- Palier 3 : EPIC.loneStart[4] Frenzy au début de chaque tour, écrit sur la carte.
 local function loneText(per, start)
-  -- (cartes de familier changées : à-côté du mot Ferocity, Core/Classes/hunter.lua)
-  if start > 0 then return "Epic.\nAttack hits: Ferocity " .. per .. ". Start of turn: +" .. start .. " Frenzy." end
+  -- (cartes de familier changées et Frenzy du début du tour : à-côté du mot Ferocity, Core/Classes/hunter.lua)
   return "Epic.\nAttack hits: Ferocity " .. per .. "."
 end
 epic("lone_wolf", {

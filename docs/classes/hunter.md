@@ -60,9 +60,12 @@ paliers 2 et 3, écrits carte par carte ; palier 0 et palier 1 inchangés. Princ
 - **Variantes de Lone Wolf** : même nature de gain que la carte d'origine, le familier devenant du Frenzy (Kill
   Command coûte 0 au +2, Kill Shot aussi ; Dire Beast gagne Retain au +3, Double Tap aussi).
 - **Épiques** : nombres en tables `{ base, +1, +2, +3 }` (`ns.HunterEpic`) lus par `Card.level(src) + 1` dans les
-  crochets et dans la ligne d'épique de l'interface (`UI/Art/hunter.lua`) ; texte toujours en deux lignes. Mots de
-  règle : « Launch N » (l'à-côté amélioré dit « N times »), « Stampede +N, in full » (l'à-côté amélioré rappelle
-  les dégâts en moins « unless in full »).
+  crochets et dans la ligne d'épique de l'interface (`UI/Art/hunter.lua`) ; texte en deux lignes à **chaque**
+  palier (contrôle du harnais sur tous les paliers, 15/11/2026). Mots de règle des paliers 2 et 3, la règle en
+  à-côté : « Hunt N » (Call of the Wild : N Frenzy, puis le familier attaque), « Trample +N » (Beast Cleave : les
+  autres ennemis en plein, N Frenzy de plus par attaque), « Prey N » (Black Arrow : le familier attaque l'ennemi
+  qui tique, puis N Frenzy) ; « Launch N » (l'à-côté amélioré dit « N times »). Lone Wolf : Ferocity 4 puis 5 (le
+  Frenzy au début du tour prévu au +3 ne tenait pas en deux lignes).
 - **Bots** : notes d'amélioration par défaut (× 0,8 puis × 0,6) ; valeur en combat des Powers dont le palier change
   la valeur (`Sim/bots.lua` : Spirit Bond, Trueshot Aura, Entrapment, Lock and Load, Resourcefulness, Feign Death).
 
@@ -133,10 +136,10 @@ Coût entre parenthèses ; « / » sépare les lignes de la carte.
 
 | Carte | +1 | +2 | +3 |
 |---|---|---|---|
-| Beast Cleave | Pet attacks: Stampede +1. | Pet attacks: Stampede +1, in full. | Pet attacks: Stampede +2, in full. |
-| Black Arrow | Enemy DoT ticks: pet attacks it. | Enemy DoT ticks: pet attacks it, +1 Frenzy. | Enemy DoT ticks: pet attacks it, +2 Frenzy. |
-| Call of the Wild | Start of turn: pet attacks. | Start of turn: +1 Frenzy, pet attacks. | Start of turn: +2 Frenzy, pet attacks. |
-| Lone Wolf | Attack hits: Ferocity 3. | Attack hits: Ferocity 4. | Attack hits: Ferocity 4. Start of turn: +1 Frenzy. |
+| Beast Cleave | Pet attacks: Stampede +1. | Pet attacks: Trample +1. | Pet attacks: Trample +2. |
+| Black Arrow | Enemy DoT ticks: pet attacks it. | Enemy DoT ticks: Prey 1. | Enemy DoT ticks: Prey 2. |
+| Call of the Wild | Start of turn: pet attacks. | Start of turn: Hunt 1. | Start of turn: Hunt 2. |
+| Lone Wolf | Attack hits: Ferocity 3. | Attack hits: Ferocity 4. | Attack hits: Ferocity 5. |
 | Master Marksman | Careful Aim: Deadeye 24. | Careful Aim: Deadeye 27. | Careful Aim: Deadeye 30. |
 | Roar of Sacrifice | When hit: Intervene 4. | When hit: Intervene 5. | When hit: Intervene 6. |
 | Trap Launcher | Traps: Launch 2. | Traps: +1 Frenzy, Launch 2. | Traps: +1 Frenzy, Launch 3. |
