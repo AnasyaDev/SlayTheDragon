@@ -62,15 +62,19 @@ return function(ns)
   end
 
   -- Part des cartes du combat qui vérifient pred (main, pioche, défausse, recharges, consumées).
-  local function deckShare(c, pred)
-    local n, k = 0, 0
-    local function scan(list)
-      for i = 1, #list do
-        n = n + 1
-        if pred(Card.def(list[i])) then k = k + 1 end
-      end
+  -- (sans closure créée à chaque appel : LuaJIT ne compile pas FNEW)
+  local function shareScan(list, pred, n, k)
+    for i = 1, #list do
+      n = n + 1
+      if pred(Card.def(list[i])) then k = k + 1 end
     end
-    scan(c.hand); scan(c.draw); scan(c.discard); scan(c.exhaust)
+    return n, k
+  end
+  local function deckShare(c, pred)
+    local n, k = shareScan(c.hand, pred, 0, 0)
+    n, k = shareScan(c.draw, pred, n, k)
+    n, k = shareScan(c.discard, pred, n, k)
+    n, k = shareScan(c.exhaust, pred, n, k)
     for i = 1, #c.cooldown do
       n = n + 1
       if pred(Card.def(c.cooldown[i].card)) then k = k + 1 end
@@ -104,20 +108,30 @@ return function(ns)
     return false
   end
   local function isAttack(d) return d.type == "attack" end
-  local function dealsDamage(d) return anyEffect(d, function(e) return e[1] == "damage" end) end
-  local function appliesDot(d)
-    return anyEffect(d, function(e) return (e[1] == "apply" and e[2] == "pain") or e[1] == "dotPer" end)
+  -- prédicats sur les effets et les fiches : fonctions fixes (une closure créée à chaque appel arrête la
+  -- compilation de LuaJIT, FNEW)
+  local function effDamage(e) return e[1] == "damage" end
+  local function effDot(e) return (e[1] == "apply" and e[2] == "pain") or e[1] == "dotPer" end
+  local function effStealth(e)
+    if e.cond == "stealth" then return true end
+    for j = 1, #(e.more or {}) do if e.more[j][2] == "stealth" then return true end end
+    return false
   end
-  local function readsStealth(d)
-    return anyEffect(d, function(e)
-      if e.cond == "stealth" then return true end
-      for j = 1, #(e.more or {}) do if e.more[j][2] == "stealth" then return true end end
-      return false
-    end)
-  end
-  local function petCard(d) return anyEffect(d, function(e) return e[1] == "pet" end) end
+  local function effPet(e) return e[1] == "pet" end
+  local function dealsDamage(d) return anyEffect(d, effDamage) end
+  local function appliesDot(d) return anyEffect(d, effDot) end
+  local function readsStealth(d) return anyEffect(d, effStealth) end
+  local function petCard(d) return anyEffect(d, effPet) end
   local function isTrap(d) return d.trap == true end
   local function isFire(d) return d.school == "fire" and dealsDamage(d) end
+  local function isFireSchool(d) return d.school == "fire" end
+  local function isDamagingAttack(d) return isAttack(d) and dealsDamage(d) end
+  local function isShadow(d) return d.school == "shadow" end
+  local function isCast(d) return d.cast end
+  local function givesAbsorb(d)
+    for i = 1, #d.effects do if d.effects[i][1] == "absorb" then return true end end
+    return false
+  end
   local function aliveCount(c)
     local n = 0
     for i = 1, #c.enemies do
@@ -169,11 +183,11 @@ return function(ns)
     retaliation = function(c, inst) return T * aliveCount(c) * 0.8 * up(inst, 4, 6) * W.enemyHp end,
     last_stand = lastBreath,
     -- Mage
-    hot_streak = function(c) return T * math.min(1, playsOf(c, function(d) return d.school == "fire" end) / 2) * 20 end,
+    hot_streak = function(c) return T * math.min(1, playsOf(c, isFireSchool) / 2) * 20 end,
     ignite = function(c, inst) return T * playsOf(c, isFire) * dotUnits(up(inst, 2, 3)) end,
     shatter = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 3, 4) * W.enemyHp end,
     arcane_power = function(c)
-      return T * playsOf(c, function(d) return isAttack(d) and dealsDamage(d) end) * 2 * W.enemyHp
+      return T * playsOf(c, isDamagingAttack) * 2 * W.enemyHp
     end,
     ice_block = lastBreath,
     -- Hunter
@@ -191,17 +205,14 @@ return function(ns)
     elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
     -- Priest
     shadowform = function(c)
-      local sh = deckShare(c, function(d) return d.school == "shadow" end)
+      local sh = deckShare(c, isShadow)
       return 10 + 9 * sh * 5 * W.enemyHp
     end,
     apotheosis = function(c)
-      return 4 * 6 * W.enemyHp + 9 * deckShare(c, function(d) return d.cast end) * 5 * W.enemyHp
+      return 4 * 6 * W.enemyHp + 9 * deckShare(c, isCast) * 5 * W.enemyHp
     end,
     rapture = function(c)
-      local share = deckShare(c, function(d)
-        for i = 1, #d.effects do if d.effects[i][1] == "absorb" then return true end end
-        return false
-      end)
+      local share = deckShare(c, givesAbsorb)
       return 10 + 9 * share * 2 * W.hp
     end,
     spirit_of_redemption = function(c)
