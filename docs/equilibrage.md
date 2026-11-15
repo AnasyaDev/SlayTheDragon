@@ -949,3 +949,16 @@ coups (Rampage paie moins de PV, Battle Shout et Recklessness passent à 0 ou In
 nombres par palier dans `ns.Warrior.EPIC`, ou une ligne « Kills: ». Paliers non mesurés carte par carte (balayages
 abandonnés sur consigne). Campagne bot `human`, clé 0, `zones=7 level=7`, 600 expéditions : 86,2 → 85,8 % ; le bot
 n'atteint le palier 2 que 0,08 fois par expédition (le palier 3 jamais), l'effet en campagne reste donc nul à ce jour.
+## Hunter : paliers +2 et +3 (15/11/2026)
+
+Les 50 cartes du Hunter (34 de classe, 7 épiques, 9 variantes de Lone Wolf) ont leurs paliers 2 et 3, écrits carte
+par carte (`docs/classes/hunter.md`, « Paliers d'amélioration +2 et +3 »). Les cartes qui étourdissent gagnent ce qui
+vaut contre Stun Resistant et Indomitable (Sundered, Demoralized, DoT, attaques du familier), sans toucher à Stunned.
+Campagne au bot `human` (600 expéditions, clé 0, `zones=7 level=7`) : 70,7 → **71,2 %** (± 3,6), combats par type
+inchangés à 0,1 point près ; améliorations par expédition +1 3,83 → 3,70, **+2 0,13**, +3 0 : le bot préfère encore
+le palier 1 d'une autre carte (notes × 0,8 puis × 0,6), les paliers 2 et 3 pèsent donc peu sur la campagne. Écarts
+« vict. avec / sans » des cartes et parts jouées : identiques à ± 2 points. Compte neuf avant : 18,2 % (non remesuré).
+**Paliers non mesurés carte par carte** : balayages `sweep=cards` abandonnés sur consigne (coût) ; un balayage
+partiel `up=2` au bot `human` (200 par ligne, ± 7 points, carte forcée à +2 contre le deck sans elle, donc la valeur
+de la carte plus que celle du palier) ne montrait aucun palier hors norme ; les Powers Survival forcées (Lock and
+Load, Resourcefulness, Entrapment) y restent négatives, comme leur carte de base.

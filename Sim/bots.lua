@@ -177,16 +177,18 @@ return function(ns)
     end,
     ice_block = lastBreath,
     -- Hunter
-    spirit_bond = function(c) return T * (1 + playsOf(c, petCard)) * 2 * W.hp * 0.5 end,
+    -- paliers (15/11/2026) : Spirit Bond+2 3 Absorb, Trueshot Aura+3 8, Entrapment+2 Sundered 1, Lock and Load+2
+    -- +1 Frenzy, Resourcefulness+3 3 Absorb par Trap ; Feign Death+2 (5 PV) : Last Breath un peu plus sûr
+    spirit_bond = function(c, inst) return T * (1 + playsOf(c, petCard)) * up(inst, 2, 2, 3) * W.hp * 0.5 end,
     the_beast_within = function(c)
       local pet = ns.Hunter and ns.Hunter.petDamage(c) or 3
       return T * playsOf(c, isAttack) * (pet + 0.5) * W.enemyHp
     end,
-    trueshot_aura = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 4, 6) * W.enemyHp end,
-    entrapment = function(c) return T * perTurn(c, isTrap) * 12 end,
-    lock_and_load = function(c) return T * perTurn(c, isTrap) * 20 end,
-    resourcefulness = function(c) return T * perTurn(c, isTrap) * 25 end,
-    feign_death = lastBreath,
+    trueshot_aura = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 4, 6, 6, 7) * W.enemyHp end,
+    entrapment = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 12, 12, 17) end,
+    lock_and_load = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 20, 20, 26) end,
+    resourcefulness = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 25, 25, 25, 25 + 3 * W.hp) end,
+    feign_death = function(c, inst) return lastBreath(c) + up(inst, 0, 0, 4 * W.hp) end,
     -- Carte neutre
     elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
     -- Priest

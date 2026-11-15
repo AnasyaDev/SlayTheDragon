@@ -3409,5 +3409,204 @@ do
   end)
 end
 
+---------------------------------------------------------------------------
+-- Hunter : paliers 2 et 3 (15/11/2026, docs/classes/hunter.md, « Paliers d'amélioration ») — section paliers-hunter
+---------------------------------------------------------------------------
+do
+  local HU = { class = "hunter" }
+  local P = ns.Hunter.PET_BASE
+  -- élite Indomitable qui frappe : Stunned toujours refusé (élites de Blackrock Mountain)
+  ns.Enemies.test_wall = { name = "Mur", hp = 100, elite = true, indomitable = true,
+    moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10 } } } }, pattern = { "hit" } }
+  ns.Enemies.test_volley = { name = "Rafale", hp = 100,
+    moves = { hits = { name = "Rafale", intent = "attack", actions = { { "attack", 8, times = 3 } } } }, pattern = { "hits" } }
+  local function petHits(c)
+    local n = 0
+    for _, ev in ipairs(c.events) do if ev.t == "pet_attack" then n = n + 1 end end
+    return n
+  end
+  -- combat dont la main est la carte id au palier n (le reste : Disengage de base)
+  local function at(id, n, encounter, extra)
+    local c = setup({ "disengage" }, encounter, extra or { "disengage", "disengage", "disengage", "disengage" }, HU)
+    c.hand[1] = Card.new(id, n, 999)
+    c.events = {}
+    return c
+  end
+
+  test("Hunter paliers : les 34 cartes aux paliers 2 et 3 jouables, textes conformes aux effets", function()
+    local n, bad = 0, {}
+    local function has(t, s) return t:find(s, 1, true) ~= nil end
+    local NAMES = { pain = "DoT", demoralized = "Demoralized", armor_broken = "Sundered", stunned = "Stunned" }
+    for id, d0 in pairs(ns.Cards) do
+      if d0.class == "hunter" and not d0.zone and not d0.variant then
+        eq(Card.tiers(id), 3, id)
+        for up = 2, 3 do
+          local d = Card.defById(id, up)
+          local t, lab = d.text, id .. "+" .. up
+          for _, e in ipairs(d.effects) do
+            local k = e[1]
+            if k == "damage" then
+              local w = (e.times == 4 and ("eal " .. e[2] .. " four times")) or ("eal " .. e[2] .. (e.all and " to all" or "."))
+              if not has(t, w) then bad[#bad + 1] = lab .. " : " .. w end
+              for _, m in ipairs(e.more or {}) do
+                if not has(t, "deal " .. m[1] .. " more") then bad[#bad + 1] = lab .. " : more" end
+              end
+            elseif k == "absorb" and not has(t, "ain " .. e[2] .. " Absorb") then bad[#bad + 1] = lab .. " : absorb"
+            elseif k == "draw" and not has(t, "raw " .. e[2] .. ".") then bad[#bad + 1] = lab .. " : draw"
+            elseif k == "res" and not has(t, "+" .. e[2] .. " Frenzy.") then bad[#bad + 1] = lab .. " : res"
+            elseif k == "apply" then
+              local w = "Apply " .. NAMES[e[2]] .. " " .. e[3] .. (e.all and (NAMES[e[2]] == "DoT" and " to all" or " ⌛ to all") or "")
+              if not has(t, w) then bad[#bad + 1] = lab .. " : " .. w end
+            elseif k == "pet" then
+              local w = e.surge and "pet attacks once per Frenzy."
+                or (e[2] == 3 and "et attacks three times." or e[2] == 2 and "et attacks twice." or "et attacks.")
+              if not has(t, w) then bad[#bad + 1] = lab .. " : pet" end
+            end
+          end
+          if (d.exhaust == true) ~= has(t, "Exhaust.") then bad[#bad + 1] = lab .. " : Exhaust" end
+          if (d.retain == true) ~= has(t, "Retain.") then bad[#bad + 1] = lab .. " : Retain" end
+          if (d.innate == true) ~= has(t, "Innate.") then bad[#bad + 1] = lab .. " : Innate" end
+          if d.cooldown and not has(t, "Cooldown " .. d.cooldown .. ".") then bad[#bad + 1] = lab .. " : Cooldown" end
+          if d.spend and not has(t, "Spend " .. d.spend .. ":") then bad[#bad + 1] = lab .. " : Spend" end
+          local c = setup({ id }, { "test_dummy", "test_hitter" }, { "disengage", "disengage", "disengage", "disengage" },
+            { class = "hunter", hp = 60 })
+          c.player.mana, c.player.res = 9, 5
+          c.hand[1] = Card.new(id, up, 999)
+          c.enemies[1].hp = 40
+          local ok, why = Combat.play(c, 1, 1)
+          if not ok then bad[#bad + 1] = lab .. " : injouable (" .. tostring(why) .. ")" end
+          Combat.endTurn(c)
+          Combat.endTurn(c)
+          n = n + 1
+        end
+      end
+    end
+    eq(n, 68)
+    assert(#bad == 0, table.concat(bad, " ; "))
+  end)
+
+  test("Hunter paliers : coût réduit (Kill Command+2, Trueshot Aura+2), puis effet ajouté (Kill Command+3 : +1 Frenzy d'abord)", function()
+    local k2 = at("kill_command", 2)
+    eq(Combat.cost(k2, k2.hand[1]), 0); eq(Combat.cost(k2, Card.new("kill_command", 1, 5)), 1)
+    eq(Card.defById("kill_command", 3).cost, 0, "coût du palier 2 gardé")
+    eq(Card.defById("kill_command", 3).cooldown, 2)
+    local k3 = at("kill_command", 3)
+    k3.player.res = 0
+    assert(Combat.play(k3, 1, 1))
+    -- +1 Frenzy, puis deux attaques à 1 + 1 puis 1 + 2 Frenzy
+    eq(k3.enemies[1].hp, 100 - (P + 1) - (P + 2)); eq(k3.player.res, 3); eq(petHits(k3), 2)
+    eq(Card.defById("trueshot_aura", 2).cost, 0); eq(Card.defById("trueshot_aura", 1).cost, 1)
+    local ta = at("trueshot_aura", 3, nil, { "rapid_fire" })
+    assert(Combat.play(ta, 1))
+    ta.hand[#ta.hand + 1] = Card.new("rapid_fire", false, 998)
+    assert(Combat.play(ta, #ta.hand, 1))
+    eq(ta.enemies[1].hp, 100 - 4 * (3 + 8), "Trueshot Aura+3 : 8 de plus par coup")
+  end)
+
+  test("Hunter paliers : condition assouplie (Growl+3 : Spend 1), Retain (Disengage+3), Innate (Spirit Bond+3)", function()
+    local g = at("growl", 3)
+    g.player.res = 1
+    assert(Combat.play(g, 1))
+    eq(g.player.block, 18); eq(g.player.res, 0)
+    local g2 = at("growl", 2)
+    g2.player.res = 1
+    assert(Combat.play(g2, 1))
+    eq(g2.player.block, 10, "palier 2 : Spend 2, pas assez de Frenzy")
+    local d = at("disengage", 3)
+    Combat.endTurn(d)
+    local kept = false
+    for _, x in ipairs(d.hand) do if x.uid == 999 then kept = true end end
+    assert(kept, "Disengage+3 gardée en main")
+    for seed = 1, 6 do
+      local deck = { { id = "spirit_bond", up = 3 } }
+      for _ = 1, 12 do deck[#deck + 1] = { id = "disengage", up = false } end
+      local c = Combat.new({ seed = seed, hp = 60, maxHp = 60, deck = deck, encounter = { "test_dummy" }, class = "hunter" })
+      local inHand = false
+      for _, x in ipairs(c.hand) do if x.id == "spirit_bond" then inHand = true end end
+      assert(inHand, "Spirit Bond+3 dans la main de départ (graine " .. seed .. ")")
+    end
+    local sb = at("spirit_bond", 2)
+    assert(Combat.play(sb, 1))
+    Combat.endPlayerTurn(sb)
+    eq(sb.player.block, 3, "Spirit Bond+2 : 3 Absorb par attaque du familier")
+  end)
+
+  test("Hunter paliers : cartes qui étourdissent contre un ennemi Indomitable (Stunned refusé, le reste porte)", function()
+    local f = at("freezing_trap", 2, { "test_wall" })
+    assert(Combat.play(f, 1))
+    Combat.endPlayerTurn(f); Combat.enemyPhase(f)
+    local e = f.enemies[1]
+    eq(e.st.stunned, nil, "Indomitable : pas de Stunned")
+    assert((e.st.armor_broken or 0) > 0 and (e.st.demoralized or 0) > 0, "Sundered et Demoralized posés")
+    local i = at("intimidation", 3, { "test_wall" })
+    assert(Combat.play(i, 1, 1))
+    eq(i.enemies[1].st.stunned, nil); eq(petHits(i), 2); eq(i.enemies[1].st.demoralized, 2)
+    local w = at("wyvern_sting", 2, { "test_wall" })
+    assert(Combat.play(w, 1, 1))
+    eq(w.enemies[1].st.stunned, nil); eq(w.enemies[1].st.pain, 7)
+    -- élite ordinaire : Stunned 1 posé, mêmes à-côtés
+    local s = at("intimidation", 3, { "test_hitter" })
+    assert(Combat.play(s, 1, 1))
+    eq(s.enemies[1].st.stunned, 1)
+  end)
+
+  test("Hunter paliers : Powers (Entrapment+2 Sundered, Lock and Load+2 Frenzy, Feign Death+2 à 5 PV, Resourcefulness+3 Absorb)", function()
+    local en = at("entrapment", 2, { "test_hitter" }, { "counterattack" })
+    en.player.mana = 9
+    assert(Combat.play(en, 1))
+    en.hand[#en.hand + 1] = Card.new("counterattack", false, 998)
+    assert(Combat.play(en, #en.hand))
+    Combat.endPlayerTurn(en); Combat.enemyPhase(en)
+    eq(en.enemies[1].st.demoralized, 2); eq(en.enemies[1].st.armor_broken, 1)
+    local ll = at("lock_and_load", 2, { "test_hitter" })
+    assert(Combat.play(ll, 1))
+    ll.hand[#ll.hand + 1] = Card.new("counterattack", false, 998)
+    assert(Combat.play(ll, #ll.hand))
+    Combat.endPlayerTurn(ll)
+    local nh, res = #ll.hand, ll.player.res
+    Combat.enemyPhase(ll)
+    eq(#ll.hand, nh + 2, "deux cartes piochées"); eq(ll.player.res, res + 1, "+1 Frenzy")
+    local fd = at("feign_death", 2, { "test_volley", "test_hitter" })
+    assert(Combat.play(fd, 1))
+    fd.player.hp = 5
+    Combat.endTurn(fd)
+    eq(fd.result, nil); eq(fd.player.hp, 5, "Feign Death+2 : reste à 5 PV")
+    local rf = at("resourcefulness", 3, { "test_hitter" })
+    rf.player.mana = 9
+    assert(Combat.play(rf, 1))
+    rf.hand[#rf.hand + 1] = Card.new("counterattack", false, 998)
+    assert(Combat.play(rf, #rf.hand))
+    Combat.endPlayerTurn(rf)
+    local hp = rf.player.hp
+    Combat.enemyPhase(rf)
+    eq(rf.player.hp, hp - (10 - 3), "3 Absorb à la Trap déclenchée, avant le coup")
+    eq(rf.hand[#rf.hand].id, "counterattack", "la Trap revient en main")
+  end)
+
+  test("Hunter paliers : Steady Shot+3 pioche sans Careful Aim, Volley+3 Careful Aim cible par cible, Hunter's Mark+3", function()
+    local function drawn(n)
+      local c = at("steady_shot", n, nil, { "disengage", "disengage", "disengage", "disengage", "disengage",
+        "disengage", "disengage", "disengage", "disengage", "disengage" })
+      c.enemies[1].hp = 40 -- sous la moitié : pas de Careful Aim
+      assert(Combat.play(c, 1, 1))
+      Combat.endTurn(c)
+      return #c.hand
+    end
+    eq(drawn(3), drawn(2) + 1)
+    local v = at("volley", 3, { "test_dummy", "test_dummy" })
+    v.player.mana = 9
+    v.enemies[2].hp = 40
+    assert(Combat.play(v, 1))
+    Combat.endTurn(v)
+    eq(v.enemies[1].hp, 100 - 28 - P, "intact : 23 + 5 (et le familier)"); eq(v.enemies[2].hp, 40 - 23)
+    local m = at("hunters_mark", 3)
+    m.player.res = 0
+    assert(Combat.play(m, 1, 1))
+    eq(m.enemies[1].st.armor_broken, 6); eq(m.player.res, 2); eq(petHits(m), 0, "pas de familier nommé"); eq(m.exhaust[1].uid, 999)
+  end)
+
+  ns.Enemies.test_wall, ns.Enemies.test_volley = nil, nil
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

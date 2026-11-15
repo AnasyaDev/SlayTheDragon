@@ -29,6 +29,8 @@ card("arcane_shot", {
   target = "enemy", effects = { { "damage", 3 }, { "pet", 1 } },
   text = "Deal 3.\nPet attacks.",
   up = { effects = { { "damage", 6 }, { "pet", 1 } }, text = "Deal 6.\nPet attacks." },
+  up2 = { effects = { { "damage", 8 }, { "pet", 1 } }, text = "Deal 8.\nPet attacks." },
+  up3 = { effects = { { "damage", 8 }, { "res", 1 }, { "pet", 1 } }, text = "Deal 8.\n+1 Frenzy.\nPet attacks." },
 })
 
 card("disengage", {
@@ -36,6 +38,8 @@ card("disengage", {
   effects = { { "absorb", 3 } },
   text = "Gain 3 Absorb.",
   up = { effects = { { "absorb", 6 } }, text = "Gain 6 Absorb." },
+  up2 = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
+  up3 = { retain = true, text = "Gain 8 Absorb.\nRetain." },
 })
 
 card("serpent_sting", {
@@ -43,6 +47,9 @@ card("serpent_sting", {
   target = "enemy", effects = { { "draw", 1 }, { "apply", "pain", 3, icon = "sting" } },
   text = "Draw 1.\nApply DoT 3",
   up = { effects = { { "draw", 1 }, { "apply", "pain", 5, icon = "sting" } }, text = "Draw 1.\nApply DoT 5" },
+  up2 = { effects = { { "draw", 1 }, { "apply", "pain", 7, icon = "sting" } }, text = "Draw 1.\nApply DoT 7" },
+  up3 = { effects = { { "draw", 1 }, { "apply", "pain", 7, icon = "sting" }, { "apply", "demoralized", 1 } },
+    text = "Draw 1.\nApply DoT 7\nApply Demoralized 1 ⌛" },
 })
 
 card("freezing_trap", {
@@ -51,6 +58,11 @@ card("freezing_trap", {
   text = "Trap.\nApply Stunned 1 ⌛\nApply Demoralized 1 ⌛",
   up = { effects = { { "apply", "stunned", 1 }, { "apply", "demoralized", 2 } },
     text = "Trap.\nApply Stunned 1 ⌛\nApply Demoralized 2 ⌛" },
+  -- contre un ennemi qui résiste à Stunned (élite Stun Resistant, Indomitable, boss) : Sundered puis Demoralized
+  up2 = { effects = { { "apply", "stunned", 1 }, { "apply", "demoralized", 2 }, { "apply", "armor_broken", 2 } },
+    text = "Trap.\nApply Stunned 1 ⌛\nApply Demoralized 2 ⌛\nApply Sundered 2 ⌛" },
+  up3 = { effects = { { "apply", "stunned", 1 }, { "apply", "demoralized", 3 }, { "apply", "armor_broken", 2 } },
+    text = "Trap.\nApply Stunned 1 ⌛\nApply Demoralized 3 ⌛\nApply Sundered 2 ⌛" },
 })
 
 -- Beast Mastery : chaque carte commande le familier ou lui donne du Frenzy -------------------------
@@ -60,6 +72,8 @@ card("kill_command", {
   target = "enemy", cooldown = 3, effects = { { "pet", 2 } },
   text = "Pet attacks twice.\nCooldown 3.",
   up = { cooldown = 2, text = "Pet attacks twice.\nCooldown 2." },
+  up2 = { cost = 0, text = "Pet attacks twice.\nCooldown 2." },
+  up3 = { effects = { { "res", 1 }, { "pet", 2 } }, text = "+1 Frenzy.\nPet attacks twice.\nCooldown 2." },
 })
 
 card("cobra_shot", {
@@ -67,6 +81,8 @@ card("cobra_shot", {
   target = "enemy", effects = { { "damage", 7 }, { "res", 1 } },
   text = "Deal 7.\n+1 Frenzy.",
   up = { effects = { { "damage", 10 }, { "res", 1 } }, text = "Deal 10.\n+1 Frenzy." },
+  up2 = { effects = { { "damage", 13 }, { "res", 1 } }, text = "Deal 13.\n+1 Frenzy." },
+  up3 = { effects = { { "damage", 13 }, { "res", 2 } }, text = "Deal 13.\n+2 Frenzy." },
 })
 
 card("barbed_shot", {
@@ -74,6 +90,8 @@ card("barbed_shot", {
   target = "enemy", effects = { { "res", 2 }, { "apply", "pain", 3, icon = "bleed" } },
   text = "+2 Frenzy.\nApply DoT 3",
   up = { effects = { { "res", 2 }, { "apply", "pain", 5, icon = "bleed" } }, text = "+2 Frenzy.\nApply DoT 5" },
+  up2 = { effects = { { "res", 2 }, { "apply", "pain", 6, icon = "bleed" } }, text = "+2 Frenzy.\nApply DoT 6" },
+  up3 = { effects = { { "res", 3 }, { "apply", "pain", 6, icon = "bleed" } }, text = "+3 Frenzy.\nApply DoT 6" },
 })
 
 card("dire_beast", {
@@ -81,6 +99,8 @@ card("dire_beast", {
   target = "enemy", exhaust = true, effects = { { "pet", 2 } },
   text = "Pet attacks twice.\nExhaust.",
   up = { effects = { { "pet", 3 } }, text = "Pet attacks three times.\nExhaust." },
+  up2 = { effects = { { "res", 1 }, { "pet", 3 } }, text = "+1 Frenzy.\nPet attacks three times.\nExhaust." },
+  up3 = { retain = true, text = "+1 Frenzy.\nPet attacks three times.\nExhaust.\nRetain." },
 })
 
 -- Growl : Spend 2 retire 2 Frenzy (le familier frappera moins fort) contre de l'Absorb en plus.
@@ -89,6 +109,8 @@ card("growl", {
   spend = 2, effects = { { "absorb", 6, more = { { 6, "spent" } } } },
   text = "Gain 6 Absorb.\nSpend 2: gain 6 more.",
   up = { effects = { { "absorb", 8, more = { { 8, "spent" } } } }, text = "Gain 8 Absorb.\nSpend 2: gain 8 more." },
+  up2 = { effects = { { "absorb", 10, more = { { 8, "spent" } } } }, text = "Gain 10 Absorb.\nSpend 2: gain 8 more." },
+  up3 = { spend = 1, text = "Gain 10 Absorb.\nSpend 1: gain 8 more." },
 })
 
 card("intimidation", {
@@ -96,6 +118,11 @@ card("intimidation", {
   target = "enemy", cooldown = 4, effects = { { "pet", 1 }, { "apply", "stunned", 1 } },
   text = "Pet attacks.\nApply Stunned 1 ⌛\nCooldown 4.",
   up = { cooldown = 3, text = "Pet attacks.\nApply Stunned 1 ⌛\nCooldown 3." },
+  -- contre un ennemi qui résiste à Stunned : le familier frappe deux fois, puis Demoralized
+  up2 = { effects = { { "pet", 2 }, { "apply", "stunned", 1 } },
+    text = "Pet attacks twice.\nApply Stunned 1 ⌛\nCooldown 3." },
+  up3 = { effects = { { "pet", 2 }, { "apply", "stunned", 1 }, { "apply", "demoralized", 2 } },
+    text = "Pet attacks twice.\nApply Stunned 1 ⌛\nApply Demoralized 2 ⌛\nCooldown 3." },
 })
 
 -- Multi-Shot : sans cible, le familier reste sur la sienne.
@@ -104,18 +131,23 @@ card("multi_shot", {
   effects = { { "damage", 5, all = true }, { "pet", 1 } },
   text = "Deal 5 to all.\nPet attacks.",
   up = { effects = { { "damage", 7, all = true }, { "pet", 1 } }, text = "Deal 7 to all.\nPet attacks." },
+  up2 = { effects = { { "damage", 8, all = true }, { "pet", 1 } }, text = "Deal 8 to all.\nPet attacks." },
+  up3 = { effects = { { "damage", 8, all = true }, { "res", 1 }, { "pet", 1 } },
+    text = "Deal 8 to all.\n+1 Frenzy.\nPet attacks." },
 })
 
 -- Spirit Bond : chaque attaque du familier (automatique, commandée ou de Surge) donne de l'Absorb.
-local spiritBondHooks = {
-  onPetAttack = function(c) Combat.gainBlock(c, c.player, 2) end,
-}
+local function spiritBondHooks(n)
+  return { onPetAttack = function(c) Combat.gainBlock(c, c.player, n) end }
+end
 
 card("spirit_bond", {
   level = 6, name = "Spirit Bond", cost = 2, type = "power", rarity = "uncommon", path = "beast_mastery",
-  power = true, effects = {}, hooks = spiritBondHooks,
+  power = true, effects = {}, hooks = spiritBondHooks(2),
   text = "Power.\nPet attacks: gain 2 Absorb.",
   up = { cost = 1, text = "Power.\nPet attacks: gain 2 Absorb." },
+  up2 = { hooks = spiritBondHooks(3), text = "Power.\nPet attacks: gain 3 Absorb." },
+  up3 = { innate = true, text = "Power.\nPet attacks: gain 3 Absorb.\nInnate." },
 })
 
 -- Bestial Wrath : une attaque par point de Frenzy, chacune à 1 + le Frenzy compté, sans en redonner ;
@@ -125,6 +157,9 @@ card("bestial_wrath", {
   target = "enemy", minRes = 1, effects = { { "surge" }, { "pet", 0, per = { 1, "surge" }, surge = true } },
   text = "Surge: pet attacks once per Frenzy.",
   up = { cost = 1, text = "Surge: pet attacks once per Frenzy." },
+  up2 = { effects = { { "surge" }, { "pet", 0, per = { 1, "surge" }, surge = true }, { "res", 2 } },
+    text = "Surge: pet attacks once per Frenzy.\n+2 Frenzy." },
+  up3 = { retain = true, text = "Surge: pet attacks once per Frenzy.\n+2 Frenzy.\nRetain." },
 })
 
 -- The Beast Within : après la résolution de chaque carte Attack (une carte Cast : à sa résolution).
@@ -139,6 +174,8 @@ card("the_beast_within", {
   power = true, effects = {}, hooks = beastWithinHooks,
   text = "Power.\nAttacks: pet attacks.",
   up = { cost = 0, text = "Power.\nAttacks: pet attacks." },
+  up2 = { innate = true, text = "Power.\nAttacks: pet attacks.\nInnate." },
+  up3 = { effects = { { "res", 2 } }, text = "Power.\n+2 Frenzy.\nAttacks: pet attacks.\nInnate." },
 })
 
 -- Marksmanship : Careful Aim (cible au-dessus de la moitié de ses PV), tirs en Cast ----------------
@@ -148,6 +185,9 @@ card("aimed_shot", {
   target = "enemy", cast = true, effects = { { "damage", 24, more = { { 10, "careful" } } } },
   text = "Cast.\nDeal 24.\nCareful Aim: deal 10 more.",
   up = { effects = { { "damage", 30, more = { { 12, "careful" } } } }, text = "Cast.\nDeal 30.\nCareful Aim: deal 12 more." },
+  up2 = { effects = { { "damage", 34, more = { { 14, "careful" } } } }, text = "Cast.\nDeal 34.\nCareful Aim: deal 14 more." },
+  up3 = { effects = { { "damage", 34, more = { { 14, "careful" } } }, { "draw", 1, cond = "careful" } },
+    text = "Cast.\nDeal 34.\nCareful Aim: deal 14 more.\nCareful Aim: draw 1." },
 })
 
 card("steady_shot", {
@@ -155,6 +195,8 @@ card("steady_shot", {
   target = "enemy", cast = true, effects = { { "damage", 13 }, { "draw", 1, cond = "careful" } },
   text = "Cast.\nDeal 13.\nCareful Aim: draw 1.",
   up = { effects = { { "damage", 17 }, { "draw", 1, cond = "careful" } }, text = "Cast.\nDeal 17.\nCareful Aim: draw 1." },
+  up2 = { effects = { { "damage", 20 }, { "draw", 1, cond = "careful" } }, text = "Cast.\nDeal 20.\nCareful Aim: draw 1." },
+  up3 = { effects = { { "damage", 20 }, { "draw", 1 } }, text = "Cast.\nDeal 20.\nDraw 1." },
 })
 
 card("hunters_mark", {
@@ -162,6 +204,9 @@ card("hunters_mark", {
   target = "enemy", exhaust = true, effects = { { "apply", "armor_broken", 3 } },
   text = "Apply Sundered 3 ⌛\nExhaust.",
   up = { effects = { { "apply", "armor_broken", 5 } }, text = "Apply Sundered 5 ⌛\nExhaust." },
+  up2 = { effects = { { "apply", "armor_broken", 6 } }, text = "Apply Sundered 6 ⌛\nExhaust." },
+  -- (pas « Pet attacks. » : une carte qui nomme le familier a une variante de Lone Wolf)
+  up3 = { effects = { { "res", 2 }, { "apply", "armor_broken", 6 } }, text = "+2 Frenzy.\nApply Sundered 6 ⌛\nExhaust." },
 })
 
 card("concussive_shot", {
@@ -169,6 +214,8 @@ card("concussive_shot", {
   target = "enemy", effects = { { "damage", 4 }, { "apply", "demoralized", 2 } },
   text = "Deal 4.\nApply Demoralized 2 ⌛",
   up = { effects = { { "damage", 7 }, { "apply", "demoralized", 2 } }, text = "Deal 7.\nApply Demoralized 2 ⌛" },
+  up2 = { effects = { { "damage", 9 }, { "apply", "demoralized", 2 } }, text = "Deal 9.\nApply Demoralized 2 ⌛" },
+  up3 = { effects = { { "damage", 9 }, { "apply", "demoralized", 3 } }, text = "Deal 9.\nApply Demoralized 3 ⌛" },
 })
 
 card("rapid_fire", {
@@ -176,6 +223,8 @@ card("rapid_fire", {
   target = "enemy", cooldown = 2, effects = { { "damage", 3, times = 4 } },
   text = "Deal 3 four times.\nCooldown 2.",
   up = { effects = { { "damage", 4, times = 4 } }, text = "Deal 4 four times.\nCooldown 2." },
+  up2 = { effects = { { "damage", 4, times = 4 }, { "res", 1 } }, text = "Deal 4 four times.\n+1 Frenzy.\nCooldown 2." },
+  up3 = { effects = { { "damage", 5, times = 4 }, { "res", 1 } }, text = "Deal 5 four times.\n+1 Frenzy.\nCooldown 2." },
 })
 
 card("counter_shot", {
@@ -183,6 +232,9 @@ card("counter_shot", {
   target = "enemy", cooldown = 3, effects = { { "interrupt" }, { "pet", 1 } },
   text = "Interrupt the target's cast.\nPet attacks.\nCooldown 3.",
   up = { cooldown = 2, text = "Interrupt the target's cast.\nPet attacks.\nCooldown 2." },
+  up2 = { effects = { { "interrupt" }, { "pet", 2 } }, text = "Interrupt the target's cast.\nPet attacks twice.\nCooldown 2." },
+  up3 = { effects = { { "interrupt" }, { "pet", 2 }, { "apply", "demoralized", 2 } },
+    text = "Interrupt the target's cast.\nPet attacks twice.\nApply Demoralized 2 ⌛\nCooldown 2." },
 })
 
 card("volley", {
@@ -190,6 +242,9 @@ card("volley", {
   cast = true, effects = { { "damage", 16, all = true } },
   text = "Cast.\nDeal 16 to all.",
   up = { effects = { { "damage", 20, all = true } }, text = "Cast.\nDeal 20 to all." },
+  up2 = { effects = { { "damage", 23, all = true } }, text = "Cast.\nDeal 23 to all." },
+  up3 = { effects = { { "damage", 23, all = true, more = { { 5, "careful" } } } },
+    text = "Cast.\nDeal 23 to all.\nCareful Aim: deal 5 more." },
 })
 
 card("readiness", {
@@ -197,6 +252,8 @@ card("readiness", {
   exhaust = true, effects = { { "readiness" } },
   text = "Return Cooldown cards to hand.\nExhaust.",
   up = { effects = { { "readiness" }, { "draw", 1 } }, text = "Return Cooldown cards to hand.\nDraw 1.\nExhaust." },
+  up2 = { retain = true, text = "Return Cooldown cards to hand.\nDraw 1.\nExhaust.\nRetain." },
+  up3 = { effects = { { "readiness" }, { "draw", 2 } }, text = "Return Cooldown cards to hand.\nDraw 2.\nExhaust.\nRetain." },
 })
 
 -- Trueshot Aura : +N par coup des cartes Attack sur une cible au-dessus de la moitié de ses PV, vérifié
@@ -215,6 +272,8 @@ card("trueshot_aura", {
   power = true, effects = {}, hooks = trueshotHooks(5),
   text = "Power.\nCareful Aim: Attacks deal 5 more.",
   up = { hooks = trueshotHooks(7), text = "Power.\nCareful Aim: Attacks deal 7 more." },
+  up2 = { cost = 0, text = "Power.\nCareful Aim: Attacks deal 7 more." },
+  up3 = { hooks = trueshotHooks(8), text = "Power.\nCareful Aim: Attacks deal 8 more." },
 })
 
 card("wailing_arrow", {
@@ -223,6 +282,10 @@ card("wailing_arrow", {
   text = "Deal 8 to all.\nInterrupt all casts.\nExhaust.",
   up = { effects = { { "damage", 12, all = true }, { "interrupt", all = true } },
     text = "Deal 12 to all.\nInterrupt all casts.\nExhaust." },
+  up2 = { effects = { { "damage", 12, all = true }, { "interrupt", all = true }, { "apply", "demoralized", 1, all = true } },
+    text = "Deal 12 to all.\nInterrupt all casts.\nApply Demoralized 1 ⌛ to all\nExhaust." },
+  up3 = { effects = { { "damage", 15, all = true }, { "interrupt", all = true }, { "apply", "demoralized", 1, all = true } },
+    text = "Deal 15 to all.\nInterrupt all casts.\nApply Demoralized 1 ⌛ to all\nExhaust." },
 })
 
 -- Survival : Traps posées pendant le tour, déclenchées par les attaques ennemies ------------------
@@ -232,6 +295,8 @@ card("immolation_trap", {
   trap = true, effects = { { "apply", "pain", 7, icon = "immolation" } },
   text = "Trap.\nApply DoT 7",
   up = { effects = { { "apply", "pain", 9, icon = "immolation" } }, text = "Trap.\nApply DoT 9" },
+  up2 = { effects = { { "apply", "pain", 11, icon = "immolation" } }, text = "Trap.\nApply DoT 11" },
+  up3 = { effects = { { "damage", 6 }, { "apply", "pain", 11, icon = "immolation" } }, text = "Trap.\nDeal 6.\nApply DoT 11" },
 })
 
 card("counterattack", {
@@ -239,6 +304,8 @@ card("counterattack", {
   trap = true, effects = { { "damage", 13 } },
   text = "Trap.\nDeal 13.",
   up = { effects = { { "damage", 17 } }, text = "Trap.\nDeal 17." },
+  up2 = { effects = { { "damage", 20 } }, text = "Trap.\nDeal 20." },
+  up3 = { effects = { { "damage", 20 }, { "apply", "demoralized", 2 } }, text = "Trap.\nDeal 20.\nApply Demoralized 2 ⌛" },
 })
 
 card("frost_trap", {
@@ -246,6 +313,10 @@ card("frost_trap", {
   trap = true, effects = { { "apply", "demoralized", 1, all = true } },
   text = "Trap.\nApply Demoralized 1 ⌛ to all",
   up = { effects = { { "apply", "demoralized", 2, all = true } }, text = "Trap.\nApply Demoralized 2 ⌛ to all" },
+  up2 = { effects = { { "apply", "demoralized", 2, all = true }, { "apply", "armor_broken", 2, all = true } },
+    text = "Trap.\nApply Demoralized 2 ⌛ to all\nApply Sundered 2 ⌛ to all" },
+  up3 = { effects = { { "apply", "demoralized", 3, all = true }, { "apply", "armor_broken", 2, all = true } },
+    text = "Trap.\nApply Demoralized 3 ⌛ to all\nApply Sundered 2 ⌛ to all" },
 })
 
 card("raptor_strike", {
@@ -253,6 +324,8 @@ card("raptor_strike", {
   target = "enemy", effects = { { "damage", 5 }, { "absorb", 3 } },
   text = "Deal 5.\nGain 3 Absorb.",
   up = { effects = { { "damage", 8 }, { "absorb", 4 } }, text = "Deal 8.\nGain 4 Absorb." },
+  up2 = { effects = { { "damage", 10 }, { "absorb", 5 } }, text = "Deal 10.\nGain 5 Absorb." },
+  up3 = { effects = { { "damage", 10 }, { "absorb", 5 }, { "res", 1 } }, text = "Deal 10.\nGain 5 Absorb.\n+1 Frenzy." },
 })
 
 card("explosive_trap", {
@@ -262,6 +335,11 @@ card("explosive_trap", {
   text = "Trap.\nDeal 6 to all.\nApply DoT 3 to all",
   up = { effects = { { "damage", 8, all = true }, { "apply", "pain", 4, all = true, icon = "immolation" } },
     text = "Trap.\nDeal 8 to all.\nApply DoT 4 to all" },
+  up2 = { effects = { { "damage", 10, all = true }, { "apply", "pain", 4, all = true, icon = "immolation" } },
+    text = "Trap.\nDeal 10 to all.\nApply DoT 4 to all" },
+  up3 = { effects = { { "damage", 10, all = true }, { "apply", "pain", 4, all = true, icon = "immolation" },
+      { "apply", "armor_broken", 1, all = true } },
+    text = "Trap.\nDeal 10 to all.\nApply DoT 4 to all\nApply Sundered 1 ⌛ to all" },
 })
 
 card("wyvern_sting", {
@@ -270,13 +348,20 @@ card("wyvern_sting", {
   effects = { { "apply", "stunned", 1 }, { "apply", "pain", 4, icon = "sting" } },
   text = "Apply Stunned 1 ⌛\nApply DoT 4\nCooldown 4.",
   up = { cooldown = 3, text = "Apply Stunned 1 ⌛\nApply DoT 4\nCooldown 3." },
+  -- contre un ennemi qui résiste à Stunned : DoT plus fort, puis Demoralized
+  up2 = { effects = { { "apply", "stunned", 1 }, { "apply", "pain", 7, icon = "sting" } },
+    text = "Apply Stunned 1 ⌛\nApply DoT 7\nCooldown 3." },
+  up3 = { effects = { { "apply", "stunned", 1 }, { "apply", "pain", 7, icon = "sting" }, { "apply", "demoralized", 2 } },
+    text = "Apply Stunned 1 ⌛\nApply DoT 7\nApply Demoralized 2 ⌛\nCooldown 3." },
 })
 
--- Entrapment : chaque Trap déclenchée pose aussi Demoralized 1 sur l'attaquant (même une Trap « to all »).
-local function entrapmentHooks(n)
+-- Entrapment : chaque Trap déclenchée pose aussi Demoralized n sur l'attaquant (même une Trap « to all ») ;
+-- palier 2 : Sundered s en plus.
+local function entrapmentHooks(n, s)
   return {
     onTrapTriggered = function(c, power, inst, enemy)
       if enemy and not enemy.dead then Combat.applyStatus(c, enemy, "demoralized", n) end
+      if s and enemy and not enemy.dead then Combat.applyStatus(c, enemy, "armor_broken", s) end
     end,
   }
 end
@@ -286,11 +371,18 @@ card("entrapment", {
   power = true, effects = {}, hooks = entrapmentHooks(1),
   text = "Power.\nTraps: also apply Demoralized 1.",
   up = { hooks = entrapmentHooks(2), text = "Power.\nTraps: also apply Demoralized 2." },
+  up2 = { hooks = entrapmentHooks(2, 1), text = "Power.\nTraps: also apply Demoralized 2 and Sundered 1." },
+  up3 = { innate = true, text = "Power.\nTraps: also apply Demoralized 2 and Sundered 1.\nInnate." },
 })
 
--- Lock and Load : la carte piochée arrive pendant le tour ennemi (main de 10 au plus).
-local function lockAndLoadHooks(n)
-  return { onTrapTriggered = function(c) Combat.drawCards(c, n) end }
+-- Lock and Load : la carte piochée arrive pendant le tour ennemi (main de 10 au plus) ; palier 2 : +f Frenzy.
+local function lockAndLoadHooks(n, f)
+  return {
+    onTrapTriggered = function(c)
+      Combat.drawCards(c, n)
+      if f and not c.result then Combat.gainRes(c, f, "card") end
+    end,
+  }
 end
 
 card("lock_and_load", {
@@ -298,29 +390,36 @@ card("lock_and_load", {
   power = true, effects = {}, hooks = lockAndLoadHooks(1),
   text = "Power.\nWhen a Trap triggers: draw 1.",
   up = { hooks = lockAndLoadHooks(2), text = "Power.\nWhen a Trap triggers: draw 2." },
+  up2 = { hooks = lockAndLoadHooks(2, 1), text = "Power.\nWhen a Trap triggers: draw 2, +1 Frenzy." },
+  up3 = { innate = true, text = "Power.\nWhen a Trap triggers: draw 2, +1 Frenzy.\nInnate." },
 })
 
 -- Feign Death : Last Breath ; tombé pendant le tour ennemi, le reste de ce tour est annulé (coups restants
 -- par beforeHit, ennemis suivants par le drapeau commun skipEnemyTurn) ; tombé pendant son propre tour
 -- (DoT), le prochain tour ennemi est sauté. Vaut contre les boss.
-local feignDeathHooks = {
-  preventDeath = function(c, power)
-    if not Combat.lastBreath(c, "feign_death") then return false end
-    c.player.hp = 1
-    c.player.flags.skipEnemyTurn = true
-    return true
-  end,
-  beforeHit = function(c, power, dmg)
-    if c.phase == "enemy" and c.player.flags.skipEnemyTurn then return 0 end
-    return dmg
-  end,
-}
+-- hp : PV gardés (1 ; palier 2 : 5).
+local function feignDeathHooks(hp)
+  return {
+    preventDeath = function(c, power)
+      if not Combat.lastBreath(c, "feign_death") then return false end
+      c.player.hp = math.min(hp, c.player.maxHp)
+      c.player.flags.skipEnemyTurn = true
+      return true
+    end,
+    beforeHit = function(c, power, dmg)
+      if c.phase == "enemy" and c.player.flags.skipEnemyTurn then return 0 end
+      return dmg
+    end,
+  }
+end
 
 card("feign_death", {
   level = 6, name = "Feign Death", cost = 1, type = "power", rarity = "rare", path = "survival",
-  power = true, effects = {}, hooks = feignDeathHooks,
+  power = true, effects = {}, hooks = feignDeathHooks(1),
   text = "Power.\nLast Breath: stay at 1 HP, enemies skip a turn.",
   up = { cost = 0, text = "Power.\nLast Breath: stay at 1 HP, enemies skip a turn." },
+  up2 = { hooks = feignDeathHooks(5), text = "Power.\nLast Breath: stay at 5 HP, enemies skip a turn." },
+  up3 = { innate = true, text = "Power.\nLast Breath: stay at 5 HP, enemies skip a turn.\nInnate." },
 })
 
 -- Resourcefulness : la Trap déclenchée revient en main tout de suite (main pleine : reste en défausse).
@@ -340,29 +439,35 @@ local function trapToHand(c, uid)
   end
 end
 
-local resourcefulnessHooks = {
-  onTrapTriggered = function(c, power, inst, enemy, why)
-    if why == "launch" then
-      local back = c.cls.trapBack or {}
-      c.cls.trapBack = back
-      back[#back + 1] = inst.uid
-      return
-    end
-    trapToHand(c, inst.uid)
-  end,
-  onRoundEnd = function(c)
-    local back = c.cls.trapBack
-    if not back then return end
-    c.cls.trapBack = nil
-    for i = 1, #back do trapToHand(c, back[i]) end
-  end,
-}
+-- absorb : Absorb gagné à chaque Trap déclenchée (palier 3 : 3 ; sinon 0).
+local function resourcefulnessHooks(absorb)
+  return {
+    onTrapTriggered = function(c, power, inst, enemy, why)
+      if absorb > 0 and not c.result then Combat.gainBlock(c, c.player, absorb) end
+      if why == "launch" then
+        local back = c.cls.trapBack or {}
+        c.cls.trapBack = back
+        back[#back + 1] = inst.uid
+        return
+      end
+      trapToHand(c, inst.uid)
+    end,
+    onRoundEnd = function(c)
+      local back = c.cls.trapBack
+      if not back then return end
+      c.cls.trapBack = nil
+      for i = 1, #back do trapToHand(c, back[i]) end
+    end,
+  }
+end
 
 card("resourcefulness", {
   level = 7, name = "Resourcefulness", cost = 1, type = "power", rarity = "rare", path = "survival",
-  power = true, effects = {}, hooks = resourcefulnessHooks,
+  power = true, effects = {}, hooks = resourcefulnessHooks(0),
   text = "Power.\nTriggered Traps return to hand.",
   up = { cost = 0, text = "Power.\nTriggered Traps return to hand." },
+  up2 = { innate = true, text = "Power.\nTriggered Traps return to hand.\nInnate." },
+  up3 = { hooks = resourcefulnessHooks(3), text = "Power.\nTriggered Traps return to hand.\nWhen a Trap triggers: gain 3 Absorb.\nInnate." },
 })
 
 -- Cartes épiques (cartes de zone, docs/zones/cartes-de-zone.md, « Hunter ») ------------------------
@@ -376,16 +481,22 @@ card("resourcefulness", {
 -- simulation dans les zones dures (14/11/2026 : gain moyen sur Duskwood, Stranglethorn, Steppes, clé 0,
 -- niveau 7 ; docs/classes.md, « Hunter : les sept épiques »). Lone Wolf amélioré : +3 par Frenzy au lieu de
 -- « Start of turn: +1 Frenzy. » (la ligne de plus faisait passer le texte sous le plancher de 8,5).
+-- Paliers 2 et 3 (15/11/2026, docs/ameliorations.md) : tables { base, +1, +2, +3 }, lues par Card.level(src) + 1.
 local EPIC = {
-  cotwCost = { 1, 0 },      -- Call of the Wild : Frenzy dépensé pour l'attaque du début du tour (0 : gratuite)
-  cleaveLess = { 2, 2 },    -- Beast Cleave : dégâts en moins du familier sur les ennemis autres que sa cible
-  blackCost = { 1, 0 },     -- Black Arrow : Frenzy dépensé pour l'attaque sur l'ennemi qui tique (0 : gratuite)
-  roar = { 2, 4 },          -- Roar of Sacrifice : dégâts arrêtés par point de Frenzy dépensé
-  marksman = { 20, 24 },    -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
-  launcher = { 1, 2 },      -- Trap Launcher : attaques du familier par Trap lancée
-  lonePer = { 2, 3 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
-  loneStart = { 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
-  chimaera = { 5, 4, 8 },   -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée (fiche : 3, 3, 6)
+  cotwCost = { 1, 0, 0, 0 },      -- Call of the Wild : Frenzy dépensé pour l'attaque du début du tour (0 : gratuite)
+  cotwRes = { 0, 0, 1, 2 },       -- Call of the Wild : Frenzy gagné au début du tour, avant l'attaque
+  cleaveLess = { 2, 2, 0, 0 },    -- Beast Cleave : dégâts en moins du familier sur les ennemis autres que sa cible
+  cleaveRes = { 0, 1, 1, 2 },     -- Beast Cleave : Frenzy de plus par attaque du familier (hors Surge)
+  blackCost = { 1, 0, 0, 0 },     -- Black Arrow : Frenzy dépensé pour l'attaque sur l'ennemi qui tique (0 : gratuite)
+  blackRes = { 0, 0, 1, 2 },      -- Black Arrow : Frenzy de plus après cette attaque
+  roar = { 2, 4, 5, 6 },          -- Roar of Sacrifice : dégâts arrêtés par point de Frenzy dépensé
+  marksman = { 20, 24, 27, 30 },  -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
+  launcher = { 1, 2, 2, 3 },      -- Trap Launcher : attaques du familier par Trap lancée
+  launchRes = { 0, 0, 1, 1 },     -- Trap Launcher : Frenzy gagné par Trap lancée, avant les attaques
+  lonePer = { 2, 3, 4, 4 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
+  loneStart = { 0, 0, 0, 1 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
+  chimaera = { 5, 4, 8, 6 },      -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée, autre ennemi
+                                  -- au palier 2 (fiche : 3, 3, 6)
 }
 ns.HunterEpic = EPIC
 
@@ -404,7 +515,8 @@ local function epic(id, t)
   card(id, t)
 end
 
-local function n2(pair, src) return src.up and pair[2] or pair[1] end
+-- Nombre d'une épique à son palier : t[palier + 1] (tables { base, +1, +2, +3 } ; plus courte : dernière valeur).
+local function nt(t, src) return t[math.min(#t, ns.Card.level(src) + 1)] end
 
 -- Attaque du familier payée en Frenzy (Call of the Wild, Black Arrow) : rien sans assez de Frenzy ; cost 0 :
 -- gratuite. Texte : « Wild Call N » (mot de règle, Core/Classes/hunter.lua), sinon « pet attacks ».
@@ -418,34 +530,50 @@ end
 
 -- Westfall — Call of the Wild : au début de chaque tour (après la pioche et la baisse du Frenzy), si le
 -- Frenzy vaut EPIC.cotwCost ou plus, il baisse d'autant et le familier attaque (+1 Frenzy comme toute
--- attaque : la dépense de 1 est rendue) ; amélioré : sans dépense.
-local function cotwText(cost)
+-- attaque : la dépense de 1 est rendue) ; amélioré : sans dépense ; paliers 2 et 3 : EPIC.cotwRes Frenzy
+-- gagné juste avant l'attaque.
+local function cotwText(cost, res)
   if cost > 0 then return "Epic.\nStart of turn: Wild Call " .. cost .. "." end
+  if res > 0 then return "Epic.\nStart of turn: +" .. res .. " Frenzy, pet attacks." end
   return "Epic.\nStart of turn: pet attacks."
 end
 epic("call_of_the_wild", {
   zone = "westfall", path = "beast_mastery", name = "Call of the Wild",
-  text = cotwText(EPIC.cotwCost[1]),
-  up = { text = cotwText(EPIC.cotwCost[2]) },
+  text = cotwText(EPIC.cotwCost[1], EPIC.cotwRes[1]),
+  up = { text = cotwText(EPIC.cotwCost[2], EPIC.cotwRes[2]) },
+  up2 = { text = cotwText(EPIC.cotwCost[3], EPIC.cotwRes[3]) },
+  up3 = { text = cotwText(EPIC.cotwCost[4], EPIC.cotwRes[4]) },
   deckHooks = {
     onTurnStart = function(c, src)
       if c.result or not H().petPresent(c) or not H().petTarget(c) then return end
-      if paidPet(c, n2(EPIC.cotwCost, src)) then H().petAttack(c, "epic") end
+      if paidPet(c, nt(EPIC.cotwCost, src)) then
+        local res = nt(EPIC.cotwRes, src)
+        if res > 0 then Combat.gainRes(c, res, "epic") end
+        H().petAttack(c, "epic")
+      end
     end,
   },
 })
 
 -- Duskwood — Trap Launcher : une Trap demande une cible et s'y déclenche aussitôt (trapLaunch), puis le
--- familier attaque cet ennemi EPIC.launcher fois (fiche : 1, amélioré 2), qui devient sa cible.
+-- familier attaque cet ennemi EPIC.launcher fois (fiche : 1, amélioré 2), qui devient sa cible ; paliers 2 et
+-- 3 : EPIC.launchRes Frenzy avant les attaques.
+local function launcherText(n, res)
+  return "Epic.\nTraps: " .. (res > 0 and ("+" .. res .. " Frenzy, ") or "") .. "Launch " .. n .. "."
+end
 epic("trap_launcher", {
   zone = "duskwood", path = "survival", name = "Trap Launcher",
-  text = "Epic.\nTraps: Launch " .. EPIC.launcher[1] .. ".",
-  up = { text = "Epic.\nTraps: Launch " .. EPIC.launcher[2] .. "." },
+  text = launcherText(EPIC.launcher[1], EPIC.launchRes[1]),
+  up = { text = launcherText(EPIC.launcher[2], EPIC.launchRes[2]) },
+  up2 = { text = launcherText(EPIC.launcher[3], EPIC.launchRes[3]) },
+  up3 = { text = launcherText(EPIC.launcher[4], EPIC.launchRes[4]) },
   deckHooks = {
     trapLaunch = function(c, src, v) return true end,
     onTrapTriggered = function(c, src, inst, enemy, why)
       if why ~= "launch" or not enemy then return end
-      for _ = 1, n2(EPIC.launcher, src) do
+      local res = nt(EPIC.launchRes, src)
+      if res > 0 and not c.result then Combat.gainRes(c, res, "epic") end
+      for _ = 1, nt(EPIC.launcher, src) do
         if c.result or enemy.dead then return end
         H().petAttackOn(c, "launch", enemy)
       end
@@ -455,17 +583,24 @@ epic("trap_launcher", {
 
 -- Wetlands — Beast Cleave : chaque attaque du familier frappe tous les ennemis vivants (petAll) : sa cible
 -- en plein, les autres pour EPIC.cleaveLess de moins (crochet petLess) ; amélioré : +1 Frenzy de plus par
--- attaque (pas pour les attaques de Surge, qui n'en donnent pas).
+-- attaque (pas pour les attaques de Surge, qui n'en donnent pas) ; palier 2 : les autres en plein (« in
+-- full ») ; palier 3 : +2 Frenzy de plus par attaque (EPIC.cleaveRes).
 -- (dégâts en moins : à-côté du mot Stampede, Core/Classes/hunter.lua)
+local function cleaveText(less, res)
+  return "Epic.\nPet attacks: Stampede" .. (res > 0 and (" +" .. res) or "") .. (less == 0 and ", in full." or ".")
+end
 epic("beast_cleave", {
   zone = "wetlands", path = "beast_mastery", name = "Beast Cleave",
-  text = "Epic.\nPet attacks: Stampede.",
-  up = { text = "Epic.\nPet attacks: Stampede +1." },
+  text = cleaveText(EPIC.cleaveLess[1], EPIC.cleaveRes[1]),
+  up = { text = cleaveText(EPIC.cleaveLess[2], EPIC.cleaveRes[2]) },
+  up2 = { text = cleaveText(EPIC.cleaveLess[3], EPIC.cleaveRes[3]) },
+  up3 = { text = cleaveText(EPIC.cleaveLess[4], EPIC.cleaveRes[4]) },
   deckHooks = {
     petAll = function(c, src, v) return true end,
-    petLess = function(c, src, v) return v + n2(EPIC.cleaveLess, src) end,
+    petLess = function(c, src, v) return v + nt(EPIC.cleaveLess, src) end,
     onPetAttack = function(c, src, t, dmg, why)
-      if src.up and why ~= "surge" and not c.result then Combat.gainRes(c, 1, "epic") end
+      local res = nt(EPIC.cleaveRes, src)
+      if res > 0 and why ~= "surge" and not c.result then Combat.gainRes(c, res, "epic") end
     end,
   },
 })
@@ -477,10 +612,12 @@ epic("roar_of_sacrifice", {
   zone = "stranglethorn", path = "beast_mastery", name = "Roar of Sacrifice",
   text = "Epic.\nWhen hit: Intervene " .. EPIC.roar[1] .. ".",
   up = { text = "Epic.\nWhen hit: Intervene " .. EPIC.roar[2] .. "." },
+  up2 = { text = "Epic.\nWhen hit: Intervene " .. EPIC.roar[3] .. "." },
+  up3 = { text = "Epic.\nWhen hit: Intervene " .. EPIC.roar[4] .. "." },
   deckHooks = {
     beforeHit = function(c, src, dmg, enemy)
       if dmg <= 0 or (c.player.res or 0) < 1 or c.result then return dmg end
-      local stop = math.min(dmg, n2(EPIC.roar, src))
+      local stop = math.min(dmg, nt(EPIC.roar, src))
       Combat.gainRes(c, -1, "roar")
       Combat.log(c, { t = "roar", src = enemy and Combat.uref(enemy), prevented = stop })
       if c.stats then c.stats.roarPrevented = (c.stats.roarPrevented or 0) + stop end
@@ -502,6 +639,8 @@ epic("master_marksman", {
   zone = "swamp", path = "marksmanship", name = "Master Marksman",
   text = marksmanText(EPIC.marksman[1]),
   up = { text = marksmanText(EPIC.marksman[2]) },
+  up2 = { text = marksmanText(EPIC.marksman[3]) },
+  up3 = { text = marksmanText(EPIC.marksman[4]) },
   deckHooks = {
     instantCast = function(c, src, v, d, inst, commit)
       if v or d.type ~= "attack" or not d.cast or d.target ~= "enemy" then return v end
@@ -510,7 +649,7 @@ epic("master_marksman", {
         if not carefulTarget(uid and Combat.enemyByUid(c, uid)) then return v end
         Combat.log(c, { t = "cast_instant", card = inst.uid, by = "master_marksman" })
         if c.stats then c.stats.castsInstant = (c.stats.castsInstant or 0) + 1 end
-        if n2(EPIC.marksman, src) > 0 then c.cls.marksman = inst.uid end
+        if nt(EPIC.marksman, src) > 0 then c.cls.marksman = inst.uid end
         return true
       end
       for i = 1, #c.enemies do
@@ -520,7 +659,7 @@ epic("master_marksman", {
     end,
     damage = function(c, src, v, dst, cardDef)
       if c.cls.marksman and cardDef and cardDef.type == "attack" and cardDef.cast then
-        return v + n2(EPIC.marksman, src)
+        return v + nt(EPIC.marksman, src)
       end
       return v
     end,
@@ -532,19 +671,27 @@ epic("master_marksman", {
 
 -- Burning Steppes — Black Arrow : après chaque tic de DoT sur un ennemi qui survit, si le Frenzy vaut
 -- EPIC.blackCost ou plus, il baisse d'autant et le familier attaque cet ennemi (+1 Frenzy comme d'habitude),
--- sans changer sa cible ; amélioré : sans dépense.
-local function blackText(cost)
+-- sans changer sa cible ; amélioré : sans dépense ; paliers 2 et 3 : EPIC.blackRes Frenzy de plus après
+-- l'attaque.
+local function blackText(cost, res)
   if cost > 0 then return "Epic.\nEnemy DoT ticks: Wild Call " .. cost .. "." end
+  if res > 0 then return "Epic.\nEnemy DoT ticks: pet attacks it, +" .. res .. " Frenzy." end
   return "Epic.\nEnemy DoT ticks: pet attacks it."
 end
 epic("black_arrow", {
   zone = "steppes", path = "survival", name = "Black Arrow",
-  text = blackText(EPIC.blackCost[1]),
-  up = { text = blackText(EPIC.blackCost[2]) },
+  text = blackText(EPIC.blackCost[1], EPIC.blackRes[1]),
+  up = { text = blackText(EPIC.blackCost[2], EPIC.blackRes[2]) },
+  up2 = { text = blackText(EPIC.blackCost[3], EPIC.blackRes[3]) },
+  up3 = { text = blackText(EPIC.blackCost[4], EPIC.blackRes[4]) },
   deckHooks = {
     onDotTick = function(c, src, unit)
       if c.result or unit.side ~= "enemy" or unit.dead or not H().petPresent(c) then return end
-      if paidPet(c, n2(EPIC.blackCost, src)) then H().petAttackOn(c, "dot", unit) end
+      if paidPet(c, nt(EPIC.blackCost, src)) then
+        H().petAttackOn(c, "dot", unit)
+        local res = nt(EPIC.blackRes, src)
+        if res > 0 and not c.result then Combat.gainRes(c, res, "epic") end
+      end
     end,
   },
 })
@@ -554,14 +701,18 @@ epic("black_arrow", {
 -- EPIC.lonePer par point de Frenzy de plus (fiche : 1 ; crochet damage, lu coup par coup ; une Cast le lit à
 -- sa résolution) ; EPIC.loneStart Frenzy au début de chaque tour (fiche : 0, amélioré 1 ; la baisse de 1 par
 -- round reste).
-local function loneText(per)
-  -- (cartes de familier changées et Frenzy du début du tour : à-côté du mot Ferocity, Core/Classes/hunter.lua)
+-- Palier 3 : EPIC.loneStart[4] Frenzy au début de chaque tour, écrit sur la carte.
+local function loneText(per, start)
+  -- (cartes de familier changées : à-côté du mot Ferocity, Core/Classes/hunter.lua)
+  if start > 0 then return "Epic.\nAttack hits: Ferocity " .. per .. ". Start of turn: +" .. start .. " Frenzy." end
   return "Epic.\nAttack hits: Ferocity " .. per .. "."
 end
 epic("lone_wolf", {
   zone = "blackrock", path = "marksmanship", name = "Lone Wolf",
-  text = loneText(EPIC.lonePer[1]),
-  up = { text = loneText(EPIC.lonePer[2]) },
+  text = loneText(EPIC.lonePer[1], EPIC.loneStart[1]),
+  up = { text = loneText(EPIC.lonePer[2], EPIC.loneStart[2]) },
+  up2 = { text = loneText(EPIC.lonePer[3], EPIC.loneStart[3]) },
+  up3 = { text = loneText(EPIC.lonePer[4], EPIC.loneStart[4]) },
   transforms = {
     arcane_shot = "chimaera_shot", kill_command = "kill_shot", dire_beast = "double_tap",
     intimidation = "scatter_shot", multi_shot = "salvo", counter_shot = "silencing_shot",
@@ -570,11 +721,11 @@ epic("lone_wolf", {
   deckHooks = {
     petAbsent = function(c, src, v) return true end,
     damage = function(c, src, v, dst, cardDef)
-      if cardDef and cardDef.type == "attack" then return v + n2(EPIC.lonePer, src) * (c.player.res or 0) end
+      if cardDef and cardDef.type == "attack" then return v + nt(EPIC.lonePer, src) * (c.player.res or 0) end
       return v
     end,
     onTurnStart = function(c, src)
-      local n = n2(EPIC.loneStart, src)
+      local n = nt(EPIC.loneStart, src)
       if n > 0 and not c.result then Combat.gainRes(c, n, "epic") end
     end,
   },
@@ -593,6 +744,10 @@ variant("chimaera_shot", {
   text = "Deal " .. EPIC.chimaera[1] .. ".\nDeal " .. EPIC.chimaera[2] .. " to another enemy.\n+1 Frenzy.",
   up = { effects = { { "damage", EPIC.chimaera[3] }, { "damageOther", EPIC.chimaera[2] }, { "res", 1 } },
     text = "Deal " .. EPIC.chimaera[3] .. ".\nDeal " .. EPIC.chimaera[2] .. " to another enemy.\n+1 Frenzy." },
+  up2 = { effects = { { "damage", EPIC.chimaera[3] }, { "damageOther", EPIC.chimaera[4] }, { "res", 1 } },
+    text = "Deal " .. EPIC.chimaera[3] .. ".\nDeal " .. EPIC.chimaera[4] .. " to another enemy.\n+1 Frenzy." },
+  up3 = { effects = { { "damage", EPIC.chimaera[3] }, { "damageOther", EPIC.chimaera[4] }, { "res", 2 } },
+    text = "Deal " .. EPIC.chimaera[3] .. ".\nDeal " .. EPIC.chimaera[4] .. " to another enemy.\n+2 Frenzy." },
 })
 
 variant("kill_shot", {
@@ -600,6 +755,9 @@ variant("kill_shot", {
   target = "enemy", cooldown = 3, effects = { { "damage", 8, more = { { 8, "execute" } } }, { "res", 1 } },
   text = "Deal 8.\nExecute: deal 16.\n+1 Frenzy.\nCooldown 3.",
   up = { cooldown = 2, text = "Deal 8.\nExecute: deal 16.\n+1 Frenzy.\nCooldown 2." },
+  up2 = { cost = 0, text = "Deal 8.\nExecute: deal 16.\n+1 Frenzy.\nCooldown 2." },
+  up3 = { effects = { { "damage", 8, more = { { 8, "execute" } } }, { "res", 2 } },
+    text = "Deal 8.\nExecute: deal 16.\n+2 Frenzy.\nCooldown 2." },
 })
 
 variant("double_tap", {
@@ -607,6 +765,8 @@ variant("double_tap", {
   exhaust = true, effects = { { "draw", 1 }, { "res", 2 } },
   text = "Draw 1.\n+2 Frenzy.\nExhaust.",
   up = { effects = { { "draw", 1 }, { "res", 3 } }, text = "Draw 1.\n+3 Frenzy.\nExhaust." },
+  up2 = { effects = { { "draw", 1 }, { "res", 4 } }, text = "Draw 1.\n+4 Frenzy.\nExhaust." },
+  up3 = { retain = true, text = "Draw 1.\n+4 Frenzy.\nExhaust.\nRetain." },
 })
 
 variant("scatter_shot", {
@@ -614,6 +774,10 @@ variant("scatter_shot", {
   target = "enemy", cooldown = 4, effects = { { "damage", 3 }, { "res", 1 }, { "apply", "stunned", 1 } },
   text = "Deal 3.\n+1 Frenzy.\nApply Stunned 1 ⌛\nCooldown 4.",
   up = { cooldown = 3, text = "Deal 3.\n+1 Frenzy.\nApply Stunned 1 ⌛\nCooldown 3." },
+  up2 = { effects = { { "damage", 7 }, { "res", 1 }, { "apply", "stunned", 1 } },
+    text = "Deal 7.\n+1 Frenzy.\nApply Stunned 1 ⌛\nCooldown 3." },
+  up3 = { effects = { { "damage", 7 }, { "res", 2 }, { "apply", "stunned", 1 } },
+    text = "Deal 7.\n+2 Frenzy.\nApply Stunned 1 ⌛\nCooldown 3." },
 })
 
 variant("salvo", {
@@ -621,6 +785,8 @@ variant("salvo", {
   effects = { { "damage", 5, all = true }, { "res", 1 } },
   text = "Deal 5 to all.\n+1 Frenzy.",
   up = { effects = { { "damage", 7, all = true }, { "res", 1 } }, text = "Deal 7 to all.\n+1 Frenzy." },
+  up2 = { effects = { { "damage", 8, all = true }, { "res", 1 } }, text = "Deal 8 to all.\n+1 Frenzy." },
+  up3 = { effects = { { "damage", 8, all = true }, { "res", 2 } }, text = "Deal 8 to all.\n+2 Frenzy." },
 })
 
 variant("silencing_shot", {
@@ -628,6 +794,9 @@ variant("silencing_shot", {
   target = "enemy", cooldown = 3, effects = { { "interrupt" }, { "res", 1 } },
   text = "Interrupt the target's cast.\n+1 Frenzy.\nCooldown 3.",
   up = { cooldown = 2, text = "Interrupt the target's cast.\n+1 Frenzy.\nCooldown 2." },
+  up2 = { effects = { { "interrupt" }, { "res", 2 } }, text = "Interrupt the target's cast.\n+2 Frenzy.\nCooldown 2." },
+  up3 = { effects = { { "interrupt" }, { "res", 2 }, { "apply", "demoralized", 2 } },
+    text = "Interrupt the target's cast.\n+2 Frenzy.\nApply Demoralized 2 ⌛\nCooldown 2." },
 })
 
 variant("explosive_shot", {
@@ -635,6 +804,9 @@ variant("explosive_shot", {
   target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } } },
   text = "Surge: deal 6 per Frenzy.",
   up = { cost = 1, text = "Surge: deal 6 per Frenzy." },
+  up2 = { effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } }, { "res", 2 } },
+    text = "Surge: deal 6 per Frenzy.\n+2 Frenzy." },
+  up3 = { retain = true, text = "Surge: deal 6 per Frenzy.\n+2 Frenzy.\nRetain." },
 })
 
 -- Trick Shots : après la résolution de chaque carte Attack, +1 Frenzy (comme The Beast Within).
@@ -649,6 +821,8 @@ variant("trick_shots", {
   power = true, effects = {}, hooks = trickShotsHooks,
   text = "Power.\nAttacks: +1 Frenzy.",
   up = { cost = 0, text = "Power.\nAttacks: +1 Frenzy." },
+  up2 = { innate = true, text = "Power.\nAttacks: +1 Frenzy.\nInnate." },
+  up3 = { effects = { { "res", 2 } }, text = "Power.\n+2 Frenzy.\nAttacks: +1 Frenzy.\nInnate." },
 })
 
 -- Aspect of the Turtle : chaque coup d'une carte Attack donne 1 Absorb (onAttackHit).
@@ -661,6 +835,8 @@ variant("aspect_of_the_turtle", {
   power = true, effects = {}, hooks = turtleHooks,
   text = "Power.\nEach Attack hit: gain 1 Absorb.",
   up = { cost = 1, text = "Power.\nEach Attack hit: gain 1 Absorb." },
+  up2 = { innate = true, text = "Power.\nEach Attack hit: gain 1 Absorb.\nInnate." },
+  up3 = { effects = { { "absorb", 5 } }, text = "Power.\nGain 5 Absorb.\nEach Attack hit: gain 1 Absorb.\nInnate." },
 })
 
 -- Bibelots du Chasseur (class = "hunter" : tirés seulement pour lui) -------------------------------
