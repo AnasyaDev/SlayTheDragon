@@ -541,5 +541,84 @@ return function(T)
     eq(exp.zone, "duskwood"); eq(exp.phase, "done")
   end)
 
+  ---------------------------------------------------------------------------
+  -- Paliers +2 / +3 des cartes neutres (docs/cartes-neutres.md, « Paliers ») : cartes de Duskwood et cartes
+  -- neutres communes de Data/Neutral.lua (un test par nature de gain : coût, mot de plaque, effet ajouté)
+  ---------------------------------------------------------------------------
+
+  -- main posée au palier n (instances du test seulement)
+  local function atTier(c, n) for _, x in ipairs(c.hand) do x.up = n end end
+  -- combat neuf, carte id au palier n + neuf Smite : main de départ tirée par le moteur (Innate)
+  local function opening(id, n, seed)
+    local deck = { { id = id, up = n } }
+    for _ = 1, 9 do deck[#deck + 1] = { id = "smite", up = false } end
+    return Combat.new({ seed = seed, class = "priest", hp = 60, maxHp = 60, deck = deck,
+      encounter = { "zt_dummy" }, kind = "combat" })
+  end
+  local function inHand(c, id) return T.handIndex(c, id) ~= nil end
+
+  test("paliers neutres : Anti-Venom +2 Retain, +3 soigne 4 ; Zombie Juice +3 Innate", function()
+    local c = combat({ hand = { "anti_venom" }, deck = { "smite", "smite", "smite", "smite", "smite", "smite" } })
+    atTier(c, 2)
+    eq(Card.def(c.hand[1]).retain, true)
+    Combat.endTurn(c)
+    assert(inHand(c, "anti_venom"), "Anti-Venom+2 gardée en main")
+    local d = combat({ hand = { "anti_venom" }, deck = { "smite", "smite", "smite" } })
+    atTier(d, 3)
+    d.player.hp = 40
+    local n = #d.hand
+    play(d, "anti_venom")
+    eq(d.player.hp, 44); eq(#d.hand, n - 1 + 2, "pioche 2")
+    for seed = 1, 8 do
+      assert(inHand(opening("zombie_juice", 3, seed), "zombie_juice"), "Innate (graine " .. seed .. ")")
+    end
+  end)
+
+  test("paliers neutres : Elixir of Superior Defense +2 coûte 0, +3 Innate (4 Absorb par tour)", function()
+    local c = combat({ hand = { "elixir_of_superior_defense" } })
+    atTier(c, 2)
+    c.player.mana = 0
+    play(c, "elixir_of_superior_defense")
+    Combat.endTurn(c)
+    eq(c.player.block, 4)
+    for seed = 1, 8 do
+      assert(inHand(opening("elixir_of_superior_defense", 3, seed), "elixir_of_superior_defense"), "Innate")
+    end
+  end)
+
+  test("paliers neutres : Arcane Bomb +2 Retain, +3 interrompt tous les ennemis", function()
+    local c = combat({ enemies = { "zt_caster", "zt_caster" }, hand = { "arcane_bomb" } })
+    atTier(c, 3)
+    eq(Card.def(c.hand[1]).retain, true, "Retain du palier 2 gardé")
+    play(c, "arcane_bomb", 1)
+    eq(c.enemies[1].interrupted, true); eq(c.enemies[2].interrupted, true)
+    local d = combat({ enemies = { "zt_caster", "zt_caster" }, hand = { "arcane_bomb" } })
+    atTier(d, 2)
+    play(d, "arcane_bomb", 1)
+    eq(d.enemies[1].interrupted, true); eq(d.enemies[2].interrupted, false, "+2 : la cible seule")
+  end)
+
+  test("paliers neutres : Heavy Silk Bandage +3 (Regen 2), Runecloth Bag +2 Innate, Iron Grenade +2 Retain", function()
+    local c = combat({ hand = { "heavy_silk_bandage" } })
+    atTier(c, 3)
+    c.player.hp = 30
+    play(c, "heavy_silk_bandage")
+    eq(c.player.hp, 41); eq(c.player.st.regen, 2)
+    for seed = 1, 8 do assert(inHand(opening("runecloth_bag", 2, seed), "runecloth_bag"), "Innate") end
+    local g = combat({ hand = { "iron_grenade" }, deck = { "smite", "smite", "smite", "smite", "smite", "smite" } })
+    atTier(g, 2)
+    Combat.endTurn(g)
+    assert(inHand(g, "iron_grenade"), "Iron Grenade+2 gardée en main")
+  end)
+
+  test("paliers neutres : Goblin Sapper Charge +2 coûte 3 PV, +3 frappe 20 ; Rough Dynamite +3 Retain", function()
+    local c = combat({ enemies = { "zt_dummy", "zt_dummy" }, hand = { "goblin_sapper_charge" } })
+    atTier(c, 3)
+    play(c, "goblin_sapper_charge")
+    eq(c.player.hp, 57); eq(c.enemies[1].hp, 30); eq(c.enemies[2].hp, 30)
+    eq(Card.defById("rough_dynamite", 3).retain, true)
+    eq(Card.defById("rough_dynamite", 2).retain, nil)
+  end)
+
   ns.Cards.dw_stun_trap, ns.Cards.dw_triple, ns.Cards.dw_zap, ns.Cards.dw_big = nil, nil, nil, nil
 end

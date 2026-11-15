@@ -536,6 +536,9 @@ D.neutralCard("dark_iron_bomb", {
   text = "Deal 4 to all.\nApply Stunned 1 ⌛ to all\nExhaust.",
   up = { effects = { { "damage", 8, all = true }, { "apply", "stunned", 1, all = true } },
     text = "Deal 8 to all.\nApply Stunned 1 ⌛ to all\nExhaust." },
+  up2 = { effects = { { "damage", 10, all = true }, { "apply", "stunned", 1, all = true } },
+    text = "Deal 10 to all.\nApply Stunned 1 ⌛ to all\nExhaust." },
+  up3 = { retain = true, text = "Deal 10 to all.\nApply Stunned 1 ⌛ to all\nExhaust.\nRetain." },
 })
 
 D.neutralCard("dark_iron_ale_mug", {
@@ -543,6 +546,8 @@ D.neutralCard("dark_iron_ale_mug", {
   exhaust = true, payHp = 3, effects = { { "apply", "force", 2, self = true } },
   text = "Pay 3 HP.\nGain Strength 2\nExhaust.",
   up = { payHp = 2, text = "Pay 2 HP.\nGain Strength 2\nExhaust." },
+  up2 = { payHp = 1, text = "Pay 1 HP.\nGain Strength 2\nExhaust." },
+  up3 = { innate = true, text = "Pay 1 HP.\nGain Strength 2\nExhaust.\nInnate." },
 })
 
 D.relic("blood_of_the_mountain", {

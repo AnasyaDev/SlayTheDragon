@@ -701,4 +701,25 @@ return function(T)
     local rec, exp = ns.SimExpedition.play({ seed = 4, class = "rogue", zone = "blackrock", zones = 6, level = 7, bot = "greedy" })
     eq(exp.phase, "done"); eq(exp.zone, "blackrock")
   end)
+
+  test("paliers neutres : Dark Iron Ale Mug +2 coûte 1 PV, +3 Innate ; Dark Iron Bomb +2 10 à tous, +3 Retain", function()
+    local c = combat({ hand = { "dark_iron_ale_mug" } })
+    c.hand[1].up = 2
+    play(c, "dark_iron_ale_mug")
+    eq(c.player.hp, 59); eq(c.player.st.force, 2)
+    for seed = 1, 8 do
+      local deck = { { id = "dark_iron_ale_mug", up = 3 } }
+      for _ = 1, 9 do deck[#deck + 1] = { id = "smite", up = false } end
+      local o = Combat.new({ seed = seed, class = "priest", hp = 60, maxHp = 60, deck = deck, encounter = { "zt_dummy" } })
+      assert(T.handIndex(o, "dark_iron_ale_mug"), "Innate (graine " .. seed .. ")")
+    end
+    local d = combat({ enemies = { "zt_dummy", "zt_dummy" }, hand = { "dark_iron_bomb" },
+      deck = { "smite", "smite", "smite", "smite", "smite", "smite" } })
+    d.hand[1].up = 3
+    Combat.endTurn(d)
+    assert(T.handIndex(d, "dark_iron_bomb"), "Dark Iron Bomb+3 gardée en main")
+    play(d, "dark_iron_bomb")
+    eq(d.enemies[1].hp, 40); eq(d.enemies[2].hp, 40)
+  end)
+
 end

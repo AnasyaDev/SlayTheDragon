@@ -288,6 +288,9 @@ D.neutralCard("jungle_remedy", {
   text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 1.\nExhaust.",
   up = { effects = { { "restoreAll", id = "hexed" }, { "cleanse" }, { "draw", 2 } },
     text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 2.\nExhaust." },
+  up2 = { retain = true, text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 2.\nExhaust.\nRetain." },
+  up3 = { innate = true,
+    text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 2.\nExhaust.\nRetain.\nInnate." },
 })
 
 D.neutralCard("rumsey_rum_black_label", {
@@ -295,6 +298,8 @@ D.neutralCard("rumsey_rum_black_label", {
   effects = { { "absorb", 6 } },
   text = "Gain 6 Absorb.\nExhaust.",
   up = { effects = { { "absorb", 9 } }, text = "Gain 9 Absorb.\nExhaust." },
+  up2 = { retain = true, text = "Gain 9 Absorb.\nExhaust.\nRetain." },
+  up3 = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb.\nExhaust.\nRetain." },
 })
 
 -- Bibelots communs

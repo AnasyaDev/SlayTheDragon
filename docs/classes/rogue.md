@@ -459,3 +459,85 @@ section UR). Écarts avec la fiche, par ordre de priorité (decisions.md puis so
   (2 000 expéditions ; 42 % sans Nightblade avec les mêmes notes).
 - Notes du bot : Nightblade 9 ; Shadowstep 3 → 7, Secret Technique 3 → 6, Hemorrhage 3,5 → 5,5,
   Vanish 3 → 5,5 (positives au balayage avec le nouveau deck).
+
+## 11. Paliers d'amélioration +2 et +3 (15/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`, « Améliorer une carte plusieurs fois » ; socle :
+`docs/ameliorations.md`). Chaque carte du Voleur et chaque épique a un palier 2 et un palier 3 écrits à la main.
+Le +1 ne change pas ; chaque colonne ne dit que ce que le palier ajoute. Règles suivies :
+
+- **Retain** pour les cartes qu'on veut garder jusqu'au bon moment (ouvertures sous Stealth, coups de grâce à
+  5 Combo) : c'est l'identité du Voleur (préparer son coup), sans nouveau mot.
+- **Cartes à 0** (Backstab, Kick, Pistol Shot, Sprint, Vanish, Cheap Shot, Premeditation, Exsanguinate) : aucune
+  pioche gratuite ajoutée à une carte qui n'en avait pas, aucun Combo de plus sur un générateur à 0 (sauf
+  Premeditation +3, sous Stealth seulement) ; gains : Retain, Parry, un état court.
+- **Coups de grâce par Combo** : le « par Combo » ne monte qu'à un seul des deux paliers (+1 par Combo au plus),
+  l'autre palier donne une partie fixe, Retain ou une pioche.
+- **Étourdissements** : aucune durée de Stunned allongée (Stun Resistant des élites) ; Cheap Shot gagne Retain puis
+  Sundered, Between the Eyes du nombre puis Retain, Kidney Shot des Combo rendus.
+- **Powers** : coût baissé une seule fois en tout (au +1 pour la plupart) ; leurs paliers 2 et 3 ajoutent un effet
+  au jeu (DoT à tous, Combo, Parry) plutôt qu'un effet permanent multiplié, sauf Blade Flurry +3 (3 → 4 à tous) et
+  Shadow Dance +3 (+1 Combo par tour).
+
+### Cartes
+
+| Carte | +1 (inchangé) | +2 | +3 |
+|---|---|---|---|
+| Sinister Strike | Deal 8 | Deal 10 | Deal 12 |
+| Feint | Draw 1 | Parry 2 | Draw 2 |
+| Backstab | Deal 5, Stealth +9 | Deal 6, Stealth +11 | Retain |
+| Eviscerate | 6 + 5 par Combo | 9 + 5 par Combo | Retain |
+| Mutilate | 5 deux fois | 6 deux fois | Apply DoT 3 (après la ligne DoT:, pour la carte suivante) |
+| Garrote | Deal 4, DoT 5 | DoT 7 | Stealth: apply DoT 5 de plus |
+| Rupture | DoT 4 par Combo | Retain | DoT 5 par Combo |
+| Fan of Knives | 4 à tous, DoT 3 à tous | 5 à tous | DoT 4 à tous |
+| Envenom | DoT 3 par Combo | Draw 1 | DoT 4 par Combo |
+| Cloak of Shadows | Parry 2 | coût 0 | Cooldown 1 |
+| Crippling Poison | DoT 4 | Demoralized 2 ⌛ | DoT 6 |
+| Exsanguinate | coût 0 | Retain | un tic de plus avant ceux du Surge (toujours injouable à 0 Combo) |
+| Deadly Poison | coût 0 | au jeu : DoT 2 à tous | au jeu : DoT 4 à tous |
+| Venomous Wounds | coût 0 | au jeu : DoT 2 à tous | au jeu : +2 Combo |
+| Kick | Cooldown 1 | Deal 4 | Apply Demoralized 1 ⌛ |
+| Pistol Shot | Deal 5 | Deal 7 | Apply Sundered 1 ⌛ |
+| Sprint | Cooldown 2 | Draw 3 | Gain Parry 1 |
+| Riposte | Deal 7 | Deal 9 | Parry 2 |
+| Evasion | Cooldown 2 | Parry 3 | Draw 1 |
+| Blade Flurry | 3 à tous | coût 0 | 4 à tous |
+| Slice and Dice | coût 0 | au jeu : +2 Combo | au jeu : Gain Parry 1 |
+| Killing Spree | 6 × 6 | coût 1 | 7 × 6 |
+| Between the Eyes | 6 par Combo | 7 par Combo | Retain |
+| Adrenaline Rush | coût 0 | Draw 3 | +3 mana |
+| Ambush | 8, Stealth +16 | 10, Stealth +19 | Retain |
+| Hemorrhage | 9, Sundered 3 | Deal 11 | Sundered 3 à tous |
+| Vanish | Draw 2 | Gain Parry 1 | Retain |
+| Shadowstep | Cooldown 1 | Parry 2 | Draw 1 |
+| Cheap Shot | coût 0 | Retain | Apply Sundered 2 ⌛ |
+| Secret Technique | 5 par Combo à tous | Draw 1 | 6 par Combo à tous |
+| Nightblade | 8 par Combo | 9 par Combo | Retain |
+| Premeditation | Draw 2 | Retain | Stealth: +3 Combo |
+| Cheat Death | coût 0 | reste à 6 PV | reste à 10 PV |
+| Smoke Bomb | Cooldown 3 | Demoralized 3 ⌛ à tous | Gain Parry 1 |
+| Shadow Dance | coût 1 | au jeu : +2 Combo | début de tour : +1 Combo |
+
+### Épiques
+
+Nombres dans `EPIC_N` (`Data/Rogue.lua`, quatre valeurs : base, +1, +2, +3), lus par `Rogue.tier(src)` =
+`Card.level(src) + 1` (`Core/Classes/rogue.lua`, aussi `UI/Art/rogue.lua` pour la ligne de l'épique). L'à-côté
+(`L.rule`, `upText`) vaut pour les paliers 1 à 3 : seuls le nombre écrit sur la carte et un ajout en fin de ligne
+changent. L'à-côté d'Atrophy ne cite plus le seuil (« Enemies with at least that much DoT count as Demoralized »),
+lu sur la carte.
+
+| Épique | +1 (inchangé) | +2 | +3 |
+|---|---|---|---|
+| Deflection | Riposte 2 | Riposte 3 | Riposte 4 |
+| Doomblade | Bleed 100% | Bleed 105% | Bleed 110% |
+| Atrophic Poison | DoT 5+, Sundered | DoT 4+ | DoT 3+ |
+| Echoing Reprimand | Animacharge 4 (2 ou 3 Combo) | Animacharge 5 | Animacharge 6 |
+| Subterfuge | Shroud 3 | chaque Surge : gain Parry 1 | Parry 2 |
+| Kidney Shot | seuil 4+ Combo | Gouge, +1 Combo (rendu après le Surge) | +2 Combo |
+| Danse Macabre | Flourish 3 | Flourish 4 | Flourish 5 |
+
+Mesures : paliers 2 et 3 non mesurés carte par carte (balayages abandonnés) ; campagne `human` clé 0 tout débloqué
+63,2 → 62,8 %, +2 atteint 0,14 fois par expédition (`docs/equilibrage.md`, « Rogue : paliers +2 et +3 »). Bots :
+`Bots.POWER_VALUE` de Blade Flurry (3 / 3 / 4 à tous aux paliers 1 / 2 / 3) et de Shadow Dance (+1 Combo par tour au
++3) ; notes d'amélioration par défaut (× 0,8 puis × 0,6).

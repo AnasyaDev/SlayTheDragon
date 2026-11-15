@@ -150,7 +150,7 @@ return function(ns)
   Bots.POWER_VALUE = {
     -- Rogue
     blade_flurry = function(c, inst)
-      return T * playsOf(c, isAttack) * up(inst, 2, 3) * aliveCount(c) * W.enemyHp
+      return T * playsOf(c, isAttack) * up(inst, 2, 3, 3, 4) * aliveCount(c) * W.enemyHp
     end,
     deadly_poison = function(c)
       return T * playsOf(c, isAttack) * 1.3 * dotUnits(1)
@@ -159,7 +159,9 @@ return function(ns)
       return T * aliveCount(c) * math.min(1, 0.2 + 2 * deckShare(c, appliesDot)) * 1.5 * Bots.resValue(c)
     end,
     slice_and_dice = function(c) return T * perTurn(c, isAttack) * MANA end,
-    shadow_dance = function(c) return T * perTurn(c, readsStealth) * 8 * W.enemyHp end,
+    shadow_dance = function(c, inst)
+      return T * (perTurn(c, readsStealth) * 8 * W.enemyHp + up(inst, 0, 0, 0, 1) * Bots.resValue(c))
+    end,
     cheat_death = lastBreath,
     -- Warrior
     deep_wounds = function(c, inst) return T * playsOf(c, isAttack) * dotUnits(up(inst, 2, 3)) end,
@@ -175,16 +177,18 @@ return function(ns)
     end,
     ice_block = lastBreath,
     -- Hunter
-    spirit_bond = function(c) return T * (1 + playsOf(c, petCard)) * 2 * W.hp * 0.5 end,
+    -- paliers (15/11/2026) : Spirit Bond+2 3 Absorb, Trueshot Aura+3 8, Entrapment+2 Sundered 1, Lock and Load+2
+    -- +1 Frenzy, Resourcefulness+3 3 Absorb par Trap ; Feign Death+2 (5 PV) : Last Breath un peu plus sûr
+    spirit_bond = function(c, inst) return T * (1 + playsOf(c, petCard)) * up(inst, 2, 2, 3) * W.hp * 0.5 end,
     the_beast_within = function(c)
       local pet = ns.Hunter and ns.Hunter.petDamage(c) or 3
       return T * playsOf(c, isAttack) * (pet + 0.5) * W.enemyHp
     end,
-    trueshot_aura = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 4, 6) * W.enemyHp end,
-    entrapment = function(c) return T * perTurn(c, isTrap) * 12 end,
-    lock_and_load = function(c) return T * perTurn(c, isTrap) * 20 end,
-    resourcefulness = function(c) return T * perTurn(c, isTrap) * 25 end,
-    feign_death = lastBreath,
+    trueshot_aura = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 4, 6, 6, 7) * W.enemyHp end,
+    entrapment = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 12, 12, 17) end,
+    lock_and_load = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 20, 20, 26) end,
+    resourcefulness = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 25, 25, 25, 25 + 3 * W.hp) end,
+    feign_death = function(c, inst) return lastBreath(c) + up(inst, 0, 0, 4 * W.hp) end,
     -- Carte neutre
     elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
     -- Priest

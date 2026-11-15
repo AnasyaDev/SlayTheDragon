@@ -30,6 +30,8 @@ card("rough_dynamite", {
   exhaust = true, effects = { { "damage", 6, all = true } },
   text = "Deal 6 to all.\nExhaust.",
   up = { effects = { { "damage", 9, all = true } }, text = "Deal 9 to all.\nExhaust." },
+  up2 = { effects = { { "damage", 11, all = true } }, text = "Deal 11 to all.\nExhaust." },
+  up3 = { retain = true, text = "Deal 11 to all.\nExhaust.\nRetain." },
 })
 
 card("heavy_silk_bandage", {
@@ -37,6 +39,8 @@ card("heavy_silk_bandage", {
   exhaust = true, effects = { { "heal", 6 } },
   text = "Heal 6.\nExhaust.",
   up = { effects = { { "heal", 9 } }, text = "Heal 9.\nExhaust." },
+  up2 = { effects = { { "heal", 11 } }, text = "Heal 11.\nExhaust." },
+  up3 = { effects = { { "heal", 11 }, { "apply", "regen", 2, self = true } }, text = "Heal 11.\nGain Regen 2\nExhaust." },
 })
 
 card("rugged_armor_kit", {
@@ -44,6 +48,8 @@ card("rugged_armor_kit", {
   retain = true, effects = { { "absorb", 4 } },
   text = "Gain 4 Absorb.\nRetain.",
   up = { effects = { { "absorb", 7 } }, text = "Gain 7 Absorb.\nRetain." },
+  up2 = { effects = { { "absorb", 9 } }, text = "Gain 9 Absorb.\nRetain." },
+  up3 = { innate = true, text = "Gain 9 Absorb.\nRetain.\nInnate." },
 })
 
 card("smoked_desert_dumplings", {
@@ -51,6 +57,9 @@ card("smoked_desert_dumplings", {
   exhaust = true, effects = { { "apply", "force", 1, self = true } },
   text = "Gain Strength 1\nExhaust.",
   up = { effects = { { "apply", "force", 2, self = true } }, text = "Gain Strength 2\nExhaust." },
+  up2 = { effects = { { "apply", "force", 2, self = true }, { "apply", "regen", 2, self = true } },
+    text = "Gain Strength 2\nGain Regen 2\nExhaust." },
+  up3 = { innate = true, text = "Gain Strength 2\nGain Regen 2\nExhaust.\nInnate." },
 })
 
 -- Westfall, zone 1 (tier 1) ------------------------------------------------------------------------
@@ -60,6 +69,8 @@ card("runecloth_bag", {
   exhaust = true, effects = { { "draw", 2 } },
   text = "Draw 2.\nExhaust.",
   up = { cost = 0, text = "Draw 2.\nExhaust." },
+  up2 = { innate = true, text = "Draw 2.\nExhaust.\nInnate." },
+  up3 = { retain = true, text = "Draw 2.\nExhaust.\nRetain.\nInnate." },
 })
 
 card("iron_grenade", {
@@ -67,6 +78,9 @@ card("iron_grenade", {
   target = "enemy", exhaust = true, effects = { { "damage", 5 }, { "apply", "stunned", 1 } },
   text = "Deal 5.\nApply Stunned 1 ⌛\nExhaust.",
   up = { effects = { { "damage", 8 }, { "apply", "stunned", 1 } }, text = "Deal 8.\nApply Stunned 1 ⌛\nExhaust." },
+  up2 = { retain = true, text = "Deal 8.\nApply Stunned 1 ⌛\nExhaust.\nRetain." },
+  up3 = { effects = { { "damage", 10 }, { "apply", "stunned", 1 } },
+    text = "Deal 10.\nApply Stunned 1 ⌛\nExhaust.\nRetain." },
 })
 
 -- Duskwood, zone 2 (tier 2) ------------------------------------------------------------------------
@@ -76,6 +90,9 @@ card("arcane_bomb", {
   target = "enemy", exhaust = true, effects = { { "interrupt" } },
   text = "Interrupt the target's cast.\nExhaust.",
   up = { effects = { { "interrupt" }, { "draw", 1 } }, text = "Interrupt the target's cast.\nDraw 1.\nExhaust." },
+  up2 = { retain = true, text = "Interrupt the target's cast.\nDraw 1.\nExhaust.\nRetain." },
+  up3 = { effects = { { "interrupt", all = true }, { "draw", 1 } },
+    text = "Interrupt all casts.\nDraw 1.\nExhaust.\nRetain." },
 })
 
 -- Power : Absorb au début de chaque tour (après DoT et Regen, Absorb remise à 0 juste avant).
@@ -90,6 +107,8 @@ card("elixir_of_superior_defense", {
   power = true, turnAbsorb = 3, effects = {}, hooks = elixirHooks,
   text = "Power.\nStart of turn: gain 3 Absorb.",
   up = { turnAbsorb = 4, text = "Power.\nStart of turn: gain 4 Absorb." },
+  up2 = { cost = 0, text = "Power.\nStart of turn: gain 4 Absorb." },
+  up3 = { innate = true, text = "Power.\nStart of turn: gain 4 Absorb.\nInnate." },
 })
 
 -- Wetlands, zone 3 (tier 3) ------------------------------------------------------------------------
@@ -99,6 +118,8 @@ card("black_lotus", {
   exhaust = true, effects = { { "mana", 2 } },
   text = "+2 mana.\nExhaust.",
   up = { effects = { { "mana", 2 }, { "draw", 1 } }, text = "+2 mana.\nDraw 1.\nExhaust." },
+  up2 = { retain = true, text = "+2 mana.\nDraw 1.\nExhaust.\nRetain." },
+  up3 = { innate = true, text = "+2 mana.\nDraw 1.\nExhaust.\nRetain.\nInnate." },
 })
 
 card("goblin_sapper_charge", {
@@ -106,6 +127,8 @@ card("goblin_sapper_charge", {
   exhaust = true, payHp = 5, effects = { { "damage", 14, all = true } },
   text = "Pay 5 HP.\nDeal 14 to all.\nExhaust.",
   up = { effects = { { "damage", 18, all = true } }, text = "Pay 5 HP.\nDeal 18 to all.\nExhaust." },
+  up2 = { payHp = 3, text = "Pay 3 HP.\nDeal 18 to all.\nExhaust." },
+  up3 = { effects = { { "damage", 20, all = true } }, text = "Pay 3 HP.\nDeal 20 to all.\nExhaust." },
 })
 
 -- Conseils aux bots de simulation (Sim/run.lua les réunit avec ceux des classes) : note des cartes
