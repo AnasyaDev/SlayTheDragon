@@ -99,14 +99,14 @@ function Art.warriorEpicLine(c)
   if not id then return nil end
   local E = Wr.EPIC
   if id == "death_wish" then
-    return ("Attacks %s, no Absorb"):format(n("+" .. math.floor((E.death_wish.mult - 1) * 100 + 0.5) .. "%"))
+    return ("Attacks %s, no Absorb"):format(n("+" .. math.floor((Wr.num("death_wish", "mult", up) - 1) * 100 + 0.5) .. "%"))
   elseif id == "thunderous_roar" then
     local T = E.thunderous_roar
-    return ("Roar in %s Rage: %s to all"):format(n(math.max(1, T.at - (c.player.res or 0))), n(up and T.upDamage or T.damage))
+    return ("Roar in %s Rage: %s to all"):format(n(math.max(1, T.at - (c.player.res or 0))), n(Wr.num("thunderous_roar", "damage", up)))
   elseif id == "sweeping_strikes" then
     local alive = #ns.Combat.aliveEnemies(c)
     if alive < 2 then return nil end
-    local k = math.min(alive - 1, up and E.sweeping_strikes.upTargets or E.sweeping_strikes.targets)
+    local k = math.min(alive - 1, Wr.num("sweeping_strikes", "targets", up))
     return ("Targeted hits splash %s other%s for a third"):format(n(k), k > 1 and "s" or "")
   elseif id == "titans_grip" then
     local lim = E.titans_grip.limit
@@ -120,14 +120,14 @@ function Art.warriorEpicLine(c)
   elseif id == "anger_management" then
     if #c.cooldown == 0 then return nil end
     local A = E.anger_management
-    local per = up and A.upPer or A.per
-    local steps = up and A.upSteps or A.steps
+    local per = A.per
+    local steps = Wr.num("anger_management", "steps", up)
     if per > 1 then
       return ("Rage spent: %s/%d, then Cooldowns −%d"):format(n(c.cls.amSpent or 0), per, steps)
     end
     return ("Each Rage spent: Cooldowns %s"):format(n("−" .. steps))
   elseif id == "avatar" then
-    local gain = n("+" .. (up and E.avatar.upGain or E.avatar.gain))
+    local gain = n("+" .. Wr.num("avatar", "gain", up))
     local bonus = Wr.avatarBonus(c)
     if bonus > 0 then return ("Rage %s: Attacks %s, %s next turn"):format(n(c.player.res), n("+" .. bonus), gain) end
     return ("Rage up to %s, %s next turn"):format(n(E.avatar.cap), gain)

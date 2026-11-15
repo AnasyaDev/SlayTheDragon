@@ -3183,5 +3183,127 @@ do
   ns.Cards.tu_triple = nil
 end
 
+---------------------------------------------------------------------------
+-- Paliers du Guerrier (+2, +3 ; docs/classes/warrior-paliers.md)
+---------------------------------------------------------------------------
+do
+  local WR = { class = "warrior" }
+  -- combat de Guerrier, main imposée : les cartes de la main au palier up (les autres de base)
+  local function wsetup(hand, up, encounter)
+    local c = setup(hand, encounter or { "test_dummy" }, { "strike", "strike", "strike", "strike", "strike" }, WR)
+    for i, x in ipairs(c.hand) do c.hand[i] = Card.new(x.id, up, x.uid) end
+    return c
+  end
+
+  test("Guerrier : chaque carte a ses paliers 2 et 3, jouables sans erreur, jamais plus chères", function()
+    local n = 0
+    for id, d0 in pairs(ns.Cards) do
+      if d0.class == "warrior" then
+        eq(Card.tiers(id), 3, id)
+        if not d0.zone then
+          for up = 2, 3 do
+            local c = setup({ id }, { "test_dummy", "test_caster" }, { "strike", "strike", "strike", "strike" },
+              { class = "warrior", hp = 60 })
+            c.player.mana, c.player.res = 9, 5
+            c.hand[1] = Card.new(id, up, 999)
+            c.player.block = 4
+            c.enemies[1].hp = 40
+            local ok, why = Combat.play(c, 1, 1)
+            assert(ok, id .. "+" .. up .. " : " .. tostring(why))
+            Combat.endTurn(c)
+            Combat.endTurn(c)
+            assert(Card.defById(id, up).cost <= Card.defById(id, up - 1).cost, id .. "+" .. up .. " : coût")
+            n = n + 1
+          end
+        end
+      end
+    end
+    eq(n, 68)
+  end)
+
+  test("Guerrier, coût réduit : Deep Wounds+2, Recklessness+2, Battle Shout+3 à 0 ; Retaliation+2", function()
+    for _, t in ipairs({ { "deep_wounds", 2 }, { "recklessness", 2 }, { "battle_shout", 3 }, { "retaliation", 2 } }) do
+      local c = wsetup({ t[1] }, t[2])
+      eq(Combat.cost(c, c.hand[1]), 0, t[1] .. "+" .. t[2])
+      eq(Combat.cost(c, Card.new(t[1], t[2] - 1, 900)), Card.defById(t[1]).cost, t[1] .. " : palier d'avant")
+    end
+  end)
+
+  test("Guerrier, Pay N HP assoupli : Rampage 3 -> 2 -> 1, toujours +1 Rage ; Recklessness+3 Pay 1", function()
+    for up, pay in pairs({ [1] = 3, [2] = 2, [3] = 1 }) do
+      local c = wsetup({ "rampage" }, up)
+      c.player.res = 0
+      local hp = c.player.hp
+      assert(Combat.play(c, 1, 1))
+      eq(c.player.hp, hp - pay, "Rampage+" .. up)
+      eq(c.player.res, 2, "PV payés (+1) et Attack (+1)")
+    end
+    local c = wsetup({ "recklessness" }, 3)
+    local hp = c.player.hp
+    assert(Combat.play(c, 1))
+    eq(c.player.hp, hp - 1); eq(c.player.st.force, 4)
+  end)
+
+  test("Guerrier, effet ajouté : Heroic Strike+3 pioche si Spend, Colossus Smash+3 pioche, Devastate+3 Sundered", function()
+    local c = wsetup({ "heroic_strike" }, 3)
+    c.player.res = 2
+    local hp, n = c.enemies[1].hp, #c.hand
+    assert(Combat.play(c, 1, 1))
+    eq(hp - c.enemies[1].hp, 19); eq(#c.hand, n, "Spend 2 : pioche 1 (la carte jouée remplacée)")
+    local c2 = wsetup({ "heroic_strike" }, 3)
+    c2.player.res = 1
+    n = #c2.hand
+    assert(Combat.play(c2, 1, 1))
+    eq(#c2.hand, n - 1, "sans Spend : rien")
+    local c3 = wsetup({ "colossus_smash" }, 3)
+    n = #c3.hand
+    assert(Combat.play(c3, 1, 1))
+    eq(#c3.hand, n); eq(c3.enemies[1].st.armor_broken, 4)
+    local c4 = wsetup({ "devastate" }, 3)
+    assert(Combat.play(c4, 1, 1))
+    eq(c4.enemies[1].st.armor_broken, 1); eq(c4.player.block, 6)
+    local c5 = wsetup({ "onslaught" }, 3)
+    c5.player.res = 1
+    n = #c5.hand
+    assert(Combat.play(c5, 1, 1))
+    eq(#c5.hand, n + 1, "Onslaught+3 : Spend 1 suffit pour piocher 2")
+  end)
+
+  test("Guerrier, Retain et Innate : Execute+2 gardée en main, Defend+3 aussi ; Battle Shout+2 dans la main de départ", function()
+    for _, t in ipairs({ { "execute", 2 }, { "defend", 3 }, { "shield_wall", 3 }, { "whirlwind", 2 } }) do
+      local c = wsetup({ t[1], "strike" }, t[2])
+      Combat.endTurn(c)
+      assert(handIndex(c, t[1]), t[1] .. "+" .. t[2] .. " : Retain")
+      eq(Card.defById(t[1], t[2] - 1).retain, nil, t[1] .. " : palier d'avant sans Retain")
+    end
+    -- Innate : en main de départ, quelle que soit la graine
+    for _, t in ipairs({ { "battle_shout", 2 }, { "bloodrage", 2 }, { "last_stand", 3 }, { "deep_wounds", 3 } }) do
+      for seed = 1, 6 do
+        local deck = {}
+        for i = 1, 14 do deck[i] = { id = "strike", up = false } end
+        deck[#deck + 1] = { id = t[1], up = t[2] }
+        local c = Combat.new({ seed = seed, class = "warrior", hp = 60, maxHp = 60, deck = deck, encounter = { "test_dummy" } })
+        assert(handIndex(c, t[1]), t[1] .. "+" .. t[2] .. " : Innate (graine " .. seed .. ")")
+      end
+    end
+  end)
+
+  test("Guerrier : Revenge+3 à tous, Pummel+3 interrompt toutes les incantations, Last Stand+2 soigne 20", function()
+    local c = wsetup({ "revenge" }, 3, { "test_dummy", "test_dummy" })
+    local a, b = c.enemies[1].hp, c.enemies[2].hp
+    assert(Combat.play(c, 1, 1))
+    eq(a - c.enemies[1].hp, 11); eq(b - c.enemies[2].hp, 11)
+    local c2 = wsetup({ "pummel" }, 3, { "test_caster", "test_caster" })
+    for _, e in ipairs(c2.enemies) do assert(ns.Enemies[e.id].moves[e.intent].cast, "incantation en vue") end
+    assert(Combat.play(c2, 1, 1))
+    assert(c2.enemies[1].interrupted and c2.enemies[2].interrupted, "toutes")
+    local c3 = wsetup({ "last_stand" }, 2)
+    assert(Combat.play(c3, 1))
+    c3.player.hp = 1
+    Combat.loseHp(c3, 5)
+    eq(c3.player.hp, 21, "1 + 20")
+  end)
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

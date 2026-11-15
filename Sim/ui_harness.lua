@@ -10642,13 +10642,13 @@ do
   host = v.classZone.views.warrior
   c.player.res = 2
   v:Render(true)
-  check("Thunderous Roar : « Roar in 3 Rage: 3 to all »", line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.EPIC.thunderous_roar.damage), line(host))
+  check("Thunderous Roar : « Roar in 3 Rage: 3 to all »", line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.num("thunderous_roar", "damage", false)), line(host))
   c.player.res = 4
   ns.Combat.gainRes(c, 1, "test")
   v:OnEvents(c.events)
   H.advance(3)
   check("Thunderous Roar : onde jouée par la vue (Rage à 0, Demoralized posé selon la règle)", c.player.res == 0
-    and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.EPIC.thunderous_roar.demoralized > 0) and #W.truncatedNow() == 0,
+    and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.num("thunderous_roar", "demoralized", false) > 0) and #W.truncatedNow() == 0,
     c.player.res .. " / " .. table.concat(W.truncatedNow(), ","))
   snap("uew-thunderous-roar", true)
 end
