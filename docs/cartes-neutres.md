@@ -150,3 +150,63 @@ art et icônes dans `UI/Art/neutral.lua` (icônes de la fiche, embarquées), TOC
   en parallèle) ; balayage `sweep=cards` des neutres (le balayage ne force que les cartes de la classe).
 - Bot : achète une carte neutre notée 6 ou plus (Heavy Silk Bandage, Iron Grenade, Elixir, Black Lotus,
   Sapper) ; une réponse `card` vaut 1,2.
+
+## Paliers +2 et +3 (15/11/2026)
+
+Décision du joueur du 15/11/2026 (`docs/ameliorations.md`) : une carte s'améliore jusqu'à trois fois, paliers 2 et
+3 écrits à la main. Les 22 cartes neutres (les dix de `Data/Neutral.lua` et les deux de chaque zone, déclarées
+dans `Data/Zones/<Zone>.lua`) ont leurs paliers 2 et 3. Base et palier 1 inchangés.
+
+Règles suivies, propres aux neutres :
+- **Bas de la fourchette** : chaque palier 2 ou 3 vaut environ la moitié du gain du palier 1 ; une neutre +3 reste
+  sous la carte de classe repère à son palier 1 (Battle Shout, Recklessness, Flash Heal, Adrenaline Rush, Silence,
+  Wailing Arrow, Ice Barrier…).
+- **Consommables** : la plupart des neutres sont Exhaust. Aucun palier ne retire Exhaust ; les paliers donnent
+  plutôt **Retain** (garder la bombe ou la potion pour le bon tour), **Innate** (la nourriture, l'élixir, l'huile
+  préparés avant le combat), un coût ou un prix en PV assoupli, ou un nombre.
+- **Cartes à 0 et pioche** (Arcane Bomb, Black Lotus, Anti-Venom, Zombie Juice, Jungle Remedy, Runecloth Bag+) :
+  jamais de pioche ni de mana en plus ; seulement des mots de plaque ou un petit effet sans pioche.
+- **Étourdissements** (Iron Grenade, Dark Iron Bomb) : jamais plus de Stunned ; Retain et dégâts seulement.
+- Elixir of Superior Defense (seul Power) : sa valeur par tour ne change pas (4 Absorb) ; coût 0 puis Innate ;
+  `Bots.POWER_VALUE` inchangé.
+- Textes : les mots de plaque (Exhaust, Retain, Innate) ne prennent pas de place dans le corps de la carte ; seul
+  Jungle Remedy reste à 5 lignes de corps (taille 9, comme à la base).
+
+| Carte | Base | +1 | +2 | +3 |
+| --- | --- | --- | --- | --- |
+| Rough Dynamite (1) | Deal 6 to all. Exhaust | Deal 9 to all | Deal 11 to all | + Retain |
+| Heavy Silk Bandage (1) | Heal 6. Exhaust | Heal 9 | Heal 11 | + Gain Regen 2 |
+| Rugged Armor Kit (1) | Gain 4 Absorb. Retain | 7 Absorb | 9 Absorb | + Innate |
+| Smoked Desert Dumplings (1) | Gain Strength 1. Exhaust | Strength 2 | + Gain Regen 2 | + Innate |
+| Runecloth Bag (1) | Draw 2. Exhaust | coût 0 | + Innate | + Retain |
+| Iron Grenade (1) | Deal 5, Stunned 1. Exhaust | Deal 8 | + Retain | Deal 10 |
+| Arcane Bomb (0) | Interrupt the target. Exhaust | + Draw 1 | + Retain | Interrupt all casts |
+| Elixir of Superior Defense (1, Power) | 3 Absorb par tour | 4 Absorb | coût 0 | + Innate |
+| Black Lotus (0) | +2 mana. Exhaust | + Draw 1 | + Retain | + Innate |
+| Goblin Sapper Charge (2) | Pay 5 HP, 14 to all. Exhaust | 18 to all | Pay 3 HP | 20 to all |
+| Anti-Venom (0, Duskwood) | Remove negative effects, Draw 1. Exhaust | Draw 2 | + Retain | + Heal 4 |
+| Zombie Juice (0, Duskwood) | +1 mana, Draw 1. Exhaust | Draw 2 | + Retain | + Innate |
+| Crocolisk Gumbo (1, Wetlands) | Heal 5, Strength 1. Exhaust | Heal 8 | Heal 10 | coût 0 |
+| Fire Oil (1, Wetlands) | DoT 4 to all. Exhaust | DoT 6 | DoT 7 | + Innate |
+| Jungle Remedy (0, Stranglethorn) | Restore Hexed, remove negative effects, Draw 1. Exhaust | Draw 2 | + Retain | + Innate |
+| Rumsey Rum Black Label (0, Stranglethorn) | Gain 6 Absorb. Exhaust | 9 Absorb | + Retain | 11 Absorb |
+| Dream Dust (1, Swamp) | Asleep 2. Exhaust | coût 0 | Asleep 3 | + Retain |
+| Dreamless Sleep Potion (0, Swamp) | Heal 10, lose all mana. Exhaust | Heal 14 | Heal 16 | + Retain |
+| Fire Protection Potion (1, Steppes) | Douse 3, 6 Absorb. Exhaust | 9 Absorb | 11 Absorb | + Retain |
+| Thorium Grenade (2, Steppes) | Deal 10 to all. Exhaust | 13 to all | 15 to all | + Sundered 1 to all |
+| Dark Iron Bomb (2, Blackrock) | Deal 4 to all, Stunned 1 to all. Exhaust | 8 to all | 10 to all | + Retain |
+| Dark Iron Ale Mug (0, Blackrock) | Pay 3 HP, Strength 2. Exhaust | Pay 2 HP | Pay 1 HP | + Innate |
+
+« + » = ajouté au palier précédent ; (n) = coût de base.
+
+**Cartes de combat sans palier 2 / 3** : les cinq Curses de Duskwood (`rabies`, `curse_of_weakness`, `web`,
+`fevered_plague`, `curse_of_tongues`), `morbents_bane` et `hexed` (Stranglethorn) ont un `up` factice (même texte,
+« jamais améliorée : hors du deck ») ; elles n'entrent jamais dans le deck de l'expédition et un palier 2 identique
+serait refusé par `Sim/upgrades.lua` (« rien ne change »). `lua5.1 Sim/upgrades.lua list=1` les liste dans le
+groupe « other » : c'est attendu.
+
+Mesure : non faite carte par carte (balayages arrêtés sur consigne) ; campagne Mage inchangée (74,8 %), aucun palier 2
+atteint par le bot (`docs/equilibrage.md`, « Paliers +2 et +3 des cartes neutres »).
+
+Tests : `Sim/tests_zone_<zone>.lua` (« paliers neutres : … ») ; les neutres de `Data/Neutral.lua` sont testées dans
+`Sim/tests_zone_duskwood.lua` (coût 0, Innate, Retain, Interrupt all casts, Regen, prix en PV).

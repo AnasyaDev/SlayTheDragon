@@ -32,6 +32,9 @@ card("smite", {
   target = "enemy", effects = { { "damage", 8 } },
   text = "Deal 8.",
   up = { effects = { { "damage", 11 } }, text = "Deal 11." },
+  up2 = { effects = { { "damage", 13 } }, text = "Deal 13." },
+  up3 = { effects = { { "damage", 13, more = { { 4, "status:atonement" } } } },
+    text = "Deal 13.\nAtonement: deal 4 more." },
 })
 
 card("inner_fire", {
@@ -39,6 +42,9 @@ card("inner_fire", {
   effects = { { "absorb", 6 } },
   text = "Gain 6 Absorb.",
   up = { effects = { { "absorb", 9 } }, text = "Gain 9 Absorb." },
+  up2 = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb." },
+  up3 = { effects = { { "absorb", 11 }, { "draw", 1, cond = "status:atonement" } },
+    text = "Gain 11 Absorb.\nAtonement: draw 1." },
 })
 
 card("pw_shield", {
@@ -46,6 +52,9 @@ card("pw_shield", {
   cooldown = 2, effects = { { "absorb", 8 } },
   text = "Gain 8 Absorb.\nCooldown 2.",
   up = { effects = { { "absorb", 11 } }, text = "Gain 11 Absorb.\nCooldown 2." },
+  up2 = { effects = { { "absorb", 13 } }, text = "Gain 13 Absorb.\nCooldown 2." },
+  up3 = { effects = { { "absorb", 13 }, { "apply", "atonement", 1, self = true } },
+    text = "Gain 13 Absorb.\nGain Atonement 1 ⌛\nCooldown 2." },
 })
 
 card("sw_pain", {
@@ -53,6 +62,8 @@ card("sw_pain", {
   target = "enemy", effects = { { "apply", "pain", 5 }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 5",
   up = { effects = { { "apply", "pain", 7 }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 7" },
+  up2 = { effects = { { "apply", "pain", 9 }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 9" },
+  up3 = { effects = { { "apply", "pain", 9 }, { "res", 2 } }, text = "+2 Insanity.\nApply DoT 9" },
 })
 
 -- Discipline ----------------------------------------------------------------
@@ -63,10 +74,19 @@ card("radiance", {
   text = "Gain 4 Absorb.\nGain Atonement 1 ⌛",
   up = { effects = { { "apply", "atonement", 2, self = true }, { "absorb", 6 } },
     text = "Gain 6 Absorb.\nGain Atonement 2 ⌛" },
+  up2 = { effects = { { "apply", "atonement", 3, self = true }, { "absorb", 6 } },
+    text = "Gain 6 Absorb.\nGain Atonement 3 ⌛" },
+  up3 = { effects = { { "apply", "atonement", 3, self = true }, { "absorb", 6 }, { "draw", 1 } },
+    text = "Gain 6 Absorb.\nDraw 1.\nGain Atonement 3 ⌛" },
 })
 
 local function penanceHit(c, ctx, t)
   if (c.player.st.atonement or 0) > 0 then Combat.gainBlock(c, c.player, 2) end
+end
+
+-- Penance+3 : 3 Absorb par coup sous Atonement.
+local function penanceHit3(c, ctx, t)
+  if (c.player.st.atonement or 0) > 0 then Combat.gainBlock(c, c.player, 3) end
 end
 
 card("penance", {
@@ -75,6 +95,10 @@ card("penance", {
   text = "Deal 5 three times.\nAtonement: +2 Absorb per hit.",
   up = { effects = { { "damage", 7, times = 3, onHit = penanceHit } },
     text = "Deal 7 three times.\nAtonement: +2 Absorb per hit." },
+  up2 = { effects = { { "damage", 8, times = 3, onHit = penanceHit } },
+    text = "Deal 8 three times.\nAtonement: +2 Absorb per hit." },
+  up3 = { effects = { { "damage", 8, times = 3, onHit = penanceHit3 } },
+    text = "Deal 8 three times.\nAtonement: +3 Absorb per hit." },
 })
 
 card("pain_suppression", {
@@ -82,6 +106,9 @@ card("pain_suppression", {
   cooldown = 5, effects = { { "apply", "halved", 1, self = true } },
   text = "Damage taken halved until next turn.\nCooldown 5.",
   up = { cooldown = 4, text = "Damage taken halved until next turn.\nCooldown 4." },
+  up2 = { retain = true, text = "Damage taken halved until next turn.\nCooldown 4.\nRetain." },
+  up3 = { effects = { { "apply", "halved", 1, self = true }, { "draw", 1 } },
+    text = "Damage taken halved until next turn.\nDraw 1.\nCooldown 4.\nRetain." },
 })
 
 local function solaceMana(c, ctx)
@@ -97,6 +124,10 @@ card("solace", {
   text = "Deal 4.\nAtonement: +1 mana.\nGain Atonement 1 ⌛",
   up = { effects = { { "fn", solaceMana }, { "damage", 6 }, { "apply", "atonement", 1, self = true } },
     text = "Deal 6.\nAtonement: +1 mana.\nGain Atonement 1 ⌛" },
+  up2 = { effects = { { "fn", solaceMana }, { "damage", 6 }, { "apply", "atonement", 2, self = true } },
+    text = "Deal 6.\nAtonement: +1 mana.\nGain Atonement 2 ⌛" },
+  up3 = { effects = { { "fn", solaceMana }, { "damage", 8 }, { "apply", "atonement", 2, self = true } },
+    text = "Deal 8.\nAtonement: +1 mana.\nGain Atonement 2 ⌛" },
 })
 
 card("angelic_feather", {
@@ -104,6 +135,10 @@ card("angelic_feather", {
   cooldown = 3, effects = { { "absorb", 2 }, { "draw", 1 } },
   text = "Gain 2 Absorb.\nDraw 1.\nCooldown 3.",
   up = { effects = { { "absorb", 4 }, { "draw", 1 } }, text = "Gain 4 Absorb.\nDraw 1.\nCooldown 3." },
+  up2 = { effects = { { "absorb", 4 }, { "draw", 1 }, { "apply", "atonement", 1, self = true } },
+    text = "Gain 4 Absorb.\nDraw 1.\nGain Atonement 1 ⌛\nCooldown 3." },
+  up3 = { effects = { { "absorb", 5 }, { "draw", 1 }, { "apply", "atonement", 1, self = true } },
+    text = "Gain 5 Absorb.\nDraw 1.\nGain Atonement 1 ⌛\nCooldown 3." },
 })
 
 card("luminous_barrier", {
@@ -112,6 +147,10 @@ card("luminous_barrier", {
   text = "Gain 14 Absorb.\nGain Atonement 1 ⌛\nCooldown 2.",
   up = { effects = { { "absorb", 18 }, { "apply", "atonement", 1, self = true } },
     text = "Gain 18 Absorb.\nGain Atonement 1 ⌛\nCooldown 2." },
+  up2 = { effects = { { "absorb", 18 }, { "apply", "atonement", 2, self = true } },
+    text = "Gain 18 Absorb.\nGain Atonement 2 ⌛\nCooldown 2." },
+  up3 = { effects = { { "absorb", 18 }, { "draw", 1 }, { "apply", "atonement", 2, self = true } },
+    text = "Gain 18 Absorb.\nDraw 1.\nGain Atonement 2 ⌛\nCooldown 2." },
 })
 
 card("schism", {
@@ -121,6 +160,10 @@ card("schism", {
   text = "Deal 3.\nApply Sundered 2 ⌛\nGain Atonement 1 ⌛",
   up = { effects = { { "damage", 6 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 1, self = true } },
     text = "Deal 6.\nApply Sundered 3 ⌛\nGain Atonement 1 ⌛" },
+  up2 = { effects = { { "damage", 8 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 1, self = true } },
+    text = "Deal 8.\nApply Sundered 3 ⌛\nGain Atonement 1 ⌛" },
+  up3 = { effects = { { "damage", 8 }, { "apply", "armor_broken", 3 }, { "apply", "atonement", 2, self = true } },
+    text = "Deal 8.\nApply Sundered 3 ⌛\nGain Atonement 2 ⌛" },
 })
 
 card("shadow_mend", {
@@ -129,6 +172,9 @@ card("shadow_mend", {
   text = "Heal 12.\n+1 Insanity.\nGain DoT 2\nExhaust.",
   up = { effects = { { "heal", 16 }, { "apply", "pain", 2, self = true }, { "res", 1 } },
     text = "Heal 16.\n+1 Insanity.\nGain DoT 2\nExhaust." },
+  up2 = { effects = { { "heal", 16 }, { "apply", "pain", 2, self = true }, { "res", 2 } },
+    text = "Heal 16.\n+2 Insanity.\nGain DoT 2\nExhaust." },
+  up3 = { effects = { { "heal", 16 }, { "res", 2 } }, text = "Heal 16.\n+2 Insanity.\nExhaust." },
 })
 
 card("evangelism", {
@@ -136,6 +182,9 @@ card("evangelism", {
   exhaust = true, effects = { { "apply", "atonement", 2, self = true }, { "draw", 2 } },
   text = "Draw 2.\nGain Atonement 2 ⌛\nExhaust.",
   up = { cost = 0, text = "Draw 2.\nGain Atonement 2 ⌛\nExhaust." },
+  up2 = { effects = { { "apply", "atonement", 3, self = true }, { "draw", 2 } },
+    text = "Draw 2.\nGain Atonement 3 ⌛\nExhaust." },
+  up3 = { retain = true, text = "Draw 2.\nGain Atonement 3 ⌛\nExhaust.\nRetain." },
 })
 
 local function raptureHooks(bonus)
@@ -149,18 +198,23 @@ card("rapture", {
   power = true, effects = {}, hooks = raptureHooks(2),
   text = "Power.\nEach Absorb gain: +2.",
   up = { hooks = raptureHooks(3), text = "Power.\nEach Absorb gain: +3." },
+  up2 = { cost = 0, text = "Power.\nEach Absorb gain: +3." },
+  up3 = { innate = true, text = "Power.\nEach Absorb gain: +3.\nInnate." },
 })
 
 -- Ombre -----------------------------------------------------------------------
 
 -- Condition sur l'état de la cible, lue AVANT le coup (comme à l'origine).
 local FLAY = { { "res", 2, cond = "status:pain" }, { "draw", 1, cond = "status:pain" } }
+local FLAY3 = { "res", 3, cond = "status:pain" } -- Mind Flay+3 : +3 Insanity
 
 card("mind_flay", {
   level = 1, name = "Mind Flay", cost = 1, type = "attack", school = "shadow", rarity = "common", path = "shadow",
   target = "enemy", effects = { FLAY[1], FLAY[2], { "damage", 8 } },
   text = "Deal 8.\nDoT: +2 Insanity, draw 1.",
   up = { effects = { FLAY[1], FLAY[2], { "damage", 11 } }, text = "Deal 11.\nDoT: +2 Insanity, draw 1." },
+  up2 = { effects = { FLAY[1], FLAY[2], { "damage", 13 } }, text = "Deal 13.\nDoT: +2 Insanity, draw 1." },
+  up3 = { effects = { FLAY3, FLAY[2], { "damage", 13 } }, text = "Deal 13.\nDoT: +3 Insanity, draw 1." },
 })
 
 card("mind_blast", {
@@ -168,13 +222,16 @@ card("mind_blast", {
   target = "enemy", cooldown = 1, effects = { { "damage", 10 }, { "res", 2 } },
   text = "Deal 10.\n+2 Insanity.\nCooldown 1.",
   up = { effects = { { "damage", 13 }, { "res", 2 } }, text = "Deal 13.\n+2 Insanity.\nCooldown 1." },
+  up2 = { effects = { { "damage", 13 }, { "res", 3 } }, text = "Deal 13.\n+3 Insanity.\nCooldown 1." },
+  up3 = { effects = { { "damage", 16 }, { "res", 3 } }, text = "Deal 16.\n+3 Insanity.\nCooldown 1." },
 })
 
 -- DoT posé directement (Combat.applyStatus) : le crochet « apply » de Forme d'ombre ne s'y ajoute pas.
+-- plagueBase (palier 3) : DoT fixe en plus, seulement si le Surge a dépensé quelque chose.
 local function plague(c, ctx)
   local n = ctx.surge or 0
   if n > 0 and ctx.target and not ctx.target.dead then
-    Combat.applyStatus(c, ctx.target, "pain", (ctx.def.plagueMult or 2) * n)
+    Combat.applyStatus(c, ctx.target, "pain", (ctx.def.plagueBase or 0) + (ctx.def.plagueMult or 2) * n)
   end
 end
 
@@ -183,6 +240,8 @@ card("devouring_plague", {
   target = "enemy", plagueMult = 2, minRes = 1, effects = { { "surge" }, { "fn", plague } },
   text = "Surge: apply DoT 2 per Insanity.",
   up = { plagueMult = 3, text = "Surge: apply DoT 3 per Insanity." },
+  up2 = { retain = true, text = "Surge: apply DoT 3 per Insanity.\nRetain." },
+  up3 = { plagueBase = 4, text = "Surge: apply DoT 4 + 3 per Insanity.\nRetain." },
 })
 
 -- Forme d'ombre : l'interdiction des cartes sacrées (version d'origine), puis un surcoût
@@ -207,6 +266,8 @@ card("shadowform", {
   text = "Power.\n+2 Insanity.\nShadow: damage and DoT +3.",
   up = { hooks = shadowformHooks(4),
     text = "Power.\n+2 Insanity.\nShadow: damage and DoT +4." },
+  up2 = { effects = { { "res", 3 } }, text = "Power.\n+3 Insanity.\nShadow: damage and DoT +4." },
+  up3 = { cost = 0, text = "Power.\n+3 Insanity.\nShadow: damage and DoT +4." },
 })
 
 card("silence", {
@@ -214,6 +275,9 @@ card("silence", {
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "draw", 1 } },
   text = "Interrupt the target's cast.\nDraw 1.\nCooldown 2.",
   up = { cooldown = 1, text = "Interrupt the target's cast.\nDraw 1.\nCooldown 1." },
+  up2 = { retain = true, text = "Interrupt the target's cast.\nDraw 1.\nCooldown 1.\nRetain." },
+  up3 = { effects = { { "interrupt" }, { "draw", 1 }, { "res", 1 } },
+    text = "Interrupt the target's cast.\nDraw 1.\n+1 Insanity.\nCooldown 1.\nRetain." },
 })
 
 card("vampiric_touch", {
@@ -222,6 +286,10 @@ card("vampiric_touch", {
   text = "+1 Insanity.\nApply DoT 3\nGain Regen 1",
   up = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "res", 1 } },
     text = "+1 Insanity.\nApply DoT 5\nGain Regen 2" },
+  up2 = { effects = { { "apply", "pain", 5 }, { "apply", "regen", 2, self = true }, { "res", 2 } },
+    text = "+2 Insanity.\nApply DoT 5\nGain Regen 2" },
+  up3 = { effects = { { "apply", "pain", 7 }, { "apply", "regen", 2, self = true }, { "res", 2 } },
+    text = "+2 Insanity.\nApply DoT 7\nGain Regen 2" },
 })
 
 card("mind_sear", {
@@ -229,6 +297,8 @@ card("mind_sear", {
   effects = { { "apply", "pain", 5, all = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply DoT 5 to all",
   up = { effects = { { "apply", "pain", 7, all = true }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 7 to all" },
+  up2 = { effects = { { "apply", "pain", 9, all = true }, { "res", 1 } }, text = "+1 Insanity.\nApply DoT 9 to all" },
+  up3 = { effects = { { "apply", "pain", 9, all = true }, { "res", 2 } }, text = "+2 Insanity.\nApply DoT 9 to all" },
 })
 
 card("sw_death", {
@@ -237,6 +307,10 @@ card("sw_death", {
   text = "Deal 7.\nExecute: deal 14.\n+1 Insanity.",
   up = { effects = { { "damage", 9, more = { { 9, "execute" } } }, { "res", 1 } },
     text = "Deal 9.\nExecute: deal 18.\n+1 Insanity." },
+  up2 = { effects = { { "damage", 10, more = { { 10, "execute" } } }, { "res", 1 } },
+    text = "Deal 10.\nExecute: deal 20.\n+1 Insanity." },
+  up3 = { effects = { { "damage", 10, more = { { 10, "execute" } } }, { "res", 2 } },
+    text = "Deal 10.\nExecute: deal 20.\n+2 Insanity." },
 })
 
 card("psychic_scream", {
@@ -244,6 +318,10 @@ card("psychic_scream", {
   cooldown = 3, effects = { { "apply", "demoralized", 2, all = true }, { "res", 1 } },
   text = "+1 Insanity.\nApply Demoralized 2 ⌛ to all\nCooldown 3.",
   up = { cost = 0, text = "+1 Insanity.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
+  up2 = { effects = { { "apply", "demoralized", 3, all = true }, { "res", 1 } },
+    text = "+1 Insanity.\nApply Demoralized 3 ⌛ to all\nCooldown 3." },
+  up3 = { effects = { { "apply", "demoralized", 3, all = true }, { "res", 2 } },
+    text = "+2 Insanity.\nApply Demoralized 3 ⌛ to all\nCooldown 3." },
 })
 
 card("void_eruption", {
@@ -251,6 +329,8 @@ card("void_eruption", {
   target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 6, per = { 5, "surge" } } },
   text = "Surge: deal 6 + 5 per Insanity.",
   up = { effects = { { "surge" }, { "damage", 6, per = { 6, "surge" } } }, text = "Surge: deal 6 + 6 per Insanity." },
+  up2 = { effects = { { "surge" }, { "damage", 9, per = { 6, "surge" } } }, text = "Surge: deal 9 + 6 per Insanity." },
+  up3 = { retain = true, text = "Surge: deal 9 + 6 per Insanity.\nRetain." },
 })
 
 -- Sacré -----------------------------------------------------------------------
@@ -261,6 +341,8 @@ card("holy_fire", {
   target = "enemy", cast = true, effects = { { "damage", 24 }, { "apply", "pain", 3 } },
   text = "Cast.\nDeal 24.\nApply DoT 3",
   up = { effects = { { "damage", 31 }, { "apply", "pain", 4 } }, text = "Cast.\nDeal 31.\nApply DoT 4" },
+  up2 = { effects = { { "damage", 36 }, { "apply", "pain", 4 } }, text = "Cast.\nDeal 36.\nApply DoT 4" },
+  up3 = { effects = { { "damage", 36 }, { "apply", "pain", 6 } }, text = "Cast.\nDeal 36.\nApply DoT 6" },
 })
 
 card("holy_nova", {
@@ -269,6 +351,10 @@ card("holy_nova", {
   text = "Deal 3 to all.\nGain Regen 2",
   up = { effects = { { "damage", 5, all = true }, { "apply", "regen", 3, self = true } },
     text = "Deal 5 to all.\nGain Regen 3" },
+  up2 = { effects = { { "damage", 7, all = true }, { "apply", "regen", 3, self = true } },
+    text = "Deal 7 to all.\nGain Regen 3" },
+  up3 = { effects = { { "damage", 7, all = true }, { "draw", 1 }, { "apply", "regen", 3, self = true } },
+    text = "Deal 7 to all.\nDraw 1.\nGain Regen 3" },
 })
 
 card("chastise", {
@@ -276,6 +362,8 @@ card("chastise", {
   target = "enemy", cooldown = 3, effects = { { "damage", 7 }, { "apply", "stunned", 1 } },
   text = "Deal 7.\nApply Stunned 1 ⌛\nCooldown 3.",
   up = { cooldown = 2, effects = { { "damage", 10 }, { "apply", "stunned", 1 } }, text = "Deal 10.\nApply Stunned 1 ⌛\nCooldown 2." },
+  up2 = { effects = { { "damage", 13 }, { "apply", "stunned", 1 } }, text = "Deal 13.\nApply Stunned 1 ⌛\nCooldown 2." },
+  up3 = { retain = true, text = "Deal 13.\nApply Stunned 1 ⌛\nCooldown 2.\nRetain." },
 })
 
 card("greater_heal", {
@@ -283,12 +371,13 @@ card("greater_heal", {
   cast = true, exhaust = true, effects = { { "heal", 10 } },
   text = "Cast.\nHeal 10.\nExhaust.",
   up = { effects = { { "heal", 13 } }, text = "Cast.\nHeal 13.\nExhaust." },
+  up2 = { cost = 0, text = "Cast.\nHeal 13.\nExhaust." },
+  up3 = { effects = { { "heal", 15 } }, text = "Cast.\nHeal 15.\nExhaust." },
 })
 
-card("spirit_of_redemption", {
-  level = 1, name = "Spirit of Redemption", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
-  power = true, effects = {},
-  hooks = {
+-- Spirit of Redemption : draw = cartes piochées au Last Breath (palier 3 : 2).
+local function spiritHooks(draw)
+  return {
     preventDeath = function(c, power)
       local f = c.player.flags
       if f.redeemed then return false end
@@ -296,12 +385,22 @@ card("spirit_of_redemption", {
       f.freeTurn = true
       c.player.hp = 1
       Combat.applyStatus(c, c.player, "regen", 6)
+      if draw > 0 then Combat.drawCards(c, draw) end
       return true
     end,
-  },
+  }
+end
+
+card("spirit_of_redemption", {
+  level = 1, name = "Spirit of Redemption", cost = 1, type = "power", school = "holy", rarity = "rare", path = "holy",
+  power = true, effects = {},
+  hooks = spiritHooks(0),
   text = "Power.\nLast Breath: stay at 1 HP, Regen 6, free turn.",
   up = { cost = 0,
     text = "Power.\nLast Breath: stay at 1 HP, Regen 6, free turn." },
+  up2 = { innate = true, text = "Power.\nLast Breath: stay at 1 HP, Regen 6, free turn.\nInnate." },
+  up3 = { hooks = spiritHooks(2),
+    text = "Power.\nLast Breath: stay at 1 HP, Regen 6, free turn, draw 2.\nInnate." },
 })
 
 card("renew", {
@@ -309,6 +408,8 @@ card("renew", {
   exhaust = true, effects = { { "apply", "regen", 3, self = true } },
   text = "Gain Regen 3\nExhaust.",
   up = { effects = { { "apply", "regen", 5, self = true } }, text = "Gain Regen 5\nExhaust." },
+  up2 = { cost = 0, text = "Gain Regen 5\nExhaust." },
+  up3 = { innate = true, text = "Gain Regen 5\nExhaust.\nInnate." },
 })
 
 card("halo", {
@@ -317,6 +418,11 @@ card("halo", {
   text = "Cast.\nDeal 22 to all.\nGain Regen 3",
   up = { effects = { { "damage", 26, all = true }, { "apply", "regen", 4, self = true } },
     text = "Cast.\nDeal 26 to all.\nGain Regen 4" },
+  up2 = { effects = { { "damage", 29, all = true }, { "apply", "regen", 4, self = true } },
+    text = "Cast.\nDeal 29 to all.\nGain Regen 4" },
+  up3 = { effects = { { "damage", 29, all = true }, { "apply", "armor_broken", 2, all = true },
+    { "apply", "regen", 4, self = true } },
+    text = "Cast.\nDeal 29 to all.\nApply Sundered 2 ⌛ to all\nGain Regen 4" },
 })
 
 card("flash_heal", {
@@ -324,6 +430,8 @@ card("flash_heal", {
   exhaust = true, effects = { { "heal", 7 }, { "draw", 1 } },
   text = "Heal 7.\nDraw 1.\nExhaust.",
   up = { effects = { { "heal", 10 }, { "draw", 1 } }, text = "Heal 10.\nDraw 1.\nExhaust." },
+  up2 = { effects = { { "heal", 10 }, { "draw", 2 } }, text = "Heal 10.\nDraw 2.\nExhaust." },
+  up3 = { effects = { { "heal", 12 }, { "draw", 2 } }, text = "Heal 12.\nDraw 2.\nExhaust." },
 })
 
 card("empyreal_blaze", {
@@ -331,6 +439,8 @@ card("empyreal_blaze", {
   target = "enemy", cast = true, effects = { { "damage", 36 }, { "apply", "armor_broken", 2 } },
   text = "Cast.\nDeal 36.\nApply Sundered 2 ⌛",
   up = { effects = { { "damage", 44 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 44.\nApply Sundered 2 ⌛" },
+  up2 = { effects = { { "damage", 49 }, { "apply", "armor_broken", 2 } }, text = "Cast.\nDeal 49.\nApply Sundered 2 ⌛" },
+  up3 = { effects = { { "damage", 49 }, { "apply", "armor_broken", 3 } }, text = "Cast.\nDeal 49.\nApply Sundered 3 ⌛" },
 })
 
 -- Apothéose : une pioche en plus ne valait rien (3 mana pour 5 cartes à 1 mana : la main
@@ -348,6 +458,8 @@ card("apotheosis", {
   power = true, effects = {}, hooks = apotheosisHooks,
   text = "Power.\n+1 mana per turn.\nCast cards: cost −1.",
   up = { cost = 1, text = "Power.\n+1 mana per turn.\nCast cards: cost −1." },
+  up2 = { effects = { { "draw", 1 } }, text = "Power.\nDraw 1.\n+1 mana per turn.\nCast cards: cost −1." },
+  up3 = { innate = true, text = "Power.\nDraw 1.\n+1 mana per turn.\nCast cards: cost −1.\nInnate." },
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Priest ») ------------------------------
@@ -365,42 +477,56 @@ epic("prayer_of_mending", {
   name = "Prayer of Mending", school = "holy", path = "holy", zone = "westfall",
   text = "Epic.\nEach heal: Divine Star.",
   up = { text = "Epic.\nEach heal: Divine Star +2." },
+  up2 = { text = "Epic.\nEach heal: Divine Star +3." },
+  up3 = { text = "Epic.\nEach heal: Divine Star +4." },
 })
 
 epic("misery", {
   name = "Misery", school = "shadow", path = "shadow", zone = "duskwood",
   text = "Epic.\nDoT applied: Contagion.",
   up = { text = "Epic.\nDoT applied: Contagion +1." },
+  up2 = { text = "Epic.\nDoT applied: Contagion +2." },
+  up3 = { text = "Epic.\nDoT applied: Contagion +3." },
 })
 
 epic("echo_of_light", {
   name = "Echo of Light", school = "holy", path = "holy", zone = "wetlands",
   text = "Epic.\nEach Regen tick: Sanctify.",
   up = { text = "Epic.\nEach Regen tick: Sanctify +2." },
+  up2 = { text = "Epic.\nEach Regen tick: Sanctify +3." },
+  up3 = { text = "Epic.\nEach Regen tick: Sanctify +4." },
 })
 
 epic("shadow_covenant", {
   name = "Shadow Covenant", school = "shadow", path = "discipline", zone = "stranglethorn",
   text = "Epic.\nShadow cards: Life Tap 2.",
   up = { text = "Epic.\nShadow cards: Life Tap 2, 1st free." },
+  up2 = { text = "Epic.\nShadow cards: Life Tap 1, 1st free." },
+  up3 = { text = "Epic.\nShadow cards: Life Tap 1, 2 free." },
 })
 
 epic("reflective_shield", {
   name = "Reflective Shield", school = "holy", path = "discipline", zone = "swamp",
   text = "Epic.\nWhen hit: Reflect a third.",
   up = { text = "Epic.\nWhen hit: Reflect half." },
+  up2 = { text = "Epic.\nWhen hit: Reflect three fifths." },
+  up3 = { text = "Epic.\nWhen hit: Reflect two thirds." },
 })
 
 epic("voidform", {
   name = "Voidform", school = "shadow", path = "shadow", zone = "steppes",
   text = "Epic.\nShadow hits: Madness 1.",
   up = { text = "Epic.\nShadow hits: Madness 2." },
+  up2 = { text = "Epic.\nShadow hits: +2, Madness 2." },
+  up3 = { text = "Epic.\nShadow hits: +4, Madness 2." },
 })
 
 epic("inner_focus", {
   name = "Inner Focus", school = "holy", path = "discipline", zone = "blackrock",
   text = "Epic.\n1st card each turn: Empower 50%.",
   up = { text = "Epic.\n1st card each turn: Empower 100%." },
+  up2 = { text = "Epic.\n1st card each turn: Empower 125%." },
+  up3 = { text = "Epic.\n1st card each turn: Empower 150%." },
 })
 
 -- Bibelots du Prêtre (class = "priest" : tirés seulement pour lui) --------------------------------
