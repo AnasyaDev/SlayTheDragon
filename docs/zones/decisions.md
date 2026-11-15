@@ -117,6 +117,10 @@ Remplace « une expédition se joue dans une zone » et le choix de la zone à l
   écrit (le contenu arrive classe par classe).
 - Lecture du concepteur, à valider : le joueur a choisi « un 2e palier écrit à la main » et « 3 fois » ; je lis
   « trois paliers écrits à la main ».
+- **Socle appliqué le 15/11/2026** (`docs/ameliorations.md`) : fiches `up`, `up2`, `up3` cumulées, instance
+  `up = false | 1..3`, nom « +2 » / « +3 », grille d'amélioration avec les cartes au plafond grisées « Fully
+  upgraded. », sauvegarde v7 / expédition v9, contrôle `lua5.1 Sim/upgrades.lua`. Aucune carte réelle n'a encore
+  de palier 2 ou 3 : simulation inchangée à graine égale.
 
 ## Or et marchands sur sept zones (décision du joueur du 15/11/2026)
 - **Constat** : une expédition traverse sept zones avec le même or, mais gains, prix et étal dataient d'une zone par

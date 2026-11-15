@@ -239,7 +239,7 @@ test("transformations : appliquées à l'affichage et en combat, défaites quand
   X.addCard(exp, "te_epic_a")
   local shown = X.shownDeck(exp)
   eq(#shown, #exp.deck)
-  eq(shown[1].id, "te_variant_ss"); eq(shown[1].up, true, "hérite de l'amélioration"); eq(shown[1].from, "sinister_strike")
+  eq(shown[1].id, "te_variant_ss"); eq(shown[1].up, 1, "hérite de l'amélioration"); eq(shown[1].from, "sinister_strike")
   eq(exp.deck[1].id, "sinister_strike", "le deck lui-même ne change pas")
   local feint
   for i, cd in ipairs(exp.deck) do if cd.id == "feint" then feint = i end end
@@ -419,7 +419,7 @@ test("feu de camp : l'épique s'améliore au choix ; les améliorations au hasar
   assert(X.act(exp, { "path", id }))
   assert(has(X.choices(exp), "upgrade", i), "épique proposée au feu de camp")
   assert(X.act(exp, { "upgrade", i }))
-  eq(exp.deck[i].up, true)
+  eq(exp.deck[i].up, 1)
 end)
 
 test("chute : un combat d'élite de rencontre compte aussi", function()
@@ -537,7 +537,7 @@ test("épique en combat : posée avant le premier tour, dans aucune pile, main d
     deck[6].up = true
     local c = Combat.new({ seed = seed, class = "rogue", hp = 50, deck = deck, encounter = { "te_dummy" } })
     assert(c.epic, "c.epic")
-    eq(c.epic.id, "te_passive"); eq(c.epic.up, true, "amélioration gardée")
+    eq(c.epic.id, "te_passive"); eq(c.epic.up, 1, "amélioration gardée")
     eq(#c.hand, 5, "la main de départ ne change pas")
     eq(#c.hand + #c.draw, #deck - 1, "l'épique n'est pas piochée")
     for _, inst in ipairs(allPiles(c)) do assert(inst.id ~= "te_passive", "épique dans une pile") end
@@ -786,7 +786,7 @@ test("sauvegarde : expédition v5 en cours migrée en v8, puis jouable (chute d'
   local out = Save.migrate(db)
   local m = out.current
   assert(m, "gardée")
-  eq(m.version, X.VERSION); eq(X.VERSION, 8); eq(m.epicOffered, nil); eq(m.startEpics, nil)
+  eq(m.version, X.VERSION); eq(X.VERSION, 9); eq(m.epicOffered, nil); eq(m.startEpics, nil)
   assert(Save.validate(out))
   withDrop({ 1 }, function()
     enter(m, "elite")

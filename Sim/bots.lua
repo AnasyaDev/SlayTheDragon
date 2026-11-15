@@ -138,7 +138,14 @@ return function(ns)
   -- DoT n ajouté à une pile : environ 2,5 tics de plus par point, à 0,8 (la cible meurt parfois avant)
   local function dotUnits(n) return n * 2.5 * 0.8 * W.enemyHp end
   local MANA = 6 * W.enemyHp -- un point de mana ≈ une carte de 6 dégâts
-  local function up(inst, a, b) return inst and inst.up and b or a end
+  -- valeur de base / améliorée d'un Power ; up(inst, a, b, c2, c3) : c2, c3 = paliers 2 et 3 (sinon b)
+  -- (docs/ameliorations.md : un palier 2 ou 3 d'un Power qui change sa valeur se déclare ici)
+  local function up(inst, a, b, c2, c3)
+    local n = inst and Card.level(inst) or 0
+    if n >= 3 and c3 then return c3 end
+    if n >= 2 and c2 then return c2 end
+    return n >= 1 and b or a
+  end
 
   Bots.POWER_VALUE = {
     -- Rogue
@@ -304,7 +311,7 @@ return function(ns)
     local ids = {}
     for i = 1, #c.hand do
       local h = c.hand[i]
-      ids[i] = h.up and (h.id .. "+") or h.id
+      ids[i] = h.id .. Card.suffix(h.up) -- palier compris (+, +2, +3)
     end
     table.sort(ids)
     parts[#parts + 1] = table.concat(ids, ",")
@@ -384,7 +391,7 @@ return function(ns)
       for i = 1, #acts do
         local a = acts[i]
         local inst = s.hand[a[1]]
-        local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
+        local key = inst.id .. Card.suffix(inst.up) .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
         if zb then
           for j = 1, #zb do
             if zb[j].skip and zb[j].skip(s, a) then tried[key] = true end
@@ -444,7 +451,7 @@ return function(ns)
     for _, i in ipairs(list) do
       local inst = c.hand[i]
       local d = Card.def(inst)
-      local v = (rating[inst.id] or 5) + (inst.up and 1 or 0) + 0.5 * (d.cost or 0)
+      local v = (rating[inst.id] or 5) + Card.level(inst) + 0.5 * (d.cost or 0)
       if charm and (d.cost or 0) >= 1 then v = v + 2 end
       if not best or v > best then best, bestUid = v, inst.uid end
     end
@@ -564,7 +571,7 @@ return function(ns)
     for i = 1, #acts do
       local a = acts[i]
       local inst = s.hand[a[1]]
-      local key = inst.id .. (inst.up and "+" or "") .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
+      local key = inst.id .. Card.suffix(inst.up) .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
       if zb then
         for j = 1, #zb do
           if zb[j].skip and zb[j].skip(s, a) then tried[key] = true end

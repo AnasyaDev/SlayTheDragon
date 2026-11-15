@@ -429,6 +429,12 @@ devant : l'épique n'était presque jamais améliorée). Tests : `Sim/tests_epic
   (`beaten` = { sa zone }) et compte tout de suite (`Save.migrate` appelle `Save.settle`). Tests « sauvegarde v7
   -> v8 » et « rechargement en plein milieu de la zone 3 et sur l'écran entre deux zones »
   (`Sim/tests_expedition.lua`), harnais U6 et UZ.
+- Version 7 (15/11/2026, paliers d'amélioration +1 à +3 ; expédition version 9 ; `docs/ameliorations.md`). Le champ
+  `up` d'une carte vaut `false` ou le palier 1..3 (`true` reste lu comme le palier 1). Méta 6 → 7
+  (`Save.MIGRATIONS[6]`) : decks du journal, `up = true` → 1. Expédition 8 → 9 (`Save.EXP_MIGRATIONS[8]`) : toute
+  table qui désigne une carte (deck, piles et Powers du combat en cours, épique du combat, marchand) passe de
+  `true` à 1 (`Save.normalizeUp`), `epicReplaced.oldUp` aussi ; `stats.upTiers` (améliorations par palier
+  atteint) = `{ stats.upgraded }`. Test « sauvegarde v6/expédition v8 -> v7/v9 » (`Sim/tests_expedition.lua`).
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
 - Journal : une entrée par expédition `{ result, class, zone (zone atteinte), beaten (boss battus), key, seed, act,
