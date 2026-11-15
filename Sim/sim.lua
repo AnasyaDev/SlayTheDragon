@@ -21,7 +21,10 @@
 --   nointerrupt=1 : monde témoin où les ennemis n'interrompent jamais
 --   sweep=cards [only=id,id] : mesure chaque carte de la réserve, ajoutée de force au deck de départ,
 --                 contre la même série sans elle (mêmes graines) ; sweep=relics de même ; only= accepte
---                 aussi des cartes hors réserve (neutres).
+--                 aussi des cartes hors réserve (neutres). up=N (sweep=cards) : chaque carte ajoutée à son
+--                 palier N (seulement les cartes dont ce palier est écrit ; épiques exclues dès N >= 1 ;
+--                 docs/ameliorations.md) : comparer up=1 et up=2 mesure le gain du palier 2.
+--   force=id+2 : carte forcée au palier 2 (id+ : palier 1 ; runner=expedition).
 --   oldstun=1 : ancienne règle de Stunned pendant le tour ennemi (l'action part, le tour suivant est perdu)
 --   hp=N : PV de départ de la classe remplacés (runner=expedition), pour mesurer l'effet des PV.
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
@@ -182,6 +185,15 @@ local function addRecord(agg, rec)
     end
   end
   agg.deckSize = (agg.deckSize or 0) + #(rec.deck or {})
+  -- améliorations par palier atteint, cartes du deck final par palier (runner=expedition)
+  if rec.upTiers then
+    agg.upTiers = agg.upTiers or { 0, 0, 0 }
+    agg.deckTiers = agg.deckTiers or { 0, 0, 0 }
+    for n = 1, 3 do
+      agg.upTiers[n] = agg.upTiers[n] + (rec.upTiers[n] or 0)
+      agg.deckTiers[n] = agg.deckTiers[n] + (rec.deckTiers[n] or 0)
+    end
+  end
   local seen = {}
   for _, card in ipairs(rec.deck or {}) do
     if not seen[card.id] then
@@ -329,6 +341,15 @@ if opts.sweep then
       if d.rarity == "epic" and d.class == (opts.class or "priest") and not d.variant then list[#list + 1] = id end
     end
   end
+  -- up=N : paliers mesurés (cartes dont le palier N est écrit, épiques exclues dès N >= 1)
+  local upN = tonumber(opts.up or 0) or 0
+  if opts.sweep == "cards" and upN > 0 then
+    local l2 = {}
+    for _, id in ipairs(list) do
+      if ns.Cards[id].rarity ~= "epic" and ns.Card.tiers(id) >= upN then l2[#l2 + 1] = id end
+    end
+    list = l2
+  end
   if opts.only then
     -- only=id,id : ne mesure que ces éléments, même hors de la réserve des récompenses (cartes neutres :
     -- only=rough_dynamite,heavy_silk_bandage…).
@@ -355,7 +376,7 @@ if opts.sweep then
       local s = a.kinds[k]
       parts[#parts + 1] = s and ("%5.1f/%4.1f"):format(s.turns / s.n, s.hpLost / s.n) or "     -    "
     end
-    local cs = a.cards[name]
+    local cs = a.cards[(name:gsub("%+%d*$", ""))] -- ligne d'un palier (up=N) : statistiques de la carte
     local use = cs and cs.drawn > 0 and ("%5.1f %%"):format(100 * cs.played / cs.drawn) or "   -   "
     return ("  %-22s %-9s %5.1f %%  %+6.1f   %s   %s"):format(name, rarity, 100 * a.wins / a.runs,
       100 * (a.wins - base.wins) / a.runs, table.concat(parts, "  "), use)
@@ -377,12 +398,12 @@ if opts.sweep then
     else
       local fl = {}
       for _, f in ipairs(force) do fl[#fl + 1] = f end
-      fl[#fl + 1] = id
+      fl[#fl + 1] = id .. ns.Card.suffix(upN)
       over.force = table.concat(fl, ",")
     end
     local a = runAll(over)
     local def = opts.sweep == "relics" and ns.Relics[id] or ns.Cards[id]
-    print(line(id, def.rarity, a))
+    print(line(id .. (opts.sweep == "cards" and ns.Card.suffix(upN) or ""), def.rarity, a))
     io.stdout:flush()
     rows[id] = { wins = a.wins, runs = a.runs }
   end
@@ -550,6 +571,11 @@ local function report(a, title)
       :format(a.goldEarned / a.runs, a.goldSpent / a.runs, a.goldEnd / a.runs, a.cleared / a.runs))
     out(("Cartes retirées : %.2f   améliorées : %.2f par expédition   deck en fin : %.1f cartes"):format(
       a.removed / a.runs, a.upgraded / a.runs, (a.deckSize or 0) / a.runs))
+    -- paliers d'amélioration (docs/ameliorations.md) : améliorations faites vers chaque palier, et cartes du
+    -- deck final à chaque palier, par expédition
+    local ut, dt = a.upTiers or { 0, 0, 0 }, a.deckTiers or { 0, 0, 0 }
+    out(("Améliorations par palier : +1 %.2f, +2 %.2f, +3 %.2f   deck en fin : +1 %.2f, +2 %.2f, +3 %.2f cartes")
+      :format(ut[1] / a.runs, ut[2] / a.runs, ut[3] / a.runs, dt[1] / a.runs, dt[2] / a.runs, dt[3] / a.runs))
     -- épique en fin d'expédition (gagnée sur un élite, achetée, ou imposée par epic=) ; victoires avec / sans
     local en, ew = a.epicEnd or 0, a.epicWins or 0
     out(("Épique en fin d'expédition : %s (améliorée : %s)   victoires avec épique %s, sans %s")

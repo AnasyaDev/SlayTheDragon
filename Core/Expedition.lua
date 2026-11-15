@@ -29,7 +29,9 @@ ns.Expedition = X
 -- 8 : une expédition traverse toute la campagne (décision du joueur, 14/11/2026) : exp.startZone, exp.lastZone,
 --     exp.beaten (boss battus), phase « transit » entre deux zones (exp.transit), exp.banked (ce que la méta a
 --     déjà reçu : Meta.bank) ; exp.act = rang de la zone dans l'expédition, exp.acts = nombre de zones.
-X.VERSION = 8
+-- 9 : paliers d'amélioration (décision du joueur, 15/11/2026) : up d'une carte = false ou palier 1..3 (true
+--     devient 1), stats.upTiers[n] = améliorations qui ont atteint le palier n (docs/ameliorations.md).
+X.VERSION = 9
 
 -- Entre deux zones : soin de cette part des PV max (sans dépasser le maximum ; crochet healOut des soins hors
 -- combat : Cursed Eye of Paleth le divise par deux). Lecture du concepteur de « soin partiel, 50 % des PV max ».
@@ -474,18 +476,39 @@ function X.addCard(exp, id, up)
       i = X.epicIndex(exp)
     end
   end
-  exp.deck[#exp.deck + 1] = { id = id, up = up and true or false }
+  -- up : palier gardé (copie d'une carte : dupe), true = palier 1 (carte offerte « améliorée » : rencontre
+  -- { "card", id, up = true }, marchand), borné aux paliers écrits de la carte
+  local n = math.min(Card.level(up), Card.tiers(id))
+  exp.deck[#exp.deck + 1] = { id = id, up = Card.upValue(n) }
   exp.stats.cardsAdded = exp.stats.cardsAdded + 1
 end
 
+-- Une carte du deck peut monter d'un palier : son palier suivant est écrit (Card.tiers) et elle est sous
+-- le palier 3 (docs/ameliorations.md).
 function X.canUpgrade(exp, i)
   local card = exp.deck[i]
-  return card ~= nil and not card.up and ns.Cards[card.id] ~= nil and ns.Cards[card.id].up ~= nil
+  return card ~= nil and ns.Cards[card.id] ~= nil and Card.canUp(card.id, card.up)
 end
 
+-- Raison du refus d'amélioration de la carte i : "maxed" (dernier palier écrit atteint), "noUpgrade" (carte
+-- sans amélioration), sinon "badCard".
+function X.upgradeRefusal(exp, i)
+  local card = exp.deck[i]
+  if not card or not ns.Cards[card.id] then return "badCard" end
+  if Card.tiers(card.id) == 0 then return "noUpgrade" end
+  if not Card.canUp(card.id, card.up) then return "maxed" end
+  return "badCard"
+end
+
+-- Monte la carte i d'un palier (stats.upgraded : toutes les améliorations ; stats.upTiers[n] : celles qui
+-- ont atteint le palier n).
 local function upgrade(exp, i)
-  exp.deck[i].up = true
+  local n = Card.level(exp.deck[i]) + 1
+  exp.deck[i].up = n
   exp.stats.upgraded = exp.stats.upgraded + 1
+  local t = exp.stats.upTiers or {}
+  exp.stats.upTiers = t
+  t[n] = (t[n] or 0) + 1
 end
 
 -- Soin hors combat (repos, rencontres, passage d'une zone à l'autre) : crochet healOut (v) des zones,
@@ -1406,7 +1429,7 @@ function X.new(opts)
       combat = Rng.stream(seed, "combat"),
     },
     stats = { cleared = 0, elites = 0, bosses = 0, combats = 0, goldEarned = 0, goldSpent = 0,
-      cardsAdded = 0, removed = 0, upgraded = 0, visits = {}, events = {} },
+      cardsAdded = 0, removed = 0, upgraded = 0, upTiers = {}, visits = {}, events = {} },
     combatStats = opts.stats and true or false,
     quiet = opts.quiet and true or false,
   }
@@ -1583,7 +1606,7 @@ H.campfire = {
     return true
   end,
   upgrade = function(exp, a)
-    if not X.canUpgrade(exp, a[2] or 0) then return false, "badCard" end
+    if not X.canUpgrade(exp, a[2] or 0) then return false, X.upgradeRefusal(exp, a[2] or 0) end
     upgrade(exp, a[2])
     leaveNode(exp)
     return true
@@ -1666,7 +1689,7 @@ H.select = {
     local i = a[2] or 0
     local kind = exp.select.kind
     if kind == "upgrade" then
-      if not X.canUpgrade(exp, i) then return false, "badCard" end
+      if not X.canUpgrade(exp, i) then return false, X.upgradeRefusal(exp, i) end
       upgrade(exp, i)
     elseif kind == "remove" then
       if not exp.deck[i] or #exp.deck <= 1 then return false, "badCard" end

@@ -257,7 +257,7 @@ test("feu de camp : repos 30 %, amélioration, Disette 20 %", function()
   local b = newExp()
   enter(b, "campfire")
   eq(X.act(b, { "upgrade", 1 }), true)
-  eq(b.deck[1].up, true)
+  eq(b.deck[1].up, 1) -- palier 1 (docs/ameliorations.md)
   local c = newExp()
   enter(c, "campfire")
   assert(not X.act(c, { "upgrade", 99 }))
@@ -1338,7 +1338,7 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 6); eq(Save.VERSION, 6); eq(X.VERSION, 8)
+  eq(note, "migrated"); eq(db.version, 7); eq(Save.VERSION, 7); eq(X.VERSION, 9)
   local m = db.current
   assert(m, "expédition gardée")
   eq(m.version, X.VERSION); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
@@ -2266,6 +2266,157 @@ test("récompenses de cartes : part de rares croissante par rang de zone (X.RARE
   X.cardWeights = orig
   assert(ok, err); eq(exp.phase, "merchant"); assert(seen.shop, "marchand : part de rares de la zone")
 end)
+
+---------------------------------------------------------------------------
+-- Paliers d'amélioration (décision du joueur du 15/11/2026, docs/ameliorations.md)
+---------------------------------------------------------------------------
+do
+  local Card = ns.Card
+  -- carte de test à trois paliers (+1 frappe plus fort, +2 coûte moins, +3 pioche en plus)
+  ns.Cards.tu_triple = { id = "tu_triple", name = "Triple Test", cost = 2, type = "attack", rarity = "common",
+    target = "enemy", effects = { { "damage", 4 } }, text = "Deal 4.",
+    up = { effects = { { "damage", 6 } }, text = "Deal 6." },
+    up2 = { cost = 1, text = "Deal 6." },
+    up3 = { effects = { { "damage", 6 }, { "draw", 1 } }, text = "Deal 6.\nDraw 1." } }
+  local function has(list, verb, arg)
+    for _, a in ipairs(list) do if a[1] == verb and a[2] == arg then return true end end
+    return false
+  end
+
+  test("paliers : feu de camp, +1 puis +2 puis +3, puis « maxed » ; carte réelle bloquée à +1", function()
+    for n = 1, 3 do
+      local exp = newExp()
+      exp.deck[1] = { id = "tu_triple", up = Card.upValue(n - 1) }
+      enter(exp, "campfire")
+      assert(has(X.choices(exp), "upgrade", 1), "améliorable au palier " .. (n - 1))
+      assert(X.act(exp, { "upgrade", 1 }))
+      eq(exp.deck[1].up, n, "palier " .. n)
+      eq(exp.stats.upgraded, 1); eq(exp.stats.upTiers[n], 1, "améliorations par palier")
+    end
+    local exp = newExp()
+    exp.deck[1] = { id = "tu_triple", up = 3 }
+    exp.deck[2].up = 1 -- carte réelle : palier 2 pas écrit
+    enter(exp, "campfire")
+    eq(X.canUpgrade(exp, 1), false); eq(X.canUpgrade(exp, 2), false)
+    assert(not has(X.choices(exp), "upgrade", 1) and not has(X.choices(exp), "upgrade", 2), "plafond : pas proposé")
+    local ok, why = X.act(exp, { "upgrade", 1 })
+    eq(ok, false); eq(why, "maxed")
+    ok, why = X.act(exp, { "upgrade", 2 })
+    eq(ok, false); eq(why, "maxed")
+    eq(X.upgradeRefusal(exp, 99), "badCard")
+    eq(exp.deck[1].up, 3)
+    assert(X.act(exp, { "upgrade", 3 }), "carte au palier 0 : améliorable")
+    eq(exp.deck[3].up, 1)
+  end)
+
+  test("paliers : upgradeRandom monte d'un palier, rien au plafond ; Whetstone-like (onRest) inchangé", function()
+    local exp = newExp()
+    for i = 1, #exp.deck do exp.deck[i].up = 1 end -- cartes réelles : toutes au plafond
+    exp.deck[#exp.deck + 1] = { id = "tu_triple", up = 1 }
+    eq(X.upgradeRandom(exp, 2, Rng.stream(3, "t")), 1, "une seule carte améliorable")
+    eq(exp.deck[#exp.deck].up, 2)
+    eq(X.upgradeRandom(exp, 1, Rng.stream(4, "t")), 1); eq(exp.deck[#exp.deck].up, 3)
+    eq(X.upgradeRandom(exp, 1, Rng.stream(5, "t")), 0, "tout au plafond")
+  end)
+
+  test("paliers : rencontres (upgrade au choix, carte offerte améliorée = palier 1, copie garde le palier)", function()
+    ns.Events.test_up = { name = "x", act = 1, tier = 0, text = "", speaker = "x", npc = "x", scene = "road",
+      choices = { { label = "a", outcome = "a", effects = { { "upgrade" } } },
+        { label = "b", outcome = "b", effects = { { "card", "tu_triple", up = true }, { "card", "smite", up = true } } },
+        { label = "c", outcome = "c", effects = { { "dupe" } } } } }
+    -- amélioration au choix : palier suivant ; carte au plafond refusée (« maxed »)
+    local exp = newExp()
+    exp.deck[1] = { id = "tu_triple", up = 2 }
+    exp.deck[2] = { id = "tu_triple", up = 3 }
+    forceEvent(exp, "test_up")
+    assert(X.act(exp, { "choose", 1 }))
+    eq(exp.phase, "select")
+    assert(not has(X.choices(exp), "select", 2), "carte au plafond : pas proposée")
+    local ok, why = X.act(exp, { "select", 2 })
+    eq(ok, false); eq(why, "maxed")
+    assert(X.act(exp, { "select", 1 }))
+    eq(exp.deck[1].up, 3)
+    -- rien à améliorer : réponse refusée
+    local full = newExp()
+    for i = 1, #full.deck do full.deck[i].up = 1 end
+    forceEvent(full, "test_up")
+    local okc, whyc = X.eventChoiceOk(full, 1)
+    eq(okc, false); eq(whyc, "upgrade")
+    -- carte offerte « améliorée » : palier 1 (même pour une carte à trois paliers)
+    local b = newExp()
+    forceEvent(b, "test_up")
+    assert(X.act(b, { "choose", 2 }))
+    eq(b.deck[#b.deck - 1].id, "tu_triple"); eq(b.deck[#b.deck - 1].up, 1); eq(b.deck[#b.deck].up, 1)
+    -- copie : même palier
+    local d = newExp()
+    d.deck[3] = { id = "tu_triple", up = 2 }
+    forceEvent(d, "test_up")
+    assert(X.act(d, { "choose", 3 }))
+    assert(X.act(d, { "select", 3 }))
+    eq(d.deck[#d.deck].id, "tu_triple"); eq(d.deck[#d.deck].up, 2, "copie au palier 2")
+    -- X.addCard : palier borné aux paliers écrits ; true = 1
+    X.addCard(d, "smite", 3); eq(d.deck[#d.deck].up, 1)
+    X.addCard(d, "smite", true); eq(d.deck[#d.deck].up, 1)
+    X.addCard(d, "tu_triple", 3); eq(d.deck[#d.deck].up, 3)
+    X.addCard(d, "smite", false); eq(d.deck[#d.deck].up, false)
+    ns.Events.test_up = nil
+  end)
+
+  test("paliers : combat de l'expédition au palier 3 (coût 1, pioche), deck jamais modifié", function()
+    local exp = newExp()
+    exp.deck[1] = { id = "tu_triple", up = 3 }
+    enter(exp, "combat")
+    local c = exp.combat
+    local inst
+    for _, pile in ipairs({ c.hand, c.draw }) do
+      for _, x in ipairs(pile) do if x.id == "tu_triple" then inst = x end end
+    end
+    assert(inst, "carte en jeu")
+    eq(inst.up, 3); eq(Combat.cost(c, inst), 1); eq(Card.def(inst).name, "Triple Test+3")
+    eq(exp.deck[1].up, 3)
+  end)
+
+  test("sauvegarde v6/expédition v8 -> v7/v9 : up = true devient 1 (deck, combat en cours, journal), idempotente", function()
+    local cur = newExp({ seed = 21, class = "rogue" })
+    cur.deck[1].up, cur.deck[2].up = true, true
+    enter(cur, "combat")
+    -- état d'avant les paliers : up = true partout (deck, piles du combat, épique remplacée, stats)
+    cur.version = 8
+    cur.stats.upTiers = nil
+    cur.stats.upgraded = 2
+    cur.epicReplaced = { old = "deflection", oldUp = true, new = "doomblade" }
+    for _, pile in ipairs({ cur.combat.hand, cur.combat.draw }) do
+      for _, x in ipairs(pile) do if x.up then x.up = true end end
+    end
+    cur.combat.hand[1].up = true
+    local v6 = { version = 6, meta = Meta.new(), current = cur,
+      journal = { { result = "lost", class = "priest", zone = "westfall", deck = { { id = "smite", up = true },
+        { id = "smite", up = false } } }, "bogus" } }
+    local db, note = Save.migrate(reload(v6))
+    eq(note, "migrated"); eq(db.version, 7); eq(Save.VERSION, 7); eq(X.VERSION, 9)
+    local x = db.current
+    assert(x, "expédition gardée")
+    eq(x.version, 9)
+    eq(x.deck[1].up, 1); eq(x.deck[2].up, 1); eq(x.deck[3].up, false)
+    eq(x.combat.hand[1].up, 1, "combat en cours : palier 1")
+    for _, pile in ipairs({ x.combat.hand, x.combat.draw, x.combat.discard }) do
+      for _, inst in ipairs(pile) do assert(inst.up ~= true, "plus de true dans les piles") end
+    end
+    eq(x.epicReplaced.oldUp, 1)
+    eq(x.stats.upTiers[1], 2, "améliorations déjà faites : palier 1")
+    eq(db.journal[1].deck[1].up, 1); eq(db.journal[1].deck[2].up, false); eq(db.journal[2], "bogus")
+    assert(Save.validate(db))
+    -- idempotente, puis jouable
+    local again = Save.migrate(reload(db))
+    eq(serialize(again), serialize(db))
+    assert(X.act(x, { "endTurn" }))
+    -- true encore posé par du code plus ancien (marchand…) : lu comme le palier 1
+    x.deck[4].up = true
+    eq(Card.level(x.deck[4]), 1); eq(X.canUpgrade(x, 4), false)
+  end)
+
+  ns.Cards.tu_triple = nil
+end
 
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end
