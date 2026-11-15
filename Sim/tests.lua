@@ -3188,5 +3188,136 @@ do
   ns.Cards.tu_single = nil
 end
 
+---------------------------------------------------------------------------
+-- Priest : paliers +2 et +3 (15/11/2026, docs/classes/priest-progression.md, « Paliers +2 et +3 »)
+---------------------------------------------------------------------------
+do
+  -- Combat du Prêtre, main = cartes (id, palier) dans l'ordre ; le reste (Smite) en pioche.
+  local function upSetup(list, encounter, opts)
+    opts = opts or {}
+    local deck = {}
+    for i, x in ipairs(list) do deck[i] = { id = x[1], up = Card.upValue(x[2]) } end
+    for _ = 1, opts.filler or 6 do deck[#deck + 1] = { id = "smite", up = false } end
+    local c = Combat.new({ seed = 7, class = "priest", hp = opts.hp or 60, maxHp = 60, deck = deck,
+      encounter = encounter or { "test_dummy" } })
+    local all = {}
+    for _, x in ipairs(c.hand) do all[#all + 1] = x end
+    for _, x in ipairs(c.draw) do all[#all + 1] = x end
+    c.hand, c.draw = {}, {}
+    local used = {}
+    for i = 1, #list do
+      for k, x in ipairs(all) do
+        if not used[k] and x.id == list[i][1] and Card.level(x) == list[i][2] then
+          used[k] = true
+          c.hand[#c.hand + 1] = x
+          break
+        end
+      end
+    end
+    for k, x in ipairs(all) do if not used[k] then c.draw[#c.draw + 1] = x end end
+    return c
+  end
+
+  test("Priest : 41 cartes à trois paliers ; coût jamais plus haut, baissé une fois au plus, jamais sous 0", function()
+    local n = 0
+    for id, d in pairs(ns.Cards) do
+      if d.class == "priest" then
+        n = n + 1
+        eq(Card.tiers(id), 3, id)
+        local drops, prev = 0, Card.defById(id, 0).cost
+        for t = 1, 3 do
+          local cost = Card.defById(id, t).cost
+          assert(cost <= prev and cost >= 0, id .. " +" .. t .. " : coût")
+          if cost < prev then drops = drops + 1 end
+          prev = cost
+        end
+        assert(drops <= 1, id .. " : coût baissé plus d'une fois")
+      end
+    end
+    eq(n, 41)
+  end)
+
+  test("Priest : Smite+3 frappe plus fort sous Atonement ; Inner Fire+3 pioche sous Atonement", function()
+    local c = upSetup({ { "smite", 3 }, { "smite", 3 } })
+    assert(Combat.play(c, 1, 1))
+    eq(c.enemies[1].hp, 100 - 13, "sans Atonement")
+    Combat.applyStatus(c, c.player, "atonement", 2)
+    assert(Combat.play(c, 1, 1))
+    eq(c.enemies[1].hp, 100 - 13 - 17, "Atonement : 4 de plus")
+    local f = upSetup({ { "inner_fire", 3 }, { "inner_fire", 3 } })
+    local h0 = #f.hand
+    assert(Combat.play(f, 1))
+    eq(f.player.block, 11); eq(#f.hand, h0 - 1, "sans Atonement : pas de pioche")
+    Combat.applyStatus(f, f.player, "atonement", 2)
+    assert(Combat.play(f, 1))
+    eq(f.player.block, 22); eq(#f.hand, h0 - 1, "Atonement : la carte jouée remplacée")
+  end)
+
+  test("Priest : coût réduit (Greater Heal+2, Renew+2, Rapture+2, Shadowform+3), le palier suivant le garde", function()
+    for _, x in ipairs({ { "greater_heal", 2 }, { "renew", 2 }, { "rapture", 2 }, { "shadowform", 3 } }) do
+      local c = upSetup({ { x[1], x[2] } })
+      eq(Combat.cost(c, c.hand[1]), 0, x[1] .. "+" .. x[2])
+      local base = upSetup({ { x[1], x[2] - 1 } })
+      eq(Combat.cost(base, base.hand[1]), 1, x[1] .. " au palier précédent")
+    end
+    eq(Card.defById("renew", 3).cost, 0); eq(Card.defById("rapture", 3).cost, 0)
+  end)
+
+  test("Priest : Retain (Silence+2) garde la carte en main ; Innate (Renew+3) dans la main de départ", function()
+    local c = upSetup({ { "silence", 2 }, { "silence", 1 } }, { "test_caster" })
+    Combat.endTurn(c)
+    local kept = 0
+    for _, x in ipairs(c.hand) do if x.id == "silence" then kept = kept + 1; eq(x.up, 2, "Silence+2 gardée") end end
+    eq(kept, 1, "seule Silence+2 reste en main")
+    for seed = 1, 6 do
+      local deck = { { id = "renew", up = 3 } }
+      for _ = 1, 14 do deck[#deck + 1] = { id = "smite", up = false } end
+      local k = Combat.new({ seed = seed, class = "priest", hp = 60, maxHp = 60, deck = deck, encounter = { "test_dummy" } })
+      assert(handIndex(k, "renew"), "Renew+3 en main de départ, graine " .. seed)
+    end
+  end)
+
+  test("Priest : Shadow Mend+3 sans DoT sur soi ; Devouring Plague+3 : DoT 4 + 3 par Insanity", function()
+    local c = upSetup({ { "shadow_mend", 3 } }, nil, { hp = 30 })
+    assert(Combat.play(c, 1))
+    eq(c.player.hp, 46); eq(c.player.st.pain, nil, "aucun DoT"); eq(c.player.res, 2, "+2 Insanity")
+    local d = upSetup({ { "devouring_plague", 3 } })
+    d.player.res = 3
+    assert(Combat.play(d, 1, 1))
+    eq(d.enemies[1].st.pain, 4 + 9)
+    local e = upSetup({ { "devouring_plague", 2 } })
+    e.player.res = 3
+    assert(Combat.play(e, 1, 1))
+    eq(e.enemies[1].st.pain, 9, "palier 2 : Retain seulement")
+  end)
+
+  test("Priest : Penance+3 (3 Absorb par coup sous Atonement), Halo+3 (Sundered à tous)", function()
+    local c = upSetup({ { "penance", 3 } })
+    Combat.applyStatus(c, c.player, "atonement", 2)
+    assert(Combat.play(c, 1, 1))
+    eq(c.enemies[1].hp, 100 - 24); eq(c.player.block, 9)
+    local h = upSetup({ { "halo", 3 } }, { "test_dummy", "test_dummy" })
+    assert(Combat.play(h, 1))
+    Combat.endTurn(h)
+    eq(h.enemies[1].hp, 100 - 29); eq(h.enemies[2].hp, 100 - 29)
+    assert((h.enemies[1].st.armor_broken or 0) > 0 and (h.enemies[2].st.armor_broken or 0) > 0, "Sundered à tous")
+  end)
+
+  test("Priest : Spirit of Redemption+3 pioche 2 au Last Breath ; +2 Innate", function()
+    local hands = {}
+    for n = 2, 3 do
+      local c = upSetup({ { "spirit_of_redemption", n } }, { "test_hitter" }, { filler = 12 })
+      assert(Combat.play(c, 1))
+      c.player.hp = 5
+      Combat.endTurn(c)
+      eq(c.result, nil)
+      eq(c.player.hp, 1 + 6)
+      hands[n] = #c.hand
+    end
+    eq(hands[3], hands[2] + 2, "2 cartes de plus en main au tour gratuit")
+    eq(Card.defById("spirit_of_redemption", 2).innate, true)
+  end)
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

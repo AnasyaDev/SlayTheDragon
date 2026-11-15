@@ -584,6 +584,87 @@ test("bots : note des épiques et conseils du deck piloté", function()
   eq(ns.SimExpedition.epicRating(exp, "misery"), 7)
 end)
 
+---------------------------------------------------------------------------
+-- Paliers +2 et +3 (15/11/2026, docs/ameliorations.md) : les crochets lisent Card.level(src)
+---------------------------------------------------------------------------
+test("paliers : chaque épique a ses paliers 2 et 3, tables { base, +1, +2, +3 } lues par Card.level", function()
+  for _, id in ipairs(P.EPICS) do
+    eq(Card.tiers(id), 3, id)
+    eq(Card.defById(id, 3).name, ns.Cards[id].name .. "+3")
+  end
+  eq(P.tier(P.MENDING_UP, { up = 3 }), 4); eq(P.tier(P.MENDING_UP, { up = true }), 2, "true = palier 1")
+  eq(P.tier(P.MENDING_UP, 2), 3); eq(P.tier(P.MENDING_UP, false), 0)
+  for _, t in ipairs({ P.MENDING_UP, P.MISERY_UP, P.ECHO_PLUS, P.COVENANT_HP, P.COVENANT_FREE, P.REFLECT_PCT,
+    P.VOID_BONUS, P.VOID_FLAT, P.FOCUS_SCALE }) do
+    eq(#t, 4, "quatre paliers")
+  end
+end)
+
+test("paliers : Prayer of Mending +3 (+4), Misery +2 (+2), Echo of Light +3 (+4)", function()
+  local c = setup({ "flash_heal" }, { hp = 50 })
+  epic(c, "prayer_of_mending", 3)
+  play(c, "flash_heal")
+  eq(c.enemies[1].hp, 100 - 7 - P.MENDING_UP[4], "7 rendus + 4")
+  local m = setup({ "sw_pain" }, { encounter = THREE })
+  epic(m, "misery", 2)
+  play(m, "sw_pain", 1)
+  eq(m.enemies[1].st.pain, 5); eq(m.enemies[2].st.pain, 5 + P.MISERY_UP[3]); eq(m.enemies[3].st.pain, 5 + P.MISERY_UP[3])
+  local e = setup({ "smite" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
+  epic(e, "echo_of_light", 3)
+  local r = e.player.st.regen
+  Combat.endTurn(e)
+  eq(e.enemies[1].hp, 100 - r - EP[4]); eq(e.enemies[2].hp, 100 - r - EP[4])
+end)
+
+test("paliers : Shadow Covenant +2 (1 PV par mana), +3 (deux cartes Shadow gratuites par tour)", function()
+  local c = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
+  epic(c, "shadow_covenant", 2)
+  play(c, "mind_blast", 1)
+  eq(c.player.hp, 50, "la première : gratuite")
+  play(c, "mind_flay", 1)
+  eq(c.player.hp, 50 - CH[3] * 1 - CS, "la deuxième : 1 PV par mana + 2")
+  local u = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
+  epic(u, "shadow_covenant", 3)
+  play(u, "mind_blast", 1)
+  play(u, "mind_flay", 1)
+  eq(u.player.hp, 50, "deux gratuites"); eq(u.player.mana, 3)
+  play(u, "sw_pain", 1)
+  eq(u.player.hp, 50 - CH[4] * 1 - 2 * CS, "la troisième paie (deux cartes Shadow déjà jouées)")
+end)
+
+test("paliers : Reflective Shield +2 (trois cinquièmes), +3 (deux tiers)", function()
+  for n = 2, 3 do
+    local c = setup({ "inner_fire", "inner_fire" }, { encounter = { "tp_hitter" } })
+    epic(c, "reflective_shield", n)
+    play(c, "inner_fire"); play(c, "inner_fire")
+    Combat.endTurn(c)
+    eq(c.enemies[1].hp, 100 - math.floor(10 * P.REFLECT_PCT[n + 1] + 1e-9), "10 absorbés, palier " .. n)
+  end
+end)
+
+test("paliers : Voidform +2 / +3 (dégâts fixes en plus par coup Shadow), Holy rien", function()
+  for n = 2, 3 do
+    local c = setup({ "mind_blast", "smite" })
+    epic(c, "voidform", n)
+    c.player.res = 7
+    play(c, "mind_blast", 1)
+    eq(c.enemies[1].hp, 100 - (10 + 2 * 7 + P.VOID_FLAT[n + 1]), "palier " .. n)
+    play(c, "smite", 1)
+    eq(c.enemies[1].hp, 100 - (10 + 2 * 7 + P.VOID_FLAT[n + 1]) - 8, "Holy : rien")
+  end
+end)
+
+test("paliers : Inner Focus +2 (× 2,25), +3 (× 2,5), arrondi au supérieur", function()
+  for n = 2, 3 do
+    local c = setup({ "smite" })
+    epic(c, "inner_focus", n)
+    play(c, "smite", 1)
+    Combat.endTurn(c)
+    eq(c.enemies[1].hp, 100 - math.ceil(8 * FS[n + 1] - 1e-9), "palier " .. n)
+  end
+  eq(FS[3], 2.25); eq(FS[4], 2.5)
+end)
+
 for _, id in ipairs({ "tp_dummy", "tp_hitter", "tp_twice", "tp_kicker" }) do E[id] = nil end
 
 print(("%d réussis, %d échoués"):format(passed, failed))
