@@ -1,6 +1,9 @@
 -- Tests de l'expédition, de la méta-progression et de la sauvegarde.
 -- Usage : lua5.1 Sim/tests_expedition.lua   (ou luajit) — doit finir par ALL PASS.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
+-- LuaJIT : grand cache de traces pour les campagnes simulées de la suite (sinon il se vide sans cesse ; sans
+-- effet sur les résultats ni sous Lua 5.1).
+if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
 local ns = dofile(root .. "/Sim/load.lua")(root)
 local X, Map, Meta, Save, Combat, Rng = ns.Expedition, ns.Map, ns.Meta, ns.Save, ns.Combat, ns.Rng
 -- PV de départ du Prêtre (classe des expéditions de test), lus dans les données : ils changent avec l'équilibrage
