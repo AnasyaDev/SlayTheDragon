@@ -134,7 +134,7 @@ Effects.interrupt = function(c, ctx, e)
   local list = e.all and Combat.aliveEnemies(c) or { ctx.target }
   for i = 1, #list do
     local t = list[i]
-    local mv = t and not t.dead and ns.Enemies[t.id].moves[t.intent]
+    local mv = t and not t.dead and ns.Combat.moveOf(t.id, t.intent)
     if mv and mv.cast and not t.interrupted then
       t.interrupted = true
       ctx.interrupted = (ctx.interrupted or 0) + 1 -- condition « interrupted »

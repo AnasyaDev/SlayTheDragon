@@ -583,7 +583,7 @@ harnais). Planches : `build/snap/zone-swamp*.svg`, `build/snap/decor-swamp_*.svg
 ### La règle telle que codée
 
 - Asleep (état d'ennemi, `ns.Statuses.asleep`, 4 au plus) : l'intention d'un dormeur est le move « asleep »
-  (ajouté à la définition de l'ennemi au besoin, aucune action) ; son ouverture (`opener`, ou celle de Slumber) est
+  (move du socle `Combat.MOVES`, lu par `Combat.moveOf`, jamais écrit dans la fiche de l'ennemi ; aucune action) ; son ouverture (`opener`, ou celle de Slumber) est
   annoncée en gris (« On waking: »). À son tour (crochet `enemyMove`) : soin de Slumber, compteur -1, réveil à 0 sans
   agir. Stunned : le moteur consomme le tour sans passer par `enemyMove`, le compteur gèle.
 - Réveil (`ns.Swamp.wake`) par tout dégât qui ne tue pas (`onEnemyDamaged`, Absorb compris), le compteur ou Alarm.

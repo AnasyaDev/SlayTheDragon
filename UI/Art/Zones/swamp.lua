@@ -123,7 +123,7 @@ end
 ---------------------------------------------------------------------------
 local function openerLine(c, e)
   local op = S.opener(e)
-  local mv = op and ns.Enemies[e.id].moves[op]
+  local mv = op and ns.Combat.moveOf(e.id, op)
   if not mv then return "No opener: it resumes its usual moves." end
   local dmg
   for _, a in ipairs(mv.actions) do

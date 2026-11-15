@@ -146,6 +146,11 @@ Zones actives dans un combat : celle de l'expédition (`c.zone`) puis celles qui
 figée). Ordre des crochets : classe, zones, cartes du deck à effet passif (épiques, `deckHooks`), Pouvoirs, bibelots, affixes. `c.zs[id]` et
 `e.zs[id]` (`ZR.unitState(e, id)`) : données simples, copiées en profondeur par `Combat.clone` (le bot clone
 les combats), sauvegardées. **Jamais de fonction ni de référence à une unité dans l'état** (uid seulement).
+**Les fiches sont immuables après le chargement** (`ns.Enemies`, `ns.Cards`, `ns.Relics`, `ns.Encounters`…) : aucune
+règle n'y écrit en cours d'expédition ou de combat (une trace resterait jusqu'au `/reload`, et en simulation pour
+les expéditions suivantes du lot) ; un move commun à tous les ennemis s'inscrit au chargement dans `Combat.MOVES`
+(« asleep » du marais), lu par `Combat.moveOf(id, move)` ; un état propre à l'unité va dans `e.zs` ou `e.mem`. Test :
+`Sim/tests_expedition.lua`, « fiches immuables ».
 Les mêmes noms de crochets servent aux bibelots (`relic.hooks`) et aux Pouvoirs : un bibelot de clé d'une zone
 s'abonne aux mêmes événements. Moment du round : `c.step` = `turnStart`, `play`, `turnEnd`, `enemy`, `roundEnd` ;
 genre du combat : `c.kind` (`combat`, `elite`, `boss`).
@@ -208,6 +213,7 @@ cible (faux : « to all », DoT) ; `ctx` (carte en cours), `effect`, `src`.
 | `Combat.transformCard(c, inst, id, { src })` / `Combat.restoreCard(c, inst)` | Hex : remplacée sur place (main, pioche, défausse), carte d'origine dans `inst.orig` ; rendue en main |
 | effets `{ "restore" }`, `{ "restoreAll", id = "hexed" }`, `{ "addCard", id, to, n }` | idem, depuis une carte |
 | champs de carte `token`, `vanish`, `endOfTurn = { effets }`, `unplayable`, `retain`, `exhaust`, `payHp` | cartes de combat (Curse : `token`, `exhaust`, `endOfTurn` ; Hexed : `token`, `vanish`, `{ "restore" }`) |
+| `Combat.moveOf(id, move)`, `Combat.MOVES[move] = { … }` (au chargement) | définition d'un move : celui de la fiche, sinon un move du socle connu de tout ennemi |
 | `Combat.forceIntent(c, e, move, { now, label })` | intention imposée (tout de suite pendant le jeu, sinon la prochaine ; `label` = « On waking ») |
 | `Combat.enterPhase(c, e, k)`, `Combat.phaseMarks(e)`, `Combat.enemyName(e)` | phases |
 | `Combat.spawn(c, spec, by)`, `Combat.enemyAction(c, e, action)`, `Combat.enemyBase(c, e, a)`, `Combat.enemyTest` | ennemis |
@@ -370,7 +376,7 @@ commun est au palier 3 ou moins (Duskwood, Wetlands) ; les zones 4 à 7 sont dé
 
 | Besoin | Crochet / aide |
 | --- | --- |
-| 1. état `asleep` (définition ou groupe), `opener` | `ns.Statuses.asleep` ; spec `{ id, st = { asleep = 3 } }` ou `init` qui lit `def.asleep` ; `Combat.forceIntent(c, e, def.opener, { now = false, label = "On waking" })` |
+| 1. état `asleep` (définition ou groupe), `opener` | `ns.Statuses.asleep` ; move « asleep » du socle (`Combat.MOVES`, jamais écrit dans la fiche) ; spec `{ id, st = { asleep = 3 } }` ou `init` qui lit `def.asleep` ; `Combat.forceIntent(c, e, def.opener, { now = false, label = "On waking" })` |
 | 2. tour d'un dormeur (Stunned : compteur gelé ; mend) | `enemyMove` → false + baisse ; Stunned : le moteur consomme le tour sans appeler `enemyMove` (`onEnemyStunned`) |
 | 3. `wake` (ouverture, pas d'action dans la phase en cours) | aide de la zone : retirer l'état, `forceIntent` ; `enemyMove` → false si réveillé pendant cette phase |
 | 4. Rude Awakening ×1,5 (une cible, pas le DoT), réveil même absorbé, pas sur un coup mortel | `enemyDamageLast` (`src.single`, `src.kind ~= "dot"`) ; `onEnemyDamaged` |
