@@ -437,6 +437,8 @@ D.neutralCard("greater_fire_protection_potion", {
   exhaust = true, effects = { { "douse", 3 }, { "absorb", 6 } },
   text = "Douse 3.\nGain 6 Absorb.\nExhaust.",
   up = { effects = { { "douse", 3 }, { "absorb", 9 } }, text = "Douse 3.\nGain 9 Absorb.\nExhaust." },
+  up2 = { effects = { { "douse", 3 }, { "absorb", 11 } }, text = "Douse 3.\nGain 11 Absorb.\nExhaust." },
+  up3 = { retain = true, text = "Douse 3.\nGain 11 Absorb.\nExhaust.\nRetain." },
 })
 
 D.neutralCard("thorium_grenade", {
@@ -444,6 +446,9 @@ D.neutralCard("thorium_grenade", {
   exhaust = true, effects = { { "damage", 10, all = true } },
   text = "Deal 10 to all.\nExhaust.",
   up = { effects = { { "damage", 13, all = true } }, text = "Deal 13 to all.\nExhaust." },
+  up2 = { effects = { { "damage", 15, all = true } }, text = "Deal 15 to all.\nExhaust." },
+  up3 = { effects = { { "damage", 15, all = true }, { "apply", "armor_broken", 1, all = true } },
+    text = "Deal 15 to all.\nApply Sundered 1 ⌛ to all\nExhaust." },
 })
 
 -- Bibelots communs

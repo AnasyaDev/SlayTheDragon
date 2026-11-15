@@ -244,6 +244,8 @@ D.neutralCard("dream_dust", {
   target = "enemy", exhaust = true, effects = { { "apply", "asleep", 2 } },
   text = "Apply Asleep 2 ⌛\nExhaust.",
   up = { cost = 0, text = "Apply Asleep 2 ⌛\nExhaust." },
+  up2 = { effects = { { "apply", "asleep", 3 } }, text = "Apply Asleep 3 ⌛\nExhaust." },
+  up3 = { retain = true, text = "Apply Asleep 3 ⌛\nExhaust.\nRetain." },
 })
 
 -- « End your turn » de la fiche : aucun effet ne termine le tour depuis une carte ; « Lose all mana. » en
@@ -254,6 +256,9 @@ D.neutralCard("dreamless_sleep_potion", {
   text = "Heal 10.\nLose all mana.\nExhaust.",
   up = { effects = { { "heal", 14 }, { "fn", function(c) c.player.mana = 0 end } },
     text = "Heal 14.\nLose all mana.\nExhaust." },
+  up2 = { effects = { { "heal", 16 }, { "fn", function(c) c.player.mana = 0 end } },
+    text = "Heal 16.\nLose all mana.\nExhaust." },
+  up3 = { retain = true, text = "Heal 16.\nLose all mana.\nExhaust.\nRetain." },
 })
 
 -- The first attack each enemy makes against you deals 3 less (premier coup de chaque ennemi).
