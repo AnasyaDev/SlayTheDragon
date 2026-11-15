@@ -2643,7 +2643,7 @@ do
     assert(X.act(x, { "endTurn" }))
     -- true encore posé par du code plus ancien (marchand…) : lu comme le palier 1
     x.deck[4].up = true
-    eq(Card.level(x.deck[4]), 1); eq(X.canUpgrade(x, 4), false)
+    eq(Card.level(x.deck[4]), 1); eq(X.canUpgrade(x, 4), Card.canUp(x.deck[4].id, 1), "palier 2 écrit ou non")
   end)
 
   ns.Cards.tu_triple = nil

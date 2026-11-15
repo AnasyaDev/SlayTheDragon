@@ -927,3 +927,16 @@ abordables par visite tout débloqué (3,6 à 4,4 au compte neuf, étals sans bi
 victoire inchangés à ± 4 points. Hors cible : 18 à 25 points du gagné tombent après le dernier marchand visité (≈ 0,6
 marchand par zone), ce que les prix ne changent pas ; pistes (marchand entre deux zones, pas d'or sur Nefarian) dans
 `docs/expedition.md`.
+
+## Rogue : paliers +2 et +3 des cartes (15/11/2026)
+
+Les 35 cartes du Voleur et ses 7 épiques ont un palier 2 et un palier 3 écrits à la main (tableau :
+`docs/classes/rogue.md`, § 11). Paliers **non mesurés carte par carte** : les balayages `sweep=cards up=2/3` ont été
+abandonnés (consigne du coordinateur : trop coûteux à six classes en parallèle). Campagne, bot `human`, clé 0,
+`zones=7 level=7`, 600 expéditions, avant → après : victoires 63,2 → 62,8 % (± 3,9, inchangé) ; améliorations par
+expédition +1 3,44 → 3,33, +2 0 → 0,14, +3 0 → 0 (le bot monte d'abord de nouvelles cartes au +1 : les paliers 2 et
+3 comptent peu pour lui). Écart « vict. avec / sans » des cartes : aucun saut hors du bruit (Nightblade +8, Crippling
+Poison +5, le reste à ± 4 points). Compte neuf avant (`zones=0 level=1`) : 21,3 %. À surveiller quand les paliers
+seront mesurés : Killing Spree +2 (coût 2 → 1), Adrenaline Rush +3 (+3 mana, Draw 3), Echoing Reprimand +3
+(Animacharge 6), Danse Macabre +3 (Flourish 5, multiplié par coup), Kidney Shot +2/+3 (Combo rendus), Shadow Dance
++3 (+1 Combo par tour), Premeditation +3 (carte à 0, +3 Combo sous Stealth).
