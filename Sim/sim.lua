@@ -36,8 +36,18 @@ local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 -- LuaJIT : plus de traces et de code machine que les réglages par défaut (1000 traces, 512 Ko) ; le
 -- moteur, les bots et les règles de zone en demandent plus, sinon le cache de traces se vide sans cesse
--- (environ deux fois plus lent). Sans effet sur les résultats.
-if jit and jit.opt then pcall(jit.opt.start, "maxtrace=4000", "maxmcode=8192") end
+-- (environ deux fois plus lent). Une campagne crée ≈ 340 traces : 4 000 traces et 8 Mo se vidaient toutes
+-- les 10 à 15 campagnes (tout recompiler, 15 à 35 % du temps dans le compilateur) ; un processus de 75
+-- campagnes (runs=600 jobs=8) en crée ≈ 25 000. Plafond de LuaJIT (65 535 traces) et 256 Mo réservés : aucun
+-- vidage avant ≈ 190 campagnes par processus, ≈ 110 Mo de mémoire par processus à 75 campagnes, ≈ 25 % de
+-- CPU en moins (15/11/2026). Sans effet sur les résultats.
+if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
+-- SIMJIT="opt=… opt=…" : réglages du compilateur essayés sans toucher au fichier (mesures)
+if jit and jit.opt and os.getenv("SIMJIT") then
+  local t = {}
+  for o in os.getenv("SIMJIT"):gmatch("%S+") do t[#t + 1] = o end
+  jit.opt.start(unpack(t))
+end
 
 local opts = {}
 for _, a in ipairs(arg or {}) do
