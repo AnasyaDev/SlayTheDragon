@@ -119,7 +119,7 @@ test("textes : les nombres de Warrior.EPIC (carte et à-côté de ses mots de r�
     if demo > 0 then has("thunderous_roar", up, "apply Demoralized " .. demo .. " ⌛ to all")
     else hasNot("thunderous_roar", up, "Demoralized") end
     local tg = N("sweeping_strikes", "targets", up)
-    has("sweeping_strikes", up, "Targeted Attack hits: Sweep " .. tg .. ".")
+    has("sweeping_strikes", up, (N("sweeping_strikes", "anyAttack", up) and "\nAttacks: Sweep " or "Targeted Attack hits: Sweep ") .. tg .. ".")
     has("sweeping_strikes", up, tg == 1 and "Also hit another random enemy" or ("Also hit " .. tg .. " other random enemies"))
     has("sweeping_strikes", up, "for a third of the HP")
     eq(tonumber(kills("sweeping_strikes", up, "%+") or 0), N("sweeping_strikes", "killRage", up), "Sweeping Strikes" .. lab(up))
@@ -138,20 +138,16 @@ test("textes : les nombres de Warrior.EPIC (carte et à-côté de ses mots de r�
     has("anger_management", up, "Each Rage spent: Haste " .. st .. ".")
     has("anger_management", up, "return " .. st .. " turn" .. (st > 1 and "s" or "") .. " sooner")
     has("anger_management", up, "Spend and Surge cards go on Cooldown " .. E.anger_management.give .. ", not to the discard")
-    eq(tonumber(kills("anger_management", up, "%+") or 0), N("anger_management", "killRage", up), "Anger Management" .. lab(up))
     local g = N("avatar", "gain", up)
     has("avatar", up, "Start of turn: Juggernaut " .. g .. ".")
     has("avatar", up, "Gain " .. g .. " Rage. Rage goes up to " .. E.avatar.cap .. ",")
     has("avatar", up, "at " .. E.avatar.cap .. " Rage Attacks deal " .. E.avatar.bonus .. " more.")
-    eq(tonumber(kills("avatar", up, "heal") or 0), N("avatar", "killHeal", up), "Avatar" .. lab(up))
   end
   eq(N("death_wish", "mult"), 1.5)
   eq(E.sweeping_strikes.div, 3)
   eq(E.titans_grip.copies, 1, "« resolve twice »")
-  for _, up in ipairs({ 1, 2, 3 }) do
-    has("titans_grip", up, "Dual Wield " .. E.titans_grip.limit .. ", 0-cost free.")
-    has("titans_grip", up, "0-cost ones skip the cost and limit.")
-  end
+  has("titans_grip", 1, "Dual Wield " .. E.titans_grip.limit .. ", 0-cost free.")
+  for _, up in ipairs({ 1, 2, 3 }) do has("titans_grip", up, "0-cost ones skip the cost and limit.") end
   eq(Warrior.TITAN_REASON, ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or ""))
   eq(E.shield_charge.div, 4)
   eq(E.anger_management.per, 1)
@@ -634,17 +630,14 @@ local function killOne(id, up)
   return c
 end
 
-test("paliers : « Kills: » (Death Wish 3 / 5, Sweeping Strikes +1 / +2 Rage, Titan's Grip 4 / 6, Anger Management +1 Rage, Avatar 3)", function()
+test("paliers : « Kills: » (Death Wish 3 / 5, Sweeping Strikes+3 +1 Rage, Titan's Grip 4 / 6)", function()
   for _, up in ipairs({ false, 1, 2, 3 }) do
     local lv = Card.level(up)
     eq(killOne("death_wish", up).player.hp, 40 + ({ 0, 3, 5, 5 })[lv + 1], "Death Wish+" .. lv)
-    eq(killOne("sweeping_strikes", up).player.res, 1 + ({ 0, 0, 1, 2 })[lv + 1], "Sweeping Strikes+" .. lv .. " : Rage")
+    eq(killOne("sweeping_strikes", up).player.res, 1 + ({ 0, 0, 0, 1 })[lv + 1], "Sweeping Strikes+" .. lv .. " : Rage")
     local tg = killOne("titans_grip", up)
     eq(tg.player.hp, 40 + ({ 0, 0, 4, 6 })[lv + 1], "Titan's Grip+" .. lv)
     eq(tg.player.res, 1, "Titan's Grip : Rage une fois par carte")
-    eq(killOne("anger_management", up).player.res, 1 + ({ 0, 0, 1, 1 })[lv + 1], "Anger Management+" .. lv)
-    local av = killOne("avatar", up)
-    eq(av.player.hp, 40 + ({ 0, 0, 0, 3 })[lv + 1], "Avatar+" .. lv)
   end
   -- dernier ennemi : soigné aussi (comme Death Wish), le soin compte pour la suite de l'expédition
   local c2 = setup({ "strike" }, { epic = "titans_grip", up = 3, hp = 40 })
@@ -653,7 +646,7 @@ test("paliers : « Kills: » (Death Wish 3 / 5, Sweeping Strikes +1 / +2 Rage, T
   eq(c2.result, "won"); eq(c2.player.hp, 46)
 end)
 
-test("paliers : Death Wish+3 Carnage 60 % ; Thunderous Roar 5 / 6 ; Shield Charge +6 / +8 ; Avatar +4 Rage", function()
+test("paliers : Death Wish+3 Carnage 60 % ; Thunderous Roar 5 / 6 ; Shield Charge +6 / +8 ; Avatar +4 / +5 Rage", function()
   for _, up in ipairs({ 2, 3 }) do
     local c = setup({ "strike" }, { epic = "death_wish", up = up })
     Combat.applyStatus(c, c.player, "force", 4)
@@ -671,12 +664,22 @@ test("paliers : Death Wish+3 Carnage 60 % ; Thunderous Roar 5 / 6 ; Shield Charg
     Combat.endPlayerTurn(s)
     eq(h - s.enemies[1].hp, math.floor(5 / 4) + (up == 3 and 8 or 6), "Punish +" .. (up == 3 and 8 or 6))
     local a = setup({ "strike" }, { epic = "avatar", up = up })
-    eq(a.player.res, 4, "Juggernaut 4"); Combat.endTurn(a); eq(a.player.res, 8)
+    eq(a.player.res, up + 2, "Juggernaut " .. (up + 2)); Combat.endTurn(a); eq(a.player.res, 2 * (up + 2))
   end
 end)
 
-test("paliers : Anger Management+3 Haste 3 (Shield Wall revient après une seule Rage), +2 Haste 2", function()
-  for _, up in ipairs({ 2, 3 }) do
+test("paliers : Sweeping Strikes+2 « Attack hits » : les Attacks à tous rebondissent aussi ; +1 non", function()
+  for _, up in ipairs({ 1, 2, 3 }) do
+    local c = setup({ "whirlwind" }, { epic = "sweeping_strikes", up = up, encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
+    local hp = c.enemies[1].hp
+    assert(play(c, "whirlwind"))
+    -- 4 deux fois à chacun ; palier 2+ : chaque coup (4 PV) rebondit d'un tiers (1) sur les deux autres
+    eq(hp - c.enemies[1].hp, up >= 2 and 12 or 8, "Whirlwind, Sweeping Strikes+" .. up)
+  end
+end)
+
+test("paliers : Anger Management Haste 3 / 4 (Shield Wall revient après une seule Rage), +1 Haste 2", function()
+  for _, up in ipairs({ 1, 2, 3 }) do
     local c = setup({ "shield_wall", "heroic_strike" }, { epic = "anger_management", up = up })
     c.player.mana = 9
     assert(play(c, "shield_wall"))
@@ -688,7 +691,7 @@ test("paliers : Anger Management+3 Haste 3 (Shield Wall revient après une seule
     c.hand[#c.hand + 1] = Card.new("ignore_pain", false, 802)
     assert(play(c, "ignore_pain")) -- Surge 1 : 2 ou 3 crans
     local back = idx(c, "shield_wall") ~= nil
-    eq(back, up == 3, "Shield Wall (recharge 3) revenue au palier 3 seulement")
+    eq(back, up >= 2, "Shield Wall (recharge 3) revenue dès Haste 3")
   end
 end)
 

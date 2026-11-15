@@ -52,8 +52,10 @@ plus une fois ; les Powers gagnent un coût à 0 puis Innate (rien de multiplié
 
 ## Épiques
 
-Une épique tient en deux lignes de texte : Death Wish (déjà deux lignes au +1) ne change que ses nombres ; les
-autres gagnent au plus une ligne « Kills: » (déclencheur déjà employé par Death Wish). L'à-côté d'un mot de règle n'a
+Une épique tient en deux lignes de texte **à chaque palier** (contrôle renforcé du harnais, 15/11/2026) : Death Wish,
+Thunderous Roar, Shield Charge, Anger Management et Avatar ne changent que leurs nombres ; Titan's Grip retire
+« , 0-cost free » de sa carte aux paliers 2 et 3 (la règle reste dans l'à-côté de Dual Wield) pour une ligne
+« Kills: » ; Sweeping Strikes passe de « Targeted Attack hits: » à « Attacks: » (déclencheur déjà déclaré par le socle ; « Attack hits: Sweep 2. » prenait deux lignes à lui seul). L'à-côté d'un mot de règle n'a
 qu'un texte amélioré (`L.ruleText`) : les nombres qui changent aux paliers 2 et 3 passent par le nombre de la carte
 (`N`) ; Haste dit désormais « return N turns sooner » une fois amélioré.
 
@@ -61,11 +63,11 @@ qu'un texte amélioré (`L.ruleText`) : les nombres qui changent aux paliers 2 e
 |---|---|---|---|
 | Death Wish | Kills : soin 3 | soin 5 | Carnage 60 % |
 | Thunderous Roar | Shockwave 4 (+ Demoralized 1) | Shockwave 5 | Shockwave 6 |
-| Sweeping Strikes | Sweep 2 | Kills : +1 Rage | Kills : +2 Rage |
-| Titan's Grip | 0-cost free | Kills : soin 4 | soin 6 |
+| Sweeping Strikes | Sweep 2 | « Attacks: Sweep 2. » (les Attacks à tous rebondissent aussi) | Kills : +1 Rage |
+| Titan's Grip | 0-cost free | Kills : soin 4 (texte « Dual Wield 2. ») | soin 6 |
 | Shield Charge | Punish +4 | +6 | +8 |
-| Anger Management | Haste 2 | Kills : +1 Rage | Haste 3 |
-| Avatar | Juggernaut 3 | Juggernaut 4 | Kills : soin 3 |
+| Anger Management | Haste 2 | Haste 3 | Haste 4 |
+| Avatar | Juggernaut 3 | Juggernaut 4 | Juggernaut 5 |
 
 ## Mesures (15/11/2026)
 
@@ -85,4 +87,5 @@ presque jamais le palier 2 ; l'effet des paliers 2 et 3 sur la campagne n'est do
 
 À surveiller si le joueur monte souvent ses cartes : Revenge+3 (11 à tous pour 0 après un coup reçu), Battle Shout+3
 (Strength 3 gratuite en main de départ), Deep Wounds+3 et Retaliation+3 (Power gratuit en main de départ),
-Death Wish+3 (Carnage 60 %), Avatar+2 (+4 Rage par tour).
+Death Wish+3 (Carnage 60 %), Avatar+2 et +3 (+4 et +5 Rage par tour), Sweeping Strikes+2 (les
+Attacks à tous rebondissent : Cleave, Whirlwind, Bladestorm gagnent jusqu’aux deux tiers de leurs dégâts à trois ennemis).
