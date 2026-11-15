@@ -536,13 +536,18 @@ end)
 epic("echoing_reprimand", "stranglethorn", "combat", "Echoing Reprimand", function(k)
   return "Surge cards: Animacharge " .. n("echoing_reprimand", k) .. "."
 end)
+-- Paliers 2 et 3 de Subterfuge et Kidney Shot : l'ajout tient en deux lignes (harnais, « textes des 35 épiques ») :
+-- « Surge cards: Shroud 3, Parry 1. » ; « Surge of 4+: Gouge, +1 Combo. » (déclencheur court, kidneyShort).
+local function kidneyShort(k) return ("Surge of %d+"):format(k) end
+ns.RogueKidneyShort = kidneyShort
 epic("subterfuge", "swamp", "subtlety", "Subterfuge", function(k)
   local p = EPIC_N.subterfugeParry[k]
-  return "Surge cards: Shroud " .. n("subterfugeTurns", k) .. (p > 0 and (", gain Parry " .. p) or "") .. "."
+  return "Surge cards: Shroud " .. n("subterfugeTurns", k) .. (p > 0 and (", Parry " .. p) or "") .. "."
 end)
 epic("kidney_shot", "steppes", "subtlety", "Kidney Shot", function(k)
   local r = EPIC_N.kidneyCombo[k]
-  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": Gouge" .. (r > 0 and (", +" .. r .. " Combo") or "") .. "."
+  if r > 0 then return kidneyShort(EPIC_N.kidney_shot[k]) .. ": Gouge, +" .. r .. " Combo." end
+  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": Gouge."
 end)
 epic("danse_macabre", "blackrock", "subtlety", "Danse Macabre", function(k)
   return "Attack hits: Flourish " .. n("danse_macabre", k) .. "."
