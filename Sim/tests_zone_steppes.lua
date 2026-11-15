@@ -489,4 +489,18 @@ return function(T)
     local rec, exp = ns.SimExpedition.play({ seed = 4, class = "rogue", zone = "steppes", zones = 5, level = 7, bot = "greedy" })
     eq(exp.phase, "done"); eq(exp.zone, "steppes")
   end)
+
+  test("paliers neutres : Thorium Grenade +3 pose Sundered 1 à tous ; Fire Protection Potion +2 11 Absorb, +3 Retain", function()
+    local c = combat({ enemies = { "zt_dummy", "zt_dummy" }, hand = { "thorium_grenade" } })
+    c.hand[1].up = 3
+    play(c, "thorium_grenade")
+    eq(c.enemies[1].hp, 35); eq(c.enemies[2].hp, 35)
+    eq(c.enemies[1].st.armor_broken, 1); eq(c.enemies[2].st.armor_broken, 1)
+    local d = combat({ hand = { "greater_fire_protection_potion" } })
+    d.hand[1].up = 2
+    play(d, "greater_fire_protection_potion")
+    eq(d.player.block, 11)
+    eq(ns.Card.defById("greater_fire_protection_potion", 3).retain, true)
+  end)
+
 end
