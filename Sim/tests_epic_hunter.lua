@@ -559,7 +559,7 @@ test("Lone Wolf : deck de l'expédition montré transformé (amélioration gard�
   exp.deck[1].up = true
   local shown = X.shownDeck(exp)
   eq(exp.deck[1].id, "arcane_shot")
-  eq(shown[1].id, "chimaera_shot"); eq(shown[1].up, true); eq(shown[1].from, "arcane_shot")
+  eq(shown[1].id, "chimaera_shot"); eq(shown[1].up, 1); eq(shown[1].from, "arcane_shot")
   for i, cd in ipairs(shown) do
     if exp.deck[i].id == "disengage" then eq(cd.id, "disengage") end
   end

@@ -17,8 +17,9 @@ ns.Save = Save
 -- version 5 : exp.zone, unlock.common, unlock.won). Expéditions version 6 (cartes épiques) et 7 (l'épique se
 -- gagne) sans changement de la méta : Save.VERSION reste 5, l'expédition en cours passe par EXP_MIGRATIONS[5]
 -- puis [6]. 6 : une expédition traverse toute la campagne (clé par classe cs.keyMax / cs.bestKey, zone la plus
--- loin atteinte cs.farthest ; expédition version 8).
-Save.VERSION = 6
+-- loin atteinte cs.farthest ; expédition version 8). 7 : paliers d'amélioration (une carte jusqu'à +3 ; up
+-- d'une carte du journal : true devient 1 ; expédition version 9).
+Save.VERSION = 7
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -155,6 +156,31 @@ Save.MIGRATIONS[5] = function(db)
   end
 end
 
+-- Palier d'amélioration des cartes (décision du joueur du 15/11/2026, docs/ameliorations.md) : le champ up
+-- d'une carte valait true ou false, il vaut false ou le palier 1..3. Toute table qui désigne une carte connue
+-- ({ id, up } : deck, piles et Powers d'un combat en cours, épique du combat, marchand, journal) passe de
+-- up = true à up = 1 ; exp.epicReplaced.oldUp aussi. Idempotent ; true reste lu comme le palier 1 partout
+-- (Card.level), la migration ne fait que rendre la forme canonique.
+function Save.normalizeUp(t, seen)
+  if type(t) ~= "table" then return end
+  seen = seen or {}
+  if seen[t] then return end
+  seen[t] = true
+  if t.up == true and type(t.id) == "string" and ns.Cards[t.id] then t.up = 1 end
+  if t.oldUp == true then t.oldUp = 1 end
+  for _, v in pairs(t) do
+    if type(v) == "table" then Save.normalizeUp(v, seen) end
+  end
+end
+
+-- 6 -> 7 : paliers d'amélioration : decks du journal (Save.normalizeUp).
+Save.MIGRATIONS[6] = function(db)
+  Save.normalize(db)
+  for _, e in ipairs(db.journal) do
+    if type(e) == "table" then Save.normalizeUp(e.deck) end
+  end
+end
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp, db) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
@@ -239,6 +265,16 @@ Save.EXP_MIGRATIONS[7] = function(exp)
     if exp.phase == "reward" and type(exp.reward) == "table" and exp.reward.kind == "boss" then
       exp.beaten[1] = zone
     end
+  end
+end
+
+-- Expédition 8 -> 9 : paliers d'amélioration. Toute carte améliorée (deck, combat en cours, marchand,
+-- récompense) passe de up = true à up = 1 (Save.normalizeUp) ; stats.upTiers[1] = améliorations déjà faites.
+Save.EXP_MIGRATIONS[8] = function(exp)
+  Save.normalizeUp(exp)
+  if type(exp.stats) == "table" and type(exp.stats.upTiers) ~= "table" then
+    local n = tonumber(exp.stats.upgraded) or 0
+    exp.stats.upTiers = n > 0 and { n } or {}
   end
 end
 

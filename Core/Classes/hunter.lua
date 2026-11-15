@@ -216,7 +216,7 @@ end
 -- c.cls.epic = { id, up } (vue de classe, bots) et la sort de la pioche si elle y est encore (une épique
 -- n'est ni piochée ni jouée ; sans effet quand le socle la pose déjà hors des piles).
 function Hunter.epicStart(c, src)
-  c.cls.epic = { id = src.id, up = src.up and true or false }
+  c.cls.epic = { id = src.id, up = ns.Card.upValue(src.up) }
   for i = #c.draw, 1, -1 do
     if c.draw[i].uid == src.uid then table.remove(c.draw, i) break end
   end
