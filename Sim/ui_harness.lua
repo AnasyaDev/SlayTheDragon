@@ -1854,7 +1854,7 @@ check("aperçu « Upgraded »", table.concat(tt, " "):find("Upgraded:", 1, true)
 local cardId = UI().current.cardOptions[1].id
 H.click(UI().current.cards[1])
 local idx = tonumber(cardId:match("%d+"))
-check("carte améliorée, retour à la carte", exp.deck[idx].up == true and currentKind() == "map", currentKind())
+check("carte améliorée, retour à la carte", exp.deck[idx].up == 1 and currentKind() == "map", currentKind())
 
 print("U11 rencontre : texte, choix, résultat")
 exp = freshRun(SEED + 4, "event")
@@ -2945,11 +2945,11 @@ do
   local tiers = {}
   local function d_text(t) return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("\n", " / ")) end
   for _, id in ipairs(ids) do
-    for _, up in ipairs({ false, true }) do
+    for up = 0, ns.Card.tiers(id) do -- tous les paliers écrits (docs/ameliorations.md)
       for vi, var in ipairs(variants) do
         cases = cases + 1
         card:SetCard(id, up, var.opts)
-        local label = id .. (up and "+" or "") .. var.key
+        local label = id .. ns.Card.suffix(up) .. var.key
         local fit = card.bodyFit
         local fs = card.body
         -- blocs du texte (un seul, ou un par clause avec l'écart entre clauses) : chacun vérifié
@@ -5862,11 +5862,11 @@ do
     for _, sc in ipairs(SCREENS) do
       holder:SetScale(sc[2])
       for _, id in ipairs(ids) do
-        for _, up in ipairs({ false, true }) do
+        for up = 0, ns.Card.tiers(id) do -- tous les paliers écrits
           for _, var in ipairs(VARS) do
             card:SetCard(id, up, var[2])
             cases = cases + 1
-            cardBad(card, ("%s%s%s, fenêtre %.2f, %s"):format(id, up and "+" or "", var[1], ws, sc[1]), bad)
+            cardBad(card, ("%s%s%s, fenêtre %.2f, %s"):format(id, ns.Card.suffix(up), var[1], ws, sc[1]), bad)
           end
         end
       end
@@ -9600,7 +9600,7 @@ do
     if inst.id == "ue_variant" then varCard = dv.cards[i] end
   end
   check("deck : variante affichée, améliorée comme la Smite d'origine, infobulle « Transformed Smite. »",
-    varCard and varCard.cardUp == true and table.concat(H.hover(varCard), " | "):find("Transformed Smite.", 1, true))
+    varCard and varCard.cardUp == 1 and table.concat(H.hover(varCard), " | "):find("Transformed Smite.", 1, true))
   dv:Close()
   clickOption("leave")
   H.advance(2)
@@ -10077,7 +10077,7 @@ do
   for i, inst in ipairs(dv.list) do
     if inst.id == "chimaera_shot" then
       nVar = nVar + 1
-      if inst.up then upOk = dv.cards[i].cardUp == true tip = table.concat(H.hover(dv.cards[i]), " | ") end
+      if inst.up then upOk = dv.cards[i].cardUp == 1 tip = table.concat(H.hover(dv.cards[i]), " | ") end
     end
     if inst.id == "arcane_shot" then nVar = -99 end
   end
@@ -11108,7 +11108,7 @@ do
   local wasUp = idx and e.deck[idx].up
   local ok, why = H.mouseClick(card)
   check("carte de la 3e rangée cliquée à la souris : c'est la carte du deck affichée qui est améliorée",
-    ok and idx and idx > 16 and card.cardId == shownCard.id and not wasUp and e.deck[idx].up == true
+    ok and idx and idx > 16 and card.cardId == shownCard.id and not wasUp and e.deck[idx].up == 1
     and currentKind() ~= "select", tostring(why) .. " " .. tostring(oid) .. " " .. tostring(currentKind()))
 
   -- 2. feu de camp (méditation) et 3. marchand (retrait) : même grille, même défilement
@@ -11145,7 +11145,7 @@ do
     ok, why = H.mouseClick(card)
     local done
     if case[3] == "upgrade" then
-      done = inst and inst.up == true and #e.deck == n
+      done = inst and inst.up == 1 and #e.deck == n
     else
       done = #e.deck == n - 1
       for _, c in ipairs(e.deck) do if c == inst then done = false end end
@@ -11184,7 +11184,7 @@ do
       local card = s.cards[i]
       if not (card and vis(card) and card.option) then why[#why + 1] = i .. " absente"
       else
-        if (card.cardUp or false) ~= (it.up or false) then why[#why + 1] = it.id .. " amélioration affichée" end
+        if (not card.cardUp) ~= (not it.up) then why[#why + 1] = it.id .. " amélioration affichée" end
         if (card.tag and card.tag.text._text) ~= tostring(it.price) then why[#why + 1] = it.id .. " prix" end
         if it.up then upCard = upCard or card elseif not it.epic then plainCard = plainCard or card end
       end
@@ -11202,8 +11202,98 @@ do
     local cid = e.shop.cards[i].id
     clickOption(o.id)
     check(zone .. " : carte améliorée achetée, au deck améliorée, marquée vendue",
-      #e.deck == n + 1 and e.deck[#e.deck].id == cid and e.deck[#e.deck].up == true and option(o.id).sold)
+      #e.deck == n + 1 and e.deck[#e.deck].id == cid and e.deck[#e.deck].up == 1 and option(o.id).sold)
   end
+end
+
+print("UUP paliers d'amélioration : nom +2 / +3 sur le ruban, aperçu du palier suivant, carte au plafond grisée, infobulle, deck")
+do
+  local e = freshRun(SEED + 61, "campfire") -- (recharge l'addon : H.ns lu après)
+  local ns = H.ns
+  local Card, W = ns.Card, ns.Widgets
+  -- paliers 2 et 3 de test posés sur Smite le temps de la section (aucune carte réelle n'en a encore)
+  local smite = ns.Cards.smite
+  smite.up2 = { effects = { { "damage", 13 } }, text = "Deal 13." }
+  smite.up3 = { cost = 0, text = "Deal 13." }
+  Card.clearCache()
+  e.deck = { { id = "smite", up = false }, { id = "smite", up = 1 }, { id = "smite", up = 2 }, { id = "smite", up = 3 },
+    { id = "pw_shield", up = 1 }, { id = "pw_shield", up = false } }
+  UI().refresh()
+  clickOption("ui:upgrade")
+  local s = UI().current
+  local o = s.cardOptions
+  check("méditation : toutes les cartes du deck montrées, celles au plafond grisées « Fully upgraded. »",
+    currentKind() == "deck" and #o == 6 and not o[1].disabled and not o[2].disabled and not o[3].disabled
+    and o[4].disabled and o[4].reason == "Fully upgraded." and o[5].disabled and o[5].reason == "Fully upgraded."
+    and not o[6].disabled and not o[4].preview, #o .. " " .. tostring(o[4] and o[4].reason))
+  local function cardFor(i)
+    for _, c in ipairs(s.cards) do if c._shown and c.option == o[i] then return c end end
+  end
+  local names = {}
+  for i = 1, 4 do names[i] = cardFor(i) and cardFor(i).name._text end
+  check("noms : Smite, Smite+, Smite+2, Smite+3 (vert dès le palier 1)",
+    names[1] == "Smite" and names[2] == "Smite+" and names[3] == "Smite+2" and names[4] == "Smite+3"
+    and cardFor(3).name._calls.SetTextColor[1] < 0.6 and cardFor(1).name._calls.SetTextColor[1] > 0.9,
+    table.concat(names, ", "))
+  check("plaque de raison « Fully upgraded. » sur la carte au plafond", cardFor(4).reasonPlate
+    and cardFor(4).reasonPlate._shown and cardFor(4).reasonPlate.text._text == "Fully upgraded.")
+  -- survol : la carte montre son palier suivant (nom, coût, texte), l'infobulle le décrit
+  local c2 = cardFor(2)
+  run(c2, "OnEnter")
+  local shown2 = { name = c2.name._text, body = W.cardBodyText(c2) or "" }
+  run(c2, "OnLeave")
+  check("survol de Smite+ : aperçu de Smite+2 (Deal 13, 13 en vert)", shown2.name == "Smite+2"
+    and shown2.body:find("13", 1, true) and shown2.body:find("7dff7d", 1, true), shown2.name .. " / " .. shown2.body)
+  local tt = table.concat(H.hover(c2), " | ")
+  local plain = tt:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+  check("infobulle de Smite+ : « Upgraded+2: » puis le texte du palier 2 (13 en vert)", plain:find("Upgraded+2:", 1, true)
+    and plain:find("Deal 13.", 1, true) and tt:find("7dff7d13", 1, true), tt)
+  local c3 = cardFor(3)
+  run(c3, "OnEnter")
+  local cost3 = c3.cost._text
+  local name3 = c3.name._text
+  run(c3, "OnLeave")
+  check("survol de Smite+2 : aperçu de Smite+3 (coût 0)", name3 == "Smite+3" and cost3 == "0", name3 .. " " .. tostring(cost3))
+  local c4 = cardFor(4)
+  run(c4, "OnEnter")
+  local name4 = c4.name._text
+  run(c4, "OnLeave")
+  tt = table.concat(H.hover(c4), " | ")
+  check("carte au plafond : survol sans aperçu, raison dans l'infobulle", name4 == "Smite+3"
+    and not tt:find("Upgraded", 1, true) and tt:find("Fully upgraded.", 1, true), name4 .. " / " .. tt)
+  snap("amelioration-paliers", true)
+  H.click(c4)
+  check("clic sur la carte au plafond : rien ne change", currentKind() == "deck" and e.deck[4].up == 3)
+  H.click(cardFor(3))
+  check("Smite+2 améliorée : palier 3, retour à la carte", e.deck[3].up == 3 and currentKind() == "map", currentKind())
+  -- deck : noms et ordre (palier croissant à nom égal)
+  local tip = {}
+  UI().fillDeckTooltip({ AddLine = function(_, l) tip[#tip + 1] = l end })
+  tip = table.concat(tip, " | ")
+  check("infobulle du deck : Smite+3 compté deux fois", tip:find("2 × Smite+3", 1, true), tip)
+  smite.up2, smite.up3 = nil, nil
+  Card.clearCache()
+
+  -- tous les noms tiennent sur le ruban au palier 3 (« Elixir of Superior Defense+3 ») : paliers fictifs
+  local card = W.card(UI().content)
+  local bad = {}
+  local n = 0
+  for id, d in pairs(ns.Cards) do
+    local u2, u3 = d.up2, d.up3
+    d.up2 = u2 or { text = (d.up and d.up.text or d.text) .. " " }
+    d.up3 = u3 or { text = d.up2.text .. " " }
+    Card.clearCache()
+    card:SetCard(id, 3, { playable = true })
+    n = n + 1
+    if not card.nameFit.ok or card.name:IsTruncated() or card.name._text ~= d.name .. "+3" then
+      bad[#bad + 1] = card.name._text
+    end
+    d.up2, d.up3 = u2, u3
+  end
+  Card.clearCache()
+  card:Hide()
+  check(("noms au palier 3 : les %d cartes tiennent sur le ruban (une ligne, taille de repli comprise)"):format(n),
+    #bad == 0, table.concat(bad, ", "))
 end
 
 print("U16 méthodes d'API inconnues appelées")
