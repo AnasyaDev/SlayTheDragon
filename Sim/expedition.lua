@@ -509,11 +509,31 @@ return function(ns)
     return v + best, route
   end
 
+  -- Politique d'amélioration (H.upfocus, 0..1 ; Bots.HUMAN_RANGE) : 0 = il étale (note du palier visé, × 0,8
+  -- puis × 0,6 : une carte neuve passe d'ordinaire devant) ; 1 = il concentre : il monte d'abord ses meilleures
+  -- cartes jusqu'au plafond avant d'en améliorer d'autres (épique du deck en tête, puis la carte la plus montée,
+  -- puis la meilleure note sans la décote des paliers) ; entre les deux, chaque choix concentre avec la chance
+  -- upfocus et étale sinon (un tirage du flux « human » de plus, seulement quand 0 < upfocus < 1).
+  -- SE.UPFOCUS_LEVEL : poids d'un palier déjà atteint (au-dessus de l'écart des notes, ≈ 0 à 14, et du bruit).
+  SE.UPFOCUS_LEVEL = 20
+  local function focusValue(exp, i, ei)
+    local card = exp.deck[i]
+    local up = botOf(exp).upgrade
+    local v = advised("upgrade", card.id) or up and up[card.id] or rating(card.id)
+    if type(v) == "table" then local n = Card.level(card) + 1 v = v[n] or v[#v] or 0 end
+    local lvl = Card.level(card) + (i == ei and Card.MAX_UP + 1 or 0)
+    return v + SE.UPFOCUS_LEVEL * lvl
+  end
+
   local function humanUpgrade(exp, H, hrng)
     local best, bestV
+    local f = H.upfocus or 0
+    local focus = f >= 1 or (f > 0 and Rng.float(hrng) < f)
+    local ei = focus and X.epicIndex(exp)
     for i = 1, #exp.deck do
       if X.canUpgrade(exp, i) then
-        local v = upgradeValue(exp, exp.deck[i]) + H.upNoise * Bots.gauss(hrng)
+        local v = focus and focusValue(exp, i, ei) or upgradeValue(exp, exp.deck[i])
+        v = v + H.upNoise * Bots.gauss(hrng)
         if not bestV or v > bestV then best, bestV = i, v end
       end
     end

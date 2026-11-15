@@ -533,6 +533,8 @@ return function(ns)
     pickNoise = { 3, 1.65, 0.3 }, rareBonus = { 2, 1, 0 }, newBonus = { 1.5, 0.75, 0 }, takeMin = { 2, 3.5, 5 },
     pathDepth = { 1, 5, 8 }, pathNoise = { 1.5, 0.8, 0.1 }, replan = { 0, 0.5, 1 }, daring = { 0.3, 0.15, 0 },
     restAt = { 0.3, 0.4, 0.5 }, upNoise = { 3, 1.65, 0.3 }, removeRate = { 0, 0.5, 1 }, eventNoise = { 2, 1.1, 0.2 },
+    -- politique d'amélioration (Sim/expedition.lua, humanUpgrade) : 0 = étale (défaut), 1 = concentre jusqu'à +3
+    upfocus = { 0, 0, 0 },
   }
   Bots.HUMAN_INT = { width = true, depth = true, pathDepth = true }
 
