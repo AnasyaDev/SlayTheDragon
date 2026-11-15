@@ -3269,10 +3269,14 @@ do
     Combat.play(g3, 2, 1); Combat.play(g3, 2, 1) -- deux incantations : emplacements pleins
     eq(Combat.castCount(g3), 2)
     assert(Combat.play(g3, 1, 1), "Glacial Spike+3 jouable emplacements pleins")
-    eq(g3.enemies[1].hp, 100 - 36, "36 tout de suite"); eq(g3.enemies[1].st.demoralized, 2)
+    eq(g3.enemies[1].hp, 100 - 32, "32 tout de suite"); eq(g3.enemies[1].st.demoralized, 2)
     local b = mageAt("blizzard", 3, {}, { "test_dummy", "test_dummy" })
     Combat.play(b, 1)
-    eq(Combat.castCount(b), 0); eq(b.enemies[1].hp, 100 - 18); eq(b.enemies[2].hp, 100 - 18)
+    eq(Combat.castCount(b), 0); eq(b.enemies[1].hp, 100 - 15); eq(b.enemies[2].hp, 100 - 15)
+    -- +2 : Retain, encore en Cast
+    local r = mageAt("blizzard", 2)
+    Combat.endTurn(r)
+    assert(handIndex(r, "blizzard"), "Blizzard+2 gardée en main")
   end)
 
   test("Mage, paliers : Fireball+3 donne Instant 1 à sa résolution, la Fireball suivante part tout de suite", function()
@@ -3281,19 +3285,19 @@ do
     Combat.play(c, 1, 1)
     eq(c.player.st.instant, nil, "rien au jeu")
     Combat.endTurn(c)
-    eq(c.enemies[1].hp, 100 - 17); eq(c.player.st.instant, 1, "Instant à la résolution")
+    eq(c.enemies[1].hp, 100 - 16); eq(c.player.st.instant, 1, "Instant à la résolution")
     table.insert(c.hand, 1, Card.new("fireball", 3, 993))
     Combat.play(c, 1, 1)
     eq(Combat.castCount(c), 0, "partie tout de suite"); eq(c.player.st.instant, 1, "Instant consommé puis regagné")
-    eq(c.enemies[1].hp, 100 - 34, "deux Fireball (le DoT n'a pas encore compté)")
+    eq(c.enemies[1].hp, 100 - 32, "deux Fireball (le DoT n'a pas encore compté)")
   end)
 
-  test("Mage, paliers : Arcane Explosion+3 coûte 0 ; Fire Blast+3 Cooldown 1 ; Presence of Mind+3 +2 Charge, Retain, Cooldown inchangé", function()
+  test("Mage, paliers : Arcane Explosion+3 et Mana Shield+3 Retain ; Fire Blast+3 Cooldown 1 ; Presence of Mind+3 +2 Charge, Retain, Cooldown inchangé", function()
     local c = mageAt("arcane_explosion", 3)
-    c.player.mana = 0
-    eq(Combat.cost(c, c.hand[1]), 0)
-    assert(Combat.play(c, 1), "jouée sans mana")
-    eq(c.enemies[1].hp, 100 - 8); eq(c.player.res, 1)
+    c.hand[2] = Card.new("mana_shield", 3, 994)
+    eq(Combat.cost(c, c.hand[1]), 1, "coût inchangé")
+    Combat.endTurn(c)
+    assert(handIndex(c, "arcane_explosion") and handIndex(c, "mana_shield") and #c.hand == 7, "gardées en main")
     eq(Card.defById("fire_blast", 3).cooldown, 1); eq(Card.defById("fire_blast", 2).cooldown, 2)
     for up = 2, 3 do -- Cooldown 1 : de retour un tour plus tôt que Cooldown 2
       local f = mageAt("fire_blast", up)

@@ -32,9 +32,9 @@ card("fireball", {
   target = "enemy", cast = true, effects = { { "damage", 10 }, { "apply", "pain", 2, icon = "burn" } },
   text = "Cast.\nDeal 10.\nApply DoT 2",
   up = { effects = { { "damage", 14 }, { "apply", "pain", 3, icon = "burn" } }, text = "Cast.\nDeal 14.\nApply DoT 3" },
-  up2 = { effects = { { "damage", 17 }, { "apply", "pain", 3, icon = "burn" } }, text = "Cast.\nDeal 17.\nApply DoT 3" },
-  up3 = { effects = { { "damage", 17 }, { "apply", "pain", 3, icon = "burn" }, { "apply", "instant", 1, self = true } },
-    text = "Cast.\nDeal 17.\nApply DoT 3\nGain Instant 1" },
+  up2 = { effects = { { "damage", 16 }, { "apply", "pain", 3, icon = "burn" } }, text = "Cast.\nDeal 16.\nApply DoT 3" },
+  up3 = { effects = { { "damage", 16 }, { "apply", "pain", 3, icon = "burn" }, { "apply", "instant", 1, self = true } },
+    text = "Cast.\nDeal 16.\nApply DoT 3\nGain Instant 1" },
 })
 
 card("frostbolt", {
@@ -52,7 +52,7 @@ card("mana_shield", {
   text = "Gain 5 Absorb.",
   up = { effects = { { "absorb", 8 } }, text = "Gain 8 Absorb." },
   up2 = { effects = { { "absorb", 10 } }, text = "Gain 10 Absorb." },
-  up3 = { effects = { { "absorb", 10 }, { "res", 1 } }, text = "Gain 10 Absorb.\n+1 Charge." },
+  up3 = { retain = true, text = "Gain 10 Absorb.\nRetain." },
 })
 
 card("arcane_blast", {
@@ -61,7 +61,7 @@ card("arcane_blast", {
   text = "Deal 6.\n+1 Charge.",
   up = { effects = { { "damage", 9 }, { "res", 1 } }, text = "Deal 9.\n+1 Charge." },
   up2 = { effects = { { "damage", 11 }, { "res", 1 } }, text = "Deal 11.\n+1 Charge." },
-  up3 = { effects = { { "damage", 11 }, { "res", 2 } }, text = "Deal 11.\n+2 Charge." },
+  up3 = { effects = { { "damage", 13 }, { "res", 1 } }, text = "Deal 13.\n+1 Charge." },
 })
 
 -- Fire : les petites cartes Fire remplissent le compte du tour, l'Instant fait partir les gros Cast ----
@@ -264,9 +264,8 @@ card("blizzard", {
   text = "Cast.\nDeal 12 to all.\nApply Demoralized 2 ⌛ to all",
   up = { effects = { { "damage", 15, all = true }, { "apply", "demoralized", 2, all = true } },
     text = "Cast.\nDeal 15 to all.\nApply Demoralized 2 ⌛ to all" },
-  up2 = { effects = { { "damage", 18, all = true }, { "apply", "demoralized", 2, all = true } },
-    text = "Cast.\nDeal 18 to all.\nApply Demoralized 2 ⌛ to all" },
-  up3 = { cast = false, text = "Deal 18 to all.\nApply Demoralized 2 ⌛ to all" },
+  up2 = { retain = true, text = "Cast.\nDeal 15 to all.\nApply Demoralized 2 ⌛ to all\nRetain." },
+  up3 = { cast = false, text = "Deal 15 to all.\nApply Demoralized 2 ⌛ to all\nRetain." },
 })
 
 card("glacial_spike", {
@@ -274,8 +273,8 @@ card("glacial_spike", {
   target = "enemy", cast = true, effects = { { "damage", 26 }, { "apply", "demoralized", 2 } },
   text = "Cast.\nDeal 26.\nApply Demoralized 2 ⌛",
   up = { effects = { { "damage", 32 }, { "apply", "demoralized", 2 } }, text = "Cast.\nDeal 32.\nApply Demoralized 2 ⌛" },
-  up2 = { effects = { { "damage", 36 }, { "apply", "demoralized", 2 } }, text = "Cast.\nDeal 36.\nApply Demoralized 2 ⌛" },
-  up3 = { cast = false, text = "Deal 36.\nApply Demoralized 2 ⌛" },
+  up2 = { retain = true, text = "Cast.\nDeal 32.\nApply Demoralized 2 ⌛\nRetain." },
+  up3 = { cast = false, text = "Deal 32.\nApply Demoralized 2 ⌛\nRetain." },
 })
 
 -- Ice Block : Last Breath ; PV remis à 0 puis soignés de 10 (Combat.heal), état Ice Block (aucun dégât
@@ -354,7 +353,7 @@ card("arcane_explosion", {
   text = "Deal 4 to all.\n+1 Charge.",
   up = { effects = { { "damage", 6, all = true }, { "res", 1 } }, text = "Deal 6 to all.\n+1 Charge." },
   up2 = { effects = { { "damage", 8, all = true }, { "res", 1 } }, text = "Deal 8 to all.\n+1 Charge." },
-  up3 = { cost = 0, text = "Deal 8 to all.\n+1 Charge." },
+  up3 = { retain = true, text = "Deal 8 to all.\n+1 Charge.\nRetain." },
 })
 
 card("prismatic_barrier", {

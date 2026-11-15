@@ -927,3 +927,18 @@ abordables par visite tout débloqué (3,6 à 4,4 au compte neuf, étals sans bi
 victoire inchangés à ± 4 points. Hors cible : 18 à 25 points du gagné tombent après le dernier marchand visité (≈ 0,6
 marchand par zone), ce que les prix ne changent pas ; pistes (marchand entre deux zones, pas d'or sur Nefarian) dans
 `docs/expedition.md`.
+
+## Paliers +2 et +3 du Mage (15/11/2026)
+
+Les 34 cartes et les 7 épiques du Mage ont leurs paliers 2 et 3 écrits à la main (tableau : `docs/classes/mage.md`, § 8 ;
+règles : `docs/ameliorations.md`). Campagne complète, bot `human`, clé 0, tout débloqué, 600 expéditions : victoires
+74,8 % → 74,8 % ; améliorations par expédition 4,06 → 4,04, dont +1 3,90, +2 0,14, +3 0,00 (le bot préfère presque
+toujours une nouvelle carte au +1) ; aucun écart anormal dans le tableau des cartes (« vict. sans » à ± 6 points). Les
+paliers **n'ont pas été mesurés carte par carte** (balayages arrêtés sur consigne) : un balayage partiel au bot
+`human` (11 cartes, `up=1` à 300 expéditions contre `up=3` à 200, ± 9 points sur l'écart) a fait adoucir les paliers
+3 nettement au-dessus du +1 : Glacial Spike et Blizzard (+16 / +18 points avec +2 chiffré puis sans Cast → +2 Retain,
++3 sans Cast), Arcane Explosion+3 à 0 mana (+18 → Retain), Mana Shield+3 +1 Charge (+14 → Retain), Arcane Blast+3
++2 Charge (→ Deal 13), Fireball+2 17 → 16. Après retouche, Arcane Blast+3 et Mana Shield+3 restaient hauts au
+balayage (78 et 81 % contre 67 et 70 % au +1) : une carte imposée au +3 vaut deux améliorations gratuites ; à
+surveiller quand le bot montera plus souvent au +2. Ice Block+3 (Innate), Combustion+3, Presence of Mind+3 et Fire
+Blast+3 : écart sous le gain du +1.
