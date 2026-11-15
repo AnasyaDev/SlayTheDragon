@@ -2406,49 +2406,65 @@ function Combat.new(opts)
 end
 
 local copyArr, copyMap = U.copyArr, U.copyMap
+
+-- Copies des unités et du combat : un constructeur qui nomme les champs habituels (table créée à sa taille
+-- d'un coup, sans les agrandissements successifs d'une copie clé par clé : environ quatre fois plus rapide
+-- sous LuaJIT), puis une boucle qui reprend tel quel tout autre champ (posé par une classe, une zone…). Les
+-- sous-tables copiées le sont dans le constructeur ; la boucle ne touche qu'aux champs encore absents.
 local function copyUnit(u)
-  local r = copyMap(u)
-  r.st = copyMap(u.st)
-  r.fresh = copyMap(u.fresh)
-  if u.mem then r.mem = copyMap(u.mem) end
-  if u.flags then r.flags = copyMap(u.flags) end
-  if u.powers then r.powers = copyArr(u.powers) end
-  if u.potions then r.potions = copyArr(u.potions) end
-  if u.castMore then r.castMore = copyArr(u.castMore) end
-  if u.powerTurns then r.powerTurns = copyMap(u.powerTurns) end
-  if u.stIcon then r.stIcon = copyMap(u.stIcon) end
-  if u.zs then r.zs = U.copy(u.zs) end -- état de zone propre à l'unité (copie profonde)
+  local r = {
+    side = u.side, hp = u.hp, maxHp = u.maxHp, block = u.block,
+    st = copyMap(u.st), fresh = copyMap(u.fresh),
+    mem = u.mem and copyMap(u.mem) or nil,
+    flags = u.flags and copyMap(u.flags) or nil,
+    powers = u.powers and copyArr(u.powers) or nil,
+    potions = u.potions and copyArr(u.potions) or nil,
+    castMore = u.castMore and copyArr(u.castMore) or nil,
+    powerTurns = u.powerTurns and copyMap(u.powerTurns) or nil,
+    stIcon = u.stIcon and copyMap(u.stIcon) or nil,
+    zs = u.zs and U.copy(u.zs) or nil, -- état de zone propre à l'unité (copie profonde)
+    uid = u.uid, id = u.id, intent = u.intent, dead = u.dead, boss = u.boss, minion = u.minion,
+    interrupted = u.interrupted, mana = u.mana, res = u.res, cast = u.cast, lastTarget = u.lastTarget,
+  }
+  for k, v in pairs(u) do
+    if r[k] == nil then r[k] = v end
+  end
   return r
 end
 
 -- Copie rapide pour la recherche des bots : les instances de cartes sont partagées
 -- (jamais modifiées), le journal et les statistiques ne sont pas copiés.
 function Combat.clone(c)
-  local n = copyMap(c)
-  n.events = {}
-  n.quiet = true
-  n.stats = nil
-  n.relicState = copyMap(c.relicState)
-  n.cls = U.copy(c.cls) -- état de classe : copie profonde (totems, familier… peuvent être des tables)
-  if c.zs then n.zs = U.copy(c.zs) end -- états des zones : copie profonde (c.zr, liste figée, partagée)
-  n.turn = { played = c.turn.played, byType = copyMap(c.turn.byType), bySchool = copyMap(c.turn.bySchool) }
-  n.charges = copyMap(c.charges)
-  n.rng = { draw = copyMap(c.rng.draw), ai = copyMap(c.rng.ai), misc = copyMap(c.rng.misc),
-    cards = c.rng.cards and copyMap(c.rng.cards) or nil }
-  n.player = copyUnit(c.player)
-  n.hand = copyArr(c.hand)
-  n.draw = copyArr(c.draw)
-  n.discard = copyArr(c.discard)
-  n.exhaust = copyArr(c.exhaust)
-  n.traps = copyArr(c.traps or {})
-  if c.passives then n.passives = copyArr(c.passives) end
+  local turn, rng = c.turn, c.rng
+  local cooldown, enemies = c.cooldown, c.enemies
   local cds = {}
-  for i = 1, #c.cooldown do
-    cds[i] = { card = c.cooldown[i].card, turns = c.cooldown[i].turns }
+  for i = 1, #cooldown do
+    cds[i] = { card = cooldown[i].card, turns = cooldown[i].turns }
   end
-  n.cooldown = cds
   local es = {}
-  for i = 1, #c.enemies do es[i] = copyUnit(c.enemies[i]) end
-  n.enemies = es
+  for i = 1, #enemies do es[i] = copyUnit(enemies[i]) end
+  local n = {
+    events = {}, quiet = true,
+    relicState = copyMap(c.relicState),
+    cls = U.copy(c.cls), -- état de classe : copie profonde (totems, familier… peuvent être des tables)
+    zs = c.zs and U.copy(c.zs) or nil, -- états des zones : copie profonde (c.zr, liste figée, partagée)
+    turn = { played = turn.played, byType = copyMap(turn.byType), bySchool = copyMap(turn.bySchool) },
+    charges = copyMap(c.charges),
+    rng = { draw = copyMap(rng.draw), ai = copyMap(rng.ai), misc = copyMap(rng.misc),
+      cards = rng.cards and copyMap(rng.cards) or nil },
+    player = copyUnit(c.player),
+    hand = copyArr(c.hand), draw = copyArr(c.draw), discard = copyArr(c.discard), exhaust = copyArr(c.exhaust),
+    traps = copyArr(c.traps or {}),
+    passives = c.passives and copyArr(c.passives) or nil,
+    cooldown = cds, enemies = es,
+    -- partagés (listes figées, instances) ou nombres et chaînes
+    seed = c.seed, round = c.round, phase = c.phase, step = c.step, result = c.result, class = c.class,
+    zone = c.zone, kind = c.kind, nextUid = c.nextUid, relics = c.relics, affixes = c.affixes, hk = c.hk,
+    zr = c.zr, epic = c.epic, fxDepth = c.fxDepth, fxSeq = c.fxSeq, lifts = c.lifts,
+  }
+  for k, v in pairs(c) do
+    if n[k] == nil then n[k] = v end
+  end
+  n.stats = nil
   return n
 end
