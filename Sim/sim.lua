@@ -42,6 +42,10 @@ local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 -- vidage avant ≈ 190 campagnes par processus, ≈ 110 Mo de mémoire par processus à 75 campagnes, ≈ 25 % de
 -- CPU en moins (15/11/2026). Sans effet sur les résultats.
 if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
+-- Ramasse-miettes moins fréquent (pause 400 : cycle suivant quand le tas a quadruplé, au lieu de doublé) : la
+-- simulation alloue sans cesse des états de combat clonés ; ≈ 15 % de CPU en moins, ≈ 200 Mo par processus au
+-- lieu de 110 (75 campagnes ; 15/11/2026). Sans effet sur les résultats.
+collectgarbage("setpause", 400)
 -- SIMJIT="opt=… opt=…" : réglages du compilateur essayés sans toucher au fichier (mesures)
 if jit and jit.opt and os.getenv("SIMJIT") then
   local t = {}
