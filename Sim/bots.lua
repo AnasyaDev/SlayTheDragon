@@ -550,9 +550,10 @@ return function(ns)
   Bots.readIntents = readIntents
 
   -- Score d'une fin de tour pour le joueur humain : real = tour ennemi joué (réflexion à fond), sinon lu.
-  local function humanLeaf(s, H, real)
+  -- inPlace : t est une copie jetable (plus jamais lue ensuite), jouée sur place sans la recopier.
+  local function humanLeaf(s, H, real, inPlace)
     if s.result then return evaluate(s) end
-    local t = Combat.clone(s)
+    local t = inPlace and s or Combat.clone(s)
     Combat.endPlayerTurn(t)
     if not t.result then
       if real then Combat.enemyPhase(t) else readIntents(t) end
@@ -599,8 +600,37 @@ return function(ns)
   end
 
   -- Meilleur score atteignable depuis s en d coups de plus, parmi les width meilleurs coups à chaque pas.
+  -- Dernier pas (d = 1) : les coups suivis ne sont plus développés, la meilleure suite vaut le meilleur coup
+  -- au coup d'œil (le premier des width meilleurs) : ni tri, ni état gardé, fin de tour jouée sur place.
+  local function humanBestLast(s, v0, H, real)
+    if H.width < 1 then return v0 end
+    local best = v0
+    local acts = Combat.legalPlays(s)
+    local tried = {}
+    local zb = zoneBots(s)
+    for i = 1, #acts do
+      local a = acts[i]
+      local inst = s.hand[a[1]]
+      local key = inst.id .. Card.suffix(inst.up) .. ":" .. (a[2] or 0) .. (a[3] and ":nospend" or "")
+      if zb then
+        for j = 1, #zb do
+          if zb[j].skip and zb[j].skip(s, a) then tried[key] = true end
+        end
+      end
+      if not tried[key] then
+        tried[key] = true
+        local t = Combat.clone(s)
+        Combat.play(t, a[1], a[2], a[3] and { spend = false } or nil)
+        local v = humanLeaf(t, H, real, true)
+        if v > best then best = v end
+      end
+    end
+    return best
+  end
+
   local function humanBest(s, v0, d, H, real)
     if d <= 0 or s.result then return v0 end
+    if d == 1 then return humanBestLast(s, v0, H, real) end
     local best = v0
     local moves = humanMoves(s, H, real, false)
     for i = 1, math.min(H.width, #moves) do
