@@ -381,14 +381,17 @@ return function(ns)
     local seq = {}
     local function dfs(s)
       nodes = nodes + 1
-      local sc = leafScore(s)
+      -- coups lus avant le score : une feuille (aucun coup, ou plafond atteint) qui n'est pas la position de
+      -- départ est une copie jetable, son tour ennemi se joue sur place
+      local acts
+      if not s.result and nodes < cap then acts = Combat.legalPlays(s) end
+      local sc = leafScore(s, s ~= c and (not acts or #acts == 0))
       if sc > best then
         best = sc
         bestSeq = {}
         for i = 1, #seq do bestSeq[i] = seq[i] end
       end
-      if s.result or nodes >= cap then return end
-      local acts = Combat.legalPlays(s)
+      if not acts then return end
       local tried = {}
       local zb = zoneBots(s)
       for i = 1, #acts do
@@ -769,14 +772,14 @@ return function(ns)
       for i = 1, #acts do
         local t = Combat.clone(c)
         Combat.play(t, acts[i][1], acts[i][2], acts[i][3] and { spend = false } or nil)
-        local sc = leafScore(t)
+        local sc = leafScore(t, true)
         if sc > best then best, bestA = sc, { "play", acts[i][1], acts[i][2], acts[i][3] and "nospend" or nil } end
       end
       local pots = Combat.legalPotions(c)
       for i = 1, #pots do
         local t = Combat.clone(c)
         Combat.usePotion(t, pots[i][1], pots[i][2])
-        local sc = leafScore(t)
+        local sc = leafScore(t, true)
         if sc > best then best, bestA = sc, { "potion", pots[i][1], pots[i][2] } end
       end
       if not bestA then return { "end" } end
