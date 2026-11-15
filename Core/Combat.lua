@@ -99,7 +99,11 @@ ns.ZoneRules = ns.ZoneRules or {}
 local ZRules = ns.ZoneRules
 
 -- Valeur modifiée : chaque crochet reçoit (c, src, v, ...) et renvoie la nouvelle valeur.
+-- Nom absent de c.hk (noms écoutés dans ce combat, Combat.collectHooks) : aucun crochet ne peut répondre,
+-- v revient tel quel sans parcourir les sources (la plupart des appels : canPlay, payHp, castAs…).
 function Combat.modify(c, name, v, a, b, d, x)
+  local hk = c.hk
+  if hk and not hk[name] then return v end
   local cr = Rules[c.class]
   local ch = cr and cr.hooks and cr.hooks[name]
   if ch then v = ch(c, c.cls, v, a, b, d, x) end
@@ -152,6 +156,8 @@ end
 -- et fire renvoie true (sert à « empêcher la mort », par exemple) et la source qui l'a arrêtée
 -- (l'état de classe ou de zone, l'instance du pouvoir, l'id du bibelot ou de l'affixe).
 function Combat.fire(c, name, a, b, d, x)
+  local hk = c.hk -- nom que personne n'écoute dans ce combat : rien à notifier (comme Combat.modify)
+  if hk and not hk[name] then return false end
   local cr = Rules[c.class]
   local ch = cr and cr.hooks and cr.hooks[name]
   if ch and ch(c, c.cls, a, b, d, x) then return true, c.cls end
@@ -206,9 +212,10 @@ function Combat.zoneState(c, id)
 end
 
 -- Noms de crochets écoutés dans ce combat (c.hk, posé par Combat.new : classe, zones actives, bibelots,
--- affixes, toutes les cartes du deck ; complété par Combat.addCard). Les notifications ajoutées pour les
--- zones (onEffectEnd, onCardDiscarded, enemyMove…) ne parcourent les crochets que si leur nom y figure :
--- le moteur reste aussi rapide sans zone. c.hk absent (ancienne sauvegarde) = tout est écouté.
+-- affixes, toutes les cartes du deck ; complété par Combat.addCard et Combat.transformCard). Combat.modify
+-- et Combat.fire ne parcourent les crochets que si leur nom y figure : toute source de crochets ajoutée en
+-- cours de combat doit compléter c.hk (copie, Combat.listenCard). c.hk absent (ancienne sauvegarde) = tout
+-- est écouté.
 local function addHookNames(hk, hooks)
   if hooks then for k in pairs(hooks) do hk[k] = true end end
 end
@@ -1316,6 +1323,17 @@ end
 
 local PILES = { "hand", "draw", "discard", "exhaust" }
 
+-- Crochets d'une carte nouvelle dans le combat (Pouvoir donné en combat, carte transformée) : ajoutés aux
+-- noms écoutés (c.hk copié : les clones le partagent).
+function Combat.listenCard(c, id)
+  local d = ns.Cards[id]
+  if d and c.hk and (d.hooks or (d.up and d.up.hooks) or (d.up2 and d.up2.hooks) or (d.up3 and d.up3.hooks)) then
+    local hk = U.copyMap(c.hk)
+    cardHookNames(hk, id)
+    c.hk = hk
+  end
+end
+
 -- Pile et index d'une instance (hand, draw, discard, exhaust, cooldown), ou nil.
 function Combat.findCard(c, inst)
   for _, key in ipairs(PILES) do
@@ -1352,13 +1370,7 @@ function Combat.addCard(c, id, to, opts)
     inst.lift = true
     c.lifts = (c.lifts or 0) + 1
   end
-  -- crochets d'une carte nouvelle (Pouvoir donné en combat) : ajoutés aux noms écoutés (copie)
-  local d = ns.Cards[id]
-  if c.hk and (d.hooks or (d.up and d.up.hooks) or (d.up2 and d.up2.hooks) or (d.up3 and d.up3.hooks)) then
-    local hk = U.copyMap(c.hk)
-    cardHookNames(hk, id)
-    c.hk = hk
-  end
+  Combat.listenCard(c, id)
   to = to or "discard"
   if to == "hand" and #c.hand >= Combat.HAND_MAX then to = "discard" end
   if to == "hand" then
@@ -1418,6 +1430,7 @@ function Combat.transformCard(c, inst, newId, opts)
   if not key or key == "cooldown" or key == "exhaust" then return nil end
   local n = Card.new(newId, false, c.nextUid)
   c.nextUid = c.nextUid + 1
+  Combat.listenCard(c, newId)
   n.orig = inst
   if opts and opts.src then n.src = opts.src end
   c[key][i] = n
