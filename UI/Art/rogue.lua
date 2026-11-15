@@ -104,7 +104,7 @@ function Art.rogueEpicLine(c)
   local id, up = R.epicOf(c)
   if not id then return nil end
   local E, res = R.EPIC, c.player.res or 0
-  local k = up and 2 or 1
+  local k = R.tier(up) -- palier de l'épique : 1 = base … 4 = +3
   if id == "deflection" then
     return ("Ripostes this turn: |cffffffff%d|r   next: |cffffffff%d|r"):format(R.ripostes(c), R.nextRiposte(c))
   elseif id == "danse_macabre" then
