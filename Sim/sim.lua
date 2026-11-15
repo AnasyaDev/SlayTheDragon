@@ -4,7 +4,8 @@
 --   bot  : random | greedy | heuristic | human        pick : rated | random | skip
 --   bot=human : skill=0..1 (défaut Bots.HUMAN_SKILL) et paramètres nommés de Bots.HUMAN_RANGE (width=, depth=,
 --     foresight=, slip=, tol=, combo=, hoard=, pickNoise=, rareBonus=, newBonus=, takeMin=, pathDepth=,
---     pathNoise=, replan=, daring=, restAt=, upNoise=, removeRate=, eventNoise=) ; fightbot=<bot> : bot des
+--     pathNoise=, replan=, daring=, restAt=, upNoise=, removeRate=, eventNoise=, upfocus=0..1 : 0 étale ses
+--     améliorations, 1 monte ses meilleures cartes jusqu'à +3 d'abord) ; fightbot=<bot> : bot des
 --     combats seul remplacé (runner=expedition).
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
 --   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
@@ -233,6 +234,29 @@ local function addRecord(agg, rec)
       cs.inDeck = cs.inDeck + 1
       if rec.won then cs.inDeckWins = cs.inDeckWins + 1 end
     end
+  end
+  -- palier atteint en fin d'expédition par carte (la copie la plus montée) : somme des paliers, expéditions où
+  -- elle finit à +2 ou +3 (hiN, hiWins) et à +3 (l3N)
+  if rec.upTiers then
+    local top = {}
+    for _, card in ipairs(rec.deck or {}) do
+      local n = card.up == true and 1 or tonumber(card.up) or 0
+      if n > (top[card.id] or -1) then top[card.id] = n end
+    end
+    for id, n in pairs(top) do
+      local cs = agg.cards[id]
+      cs.lvlSum = (cs.lvlSum or 0) + n
+      if n >= 2 then
+        cs.hiN = (cs.hiN or 0) + 1
+        if rec.won then cs.hiWins = (cs.hiWins or 0) + 1 end
+      end
+      if n >= 3 then cs.l3N = (cs.l3N or 0) + 1 end
+    end
+  end
+  -- feu de camp : repos et améliorations choisis (rec.picks : "rest", "up:<carte>")
+  for _, p in ipairs(rec.picks or {}) do
+    if p == "rest" then agg.campRest = (agg.campRest or 0) + 1
+    elseif p:sub(1, 3) == "up:" then agg.campUp = (agg.campUp or 0) + 1 end
   end
   for _, p in ipairs(rec.picks or {}) do
     local cs = agg.cards[p]
@@ -574,7 +598,10 @@ local function report(a, title)
       e.turns / e.n, p95(e.turnsHist, e.n), e.hpLost / e.n, e.stalled, netCols(e)))
   end
   out("")
-  out("Cartes                   rareté    choisie  dans deck  vict. avec  vict. sans  écart  jouées/piochées  gardées en main")
+  -- colonnes ajoutées en fin de ligne (runner=expedition) : palier moyen en fin d'expédition (copie la plus
+  -- montée, expéditions où la carte est au deck) et victoires quand elle finit à +2/+3
+  out("Cartes                   rareté    choisie  dans deck  vict. avec  vict. sans  écart  jouées/piochées  gardées en main"
+    .. (a.upTiers and "  palier moy  vict. à +2/+3" or ""))
   local ids = {}
   for id in pairs(a.cards) do ids[#ids + 1] = id end
   local RANK = { basic = 0, common = 1, uncommon = 2, rare = 3, epic = 4 }
@@ -590,8 +617,13 @@ local function report(a, title)
     local winsWithout = a.wins - cs.inDeckWins
     local gap = (cs.inDeck > 0 and without > 0)
       and ("%+5.1f"):format(100 * cs.inDeckWins / cs.inDeck - 100 * winsWithout / without) or "  -  "
-    out(("  %-22s %-9s %7d  %9d  %s     %s    %s    %s          %s"):format(id, rarityOf(id), cs.picked, cs.inDeck,
-      pct(cs.inDeckWins, cs.inDeck), pct(winsWithout, without), gap, pct(cs.played, cs.drawn), pct(cs.unplayed, cs.drawn)))
+    local tiers = ""
+    if a.upTiers and cs.inDeck > 0 then
+      tiers = ("        %4.2f  %s (%d)"):format((cs.lvlSum or 0) / cs.inDeck, pct(cs.hiWins or 0, cs.hiN or 0), cs.hiN or 0)
+    end
+    out(("  %-22s %-9s %7d  %9d  %s     %s    %s    %s          %s%s"):format(id, rarityOf(id), cs.picked, cs.inDeck,
+      pct(cs.inDeckWins, cs.inDeck), pct(winsWithout, without), gap, pct(cs.played, cs.drawn), pct(cs.unplayed, cs.drawn),
+      tiers))
   end
   out("")
   out("Potions bues            facile  normal   élite    boss   (par 100 expéditions)")
@@ -637,6 +669,28 @@ local function report(a, title)
     local ut, dt = a.upTiers or { 0, 0, 0 }, a.deckTiers or { 0, 0, 0 }
     out(("Améliorations par palier : +1 %.2f, +2 %.2f, +3 %.2f   deck en fin : +1 %.2f, +2 %.2f, +3 %.2f cartes")
       :format(ut[1] / a.runs, ut[2] / a.runs, ut[3] / a.runs, dt[1] / a.runs, dt[2] / a.runs, dt[3] / a.runs))
+    out(("Feu de camp : repos %.2f, amélioration %.2f par expédition (%s des feux choisis)"):format(
+      (a.campRest or 0) / a.runs, (a.campUp or 0) / a.runs, pct(a.campUp or 0, (a.campUp or 0) + (a.campRest or 0))))
+    -- cartes montées le plus haut : expéditions où la carte finit à +2/+3 (copie la plus montée), palier moyen
+    -- quand elle est au deck, victoires à +2/+3 contre à +0/+1 (expéditions où elle est au deck)
+    local hi = {}
+    for id, cs in pairs(a.cards) do if (cs.hiN or 0) > 0 then hi[#hi + 1] = id end end
+    table.sort(hi, function(x, y)
+      local hx, hy = a.cards[x].hiN, a.cards[y].hiN
+      if hx ~= hy then return hx > hy end
+      return x < y
+    end)
+    if #hi > 0 then
+      out("Cartes montées le plus haut  à +2/+3  dont +3  dans deck  palier moy  vict. à +2/+3  vict. à +0/+1  écart")
+      for k = 1, math.min(10, #hi) do
+        local id = hi[k]
+        local cs = a.cards[id]
+        local lo, loW = cs.inDeck - cs.hiN, cs.inDeckWins - (cs.hiWins or 0)
+        local gap = lo > 0 and ("%+5.1f"):format(100 * (cs.hiWins or 0) / cs.hiN - 100 * loW / lo) or "  -  "
+        out(("  %-26s %7d  %7d  %9d      %4.2f      %s        %s    %s"):format(id, cs.hiN, cs.l3N or 0, cs.inDeck,
+          (cs.lvlSum or 0) / cs.inDeck, pct(cs.hiWins or 0, cs.hiN), pct(loW, lo), gap))
+      end
+    end
     -- épique en fin d'expédition (gagnée sur un élite, achetée, ou imposée par epic=) ; victoires avec / sans
     local en, ew = a.epicEnd or 0, a.epicWins or 0
     out(("Épique en fin d'expédition : %s (améliorée : %s)   victoires avec épique %s, sans %s")
