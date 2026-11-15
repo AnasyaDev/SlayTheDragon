@@ -62,15 +62,19 @@ return function(ns)
   end
 
   -- Part des cartes du combat qui vérifient pred (main, pioche, défausse, recharges, consumées).
-  local function deckShare(c, pred)
-    local n, k = 0, 0
-    local function scan(list)
-      for i = 1, #list do
-        n = n + 1
-        if pred(Card.def(list[i])) then k = k + 1 end
-      end
+  -- (sans closure créée à chaque appel : LuaJIT ne compile pas FNEW)
+  local function shareScan(list, pred, n, k)
+    for i = 1, #list do
+      n = n + 1
+      if pred(Card.def(list[i])) then k = k + 1 end
     end
-    scan(c.hand); scan(c.draw); scan(c.discard); scan(c.exhaust)
+    return n, k
+  end
+  local function deckShare(c, pred)
+    local n, k = shareScan(c.hand, pred, 0, 0)
+    n, k = shareScan(c.draw, pred, n, k)
+    n, k = shareScan(c.discard, pred, n, k)
+    n, k = shareScan(c.exhaust, pred, n, k)
     for i = 1, #c.cooldown do
       n = n + 1
       if pred(Card.def(c.cooldown[i].card)) then k = k + 1 end
@@ -104,20 +108,30 @@ return function(ns)
     return false
   end
   local function isAttack(d) return d.type == "attack" end
-  local function dealsDamage(d) return anyEffect(d, function(e) return e[1] == "damage" end) end
-  local function appliesDot(d)
-    return anyEffect(d, function(e) return (e[1] == "apply" and e[2] == "pain") or e[1] == "dotPer" end)
+  -- prédicats sur les effets et les fiches : fonctions fixes (une closure créée à chaque appel arrête la
+  -- compilation de LuaJIT, FNEW)
+  local function effDamage(e) return e[1] == "damage" end
+  local function effDot(e) return (e[1] == "apply" and e[2] == "pain") or e[1] == "dotPer" end
+  local function effStealth(e)
+    if e.cond == "stealth" then return true end
+    for j = 1, #(e.more or {}) do if e.more[j][2] == "stealth" then return true end end
+    return false
   end
-  local function readsStealth(d)
-    return anyEffect(d, function(e)
-      if e.cond == "stealth" then return true end
-      for j = 1, #(e.more or {}) do if e.more[j][2] == "stealth" then return true end end
-      return false
-    end)
-  end
-  local function petCard(d) return anyEffect(d, function(e) return e[1] == "pet" end) end
+  local function effPet(e) return e[1] == "pet" end
+  local function dealsDamage(d) return anyEffect(d, effDamage) end
+  local function appliesDot(d) return anyEffect(d, effDot) end
+  local function readsStealth(d) return anyEffect(d, effStealth) end
+  local function petCard(d) return anyEffect(d, effPet) end
   local function isTrap(d) return d.trap == true end
   local function isFire(d) return d.school == "fire" and dealsDamage(d) end
+  local function isFireSchool(d) return d.school == "fire" end
+  local function isDamagingAttack(d) return isAttack(d) and dealsDamage(d) end
+  local function isShadow(d) return d.school == "shadow" end
+  local function isCast(d) return d.cast end
+  local function givesAbsorb(d)
+    for i = 1, #d.effects do if d.effects[i][1] == "absorb" then return true end end
+    return false
+  end
   local function aliveCount(c)
     local n = 0
     for i = 1, #c.enemies do
@@ -169,11 +183,11 @@ return function(ns)
     retaliation = function(c, inst) return T * aliveCount(c) * 0.8 * up(inst, 4, 6) * W.enemyHp end,
     last_stand = lastBreath,
     -- Mage
-    hot_streak = function(c) return T * math.min(1, playsOf(c, function(d) return d.school == "fire" end) / 2) * 20 end,
+    hot_streak = function(c) return T * math.min(1, playsOf(c, isFireSchool) / 2) * 20 end,
     ignite = function(c, inst) return T * playsOf(c, isFire) * dotUnits(up(inst, 2, 3, 3, 4)) end, -- +3 : DoT 5
     shatter = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 3, 4, 4, 5) * W.enemyHp end, -- +3 : 6
     arcane_power = function(c)
-      return T * playsOf(c, function(d) return isAttack(d) and dealsDamage(d) end) * 2 * W.enemyHp
+      return T * playsOf(c, isDamagingAttack) * 2 * W.enemyHp
     end,
     ice_block = lastBreath,
     -- Hunter
@@ -193,17 +207,14 @@ return function(ns)
     elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
     -- Priest
     shadowform = function(c)
-      local sh = deckShare(c, function(d) return d.school == "shadow" end)
+      local sh = deckShare(c, isShadow)
       return 10 + 9 * sh * 5 * W.enemyHp
     end,
     apotheosis = function(c)
-      return 4 * 6 * W.enemyHp + 9 * deckShare(c, function(d) return d.cast end) * 5 * W.enemyHp
+      return 4 * 6 * W.enemyHp + 9 * deckShare(c, isCast) * 5 * W.enemyHp
     end,
     rapture = function(c)
-      local share = deckShare(c, function(d)
-        for i = 1, #d.effects do if d.effects[i][1] == "absorb" then return true end end
-        return false
-      end)
+      local share = deckShare(c, givesAbsorb)
       return 10 + 9 * share * 2 * W.hp
     end,
     spirit_of_redemption = function(c)
@@ -297,43 +308,62 @@ return function(ns)
   end
   Bots.evaluate = evaluate
 
-  -- Score d'une fin de tour : on joue le tour ennemi sur une copie.
-  local function leafScore(s)
+  -- Score d'une fin de tour : on joue le tour ennemi sur une copie (inPlace : s est une copie jetable,
+  -- plus jamais lue ensuite, jouée sur place sans la recopier).
+  local function leafScore(s, inPlace)
     if s.result then return evaluate(s) end
-    local t = Combat.clone(s)
+    local t = inPlace and s or Combat.clone(s)
     Combat.endPlayerTurn(t)
     if not t.result then Combat.enemyPhase(t) end
     return evaluate(t)
   end
   Bots.leafScore = leafScore
 
+  -- (tables de travail réutilisées d'un appel à l'autre : vidées au-delà de la longueur utile)
+  local keyParts, keyIds = {}, {}
   local function stateKey(c)
     local p = c.player
-    local parts = { p.mana, p.hp, p.block, p.res, p.cast and p.cast.card.id or "-",
-      p.st.atonement or 0, p.st.halved or 0, p.st.regen or 0, #p.powers, #c.cooldown, #c.exhaust,
-      p.st.pain or 0 }
-    local ids = {}
-    for i = 1, #c.hand do
+    local parts = keyParts
+    parts[1], parts[2], parts[3], parts[4] = p.mana, p.hp, p.block, p.res
+    parts[5] = p.cast and p.cast.card.id or "-"
+    parts[6], parts[7], parts[8] = p.st.atonement or 0, p.st.halved or 0, p.st.regen or 0
+    parts[9], parts[10], parts[11], parts[12] = #p.powers, #c.cooldown, #c.exhaust, p.st.pain or 0
+    local ids, nh = keyIds, #c.hand
+    for i = 1, nh do
       local h = c.hand[i]
       ids[i] = h.id .. Card.suffix(h.up) -- palier compris (+, +2, +3)
     end
+    for i = #ids, nh + 1, -1 do ids[i] = nil end
     table.sort(ids)
-    parts[#parts + 1] = table.concat(ids, ",")
+    local n = 13
+    parts[n] = table.concat(ids, ",")
     for i = 1, #c.enemies do
       local e = c.enemies[i]
-      parts[#parts + 1] = e.dead and "x" or (e.hp .. ":" .. e.block .. ":" .. (e.st.pain or 0) .. ":"
+      n = n + 1
+      parts[n] = e.dead and "x" or (e.hp .. ":" .. e.block .. ":" .. (e.st.pain or 0) .. ":"
         .. (e.st.armor_broken or 0) .. ":" .. (e.st.stunned or 0) .. ":" .. (e.interrupted and 1 or 0)
         .. ":" .. (e.st.demoralized or 0))
     end
-    parts[#parts + 1] = c.result or ""
-    -- état propre à la classe qui distingue deux positions (ns.ClassRules[classe].botKey)
+    n = n + 1
+    parts[n] = c.result or ""
+    -- état propre à la classe qui distingue deux positions (ns.ClassRules[classe].botKey) ; une clé nil
+    -- n'ajoute rien
     local cr = ns.ClassRules[c.class]
-    if cr and cr.botKey then parts[#parts + 1] = cr.botKey(c) end
+    if cr and cr.botKey then
+      local k = cr.botKey(c)
+      if k ~= nil then n = n + 1 parts[n] = k end
+    end
     local zb = zoneBots(c)
     if zb then
-      for i = 1, #zb do if zb[i].key then parts[#parts + 1] = zb[i].key(c) end end
+      for i = 1, #zb do
+        if zb[i].key then
+          local k = zb[i].key(c)
+          if k ~= nil then n = n + 1 parts[n] = k end
+        end
+      end
     end
-    return table.concat(parts, "|")
+    for i = #parts, n + 1, -1 do parts[i] = nil end
+    return table.concat(parts, "|", 1, n)
   end
 
   local function actionRef(c, a)
@@ -380,15 +410,21 @@ return function(ns)
     local nodes = 0
     local seen = {}
     local seq = {}
-    local function dfs(s)
-      nodes = nodes + 1
-      local sc = leafScore(s)
-      if sc > best then
+    -- Score de fin de tour de s noté APRÈS ses suites : s n'est plus lu ensuite, son tour ennemi se joue sur
+    -- place (sauf la position de départ). Le meilleur reste le premier dans l'ordre de visite (s avant ses
+    -- suites) : s le prend s'il bat tout ce qui précède (bestBefore) et égale au moins ses suites.
+    local function score(s, bestBefore)
+      local sc = leafScore(s, s ~= c)
+      if sc > bestBefore and sc >= best then
         best = sc
         bestSeq = {}
         for i = 1, #seq do bestSeq[i] = seq[i] end
       end
-      if s.result or nodes >= cap then return end
+    end
+    local function dfs(s)
+      nodes = nodes + 1
+      local bestBefore = best
+      if s.result or nodes >= cap then return score(s, bestBefore) end
       local acts = Combat.legalPlays(s)
       local tried = {}
       local zb = zoneBots(s)
@@ -412,9 +448,10 @@ return function(ns)
             dfs(t)
             seq[#seq] = nil
           end
-          if nodes >= cap then return end
+          if nodes >= cap then break end
         end
       end
+      score(s, bestBefore)
     end
     dfs(c)
     return bestSeq, nodes, best
@@ -552,9 +589,10 @@ return function(ns)
   Bots.readIntents = readIntents
 
   -- Score d'une fin de tour pour le joueur humain : real = tour ennemi joué (réflexion à fond), sinon lu.
-  local function humanLeaf(s, H, real)
+  -- inPlace : t est une copie jetable (plus jamais lue ensuite), jouée sur place sans la recopier.
+  local function humanLeaf(s, H, real, inPlace)
     if s.result then return evaluate(s) end
-    local t = Combat.clone(s)
+    local t = inPlace and s or Combat.clone(s)
     Combat.endPlayerTurn(t)
     if not t.result then
       if real then Combat.enemyPhase(t) else readIntents(t) end
@@ -565,11 +603,13 @@ return function(ns)
   end
   Bots.humanLeaf = humanLeaf
 
-  -- Coups d'une position (doublons et conseils de zone écartés comme planTurn), chacun avec son état et
-  -- le score de fin de tour juste après (coup d'œil), triés du meilleur au moins bon.
-  local function humanMoves(s, H, real, potions)
-    local out = {}
+  -- Coups joués d'une position (doublons et conseils de zone écartés comme planTurn), dans l'ordre des coups
+  -- légaux : rec = { acts = coups légaux { indexMain, indexCible|nil, sansDépense|nil }, v = score de fin de
+  -- tour juste après chacun (coup d'œil), s = état après chacun (keep ; sinon fin de tour jouée sur place et
+  -- état non gardé, refait par humanState s'il faut le développer) }.
+  local function humanPlays(s, H, real, keep)
     local acts = Combat.legalPlays(s)
+    local list, vs, ss = {}, {}, keep and {} or nil
     local tried = {}
     local zb = zoneBots(s)
     for i = 1, #acts do
@@ -585,46 +625,101 @@ return function(ns)
         tried[key] = true
         local t = Combat.clone(s)
         Combat.play(t, a[1], a[2], a[3] and { spend = false } or nil)
-        out[#out + 1] = { act = { "play", a[1], a[2], a[3] and "nospend" or nil }, s = t, v = humanLeaf(t, H, real) }
+        local n = #list + 1
+        list[n] = a
+        vs[n] = humanLeaf(t, H, real, not keep)
+        if keep then ss[n] = t end
       end
     end
-    if potions then
-      local pots = Combat.legalPotions(s)
-      for i = 1, #pots do
-        local t = Combat.clone(s)
-        Combat.usePotion(t, pots[i][1], pots[i][2])
-        out[#out + 1] = { act = { "potion", pots[i][1], pots[i][2] }, s = t, v = humanLeaf(t, H, real) }
-      end
-    end
-    table.sort(out, function(x, y) return x.v > y.v end)
+    return { acts = list, v = vs, s = ss }
+  end
+
+  -- État après le coup k de rec (position s) : gardé, sinon rejoué (même coup sur une copie de s : même état).
+  local function humanState(s, rec, k)
+    local ss = rec.s
+    if ss and ss[k] then return ss[k] end
+    local a = rec.acts[k]
+    local t = Combat.clone(s)
+    Combat.play(t, a[1], a[2], a[3] and { spend = false } or nil)
+    if not ss then ss = {} rec.s = ss end
+    ss[k] = t
+    return t
+  end
+
+  local function byValue(x, y) return x.v > y.v end
+
+  -- Coups de rec triés du meilleur au moins bon : { k = rang dans rec, v }. Même liste d'entrée, dans le
+  -- même ordre, que l'ancien tri des coups : même ordre de sortie, égalités comprises.
+  local function sortedPlays(rec)
+    local out, vs = {}, rec.v
+    for k = 1, #vs do out[k] = { k = k, v = vs[k] } end
+    table.sort(out, byValue)
     return out
   end
 
   -- Meilleur score atteignable depuis s en d coups de plus, parmi les width meilleurs coups à chaque pas.
-  local function humanBest(s, v0, d, H, real)
+  -- memo : position → rec (humanPlays) déjà calculé, gardé d'un coup à l'autre du même tour (BotMT:act) : le
+  -- coup joué arrive sur une position déjà explorée au coup précédent.
+  -- Dernier pas (d = 1) : les coups suivis ne sont plus développés, la meilleure suite vaut le meilleur coup
+  -- au coup d'œil (le premier des width meilleurs) : ni tri, ni état gardé, fin de tour jouée sur place.
+  local function humanBest(s, v0, d, H, real, memo)
     if d <= 0 or s.result then return v0 end
+    local rec = memo[s]
+    if d == 1 then
+      if H.width < 1 then return v0 end
+      if not rec then
+        rec = humanPlays(s, H, real, false)
+        memo[s] = rec
+      end
+      local best, vs = v0, rec.v
+      for k = 1, #vs do if vs[k] > best then best = vs[k] end end
+      return best
+    end
+    if not rec then
+      rec = humanPlays(s, H, real, true)
+      memo[s] = rec
+    end
     local best = v0
-    local moves = humanMoves(s, H, real, false)
+    local moves = sortedPlays(rec)
     for i = 1, math.min(H.width, #moves) do
       local m = moves[i]
-      local w = humanBest(m.s, m.v, d - 1, H, real)
+      local w = humanBest(humanState(s, rec, m.k), m.v, d - 1, H, real, memo)
       if w > best then best = w end
     end
     return best
   end
 
-  -- Prochain coup du joueur humain : { "play", … } | { "potion", … } | { "end" }.
-  function Bots.humanAct(c, H, rng, real)
-    local cands = { { act = { "end" }, v = humanLeaf(c, H, real) } }
-    local moves = humanMoves(c, H, real, true)
+  -- Prochain coup du joueur humain : { "play", … } | { "potion", … } | { "end" }, puis l'état prévu après
+  -- ce coup (nil pour « end ») et son score au coup d'œil. memo (facultatif) : celui du coup précédent du
+  -- même tour ; root : le rec déjà calculé d'une position identique à c, endV : son score au coup d'œil, qui
+  -- est celui de finir le tour tout de suite (BotMT:act).
+  function Bots.humanAct(c, H, rng, real, memo, root, endV)
+    memo = memo or {}
+    local cands = { { act = { "end" }, v = endV or humanLeaf(c, H, real) } }
+    local rec = root or humanPlays(c, H, real, true)
+    -- coups joués puis potions, dans l'ordre d'avant (tri identique, égalités comprises)
+    local moves = {}
+    for k = 1, #rec.acts do
+      local a = rec.acts[k]
+      moves[k] = { act = { "play", a[1], a[2], a[3] and "nospend" or nil }, k = k, v = rec.v[k] }
+    end
+    local pots = Combat.legalPotions(c)
+    for i = 1, #pots do
+      local t = Combat.clone(c)
+      Combat.usePotion(t, pots[i][1], pots[i][2])
+      moves[#moves + 1] = { act = { "potion", pots[i][1], pots[i][2] }, s = t, v = humanLeaf(t, H, real) }
+    end
+    table.sort(moves, byValue)
     -- les width meilleurs coups au coup d'œil, plus les potions qui n'y sont pas (il les a sous les yeux)
     for i = 1, #moves do
       local m = moves[i]
       if i <= H.width or m.act[1] == "potion" then
-        cands[#cands + 1] = { act = m.act, v = humanBest(m.s, m.v, H.depth - 1, H, real) }
+        local st = m.s or humanState(c, rec, m.k)
+        cands[#cands + 1] = { act = m.act, s = st, glance = m.v,
+          v = humanBest(st, m.v, H.depth - 1, H, real, memo) }
       end
     end
-    table.sort(cands, function(x, y) return x.v > y.v end)
+    table.sort(cands, byValue)
     local pick = cands[1]
     if #cands > 1 and H.slip > 0 and Rng.float(rng) < H.slip then
       local near = {}
@@ -633,8 +728,34 @@ return function(ns)
       end
       if #near > 0 then pick = near[Rng.int(rng, 1, #near)] end
     end
-    return pick.act
+    return pick.act, pick.s, pick.glance
   end
+
+  -- Deux états de combat identiques (hors journal, quiet et statistiques, que les copies de recherche n'ont
+  -- pas) : mêmes valeurs partout, tables comparées en profondeur (au-delà de 24 niveaux : réputées
+  -- différentes, la recherche est alors refaite).
+  local SKIP_TOP = { events = true, quiet = true, stats = true }
+  local function sameValue(x, y, depth)
+    if x == y then return true end
+    if type(x) ~= "table" or type(y) ~= "table" or depth > 24 then return false end
+    for k, v in pairs(x) do
+      if not sameValue(v, y[k], depth + 1) then return false end
+    end
+    for k in pairs(y) do
+      if x[k] == nil then return false end
+    end
+    return true
+  end
+  local function sameState(a, b)
+    for k, v in pairs(a) do
+      if not SKIP_TOP[k] and not sameValue(v, b[k], 1) then return false end
+    end
+    for k in pairs(b) do
+      if not SKIP_TOP[k] and a[k] == nil then return false end
+    end
+    return true
+  end
+  Bots.sameState = sameState
 
   local BotMT = {}
   BotMT.__index = BotMT
@@ -655,7 +776,21 @@ return function(ns)
         self.thinkRound = c.round
         self.real = H.foresight > 0 and Rng.float(self.rng) < H.foresight
       end
-      local a = Bots.humanAct(c, H, self.rng, self.real)
+      -- recherche du coup précédent reprise si le coup joué a mené là où elle l'avait prévu (même tour, même
+      -- combat, même état) : ses positions déjà explorées ne sont pas recalculées
+      local memo, root, endV
+      local prev = self.prevState
+      if prev and self.prevCombat == c and self.prevRound == c.round and self.prevReal == self.real
+          and self.prevKeep == Bots.potionKeep and sameState(c, prev) then
+        memo = self.memo
+        root, endV = memo[prev], self.prevGlance
+      else
+        memo = {}
+      end
+      local a, st, glance = Bots.humanAct(c, H, self.rng, self.real, memo, root, endV)
+      self.memo, self.prevState, self.prevCombat, self.prevRound, self.prevReal = memo, st, c, c.round, self.real
+      self.prevKeep, self.prevGlance = Bots.potionKeep, glance
+      if not st then self.memo = nil end
       Bots.potionKeep = 1
       return a
     elseif self.kind == "random" then
@@ -674,14 +809,14 @@ return function(ns)
       for i = 1, #acts do
         local t = Combat.clone(c)
         Combat.play(t, acts[i][1], acts[i][2], acts[i][3] and { spend = false } or nil)
-        local sc = leafScore(t)
+        local sc = leafScore(t, true)
         if sc > best then best, bestA = sc, { "play", acts[i][1], acts[i][2], acts[i][3] and "nospend" or nil } end
       end
       local pots = Combat.legalPotions(c)
       for i = 1, #pots do
         local t = Combat.clone(c)
         Combat.usePotion(t, pots[i][1], pots[i][2])
-        local sc = leafScore(t)
+        local sc = leafScore(t, true)
         if sc > best then best, bestA = sc, { "potion", pots[i][1], pots[i][2] } end
       end
       if not bestA then return { "end" } end
