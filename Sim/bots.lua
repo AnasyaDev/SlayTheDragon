@@ -317,33 +317,51 @@ return function(ns)
   end
   Bots.leafScore = leafScore
 
+  -- (tables de travail réutilisées d'un appel à l'autre : vidées au-delà de la longueur utile)
+  local keyParts, keyIds = {}, {}
   local function stateKey(c)
     local p = c.player
-    local parts = { p.mana, p.hp, p.block, p.res, p.cast and p.cast.card.id or "-",
-      p.st.atonement or 0, p.st.halved or 0, p.st.regen or 0, #p.powers, #c.cooldown, #c.exhaust,
-      p.st.pain or 0 }
-    local ids = {}
-    for i = 1, #c.hand do
+    local parts = keyParts
+    parts[1], parts[2], parts[3], parts[4] = p.mana, p.hp, p.block, p.res
+    parts[5] = p.cast and p.cast.card.id or "-"
+    parts[6], parts[7], parts[8] = p.st.atonement or 0, p.st.halved or 0, p.st.regen or 0
+    parts[9], parts[10], parts[11], parts[12] = #p.powers, #c.cooldown, #c.exhaust, p.st.pain or 0
+    local ids, nh = keyIds, #c.hand
+    for i = 1, nh do
       local h = c.hand[i]
       ids[i] = h.id .. Card.suffix(h.up) -- palier compris (+, +2, +3)
     end
+    for i = #ids, nh + 1, -1 do ids[i] = nil end
     table.sort(ids)
-    parts[#parts + 1] = table.concat(ids, ",")
+    local n = 13
+    parts[n] = table.concat(ids, ",")
     for i = 1, #c.enemies do
       local e = c.enemies[i]
-      parts[#parts + 1] = e.dead and "x" or (e.hp .. ":" .. e.block .. ":" .. (e.st.pain or 0) .. ":"
+      n = n + 1
+      parts[n] = e.dead and "x" or (e.hp .. ":" .. e.block .. ":" .. (e.st.pain or 0) .. ":"
         .. (e.st.armor_broken or 0) .. ":" .. (e.st.stunned or 0) .. ":" .. (e.interrupted and 1 or 0)
         .. ":" .. (e.st.demoralized or 0))
     end
-    parts[#parts + 1] = c.result or ""
-    -- état propre à la classe qui distingue deux positions (ns.ClassRules[classe].botKey)
+    n = n + 1
+    parts[n] = c.result or ""
+    -- état propre à la classe qui distingue deux positions (ns.ClassRules[classe].botKey) ; une clé nil
+    -- n'ajoute rien
     local cr = ns.ClassRules[c.class]
-    if cr and cr.botKey then parts[#parts + 1] = cr.botKey(c) end
+    if cr and cr.botKey then
+      local k = cr.botKey(c)
+      if k ~= nil then n = n + 1 parts[n] = k end
+    end
     local zb = zoneBots(c)
     if zb then
-      for i = 1, #zb do if zb[i].key then parts[#parts + 1] = zb[i].key(c) end end
+      for i = 1, #zb do
+        if zb[i].key then
+          local k = zb[i].key(c)
+          if k ~= nil then n = n + 1 parts[n] = k end
+        end
+      end
     end
-    return table.concat(parts, "|")
+    for i = #parts, n + 1, -1 do parts[i] = nil end
+    return table.concat(parts, "|", 1, n)
   end
 
   local function actionRef(c, a)
