@@ -60,10 +60,13 @@ end
 
 -- Fiche effective d'une carte à un palier (valeur up : false, true, 1..3). Champs ajoutés : plus = palier
 -- (0..3), isUp = true dès le palier 1 ; nom suivi de Card.suffix. Un palier non écrit est une erreur.
+-- Cache par palier puis par id (aucune chaîne construite à chaque appel : appelé des millions de fois par
+-- les crochets en simulation).
 function Card.defById(id, up)
-  local n = Card.level(up)
-  local key = n > 0 and (id .. "+" .. n) or id
-  local d = cache[key]
+  local n
+  if not up then n = 0 elseif up == true then n = 1 else n = Card.level(up) end
+  local byId = cache[n]
+  local d = byId[id]
   if d then return d end
   local base = ns.Cards[id]
   if not base then error("unknown card: " .. tostring(id)) end
@@ -81,14 +84,15 @@ function Card.defById(id, up)
     d.name = base.name .. Card.suffix(n)
     d.isUp = true
   end
-  cache[key] = d
+  byId[id] = d
   return d
 end
 
 -- Oublie les fiches effectives calculées (tests et harnais qui posent ou retirent des paliers en cours de route).
 function Card.clearCache()
-  cache = {}
+  cache = { [0] = {}, {}, {}, {} }
 end
+Card.clearCache()
 
 function Card.def(inst)
   return Card.defById(inst.id, inst.up)
