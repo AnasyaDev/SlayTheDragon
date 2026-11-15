@@ -12,7 +12,7 @@ return function(ns, Bots, SE)
   local BR = ns.Blackrock
 
   local function forcedDamage(c, e)
-    local mv = e.mem.forced and ns.Enemies[e.id].moves[e.mem.forced]
+    local mv = e.mem.forced and ns.Combat.moveOf(e.id, e.mem.forced)
     if not mv then return 0 end
     local n = 0
     for _, a in ipairs(mv.actions) do

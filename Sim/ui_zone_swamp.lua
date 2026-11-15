@@ -51,6 +51,18 @@ return function(T)
     and ns.Language.keywords.rude_awakening.zone == "swamp" and Art.statusShort.asleep ~= nil and Art.statuses.asleep ~= nil)
   snap("zone-swamp", true)
 
+  -- fiche intacte (move « asleep » du socle) et reprise après /reload : un dormeur dont la fiche n'a jamais été
+  -- vue endormie dans la session (fiches fraîches) garde une intention valable, l'expédition n'est pas mise en
+  -- quarantaine (l'oracle prend la place du crocodile le temps de la vérification)
+  local okSave, whySave = ns.Controller.validateCombat(c)
+  local id0 = croc.id
+  croc.id = "marsh_oracle"
+  local okFresh, whyFresh = ns.Controller.validateCombat(c)
+  croc.id = id0
+  check("dormeur : fiche intacte, combat sauvegardé valable même pour une fiche jamais endormie",
+    ns.Enemies.sawtooth_crocolisk.moves.asleep == nil and croc.intent == "asleep" and okSave and okFresh,
+    tostring(whySave) .. " / " .. tostring(whyFresh))
+
   -- réveil par une carte : l'ouverture devient l'intention (chiffre en couleur), petite icône d'ouverture
   local idx
   for i, inst in ipairs(c.hand) do if ns.Card.def(inst).target == "enemy" and ns.Card.def(inst).type == "attack" then idx = i break end end

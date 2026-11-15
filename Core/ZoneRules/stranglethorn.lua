@@ -44,7 +44,7 @@ ST.hexMove = hexMove
 -- L'ennemi e annonce-t-il un Hex encore valable (vivant, non interrompu, non étourdi) ?
 function ST.hexing(c, e)
   if e.dead or e.interrupted or (e.st.stunned or 0) > 0 then return false end
-  return hexMove(ns.Enemies[e.id].moves[e.intent])
+  return hexMove(ns.Combat.moveOf(e.id, e.intent))
 end
 
 -- Index de la carte que viserait un Hex : la plus chère de la main (coût actuel), la plus à gauche à
@@ -163,13 +163,13 @@ ZR.define(ID, {
   end,
   hooks = {
     onEnemyCastStart = function(c, z, e, move)
-      if hexMove(ns.Enemies[e.id].moves[move]) then Combat.zstat(c, "hexAnnounced") end
+      if hexMove(ns.Combat.moveOf(e.id, move)) then Combat.zstat(c, "hexAnnounced") end
     end,
     onEnemyCastInterrupted = function(c, z, e, move)
-      if hexMove(ns.Enemies[e.id].moves[move]) then Combat.zstat(c, "hexInterrupted") end
+      if hexMove(ns.Combat.moveOf(e.id, move)) then Combat.zstat(c, "hexInterrupted") end
     end,
     onEnemyStunned = function(c, z, e)
-      if hexMove(ns.Enemies[e.id].moves[e.intent]) then Combat.zstat(c, "hexStunned") end
+      if hexMove(ns.Combat.moveOf(e.id, e.intent)) then Combat.zstat(c, "hexStunned") end
     end,
     -- verrouillage : main encore entière, avant la défausse
     onHandEnd = function(c, z)

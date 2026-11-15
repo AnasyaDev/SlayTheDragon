@@ -9,8 +9,8 @@
 -- suivant sinon (effet à tous ou DoT : réveil doux, SOFT_ALL ; compteur, Alarm). Stunned
 -- sur un dormeur gèle son compteur ; sur une ouverture, la retarde sans la perdre.
 --
--- Mise en œuvre : un dormeur a pour intention le move « asleep » (Swamp.SLEEP, ajouté à la définition de
--- l'ennemi au besoin : aucune action) et, en gris, son ouverture (e.mem.forced, « On waking ») ; le crochet
+-- Mise en œuvre : un dormeur a pour intention le move « asleep » (Swamp.SLEEP, move du socle Combat.MOVES,
+-- jamais écrit dans la fiche de l'ennemi : aucune action) et, en gris, son ouverture (e.mem.forced, « On waking ») ; le crochet
 -- « intent » le maintient endormi tant que l'état dure, « enemyMove » saute son tour. État propre à l'unité :
 -- e.zs.swamp = { opener (ouverture posée par Slumber), mend, lulled, pending (ouverture pas encore jouée),
 -- stopped (ouverture arrêtée par Stunned), dream (phase de Slumber à appliquer après l'effet en cours) }.
@@ -45,11 +45,9 @@ Swamp.SLEEP_MOVE = SLEEP_MOVE
 
 local function def(e) return ns.Enemies[e.id] end
 
--- Le move « asleep » existe dans la définition de l'ennemi (Dream Dust peut endormir n'importe qui).
-local function ensureMove(d)
-  if not d.moves[Swamp.SLEEP] then d.moves[Swamp.SLEEP] = SLEEP_MOVE end
-end
-Swamp.ensureMove = ensureMove
+-- Le move « asleep » est un move du socle (Combat.MOVES) : connu de tout ennemi (Dream Dust peut endormir
+-- n'importe qui) sans jamais être écrit dans sa fiche.
+Combat.MOVES[Swamp.SLEEP] = SLEEP_MOVE
 
 local function us(e) return ZR.unitState(e, Swamp.ID) end
 local function peek(e) return e.zs and e.zs.swamp end
@@ -292,7 +290,6 @@ ZR.define("swamp", {
     -- un dormeur garde l'intention « asleep » et son ouverture en gris
     intent = function(c, z, move, e)
       if asleep(e) then
-        ensureMove(def(e))
         announce(e)
         return Swamp.SLEEP
       end
@@ -324,8 +321,6 @@ ZR.define("swamp", {
     onStatusApplied = function(c, z, unit, id, n)
       if unit.side ~= "enemy" then return end
       if id == "asleep" and n > 0 and asleep(unit) then
-        local d = def(unit)
-        ensureMove(d)
         local s = us(unit)
         s.pending, s.stopped = nil, nil
         if opener(unit) then unit.mem.idx = nil end
@@ -404,7 +399,7 @@ ZR.define("swamp", {
     onEnemyPhaseEnd = function(c, z) runDreams(c, true) end,
 
     onEnemyCastInterrupted = function(c, z, e, move)
-      local mv = def(e).moves[move]
+      local mv = Combat.moveOf(e.id, move)
       local a = mv and mv.actions[1]
       if a and (a[1] == "lull" or a[1] == "alarm") then stat(c, a[1] .. "_interrupted") end
     end,

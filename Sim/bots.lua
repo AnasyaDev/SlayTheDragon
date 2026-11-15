@@ -572,7 +572,7 @@ return function(ns)
       if not e.dead then
         e.block = 0
         local def = ns.Enemies[e.id]
-        if (e.st.stunned or 0) == 0 and def and e.intent and def.moves[e.intent] then
+        if (e.st.stunned or 0) == 0 and def and e.intent and Combat.moveOf(e.id, e.intent) then
           local info = Combat.intentInfo(t, e)
           dmg = dmg + info.damage * math.max(info.times, info.damage > 0 and 1 or 0)
           if info.interrupts and not info.interrupted and p.cast then p.cast, p.castMore = nil, nil end

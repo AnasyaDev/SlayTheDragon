@@ -142,7 +142,7 @@ function Wildfire.forecast(c)
   for i = 1, #c.enemies do
     local e = c.enemies[i]
     if not e.dead and e.intent and (e.st.stunned or 0) == 0 and not e.interrupted then
-      local mv = ns.Enemies[e.id].moves[e.intent]
+      local mv = ns.Combat.moveOf(e.id, e.intent)
       for _, a in ipairs(mv and mv.actions or {}) do
         if a[1] == "stoke" then
           stoke = stoke + a[2]
@@ -221,13 +221,13 @@ ZR.define("steppes", {
       Wildfire.delay(c, 1, "death")
     end,
     onEnemyCastInterrupted = function(c, z, e, mv)
-      local m = ns.Enemies[e.id].moves[mv]
+      local m = ns.Combat.moveOf(e.id, mv)
       for _, a in ipairs(m and m.actions or {}) do
         if a[1] == "stoke" then Combat.zstat(c, "stokesInterrupted", 1) return end
       end
     end,
     onEnemyStunned = function(c, z, e)
-      local m = ns.Enemies[e.id].moves[e.intent]
+      local m = ns.Combat.moveOf(e.id, e.intent)
       for _, a in ipairs(m and m.actions or {}) do
         if a[1] == "stoke" then Combat.zstat(c, "stokesStunned", 1) return end
       end

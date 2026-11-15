@@ -629,7 +629,7 @@ function V.fillIntentTooltip(tt, e)
   local c = Controller.combat()
   if not c or not e or e.dead then return end
   local info = Combat.intentInfo(c, e)
-  local mv = ns.Enemies[e.id].moves[e.intent]
+  local mv = ns.Combat.moveOf(e.id, e.intent)
   -- intention remplacée par une zone (dormeur) : son infobulle d'abord
   local over = ns.ZoneView.first(c, "intent", e)
   if over then
@@ -660,7 +660,7 @@ function V.fillIntentTooltip(tt, e)
   end
   -- intention suivante imposée (ouverture d'une phase, d'un dormeur)
   if info.forced then
-    local fm = ns.Enemies[e.id].moves[info.forced]
+    local fm = ns.Combat.moveOf(e.id, info.forced)
     tt:AddLine((info.forcedLabel or "Next") .. ": " .. (fm and fm.name or info.forced) .. ".", 0.7, 0.7, 0.7, true)
   end
   local badge = ns.ZoneView.first(c, "intentBadge", e)
@@ -825,7 +825,7 @@ local function intentDisplay(c, e)
   local info = Combat.intentInfo(c, e)
   if info.stunned then return Art.intents.stunned, "Stunned", "defend" end
   if info.interrupted then return Art.intents.interrupted, "Interrupted", "defend" end
-  local mv = ns.Enemies[e.id].moves[e.intent]
+  local mv = ns.Combat.moveOf(e.id, e.intent)
   local parts = {}
   for i = 1, #mv.actions do
     local a = mv.actions[i]
@@ -882,7 +882,7 @@ function V:RenderIntent(s, e)
   s.intent:Show()
   -- intention suivante imposée, en gris (« On waking: Death Roll 20 »)
   local info = Combat.intentInfo(c, e)
-  local fm = info.forced and ns.Enemies[e.id].moves[info.forced]
+  local fm = info.forced and ns.Combat.moveOf(e.id, info.forced)
   if fm and info.forcedLabel then
     local dmg
     for _, a in ipairs(fm.actions) do
@@ -1465,7 +1465,7 @@ function V:QueueEvent(ev)
     end)
   elseif t == "act" then
     local e = enemyByUid(self.c, ev.unit)
-    local mv = e and ns.Enemies[e.id].moves[ev.move]
+    local mv = e and ns.Combat.moveOf(e.id, ev.move)
     local isAttack = mv and mv.intent == "attack"
     self:Push(0.35, function()
       local s = self_.slotOf[ev.unit]

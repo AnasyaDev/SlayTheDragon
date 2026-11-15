@@ -570,7 +570,7 @@ D.relic("morbents_bane_relic", {
   hooks = {
     onIntents = function(c, src)
       for _, e in ipairs(c.enemies) do
-        local mv = not e.dead and ns.Enemies[e.id].moves[e.intent]
+        local mv = not e.dead and ns.Combat.moveOf(e.id, e.intent)
         if mv and mv.cast then
           c.player.mana = c.player.mana + 1
           Combat.log(c, { t = "float", unit = "player", text = "+1 mana", color = "defendText" })
