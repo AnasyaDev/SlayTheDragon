@@ -111,28 +111,36 @@ test("textes : les nombres affichés (carte et à-côté de ses mots de règle) 
     local out = { d.text }
     for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = r.kw.name .. ": " .. Lg.ruleText(r.kw, r.n, up) end
     local t = table.concat(out, "\n")
-    assert(t:find(s, 1, true), id .. (up and "+" or "") .. " : « " .. s .. " » absent de « " .. t .. " »")
+    assert(t:find(s, 1, true), id .. Card.suffix(up) .. " : « " .. s .. " » absent de « " .. t .. " »")
   end
   has("echo_of_light", false, "Each Regen tick: Sanctify.")
   has("echo_of_light", false, "starts with Regen " .. P.ECHO_START)
-  has("echo_of_light", true, "Sanctify +" .. P.ECHO_PLUS[2])
-  has("echo_of_light", true, "Deal the tick +" .. P.ECHO_PLUS[2] .. " to all enemies")
   eq(P.ECHO_PLUS[1], 0, "Echo of Light de base : la valeur seule")
   has("shadow_covenant", false, "Life Tap " .. P.COVENANT_HP[1] .. ".")
   has("shadow_covenant", false, ("Pay %d HP per mana instead of mana, +%d per Shadow card"):format(P.COVENANT_HP[1], P.COVENANT_STEP))
-  has("shadow_covenant", true, "Life Tap " .. P.COVENANT_HP[2] .. ", 1st free.")
-  has("shadow_covenant", true, ("The first one each turn is free. Others pay %d HP per mana, +%d"):format(P.COVENANT_HP[2], P.COVENANT_STEP))
   eq(P.REFLECT_PCT[1], 1 / 3); has("reflective_shield", false, "Reflect a third.")
-  eq(P.REFLECT_PCT[2], 1 / 2); has("reflective_shield", true, "Reflect half.")
   has("inner_focus", false, ("Empower %d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
   has("inner_focus", false, ("its values +%d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
-  eq(P.FOCUS_SCALE[2], 2); has("inner_focus", true, "its values doubled")
-  has("voidform", false, "Madness " .. P.VOID_BONUS[1]); has("voidform", true, "Madness " .. P.VOID_BONUS[2])
-  has("voidform", true, "+" .. P.VOID_BONUS[2] .. " damage per Insanity. Surge cards can't be played.")
-  has("prayer_of_mending", true, "Divine Star +" .. P.MENDING_UP)
-  has("prayer_of_mending", true, "restored, +" .. P.MENDING_UP .. ", to a random enemy")
-  has("misery", true, "Contagion +" .. P.MISERY_UP)
-  has("misery", true, "every other enemy, +" .. P.MISERY_UP .. ".")
+  has("voidform", false, "Madness " .. P.VOID_BONUS[1])
+  -- paliers 1 à 3 : chaque nombre de la carte et de l'à-côté est celui de la table du palier
+  local REFLECT = { "half", "three fifths", "two thirds" }
+  for n = 1, 3 do
+    local i = n + 1
+    has("echo_of_light", n, "Sanctify +" .. P.ECHO_PLUS[i])
+    has("echo_of_light", n, "Deal the tick +" .. P.ECHO_PLUS[i] .. " to all enemies")
+    has("shadow_covenant", n, "Life Tap " .. P.COVENANT_HP[i] .. ", " .. (P.COVENANT_FREE[i] == 1 and "1st" or P.COVENANT_FREE[i]) .. " free.")
+    has("shadow_covenant", n, ("are free, as stated. Others pay %d HP per mana, +%d"):format(P.COVENANT_HP[i], P.COVENANT_STEP))
+    has("reflective_shield", n, "Reflect " .. REFLECT[n] .. ".")
+    has("inner_focus", n, ("Empower %d%%"):format(math.floor((P.FOCUS_SCALE[i] - 1) * 100 + 0.5)))
+    has("inner_focus", n, ("its values +%d%%"):format(math.floor((P.FOCUS_SCALE[i] - 1) * 100 + 0.5)))
+    has("voidform", n, (P.VOID_FLAT[i] > 0 and ("+" .. P.VOID_FLAT[i] .. ", ") or "") .. "Madness " .. P.VOID_BONUS[i] .. ".")
+    has("voidform", n, "+" .. P.VOID_BONUS[i] .. " damage per Insanity. Surge cards can't be played.")
+    has("prayer_of_mending", n, "Divine Star +" .. P.MENDING_UP[i])
+    has("prayer_of_mending", n, "restored, +" .. P.MENDING_UP[i] .. ", to a random enemy")
+    has("misery", n, "Contagion +" .. P.MISERY_UP[i])
+    has("misery", n, "every other enemy, +" .. P.MISERY_UP[i] .. ".")
+  end
+  eq(P.REFLECT_PCT[2], 1 / 2); eq(P.REFLECT_PCT[3], 3 / 5); eq(P.REFLECT_PCT[4], 2 / 3)
 end)
 
 test("socle : une épique posée dans le deck de départ est en jeu (c.epic), dans aucune pile", function()
@@ -574,6 +582,87 @@ test("bots : note des épiques et conseils du deck piloté", function()
   local exp = { class = "priest", deck = deckOf({ "smite", "renew", "renew", "flash_heal" }) }
   assert(b.epic(exp, "prayer_of_mending") > b.epic(exp, "voidform"), "le deck soigne : Prayer of Mending")
   eq(ns.SimExpedition.epicRating(exp, "misery"), 7)
+end)
+
+---------------------------------------------------------------------------
+-- Paliers +2 et +3 (15/11/2026, docs/ameliorations.md) : les crochets lisent Card.level(src)
+---------------------------------------------------------------------------
+test("paliers : chaque épique a ses paliers 2 et 3, tables { base, +1, +2, +3 } lues par Card.level", function()
+  for _, id in ipairs(P.EPICS) do
+    eq(Card.tiers(id), 3, id)
+    eq(Card.defById(id, 3).name, ns.Cards[id].name .. "+3")
+  end
+  eq(P.tier(P.MENDING_UP, { up = 3 }), 4); eq(P.tier(P.MENDING_UP, { up = true }), 2, "true = palier 1")
+  eq(P.tier(P.MENDING_UP, 2), 3); eq(P.tier(P.MENDING_UP, false), 0)
+  for _, t in ipairs({ P.MENDING_UP, P.MISERY_UP, P.ECHO_PLUS, P.COVENANT_HP, P.COVENANT_FREE, P.REFLECT_PCT,
+    P.VOID_BONUS, P.VOID_FLAT, P.FOCUS_SCALE }) do
+    eq(#t, 4, "quatre paliers")
+  end
+end)
+
+test("paliers : Prayer of Mending +3 (+4), Misery +2 (+2), Echo of Light +3 (+4)", function()
+  local c = setup({ "flash_heal" }, { hp = 50 })
+  epic(c, "prayer_of_mending", 3)
+  play(c, "flash_heal")
+  eq(c.enemies[1].hp, 100 - 7 - P.MENDING_UP[4], "7 rendus + 4")
+  local m = setup({ "sw_pain" }, { encounter = THREE })
+  epic(m, "misery", 2)
+  play(m, "sw_pain", 1)
+  eq(m.enemies[1].st.pain, 5); eq(m.enemies[2].st.pain, 5 + P.MISERY_UP[3]); eq(m.enemies[3].st.pain, 5 + P.MISERY_UP[3])
+  local e = setup({ "smite" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
+  epic(e, "echo_of_light", 3)
+  local r = e.player.st.regen
+  Combat.endTurn(e)
+  eq(e.enemies[1].hp, 100 - r - EP[4]); eq(e.enemies[2].hp, 100 - r - EP[4])
+end)
+
+test("paliers : Shadow Covenant +2 (1 PV par mana), +3 (deux cartes Shadow gratuites par tour)", function()
+  local c = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
+  epic(c, "shadow_covenant", 2)
+  play(c, "mind_blast", 1)
+  eq(c.player.hp, 50, "la première : gratuite")
+  play(c, "mind_flay", 1)
+  eq(c.player.hp, 50 - CH[3] * 1 - CS, "la deuxième : 1 PV par mana + 2")
+  local u = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
+  epic(u, "shadow_covenant", 3)
+  play(u, "mind_blast", 1)
+  play(u, "mind_flay", 1)
+  eq(u.player.hp, 50, "deux gratuites"); eq(u.player.mana, 3)
+  play(u, "sw_pain", 1)
+  eq(u.player.hp, 50 - CH[4] * 1 - 2 * CS, "la troisième paie (deux cartes Shadow déjà jouées)")
+end)
+
+test("paliers : Reflective Shield +2 (trois cinquièmes), +3 (deux tiers)", function()
+  for n = 2, 3 do
+    local c = setup({ "inner_fire", "inner_fire" }, { encounter = { "tp_hitter" } })
+    epic(c, "reflective_shield", n)
+    play(c, "inner_fire"); play(c, "inner_fire")
+    Combat.endTurn(c)
+    eq(c.enemies[1].hp, 100 - math.floor(10 * P.REFLECT_PCT[n + 1] + 1e-9), "10 absorbés, palier " .. n)
+  end
+end)
+
+test("paliers : Voidform +2 / +3 (dégâts fixes en plus par coup Shadow), Holy rien", function()
+  for n = 2, 3 do
+    local c = setup({ "mind_blast", "smite" })
+    epic(c, "voidform", n)
+    c.player.res = 7
+    play(c, "mind_blast", 1)
+    eq(c.enemies[1].hp, 100 - (10 + 2 * 7 + P.VOID_FLAT[n + 1]), "palier " .. n)
+    play(c, "smite", 1)
+    eq(c.enemies[1].hp, 100 - (10 + 2 * 7 + P.VOID_FLAT[n + 1]) - 8, "Holy : rien")
+  end
+end)
+
+test("paliers : Inner Focus +2 (× 2,25), +3 (× 2,5), arrondi au supérieur", function()
+  for n = 2, 3 do
+    local c = setup({ "smite" })
+    epic(c, "inner_focus", n)
+    play(c, "smite", 1)
+    Combat.endTurn(c)
+    eq(c.enemies[1].hp, 100 - math.ceil(8 * FS[n + 1] - 1e-9), "palier " .. n)
+  end
+  eq(FS[3], 2.25); eq(FS[4], 2.5)
 end)
 
 for _, id in ipairs({ "tp_dummy", "tp_hitter", "tp_twice", "tp_kicker" }) do E[id] = nil end
