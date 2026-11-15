@@ -11184,7 +11184,7 @@ do
       local card = s.cards[i]
       if not (card and vis(card) and card.option) then why[#why + 1] = i .. " absente"
       else
-        if (card.cardUp or false) ~= (it.up or false) then why[#why + 1] = it.id .. " amélioration affichée" end
+        if (card.cardUp and true or false) ~= (it.up and true or false) then why[#why + 1] = it.id .. " amélioration affichée" end
         if (card.tag and card.tag.text._text) ~= tostring(it.price) then why[#why + 1] = it.id .. " prix" end
         if it.up then upCard = upCard or card elseif not it.epic then plainCard = plainCard or card end
       end
