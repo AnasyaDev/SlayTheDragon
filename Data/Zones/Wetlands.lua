@@ -434,6 +434,8 @@ Declare.neutralCard("crocolisk_gumbo", {
   exhaust = true, effects = { { "heal", 5 }, { "apply", "force", 1, self = true } },
   text = "Heal 5.\nGain Strength 1\nExhaust.",
   up = { effects = { { "heal", 8 }, { "apply", "force", 1, self = true } }, text = "Heal 8.\nGain Strength 1\nExhaust." },
+  up2 = { effects = { { "heal", 10 }, { "apply", "force", 1, self = true } }, text = "Heal 10.\nGain Strength 1\nExhaust." },
+  up3 = { cost = 0, text = "Heal 10.\nGain Strength 1\nExhaust." },
 })
 
 Declare.neutralCard("fire_oil", {
@@ -441,6 +443,8 @@ Declare.neutralCard("fire_oil", {
   exhaust = true, effects = { { "apply", "pain", 4, all = true } },
   text = "Apply DoT 4 to all\nExhaust.",
   up = { effects = { { "apply", "pain", 6, all = true } }, text = "Apply DoT 6 to all\nExhaust." },
+  up2 = { effects = { { "apply", "pain", 7, all = true } }, text = "Apply DoT 7 to all\nExhaust." },
+  up3 = { innate = true, text = "Apply DoT 7 to all\nExhaust.\nInnate." },
 })
 if ns.NeutralBot and ns.NeutralBot.rating then
   ns.NeutralBot.rating.crocolisk_gumbo = 5

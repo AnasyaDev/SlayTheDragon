@@ -940,3 +940,75 @@ Poison +5, le reste à ± 4 points). Compte neuf avant (`zones=0 level=1`) : 21,
 seront mesurés : Killing Spree +2 (coût 2 → 1), Adrenaline Rush +3 (+3 mana, Draw 3), Echoing Reprimand +3
 (Animacharge 6), Danse Macabre +3 (Flourish 5, multiplié par coup), Kidney Shot +2/+3 (Combo rendus), Shadow Dance
 +3 (+1 Combo par tour), Premeditation +3 (carte à 0, +3 Combo sous Stealth).
+## Paliers +2 et +3 du Guerrier (15/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`, « Améliorer une carte plusieurs fois ») : paliers 2 et 3 écrits à la
+main pour les 34 cartes et les sept épiques du Guerrier (tableau : `docs/classes/warrior-paliers.md`). Classe déjà la
+plus forte : gains dans le bas de la fourchette, rien de multiplié sur Strength, la Rage ou les cartes à plusieurs
+coups (Rampage paie moins de PV, Battle Shout et Recklessness passent à 0 ou Innate, Powers à 0 puis Innate) ; épiques :
+nombres par palier dans `ns.Warrior.EPIC`, ou une ligne « Kills: ». Paliers non mesurés carte par carte (balayages
+abandonnés sur consigne). Campagne bot `human`, clé 0, `zones=7 level=7`, 600 expéditions : 86,2 → 85,8 % ; le bot
+n'atteint le palier 2 que 0,08 fois par expédition (le palier 3 jamais), l'effet en campagne reste donc nul à ce jour.
+## Hunter : paliers +2 et +3 (15/11/2026)
+
+Les 50 cartes du Hunter (34 de classe, 7 épiques, 9 variantes de Lone Wolf) ont leurs paliers 2 et 3, écrits carte
+par carte (`docs/classes/hunter.md`, « Paliers d'amélioration +2 et +3 »). Les cartes qui étourdissent gagnent ce qui
+vaut contre Stun Resistant et Indomitable (Sundered, Demoralized, DoT, attaques du familier), sans toucher à Stunned.
+Campagne au bot `human` (600 expéditions, clé 0, `zones=7 level=7`) : 70,7 → **71,2 %** (± 3,6), combats par type
+inchangés à 0,1 point près ; améliorations par expédition +1 3,83 → 3,70, **+2 0,13**, +3 0 : le bot préfère encore
+le palier 1 d'une autre carte (notes × 0,8 puis × 0,6), les paliers 2 et 3 pèsent donc peu sur la campagne. Écarts
+« vict. avec / sans » des cartes et parts jouées : identiques à ± 2 points. Compte neuf avant : 18,2 % (non remesuré).
+**Paliers non mesurés carte par carte** : balayages `sweep=cards` abandonnés sur consigne (coût) ; un balayage
+partiel `up=2` au bot `human` (200 par ligne, ± 7 points, carte forcée à +2 contre le deck sans elle, donc la valeur
+de la carte plus que celle du palier) ne montrait aucun palier hors norme ; les Powers Survival forcées (Lock and
+Load, Resourcefulness, Entrapment) y restent négatives, comme leur carte de base.
+## Paliers +2 et +3 des cartes neutres et des cartes de zone (15/11/2026)
+
+Les 22 cartes neutres (dix de `Data/Neutral.lua`, deux par zone) ont leurs paliers 2 et 3, écrits dans le bas de la
+fourchette (tableau et règles : `docs/cartes-neutres.md`, « Paliers +2 et +3 ») : Retain, Innate, coût ou prix en PV
+assoupli, ou un nombre ; jamais de pioche ni de mana en plus, jamais plus de Stunned, Exhaust toujours là. Les sept
+cartes de combat posées par les zones (Curses, Hexed, Morbent's Bane) restent sans palier 2 : jamais dans le deck.
+
+**Non mesurées carte par carte** : les balayages `sweep=cards up=1/2/3` ont été arrêtés sur consigne (coût en
+campagnes, machine partagée). Seul repère : le balayage `up=1` du Warrior (bot `human`, 200 expéditions par ligne,
+± 7 points, base 80,5 %) place déjà au palier 1 les soins en tête (Dreamless Sleep Potion +17,5, Crocolisk Gumbo +16,
+Heavy Silk Bandage +13,5, Dark Iron Bomb +13,5, Black Lotus +12,5) et Goblin Sapper Charge, Arcane Bomb, Elixir à 0
+ou dessous. Les paliers 2 et 3 des trois soins restent petits (Heal +2, puis Regen 2, Retain ou coût 0) ; à
+surveiller pour le Warrior, qui n'a pas d'autre soin.
+
+Campagne Mage (bot `human`, clé 0, `zones=7 level=7`, 600 expéditions, graine 1), avant → après : **74,8 → 74,8 %**,
+rapport identique ligne pour ligne. « Améliorations par palier » : +1 4,06, +2 0,00, +3 0,00 avant et après : le bot
+`human` du Mage n'a une carte neutre dans son deck final que dans 1 à 3 expéditions sur 600 et ne l'améliore jamais
+deux fois ; les paliers neutres n'ont donc aucun effet mesurable sur la campagne tant que les cartes de classe n'ont
+pas leurs propres paliers 2 et 3 (le bot répartit ses quatre améliorations sur des cartes différentes).
+
+## Paliers +2 et +3 du Mage (15/11/2026)
+
+Les 34 cartes et les 7 épiques du Mage ont leurs paliers 2 et 3 écrits à la main (tableau : `docs/classes/mage.md`, § 8 ;
+règles : `docs/ameliorations.md`). Campagne complète, bot `human`, clé 0, tout débloqué, 600 expéditions : victoires
+74,8 % → 74,8 % ; améliorations par expédition 4,06 → 4,04, dont +1 3,90, +2 0,14, +3 0,00 (le bot préfère presque
+toujours une nouvelle carte au +1) ; aucun écart anormal dans le tableau des cartes (« vict. sans » à ± 6 points). Les
+paliers **n'ont pas été mesurés carte par carte** (balayages arrêtés sur consigne) : un balayage partiel au bot
+`human` (11 cartes, `up=1` à 300 expéditions contre `up=3` à 200, ± 9 points sur l'écart) a fait adoucir les paliers
+3 nettement au-dessus du +1 : Glacial Spike et Blizzard (+16 / +18 points avec +2 chiffré puis sans Cast → +2 Retain,
++3 sans Cast), Arcane Explosion+3 à 0 mana (+18 → Retain), Mana Shield+3 +1 Charge (+14 → Retain), Arcane Blast+3
++2 Charge (→ Deal 13), Fireball+2 17 → 16. Après retouche, Arcane Blast+3 et Mana Shield+3 restaient hauts au
+balayage (78 et 81 % contre 67 et 70 % au +1) : une carte imposée au +3 vaut deux améliorations gratuites ; à
+surveiller quand le bot montera plus souvent au +2. Ice Block+3 (Innate), Combustion+3, Presence of Mind+3 et Fire
+Blast+3 : écart sous le gain du +1.
+
+## Priest : paliers +2 et +3 (15/11/2026)
+
+Les 41 cartes du Priest ont leurs paliers 2 et 3 écrits à la main (tableau : `docs/classes/priest-progression.md`,
+« Paliers +2 et +3 »). Soins et boucliers ne montent presque plus après le +1 (le Priest perd déjà peu de PV) ;
+les paliers vont au tempo (coût, Retain, Innate, pioche), à l'Atonement et à l'Insanity ; épiques : tables
+`{ base, +1, +2, +3 }` lues par `Card.level`. Campagne au bot human (`runs=600 key=0 zones=7 level=7`) :
+**65,0 % → 64,2 %** (± 3,8, aucun écart), PV perdus par type de combat inchangés à 0,2 près ; améliorations par
+expédition +1 4,96 → 4,87, **+2 0,14, +3 0,00** : le bot améliore d'abord les cartes neuves d'un deck de
+≈ 41 cartes (≈ 5 améliorations par expédition), les paliers 2 et 3 ne pèsent presque pas sur la mesure. Écarts
+« vict. avec / sans » du tableau des cartes identiques à ± 4 points à ceux d'avant. **Paliers non mesurés
+carte par carte** : balayages `sweep=cards` abandonnés (coût ≈ 25 000 campagnes par classe ; décision du
+coordinateur), seul un début de `up=1` au bot human a tourné (18 cartes, `reports/priest-sweep-up1.txt`).
+À surveiller en jeu : Shadow Covenant+3 (deux cartes Shadow gratuites par tour, gain ≈ 1,5 fois celui du +1),
+Inner Focus+2/+3 (multiplicateur), Misery+2/+3 (+ 1 par copie, autant que le +1), Rapture+3 et Renew+3
+(Innate), les paliers « Retain » (le bot n'en tire presque rien).

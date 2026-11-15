@@ -475,4 +475,21 @@ return function(T)
     local rec, exp = ns.SimExpedition.play({ seed = 3, class = "warrior", zone = "swamp", zones = 4, level = 7, bot = "heuristic" })
     eq(exp.phase, "done"); eq(exp.zone, "swamp")
   end)
+
+  test("paliers neutres : Dream Dust +2 Asleep 3 (coût 0 du palier 1 gardé) ; Dreamless Sleep Potion +2 soigne 16, +3 Retain", function()
+    local c = combat({ zone = "westfall", enemies = { "bandit" }, hand = { "dream_dust" } })
+    c.hand[1].up = 2
+    eq(ns.Card.def(c.hand[1]).cost, 0)
+    play(c, "dream_dust", 1)
+    eq(c.enemies[1].st.asleep, 3)
+    local d = combat({ hand = { "dreamless_sleep_potion" }, deck = { "smite", "smite", "smite", "smite", "smite", "smite" } })
+    d.hand[1].up = 3
+    eq(ns.Card.def(d.hand[1]).retain, true)
+    Combat.endTurn(d)
+    assert(T.handIndex(d, "dreamless_sleep_potion"), "gardée en main")
+    d.player.hp = 20
+    play(d, "dreamless_sleep_potion")
+    eq(d.player.hp, 36); eq(d.player.mana, 0)
+  end)
+
 end

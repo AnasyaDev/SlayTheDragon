@@ -60,6 +60,8 @@ L.trigger("When attacked")
 L.trigger("Enemy deaths")
 L.trigger("3rd card each turn")
 L.trigger("Every 3rd card")
+L.trigger("2nd card each turn") -- Rule of Threes+2
+L.trigger("Every 2nd card") -- Rule of Threes+3
 
 -- Mots de règle des épiques (L.rule) : la carte dit « Déclencheur: Mot N. », l'à-côté la règle complète, avec les
 -- nombres des cartes (Data/Mage.lua ; base, puis améliorée).
@@ -80,9 +82,11 @@ do
   L.rule("brainFreeze", { name = "Brain Freeze",
     text = "Cast cards on a Frozen enemy resolve at once. Its Stunned and Demoralized then end.",
     upText = "Cast cards on a Frozen enemy resolve at once, +N damage. Its Stunned and Demoralized then end." })
+  -- Améliorée (paliers 1 à 3 : Conserve 6 / 9 / 12, bonus 2 / 3 / 4) : le bonus vaut le tiers de N, ce que dit
+  -- le texte amélioré (un seul texte pour les trois paliers, Core/Language.lua).
   local function carry(b) return "Up to N unspent mana carries over to the next turn, +" .. b .. " if any." end
   L.rule("conserve", { name = "Conserve", text = carry(base("arcane_meditation", "epicBonus")),
-    upText = carry(up("arcane_meditation", "epicBonus")) })
+    upText = "Up to N unspent mana carries over to the next turn, plus a third of N if any." })
   L.rule("pyroclasm", { name = "Pyroclasm", text = "An enemy dying with DoT gives that DoT, +N, to each other enemy." })
   L.rule("multistrike", { name = "Multistrike",
     text = "Spend N Charge, if available, to make the card resolve twice." })
@@ -259,8 +263,11 @@ Cards.conflagration.deckHooks = {
 -- Mage dépense epicCharge Charges au moment où elle est jouée (sans assez de Charges : une fois, la carte compte) ;
 -- la copie tout de suite après, même cible, sans coût (crochet « replay ») ; marquée au jeu (c.turn.played), donc
 -- une carte Cast incantée se résout deux fois à son départ. La copie compte le même Surge que l'original.
+-- Rang doublé : epicAt (3 ; 2 aux paliers 2 et 3), puis chaque multiple si epicEvery (paliers 1 et 3).
 local function thirdRank(c, src, n)
-  return n == 3 or (Card.def(src).epicEvery and n > 0 and n % 3 == 0)
+  local d = Card.def(src)
+  local at = d.epicAt or 3
+  return n == at or (d.epicEvery and n > 0 and n % at == 0)
 end
 Combat.ruleOfThreesNext = function(c, src) -- la prochaine carte jouée tombe-t-elle au rang doublé ? (vue, bots)
   return thirdRank(c, src, c.turn.played + 1)

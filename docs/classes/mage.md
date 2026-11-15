@@ -403,3 +403,74 @@ Mesures à ajouter aux rapports : PV perdus par combat (par type de rencontre), 
 interrompues / instantanées, tours avec deux incantations, Instant perdu en fin de combat, charges au
 moment de chaque Surge, part des tours à 4 charges, part des coups ennemis contre une cible Frozen, mana
 inutilisé, victoires par deck forcé d'une seule voie et par paire de voies.
+
+## 8. Paliers d'amélioration +2 et +3 (15/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`, « Améliorer une carte plusieurs fois ») ; forme des données et règles :
+`docs/ameliorations.md`. Chaque palier ne donne que ce qui change ; le +1 est celui d'avant. Principes suivis pour le
+Mage :
+
+- **L'incantation elle-même** : le socle n'a ni incantation plus courte d'un tour ni incantation protégée carte par
+  carte (le crochet `preventInterrupt` ne sait pas quelle incantation il protège, et un mot « protégée » serait un
+  mot nouveau). Les deux leviers existants : **perdre Cast** (la carte part tout de suite, sans emplacement ni
+  interruption : Blizzard+3, Glacial Spike+3, sorts Frost sans synergie de Cast hors épiques) et **Instant** gagné à
+  la résolution (Fireball+3 : la Fireball suivante part tout de suite, la « Hot Streak » de WoW).
+- **Powers** : Innate (en main de départ, mot du socle) au palier 2 ou 3, plutôt qu'un second coût réduit.
+- **Retain** pour les cartes qu'on veut garder pour le bon tour (Counterspell, Polymorph, Combustion, Presence of
+  Mind, Prismatic Barrier, Frost Nova, Deep Freeze, Mana Shield, Arcane Explosion ; Blizzard et Glacial Spike au +2,
+  avant de perdre Cast), **+1 Charge** après un Surge (Arcane Barrage, Arcane Surge), **Demoralized 2** (une
+  durée de plus) pour Frost.
+- Un coût ne baisse qu'une fois : Hot Streak, Ice Block, Polymorph, Arcane Power, Arcane Surge l'ont déjà au +1 ;
+  aucun palier 2 ou 3 ne baisse un coût (Arcane Explosion+3 à 0 mana : +18 points au balayage, remplacé par Retain) ;
+  aucune carte à 0 ne gagne de pioche.
+- Épiques : nombres seulement (deux lignes au plus), lus par les crochets dans `Card.def(src)` (fiche du palier) ;
+  Rule of Threes change de rang (2e carte du tour, puis chaque 2e) ; Conserve améliorée dit « plus a third of N »
+  (bonus 2 / 3 / 4 pour Conserve 6 / 9 / 12 : un seul texte amélioré pour les trois paliers, `Core/Language.lua`).
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Fireball | Deal 14, DoT 3 | Deal 16 | Gain Instant 1 (à la résolution) |
+| Frostbolt | Deal 9 | Demoralized 2 | Deal 11 |
+| Mana Shield | Absorb 8 | Absorb 10 | Retain |
+| Arcane Blast | Deal 9 | Deal 11 | Deal 13 |
+| Fire Blast | Deal 8 | Deal 10 | Cooldown 1 |
+| Scorch | Deal 5, Execute 10 | Execute 13 | Apply DoT 2 |
+| Flamestrike | 16 à tous, DoT 4 | DoT 5 à tous | 19 à tous |
+| Blazing Barrier | Absorb 10 | DoT 2 à tous | Absorb 13 |
+| Pyroblast | Deal 38 | Apply DoT 4 | Deal 44 |
+| Hot Streak | coût 0 | Innate | Gain Instant 1 au jeu |
+| Living Bomb | 4 à tous, DoT 5 | DoT 6 à tous | 6 à tous |
+| Phoenix Flames | Deal 11 | Apply DoT 3 (après le test « DoT: ») | Deal 14 |
+| Ignite | DoT 4 | Innate | DoT 5 |
+| Combustion | Draw 3 | Instant 3 | Retain |
+| Ice Lance | 4, Frozen +8 | Frozen +11 | Deal 6 |
+| Frost Nova | Absorb 4, Cooldown 3 | Absorb 7 | Retain |
+| Ice Barrier | Absorb 11 | Absorb 13 | Innate |
+| Cone of Cold | 6 à tous | Demoralized 2 à tous | 8 à tous |
+| Flurry | 4 trois fois | Demoralized 2 | 5 trois fois |
+| Blizzard | 15 à tous | Retain | **sans Cast** |
+| Glacial Spike | Deal 32 | Retain | **sans Cast** |
+| Ice Block | coût 0 | soin 14 | Innate |
+| Deep Freeze | Deal 11 | Deal 14 | Retain |
+| Shatter | +5 | Innate | +6 |
+| Arcane Missiles | 4 trois fois | 5 trois fois | +2 Charge |
+| Arcane Explosion | 6 à tous | 8 à tous | Retain |
+| Prismatic Barrier | Absorb 8 | Retain | Absorb 11 |
+| Arcane Barrage | 8 par Charge | +1 Charge après le Surge | 9 par Charge |
+| Counterspell | Cooldown 1 | Retain | Interrupt all casts |
+| Evocation | +4 mana | +1 Charge (à la résolution) | +5 mana |
+| Polymorph | coût 1 | Retain | +2 Charge |
+| Presence of Mind | Cooldown 3 | Retain | +2 Charge |
+| Arcane Power | coût 0 | Innate | +1 Charge au jeu |
+| Arcane Surge | coût 0 | Retain | +1 Charge après le Surge |
+| Mirror Image | Image 100 % | 125 % | 150 % |
+| Molten Armor | Burn 4 | Burn 5 | Burn 6 |
+| Water Elemental | Waterbolt 4 | 5 | 6 |
+| Fingers of Frost | Brain Freeze +4 | +6 | +8 |
+| Arcane Meditation | Conserve 6, +2 | Conserve 9, +3 | Conserve 12, +4 |
+| Conflagration | Pyroclasm 20 | 22 | 25 |
+| Rule of Threes | chaque 3e carte | 2e carte du tour | chaque 2e carte |
+
+Limites connues : Blizzard+3 et Glacial Spike+3 perdent les synergies de Cast (Mirror Image, Fingers of Frost, Robe
+of the Archmage, Apprentice's Wand) ; c'est écrit sur la carte, le bot ne le sait pas (notes d'amélioration par
+défaut). Mesures : `docs/equilibrage.md`, « Paliers +2 et +3 du Mage ».

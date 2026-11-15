@@ -10642,13 +10642,13 @@ do
   host = v.classZone.views.warrior
   c.player.res = 2
   v:Render(true)
-  check("Thunderous Roar : « Roar in 3 Rage: 3 to all »", line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.EPIC.thunderous_roar.damage), line(host))
+  check("Thunderous Roar : « Roar in 3 Rage: 3 to all »", line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.num("thunderous_roar", "damage", false)), line(host))
   c.player.res = 4
   ns.Combat.gainRes(c, 1, "test")
   v:OnEvents(c.events)
   H.advance(3)
   check("Thunderous Roar : onde jouée par la vue (Rage à 0, Demoralized posé selon la règle)", c.player.res == 0
-    and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.EPIC.thunderous_roar.demoralized > 0) and #W.truncatedNow() == 0,
+    and ((c.enemies[1].st.demoralized or 0) > 0) == (Wr.num("thunderous_roar", "demoralized", false) > 0) and #W.truncatedNow() == 0,
     c.player.res .. " / " .. table.concat(W.truncatedNow(), ","))
   snap("uew-thunderous-roar", true)
 end
@@ -10837,13 +10837,14 @@ do
     return a < b
   end)
   check("35 épiques de classe (7 par classe)", #ids == 35, #ids)
-  -- 1. lignes du texte tel que la carte le rend (W.cardMaxLines : 2), palier 8,5 ou plus, jamais tronqué
+  -- 1. lignes du texte tel que la carte le rend (W.cardMaxLines : 2), palier 8,5 ou plus, jamais tronqué ; chaque
+  -- palier écrit (+1 à +3)
   local card = W.card(UI().content)
   local bad, dist = {}, {}
   for _, id in ipairs(ids) do
-    for _, up in ipairs({ false, true }) do
+    for _, up in ipairs({ false, 1, 2, 3 }) do if H.ns.Card.tiers(id) >= (up or 0) then
       card:SetCard(id, up, { playable = true })
-      local fit, label = card.bodyFit, id .. (up and "+" or "")
+      local fit, label = card.bodyFit, id .. (up and ("+" .. up) or "")
       local shown = 0
       for l in (W.cardBodyText(card) .. "\n"):gmatch("(.-)\n") do if l ~= "" then shown = shown + 1 end end
       if not fit.ok or (fit.lines or 99) > W.EPIC_LINES or shown ~= fit.lines or fit.size < W.EPIC_FLOOR
@@ -10852,7 +10853,7 @@ do
           tostring(fit.size), tostring(fit.mode))
       end
       dist[fit.size] = (dist[fit.size] or 0) + 1
-    end
+    end end
   end
   local ds = {}
   for _, s in ipairs(W.BODY_SIZES) do if dist[s] then ds[#ds + 1] = s .. " → " .. dist[s] end end
@@ -10874,9 +10875,10 @@ do
   function tip:NumLines() return #self.lines end
   local sheets = {}
   for _, id in ipairs(ids) do
-    for _, up in ipairs({ false, true }) do
+    for n = 0, Card.tiers(id) do -- tous les paliers écrits (un mot de règle peut n'apparaître qu'au palier 2 ou 3)
+      local up = Card.upValue(n)
       local d = Card.defById(id, up)
-      local label = id .. (up and "+" or "")
+      local label = id .. Card.suffix(n)
       tip.lines = {}
       W.fillCardTooltip(tip, id, up)
       local all = {}
@@ -11162,11 +11164,12 @@ do
   local Card, W = ns.Card, ns.Widgets
   -- paliers 2 et 3 de test posés sur Smite le temps de la section (aucune carte réelle n'en a encore)
   local smite = ns.Cards.smite
+  local keep2, keep3 = smite.up2, smite.up3 -- paliers réels de Smite (Priest), rendus en fin de section
   smite.up2 = { effects = { { "damage", 13 } }, text = "Deal 13." }
   smite.up3 = { cost = 0, text = "Deal 13." }
   Card.clearCache()
   e.deck = { { id = "smite", up = false }, { id = "smite", up = 1 }, { id = "smite", up = 2 }, { id = "smite", up = 3 },
-    { id = "pw_shield", up = 1 }, { id = "pw_shield", up = false } }
+    { id = "pw_shield", up = Card.upValue(Card.tiers("pw_shield")) }, { id = "pw_shield", up = false } }
   UI().refresh()
   clickOption("ui:upgrade")
   local s = UI().current
@@ -11220,7 +11223,7 @@ do
   UI().fillDeckTooltip({ AddLine = function(_, l) tip[#tip + 1] = l end })
   tip = table.concat(tip, " | ")
   check("infobulle du deck : Smite+3 compté deux fois", tip:find("2 × Smite+3", 1, true), tip)
-  smite.up2, smite.up3 = nil, nil
+  smite.up2, smite.up3 = keep2, keep3
   Card.clearCache()
 
   -- tous les noms tiennent sur le ruban au palier 3 (« Elixir of Superior Defense+3 ») : paliers fictifs

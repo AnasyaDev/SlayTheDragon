@@ -154,7 +154,7 @@ function Art.hunterEpicLine(c)
   local id, up = H and H.epic(c)
   if not id or c.result then return nil end
   local E, res = ns.HunterEpic, c.player.res or 0
-  local k = up and 2 or 1
+  local k = ns.Card.level(up) + 1 -- palier de l'épique (tables { base, +1, +2, +3 } de ns.HunterEpic)
   local alive = 0
   for i = 1, #c.enemies do if not c.enemies[i].dead then alive = alive + 1 end end
   if id == "call_of_the_wild" then
@@ -162,7 +162,7 @@ function Art.hunterEpicLine(c)
     -- du round), puis la dépense de l'épique
     local cost = E.cotwCost[k]
     if res < cost then return "Start of turn: " .. num(cost) .. " Frenzy needed for a pet attack" end
-    return "Start of turn: pet attacks for " .. num(H.petDamage(c, nil, res - cost))
+    return "Start of turn: pet attacks for " .. num(H.petDamage(c, nil, math.min(5, res - cost + E.cotwRes[k])))
       .. (cost > 0 and (" (" .. num(-cost) .. " Frenzy)") or "")
   elseif id == "trap_launcher" then
     return "Traps hit at once, pet attacks " .. num(E.launcher[k]) .. "x"
