@@ -41,6 +41,120 @@ Codé : `Data/Hunter.lua`, `Core/Classes/hunter.lua`, `UI/Art/hunter.lua`, tests
   cases sous le héros ; pas encore de crans autour de la pastille, de teinte rouge, de prévision de Trap sur
   l'intention ni de griffe en pointillé au survol.
 
+## Paliers d'amélioration +2 et +3 (15/11/2026)
+
+Décision du joueur (`docs/zones/decisions.md`, « Améliorer une carte plusieurs fois ») ; forme et règles :
+`docs/ameliorations.md`. Les 50 cartes du Hunter (34 de classe, 7 épiques, 9 variantes de Lone Wolf) ont leurs
+paliers 2 et 3, écrits carte par carte ; palier 0 et palier 1 inchangés. Principes suivis :
+
+- **Nature du gain variée** : d'ordinaire un nombre au +2, puis un effet de l'identité de la carte au +3 (Frenzy,
+  Retain, Innate, Careful Aim, un état de plus), ou l'inverse. **Coût réduit une seule fois** : Kill Command (+2 :
+  0), Trueshot Aura (+2 : 0), Kill Shot (+2 : 0) ; aucune carte ne descend sous 0, aucune carte à 0 ne gagne de
+  pioche (Readiness piochait déjà : Draw 2 au +3, elle reste Exhaust).
+- **Cartes qui étourdissent** (Freezing Trap, Intimidation, Wyvern Sting, Scatter Shot) : Stun Resistant (élites)
+  et Indomitable (élites de Blackrock Mountain, boss) bornent Stunned ; leurs paliers 2 et 3 n'y touchent pas et
+  donnent ce qui vaut contre un ennemi qui résiste : Sundered et Demoralized (Freezing Trap), deux attaques du
+  familier et Demoralized (Intimidation), DoT 7 et Demoralized (Wyvern Sting), Deal 7 et Frenzy (Scatter Shot).
+- **Familier** : une carte qui ne nomme pas le familier ne le nomme pas plus à +3 (sinon il lui faudrait une
+  variante de Lone Wolf) ; Hunter's Mark et Raptor Strike gagnent du Frenzy à la place.
+- **Variantes de Lone Wolf** : même nature de gain que la carte d'origine, le familier devenant du Frenzy (Kill
+  Command coûte 0 au +2, Kill Shot aussi ; Dire Beast gagne Retain au +3, Double Tap aussi).
+- **Épiques** : nombres en tables `{ base, +1, +2, +3 }` (`ns.HunterEpic`) lus par `Card.level(src) + 1` dans les
+  crochets et dans la ligne d'épique de l'interface (`UI/Art/hunter.lua`) ; texte toujours en deux lignes. Mots de
+  règle : « Launch N » (l'à-côté amélioré dit « N times »), « Stampede +N, in full » (l'à-côté amélioré rappelle
+  les dégâts en moins « unless in full »).
+- **Bots** : notes d'amélioration par défaut (× 0,8 puis × 0,6) ; valeur en combat des Powers dont le palier change
+  la valeur (`Sim/bots.lua` : Spirit Bond, Trueshot Aura, Entrapment, Lock and Load, Resourcefulness, Feign Death).
+
+Tests : `Sim/tests.lua`, section « Hunter : paliers 2 et 3 » (les 34 cartes aux paliers 2 et 3 jouables et
+conformes à leur texte ; coût réduit ; Spend 1 ; Retain ; Innate ; cartes qui étourdissent contre un Indomitable ;
+Powers) ; `Sim/tests_epic_hunter.lua`, section « Paliers 2 et 3 » (textes, chaque épique à +2 et +3, variantes au
+palier de leur carte d'origine).
+
+### Les trois paliers de chaque carte
+
+Coût entre parenthèses ; « / » sépare les lignes de la carte.
+
+**Départ**
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Arcane Shot | (1) Deal 6. / Pet attacks. | (1) Deal 8. / Pet attacks. | (1) Deal 8. / +1 Frenzy. / Pet attacks. |
+| Disengage | (1) Gain 6 Absorb. | (1) Gain 8 Absorb. | (1) Gain 8 Absorb. / Retain. |
+| Freezing Trap | (1) Trap. / Apply Stunned 1 ⌛ / Apply Demoralized 2 ⌛ | (1) Trap. / Apply Stunned 1 ⌛ / Apply Demoralized 2 ⌛ / Apply Sundered 2 ⌛ | (1) Trap. / Apply Stunned 1 ⌛ / Apply Demoralized 3 ⌛ / Apply Sundered 2 ⌛ |
+| Serpent Sting | (1) Draw 1. / Apply DoT 5 | (1) Draw 1. / Apply DoT 7 | (1) Draw 1. / Apply DoT 7 / Apply Demoralized 1 ⌛ |
+
+**Beast Mastery**
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Barbed Shot | (1) +2 Frenzy. / Apply DoT 5 | (1) +2 Frenzy. / Apply DoT 6 | (1) +3 Frenzy. / Apply DoT 6 |
+| Bestial Wrath | (1) Surge: pet attacks once per Frenzy. | (1) Surge: pet attacks once per Frenzy. / +2 Frenzy. | (1) Surge: pet attacks once per Frenzy. / +2 Frenzy. / Retain. |
+| Cobra Shot | (1) Deal 10. / +1 Frenzy. | (1) Deal 13. / +1 Frenzy. | (1) Deal 13. / +2 Frenzy. |
+| Dire Beast | (0) Pet attacks three times. / Exhaust. | (0) +1 Frenzy. / Pet attacks three times. / Exhaust. | (0) +1 Frenzy. / Pet attacks three times. / Exhaust. / Retain. |
+| Growl | (1) Gain 8 Absorb. / Spend 2: gain 8 more. | (1) Gain 10 Absorb. / Spend 2: gain 8 more. | (1) Gain 10 Absorb. / Spend 1: gain 8 more. |
+| Intimidation | (1) Pet attacks. / Apply Stunned 1 ⌛ / Cooldown 3. | (1) Pet attacks twice. / Apply Stunned 1 ⌛ / Cooldown 3. | (1) Pet attacks twice. / Apply Stunned 1 ⌛ / Apply Demoralized 2 ⌛ / Cooldown 3. |
+| Kill Command | (1) Pet attacks twice. / Cooldown 2. | (0) Pet attacks twice. / Cooldown 2. | (0) +1 Frenzy. / Pet attacks twice. / Cooldown 2. |
+| Multi-Shot | (1) Deal 7 to all. / Pet attacks. | (1) Deal 8 to all. / Pet attacks. | (1) Deal 8 to all. / +1 Frenzy. / Pet attacks. |
+| Spirit Bond | (1) Power. / Pet attacks: gain 2 Absorb. | (1) Power. / Pet attacks: gain 3 Absorb. | (1) Power. / Pet attacks: gain 3 Absorb. / Innate. |
+| The Beast Within | (0) Power. / Attacks: pet attacks. | (0) Power. / Attacks: pet attacks. / Innate. | (0) Power. / +2 Frenzy. / Attacks: pet attacks. / Innate. |
+
+**Marksmanship**
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Aimed Shot | (2) Cast. / Deal 30. / Careful Aim: deal 12 more. | (2) Cast. / Deal 34. / Careful Aim: deal 14 more. | (2) Cast. / Deal 34. / Careful Aim: deal 14 more. / Careful Aim: draw 1. |
+| Concussive Shot | (1) Deal 7. / Apply Demoralized 2 ⌛ | (1) Deal 9. / Apply Demoralized 2 ⌛ | (1) Deal 9. / Apply Demoralized 3 ⌛ |
+| Counter Shot | (0) Interrupt the target's cast. / Pet attacks. / Cooldown 2. | (0) Interrupt the target's cast. / Pet attacks twice. / Cooldown 2. | (0) Interrupt the target's cast. / Pet attacks twice. / Apply Demoralized 2 ⌛ / Cooldown 2. |
+| Hunter's Mark | (0) Apply Sundered 5 ⌛ / Exhaust. | (0) Apply Sundered 6 ⌛ / Exhaust. | (0) +2 Frenzy. / Apply Sundered 6 ⌛ / Exhaust. |
+| Rapid Fire | (1) Deal 4 four times. / Cooldown 2. | (1) Deal 4 four times. / +1 Frenzy. / Cooldown 2. | (1) Deal 5 four times. / +1 Frenzy. / Cooldown 2. |
+| Readiness | (0) Return Cooldown cards to hand. / Draw 1. / Exhaust. | (0) Return Cooldown cards to hand. / Draw 1. / Exhaust. / Retain. | (0) Return Cooldown cards to hand. / Draw 2. / Exhaust. / Retain. |
+| Steady Shot | (1) Cast. / Deal 17. / Careful Aim: draw 1. | (1) Cast. / Deal 20. / Careful Aim: draw 1. | (1) Cast. / Deal 20. / Draw 1. |
+| Trueshot Aura | (1) Power. / Careful Aim: Attacks deal 7 more. | (0) Power. / Careful Aim: Attacks deal 7 more. | (0) Power. / Careful Aim: Attacks deal 8 more. |
+| Volley | (2) Cast. / Deal 20 to all. | (2) Cast. / Deal 23 to all. | (2) Cast. / Deal 23 to all. / Careful Aim: deal 5 more. |
+| Wailing Arrow | (1) Deal 12 to all. / Interrupt all casts. / Exhaust. | (1) Deal 12 to all. / Interrupt all casts. / Apply Demoralized 1 ⌛ to all / Exhaust. | (1) Deal 15 to all. / Interrupt all casts. / Apply Demoralized 1 ⌛ to all / Exhaust. |
+
+**Survival**
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Counterattack | (1) Trap. / Deal 17. | (1) Trap. / Deal 20. | (1) Trap. / Deal 20. / Apply Demoralized 2 ⌛ |
+| Entrapment | (0) Power. / Traps: also apply Demoralized 2. | (0) Power. / Traps: also apply Demoralized 2 and Sundered 1. | (0) Power. / Traps: also apply Demoralized 2 and Sundered 1. / Innate. |
+| Explosive Trap | (1) Trap. / Deal 8 to all. / Apply DoT 4 to all | (1) Trap. / Deal 10 to all. / Apply DoT 4 to all | (1) Trap. / Deal 10 to all. / Apply DoT 4 to all / Apply Sundered 1 ⌛ to all |
+| Feign Death | (0) Power. / Last Breath: stay at 1 HP, enemies skip a turn. | (0) Power. / Last Breath: stay at 5 HP, enemies skip a turn. | (0) Power. / Last Breath: stay at 5 HP, enemies skip a turn. / Innate. |
+| Frost Trap | (1) Trap. / Apply Demoralized 2 ⌛ to all | (1) Trap. / Apply Demoralized 2 ⌛ to all / Apply Sundered 2 ⌛ to all | (1) Trap. / Apply Demoralized 3 ⌛ to all / Apply Sundered 2 ⌛ to all |
+| Immolation Trap | (1) Trap. / Apply DoT 9 | (1) Trap. / Apply DoT 11 | (1) Trap. / Deal 6. / Apply DoT 11 |
+| Lock and Load | (0) Power. / When a Trap triggers: draw 2. | (0) Power. / When a Trap triggers: draw 2, +1 Frenzy. | (0) Power. / When a Trap triggers: draw 2, +1 Frenzy. / Innate. |
+| Raptor Strike | (1) Deal 8. / Gain 4 Absorb. | (1) Deal 10. / Gain 5 Absorb. | (1) Deal 10. / Gain 5 Absorb. / +1 Frenzy. |
+| Resourcefulness | (0) Power. / Triggered Traps return to hand. | (0) Power. / Triggered Traps return to hand. / Innate. | (0) Power. / Triggered Traps return to hand. / When a Trap triggers: gain 3 Absorb. / Innate. |
+| Wyvern Sting | (1) Apply Stunned 1 ⌛ / Apply DoT 4 / Cooldown 3. | (1) Apply Stunned 1 ⌛ / Apply DoT 7 / Cooldown 3. | (1) Apply Stunned 1 ⌛ / Apply DoT 7 / Apply Demoralized 2 ⌛ / Cooldown 3. |
+
+**Épiques**
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Beast Cleave | Pet attacks: Stampede +1. | Pet attacks: Stampede +1, in full. | Pet attacks: Stampede +2, in full. |
+| Black Arrow | Enemy DoT ticks: pet attacks it. | Enemy DoT ticks: pet attacks it, +1 Frenzy. | Enemy DoT ticks: pet attacks it, +2 Frenzy. |
+| Call of the Wild | Start of turn: pet attacks. | Start of turn: +1 Frenzy, pet attacks. | Start of turn: +2 Frenzy, pet attacks. |
+| Lone Wolf | Attack hits: Ferocity 3. | Attack hits: Ferocity 4. | Attack hits: Ferocity 4. Start of turn: +1 Frenzy. |
+| Master Marksman | Careful Aim: Deadeye 24. | Careful Aim: Deadeye 27. | Careful Aim: Deadeye 30. |
+| Roar of Sacrifice | When hit: Intervene 4. | When hit: Intervene 5. | When hit: Intervene 6. |
+| Trap Launcher | Traps: Launch 2. | Traps: +1 Frenzy, Launch 2. | Traps: +1 Frenzy, Launch 3. |
+
+**Variantes de Lone Wolf**
+
+| Carte | +1 | +2 | +3 |
+|---|---|---|---|
+| Aspect of the Turtle | (1) Power. / Each Attack hit: gain 1 Absorb. | (1) Power. / Each Attack hit: gain 1 Absorb. / Innate. | (1) Power. / Gain 5 Absorb. / Each Attack hit: gain 1 Absorb. / Innate. |
+| Chimaera Shot | (1) Deal 8. / Deal 4 to another enemy. / +1 Frenzy. | (1) Deal 8. / Deal 6 to another enemy. / +1 Frenzy. | (1) Deal 8. / Deal 6 to another enemy. / +2 Frenzy. |
+| Double Tap | (0) Draw 1. / +3 Frenzy. / Exhaust. | (0) Draw 1. / +4 Frenzy. / Exhaust. | (0) Draw 1. / +4 Frenzy. / Exhaust. / Retain. |
+| Explosive Shot | (1) Surge: deal 6 per Frenzy. | (1) Surge: deal 6 per Frenzy. / +2 Frenzy. | (1) Surge: deal 6 per Frenzy. / +2 Frenzy. / Retain. |
+| Kill Shot | (1) Deal 8. / Execute: deal 16. / +1 Frenzy. / Cooldown 2. | (0) Deal 8. / Execute: deal 16. / +1 Frenzy. / Cooldown 2. | (0) Deal 8. / Execute: deal 16. / +2 Frenzy. / Cooldown 2. |
+| Salvo | (1) Deal 7 to all. / +1 Frenzy. | (1) Deal 8 to all. / +1 Frenzy. | (1) Deal 8 to all. / +2 Frenzy. |
+| Scatter Shot | (1) Deal 3. / +1 Frenzy. / Apply Stunned 1 ⌛ / Cooldown 3. | (1) Deal 7. / +1 Frenzy. / Apply Stunned 1 ⌛ / Cooldown 3. | (1) Deal 7. / +2 Frenzy. / Apply Stunned 1 ⌛ / Cooldown 3. |
+| Silencing Shot | (0) Interrupt the target's cast. / +1 Frenzy. / Cooldown 2. | (0) Interrupt the target's cast. / +2 Frenzy. / Cooldown 2. | (0) Interrupt the target's cast. / +2 Frenzy. / Apply Demoralized 2 ⌛ / Cooldown 2. |
+| Trick Shots | (0) Power. / Attacks: +1 Frenzy. | (0) Power. / Attacks: +1 Frenzy. / Innate. | (0) Power. / +2 Frenzy. / Attacks: +1 Frenzy. / Innate. |
+
 ## 1. Règles propres
 
 ### Le familier
