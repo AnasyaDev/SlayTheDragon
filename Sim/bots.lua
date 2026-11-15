@@ -390,19 +390,22 @@ return function(ns)
     local nodes = 0
     local seen = {}
     local seq = {}
-    local function dfs(s)
-      nodes = nodes + 1
-      -- coups lus avant le score : une feuille (aucun coup, ou plafond atteint) qui n'est pas la position de
-      -- départ est une copie jetable, son tour ennemi se joue sur place
-      local acts
-      if not s.result and nodes < cap then acts = Combat.legalPlays(s) end
-      local sc = leafScore(s, s ~= c and (not acts or #acts == 0))
-      if sc > best then
+    -- Score de fin de tour de s noté APRÈS ses suites : s n'est plus lu ensuite, son tour ennemi se joue sur
+    -- place (sauf la position de départ). Le meilleur reste le premier dans l'ordre de visite (s avant ses
+    -- suites) : s le prend s'il bat tout ce qui précède (bestBefore) et égale au moins ses suites.
+    local function score(s, bestBefore)
+      local sc = leafScore(s, s ~= c)
+      if sc > bestBefore and sc >= best then
         best = sc
         bestSeq = {}
         for i = 1, #seq do bestSeq[i] = seq[i] end
       end
-      if not acts then return end
+    end
+    local function dfs(s)
+      nodes = nodes + 1
+      local bestBefore = best
+      if s.result or nodes >= cap then return score(s, bestBefore) end
+      local acts = Combat.legalPlays(s)
       local tried = {}
       local zb = zoneBots(s)
       for i = 1, #acts do
@@ -425,9 +428,10 @@ return function(ns)
             dfs(t)
             seq[#seq] = nil
           end
-          if nodes >= cap then return end
+          if nodes >= cap then break end
         end
       end
+      score(s, bestBefore)
     end
     dfs(c)
     return bestSeq, nodes, best
