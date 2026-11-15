@@ -3,6 +3,9 @@
 -- la pile où se trouve l'épique : ses crochets sont ceux du deck (deckHooks), actifs partout.
 -- Usage : lua5.1 Sim/tests_epic_rogue.lua   (ou luajit) — doit finir par ALL PASS.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
+-- LuaJIT : grand cache de traces pour les campagnes simulées de la suite (sinon il se vide sans cesse ; sans
+-- effet sur les résultats ni sous Lua 5.1).
+if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
 local ns = dofile(root .. "/Sim/load.lua")(root)
 local Combat, Card, Save, R = ns.Combat, ns.Card, ns.Save, ns.Rogue
 local Cards = ns.Cards
