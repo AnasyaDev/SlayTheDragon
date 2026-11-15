@@ -168,8 +168,8 @@ return function(ns)
     last_stand = lastBreath,
     -- Mage
     hot_streak = function(c) return T * math.min(1, playsOf(c, function(d) return d.school == "fire" end) / 2) * 20 end,
-    ignite = function(c, inst) return T * playsOf(c, isFire) * dotUnits(up(inst, 2, 3)) end,
-    shatter = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 3, 4) * W.enemyHp end,
+    ignite = function(c, inst) return T * playsOf(c, isFire) * dotUnits(up(inst, 2, 3, 3, 4)) end, -- +3 : DoT 5
+    shatter = function(c, inst) return T * playsOf(c, isAttack) * 0.5 * up(inst, 3, 4, 4, 5) * W.enemyHp end, -- +3 : 6
     arcane_power = function(c)
       return T * playsOf(c, function(d) return isAttack(d) and dealsDamage(d) end) * 2 * W.enemyHp
     end,
