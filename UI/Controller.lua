@@ -62,6 +62,8 @@ C.REASONS = {
   chosen = "Choice already made.",
   deck = "Deck too small.",
   upgrade = "No card to upgrade.",
+  maxed = "Fully upgraded.",
+  noUpgrade = "Can't be upgraded.",
   relic = "Relic already owned.",
   epic = "Only one epic card per expedition.",
   ended = "The expedition is over.",
@@ -134,7 +136,7 @@ local function validCard(inst)
   if type(inst) ~= "table" then return false end
   local def = ns.Cards[inst.id]
   if not def then return false end
-  if inst.up and not def.up then return false end
+  if Card.level(inst) > Card.tiers(inst.id) then return false end -- palier non écrit (carte renommée…)
   return true
 end
 
@@ -1146,6 +1148,19 @@ local function epicFirst(opts)
   return opts
 end
 
+-- Carte du deck sur un écran d'amélioration (feu de camp, rencontre « upgrade ») : améliorable, avec l'aperçu
+-- de son palier suivant au survol ; sinon grisée avec sa raison (« Fully upgraded. » : dernier palier écrit
+-- atteint, X.upgradeRefusal). card = carte montrée (X.shownDeck), i = sa place dans le deck.
+local function upgradeOption(exp, avail, id, i, card)
+  local o = { id = id, card = { id = card.id, up = card.up, from = card.from } }
+  if avail[id] then
+    o.preview = Card.canUp(card.id, card.up) or nil
+  elseif not X.canUpgrade(exp, i) then
+    o.disabled, o.reason = true, C.reasonText(X.upgradeRefusal(exp, i))
+  end
+  return actionOption(avail, o)
+end
+
 local function deckStep(exp, view)
   local avail = available(exp)
   local opts = {}
@@ -1154,10 +1169,7 @@ local function deckStep(exp, view)
   if view == "upgrade" then
     title = "Meditate: choose a card to upgrade"
     for i, card in ipairs(shown) do
-      if avail["upgrade:" .. i] then
-        opts[#opts + 1] = { id = "upgrade:" .. i, card = { id = card.id, up = card.up, from = card.from },
-          preview = ns.Cards[card.id].up ~= nil }
-      end
+      opts[#opts + 1] = upgradeOption(exp, avail, "upgrade:" .. i, i, card)
     end
   else
     title = "Remove a card from the deck (" .. X.removePrice(exp) .. "g)"
@@ -1181,9 +1193,10 @@ local function merchantStep(exp)
     opts[#opts + 1] = actionOption(avail, o)
   end
   for i, it in ipairs(s.cards) do
-    -- carte vendue déjà améliorée (zones hautes, X.SHOP_UPGRADED) : affichée améliorée
+    -- carte vendue déjà améliorée (zones hautes, X.SHOP_UPGRADED) : affichée à son palier (variante : borné à ses
+    -- paliers écrits)
     local card = shownCard(exp, it.id)
-    if it.up then card.up = true end
+    if it.up then card.up = Card.upValue(math.min(Card.level(it.up), Card.tiers(card.id))) end
     item("buyCard", i, it, { card = card, epic = it.epic })
   end
   for i, it in ipairs(s.relics) do
@@ -1261,9 +1274,10 @@ local function selectStep(exp)
   local opts = {}
   for i, card in ipairs(X.shownDeck(exp)) do
     local id = "select:" .. i
-    if avail[id] then
-      opts[#opts + 1] = { id = id, card = { id = card.id, up = card.up, from = card.from },
-        preview = (sel.kind == "upgrade" and ns.Cards[card.id].up ~= nil) or nil }
+    if sel.kind == "upgrade" then
+      opts[#opts + 1] = upgradeOption(exp, avail, id, i, card)
+    elseif avail[id] then
+      opts[#opts + 1] = { id = id, card = { id = card.id, up = card.up, from = card.from } }
     end
   end
   opts[#opts + 1] = actionOption(avail, { id = "skipSelect", label = "Skip" })

@@ -57,6 +57,7 @@ target, effects, text, up, cast, cooldown, exhaust, retain, power, hooks, level)
 
 | Champ | Règle |
 |---|---|
+| `up`, `up2`, `up3` | paliers d'amélioration (+1, +2, +3), chacun ne donne que ce qui change par rapport au précédent, `text` toujours redonné : `docs/ameliorations.md` (contrôle : `lua5.1 Sim/upgrades.lua`) |
 | `class` | id de la classe ; absent = carte neutre (avec `neutral = true` : marchand et rencontres seulement, GDD ; `Data/Neutral.lua`) |
 | `neutral`, `tier` | carte neutre : `neutral = true`, `path = "neutral"`, `noReward = true`, `tier` = palier commun qui la débloque (0 d'emblée, N = première victoire du compte dans la zone N, `docs/zones.md`) ; tirée par `Expedition.neutralPool` (emplacement « Neutral » du marchand, `{ "cardChoice", neutral = true }`), jamais par `cardPool` (récompenses) |
 | `school` | champ libre (holy, shadow, fire, frost, arcane, nature…) : condition `school:<x>`, compteurs du tour, couleur |

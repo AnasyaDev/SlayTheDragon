@@ -115,7 +115,7 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | `combat` | état du combat en cours (phase `combat`) |
 | `fight` | `{ kind = combat/elite/boss, pool, encounter, seed, reward }` pendant le combat |
 | `reward` | phase `reward` : `{ kind, gold, goldGained, cards = {ids}, cardsDone, picked, relic, relicTaken, potion, potionTaken }` |
-| `shop` | phase `merchant` : `{ cards = { {id, price, sold, neutral?, up?, epic?} }, relics = {...}, potions = {...}, removed }` (6e carte `neutral = true` : emplacement « Neutral » ; `up = true` : carte vendue déjà améliorée, zones 2 à 7 ; `removed` = retraits de la visite) ; prix selon le rang de la zone (« Économie sur sept zones ») ; retrait : `Expedition.removePrice(exp)` (crochet `removePrice`) |
+| `shop` | phase `merchant` : `{ cards = { {id, price, sold, neutral?, up?, epic?} }, relics = {...}, potions = {...}, removed }` (6e carte `neutral = true` : emplacement « Neutral » ; `up` = palier de la carte vendue déjà améliorée (1 aujourd'hui, `X.SHOP_UP_TIER`), zones 2 à 7 ; `removed` = retraits de la visite) ; prix selon le rang de la zone (« Économie sur sept zones ») ; retrait : `Expedition.removePrice(exp)` (crochet `removePrice`) |
 | `event` | phase `event` : `{ id (false = rien à signaler), chosen (false ou index), rolls, result, lucky }` ; texte dans `ns.Events[id]` ; `result` = texte après le choix (réponse + issue du pari) ; `lucky` = issue d'un pari (true/false, nil sans pari) |
 | `select` | phase `select` : `{ kind = "upgrade" | "remove" | "dupe", reward? }` |
 | `flags` | drapeaux de compte connus au départ (copie de `meta.flags`, sert aux conditions) |
@@ -429,6 +429,12 @@ devant : l'épique n'était presque jamais améliorée). Tests : `Sim/tests_epic
   (`beaten` = { sa zone }) et compte tout de suite (`Save.migrate` appelle `Save.settle`). Tests « sauvegarde v7
   -> v8 » et « rechargement en plein milieu de la zone 3 et sur l'écran entre deux zones »
   (`Sim/tests_expedition.lua`), harnais U6 et UZ.
+- Version 7 (15/11/2026, paliers d'amélioration +1 à +3 ; expédition version 9 ; `docs/ameliorations.md`). Le champ
+  `up` d'une carte vaut `false` ou le palier 1..3 (`true` reste lu comme le palier 1). Méta 6 → 7
+  (`Save.MIGRATIONS[6]`) : decks du journal, `up = true` → 1. Expédition 8 → 9 (`Save.EXP_MIGRATIONS[8]`) : toute
+  table qui désigne une carte (deck, piles et Powers du combat en cours, épique du combat, marchand) passe de
+  `true` à 1 (`Save.normalizeUp`), `epicReplaced.oldUp` aussi ; `stats.upTiers` (améliorations par palier
+  atteint) = `{ stats.upgraded }`. Test « sauvegarde v6/expédition v8 -> v7/v9 » (`Sim/tests_expedition.lua`).
 - Jamais d'effacement : une expédition illisible part dans `db.quarantine` avec la raison ; une
   sauvegarde d'une version plus récente de l'addon n'est pas touchée.
 - Journal : une entrée par expédition `{ result, class, zone (zone atteinte), beaten (boss battus), key, seed, act,
@@ -499,7 +505,7 @@ dernière valeur ; rang 1 = étal d'origine) :
   cartes de classe, emplacement « Neutral », bibelots, potions et épique.
 - **Cartes vendues améliorées** : chaque carte de l'étal (classe ou neutre, qui a une amélioration ; jamais
   l'épique) est tirée améliorée avec la chance `SHOP_UPGRADED` (tirage du flux `merchant` avant son prix, **aucun
-  tirage si la chance est nulle**) : `shop.cards[i].up = true`, affichée améliorée par l'interface (`merchantStep`
+  tirage si la chance est nulle**) : `shop.cards[i].up` = palier vendu (`X.SHOP_UP_TIER`, 1 aujourd'hui ; `docs/ameliorations.md`), affichée améliorée par l'interface (`merchantStep`
   de `UI/Controller.lua` passe `up` à la carte de l'étal), ajoutée améliorée au deck par `buyCard`.
 - **Rareté** : `Expedition.cardWeights(exp, "shop")` suit désormais `SHOP_RARE_BY_ZONE` (il suivait `RARE_BY_ZONE`,
   ×2 à Blackrock Mountain : trop faible pour « plus rares », et partagé avec les récompenses) ; les bibelots de l'étal

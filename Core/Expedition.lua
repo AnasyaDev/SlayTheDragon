@@ -29,7 +29,9 @@ ns.Expedition = X
 -- 8 : une expédition traverse toute la campagne (décision du joueur, 14/11/2026) : exp.startZone, exp.lastZone,
 --     exp.beaten (boss battus), phase « transit » entre deux zones (exp.transit), exp.banked (ce que la méta a
 --     déjà reçu : Meta.bank) ; exp.act = rang de la zone dans l'expédition, exp.acts = nombre de zones.
-X.VERSION = 8
+-- 9 : paliers d'amélioration (décision du joueur, 15/11/2026) : up d'une carte = false ou palier 1..3 (true
+--     devient 1), stats.upTiers[n] = améliorations qui ont atteint le palier n (docs/ameliorations.md).
+X.VERSION = 9
 
 -- Entre deux zones : soin de cette part des PV max (sans dépasser le maximum ; crochet healOut des soins hors
 -- combat : Cursed Eye of Paleth le divise par deux). Lecture du concepteur de « soin partiel, 50 % des PV max ».
@@ -69,13 +71,17 @@ X.RARE_BY_ZONE = { 1, 1.15, 1.3, 1.5, 1.65, 1.8, 2 }
 --                        appliqué avant le crochet « price » des bibelots ; le retrait garde sa propre hausse
 --   SHOP_UPGRADED        chance qu'une carte de l'étal (classe ou neutre, améliorable, pas l'épique) soit vendue
 --                        déjà améliorée (tirage du flux « merchant », seulement si la chance dépasse 0)
---   UPGRADED_PRICE       facteur de prix d'une carte vendue améliorée
+--   UPGRADED_PRICE       facteur de prix d'une carte vendue améliorée (quel que soit son palier)
+--   SHOP_UP_TIER         palier d'une carte vendue améliorée (docs/ameliorations.md) : nombre, ou table par rang de
+--                        zone ; borné aux paliers écrits de la carte. 1 aujourd'hui (le marchand ne vend que le +1) :
+--                        une table { 1, 1, 1, 2, 2, 2, 3 } suffira quand les paliers 2 et 3 seront écrits
 --   SHOP_RARE_BY_ZONE    part de rares des cartes de l'étal (comme X.RARE_BY_ZONE, propre au marchand)
 --   SHOP_RELIC_RARE_BY_ZONE  part de bibelots rares de l'étal (poids « rare » de X.RELIC_WEIGHTS.normal
 --                        multiplié, pris sur « common » ; récompenses, coffres et rencontres inchangés)
 X.PRICE_BY_ZONE = { 1, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2 }
 X.SHOP_UPGRADED = { 0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6 }
 X.UPGRADED_PRICE = 1.25
+X.SHOP_UP_TIER = 1
 X.SHOP_RARE_BY_ZONE = { 1, 1.3, 1.6, 1.9, 2.2, 2.5, 2.8 }
 X.SHOP_RELIC_RARE_BY_ZONE = { 1, 1.2, 1.4, 1.6, 1.8, 2.0, 2.2 }
 
@@ -156,6 +162,11 @@ end
 -- Chance qu'une carte de l'étal soit vendue déjà améliorée dans la zone de l'expédition (X.SHOP_UPGRADED).
 function X.shopUpgradeChance(exp)
   return byRank(X.SHOP_UPGRADED, exp) or 0
+end
+
+-- Palier d'une carte id vendue améliorée dans la zone de l'expédition (X.SHOP_UP_TIER, borné aux paliers écrits).
+function X.shopUpgradeTier(exp, id)
+  return min(byRank(X.SHOP_UP_TIER, exp) or 1, Card.tiers(id))
 end
 
 ---------------------------------------------------------------------------
@@ -514,18 +525,39 @@ function X.addCard(exp, id, up)
       i = X.epicIndex(exp)
     end
   end
-  exp.deck[#exp.deck + 1] = { id = id, up = up and true or false }
+  -- up : palier gardé (copie d'une carte : dupe), true = palier 1 (carte offerte « améliorée » : rencontre
+  -- { "card", id, up = true }, marchand), borné aux paliers écrits de la carte
+  local n = math.min(Card.level(up), Card.tiers(id))
+  exp.deck[#exp.deck + 1] = { id = id, up = Card.upValue(n) }
   exp.stats.cardsAdded = exp.stats.cardsAdded + 1
 end
 
+-- Une carte du deck peut monter d'un palier : son palier suivant est écrit (Card.tiers) et elle est sous
+-- le palier 3 (docs/ameliorations.md).
 function X.canUpgrade(exp, i)
   local card = exp.deck[i]
-  return card ~= nil and not card.up and ns.Cards[card.id] ~= nil and ns.Cards[card.id].up ~= nil
+  return card ~= nil and ns.Cards[card.id] ~= nil and Card.canUp(card.id, card.up)
 end
 
+-- Raison du refus d'amélioration de la carte i : "maxed" (dernier palier écrit atteint), "noUpgrade" (carte
+-- sans amélioration), sinon "badCard".
+function X.upgradeRefusal(exp, i)
+  local card = exp.deck[i]
+  if not card or not ns.Cards[card.id] then return "badCard" end
+  if Card.tiers(card.id) == 0 then return "noUpgrade" end
+  if not Card.canUp(card.id, card.up) then return "maxed" end
+  return "badCard"
+end
+
+-- Monte la carte i d'un palier (stats.upgraded : toutes les améliorations ; stats.upTiers[n] : celles qui
+-- ont atteint le palier n).
 local function upgrade(exp, i)
-  exp.deck[i].up = true
+  local n = Card.level(exp.deck[i]) + 1
+  exp.deck[i].up = n
   exp.stats.upgraded = exp.stats.upgraded + 1
+  local t = exp.stats.upTiers or {}
+  exp.stats.upTiers = t
+  t[n] = (t[n] or 0) + 1
 end
 
 -- Soin hors combat (repos, rencontres, passage d'une zone à l'autre) : crochet healOut (v) des zones,
@@ -847,15 +879,17 @@ local function openShop(exp)
   -- crochet « price » des bibelots ; à Westfall (facteur 1), le calcul d'origine
   local factor = X.priceFactor(exp)
   local function price(base, kind, up)
-    local p = base * factor * (up and X.UPGRADED_PRICE or 1) * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(rng))
+    local p = base * factor * (Card.level(up) > 0 and X.UPGRADED_PRICE or 1)
+      * (1 - X.PRICE_JITTER + 2 * X.PRICE_JITTER * Rng.float(rng))
     p = X.modify(exp, "price", p, kind)
     return max(1, floor(p + 0.5))
   end
-  -- carte vendue déjà améliorée (X.SHOP_UPGRADED) : tirée avant son prix, jamais si la chance est nulle
+  -- carte vendue déjà améliorée (X.SHOP_UPGRADED) : tirée avant son prix, jamais si la chance est nulle ; renvoie
+  -- son palier (X.shopUpgradeTier) ou false
   local upChance = X.shopUpgradeChance(exp)
   local function rollUp(id)
-    local d = ns.Cards[id]
-    return upChance > 0 and d.up ~= nil and Rng.float(rng) < upChance or false
+    if upChance > 0 and Card.tiers(id) > 0 and Rng.float(rng) < upChance then return X.shopUpgradeTier(exp, id) end
+    return false
   end
   local shop = { cards = {}, relics = {}, potions = {}, removed = 0 }
   local shopWeights = X.cardWeights(exp, "shop")
@@ -1458,7 +1492,7 @@ function X.new(opts)
       combat = Rng.stream(seed, "combat"),
     },
     stats = { cleared = 0, elites = 0, bosses = 0, combats = 0, goldEarned = 0, goldSpent = 0,
-      cardsAdded = 0, removed = 0, upgraded = 0, visits = {}, events = {} },
+      cardsAdded = 0, removed = 0, upgraded = 0, upTiers = {}, visits = {}, events = {} },
     combatStats = opts.stats and true or false,
     quiet = opts.quiet and true or false,
   }
@@ -1635,7 +1669,7 @@ H.campfire = {
     return true
   end,
   upgrade = function(exp, a)
-    if not X.canUpgrade(exp, a[2] or 0) then return false, "badCard" end
+    if not X.canUpgrade(exp, a[2] or 0) then return false, X.upgradeRefusal(exp, a[2] or 0) end
     upgrade(exp, a[2])
     leaveNode(exp)
     return true
@@ -1660,6 +1694,7 @@ end
 H.merchant = {
   buyCard = function(exp, a)
     local it = exp.shop.cards[a[2] or 0]
+    -- carte vendue améliorée : ajoutée à son palier (it.up : nombre ; true d'avant les paliers = 1)
     return buy(exp, exp.shop.cards, a[2], function(id) X.addCard(exp, id, it and it.up) end)
   end,
   buyRelic = function(exp, a)
@@ -1719,7 +1754,7 @@ H.select = {
     local i = a[2] or 0
     local kind = exp.select.kind
     if kind == "upgrade" then
-      if not X.canUpgrade(exp, i) then return false, "badCard" end
+      if not X.canUpgrade(exp, i) then return false, X.upgradeRefusal(exp, i) end
       upgrade(exp, i)
     elseif kind == "remove" then
       if not exp.deck[i] or #exp.deck <= 1 then return false, "badCard" end
