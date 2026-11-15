@@ -1208,6 +1208,19 @@ function Combat.enemyAction(c, e, a)
   actionBody(c, e, a)
 end
 
+-- Étourdi pendant son propre tour : le reste du tour est annulé (aucun coup de l'attaque qui a
+-- déclenché l'effet), la charge de Stunned est consommée par ce tour-là. Fonction du module et non
+-- closure d'executeMove : LuaJIT ne compile pas une fonction qui crée une closure (FNEW).
+local function stopped(c, e)
+  if not e.stopTurn then return false end
+  e.stopTurn = nil
+  e.st.stunned = (e.st.stunned or 0) > 1 and e.st.stunned - 1 or nil
+  log(c, { t = "stunned", unit = e.uid, stopped = true, move = e.intent })
+  stat(c, "enemyTurnsStopped")
+  stunSpent(c, e)
+  return true
+end
+
 local function executeMove(c, e)
   local def = ns.Enemies[e.id]
   local mv = def.moves[e.intent]
@@ -1221,17 +1234,6 @@ local function executeMove(c, e)
     end
   end
   local p = c.player
-  -- Étourdi pendant son propre tour : le reste du tour est annulé (aucun coup de l'attaque qui a
-  -- déclenché l'effet), la charge de Stunned est consommée par ce tour-là.
-  local function stopped()
-    if not e.stopTurn then return false end
-    e.stopTurn = nil
-    e.st.stunned = (e.st.stunned or 0) > 1 and e.st.stunned - 1 or nil
-    log(c, { t = "stunned", unit = e.uid, stopped = true, move = e.intent })
-    stat(c, "enemyTurnsStopped")
-    stunSpent(c, e)
-    return true
-  end
   -- « act » (élan de l'attaque à l'écran) seulement quand la première action part vraiment
   local acted = #mv.actions == 0
   if acted then log(c, { t = "act", unit = e.uid, move = e.intent }) end
@@ -1244,7 +1246,7 @@ local function executeMove(c, e)
         -- Trap : la plus ancienne se déclenche avant les coups de cette attaque, sur l'attaquant
         Combat.triggerTrap(c, e)
       end
-      if c.result or e.dead or stopped() then break end
+      if c.result or e.dead or stopped(c, e) then break end
       if not acted then
         acted = true
         log(c, { t = "act", unit = e.uid, move = e.intent })
@@ -1264,7 +1266,7 @@ local function executeMove(c, e)
           if c.result or e.dead then break end
           -- Coup qui interrompt : coupe l'incantation s'il fait perdre des PV.
           if a.interrupts and loss > 0 then interruptPlayer(c, e) end
-          if stopped() then halt = true break end
+          if stopped(c, e) then halt = true break end
         end
         -- fin de l'action d'attaque (tous ses coups) : PV perdus au total (Bite de Duskwood : une Curse
         -- si total > 0)
@@ -1273,7 +1275,7 @@ local function executeMove(c, e)
       else
         actionBody(c, e, a)
       end
-      if c.result or e.dead or stopped() then break end
+      if c.result or e.dead or stopped(c, e) then break end
     end
   end
   e.stopTurn = nil
@@ -1497,17 +1499,18 @@ function Combat.castSlots(c)
 end
 
 local function allowed(c, d)
+  local hk = c.hk -- aucun crochet « allow » dans ce combat (c.hk) : tout est permis
+  if hk and not hk.allow then return true end
   local powers = c.player.powers
   for i = 1, #powers do
     local h = Card.def(powers[i]).hooks
     h = h and h.allow
     if h and not h(c, powers[i], d) then return false end
   end
-  if c.epic then -- épique en jeu : son crochet « allow » (deckHooks ou hooks), comme un pouvoir
+  if c.epic then -- épique en jeu : son crochet « allow » (deckHooks puis hooks), comme un pouvoir
     local dh, ph = epicHooks(c)
-    for _, t in ipairs({ dh or false, ph or false }) do
-      if t and t.allow and not t.allow(c, c.epic, d) then return false end
-    end
+    if dh and dh.allow and not dh.allow(c, c.epic, d) then return false end
+    if ph and ph.allow and not ph.allow(c, c.epic, d) then return false end
   end
   return true
 end
@@ -2403,7 +2406,6 @@ function Combat.new(opts)
 end
 
 local copyArr, copyMap = U.copyArr, U.copyMap
-
 local function copyUnit(u)
   local r = copyMap(u)
   r.st = copyMap(u.st)
