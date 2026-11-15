@@ -115,7 +115,7 @@ Données simples uniquement (pas de fonction ni de métatable : `Save.isPlain`).
 | `combat` | état du combat en cours (phase `combat`) |
 | `fight` | `{ kind = combat/elite/boss, pool, encounter, seed, reward }` pendant le combat |
 | `reward` | phase `reward` : `{ kind, gold, goldGained, cards = {ids}, cardsDone, picked, relic, relicTaken, potion, potionTaken }` |
-| `shop` | phase `merchant` : `{ cards = { {id, price, sold, neutral?} }, relics = {...}, potions = {...}, removed }` (6e carte `neutral = true` : emplacement « Neutral » ; `removed` = retraits de la visite) ; retrait : `Expedition.removePrice(exp)` (crochet `removePrice`) |
+| `shop` | phase `merchant` : `{ cards = { {id, price, sold, neutral?, up?, epic?} }, relics = {...}, potions = {...}, removed }` (6e carte `neutral = true` : emplacement « Neutral » ; `up` = palier de la carte vendue déjà améliorée (1 aujourd'hui, `X.SHOP_UP_TIER`), zones 2 à 7 ; `removed` = retraits de la visite) ; prix selon le rang de la zone (« Économie sur sept zones ») ; retrait : `Expedition.removePrice(exp)` (crochet `removePrice`) |
 | `event` | phase `event` : `{ id (false = rien à signaler), chosen (false ou index), rolls, result, lucky }` ; texte dans `ns.Events[id]` ; `result` = texte après le choix (réponse + issue du pari) ; `lucky` = issue d'un pari (true/false, nil sans pari) |
 | `select` | phase `select` : `{ kind = "upgrade" | "remove" | "dupe", reward? }` |
 | `flags` | drapeaux de compte connus au départ (copie de `meta.flags`, sert aux conditions) |
@@ -327,7 +327,8 @@ obtention : l'épique se gagne (`docs/zones/decisions.md`, « Difficulté et ép
   garder l'actuelle (refus ; partir sans choisir = refuser). Seules les épiques débloquées par la classe sont
   proposables ; s'il n'y en a aucune, rien ne tombe et rien n'est tiré.
 - **Marchand** : à partir de la moitié du parcours, une chance qu'il vende une épique (à la suite des cartes,
-  `shop.cards[i].epic = true`), 150 po (± 10 %, crochet `price` genre `"card"`) ; achat = `addCard`.
+  `shop.cards[i].epic = true`), 150 po × le multiplicateur de prix de la zone (`PRICE_BY_ZONE` : 150 à Westfall,
+  330 à Blackrock Mountain ; ± 10 %, crochet `price` genre `"card"` ; « Économie sur sept zones ») ; achat = `addCard`.
 - **Hasard** : flux `exp.rng.epic` (créé au premier usage : premier tirage de chute, puis l'épique proposée ;
   marchand) ; les autres flux ne bougent pas. Sans épique débloquée : ni tirage, ni flux ; une expédition se
   déroule exactement comme sans épiques.
@@ -343,8 +344,8 @@ Paramètres (`Expedition.EPIC`, à changer en un endroit) :
 | `price` | 150 | prix de base d'une épique chez le marchand |
 
 **Part de rares par zone** (`Expedition.RARE_BY_ZONE`, même décision : un deck fourni en rares est la cible
-des zones tardives) : dans les récompenses de cartes de combat, d'élite et du marchand (cartes de classe et
-emplacement « Neutral »), le poids `rare` de `CARD_WEIGHTS` est multiplié par le facteur du rang de la zone et
+des zones tardives) : dans les récompenses de cartes de combat et d'élite (le marchand a sa propre progression
+depuis le 15/11/2026, `SHOP_RARE_BY_ZONE` : « Économie sur sept zones »), le poids `rare` de `CARD_WEIGHTS` est multiplié par le facteur du rang de la zone et
 pris sur le poids `common` (total inchangé : la part de rares est multipliée d'autant) ;
 `Expedition.cardWeights(exp, genre)`. Le boss n'offre que des rares (inchangé) ; les choix de cartes des
 rencontres gardent leurs poids. Facteurs proposés, à régler par simulation :
@@ -354,7 +355,9 @@ rencontres gardent leurs poids. Facteurs proposés, à régler par simulation :
 | facteur | 1 | 1,15 | 1,3 | 1,5 | 1,65 | 1,8 | 2 |
 | rares, combat (base 7 %) | 7 % | 8,1 % | 9,1 % | 10,5 % | 11,6 % | 12,6 % | 14 % |
 | rares, élite (base 15 %) | 15 % | 17,3 % | 19,5 % | 22,5 % | 24,8 % | 27 % | 30 % |
-| rares, marchand (base 13 %) | 13 % | 15 % | 16,9 % | 19,5 % | 21,5 % | 23,4 % | 26 % |
+| rares, marchand (base 13 %) | 13 % | 16,9 % | 20,8 % | 24,7 % | 28,6 % | 32,5 % | 36,4 % |
+
+(Ligne du marchand : `SHOP_RARE_BY_ZONE`, 1 / 1,3 / 1,6 / 1,9 / 2,2 / 2,5 / 2,8, depuis le 15/11/2026 ; avant : ce tableau.)
 
 Zone 1 : poids d'origine, tirages identiques à avant.
 
@@ -469,6 +472,148 @@ Décisions de détail (concepteur, 14/11/2026, à revoir par le joueur) :
 - `Expedition.enterZone` est public : les tests et le harnais d'interface s'en servent pour amener une expédition
   dans une zone plus loin.
 
+## Économie sur sept zones (décision du joueur, 15/11/2026)
+
+**Constat** (mesuré avant le changement, bot `human`, clé 0, 600 expéditions par classe) : l'économie datait d'une
+zone par expédition. Gains ≈ 150 à 270 po par zone (`GOLD` : combat 12–18, élite 25–35, boss 75–85, coffre 20–30,
+plus les rencontres ; 50 au départ), étal entier ≈ 700 à 950 po à prix fixes, marchand ≈ 0,43 visite par zone. Le
+Warrior gagnait 1 088 po par campagne, en dépensait 602 et finissait avec 536 inutilisés (≈ 50 % du gagné ; 35 %
+tout débloqué) ; à partir de Stranglethorn, tout l'étal était souvent achetable (jusqu'à 77 % des visites de
+Blackrock Mountain au compte neuf). Le joueur avait pu acheter tout l'étal dès la zone 2.
+
+**Décision du joueur** : « Équilibrer. Pour les marchands des zones plus hautes : augmenter les prix, MAIS augmenter
+la chance d'y trouver des cartes déjà améliorées et plus rares. »
+
+**Règles** (`Core/Expedition.lua`, tables par rang de la zone EN COURS, `ns.Zone.order` ; au-delà de la table, la
+dernière valeur ; rang 1 = étal d'origine) :
+
+| Rang | 1 WF | 2 DW | 3 WL | 4 STV | 5 SoS | 6 BS | 7 BRM |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `PRICE_BY_ZONE` (prix × ; `Expedition.priceFactor(exp)`) | 1 | 1,2 | 1,4 | 1,6 | 1,8 | 2,0 | 2,2 |
+| `SHOP_UPGRADED` (chance qu'une carte soit vendue améliorée ; `Expedition.shopUpgradeChance(exp)`) | 0 | 10 % | 20 % | 30 % | 40 % | 50 % | 60 % |
+| `SHOP_RARE_BY_ZONE` (part de rares des cartes de l'étal ×) | 1 | 1,3 | 1,6 | 1,9 | 2,2 | 2,5 | 2,8 |
+| → cartes rares à l'étal (base 13 %) | 13 % | 16,9 % | 20,8 % | 24,7 % | 28,6 % | 32,5 % | 36,4 % |
+| `SHOP_RELIC_RARE_BY_ZONE` (part de bibelots rares de l'étal ×) | 1 | 1,2 | 1,4 | 1,6 | 1,8 | 2,0 | 2,2 |
+| → bibelots rares à l'étal (base 15 %) | 15 % | 18 % | 21 % | 24 % | 27 % | 30 % | 33 % |
+| carte commune / peu commune / rare (po) | 35 / 55 / 90 | 42 / 66 / 108 | 49 / 77 / 126 | 56 / 88 / 144 | 63 / 99 / 162 | 70 / 110 / 180 | 77 / 121 / 198 |
+| bibelot commun / peu commun / rare (po) | 90 / 120 / 160 | 108 / 144 / 192 | 126 / 168 / 224 | 144 / 192 / 256 | 162 / 216 / 288 | 180 / 240 / 320 | 198 / 264 / 352 |
+| potion commune / peu commune / rare (po) | 30 / 45 / 60 | 36 / 54 / 72 | 42 / 63 / 84 | 48 / 72 / 96 | 54 / 81 / 108 | 60 / 90 / 120 | 66 / 99 / 132 |
+| épique (po) | 150 | 180 | 210 | 240 | 270 | 300 | 330 |
+
+- **Prix** : base (`PRICES`, `EPIC.price`) × `PRICE_BY_ZONE` × `UPGRADED_PRICE` (1,25, carte vendue améliorée)
+  ± `PRICE_JITTER` (10 %), **puis** le crochet `price` des bibelots (une remise s'applique au prix de la zone) ;
+  cartes de classe, emplacement « Neutral », bibelots, potions et épique.
+- **Cartes vendues améliorées** : chaque carte de l'étal (classe ou neutre, qui a une amélioration ; jamais
+  l'épique) est tirée améliorée avec la chance `SHOP_UPGRADED` (tirage du flux `merchant` avant son prix, **aucun
+  tirage si la chance est nulle**) : `shop.cards[i].up` = palier vendu (`X.SHOP_UP_TIER`, 1 aujourd'hui ; `docs/ameliorations.md`), affichée améliorée par l'interface (`merchantStep`
+  de `UI/Controller.lua` passe `up` à la carte de l'étal), ajoutée améliorée au deck par `buyCard`.
+- **Rareté** : `Expedition.cardWeights(exp, "shop")` suit désormais `SHOP_RARE_BY_ZONE` (il suivait `RARE_BY_ZONE`,
+  ×2 à Blackrock Mountain : trop faible pour « plus rares », et partagé avec les récompenses) ; les bibelots de l'étal
+  tirent avec `Expedition.shopRelicWeights(exp)` (poids `rare` de `RELIC_WEIGHTS.normal` × `SHOP_RELIC_RARE_BY_ZONE`,
+  pris sur `common`). Récompenses de combat, d'élite, coffres et rencontres : inchangés.
+- **Épique** : suit le multiplicateur (150 → 330 po). Mesure : le bot n'achète jamais l'épique du marchand, ni à
+  150 ni au nouveau prix (0,00 achat pour 0,2 à 0,4 épique en vente par visite, tout débloqué) : l'épique se gagne aux
+  élites (99 % des decks en ont une à Blackrock Mountain, avant comme après). Décision par la cohérence des prix :
+  à 150 fixes, l'épique coûterait à Blackrock Mountain moins qu'une rare (198 po) ou qu'une rare améliorée (248 po) ;
+  elle reste ainsi, comme à Westfall, la carte la plus chère de l'étal.
+- **Retrait de carte** : **ne suit pas** le multiplicateur. Il monte déjà de 25 po à chaque retrait sur toute
+  l'expédition (le bot `human` en fait 1 à 2,2 par expédition : 100 à 130 po en fin de campagne) ; mesure : 0,2 à 0,5
+  retrait par visite tout débloqué (0,2 à 0,7 avant), 1,2 à 1,5 au compte neuf dans les zones 5 à 7 (1,6 à 1,9 avant)
+  — c'est le seul achat qui reste quand le deck a 40 cartes et l'étal plus de bibelots (compte neuf) ; le multiplier
+  l'aurait mis à 300–500 po. Le crochet `removePrice` (Darkmoon Faire Prize Ticket) s'applique comme avant.
+- **Westfall inchangée** : facteurs 1 et chance 0 au rang 1 : mêmes tirages et mêmes prix à la pièce près (60 étals des
+  cinq classes identiques au code d'avant ; test « marchand de Westfall inchangé » : identiques, flux compris, à un
+  marchand sans aucun effet de zone), mêmes taux de victoire à Westfall à graine égale.
+- **Sauvegarde** : `shop.cards[i].up` est facultatif (absent = carte de base) : un étal ouvert avant le changement reste
+  valide et s'achète tel quel ; pas de nouvelle version d'expédition (`Expedition.VERSION` reste 8 ; test « sauvegarde :
+  étal ouvert d'une zone haute »).
+
+**Bot** (`Sim/expedition.lua`, pour que l'or inutilisé mesure l'économie et non le bot) :
+- une carte vendue améliorée vaut sa note + `SE.UPGRADED_BONUS`, plus `SE.SHOP_UP_VALUE` (0,5 unité, la moitié d'une
+  amélioration de feu de camp) ;
+- le coût d'un article est jugé au prix de la zone (`SE.priceCost` : 0,03 unité par pièce ÷ `priceFactor`) ; au-delà
+  d'une réserve de `SE.RESERVE` (150) pièces de Westfall × `priceFactor`, l'or est un surplus dont chaque pièce ne
+  vaut que `SE.SURPLUS_VALUE` (0,2) ; dans la dernière zone, la réserve est nulle (plus rien à garder). Avant, une
+  carte ne valait presque rien dans un deck de 40 cartes face à son prix : au compte neuf, le bot repartait de Blackrock
+  Mountain avec 0,6 article acheté pour 735 po en poche ;
+- il va au marchand quand sa bourse est pleine : score de la case marchand 1,6 + 1 par `SE.RICH_STEP` (40) pièces au-delà
+  de `SE.RICH_GOLD` (150) pièces de Westfall, au plus `SE.RICH_MAX` (5) de plus (visites ≈ 0,43 → 0,6 par zone à partir
+  de Duskwood ; à Westfall, la bourse dépasse rarement 150 : routes inchangées, 0,32 visite).
+
+**Mesures** (`luajit Sim/sim.lua runs=600 bot=human jobs=8 runner=expedition key=0 class=<c> zones=0 level=2`, puis
+`zones=7 level=7` ; graine 1 ; rapport « Or et marchand par zone » ajouté au rapport de simulation, avec « Or gagné
+après le dernier marchand ») :
+
+**`zones=0 level=2`, par classe** (avant → après ; 600 expéditions, ± 4 points sur les victoires)
+
+| Classe | victoires | or gagné | dépensé | inutilisé (% du gagné) | inutilisé, victoires | gagné après le dernier marchand | articles / visite (DW–BRM) | visites / zone |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 44,0 → 43,0 | 1083 → 1051 | 565 → 863 | 52,4 → **22,7 %** | 50,5 → 19,5 % | 17,8 % | 2,03 → 1,98 | 0,42 → 0,63 |
+| Warrior | 61,7 → 63,7 | 1088 → 1097 | 602 → 897 | 49,3 → **22,8 %** | 46,4 → 19,6 % | 19,5 % | 2,47 → 2,10 | 0,44 → 0,61 |
+| Mage | 31,2 → 35,3 | 754 → 787 | 408 → 635 | 52,5 → **25,7 %** | 47,6 → 19,2 % | 21,6 % | 2,24 → 2,13 | 0,45 → 0,61 |
+| Rogue | 25,8 → 25,2 | 684 → 677 | 365 → 532 | 54,0 → **28,8 %** | 47,0 → 19,7 % | 24,9 % | 2,34 → 2,13 | 0,42 → 0,59 |
+| Hunter | 27,0 → 24,5 | 742 → 705 | 403 → 553 | 52,4 → **28,7 %** | 45,7 → 21,5 % | 23,1 % | 2,05 → 1,99 | 0,44 → 0,61 |
+
+**`zones=0 level=2`, par zone** (moyenne des cinq classes, avant → après) : or à l'entrée du marchand, prix de l'étal entier, part de l'étal achetable, visites où tout l'étal est achetable, articles abordables (or / prix moyen d'un article), articles achetés, retraits, battue / atteinte
+
+| Zone | or au marchand | étal entier (po) | part achetable | étal entier achetable | abordables | achetés | retraits | battue / atteinte |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| WF | 93 → 93 | 698 → 698 | 13 → 13 % | 0,0 → 0,0 % | ≈ 1,6 → 1,60 | 0,97 → 0,97 | 0,22 → 0,22 | 70,3 → 70,3 |
+| DW | 237 → 250 | 693 → 845 | 34 → 30 % | 0,0 → 0,0 % | ≈ 4,1 → 3,56 | 2,61 → 2,25 | 0,10 → 0,12 | 82,5 → 83,3 |
+| WL | 320 → 304 | 686 → 990 | 47 → 31 % | 0,0 → 0,0 % | ≈ 5,6 → 3,69 | 3,52 → 2,37 | 0,30 → 0,19 | 87,5 → 86,6 |
+| STV | 412 → 359 | 615 → 1061 | 65 → 34 % | 12,2 → 0,0 % | ≈ 7,7 → 3,90 | 3,67 → 2,48 | 0,74 → 0,33 | 87,7 → 88,1 |
+| SoS | 500 → 392 | 460 → 896 | 87 → 45 % | 51,9 → 0,5 % | ≈ 10,3 → 4,24 | 1,95 → 1,88 | 1,62 → 1,18 | 94,2 → 93,8 |
+| BS | 624 → 455 | 420 → 936 | 93 → 49 % | 75,6 → 0,0 % | ≈ 13,4 → 4,43 | 1,02 → 1,49 | 1,87 → 1,46 | 97,1 → 98,3 |
+| BRM | 735 → 485 | 414 → 1060 | 94 → 46 % | 77,2 → 0,0 % | ≈ 16,0 → 4,17 | 0,60 → 1,93 | 1,87 → 1,42 | 89,4 → 88,6 |
+
+**`zones=7 level=7`, par classe** (avant → après ; 600 expéditions, ± 4 points sur les victoires)
+
+| Classe | victoires | or gagné | dépensé | inutilisé (% du gagné) | inutilisé, victoires | gagné après le dernier marchand | articles / visite (DW–BRM) | visites / zone |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Priest | 66,0 → 65,0 | 1032 → 1009 | 713 → 826 | 35,8 → **23,1 %** | 32,3 → 21,3 % | 20,0 % | 3,12 → 1,74 | 0,43 → 0,57 |
+| Warrior | 85,8 → 86,2 | 1186 → 1172 | 820 → 957 | 35,0 → **22,6 %** | 33,5 → 21,3 % | 20,1 % | 3,25 → 1,81 | 0,43 → 0,56 |
+| Mage | 76,0 → 74,8 | 1062 → 1034 | 724 → 838 | 36,5 → **23,8 %** | 34,3 → 21,8 % | 20,8 % | 3,10 → 1,74 | 0,43 → 0,55 |
+| Rogue | 59,0 → 63,2 | 885 → 907 | 578 → 732 | 40,4 → **24,9 %** | 35,5 → 21,0 % | 21,6 % | 3,14 → 1,74 | 0,42 → 0,56 |
+| Hunter | 70,3 → 70,7 | 1015 → 993 | 661 → 803 | 39,8 → **24,2 %** | 36,8 → 21,5 % | 21,0 % | 2,98 → 1,67 | 0,42 → 0,56 |
+
+**`zones=7 level=7`, par zone** (moyenne des cinq classes, avant → après) : or à l'entrée du marchand, prix de l'étal entier, part de l'étal achetable, visites où tout l'étal est achetable, articles abordables (or / prix moyen d'un article), articles achetés, retraits, battue / atteinte
+
+| Zone | or au marchand | étal entier (po) | part achetable | étal entier achetable | abordables | achetés | retraits | battue / atteinte |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| WF | 94 → 94 | 918 → 918 | 10 → 10 % | 0,0 → 0,0 % | ≈ 1,4 → 1,38 | 0,98 → 0,99 | 0,21 → 0,21 | 83,9 → 83,9 |
+| DW | 236 → 249 | 920 → 1136 | 26 → 22 % | 0,0 → 0,0 % | ≈ 3,4 → 2,94 | 2,48 → 2,13 | 0,14 → 0,16 | 92,1 → 92,7 |
+| WL | 314 → 298 | 924 → 1353 | 34 → 22 % | 0,0 → 0,0 % | ≈ 4,5 → 2,95 | 3,08 → 2,07 | 0,20 → 0,20 | 97,4 → 97,6 |
+| STV | 362 → 310 | 937 → 1603 | 39 → 20 % | 0,0 → 0,0 % | ≈ 5,2 → 2,60 | 3,31 → 1,78 | 0,35 → 0,28 | 97,6 → 98,1 |
+| SoS | 412 → 331 | 940 → 1866 | 44 → 18 % | 2,7 → 0,0 % | ≈ 5,8 → 2,38 | 3,30 → 1,58 | 0,52 → 0,33 | 98,5 → 97,9 |
+| BS | 451 → 358 | 951 → 2141 | 47 → 17 % | 7,4 → 0,0 % | ≈ 6,3 → 2,24 | 3,29 → 1,42 | 0,55 → 0,38 | 99,8 → 99,9 |
+| BRM | 490 → 375 | 954 → 2446 | 50 → 16 % | 9,1 → 0,0 % | ≈ 6,9 → 2,07 | 3,24 → 1,44 | 0,68 → 0,47 | 98,3 → 98,6 |
+
+Lecture :
+- **Or inutilisé** : ≈ 50 → 23–29 % au compte neuf, ≈ 36–40 → 23–25 % tout débloqué ; **19 à 22 % pour les expéditions
+  victorieuses**. La cible de 20 % n'est pas atteinte sur l'ensemble : de 18 à 25 points du gagné sont gagnés **après le
+  dernier marchand visité** (or des étapes qui suivent, dont les 75–85 po de Nefarian, jamais dépensables, et l'or en
+  poche d'une expédition qui meurt avant le marchand suivant). Le bot dépense 75 à 95 % de sa bourse à chaque visite :
+  ce reste ne dépend pas des prix, seulement de la fréquence des marchands.
+- **Articles par visite** : 2 à 3 articles abordables tout débloqué (2,9 à Duskwood, 2,1 à Blackrock Mountain ; 3,4 à
+  6,9 avant) ; 3,6 à 4,4 au compte neuf, dont l'étal se vide de bibelots (palier commun 0 : 9 articles par étal à
+  partir des Swamp of Sorrows, sans bibelot, au lieu de 12–13). Le bot en achète 1,4 à 2,4 (plus les retraits).
+  **L'étal entier n'est plus jamais achetable** (0 % des visites, 0,5 % aux Swamp of Sorrows au compte neuf ; jusqu'à
+  77 % avant).
+- **Taux de victoire** : aucun effet hors de l'erreur de mesure (± 4 points) : Westfall identique, zones 2 à 7 à
+  ± 1,2 point par zone en moyenne ; victoires de campagne −2,5 à +4,2 selon la classe (Mage +4,1 et Hunter −2,5 au compte neuf,
+  Rogue +4,2 tout débloqué). Le joueur achète moins d'articles, mais plus forts (rares, améliorés).
+
+**Essais écartés et propositions** (hors du changement, à décider par le joueur) :
+- *Plus de marchands sur les cartes des zones 2 à 7* (poids du marchand ×2,5, essai sur le Warrior, 300 expéditions) :
+  visites 0,61 → 0,69 par zone, or inutilisé −0,1 à −0,9 point seulement (au plus un marchand par chemin, et le bot
+  `human` ne voit que quelques étapes devant lui). Écarté.
+- *Pas d'or sur la récompense de Nefarian* (inutilisable par construction) : ≈ −4 à −6 points pour les victoires
+  (19–22 → ≈ 17–19 %), sans effet de jeu ; non fait (la récompense finale perdrait sa ligne d'or).
+- *Un marchand sur l'écran entre deux zones* (proposition) : une visite assurée par zone ramènerait l'or gagné après le
+  dernier marchand à celui de la fin de Blackrock Mountain (≈ 10–12 % du gagné) ; à voir avec l'écran entre deux zones.
+- Baisser les gains d'or par zone ne change pas la part inutilisée (elle suit la part gagnée après le dernier marchand) :
+  non proposé.
+
 ## Contrat avec les bibelots et potions (piste A)
 
 - `ns.Relics[id].run` : crochets d'expédition appelés par `Expedition.modify / fire` :
@@ -502,7 +647,9 @@ Ces crochets sont aussi disponibles pour les bibelots et pouvoirs.
 
 `Core/Expedition.lua` : or de départ 50 ; or par combat 12–18, élite 25–35, boss 75–85 ;
 potion après combat 35 % ; cartes 35/55/90 po, bibelots 90/120/160 (boss 220), potions 30/45/60
-(±10 %), cartes neutres 45/65/100 ; retrait 75 po puis +25 ; marchand 5 cartes + 1 neutre, 3 bibelots, 3 potions ; repos 30 % ;
+(±10 %), cartes neutres 45/65/100, prix de Westfall multipliés selon le rang de la zone (`PRICE_BY_ZONE`, ×1 à ×2,2) et
+×1,25 pour une carte vendue améliorée (« Économie sur sept zones ») ; retrait 75 po puis +25 (sans multiplicateur de zone) ;
+marchand 5 cartes + 1 neutre, 3 bibelots, 3 potions ; repos 30 % ;
 2 premiers combats de l'acte dans le groupe `easy` ; rareté des cartes (commune/inhabituelle/rare, zone 1)
 combat 60/33/7, élite 45/40/15, marchand 50/37/13, boss que des rares ; part de rares multipliée par zone
 (`RARE_BY_ZONE`, « Cartes épiques »).
@@ -529,7 +676,8 @@ marchand par carte ; deux successeurs d'un même nœud évitent autant que possi
 - **Potions** : 3 emplacements ; 35 % de chance d'une potion après un combat normal ou d'élite (non
   précisé par le GDD).
 - **Retrait de carte** : plusieurs retraits par visite autorisés, prix croissant sur toute
-  l'expédition (75, 100, 125…).
+  l'expédition (75, 100, 125…) ; il ne suit pas le multiplicateur de prix des zones (15/11/2026, « Économie sur sept
+  zones »).
 - **Rencontres** : les PV perdus ne tuent jamais (plancher à 1 PV, PV max au moins 1) ; une
   rencontre déjà vue ne revient pas dans la même expédition ; si aucune n'est disponible, l'étape
   est « rien à signaler ». Familles, conditions, paris et histoires : `docs/rencontres.md`.

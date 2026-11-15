@@ -911,3 +911,19 @@ Rend 6 + DoT 2 (DoT 3, que le joueur ne voit pas dans l'intention) ; Gruklash, �
 défaites au boss : 57 à 59 % (Priest, Warrior, Rogue), mais 71 % (Mage) et 78 % (Hunter), qui passent les élites
 par le contrôle ; durcir les élites coûtait deux à trois fois plus au Priest. Contrôle `heuristic` (800) : Priest 69,2, Warrior 77,4, Mage 74,5, Rogue 72,1, Hunter 66,0 % (moyenne 71,8, écart 11,4 ; élites 92 à 98 %, boss 68 à 83 %).
 Détail et essais écartés : `docs/zones/steppes.md`, « Réglage sur le bot human ».
+
+## Or et marchands sur sept zones (15/11/2026)
+
+Une expédition traverse sept zones avec le même or, mais l'économie datait d'une zone par expédition : bot `human`, clé
+0, 600 expéditions par classe, le Warrior gagnait 1 088 po par campagne et en laissait 536 (≈ 50 % du gagné au compte
+neuf, 35–40 % tout débloqué), et l'étal entier devenait achetable à partir de Stranglethorn. Décision du joueur
+(`docs/zones/decisions.md`) : prix plus hauts dans les zones hautes, avec plus de cartes déjà améliorées et plus rares.
+Appliqué (`docs/expedition.md`, « Économie sur sept zones ») : prix × 1 à 2,2 selon le rang de la zone (épique comprise,
+retrait non), 0 à 60 % de cartes vendues améliorées (× 1,25), part de cartes rares de l'étal × 1 à 2,8 et de bibelots
+rares × 1 à 2,2 ; Westfall identique (tirages, prix, taux de victoire). Le bot hors combat juge les prix au niveau de la
+zone, dépense le surplus et va au marchand quand sa bourse est pleine. Résultat (600 expéditions, avant → après) : or
+inutilisé 49–54 → 23–29 % au compte neuf, 35–40 → 23–25 % tout débloqué, 19–22 % pour les victoires ; 2 à 3 articles
+abordables par visite tout débloqué (3,6 à 4,4 au compte neuf, étals sans bibelots), l'étal entier jamais ; taux de
+victoire inchangés à ± 4 points. Hors cible : 18 à 25 points du gagné tombent après le dernier marchand visité (≈ 0,6
+marchand par zone), ce que les prix ne changent pas ; pistes (marchand entre deux zones, pas d'or sur Nefarian) dans
+`docs/expedition.md`.

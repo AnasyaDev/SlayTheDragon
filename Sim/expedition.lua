@@ -218,6 +218,10 @@ return function(ns)
   --   SE.CAMP_ACTION[id] = f(exp) -> valeur d'une action de feu de camp de zone, comparée au repos
   --     (≈ PV soignés × 0,15) et à l'amélioration (≈ 1) : prise si elle vaut plus.
   SE.KIND_SCORE, SE.EFFECT_VALUE, SE.CAMP_ACTION = {}, {}, {}
+  -- Marchand sur le chemin : score 1,6, plus 1 par SE.RICH_STEP pièces au-delà de SE.RICH_GOLD (en or de Westfall :
+  -- bourse divisée par X.priceFactor), au plus SE.RICH_MAX de plus. Un joueur qui a de quoi acheter cherche le
+  -- marchand (à Westfall, la bourse dépasse rarement 150 avant le boss : routes presque inchangées).
+  SE.RICH_GOLD, SE.RICH_STEP, SE.RICH_MAX = 150, 40, 5
   local kindExp -- expédition en cours de choix (cases de zone)
 
   -- Choix du chemin : meilleur score cumulé sur les chemins restants depuis chaque candidat.
@@ -232,7 +236,12 @@ return function(ns)
       return -3.0
     end
     if kind == "campfire" then return hpRatio < 0.5 and 3.0 or 1.0 end
-    if kind == "merchant" then return gold >= math.min(removePrice, 60) and 1.6 or 0.4 end
+    if kind == "merchant" then
+      if gold < math.min(removePrice, 60) then return 0.4 end
+      -- bourse pleine (au prix de la zone : X.priceFactor) : il va chez le marchand plutôt que de la garder
+      local rich = gold / (kindExp and X.priceFactor(kindExp) or 1)
+      return 1.6 + math.max(0, math.min(SE.RICH_MAX, (rich - SE.RICH_GOLD) / SE.RICH_STEP))
+    end
     if kind == "event" then return 1.2 end
     if kind == "chest" then return 2.0 end
     return 0
@@ -319,6 +328,30 @@ return function(ns)
     return nil
   end
 
+  -- Marchand : coût d'un article en unités (0,03 par pièce, comme les rencontres), au prix de la zone : une pièce
+  -- vaut moins là où tout coûte plus cher (X.priceFactor ; Westfall inchangée). Au-delà d'une réserve
+  -- (SE.RESERVE pièces de Westfall, × X.priceFactor), l'or est un surplus qu'il ne saurait pas dépenser ailleurs :
+  -- ses pièces ne valent que SE.SURPLUS_VALUE (un joueur qui a la bourse pleine achète) ; dans la dernière zone de
+  -- l'expédition, il n'y a plus rien à garder pour plus tard (réserve nulle).
+  SE.RESERVE, SE.SURPLUS_VALUE = 150, 0.2
+  local function priceCost(exp, price)
+    local f = X.priceFactor(exp)
+    local reserve = X.nextZone(exp) and SE.RESERVE * f or 0
+    local surplus = math.max(0, exp.gold - reserve)
+    local cheap = math.min(price, surplus)
+    return (cheap * SE.SURPLUS_VALUE + price - cheap) * 0.03 / f
+  end
+  SE.priceCost = priceCost
+  -- Carte vendue déjà améliorée (shop.cards[i].up = palier) : note + SE.UPGRADED_BONUS, plus SE.SHOP_UP_VALUE unités
+  -- (l'amélioration d'un feu de camp vaut ≈ 1 ; moitié, la carte n'étant piochée qu'une fois sur plusieurs), par palier.
+  SE.SHOP_UP_VALUE = 0.5
+  local function shopCardValue(exp, it, r)
+    local n = Card.level(it.up)
+    if n == 0 then return cardValue(exp, r) end
+    return cardValue(exp, r + SE.UPGRADED_BONUS * n) + SE.SHOP_UP_VALUE * n
+  end
+  SE.shopCardValue = shopCardValue
+
   -- Action hors combat selon la phase.
   local function decide(exp, opts, rng)
     advice, adviceExp = adviceOf(exp), exp
@@ -379,8 +412,8 @@ return function(ns)
       -- rencontres)
       local best, bestR
       for i, it in ipairs(s.cards) do
-        local v = (ns.Card.isEpic(ns.Cards[it.id]) and epicGain(exp, it.id) or cardValue(exp, rating(it.id)))
-          - it.price * 0.03
+        local v = (ns.Card.isEpic(ns.Cards[it.id]) and epicGain(exp, it.id) or shopCardValue(exp, it, rating(it.id)))
+          - priceCost(exp, it.price)
         if not it.sold and exp.gold >= it.price and v > 0 and (not bestR or v > bestR) then
           best, bestR = i, v
         end
@@ -564,9 +597,9 @@ return function(ns)
             v = epicGain(exp, it.id)
           else
             local r = humanRating(exp, H, hrng, it.id)
-            v = r >= H.takeMin and cardValue(exp, math.max(r, 5.5)) or -1
+            v = r >= H.takeMin and shopCardValue(exp, it, math.max(r, 5.5)) or -1
           end
-          v = v - it.price * 0.03
+          v = v - priceCost(exp, it.price)
           if v > 0 and (not bestR or v > bestR) then best, bestR = i, v end
         end
       end
@@ -683,13 +716,52 @@ return function(ns)
     -- entrée dans chaque zone (après le soin du passage) : PV, PV max, taille du deck, épique au deck
     local function enterZone()
       record.zones[#record.zones + 1] = { zone = exp.zone, hp = exp.hp, maxHp = exp.maxHp, deck = #exp.deck,
-        epic = X.epicIndex(exp) and 1 or 0 }
+        epic = X.epicIndex(exp) and 1 or 0, gold = exp.gold, earned = exp.stats.goldEarned }
       humanRoute = nil -- route de l'ancienne carte
+    end
+    -- Visites du marchand (économie, docs/expedition.md) : or à l'entrée, prix de l'étal entier (cartes,
+    -- bibelots, potions ; retrait non compris), articles achetés, retraits, or dépensé pendant la visite.
+    record.shops = {}
+    local visit, visitShop, spent0
+    local function closeVisit()
+      if not visit then return end
+      local n, ep, up = 0, 0, 0
+      for _, k in ipairs({ "cards", "relics", "potions" }) do
+        for _, it in ipairs(visitShop[k] or {}) do
+          if it.sold then
+            n = n + 1
+            if it.epic then ep = ep + 1 end
+            if it.up then up = up + 1 end
+          end
+        end
+      end
+      visit.bought, visit.removed, visit.epicBought, visit.upBought = n, visitShop.removed or 0, ep, up
+      visit.spent = exp.stats.goldSpent - spent0
+      record.earnedAtLastShop = exp.stats.goldEarned
+      visit, visitShop = nil, nil
+    end
+    local function watchShop()
+      if visit and exp.phase ~= "merchant" then closeVisit() end
+      if exp.phase == "merchant" and exp.shop ~= visitShop then
+        closeVisit()
+        visitShop, spent0 = exp.shop, exp.stats.goldSpent
+        local total, items, up, epic = 0, 0, 0, 0
+        for _, k in ipairs({ "cards", "relics", "potions" }) do
+          for _, it in ipairs(exp.shop[k] or {}) do
+            total, items = total + it.price, items + 1
+            if it.up then up = up + 1 end
+            if it.epic then epic = epic + 1 end
+          end
+        end
+        visit = { zone = exp.zone, gold = exp.gold, total = total, items = items, up = up, epic = epic }
+        record.shops[#record.shops + 1] = visit
+      end
     end
     enterZone()
     local guard = 0
     while exp.phase ~= "done" do
       if exp.zone ~= record.zones[#record.zones].zone then enterZone() end
+      watchShop()
       guard = guard + 1
       if guard > 40000 then
         X.act(exp, { "abandon" })
@@ -713,6 +785,7 @@ return function(ns)
         if not ok then error(("action refusée en phase %s : %s (%s)"):format(before, tostring(a[1]), tostring(why))) end
       end
     end
+    closeVisit()
     record.won = exp.result == "won"
     record.floor = exp.floor
     record.zone = exp.zone
