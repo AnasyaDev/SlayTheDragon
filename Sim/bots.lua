@@ -670,11 +670,12 @@ return function(ns)
   end
 
   -- Prochain coup du joueur humain : { "play", … } | { "potion", … } | { "end" }, puis l'état prévu après
-  -- ce coup (nil pour « end »). memo (facultatif) : celui du coup précédent du même tour ; root : le rec
-  -- déjà calculé d'une position identique à c (BotMT:act).
-  function Bots.humanAct(c, H, rng, real, memo, root)
+  -- ce coup (nil pour « end ») et son score au coup d'œil. memo (facultatif) : celui du coup précédent du
+  -- même tour ; root : le rec déjà calculé d'une position identique à c, endV : son score au coup d'œil, qui
+  -- est celui de finir le tour tout de suite (BotMT:act).
+  function Bots.humanAct(c, H, rng, real, memo, root, endV)
     memo = memo or {}
-    local cands = { { act = { "end" }, v = humanLeaf(c, H, real) } }
+    local cands = { { act = { "end" }, v = endV or humanLeaf(c, H, real) } }
     local rec = root or humanPlays(c, H, real, true)
     -- coups joués puis potions, dans l'ordre d'avant (tri identique, égalités comprises)
     local moves = {}
@@ -694,7 +695,8 @@ return function(ns)
       local m = moves[i]
       if i <= H.width or m.act[1] == "potion" then
         local st = m.s or humanState(c, rec, m.k)
-        cands[#cands + 1] = { act = m.act, s = st, v = humanBest(st, m.v, H.depth - 1, H, real, memo) }
+        cands[#cands + 1] = { act = m.act, s = st, glance = m.v,
+          v = humanBest(st, m.v, H.depth - 1, H, real, memo) }
       end
     end
     table.sort(cands, byValue)
@@ -706,7 +708,7 @@ return function(ns)
       end
       if #near > 0 then pick = near[Rng.int(rng, 1, #near)] end
     end
-    return pick.act, pick.s
+    return pick.act, pick.s, pick.glance
   end
 
   -- Deux états de combat identiques (hors journal, quiet et statistiques, que les copies de recherche n'ont
@@ -756,18 +758,18 @@ return function(ns)
       end
       -- recherche du coup précédent reprise si le coup joué a mené là où elle l'avait prévu (même tour, même
       -- combat, même état) : ses positions déjà explorées ne sont pas recalculées
-      local memo, root
+      local memo, root, endV
       local prev = self.prevState
       if prev and self.prevCombat == c and self.prevRound == c.round and self.prevReal == self.real
           and self.prevKeep == Bots.potionKeep and sameState(c, prev) then
         memo = self.memo
-        root = memo[prev]
+        root, endV = memo[prev], self.prevGlance
       else
         memo = {}
       end
-      local a, st = Bots.humanAct(c, H, self.rng, self.real, memo, root)
+      local a, st, glance = Bots.humanAct(c, H, self.rng, self.real, memo, root, endV)
       self.memo, self.prevState, self.prevCombat, self.prevRound, self.prevReal = memo, st, c, c.round, self.real
-      self.prevKeep = Bots.potionKeep
+      self.prevKeep, self.prevGlance = Bots.potionKeep, glance
       if not st then self.memo = nil end
       Bots.potionKeep = 1
       return a
