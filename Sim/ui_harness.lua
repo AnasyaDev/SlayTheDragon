@@ -10875,9 +10875,10 @@ do
   function tip:NumLines() return #self.lines end
   local sheets = {}
   for _, id in ipairs(ids) do
-    for _, up in ipairs({ false, true }) do
+    for n = 0, Card.tiers(id) do -- tous les paliers écrits (un mot de règle peut n'apparaître qu'au palier 2 ou 3)
+      local up = Card.upValue(n)
       local d = Card.defById(id, up)
-      local label = id .. (up and "+" or "")
+      local label = id .. Card.suffix(n)
       tip.lines = {}
       W.fillCardTooltip(tip, id, up)
       local all = {}
