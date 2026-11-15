@@ -3064,5 +3064,124 @@ do
   ns.Enemies.test_elite_dummy, ns.Enemies.test_boss_hitter = nil, nil
 end
 
+---------------------------------------------------------------------------
+-- Paliers d'amélioration (décision du joueur du 15/11/2026, docs/ameliorations.md) : une carte jusqu'à +3,
+-- paliers écrits à la main (up, up2, up3, chacun ne donne que ce qui change par rapport au précédent).
+---------------------------------------------------------------------------
+do
+  local Up = dofile(root .. "/Sim/upgrades.lua")
+  -- carte de test à trois paliers : +1 frappe plus fort, +2 coûte moins, +3 pioche en plus
+  local TRIPLE = { id = "tu_triple", name = "Triple Test", cost = 2, type = "attack", rarity = "common",
+    target = "enemy", effects = { { "damage", 4 } }, text = "Deal 4.",
+    up = { effects = { { "damage", 6 } }, text = "Deal 6." },
+    up2 = { cost = 1, text = "Deal 6." },
+    up3 = { effects = { { "damage", 6 }, { "draw", 1 } }, text = "Deal 6.\nDraw 1." } }
+  ns.Cards.tu_triple = TRIPLE
+
+  test("paliers : Card.level, upValue, suffix, tiers, canUp (true = palier 1, forme d'avant)", function()
+    eq(Card.level(false), 0); eq(Card.level(nil), 0); eq(Card.level(true), 1); eq(Card.level(2), 2)
+    eq(Card.level(9), 3, "borné à 3"); eq(Card.level({ id = "smite", up = true }), 1); eq(Card.level(0), 0)
+    eq(Card.upValue(0), false); eq(Card.upValue(true), 1); eq(Card.upValue(3), 3)
+    eq(Card.suffix(0), ""); eq(Card.suffix(true), "+"); eq(Card.suffix(2), "+2"); eq(Card.suffix(3), "+3")
+    eq(Card.tiers("tu_triple"), 3); eq(Card.tiers("smite"), 1); eq(Card.tiers("nope"), 0)
+    eq(Card.canUp("smite", false), true); eq(Card.canUp("smite", 1), false, "palier 2 non écrit")
+    eq(Card.canUp("tu_triple", 2), true); eq(Card.canUp("tu_triple", 3), false, "plafond 3")
+    eq(Card.new("smite", true, 5).up, 1); eq(Card.new("smite", false, 5).up, false)
+  end)
+
+  test("paliers : fiche effective cumulée (base ⊕ up ⊕ up2 ⊕ up3), nom +, +2, +3", function()
+    local d0, d1, d2, d3 = Card.defById("tu_triple"), Card.defById("tu_triple", 1),
+      Card.defById("tu_triple", 2), Card.defById("tu_triple", 3)
+    eq(d0.name, "Triple Test"); eq(d1.name, "Triple Test+"); eq(d2.name, "Triple Test+2"); eq(d3.name, "Triple Test+3")
+    eq(d0.cost, 2); eq(d1.cost, 2); eq(d2.cost, 1); eq(d3.cost, 1, "le coût du palier 2 reste au palier 3")
+    eq(d0.effects[1][2], 4); eq(d1.effects[1][2], 6); eq(d2.effects[1][2], 6, "effets du palier 1 gardés")
+    eq(#d3.effects, 2); eq(d3.text, "Deal 6.\nDraw 1.")
+    eq(d0.plus, 0); eq(d3.plus, 3); eq(d0.isUp, nil); eq(d2.isUp, true)
+    eq(d3.up, nil); eq(d3.up2, nil); eq(d3.up3, nil)
+    eq(Card.defById("tu_triple", true), d1, "true = palier 1 (même fiche)")
+    eq(Card.defById("smite", true).name, "Smite+", "palier 1 inchangé")
+    assert(not pcall(Card.defById, "smite", 2), "palier non écrit : erreur")
+  end)
+
+  test("paliers en combat : dégâts, coût et pioche de chaque palier ; instances jamais modifiées", function()
+    for n = 0, 3 do
+      local deck = { { id = "tu_triple", up = Card.upValue(n) } }
+      for _ = 1, 6 do deck[#deck + 1] = { id = "smite", up = false } end
+      local c = Combat.new({ seed = 7, hp = 60, maxHp = 60, deck = deck, encounter = { "test_dummy" } })
+      local i = handIndex(c, "tu_triple")
+      if not i then -- au fond de la pioche : ramenée en main
+        for k, x in ipairs(c.draw) do if x.id == "tu_triple" then c.hand[#c.hand + 1] = table.remove(c.draw, k) break end end
+        i = #c.hand
+      end
+      local inst = c.hand[i]
+      eq(inst.up, Card.upValue(n), "palier " .. n)
+      eq(Combat.cost(c, inst), n >= 2 and 1 or 2, "coût au palier " .. n)
+      local clone = Combat.clone(c)
+      local hand0 = #c.hand
+      assert(Combat.play(c, i, 1))
+      eq(c.enemies[1].hp, 100 - (n >= 1 and 6 or 4), "dégâts au palier " .. n)
+      eq(#c.hand, hand0 - 1 + (n >= 3 and 1 or 0), "pioche au palier " .. n)
+      eq(inst.up, Card.upValue(n), "instance intacte")
+      eq(clone.hand[i].up, Card.upValue(n), "clone : même palier")
+    end
+  end)
+
+  test("paliers : carte de combat donnée améliorée (addCard up = true) = palier 1, up = 2 = palier 2", function()
+    local c = setup({ "smite" })
+    eq(Combat.addCard(c, "tu_triple", "hand", { up = true }).up, 1)
+    eq(Combat.addCard(c, "tu_triple", "hand", { up = 2 }).up, 2)
+    eq(Card.def(c.hand[#c.hand]).cost, 1)
+  end)
+
+  test("paliers : transformations d'épique gardent le palier, bornées aux paliers de la variante", function()
+    local deck = { { id = "tu_triple", up = 3 } }
+    eq(Card.applyTransforms(deck), deck, "sans épique : le deck lui-même")
+    ns.Cards.tu_epic = { id = "tu_epic", name = "Epic Test", rarity = "epic", type = "power", effects = {},
+      text = "Test.", transforms = { tu_triple = "tu_var" }, up = { text = "Test+." } }
+    ns.Cards.tu_var = { id = "tu_var", name = "Variant Test", cost = 1, type = "attack", rarity = "common",
+      variant = true, target = "enemy", effects = { { "damage", 1 } }, text = "Deal 1.",
+      up = { effects = { { "damage", 2 } }, text = "Deal 2." }, up2 = { effects = { { "damage", 3 } }, text = "Deal 3." } }
+    local shown = Card.applyTransforms({ { id = "tu_epic", up = false }, { id = "tu_triple", up = 3 },
+      { id = "tu_triple", up = 1 }, { id = "tu_triple", up = false } })
+    eq(shown[2].id, "tu_var"); eq(shown[2].up, 2, "palier 3 borné au palier 2 de la variante")
+    eq(shown[3].up, 1); eq(shown[4].up, false); eq(shown[2].from, "tu_triple")
+    ns.Cards.tu_epic, ns.Cards.tu_var = nil, nil
+  end)
+
+  test("paliers : contrôle des fiches (Sim/upgrades.lua) sur toutes les cartes et sur des fiches fautives", function()
+    local errs = Up.checkAll(ns)
+    eq(#errs, 0, table.concat(errs, " ; "))
+    ns.Cards.tu_bad = { id = "tu_bad", name = "Bad", cost = 1, type = "skill", rarity = "common", effects = {},
+      text = "Nothing.", up = { text = "Nothing more." }, up3 = { name = "Worse", cost = 2 } }
+    local bad = table.concat(Up.check(ns, "tu_bad"), " | ")
+    assert(bad:find("up3 sans up2", 1, true), bad)
+    ns.Cards.tu_bad.up2 = { cost = 3 }
+    bad = table.concat(Up.check(ns, "tu_bad"), " | ")
+    assert(bad:find("up2 sans text", 1, true), bad)
+    assert(bad:find("up3.name : champ interdit", 1, true), bad)
+    assert(bad:find("coût 3 au-dessus du palier 1", 1, true), bad)
+    ns.Cards.tu_bad.up2 = { text = "Nothing more." }
+    bad = table.concat(Up.check(ns, "tu_bad"), " | ")
+    assert(bad:find("up2 : rien ne change", 1, true), bad)
+    ns.Cards.tu_bad = nil
+    local m = Up.missing(ns, "rogue")
+    eq(m.total, m.tiers[1]); eq(#m.no2 + #m.no3, m.total - m.tiers[3])
+  end)
+
+  test("paliers : le bot vise le palier suivant (note du palier 1 × SE.UPGRADE_TIER)", function()
+    local SE = ns.SimExpedition
+    eq(SE.tierValue(5, { up = false }), 5, "palier 1 : note inchangée")
+    eq(SE.tierValue(5, { up = 1 }), 5 * SE.UPGRADE_TIER[2])
+    eq(SE.tierValue({ 5, 3, 2 }, { up = 2 }), 2, "note par palier")
+    local id, n = SE.forced("tu_triple+2")
+    eq(id, "tu_triple"); eq(n, 2)
+    id, n = SE.forced("tu_triple+"); eq(n, 1)
+    id, n = SE.forced("smite"); eq(id, "smite"); eq(n, 0)
+    assert(not pcall(SE.forced, "smite+2"), "palier non écrit refusé")
+  end)
+
+  ns.Cards.tu_triple = nil
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

@@ -102,7 +102,7 @@ test("épique dans le deck : en jeu (c.epic), dans aucune pile, combat sauvegard
   for _, id in ipairs(EPICS) do
     for _, up in ipairs({ false, true }) do
       local c = setup({ "frostbolt" }, { epic = id, up = up })
-      eq(c.epic.id, id); eq(c.epic.up, up)
+      eq(c.epic.id, id); eq(c.epic.up, ns.Card.upValue(up))
       eq(Combat.mageEpic(c), id)
       eq(c.passives, nil, id .. " : pas un passif du deck")
       for _, pile in ipairs({ c.hand, c.draw, c.discard, c.exhaust }) do

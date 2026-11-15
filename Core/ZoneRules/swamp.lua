@@ -245,7 +245,10 @@ function Swamp.sleepCards()
   if not sleepCards then
     sleepCards = {}
     for id, d in pairs(ns.Cards) do
-      if d.sleeps or appliesAsleep(d.effects) or (d.up and appliesAsleep(d.up.effects)) then sleepCards[id] = true end
+      if d.sleeps or appliesAsleep(d.effects) or (d.up and appliesAsleep(d.up.effects))
+          or (d.up2 and appliesAsleep(d.up2.effects)) or (d.up3 and appliesAsleep(d.up3.effects)) then
+        sleepCards[id] = true
+      end
     end
   end
   return sleepCards

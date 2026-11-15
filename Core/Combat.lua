@@ -218,9 +218,12 @@ local function cardHookNames(hk, id)
   if not d then return end
   addHookNames(hk, d.hooks)
   addHookNames(hk, d.deckHooks)
-  if d.up then
-    addHookNames(hk, d.up.hooks)
-    addHookNames(hk, d.up.deckHooks)
+  for _, k in ipairs(Card.UP_KEYS) do
+    local t = d[k]
+    if t then
+      addHookNames(hk, t.hooks)
+      addHookNames(hk, t.deckHooks)
+    end
   end
 end
 
@@ -1338,7 +1341,7 @@ end
 
 -- Ajoute une carte de combat. to = "hand" (main pleine : défausse), "draw" (dessus de la pioche),
 -- "drawRandom" (au hasard dans la pioche, flux c.rng.misc), "discard", "exhaust". opts = { src = uid
--- d'ennemi, lift = bool, up = bool }. Journal { t = "card_added", card, id, to, src } ; notification
+-- d'ennemi, lift = bool, up = palier (true = 1, Card.level) }. Journal { t = "card_added", card, id, to, src } ; notification
 -- « onCardAdded » (instance, pile, src). Renvoie l'instance.
 function Combat.addCard(c, id, to, opts)
   if not ns.Cards[id] then error("unknown card: " .. tostring(id)) end
@@ -1351,7 +1354,7 @@ function Combat.addCard(c, id, to, opts)
   end
   -- crochets d'une carte nouvelle (Pouvoir donné en combat) : ajoutés aux noms écoutés (copie)
   local d = ns.Cards[id]
-  if c.hk and (d.hooks or (d.up and d.up.hooks)) then
+  if c.hk and (d.hooks or (d.up and d.up.hooks) or (d.up2 and d.up2.hooks) or (d.up3 and d.up3.hooks)) then
     local hk = U.copyMap(c.hk)
     cardHookNames(hk, id)
     c.hk = hk
