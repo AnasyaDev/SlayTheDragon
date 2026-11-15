@@ -11202,7 +11202,7 @@ do
     local cid = e.shop.cards[i].id
     clickOption(o.id)
     check(zone .. " : carte améliorée achetée, au deck améliorée, marquée vendue",
-      #e.deck == n + 1 and e.deck[#e.deck].id == cid and e.deck[#e.deck].up == true and option(o.id).sold)
+      #e.deck == n + 1 and e.deck[#e.deck].id == cid and e.deck[#e.deck].up == 1 and option(o.id).sold)
   end
 end
 

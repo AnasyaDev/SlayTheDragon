@@ -2402,8 +2402,8 @@ test("marchand : carte vendue déjà améliorée (zones hautes), prix majoré, a
     for j, it in ipairs(exp.shop.cards) do if it.up and not i then i = j end end
     local id = exp.shop.cards[i].id
     assert(X.act(exp, { "buyCard", i }))
-    eq(exp.deck[#exp.deck].id, id); eq(exp.deck[#exp.deck].up, true, "achetée améliorée")
-    assert(not X.canUpgrade(exp, #exp.deck), "plus rien à améliorer")
+    eq(exp.deck[#exp.deck].id, id); eq(exp.deck[#exp.deck].up, 1, "achetée améliorée (palier 1)")
+    eq(X.canUpgrade(exp, #exp.deck) and true or false, ns.Cards[id].up2 ~= nil, "palier suivant seulement s'il est écrit")
     -- Westfall : jamais, même à chance forcée ailleurs
     for _, it in ipairs(shopIn("westfall", 71).shop.cards) do eq(it.up, nil) end
   end)
@@ -2483,7 +2483,7 @@ test("sauvegarde : étal ouvert d'une zone haute (carte améliorée) rechargé ;
     local cur = back.current
     cur.gold = 9999
     assert(X.act(cur, { "buyCard", i }))
-    eq(cur.deck[#cur.deck].up, true)
+    eq(cur.deck[#cur.deck].up, 1)
     -- étal ouvert avant le changement (aucun champ up) : valide, la carte s'achète telle quelle
     local saved = reload(db)
     for _, it in ipairs(saved.current.shop.cards) do it.up = nil end
