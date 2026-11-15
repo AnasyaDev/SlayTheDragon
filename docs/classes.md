@@ -503,6 +503,11 @@ Bot : non modifié. Le contrôle à blanc de Reflective Shield montre que ses co
 rien seuls. Pistes non vérifiées : sous Inner Focus le bot perd des combats normaux (95 % contre 98,5 % sans
 épique, 12 PV perdus contre 9,6), signe probable d'un mauvais choix de la première carte (Absorb retardée) ;
 `botValue` ne donne aucune valeur propre à Shadow Covenant (la hausse dans le tour n'est vue que coup par coup).
+
+**Paliers +2 et +3 (15/11/2026).** Les nombres réglables sont des tables `{ base, +1, +2, +3 }` lues par
+`ns.Priest.tier(t, src)` (`Card.level(src)`) ; nouveaux réglages `COVENANT_FREE` (cartes Shadow gratuites par
+tour : 0 / 1 / 1 / 2) et `VOID_FLAT` (dégâts fixes par coup Shadow : 0 / 0 / 2 / 4). Tableau des paliers :
+`docs/classes/priest-progression.md`, « Paliers +2 et +3 ».
 ### Hunter : les sept épiques (14/11/2026)
 
 Données et règles dans `Data/Hunter.lua` (bloc « Cartes épiques », nombres réglés dans la table `EPIC`,

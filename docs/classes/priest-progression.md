@@ -136,3 +136,69 @@ la Ligue complète (`docs/equilibrage.md`, compensation d'Atonement : 78,8 %).
   tiré) ; `X.relicPool` inclut les bibelots de la classe jouée de niveau atteint.
 - Écran de progression (GDD) : 34 cartes par voie et 6 bibelots, verrouillés = icône grisée et
   infobulle « Priest level N ».
+
+## Paliers +2 et +3 (15/11/2026)
+
+Décision du joueur du 15/11/2026 (`docs/ameliorations.md`) : chaque carte s'améliore jusqu'à trois fois, chaque
+palier écrit à la main. Les 41 cartes du Priest (34 cartes, 7 épiques) ont leurs paliers 2 et 3
+(`Data/Priest.lua`, champs `up2` / `up3` ; épiques : tables `{ base, +1, +2, +3 }` de `Core/Classes/priest.lua`
+lues par `Priest.tier(t, src)` = `t[Card.level(src) + 1]`). Paliers 0 et 1 inchangés.
+
+Fil conducteur : **le Priest perd déjà très peu de PV** ; ses soins et boucliers ne grimpent donc presque plus
+après le +1 (au plus + 2 sur un nombre, jamais un deuxième doublement). Ses paliers 2 et 3 vont d'abord au
+tempo (coût, Retain, Innate, pioche), à l'Atonement (durée, effets conditionnels) et à l'Insanity.
+
+| Carte | +1 (inchangé) | +2 | +3 |
+|---|---|---|---|
+| Smite | Deal 11 | Deal 13 | Atonement : 4 de plus |
+| Inner Fire | 9 Absorb | 11 Absorb | Atonement : pioche 1 |
+| PW: Shield | 11 Absorb | 13 Absorb | gagne Atonement 1 |
+| SW: Pain | DoT 7 | DoT 9 | +2 Insanity |
+| PW: Radiance | 6 Absorb, Atonement 2 | Atonement 3 | pioche 1 |
+| Penance | 7 × 3 | 8 × 3 | Atonement : 3 Absorb par coup |
+| Pain Suppression | Cooldown 4 | Retain | pioche 1 |
+| PW: Solace | Deal 6 | Atonement 2 | Deal 8 |
+| Angelic Feather | 4 Absorb | gagne Atonement 1 | 5 Absorb |
+| Luminous Barrier | 18 Absorb | Atonement 2 | pioche 1 |
+| Schism | Deal 6, Sundered 3 | Deal 8 | Atonement 2 |
+| Shadow Mend | Heal 16 | +2 Insanity | plus de DoT sur soi |
+| Evangelism | coût 0 | Atonement 3 | Retain |
+| Rapture | +3 par gain d'Absorb | coût 0 | Innate |
+| Mind Flay | Deal 11 | Deal 13 | DoT : +3 Insanity |
+| Mind Blast | Deal 13 | +3 Insanity | Deal 16 |
+| Devouring Plague | DoT 3 par Insanity | Retain | DoT 4 fixe en plus |
+| Shadowform | +4 aux coups et DoT Shadow | +3 Insanity à la pose | coût 0 |
+| Silence | Cooldown 1 | Retain | +1 Insanity |
+| Vampiric Touch | DoT 5, Regen 2 | +2 Insanity | DoT 7 |
+| Mind Sear | DoT 7 à tous | DoT 9 à tous | +2 Insanity |
+| SW: Death | Deal 9 / Execute 18 | Deal 10 / Execute 20 | +2 Insanity |
+| Psychic Scream | coût 0 | Demoralized 3 | +2 Insanity |
+| Void Eruption | 6 + 6 par Insanity | 9 + 6 par Insanity | Retain |
+| Holy Fire | Deal 31, DoT 4 | Deal 36 | DoT 6 |
+| Holy Nova | Deal 5 à tous, Regen 3 | Deal 7 à tous | pioche 1 |
+| Holy Word: Chastise | Deal 10, Cooldown 2 | Deal 13 | Retain |
+| Greater Heal | Heal 13 | coût 0 | Heal 15 |
+| Spirit of Redemption | coût 0 | Innate | pioche 2 au Last Breath |
+| Renew | Regen 5 | coût 0 | Innate |
+| Halo | Deal 26 à tous, Regen 4 | Deal 29 à tous | Sundered 2 à tous |
+| Flash Heal | Heal 10 | pioche 2 | Heal 12 |
+| Empyreal Blaze | Deal 44 | Deal 49 | Sundered 3 |
+| Apotheosis | coût 1 | pioche 1 à la pose | Innate |
+| Prayer of Mending (épique) | Divine Star +2 | +3 | +4 |
+| Misery (épique) | Contagion +1 | +2 | +3 |
+| Echo of Light (épique) | Sanctify +2 | +3 | +4 |
+| Shadow Covenant (épique) | 1re carte Shadow du tour gratuite | Life Tap 1 (1 PV par mana) | 2 cartes Shadow gratuites par tour |
+| Reflective Shield (épique) | renvoie la moitié | trois cinquièmes | deux tiers |
+| Voidform (épique) | Madness 2 | + 2 fixes par coup Shadow | + 4 fixes |
+| Inner Focus (épique) | Empower 100 % | 125 % | 150 % |
+
+Épiques : leur texte tient en une clause (deux lignes au plus, harnais UEL, désormais vérifié à chaque palier
+écrit) ; une deuxième clause (« Start of combat: +1 Insanity. », « It can't be interrupted. ») passait à quatre
+lignes, d'où des paliers chiffrés. Mot de règle Life Tap amélioré : « The first ones each turn are free, as
+stated. » (le nombre de cartes gratuites est sur la carte). Inner Focus : mot Empower lu « +N % » à tous les
+paliers (plus « doubled »).
+
+Bots : notes d'amélioration par défaut (× 0,8 puis × 0,6). Une table par palier pour les paliers « Retain »
+changerait la note du palier 1 sous les épiques dont la table `byEpic.rating` diffère de la note de classe
+(Pain Suppression, Evangelism, Devouring Plague, Void Eruption) : non posée. `Bots.POWER_VALUE` inchangé (les
+paliers des Powers ne changent que coût, Innate ou effet de pose).
