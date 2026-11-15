@@ -3077,14 +3077,18 @@ do
     up2 = { cost = 1, text = "Deal 6." },
     up3 = { effects = { { "damage", 6 }, { "draw", 1 } }, text = "Deal 6.\nDraw 1." } }
   ns.Cards.tu_triple = TRIPLE
+  -- carte de test à un seul palier (les cartes réelles ont toutes leurs trois paliers : Priest du 15/11/2026)
+  ns.Cards.tu_single = { id = "tu_single", name = "Single Test", cost = 1, type = "attack", rarity = "common",
+    target = "enemy", effects = { { "damage", 8 } }, text = "Deal 8.",
+    up = { effects = { { "damage", 11 } }, text = "Deal 11." } }
 
   test("paliers : Card.level, upValue, suffix, tiers, canUp (true = palier 1, forme d'avant)", function()
     eq(Card.level(false), 0); eq(Card.level(nil), 0); eq(Card.level(true), 1); eq(Card.level(2), 2)
     eq(Card.level(9), 3, "borné à 3"); eq(Card.level({ id = "smite", up = true }), 1); eq(Card.level(0), 0)
     eq(Card.upValue(0), false); eq(Card.upValue(true), 1); eq(Card.upValue(3), 3)
     eq(Card.suffix(0), ""); eq(Card.suffix(true), "+"); eq(Card.suffix(2), "+2"); eq(Card.suffix(3), "+3")
-    eq(Card.tiers("tu_triple"), 3); eq(Card.tiers("smite"), 1); eq(Card.tiers("nope"), 0)
-    eq(Card.canUp("smite", false), true); eq(Card.canUp("smite", 1), false, "palier 2 non écrit")
+    eq(Card.tiers("tu_triple"), 3); eq(Card.tiers("tu_single"), 1); eq(Card.tiers("nope"), 0)
+    eq(Card.canUp("tu_single", false), true); eq(Card.canUp("tu_single", 1), false, "palier 2 non écrit")
     eq(Card.canUp("tu_triple", 2), true); eq(Card.canUp("tu_triple", 3), false, "plafond 3")
     eq(Card.new("smite", true, 5).up, 1); eq(Card.new("smite", false, 5).up, false)
   end)
@@ -3100,7 +3104,7 @@ do
     eq(d3.up, nil); eq(d3.up2, nil); eq(d3.up3, nil)
     eq(Card.defById("tu_triple", true), d1, "true = palier 1 (même fiche)")
     eq(Card.defById("smite", true).name, "Smite+", "palier 1 inchangé")
-    assert(not pcall(Card.defById, "smite", 2), "palier non écrit : erreur")
+    assert(not pcall(Card.defById, "tu_single", 2), "palier non écrit : erreur")
   end)
 
   test("paliers en combat : dégâts, coût et pioche de chaque palier ; instances jamais modifiées", function()
@@ -3177,10 +3181,11 @@ do
     eq(id, "tu_triple"); eq(n, 2)
     id, n = SE.forced("tu_triple+"); eq(n, 1)
     id, n = SE.forced("smite"); eq(id, "smite"); eq(n, 0)
-    assert(not pcall(SE.forced, "smite+2"), "palier non écrit refusé")
+    assert(not pcall(SE.forced, "tu_single+2"), "palier non écrit refusé")
   end)
 
   ns.Cards.tu_triple = nil
+  ns.Cards.tu_single = nil
 end
 
 print(("%d réussis, %d échoués"):format(passed, failed))

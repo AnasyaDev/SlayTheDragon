@@ -2403,7 +2403,7 @@ test("marchand : carte vendue déjà améliorée (zones hautes), prix majoré, a
     local id = exp.shop.cards[i].id
     assert(X.act(exp, { "buyCard", i }))
     eq(exp.deck[#exp.deck].id, id); eq(exp.deck[#exp.deck].up, 1, "achetée améliorée (palier 1)")
-    assert(not X.canUpgrade(exp, #exp.deck), "plus rien à améliorer")
+    eq(X.canUpgrade(exp, #exp.deck), ns.Card.canUp(id, 1), "palier 2 seulement s'il est écrit")
     -- Westfall : jamais, même à chance forcée ailleurs
     for _, it in ipairs(shopIn("westfall", 71).shop.cards) do eq(it.up, nil) end
   end)
@@ -2509,6 +2509,14 @@ do
     up = { effects = { { "damage", 6 } }, text = "Deal 6." },
     up2 = { cost = 1, text = "Deal 6." },
     up3 = { effects = { { "damage", 6 }, { "draw", 1 } }, text = "Deal 6.\nDraw 1." } }
+  -- carte de test à un seul palier (les cartes réelles du Priest ont leurs trois paliers depuis le 15/11/2026)
+  ns.Cards.tu_single = { id = "tu_single", name = "Single Test", cost = 1, type = "attack", rarity = "common",
+    target = "enemy", effects = { { "damage", 8 } }, text = "Deal 8.",
+    up = { effects = { { "damage", 11 } }, text = "Deal 11." } }
+  -- chaque carte du deck à son dernier palier écrit
+  local function maxAll(deck)
+    for i = 1, #deck do deck[i].up = Card.upValue(Card.tiers(deck[i].id)) end
+  end
   local function has(list, verb, arg)
     for _, a in ipairs(list) do if a[1] == verb and a[2] == arg then return true end end
     return false
@@ -2526,7 +2534,7 @@ do
     end
     local exp = newExp()
     exp.deck[1] = { id = "tu_triple", up = 3 }
-    exp.deck[2].up = 1 -- carte réelle : palier 2 pas écrit
+    exp.deck[2] = { id = "tu_single", up = 1 } -- palier 2 pas écrit
     enter(exp, "campfire")
     eq(X.canUpgrade(exp, 1), false); eq(X.canUpgrade(exp, 2), false)
     assert(not has(X.choices(exp), "upgrade", 1) and not has(X.choices(exp), "upgrade", 2), "plafond : pas proposé")
@@ -2542,7 +2550,7 @@ do
 
   test("paliers : upgradeRandom monte d'un palier, rien au plafond ; Whetstone-like (onRest) inchangé", function()
     local exp = newExp()
-    for i = 1, #exp.deck do exp.deck[i].up = 1 end -- cartes réelles : toutes au plafond
+    maxAll(exp.deck) -- cartes réelles : toutes au plafond
     exp.deck[#exp.deck + 1] = { id = "tu_triple", up = 1 }
     eq(X.upgradeRandom(exp, 2, Rng.stream(3, "t")), 1, "une seule carte améliorable")
     eq(exp.deck[#exp.deck].up, 2)
@@ -2553,7 +2561,7 @@ do
   test("paliers : rencontres (upgrade au choix, carte offerte améliorée = palier 1, copie garde le palier)", function()
     ns.Events.test_up = { name = "x", act = 1, tier = 0, text = "", speaker = "x", npc = "x", scene = "road",
       choices = { { label = "a", outcome = "a", effects = { { "upgrade" } } },
-        { label = "b", outcome = "b", effects = { { "card", "tu_triple", up = true }, { "card", "smite", up = true } } },
+        { label = "b", outcome = "b", effects = { { "card", "tu_triple", up = true }, { "card", "tu_single", up = true } } },
         { label = "c", outcome = "c", effects = { { "dupe" } } } } }
     -- amélioration au choix : palier suivant ; carte au plafond refusée (« maxed »)
     local exp = newExp()
@@ -2569,7 +2577,7 @@ do
     eq(exp.deck[1].up, 3)
     -- rien à améliorer : réponse refusée
     local full = newExp()
-    for i = 1, #full.deck do full.deck[i].up = 1 end
+    maxAll(full.deck)
     forceEvent(full, "test_up")
     local okc, whyc = X.eventChoiceOk(full, 1)
     eq(okc, false); eq(whyc, "upgrade")
@@ -2586,10 +2594,10 @@ do
     assert(X.act(d, { "select", 3 }))
     eq(d.deck[#d.deck].id, "tu_triple"); eq(d.deck[#d.deck].up, 2, "copie au palier 2")
     -- X.addCard : palier borné aux paliers écrits ; true = 1
-    X.addCard(d, "smite", 3); eq(d.deck[#d.deck].up, 1)
-    X.addCard(d, "smite", true); eq(d.deck[#d.deck].up, 1)
+    X.addCard(d, "tu_single", 3); eq(d.deck[#d.deck].up, 1)
+    X.addCard(d, "tu_single", true); eq(d.deck[#d.deck].up, 1)
     X.addCard(d, "tu_triple", 3); eq(d.deck[#d.deck].up, 3)
-    X.addCard(d, "smite", false); eq(d.deck[#d.deck].up, false)
+    X.addCard(d, "tu_single", false); eq(d.deck[#d.deck].up, false)
     ns.Events.test_up = nil
   end)
 
@@ -2647,6 +2655,7 @@ do
   end)
 
   ns.Cards.tu_triple = nil
+  ns.Cards.tu_single = nil
 end
 
 print(("%d réussis, %d échoués"):format(passed, failed))
