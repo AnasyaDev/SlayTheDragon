@@ -98,12 +98,38 @@ end
 ns.ZoneRules = ns.ZoneRules or {}
 local ZRules = ns.ZoneRules
 
+-- Pouvoirs en jeu et épique : toujours consultés, même pour un nom absent de c.hk (un pouvoir ou une épique
+-- peuvent être posés hors du déroulé normal : tests, carte glissée en main puis jouée). Les autres sources
+-- (classe, zones, passifs du deck, bibelots, affixes) sont figées à la création du combat et couvertes par c.hk.
+local function modifyPowers(c, name, v, a, b, d, x)
+  local powers = c.player.powers
+  for i = 1, #powers do
+    local h = Card.def(powers[i]).hooks
+    h = h and h[name]
+    if h then v = h(c, powers[i], v, a, b, d, x) end
+  end
+  return v
+end
+
+local function modifyEpic(c, name, v, a, b, d)
+  local dh, ph = epicHooks(c)
+  local h = dh and dh[name]
+  if h then v = h(c, c.epic, v, a, b, d) end
+  h = ph and ph[name]
+  if h then v = h(c, c.epic, v, a, b, d) end
+  return v
+end
+
 -- Valeur modifiée : chaque crochet reçoit (c, src, v, ...) et renvoie la nouvelle valeur.
--- Nom absent de c.hk (noms écoutés dans ce combat, Combat.collectHooks) : aucun crochet ne peut répondre,
--- v revient tel quel sans parcourir les sources (la plupart des appels : canPlay, payHp, castAs…).
+-- Nom absent de c.hk (noms écoutés dans ce combat, Combat.collectHooks) : seuls les pouvoirs en jeu et
+-- l'épique sont consultés (la plupart des appels : canPlay, payHp, castAs…).
 function Combat.modify(c, name, v, a, b, d, x)
   local hk = c.hk
-  if hk and not hk[name] then return v end
+  if hk and not hk[name] then
+    v = modifyPowers(c, name, v, a, b, d, x)
+    if c.epic then v = modifyEpic(c, name, v, a, b, d) end
+    return v
+  end
   local cr = Rules[c.class]
   local ch = cr and cr.hooks and cr.hooks[name]
   if ch then v = ch(c, c.cls, v, a, b, d, x) end
@@ -122,12 +148,7 @@ function Combat.modify(c, name, v, a, b, d, x)
       if h then v = h(c, ps[i], v, a, b, d, x) end
     end
   end
-  local powers = c.player.powers
-  for i = 1, #powers do
-    local h = Card.def(powers[i]).hooks
-    h = h and h[name]
-    if h then v = h(c, powers[i], v, a, b, d, x) end
-  end
+  v = modifyPowers(c, name, v, a, b, d, x)
   local relics = c.relics
   for i = 1, #relics do
     local r = ns.Relics[relics[i]]
@@ -142,22 +163,41 @@ function Combat.modify(c, name, v, a, b, d, x)
       if h then v = h(c, affixes[i], v, a, b, d, x) end
     end
   end
-  if c.epic then
-    local dh, ph = epicHooks(c)
-    local h = dh and dh[name]
-    if h then v = h(c, c.epic, v, a, b, d) end
-    h = ph and ph[name]
-    if h then v = h(c, c.epic, v, a, b, d) end
-  end
+  if c.epic then v = modifyEpic(c, name, v, a, b, d) end
   return v
+end
+
+local function firePowers(c, name, a, b, d, x)
+  local powers = c.player.powers
+  for i = 1, #powers do
+    local h = Card.def(powers[i]).hooks
+    h = h and h[name]
+    if h and h(c, powers[i], a, b, d, x) then return true, powers[i] end
+  end
+  return false
+end
+
+local function fireEpic(c, name, a, b, d)
+  local dh, ph = epicHooks(c)
+  local h = dh and dh[name]
+  if h and h(c, c.epic, a, b, d) then return true, c.epic end
+  h = ph and ph[name]
+  if h and h(c, c.epic, a, b, d) then return true, c.epic end
+  return false
 end
 
 -- Notification : chaque crochet reçoit (c, src, ...) ; s'il renvoie true, on s'arrête
 -- et fire renvoie true (sert à « empêcher la mort », par exemple) et la source qui l'a arrêtée
 -- (l'état de classe ou de zone, l'instance du pouvoir, l'id du bibelot ou de l'affixe).
+-- Nom absent de c.hk : seuls les pouvoirs en jeu et l'épique sont consultés (comme Combat.modify).
 function Combat.fire(c, name, a, b, d, x)
-  local hk = c.hk -- nom que personne n'écoute dans ce combat : rien à notifier (comme Combat.modify)
-  if hk and not hk[name] then return false end
+  local hk = c.hk
+  if hk and not hk[name] then
+    local stop, src = firePowers(c, name, a, b, d, x)
+    if stop then return true, src end
+    if c.epic then return fireEpic(c, name, a, b, d) end
+    return false
+  end
   local cr = Rules[c.class]
   local ch = cr and cr.hooks and cr.hooks[name]
   if ch and ch(c, c.cls, a, b, d, x) then return true, c.cls end
@@ -176,12 +216,8 @@ function Combat.fire(c, name, a, b, d, x)
       if h and h(c, ps[i], a, b, d, x) then return true, ps[i] end
     end
   end
-  local powers = c.player.powers
-  for i = 1, #powers do
-    local h = Card.def(powers[i]).hooks
-    h = h and h[name]
-    if h and h(c, powers[i], a, b, d, x) then return true, powers[i] end
-  end
+  local stop, src = firePowers(c, name, a, b, d, x)
+  if stop then return true, src end
   local relics = c.relics
   for i = 1, #relics do
     local r = ns.Relics[relics[i]]
@@ -196,13 +232,7 @@ function Combat.fire(c, name, a, b, d, x)
       if h and h(c, affixes[i], a, b, d, x) then return true, affixes[i] end
     end
   end
-  if c.epic then
-    local dh, ph = epicHooks(c)
-    local h = dh and dh[name]
-    if h and h(c, c.epic, a, b, d) then return true, c.epic end
-    h = ph and ph[name]
-    if h and h(c, c.epic, a, b, d) then return true, c.epic end
-  end
+  if c.epic then return fireEpic(c, name, a, b, d) end
   return false
 end
 
@@ -1499,8 +1529,6 @@ function Combat.castSlots(c)
 end
 
 local function allowed(c, d)
-  local hk = c.hk -- aucun crochet « allow » dans ce combat (c.hk) : tout est permis
-  if hk and not hk.allow then return true end
   local powers = c.player.powers
   for i = 1, #powers do
     local h = Card.def(powers[i]).hooks
