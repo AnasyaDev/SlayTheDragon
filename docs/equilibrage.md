@@ -927,3 +927,19 @@ abordables par visite tout débloqué (3,6 à 4,4 au compte neuf, étals sans bi
 victoire inchangés à ± 4 points. Hors cible : 18 à 25 points du gagné tombent après le dernier marchand visité (≈ 0,6
 marchand par zone), ce que les prix ne changent pas ; pistes (marchand entre deux zones, pas d'or sur Nefarian) dans
 `docs/expedition.md`.
+
+## Priest : paliers +2 et +3 (15/11/2026)
+
+Les 41 cartes du Priest ont leurs paliers 2 et 3 écrits à la main (tableau : `docs/classes/priest-progression.md`,
+« Paliers +2 et +3 »). Soins et boucliers ne montent presque plus après le +1 (le Priest perd déjà peu de PV) ;
+les paliers vont au tempo (coût, Retain, Innate, pioche), à l'Atonement et à l'Insanity ; épiques : tables
+`{ base, +1, +2, +3 }` lues par `Card.level`. Campagne au bot human (`runs=600 key=0 zones=7 level=7`) :
+**65,0 % → 64,2 %** (± 3,8, aucun écart), PV perdus par type de combat inchangés à 0,2 près ; améliorations par
+expédition +1 4,96 → 4,87, **+2 0,14, +3 0,00** : le bot améliore d'abord les cartes neuves d'un deck de
+≈ 41 cartes (≈ 5 améliorations par expédition), les paliers 2 et 3 ne pèsent presque pas sur la mesure. Écarts
+« vict. avec / sans » du tableau des cartes identiques à ± 4 points à ceux d'avant. **Paliers non mesurés
+carte par carte** : balayages `sweep=cards` abandonnés (coût ≈ 25 000 campagnes par classe ; décision du
+coordinateur), seul un début de `up=1` au bot human a tourné (18 cartes, `reports/priest-sweep-up1.txt`).
+À surveiller en jeu : Shadow Covenant+3 (deux cartes Shadow gratuites par tour, gain ≈ 1,5 fois celui du +1),
+Inner Focus+2/+3 (multiplicateur), Misery+2/+3 (+ 1 par copie, autant que le +1), Rapture+3 et Renew+3
+(Innate), les paliers « Retain » (le bot n'en tire presque rien).

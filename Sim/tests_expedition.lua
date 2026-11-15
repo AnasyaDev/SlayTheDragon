@@ -2567,7 +2567,7 @@ test("marchand : carte vendue déjà améliorée (zones hautes), prix majoré, a
     -- palier vendu (X.SHOP_UP_TIER, nombre ou table par rang de zone) : borné aux paliers écrits de la carte
     local oldTier = X.SHOP_UP_TIER
     X.SHOP_UP_TIER = { 1, 3 }
-    eq(X.shopUpgradeTier(exp, id), 1, "palier 2 pas écrit : palier 1")
+    eq(X.shopUpgradeTier(exp, id), math.min(3, ns.Card.tiers(id)), "borné aux paliers écrits de la carte")
     ns.Cards.tu_shop3 = { id = "tu_shop3", name = "Shop Test", cost = 1, type = "skill", rarity = "common",
       effects = {}, text = "A.", up = { text = "B." }, up2 = { text = "C." }, up3 = { text = "D." } }
     eq(X.shopUpgradeTier(exp, "tu_shop3"), 3, "Stranglethorn (rang 4) : dernier palier de la table")
