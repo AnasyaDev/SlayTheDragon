@@ -141,8 +141,8 @@ historique.
   héros, panneau d'ardoise (`W.dialog`, x 280, y 70, 560 × 250) : nom de la zone en grand (28, or), sept
   pastilles de carte de vol (zones franchies vertes, la suivante jaune et plus grande, à venir grises : mêmes
   pièces que le bandeau), texte « Westfall is behind you. Zone 2 of 7. », « You recover 12 HP (36/36). »
-  (vert) et, si le boss vaincu a débloqué quelque chose, « Unlocked for your next expeditions (Priest): epic
-  card Prayer of Mending, new common content for every class. ». Bouton doré « Continue » (790, 494 ;
+  (vert) et, si le boss vaincu a débloqué quelque chose, la vitrine des déblocages (cartes et bibelots montrés :
+  voir « Déblocages montrés, plus décrits » ; avant le 15/11/2026, une phrase). Bouton doré « Continue » (790, 494 ;
   option `continue`) ; l'abandon reste au menu. Le bandeau montre « Duskwood · 2/7 », sans pastilles d'étape.
 - **Carte et bandeau** : la zone en cours et sa place dans la campagne, « Duskwood · 2/7 »
   (`Expedition.campaignName`, `runInfo().act`, titre de l'étape `map`).
@@ -160,9 +160,9 @@ historique.
   Duskwood (2/7). » avant sa première étape), puis « Zones beaten: Westfall (1 of 7). » (ou « No zone
   beaten. ») ; étapes, élites, boss ; expérience de toute l'expédition, montée de niveau ; déblocages des boss
   battus, **regroupés** (une expédition peut en battre sept) : « First bosses defeated with the Priest:
-  Duskwood, Wetlands. », « New epic card(s): … », « New relic(s): … », « First Duskwood, Wetlands bosses on
-  this account: 16 neutral cards, … unlocked for every class. » (et les avantages communs), « Mythic Keystone
-  +2 unlocked. » (Nefarian). Cartes épiques, cartes et bibelots révélés comme avant.
+  Duskwood, Wetlands. », « Mythic Keystone +2 unlocked. » (Nefarian) ; les épiques, cartes, bibelots et le
+  commun du compte sont montrés dans la vitrine (15/11/2026 : plus de « New epic card(s) », « New relic(s) »,
+  « First … bosses on this account: 16 neutral cards… » en texte ; voir « Déblocages montrés, plus décrits »).
 - Harnais : U6 (le boss de Westfall mène à l'écran entre deux zones : textes, soin, épique débloquée tout de
   suite dans la méta, bandeau, décor de Duskwood, rechargement sur cet écran, « Continue », carte de Duskwood,
   puis abandon), U7 (bilan : jusqu'où, Westfall battue, déblocages ; journal), section **UZ** réécrite
@@ -174,6 +174,53 @@ historique.
   `bilan-bibelot-de-cle`, `bilan-victoire-complete`, `progression-zones`.
 - Non vérifiable hors jeu : rendu des plaques éteintes (`SetDesaturated`), lisibilité du petit état (10) sur
   la plaque, pastilles du panneau entre deux zones sur l'ardoise.
+
+## Déblocages montrés, plus décrits (15/11/2026)
+
+Demande du joueur : après chaque boss, voir les cartes et les bibelots obtenus plutôt qu'une phrase (« Unlocked
+for your next expeditions (Rogue): epic card X, relic Y, new common content for every class. »).
+- **Vitrine partagée** (`Shelf`, haut de `UI/Screens.lua`, après `RowScroll`) : écran entre deux zones et bilan.
+  Titre « Unlocked for your next expeditions » (or, 15), puis un groupe par destinataire : la classe (« Rogue » :
+  épiques d'abord, cartes de zone, cartes et bibelots de la montée de niveau au bilan, bibelots de clé) et
+  « All classes » (le commun que le compte vient d'ouvrir : `Meta.commonContent` de chaque zone dont le compte bat
+  le boss pour la première fois — cartes neutres, bibelots, potions). Vraies cartes `W.card` (survol : halo et
+  aperçu à taille réelle, comme toute petite carte), bibelots et potions en cases `W.iconButton` (infobulle de
+  l'objet). Nom du groupe dans une colonne à gauche (96) de sa première rangée visible.
+- **Reste en texte** : une ligne courte par groupe sous les rangées pour ce qui n'est ni carte ni objet :
+  « All classes: 15 new encounters. Choose a relic at the start of each expedition. One more relic at the
+  merchant. » (rencontres, avantages du compte). Les drapeaux d'histoire ne sont pas montrés entre deux zones
+  (rien à en savoir) ; au bilan restent en texte « First boss(es) defeated with the Priest: … », « Mythic
+  Keystone +N unlocked. », le titre Dragonslayer et Rallying Cry.
+- **Mise en page** : la densité la plus aérée qui tient dans la hauteur offerte (`SH_DENSITY` : cartes 0,5 et
+  épique 0,72, cases 44 seules ; puis cases 44 par deux ; épique 0,5 ; cases 32 par trois ; cartes 0,42 et cases
+  28 par trois), groupes empilés, sinon côte à côte sur une seule rangée (chaque nom à sa largeur) ; si rien ne
+  tient, la plus serrée, empilée, et les rangées défilent à la molette (`RowScroll`, une rangée par cran,
+  rangées entières, indicateur au bord droit de la vitrine ; fenêtre = la plus haute des positions).
+  Contrôleur : `step.unlocks = { { label, cards, relics, potions, notes } }` (nil : rien) pour `transit` et `end` ;
+  `step.unlocked` (bilan) retiré.
+- **Entre deux zones** : avec des déblocages, le panneau monte (y 44), s'élargit vers la droite de 560 à 700 selon
+  la vitrine (le héros est à gauche), grandit vers le bas jusqu'à y 486 au plus (« Continue » à y 494) ; nom,
+  pastilles et texte resserrés en haut. Rien de débloqué : panneau (280, 70, 560 × 250) et textes comme avant,
+  sans la phrase. Cas réels, compte neuf à +5, chaque zone : tout tient sans défilement (après Duskwood, le plus
+  chargé : épique et 3 bibelots de clé, puis 4 cartes, 12 bibelots et 2 potions du commun, en cases 32 par trois).
+- **Bilan** : la vitrine sous la barre de niveau (panneau monté à y 40, bas à y 488 au plus). Bilan d'un compte
+  neuf qui a battu Westfall : les deux groupes côte à côte sur une rangée ; victoire complète d'un compte neuf
+  (commun de six zones) : défilement.
+- Harnais : `shelfReport` / `shelfHovers` / `transitAvoid` (après `snap`) : cartes et cases visibles, chaque
+  élément dans le panneau (12 sous ses bords), sans chevauchement entre éléments, ni du visuel d'une carte
+  (languette, plaque) sur un texte de la vitrine ou de l'écran (nom de la zone, pastilles, soin, Continue,
+  barres, boutons) ; aperçu à taille réelle de chaque carte, infobulle de chaque case. U6 (compte neuf, Westfall :
+  épique en tête au cadre violet, commun, note, survols, rien ne chevauche, sans défilement), U7 (bilan côte à
+  côte), UP, UZ (bilans : commun de six zones regroupé, rencontres et avantages en note, toutes les positions du
+  défilement propres, tout vu une fois), **UT** (pour chaque zone suivie d'une autre, compte neuf, Voleur à +5 :
+  groupes, chaque carte et case une fois, l'épique d'abord, survols, rien ne chevauche, sans défilement, rien de
+  tronqué ; épique seule à 0,72 dans un panneau de largeur ordinaire ; rien de débloqué : pas de vitrine,
+  panneau à sa place d'origine), UE (l'épique en tête, une fois). Aperçus : `entre-zones`, `entre-zones-compte-neuf`,
+  `entre-zones-maximal`, `entre-zones-epique`, `entre-zones-sans-deblocage`, `bilan`, `bilan-victoire-complete`,
+  `bilan-victoire-complete-defile`.
+- Non vérifiable hors jeu : lisibilité des cartes à 0,5 et des cases 32 sur l'ardoise, rendu de l'aura violette
+  de l'épique à côté des cases, molette sur la vitrine du bilan (cadres survolés rejoués), largeur réelle des noms
+  mesurée par le client (côte à côte).
 
 ## Westfall réelle (13/11/2026)
 
@@ -259,8 +306,8 @@ hors de toute pile, sans coût).
 - **Progress, onglet Zones** : l'emplacement verrouillé d'une carte de zone est un dos de carte teinté de violet
   avec l'aura épique (`lockedCard`, `SetEpic`) ; débloquée, la vraie carte (cadre violet) à 0,85 : son survol
   montre l'aperçu à taille réelle (sous `W.PREVIEW_BELOW`).
-- **Bilan** : « New epic card: X. » en violet ; la carte est présentée à part (`unlocked.epic`) : à 0,72, à
-  gauche de la rangée des déblocages, libellé violet « New epic card » au-dessus ; le panneau grandit d'autant.
+- **Bilan** : (remplacé le 15/11/2026 par la vitrine, « Déblocages montrés, plus décrits » : l'épique en tête
+  du groupe de la classe, à 0,72 si la place le permet, sans libellé « New epic card » ni ligne de texte.)
 - Harnais : section **UE** (avant U16 ; départ sans épique, puis l'épique posée dans le deck comme gagnée, chute
   imposée à 100 % pour l'élite) ; planches `ue-combat-epique`
   (l'épique parmi les Powers), `ue-carte-epique` (panneau du deck : carte sans coût, en tête), `ue-choix-epic`
@@ -1436,8 +1483,8 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 75 % (8 par rangée, 2 rangées visibles, défilement à la molette au-delà de 16 : « Grille du deck défilante ») ; amélioration : la carte survolée montre sa version améliorée ; plateau : « Retour » / « Passer » |
-| `transit` | **Entre deux zones** (`transit`) | décor de la zone suivante, héros ; panneau : nom de la zone, pastilles de la campagne, soin du passage, déblocages du boss vaincu ; « Continue » |
-| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), jusqu'où (zone atteinte, zones battues), déblocages des boss battus regroupés (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe ; « Nouvelle expédition », « Progress » |
+| `transit` | **Entre deux zones** (`transit`) | décor de la zone suivante, héros ; panneau : nom de la zone, pastilles de la campagne, soin du passage, déblocages du boss vaincu montrés (vitrine `Shelf` : cartes, cases) ; « Continue » |
+| `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), jusqu'où (zone atteinte, zones battues), premiers boss de la classe (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe, déblocages des boss battus regroupés et montrés (vitrine `Shelf`) ; « Nouvelle expédition », « Progress » |
 | vue méta | **Journal** (« Log ») | barre du niveau de la classe, boss battus, zone la plus loin, 8 dernières expéditions (zone atteinte, boss battus) ; « Retour » |
 
 **Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi ; clic droit
