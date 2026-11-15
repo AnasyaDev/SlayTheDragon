@@ -111,6 +111,9 @@ local function scatter(c, z, by)
   Combat.zstat(c, "scatters")
 end
 
+-- Ordre de gauche à droite (hors de settle : une closure y arrêterait la compilation LuaJIT).
+local function byPos(a, b) return a.pos < b.pos end
+
 -- Règle les morts de l'effet id (nil : toutes les morts en attente).
 local function settle(c, z, id)
   local q = z.queue
@@ -123,7 +126,7 @@ local function settle(c, z, id)
   if #now == 0 then return end
   if #now > 1 then Combat.zstat(c, "packGroupKills", #now) end
   -- de gauche à droite (place dans le combat)
-  table.sort(now, function(a, b) return a.pos < b.pos end)
+  table.sort(now, byPos)
   for i = 1, #now do
     if now[i].leader then
       Combat.zstat(c, "packBonusesCancelled", #now - 1)

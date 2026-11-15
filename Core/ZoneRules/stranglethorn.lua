@@ -77,8 +77,18 @@ function ST.plan(c)
 end
 
 -- Cartes Hexed du combat (main, pioche, défausse, recharges).
+-- (sans closure : appelé par l'intention des ennemis, chemin chaud de la simulation)
+local function hexedIn(list, n)
+  local id = ST.HEXED
+  for i = 1, #list do if list[i].id == id then n = n + 1 end end
+  return n
+end
+
 function ST.hexedCount(c)
-  return Combat.countCards(c, function(inst) return inst.id == ST.HEXED end)
+  local n = hexedIn(c.discard, hexedIn(c.draw, hexedIn(c.hand, 0)))
+  local cd, id = c.cooldown, ST.HEXED
+  for i = 1, #cd do if cd[i].card.id == id then n = n + 1 end end
+  return n
 end
 
 -- Remplace inst (main ou défausse) par une carte Hexed posée par e ; renvoie la nouvelle instance.
