@@ -342,12 +342,13 @@ return function(ns)
     return (cheap * SE.SURPLUS_VALUE + price - cheap) * 0.03 / f
   end
   SE.priceCost = priceCost
-  -- Carte vendue déjà améliorée (shop.cards[i].up) : note + SE.UPGRADED_BONUS, plus SE.SHOP_UP_VALUE unités
-  -- (l'amélioration d'un feu de camp vaut ≈ 1 ; moitié, la carte n'étant piochée qu'une fois sur plusieurs).
+  -- Carte vendue déjà améliorée (shop.cards[i].up = palier) : note + SE.UPGRADED_BONUS, plus SE.SHOP_UP_VALUE unités
+  -- (l'amélioration d'un feu de camp vaut ≈ 1 ; moitié, la carte n'étant piochée qu'une fois sur plusieurs), par palier.
   SE.SHOP_UP_VALUE = 0.5
   local function shopCardValue(exp, it, r)
-    if not it.up then return cardValue(exp, r) end
-    return cardValue(exp, r + SE.UPGRADED_BONUS) + SE.SHOP_UP_VALUE
+    local n = Card.level(it.up)
+    if n == 0 then return cardValue(exp, r) end
+    return cardValue(exp, r + SE.UPGRADED_BONUS * n) + SE.SHOP_UP_VALUE * n
   end
   SE.shopCardValue = shopCardValue
 
