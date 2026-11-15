@@ -154,7 +154,7 @@ test("règle active dès le premier tour, combat sauvegardable et clonable, épi
     for _, up in ipairs({ false, true }) do
       local c = setup({ "strike", "defend" }, { epic = id, up = up })
       local got, gotUp = Warrior.epicOf(c)
-      eq(got, id); eq(gotUp, up)
+      eq(got, id); eq(gotUp, ns.Card.upValue(up))
       assert(Save.isPlain(c), id .. " : sauvegardable")
       local cl = Combat.clone(c)
       eq(Warrior.epicOf(cl), id)

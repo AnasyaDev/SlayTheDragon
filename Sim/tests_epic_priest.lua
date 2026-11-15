@@ -141,7 +141,7 @@ test("socle : une épique posée dans le deck de départ est en jeu (c.epic), da
     deck[#deck + 1] = { id = id, up = true }
     local c = Combat.new({ seed = 3, class = "priest", hp = 40, deck = deck, encounter = { "tp_dummy" } })
     local got, up = P.epicOf(c)
-    eq(got, id); eq(up, true)
+    eq(got, id); eq(up, 1)
     for _, pile in ipairs({ c.hand, c.draw, c.discard, c.exhaust }) do
       for _, inst in ipairs(pile) do assert(inst.id ~= id, id .. " : dans aucune pile") end
     end

@@ -2756,7 +2756,7 @@ function DV.sorted(list)
     -- l'épique en tête (règle de l'expédition, docs/expedition.md, « Cartes épiques »)
     out[i] = { inst = inst, t = d.rarity == "epic" and 0 or TYPE_ORDER[d.type] or 9, cost = d.cost or 99,
       name = d.name or inst.id,
-      up = inst.up and 1 or 0, uid = tostring(inst.uid or "") }
+      up = ns.Card.level(inst), uid = tostring(inst.uid or "") }
   end
   table.sort(out, function(a, b)
     if a.t ~= b.t then return a.t < b.t end
@@ -2985,6 +2985,8 @@ function EC:Open(id, swap)
   self.newLabel:SetPoint("TOP", UI.content, "TOPLEFT", cx[2], -ly)
   self.lost:ClearAllPoints()
   self.lost:SetPoint("TOP", self.oldLabel, "BOTTOM", 0, -2)
+  -- épique améliorée (palier 1 à 3) : ses améliorations ne passent pas à la nouvelle
+  self.lost:SetText(ns.Card.level(swap.old.up) > 1 and "The upgrades are lost." or "The upgrade is lost.")
   if swap.old.up then self.lost:Show() else self.lost:Hide() end
   self.frame:Show()
   W.sound("card")
