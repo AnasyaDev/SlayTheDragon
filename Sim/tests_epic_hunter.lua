@@ -3,6 +3,9 @@
 -- la carte, les tests ne dépendent pas de la pile qui la porte.
 -- Usage : lua5.1 Sim/tests_epic_hunter.lua   (ou luajit) — doit finir par ALL PASS.
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
+-- LuaJIT : grand cache de traces pour les campagnes simulées de la suite (sinon il se vide sans cesse ; sans
+-- effet sur les résultats ni sous Lua 5.1).
+if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
 local ns = dofile(root .. "/Sim/load.lua")(root)
 local X, Meta, Save, Combat, Card, H = ns.Expedition, ns.Meta, ns.Save, ns.Combat, ns.Card, ns.Hunter
 

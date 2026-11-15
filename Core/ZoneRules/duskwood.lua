@@ -32,10 +32,29 @@ local function isCurse(inst, d) return (d or Card.def(inst)).curse == true end
 DW.isCurse = isCurse
 
 -- Curses du combat (main, pioche, défausse, recharges) ; src = uid du lanceur, id = sorte (facultatifs).
+-- (sans closure : appelé dans les chemins chauds de la simulation, où une closure arrête la compilation LuaJIT)
+local function countIn(list, src, id, n)
+  for i = 1, #list do
+    local inst = list[i]
+    if Card.def(inst).curse == true and (src == nil or inst.src == src) and (id == nil or inst.id == id) then
+      n = n + 1
+    end
+  end
+  return n
+end
+
 function DW.count(c, src, id)
-  return Combat.countCards(c, function(inst, d)
-    return d.curse == true and (src == nil or inst.src == src) and (id == nil or inst.id == id)
-  end)
+  local n = countIn(c.hand, src, id, 0)
+  n = countIn(c.draw, src, id, n)
+  n = countIn(c.discard, src, id, n)
+  local cd = c.cooldown
+  for i = 1, #cd do
+    local inst = cd[i].card
+    if Card.def(inst).curse == true and (src == nil or inst.src == src) and (id == nil or inst.id == id) then
+      n = n + 1
+    end
+  end
+  return n
 end
 
 -- Curses de cette sorte dans la main.
