@@ -99,12 +99,17 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
     assert(t("echoing_reprimand"):find("counts as a Surge of " .. E.echoing_reprimand[k] .. "%."))
     assert(t("echoing_reprimand"):find("Surge of 2" .. (E.echoingMax[k] == 3 and " or 3" or "") .. " Combo", 1, true))
     local kl, kr = E.kidney_shot[k], E.kidneyCombo[k]
-    assert(card("kidney_shot"):find("Surge of " .. kl .. "+ Combo: Gouge"
-      .. (kr > 0 and (", +" .. kr .. " Combo") or "") .. ".", 1, true), card("kidney_shot"))
+    -- paliers 2 et 3 : déclencheur court « Surge of 4+: Gouge, +N Combo. » ; « Shroud 3, Parry N. » (deux lignes)
+    if kr > 0 then
+      assert(card("kidney_shot"):find("Surge of " .. kl .. "+: Gouge, +" .. kr .. " Combo.", 1, true), card("kidney_shot"))
+      assert(Lg.triggers["Surge of " .. kl .. "+"], "déclencheur court enregistré")
+    else
+      assert(card("kidney_shot"):find("Surge of " .. kl .. "+ Combo: Gouge.", 1, true), card("kidney_shot"))
+    end
     assert(t("kidney_shot"):find("Gouge: Apply Stunned 1", 1, true))
     local sp = E.subterfugeParry[k]
-    assert(card("subterfuge"):find("Shroud " .. E.subterfugeTurns[k] .. (sp > 0 and (", gain Parry " .. sp) or "")
-      .. ".", 1, true), card("subterfuge"))
+    assert(card("subterfuge"):find("Shroud " .. E.subterfugeTurns[k] .. (sp > 0 and (", Parry " .. sp) or "") .. ".",
+      1, true), card("subterfuge"))
     assert(t("subterfuge"):find("Stealth lasts " .. E.subterfugeTurns[k] .. " turns", 1, true))
     if E.subterfuge[k] > 0 then assert(t("subterfuge"):find("gives %+" .. E.subterfuge[k] .. " Combo"))
     else assert(not t("subterfuge"):find("Combo%.")) end
