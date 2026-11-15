@@ -9206,7 +9206,7 @@ do
   snap("rencontre-sentinel-hill", true)
 end
 
-print("UT  écran entre deux zones : vitrine des déblocages (compte neuf à +5 après chaque zone, épique seule, rien)")
+print("UTR écran entre deux zones : vitrine des déblocages (compte neuf à +5 après chaque zone, épique seule, rien)")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
