@@ -329,6 +329,43 @@ if opts.worker then
   return
 end
 
+-- Lots fixes d'une série (jobs > 1) : { from, to } de ceil(runs / jobs) expéditions, un processus chacun.
+-- Le découpage compte : une expédition laisse des traces dans l'addon chargé (Swamp.ensureMove ajoute pour de
+-- bon le move « asleep » à la fiche d'un ennemi endormi, que le cache HITS de Sim/zones/wetlands.lua compte s'il
+-- est déjà là), donc les chiffres dépendent des expéditions jouées avant dans le même processus.
+local function lots()
+  local list, per = {}, math.ceil(runs / jobs)
+  for j = 1, jobs do
+    local from, to = (j - 1) * per + 1, math.min(runs, j * per)
+    if from <= to then list[#list + 1] = { from, to } end
+  end
+  return list
+end
+
+-- Commande d'un lot ; over remplace des options (force=, relics=, epic=) le temps de la série.
+local function lotCommand(over, lot)
+  local passthrough = {}
+  for k, v in pairs(opts) do
+    if k ~= "jobs" and k ~= "save" and k ~= "compare" and k ~= "runs" and k ~= "sweep"
+        and over[k] == nil then
+      passthrough[#passthrough + 1] = k .. "=" .. v
+    end
+  end
+  for k, v in pairs(over) do passthrough[#passthrough + 1] = k .. "=" .. v end
+  return string.format("%s %s/Sim/sim.lua worker=1 from=%d to=%d %s", opts.exe or "luajit", root, lot[1],
+    lot[2], table.concat(passthrough, " "))
+end
+
+-- Lance un lot dans un processus sans l'attendre. Renvoie une fonction qui attend la fin et rend ses agrégats.
+local function launchLot(over, lot)
+  local p = assert(io.popen(lotCommand(over, lot), "r"))
+  return function()
+    local out = p:read("*a")
+    p:close()
+    return deserialize(out)
+  end
+end
+
 -- Lance la série complète ; over remplace des options (force=, relics=) le temps de la série.
 local function runAll(over)
   over = over or {}
@@ -341,31 +378,10 @@ local function runAll(over)
     force, startRelics, opts.epic = f0, r0, e0
     return a
   end
-  local exe = opts.exe or "luajit"
-  local pipes = {}
-  local per = math.ceil(runs / jobs)
-  local passthrough = {}
-  for k, v in pairs(opts) do
-    if k ~= "jobs" and k ~= "save" and k ~= "compare" and k ~= "runs" and k ~= "sweep"
-        and over[k] == nil then
-      passthrough[#passthrough + 1] = k .. "=" .. v
-    end
-  end
-  for k, v in pairs(over) do passthrough[#passthrough + 1] = k .. "=" .. v end
-  local extra = table.concat(passthrough, " ")
-  for j = 1, jobs do
-    local from, to = (j - 1) * per + 1, math.min(runs, j * per)
-    if from <= to then
-      local cmd = string.format("%s %s/Sim/sim.lua worker=1 from=%d to=%d %s", exe, root, from, to, extra)
-      pipes[#pipes + 1] = assert(io.popen(cmd, "r"))
-    end
-  end
+  local pending = {}
+  for i, lot in ipairs(lots()) do pending[i] = launchLot(over, lot) end
   local a = newAgg()
-  for _, p in ipairs(pipes) do
-    local out = p:read("*a")
-    p:close()
-    mergeInto(a, deserialize(out))
-  end
+  for _, wait in ipairs(pending) do mergeInto(a, wait()) end
   return a
 end
 
@@ -413,7 +429,81 @@ if opts.sweep then
   end)
   -- runner=expedition : mesures sans épique (epic=none), sauf l'épique imposée de sa ligne
   local noEpic = opts.runner == "expedition" and "none" or nil
-  local base = runAll({ epic = noEpic })
+  -- Séries du balayage dans l'ordre du rapport : la référence (sans), puis une par élément.
+  local series = { { over = { epic = noEpic } } }
+  for _, id in ipairs(list) do
+    local over = { epic = noEpic }
+    if opts.sweep == "relics" then
+      local rl = {}
+      for _, r in ipairs(startRelics) do rl[#rl + 1] = r end
+      rl[#rl + 1] = id
+      over.relics = table.concat(rl, ",")
+    elseif ns.Cards[id].rarity == "epic" and opts.runner == "expedition" then
+      over.epic = id
+    else
+      local fl = {}
+      for _, f in ipairs(force) do fl[#fl + 1] = f end
+      fl[#fl + 1] = id .. ns.Card.suffix(upN)
+      over.force = table.concat(fl, ",")
+    end
+    series[#series + 1] = { id = id, over = over }
+  end
+  -- jobs > 1 : les lots de toutes les séries forment une file que xargs -P fait tourner, jobs processus à la fois,
+  -- chaque place libérée prise aussitôt par le lot suivant, même s'il est d'une ligne d'après : plus d'attente
+  -- du lot le plus lent à chaque ligne (≈ 25 % du temps d'un balayage). Chaque lot écrit ses agrégats dans un
+  -- fichier ; mêmes lots, mêmes processus et même ordre de fusion que runAll : mêmes chiffres.
+  local result, closePool
+  if jobs > 1 then
+    local seriesLots = lots()
+    local dir = os.tmpname()
+    os.remove(dir)
+    os.execute("mkdir -p '" .. dir .. "'")
+    local lotsFile = assert(io.open(dir .. "/lots", "w"))
+    local t = 0
+    for s = 1, #series do
+      for _, lot in ipairs(seriesLots) do
+        t = t + 1
+        local f = assert(io.open(("%s/%d.sh"):format(dir, t), "w"))
+        f:write(lotCommand(series[s].over, lot), "\n")
+        f:close()
+        lotsFile:write(t, "\n")
+      end
+    end
+    lotsFile:close()
+    -- une ligne « n » par lot fini (dans l'ordre où ils finissent), ses agrégats dans <dir>/n.out
+    local pool = assert(io.popen(("xargs -P %d -n 1 sh -c 'sh \"$0/$1.sh\" > \"$0/$1.out\"; echo \"$1\"' '%s' < '%s/lots'")
+      :format(jobs, dir, dir), "r"))
+    local done, readT = {}, 0
+    local function lotResult(n)
+      while not done[n] do
+        local line = assert(pool:read("*l"), "balayage : file des lots interrompue")
+        done[tonumber(line)] = true
+      end
+      local f = assert(io.open(("%s/%d.out"):format(dir, n), "r"))
+      local out = f:read("*a")
+      f:close()
+      assert(out ~= "", "balayage : lot " .. n .. " en échec")
+      os.remove(("%s/%d.out"):format(dir, n))
+      os.remove(("%s/%d.sh"):format(dir, n))
+      return deserialize(out)
+    end
+    result = function()
+      local a = newAgg()
+      for _ = 1, #seriesLots do
+        readT = readT + 1
+        mergeInto(a, lotResult(readT))
+      end
+      return a
+    end
+    closePool = function()
+      pool:close()
+      os.remove(dir .. "/lots")
+      os.remove(dir)
+    end
+  else
+    result = function(s) return runAll(series[s].over) end
+  end
+  local base = result(1)
   local function line(name, rarity, a)
     local parts = {}
     for _, k in ipairs({ "easy", "normal", "elite", "boss" }) do
@@ -430,27 +520,15 @@ if opts.sweep then
   print("  élément                rareté    vict.   écart   facile t/PV  normal t/PV  élite t/PV   boss t/PV    jouée")
   print(line("(sans)", "-", base))
   local rows = {}
-  for _, id in ipairs(list) do
-    local over = { epic = noEpic }
-    if opts.sweep == "relics" then
-      local rl = {}
-      for _, r in ipairs(startRelics) do rl[#rl + 1] = r end
-      rl[#rl + 1] = id
-      over.relics = table.concat(rl, ",")
-    elseif ns.Cards[id].rarity == "epic" and opts.runner == "expedition" then
-      over.epic = id
-    else
-      local fl = {}
-      for _, f in ipairs(force) do fl[#fl + 1] = f end
-      fl[#fl + 1] = id .. ns.Card.suffix(upN)
-      over.force = table.concat(fl, ",")
-    end
-    local a = runAll(over)
+  for i = 2, #series do
+    local id = series[i].id
+    local a = result(i)
     local def = opts.sweep == "relics" and ns.Relics[id] or ns.Cards[id]
     print(line(id .. (opts.sweep == "cards" and ns.Card.suffix(upN) or ""), def.rarity, a))
     io.stdout:flush()
     rows[id] = { wins = a.wins, runs = a.runs }
   end
+  if closePool then closePool() end
   if opts.save then
     local f = assert(io.open(opts.save, "w"))
     f:write(serialize({ base = { wins = base.wins, runs = base.runs }, rows = rows }))
