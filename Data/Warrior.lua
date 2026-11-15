@@ -438,16 +438,16 @@ epic("sweeping_strikes", {
   zone = "wetlands", name = "Sweeping Strikes", path = "arms",
   text = "Epic.\nTargeted Attack hits: Sweep 1.",
   up = { text = "Epic.\nTargeted Attack hits: Sweep 2." },
-  up2 = { text = "Epic.\nTargeted Attack hits: Sweep 2.\nKills: +1 Rage." },
-  up3 = { text = "Epic.\nTargeted Attack hits: Sweep 2.\nKills: +2 Rage." },
+  up2 = { text = "Epic.\nAttacks: Sweep 2." },
+  up3 = { text = "Epic.\nAttacks: Sweep 2.\nKills: +1 Rage." },
 })
 
 epic("titans_grip", {
   zone = "stranglethorn", name = "Titan's Grip", path = "fury",
   text = "Epic.\nDual Wield 2.",
   up = { text = "Epic.\nDual Wield 2, 0-cost free." },
-  up2 = { text = "Epic.\nDual Wield 2, 0-cost free.\nKills: heal 4." },
-  up3 = { text = "Epic.\nDual Wield 2, 0-cost free.\nKills: heal 6." },
+  up2 = { text = "Epic.\nDual Wield 2.\nKills: heal 4." },
+  up3 = { text = "Epic.\nDual Wield 2.\nKills: heal 6." },
 })
 
 epic("shield_charge", {
@@ -462,8 +462,8 @@ epic("anger_management", {
   zone = "steppes", name = "Anger Management", path = "arms",
   text = "Epic.\nEach Rage spent: Haste 1.",
   up = { text = "Epic.\nEach Rage spent: Haste 2." },
-  up2 = { text = "Epic.\nEach Rage spent: Haste 2.\nKills: +1 Rage." },
-  up3 = { text = "Epic.\nEach Rage spent: Haste 3.\nKills: +1 Rage." },
+  up2 = { text = "Epic.\nEach Rage spent: Haste 3." },
+  up3 = { text = "Epic.\nEach Rage spent: Haste 4." },
 })
 
 epic("avatar", {
@@ -471,7 +471,7 @@ epic("avatar", {
   text = "Epic.\nStart of turn: Juggernaut 2.",
   up = { text = "Epic.\nStart of turn: Juggernaut 3." },
   up2 = { text = "Epic.\nStart of turn: Juggernaut 4." },
-  up3 = { text = "Epic.\nStart of turn: Juggernaut 4.\nKills: heal 3." },
+  up3 = { text = "Epic.\nStart of turn: Juggernaut 5." },
 })
 
 -- Bibelots du Guerrier (class = "warrior" : tirés seulement pour lui) ------------------------------
