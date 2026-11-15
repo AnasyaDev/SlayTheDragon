@@ -176,6 +176,10 @@ local function addRecord(agg, rec)
     if not e then
       e = { kind = cb.kind, n = 0, won = 0, turns = 0, turnsHist = {}, hpLost = 0, stalled = 0 }
       agg.enc[cb.encounter] = e
+    elseif cb.kind < e.kind then
+      -- groupe partagé entre deux genres (rencontre « event_* » et combat normal) : le plus petit nom, comme
+      -- mergeInto, pour un rapport indépendant de l'ordre des expéditions et du découpage en lots
+      e.kind = cb.kind
     end
     e.n = e.n + 1
     if cb.won then e.won = e.won + 1 end
@@ -276,6 +280,8 @@ local function mergeInto(a, b)
     elseif type(v) == "table" then
       a[k] = a[k] or {}
       mergeInto(a[k], v)
+    elseif type(v) == "string" and type(a[k]) == "string" then
+      if v < a[k] then a[k] = v end -- indépendant de l'ordre des lots (genre d'une rencontre partagée)
     else
       a[k] = v
     end
@@ -330,9 +336,9 @@ if opts.worker then
 end
 
 -- Lots fixes d'une série (jobs > 1) : { from, to } de ceil(runs / jobs) expéditions, un processus chacun.
--- Le découpage compte : une expédition laisse des traces dans l'addon chargé (Swamp.ensureMove ajoute pour de
--- bon le move « asleep » à la fiche d'un ennemi endormi, que le cache HITS de Sim/zones/wetlands.lua compte s'il
--- est déjà là), donc les chiffres dépendent des expéditions jouées avant dans le même processus.
+-- Le découpage ne change rien : les fiches sont immuables après le chargement et une expédition ne laisse
+-- aucune trace dans l'addon chargé (Sim/tests_expedition.lua, « fiches immuables »), donc jobs=1, 4 ou 8
+-- donnent le même rapport (hors durée).
 local function lots()
   local list, per = {}, math.ceil(runs / jobs)
   for j = 1, jobs do

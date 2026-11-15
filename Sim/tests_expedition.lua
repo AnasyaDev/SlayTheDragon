@@ -2684,5 +2684,85 @@ test("sauvegarde : étal ouvert d'une zone haute (carte améliorée) rechargé ;
   assert(ok, err)
 end)
 
+---------------------------------------------------------------------------
+-- Fiches immuables : une expédition ne laisse aucune trace dans l'addon chargé
+---------------------------------------------------------------------------
+
+-- Empreinte profonde d'une table (chemin -> valeur, clés triées ; une table vue deux fois = renvoi au premier
+-- chemin, une fonction = son identité) : toute écriture, ajout ou retrait la change.
+local function fingerprint(roots)
+  local out, seen = {}, {}
+  local function walk(v, path)
+    if type(v) ~= "table" then
+      out[path] = type(v) == "string" and ("%q"):format(v) or tostring(v)
+      return
+    end
+    if seen[v] then out[path] = "ref " .. seen[v] return end
+    seen[v] = path
+    out[path] = "{}" .. (getmetatable(v) and (" mt " .. tostring(getmetatable(v))) or "")
+    local keys = {}
+    for k in pairs(v) do keys[#keys + 1] = k end
+    table.sort(keys, function(a, b)
+      if type(a) ~= type(b) then return type(a) < type(b) end
+      return tostring(a) < tostring(b)
+    end)
+    for _, k in ipairs(keys) do walk(v[k], path .. "." .. tostring(k)) end
+  end
+  for _, name in ipairs(roots) do walk(ns[name], name) end
+  return out
+end
+
+local function fpDiff(a, b)
+  local d = {}
+  for p, v in pairs(a) do if b[p] ~= v then d[#d + 1] = p .. " : " .. v .. " -> " .. tostring(b[p]) end end
+  for p, v in pairs(b) do if a[p] == nil then d[#d + 1] = "+ " .. p .. " = " .. v end end
+  table.sort(d)
+  return d
+end
+
+-- Signature des décisions d'une expédition simulée : choix, deck, et chaque combat (rencontre, tours, PV).
+local function expSig(r)
+  local parts = { tostring(r.won), r.floor, r.hp, r.gold, table.concat(r.picks, ",") }
+  for _, card in ipairs(r.deck) do parts[#parts + 1] = card.id .. ":" .. tostring(card.up) end
+  for _, cb in ipairs(r.combats) do
+    parts[#parts + 1] = ("%s/%s/%d/%d/%d"):format(cb.kind, cb.encounter, cb.turns, cb.hpBefore, cb.hpAfter)
+  end
+  return table.concat(parts, "|")
+end
+
+test("fiches immuables : une campagne par classe ne modifie aucune donnée chargée", function()
+  local roots = { "Enemies", "Cards", "Relics", "Encounters", "Potions", "Events", "Zones", "Statuses",
+    "Affixes", "Classes" }
+  for _, r in ipairs(roots) do assert(type(ns[r]) == "table", "registre ns." .. r) end
+  local before = fingerprint(roots)
+  local slept = 0
+  for i, cls in ipairs({ "priest", "warrior", "mage", "rogue", "hunter" }) do
+    -- tout débloqué (Dream Dust, Egg of Hakkar proposables) ; départ au marais : dormeurs et Somnus, puis la
+    -- fin de la campagne (Steppes, Blackrock)
+    local rec = ns.SimExpedition.play({ seed = 40 + i, bot = "human", class = cls, zones = 7, level = 7,
+      startZone = "swamp" })
+    for _, cb in ipairs(rec.combats) do
+      if cb.encounter:find("crocolisk", 1, true) or cb.encounter:find("swampwalker", 1, true)
+          or cb.encounter:find("somnus", 1, true) then slept = slept + 1 end
+    end
+  end
+  assert(slept > 0, "aucun dormeur rencontré : le test ne vérifie rien")
+  local d = fpDiff(before, fingerprint(roots))
+  assert(#d == 0, #d .. " écriture(s) dans les fiches, dont : " .. table.concat(d, " ; ", 1, math.min(#d, 5)))
+end)
+
+test("même graine jouée seule ou après une autre expédition : mêmes décisions", function()
+  -- deux addons chargés à neuf (celui de la suite a des bibelots et ennemis de test) : la graine jouée seule,
+  -- puis après une autre campagne. Paire de graines de sim.lua (lot 7 de 600 à jobs=8) où l'ancien
+  -- Swamp.ensureMove (move « asleep » écrit dans les fiches, compté par le cache HITS des Wetlands) changeait
+  -- les décisions du bot.
+  local function opt(i) return { seed = 1000003 + i, bot = "human", class = "rogue", zones = 7, level = 7, key = 0 } end
+  local alone = dofile(root .. "/Sim/load.lua")(root).SimExpedition.play(opt(453))
+  local ns2 = dofile(root .. "/Sim/load.lua")(root)
+  ns2.SimExpedition.play(opt(451))
+  local after = ns2.SimExpedition.play(opt(453))
+  eq(expSig(after), expSig(alone), "graine 453 après la 451 : ")
+end)
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

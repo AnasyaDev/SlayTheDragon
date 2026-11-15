@@ -125,7 +125,7 @@ local DW = ns.Duskwood
 
 -- Action d'attaque à Bite (drapeau curse) de l'intention annoncée, ou nil.
 local function biteOf(e)
-  local mv = ns.Enemies[e.id].moves[e.intent]
+  local mv = ns.Combat.moveOf(e.id, e.intent)
   for _, a in ipairs(mv and mv.actions or {}) do
     if a[1] == "attack" and a.curse then return a end
   end

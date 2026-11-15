@@ -565,7 +565,7 @@ D.relic("black_dragonscale", {
   text = "Enemy Cast attacks deal 4 less damage.",
   hooks = {
     beforeHit = function(c, src, dmg, enemy)
-      local mv = enemy and enemy.intent and ns.Enemies[enemy.id].moves[enemy.intent]
+      local mv = enemy and ns.Combat.moveOf(enemy.id, enemy.intent)
       if mv and mv.cast and dmg > 0 then return math.max(0, dmg - 4) end
       return dmg
     end,

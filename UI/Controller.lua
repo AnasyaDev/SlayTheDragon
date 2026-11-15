@@ -165,7 +165,7 @@ function C.validateCombat(c)
     local e = c.enemies[i]
     local def = ns.Enemies[e.id]
     if not def then return false, "unknown enemy " .. tostring(e.id) end
-    if not e.dead and e.intent and not def.moves[e.intent] then return false, "move" end
+    if not e.dead and e.intent and not ns.Combat.moveOf(e.id, e.intent) then return false, "move" end
   end
   return true
 end

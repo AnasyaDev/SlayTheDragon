@@ -937,14 +937,28 @@ function Combat.enemyName(e)
   return e.name or ns.Enemies[e.id].name
 end
 
+-- Moves du socle : connus de tout ennemi sans figurer dans sa fiche (« asleep » du marais, posé par une règle
+-- de zone sur n'importe qui). Les fiches (ns.Enemies, ns.Cards…) sont immuables après le chargement : un move
+-- commun s'inscrit ici au chargement, jamais dans def.moves en cours de partie.
+Combat.MOVES = {}
+local MOVES = Combat.MOVES
+
+-- Définition du move `move` de l'ennemi d'id `id` : celui de sa fiche, sinon un move du socle (nil : inconnu).
+function Combat.moveOf(id, move)
+  if move == nil then return nil end
+  local def = ns.Enemies[id]
+  return def and def.moves[move] or MOVES[move]
+end
+local moveOf = Combat.moveOf
+
 -- Intention suivante imposée (ouverture d'une phase, ouverture d'un dormeur) : now = vrai (défaut :
 -- pendant le jeu du joueur, c.step == "play") remplace l'intention annoncée tout de suite (incantation
 -- comprise, interruption effacée) ; sinon elle sera la prochaine intention choisie (e.mem.forced),
 -- annoncée en gris sous l'intention si label est donné (« On waking: »).
 function Combat.forceIntent(c, e, move, opts)
   if e.dead then return end
-  local def = ns.Enemies[e.id]
-  if not def.moves[move] then error(e.id .. ": unknown move " .. tostring(move)) end
+  local mv = moveOf(e.id, move)
+  if not mv then error(e.id .. ": unknown move " .. tostring(move)) end
   local now = opts and opts.now
   if now == nil then now = c.step == "play" end
   if now then
@@ -952,7 +966,7 @@ function Combat.forceIntent(c, e, move, opts)
     e.interrupted = false
     e.mem.forced, e.mem.forcedLabel = nil, nil
     if not c.quiet then log(c, { t = "intent", unit = e.uid, move = move, forced = true }) end
-    if def.moves[move].cast then Combat.zfire(c, "onEnemyCastStart", e, move) end
+    if mv.cast then Combat.zfire(c, "onEnemyCastStart", e, move) end
   else
     e.mem.forced = move
     e.mem.forcedLabel = opts and opts.label or nil
@@ -991,11 +1005,12 @@ function Combat.chooseIntent(c, e)
     end
   end
   move = Combat.zmodify(c, "intent", move, e)
-  if not def.moves[move] then error(e.id .. ": unknown move " .. tostring(move)) end
+  local mv = moveOf(e.id, move)
+  if not mv then error(e.id .. ": unknown move " .. tostring(move)) end
   e.intent = move
   e.interrupted = false
   if not c.quiet then log(c, { t = "intent", unit = e.uid, move = move }) end
-  if def.moves[move].cast then Combat.zfire(c, "onEnemyCastStart", e, move) end
+  if mv.cast then Combat.zfire(c, "onEnemyCastStart", e, move) end
 end
 
 -- Entrée dans la phase k d'un ennemi (seuil franchi, Combat.dealDamage) : journal « phase », réplique,
@@ -1094,7 +1109,7 @@ end
 -- Résumé d'intention pour l'affichage et les bots.
 function Combat.intentInfo(c, e)
   local def = ns.Enemies[e.id]
-  local mv = def.moves[e.intent]
+  local mv = moveOf(e.id, e.intent)
   local info = { move = e.intent, name = mv.name, kind = mv.intent, cast = mv.cast or false,
     interrupted = e.interrupted, stunned = (e.st.stunned or 0) > 0, damage = 0, times = 0,
     forced = e.mem.forced, forcedLabel = e.mem.forcedLabel }
@@ -1253,7 +1268,7 @@ end
 
 local function executeMove(c, e)
   local def = ns.Enemies[e.id]
-  local mv = def.moves[e.intent]
+  local mv = moveOf(e.id, e.intent)
   if mv.cast then
     stat(c, "enemyCasts")
     if e.interrupted then

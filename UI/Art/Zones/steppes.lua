@@ -90,7 +90,7 @@ end
 -- Vue de la règle
 ---------------------------------------------------------------------------
 local function hasStoke(e)
-  local mv = ns.Enemies[e.id].moves[e.intent]
+  local mv = ns.Combat.moveOf(e.id, e.intent)
   local n = 0
   for _, a in ipairs(mv and mv.actions or {}) do if a[1] == "stoke" then n = n + (a[2] or 1) end end
   return n
