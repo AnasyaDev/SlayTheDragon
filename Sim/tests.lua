@@ -3183,5 +3183,109 @@ do
   ns.Cards.tu_triple = nil
 end
 
+---------------------------------------------------------------------------
+-- Rogue : paliers 2 et 3 (15/11/2026, docs/classes/rogue.md, « Paliers d'amélioration »)
+---------------------------------------------------------------------------
+do
+  -- carte id au palier n en main (position 1), le reste du combat de setup
+  local function tierHand(id, n, encounter, more)
+    local c = setup({ "feint" }, encounter or { "test_dummy" }, { "feint", "feint", "feint", "feint" }, RO)
+    for k, v in pairs(more or {}) do c.player[k] = v end
+    c.hand[1] = Card.new(id, n, 900 + n)
+    return c
+  end
+
+  test("Rogue paliers : chaque carte (hors épiques) écrite à +2 et +3, jouable sans erreur, deux tours joués", function()
+    local n = 0
+    for id, d0 in pairs(ns.Cards) do
+      if d0.class == "rogue" and not d0.zone then
+        eq(Card.tiers(id), 3, id)
+        for lv = 2, 3 do
+          local c = tierHand(id, lv, { "test_dummy", "test_caster" })
+          c.player.mana, c.player.res, c.player.hp = 9, 5, 60
+          c.enemies[1].hp = 40
+          c.enemies[1].st.pain = 3
+          local ok, why = Combat.play(c, 1, 1)
+          assert(ok, id .. "+" .. lv .. " : " .. tostring(why))
+          Combat.endTurn(c)
+          Combat.endTurn(c)
+          n = n + 1
+        end
+      end
+    end
+    eq(n, 70)
+  end)
+
+  test("Rogue paliers : coût réduit au palier 2 (Killing Spree 1, Cloak of Shadows 0, Blade Flurry 0), gardé au 3", function()
+    eq(Card.defById("killing_spree", 1).cost, 2)
+    eq(Card.defById("killing_spree", 2).cost, 1); eq(Card.defById("killing_spree", 3).cost, 1)
+    eq(Card.defById("cloak_of_shadows", 2).cost, 0); eq(Card.defById("cloak_of_shadows", 3).cooldown, 1)
+    eq(Card.defById("blade_flurry", 2).cost, 0); eq(Card.defById("blade_flurry", 3).cost, 0)
+    local c = tierHand("killing_spree", 3, nil, { mana = 1 })
+    local h = c.enemies[1].hp
+    assert(Combat.play(c, 1))
+    eq(c.player.mana, 0); eq(h - c.enemies[1].hp, 7 * 6, "six coups de 7")
+  end)
+
+  test("Rogue paliers : Retain (Eviscerate +3, Backstab +3, Cheap Shot +2) gardée en main en fin de tour", function()
+    for _, x in ipairs({ { "eviscerate", 3 }, { "backstab", 3 }, { "cheap_shot", 2 }, { "rupture", 2 } }) do
+      local id, lv = x[1], x[2]
+      eq(Card.defById(id, lv).retain, true, id)
+      eq(Card.defById(id, lv - 1).retain, nil, id .. " : pas avant")
+      local c = tierHand(id, lv)
+      Combat.endTurn(c)
+      assert(handIndex(c, id), id .. "+" .. lv .. " gardée")
+    end
+  end)
+
+  test("Rogue paliers : effets ajoutés (Feint +3 pioche 2, Hemorrhage +3 Sundered à tous, Garrote +3 sous Stealth)", function()
+    local f = tierHand("feint", 3)
+    local nh = #f.hand
+    assert(Combat.play(f, 1))
+    eq(#f.hand, nh - 1 + 2); eq(f.player.st.parry, 2)
+    local hm = tierHand("hemorrhage", 3, { "test_dummy", "test_dummy" })
+    assert(Combat.play(hm, 1, 1))
+    eq(hm.enemies[1].st.armor_broken, 3); eq(hm.enemies[2].st.armor_broken, 3)
+    local g = tierHand("garrote", 3)
+    eq(g.player.st.stealth, 1)
+    assert(Combat.play(g, 1, 1))
+    eq(g.enemies[1].st.pain, 7 + 5, "Stealth : DoT 5 de plus")
+    local g2 = tierHand("garrote", 3)
+    g2.player.st.stealth = nil
+    assert(Combat.play(g2, 1, 1))
+    eq(g2.enemies[1].st.pain, 7, "sans Stealth : DoT 7")
+  end)
+
+  test("Rogue paliers : Mutilate +3 pose son DoT après sa ligne DoT: ; Exsanguinate +3 tique une fois de plus", function()
+    local m = tierHand("mutilate", 3, nil, { res = 0 })
+    assert(Combat.play(m, 1, 1))
+    eq(m.player.res, 1, "pas de DoT avant : un seul Combo"); eq(m.enemies[1].st.pain, 3)
+    local e = tierHand("exsanguinate", 3, nil, { res = 2 })
+    e.enemies[1].st.pain = 10
+    local h = e.enemies[1].hp
+    assert(Combat.play(e, 1, 1))
+    assert(h - e.enemies[1].hp >= 10 + 9 + 8, "trois tics (un + deux Combo)")
+    local z = tierHand("exsanguinate", 3, nil, { res = 0 })
+    assert(not Combat.play(z, 1, 1), "toujours injouable à 0 Combo")
+  end)
+
+  test("Rogue paliers : Cheat Death +2 / +3 reste à 6 / 10 PV ; Shadow Dance +3 donne 1 Combo par tour", function()
+    for lv, want in pairs({ [1] = 1, [2] = 6, [3] = 10 }) do
+      local c = setup({ "feint" }, { "test_hitter" }, nil, RO)
+      c.hand[1] = Card.new("cheat_death", lv, 950)
+      assert(Combat.play(c, 1))
+      c.player.hp = 5
+      c.player.st.parry = nil
+      Combat.endTurn(c)
+      eq(c.result, nil); eq(c.player.hp, want, "palier " .. lv)
+    end
+    local s = tierHand("shadow_dance", 3, nil, { res = 0 })
+    assert(Combat.play(s, 1))
+    eq(s.player.res, 2, "+2 Combo au jeu")
+    Combat.endTurn(s)
+    eq(s.player.res, 3); eq(s.player.st.stealth, 1)
+  end)
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

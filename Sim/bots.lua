@@ -150,7 +150,7 @@ return function(ns)
   Bots.POWER_VALUE = {
     -- Rogue
     blade_flurry = function(c, inst)
-      return T * playsOf(c, isAttack) * up(inst, 2, 3) * aliveCount(c) * W.enemyHp
+      return T * playsOf(c, isAttack) * up(inst, 2, 3, 3, 4) * aliveCount(c) * W.enemyHp
     end,
     deadly_poison = function(c)
       return T * playsOf(c, isAttack) * 1.3 * dotUnits(1)
@@ -159,7 +159,9 @@ return function(ns)
       return T * aliveCount(c) * math.min(1, 0.2 + 2 * deckShare(c, appliesDot)) * 1.5 * Bots.resValue(c)
     end,
     slice_and_dice = function(c) return T * perTurn(c, isAttack) * MANA end,
-    shadow_dance = function(c) return T * perTurn(c, readsStealth) * 8 * W.enemyHp end,
+    shadow_dance = function(c, inst)
+      return T * (perTurn(c, readsStealth) * 8 * W.enemyHp + up(inst, 0, 0, 0, 1) * Bots.resValue(c))
+    end,
     cheat_death = lastBreath,
     -- Warrior
     deep_wounds = function(c, inst) return T * playsOf(c, isAttack) * dotUnits(up(inst, 2, 3)) end,

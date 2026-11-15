@@ -66,7 +66,7 @@ local function idx(c, id)
 end
 local function play(c, id, t) return assert(Combat.play(c, idx(c, id), t)) end
 local function hp(c, i) return c.enemies[i or 1].hp end
-local function dot(v, up) return math.ceil(v * E.doomblade[up and 2 or 1] - 1e-9) end
+local function dot(v, up) return math.ceil(v * E.doomblade[R.tier(up)] - 1e-9) end
 
 ---------------------------------------------------------------------------
 -- Commun aux sept
@@ -84,7 +84,7 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
   end
   -- texte de la carte (déclencheur, mot de règle et son nombre) et à-côté de ses mots de règle (L.rule)
   local Lg = ns.Language
-  for k, up in ipairs({ false, true }) do
+  for k, up in ipairs({ false, 1, 2, 3 }) do -- k = Rogue.tier(up) : base, +1, +2, +3
     local function card(id) return Card.defById(id, up).text end
     local function t(id)
       local d = Card.defById(id, up)
@@ -98,10 +98,13 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
     assert(card("echoing_reprimand"):find("Animacharge " .. E.echoing_reprimand[k] .. "%."))
     assert(t("echoing_reprimand"):find("counts as a Surge of " .. E.echoing_reprimand[k] .. "%."))
     assert(t("echoing_reprimand"):find("Surge of 2" .. (E.echoingMax[k] == 3 and " or 3" or "") .. " Combo", 1, true))
-    local kl = E.kidney_shot[k]
-    assert(card("kidney_shot"):find("Surge of " .. kl .. "%+" .. " Combo: Gouge%."))
+    local kl, kr = E.kidney_shot[k], E.kidneyCombo[k]
+    assert(card("kidney_shot"):find("Surge of " .. kl .. "+ Combo: Gouge"
+      .. (kr > 0 and (", +" .. kr .. " Combo") or "") .. ".", 1, true), card("kidney_shot"))
     assert(t("kidney_shot"):find("Gouge: Apply Stunned 1", 1, true))
-    assert(card("subterfuge"):find("Shroud " .. E.subterfugeTurns[k] .. ".", 1, true))
+    local sp = E.subterfugeParry[k]
+    assert(card("subterfuge"):find("Shroud " .. E.subterfugeTurns[k] .. (sp > 0 and (", gain Parry " .. sp) or "")
+      .. ".", 1, true), card("subterfuge"))
     assert(t("subterfuge"):find("Stealth lasts " .. E.subterfugeTurns[k] .. " turns", 1, true))
     if E.subterfuge[k] > 0 then assert(t("subterfuge"):find("gives %+" .. E.subterfuge[k] .. " Combo"))
     else assert(not t("subterfuge"):find("Combo%.")) end
@@ -114,8 +117,8 @@ test("sept épiques : une par zone, rareté epic, Voleur, texte « Epic. » en t
     assert(card("doomblade"):find("Surge Attacks: Bleed " .. pct .. "%", 1, true), card("doomblade"))
     assert(t("doomblade"):find("applies " .. pct .. "% of it as DoT", 1, true), t("doomblade"))
     assert(card("atrophic_poison"):find("DoT " .. E.atrophic_poison[k] .. "+: Atrophy", 1, true))
-    assert(t("atrophic_poison"):find("with DoT " .. E.atrophic_poison[k] .. " or more count as Demoralized", 1, true))
-    assert((t("atrophic_poison"):find("Sundered", 1, true) ~= nil) == up)
+    assert(t("atrophic_poison"):find("with at least that much DoT count as Demoralized", 1, true))
+    assert((t("atrophic_poison"):find("Sundered", 1, true) ~= nil) == (k >= 2))
   end
 end)
 
@@ -485,7 +488,7 @@ end)
 ---------------------------------------------------------------------------
 -- bonus d'un coup quand n autres noms ont été joués ce tour
 local function DB(n, up)
-  local k = up and 2 or 1
+  local k = R.tier(up)
   local b = E.danse_macabre[k] * math.max(0, n - E.danseFree[k])
   local cap = E.danseCap[k]
   return (cap > 0 and b > cap) and cap or b
@@ -526,6 +529,86 @@ test("Danse Macabre : chaque coup (Killing Spree), avant Sundered ; amélioré",
   local h2 = hp(s)
   play(s, "sinister_strike", 1)
   eq(h2 - hp(s), math.floor((5 + DB(3, true)) * 1.25), "(5 + bonus) × 1,25")
+end)
+
+---------------------------------------------------------------------------
+-- Paliers 2 et 3 des épiques (15/11/2026, docs/ameliorations.md) : nombres lus par Card.level(src)
+---------------------------------------------------------------------------
+test("paliers : Rogue.tier (base 1 … +3 = 4), nombres croissants, l'à-côté (upText) reste vrai aux paliers 2 et 3", function()
+  eq(R.tier(false), 1); eq(R.tier(true), 2); eq(R.tier(2), 3); eq(R.tier({ up = 3 }), 4)
+  for key, t in pairs(E) do eq(#t, 4, key .. " : quatre paliers") end
+  for _, id in ipairs(EPICS) do eq(Card.tiers(id), 3, id) end
+  -- seuils qui baissent, nombres qui montent
+  assert(E.deflection[3] > E.deflection[2] and E.deflection[4] > E.deflection[3])
+  assert(E.atrophic_poison[3] < E.atrophic_poison[2] and E.atrophic_poison[4] < E.atrophic_poison[3])
+  assert(E.kidneyCombo[3] > 0 and E.subterfugeParry[3] > 0)
+  -- nombres de l'à-côté écrits pour le +1 : inchangés aux paliers 2 et 3
+  for _, key in ipairs({ "deflectionStep", "echoingMax", "subterfuge", "subterfugeSurge", "danseFree", "danseCap" }) do
+    eq(E[key][3], E[key][2], key); eq(E[key][4], E[key][2], key)
+  end
+end)
+
+test("paliers : Deflection +3 (riposte N = 4), Doomblade +2 (part du DoT), Danse Macabre +3", function()
+  local u = setup("deflection", { "feint" }, { up = 3 })
+  eq(u.epic.up, 3)
+  play(u, "feint")
+  eq(hp(u), 200 - E.deflection[4]); eq(R.riposteDamage(2, 3), E.deflection[4] + E.deflectionStep[4])
+  local d = setup("doomblade", { "eviscerate" }, { up = 2 })
+  d.player.res = 5
+  play(d, "eviscerate", 1)
+  eq(d.enemies[1].st.pain, dot(24, 2)); assert(dot(24, 2) > dot(24, true))
+  local s = setup("danse_macabre", { "kick", "sprint", "pistol_shot", "sinister_strike" }, { up = 3 })
+  play(s, "kick", 1); play(s, "sprint"); play(s, "pistol_shot", 1)
+  local h = hp(s)
+  play(s, "sinister_strike", 1)
+  eq(h - hp(s), 5 + DB(3, 3)); eq(DB(3, 3), E.danse_macabre[4])
+end)
+
+test("paliers : Atrophic Poison +3, seuil 3 (Demoralized et Sundered) ; Echoing Reprimand +3", function()
+  local T = E.atrophic_poison[4]
+  local c = setup("atrophic_poison", { "sinister_strike" }, { up = 3, encounter = { "ter_hitter" } })
+  Combat.applyStatus(c, c.enemies[1], "pain", T)
+  assert(R.countsDemoralized(c, c.enemies[1]), "seuil du +3")
+  play(c, "sinister_strike", 1)
+  eq(hp(c), 200 - 6, "Sundered dès le seuil du +3")
+  local b = setup("atrophic_poison", { "sinister_strike" }, { up = 1, encounter = { "ter_hitter" } })
+  Combat.applyStatus(b, b.enemies[1], "pain", T)
+  assert(not R.countsDemoralized(b, b.enemies[1]), "sous le seuil du +1")
+  local e = setup("echoing_reprimand", { "eviscerate" }, { up = 3 })
+  e.player.res = 2
+  play(e, "eviscerate", 1)
+  eq(hp(e), 200 - (4 + 4 * E.echoing_reprimand[4]))
+end)
+
+test("paliers : Kidney Shot +2 rend des Combo après le Surge qui étourdit (cible morte comprise), pas en dessous du seuil", function()
+  local k = E.kidney_shot[3]
+  local c = setup("kidney_shot", { "eviscerate" }, { up = 2 })
+  c.player.res = k
+  play(c, "eviscerate", 1)
+  eq(c.enemies[1].st.stunned, 1); eq(c.player.res, E.kidneyCombo[3])
+  local f = setup("kidney_shot", { "eviscerate" }, { up = 3 })
+  f.player.res = k - 1
+  play(f, "eviscerate", 1)
+  eq(f.player.res, 0, "sous le seuil : rien")
+  local m = setup("kidney_shot", { "eviscerate" }, { up = 3, encounter = { "ter_dummy", "ter_dummy" } })
+  m.player.res = 5
+  m.enemies[1].hp = 5
+  play(m, "eviscerate", 1)
+  assert(m.enemies[1].dead); eq(m.player.res, E.kidneyCombo[4], "cible morte : Combo rendus")
+  local u = setup("kidney_shot", { "eviscerate" }, { up = 1 })
+  u.player.res = 5
+  play(u, "eviscerate", 1)
+  eq(u.player.res, 0, "+1 : rien de rendu")
+end)
+
+test("paliers : Subterfuge +2 / +3, Parry à chaque Surge (en plus de Stealth)", function()
+  for lv = 1, 3 do
+    local c = setup("subterfuge", { "eviscerate" }, { up = lv })
+    c.player.res = 2
+    play(c, "eviscerate", 1)
+    eq(c.player.st.parry or 0, E.subterfugeParry[lv + 1], "palier " .. lv)
+    eq(c.player.st.stealth, 1)
+  end
 end)
 
 ---------------------------------------------------------------------------

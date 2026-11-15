@@ -28,6 +28,8 @@ card("sinister_strike", {
   target = "enemy", effects = { { "damage", 5 }, { "res", 1 } },
   text = "Deal 5.\n+1 Combo.",
   up = { effects = { { "damage", 8 }, { "res", 1 } }, text = "Deal 8.\n+1 Combo." },
+  up2 = { effects = { { "damage", 10 }, { "res", 1 } }, text = "Deal 10.\n+1 Combo." },
+  up3 = { effects = { { "damage", 12 }, { "res", 1 } }, text = "Deal 12.\n+1 Combo." },
 })
 
 card("feint", {
@@ -35,6 +37,8 @@ card("feint", {
   effects = { { "apply", "parry", 1, self = true } },
   text = "Gain Parry 1",
   up = { effects = { { "draw", 1 }, { "apply", "parry", 1, self = true } }, text = "Draw 1.\nGain Parry 1" },
+  up2 = { effects = { { "draw", 1 }, { "apply", "parry", 2, self = true } }, text = "Draw 1.\nGain Parry 2" },
+  up3 = { effects = { { "draw", 2 }, { "apply", "parry", 2, self = true } }, text = "Draw 2.\nGain Parry 2" },
 })
 
 card("backstab", {
@@ -43,6 +47,10 @@ card("backstab", {
   text = "Deal 3.\n+1 Combo.\nStealth: deal 7 more.",
   up = { effects = { { "damage", 5, more = { { 9, "stealth" } } }, { "res", 1 } },
     text = "Deal 5.\n+1 Combo.\nStealth: deal 9 more." },
+  up2 = { effects = { { "damage", 6, more = { { 11, "stealth" } } }, { "res", 1 } },
+    text = "Deal 6.\n+1 Combo.\nStealth: deal 11 more." },
+  -- palier 3 : gardée en main jusqu'au prochain Stealth (Vanish, Shadowstep, Nightblade)
+  up3 = { retain = true, text = "Deal 6.\n+1 Combo.\nStealth: deal 11 more.\nRetain." },
 })
 
 card("eviscerate", {
@@ -50,6 +58,9 @@ card("eviscerate", {
   target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 4, per = { 4, "surge" } } },
   text = "Surge: deal 4 + 4 per Combo.",
   up = { effects = { { "surge" }, { "damage", 6, per = { 5, "surge" } } }, text = "Surge: deal 6 + 5 per Combo." },
+  up2 = { effects = { { "surge" }, { "damage", 9, per = { 5, "surge" } } }, text = "Surge: deal 9 + 5 per Combo." },
+  -- palier 3 : gardée en main jusqu'à 5 Combo
+  up3 = { retain = true, text = "Surge: deal 9 + 5 per Combo.\nRetain." },
 })
 
 -- Assassination : poser du DoT en montant les points, puis le faire éclater -------------------------
@@ -60,6 +71,11 @@ card("mutilate", {
   text = "Deal 3 twice.\n+1 Combo.\nDoT: +1 Combo.",
   up = { effects = { { "damage", 5, times = 2 }, { "res", 1 }, { "res", 1, cond = "status:pain" } },
     text = "Deal 5 twice.\n+1 Combo.\nDoT: +1 Combo." },
+  up2 = { effects = { { "damage", 6, times = 2 }, { "res", 1 }, { "res", 1, cond = "status:pain" } },
+    text = "Deal 6 twice.\n+1 Combo.\nDoT: +1 Combo." },
+  -- palier 3 : pose son DoT après la ligne DoT: (la carte suivante en profite, pas elle-même)
+  up3 = { effects = { { "damage", 6, times = 2 }, { "res", 1 }, { "res", 1, cond = "status:pain" },
+    { "apply", "pain", 3, icon = "poison" } }, text = "Deal 6 twice.\n+1 Combo.\nDoT: +1 Combo.\nApply DoT 3" },
 })
 
 card("garrote", {
@@ -68,6 +84,12 @@ card("garrote", {
   text = "Deal 3.\n+1 Combo.\nApply DoT 3",
   up = { effects = { { "damage", 4 }, { "res", 1 }, { "apply", "pain", 5, icon = "bleed" } },
     text = "Deal 4.\n+1 Combo.\nApply DoT 5" },
+  up2 = { effects = { { "damage", 4 }, { "res", 1 }, { "apply", "pain", 7, icon = "bleed" } },
+    text = "Deal 4.\n+1 Combo.\nApply DoT 7" },
+  -- palier 3 : ouverture (Garrote se joue sous Stealth dans le jeu)
+  up3 = { effects = { { "damage", 4 }, { "res", 1 }, { "apply", "pain", 7, icon = "bleed" },
+    { "apply", "pain", 5, icon = "bleed", cond = "stealth" } },
+    text = "Deal 4.\n+1 Combo.\nApply DoT 7\nStealth: apply DoT 5" },
 })
 
 -- « Surge: apply DoT K per Combo. » : effet propre dotPer (Core/Classes/rogue.lua), comme la
@@ -77,6 +99,8 @@ card("rupture", {
   target = "enemy", minRes = 1, effects = { { "surge" }, { "dotPer", 3, icon = "bleed" } },
   text = "Surge: apply DoT 3 per Combo.",
   up = { effects = { { "surge" }, { "dotPer", 4, icon = "bleed" } }, text = "Surge: apply DoT 4 per Combo." },
+  up2 = { retain = true, text = "Surge: apply DoT 4 per Combo.\nRetain." },
+  up3 = { effects = { { "surge" }, { "dotPer", 5, icon = "bleed" } }, text = "Surge: apply DoT 5 per Combo.\nRetain." },
 })
 
 card("fan_of_knives", {
@@ -85,6 +109,10 @@ card("fan_of_knives", {
   text = "Deal 3 to all.\n+1 Combo.\nApply DoT 2 to all",
   up = { effects = { { "damage", 4, all = true }, { "res", 1 }, { "apply", "pain", 3, all = true, icon = "poison" } },
     text = "Deal 4 to all.\n+1 Combo.\nApply DoT 3 to all" },
+  up2 = { effects = { { "damage", 5, all = true }, { "res", 1 }, { "apply", "pain", 3, all = true, icon = "poison" } },
+    text = "Deal 5 to all.\n+1 Combo.\nApply DoT 3 to all" },
+  up3 = { effects = { { "damage", 5, all = true }, { "res", 1 }, { "apply", "pain", 4, all = true, icon = "poison" } },
+    text = "Deal 5 to all.\n+1 Combo.\nApply DoT 4 to all" },
 })
 
 -- Envenom : jouable à 0 point (règle commune : une autre clause que le Surge), elle ne fait alors
@@ -95,6 +123,10 @@ card("envenom", {
   text = "Surge: apply DoT 2 per Combo.\nIts DoT ticks now.",
   up = { effects = { { "surge" }, { "dotPer", 3, icon = "poison" }, { "tickDot" } },
     text = "Surge: apply DoT 3 per Combo.\nIts DoT ticks now." },
+  up2 = { effects = { { "surge" }, { "dotPer", 3, icon = "poison" }, { "tickDot" }, { "draw", 1 } },
+    text = "Surge: apply DoT 3 per Combo.\nIts DoT ticks now.\nDraw 1." },
+  up3 = { effects = { { "surge" }, { "dotPer", 4, icon = "poison" }, { "tickDot" }, { "draw", 1 } },
+    text = "Surge: apply DoT 4 per Combo.\nIts DoT ticks now.\nDraw 1." },
 })
 
 card("cloak_of_shadows", {
@@ -103,6 +135,8 @@ card("cloak_of_shadows", {
   text = "Remove negative effects.\nGain Parry 1\nCooldown 2.",
   up = { effects = { { "cleanse" }, { "apply", "parry", 2, self = true } },
     text = "Remove negative effects.\nGain Parry 2\nCooldown 2." },
+  up2 = { cost = 0, text = "Remove negative effects.\nGain Parry 2\nCooldown 2." },
+  up3 = { cooldown = 1, text = "Remove negative effects.\nGain Parry 2\nCooldown 1." },
 })
 
 card("crippling_poison", {
@@ -111,6 +145,10 @@ card("crippling_poison", {
   text = "Apply DoT 2\nApply Demoralized 1 ⌛",
   up = { effects = { { "apply", "pain", 4, icon = "poison" }, { "apply", "demoralized", 1 } },
     text = "Apply DoT 4\nApply Demoralized 1 ⌛" },
+  up2 = { effects = { { "apply", "pain", 4, icon = "poison" }, { "apply", "demoralized", 2 } },
+    text = "Apply DoT 4\nApply Demoralized 2 ⌛" },
+  up3 = { effects = { { "apply", "pain", 6, icon = "poison" }, { "apply", "demoralized", 2 } },
+    text = "Apply DoT 6\nApply Demoralized 2 ⌛" },
 })
 
 card("exsanguinate", {
@@ -118,6 +156,10 @@ card("exsanguinate", {
   target = "enemy", minRes = 1, effects = { { "surge" }, { "tickDotPer" } },
   text = "Surge: its DoT ticks once per Combo.",
   up = { cost = 0, text = "Surge: its DoT ticks once per Combo." },
+  up2 = { retain = true, text = "Surge: its DoT ticks once per Combo.\nRetain." },
+  -- palier 3 : un tic de plus, avant ceux du Surge (la carte reste injouable à 0 point : minRes)
+  up3 = { effects = { { "tickDot" }, { "surge" }, { "tickDotPer" } },
+    text = "Its DoT ticks now.\nSurge: its DoT ticks once per Combo.\nRetain." },
 })
 
 -- Deadly Poison : après chaque coup d'une carte Attack sur un ennemi vivant, DoT 1 (crochet
@@ -135,6 +177,10 @@ card("deadly_poison", {
   power = true, effects = {}, hooks = deadlyPoisonHooks,
   text = "Power.\nEach Attack hit: apply DoT 1.",
   up = { cost = 0, text = "Power.\nEach Attack hit: apply DoT 1." },
+  up2 = { effects = { { "apply", "pain", 2, all = true, icon = "poison" } },
+    text = "Power.\nApply DoT 2 to all\nEach Attack hit: apply DoT 1." },
+  up3 = { effects = { { "apply", "pain", 4, all = true, icon = "poison" } },
+    text = "Power.\nApply DoT 4 to all\nEach Attack hit: apply DoT 1." },
 })
 
 local venomousHooks = {
@@ -153,6 +199,11 @@ card("venomous_wounds", {
   power = true, effects = {}, hooks = venomousHooks,
   text = "Power.\nStart of turn: +1 Combo per enemy with DoT.",
   up = { cost = 0, text = "Power.\nStart of turn: +1 Combo per enemy with DoT." },
+  -- palier 2 : son premier tour compte déjà ; palier 3 : de quoi finir tout de suite
+  up2 = { effects = { { "apply", "pain", 2, all = true, icon = "poison" } },
+    text = "Power.\nApply DoT 2 to all\nStart of turn: +1 Combo per enemy with DoT." },
+  up3 = { effects = { { "apply", "pain", 2, all = true, icon = "poison" }, { "res", 2 } },
+    text = "Power.\nApply DoT 2 to all\n+2 Combo.\nStart of turn: +1 Combo per enemy with DoT." },
 })
 
 -- Combat : cartes à 0 mana, Attack en chaîne, Parry sans casser le rythme ---------------------------
@@ -162,6 +213,10 @@ card("kick", {
   target = "enemy", cooldown = 2, effects = { { "interrupt" }, { "res", 1 } },
   text = "Interrupt the target's cast.\n+1 Combo.\nCooldown 2.",
   up = { cooldown = 1, text = "Interrupt the target's cast.\n+1 Combo.\nCooldown 1." },
+  up2 = { effects = { { "damage", 4 }, { "interrupt" }, { "res", 1 } },
+    text = "Deal 4.\nInterrupt the target's cast.\n+1 Combo.\nCooldown 1." },
+  up3 = { effects = { { "damage", 4 }, { "interrupt" }, { "res", 1 }, { "apply", "demoralized", 1 } },
+    text = "Deal 4.\nInterrupt the target's cast.\n+1 Combo.\nApply Demoralized 1 ⌛\nCooldown 1." },
 })
 
 card("pistol_shot", {
@@ -169,6 +224,9 @@ card("pistol_shot", {
   target = "enemy", effects = { { "damage", 3 }, { "draw", 1 } },
   text = "Deal 3.\nDraw 1.",
   up = { effects = { { "damage", 5 }, { "draw", 1 } }, text = "Deal 5.\nDraw 1." },
+  up2 = { effects = { { "damage", 7 }, { "draw", 1 } }, text = "Deal 7.\nDraw 1." },
+  up3 = { effects = { { "damage", 7 }, { "draw", 1 }, { "apply", "armor_broken", 1 } },
+    text = "Deal 7.\nDraw 1.\nApply Sundered 1 ⌛" },
 })
 
 card("sprint", {
@@ -176,6 +234,8 @@ card("sprint", {
   cooldown = 3, effects = { { "draw", 2 } },
   text = "Draw 2.\nCooldown 3.",
   up = { cooldown = 2, text = "Draw 2.\nCooldown 2." },
+  up2 = { effects = { { "draw", 3 } }, text = "Draw 3.\nCooldown 2." },
+  up3 = { effects = { { "draw", 3 }, { "apply", "parry", 1, self = true } }, text = "Draw 3.\nGain Parry 1\nCooldown 2." },
 })
 
 card("riposte", {
@@ -183,6 +243,8 @@ card("riposte", {
   target = "enemy", effects = { { "damage", 4 }, { "apply", "parry", 1, self = true } },
   text = "Deal 4.\nGain Parry 1",
   up = { effects = { { "damage", 7 }, { "apply", "parry", 1, self = true } }, text = "Deal 7.\nGain Parry 1" },
+  up2 = { effects = { { "damage", 9 }, { "apply", "parry", 1, self = true } }, text = "Deal 9.\nGain Parry 1" },
+  up3 = { effects = { { "damage", 9 }, { "apply", "parry", 2, self = true } }, text = "Deal 9.\nGain Parry 2" },
 })
 
 card("evasion", {
@@ -190,6 +252,8 @@ card("evasion", {
   cooldown = 3, effects = { { "apply", "parry", 2, self = true } },
   text = "Gain Parry 2\nCooldown 3.",
   up = { cooldown = 2, text = "Gain Parry 2\nCooldown 2." },
+  up2 = { effects = { { "apply", "parry", 3, self = true } }, text = "Gain Parry 3\nCooldown 2." },
+  up3 = { effects = { { "apply", "parry", 3, self = true }, { "draw", 1 } }, text = "Gain Parry 3\nDraw 1.\nCooldown 2." },
 })
 
 -- Blade Flurry : après la résolution de chaque carte Attack, N à chaque ennemi vivant (dégâts du
@@ -213,6 +277,8 @@ card("blade_flurry", {
   power = true, effects = {}, hooks = bladeFlurryHooks(2),
   text = "Power.\nAttacks: deal 2 to all.",
   up = { hooks = bladeFlurryHooks(3), text = "Power.\nAttacks: deal 3 to all." },
+  up2 = { cost = 0, text = "Power.\nAttacks: deal 3 to all." },
+  up3 = { hooks = bladeFlurryHooks(4), text = "Power.\nAttacks: deal 4 to all." },
 })
 
 -- Slice and Dice : tant qu'aucune Attack n'a été jouée ce tour-ci (compteur c.turn.byType), les
@@ -229,6 +295,9 @@ card("slice_and_dice", {
   power = true, effects = {}, hooks = sliceHooks,
   text = "Power.\nFirst Attack each turn costs 0.",
   up = { cost = 0, text = "Power.\nFirst Attack each turn costs 0." },
+  up2 = { effects = { { "res", 2 } }, text = "Power.\n+2 Combo.\nFirst Attack each turn costs 0." },
+  up3 = { effects = { { "res", 2 }, { "apply", "parry", 1, self = true } },
+    text = "Power.\n+2 Combo.\nGain Parry 1\nFirst Attack each turn costs 0." },
 })
 
 card("killing_spree", {
@@ -236,6 +305,8 @@ card("killing_spree", {
   effects = { { "randomHits", 4, times = 6 } },
   text = "Deal 4 to a random enemy six times.",
   up = { effects = { { "randomHits", 6, times = 6 } }, text = "Deal 6 to a random enemy six times." },
+  up2 = { cost = 1, text = "Deal 6 to a random enemy six times." },
+  up3 = { effects = { { "randomHits", 7, times = 6 } }, text = "Deal 7 to a random enemy six times." },
 })
 
 -- Between the Eyes : jouable à 0 point (autre clause que le Surge) : Stunned seul, sans dégâts.
@@ -245,6 +316,9 @@ card("between_the_eyes", {
   text = "Surge: deal 4 per Combo.\nApply Stunned 1 ⌛\nCooldown 2.",
   up = { effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } }, { "apply", "stunned", 1 } },
     text = "Surge: deal 6 per Combo.\nApply Stunned 1 ⌛\nCooldown 2." },
+  up2 = { effects = { { "surge" }, { "damage", 0, per = { 7, "surge" } }, { "apply", "stunned", 1 } },
+    text = "Surge: deal 7 per Combo.\nApply Stunned 1 ⌛\nCooldown 2." },
+  up3 = { retain = true, text = "Surge: deal 7 per Combo.\nApply Stunned 1 ⌛\nCooldown 2.\nRetain." },
 })
 
 card("adrenaline_rush", {
@@ -252,6 +326,8 @@ card("adrenaline_rush", {
   exhaust = true, effects = { { "mana", 2 }, { "draw", 2 } },
   text = "+2 mana.\nDraw 2.\nExhaust.",
   up = { cost = 0, text = "+2 mana.\nDraw 2.\nExhaust." },
+  up2 = { effects = { { "mana", 2 }, { "draw", 3 } }, text = "+2 mana.\nDraw 3.\nExhaust." },
+  up3 = { effects = { { "mana", 3 }, { "draw", 3 } }, text = "+3 mana.\nDraw 3.\nExhaust." },
 })
 
 -- Subtlety : ouvrir sous Stealth, le retrouver, préparer l'ouverture -------------------------------
@@ -262,6 +338,9 @@ card("ambush", {
   text = "Deal 6.\n+2 Combo.\nStealth: deal 12 more.",
   up = { effects = { { "damage", 8, more = { { 16, "stealth" } } }, { "res", 2 } },
     text = "Deal 8.\n+2 Combo.\nStealth: deal 16 more." },
+  up2 = { effects = { { "damage", 10, more = { { 19, "stealth" } } }, { "res", 2 } },
+    text = "Deal 10.\n+2 Combo.\nStealth: deal 19 more." },
+  up3 = { retain = true, text = "Deal 10.\n+2 Combo.\nStealth: deal 19 more.\nRetain." },
 })
 
 card("hemorrhage", {
@@ -270,6 +349,10 @@ card("hemorrhage", {
   text = "Deal 7.\n+1 Combo.\nApply Sundered 2 ⌛",
   up = { effects = { { "damage", 9 }, { "res", 1 }, { "apply", "armor_broken", 3 } },
     text = "Deal 9.\n+1 Combo.\nApply Sundered 3 ⌛" },
+  up2 = { effects = { { "damage", 11 }, { "res", 1 }, { "apply", "armor_broken", 3 } },
+    text = "Deal 11.\n+1 Combo.\nApply Sundered 3 ⌛" },
+  up3 = { effects = { { "damage", 11 }, { "res", 1 }, { "apply", "armor_broken", 3, all = true } },
+    text = "Deal 11.\n+1 Combo.\nApply Sundered 3 ⌛ to all" },
 })
 
 card("vanish", {
@@ -277,6 +360,9 @@ card("vanish", {
   exhaust = true, effects = { { "draw", 1 }, { "apply", "stealth", 1, self = true } },
   text = "Draw 1.\nGain Stealth\nExhaust.",
   up = { effects = { { "draw", 2 }, { "apply", "stealth", 1, self = true } }, text = "Draw 2.\nGain Stealth\nExhaust." },
+  up2 = { effects = { { "draw", 2 }, { "apply", "stealth", 1, self = true }, { "apply", "parry", 1, self = true } },
+    text = "Draw 2.\nGain Stealth\nGain Parry 1\nExhaust." },
+  up3 = { retain = true, text = "Draw 2.\nGain Stealth\nGain Parry 1\nExhaust.\nRetain." },
 })
 
 card("shadowstep", {
@@ -284,6 +370,10 @@ card("shadowstep", {
   cooldown = 2, effects = { { "apply", "parry", 1, self = true }, { "apply", "stealth", 1, self = true } },
   text = "Gain Parry 1\nGain Stealth\nCooldown 2.",
   up = { cooldown = 1, text = "Gain Parry 1\nGain Stealth\nCooldown 1." },
+  up2 = { effects = { { "apply", "parry", 2, self = true }, { "apply", "stealth", 1, self = true } },
+    text = "Gain Parry 2\nGain Stealth\nCooldown 1." },
+  up3 = { effects = { { "apply", "parry", 2, self = true }, { "apply", "stealth", 1, self = true }, { "draw", 1 } },
+    text = "Gain Parry 2\nGain Stealth\nDraw 1.\nCooldown 1." },
 })
 
 -- Cheap Shot : Skill, lit Stealth sans le consommer ; l'état posé sous condition reste dans sa clause.
@@ -292,6 +382,10 @@ card("cheap_shot", {
   target = "enemy", cooldown = 2, effects = { { "res", 2 }, { "apply", "stunned", 1, cond = "stealth" } },
   text = "+2 Combo.\nStealth: apply Stunned 1 ⌛\nCooldown 2.",
   up = { cost = 0, text = "+2 Combo.\nStealth: apply Stunned 1 ⌛\nCooldown 2." },
+  -- palier 2 : gardée en main jusqu'au prochain Stealth (l'étourdissement, pas sa durée)
+  up2 = { retain = true, text = "+2 Combo.\nStealth: apply Stunned 1 ⌛\nCooldown 2.\nRetain." },
+  up3 = { effects = { { "res", 2 }, { "apply", "armor_broken", 2 }, { "apply", "stunned", 1, cond = "stealth" } },
+    text = "+2 Combo.\nApply Sundered 2 ⌛\nStealth: apply Stunned 1 ⌛\nCooldown 2.\nRetain." },
 })
 
 -- Secret Technique : jouable à 0 point (règle commune : la ligne Stealth n'est pas un Surge).
@@ -303,6 +397,12 @@ card("secret_technique", {
   up = { effects = { { "surge" }, { "damage", 0, per = { 5, "surge" }, all = true },
     { "damage", 0, per = { 5, "surge" }, all = true, cond = "stealth" } },
     text = "Surge: deal 5 per Combo to all.\nStealth: hits twice." },
+  up2 = { effects = { { "surge" }, { "damage", 0, per = { 5, "surge" }, all = true },
+    { "damage", 0, per = { 5, "surge" }, all = true, cond = "stealth" }, { "draw", 1 } },
+    text = "Surge: deal 5 per Combo to all.\nStealth: hits twice.\nDraw 1." },
+  up3 = { effects = { { "surge" }, { "damage", 0, per = { 6, "surge" }, all = true },
+    { "damage", 0, per = { 6, "surge" }, all = true, cond = "stealth" }, { "draw", 1 } },
+    text = "Surge: deal 6 per Combo to all.\nStealth: hits twice.\nDraw 1." },
 })
 
 -- Nightblade : coup de grâce mono-cible de la voie (ajouté le 12/11/2026, décision du joueur : Subtlety
@@ -316,6 +416,9 @@ card("nightblade", {
   text = "Surge: deal 6 per Combo.\nGain Stealth",
   up = { effects = { { "surge" }, { "damage", 0, per = { 8, "surge" } }, { "apply", "stealth", 1, self = true } },
     text = "Surge: deal 8 per Combo.\nGain Stealth" },
+  up2 = { effects = { { "surge" }, { "damage", 0, per = { 9, "surge" } }, { "apply", "stealth", 1, self = true } },
+    text = "Surge: deal 9 per Combo.\nGain Stealth" },
+  up3 = { retain = true, text = "Surge: deal 9 per Combo.\nGain Stealth\nRetain." },
 })
 
 card("premeditation", {
@@ -323,23 +426,30 @@ card("premeditation", {
   effects = { { "draw", 1 }, { "res", 2, cond = "stealth" } },
   text = "Draw 1.\nStealth: +2 Combo.",
   up = { effects = { { "draw", 2 }, { "res", 2, cond = "stealth" } }, text = "Draw 2.\nStealth: +2 Combo." },
+  up2 = { retain = true, text = "Draw 2.\nStealth: +2 Combo.\nRetain." },
+  up3 = { effects = { { "draw", 2 }, { "res", 3, cond = "stealth" } }, text = "Draw 2.\nStealth: +3 Combo.\nRetain." },
 })
 
-local cheatDeathHooks = {
-  preventDeath = function(c, power)
-    if not Combat.lastBreath(c, "cheat_death") then return false end
-    c.player.hp = 1
-    Combat.applyStatus(c, c.player, "parry", 3)
-    Combat.applyStatus(c, c.player, "stealth", 1)
-    return true
-  end,
-}
+-- Cheat Death : Last Breath, reste à hp PV (paliers 2 et 3 : 6, 10)
+local function cheatDeathHooks(hp)
+  return {
+    preventDeath = function(c, power)
+      if not Combat.lastBreath(c, "cheat_death") then return false end
+      c.player.hp = math.min(hp, c.player.maxHp)
+      Combat.applyStatus(c, c.player, "parry", 3)
+      Combat.applyStatus(c, c.player, "stealth", 1)
+      return true
+    end,
+  }
+end
 
 card("cheat_death", {
   level = 4, name = "Cheat Death", cost = 1, type = "power", rarity = "rare", path = "subtlety",
-  power = true, effects = {}, hooks = cheatDeathHooks,
+  power = true, effects = {}, hooks = cheatDeathHooks(1),
   text = "Power.\nLast Breath: stay at 1 HP, gain Parry 3 and Stealth.",
   up = { cost = 0, text = "Power.\nLast Breath: stay at 1 HP, gain Parry 3 and Stealth." },
+  up2 = { hooks = cheatDeathHooks(6), text = "Power.\nLast Breath: stay at 6 HP, gain Parry 3 and Stealth." },
+  up3 = { hooks = cheatDeathHooks(10), text = "Power.\nLast Breath: stay at 10 HP, gain Parry 3 and Stealth." },
 })
 
 card("smoke_bomb", {
@@ -347,42 +457,56 @@ card("smoke_bomb", {
   cooldown = 4, effects = { { "apply", "demoralized", 2, all = true }, { "apply", "stealth", 1, self = true } },
   text = "Apply Demoralized 2 ⌛ to all\nGain Stealth\nCooldown 4.",
   up = { cooldown = 3, text = "Apply Demoralized 2 ⌛ to all\nGain Stealth\nCooldown 3." },
+  up2 = { effects = { { "apply", "demoralized", 3, all = true }, { "apply", "stealth", 1, self = true } },
+    text = "Apply Demoralized 3 ⌛ to all\nGain Stealth\nCooldown 3." },
+  up3 = { effects = { { "apply", "demoralized", 3, all = true }, { "apply", "stealth", 1, self = true },
+    { "apply", "parry", 1, self = true } }, text = "Apply Demoralized 3 ⌛ to all\nGain Stealth\nGain Parry 1\nCooldown 3." },
 })
 
-local shadowDanceHooks = {
-  onTurnStart = function(c)
-    Combat.applyStatus(c, c.player, "stealth", 1)
-  end,
-}
+-- Shadow Dance : Stealth au début de chaque tour, et n Combo (palier 3 : 1)
+local function shadowDanceHooks(n)
+  return {
+    onTurnStart = function(c)
+      Combat.applyStatus(c, c.player, "stealth", 1)
+      if n > 0 then Combat.gainRes(c, n, "power") end
+    end,
+  }
+end
 
 card("shadow_dance", {
   level = 7, name = "Shadow Dance", cost = 2, type = "power", rarity = "rare", path = "subtlety",
-  power = true, effects = {}, hooks = shadowDanceHooks,
+  power = true, effects = {}, hooks = shadowDanceHooks(0),
   text = "Power.\nStart of turn: gain Stealth.",
   up = { cost = 1, text = "Power.\nStart of turn: gain Stealth." },
+  up2 = { effects = { { "res", 2 } }, text = "Power.\n+2 Combo.\nStart of turn: gain Stealth." },
+  up3 = { hooks = shadowDanceHooks(1), text = "Power.\n+2 Combo.\nStart of turn: gain Stealth, +1 Combo." },
 })
 
 -- Cartes épiques (une par zone, docs/zones/cartes-de-zone.md, « Rogue ») ------------------------------
 -- Règles en jeu dès le début de chaque combat (Combat.new : c.epic), jamais piochées ni jouées (cost 0 :
 -- contrat des données de Sim/tests.lua, jamais payé ni affiché). Leurs crochets (deckHooks, src = c.epic)
 -- sont posés par Core/Classes/rogue.lua ; « Epic. » = mot de plaque en tête.
--- Nombres des épiques (base, amélioré), seule source : les textes ci-dessous et les règles
--- (Core/Classes/rogue.lua, ns.Rogue.EPIC) les lisent. Fiche entre parenthèses ; réglés le 14/11/2026 sur
--- les zones dures (Duskwood, Stranglethorn, Steppes ; simulation epic=<id>, docs/classes.md).
+-- Nombres des épiques (base, +1, +2, +3 : indexés par Card.level(src) + 1), seule source : les textes
+-- ci-dessous et les règles (Core/Classes/rogue.lua, ns.Rogue.EPIC) les lisent. Fiche entre parenthèses ;
+-- réglés le 14/11/2026 sur les zones dures (Duskwood, Stranglethorn, Steppes ; simulation epic=<id>,
+-- docs/classes.md). Paliers 2 et 3 (15/11/2026) : seul le nombre écrit sur la carte change, ou un effet
+-- s'ajoute à la ligne (Kidney Shot, Subterfuge) ; les nombres de l'à-côté (L.rule) restent ceux du +1.
 local EPIC_N = {
-  deflection = { 1, 2 },          -- première riposte du tour (fiche : 3 / 4)
-  deflectionStep = { 2, 2 },      -- de plus par riposte précédente du tour : k-ième = N + S × (k − 1) (fiche : 3 / 4)
-  doomblade = { 0.9, 1 },         -- part des dégâts d'un coup de grâce posée en DoT, arrondie au-dessus (fiche : ½ / 1)
-  atrophic_poison = { 5, 5 },     -- DoT montré (avant son tic) qu'il faut au moins (fiche : 2, « garde du DoT après son tic »)
-  echoing_reprimand = { 3, 4 },   -- un Surge de 2 (à M) Combo compte N (fiche : 5 / 6)
-  echoingMax = { 2, 3 },          -- M : dépense la plus haute qui compte N (fiche : 3)
-  subterfuge = { 0, 0 },          -- Combo par Stealth gagné (fiche : 0 / 1 ; la ligne ne tient plus sur la carte)
-  subterfugeTurns = { 2, 3 },     -- tours que dure un Stealth (le tour où il est gagné compris ; fiche : 1)
-  subterfugeSurge = { true, true }, -- chaque Surge rend Stealth (source incluse ; fiche : aucune)
-  kidney_shot = { 5, 4 },         -- Combo dépensés au moins (fiche : 5 / 4)
-  danse_macabre = { 2, 3 },       -- par autre nom joué dans le tour, au-delà des F premiers (fiche : 2 / 3)
-  danseFree = { 2, 2 },           -- F : autres noms joués qui ne comptent pas encore (fiche : 0)
-  danseCap = { 0, 0 },            -- bonus par coup au plus, 0 = sans plafond (fiche : aucun ; repli de la fiche : +10)
+  deflection = { 1, 2, 3, 4 },    -- première riposte du tour (fiche : 3 / 4)
+  deflectionStep = { 2, 2, 2, 2 }, -- de plus par riposte précédente du tour : k-ième = N + S × (k − 1) (fiche : 3 / 4)
+  doomblade = { 0.9, 1, 1.05, 1.1 }, -- part des dégâts d'un coup de grâce posée en DoT, arrondie au-dessus (fiche : ½ / 1)
+  atrophic_poison = { 5, 5, 4, 3 }, -- DoT montré (avant son tic) qu'il faut au moins (fiche : 2, « garde du DoT après son tic »)
+  echoing_reprimand = { 3, 4, 5, 6 }, -- un Surge de 2 (à M) Combo compte N (fiche : 5 / 6)
+  echoingMax = { 2, 3, 3, 3 },    -- M : dépense la plus haute qui compte N (fiche : 3)
+  subterfuge = { 0, 0, 0, 0 },    -- Combo par Stealth gagné (fiche : 0 / 1 ; la ligne ne tient plus sur la carte)
+  subterfugeTurns = { 2, 3, 3, 3 }, -- tours que dure un Stealth (le tour où il est gagné compris ; fiche : 1)
+  subterfugeSurge = { true, true, true, true }, -- chaque Surge rend Stealth (source incluse ; fiche : aucune)
+  subterfugeParry = { 0, 0, 1, 2 }, -- Parry gagné après chaque Surge (paliers 2 et 3)
+  kidney_shot = { 5, 4, 4, 4 },   -- Combo dépensés au moins (fiche : 5 / 4)
+  kidneyCombo = { 0, 0, 1, 2 },   -- Combo rendus après un Surge qui étourdit (paliers 2 et 3)
+  danse_macabre = { 2, 3, 4, 5 }, -- par autre nom joué dans le tour, au-delà des F premiers (fiche : 2 / 3)
+  danseFree = { 2, 2, 2, 2 },     -- F : autres noms joués qui ne comptent pas encore (fiche : 0)
+  danseCap = { 0, 0, 0, 0 },      -- bonus par coup au plus, 0 = sans plafond (fiche : aucun ; repli de la fiche : +10)
 }
 ns.RogueEpicNumbers = EPIC_N
 
@@ -394,7 +518,7 @@ ns.RogueKidneyLabel = kidneyLabel
 local function epic(id, zone, path, name, text)
   local function t(k) return "Epic.\n" .. (type(text) == "function" and text(k) or text[k]) end
   card(id, { zone = zone, rarity = "epic", epic = true, name = name, cost = 0, type = "power", power = true,
-    path = path, effects = {}, text = t(1), up = { text = t(2) } })
+    path = path, effects = {}, text = t(1), up = { text = t(2) }, up2 = { text = t(3) }, up3 = { text = t(4) } })
 end
 local function n(id, k) return tostring(EPIC_N[id][k]) end
 
@@ -407,16 +531,18 @@ epic("doomblade", "duskwood", "assassination", "Doomblade", function(k)
   return "Surge Attacks: Bleed " .. math.floor(EPIC_N.doomblade[k] * 100 + 0.5) .. "%."
 end)
 epic("atrophic_poison", "wetlands", "assassination", "Atrophic Poison", function(k)
-  return "DoT " .. n("atrophic_poison", k) .. "+: Atrophy" .. (k == 2 and ", Sundered." or ".")
+  return "DoT " .. n("atrophic_poison", k) .. "+: Atrophy" .. (k >= 2 and ", Sundered." or ".")
 end)
 epic("echoing_reprimand", "stranglethorn", "combat", "Echoing Reprimand", function(k)
   return "Surge cards: Animacharge " .. n("echoing_reprimand", k) .. "."
 end)
 epic("subterfuge", "swamp", "subtlety", "Subterfuge", function(k)
-  return "Surge cards: Shroud " .. n("subterfugeTurns", k) .. "."
+  local p = EPIC_N.subterfugeParry[k]
+  return "Surge cards: Shroud " .. n("subterfugeTurns", k) .. (p > 0 and (", gain Parry " .. p) or "") .. "."
 end)
 epic("kidney_shot", "steppes", "subtlety", "Kidney Shot", function(k)
-  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": Gouge."
+  local r = EPIC_N.kidneyCombo[k]
+  return kidneyLabel(EPIC_N.kidney_shot[k]) .. ": Gouge" .. (r > 0 and (", +" .. r .. " Combo") or "") .. "."
 end)
 epic("danse_macabre", "blackrock", "subtlety", "Danse Macabre", function(k)
   return "Attack hits: Flourish " .. n("danse_macabre", k) .. "."
