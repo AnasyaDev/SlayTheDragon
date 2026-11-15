@@ -458,13 +458,13 @@ test("Lone Wolf : table des variantes complète (toute carte de familier), varia
   end
 end)
 
-test("Lone Wolf : variantes jouables (base et améliorée), textes conformes aux effets", function()
+test("Lone Wolf : variantes jouables (base et paliers 1 à 3), textes conformes aux effets", function()
   local bad = {}
   local function has(t, s) return t:find(s, 1, true) ~= nil end
   for _, vid in pairs(LW) do
-    for _, up in ipairs({ false, true }) do
+    for _, up in ipairs({ false, 1, 2, 3 }) do -- tous les paliers (paliers 2 et 3 : 15/11/2026)
       local d = Card.defById(vid, up)
-      local t, lab = d.text, vid .. (up and "+" or "")
+      local t, lab = d.text, vid .. Card.suffix(up)
       for _, e in ipairs(d.effects) do
         if e[1] == "damage" and e[2] > 0 and not has(t, "eal " .. e[2] .. (e.all and " to all" or ".")) then bad[#bad + 1] = lab .. " : damage" end
         if e[1] == "damageOther" and not has(t, "eal " .. e[2] .. " to another enemy.") then bad[#bad + 1] = lab .. " : other" end
@@ -565,6 +565,110 @@ test("Lone Wolf : deck de l'expédition montré transformé (amélioration gard�
   end
   table.remove(exp.deck, X.epicIndex(exp))
   eq(X.shownDeck(exp)[1].id, "arcane_shot")
+end)
+
+---------------------------------------------------------------------------
+-- Paliers 2 et 3 (15/11/2026, docs/ameliorations.md) : nombres lus par Card.level(src) dans ns.HunterEpic
+---------------------------------------------------------------------------
+test("paliers : sept épiques et neuf variantes à +2 / +3 ; textes en deux lignes, mots de règle avec leur nombre", function()
+  local Lg = ns.Language
+  for _, id in ipairs(EPICS) do
+    eq(Card.tiers(id), 3, id)
+    local prev = Card.defById(id, 1).text
+    for n = 2, 3 do
+      local d = Card.defById(id, n)
+      assert(d.text:find("^Epic%.\n[^\n]+$"), id .. "+" .. n .. " : deux lignes")
+      assert(d.text ~= prev, id .. "+" .. n .. " : le texte change")
+      prev = d.text
+      for _, r in ipairs(Lg.ruleWords(d)) do
+        local t = Lg.ruleText(r.kw, r.n, true)
+        assert(not t:find("%f[%w]N%f[%W]"), id .. "+" .. n .. " : N remplacé (" .. t .. ")")
+      end
+    end
+  end
+  for _, vid in pairs({ "chimaera_shot", "kill_shot", "double_tap", "scatter_shot", "salvo", "silencing_shot",
+      "explosive_shot", "trick_shots", "aspect_of_the_turtle" }) do
+    eq(Card.tiers(vid), 3, vid)
+  end
+  eq(Card.defById("trap_launcher", 2).text, "Epic.\nTraps: +1 Frenzy, Launch 2.")
+  eq(Card.defById("beast_cleave", 3).text, "Epic.\nPet attacks: Trample +2.")
+  eq(Card.defById("call_of_the_wild", 2).text, "Epic.\nStart of turn: Hunt 1.")
+  eq(Card.defById("black_arrow", 3).text, "Epic.\nEnemy DoT ticks: Prey 2.")
+  eq(Card.defById("lone_wolf", 3).text, "Epic.\nAttack hits: Ferocity 5.")
+  local tr = Lg.ruleWords(Card.defById("beast_cleave", 2))[1]
+  eq(tr.key, "trample"); eq(Lg.ruleText(tr.kw, tr.n, true), "Pet attacks also hit every other enemy, in full. Each one gives 1 more Frenzy.")
+  local launch = Lg.ruleWords(Card.defById("trap_launcher", 3))[1]
+  eq(Lg.ruleText(launch.kw, launch.n, true), "The Trap triggers at once on a target, then the pet attacks it 3 times.")
+end)
+
+test("paliers : Call of the Wild +2 / +3 (Frenzy avant l'attaque), Trap Launcher +2 / +3", function()
+  for n = 2, 3 do
+    local r = E.cotwRes[n + 1]
+    local c = setup({ "disengage" }, { epic = { "call_of_the_wild", n } })
+    -- tour 1 : +r Frenzy, attaque à 1 + r, +1
+    eq(dealt(c.enemies[1]), H.PET_BASE + r, "Call of the Wild+" .. n)
+    eq(c.player.res, r + 1)
+    local t = setup({ "counterattack" }, { epic = { "trap_launcher", n } })
+    t.player.res = 0
+    assert(Combat.play(t, 1, 1))
+    local k, lr = E.launcher[n + 1], E.launchRes[n + 1]
+    eq(dealt(t.enemies[1]), 13 + petSeries(k, lr), "Trap Launcher+" .. n)
+    eq(t.player.res, math.min(5, lr + k))
+  end
+end)
+
+test("paliers : Beast Cleave +2 (en plein) / +3 (+2 Frenzy) ; Roar +2 / +3 ; Black Arrow +2 (+1 Frenzy)", function()
+  local c = setup({ "kill_command" }, { epic = { "beast_cleave", 2 }, encounter = { "th_dummy", "th_dummy" } })
+  c.player.res = 0
+  assert(Combat.play(c, 1, 1))
+  -- 1 + 0 (F 2), puis 1 + 2 (F 4) : les deux ennemis en plein
+  eq(dealt(c.enemies[1]), 2 * H.PET_BASE + 2); eq(dealt(c.enemies[2]), 2 * H.PET_BASE + 2, "en plein")
+  eq(c.player.res, 4)
+  local c3 = setup({ "kill_command" }, { epic = { "beast_cleave", 3 }, encounter = { "th_dummy", "th_dummy" } })
+  c3.player.res = 0
+  assert(Combat.play(c3, 1, 1))
+  eq(dealt(c3.enemies[2]), 2 * H.PET_BASE + 3, "+3 : Frenzy 3 à la seconde attaque"); eq(c3.player.res, 5)
+  for n = 2, 3 do
+    local r = setup({ "disengage" }, { epic = { "roar_of_sacrifice", n }, encounter = { "th_hitter" } })
+    r.player.res = 1
+    local hp = r.player.hp
+    Combat.endTurn(r)
+    eq(r.player.hp, hp - (10 - E.roar[n + 1]), "Roar of Sacrifice+" .. n)
+  end
+  local u = setup({ "disengage" }, { epic = { "black_arrow", 2 } })
+  Combat.applyStatus(u, u.enemies[1], "pain", 3)
+  Combat.endTurn(u)
+  -- auto : 1 + 0 (F 1) ; tic 3, familier 1 + 1 (F 2), +1 (F 3) ; baisse de round : 2
+  eq(dealt(u.enemies[1]), H.PET_BASE + 3 + H.PET_BASE + 1)
+  eq(u.player.res, 2)
+end)
+
+test("paliers : Master Marksman +3, Lone Wolf +2 (Ferocity 4) / +3 (Ferocity 5), variantes au palier", function()
+  local m = setup({ "aimed_shot" }, { epic = { "master_marksman", 3 } })
+  assert(Combat.play(m, 1, 1))
+  eq(dealt(m.enemies[1]), 24 + 10 + E.marksman[4])
+  local l = setup({ "chimaera_shot" }, { epic = { "lone_wolf", 2 }, extra = { "arcane_shot" } })
+  l.player.res = 2
+  assert(Combat.play(l, 1, 1))
+  eq(dealt(l.enemies[1]), E.chimaera[1] + 2 * E.lonePer[3])
+  local s = setup({ "chimaera_shot" }, { epic = { "lone_wolf", 3 }, extra = { "arcane_shot" } })
+  s.player.res = 2
+  assert(Combat.play(s, 1, 1))
+  eq(dealt(s.enemies[1]), E.chimaera[1] + 2 * E.lonePer[4], "Ferocity 5")
+  eq(E.lonePer[4], 5); eq(E.loneStart[4], 0, "pas de Frenzy au début du tour")
+  -- variantes : palier de la carte d'origine (Chimaera Shot+3 : 8, 6 à un autre, +2 Frenzy ; Kill Shot+2 : coût 0)
+  local deck = deckOf({ { "arcane_shot", 3 }, { "kill_command", 2 }, "lone_wolf", "disengage", "disengage", "disengage" })
+  local c = Combat.new({ seed = 3, class = "hunter", hp = 50, deck = deck, encounter = { "th_dummy", "th_dummy" } })
+  local ch, ks
+  for _, pile in ipairs({ c.hand, c.draw }) do
+    for _, x in ipairs(pile) do
+      if x.id == "chimaera_shot" then ch = x elseif x.id == "kill_shot" then ks = x end
+    end
+  end
+  eq(ch.up, 3); eq(ks.up, 2)
+  eq(Combat.cost(c, ks), 0)
+  local d = Card.def(ch)
+  eq(d.effects[1][2], E.chimaera[3]); eq(d.effects[2][2], E.chimaera[4]); eq(d.effects[3][2], 2)
 end)
 
 ---------------------------------------------------------------------------

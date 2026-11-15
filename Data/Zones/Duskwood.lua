@@ -457,6 +457,9 @@ D.neutralCard("anti_venom", {
   exhaust = true, effects = { { "cleanse" }, { "draw", 1 } },
   text = "Remove negative effects.\nDraw 1.\nExhaust.",
   up = { effects = { { "cleanse" }, { "draw", 2 } }, text = "Remove negative effects.\nDraw 2.\nExhaust." },
+  up2 = { retain = true, text = "Remove negative effects.\nDraw 2.\nExhaust.\nRetain." },
+  up3 = { effects = { { "cleanse" }, { "heal", 4 }, { "draw", 2 } },
+    text = "Remove negative effects.\nHeal 4.\nDraw 2.\nExhaust.\nRetain." },
 })
 
 D.neutralCard("zombie_juice", {
@@ -465,6 +468,8 @@ D.neutralCard("zombie_juice", {
   exhaust = true, effects = { { "mana", 1 }, { "draw", 1 } },
   text = "+1 mana.\nDraw 1.\nExhaust.",
   up = { effects = { { "mana", 1 }, { "draw", 2 } }, text = "+1 mana.\nDraw 2.\nExhaust." },
+  up2 = { retain = true, text = "+1 mana.\nDraw 2.\nExhaust.\nRetain." },
+  up3 = { innate = true, text = "+1 mana.\nDraw 2.\nExhaust.\nRetain.\nInnate." },
 })
 
 D.relic("ogres_monocle", {

@@ -7,6 +7,7 @@ local ns = dofile(root .. "/Sim/load.lua")(root)
 local X, Meta, Save, Combat, Card = ns.Expedition, ns.Meta, ns.Save, ns.Combat, ns.Card
 local Warrior = ns.Warrior
 local E = Warrior.EPIC
+local function N(id, key, up) return Warrior.num(id, key, up or false) end -- nombre au palier (up : 0..3, true = 1)
 
 local passed, failed = 0, 0
 local function test(name, f)
@@ -90,62 +91,71 @@ test("textes : les nombres de Warrior.EPIC (carte et à-côté de ses mots de r�
     local out = { d.text }
     for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = r.kw.name .. ": " .. Lg.ruleText(r.kw, r.n, up) end
     local t = table.concat(out, "\n")
-    assert(t:find(s, 1, true), id .. (up and "+" or "") .. " : « " .. s .. " » absent de « " .. t .. " »")
+    assert(t:find(s, 1, true), id .. (up and ("+" .. tostring(up)) or "") .. " : « " .. s .. " » absent de « " .. t .. " »")
   end
   local function hasNot(id, up, s)
     local d = Card.defById(id, up)
     local out = { d.text }
     for _, r in ipairs(Lg.ruleWords(d)) do out[#out + 1] = Lg.ruleText(r.kw, r.n, up) end
-    assert(not table.concat(out, "\n"):find(s, 1, true), id .. (up and "+" or "") .. " : « " .. s .. " » en trop")
+    assert(not table.concat(out, "\n"):find(s, 1, true), id .. (up and ("+" .. tostring(up)) or "") .. " : « " .. s .. " » en trop")
   end
-  eq(E.death_wish.mult, 1.5)
-  for _, up in ipairs({ false, true }) do
-    has("death_wish", up, "Carnage 50%."); has("death_wish", up, "Attacks deal 50% more damage. Absorb can't be gained.")
+  -- quatre paliers (0 = false, 1, 2, 3) : nombres de la carte et de l'à-côté lus dans Warrior.EPIC au palier
+  local UPS = { false, 1, 2, 3 }
+  local function lab(up) return up and ("+" .. up) or "" end
+  local function kills(id, up, word)
+    local d = Card.defById(id, up)
+    return d.text:match(word == "heal" and "\nKills: heal (%d+)%.$" or "\nKills: %+(%d+) Rage%.$")
   end
-  has("death_wish", true, "Kills: heal " .. E.death_wish.heal .. ".")
-  local T = E.thunderous_roar
-  has("thunderous_roar", false, "At " .. T.at .. " Rage: Shockwave " .. T.damage .. ".")
-  has("thunderous_roar", false, "Spend all Rage")
-  has("thunderous_roar", false, "deal " .. T.damage .. " to all enemies")
-  has("thunderous_roar", true, "At " .. T.at .. " Rage: Shockwave " .. T.upDamage .. ".")
-  has("thunderous_roar", true, "deal " .. T.upDamage .. " to all enemies")
-  if T.demoralized > 0 then has("thunderous_roar", false, "Demoralized " .. T.demoralized)
-  else hasNot("thunderous_roar", false, "Demoralized") end
-  if T.upDemoralized > 0 then has("thunderous_roar", true, "apply Demoralized " .. T.upDemoralized .. " ⌛ to all") end
-  has("sweeping_strikes", false, "Targeted Attack hits: Sweep " .. E.sweeping_strikes.targets .. ".")
-  has("sweeping_strikes", false, "Also hit another random enemy")
-  has("sweeping_strikes", true, "Sweep " .. E.sweeping_strikes.upTargets .. ".")
-  has("sweeping_strikes", true, "Also hit " .. E.sweeping_strikes.upTargets .. " other random enemies")
-  eq(E.sweeping_strikes.div, 3)
-  for _, up in ipairs({ false, true }) do has("sweeping_strikes", up, "for a third of the HP") end
-  eq(E.titans_grip.copies, 1, "« resolve twice »")
-  for _, up in ipairs({ false, true }) do
+  for _, up in ipairs(UPS) do
+    local pct = math.floor((N("death_wish", "mult", up) - 1) * 100 + 0.5)
+    has("death_wish", up, "Carnage " .. pct .. "%."); has("death_wish", up, "Attacks deal " .. pct .. "% more damage. Absorb can't be gained.")
+    local h = N("death_wish", "heal", up)
+    if h > 0 then has("death_wish", up, "Kills: heal " .. h .. ".") else hasNot("death_wish", up, "Kills") end
+    local T = E.thunderous_roar
+    local dmg, demo = N("thunderous_roar", "damage", up), N("thunderous_roar", "demoralized", up)
+    has("thunderous_roar", up, "At " .. T.at .. " Rage: Shockwave " .. dmg .. ".")
+    has("thunderous_roar", up, "Spend all Rage")
+    has("thunderous_roar", up, "deal " .. dmg .. " to all enemies")
+    if demo > 0 then has("thunderous_roar", up, "apply Demoralized " .. demo .. " ⌛ to all")
+    else hasNot("thunderous_roar", up, "Demoralized") end
+    local tg = N("sweeping_strikes", "targets", up)
+    has("sweeping_strikes", up, (N("sweeping_strikes", "anyAttack", up) and "\nAttacks: Sweep " or "Targeted Attack hits: Sweep ") .. tg .. ".")
+    has("sweeping_strikes", up, tg == 1 and "Also hit another random enemy" or ("Also hit " .. tg .. " other random enemies"))
+    has("sweeping_strikes", up, "for a third of the HP")
+    eq(tonumber(kills("sweeping_strikes", up, "%+") or 0), N("sweeping_strikes", "killRage", up), "Sweeping Strikes" .. lab(up))
     has("titans_grip", up, "Dual Wield " .. E.titans_grip.limit)
     has("titans_grip", up, "Attacks cost " .. E.titans_grip.extraCost .. " more and resolve twice, at most "
       .. E.titans_grip.limit .. " per turn.")
-  end
-  has("titans_grip", true, "Dual Wield " .. E.titans_grip.limit .. ", 0-cost free.")
-  has("titans_grip", true, "0-cost ones skip the cost and limit.")
-  eq(Warrior.TITAN_REASON, ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or ""))
-  eq(E.shield_charge.div, 4); has("shield_charge", false, "End of turn: Punish.")
-  has("shield_charge", false, "deal a quarter of it to the last target")
-  has("shield_charge", true, "Punish +" .. E.shield_charge.upBonus .. ".")
-  has("shield_charge", true, "deal a quarter of it +" .. E.shield_charge.upBonus .. " to the last target")
-  eq(E.anger_management.per, 1); eq(E.anger_management.upPer, 1)
-  has("anger_management", false, "Each Rage spent: Haste " .. E.anger_management.steps .. ".")
-  has("anger_management", false, "return " .. E.anger_management.steps .. " turn sooner")
-  has("anger_management", true, "Each Rage spent: Haste " .. E.anger_management.upSteps .. ".")
-  has("anger_management", true, "return " .. E.anger_management.upSteps .. " turns sooner")
-  for _, up in ipairs({ false, true }) do
+    eq(tonumber(kills("titans_grip", up, "heal") or 0), N("titans_grip", "killHeal", up), "Titan's Grip" .. lab(up))
+    local bonus = N("shield_charge", "bonus", up)
+    if bonus > 0 then
+      has("shield_charge", up, "Punish +" .. bonus .. ".")
+      has("shield_charge", up, "deal a quarter of it +" .. bonus .. " to the last target")
+    else
+      has("shield_charge", up, "End of turn: Punish."); has("shield_charge", up, "deal a quarter of it to the last target")
+    end
+    local st = N("anger_management", "steps", up)
+    has("anger_management", up, "Each Rage spent: Haste " .. st .. ".")
+    has("anger_management", up, "return " .. st .. " turn" .. (st > 1 and "s" or "") .. " sooner")
     has("anger_management", up, "Spend and Surge cards go on Cooldown " .. E.anger_management.give .. ", not to the discard")
-  end
-  has("avatar", false, "Start of turn: Juggernaut " .. E.avatar.gain .. ".")
-  has("avatar", false, "Gain " .. E.avatar.gain .. " Rage. Rage goes up to " .. E.avatar.cap .. ",")
-  has("avatar", true, "Juggernaut " .. E.avatar.upGain .. ".")
-  has("avatar", true, "Gain " .. E.avatar.upGain .. " Rage.")
-  eq(E.avatar.over, E.avatar.cap - 1, "« At 10 Rage »")
-  for _, up in ipairs({ false, true }) do
+    local g = N("avatar", "gain", up)
+    has("avatar", up, "Start of turn: Juggernaut " .. g .. ".")
+    has("avatar", up, "Gain " .. g .. " Rage. Rage goes up to " .. E.avatar.cap .. ",")
     has("avatar", up, "at " .. E.avatar.cap .. " Rage Attacks deal " .. E.avatar.bonus .. " more.")
+  end
+  eq(N("death_wish", "mult"), 1.5)
+  eq(E.sweeping_strikes.div, 3)
+  eq(E.titans_grip.copies, 1, "« resolve twice »")
+  has("titans_grip", 1, "Dual Wield " .. E.titans_grip.limit .. ", 0-cost free.")
+  for _, up in ipairs({ 1, 2, 3 }) do has("titans_grip", up, "0-cost ones skip the cost and limit.") end
+  eq(Warrior.TITAN_REASON, ("Only %d Attack%s per turn."):format(E.titans_grip.limit, E.titans_grip.limit > 1 and "s" or ""))
+  eq(E.shield_charge.div, 4)
+  eq(E.anger_management.per, 1)
+  eq(E.avatar.over, E.avatar.cap - 1, "« At 10 Rage »")
+  -- l'à-côté n'a qu'un texte amélioré : les nombres qu'il écrit en clair sont ceux de tous les paliers 1 à 3
+  for lv = 2, 4 do
+    eq(E.thunderous_roar.demoralized[lv], E.thunderous_roar.demoralized[2], "Demoralized du palier " .. (lv - 1))
+    eq(E.sweeping_strikes.targets[lv], E.sweeping_strikes.targets[2], "Sweep du palier " .. (lv - 1))
   end
 end)
 
@@ -207,12 +217,12 @@ test("Death Wish amélioré : chaque ennemi tué soigne de 3 ; de base, rien", f
     c.enemies[1].hp = 5
     assert(play(c, "strike", 1))
     assert(c.enemies[1].dead)
-    eq(c.player.hp, up and 40 + E.death_wish.heal or 40)
+    eq(c.player.hp, up and 40 + N("death_wish", "heal", true) or 40)
     -- dernier ennemi : soigné aussi (avant la victoire)
     c.enemies[2].hp = 3
     assert(play(c, "strike", 2))
     eq(c.result, "won")
-    eq(c.player.hp, up and 40 + 2 * E.death_wish.heal or 40)
+    eq(c.player.hp, up and 40 + 2 * N("death_wish", "heal", true) or 40)
   end
 end)
 
@@ -220,14 +230,14 @@ end)
 -- Duskwood — Thunderous Roar
 ---------------------------------------------------------------------------
 test("Thunderous Roar : à 5 Rage (fin de l'Attack), Rage à 0, dégâts à tous, Demoralized selon la règle", function()
-  local n = E.thunderous_roar.damage
+  local n = N("thunderous_roar", "damage")
   local c = setup({ "strike" }, { epic = "thunderous_roar", encounter = { "tw_dummy", "tw_dummy" } })
   c.player.res = 4
   local a, b = c.enemies[1].hp, c.enemies[2].hp
   assert(play(c, "strike", 1))
   eq(c.player.res, 0)
   eq(c.enemies[1].hp, a - 6 - n); eq(c.enemies[2].hp, b - n)
-  local demo = E.thunderous_roar.demoralized > 0 and E.thunderous_roar.demoralized or nil
+  local demo = N("thunderous_roar", "demoralized") > 0 and N("thunderous_roar", "demoralized") or nil
   eq(c.enemies[1].st.demoralized, demo); eq(c.enemies[2].st.demoralized, demo)
   Combat.endTurn(c)
   eq(c.enemies[1].st.demoralized, nil, "jamais au-delà du round")
@@ -245,20 +255,20 @@ test("Thunderous Roar : sous 5 rien ; Strength comprise ; amélioré ; gain par 
   hp = c2.enemies[1].hp
   assert(play(c2, "bloodrage")) -- Pay 2 HP (+1 Rage) puis +2 Rage : 5
   eq(c2.player.res, 0)
-  eq(c2.enemies[1].hp, hp - (E.thunderous_roar.upDamage + 2))
+  eq(c2.enemies[1].hp, hp - (N("thunderous_roar", "damage", true) + 2))
 end)
 
 test("Thunderous Roar : coup reçu pendant le tour ennemi ; Demoralized (si posé) seulement jusqu'à la fin du round", function()
   local old = E.thunderous_roar.demoralized
   for _, demo in ipairs({ 0, 1 }) do
-    E.thunderous_roar.demoralized = demo
+    E.thunderous_roar.demoralized = { demo, demo, demo, demo }
     local c = setup({ "defend" }, { epic = "thunderous_roar", encounter = { "tw_double" } })
     c.player.res = 4
     local hp = c.enemies[1].hp
     Combat.endPlayerTurn(c)
     Combat.enemyPhase(c)
     -- premier coup (3) : +1 Rage, onde ; le second coup est allégé par Demoralized (3 × 0,75 = 2)
-    eq(c.enemies[1].hp, hp - E.thunderous_roar.damage)
+    eq(c.enemies[1].hp, hp - N("thunderous_roar", "damage"))
     eq(c.player.hp, 60 - 3 - (demo > 0 and 2 or 3))
     eq(c.enemies[1].st.demoralized, demo > 0 and 1 or nil)
     Combat.endRound(c)
@@ -273,8 +283,8 @@ test("Thunderous Roar amélioré : onde de upDamage puis Demoralized upDemoraliz
     c.player.res = 4
     local b = c.enemies[2].hp
     assert(play(c, "strike", 1))
-    eq(c.enemies[2].hp, b - (up and E.thunderous_roar.upDamage or E.thunderous_roar.damage))
-    local demo = up and E.thunderous_roar.upDemoralized or E.thunderous_roar.demoralized
+    eq(c.enemies[2].hp, b - (up and N("thunderous_roar", "damage", true) or N("thunderous_roar", "damage")))
+    local demo = N("thunderous_roar", "demoralized", up)
     eq(c.enemies[2].st.demoralized, demo > 0 and demo or nil, up and "amélioré" or "de base")
   end
 end)
@@ -453,7 +463,7 @@ test("Shield Charge : cible morte -> le plus à gauche ; sans Absorb rien ; amé
   c3.enemies[1].st.asleep = 2 -- dormeur (Swamp) : évité tant qu'un ennemi est éveillé
   local b3 = c3.enemies[2].hp
   Combat.endPlayerTurn(c3)
-  local want = E.shield_charge.upBonus + math.floor(5 / E.shield_charge.div)
+  local want = N("shield_charge", "bonus", true) + math.floor(5 / E.shield_charge.div)
   eq(c3.enemies[2].hp, b3 - want)
   eq(Warrior.chargeDamage(c3, true), want)
 end)
@@ -554,7 +564,7 @@ end)
 test("Avatar : Rage jusqu'à 10, +1 au début du tour (amélioré +2), cartes « per Rage » sur la Rage réelle", function()
   local c = setup({ "execute", "ignore_pain" }, { epic = "avatar" })
   eq(Combat.resCap(c), E.avatar.cap)
-  eq(c.player.res, E.avatar.gain, "+1 dès le premier tour")
+  eq(c.player.res, N("avatar", "gain"), "+1 dès le premier tour")
   Combat.gainRes(c, 20)
   eq(c.player.res, 10)
   c.enemies[1].hp = 50
@@ -564,9 +574,9 @@ test("Avatar : Rage jusqu'à 10, +1 au début du tour (amélioré +2), cartes «
   assert(play(c, "ignore_pain"))
   eq(c.player.block, 30)
   local c2 = setup({ "strike" }, { epic = "avatar", up = true })
-  eq(c2.player.res, E.avatar.upGain)
+  eq(c2.player.res, N("avatar", "gain", true))
   Combat.endTurn(c2)
-  eq(c2.player.res, 2 * E.avatar.upGain)
+  eq(c2.player.res, 2 * N("avatar", "gain", true))
   eq(Combat.resCap(setup({ "strike" })), 5, "sans épique : 5")
 end)
 
@@ -593,6 +603,96 @@ test("Avatar : à 10 Rage, chaque coup d'une Attack +1 (Rampage : quatre fois) ;
   local h2 = c2.enemies[1].hp
   assert(play(c2, "strike", 1))
   eq(c2.enemies[1].hp, h2 - 6, "sans épique")
+end)
+
+---------------------------------------------------------------------------
+-- Paliers +2 et +3 (15/11/2026, docs/ameliorations.md) : nombres lus par Card.level(src)
+---------------------------------------------------------------------------
+test("paliers : chaque épique a +2 et +3, texte en « Epic. », crochets hérités du palier 1", function()
+  for _, id in ipairs(Warrior.EPICS) do
+    eq(Card.tiers(id), 3, id)
+    for _, up in ipairs({ 2, 3 }) do
+      local d = Card.defById(id, up)
+      assert(d.text:find("^Epic%.\n"), id .. "+" .. up)
+      eq(d.deckHooks, ns.Cards[id].up.deckHooks, id .. "+" .. up .. " : crochets")
+      assert(d.text ~= Card.defById(id, up - 1).text, id .. "+" .. up .. " : texte changé")
+    end
+  end
+end)
+
+-- Ennemi tué avec deux ennemis en face (le combat continue) : PV et Rage du Guerrier après le coup.
+local function killOne(id, up)
+  local c = setup({ "strike" }, { epic = id, up = up, hp = 40, encounter = { "tw_dummy", "tw_dummy" } })
+  c.player.res = 0
+  c.enemies[1].hp = 2
+  assert(play(c, "strike", 1))
+  assert(c.enemies[1].dead and not c.result)
+  return c
+end
+
+test("paliers : « Kills: » (Death Wish 3 / 5, Sweeping Strikes+3 +1 Rage, Titan's Grip 4 / 6)", function()
+  for _, up in ipairs({ false, 1, 2, 3 }) do
+    local lv = Card.level(up)
+    eq(killOne("death_wish", up).player.hp, 40 + ({ 0, 3, 5, 5 })[lv + 1], "Death Wish+" .. lv)
+    eq(killOne("sweeping_strikes", up).player.res, 1 + ({ 0, 0, 0, 1 })[lv + 1], "Sweeping Strikes+" .. lv .. " : Rage")
+    local tg = killOne("titans_grip", up)
+    eq(tg.player.hp, 40 + ({ 0, 0, 4, 6 })[lv + 1], "Titan's Grip+" .. lv)
+    eq(tg.player.res, 1, "Titan's Grip : Rage une fois par carte")
+  end
+  -- dernier ennemi : soigné aussi (comme Death Wish), le soin compte pour la suite de l'expédition
+  local c2 = setup({ "strike" }, { epic = "titans_grip", up = 3, hp = 40 })
+  c2.enemies[1].hp = 2
+  assert(play(c2, "strike", 1))
+  eq(c2.result, "won"); eq(c2.player.hp, 46)
+end)
+
+test("paliers : Death Wish+3 Carnage 60 % ; Thunderous Roar 5 / 6 ; Shield Charge +6 / +8 ; Avatar +4 / +5 Rage", function()
+  for _, up in ipairs({ 2, 3 }) do
+    local c = setup({ "strike" }, { epic = "death_wish", up = up })
+    Combat.applyStatus(c, c.player, "force", 4)
+    local hp = c.enemies[1].hp
+    assert(play(c, "strike", 1))
+    eq(hp - c.enemies[1].hp, up == 3 and 16 or 15, "(6 + 4) × " .. N("death_wish", "mult", up))
+    local r = setup({ "strike" }, { epic = "thunderous_roar", up = up, encounter = { "tw_dummy", "tw_dummy" } })
+    r.player.res = 4
+    local b = r.enemies[2].hp
+    assert(play(r, "strike", 1))
+    eq(b - r.enemies[2].hp, up + 3, "Shockwave " .. (up + 3)); eq(r.enemies[2].st.demoralized, 1)
+    local s = setup({ "defend" }, { epic = "shield_charge", up = up })
+    assert(play(s, "defend"))
+    local h = s.enemies[1].hp
+    Combat.endPlayerTurn(s)
+    eq(h - s.enemies[1].hp, math.floor(5 / 4) + (up == 3 and 8 or 6), "Punish +" .. (up == 3 and 8 or 6))
+    local a = setup({ "strike" }, { epic = "avatar", up = up })
+    eq(a.player.res, up + 2, "Juggernaut " .. (up + 2)); Combat.endTurn(a); eq(a.player.res, 2 * (up + 2))
+  end
+end)
+
+test("paliers : Sweeping Strikes+2 « Attack hits » : les Attacks à tous rebondissent aussi ; +1 non", function()
+  for _, up in ipairs({ 1, 2, 3 }) do
+    local c = setup({ "whirlwind" }, { epic = "sweeping_strikes", up = up, encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
+    local hp = c.enemies[1].hp
+    assert(play(c, "whirlwind"))
+    -- 4 deux fois à chacun ; palier 2+ : chaque coup (4 PV) rebondit d'un tiers (1) sur les deux autres
+    eq(hp - c.enemies[1].hp, up >= 2 and 12 or 8, "Whirlwind, Sweeping Strikes+" .. up)
+  end
+end)
+
+test("paliers : Anger Management Haste 3 / 4 (Shield Wall revient après une seule Rage), +1 Haste 2", function()
+  for _, up in ipairs({ 1, 2, 3 }) do
+    local c = setup({ "shield_wall", "heroic_strike" }, { epic = "anger_management", up = up })
+    c.player.mana = 9
+    assert(play(c, "shield_wall"))
+    c.hand[#c.hand + 1] = Card.new("execute", false, 801)
+    c.player.res = 0
+    c.enemies[1].hp = 40
+    assert(play(c, "execute", 1)) -- Surge 0 (Rage gagnée après) : rien
+    c.player.res = 1
+    c.hand[#c.hand + 1] = Card.new("ignore_pain", false, 802)
+    assert(play(c, "ignore_pain")) -- Surge 1 : 2 ou 3 crans
+    local back = idx(c, "shield_wall") ~= nil
+    eq(back, up >= 2, "Shield Wall (recharge 3) revenue dès Haste 3")
+  end
 end)
 
 ---------------------------------------------------------------------------

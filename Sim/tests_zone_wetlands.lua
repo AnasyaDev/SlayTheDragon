@@ -544,6 +544,24 @@ return function(T)
     local ok, why = T.plainData(exp); assert(ok, why)
   end)
 
+  test("paliers neutres : Crocolisk Gumbo +3 coûte 0 ; Fire Oil +2 DoT 7 à tous, +3 Innate", function()
+    local c = combat({ hand = { "crocolisk_gumbo" } })
+    c.hand[1].up = 3
+    c.player.mana, c.player.hp = 0, 40
+    play(c, "crocolisk_gumbo")
+    eq(c.player.hp, 50); eq(c.player.st.force, 1)
+    local d = combat({ enemies = { "zt_dummy", "zt_dummy" }, hand = { "fire_oil" } })
+    d.hand[1].up = 2
+    play(d, "fire_oil")
+    eq(d.enemies[1].st.pain, 7); eq(d.enemies[2].st.pain, 7)
+    for seed = 1, 8 do
+      local deck = { { id = "fire_oil", up = 3 } }
+      for _ = 1, 9 do deck[#deck + 1] = { id = "smite", up = false } end
+      local o = Combat.new({ seed = seed, class = "priest", hp = 60, maxHp = 60, deck = deck, encounter = { "zt_dummy" } })
+      assert(T.handIndex(o, "fire_oil"), "Fire Oil+3 Innate (graine " .. seed .. ")")
+    end
+  end)
+
   -- cartes de test retirées
   for _, id in ipairs({ "wlt_hit", "wlt_poke", "wlt_all3", "wlt_twice", "wlt_nova", "wlt_trap", "wlt_stun", "wlt_kick" }) do
     C[id] = nil

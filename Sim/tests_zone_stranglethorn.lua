@@ -615,6 +615,22 @@ return function(T)
     eq(count(c, "hexed"), 1, "l'original n'a pas bougé")
   end)
 
+  test("paliers neutres : Jungle Remedy +2 Retain, +3 Innate ; Rumsey Rum +2 Retain, +3 11 Absorb", function()
+    for seed = 1, 8 do
+      local deck = { { id = "jungle_remedy", up = 3 } }
+      for _ = 1, 9 do deck[#deck + 1] = { id = "smite", up = false } end
+      local o = Combat.new({ seed = seed, class = "priest", hp = 60, maxHp = 60, deck = deck, encounter = { "zt_dummy" } })
+      assert(T.handIndex(o, "jungle_remedy"), "Innate (graine " .. seed .. ")")
+      eq(ns.Card.def(o.hand[T.handIndex(o, "jungle_remedy")]).retain, true)
+    end
+    local c = combat({ hand = { "rumsey_rum_black_label" }, deck = { "smite", "smite", "smite", "smite", "smite", "smite" } })
+    c.hand[1].up = 3
+    Combat.endTurn(c)
+    assert(T.handIndex(c, "rumsey_rum_black_label"), "gardée en main")
+    play(c, "rumsey_rum_black_label")
+    eq(c.player.block, 11)
+  end)
+
   -- ménage
   for _, id in ipairs(TEST) do C[id] = nil end
   ns.Enemies.stv_dummy = nil
