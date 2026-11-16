@@ -6891,7 +6891,7 @@ if SNAP then
   big:Hide()
   -- cartes qui déclenchent un DoT (« deals its damage ») et Regen (« Each Regen heal ») aux quatre paliers,
   -- avec des voisines du Voleur pour comparer la taille du texte
-  local rows = { "exsanguinate", "envenom", "rupture", "crippling_poison", "echo_of_light" }
+  local rows = { "exsanguinate", "envenom", "rupture", "crippling_poison", "echo_of_light", "jungle_remedy" }
   local tiers = CreateFrame("Frame", nil, _G.UIParent)
   tiers:SetSize(4 * cw + 20, #rows * ch + 10)
   tiers:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)

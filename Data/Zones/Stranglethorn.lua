@@ -285,12 +285,12 @@ ns.Cards.hexed = {
 D.neutralCard("jungle_remedy", {
   tier = 4, name = "Jungle Remedy", cost = 0, type = "skill", rarity = "uncommon", exhaust = true,
   effects = { { "restoreAll", id = "hexed" }, { "cleanse" }, { "draw", 1 } },
-  text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 1.\nExhaust.",
+  text = "Lift all Hexes.\nRemove negative effects.\nDraw 1.\nExhaust.",
   up = { effects = { { "restoreAll", id = "hexed" }, { "cleanse" }, { "draw", 2 } },
-    text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 2.\nExhaust." },
-  up2 = { retain = true, text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 2.\nExhaust.\nRetain." },
+    text = "Lift all Hexes.\nRemove negative effects.\nDraw 2.\nExhaust." },
+  up2 = { retain = true, text = "Lift all Hexes.\nRemove negative effects.\nDraw 2.\nExhaust.\nRetain." },
   up3 = { innate = true,
-    text = "Restore all Hexed cards to hand.\nRemove negative effects.\nDraw 2.\nExhaust.\nRetain.\nInnate." },
+    text = "Lift all Hexes.\nRemove negative effects.\nDraw 2.\nExhaust.\nRetain.\nInnate." },
 })
 
 D.neutralCard("rumsey_rum_black_label", {

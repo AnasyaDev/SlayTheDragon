@@ -540,8 +540,8 @@ de la zone), `Core/ZoneRules/stranglethorn.lua` (règle, `ns.Stranglethorn`, cas
   rencontres de la zone, pas du commun (avec les paliers 1 et 2 de la fiche, `Meta.commonContent` les aurait
   annoncées comme débloquées par Westfall ou Duskwood).
 - **Textes impersonnels** (langage des cartes : aucun « your ») : Hexed « Return the original card to hand. » (le
-  nom de la carte d'origine est déjà écrit au-dessus par le socle) ; Jungle Remedy « Restore all Hexed cards to
-  hand. ».
+  nom de la carte d'origine est déjà écrit au-dessus par le socle) ; Jungle Remedy « Lift all Hexes » (avant : « Restore all Hexed cards to
+  hand. »).
 - **Mokk** : la rage à 49 PV est une phase du moteur commun (seuil à 50 %, cran sur la barre, bandeau « Berserk »),
   sans réplique (un gorille ne parle pas).
 - **King Bangalash** : Call the Pride devient Roar quand les deux tigres vivent (IA à motif propre).
