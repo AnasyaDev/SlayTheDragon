@@ -658,7 +658,12 @@ function V:Build(parent)
   banner:SetFrameLevel(parent:GetFrameLevel() + 70)
   banner.text = W.label(banner, "heavy", 42, C.goldText, "OVERLAY")
   banner.text:SetPoint("TOP", 0, -20)
-  banner.button = W.button(banner, "Continue", 190, 48, function() Controller.finishCombat() end, "gold", 18)
+  -- sans combat tranché (bandeau resté d'un rendu interrompu) : le bandeau s'efface, le combat est rendu
+  banner.button = W.button(banner, "Continue", 190, 48, function()
+    if Controller.finishCombat() then return end
+    banner:Hide()
+    self:Render(true)
+  end, "gold", 18)
   banner.button:SetPoint("BOTTOM", 0, 18)
   banner:Hide()
   self.banner = banner
@@ -837,6 +842,10 @@ function V:Show(step)
     self.shownHand = {}
     self.resPips.class = nil -- nouveau combat : crans posés sans animation
     self.keepMode = nil
+    -- rien du combat précédent (bandeau « Victory! », End Turn éteint) ne reste si le rendu s'interrompt :
+    -- RenderBanner, qui les règle, passe en dernier
+    self.banner:Hide()
+    self.endTurn:SetActive(true)
   end
   self:ApplyFacing()
   self:Render(true)
@@ -1630,7 +1639,9 @@ function V:RunQueue()
     self.playing = false
     self.frozen = false
     self.pendingDraw = {}
-    if self.c then self:Render(true) end
+    -- combat quitté entre-temps (écran caché, expédition abandonnée) : plus rien à rendre (Controller.handInfo
+    -- lit le combat du contrôleur, plus celui de la vue)
+    if self.c and self.c == Controller.combat() then self:Render(true) end
     return
   end
   self.playing = true

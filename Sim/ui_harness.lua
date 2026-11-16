@@ -85,7 +85,6 @@ SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlp
 SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
 SetScaleAnimationMode SetSmoothScaling SetOrigin SetSmoothing SetSnapToPixelGrid SetTexelSnappingBias
 SetTextureSliceMargins SetTextureSliceMode SetModelScale SetPosition SetKeepModelOnHide SetViewInsets
-GetCameraPosition GetCameraTarget SetCameraPosition SetCameraTarget
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -232,9 +231,27 @@ function Frame:SetPoint(p, a, b, c, d)
   local rel, rp, x, y = a, b, c, d
   if type(a) == "number" then rel, rp, x, y = self._parent, p, a, b end
   if type(a) == "string" then rel, rp, x, y = self._parent, a, b, c end
+  H.anchorCheck(self, rel)
   self._points[#self._points + 1] = { p, rel, rp or p, x or 0, y or 0 }
 end
-function Frame:SetAllPoints(rel) self._points = { { "ALL", type(rel) == "table" and rel or nil } } end
+-- Ancrage refusé par le client : sur soi-même, ou sur une région qui dépend (par ses ancres) de celle-ci.
+function H.anchorCheck(self, rel)
+  if type(rel) ~= "table" then return end
+  if rel == self then error("SetPoint : Cannot anchor to itself", 3) end
+  local seen, list = { [rel] = true }, { rel }
+  while #list > 0 do
+    local o = table.remove(list)
+    for _, pt in ipairs(rawget(o, "_points") or {}) do
+      local r = pt[2] or (pt[1] == "ALL" and rawget(o, "_parent")) or nil
+      if r == self then error("SetPoint : Cannot anchor to a region dependent on it", 3) end
+      if type(r) == "table" and not seen[r] then seen[r] = true list[#list + 1] = r end
+    end
+  end
+end
+function Frame:SetAllPoints(rel)
+  H.anchorCheck(self, type(rel) == "table" and rel or rawget(self, "_parent"))
+  self._points = { { "ALL", type(rel) == "table" and rel or nil } }
+end
 function Frame:ClearAllPoints() self._points = {} end
 function Frame:GetPoint(i)
   local pt = self._points[i or 1]
@@ -578,24 +595,76 @@ H.modelDelay = 0.2
 function H.camNow(self)
   return { rawget(self, "_w"), rawget(self, "_h"), effScale(self) }
 end
+-- Modèle déjà chargé une fois depuis le démarrage du client (H.modelCache[nom]) : le vrai client le pose
+-- AUSSITÔT et sonne OnModelLoaded PENDANT l'appel Set… (pile relevée dans Logs/General.log du client
+-- Forever, 16/11/2026 : « [C]: in function 'SetDisplayInfo' » sous le script OnModelLoaded) ; une erreur du
+-- script remonte alors dans l'appelant (rendu du combat). H.asyncCache = true : ancien faux client, toujours
+-- asynchrone. Caméra personnalisée (_customCam) : retombée à celle du modèle à chaque nouveau modèle.
 function H.poseModel(self, name, disp, file)
   if H.noModels then name = nil end
   self._model, self._ready = name, false
+  self._customCam = nil
   self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1
   if not name then return end
   local serial = self._modelSerial
-  local d = (H.slowModels and H.slowModels[name]) or H.modelDelay
-  H.timers[#H.timers + 1] = { at = H.now + d, fn = function()
+  local function deliver()
     local current = rawget(self, "_modelSerial") == serial and rawget(self, "_model") == name
     if not current and not H.lateLoads then return end
     if not current then H.lateDelivered = (H.lateDelivered or 0) + 1 end
     self._model, self._display, self._file, self._ready = name, disp, file, true
     self._cam = H.camNow(self)
     H.modelLoads = (H.modelLoads or 0) + 1
+    H.modelCache[name] = true
     run(self, "OnModelLoaded")
-  end }
+  end
+  if H.modelCache[name] and not H.asyncCache and not (H.slowModels and H.slowModels[name]) then
+    H.syncLoads = (H.syncLoads or 0) + 1
+    return deliver()
+  end
+  local d = (H.slowModels and H.slowModels[name]) or H.modelDelay
+  H.timers[#H.timers + 1] = { at = H.now + d, fn = deliver }
 end
-function Frame:SetUnit(u) self._model, self._ready = "unit:" .. u, true return true end
+function Frame:SetUnit(u) self._model, self._ready, self._customCam = "unit:" .. u, true, nil return true end
+-- Caméra d'un PlayerModel (SimpleModelAPI, client Forever) : GetCameraPosition / GetCameraTarget rendent la
+-- caméra du modèle une fois chargé (nil avant : rien d'affirmé par l'API) ; centre de la boîte englobante
+-- hors de l'origine par défaut (arme tenue d'un côté : _camT). SetCameraPosition / SetCameraTarget LÈVENT
+-- l'erreur du client tant qu'aucune caméra personnalisée n'est active (« PlayerModel:SetCameraPosition(): Not
+-- using a custom camera. », Logs/General.log du 16/11/2026). Rendent une caméra personnalisée :
+-- MakeCurrentCameraCustom (copie de la caméra courante, SimpleModelAPI ; Blizzard l'appelle juste avant
+-- SetCameraPosition : RecruitActivityButtonModelMixin:OnModelLoaded, Model_ApplyUICamera) et
+-- SetCustomCamera(index) (SimpleModelAPI).
+H.CAM_P, H.CAM_T = { 3, 0, 1.2 }, { 0, 0.15, 0.9 }
+function Frame:GetCameraPosition()
+  if not (rawget(self, "_model") and rawget(self, "_ready")) then return nil end
+  local p = rawget(self, "_customCam") and rawget(self, "_camP") or H.CAM_P
+  return p[1], p[2], p[3]
+end
+function Frame:GetCameraTarget()
+  if not (rawget(self, "_model") and rawget(self, "_ready")) then return nil end
+  local t = rawget(self, "_customCam") and rawget(self, "_camT") or H.CAM_T
+  return t[1], t[2], t[3]
+end
+function Frame:MakeCurrentCameraCustom()
+  if not rawget(self, "_customCam") then
+    self._camP, self._camT = { unpack(H.CAM_P) }, { unpack(H.CAM_T) }
+  end
+  self._customCam = true
+end
+function Frame:SetCustomCamera(i)
+  if type(i) ~= "number" then error("SetCustomCamera : nombre attendu") end
+  self:MakeCurrentCameraCustom()
+end
+for _, k in ipairs({ "SetCameraPosition", "SetCameraTarget" }) do
+  local field = k == "SetCameraPosition" and "_camP" or "_camT"
+  Frame[k] = function(self, x, y, z)
+    if not rawget(self, "_customCam") then
+      H.camRefused = (H.camRefused or 0) + 1
+      error(rawget(self, "_kind") .. ":" .. k .. "(): Not using a custom camera.", 2)
+    end
+    if type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then error(k .. " : trois nombres attendus") end
+    self[field] = { x, y, z }
+  end
+end
 function Frame:SetCreature(id)
   if type(id) ~= "number" then error("SetCreature : nombre attendu") end
   self._display = 0
@@ -614,7 +683,7 @@ function Frame:SetModel(file)
     type(file) == "number" and file or 778)
 end
 function Frame:ClearModel()
-  self._model, self._display, self._ready = nil, 0, false
+  self._model, self._display, self._ready, self._customCam = nil, 0, false, nil
   self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1
   H.record(self, "ClearModel")
 end
@@ -763,6 +832,7 @@ function H.boot(db)
   H.cursor = { 500, 300 }
   H.badPaths = H.badPaths or {}
   H.badCreatures = H.badCreatures or {}
+  H.modelCache = {} -- client neuf : aucun modèle en mémoire (H.poseModel)
   H.knownEvents = EVENTS
 
   _G.CreateFrame = function(kind, name, parent, template)
@@ -1517,6 +1587,88 @@ local function transitAvoid(scr)
   local out = { { "nom de la zone", scr.title }, { "texte (soin)", scr.text }, { "Continue", scr.go } }
   for i, p in ipairs(scr.pips) do out[#out + 1] = { "pastille " .. i, p } end
   return out
+end
+
+-- Défaut du 16/11/2026 (Hunter, Westfall, un Defias Highwayman) : bandeau « Victory! » du combat précédent,
+-- bouton inerte, main vide, aucun modèle. Le rendu du nouveau combat levait « PlayerModel:SetCameraPosition():
+-- Not using a custom camera. » (Scene.centerFeet, pendant LayoutEnemies) et s'arrêtait avant la main et le
+-- bandeau. Section en tête : sur un code fautif, elle signale l'erreur au lieu de laisser le harnais tomber.
+print("U0  combat neuf après une victoire, même session (Hunter, Defias Highwayman) : rendu complet, rien du combat précédent")
+do
+  H.boot(nil)
+  H.slash("")
+  local wf = H.ns.Encounters.westfall
+  local easy = wf.easy
+  wf.easy = { { "bandit" } }
+  local function step(f) local ok, err = pcall(f) return ok, tostring(err):sub(1, 160) end
+  local function hunterFight(seed)
+    clickOption("class:hunter")
+    H.ns.Controller.makeSeed = function() return seed end
+    clickOption("go")
+    local e = EXP()
+    local id = e.map.start[1]
+    e.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+  end
+  local ok, err = step(function() hunterFight(SEED) end)
+  check("premier combat du Hunter : rendu et chargement des modèles sans erreur", ok, err)
+  ok, err = step(function()
+    local res = fightUntil(nil, 300)
+    if res ~= "won" then error("combat non gagné : " .. tostring(res)) end
+  end)
+  check("premier combat gagné par l'interface, bandeau « Victory! »", ok and V().banner._shown
+    and V().banner.text._text == "Victory!", err)
+  local m = V().slots[1].model -- emplacement du Defias, rendu au combat suivant
+  check("modèle de l'ennemi chargé et cadré (le cadre le garde pour le combat suivant)", m and m.sceneHasModel
+    and rawget(m, "_ready") == true, m and tostring(m.sceneHasModel))
+  ok, err = step(function()
+    H.click(V().banner.button)
+    UI().toggleOptions()
+    H.click(UI().abandonButton)
+    H.click(UI().abandonButton)
+    clickOption("ui:new")
+    local sync = H.syncLoads or 0
+    hunterFight(SEED + 1)
+    if (H.syncLoads or 0) == sync then error("aucun modèle posé depuis le cache (chargement pendant Set…)") end
+  end)
+  check("nouvelle expédition, premier combat : cadres réutilisés, modèle en cache chargé pendant Set…, aucune erreur", ok, err)
+  local v, c = V(), C().combat()
+  local e1 = c and c.enemies[1]
+  local s = e1 and v.slotOf[e1.uid]
+  check("même écran : aucun bandeau de fin de combat (ni « Victory! » du combat précédent)", c and not C().over()
+    and not v.banner._shown, tostring(v.banner.text._text))
+  check("main affichée, End Turn actif", c and #c.hand > 0 and v.cards[1]._shown and v.endTurn.active == true, c and #c.hand)
+  check("ennemi : Defias Highwayman, intention dans sa case, modèle visible", s and e1.id == "bandit" and s.intent._shown
+    and (s.intent.text._text or "") ~= "" and rawget(s.model, "_ready") == true and ((s.model._calls.SetAlpha or {})[1] or 0) > 0.99,
+    s and (tostring(s.intent.text._text) .. " / alpha " .. tostring((s.model._calls.SetAlpha or {})[1])))
+  -- bandeau resté d'un combat précédent (rendu interrompu, combat suivant) : caché dès l'entrée du combat
+  v.banner:Show()
+  v.endTurn:SetActive(false)
+  v.c = nil
+  local realRE = v.RenderEnemies
+  v.RenderEnemies = function() error("rendu interrompu (essai)") end
+  local okShow = pcall(v.Show, v, UI().step)
+  v.RenderEnemies = realRE
+  check("entrée d'un combat : bandeau et End Turn remis à neuf avant le rendu", not v.banner._shown and v.endTurn.active == true
+    and not okShow)
+  -- bouton du bandeau sans fin de combat : le bandeau disparaît (jamais de bouton inerte)
+  v.banner:Show()
+  H.click(v.banner.button)
+  check("bouton du bandeau sans combat tranché : bandeau retiré, combat rendu", not v.banner._shown and v.cards[1]._shown)
+  -- expédition abandonnée pendant la file d'animations : le dernier tour de file (minuteur déjà posé) ne rend
+  -- plus l'ancien combat (« attempt to index local 'info' », RenderHand, Logs/General.log du 16/11/2026)
+  ok, err = step(function()
+    local played
+    for i = 1, #c.hand do
+      if not played and C().handInfo(i).playable then played = C().play(i, 1) end
+    end
+    if not (played and v.playing) then error("aucune carte jouée, file vide") end
+    C().abandon()
+    H.advance(5)
+  end)
+  check("abandon pendant la file d'animations : aucune erreur au dernier tour de file", ok and currentKind() == "end", err)
+  wf.easy = easy
 end
 
 print("U1  chargement de tous les fichiers du TOC et premier lancement")
