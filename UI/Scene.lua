@@ -1436,8 +1436,9 @@ function S.centerFeet(model)
   local shift = -(tx * rx + ty * ry)  -- origine (0, 0, 0) ramenée sur l'axe de visée
   model.sceneFeetShift = shift
   if math.abs(shift) < 1e-5 then return 0 end
-  model:SetCameraPosition(px + shift * rx, py + shift * ry, pz)
-  model:SetCameraTarget(tx + shift * rx, ty + shift * ry, tz)
+  -- le client refuse ces appels hors caméra personnalisée (« Not using a custom camera ») : sans effet alors
+  if not pcall(model.SetCameraPosition, model, px + shift * rx, py + shift * ry, pz) then return nil end
+  if not pcall(model.SetCameraTarget, model, tx + shift * rx, ty + shift * ry, tz) then return nil end
   return shift
 end
 
