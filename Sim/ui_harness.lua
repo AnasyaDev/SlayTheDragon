@@ -11962,6 +11962,50 @@ do
     check("Bestial Wrath : aperçu de +1 au coût 1 vert, +1 à +3 au coût 1 vert, base au coût 2 blanc",
       table.concat(seen, ", ") == "Bestial Wrath+ 1 vert, Bestial Wrath+ 1 vert, Bestial Wrath+2 1 vert, "
         .. "Bestial Wrath+3 1 vert, Bestial Wrath 2 blanc", table.concat(seen, ", "))
+    do
+      -- plaque d'une carte améliorée : mots qui diffèrent de la carte de base en vert (valeur changée ou mot
+      -- gagné), mots inchangés à leur couleur ; glossaire de l'infobulle = palier montré (aperçu compris)
+      local G = function(w) return W.colorize(w, green) end
+      local sc = W.card(UI().content)
+      local function look(id, up, opts)
+        sc:SetCard(id, up, opts)
+        local tip = table.concat(H.hover(sc), " | ")
+        return sc.name._text, sc.plateText._text, (tip:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")), W.cardBodyText(sc) or ""
+      end
+      local n1, p1, t1 = look("silence", false, { preview = true, showUp = true })
+      check("aperçu de Silence+ : plaque « Cooldown 1 » en vert, glossaire « Cooldown 1 … after 1 turn. »",
+        n1 == "Silence+" and p1 == G("Cooldown 1") and t1:find("Cooldown 1: returns to hand after 1 turn.", 1, true)
+        and not t1:find("Cooldown 2", 1, true), n1 .. " / " .. p1 .. " / " .. t1)
+      local n1b, p1b, t1b = look("silence", 1, {})
+      check("Silence+ au repos : plaque « Cooldown 1 » en vert, glossaire « after 1 turn. »",
+        n1b == "Silence+" and p1b == G("Cooldown 1") and t1b:find("Cooldown 1: returns to hand after 1 turn.", 1, true),
+        n1b .. " / " .. p1b .. " / " .. t1b)
+      local n2, p2, t2 = look("silence", 1, { preview = true, showUp = true })
+      check("aperçu de Silence+2 : « Cooldown 1 » (≠ base) et « Retain » (gagné) en vert, glossaire du palier 2",
+        n2 == "Silence+2" and p2 == G("Cooldown 1") .. " · " .. G("Retain")
+        and t2:find("Cooldown 1: returns to hand after 1 turn.", 1, true) and t2:find("Retain: ", 1, true),
+        n2 .. " / " .. p2 .. " / " .. t2)
+      local n0, p0, t0 = look("silence", false, {})
+      check("Silence de base : plaque « Cooldown 2 » sans couleur, glossaire « after 2 turns. »",
+        n0 == "Silence" and p0 == "Cooldown 2" and t0:find("Cooldown 2: returns to hand after 2 turns.", 1, true),
+        n0 .. " / " .. p0 .. " / " .. t0)
+      local nl, pl = look("luminous_barrier", false, { preview = true, showUp = true })
+      check("aperçu de Luminous Barrier+ (plaque inchangée) : « Cooldown 2 » sans couleur", nl == "Luminous Barrier+"
+        and pl == "Cooldown 2", nl .. " / " .. pl)
+      -- nombres du texte : sans le « Cooldown 2. » de la base (lu sur la plaque) ; clause ajoutée (« Draw 1. »)
+      -- en vert, clause inchangée en blanc
+      local gp = "|cff" .. W.hexOf(green)
+      local _, _, _, b3 = look("luminous_barrier", 3, {})
+      local _, n3 = b3:gsub(gp, "")
+      check("Luminous Barrier+3 : 18, « Draw 1 » ajouté et Atonement 2 en vert (3 nombres verts)",
+        n3 == 3 and b3:find(gp .. "18|r", 1, true) and b3:find("Draw[%s\194\160]*" .. gp .. "1|r")
+        and b3:find(gp .. "2|r", 1, true), b3)
+      local _, _, _, ba = look("apotheosis", 2, {})
+      local _, na = ba:gsub(gp, "")
+      check("Apotheosis+2 : « Draw 1 » ajouté en vert, « +1 mana » inchangé (1 seul nombre vert)", na == 1
+        and ba:find("Draw[%s\194\160]*" .. gp .. "1|r"), ba)
+      sc:Hide()
+    end
     -- aperçu à taille réelle de chaque carte de la grille : languette et chiffre du coût dans la fenêtre,
     -- à PREVIEW_MARGIN du haut au moins
     local R = dofile(root .. "/Sim/ui_render.lua")

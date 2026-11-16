@@ -108,7 +108,10 @@ Règles de forme (contrôlées par `Sim/upgrades.lua`, test « paliers : contrô
 
 ## Interface
 
-- Nom suivi de `+`, `+2`, `+3`, en vert dès le palier 1 ; chiffres qui diffèrent de la carte de base en vert.
+- Nom suivi de `+`, `+2`, `+3`, en vert dès le palier 1 ; chiffres qui diffèrent de la carte de base en vert
+  (texte comparé clause par clause, sans les mots de la plaque ; clause ajoutée : ses chiffres en vert), coût plus
+  bas que la base en vert, mots de la plaque changés ou gagnés en vert (« Cooldown 1 », « Retain »).
+- Glossaire de l'infobulle : celui du palier montré (aperçu compris : « Cooldown 1: … after 1 turn. »).
 - Grille d'amélioration (feu de camp, rencontre) : **toutes** les cartes du deck ; celles qui ne peuvent pas
   monter sont grisées avec leur raison (« Fully upgraded. ») ; survol d'une carte améliorable : son palier
   suivant (chiffres qui changent en vert par rapport au palier actuel), infobulle « Upgraded: » / « Upgraded+2: ».

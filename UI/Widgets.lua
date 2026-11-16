@@ -1873,6 +1873,9 @@ end
 -- l'amélioration (aperçu) et la raison d'un refus. full = nom et texte en plus (pouvoirs, recharges).
 function W.fillCardTooltip(tt, id, up, extra)
   local d = Card.defById(id, up)
+  -- fiche du palier montré par la carte : l'aperçu d'amélioration montre le palier suivant ; le glossaire
+  -- (Cooldown N, mots de règle…) et les rappels suivent la carte montrée, pas la fiche du palier actuel
+  local shown = (extra and extra.preview and Card.canUp(id, up)) and Card.defById(id, Card.level(up) + 1) or d
   if extra and extra.full then
     local rc = Art.rarityText[d.rarity] or Art.rarityText.common
     tt:AddLine(d.name, rc[1], rc[2], rc[3])
@@ -1888,18 +1891,18 @@ function W.fillCardTooltip(tt, id, up, extra)
     for _, l in ipairs(W.cardTextLines(u, Card.defById(id, lv))) do wrap(tt, l, 0.5, 1, 0.5) end
   end
   -- mots-clés : une ligne chacun, en bloc (séparé du reste par une ligne vide)
-  local kws = W.cardKeywords(d)
+  local kws = W.cardKeywords(shown)
   if #kws > 0 and tt:NumLines() > 0 then tt:AddLine(" ") end
   for i = 1, #kws do
     wrap(tt, W.keywordText(kws[i]), 0.85, 0.85, 0.85)
   end
   -- « Spend N » au choix : comment jouer la carte sans dépenser (une ligne)
-  if d.spend then wrap(tt, W.SPEND_HINT, 0.85, 0.85, 0.85) end
+  if shown.spend then wrap(tt, W.SPEND_HINT, 0.85, 0.85, 0.85) end
   -- épique : une seule par expédition ; cartes qu'elle transforme tant qu'elle est dans le deck ; variante :
   -- la carte d'origine
-  if d.rarity == "epic" then
+  if shown.rarity == "epic" then
     wrap(tt, W.EPIC_HINT, 0.85, 0.85, 0.85)
-    for _, l in ipairs(W.transformLines(d)) do wrap(tt, l, 0.85, 0.85, 0.85) end
+    for _, l in ipairs(W.transformLines(shown)) do wrap(tt, l, 0.85, 0.85, 0.85) end
   end
   if extra and extra.from and ns.Cards[extra.from] then
     wrap(tt, "Transformed " .. ns.Cards[extra.from].name .. ".", 0.85, 0.85, 0.85)
@@ -2352,13 +2355,60 @@ end
 -- Garde les « \n » des clauses et le « ⌛ » (posé à la taille du palier par la mise en page).
 -- spendOff : la clause « Spend N: … » est éteinte (gris, chiffres compris) : le bonus ne sera pas payé.
 W.SPEND_OFF_COLOR = C.textDim
-function W.cardBody(d, base, spendOff)
+local function stripPlateWords(d)
   local text = d.text or ""
   for _, k in ipairs(keywordStrip()) do
     if ns.Language.plateWord(k.plate, d) or (k.plate.key == "power" and d.rarity == "epic") then
       text = text:gsub(k.pat, "")
     end
   end
+  return text
+end
+
+-- Nombres du texte affiché qui changent par rapport à base (vrai à l'indice du nombre, dans l'ordre du
+-- texte). Les deux textes sans les mots de la plaque (« Cooldown 2. » se lit sur la plaque, pas dans le
+-- texte). Clause par clause : une clause de même forme dans base (mêmes mots, nombres mis à part) compare
+-- ses nombres un à un ; une clause récrite se compare à la première clause récrite de base, dans l'ordre ;
+-- une clause ajoutée (« Draw 1. » d'un palier) a tous ses nombres en vert.
+local function changedNumbers(text, baseText)
+  local function clauses(t)
+    local out = {}
+    for l in (t .. "\n"):gmatch("(.-)\n") do
+      if l ~= "" then out[#out + 1] = { text = l, shape = l:gsub("%d+", "#") } end
+    end
+    return out
+  end
+  local cur, old = clauses(text), clauses(baseText)
+  local pair, used = {}, {}
+  for i, c in ipairs(cur) do
+    for j, b in ipairs(old) do
+      if not used[j] and b.shape == c.shape then pair[i], used[j] = j, true break end
+    end
+  end
+  local free = 1
+  for i in ipairs(cur) do
+    if not pair[i] then
+      while old[free] and used[free] do free = free + 1 end
+      if old[free] then pair[i], used[free] = free, true end
+    end
+  end
+  local changed, k = {}, 0
+  for i, c in ipairs(cur) do
+    local nums = {}
+    if pair[i] then for n in old[pair[i]].text:gmatch("%d+") do nums[#nums + 1] = n end end
+    local m = 0
+    for n in c.text:gmatch("%d+") do
+      m, k = m + 1, k + 1
+      changed[k] = nums[m] ~= n
+    end
+  end
+  return changed
+end
+W.changedNumbers = changedNumbers
+
+function W.cardBody(d, base, spendOff)
+  local text = stripPlateWords(d)
+  local changed = base and changedNumbers(text, stripPlateWords(base)) or {}
   -- (ligne d'état : le verbe et le nom de l'état peuvent se couper, coupure de second choix de la
   -- mise en page, W.clauseGroups ; plus d'insécable entre eux)
   -- un nom d'état insécable avec son nombre (« DoT 5 », « Sundered 2 ⌛ ») ; « to all » insécable
@@ -2369,12 +2419,11 @@ function W.cardBody(d, base, spendOff)
     end
   end
   text = eachPhrase(text, "to all", function() return "to" .. NBSP .. "all" end)
-  local baseNums = {}
-  if base then for n in (base.text or ""):gmatch("%d+") do baseNums[#baseNums + 1] = n end end
+  -- (les insécables et « to all » n'ajoutent ni ne retirent de chiffre : les indices de changed tiennent)
   local i = 0
   text = text:gsub("%d+", function(n)
     i = i + 1
-    if base and baseNums[i] ~= n then return W.colorize(n, C.upGreen) end
+    if changed[i] then return W.colorize(n, C.upGreen) end
     return W.colorize(n, C.white)
   end)
   -- mots-clés : noms d'états et conditions nommées (une seule couleur d'accent)
@@ -2405,11 +2454,13 @@ function W.cardTextLines(d, base)
   return out
 end
 
--- Mots-clés de la plaque du bas.
-function W.cardPills(d)
+-- Mots-clés de la plaque du bas. base (carte améliorée) : chaque mot qui n'est pas tel quel sur la carte
+-- de base (valeur changée, « Cooldown 2 » → « Cooldown 1 », ou mot gagné, « Retain ») en vert du nom.
+function W.cardPills(d, base)
   local list = {}
   for _, p in ipairs(ns.Language.plates) do
     local w = ns.Language.plateWord(p, d)
+    if w and base and ns.Language.plateWord(p, base) ~= w then w = W.colorize(w, C.upGreen) end
     if w then list[#list + 1] = w end
   end
   return list
@@ -3185,6 +3236,15 @@ end
 -- Pose les mots-clés sur la plaque : premier palier qui tient dans la zone utile à la largeur de
 -- repos ; sinon plaque élargie au plancher ; sinon secours plus petits à la largeur du corps ; sinon
 -- mots-clés abrégés. Mesure par le client (GetUnboundedStringWidth), vérification (IsTruncated).
+-- Mot de la plaque abrégé (W.PLATE_SHORT), couleur d'un mot amélioré gardée (« |cff…Cooldown 1|r »).
+local function shortPill(pl)
+  local color, rest = pl:match("^(|c%x%x%x%x%x%x%x%x)(.*)$")
+  if not color then color, rest = "", pl end
+  local head, tail = rest:match("^(%S+)(.*)$")
+  if not head then return pl end
+  return color .. (W.PLATE_SHORT[head] or head) .. tail
+end
+
 local function fitPlate(b, pills)
   local fs = b.plateText
   local CW = W.CARD_W
@@ -3212,8 +3272,7 @@ local function fitPlate(b, pills)
   if not fit then
     local short = {}
     for i, pl in ipairs(pills) do
-      local head, tail = pl:match("^(%S+)(.*)$")
-      short[i] = (W.PLATE_SHORT[head] or head) .. tail
+      short[i] = shortPill(pl)
     end
     for _, t in ipairs({ text, table.concat(short, " · ") }) do
       for _, s in ipairs(W.PLATE_UNDER) do
@@ -3231,8 +3290,7 @@ local function fitPlate(b, pills)
     local s = W.PLATE_UNDER[#W.PLATE_UNDER]
     local keep = {}
     for i, pl in ipairs(pills) do
-      local head, tail = pl:match("^(%S+)(.*)$")
-      keep[i] = (W.PLATE_SHORT[head] or head) .. tail
+      keep[i] = shortPill(pl)
     end
     local t
     repeat
@@ -3569,10 +3627,14 @@ function W.card(parent)
       end)
     end
     -- plaque du bas : mots-clés ; Instant (la prochaine carte Cast part tout de suite) : « Cast · Instant »
-    local pills = W.cardPills(d)
+    -- palier amélioré (aperçu compris) : mots qui diffèrent de la carte de base en vert (vert du nom), comme
+    -- le coût ; mots inchangés à leur couleur
+    local pills = W.cardPills(d, showUp and ns.Cards[id] or nil)
     if opts.instant then
       local at = #pills + 1
-      for i = 1, #pills do if pills[i] == "Cast" then at = i + 1 break end end
+      for i = 1, #pills do
+        if pills[i]:gsub("^|c%x%x%x%x%x%x%x%x", ""):gsub("|r$", "") == "Cast" then at = i + 1 break end
+      end
       table.insert(pills, at, W.colorize("Instant", W.INSTANT_COLOR))
     end
     -- liseré tenu : Instant (bleu) ou choix de la carte gardée en fin de tour (or)
