@@ -1,7 +1,7 @@
 -- Art du Chasseur : icônes des cartes et des bibelots, voies, classe et ressource (Frenzy), vue de classe
 -- (familier dans la scène, cible du familier, Traps posées).
 -- Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la copie depuis
--- ~/Téléchargements/ICONS) ; `icon` = repli par chemin du client.
+-- le pack d'icônes local) ; `icon` = repli par chemin du client.
 local _, ns = ...
 
 local Art = ns.Art

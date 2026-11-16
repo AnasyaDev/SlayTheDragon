@@ -464,7 +464,7 @@ indiquée.
 ## 10. Modèles et icônes
 
 **Créatures.** `wow_creature_search` répond « No World of Warcraft install found » (le MCP ne connaît pas
-`/mnt/Games/World of Warcraft`). Lancé hors MCP avec `WOW_INSTALL_PATH` (même code, lecture seule), il
+le dossier d'installation du jeu). Lancé hors MCP avec `WOW_INSTALL_PATH` (même code, lecture seule), il
 trouve la base vide sur les clients Forever, Classic Era et Retail : aucune recherche par nom n'aboutit,
 seule la recherche par identifiant d'affichage marche. Les identifiants de créature ci-dessous viennent
 donc de la base Questie locale (fiable, ce sont ceux de Classic) ; **les identifiants d'affichage sont

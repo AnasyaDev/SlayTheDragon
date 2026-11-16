@@ -522,7 +522,7 @@ Art.relics = {
   camp_kettle      = { icon = 133779, tga = "INV_Misc_Cauldron_Fire" },  -- inv_misc_cauldron_fire
   mana_ruby        = { icon = 134128, tga = "INV_Misc_Gem_Ruby_01" },  -- inv_misc_gem_ruby_01
 }
--- Bibelots du Prêtre (Data/Priest.lua ; icônes vérifiées dans ~/Téléchargements/ICONS)
+-- Bibelots du Prêtre (Data/Priest.lua ; icônes vérifiées dans le pack d'icônes local)
 Art.relics.sacred_candle       = { icon = "Interface\\Icons\\inv_misc_candle_02", tga = "INV_Misc_Candle_02" }
 Art.relics.mindtap_talisman    = { icon = "Interface\\Icons\\inv_jewelry_talisman_04", tga = "INV_Jewelry_Talisman_04" }
 Art.relics.benediction         = { icon = "Interface\\Icons\\inv_staff_30", tga = "INV_Staff_30" }

@@ -2,7 +2,7 @@
 -- classe, ressource (Charges), état Ice Block, icône du DoT de feu, et vue de classe
 -- (ns.ClassViews.mage : deuxième incantation en cours, compte Fire du tour sous Hot Streak).
 -- Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la copie depuis
--- ~/Téléchargements/ICONS) ; `spell` = repli par l'icône du sort ; `icon` = repli par chemin du client.
+-- le pack d'icônes local) ; `spell` = repli par l'icône du sort ; `icon` = repli par chemin du client.
 local _, ns = ...
 
 local Art = ns.Art

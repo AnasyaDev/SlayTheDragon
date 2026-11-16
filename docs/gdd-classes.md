@@ -9,7 +9,7 @@
 
 Chaque classe est un jeu de cartes à part, avec sa propre mécanique, comme l'Ironclad, la Silent, le Defect et la Watcher de Slay the Spire. Ce document fixe ce que toutes les classes partagent, puis ce qui rend chacune unique.
 
-Il complète le [GDD général](docs/), qui décrit l'expédition, la méta-progression et l'interface. Il ne les répète pas.
+Il complète le GDD général (notes dans `docs/`), qui décrit l'expédition, la méta-progression et l'interface. Il ne les répète pas.
 
 - **Ce qui est fixé ici :** le fantasme de chaque classe, sa ressource, ses trois voies, ses mots-clés propres et quelques cartes phares qui montrent comment elle se joue.
 - **Ce qui ne l'est pas :** la liste complète des cartes et les chiffres. Les valeurs données sont des ordres de grandeur, à régler par simulation comme pour le Priest.

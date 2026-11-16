@@ -2,7 +2,7 @@
 -- états du héros) qui dit ce que l'épique change pendant le combat. Le reste de l'art du Prêtre (cartes,
 -- bibelots, ressource) est dans UI/Art.lua.
 -- Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la copie depuis
--- ~/Téléchargements/ICONS) ; `spell` = repli par l'icône du sort ; `icon` = FileDataID (vérifiés).
+-- le pack d'icônes local) ; `spell` = repli par l'icône du sort ; `icon` = FileDataID (vérifiés).
 local _, ns = ...
 
 local Art = ns.Art

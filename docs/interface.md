@@ -1864,7 +1864,7 @@ cartes, base et améliorée). Comparé aux planches (`combat_pack.jpg`…) pour 
 
 ## Tests en vol (pour toi)
 
-Préparation : copier le dossier dans `/mnt/Games/World of Warcraft/_forever_/Interface/AddOns/SlayTheDragon`
+Préparation : copier le dossier dans `World of Warcraft/_forever_/Interface/AddOns/SlayTheDragon`
 (commande `rsync` dans `CLAUDE.md`). **Nouveau fichier dans le TOC (`UI\SkinData.lua`) et nouveau dossier
 `Media/` : relancer le client** (`/reload` ne suffit pas). Activer les erreurs Lua
 (`/console scriptErrors 1`) ou BugSack.

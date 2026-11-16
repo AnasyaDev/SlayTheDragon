@@ -3,7 +3,7 @@
 -- du Gryphon Master (Art.ui.map), décors peints (Art.scenes, Art.paintings, Art.palettes) et vue de zone
 -- ns.ZoneViews.wetlands (UI/ZoneView.lua) : primes de meute sous chaque ennemi, Charge de Modr, limon.
 -- Guide : docs/zones.md. Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la
--- copie depuis ~/Téléchargements/ICONS) ; `icon` = repli par chemin du client.
+-- copie depuis le pack d'icônes local) ; `icon` = repli par chemin du client.
 --
 -- Modèles : identifiants lus dans le cache de créatures du client Forever (tools/wdb_creatures.py, 13/11/2026) :
 -- la créature, puis son affichage, puis des affichages de la même famille (repli). Sarltooth et Ormer

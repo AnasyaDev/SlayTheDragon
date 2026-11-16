@@ -1,7 +1,7 @@
 -- Art du contenu commun à toutes les classes : cartes neutres (docs/cartes-neutres.md) et bibelots
 -- communs ajoutés (docs/bibelots-communs.md, bloc à part de Data/Relics.lua).
 -- Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la copie depuis
--- ~/Téléchargements/ICONS) ; `icon` = repli par chemin du client.
+-- le pack d'icônes local) ; `icon` = repli par chemin du client.
 local _, ns = ...
 
 local Art = ns.Art
