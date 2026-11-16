@@ -3976,14 +3976,11 @@ function W.modelAlpha(model, a)
   if model.SetModelAlpha then model:SetModelAlpha(a) end
 end
 
--- Détection d'un modèle absent. SetCreature / SetDisplayInfo ne lèvent aucune erreur pour un
--- identifiant inconnu : le cadre reste simplement vide, et le chargement est asynchrone (une créature
--- absente du cache du client est demandée au serveur). Un essai est jugé réussi si le gestionnaire
--- OnModelLoaded a sonné pour lui, ou si GetModelFileID rend un fichier (ni nil ni 0) MODEL_WAIT
--- secondes plus tard ; sinon l'essai suivant est tenté. Sans aucun modèle, le repli s'affiche, puis
--- une relance tardive (MODEL_LATE) retente la créature ; un OnModelLoaded tardif efface aussi le repli.
-W.MODEL_WAIT = 0.8
-W.MODEL_LATE = 3
+-- Modèles des personnages : essais, attente, chargements tardifs, cadrage dans UI/Scene.lua (S.loadModel,
+-- S.showModel). Ici : le statut public par clé et la présence d'un modèle (GetModelFileID, ni nil ni 0).
+-- L'ancienne chaîne W.setCreatureArt (0,8 s par essai, tout OnModelLoaded crédité au dernier essai
+-- posé) est retirée le 16/11/2026 : un chargement tardif d'une demande abandonnée y passait pour le
+-- candidat suivant.
 W.models = {} -- clé -> { tries = { libellés }, state = "pending" | "ok" | "missing", via = libellé }
 
 local function hasModel(model)
@@ -3992,94 +3989,6 @@ local function hasModel(model)
   return ok and id ~= nil and id ~= 0
 end
 W.hasModel = hasModel
-
--- Essais d'une entrée d'art, dans l'ordre : créature, puis affichage(s) (nombre ou liste).
-function W.modelTries(art)
-  local out = {}
-  if art and art.creature then out[#out + 1] = { "creature", art.creature } end
-  local d = art and art.display
-  if type(d) == "number" then
-    out[#out + 1] = { "display", d }
-  elseif type(d) == "table" then
-    for i = 1, #d do out[#out + 1] = { "display", d[i] } end
-  end
-  return out
-end
-
-function W.tryLabel(t) return (t[1] == "creature" and "creature " or "display ") .. t[2] end
-
-local function applyTry(model, t)
-  if model.ClearModel then model:ClearModel() end
-  if t[1] == "creature" then model:SetCreature(t[2]) else model:SetDisplayInfo(t[2]) end
-end
-
--- OnModelLoaded : gestionnaire des cadres Model (pcall : sans effet si le client ne le connaît pas).
-local function hookLoaded(model)
-  if model.artHooked then return end
-  model.artHooked = true
-  pcall(model.SetScript, model, "OnModelLoaded", function(self)
-    self.loadedToken = self.artToken
-    if self.onArtLoaded then self.onArtLoaded() end
-  end)
-end
-
--- Affiche une créature : essais en chaîne (W.modelTries), puis repli.
--- art = { creature, display } ; key = clé des rapports (/slay art, /slay models) ;
--- onMissing() sans aucun modèle, onFound(libellé) quand un modèle (même tardif) est là.
-function W.setCreatureArt(model, art, key, onMissing, onFound)
-  key = tostring(key)
-  model.dead = false
-  model.artKey = key
-  model.artChain = (model.artChain or 0) + 1
-  model.onArtLoaded = nil
-  local chain = model.artChain
-  hookLoaded(model)
-  local tries = W.modelTries(art)
-  local labels = {}
-  for i = 1, #tries do labels[i] = W.tryLabel(tries[i]) end
-  local status = { tries = labels, state = "pending" }
-  W.models[key] = status
-  local current = 0
-  local function found()
-    if model.artChain ~= chain or status.state == "ok" then return end
-    status.state, status.via = "ok", labels[current]
-    model.onArtLoaded = nil
-    W.missing["model:" .. key] = nil
-    if onFound then onFound(status.via) end
-  end
-  local function missing()
-    status.state = "missing"
-    W.missing["model:" .. key] = true
-    if onMissing then onMissing() end
-  end
-  if #tries == 0 then
-    if model.ClearModel then model:ClearModel() end
-    missing()
-    return
-  end
-  local function attempt(i, onFail)
-    current = i
-    model.artToken = (model.artToken or 0) + 1
-    local token = model.artToken
-    applyTry(model, tries[i])
-    W.delay(W.MODEL_WAIT, function()
-      if model.artChain ~= chain or status.state == "ok" then return end
-      if model.loadedToken == token or hasModel(model) then found() else onFail() end
-    end)
-  end
-  local function run(i)
-    attempt(i, function()
-      if i < #tries then run(i + 1) return end
-      missing()
-      model.onArtLoaded = function() if model.artChain == chain then found() end end
-      W.delay(W.MODEL_LATE, function()
-        if model.artChain ~= chain or status.state == "ok" then return end
-        attempt(1, function() end)
-      end)
-    end)
-  end
-  run(1)
-end
 
 -- Repli d'un modèle absent : médaillon argenté (W.medallion) à l'icône de l'ennemi, sinon disque
 -- sombre (silhouette sobre). Jamais de point d'interrogation.
@@ -4090,19 +3999,4 @@ function W.setFallbackArt(medal, entry)
   icon:SetTexture(nil)
   icon:SetColorTexture(C.slateDark[1], C.slateDark[2], C.slateDark[3], 1)
   return false
-end
-
--- Ennemi : modèle, sinon médaillon de repli (fallback = W.medallion, caché tant qu'un modèle est là).
-function W.setCreature(model, enemyId, fallback)
-  local art = Art.enemies[enemyId]
-  if fallback then
-    fallback:Hide()
-    W.setFallbackArt(fallback, art and art.icon)
-  end
-  model.enemyId = enemyId
-  W.setCreatureArt(model, art, enemyId, function()
-    if fallback then fallback:Show() end
-  end, function()
-    if fallback then fallback:Hide() end
-  end)
 end

@@ -565,40 +565,89 @@ end
 -- s'il est toujours celui du cadre. H.noModels = true : le client ne connaît aucun modèle (créatures,
 -- affichages, fichiers). Fichiers (SetModel) : seuls ceux de H.goodFiles existent (le faux client n'a
 -- pas de feu de camp par défaut : aperçus en repli).
+-- H.lateLoads = true : client défavorable, une demande remplacée (ClearModel, autre Set…) n'est PAS
+-- annulée ; elle arrive quand même à son heure et remplace le modèle du cadre (créature absente du
+-- cache, réponse du serveur après l'abandon de l'essai). Identité rendue par le client : GetDisplayInfo
+-- = l'affichage demandé dès SetDisplayInfo, celui de la créature (H.creatureDisplays[id], sinon
+-- 60000 + id) une fois chargée, 0 sinon ; GetModelFileID, une fois le modèle chargé = le fichier
+-- (FileDataID) d'un SetModel, 777 pour une créature ou un affichage, 778 pour un chemin. Caméra : calculée au chargement pour la taille
+-- et l'échelle effective du cadre à ce moment (_cam), recalculée seulement par RefreshCamera ; position,
+-- échelle du modèle et animation sont des réglages du CADRE, gardés d'un modèle à l'autre.
 H.modelDelay = 0.2
-local function poseModel(self, name)
+local function camNow(self)
+  return { rawget(self, "_w"), rawget(self, "_h"), effScale(self) }
+end
+local function poseModel(self, name, disp, file)
   if H.noModels then name = nil end
-  self._model = name
+  self._model, self._ready = name, false
   self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1
   if not name then return end
   local serial = self._modelSerial
   local d = (H.slowModels and H.slowModels[name]) or H.modelDelay
   H.timers[#H.timers + 1] = { at = H.now + d, fn = function()
-    if rawget(self, "_modelSerial") == serial and rawget(self, "_model") == name then
-      H.modelLoads = (H.modelLoads or 0) + 1
-      run(self, "OnModelLoaded")
-    end
+    local current = rawget(self, "_modelSerial") == serial and rawget(self, "_model") == name
+    if not current and not H.lateLoads then return end
+    if not current then H.lateDelivered = (H.lateDelivered or 0) + 1 end
+    self._model, self._display, self._file, self._ready = name, disp, file, true
+    self._cam = camNow(self)
+    H.modelLoads = (H.modelLoads or 0) + 1
+    run(self, "OnModelLoaded")
   end }
 end
-function Frame:SetUnit(u) self._model = "unit:" .. u return true end
+function Frame:SetUnit(u) self._model, self._ready = "unit:" .. u, true return true end
 function Frame:SetCreature(id)
   if type(id) ~= "number" then error("SetCreature : nombre attendu") end
-  poseModel(self, (not H.badCreatures[id]) and ("creature:" .. id) or nil)
+  self._display = 0
+  poseModel(self, (not H.badCreatures[id]) and ("creature:" .. id) or nil,
+    (H.creatureDisplays and H.creatureDisplays[id]) or (60000 + id), 777)
 end
 function Frame:SetDisplayInfo(id)
   if type(id) ~= "number" then error("SetDisplayInfo : nombre attendu") end
-  poseModel(self, (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil)
+  self._display = id
+  poseModel(self, (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil, id, 777)
 end
 function Frame:SetModel(file)
   if type(file) ~= "number" and type(file) ~= "string" then error("SetModel : fichier attendu") end
-  poseModel(self, (H.goodFiles and H.goodFiles[file]) and ("file:" .. tostring(file)) or nil)
+  self._display = 0
+  poseModel(self, (H.goodFiles and H.goodFiles[file]) and ("file:" .. tostring(file)) or nil, 0,
+    type(file) == "number" and file or 778)
 end
-function Frame:ClearModel() self._model = nil self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1 end
-function Frame:GetModelFileID() return self._model and 777 or nil end
+function Frame:ClearModel()
+  self._model, self._display, self._ready = nil, 0, false
+  self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1
+  H.record(self, "ClearModel")
+end
+-- fichier connu une fois le modèle chargé seulement (créature absente du cache : rien avant la réponse)
+function Frame:GetModelFileID() return (self._model and self._ready) and (rawget(self, "_file") or 777) or nil end
+function Frame:GetDisplayInfo() return rawget(self, "_display") or 0 end
+function Frame:RefreshCamera()
+  self._cam = camNow(self)
+  self._camRefreshes = (rawget(self, "_camRefreshes") or 0) + 1
+end
+function Frame:SetPosition(x, y, z)
+  if type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then error("SetPosition : trois nombres attendus") end
+  self._pos = { x, y, z }
+  H.record(self, "SetPosition", x, y, z)
+end
+function Frame:GetPosition()
+  local p = rawget(self, "_pos") or { 0, 0, 0 }
+  return p[1], p[2], p[3]
+end
+function Frame:SetModelScale(v)
+  if type(v) ~= "number" then error("SetModelScale : nombre attendu") end
+  self._modelScale = v
+  H.record(self, "SetModelScale", v)
+end
+function Frame:GetModelScale() return rawget(self, "_modelScale") or 1 end
 function Frame:SetAnimation(a)
   if type(a) ~= "number" then error("SetAnimation : nombre attendu") end
   self._anim = a
   H.anims[#H.anims + 1] = a
+end
+-- Caméra du modèle calculée pour la taille et l'échelle effective ACTUELLES du cadre.
+function H.cameraFits(m)
+  local c, now = rawget(m, "_cam"), camNow(m)
+  return c ~= nil and c[1] == now[1] and c[2] == now[2] and math.abs(c[3] - now[3]) < 1e-9
 end
 
 -- Messages défilants
@@ -634,7 +683,7 @@ end
 local EVENTS = {}
 for e in ([[ADDON_LOADED PLAYER_LOGIN PLAYER_ENTERING_WORLD PLAYER_LOGOUT PLAYER_REGEN_DISABLED
 PLAYER_REGEN_ENABLED PLAYER_CONTROL_LOST PLAYER_CONTROL_GAINED TAXIMAP_CLOSED TAXIMAP_OPENED
-MODIFIER_STATE_CHANGED]]):gmatch("%S+") do
+MODIFIER_STATE_CHANGED UI_SCALE_CHANGED DISPLAY_SIZE_CHANGED]]):gmatch("%S+") do
   EVENTS[e] = true
 end
 
@@ -8189,6 +8238,185 @@ do
   check("rencontre : préchargement des ennemis des combats qu'elle peut lancer, feu de camp gardé", fightOk,
     EXP().event.id .. " : " .. #need .. " ennemi(s)")
   H.badCreatures = {}
+end
+
+-- UL : retour en jeu du 16/11/2026 (Swamp of Sorrows) : Wyrmkin Dreamwalker « cassé », presque tout hors
+-- de son cadre, un fragment en bas à gauche, ombre en place, à côté d'un Green Scalebane correct ; gagnant
+-- mémorisé « display 7976 ». Faux client défavorable (H.lateLoads) : une demande abandonnée arrive quand
+-- même et remplace le modèle du cadre. L'ancienne chaîne créditait tout OnModelLoaded au dernier candidat
+-- posé (gagnant mémorisé à tort), ne reposait pas le candidat validé, ne recadrait rien (caméra, position,
+-- échelle, animation de mort d'un cadre réutilisé, emplacement passé de 0,86 à 1).
+print("UL  modèles arrivés en retard : demande abandonnée qui arrive après le passage au candidat suivant, cadre réutilisé après une mort, recadrage")
+do
+  freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local Sc, W, Art = ns.Scene, ns.Widgets, ns.Art
+  local A = Art.anim
+  local function fight(ids)
+    local c = C().combat()
+    c.enemies = {}
+    for i = 1, #ids do
+      if not ns.Combat.spawn(c, ids[i]) then
+        local e = deepcopy(c.enemies[1])
+        e.uid, e.id, e.mem = c.nextUid, ids[i], {}
+        e.intent = ns.Enemies[ids[i]].pattern[1]
+        c.nextUid = c.nextUid + 1
+        c.enemies[#c.enemies + 1] = e
+      end
+    end
+    local v = V()
+    v.c = nil
+    v:Show({ state = c })
+    return v, c
+  end
+  local function slotOf(v, id)
+    for _, s in pairs(v.slotOf) do
+      for _, e in ipairs(v.c.enemies) do if e.uid == s.uid and e.id == id then return s, e end end
+    end
+  end
+  local function fresh()
+    Sc.won, Sc.failed, Sc.lost = {}, {}, {}
+    ns.Persist.options().modelWins = {}
+  end
+  local function won(k) return Sc.won[k] or ns.Persist.options().modelWins[k] end
+  local function alpha(m) return m._calls.SetAlpha and m._calls.SetAlpha[1] end
+  local function neutral(m)
+    local x, y, z = m:GetPosition()
+    return x == 0 and y == 0 and z == 0 and m:GetModelScale() == 1
+  end
+  local function said() return table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n") end
+  local WY = "wyrmkin_dreamwalker"
+  check("données : Wyrmkin Dreamwalker = créature 743, affichages 7976 puis 8309",
+    Art.enemies[WY].creature == 743 and table.concat(Art.enemies[WY].display, ",") == "7976,8309")
+
+  -- 1. la créature (absente du cache) arrive après l'abandon, pendant l'essai de l'affichage 7976 qui
+  -- n'existe pas : elle ne doit pas le valider
+  fresh()
+  H.lateLoads = true
+  H.badDisplays = { [7976] = true }
+  H.creatureDisplays = { [743] = 9001 } -- affichage que le serveur annonce : aucun des deux déclarés
+  H.slowModels = { ["creature:743"] = Sc.MODEL_WAIT + 0.5 }
+  local late0 = H.lateDelivered or 0
+  local v = fight({ WY })
+  local s = slotOf(v, WY)
+  local m = s.fig.model
+  H.advance(Sc.MODEL_WAIT + 0.8)
+  check("faux client : la créature abandonnée est bien arrivée en retard", (H.lateDelivered or 0) > late0)
+  check("créature arrivée pendant l'essai de display 7976 : 7976 ni validé ni mémorisé",
+    won(WY) ~= "display 7976" and W.models[WY].via ~= "display 7976",
+    tostring(won(WY)) .. " / " .. tostring(W.models[WY].via))
+  check("chargement étranger compté sur le cadre (diagnostic)", (m.sceneLate or 0) >= 1, m.sceneLate)
+  H.advance(Sc.MODEL_WAIT + 1)
+  check("la chaîne continue : display 8309 validé, mémorisé, seul modèle du cadre, caméra à sa taille",
+    W.models[WY].state == "ok" and W.models[WY].via == "display 8309" and won(WY) == "display 8309"
+    and m._model == "display:8309" and H.cameraFits(m) and alpha(m) == 1,
+    tostring(W.models[WY].via) .. " " .. tostring(won(WY)) .. " " .. tostring(m._model))
+
+  -- 2. la créature arrive APRÈS la validation de display 7976 (déjà affiché) : le candidat validé est
+  -- reposé, cadré ; le cadre ne garde pas le modèle tardif
+  fresh()
+  H.badDisplays = {}
+  v = fight({ WY })
+  s = slotOf(v, WY)
+  m = s.fig.model
+  H.advance(Sc.MODEL_WAIT + 0.3)
+  check("display 7976 validé avant l'arrivée de la créature", W.models[WY].via == "display 7976"
+    and won(WY) == "display 7976", W.models[WY].via)
+  local loads0 = m.sceneLoads or 0
+  H.advance(0.7)
+  check("créature arrivée après la validation : display 7976 reposé, le modèle tardif ne reste pas",
+    m._model == "display:7976" and W.models[WY].via == "display 7976" and won(WY) == "display 7976", m._model)
+  check("chaque chargement reçu est cadré : caméra recalculée à la taille du cadre, position et échelle neutres",
+    H.cameraFits(m) and neutral(m) and (m._camRefreshes or 0) > 0 and (m.sceneLoads or 0) >= loads0 + 2)
+  check("diagnostic du cadre : chargement tardif compté", m.sceneLate == 1, m.sceneLate)
+  -- /slay models : les cadres du combat en cours d'abord (de quoi attraper le défaut), puis l'aperçu
+  _G.DEFAULT_CHAT_FRAME._lines = {}
+  H.lateLoads, H.slowModels, H.creatureDisplays = nil, nil, nil
+  local lines = v.CombatModelLines and v:CombatModelLines() or {}
+  local line = lines[2] or ""
+  check("/slay models : ligne du cadre en combat (candidat, modèle porté, position, échelle, chargements, tardif)",
+    lines[1] == "combat frames:" and line:find(WY .. ": via display 7976; display 7976 file 777; pos 0,0,0; scale 1; loads ", 1, true)
+    and line:find("late 1 (creature 743)", 1, true), line)
+  H.slash("models")
+  H.advance(8 * Sc.MODEL_WAIT + 1)
+  check("/slay models : cadres du combat écrits au chat", said():find("combat frames:", 1, true)
+    and said():find(WY .. ": via display 7976", 1, true), said():sub(1, 300))
+  local diagOk = true
+  for _, pm in ipairs(V().preview.models) do
+    local st = W.models[pm.key]
+    if st and st.state == "ok" and not pm.fire and not ((pm.diag and pm.diag._text or ""):find("pos 0,0,0 scale 1 loads", 1, true)) then
+      diagOk = false
+    end
+  end
+  check("aperçu : diagnostic sous chaque modèle chargé (fichier, position, échelle, chargements)", diagOk)
+  check("aperçu : rien d'anormal signalé sans chargement tardif", not said():find("late load", 1, true))
+  V().preview:Hide()
+
+  -- 3. cadre réutilisé après une mort : animation de mort, position et échelle laissées par le modèle
+  -- précédent ; le nouveau modèle est debout, au neutre, caméra recalculée
+  fresh()
+  H.badDisplays = {}
+  v = fight({ "murloc", "harvest_golem" })
+  H.advance(0.5)
+  local gs, ge = slotOf(v, "harvest_golem")
+  local gm = gs.fig.model
+  ge.hp, ge.dead = 0, true
+  v:OnEvents({ { t = "death", unit = ge.uid } })
+  H.advance(5)
+  gm:SetPosition(0.6, -0.4, 0.3)
+  gm:SetModelScale(0.45)
+  check("mort : animation de mort sur le cadre de l'ennemi", gm._anim == A.death and gm.dead == true, gm._anim)
+  v = fight({ "murloc", WY })
+  local reuse
+  for _, sl in pairs(v.slotOf) do if sl == gs then reuse = sl end end
+  H.advance(0.8)
+  check("cadre de l'ennemi mort réutilisé au combat suivant", reuse ~= nil)
+  check("cadre réutilisé : modèle debout, position et échelle neutres, caméra à sa taille, visible",
+    reuse and gm._anim == A.stand and neutral(gm) and H.cameraFits(gm) and not gm.dead and alpha(gm) == 1,
+    tostring(gm._anim) .. " " .. table.concat({ gm:GetPosition() }, ",") .. " x" .. tostring(gm:GetModelScale()))
+
+  -- 4. emplacement passé de 0,86 (5 ennemis) à 1 (un mort) : modèles déjà chargés recadrés
+  fresh()
+  v = fight({ "murloc", "murloc", "murloc", "murloc", "murloc" })
+  H.advance(0.5)
+  local fits5 = true
+  for _, sl in pairs(v.slotOf) do if not H.cameraFits(sl.fig.model) then fits5 = false end end
+  check("cinq ennemis : emplacements à 0,86, caméras à cette échelle", fits5)
+  local dead = v.c.enemies[1]
+  dead.hp, dead.dead = 0, true
+  v:OnEvents({ { t = "death", unit = dead.uid } })
+  H.advance(5)
+  local fits4, n4 = true, 0
+  for _, sl in pairs(v.slotOf) do
+    if sl:IsShown() then
+      n4 = n4 + 1
+      if not (sl:GetScale() == 1 and H.cameraFits(sl.fig.model)) then fits4 = false end
+    end
+  end
+  check("quatre ennemis : emplacements à 1, caméras recalculées à la nouvelle échelle", n4 == 4 and fits4, n4)
+
+  -- 5. cadre réutilisé avant l'arrivée de la créature précédente (créature contre créature, rien ne les
+  -- distingue au chargement) : candidat affiché sans être mémorisé ; la créature tardive est écartée
+  fresh()
+  H.lateLoads = true
+  H.slowModels = { ["creature:743"] = 1.5 }
+  v = fight({ WY })
+  s = slotOf(v, WY)
+  m = s.fig.model
+  H.advance(0.5)
+  v = fight({ "green_scalebane" })
+  local gsb = slotOf(v, "green_scalebane")
+  H.advance(0.4)
+  check("même cadre (emplacement 1) réutilisé avant l'arrivée de la créature 743", gsb == s)
+  check("Green Scalebane affiché (créature 744) mais pas mémorisé tant que 743 peut arriver",
+    m._model == "creature:744" and W.models.green_scalebane.via == "creature 744"
+    and won("green_scalebane") == nil and W.models.green_scalebane.unsure == true, tostring(won("green_scalebane")))
+  H.advance(1.5)
+  check("créature 743 arrivée en retard : écartée, 744 reposée et alors mémorisée",
+    m._model == "creature:744" and (m.sceneLate or 0) >= 1 and won("green_scalebane") == "creature 744"
+    and not W.models.green_scalebane.unsure and H.cameraFits(m), tostring(m._model) .. " " .. tostring(won("green_scalebane")))
+  H.lateLoads, H.slowModels, H.creatureDisplays, H.badDisplays = nil, nil, nil, nil
 end
 
 -- UC : retours en jeu du 12/11/2026 (main du Mage, fenêtre à 115 %). Frostbolt : « Deal 6. » / « Apply » /

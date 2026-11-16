@@ -679,7 +679,8 @@ Stonefield 252, Elwynn : aucun enfant nommé de la Marche connu) et Tobin guette
   `S.MODEL_WAIT` = **2 s** ; fichier : `OnModelLoaded` seulement (si le client a ce script : un fichier
   absent pourrait être « vu » par `GetModelFileID`). Après l'échec de tous : repli, puis 2 tours de
   relance de **tous** les candidats (4 s entre deux), puis le premier reste posé (un `OnModelLoaded`
-  tardif le valide).
+  tardif le valide). Depuis le 16/11/2026, un `OnModelLoaded` ne valide un candidat que si le modèle
+  arrivé est bien le sien (`S.judgeLoad`, voir « Modèles arrivés en retard » plus bas).
 - Pourquoi 2 s : 0,8 s abandonnait des premiers chargements de plus d'une seconde ; le délai ne coûte
   rien quand le modèle charge (validé à l'`OnModelLoaded`) ni quand le gagnant est connu ; il ne retarde
   que l'abandon d'un candidat qui échoue vraiment.
@@ -693,8 +694,9 @@ Stonefield 252, Elwynn : aucun enfant nommé de la Marche connu) et Tobin guette
   `art.icon`, au-dessus du modèle) n'apparaît qu'après l'échec de **tous** les candidats et s'efface si
   un modèle arrive. Texte, réponses, cartes et boutons ne l'attendent jamais. Pour les ennemis
   (`S.enemyFigure`, `UI/CombatView.lua`), les PNJ (`S.npcFigure`), le familier (`UI/Art/hunter.lua`), le
-  feu. Les cadres gardent leur modèle cachés (`SetKeepModelOnHide(true)`). `W.setCreatureArt` et
-  `W.MODEL_WAIT` (`UI/Widgets.lua`) ne servent plus.
+  feu. Les cadres gardent leur modèle cachés (`SetKeepModelOnHide(true)`). `W.setCreatureArt`,
+  `W.setCreature`, `W.MODEL_WAIT` et `W.MODEL_LATE` (`UI/Widgets.lua`, ancienne chaîne) sont retirés le
+  16/11/2026.
 - **Préchargement** (`S.preload`, `S.nextNeeds`) : à chaque affichage du parcours (étapes accessibles
   connues ; au départ de l'expédition c'est le premier écran), cadres de modèle créés une fois et
   réutilisés, enfants d'`UIParent`, **montrés à alpha 0** dans l'écran (un `PlayerModel` caché libère
@@ -730,10 +732,102 @@ Stonefield 252, Elwynn : aucun enfant nommé de la Marche connu) et Tobin guette
 
 ### `/slay models`
 
-Galerie (ennemis, chaque `npc` des rencontres, familier, feu de camp) puis, quand plus rien n'est en
-cours (au plus 60 s), au chat : « models: N/M loaded, K on fallback: » et **une ligne par modèle** :
-`clé (nom): display 1691` (candidat chargé, « (declared first: creature 235) » si d'autres ont échoué
-avant), `clé (nom): fallback (no model: creature 619, display 2329, …)`, ou `loading (…)`.
+D'abord, si un combat est affiché, les **cadres du combat en cours** au chat (avant que la galerie ne
+les couvre ; de quoi attraper un modèle « cassé » en jeu) : « combat frames: » puis une ligne par
+ennemi, `clé: via display 7976; display 7976 file 123456; pos 0,0,0; scale 1; loads 1[; late 1
+(creature 743)]` (`Scene.modelDiag` : candidat validé, « (unverified) » s'il est chargé sans preuve
+d'identité ; affichage et fichier réellement portés, `GetDisplayInfo` / `GetModelFileID` ; position,
+`GetPosition` ; échelle, `GetModelScale` ; chargements reçus depuis la pose du personnage ;
+chargements étrangers écartés et la demande reconnue).
+Puis la galerie (ennemis, chaque `npc` des rencontres, familier, feu de camp) ; sous chaque case, nom,
+identifiants, état, et une ligne de diagnostic compacte (`display 2029 file 777 pos 0,0,0 scale 1 loads
+1`, en rouge s'il y a eu un chargement étranger). Quand plus rien n'est en cours (au plus 60 s), au
+chat : « models: N/M loaded, K on fallback: » et **une ligne par modèle** : `clé (nom): display 1691`
+(candidat chargé, « (declared first: creature 235) » si d'autres ont échoué avant, « (unverified) »
+s'il n'est pas prouvé), `clé (nom): fallback (no model: creature 619, display 2329, …)`, ou
+`loading (…)` ; en fin de ligne, seulement s'il y a lieu : `[late load x1 (creature 743); pos …;
+scale …]` (`Scene.modelAnomaly`).
+
+### Modèles arrivés en retard (16/11/2026)
+
+Retour en jeu : en combat, un modèle d'ennemi parfois « cassé », presque tout hors de son cadre, un
+fragment en bas à gauche, ombre à sa place (Wyrmkin Dreamwalker, Swamp of Sorrows, à côté d'un Green
+Scalebane correct ; gagnant mémorisé « display 7976 » ; intermittent).
+
+**Ce que dit le code d'avant** (lecture, non reproductible hors jeu) :
+- `hookLoaded` créditait **tout** `OnModelLoaded` au dernier candidat posé (`sceneLoaded =
+  sceneToken`). Si la créature 743 (absente du cache : réponse du serveur) arrive après l'abandon de
+  son essai (2 s), pendant l'essai de l'affichage 7976, c'est 7976 qui est validé et mémorisé, même
+  si 7976 n'existe pas dans ce client (le harnais UL le reproduit : l'ancien code mémorise
+  exactement « display 7976 »). Arrivée après la validation : le cadre garde le modèle tardif, rien ne
+  le remarque.
+- Rien ne remettait le cadre au neutre ni ne recadrait : caméra calculée au chargement et jamais
+  recalculée (`RefreshCamera` absent), alors que Blizzard la recalcule à chaque `OnModelLoaded` et à
+  chaque changement d'échelle (`TalkingHeadFrameModelMixin`, `Model_OnEvent`) ; emplacement passé de
+  0,86 (5 ennemis) à 1 avec les modèles chargés ; animation de mort d'un cadre d'ennemi réutilisé
+  au combat suivant ; position et échelle laissées par un modèle précédent.
+- Cause du défaut vu en jeu **non prouvée** : ces deux faiblesses l'expliquent toutes deux (modèle
+  d'une demande abandonnée, ou modèle montré avec une caméra calculée pour une autre taille), mais le
+  comportement du client (une demande remplacée est-elle annulée ? `GetDisplayInfo` suit-il le modèle
+  arrivé en retard ?) n'est vérifiable qu'en jeu.
+
+**API (wow_api_search, client Forever ; source de l'interface Forever non synchronisée, lue sur
+mainline)** : `RefreshCamera`, `SetCamDistanceScale`, `SetPortraitZoom`, `SetAnimation`,
+`GetDisplayInfo`, `SetCreature`, `SetDisplayInfo` (CharacterModelBase) ; `SetPosition`, `GetPosition`,
+`SetModelScale`, `GetModelScale`, `GetModelFileID`, `SetViewInsets` (SimpleModelAPI) ; événements
+`UI_SCALE_CHANGED`, `DISPLAY_SIZE_CHANGED`. Toutes appelées sous garde `if m.Methode then` (lectures
+par `pcall`).
+
+**Mécanisme (`UI/Scene.lua`)** :
+- Chaque pose est une **demande** (`model.sceneReq` : genre, identifiant, jeton) ; une demande
+  remplacée avant son chargement devient **orpheline** (`model.sceneOrphans`, 16 au plus, oubliée
+  après `S.ORPHAN_TTL` = 60 s).
+- `S.judgeLoad` à chaque `OnModelLoaded` : affichage → `GetDisplayInfo()` doit rendre l'affichage
+  demandé (Blizzard compare de même `GetDisplayInfo()` avant de reposer un modèle,
+  `TalkingHeadFrameMixin:PlayCurrent`) ; fichier (FileDataID) → `GetModelFileID()` ; créature déjà
+  chargée → son affichage relevé au premier chargement ; un affichage orphelin se reconnaît à son
+  identifiant. Verdicts : **mine** (validé, mémorisé), **foreign** (chargement étranger : la demande
+  en cours est reposée, même jeton, `S.REPOSE_MAX` = 3 fois par chaîne ; rien n'est validé ; compté
+  dans `model.sceneLate`), **unsure** (aucune preuve : créature ou chemin de fichier alors qu'une autre
+  demande abandonnée peut encore arriver, ou identifiant rendu différent sans orphelin pour
+  l'expliquer, ou client sans ces fonctions) : modèle gardé et affiché, **jamais mémorisé** ; s'il est
+  prouvé plus tard (rechargé une fois l'orphelin arrivé), il est mémorisé alors.
+- Sans `OnModelLoaded` (client sans ce script) : `GetModelFileID` au bout de `MODEL_WAIT`, puis le même
+  jugement.
+- **État neutre à chaque pose** (`S.resetModel`) : `ClearModel`, `SetPosition(0, 0, 0)`,
+  `SetModelScale(1)`, `SetCamDistanceScale(1)`, `SetPortraitZoom(0)`, attente debout (sauf mort),
+  retour à l'attente prévu par `W.anim` annulé.
+- **Cadrage après chaque chargement reçu**, le nôtre ou un étranger (`S.frameModel`) :
+  `RefreshCamera`, position et échelle neutres, orientation du personnage (`model.sceneFacing`, tenue à
+  jour par `CombatView:ApplyFacing`), attente debout, puis le cadrage propre du cadre
+  (`model.sceneFraming` : le feu de camp passe `S.fireCam`, qui pose échelle et hauteur, `1` et `0` sans
+  réglage, et son orientation). Recadrage sans toucher à l'animation après `S.setWide` /
+  `S.setFigureSize`, quand l'emplacement change d'échelle (`S.refreshFigure`, `LayoutEnemies`), et à
+  `UI_SCALE_CHANGED` / `DISPLAY_SIZE_CHANGED`.
+- Préchargement : un cadre rendu au réservoir passe par `S.releaseModel` (sa demande devient orpheline).
+- Non couvert : l'échelle de la fenêtre de l'addon (`/slay` options, `UI.frame:SetScale`) ne recadre
+  pas les modèles affichés (le prochain chargement le fait).
+
+**Faux client** (`Sim/ui_harness.lua`) : `GetDisplayInfo` (affichage demandé dès `SetDisplayInfo`,
+celui de la créature une fois chargée, `H.creatureDisplays`), `GetModelFileID` seulement une fois le
+modèle chargé, `GetPosition` / `GetModelScale`, `RefreshCamera` ; caméra calculée au chargement pour
+la taille et l'échelle effective du moment (`H.cameraFits`) ; position, échelle et animation gardées
+d'un modèle à l'autre ; `H.lateLoads` : client défavorable, une demande remplacée arrive quand même.
+
+**Harnais UL** (22 contrôles ; 13 échouent sur l'ancien code) : créature arrivée pendant l'essai de
+7976 (inexistant) → 7976 ni validé ni mémorisé, chaîne qui continue jusqu'à 8309 ; créature arrivée
+après la validation de 7976 → 7976 reposé et cadré, tardif compté ; ligne `combat frames:` de
+`/slay models` et diagnostic sous chaque case ; cadre d'un ennemi mort réutilisé (animation de mort,
+position et échelle dérangées) → debout, neutre, caméra à sa taille ; passage de 5 à 4 ennemis →
+caméras recalculées à l'échelle 1 ; cadre réutilisé avant l'arrivée de la créature précédente →
+Green Scalebane affiché sans être mémorisé, puis mémorisé une fois la créature 743 écartée.
+
+**À vérifier en jeu** : que le défaut ne revient pas (sinon `/slay models` en combat, ligne `combat
+frames:` à recopier) ; le comportement réel du client sur une demande remplacée (`late` dans le
+diagnostic : des chargements étrangers existent bien) ; que `GetDisplayInfo` rend l'affichage
+d'une créature chargée (sinon les créatures restent « unverified » quand un orphelin est en route) ;
+que `RefreshCamera` + `SetPosition(0, 0, 0)` + `SetModelScale(1)` ne changent pas le cadrage habituel
+des personnages ; le feu de camp (`/slay fire`) toujours cadré comme avant.
 
 ### Harnais (UF, et U15, U21, U28 adaptés)
 

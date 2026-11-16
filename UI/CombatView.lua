@@ -697,7 +697,8 @@ function V:ApplyFacing()
   if self.playerModel and self.playerModel.SetFacing then self.playerModel:SetFacing(opts().facingPlayer or 0.6) end
   for i = 1, #(self.slots or {}) do
     local m = self.slots[i].model
-    if m.SetFacing then m:SetFacing(opts().facingEnemy or -0.6) end
+    m.sceneFacing = opts().facingEnemy or -0.6 -- réappliquée après chaque chargement (Scene.frameModel)
+    if m.SetFacing then m:SetFacing(m.sceneFacing) end
   end
 end
 
@@ -803,7 +804,11 @@ function V:LayoutEnemies()
     -- personnage agrandi (art.scale) : l'emplacement remonte, les pieds restent sur la même ligne
     s.top = ENEMY_TOP + ((k % 2 == 0) and ENEMY_STAGGER or 0) - Scene.TOP - ((s.figH or FIG_H) - FIG_H)
     local sc = n >= 5 and 0.86 or 1
-    s:SetScale(sc)
+    if s:GetScale() ~= sc then
+      s:SetScale(sc)
+      -- modèle déjà chargé (le cinquième ennemi arrive ou meurt) : caméra recalculée à la nouvelle échelle
+      Scene.refreshFigure(s.fig)
+    end
     -- cadre compact : ordinaire, ou d'élite / boss (dragon d'or) ; jamais plus large que l'écart
     local def = ns.Enemies[e.id]
     setUnitFrame(s, def.boss or def.elite, min(FRAME_W, spacing / sc - 8))
@@ -1943,7 +1948,7 @@ function V:PreviewEnemies()
     local cellW = (UI.CONTENT_W - 20 - 24) / cols
     local rowH = min(236, (UI.CONTENT_H - 60 - 36 - 50) / max(1, rows))
     local figW = min(150, cellW - 8)
-    local figH = min(170, rowH - 52)
+    local figH = min(170, rowH - 63) -- trois lignes sous le modèle : nom, identifiants, état ; diagnostic
     for k = 1, #list do
       local e = list[k]
       local col, row = (k - 1) % cols, floor((k - 1) / cols)
@@ -1974,6 +1979,11 @@ function V:PreviewEnemies()
       m.state:SetPoint("TOP", ids, "BOTTOM", 0, -1)
       m.state:SetWidth(cellW - 4)
       m.state:SetWordWrap(false)
+      -- diagnostic du cadre (Scene.modelDiag) : modèle réellement porté, position, échelle, chargements
+      m.diag = W.label(top, "body", 9, C.textDim)
+      m.diag:SetPoint("TOP", m.state, "BOTTOM", 0, -1)
+      m.diag:SetWidth(cellW - 4)
+      m.diag:SetWordWrap(false)
       m.id, m.key, m.art, m.npc, m.fire, m.fallback, m.label, m.fig = e.id, e.key, e.art, e.npc, e.fire,
         fig.fallback, e.name, fig
       p.models[k] = m
@@ -1982,9 +1992,13 @@ function V:PreviewEnemies()
     close:SetPoint("BOTTOMRIGHT", -16, 16)
     self.preview = p
   end
+  -- cadres du combat en cours, avant que l'aperçu ne les couvre : de quoi attraper un modèle « cassé »
+  local live = self:CombatModelLines()
+  for i = 1, #live do UI.say(i == 1 and live[i] or ("  " .. live[i])) end
   self.preview:Show()
   for k = 1, #self.preview.models do
     local m = self.preview.models[k]
+    m.diag:SetText("")
     m.state:SetText("loading")
     m.state:SetTextColor(C.textDim[1], C.textDim[2], C.textDim[3])
     if m.fire then
@@ -2026,12 +2040,28 @@ function V:ModelReportLines()
     local m = models[k]
     local st = W.models[m.key]
     if st and st.state == "ok" then ok = ok + 1 elseif st and st.state == "missing" then lost = lost + 1 end
-    body[#body + 1] = Scene.reportLine(m.key, m.label)
+    -- chargement tardif, position ou échelle hors du neutre : signalés en fin de ligne
+    body[#body + 1] = Scene.reportLine(m.key, m.label) .. Scene.modelAnomaly(m)
   end
   local lines = { "models: " .. ok .. "/" .. #models .. " loaded, " .. lost .. " on fallback"
     .. (ok + lost < #models and (", " .. (#models - ok - lost) .. " still loading") or "") .. ":" }
   for i = 1, #body do lines[#lines + 1] = body[i] end
   return lines, lost
+end
+
+-- Cadres des ennemis du combat en cours (/slay models, avant l'aperçu) : une ligne par ennemi affiché,
+-- « combat frames: » puis « clé: via display 7976; display 7976 file 123; pos 0,0,0; scale 1; loads 1 »
+-- (Scene.modelDiag). Rien hors combat.
+function V:CombatModelLines()
+  local lines = {}
+  for i = 1, #(self.slots or {}) do
+    local s = self.slots[i]
+    if s.uid and s.artKey and s:IsShown() then
+      lines[#lines + 1] = tostring(s.artKey) .. ": " .. Scene.modelDiag(s.fig.model)
+    end
+  end
+  if #lines > 0 then table.insert(lines, 1, "combat frames:") end
+  return lines
 end
 
 function V:ReportModels()
@@ -2043,6 +2073,10 @@ function V:ReportModels()
     m.state:SetText(good and ("model: " .. st.via) or (st and st.state == "missing" and "fallback" or "loading"))
     local c = good and C.healGreen or C.badText
     m.state:SetTextColor(c[1], c[2], c[3])
+    m.diag:SetText(Scene.modelDiag(m, true))
+    local late = (m.sceneLate or 0) > 0
+    m.diag:SetTextColor(late and C.badText[1] or C.textDim[1], late and C.badText[2] or C.textDim[2],
+      late and C.badText[3] or C.textDim[3])
   end
   local lines = self:ModelReportLines()
   for i = 1, #lines do UI.say(i == 1 and lines[i] or ("  " .. lines[i])) end

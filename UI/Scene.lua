@@ -1195,6 +1195,15 @@ function S.setWide(f, wide, maxW)
     m:SetViewInsets(inset, inset, 0, 0)
   end
   if f.shadow then f.shadow:Place(w) end
+  -- modèle déjà chargé : caméra recalculée pour la nouvelle taille (S.frameModel)
+  S.refreshFigure(f)
+end
+
+-- Cadre d'un personnage qui change de taille ou d'échelle (S.setWide, emplacement à 0,86 de CombatView)
+-- alors que son modèle est chargé : caméra recalculée, animation en cours gardée.
+function S.refreshFigure(f)
+  local m = f and f.model
+  if m and m.sceneHasModel then S.frameModel(m, true) end
 end
 
 -- Taille de base d'un personnage (ennemi agrandi par art.scale) ; l'élargissement en cours est gardé.
@@ -1322,51 +1331,263 @@ function S.orderedTries(key, art)
   return first, tries
 end
 
-local function applyTry(model, t)
+-- Demandes et chargements tardifs. Le client ne promet pas qu'une demande remplacée (ClearModel puis
+-- SetCreature / SetDisplayInfo / SetModel sur le même cadre) soit annulée : une créature absente du
+-- cache, demandée au serveur puis abandonnée au bout de MODEL_WAIT, peut arriver plus tard et remplacer
+-- le modèle du cadre ; son OnModelLoaded ressemble alors à celui du candidat suivant. Chaque pose est
+-- donc une demande (model.sceneReq = { kind, id, token, label }) ; une demande abandonnée avant son
+-- chargement devient orpheline (model.sceneOrphans, oubliée après ORPHAN_TTL secondes) ; à chaque
+-- OnModelLoaded, S.judgeLoad dit si le modèle arrivé est celui de la demande en cours :
+--   * affichage : GetDisplayInfo() (CharacterModelBase, client Forever) doit rendre l'affichage
+--     demandé ; Blizzard compare de même GetDisplayInfo() à l'affichage voulu avant de reposer un
+--     modèle (TalkingHeadFrameMixin:PlayCurrent) ;
+--   * fichier (FileDataID) : GetModelFileID() doit rendre le fichier demandé ;
+--   * créature (affichage inconnu d'avance) : rien ne la distingue d'une autre créature abandonnée ;
+--   * un affichage orphelin qui arrive se reconnaît toujours à son identifiant.
+-- Verdicts : « mine » (validé, mémorisé), « foreign » (chargement étranger : la demande en cours est
+-- reposée, REPOSE_MAX fois au plus par chaîne, sans jamais rien valider), « unsure » (rien ne permet
+-- de trancher : orphelin possible encore en route, ou identifiant rendu différent sans orphelin ; le
+-- modèle est gardé et cadré, le candidat compte comme chargé pour cet affichage mais n'est JAMAIS
+-- mémorisé comme gagnant).
+-- Chaque chargement reçu, le nôtre ou non, est cadré (S.frameModel) : un modèle arrivé en retard
+-- n'est jamais montré avec la caméra, la position ou l'animation d'un autre.
+S.ORPHAN_TTL = 60   -- secondes pendant lesquelles une demande abandonnée peut encore arriver
+S.ORPHAN_MAX = 16   -- orphelins gardés par cadre (les plus anciens oubliés d'abord)
+S.REPOSE_MAX = 3    -- reposes de la demande en cours après un chargement étranger, par chaîne
+
+local function clock() return GetTime and GetTime() or 0 end
+
+local function call(model, name)
+  local fn = model[name]
+  if not fn then return nil end
+  local ok, a, b, c = pcall(fn, model)
+  if ok then return a, b, c end
+  return nil
+end
+
+-- Affichage réellement porté par le cadre (nil : inconnu, vide, ou client sans GetDisplayInfo).
+function S.shownDisplay(model)
+  local d = call(model, "GetDisplayInfo")
+  if type(d) == "number" and d ~= 0 then return d end
+  return nil
+end
+
+-- Fichier du modèle porté (nil : aucun, ou client sans GetModelFileID).
+function S.shownFile(model)
+  local f = call(model, "GetModelFileID")
+  if f ~= nil and f ~= 0 then return f end
+  return nil
+end
+
+-- État neutre d'un cadre avant la pose d'un candidat : rien de ce que le modèle précédent a reçu
+-- (position, échelle, distance de caméra, zoom, animation de mort, retour à l'attente prévu par
+-- W.anim) ne passe au suivant. Cadres réutilisés d'un combat à l'autre (emplacements des ennemis).
+function S.resetModel(model)
+  model.animToken = (model.animToken or 0) + 1
+  model.sceneHasModel = false
   if model.ClearModel then model:ClearModel() end
+  if model.SetPosition then model:SetPosition(0, 0, 0) end
+  if model.SetModelScale then model:SetModelScale(1) end
+  if model.SetCamDistanceScale then model:SetCamDistanceScale(1) end
+  if model.SetPortraitZoom then model:SetPortraitZoom(0) end
+  if not model.dead and model.SetAnimation then model:SetAnimation(Art.anim.stand) end
+end
+
+-- Cadrage d'un modèle chargé, à chaque OnModelLoaded (le nôtre ou un étranger) et quand le cadre
+-- change de taille ou d'échelle : caméra recalculée pour la taille actuelle du cadre (RefreshCamera,
+-- comme TalkingHeadFrameModelMixin:OnModelLoaded et Model_OnEvent de Blizzard), position et échelle
+-- neutres, orientation du personnage (model.sceneFacing), attente debout (sauf keepAnim : simple
+-- changement de taille, ou mort en cours), puis le cadrage propre du cadre (model.sceneFraming :
+-- feu de camp, S.fireCam, qui règle échelle, hauteur et orientation).
+function S.frameModel(model, keepAnim)
+  if model.RefreshCamera then model:RefreshCamera() end
+  if model.SetPosition then model:SetPosition(0, 0, 0) end
+  if model.SetModelScale then model:SetModelScale(1) end
+  if model.SetCamDistanceScale then model:SetCamDistanceScale(1) end
+  if model.sceneFacing and model.SetFacing then model:SetFacing(model.sceneFacing) end
+  if not keepAnim and not model.dead and model.SetAnimation then model:SetAnimation(Art.anim.stand) end
+  if model.sceneFraming then model.sceneFraming(model) end
+  model.sceneFramed = (model.sceneFramed or 0) + 1
+end
+
+local function orphans(model)
+  local list = model.sceneOrphans
+  if not list then list = {} model.sceneOrphans = list end
+  local t = clock()
+  for i = #list, 1, -1 do
+    if t - (list[i].at or t) > S.ORPHAN_TTL then table.remove(list, i) end
+  end
+  return list
+end
+
+-- La demande en cours, pas encore arrivée, devient orpheline (elle peut arriver plus tard).
+local function retire(model)
+  local r = model.sceneReq
+  model.sceneReq = nil
+  if not r or r.loaded or r.reposed then return end
+  local list = orphans(model)
+  r.at = clock()
+  list[#list + 1] = r
+  while #list > S.ORPHAN_MAX do table.remove(list, 1) end
+end
+
+-- Pose d'un candidat t = { genre, identifiant } sous le jeton token (le même pour une repose).
+local function request(model, t, token)
+  retire(model)
+  S.resetModel(model)
+  local r = { kind = t[1], id = t[2], token = token, label = S.tryLabel(t) }
+  model.sceneReq = r
   if t[1] == "creature" then model:SetCreature(t[2])
   elseif t[1] == "display" then model:SetDisplayInfo(t[2])
   else model:SetModel(t[2]) end
+  return r
+end
+
+-- Retire le premier orphelin qui vérifie pred ; le renvoie.
+local function take(list, pred)
+  for i = 1, #list do
+    if pred(list[i]) then return table.remove(list, i) end
+  end
+  return nil
+end
+
+-- Le chargement qui vient de sonner est-il celui de la demande en cours r ? « mine », « foreign » ou
+-- « unsure » (voir plus haut), et l'orphelin reconnu s'il y en a un.
+function S.judgeLoad(model, r)
+  local list = orphans(model)
+  local d = S.shownDisplay(model)
+  if d then
+    -- un affichage abandonné qui arrive se reconnaît à son identifiant
+    local o = take(list, function(x) return x.kind == "display" and x.id == d end)
+    if o and not (r and r.kind == "display" and r.id == d) then return "foreign", o end
+  end
+  if not r then return "foreign", take(list, function() return true end) end
+  local file = (r.kind == "file" and type(r.id) == "number") and S.shownFile(model) or nil
+  local proof, other
+  if r.kind == "display" and d then proof, other = d == r.id, d ~= r.id end
+  if file then proof, other = file == r.id, file ~= r.id end
+  -- créature déjà chargée : son affichage est connu depuis, un autre est un chargement étranger
+  if r.kind == "creature" and r.display and d then proof, other = d == r.display, d ~= r.display end
+  if proof then return "mine" end
+  if other then
+    -- autre modèle que celui demandé : une créature (ou un fichier) abandonnée qui arrive ; sans
+    -- orphelin pour l'expliquer, rien ne prouve un chargement étranger (identifiant rendu autrement)
+    local o = take(list, function(x) return x.kind ~= "display" end)
+    if o then return "foreign", o end
+    return "unsure"
+  end
+  -- pas de preuve d'identité (créature, chemin de fichier, client sans ces fonctions) : sûr seulement
+  -- si aucune autre demande abandonnée ne peut être en route
+  for i = #list, 1, -1 do
+    local x = list[i]
+    if x.kind == r.kind and x.id == r.id then table.remove(list, i) end -- la même demande : même modèle
+  end
+  for _, x in ipairs(list) do
+    -- un affichage orphelin arrivé aurait été reconnu ci-dessus (si GetDisplayInfo existe)
+    if not (d and x.kind == "display") then return "unsure" end
+  end
+  return "mine"
+end
+
+-- OnModelLoaded de tous les cadres de la chaîne.
+function S.onModelLoaded(model)
+  model.sceneLoads = (model.sceneLoads or 0) + 1
+  model.sceneHasModel = true
+  local r = model.sceneReq
+  local verdict, orphan = S.judgeLoad(model, r)
+  if verdict == "foreign" and r and (model.sceneReposes or 0) >= S.REPOSE_MAX then verdict = "unsure" end
+  S.frameModel(model)
+  if verdict == "foreign" then
+    model.sceneLate = (model.sceneLate or 0) + 1
+    model.sceneLateWhat = orphan and orphan.label or "?"
+    if r then
+      -- la demande en cours est reposée (même jeton : la chaîne continue, le délai d'essai court encore)
+      model.sceneReposes = (model.sceneReposes or 0) + 1
+      r.reposed = true
+      request(model, { r.kind, r.id }, r.token).display = r.display
+    else
+      S.resetModel(model) -- rien ne doit être montré
+    end
+    return
+  end
+  if r then
+    r.loaded, r.verified = true, verdict == "mine"
+    r.display = r.display or S.shownDisplay(model)
+    if verdict == "unsure" then model.sceneUnsure = (model.sceneUnsure or 0) + 1 end
+  end
+  -- candidat déjà affiché sans preuve, prouvé depuis (rechargé une fois les orphelins arrivés) :
+  -- mémorisé maintenant
+  local st = model.sceneStatus
+  if verdict == "mine" and r and st and st.state == "ok" and st.unsure and st.via == r.label then
+    st.unsure = nil
+    remember(st.key, st.via)
+  end
+  if model.sceneOnLoaded then model.sceneOnLoaded(r) end
 end
 
 -- OnModelLoaded (pcall : sans effet sur un client qui ne connaît pas ce script ; model.sceneHook dit
--- s'il est posé).
+-- s'il est posé) ; échelle de l'interface ou taille de l'écran changée : caméra recalculée (comme
+-- Model_OnLoad / Model_OnEvent de Blizzard).
 local function hookLoaded(model)
   if model.sceneHook ~= nil then return end
-  model.sceneHook = pcall(model.SetScript, model, "OnModelLoaded", function(self)
-    self.sceneLoaded = self.sceneToken
-    if self.sceneOnLoaded then self.sceneOnLoaded() end
-  end) and true or false
+  model.sceneHook = pcall(model.SetScript, model, "OnModelLoaded", S.onModelLoaded) and true or false
+  if model.RegisterEvent and pcall(model.SetScript, model, "OnEvent", function(self)
+    if self.sceneHasModel then S.frameModel(self, true) end
+  end) then
+    pcall(model.RegisterEvent, model, "UI_SCALE_CHANGED")
+    pcall(model.RegisterEvent, model, "DISPLAY_SIZE_CHANGED")
+  end
 end
 
+-- Le candidat posé sous token est-il chargé ? Renvoie chargé, vérifié. Sans OnModelLoaded (client
+-- sans ce script) : GetModelFileID, et l'identité si le client la donne.
 local function isLoaded(model, t, token)
-  if model.sceneLoaded == token then return true end
+  local r = model.sceneReq
+  if not r or r.token ~= token then return false end
+  if r.loaded then return true, r.verified end
   if t[1] == "file" and model.sceneHook then return false end
-  return W.hasModel(model)
+  if not W.hasModel(model) then return false end
+  local verdict = S.judgeLoad(model, r)
+  if verdict == "foreign" then return false end
+  return true, verdict == "mine"
+end
+
+-- Abandon des essais d'un cadre (cadre de préchargement rendu au réservoir) : vidé, demande orpheline.
+function S.releaseModel(model)
+  model.sceneChain = (model.sceneChain or 0) + 1
+  model.sceneOnLoaded = nil
+  retire(model)
+  S.resetModel(model)
 end
 
 -- Essais en chaîne sur un cadre de modèle. h = { onFound(libellé, essai), onMissing(), quiet = sans
--- statut public }. Statut (W.models[key], lu par /slay models et /slay art) : tries = libellés dans
--- l'ordre déclaré, state = "pending" | "ok" | "missing", via = libellé du candidat chargé.
+-- statut public }. Statut (W.models[key], lu par /slay models et /slay art ; model.sceneStatus pour le
+-- diagnostic du cadre) : tries = libellés dans l'ordre déclaré, state = "pending" | "ok" | "missing",
+-- via = libellé du candidat chargé, unsure = chargé sans preuve d'identité (jamais mémorisé).
 -- Après l'échec de tous : onMissing (repli), puis MODEL_ROUNDS tours de relance de tous les candidats
 -- (MODEL_LATE entre deux), puis le premier candidat reste posé : un OnModelLoaded tardif le valide.
 function S.loadModel(model, art, key, h)
   key, h = tostring(key), h or {}
   model.sceneChain = (model.sceneChain or 0) + 1
   local chain = model.sceneChain
+  model.sceneOnLoaded = nil
+  -- diagnostic du personnage en cours (/slay models) : chargements reçus, chargements étrangers
+  model.sceneReposes, model.sceneLoads, model.sceneLate, model.sceneLateWhat = 0, 0, 0, nil
   hookLoaded(model)
   local tries, declared = S.orderedTries(key, art)
   local labels, names = {}, {}
   for i = 1, #tries do labels[i] = S.tryLabel(tries[i]) end
   for i = 1, #declared do names[i] = S.tryLabel(declared[i]) end
-  local status = { tries = names, state = "pending" }
+  local status = { tries = names, state = "pending", key = key }
+  model.sceneStatus = status
   if not h.quiet then W.models[key] = status end
   local function live() return model.sceneChain == chain and status.state ~= "ok" end
-  local function found(i)
+  local function found(i, verified)
     if not live() then return end
-    status.state, status.via = "ok", labels[i]
+    status.state, status.via, status.unsure = "ok", labels[i], (not verified) or nil
     model.sceneOnLoaded = nil
-    remember(key, labels[i])
+    -- seul un chargement prouvé (ou sans autre demande en route) est mémorisé comme gagnant
+    if verified then remember(key, labels[i]) end
     if not h.quiet then W.missing["model:" .. key] = nil end
     if h.onFound then h.onFound(labels[i], tries[i]) end
   end
@@ -1377,24 +1598,26 @@ function S.loadModel(model, art, key, h)
     if h.onMissing then h.onMissing() end
   end
   if #tries == 0 then
-    if model.ClearModel then model:ClearModel() end
+    retire(model)
+    S.resetModel(model)
     missing()
     return status
   end
   local function pose(i)
     model.sceneToken = (model.sceneToken or 0) + 1
     local token = model.sceneToken
-    model.sceneOnLoaded = function()
-      if model.sceneChain == chain and model.sceneToken == token then found(i) end
+    model.sceneOnLoaded = function(r)
+      if model.sceneChain == chain and model.sceneToken == token then found(i, r and r.verified) end
     end
-    applyTry(model, tries[i])
+    request(model, tries[i], token)
     return token
   end
   local function attempt(i, onFail)
     local token = pose(i)
     W.delay(S.MODEL_WAIT, function()
       if not live() or model.sceneToken ~= token then return end
-      if isLoaded(model, tries[i], token) then found(i) return end
+      local ok, verified = isLoaded(model, tries[i], token)
+      if ok then found(i, verified) return end
       forget(key, labels[i])
       onFail()
     end)
@@ -1414,12 +1637,61 @@ function S.loadModel(model, art, key, h)
   return status
 end
 
+-- Diagnostic d'un cadre (/slay models) : candidat validé, modèle réellement porté (affichage,
+-- fichier), position, échelle, chargements reçus, chargements étrangers (tardifs). ASCII seulement.
+local function num(v)
+  if type(v) ~= "number" then return "?" end
+  if v == math.floor(v) then return tostring(v) end
+  return ("%.2f"):format(v)
+end
+
+-- compact = sans le candidat (case de la grille, sous l'état « model: … »).
+function S.modelDiag(model, compact)
+  local st = model.sceneStatus
+  local parts = {}
+  if not compact then
+    local via = st and (st.state == "ok" and (st.via .. (st.unsure and " (unverified)" or ""))
+      or st.state) or "nothing posed"
+    parts[#parts + 1] = "via " .. via
+  end
+  local d, f = S.shownDisplay(model), S.shownFile(model)
+  parts[#parts + 1] = (d and ("display " .. d .. " ") or "") .. "file " .. (f and tostring(f) or "?")
+  local x, y, z = call(model, "GetPosition")
+  parts[#parts + 1] = "pos " .. num(x) .. "," .. num(y) .. "," .. num(z)
+  parts[#parts + 1] = "scale " .. num(call(model, "GetModelScale"))
+  parts[#parts + 1] = "loads " .. (model.sceneLoads or 0)
+  if (model.sceneLate or 0) > 0 then
+    parts[#parts + 1] = "late " .. model.sceneLate .. (compact and "" or (" (" .. tostring(model.sceneLateWhat) .. ")"))
+  end
+  return table.concat(parts, compact and " " or "; ")
+end
+
+-- Anomalie à signaler sur la ligne du rapport (/slay models) : chargement étranger (tardif), position
+-- ou échelle hors du neutre (sauf cadre à cadrage propre : feu de camp) ; "" sinon. Candidat non
+-- prouvé : « (unverified) » de S.reportLine.
+function S.modelAnomaly(model)
+  local out = {}
+  if (model.sceneLate or 0) > 0 then
+    out[#out + 1] = "late load x" .. model.sceneLate .. " (" .. tostring(model.sceneLateWhat) .. ")"
+  end
+  if not model.sceneFraming then
+    local x, y, z = call(model, "GetPosition")
+    if (x and x ~= 0) or (y and y ~= 0) or (z and z ~= 0) then
+      out[#out + 1] = "pos " .. num(x) .. "," .. num(y) .. "," .. num(z)
+    end
+    local s = call(model, "GetModelScale")
+    if s and s ~= 1 then out[#out + 1] = "scale " .. num(s) end
+  end
+  return #out > 0 and (" [" .. table.concat(out, "; ") .. "]") or ""
+end
+
 -- Personnage (cadre de S.figure ou S.campfire : model, fallback, shadow facultative) : le modèle reste
 -- invisible (alpha 0 : le client le charge quand même, comme les cadres de préchargement de Blizzard,
 -- MissionCompletePreloadModelTemplate alpha="0") jusqu'à son chargement, puis apparaît en fondu court
 -- avec son ombre. Le médaillon de repli (icône de art.icon) n'apparaît qu'après l'échec de TOUS les
 -- candidats (aussitôt si une tentative précédente a déjà tout essayé en vain : S.lost), et s'efface
--- si un modèle finit par arriver. o = { facing, onFound(libellé, essai) }. Rien d'autre n'attend.
+-- si un modèle finit par arriver. o = { facing, framing(model) = cadrage propre après chaque
+-- chargement, onFound(libellé, essai) }. Rien d'autre n'attend.
 function S.showModel(f, art, key, o)
   o = o or {}
   local m = f.model
@@ -1432,6 +1704,8 @@ function S.showModel(f, art, key, o)
   m:Show()
   m:SetAlpha(0)
   if f.shadow then f.shadow:Hide() end
+  -- orientation et cadrage réappliqués après chaque chargement (S.frameModel)
+  m.sceneFacing, m.sceneFraming = o.facing, o.framing
   -- personnage de S.figure : élargi selon art.wide (S.setWide), remis à la largeur de base sinon
   if f.figW then S.setWide(f, art and art.wide, f.wideMax) end
   W.setFallbackArt(f.fallback, art and art.icon)
@@ -1515,8 +1789,7 @@ function S.preload(list)
   end
   for k, p in pairs(S.preloads) do
     if not want[k] then
-      p.model.sceneChain = (p.model.sceneChain or 0) + 1 -- arrête ses essais
-      if p.model.ClearModel then p.model:ClearModel() end
+      S.releaseModel(p.model) -- arrête ses essais, vide le cadre (demande en cours : orpheline)
       S.preloadFree[#S.preloadFree + 1] = p.model
       S.preloads[k] = nil
     end
@@ -1646,18 +1919,21 @@ function S.fireCam(m)
   local a, o = Art.campfire or {}, opts().fireCam
   local scale, z, facing = a.scale, a.z, a.facing
   if type(o) == "table" then scale, z, facing = o[1] or scale, o[2] or z, o[3] or facing end
-  if scale and m.SetModelScale then m:SetModelScale(scale) end
-  if z and m.SetPosition then m:SetPosition(0, 0, z) end
+  -- sans réglage : échelle et hauteur neutres (/slay fire reset efface aussi un réglage déjà posé)
+  if m.SetModelScale then m:SetModelScale(scale or 1) end
+  if m.SetPosition then m:SetPosition(0, 0, z or 0) end
   if facing and m.SetFacing then m:SetFacing(facing) end
 end
 
 function S.showCampfire(f)
-  return S.showModel(f, Art.campfire, "campfire", { onFound = function() S.fireCam(f.model) end })
+  -- cadrage du feu réappliqué après chaque chargement (S.frameModel, model.sceneFraming)
+  return S.showModel(f, Art.campfire, "campfire", { framing = S.fireCam })
 end
 
 -- Ligne de rapport d'un modèle (/slay models) : « clé (nom): display 1691 » si chargé (« , after
 -- creature 235 » si des candidats ont échoué avant), « clé (nom): fallback (no model: creature 619,
--- display 2329, …) » sinon, « …: loading (…) » pendant les essais. ASCII seulement.
+-- display 2329, …) » sinon, « …: loading (…) » pendant les essais ; « (unverified) » : chargé sans
+-- preuve d'identité, jamais mémorisé (S.judgeLoad). ASCII seulement.
 function S.reportLine(key, name)
   local st = W.models[tostring(key)]
   local head = tostring(key) .. ((name and name ~= key) and (" (" .. name .. ")") or "") .. ": "
@@ -1665,6 +1941,7 @@ function S.reportLine(key, name)
   local tried = #st.tries > 0 and table.concat(st.tries, ", ") or "no identifier"
   if st.state == "ok" then
     return head .. st.via .. (st.via ~= st.tries[1] and (" (declared first: " .. tostring(st.tries[1]) .. ")") or "")
+      .. (st.unsure and " (unverified)" or "")
   elseif st.state == "missing" then
     return head .. "fallback (no model: " .. tried .. ")"
   end
