@@ -1363,3 +1363,86 @@ function C.step()
   C.finish()
   return C.ending and endStep() or startStep()
 end
+
+---------------------------------------------------------------------------
+-- Combat de test (/slay dev fight, développement) : le prochain combat lancé dans l'expédition en cours oppose
+-- les ennemis armés à la place du groupe tiré ; genre, récompense et suite inchangés. État armé non sauvegardé
+-- (perdu au /reload) ; le combat de test, lui, est dans db.current comme tout combat. Branché sur la
+-- notification onFightStart (X.fire, après les tirages et les règles de zone) : rien ne change sans armement.
+-- Les fiches ne sont jamais modifiées : seuls opts.encounter et exp.fight.encounter du combat sont remplacés.
+---------------------------------------------------------------------------
+
+C.devFight = nil -- { exp = expédition visée, ids = { id, … } }
+
+do
+  local fire = X.fire
+  X.fire = function(exp, name, a, b)
+    local r = fire(exp, name, a, b)
+    local d = C.devFight
+    if name == "onFightStart" and d and d.exp == exp then
+      C.devFight = nil
+      b.encounter = U.copy(d.ids)
+      a.encounter = U.copy(d.ids)
+      a.test = true
+    end
+    return r
+  end
+end
+
+-- Ennemis de la zone de l'expédition (groupes ns.Encounters, ordre des groupes) hors boss et serviteurs :
+-- réguliers, élites.
+local function zoneEnemies(exp)
+  local pools = ns.Encounters[X.zoneDef(exp).encounters] or {}
+  local keys = {}
+  for k in pairs(pools) do keys[#keys + 1] = k end
+  table.sort(keys)
+  local seen, reg, eli = {}, {}, {}
+  for _, k in ipairs(keys) do
+    for _, g in ipairs(pools[k]) do
+      for _, spec in ipairs(g) do
+        local id = Combat.specId(spec)
+        local def = ns.Enemies[id]
+        if def and not seen[id] and not def.boss and not def.minion then
+          seen[id] = true
+          if def.elite then eli[#eli + 1] = id else reg[#reg + 1] = id end
+        end
+      end
+    end
+  end
+  return reg, eli
+end
+
+-- Arme le combat de test : arg = "" | N | "off" | "id id …". Renvoie le message à afficher.
+function C.armDevFight(arg)
+  local exp = C.exp()
+  if arg == "off" then
+    C.devFight = nil
+    return "dev fight: off."
+  end
+  if not exp or exp.phase == "done" then return "dev fight: no expedition running." end
+  local reg, eli = zoneEnemies(exp)
+  local ids = {}
+  local n = tonumber(arg ~= "" and arg or "4")
+  if n then
+    n = max(1, min(Combat.MAX_ENEMIES, math.floor(n)))
+    if n >= 3 and #eli > 0 then ids[1] = eli[1] end
+    local i = 0
+    while #ids < n and #reg > 0 do
+      i = i + 1
+      ids[#ids + 1] = reg[(i - 1) % #reg + 1]
+    end
+  else
+    for id in arg:gmatch("%S+") do
+      if not ns.Enemies[id] then
+        local list = {}
+        for _, v in ipairs(reg) do list[#list + 1] = v end
+        for _, v in ipairs(eli) do list[#list + 1] = v end
+        return "dev fight: unknown enemy '" .. id .. "'. Try: " .. table.concat(list, " ") .. "."
+      end
+      if #ids < Combat.MAX_ENEMIES then ids[#ids + 1] = id end
+    end
+  end
+  if #ids == 0 then return "dev fight: no enemy to arm." end
+  C.devFight = { exp = exp, ids = ids }
+  return "dev fight armed (next fight): " .. table.concat(ids, ", ") .. "."
+end

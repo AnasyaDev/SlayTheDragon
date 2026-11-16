@@ -934,6 +934,10 @@ SlashCmdList.SLAYTHEDRAGON = function(msg)
   msg = (msg or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
   if msg == "" then UI.toggle()
   elseif msg == "options" or msg == "config" then UI.toggleOptions()
+  elseif msg == "dev" or msg:match("^dev%s") then
+    local arg = msg:match("^dev%s+fight%s*(.*)$")
+    if arg then say(Controller.armDevFight(arg))
+    else say("/slay dev fight [1-5 | id id ... | off]: next fight in this expedition uses these enemies.") end
   elseif msg == "art" then artReport()
   elseif msg == "text" then textReport()
   elseif msg == "models" then artPreview()
