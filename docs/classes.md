@@ -259,8 +259,15 @@ Art.classes.<id> = { tga = "ClassIcon_Warrior", wow = "WARRIOR",           -- wo
 Art.statusIcons.<clé> = { tga = … }        -- icône d'un état selon sa source (apply … icon = "bleed")
 ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte, combat, vue) end,
   tokens = function(combat, liste, vue) end, -- facultatif : notes sur les jetons des états du héros
+  enemyMarks = true,                         -- facultatif : la vue marque des ennemis (place réservée)
   event = function(hôte, ev, vue) end }    -- facultatif : animations propres (vue:Push(délai, fn))
 ```
+
+- **Marque sur un ennemi** (`enemyMarks`, 16/11/2026 : cadre d'unité des ennemis refait, docs/interface.md,
+  « Cadre d'unité des ennemis ») : une petite icône (13 au plus) posée par la vue au centre de
+  `vue.slotOf[uid].markSpot`, au bout de la ligne du nom de l'ennemi, avant la case d'intention ; avec
+  `enemyMarks = true`, `CombatView` y réserve la place (le nom se tronque avant). Cible du familier (Hunter),
+  Atrophic Poison (Rogue). Plus rien à côté du cadre : les cadres voisins se touchent presque à 5 ennemis.
 
 - **Pastille de ressource** (générique, `UI/CombatView.lua`) : petit anneau doré près du mana, icône de la
   ressource de la classe jouée, nombre, cachée à 0 ; infobulle = explication du registre et « n / plafond ».

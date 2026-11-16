@@ -50,8 +50,8 @@ return function(T)
     vis(v.counter) and v.counter.text._text == "Wildfire in 4 → 3" and (H.hover(v.counter)[1] or ""):find("Ignites in 4 rounds", 1, true) ~= nil,
     tostring(v.counter.text._text))
   local s1 = v.slotOf[c.enemies[1].uid]
-  check("intention avec Stoke : « 7 +1 » et petite flamme à droite, infobulle Stoke",
-    s1 and (s1.intent.text._text or ""):find("+1", 1, true) and vis(s1.intent.badge)
+  check("intention avec Stoke : « 7 +1 » (case : les dégâts, petite flamme en marque), infobulle Stoke",
+    s1 and (s1.intent.full or ""):find("+1", 1, true) and vis(s1.intent.badge)
     and table.concat(H.hover(s1.intent), " | "):find("Stoke 1:", 1, true) ~= nil,
     s1 and tostring(s1.intent.text._text))
   snap("zone-steppes-combat", true)

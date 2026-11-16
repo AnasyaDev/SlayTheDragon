@@ -21,7 +21,7 @@ local SLOTS = 6
 local SLOT_W, SLOT_H = 150, 280
 local HERO_X = 196                       -- centre du héros
 local HERO_FEET = 292
-local ENEMY_X0, ENEMY_X1 = 470, 1022     -- zone des ennemis
+local ENEMY_X0, ENEMY_X1 = 452, 1024     -- zone des ennemis (de la barre d'incantation du héros au bord droit)
 local HAND_CX, HAND_W = 530, 660         -- main : centre et largeur
 local HAND_TOP = 418                     -- (plaque du bas comprise, la main reste dans la fenêtre)
 local DRAW_PILE = { 45, 554 }            -- piles : cases de 36 et libellé dessous (bas à y 588 < 614)
@@ -40,16 +40,20 @@ local PIP_R, PIP_A0, PIP_DA = 49, -5, 14
 local PIP_R2 = PIP_R + PIP + 2
 local PIP_SOCKET = { 0.3, 0.29, 0.28 }  -- alvéole : gemme désaturée assombrie
 local PIP_FADE, PIP_GLOW = 0.22, 0.45   -- fondu d'un cran, éclat au remplissage (secondes)
--- Personnage d'un ennemi : 33 sous le haut de l'emplacement, pieds à 33 + FIG_H (193 à l'échelle 1) ;
--- cadre compact au-dessus de la tête, états ST_DY sous les pieds.
+-- Ennemi (refonte du 16/11/2026, maquette validée par le joueur) : TOUT ce qui se lit tient dans le cadre d'unité
+-- et la rangée d'états dessous, en haut du décor ; plus rien n'est posé sur le modèle. L'emplacement commence au
+-- haut du cadre (ENEMY_TOP, le même pour tous) ; le modèle est posé par les pieds sur la ligne ENEMY_FEET (un
+-- ennemi sur deux ENEMY_STAGGER plus bas), sa hauteur bornée pour ne jamais monter dans le bloc des infos
+-- (INFO_H unités de l'emplacement) : un ennemi agrandi (art.scale) l'est autant que la place le permet.
 local FIG_H = 160
 local NAME_SIZE = 11.5
-local ST_DY = 10
 local INFO_LEVEL = 10                    -- cadre des infos : au-dessus du personnage (modèle +2, repli +4,
                                          -- étage d'interface fig.ui +8 : Scene.UI_LIFT)
-local ENEMY_TOP = 92                     -- haut de l'emplacement d'un ennemi à l'échelle 1
-local ENEMY_STAGGER = 26                 -- un ennemi sur deux, posé un peu plus bas
-local COUNTER_X = 517                    -- compteur de combat d'une zone (Wildfire) : centre x, haut du décor
+local ENEMY_TOP = 44                     -- haut du cadre d'unité (coordonnées du contenu ; l'écusson dépasse de 6)
+local ENEMY_FEET = 300                   -- ligne des pieds (coordonnées du contenu)
+local ENEMY_STAGGER = 24                 -- un ennemi sur deux, posé un peu plus bas
+local COUNTER_X, COUNTER_Y = 378, 110    -- compteur de combat d'une zone (Wildfire) : centre x, haut ; entre le héros et
+                                         -- les ennemis, sous la barre d'incantation (le haut du décor est aux cadres)
 
 local function now() return GetTime and GetTime() or 0 end
 local function opts() return ns.Persist.options() end
@@ -62,60 +66,81 @@ end
 -- Construction
 ---------------------------------------------------------------------------
 
--- Intention (direction B) : case de barre d'action à l'icône de l'intention, chiffres exacts à droite,
--- en couleur (rouge attaque, bleu défense, violet guet…). f:SetColor(c) teint le chiffre.
-local INTENT_SLOT = 26
-local function intentBubble(parent)
-  local f = CreateFrame("Frame", nil, parent)
-  f:SetSize(INTENT_SLOT + 60, INTENT_SLOT)
+-- Cadre d'unité d'un ennemi (maquette validée le 16/11/2026), de gauche à droite et de haut en bas :
+--   corps       : ligne du nom (nom tronqué au besoin, « ? » de la fiche juste à sa droite s'il y a une
+--                 information), puis une seule barre de vie (Absorption en prolongement, W.unitBar) ; repères de
+--                 seuil (phases) en petits triangles dorés SOUS la barre ;
+--   intention   : case collée à droite du corps, séparée par un filet : icône, nombre dessous (couleur de la
+--                 nature, celles de l'ancienne bulle) ; le détail complet au survol de la case ;
+--   élite, boss : même cadre au liseré doré, écusson droit à l'angle haut gauche (boss : plus grand) ;
+-- sous le cadre, alignés à gauche : compteurs gardés de la fiche puis états (auras), « +N » s'ils débordent.
+-- Pièces embarquées (tools/build_wowui.py) : uf_box / uf_box_gold (neuf tranches), uf_vline(_gold), elite_crest,
+-- mark_up ; case d'action du jeu pour l'icône d'intention.
+local FRAME_W, FRAME_H = 204, 42         -- largeur au plus (échelle 1), hauteur (ombre portée comprise)
+local FRAME_GAP = 8                      -- écart au plus serré entre deux cadres voisins (l'écusson dépasse de 5)
+local UF_K = 0.6                         -- unités par pixel stocké des pièces du cadre (liseré de 1,2)
+local INTENT_W = 40                      -- case d'intention (filet compris)
+local INTENT_ICON = 20                   -- case de barre d'action de l'icône
+local INTENT_SIZE, INTENT_MIN = 12.5, 8.5 -- nombre de la case : taille, plancher avant l'abrégé
+local NAME_Y, NAME_X = 10, 6             -- centre de la ligne du nom, retrait à gauche
+local BAR_Y, BAR_H, BAR_X = 18.5, 12, 5  -- barre de vie
+local MARK_W, MARK_H = 7, 5              -- repère de seuil (triangle sous la barre)
+local CREST = { elite = { h = 22, x = -3, y = 4 }, boss = { h = 27, x = -5, y = 6 } } -- écusson (débord haut gauche)
+local ST_SIZE, ST_GAP, ST_TOP = 19, 3, 1 -- rangée d'états : icônes, écart, sous le cadre (ombre portée comprise)
+local ST_MAX = 12
+local INFO_H = FRAME_H + ST_TOP + ST_SIZE + 4 -- bloc des infos (le modèle commence dessous)
+local ASK, ASK_GAP = 13, 3               -- « ? » de la fiche : diamètre, écart au nom
+local MARK_SPOT = 14                     -- place d'une marque de classe (Atrophic Poison, cible du familier)
+local CHIPS, CHIP_ICON = 2, 16
+V.FRAME_W, V.FRAME_H, V.INTENT_W, V.INFO_H = FRAME_W, FRAME_H, INTENT_W, INFO_H
+V.ASK, V.ST_SIZE, V.FRAME_GAP = ASK, ST_SIZE, FRAME_GAP
+
+-- Bas visible du cadre (liseré du bas ; l'ombre portée est dessous) et bord intérieur, en unités.
+local function boxBottom()
+  local m = W.Wow.meta.uf_box
+  return FRAME_H - (W.Wow.pieces.uf_box.ph - m.bottom) * UF_K
+end
+V.boxBottom = boxBottom
+
+-- Case d'intention : case de barre d'action (icône), nombre dessous en couleur ; f.mark = petite marque d'un second
+-- effet (icône de zone, sinon « + » doré) ; survol = le détail complet (V.fillIntentTooltip).
+local function intentBox(s)
+  local spot = CreateFrame("Frame", nil, s.tag)
+  spot:SetSize(INTENT_W - 2, FRAME_H)
+  s.intentSpot = spot
+  local f = CreateFrame("Frame", nil, s.info)
+  f:SetSize(INTENT_W - 2, boxBottom() - 2)
+  f:SetPoint("CENTER", spot, "CENTER", 0, 0) -- sans décalage : l'éclat (échelle) ne le déplace pas
   f:EnableMouse(true)
   local box = CreateFrame("Frame", nil, f)
-  box:SetSize(INTENT_SLOT, INTENT_SLOT)
-  box:SetPoint("LEFT", 0, 0)
-  f.slot = W.slotOn(box, INTENT_SLOT)
+  box:SetSize(INTENT_ICON, INTENT_ICON)
+  box:SetPoint("TOP", f, "TOP", 0, -0.5)
+  f.box = box
+  f.slot = W.slotOn(box, INTENT_ICON)
   f.icon = f.slot.icon
-  f.text = W.label(f, "heavy", 19, C.attackText)
-  f.text:SetPoint("LEFT", box, "RIGHT", 4, 0.5)
+  -- nombre centré entre le bas de l'icône et le bas de la case
+  f.text = W.label(f, "heavy", INTENT_SIZE, C.attackText)
+  f.text:SetPoint("CENTER", f, "BOTTOM", 0, (boxBottom() - 2 - INTENT_ICON - 0.5) / 2 + 0.5)
+  f.text:SetWordWrap(false)
   f.SetColor = function(self, c) self.text:SetTextColor(c[1], c[2], c[3]) end
-  W.tooltip(f, function(tt, self) V.fillIntentTooltip(tt, self.enemy) end, "ANCHOR_TOP")
+  -- second effet : petite icône (zone : Curse du Bite, ouverture…) ou « + » doré, à l'angle haut droit de l'icône
+  f.badge = W.noSnap(f:CreateTexture(nil, "OVERLAY", nil, 1))
+  f.badge:SetSize(11, 11)
+  f.badge:SetPoint("CENTER", box, "TOPRIGHT", 0, 0)
+  f.badge:Hide()
+  f.plus = W.label(f, "heavy", 12, C.goldText, "OVERLAY")
+  f.plus:SetPoint("CENTER", box, "TOPRIGHT", 0, -1)
+  f.plus:SetText("+")
+  f.plus:Hide()
+  W.tooltip(f, function(tt, self) V.fillIntentTooltip(tt, self.enemy) end, "ANCHOR_BOTTOMLEFT")
   return f
 end
 
--- Personnage d'un emplacement posé par les pieds (zone de clic : l'emplacement lui-même).
+-- Personnage d'un emplacement posé par les pieds (s.feet : unités de l'emplacement sous son haut).
 local function placeFig(s)
   local k = s.fig:GetScale() or 1
-  local h = s.figH or 160
   s.fig:ClearAllPoints()
-  s.fig:SetPoint("BOTTOM", s, "TOP", 0, -(33 + h) / k)
-end
-
--- Cadre compact (direction B) au-dessus de la tête, intention dessous ; états sous les pieds. Le
--- cadre ne sort jamais du haut du décor (FRAME_MIN_Y, coordonnées du contenu).
-local FRAME_W, FRAME_H, BOSS_H = 114, 46, 62
-local FRAME_MIN_Y = Scene.TOP + 4
-V.FRAME_W, V.FRAME_H = FRAME_W, FRAME_H
--- Fiche de l'ennemi : bouton « ? » (diamètre) posé sur le bord gauche du cadre (ASK_IN unités sur le liseré, à la
--- façon des pastilles des cadres du jeu, sans toucher la barre de vie) ; le reste (ASK_OUT) est réservé dans
--- l'écart entre ennemis (LayoutEnemies) ; compteurs gardés sous le cadre (2 au plus).
-local ASK, ASK_IN, ASK_GAP = 15, 3, 2
-local ASK_OUT = ASK - ASK_IN
-local CHIPS, CHIP_ICON = 2, 12
-V.ASK, V.ASK_IN = ASK, ASK_IN
-local function placeInfo(s)
-  local feet = 33 + (s.figH or FIG_H)
-  local sc = s:GetScale() or 1
-  local h = s.tag:GetHeight() or FRAME_H
-  local y = 33 + 10 - h
-  local absTop = Scene.TOP + (s.top or 0)
-  local minRel = (FRAME_MIN_Y - absTop) / sc
-  if y < minRel then y = minRel end
-  s.tagRoom = y - minRel -- place au-dessus du cadre, sous le haut du décor (compteurs de la fiche)
-  s.tag:ClearAllPoints()
-  s.tag:SetPoint("TOP", s, "TOP", 0, -y)
-  s.intent:ClearAllPoints()
-  s.intent:SetPoint("TOPLEFT", s.tag, "BOTTOMLEFT", 6, -3)
-  s.st:ClearAllPoints()
-  s.st:SetPoint("TOP", s, "TOP", 0, -(feet + ST_DY))
+  s.fig:SetPoint("BOTTOM", s, "TOP", 0, -(s.feet or (INFO_H + FIG_H)) / k)
 end
 
 -- Ennemi visé (carte à cible armée) : son anneau s'allume ; il ne grandit plus (aucune échelle au
@@ -126,65 +151,53 @@ local function aimApply(s)
   if s.fig.ring:IsShown() then s.fig.ring:SetAlpha(0.45 + 0.55 * max(v, s.ringBase or 0)) end
 end
 
--- Pose le cadre compact d'un ennemi : ordinaire (trois tranches) ou élite / boss (dragon d'or) ; w =
--- largeur du cadre ordinaire, bigW = largeur permise au cadre d'élite (w + 12 par défaut ; il garde ses
--- proportions, réduit au besoin).
-local function setUnitFrame(s, boss, w, bigW)
-  local WS = W.Wow
-  local meta
+-- Pose le cadre d'unité à la largeur w : boîte argentée ou dorée (élite / boss), écusson, filet, case d'intention,
+-- barre, place du nom. rank = nil | "elite" | "boss".
+local function setUnitFrame(s, rank, w)
   local tag = s.tag
-  if boss then
-    local e = WS.pieces.unit_boss
-    local h = BOSS_H
-    local ww = h * e.pw / e.ph
-    local k = math.min(1, (bigW or (w + 12)) / ww)
-    h, ww = h * k, ww * k
-    tag:SetSize(ww, h)
-    tag.plain:Hide()
-    tag.boss:Show()
-    meta = WS.meta.unit_boss
-    tag.kk = h / e.ph
+  tag:SetSize(w, FRAME_H)
+  local gold = rank ~= nil
+  if gold then tag.plain:Hide() tag.gold:Show() s.vline:Hide() s.vlineGold:Show()
+  else tag.plain:Show() tag.gold:Hide() s.vline:Show() s.vlineGold:Hide() end
+  local cr = rank and CREST[rank]
+  if cr then
+    local e = W.Wow.pieces.elite_crest
+    local k = cr.h / e.ph
+    s.crest:SetSize(e.pw * k, cr.h)
+    s.crest:ClearAllPoints()
+    s.crest:SetPoint("TOPLEFT", tag, "TOPLEFT", cr.x, cr.y)
+    s.crest:Show()
+    s.nameX = cr.x + e.pw * k + 2
   else
-    tag:SetSize(w, FRAME_H)
-    tag.plain:Show()
-    tag.boss:Hide()
-    meta = WS.meta.unit_enemy
-    tag.kk = FRAME_H / WS.pieces.unit_enemy.ph
+    s.crest:Hide()
+    s.nameX = NAME_X
   end
-  -- logements (pixels stockés de la pièce) -> unités ; en trois tranches, x pris depuis les bords
-  local kk = tag.kk
-  local pw = boss and WS.pieces.unit_boss.pw or WS.pieces.unit_enemy.pw
-  local function box(r)
-    local x0, x1 = r[1] * kk, r[1] * kk + r[3] * kk
-    if not boss then x1 = w - (pw - r[1] - r[3]) * kk end
-    return x0, -r[2] * kk, x1 - x0, r[4] * kk
-  end
-  local x, y, bw, bh = box(meta.name)
-  s.name:ClearAllPoints()
-  s.name:SetPoint("CENTER", tag, "TOPLEFT", x + bw / 2, y - bh / 2)
-  s.nameW = bw - 6
-  x, y, bw, bh = box(meta.hp)
+  local bodyR = w - INTENT_W -- filet
+  s.vline:ClearAllPoints()
+  s.vline:SetPoint("TOP", tag, "TOPLEFT", bodyR, -0.5)
+  s.vline:SetPoint("BOTTOM", tag, "BOTTOMLEFT", bodyR, FRAME_H - boxBottom() + 0.5)
+  s.vline:SetWidth(W.Wow.pieces.uf_vline.pw * UF_K)
+  s.vlineGold:ClearAllPoints()
+  s.vlineGold:SetAllPoints(s.vline)
+  s.intentSpot:ClearAllPoints()
+  s.intentSpot:SetPoint("TOPLEFT", tag, "TOPLEFT", bodyR + 1, 0)
+  s.intentSpot:SetSize(INTENT_W - 2, boxBottom())
+  local bw = bodyR - 3 - BAR_X
   s.hp:ClearAllPoints()
-  s.hp:SetPoint("TOPLEFT", tag, "TOPLEFT", x, y)
-  s.hp:SetSize(bw, bh)
+  s.hp:SetPoint("TOPLEFT", tag, "TOPLEFT", BAR_X, -BAR_Y)
+  s.hp:SetSize(bw, BAR_H)
   s.hp.w = bw
-  x, y, bw, bh = box(meta.low)
-  s.block:ClearAllPoints()
-  s.block:SetPoint("TOPLEFT", tag, "TOPLEFT", x, y)
-  s.block:SetSize(bw, bh)
-  s.block.w = bw
-  -- « ? » : sur le bord gauche du cadre (ordinaire comme d'élite : le dragon d'or occupe la droite), centré sur
-  -- la barre de vie, qui commence juste après
-  x, y, bw, bh = box(meta.hp)
-  s.ask:ClearAllPoints()
-  s.ask:SetPoint("RIGHT", tag, "TOPLEFT", ASK_IN, y - bh / 2)
-  s.frameBoss, s.frameW = boss, w
+  if s.hp.Relayout then s.hp:Relayout() end
+  s.markSpot:ClearAllPoints()
+  s.markSpot:SetPoint("RIGHT", tag, "TOPLEFT", bodyR - 3, -NAME_Y)
+  s.bodyR = bodyR
+  s.frameRank, s.frameW = rank, w
 end
 
 -- Bouton « ? » d'un ennemi : petit anneau doré du jeu (ring_small) sur un disque sombre, « ? » doré ; survol :
 -- l'anneau s'éclaircit (copie additive) et le « ? » blanchit ; infobulle = fiche de l'ennemi (V.fillEnemySheet),
 -- ouverte en bas à gauche du bouton (les ennemis occupent la moitié droite de la fenêtre). Un clic vaut un clic
--- sur l'ennemi (visée).
+-- sur l'ennemi (visée). Posé à droite du nom, sur sa ligne (V:RenderEnemies).
 local function askButton(s)
   local b = CreateFrame("Button", nil, s.info)
   b:SetSize(ASK, ASK)
@@ -198,7 +211,7 @@ local function askButton(s)
   b.ring:SetAllPoints()
   b.light = W.lightLayer(W.wow(face, "ring_small", "ARTWORK", 2))
   b.light:SetAllPoints()
-  b.glyph = W.label(face, "heavy", 10.5, C.wowGold, "OVERLAY")
+  b.glyph = W.label(face, "heavy", 9.5, C.wowGold, "OVERLAY")
   b.glyph:SetPoint("CENTER", 0.5, 0.5)
   b.glyph:SetText("?")
   W.hoverable(b, { paint = function(f, h)
@@ -212,16 +225,18 @@ local function askButton(s)
   return b
 end
 
--- Compteur gardé sous le cadre (icône + nombre) : valeur dont le joueur a besoin à chaque tour sans survoler
--- (entrée `compact` de la fiche) ; survol = la fiche.
+-- Compteur gardé de la fiche (icône + nombre), en tête de la rangée des états : valeur dont le joueur a besoin à
+-- chaque tour sans survoler (entrée `compact`) ; survol = la fiche.
 local function infoChip(s)
   local f = CreateFrame("Frame", nil, s.info)
-  f:SetSize(CHIP_ICON + 20, CHIP_ICON + 2)
+  f:SetSize(CHIP_ICON + 20, ST_SIZE)
   f:SetFrameLevel(s.tag:GetFrameLevel() + 2)
   f:EnableMouse(true)
+  f.back = W.rect(f, "BACKGROUND", 0, C.black, 0.55)
+  f.back:SetAllPoints()
   f.icon = W.noSnap(f:CreateTexture(nil, "ARTWORK", nil, 0))
   f.icon:SetSize(CHIP_ICON, CHIP_ICON)
-  f.icon:SetPoint("LEFT", 0, 0)
+  f.icon:SetPoint("LEFT", 1.5, 0)
   f.text = W.label(f, "heavy", 11, C.text, "OVERLAY")
   f.text:SetPoint("LEFT", f.icon, "RIGHT", 2, 0.5)
   f.text:SetJustifyH("LEFT")
@@ -231,13 +246,40 @@ local function infoChip(s)
   return f
 end
 
+-- « +N » au bout de la rangée des états quand ils débordent la largeur du cadre : infobulle = les états cachés.
+local function moreToken(s)
+  local f = CreateFrame("Frame", nil, s.info)
+  f:SetFrameLevel(s.tag:GetFrameLevel() + 2)
+  f:EnableMouse(true)
+  -- case vide sombre dans le cadre de case (même allure que les jetons d'état), « +N » au centre
+  f:SetSize(ST_SIZE, ST_SIZE)
+  f.back = W.rect(f, "BACKGROUND", 0, C.black, 0.75)
+  f.frame = W.wow(f, "slot_frame", "ARTWORK", 1)
+  W.slotFit(f, ST_SIZE, f.back, f.frame)
+  f.text = W.label(f, "heavy", 10, C.text, "OVERLAY")
+  f.text:SetPoint("CENTER", 0, 0.5)
+  W.tooltip(f, function(tt, self)
+    for _, it in ipairs(self.hidden or {}) do
+      if it.info and it.info.status then
+        local name = W.statusText(it.info.status, it.info.n)
+        tt:AddLine(name .. ((it.n and it.n ~= 0) and (" " .. tostring(it.n)) or ""), 1, 0.82, 0)
+      elseif it.text then
+        tt:AddLine(it.text, 1, 0.82, 0)
+      end
+    end
+  end, "ANCHOR_BOTTOMLEFT")
+  f:Hide()
+  return f
+end
+
 local function buildSlot(self, i)
   local s = CreateFrame("Button", nil, self.bf)
-  s:SetSize(SLOT_W, SLOT_H)
+  s:SetSize(FRAME_W, INFO_H + FIG_H)
   s:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   s.index = i
   s.fig = Scene.figure(s, 150, 160)
   s.figH = 160
+  s.feet = INFO_H + FIG_H
   placeFig(s)
   s.fig:EnableMouse(false)
   s._animApply = aimApply
@@ -247,48 +289,62 @@ local function buildSlot(self, i)
   s.flash = W.disc(s.fig.ui, "OVERLAY", 0, C.hp, 0)
   s.flash:SetSize(110, 130)
   s.flash:SetPoint("CENTER", 0, 4)
-  -- Infos (cadre compact : nom, vie, Absorption ; intention ; états) dans un cadre au-dessus du
-  -- personnage et de son repli : aucun modèle, ombre ou anneau ne peut les recouvrir.
+  -- Infos (cadre d'unité, rangée d'états) dans un cadre au-dessus du personnage et de son repli : aucun modèle,
+  -- ombre ou anneau ne peut les recouvrir (ils ne se recouvrent d'ailleurs plus : le modèle est dessous).
   s.info = CreateFrame("Frame", nil, s)
   s.info:SetAllPoints()
   s.info:SetFrameLevel(s:GetFrameLevel() + INFO_LEVEL)
   s.tag = CreateFrame("Frame", nil, s.info)
   s.tag:SetFrameLevel(s.info:GetFrameLevel() + 5) -- au-dessus des jetons d'état
   s.tag:SetSize(FRAME_W, FRAME_H)
-  s.tag.plain = W.threeSlice(s.tag, "unit_enemy", "BACKGROUND", 0)
-  s.tag.boss = W.wow(s.tag, "unit_boss", "BACKGROUND", 0)
-  s.tag.boss:SetAllPoints()
-  s.tag.boss:Hide()
+  s.tag:SetPoint("TOP", s, "TOP", 0, 0)
+  -- fond : la boîte du jeu est translucide (0,4) ; un voile sombre dessous garde nom et nombres lisibles sur tout décor
+  s.tag.shade = W.rect(s.tag, "BACKGROUND", -1, C.black, 0.42)
+  s.tag.shade:SetPoint("TOPLEFT", s.tag, "TOPLEFT", 1.5, -1.5)
+  s.tag.shade:SetPoint("BOTTOMRIGHT", s.tag, "BOTTOMRIGHT", -1.5, FRAME_H - boxBottom() + 1.5)
+  s.tag.plain = W.nineStretch(s.tag, "uf_box", W.Wow.pieces.uf_box.nine, UF_K, "BACKGROUND", 0)
+  s.tag.gold = W.nineStretch(s.tag, "uf_box_gold", W.Wow.pieces.uf_box_gold.nine, UF_K, "BACKGROUND", 0)
+  s.tag.gold:Hide()
+  s.vline = W.wow(s.tag, "uf_vline", "BORDER", 0)
+  s.vlineGold = W.wow(s.tag, "uf_vline_gold", "BORDER", 0)
+  s.crest = W.wow(s.tag, "elite_crest", "OVERLAY", 2)
+  s.crest:Hide()
   s.name = W.label(s.tag, "bold", NAME_SIZE, C.text, "OVERLAY")
   s.name:SetWordWrap(false)
-  s.hp = W.hpBar(s.tag, 100, 10, 9.5, "bar_enemy")
-  s.block = W.shieldBadge(s.tag, 100, 8)
-  s.intent = intentBubble(s.info)
+  s.name:SetJustifyH("LEFT")
+  s.hp = W.unitBar(s.tag, 100, BAR_H, 9.5, "bar_enemy", "ANCHOR_BOTTOMLEFT")
+  -- Absorption : plus de barre à part, elle prolonge la barre de vie ; s.block garde l'interface de l'ancien écusson
+  -- (Set(n[, max]), text = nombre) pour la file d'animations
+  local blk = CreateFrame("Frame", nil, s.hp)
+  blk:SetSize(1, 1)
+  blk:SetPoint("CENTER")
+  blk.text = W.label(blk, "heavy", 9, C.text, "OVERLAY")
+  blk.text:Hide()
+  blk.Set = function(self, n, maxHp)
+    self.text:SetText(tostring(n or 0))
+    s.hp:SetAbsorb(n or 0, maxHp)
+  end
+  s.block = blk
+  s.markSpot = CreateFrame("Frame", nil, s.tag)
+  s.markSpot:SetSize(MARK_SPOT - 1, MARK_SPOT - 1)
+  s.intent = intentBox(s)
   s.intent:SetFrameLevel(s.tag:GetFrameLevel() + 2)
-  -- Zones (UI/ZoneView.lua) : petite icône à droite de l'intention (Bite de Duskwood), intention
-  -- suivante en gris dessous (« On waking: Death Roll 20 »), crans de vie.
-  s.intent.badge = W.noSnap(s.intent:CreateTexture(nil, "OVERLAY", nil, 1))
-  s.intent.badge:SetSize(14, 14)
-  s.intent.badge:Hide()
-  s.next = W.label(s.info, "bold", 10.5, C.textDim, "OVERLAY")
-  s.next:SetPoint("TOPLEFT", s.intent, "BOTTOMLEFT", 2, -1)
-  s.next:SetJustifyH("LEFT")
-  s.next:SetWordWrap(false)
-  s.next:Hide()
-  -- Fiche de l'ennemi : bouton « ? » accolé au cadre d'unité, compteurs gardés sous le cadre (V:RenderEnemyInfo)
-  s.ask = askButton(s)
-  s.chips = {}
-  for k = 1, CHIPS do s.chips[k] = infoChip(s) end
+  -- repères de seuil : triangles dorés sous la barre, pointe vers le seuil
   s.marks = {}
   for k = 1, 4 do
-    local m = W.rect(s.hp, "OVERLAY", 3, C.goldText, 0.95)
-    m:SetSize(2, 10)
+    local m = W.wow(s.tag, "mark_up", "OVERLAY", 3)
+    m:SetSize(MARK_W, MARK_H)
     m:Hide()
     s.marks[k] = m
   end
-  s.st = W.tokenRow(s.info, 6, SLOT_W + 10, 24)
-  setUnitFrame(s, false, FRAME_W)
-  placeInfo(s)
+  -- Fiche de l'ennemi : « ? » à droite du nom, compteurs gardés en tête de la rangée des états
+  s.ask = askButton(s)
+  s.chips = {}
+  for k = 1, CHIPS do s.chips[k] = infoChip(s) end
+  s.st = W.tokenRow(s.info, ST_MAX, 2000, ST_SIZE, { anchor = "ANCHOR_BOTTOMLEFT", count = 10 })
+  s.st.align = "LEFT"
+  s.more = moreToken(s)
+  setUnitFrame(s, nil, FRAME_W)
   s:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
   s:SetScript("OnEnter", function() s.hover = true V:RenderTargets() end)
   s:SetScript("OnLeave", function() s.hover = false V:RenderTargets() end)
@@ -610,7 +666,7 @@ function V:Build(parent)
   -- Zones : compteur de combat en haut au centre du décor (Wildfire : ns.ZoneViews[zone].counter), calque
   -- libre des vues de zone (build / render / event, comme ns.ClassViews), sans souris.
   local counter = CreateFrame("Frame", nil, parent)
-  at(counter, parent, COUNTER_X - 70, Scene.TOP + 6, 140, 34)
+  at(counter, parent, COUNTER_X - 70, COUNTER_Y, 140, 34)
   counter:SetFrameLevel(bf:GetFrameLevel() + 16)
   counter:EnableMouse(true)
   local cbox = CreateFrame("Frame", nil, counter)
@@ -711,11 +767,10 @@ function V.fillIntentTooltip(tt, e)
       tt:AddLine("Spell being cast: an Interrupt cancels it.", 1, 0.6, 0.2, true)
     end
   end
-  -- intention suivante imposée (ouverture d'une phase, d'un dormeur)
-  if info.forced then
-    local fm = ns.Combat.moveOf(e.id, info.forced)
-    tt:AddLine((info.forcedLabel or "Next") .. ": " .. (fm and fm.name or info.forced) .. ".", 0.7, 0.7, 0.7, true)
-  end
+  -- intention suivante imposée (ouverture d'une phase, d'un dormeur), dégâts compris : « On waking: Death Roll 20 »
+  -- (n'est plus écrite sous la case : la case garde l'essentiel, le détail est ici)
+  local nextLine = info.forced and V.forcedLine(c, e)
+  if nextLine then tt:AddLine(nextLine .. ".", 0.85, 0.85, 0.85, true) end
   local badge = ns.ZoneView.first(c, "intentBadge", e)
   if badge and badge.tip then tt:AddLine(badge.tip, 0.75, 0.6, 1, true) end
 end
@@ -749,8 +804,12 @@ function V:ApplyFacing()
   if self.playerModel and self.playerModel.SetFacing then self.playerModel:SetFacing(opts().facingPlayer or 0.6) end
   for i = 1, #(self.slots or {}) do
     local m = self.slots[i].model
-    m.sceneFacing = opts().facingEnemy or -0.6 -- réappliquée après chaque chargement (Scene.frameModel)
+    local facing = opts().facingEnemy or -0.6
+    local changed = m.sceneFacing ~= facing
+    m.sceneFacing = facing -- réappliquée après chaque chargement (Scene.frameModel)
     if m.SetFacing then m:SetFacing(m.sceneFacing) end
+    -- orientation changée (options) : cadrage refait, pieds ramenés sous l'ombre (Scene.centerFeet)
+    if changed then Scene.refreshFigure(self.slots[i].fig) end
   end
 end
 
@@ -818,8 +877,10 @@ function V:LayoutEnemies()
     end
   end
   local n = #shown
-  local spacing = n > 0 and min(170, (ENEMY_X1 - ENEMY_X0) / n) or 170
+  -- écart entre centres : la largeur d'un cadre plus FRAME_GAP au plus, la zone des ennemis partagée sinon
+  local spacing = n > 0 and min(FRAME_W + FRAME_GAP, (ENEMY_X1 - ENEMY_X0) / n) or FRAME_W + FRAME_GAP
   local cx0 = (ENEMY_X0 + ENEMY_X1) / 2 - (n - 1) * spacing / 2
+  local sc = n >= 5 and 0.86 or 1
   for k = 1, n do
     local idx = shown[k]
     local e = c.enemies[idx]
@@ -838,37 +899,38 @@ function V:LayoutEnemies()
       s.hp:Set(e.hp, e.maxHp)
       s.block:Set(e.block, e.maxHp)
     end
-    -- modèle (e.art : modèle d'une phase, Nefarius -> Nefarian) : apparaît en fondu une fois chargé
-    -- (ombre avec lui) ; médaillon si aucun candidat ne charge
-    local artKey = e.art or e.id
-    if s.artKey ~= artKey then
-      s.artKey = artKey
-      local art = Art.enemies[artKey] or {}
-      local sc = art.scale or 1
-      -- taille de base ; art.wide (quadrupède long) l'élargit, centrée, à hauteur égale (Scene.setWide,
-      -- dans Scene.showModel) : pieds, cadre d'unité, intention et ombre ne bougent pas
-      Scene.setFigureSize(s.fig, 150 * sc, 160 * sc)
-      s.figH = FIG_H * sc
-      Scene.enemyFigure(s.fig, artKey)
-    end
     s.enemyIndex = idx
     s.cx = cx0 + (k - 1) * spacing
-    -- personnage agrandi (art.scale) : l'emplacement remonte, les pieds restent sur la même ligne
-    s.top = ENEMY_TOP + ((k % 2 == 0) and ENEMY_STAGGER or 0) - Scene.TOP - ((s.figH or FIG_H) - FIG_H)
-    local sc = n >= 5 and 0.86 or 1
-    if s:GetScale() ~= sc then
-      s:SetScale(sc)
+    -- haut de l'emplacement = haut du cadre, le même pour tous ; pieds sur ENEMY_FEET (un sur deux plus bas)
+    s.top = ENEMY_TOP - Scene.TOP
+    local scaleChanged = s:GetScale() ~= sc
+    if scaleChanged then s:SetScale(sc) end
+    local feetAbs = ENEMY_FEET + ((k % 2 == 0) and ENEMY_STAGGER or 0)
+    s.feet = (feetAbs - ENEMY_TOP) / sc
+    -- modèle (e.art : modèle d'une phase, Nefarius -> Nefarian) : apparaît en fondu une fois chargé (ombre avec
+    -- lui) ; médaillon si aucun candidat ne charge. Taille : art.scale, bornée par la place sous les infos.
+    local artKey = e.art or e.id
+    local art = Art.enemies[artKey] or {}
+    local fk = min(art.scale or 1, (s.feet - INFO_H) / FIG_H)
+    if s.artKey ~= artKey or s.figK ~= fk then
+      local fresh = s.artKey ~= artKey
+      s.artKey, s.figK = artKey, fk
+      -- taille de base ; art.wide (quadrupède long) l'élargit, centrée, à hauteur égale (Scene.setWide,
+      -- dans Scene.showModel) : pieds, cadre d'unité et ombre ne bougent pas
+      Scene.setFigureSize(s.fig, 150 * fk, FIG_H * fk)
+      s.figH = FIG_H * fk
+      if fresh then Scene.enemyFigure(s.fig, artKey) end
+    elseif scaleChanged then
       -- modèle déjà chargé (le cinquième ennemi arrive ou meurt) : caméra recalculée à la nouvelle échelle
       Scene.refreshFigure(s.fig)
     end
-    -- cadre compact : ordinaire, ou d'élite / boss (dragon d'or, 12 de plus si la place le permet) ; place du
-    -- « ? » de la fiche réservée à gauche de chaque cadre : ASK_GAP au moins entre un « ? » et le cadre voisin,
-    -- quels que soient les deux cadres (ordinaire w, élite big)
+    s:SetSize(max(150 * fk, (spacing / sc) - FRAME_GAP), s.feet + 6)
+    placeFig(s)
+    -- cadre d'unité : ordinaire, d'élite ou de boss ; largeur = l'écart moins FRAME_GAP (l'écusson qui dépasse à
+    -- gauche y tient), FRAME_W au plus
     local def = ns.Enemies[e.id]
-    local room = spacing / sc - ASK_GAP - ASK_OUT
-    local w = min(FRAME_W, room)
-    setUnitFrame(s, def.boss or def.elite, w, min(w + 12, 2 * room - w, room))
-    placeInfo(s)
+    local w = min(FRAME_W, spacing / sc - FRAME_GAP)
+    setUnitFrame(s, def.boss and "boss" or (def.elite and "elite" or nil), w)
     self:PlaceSlot(s, 0, 0)
   end
 end
@@ -879,11 +941,13 @@ function V:PlaceSlot(s, dx, dy)
   s:SetPoint("TOP", self.bf, "TOPLEFT", (s.cx + (dx or 0)) / sc, -(s.top + (dy or 0)) / sc)
 end
 
--- Bulle d'intention : icône + chiffres exacts (Combat.calcDamage).
+-- Intention : icône, texte entier (chiffres exacts de Combat.calcDamage, « ×N » des coups multiples, texte d'une
+-- zone), couleur, clé d'icône, et s'il y a un effet de plus que le premier chiffre (attaque + Absorption, attaque
+-- + affaiblissement…).
 local function intentDisplay(c, e)
-  -- intention remplacée par une zone (dormeur : « Asleep 2 »), sinon la bulle commune
+  -- intention remplacée par une zone (dormeur : « Asleep 2 »), sinon celle du socle
   local over = ns.ZoneView.first(c, "intent", e)
-  if over then return over.icon or Art.intents.defend, over.text or "", over.color or "defend", over.key end
+  if over then return over.icon or Art.intents.defend, over.text or "", over.color or "defend", over.key, false end
   local info = Combat.intentInfo(c, e)
   if info.stunned then return Art.intents.stunned, "Stunned", "defend" end
   if info.interrupted then return Art.intents.interrupted, "Interrupted", "defend" end
@@ -909,55 +973,82 @@ local function intentDisplay(c, e)
   local text = table.concat(parts, " ")
   if info.kind == "watch" then text = "Watch" end
   local entry = Art.intents[info.kind] or Art.intents.attack
-  return entry, text, entry.color
+  return entry, text, entry.color, nil, #mv.actions > 1
 end
 
-function V:RenderIntent(s, e)
-  local c = self.c
-  s.intent.enemy = e
-  if e.dead or c.result then
-    s.intent:Hide()
-    s.next:Hide()
-    return
-  end
-  local entry, text, color, key = intentDisplay(c, e)
-  W.setIcon(s.intent.icon, entry, key or ("intent:" .. tostring(Combat.intentInfo(c, e).kind)))
-  s.intent:SetColor(C[(color or "attack") .. "Text"] or C.attackText)
-  local big = W.utf8len(text) <= 3
-  W.setSize(s.intent.text, big and 19 or 13.5)
-  s.intent.text:SetText(text)
-  local w = 30 + max(20, s.intent.text:GetStringWidth() or 20)
-  -- petite icône d'une zone à droite du chiffre (Curse posée par un Bite)
-  local badge = ns.ZoneView.first(c, "intentBadge", e)
-  if badge and badge.icon then
-    W.setIcon(s.intent.badge, badge.icon, badge.key or "intent:badge")
-    s.intent.badge:ClearAllPoints()
-    s.intent.badge:SetPoint("LEFT", s.intent.text, "RIGHT", 3, 0)
-    s.intent.badge:Show()
-    w = w + 17
-  else
-    s.intent.badge:Hide()
-  end
-  s.intent:SetWidth(w)
-  s.intent:SetAlpha(1)
-  s.intent:SetScale(1)
-  s.intent:Show()
-  -- intention suivante imposée, en gris (« On waking: Death Roll 20 »)
+-- Intention suivante imposée (ouverture d'un dormeur, d'une phase) : « On waking: Death Roll 20 », ou nil.
+local function forcedLine(c, e)
   local info = Combat.intentInfo(c, e)
   local fm = info.forced and ns.Combat.moveOf(e.id, info.forced)
-  if fm and info.forcedLabel then
-    local dmg
-    for _, a in ipairs(fm.actions) do
-      if a[1] == "attack" then
-        dmg = Combat.calcDamage(c, e, c.player, Combat.enemyBase(c, e, a)) .. ((a.times or 1) > 1 and ("×" .. a.times) or "")
-        break
-      end
+  if not fm then return nil end
+  local dmg
+  for _, a in ipairs(fm.actions) do
+    if a[1] == "attack" then
+      dmg = Combat.calcDamage(c, e, c.player, Combat.enemyBase(c, e, a)) .. ((a.times or 1) > 1 and ("×" .. a.times) or "")
+      break
     end
-    s.next:SetText(info.forcedLabel .. ": " .. fm.name .. (dmg and (" " .. dmg) or ""))
-    s.next:Show()
-  else
-    s.next:Hide()
   end
+  return (info.forcedLabel or "Next") .. ": " .. fm.name .. (dmg and (" " .. dmg) or "")
+end
+V.forcedLine = forcedLine
+
+-- Texte de la case : entier s'il tient à la taille INTENT_SIZE ; sinon l'essentiel : le premier nombre (dégâts
+-- « 12 » ou « 6×3 », tours de sommeil de « Asleep 2 », dormeurs réveillés de « Wakes 2 ») ; un texte sans nombre
+-- (« Stunned ») descend jusqu'à INTENT_MIN, puis s'abrège. Renvoie le texte posé et s'il a été abrégé.
+local INTENT_SHORT = { Stunned = "Stun", Interrupted = "Int.", Waking = "Wake" }
+local function fits(fs, w) return (fs:GetStringWidth() or 0) <= w + 0.01 end
+function V.intentShort(fs, text, w)
+  W.fitText(fs, text, INTENT_SIZE, w, INTENT_SIZE)
+  if fits(fs, w) then return text, false end
+  local main
+  if text:find("%d") then
+    local lead = text:match("^[%+%-]?%d+")
+    main = lead and (lead .. (text:match("^[%+%-]?%d+(×%d+)") or "")) or text:match("[%+%-]?%d+")
+  else
+    W.fitText(fs, text, INTENT_SIZE, w, INTENT_MIN)
+    if fits(fs, w) then return text, false end
+    main = INTENT_SHORT[text] or text:match("^%S+") or text
+  end
+  W.fitText(fs, main, INTENT_SIZE, w, INTENT_MIN)
+  return main, main ~= text
+end
+
+-- Case d'intention : icône, nombre (l'essentiel s'il faut abréger) ; marque d'un second effet (icône d'une zone,
+-- sinon « + » doré) quand le nombre n'en dit pas tout (attaque + effet, texte abrégé, ouverture annoncée) ; le
+-- détail complet au survol. s.intent.full = texte entier, s.intent.nextText = intention suivante imposée.
+function V:RenderIntent(s, e)
+  local c = self.c
+  local b = s.intent
+  b.enemy = e
+  if e.dead or c.result then
+    b:Hide()
+    b.full, b.nextText = nil, nil
+    return
+  end
+  local entry, text, color, key, extra = intentDisplay(c, e)
+  W.setIcon(b.icon, entry, key or ("intent:" .. tostring(Combat.intentInfo(c, e).kind)))
+  b:SetColor(C[(color or "attack") .. "Text"] or C.attackText)
+  b.full = text
+  -- attaque + effet : le premier nombre seul (les dégâts), le reste au survol
+  local shownText = text
+  if extra then shownText = text:match("^%S+") or text end
+  local shown, cut = V.intentShort(b.text, shownText, INTENT_W - 4)
+  b.text:SetText(shown)
+  b.nextText = forcedLine(c, e)
+  local badge = ns.ZoneView.first(c, "intentBadge", e)
+  local second = extra or cut or shown ~= text or b.nextText ~= nil
+  if badge and badge.icon then
+    W.setIcon(b.badge, badge.icon, badge.key or "intent:badge")
+    b.badge:Show()
+    b.plus:Hide()
+  else
+    b.badge:Hide()
+    if second then b.plus:Show() else b.plus:Hide() end
+  end
+  b.second = second or (badge ~= nil)
+  b:SetAlpha(1)
+  b:SetScale(1)
+  b:Show()
 end
 
 -- Fiche d'un ennemi : ce qui est connu de lui, une entrée par trait ou règle ({ name, text, lines, compact },
@@ -1012,8 +1103,88 @@ function V.fillEnemySheet(tt, e)
   end
 end
 
--- « ? » de la fiche (seulement s'il y a une information), compteurs gardés sous le cadre (alignés à droite,
--- sur la ligne de l'intention), crans de vie (phases et zones) sur la barre.
+-- Nom sur sa ligne, à gauche (après l'écusson d'une élite) : réduit jusqu'à 9,5 puis tronqué (« … ») à la place
+-- laissée par le « ? » (juste à sa droite) et, si la classe jouée marque des ennemis (ClassViews.enemyMarks), par la
+-- marque de classe au bout de la ligne.
+local NAME_MIN = 9.5
+local function truncateText(fs, text, w)
+  if (fs:GetStringWidth() or 0) <= w + 0.01 then return text end
+  local chars = {}
+  for ch in text:gmatch("[%z\1-\127\194-\244][\128-\191]*") do chars[#chars + 1] = ch end
+  for n = #chars - 1, 1, -1 do
+    local t = table.concat(chars, "", 1, n):gsub("[%s%-]+$", "") .. "…"
+    fs:SetText(t)
+    if (fs:GetStringWidth() or 0) <= w + 0.01 then return t end
+  end
+  fs:SetText("…")
+  return "…"
+end
+
+function V:PlaceName(s, name)
+  local cv = ns.ClassViews and self.c and ns.ClassViews[self.c.class or "priest"]
+  local reserve = (cv and cv.enemyMarks) and MARK_SPOT or 0
+  local ask = s.ask:IsShown() and (ASK + ASK_GAP) or 0
+  local avail = max(10, (s.bodyR or (FRAME_W - INTENT_W)) - 3 - (s.nameX or NAME_X) - ask - reserve)
+  local key = name .. "|" .. avail
+  if s.nameKey ~= key then
+    s.nameKey = key
+    W.fitText(s.name, name, NAME_SIZE, avail, NAME_MIN)
+    s.nameShown = truncateText(s.name, name, avail)
+  end
+  s.nameText, s.nameW = name, avail
+  s.name:ClearAllPoints()
+  s.name:SetPoint("LEFT", s.tag, "TOPLEFT", s.nameX or NAME_X, -NAME_Y)
+  local nw = min(avail, s.name:GetStringWidth() or 0)
+  s.ask:ClearAllPoints()
+  s.ask:SetPoint("LEFT", s.tag, "TOPLEFT", (s.nameX or NAME_X) + nw + ASK_GAP, -NAME_Y)
+end
+
+-- Rangée sous le cadre, alignée à gauche : compteurs gardés de la fiche, puis états (auras) ; ce qui dépasse la
+-- largeur du cadre est remplacé par « +N » au bout (infobulle : les états cachés). Une seule ligne : le modèle
+-- commence juste dessous.
+function V:LayoutStates(s)
+  local y = -(FRAME_H + ST_TOP)
+  local x = 0
+  local wmax = s.frameW or FRAME_W
+  for _, f in ipairs(s.chips) do
+    if f:IsShown() then
+      f:ClearAllPoints()
+      f:SetPoint("TOPLEFT", s.tag, "TOPLEFT", x, y)
+      x = x + (f:GetWidth() or 0) + ST_GAP
+    end
+  end
+  local list = s.stList or {}
+  local step = ST_SIZE + 4 -- écart de W.tokenRow
+  local room = wmax - x
+  local n = #list
+  local fit = floor((room + 4) / step)
+  local shown = n
+  if n > fit then
+    local moreW = ST_SIZE
+    shown = max(0, floor((room - moreW - ST_GAP + 4) / step))
+  end
+  local sub = {}
+  for i = 1, shown do sub[i] = list[i] end
+  s.st:ClearAllPoints()
+  s.st:SetPoint("TOPLEFT", s.tag, "TOPLEFT", x, y)
+  s.st:Set(sub)
+  if shown < n then
+    local hidden = {}
+    for i = shown + 1, n do hidden[#hidden + 1] = list[i] end
+    s.more.hidden = hidden
+    s.more.text:SetText("+" .. (n - shown))
+    s.more:ClearAllPoints()
+    s.more:SetPoint("TOPLEFT", s.tag, "TOPLEFT", x + shown * step, y)
+    s.more:Show()
+  else
+    s.more.hidden = nil
+    s.more:Hide()
+  end
+  s.stShown = shown
+end
+
+-- « ? » de la fiche (seulement s'il y a une information), compteurs gardés (en tête de la rangée des états),
+-- repères de seuil (phases et zones) sous la barre, nom, rangée des états.
 function V:RenderEnemyInfo(s, e)
   local c = self.c
   local list = (e.dead or c.result) and {} or V.enemyInfo(c, e)
@@ -1023,71 +1194,37 @@ function V:RenderEnemyInfo(s, e)
   for _, it in ipairs(list) do
     if it.compact and #chips < CHIPS then chips[#chips + 1] = it.compact end
   end
-  -- place laissée par l'intention (et sa petite icône) sur sa ligne, à droite : compteurs avec icône, sinon
-  -- nombres seuls ; s'ils n'y tiennent pas, au-dessus du cadre (s'il y a la place sous le haut du décor), en
-  -- dernier recours une ligne plus bas
-  local room = (s.tag:GetWidth() or FRAME_W) - 2 - 6 - (s.intent:IsShown() and (s.intent:GetWidth() or 0) or 0) - 3
-  local need, bareNeed, widths = 0, 0, {}
-  for k, it in ipairs(chips) do
-    local f = s.chips[k]
-    f.text:SetText(it.text or "")
-    widths[k] = (f.text:GetStringWidth() or 0) + 1
-    need = need + CHIP_ICON + 2 + widths[k] + (k > 1 and 4 or 0)
-    bareNeed = bareNeed + widths[k] + (k > 1 and 4 or 0)
-  end
-  local where = "row"
-  local bare = false
-  if need > room then
-    if bareNeed <= room then
-      bare = true
-    elseif (s.tagRoom or 0) >= CHIP_ICON + 3 then
-      where = "above"
-    else
-      where, bare = "below", true
-    end
-  end
-  local anchor
   for k, f in ipairs(s.chips) do
     local it = chips[k]
     if it then
       W.setIcon(f.icon, it.icon or { icon = Art.QUESTION }, it.key or ("chip:" .. k))
       f.icon:SetDesaturated(it.dim and true or false)
-      if bare then f.icon:Hide() else f.icon:Show() end
       local r, g, b = infoColor(it.color, C.text)
       f.text:SetTextColor(r, g, b)
-      f.text:ClearAllPoints()
-      if bare then f.text:SetPoint("LEFT", f, "LEFT", 0, 0.5) else f.text:SetPoint("LEFT", f.icon, "RIGHT", 2, 0.5) end
-      f:SetWidth((bare and 0 or CHIP_ICON + 2) + widths[k])
-      f:ClearAllPoints()
-      if anchor then
-        f:SetPoint("RIGHT", anchor, "LEFT", -4, 0)
-      elseif where == "above" then
-        f:SetPoint("BOTTOMRIGHT", s.tag, "TOPRIGHT", -2, 1)
-      elseif where == "below" then
-        f:SetPoint("TOPRIGHT", s.tag, "BOTTOMRIGHT", -2, -3 - INTENT_SLOT - (s.next:IsShown() and 14 or 1))
-      else
-        f:SetPoint("TOPRIGHT", s.tag, "BOTTOMRIGHT", -2, -3 - (INTENT_SLOT - CHIP_ICON - 2) / 2)
-      end
+      f.text:SetText(it.text or "")
+      f:SetWidth(1.5 + CHIP_ICON + 2 + (f.text:GetStringWidth() or 0) + 3)
       f:Show()
-      anchor = f
     else
       f:Hide()
     end
   end
-  s.chipsAt = #chips > 0 and (where == "row" and bare and "bare" or where) or nil
-  -- crans de vie : phases (def.phases) puis ceux des zones ; infobulle de la barre
+  s.chipsAt = #chips > 0 and "row" or nil
+  -- repères de seuil : phases (def.phases) puis ceux des zones, triangles sous la barre (pointe au seuil) ;
+  -- infobulle de la barre
   local marks = Combat.phaseMarks(e)
   for _, m in ipairs(ns.ZoneView.all(c, "marks", e)) do marks[#marks + 1] = m end
   local w = s.hp.w or s.hp:GetWidth() or 100
-  local h = s.hp:GetHeight() or 10
   for k, t in ipairs(s.marks) do
     local m = marks[k]
     if m and not e.dead then
       t:ClearAllPoints()
-      t:SetSize(2, h)
-      t:SetPoint("CENTER", s.hp, "LEFT", w * m.at, 0)
-      local col = m.passed and C.textDim or (m.color and (C[m.color] or m.color)) or C.goldText
-      t:SetVertexColor(col[1], col[2], col[3], 1)
+      t:SetPoint("TOP", s.hp, "BOTTOMLEFT", w * m.at, 0.5)
+      local col = (not m.passed) and m.color and (C[m.color] or m.color) or nil
+      t:SetDesaturated((m.passed or col) and true or false)
+      if m.passed then t:SetVertexColor(0.55, 0.55, 0.55, 1)
+      elseif col then t:SetVertexColor(col[1], col[2], col[3], 1)
+      else t:SetVertexColor(1, 1, 1, 1) end
+      t.at, t.passed = m.at, m.passed
       t:Show()
     else
       t:Hide()
@@ -1100,6 +1237,8 @@ function V:RenderEnemyInfo(s, e)
       tt:AddLine(line, m.passed and 0.6 or 1, m.passed and 0.6 or 0.82, m.passed and 0.6 or 0, true)
     end
   end or nil
+  self:PlaceName(s, Combat.enemyName(e))
+  self:LayoutStates(s)
 end
 
 -- Compteur de combat d'une zone (Wildfire) et calque libre des vues de zone.
@@ -1110,7 +1249,8 @@ function V:RenderZone()
   if spec and not c.result then
     W.setIcon(f.slot.icon, spec.icon or { icon = Art.QUESTION }, spec.key or "zone:counter")
     f.slot.icon:SetDesaturated(spec.hot == false)
-    f.text:SetText(spec.text or tostring(spec.value or ""))
+    -- tient dans son cadre (140 de large), à gauche de la zone des ennemis
+    W.fitText(f.text, spec.text or tostring(spec.value or ""), 15, 140 - 36, 10)
     local col = spec.hot and C.attackText or C.goldText
     f.text:SetTextColor(col[1], col[2], col[3])
     f.tip = spec.tip
@@ -1146,17 +1286,13 @@ function V:RenderEnemies(full)
   for uid, s in pairs(self.slotOf) do
     local e = enemyByUid(c, uid)
     local def = ns.Enemies[e.id]
-    local name = Combat.enemyName(e) -- une phase peut renommer l'ennemi
-    if s.nameText ~= name or s.nameFitW ~= s.nameW then
-      s.nameFitW, s.nameText = s.nameW, name
-      W.fitText(s.name, name, NAME_SIZE, s.nameW or (FRAME_W - 14), 8)
-    end
+    -- nom (une phase peut renommer l'ennemi) : posé par RenderEnemyInfo, après le « ? »
     local nc = def.boss and { 1, 0.6, 0.25 } or (def.elite and C.watchText or C.text)
     s.name:SetTextColor(nc[1], nc[2], nc[3])
     if full then
       s.hp:Set(e.hp, e.maxHp)
       s.block:Set(e.block, e.maxHp)
-      s.st:Set(W.unitStatuses(e))
+      s.stList = (e.dead and not s.dying) and {} or W.unitStatuses(e)
     end
     if not self.frozen or e.dead then self:RenderIntent(s, e) end
     self:RenderEnemyInfo(s, e)
@@ -1481,7 +1617,7 @@ function V:UnitPos(ref)
   local s = self.slotOf[ref]
   if not s then return nil end
   local sc = s:GetScale() or 1
-  return s.cx, Scene.TOP + s.top + (33 + (s.figH or FIG_H) / 2) * sc, s
+  return s.cx, Scene.TOP + s.top + ((s.feet or (INFO_H + FIG_H)) - (s.figH or FIG_H) / 2) * sc, s
 end
 
 function V:Push(delay, fn)
@@ -1593,7 +1729,7 @@ function V:QueueEvent(ev)
       if f:IsShown() then
         W.tween(0.4, function(p) f.slot.icon:SetAlpha(0.4 + 0.6 * p) end, function() f.slot.icon:SetAlpha(1) end, f, "pulse")
         if ev.d and ev.d ~= 0 then
-          W.float(self_.parent, COUNTER_X, Scene.TOP + 52, (ev.d > 0 and "+" or "") .. ev.d, ev.d > 0 and C.defendText or C.attackText, 16, 1.0, 14)
+          W.float(self_.parent, COUNTER_X, COUNTER_Y + 46, (ev.d > 0 and "+" or "") .. ev.d, ev.d > 0 and C.defendText or C.attackText, 16, 1.0, 14)
         end
       end
     end)

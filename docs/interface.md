@@ -377,7 +377,7 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   de boss et son miroir (le fichier servi n'a que la version au dragon) ; grand anneau doré isolé du coin
   « PortraitMetal » (anneau masqué, restes gris du cadre effacés) ; bouton rouge et or = bouts gauche et
   droit accolés ; trait de taxi couché.
-- Sorties : `Media/WowUI/atlas.tga` (1024 × 512, 42 pièces, 3 pixels d'écart aux bords répétés) et 13
+- Sorties : `Media/WowUI/atlas.tga` (1024 × 512, 48 pièces, 3 pixels d'écart aux bords répétés) et 13
   fichiers répétés (bords du cadre métal et des dialogues, roche 256, table 256, parchemins), TGA 32 bits
   non compressés, origine en bas à gauche, toiles en puissances de deux (même écriture que
   `tools/build_media.py`) ; `UI/WowSkin.lua` (GÉNÉRÉ : par pièce, fichier, toile, taille stockée,
@@ -399,7 +399,7 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 | `arrow_l` | 4567914 | 11×19 | flèche gauche (Minimal_SliderBar_Button_Left) |
 | `arrow_r` | 4567914 | 9×18 | flèche droite (Minimal_SliderBar_Button_Right) |
 | `bar_absorb` | 4642466 | 180×14 | barre d'Absorption (…-Bar-Mana-2x, mesurée à la main) |
-| `bar_enemy` | 4703662 | 127×15 | barre de vie compacte (…-Boss-Small-PortraitOff-Bar-Health-2x) |
+| `bar_enemy` | 4703662 | 127×15 | barre de vie des ennemis (…-Boss-Small-PortraitOff-Bar-Health-2x), étirée en largeur |
 | `bar_hp` | 4642466 | 186×30 | barre de vie (…-Player-PortraitOn-Bar-Health-2x) |
 | `bar_yellow` | 4703662 | 127×11 | barre jaune : incantation, réputation (…-Boss-Small-PortraitOff-Bar-Energy-2x) |
 | `boot` | 1455734 | 72×73 | botte ailée : position (taxi_frame_yellow) |
@@ -416,11 +416,13 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 | `diamond_tl` | 3056750 | 64×64 | boîte de dialogue (UI-Frame-DiamondMetal-Corner*-2x) |
 | `diamond_top` | 3056750 | 64×64 (répétée) | bord haut (_UI-Frame-DiamondMetal-EdgeTop-2x) |
 | `diamond_tr` | 3056750 | 64×64 | boîte de dialogue (UI-Frame-DiamondMetal-Corner*-2x) |
+| `elite_crest` | 4703662 | 43×51 | écusson d'élite / de boss (bouclier de …-Boss-Quest-2x sans le « ! », tête de nameplates-icon-elite-gold) |
 | `elite_dragon` | 1300837 | 80×80 | dragon d'or des élites et boss (nameplates-icon-elite-gold) |
 | `elite_node` | 1121272 | 62×62 | étape d'élite (VignetteKillElite) |
 | `header_l` | 3058483 | 64×78 | en-tête de titre (UI-Frame-DiamondMetal-Header-CornerLeft-2x) |
 | `header_m` | 3058483 | 64×78 (répétée) | en-tête de titre (_UI-Frame-DiamondMetal-Header-Tile-2x) |
 | `header_r` | 3058483 | 64×78 | en-tête de titre (UI-Frame-DiamondMetal-Header-CornerRight-2x) |
+| `mark_up` | — | 14×10 | repère de seuil sous la barre (triangle doré, dessiné par le script) |
 | `metal_bl` | 2406979 | 64×64 | cadre de la fenêtre (UI-Frame-Metal-Corner*-2x) |
 | `metal_bottom` | 2406987 | 32×64 (répétée) | bord bas, filet du plateau (_UI-Frame-Metal-EdgeBottom-2x) |
 | `metal_br` | 2406979 | 64×64 | cadre de la fenêtre (UI-Frame-Metal-Corner*-2x) |
@@ -448,8 +450,12 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 | `slot_hover` | 4615764 | 68×68 | cadre doré de survol (UI-HUD-ActionBar-IconFrame-Mouseover-2x, mesuré) |
 | `table` | 4699279 | 256×256 (répétée) | table du bas (UI-Frame-DragonFlight-BackgroundTile) |
 | `taxi_line` | 1455735 | 32×32 | trait de trajet, couché (!UI-Taxi-Line) |
-| `unit_boss` | 4703662 | 172×84 | cadre compact d'élite / boss, dragon d'or (…-Boss-Small-PortraitOff-2x) |
-| `unit_enemy` | 4703662 | 135×57 | cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon) |
+| `uf_box` | 4703662 | 120×34 | cadre d'unité d'un ennemi (boîte du cadre compact de boss, un seul logement, neuf tranches) |
+| `uf_box_gold` | 4703662 | 120×34 | cadre d'unité d'une élite / d'un boss (même boîte, liseré recoloré en or) |
+| `uf_vline` | 4703662 | 8×24 | filet vertical de la case d'intention (filet de la même boîte) |
+| `uf_vline_gold` | 4703662 | 8×24 | filet vertical, version d'élite (recoloré en or) |
+| `unit_boss` | 4703662 | 172×84 | cadre compact d'élite / boss, dragon d'or (…-Boss-Small-PortraitOff-2x) ; plus employé en combat |
+| `unit_enemy` | 4703662 | 135×57 | cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon) ; plus employé en combat |
 | `unit_player` | 4642466 | 297×106 | cadre du héros (UI-HUD-UnitFrame-Player-PortraitOn-2x) |
 
 ### Briques (`UI/Widgets.lua`)
@@ -497,11 +503,10 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
 - **Combat** : cadre d'unité du héros en haut à gauche (UI-HUD-UnitFrame-Player : portrait par
   `SetPortraitTexture(…, "player")`, icône de classe en repli ; nom ; vie ; Absorption dans le logement
   bas) ; auras dessous ; incantation à droite du cadre (case du sort, nom, barre jaune dans un rail).
-  Ennemis : cadre compact au-dessus de la tête (nom, vie, Absorption dans le logement bas), version d'élite
-  et de boss au dragon d'or, largeur réduite à l'écart entre ennemis, jamais sur le bandeau ; « ? » de la
-  fiche de l'ennemi sur son bord gauche (petit anneau doré, voir « Combat », « Fiche de l'ennemi ») ; intention
-  dessous (case à l'icône, chiffres en couleur), compteurs de la fiche à droite sur la même ligne ; états sous
-  les pieds. Mana (C) : orbe de mana dans le
+  Ennemis : cadre d'unité horizontal en haut du décor (voir « Combat », « Cadre d'unité des ennemis ») : nom et
+  « ? » de la fiche, une barre de vie (Absorption en prolongement), case d'intention à droite ; élite et boss au
+  liseré doré et à l'écusson droit ; compteurs de la fiche et états en rangée dessous ; rien sur le modèle.
+  Mana (C) : orbe de mana dans le
   grand anneau doré, « 2/3 », libellé « Mana » ; Démence : petit anneau. Pioche, défausse, consumées :
   cases (livre, bourse, flamme) avec nombre et libellé doré. Recharges : cases à l'icône grisée et tours.
   « End Turn » rouge et or ; fin de combat : boîte de dialogue.
@@ -531,7 +536,7 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   du vol…) ni d'option nouvelle — aucune information ajoutée. Pastilles : celles de la carte de vol (C) au
   lieu des gemmes d'essence de la maquette B (qui se ressemblaient toutes).
 - **Combat** : pas de barre de mana dans le cadre du héros (le mana est l'anneau C) : son logement porte
-  l'Absorption ; les auras des ennemis restent sous leurs pieds ; libellés « Draw », « Discard »,
+  l'Absorption ; les auras des ennemis sont sous leur cadre d'unité (16/11/2026 ; sous leurs pieds avant) ; libellés « Draw », « Discard »,
   « Exhaust » sous les cases (comme la maquette ; le tas des consumées n'existe que s'il y en a).
 - **Parcours** : pas de légende « Flight path : … 3 of 9 stops » (information nouvelle) ; traits plus fins
   que la maquette C (trait de taxi 1x, pas agrandi : netteté) ; lueur dorée sous les étapes accessibles.
@@ -602,6 +607,14 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   curseur, plaques d'ardoise des cartes) : fichiers différents, hors des visuels animés, bord à bord.
 
 ### Non vérifiable hors jeu (à voir)
+
+- Cadre d'unité des ennemis (16/11/2026) : neuf tranches de `uf_box` sans couture ni liseré voisin ; lisibilité
+  du nom et du nombre de la case sur les décors clairs (voile à 0,42) ; écusson net à 22 / 27 ; triangles des seuils
+  visibles sous la barre ; segment d'Absorption assez distinct de la vie (bleu clair désaturé) ; infobulles des
+  états et de la case ouvertes en bas à gauche sans sortir de l'écran. Ombre : `GetCameraPosition` /
+  `GetCameraTarget` rendent bien la caméra calculée par `RefreshCamera` (même repère que les `Set…`) et le
+  glissement ramène les pieds sous l'ombre (Grark Lorkrub de trois quarts) ; sinon, l'ombre resterait où elle
+  était (aucune régression). Hauteur de l'ombre (pieds au-dessus du bas du cadre) : non corrigée.
 
 - Découpe par le client (`SetTextureSliceMargins` sur une pièce de l'atlas posée par `SetTexCoord`, région
   à échelle propre) : bouts des boutons à la même taille qu'avant (hauteur × 24 / 62), coins des
@@ -1640,24 +1653,82 @@ de carte revient au même.
 - Décor plein cadre (Mortemines pour le boss, route sinon). Héros à gauche (x 96–296) : modèle 3D du
   joueur posé au sol, barre d'incantation au-dessus (nom du sort, cible, « au prochain tour »), écusson
   d'Absorption à gauche de la barre de vie, états et Pouvoirs actifs en pastilles dessous.
-- Ennemis à droite (x 470–1022, 1 à 5, légèrement décalés en profondeur, réduits à 86 % à partir de 5) :
-  bulle d'intention au-dessus (icône + chiffres exacts de `Combat.calcDamage`, « ×N » pour les coups
-  multiples, « Guette », « Étourdi »… ; liseré rouge = attaque, bleu = défense / renfort, violet = guet /
-  affaiblissement, vert = soin), modèle 3D avec ombre, anneau doré aux pieds de la cible (survol, ou ennemi
-  retenu pendant une visée) ; sous les pieds, dans un cadre d'infos au-dessus du personnage (aucun
-  modèle ni repli ne peut les recouvrir) : nom sur une pilule d'ardoise (élite violet, boss orangé ;
-  réduit s'il est trop long), barre de vie (+ écusson d'Absorption), états en pastilles. Les pieds sont
-  sur la même ligne quelle que soit la taille du personnage (`art.scale` : l'emplacement remonte), de
-  sorte que nom et états restent au-dessus du plateau (vérifié par le harnais pour 1 à 6 ennemis).
+- Ennemis à droite (x 452–1024, 1 à 6, légèrement décalés en profondeur, réduits à 86 % à partir de 5) :
+  **cadre d'unité** en haut du décor (voir ci-dessous) et, dessous, le modèle 3D posé par les pieds avec son
+  ombre, anneau doré aux pieds de la cible (survol, ou ennemi retenu pendant une visée). Pieds sur la ligne y 300
+  (un ennemi sur deux 24 plus bas), quelle que soit la taille du personnage ; un personnage agrandi
+  (`art.scale`) l'est autant que la place sous le cadre et ses états le permet (sa tête n'y monte jamais).
   Quadrupède long (`art.wide`, crocilisques 1,6) : `Scene.setWide` élargit cadre et modèle en largeur seulement
   (centrés, même hauteur) et pose `SetViewInsets` de l'excédent : vue projetée = cadre de base, taille apparente
   inchangée (raison et sources dans le commentaire de `Scene.setWide` ; harnais U28W).
   Sans modèle : médaillon argenté à l'icône de l'ennemi (`Art.enemies[id].icon`), ou disque sombre.
+- **Cadre d'unité des ennemis** (maquette validée par le joueur le 16/11/2026, capture d'un élite, Grark
+  Lorkrub : le dragon d'or arrondi du cadre d'élite entourait un portrait absent, les traits de seuil juraient
+  dans la barre, l'intention et son « +1 » étaient sur le modèle, l'ombre n'était pas sous les pieds, les états
+  étaient sous les pieds). **Tout ce qui se lit tient dans le cadre et la rangée dessous ; plus rien sur le
+  modèle.** Cadre horizontal de 204 × 42 à l'échelle 1 (ombre portée comprise ; bas visible à 37,8), en haut
+  du décor (y 44, le même pour tous les ennemis), de gauche à droite :
+  - **Corps** : ligne du nom (gras 11,5, élite violet, boss orangé ; réduit jusqu'à 9,5 puis tronqué « … ») et,
+    juste à sa droite, le **« ? »** de la fiche (diamètre 13, seulement si l'ennemi a une information) ; puis
+    **une seule barre de vie** (`W.unitBar`, pièce `bar_enemy` étirée en largeur) : l'**Absorption n'a plus de
+    barre**, elle prolonge la vie par un segment bleu clair (la même pièce désaturée, teinte `W.ABSORB_TINT`) de
+    la fin de la vie sur Absorption / PV max ; au-delà du maximum le segment se cale à droite, par-dessus la fin
+    de la vie (comme le bouclier des cadres du jeu). Texte « 116 / 116 +6 ». Infobulle de la barre : vie,
+    Absorption et sa règle, seuils. Seuils de phase (`def.phases`) et crans des zones (`marks`) : **petits
+    triangles dorés sous la barre** (`mark_up`, 7 × 5), pointe sur le seuil ; passés : gris ; couleur d'une zone :
+    pièce désaturée teintée. Plus aucun trait dans la barre.
+  - **Case d'intention** (40 de large, filet compris), collée à droite du corps, séparée par un filet vertical
+    (`uf_vline`) : icône dans une case de barre d'action (20) et un nombre dessous (gras 12,5), dans la couleur
+    de la nature de l'intention (celles de l'ancienne bulle : `C.<couleur>Text`, rouge attaque, bleu défense /
+    renfort / sommeil, violet guet…). Le nombre : le texte entier s'il tient (« 12 », « 6×3 », « +1 », « Hex ») ;
+    attaque + effet : les dégâts seuls ; sinon l'essentiel (`V.intentShort`) : le premier nombre (« Asleep 2 » →
+    « 2 », « Wakes 2 » → « 2 »), un mot sans nombre réduit jusqu'à 8,5 puis abrégé (« Stun »). Quand le nombre
+    n'en dit pas tout (attaque + effet, texte abrégé, ouverture annoncée « On waking: … » / « Next: … ») :
+    **petite marque** à l'angle haut droit de l'icône, l'icône de la zone s'il y en a une (Curse du Bite, flamme
+    du Stoke, corne de l'ouverture), sinon un « + » doré. **Le détail complet s'ouvre au survol de la case**
+    (infobulle habituelle, en bas à gauche) : nom du coup, chaque action, texte de la zone, et l'intention
+    suivante imposée avec ses dégâts (« On waking: Death Roll 20. »). Les dégâts de ce tour sont toujours dans
+    la case sans survoler. `s.intent.full` = texte entier, `s.intent.nextText` = intention suivante (harnais).
+  - **Élite / boss** : même cadre au liseré doré (`uf_box_gold`, filet `uf_vline_gold`) et **écusson droit** à
+    l'angle haut gauche (`elite_crest`, 22 de haut, boss 27), qui déborde de 3 (5) à gauche et de 4 (6) en haut ;
+    le nom commence après lui. Le dragon d'or rond (`unit_boss`) ne sert plus en combat ; il reste sur la carte,
+    autour des portraits.
+  - Sous le cadre, une **rangée** alignée à gauche (icônes de 19, comme les auras d'une cible) : d'abord les
+    **compteurs gardés** de la fiche (icône + nombre sur un fond sombre), puis les **états** (buffs, debuffs, avec
+    leur nombre ; mêmes infobulles, ouvertes en bas à gauche). Une seule ligne, jamais plus large que le cadre :
+    ce qui déborde est remplacé par une case « +N » au bout (infobulle : les états cachés). Choix : « +N » plutôt
+    qu'une seconde ligne, pour que le modèle ne bouge jamais quand un état s'ajoute.
+  - Pièces : `uf_box` / `uf_box_gold` (neuf tranches d'une seule texture, 0,6 unité par pixel stocké, liseré de
+    1,2), voile noir à 0,42 dessous (la boîte du jeu n'est opaque qu'à 0,4 : nom et nombres lisibles sur tout
+    décor), `uf_vline`, `elite_crest`, `mark_up`, case d'action. Source : la boîte argentée du cadre compact de
+    boss (UI-HUD-UnitFrame-Boss-Small-PortraitOff-2x, 4703662) réduite à un seul logement (haut et bas de la
+    boîte, sans le filet du milieu ; moitié gauche et son miroir, le dragon passant sous le coin bas droit du
+    fichier) ; version dorée = liseré recoloré en or par la luminance ; écusson = bouclier doré droit du même
+    fichier (…-Target-PortraitOn-Boss-Quest-2x) vidé de son « ! » (fond refait ligne à ligne), tête de dragon
+    d'or des élites dedans (nameplates-icon-elite-gold, 1300837) ; triangle dessiné par le script. Cherchées
+    avant (MCP wow) : dragon des nameplates (rond, fait pour un portrait), écussons des hauts faits (couronne de
+    lauriers illisible petite), bouclier de la barre d'incantation (argent, vide), étoile rare-élite.
+  - Largeur : l'écart entre centres est la largeur d'un cadre + 8 au plus (212), la zone partagée sinon ; cadre =
+    écart − 8 (en unités de l'emplacement), 204 au plus : 204 à 1 et 2 ennemis, ≈ 183 à 3, ≈ 135 à 4, ≈ 125 à 5
+    et ≈ 103 à 6 (échelle 0,86) ; la case d'intention garde ses 40, le nom se tronque.
+  - **Ombre** sous les pieds du modèle réel. Cause du décalage : l'ombre et l'anneau sont posés au centre du bas du
+    cadre du personnage, mais le client ne cadre pas une créature sur ses pieds (origine du modèle) : sa caméra
+    (`RefreshCamera`) vise le centre de la boîte englobante (comme les caméras d'interface de Blizzard,
+    `useModelCenter`) ; une arme tenue d'un côté, un modèle tourné de trois quarts (`SetFacing`) déplacent ce
+    centre, donc les pieds, hors de l'axe du cadre. Correction (`Scene.centerFeet`, à chaque cadrage) : position et
+    cible de la caméra glissent ensemble à l'horizontale, perpendiculairement à la visée, de la distance qui
+    sépare l'origine de l'axe de visée (lues par `GetCameraPosition` / `GetCameraTarget`, posées par
+    `SetCameraPosition` / `SetCameraTarget`, SimpleModelAPI de WoW Forever) : l'origine se projette au centre
+    horizontal du cadre, sur l'ombre ; indépendant de l'angle de champ (inconnu). Hauteur inchangée
+    (`S.SHADOW_FEET`). Orientation changée dans les options : cadrage refait (`V:ApplyFacing`).
+  - Compteur de combat d'une zone (Wildfire) : déplacé entre le héros et les ennemis (x 308–448, y 110), le haut
+    du décor étant aux cadres ; texte réduit à sa largeur.
+  - Marques de classe sur un ennemi (cible du familier, Atrophic Poison) : au bout de la ligne du nom
+    (`s.markSpot`, place réservée si `ClassViews.<classe>.enemyMarks` ; docs/classes.md).
 - **Fiche de l'ennemi** (demande du joueur du 16/11/2026 : la ligne « Pack: +2 Str » posée en travers du modèle
   et son infobulle étaient médiocres). Plus aucune ligne de texte permanente sur le modèle : ce qui est connu
-  d'un ennemi passe par un bouton **« ? »** rond posé sur le bord gauche de son cadre d'unité, centré sur la
-  barre de vie (diamètre 15, 3 unités sur le liseré du cadre sans toucher la barre ; à gauche aussi pour le cadre
-  d'élite / boss, dont le dragon d'or occupe la droite). Pièces : `ring_small` (petit anneau doré du jeu,
+  d'un ennemi passe par un bouton **« ? »** rond posé juste à droite de son nom, sur sa ligne (cadre d'unité
+  refait le même jour, ci-dessus ; d'abord sur le bord gauche du cadre). Pièces : `ring_small` (petit anneau doré du jeu,
   embarqué) sur un disque sombre (`mask_disc`), « ? » doré dessiné en texte ; survol : copie additive de
   l'anneau, « ? » blanchi. Il n'apparaît que si l'ennemi a au moins une information ; un clic vaut un clic sur
   l'ennemi (visée). Place : `LayoutEnemies` réserve les 12 unités qui dépassent du cadre dans l'écart entre
@@ -1671,8 +1742,8 @@ de carte revient au même.
   quand elle change en combat. `V.enemyInfo(c, e)` (`UI/CombatView.lua`) réunit les entrées : traits du socle
   sans état (`Art.enemyTraits`), règles des zones actives (`ns.ZoneViews.<zone>.enemyInfo`, `UI/ZoneView.lua`),
   Stun Resistant des élites (`Art.stunResistInfo`), seuils de PV (« Phases », passés en gris ; aussi en crans sur
-  la barre, dont l'infobulle reste). La bulle d'intention (« Asleep 2 », « On waking: … », petite icône du Bite,
-  du Stoke, de l'ouverture) et les états sous les pieds ne changent pas.
+  repères sous la barre, dont l'infobulle reste). Intention et états : dans la case d'intention et la rangée sous le
+  cadre (« Cadre d'unité des ennemis », ci-dessus).
 
   | Information | Où | Valeur actuelle |
   | --- | --- | --- |
@@ -1693,16 +1764,22 @@ de carte revient au même.
 
   **Compteurs gardés** (entrée `compact`) : seulement un nombre dont le joueur a besoin à chaque tour pour
   décider sans survoler (Earthen Charge, Curses du lanceur, soin de Slumber, plafond d'Invincible) ; icône +
-  nombre, alignés à droite sous le cadre, sur la ligne de l'intention (jamais sur le modèle). S'ils n'y tiennent
-  pas à côté de l'intention : nombres seuls ; sinon juste au-dessus du cadre (s'il reste la place sous le haut du
-  décor) ; en dernier recours une ligne plus bas (aucun combat réel n'y arrive : harnais). Deux au plus.
-  Harnais **UFE** (et sections des zones) : « ? » présent seulement s'il y a une information, dans la fenêtre, sur
-  le bord gauche du cadre et centré sur la barre, sans chevauchement d'un autre ennemi ni du cadre du héros à 1, 3
-  et 5 ennemis (cadres ordinaires, d'élite et de boss côte à côte), fiche correcte au survol par la souris du
-  client (`H.mouseFocus` : nom, rang, chaque entrée ; ancrage et place estimée dans la fenêtre), compteurs sur la
-  ligne de l'intention sans la toucher (ou au-dessus du cadre dans le cas défavorable), aucun autre texte sur
-  l'emplacement que cadre, intention, états, compteurs et « ? ». Aperçus `fiche-wetlands.svg`, `fiche-elite.svg`,
-  `fiche-swamp.svg`, `fiche-5-ennemis.svg`, `fiche-compteurs.svg`.
+  nombre, en tête de la rangée sous le cadre, avant les états (jamais sur le modèle). Deux au plus.
+  Harnais **UFE** (refait avec le cadre, et sections des zones), à 1, 3, 5 et 6 ennemis, ordinaires, élites et
+  boss mêlés, ennemis agrandis : cadre, écusson, « ? », compteurs et états dans la fenêtre, sous le bandeau, hors
+  du cadre du héros et de tout voisin, **rien sur la zone du modèle** (son cadre) ; rang du cadre (liseré doré,
+  écusson, plus grand pour un boss, nom après lui) ; barre dans le cadre et à gauche du filet, case d'intention
+  à sa droite, nombre dans la case ; « ? » juste à droite du nom, seulement s'il y a une information, fiche
+  correcte au survol par la souris du client (`H.mouseFocus` : nom, rang, chaque entrée, ancrage) ; repères de
+  seuil sous la barre, au bon endroit ; rangée sous le cadre, alignée à gauche, dans sa largeur ; aucun texte de
+  l'emplacement ailleurs ; pieds sur une ou deux lignes (y 300) ; ombre centrée sous le modèle. Case d'intention :
+  attaque simple (dégâts exacts, sans marque), multi-coups (« 6×3 »), renfort (« +1 »), Absorption, attaque +
+  effet (dégâts, « + », détail au survol), dormeur (« 2 », « Asleep 2 » et l'ouverture au survol), intention
+  longue avec icône de zone. Absorption en prolongement (pleine vie : calée à droite ; vie entamée : commence où
+  la vie finit ; texte ; infobulle ; disparue à 0). Ennemi chargé d'états : « +N », infobulle des cachés.
+  Caméra recentrée (modèle simulé : origine sur l'axe de visée, hauteur gardée). Aperçus `fiche-elite.svg` (3
+  dont un élite), `fiche-5-ennemis.svg` (5 avec un boss), `cadres-6-ennemis.svg`, `fiche-swamp.svg` (dormeurs),
+  `cadres-etats.svg` (ennemi chargé d'états), `fiche-compteurs.svg`, `fiche-wetlands.svg`.
 - Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
   (cachée à 0), pioche, défausse et consumées (tas avec nombre ; infobulles : contenu trié ; clic =
   panneau des cartes, pioche triée), main en arc au centre (cartes droites ; la survolée se lève de 12,
@@ -2013,8 +2090,8 @@ textures de la fenêtre = fichiers de l'addon présents sur disque, icônes ou t
 jamais agrandies au-delà de leurs pixels à l'échelle 115 % (combat, options, marchand, parcours, rencontre,
 feu de camp) ; libellés des boutons entre leurs bouts, nom et PV du héros dans leurs logements, PV des
 ennemis dans leur barre ; aucun cadre enfant dessiné sous un visuel survolable) ; **ordre de dessin et silhouette** (U31 : règle du faux client — un cadre rogneur dessine son sous-arbre à son niveau, `R.drawKey` dans `Sim/ui_render.lua`, que les aperçus SVG appliquent aussi, avec le rognage — ; chaque élément du bandeau au-dessus de la barre de titre et filets au-dessus du contenu (combat, récompense, parcours, rencontre) ; message passager devant les options et le panneau du deck ; butin en vol sur la couche du dessus puis rendu à son écran ; rien du contenu, du fond ni du bandeau sur un pixel extérieur des pièces du cadre métal, contenu bord à bord avec la partie opaque des filets ; dialogues et parchemins de même ; cases d'icônes : icône = ouverture du cadre mesurée sur les pixels à ±1, fond dans le cadre). U21 contrôle les cadres
-compacts des ennemis (nom dans son logement, barre dans le cadre, jamais sur le bandeau ni sous le modèle,
-sans chevauchement, 1 à 6 ennemis × 3 échelles), U24 les réponses (libellé d'une ligne dans le bouton, texte
+d'unité des ennemis (nom dans sa place, barre dans le cadre, jamais sur le bandeau ni sous le modèle,
+sans chevauchement, 1 à 6 ennemis × 3 échelles ; le reste du cadre : UFE), U24 les réponses (libellé d'une ligne dans le bouton, texte
 dessous dans la place restante). Le faux client mesure les textes avec les
 avances des glyphes de Baloo Chettan 2 (`Sim/baloo_metrics.lua`), une ligne d'un cadratin (`H.LINE_EM` :
 l'interligne du client, mesuré sur une capture ; le fichier généré donne 1,47, la hauteur hhea),

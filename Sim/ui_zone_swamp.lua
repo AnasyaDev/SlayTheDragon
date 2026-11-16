@@ -36,17 +36,18 @@ return function(T)
   local rollA = ns.Enemies.sawtooth_crocolisk.moves.death_roll.actions[1]
   local roll = tostring(Combat.calcDamage(c, croc, c.player, rollA[2]))
   if (rollA.times or 1) > 1 then roll = roll .. "×" .. rollA.times end -- coups multiples : « 10×2 »
-  check("dormeurs : bulle « Asleep 2 » / « Asleep 3 », icône du sommeil", sc.intent.text._text == "Asleep 2"
-    and sw.intent.text._text == "Asleep 3", tostring(sc.intent.text._text) .. " / " .. tostring(sw.intent.text._text))
-  check("ouverture annoncée en gris sous la bulle : « On waking: Death Roll " .. roll .. " »", vis(sc.next)
-    and sc.next._text == "On waking: Death Roll " .. roll, tostring(sc.next._text))
+  check("dormeurs : « Asleep 2 » / « Asleep 3 » (case : tours de sommeil « 2 » / « 3 »), icône du sommeil", sc.intent.full == "Asleep 2"
+    and sw.intent.full == "Asleep 3" and sc.intent.text._text == "2" and sw.intent.text._text == "3",
+    tostring(sc.intent.text._text) .. " / " .. tostring(sw.intent.text._text))
+  check("ouverture annoncée (marque sur la case, détail au survol) : « On waking: Death Roll " .. roll .. " »", vis(sc.intent.plus)
+    and sc.intent.nextText == "On waking: Death Roll " .. roll, tostring(sc.intent.nextText))
   local t = tip(sc.intent)
   check("infobulle du dormeur : tours sautés, réveil par les dégâts, Rude Awakening, ouverture",
     t:find("Asleep 2", 1, true) and t:find("Damage wakes it up", 1, true) and t:find("Rude Awakening", 1, true)
     and t:find("On waking: Death Roll", 1, true), t)
   check("Marsh Oracle : Alarm Cry annonce le nombre de dormeurs (« Wakes 2 »), incantation",
-    (so.intent.text._text or ""):find("Wakes 2", 1, true) ~= nil and tip(so.intent):find("Wakes up all sleeping allies", 1, true) ~= nil,
-    tostring(so.intent.text._text) .. " | " .. tip(so.intent))
+    (so.intent.full or ""):find("Wakes 2", 1, true) ~= nil and tip(so.intent):find("Wakes up all sleeping allies", 1, true) ~= nil,
+    tostring(so.intent.full) .. " | " .. tip(so.intent))
   check("état Asleep : mot du langage (zone swamp) et définition courte", ns.Language.keywords.rude_awakening
     and ns.Language.keywords.rude_awakening.zone == "swamp" and Art.statusShort.asleep ~= nil and Art.statuses.asleep ~= nil)
   snap("zone-swamp", true)
@@ -74,7 +75,7 @@ return function(T)
   end
   check("réveil par un coup : bonus, ouverture devenue l'intention (« " .. roll .. " »), petite icône d'ouverture",
     idx and croc.hp < hp0 and croc.st.asleep == nil and sc.intent.text._text == roll and vis(sc.intent.badge)
-    and not vis(sc.next), tostring(sc.intent.text._text))
+    and sc.intent.nextText == nil, tostring(sc.intent.text._text))
   snap("zone-swamp-wake", true)
 
   -- 2. Boss : Somnus endormi, puis The Dream (dragonnets, Slumber, soin affiché sous la bulle)
@@ -84,8 +85,8 @@ return function(T)
   local s = c2.enemies[1]
   local ss = v2.slotOf[s.uid]
   check("Somnus : « Asleep 2 », ouverture Bellowing Roar en gris, cran de The Dream sur la barre",
-    ss.intent.text._text == "Asleep 2" and (ss.next._text or ""):find("^On waking: Bellowing Roar") ~= nil
-    and vis(ss.marks[1]), tostring(ss.next._text))
+    ss.intent.full == "Asleep 2" and (ss.intent.nextText or ""):find("^On waking: Bellowing Roar") ~= nil
+    and vis(ss.marks[1]), tostring(ss.intent.nextText))
   ns.Swamp.wake(c2, s, "test")
   s.hp = math.floor(s.maxHp * 0.5) + 1
   Combat.dealDamage(c2, c2.player, s, 3)
@@ -95,8 +96,8 @@ return function(T)
   local mend = ss.chips[1]
   local tsom = vis(ss.ask) and table.concat(H.hover(ss.ask), " | ") or ""
   check("The Dream : deux dragonnets, Somnus endormi (« Asleep 2 »), compteur de Slumber sous le cadre (« +5 »), fiche",
-    #c2.enemies == 3 and ss.intent.text._text == "Asleep 2" and vis(mend) and mend.text._text == "+5"
-    and (ss.next._text or ""):find("Deep Breath", 1, true) ~= nil
+    #c2.enemies == 3 and ss.intent.full == "Asleep 2" and vis(mend) and mend.text._text == "+5"
+    and (ss.intent.nextText or ""):find("Deep Breath", 1, true) ~= nil
     and tsom:find("Slumber|r — heals 5 at each of its turns while asleep.", 1, true) ~= nil
     and tsom:find("Asleep|r — skips its turns while asleep.", 1, true) ~= nil
     and tsom:find("Asleep for 2 more turns. On waking: Deep Breath", 1, true) ~= nil, tostring(mend and mend.text._text) .. " // " .. tsom)

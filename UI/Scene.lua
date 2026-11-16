@@ -1137,6 +1137,7 @@ function S.figure(parent, w, h)
   f.model = W.model(f, w, h)
   f.model:SetPoint("BOTTOM", 0, 0)
   f.model:EnableMouse(false)
+  f.model.sceneCenterFeet = true -- pieds ramenés sous l'ombre à chaque cadrage (S.centerFeet)
   -- repli sans modèle : médaillon argenté (icône de l'ennemi ou disque sombre), W.setFallbackArt
   f.fallback = W.medallion(f, math.max(40, math.floor(math.min(w, h) * 0.42)))
   f.fallback:SetPoint("CENTER", 0, h * 0.08)
@@ -1406,8 +1407,38 @@ function S.frameModel(model, keepAnim)
   if model.SetCamDistanceScale then model:SetCamDistanceScale(1) end
   if model.sceneFacing and model.SetFacing then model:SetFacing(model.sceneFacing) end
   if not keepAnim and not model.dead and model.SetAnimation then model:SetAnimation(Art.anim.stand) end
-  if model.sceneFraming then model.sceneFraming(model) end
+  if model.sceneFraming then model.sceneFraming(model)
+  elseif model.sceneCenterFeet then S.centerFeet(model) end
   model.sceneFramed = (model.sceneFramed or 0) + 1
+end
+
+-- Ombre décalée (retour du 16/11/2026, capture d'un élite : ombre nettement à gauche et sous un orc de face tourné
+-- de trois quarts). L'ombre et l'anneau de cible sont posés au centre du bas du cadre du personnage. Or le client ne
+-- cadre pas une créature sur ses pieds (origine du modèle) : RefreshCamera vise le centre de sa boîte englobante
+-- (comme les caméras d'interface de Blizzard, GetUICameraInfo → useModelCenter, UseModelCenterToTransform). Une
+-- arme tenue d'un côté, une cape, un modèle tourné de trois quarts (SetFacing) déplacent ce centre, donc les pieds,
+-- hors de l'axe du cadre : l'ombre restait au milieu, à côté des pieds. Correction (indépendante de l'angle de champ,
+-- inconnu) : position et cible de la caméra glissent ensemble, perpendiculairement à la visée et à l'horizontale, de
+-- la distance qui sépare l'origine de l'axe de visée ; l'origine se projette alors au centre horizontal du cadre, sur
+-- l'ombre. Hauteur : inchangée (la boîte est posée sur les pieds ; S.SHADOW_FEET). Sans les fonctions de caméra
+-- (autre client, harnais sans elles) : rien ne change. Renvoie le glissement appliqué (unités du modèle) ou nil.
+function S.centerFeet(model)
+  if not (model.GetCameraPosition and model.GetCameraTarget and model.SetCameraPosition and model.SetCameraTarget) then
+    return nil
+  end
+  local ok1, px, py, pz = pcall(model.GetCameraPosition, model)
+  local ok2, tx, ty, tz = pcall(model.GetCameraTarget, model)
+  if not (ok1 and ok2 and px and py and pz and tx and ty and tz) then return nil end
+  local dx, dy = tx - px, ty - py
+  local len = math.sqrt(dx * dx + dy * dy)
+  if len < 1e-6 then return nil end
+  local rx, ry = dy / len, -dx / len -- à droite de la visée, à l'horizontale
+  local shift = -(tx * rx + ty * ry)  -- origine (0, 0, 0) ramenée sur l'axe de visée
+  model.sceneFeetShift = shift
+  if math.abs(shift) < 1e-5 then return 0 end
+  model:SetCameraPosition(px + shift * rx, py + shift * ry, pz)
+  model:SetCameraTarget(tx + shift * rx, ty + shift * ry, tz)
+  return shift
 end
 
 local function orphans(model)

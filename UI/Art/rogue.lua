@@ -139,6 +139,7 @@ function Art.rogueAtrophic(c, e)
 end
 
 ns.ClassViews.rogue = {
+  enemyMarks = true, -- marque sur un cadre d'ennemi : CombatView lui réserve la fin de la ligne du nom
   tokens = function(c, list)
     ns.Widgets.noteToken(list, "epic", Art.rogueEpicLine(c))
   end,
@@ -148,11 +149,11 @@ ns.ClassViews.rogue = {
       local m = view.playerModel
       if m and not m.dead then W.modelAlpha(m, 1) end
     end)
-    -- marques d'Atrophic Poison (une par ennemi, à droite de son cadre)
+    -- marques d'Atrophic Poison (une par ennemi, au bout de la ligne du nom : s.markSpot, enemyMarks)
     host.marks = {}
     for i = 1, MARKS do
       local mk = CreateFrame("Frame", nil, host)
-      mk:SetSize(16, 16)
+      mk:SetSize(13, 13)
       mk:SetFrameLevel(host:GetFrameLevel() + 30)
       mk.icon = W.noSnap(mk:CreateTexture(nil, "ARTWORK", nil, 0))
       mk.icon:SetAllPoints()
@@ -182,7 +183,7 @@ ns.ClassViews.rogue = {
         k = k + 1
         local mk = host.marks[k]
         mk:ClearAllPoints()
-        mk:SetPoint("LEFT", s.tag, "RIGHT", 2, 0)
+        mk:SetPoint("CENTER", s.markSpot or s.tag, "CENTER", 0, 0)
         mk:Show()
       end
     end

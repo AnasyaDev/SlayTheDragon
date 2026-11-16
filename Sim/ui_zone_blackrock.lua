@@ -135,8 +135,9 @@ local function body(T)
   Combat.forceIntent(c, f, "nova", { now = false, label = "Next" })
   v:Render(true)
   local sf = v.slotOf[f.uid]
-  check("ouverture différée en gris : « Next: Fire Nova … »", vis(sf.next) and (sf.next._text or ""):find("^Next: Fire Nova") ~= nil,
-    tostring(sf.next._text))
+  check("ouverture différée : marque sur la case, « Next: Fire Nova … » au survol", vis(sf.intent.plus)
+    and (sf.intent.nextText or ""):find("^Next: Fire Nova") ~= nil and tip(sf.intent):find("Next: Fire Nova", 1, true) ~= nil,
+    tostring(sf.intent.nextText))
   Combat.applyStatus(c, f, "fire_shield", 2)
   v:Render(true)
   H.settle()

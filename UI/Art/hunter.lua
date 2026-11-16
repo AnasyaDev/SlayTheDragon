@@ -129,6 +129,7 @@ local TRAP_Y = HERO_FEET + 30
 
 local V = {}
 ns.ClassViews.hunter = V
+V.enemyMarks = true -- marque sur un cadre d'ennemi : CombatView lui réserve la fin de la ligne du nom
 
 local function petTooltip(tt)
   local c = ns.Controller.combat()
@@ -234,17 +235,18 @@ function V.build(host, view)
     showPet()
   end)
   showPet()
-  -- marqueur de la cible du familier : petite icône ronde à gauche du cadre de l'ennemi visé
+  -- marqueur de la cible du familier : petite icône ronde au bout de la ligne du nom de l'ennemi visé (place
+  -- réservée par CombatView : s.markSpot, ClassViews.hunter.enemyMarks)
   local mark = CreateFrame("Frame", nil, host)
-  mark:SetSize(18, 18)
+  mark:SetSize(10, 10)
   mark:SetFrameLevel(host:GetFrameLevel() + 30)
   mark.icon = W.noSnap(mark:CreateTexture(nil, "ARTWORK", nil, 0))
   mark.icon:SetAllPoints()
   W.roundMask(mark, mark.icon)
   W.setIcon(mark.icon, Art.petMark, "ui:petmark")
   mark.ring = W.wow(mark, "ring_small", "ARTWORK", 1)
-  mark.ring:SetPoint("TOPLEFT", -3, 3)
-  mark.ring:SetPoint("BOTTOMRIGHT", 3, -3)
+  mark.ring:SetPoint("TOPLEFT", -2, 2)
+  mark.ring:SetPoint("BOTTOMRIGHT", 2, -2)
   mark:EnableMouse(false)
   mark:Hide()
   host.mark = mark
@@ -297,7 +299,7 @@ function V.render(host, c, view)
   local s = t and view.slotOf and view.slotOf[t.uid]
   if s and s.tag and s:IsShown() then
     host.mark:ClearAllPoints()
-    host.mark:SetPoint("RIGHT", s.tag, "LEFT", -2, 0)
+    host.mark:SetPoint("CENTER", s.markSpot or s.tag, "CENTER", 0, 0)
     host.mark:Show()
   else
     host.mark:Hide()

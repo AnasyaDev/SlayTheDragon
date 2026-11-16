@@ -85,6 +85,7 @@ SetDrawLayer SetBlendMode SetShadowColor SetShadowOffset SetRotation SetModelAlp
 SetGradient SetMaxLines SetHorizTile SetVertTile SetHitRectInsets SetClipsChildren SetSpacing
 SetScaleAnimationMode SetSmoothScaling SetOrigin SetSmoothing SetSnapToPixelGrid SetTexelSnappingBias
 SetTextureSliceMargins SetTextureSliceMode SetModelScale SetPosition SetKeepModelOnHide SetViewInsets
+GetCameraPosition GetCameraTarget SetCameraPosition SetCameraTarget
 ]]):gmatch("%S+") do NOOP[name] = true end
 
 local Frame = {}
@@ -4603,8 +4604,8 @@ do
     check("vue projetée = cadre de base : SetViewInsets(45, 45, 0, 0), taille apparente inchangée",
       ins[1] == inset and ins[2] == inset and ins[3] == 0 and ins[4] == 0, table.concat(ins, ", "))
     local scx = (sr[1] + sr[3]) / 2
-    local feet = sr[4] - (33 + H0) * (sr[4] - sr[2]) / croc._h
-    check("cadre élargi centré sur l'emplacement, pieds sur la même ligne (33 + 160 sous le haut)",
+    local feet = sr[4] - croc.feet * (sr[4] - sr[2]) / croc._h
+    check("cadre élargi centré sur l'emplacement, pieds sur la ligne de l'emplacement (s.feet sous le haut)",
       math.abs((fr[1] + fr[3]) / 2 - scx) < 0.01 and math.abs((mr[1] + mr[3]) / 2 - scx) < 0.01
       and math.abs(fr[2] - feet) < 0.01 and math.abs(mr[2] - feet) < 0.01 and croc.figH == H0,
       ("centre %.1f / %.1f, bas %.1f / %.1f"):format((fr[1] + fr[3]) / 2, scx, fr[2], feet))
@@ -4652,7 +4653,7 @@ do
       and f.ui._calls.EnableMouse and f.ui._calls.EnableMouse[1] == false
     local slotsOk = true
     for _, s in ipairs({ croc, others[1], others[2] }) do
-      if s._w ~= v.slots[1]._w or s._h ~= v.slots[1]._h or not s._scripts.OnClick or not s._scripts.OnEnter then slotsOk = false end
+      if s._w < s.tag._w or s._w >= f._w or not s._scripts.OnClick or not s._scripts.OnEnter then slotsOk = false end
     end
     check("souris : cadre élargi (débordant sur un voisin) sans souris, ni lui ni ses enfants ; emplacements intacts",
       over and off and #mbad == 0 and slotsOk, table.concat(mbad, ", "))
@@ -4965,7 +4966,7 @@ do
         local r = R.rect(o)
         if r then
           local w, h = (r[3] - r[1]), (r[4] - r[2])
-          if (w > e.pw + 0.75 and e.stretch ~= "h") or h > e.ph + 0.75 then
+          if (w > e.pw + 0.75 and e.stretch ~= "h") or (h > e.ph + 0.75 and e.stretch ~= "v") then
             blurry[#blurry + 1] = string.format("%s : %s %.0f×%.0f > %d×%d", where, wn, w, h, e.pw, e.ph)
           end
         end
@@ -6858,8 +6859,8 @@ do
   check("infobulle du familier : cible et dégâts, explication du Frenzy", tp:find("Attacks ", 1, true) and tp:find("Frenzy", 1, true), tp)
   local tgt = ns.Hunter.petTarget(c)
   local s = tgt and v.slotOf[tgt.uid]
-  check("marqueur de la cible du familier : visible, collé au cadre de l'ennemi visé", vis(host.mark) and s
-    and host.mark._points[1] and host.mark._points[1][2] == s.tag)
+  check("marqueur de la cible du familier : visible, au bout de la ligne du nom de l'ennemi visé (place réservée)", vis(host.mark) and s
+    and host.mark._points[1] and host.mark._points[1][2] == s.markSpot and ns.ClassViews.hunter.enemyMarks == true)
   -- pastille de ressource : Frenzy
   local r = v.resource
   check("pastille de ressource : icône du Frenzy, nombre, visible", r._shown
@@ -10143,8 +10144,8 @@ do
   check("infobulle de la barre : « Below 50%: Enraged. Gains Strength 2. »",
     table.concat(tt, " | "):find("Below 50%: Enraged. Gains Strength 2.", 1, true) ~= nil, table.concat(tt, " | "))
   -- intention remplacée, primes, intention suivante, petite icône
-  check("intention remplacée par la zone : « Asleep 2 », infobulle de la zone",
-    s1.intent.text._text == "Asleep 2" and (H.hover(s1.intent)[1] or "") == "Asleep", s1.intent.text._text)
+  check("intention remplacée par la zone : « Asleep 2 » (case : « 2 »), infobulle de la zone",
+    s1.intent.full == "Asleep 2" and s1.intent.text._text == "2" and (H.hover(s1.intent)[1] or "") == "Asleep", s1.intent.text._text)
   local b1 = s1.chips[1]
   local content = R.rect(ns.UI.content)
   local badBadge = {}
@@ -10153,16 +10154,18 @@ do
     if not vis(b) then badBadge[#badBadge + 1] = "compteur caché" end
     if (b.text._text or "") ~= "+2" then badBadge[#badBadge + 1] = tostring(b.text._text) end
     if not inside(R.rect(b), content) then badBadge[#badBadge + 1] = "hors fenêtre " .. fmt(R.rect(b)) end
-    if overlaps(R.rect(b), R.rect(s.tag)) then badBadge[#badBadge + 1] = "sur le cadre" end
+    if overlaps(R.rect(b), R.rect(s.tag)) then badBadge[#badBadge + 1] = "sur le cadre " .. fmt(R.rect(b)) .. " / " .. fmt(R.rect(s.tag)) end
+    if overlaps(R.rect(b), R.rect(s.fig)) then badBadge[#badBadge + 1] = "sur le modèle" end
     if overlaps(R.rect(b), R.rect(s.intent)) then badBadge[#badBadge + 1] = "sur l'intention" end
     if not vis(s.ask) then badBadge[#badBadge + 1] = "« ? » caché" end
   end
-  check("compteur de la fiche sous le cadre de chaque ennemi : « +2 », dans la fenêtre, hors du cadre et de l'intention, « ? » montré",
+  check("compteur de la fiche sous le cadre de chaque ennemi : « +2 », dans la fenêtre, hors du cadre, de l'intention et du modèle, « ? » montré",
     #badBadge == 0, table.concat(badBadge, " ; "))
   check("infobulle d'un compteur = fiche (« Pack — … »)", table.concat(H.hover(b1), " | "):find("Pack|r — when it dies", 1, true) ~= nil)
   local s2 = v.slotOf[e2.uid]
-  check("intention suivante en gris sous l'intention (« On waking: … »)", vis(s2.next)
-    and (s2.next._text or ""):find("^On waking: ") ~= nil, tostring(s2.next._text))
+  check("intention suivante (« On waking: … ») : marque sur la case, détail au survol", (vis(s2.intent.plus) or vis(s2.intent.badge))
+    and (s2.intent.nextText or ""):find("^On waking: ") ~= nil
+    and table.concat(H.hover(s2.intent), " | "):find("On waking: ", 1, true) ~= nil, tostring(s2.intent.nextText))
   if e2 ~= e1 then
     check("petite icône de zone à droite de l'intention", vis(s2.intent.badge) and not vis(s1.intent.badge))
   end
@@ -10172,8 +10175,14 @@ do
   local badC = {}
   if not vis(v.counter) then badC[#badC + 1] = "caché" end
   if overlaps(cr, hf) then badC[#badC + 1] = "sur le cadre du héros" end
-  for _, s in pairs(v.slotOf) do if overlaps(cr, R.rect(s.tag)) then badC[#badC + 1] = "sur un cadre d'ennemi" end end
-  check("compteur de combat en haut au centre : « Wildfire in 2 », hors des cadres", #badC == 0
+  for _, s in pairs(v.slotOf) do
+    if overlaps(cr, R.rect(s.tag)) then badC[#badC + 1] = "sur un cadre d'ennemi" end
+    for _, o in ipairs({ s.chips[1], s.chips[2], s.fig, unpack(s.st.tokens) }) do
+      if vis(o) and overlaps(R.rect(v.counter.text), R.rect(o)) then badC[#badC + 1] = "texte sur la rangée d'états ou le modèle d'un ennemi" end
+    end
+  end
+  if not inside(R.rect(v.counter.text), { cr[1] - 1, cr[2] - 1, cr[3] + 1, cr[4] + 1 }) then badC[#badC + 1] = "texte hors de son cadre" end
+  check("compteur de combat entre le héros et les ennemis : « Wildfire in 2 », hors des cadres", #badC == 0
     and v.counter.text._text == "Wildfire in 2", table.concat(badC, " ; ") .. " " .. fmt(cr))
   check("infobulle du compteur", (H.hover(v.counter)[1] or "") == "Ignites in 2 rounds.")
   -- cartes de combat : corps teinté, carte d'origine, marque
@@ -10647,8 +10656,10 @@ do
   for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 mk = m end end
   local s = v.slotOf[tgt.uid]
   local mr, tr = mk and R.rect(mk), s and R.rect(s.tag)
-  check("Atrophic Poison : une marque à droite du cadre de l'ennemi sous DoT (jeton sans ligne)",
-    shown == 1 and mr and tr and mr[1] >= tr[3] - 0.5 and line() == "" and not dim(), shown)
+  local nr = s and R.rect(s.name)
+  check("Atrophic Poison : une marque au bout de la ligne du nom de l'ennemi sous DoT, dans le cadre, après le nom (jeton sans ligne)",
+    shown == 1 and mr and tr and mr[1] >= tr[1] and mr[3] <= tr[3] and mr[1] >= nr[3] - 0.5 and mk._points[1][2] == s.markSpot
+      and line() == "" and not dim(), shown)
   local mt = mk and table.concat(H.hover(mk), " | ") or ""
   check("survol de la marque : compte comme Demoralized", mt:find("counts as Demoralized", 1, true), mt)
   tgt.st.pain = 1
@@ -11888,7 +11899,7 @@ do
   snap("marchand-7-cartes", true)
 end
 
-print("UFE fiche de l'ennemi : « ? » du cadre d'unité (seulement s'il y a une information), place à 1, 3 et 5 ennemis, fiche au survol (souris du client), compteurs sous le cadre, aucun texte sur le modèle")
+print("UFE cadre d'unité des ennemis (maquette du 16/11/2026) : tout dans le cadre et la rangée d'états, rien sur le modèle ; 1, 3, 5 et 6 ennemis ; case d'intention, Absorption, seuils, états, fiche « ? », ombre")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
@@ -11901,7 +11912,7 @@ do
     return false
   end
   local function inside(r, box)
-    return r and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+    return r and box and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
   end
   local function overlaps(a, b)
     return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
@@ -11910,13 +11921,22 @@ do
   local strip = function(t) return (t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
   local _, c0, v = zoneCombat("priest")
   local ns = H.ns
-  local Combat, CV = ns.Combat, ns.UI.screens.combat
-  -- combat de test : ces ennemis (zone des vues : c.zone), réaffiché de zéro
+  local Combat, CV, Sc = ns.Combat, ns.UI.screens.combat, ns.Scene
+  -- combat de test : ces ennemis (zone des vues : c.zone), réaffiché de zéro ; au-delà de Combat.MAX_ENEMIES (un
+  -- mourant reste affiché) : copie directe
   local function fight(ids, zone, prep)
     local c = ns.Controller.combat()
     c.enemies = {}
     c.zone = zone or "westfall"
-    for _, id in ipairs(ids) do assert(Combat.spawn(c, id), id) end
+    for _, id in ipairs(ids) do
+      if not Combat.spawn(c, id) then
+        local e = deepcopy(c.enemies[1])
+        e.uid, e.id, e.mem, e.st = c.nextUid, id, {}, {}
+        e.intent = ns.Enemies[id].pattern[1]
+        c.nextUid = c.nextUid + 1
+        c.enemies[#c.enemies + 1] = e
+      end
+    end
     if prep then prep(c) end
     v.c = nil
     v:Show({ state = c })
@@ -11937,83 +11957,136 @@ do
     return lines, focus
   end
   local content = R.rect(ns.UI.content)
-  local heroR, castR = R.rect(v.heroFrame), vis(v.cast) and R.rect(v.cast) or nil
-  -- disposition d'un combat : « ? » seulement s'il y a une information, dans la fenêtre, sur le bord gauche du
-  -- cadre et centré sur la barre de vie, sans chevauchement d'un autre ennemi (cadre, « ? », compteurs) ni du
-  -- cadre du héros ; compteurs sur la ligne de l'intention, sans la toucher ; aucun texte posé sur le modèle ;
-  -- fiche au survol : nom, rang, une entrée par information, infobulle dans la fenêtre
-  local modes = {}
+  local k1 = (content[3] - content[1]) / Sc.W -- unités résolues par unité du contenu
+  local decorTop = content[4] - Sc.TOP * k1
+  local heroR = R.rect(v.heroFrame)
+  local function slotOfEnemy(e) return v.slotOf[e.uid] end
+  -- Disposition d'un combat. Pour chaque ennemi : cadre, écusson, « ? », compteurs et états dans la fenêtre, sous
+  -- le bandeau, hors du cadre du héros ; barre et case d'intention dans le cadre (case à droite du filet) ; « ? » à
+  -- droite du nom, sur sa ligne ; rangée d'états sous le cadre, alignée à gauche, dans sa largeur ; repères de
+  -- seuil sous la barre ; AUCUN de ces éléments sur la zone du modèle (son cadre), ni sur un voisin ; aucun texte
+  -- de l'emplacement hors du cadre, de la case, des états, des compteurs et du « ? » ; pieds sur la ligne commune ;
+  -- ombre centrée sous le modèle ; fiche au survol (souris du client).
   local function layout(label, c, expectAsk)
-    local bad, boxes, asks = {}, {}, 0
+    local bad, boxes = {}, {}
+    local feetY = {}
     for _, s in pairs(v.slotOf) do
       local e = c.enemies[s.enemyIndex]
+      local def = ns.Enemies[e.id]
       local info = CV.enemyInfo(c, e)
       local name = Combat.enemyName(e)
-      local tr, hr = R.rect(s.tag), R.rect(s.hp)
+      local tr, hr, ir = R.rect(s.tag), R.rect(s.hp), R.rect(s.intent)
+      local k = s:GetEffectiveScale() and (tr[3] - tr[1]) / s.tag._w or k1
+      local boxBottom = tr[4] - CV.boxBottom() * k -- bas visible du cadre (l'ombre portée est dessous)
+      local model = R.rect(s.fig)
+      local own = { tr }
+      if not inside(tr, content) or tr[4] > decorTop + 0.5 then bad[#bad + 1] = name .. " : cadre hors du décor " .. fmt(tr) end
+      if overlaps(tr, heroR) then bad[#bad + 1] = name .. " : cadre sur celui du héros" end
+      -- élite / boss : liseré doré, écusson (plus grand pour un boss) dans la fenêtre ; ordinaire : argent, sans
+      local rank = def.boss and "boss" or (def.elite and "elite" or nil)
+      if s.frameRank ~= rank then bad[#bad + 1] = name .. " : rang du cadre " .. tostring(s.frameRank) end
+      if vis(s.tag.gold.parts[1]) ~= (rank ~= nil) or vis(s.tag.plain.parts[1]) == (rank ~= nil) then
+        bad[#bad + 1] = name .. " : liseré " .. (rank and "doré attendu" or "argenté attendu")
+      end
+      if rank then
+        local cr = R.rect(s.crest)
+        own[#own + 1] = cr
+        if not vis(s.crest) or s.crest._wow ~= "elite_crest" then bad[#bad + 1] = name .. " : écusson absent" end
+        if not inside(cr, content) or cr[4] > decorTop + 0.5 then bad[#bad + 1] = name .. " : écusson hors du décor " .. fmt(cr) end
+        if cr[1] > tr[1] + 2 * k or cr[4] < tr[4] then bad[#bad + 1] = name .. " : écusson pas à l'angle haut gauche" end
+        local h = (cr[4] - cr[2]) / k
+        if (rank == "boss" and h < 25) or (rank == "elite" and (h < 20 or h > 24)) then
+          bad[#bad + 1] = ("%s : écusson de %.1f"):format(name, h)
+        end
+        local nr = R.rect(s.name)
+        if overlaps(nr, cr) then bad[#bad + 1] = name .. " : nom sous l'écusson" end
+      elseif vis(s.crest) then
+        bad[#bad + 1] = name .. " : écusson sur un ennemi ordinaire"
+      end
+      -- barre dans le cadre, une seule ; case d'intention à droite du filet, dans le cadre
+      if not inside(hr, tr) then bad[#bad + 1] = name .. " : barre hors du cadre" end
+      local vr = R.rect(s.tag.gold.parts[1]._shown and s.vlineGold or s.vline)
+      local filetX = (vr[1] + vr[3]) / 2
+      if hr[3] > filetX then bad[#bad + 1] = name .. " : barre sous le filet" end
+      if vis(s.intent) then
+        if not inside(ir, { filetX, tr[2], tr[3], tr[4] }) then bad[#bad + 1] = name .. " : case d'intention hors de sa place " .. fmt(ir) end
+        local tx = R.rect(s.intent.text)
+        if not inside(tx, ir) then bad[#bad + 1] = name .. " : nombre de l'intention hors de la case" end
+        if (s.intent.text:GetStringWidth() or 0) > (CV.INTENT_W - 4) + 0.5 then bad[#bad + 1] = name .. " : nombre trop large" end
+      elseif not e.dead then
+        bad[#bad + 1] = name .. " : case d'intention cachée"
+      end
+      -- nom dans le corps ; « ? » juste à droite du nom, sur sa ligne, seulement s'il y a une information
+      local nr = R.rect(s.name)
+      if not inside(nr, { tr[1], hr[4], filetX, tr[4] }) then bad[#bad + 1] = name .. " : nom hors de sa ligne " .. fmt(nr) end
+      if (s.name:GetStringWidth() or 0) > (s.nameW or 0) + 0.5 then bad[#bad + 1] = name .. " : nom plus large que sa place" end
       if vis(s.ask) ~= (#info > 0) then bad[#bad + 1] = name .. " : « ? » " .. (vis(s.ask) and "sans information" or "absent") end
       if expectAsk and expectAsk[e.id] ~= nil and expectAsk[e.id] ~= vis(s.ask) then
         bad[#bad + 1] = name .. " : « ? » attendu " .. tostring(expectAsk[e.id])
       end
-      local own = { tr }
       if vis(s.ask) then
-        asks = asks + 1
         local ar = R.rect(s.ask)
         own[#own + 1] = ar
-        if not inside(ar, content) then bad[#bad + 1] = name .. " : « ? » hors de la fenêtre " .. fmt(ar) end
-        if ar[3] > hr[1] + 0.5 or ar[1] > tr[1] then bad[#bad + 1] = name .. " : « ? » pas sur le bord gauche du cadre" end
-        if math.abs((ar[2] + ar[4]) / 2 - (hr[2] + hr[4]) / 2) > 0.6 then bad[#bad + 1] = name .. " : « ? » pas centré sur la barre de vie" end
-        if overlaps(ar, heroR) or overlaps(ar, castR) then bad[#bad + 1] = name .. " : « ? » sur le cadre du héros" end
-        if overlaps(ar, R.rect(s.intent)) then bad[#bad + 1] = name .. " : « ? » sur l'intention" end
-        -- fiche par la souris du client
+        local nw = math.min(s.name:GetStringWidth() or 0, s.nameW or 0) * k
+        if ar[1] < nr[1] + nw - 0.5 or ar[1] > nr[1] + nw + 6 * k then bad[#bad + 1] = name .. " : « ? » pas juste à droite du nom" end
+        if math.abs((ar[2] + ar[4]) / 2 - (nr[2] + nr[4]) / 2) > 1 then bad[#bad + 1] = name .. " : « ? » pas sur la ligne du nom" end
+        if ar[3] > filetX + 0.5 or overlaps(ar, hr) then bad[#bad + 1] = name .. " : « ? » hors du corps" end
         local lines, focus = hoverAt(s.ask)
         if not lines then
-          bad[#bad + 1] = name .. " : souris prise par " .. tostring(focus and rawget(focus, "_kind"))
+          bad[#bad + 1] = name .. " : souris du « ? » prise par " .. tostring(focus and rawget(focus, "_kind"))
         else
-          local def = ns.Enemies[e.id]
-          local rank = def.boss and "Boss" or (def.elite and "Elite" or nil)
+          local rk = def.boss and "Boss" or (def.elite and "Elite" or nil)
           local body = table.concat(lines, " | ")
-          if lines[1] ~= name or (rank and lines[2] ~= rank) then bad[#bad + 1] = name .. " : en-tête « " .. body .. " »" end
+          if lines[1] ~= name or (rk and lines[2] ~= rk) then bad[#bad + 1] = name .. " : en-tête « " .. body .. " »" end
           for _, it in ipairs(info) do
             if not body:find(it.name, 1, true) then bad[#bad + 1] = name .. " : entrée « " .. it.name .. " » absente" end
           end
           if anchorSeen ~= "ANCHOR_BOTTOMLEFT" then bad[#bad + 1] = name .. " : ancrage " .. tostring(anchorSeen) end
-          -- infobulle estimée (330 de large au plus, lignes repliées à ~55 caractères, 13 par ligne) : ouverte
-          -- en bas à gauche du « ? », elle tient dans la fenêtre
-          local n = 0
-          for _, l in ipairs(lines) do n = n + math.max(1, math.ceil(#strip(l) / 55)) end
-          local box = { ar[1] - 330, ar[2] - (n * 13 + 20), ar[1], ar[2] }
-          if not inside(box, content) then bad[#bad + 1] = name .. " : infobulle hors de la fenêtre " .. fmt(box) end
         end
       end
-      -- compteurs : sur la ligne de l'intention, ou juste au-dessus du cadre (sous le haut du décor)
-      local k0 = s:GetEffectiveScale()
-      local rowBand = { tr[1] - 40, tr[2] - (3 + 26 + 0.5) * k0, tr[3] + 40, tr[2] }
-      local aboveBand = { tr[1] - 40, tr[4], tr[3] + 40, tr[4] + 16 * k0 }
-      if s.chipsAt then modes[s.chipsAt] = (modes[s.chipsAt] or 0) + 1 end
-      if s.chipsAt == "below" then bad[#bad + 1] = name .. " : compteurs une ligne sous l'intention (sur le modèle)" end
-      for k, ch in ipairs(s.chips) do
-        if vis(ch) then
-          local cr = R.rect(ch)
-          own[#own + 1] = cr
-          if not (inside(cr, rowBand) or inside(cr, aboveBand)) then
-            bad[#bad + 1] = name .. " : compteur " .. k .. " ni sur la ligne de l'intention ni au-dessus du cadre (" .. tostring(s.chipsAt) .. ")"
-          end
-          if overlaps(cr, R.rect(s.name)) or overlaps(cr, tr) then bad[#bad + 1] = name .. " : compteur sur le cadre" end
-          if not inside(cr, content) then bad[#bad + 1] = name .. " : compteur hors de la fenêtre" end
-          if overlaps(cr, R.rect(s.intent)) then bad[#bad + 1] = name .. " : compteur sur l'intention" end
-          if s.chips[k + 1] and vis(s.chips[k + 1]) and overlaps(cr, R.rect(s.chips[k + 1])) then
-            bad[#bad + 1] = name .. " : compteurs l'un sur l'autre"
-          end
+      -- repères de seuil : sous la barre (pointe sur son bord bas), dans le cadre
+      for _, m in ipairs(s.marks) do
+        if vis(m) then
+          local mr = R.rect(m)
+          if math.abs(mr[4] - hr[2]) > 1 or not inside(mr, tr) then bad[#bad + 1] = name .. " : repère de seuil pas sous la barre " .. fmt(mr) end
+          if math.abs((mr[1] + mr[3]) / 2 - (hr[1] + (hr[3] - hr[1]) * m.at)) > 0.6 then bad[#bad + 1] = name .. " : repère de seuil mal placé" end
         end
       end
-      -- textes visibles de l'emplacement : seulement ceux du cadre, de l'intention (et la suivante), des états,
-      -- des compteurs et du « ? » ; aucun autre texte (ancienne ligne « Pack: +2 Str ») sur le modèle
+      -- rangée sous le cadre : compteurs puis états, alignée à gauche, dans la largeur du cadre, une ligne
+      local row = {}
+      for _, ch in ipairs(s.chips) do if vis(ch) then row[#row + 1] = ch end end
+      for _, t in ipairs(s.st.tokens) do if vis(t) then row[#row + 1] = t end end
+      if vis(s.more) then row[#row + 1] = s.more end
+      local x0
+      for i, o in ipairs(row) do
+        local r = R.rect(o)
+        own[#own + 1] = r
+        if i == 1 and math.abs(r[1] - tr[1]) > 0.6 then bad[#bad + 1] = name .. " : rangée pas alignée à gauche du cadre" end
+        if r[4] > boxBottom + 0.5 or r[4] < boxBottom - 6 * k then bad[#bad + 1] = name .. " : rangée pas sous le cadre " .. fmt(r) end
+        if r[3] > tr[3] + 0.5 then bad[#bad + 1] = name .. " : rangée plus large que le cadre" end
+        if x0 and r[1] < x0 - 0.5 then bad[#bad + 1] = name .. " : rangée en désordre" end
+        x0 = r[3]
+      end
+      -- rien de l'emplacement sur la zone du modèle
+      for _, r in ipairs(own) do
+        if overlaps(r, model) then bad[#bad + 1] = name .. " : infos sur la zone du modèle " .. fmt(r) .. " / " .. fmt(model) end
+        if not inside(r, content) then bad[#bad + 1] = name .. " : hors de la fenêtre " .. fmt(r) end
+        if overlaps(r, heroR) then bad[#bad + 1] = name .. " : sur le cadre du héros" end
+      end
+      -- aucun texte visible de l'emplacement hors du cadre, des états, des compteurs, du « ? » et de la case
       for _, o in ipairs(H.objects) do
         if rawget(o, "_kind") == "FontString" and under(o, s) and vis(o) and (o._text or "") ~= "" then
-          local ok = under(o, s.tag) or under(o, s.intent) or o == s.next or under(o, s.st) or under(o, s.ask)
+          local ok = under(o, s.tag) or under(o, s.intent) or under(o, s.st) or under(o, s.ask) or under(o, s.more)
           for _, ch in ipairs(s.chips) do ok = ok or under(o, ch) end
           if not ok then bad[#bad + 1] = name .. " : texte « " .. tostring(o._text) .. " » sur le modèle" end
         end
+      end
+      -- pieds et ombre : bas du modèle sur la ligne commune (la sienne, ou celle des décalés), ombre centrée dessous
+      local mr = R.rect(s.model)
+      feetY[#feetY + 1] = mr[2]
+      for _, t in ipairs(s.fig.shadow.parts) do
+        local sr = R.rect(t)
+        if math.abs((sr[1] + sr[3]) / 2 - (mr[1] + mr[3]) / 2) > 0.05 then bad[#bad + 1] = name .. " : ombre décentrée" end
       end
       for _, b in ipairs(boxes) do
         for _, r1 in ipairs(own) do
@@ -12024,15 +12097,28 @@ do
       end
       boxes[#boxes + 1] = own
     end
+    -- deux lignes de pieds au plus (posés, et un sur deux un peu plus bas)
+    local lines = {}
+    for _, y in ipairs(feetY) do
+      local found = false
+      for _, l in ipairs(lines) do if math.abs(l - y) < 0.05 then found = true end end
+      if not found then lines[#lines + 1] = y end
+    end
+    if #lines > 2 then bad[#bad + 1] = #lines .. " lignes de pieds" end
+    local want = content[4] - (300 + (#feetY > 1 and 24 or 0)) * k1
+    local hasLine = false
+    for _, l in ipairs(lines) do if math.abs(l - (content[4] - 300 * k1)) < 0.6 then hasLine = true end end
+    if #feetY > 0 and not hasLine then bad[#bad + 1] = "pieds hors de la ligne commune (300) " .. tostring(lines[1]) .. " / " .. want end
     check(label, #bad == 0, table.concat(bad, " ; "))
-    return asks
   end
 
-  -- Westfall : 1, 3, 5 ennemis, cadres ordinaires et d'élite / boss mêlés (deux dragons d'or côte à côte)
+  -- 1, 3, 5 et 6 ennemis, cadres ordinaires, d'élite et de boss mêlés
   local c = fight({ "vancleef" })
-  layout("1 ennemi (boss VanCleef) : « ? » (Phases), place, fiche", c, { vancleef = true })
+  layout("1 ennemi (boss VanCleef) : cadre doré, grand écusson, « ? » (Phases), repères sous la barre", c, { vancleef = true })
+  local sv1 = v.slotOf[c.enemies[1].uid]
+  check("1 ennemi : cadre à sa largeur pleine (204)", math.abs(sv1.tag._w - CV.FRAME_W) < 0.01, sv1.tag._w)
   c = fight({ "gnoll", "harvest_golem", "murloc" })
-  layout("3 ennemis : gnoll sans « ? », élite (Stun Resistant) et murloc (Vengeance) avec, place, fiches", c,
+  layout("3 ennemis : gnoll sans « ? », élite (Stun Resistant) et murloc (Vengeance) avec", c,
     { gnoll = false, harvest_golem = true, murloc = true })
   local s = v.slotOf[c.enemies[3].uid]
   local tm = table.concat(hoverAt(s.ask) or {}, " | ")
@@ -12045,15 +12131,103 @@ do
   snap("fiche-elite", true)
   c = fight({ "murloc", "harvest_golem", "vancleef", "rhahkzor", "gnoll" })
   check("5 ennemis : emplacements à l'échelle 0,86", math.abs((v.slotOf[c.enemies[1].uid]:GetScale() or 1) - 0.86) < 1e-6)
-  layout("5 ennemis (élite, boss, élite côte à côte) : « ? » dans la fenêtre, aucun chevauchement, fiches", c,
+  layout("5 ennemis (élite, boss, élite côte à côte) : tout dans la fenêtre, aucun chevauchement", c,
     { gnoll = false, murloc = true, vancleef = true })
+  local s5 = v.slotOf[c.enemies[1].uid]
+  check("5 ennemis : cadre rétréci, case d'intention à sa largeur", s5.tag._w < CV.FRAME_W and s5.tag._w >= 100
+    and math.abs(s5.intentSpot._w - (CV.INTENT_W - 2)) < 0.01, s5.tag._w)
   snap("fiche-5-ennemis", true)
+  c = fight({ "murloc", "harvest_golem", "vancleef", "rhahkzor", "mystic", "gnoll" })
+  layout("6 ennemis (un mourant affiché) : tout dans la fenêtre, aucun chevauchement", c)
+  snap("cadres-6-ennemis", true)
   c = fight({ "murloc", "murloc", "gnoll", "murloc", "mystic" })
   layout("5 ennemis ordinaires : « ? » des murlocs seulement, aucun chevauchement", c, { gnoll = false, mystic = false, murloc = true })
-  local sv = v.slotOf[c.enemies[3].uid]
-  check("gnoll : pas de « ? » (rien à montrer)", not vis(sv.ask))
+  check("gnoll : pas de « ? » (rien à montrer)", not vis(v.slotOf[c.enemies[3].uid].ask))
+  -- ennemi agrandi (art.scale) : modèle borné sous les infos, pieds sur la ligne
+  c = fight({ "murloc", "vancleef", "harvest_golem" })
+  layout("ennemis agrandis (VanCleef, golem) : modèle sous les infos, pieds sur la ligne", c)
 
-  -- Wetlands : meute (Pack dans la fiche, plus de ligne « Pack: +2 Str »), 3 et 5 ennemis
+  -- case d'intention : attaque simple, multi-coups, renfort, intention longue (détail au survol)
+  local function intentOf(e) return v.slotOf[e.uid].intent end
+  c = fight({ "gnoll", "murloc", "gnoll" }, nil, function(cc)
+    cc.enemies[1].intent = ns.Enemies.gnoll.pattern[1]
+  end)
+  local e1 = c.enemies[1]
+  local mv = Combat.moveOf(e1.id, e1.intent)
+  local dmg
+  for _, a in ipairs(mv.actions) do if a[1] == "attack" then dmg = Combat.calcDamage(c, e1, c.player, Combat.enemyBase(c, e1, a)) end end
+  local ib = intentOf(e1)
+  check("attaque simple : icône, dégâts exacts dans la case, sans marque", dmg and ib.text._text == tostring(dmg)
+    and ib.icon._texture ~= nil and not vis(ib.plus) and not vis(ib.badge), tostring(ib.text._text) .. " / " .. tostring(dmg))
+  -- intentions fabriquées : multi-coups, renfort, attaque + effet, texte long
+  ns.Enemies.uce_test = { name = "Intent Tester", hp = 40, moves = {
+      multi = { name = "Flurry", intent = "attack", actions = { { "attack", 6, times = 3 } } },
+      summon = { name = "Call", intent = "summon", actions = { { "summon", "gnoll" } } },
+      combo = { name = "Rend", intent = "attack", actions = { { "attack", 9 }, { "debuff", "demoralized", 2 } } },
+      guard = { name = "Brace", intent = "defend", actions = { { "block", 8 } } },
+    }, pattern = { "multi" } }
+  c = fight({ "uce_test", "uce_test", "uce_test", "uce_test" }, nil, function(cc)
+    cc.enemies[1].intent, cc.enemies[2].intent, cc.enemies[3].intent, cc.enemies[4].intent = "multi", "summon", "combo", "guard"
+  end)
+  local function show(e) local b = intentOf(e) return tostring(b.text._text), b end
+  local t1, b1 = show(c.enemies[1])
+  local d1 = Combat.calcDamage(c, c.enemies[1], c.player, Combat.enemyBase(c, c.enemies[1], { "attack", 6, times = 3 }))
+  check("multi-coups : « " .. d1 .. "×3 » dans la case", t1 == d1 .. "×3" and not vis(b1.plus), t1)
+  local t2, b2 = show(c.enemies[2])
+  check("renfort : « +1 », couleur de la nature (summon)", t2 == "+1" and b2.text._calls.SetTextColor ~= nil, t2)
+  local t3, b3 = show(c.enemies[3])
+  local d3 = Combat.calcDamage(c, c.enemies[3], c.player, Combat.enemyBase(c, c.enemies[3], { "attack", 9 }))
+  local tt3 = table.concat(hoverAt(b3) or {}, " | ")
+  check("attaque + effet : dégâts seuls dans la case, marque « + », détail (Demoralized) au survol par la souris",
+    t3 == tostring(d3) and vis(b3.plus) and tt3:find("Attack: " .. d3, 1, true) ~= nil and tt3:find("Demoralized 2", 1, true) ~= nil
+      and anchorSeen == "ANCHOR_BOTTOMLEFT", t3 .. " | " .. tt3)
+  local t4 = show(c.enemies[4])
+  check("Absorption : « 8 » dans la case", t4 == "8", t4)
+  -- Absorption en prolongement de la barre de vie, texte des deux
+  local e4 = c.enemies[4]
+  e4.block = 6
+  e4.hp = e4.maxHp
+  v:Render(true)
+  H.settle()
+  local s4 = v.slotOf[e4.uid]
+  local hb, sh = R.rect(s4.hp), R.rect(s4.hp.shield)
+  check("Absorption pleine vie : segment bleu clair calé à droite de la barre, « " .. e4.maxHp .. " / " .. e4.maxHp .. " +6 »",
+    vis(s4.hp.shield) and s4.hp.text._text == e4.maxHp .. " / " .. e4.maxHp .. " +6" and math.abs(sh[3] - hb[3]) < 0.05
+      and math.abs((sh[3] - sh[1]) - (hb[3] - hb[1]) * 6 / e4.maxHp) < 0.05, tostring(s4.hp.text._text))
+  e4.hp = math.floor(e4.maxHp / 2)
+  v:Render(true)
+  H.settle()
+  sh = R.rect(s4.hp.shield)
+  local fr = R.rect(s4.hp.fill)
+  check("Absorption, vie entamée : le segment prolonge la vie (commence où elle finit)", vis(s4.hp.shield)
+    and math.abs(sh[1] - fr[3]) < 0.05 and s4.hp.text._text == e4.hp .. " / " .. e4.maxHp .. " +6", fmt(sh) .. " / " .. fmt(fr))
+  local tb4 = table.concat(H.hover(s4.hp), " | ")
+  check("infobulle de la barre : vie et Absorption", tb4:find("Absorb: 6", 1, true) ~= nil, tb4)
+  e4.block = 0
+  v:Render(true)
+  H.settle()
+  check("sans Absorption : plus de segment, « PV / max »", not vis(s4.hp.shield) and s4.hp.text._text == e4.hp .. " / " .. e4.maxHp)
+  ns.Enemies.uce_test = nil
+
+  -- ennemi chargé d'états : rangée sous le cadre, « +N » au bout, infobulles
+  c = fight({ "murloc", "harvest_golem", "gnoll", "mystic", "murloc" }, nil, function(cc)
+    local st, ids = cc.enemies[2].st, {}
+    for id, d in pairs(ns.Statuses) do if not d.affix and not d.flag then ids[#ids + 1] = id end end
+    table.sort(ids)
+    for i = 1, math.min(10, #ids) do st[ids[i]] = 2 end
+  end)
+  layout("ennemi chargé d'états (5 ennemis) : rangée sous le cadre, « +N », rien sur le modèle", c)
+  local sg = v.slotOf[c.enemies[2].uid]
+  local nst = #ns.Widgets.unitStatuses(c.enemies[2])
+  check("états qui débordent : « +" .. (nst - (sg.stShown or 0)) .. " » au bout, infobulle des états cachés", vis(sg.more)
+    and sg.more.text._text == "+" .. (nst - sg.stShown) and #(H.hover(sg.more)) == nst - sg.stShown, tostring(sg.more.text._text))
+  local tk = sg.st.tokens[1]
+  local tl = tk and hoverAt(tk) or nil
+  check("état de la rangée : infobulle par la souris du client (nom de l'état)", tl and #tl > 0 and anchorSeen == "ANCHOR_BOTTOMLEFT",
+    tl and table.concat(tl, " | ") or "souris prise")
+  snap("cadres-etats", true)
+
+  -- Wetlands : meute, Modr (compteur gardé en tête de la rangée)
   c = fight({ "mosshide_brute", "mosshide_mystic", "mosshide_alpha" }, "wetlands")
   layout("Wetlands, meute de 3 : « ? » sur chaque membre, place, fiches", c,
     { mosshide_brute = true, mosshide_mystic = true, mosshide_alpha = true })
@@ -12067,11 +12241,12 @@ do
   c = fight({ "bluegill_raider", "mosshide_brute", "mottled_screecher", "dragonmaw_raider", "mosshide_alpha" }, "wetlands")
   layout("Wetlands, meute de 5 : « ? » sur chaque membre, aucun chevauchement", c)
   c = fight({ "modr" }, "wetlands")
-  layout("Modr : « ? » et compteur d'Earthen Charge sous le cadre d'élite", c, { modr = true })
-  check("Modr : compteur « 0/15 »", vis(v.slotOf[c.enemies[1].uid].chips[1])
-    and v.slotOf[c.enemies[1].uid].chips[1].text._text == "0/15")
+  layout("Modr : « ? » et compteur d'Earthen Charge en tête de la rangée", c, { modr = true })
+  local sm = v.slotOf[c.enemies[1].uid]
+  check("Modr : compteur « 0/15 », infobulle = la fiche", vis(sm.chips[1]) and sm.chips[1].text._text == "0/15"
+    and table.concat(hoverAt(sm.chips[1]) or {}, " | "):find("Earthen Charge", 1, true) ~= nil)
 
-  -- Swamp : dormeur (sommeil, ouverture), avec un dragonnet éveillé
+  -- Swamp : dormeur (tours de sommeil dans la case, ouverture au survol)
   c = fight({ "sawtooth_crocolisk", "dreaming_whelp", "wyrmkin_dreamwalker" }, "swamp", function(cc)
     cc.enemies[1].st.asleep = 2
     cc.enemies[2].st.asleep = 2
@@ -12082,28 +12257,47 @@ do
   check("fiche d'un dormeur : règle d'Asleep (Rude Awakening), tours restants et ouverture",
     ts:find("Asleep — skips its turns while asleep. Damage wakes it up. Rude Awakening:", 1, true) ~= nil
       and ts:find("Asleep for 2 more turns. On waking: Death Roll", 1, true) ~= nil, ts)
-  check("dormeur : bulle « Asleep 2 » inchangée", s.intent.text._text == "Asleep 2", tostring(s.intent.text._text))
+  local ti = table.concat(hoverAt(s.intent) or {}, " | ")
+  check("dormeur : « 2 » (tours de sommeil) dans la case, marque, « Asleep 2 » et l'ouverture au survol", s.intent.text._text == "2"
+    and s.intent.full == "Asleep 2" and vis(s.intent.plus) and ti:find("Asleep 2", 1, true) ~= nil
+      and ti:find("On waking: Death Roll", 1, true) ~= nil, tostring(s.intent.text._text) .. " | " .. ti)
   snap("fiche-swamp", true)
 
-  -- cas défavorable : 5 ennemis, intention longue (« Asleep 2 » et petite icône) et deux compteurs larges chacun
+  -- cas défavorable : 5 ennemis, intention longue et petite icône, deux compteurs larges chacun
   ns.ZoneViews.ufetest = {
     intent = function() return { icon = { icon = 136090 }, text = "Asleep 2", color = "defend", title = "Asleep", tip = "-" } end,
     intentBadge = function() return { icon = { icon = 136139 }, tip = "-" } end,
     enemyInfo = function() return { { name = "Test A", text = "a.", compact = { icon = { icon = 135805 }, text = "12/15" } },
       { name = "Test B", text = "b.", compact = { icon = { icon = 135805 }, text = "+9" } } } end,
   }
-  for k in pairs(modes) do modes[k] = nil end
-  c = fight({ "murloc", "harvest_golem", "gnoll", "vancleef", "mystic" }, "ufetest")
-  layout("5 ennemis, intention longue et deux compteurs larges : au-dessus du cadre (place sous le haut du décor), jamais sur l'intention ni le modèle", c)
-  local ml = {}
-  for k, n in pairs(modes) do ml[#ml + 1] = k .. " " .. n end
-  table.sort(ml)
-  print("      compteurs placés : " .. table.concat(ml, ", "))
+  c = fight({ "murloc", "harvest_golem", "gnoll", "vancleef", "mystic" }, "ufetest", function(cc)
+    cc.enemies[2].st.weak, cc.enemies[2].st.vulnerable, cc.enemies[2].st.strength = 2, 3, 1
+  end)
+  layout("5 ennemis, intention longue et deux compteurs larges : rangée sous le cadre, jamais sur l'intention ni le modèle", c)
+  local sb = v.slotOf[c.enemies[1].uid]
+  check("intention longue avec icône de zone : « 2 » et l'icône en marque (pas de « + »)", sb.intent.text._text == "2"
+    and vis(sb.intent.badge) and not vis(sb.intent.plus), tostring(sb.intent.text._text))
   snap("fiche-compteurs", true)
   ns.ZoneViews.ufetest = nil
+
+  -- ombre : sous les pieds du modèle réel (caméra recentrée sur l'origine du modèle, Scene.centerFeet)
+  local m = sb.model
+  local cam = { p = { 2, 0.6, 1.1 }, t = { 0, 0.35, 0.9 } }
+  rawset(m, "GetCameraPosition", function() return cam.p[1], cam.p[2], cam.p[3] end)
+  rawset(m, "GetCameraTarget", function() return cam.t[1], cam.t[2], cam.t[3] end)
+  rawset(m, "SetCameraPosition", function(_, x, y, z) cam.p = { x, y, z } end)
+  rawset(m, "SetCameraTarget", function(_, x, y, z) cam.t = { x, y, z } end)
+  m.sceneHasModel = true
+  Sc.refreshFigure(sb.fig)
+  -- l'origine (0, 0, 0) doit être sur l'axe de visée : distance à la droite (P, T) dans le plan horizontal nulle
+  local dx, dy = cam.t[1] - cam.p[1], cam.t[2] - cam.p[2]
+  local cross = (0 - cam.p[1]) * dy - (0 - cam.p[2]) * dx
+  check("ombre : caméra glissée à l'horizontale, pieds (origine) sur l'axe de visée = centre du cadre, sous l'ombre ; hauteur gardée",
+    math.abs(cross) < 1e-9 and math.abs(cam.p[3] - 1.1) < 1e-9 and math.abs(cam.t[3] - 0.9) < 1e-9
+      and math.abs((m.sceneFeetShift or 0) - 0.35 * 2 / math.sqrt(4 + 0.0625)) > 0 , ("%.4f"):format(cross))
+  for _, k in ipairs({ "GetCameraPosition", "GetCameraTarget", "SetCameraPosition", "SetCameraTarget" }) do rawset(m, k, nil) end
   local _ = c0
 end
-
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end

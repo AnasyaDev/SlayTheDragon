@@ -1556,6 +1556,65 @@ function W.hpBar(parent, w, h, textSize, piece)
   return f
 end
 
+-- Barre de vie d'un ennemi (cadre d'unité de combat, une seule barre) : celle de W.hpBar, plus l'Absorption EN
+-- PROLONGEMENT de la vie (segment bleu clair : la même pièce désaturée et teintée, de la fin de la vie sur
+-- Absorption / PV max ; au-delà du maximum, il se cale à droite, par-dessus la fin de la vie, comme le bouclier
+-- des cadres du jeu) ; texte « PV / max » ou « PV / max +A ». Set(hp, maxHp, animate) ; SetAbsorb(n[, maxHp]).
+-- Infobulle (anchor, défaut en bas) : vie, Absorption s'il y en a, lignes de l'écran (extraTip : seuils).
+W.ABSORB_TINT = { 0.6, 0.88, 1, 0.95 }
+function W.unitBar(parent, w, h, textSize, piece, anchor)
+  local f = W.hpBar(parent, w, h, textSize, piece)
+  piece = f.piece
+  f.shield = W.wow(f, piece, "ARTWORK", 2)
+  f.shield:SetDesaturated(true)
+  local t = W.ABSORB_TINT
+  f.shield:SetVertexColor(t[1], t[2], t[3], t[4])
+  f.shield:Hide()
+  f.absorb = 0
+  local function layout(self)
+    local n, mx = self.absorb or 0, self.maxHp or 1
+    local hp = self.hp or 0
+    local text = hp .. " / " .. mx
+    if n > 0 then
+      local fa = min(1, n / max(1, mx))
+      local x0 = min(hp / max(1, mx), 1 - fa)
+      local ww = self.w or w
+      self.shield:ClearAllPoints()
+      self.shield:SetPoint("TOPLEFT", self, "TOPLEFT", ww * x0, 0)
+      self.shield:SetPoint("BOTTOMLEFT", self, "BOTTOMLEFT", ww * x0, 0)
+      self.shield:SetWidth(max(0.01, ww * fa))
+      W.setWow(self.shield, piece, { x0, max(x0 + 0.001, x0 + fa), 0, 1 })
+      self.shield:Show()
+      self.shieldFrom, self.shieldTo = x0, x0 + fa
+      text = text .. " +" .. n
+    else
+      self.shield:Hide()
+      self.shieldFrom, self.shieldTo = nil, nil
+    end
+    self.text:SetText(text)
+  end
+  local base = f.Set
+  f.Set = function(self, hp, maxHp, animate)
+    base(self, hp, maxHp, animate)
+    layout(self)
+  end
+  f.SetAbsorb = function(self, n, maxHp)
+    if maxHp then self.maxHp = maxHp end
+    self.absorb = max(0, n or 0)
+    layout(self)
+  end
+  f.Relayout = layout
+  W.tooltip(f, function(tt, self)
+    if self.hp then tt:AddLine("Health: " .. self.hp .. " / " .. self.maxHp, 1, 0.5, 0.45) end
+    if (self.absorb or 0) > 0 then
+      tt:AddLine("Absorb: " .. self.absorb, t[1], t[2], t[3])
+      tt:AddLine(Art.keywordLine("absorb"), 1, 1, 1, true)
+    end
+    if self.extraTip then self.extraTip(tt, self) end
+  end, anchor or "ANCHOR_BOTTOM")
+  return f
+end
+
 -- Absorption : barre bleue du jeu dans le logement bas du cadre d'unité (fraction des PV max, plafonnée)
 -- et son nombre ; cachée à 0 (le logement vide reste dessiné par le cadre). Set(n, maxHp).
 function W.shieldBadge(parent, w, h)
@@ -2022,8 +2081,10 @@ end
 -- (état), { power | card = instance, now = lignes } (carte : infobulle complète, `now` sous le nom) ou
 -- { title, text }.
 -- t.medal = { icon, ring (cadre), SetRing(teinte) } (régions du visuel du jeton : tout suit son animation).
-function W.tokenRow(parent, maxN, width, size)
+-- opts (facultatif) = { anchor = ancrage de l'infobulle (défaut ANCHOR_TOP), count = taille du nombre }.
+function W.tokenRow(parent, maxN, width, size, opts)
   size = size or 30
+  opts = opts or {}
   local row = CreateFrame("Frame", nil, parent)
   row:SetSize(width, size)
   row.tokens = {}
@@ -2042,7 +2103,7 @@ function W.tokenRow(parent, maxN, width, size)
     t.aura:Hide()
     t.medal = { icon = icon, ring = ring,
       SetRing = function(self, c) c = c or Art.rim.silver self.ring:SetVertexColor(c[1], c[2], c[3], 1) end }
-    t.count = W.label(face, "heavy", floor(size * 0.45), C.text, "OVERLAY")
+    t.count = W.label(face, "heavy", opts.count or floor(size * 0.45), C.text, "OVERLAY")
     t.count:SetPoint("BOTTOMRIGHT", face, "BOTTOMRIGHT", 1, -1)
     -- survol : cadre doré de case (créé d'avance, éteint), sans grossir
     t.hot = W.hoverLayer(W.wow(face, "slot_hover", "ARTWORK", 3))
@@ -2060,7 +2121,7 @@ function W.tokenRow(parent, maxN, width, size)
         if info.title then tt:AddLine(info.title, 1, 0.82, 0) end
         if info.text then tt:AddLine(info.text, 1, 1, 1, true) end
       end
-    end, "ANCHOR_TOP")
+    end, opts.anchor or "ANCHOR_TOP")
     t:Hide()
     row.tokens[i] = t
   end
