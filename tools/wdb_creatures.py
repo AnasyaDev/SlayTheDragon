@@ -6,7 +6,8 @@ Usage : python3 -I tools/wdb_creatures.py [--cache FICHIER]... [--id N]... [--di
 Sans argument : toutes les créatures du cache (identifiant, nom, sous-titre, affichages).
 Avec des mots : celles dont le nom ou le sous-titre contient l'un d'eux (sans casse).
 --id / --display : filtrent par identifiant de créature ou d'affichage.
-Par défaut, lit les caches enUS et frFR du client Forever.
+Par défaut, lit les caches enUS et frFR du client Forever, sous WOW_INSTALL_PATH (dossier
+d'installation du jeu ; à défaut, build/wow, lien symbolique local vers ce dossier).
 
 Format (constaté sur le client Forever, build 71912) : en-tête de 24 octets (« BOMW », build,
 langue inversée, trois entiers), puis des enregistrements { identifiant (u32), taille (u32), données }.
@@ -17,11 +18,16 @@ puis le sous-titre. Le bloc des affichages est repéré par sa forme (cohérence
 par un décalage fixe : le lecteur reste juste si quelques champs changent de taille.
 """
 import argparse
+import os
 import struct
 import sys
 
-FOREVER = "/mnt/Games/World of Warcraft/_forever_/Cache/WDB/"
-DEFAULT_CACHES = [FOREVER + "enUS/creaturecache.wdb", FOREVER + "frFR/creaturecache.wdb"]
+# Dossier d'installation du jeu : variable WOW_INSTALL_PATH, sinon build/wow (lien local, non suivi).
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+WOW = os.environ.get("WOW_INSTALL_PATH") or os.path.join(ROOT, "build", "wow")
+FOREVER = os.path.join(WOW, "_forever_", "Cache", "WDB")
+DEFAULT_CACHES = [os.path.join(FOREVER, "enUS", "creaturecache.wdb"),
+                  os.path.join(FOREVER, "frFR", "creaturecache.wdb")]
 HEADER = 24
 
 

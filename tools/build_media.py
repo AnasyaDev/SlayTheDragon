@@ -21,6 +21,9 @@ fractions de la largeur du corps). Aperçus PNG pour le rendu hors jeu : build/m
 Usage (depuis la racine du dépôt) :
   python3 -m venv build/venv && build/venv/bin/pip install pillow fonttools
   build/venv/bin/python tools/build_media.py [--psd CHEMIN] [--icons DOSSIER] [--font FICHIER] [--icons-only]
+  Sources par défaut (sinon variables STD_PSD, STD_ICONS, STD_FONT, ou les options) :
+    build/sources/PSD Card Constructor.psd (pack Mechanized Magic), build/sources/ICONS (icônes 128 px),
+    ~/.local/share/fonts/BalooChettan2.ttf ; build/sources peut ne contenir que des liens symboliques.
   --icons-only : ajoute seulement les icônes nouvellement nommées (nouvelle classe), rien d autre.
   --epic-only : refait seulement les pièces violettes des cartes épiques (card_ribbon_epic, card_cost_epic) à
                 partir de Media/card_ribbon.tga et Media/card_cost.tga, et leurs entrées de UI/SkinData.lua.
@@ -31,10 +34,11 @@ from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageOps
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 HOME = pathlib.Path.home()
+SOURCES = ROOT / "build/sources"  # sources locales (non suivies) : fichiers ou liens symboliques
 ap = argparse.ArgumentParser()
-ap.add_argument("--psd", default=str(HOME / "Téléchargements/1_Free Pack/PSD Card Constructor.psd"))
-ap.add_argument("--icons", default=str(HOME / "Téléchargements/ICONS"))
-ap.add_argument("--font", default=str(HOME / ".local/share/fonts/BalooChettan2.ttf"))
+ap.add_argument("--psd", default=os.environ.get("STD_PSD", str(SOURCES / "PSD Card Constructor.psd")))
+ap.add_argument("--icons", default=os.environ.get("STD_ICONS", str(SOURCES / "ICONS")))
+ap.add_argument("--font", default=os.environ.get("STD_FONT", str(HOME / ".local/share/fonts/BalooChettan2.ttf")))
 ap.add_argument("--epic-only", action="store_true",
                 help="refait seulement les pièces violettes des cartes épiques (ruban, languette de coût)")
 ap.add_argument("--icons-only", action="store_true",
