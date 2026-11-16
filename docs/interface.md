@@ -750,10 +750,14 @@ Stonefield 252, Elwynn : aucun enfant nommé de la Marche connu) et Tobin guette
 D'abord, si un combat est affiché, les **cadres du combat en cours** au chat (avant que la galerie ne
 les couvre ; de quoi attraper un modèle « cassé » en jeu) : « combat frames: » puis une ligne par
 ennemi, `clé: via display 7976; display 7976 file 123456; pos 0,0,0; scale 1; loads 1[; late 1
-(creature 743)]` (`Scene.modelDiag` : candidat validé, « (unverified) » s'il est chargé sans preuve
-d'identité ; affichage et fichier réellement portés, `GetDisplayInfo` / `GetModelFileID` ; position,
-`GetPosition` ; échelle, `GetModelScale` ; chargements reçus depuis la pose du personnage ;
-chargements étrangers écartés et la demande reconnue).
+(creature 743)][; feet shift 0.07 (19.60 px wider each side)]` (`Scene.modelDiag` : candidat validé,
+« (unverified) » s'il est chargé sans preuve d'identité ; affichage et fichier réellement portés,
+`GetDisplayInfo` / `GetModelFileID` ; position = **écart** de `GetPosition` à la position voulue
+(`Scene.feetResidual` : le glissement des pieds de `Scene.centerFeet` est déduit, `0,0,0` = au neutre attendu) ;
+échelle, `GetModelScale` ; chargements reçus depuis la pose du personnage ; chargements étrangers écartés et la
+demande reconnue ; glissement des pieds voulu, à part, en unités du modèle, et l'élargissement du cadre du modèle
+qu'il entraîne). Le rapport (`Scene.modelAnomaly`) ne signale une position que si elle s'écarte de la position
+voulue.
 Puis la galerie (ennemis, chaque `npc` des rencontres, familier, feu de camp) ; sous chaque case, nom,
 identifiants, état, et une ligne de diagnostic compacte (`display 2029 file 777 pos 0,0,0 scale 1 loads
 1`, en rouge s'il y a eu un chargement étranger). Quand plus rien n'est en cours (au plus 60 s), au
@@ -1755,7 +1759,15 @@ de carte revient au même.
       d'où au plus `figH / (2 tz)` pixels par unité (estimation par excès : élargissement trop grand plutôt que
       trop petit). Surplus borné à `S.FEET_EXTRA` = 0,3 × la largeur de base de chaque côté (et à la case de
       `/slay models`) ; au-delà, le glissement lui-même est borné (les pieds s'écartent un peu de l'ombre).
-      Hauteur de cible ≈ 0 : aucun glissement. Diagnostic : `model.sceneFeetShift` (unités), `model.sceneFeetPx`.
+      Hauteur de cible ≈ 0 : aucun glissement. Diagnostic : `model.sceneFeetShift` (unités), `model.sceneFeetPx`,
+      `model.sceneFeetPos` (position voulue ; `/slay models` affiche l'écart à elle et le glissement à part).
+    - **Élargi pour tous les modèles qui glissent**, humanoïdes de face compris (décision du 16/11/2026, après
+      le relevé en jeu d'un glissement de 0,065 unité, ≈ 20 px estimés pour un cadre de 160) : le décalage vient
+      justement d'une arme, d'une cape ou d'un bras tenu d'un côté, et le glissement pousse ce côté-là vers le
+      bord ; la largeur réelle du modèle étant inconnue, seul l'élargissement garantit « jamais hors du cadre ».
+      Sans effet de bord : le cadre du modèle ne prend pas la souris (personnage, emplacement et survol à leur
+      taille), même niveau de dessin qu'avant (sous les cadres d'unité, intentions et noms), transparent hors du
+      modèle ; dans la grille de `/slay models`, borné à sa case (au-delà : glissement borné, ou nul).
     - Harnais (`H.feetSim`, `H.feetFits`) : modèle simulé d'étendue `[-back ; front]` autour de ses pieds, caméra
       sur le centre de sa boîte, écriture de la caméra refusée comme en jeu ; familier (section UH) et emplacement
       d'ennemi (U28W : glissement borné, dans la marge, `SetPosition` sans effet).

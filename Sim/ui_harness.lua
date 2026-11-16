@@ -770,6 +770,25 @@ function H.feetFits(m, g)
   return left >= -half - 0.01 and right <= half + 0.01, left, right, feet, half
 end
 
+-- Largeur attendue du cadre du modèle d'un personnage : largeur élargie par art.wide (fig.wideW) plus le
+-- glissement des pieds de chaque côté (Scene.centerFeet, model.sceneFeetPx) ; glissement attendu en pixels
+-- pour la caméra du faux client (H.CAM_T : visée décalée de l'origine), borné comme dans l'addon.
+function H.modelWant(fig)
+  local m = fig.model
+  return (fig.wideW or fig.figW) + 2 * (m.sceneFeetPx or 0)
+end
+function H.feetPxWant(fig)
+  local m, Sc = fig.model, H.ns.Scene
+  if not m.SetViewInsets then return 0 end
+  local p, t = H.CAM_P, H.CAM_T
+  local dx, dy = t[1] - p[1], t[2] - p[2]
+  local off = math.abs(t[1] * dy - t[2] * dx) / math.sqrt(dx * dx + dy * dy) -- distance de l'origine à la visée
+  local px = off * fig.figH / (2 * t[3])
+  local room = fig.figW * Sc.FEET_EXTRA
+  if fig.wideMax then room = math.min(room, math.max(0, (fig.wideMax - fig.wideW) / 2)) end
+  return math.min(px, room)
+end
+
 function H.unFeetSim(m)
   for _, k in ipairs({ "RefreshCamera", "GetCameraPosition", "GetCameraTarget", "SetCameraPosition", "SetCameraTarget" }) do
     rawset(m, k, nil)
@@ -4805,12 +4824,16 @@ do
     local W0, H0 = 150, 160
     local fr, sr, mr = R.rect(f), R.rect(croc), R.rect(m)
     local ins = m._calls.SetViewInsets or {}
-    local inset = (W0 * 1.6 - W0) / 2
-    check("cadre du modèle élargi de 1.6 en largeur seulement (240 × 160), personnage à sa base (150, figW)",
-      f._w == W0 and f._h == H0 and m._w == W0 * 1.6 and m._h == H0 and f.figW == W0 and f.figH == H0,
-      ("%s × %s, modèle %s × %s"):format(f._w, f._h, m._w, m._h))
-    check("vue projetée = cadre de base : SetViewInsets(45, 45, 0, 0), taille apparente inchangée",
-      ins[1] == inset and ins[2] == inset and ins[3] == 0 and ins[4] == 0, table.concat(ins, ", "))
+    -- 45 de chaque côté pour art.wide, plus le glissement des pieds (visée du faux client décalée de l'origine)
+    local inset = (W0 * 1.6 - W0) / 2 + H.feetPxWant(f)
+    check("cadre du modèle élargi de 1.6 en largeur seulement (240 × 160) et du glissement des pieds, personnage à sa base",
+      f._w == W0 and f._h == H0 and math.abs(m._w - (W0 * 1.6 + 2 * H.feetPxWant(f))) < 1e-6
+      and math.abs(m.sceneFeetPx - H.feetPxWant(f)) < 1e-6 and m.sceneFeetPx > 0
+      and m._h == H0 and f.figW == W0 and f.figH == H0,
+      ("%s × %s, modèle %s × %s, pieds %s"):format(f._w, f._h, m._w, m._h, tostring(m.sceneFeetPx)))
+    check("vue projetée = cadre de base : SetViewInsets(45 + glissement, idem, 0, 0), taille apparente inchangée",
+      math.abs(ins[1] - inset) < 1e-6 and math.abs(ins[2] - inset) < 1e-6 and ins[3] == 0 and ins[4] == 0,
+      table.concat(ins, ", "))
     local scx = (sr[1] + sr[3]) / 2
     local feet = sr[4] - croc.feet * (sr[4] - sr[2]) / croc._h
     check("cadre élargi centré sur l'emplacement, pieds sur la ligne de l'emplacement (s.feet sous le haut)",
@@ -4887,8 +4910,9 @@ do
     -- même emplacement repris par un ennemi ordinaire : largeur de base, marges à zéro
     Sc.enemyFigure(f, "murloc")
     local ins2 = m._calls.SetViewInsets or {}
-    check("ennemi ordinaire dans le même cadre : largeur de base, marges de vue à zéro",
-      f._w == W0 and m._w == W0 and ins2[1] == 0 and ins2[2] == 0, f._w)
+    check("ennemi ordinaire dans le même cadre : largeur de base plus le seul glissement des pieds, marges de vue de ce glissement",
+      f._w == W0 and math.abs(m._w - (W0 + 2 * H.feetPxWant(f))) < 1e-6
+      and math.abs(ins2[1] - H.feetPxWant(f)) < 1e-6 and ins2[1] == ins2[2], m._w)
     -- client sans SetViewInsets : aucun élargissement (la taille apparente ne doit jamais changer)
     rawset(m, "SetViewInsets", false)
     Sc.enemyFigure(f, "wetlands_crocolisk")
@@ -4900,9 +4924,9 @@ do
     Sc.setFigureSize(f, W0 * sar.scale, H0 * sar.scale)
     Sc.enemyFigure(f, "sarltooth")
     check("agrandi et large (Sarltooth) : modèle 150 × scale × wide, personnage 150 × scale, hauteur 160 × scale",
-      math.abs(m._w - W0 * sar.scale * sar.wide) < 1e-9 and math.abs(f._w - W0 * sar.scale) < 1e-9
+      math.abs(m._w - (W0 * sar.scale * sar.wide + 2 * H.feetPxWant(f))) < 1e-6 and math.abs(f._w - W0 * sar.scale) < 1e-9
       and math.abs(f._h - H0 * sar.scale) < 1e-9
-      and math.abs((m._calls.SetViewInsets or {})[1] - (W0 * sar.scale * (sar.wide - 1) / 2)) < 1e-9, m._w)
+      and math.abs((m._calls.SetViewInsets or {})[1] - (W0 * sar.scale * (sar.wide - 1) / 2 + H.feetPxWant(f))) < 1e-6, m._w)
     -- recalage des pieds (Scene.centerFeet) plus grand que la marge permise (FEET_EXTRA de chaque côté) : glissement
     -- borné, cadre du modèle élargi d'autant ; le modèle ne sort jamais de son cadre
     ;(function()
@@ -4951,12 +4975,15 @@ do
       if wide then
         seen = seen + 1
         local want = math.min(fig.figW * wide, math.max(fig.figW, fig.wideMax))
-        if math.abs(fig.model._w - want) > 1e-9 or fig._w ~= fig.figW or fig._h ~= fig.figH then
+        if math.abs(fig.wideW - want) > 1e-9 or math.abs(fig.model._w - H.modelWant(fig)) > 1e-6
+          or fig._w ~= fig.figW or fig._h ~= fig.figH then
           pbad[#pbad + 1] = pm.key .. " " .. fig.model._w
         end
-      elseif fig.model._w ~= fig.figW or fig._w ~= fig.figW then
+      elseif fig.wideW ~= fig.figW or math.abs(fig.model._w - H.modelWant(fig)) > 1e-6 or fig._w ~= fig.figW then
         pbad[#pbad + 1] = pm.key .. " élargi"
       end
+      -- jamais au-delà de sa case, glissement des pieds compris
+      if fig.model._w > math.max(fig.figW, fig.wideMax) + 1e-6 then pbad[#pbad + 1] = pm.key .. " hors de sa case" end
     end
   end
   check("grille des modèles : ennemis larges élargis (bornés à leur case), les autres à leur largeur",
@@ -8560,9 +8587,13 @@ do
   end
   local function won(k) return Sc.won[k] or ns.Persist.options().modelWins[k] end
   local function alpha(m) return m._calls.SetAlpha and m._calls.SetAlpha[1] end
+  -- neutre : position voulue (glissement des pieds de Scene.centerFeet déduit, qui doit être celui attendu
+  -- pour la caméra du faux client) et échelle 1
   local function neutral(m)
-    local x, y, z = m:GetPosition()
+    local x, y, z = H.ns.Scene.feetResidual(m)
+    local fig = m:GetParent()
     return x == 0 and y == 0 and z == 0 and m:GetModelScale() == 1
+      and math.abs((m.sceneFeetPx or 0) - H.feetPxWant(fig)) < 1e-6 and (m.sceneFeetPos ~= nil) == (H.feetPxWant(fig) > 0)
   end
   local function said() return table.concat(_G.DEFAULT_CHAT_FRAME._lines, "\n") end
   local WY = "wyrmkin_dreamwalker"

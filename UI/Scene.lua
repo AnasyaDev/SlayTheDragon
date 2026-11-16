@@ -1403,6 +1403,7 @@ function S.resetModel(model)
   model.sceneHasModel = false
   if model.ClearModel then model:ClearModel() end
   if model.SetPosition then model:SetPosition(0, 0, 0) end
+  model.sceneFeetPos, model.sceneFeetShift, model.sceneFeetPx = nil, 0, 0
   if model.SetModelScale then model:SetModelScale(1) end
   if model.SetCamDistanceScale then model:SetCamDistanceScale(1) end
   if model.SetPortraitZoom then model:SetPortraitZoom(0) end
@@ -1419,6 +1420,7 @@ function S.frameModel(model, keepAnim)
   -- position neutre AVANT la caméra : un glissement des pieds (S.centerFeet) d'un cadrage précédent ne doit pas
   -- entrer dans la caméra recalculée (il s'ajouterait au suivant)
   if model.SetPosition then model:SetPosition(0, 0, 0) end
+  model.sceneFeetPos, model.sceneFeetShift = nil, 0
   if model.RefreshCamera then model:RefreshCamera() end
   if model.SetModelScale then model:SetModelScale(1) end
   if model.SetCamDistanceScale then model:SetCamDistanceScale(1) end
@@ -1481,7 +1483,7 @@ end
 -- Cadre du modèle à sa largeur sans glissement (art.wide seul).
 local function unshift(model)
   if model.SetPosition then pcall(model.SetPosition, model, 0, 0, 0) end
-  model.sceneFeetShift, model.sceneFeetPx = 0, 0
+  model.sceneFeetPos, model.sceneFeetShift, model.sceneFeetPx = nil, 0, 0
   local ww = model.sceneWideW or model.sceneBaseW
   if ww and model.sceneBaseH and math.abs((model:GetWidth() or ww) - ww) > 0.01 then
     S.sizeModel(model, ww)
@@ -1541,8 +1543,20 @@ function S.centerFeet(model)
   local fixed = c and math.abs((gx - c[4]) * c[7] + (gy - c[5]) * c[8] - rest) < eps
   local carried = c and math.abs(c[9] - rest) < eps
   if not (fixed or carried) then unshift(model) return nil end
-  model.sceneFeetShift, model.sceneFeetPx = shift, px
+  model.sceneFeetPos, model.sceneFeetShift, model.sceneFeetPx = { mx, my }, shift, px
   return shift
+end
+
+-- Écart de la position du modèle à celle voulue (glissement des pieds compris, model.sceneFeetPos) : 0, 0, 0
+-- quand le cadre est au neutre attendu ; nil si le client ne rend pas la position. Lu par /slay models.
+function S.feetResidual(model)
+  local x, y, z = call(model, "GetPosition")
+  if type(x) ~= "number" or type(y) ~= "number" or type(z) ~= "number" then return nil end
+  local e = model.sceneFeetPos
+  if e then x, y = x - e[1], y - e[2] end
+  if math.abs(x) < 1e-9 then x = 0 end
+  if math.abs(y) < 1e-9 then y = 0 end
+  return x, y, z
 end
 
 local function orphans(model)
@@ -1791,12 +1805,18 @@ function S.modelDiag(model, compact)
   end
   local d, f = S.shownDisplay(model), S.shownFile(model)
   parts[#parts + 1] = (d and ("display " .. d .. " ") or "") .. "file " .. (f and tostring(f) or "?")
-  local x, y, z = call(model, "GetPosition")
+  -- position : écart à la position voulue (0,0,0 = au neutre attendu) ; le glissement des pieds voulu est donné
+  -- à part (« feet shift », unités du modèle) : une position non nulle due au recalage n'est pas une anomalie
+  local x, y, z = S.feetResidual(model)
   parts[#parts + 1] = "pos " .. num(x) .. "," .. num(y) .. "," .. num(z)
   parts[#parts + 1] = "scale " .. num(call(model, "GetModelScale"))
   parts[#parts + 1] = "loads " .. (model.sceneLoads or 0)
   if (model.sceneLate or 0) > 0 then
     parts[#parts + 1] = "late " .. model.sceneLate .. (compact and "" or (" (" .. tostring(model.sceneLateWhat) .. ")"))
+  end
+  if model.sceneFeetPos then
+    parts[#parts + 1] = "feet shift " .. num(model.sceneFeetShift) .. (compact and "" or
+      (" (" .. num(model.sceneFeetPx) .. " px wider each side)"))
   end
   return table.concat(parts, compact and " " or "; ")
 end
@@ -1810,7 +1830,7 @@ function S.modelAnomaly(model)
     out[#out + 1] = "late load x" .. model.sceneLate .. " (" .. tostring(model.sceneLateWhat) .. ")"
   end
   if not model.sceneFraming then
-    local x, y, z = call(model, "GetPosition")
+    local x, y, z = S.feetResidual(model) -- écart à la position voulue (glissement des pieds déduit)
     if (x and x ~= 0) or (y and y ~= 0) or (z and z ~= 0) then
       out[#out + 1] = "pos " .. num(x) .. "," .. num(y) .. "," .. num(z)
     end
