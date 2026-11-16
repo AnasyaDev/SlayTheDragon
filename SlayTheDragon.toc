@@ -4,6 +4,7 @@
 ## Author: AnasyaDev
 ## Version: 0.1.0-dev
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
+## X-Website: https://github.com/AnasyaDev/SlayTheDragon
 ## SavedVariables: SlayTheDragonDB
 
 Core\Init.lua
