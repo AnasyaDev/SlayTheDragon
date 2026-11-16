@@ -2,3 +2,19 @@ reports/
 build/
 *.tmp
 .claude/
+
+# Editors
+.cursor/
+.vscode/
+/Untitled
+
+# Python cache (tools/, docs/maquette/)
+__pycache__/
+*.pyc
+
+# Leftovers of a failed patch
+*.orig
+*.rej
+
+# Local run of BigWigsMods/packager (release.sh writes here)
+.release/

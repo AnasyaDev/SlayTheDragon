@@ -1,0 +1,14 @@
+package-as: SlayTheDragon
+enable-nolib-creation: no
+
+ignore:
+  - README.md
+  - CLAUDE.md
+  - .github
+  - .claude
+  - .gitignore
+  - docs
+  - Sim
+  - tools
+  - build
+  - reports
