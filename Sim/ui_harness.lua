@@ -651,6 +651,62 @@ function H.cameraFits(m)
   return c ~= nil and c[1] == now[1] and c[2] == now[2] and math.abs(c[3] - now[3]) < 1e-9
 end
 
+-- Modèle simulé pour le cadrage des pieds (Scene.centerFeet) : g = { back, front, height, dist, dx, dy } ;
+-- étendue horizontale du modèle vue de la caméra, en unités, de -back (derrière l'origine, la queue) à +front
+-- (devant, la tête : quadrupède de trois quarts tourné vers la droite), hauteur height (boîte posée sur les
+-- pieds), visée horizontale (dx, dy). RefreshCamera vise le centre de la boîte à la position du modèle du
+-- moment (SetPosition, espace de la caméra du cadre) ; GetCameraPosition / GetCameraTarget la rendent ;
+-- SetCameraPosition / SetCameraTarget la déplacent (client complaisant : g.refuse = refus du vrai client hors
+-- caméra personnalisée). Projection : g.k pixels par unité (défaut : hauteur de la vue / height, la boîte tient
+-- juste dans la hauteur du cadre, le pire cas pour la largeur).
+function H.feetSim(m, g)
+  local len = math.sqrt(g.dx * g.dx + g.dy * g.dy)
+  local dx, dy = g.dx / len, g.dy / len
+  local rx, ry = dy, -dx
+  local cam = {}
+  g.cam, g.rx, g.ry = cam, rx, ry
+  local function refresh()
+    local ox, oy = m:GetPosition()
+    local c = (g.front - g.back) / 2
+    cam.t = { ox + c * rx, oy + c * ry, g.height / 2 }
+    cam.p = { cam.t[1] - g.dist * dx, cam.t[2] - g.dist * dy, g.height * 0.8 }
+  end
+  local orig = Frame.RefreshCamera
+  rawset(m, "RefreshCamera", function(self) orig(self) refresh() end)
+  rawset(m, "GetCameraPosition", function() return cam.p[1], cam.p[2], cam.p[3] end)
+  rawset(m, "GetCameraTarget", function() return cam.t[1], cam.t[2], cam.t[3] end)
+  rawset(m, "SetCameraPosition", function(_, x, y, z)
+    if g.refuse then error("PlayerModel:SetCameraPosition(): Not using a custom camera.") end
+    cam.p = { x, y, z }
+  end)
+  rawset(m, "SetCameraTarget", function(_, x, y, z)
+    if g.refuse then error("PlayerModel:SetCameraTarget(): Not using a custom camera.") end
+    cam.t = { x, y, z }
+  end)
+  refresh()
+  return g
+end
+
+-- Le modèle simulé tient-il dans son cadre ? Renvoie vrai/faux, bords gauche / droit du modèle et pieds
+-- (origine), en pixels depuis le centre de la vue (= centre du cadre du modèle, marges symétriques), et la
+-- demi-largeur du cadre.
+function H.feetFits(m, g)
+  local k = g.k or (rawget(m, "_h") / g.height)
+  local ox, oy = m:GetPosition()
+  local t = g.cam.t
+  local tr = t[1] * g.rx + t[2] * g.ry
+  local orr = ox * g.rx + oy * g.ry
+  local left, right, feet = (orr - g.back - tr) * k, (orr + g.front - tr) * k, (orr - tr) * k
+  local half = rawget(m, "_w") / 2
+  return left >= -half - 0.01 and right <= half + 0.01, left, right, feet, half
+end
+
+function H.unFeetSim(m)
+  for _, k in ipairs({ "RefreshCamera", "GetCameraPosition", "GetCameraTarget", "SetCameraPosition", "SetCameraTarget" }) do
+    rawset(m, k, nil)
+  end
+end
+
 -- Messages défilants
 function Frame:AddMessage(text)
   if type(text) ~= "string" then error("AddMessage : texte attendu") end
@@ -4558,7 +4614,7 @@ do
     #ebad == 0 and loadedNpc() and ch.npc.shadow:IsShown(), table.concat(ebad, " ; "))
 end
 
-print("U28W modèle large (art.wide) : cadre élargi, même hauteur, centré ; vue projetée = cadre de base ; souris et ordre des voisins intacts")
+print("U28W modèle large (art.wide) : cadre du modèle élargi, même hauteur, centré ; vue projetée = cadre de base ; souris et ordre des voisins intacts")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
@@ -4598,8 +4654,8 @@ do
     local fr, sr, mr = R.rect(f), R.rect(croc), R.rect(m)
     local ins = m._calls.SetViewInsets or {}
     local inset = (W0 * 1.6 - W0) / 2
-    check("cadre et modèle élargis de 1.6 en largeur seulement (240 × 160), base gardée (figW 150)",
-      f._w == W0 * 1.6 and f._h == H0 and m._w == W0 * 1.6 and m._h == H0 and f.figW == W0 and f.figH == H0,
+    check("cadre du modèle élargi de 1.6 en largeur seulement (240 × 160), personnage à sa base (150, figW)",
+      f._w == W0 and f._h == H0 and m._w == W0 * 1.6 and m._h == H0 and f.figW == W0 and f.figH == H0,
       ("%s × %s, modèle %s × %s"):format(f._w, f._h, m._w, m._h))
     check("vue projetée = cadre de base : SetViewInsets(45, 45, 0, 0), taille apparente inchangée",
       ins[1] == inset and ins[2] == inset and ins[3] == 0 and ins[4] == 0, table.concat(ins, ", "))
@@ -4632,7 +4688,7 @@ do
     local over = false
     for _, s in ipairs(others) do
       local r = R.rect(s)
-      if fr[1] < r[3] and r[1] < fr[3] then over = true end
+      if mr[1] < r[3] and r[1] < mr[3] then over = true end
     end
     local function under(o, top)
       while o do if o == top then return true end o = rawget(o, "_parent") end
@@ -4653,7 +4709,7 @@ do
       and f.ui._calls.EnableMouse and f.ui._calls.EnableMouse[1] == false
     local slotsOk = true
     for _, s in ipairs({ croc, others[1], others[2] }) do
-      if s._w < s.tag._w or s._w >= f._w or not s._scripts.OnClick or not s._scripts.OnEnter then slotsOk = false end
+      if s._w < s.tag._w or s._w >= m._w or not s._scripts.OnClick or not s._scripts.OnEnter then slotsOk = false end
     end
     check("souris : cadre élargi (débordant sur un voisin) sans souris, ni lui ni ses enfants ; emplacements intacts",
       over and off and #mbad == 0 and slotsOk, table.concat(mbad, ", "))
@@ -4684,16 +4740,52 @@ do
     -- client sans SetViewInsets : aucun élargissement (la taille apparente ne doit jamais changer)
     rawset(m, "SetViewInsets", false)
     Sc.enemyFigure(f, "wetlands_crocolisk")
-    check("client sans SetViewInsets : cadre laissé à la largeur de base", f._w == W0 and m._w == W0, f._w)
+    check("client sans SetViewInsets : cadre laissé à la largeur de base", f._w == W0 and m._w == W0, m._w)
     rawset(m, "SetViewInsets", nil)
     Sc.enemyFigure(f, "wetlands_crocolisk")
     -- agrandi (art.scale) et large : base = 150 × scale, élargie de wide, hauteur 160 × scale
     local sar = Art.enemies.sarltooth
     Sc.setFigureSize(f, W0 * sar.scale, H0 * sar.scale)
     Sc.enemyFigure(f, "sarltooth")
-    check("agrandi et large (Sarltooth) : largeur 150 × scale × wide, hauteur 160 × scale",
-      math.abs(f._w - W0 * sar.scale * sar.wide) < 1e-9 and math.abs(f._h - H0 * sar.scale) < 1e-9
-      and math.abs((m._calls.SetViewInsets or {})[1] - (W0 * sar.scale * (sar.wide - 1) / 2)) < 1e-9, f._w)
+    check("agrandi et large (Sarltooth) : modèle 150 × scale × wide, personnage 150 × scale, hauteur 160 × scale",
+      math.abs(m._w - W0 * sar.scale * sar.wide) < 1e-9 and math.abs(f._w - W0 * sar.scale) < 1e-9
+      and math.abs(f._h - H0 * sar.scale) < 1e-9
+      and math.abs((m._calls.SetViewInsets or {})[1] - (W0 * sar.scale * (sar.wide - 1) / 2)) < 1e-9, m._w)
+    -- recalage des pieds (Scene.centerFeet) plus grand que la marge permise (FEET_EXTRA de chaque côté) : glissement
+    -- borné, cadre du modèle élargi d'autant ; le modèle ne sort jamais de son cadre
+    ;(function()
+      local nb2 = others[1]
+      local m2 = nb2.model
+      local bw, bh = m2.sceneBaseW, m2.sceneBaseH
+      local k = bh -- hauteur 1 : bh pixels par unité
+      -- modèle de la largeur de base, centre de sa boîte 60 pixels devant ses pieds (marge permise : 45)
+      local g = H.feetSim(m2, { back = (bw / 2 - 60) / k, front = (bw / 2 + 60) / k, height = 1, dist = 2, dx = -1, dy = -0.3,
+        refuse = true })
+      m2.sceneHasModel = true
+      local ok, err = pcall(Sc.refreshFigure, nb2.fig)
+      local fits, l, r, feet, half = H.feetFits(m2, g)
+      local room = bw * Sc.FEET_EXTRA
+      check("recalage des pieds au-delà de la marge : borné à FEET_EXTRA × la base, modèle contenu dans son cadre élargi",
+        ok and fits and math.abs((m2.sceneFeetPx or 0) - room) < 1e-6 and math.abs(m2._w - (bw + 2 * room)) < 1e-6
+        and math.abs(feet + (60 - room)) < 0.01 and nb2.fig._w == bw,
+        ("%s ; modèle %.1f à %.1f, pieds %.1f, cadre ±%.1f"):format(tostring(err), l, r, feet, half))
+      -- glissement dans la marge : pieds au centre, cadre élargi du glissement de chaque côté
+      g.back, g.front = (bw / 2 - 20) / k, (bw / 2 + 20) / k
+      ok, err = pcall(Sc.refreshFigure, nb2.fig)
+      fits, l, r, feet, half = H.feetFits(m2, g)
+      check("recalage des pieds dans la marge : pieds au centre, cadre du modèle élargi de 20 de chaque côté",
+        ok and fits and math.abs(feet) < 0.01 and math.abs(m2._w - (bw + 40)) < 1e-6,
+        ("%s ; modèle %.1f à %.1f, pieds %.1f, cadre ±%.1f"):format(tostring(err), l, r, feet, half))
+      -- client qui interprète autrement SetPosition (l'origine ne vient pas sur l'axe) : rien ne glisse
+      rawset(m2, "SetPosition", function(self) Frame.SetPosition(self, 0, 0, 0) end)
+      ok = pcall(Sc.refreshFigure, nb2.fig)
+      fits, l, r, feet = H.feetFits(m2, g)
+      check("SetPosition sans effet visible : glissement abandonné, cadre du modèle remis à sa largeur",
+        ok and fits and (m2.sceneFeetShift or 1) == 0 and m2._w == bw, ("%s, %s"):format(tostring(m2.sceneFeetShift), m2._w))
+      rawset(m2, "SetPosition", nil)
+      H.unFeetSim(m2)
+      Sc.refreshFigure(nb2.fig)
+    end)()
   end
 
   -- hors combat : la grille /slay models élargit aussi, jamais au-delà de sa case
@@ -4707,8 +4799,10 @@ do
       if wide then
         seen = seen + 1
         local want = math.min(fig.figW * wide, math.max(fig.figW, fig.wideMax))
-        if math.abs(fig._w - want) > 1e-9 or fig._h ~= fig.figH then pbad[#pbad + 1] = pm.key .. " " .. fig._w end
-      elseif fig._w ~= fig.figW then
+        if math.abs(fig.model._w - want) > 1e-9 or fig._w ~= fig.figW or fig._h ~= fig.figH then
+          pbad[#pbad + 1] = pm.key .. " " .. fig.model._w
+        end
+      elseif fig.model._w ~= fig.figW or fig._w ~= fig.figW then
         pbad[#pbad + 1] = pm.key .. " élargi"
       end
     end
@@ -6857,6 +6951,38 @@ do
     and tt:find("next enemy attack", 1, true), tt)
   local tp = table.concat(H.hover(pet), " | ")
   check("infobulle du familier : cible et dégâts, explication du Frenzy", tp:find("Attacks ", 1, true) and tp:find("Frenzy", 1, true), tp)
+  -- familier coupé net sur le bord droit (retour du 16/11/2026, loup de trois quarts) : le cadre du modèle le
+  -- contient, pieds recalés (Scene.centerFeet) compris ; ombre, nom, place et survol du familier inchangés
+  ;(function()
+    local Sc, m = ns.Scene, pet.model
+    local before = R.rect(pet)
+    local nameW = pet.name._w
+    check("familier : art.wide déclaré (quadrupède long de trois quarts), dans ]1 ; 1.6]",
+      type(ns.Art.pet.wide) == "number" and ns.Art.pet.wide > 1 and ns.Art.pet.wide <= 1.6, tostring(ns.Art.pet.wide))
+    -- loup de trois quarts : 1,6 unité de long à l'écran pour 1 de haut, tête 1,05 devant les pieds, queue 0,55
+    -- derrière ; le client refuse d'écrire la caméra (« Not using a custom camera »)
+    local g = H.feetSim(m, { back = 0.55, front = 1.05, height = 1, dist = 1.9, dx = -1.688, dy = -0.782, refuse = true })
+    m.sceneHasModel = true
+    local ok, err = pcall(Sc.refreshFigure, pet)
+    local fits, l, r, feet, half = H.feetFits(m, g)
+    check("familier : modèle de trois quarts plus large que le cadre de base, contenu dans le cadre de son modèle",
+      ok and fits and r - l > 120 + 1, ("%s ; modèle %.1f à %.1f, pieds %.1f, cadre ±%.1f"):format(tostring(err), l, r, feet, half))
+    check("familier : pieds ramenés sous l'ombre (centre du cadre) sans écrire la caméra", ok and math.abs(feet) < 0.01,
+      ("pieds %.2f"):format(feet))
+    local after = R.rect(pet)
+    local mr = R.rect(m)
+    local sbad = 0
+    for i, t in ipairs(pet.shadow.parts) do
+      if math.abs(t._w - 120 * Sc.SHADOW_LAYERS[i].w) > 0.01 then sbad = sbad + 1 end
+    end
+    check("familier : place, taille (zone de survol), nom et ombre inchangés ; modèle centré, sans souris",
+      math.abs(after[1] - before[1]) < 0.01 and math.abs(after[3] - before[3]) < 0.01 and pet._w == 120
+      and pet.name._w == nameW and sbad == 0 and math.abs((mr[1] + mr[3]) / 2 - (after[1] + after[3]) / 2) < 0.01
+      and m._calls.EnableMouse and m._calls.EnableMouse[1] == false and pet._calls.EnableMouse[1] == true,
+      ("%.1f-%.1f / %.1f-%.1f, nom %s"):format(before[1], before[3], after[1], after[3], tostring(pet.name._w)))
+    H.unFeetSim(m)
+    Sc.refreshFigure(pet)
+  end)()
   local tgt = ns.Hunter.petTarget(c)
   local s = tgt and v.slotOf[tgt.uid]
   check("marqueur de la cible du familier : visible, au bout de la ligne du nom de l'ennemi visé (place réservée)", vis(host.mark) and s
@@ -12280,21 +12406,24 @@ do
   snap("fiche-compteurs", true)
   ns.ZoneViews.ufetest = nil
 
-  -- ombre : sous les pieds du modèle réel (caméra recentrée sur l'origine du modèle, Scene.centerFeet)
+  -- ombre : sous les pieds du modèle réel (modèle glissé sur l'axe de visée, Scene.centerFeet) ; le client refuse
+  -- d'écrire la caméra hors caméra personnalisée : elle n'est que lue
   local m = sb.model
   local cam = { p = { 2, 0.6, 1.1 }, t = { 0, 0.35, 0.9 } }
   rawset(m, "GetCameraPosition", function() return cam.p[1], cam.p[2], cam.p[3] end)
   rawset(m, "GetCameraTarget", function() return cam.t[1], cam.t[2], cam.t[3] end)
-  rawset(m, "SetCameraPosition", function(_, x, y, z) cam.p = { x, y, z } end)
-  rawset(m, "SetCameraTarget", function(_, x, y, z) cam.t = { x, y, z } end)
+  rawset(m, "SetCameraPosition", function() error("PlayerModel:SetCameraPosition(): Not using a custom camera.") end)
+  rawset(m, "SetCameraTarget", function() error("PlayerModel:SetCameraTarget(): Not using a custom camera.") end)
   m.sceneHasModel = true
-  Sc.refreshFigure(sb.fig)
-  -- l'origine (0, 0, 0) doit être sur l'axe de visée : distance à la droite (P, T) dans le plan horizontal nulle
-  local dx, dy = cam.t[1] - cam.p[1], cam.t[2] - cam.p[2]
-  local cross = (0 - cam.p[1]) * dy - (0 - cam.p[2]) * dx
-  check("ombre : caméra glissée à l'horizontale, pieds (origine) sur l'axe de visée = centre du cadre, sous l'ombre ; hauteur gardée",
-    math.abs(cross) < 1e-9 and math.abs(cam.p[3] - 1.1) < 1e-9 and math.abs(cam.t[3] - 0.9) < 1e-9
-      and math.abs((m.sceneFeetShift or 0) - 0.35 * 2 / math.sqrt(4 + 0.0625)) > 0 , ("%.4f"):format(cross))
+  -- l'origine du modèle (sa position) doit être sur l'axe de visée : distance à la droite (P, T) dans le plan
+  -- horizontal nulle ; caméra inchangée, hauteur du modèle gardée
+  local dx, dy = pcall(Sc.refreshFigure, sb.fig)
+  local cross = { m:GetPosition() }
+  cross[4] = (cross[1] - cam.p[1]) * (cam.t[2] - cam.p[2]) - (cross[2] - cam.p[2]) * (cam.t[1] - cam.p[1])
+  check("ombre : modèle glissé à l'horizontale, pieds (origine) sur l'axe de visée = centre du cadre ; caméra non écrite",
+    dx and math.abs(cross[4]) < 1e-9 and cross[3] == 0 and cam.p[1] == 2 and cam.t[2] == 0.35
+      and math.abs(math.abs(m.sceneFeetShift or 0) - 0.35 * 2 / math.sqrt(4 + 0.0625)) < 1e-9,
+    ("%s %.4f"):format(tostring(dy), cross[4]))
   for _, k in ipairs({ "GetCameraPosition", "GetCameraTarget", "SetCameraPosition", "SetCameraTarget" }) do rawset(m, k, nil) end
   local _ = c0
 end

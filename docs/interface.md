@@ -813,10 +813,11 @@ par `pcall`).
   `SetModelScale(1)`, `SetCamDistanceScale(1)`, `SetPortraitZoom(0)`, attente debout (sauf mort),
   retour à l'attente prévu par `W.anim` annulé.
 - **Cadrage après chaque chargement reçu**, le nôtre ou un étranger (`S.frameModel`) :
-  `RefreshCamera`, position et échelle neutres, orientation du personnage (`model.sceneFacing`, tenue à
+  position neutre (avant la caméra : un glissement des pieds précédent n'entre jamais dans la caméra
+  recalculée), `RefreshCamera`, échelle neutre, orientation du personnage (`model.sceneFacing`, tenue à
   jour par `CombatView:ApplyFacing`), attente debout, puis le cadrage propre du cadre
   (`model.sceneFraming` : le feu de camp passe `S.fireCam`, qui pose échelle et hauteur, `1` et `0` sans
-  réglage, et son orientation). Recadrage sans toucher à l'animation après `S.setWide` /
+  réglage, et son orientation ; sinon les pieds sous l'ombre, `S.centerFeet`). Recadrage sans toucher à l'animation après `S.setWide` /
   `S.setFigureSize`, quand l'emplacement change d'échelle (`S.refreshFigure`, `LayoutEnemies`), et à
   `UI_SCALE_CHANGED` / `DISPLAY_SIZE_CHANGED`.
 - Préchargement : un cadre rendu au réservoir passe par `S.releaseModel` (sa demande devient orpheline).
@@ -1658,9 +1659,22 @@ de carte revient au même.
   ombre, anneau doré aux pieds de la cible (survol, ou ennemi retenu pendant une visée). Pieds sur la ligne y 300
   (un ennemi sur deux 24 plus bas), quelle que soit la taille du personnage ; un personnage agrandi
   (`art.scale`) l'est autant que la place sous le cadre et ses états le permet (sa tête n'y monte jamais).
-  Quadrupède long (`art.wide`, crocilisques 1,6) : `Scene.setWide` élargit cadre et modèle en largeur seulement
-  (centrés, même hauteur) et pose `SetViewInsets` de l'excédent : vue projetée = cadre de base, taille apparente
-  inchangée (raison et sources dans le commentaire de `Scene.setWide` ; harnais U28W).
+  Quadrupède long (`art.wide`, crocilisques 1,6) : `Scene.setWide` élargit le **cadre du modèle** seul en largeur
+  (ancré par le bas au centre du personnage, il déborde également des deux côtés, même hauteur) et pose
+  `SetViewInsets` de l'excédent : vue projetée = cadre de base, taille apparente inchangée (raison et sources dans
+  le commentaire de `Scene.setWide` ; harnais U28W). Le personnage (`f`) garde sa taille de base : ombre, anneau,
+  repli, nom au-dessus et zone de survol ne bougent pas, quel que soit son ancrage (le familier et les PNJ sont
+  posés par leur coin haut gauche : élargir `f` les décalait vers la droite). Le cadre du modèle ne prend pas la
+  souris ; transparent, il peut déborder sur un voisin sans le masquer. `Scene.centerFeet` l'élargit encore du
+  glissement des pieds (ci-dessous, « Ombre »).
+  - **Figures hors emplacements d'ennemi** (revue du 16/11/2026, loup du Chasseur coupé net sur le bord droit) :
+    familier du Chasseur (`Art.pet`, seul familier, cadre 120 × 110, orientation 0,9 : trois quarts vers la
+    droite) **`wide = 1.6`** ; PNJ des rencontres (cadre 170 × 200) : tous humanoïdes sauf le parchemin de
+    Cortello (Swamp, `cortello_scroll` = Deathstrike Tarantula, araignée large et basse) **`wide = 1.6`**, le
+    Green Scalebane (`atalai_chest`, bipède) et l'affiche (`wanted_poster`) laissés ; feu de camp (140 × 130, son
+    propre cadrage `S.fireCam`, pas de recalage des pieds) laissé ; héros (`SetUnit("player")`, 200 × 220, sans
+    `OnModelLoaded` ni recalage) laissé ; élémentaire d'eau et images miroir du Mage : jetons d'état, aucun
+    modèle 3D.
   Sans modèle : médaillon argenté à l'icône de l'ennemi (`Art.enemies[id].icon`), ou disque sombre.
 - **Cadre d'unité des ennemis** (maquette validée par le joueur le 16/11/2026, capture d'un élite, Grark
   Lorkrub : le dragon d'or arrondi du cadre d'élite entourait un portrait absent, les traits de seuil juraient
@@ -1715,12 +1729,36 @@ de carte revient au même.
     cadre du personnage, mais le client ne cadre pas une créature sur ses pieds (origine du modèle) : sa caméra
     (`RefreshCamera`) vise le centre de la boîte englobante (comme les caméras d'interface de Blizzard,
     `useModelCenter`) ; une arme tenue d'un côté, un modèle tourné de trois quarts (`SetFacing`) déplacent ce
-    centre, donc les pieds, hors de l'axe du cadre. Correction (`Scene.centerFeet`, à chaque cadrage) : position et
-    cible de la caméra glissent ensemble à l'horizontale, perpendiculairement à la visée, de la distance qui
-    sépare l'origine de l'axe de visée (lues par `GetCameraPosition` / `GetCameraTarget`, posées par
-    `SetCameraPosition` / `SetCameraTarget`, SimpleModelAPI de WoW Forever) : l'origine se projette au centre
-    horizontal du cadre, sur l'ombre ; indépendant de l'angle de champ (inconnu). Hauteur inchangée
-    (`S.SHADOW_FEET`). Orientation changée dans les options : cadrage refait (`V:ApplyFacing`).
+    centre, donc les pieds, hors de l'axe du cadre. Correction (`Scene.centerFeet`, à chaque cadrage) : le
+    **modèle** glisse à l'horizontale (`SetPosition`), perpendiculairement à la visée, de la distance qui sépare
+    son origine de l'axe de visée (caméra lue par `GetCameraPosition` / `GetCameraTarget`, SimpleModelAPI de WoW
+    Forever, jamais écrite) : l'origine se projette au centre horizontal du cadre, sur l'ombre ; indépendant de
+    l'angle de champ (inconnu). Hauteur inchangée (`S.SHADOW_FEET`). Orientation changée dans les options :
+    cadrage refait (`V:ApplyFacing`).
+    - Première version (16/11/2026) : la caméra glissait (`SetCameraPosition` / `SetCameraTarget`). En jeu, le
+      client refuse : « PlayerModel:SetCameraPosition(): Not using a custom camera. » (l'erreur bloquait le rendu
+      du combat ; mis sous `pcall` en urgence, le recalage ne faisait alors plus rien). Écartés :
+      `MakeCurrentCameraCustom` (caméra figée, gardée par un cadre réutilisé pour un autre modèle : emplacements
+      des ennemis) ; ombre déplacée sous les pieds calculés (il faudrait la projection exacte en pixels, inconnue).
+      Retenu : `SetPosition`, dont Blizzard passe les coordonnées dans l'espace de la caméra du cadre
+      (`TransmogSetBaseModelMixin:OnLoad` : déplacement converti par `TransformCameraSpaceToModelSpace` puis
+      `SetPosition` ; `Model_ApplyUICamera`) ; le feu de camp s'y règle déjà en hauteur.
+    - **Contrôle** après le glissement : caméra et position relues, l'origine doit être là où on l'attend (caméra
+      fixe : position sur l'axe ; caméra relue par rapport au modèle : origine sur l'axe). Sinon (axe ou sens de
+      `SetPosition` autre sur ce client) : modèle remis à zéro, cadre à sa largeur, pas de glissement. Tous les
+      appels sous garde et `pcall`.
+    - **Jamais hors du cadre** : glisser le modèle déplace tout le modèle dans son cadre (chez le loup du Chasseur,
+      tourné de trois quarts vers la droite, le centre de la boîte est devant les pieds : la tête partait vers le
+      bord droit). Le cadre du modèle est élargi du glissement de chaque côté (`S.sizeModel`, marges de vue :
+      taille apparente et centre de la vue inchangés), en plus d'`art.wide`. Glissement en pixels sans angle de
+      champ : boîte posée sur les pieds (cible de la caméra à mi-hauteur, `tz`) tenant dans la hauteur de la vue,
+      d'où au plus `figH / (2 tz)` pixels par unité (estimation par excès : élargissement trop grand plutôt que
+      trop petit). Surplus borné à `S.FEET_EXTRA` = 0,3 × la largeur de base de chaque côté (et à la case de
+      `/slay models`) ; au-delà, le glissement lui-même est borné (les pieds s'écartent un peu de l'ombre).
+      Hauteur de cible ≈ 0 : aucun glissement. Diagnostic : `model.sceneFeetShift` (unités), `model.sceneFeetPx`.
+    - Harnais (`H.feetSim`, `H.feetFits`) : modèle simulé d'étendue `[-back ; front]` autour de ses pieds, caméra
+      sur le centre de sa boîte, écriture de la caméra refusée comme en jeu ; familier (section UH) et emplacement
+      d'ennemi (U28W : glissement borné, dans la marge, `SetPosition` sans effet).
   - Compteur de combat d'une zone (Wildfire) : déplacé entre le héros et les ennemis (x 308–448, y 110), le haut
     du décor étant aux cadres ; texte réduit à sa largeur.
   - Marques de classe sur un ennemi (cible du familier, Atrophic Poison) : au bout de la ligne du nom

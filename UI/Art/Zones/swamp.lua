@@ -68,7 +68,8 @@ N.stonard_fisherman = { creature = 19150, display = { 18559, 18556, 18557 }, ico
 -- rencontres sans personnage : on montre ce que le joueur voit (le Green Scalebane endormi sur les marches,
 -- une Deathstrike Tarantula de la grotte de Cortello)
 N.atalai_chest = { creature = 744, display = { 7976, 8309 }, icon = { icon = 132595, tga = "INV_Box_02" } }
-N.cortello_scroll = { creature = 769, display = { 520, 366 }, icon = { icon = 134939, tga = "INV_Scroll_03" } }
+-- (araignée : large et basse, de trois quarts dans le cadre étroit des PNJ, 170 × 200 : wide, Scene.setWide)
+N.cortello_scroll = { creature = 769, display = { 520, 366 }, wide = 1.6, icon = { icon = 134939, tga = "INV_Scroll_03" } }
 
 ---------------------------------------------------------------------------
 -- Cartes, bibelots, état, intentions

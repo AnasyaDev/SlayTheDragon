@@ -1138,6 +1138,8 @@ function S.figure(parent, w, h)
   f.model:SetPoint("BOTTOM", 0, 0)
   f.model:EnableMouse(false)
   f.model.sceneCenterFeet = true -- pieds ramenés sous l'ombre à chaque cadrage (S.centerFeet)
+  -- largeur de base (vue projetée), largeur élargie par art.wide (S.setWide), largeur au plus
+  f.model.sceneBaseW, f.model.sceneBaseH, f.model.sceneWideW = w, h, w
   -- repli sans modèle : médaillon argenté (icône de l'ennemi ou disque sombre), W.setFallbackArt
   f.fallback = W.medallion(f, math.max(40, math.floor(math.min(w, h) * 0.42)))
   f.fallback:SetPoint("CENTER", 0, h * 0.08)
@@ -1178,8 +1180,11 @@ end
 -- 600 × 680). Les marges ne rognent pas le dessin : les scènes plein écran de Blizzard (GlobalFX*ModelScene,
 -- UIParent entier, ramenées à 600 × 680 par ces marges) dessinent leurs effets partout dans le cadre ; le
 -- modèle déborde donc de la vue jusqu'au bord du cadre élargi. Sans SetViewInsets : aucun élargissement.
--- Ombre, anneau de cible, repli et éclat restent à la taille de base (f.figW) ; le cadre et son étage
--- d'interface ne prennent jamais la souris. maxW : largeur au plus (grille de /slay models).
+-- Seul le cadre du MODÈLE s'élargit (ancré par le bas au centre du personnage, il déborde également des
+-- deux côtés, quel que soit l'ancrage du personnage : le familier et les PNJ sont posés par leur coin haut
+-- gauche) ; le personnage f garde sa taille de base (f.figW), donc ombre, anneau de cible, repli, éclat,
+-- nom au-dessus et zone de survol (infobulle du familier) ne bougent pas. Le cadre du modèle ne prend
+-- jamais la souris. maxW : largeur au plus (grille de /slay models). S.centerFeet peut l'élargir encore.
 function S.setWide(f, wide, maxW)
   local m = f.model
   local w, h = f.figW, f.figH
@@ -1189,15 +1194,25 @@ function S.setWide(f, wide, maxW)
     if maxW and ww > maxW then ww = math.max(w, maxW) end
   end
   f.wideW = ww
-  f:SetSize(ww, h)
+  f:SetSize(w, h)
+  m.sceneBaseW, m.sceneBaseH, m.sceneWideW, m.sceneMaxW = w, h, ww, maxW
+  m.sceneFeetPx = 0
+  S.sizeModel(m, ww)
+  if f.shadow then f.shadow:Place(w) end
+  -- modèle déjà chargé : caméra recalculée pour la nouvelle taille (S.frameModel)
+  S.refreshFigure(f)
+end
+
+-- Cadre du modèle à la largeur ww (hauteur de base), centré ; marges de vue de l'excédent : la vue
+-- projetée reste le cadre de base (m.sceneBaseW × m.sceneBaseH). Sans SetViewInsets : largeur de base.
+function S.sizeModel(m, ww)
+  local w, h = m.sceneBaseW, m.sceneBaseH
+  if not m.SetViewInsets then ww = w end
   m:SetSize(ww, h)
   if m.SetViewInsets then
     local inset = (ww - w) / 2
     m:SetViewInsets(inset, inset, 0, 0)
   end
-  if f.shadow then f.shadow:Place(w) end
-  -- modèle déjà chargé : caméra recalculée pour la nouvelle taille (S.frameModel)
-  S.refreshFigure(f)
 end
 
 -- Cadre d'un personnage qui change de taille ou d'échelle (S.setWide, emplacement à 0,86 de CombatView)
@@ -1401,8 +1416,10 @@ end
 -- changement de taille, ou mort en cours), puis le cadrage propre du cadre (model.sceneFraming :
 -- feu de camp, S.fireCam, qui règle échelle, hauteur et orientation).
 function S.frameModel(model, keepAnim)
-  if model.RefreshCamera then model:RefreshCamera() end
+  -- position neutre AVANT la caméra : un glissement des pieds (S.centerFeet) d'un cadrage précédent ne doit pas
+  -- entrer dans la caméra recalculée (il s'ajouterait au suivant)
   if model.SetPosition then model:SetPosition(0, 0, 0) end
+  if model.RefreshCamera then model:RefreshCamera() end
   if model.SetModelScale then model:SetModelScale(1) end
   if model.SetCamDistanceScale then model:SetCamDistanceScale(1) end
   if model.sceneFacing and model.SetFacing then model:SetFacing(model.sceneFacing) end
@@ -1417,28 +1434,114 @@ end
 -- cadre pas une créature sur ses pieds (origine du modèle) : RefreshCamera vise le centre de sa boîte englobante
 -- (comme les caméras d'interface de Blizzard, GetUICameraInfo → useModelCenter, UseModelCenterToTransform). Une
 -- arme tenue d'un côté, une cape, un modèle tourné de trois quarts (SetFacing) déplacent ce centre, donc les pieds,
--- hors de l'axe du cadre : l'ombre restait au milieu, à côté des pieds. Correction (indépendante de l'angle de champ,
--- inconnu) : position et cible de la caméra glissent ensemble, perpendiculairement à la visée et à l'horizontale, de
--- la distance qui sépare l'origine de l'axe de visée ; l'origine se projette alors au centre horizontal du cadre, sur
--- l'ombre. Hauteur : inchangée (la boîte est posée sur les pieds ; S.SHADOW_FEET). Sans les fonctions de caméra
--- (autre client, harnais sans elles) : rien ne change. Renvoie le glissement appliqué (unités du modèle) ou nil.
-function S.centerFeet(model)
-  if not (model.GetCameraPosition and model.GetCameraTarget and model.SetCameraPosition and model.SetCameraTarget) then
-    return nil
-  end
+-- hors de l'axe du cadre : l'ombre restait au milieu, à côté des pieds.
+--
+-- Correction (indépendante de l'angle de champ, inconnu) : le MODÈLE glisse à l'horizontale, perpendiculairement
+-- à la visée, de la distance qui sépare son origine de l'axe de visée (SetPosition) ; l'origine se projette alors
+-- au centre horizontal du cadre, sur l'ombre. Hauteur : inchangée (S.SHADOW_FEET). Caméra lue par
+-- GetCameraPosition / GetCameraTarget (SimpleModelAPI de WoW Forever), jamais écrite : SetCameraPosition /
+-- SetCameraTarget sont refusés en jeu hors caméra personnalisée (« PlayerModel:SetCameraPosition(): Not using a
+-- custom camera. », retour du 16/11/2026 : l'erreur bloquait le rendu du combat), et MakeCurrentCameraCustom
+-- laisserait une caméra figée à un cadre réutilisé par un autre modèle (emplacements des ennemis). SetPosition
+-- prend les coordonnées de l'espace de la caméra du cadre (Blizzard : TransmogSetBaseModelMixin:OnLoad passe à
+-- SetPosition un déplacement converti par TransformCameraSpaceToModelSpace ; Model_ApplyUICamera pose position
+-- du modèle et caméra dans cet espace) ; le feu de camp s'y règle déjà en hauteur (S.fireCam). Contrôle : après
+-- le glissement, la caméra est relue ; l'origine doit être sur l'axe (caméra fixe, modèle déplacé, ou caméra
+-- relue par rapport au modèle) ; sinon (axe ou sens différent sur ce client) le modèle est remis à zéro et rien
+-- ne glisse. Chaque appel sous garde et pcall. Sans les fonctions de caméra (autre client, harnais sans elles) :
+-- rien ne change. Renvoie le glissement appliqué (unités du modèle) ou nil.
+--
+-- Glisser le modèle déplace TOUT le modèle dans son cadre, du côté opposé au centre de sa boîte : chez un
+-- quadrupède de trois quarts (familier du Chasseur, tourné vers la droite), le centre de la boîte est devant les
+-- pieds, la tête part vers le bord droit et un PlayerModel rogne ce qui sort de son cadre (museau du loup coupé
+-- net, retour du 16/11/2026). Le cadre du modèle est donc élargi d'autant de chaque côté (S.sizeModel, marges de
+-- vue : taille apparente et centre de la vue inchangés), en plus de l'élargissement d'art.wide qui suppose le
+-- modèle centré. Glissement en pixels, sans angle de champ : la boîte englobante est posée sur les pieds (cible de
+-- la caméra à mi-hauteur, z = tz) et tient dans la hauteur de la vue, d'où au plus figH / (2 tz) pixels par unité
+-- (estimation par excès : une boîte cadrée avec de la marge, ou par sa largeur, est plus petite ; l'élargissement
+-- est alors plus grand que nécessaire, jamais trop petit). Le surplus est borné à FEET_EXTRA × la largeur de base
+-- de chaque côté (et à la largeur au plus de la grille de /slay models) ; au-delà, le glissement lui-même est
+-- borné : les pieds s'écartent un peu de l'ombre plutôt que le modèle ne sorte du cadre. Hauteur de la cible
+-- inconnue (tz ≈ 0) : aucun glissement.
+S.FEET_EXTRA = 0.3
+
+local function feetAxis(model)
   local ok1, px, py, pz = pcall(model.GetCameraPosition, model)
   local ok2, tx, ty, tz = pcall(model.GetCameraTarget, model)
-  if not (ok1 and ok2 and px and py and pz and tx and ty and tz) then return nil end
+  if not (ok1 and ok2 and type(px) == "number" and type(py) == "number" and type(pz) == "number"
+    and type(tx) == "number" and type(ty) == "number" and type(tz) == "number") then return nil end
   local dx, dy = tx - px, ty - py
   local len = math.sqrt(dx * dx + dy * dy)
   if len < 1e-6 then return nil end
   local rx, ry = dy / len, -dx / len -- à droite de la visée, à l'horizontale
-  local shift = -(tx * rx + ty * ry)  -- origine (0, 0, 0) ramenée sur l'axe de visée
-  model.sceneFeetShift = shift
-  if math.abs(shift) < 1e-5 then return 0 end
-  -- le client refuse ces appels hors caméra personnalisée (« Not using a custom camera ») : sans effet alors
-  if not pcall(model.SetCameraPosition, model, px + shift * rx, py + shift * ry, pz) then return nil end
-  if not pcall(model.SetCameraTarget, model, tx + shift * rx, ty + shift * ry, tz) then return nil end
+  -- position, cible, axe à droite, distance de l'origine (0, 0, 0) à l'axe de visée (vers la droite)
+  return { px, py, pz, tx, ty, tz, rx, ry, -(tx * rx + ty * ry) }
+end
+
+-- Cadre du modèle à sa largeur sans glissement (art.wide seul).
+local function unshift(model)
+  if model.SetPosition then pcall(model.SetPosition, model, 0, 0, 0) end
+  model.sceneFeetShift, model.sceneFeetPx = 0, 0
+  local ww = model.sceneWideW or model.sceneBaseW
+  if ww and model.sceneBaseH and math.abs((model:GetWidth() or ww) - ww) > 0.01 then
+    S.sizeModel(model, ww)
+    if model.RefreshCamera then model:RefreshCamera() end
+  end
+end
+
+function S.centerFeet(model)
+  if not (model.GetCameraPosition and model.GetCameraTarget and model.SetPosition) then return nil end
+  local a = feetAxis(model)
+  if not a then return nil end
+  local shift = a[9]
+  local w, h = model.sceneBaseW, model.sceneBaseH
+  local ww = model.sceneWideW or w
+  local px = 0
+  if w and h and math.abs(shift) >= 1e-5 then
+    if a[6] > 1e-3 then
+      local k = h / (2 * a[6]) -- pixels par unité du modèle, au plus
+      local room = model.SetViewInsets and w * S.FEET_EXTRA or 0
+      if model.sceneMaxW then room = math.min(room, math.max(0, (model.sceneMaxW - ww) / 2)) end
+      px = math.abs(shift) * k
+      if px > room then
+        px = room
+        shift = (shift > 0 and 1 or -1) * room / k
+      end
+    else
+      shift = 0
+    end
+  end
+  if math.abs(shift) < 1e-5 then
+    unshift(model)
+    return 0
+  end
+  if w and h then
+    local want = ww + 2 * px
+    if math.abs((model:GetWidth() or want) - want) > 0.01 then
+      S.sizeModel(model, want)
+      -- caméra recalculée pour la nouvelle taille (même vue projetée), relue ; glissement gardé dans sa borne
+      if model.RefreshCamera then model:RefreshCamera() end
+      local b = feetAxis(model)
+      if not b then unshift(model) return nil end
+      local lim = math.abs(shift)
+      a, shift = b, math.max(-lim, math.min(lim, b[9]))
+    end
+  end
+  -- origine amenée sur l'axe : le modèle part de -shift vers la droite de la visée
+  local mx, my = -shift * a[7], -shift * a[8]
+  if not pcall(model.SetPosition, model, mx, my, 0) then unshift(model) return nil end
+  -- contrôle : l'origine du modèle est-elle là où on l'attend, sur l'axe de visée (à ce qui reste d'un glissement
+  -- borné près) ? Caméra fixe : position relue ; caméra relue par rapport au modèle : origine à zéro.
+  local rest = a[9] - shift
+  local c = feetAxis(model)
+  local okP, gx, gy = true, mx, my
+  if model.GetPosition then okP, gx, gy = pcall(model.GetPosition, model) end
+  if not (okP and type(gx) == "number" and type(gy) == "number") then gx, gy = mx, my end
+  local eps = math.max(1e-4, 0.1 * math.abs(shift))
+  local fixed = c and math.abs((gx - c[4]) * c[7] + (gy - c[5]) * c[8] - rest) < eps
+  local carried = c and math.abs(c[9] - rest) < eps
+  if not (fixed or carried) then unshift(model) return nil end
+  model.sceneFeetShift, model.sceneFeetPx = shift, px
   return shift
 end
 

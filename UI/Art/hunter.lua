@@ -90,8 +90,11 @@ Art.classes.hunter.resource = { tga = "Ability_Hunter_FerociousInspiration",
   icon = "Interface\\Icons\\ability_hunter_ferociousinspiration", color = "attackText" }
 
 -- Familier : modèle 3D (Young Wolf de la forêt d'Elwynn, puis Mangy Wolf ; identifiants relevés dans
--- Cache/WDB/enUS/creaturecache.wdb du client Forever), repli en médaillon à l'icône du loup.
-Art.pet = { creature = 299, display = { 447, 903 }, icon = I("Ability_Hunter_Pet_Wolf"), name = "Wolf" }
+-- Cache/WDB/enUS/creaturecache.wdb du client Forever), repli en médaillon à l'icône du loup. Seul familier
+-- du Chasseur (aucune variante : Lone Wolf le retire). wide : quadrupède long tourné de trois quarts vers la
+-- droite (orientation 0,9) dans un cadre de 120 × 110 : tête et museau coupés net sur le bord droit (retour
+-- du 16/11/2026) ; cadre du modèle élargi (Scene.setWide, taille apparente inchangée).
+Art.pet = { creature = 299, display = { 447, 903 }, wide = 1.6, icon = I("Ability_Hunter_Pet_Wolf"), name = "Wolf" }
 Art.petMark = I("Ability_Hunter_Pet_Wolf") -- marqueur de la cible du familier
 
 -- Pet Whistle sous une épique qui retire le familier (Lone Wolf, deckHooks.petAbsent) : le bibelot montre
