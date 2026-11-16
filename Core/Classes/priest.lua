@@ -38,7 +38,7 @@ ns.Priest = Priest
 if not L.plateByKey("epic") then
   L.plate("epic", { word = "Epic", head = true, flag = "epic", text = "in play from the start of each combat." })
 end
-for _, label in ipairs({ "Each heal", "DoT applied", "Each Regen tick", "Shadow cards", "Shadow hits",
+for _, label in ipairs({ "Each heal", "DoT applied", "Each Regen heal", "Shadow cards", "Shadow hits",
   "1st card each turn" }) do
   L.trigger(label)
 end
@@ -78,14 +78,14 @@ Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
 -- Mots de règle des épiques (L.rule) : la carte dit « Déclencheur: Mot N. », l'à-côté la règle complète (mêmes
 -- nombres que les réglages ci-dessus ; base, puis améliorée).
 L.rule("divineStar", { name = "Divine Star",
-  text = "Deal the HP actually restored to a random enemy. Every heal counts, Regen ticks too.",
-  upText = "Deal the HP actually restored, +N, to a random enemy. Every heal counts, Regen ticks too." })
+  text = "Deal the HP actually restored to a random enemy. Every heal counts, Regen heals too.",
+  upText = "Deal the HP actually restored, +N, to a random enemy. Every heal counts, Regen heals too." })
 L.rule("contagion", { name = "Contagion",
   text = "A DoT a card applies to its target also goes to every other enemy.",
   upText = "A DoT a card applies to its target also goes to every other enemy, +N." })
 L.rule("sanctify", { name = "Sanctify",
-  text = "Deal the tick to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. ".",
-  upText = "Deal the tick +N to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. "." })
+  text = "Deal the Regen heal to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. ".",
+  upText = "Deal the Regen heal +N to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. "." })
 L.rule("lifeTap", { name = "Life Tap",
   text = "Pay N HP per mana instead of mana, +" .. Priest.COVENANT_STEP .. " per Shadow card played before this turn.",
   upText = "The first ones each turn are free, as stated. Others pay N HP per mana, +"

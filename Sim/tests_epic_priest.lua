@@ -113,7 +113,7 @@ test("textes : les nombres affichés (carte et à-côté de ses mots de règle) 
     local t = table.concat(out, "\n")
     assert(t:find(s, 1, true), id .. Card.suffix(up) .. " : « " .. s .. " » absent de « " .. t .. " »")
   end
-  has("echo_of_light", false, "Each Regen tick: Sanctify.")
+  has("echo_of_light", false, "Each Regen heal: Sanctify.")
   has("echo_of_light", false, "starts with Regen " .. P.ECHO_START)
   eq(P.ECHO_PLUS[1], 0, "Echo of Light de base : la valeur seule")
   has("shadow_covenant", false, "Life Tap " .. P.COVENANT_HP[1] .. ".")
@@ -127,7 +127,7 @@ test("textes : les nombres affichés (carte et à-côté de ses mots de règle) 
   for n = 1, 3 do
     local i = n + 1
     has("echo_of_light", n, "Sanctify +" .. P.ECHO_PLUS[i])
-    has("echo_of_light", n, "Deal the tick +" .. P.ECHO_PLUS[i] .. " to all enemies")
+    has("echo_of_light", n, "Deal the Regen heal +" .. P.ECHO_PLUS[i] .. " to all enemies")
     has("shadow_covenant", n, "Life Tap " .. P.COVENANT_HP[i] .. ", " .. (P.COVENANT_FREE[i] == 1 and "1st" or P.COVENANT_FREE[i]) .. " free.")
     has("shadow_covenant", n, ("are free, as stated. Others pay %d HP per mana, +%d"):format(P.COVENANT_HP[i], P.COVENANT_STEP))
     has("reflective_shield", n, "Reflect " .. REFLECT[n] .. ".")

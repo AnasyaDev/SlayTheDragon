@@ -6503,6 +6503,22 @@ if SNAP then
   end
   Render.svg(H, big, SNAP .. "/cartes_rogue.svg", "cartes du Voleur (base, améliorée)")
   big:Hide()
+  -- cartes qui déclenchent un DoT (« deals its damage ») et Regen (« Each Regen heal ») aux quatre paliers,
+  -- avec des voisines du Voleur pour comparer la taille du texte
+  local rows = { "exsanguinate", "envenom", "rupture", "crippling_poison", "echo_of_light" }
+  local tiers = CreateFrame("Frame", nil, _G.UIParent)
+  tiers:SetSize(4 * cw + 20, #rows * ch + 10)
+  tiers:SetPoint("TOPLEFT", _G.UIParent, "TOPLEFT", 0, 0)
+  tiers:SetScale(1.5)
+  for r, id in ipairs(rows) do
+    for up = 0, 3 do
+      local c = W.card(tiers)
+      c:SetCard(id, up > 0 and up or false, { playable = true })
+      W.placeCenter(c, tiers, 80 + up * cw, 125 + (r - 1) * ch, 1)
+    end
+  end
+  Render.svg(H, tiers, SNAP .. "/cartes_dot_paliers.svg", "DoT et Regen déclenchés, paliers 0 à 3")
+  tiers:Hide()
 end
 
 print("UM  Mage : textes des cartes dans la zone, accueil, combat (pastille d'Charges, portrait, Instant, deuxième incantation)")

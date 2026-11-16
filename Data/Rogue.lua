@@ -120,13 +120,13 @@ card("fan_of_knives", {
 card("envenom", {
   level = 1, name = "Envenom", cost = 1, type = "attack", rarity = "uncommon", path = "assassination",
   target = "enemy", effects = { { "surge" }, { "dotPer", 2, icon = "poison" }, { "tickDot" } },
-  text = "Surge: apply DoT 2 per Combo.\nIts DoT ticks now.",
+  text = "Surge: apply DoT 2 per Combo.\nThe target's DoT deals its damage.",
   up = { effects = { { "surge" }, { "dotPer", 3, icon = "poison" }, { "tickDot" } },
-    text = "Surge: apply DoT 3 per Combo.\nIts DoT ticks now." },
+    text = "Surge: apply DoT 3 per Combo.\nThe target's DoT deals its damage." },
   up2 = { effects = { { "surge" }, { "dotPer", 3, icon = "poison" }, { "tickDot" }, { "draw", 1 } },
-    text = "Surge: apply DoT 3 per Combo.\nIts DoT ticks now.\nDraw 1." },
+    text = "Surge: apply DoT 3 per Combo.\nThe target's DoT deals its damage.\nDraw 1." },
   up3 = { effects = { { "surge" }, { "dotPer", 4, icon = "poison" }, { "tickDot" }, { "draw", 1 } },
-    text = "Surge: apply DoT 4 per Combo.\nIts DoT ticks now.\nDraw 1." },
+    text = "Surge: apply DoT 4 per Combo.\nThe target's DoT deals its damage.\nDraw 1." },
 })
 
 card("cloak_of_shadows", {
@@ -154,12 +154,13 @@ card("crippling_poison", {
 card("exsanguinate", {
   level = 4, name = "Exsanguinate", cost = 1, type = "skill", rarity = "rare", path = "assassination",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "tickDotPer" } },
-  text = "Surge: its DoT ticks once per Combo.",
-  up = { cost = 0, text = "Surge: its DoT ticks once per Combo." },
-  up2 = { retain = true, text = "Surge: its DoT ticks once per Combo.\nRetain." },
-  -- palier 3 : un tic de plus, avant ceux du Surge (la carte reste injouable à 0 point : minRes)
+  text = "Surge: the target's DoT deals its damage once per Combo spent.",
+  up = { cost = 0, text = "Surge: the target's DoT deals its damage once per Combo spent." },
+  up2 = { retain = true, text = "Surge: the target's DoT deals its damage once per Combo spent.\nRetain." },
+  -- palier 3 : un tic de plus, avant ceux du Surge (la carte reste injouable à 0 point : minRes, d'où un
+  -- texte en une seule clause Surge : « once, then once per Combo spent »)
   up3 = { effects = { { "tickDot" }, { "surge" }, { "tickDotPer" } },
-    text = "Its DoT ticks now.\nSurge: its DoT ticks once per Combo.\nRetain." },
+    text = "Surge: the target's DoT deals its damage once, then once per Combo spent.\nRetain." },
 })
 
 -- Deadly Poison : après chaque coup d'une carte Attack sur un ennemi vivant, DoT 1 (crochet

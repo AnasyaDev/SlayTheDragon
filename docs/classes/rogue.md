@@ -21,8 +21,8 @@ durée (`pain` / « Pain » dans le code actuel, à renommer).
 | Bibelot de départ | Thieves' Tools : pioche 1 carte de plus au premier tour. |
 
 Ce qu'il est seul à faire : enchaîner des cartes à 0 mana avant un Surge, et parer (Parry). Le DoT est
-partagé avec le Priest Shadow et le Warlock ; chez le Rogue il **éclate** (il se déclenche tout de suite,
-« ticks »), il ne monte pas avec l'Insanity et n'est jamais figé ni drainé.
+partagé avec le Priest Shadow et le Warlock ; chez le Rogue il **éclate** (il inflige ses dégâts tout de suite,
+« deals its damage »), il ne monte pas avec l'Insanity et n'est jamais figé ni drainé.
 
 ## 1. Règles propres
 
@@ -90,12 +90,18 @@ partagé avec le Priest Shadow et le Warlock ; chez le Rogue il **éclate** (il 
 ### 1.4 Effets propres au Rogue
 
 - **`DoT:` (condition)** : la cible a au moins 1 de DoT au moment où la ligne se résout.
-- **`Its DoT ticks now.`** : le DoT de la cible se déclenche tout de suite, exactement comme au début de
+- **`The target's DoT deals its damage.`** (Envenom ; « Its DoT ticks now. » avant le 16/11/2026) : le DoT de
+  la cible se déclenche tout de suite, exactement comme au début de
   son tour (dégâts égaux au DoT, ignore l'Absorb, puis le DoT baisse de 1). Sans DoT : rien. Un
   déclenchement n'est pas un coup d'Attack (ni Strength, ni Deadly Poison, ni Sundered).
-- **`Surge: its DoT ticks once per Combo Point.`** (Exsanguinate) : autant de déclenchements que de points
-  dépensés, l'un après l'autre ; s'arrête si la cible meurt ou si son DoT tombe à 0 (les points restent
-  dépensés).
+- **`Surge: the target's DoT deals its damage once per Combo spent.`** (Exsanguinate ; « Surge: its DoT ticks
+  once per Combo. » avant le 16/11/2026 : le joueur ne savait ni à qui était le DoT ni ce qu'était un « tick ») :
+  autant de déclenchements que de points dépensés, l'un après l'autre ; s'arrête si la cible meurt ou si son
+  DoT tombe à 0 (les points restent dépensés). Palier 3 : `Surge: the target's DoT deals its damage once, then
+  once per Combo spent.` (une seule clause : deux clauses, « The target's DoT deals its damage. » puis la
+  phrase de base, demandaient six lignes et le palier 7,5 ; la carte est injouable à 0 Combo, `minRes`, donc le
+  Surge a toujours lieu). Tous les paliers au texte 9, cinq lignes (avant : 10 en quatre lignes, 9 en cinq au
+  palier 3).
 - **`Each Attack hit: apply DoT 1.`** (Deadly Poison) : après chaque coup d'un effet `damage` d'une carte
   Attack sur un ennemi vivant, même entièrement absorbé par son Absorb. Fan of Knives sur 3 ennemis = 3
   applications ; Killing Spree = 6.
@@ -153,10 +159,10 @@ de fichiers exacts de `~/Téléchargements/ICONS/<nom>.tga` (tous vérifiés).
 | `garrote` | Garrote | common | 1 | 1 | Attack | | Deal 3. / +1 Combo Point. / Apply DoT 4 | Deal 4. / +1 Combo Point. / Apply DoT 6 | Ability_Rogue_Garrote |
 | `rupture` | Rupture | common | 1 | 1 | Skill | | Surge: apply DoT 3 per Combo Point. | Surge: apply DoT 4 per Combo Point. | Ability_Rogue_Rupture |
 | `fan_of_knives` | Fan of Knives | common | 1 | 1 | Attack | | Deal 3 to all. / +1 Combo Point. / Apply DoT 2 to all | Deal 4 to all. / +1 Combo Point. / Apply DoT 3 to all | Ability_Rogue_FanofKnives |
-| `envenom` | Envenom | uncommon | 1 | 1 | Attack | | Surge: apply DoT 2 per Combo Point. / Its DoT ticks now. | Surge: apply DoT 3 per Combo Point. / Its DoT ticks now. | Ability_Rogue_Disembowel |
+| `envenom` | Envenom | uncommon | 1 | 1 | Attack | | Surge: apply DoT 2 per Combo. / The target's DoT deals its damage. | Surge: apply DoT 3 per Combo. / The target's DoT deals its damage. | Ability_Rogue_Disembowel |
 | `cloak_of_shadows` | Cloak of Shadows | uncommon | 1 | 1 | Skill | Cooldown 2 | Remove your debuffs. / Gain Parry 1 | Remove your debuffs. / Gain Parry 2 | Spell_Shadow_NetherCloak |
 | `crippling_poison` | Crippling Poison | common | 2 | 1 | Skill | | Apply DoT 3 / Apply Demoralized 2 ⌛ | Apply DoT 5 / Apply Demoralized 2 ⌛ | ABILITY_POISONSTING |
-| `exsanguinate` | Exsanguinate | rare | 4 | 1 | Skill | | Surge: its DoT ticks once per Combo Point. | (coût 0) | ability_deathwing_bloodcorruption_death |
+| `exsanguinate` | Exsanguinate | rare | 4 | 1 | Skill | | Surge: the target's DoT deals its damage once per Combo spent. | (coût 0) | ability_deathwing_bloodcorruption_death |
 | `deadly_poison` | Deadly Poison | uncommon | 6 | 1 | Power | Power | Each Attack hit: apply DoT 1. | (coût 0) | Ability_Rogue_DualWeild |
 | `venomous_wounds` | Venomous Wounds | rare | 7 | 1 | Power | Power | Turn start: +1 Combo Point per enemy with DoT. | (coût 0) | ability_rogue_venomouswounds |
 
@@ -494,7 +500,7 @@ Le +1 ne change pas ; chaque colonne ne dit que ce que le palier ajoute. Règles
 | Envenom | DoT 3 par Combo | Draw 1 | DoT 4 par Combo |
 | Cloak of Shadows | Parry 2 | coût 0 | Cooldown 1 |
 | Crippling Poison | DoT 4 | Demoralized 2 ⌛ | DoT 6 |
-| Exsanguinate | coût 0 | Retain | un tic de plus avant ceux du Surge (toujours injouable à 0 Combo) |
+| Exsanguinate | coût 0 | Retain | un tic de plus avant ceux du Surge (toujours injouable à 0 Combo) : « Surge: the target's DoT deals its damage once, then once per Combo spent. » |
 | Deadly Poison | coût 0 | au jeu : DoT 2 à tous | au jeu : DoT 4 à tous |
 | Venomous Wounds | coût 0 | au jeu : DoT 2 à tous | au jeu : +2 Combo |
 | Kick | Cooldown 1 | Deal 4 | Apply Demoralized 1 ⌛ |

@@ -69,9 +69,9 @@ Noms : vocabulaire de WoW quand il existe, aucun nom d'état, de condition, de m
 
 | Classe | Épique | Ancien texte (lignes à l'affichage) | Nouveau texte : base / améliorée | Mot de règle | À-côté (base ; amélioré si différent) |
 |---|---|---|---|---|---|
-| Priest | Prayer of Mending | `Each heal: deal the HP restored to a random enemy.` (4) / `Each heal: deal the HP restored + 2 to a random enemy.` (5) | `Each heal: Divine Star.` / `Each heal: Divine Star +2.` | Divine Star | Deal the HP actually restored to a random enemy. Every heal counts, Regen ticks too. ; amélioré : Deal the HP actually restored, +2, to a random enemy. Every heal counts, Regen ticks too. |
+| Priest | Prayer of Mending | `Each heal: deal the HP restored to a random enemy.` (4) / `Each heal: deal the HP restored + 2 to a random enemy.` (5) | `Each heal: Divine Star.` / `Each heal: Divine Star +2.` | Divine Star | Deal the HP actually restored to a random enemy. Every heal counts, Regen heals too. ; amélioré : Deal the HP actually restored, +2, to a random enemy. Every heal counts, Regen heals too. |
 | Priest | Misery | `DoT applied to an enemy also goes to every other enemy.` (4) / `DoT applied to an enemy also goes to every other enemy, +1.` (4) | `DoT applied: Contagion.` / `DoT applied: Contagion +1.` | Contagion | A DoT a card applies to its target also goes to every other enemy. ; amélioré : A DoT a card applies to its target also goes to every other enemy, +1. |
-| Priest | Echo of Light | `Each Regen tick: deal that much to all, no heal. / Start of combat: gain Regen 4` (5) / `Each Regen tick: deal that much + 2 to all, no heal. / Start of combat: gain Regen 4` (5) | `Each Regen tick: Sanctify.` / `Each Regen tick: Sanctify +2.` | Sanctify | Deal the tick to all enemies instead of healing. Each combat starts with Regen 4. ; amélioré : Deal the tick +2 to all enemies instead of healing. Each combat starts with Regen 4. |
+| Priest | Echo of Light | `Each Regen tick: deal that much to all, no heal. / Start of combat: gain Regen 4` (5) / `Each Regen tick: deal that much + 2 to all, no heal. / Start of combat: gain Regen 4` (5) | `Each Regen heal: Sanctify.` / `Each Regen heal: Sanctify +2.` | Sanctify | Deal the Regen heal to all enemies instead of healing. Each combat starts with Regen 4. ; amélioré : Deal the Regen heal +2 to all enemies instead of healing. Each combat starts with Regen 4. |
 | Priest | Shadow Covenant | `Shadow cards: pay HP, not mana: 2, 4, 6... each turn.` (4) / `Shadow cards: pay HP, not mana: 0, 4, 6... each turn.` (4) | `Shadow cards: Life Tap 2.` / `Shadow cards: Life Tap 2, 1st free.` | Life Tap | Pay 2 HP per mana instead of mana, +2 per Shadow card played before this turn. ; amélioré : The first one each turn is free. Others pay 2 HP per mana, +2 per Shadow card before. |
 | Priest | Reflective Shield | `When hit: deal a third of the damage absorbed to the attacker.` (4) / `When hit: deal half the damage absorbed to the attacker.` (4) | `When hit: Reflect a third.` / `When hit: Reflect half.` | Reflect | Deal that part of the Absorb lost on the hit to the attacker, rounded down. |
 | Priest | Voidform | `Surge cards can't be played. / Per Insanity: Shadow hits +1.` (4) / `Surge cards can't be played. / Per Insanity: Shadow hits +2.` (4) | `Shadow hits: Madness 1.` / `Shadow hits: Madness 2.` | Madness | +1 damage per Insanity. Surge cards can't be played. ; amélioré : +2 damage per Insanity. Surge cards can't be played. |
@@ -147,7 +147,7 @@ Sept builds :
 |---|---|---|
 | —, Epic | `Epic.` / `Each heal:` / `Divine Star.` | `Each heal:` / `Divine Star +2.` |
 
-À-côté (mot de règle) : `Divine Star: Deal the HP actually restored to a random enemy. Every heal counts, Regen ticks too.` ; amélioré : `Divine Star: Deal the HP actually restored, +2, to a random enemy. Every heal counts, Regen ticks too.`
+À-côté (mot de règle) : `Divine Star: Deal the HP actually restored to a random enemy. Every heal counts, Regen heals too.` ; amélioré : `Divine Star: Deal the HP actually restored, +2, to a random enemy. Every heal counts, Regen heals too.`
 
 - **Règle.** Chaque soin qui rend au moins 1 PV au Priest inflige autant (amélioré : autant + 2) à un
   ennemi vivant tiré par `c.rng.cards`. Toutes sources : cartes, chaque tic de Regen, Atonement, potions,
@@ -190,9 +190,9 @@ Sept builds :
 
 | Coût / type | Texte de base | Amélioré |
 |---|---|---|
-| —, Epic | `Epic.` / `Each Regen tick:` / `Sanctify.` | `Each Regen tick:` / `Sanctify +2.` |
+| —, Epic | `Epic.` / `Each Regen` / `heal: Sanctify.` | `Each Regen heal:` / `Sanctify +2.` |
 
-À-côté (mot de règle) : `Sanctify: Deal the tick to all enemies instead of healing. Each combat starts with Regen 4.` ; amélioré : `Sanctify: Deal the tick +2 to all enemies instead of healing. Each combat starts with Regen 4.`
+À-côté (mot de règle) : `Sanctify: Deal the Regen heal to all enemies instead of healing. Each combat starts with Regen 4.` ; amélioré : `Sanctify: Deal the Regen heal +2 to all enemies instead of healing. Each combat starts with Regen 4.`
 
 - **Règle.** Au début de chaque combat, le Priest gagne Regen 4. Au début de son tour, le tic de Regen ne
   soigne plus : il inflige sa valeur (amélioré : + 2) à chaque ennemi vivant, puis la Regen baisse de 1 comme
@@ -1225,7 +1225,7 @@ Deflection), `onEnemyDeath` (Conflagration, Death Wish amélioré), `onDotTick` 
    d'origine → variante portée par l'épique, `Card.def` qui la consulte quand l'épique est dans le deck ;
    affichage dans le deck, les récompenses, le marchand (ruban du nom de l'épique) ; Pet Whistle a la même
    bascule.
-8. **Langage et harnais** : plaque Epic ; déclencheurs « Each heal », « Each Regen tick », « Each Parry
+8. **Langage et harnais** : plaque Epic ; déclencheurs « Each heal », « Each Regen heal », « Each Parry
    gained », « At 5 Rage », « Surge of 5 Combo », « Surge of 4+ Combo », « Each 3 Rage spent », « Each 2 Rage
    spent », « Targeted Attack hits », « Attack hits », « Shadow hits », « Cast cards aimed at a Frozen
    enemy » (forme à revoir avec U27) ; infobulles d'Inner Focus, Deflection, Kidney Shot, Lone Wolf ;

@@ -491,10 +491,10 @@ epic("misery", {
 
 epic("echo_of_light", {
   name = "Echo of Light", school = "holy", path = "holy", zone = "wetlands",
-  text = "Epic.\nEach Regen tick: Sanctify.",
-  up = { text = "Epic.\nEach Regen tick: Sanctify +2." },
-  up2 = { text = "Epic.\nEach Regen tick: Sanctify +3." },
-  up3 = { text = "Epic.\nEach Regen tick: Sanctify +4." },
+  text = "Epic.\nEach Regen heal: Sanctify.",
+  up = { text = "Epic.\nEach Regen heal: Sanctify +2." },
+  up2 = { text = "Epic.\nEach Regen heal: Sanctify +3." },
+  up3 = { text = "Epic.\nEach Regen heal: Sanctify +4." },
 })
 
 epic("shadow_covenant", {
