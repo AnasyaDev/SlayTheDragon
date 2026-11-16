@@ -81,3 +81,9 @@ The game rules (`Core/`, `Data/`) are plain Lua 5.1 with no WoW API, so they run
 - Balance simulation with bots: `luajit Sim/sim.lua runs=2000 bot=heuristic runner=expedition class=priest`.
 
 Design notes, balance measurements and the interface reference are in `docs/` (in French).
+
+## Credits
+
+- Card frames: "Mechanized Magic" card pack by Dumivid (CC0).
+- Font: Baloo Chettan 2 by Ek Type, licensed under the SIL Open Font License 1.1 (`Media/Fonts/OFL.txt`).
+- World of Warcraft artwork, icons and interface elements used by the addon belong to Blizzard Entertainment.
