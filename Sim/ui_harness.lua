@@ -574,10 +574,10 @@ end
 -- et l'échelle effective du cadre à ce moment (_cam), recalculée seulement par RefreshCamera ; position,
 -- échelle du modèle et animation sont des réglages du CADRE, gardés d'un modèle à l'autre.
 H.modelDelay = 0.2
-local function camNow(self)
+function H.camNow(self)
   return { rawget(self, "_w"), rawget(self, "_h"), effScale(self) }
 end
-local function poseModel(self, name, disp, file)
+function H.poseModel(self, name, disp, file)
   if H.noModels then name = nil end
   self._model, self._ready = name, false
   self._modelSerial = (rawget(self, "_modelSerial") or 0) + 1
@@ -589,7 +589,7 @@ local function poseModel(self, name, disp, file)
     if not current and not H.lateLoads then return end
     if not current then H.lateDelivered = (H.lateDelivered or 0) + 1 end
     self._model, self._display, self._file, self._ready = name, disp, file, true
-    self._cam = camNow(self)
+    self._cam = H.camNow(self)
     H.modelLoads = (H.modelLoads or 0) + 1
     run(self, "OnModelLoaded")
   end }
@@ -598,18 +598,18 @@ function Frame:SetUnit(u) self._model, self._ready = "unit:" .. u, true return t
 function Frame:SetCreature(id)
   if type(id) ~= "number" then error("SetCreature : nombre attendu") end
   self._display = 0
-  poseModel(self, (not H.badCreatures[id]) and ("creature:" .. id) or nil,
+  H.poseModel(self, (not H.badCreatures[id]) and ("creature:" .. id) or nil,
     (H.creatureDisplays and H.creatureDisplays[id]) or (60000 + id), 777)
 end
 function Frame:SetDisplayInfo(id)
   if type(id) ~= "number" then error("SetDisplayInfo : nombre attendu") end
   self._display = id
-  poseModel(self, (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil, id, 777)
+  H.poseModel(self, (not (H.badDisplays and H.badDisplays[id])) and ("display:" .. id) or nil, id, 777)
 end
 function Frame:SetModel(file)
   if type(file) ~= "number" and type(file) ~= "string" then error("SetModel : fichier attendu") end
   self._display = 0
-  poseModel(self, (H.goodFiles and H.goodFiles[file]) and ("file:" .. tostring(file)) or nil, 0,
+  H.poseModel(self, (H.goodFiles and H.goodFiles[file]) and ("file:" .. tostring(file)) or nil, 0,
     type(file) == "number" and file or 778)
 end
 function Frame:ClearModel()
@@ -621,7 +621,7 @@ end
 function Frame:GetModelFileID() return (self._model and self._ready) and (rawget(self, "_file") or 777) or nil end
 function Frame:GetDisplayInfo() return rawget(self, "_display") or 0 end
 function Frame:RefreshCamera()
-  self._cam = camNow(self)
+  self._cam = H.camNow(self)
   self._camRefreshes = (rawget(self, "_camRefreshes") or 0) + 1
 end
 function Frame:SetPosition(x, y, z)
@@ -646,7 +646,7 @@ function Frame:SetAnimation(a)
 end
 -- Caméra du modèle calculée pour la taille et l'échelle effective ACTUELLES du cadre.
 function H.cameraFits(m)
-  local c, now = rawget(m, "_cam"), camNow(m)
+  local c, now = rawget(m, "_cam"), H.camNow(m)
   return c ~= nil and c[1] == now[1] and c[2] == now[2] and math.abs(c[3] - now[3]) < 1e-9
 end
 
