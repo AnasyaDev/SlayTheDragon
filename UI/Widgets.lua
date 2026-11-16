@@ -1817,6 +1817,8 @@ function W.fillCardTooltip(tt, id, up, extra)
   if extra and extra.full then
     local rc = Art.rarityText[d.rarity] or Art.rarityText.common
     tt:AddLine(d.name, rc[1], rc[2], rc[3])
+    -- ce que la carte fait maintenant (jeton des états du héros : épique, pouvoir, vue de classe), sous le nom
+    if extra.now then W.addNowLines(tt, extra.now) end
     for _, l in ipairs(W.cardTextLines(d)) do wrap(tt, l) end
   end
   -- aperçu de l'amélioration : le palier suivant de cette carte, chiffres qui changent en vert
@@ -1852,6 +1854,15 @@ function W.fillCardTooltip(tt, id, up, extra)
   if extra and extra.reason then
     if tt:NumLines() > 0 then tt:AddLine(" ") end
     tt:AddLine(extra.reason, 1, 0.3, 0.3, true)
+  end
+end
+
+-- Lignes « maintenant » d'une infobulle (texte en or, ou { texte, r, g, b }).
+function W.addNowLines(tt, now)
+  if type(now) ~= "table" then now = { now } end
+  for i = 1, #now do
+    local l = now[i]
+    if type(l) == "table" then wrap(tt, l[1], l[2], l[3], l[4]) else wrap(tt, l, 1, 0.82, 0) end
   end
 end
 
@@ -2006,7 +2017,10 @@ end
 ---------------------------------------------------------------------------
 
 -- Rangée centrée de jetons avec infobulle ; list = { { icon = entrée, n = nombre, rim = teinte, info = {...},
--- glow = couleur d'une aura tenue derrière le jeton (épique en jeu) } }.
+-- glow = couleur d'une aura tenue derrière le jeton (épique en jeu), dim = icône désaturée et assombrie
+-- (règle inactive) } }. n : nombre ou texte court (« 2/3 », « +4 »), écrit en bas à droite. info = { status, n }
+-- (état), { power | card = instance, now = lignes } (carte : infobulle complète, `now` sous le nom) ou
+-- { title, text }.
 -- t.medal = { icon, ring (cadre), SetRing(teinte) } (régions du visuel du jeton : tout suit son animation).
 function W.tokenRow(parent, maxN, width, size)
   size = size or 30
@@ -2039,8 +2053,9 @@ function W.tokenRow(parent, maxN, width, size)
     W.tooltip(t, function(tt, self)
       local info = self.info
       if not info then return end
+      local inst = info.power or info.card
       if info.status then W.addStatusLines(tt, info.status, info.n)
-      elseif info.power then W.fillCardTooltip(tt, info.power.id, info.power.up, { full = true })
+      elseif inst then W.fillCardTooltip(tt, inst.id, inst.up, { full = true, now = info.now })
       else
         if info.title then tt:AddLine(info.title, 1, 0.82, 0) end
         if info.text then tt:AddLine(info.text, 1, 1, 1, true) end
@@ -2058,12 +2073,18 @@ function W.tokenRow(parent, maxN, width, size)
     for i = 1, #self.tokens do
       local t, it = self.tokens[i], list[i]
       if it and i <= n then
-        t.info = it.info
+        t.info, t.key = it.info, it.key
         W.setIcon(t.medal.icon, it.icon, it.key)
         t.medal:SetRing(it.rim)
+        -- règle inactive (« No Frozen enemy ») : icône désaturée et assombrie, aura éteinte d'autant
+        local dim = it.dim and true or false
+        t.dim = dim
+        t.medal.icon:SetDesaturated(dim)
+        local k = dim and 0.55 or 1
+        t.medal.icon:SetVertexColor(k, k, k, 1)
         if it.glow then
           t.aura:SetVertexColor(it.glow[1], it.glow[2], it.glow[3], 1)
-          t.aura:SetAlpha(it.glow[4] or 0.9)
+          t.aura:SetAlpha((it.glow[4] or 0.9) * (dim and 0.35 or 1))
           t.aura:Show()
         else
           t.aura:Hide()
@@ -2077,7 +2098,7 @@ function W.tokenRow(parent, maxN, width, size)
         t:SetPoint("TOPLEFT", self, "TOPLEFT", x, -line * (size + 4))
         t:Show()
       else
-        t.info = nil
+        t.info, t.key, t.dim = nil, nil, nil
         t:Hide()
       end
     end
@@ -2085,6 +2106,19 @@ function W.tokenRow(parent, maxN, width, size)
   return row
 end
 W.pillRow = W.tokenRow
+
+-- Note d'une vue de classe sur un jeton des états du héros (avant row:Set) : `match` = "epic" (jeton de
+-- l'épique en jeu) ou la clé du jeton (« card:hot_streak », tous les exemplaires) ; now = ligne(s) de
+-- l'infobulle sous le nom, n = compteur écrit sur l'icône (nil : aucun), dim = règle inactive.
+function W.noteToken(list, match, now, n, dim)
+  for i = 1, #list do
+    local it = list[i]
+    if (match == "epic" and it.epic) or it.key == match then
+      it.n, it.dim = n, dim
+      if it.info then it.info.now = now end
+    end
+  end
+end
 
 -- États d'une unité en jetons (triés par id, stable).
 function W.unitStatuses(unit)

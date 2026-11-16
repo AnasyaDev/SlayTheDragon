@@ -79,17 +79,17 @@ Art.classes.warrior.wow = "WARRIOR"
 Art.classes.warrior.resource = { tga = "Ability_Warrior_FocusedRage", icon = "Interface\\Icons\\ability_warrior_focusedrage",
   color = "attackText" }
 
--- Vue de classe (zone libre sous les états du héros, 300 × 40) : ligne de l'épique, comme celle du Voleur,
--- icône (infobulle : la carte) et ce qu'elle change maintenant :
+-- Vue de classe : rien d'écrit sur la scène ; la note de l'épique va sur son jeton des états du héros
+-- (W.noteToken) : ligne actuelle dans l'infobulle, compteur sur l'icône, icône atténuée si la règle est
+-- inactive :
 --   Death Wish         « Attacks +50%, no Absorb »
---   Thunderous Roar    « Roar in 3 Rage: 3 to all »
---   Sweeping Strikes   « Targeted hits splash 1 other for a third » (deux ennemis vivants au moins)
---   Titan's Grip       « Attacks this turn: 0/2, each twice »
---   Shield Charge      « End of turn: 7 to Defias Thug » (avec de l'Absorb)
---   Anger Management   « Each Rage spent: Cooldowns −1 » (une carte en recharge au moins)
---   Avatar             « Rage up to 10, +2 next turn » ; à 10 Rage « Rage 10: Attacks +1, +2 next turn »
--- Ne lit que le combat.
-local EPIC_ICON = 22
+--   Thunderous Roar    « Roar in 3 Rage: 3 to all »                     compteur 3 (Rage qui manque)
+--   Sweeping Strikes   « Targeted hits splash 1 other for a third »     compteur 1 ; atténuée seul
+--   Titan's Grip       « Attacks this turn: 0/2, each twice »           compteur 0/2
+--   Shield Charge      « End of turn: 7 to Defias Thug »                compteur 7 ; atténuée sans Absorb
+--   Anger Management   « Each Rage spent: Cooldowns −1 »                atténuée sans recharge
+--   Avatar             « Rage up to 10, +2 next turn » ; à 10 Rage « Rage 10: Attacks +1, +2 next turn » (+1)
+-- Renvoie ligne, compteur, inactive (nil : rien à dire). Ne lit que le combat ; lu aussi par le harnais.
 local function n(v) return "|cffffffff" .. tostring(v) .. "|r" end
 
 function Art.warriorEpicLine(c)
@@ -102,71 +102,47 @@ function Art.warriorEpicLine(c)
     return ("Attacks %s, no Absorb"):format(n("+" .. math.floor((Wr.num("death_wish", "mult", up) - 1) * 100 + 0.5) .. "%"))
   elseif id == "thunderous_roar" then
     local T = E.thunderous_roar
-    return ("Roar in %s Rage: %s to all"):format(n(math.max(1, T.at - (c.player.res or 0))), n(Wr.num("thunderous_roar", "damage", up)))
+    local left = math.max(1, T.at - (c.player.res or 0))
+    return ("Roar in %s Rage: %s to all"):format(n(left), n(Wr.num("thunderous_roar", "damage", up))), tostring(left)
   elseif id == "sweeping_strikes" then
     local alive = #ns.Combat.aliveEnemies(c)
-    if alive < 2 then return nil end
+    if alive < 2 then return nil, nil, true end
     local k = math.min(alive - 1, Wr.num("sweeping_strikes", "targets", up))
-    return ("Targeted hits splash %s other%s for a third"):format(n(k), k > 1 and "s" or "")
+    return ("Targeted hits splash %s other%s for a third"):format(n(k), k > 1 and "s" or ""), tostring(k)
   elseif id == "titans_grip" then
     local lim = E.titans_grip.limit
-    return ("Attacks this turn: %s/%d, each twice"):format(n(math.min(c.cls.tgAttacks or 0, lim)), lim)
+    local done = math.min(c.cls.tgAttacks or 0, lim)
+    return ("Attacks this turn: %s/%d, each twice"):format(n(done), lim), done .. "/" .. lim
   elseif id == "shield_charge" then
     local dmg = Wr.chargeDamage(c, up)
     local t = dmg > 0 and Wr.chargeTarget(c)
-    if not t then return nil end
+    if not t then return nil, nil, true end
     local d = ns.Enemies[t.id]
-    return ("End of turn: %s to %s"):format(n(ns.Combat.calcDamage(c, c.player, t, dmg)), d and d.name or "the target")
+    local hit = ns.Combat.calcDamage(c, c.player, t, dmg)
+    return ("End of turn: %s to %s"):format(n(hit), d and d.name or "the target"), tostring(hit)
   elseif id == "anger_management" then
-    if #c.cooldown == 0 then return nil end
+    if #c.cooldown == 0 then return nil, nil, true end
     local A = E.anger_management
     local per = A.per
     local steps = Wr.num("anger_management", "steps", up)
     if per > 1 then
-      return ("Rage spent: %s/%d, then Cooldowns −%d"):format(n(c.cls.amSpent or 0), per, steps)
+      local spent = c.cls.amSpent or 0
+      return ("Rage spent: %s/%d, then Cooldowns −%d"):format(n(spent), per, steps), spent .. "/" .. per
     end
     return ("Each Rage spent: Cooldowns %s"):format(n("−" .. steps))
   elseif id == "avatar" then
     local gain = n("+" .. Wr.num("avatar", "gain", up))
     local bonus = Wr.avatarBonus(c)
-    if bonus > 0 then return ("Rage %s: Attacks %s, %s next turn"):format(n(c.player.res), n("+" .. bonus), gain) end
+    if bonus > 0 then
+      return ("Rage %s: Attacks %s, %s next turn"):format(n(c.player.res), n("+" .. bonus), gain), "+" .. bonus
+    end
     return ("Rage up to %s, %s next turn"):format(n(E.avatar.cap), gain)
   end
   return nil
 end
 
 ns.ClassViews.warrior = {
-  build = function(host)
-    local W = ns.Widgets
-    local ep = CreateFrame("Frame", nil, host)
-    ep:SetSize(EPIC_ICON, EPIC_ICON)
-    ep:SetPoint("LEFT", host, "LEFT", 2, 0)
-    ep:EnableMouse(true)
-    ep.slot = W.slotOn(ep, EPIC_ICON)
-    W.tooltip(ep, function(tt, f)
-      if f.epicId then W.fillCardTooltip(tt, f.epicId, f.epicUp, { full = true }) end
-    end, "ANCHOR_RIGHT")
-    ep.text = W.label(host, "bold", 11, Art.C.goldText, "OVERLAY")
-    ep.text:SetPoint("LEFT", ep, "RIGHT", 6, 0)
-    ep:Hide()
-    ep.text:Hide()
-    host.epic = ep
-  end,
-  render = function(host, c)
-    local W = ns.Widgets
-    local ep = host.epic
-    local id, up = ns.Warrior.epicOf(c)
-    local line = id and Art.warriorEpicLine(c)
-    if line then
-      if ep.epicId ~= id then W.setIcon(ep.slot.icon, Art.cards[id], "card:" .. id) end
-      ep.epicId, ep.epicUp = id, up
-      ep.text:SetText(line)
-      ep:Show()
-      ep.text:Show()
-    else
-      ep.epicId = nil
-      ep:Hide()
-      ep.text:Hide()
-    end
+  tokens = function(c, list)
+    ns.Widgets.noteToken(list, "epic", Art.warriorEpicLine(c))
   end,
 }

@@ -29,7 +29,30 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   ressource de la classe (`Art.classes[id].resource`), nombre, cachée à 0 ; infobulle = explication du
   registre du langage et « n / plafond » ; chiffres flottants « +2 Rage » à la couleur de la ressource.
 - **Zone libre de classe** : cadre de 300 × 40 sous les états du héros, rempli par `ns.ClassViews[id]`
-  (`build` une fois, `render` à chaque rendu) ; vide pour le Priest et le Warrior.
+  (`build` une fois, `render` à chaque rendu) : familier, Traps et cible du Hunter, marques d'Atrophic
+  Poison et transparence sous Stealth du Voleur ; vide pour le Priest, le Warrior et le Mage. **Aucun texte
+  permanent** : la ligne d'épique écrite là (« Cast cards hit twice ») passait en travers du modèle du héros.
+- **Notes de classe sur les états du héros** (16/11/2026, demande du joueur : « uniquement au hover ») :
+  l'épique en jeu a déjà son jeton dans la rangée des états (liseré et aura violets) ; ce qu'elle fait
+  maintenant y est noté par la vue de classe (`ns.ClassViews[id].tokens`, `W.noteToken`, contrat :
+  docs/classes.md, « Notes sur les jetons ») au lieu d'une icône et d'un texte sous la rangée.
+  - **Infobulle** du jeton (même infobulle que les autres jetons d'état) : nom de la carte en titre, puis la
+    ligne actuelle en or (« Cast cards hit twice », « Cards played: 2/3 »), puis le texte et les mots-clés.
+  - **Compteur** : seulement quand la ligne porte un nombre qui change pendant le combat, écrit en bas à
+    droite de l'icône comme le nombre d'un état (« 2/3 », « 2 », « 4 », « +5 »).
+  - **Icône atténuée** (désaturée, assombrie, aura baissée) quand la règle est inactive (« No Frozen
+    enemy », « No enemy with DoT », Echoing Reprimand hors de sa plage, Shield Charge sans Absorb…).
+  - Lignes purement descriptives : icône seule.
+  - Mage : Hot Streak en jeu = compteur « 1/2 » sur son propre jeton (« Fire cards this turn: 1/2 ») ; la
+    deuxième incantation en cours = un jeton de plus au bout de la rangée (icône de la carte, infobulle = la
+    carte, « 2nd cast: Pyroblast », « An interrupt cancels this cast first. »).
+  - Tableau des lignes : `Art.mageEpicText`, `Art.priestEpicLine`, `Art.warriorEpicLine`,
+    `Art.rogueEpicLine`, `Art.hunterEpicLine` (ligne, compteur, inactive). Zones : leurs vues
+    (`ns.ZoneViews`) n'écrivent rien sous le héros (compteur de combat en haut au centre, badges des ennemis).
+  - Harnais : `H.heroToken(v, "epic" | clé)` (jeton, ligne, compteur, atténué), `H.tokenPlaced` (rangée des
+    états, taille commune, hors du corps du héros, souris par `H.mouseFocus`, infobulle nom puis ligne, aucun
+    texte sous la zone de classe : `H.textsUnder`) ; aperçus `combat-mage`, `uem-mirror-image`,
+    `uem-fingers-of-frost`, `uem-cartes-jouees`, `uem-deux-lignes`, `uew-titans-grip`, `uer-deflection`.
 - **Spend N au choix** (décision du joueur) : clic ou glisser = la carte se joue en dépensant si
   la ressource suffit ; **Maj enfoncée en jouant** = sans dépenser. Le clic droit n'est pas employé : il
   désélectionne partout dans le combat. La ligne « Spend N: » de la carte en main est éteinte (gris)

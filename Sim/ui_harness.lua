@@ -904,6 +904,69 @@ function H.mouseFocus(x, y)
   return best, ties
 end
 
+-- Jeton des états du héros (v.playerSt) : which = "epic" (jeton de l'épique en jeu) ou sa clé
+-- (« card:hot_streak », « cast2:pyroblast »). Renvoie le jeton affiché (nil : absent), sa ligne
+-- « maintenant » (info.now, première ligne, sans couleurs ; nil : aucune), le compteur écrit sur l'icône
+-- ("" : aucun) et vrai si l'icône est atténuée (règle inactive).
+local function plain(s) return s and (s:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+H.plain = plain
+function H.heroToken(v, which)
+  for _, t in ipairs(v.playerSt.tokens) do
+    if t._shown and t.info and ((which == "epic" and t.info.epic) or rawget(t, "key") == which) then
+      local now = t.info.now
+      if type(now) == "table" then now = now[1] end
+      if type(now) == "table" then now = now[1] end
+      return t, plain(now), t.count._text or "", t.dim == true
+    end
+  end
+  return nil, nil, "", false
+end
+
+-- Textes visibles (non vides) sous un cadre : la zone libre de classe n'en écrit plus aucun.
+function H.textsUnder(frame)
+  local out = {}
+  for _, o in ipairs(H.objects) do
+    if rawget(o, "_kind") == "FontString" and isAncestor(frame, o) and o:IsVisible() and (o._text or "") ~= "" then
+      out[#out + 1] = plain(o._text)
+    end
+  end
+  return out
+end
+
+-- Contrôles communs d'un jeton noté par une vue de classe : dans la rangée des états du héros, à la taille
+-- des autres jetons, hors du modèle du héros (corps : bande centrale de sa figure, sous la tête), la souris
+-- lui revient (H.mouseFocus) et son infobulle donne le nom de la carte puis la ligne actuelle ; aucun texte
+-- permanent dans la zone libre de classe. Renvoie vrai, ou faux et la raison.
+function H.tokenPlaced(v, t, name, now)
+  if not t then return false, "jeton absent" end
+  if not mouseRender then H.mouseFocus(0, 0) end
+  local R = mouseRender
+  local r, row = R.rect(t), R.rect(v.playerSt)
+  local first = R.rect(v.playerSt.tokens[1])
+  if not (r and row and first) then return false, "rectangles" end
+  if math.abs((r[3] - r[1]) - (first[3] - first[1])) > 0.5 then return false, "taille" end
+  -- rectangles { gauche, bas, droite, haut } (y vers le haut) ; la rangée pousse ses jetons vers le bas
+  if r[4] > row[4] + 0.5 or r[2] < row[4] - 2 * (first[4] - first[2]) - 4.5 then return false, "hors de la rangée" end
+  local hero = R.rect(v.hero)
+  if hero then
+    -- corps du héros : bande centrale de sa figure (40 % de la largeur), des pieds aux deux tiers de la hauteur
+    local w, h = hero[3] - hero[1], hero[4] - hero[2]
+    local body = { hero[1] + w * 0.3, hero[2], hero[3] - w * 0.3, hero[4] - h * 0.35 }
+    if r[1] < body[3] and r[3] > body[1] and r[2] < body[4] and r[4] > body[2] then return false, "sur le modèle" end
+  end
+  local focus = H.mouseFocus((r[1] + r[3]) / 2, (r[2] + r[4]) / 2)
+  if focus ~= t then return false, "souris prise par " .. tostring(focus and rawget(focus, "_kind")) end
+  local tt = plain(table.concat(H.hover(t), " | "))
+  if name and not tt:find(name, 1, true) then return false, "infobulle sans le nom : " .. tt end
+  if now then
+    local a, b = tt:find(name or "", 1, true), tt:find(now, 1, true)
+    if not b or (a and b < a) then return false, "infobulle sans la ligne actuelle après le nom : " .. tt end
+  end
+  local texts = H.textsUnder(v.classZone)
+  if #texts > 0 then return false, "texte permanent dans la zone de classe : " .. table.concat(texts, " ; ") end
+  return true
+end
+
 local function describe(o)
   if not o then return "rien" end
   local r = mouseRender and mouseRender.rect(o)
@@ -6620,18 +6683,24 @@ do
   ns.Combat.play(c, #c.hand - 1, 1)
   ns.Combat.play(c, #c.hand, 1)
   v:Render(true)
-  local host = v.classZone.views.mage
-  check("deux incantations : barre commune = Fireball, vue du Mage = « 2nd cast: Pyroblast »",
-    v.cast._shown and (v.cast.name._text or ""):find("Fireball", 1, true) and host and host._shown
-      and host.name._shown and host.name._text == "2nd cast: Pyroblast",
-    tostring(v.cast.name._text) .. " / " .. tostring(host and host.name._text))
-  local ctt = table.concat(H.hover(host.box), " | ")
+  local t2, now2, n2 = H.heroToken(v, "cast2:pyroblast")
+  check("deux incantations : barre commune = Fireball, jeton Pyroblast dans les états du héros (« 2nd cast: Pyroblast » au survol, sans compteur)",
+    v.cast._shown and (v.cast.name._text or ""):find("Fireball", 1, true) and t2 and now2 == "2nd cast: Pyroblast" and n2 == "",
+    tostring(v.cast.name._text) .. " / " .. tostring(now2))
+  local ctt = table.concat(H.hover(t2 or v.cast), " | ")
   check("infobulle de la deuxième incantation : carte et interruption", ctt:find("Pyroblast", 1, true)
     and ctt:find("interrupt cancels this cast first", 1, true), ctt)
-  -- Hot Streak en jeu : compte Fire du tour
+  local okp, whyp = H.tokenPlaced(v, t2, "Pyroblast", "2nd cast: Pyroblast")
+  check("jeton de la deuxième incantation : rangée des états, taille commune, hors du modèle, souris et infobulle, aucun texte permanent",
+    okp, whyp)
+  -- Hot Streak en jeu : compte Fire du tour, écrit sur son jeton
   c.player.powers[#c.player.powers + 1] = ns.Card.new("hot_streak", false, 9103)
   v:Render(true)
-  check("Hot Streak en jeu : « Fire 2/2 » dans la vue du Mage", host.fire._shown and host.fire._text == "Fire 2/2", host.fire._text)
+  local th, nowh, nh = H.heroToken(v, "card:hot_streak")
+  check("Hot Streak en jeu : compteur « 2/2 » sur son jeton, « Fire cards this turn: 2/2 » au survol",
+    th and nh == "2/2" and nowh == "Fire cards this turn: 2/2", tostring(nh) .. " / " .. tostring(nowh))
+  local okh, whyh = H.tokenPlaced(v, th, "Hot Streak", "Fire cards this turn: 2/2")
+  check("jeton Hot Streak : rangée des états, souris et infobulle (nom puis ligne)", okh, whyh)
   snap("combat-mage", true)
   -- carte Cast injouable avec deux incantations : raison du moteur
   c.hand[#c.hand + 1] = ns.Card.new("blizzard", false, 9104)
@@ -10063,10 +10132,14 @@ do
     all == 4 and named, all .. " / " .. tostring(named))
   check("Lone Wolf : la figure du familier et son marqueur de cible ont disparu de l'écran", host and not vis(host.pet)
     and not vis(host.mark) and not ns.Hunter.petPresent(c))
-  local lw = host.epic
-  check("ligne de l'épique sous le héros : icône de Lone Wolf et bonus actuel des coups (« No pet. Attack hits: +2 »)",
-    lw and vis(lw) and lw.epicId == "lone_wolf" and (lw.text._text or ""):find("No pet", 1, true)
-    and (lw.text._text or ""):find("+" .. ns.HunterEpic.lonePer[1] * c.player.res, 1, true), lw and lw.text._text)
+  local lw, lwNow, lwN = H.heroToken(v, "epic")
+  local lwB = ns.HunterEpic.lonePer[1] * c.player.res
+  check("jeton de l'épique (Lone Wolf) : compteur « +N » (bonus actuel des coups), « No pet. Attack hits: +N » au survol",
+    lw and (lwNow or ""):find("No pet", 1, true) and (lwNow or ""):find("+" .. lwB, 1, true)
+    and lwN == (lwB > 0 and ("+" .. lwB) or ""), tostring(lwNow) .. " / " .. tostring(lwN))
+  local okl, whyl = H.tokenPlaced(v, lw, "Lone Wolf", lwNow)
+  check("jeton de Lone Wolf : rangée des états, hors du modèle, souris et infobulle (nom puis ligne), aucun texte permanent",
+    okl, whyl)
   local lines, nLines = {}, 0
   for _, id in ipairs({ "call_of_the_wild", "trap_launcher", "beast_cleave", "roar_of_sacrifice", "master_marksman",
     "black_arrow", "lone_wolf" }) do
@@ -10281,13 +10354,16 @@ do
   check("combat : Deflection en jeu dès la première main (c.epic), dans aucune pile, main de 6", not inPile
     and c.epic and c.epic.id == "deflection" and #c.hand == 6, #c.hand)
   local host = v.classZone.views.rogue
-  local ep = host and host.epic
-  local function line() return ep and ep.text._shown and (ep.text._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "") or "" end
+  local function tok() return (H.heroToken(v, "epic")) end
+  local function line() return select(2, H.heroToken(v, "epic")) or "" end
+  local function cnt() return select(3, H.heroToken(v, "epic")) end
+  local function dim() return select(4, H.heroToken(v, "epic")) end
   local EN = ns.Rogue.EPIC
   local d1 = RD(1)
-  check("ligne de l'épique : icône de Deflection, « Ripostes this turn: 0   next: N »",
-    ep and ep._shown and (ep.slot.icon._texture or ""):lower():find("ability_rogue_dismantle", 1, true)
-    and line() == "Ripostes this turn: 0   next: " .. d1, line())
+  local ep = tok()
+  check("jeton de l'épique : icône de Deflection, compteur = prochaine riposte, « Ripostes this turn: 0   next: N » au survol",
+    ep and (ep.medal.icon._texture or ""):lower():find("ability_rogue_dismantle", 1, true)
+    and line() == "Ripostes this turn: 0   next: " .. d1 and cnt() == tostring(d1) and not dim(), line() .. " / " .. cnt())
   local hp0 = c.enemies[1].hp
   c.hand[#c.hand + 1] = ns.Card.new("feint", false, 980)
   c.hand[#c.hand + 1] = ns.Card.new("feint", false, 981)
@@ -10296,14 +10372,20 @@ do
   ns.Controller.act({ "play", #c.hand })
   H.settle()
   v:Render(true)
-  check("deux Feint : deux ripostes sur la cible, ligne « Ripostes this turn: 2   next: » la troisième",
-    c.enemies[1].hp == hp0 - RD(1) - RD(2) and line() == "Ripostes this turn: 2   next: " .. RD(3), line() .. " / " .. (hp0 - c.enemies[1].hp))
-  local hv = table.concat(H.hover(ep), " | "):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-  check("survol de l'icône : la carte Deflection et son texte", hv:find("Deflection", 1, true) and hv:find("Each Parry gained", 1, true), hv)
-  check("ligne dans la zone de classe, sans texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
+  check("deux Feint : deux ripostes sur la cible, « Ripostes this turn: 2   next: » la troisième, compteur suivi",
+    c.enemies[1].hp == hp0 - RD(1) - RD(2) and line() == "Ripostes this turn: 2   next: " .. RD(3) and cnt() == tostring(RD(3)),
+    line() .. " / " .. cnt() .. " / " .. (hp0 - c.enemies[1].hp))
+  ep = tok()
+  local hv = H.plain(table.concat(H.hover(ep), " | "))
+  check("survol du jeton : la carte Deflection, la ligne actuelle et son texte", hv:find("Deflection", 1, true)
+    and hv:find("Ripostes this turn: 2", 1, true) and hv:find("Each Parry gained", 1, true), hv)
+  local okd, whyd = H.tokenPlaced(v, ep, "Deflection", "Ripostes this turn: 2")
+  check("jeton de Deflection : rangée des états, hors du modèle, souris et infobulle (nom puis ligne), aucun texte permanent",
+    okd, whyd)
+  check("aucun texte tronqué", #W.truncatedNow() == 0, table.concat(W.truncatedNow(), " ; "))
   snap("uer-deflection", true)
 
-  -- 3. autres épiques sur le même combat (passif remplacé) : lignes et marques d'Atrophic Poison
+  -- 3. autres épiques sur le même combat (passif remplacé) : notes du jeton et marques d'Atrophic Poison
   local function setEpic(eid, up)
     c.epic = { id = eid, up = up or false, uid = 970 }
     v:Render(true)
@@ -10313,20 +10395,22 @@ do
   v:Render(true)
   local dmb = EN.danse_macabre[1] * (3 - EN.danseFree[1])
   local dm = "Card names this turn: 3   +" .. dmb .. " per hit"
-  check("Danse Macabre : « Card names this turn: 3   +N per hit » (noms au-delà des F premiers)",
-    line() == dm and dmb > 0, line())
+  check("Danse Macabre : « Card names this turn: 3   +N per hit » (noms au-delà des F premiers), compteur « +N »",
+    line() == dm and dmb > 0 and cnt() == "+" .. dmb, line() .. " / " .. cnt())
   setEpic("echoing_reprimand")
   c.player.res = EN.echoingMax[1]
   v:Render(true)
-  check("Echoing Reprimand au haut de la plage (2 ou 3 Combo) : « Surge now counts as N Combo »",
-    line() == "Surge now counts as " .. EN.echoing_reprimand[1] .. " Combo", line())
+  check("Echoing Reprimand au haut de la plage (2 ou 3 Combo) : « Surge now counts as N Combo », compteur N",
+    line() == "Surge now counts as " .. EN.echoing_reprimand[1] .. " Combo" and cnt() == tostring(EN.echoing_reprimand[1])
+    and not dim(), line())
   c.player.res = 4
   v:Render(true)
-  check("Echoing Reprimand à 4 Combo : ligne cachée", not ep._shown and line() == "")
+  check("Echoing Reprimand à 4 Combo : icône atténuée, ni ligne ni compteur", tok() and dim() and line() == "" and cnt() == "")
   setEpic("kidney_shot", true)
   c.player.res = EN.kidney_shot[2]
   v:Render(true)
-  check("Kidney Shot amélioré au seuil : « Surge now stuns the target »", line() == "Surge now stuns the target", line())
+  check("Kidney Shot amélioré au seuil : « Surge now stuns the target », icône seule (sans compteur)",
+    line() == "Surge now stuns the target" and cnt() == "" and not dim(), line())
   setEpic("atrophic_poison")
   for _, en in ipairs(c.enemies) do en.st.pain = nil end
   local tgt = c.enemies[1]
@@ -10336,8 +10420,8 @@ do
   for _, m in ipairs(host.marks) do if m._shown then shown = shown + 1 mk = m end end
   local s = v.slotOf[tgt.uid]
   local mr, tr = mk and R.rect(mk), s and R.rect(s.tag)
-  check("Atrophic Poison : une marque à droite du cadre de l'ennemi sous DoT (aucune ligne)",
-    shown == 1 and mr and tr and mr[1] >= tr[3] - 0.5 and not ep._shown, shown)
+  check("Atrophic Poison : une marque à droite du cadre de l'ennemi sous DoT (jeton sans ligne)",
+    shown == 1 and mr and tr and mr[1] >= tr[3] - 0.5 and line() == "" and not dim(), shown)
   local mt = mk and table.concat(H.hover(mk), " | ") or ""
   check("survol de la marque : compte comme Demoralized", mt:find("counts as Demoralized", 1, true), mt)
   tgt.st.pain = 1
@@ -10352,7 +10436,7 @@ do
   v:Render(true)
   local anyMark = false
   for _, m in ipairs(host.marks) do if m._shown then anyMark = true end end
-  check("sans épique : ni ligne ni marque", not ep._shown and not anyMark)
+  check("sans épique : ni jeton ni marque", not tok() and not anyMark)
 
   -- 4. planche des sept épiques (base, améliorée)
   if SNAP then
@@ -10389,13 +10473,18 @@ do
   local v = V()
   local c = e.combat
   v:Render(true)
-  local host = v.classZone.views.priest
-  local function line() return host and host.line._shown and host.line._text or nil end
-  local function icon() return host and host.box._shown and (host.box.slot.icon._texture or ""):lower() or "" end
+  local function line() return select(2, H.heroToken(v, "epic")) end
+  local function cnt() return select(3, H.heroToken(v, "epic")) end
+  local function dim() return select(4, H.heroToken(v, "epic")) end
+  local function icon()
+    local t = H.heroToken(v, "epic")
+    return t and (t.medal.icon._texture or ""):lower() or ""
+  end
   check("combat : l'épique du deck est active dès le premier tour (Inner Focus)", P.epicOf(c) == "inner_focus")
   local pct = ("+%d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5))
-  check("vue de classe : icône de l'épique et « Inner Focus: next card is Cast, " .. pct .. " »",
-    line() == "Inner Focus: next card is Cast, " .. pct and icon():find("windwalkon", 1, true), tostring(line()) .. " / " .. icon())
+  check("jeton de l'épique : icône d'Inner Focus, sans compteur, « Next card is Cast, " .. pct .. " » au survol",
+    line() == "Next card is Cast, " .. pct and icon():find("windwalkon", 1, true) and cnt() == "" and not dim(),
+    tostring(line()) .. " / " .. icon())
   -- première carte jouée par l'interface : elle part en Cast, la vue le dit
   local hi
   for i, inst in ipairs(c.hand) do
@@ -10408,21 +10497,34 @@ do
     H.settle()
     v:Render(true)
   end
-  check("Inner Focus : la première carte part en Cast (barre d'incantation), la vue la nomme",
+  check("Inner Focus : la première carte part en Cast (barre d'incantation), l'infobulle du jeton la nomme",
     c.player.cast and c.player.cast.card and line() == ("Focused cast: " .. tostring(name) .. " " .. pct), tostring(line()))
-  local tt = table.concat(H.hover(host.box), " | ")
-  check("vue de classe : survol = la carte épique (nom, texte, explication)", tt:find("Inner Focus", 1, true)
-    and tt:find("Empower", 1, true) and tt:find("The first Attack or Skill each turn becomes a Cast", 1, true), tt)
+  local tt = table.concat(H.hover((H.heroToken(v, "epic"))), " | ")
+  check("jeton de l'épique : survol = la carte épique (nom, ligne actuelle, texte, explication)", tt:find("Inner Focus", 1, true)
+    and tt:find("Focused cast", 1, true) and tt:find("Empower", 1, true)
+    and tt:find("The first Attack or Skill each turn becomes a Cast", 1, true), tt)
+  local okf, whyf = H.tokenPlaced(v, (H.heroToken(v, "epic")), "Inner Focus", "Focused cast: " .. tostring(name))
+  check("jeton d'Inner Focus : rangée des états, hors du modèle, souris et infobulle (nom puis ligne), aucun texte permanent",
+    okf, whyf)
   snap("uep-inner-focus", true)
   -- les autres épiques, posées dans le même combat (la vue ne lit que le combat)
   local function setEpic(eid, up) c.epic.id, c.epic.up = eid, up or false end
+  local cast0 = c.player.cast
+  c.player.cast = nil
+  local fr0 = c.cls.focusRound
+  c.cls.focusRound = c.round -- Inner Focus déjà employé ce tour (P.focusReady)
+  v:Render(true)
+  check("Inner Focus employé ce tour : icône atténuée, « Used this turn » au survol", not P.focusReady(c) and dim()
+    and line() == "Used this turn" and cnt() == "", tostring(line()))
+  c.cls.focusRound = fr0
+  c.player.cast = cast0
   setEpic("voidform")
   c.player.res = 5
   c.hand[#c.hand + 1] = Card.new("devouring_plague", false, 990)
   v:Render(true)
   local info = ns.Controller.handInfo(#c.hand)
-  check("Voidform : « Voidform: Shadow hits +5 » (5 Insanity), icône", line() == "Voidform: Shadow hits +5"
-    and icon():find("voidform", 1, true), tostring(line()))
+  check("Voidform : compteur « +5 » (5 Insanity), « Shadow hits: +5 » au survol, icône", line() == "Shadow hits: +5"
+    and cnt() == "+5" and icon():find("voidform", 1, true), tostring(line()) .. " / " .. cnt())
   check("Voidform : carte à Surge injouable, raison lisible", info and not info.playable
     and ns.Controller.reasonText(info.why) == "Voidform: Surge cards can't be played.", info and tostring(info.why))
   snap("uep-voidform", true)
@@ -10431,12 +10533,16 @@ do
   c.player.st.regen = 3
   v:Render(true)
   local echo1 = ("Regen 3: %d to all next turn"):format(3 + P.ECHO_PLUS[1])
-  check("Echo of Light : « " .. echo1 .. " »", line() == echo1, tostring(line()))
+  check("Echo of Light : « " .. echo1 .. " », compteur = dégâts", line() == echo1 and cnt() == tostring(3 + P.ECHO_PLUS[1]),
+    tostring(line()))
   setEpic("echo_of_light", true)
   v:Render(true)
   local echo2 = ("Regen 3: %d to all next turn"):format(3 + P.ECHO_PLUS[2])
   check("Echo of Light amélioré : « " .. echo2 .. " »", line() == echo2, tostring(line()))
   c.player.st.regen = nil
+  v:Render(true)
+  check("Echo of Light sans Regen : icône atténuée, sans compteur", dim() and cnt() == "" and line() == "No Regen: no damage next turn",
+    tostring(line()))
   setEpic("shadow_covenant")
   c.hand[#c.hand + 1] = Card.new("mind_blast", false, 991)
   local shadowBefore = c.turn.bySchool.shadow
@@ -10444,7 +10550,8 @@ do
   v:Render(true)
   info = ns.Controller.handInfo(#c.hand)
   local cov1 = ("Next Shadow card: %d HP"):format(P.COVENANT_HP[1])
-  check("Shadow Covenant : « " .. cov1 .. " », Mind Blast à 0 mana", line() == cov1 and info and info.cost == 0, tostring(line()))
+  check("Shadow Covenant : « " .. cov1 .. " », compteur = PV, Mind Blast à 0 mana",
+    line() == cov1 and cnt() == tostring(P.COVENANT_HP[1]) and info and info.cost == 0, tostring(line()))
   c.turn.bySchool.shadow = 1
   v:Render(true)
   local cov2 = ("Next Shadow card: %d HP"):format(P.COVENANT_HP[1] + P.COVENANT_STEP)
@@ -10453,12 +10560,14 @@ do
   setEpic("shadow_covenant", true)
   v:Render(true)
   local cov3 = ("Shadow: first card free, then %d HP"):format(P.COVENANT_HP[2] + P.COVENANT_STEP)
-  check("Shadow Covenant amélioré : première carte Shadow gratuite annoncée", line() == cov3, tostring(line()))
+  check("Shadow Covenant amélioré : première carte Shadow gratuite annoncée (compteur 0)", line() == cov3 and cnt() == "0",
+    tostring(line()))
   c.turn.bySchool.shadow = shadowBefore
   table.remove(c.hand)
   setEpic("prayer_of_mending")
   v:Render(true)
-  check("Prayer of Mending : rien à afficher (zone de classe vide)", not host.box._shown and not host.line._shown)
+  check("Prayer of Mending : jeton seul (ni ligne, ni compteur, pas atténué), aucun texte permanent",
+    H.heroToken(v, "epic") and line() == nil and cnt() == "" and not dim() and #H.textsUnder(v.classZone) == 0)
   -- infobulles des sept épiques : la plaque Epic et le détail de la règle
   local tip = { lines = {} }
   function tip:AddLine(t) self.lines[#self.lines + 1] = t end
@@ -10587,26 +10696,27 @@ do
   local _, c0, v0 = uewCombat("strike")
   local s0 = 0
   for _, p in ipairs(v0.resPips.list) do if vis(p.socket) then s0 = s0 + 1 end end
-  local h0 = v0.classZone.views.warrior
-  check("sans épique : 5 crans, ligne de l'épique cachée", s0 == 5 and ns.Combat.resCap(c0) == 5
-    and not (h0 and vis(h0.epic)), s0)
+  check("sans épique : 5 crans, aucun jeton d'épique", s0 == 5 and ns.Combat.resCap(c0) == 5
+    and not H.heroToken(v0, "epic"), s0)
 
-  -- ligne de l'épique (icône, texte) : texte sans couleurs, icône de la carte, infobulle = la carte
-  local function line(host)
-    if not (host and vis(host.epic) and vis(host.epic.text)) then return nil end
-    return ((host.epic.text._text or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""))
-  end
-  local function iconOk(host, id)
-    return (host.epic.slot.icon._texture or ""):lower():find(H.ns.Art.cards[id].tga:lower(), 1, true) ~= nil
-      and table.concat(H.hover(host.epic), " | "):find(H.ns.Cards[id].name, 1, true) ~= nil
+  -- jeton de l'épique dans les états du héros : ligne actuelle de l'infobulle (sans couleurs), compteur écrit
+  -- sur l'icône, icône atténuée (règle inactive), icône de la carte, infobulle = la carte puis la ligne
+  local function line() return select(2, H.heroToken(v, "epic")) end
+  local function cnt() return select(3, H.heroToken(v, "epic")) end
+  local function dim() return select(4, H.heroToken(v, "epic")) end
+  local function iconOk(_, id)
+    local t = H.heroToken(v, "epic")
+    return t and (t.medal.icon._texture or ""):lower():find(H.ns.Art.cards[id].tga:lower(), 1, true) ~= nil
+      and (H.tokenPlaced(v, t, H.ns.Cards[id].name, line()))
   end
 
   -- 3. Titan's Grip : compteur du tour, Attack suivante grisée avec la raison
   e, c, v = uewCombat("titans_grip")
   local host = v.classZone.views.warrior
   local lim = Wr.EPIC.titans_grip.limit
-  check(("Titan's Grip : ligne « Attacks this turn: 0/%d, each twice », icône et infobulle de la carte"):format(lim),
-    line(host) == ("Attacks this turn: 0/%d, each twice"):format(lim) and iconOk(host, "titans_grip"), line(host))
+  check(("Titan's Grip : compteur « 0/%d », « Attacks this turn: 0/%d, each twice » au survol, jeton dans la rangée des états, hors du modèle, aucun texte permanent"):format(lim, lim),
+    line(host) == ("Attacks this turn: 0/%d, each twice"):format(lim) and cnt() == "0/" .. lim and iconOk(host, "titans_grip"),
+    tostring(line(host)) .. " / " .. cnt() .. " / " .. tostring((select(2, H.tokenPlaced(v, (H.heroToken(v, "epic")), "Titan's Grip", line())))))
   c.hand = {}
   for k = 1, lim + 1 do c.hand[k] = ns.Card.new("strike", false, 900 + k) end
   c.player.mana = (lim + 1) * (1 + Wr.EPIC.titans_grip.extraCost)
@@ -10617,7 +10727,7 @@ do
   H.settle()
   local sc = v.cards[1]
   check(("Titan's Grip : %d/%d, la suivante grisée avec « %s »"):format(lim, lim, Wr.TITAN_REASON),
-    line(host) == ("Attacks this turn: %d/%d, each twice"):format(lim, lim) and vis(sc.reasonPlate)
+    line(host) == ("Attacks this turn: %d/%d, each twice"):format(lim, lim) and cnt() == lim .. "/" .. lim and vis(sc.reasonPlate)
       and sc.reasonPlate.text._text == Wr.TITAN_REASON and not sc.reasonPlate.text:IsTruncated(),
     tostring(line(host)) .. " / " .. tostring(sc.reasonPlate and sc.reasonPlate.text._text))
   snap("uew-titans-grip", true)
@@ -10625,29 +10735,31 @@ do
   -- 4. lignes des autres épiques
   e, c, v = uewCombat("shield_charge", true)
   host = v.classZone.views.warrior
-  check("Shield Charge : sans Absorb, ligne cachée", line(host) == nil)
+  check("Shield Charge : sans Absorb, icône atténuée, ni ligne ni compteur", line(host) == nil and dim() and cnt() == "")
   c.player.block = 11
   v:Render(true)
   local t = Wr.chargeTarget(c)
   local want = ("End of turn: %d to %s"):format(ns.Combat.calcDamage(c, c.player, t, Wr.chargeDamage(c, true)),
     H.ns.Enemies[t.id].name)
-  check("Shield Charge+ : « " .. want .. " »", line(host) == want and Wr.chargeDamage(c, true) > 4, line(host))
+  check("Shield Charge+ : « " .. want .. " », compteur = dégâts", line(host) == want and Wr.chargeDamage(c, true) > 4
+    and cnt() == tostring(ns.Combat.calcDamage(c, c.player, t, Wr.chargeDamage(c, true))) and not dim(), line(host))
   e, c, v = uewCombat("anger_management")
   host = v.classZone.views.warrior
-  check("Anger Management : sans recharge, ligne cachée", line(host) == nil)
+  check("Anger Management : sans recharge, icône atténuée", line(host) == nil and dim())
   c.cooldown[1] = { card = ns.Card.new("shield_block", false, 950), turns = 1 }
   v:Render(true)
-  check("Anger Management : « Each Rage spent: Cooldowns −1 »", line(host) == "Each Rage spent: Cooldowns −1", line(host))
+  check("Anger Management : « Each Rage spent: Cooldowns −1 », icône seule", line(host) == "Each Rage spent: Cooldowns −1"
+    and cnt() == "" and not dim(), line(host))
   e, c, v = uewCombat("death_wish")
   host = v.classZone.views.warrior
-  check("Death Wish : « Attacks +50%, no Absorb »", line(host) == "Attacks +50%, no Absorb", line(host))
+  check("Death Wish : « Attacks +50%, no Absorb », icône seule", line(host) == "Attacks +50%, no Absorb" and cnt() == "", line(host))
   e, c, v = uewCombat("avatar", true)
   host = v.classZone.views.warrior
   check("Avatar+ : « Rage up to 10, +3 next turn »", line(host) == "Rage up to 10, +3 next turn", line(host))
   c.player.res = 10
   v:Render(true)
-  check("Avatar+ à 10 Rage : « Rage 10: Attacks +1, +3 next turn », non tronquée",
-    line(host) == "Rage 10: Attacks +1, +3 next turn" and not host.epic.text:IsTruncated(), line(host))
+  check("Avatar+ à 10 Rage : « Rage 10: Attacks +1, +3 next turn », compteur « +1 »",
+    line(host) == "Rage 10: Attacks +1, +3 next turn" and cnt() == "+1", line(host))
   e, c, v = uewCombat("sweeping_strikes")
   host = v.classZone.views.warrior
   local alive = #ns.Combat.aliveEnemies(c)
@@ -10658,7 +10770,8 @@ do
   host = v.classZone.views.warrior
   c.player.res = 2
   v:Render(true)
-  check("Thunderous Roar : « Roar in 3 Rage: 3 to all »", line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.num("thunderous_roar", "damage", false)), line(host))
+  check("Thunderous Roar : « Roar in 3 Rage: 3 to all », compteur 3 (Rage qui manque)",
+    line(host) == ("Roar in 3 Rage: %d to all"):format(Wr.num("thunderous_roar", "damage", false)) and cnt() == "3", line(host))
   c.player.res = 4
   ns.Combat.gainRes(c, 1, "test")
   v:OnEvents(c.events)
@@ -10707,21 +10820,24 @@ do
   H.settle()
   local v = V()
   local c = e.combat
-  local host = v.classZone.views.mage
+  -- jeton de l'épique : ligne actuelle (infobulle), compteur sur l'icône, atténuée
+  local function note() local _, l, n, d = H.heroToken(v, "epic") return l, n, d end
   check("combat : l'épique du deck est active (crochets du deck)", c and ns.Combat.mageEpic(c) == "arcane_meditation")
   v:Render(true)
   local cap, bonus = ns.Cards.arcane_meditation.epicN, ns.Cards.arcane_meditation.epicBonus
   local want = ("Mana kept: %d/%d, +%d"):format(math.min(3, cap), cap, bonus)
-  check("Arcane Meditation : « " .. want .. " » dans la vue du Mage (mana restant / plafond, bonus du report)",
-    host.epic._shown and host.epic._text == want, tostring(host.epic._text))
+  local l0, n0 = note()
+  check("Arcane Meditation : « " .. want .. " » au survol du jeton, compteur « " .. math.min(3, cap) .. "/" .. cap .. " »",
+    l0 == want and n0 == math.min(3, cap) .. "/" .. cap, tostring(l0) .. " / " .. tostring(n0))
   c.player.mana = 1
   v:Render(true)
-  local m1 = host.epic._text
+  local m1, k1 = note()
   c.player.mana = 0
   v:Render(true)
-  local m0 = host.epic._text
-  check("Arcane Meditation : le compte suit le mana restant, sans bonus à 0",
-    m1 == ("Mana kept: 1/%d, +%d"):format(cap, bonus) and m0 == "Mana kept: 0/" .. cap, tostring(m1) .. " | " .. tostring(m0))
+  local m0, k0, d0 = note()
+  check("Arcane Meditation : le compte suit le mana restant, sans bonus à 0 (icône atténuée)",
+    m1 == ("Mana kept: 1/%d, +%d"):format(cap, bonus) and k1 == "1/" .. cap and m0 == "Mana kept: 0/" .. cap
+      and k0 == "0/" .. cap and d0, tostring(m1) .. " | " .. tostring(m0))
   c.player.mana = 6
   v:Render(true)
   check("mana au-dessus du maximum : « 6 » et « /3 » dans l'anneau", v.mana.text._text == "6" and v.mana.max._text == "/3",
@@ -10731,7 +10847,7 @@ do
   local function use(epic, up)
     c.epic = { id = epic, up = up or false, uid = 9990 }
     v:Render(true)
-    return host.epic._shown and host.epic._text or nil
+    return (note())
   end
   local res = c.player.res
   c.player.res = 1
@@ -10752,6 +10868,18 @@ do
     t0 == "Cards played: 0/3" and t2 == "Next card: twice" and t2n == "Next card: needs 1 Charge" and t3 == nil
       and t3u == "Cards played: 0/3" and t5u == "Next card: twice",
     table.concat({ tostring(t0), tostring(t2), tostring(t2n), tostring(t3), tostring(t3u), tostring(t5u) }, " | "))
+  -- compteur du jeton : cartes jouées du tour, écrit sur l'icône ; doublée ce tour (base) : atténuée, sans compteur
+  c.player.res = 1
+  c.turn.played = 2
+  use("rule_of_threes")
+  local _, rn2 = note()
+  c.turn.played = 3
+  use("rule_of_threes")
+  local r3l, rn3, rd3 = note()
+  c.turn.played = 0
+  check("Rule of Threes : compteur « 2/3 » sur le jeton, puis atténuée sans compteur ni ligne une fois doublée",
+    rn2 == "2/3" and r3l == nil and rn3 == "" and rd3, tostring(rn2) .. " / " .. tostring(rn3))
+  c.player.res = res
   c.turn.played = 0
   local alive = ns.Combat.aliveEnemies(c)
   c.player.lastTarget = alive[#alive].uid
@@ -10762,41 +10890,76 @@ do
   local f0 = use("fingers_of_frost")
   ns.Combat.applyStatus(c, alive[1], "demoralized", 1)
   local f1 = use("fingers_of_frost")
-  check("Fingers of Frost : « Frozen: Cast at once » quand un ennemi est Frozen, sinon « No Frozen enemy »",
-    f0 == "No Frozen enemy" and f1 == "Frozen: Cast at once", tostring(f0) .. " | " .. tostring(f1))
+  local _, fn1, fd1 = note()
+  for _, en in ipairs(c.enemies) do en.st.demoralized, en.st.stunned = nil, nil end
+  use("fingers_of_frost")
+  local _, fn0, fd0 = note()
+  check("Fingers of Frost : « Frozen: Cast at once » quand un ennemi est Frozen, sinon « No Frozen enemy » (icône atténuée), sans compteur",
+    f0 == "No Frozen enemy" and f1 == "Frozen: Cast at once" and fn1 == "" and not fd1 and fn0 == "" and fd0,
+    tostring(f0) .. " | " .. tostring(f1))
+  ns.Combat.applyStatus(c, alive[1], "demoralized", 1)
+  use("fingers_of_frost")
+  local fok, fwhy = H.tokenPlaced(v, (H.heroToken(v, "epic")), "Fingers of Frost", "Frozen: Cast at once")
+  check("jeton de Fingers of Frost : rangée des états, hors du modèle, souris et infobulle (nom puis ligne), aucun texte permanent",
+    fok, fwhy)
+  snap("uem-fingers-of-frost", true)
+  for _, en in ipairs(c.enemies) do en.st.demoralized, en.st.stunned = nil, nil end
   for _, en in ipairs(c.enemies) do en.st.pain = nil end
-  local m1, m1u, m2, k0 = use("mirror_image"), use("mirror_image", true), use("molten_armor"), use("conflagration")
+  local m1 = use("mirror_image")
+  local m1u = use("mirror_image", true)
+  local _, mn, md = note()
+  local mok, mwhy = H.tokenPlaced(v, (H.heroToken(v, "epic")), "Mirror Image", "Cast cards hit twice")
+  snap("uem-mirror-image", true)
+  local m2 = use("molten_armor")
+  local _, an = note()
+  local k0 = use("conflagration")
+  local _, kn0, kd0 = note()
   alive[1].st.pain = 3
   local k1 = use("conflagration")
+  local _, kn1, kd1 = note()
+  local kok, kwhy = H.tokenPlaced(v, (H.heroToken(v, "epic")), "Conflagration", "DoT spreads on death: 1")
   alive[1].st.pain = nil
   check("Mirror Image (moitié, puis tout), Molten Armor (DoT N), Conflagration (ennemis porteurs de DoT) : leur ligne",
     m1 == "Cast cards: half again" and m1u == "Cast cards hit twice"
       and m2 == "When attacked: DoT " .. ns.Cards.molten_armor.epicN and k0 == "No enemy with DoT"
       and k1 == "DoT spreads on death: 1",
     table.concat({ tostring(m1), tostring(m1u), tostring(m2), tostring(k0), tostring(k1) }, " | "))
+  check("compteurs : Mirror Image icône seule, Molten Armor « N », Conflagration « 1 » (atténuée sans DoT)",
+    mn == "" and not md and an == tostring(ns.Cards.molten_armor.epicN) and kn0 == "" and kd0 and kn1 == "1" and not kd1,
+    table.concat({ tostring(mn), tostring(an), tostring(kn0), tostring(kn1) }, " | "))
+  check("jeton de Mirror Image : rangée des états, à la taille des autres, hors du modèle, souris et infobulle (nom puis « Cast cards hit twice »), aucun texte permanent",
+    mok, mwhy)
+  check("jeton de Conflagration : idem (compteur)", kok, kwhy)
+  c.turn.played = 2
+  c.player.res = 1
   use("rule_of_threes")
-  local eb = host.epicBox
-  local ett = table.concat(H.hover(eb), " | ")
-  check("icône de l'épique à gauche de sa ligne, infobulle = la carte", eb._shown and eb.epicId == "rule_of_threes"
-    and ett:find("Rule of Threes", 1, true), ett)
-  -- deuxième incantation et épique : deux lignes, sans chevauchement ni troncature
+  local rt = H.heroToken(v, "epic")
+  local ett = H.plain(table.concat(H.hover(rt), " | "))
+  check("jeton de Rule of Threes : compteur « 2/3 », infobulle = la carte puis « Next card: twice »",
+    rt and rt.count._text == "2/3" and ett:find("Rule of Threes", 1, true) and ett:find("Next card", 1, true), ett)
+  snap("uem-cartes-jouees", true)
+  c.turn.played = 0
+  c.player.res = res
+  -- deuxième incantation et épique : deux jetons voisins dans la rangée des états, aucun texte sur la scène
   c.player.mana = 9
   c.hand[#c.hand + 1] = ns.Card.new("fireball", false, 9201)
   c.hand[#c.hand + 1] = ns.Card.new("pyroblast", false, 9202)
   ns.Combat.play(c, #c.hand - 1, 1)
   ns.Combat.play(c, #c.hand, 1)
   use("water_elemental")
-  local R = dofile(root .. "/Sim/ui_render.lua")
-  R.H = H
-  local a, b = R.rect(host.name), R.rect(host.epic)
-  local apart = a and b and (a[4] <= b[2] + 0.5 or b[4] <= a[2] + 0.5)
-  check("deuxième incantation et ligne de l'épique : deux lignes séparées", host.name._shown and host.epic._shown and apart)
+  local te, tel = H.heroToken(v, "epic")
+  local tc = H.heroToken(v, "cast2:pyroblast")
+  local okc, whyc = H.tokenPlaced(v, tc, "Pyroblast", "2nd cast: Pyroblast")
+  local oke, whye = H.tokenPlaced(v, te, "Water Elemental", tel)
+  check("deuxième incantation et épique : deux jetons dans la rangée des états (« Elemental: … » et « 2nd cast: Pyroblast » au survol)",
+    te and tc and (tel or ""):find("Elemental: ", 1, true) and okc and oke, tostring(whyc) .. " / " .. tostring(whye))
   H.settle()
+  -- (la barre d'incantation commune, « Fireball on Murloc Coastrunner », n'est pas de cette vue)
   local cut = {}
   for _, s in ipairs(W.truncatedNow()) do
-    if s:find(host.epic._text, 1, true) or s:find(host.name._text, 1, true) then cut[#cut + 1] = s end
+    if not s:find(v.cast.name._text or "\0", 1, true) then cut[#cut + 1] = s end
   end
-  check("vue du Mage : lignes de l'épique et de la deuxième incantation non tronquées", #cut == 0, table.concat(cut, " ; "))
+  check("vue du Mage : aucun texte tronqué hors de la barre d'incantation", #cut == 0, table.concat(cut, " ; "))
   snap("uem-deux-lignes", true)
   -- nom de l'épique qui s'élève au-dessus de l'unité touchée
   local floats = {}

@@ -477,9 +477,10 @@ function V:Build(parent)
   pips:Hide()
   self.resPips = pips
 
-  -- Zone libre de la classe (formes, totems, Seal, familier…) : cadre vide sous les états du héros,
-  -- rempli par ns.ClassViews[classe] (build(zone, vue) une fois, render(zone, combat, vue) à chaque
-  -- rendu). Contrat : docs/classes.md.
+  -- Zone libre de la classe (familier, Traps, marques sur les ennemis…) : cadre vide sous les états du
+  -- héros, rempli par ns.ClassViews[classe] (build(zone, vue) une fois, render(zone, combat, vue) à chaque
+  -- rendu). Aucun texte permanent : ce qu'une épique ou un pouvoir fait maintenant va sur son jeton des
+  -- états du héros (tokens(combat, liste, vue), RenderPlayer). Contrat : docs/classes.md.
   local zone = CreateFrame("Frame", nil, parent)
   at(zone, parent, HERO_FRAME_X, HERO_FRAME_Y + hf:GetHeight() + 32, 300, 40)
   zone:SetFrameLevel(bf:GetFrameLevel() + 15)
@@ -1062,14 +1063,19 @@ function V:RenderPlayer(full)
     -- épique en jeu (c.epic) : le premier des pouvoirs, liseré violet, infobulle complète
     if c.epic then
       list[#list + 1] = { icon = W.cardArt(c.epic.id), text = Card.def(c.epic).name,
-        rim = Art.rarityRim.epic or Art.rim.violet, glow = W.EPIC_COLOR, info = { power = c.epic },
-        key = "epic:" .. c.epic.id }
+        rim = Art.rarityRim.epic or Art.rim.violet, glow = W.EPIC_COLOR, info = { power = c.epic, epic = true },
+        key = "epic:" .. c.epic.id, epic = true }
     end
     for i = 1, #p.powers do
       local inst = p.powers[i]
       list[#list + 1] = { icon = W.cardArt(inst.id), text = Card.def(inst).name, rim = Art.rim.gold,
         info = { power = inst }, key = "card:" .. inst.id }
     end
+    -- vue de classe : ce que l'épique et les pouvoirs font maintenant, sur leurs jetons (compteur sur
+    -- l'icône, ligne dans l'infobulle, icône atténuée si la règle est inactive), jetons de plus
+    -- (W.noteToken ; docs/classes.md, « Vue de classe ») : aucun texte permanent sur la scène
+    local cv = ns.ClassViews and ns.ClassViews[c.class or "priest"]
+    if cv and cv.tokens then cv.tokens(c, list, self) end
     self.playerSt:Set(list)
   end
   if p.cast then

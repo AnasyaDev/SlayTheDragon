@@ -144,9 +144,9 @@ local function petTooltip(tt)
   tt:AddLine("The pet attacks the last enemy targeted.", 0.8, 0.8, 0.8, true)
 end
 
--- Ligne de l'épique sous les états du héros (comme le Voleur, UI/Art/rogue.lua) : icône de l'épique (infobulle
--- = la carte) et ce qu'elle change maintenant. Texte (nil : rien à montrer), lu aussi par le harnais.
-local EPIC_ICON = 22
+-- Note de l'épique sur son jeton des états du héros (comme le Voleur, UI/Art/rogue.lua ; W.noteToken) : ce
+-- qu'elle change maintenant (ligne de l'infobulle, nil : rien à dire), compteur écrit sur l'icône (nil : aucun),
+-- vrai si la règle est inactive (icône atténuée). Lu aussi par le harnais.
 local W_ = "|cffffffff%s|r"
 local function num(n) return W_:format(tostring(n)) end
 function Art.hunterEpicLine(c)
@@ -161,26 +161,31 @@ function Art.hunterEpicLine(c)
     -- Frenzy au prochain début de tour ≈ le Frenzy actuel (+1 de l'attaque de fin de tour, -1 de la baisse
     -- du round), puis la dépense de l'épique
     local cost = E.cotwCost[k]
-    if res < cost then return "Start of turn: " .. num(cost) .. " Frenzy needed for a pet attack" end
-    return "Start of turn: pet attacks for " .. num(H.petDamage(c, nil, math.min(5, res - cost + E.cotwRes[k])))
-      .. (cost > 0 and (" (" .. num(-cost) .. " Frenzy)") or "")
+    if res < cost then return "Start of turn: " .. num(cost) .. " Frenzy needed for a pet attack", nil, true end
+    local dmg = H.petDamage(c, nil, math.min(5, res - cost + E.cotwRes[k]))
+    return "Start of turn: pet attacks for " .. num(dmg) .. (cost > 0 and (" (" .. num(-cost) .. " Frenzy)") or ""),
+      tostring(dmg)
   elseif id == "trap_launcher" then
     return "Traps hit at once, pet attacks " .. num(E.launcher[k]) .. "x"
   elseif id == "beast_cleave" then
     local less = E.cleaveLess[k]
-    if alive > 1 and less > 0 then return "Pet hits all " .. num(alive) .. " enemies, the others for " .. num(-less) end
-    return "Pet hits all " .. num(alive) .. " enemies"
+    if alive > 1 and less > 0 then
+      return "Pet hits all " .. num(alive) .. " enemies, the others for " .. num(-less), tostring(alive)
+    end
+    return "Pet hits all " .. num(alive) .. " enemies", tostring(alive)
   elseif id == "roar_of_sacrifice" then
-    if res >= 1 then return "Next hit: " .. num(-E.roar[k]) .. " damage (" .. num(res) .. " Frenzy left)" end
-    return "No Frenzy: hits are not reduced"
+    if res >= 1 then return "Next hit: " .. num(-E.roar[k]) .. " damage (" .. num(res) .. " Frenzy left)", tostring(res) end
+    return "No Frenzy: hits are not reduced", nil, true
   elseif id == "master_marksman" then
     local n = 0
     for i = 1, #c.enemies do
       local e = c.enemies[i]
       if not e.dead and e.hp * 2 > e.maxHp then n = n + 1 end
     end
-    if n > 0 then return "Cast Attacks on " .. num(n) .. " intact target" .. (n > 1 and "s" or "") .. " resolve at once" end
-    return "No intact target: Cast Attacks wait"
+    if n > 0 then
+      return "Cast Attacks on " .. num(n) .. " intact target" .. (n > 1 and "s" or "") .. " resolve at once", tostring(n)
+    end
+    return "No intact target: Cast Attacks wait", nil, true
   elseif id == "black_arrow" then
     local n = 0
     for i = 1, #c.enemies do
@@ -188,12 +193,12 @@ function Art.hunterEpicLine(c)
       if not e.dead and (e.st.pain or 0) > 0 then n = n + 1 end
     end
     local cost = E.blackCost[k]
-    if cost > 0 then
-      return "Pet attacks on DoT ticks: " .. num(n) .. " enem" .. (n == 1 and "y" or "ies") .. ", " .. num(cost) .. " Frenzy each"
-    end
-    return "Pet attacks on DoT ticks: " .. num(n) .. " enem" .. (n == 1 and "y" or "ies")
+    local line = "Pet attacks on DoT ticks: " .. num(n) .. " enem" .. (n == 1 and "y" or "ies")
+    if cost > 0 then line = line .. ", " .. num(cost) .. " Frenzy each" end
+    return line, n > 0 and tostring(n) or nil, n == 0
   elseif id == "lone_wolf" then
-    return "No pet. Attack hits: " .. num("+" .. E.lonePer[k] * res)
+    local b = E.lonePer[k] * res
+    return "No pet. Attack hits: " .. num("+" .. b), b > 0 and ("+" .. b) or nil
   end
   return nil
 end
@@ -215,20 +220,6 @@ function V.build(host, view)
   W.tooltip(pet, petTooltip, "ANCHOR_RIGHT")
   Scene.setName(pet, Art.pet.name, 12)
   host.pet = pet
-  -- ligne de l'épique : icône et texte, à gauche de la zone de classe
-  local ep = CreateFrame("Frame", nil, host)
-  ep:SetSize(EPIC_ICON, EPIC_ICON)
-  ep:SetPoint("LEFT", host, "LEFT", 2, 0)
-  ep:EnableMouse(true)
-  ep.slot = W.slotOn(ep, EPIC_ICON)
-  W.tooltip(ep, function(tt, f)
-    if f.epicId then W.fillCardTooltip(tt, f.epicId, f.epicUp, { full = true }) end
-  end, "ANCHOR_RIGHT")
-  ep.text = W.label(host, "bold", 11, Art.C.goldText, "OVERLAY")
-  ep.text:SetPoint("LEFT", ep, "RIGHT", 6, 0)
-  ep:Hide()
-  ep.text:Hide()
-  host.epic = ep
   -- le familier suit la zone de classe (cachée quand le combat est d'une autre classe)
   host:SetScript("OnHide", function() pet:Hide() end)
   host.petX = PET_X - PET_W / 2
@@ -279,6 +270,11 @@ function V.build(host, view)
   end
 end
 
+-- note de l'épique sur son jeton des états du héros (aucun texte sur la scène)
+function V.tokens(c, list)
+  ns.Widgets.noteToken(list, "epic", Art.hunterEpicLine(c))
+end
+
 function V.render(host, c, view)
   local W = ns.Widgets
   -- sans familier (Lone Wolf) : ni figure, ni nom, ni marqueur de cible
@@ -295,21 +291,6 @@ function V.render(host, c, view)
       tk.inst = nil
       tk:Hide()
     end
-  end
-  -- ligne de l'épique
-  local ep = host.epic
-  local id, up = ns.Hunter.epic(c)
-  local line = id and Art.hunterEpicLine(c)
-  if line then
-    if ep.epicId ~= id then W.setIcon(ep.slot.icon, Art.cards[id], "card:" .. id) end
-    ep.epicId, ep.epicUp = id, up
-    ep.text:SetText(line)
-    ep:Show()
-    ep.text:Show()
-  else
-    ep.epicId = nil
-    ep:Hide()
-    ep.text:Hide()
   end
   -- cible du familier
   local t = (present and not c.result) and ns.Hunter.petTarget(c) or nil

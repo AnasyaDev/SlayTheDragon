@@ -258,6 +258,7 @@ Art.classes.<id> = { tga = "ClassIcon_Warrior", wow = "WARRIOR",           -- wo
   resource = { tga = "Ability_Warrior_FocusedRage", color = "attackText" } } -- pastille, chiffres flottants
 Art.statusIcons.<clé> = { tga = … }        -- icône d'un état selon sa source (apply … icon = "bleed")
 ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte, combat, vue) end,
+  tokens = function(combat, liste, vue) end, -- facultatif : notes sur les jetons des états du héros
   event = function(hôte, ev, vue) end }    -- facultatif : animations propres (vue:Push(délai, fn))
 ```
 
@@ -268,7 +269,17 @@ ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte
   Hunter). Pas de cadre enfant dans un visuel survolable (docs/interface.md) ; ne lire que `c`.
   La vue peut aussi poser des éléments dans la scène (cadres ancrés au parent de l'écran, `vue.parent`,
   personnage par `Scene.figure` : le familier du Hunter) et viser les ennemis par `vue.slotOf[uid]` ; ce qui
-  n'est pas enfant de l'hôte se cache avec lui (`OnHide` de l'hôte).
+  n'est pas enfant de l'hôte se cache avec lui (`OnHide` de l'hôte). **Aucun texte permanent** dans la zone
+  (il passait sur le modèle du héros) : voir « Notes sur les jetons ».
+- **Notes sur les jetons** (`tokens`, facultatif ; 16/11/2026) : appelé à chaque rendu complet des états du
+  héros, avant l'affichage de la rangée (épique en jeu `epic = true`, puis les pouvoirs `card:<id>`). La vue y
+  note ce qu'une épique ou un pouvoir fait maintenant par `W.noteToken(liste, "epic" | clé, ligne, n, inactive)` :
+  `ligne` = texte (ou liste de lignes, `{ texte, r, g, b }`) de l'infobulle sous le nom de la carte, `n` =
+  compteur court écrit sur l'icône comme le nombre d'un état (« 2/3 », « 4 », « +5 » ; seulement si le
+  nombre change pendant le combat), `inactive` = icône désaturée et assombrie (« No Frozen enemy »). Une
+  ligne purement descriptive (« Cast cards hit twice ») = icône seule. La vue peut ajouter un jeton (deuxième
+  incantation du Mage : `{ icon, text, key, info = { card = instance, now = lignes } }`). Lignes et compteurs :
+  `Art.<classe>EpicLine(c)` (Mage : `Art.mageEpicText`) → ligne, compteur, inactive, lus aussi par le harnais.
 - **Événements de la classe** (`event`, facultatif) : `CombatView:QueueEvent` appelle
   `ns.ClassViews[classe].event(hôte, ev, vue)` pour CHAQUE événement du journal, avant le traitement commun ;
   la vue y met ses animations dans la file commune par `vue:Push(délai, fn)` (bond du familier sur
@@ -556,7 +567,7 @@ Ajouts de la classe : `Hunter.petAttackOn(c, why, ennemi)` (cible imposée par `
 `Hunter.petTarget` : la signature de `petAttack` / `petTarget`, enveloppées par Core/ZoneRules.lua, ne change pas) ;
 effet `{ "damageOther", n }` (« Deal N to another enemy. », Chimaera Shot : l'ennemi vivant le plus à gauche
 autre que la cible) ; déclencheurs « Each enemy DoT tick », « Attack hits », « Each Attack hit ». Vue
-(`ns.ClassViews.hunter`) : figure et marqueur du familier cachés sans familier, « Roar » flottant, ligne de l'épique sous les états du héros (icône, infobulle = la carte, et ce qu'elle change maintenant : `Art.hunterEpicLine(c)`, lue par le harnais).
+(`ns.ClassViews.hunter`) : figure et marqueur du familier cachés sans familier, « Roar » flottant, note de l'épique sur son jeton des états du héros (compteur sur l'icône, infobulle = la carte et ce qu'elle change maintenant : `Art.hunterEpicLine(c)`, lue par le harnais).
 Interface commune touchée au minimum : `UI/Controller.lua` montre une carte proposée en récompense ou chez le
 marchand sous sa variante quand l'épique du deck la transforme (`shownCard`, `from` = l'originale ; la carte
 prise entre au deck sous son id d'origine). Bots : `classDef.bot.epic(exp, id)` (note d'offre) et
@@ -569,7 +580,7 @@ l'épique du deck vaut 5 de plus pour le bot (`EPIC_KEEP`) : il ne la remplace q
 ### Épiques du Voleur (14/11/2026)
 
 Données et nombres (`EPIC_N`, seule source : textes et règles) dans `Data/Rogue.lua` ; règles (`deckHooks`,
-`ns.Rogue`) dans `Core/Classes/rogue.lua` ; vue (ligne de l'épique sous les états du héros, marques
+`ns.Rogue`) dans `Core/Classes/rogue.lua` ; vue (note de l'épique sur son jeton des états du héros, marques
 d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, harnais UER.
 - **Deflection** : `onStatusApplied` (Parry sur le héros, `n` demandé avant le plafond de 3) ; compteur
   `c.cls.ripostes` du tour (`c.cls.riposteRound`, le début du combat compte pour le tour 1, le tour ennemi

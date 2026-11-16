@@ -90,14 +90,16 @@ Art.classes.rogue.resource = { tga = "INV_ThrowingKnife_04", icon = "Interface\\
 
 -- Vue de classe : sous Stealth, le modèle du héros passe en semi-transparence (indice immédiat) ;
 -- rendu à pleine opacité dès que la vue est cachée (autre classe, fin du combat).
--- Épique du combat (ns.Rogue, Core/Classes/rogue.lua) : une ligne sous les états du héros, icône de
--- l'épique et ce qu'elle change maintenant (ripostes du tour et la suivante, noms joués, Surge qui compte
--- 5, Surge qui étourdit, Stealth jusqu'à la fin du tour) ; Atrophic Poison : marque sur chaque ennemi qui
--- compte comme Demoralized. N'applique aucune règle : lit le combat.
+-- Épique du combat (ns.Rogue, Core/Classes/rogue.lua) : rien d'écrit sur la scène ; note sur son jeton des
+-- états du héros (W.noteToken) : ce qu'elle change maintenant dans l'infobulle (ripostes du tour et la
+-- suivante, noms joués, Surge qui compte 5, Surge qui étourdit, Stealth jusqu'à la fin du tour), compteur sur
+-- l'icône, icône atténuée hors de sa plage ; Atrophic Poison : marque sur chaque ennemi qui compte comme
+-- Demoralized. N'applique aucune règle : lit le combat.
 local STEALTH_ALPHA = 0.45
-local EPIC_ICON, MARKS = 22, 6
+local MARKS = 6
 
--- Texte de la ligne de l'épique (nil : rien à montrer). Lu aussi par le harnais.
+-- Ligne de l'épique (nil : rien à dire), compteur écrit sur son icône (nil : aucun), vrai si la règle est
+-- inactive (icône atténuée). Lu aussi par le harnais.
 function Art.rogueEpicLine(c)
   local R = ns.Rogue
   if not R then return nil end
@@ -106,18 +108,25 @@ function Art.rogueEpicLine(c)
   local E, res = R.EPIC, c.player.res or 0
   local k = R.tier(up) -- palier de l'épique : 1 = base … 4 = +3
   if id == "deflection" then
-    return ("Ripostes this turn: |cffffffff%d|r   next: |cffffffff%d|r"):format(R.ripostes(c), R.nextRiposte(c))
+    local nxt = R.nextRiposte(c)
+    return ("Ripostes this turn: |cffffffff%d|r   next: |cffffffff%d|r"):format(R.ripostes(c), nxt), tostring(nxt)
   elseif id == "danse_macabre" then
     -- bonus d'une Attack d'un nom pas encore joué ce tour
-    return ("Card names this turn: |cffffffff%d|r   +%d per hit"):format(R.namesPlayed(c), R.danseBonus(c, up))
+    local b = R.danseBonus(c, up)
+    return ("Card names this turn: |cffffffff%d|r   +%d per hit"):format(R.namesPlayed(c), b), b > 0 and ("+" .. b) or nil
   elseif id == "echoing_reprimand" then
-    if res >= 2 and res <= E.echoingMax[k] then return ("Surge now counts as |cffffffff%d|r Combo"):format(E.echoing_reprimand[k]) end
+    if res >= 2 and res <= E.echoingMax[k] then
+      return ("Surge now counts as |cffffffff%d|r Combo"):format(E.echoing_reprimand[k]), tostring(E.echoing_reprimand[k])
+    end
+    return nil, nil, true
   elseif id == "kidney_shot" then
     if res >= E.kidney_shot[k] then return "Surge now stuns the target" end
+    return nil, nil, true
   elseif id == "subterfuge" then
     local left = R.stealthLeft(c)
     if left == 1 then return "Stealth until the end of the turn" end
-    if left and left > 1 then return ("Stealth for |cffffffff%d|r turns"):format(left) end
+    if left and left > 1 then return ("Stealth for |cffffffff%d|r turns"):format(left), tostring(left) end
+    return nil, nil, true
   end
   return nil
 end
@@ -130,26 +139,15 @@ function Art.rogueAtrophic(c, e)
 end
 
 ns.ClassViews.rogue = {
+  tokens = function(c, list)
+    ns.Widgets.noteToken(list, "epic", Art.rogueEpicLine(c))
+  end,
   build = function(host, view)
     local W = ns.Widgets
     host:SetScript("OnHide", function()
       local m = view.playerModel
       if m and not m.dead then W.modelAlpha(m, 1) end
     end)
-    -- ligne de l'épique : icône (infobulle = la carte) et texte
-    local ep = CreateFrame("Frame", nil, host)
-    ep:SetSize(EPIC_ICON, EPIC_ICON)
-    ep:SetPoint("LEFT", host, "LEFT", 2, 0)
-    ep:EnableMouse(true)
-    ep.slot = W.slotOn(ep, EPIC_ICON)
-    W.tooltip(ep, function(tt, f)
-      if f.epicId then W.fillCardTooltip(tt, f.epicId, f.epicUp, { full = true }) end
-    end, "ANCHOR_RIGHT")
-    ep.text = W.label(host, "bold", 11, Art.C.goldText, "OVERLAY")
-    ep.text:SetPoint("LEFT", ep, "RIGHT", 6, 0)
-    ep:Hide()
-    ep.text:Hide()
-    host.epic = ep
     -- marques d'Atrophic Poison (une par ennemi, à droite de son cadre)
     host.marks = {}
     for i = 1, MARKS do
@@ -175,20 +173,6 @@ ns.ClassViews.rogue = {
     local m = view.playerModel
     if m and not m.dead then
       W.modelAlpha(m, (c.player.st.stealth or 0) > 0 and STEALTH_ALPHA or 1)
-    end
-    local ep = host.epic
-    local id, up = ns.Rogue.epicOf(c)
-    local line = id and Art.rogueEpicLine(c)
-    if line then
-      if ep.epicId ~= id then W.setIcon(ep.slot.icon, Art.cards[id], "card:" .. id) end
-      ep.epicId, ep.epicUp = id, up
-      ep.text:SetText(line)
-      ep:Show()
-      ep.text:Show()
-    else
-      ep.epicId = nil
-      ep:Hide()
-      ep.text:Hide()
     end
     local k = 0
     for i = 1, #c.enemies do

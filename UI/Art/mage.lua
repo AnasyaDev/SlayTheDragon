@@ -1,6 +1,6 @@
 -- Art du Mage : icônes des cartes et des bibelots (noms de la fiche docs/classes/mage.md), voies, écoles,
 -- classe, ressource (Charges), état Ice Block, icône du DoT de feu, et vue de classe
--- (ns.ClassViews.mage : deuxième incantation en cours, compte Fire du tour sous Hot Streak).
+-- (ns.ClassViews.mage : notes sur les jetons des états du héros — épique, Hot Streak, deuxième incantation).
 -- Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la copie depuis
 -- le pack d'icônes local) ; `spell` = repli par l'icône du sort ; `icon` = repli par chemin du client.
 local _, ns = ...
@@ -89,9 +89,11 @@ Art.classes.mage.wow = "MAGE"
 Art.classes.mage.resource = { tga = "Spell_Arcane_Arcane01", icon = "Interface\\Icons\\spell_arcane_arcane01",
   color = "watchText" }
 
--- Vue de classe (zone libre sous les états du héros, 300 × 40) : la deuxième incantation en cours (la
--- barre commune ne montre que la première), celle qu'une interruption couperait d'abord ; à droite, le
--- compte des cartes Fire du tour quand Hot Streak est en jeu (« Fire 1/2 »). Ne lit que le combat.
+-- Vue de classe : rien d'écrit sur la scène ; tout passe par les jetons des états du héros (W.noteToken) :
+-- l'épique (compteur sur l'icône, ligne actuelle dans l'infobulle, icône atténuée si sa règle est inactive),
+-- Hot Streak (« 1/2 » : cartes Fire du tour) et un jeton de plus pour la deuxième incantation en cours (la
+-- barre commune ne montre que la première ; c'est elle qu'une interruption couperait d'abord). Ne lit que le
+-- combat.
 local function hotStreakInPlay(c)
   local powers = c.player.powers
   for i = 1, #powers do if powers[i].id == "hot_streak" then return true end end
@@ -99,87 +101,20 @@ local function hotStreakInPlay(c)
 end
 
 ns.ClassViews.mage = {
-  build = function(host)
-    local W, C = ns.Widgets, Art.C
-    local box = CreateFrame("Frame", nil, host)
-    box:SetSize(26, 26)
-    box:SetPoint("LEFT", host, "LEFT", 0, 0)
-    box:EnableMouse(true)
-    box.slot = W.slotOn(box, 26)
-    W.tooltip(box, function(tt)
-      local c = ns.Controller.combat()
-      local more = c and c.player.castMore
-      local e = more and more[#more]
-      if not e then return end
-      W.fillCardTooltip(tt, e.card.id, e.card.up, { full = true })
-      tt:AddLine("An interrupt cancels this cast first.", 1, 0.5, 0.4, true)
-    end, "ANCHOR_TOP")
-    host.box = box
-    host.name = W.label(host, "bold", 12.5, C.text)
-    host.name:SetPoint("LEFT", host, "LEFT", 32, 0)
-    host.name:SetWidth(190)
-    host.name:SetJustifyH("LEFT")
-    host.name:SetWordWrap(false)
-    host.fire = W.label(host, "bold", 12.5, C.goldText)
-    host.fire:SetPoint("RIGHT", host, "RIGHT", -4, 0)
-    host.fire:SetJustifyH("RIGHT")
-    -- ce que l'épique change pendant le tour (mana gardé, rang de la carte, cible de l'élémentaire…)
-    host.epic = W.label(host, "bold", 12.5, Art.hex("#d9a6ff"))
-    host.epic:SetPoint("RIGHT", host, "RIGHT", -4, 0)
-    host.epic:SetJustifyH("RIGHT")
-    -- icône de l'épique à gauche de sa ligne (infobulle = la carte)
-    local eb = CreateFrame("Frame", nil, host)
-    eb:SetSize(18, 18)
-    eb:SetPoint("RIGHT", host.epic, "LEFT", -5, 0)
-    eb:EnableMouse(true)
-    eb.slot = W.slotOn(eb, 18)
-    W.tooltip(eb, function(tt, f)
-      if f.epicId then W.fillCardTooltip(tt, f.epicId, f.epicUp, { full = true }) end
-    end, "ANCHOR_TOP")
-    eb:Hide()
-    host.epicBox = eb
-  end,
-  render = function(host, c)
+  tokens = function(c, list)
     local W = ns.Widgets
+    local text, n, dim = Art.mageEpicText(c)
+    W.noteToken(list, "epic", text, n, dim)
+    if hotStreakInPlay(c) then
+      local f = math.min(c.turn.bySchool.fire or 0, 2)
+      W.noteToken(list, "card:hot_streak", ("Fire cards this turn: %d/2"):format(f), f .. "/2")
+    end
     local more = c.player.castMore
     local e = more and more[#more]
     if e then
-      W.setIcon(host.box.slot.icon, W.cardArt(e.card.id), "card:" .. e.card.id)
-      host.name:SetText("2nd cast: " .. ns.Card.def(e.card).name)
-      host.box:Show()
-      host.name:Show()
-    else
-      host.box:Hide()
-      host.name:Hide()
-    end
-    local hot = hotStreakInPlay(c)
-    if hot then
-      host.fire:SetText("Fire " .. math.min(c.turn.bySchool.fire or 0, 2) .. "/2")
-      host.fire:Show()
-    else
-      host.fire:Hide()
-    end
-    -- ligne de l'épique : seule au milieu, ou sous la deuxième incantation et le compte Fire (deux lignes)
-    local text = Art.mageEpicText(c)
-    local two = text ~= nil and (hot or e ~= nil)
-    host.fire:ClearAllPoints()
-    host.fire:SetPoint("RIGHT", host, "RIGHT", -4, two and 9 or 0)
-    host.name:ClearAllPoints()
-    host.name:SetPoint("LEFT", host, "LEFT", 32, two and 9 or 0)
-    host.epic:ClearAllPoints()
-    host.epic:SetPoint("RIGHT", host, "RIGHT", -4, two and -11 or 0)
-    local eb = host.epicBox
-    if text then
-      host.epic:SetText(text)
-      host.epic:Show()
-      local id, src = ns.Combat.mageEpic(c)
-      if eb.epicId ~= id then W.setIcon(eb.slot.icon, Art.cards[id], "card:" .. id) end
-      eb.epicId, eb.epicUp = id, src.up
-      eb:Show()
-    else
-      host.epic:Hide()
-      eb.epicId = nil
-      eb:Hide()
+      local name = ns.Card.def(e.card).name
+      list[#list + 1] = { icon = W.cardArt(e.card.id), text = name, key = "cast2:" .. e.card.id,
+        info = { card = e.card, now = { "2nd cast: " .. name, { "An interrupt cancels this cast first.", 1, 0.5, 0.4 } } } }
     end
   end,
   -- épiques : le nom de l'épique s'élève au-dessus de l'unité qu'elle touche (coup de l'élémentaire, image
@@ -197,7 +132,8 @@ ns.ClassViews.mage = {
   end,
 }
 
--- Texte de la vue du Mage pour son épique (nil : rien à montrer). Ne lit que le combat.
+-- Ligne actuelle de l'épique du Mage (nil : rien à dire), compteur écrit sur son icône (nil : aucun), et vrai
+-- si sa règle est inactive (icône atténuée). Ne lit que le combat ; lu aussi par le harnais.
 function Art.mageEpicText(c)
   if not ns.Combat.mageEpic then return nil end
   local id, src = ns.Combat.mageEpic(c)
@@ -206,38 +142,42 @@ function Art.mageEpicText(c)
   if id == "arcane_meditation" then
     -- mana gardé si le tour finit maintenant (plafond), et le bonus du report
     local keep = math.min(math.max(c.player.mana or 0, 0), d.epicN)
-    if keep > 0 and (d.epicBonus or 0) > 0 then return ("Mana kept: %d/%d, +%d"):format(keep, d.epicN, d.epicBonus) end
-    return ("Mana kept: %d/%d"):format(keep, d.epicN)
+    local n = ("%d/%d"):format(keep, d.epicN)
+    if keep > 0 and (d.epicBonus or 0) > 0 then return ("Mana kept: %d/%d, +%d"):format(keep, d.epicN, d.epicBonus), n end
+    return ("Mana kept: %d/%d"):format(keep, d.epicN), n, keep == 0
   elseif id == "rule_of_threes" then
-    if ns.Combat.ruleOfThreesNext(c, src) then
-      local k = d.epicCharge or 0
-      if (c.player.res or 0) < k then return ("Next card: needs %d %s"):format(k, k == 1 and "Charge" or "Charges") end
-      return "Next card: twice"
-    end
     local n, at = c.turn.played, d.epicAt or 3 -- rang doublé : 3, ou 2 aux paliers 2 et 3
     if d.epicEvery then n = n % at end
-    if not d.epicEvery and n >= at then return nil end
-    return ("Cards played: %d/%d"):format(n, at)
+    local count = ("%d/%d"):format(math.min(n, at), at)
+    if ns.Combat.ruleOfThreesNext(c, src) then
+      local k = d.epicCharge or 0
+      if (c.player.res or 0) < k then return ("Next card: needs %d %s"):format(k, k == 1 and "Charge" or "Charges"), count end
+      return "Next card: twice", count
+    end
+    if not d.epicEvery and n >= at then return nil, nil, true end -- déjà doublée ce tour
+    return ("Cards played: %d/%d"):format(n, at), count
   elseif id == "water_elemental" then
     -- le coup part au début du prochain tour : la vue dit sur qui
     local t = ns.Combat.elementalTarget(c)
-    return t and ("Elemental: " .. ns.Enemies[t.id].name) or nil
+    if not t then return nil, nil, true end
+    return "Elemental: " .. ns.Enemies[t.id].name
   elseif id == "fingers_of_frost" then
     for i = 1, #c.enemies do
       if ns.Combat.isFrozen(c.enemies[i]) then return "Frozen: Cast at once" end
     end
-    return "No Frozen enemy"
+    return "No Frozen enemy", nil, true
   elseif id == "mirror_image" then
     return (d.epicPct or 100) >= 100 and "Cast cards hit twice" or "Cast cards: half again"
   elseif id == "molten_armor" then
-    return ("When attacked: DoT %d"):format(d.epicN)
+    return ("When attacked: DoT %d"):format(d.epicN), tostring(d.epicN)
   elseif id == "conflagration" then
     local n = 0
     for i = 1, #c.enemies do
       local e = c.enemies[i]
       if not e.dead and (e.st.pain or 0) > 0 then n = n + 1 end
     end
-    return n > 0 and ("DoT spreads on death: %d"):format(n) or "No enemy with DoT"
+    if n > 0 then return ("DoT spreads on death: %d"):format(n), tostring(n) end
+    return "No enemy with DoT", nil, true
   end
   return nil
 end
