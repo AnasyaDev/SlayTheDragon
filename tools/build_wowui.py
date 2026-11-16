@@ -272,8 +272,66 @@ clean.alpha_composite(fr, (0, 0))
 clean.alpha_composite(ImageOps.mirror(fr), (90, 0))
 add("unit_enemy", rs(clean, S_UNIT), 4703662, (203, 18, 90, 76), S_UNIT,
     "cadre compact d'ennemi (moitié gauche du cadre de boss et son miroir, sans le dragon)", cap=18)
-piece("bar_enemy", 4703662, (337, 165, 169, 20), 0.75, "barre de vie compacte (…-Boss-Small-PortraitOff-Bar-Health-2x)")
+# étirée en largeur (dégradé sans détail) : la barre unique du cadre d'unité est plus longue que la pièce
+piece("bar_enemy", 4703662, (337, 165, 169, 20), 0.75, "barre de vie des ennemis (…-Boss-Small-PortraitOff-Bar-Health-2x), étirée en largeur", stretch="h")
 piece("elite_dragon", 1300837, (1, 1, 80, 80), 1, "dragon d'or des élites et boss (nameplates-icon-elite-gold)")
+
+# --- Cadre d'unité des ennemis en combat (16/11/2026) : boîte argentée à un seul logement, prise dans le cadre
+# compact de boss (…-Boss-Small-PortraitOff-2x, 4703662 : liseré argenté chanfreiné, intérieur sombre
+# translucide, ombre portée en bas) : haut de la boîte (liseré et ombre intérieure) puis bas (sous le logement
+# de l'énergie : sans le filet du milieu), moitié gauche et son miroir (le dragon d'or passe sous le coin bas
+# droit du fichier servi). Stockée à 1 (pixels -2x), affichée en neuf tranches (W.nineStretch). Version
+# d'élite / de boss : la même, liseré recoloré en or (luminance -> rampe dorée). Filet vertical (case
+# d'intention) : le filet du milieu de la même boîte, couché, avec son ombre.
+def gold_ramp(im):
+    im = im.copy()
+    p = im.load()
+    for yy in range(im.height):
+        for xx in range(im.width):
+            r_, g_, b_, a_ = p[xx, yy]
+            lum = (r_ + g_ + b_) / 3
+            if a_ and lum > 20:
+                p[xx, yy] = (min(255, round(lum * 1.3)), min(255, round(lum * 1.06)), round(lum * 0.42), a_)
+    return im
+
+
+_bx = crop(4703662, (203, 47, 87, 48))      # x 203..289, y 47 (liseré du haut) .. 94 (fin de l'ombre portée)
+_half = Image.new("RGBA", (60, 34))
+_half.alpha_composite(_bx.crop((0, 0, 60, 18)), (0, 0))     # liseré du haut, ombre intérieure (y 47..64)
+_half.alpha_composite(_bx.crop((0, 32, 60, 48)), (0, 18))   # fond, liseré du bas, ombre portée (y 79..94)
+_box = Image.new("RGBA", (120, 34))
+_box.alpha_composite(_half, (0, 0))
+_box.alpha_composite(ImageOps.mirror(_half), (60, 0))
+add("uf_box", _box, 4703662, (203, 47, 87, 48), 1,
+    "cadre d'unité d'un ennemi (boîte du cadre compact de boss, un seul logement, neuf tranches)", nine=[8, 8, 8, 12])
+add("uf_box_gold", gold_ramp(_box), 4703662, (203, 47, 87, 48), 1,
+    "cadre d'unité d'une élite / d'un boss (même boîte, liseré recoloré en or)", nine=[8, 8, 8, 12])
+_vl = crop(4703662, (250, 66, 24, 8)).rotate(90, expand=True)  # filet du milieu et son ombre, couché
+add("uf_vline", _vl, 4703662, (250, 66, 24, 8), 1, "filet vertical de la case d'intention (filet de la même boîte)",
+    stretch="v")
+add("uf_vline_gold", gold_ramp(_vl), 4703662, (250, 66, 24, 8), 1, "filet vertical, version d'élite (recoloré en or)",
+    stretch="v")
+# Écusson d'élite : bouclier doré droit des cadres de boss (UI-HUD-UnitFrame-Target-PortraitOn-Boss-Quest-2x,
+# 4703662) vidé de son « ! » (fond refait ligne à ligne entre les deux bords sombres), tête de dragon d'or des
+# élites dedans (nameplates-icon-elite-gold, 1300837).
+_sh = crop(4703662, (433, 55, 52, 52)).copy()
+_sp = _sh.load()
+for yy in range(8, 40):
+    a0, b0 = _sp[16, yy], _sp[36, yy]
+    for xx in range(17, 36):
+        t_ = (xx - 16) / 20
+        _sp[xx, yy] = tuple(round(a0[i] + (b0[i] - a0[i]) * t_) for i in range(4))
+_sh.alpha_composite(crop(1300837, (1, 1, 80, 80)).resize((28, 28), Image.LANCZOS), (12, 8))
+_sh = _sh.crop(_sh.getbbox())
+add("elite_crest", _sh, 4703662, (433, 55, 52, 52), 1,
+    "écusson d'élite / de boss (bouclier de …-Boss-Quest-2x sans le « ! », tête de nameplates-icon-elite-gold)")
+# Repère de seuil (phase) sous la barre : petit triangle doré pointe en haut, liseré sombre, dessiné ici.
+_tri = Image.new("RGBA", (14 * 4, 10 * 4))
+_d = ImageDraw.Draw(_tri)
+_d.polygon([(28, 0), (56, 40), (0, 40)], fill=(20, 14, 4, 255))
+_d.polygon([(28, 9), (47, 36), (9, 36)], fill=(255, 205, 64, 255))
+_d.polygon([(28, 9), (28, 36), (9, 36)], fill=(214, 160, 30, 255))
+add("mark_up", _tri.resize((14, 10), Image.LANCZOS), 0, None, 1, "repère de seuil sous la barre (triangle doré, dessiné)")
 
 # --- Cases d'icônes (barre d'action Dragonflight, -2x, stockées à 0,75 : nettes jusqu'à 60 unités)
 piece("slot_bg", 4615764, (359, 209, 128, 124), 0.75, "fond de case (UI-HUD-ActionBar-IconFrame-Slot-2x)")
@@ -376,6 +434,12 @@ UNIT_META = {"unit_player": {"portrait": [11, 8, 64, 64], "name": [84, 12, 142, 
              "unit_boss": {"name": [5, 11, 96, 15], "hp": [3, 29, 100, 11], "low": [3, 42, 100, 9]}}
 for _n, _d in UNIT_META.items():
     META[_n] = {k: [round(v * S_UNIT / 0.6, 1) for v in box] for k, box in _d.items()}
+# Cadre d'unité des ennemis : liseré mesuré sur l'alpha de la colonne du milieu et de la ligne du milieu (pixels
+# stockés) : haut du liseré du haut, bas du liseré du bas (l'ombre portée est dessous), bords gauche et droit.
+_ub = PIECES["uf_box"]
+_col = [y for y in range(_ub.height) if _ub.getpixel((60, y))[3] > 200 and sum(_ub.getpixel((60, y))[:3]) > 300]
+_row = [x for x in range(_ub.width) if _ub.getpixel((x, 18))[3] > 200 and sum(_ub.getpixel((x, 18))[:3]) > 300]
+META["uf_box"] = {"top": _col[0], "bottom": _col[-1] + 1, "left": _row[0], "right": _row[-1] + 1}
 
 # ---------------------------------------------------------------------------
 # Atlas : rangées (étagères) dans une toile de 1024 de large, 3 pixels d'écart, bords répétés
