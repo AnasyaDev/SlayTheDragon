@@ -52,6 +52,10 @@ local INFO_LEVEL = 10                    -- cadre des infos : au-dessus du perso
 local ENEMY_TOP = 44                     -- haut du cadre d'unité (coordonnées du contenu ; l'écusson dépasse de 6)
 local ENEMY_FEET = 300                   -- ligne des pieds (coordonnées du contenu)
 local ENEMY_STAGGER = 24                 -- un ennemi sur deux, posé un peu plus bas
+-- Deux rangées de cadres en quinconce (demande du joueur du 16/11/2026, 5 ennemis : noms tronqués) : dès qu'une
+-- rangée unique laisserait moins de ROWS_AT de la largeur pleine ; échelle des emplacements ROWS_SCALE (modèles de
+-- la même taille qu'avant à 5 ennemis), marge aux bords de la zone des ennemis (écusson compris).
+local ROWS_AT, ROWS_SCALE, ROWS_MARGIN = 0.85, 0.86, 6
 local COUNTER_X, COUNTER_Y = 378, 110    -- compteur de combat d'une zone (Wildfire) : centre x, haut ; entre le héros et
                                          -- les ennemis, sous la barre d'incantation (le haut du décor est aux cadres)
 
@@ -89,11 +93,13 @@ local CREST = { elite = { h = 22, x = -3, y = 4 }, boss = { h = 27, x = -5, y = 
 local ST_SIZE, ST_GAP, ST_TOP = 19, 3, 1 -- rangée d'états : icônes, écart, sous le cadre (ombre portée comprise)
 local ST_MAX = 12
 local INFO_H = FRAME_H + ST_TOP + ST_SIZE + 4 -- bloc des infos (le modèle commence dessous)
+-- rangée basse des cadres (deux rangées) : sous la rangée d'états de la rangée haute, écusson de boss compris
+local ROW_DY = FRAME_H + ST_TOP + ST_SIZE + CREST.boss.y + 1
 local ASK, ASK_GAP = 13, 3               -- « ? » de la fiche : diamètre, écart au nom
 local MARK_SPOT = 14                     -- place d'une marque de classe (Atrophic Poison, cible du familier)
 local CHIPS, CHIP_ICON = 2, 16
 V.FRAME_W, V.FRAME_H, V.INTENT_W, V.INFO_H = FRAME_W, FRAME_H, INTENT_W, INFO_H
-V.ASK, V.ST_SIZE, V.FRAME_GAP = ASK, ST_SIZE, FRAME_GAP
+V.ASK, V.ST_SIZE, V.FRAME_GAP, V.ROW_DY = ASK, ST_SIZE, FRAME_GAP, ROW_DY
 
 -- Bas visible du cadre (liseré du bas ; l'ombre portée est dessous) et bord intérieur, en unités.
 local function boxBottom()
@@ -144,11 +150,14 @@ local function placeFig(s)
 end
 
 -- Ennemi visé (carte à cible armée) : son anneau s'allume ; il ne grandit plus (aucune échelle au
--- survol dans l'addon).
+-- survol dans l'addon). Le liseré du cadre s'éclaire avec l'anneau (canal « lit » : anneau montré).
 local function aimApply(s)
   local v = W.animValue(s, "aim")
   placeFig(s)
   if s.fig.ring:IsShown() then s.fig.ring:SetAlpha(0.45 + 0.55 * max(v, s.ringBase or 0)) end
+  local lit = W.LIGHT_ADD * 1.5 * W.animValue(s, "lit")
+  s.tag.lightPlain:SetAlpha(lit)
+  s.tag.lightGold:SetAlpha(lit)
 end
 
 -- Pose le cadre d'unité à la largeur w : boîte argentée ou dorée (élite / boss), écusson, filet, case d'intention,
@@ -159,6 +168,8 @@ local function setUnitFrame(s, rank, w)
   local gold = rank ~= nil
   if gold then tag.plain:Hide() tag.gold:Show() s.vline:Hide() s.vlineGold:Show()
   else tag.plain:Show() tag.gold:Hide() s.vline:Show() s.vlineGold:Hide() end
+  tag.lightPlain:SetShown(not gold)
+  tag.lightGold:SetShown(gold)
   local cr = rank and CREST[rank]
   if cr then
     local e = W.Wow.pieces.elite_crest
@@ -294,10 +305,14 @@ local function buildSlot(self, i)
   s.info = CreateFrame("Frame", nil, s)
   s.info:SetAllPoints()
   s.info:SetFrameLevel(s:GetFrameLevel() + INFO_LEVEL)
-  s.tag = CreateFrame("Frame", nil, s.info)
+  -- Le cadre prend la souris (bouton) : en deux rangées il déborde sur l'emplacement d'un voisin ; survol et clic
+  -- valent ceux de son ennemi (anneau du modèle et liseré du cadre ensemble, V:RenderTargets).
+  s.tag = CreateFrame("Button", nil, s.info)
   s.tag:SetFrameLevel(s.info:GetFrameLevel() + 5) -- au-dessus des jetons d'état
   s.tag:SetSize(FRAME_W, FRAME_H)
   s.tag:SetPoint("TOP", s, "TOP", 0, 0)
+  s.tag:EnableMouse(true)
+  s.tag:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   -- fond : la boîte du jeu est translucide (0,4) ; un voile sombre dessous garde nom et nombres lisibles sur tout décor
   s.tag.shade = W.rect(s.tag, "BACKGROUND", -1, C.black, 0.42)
   s.tag.shade:SetPoint("TOPLEFT", s.tag, "TOPLEFT", 1.5, -1.5)
@@ -305,6 +320,9 @@ local function buildSlot(self, i)
   s.tag.plain = W.nineStretch(s.tag, "uf_box", W.Wow.pieces.uf_box.nine, UF_K, "BACKGROUND", 0)
   s.tag.gold = W.nineStretch(s.tag, "uf_box_gold", W.Wow.pieces.uf_box_gold.nine, UF_K, "BACKGROUND", 0)
   s.tag.gold:Hide()
+  -- liseré éclairé (survol, cible) : copie additive de la boîte, éteinte au repos (V:RenderTargets, aimApply)
+  s.tag.lightPlain = W.lightLayer(W.nineStretch(s.tag, "uf_box", W.Wow.pieces.uf_box.nine, UF_K, "BACKGROUND", 1))
+  s.tag.lightGold = W.lightLayer(W.nineStretch(s.tag, "uf_box_gold", W.Wow.pieces.uf_box_gold.nine, UF_K, "BACKGROUND", 1))
   s.vline = W.wow(s.tag, "uf_vline", "BORDER", 0)
   s.vlineGold = W.wow(s.tag, "uf_vline_gold", "BORDER", 0)
   s.crest = W.wow(s.tag, "elite_crest", "OVERLAY", 2)
@@ -348,6 +366,13 @@ local function buildSlot(self, i)
   s:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
   s:SetScript("OnEnter", function() s.hover = true V:RenderTargets() end)
   s:SetScript("OnLeave", function() s.hover = false V:RenderTargets() end)
+  -- survol du cadre (et de ce qui s'y pose : barre, case d'intention, « ? ») = survol de l'ennemi
+  local function frameEnter() s.frameHover = true V:RenderTargets() end
+  local function frameLeave() s.frameHover = false V:RenderTargets() end
+  s.tag:SetScript("OnClick", function(_, button) V:ClickEnemy(s, button) end)
+  s.tag:SetScript("OnEnter", frameEnter)
+  s.tag:SetScript("OnLeave", frameLeave)
+  for _, f in ipairs({ s.hp, s.intent, s.ask }) do f.onEnterExtra, f.onLeaveExtra = frameEnter, frameLeave end
   s:Hide()
   return s
 end
@@ -886,10 +911,25 @@ function V:LayoutEnemies()
     end
   end
   local n = #shown
-  -- écart entre centres : la largeur d'un cadre plus FRAME_GAP au plus, la zone des ennemis partagée sinon
-  local spacing = n > 0 and min(FRAME_W + FRAME_GAP, (ENEMY_X1 - ENEMY_X0) / n) or FRAME_W + FRAME_GAP
+  -- Une rangée : écart entre centres = la largeur d'un cadre plus FRAME_GAP au plus, la zone des ennemis partagée
+  -- sinon ; cadre = écart − FRAME_GAP (FRAME_W au plus). Si une rangée rétrécit nettement les cadres (4 ennemis et
+  -- plus) : deux rangées en quinconce (rangs impairs en haut, pairs dessous, ceux dont le modèle est un peu plus
+  -- bas), à l'échelle ROWS_SCALE ; un cadre ne côtoie alors que le surlendemain dans sa rangée, d'où la largeur
+  -- pleine (6 ennemis : la plus grande qui tient, la même pour tous). Les centres se resserrent pour que les
+  -- cadres des bouts restent dans la zone des ennemis (chaque cadre reste centré sur son modèle).
+  local zone = ENEMY_X1 - ENEMY_X0
+  local spacing = n > 0 and min(FRAME_W + FRAME_GAP, zone / n) or FRAME_W + FRAME_GAP
+  local w = min(FRAME_W, spacing - FRAME_GAP)
+  local rows = (n >= 2 and w < FRAME_W * ROWS_AT) and 2 or 1
+  local sc = rows == 2 and ROWS_SCALE or 1
+  if rows == 2 then
+    local room = zone - 2 * ROWS_MARGIN
+    local wa = min(FRAME_W * sc, (2 * room - (n - 1) * FRAME_GAP * sc) / (n + 1))
+    w = wa / sc
+    spacing = min(spacing, (room - wa) / (n - 1))
+  end
   local cx0 = (ENEMY_X0 + ENEMY_X1) / 2 - (n - 1) * spacing / 2
-  local sc = n >= 5 and 0.86 or 1
+  self.enemyRows = rows
   for k = 1, n do
     local idx = shown[k]
     local e = c.enemies[idx]
@@ -904,23 +944,30 @@ function V:LayoutEnemies()
       s:Show()
       s.artKey = nil
       W.animSet(s, "aim", 0)
+      W.animSet(s, "lit", 0)
+      s.frameHover = false
       s:SetAlpha(1)
       s.hp:Set(e.hp, e.maxHp)
       s.block:Set(e.block, e.maxHp)
     end
     s.enemyIndex = idx
     s.cx = cx0 + (k - 1) * spacing
-    -- haut de l'emplacement = haut du cadre, le même pour tous ; pieds sur ENEMY_FEET (un sur deux plus bas)
-    s.top = ENEMY_TOP - Scene.TOP
+    -- haut de l'emplacement = haut du cadre : ENEMY_TOP (rangée haute), ROW_DY plus bas (rangée basse : rangs pairs) ;
+    -- pieds sur ENEMY_FEET (un sur deux plus bas). Le modèle commence sous le bloc des infos de toutes les rangées
+    -- (s.ceil, unités de l'emplacement sous son haut) : aucun cadre voisin ne le recouvre.
+    local low = rows == 2 and k % 2 == 0
+    s.row = low and 2 or 1
+    s.top = ENEMY_TOP + (low and ROW_DY * sc or 0) - Scene.TOP
+    s.ceil = INFO_H + ((rows == 2 and not low) and ROW_DY or 0)
     local scaleChanged = s:GetScale() ~= sc
     if scaleChanged then s:SetScale(sc) end
     local feetAbs = ENEMY_FEET + ((k % 2 == 0) and ENEMY_STAGGER or 0)
-    s.feet = (feetAbs - ENEMY_TOP) / sc
+    s.feet = (feetAbs - ENEMY_TOP - (low and ROW_DY * sc or 0)) / sc
     -- modèle (e.art : modèle d'une phase, Nefarius -> Nefarian) : apparaît en fondu une fois chargé (ombre avec
     -- lui) ; médaillon si aucun candidat ne charge. Taille : art.scale, bornée par la place sous les infos.
     local artKey = e.art or e.id
     local art = Art.enemies[artKey] or {}
-    local fk = min(art.scale or 1, (s.feet - INFO_H) / FIG_H)
+    local fk = min(art.scale or 1, (s.feet - s.ceil) / FIG_H)
     if s.artKey ~= artKey or s.figK ~= fk then
       local fresh = s.artKey ~= artKey
       s.artKey, s.figK = artKey, fk
@@ -930,15 +977,13 @@ function V:LayoutEnemies()
       s.figH = FIG_H * fk
       if fresh then Scene.enemyFigure(s.fig, artKey) end
     elseif scaleChanged then
-      -- modèle déjà chargé (le cinquième ennemi arrive ou meurt) : caméra recalculée à la nouvelle échelle
+      -- modèle déjà chargé (le quatrième ennemi arrive ou meurt) : caméra recalculée à la nouvelle échelle
       Scene.refreshFigure(s.fig)
     end
     s:SetSize(max(150 * fk, (spacing / sc) - FRAME_GAP), s.feet + 6)
     placeFig(s)
-    -- cadre d'unité : ordinaire, d'élite ou de boss ; largeur = l'écart moins FRAME_GAP (l'écusson qui dépasse à
-    -- gauche y tient), FRAME_W au plus
+    -- cadre d'unité : ordinaire, d'élite ou de boss ; largeur w (la même pour tous)
     local def = ns.Enemies[e.id]
-    local w = min(FRAME_W, spacing / sc - FRAME_GAP)
     setUnitFrame(s, def.boss and "boss" or (def.elite and "elite" or nil), w)
     self:PlaceSlot(s, 0, 0)
   end
@@ -1339,11 +1384,14 @@ function V:RenderTargets()
   for _, s in pairs(self.slotOf) do
     local e = self.c.enemies[s.enemyIndex]
     local alive = e and not e.dead and not s.dying
-    local on = alive and ((targeting and (s.hover or s.enemyIndex == aimed)) or s.hover)
+    local hover = s.hover or s.frameHover -- modèle ou cadre
+    local on = alive and ((targeting and (hover or s.enemyIndex == aimed)) or hover)
     s.fig:SetRing(on, not targeting)
+    -- liseré du cadre éclairé tant que l'anneau du modèle est montré : le lien cadre ↔ modèle (deux rangées)
+    W.animTo(s, "lit", on and 1 or 0, on and W.HOVER_IN or W.HOVER_OUT)
     -- visée : l'ennemi survolé (ou l'ennemi retenu) grandit, son anneau s'allume
     s.ringBase = targeting and 0 or 1
-    local aim = alive and targeting and (s.hover or s.enemyIndex == aimed)
+    local aim = alive and targeting and (hover or s.enemyIndex == aimed)
     W.animTo(s, "aim", aim and 1 or 0, aim and W.HOVER_IN or W.HOVER_OUT)
     aimApply(s)
   end

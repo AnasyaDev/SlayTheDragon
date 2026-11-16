@@ -8686,16 +8686,19 @@ do
     reuse and gm._anim == A.stand and neutral(gm) and H.cameraFits(gm) and not gm.dead and alpha(gm) == 1,
     tostring(gm._anim) .. " " .. table.concat({ gm:GetPosition() }, ",") .. " x" .. tostring(gm:GetModelScale()))
 
-  -- 4. emplacement passé de 0,86 (5 ennemis) à 1 (un mort) : modèles déjà chargés recadrés
+  -- 4. emplacement passé de 0,86 (5 ennemis : deux rangées) à 1 (deux morts, une rangée) : modèles déjà chargés
+  -- recadrés
   fresh()
   v = fight({ "murloc", "murloc", "murloc", "murloc", "murloc" })
   H.advance(0.5)
   local fits5 = true
   for _, sl in pairs(v.slotOf) do if not H.cameraFits(sl.fig.model) then fits5 = false end end
   check("cinq ennemis : emplacements à 0,86, caméras à cette échelle", fits5)
-  local dead = v.c.enemies[1]
-  dead.hp, dead.dead = 0, true
-  v:OnEvents({ { t = "death", unit = dead.uid } })
+  for i = 1, 2 do
+    local dead = v.c.enemies[i]
+    dead.hp, dead.dead = 0, true
+    v:OnEvents({ { t = "death", unit = dead.uid } })
+  end
   H.advance(5)
   local fits4, n4 = true, 0
   for _, sl in pairs(v.slotOf) do
@@ -8704,7 +8707,7 @@ do
       if not (sl:GetScale() == 1 and H.cameraFits(sl.fig.model)) then fits4 = false end
     end
   end
-  check("quatre ennemis : emplacements à 1, caméras recalculées à la nouvelle échelle", n4 == 4 and fits4, n4)
+  check("trois ennemis : emplacements à 1, caméras recalculées à la nouvelle échelle", n4 == 3 and fits4, n4)
 
   -- 5. cadre réutilisé avant l'arrivée de la créature précédente (créature contre créature, rien ne les
   -- distingue au chargement) : candidat affiché sans être mémorisé ; la créature tardive est écartée
@@ -12208,7 +12211,7 @@ do
   snap("marchand-7-cartes", true)
 end
 
-print("UFE cadre d'unité des ennemis (maquette du 16/11/2026) : tout dans le cadre et la rangée d'états, rien sur le modèle ; 1, 3, 5 et 6 ennemis ; case d'intention, Absorption, seuils, états, fiche « ? », ombre")
+print("UFE cadre d'unité des ennemis (maquette du 16/11/2026) : tout dans le cadre et la rangée d'états, rien sur le modèle ; 1, 3, 4, 5 et 6 ennemis (deux rangées en quinconce dès 4) ; case d'intention, Absorption, seuils, états, fiche « ? », survol cadre ↔ modèle, ombre")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
@@ -12276,9 +12279,14 @@ do
   -- seuil sous la barre ; AUCUN de ces éléments sur la zone du modèle (son cadre), ni sur un voisin ; aucun texte
   -- de l'emplacement hors du cadre, de la case, des états, des compteurs et du « ? » ; pieds sur la ligne commune ;
   -- ombre centrée sous le modèle ; fiche au survol (souris du client).
+  -- Deux rangées (4 ennemis et plus) : rangs impairs en haut, pairs dessous (le modèle le plus bas) ; cadres de même
+  -- largeur, chacun centré sur son modèle ; la rangée d'états d'un cadre (sa bande entière, même vide) et son écusson
+  -- ne touchent aucun autre cadre ; rien d'un cadre sur AUCUN modèle (le sien ou un voisin).
   local function layout(label, c, expectAsk)
     local bad, boxes = {}, {}
     local feetY = {}
+    local models, tops, widths = {}, {}, {}
+    for _, s in pairs(v.slotOf) do models[s] = R.rect(s.fig) end
     for _, s in pairs(v.slotOf) do
       local e = c.enemies[s.enemyIndex]
       local def = ns.Enemies[e.id]
@@ -12289,6 +12297,11 @@ do
       local boxBottom = tr[4] - CV.boxBottom() * k -- bas visible du cadre (l'ombre portée est dessous)
       local model = R.rect(s.fig)
       local own = { tr }
+      -- bande de la rangée d'états (réservée, même vide)
+      own[#own + 1] = { tr[1], tr[2] - (1 + CV.ST_SIZE) * k, tr[3], tr[2] - 1 * k }
+      tops[#tops + 1] = { y = tr[4], k = s.enemyIndex, feet = R.rect(s.model)[2] }
+      widths[#widths + 1] = s.tag._w
+      if math.abs((tr[1] + tr[3]) / 2 - (model[1] + model[3]) / 2) > 0.05 then bad[#bad + 1] = name .. " : cadre pas centré sur son modèle" end
       if not inside(tr, content) or tr[4] > decorTop + 0.5 then bad[#bad + 1] = name .. " : cadre hors du décor " .. fmt(tr) end
       if overlaps(tr, heroR) then bad[#bad + 1] = name .. " : cadre sur celui du héros" end
       -- élite / boss : liseré doré, écusson (plus grand pour un boss) dans la fenêtre ; ordinaire : argent, sans
@@ -12378,7 +12391,11 @@ do
       end
       -- rien de l'emplacement sur la zone du modèle
       for _, r in ipairs(own) do
-        if overlaps(r, model) then bad[#bad + 1] = name .. " : infos sur la zone du modèle " .. fmt(r) .. " / " .. fmt(model) end
+        for so, mo in pairs(models) do
+          if overlaps(r, mo) then
+            bad[#bad + 1] = name .. " : infos sur la zone " .. (so == s and "du modèle " or "d'un modèle voisin ") .. fmt(r) .. " / " .. fmt(mo)
+          end
+        end
         if not inside(r, content) then bad[#bad + 1] = name .. " : hors de la fenêtre " .. fmt(r) end
         if overlaps(r, heroR) then bad[#bad + 1] = name .. " : sur le cadre du héros" end
       end
@@ -12418,6 +12435,16 @@ do
     local hasLine = false
     for _, l in ipairs(lines) do if math.abs(l - (content[4] - 300 * k1)) < 0.6 then hasLine = true end end
     if #feetY > 0 and not hasLine then bad[#bad + 1] = "pieds hors de la ligne commune (300) " .. tostring(lines[1]) .. " / " .. want end
+    -- rangées : une seule jusqu'à 3, deux dès 4 ; en deux rangées, rang impair en haut et pair dessous, pieds plus bas
+    table.sort(tops, function(a, b) return a.k < b.k end)
+    local n, hi = #tops, -math.huge
+    for _, t in ipairs(tops) do hi = math.max(hi, t.y) end
+    for i, t in ipairs(tops) do
+      local low = n >= 4 and i % 2 == 0
+      if low ~= (t.y < hi - 0.5) then bad[#bad + 1] = ("rang %d : rangée %s attendue"):format(i, low and "basse" or "haute") end
+      if low and tops[i - 1] and t.feet > tops[i - 1].feet - 0.5 then bad[#bad + 1] = ("rang %d : cadre bas, modèle pas plus bas"):format(i) end
+    end
+    for _, w in ipairs(widths) do if math.abs(w - widths[1]) > 0.01 then bad[#bad + 1] = "cadres de largeurs différentes" break end end
     check(label, #bad == 0, table.concat(bad, " ; "))
   end
 
@@ -12438,16 +12465,84 @@ do
   check("fiche d'un élite : « Harvest Golem | Elite », Stun Resistant", tg == "Harvest Golem | Elite |   | Stun Resistant — "
     .. ns.Art.STUN_RESIST_TEXT, tg)
   snap("fiche-elite", true)
+  local s3 = v.slotOf[c.enemies[1].uid]
+  check("3 ennemis : une rangée, échelle 1, cadre ≈ 183", v.enemyRows == 1 and (s3:GetScale() or 1) == 1
+    and s3.tag._w > 180, s3.tag._w)
+  c = fight({ "murloc", "harvest_golem", "vancleef", "rhahkzor" })
+  layout("4 ennemis (élite, boss, élite côte à côte) : deux rangées, tout dans la fenêtre, aucun chevauchement", c)
+  local s4w = v.slotOf[c.enemies[1].uid]
+  check("4 ennemis : deux rangées, cadre à sa largeur pleine (204)", v.enemyRows == 2
+    and math.abs(s4w.tag._w - CV.FRAME_W) < 0.01, s4w.tag._w)
+  snap("cadres-4-ennemis", true)
   c = fight({ "murloc", "harvest_golem", "vancleef", "rhahkzor", "gnoll" })
   check("5 ennemis : emplacements à l'échelle 0,86", math.abs((v.slotOf[c.enemies[1].uid]:GetScale() or 1) - 0.86) < 1e-6)
   layout("5 ennemis (élite, boss, élite côte à côte) : tout dans la fenêtre, aucun chevauchement", c,
     { gnoll = false, murloc = true, vancleef = true })
   local s5 = v.slotOf[c.enemies[1].uid]
-  check("5 ennemis : cadre rétréci, case d'intention à sa largeur", s5.tag._w < CV.FRAME_W and s5.tag._w >= 100
-    and math.abs(s5.intentSpot._w - (CV.INTENT_W - 2)) < 0.01, s5.tag._w)
+  check("5 ennemis : deux rangées, cadre à sa largeur pleine (≥ 180), case d'intention à sa largeur", v.enemyRows == 2
+    and s5.tag._w >= 180 and math.abs(s5.intentSpot._w - (CV.INTENT_W - 2)) < 0.01, s5.tag._w)
   snap("fiche-5-ennemis", true)
+  -- la capture du joueur : cinq noms lisibles en entier
+  c = fight({ "harvest_golem", "gnoll", "murloc", "bandit", "sorcerer" })
+  layout("5 ennemis de Westfall (capture du joueur) : deux rangées, aucun chevauchement", c)
+  local cut = {}
+  for _, e in ipairs(c.enemies) do
+    local sl = v.slotOf[e.uid]
+    if sl.nameShown ~= Combat.enemyName(e) then cut[#cut + 1] = tostring(sl.nameShown) end
+  end
+  check("5 ennemis : « Harvest Golem », « Riverpaw Gnoll », « Murloc Coastrunner », « Defias Highwayman », « Defias Conjurer » en entier",
+    #cut == 0, table.concat(cut, ", "))
+  snap("cadres-5-ennemis", true)
+  -- lien cadre ↔ modèle : survol du cadre (souris du client, partie qui déborde sur l'emplacement d'un voisin) ou
+  -- du modèle = anneau du modèle et liseré du cadre ensemble
+  do
+    local sh = v.slotOf[c.enemies[2].uid] -- rangée basse
+    local tr = R.rect(sh.tag)
+    -- ligne du nom, 8 unités après le bord gauche : hors de la barre, au-dessus de l'emplacement du voisin
+    local ku = (tr[3] - tr[1]) / sh.tag._w
+    local fx, fy = tr[1] + 8 * ku, tr[4] - 6 * ku
+    local sn = v.slotOf[c.enemies[1].uid]
+    local nb = R.rect(sn)
+    local overNeighbour = fx >= nb[1] and fx <= nb[3] and fy >= nb[2] and fy <= nb[4]
+    local focus = H.mouseFocus(fx, fy)
+    local okFocus = focus == sh.tag
+    if okFocus then H.run(sh.tag, "OnEnter") H.settle() end
+    local ringOn, frameOn = vis(sh.fig.ring), ((sh.tag.lightPlain.parts[1]._calls.SetAlpha or {})[1] or 0) > 0.2
+    local others = false
+    for _, so in pairs(v.slotOf) do if so ~= sh and (vis(so.fig.ring) or ((so.tag.lightPlain.parts[1]._calls.SetAlpha or {})[1] or 0) > 0.01) then others = true end end
+    if okFocus then H.run(sh.tag, "OnLeave") H.settle() end
+    local offRing, offFrame = vis(sh.fig.ring), ((sh.tag.lightPlain.parts[1]._calls.SetAlpha or {})[1] or 0) > 0.01
+    H.run(sh, "OnEnter") H.settle()
+    local modelLit = vis(sh.fig.ring) and ((sh.tag.lightPlain.parts[1]._calls.SetAlpha or {})[1] or 0) > 0.2
+    H.run(sh, "OnLeave") H.settle()
+    check("survol du cadre (bord gauche, sur l'emplacement d'un voisin) : la souris va au cadre, anneau du modèle et liseré allumés, rien d'autre ; survol du modèle : les deux aussi",
+      overNeighbour and okFocus and ringOn and frameOn and not others and not offRing and not offFrame and modelLit,
+      ("voisin %s focus %s ring %s frame %s autres %s après %s/%s modèle %s"):format(tostring(overNeighbour), tostring(okFocus), tostring(ringOn), tostring(frameOn),
+        tostring(others), tostring(offRing), tostring(offFrame), tostring(modelLit)))
+    v.aimTarget = c.enemies[1].uid
+    if okFocus then H.run(sh.tag, "OnClick", "LeftButton", false) end
+    check("clic sur ce bord du cadre : visée de son ennemi (pas du voisin)", okFocus and v.aimTarget == c.enemies[2].uid)
+  end
+  -- 3 → 4 (invocation) puis 4 → 3 (mort, le mourant compte tant qu'il est affiché)
+  c = fight({ "gnoll", "harvest_golem", "murloc" })
+  local okSpawn = Combat.spawn(c, "murloc")
+  local okR, errR = pcall(function() v:Render(true) H.settle() end)
+  check("3 → 4 ennemis en combat (invocation) : replacement sans erreur, deux rangées", okSpawn and okR and v.enemyRows == 2, tostring(errR))
+  layout("4 ennemis après invocation", c)
+  c.enemies[4].dead, c.enemies[4].hp = true, 0
+  local sd = v.slotOf[c.enemies[4].uid]
+  sd.dying = true
+  okR, errR = pcall(function() v:Render(true) end)
+  check("4 → 3 : le mourant affiché compte (deux rangées)", okR and v.enemyRows == 2, tostring(errR))
+  sd.dying = false
+  okR, errR = pcall(function() v:Render(true) H.settle() end)
+  check("4 → 3 : mourant parti, une rangée, cadres à leur largeur d'une rangée", okR and v.enemyRows == 1
+    and v.slotOf[c.enemies[1].uid].tag._w > 180 and (v.slotOf[c.enemies[1].uid]:GetScale() or 1) == 1, tostring(errR))
+  layout("3 ennemis après une mort", c)
   c = fight({ "murloc", "harvest_golem", "vancleef", "rhahkzor", "mystic", "gnoll" })
   layout("6 ennemis (un mourant affiché) : tout dans la fenêtre, aucun chevauchement", c)
+  local s6 = v.slotOf[c.enemies[1].uid]
+  check("6 ennemis : deux rangées, cadres de ≥ 175", v.enemyRows == 2 and s6.tag._w >= 175, s6.tag._w)
   snap("cadres-6-ennemis", true)
   c = fight({ "murloc", "murloc", "gnoll", "murloc", "mystic" })
   layout("5 ennemis ordinaires : « ? » des murlocs seulement, aucun chevauchement", c, { gnoll = false, mystic = false, murloc = true })

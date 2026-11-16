@@ -1658,7 +1658,7 @@ de carte revient au même.
 - Décor plein cadre (Mortemines pour le boss, route sinon). Héros à gauche (x 96–296) : modèle 3D du
   joueur posé au sol, barre d'incantation au-dessus (nom du sort, cible, « au prochain tour »), écusson
   d'Absorption à gauche de la barre de vie, états et Pouvoirs actifs en pastilles dessous.
-- Ennemis à droite (x 452–1024, 1 à 6, légèrement décalés en profondeur, réduits à 86 % à partir de 5) :
+- Ennemis à droite (x 452–1024, 1 à 6, légèrement décalés en profondeur, réduits à 86 % à partir de 4 : deux rangées de cadres) :
   **cadre d'unité** en haut du décor (voir ci-dessous) et, dessous, le modèle 3D posé par les pieds avec son
   ombre, anneau doré aux pieds de la cible (survol, ou ennemi retenu pendant une visée). Pieds sur la ligne y 300
   (un ennemi sur deux 24 plus bas), quelle que soit la taille du personnage ; un personnage agrandi
@@ -1685,7 +1685,7 @@ de carte revient au même.
   dans la barre, l'intention et son « +1 » étaient sur le modèle, l'ombre n'était pas sous les pieds, les états
   étaient sous les pieds). **Tout ce qui se lit tient dans le cadre et la rangée dessous ; plus rien sur le
   modèle.** Cadre horizontal de 204 × 42 à l'échelle 1 (ombre portée comprise ; bas visible à 37,8), en haut
-  du décor (y 44, le même pour tous les ennemis), de gauche à droite :
+  du décor (y 44 ; deux rangées dès 4 ennemis, ci-dessous), de gauche à droite :
   - **Corps** : ligne du nom (gras 11,5, élite violet, boss orangé ; réduit jusqu'à 9,5 puis tronqué « … ») et,
     juste à sa droite, le **« ? »** de la fiche (diamètre 13, seulement si l'ennemi a une information) ; puis
     **une seule barre de vie** (`W.unitBar`, pièce `bar_enemy` étirée en largeur) : l'**Absorption n'a plus de
@@ -1727,8 +1727,22 @@ de carte revient au même.
     avant (MCP wow) : dragon des nameplates (rond, fait pour un portrait), écussons des hauts faits (couronne de
     lauriers illisible petite), bouclier de la barre d'incantation (argent, vide), étoile rare-élite.
   - Largeur : l'écart entre centres est la largeur d'un cadre + 8 au plus (212), la zone partagée sinon ; cadre =
-    écart − 8 (en unités de l'emplacement), 204 au plus : 204 à 1 et 2 ennemis, ≈ 183 à 3, ≈ 135 à 4, ≈ 125 à 5
-    et ≈ 103 à 6 (échelle 0,86) ; la case d'intention garde ses 40, le nom se tronque.
+    écart − 8 (en unités de l'emplacement), 204 au plus : 204 à 1 et 2 ennemis, ≈ 183 à 3 (une rangée).
+  - **Deux rangées en quinconce** (demande du joueur du 16/11/2026, capture à 5 ennemis : cadres de 125, noms
+    tronqués ; maquette validée) : dès qu'une rangée unique laisserait moins de 85 % de 204 (4, 5, 6 ennemis), rangs
+    impairs en rangée haute (y 44), pairs en rangée basse (ceux dont les pieds sont 24 plus bas), `ROW_DY` = 69
+    unités plus bas (sous la rangée d'états de la rangée haute, écusson de boss compris : y ≈ 103). Emplacements à
+    0,86 (`ROWS_SCALE`). Un cadre ne côtoie que le surlendemain dans sa rangée : 204 à 4 et 5, ≈ 180 à 6 (la plus
+    grande qui tient, la même pour tous). Chaque cadre reste centré sur son modèle ; pour que les cadres des bouts
+    tiennent dans la zone (marge 6), les centres se resserrent : écart ≈ 128 à 4, ≈ 96 à 5, ≈ 81 à 6 (143, 114 et
+    95 avant). Les états d'un cadre ont toute sa largeur. Modèles : sous le bloc des deux rangées (y ≈ 160) ; taille
+    ordinaire 137,6 comme avant à 5 et 6 (à 4 : 160 avant, d'où l'échelle 0,86 gardée) ; un ennemi agrandi
+    (`art.scale` > 1) en rangée haute est borné à ≈ 1,02 (place sous la rangée basse). `V.enemyRows`, `s.row`,
+    `s.ceil` (plafond du modèle). Passage 3 ↔ 4 en combat : `LayoutEnemies` replace tout (un mourant affiché compte).
+  - **Lien cadre ↔ modèle** : le cadre est un bouton (en deux rangées il déborde sur l'emplacement d'un voisin) ;
+    survol du cadre (barre, case d'intention et « ? » compris) ou du modèle = anneau du modèle et **liseré du
+    cadre éclairé** ensemble (copie additive de la boîte, `lightPlain` / `lightGold`, canal « lit » : allumée tant
+    que l'anneau est montré, visée comprise) ; clic sur le cadre = clic sur son ennemi.
   - **Ombre** sous les pieds du modèle réel. Cause du décalage : l'ombre et l'anneau sont posés au centre du bas du
     cadre du personnage, mais le client ne cadre pas une créature sur ses pieds (origine du modèle) : sa caméra
     (`RefreshCamera`) vise le centre de la boîte englobante (comme les caméras d'interface de Blizzard,
@@ -1815,9 +1829,12 @@ de carte revient au même.
   **Compteurs gardés** (entrée `compact`) : seulement un nombre dont le joueur a besoin à chaque tour pour
   décider sans survoler (Earthen Charge, Curses du lanceur, soin de Slumber, plafond d'Invincible) ; icône +
   nombre, en tête de la rangée sous le cadre, avant les états (jamais sur le modèle). Deux au plus.
-  Harnais **UFE** (refait avec le cadre, et sections des zones), à 1, 3, 5 et 6 ennemis, ordinaires, élites et
-  boss mêlés, ennemis agrandis : cadre, écusson, « ? », compteurs et états dans la fenêtre, sous le bandeau, hors
-  du cadre du héros et de tout voisin, **rien sur la zone du modèle** (son cadre) ; rang du cadre (liseré doré,
+  Harnais **UFE** (refait avec le cadre, et sections des zones), à 1, 3, 4, 5 et 6 ennemis, ordinaires, élites et
+  boss mêlés, ennemis agrandis : cadre, écusson, « ? », compteurs et états (bande entière, même vide) dans la
+  fenêtre, sous le bandeau, hors du cadre du héros et de tout voisin, **rien sur la zone d'aucun modèle** ; une
+  rangée jusqu'à 3, deux dès 4 (rang pair en bas, modèle plus bas), cadres de même largeur centrés sur leur modèle,
+  noms de la capture à 5 en entier, survol cadre ↔ modèle (anneau + liseré) et clic sur le bord d'un cadre bas,
+  passages 3 → 4 et 4 → 3 ; rang du cadre (liseré doré,
   écusson, plus grand pour un boss, nom après lui) ; barre dans le cadre et à gauche du filet, case d'intention
   à sa droite, nombre dans la case ; « ? » juste à droite du nom, seulement s'il y a une information, fiche
   correcte au survol par la souris du client (`H.mouseFocus` : nom, rang, chaque entrée, ancrage) ; repères de
