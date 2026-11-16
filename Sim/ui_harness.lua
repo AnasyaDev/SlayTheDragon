@@ -11935,6 +11935,63 @@ do
   local name3 = c3.name._text
   run(c3, "OnLeave")
   check("survol de Smite+2 : aperçu de Smite+3 (coût 0)", name3 == "Smite+3" and cost3 == "0", name3 .. " " .. tostring(cost3))
+  do
+    -- coût plus bas que la carte de base : chiffre du coût en vert (vert du nom) sur l'aperçu, au repos
+    -- blanc tant que le palier coûte autant que la base ; texte qui change (Smite+ → +2) : coût blanc
+    local green = ns.Art.C.upGreen
+    local function isGreen(c) local k = c.cost._calls.SetTextColor return k and math.abs(k[1] - green[1]) < 1e-6
+      and math.abs(k[2] - green[2]) < 1e-6 end
+    run(c3, "OnEnter")
+    local g3 = isGreen(c3)
+    run(c3, "OnLeave")
+    run(c2, "OnEnter")
+    local g2 = isGreen(c2)
+    run(c2, "OnLeave")
+    check("aperçu de Smite+3 : coût 0 en vert ; aperçu de Smite+2 (texte changé, coût inchangé) : coût blanc",
+      g3 and not g2 and not isGreen(c3), tostring(g3) .. " " .. tostring(g2))
+    -- Bestial Wrath (Hunter) : +1 ne change que le coût (2 → 1) ; tout palier au coût baissé : chiffre vert
+    local bw = W.card(UI().content)
+    local seen = {}
+    for lv = 0, 3 do
+      bw:SetCard("bestial_wrath", Card.upValue(lv), { preview = true, showUp = lv == 0 })
+      seen[#seen + 1] = bw.name._text .. " " .. bw.cost._text .. (isGreen(bw) and " vert" or " blanc")
+    end
+    bw:SetCard("bestial_wrath", false, {})
+    seen[#seen + 1] = bw.name._text .. " " .. bw.cost._text .. (isGreen(bw) and " vert" or " blanc")
+    bw:Hide()
+    check("Bestial Wrath : aperçu de +1 au coût 1 vert, +1 à +3 au coût 1 vert, base au coût 2 blanc",
+      table.concat(seen, ", ") == "Bestial Wrath+ 1 vert, Bestial Wrath+ 1 vert, Bestial Wrath+2 1 vert, "
+        .. "Bestial Wrath+3 1 vert, Bestial Wrath 2 blanc", table.concat(seen, ", "))
+    -- aperçu à taille réelle de chaque carte de la grille : languette et chiffre du coût dans la fenêtre,
+    -- à PREVIEW_MARGIN du haut au moins
+    local R = dofile(root .. "/Sim/ui_render.lua")
+    R.H = H
+    local content = R.rect(ns.UI.content)
+    local ws = (content[3] - content[1]) / ns.UI.CONTENT_W
+    local why = {}
+    for i = 1, #o do
+      local c = cardFor(i)
+      if c then
+        run(c, "OnEnter")
+        for _ = 1, 30 do H.advance(0.02) end
+        local pv = W.preview
+        if not (pv and pv:IsVisible() and pv.of == c) then why[#why + 1] = i .. " : pas d'aperçu"
+        else
+          for _, part in ipairs({ { "languette", pv.costTab }, { "coût", pv.cost } }) do
+            local r = R.vrect(part[2])
+            if not (part[2]:IsVisible() and r and r[4] <= content[4] - (W.PREVIEW_MARGIN - 0.5) * ws
+              and r[2] >= content[2]) then
+              why[#why + 1] = i .. " : " .. part[1] .. " hors de la fenêtre"
+            end
+          end
+        end
+        run(c, "OnLeave")
+        for _ = 1, 30 do H.advance(0.02) end
+      end
+    end
+    check("grille d'amélioration : languette et chiffre du coût de l'aperçu à taille réelle dans la fenêtre",
+      #why == 0, table.concat(why, " ; "))
+  end
   local c4 = cardFor(4)
   run(c4, "OnEnter")
   local name4 = c4.name._text

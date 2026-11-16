@@ -3634,6 +3634,12 @@ function W.card(parent)
     -- coût ; épique : sans coût, languette violette marquée « Epic »
     local cost = opts.cost or d.cost
     self.cost:SetText(tostring(cost))
+    -- palier amélioré (aperçu compris) qui coûte moins que la carte de base : chiffre du coût en vert (vert
+    -- du nom) ; coût changé en combat (opts.cost autre que la fiche) : couleur habituelle
+    local raw = ns.Cards[id]
+    local cc = (showUp and raw and type(raw.cost) == "number" and type(d.cost) == "number" and d.cost < raw.cost
+      and cost == d.cost) and C.upGreen or C.costText
+    self.cost:SetTextColor(cc[1], cc[2], cc[3])
     if epic then
       self.cost:Hide()
       self.costTab:Show()
@@ -3826,7 +3832,10 @@ function W.cardPreviewShow(card)
     right = cx < width / 2
     x = right and min(cx + off, width - M - half) or max(cx - off, M + half)
   end
-  local top, bottom = CH / 2 + pad.top * CW, CH / 2 + pad.bottom * CW
+  -- haut : la languette du coût dépasse plus que le ruban (pad.top) ; l'aperçu poussé contre le haut garde
+  -- toute la languette et son chiffre à PREVIEW_MARGIN du bord (écran d'amélioration, 1re rangée)
+  local top = CH / 2 + max(pad.top, -SC.pieces.card_cost[2]) * CW
+  local bottom = CH / 2 + pad.bottom * CW
   local y = max(M + top, min(height - M - bottom, cy))
   p:SetCard(card.cardId, card.cardUp, card.opts)
   W.placeCenter(p, host, x, y, 1)
