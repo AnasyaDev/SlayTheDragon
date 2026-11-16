@@ -571,7 +571,7 @@ Art.intentName = {
 -- Interface
 ---------------------------------------------------------------------------
 Art.ui = {
-  minimap   = { icon = 133741, tga = "INV_Misc_Book_09" },  -- inv_misc_book_09
+  minimap   = { icon = 134154, tga = "INV_Misc_Head_Dragon_Black" },  -- inv_misc_head_dragon_black (tête de Nefarian)
   mana      = { icon = 132841, tga = "INV_Elemental_Mote_Mana" },  -- inv_elemental_mote_mana
   gold     = { icon = 133784, tga = "INV_Misc_Coin_01" },  -- inv_misc_coin_01
   bedroll   = { icon = 5545560, tga = "INV_MISC_NightelfBedroll" }, -- inv_misc_nightelfbedroll

@@ -3,7 +3,7 @@
 ## Notes: Roguelike deckbuilder to play during flights.
 ## Author: AnasyaDev
 ## Version: 0.1.0-dev
-## IconTexture: Interface\Icons\INV_Misc_Book_09
+## IconTexture: Interface\AddOns\SlayTheDragon\Media\Icons\inv_misc_head_dragon_black.tga
 ## X-Website: https://github.com/AnasyaDev/SlayTheDragon
 ## SavedVariables: SlayTheDragonDB
 
