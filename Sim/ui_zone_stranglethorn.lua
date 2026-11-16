@@ -122,11 +122,13 @@ return function(T)
     local tip = marked[1] and table.concat(H.hover(marked[1]), " | ") or ""
     check("infobulle de la carte marquée : qui la hexe, comment l'éviter", tip:find("Hex: Bloodscalp Witch Doctor", 1, true)
       and tip:find("interrupt or stun", 1, true), tip)
-    local b1 = s1.badges[1]
-    check("sous l'intention du lanceur : la carte visée", vis(b1) and b1.text._text == "Penance", tostring(b1 and b1.text._text))
+    local t1 = vis(s1.ask) and table.concat(H.hover(s1.ask), " | ") or ""
+    check("fiche du lanceur (« ? ») : règle du Hex et carte visée (« Target now: Penance. »), aucun texte sous l'intention",
+      t1:find("Hex|r — at the end of your turn", 1, true) ~= nil and t1:find("Target now: Penance.", 1, true) ~= nil
+        and not vis(s1.chips[1]), t1)
     local trophy = ns.Enemies.bloodscalp_headhunter.moves.trophy.actions[1][2]
-    check("Headhunter : Take a Trophy annoncé à sa base (aucune Hexed), aucune pastille de Hex (pas un lanceur)",
-      v.slotOf[hh.uid].intent.text._text == tostring(trophy) and not vis(v.slotOf[hh.uid].badges[1]),
+    check("Headhunter : Take a Trophy annoncé à sa base (aucune Hexed), pas de « ? » (rien à montrer)",
+      v.slotOf[hh.uid].intent.text._text == tostring(trophy) and not vis(v.slotOf[hh.uid].ask),
       tostring(v.slotOf[hh.uid].intent.text._text))
     snap("zone-stranglethorn", true)
     -- la carte visée change en direct quand on joue la carte chère
@@ -194,10 +196,8 @@ return function(T)
     local e, c, v = stvCombat("mage", { "zanzil_naga", "skullsplitter_mystic" }, "combat")
     local ns = H.ns
     local s = v.slotOf[c.enemies[1].uid]
-    local found
-    for _, b in ipairs(s.badges) do if vis(b) and b.text._text == "Death Hex" then found = b end end
-    check("Zanzil Naga : « Death Hex » sous son intention, infobulle", found ~= nil
-      and (H.hover(found)[1] or ""):find("On death: hexes", 1, true) ~= nil)
+    local tn = vis(s.ask) and table.concat(H.hover(s.ask), " | ") or ""
+    check("Zanzil Naga : « Death Hex » dans la fiche", tn:find("Death Hex|r — when it dies, it hexes", 1, true) ~= nil, tn)
     snap("zone-stranglethorn-naga", true)
   end
 

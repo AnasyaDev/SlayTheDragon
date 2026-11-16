@@ -151,14 +151,13 @@ ns.ZoneViews.duskwood = {
     return { icon = Art.cards[a.curse] or CURSE_ICON, key = "dw:bite:" .. a.curse,
       tip = "Bite: if this attack costs you HP, adds " .. (d and d.name or a.curse) .. " to your discard." }
   end,
-  -- « Curse N » sous le lanceur : ses Curses encore en jeu (levées à sa mort)
-  enemyBadges = function(c, e)
+  -- fiche du lanceur : ses Curses encore en jeu (levées à sa mort) ; compteur gardé sous le cadre (icône + N)
+  enemyInfo = function(c, e)
     local n = DW.count(c, e.uid)
     if n == 0 then return nil end
-    local name = ns.Combat.enemyName(e)
-    return { { icon = CURSE_ICON, key = "dw:caster", text = "Curse " .. n, color = "watchText",
-      tip = n .. " Curse" .. (n > 1 and "s" or "") .. " from " .. name .. " in your cards. All of them are lifted when "
-        .. name .. " dies." } }
+    return { { name = "Curses", text = "all the Curses it put in your cards are lifted when it dies.",
+      lines = { { "In your cards now: " .. n .. ".", "watchText" } },
+      compact = { icon = CURSE_ICON, key = "dw:caster", text = tostring(n), color = "watchText" } } }
   end,
   -- Curse en main : liseré violet ; infobulle : son lanceur
   handMark = function(c, i, inst)

@@ -1,8 +1,8 @@
 -- Art de la zone Blackrock Mountain (`blackrock`) : modèles des ennemis et des personnages, icônes des
 -- cartes, bibelots et états, case du Grim Guzzler, décors peints (intérieur de la montagne : le Molten
 -- Span, le Detention Block, Blackrock Spire, le Grim Guzzler, la forge de la Black Anvil, la salle du trône
--- de Nefarian) et vue de zone ns.ZoneViews.blackrock (badges des règles de phase, de l'ouverture et de la
--- phase du combat final). Guide : docs/zones.md.
+-- de Nefarian) et vue de zone ns.ZoneViews.blackrock (fiche des règles portées par les ennemis, ouverture de
+-- phase, phase du combat final). Guide : docs/zones.md.
 local _, ns = ...
 
 local Art = ns.Art
@@ -119,33 +119,47 @@ ns.ZoneViews.blackrock = {
       return { icon = OPENING, tip = "Opening move of its new phase." }
     end
   end,
-  -- règles qui ne sont pas des états : Invincible, Indomitable (élites), Shadow of the Throne
-  enemyBadges = function(c, e)
+  -- fiche : règles qui ne sont pas des états (Invincible : compteur gardé sous le cadre ; Indomitable, Shadow of
+  -- the Throne, Drakonids, rage des dragonnets), phase du combat final
+  enemyInfo = function(c, e)
     local BR = ns.Blackrock
     local list = {}
+    local d = ns.Enemies[e.id]
     local cap = BR.maxHit(e)
     if cap then
-      list[#list + 1] = { icon = I("Spell_Holy_PowerWordBarrier"), text = "Max " .. cap,
-        tip = "Invincible: each hit deals at most " .. cap .. " to it. DoT is not a hit.", color = "goldText" }
+      list[#list + 1] = { name = "Invincible", text = "each hit deals at most " .. cap .. " damage to it. DoT is not a hit.",
+        compact = { icon = I("Spell_Holy_PowerWordBarrier"), key = "br:maxhit", text = tostring(cap), color = "goldText" } }
     end
-    if ns.Enemies[e.id].indomitable then
-      list[#list + 1] = { icon = I("Spell_Frost_Stun"), text = "Indomitable", tip = "Can't be Stunned.",
-        color = "goldText" }
+    if d.indomitable then
+      list[#list + 1] = { name = "Indomitable", text = "can't be Stunned." }
     end
-    if ns.Enemies[e.id].throne and (e.mem.phase or 0) == 0 then
+    if d.throne and (e.mem.phase or 0) == 0 then
       local on = BR.drakonidAlive(c)
-      list[#list + 1] = { icon = I("Spell_Shadow_GatherShadows"), text = "Half", dim = not on, color = on and "goldText" or nil,
-        tip = "Shadow of the Throne: takes half damage while a Drakonid lives." }
+      list[#list + 1] = { name = "Shadow of the Throne", text = "takes half damage while a Drakonid lives.",
+        lines = { on and { "Active: a Drakonid lives.", "goldText" } or { "Inactive: no Drakonid lives.", "textDim" } } }
     end
-    -- combat final : la phase en cours et ce qui vient (sous l'intention : le compteur du haut serait sur son cadre)
+    if d.drakonid then
+      list[#list + 1] = { name = "Drakonid", text = "while it lives, Lord Victor Nefarius takes half damage. If it is "
+        .. "slain before Nefarian lands, it rises again as a Bone Construct when he falls below 25% ("
+        .. BR.BONES_MAX .. " at most)." }
+    end
+    if e.id == "rookery_whelp" or e.id == "rookery_whelpling" then
+      list[#list + 1] = { name = "Vengeance", text = "gains Strength 1 each time another Rookery Whelp dies." }
+    end
+    -- combat final : la phase en cours et ce qui vient
     if e.id == "nefarian" then
       local k = (e.mem.phase or 0) + 1
-      local n = #ns.Enemies.nefarian.phases + 1
+      local n = #d.phases + 1
       local t = k == 1 and "Lord Victor Nefarius on his throne. Below 75%, Nefarian lands."
         or (k == 2 and "Nefarian calls on your class. Below 25%, the Drakonids slain rise again."
-        or "Last phase. Shadowflame Fury: Strength 10 when it runs out.")
-      list[#list + 1] = { icon = I("Achievement_Boss_Nefarion"), text = "Phase " .. k .. "/" .. n, tip = t,
-        color = k == n and "attackText" or "goldText" }
+        or "last phase. Shadowflame Fury: Strength 10 when it runs out.")
+      local lines = {}
+      if k < n then
+        local f = math.min(BR.BONES_MAX, e.mem.fallen or 0)
+        lines[1] = { "Drakonids slain so far: " .. (e.mem.fallen or 0) .. " (" .. f .. " Bone Construct"
+          .. (f == 1 and "" or "s") .. " below 25%).", "textSoft" }
+      end
+      list[#list + 1] = { name = "Phase " .. k .. " of " .. n, text = t, lines = lines }
     end
     return list
   end,

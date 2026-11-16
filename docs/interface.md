@@ -498,8 +498,10 @@ build/venv/bin/python -I tools/build_wowui.py [planche] [doc]
   `SetPortraitTexture(…, "player")`, icône de classe en repli ; nom ; vie ; Absorption dans le logement
   bas) ; auras dessous ; incantation à droite du cadre (case du sort, nom, barre jaune dans un rail).
   Ennemis : cadre compact au-dessus de la tête (nom, vie, Absorption dans le logement bas), version d'élite
-  et de boss au dragon d'or, largeur réduite à l'écart entre ennemis, jamais sur le bandeau ; intention
-  dessous (case à l'icône, chiffres en couleur) ; états sous les pieds. Mana (C) : orbe de mana dans le
+  et de boss au dragon d'or, largeur réduite à l'écart entre ennemis, jamais sur le bandeau ; « ? » de la
+  fiche de l'ennemi sur son bord gauche (petit anneau doré, voir « Combat », « Fiche de l'ennemi ») ; intention
+  dessous (case à l'icône, chiffres en couleur), compteurs de la fiche à droite sur la même ligne ; états sous
+  les pieds. Mana (C) : orbe de mana dans le
   grand anneau doré, « 2/3 », libellé « Mana » ; Démence : petit anneau. Pioche, défausse, consumées :
   cases (livre, bourse, flamme) avec nombre et libellé doré. Recharges : cases à l'icône grisée et tours.
   « End Turn » rouge et or ; fin de combat : boîte de dialogue.
@@ -1651,6 +1653,56 @@ de carte revient au même.
   (centrés, même hauteur) et pose `SetViewInsets` de l'excédent : vue projetée = cadre de base, taille apparente
   inchangée (raison et sources dans le commentaire de `Scene.setWide` ; harnais U28W).
   Sans modèle : médaillon argenté à l'icône de l'ennemi (`Art.enemies[id].icon`), ou disque sombre.
+- **Fiche de l'ennemi** (demande du joueur du 16/11/2026 : la ligne « Pack: +2 Str » posée en travers du modèle
+  et son infobulle étaient médiocres). Plus aucune ligne de texte permanente sur le modèle : ce qui est connu
+  d'un ennemi passe par un bouton **« ? »** rond posé sur le bord gauche de son cadre d'unité, centré sur la
+  barre de vie (diamètre 15, 3 unités sur le liseré du cadre sans toucher la barre ; à gauche aussi pour le cadre
+  d'élite / boss, dont le dragon d'or occupe la droite). Pièces : `ring_small` (petit anneau doré du jeu,
+  embarqué) sur un disque sombre (`mask_disc`), « ? » doré dessiné en texte ; survol : copie additive de
+  l'anneau, « ? » blanchi. Il n'apparaît que si l'ennemi a au moins une information ; un clic vaut un clic sur
+  l'ennemi (visée). Place : `LayoutEnemies` réserve les 12 unités qui dépassent du cadre dans l'écart entre
+  ennemis (cadre ordinaire `min(114, écart − 2 − 12)`, cadre d'élite au plus 12 de plus et jamais plus que la
+  place laissée par ses voisins) : 2 unités au moins entre un « ? » et le cadre voisin, à 1 comme à 5 (ou 6, un
+  mourant) ennemis, à l'échelle 0,86, cadres d'élite côte à côte compris.
+  Au survol (du « ? » ou d'un compteur) : la fiche dans l'infobulle du jeu (`GameTooltip`, ouverte en bas à
+  gauche, `ANCHOR_BOTTOMLEFT` : les ennemis occupent la moitié droite de la fenêtre ; elle est de toute façon
+  bornée à l'écran par le jeu) : nom en titre, rang (« Elite » violet, « Boss » orangé), puis une entrée par
+  information : « **Name** — règle » (nom en or, règle en une ou deux phrases) et, dessous, la valeur actuelle
+  quand elle change en combat. `V.enemyInfo(c, e)` (`UI/CombatView.lua`) réunit les entrées : traits du socle
+  sans état (`Art.enemyTraits`), règles des zones actives (`ns.ZoneViews.<zone>.enemyInfo`, `UI/ZoneView.lua`),
+  Stun Resistant des élites (`Art.stunResistInfo`), seuils de PV (« Phases », passés en gris ; aussi en crans sur
+  la barre, dont l'infobulle reste). La bulle d'intention (« Asleep 2 », « On waking: … », petite icône du Bite,
+  du Stoke, de l'ouverture) et les états sous les pieds ne changent pas.
+
+  | Information | Où | Valeur actuelle |
+  | --- | --- | --- |
+  | Vengeance (Murloc Coastrunner, Rookery Whelp) | fiche | — |
+  | Stun Resistant (élites hors boss et Indomitable) | fiche | tours de résistance (aussi en jeton d'état) |
+  | Phases (`def.phases`) | fiche + crans de la barre | seuils passés en gris |
+  | Pack, Pack (sans prime), Pack Leader (Wetlands) | fiche | « Scattered: … » après la mort du chef |
+  | Earthen Charge (Modr) | fiche + **compteur** « 7/15 » | PV perdus depuis son tour, rouge s'il chargera |
+  | Splits (Black Ooze), Wyrmscale Armor (Centurion) | fiche | armure prête ou dépensée |
+  | Curses (lanceur de Duskwood) | fiche + **compteur** (icône de Curse + N) | Curses de lui dans vos cartes |
+  | Hex (lanceur de Stranglethorn), Death Hex (Zanzil Naga) | fiche | carte visée (aussi marquée dans la main) |
+  | Wildfire (Volchan, Grark), Minion (Burning Steppes) | fiche | — |
+  | Asleep / Waking up, Lulled (Swamp) | fiche | tours de sommeil restants, ouverture |
+  | Slumber (Gilmorian, Somnus) | fiche + **compteur** « +N » | soin à chaque tour de sommeil |
+  | Invincible (Panzor) | fiche + **compteur** (bouclier + plafond) | plafond de la phase en cours |
+  | Indomitable, Shadow of the Throne, Drakonid (Blackrock) | fiche | Throne active ou non |
+  | Phase k of n (Nefarian) | fiche | Drakonids tués (Bone Constructs à 25 %) |
+
+  **Compteurs gardés** (entrée `compact`) : seulement un nombre dont le joueur a besoin à chaque tour pour
+  décider sans survoler (Earthen Charge, Curses du lanceur, soin de Slumber, plafond d'Invincible) ; icône +
+  nombre, alignés à droite sous le cadre, sur la ligne de l'intention (jamais sur le modèle). S'ils n'y tiennent
+  pas à côté de l'intention : nombres seuls ; sinon juste au-dessus du cadre (s'il reste la place sous le haut du
+  décor) ; en dernier recours une ligne plus bas (aucun combat réel n'y arrive : harnais). Deux au plus.
+  Harnais **UFE** (et sections des zones) : « ? » présent seulement s'il y a une information, dans la fenêtre, sur
+  le bord gauche du cadre et centré sur la barre, sans chevauchement d'un autre ennemi ni du cadre du héros à 1, 3
+  et 5 ennemis (cadres ordinaires, d'élite et de boss côte à côte), fiche correcte au survol par la souris du
+  client (`H.mouseFocus` : nom, rang, chaque entrée ; ancrage et place estimée dans la fenêtre), compteurs sur la
+  ligne de l'intention sans la toucher (ou au-dessus du cadre dans le cas défavorable), aucun autre texte sur
+  l'emplacement que cadre, intention, états, compteurs et « ? ». Aperçus `fiche-wetlands.svg`, `fiche-elite.svg`,
+  `fiche-swamp.svg`, `fiche-5-ennemis.svg`, `fiche-compteurs.svg`.
 - Plateau : orbe de mana « 2/3 » (mana max lu par `Combat.modify(c, "maxMana", …)`), pastille Démence
   (cachée à 0), pioche, défausse et consumées (tas avec nombre ; infobulles : contenu trié ; clic =
   panneau des cartes, pioche triée), main en arc au centre (cartes droites ; la survolée se lève de 12,

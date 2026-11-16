@@ -160,16 +160,27 @@ ns.ZoneViews.swamp = {
     return nil
   end,
 
-  enemyBadges = function(c, e)
+  -- fiche : sommeil (règle, tours restants, ouverture), Slumber (soin pendant le sommeil : compteur gardé sous le
+  -- cadre), Lulled
+  enemyInfo = function(c, e)
     local list = {}
     local s = e.zs and e.zs.swamp
+    if S.asleep(e) then
+      local n = e.st.asleep
+      list[#list + 1] = { name = "Asleep", text = "skips its turns while asleep. Damage wakes it up. Rude Awakening: "
+        .. "the first single-target hit on it deals 50% more, and it acts this round. Hits on all enemies and DoT wake "
+        .. "it without the bonus: it acts next round.",
+        lines = { { "Asleep for " .. n .. " more turn" .. (n > 1 and "s" or "") .. ". " .. openerLine(c, e), "defendText" } } }
+    elseif e.intent == S.SLEEP then
+      list[#list + 1] = { name = "Waking up", text = "it woke up too late to act this round: it acts next turn.",
+        lines = { { openerLine(c, e), "defendText" } } }
+    end
     if S.asleep(e) and s and (s.mend or 0) > 0 then
-      list[#list + 1] = { icon = Art.intents.heal, key = "badge:mend", text = "+" .. s.mend, color = "healText",
-        tip = "Slumber: heals " .. s.mend .. " each turn it sleeps." }
+      list[#list + 1] = { name = "Slumber", text = "heals " .. s.mend .. " at each of its turns while asleep.",
+        compact = { icon = Art.intents.heal, key = "badge:mend", text = "+" .. s.mend, color = "healText" } }
     end
     if s and s.lulled then
-      list[#list + 1] = { icon = SLEEP, key = "badge:lulled", text = "Lulled", color = "textDim", dim = true,
-        tip = "Already put back to sleep once: Lull can't target it again." }
+      list[#list + 1] = { name = "Lulled", text = "already put back to sleep once: Lull can't target it again." }
     end
     return list
   end,

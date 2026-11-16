@@ -75,9 +75,10 @@ return function(T)
     v:Render(true)
     H.settle()
     local sm = v.slotOf[m.uid]
-    assert(sm and vis(sm.badges[1]) and (H.hover(sm.badges[1])[1] or ""):find("does not delay", 1, true))
+    assert(sm and vis(sm.ask) and table.concat(H.hover(sm.ask), " | "):find("Minion|r — its death does not delay Wildfire.", 1, true)
+      and not vis(sm.chips[1]))
   end)
-  check("serviteur : flamme grisée (sa mort ne recule pas le feu)", ok)
+  check("serviteur : fiche « Minion — its death does not delay Wildfire. »", ok)
   -- carte Douse : explication du mot au survol
   local L = ns.Language
   check("mots de la zone : Wildfire, Douse, Stoke (explications de 60 caractères au plus)",

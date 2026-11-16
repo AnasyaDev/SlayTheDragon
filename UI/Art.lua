@@ -459,18 +459,21 @@ Art.statuses = {
   stun_resist  = { icon = "Interface\\Icons\\spell_frost_stun", tga = "Spell_Frost_Stun" },
 }
 
--- Trait des élites Stun Resistant (Combat.stunResistant) : badge permanent sous l'intention, au même endroit
--- que les traits de zone (Indomitable) ; doré pendant la résistance (état stun_resist, tours restants).
-Art.STUN_RESIST_TIP = "After being Stunned, can't be Stunned for 2 turns."
-function Art.stunResistBadge(e)
+-- Trait des élites Stun Resistant (Combat.stunResistant) : entrée de la fiche de l'ennemi (bouton « ? » du cadre
+-- d'unité, après les traits de zone) ; pendant la résistance, les tours restants (aussi en jeton d'état).
+Art.STUN_RESIST_TEXT = "Stunned makes it lose 1 turn at most. After that, it can't be Stunned for "
+  .. "2 turns."
+function Art.stunResistInfo(e)
   local n = e.st and e.st.stun_resist or 0
-  if n > 0 then
-    return { icon = Art.statuses.stun_resist, key = "badge:stun_resist", text = "Stun Resistant " .. n,
-      color = "goldText", tip = Art.STUN_RESIST_TIP .. " Resisting: " .. n .. " more turn" .. (n > 1 and "s" or "") .. "." }
-  end
-  return { icon = Art.statuses.stun_resist, key = "badge:stun_resist", text = "Stun Resistant",
-    tip = Art.STUN_RESIST_TIP }
+  return { name = "Stun Resistant", text = Art.STUN_RESIST_TEXT,
+    lines = n > 0 and { { "Resisting: can't be Stunned for " .. n .. " more turn" .. (n > 1 and "s" or "") .. ".",
+      "goldText" } } or nil }
 end
+
+-- Traits des ennemis du socle que ni un état ni une zone ne montrent (fiche de l'ennemi) : Art.enemyTraits[id] =
+-- { { name, text } } (règle écrite comme dans ns.ZoneViews.<zone>.enemyInfo : « Name — text »).
+Art.enemyTraits = Art.enemyTraits or {}
+Art.enemyTraits.murloc = { { name = "Vengeance", text = "gains Strength 1 each time another Murloc Coastrunner dies." } }
 
 -- Icône d'un état selon sa source (Combat.applyStatus(c, unité, id, n, clé) → unit.stIcon[id] = clé) :
 -- Art.statusIcons[clé] remplace l'icône de l'état (DoT de poison, de saignement, de brûlure…).

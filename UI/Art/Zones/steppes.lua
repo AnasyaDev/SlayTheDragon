@@ -134,11 +134,19 @@ function V.intentBadge(c, e)
   return { icon = STOKE, key = "steppes:stoke", tip = "Stoke " .. n .. ": Wildfire " .. rounds(n) .. " sooner." }
 end
 
--- Serviteur : sa mort ne recule pas le feu (flamme grisée).
-function V.enemyBadges(c, e)
-  if not ns.Wildfire or not ns.Wildfire.state(c) or not e.minion then return nil end
-  return { { icon = FLAME, key = "steppes:minion", text = "", dim = true,
-    tip = "Minion: its death does not delay Wildfire." } }
+-- Fiche : un serviteur ne recule pas le feu ; un ennemi au compte à rebours propre (Volchan) le raccourcit.
+function V.enemyInfo(c, e)
+  if not ns.Wildfire or not ns.Wildfire.state(c) then return nil end
+  local list = {}
+  local d = ns.Enemies[e.id]
+  if d.wildfire then
+    list[#list + 1] = { name = "Wildfire", text = "in its fight, Wildfire ignites after " .. rounds(d.wildfire)
+      .. " at most." }
+  end
+  if e.minion then
+    list[#list + 1] = { name = "Minion", text = "its death does not delay Wildfire." }
+  end
+  return #list > 0 and list or nil
 end
 
 -- Brûlure de fin de round hachurée sur la barre de PV du joueur.

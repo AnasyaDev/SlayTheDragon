@@ -112,11 +112,13 @@ return function(T)
     check("Hex : intention « Curse » (+1), infobulle de la Curse et de la pile visée", (s3.intent.text._text or "") == "+1"
       and tt3:find("Curse: adds Curse of Weakness to the top of your draw pile.", 1, true) ~= nil
       and tt3:find("an Interrupt cancels it", 1, true) ~= nil, tt3)
-    local b1 = s1.badges[1]
-    check("« Curse 2 » sous le Dark Runner qui les a posées ; rien sous l'autre", vis(b1) and b1.text._text == "Curse 2"
-      and not vis(v.slotOf[c.enemies[2].uid].badges[1]), b1.text._text)
-    check("infobulle du compteur de lanceur : levées à sa mort", (b1.tip or ""):find("lifted when Nightbane Dark Runner dies", 1, true) ~= nil,
-      b1.tip)
+    local b1 = s1.chips[1]
+    check("compteur « 2 » (icône de Curse) sous le cadre du Dark Runner qui les a posées ; rien sous l'autre",
+      vis(b1) and b1.text._text == "2" and not vis(v.slotOf[c.enemies[2].uid].chips[1]), tostring(b1.text._text))
+    local tb = table.concat(H.hover(b1), " | ")
+    check("fiche du lanceur (compteur et « ? ») : Curses levées à sa mort, « In your cards now: 2. »",
+      tb:find("Curses|r — all the Curses it put in your cards are lifted when it dies.", 1, true) ~= nil
+        and tb:find("In your cards now: 2.", 1, true) ~= nil and table.concat(H.hover(s1.ask), " | ") == tb, tb)
     local marked, plain = 0, 0
     for _, cd in ipairs(v.cards) do
       if cd._shown and cd.cardId then

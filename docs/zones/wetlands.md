@@ -50,8 +50,9 @@ propres aux Wetlands.
 
 ### Ce que voit le joueur
 
-- Sous chaque ennemi Pack : une patte et sa prime (`+2 Str`, `+8 HP`, `+4 Abs`) ; le chef porte une
-  couronne à la place de la prime ; un ennemi `Scattered` a la patte grisée.
+- Dans la fiche de chaque ennemi Pack (bouton « ? » de son cadre d'unité, 16/11/2026 : plus de ligne
+  « Pack: +2 Str » posée sur le modèle) : sa prime, ou Pack Leader pour le chef, et « Scattered: … » une fois
+  la meute dispersée (`docs/interface.md`, « Fiche de l'ennemi »).
 - Au survol d'une carte qui tuerait un ou plusieurs ennemis (dégâts prévus ≥ PV + Absorb), les survivants
   montrent en aperçu les primes qu'ils recevraient (ou « Scatter » si le chef tombe).
 - Journal : `{ t = "pack", src = uid du mort, dst = uid, bonus = … }`, `{ t = "scatter", by = uid }`.
@@ -60,9 +61,9 @@ propres aux Wetlands.
 
 | Terme | Infobulle |
 |---|---|
-| Pack | `When it dies, the rest of its pack gains this. Packmates killed by the same card gain nothing.` |
-| Pack Leader | `When it dies, its pack scatters: no more Pack bonuses, and the others are Demoralized.` |
-| Scattered | `No longer part of a pack.` |
+| Pack | `Pack — when it dies, the other members of its pack gain Strength 2. Packmates that die at the same time gain nothing.` (sans prime : `gains the bonus of each packmate that dies, but gives none.`) |
+| Pack Leader | `Pack Leader — when it dies, its pack scatters: the others no longer give or gain Pack bonuses, and bonuses from packmates that die at the same time are lost.` |
+| Scattered | `Scattered: it no longer gives or gains Pack bonuses.` (valeur actuelle sous Pack) |
 
 ### Interactions
 

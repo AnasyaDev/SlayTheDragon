@@ -10118,7 +10118,8 @@ do
     intent = function(cc, en) if en == e1 then return { icon = sleepIcon, text = "Asleep 2", color = "defend",
       title = "Asleep", tip = "Skips its next 2 turns. Damage wakes it up." } end end,
     intentBadge = function(cc, en) if en ~= e1 then return { icon = { icon = 136139 }, tip = "Bite: adds a Curse." } end end,
-    enemyBadges = function(cc, en) return { { icon = { icon = 132203 }, text = "+2 Str", tip = "Pack: when it dies, the rest gains this." } } end,
+    enemyInfo = function(cc, en) return { { name = "Pack", text = "when it dies, the rest gains this.",
+      compact = { icon = { icon = 132203 }, text = "+2" } } } end,
     handMark = function(cc, i) if i == 1 then return { rim = { 0.4, 1, 0.4, 1 }, icon = { icon = 136071 }, tip = "Hexed at the end of your turn." } end end,
   }
   c.zone = "uztest"
@@ -10144,19 +10145,21 @@ do
   -- intention remplacée, primes, intention suivante, petite icône
   check("intention remplacée par la zone : « Asleep 2 », infobulle de la zone",
     s1.intent.text._text == "Asleep 2" and (H.hover(s1.intent)[1] or "") == "Asleep", s1.intent.text._text)
-  local b1 = s1.badges[1]
+  local b1 = s1.chips[1]
   local content = R.rect(ns.UI.content)
   local badBadge = {}
   for _, s in pairs(v.slotOf) do
-    local b = s.badges[1]
-    if not vis(b) then badBadge[#badBadge + 1] = "prime cachée" end
-    if (b.text._text or "") ~= "+2 Str" then badBadge[#badBadge + 1] = tostring(b.text._text) end
+    local b = s.chips[1]
+    if not vis(b) then badBadge[#badBadge + 1] = "compteur caché" end
+    if (b.text._text or "") ~= "+2" then badBadge[#badBadge + 1] = tostring(b.text._text) end
     if not inside(R.rect(b), content) then badBadge[#badBadge + 1] = "hors fenêtre " .. fmt(R.rect(b)) end
     if overlaps(R.rect(b), R.rect(s.tag)) then badBadge[#badBadge + 1] = "sur le cadre" end
+    if overlaps(R.rect(b), R.rect(s.intent)) then badBadge[#badBadge + 1] = "sur l'intention" end
+    if not vis(s.ask) then badBadge[#badBadge + 1] = "« ? » caché" end
   end
-  check("primes sous l'intention de chaque ennemi : « +2 Str », dans la fenêtre, hors du cadre", #badBadge == 0,
-    table.concat(badBadge, " ; "))
-  check("infobulle d'une prime", (H.hover(b1)[1] or ""):find("Pack:", 1, true) ~= nil)
+  check("compteur de la fiche sous le cadre de chaque ennemi : « +2 », dans la fenêtre, hors du cadre et de l'intention, « ? » montré",
+    #badBadge == 0, table.concat(badBadge, " ; "))
+  check("infobulle d'un compteur = fiche (« Pack — … »)", table.concat(H.hover(b1), " | "):find("Pack|r — when it dies", 1, true) ~= nil)
   local s2 = v.slotOf[e2.uid]
   check("intention suivante en gris sous l'intention (« On waking: … »)", vis(s2.next)
     and (s2.next._text or ""):find("^On waking: ") ~= nil, tostring(s2.next._text))
@@ -10228,7 +10231,7 @@ do
   ns.Enemies.uz_phaser, ns.Cards.uz_token, ns.Cards.uz_hexed = nil, nil, nil
 end
 
-print("USR élites Stun Resistant : badge permanent sous l'intention, résistance en cours (compteur, état)")
+print("USR élites Stun Resistant : entrée de la fiche (« ? » du cadre), résistance en cours (tours restants, état)")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
@@ -10247,28 +10250,24 @@ do
   local g = Combat.spawn(c, "harvest_golem")
   v:Render(true)
   H.settle()
-  local function badgeOf(s)
-    for _, b in ipairs(s.badges) do if vis(b) and (b.text._text or ""):find("^Stun Resistant") then return b end end
-  end
+  local function sheet(s) return vis(s.ask) and table.concat(H.hover(s.ask), " | ") or "" end
   local sg, sn = v.slotOf[g.uid], v.slotOf[normal.uid]
-  local b = sg and badgeOf(sg)
   local content = R.rect(ns.UI.content)
-  check("élite (Harvest Golem) : badge « Stun Resistant » sous l'intention, infobulle de la règle",
-    b and b.text._text == "Stun Resistant" and H.hover(b)[1] == "After being Stunned, can't be Stunned for 2 turns."
-      and inside(R.rect(b), content), b and tostring(b.text._text))
-  check("ennemi normal : pas de badge « Stun Resistant »", sn and not badgeOf(sn))
-  -- résistance en cours : compteur sur le badge (doré), état à durée dans la rangée des états
+  local tg = sg and sheet(sg) or ""
+  check("élite (Harvest Golem) : « ? » dans la fenêtre, fiche « Harvest Golem | Elite », règle Stun Resistant",
+    sg and vis(sg.ask) and inside(R.rect(sg.ask), content) and tg:find("^Harvest Golem | Elite | ") ~= nil
+      and tg:find("Stun Resistant|r — " .. ns.Art.STUN_RESIST_TEXT, 1, true) ~= nil, tg)
+  check("ennemi normal : pas d'entrée Stun Resistant", sn and not sheet(sn):find("Stun Resistant", 1, true))
+  -- résistance en cours : tours restants dans la fiche, état à durée dans la rangée des états
   Combat.applyStatus(c, g, "stun_resist", 2)
   v:Render(true)
   H.settle()
-  b = badgeOf(sg)
+  tg = sheet(sg)
   local tok
   for _, t in ipairs(sg.st.tokens) do if vis(t) and t.info and t.info.status == "stun_resist" then tok = t end end
   local tt = tok and table.concat(H.hover(tok), " | ") or ""
-  check("résistance : badge « Stun Resistant 2 », infobulle des tours restants, texte non tronqué",
-    b and b.text._text == "Stun Resistant 2" and (H.hover(b)[1] or ""):find("Resisting: 2 more turns.", 1, true) ~= nil
-      and not b.text:IsTruncated() and R.rect(b.text)[3] <= R.rect(b)[3] + 0.5,
-    b and (tostring(b.text._text) .. " " .. table.concat(R.rect(b.text), ",") .. " / " .. table.concat(R.rect(b), ",")))
+  check("résistance : fiche « Resisting: can't be Stunned for 2 more turns. », aucun compteur sous le cadre",
+    tg:find("Resisting: can't be Stunned for 2 more turns.", 1, true) ~= nil and not vis(sg.chips[1]), tg)
   check("résistance : état « Stun Resistant (2 turns) » dans la rangée des états", tok ~= nil
     and tt:find("Stun Resistant (2 turns)", 1, true) ~= nil, tt)
   snap("stun-resistant", true)
@@ -11887,6 +11886,222 @@ do
   ns.UI.refresh()
   H.settle()
   snap("marchand-7-cartes", true)
+end
+
+print("UFE fiche de l'ennemi : « ? » du cadre d'unité (seulement s'il y a une information), place à 1, 3 et 5 ennemis, fiche au survol (souris du client), compteurs sous le cadre, aucun texte sur le modèle")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  local function under(o, a)
+    while o do if o == a then return true end o = rawget(o, "_parent") end
+    return false
+  end
+  local function inside(r, box)
+    return r and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local function overlaps(a, b)
+    return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
+  end
+  local function fmt(r) return r and ("%.0f,%.0f,%.0f,%.0f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  local strip = function(t) return (t:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) end
+  local _, c0, v = zoneCombat("priest")
+  local ns = H.ns
+  local Combat, CV = ns.Combat, ns.UI.screens.combat
+  -- combat de test : ces ennemis (zone des vues : c.zone), réaffiché de zéro
+  local function fight(ids, zone, prep)
+    local c = ns.Controller.combat()
+    c.enemies = {}
+    c.zone = zone or "westfall"
+    for _, id in ipairs(ids) do assert(Combat.spawn(c, id), id) end
+    if prep then prep(c) end
+    v.c = nil
+    v:Show({ state = c })
+    H.settle()
+    return c
+  end
+  -- infobulle ouverte au survol (souris du client au centre du cadre) : lignes, ancrage, cadre sous la souris
+  local anchorSeen
+  local GT = _G.GameTooltip
+  local function hoverAt(f)
+    local r = R.rect(f)
+    local focus, ties = H.mouseFocus((r[1] + r[3]) / 2, (r[2] + r[4]) / 2)
+    if focus ~= f or #ties > 0 then return nil, focus end
+    anchorSeen = nil
+    rawset(GT, "SetOwner", function(self, o, anchor) anchorSeen = anchor self._owner = o self._tt = {} end)
+    local lines = H.hover(f)
+    rawset(GT, "SetOwner", nil)
+    return lines, focus
+  end
+  local content = R.rect(ns.UI.content)
+  local heroR, castR = R.rect(v.heroFrame), vis(v.cast) and R.rect(v.cast) or nil
+  -- disposition d'un combat : « ? » seulement s'il y a une information, dans la fenêtre, sur le bord gauche du
+  -- cadre et centré sur la barre de vie, sans chevauchement d'un autre ennemi (cadre, « ? », compteurs) ni du
+  -- cadre du héros ; compteurs sur la ligne de l'intention, sans la toucher ; aucun texte posé sur le modèle ;
+  -- fiche au survol : nom, rang, une entrée par information, infobulle dans la fenêtre
+  local modes = {}
+  local function layout(label, c, expectAsk)
+    local bad, boxes, asks = {}, {}, 0
+    for _, s in pairs(v.slotOf) do
+      local e = c.enemies[s.enemyIndex]
+      local info = CV.enemyInfo(c, e)
+      local name = Combat.enemyName(e)
+      local tr, hr = R.rect(s.tag), R.rect(s.hp)
+      if vis(s.ask) ~= (#info > 0) then bad[#bad + 1] = name .. " : « ? » " .. (vis(s.ask) and "sans information" or "absent") end
+      if expectAsk and expectAsk[e.id] ~= nil and expectAsk[e.id] ~= vis(s.ask) then
+        bad[#bad + 1] = name .. " : « ? » attendu " .. tostring(expectAsk[e.id])
+      end
+      local own = { tr }
+      if vis(s.ask) then
+        asks = asks + 1
+        local ar = R.rect(s.ask)
+        own[#own + 1] = ar
+        if not inside(ar, content) then bad[#bad + 1] = name .. " : « ? » hors de la fenêtre " .. fmt(ar) end
+        if ar[3] > hr[1] + 0.5 or ar[1] > tr[1] then bad[#bad + 1] = name .. " : « ? » pas sur le bord gauche du cadre" end
+        if math.abs((ar[2] + ar[4]) / 2 - (hr[2] + hr[4]) / 2) > 0.6 then bad[#bad + 1] = name .. " : « ? » pas centré sur la barre de vie" end
+        if overlaps(ar, heroR) or overlaps(ar, castR) then bad[#bad + 1] = name .. " : « ? » sur le cadre du héros" end
+        if overlaps(ar, R.rect(s.intent)) then bad[#bad + 1] = name .. " : « ? » sur l'intention" end
+        -- fiche par la souris du client
+        local lines, focus = hoverAt(s.ask)
+        if not lines then
+          bad[#bad + 1] = name .. " : souris prise par " .. tostring(focus and rawget(focus, "_kind"))
+        else
+          local def = ns.Enemies[e.id]
+          local rank = def.boss and "Boss" or (def.elite and "Elite" or nil)
+          local body = table.concat(lines, " | ")
+          if lines[1] ~= name or (rank and lines[2] ~= rank) then bad[#bad + 1] = name .. " : en-tête « " .. body .. " »" end
+          for _, it in ipairs(info) do
+            if not body:find(it.name, 1, true) then bad[#bad + 1] = name .. " : entrée « " .. it.name .. " » absente" end
+          end
+          if anchorSeen ~= "ANCHOR_BOTTOMLEFT" then bad[#bad + 1] = name .. " : ancrage " .. tostring(anchorSeen) end
+          -- infobulle estimée (330 de large au plus, lignes repliées à ~55 caractères, 13 par ligne) : ouverte
+          -- en bas à gauche du « ? », elle tient dans la fenêtre
+          local n = 0
+          for _, l in ipairs(lines) do n = n + math.max(1, math.ceil(#strip(l) / 55)) end
+          local box = { ar[1] - 330, ar[2] - (n * 13 + 20), ar[1], ar[2] }
+          if not inside(box, content) then bad[#bad + 1] = name .. " : infobulle hors de la fenêtre " .. fmt(box) end
+        end
+      end
+      -- compteurs : sur la ligne de l'intention, ou juste au-dessus du cadre (sous le haut du décor)
+      local k0 = s:GetEffectiveScale()
+      local rowBand = { tr[1] - 40, tr[2] - (3 + 26 + 0.5) * k0, tr[3] + 40, tr[2] }
+      local aboveBand = { tr[1] - 40, tr[4], tr[3] + 40, tr[4] + 16 * k0 }
+      if s.chipsAt then modes[s.chipsAt] = (modes[s.chipsAt] or 0) + 1 end
+      if s.chipsAt == "below" then bad[#bad + 1] = name .. " : compteurs une ligne sous l'intention (sur le modèle)" end
+      for k, ch in ipairs(s.chips) do
+        if vis(ch) then
+          local cr = R.rect(ch)
+          own[#own + 1] = cr
+          if not (inside(cr, rowBand) or inside(cr, aboveBand)) then
+            bad[#bad + 1] = name .. " : compteur " .. k .. " ni sur la ligne de l'intention ni au-dessus du cadre (" .. tostring(s.chipsAt) .. ")"
+          end
+          if overlaps(cr, R.rect(s.name)) or overlaps(cr, tr) then bad[#bad + 1] = name .. " : compteur sur le cadre" end
+          if not inside(cr, content) then bad[#bad + 1] = name .. " : compteur hors de la fenêtre" end
+          if overlaps(cr, R.rect(s.intent)) then bad[#bad + 1] = name .. " : compteur sur l'intention" end
+          if s.chips[k + 1] and vis(s.chips[k + 1]) and overlaps(cr, R.rect(s.chips[k + 1])) then
+            bad[#bad + 1] = name .. " : compteurs l'un sur l'autre"
+          end
+        end
+      end
+      -- textes visibles de l'emplacement : seulement ceux du cadre, de l'intention (et la suivante), des états,
+      -- des compteurs et du « ? » ; aucun autre texte (ancienne ligne « Pack: +2 Str ») sur le modèle
+      for _, o in ipairs(H.objects) do
+        if rawget(o, "_kind") == "FontString" and under(o, s) and vis(o) and (o._text or "") ~= "" then
+          local ok = under(o, s.tag) or under(o, s.intent) or o == s.next or under(o, s.st) or under(o, s.ask)
+          for _, ch in ipairs(s.chips) do ok = ok or under(o, ch) end
+          if not ok then bad[#bad + 1] = name .. " : texte « " .. tostring(o._text) .. " » sur le modèle" end
+        end
+      end
+      for _, b in ipairs(boxes) do
+        for _, r1 in ipairs(own) do
+          for _, r2 in ipairs(b) do
+            if overlaps(r1, r2) then bad[#bad + 1] = name .. " : chevauche un voisin " .. fmt(r1) .. " / " .. fmt(r2) end
+          end
+        end
+      end
+      boxes[#boxes + 1] = own
+    end
+    check(label, #bad == 0, table.concat(bad, " ; "))
+    return asks
+  end
+
+  -- Westfall : 1, 3, 5 ennemis, cadres ordinaires et d'élite / boss mêlés (deux dragons d'or côte à côte)
+  local c = fight({ "vancleef" })
+  layout("1 ennemi (boss VanCleef) : « ? » (Phases), place, fiche", c, { vancleef = true })
+  c = fight({ "gnoll", "harvest_golem", "murloc" })
+  layout("3 ennemis : gnoll sans « ? », élite (Stun Resistant) et murloc (Vengeance) avec, place, fiches", c,
+    { gnoll = false, harvest_golem = true, murloc = true })
+  local s = v.slotOf[c.enemies[3].uid]
+  local tm = table.concat(hoverAt(s.ask) or {}, " | ")
+  check("fiche du Murloc Coastrunner : « Vengeance — gains Strength 1 each time another Murloc Coastrunner dies. »",
+    strip(tm) == "Murloc Coastrunner |   | Vengeance — gains Strength 1 each time another Murloc Coastrunner dies.", tm)
+  s = v.slotOf[c.enemies[2].uid]
+  local tg = strip(table.concat(hoverAt(s.ask) or {}, " | "))
+  check("fiche d'un élite : « Harvest Golem | Elite », Stun Resistant", tg == "Harvest Golem | Elite |   | Stun Resistant — "
+    .. ns.Art.STUN_RESIST_TEXT, tg)
+  snap("fiche-elite", true)
+  c = fight({ "murloc", "harvest_golem", "vancleef", "rhahkzor", "gnoll" })
+  check("5 ennemis : emplacements à l'échelle 0,86", math.abs((v.slotOf[c.enemies[1].uid]:GetScale() or 1) - 0.86) < 1e-6)
+  layout("5 ennemis (élite, boss, élite côte à côte) : « ? » dans la fenêtre, aucun chevauchement, fiches", c,
+    { gnoll = false, murloc = true, vancleef = true })
+  snap("fiche-5-ennemis", true)
+  c = fight({ "murloc", "murloc", "gnoll", "murloc", "mystic" })
+  layout("5 ennemis ordinaires : « ? » des murlocs seulement, aucun chevauchement", c, { gnoll = false, mystic = false, murloc = true })
+  local sv = v.slotOf[c.enemies[3].uid]
+  check("gnoll : pas de « ? » (rien à montrer)", not vis(sv.ask))
+
+  -- Wetlands : meute (Pack dans la fiche, plus de ligne « Pack: +2 Str »), 3 et 5 ennemis
+  c = fight({ "mosshide_brute", "mosshide_mystic", "mosshide_alpha" }, "wetlands")
+  layout("Wetlands, meute de 3 : « ? » sur chaque membre, place, fiches", c,
+    { mosshide_brute = true, mosshide_mystic = true, mosshide_alpha = true })
+  s = v.slotOf[c.enemies[1].uid]
+  local tb = strip(table.concat(hoverAt(s.ask) or {}, " | "))
+  check("fiche de la Mosshide Brute : « Pack — when it dies, the other members of its pack gain Strength 2. Packmates that die at the same time gain nothing. »",
+    tb == "Mosshide Brute |   | Pack — when it dies, the other members of its pack gain Strength "
+      .. ns.Enemies.mosshide_brute.pack[2] .. ". Packmates that die at the same time gain nothing.", tb)
+  check("meute : aucun compteur sous les cadres (Pack : fiche seule)", not vis(s.chips[1]))
+  snap("fiche-wetlands", true)
+  c = fight({ "bluegill_raider", "mosshide_brute", "mottled_screecher", "dragonmaw_raider", "mosshide_alpha" }, "wetlands")
+  layout("Wetlands, meute de 5 : « ? » sur chaque membre, aucun chevauchement", c)
+  c = fight({ "modr" }, "wetlands")
+  layout("Modr : « ? » et compteur d'Earthen Charge sous le cadre d'élite", c, { modr = true })
+  check("Modr : compteur « 0/15 »", vis(v.slotOf[c.enemies[1].uid].chips[1])
+    and v.slotOf[c.enemies[1].uid].chips[1].text._text == "0/15")
+
+  -- Swamp : dormeur (sommeil, ouverture), avec un dragonnet éveillé
+  c = fight({ "sawtooth_crocolisk", "dreaming_whelp", "wyrmkin_dreamwalker" }, "swamp", function(cc)
+    cc.enemies[1].st.asleep = 2
+    cc.enemies[2].st.asleep = 2
+  end)
+  layout("Swamp, dormeurs : « ? » des dormeurs, place, fiches", c, { sawtooth_crocolisk = true, dreaming_whelp = true })
+  s = v.slotOf[c.enemies[1].uid]
+  local ts = strip(table.concat(hoverAt(s.ask) or {}, " | "))
+  check("fiche d'un dormeur : règle d'Asleep (Rude Awakening), tours restants et ouverture",
+    ts:find("Asleep — skips its turns while asleep. Damage wakes it up. Rude Awakening:", 1, true) ~= nil
+      and ts:find("Asleep for 2 more turns. On waking: Death Roll", 1, true) ~= nil, ts)
+  check("dormeur : bulle « Asleep 2 » inchangée", s.intent.text._text == "Asleep 2", tostring(s.intent.text._text))
+  snap("fiche-swamp", true)
+
+  -- cas défavorable : 5 ennemis, intention longue (« Asleep 2 » et petite icône) et deux compteurs larges chacun
+  ns.ZoneViews.ufetest = {
+    intent = function() return { icon = { icon = 136090 }, text = "Asleep 2", color = "defend", title = "Asleep", tip = "-" } end,
+    intentBadge = function() return { icon = { icon = 136139 }, tip = "-" } end,
+    enemyInfo = function() return { { name = "Test A", text = "a.", compact = { icon = { icon = 135805 }, text = "12/15" } },
+      { name = "Test B", text = "b.", compact = { icon = { icon = 135805 }, text = "+9" } } } end,
+  }
+  for k in pairs(modes) do modes[k] = nil end
+  c = fight({ "murloc", "harvest_golem", "gnoll", "vancleef", "mystic" }, "ufetest")
+  layout("5 ennemis, intention longue et deux compteurs larges : au-dessus du cadre (place sous le haut du décor), jamais sur l'intention ni le modèle", c)
+  local ml = {}
+  for k, n in pairs(modes) do ml[#ml + 1] = k .. " " .. n end
+  table.sort(ml)
+  print("      compteurs placés : " .. table.concat(ml, ", "))
+  snap("fiche-compteurs", true)
+  ns.ZoneViews.ufetest = nil
+  local _ = c0
 end
 
 print("U16 méthodes d'API inconnues appelées")

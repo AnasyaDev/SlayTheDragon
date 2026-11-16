@@ -1,7 +1,7 @@
 -- Art de la zone Wetlands (`wetlands`) : modèles des ennemis (Art.enemies), personnages des rencontres
 -- (Art.npcs), icônes des cartes, bibelots, états (Art.cards, Art.relics, Art.statuses, Art.statusShort), case
 -- du Gryphon Master (Art.ui.map), décors peints (Art.scenes, Art.paintings, Art.palettes) et vue de zone
--- ns.ZoneViews.wetlands (UI/ZoneView.lua) : primes de meute sous chaque ennemi, Charge de Modr, limon.
+-- ns.ZoneViews.wetlands (UI/ZoneView.lua) : fiche de l'ennemi (Pack, Charge de Modr, limon), animation des primes.
 -- Guide : docs/zones.md. Champ `tga` = icône améliorée de Media/Icons (tools/build_media.py --icons-only la
 -- copie depuis le pack d'icônes local) ; `icon` = repli par chemin du client.
 --
@@ -121,59 +121,61 @@ Art.ui.mapBoss.wetlands = Art.enemies.nekrosh.icon -- boss du parcours : Chiefta
 Art.actionText.discharge = function() return "Earthen Charges drop to 0." end
 
 ---------------------------------------------------------------------------
--- Vue de zone : primes de meute, chef, dispersion, Charge de Modr, limon
+-- Vue de zone : fiche (meute, chef, dispersion, Charge de Modr, limon, Wyrmscale), animation des primes
 ---------------------------------------------------------------------------
 
-local PAW, PAW_DIM, CROWN = I("INV_Misc_Bearpaw_brown"), I("INV_Misc_Bearpaw_black"), I("INV_Crown_01")
-local SHORT = { force = "Str", heal = "HP", absorb = "Abs" }
-local COLOR = { force = "attackText", heal = "healText", absorb = "defendText" }
-local LONG = { force = "Strength %d", heal = "heal %d", absorb = "%d Absorb" }
+local PAW = I("INV_Misc_Bearpaw_brown")
+local QUAKE = I("Spell_Nature_Earthquake")
+local GAIN = { force = "gain Strength %d", heal = "heal %d", absorb = "gain %d Absorb" }
+local SCATTERED = { "Scattered: it no longer gives or gains Pack bonuses.", "textDim" }
 
-local function packTip(b)
-  return "Pack: when it dies, the rest of its pack gains " .. LONG[b[1]]:format(b[2])
-    .. ". Packmates killed by the same card gain nothing."
-end
-
-local function packBadge(c, e)
+-- Fiche de l'ennemi : Pack (prime, sans prime, chef ; dispersé), Earthen Charge, Splits, Wyrmscale Armor.
+local function packInfo(e)
   local WL = ns.Wetlands
   local d = ns.Enemies[e.id]
   if not (d.pack or d.packLeader) then return nil end
-  if WL.scattered(e) then
-    return { icon = PAW_DIM, text = "Scattered", color = "textDim", dim = true, key = "wl:scattered",
-      tip = "Scattered: no longer part of a pack. It gives and gains no Pack bonus." }
-  end
+  local lines = WL.scattered(e) and { SCATTERED } or nil
   if d.packLeader then
-    return { icon = CROWN, text = "Pack Leader", color = "goldText", key = "wl:leader",
-      tip = "Pack Leader: when it dies, its pack scatters. Bonuses from the same card are lost, and the others no longer give or gain Pack bonuses." }
+    return { name = "Pack Leader", lines = lines,
+      text = "when it dies, its pack scatters: the others no longer give or gain Pack bonuses, and bonuses from "
+        .. "packmates that die at the same time are lost." }
   end
   local b = WL.bonus(e)
   if b then
-    local txt = b[1] == "heal" and ("+" .. b[2] .. " HP") or ("+" .. b[2] .. " " .. SHORT[b[1]])
-    return { icon = PAW, text = "Pack: " .. txt, color = COLOR[b[1]], key = "wl:paw", tip = packTip(b) }
+    return { name = "Pack", lines = lines, text = "when it dies, the other members of its pack " .. GAIN[b[1]]:format(b[2])
+      .. ". Packmates that die at the same time gain nothing." }
   end
-  return { icon = PAW, text = "Pack", color = "textSoft", key = "wl:paw",
-    tip = "Pack: gains the bonus of each packmate that dies. Gives no bonus itself." }
+  return { name = "Pack", lines = lines, text = "gains the bonus of each packmate that dies, but gives none." }
 end
 
 ns.ZoneViews.wetlands = {
-  enemyBadges = function(c, e)
+  enemyInfo = function(c, e)
     local list = {}
-    local pb = packBadge(c, e)
+    local pb = packInfo(e)
     if pb then list[#list + 1] = pb end
     local d = ns.Enemies[e.id]
     local WL = ns.Wetlands
+    -- compteur gardé sous le cadre : PV perdus depuis son tour / seuil (rouge : il gagnera une Charge)
     if d.chargeAt then
       local lost = WL.lostSince(e)
       local pending = WL.chargePending(c, e)
-      list[#list + 1] = { icon = I("Spell_Nature_Earthquake"),
-        text = ("Charge: %d/%d dmg"):format(math.min(lost, d.chargeAt), d.chargeAt),
-        color = pending and "attackText" or "healText", key = "wl:charge",
-        tip = ("Earthen Charge: at the start of its turn, if it lost less than %d HP since its last turn, it gains "
-          .. "1 Charge (3 at most). Seismic Slam deals 8 more per Charge. Lost so far: %d."):format(d.chargeAt, lost) }
+      local col = pending and "attackText" or "healText"
+      list[#list + 1] = { name = "Earthen Charge",
+        text = ("at the start of its turn, if it lost less than %d HP since its last turn, it gains 1 Charge "
+          .. "(3 at most). Seismic Slam deals 8 more per Charge."):format(d.chargeAt),
+        lines = { { ("Lost since its last turn: %d of %d. "):format(math.min(lost, d.chargeAt), d.chargeAt)
+          .. (pending and "It gains a Charge at the start of its turn." or "No Charge this turn."), col } },
+        compact = { icon = QUAKE, key = "wl:charge", text = math.min(lost, d.chargeAt) .. "/" .. d.chargeAt,
+          color = col } }
     end
     if d.splits then
-      list[#list + 1] = { icon = I("INV_Misc_Food_Legion_gooSlime_chunk"), text = "Splits: " .. d.splits .. " Slimes",
-        color = "textSoft", key = "wl:split", tip = "When it dies, " .. d.splits .. " Black Slimes take its place." }
+      list[#list + 1] = { name = "Splits", text = "when it dies, " .. d.splits .. " Black Slimes take its place." }
+    end
+    if d.wyrmscale then
+      list[#list + 1] = { name = "Wyrmscale Armor",
+        text = "at the start of each of your turns, the next hit it takes deals " .. d.wyrmscale
+          .. " less damage. DoT is not a hit.",
+        lines = { e.st.wyrmscale and { "Ready this turn.", "healText" } or { "Spent this turn.", "textDim" } } }
     end
     return list
   end,

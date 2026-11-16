@@ -74,8 +74,8 @@ ns.Enemies.vile_fang = {
 `indomitable` est **Stun Resistant** d'office (`Combat.stunResistant`, aucun champ à poser ; `stunResist = false`
 l'en exempte) : Stunned 1 au plus ; quand ce Stunned lui fait perdre son tour (ou l'arrête, Trap), il prend l'état
 `stun_resist` 2 (décompté en fin de round, posé pendant la phase ennemie) et `Combat.stunImmune` répond vrai tant
-qu'il dure. Badge commun « Stun Resistant » sous l'intention (après ceux de la zone, `Art.stunResistBadge`), avec
-les tours restants pendant la résistance. Les sbires normaux d'un combat d'élite ne sont pas concernés ; les
+qu'il dure. Entrée commune « Stun Resistant » dans la fiche de l'ennemi (bouton « ? » du cadre, après celles de la
+zone, `Art.stunResistInfo`), avec les tours restants pendant la résistance (aussi en jeton d'état). Les sbires normaux d'un combat d'élite ne sont pas concernés ; les
 élites de Blackrock Mountain sont `indomitable` (immunité totale).
 
 `intent` (icône de la bulle) : `attack`, `defend`, `cast`, `watch`, `debuff`, `buff`, `heal`, `summon`, ou une
@@ -256,7 +256,8 @@ ns.ZoneViews.swamp = {
   counter = function(c) return { icon = …, text = "Wildfire in 2", tip = "…", hot = false } end, -- en haut au centre
   intent = function(c, e) return { icon = …, text = "Asleep 2", color = "defend", title = "Asleep", tip = "…", showMove } end,
   intentBadge = function(c, e) return { icon = …, tip = "Bite: …" } end,  -- petite icône à droite du chiffre
-  enemyBadges = function(c, e) return { { icon, text = "+2 Str", tip, color, dim } } end,  -- sous l'intention (3 au plus, dont « Stun Resistant » d'un élite)
+  enemyInfo = function(c, e) return { { name = "Pack", text = "when it dies, …", lines = { { "Scattered: …", "textDim" } },
+    compact = { icon, text = "7/15", color } } } end,  -- fiche de l'ennemi (« ? » du cadre) ; compact = compteur gardé sous le cadre
   marks = function(c, e) return { { at = 0.5, name, text, color } } end,   -- crans en plus (les phases sont d'office)
   handMark = function(c, i, inst) return { rim = { r, g, b, a }, icon = …, tip = "…" } end, -- carte visée (Hex)
   build = function(host, view) end, render = function(host, c, view) end, event = function(host, ev, view) end,
@@ -265,7 +266,14 @@ Art.intentParts.stoke = function(c, e, a) return "+" .. a[2] end         -- chif
 Art.actionText.stoke = function(a, c, e) return "Wildfire " .. a[2] .. " rounds sooner." end -- infobulle
 ```
 
-D'office (rien à déclarer) : crans des phases sur la barre de vie (infobulle « Below 50%: Enraged. … »),
+Fiche de l'ennemi (`enemyInfo`) : une entrée par trait ou règle que l'ennemi porte (Pack, Earthen Charge, Hex,
+Asleep…), jamais de ligne de texte posée sur le modèle ; `text` suit « Name — » (minuscule au début, une ou deux
+phrases), `lines` = la valeur actuelle en combat, `compact` seulement pour un nombre dont le joueur a besoin à
+chaque tour sans survoler (détails : `docs/interface.md`, « Fiche de l'ennemi »). Trait d'un ennemi hors zone (le
+socle, Westfall) : `Art.enemyTraits[id] = { { name, text } }` (`UI/Art.lua`).
+
+D'office (rien à déclarer) : crans des phases sur la barre de vie (infobulle « Below 50%: Enraged. … ») et entrée
+« Phases » de la fiche, entrée « Stun Resistant » des élites,
 intention suivante en gris (`Combat.forceIntent` avec `label`), nom et modèle d'une phase, bandeau de phase,
 corps sobre des cartes `token`, nom de la carte d'origine au-dessus d'une carte transformée, textes flottants
 du journal (`float`, `phase`, `counter`, `card_added`, `card_transformed`, `cards_lifted`), boutons du feu de
@@ -353,7 +361,7 @@ commun est au palier 3 ou moins (Duskwood, Wetlands) ; les zones 4 à 7 sont dé
 | 3. `block_allies`, `block_boss` | actions communes |
 | 4. Ma'ruk (premier coup annulé), Modr (PV perdus depuis son tour) | `enemyDamageTaken` (source ≠ dot) ; `onEnemyDamaged` cumule dans `e.zs`, `enemyMove` lit et remet à 0 (après son DoT) |
 | 5. effets `strip`, `steal`, `unpack`, `marked`, Execute par cible | `ns.Effects` de la zone ; `more = { { k, "execute" } }` est évalué par cible ; familier dans l'effet : `Hunter.petAttack` depuis `onEnemyDeath` |
-| 6. prime sous la barre, couronne, patte grisée, animation | `ZoneViews.wetlands.enemyBadges` (`dim`), `event` ; aperçu au survol : non fourni (voir limites) |
+| 6. Pack, Pack Leader, Scattered dans la fiche de l'ennemi, animation | `ZoneViews.wetlands.enemyInfo`, `event` ; aperçu au survol : non fourni (voir limites) |
 | 7–8. bots, statistiques | `ZoneBots.wetlands`, `Combat.zstat` |
 | Gryphon Master, Flagongut's Fossil, Crude Flint, Cursed Eye, War Banner, Goaz Stone | `nodeKind` + rencontre (`skipFloors`, `healPct`) ; `relic.run.rewardCards` ; `onEnemyDeath` ; `relic.run.healOut` ; `onEnemyDeath` ; `onEnemyDeath` + `onTurnStart` |
 

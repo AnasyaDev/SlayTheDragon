@@ -1,6 +1,6 @@
 -- Art de la zone Stranglethorn Vale (`stranglethorn`) : modèles des ennemis (Art.enemies), personnages des
 -- rencontres (Art.npcs), icônes (cartes, bibelots, intention Hex, case Gurubashi Arena), vue de zone
--- ns.ZoneViews.stranglethorn (carte visée par un Hex, lanceurs, Death Hex, cartes Hexed) et décors peints de la
+-- ns.ZoneViews.stranglethorn (carte visée par un Hex, fiche des lanceurs et du Death Hex, cartes Hexed) et décors peints de la
 -- jungle (Art.paintings, peints par la zone avec les formes du peintre, UI/Scene.lua S.paintKit). Guide :
 -- docs/zones.md ; fiche : docs/zones/stranglethorn.md.
 local _, ns = ...
@@ -82,7 +82,6 @@ Art.npcs.short_john_mithril = { creature = 14508, display = { 4429, 2347, 7113 }
 ---------------------------------------------------------------------------
 
 local HEX_ICON = I("Spell_Shaman_Hex")
-local DEATH_HEX_ICON = I("Spell_Shadow_CurseOfMannoroth")
 
 Art.cards.hexed = HEX_ICON
 Art.cards.jungle_remedy = I("INV_Potion_12")
@@ -115,7 +114,6 @@ local function targetOf(c, e)
 end
 
 local function cardName(inst) return ns.Card.def(inst).name end
-local function short(s, n) if #s > n then return s:sub(1, n - 1) .. "." end return s end
 
 -- Chiffre de la bulle : « Hex » ; infobulle : la carte visée.
 Art.intentParts.hex = function() return "Hex" end
@@ -139,21 +137,20 @@ ns.ZoneViews.stranglethorn = {
     end
     return nil
   end,
-  -- sous l'intention : la carte visée (lanceur), ou le Death Hex du Zanzil Naga
-  enemyBadges = function(c, e)
+  -- fiche : le Hex en cours (carte visée, aussi marquée dans la main), le Death Hex du Zanzil Naga
+  enemyInfo = function(c, e)
     local def = ns.Enemies[e.id]
     local list = {}
     local inst
     if ST().hexing(c, e) then inst = targetOf(c, e) end
-    if inst then
-      list[#list + 1] = { icon = HEX_ICON, text = short(cardName(inst), 16), color = "watchText",
-        tip = "Hex target: " .. cardName(inst) .. ", the costliest card left in your hand." }
-    elseif inst == false then
-      list[#list + 1] = { icon = HEX_ICON, text = "No card", dim = true, tip = "Your hand is empty: the hex will fail." }
+    if inst ~= nil then
+      list[#list + 1] = { name = "Hex", text = "at the end of your turn, it turns the costliest card left in your hand "
+        .. "into a Hexed card. Interrupt or Stun it to stop the Hex.",
+        lines = { inst and { "Target now: " .. cardName(inst) .. ".", "watchText" }
+          or { "Your hand is empty: the Hex will fail.", "textDim" } } }
     end
     if def.deathHex then
-      list[#list + 1] = { icon = DEATH_HEX_ICON, text = "Death Hex", color = "watchText",
-        tip = "On death: hexes the costliest card in your hand." }
+      list[#list + 1] = { name = "Death Hex", text = "when it dies, it hexes the costliest card in your hand." }
     end
     return #list > 0 and list or nil
   end,

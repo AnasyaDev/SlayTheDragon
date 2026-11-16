@@ -1,7 +1,7 @@
 -- Harnais de l'interface de Blackrock Mountain (section « UZB » de Sim/ui_harness.lua) : accueil (zone
 -- ouverte, titre « Dragonslayer »), écran Progress (titre), combat avec la mécanique visible (crans de
 -- phase, infobulle, ouverture remplacée et badge, ouverture différée « Next: »), règles de phase en
--- badges (Invincible, Shadow of the Throne), compteur et phases du combat final, Class Call, rencontres
+-- fiche de l'ennemi (Invincible, Indomitable, Shadow of the Throne, Drakonid), phases du combat final, Class Call, rencontres
 -- (décor, personnage), Grim Guzzler, décors peints de la zone. Planches : build/snap/zone-blackrock*.svg
 -- et decor-blackrock_*.svg.
 local function body(T)
@@ -142,21 +142,21 @@ local function body(T)
   H.settle()
   snap("zone-blackrock", true)
 
-  -- Élite : Panzor (badge Invincible)
+  -- Élite : Panzor (compteur et fiche d'Invincible)
   for _, e in ipairs(c.enemies) do e.dead = true end
   local pz = Combat.spawn(c, "panzor")
   pz.intent = "pulverize"
   v:Render(true)
   H.settle()
   local sp = v.slotOf[pz.uid]
-  local b1 = sp and sp.badges[1]
-  check("Panzor : badge « Max " .. ns.Enemies.panzor.maxHit .. " » sous l'intention, infobulle d'Invincible",
-    b1 and vis(b1) and b1.text._text == "Max " .. ns.Enemies.panzor.maxHit and (b1.tip or ""):find("Invincible", 1, true) ~= nil,
-    b1 and tostring(b1.text._text))
-  local b2 = sp and sp.badges[2]
-  check("Panzor : badge « Indomitable » (Can't be Stunned.)",
-    b2 and vis(b2) and b2.text._text == "Indomitable" and b2.tip == "Can't be Stunned.",
-    b2 and tostring(b2.text._text))
+  local b1 = sp and sp.chips[1]
+  local tp = sp and vis(sp.ask) and table.concat(H.hover(sp.ask), " | ") or ""
+  check("Panzor : compteur « " .. ns.Enemies.panzor.maxHit .. " » (bouclier) sous le cadre, Invincible dans la fiche",
+    b1 and vis(b1) and b1.text._text == tostring(ns.Enemies.panzor.maxHit)
+      and tp:find("Invincible|r — each hit deals at most " .. ns.Enemies.panzor.maxHit .. " damage to it.", 1, true) ~= nil,
+    tostring(b1 and b1.text._text) .. " // " .. tp)
+  check("Panzor : « Indomitable — can't be Stunned. » dans la fiche, pas de Stun Resistant",
+    tp:find("Indomitable|r — can't be Stunned.", 1, true) ~= nil and not tp:find("Stun Resistant", 1, true), tp)
   snap("zone-blackrock-panzor", true)
 
   -- Combat final (même expédition : combat de boss lancé directement)
@@ -174,13 +174,16 @@ local function body(T)
   H.settle()
   local n = bc.enemies[1]
   local sn = v.slotOf[n.uid]
-  local tb = sn and sn.badges[1]
-  local pb = sn and sn.badges[2]
-  check("combat final : badge « Phase 1/3 » sous l'intention, infobulle ; pas de compteur sur son cadre",
-    pb and vis(pb) and pb.text._text == "Phase 1/3" and (pb.tip or ""):find("Below 75%", 1, true) ~= nil and not vis(v.counter),
-    pb and tostring(pb.text._text))
-  check("Shadow of the Throne : badge « Half » allumé tant qu'un Drakonid vit", tb and vis(tb) and tb.text._text == "Half"
-    and (tb.tip or ""):find("half damage", 1, true) ~= nil)
+  local function sheetOf(s) return s and vis(s.ask) and table.concat(H.hover(s.ask), " | ") or "" end
+  local tn = sheetOf(sn)
+  check("combat final : fiche « Phase 1 of 3 — … Below 75%, Nefarian lands. », Boss ; pas de compteur sur son cadre",
+    tn:find("^Lord Victor Nefarius | Boss | ") ~= nil and tn:find("Phase 1 of 3|r — Lord Victor Nefarius on his throne. Below 75%", 1, true) ~= nil
+      and not vis(v.counter) and not vis(sn.chips[1]), tn)
+  check("Shadow of the Throne : « Active: a Drakonid lives. » dans la fiche tant qu'un Drakonid vit",
+    tn:find("Shadow of the Throne|r — takes half damage while a Drakonid lives.", 1, true) ~= nil
+      and tn:find("Active: a Drakonid lives.", 1, true) ~= nil, tn)
+  local td = sheetOf(v.slotOf[bc.enemies[2].uid])
+  check("Drakonid : sa règle dans la fiche (moitié des dégâts, Bone Construct)", td:find("Drakonid|r — while it lives", 1, true) ~= nil, td)
   snap("zone-blackrock-boss", true)
   -- phase 2 : Nefarian, Class Call
   n.hp = 80
@@ -191,8 +194,8 @@ local function body(T)
   local tc = tip(sn.intent)
   check("phase 2 : nom « Nefarian », intention Class Call, son état expliqué (Corrupted Healing)",
     ns.Combat.enemyName(n) == "Nefarian" and n.intent == "class_call"
-      and tc:find("Corrupted Healing", 1, true) ~= nil and sn.badges[1].text._text == "Phase 2/3", tc)
-  check("Throne terminé : plus de badge « Half »", not (sn.badges[1] and vis(sn.badges[1]) and sn.badges[1].text._text == "Half"))
+      and tc:find("Corrupted Healing", 1, true) ~= nil and sheetOf(sn):find("Phase 2 of 3|r — Nefarian calls on your class.", 1, true) ~= nil, tc)
+  check("Throne terminé : plus de Shadow of the Throne dans la fiche", not sheetOf(sn):find("Shadow of the Throne|r", 1, true), sheetOf(sn))
   snap("zone-blackrock-nefarian", true)
 
   -- Rencontres : décor de la zone, personnage

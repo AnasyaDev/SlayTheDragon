@@ -1,5 +1,5 @@
 -- Harnais d'interface des Wetlands (section « UZW » de Sim/ui_harness.lua) : décors peints de la zone, combat
--- avec la meute (primes sous les ennemis, chef, dispersion), Modr (Charge), Dragonmaw Centurion (armure),
+-- avec la meute (Pack dans la fiche de l'ennemi, chef, dispersion), Modr (compteur de Charge), Dragonmaw Centurion,
 -- boss Nek'rosh (phases), rencontres, case du Gryphon Master. Planches : build/snap/zone-wetlands*.svg et
 -- build/snap/decor-wetlands_*.svg (rsvg-convert pour les PNG).
 return function(T)
@@ -101,40 +101,39 @@ return function(T)
     while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
     return true
   end
-  local function badgeTexts(v, en)
+  -- fiche d'un ennemi (survol du « ? » de son cadre), lignes réunies ; vide s'il n'a pas de « ? »
+  local function sheet(v, en)
     local s = v.slotOf[en.uid]
-    local out = {}
-    for _, b in ipairs(s.badges) do if vis(b) then out[#out + 1] = b.text._text or "" end end
-    return out, s
+    if not (s and vis(s.ask)) then return "", s end
+    return table.concat(H.hover(s.ask), " | "), s
   end
 
-  -- 2. Meute Mosshide : primes sous chaque ennemi, chef, dispersion grisée, infobulles, flèche de prime
+  -- 2. Meute Mosshide : Pack dans la fiche de chaque membre (prime, chef, dispersion), aucune ligne sur le modèle
   do
     local e, c, v = fight("priest", "combat", "normal", 1)
     check("combat des Wetlands : Brute, Mystic, Alpha à l'écran", T.currentKind() == "combat"
       and c.enemies[1].id == "mosshide_brute" and c.enemies[3].id == "mosshide_alpha", T.currentKind())
     local WL = ns.Wetlands
-    local b1, s1 = badgeTexts(v, c.enemies[1])
-    local b2 = badgeTexts(v, c.enemies[2])
-    local b3, s3 = badgeTexts(v, c.enemies[3])
+    local t1, s1 = sheet(v, c.enemies[1])
+    local t2 = sheet(v, c.enemies[2])
+    local t3 = sheet(v, c.enemies[3])
     local nb = ns.Enemies.mosshide_brute.pack[2]
-    check("prime sous chaque membre : « Pack: +N Str » (Brute), « Pack: +N HP » (Mystic), couronne du chef",
-      b1[1] == "Pack: +" .. nb .. " Str" and (b2[1] or ""):find("^Pack: %+%d+ HP$") ~= nil and b3[1] == "Pack Leader",
-      table.concat(b1, ",") .. " / " .. table.concat(b2, ",") .. " / " .. table.concat(b3, ","))
-    local tip = table.concat(H.hover(s1.badges[1]), " | ")
-    check("infobulle de la prime : ce que reçoivent les autres, morts du même effet exclues",
-      tip:find("rest of its pack gains Strength " .. nb, 1, true) ~= nil and tip:find("same card", 1, true) ~= nil, tip)
-    local tipL = table.concat(H.hover(s3.badges[1]), " | ")
-    check("infobulle du chef : dispersion", tipL:find("scatters", 1, true) ~= nil, tipL)
+    check("fiche de chaque membre : Pack de la Brute (Strength N), du Mystic (heal), Pack Leader de l'Alpha",
+      t1:find("^Mosshide Brute | ") ~= nil
+        and t1:find("Pack|r — when it dies, the other members of its pack gain Strength " .. nb .. ".", 1, true) ~= nil
+        and t1:find("Packmates that die at the same time gain nothing.", 1, true) ~= nil
+        and t2:find("Pack|r — when it dies, the other members of its pack heal %d+%.") ~= nil
+        and t3:find("Pack Leader|r — when it dies, its pack scatters", 1, true) ~= nil, t1 .. " // " .. t2 .. " // " .. t3)
+    check("Pack : aucun compteur gardé sous le cadre (fiche seule)", not vis(s1.chips[1]))
     T.snap("zone-wetlands", true)
-    -- le chef tombe : meute dispersée, pattes grisées
+    -- le chef tombe : meute dispersée, état dans la fiche
     c.enemies[3].hp = 1
     ns.Combat.dealDamage(c, c.player, c.enemies[3], 5)
     v:Render(true)
     H.settle()
-    local d1, ds = badgeTexts(v, c.enemies[1])
-    check("dispersion : « Scattered », patte grisée", d1[1] == "Scattered" and ds.badges[1].icon._calls.SetDesaturated
-      and ds.badges[1].icon._calls.SetDesaturated[1] == true and WL.scattered(c.enemies[1]), table.concat(d1, ","))
+    local d1 = sheet(v, c.enemies[1])
+    check("dispersion : « Scattered: it no longer gives or gains Pack bonuses. » dans la fiche",
+      d1:find("Scattered: it no longer gives or gains Pack bonuses.", 1, true) ~= nil and WL.scattered(c.enemies[1]), d1)
     -- animation de prime : un événement « pack » passe par la vue sans erreur
     local ok, err = pcall(function()
       v:OnEvents({ { t = "pack", src = c.enemies[3].uid, dst = c.enemies[1].uid, bonus = "force", n = 1, got = 1 },
@@ -148,21 +147,32 @@ return function(T)
   do
     local e, c, v = fight("mage", "elite", "elite", 2)
     local m = c.enemies[1]
-    local b = badgeTexts(v, m)
-    check("Modr : badge « Charge: 0/15 dmg » (prévision rouge tant qu'il chargera)", b[1] == "Charge: 0/15 dmg", b[1])
+    local tm, sm = sheet(v, m)
+    local ch = sm.chips[1]
+    local red = ch and ch.text._calls.SetTextColor
+    local ar = ns.Art.C.attackText
+    check("Modr : compteur gardé sous le cadre « 0/15 » en rouge (il chargera), Earthen Charge dans la fiche",
+      ch and vis(ch) and ch.text._text == "0/15" and red and math.abs(red[1] - ar[1]) < 1e-6
+        and tm:find("Earthen Charge|r — at the start of its turn", 1, true) ~= nil
+        and tm:find("Lost since its last turn: 0 of 15. It gains a Charge", 1, true) ~= nil,
+      tostring(ch and ch.text._text) .. " // " .. tm)
+    check("Modr : infobulle du compteur = fiche", ch and table.concat(H.hover(ch), " | ") == tm)
     T.snap("zone-wetlands-modr", true)
     local e2, c2, v2 = fight("rogue", "elite", "elite", 3)
     local ce = c2.enemies[2]
-    check("Dragonmaw Centurion : Wyrmscale Armor prête (jeton), membre sans prime (« Pack »)",
-      ce.st.wyrmscale == 1 and badgeTexts(v2, ce)[1] == "Pack")
+    local tc = sheet(v2, ce)
+    check("Dragonmaw Centurion : Wyrmscale Armor prête (jeton, fiche « Ready this turn. »), Pack sans prime, Elite",
+      ce.st.wyrmscale == 1 and tc:find("^Dragonmaw Centurion | Elite | ") ~= nil
+        and tc:find("Pack|r — gains the bonus of each packmate that dies, but gives none.", 1, true) ~= nil
+        and tc:find("Wyrmscale Armor|r — ", 1, true) ~= nil and tc:find("Ready this turn.", 1, true) ~= nil, tc)
     T.snap("zone-wetlands-centurion", true)
   end
 
   -- 4. Boss : Nek'rosh et ses Bonewarders, cran de phase, décor des portes
   do
     local e, c, v = fight("warrior", "boss", "boss", 1)
-    check("boss : Chieftain Nek'rosh, deux Bonewarders (« Pack: +N HP »), décor des portes de Grim Batol",
-      c.enemies[1].id == "nekrosh" and (badgeTexts(v, c.enemies[2])[1] or ""):find("HP") ~= nil
+    check("boss : Chieftain Nek'rosh, deux Bonewarders (Pack : heal N), décor des portes de Grim Batol",
+      c.enemies[1].id == "nekrosh" and sheet(v, c.enemies[2]):find("its pack heal %d+%.") ~= nil
       and ns.Scene.scene == "wetlands_gates", tostring(ns.Scene.scene))
     local s = v.slotOf[c.enemies[1].uid]
     local tt = table.concat(H.hover(s.hp), " | ")

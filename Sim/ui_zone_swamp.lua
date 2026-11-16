@@ -92,10 +92,14 @@ return function(T)
   ns.Combat.fire(c2, "onEffectEnd", "card", 1)
   v2:Render(true)
   H.settle()
-  local mend = ss.badges[1]
-  check("The Dream : deux dragonnets, Somnus endormi (« Asleep 2 »), soin de Slumber sous la bulle (« +5 »)",
+  local mend = ss.chips[1]
+  local tsom = vis(ss.ask) and table.concat(H.hover(ss.ask), " | ") or ""
+  check("The Dream : deux dragonnets, Somnus endormi (« Asleep 2 »), compteur de Slumber sous le cadre (« +5 »), fiche",
     #c2.enemies == 3 and ss.intent.text._text == "Asleep 2" and vis(mend) and mend.text._text == "+5"
-    and (ss.next._text or ""):find("Deep Breath", 1, true) ~= nil, tostring(mend and mend.text._text))
+    and (ss.next._text or ""):find("Deep Breath", 1, true) ~= nil
+    and tsom:find("Slumber|r — heals 5 at each of its turns while asleep.", 1, true) ~= nil
+    and tsom:find("Asleep|r — skips its turns while asleep.", 1, true) ~= nil
+    and tsom:find("Asleep for 2 more turns. On waking: Deep Breath", 1, true) ~= nil, tostring(mend and mend.text._text) .. " // " .. tsom)
   check("décor du boss : Pool of Tears (zone)", ns.Controller.scene() == "swamp_pool", ns.Controller.scene())
   snap("zone-swamp-boss", true)
 

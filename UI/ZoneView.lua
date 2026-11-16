@@ -5,12 +5,19 @@
 --     counter = function(c) return { icon, text, tip, value, hot } end,  -- jeton en haut au centre
 --     intent = function(c, e) return { icon, text, color, tip } end,   -- remplace la bulle d'intention
 --     intentBadge = function(c, e) return { icon, tip } end,          -- petite icône à droite de l'intention
---     enemyBadges = function(c, e) return { { icon, text, tip, color, dim } } end, -- sous l'intention (Pack)
+--     enemyInfo = function(c, e) return { { name, text, lines, compact } } end, -- fiche de l'ennemi (« ? »)
 --     marks = function(c, e) return { { at, text, color } } end,      -- crans en plus sur la barre de vie
 --     handMark = function(c, i, inst) return { rim, icon, tip } end, -- carte de la main marquée (Hex visé)
 --     build = function(host, view) end, render = function(host, c, view) end,       -- zone libre (calque)
 --     event = function(host, ev, view) end,                           -- animations (view:Push(délai, fn))
 --   }
+--
+-- Fiche de l'ennemi (enemyInfo) : une entrée par trait ou règle portée par l'ennemi, montrée au survol du bouton
+-- « ? » accolé à son cadre d'unité (UI/CombatView.lua, V.enemyInfo) : name = nom du trait (couleur de titre),
+-- text = sa règle (« when it dies, … » : suit « Name — »), lines = { { texte, couleur } } = valeur actuelle en
+-- combat (couleur : clé d'Art.C ou { r, g, b }), compact = { icon, text, color, dim, key } = compteur gardé sous
+-- le cadre (icône + nombre ; seulement pour une valeur dont le joueur a besoin à chaque tour sans survoler).
+-- Aucune ligne de texte n'est posée sur le modèle.
 --
 -- Registres communs (toutes zones) : Art.actionText[action] = function(a, c, e) -> ligne d'infobulle ;
 -- Art.intentParts[action] = function(c, e, a) -> chiffre de la bulle (« +1 ») ; Art.bodyTints.token
