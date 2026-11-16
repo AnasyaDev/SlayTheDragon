@@ -1,5 +1,7 @@
 reports/
 build/
+# Local agent instructions (kept on disk, not published)
+CLAUDE.md
 *.tmp
 .claude/
 
