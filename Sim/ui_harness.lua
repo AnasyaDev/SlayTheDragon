@@ -11319,6 +11319,185 @@ do
   end
 end
 
+print("UET étal du marchand de 1 à 7 cartes (16/11/2026) : rangée centrée dans la scène, prix et plaques, survols, bibelots au maximum")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function fmt(r) return r and ("%.1f,%.1f,%.1f,%.1f"):format(r[1], r[2], r[3], r[4]) or "nil" end
+  local function inside(r, box)
+    return r and box and r[1] >= box[1] - 0.5 and r[2] >= box[2] - 0.5 and r[3] <= box[3] + 0.5 and r[4] <= box[4] + 0.5
+  end
+  local function overlaps(a, b)
+    return a and b and a[1] < b[3] - 0.5 and b[1] < a[3] - 0.5 and a[2] < b[4] - 0.5 and b[2] < a[4] - 0.5
+  end
+  H.boot(nil)
+  H.slash("")
+  if option("class:rogue") then clickOption("class:rogue") end
+  H.ns.Controller.makeSeed = function() return SEED + 2 end
+  clickOption("go")
+  local e = EXP()
+  local id = e.map.start[1]
+  e.map.nodes[id].kind = "merchant"
+  e.gold = 999
+  clickOption("path:" .. id)
+  H.settle()
+  check("étal : écran du marchand", currentKind() == "merchant", currentKind())
+  local ns, W = H.ns, H.ns.Widgets
+  -- étal complet : cartes de l'étal tiré, puis l'épique de Westfall de la classe jouée (7 cartes au plus :
+  -- X.SHOP.cards + X.SHOP.neutral + l'épique, Core/Expedition.lua, openShop)
+  local X = ns.Expedition
+  local maxCards = X.SHOP.cards + X.SHOP.neutral + 1
+  local full = {}
+  for i, it in ipairs(e.shop.cards) do if not it.epic then full[#full + 1] = it end end
+  local epicId
+  for cid, d in pairs(ns.Cards) do
+    if d.rarity == "epic" and d.zone == "westfall" and d.class == e.class and not d.variant then epicId = cid end
+  end
+  full[#full + 1] = { id = epicId, price = 300, sold = false, epic = true }
+  check("étal : " .. maxCards .. " cartes au plus, dont une épique", #full == maxCards and epicId ~= nil, #full)
+  -- bibelots au maximum (avantage « One more relic at the merchant ») et fioles
+  local nRelics = X.SHOP.relics + 1
+  local seen = {}
+  for _, it in ipairs(e.shop.relics) do seen[it.id] = true end
+  local rids = {}
+  for rid in pairs(ns.Relics) do rids[#rids + 1] = rid end
+  table.sort(rids)
+  for _, rid in ipairs(rids) do
+    if #e.shop.relics >= nRelics then break end
+    if not seen[rid] then e.shop.relics[#e.shop.relics + 1] = { id = rid, price = 250, sold = false } seen[rid] = true end
+  end
+  local content = R.rect(ns.UI.content)
+  local ws = (content[3] - content[1]) / ns.UI.CONTENT_W
+  local pad = W.PREVIEW_PAD
+  local function padded(r)
+    local w = r[3] - r[1]
+    return { r[1] - pad.side * w, r[2] - pad.bottom * w, r[3] + pad.side * w, r[4] + pad.top * w }
+  end
+  local function plateRects(c)
+    local out = {}
+    if c.plate and c.plate.parts and c.plateText:IsShown() then
+      for _, p in ipairs(c.plate.parts) do out[#out + 1] = R.rect(p) end
+      out[#out + 1] = R.rect(c.plateText)
+    end
+    if c.epicMark:IsShown() then out[#out + 1] = R.rect(c.epicMark) end
+    return out
+  end
+  local layouts = {}
+  for n = 1, maxCards do
+    e.shop.cards = {}
+    for i = 1, n do
+      local it = (i == n and n >= 2) and full[maxCards] or full[i] -- l'épique en dernier dès 2 cartes
+      e.shop.cards[i] = { id = it.id, price = it.price, sold = false, epic = it.epic, neutral = it.neutral, up = it.up }
+    end
+    ns.UI.refresh()
+    H.settle()
+    local s = UI().current
+    local why, shown = {}, {}
+    for i = 1, #s.cards do if visibleChain(s.cards[i]) then shown[#shown + 1] = s.cards[i] end end
+    if #shown ~= n then why[#why + 1] = #shown .. " cartes montrées" end
+    local vis = {}
+    for i, c in ipairs(shown) do
+      local body = R.rect(c)
+      local v = padded(body)
+      vis[i] = v
+      local parts = { { "visuel", v }, { "halo", R.rect(c.halo) }, { "prix", R.rect(c.tag) },
+        { "texte du prix", R.rect(c.tag.text) } }
+      if c.epicGlow:IsShown() then parts[#parts + 1] = { "aura épique", R.rect(c.epicGlow) } end
+      for _, pr in ipairs(plateRects(c)) do parts[#parts + 1] = { "plaque", pr } end
+      for _, p in ipairs(parts) do
+        if not inside(p[2], content) then why[#why + 1] = ("carte %d : %s hors de la scène %s"):format(i, p[1], fmt(p[2])) end
+      end
+      if not visibleChain(c.tag) then why[#why + 1] = "carte " .. i .. " : prix caché" end
+      for j = 1, i - 1 do
+        local o = shown[j]
+        if overlaps(v, vis[j]) then why[#why + 1] = ("cartes %d et %d se chevauchent"):format(j, i) end
+        if overlaps(R.rect(c.tag), R.rect(o.tag)) then why[#why + 1] = ("prix %d et %d se chevauchent"):format(j, i) end
+        for _, a in ipairs(plateRects(c)) do
+          if overlaps(a, padded(R.rect(o))) then why[#why + 1] = ("plaque %d sur la carte %d"):format(i, j) end
+        end
+      end
+      local k = (body[3] - body[1]) / ws / W.CARD_W
+      if math.abs(k - s.scale) > 1e-6 then why[#why + 1] = ("carte %d : échelle %.3f au lieu de %.3f"):format(i, k, s.scale) end
+    end
+    if #vis == n and n > 0 then
+      local left, right = vis[1][1] - content[1], content[3] - vis[n][3]
+      if math.abs(left - right) > 0.5 then why[#why + 1] = ("rangée décentrée : %.1f à gauche, %.1f à droite"):format(left / ws, right / ws) end
+      local dx = n > 1 and ((vis[2][1] - vis[1][1]) / ws) or 0
+      layouts[n] = ("%d : ×%.2f, pas %.1f, marge %.0f"):format(n, s.scale, dx, left / ws)
+      if n <= 6 and (math.abs(s.scale - 0.92) > 1e-9 or (n > 1 and math.abs(dx - 150) > 1e-6)) then
+        why[#why + 1] = "jusqu'à 6 cartes : échelle 0,92 et pas de 150 attendus"
+      end
+      if s.scale < 0.75 then why[#why + 1] = ("échelle %.2f sous celle de la grille du deck (0,75)"):format(s.scale) end
+    end
+    check(("étal de %d carte(s) : cartes, prix et plaques dans la scène, sans chevauchement, rangée centrée (%s)")
+      :format(n, layouts[n] or "?"), #why == 0, table.concat(why, " ; "))
+  end
+  -- étal complet : survols (halo, levée ou aperçu à taille réelle) dans la scène
+  local s = UI().current
+  local why = {}
+  for i, c in ipairs(s.cards) do
+    if visibleChain(c) then
+      c:GetScript("OnEnter")(c)
+      for _ = 1, 30 do H.advance(0.02) end
+      local hr = R.vrect(c.halo)
+      if not (c.halo:IsVisible() and inside(hr, content)) then why[#why + 1] = "halo " .. i .. " hors de la scène " .. fmt(hr) end
+      local fr = R.vrect(c.bg)
+      if not inside(padded(fr), content) then why[#why + 1] = "carte survolée " .. i .. " hors de la scène" end
+      local pv = W.preview
+      if s.scale < W.PREVIEW_BELOW then
+        local pr = pv and pv:IsVisible() and pv.of == c and R.vrect(pv.bg)
+        if not (pr and inside(padded(pr), content)) then why[#why + 1] = "aperçu " .. i .. " absent ou hors de la scène" end
+      elseif pv and pv:IsVisible() and pv.of == c then
+        why[#why + 1] = "aperçu inattendu sur une carte lisible " .. i
+      end
+      c:GetScript("OnLeave")(c)
+      for _ = 1, 30 do H.advance(0.02) end
+    end
+  end
+  check(("étal de %d cartes : survols (halo, levée%s) dans la scène"):format(maxCards,
+    s.scale < W.PREVIEW_BELOW and ", aperçu" or ""), #why == 0, table.concat(why, " ; "))
+  -- achat : les autres cartes ne bougent pas
+  local before = {}
+  for i, c in ipairs(s.cards) do before[i] = c.cx end
+  clickOption(s.cardOptions[3].id)
+  H.settle()
+  s = UI().current
+  local moved = {}
+  for i, c in ipairs(s.cards) do if c.cx ~= before[i] then moved[#moved + 1] = i end end
+  check("étal : une carte achetée reste à sa place (« Sold »), les autres ne bougent pas", e.shop.cards[3].sold
+    and #moved == 0 and s.cards[3].tag.text._text == "Sold", table.concat(moved, ","))
+  -- bibelots (au maximum), fioles et service : ni chevauchement ni sortie de la scène
+  why = {}
+  local things = {}
+  for i, b in ipairs(s.items) do
+    if visibleChain(b) then
+      things[#things + 1] = { "case " .. i, R.rect(b) }
+      things[#things + 1] = { "prix de la case " .. i, R.rect(b.tag) }
+    end
+  end
+  local nItems = #things / 2
+  for i, l in ipairs(s.sections) do things[#things + 1] = { "titre " .. l._text, R.rect(l) } end
+  things[#things + 1] = { "Remove a card", R.rect(s.remove) }
+  things[#things + 1] = { "prix du retrait", R.rect(s.remove.tag) }
+  for _, c in ipairs(s.cards) do
+    if visibleChain(c) then things[#things + 1] = { "carte " .. tostring(c.cardId), padded(R.rect(c)) } end
+  end
+  for i, t in ipairs(things) do
+    if not inside(t[2], content) then why[#why + 1] = t[1] .. " hors de la scène " .. fmt(t[2]) end
+    for j = i + 1, #things do
+      if overlaps(t[2], things[j][2]) then why[#why + 1] = t[1] .. " sur " .. things[j][1] end
+    end
+  end
+  check(("étal : %d bibelots (maximum) et %d fioles, titres, service : ni chevauchement ni sortie de la scène")
+    :format(#e.shop.relics, #e.shop.potions), nItems == #e.shop.relics + #e.shop.potions
+    and #e.shop.relics == nRelics and #why == 0, nItems .. " cases ; " .. table.concat(why, " ; "))
+  -- aperçu de l'étal complet (avant achat)
+  e.shop.cards[3].sold = false
+  ns.UI.refresh()
+  H.settle()
+  snap("marchand-7-cartes", true)
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end

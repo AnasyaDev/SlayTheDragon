@@ -1730,8 +1730,32 @@ UI.register("shop", Shop)
 -- Planche ecran_marchand.jpg : rangée de cartes ×0,92 (prix en pastille dessous), puis « Bibelots »,
 -- « Potions » et « Service » (plaque « Retirer une carte ») ; plateau : deck, or, « Reprendre la route ».
 local SHOP_SCALE = 0.92
-local SHOP_TOP, SHOP_X0, SHOP_DX = 81, 147, 150
+local SHOP_TOP, SHOP_DX = 81, 150
+local SHOP_MARGIN, SHOP_GAP = 16, 2
 local SHOP_ITEM_Y, SHOP_ITEM_DX = 365, 104
+
+-- Rangée de cartes de l'étal (1 à 7 : cinq de classe, la neutre, l'épique) : échelle, pas et centre de la
+-- première carte. Rangée centrée sur la scène ; échelle SHOP_SCALE et pas SHOP_DX tant que les halos (et
+-- l'aura de l'épique, pièce card_glow) tiennent à SHOP_MARGIN des bords (jusqu'à 6 cartes) ; au-delà, le
+-- pas se resserre, jusqu'à SHOP_GAP entre les visuels (corps et débords W.PREVIEW_PAD.side), puis
+-- l'échelle baisse (arrondie au centième inférieur). La place ne dépend que du nombre de cartes à l'étal,
+-- vendues comprises : un achat ne déplace rien.
+function Shop.rowLayout(n)
+  local CW, side = W.CARD_W, W.PREVIEW_PAD.side
+  local g = ns.Skin.card.pieces.card_glow
+  local haloW = g[3] * CW                   -- largeur du halo (symétrique autour du corps)
+  local cardW = (1 + 2 * side) * CW         -- largeur du visuel
+  local avail = Scene.W - 2 * SHOP_MARGIN
+  local s, dx = SHOP_SCALE, SHOP_DX
+  if n > 1 and (n - 1) * dx + haloW * s > avail then
+    dx = (avail - haloW * s) / (n - 1)
+    if dx < cardW * s + SHOP_GAP then
+      s = floor(100 * (avail - (n - 1) * SHOP_GAP) / ((n - 1) * cardW + haloW)) / 100
+      dx = min(SHOP_DX, (avail - haloW * s) / (n - 1))
+    end
+  end
+  return s, dx, Scene.W / 2 - (n - 1) * dx / 2
+end
 
 -- Service (retrait de carte) : bouton rouge du jeu, icône dans une case à gauche, libellé doré ;
 -- étiquette de prix dessous. Survol : liseré d'or, bouton éclairci, libellé blanchi, sans bouger.
@@ -1774,7 +1798,7 @@ function Shop:Build(f)
   for i = 1, 7 do
     local c = W.card(f)
     c:SetScript("OnClick", function(card) chooseOption(card.option) end)
-    W.setLift(c, W.CARD_LIFT / SHOP_SCALE) -- carte lisible : levée et halo au survol
+    W.setLift(c, W.CARD_LIFT / SHOP_SCALE) -- carte lisible : levée et halo au survol (Show : selon l'échelle)
     c:Hide()
     self.cards[i] = c
   end
@@ -1813,7 +1837,7 @@ end
 function Shop:PlaceCard(card)
   if not card.cx then return end
   local base = self.frame:GetFrameLevel() + 10 + card.slot
-  W.placeCard(card, self.frame, card.cx, card.cy, SHOP_SCALE, base, base + 30)
+  W.placeCard(card, self.frame, card.cx, card.cy, self.scale or SHOP_SCALE, base, base + 30)
   card:SetHot(card.hover and true or false)
 end
 
@@ -1834,13 +1858,17 @@ function Shop:Show(step)
   self.serviceOptions = services
   self.optionButtons = {}
   local n = min(#cards, #self.cards)
-  local dx = n > 6 and 140 or SHOP_DX
+  local sc, dx, x0 = Shop.rowLayout(n)
+  self.scale = sc
+  -- sous W.PREVIEW_BELOW, petite carte : immobile, aperçu à taille réelle au survol
+  local lift = sc >= W.PREVIEW_BELOW and W.CARD_LIFT / sc or 0
   for i = 1, #self.cards do
     local card, o = self.cards[i], cards[i]
     if o and i <= n then
       card.option, card.slot = o, i
-      card.cx = SHOP_X0 + (i - 1) * dx
-      card.cy = SHOP_TOP + W.CARD_H * SHOP_SCALE / 2
+      card.cx = x0 + (i - 1) * dx
+      card.cy = SHOP_TOP + W.CARD_H * sc / 2
+      if card.hoverLift ~= lift then W.setLift(card, lift) end
       card:SetCard(o.card.id, o.card.up, { price = o.price, sold = o.sold, tooPoor = o.disabled and not o.sold,
         playable = true })
       self:PlaceCard(card)

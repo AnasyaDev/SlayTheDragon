@@ -299,7 +299,7 @@ hors de toute pile, sans coût).
   décalé d'un demi-cran ; remplis dans l'ordre, l'arc intérieur d'abord ; 12 crans au plus (`PIPS_MAX`).
   `V.layoutPips(pips, cap)` les repose quand le plafond change.
 - **Marchand** : l'épique en vente se range à la suite des cartes (7 cartes au plus), cadre violet, prix sur sa
-  plaque ; l'achat passe par la même confirmation.
+  plaque ; l'achat passe par la même confirmation. Rangée de l'étal : voir « Étal du marchand ».
 - **Deck** : l'épique en tête du panneau du deck (`DV.sorted`) et des grilles d'amélioration et de retrait
   (`epicFirst` du contrôleur) ; bandeau, panneau, amélioration, retrait et sélection montrent le deck transformé
   (`Expedition.shownDeck`).
@@ -1480,12 +1480,30 @@ cadre teint à la rareté), 3 fioles (potions), « Menu » (options), fermeture.
 | `combat` | **Combat** | voir plus bas |
 | `reward` | **Récompense** | décor du combat, héros ; 3 cartes en grand (survol : plus grandes) ; butin au sol à droite : bourse avec montant, bibelot, fiole (« Pas de place » si les emplacements sont pleins) ; plateau : tas du deck, « Reprendre la route ». Coffre (`chest`) : un coffre à ouvrir d'abord (clic). Rencontre : bulle du texte après coup |
 | `campfire` | **Feu de camp** | décor de nuit, modèle 3D d'un feu de camp du jeu (`Art.campfire`, lueur orange au sol, médaillon du feu de camp en repli), couchage (« +N PV » calculés par le moteur) = repos, grimoire (« Améliorer une carte ») = grille d'amélioration, « Reprendre la route » |
-| `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle) avec étiquette de prix (rouge si trop cher, « Vendu »), bibelots puis fioles à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
+| `merchant` | **Marchand** | étal (tenture, comptoir) : 5 cartes de classe + la carte neutre en 6e (corps vert sauge, ligne « Neutral » en infobulle), l'épique en 7e s'il y en a une, avec étiquette de prix (rouge si trop cher, « Vendu ») ; rangée centrée (« Étal du marchand » ci-dessous) ; bibelots (4 au plus) puis fioles (3) à droite avec prix ; plateau : tas du deck, plaque « Retirer une carte » avec son prix, « Partir » |
 | `event` | **Rencontre** | décor `scene`, héros à gauche, personnage à droite (modèle d'`Art.npcs[npc]` en fondu dès qu'il est chargé, médaillon à son icône si aucun candidat ne charge), nom (`speaker`), bulle (titre + texte ; bord doré si `rare`, violet si `story`) ; plaques de réponses à la place de la main : libellé et l'issue sur une ligne (verte si elle commence par « + », « ? » si cachée), réponses impossibles grisées avec leur raison ; après coup : `exp.event.result` et « Continuer » |
 | `select`, amélioration, retrait | **Grille du deck** (`deck`) | panneau de bois sur le décor voilé, titre court, cartes à 75 % (8 par rangée, 2 rangées visibles, défilement à la molette au-delà de 16 : « Grille du deck défilante ») ; amélioration : toutes les cartes du deck, celles au dernier palier écrit grisées « Fully upgraded. », la carte survolée montre son palier suivant (`docs/ameliorations.md`) ; plateau : « Retour » / « Passer » |
 | `transit` | **Entre deux zones** (`transit`) | décor de la zone suivante, héros ; panneau : nom de la zone, pastilles de la campagne, soin du passage, déblocages du boss vaincu montrés (vitrine `Shelf` : cartes, cases) ; « Continue » |
 | `done` | **Bilan** (`end`) | parchemin : titre (vert ou rouge), jusqu'où (zone atteinte, zones battues), premiers boss de la classe (victoire contre Nefarian : titre Dragonslayer de la classe, Rallying Cry du compte), barre du niveau de la classe, déblocages des boss battus regroupés et montrés (vitrine `Shelf`) ; « Nouvelle expédition », « Progress » |
 | vue méta | **Journal** (« Log ») | barre du niveau de la classe, boss battus, zone la plus loin, 8 dernières expéditions (zone atteinte, boss battus) ; « Retour » |
+
+**Étal du marchand** (16/11/2026, `Shop.rowLayout` dans `UI/Screens.lua`) : de 1 à 7 cartes
+(`X.SHOP.cards` + `X.SHOP.neutral` + l'épique, `openShop` ; aucun bibelot ni zone n'en ajoute). La rangée est
+**centrée** sur la scène (1034 de large), haut des cartes à y = 81. Échelle 0,92 et pas de 150 tant que les
+halos (pièce `card_glow`, 1,43 largeur de carte, aussi l'aura violette de l'épique) restent à `SHOP_MARGIN` = 16
+des bords : jusqu'à 6 cartes (6 cartes : marge de 60 aux halos, centres de 142 à 892). Au-delà, le pas se
+resserre jusqu'à `SHOP_GAP` = 2 entre les visuels (corps + débords `W.PREVIEW_PAD.side`), puis l'échelle
+baisse, arrondie au centième inférieur : **7 cartes = ×0,90, pas de 140,4**, centres de 95,8 à 938,2, halos
+de 16 à 1018 (texte 2 % plus petit qu'à 6, cartes encore « lisibles » : levée au survol, pas d'aperçu).
+Prix, plaques du bas et marque « Epic » sont des pièces de la carte et suivent son échelle. Si une
+échelle tombait sous `W.PREVIEW_BELOW` (0,9), la carte deviendrait une petite carte : immobile au survol et
+aperçu à taille réelle (`W.cardPreviewShow`, toujours dans la fenêtre). La place ne dépend que du nombre de
+cartes à l'étal, vendues comprises : un achat ne déplace rien. Bibelots : 3, ou 4 avec l'avantage de compte
+« One more relic at the merchant » (pas de 78 au lieu de 104, à partir de x = 81) ; fioles : 3 à partir de
+x = 441. Harnais **UET** : pour 1 à 7 cartes, chaque visuel, halo, aura, prix et plaque dans la scène, ni
+cartes ni prix ni plaques qui se chevauchent, rangée centrée (même marge à gauche et à droite), 0,92 et 150
+jusqu'à 6 ; survols de l'étal à 7 dans la scène ; carte achetée à sa place ; 4 bibelots, 3 fioles, titres et
+service sans chevauchement ; aperçu `marchand-7-cartes.svg`.
 
 **Potions** : en combat, clic = boire ; potion à cible : clic, puis clic sur un ennemi ; clic droit
 annule. Hors combat : « Les potions se boivent en combat » ; deux clics droits
