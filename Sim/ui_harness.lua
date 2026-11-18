@@ -7654,18 +7654,18 @@ do
     and r.text._text == "" and nf == 0 and (r.icon._texture or ""):lower():find("classicon_druid", 1, true) ~= nil, tostring(r.text._text) .. " / " .. nf)
   -- levier A (taxe des changements de forme) : compteur du tour et malus à venir dans l'infobulle de la pastille
   if real and (ns.Druid.TAX or 0) > 0 then
-    local D, s0 = ns.Druid, c.cls.shifts
+    local D, s0 = ns.Druid, c.cls.taxed
     local function ttOf(n)
-      c.cls.shifts = n
+      c.cls.taxed = n
       v:Render(true)
       return table.concat(plainLines(H.hover(r)), " | ")
     end
     local t0 = ttOf(0)
     local t1 = ttOf(D.TAX_FREE)
     local t2 = ttOf(D.TAX_FREE + 1)
-    c.cls.shifts = s0
-    check("pastille : taxe des changements de forme (compteur, « Shifting again costs », malus à venir)",
-      t0:find("Form changes this turn: 0.", 1, true) ~= nil
+    c.cls.taxed = s0
+    check("pastille : taxe des changements de forme (compteur, Cat et Bear libres, « Shifting again costs », malus à venir)",
+      t0:find("Form changes this turn: 0. Shifting between Cat and Bear is free.", 1, true) ~= nil
       and t1:find(("Shifting again costs %d mana next turn."):format(D.TAX), 1, true) ~= nil
       and t2:find(("Next turn: %d mana less."):format(D.taxOf(D.TAX_FREE + 1)), 1, true) ~= nil, t0 .. "\n        " .. t1 .. "\n        " .. t2)
   end

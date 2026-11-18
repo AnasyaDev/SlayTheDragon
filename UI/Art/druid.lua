@@ -284,13 +284,14 @@ function V.badgeTooltip(tt, c)
   if tl then tt:AddLine(tl, 1, 0.5, 0.25, true) end
 end
 
--- Levier A (taxe des changements de forme) : compteur du tour et malus à venir ; nil si le levier est inactif.
+-- Levier A (taxe des changements de forme) : compteur du tour (changements comptés : Cat <-> Bear exclu) et
+-- malus à venir ; nil si le levier est inactif.
 function Art.druidTaxLine(c)
   local D = ns.Druid
   if not D or (D.TAX or 0) <= 0 then return nil end
-  local n = c.cls and c.cls.shifts or 0
+  local n = c.cls and c.cls.taxed or 0
   local tax = D.pendingTax(c)
-  local head = ("Form changes this turn: %d. "):format(n)
+  local head = ("Form changes this turn: %d. Shifting between Cat and Bear is free. "):format(n)
   if tax > 0 then return head .. ("Next turn: %d mana less."):format(tax) end
   if n >= D.TAX_FREE then return head .. ("Shifting again costs %d mana next turn."):format(D.TAX) end
   return head .. ("%d more free, then each costs %d mana next turn."):format(D.TAX_FREE - n, D.TAX)

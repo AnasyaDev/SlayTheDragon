@@ -415,6 +415,45 @@ test("levier A (actif) : à partir du 2e changement d'un tour, −1 mana au tour
   assert(ok, err)
 end)
 
+test("taxe : un passage entre Cat et Bear ne compte pas ; il reste un changement (onShift, Idol of the Wild)", function()
+  eq(D.taxed("cat", "bear"), false); eq(D.taxed("bear", "cat"), false)
+  eq(D.taxed(nil, "cat"), true, "entrée dans la première forme : comptée")
+  eq(D.taxed("moonkin", "cat"), true); eq(D.taxed("tree", "bear"), true); eq(D.taxed("bear", "moonkin"), true)
+  -- premier tour : sans forme → Cat → Bear → Cat → Bear : un seul changement compté (l'entrée), 4 changements
+  local c = setup({ "shred", "thick_hide", "rake", "maul" }, { mana = 4 })
+  local fired = 0
+  local old = ns.Combat.fire
+  ns.Combat.fire = function(cc, name, ...)
+    if name == "onShift" then fired = fired + 1 end
+    return old(cc, name, ...)
+  end
+  local ok, err = pcall(function()
+    play(c, "shred", 1); play(c, "thick_hide"); play(c, "rake", 1); play(c, "maul", 1)
+  end)
+  ns.Combat.fire = old
+  assert(ok, err)
+  eq(c.cls.shifts, 4, "quatre changements de forme")
+  eq(fired, 4, "onShift à chaque changement")
+  eq(c.cls.taxed, 1, "un seul compté")
+  eq(D.pendingTax(c), 0)
+  Combat.endTurn(c)
+  eq(c.player.mana, 3, "aucun malus")
+  -- Moonkin → Cat → Bear (depuis Moonkin, tour 2) : un seul changement compté, gratuit
+  local m = setup({ "wrath" })
+  play(m, "wrath", 1)
+  Combat.endTurn(m)
+  eq(m.cls.form, "moonkin")
+  m.player.mana = 9
+  give(m, "shred"); give(m, "thick_hide"); give(m, "wrath")
+  play(m, "shred", 1); play(m, "thick_hide")
+  eq(m.cls.shifts, 2); eq(m.cls.taxed, 1)
+  eq(D.pendingTax(m), 0)
+  -- Cat → Bear → Moonkin : la sortie vers Moonkin compte
+  play(m, "wrath", 1)
+  eq(m.cls.taxed, 2)
+  eq(D.pendingTax(m), 1)
+end)
+
 test("bot : la taxe à venir compte dans l'évaluation (fin de tour simulée) et distingue deux positions", function()
   local a = setup({ "wrath", "thick_hide" }, { mana = 3 })
   local b = setup({ "wrath", "wrath" }, { mana = 3 })

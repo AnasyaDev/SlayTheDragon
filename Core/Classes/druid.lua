@@ -4,7 +4,8 @@
 --   "tree". Jouer une carte dont le champ `form` diffère de la forme active fait entrer dans sa forme
 --   (crochet de classe onCardCommitted : après tous les coûts, payés dans la forme d'avant ; avant
 --   l'incantation ou la résolution, avant les Powers et bibelots) : journal { t = "shift", from, to },
---   événement propre « onShift » (from, to), compteur du tour c.cls.shifts. Une carte sans forme, une copie
+--   événement propre « onShift » (from, to), compteurs du tour c.cls.shifts (tous) et c.cls.taxed (comptés
+--   pour la taxe : tous sauf Cat <-> Bear). Une carte sans forme, une copie
 --   (replay), la résolution d'un Cast au tour suivant ne changent jamais la forme.
 -- Réserve : ressource commune c.player.res (« wild », 0 à 5, gardée), une seule valeur pour toutes les formes ;
 --   son nom suit la forme (Core/Language.lua). Lecture : Moonkin, +1 par point à chaque coup des cartes Attack
@@ -16,9 +17,12 @@
 --   ceil(réserve / 2), PULSE_MAX au plus ; Tree : TREE_ABSORB Absorb pour le tour ennemi (repli de la fiche
 --   § 1.3, 19/11/2026 : protège sans soigner entre les combats) ; sans forme : rien.
 -- Levier de secours A (fiche § 1.6, actif depuis le 18/11/2026) : à partir du (TAX_FREE + 1)-ième changement
---   d'un tour, TAX mana de moins au tour suivant par changement, TAX_MAX au plus (crochet maxMana, c.cls.tax).
---   Compte comme changement toute carte jouée qui fait entrer dans une autre forme, l'entrée dans la première
---   forme du combat (depuis « sans forme ») comprise ; une carte de la forme active ou sans forme ne compte pas.
+--   compté d'un tour, TAX mana de moins au tour suivant par changement compté, TAX_MAX au plus (crochet maxMana,
+--   c.cls.tax). Compte toute carte jouée qui fait entrer dans une autre forme, l'entrée dans la première forme
+--   du combat (depuis « sans forme ») comprise, sauf un passage entre Cat et Bear (dans les deux sens, depuis le
+--   19/11/2026 : les deux formes de Feral) ; une carte de la forme active ou sans forme ne change rien. Un
+--   passage Cat <-> Bear reste un changement de forme pour tout le reste (onShift : Idol of the Wild, Wolfshead
+--   Helm, Furor ; journal, compteur c.cls.shifts).
 local _, ns = ...
 
 local Combat = ns.Combat
@@ -65,13 +69,19 @@ function Druid.shift(c, to)
   if from == to then return false end
   cls.form = to
   cls.shifts = (cls.shifts or 0) + 1
+  if Druid.taxed(from, to) then cls.taxed = (cls.taxed or 0) + 1 end
   Combat.log(c, { t = "shift", from = from, to = to })
   stat(c, "druid_shifts")
   Combat.fire(c, "onShift", from, to)
   return true
 end
 
--- Mana perdu au tour suivant pour n changements de forme dans un tour (levier A ; 0 si TAX = 0).
+-- Le changement from -> to compte-t-il pour la taxe ? Tous, sauf un passage entre Cat et Bear (19/11/2026).
+function Druid.taxed(from, to)
+  return not ((from == "cat" and to == "bear") or (from == "bear" and to == "cat"))
+end
+
+-- Mana perdu au tour suivant pour n changements de forme comptés dans un tour (levier A ; 0 si TAX = 0).
 function Druid.taxOf(n)
   local over = (n or 0) - Druid.TAX_FREE
   if Druid.TAX <= 0 or over <= 0 then return 0 end
@@ -79,7 +89,7 @@ function Druid.taxOf(n)
 end
 
 -- Malus de mana à venir si le tour finissait maintenant (pastille de la vue).
-function Druid.pendingTax(c) return Druid.taxOf(c.cls and c.cls.shifts or 0) end
+function Druid.pendingTax(c) return Druid.taxOf(c.cls and c.cls.taxed or 0) end
 
 -- Clearcasting : une carte Attack sans la plaque Cast (lue sur la carte, Instant ou non).
 local function clearcastable(d) return d.type == "attack" and not d.cast end
@@ -176,6 +186,7 @@ ns.ClassRules.druid = {
   init = function(c, cls)
     cls.form = nil
     cls.shifts = 0
+    cls.taxed = 0
     cls.tax = 0
   end,
   hooks = {
@@ -210,9 +221,10 @@ ns.ClassRules.druid = {
     end,
     onTurnStart = function(c, cls)
       cls.shifts = 0
+      cls.taxed = 0
     end,
     onTurnEnd = function(c, cls)
-      cls.tax = Druid.taxOf(cls.shifts)
+      cls.tax = Druid.taxOf(cls.taxed)
       if cls.tax > 0 then stat(c, "druid_tax", cls.tax) end
       Druid.endOfTurn(c)
     end,
@@ -222,12 +234,12 @@ ns.ClassRules.druid = {
     end,
   },
   -- Bots : forme (nil compris), Clearcasting, dernière cible (frappe de l'ours), bibelots de forme déjà servis,
-  -- changements du tour (seulement si le levier A est actif).
+  -- changements du tour comptés pour la taxe (seulement si le levier A est actif ; Cat <-> Bear exclu).
   botKey = function(c)
     local cls, p, rs = c.cls, c.player, c.relicState
     local k = (cls.form or "-") .. ":" .. (p.st.clearcasting or 0) .. ":" .. tostring(p.lastTarget or 0) .. ":"
       .. (rs.idol_of_the_wild and 1 or 0) .. (rs.wolfshead_helm == c.round and 1 or 0)
-    if Druid.TAX > 0 then k = k .. ":" .. (cls.shifts or 0) end
+    if Druid.TAX > 0 then k = k .. ":" .. (cls.taxed or 0) end
     return k
   end,
   -- Bots : Clearcasting posé (un mana au tour suivant), bonus des Charges d'un Cast Attack en attente qui se
