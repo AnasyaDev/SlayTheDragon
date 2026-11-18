@@ -1237,3 +1237,50 @@ départ inchangés.
 
 - Non vérifié : graine 2, niveau 1 (compte neuf), clés 1 à 5, voies seules, épiques dans les zones dures (mesurées
   à 50 PV le 14/11/2026, `docs/zones/cartes-de-zone.md`) ; le bot `human` des autres classes n'a pas été remesuré.
+
+## Warrior : réglage au bot human (18/11/2026)
+
+Demande du joueur : « nerfer un peu » le Warrior, le plus facile au bot `human`. Cible : 62 à 68 % au bot `human`
+(`luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0 class=warrior`, niveau 7, `zones=0`,
+± 3,7 points), sans faire passer Westfall battue sous celle du Mage. Rapports bruts : `reports/w-*.txt` du worktree.
+
+**D'où venait l'avance.** Référence au même réglage : Warrior 80,0 % (Westfall battue 85,2 %), Mage 60,7 % (76,7),
+Priest 53,5 % (77,5). Deux sources : Westfall (8 points de mieux que le Mage et le Priest) et une campagne presque
+sans perte après Duskwood (battue / atteinte ≥ 99,4 % dans chaque zone dès Wetlands ; 94 % des Warriors qui battent
+Van Cleef battent Nefarian, 79 % des Mages, 69 % des Priests). Par type de combat, le Warrior ne perd pas plus de PV
+en proportion que les autres en combat normal et d'élite (5,6 / 12,8 % de ses PV max) mais un boss ne lui coûte
+que 20 % de ses PV (Mage 33,5 %, Priest 21,8 %). Balayage `sweep=cards class=warrior runs=300 bot=human` (sans
+carte 79,3 %) : aucune carte hors norme ; en tête Victory Rush +14,0, Mortal Strike +11,7, Bloodthirst +11,3,
+Demoralizing Shout et Shield Wall +10,3, Shield Block et Execute +9,3 ; en queue Deep Wounds −7,0, Enrage −4,0,
+Retaliation −3,3. Bibelot de départ (+1 Rage) : passer à +2 vaut à peu près +3 PV (essai 7), sans effet propre sur
+Westfall. Conclusion : l'avance tient aux PV (74, le plus haut) et à la tenue des soins sur la durée.
+
+| Essai (graine 1, 600) | Victoires | Westfall battue | battent Nefarian / battent Van Cleef |
+|---|---|---|---|
+| Référence (74 PV) | 80,0 % | 85,2 % | 93,9 % |
+| 1. 66 PV | 65,0 % | 72,5 % | 89,7 % |
+| 2. 69 PV | 70,2 % | 77,3 % | 90,8 % |
+| 3. 69 PV, soins de Victory Rush et Bloodthirst −1 | 68,2 % | 76,3 % | 89,4 % |
+| 4. 70 PV, soins −1, Demoralizing Shout Cooldown 5 | 70,3 % | 78,3 % | 89,8 % |
+| 5. 70 PV, soins −1, Mortal Strike 19, Shield Wall 15 | 70,0 % | 78,0 % | 89,7 % |
+| 6. 70 PV, soins −1, Bloodthirst Cooldown 5 | 70,2 % | 78,2 % | 89,8 % |
+| 7. 68 PV, soins −1, Battle Standard +2 Rage | 71,2 % | 78,2 % | 91,0 % |
+| **Retenu : 70 PV, soins −1, Diamond Flask Regen 3** | **68,5 %** | **77,5 %** | 88,4 % |
+
+Retenu : PV 74 → 70 ; Victory Rush soin 4 / 6 / 8 / 8 → 3 / 5 / 6 / 6 (+0 à +3) ; Bloodthirst soin 2 / 3 / 3 / 5 →
+1 / 2 / 2 / 4 ; Diamond Flask (bibelot du Warrior, niveau 3) Regen 5 → 3. Paliers : `docs/classes/warrior-paliers.md`.
+Après : % des PV max perdus par combat normal / élite / boss 5,6 / 12,8 / 20,0 → 6,6 / 14,6 / 22,9. Contrôle
+`heuristic` (300 expéditions, graine 1) : 96,7 → **95,0 %** (Westfall battue 96,3 %).
+
+- **Les PV bougent Westfall et la campagne ensemble** (≈ 2 points par PV pour chacune, essais 1 à 3) : la limite
+  « Westfall battue ≥ Mage (76,7) » arrête la baisse à 69-70 PV, soit ≈ 70 % de victoires. Le reste doit venir de
+  ce qui pèse après Westfall : les soins (essai 3 contre 2 : −2,0 points de victoires pour −1,0 à Westfall ; Diamond
+  Flask : −1,8 pour −0,8), gagnés en route et décisifs dans les combats longs.
+- **Les cartes de dégâts ou de défense ne déplacent rien** à graines égales (Demoralizing Shout, Mortal Strike, Shield
+  Wall, Bloodthirst Cooldown 5 : ± 0,3) : le Warrior perd à Westfall et à Duskwood avec un deck de 10 à 16 cartes,
+  et ne perd plus ensuite quelle que soit la force de ses cartes tardives. Essais annulés.
+- Résultat à 68,5 % : un demi-point au-dessus de la fourchette (± 3,7), Westfall à 0,8 point au-dessus du Mage ;
+  69 PV avec les mêmes soins passerait sous le Mage à Westfall (essai 3). Le Warrior reste la classe la plus facile
+  au bot `human` (Mage 60,7, Priest 53,5 avant les réglages des autres classes du même jour).
+- Non vérifié : niveau 1 compte neuf (Victory Rush soin 4 → 3 avait été annulé en passe 1 pour −11 points au niveau 1,
+  bot `heuristic` : à remesurer), clés 1 à 5, épiques du Warrior, autres graines.

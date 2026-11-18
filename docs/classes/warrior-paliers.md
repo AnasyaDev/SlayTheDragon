@@ -31,9 +31,9 @@ plus une fois ; les Powers gagnent un coût à 0 puis Innate (rien de multiplié
 | Deep Wounds | DoT 2 | coût 0 | Innate |
 | Raging Blow | 7 × 2 | 8 × 2 | 9 × 2 |
 | Whirlwind | 5 × 2 à tous | Retain | 6 × 2 à tous |
-| Victory Rush | 5, soin 6 | soin 8 | Deal 8 |
+| Victory Rush | 5, soin 5 | soin 6 | Deal 8 |
 | Berserker Rage | +3 Rage | Innate | +4 Rage |
-| Bloodthirst | 8, soin 3 | Deal 10 | soin 5 |
+| Bloodthirst | 8, soin 2 | Deal 10 | soin 4 |
 | Rampage | 5 × 4 | Pay 2 HP | Pay 1 HP |
 | Battle Shout | Strength 3 | Innate | coût 0 |
 | Onslaught | Deal 13 | Deal 15 | Spend 1 : pioche 2 |
@@ -49,6 +49,10 @@ plus une fois ; les Powers gagnent un coût à 0 puis Innate (rien de multiplié
 | Retaliation | 6 par coup | coût 0 | Innate |
 | Shield Wall | 24 Absorb | 28 | Retain |
 | Last Stand | coût 0 | soin 20 | Innate |
+
+Réglage au bot `human` du 18/11/2026 (`docs/equilibrage.md`, « Warrior : réglage au bot human ») : soins baissés
+d'un cran à chaque palier, Victory Rush 4 / 6 / 8 / 8 → 3 / 5 / 6 / 6, Bloodthirst 2 / 3 / 3 / 5 → 1 / 2 / 2 / 4 (dégâts,
+Strength et Cooldown inchangés).
 
 ## Épiques
 

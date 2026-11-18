@@ -199,11 +199,11 @@ card("whirlwind", {
 
 card("victory_rush", {
   level = 1, name = "Victory Rush", cost = 0, type = "attack", rarity = "common", path = "fury",
-  target = "enemy", exhaust = true, effects = { { "damage", 3 }, { "heal", 4 } },
-  text = "Deal 3.\nHeal 4.\nExhaust.",
-  up = { effects = { { "damage", 5 }, { "heal", 6 } }, text = "Deal 5.\nHeal 6.\nExhaust." },
-  up2 = { effects = { { "damage", 5 }, { "heal", 8 } }, text = "Deal 5.\nHeal 8.\nExhaust." },
-  up3 = { effects = { { "damage", 8 }, { "heal", 8 } }, text = "Deal 8.\nHeal 8.\nExhaust." },
+  target = "enemy", exhaust = true, effects = { { "damage", 3 }, { "heal", 3 } },
+  text = "Deal 3.\nHeal 3.\nExhaust.",
+  up = { effects = { { "damage", 5 }, { "heal", 5 } }, text = "Deal 5.\nHeal 5.\nExhaust." },
+  up2 = { effects = { { "damage", 5 }, { "heal", 6 } }, text = "Deal 5.\nHeal 6.\nExhaust." },
+  up3 = { effects = { { "damage", 8 }, { "heal", 6 } }, text = "Deal 8.\nHeal 6.\nExhaust." },
 })
 
 card("berserker_rage", {
@@ -220,14 +220,14 @@ card("berserker_rage", {
 card("bloodthirst", {
   level = 2, name = "Bloodthirst", cost = 1, type = "attack", rarity = "uncommon", path = "fury",
   target = "enemy", cooldown = 4,
-  effects = { { "damage", 6 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
-  text = "Deal 6.\nHeal 2.\nGain Strength 1\nCooldown 4.",
-  up = { effects = { { "damage", 8 }, { "heal", 3 }, { "apply", "force", 1, self = true } },
-    text = "Deal 8.\nHeal 3.\nGain Strength 1\nCooldown 4." },
-  up2 = { effects = { { "damage", 10 }, { "heal", 3 }, { "apply", "force", 1, self = true } },
-    text = "Deal 10.\nHeal 3.\nGain Strength 1\nCooldown 4." },
-  up3 = { effects = { { "damage", 10 }, { "heal", 5 }, { "apply", "force", 1, self = true } },
-    text = "Deal 10.\nHeal 5.\nGain Strength 1\nCooldown 4." },
+  effects = { { "damage", 6 }, { "heal", 1 }, { "apply", "force", 1, self = true } },
+  text = "Deal 6.\nHeal 1.\nGain Strength 1\nCooldown 4.",
+  up = { effects = { { "damage", 8 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
+    text = "Deal 8.\nHeal 2.\nGain Strength 1\nCooldown 4." },
+  up2 = { effects = { { "damage", 10 }, { "heal", 2 }, { "apply", "force", 1, self = true } },
+    text = "Deal 10.\nHeal 2.\nGain Strength 1\nCooldown 4." },
+  up3 = { effects = { { "damage", 10 }, { "heal", 4 }, { "apply", "force", 1, self = true } },
+    text = "Deal 10.\nHeal 4.\nGain Strength 1\nCooldown 4." },
 })
 
 card("rampage", {
@@ -496,13 +496,13 @@ relic("battle_standard", {
 
 relic("diamond_flask", {
   level = 3, name = "Diamond Flask", rarity = "uncommon",
-  text = "Once per combat, upon dropping below half HP, gain Regen 5.",
+  text = "Once per combat, upon dropping below half HP, gain Regen 3.",
   hooks = {
     onHpLost = function(c)
       local p = c.player
       if c.relicState.diamond_flask or p.hp * 2 >= p.maxHp or p.hp <= 0 then return end
       c.relicState.diamond_flask = true
-      Combat.applyStatus(c, p, "regen", 5)
+      Combat.applyStatus(c, p, "regen", 3)
     end,
   },
 })
@@ -550,7 +550,7 @@ relic("skullflame_shield", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.warrior = {
-  id = "warrior", name = "Warrior", order = 2, hp = 74,
+  id = "warrior", name = "Warrior", order = 2, hp = 70,
   resource = { id = "rage", cap = 5, keep = true },
   deck = {
     "strike", "strike", "strike", "strike",
