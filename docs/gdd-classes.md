@@ -104,7 +104,7 @@ Chaque classe a une chose qu'aucune autre ne fait. C'est elle qui décide si la 
 | Hunter | Frenzy du familier (0 à 5) | A un familier qui attaque seul, et pose des Traps | Contrôle | Facile |
 | Paladin | Holy Power (0 à 3) | Porte un Seal qui transforme son Judgement | Absorb, soin | Facile |
 | Shaman | Maelstrom (0 à 5) | Pose des totems à durée limitée, un par élément | Soin, Absorb | Difficile |
-| Druid | Forme active | Change de forme, et ses cartes changent avec | Selon la forme | Difficile |
+| Druid | Réserve unique (0 à 5), lue selon la forme | Chaque carte le fait changer de forme ; il emprunte la mécanique d'une autre classe dans chaque forme | Absorb (Bear), soin (Caster) | Difficile |
 
 ## Priest (jouable)
 
@@ -342,41 +342,46 @@ Le Shaman pose des totems qui travaillent pour lui pendant quelques tours, puis 
 
 ## Druid
 
-Le Druid a une forme active, et la même carte ne fait pas la même chose selon la forme. C'est l'équivalent des postures de la Watcher, et la classe la plus exigeante.
+> Section réécrite le 18/11/2026 d'après la conception décidée avec le joueur (fiche complète : `docs/classes/druid.md`). Elle remplace la conception du Claude Doc (formes à effet permanent, cartes `Shift`, lignes `Bear:` / `Cat:`), à reporter dans le document source.
 
-**Ressource : la forme active.** La pastille de classe affiche la forme, pas un nombre. Il y en a quatre : Caster (au départ), Bear, Cat, Moonkin. Une carte `Shift` fait entrer dans une forme et l'on y reste jusqu'au prochain Shift.
+Le Druid emprunte : dans chaque forme, il se bat avec la mécanique d'une autre classe. Chaque carte porte une forme, et la jouer y fait entrer. C'est la classe la plus exigeante : l'ordre des cartes décide de la forme, et la forme décide du sens de la réserve.
 
-**Mécanique propre : `Forme: effet`.** Beaucoup de cartes ont une ligne par forme, écrite avec la condition habituelle. Changer de forme déclenche aussi les effets `Shift:` de certains Powers. Le Druid gagne donc à changer souvent, pas à rester.
+**Ressource : une réserve unique (0 à 5).** Gardée d'un tour à l'autre et au changement de forme. Son sens dépend de la forme active ; la pastille montre l'icône de la forme et le nombre.
 
-| Forme | Effet permanent |
-|---|---|
-| Caster | Aucun. Seule forme où les soins sont jouables. |
-| Bear | L'Absorb gagné augmente de moitié. |
-| Cat | La première carte Attack de chaque tour coûte 0. |
-| Moonkin | Les cartes Cast infligent 4 de plus. |
+**Mécanique propre : la forme portée par les cartes.** Chaque carte du Druid est marquée d'une forme (mot de tête de la plaque, icône sur la carte). La jouer fait entrer dans cette forme, sans coût, après le paiement et avant la résolution. Pas de carte Shift, pas de choix. Les Powers, l'Interrupt et Nature's Swiftness n'ont pas de forme. La forme où l'on termine le tour décide de l'effet de fin de tour.
+
+| Forme | La réserve vaut | Effet |
+|---|---|---|
+| Caster (départ) | rien (elle attend) | Aucun. Forme des soins et de la Regen. |
+| Cat | des Combo du Rogue (`+1 Combo.`, `Surge:`) | Aucun hors Surge. |
+| Bear | du Frenzy du Hunter (`+1 Frenzy.`, `Spend N:`, `Surge:`) | Fin de tour : le Druid frappe seul la dernière cible pour 1 + réserve, puis +1 ; −1 à la fin du round en Bear. |
+| Moonkin | des Charges du Mage (`+1 Charge.`, `Surge:`) | Permanent : +1 dégât par point sur chaque coup des cartes Attack. |
 
 | Voie | Moteur | Ce qu'elle cherche |
 |---|---|---|
-| Balance | Moonkin, Cast, DoT sur tous les ennemis (Moonfire). | Les gros Cast |
-| Feral | Bear pour tenir, Cat pour frapper, en alternant. | Le Shift à chaque tour |
-| Restoration | Regen empilé, puis consommé pour un soin immédiat. | Le combat long |
+| Feral | Cat monte et vide la réserve, Bear tient (Absorb) et frappe en fin de tour. | Construire en Cat, finir en Bear |
+| Balance | Moonkin : Charges, Attack renforcées, Surge à tous, Cast qui gardent le bonus si l'on finit en Moonkin. | Le tour fini en Moonkin avec 5 Charges |
+| Restoration | Regen empilée puis convertie (Swiftmend), Thorns, Regen qui renforce les attaques. | Le combat long |
 
-| Carte | Coût | Type | Texte |
-|---|---|---|---|
-| Bear Form | 0 | Skill (Shift) | `Enter Bear.` / `Gain 4 Absorb.` |
-| Cat Form | 0 | Skill (Shift) | `Enter Cat.` / `Draw 1.` |
-| Maul | 1 | Attack | `Deal 7.` / `Bear: gain 5 Absorb.` / `Cat: apply DoT 4.` |
-| Wrath | 1 | Attack | `Deal 7.` / `Moonkin: deal 4 more.` |
-| Starfire | 2 | Attack (Cast) | `Deal 20.` |
-| Rejuvenation | 1 | Skill | `Gain Regen 4` |
-| Swiftmend | 0 | Skill | `Heal twice your Regen.` (Cooldown 2) |
-| Feral Instinct | 1 | Power | `Shift: deal 3 to all.` |
+| Carte | Coût | Type | Forme | Texte |
+|---|---|---|---|---|
+| Wrath | 1 | Attack | Moonkin | `Deal 5.` / `+1 Charge.` |
+| Thick Hide | 1 | Skill | Bear | `Gain 5 Absorb.` |
+| Maul | 1 | Attack | Bear | `Deal 4.` / `Bear strikes.` |
+| Ferocious Bite | 1 | Attack | Cat | `Surge: deal 4 + 4 per Combo.` |
+| Starfire | 2 | Attack (Cast) | Moonkin | `Deal 20.` |
+| Frenzied Regeneration | 1 | Skill | Bear | `Gain 6 Absorb.` / `Spend 2: gain 6 more.` |
+| Swiftmend | 0 | Skill | Caster | `Heal 2 per Regen.` (Exhaust) |
+| Mangle | 2 | Skill | Bear | `Surge: Bear strikes once per Frenzy.` |
 
-- **Deck de départ :** Wrath, Bear Form, Maul, Rejuvenation.
-- **Interrupt :** Skull Bash.
+- **Deck de départ :** Wrath ×3, Thick Hide ×4, Maul ×2, Ferocious Bite ×1.
+- **PV de départ :** 50 (à régler).
+- **Interrupt :** Skull Bash (sans forme).
 - **Last Breath :** Rebirth.
-- **Bibelot de classe :** Idol of the Wild, le premier Shift de chaque tour donne 1 mana.
-- **Risque :** trois lignes de forme sur une carte ne tiennent pas dans le panneau de texte. Limite à fixer : deux lignes de forme par carte au plus, et la ligne de la forme active mise en évidence.
+- **Bibelot de classe :** Idol of the Wild, la première carte de chaque combat qui change de forme coûte 0.
+- **Cartes propres, pas partagées :** les cartes reprennent les effets et les mots des autres classes sous des noms de sorts de druide (Ferocious Bite = Eviscerate, Mangle = Bestial Wrath) ; elles se règlent sans toucher au Rogue, au Hunter ni au Mage.
+- **Réglage de secours (non actif) :** à partir du troisième changement de forme d'un tour, −1 mana au tour suivant par changement (−2 au plus), ou −1 point de réserve par changement.
+- **Risque :** le transfert de réserve (monter en Moonkin, vider en Cat) fait servir chaque point deux fois ; finir en Bear ne coûte rien dès qu'on garde une carte Bear. À mesurer en simulation avant d'activer le réglage de secours.
 
 ## Progression par classe
 
@@ -417,7 +422,7 @@ Le Warrior vient en premier : il ne demande que `Spend N` et la Rage, et il épr
 | 5 | Warlock | Coût `Pay N HP`, Power qui agit en fin de tour |
 | 6 | Hunter | Familier, cartes `Trap` pendant le tour ennemi |
 | 7 | Shaman | Powers à durée (`Totem N`), quatre emplacements |
-| 8 | Druid | Formes, cartes à plusieurs lignes conditionnelles |
+| 8 | Druid | Forme portée par chaque carte, nom de ressource selon la forme, frappe de fin de tour (comme le familier) |
 
 Décisions prises le 11 novembre 2026 :
 

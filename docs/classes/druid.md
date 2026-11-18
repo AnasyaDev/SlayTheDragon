@@ -1,373 +1,628 @@
 # Druid — fiche de conception
 
-Développe la section Druid du GDD des classes (Claude Docs, « Slay the Dragon — GDD des classes »)
-sans la contredire. Format des cartes, chiffres et raretés calés sur le Priest (`Data/Priest.lua`) ;
-écriture des textes : `docs/interface.md`, « Langage des cartes ». L'état de dégâts sur la durée
-s'appelle **DoT** (encore `pain` / « Pain » dans le code). Textes affichés en anglais.
+Fiche de conception, réécrite le 18/11/2026 d'après la conception décidée avec le joueur. Elle remplace la
+version du 12/11/2026 (formes à effet permanent, cartes `Shift` dédiées, lignes `Bear:` / `Cat:` / `Moonkin:`
+sur les cartes, Idol of the Wild à +1 mana par Shift) : de cette version restent les trois voies, l'Interrupt
+(Skull Bash), le Last Breath (Rebirth), une partie des bibelots et des noms de cartes. Rien n'est codé (le
+Druid est un ajout futur, `docs/classes/decisions.md`, « Périmètre »).
 
-Résumé : la ressource du Druid est sa **forme active** (Caster au départ, Bear, Cat, Moonkin),
-affichée dans la pastille de classe. Les cartes **Shift** changent de forme ; beaucoup de cartes ont
-une ou deux lignes `Bear:` / `Cat:` / `Moonkin:` ; les Powers à effet `Shift:` récompensent les
-changements. Survie : selon la forme (Absorb en Bear, vitesse en Cat, Cast en Moonkin, soins en
-Caster). Difficulté : difficile.
+Règles communes (tour, Cast, Interrupt, Cooldown, Exhaust, Retain, Innate, Surge, Spend N, Last Breath, états
+communs) : `docs/gdd-classes.md` et `docs/classes.md`. Langage des cartes : `docs/interface.md`, « Langage des
+cartes ». Textes de jeu en anglais. Chiffres : points de départ copiés des cartes des classes empruntées
+(`Data/Rogue.lua`, `Data/Hunter.lua`, `Data/Mage.lua`), à régler par simulation.
 
-| Élément | Valeur |
-| --- | --- |
-| PV de départ | 65 (comme le Priest ; à mesurer) |
-| Deck de départ | Wrath ×4, Bear Form ×4, Maul ×1, Rejuvenation ×1 |
-| Bibelot de départ | Idol of the Wild |
-| Interrupt | Skull Bash (Feral) |
-| Last Breath | Rebirth (Restoration) |
-| Mots-clés propres | `Shift`, `Caster` (deux, le maximum du gabarit) |
+## Résumé
+
+Le Druid **emprunte** les mécaniques des autres classes. Chacune de ses cartes porte une **forme** (Cat, Bear,
+Moonkin, Caster) ; la jouer fait entrer dans cette forme, sans coût. Il a **une seule réserve** de 0 à 5
+points, gardée d'un tour à l'autre et au changement de forme, dont le sens dépend de la forme active :
+
+| Forme | La réserve vaut | Effet de la forme |
+|---|---|---|
+| Caster (départ) | rien (réserve en attente) | aucun |
+| Cat | des **Combo** du Rogue | aucun hors Surge : les cartes Cat montent la réserve (« +1 Combo. ») et la vident (« Surge: ») |
+| Bear | du **Frenzy** du Hunter | fin de tour : le Druid frappe seul la dernière cible pour 1 + réserve, puis +1 ; −1 à la fin du round |
+| Moonkin | des **Charges** du Mage | permanent : +1 dégât par point sur chaque coup des cartes Attack |
+
+Le rythme : monter la réserve avec les cartes d'une forme, la dépenser avec celles d'une autre, et finir le tour
+dans la forme dont on veut l'effet (Bear pour frapper en fin de tour, Moonkin pour qu'un Cast se résolve avec
+le bonus). Survie : Absorb en Bear, soins et Regen en Caster. Difficulté : difficile.
+
+## 0. Identité
+
+| | |
+|---|---|
+| Fantasme | Le Druid change de forme à chaque carte et emprunte à chaque forme la façon de se battre d'une autre classe : le chat finit comme un Rogue, l'ours frappe seul comme le familier du Hunter, le sélénien charge ses sorts comme un Mage. |
+| Ressource | Réserve unique, 0 à 5, gardée d'un tour à l'autre et au changement de forme. Son nom affiché est celui de la forme active (Combo, Frenzy, Charges). |
+| PV de départ | **50** (comme le Hunter et le Rogue après réglage : frappe gratuite en fin de tour comme le Hunter, Absorb en Bear, soins Exhaust en Caster). À régler. `decisions.md` donnait 65 avant les réglages des autres classes. |
+| Deck de départ | Wrath ×3 (Moonkin), Thick Hide ×4 (Bear), Maul ×2 (Bear), Ferocious Bite ×1 (Cat). |
+| Bibelot de départ | Idol of the Wild : la première carte de chaque combat qui change de forme coûte 0. |
+| Interrupt | Skull Bash (Feral, sans forme, niveau 1). |
+| Last Breath | Rebirth (Restoration, rare, niveau 1). |
+| Mots-clés propres | **Forme** (mot de plaque : `Cat`, `Bear`, `Moonkin`, `Caster`, une seule règle) et **Bear strikes**. Les mots de la réserve (Combo, Frenzy, Charge), `Surge:` et `Spend N:` sont des mots communs ou des noms de ressource, pas des mots-clés propres. |
+| Style de survie | Encaisser (Absorb des cartes Bear) et se soigner (cartes Caster : soins directs tous Exhaust, Regen). `survival = "absorb"`. |
+| Difficulté | Difficile : chaque carte change la forme, l'ordre des cartes compte. |
+
+Deck de départ (gabarit du GDD : 10 cartes de 4 sortes, une attaque, une défense, deux cartes de mécanique) :
+Wrath est l'attaque (et monte la réserve), Thick Hide la défense (et laisse en Bear pour la frappe de fin de
+tour), Maul montre la frappe de l'ours et Ferocious Bite dépense en Cat ce que Wrath a monté en Moonkin.
+Un tour type de départ : Wrath, Wrath (réserve 2, Moonkin), Thick Hide (Bear, 5 Absorb) ; fin de tour en Bear :
+frappe de 1 + 2 = 3, réserve 3 ; fin du round : réserve 2. Au tour suivant, Ferocious Bite à 2 Combo : 12.
 
 ## 1. Règles propres (spécification)
 
-### Formes
+### 1.1 Forme d'une carte
 
-| Forme | Effet permanent | Infobulle (≤ 60 caractères) |
-| --- | --- | --- |
-| Caster | Aucun. Forme de départ ; les cartes `Caster` s'y jouent. | `Starting form. Heal cards are played in it.` |
-| Bear | L'Absorb gagné augmente de moitié (arrondi à l'inférieur). | `Absorb you gain is increased by half.` |
-| Cat | La première Attack hors Cast de chaque tour coûte 0. | `First Attack each turn costs 0 (not Cast).` |
-| Moonkin | Les cartes Cast infligent 4 de plus par coup. | `Cast cards deal 4 more damage per hit.` |
+1. Champ de carte `form = "cat" | "bear" | "moonkin" | "caster"`, ou absent (carte **sans forme**). Toute carte
+   du Druid a une forme, sauf la liste fermée du § 1.7.
+2. **Jouer une carte dont la forme diffère de la forme active fait entrer dans sa forme.** Pas de carte Shift,
+   pas de choix, pas de bouton, aucun coût. Jouer une carte de la forme active, ou une carte sans forme, ne
+   change rien (aucun événement).
+3. **Ordre exact** (`Combat.play`, `docs/classes.md`, « Ordre d'un coup joué ») :
+   1. cible (crochet `target`) ; une carte à cible devient la dernière cible (`c.player.lastTarget`), celle de
+      la frappe de l'ours ;
+   2. coût calculé **dans la forme active avant le changement** (crochet `cost`), puis payé : mana, PV, `Spend N`
+      (pris dans la réserve commune, donc indifférent à la forme) ;
+   3. compteurs du tour ;
+   4. **changement de forme** (crochet de classe `onCardCommitted`, qui passe avant ceux des Powers et des
+      bibelots) : journal `{ t = "shift", from, to }`, événement propre `onShift(from, to)`, compteur de
+      changements du tour (§ 1.6) ;
+   5. incantation (Cast) ou résolution : toutes les lignes de la carte se résolvent dans sa forme.
+   Raison du coût avant le changement : le coût affiché en main est celui qui sera payé, sans calcul ; aucune
+   carte de la liste n'a de coût qui dépende de la forme (Idol of the Wild lit seulement si la carte changera la
+   forme, ce qui se sait avant le jeu).
+4. **Cartes Cast** : la forme change **au jeu** (étape 4), comme pour toute carte. La résolution, au début du tour
+   suivant, ne change pas la forme : elle se fait dans la forme active à ce moment-là (celle où le tour précédent
+   s'est terminé). Le bonus de Moonkin ne s'ajoute donc que si l'on a fini le tour en Moonkin. Exemple : Starfire
+   (Moonkin, Cast) puis Thick Hide (Bear) : fin de tour en Bear (frappe, Absorb), Starfire se résout en Bear sans
+   le bonus des Charges. Finir en Moonkin garde le bonus mais sans frappe ni Absorb : c'est le choix de la voie
+   Balance. Sous Instant (Nature's Swiftness), la carte se résout tout de suite, dans sa forme.
+5. **Cartes Surge** : la carte entre dans sa forme, puis son `Surge:` dépense **toute** la réserve à sa
+   résolution (règle commune) ; le montant se lit avec le mot de la carte (« per Combo », « per Charge », « per
+   Frenzy »). Les Charges sont lues puis remises à 0 avant le coup : le bonus de Moonkin ne s'ajoute pas à une
+   carte Surge (comme chez le Mage). Après résolution, la carte suit sa plaque (défausse par défaut).
+   Une carte dont toutes les clauses sont `Surge:` est injouable à 0 (`minRes = 1`, raison « resource »).
+   Contrainte de conception : **aucune carte Surge n'est en Cast** (la réserve pourrait changer entre le jeu et la
+   résolution).
+6. **Retain, Innate, Cooldown** : une carte gardée en main (Retain, Traveler's Backpack), placée dans la main de
+   départ (Innate) ou revenue de recharge (Cooldown) ne change pas la forme ; seule la jouer la change. La forme
+   de fin de tour se lit sur la forme active, pas sur les cartes gardées.
+7. **Copies** (crochet `replay`, `Combat.copyCard`) : une copie se résout sans changer la forme (elle ne passe pas
+   par `Combat.play`). Potions, bibelots, déclencheurs de Powers, épique : ne changent jamais la forme.
+8. **Début et fin de combat** : chaque combat commence en **Caster**, réserve à 0 (l'épique Heart of the Wild
+   améliorée +3 mise à part, § 5). La forme et la réserve ne se gardent pas d'un combat à l'autre.
+   Last Breath (Rebirth) ne change pas la forme ; une interruption de Cast non plus.
+9. Cartes neutres (sans classe, `Data/Neutral.lua`) : sans forme.
 
-Les formes sont affichées comme des états (pastille et infobulle), pas comme des mots-clés : le
-Druid n'a que deux mots-clés propres.
+### 1.2 La réserve
 
-### Mots-clés propres
+1. Ressource de classe `c.player.res`, `resource = { id = "wild", cap = 5, keep = true }` (id à confirmer), une
+   seule valeur pour toutes les formes. **Les points sont gardés au changement de forme** : 3 Charges montées en
+   Moonkin deviennent 3 Combo dès qu'une carte Cat est jouée.
+2. **Gains** : clauses « +N Combo. » (cartes Cat), « +N Charge. » / « +N Charges. » (cartes Moonkin),
+   « +N Frenzy. » (cartes Bear), et +1 après chaque frappe de l'ours (§ 1.4). Un mot de réserve n'apparaît que
+   sur une carte de sa forme, ou sur un Power dont le déclencheur nomme cette forme (« Cat Attacks: +1 Combo. ») :
+   la clause se résout alors toujours dans la forme qui porte ce mot. Les cartes Caster et les cartes sans forme
+   ne gagnent ni ne dépensent rien.
+3. **Plafond 5** ; le surplus est perdu (journal `capped`, pastille qui clignote, comme chez le Rogue).
+4. **Dépense** : `Surge:` (toute la réserve, cartes Cat, Bear, Moonkin) et `Spend N:` (cartes Bear, au choix du
+   joueur : clic droit ou Maj pour ne pas dépenser, `decisions.md`).
+5. **Baisse** : −1 à la fin de chaque round **si la forme active est Bear** à ce moment (crochet `onRoundEnd`,
+   après le tour ennemi ; c'est la baisse du Frenzy du Hunter, « sauf le premier tour » compris puisqu'elle a lieu
+   après le tour ennemi). Dans les autres formes, la réserve ne baisse pas (le Combo et les Charges ne baissent
+   pas chez le Rogue et le Mage). Conséquence voulue : la frappe automatique de l'ours (+1) et la baisse (−1)
+   s'annulent ; seules les cartes font monter la réserve.
+6. **Lecture par forme** :
 
-| Mot-clé | Où | Infobulle (≤ 60 caractères) |
-| --- | --- | --- |
-| `Shift` | plaque des cartes qui changent de forme ; condition `Shift:` sur les Powers | `Enter a form. Shift: triggers each time your form changes.` |
-| `Caster` | plaque des cartes de soin | `Heal card: returns you to Caster form before acting.` |
+| Forme | Mot | Effet de la réserve |
+|---|---|---|
+| Caster | aucun | aucun : la réserve attend la forme suivante |
+| Cat | Combo | aucun effet passif ; les `Surge:` des cartes Cat la dépensent |
+| Bear | Frenzy | dégâts de la frappe de l'ours : 1 + réserve ; `Spend N:` des cartes Bear |
+| Moonkin | Charge(s) | +1 aux dégâts de **chaque coup** des cartes Attack tant que Moonkin est active, compté au coup, comme Strength, avant Demoralized et Sundered ; ni DoT, ni Skills, ni frappe de l'ours, ni bibelots |
 
-### Règles, au cas limite près
+### 1.3 Effet de fin de tour
 
-1. **Forme en début de combat.** Chaque combat commence en Caster. La forme ne se garde pas d'un
-   combat à l'autre. Entrer dans la forme de départ (ou dans celle qu'impose un bibelot, comme Idol
-   of the Moon) n'est pas un Shift : aucun effet `Shift:` ne se déclenche.
-2. **Ordre de résolution.** Les clauses d'une carte se résolvent dans l'ordre du texte. `Enter Bear.`
-   change la forme tout de suite : les clauses suivantes de la même carte voient la nouvelle forme
-   (Bear Form : `Enter Bear.` puis `Gain 4 Absorb.` donne 6 Absorb).
-3. **Shift.** Un Shift est un changement de forme effectif. Chaque Shift déclenche une fois les effets
-   `Shift:` (Powers dans l'ordre où ils ont été joués, puis bibelots), juste après le changement et
-   avant la clause suivante.
-4. **Entrer dans la forme déjà active.** Rien ne change : pas de Shift, aucun effet `Shift:`, pas de
-   mana d'Idol of the Wild. Le reste de la carte s'applique normalement (Bear Form en Bear : 6 Absorb).
-   Raison : sinon une carte Shift à 0 mana rejouée dans la même forme déclencherait `Shift:` sans
-   rien changer, ce qui récompenserait le contraire de ce que demande la classe.
-5. **Soins seulement en Caster : ni carte injouable, ni effet ignoré.** Une carte `Caster` (toute carte
-   dont les effets à la pose soignent ou donnent Regen à soi) jouée dans une autre forme ramène
-   d'abord en Caster ; ce retour est un Shift (il déclenche `Shift:` et Idol of the Wild), puis la carte
-   agit en Caster. Les soins restent donc joués en Caster, comme le veut le GDD, et comme dans WoW où
-   lancer un soin fait quitter la forme.
-   - Pourquoi pas « injouable » : le deck de départ entre en Bear et n'a aucun moyen d'en sortir ;
-     Rejuvenation serait morte dès le premier Bear Form. Pourquoi pas « effet ignoré » : une carte qui
-     se joue pour rien est un piège.
-   - Le mot `Caster` est affiché sur la plaque de toute carte qui soigne, y compris une carte neutre
-     (Heavy Silk Bandage) : la règle suit l'effet, pas la classe d'origine.
-   - Ne sont pas des cartes `Caster` : les soins qui ne viennent pas de la pose d'une carte (tic de
-     Regen, Last Breath d'un Power, bibelot, potion). Ils agissent dans toutes les formes.
-   - Contrainte de conception : aucune carte `Caster` n'a Cast (pas de soin en attente qui se
-     résoudrait dans une autre forme).
-6. **Bear et Absorb.** Chaque gain d'Absorb sur soi est multiplié par 1,5 et arrondi à l'inférieur,
-   **après** les bonus fixes (Heart of the Wild, Rapture, bibelots) : 3 → 4, 4 → 6, 5 → 7, 7 → 10.
-   Chaque gain est arrondi à part (Barkskin : 7 → 10 puis 4 → 6). Vaut pour les cartes, Powers,
-   bibelots et potions. L'Absorb déjà acquis ne change pas en entrant ou en sortant de Bear.
-7. **Cat et coût.** Une fois par tour, la première Attack sans Cast jouée en Cat dont le coût serait
-   supérieur à 0 coûte 0.
-   - Le coût tombe à 0 quelles que soient les autres réductions (elles ne s'accumulent pas au-delà).
-   - Une Attack qui coûte déjà 0 ne consomme pas la gratuité ; une Attack jouée dans une autre forme
-     non plus.
-   - Sortir de Cat puis y revenir dans le même tour ne rend pas la gratuité.
-   - Les cartes Cast en sont exclues : sinon Cat Form + Starfire donnerait un Cast de 24 gratuit.
-   - Les cartes en main affichent leur coût réel (0 pour les Attack concernées tant que la gratuité
-     est disponible).
-8. **Moonkin et attaques multiples.** +4 par coup, comme Strength : à chaque cible d'une carte de zone
-   et à chaque coup d'une carte à plusieurs coups. Ajouté avant les multiplicateurs (Sundered,
-   Demoralized). Ne s'applique qu'aux cartes Cast (pas aux dégâts d'un Power comme Starfall, pas au
-   DoT).
-9. **Shift et Cast en cours.** Changer de forme n'interrompt pas un Cast. Une carte Cast lit la forme
-   **à sa résolution** (début du tour suivant, avant la pioche) : lignes de forme et bonus de Moonkin
-   compris. Jouer Starfire en Moonkin puis passer en Bear pour encaisser fait perdre les +4 : c'est le
-   choix de la voie Balance (gourmandise ou sécurité).
-10. **Lignes de forme.** `Bear: effect.` ne s'applique que si la forme est active au moment où la
-    clause se résout. Deux lignes de forme par carte au plus. Un état posé sous condition de forme
-    reste dans sa clause (`Cat: apply DoT 3.`), comme les exceptions du langage des cartes.
-11. **Fin de tour, fin de combat.** La forme reste d'un tour à l'autre jusqu'au prochain Shift. Elle
-    revient à Caster à la fin du combat. Last Breath (Rebirth) ne change pas la forme.
+La forme active au moment de la fin du tour (crochet de classe `onTurnEnd`, avant les Powers, les bibelots et la
+défausse, comme le familier du Hunter) décide de l'effet :
 
-## 2. Les 34 cartes
+| Forme de fin de tour | Effet |
+|---|---|
+| Caster | aucun |
+| Cat | aucun |
+| Bear | **frappe de l'ours** : un coup de 1 + réserve sur la dernière cible, puis +1 (§ 1.4) ; puis, à la fin du round, −1 (§ 1.2) |
+| Moonkin | aucun en fin de tour ; un Cast en attente se résoudra au début du tour suivant avec le bonus des Charges (§ 1.1, point 4) |
 
-Colonnes : identifiant ; nom du sort ; voie ; rareté ; coût ; type ; mots de plaque ; texte de base et
-amélioré (`/` = retour de clause ; mots de plaque omis, ils restent dans `text` comme pour le
-Priest) ; icône (fichier `.tga` vérifié dans `~/Téléchargements/ICONS`, en minuscules). « Deck de
-départ » et le niveau de déblocage : section 5.
+La partie « tenir » de l'ours n'est pas un effet de forme : ce sont ses cartes (Thick Hide, Frenzied
+Regeneration, Demoralizing Roar), qui donnent de l'Absorb ou réduisent les coups, et `Spend N:` qui échange des
+points de Frenzy (frappe plus faible) contre de l'Absorb. Finir en Bear demande donc de garder une carte Bear
+pour la fin du tour (les cartes sans forme jouées ensuite ne changent rien).
 
-### Départ (4, rareté basic)
+### 1.4 La frappe de l'ours (« Bear strikes. »)
 
-| Id | Nom | Coût | Type | Plaque | Texte | Amélioré | Icône |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `wrath` | Wrath | 1 | Attack | — | Deal 6. / Moonkin: deal 3 more. | Deal 9. / Moonkin: deal 3 more. | `spell_nature_abolishmagic` |
-| `bear_form` | Bear Form | 1 | Skill | Shift | Enter Bear. / Gain 4 Absorb. | Enter Bear. / Gain 6 Absorb. | `ability_racial_bearform` |
-| `maul` | Maul | 1 | Attack | — | Deal 5. / Bear: gain 3 Absorb. / Cat: apply DoT 3. | Deal 7. / Bear: gain 4 Absorb. / Cat: apply DoT 4. | `ability_druid_maul` |
-| `rejuvenation` | Rejuvenation | 1 | Skill | Caster, Exhaust | Gain Regen 4 | Gain Regen 6 | `spell_nature_rejuvenation` |
+1. Un coup **sans carte** (comme le familier du Hunter, `Core/Classes/hunter.lua`) de **1 + réserve** sur la
+   dernière cible du Druid ; morte ou absente : l'ennemi vivant le plus à gauche. Strength et Demoralized du Druid
+   s'appliquent, Sundered et Absorb de la cible aussi ; les bonus des cartes Attack (Moonkin, Gift of Nature,
+   bibelots « Attacks ») ne s'appliquent pas.
+2. Puis **+1 Frenzy** (plafond 5).
+3. Automatique à la fin de chaque tour fini en Bear ; commandée par la clause « Bear strikes. » / « Bear strikes
+   twice. » d'une carte Bear, tout de suite, dans l'ordre des lignes, chaque frappe recalculée.
+4. Frappes d'un Surge (Mangle : « Surge: Bear strikes once per Frenzy. ») : chacune à 1 + le montant compté,
+   sans gain (comme Bestial Wrath).
+5. La frappe n'interrompt, n'étourdit et ne pose rien ; si elle tue le dernier ennemi, le combat est gagné avant
+   le tour ennemi.
 
-### Balance (10)
+### 1.5 Rage du Warrior en Bear : non
 
-| Id | Nom | Rareté | Coût | Type | Plaque | Texte | Amélioré | Icône |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `moonkin_form` | Moonkin Form | common | 0 | Skill | Shift | Enter Moonkin. / Gain 2 Absorb. | Enter Moonkin. / Gain 4 Absorb. | `spell_nature_forceofnature` |
-| `starfire` | Starfire | common | 2 | Attack | Cast | Deal 24. | Deal 31. | `spell_arcane_starfire` |
-| `moonfire` | Moonfire | common | 1 | Attack | — | Deal 2 to all. / Apply DoT 3 to all | Deal 3 to all. / Apply DoT 4 to all | `spell_nature_starfall` |
-| `faerie_fire` | Faerie Fire | common | 0 | Skill | Cooldown 2 | Draw 1. / Apply Sundered 1 ⌛ | Draw 1. / Apply Sundered 2 ⌛ | `spell_nature_faeriefire` |
-| `hurricane` | Hurricane | uncommon | 2 | Attack | Cast | Deal 15 to all. | Deal 19 to all. | `spell_nature_cyclone` |
-| `natures_grace` | Nature's Grace | uncommon | 1 | Power | — | Moonkin: Cast cards cost −1. | (coût 0) | `spell_nature_naturesblessing` |
-| `innervate` | Innervate | uncommon | 0 | Skill | Exhaust | +2 mana. | +3 mana. | `spell_nature_lightning` |
-| `entangling_roots` | Entangling Roots | uncommon | 1 | Attack | Cast, Cooldown 3 | Deal 9. / Apply Stunned 1 ⌛ | Deal 12. / Apply Stunned 1 ⌛ (Cooldown 2) | `spell_nature_stranglevines` |
-| `starfall` | Starfall | rare | 2 | Power | — | Turn start: deal 3 to all. / Moonkin: deal 3 more. | (coût 1) | `ability_druid_starfall` |
-| `eclipse` | Eclipse | rare | 1 | Power | — | Cast cards: apply DoT 3 to all. | Cast cards: apply DoT 4 to all. | `ability_druid_eclipse` |
+Étudié : la Rage (+1 par perte de PV, `Core/Classes/warrior.lua`, `onHpLost`) à la place du Frenzy, ou en plus.
+Tranché : **non**, la réserve de l'ours est le Frenzy seul ; du Warrior, l'ours garde la forme `Spend N:` (déjà
+commune : Growl du Hunter l'emploie).
 
-### Feral (10)
+- **L'Absorb tuerait la Rage** : les cartes Bear donnent de l'Absorb, et la Rage ne vient que des PV perdus. Un
+  ours bien joué (tout absorbé) ne gagnerait rien ; la forme qui tient serait celle qui ne monte pas sa réserve.
+  Le Warrior vit avec cette tension parce qu'elle fait son identité ; pour l'ours, elle contredit son rôle.
+- **Gain passif et réserve partagée** : la réserve passe d'une forme à l'autre. Avec la Rage, finir en Bear et
+  prendre trois coups donnerait 3 points gratuits, vidés au tour suivant par Ferocious Bite (16 dégâts) ou
+  ajoutés à chaque coup de Moonkin, sans aucune carte de construction. Le Frenzy ne monte que par les frappes
+  et les cartes, et la baisse en Bear compense la frappe automatique.
+- **Lisibilité** : un quatrième mode de gain (coup reçu) s'ajouterait aux trois mots empruntés.
+- La Rage reste possible comme règle d'épique, bornée à une forme : Owlkin Frenzy (§ 5) donne de la réserve
+  quand le Druid perd des PV en Moonkin.
 
-| Id | Nom | Rareté | Coût | Type | Plaque | Texte | Amélioré | Icône |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `cat_form` | Cat Form | common | 0 | Skill | Shift | Enter Cat. / Draw 1. | Enter Cat. / Draw 2. | `ability_druid_catform` |
-| `shred` | Shred | common | 1 | Attack | — | Deal 7. / Cat: deal 4 more. | Deal 9. / Cat: deal 6 more. | `spell_shadow_vampiricaura` |
-| `swipe` | Swipe | common | 1 | Attack | — | Deal 4 to all. / Bear: gain 3 Absorb. | Deal 6 to all. / Bear: gain 4 Absorb. | `inv_misc_monsterclaw_03` |
-| `rake` | Rake | common | 1 | Attack | — | Deal 4. / Apply DoT 5 | Deal 5. / Apply DoT 7 | `ability_druid_disembowel` |
-| `demoralizing_roar` | Demoralizing Roar | common | 1 | Skill | Cooldown 2 | Bear: gain 4 Absorb. / Apply Demoralized 1 ⌛ to all | Bear: gain 6 Absorb. / Apply Demoralized 1 ⌛ to all | `ability_druid_demoralizingroar` |
-| `skull_bash` | Skull Bash | uncommon | 0 | Attack | Cooldown 2 | Interrupt the target's cast. / Deal 3. | Interrupt the target's cast. / Deal 3. (Cooldown 1) | `inv_bone_skull_04` |
-| `feral_instinct` | Feral Instinct | uncommon | 1 | Power | — | Shift: deal 3 to all. | Shift: deal 4 to all. | `ability_ambush` |
-| `mangle` | Mangle | uncommon | 1 | Attack | — | Deal 6. / Bear: apply Sundered 2 ⌛. / Cat: apply DoT 5. | Deal 8. / Bear: apply Sundered 3 ⌛. / Cat: apply DoT 7. | `ability_druid_mangle2` |
-| `heart_of_the_wild` | Heart of the Wild | rare | 1 | Power | — | Bear: Absorb gains +2. / Cat: Attacks deal 3 more. | (coût 0) | `spell_holy_blessingofagility` |
-| `survival_instincts` | Survival Instincts | rare | 1 | Skill | Shift, Cooldown 4 | Enter Bear. / Damage taken halved until next turn. | (Cooldown 3) | `ability_druid_tigersroar` |
+### 1.6 Changements de forme et réglage de secours
 
-### Restoration (10)
+1. Un **changement de forme** = une carte jouée dont la forme diffère de la forme active (§ 1.1). Compteur par
+   tour dans `c.cls` (remis à 0 au début du tour) ; le premier changement d'un tour est souvent la sortie de la
+   forme de fin du tour précédent.
+2. **Aucune limite ni coût dans la règle de base.** Un tour type en compte deux (sortir de Bear pour Cat ou
+   Moonkin, revenir en Bear pour finir) ; un tour qui passe par trois formes en compte trois.
+3. **Levier A (prévu, non actif) — mana du tour suivant.** À partir du **troisième** changement d'un tour, chaque
+   changement retire 1 mana au tour suivant (crochet `maxMana` de la classe), −2 au plus (il reste 1 mana).
+   Pourquoi deux changements gratuits et non un : avec « au-delà du premier », le tour normal « Moonkin puis
+   retour en Bear » (deux changements) coûterait déjà 1 mana sur 3 au tour suivant, et la classe paierait sa
+   mécanique de base. Avec deux gratuits, le tour Moonkin → Cat → Bear (monter, dépenser, finir) coûte 1 mana au
+   tour suivant ; Moonkin → Cat → Moonkin → Bear en coûte 2. La pastille montre le malus à venir (« −1 mana next
+   turn »).
+4. **Levier B (prévu, non actif) — réserve.** À partir du troisième changement d'un tour, chaque changement fait
+   perdre 1 point de réserve, au changement, avant la résolution de la carte. Plus doux que A (il ne touche pas au
+   mana) et plus ciblé : il ne vise que le transfert de réserve entre formes.
+5. Quand les activer : si la mesure montre plus de 3 changements par tour en moyenne au bot heuristic, ou si les
+   decks à trois formes gagnent plus de 10 points de plus que les decks à deux formes. A d'abord ; B si A rend la
+   classe lente.
 
-| Id | Nom | Rareté | Coût | Type | Plaque | Texte | Amélioré | Icône |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `regrowth` | Regrowth | common | 1 | Skill | Caster, Exhaust | Heal 4. / Gain Regen 3 | Heal 6. / Gain Regen 4 | `spell_nature_resistnature` |
-| `insect_swarm` | Insect Swarm | common | 1 | Skill | — | Apply DoT 4 / Apply Demoralized 1 ⌛ | Apply DoT 6 / Apply Demoralized 2 ⌛ | `spell_nature_insectswarm` |
-| `mark_of_the_wild` | Mark of the Wild | common | 1 | Skill | Caster | Gain 5 Absorb. / Gain Regen 2 | Gain 7 Absorb. / Gain Regen 3 | `spell_nature_regeneration` |
-| `remove_curse` | Remove Curse | common | 0 | Skill | Cooldown 2 | Remove negative effects. / Draw 1. | Remove negative effects. / Draw 2. | `spell_holy_removecurse` |
-| `swiftmend` | Swiftmend | uncommon | 0 | Skill | Caster, Cooldown 2 | Heal twice your Regen. | Heal twice your Regen. / Draw 1. | `inv_relics_idolofrejuvenation` |
-| `healing_touch` | Healing Touch | uncommon | 1 | Skill | Caster, Exhaust | Heal 8. / Regen: heal 4 more. | Heal 11. / Regen: heal 5 more. | `spell_nature_healingtouch` |
-| `barkskin` | Barkskin | uncommon | 1 | Skill | Cooldown 2 | Gain 7 Absorb. / Regen: gain 4 more. | Gain 9 Absorb. / Regen: gain 5 more. | `spell_nature_stoneclawtotem` |
-| `gift_of_nature` | Gift of Nature | uncommon | 1 | Power | — | Regen: Attacks deal 2 more. | Regen: Attacks deal 3 more. | `spell_nature_protectionformnature` |
-| `tranquility` | Tranquility | rare | 2 | Skill | Caster, Exhaust | Heal 6. / Gain Regen 5 | Heal 9. / Gain Regen 6 | `spell_nature_tranquility` |
-| `rebirth` | Rebirth | rare | 1 | Power | — | Last Breath: stay at 15 HP. | (coût 0) | `spell_nature_reincarnation` |
+### 1.7 Cartes sans forme
 
-Comptes : 4 de départ ; 13 communes (Balance 4, Feral 5, Restoration 4) ; 11 inhabituelles (4, 3,
-4) ; 6 rares (2 par voie). Cartes Shift : Bear Form, Moonkin Form, Cat Form, Survival Instincts.
-Cartes Caster : Rejuvenation, Regrowth, Mark of the Wild, Swiftmend, Healing Touch, Tranquility.
-Cartes à deux lignes de forme : Maul, Mangle, Heart of the Wild.
+Liste fermée : **Skull Bash** (l'Interrupt doit pouvoir partir dès qu'une incantation ennemie paraît, sans
+casser la forme de fin de tour), **Nature's Swiftness** (prépare un Cast de n'importe quelle forme), et **tous les
+Powers** (Thorns, Gift of Nature, Rebirth, Nature's Grace, Moonkin Aura, Leader of the Pack) : un Power se joue une
+fois et reste ; lui faire changer la forme ferait d'une carte permanente un détour de forme. Un Power peut nommer
+une forme dans son déclencheur (« Cat Attacks: », « End of turn in Moonkin: »). Les soins ne sont pas sans forme :
+ils sont Caster, et les jouer fait quitter Bear (comme dans WoW).
 
-### Calage sur le Priest (coût et rareté égaux)
+### 1.8 Marque de forme sur la carte et pastille de classe
 
-| Druid | Repère Priest | Écart voulu |
-| --- | --- | --- |
-| Wrath 6/9 | Smite 6/9 | +3 en Moonkin, absent du deck de départ |
-| Bear Form 4/6 Absorb | Inner Fire 5/8 | 6/9 en Bear ; Rejuvenation fait sortir de Bear |
-| Rejuvenation Regen 4/6, Exhaust | Renew 3/5 (commune) | le Druid n'a pas PW: Shield ni SW: Pain |
-| Starfire 24/31, Cast | Holy Fire 24/31 + DoT 3/4 | pas de DoT ; +4 en Moonkin |
-| Moonfire 2 + DoT 3 à tous | Mind Sear DoT 4 à tous, Holy Nova 4 à tous + Regen 2 | même total |
-| Faerie Fire 0, Cooldown 2 | Angelic Feather 0, Cooldown 2 | Sundered au lieu d'Absorb |
-| Shred 7 / Cat +4 | Mind Flay 8 / DoT: +2 Insanity, draw 1 | 11 gratuit en Cat |
-| Swipe 4 à tous / Bear 3 | Holy Nova 4 à tous / Regen 2 | Absorb au lieu de Regen |
-| Rake 4 + DoT 5 | Vampiric Touch DoT 3 + Regen 1 | pas de soin |
-| Regrowth 4 + Regen 3, Exhaust | Flash Heal 7 + Draw 1, Exhaust | même total (10 PV) |
-| Mark of the Wild 5 Absorb + Regen 2 | Radiance 4 Absorb + Atonement 1 | fait quitter la forme |
-| Hurricane 15 à tous, Cast | Halo 15 à tous + Regen 3, Cast | +4 par cible en Moonkin |
-| Entangling Roots 9 + Stunned 1, Cast, Cooldown 3 | Chastise 7 + Stunned 1, Cooldown 3 | +2 pour le Cast |
-| Skull Bash : Interrupt + Deal 3, Cooldown 2 | Silence : Interrupt + Draw 1, Cooldown 2 | dégâts au lieu de pioche |
-| Mangle 6 + une ligne de forme | Schism 3 + Sundered 2 + Atonement 1 | |
-| Healing Touch 8 / Regen +4, Exhaust | Greater Heal 12, Cast, Exhaust | sans Cast, 12 seulement sous Regen |
-| Barkskin 7 / Regen +4, Cooldown 2 | PW: Shield 8, Cooldown 2 (départ) | 11 sous Regen, 16 en Bear |
-| Survival Instincts | Pain Suppression (même Cooldown 4/3) | entre en Bear en plus |
-| Rebirth : 15 PV | Spirit of Redemption : 1 PV + Regen 6 + tour gratuit | soin immédiat, pas de tour gratuit |
-| Innervate +2/+3 mana, Exhaust | Mana Potion +2 | une fois par combat |
+- **Sur la carte** : la forme est le **premier mot de la plaque du bas**, en tête comme `Cast` (« Bear »,
+  « Moonkin · Cast », « Cat », « Caster · Exhaust »), retiré du corps du texte : elle ne prend aucune ligne. Une
+  petite icône de la forme (pastille ronde de la taille du coût) est posée dans le coin haut opposé au coût, et le
+  liseré de la plaque prend la couleur de la forme (brun pour Bear, jaune pour Cat, bleu nuit pour Moonkin, vert
+  pour Caster). Carte sans forme : ni icône ni mot.
+- **En main, en combat** : l'icône de forme d'une carte qui changerait la forme est allumée (contour doré) ;
+  celle d'une carte de la forme active reste éteinte. Hors combat (récompenses, deck, marchand) : toutes éteintes.
+- **Infobulles des mots de plaque** (60 caractères au plus) : `Cat` « Playing it enters Cat form. Reserve = Combo. » ;
+  `Bear` « Playing it enters Bear form. Reserve = Frenzy. » ; `Moonkin` « Playing it enters Moonkin form.
+  Reserve = Charges. » ; `Caster` « Playing it enters Caster form. Reserve unused. ».
+- **Pastille de classe** : l'anneau près du mana montre l'icône de la forme active à la place de celle de la
+  ressource, et le nombre de la réserve (cinq crans, cachés à 0 comme ailleurs) ; la couleur de l'anneau suit la
+  forme. Infobulle : nom de la forme, ce que vaut la réserve (« 3 Frenzy: end-of-turn strike for 4. », « 3
+  Charges: Attack hits +3. », « 3 Combo: spent by Surge. », « Caster: reserve kept, unused. »), « n / 5 », puis le
+  malus de mana à venir si le levier A est actif. Au changement de forme : l'icône tourne et change (événement
+  `shift`).
+- **Cible de la frappe** : en Bear, la marque d'ennemi (`enemyMarks`, comme la cible du familier du Hunter) montre
+  la dernière cible et les dégâts de la prochaine frappe.
 
-Écarts aux ordres de grandeur du GDD : **Bear Form coûte 1** (0 dans le GDD) parce qu'elle est la
-carte de défense du deck de départ, en quatre exemplaires : à 0 mana, ce seraient 24 Absorb gratuits
-par passage du deck, contre 20 pour 4 mana chez le Priest. Cat Form et Moonkin Form restent à 0.
-Wrath (6 / Moonkin +3 au lieu de 7 / +4) et Starfire (24 au lieu de 20) sont recalés sur Smite et Holy
-Fire. Maul (5 / Bear 3 / Cat DoT 3 au lieu de 7 / 5 / 4) : en Bear, la version du GDD donnerait 7
-dégâts et 7 Absorb pour 1 mana, soit Smite et Inner Fire réunis. Rejuvenation reçoit Exhaust : les
-PV se gardent d'un combat à l'autre et les soins répétables dominaient chez le Priest
-(`docs/equilibrage.md`, itération 4).
+### 1.9 Mots-clés et infobulles
 
-### Notes d'écriture
+| Mot | Infobulle (≤ 60 caractères) |
+|---|---|
+| Forme (plaque `Cat` / `Bear` / `Moonkin` / `Caster`) | ci-dessus, § 1.8 |
+| Bear strikes | `Hits the last target for 1 + Frenzy, then +1 Frenzy.` |
+| *(ressource)* Combo, en Cat | `Kept between forms and turns. Surge spends it all. Max 5.` |
+| *(ressource)* Frenzy, en Bear | `End-of-turn strike 1 + Frenzy. −1 each round in Bear.` |
+| *(ressource)* Charges, en Moonkin | `+1 damage to Attack hits per charge. Max 5.` |
 
-- `Turn start:` (Starfall) est une tournure nouvelle : « au début de ton tour ». À ajouter aux
-  conditions nommées de l'infobulle (`Turn start: at the start of your turn.`).
-- `Shift:` et `Regen:` suivent la forme `Name: effect` existante (`Regen:` = si tu as Regen).
-- Clauses de plus de 22 caractères (chacune reste une seule clause, coupée en deux lignes à
-  l'affichage, comme `Atonement: +2 Absorb per hit.` chez le Priest) : trois reprises telles quelles
-  du Priest, `Interrupt the target's cast.` (28), `Apply Demoralized 1 ⌛ to all` (28),
-  `Damage taken halved until next turn.` (36) ; et `Cast cards: apply DoT 3 to all.` (31),
-  `Moonkin: Cast cards cost −1.` (28), `Regen: Attacks deal 2 more.` (27),
-  `Last Breath: stay at 15 HP.` (27), `Turn start: deal 3 to all.` (26), `Bear: apply Sundered
-  2 ⌛.` (25), `Cat: Attacks deal 3 more.` (25), `Remove negative effects.` (24). Aucune carte n'a
-  plus de trois clauses hors plaque (Maul, Mangle : trois).
+Conditions et déclencheurs employés : `Surge:`, `Spend N:`, `Regen:` (état sur soi), `Last Breath:`, `When hit:`,
+`Cast cards:` (existants) ; nouveaux : `Cat Attacks:`, `End of turn in Moonkin:` (Powers), et pour les épiques
+`Form changes:`, `Bear strikes:`, `Forms:`, `Each Regen heal:` (existant, Priest), `Surge cards:` (existant,
+Rogue).
 
-## 3. Les trois voies
+## 2. Choix : cartes empruntées ou cartes propres
 
-### Balance — Moonkin, Cast, DoT sur tous
+Deux façons d'emprunter :
 
-Moteur : on entre en Moonkin pour que les Cast frappent 4 de plus par coup, on pose du DoT sur tous
-les ennemis entre deux gros sorts, puis on assume d'encaisser en Moonkin (ou de perdre le bonus en
-passant en Bear). Ce qu'elle cherche : les gros Cast.
+- **(a) Vraies cartes des autres classes dans le pool du Druid, avec une marque de forme** (Sinister Strike en
+  Cat, Arcane Blast en Moonkin, Arcane Shot en Bear).
+- **(b) Cartes propres au Druid** (Rake, Shred, Ferocious Bite, Maul, Swipe, Wrath, Starfire…), qui reprennent les
+  mêmes effets et les mêmes mots (« +1 Combo. », « Surge: », « Spend 2: », frappe comme « Pet attacks. »).
 
-Cartes : Moonkin Form, Starfire, Moonfire, Faerie Fire, Hurricane, Nature's Grace, Innervate,
-Entangling Roots, Starfall, Eclipse.
+**Recommandation : (b).** Conséquences concrètes :
 
-- Avec Feral : Feral Instinct paie chaque aller-retour Moonkin ↔ Bear ; Moonkin Form à 0 mana remet
-  le bonus juste avant de lancer, Bear Form couvre le tour ennemi (au prix des +4 sur le Cast en
-  attente, règle 9).
-- Avec Restoration : DoT et Regen font un combat long ; Insect Swarm et Eclipse empilent le DoT, et
-  chaque soin qui ramène en Caster suivi de Moonkin Form fait deux Shift (mana d'Idol of the Wild).
-- Tour type (en Moonkin depuis le tour précédent, Nature's Grace en jeu, 3 mana) : le Starfire lancé
-  au tour précédent se résout d'abord (24 + 4 = 28) ; Faerie Fire (0, pioche 1) ; Moonfire (1, 2 à
-  tous et DoT 3 à tous) ; Starfire (2 − 1 = 1, pour le tour suivant) ; Wrath (1, 6 + 3). Le tour
-  ennemi se passe en Moonkin, sans défense : c'est le prix des +4.
+| | (a) cartes partagées | (b) cartes propres (retenue) |
+|---|---|---|
+| Équilibrage | couplé : Eviscerate est passée de 5 + 5 à 4 + 4 par Combo pendant les réglages du Rogue ; avec (a), chaque réglage du Rogue change le Druid, et inversement un Druid trop fort forcerait à affaiblir le Rogue | indépendant : les chiffres partent de la carte d'origine, puis le Druid se règle seul (`sweep=cards class=druid`) |
+| Lignes mortes | beaucoup de cartes citent une mécanique que le Druid n'a pas : Backstab et Ambush (`Stealth:`), Feint et Riposte (Parry), Arcane Shot et Kill Command (« Pet attacks. » : pas de familier), Frostbolt et Ice Lance (Frozen), Fireball (Hot Streak, école Fire) ; il faudrait les exclure ou donner ces mécaniques au Druid | aucune : chaque carte est écrite pour les règles du Druid |
+| Code | une carte n'a qu'un `class` ; il faudrait une liste de cartes étrangères par classe, une table de formes à part (les fiches sont immuables), des règles de pool, de niveau (le niveau est celui de la classe d'origine), de progression et d'amélioration qui lisent deux classes ; le harnais refuse aujourd'hui toute ressource d'une autre classe | un fichier `Data/Druid.lua` ordinaire ; seuls le mot de ressource par forme, la plaque de forme et la frappe de l'ours sont nouveaux (§ 8) |
+| Lisibilité | le joueur qui connaît le Rogue reconnaît Sinister Strike, mais un chat qui joue « Sinister Strike » ou un ours qui lance « Arcane Shot » se lit mal ; une même carte dans deux collections, avec des paliers +2 / +3 écrits pour l'autre classe (Retain des ouvertures sous Stealth) | noms de sorts de druide, effets et mots identiques à ceux des autres classes : on reconnaît la mécanique sans confondre les cartes |
+| Coût | aucun texte à écrire | 34 cartes à écrire et à régler |
 
-### Feral — Bear pour tenir, Cat pour frapper
+Plusieurs cartes du Druid reprennent donc exactement une carte d'une autre classe (Ferocious Bite = Eviscerate,
+Rake = Garrote, Frenzied Regeneration = Growl, Mangle = Bestial Wrath, Healing Touch = Greater Heal) : c'est
+l'emprunt voulu, mais deux fiches indépendantes.
 
-Moteur : on alterne Cat (première Attack gratuite, saignements) et Bear (Absorb ×1,5) selon les
-intentions ennemies ; chaque changement de forme rapporte grâce aux effets `Shift:`. Ce qu'elle
-cherche : le Shift à chaque tour.
+### Plafond de 5
 
-Cartes : Cat Form, Shred, Swipe, Rake, Demoralizing Roar, Skull Bash, Feral Instinct, Mangle, Heart
-of the Wild, Survival Instincts.
+Les trois mécaniques empruntées ont un plafond de 5 (Combo, Frenzy) ou de 4 (Charges du Mage). Avec **5**, les
+cartes Cat et Bear reprennent telles quelles les chiffres du Rogue et du Hunter (Eviscerate à 5 Combo, frappe de
+1 + 5 = 6, Bestial Wrath à cinq frappes) ; seules les cartes Moonkin changent par rapport au Mage, et elles sont
+écrites pour le Druid de toute façon. Avec 4, les finisseurs Cat (Ferocious Bite : 20 au lieu de 24) et la frappe
+de l'ours perdraient un cran, soit deux mécaniques sur trois à recalculer au lieu d'une. Contrepartie mesurée
+dans les chiffres : Moonkin à 5 Charges donne +5 par coup ; les cartes Moonkin à plusieurs coups sont donc
+évitées (aucune « twice » ni « three times » en Moonkin) et les cartes « to all » en Moonkin ont une base basse
+(Hurricane 12 à tous).
 
-- Avec Balance : Moonkin Form est un Shift de plus à 0 mana pour Feral Instinct ; Wrath et Maul ont
-  déjà leurs lignes de forme.
-- Avec Restoration : chaque carte Caster est un Shift gratuit (retour en Caster) ; Barkskin en Bear
-  donne 16 Absorb sous Regen ; Swiftmend à 0 mana sert de Shift et de soin.
-- Tour type (Caster → Cat → Bear, Feral Instinct en jeu, Idol of the Wild, 3 mana) : Cat Form (0,
-  premier Shift : +1 mana, 3 à tous, pioche 1) ; Shred (gratuit en Cat : 11) ; Rake (1 : 4 et DoT 5) ;
-  Bear Form (1, Shift : 3 à tous, 6 Absorb) ; Swipe (1 : 4 à tous, 4 Absorb). Bilan : 3 mana dépensés
-  sur 4, 10 à tous plus 15 et DoT 5 sur une cible, 10 Absorb pour le tour ennemi.
+## 3. Les 34 cartes
 
-### Restoration — Regen empilé, puis converti en soin
+Colonnes : **Niv.** = niveau de classe qui débloque la carte (§ 7) ; **Forme** = mot de plaque (— = sans forme) ;
+**Plaque** = autres mots de la plaque (dans `text`, en fin de texte, « Power. » / « Cast. » en tête) ; dans les
+textes, « / » sépare les clauses (`\n`) ; **Amélioré** = palier +1 ; paliers +2 et +3 : § 3.5. Toutes les cartes
+tiennent en quatre lignes au plus (retour glouton à 22 caractères, plaque non comptée) : trois lignes au plus en
+base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de Demoralizing Roar.
 
-Moteur : on empile Regen en Caster, puis Swiftmend et Healing Touch le transforment en soin
-immédiat ; le DoT d'Insect Swarm et Gift of Nature (Attacks +2 sous Regen) font les dégâts d'un
-combat long. Ce qu'elle cherche : le combat long.
+### 3.1 Départ (4, rareté basic)
 
-Cartes : Regrowth, Insect Swarm, Mark of the Wild, Remove Curse, Swiftmend, Healing Touch, Barkskin,
-Gift of Nature, Tranquility, Rebirth.
+| id | Nom | Forme | Coût | Type | Plaque | Texte | Amélioré | Icône | Calé sur |
+|---|---|---|---|---|---|---|---|---|---|
+| `wrath` | Wrath | Moonkin | 1 | Attack | | Deal 5. / +1 Charge. | Deal 8. / +1 Charge. | Spell_Nature_WrathV2 | Arcane Blast 6 / 9 (Mage) : −1 car le Druid en a trois |
+| `thick_hide` | Thick Hide | Bear | 1 | Skill | | Gain 5 Absorb. | Gain 8 Absorb. | Ability_Druid_Ironfur | Mana Shield 5 / 8, Defend 5 |
+| `maul` | Maul | Bear | 1 | Attack | | Deal 4. / Bear strikes. | Deal 7. / Bear strikes. | Ability_Druid_Maul | Arcane Shot 3 / 6 + Pet attacks |
+| `ferocious_bite` | Ferocious Bite | Cat | 1 | Attack | | Surge: deal 4 + 4 per Combo. | Surge: deal 6 + 5 per Combo. | Ability_Druid_FerociousBite | Eviscerate (Rogue, `minRes = 1`) |
 
-« Consommé pour un soin immédiat » (GDD) est lu comme « converti » : Swiftmend soigne deux fois la
-Regen **sans la retirer**, comme sa carte phare du GDD l'écrit. La retirer rendrait la carte
-perdante dès Regen 4 (soin de 8 contre 10 PV de tics restants).
+### 3.2 Feral (10 : Cat, Bear, Interrupt ; 4 communes, 4 inhabituelles, 2 rares)
 
-- Avec Balance : DoT de Moonfire, Insect Swarm et Eclipse sur des combats longs ; on soigne en Caster
-  puis on remonte en Moonkin (0 mana).
-- Avec Feral : les soins deviennent des Shift ; Barkskin et Heart of the Wild en Bear.
-- Tour type (Caster) : Rejuvenation (1, Regen 4) ; Swiftmend (0, soigne 8) ; Insect Swarm (1) ;
-  Wrath (1, +2 avec Gift of Nature). Puis Bear Form au tour suivant si l'intention ennemie est forte.
+| id | Nom | Rareté | Niv. | Forme | Coût | Type | Plaque | Texte | Amélioré | Icône | Calé sur |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `shred` | Shred | common | 1 | Cat | 1 | Attack | | Deal 7. / +1 Combo. | Deal 10. / +1 Combo. | Spell_Shadow_VampiricAura | Hemorrhage 7 + 1 Combo, sans Sundered |
+| `rake` | Rake | common | 1 | Cat | 1 | Attack | | Deal 3. / +1 Combo. / Apply DoT 3 | Deal 4. / +1 Combo. / Apply DoT 5 | Ability_Druid_Rake | Garrote |
+| `swipe` | Swipe | common | 1 | Bear | 1 | Attack | | Deal 4 to all. / Bear strikes. | Deal 6 to all. / Bear strikes. | Ability_Druid_Swipe | Multi-Shot 5 à tous + Pet attacks (inhabituelle) |
+| `skull_bash` | Skull Bash | common | 1 | — | 0 | Skill | Cooldown 2 | Interrupt the target's cast. / Draw 1. | (Cooldown 1) | INV_Bone_Skull_04 | Silence (Priest) |
+| `rip` | Rip | uncommon | 1 | Cat | 1 | Skill | | Surge: apply DoT 3 per Combo. | Surge: apply DoT 4 per Combo. | Ability_GhoulFrenzy | Rupture (`minRes = 1`) |
+| `frenzied_regeneration` | Frenzied Regeneration | uncommon | 1 | Bear | 1 | Skill | | Gain 6 Absorb. / Spend 2: gain 6 more. | Gain 8 Absorb. / Spend 2: gain 8 more. | Ability_BullRush | Growl (Hunter) |
+| `tigers_fury` | Tiger's Fury | uncommon | 2 | Cat | 0 | Skill | Cooldown 2 | +1 Combo. / Draw 1. | (Cooldown 1) | Ability_Mount_JungleTiger | Premeditation, Kick |
+| `mangle` | Mangle | rare | 4 | Bear | 2 | Skill | | Surge: Bear strikes once per Frenzy. | (coût 1) | Ability_Druid_Mangle2 | Bestial Wrath (`minRes = 1`) |
+| `demoralizing_roar` | Demoralizing Roar | uncommon | 6 | Bear | 0 | Skill | Cooldown 4 | +1 Frenzy. / Apply Demoralized 2 ⌛ to all | (Cooldown 3) | ABILITY_DRUID_DEMORALIZINGROAR | Demoralizing Shout (Warrior) |
+| `leader_of_the_pack` | Leader of the Pack | rare | 7 | — | 1 | Power | | Power. / Cat Attacks: +1 Combo. | (coût 0) | Spell_Nature_UnyeildingStamina | Venomous Wounds (rare, moteur de Combo) |
 
-## 4. Bibelots de classe (6)
+### 3.3 Balance (10 : Moonkin ; 5 communes, 3 inhabituelles, 2 rares)
 
-| Id | Nom | Rareté | Effet | Icône | Niveau |
-| --- | --- | --- | --- | --- | --- |
-| `idol_of_the_wild` | Idol of the Wild | départ | `The first Shift each turn: +1 mana.` | `inv_misc_idol_02` | 1 (porté au départ) |
-| `idol_of_brutality` | Idol of Brutality | common | `Bear: gain 3 Absorb at the start of your turn.` | `inv_misc_idol_03` | 1 |
-| `idol_of_the_moon` | Idol of the Moon | uncommon | `Each combat starts in Moonkin.` | `inv_misc_idol_05` | 3 |
-| `idol_of_health` | Idol of Health | uncommon | `Caster cards also give 3 Absorb.` | `inv_relics_idolofhealth` | 5 |
-| `idol_of_ferocity` | Idol of Ferocity | uncommon | `Cat: your first Attack each turn deals 4 more.` | `inv_relics_idolofferocity` | 7 |
-| `wolfshead_helm` | Wolfshead Helm | rare | `Shift: gain 3 Absorb.` | `inv_helmet_04` | 7 |
+| id | Nom | Rareté | Niv. | Forme | Coût | Type | Plaque | Texte | Amélioré | Icône | Calé sur |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `starfire` | Starfire | common | 1 | Moonkin | 2 | Attack | Cast | Cast. / Deal 20. | Cast. / Deal 26. | Spell_Arcane_StarFire | Holy Fire 24 + DoT 3 ; +Charges si fin en Moonkin |
+| `moonfire` | Moonfire | common | 1 | Moonkin | 1 | Attack | | Deal 3. / +1 Charge. / Apply DoT 3 | Deal 5. / +1 Charge. / Apply DoT 4 | Spell_Nature_StarFall | Garrote, Fireball |
+| `starsurge` | Starsurge | common | 1 | Moonkin | 1 | Attack | | Surge: deal 6 per Charge. | Surge: deal 7 per Charge. | Spell_Arcane_Arcane03 | Nightblade 6 par Combo (`minRes = 1`) |
+| `faerie_fire` | Faerie Fire | common | 1 | Moonkin | 0 | Skill | Cooldown 3 | +1 Charge. / Apply Sundered 2 ⌛ | (Cooldown 2) | Spell_Nature_FaerieFire | Hunter's Mark 3, Exhaust |
+| `insect_swarm` | Insect Swarm | common | 1 | Moonkin | 1 | Skill | | Apply DoT 4 / Apply Demoralized 1 ⌛ | Apply DoT 6 / Apply Demoralized 1 ⌛ | Spell_Nature_InsectSwarm | Crippling Poison 2 + Demoralized 1 |
+| `hurricane` | Hurricane | uncommon | 1 | Moonkin | 2 | Attack | Cast | Cast. / Deal 12 to all. | Cast. / Deal 15 to all. | Spell_Nature_Cyclone | Blizzard 12 à tous + Demoralized 2 |
+| `entangling_roots` | Entangling Roots | uncommon | 2 | Moonkin | 1 | Skill | Cooldown 4 | +1 Charge. / Apply Stunned 1 ⌛ | (Cooldown 3) | Spell_Nature_StrangleVines | Chastise, Wyvern Sting |
+| `starfall` | Starfall | rare | 4 | Moonkin | 1 | Attack | | Surge: deal 6 per Charge to all. | Surge: deal 7 per Charge to all. | Ability_Druid_Starfall | Arcane Barrage (commune, plafond 4) : 30 à tous à 5 |
+| `natures_grace` | Nature's Grace | uncommon | 6 | — | 2 | Power | | Power. / Cast cards: cost −1. | (coût 1) | Spell_Nature_NaturesBlessing | Apotheosis (rare, + 1 mana) |
+| `moonkin_aura` | Moonkin Aura | rare | 7 | — | 1 | Power | | Power. / End of turn in Moonkin: +1 Charge. | (coût 0) | Spell_Nature_ForceOfNature | Shadow Dance (moteur rare) ; raison de finir en Moonkin |
 
-Idol of the Wild est le bibelot de départ voulu par le GDD : il amorce la mécanique dès le premier
-tour (un Shift par tour rend un mana ; entrer en Bear avec Bear Form revient à 0). Les cinq autres
-couvrent Bear, Moonkin, Caster (les soins, qui laissent sans défense), Cat et le Shift. Idol of
-Health donne son Absorb après le retour en Caster : il n'est jamais augmenté par Bear.
+### 3.4 Restoration (10 : Caster et Powers ; 4 communes, 4 inhabituelles, 2 rares)
 
-## 5. Progression (niveaux de classe 1 à 7)
+| id | Nom | Rareté | Niv. | Forme | Coût | Type | Plaque | Texte | Amélioré | Icône | Calé sur |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| `rejuvenation` | Rejuvenation | common | 1 | Caster | 1 | Skill | Exhaust | Gain Regen 4 | Gain Regen 6 | Spell_Nature_Rejuvenation | Renew 3, Exhaust |
+| `regrowth` | Regrowth | common | 1 | Caster | 1 | Skill | Exhaust | Heal 4. / Gain Regen 3 | Heal 6. / Gain Regen 4 | Spell_Nature_ResistNature | Flash Heal 7 + Draw 1, Exhaust |
+| `mark_of_the_wild` | Mark of the Wild | common | 1 | Caster | 1 | Skill | | Gain 4 Absorb. / Gain Regen 2 | Gain 6 Absorb. / Gain Regen 3 | Spell_Nature_Regeneration | Radiance 4 + Atonement 1 |
+| `thorns` | Thorns | common | 1 | — | 1 | Power | | Power. / When hit: deal 3 to the attacker. | (coût 0) | Spell_Nature_Thorns | Retaliation 4 (inhabituelle, niveau 6) |
+| `swiftmend` | Swiftmend | uncommon | 1 | Caster | 0 | Skill | Exhaust | Heal 2 per Regen. | Heal 2 per Regen. / Draw 1. | INV_Relics_IdolofRejuvenation | soin immédiat sans retirer la Regen |
+| `rebirth` | Rebirth | rare | 1 | — | 1 | Power | | Power. / Last Breath: stay at 1 HP, heal 12. | (coût 0) | Spell_Nature_Reincarnation | Last Stand 15, Ice Block 10 |
+| `natures_swiftness` | Nature's Swiftness | uncommon | 2 | — | 0 | Skill | Exhaust | Draw 1. / Gain Instant 1 | Draw 2. / Gain Instant 1 | Spell_Nature_RavenForm | Combustion (Draw 2, Instant 2, rare) |
+| `healing_touch` | Healing Touch | uncommon | 4 | Caster | 1 | Skill | Cast, Exhaust | Cast. / Heal 12. | Cast. / Heal 16. | SPELL_NATURE_HEALINGTOUCH | Greater Heal 10, Cast, Exhaust |
+| `gift_of_nature` | Gift of Nature | uncommon | 6 | — | 1 | Power | | Power. / Regen: Attack hits deal 2 more. | (coût 0) | Spell_Nature_ProtectionformNature | Shatter (« Frozen: Attack hits deal 4 more. ») |
+| `tranquility` | Tranquility | rare | 7 | Caster | 2 | Skill | Exhaust | Heal 6. / Gain Regen 5 | Heal 9. / Gain Regen 6 | Spell_Nature_Tranquility | rare de soin, une fois par combat |
 
-| Niveau | Balance | Feral | Restoration | Bibelots |
-| --- | --- | --- | --- | --- |
-| 1 | Moonkin Form, Starfire, Moonfire, Faerie Fire, Entangling Roots, Starfall | Cat Form, Shred, Swipe, Rake, Skull Bash, Survival Instincts | Regrowth, Insect Swarm, Mark of the Wild, Swiftmend, Gift of Nature, Rebirth | Idol of the Wild, Idol of Brutality |
-| 2 | Nature's Grace | Feral Instinct | Barkskin | |
-| 3 | | | | Idol of the Moon |
-| 4 | Hurricane | Mangle | Healing Touch | |
-| 5 | | | | Idol of Health |
-| 6 | Innervate | Demoralizing Roar | Remove Curse | |
-| 7 | Eclipse (rare) | Heart of the Wild (rare) | Tranquility (rare) | Idol of Ferocity, Wolfshead Helm |
+Comptes : 4 de départ ; 13 communes (Feral 4, Balance 5, Restoration 4) ; 11 inhabituelles (4, 3, 4) ; 6 rares
+(2 par voie) = 34. Par forme : Cat 5 (Ferocious Bite, Shred, Rake, Rip, Tiger's Fury), Bear 6 (Thick Hide, Maul,
+Swipe, Frenzied Regeneration, Mangle, Demoralizing Roar), Moonkin 9 (Wrath et la voie Balance hors Powers),
+Caster 6, sans forme 8 (Skull Bash, Nature's Swiftness, six Powers).
 
-Niveau 1 : 4 de départ + 18 cartes, dont une rare par voie, l'Interrupt (Skull Bash) et le Last
-Breath (Rebirth). Chaque voie y a sa forme ou son moteur : Moonkin Form et deux Cast pour Balance,
-Cat Form et Survival Instincts (Shift en Bear) pour Feral, Regen, Swiftmend et Gift of Nature pour
-Restoration. Les déblocages ouvrent une façon de jouer plutôt qu'un chiffre : Nature's Grace (Cast
-moins chers en Moonkin), Feral Instinct (payer le Shift), Barkskin (Regen qui protège, aussi en Bear),
-puis les cartes de zone et de soin, puis les rares d'ensemble.
+Notes :
 
-## 6. Besoins moteur et interface
+- Icônes : noms exacts des fichiers de `~/Téléchargements/ICONS/` (vérifiés le 18/11/2026). Shred
+  (`Spell_Shadow_VampiricAura`), Starsurge (`Spell_Arcane_Arcane03`), Frenzied Regeneration (`Ability_BullRush`),
+  Leader of the Pack (`Spell_Nature_UnyeildingStamina`) : icônes de substitution, à vérifier au moment du code.
+- Swiftmend : « Heal 2 per Regen. » soigne deux fois la Regen du Druid **sans la retirer** ; Exhaust (les PV se
+  gardent d'un combat à l'autre, les soins répétables dominaient chez le Priest, `docs/equilibrage.md`).
+- Healing Touch (Cast) entre en Caster au jeu ; le soin se résout au tour suivant dans n'importe quelle forme
+  (un soin ne dépend pas de la forme). Nature's Swiftness le rend immédiat.
+- Gift of Nature : « Regen: » = le Druid a Regen au moment du coup ; vaut pour les cartes Attack de toutes les
+  formes, pas pour la frappe de l'ours (coup sans carte).
+- Maul et Rake sont aussi des noms d'actions ennemies (`Data/Zones/Duskwood.lua`, `Wetlands.lua`,
+  `Stranglethorn.lua`) : des intentions, pas des cartes ; à garder ou à renommer (question ouverte 8).
+- Insect Swarm est la carte de contrôle de Balance, sans gain de réserve en base et au +1 (comme Hurricane) ; il
+  reçoit « +1 Charge. » au palier +2.
 
-### Moteur (`Core/`, `Data/Druid.lua`)
+### 3.5 Paliers d'amélioration +2 et +3
 
-- `c.player.form` (`"caster"` au départ de chaque combat, donnée simple : sauvegardable, clonable).
-- Effet `{ "shift", "bear" }` : change la forme si elle diffère, journalise
-  `{ t = "shift", from, to }`, puis `Combat.fire(c, "onShift", from, to)` (Powers et bibelots).
-- Option d'effet `form = "bear"` : l'effet ne s'applique que dans cette forme (lignes `Bear:` etc.),
-  évaluée au moment de l'effet. Même mécanisme pour `Regen:` (`self status = "regen"`), utile à
-  d'autres classes.
-- Carte `Caster` dérivée des effets (`Card.heals(def)` : `heal`, ou `apply regen self`) : dans
-  `Combat.resolveCard`, si la classe est druid et la forme n'est pas `caster`, Shift vers `caster`
-  avant les effets. Le champ peut être forcé (`caster = true`) pour l'affichage.
-- Bear : multiplicateur appliqué dans `Combat.gainBlock` **après** `Combat.modify(c, "block", …)`
-  (les crochets actuels ne garantissent pas l'ordre).
-- Cat : drapeau de tour `c.player.flags.catFree` remis au début du tour ; `Combat.cost` renvoie 0
-  pour la première Attack sans `cast` de coût > 0 en Cat ; `Combat.play` consomme le drapeau quand la
-  gratuité a servi (au paiement, pas à la résolution).
-- Moonkin : crochet `damage` (+4 si `cardDef.cast`), lu à la résolution.
-- Starfall : Power avec le crochet `onTurnStart` existant (appelé après les tics, la résolution du
-  Cast, la pioche et le mana) ; la ligne `Moonkin:` y est lue dans la forme du moment.
-- `halved` (Survival Instincts) : l'état s'affiche « Pain Suppression » ; lui donner un nom neutre
-  (`Damage Halved`) ou un nom par source.
-- Idol of the Wild : compteur de tour `c.relicState`, remis à zéro dans `onTurnStart`.
-- Idol of the Moon : forme posée dans `onCombatStart`, sans `onShift`.
-- Bot de simulation : évaluer les lignes de forme dans la forme courante et la valeur d'un Shift
-  (sinon la classe sera mesurée comme injouable, voir Forme d'ombre dans `docs/equilibrage.md`).
+Règles suivies, celles du Rogue et du Hunter (`docs/ameliorations.md`) : Retain pour les cartes qu'on garde pour
+le bon moment (finisseurs, Cast) ; un seul palier monte le « par point » d'un Surge ; coût d'un Power baissé une
+seule fois ; aucun Stunned allongé (Stun Resistant des élites) ; pas de pioche ajoutée aux cartes à 0 qui n'en ont
+pas. Chaque colonne ne dit que ce que le palier ajoute.
 
-### Interface
+| Carte | +1 (tableau ci-dessus) | +2 | +3 |
+|---|---|---|---|
+| Wrath | Deal 8 | Deal 10 | Deal 12 |
+| Thick Hide | 8 Absorb | 10 Absorb | Retain |
+| Maul | Deal 7 | Deal 9 | `+1 Frenzy.` avant la frappe |
+| Ferocious Bite | 6 + 5 par Combo | 9 + 5 par Combo | Retain |
+| Shred | Deal 10 | Deal 12 | Deal 14 |
+| Rake | Deal 4, DoT 5 | DoT 7 | Deal 6 |
+| Swipe | 6 à tous | 7 à tous | `+1 Frenzy.` avant la frappe |
+| Skull Bash | Cooldown 1 | Retain | `Interrupt all casts.` |
+| Rip | DoT 4 par Combo | Retain | DoT 5 par Combo |
+| Frenzied Regeneration | 8 / 8 | 10 / 8 | Spend 1 |
+| Tiger's Fury | Cooldown 1 | Retain | +2 Combo |
+| Mangle | coût 1 | `+2 Frenzy.` après les frappes | Retain |
+| Demoralizing Roar | Cooldown 3 | +2 Frenzy | `Gain 4 Absorb.` |
+| Leader of the Pack | coût 0 | Innate | `Cat Attacks: +1 Combo, deal 2 more.` |
+| Starfire | Deal 26 | Deal 30 | Deal 34 |
+| Moonfire | Deal 5, DoT 4 | DoT 6 | Deal 7 |
+| Starsurge | 7 par Charge | Retain | 8 par Charge |
+| Faerie Fire | Cooldown 2 | Sundered 3 | Retain |
+| Insect Swarm | DoT 6 | `+1 Charge.` en tête | Demoralized 2 ⌛ |
+| Hurricane | 15 à tous | Retain | 18 à tous |
+| Entangling Roots | Cooldown 3 | `Apply DoT 4` | Retain |
+| Starfall | 7 par Charge à tous | Retain | 8 par Charge à tous |
+| Nature's Grace | coût 1 | Innate | au jeu : `Gain Instant 1` |
+| Moonkin Aura | coût 0 | Innate | `+2 Charges.` par fin de tour |
+| Rejuvenation | Regen 6 | Regen 7 | Retain |
+| Regrowth | Heal 6, Regen 4 | Draw 1 | Heal 8 |
+| Mark of the Wild | 6 Absorb, Regen 3 | 8 Absorb | Retain |
+| Thorns | coût 0 | deal 4 | Innate |
+| Swiftmend | Draw 1 | Retain | Heal 3 per Regen |
+| Rebirth | coût 0 | heal 16 | Innate |
+| Nature's Swiftness | Draw 2 | Retain | Instant 2 |
+| Healing Touch | Heal 16 | Retain | sans Cast (se résout tout de suite) |
+| Gift of Nature | coût 0 | Innate | deal 3 more |
+| Tranquility | Heal 9, Regen 6 | coût 1 | Retain |
 
-- **Pastille de classe** : icône et nom de la forme active à la place du nombre (Caster
-  `spell_nature_wispsplode`, Bear `ability_racial_bearform`, Cat
-  `ability_druid_catform`, Moonkin `spell_nature_forceofnature`), infobulle de la forme (table de la
-  section 1), courte animation au Shift.
-- **Ligne de la forme active** : sur les cartes en main, la ligne `Bear:` / `Cat:` / `Moonkin:` de la
-  forme active est mise en évidence (nom de forme en or comme aujourd'hui, texte de la ligne en blanc
-  plein) ; les autres lignes de forme sont atténuées (gris, alpha ≈ 0,55). Hors combat (récompense,
-  deck, marchand), aucune ligne n'est atténuée. Une carte Cast en attente garde la mise en évidence
-  de la forme courante, puisqu'elle lira la forme à sa résolution.
-- **Coût en Cat** : le coût affiché est déjà `Combat.cost` ; la gratuité de Cat s'y voit sans
-  travail de plus.
-- **Plaque** : `Shift` et `Caster` en tête, comme `Cast` ; plus longue combinaison :
-  « Caster · Cooldown 2 » (Swiftmend), « Shift · Cooldown 4 » (Survival Instincts),
-  « Cast · Cooldown 3 » (Entangling Roots).
-- **Indice de retour en Caster** : une carte `Caster` en main hors Caster peut porter un petit
-  marqueur (icône de la forme Caster) pour annoncer le Shift qu'elle provoquera.
-- **Infobulles** : `Shift`, `Caster`, les quatre formes, `Turn start:` (section 1).
-- Journal d'animations : événement `shift` (changement de pastille, éventuel effet sur le modèle).
+## 4. Les trois voies
 
-## 7. Risques d'équilibrage et mesures
+### Feral — monter en Cat, finir en Bear
 
-| Risque | Pourquoi | Mesure (`Sim/sim.lua`, heuristic, 2 000 expéditions) |
-| --- | --- | --- |
-| Idol of the Wild trop fort | +1 mana par tour dès qu'on change de forme : c'est presque le Bandeau de VanCleef sans contrepartie | mana gagné par tour ; victoires avec / sans Idol (`sweep=relics`) ; cible : ≤ +15 points |
-| Shift en boucle | Cat Form et Moonkin Form à 0 mana + Feral Instinct + Wolfshead Helm | Shift par tour (moyenne, p95) ; dégâts de Feral Instinct par combat |
-| Bear trop sûr | ×1,5 sur tout l'Absorb, Barkskin 16, Heart of the Wild | PV perdus par combat en Bear vs Priest Discipline |
-| Soins entre combats | les PV se gardent ; le Priest a dû rendre ses soins Consumés (`docs/equilibrage.md`) | PV soignés par combat ; écart de Swiftmend (non consommant) et Tranquility |
-| Swiftmend sans consommation | 0 mana, Cooldown 2, double la Regen | écart `pick=random` ; repli : Cooldown 3 ou retrait de la Regen |
-| Balance trop fragile | Moonkin n'a aucune défense et les Cast se font couper | taux d'interruption des Cast ; victoires du deck forcé Balance |
-| Hurricane en Moonkin | +4 par cible | dégâts moyens d'Hurricane en Moonkin à 3 ennemis |
-| Starfire gratuit | exclu de Cat par la règle 7 ; vérifier qu'aucun bibelot ne le contourne | test de règle |
-| Classe illisible pour le bot | lignes de forme et valeur d'un Shift | part des tours dans chaque forme ; cartes jouées / piochées (aucune < 40 %) |
-| Voie seule | chaque voie doit gagner avec ses 6 cartes de niveau 1 | victoires par deck forcé (Balance, Feral, Restoration) au niveau 1 et au niveau 7 |
+Moteur : les cartes Cat montent la réserve en Combo (Shred, Rake, Tiger's Fury) et la vident par un Surge (Ferocious
+Bite, Rip) ; les cartes Bear donnent l'Absorb du tour ennemi (Thick Hide, Frenzied Regeneration) et font frapper
+l'ours (Maul, Swipe), dont chaque frappe rend un point. Finir en Bear donne la frappe de fin de tour. Ce qu'elle
+cherche : alterner chaque tour entre construire (Cat) et tenir (Bear).
 
-Mesures à faire dans l'ordre : deck de départ seul (référence Priest de départ) ; niveau 1 par voie ;
-niveau 7 ; balayage des cartes (`sweep=cards`) et des bibelots (`sweep=relics loot=0`) ; part des
-tours par forme ; PV perdus par combat, à comparer au style de survie visé (question ouverte du GDD).
+Cartes : Shred, Rake, Swipe, Skull Bash, Rip, Frenzied Regeneration, Tiger's Fury, Mangle, Demoralizing Roar,
+Leader of the Pack.
+
+- Avec **Balance** : Wrath, Moonfire et Faerie Fire montent la réserve en Charges, Ferocious Bite la vide en
+  Combo ; Mangle vide en Frenzy ce que Moonkin a monté.
+- Avec **Restoration** : Thorns punit les coups que l'ours encaisse ; Gift of Nature (sous Regen) renforce chaque
+  attaque Cat et Bear.
+- Tour type (3 mana, réserve 2, fin du tour précédent en Bear, main : Tiger's Fury, Shred, Ferocious Bite,
+  Frenzied Regeneration, Rake) : Tiger's Fury (0, Cat : 3 Combo, pioche Maul) ; Shred (1 : 7, 4 Combo) ;
+  Ferocious Bite (1 : 4 + 16 = 20, réserve 0) ; Frenzied Regeneration (1, Bear : 6 Absorb, sans Spend). Fin en
+  Bear : frappe de 1, réserve 1 ; fin du round : 0. Deux changements de forme (Bear → Cat → Bear).
+
+### Balance — Charges et gros Cast
+
+Moteur : les cartes Moonkin montent les Charges (Wrath, Moonfire, Faerie Fire, Entangling Roots) et chaque coup
+des Attack en Moonkin les ajoute à ses dégâts ; Starsurge et Starfall vident la réserve ; Starfire et Hurricane
+sont des Cast qui ne profitent des Charges que si l'on finit le tour en Moonkin. Ce qu'elle cherche : le tour fini
+en Moonkin avec 5 Charges et un Cast en attente.
+
+Cartes : Starfire, Moonfire, Starsurge, Faerie Fire, Insect Swarm, Hurricane, Entangling Roots, Starfall,
+Nature's Grace, Moonkin Aura.
+
+- Avec **Feral** : finir en Bear protège le tour ennemi au prix du bonus sur le Cast ; Ferocious Bite et Mangle
+  dépensent autrement ce que Moonkin a monté.
+- Avec **Restoration** : Nature's Swiftness fait partir Starfire tout de suite, en Moonkin ; Mark of the Wild et la
+  Regen couvrent un tour fini en Moonkin, sans Absorb de l'ours.
+- Tour type (3 mana, réserve 3, Moonkin depuis le tour précédent, Starfire en attente) : début du tour, Starfire
+  se résout en Moonkin : 20 + 3 = 23. Faerie Fire (0 : 4 Charges, Sundered 2) ; Wrath (1 : 5 + 4 = 9, ×1,25 sous
+  Sundered = 11, 5 Charges) ; Starfire (2, Cast) ; on reste en Moonkin : aucune frappe, aucun Absorb ; Starfire
+  vaudra 20 + 5 = 25 au tour suivant, 31 si la cible porte encore Sundered.
+
+### Restoration — Regen, soins, et la réserve en attente
+
+Moteur : la Regen empilée (Rejuvenation, Regrowth, Mark of the Wild) se convertit en soin immédiat (Swiftmend) ;
+Gift of Nature fait de la Regen un bonus d'attaque pour toutes les formes, Thorns rend des dégâts à chaque coup
+reçu. En Caster, la réserve n'a pas d'effet et ne baisse pas : on soigne sans perdre ce qui a été monté. Ce
+qu'elle cherche : le combat long.
+
+Cartes : Rejuvenation, Regrowth, Mark of the Wild, Thorns, Swiftmend, Rebirth, Nature's Swiftness, Healing Touch,
+Gift of Nature, Tranquility.
+
+- Avec **Feral** : les soins Caster se jouent au milieu du tour, puis une carte Bear ramène en Bear pour la
+  frappe et l'Absorb ; Gift of Nature renforce Shred, Rake, Maul et Swipe sous Regen.
+- Avec **Balance** : Nature's Swiftness fait partir un Cast tout de suite ; la Regen couvre les tours finis en
+  Moonkin.
+- Tour type (3 mana, Regen 0, réserve 3, fin du tour précédent en Bear) : Rejuvenation (1, Caster : Regen 4) ;
+  Swiftmend (0 : soin 8) ; Wrath (1, Moonkin : 5 + 3 = 8, 4 Charges) ; Thick Hide (1, Bear : 5 Absorb). Fin en
+  Bear : frappe de 5, réserve 5 ; fin du round : 4. Trois changements de forme (Bear → Caster → Moonkin → Bear) :
+  sous le levier A, −1 mana au tour suivant.
+
+### Pourquoi la réserve ne vaut rien en Caster
+
+- La voie Restoration a déjà sa jauge : la **Regen**, qu'elle empile puis convertit (Swiftmend). Une seconde
+  lecture en Caster doublerait la jauge de la voie.
+- Toute lecture en Caster qui soignerait (« +1 soin par point », « Regen par point ») transformerait la réserve
+  en PV, qui se gardent d'un combat à l'autre : c'est ce qui a obligé à rendre les soins du Priest Exhaust.
+- Trois lectures empruntées (Combo, Frenzy, Charges) sont la limite de lisibilité de la pastille.
+- Conséquence : Caster est une forme de passage, choisie pour ses cartes ; y finir le tour ne donne rien. L'épique
+  Tree of Life (§ 5) lui donne un rôle sur la réserve, pour un build.
+
+## 5. Cartes épiques (une par zone)
+
+Gabarit des épiques (`docs/zones/cartes-de-zone.md`) : règle en jeu dès le début du combat, deux lignes au plus,
+« Déclencheur: Mot N. », l'à-côté (mot de règle, `L.rule`) donne la règle complète. Noms : sorts ou talents de
+druide absents de `Data/` (vérifié ; « Berserk » et « Ravage » sont pris par Stranglethorn Vale et évités).
+
+| Zone | Épique | Voie | Texte (base) | Mot de règle : à-côté | N (base / +1 / +2 / +3) | Icône | Ce qu'elle fait construire |
+|---|---|---|---|---|---|---|---|
+| 1 Westfall | Furor | Restoration | `Form changes: Primal 2.` | Primal : `The reserve gains 1 on each form change, at most N times per turn.` | 2 / 3 / 4 / 5 | Spell_Holy_BlessingOfStamina | un deck qui change de forme à chaque carte (simple, lisible en une fois) ; incompatible avec le levier A |
+| 2 Duskwood | Mark of Ursol | Feral | `Bear strikes: Ironfur 50%.` | Ironfur : `Gain Absorb equal to N% of each Bear strike's damage, rounded down.` | 50 / 75 / 100 / 125 | Ability_Druid_MarkofUrsol | un ours qui frappe souvent et haut (Maul, Swipe, Mangle, Frenzy à 5) et tient par ses frappes |
+| 3 Wetlands | Eclipse | Balance | `Cast cards: Eclipse 5.` | Eclipse : `With at least N in the reserve, Moonkin Cast cards resolve at once.` | 5 / 4 / 4 / 3 (+2 : `and deal 3 more`) | Ability_Druid_Eclipse | monter à 5, puis Starfire et Hurricane tout de suite, avec le bonus, et finir en Bear |
+| 4 Stranglethorn Vale | King of the Jungle | Feral | `Surge cards: Predator 1.` | Predator : `The Surge counts the whole reserve, then N stays in it.` | 1 / 2 / 2 / 3 (+2 : `the first Surge each turn draws 1`) | Ability_Druid_KingoftheJungle | plusieurs Surge par combat (Ferocious Bite, Rip, Starsurge, Mangle) |
+| 5 Swamp of Sorrows | Tree of Life | Restoration | `Each Regen heal: Bloom 1.` | Bloom : `The reserve gains N each time Regen heals, even at full HP.` | 1 / 1 / 2 / 2 (+1 et +3 : `Each combat starts with Regen 3`, puis 5) | Ability_Druid_TreeofLife | la Regen comme générateur : Rejuvenation et Regrowth nourrissent les Surge des autres formes |
+| 6 Burning Steppes | Owlkin Frenzy | Balance | `When hit: Moonfury 1.` | Moonfury : `In Moonkin, a hit that costs HP gives N to the reserve, once per enemy attack.` | 1 / 2 / 2 / 3 (+2 : `End of turn in Moonkin: gain 3 Absorb.`) | Ability_Druid_OwlkinFrenzy | finir en Moonkin et encaisser (la Rage du Warrior, bornée à Moonkin) |
+| 7 Blackrock Mountain | Heart of the Wild | Feral | `Forms: Kinship 3.` | Kinship : `Cat, Bear and Moonkin each keep their own reserve, up to N.` | 3 / 4 / 5 / 5 (+3 : `each starts at 1`) | Spell_Holy_BlessingOfAgility | trois réserves séparées : un deck à trois formes qui construit chacune pour elle (un Surge ne vide que la sienne) |
+
+Par voie : Feral 3, Balance 2, Restoration 2. Textes : « Epic. » en tête, deux lignes, aucun « you / your ».
+Nouveaux déclencheurs : `Form changes`, `Bear strikes`, `Forms`. Heart of the Wild change le contrat de la
+ressource (trois valeurs dans `c.cls` au lieu de `c.player.res`) : c'est l'épique la plus chère à coder, placée à
+Blackrock pour cette raison.
+
+## 6. Bibelots de classe (6)
+
+| id | Nom | Rareté | Niv. | Effet | Icône |
+|---|---|---|---|---|---|
+| `idol_of_the_wild` | Idol of the Wild | départ | 1 | `The first card each combat that changes form costs 0.` | INV_Misc_Idol_02 |
+| `idol_of_brutality` | Idol of Brutality | common | 1 | `Bear strikes deal 2 more.` | INV_Misc_Idol_03 |
+| `idol_of_ferocity` | Idol of Ferocity | uncommon | 3 | `Each Surge in Cat: draw 1.` | INV_Relics_IdolofFerocity |
+| `idol_of_the_moon` | Idol of the Moon | uncommon | 5 | `End of turn in Moonkin: gain 4 Absorb.` | INV_MISC_IDOL_05 |
+| `idol_of_rejuvenation` | Idol of Rejuvenation | rare | 7 | `Each Caster card played: gain 3 Absorb.` | INV_Relics_IdolofHealth (l'icône de l'idole du même nom sert déjà à Swiftmend, comme dans WoW) |
+| `wolfshead_helm` | Wolfshead Helm | rare | 7 | `The first form change each turn: draw 1.` | INV_Helmet_04 |
+
+Idol of the Wild amorce la mécanique au premier tour, comme Apprentice's Wand pour le Mage : le combat commence en
+Caster, donc la première carte de forme jouée (Wrath, Thick Hide, Maul, Ferocious Bite) est gratuite ; son coût
+tombe à 0 avant le paiement (crochet `cost`, qui lit si la carte changerait la forme). Les cinq autres couvrent
+chacune une forme (Bear, Cat, Moonkin, Caster) et le changement de forme. Idol of the Moon donne une raison de finir
+en Moonkin quand un Cast attend ; Wolfshead Helm reprend l'ancienne Idol of the Wild (+1 mana par Shift, trop fort
+quand chaque carte change la forme) en pioche, une fois par tour.
+
+## 7. Progression (niveaux de classe 1 à 7)
+
+| Niveau | Feral | Balance | Restoration | Bibelots |
+|---|---|---|---|---|
+| 1 | Shred, Rake, Swipe, Skull Bash, Rip, Frenzied Regeneration | Starfire, Moonfire, Starsurge, Faerie Fire, Insect Swarm, Hurricane | Rejuvenation, Regrowth, Mark of the Wild, Thorns, Swiftmend, Rebirth (rare) | Idol of the Wild, Idol of Brutality |
+| 2 | Tiger's Fury | Entangling Roots | Nature's Swiftness | |
+| 3 | | | | Idol of Ferocity |
+| 4 | Mangle (rare) | Starfall (rare) | Healing Touch | |
+| 5 | | | | Idol of the Moon |
+| 6 | Demoralizing Roar | Nature's Grace | Gift of Nature | |
+| 7 | Leader of the Pack (rare) | Moonkin Aura (rare) | Tranquility (rare) | Idol of Rejuvenation, Wolfshead Helm |
+
+Plus les 4 cartes de départ au niveau 1 (22 cartes ; 34 au niveau 7). Le niveau 1 suffit pour gagner : chaque
+voie y a un générateur, une dépense ou un gros coup, de la défense et du soin (Feral : Shred, Rake, Rip, Swipe,
+Frenzied Regeneration ; Balance : Moonfire, Starsurge, Starfire, Hurricane ; Restoration : Regen, Swiftmend,
+Thorns, Rebirth), plus l'Interrupt (Skull Bash) et le Last Breath (Rebirth). Les déblocages ouvrent une façon de
+jouer : au 2, une carte à 0 ou le contrôle (Tiger's Fury, Entangling Roots, Instant) ; au 4, les grosses dépenses
+(Mangle, Starfall) et le soin en Cast ; au 6, Demoralized à tous, Cast moins chers, la Regen offensive ; au 7, les
+moteurs (Leader of the Pack, Moonkin Aura) et Tranquility.
+
+## 8. Points d'accroche dans le code
+
+### Ce qui existe déjà (`docs/classes.md`)
+
+| Besoin du Druid | Point d'accroche existant |
+|---|---|
+| Forme active | état de classe `c.cls.form` (données simples, cloné, sauvegardé), posé à `"caster"` par `init` |
+| Changement de forme au jeu | crochet de classe `onCardCommitted` (inst, d, cible) : après tous les coûts, avant incantation ou résolution, et avant les Powers et bibelots (crochets de classe en premier) ; ne passe pas pour une copie (`replay`, `copyCard`) |
+| Événement de changement | `Combat.fire(c, "onShift", from, to)` (trois arguments au plus) ; Powers, bibelots et épiques s'y abonnent |
+| Réserve | ressource commune `c.player.res`, `resource.cap = 5`, `keep = true` ; `Combat.gainRes`, `Combat.surge`, `Combat.spendRes`, `minRes`, `spend` ; effet `res` (« +1 Combo. ») ; `per = { k, "surge" }` |
+| Bonus de Moonkin | crochet de classe `damage` (v, cible, d) : `v + res` si `c.cls.form == "moonkin"` et `d.type == "attack"` (même code que `ns.ClassRules.mage`) ; lu au coup, donc à la résolution d'un Cast |
+| Frappe de fin de tour | crochet de classe `onTurnEnd` (avant Powers, bibelots et défausse), comme le familier |
+| Baisse en Bear | crochet de classe `onRoundEnd` : −1 si `c.cls.form == "bear"` (même code que le Hunter) |
+| Cible de la frappe | `c.player.lastTarget` (posée par `Combat.play`) |
+| Levier A | crochet de classe `maxMana` (mana du tour suivant) |
+| Idol of the Wild | crochet `cost` (d, inst) : 0 si la carte changerait la forme et que le bibelot n'a pas servi (`c.relicState`) |
+| Instant (Nature's Swiftness) | état commun `instant` (`Combat.isInstant`) |
+| `Regen:` (Gift of Nature) | condition d'état `status:regen` (bienfait sur soi) |
+| Soins, Absorb, DoT, Stunned, Demoralized, Sundered | effets communs `heal`, `absorb`, `apply` |
+| Cible de la frappe affichée | `ns.ClassViews.druid` avec `enemyMarks = true` (comme le Hunter) |
+| Animation du changement | `ns.ClassViews.druid.event` sur `{ t = "shift" }` |
+
+### Ce qui manque dans le socle
+
+1. **Champ `form` et mots de plaque de forme.** `Core/Language.lua` déclare encore l'ancienne conception : conditions
+   `shift`, `caster`, `bear`, `cat`, `moonkin` et plaque `shift`. À remplacer par quatre plaques de tête (`Cat`,
+   `Bear`, `Moonkin`, `Caster`) lues sur `d.form` ; `L.plateWord` ne sait aujourd'hui que lire un champ vrai
+   (`d[p.flag]`) : il faut une plaque qui compare une valeur (`d.form == "bear"`). Le harnais U27 et `W.cardBody`
+   retirent alors le mot du corps comme `Cast`.
+2. **Nom de la ressource selon la forme.** `L.resourceName(id, n)` et l'explication « %s » (`Surge`, `Spend`)
+   lisent un nom fixe par classe. Il faut un nom par forme (Combo, Frenzy, Charge/Charges) : registre
+   `L.resource("wild", { forms = { cat = "combo", bear = "frenzy", moonkin = "arcane" } })` ou crochet de classe. Le
+   harnais U27 refuse aujourd'hui toute ressource d'une autre classe (« ressource d'une autre classe ») et exige
+   la clause « +N <ressource de la classe>. » pour chaque effet `res` : pour le Druid, le mot permis est celui de
+   la forme de la carte, ou de la forme nommée par le déclencheur d'un Power.
+3. **Pastille par forme.** La pastille générique (`UI/CombatView.lua`) montre l'icône fixe de la ressource
+   (`Art.classes[id].resource`) : il faut que l'icône, la couleur et l'infobulle suivent `c.cls.form`.
+4. **Frappe de l'ours.** `ns.Hunter.petAttack` fait déjà le bon coup (sans carte, dernière cible, +1, Surge sans
+   gain), mais il lit `Hunter.PET_BASE` (couplage d'équilibrage), les crochets `petAbsent` / `petAll` des épiques du
+   Hunter, et journalise `pet_attack` (animé par la vue du Hunter). À faire : soit une fonction commune
+   `Combat.companionStrike(c, why, base, n)` dont le Hunter et le Druid se servent, soit une copie
+   `Druid.strike` (base `Druid.STRIKE_BASE = 1`, journal `bear_strike`, événement `onBearStrike`) ; effet de carte
+   `{ "strike", n, surge = bool }` (« Bear strikes. », « Surge: Bear strikes once per Frenzy. ») et mot du langage
+   `Bear strikes` (`L.keyword`, comme `pet`).
+5. **Marque de forme en main** (icône allumée si la carte changerait la forme) : lecture de `c.cls.form` par le
+   rendu des cartes en main (`UI/Widgets.lua`), nouveau.
+6. **Clé des bots** : `botKey` doit contenir `c.cls.form` (deux positions de même main et même réserve mais de
+   formes différentes ne se valent pas : la frappe, la baisse, le bonus de Moonkin en dépendent).
+7. **Épique Heart of the Wild** : trois réserves dans `c.cls` ; la pastille et `Combat.gainRes` / `surge` /
+   `spendRes` doivent lire la réserve de la forme active (crochet sur la ressource, nouveau).
+
+## 9. Conseils pour les bots de simulation
+
+- **Finir en Bear** sauf raison contraire : garder une carte Bear (Thick Hide, Maul, Frenzied Regeneration) pour la
+  fin du tour ; jouer les cartes sans forme après elle. Exceptions : un Cast Moonkin en attente qui vaut plus que
+  la frappe et l'Absorb (Starfire avec 4 ou 5 Charges), ou un tour qui tue tout.
+- **Monter avant de dépenser** : jouer les générateurs de toutes les formes avant le Surge du tour ; ne pas monter
+  au-delà de 5 ; un Surge à 1 ou 2 points seulement s'il tue ou si le combat finit.
+- **Moonkin** : jouer les Attack Moonkin après les générateurs Moonkin (le bonus compte au coup) ; ne pas jouer
+  Starsurge ou Starfall avant les autres Attack Moonkin du tour (ils remettent les Charges à 0).
+- **Ordre des soins** : soins Caster au milieu du tour, jamais en dernier (ils feraient finir en Caster).
+- **Spend** (Frenzied Regeneration) : dépenser seulement si l'Absorb sert au tour ennemi et que la frappe perdue
+  vaut moins (2 points ≈ 2 dégâts par frappe).
+- `bot.resValue` ≈ 5 (entre Combo et Frenzy) ; `botValue` : en Bear, valeur de la frappe de fin de tour ; un Cast en
+  attente vaut son bonus de Charges seulement si la forme est Moonkin ; levier A actif : −22 par mana perdu
+  (`evoMana` du Mage : 22 par mana).
+- Mesurer la part des tours finis dans chaque forme : un bot qui finit toujours en Caster a mal lu la classe (voir
+  Forme d'ombre, `docs/equilibrage.md`).
+
+## 10. Risques d'équilibrage et mesures
+
+| Risque | Pourquoi | Mesure (`runner=expedition class=druid`, heuristic, clé 0) |
+|---|---|---|
+| Transfert de réserve trop fort | monter en Moonkin (+1 dégât par coup en passant), vider en Cat : chaque point sert deux fois | dégâts par point de réserve ; victoires des decks à deux et trois formes ; activer le levier A si l'écart dépasse 10 points |
+| Finir en Bear sans coût | la frappe (+1) et la baisse (−1) s'annulent : finir en Bear est gratuit dès qu'on a une carte Bear | part des tours finis en Bear ; si > 85 %, baisse en Bear à −2 ou frappe sans gain |
+| Moonkin à 5 | +5 par coup sur Wrath, Moonfire, Hurricane (à chaque cible) | dégâts moyens de Hurricane à 3 ennemis ; Wrath à 5 Charges |
+| Soins entre combats | Swiftmend (sans retirer la Regen), Tranquility | PV soignés par combat ; repli : Swiftmend retire la Regen |
+| Cat sans raison de finir là | aucun effet de fin de tour en Cat | part des tours finis en Cat ; repli (question 3) |
+| Idol of the Wild | +1 mana au premier tour de chaque combat | `sweep=relics` ; comparer à Apprentice's Wand |
+| PV perdus | cible commune 6 à 9 PV par combat normal (`decisions.md`) | PV perdus et PV nets par combat |
+
+## 11. Questions ouvertes pour le joueur
+
+1. **Nom de la réserve hors forme.** Sur les cartes, le mot est celui de la forme (Combo, Frenzy, Charges). En
+   Caster, la pastille ne montre que le nombre. Faut-il un nom propre à la réserve (proposition : « Reserve ») pour
+   l'infobulle et les textes de bibelots ?
+2. **Leviers de secours** (§ 1.6) : deux changements gratuits par tour, puis −1 mana au tour suivant (A) ou −1 point
+   de réserve (B) : d'accord sur le seuil de deux plutôt qu'un ?
+3. **Cat en fin de tour** : rien dans cette fiche. Si la simulation montre qu'on ne finit jamais en Cat, piste :
+   finir en Cat donne Parry 1 (emprunt au Rogue ; un état de plus à afficher).
+4. **Caster** : la réserve n'y vaut rien (§ 4, « Pourquoi »). D'accord, ou faut-il une lecture (par exemple
+   Atonement du Priest : les cartes Caster qui infligent des dégâts soignent) ?
+5. **Cartes sans forme** : Skull Bash, Nature's Swiftness et tous les Powers. Faut-il des Powers de forme (jouer
+   Moonkin Aura ferait entrer en Moonkin) ?
+6. **PV de départ** : 50 proposé.
+7. **Mots-clés** : la marque de forme (quatre mots de plaque, une règle) et `Bear strikes` comptent pour deux
+   mots-clés propres. D'accord pour compter les quatre formes comme un seul mot ?
+8. **Noms** : Maul et Rake sont aussi des actions ennemies (Duskwood, Wetlands, Stranglethorn Vale). Garder ?
+9. **`docs/classes/decisions.md`**, ligne « Druid » (« Une carte de soin jouée hors de Caster ramène d'abord en
+   Caster, et ce retour est un Shift. […] Bear Form coûte 1. ») : elle décrit l'ancienne conception et prime sur
+   les fiches ; à remplacer par la règle de cette fiche (« Chaque carte porte sa forme ; la jouer y fait entrer,
+   sans coût ; la réserve est gardée au changement »).
