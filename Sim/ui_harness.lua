@@ -2903,7 +2903,7 @@ do
   -- fichiers d'art dont les icônes attendent leur lot de médias (tools/build_media.py --icons-only, à part) :
   -- icônes absentes de Media/Icons tolérées (repli `icon` du client, aucun plantage), mais présentes dans le
   -- pack local s'il est là (sinon la copie échouerait). Retirer l'entrée une fois les icônes copiées.
-  local pendingFiles, pending, notInPack = { ["UI/Art/druid.lua"] = true }, {}, {}
+  local pendingFiles, pending, notInPack = {}, {}, {}
   local PACK = (os.getenv("HOME") or "") .. "/Téléchargements/ICONS/"
   local packHere = io.open(PACK .. "ClassIcon_Priest.tga", "rb")
   if packHere then packHere:close() end
