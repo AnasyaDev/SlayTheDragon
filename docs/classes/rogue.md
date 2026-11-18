@@ -14,7 +14,7 @@ durée (`pain` / « Pain » dans le code actuel, à renommer).
 | Mécaniques propres | Parry (état empilable, une charge annule un coup jusqu'à 8 dégâts) et Stealth (première carte Attack renforcée). |
 | Style de survie | Tuer vite, et Parry. Aucun soin. |
 | Difficulté | Moyenne. |
-| PV de départ | 65 (comme le Priest : pas de soin, mais Parry ne se perd pas d'un tour à l'autre). À régler. |
+| PV de départ | 65 (comme le Priest : pas de soin, mais Parry ne se perd pas d'un tour à l'autre). À régler. **57** depuis le 18/11/2026 (§ 10, réglage au bot human ; 50 avant). |
 | Deck de départ | 4 Sinister Strike, 4 Feint, 1 Backstab, 1 Eviscerate (5 Sinister Strike et 3 Feint depuis le 12/11/2026, § 10, passe 2). |
 | Interrupt | Kick (0 mana, voie Combat, niveau 1). |
 | Last Breath | Cheat Death (Power rare, voie Subtlety). |
@@ -465,6 +465,17 @@ section UR). Écarts avec la fiche, par ordre de priorité (decisions.md puis so
   (2 000 expéditions ; 42 % sans Nightblade avec les mêmes notes).
 - Notes du bot : Nightblade 9 ; Shadowstep 3 → 7, Secret Technique 3 → 6, Hemorrhage 3,5 → 5,5,
   Vanish 3 → 5,5 (positives au balayage avec le nouveau deck).
+
+### Réglage au bot human (18/11/2026 ; détails : `docs/equilibrage.md`, « Rogue : réglage au bot human »)
+
+- **PV 50 → 57**, seul changement (demande du joueur : monter le Rogue, 38,5 % au bot `human`, clé 0, niveau 7).
+  Il perdait par usure : 1,5 à 1,8 fois les PV perdus du bot `heuristic` à chaque combat, sans soin, d'où 197
+  défaites sur 600 à Westfall (121 contre VanCleef) et 86 à Duskwood. Les PV absorbent ces erreurs sans accélérer
+  le bot parfait. Résultat : **57,2 %** au bot `human` (600 expéditions ; Westfall 80,7 %, Duskwood 85,3 % quand
+  atteinte), **93,3 %** au bot `heuristic` (300 ; 88,0 avant).
+- Balayage au bot `human` : les cartes à 0 et les coups immédiats l'aident le plus (Adrenaline Rush, Ambush, +17 à
+  +18), les Powers payants et les Surge de DoT le freinent (Shadow Dance −16, Cheat Death −14, Deadly Poison −6,
+  Envenom −4, Rupture −3) alors que ses notes les lui font prendre souvent ; cartes et notes inchangées.
 
 ## 11. Paliers d'amélioration +2 et +3 (15/11/2026)
 

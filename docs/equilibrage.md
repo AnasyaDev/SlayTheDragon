@@ -1194,3 +1194,46 @@ textes des cartes sont inchangés.
   suffisaient.
 - Non vérifié : niveau 1 (compte neuf), clés 1 à 5, cible de 6 à 9 PV par combat normal au niveau 1 (les PV
   encaissés par combat ne bougent pas avec les PV max ; leur part tombe de 7,4 à 6,6 % des PV à l'entrée).
+
+## Rogue : réglage au bot human (18/11/2026)
+
+Demande du joueur : monter le Rogue, le plus bas des classes au bot `human` avec le Druid. Cible : 52 à 60 % au bot
+`human` (`luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0 class=rogue`, niveau 7,
+`zones=0`, ± 4), le bot `heuristic` (300 expéditions, graine 1) sous 95 %. Rapports bruts : `reports/rogue-h-*`,
+`reports/rogue-heur-57.*` (non versionnés).
+
+**Où il perdait** (50 PV) : 197 défaites sur 600 à Westfall (121 contre VanCleef, 48 à l'étape 6, 20 à l'étape 5),
+86 à Duskwood (38 contre Morbent Fel). Westfall seule (`zone=westfall`) : 8,6 PV perdus par combat normal (16,5 % des
+PV max), 16,5 par élite (30 %), 23,1 au boss (40 %) ; VanCleef 76,7 %, Harvest Golem 89,4 %, Rhahk'Zor 94,3 % ; les
+victoires finissent la zone à 16,8 PV. Le bot `human` ne rate pas une mécanique précise : il encaisse 1,5 à 1,8 fois
+les PV du bot `heuristic` sur toute la campagne (normal 5,9 contre 3,2, élite 10,8 contre 7,5, boss 19,7 contre
+12,8) et tue en 20 % de tours de plus (2,6 / 3,7 / 4,5 contre 2,2 / 3,15 / 3,8). Sans soin, cette usure s'additionne
+d'un combat à l'autre jusqu'au boss. Le Combo compté à 60 % par le bot `human` coûte peu (≈ 0,3 PV par point laissé
+au jugé) ; Eviscerate reste en main 31 % des fois où elle est piochée, Feint est jouée 62 % des fois.
+
+**Balayage** (`sweep=cards class=rogue runs=300 bot=human`, carte ajoutée au deck de départ, 38,0 % sans) : gains
+Adrenaline Rush +18,3, Ambush +17,0, Smoke Bomb +13,7, Cheap Shot +13,3, Between the Eyes +13,0, Evasion +12,3,
+Killing Spree +12,3, Pistol Shot +9,3 ; pertes Shadow Dance −15,7, Cheat Death −14,3, Exsanguinate −8,3, Venomous
+Wounds −7,3, Deadly Poison −6,0, Envenom −4,0, Nightblade −3,0, Rupture −2,7, Slice and Dice −2,7. Le joueur moyen
+profite des cartes à 0 et des coups immédiats, perd du temps sur les Powers payants et les Surge de DoT, que ses
+notes lui font pourtant prendre le plus (sur 600 expéditions : Rupture choisie 951 fois, Blade Flurry 916, Deadly
+Poison 840, Envenom 828). Ni les cartes ni les notes ne sont touchées : à garder en tête pour un réglage des voies.
+
+**Levier retenu : PV 50 → 57**, seul changement. Les PV sont le levier de tolérance : ils absorbent les erreurs
+sans rien changer à la vitesse de tuer, là où un bonus de dégâts accélérerait d'abord le bot parfait. Effet (bot
+`human`, `hp=N` puis valeur écrite) : environ 2,7 points par PV.
+
+| Mesure (clé 0, niveau 7, graine 1) | 50 PV (avant) | 55 (`hp=`) | 56 | **57 (retenu)** | 58 (`hp=`) |
+|---|---|---|---|---|---|
+| `human`, 600 expéditions | 38,5 % | 53,0 % | 53,8 % | **57,2 %** | 60,0 % |
+| Westfall battue (`human`) | 67,2 % | 77,8 % | 78,7 % | **80,7 %** | 83,0 % |
+| Duskwood battue quand atteinte (`human`) | 78,7 % | 82,4 % | 82,2 % | **85,3 %** | 86,7 % |
+| VanCleef / Morbent Fel (`human`) | 76,9 / 89,3 % | 85,1 / 90,0 % | 85,2 / 89,8 % | **86,3 / 92,0 %** | 88,0 / 93,3 % |
+| `heuristic`, 300 expéditions | 88,0 % | – | – | **93,3 %** (± 2,8) | – |
+
+À 57 PV, bot `human` : 5,7 PV perdus par combat normal, 10,3 par élite, 19,9 au boss (7,5 / 14,3 / 28,1 % des PV max
+à l'entrée) ; bot `heuristic` : 3,1 / 7,3 / 12,8, Westfall battue 97,3 %. Parry, Stealth, cartes, deck et bibelot de
+départ inchangés.
+
+- Non vérifié : graine 2, niveau 1 (compte neuf), clés 1 à 5, voies seules, épiques dans les zones dures (mesurées
+  à 50 PV le 14/11/2026, `docs/zones/cartes-de-zone.md`) ; le bot `human` des autres classes n'a pas été remesuré.

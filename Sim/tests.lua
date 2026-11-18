@@ -1225,7 +1225,7 @@ test("Rogue : 35 cartes (4 de départ, 14/11/6), 10 par voie (11 en Subtlety), n
   eq(nr, 6)
   local cd = ns.Classes.rogue
   eq(#cd.deck, 10); eq(cd.resource.id, "combo"); eq(cd.resource.cap, 5); eq(cd.resource.keep, true)
-  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 50)
+  eq(cd.startRelic, "thieves_tools"); eq(ns.Relics.thieves_tools.noPool, true); eq(cd.hp, 57)
   local nSS, nFeint = 0, 0
   for _, id in ipairs(cd.deck) do
     if id == "sinister_strike" then nSS = nSS + 1 elseif id == "feint" then nFeint = nFeint + 1 end

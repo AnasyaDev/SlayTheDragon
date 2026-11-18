@@ -627,11 +627,12 @@ relic("shadowfang", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.rogue = {
-  id = "rogue", name = "Rogue", order = 3, hp = 50,
+  id = "rogue", name = "Rogue", order = 3, hp = 57,
   resource = { id = "combo", cap = 5, keep = true },
   -- 5 Sinister Strike, 3 Feint (décision du joueur, 12/11/2026 : Parry annulait presque tous les coups des
   -- normaux avec 4 Feint). Le deck tue plus vite sans perdre plus de PV : les PV n'ont pu monter que de
-  -- 49 à 50 sans sortir des cibles de victoires (docs/equilibrage.md, « Passe 2 »).
+  -- 49 à 50 sans sortir des cibles de victoires (docs/equilibrage.md, « Passe 2 »). PV 50 → 57 le 18/11/2026 :
+  -- réglage au bot human (38,5 → 52-60 % visés ; docs/equilibrage.md, « Rogue : réglage au bot human »).
   deck = {
     "sinister_strike", "sinister_strike", "sinister_strike", "sinister_strike", "sinister_strike",
     "feint", "feint", "feint",
