@@ -1284,3 +1284,67 @@ Après : % des PV max perdus par combat normal / élite / boss 5,6 / 12,8 / 20,0
   au bot `human` (Mage 60,7, Priest 53,5 avant les réglages des autres classes du même jour).
 - Non vérifié : niveau 1 compte neuf (Victory Rush soin 4 → 3 avait été annulé en passe 1 pour −11 points au niveau 1,
   bot `heuristic` : à remesurer), clés 1 à 5, épiques du Warrior, autres graines.
+
+## Druid : compte neuf (18/11/2026)
+
+Mesure du 18/11/2026 (`luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0 class=<classe>`,
+± 4 points) : au niveau 7, Warrior 68,5, Mage 60,7, Hunter 59,3, Rogue 57,2, Priest 53,5, Druid 51,8 % ; en compte
+neuf (`zones=0 level=1`), Warrior 43,3, Rogue 41,5, Mage 37,0, Priest 34,3, Hunter 34,0, **Druid 1,3 %**. Cible :
+Druid en compte neuf entre 32 et 42 %, niveau 7 entre 48 et 60 %, bot heuristic au niveau 7 sous 97 %. Leviers dans
+l'ordre : répartition des niveaux de déblocage (échanges à nombre de cartes égal par niveau), puis chiffres ; règles,
+PV (65) et taxe intouchés. Rapports bruts : `reports/l1-*.txt`, `reports/l7-F*.txt` du worktree (non versionnés).
+
+**Diagnostic.** Rien de verrouillé à tort au niveau 1 : les 4 cartes de départ et Idol of the Wild sont au niveau 1,
+les quatre formes sont jouables (Cat par Ferocious Bite, Shred, Rake ; Tree par les soins), chaque carte du niveau 1
+a sa note de bot. Le deck de départ passe Westfall presque comme au niveau 7 (62,3 contre 71,2 %) ; la classe
+s'effondre ensuite (Duskwood 61,0, Wetlands 27,2 % battues quand atteintes ; niveau 7 : 87,8 et 86,9 %). Combat
+normal : 17,3 PV encaissés (niveau 7 : 11,9), boss 55,2 (48,7) ; Nek'rosh 41,3 % (88,3 au niveau 7), Morbent Fel
+74,0 (92,6), Dragonmaw Raider et Centurion 60,7 (97,8). Fins de tour Bear / Cat / Moonkin / Tree 40,9 / 19,6 / 26,9 /
+12,4 %, 1,90 changement par tour (niveau 7 : 2,31), taxe 2,3 mana par combat normal, 3,7 par boss. Deux causes :
+
+- **Rebirth, seule rare du niveau 1** (Hunter et Druid ont une rare au niveau 1, Warrior et Priest trois, Mage et
+  Rogue aucune). Une récompense de boss ne tire que des rares (`X.CARD_WEIGHTS.boss = { rare = 1 }`) : elle n'offrait
+  que Rebirth, seule carte ; les rares des élites (15 %, plus dans les zones suivantes) et du marchand aussi. Le bot
+  `human` l'a choisie 1 594 fois sur 600 expéditions (3,4 exemplaires dans les 465 decks qui l'ont) et joue 83 % des
+  exemplaires piochés, alors que Last Breath ne vaut qu'une fois par combat : chaque copie en plus coûte 1 mana et une
+  pioche. Le Bestial Wrath du Hunter, dans la même position, se rejoue. Le bot ne voit pas la copie inutile (note de
+  choix sans malus de doublon ; `Bots.POWER_VALUE.rebirth` compté par exemplaire en jeu) : écart de bot commun à
+  tous les Last Breath en Power, non corrigé ici.
+- **Pool du niveau 1 sans carte à 0 mana ni contrôle** : Tiger's Fury et Entangling Roots étaient au niveau 2, alors
+  que le niveau 1 gardait Hurricane (Cast à 2 mana, gardée en main 54 % des fois où le bot `human` la pioche) et Rip
+  (Surge en DoT, gardée 43 %).
+
+| Répartition (niveau 1) | Victoires | Westfall | Duskwood | Wetlands | Stranglethorn | Swamp | Steppes | Blackrock | Normal / élite / boss : PV encaissés | Changements par tour |
+|---|---|---|---|---|---|---|---|---|---|---|
+| départ | 1,3 % | 62,3 | 61,0 | 27,2 | 46,8 | 51,7 | 86,7 | 61,5 | 17,3 / 33,4 / 55,2 | 1,90 |
+| (1) Rebirth 1 → 4, Healing Touch 4 → 1 | 19,0 % | 56,8 | 75,1 | 60,5 | 87,7 | 95,6 | 99,2 | 88,4 | 15,7 / 29,9 / 55,5 | 2,15 |
+| (2) + Tiger's Fury 2 → 1, Rip 1 → 2 | 26,2 % | 58,5 | 78,6 | 71,0 | 92,9 | 96,7 | 99,4 | 89,7 | 14,2 / 27,7 / 53,8 | 2,45 |
+| **(3) + Entangling Roots 2 → 1, Hurricane 1 → 2 : retenu** | **36,2 %** (± 3,8) | **64,2** | **86,0** | **75,5** | **95,2** | **100,0** | **99,6** | **91,6** | 10,5 / 21,9 / 56,3 | 2,47 |
+| essai : (1) + Demoralizing Roar 6 → 1, Rip 1 → 6 | 53,7 % | 74,0 | 90,5 | 87,8 | 96,0 | 99,1 | 99,7 | 96,1 | 13,0 / 23,0 / 45,5 | 2,23 |
+| essai : (2) + Starfall 4 → 1, Starsurge 1 → 4 | 19,5 % | 58,3 | 80,0 | 64,3 | 81,1 | 95,9 | 96,4 | 86,7 | 11,8 / 29,4 / 50,0 | 2,49 |
+| niveau 7, pour mémoire (inchangé) | 51,8 % | 71,2 | 87,8 | 86,9 | 97,5 | 99,4 | 100,0 | 98,4 | 11,9 / 22,6 / 48,7 | 2,31 |
+
+Zones : battue / atteinte, en %.
+
+| Contrôle | Avant | Après |
+|---|---|---|
+| `human`, niveau 1 (`zones=0 level=1`, 600) | 1,3 % | **36,2 %** |
+| `human`, niveau 7 (600) | 51,8 % | 51,8 % (rapport identique) |
+| `heuristic`, niveau 7 (300) | 95,7 % | 95,7 % (identique) |
+
+- **Retenu : trois échanges dans la même voie** (même nombre de cartes par voie et par niveau, test « progression :
+  répartition exacte ») : Rebirth 1 → 4 et Healing Touch 4 → 1 (Restoration) ; Tiger's Fury 2 → 1 et Rip 1 → 2
+  (Feral) ; Entangling Roots 2 → 1 et Hurricane 1 → 2 (Balance). Le niveau 1 n'a plus de rare, comme le Mage et le
+  Rogue (une récompense de boss se rabat alors sur les poids d'un combat ordinaire) ; Rebirth rejoint Mangle et
+  Starfall au niveau 4, comme Ice Block (Mage) et Cheat Death (Rogue). Aucun chiffre changé.
+- **Le niveau 7 ne bouge pas** : tout y est débloqué, la répartition ne change ni le pool ni le tirage (rapport
+  identique à la graine 1). L'écart niveau 1 / niveau 7 passe à 15,6 points (Hunter 25,3, Mage 23,7, Warrior 25,2).
+- **Essais écartés** : Demoralizing Roar au niveau 1 dépasse le niveau 7 (53,7 %) : dans un pool de cinq
+  inhabituelles, la seule défense à 0 mana s'empile (2 405 choix, 4 par expédition) ; Starfall au niveau 1 refait le
+  piège de la rare seule (2 670 choix, 4,5 par expédition, gardée en main 49 %) et perd 6,7 points.
+- **Wetlands reste la zone la plus dure du Druid en compte neuf** (75,5 % battue quand atteinte ; autres classes 84 à
+  92 %) : Nek'rosh 76,5 %, sans dégâts de zone à 1 mana au niveau 1 hors Swipe et les coups de fin de tour en Moonkin
+  (Hurricane passe au niveau 2).
+- Non vérifié : niveaux 2 à 6 (Rebirth au 4 et Healing Touch au 1 changent les pools intermédiaires), autres graines,
+  clés 1 à 5, bot heuristic au niveau 1, épiques du Druid imposées ; le malus de doublon des Last Breath dans les
+  bots (Rebirth, Cheat Death, Last Stand, Ice Block, Feign Death) reste à traiter à part.

@@ -105,7 +105,7 @@ card("skull_bash", {
 
 -- Rip : Rupture du Voleur (effet dotPer, Core/Classes/rogue.lua).
 card("rip", {
-  level = 1, name = "Rip", form = "cat", cost = 1, type = "skill", rarity = "uncommon", path = "feral",
+  level = 2, name = "Rip", form = "cat", cost = 1, type = "skill", rarity = "uncommon", path = "feral",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "dotPer", 3, icon = "bleed" } },
   text = "Surge: apply DoT 3 per Combo.",
   up = { effects = { { "surge" }, { "dotPer", 4, icon = "bleed" } }, text = "Surge: apply DoT 4 per Combo." },
@@ -124,7 +124,7 @@ card("frenzied_regeneration", {
 })
 
 card("tigers_fury", {
-  level = 2, name = "Tiger's Fury", form = "cat", cost = 0, type = "skill", rarity = "uncommon", path = "feral",
+  level = 1, name = "Tiger's Fury", form = "cat", cost = 0, type = "skill", rarity = "uncommon", path = "feral",
   cooldown = 2, effects = { { "res", 1 }, { "draw", 1 } },
   text = "+1 Combo.\nDraw 1.\nCooldown 2.",
   up = { cooldown = 1, text = "+1 Combo.\nDraw 1.\nCooldown 1." },
@@ -232,7 +232,7 @@ card("insect_swarm", {
 })
 
 card("hurricane", {
-  level = 1, name = "Hurricane", form = "moonkin", cost = 2, type = "attack", rarity = "uncommon", path = "balance",
+  level = 2, name = "Hurricane", form = "moonkin", cost = 2, type = "attack", rarity = "uncommon", path = "balance",
   cast = true, effects = { { "damage", 12, all = true } },
   text = "Cast.\nDeal 12 to all.",
   up = { effects = { { "damage", 15, all = true } }, text = "Cast.\nDeal 15 to all." },
@@ -241,7 +241,7 @@ card("hurricane", {
 })
 
 card("entangling_roots", {
-  level = 2, name = "Entangling Roots", form = "moonkin", cost = 1, type = "skill", rarity = "uncommon",
+  level = 1, name = "Entangling Roots", form = "moonkin", cost = 1, type = "skill", rarity = "uncommon",
   path = "balance", target = "enemy", cooldown = 4, effects = { { "res", 1 }, { "apply", "stunned", 1 } },
   text = "+1 Charge.\nApply Stunned 1 ⌛\nCooldown 4.",
   up = { cooldown = 3, text = "+1 Charge.\nApply Stunned 1 ⌛\nCooldown 3." },
@@ -368,7 +368,7 @@ local function rebirthHooks(n)
 end
 
 card("rebirth", {
-  level = 1, name = "Rebirth", cost = 1, type = "power", rarity = "rare", path = "restoration",
+  level = 4, name = "Rebirth", cost = 1, type = "power", rarity = "rare", path = "restoration",
   power = true, effects = {}, hooks = rebirthHooks(12),
   text = "Power.\nLast Breath: stay at 1 HP, heal 12.",
   up = { cost = 0, text = "Power.\nLast Breath: stay at 1 HP, heal 12." },
@@ -389,7 +389,7 @@ card("natures_swiftness", {
 -- Healing Touch : Cast ; entre en Tree of Life au jeu, le soin se résout au tour suivant dans n'importe quelle
 -- forme ; palier 3 : sans Cast (se résout tout de suite).
 card("healing_touch", {
-  level = 4, name = "Healing Touch", form = "tree", cost = 1, type = "skill", rarity = "uncommon",
+  level = 1, name = "Healing Touch", form = "tree", cost = 1, type = "skill", rarity = "uncommon",
   path = "restoration", cast = true, exhaust = true, effects = { { "heal", 12 } },
   text = "Cast.\nHeal 12.\nExhaust.",
   up = { effects = { { "heal", 16 } }, text = "Cast.\nHeal 16.\nExhaust." },

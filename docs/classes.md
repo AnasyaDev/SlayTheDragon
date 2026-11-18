@@ -446,8 +446,14 @@ Six par classe (GDD) : niveau 1 = le bibelot de départ et un autre ; 3 et 5 = u
 Table du GDD (`docs/gdd-classes.md`), vérifiée pour chaque classe jouable par le test « progression :
 répartition exacte » : niveau 1 = 4 cartes de départ + 6 par voie (22) et 2 bibelots ; 2, 4 et 6 = une carte
 par voie ; 3 et 5 = un bibelot ; 7 = une rare par voie et 2 bibelots (34 cartes, 6 bibelots). Expérience,
-seuils et règles : `docs/expedition.md`, « Niveau de classe ». Mage, Rogue, Hunter : niveaux de leur fiche
-(`docs/classes/<classe>.md`, § Progression). Priest : `docs/classes/priest-progression.md`.
+seuils et règles : `docs/expedition.md`, « Niveau de classe ». Mage, Rogue, Hunter, Druid : niveaux de leur
+fiche (`docs/classes/<classe>.md`, § Progression). Priest : `docs/classes/priest-progression.md`.
+
+Rares du niveau 1 : aucune, ou plusieurs, mais jamais une seule carte qui ne vaut qu'une fois par combat. Une
+récompense de boss ne tire que des rares (`boss = { rare = 1 }`) : avec une seule rare débloquée, elle n'offre
+que cette carte, que le joueur reprend à chaque boss. Le Druid avait Rebirth (Last Breath) seule au niveau 1 :
+2,7 exemplaires par expédition au bot `human`, 1,3 % de victoires en compte neuf ; Rebirth passée au niveau 4
+(18/11/2026, `docs/equilibrage.md`, « Druid : compte neuf »).
 
 En plus du niveau (campagne par zones, 13/11/2026, `docs/zones.md`) : chaque classe a **une carte de zone
 par zone** (`zone = "<id>"`, débloquée par sa première victoire dans la zone ; à écrire, aucune aujourd'hui),

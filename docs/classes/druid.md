@@ -9,7 +9,8 @@ sur les cartes, Idol of the Wild à +1 mana par Shift) : de cette version resten
 le réglage des bots et des chiffres (§ 8, « Ce qui reste »). Première mesure et premier réglage le 18/11/2026
 (§ 10, « Réglage du 18/11/2026 ») : levier A actif (taxe dès le deuxième changement d'un tour), PV 65 → 58,
 Regen de fin de tour en Tree of Life 1 → 2. Réglé ensuite au bot `human` (§ 10, « Réglage au bot human ») : PV
-58 → 65.
+58 → 65. Répartition des niveaux de déblocage revue pour le compte neuf (§ 7 ; § 10, « Compte neuf ») : 1,3 → 36,2 %
+au bot `human` au niveau 1.
 
 Corrigée le même jour après relecture du joueur : chaque forme a un effet de fin de tour ; la forme Caster
 devient **Tree of Life** (quatrième forme, portée par les cartes de soin) ; le combat commence **sans forme** ;
@@ -55,7 +56,7 @@ Regen). Survie : Absorb en Bear, soins et Regen en Tree of Life. Difficulté : d
 | Deck de départ | Wrath ×3 (Moonkin), Thick Hide ×4 (Bear), Maul ×2 (Bear), Ferocious Bite ×1 (Cat). |
 | Bibelot de départ | Idol of the Wild : la première carte de chaque combat qui change de forme coûte 0 (le combat commence sans forme : c'est la première carte de forme jouée). |
 | Interrupt | Skull Bash (Feral, sans forme, niveau 1). |
-| Last Breath | Rebirth (Restoration, rare, niveau 1). |
+| Last Breath | Rebirth (Restoration, rare, niveau 4 ; niveau 1 jusqu'au réglage du compte neuf, § 10). |
 | Mots-clés propres | **Forme** (mots de plaque `Cat`, `Bear`, `Moonkin`, `Tree` : un seul mot-clé, une seule règle, décision du joueur) et **Bear strikes**. Les mots de la réserve (Combo, Frenzy, Charge, Reserve), `Surge:` et `Spend N:` sont des mots communs ou des noms de ressource ; Clearcasting est un état posé sur le héros, écrit sur aucune carte : ni l'un ni l'autre ne sont des mots-clés propres. |
 | Style de survie | Encaisser (Absorb des cartes Bear) et se soigner (cartes Tree : soins directs tous Exhaust, Regen ; Regen 2 en finissant le tour en Tree of Life). `survival = "absorb"`. |
 | Difficulté | Difficile : chaque carte change la forme, l'ordre des cartes compte. |
@@ -399,9 +400,9 @@ base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de D
 | `rake` | Rake | common | 1 | Cat | 1 | Attack | | Deal 3. / +1 Combo. / Apply DoT 3 | Deal 4. / +1 Combo. / Apply DoT 5 | Ability_Druid_Rake | Garrote |
 | `swipe` | Swipe | common | 1 | Bear | 1 | Attack | | Deal 4 to all. / Bear strikes. | Deal 6 to all. / Bear strikes. | Ability_Druid_Swipe | Multi-Shot 5 à tous + Pet attacks (inhabituelle) |
 | `skull_bash` | Skull Bash | common | 1 | — | 0 | Skill | Cooldown 2 | Interrupt the target's cast. / Draw 1. | (Cooldown 1) | INV_Bone_Skull_04 | Silence (Priest) |
-| `rip` | Rip | uncommon | 1 | Cat | 1 | Skill | | Surge: apply DoT 3 per Combo. | Surge: apply DoT 4 per Combo. | Ability_GhoulFrenzy | Rupture (`minRes = 1`) |
+| `rip` | Rip | uncommon | 2 | Cat | 1 | Skill | | Surge: apply DoT 3 per Combo. | Surge: apply DoT 4 per Combo. | Ability_GhoulFrenzy | Rupture (`minRes = 1`) |
 | `frenzied_regeneration` | Frenzied Regeneration | uncommon | 1 | Bear | 1 | Skill | | Gain 6 Absorb. / Spend 2: gain 6 more. | Gain 8 Absorb. / Spend 2: gain 8 more. | Ability_BullRush | Growl (Hunter) |
-| `tigers_fury` | Tiger's Fury | uncommon | 2 | Cat | 0 | Skill | Cooldown 2 | +1 Combo. / Draw 1. | (Cooldown 1) | Ability_Mount_JungleTiger | Premeditation, Kick |
+| `tigers_fury` | Tiger's Fury | uncommon | 1 | Cat | 0 | Skill | Cooldown 2 | +1 Combo. / Draw 1. | (Cooldown 1) | Ability_Mount_JungleTiger | Premeditation, Kick |
 | `mangle` | Mangle | rare | 4 | Bear | 2 | Skill | | Surge: Bear strikes once per Frenzy. | (coût 1) | Ability_Druid_Mangle2 | Bestial Wrath (`minRes = 1`) |
 | `demoralizing_roar` | Demoralizing Roar | uncommon | 6 | Bear | 0 | Skill | Cooldown 4 | +1 Frenzy. / Apply Demoralized 2 ⌛ to all | (Cooldown 3) | ABILITY_DRUID_DEMORALIZINGROAR | Demoralizing Shout (Warrior) |
 | `leader_of_the_pack` | Leader of the Pack | rare | 7 | — | 1 | Power | | Power. / Cat Attacks: +1 Combo. | (coût 0) | Spell_Nature_UnyeildingStamina | Venomous Wounds (rare, moteur de Combo) |
@@ -415,8 +416,8 @@ base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de D
 | `starsurge` | Starsurge | common | 1 | Moonkin | 1 | Attack | | Surge: deal 6 per Charge. | Surge: deal 7 per Charge. | Spell_Arcane_Arcane03 | Nightblade 6 par Combo (`minRes = 1`) |
 | `faerie_fire` | Faerie Fire | common | 1 | Moonkin | 0 | Skill | Cooldown 3 | +1 Charge. / Apply Sundered 2 ⌛ | (Cooldown 2) | Spell_Nature_FaerieFire | Hunter's Mark 3, Exhaust |
 | `insect_swarm` | Insect Swarm | common | 1 | Moonkin | 1 | Skill | | Apply DoT 4 / Apply Demoralized 1 ⌛ | Apply DoT 6 / Apply Demoralized 1 ⌛ | Spell_Nature_InsectSwarm | Crippling Poison 2 + Demoralized 1 |
-| `hurricane` | Hurricane | uncommon | 1 | Moonkin | 2 | Attack | Cast | Cast. / Deal 12 to all. | Cast. / Deal 15 to all. | Spell_Nature_Cyclone | Blizzard 12 à tous + Demoralized 2 |
-| `entangling_roots` | Entangling Roots | uncommon | 2 | Moonkin | 1 | Skill | Cooldown 4 | +1 Charge. / Apply Stunned 1 ⌛ | (Cooldown 3) | Spell_Nature_StrangleVines | Chastise, Wyvern Sting |
+| `hurricane` | Hurricane | uncommon | 2 | Moonkin | 2 | Attack | Cast | Cast. / Deal 12 to all. | Cast. / Deal 15 to all. | Spell_Nature_Cyclone | Blizzard 12 à tous + Demoralized 2 |
+| `entangling_roots` | Entangling Roots | uncommon | 1 | Moonkin | 1 | Skill | Cooldown 4 | +1 Charge. / Apply Stunned 1 ⌛ | (Cooldown 3) | Spell_Nature_StrangleVines | Chastise, Wyvern Sting |
 | `starfall` | Starfall | rare | 4 | Moonkin | 1 | Attack | | Surge: deal 6 per Charge to all. | Surge: deal 7 per Charge to all. | Ability_Druid_Starfall | Arcane Barrage (commune, plafond 4) : 30 à tous à 5 |
 | `natures_grace` | Nature's Grace | uncommon | 6 | — | 2 | Power | | Power. / Cast cards: cost −1. | (coût 1) | Spell_Nature_NaturesBlessing | Apotheosis (rare, + 1 mana) |
 | `moonkin_aura` | Moonkin Aura | rare | 7 | — | 1 | Power | | Power. / End of turn in Moonkin: +1 Charge. | (coût 0) | Spell_Nature_ForceOfNature | Shadow Dance (moteur rare) ; raison de finir en Moonkin |
@@ -430,9 +431,9 @@ base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de D
 | `mark_of_the_wild` | Mark of the Wild | common | 1 | Tree | 1 | Skill | | Gain 4 Absorb. / Gain Regen 2 | Gain 6 Absorb. / Gain Regen 3 | Spell_Nature_Regeneration | Radiance 4 + Atonement 1 |
 | `thorns` | Thorns | common | 1 | — | 1 | Power | | Power. / When hit: deal 3 to the attacker. | (coût 0) | Spell_Nature_Thorns | Retaliation 4 (inhabituelle, niveau 6) |
 | `swiftmend` | Swiftmend | uncommon | 1 | Tree | 0 | Skill | Exhaust | Heal 2 per Regen. | Heal 2 per Regen. / Draw 1. | INV_Relics_IdolofRejuvenation | soin immédiat sans retirer la Regen |
-| `rebirth` | Rebirth | rare | 1 | — | 1 | Power | | Power. / Last Breath: stay at 1 HP, heal 12. | (coût 0) | Spell_Nature_Reincarnation | Last Stand 15, Ice Block 10 |
+| `rebirth` | Rebirth | rare | 4 | — | 1 | Power | | Power. / Last Breath: stay at 1 HP, heal 12. | (coût 0) | Spell_Nature_Reincarnation | Last Stand 15, Ice Block 10 |
 | `natures_swiftness` | Nature's Swiftness | uncommon | 2 | — | 0 | Skill | Exhaust | Draw 1. / Gain Instant 1 | Draw 2. / Gain Instant 1 | Spell_Nature_RavenForm | Combustion (Draw 2, Instant 2, rare) |
-| `healing_touch` | Healing Touch | uncommon | 4 | Tree | 1 | Skill | Cast, Exhaust | Cast. / Heal 12. | Cast. / Heal 16. | SPELL_NATURE_HEALINGTOUCH | Greater Heal 10, Cast, Exhaust |
+| `healing_touch` | Healing Touch | uncommon | 1 | Tree | 1 | Skill | Cast, Exhaust | Cast. / Heal 12. | Cast. / Heal 16. | SPELL_NATURE_HEALINGTOUCH | Greater Heal 10, Cast, Exhaust |
 | `gift_of_nature` | Gift of Nature | uncommon | 6 | — | 1 | Power | | Power. / Regen: Attack hits deal 2 more. | (coût 0) | Spell_Nature_ProtectionformNature | Shatter (« Frozen: Attack hits deal 4 more. ») |
 | `tranquility` | Tranquility | rare | 7 | Tree | 2 | Skill | Exhaust | Heal 6. / Gain Regen 5 | Heal 9. / Gain Regen 6 | Spell_Nature_Tranquility | rare de soin, une fois par combat |
 
@@ -654,21 +655,26 @@ de l'Absorb à la fin de tour en Moonkin, qui n'en a pas ; Wolfshead Helm repren
 
 | Niveau | Feral | Balance | Restoration | Bibelots |
 |---|---|---|---|---|
-| 1 | Shred, Rake, Swipe, Skull Bash, Rip, Frenzied Regeneration | Starfire, Moonfire, Starsurge, Faerie Fire, Insect Swarm, Hurricane | Rejuvenation, Regrowth, Mark of the Wild, Thorns, Swiftmend, Rebirth (rare) | Idol of the Wild, Idol of Brutality |
-| 2 | Tiger's Fury | Entangling Roots | Nature's Swiftness | |
+| 1 | Shred, Rake, Swipe, Skull Bash, Tiger's Fury, Frenzied Regeneration | Starfire, Moonfire, Starsurge, Faerie Fire, Insect Swarm, Entangling Roots | Rejuvenation, Regrowth, Mark of the Wild, Thorns, Swiftmend, Healing Touch | Idol of the Wild, Idol of Brutality |
+| 2 | Rip | Hurricane | Nature's Swiftness | |
 | 3 | | | | Idol of Ferocity |
-| 4 | Mangle (rare) | Starfall (rare) | Healing Touch | |
+| 4 | Mangle (rare) | Starfall (rare) | Rebirth (rare) | |
 | 5 | | | | Idol of the Moon |
 | 6 | Demoralizing Roar | Nature's Grace | Gift of Nature | |
 | 7 | Leader of the Pack (rare) | Moonkin Aura (rare) | Tranquility (rare) | Idol of Rejuvenation, Wolfshead Helm |
 
 Plus les 4 cartes de départ au niveau 1 (22 cartes ; 34 au niveau 7). Le niveau 1 suffit pour gagner : chaque
-voie y a un générateur, une dépense ou un gros coup, de la défense et du soin (Feral : Shred, Rake, Rip, Swipe,
-Frenzied Regeneration ; Balance : Moonfire, Starsurge, Starfire, Hurricane ; Restoration : Regen, Swiftmend,
-Thorns, Rebirth), plus l'Interrupt (Skull Bash) et le Last Breath (Rebirth). Les déblocages ouvrent une façon de
-jouer : au 2, une carte à 0 ou le contrôle (Tiger's Fury, Entangling Roots, Instant) ; au 4, les grosses dépenses
-(Mangle, Starfall) et le soin en Cast ; au 6, Demoralized à tous, Cast moins chers, la Regen offensive ; au 7, les
-moteurs (Leader of the Pack, Moonkin Aura) et Tranquility.
+voie y a un générateur, une dépense ou un gros coup, de la défense et du soin (Feral : Shred, Rake, Tiger's Fury,
+Ferocious Bite, Swipe, Frenzied Regeneration ; Balance : Moonfire, Faerie Fire, Entangling Roots, Starsurge,
+Starfire ; Restoration : Regen, Swiftmend, Healing Touch, Thorns), plus l'Interrupt (Skull Bash). Aucune rare au
+niveau 1, comme le Mage et le Rogue : une seule rare au niveau 1 serait la seule carte de chaque récompense de
+boss (tirage `boss = { rare = 1 }`) et s'empilerait dans le deck (§ 10, « Compte neuf »). Les déblocages ouvrent
+une façon de jouer : au 2, la dépense en DoT (Rip), le Cast à tous (Hurricane) et l'Instant ; au 4, les grosses
+dépenses (Mangle, Starfall) et le Last Breath (Rebirth, comme Ice Block et Cheat Death) ; au 6, Demoralized à
+tous, Cast moins chers, la Regen offensive ; au 7, les moteurs (Leader of the Pack, Moonkin Aura) et Tranquility.
+Répartition revue le 18/11/2026 pour le compte neuf (trois échanges dans une même voie, nombre de cartes par niveau
+inchangé : Rip 1 → 2 et Tiger's Fury 2 → 1, Hurricane 1 → 2 et Entangling Roots 2 → 1, Rebirth 1 → 4 et Healing
+Touch 4 → 1).
 
 ## 8. Points d'accroche dans le code
 
@@ -846,6 +852,37 @@ Priest 53,5, Hunter 47,7, Rogue 38,5), avec 58 % de Westfall battue. Cible : 50 
 Les PV (58 → 65, le chiffre du joueur) suffisent ; l'entrée dans la première forme reste taxée (§ 1.6, point 7)
 et le deck de départ ne change pas. Bot heuristic au même réglage : 95,7 % (300 expéditions ; plafond fixé à
 97 %), 2,70 changements par tour, fins de tour 38,5 / 16,6 / 38,2 / 6,7 %.
+
+### Compte neuf (18/11/2026)
+
+Au bot `human` en compte neuf (`zones=0 level=1`, 600 expéditions, graine 1), le Druid gagnait 1,3 % (autres
+classes 34,0 à 43,3 %) : Westfall battue 62,3 %, puis Duskwood 61,0, Wetlands 27,2 % (battue / atteinte). Cible :
+32 à 42 %, sans faire sortir le niveau 7 de 48 à 60 %. Détail : `docs/equilibrage.md`, « Druid : compte neuf ».
+
+**Cause : le pool du niveau 1, pas un bug de carte.** Cartes et bibelot de départ, formes et notes du bot sont
+tous en place au niveau 1. Mais **Rebirth était la seule rare du niveau 1** : une récompense de boss (tirage
+`boss = { rare = 1 }`) n'offrait qu'elle, seule carte, et les rares des élites et du marchand aussi. Le bot la
+prenait 2,7 fois par expédition (1 594 choix, 3,4 exemplaires par deck qui l'a) et jouait 83 % des exemplaires
+piochés : Last Breath ne sert qu'une fois par combat, chaque copie en plus est 1 mana pour rien. Le Hunter a le
+même gabarit (une rare au niveau 1), mais Bestial Wrath se rejoue. Ensuite, le pool du niveau 1 manquait de
+cartes à 0 mana et de contrôle (Tiger's Fury, Entangling Roots au niveau 2) et gardait Hurricane (Cast à 2 mana,
+gardée en main 54 % des fois où le bot `human` la pioche, 56 % une fois Rebirth retirée).
+
+| Répartition (niveau 1, bot `human`) | Victoires | Westfall / Duskwood / Wetlands battues (quand atteinte) | Van Cleef / Morbent Fel / Nek'rosh | Changements par tour |
+|---|---|---|---|---|
+| départ | 1,3 % | 62,3 / 61,0 / 27,2 % | 67,3 / 74,0 / 41,3 % | 1,90 |
+| Rebirth 1 → 4, Healing Touch 4 → 1 | 19,0 % | 56,8 / 75,1 / 60,5 % | 62,8 / 84,8 / 65,1 % | 2,15 |
+| + Tiger's Fury 2 → 1, Rip 1 → 2 | 26,2 % | 58,5 / 78,6 / 71,0 % | 63,7 / 88,7 / 74,8 % | 2,45 |
+| **+ Entangling Roots 2 → 1, Hurricane 1 → 2 (retenu)** | **36,2 %** | **64,2 / 86,0 / 75,5 %** | 66,7 / 89,2 / 76,5 % | 2,47 |
+| essai : Demoralizing Roar 6 → 1, Rip 1 → 6 (au lieu de Tiger's Fury) | 53,7 % | 74,0 / 90,5 / 87,8 % | 77,4 / 95,7 / 89,8 % | 2,23 |
+| essai : Starfall 4 → 1, Starsurge 1 → 4 (sur la 3e ligne) | 19,5 % | 58,3 / 80,0 / 64,3 % | 63,8 / 87,0 / 70,6 % | 2,49 |
+
+- Niveau 7 inchangé par construction (tout y est débloqué) : 51,8 % au bot `human`, rapport identique ; bot
+  heuristic 95,7 % (300 expéditions), identique.
+- **Pas de rare au niveau 1** : remettre une rare seule (Starfall) refait le piège de Rebirth (2 670 choix, 4,5 par
+  deck, gardée en main 49 % des fois) ; Demoralizing Roar au niveau 1 dépasse le niveau 7 (53,7 %) : la seule
+  inhabituelle de défense à 0 mana d'un petit pool s'empile (2 405 choix). Elle reste au niveau 6.
+- Aucun chiffre changé ; ni les règles, ni les PV, ni la taxe.
 
 ## 11. Questions ouvertes pour le joueur
 
