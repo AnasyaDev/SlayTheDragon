@@ -273,16 +273,17 @@ test("Moonkin : 1 dégât à tous par 2 Charges, arrondi au supérieur, 3 au plu
   end
 end)
 
-test("Tree of Life : Regen 1 à la fin du tour, soigne au début du suivant", function()
+test("Tree of Life : Regen TREE_REGEN (2) à la fin du tour, soigne au début du suivant", function()
+  eq(D.TREE_REGEN, 2)
   local c = setup({ "mark_of_the_wild" }, { hp = 40 })
   play(c, "mark_of_the_wild")
   eq(c.player.st.regen, 2)
   Combat.endPlayerTurn(c)
-  eq(c.player.st.regen, 3, "+1")
+  eq(c.player.st.regen, 4, "+2")
   Combat.enemyPhase(c)
   Combat.endRound(c)
   Combat.startPlayerTurn(c)
-  eq(c.player.hp, 43)
+  eq(c.player.hp, 44)
 end)
 
 -- Cast et forme de fin de tour ---------------------------------------------------------------------------
@@ -373,33 +374,63 @@ end)
 
 -- Levier de secours -------------------------------------------------------------------------------------
 
-test("levier A (inactif par défaut) : à partir du 3e changement d'un tour, −1 mana au tour suivant, −2 au plus", function()
-  eq(D.TAX, 0, "inactif")
-  local c = setup({ "wrath", "thick_hide", "shred", "rejuvenation" })
-  play(c, "wrath", 1)
-  play(c, "thick_hide")
-  play(c, "shred", 1)
+test("levier A (actif) : à partir du 2e changement d'un tour, −1 mana au tour suivant, −2 au plus", function()
+  eq(D.TAX, 1, "actif")
+  eq(D.TAX_FREE, 1, "un changement gratuit")
+  -- un seul changement (entrée dans la première forme du combat comprise) : gratuit
+  local c = setup({ "wrath", "wrath", "skull_bash" })
+  play(c, "wrath", 1); play(c, "wrath", 1); play(c, "skull_bash", 1)
+  eq(c.cls.shifts, 1, "même forme, sans forme : aucun changement")
+  eq(D.pendingTax(c), 0)
   Combat.endTurn(c)
-  eq(c.player.mana, 3, "levier inactif : 3 mana")
+  eq(c.player.mana, 3, "1 changement : 3 mana")
+  -- deux changements (sans forme → Moonkin → Bear) : −1
+  local a = setup({ "wrath", "thick_hide" })
+  play(a, "wrath", 1); play(a, "thick_hide")
+  eq(a.cls.shifts, 2)
+  eq(D.pendingTax(a), 1)
+  Combat.endTurn(a)
+  eq(a.player.mana, 2, "2 changements : −1")
+  eq(a.cls.shifts, 0, "compteur remis à 0")
+  eq(a.cls.tax, 1)
+  local b = setup({ "wrath", "thick_hide", "shred", "rejuvenation" })
+  play(b, "wrath", 1); play(b, "thick_hide"); play(b, "shred", 1); play(b, "rejuvenation")
+  Combat.endTurn(b)
+  eq(b.player.mana, 1, "4 changements : −2 au plus")
+  Combat.endTurn(b)
+  eq(b.player.mana, 3, "tour sans changement : plus de malus")
+  -- levier coupé (TAX = 0) : aucun malus
   local old = D.TAX
-  D.TAX = 1
+  D.TAX = 0
   local ok, err = pcall(function()
-    local a = setup({ "wrath", "thick_hide", "shred" })
-    play(a, "wrath", 1); play(a, "thick_hide"); play(a, "shred", 1)
-    eq(a.cls.shifts, 3)
-    eq(D.pendingTax(a), 1)
-    Combat.endTurn(a)
-    eq(a.player.mana, 2, "3 changements : −1")
-    eq(a.cls.shifts, 0, "compteur remis à 0")
-    local b = setup({ "wrath", "thick_hide", "shred", "rejuvenation", "wrath" })
-    play(b, "wrath", 1); play(b, "thick_hide"); play(b, "shred", 1); play(b, "rejuvenation"); play(b, "wrath", 1)
-    Combat.endTurn(b)
-    eq(b.player.mana, 1, "5 changements : −2 au plus")
-    Combat.endTurn(b)
-    eq(b.player.mana, 3, "tour sans changement : plus de malus")
+    local z = setup({ "wrath", "thick_hide", "shred" })
+    play(z, "wrath", 1); play(z, "thick_hide"); play(z, "shred", 1)
+    eq(D.pendingTax(z), 0)
+    Combat.endTurn(z)
+    eq(z.player.mana, 3, "levier inactif : 3 mana")
   end)
   D.TAX = old
   assert(ok, err)
+end)
+
+test("bot : la taxe à venir compte dans l'évaluation (fin de tour simulée) et distingue deux positions", function()
+  local a = setup({ "wrath", "thick_hide" }, { mana = 3 })
+  local b = setup({ "wrath", "wrath" }, { mana = 3 })
+  play(a, "wrath", 1); play(a, "thick_hide")
+  play(b, "wrath", 1); play(b, "wrath", 1)
+  local cr = ns.ClassRules.druid
+  local ka, kb = cr.botKey(a), cr.botKey(b)
+  eq(ka:match(":(%d+)$"), "2", "changements dans la clé")
+  eq(kb:match(":(%d+)$"), "1")
+  Combat.endPlayerTurn(a)
+  Combat.endPlayerTurn(b)
+  eq(a.cls.tax, 1); eq(b.cls.tax, 0)
+  local W = { enemyHp = 1, castRisk = 1, res = 5 }
+  local va, vb = cr.botValue(a, W), cr.botValue(b, W)
+  -- a finit en Bear (baisse du Frenzy à venir) : on ne compare que la part de la taxe
+  local bearPart = (a.player.res or 0) > 0 and -(ns.Classes.druid.bot.resValue) or 0
+  eq(va - bearPart, -D.TAX_VALUE, "−22 par mana perdu")
+  eq(vb, 0)
 end)
 
 -- Cartes et bibelots clés --------------------------------------------------------------------------------

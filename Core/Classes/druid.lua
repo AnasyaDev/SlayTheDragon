@@ -14,8 +14,10 @@
 --   Bear : frappe de l'ours (Druid.bearStrike) ; Cat : état Clearcasting (drapeau, ne s'empile pas : la
 --   prochaine Attack hors Cast coûte 0, consommé au jeu par cette Attack) ; Moonkin : coup sans carte à tous,
 --   ceil(réserve / 2), PULSE_MAX au plus ; Tree : Regen TREE_REGEN ; sans forme : rien.
--- Levier de secours A (fiche § 1.6, inactif : TAX = 0) : à partir du (TAX_FREE + 1)-ième changement d'un tour,
---   TAX mana de moins au tour suivant par changement, TAX_MAX au plus (crochet maxMana, c.cls.tax).
+-- Levier de secours A (fiche § 1.6, actif depuis le 18/11/2026) : à partir du (TAX_FREE + 1)-ième changement
+--   d'un tour, TAX mana de moins au tour suivant par changement, TAX_MAX au plus (crochet maxMana, c.cls.tax).
+--   Compte comme changement toute carte jouée qui fait entrer dans une autre forme, l'entrée dans la première
+--   forme du combat (depuis « sans forme ») comprise ; une carte de la forme active ou sans forme ne compte pas.
 local _, ns = ...
 
 local Combat = ns.Combat
@@ -24,12 +26,12 @@ local L = ns.Language
 local Druid = {}
 ns.Druid = Druid
 
--- Réglages (points de départ de la fiche, à régler par la simulation : docs/classes/druid.md, § 10).
+-- Réglages (docs/classes/druid.md, § 10 ; mesures du 18/11/2026 : docs/equilibrage.md, « Druid »).
 Druid.STRIKE_BASE = 1   -- frappe de l'ours : 1 + réserve
 Druid.PULSE_MAX = 3     -- Moonkin, fin de tour : ceil(Charges / 2) à chaque ennemi, au plus
-Druid.TREE_REGEN = 1    -- Tree of Life, fin de tour : Regen gagnée
-Druid.TAX = 0           -- levier A : mana perdu au tour suivant par changement au-delà de TAX_FREE (0 = inactif)
-Druid.TAX_FREE = 2      -- changements gratuits par tour
+Druid.TREE_REGEN = 2    -- Tree of Life, fin de tour : Regen gagnée (1 au départ : 2,5 % des fins de tour)
+Druid.TAX = 1           -- levier A : mana perdu au tour suivant par changement au-delà de TAX_FREE (0 = inactif)
+Druid.TAX_FREE = 1      -- changements gratuits par tour (taxe dès le 2e : décision du joueur, « plus d'une fois »)
 Druid.TAX_MAX = 2       -- mana perdu au plus (il reste 1 mana sur 3)
 Druid.FORMS = { "cat", "bear", "moonkin", "tree" }
 
@@ -68,7 +70,7 @@ function Druid.shift(c, to)
   return true
 end
 
--- Mana perdu au tour suivant pour n changements de forme dans un tour (levier A ; 0 tant que TAX = 0).
+-- Mana perdu au tour suivant pour n changements de forme dans un tour (levier A ; 0 si TAX = 0).
 function Druid.taxOf(n)
   local over = (n or 0) - Druid.TAX_FREE
   if Druid.TAX <= 0 or over <= 0 then return 0 end
@@ -210,6 +212,7 @@ ns.ClassRules.druid = {
     end,
     onTurnEnd = function(c, cls)
       cls.tax = Druid.taxOf(cls.shifts)
+      if cls.tax > 0 then stat(c, "druid_tax", cls.tax) end
       Druid.endOfTurn(c)
     end,
     -- Frenzy de l'ours : −1 à la fin de chaque round fini en Bear

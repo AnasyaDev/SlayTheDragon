@@ -4610,7 +4610,7 @@ do
     want(line("zzf_maul", "Bear strikes: hits the last target for 1 + Frenzy, then +1."), "Bear strikes" .. gloss("zzf_maul"))
     want(line("zzf_wrath", "Charge: +1 to each Attack hit per Charge, up to 5.")
       and not gloss("zzf_wrath"):find("up to 4", 1, true), "Charges du Druid, pas du Mage" .. gloss("zzf_wrath"))
-    want(line("zzf_rejuv", "Enters Tree of Life. End of turn: gain Regen 1."), "Tree of Life" .. gloss("zzf_rejuv"))
+    want(line("zzf_rejuv", "Enters Tree of Life. End of turn: gain Regen 2."), "Tree of Life" .. gloss("zzf_rejuv"))
     want(line("zzf_leader", "Combo: kept between forms and turns, Surge spends it all."), "Power « Cat Attacks: » : Combo" .. gloss("zzf_leader"))
     local kt = W.keywordText({ key = "form:tree" })
     want(kt:find("|cffffd100Tree of Life|r", 1, true) ~= nil, "nom de forme coloré dans la ligne : " .. kt)
@@ -7587,7 +7587,7 @@ do
     { key = "cat", form = "cat", icon = "ability_druid_catform", word = "Combo", eot = "End of turn: Clearcasting, the next Attack costs 0." },
     { key = "bear", form = "bear", icon = "ability_racial_bearform", word = "Frenzy" },
     { key = "moonkin", form = "moonkin", icon = "spell_nature_forceofnature", word = "Charges", eot = "End of turn: 2 damage to each enemy." },
-    { key = "tree", form = "tree", icon = "ability_druid_treeoflife", word = "Reserve", eot = "End of turn: gain Regen 1." },
+    { key = "tree", form = "tree", icon = "ability_druid_treeoflife", word = "Reserve", eot = "End of turn: gain Regen 2." },
   }
   local alive = 0
   for _, en in ipairs(c.enemies) do if not en.dead then alive = alive + 1 end end
@@ -7652,6 +7652,23 @@ do
   for i = 1, 5 do if (v.resPips.list[i].fill._calls.SetAlpha or {})[1] == 1 then nf = nf + 1 end end
   check("sans forme, réserve 0 : pastille visible à l'icône de la classe, sans nombre, aucun cran plein", vis(r)
     and r.text._text == "" and nf == 0 and (r.icon._texture or ""):lower():find("classicon_druid", 1, true) ~= nil, tostring(r.text._text) .. " / " .. nf)
+  -- levier A (taxe des changements de forme) : compteur du tour et malus à venir dans l'infobulle de la pastille
+  if real and (ns.Druid.TAX or 0) > 0 then
+    local D, s0 = ns.Druid, c.cls.shifts
+    local function ttOf(n)
+      c.cls.shifts = n
+      v:Render(true)
+      return table.concat(plainLines(H.hover(r)), " | ")
+    end
+    local t0 = ttOf(0)
+    local t1 = ttOf(D.TAX_FREE)
+    local t2 = ttOf(D.TAX_FREE + 1)
+    c.cls.shifts = s0
+    check("pastille : taxe des changements de forme (compteur, « Shifting again costs », malus à venir)",
+      t0:find("Form changes this turn: 0.", 1, true) ~= nil
+      and t1:find(("Shifting again costs %d mana next turn."):format(D.TAX), 1, true) ~= nil
+      and t2:find(("Next turn: %d mana less."):format(D.taxOf(D.TAX_FREE + 1)), 1, true) ~= nil, t0 .. "\n        " .. t1 .. "\n        " .. t2)
+  end
 
   -- 2. Cast en attente : bonus des Charges selon la forme de fin de tour
   c.player.res = 3

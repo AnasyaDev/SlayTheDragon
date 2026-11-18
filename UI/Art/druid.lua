@@ -171,7 +171,7 @@ function Art.druidLines(c)
     end
   elseif form == "tree" then
     now = rname .. " " .. num(res) .. ": unused in Tree of Life."
-    eot = "End of turn: gain Regen 1."
+    eot = "End of turn: gain Regen " .. ((ns.Druid and ns.Druid.TREE_REGEN) or 2) .. "."
   else
     now = rname .. " " .. num(res) .. ": unused until a form card is played."
     eot = "End of turn: nothing, no form yet."
@@ -280,6 +280,20 @@ function V.badgeTooltip(tt, c)
   local rd = ns.Classes.druid and ns.Classes.druid.resource
   local cap = ns.Combat.resCap(c) or (rd and rd.cap)
   if cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, cap), 0.8, 0.8, 0.8) end
+  local tl = Art.druidTaxLine(c)
+  if tl then tt:AddLine(tl, 1, 0.5, 0.25, true) end
+end
+
+-- Levier A (taxe des changements de forme) : compteur du tour et malus à venir ; nil si le levier est inactif.
+function Art.druidTaxLine(c)
+  local D = ns.Druid
+  if not D or (D.TAX or 0) <= 0 then return nil end
+  local n = c.cls and c.cls.shifts or 0
+  local tax = D.pendingTax(c)
+  local head = ("Form changes this turn: %d. "):format(n)
+  if tax > 0 then return head .. ("Next turn: %d mana less."):format(tax) end
+  if n >= D.TAX_FREE then return head .. ("Shifting again costs %d mana next turn."):format(D.TAX) end
+  return head .. ("%d more free, then each costs %d mana next turn."):format(D.TAX_FREE - n, D.TAX)
 end
 
 -- Jeton Clearcasting (état à drapeau, sans nombre) : aura jaune de Cat tant qu'il attend son Attack.

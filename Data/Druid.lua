@@ -745,8 +745,8 @@ relic("wolfshead_helm", {
 -- Classe ------------------------------------------------------------------------------------------------
 
 ns.Classes.druid = {
-  -- PV : 65 (décision du joueur, 18/11/2026), à régler par la simulation comme ceux des autres classes
-  id = "druid", name = "Druid", order = 6, hp = 65,
+  -- PV : 65 décidés par le joueur (18/11/2026), 58 après la première mesure (docs/equilibrage.md, « Druid »)
+  id = "druid", name = "Druid", order = 6, hp = 58,
   resource = { id = "wild", cap = 5, keep = true },
   deck = {
     "wrath", "wrath", "wrath",

@@ -1079,3 +1079,40 @@ pour Lone Wolf (+7,1). L'écart entre classes ne bouge presque pas (Warrior 87, 
 62 % ; compte neuf inchangé) : il se fait à Westfall, avant toute amélioration. Paliers à revoir : aucun « trop
 fort » en campagne ; les +2/+3 de Shadow Covenant et de Lone Wolf réparent une épique faible au +0 ; les épiques du
 Warrior et du Mage montées à +3 ne changent rien (paliers inutiles pour ce bot, ou épiques déjà au plafond).
+
+## Druid : premier réglage (18/11/2026)
+
+Classe codée le 18/11/2026 (`docs/classes/druid.md`). Mesure : `luajit Sim/sim.lua runs=300 bot=heuristic seed=1
+jobs=8 runner=expedition key=0 class=<classe>` (niveau 7, `zones=0`, sans épique imposée ; ± 2 à 4 points).
+Aucun chiffre comparable récent n'existait pour les autres classes : elles ont été remesurées au même réglage
+(une série chacune). Rapports bruts : `reports/druid-tax/`.
+
+| Classe / réglage | Victoires | Normal : PV perdus / tours | Élite : PV / tours | Boss : PV / tours |
+|---|---|---|---|---|
+| Priest (36 PV) | 86,7 % | 6,2 / 3,53 | 9,6 / 4,97 | 18,8 / 6,46 |
+| Warrior (74) | 96,7 % | 4,9 / 2,26 | 10,6 / 3,40 | 15,1 / 4,00 |
+| Mage (42) | 93,0 % | 2,0 / 2,43 | 5,2 / 3,41 | 14,1 / 4,29 |
+| Rogue (50) | 88,0 % | 3,2 / 2,20 | 7,5 / 3,15 | 12,8 / 3,82 |
+| Hunter (50) | 81,7 % | 2,9 / 2,16 | 8,0 / 3,22 | 19,0 / 4,01 |
+| Druid (a) : sans taxe, 65 PV, Regen 1 | 99,7 % | 3,1 / 2,27 | 8,1 / 3,48 | 17,7 / 4,45 |
+| Druid (b) : taxe dès le 2e changement | 95,7 % | 4,2 / 2,41 | 11,0 / 3,86 | 26,8 / 5,15 |
+| Druid (c) : taxe dès le 3e changement | 99,3 % | 3,5 / 2,32 | 9,2 / 3,64 | 21,5 / 4,76 |
+| **Druid retenu : (b) + 58 PV + Regen 2 en Tree** | **91,0 %** | 4,5 / 2,41 | 11,7 / 3,92 | 28,0 / 5,20 |
+| Druid, essai : (b) + 58 PV + Regen 3 | 92,7 % | 4,4 / 2,41 | 11,7 / 3,90 | 28,5 / 5,21 |
+
+Druid, changements de forme par tour et fins de tour (Bear / Cat / Moonkin / Tree) : (a) 3,59, 43,7 / 16,5 / 37,2 /
+2,5 % ; (b) 2,69, 39,3 / 17,2 / 39,4 / 4,0 % (0,8 mana perdu par tour) ; (c) 2,86, 39,9 / 17,5 / 39,4 / 3,2 % ;
+retenu 2,69, 38,2 / 16,7 / 38,2 / 6,8 %.
+
+- **Fourchette des cinq classes au niveau 7** : 81,7 à 96,7 % (moyenne 89,2), 2,0 à 6,2 PV perdus par combat normal
+  (la cible de 6 à 9, posée au niveau 1 compte neuf, n'est tenue qu'au niveau 1), 2,16 à 3,53 tours. Le Druid de
+  départ n'en sortait que par les victoires.
+- **Levier A** (taxe des changements de forme, `Druid.TAX`, `Druid.TAX_FREE`) : dès le 3e changement il ne change
+  rien (−0,4 point, le bot évite simplement le 3e) ; dès le 2e (« plus d'une fois », la règle du joueur) −4,0
+  points. Seuil retenu : dès le 2e.
+- **Balayage** (`sweep=cards class=druid runs=300` au réglage (b)) : aucune carte n'explique la force, de −6,3
+  (Mangle, Hurricane) à +3,0 (Tranquility) ; Starfall −1,0 (le +33 du rapport d'expédition est un biais de survie).
+  Le reste du réglage porte donc sur le socle : 65 → 58 PV (−4,7 points avec la Regen 2) ; Regen de fin de tour en
+  Tree of Life 1 → 2 pour la forme la moins jouée (2,5 → 6,8 % des fins de tour, sous les 10 % visés : deck de
+  départ sans carte Tree, question ouverte de la fiche, § 11).
+- Non vérifié : bot `human`, niveau 1 (compte neuf), clés 1 à 5, épiques du Druid (pas encore codées).

@@ -6,7 +6,9 @@ sur les cartes, Idol of the Wild à +1 mana par Shift) : de cette version resten
 (Skull Bash), le Last Breath (Rebirth), une partie des bibelots et des noms de cartes. Codé le 18/11/2026
 (règles, 34 cartes, 6 bibelots, progression : `Core/Classes/druid.lua`, `Data/Druid.lua`, tests
 `Sim/tests_druid.lua`) ; restent les sept épiques (§ 5), l'interface (`UI/Art/druid.lua`, pastille par forme) et
-le réglage des bots et des chiffres (§ 8, « Ce qui reste »).
+le réglage des bots et des chiffres (§ 8, « Ce qui reste »). Première mesure et premier réglage le 18/11/2026
+(§ 10, « Réglage du 18/11/2026 ») : levier A actif (taxe dès le deuxième changement d'un tour), PV 65 → 58,
+Regen de fin de tour en Tree of Life 1 → 2.
 
 Corrigée le même jour après relecture du joueur : chaque forme a un effet de fin de tour ; la forme Caster
 devient **Tree of Life** (quatrième forme, portée par les cartes de soin) ; le combat commence **sans forme** ;
@@ -32,9 +34,10 @@ où l'on termine le tour décide de l'**effet de fin de tour** :
 | Cat | des **Combo** du Rogue | les cartes Cat montent la réserve (« +1 Combo. ») et la vident (« Surge: ») | **Clearcasting** : la première Attack (hors Cast) du tour suivant coûte 0 |
 | Bear | du **Frenzy** du Hunter | `Spend N:` des cartes Bear | le Druid frappe seul la dernière cible pour 1 + réserve, puis +1 ; −1 à la fin du round |
 | Moonkin | des **Charges** du Mage | +1 dégât par point sur chaque coup des cartes Attack ; un Cast se résout avec ce bonus si l'on a fini le tour en Moonkin | 1 dégât à tous les ennemis par 2 Charges, arrondi au supérieur, 3 au plus |
-| Tree of Life | rien (« Reserve », ne baisse pas) | forme des soins et de la Regen | gagne **Regen 1** |
+| Tree of Life | rien (« Reserve », ne baisse pas) | forme des soins et de la Regen | gagne **Regen 2** |
 
-Les chiffres des effets de fin de tour sont des points de départ, à régler par la simulation.
+Les chiffres des effets de fin de tour sont des points de départ, à régler par la simulation. Changer de forme
+plus d'une fois dans un tour coûte 1 mana au tour suivant par changement de plus (levier A, § 1.6).
 
 Le rythme : monter la réserve avec les cartes d'une forme, la dépenser avec celles d'une autre, et finir le tour
 dans la forme dont on veut l'effet (Bear pour frapper et tenir, Cat pour une Attack gratuite au tour suivant,
@@ -47,13 +50,13 @@ Regen). Survie : Absorb en Bear, soins et Regen en Tree of Life. Difficulté : d
 |---|---|
 | Fantasme | Le Druid change de forme à chaque carte et emprunte à chaque forme la façon de se battre d'une autre classe : le chat finit comme un Rogue, l'ours frappe seul comme le familier du Hunter, le sélénien charge ses sorts comme un Mage ; l'arbre de vie soigne. |
 | Ressource | Réserve unique, 0 à 5, gardée d'un tour à l'autre et au changement de forme. Son nom affiché est celui de la forme active (Combo, Frenzy, Charges) ; sans forme et en Tree of Life, elle s'appelle **Reserve**. |
-| PV de départ | **65** (décision du joueur, 18/11/2026 ; même chiffre que la première liste de `decisions.md`). Point de départ, à régler par la simulation comme ceux des autres classes (Hunter et Rogue réglés à 50). |
+| PV de départ | **58** (65 décidés par le joueur le 18/11/2026, baissés à 58 après la première mesure : § 10, « Réglage du 18/11/2026 » ; Hunter et Rogue 50, Warrior 74). |
 | Deck de départ | Wrath ×3 (Moonkin), Thick Hide ×4 (Bear), Maul ×2 (Bear), Ferocious Bite ×1 (Cat). |
 | Bibelot de départ | Idol of the Wild : la première carte de chaque combat qui change de forme coûte 0 (le combat commence sans forme : c'est la première carte de forme jouée). |
 | Interrupt | Skull Bash (Feral, sans forme, niveau 1). |
 | Last Breath | Rebirth (Restoration, rare, niveau 1). |
 | Mots-clés propres | **Forme** (mots de plaque `Cat`, `Bear`, `Moonkin`, `Tree` : un seul mot-clé, une seule règle, décision du joueur) et **Bear strikes**. Les mots de la réserve (Combo, Frenzy, Charge, Reserve), `Surge:` et `Spend N:` sont des mots communs ou des noms de ressource ; Clearcasting est un état posé sur le héros, écrit sur aucune carte : ni l'un ni l'autre ne sont des mots-clés propres. |
-| Style de survie | Encaisser (Absorb des cartes Bear) et se soigner (cartes Tree : soins directs tous Exhaust, Regen ; Regen 1 en finissant le tour en Tree of Life). `survival = "absorb"`. |
+| Style de survie | Encaisser (Absorb des cartes Bear) et se soigner (cartes Tree : soins directs tous Exhaust, Regen ; Regen 2 en finissant le tour en Tree of Life). `survival = "absorb"`. |
 | Difficulté | Difficile : chaque carte change la forme, l'ordre des cartes compte. |
 
 Deck de départ (gabarit du GDD : 10 cartes de 4 sortes, une attaque, une défense, deux cartes de mécanique) :
@@ -61,8 +64,9 @@ Wrath est l'attaque (et monte la réserve), Thick Hide la défense (et laisse en
 tour), Maul montre la frappe de l'ours et Ferocious Bite dépense en Cat ce que Wrath a monté en Moonkin.
 Premier tour type (sans forme, Idol of the Wild) : Wrath (0 mana, entre en Moonkin, réserve 1), Wrath (réserve 2),
 Thick Hide (Bear, 5 Absorb), 1 mana pour une quatrième carte ; fin de tour en Bear : frappe de 1 + 2 = 3,
-réserve 3 ; fin du round : réserve 2. Au tour suivant, Ferocious Bite à 2 Combo : 12. Finir ce premier tour en
-Moonkin (sans Thick Hide) aurait donné 1 dégât à tous (2 Charges) et aucun Absorb.
+réserve 3 ; fin du round : réserve 2. Deux changements (sans forme → Moonkin → Bear) : 2 mana au tour suivant
+(levier A, § 1.6). Au tour suivant, Ferocious Bite à 2 Combo : 12. Finir ce premier tour en Moonkin (sans Thick
+Hide) aurait donné 1 dégât à tous (2 Charges), aucun Absorb, et gardé les 3 mana du tour suivant.
 
 ## 1. Règles propres (spécification)
 
@@ -154,7 +158,7 @@ sont des **points de départ à régler par la simulation** (§ 10).
 | Cat | pose **Clearcasting** sur le Druid : la première Attack jouée ensuite coûte 0, sauf les cartes Cast |
 | Bear | **frappe de l'ours** : un coup de 1 + réserve sur la dernière cible, puis +1 (§ 1.4) ; puis, à la fin du round, −1 (§ 1.2) |
 | Moonkin | **1 dégât à tous les ennemis par 2 Charges, arrondi au supérieur, 3 au plus** ; un Cast en attente se résoudra au début du tour suivant avec le bonus des Charges (§ 1.1, point 4) |
-| Tree of Life | gagne **Regen 1** |
+| Tree of Life | gagne **Regen 2** (1 au départ, § 10) |
 
 **Cat : Clearcasting.**
 
@@ -193,11 +197,11 @@ sont des **points de départ à régler par la simulation** (§ 10).
 5. Ordre : l'effet de forme passe dans le crochet de classe, avant les Powers et bibelots « End of turn in
    Moonkin: » (Moonkin Aura, Idol of the Moon) : les coups lisent les Charges d'avant le +1 de Moonkin Aura.
 
-**Tree of Life : Regen 1.**
+**Tree of Life : Regen 2** (`Druid.TREE_REGEN` ; 1 au départ, passée à 2 le 18/11/2026 : § 10).
 
-1. Le Druid gagne Regen 1 (état commun `regen`, qui s'ajoute à la Regen déjà posée). Elle soigne au début du tour
-   suivant, puis baisse de 1 (`tickPeriodic`, `Core/Combat.lua`). Seule, elle soigne 1 et disparaît avant que le
-   Druid ne joue : elle n'active pas Gift of Nature (« Regen: ») sans autre Regen.
+1. Le Druid gagne Regen 2 (état commun `regen`, qui s'ajoute à la Regen déjà posée). Elle soigne 2 au début du
+   tour suivant, puis baisse de 1 (`tickPeriodic`, `Core/Combat.lua`) : il reste Regen 1 pendant ce tour, qui
+   active Gift of Nature (« Regen: ») et soigne encore 1 au tour d'après (3 PV en tout).
 2. L'effet **ne lit pas la réserve**, volontairement petit : la réserve ne vaut rien en Tree of Life (§ 4,
    « Pourquoi »), et la voie Restoration a déjà sa jauge, la Regen.
 3. **Repli prévu** : si la simulation montre que les combats traînent pour se soigner (tours finis en Tree of
@@ -246,24 +250,32 @@ commune : Growl du Hunter l'emploie).
    tour dans `c.cls` (remis à 0 au début du tour) ; le premier changement d'un tour est souvent la sortie de la
    forme de fin du tour précédent. L'entrée dans la première forme du combat (depuis « sans forme ») compte
    comme un changement : Idol of the Wild, Wolfshead Helm et Furor la voient.
-2. **Aucune limite ni coût dans la règle de base.** Un tour type en compte deux (sortir de Bear pour Cat ou
-   Moonkin, revenir en Bear pour finir) ; un tour qui passe par trois formes en compte trois.
-3. **Levier A (prévu, non actif) — mana du tour suivant.** À partir du **troisième** changement d'un tour, chaque
-   changement retire 1 mana au tour suivant (crochet `maxMana` de la classe), −2 au plus (il reste 1 mana).
-   Pourquoi deux changements gratuits et non un : avec « au-delà du premier », le tour normal « Moonkin puis
-   retour en Bear » (deux changements) coûterait déjà 1 mana sur 3 au tour suivant, et la classe paierait sa
-   mécanique de base. Avec deux gratuits, le tour Moonkin → Cat → Bear (monter, dépenser, finir) coûte 1 mana au
-   tour suivant ; Moonkin → Cat → Moonkin → Bear en coûte 2. La pastille montre le malus à venir (« −1 mana next
-   turn »).
+   Une carte de la forme active, une carte sans forme, une copie ne comptent pas (aucun changement).
+2. Sans le levier, aucune limite ni coût. Un tour type en compte deux (sortir de Bear pour Cat ou Moonkin, revenir
+   en Bear pour finir) ; un tour qui passe par trois formes en compte trois.
+3. **Levier A (actif depuis le 18/11/2026) — mana du tour suivant.** À partir du **deuxième** changement d'un
+   tour, chaque changement retire 1 mana au tour suivant (crochet `maxMana` de la classe, `c.cls.tax` posé à la
+   fin du tour), −2 au plus (il reste 1 mana). Constantes : `Druid.TAX = 1` (mana par changement taxé, 0 = levier
+   coupé), `Druid.TAX_FREE = 1` (changements gratuits par tour), `Druid.TAX_MAX = 2`. Exemples : Moonkin puis
+   retour en Bear (deux changements) : 2 mana au tour suivant ; Moonkin → Cat → Bear : 1 mana ; rester dans la
+   forme de fin du tour précédent, ou n'en sortir qu'une fois pour finir ailleurs : 3 mana. Le premier tour du
+   combat compte l'entrée dans la première forme : Wrath (Moonkin) puis Thick Hide (Bear) laisse 2 mana au tour 2.
+   Infobulle de la pastille : `Form changes this turn: N.` suivi de `1 more free, then each costs 1 mana next
+   turn.`, `Shifting again costs 1 mana next turn.` ou `Next turn: N mana less.`.
+   Le bot heuristic voit la taxe : sa fin de tour simulée pose `c.cls.tax`, que `botValue` compte −22 par mana
+   (`Druid.TAX_VALUE`, un mana comme Clearcasting), et `botKey` distingue les positions par le nombre de
+   changements du tour.
 4. **Levier B (prévu, non actif) — réserve.** À partir du troisième changement d'un tour, chaque changement fait
    perdre 1 point de réserve, au changement, avant la résolution de la carte. Plus doux que A (il ne touche pas au
    mana) et plus ciblé : il ne vise que le transfert de réserve entre formes.
 5. Quand les activer : si la mesure montre plus de 3 changements par tour en moyenne au bot heuristic, ou si les
    decks à trois formes gagnent plus de 10 points de plus que les decks à deux formes. A d'abord ; B si A rend la
-   classe lente.
-6. **Seuil** : la fiche garde deux changements gratuits (taxe à partir du troisième). Le joueur avait d'abord dit
-   « plus d'une fois » (taxe dès le deuxième) ; le seuil reste à décider si un levier est activé, d'après la
-   mesure du point 5.
+   classe lente. Mesure du 18/11/2026 : 3,59 changements par tour, 99,7 % de victoires : A activé, B non.
+6. **Seuil retenu : un changement gratuit (taxe dès le deuxième)**, la règle du joueur (« plus d'une fois »), et non
+   les deux gratuits que proposait la fiche. Raison mesurée (§ 10) : taxe dès le troisième, 99,3 % de victoires
+   (−0,4 point, 2,86 changements par tour) : le bot paie rarement le troisième changement et la classe ne change
+   pas ; dès le deuxième, 95,7 % (−4,0 points, 2,69 changements par tour, 0,8 mana perdu par tour en moyenne) :
+   la classe paie son va-et-vient de base, ce qui est le but.
 
 ### 1.7 Cartes sans forme
 
@@ -292,14 +304,14 @@ ils sont Tree, et les jouer fait quitter Bear (comme dans WoW, où l'on soigne h
   `Cat` « Enters Cat (Combo). End of turn: next Attack costs 0. » ;
   `Bear` « Enters Bear (Frenzy). End of turn: Bear strikes. » ;
   `Moonkin` « Enters Moonkin (Charges). End of turn: 1 to all per 2. » ;
-  `Tree` « Enters Tree of Life. End of turn: gain Regen 1. ».
+  `Tree` « Enters Tree of Life. End of turn: gain Regen 2. ».
 - **Pastille de classe** : l'anneau près du mana montre l'icône de la forme active à la place de celle de la
   ressource (sans forme : l'icône de la classe, anneau gris ; Tree of Life : `Ability_Druid_TreeofLife`), et le
   nombre de la réserve (cinq crans, cachés à 0 comme ailleurs) ; la couleur de l'anneau suit la forme. Infobulle :
   nom de la forme, ce que vaut la réserve et l'effet de fin de tour (« 3 Frenzy: end-of-turn strike for 4. »,
   « 3 Charges: Attack hits +3, end of turn 2 to all. », « 3 Combo: spent by Surge. End of turn: free Attack. »,
-  « Tree of Life: Reserve 3, unused. End of turn: Regen 1. », « No form: Reserve 3, unused. »), « n / 5 », puis
-  le malus de mana à venir si le levier A est actif. Au changement de forme : l'icône tourne et change (événement
+  « Tree of Life: Reserve 3, unused. End of turn: Regen 2. », « No form: Reserve 3, unused. »), « n / 5 », puis
+  la ligne du levier A (compteur des changements du tour et malus à venir, § 1.6). Au changement de forme : l'icône tourne et change (événement
   `shift`).
 - **Cible de la frappe** : en Bear, la marque d'ennemi (`enemyMarks`, comme la cible du familier du Hunter) montre
   la dernière cible et les dégâts de la prochaine frappe. En Moonkin, chaque ennemi montre les dégâts du coup de
@@ -507,7 +519,8 @@ Leader of the Pack.
 - Tour type (3 mana, réserve 2, fin du tour précédent en Bear, main : Tiger's Fury, Shred, Ferocious Bite,
   Frenzied Regeneration, Rake) : Tiger's Fury (0, Cat : 3 Combo, pioche Maul) ; Shred (1 : 7, 4 Combo) ;
   Ferocious Bite (1 : 4 + 16 = 20, réserve 0) ; Frenzied Regeneration (1, Bear : 6 Absorb, sans Spend). Fin en
-  Bear : frappe de 1, réserve 1 ; fin du round : 0. Deux changements de forme (Bear → Cat → Bear). Variante si
+  Bear : frappe de 1, réserve 1 ; fin du round : 0. Deux changements de forme (Bear → Cat → Bear) : 2 mana au
+  tour suivant (levier A). Variante si
   l'ennemi annonce une défense : Rake (1, Cat) au lieu de Frenzied Regeneration, fin en Cat : ni frappe ni
   Absorb, Clearcasting posé, réserve 1 ; au tour suivant, la première Attack (Shred, Maul…) coûte 0 : quatre
   cartes à 1 mana pour 3 mana.
@@ -538,7 +551,7 @@ Nature's Grace, Moonkin Aura.
 Moteur : la Regen empilée (Rejuvenation, Regrowth, Mark of the Wild) se convertit en soin immédiat (Swiftmend) ;
 Gift of Nature fait de la Regen un bonus d'attaque pour toutes les formes, Thorns rend des dégâts à chaque coup
 reçu. En Tree of Life, la réserve n'a pas d'effet et ne baisse pas : on soigne sans perdre ce qui a été monté ;
-finir le tour en Tree of Life donne Regen 1. Ce qu'elle cherche : le combat long.
+finir le tour en Tree of Life donne Regen 2. Ce qu'elle cherche : le combat long.
 
 Cartes : Rejuvenation, Regrowth, Mark of the Wild, Thorns, Swiftmend, Rebirth, Nature's Swiftness, Healing Touch,
 Gift of Nature, Tranquility.
@@ -550,8 +563,8 @@ Gift of Nature, Tranquility.
 - Tour type (3 mana, Regen 0, réserve 3, fin du tour précédent en Bear) : Rejuvenation (1, Tree : Regen 4) ;
   Swiftmend (0 : soin 8) ; Wrath (1, Moonkin : 5 + 3 = 8, 4 Charges) ; Thick Hide (1, Bear : 5 Absorb). Fin en
   Bear : frappe de 5, réserve 5 ; fin du round : 4. Trois changements de forme (Bear → Tree → Moonkin → Bear) :
-  sous le levier A, −1 mana au tour suivant. Finir en Tree of Life (Thick Hide gardée) aurait donné Regen 1 de
-  plus, sans frappe ni Absorb : à réserver aux tours sans menace.
+  levier A, −2 mana au tour suivant. Finir en Tree of Life (Thick Hide gardée) aurait donné Regen 2 de plus,
+  sans frappe ni Absorb : à réserver aux tours sans menace.
 
 ### Pourquoi la réserve ne vaut rien en Tree of Life
 
@@ -564,7 +577,7 @@ de tour de la forme ne la lit pas.
   en PV, qui se gardent d'un combat à l'autre : c'est ce qui a obligé à rendre les soins du Priest Exhaust.
 - Trois lectures empruntées (Combo, Frenzy, Charges) sont la limite de lisibilité de la pastille.
 - Conséquence : Tree of Life est surtout une forme de passage, choisie pour ses cartes ; y finir le tour donne
-  Regen 1, volontairement petit (repli prévu : de l'Absorb, § 1.3). L'épique Lifebloom (§ 5) donne à la Regen un
+  Regen 2, volontairement petit (repli prévu : de l'Absorb, § 1.3). L'épique Lifebloom (§ 5) donne à la Regen un
   rôle sur la réserve, pour un build.
 
 ## 5. Cartes épiques (une par zone)
@@ -590,7 +603,7 @@ Blackrock pour cette raison.
 
 Lifebloom s'appelait Tree of Life, nom pris par la forme ; son icône (`Ability_Druid_TreeofLife`) passe à la
 forme, et Lifebloom prend `INV_Misc_Herb_Felblossom` (icône du sort dans WoW, présente dans
-`~/Téléchargements/ICONS/`). Avec la Regen 1 de fin de tour en Tree of Life, Lifebloom donne N points de réserve
+`~/Téléchargements/ICONS/`). Avec la Regen 2 de fin de tour en Tree of Life, Lifebloom donne N points de réserve
 au début du tour suivant : c'est le seul lien entre la forme et la réserve, et il passe par l'épique.
 
 **Codées le 18/11/2026** (`Data/Druid.lua`, `Core/Classes/druid.lua`, tests `Sim/tests_epic_druid.lua` ; détail :
@@ -664,12 +677,12 @@ moteurs (Leader of the Pack, Moonkin Aura) et Tranquility.
 | Réserve | ressource commune `c.player.res`, `resource.cap = 5`, `keep = true` ; `Combat.gainRes`, `Combat.surge`, `Combat.spendRes`, `minRes`, `spend` ; effet `res` (« +1 Combo. ») ; `per = { k, "surge" }` |
 | Bonus de Moonkin | crochet de classe `damage` (v, cible, d) : `v + res` si `c.cls.form == "moonkin"` et `d.type == "attack"` (même code que `ns.ClassRules.mage`) ; lu au coup, donc à la résolution d'un Cast |
 | Effet de fin de tour des quatre formes | crochet de classe `onTurnEnd` (avant Powers, bibelots et défausse), comme le familier ; rien si `c.cls.form == nil` |
-| Tree of Life : Regen 1 | état commun `regen` (`ns.Statuses.regen`) posé par `Combat.applyStatus(c, c.player, "regen", 1)` ; tic au début du tour du porteur puis −1 (`tickPeriodic`, crochet `regenHeal`, événement `onRegenTick`) ; s'ajoute à la Regen déjà posée |
+| Tree of Life : Regen 2 | état commun `regen` (`ns.Statuses.regen`) posé par `Combat.applyStatus(c, c.player, "regen", Druid.TREE_REGEN)` ; tic au début du tour du porteur puis −1 (`tickPeriodic`, crochet `regenHeal`, événement `onRegenTick`) ; s'ajoute à la Regen déjà posée |
 | Cat : Clearcasting (coût 0 de la prochaine Attack) | même assemblage que deux mécaniques du Rogue : état à drapeau consommé par la première Attack dans le crochet de classe `onCardCommitted` (Stealth, `Core/Classes/rogue.lua` : `ns.Statuses.stealth = { flag = true }`) et crochet de coût qui rend une Attack gratuite (Slice and Dice, `Data/Rogue.lua` : `cost` → 0 si `d.type == "attack"`) ; crochet `cost` au niveau de la classe déjà employé (`ns.ClassRules.warrior`) ; coût en main par `Combat.cost` ; Cast lu sur `d.cast` ; icône et texte court de l'état déclarés par la classe (`Art.statuses`, `Art.statusShort`, comme `UI/Art/rogue.lua`) |
 | Moonkin : coups à tous | coup sans carte (`Combat.calcDamage` avec `cardDef` nil, comme le familier) répété sur chaque ennemi vivant ; le familier sait déjà toucher tous les ennemis (crochet `petAll` des épiques du Hunter) |
 | Baisse en Bear | crochet de classe `onRoundEnd` : −1 si `c.cls.form == "bear"` (même code que le Hunter) |
 | Cible de la frappe | `c.player.lastTarget` (posée par `Combat.play`) |
-| Levier A (non actif) | crochet de classe `maxMana` (mana du tour suivant) |
+| Levier A (actif) | crochet de classe `maxMana` (mana du tour suivant) |
 | Idol of the Wild | crochet `cost` (d, inst) : 0 si la carte changerait la forme et que le bibelot n'a pas servi (`c.relicState`) |
 | Instant (Nature's Swiftness) | état commun `instant` (`Combat.isInstant`) |
 | `Regen:` (Gift of Nature) | condition d'état `status:regen` (bienfait sur soi) |
@@ -708,7 +721,7 @@ Ce qui manquait au socle existe maintenant ; la classe est codée dessus.
    `shifts`, `tax`) ; `onCardCommitted` (Clearcasting consommé par une Attack hors Cast, puis changement de forme :
    `ns.Druid.shift`, journal `{ t = "shift", from, to }`, événement `onShift(from, to)`, `c.cls.shifts`) ;
    `cost` (Clearcasting) ; `damage` (Moonkin) ; `onTurnEnd` (`ns.Druid.endOfTurn` : Bear, Cat, Moonkin, Tree) ;
-   `onRoundEnd` (−1 en Bear) ; `maxMana` et `c.cls.tax` (levier A, `Druid.TAX = 0` : inactif, testé actif) ;
+   `onRoundEnd` (−1 en Bear) ; `maxMana` et `c.cls.tax` (levier A, `Druid.TAX = 1`, `TAX_FREE = 1` : actif ; compteur de simulation `druid_tax`, mana perdu) ;
    état `clearcasting` (drapeau, journal `{ t = "clearcasting" }` à la pose, `{ t = "clearcasting_used", card }`
    à la consommation) ; aides `Druid.wouldShift(c, d)` (marque en main, Idol of the Wild),
    `Druid.strikeTarget`, `Druid.strikeDamage`, `Druid.pulseBase`, `Druid.pendingTax` (affichage, bots) ;
@@ -743,7 +756,7 @@ Moonkin `moonkin_pulse` (et non `moonkin_hits`).
     sera jouée au tour suivant : Clearcasting vaut 1 mana ; inutile s'il est déjà posé (il ne s'empile pas) ;
   - **Moonkin** avec un Cast Moonkin en attente qui vaut plus que la frappe et l'Absorb (Starfire avec 4 ou 5
     Charges), ou contre trois ennemis et plus à 3 Charges et plus (2 ou 3 à chacun) ;
-  - **Tree of Life** seulement sans menace et sans autre choix utile (Regen 1).
+  - **Tree of Life** seulement sans menace et sans autre choix utile (Regen 2).
   Un tour qui tue tout n'a pas de fin de tour à choisir.
 - **Monter avant de dépenser** : jouer les générateurs de toutes les formes avant le Surge du tour ; ne pas monter
   au-delà de 5 ; un Surge à 1 ou 2 points seulement s'il tue ou si le combat finit. Finir en Moonkin après un
@@ -753,20 +766,20 @@ Moonkin `moonkin_pulse` (et non `moonkin_hits`).
 - **Clearcasting** : jouer d'abord l'Attack hors Cast qui le consomme (elle coûte 0), avant de compter le mana du
   tour ; une Attack Cast ne le consomme pas.
 - **Ordre des soins** : soins Tree au milieu du tour, rarement en dernier (finir en Tree of Life ne donne que
-  Regen 1).
+  Regen 2).
 - **Spend** (Frenzied Regeneration) : dépenser seulement si l'Absorb sert au tour ennemi et que la frappe perdue
   vaut moins (2 points ≈ 2 dégâts par frappe).
 - `bot.resValue` ≈ 5 (entre Combo et Frenzy) ; `botValue` de la forme de fin de tour : Bear, valeur de la frappe ;
   Cat, 22 (un mana, `evoMana` du Mage : 22 par mana) si Clearcasting n'est pas déjà posé ; Moonkin, dégâts à tous
   (`ceil(Charges / 2)` × ennemis vivants), plus le bonus de Charges d'un Cast en attente ; Tree of Life, 1 PV ;
-  levier A actif : −22 par mana perdu.
+  levier A : −22 par mana perdu au tour suivant (`c.cls.tax` posé par la fin de tour simulée).
 - Mesurer la part des tours finis dans chaque forme (et sans forme) : un bot qui finit toujours en Tree of Life,
   ou jamais en Cat, a mal lu la classe (voir Forme d'ombre, `docs/equilibrage.md`).
 
 ## 10. Risques d'équilibrage et mesures
 
 Les quatre effets de fin de tour (Clearcasting, frappe de 1 + réserve, 1 à tous par 2 Charges et 3 au plus,
-Regen 1) sont des points de départ : la simulation règle leurs chiffres.
+Regen 2 depuis le 18/11/2026) sont des points de départ : la simulation règle leurs chiffres.
 
 | Risque | Pourquoi | Mesure (`runner=expedition class=druid`, heuristic, clé 0) |
 |---|---|---|
@@ -775,16 +788,55 @@ Regen 1) sont des points de départ : la simulation règle leurs chiffres.
 | Moonkin à 5 | +5 par coup sur Wrath, Moonfire, Hurricane (à chaque cible), plus 3 à tous en fin de tour | dégâts moyens de Hurricane à 3 ennemis ; Wrath à 5 Charges ; dégâts de fin de tour par combat contre les groupes ; repli : 1 à tous par 3 Charges, ou 2 au plus |
 | Cat trop faible ou trop fort en fin de tour | Clearcasting vaut 1 mana, mais sans frappe ni Absorb | part des tours finis en Cat ; trop rare : Clearcasting donne aussi +1 Combo ; trop fréquent : il ne vaut que pour une Attack Cat |
 | Combats qui traînent en Tree of Life | finir en Tree of Life pour remonter les PV à 1 par tour | part des tours finis en Tree of Life, tours par combat, PV nets ; repli prévu : Absorb pour le tour ennemi au lieu de Regen (§ 1.3) |
-| Soins entre combats | Swiftmend (sans retirer la Regen), Tranquility, Regen 1 de Tree of Life | PV soignés par combat ; repli : Swiftmend retire la Regen |
+| Soins entre combats | Swiftmend (sans retirer la Regen), Tranquility, Regen 2 de Tree of Life | PV soignés par combat ; repli : Swiftmend retire la Regen |
 | Idol of the Wild | +1 mana au premier tour de chaque combat | `sweep=relics` ; comparer à Apprentice's Wand |
-| PV perdus, PV de départ 65 | cible commune 6 à 9 PV par combat normal (`decisions.md`) ; 65 est au-dessus des classes réglées (Hunter et Rogue 50) | PV perdus et PV nets par combat ; régler les PV comme pour les autres classes |
+| PV perdus, PV de départ 65 (58 depuis le 18/11/2026) | cible commune 6 à 9 PV par combat normal (`decisions.md`) ; 65 est au-dessus des classes réglées (Hunter et Rogue 50) | PV perdus et PV nets par combat ; régler les PV comme pour les autres classes |
+
+### Réglage du 18/11/2026
+
+Mesure : `luajit Sim/sim.lua runs=300 bot=heuristic seed=1 jobs=8 runner=expedition key=0 class=<classe>` (niveau 7,
+`zones=0`, ± 2 à 4 points) ; détail et autres classes : `docs/equilibrage.md`, « Druid : premier réglage ».
+
+| Réglage | Victoires | Normal : PV perdus / tours | Élite : PV | Boss : PV / tours | Changements par tour | Fins de tour Bear / Cat / Moonkin / Tree |
+|---|---|---|---|---|---|---|
+| (a) sans taxe, PV 65, Regen 1 | 99,7 % | 3,1 / 2,27 | 8,1 | 17,7 / 4,45 | 3,59 | 43,7 / 16,5 / 37,2 / 2,5 % |
+| (b) taxe dès le 2e changement | 95,7 % | 4,2 / 2,41 | 11,0 | 26,8 / 5,15 | 2,69 | 39,3 / 17,2 / 39,4 / 4,0 % |
+| (c) taxe dès le 3e changement | 99,3 % | 3,5 / 2,32 | 9,2 | 21,5 / 4,76 | 2,86 | 39,9 / 17,5 / 39,4 / 3,2 % |
+| **retenu : (b) + PV 58 + Regen 2** | **91,0 %** | 4,5 / 2,41 | 11,7 | 28,0 / 5,20 | 2,69 | 38,2 / 16,7 / 38,2 / 6,8 % |
+| essai : (b) + PV 58 + Regen 3 | 92,7 % | 4,4 / 2,41 | 11,7 | 28,5 / 5,21 | 2,71 | 37,7 / 16,5 / 37,8 / 7,9 % |
+| autres classes, même réglage | 81,7 (Hunter) à 96,7 % (Warrior) | 2,0 à 6,2 / 2,16 à 3,53 | | | | |
+
+Constats :
+
+- **La force ne vient d'aucune carte.** Balayage `sweep=cards` (300 par ligne) au réglage (b) : aucune carte
+  imposée au départ ne gagne plus de 3 points sur la ligne « (sans) » (95,7 %) : Tranquility +3,0, Demoralizing
+  Roar +2,7, Rejuvenation et Healing Touch +2,3 ; **Starfall −1,0**. Le « +33 points » de Starfall du rapport de
+  fin d'expédition est un biais de survie (rare de niveau 4 trouvée tard, présente dans 297 decks sur 300 : les
+  3 decks sans elle sont des expéditions mortes tôt). Les cartes chères à monter (Mangle, Hurricane, Nature's
+  Grace, Moonkin Aura, Gift of Nature, Rip) coûtent 5 à 6 points imposées au deck de départ. La force est celle
+  du socle : changer de forme sans coût, effets de fin de tour et 65 PV.
+- **PV perdus et durée** : au niveau 7, les autres classes sont aussi sous la cible de 6 à 9 PV par combat normal
+  (cible posée au niveau 1) : Priest 6,2, Warrior 4,9, Rogue 3,2, Hunter 2,9, Mage 2,0 ; combats normaux de 2,16
+  à 3,53 tours. Le Druid réglé (4,5 PV, 2,41 tours) est dans cette fourchette ; seules les victoires en sortaient.
+- **Tree of Life** : 2,5 % des fins de tour au départ, 6,8 % avec Regen 2, 7,9 % avec Regen 3 (+1,7 point de
+  victoires pour +1,1 point de fins de tour : Regen 3 non retenue). Le plafond vient des decks : le deck de
+  départ n'a aucune carte Tree et le bot en prend peu (Mark of the Wild dans 222 decks sur 300, Rejuvenation 6).
+  Atteindre 10 % demanderait une carte Tree au départ ou le repli Absorb du § 1.3 (règle, pas un chiffre) : à
+  décider par le joueur.
+- Les défaites se font surtout aux boss de Westfall (13 sur 27) et des Wetlands (5), comme pour les autres
+  classes : c'est le deck de départ qui décide.
 
 ## 11. Questions ouvertes pour le joueur
 
 Tranchées le 18/11/2026 et retirées : nom de la réserve hors forme (« Reserve »), seuil du levier de secours
-(deux changements gratuits gardés, seuil à décider si le levier est activé, § 1.6), fin de tour en Cat
-(Clearcasting), réserve en Tree of Life (sans lecture), PV de départ (65), mots-clés (un seul pour les quatre
+(levier A activé le 18/11/2026 au seuil du joueur : taxe dès le deuxième changement, § 1.6), fin de tour en Cat
+(Clearcasting), réserve en Tree of Life (sans lecture), PV de départ (65, puis 58 après mesure), mots-clés (un seul pour les quatre
 formes), noms de Maul et Rake (gardés), ligne « Druid » de `docs/classes/decisions.md` (réécrite).
 
 1. **Cartes sans forme** : Skull Bash, Nature's Swiftness et tous les Powers. Faut-il des Powers de forme (jouer
    Moonkin Aura ferait entrer en Moonkin) ?
+2. **Tree of Life sous 10 % des fins de tour** (6,8 % avec Regen 2, § 10) : mettre une carte Tree dans le deck de
+   départ (Mark of the Wild à la place d'un Thick Hide ?), passer au repli Absorb (§ 1.3), ou laisser Tree of Life
+   forme de passage ?
+3. **Furor** (épique de Westfall, § 5) était notée « incompatible avec le levier A », désormais actif : la garder
+   (elle rend de la réserve à chaque changement, la taxe retire du mana) ou la revoir ?

@@ -332,7 +332,7 @@ L.plate("form", { head = true, field = "form", name = "Form", text = "playing th
     cat = { word = "Cat", text = "Enters Cat (Combo). End of turn: next Attack costs 0." },
     bear = { word = "Bear", text = "Enters Bear (Frenzy). End of turn: Bear strikes." },
     moonkin = { word = "Moonkin", text = "Enters Moonkin (Charges). End of turn: 1 to all per 2." },
-    tree = { word = "Tree", name = "Tree of Life", text = "Enters Tree of Life. End of turn: gain Regen 1." },
+    tree = { word = "Tree", name = "Tree of Life", text = "Enters Tree of Life. End of turn: gain Regen 2." },
   } })
 L.plate("cast", { word = "Cast", head = true, text = "resolves at the start of the next turn." })
 L.plate("cooldown", { word = "Cooldown", n = true, text = "returns to hand after N." })
