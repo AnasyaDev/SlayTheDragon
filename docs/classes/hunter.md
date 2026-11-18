@@ -24,7 +24,9 @@ Codé : `Data/Hunter.lua`, `Core/Classes/hunter.lua`, `UI/Art/hunter.lua`, tests
 
 - **Familier : 1 + Frenzy** (fiche : 3 + Frenzy ; `ns.Hunter.PET_BASE`). À 3, la simulation de fumée donnait
   99 % de victoires à la clé 0 et le deck de départ seul en gagnait 95 % (Warrior : 0 %) ; à 1, 87 %.
-- **PV 55** (fiche et décisions : 65, « à régler par simulation »).
+- **PV 56** (fiche et décisions : 65, « à régler par simulation » ; 55 à la simulation de fumée, 41 puis 50 à
+  la passe 3, 56 le 18/11/2026 au bot human : 47,7 → 59,3 % ; `docs/equilibrage.md`, « Hunter : réglage au bot
+  human (18/11/2026) »).
 - **Bestial Wrath coûte 2** (amélioré : 1), le levier prévu au risque 3.
 - **Baisse du Frenzy** posée en fin de round (crochet `onRoundEnd`), donc au début de chaque tour sauf le
   premier mais avant la résolution des Cast (même effet que « avec le DoT et la Regen »).
@@ -517,7 +519,9 @@ Plus les 4 cartes de départ au niveau 1 (22 cartes). Pourquoi cet ordre :
    combats ordinaires, pas plus contre le boss.
    Cible remplacée le 13/11/2026 : 6 à 9 PV perdus par combat normal pour toutes les classes
    (`decisions.md`) ; le Hunter en perdait 4,5, d'où Disengage 3/6 et 50 PV (`docs/equilibrage.md`,
-   « Passe 3 »).
+   « Passe 3 »). Au bot human (18/11/2026), ses défaites venaient presque toutes du boss de chaque zone
+   (24 PV perdus, 39 % de ses PV, contre 5 par combat normal) : 50 → 56 PV, Disengage inchangé
+   (`docs/equilibrage.md`, « Hunter : réglage au bot human (18/11/2026) »).
 8. **Identité** : le DoT (Survival) est partagé avec Priest, Warlock, Rogue ; Hunter's Mark + gros tir
    rappelle le Warrior Arms (Sundered + gros coup). Ce qui doit rester propre : le familier, les Traps,
    Careful Aim (l'inverse d'Execute). Aucune carte Hunter ne dépend d'Execute.

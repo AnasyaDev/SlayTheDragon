@@ -918,8 +918,9 @@ relic("rhokdelar", {
 -- Classe ------------------------------------------------------------------------
 
 ns.Classes.hunter = {
-  -- PV : 65 dans la fiche et les décisions (« à régler par simulation ») ; 55 après la simulation de fumée
-  id = "hunter", name = "Hunter", order = 5, hp = 50,
+  -- PV : 65 dans la fiche et les décisions (« à régler par simulation ») ; 55 après la simulation de fumée,
+  -- 41 puis 50 (passe 3), 56 au bot human (18/11/2026, docs/equilibrage.md : usure au boss de chaque zone)
+  id = "hunter", name = "Hunter", order = 5, hp = 56,
   resource = { id = "frenzy", cap = 5, keep = true },
   deck = {
     "arcane_shot", "arcane_shot", "arcane_shot", "arcane_shot",

@@ -1140,3 +1140,57 @@ dans l'ordre et cumulés jusqu'à la cible : (1) PV 58 → 65, (2) entrée dans 
 - **Formes** : le bot human change 2,31 fois de forme par tour (heuristic 2,70) et finit plus souvent en Tree of
   Life (12,5 %, heuristic 6,7 %) : il soigne davantage.
 - Non vérifié : niveau 1 (compte neuf), clés 1 à 5, épiques du Druid imposées.
+
+## Hunter : réglage au bot human (18/11/2026)
+
+Demande : monter le Hunter, dernier au bot `human` derrière Warrior, Mage et Priest. Cible : 55 à 62 %. Mesure :
+`luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0 class=hunter` (niveau 7, `zones=0`,
+sans épique imposée ; ± 4 points), contrôle `bot=heuristic runs=300` (plafond 95 %). Rapports bruts :
+`reports/hunter-*.txt`.
+
+**D'où venait l'usure.** Les combats ordinaires ne coûtent presque rien au Hunter (normal : 5,1 PV encaissés,
+4,0 nets, 7 % de ses PV ; élite : 9,1 nets, 98,5 % de victoires) ; **ses défaites viennent du boss de chaque
+zone** (241 des 314 défaites). Le boss lui coûte 24 PV encaissés, 21 nets, soit 39 % de ses PV à l'entrée, et il
+y entre vers 78 % de ses PV : VanCleef 83,7 %, Somnus 88,5 %, Jin'do 90,4 %, Nek'rosh 92,4 %, Morbent Fel 93,7 %
+de victoires. Les boss sont immunisés à Stunned : Freezing Trap n'y pose que Demoralized 1, et le reste de sa
+défense est l'Absorb de Disengage (3, le plus faible des Absorb de départ : Defend et Mana Shield 5, Inner Fire 6).
+Aucun soin. Le deck ne monte pas plus vite qu'ailleurs (2,8 améliorations par expédition, presque toutes +1). La
+règle du Swamp ne pénalise pas le familier au-delà de ce qui est prévu : il évite les dormeurs tant qu'un ennemi
+est éveillé et attend si tous dorment (`Swamp.PET_WAITS`, 14/11/2026) ; Somnus (140 PV) reste le boss le plus dur
+pour le Hunter.
+
+**Balayage** (`sweep=cards class=hunter runs=300 bot=human`, ligne « sans » 47,3 %, boss 24,0 PV encaissés) :
+aucune carte de classe ne règle le boss (de 22,3 à 25,7 PV encaissés au boss ; au mieux Spirit Bond −1,7). Les
+épiques montent beaucoup (Roar of Sacrifice +24,7, Master Marksman +23,0, Trap Launcher +22,3, Call of the Wild
++11,7), mais aucune n'est gagnée à la clé 0 avec `zones=0` (épique à l'entrée : 0 %). Cartes qui coûtent le plus au
+bot human, imposées au départ : Resourcefulness −23,3, Feign Death −19,3, Immolation Trap −17,7, Lock and Load
+−14,0, Volley −12,3 (Feign Death est pourtant la carte la plus choisie : 1 419 choix pour 600 expéditions) ; en
+tête : Dire Beast +8,3, Growl +4,0, Kill Command +3,0. Non retouchées : hors du périmètre de ce lot.
+
+**Changement retenu : PV 50 → 56**, seul. Le levier vise directement l'usure : 6 PV de plus à l'entrée de
+Westfall, 3 de plus après chaque soin de 50 %, et une marge au boss. Disengage, `PET_BASE`, Pet Whistle et les
+textes des cartes sont inchangés.
+
+| Zone (battue / atteinte) | Avant, 50 PV (human) | **Après, 56 PV (human)** | Après, 56 PV (heuristic, 300) |
+|---|---|---|---|
+| Westfall | 79,3 % | **86,7 %** | 98,7 % |
+| Duskwood | 87,6 % | **90,6 %** | 99,0 % |
+| Wetlands | 90,9 % | **95,1 %** | 99,7 % |
+| Stranglethorn Vale | 89,7 % | **94,0 %** | 100,0 % |
+| Swamp of Sorrows | 88,2 % | **87,2 %** | 91,8 % |
+| Burning Steppes | 99,7 % | **100,0 %** | 99,6 % |
+| Blackrock Mountain | 95,7 % | **97,0 %** | 98,5 % |
+| **Victoires** | **47,7 %** | **59,3 %** (± 3,9) | **87,7 %** (81,7 avant) |
+| PV à l'entrée, Duskwood → Swamp | 37,1 / 42,3 / 42,7 / 41,4 | 42,5 / 48,8 / 49,4 / 48,5 | 49,1 / 54,9 / 54,9 / 50,8 |
+| Boss : victoires / PV encaissés / nets | 91,2 % / 23,9 / 21,2 | 93,9 % / 24,4 / 22,1 | 98,3 % / 19,2 / 17,6 |
+| Normal : PV encaissés / tours | 5,1 / 2,36 | 5,1 / 2,35 | 2,7 / 2,15 |
+
+- **Cible atteinte** : 59,3 % au bot human (55 à 62 visés), 87,7 % au bot heuristic (sous les 95 %). Le Hunter
+  passe devant le Priest (53,5) et reste derrière le Mage (60,7) et le Warrior (80,0) des mesures du 18/11/2026.
+- **Ce qui reste** : Swamp of Sorrows ne bouge pas (88,2 → 87,2 %, 48 des 244 défaites au boss Somnus) ; c'est le
+  seul mur du Hunter au bot heuristic (24 des 37 défaites). Un réglage de Somnus ou de la règle du sommeil est
+  affaire de zone, hors de ce lot. VanCleef reste le boss qui coûte le plus d'expéditions (67 défaites).
+- **Essai non fait** : Disengage 3 → 4 Absorb (le levier suivant si le Swamp doit monter) ; les PV seuls
+  suffisaient.
+- Non vérifié : niveau 1 (compte neuf), clés 1 à 5, cible de 6 à 9 PV par combat normal au niveau 1 (les PV
+  encaissés par combat ne bougent pas avec les PV max ; leur part tombe de 7,4 à 6,6 % des PV à l'entrée).
