@@ -318,8 +318,8 @@ L.combatResource(c)                         --> "wild:bear" si c.cls.form == "be
   (`W.cardKeywords`) explique le nom par l'entrée de la forme, jamais par la ressource d'une autre classe qui
   porte le même nom (Combo du Rogue).
 - **En combat** (pastille, chiffres flottants « +1 Frenzy », raison « Not enough … ») : `L.combatResource(c)`
-  donne la clé dans la forme active ; à brancher par l'interface du Druid (`UI/CombatView.lua`,
-  `UI/Controller.lua` lisent encore l'id de base : sans effet pour les autres classes).
+  donne la clé dans la forme active ; branché dans `UI/CombatView.lua` et `UI/Controller.lua` (la raison d'une
+  carte refusée nomme la ressource de la carte, `L.cardResource(d)`) ; sans effet pour les autres classes.
 - **Harnais U27** : les noms d'un texte sont seulement ceux de `L.cardResourceKeys(d)` (`H.resourceWordErrors`) :
   une carte Cat qui écrit « Frenzy », une carte sans forme qui écrit « Combo » sans libellé « Cat … : », ou
   une carte d'une autre classe qui nomme une autre ressource (Frenzy sur un Rogue, Reserve) sont refusées.
@@ -372,8 +372,27 @@ Art.statusIcons.<clé> = { tga = … }        -- icône d'un état selon sa sour
 ns.ClassViews.<id> = { build = function(hôte, vue) end, render = function(hôte, combat, vue) end,
   tokens = function(combat, liste, vue) end, -- facultatif : notes sur les jetons des états du héros
   enemyMarks = true,                         -- facultatif : la vue marque des ennemis (place réservée)
+  badge = function(combat) end,              -- facultatif : pastille propre (forme du Druid), voir ci-dessous
+  badgeTooltip = function(tt, combat) end,   -- facultatif : infobulle de cette pastille
   event = function(hôte, ev, vue) end }    -- facultatif : animations propres (vue:Push(délai, fn))
 ```
+
+- **Pastille propre à la classe** (`badge`, `badgeTooltip`, 18/11/2026, Druid) : `badge(c)` rend une table
+  **fixe** (pas d'allocation à chaque rendu) `{ icon, key, ring, grey, color, always }` : `icon` = entrée
+  d'icône de la pastille (`W.setIcon`), `key` = clé d'icône (changement d'icône quand elle change), `ring` =
+  teinte `{ r, g, b }` multipliée sur l'anneau doré (`grey` : anneau désaturé), `color` = couleur `{ r, g, b }`
+  des crans et des chiffres flottants « +1 … » (au lieu de `Art.classes[id].resource.color`), `always` =
+  pastille visible même à 0 (le nombre reste caché à 0). `badgeTooltip(tt, c)` remplace l'infobulle générique.
+  Sans ces champs, rien ne change (classes à un seul nom).
+- **Nom de la ressource en combat** : la pastille générique, les chiffres flottants et la raison « Not enough … »
+  lisent `L.combatResource(c)` (forme active) ; `Controller.reasonText(why, d)` prend la carte refusée quand elle
+  est connue (main, sélection, jeu) et nomme alors la ressource **de la carte** (`L.cardResource(d)` : Ferocious
+  Bite en Bear → « Not enough Combo. »). Pour une classe à un seul nom, l'id de base : inchangé.
+- **Druid** (`UI/Art/druid.lua`) : `Art.druidForms[none|cat|bear|moonkin|tree]` (nom, icône, teinte, couleur,
+  `badge`), `Art.druidForm(c)`, `Art.druidStrike(c)` (cible et dégâts de la frappe de l'ours),
+  `Art.druidPulse(c, e)` (base et dégâts des coups à tous de Moonkin), `Art.druidLines(c)` (lignes de la
+  pastille : réserve maintenant, « End of turn: … », Cast en attente) ; chiffres de la fiche sauf si la classe
+  publie `ns.Druid.STRIKE_BASE`, `PULSE_PER`, `PULSE_MAX`. Détail : `docs/interface.md`, « Druid ».
 
 - **Marque sur un ennemi** (`enemyMarks`, 16/11/2026 : cadre d'unité des ennemis refait, docs/interface.md,
   « Cadre d'unité des ennemis ») : une petite icône (13 au plus) posée par la vue au centre de

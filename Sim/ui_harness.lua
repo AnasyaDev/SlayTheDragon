@@ -2900,18 +2900,30 @@ do
     local f = line:gsub("\r", ""):match("^UI\\Art\\(.+%.lua)$")
     if f then artFiles[#artFiles + 1] = "UI/Art/" .. f:gsub("\\", "/") end -- UI\Art\Zones\<zone>.lua compris
   end
+  -- fichiers d'art dont les icônes attendent leur lot de médias (tools/build_media.py --icons-only, à part) :
+  -- icônes absentes de Media/Icons tolérées (repli `icon` du client, aucun plantage), mais présentes dans le
+  -- pack local s'il est là (sinon la copie échouerait). Retirer l'entrée une fois les icônes copiées.
+  local pendingFiles, pending, notInPack = { ["UI/Art/druid.lua"] = true }, {}, {}
+  local PACK = (os.getenv("HOME") or "") .. "/Téléchargements/ICONS/"
+  local packHere = io.open(PACK .. "ClassIcon_Priest.tga", "rb")
+  if packHere then packHere:close() end
   for _, file in ipairs(artFiles) do
     local art = assert(io.open(root .. "/" .. file)):read("*a")
-    for name in art:gmatch('tga%s*=%s*"([^"]+)"') do
+    local function seen(name)
       used = used + 1
-      if not Skin.icons[name:lower()] then absent[#absent + 1] = name end
+      if Skin.icons[name:lower()] then return end
+      if not pendingFiles[file] then absent[#absent + 1] = name return end
+      pending[#pending + 1] = name
+      local f = packHere and io.open(PACK .. name .. ".tga", "rb")
+      if f then f:close() elseif packHere then notInPack[#notInPack + 1] = name end
     end
-    for name in art:gmatch('%f[%w_]I%(%s*"([^"]+)"') do
-      used = used + 1
-      if not Skin.icons[name:lower()] then absent[#absent + 1] = name end
-    end
+    for name in art:gmatch('tga%s*=%s*"([^"]+)"') do seen(name) end
+    for name in art:gmatch('%f[%w_]I%(%s*"([^"]+)"') do seen(name) end
   end
-  check(("icônes nommées dans l'art (%d fichiers) toutes copiées (%d)"):format(#artFiles, used), #absent == 0, table.concat(absent, ", "))
+  check(("icônes nommées dans l'art (%d fichiers) toutes copiées (%d, dont %d en attente du lot de médias)")
+    :format(#artFiles, used, #pending), #absent == 0, table.concat(absent, ", "))
+  check(("icônes en attente (%d) : présentes dans le pack local%s"):format(#pending, packHere and "" or " (pack absent, non vérifié)"),
+    #notInPack == 0, table.concat(notInPack, ", "))
   for kind, rel in pairs(Skin.fonts) do
     local f = io.open(disk(rel), "rb")
     check("police " .. kind .. " présente", f ~= nil, rel)
@@ -7461,6 +7473,340 @@ if SNAP then
   end
   Render.svg(H, big, SNAP .. "/cartes_hunter.svg", "cartes du Hunter (base, améliorée)")
   big:Hide()
+end
+
+-- Classe factice « druid » posée par la section UD tant que la vraie classe n'existe pas (Core/Classes/druid.lua,
+-- Data/Druid.lua) : contrat du lot E (ressource wild plafonnée à 5, c.cls.form, état à drapeau clearcasting,
+-- crochet de coût de Clearcasting) et huit cartes aux ids de la fiche (docs/classes/druid.md, § 3). Posée dans
+-- le ns chargé par freshRun seulement (le suivant repart des fichiers).
+function H.installDruidFake(ns)
+  ns.Classes.druid = { id = "druid", name = "Druid", order = 6, hp = 65, playable = false,
+    resource = { id = "wild", cap = 5, keep = true }, deck = {},
+    paths = { { id = "feral", name = "Feral" }, { id = "balance", name = "Balance" }, { id = "restoration", name = "Restoration" } } }
+  ns.Statuses.clearcasting = ns.Statuses.clearcasting
+    or { name = "Clearcasting", flag = true, text = "The next Attack played costs 0 (not Cast cards)." }
+  ns.ClassRules.druid = { hooks = { cost = function(c, _, v, d)
+    if d and d.type == "attack" and not d.cast and (c.player.st.clearcasting or 0) ~= 0 then return 0 end
+    return v
+  end } }
+  local function card(id, path, t)
+    t.id, t.class, t.level, t.rarity, t.path = id, "druid", 1, path == "start" and "basic" or "common", path
+    t.name = t.name
+    t.up = t.up or { text = t.text }
+    ns.Cards[id] = t
+  end
+  card("wrath", "start", { name = "Wrath", form = "moonkin", cost = 1, type = "attack", target = "enemy",
+    effects = { { "damage", 5 }, { "res", 1 } }, text = "Deal 5.\n+1 Charge." })
+  card("thick_hide", "start", { name = "Thick Hide", form = "bear", cost = 1, type = "skill",
+    effects = { { "absorb", 5 } }, text = "Gain 5 Absorb." })
+  card("maul", "start", { name = "Maul", form = "bear", cost = 1, type = "attack", target = "enemy",
+    effects = { { "damage", 4 } }, text = "Deal 4.\nBear strikes." })
+  card("ferocious_bite", "start", { name = "Ferocious Bite", form = "cat", cost = 1, type = "attack", target = "enemy",
+    minRes = 1, effects = { { "surge" }, { "damage", 4, per = { 4, "surge" } } }, text = "Surge: deal 4 + 4 per Combo." })
+  card("shred", "feral", { name = "Shred", form = "cat", cost = 1, type = "attack", target = "enemy",
+    effects = { { "damage", 7 }, { "res", 1 } }, text = "Deal 7.\n+1 Combo." })
+  card("starfire", "balance", { name = "Starfire", form = "moonkin", cost = 2, type = "attack", target = "enemy", cast = true,
+    effects = { { "damage", 20 } }, text = "Cast.\nDeal 20." })
+  card("rejuvenation", "restoration", { name = "Rejuvenation", form = "tree", cost = 1, type = "skill", exhaust = true,
+    effects = { { "apply", "regen", 4, self = true } }, text = "Gain Regen 4\nExhaust." })
+  card("skull_bash", "feral", { name = "Skull Bash", cost = 0, type = "skill", target = "enemy", cooldown = 2,
+    effects = { { "interrupt" }, { "draw", 1 } }, text = "Interrupt the target's cast.\nDraw 1.\nCooldown 2." })
+end
+
+-- Aperçus seulement (SNAP) : icônes du Druid pas encore copiées dans Media/Icons (lot de médias à part) mais dont
+-- un aperçu PNG est dans build/media_png/Icons (converti depuis le pack local) : Skin.icons les nomme le temps du
+-- rendu, pour que le SVG les montre. Aucune vérification ne dépend de cette entrée (icônes cherchées par nom).
+function H.previewDruidIcons(ns)
+  if not SNAP then return end
+  local text = assert(io.open(root .. "/UI/Art/druid.lua")):read("*a")
+  for name in text:gmatch('%f[%w_]I%(%s*"([^"]+)"') do
+    local k = name:lower()
+    local f = not ns.Skin.icons[k] and io.open(SNAP .. "/media/Icons/" .. k .. ".png", "rb")
+    if f then
+      f:close()
+      ns.Skin.icons[k] = "Icons\\" .. k .. ".tga"
+    end
+  end
+end
+
+print("UD  Druid : pastille de la forme (sans forme, Cat, Bear, Moonkin, Tree of Life), nom de la réserve, Clearcasting, marques, événements, raison, aperçus")
+do
+  local e = freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local W, Art, Card, L, Combat = ns.Widgets, ns.Art, ns.Card, ns.Language, ns.Combat
+  local real = ns.Classes.druid ~= nil and ns.ClassRules.druid ~= nil
+  if not real then H.installDruidFake(ns) end
+  H.previewDruidIcons(ns)
+  print("    classe " .. (real and "réelle (Core/Classes/druid.lua)" or "factice (H.installDruidFake : la vraie classe n'a pas fusionné)"))
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  local function vis(o)
+    while o do if not rawget(o, "_shown") then return false end o = rawget(o, "_parent") end
+    return true
+  end
+  -- combat du Priest converti en combat du Druid (classe, état de classe, main de cartes de formes différentes)
+  local c = e.combat
+  e.class, c.class = "druid", "druid"
+  c.cls, c.hk = {}, nil
+  if real and ns.ClassRules.druid.init then ns.ClassRules.druid.init(c, c.cls) end
+  c.player.res, c.player.st.clearcasting, c.player.cast = 0, nil, nil
+  local HAND = { "wrath", "thick_hide", "ferocious_bite", "shred", "rejuvenation", "starfire", "skull_bash" }
+  c.hand = {}
+  for i, id in ipairs(HAND) do c.hand[i] = Card.new(id, false, 9100 + i) end
+  c.player.mana = 3
+  local v = V()
+  v:Render(true)
+  H.settle()
+  local host = v.classZone.views.druid
+  check("vue du Druid construite (marques des ennemis), place des marques réservée", host and host._shown and host.marks
+    and #host.marks == 6 and ns.ClassViews.druid.enemyMarks == true and ns.ClassViews.druid.badge ~= nil)
+  check("cadre du héros : nom et portrait du Druid", v.heroFrame.name._text == "Druid"
+    and (v.heroFrame.portrait._texture or ""):lower():find("classicon_druid", 1, true) ~= nil, tostring(v.heroFrame.portrait._texture))
+
+  -- 1. pastille dans les cinq états : icône, anneau, nombre, crans, infobulle (nom, réserve, fin de tour, n / 5)
+  local r = v.resource
+  local crops = {}
+  local frameR = R.rect(_G.SlayTheDragonFrame)
+  local function box(objs, pad)
+    local l, b, rr, t = 1e9, 1e9, -1e9, -1e9
+    for _, o in ipairs(objs) do
+      local q = R.rect(o)
+      if q then l, b, rr, t = math.min(l, q[1]), math.min(b, q[2]), math.max(rr, q[3]), math.max(t, q[4]) end
+    end
+    pad = pad or 0
+    return { l - frameR[1] - pad, frameR[4] - t - pad, rr - frameR[1] + pad, frameR[4] - b + pad }
+  end
+  local function plainLines(lines)
+    local out = {}
+    for _, l in ipairs(lines) do out[#out + 1] = H.plain(tostring(l)) end
+    return out
+  end
+  local STATES = {
+    { key = "none", form = nil, icon = "classicon_druid", word = "Reserve", eot = "End of turn: nothing, no form yet." },
+    { key = "cat", form = "cat", icon = "ability_druid_catform", word = "Combo", eot = "End of turn: Clearcasting, the next Attack costs 0." },
+    { key = "bear", form = "bear", icon = "ability_racial_bearform", word = "Frenzy" },
+    { key = "moonkin", form = "moonkin", icon = "spell_nature_forceofnature", word = "Charges", eot = "End of turn: 2 damage to each enemy." },
+    { key = "tree", form = "tree", icon = "ability_druid_treeoflife", word = "Reserve", eot = "End of turn: gain Regen 1." },
+  }
+  local alive = 0
+  for _, en in ipairs(c.enemies) do if not en.dead then alive = alive + 1 end end
+  for _, s in ipairs(STATES) do
+    c.cls.form = s.form
+    c.player.res = 3
+    v:Render(true)
+    H.advance(1)
+    local f = Art.druidForms[s.key]
+    local bad = {}
+    local function want(ok, what) if not ok then bad[#bad + 1] = what end end
+    want(vis(r), "pastille cachée")
+    want((r.icon._texture or ""):lower():find(s.icon, 1, true) ~= nil, "icône " .. tostring(r.icon._texture))
+    local vc = r.ring._calls.SetVertexColor or {}
+    want(vc[1] == f.ring[1] and vc[2] == f.ring[2] and vc[3] == f.ring[3], "teinte de l'anneau")
+    want((r.ring._calls.SetDesaturated or {})[1] == (s.key == "none"), "anneau gris seulement sans forme")
+    want(r.text._text == "3", "nombre " .. tostring(r.text._text))
+    local pc = v.resPips.list[1].fill._calls.SetVertexColor or {}
+    want(math.abs((pc[1] or 0) - f.color[1]) < 1e-6 and math.abs((pc[3] or 0) - f.color[3]) < 1e-6, "couleur des crans")
+    local lines = plainLines(H.hover(r))
+    local tt = table.concat(lines, " | ")
+    want(lines[1] == f.name, "titre « " .. tostring(lines[1]) .. " »")
+    want(L.resourceName(L.combatResource(c), 3) == s.word and tt:find(s.word, 1, true) ~= nil, "nom de la réserve " .. s.word)
+    want(tt:find("3 / 5", 1, true) ~= nil, "« 3 / 5 »")
+    local eot = s.eot
+    if s.key == "bear" then
+      local t, dmg = Art.druidStrike(c)
+      want(t ~= nil and dmg == Combat.strikeDamage(c, t, 1, true), "dégâts de la frappe")
+      eot = ("End of turn: Bear strikes %s for %d, then +1 Frenzy."):format(Combat.enemyName(t), dmg)
+    end
+    want(tt:find(eot, 1, true) ~= nil, "fin de tour « " .. eot .. " »")
+    -- marques : cible de la frappe en Bear, chaque ennemi en Moonkin, aucune ailleurs
+    local shown, at = 0, {}
+    for _, mk in ipairs(host.marks) do
+      if vis(mk) then shown = shown + 1 at[#at + 1] = mk end
+    end
+    local wantMarks = (s.key == "bear" and 1) or (s.key == "moonkin" and alive) or 0
+    want(shown == wantMarks, ("marques %d (attendu %d)"):format(shown, wantMarks))
+    if s.key == "bear" and at[1] then
+      local t = Art.druidStrike(c)
+      local sl = v.slotOf[t.uid]
+      want(at[1]._points[1] and at[1]._points[1][2] == sl.markSpot, "marque hors de la place réservée")
+      local mt = table.concat(plainLines(H.hover(at[1])), " | ")
+      want(mt:find("Bear strikes it for", 1, true) ~= nil, "infobulle de la marque : " .. mt)
+    elseif s.key == "moonkin" and at[1] then
+      local mt = table.concat(plainLines(H.hover(at[1])), " | ")
+      want(mt:find("End of turn: 2 damage to it.", 1, true) ~= nil, "infobulle de la marque : " .. mt)
+    end
+    check(("pastille %s : icône %s, anneau, crans, « 3 », %s ; infobulle : %s, %s"):format(s.key, s.icon,
+      shown > 0 and (shown .. " marque(s)") or "aucune marque", f.name, eot), #bad == 0, table.concat(bad, "\n        ") .. "\n        " .. tt)
+    snap("druide-pastille-" .. s.key, true)
+    crops[#crops + 1] = { "druide-pastille-" .. s.key, "druide-pastille-" .. s.key, box({ r, v.mana, v.resPips }, 14), lines }
+    if s.key == "bear" or s.key == "moonkin" then
+      crops[#crops + 1] = { "druide-combat-" .. s.key, "druide-pastille-" .. s.key, box({ _G.SlayTheDragonFrame }, 0), {} }
+    end
+  end
+  -- sans forme à 0 : pastille visible (la forme se lit toujours), nombre et crans vides
+  c.cls.form, c.player.res = nil, 0
+  v:Render(true)
+  H.advance(1)
+  local nf = 0
+  for i = 1, 5 do if (v.resPips.list[i].fill._calls.SetAlpha or {})[1] == 1 then nf = nf + 1 end end
+  check("sans forme, réserve 0 : pastille visible à l'icône de la classe, sans nombre, aucun cran plein", vis(r)
+    and r.text._text == "" and nf == 0 and (r.icon._texture or ""):lower():find("classicon_druid", 1, true) ~= nil, tostring(r.text._text) .. " / " .. nf)
+
+  -- 2. Cast en attente : bonus des Charges selon la forme de fin de tour
+  c.player.res = 3
+  c.player.cast = { card = Card.new("starfire", false, 9200), target = c.enemies[1].uid }
+  c.cls.form = "bear"
+  v:Render(true)
+  local tb = table.concat(plainLines(H.hover(r)), " | ")
+  c.cls.form = "moonkin"
+  v:Render(true)
+  local tm = table.concat(plainLines(H.hover(r)), " | ")
+  check("Cast en attente (Starfire) : sans les Charges hors Moonkin, +3 en Moonkin",
+    tb:find("Starfire resolves without the Charges: end the turn in Moonkin for +3.", 1, true)
+    and tm:find("Starfire resolves next turn with +3.", 1, true), tb .. "\n        " .. tm)
+  c.player.cast = nil
+
+  -- 3. chiffres flottants de la réserve dans la forme active, couleur de la forme
+  local floats = {}
+  local oldFloat = W.float
+  W.float = function(parent, x, y, text, col, ...)
+    floats[#floats + 1] = { text = text, col = col }
+    return oldFloat(parent, x, y, text, col, ...)
+  end
+  local function floated(text)
+    for _, f in ipairs(floats) do if f.text == text then return f end end
+    return nil
+  end
+  c.cls.form = "bear"
+  v:Render(true)
+  v:OnEvents({ { t = "resource", n = 1 } })
+  H.advance(2)
+  c.cls.form = "moonkin"
+  v:Render(true)
+  v:OnEvents({ { t = "resource", n = 2 } })
+  H.advance(2)
+  c.cls.form = nil
+  v:Render(true)
+  v:OnEvents({ { t = "resource", n = 1 } })
+  H.advance(2)
+  local fb, fm, fr = floated("+1 Frenzy"), floated("+2 Charges"), floated("+1 Reserve")
+  check("chiffres flottants : « +1 Frenzy » en Bear, « +2 Charges » en Moonkin, « +1 Reserve » sans forme, couleur de la forme",
+    fb and fm and fr and fb.col == Art.druidForms.bear.color and fm.col == Art.druidForms.moonkin.color,
+    (function() local o = {} for _, f in ipairs(floats) do o[#o + 1] = f.text end return table.concat(o, "|") end)())
+
+  -- 4. raison « Not enough … » : ressource de la carte, sinon de la forme active
+  local Ctl = ns.Controller
+  c.cls.form, c.player.res = "bear", 0
+  v:Render(true)
+  local fbi
+  for i, inst in ipairs(c.hand) do if inst.id == "ferocious_bite" then fbi = i end end
+  local info = Ctl.handInfo(fbi)
+  local card = v.cards[fbi]
+  local plate = card and card.reasonPlate and card.reasonPlate:IsShown() and H.plain(card.reasonPlate.text._text or "") or ""
+  check("raison en Bear : « Not enough Combo. » pour Ferocious Bite (forme de la carte), « Not enough Frenzy. » sans carte",
+    info and info.why == "resource" and Ctl.reasonText("resource", info.def) == "Not enough Combo."
+    and Ctl.reasonText("resource") == "Not enough Frenzy." and plate:find("Not enough Combo.", 1, true) ~= nil,
+    tostring(info and info.why) .. " / " .. Ctl.reasonText("resource", info and info.def) .. " / " .. plate)
+
+  -- 5. Clearcasting : jeton sous le héros (icône, sans nombre, aura de Cat), coût 0 des Attack hors Cast en main
+  c.cls.form, c.player.res = "cat", 2
+  c.player.st.clearcasting = 1
+  v:Render(true)
+  local tok = H.heroToken(v, "status:clearcasting")
+  local tcc = tok and table.concat(plainLines(H.hover(tok)), " | ") or ""
+  check("jeton Clearcasting : icône de Clearcasting, sans nombre, aura et liseré dorés, infobulle de l'état",
+    tok and (tok.medal.icon._texture or ""):lower():find("spell_shadow_manaburn", 1, true) and (tok.count._text or "") == ""
+    and vis(tok.aura) and tcc:find("Clearcasting", 1, true) and tcc:find("costs 0", 1, true), tcc)
+  local costs, want = {}, { wrath = "0", ferocious_bite = "0", shred = "0", starfire = "2", thick_hide = "1", rejuvenation = "1", skull_bash = "0" }
+  local cbad = {}
+  for i, inst in ipairs(c.hand) do
+    local cf = v.cards[i]
+    costs[#costs + 1] = inst.id .. "=" .. tostring(cf and cf.cost._text)
+    if not cf or cf.cost._text ~= want[inst.id] or tostring(Ctl.handInfo(i).cost) ~= want[inst.id] then cbad[#cbad + 1] = inst.id end
+  end
+  check("Clearcasting : coût affiché 0 en main pour les Attack hors Cast (Wrath, Ferocious Bite, Shred), Starfire (Cast) à 2, Skills inchangés",
+    #cbad == 0, table.concat(costs, ", "))
+  local tcat = table.concat(plainLines(H.hover(r)), " | ")
+  check("pastille en Cat sous Clearcasting : il ne s'empile pas", tcat:find("Clearcasting is already set, it doesn't stack.", 1, true) ~= nil, tcat)
+  snap("druide-clearcasting", true)
+  crops[#crops + 1] = { "druide-main-clearcasting", "druide-clearcasting", box(v.cards, 30), {} }
+  crops[#crops + 1] = { "druide-clearcasting", "druide-clearcasting", box({ tok }, 60), plainLines(H.hover(tok)) }
+  c.player.st.clearcasting = nil
+
+  -- 6. événements : changement de forme (l'icône tourne, nom de la forme), frappe de l'ours, salve de Moonkin,
+  -- Clearcasting posé
+  floats = {}
+  local spins = 0
+  local oldTween = W.tween
+  W.tween = function(dur, fn, done, owner, key, ...)
+    if owner == r.icon and key == "shift" then spins = spins + 1 end
+    return oldTween(dur, fn, done, owner, key, ...)
+  end
+  local anims = {}
+  local oldAnim = W.anim
+  W.anim = function(m, a, ...) anims[#anims + 1] = a return oldAnim(m, a, ...) end
+  local t1 = Art.druidStrike(c)
+  local en2 = c.enemies[2] and not c.enemies[2].dead and c.enemies[2] or c.enemies[1]
+  c.cls.form = "bear"
+  v:OnEvents({ { t = "shift", from = "cat", to = "bear" } })
+  H.advance(2)
+  local shiftOk = spins == 1 and floated("Bear Form") ~= nil
+  v:OnEvents({ { t = "bear_strike", dst = t1.uid, dmg = 4, why = "auto" },
+    { t = "damage", src = "player", dst = t1.uid, amount = 4, absorbed = 0, loss = 4 } })
+  H.advance(2)
+  local strikeOk = floated("Bear strike") ~= nil and floated("-4") ~= nil
+  local nAnimStrike = #anims
+  floats = {}
+  c.cls.form = "moonkin"
+  v:OnEvents({ { t = "shift", from = "bear", to = "moonkin" },
+    { t = "moonkin_pulse", dst = t1.uid, dmg = 2, why = "auto", all = true },
+    { t = "damage", src = "player", dst = t1.uid, amount = 2, absorbed = 0, loss = 2 },
+    { t = "moonkin_pulse", dst = en2.uid, dmg = 2, why = "auto", all = true },
+    { t = "damage", src = "player", dst = en2.uid, amount = 2, absorbed = 0, loss = 2 },
+    { t = "clearcasting" } })
+  H.advance(3)
+  local nMoon = 0
+  for _, f in ipairs(floats) do if f.text == "Moonkin" then nMoon = nMoon + 1 end end
+  local pulseOk = nMoon == 1 and floated("Moonkin Form") ~= nil and spins == 2 and floated("Clearcasting") ~= nil
+  W.tween, W.anim, W.float = oldTween, oldAnim, oldFloat
+  check("événements : shift (l'icône de la pastille tourne, « Bear Form »), bear_strike (coup du héros, « Bear strike », « -4 »), moonkin_pulse (un seul « Moonkin » pour la salve), clearcasting",
+    shiftOk and strikeOk and nAnimStrike >= 2 and pulseOk and (r.icon._calls.SetRotation or {})[1] == 0,
+    ("%s %s %s, %d tours, %d anim"):format(tostring(shiftOk), tostring(strikeOk), tostring(pulseOk), spins, nAnimStrike))
+
+  -- 7. classe réelle : une carte Cat jouée par l'interface fait entrer en Cat, la pastille suit
+  if real then
+    c.cls.form, c.player.res, c.player.mana = nil, 0, 3
+    local si
+    for i, inst in ipairs(c.hand) do if inst.id == "shred" then si = i end end
+    v:Render(true)
+    Ctl.act({ "play", si, 1 })
+    H.settle()
+    v:Render(true)
+    check("classe réelle : Shred jouée depuis sans forme → Cat, icône de la pastille de Cat",
+      c.cls.form == "cat" and (r.icon._texture or ""):lower():find("ability_druid_catform", 1, true) ~= nil, tostring(c.cls.form))
+  end
+
+  -- 8. aperçus : main de cartes de formes différentes (plaques Moonkin, Bear, Cat, Tree, Moonkin · Cast)
+  c.cls.form, c.player.res = nil, 0
+  v:Render(true)
+  H.advance(1)
+  local plates = {}
+  for i = 1, #c.hand do plates[#plates + 1] = tostring(v.cards[i].plateText and v.cards[i].plateText._text) end
+  check("main : plaques de forme (Moonkin, Bear, Cat, Tree · Exhaust, Moonkin · Cast)", table.concat(plates, ","):find("Moonkin", 1, true)
+    and table.concat(plates, ","):find("Tree", 1, true) and table.concat(plates, ","):find("Cast", 1, true), table.concat(plates, ","))
+  snap("druide-main", true)
+  crops[#crops + 1] = { "druide-main", "druide-main", box(v.cards, 30), {} }
+  if SNAP then
+    -- cadres à découper dans les PNG : nom, SVG source, coordonnées du SVG (gauche, haut, droite, bas),
+    -- légende = lignes de l'infobulle (séparées par \31)
+    local f = assert(io.open(SNAP .. "/druide-crops.tsv", "w"))
+    for _, cr in ipairs(crops) do
+      local b = cr[3]
+      f:write(("%s\t%s\t%.0f\t%.0f\t%.0f\t%.0f\t%s\n"):format(cr[1], cr[2], b[1], b[2], b[3], b[4], table.concat(cr[4], "\31")))
+    end
+    f:close()
+  end
 end
 
 print("UB  pièces en tranches : une texture découpée par le client, repli bord à bord à toute échelle, gardes de l'atlas")

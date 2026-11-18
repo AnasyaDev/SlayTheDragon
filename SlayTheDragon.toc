@@ -59,6 +59,7 @@ UI\Art\warrior.lua
 UI\Art\rogue.lua
 UI\Art\mage.lua
 UI\Art\hunter.lua
+UI\Art\druid.lua
 UI\Art\neutral.lua
 UI\ZoneView.lua
 UI\Art\Zones\duskwood.lua

@@ -74,14 +74,25 @@ C.REASONS = {
   running = "An expedition is already in progress.",
 }
 
--- « %s » : nom de la ressource de la classe jouée (« Not enough Rage. »).
-function C.reasonText(why)
+-- « %s » : nom de la ressource de la classe jouée (« Not enough Rage. ») ; d (facultatif) = la carte refusée :
+-- nom dans la forme de la carte (L.cardResource : « Not enough Combo. » pour une carte Cat du Druid), sinon
+-- dans la forme active du combat (L.combatResource), sinon l'id de base. Classe à un seul nom : inchangé.
+function C.reasonText(why, d)
   local t = C.REASONS[why] or tostring(why)
   if t:find("%s", 1, true) then
+    local L = ns.Language
     local exp = C.exp()
-    local cd = ns.Classes[exp and exp.class or "priest"]
-    local rid = cd and cd.resource and cd.resource.id
-    t = t:gsub("%%s", rid and ns.Language.resourceName(rid, 2) or "resource") -- pluriel : « Not enough Combo. »
+    local cls = exp and exp.class or "priest"
+    local key = d and d.class == cls and L.cardResource(d) or nil
+    if not key then
+      local c = C.combat()
+      key = c and c.class == cls and L.combatResource(c) or nil
+    end
+    if not key then
+      local cd = ns.Classes[cls]
+      key = cd and cd.resource and cd.resource.id
+    end
+    t = t:gsub("%%s", key and L.resourceName(key, 2) or "resource") -- pluriel : « Not enough Combo. »
   end
   return t
 end

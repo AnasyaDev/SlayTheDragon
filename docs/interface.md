@@ -28,9 +28,41 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
 - **Pastille de ressource** (anciennement Démence) : petit anneau doré près du mana, icône de la
   ressource de la classe (`Art.classes[id].resource`), nombre, cachée à 0 ; infobulle = explication du
   registre du langage et « n / plafond » ; chiffres flottants « +2 Rage » à la couleur de la ressource.
+  Nom lu dans la forme active (`L.combatResource`) ; une classe peut poser sa propre pastille
+  (`ns.ClassViews[id].badge` / `badgeTooltip` : icône, teinte de l'anneau, couleur des crans, toujours
+  visible ; docs/classes.md, « Interface ») : le Druid, ci-dessous.
+- **Druid** (18/11/2026, `UI/Art/druid.lua`, fiche `docs/classes/druid.md` § 1.8) :
+  - **Pastille de la forme**, toujours visible (la forme se lit même à 0), nombre et crans cachés à 0 :
+    sans forme = icône de la classe (`ClassIcon_Druid`), anneau gris ; Cat = `Ability_Druid_CatForm`, anneau
+    jaune ; Bear = `Ability_Racial_BearForm`, brun ; Moonkin = `Spell_Nature_ForceOfNature`, bleu nuit ;
+    Tree of Life = `Ability_Druid_TreeofLife`, vert. Crans et « +1 Frenzy » flottants à la couleur de la forme.
+  - **Infobulle** : nom de la forme (« Bear Form », « No form »…), ce que vaut la réserve maintenant
+    (« 3 Frenzy: Bear strikes for 4. », « 3 Charges: Attack hits +3. », « 3 Combo: spent by Surge. »,
+    « Reserve 3: unused in Tree of Life. »), puis en or **ce que fera la fin de tour** (« End of turn: Bear
+    strikes Murloc Coastrunner for 4, then +1 Frenzy. », « End of turn: 2 damage to each enemy. », « End of
+    turn: Clearcasting, the next Attack costs 0. » ou « … already set, it doesn't stack. », « End of turn: gain
+    Regen 1. », « End of turn: nothing, no form yet. ») ; avec un Cast Attack en attente, son bonus selon la
+    forme de fin (« Starfire resolves without the Charges: end the turn in Moonkin for +3. ») ; l'explication
+    de la ressource dans la forme ; « 3 / 5 ».
+  - **Marques des ennemis** (`enemyMarks`) : en Bear, la cible de la frappe de fin de tour (icône de Bear) ;
+    en Moonkin avec au moins une Charge, chaque ennemi vivant (icône de Moonkin) ; infobulle = les dégâts de
+    fin de tour sur cet ennemi.
+  - **Clearcasting** : jeton d'état sous le héros (`Spell_Shadow_ManaBurn`, sans nombre), aura et liseré dorés
+    tant qu'il attend son Attack ; coût 0 en main des Attack hors Cast par le crochet de classe `cost`
+    (`Combat.cost`, rien de plus côté interface).
+  - **Animations** : `shift` (l'icône de la pastille fait un tour, nom de la forme au-dessus du héros),
+    `bear_strike` (coup du héros, « Bear strike », chiffre de l'événement « damage »), `moonkin_pulse` (un
+    seul « Moonkin » par salve), `clearcasting` (nom flottant).
+  - **Forme des cartes en main** : seulement le mot de plaque (« Moonkin · Cast ») ; icône de forme, liseré
+    coloré et icône allumée de la fiche (§ 1.8) attendent une maquette validée par le joueur.
+  - Harnais UD (classe réelle si `ns.Classes.druid` existe, sinon `H.installDruidFake`) ; aperçus
+    `druide-pastille-<forme>`, `druide-clearcasting`, `druide-main` (PNG dans `build/png/`). Icônes du Druid
+    pas encore dans `Media/Icons` : repli `icon` du client, tolérées par U20 tant que `UI/Art/druid.lua` est
+    dans sa liste d'attente (vérifiées dans le pack local) ; à copier par `tools/build_media.py --icons-only`,
+    puis retirer l'entrée.
 - **Zone libre de classe** : cadre de 300 × 40 sous les états du héros, rempli par `ns.ClassViews[id]`
   (`build` une fois, `render` à chaque rendu) : familier, Traps et cible du Hunter, marques d'Atrophic
-  Poison et transparence sous Stealth du Voleur ; vide pour le Priest, le Warrior et le Mage. **Aucun texte
+  Poison et transparence sous Stealth du Voleur, marques de fin de tour du Druid ; vide pour le Priest, le Warrior et le Mage. **Aucun texte
   permanent** : la ligne d'épique écrite là (« Cast cards hit twice ») passait en travers du modèle du héros.
 - **Notes de classe sur les états du héros** (16/11/2026, demande du joueur : « uniquement au hover ») :
   l'épique en jeu a déjà son jeton dans la rangée des états (liseré et aura violets) ; ce qu'elle fait

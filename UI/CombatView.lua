@@ -569,8 +569,12 @@ function V:Build(parent)
   dem.text:SetPoint("CENTER", 0, 1)
   W.tooltip(dem, function(tt)
     local c = Controller.combat()
+    -- pastille propre à la classe (ns.ClassViews[classe].badgeTooltip : forme du Druid)
+    local cv = c and ns.ClassViews and ns.ClassViews[c.class]
+    if cv and cv.badgeTooltip then cv.badgeTooltip(tt, c) return end
     local rd = c and ns.Classes[c.class] and ns.Classes[c.class].resource
-    local rid = rd and rd.id or "insanity"
+    -- nom dans la forme active (L.combatResource : l'id de base pour une classe à un seul nom)
+    local rid = (c and ns.Language.combatResource(c)) or "insanity"
     tt:AddLine(Art.keywordLine("res:" .. rid), 1, 1, 1, true)
     if rd and rd.cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, Combat.resCap(c) or rd.cap), 0.8, 0.8, 0.8) end
   end, "ANCHOR_RIGHT")
@@ -1438,15 +1442,27 @@ function V:RenderPlayer(full)
   local class = c.class or "priest"
   self.heroFrame.name:SetText((ns.Classes[class] or {}).name or "")
   if self.heroFrame.portrait._class ~= class then self.heroFrame:SetPortrait() end
-  -- ressource de classe : icône de la classe jouée, nombre, cachée à 0
-  if self.resource._class ~= class then
-    self.resource._class = class
-    W.setIcon(self.resource.icon, Art.classResource(class), "ui:resource:" .. class)
+  -- ressource de classe : icône de la classe jouée, nombre, cachée à 0 ; pastille propre à la classe
+  -- (ns.ClassViews[classe].badge(c) : icône, teinte de l'anneau, couleur des crans, toujours visible ;
+  -- forme du Druid), nombre caché à 0
+  local cvb = ns.ClassViews and ns.ClassViews[class]
+  local badge = cvb and cvb.badge and cvb.badge(c) or nil
+  local bkey = badge and badge.key or ("ui:resource:" .. class)
+  local res = self.resource
+  if res._class ~= class or res._key ~= bkey then
+    res._class, res._key = class, bkey
+    W.setIcon(res.icon, badge and badge.icon or Art.classResource(class), bkey)
+    local tint = badge and badge.ring
+    if tint or res._tinted then -- anneau doré intact pour les classes sans pastille propre
+      res.ring:SetVertexColor(tint and tint[1] or 1, tint and tint[2] or 1, tint and tint[3] or 1, 1)
+      res.ring:SetDesaturated(badge and badge.grey or false)
+      res._tinted = tint and true or nil
+    end
   end
   local dem = p.res or 0
-  self.resource.text:SetText(tostring(dem))
-  if dem > 0 then self.resource:Show() else self.resource:Hide() end
-  self:RenderPips(class, dem)
+  res.text:SetText((dem > 0 or not badge) and tostring(dem) or "")
+  if dem > 0 or (badge and badge.always) then res:Show() else res:Hide() end
+  self:RenderPips(class, dem, badge and badge.color)
   -- zone libre de la classe
   local zone, cv = self.classZone, ns.ClassViews and ns.ClassViews[class]
   for k, f in pairs(zone.views) do if k ~= class then f:Hide() end end
@@ -1534,7 +1550,7 @@ function V.layoutPips(pips, cap)
   pips.layoutCap = cap
 end
 
-function V:RenderPips(class, n)
+function V:RenderPips(class, n, color)
   local row = self.resPips
   local rd = ns.Classes[class] and ns.Classes[class].resource
   -- plafond du combat (crochet « resCap » : épique, pouvoir), sinon celui de la classe
@@ -1546,12 +1562,13 @@ function V:RenderPips(class, n)
     return
   end
   cap = min(cap, PIPS_MAX)
-  local fresh = row.class ~= class or row.cap ~= cap or not row:IsShown()
+  -- color : couleur de la pastille propre à la classe (forme du Druid), sinon celle de la ressource
+  local fresh = row.class ~= class or row.cap ~= cap or row.color ~= color or not row:IsShown()
   if fresh then
-    row.class, row.cap = class, cap
+    row.class, row.cap, row.color = class, cap, color
     if row.layoutCap ~= cap then V.layoutPips(row, cap) end
     local ra = Art.classResource(class)
-    local col = ra.color and C[ra.color] or C.watchText
+    local col = color or (ra.color and C[ra.color]) or C.watchText
     for i, p in ipairs(row.list) do
       local used = i <= cap
       p.fill:SetVertexColor(col[1], col[2], col[3], 1)
@@ -1617,7 +1634,7 @@ function V:RenderHand()
       -- « Spend N: » allumée si la ressource suffit et que Maj n'est pas enfoncée, éteinte sinon ;
       -- carte Cast qui partira tout de suite (Instant) : liseré bleu et « Cast · Instant »
       card:SetCard(info.inst.id, info.inst.up, { cost = info.cost, playable = info.playable,
-        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why) or nil,
+        manaShort = info.cost > mana, reason = not info.playable and Controller.reasonText(info.why, info.def) or nil,
         spendOff = info.spendOff, instant = info.instant, keepPick = keepable[i] or nil,
         markRim = mark and mark.rim or nil, markIcon = mark and mark.icon or nil, markTip = mark and mark.tip or nil,
         markKey = mark and mark.key or nil, zoneTag = orig and Card.def(orig).name or nil })
@@ -1967,10 +1984,12 @@ function V:QueueEvent(ev)
     self:Push(0.4, function() W.float(self_.parent, HERO_X, HERO_FEET - 150, label, C.goldText, 18, 2) end)
   elseif (t == "resource" or t == "demence") and ev.n ~= 0 then
     local c = Controller.combat()
-    local cd = c and ns.Classes[c.class]
-    local rid = cd and cd.resource and cd.resource.id or "insanity"
+    -- nom dans la forme active (« +1 Frenzy » en Bear) ; couleur de la pastille propre à la classe
+    local rid = (c and ns.Language.combatResource(c)) or "insanity"
     local ra = Art.classResource(c and c.class or "priest")
-    local col = ra.color and C[ra.color] or C.watchText
+    local cvb = c and ns.ClassViews and ns.ClassViews[c.class]
+    local badge = cvb and cvb.badge and cvb.badge(c)
+    local col = (badge and badge.color) or (ra.color and C[ra.color]) or C.watchText
     local word = ns.Language.resourceName(rid, ev.n)
     self:Push(0.1, function()
       W.float(self_.parent, MANA_X + 44, MANA_Y - 40, (ev.n > 0 and "+" or "") .. ev.n .. " " .. word, col, 15, 1.0, 26)
@@ -2028,7 +2047,7 @@ function V:Select(i)
   local info = Controller.handInfo(i)
   if not info then return end
   self.potionSlot = nil
-  if not info.playable then UI.flash(Controller.reasonText(info.why)) return end
+  if not info.playable then UI.flash(Controller.reasonText(info.why, info.def)) return end
   W.sound("card")
   self.selected = i
   self:RenderHand()
@@ -2045,8 +2064,8 @@ end
 
 function V:Play(i, target)
   local card = self.cards[i]
+  local info = Controller.handInfo(i)
   if card and card.baseX then
-    local info = Controller.handInfo(i)
     self.pendingPlay = { x = card.baseX, y = card.baseY + W.CARD_H / 2 - W.CARD_LIFT, id = card.cardId, up = card.cardUp,
       cost = info and info.cost }
   end
@@ -2056,7 +2075,7 @@ function V:Play(i, target)
   local ok, why = Controller.play(i, target, nospend)
   if not ok then
     self.pendingPlay = nil
-    UI.flash(Controller.reasonText(why))
+    UI.flash(Controller.reasonText(why, info and info.def))
     self:Render()
   end
   return ok
