@@ -1290,7 +1290,7 @@ end)
 test("classes : réserves par niveau de classe (cartes et bibelots), sans effet du palier commun", function()
   local CARDS = { 18, 21, 21, 24, 24, 27, 30 }
   local RELICS = { 1, 1, 2, 2, 3, 3, 5 } -- bibelots de classe tirables (hors bibelot de départ)
-  for _, class in ipairs({ "priest", "warrior", "mage", "rogue", "hunter" }) do
+  for _, class in ipairs({ "priest", "warrior", "mage", "rogue", "hunter", "druid" }) do
     for lv = 1, 7 do
       for _, league in ipairs({ 0, 3 }) do
         local e = newExp({ class = class, unlocks = { level = lv, common = league } })
@@ -1432,10 +1432,10 @@ end)
 -- Cartes neutres (docs/cartes-neutres.md) : marchand et rencontres seulement, palier de Ligue
 ---------------------------------------------------------------------------
 
-local NEUTRAL_CLASSES = { "priest", "warrior", "mage", "rogue", "hunter" }
+local NEUTRAL_CLASSES = { "priest", "warrior", "mage", "rogue", "hunter", "druid" }
 local function isNeutral(id) local d = ns.Cards[id] return d and d.class == nil and d.neutral == true end
 
-test("neutres : jamais en récompense de combat (pool des cinq classes, 40 combats et élites tirés)", function()
+test("neutres : jamais en récompense de combat (pool des six classes, 40 combats et élites tirés)", function()
   for _, cl in ipairs(NEUTRAL_CLASSES) do
     local exp = newExp({ class = cl, unlocks = { rep = 2, common = 3 } })
     for _, id in ipairs(X.cardPool(exp)) do assert(not isNeutral(id), cl .. " : " .. id) end

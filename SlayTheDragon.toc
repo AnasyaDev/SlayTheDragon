@@ -31,6 +31,8 @@ Data\Mage.lua
 Core\Classes\mage.lua
 Data\Hunter.lua
 Core\Classes\hunter.lua
+Data\Druid.lua
+Core\Classes\druid.lua
 Core\ZoneRules.lua
 Data\Neutral.lua
 Data\Zones\Westfall.lua

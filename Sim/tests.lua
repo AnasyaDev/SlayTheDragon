@@ -404,7 +404,7 @@ test("progression : répartition exacte des cartes et bibelots par niveau, pour 
       assert(start and start.class == class and start.level == 1 and start.noPool, class .. " : bibelot de départ")
     end
   end
-  eq(n, 5, "cinq classes jouables")
+  eq(n, 6, "six classes jouables")
 end)
 
 test("récompenses filtrées par niveau de classe", function()
