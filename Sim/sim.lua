@@ -29,6 +29,12 @@
 --   oldstun=1 : ancienne règle de Stunned pendant le tour ennemi (l'action part, le tour suivant est perdu)
 --   hp=N : PV de départ de la classe remplacés (runner=expedition), pour mesurer l'effet des PV.
 --   path=<voie> : récompenses de cartes limitées à une voie de la classe (runner=expedition), voie seule.
+--   tune=Module.CLE=n[,Module.CLE=n] : constante numérique de réglage d'un module (ns.Druid.TAX…) remplacée le
+--     temps de la série, sans toucher au code (Druid.TAX=0 : sans taxe ; Druid.TREE_REGEN=0).
+--   sources=1 : d'où viennent dégâts, soins, Regen et Absorb du joueur, par combat (« Statistiques de zone »,
+--     clés src_dmg:, src_heal:, src_regen:, src_abs:) : carte qui les porte, frappe de l'ours (bear:auto ou
+--     bear:<carte>), coups de fin de tour de Moonkin (pulse), DoT, Thorns, tic de Regen ; dégâts effectifs
+--     (sans l'excédent au-delà des PV de la cible).
 --   epic=<id> : carte épique imposée au deck de départ (runner=expedition ; comme une épique prise : une seule
 --     dans le deck, ses transformations s'appliquent). sweep=cards mesure aussi les épiques de la classe, chacune
 --     imposée ainsi (runner=expedition ; sinon ajoutée de force). epic=none : aucune épique (offres refusées) ;
@@ -315,8 +321,96 @@ end
 ---------------------------------------------------------------------------
 -- Exécution
 ---------------------------------------------------------------------------
+-- tune= : constantes numériques remplacées (Module.CLE=n, séparées par des virgules).
+local function applyTune(ns)
+  for item in (opts.tune or ""):gmatch("[^,]+") do
+    local mod, key, v = item:match("^([%w_]+)%.([%w_]+)=(.+)$")
+    local m = mod and ns[mod]
+    assert(m and type(m[key]) == "number" and tonumber(v), "tune= : réglage inconnu ou non numérique " .. item)
+    m[key] = tonumber(v)
+  end
+end
+
+-- sources=1 : compteurs par source (Combat.zstat) posés par des enveloppes de Combat.dealDamage, Combat.heal,
+-- Combat.applyStatus (Regen du joueur) et Combat.gainBlock ; drapeaux posés le temps d'un appel sur le combat.
+local function installSources(ns)
+  local Combat = ns.Combat
+  local function cardOf(c) return c.cardCtx and c.cardCtx.def and c.cardCtx.def.id end
+  local deal = Combat.dealDamage
+  Combat.dealDamage = function(c, src, dst, amount, pierce, ctx)
+    if dst.side ~= "enemy" or dst.dead or c.result or not c.stats then return deal(c, src, dst, amount, pierce, ctx) end
+    local before = math.max(dst.hp, 0)
+    local label
+    if src and src.side == "enemy" then label = "enemy"
+    elseif c.hitKind == "dot" or src == nil then label = "dot"
+    elseif c.hitKind == "pet" then label = "bear:" .. (cardOf(c) or "auto")
+    elseif c.srcPulse then label = "pulse"
+    elseif c.srcThorns then label = "thorns"
+    else label = cardOf(c) or "other" end
+    local loss, absorbed = deal(c, src, dst, amount, pierce, ctx)
+    Combat.zstat(c, "src_dmg:" .. label, math.min(loss, before))
+    return loss, absorbed
+  end
+  local modify = Combat.modify
+  Combat.modify = function(c, name, v, a, b, d, x)
+    if name == "regenHeal" then c.srcRegen = true end
+    return modify(c, name, v, a, b, d, x)
+  end
+  local heal = Combat.heal
+  Combat.heal = function(c, unit, n)
+    local regen = c.srcRegen
+    c.srcRegen = nil
+    local got = heal(c, unit, n)
+    if unit.side == "player" and c.stats and got > 0 then
+      Combat.zstat(c, "src_heal:" .. (regen and "regen_tick" or cardOf(c) or "other"), got)
+    end
+    return got
+  end
+  local apply = Combat.applyStatus
+  Combat.applyStatus = function(c, unit, id, n, icon)
+    if id == "regen" and unit.side == "player" and c.stats then
+      Combat.zstat(c, "src_regen:" .. (cardOf(c) or (c.srcTreeEnd and "tree_end" or "other")), n)
+    end
+    return apply(c, unit, id, n, icon)
+  end
+  local block = Combat.gainBlock
+  Combat.gainBlock = function(c, unit, n)
+    local b0 = unit.block
+    block(c, unit, n)
+    if unit.side == "player" and c.stats and unit.block > b0 then
+      Combat.zstat(c, "src_abs:" .. (cardOf(c) or "other"), unit.block - b0)
+    end
+  end
+  local D = ns.Druid
+  if D then
+    local pulse, eot = D.moonkinPulse, D.endOfTurn
+    D.moonkinPulse = function(c)
+      c.srcPulse = true
+      local r = pulse(c)
+      c.srcPulse = nil
+      return r
+    end
+    D.endOfTurn = function(c)
+      c.srcTreeEnd = true
+      eot(c)
+      c.srcTreeEnd = nil
+    end
+    local th = ns.Cards.thorns
+    for _, t in ipairs({ th, th.up2 }) do
+      local f = t.hooks.afterHit
+      t.hooks.afterHit = function(c, ...)
+        c.srcThorns = true
+        f(c, ...)
+        c.srcThorns = nil
+      end
+    end
+  end
+end
+
 local function runRange(from, to)
   local ns = dofile(root .. "/Sim/load.lua")(root)
+  applyTune(ns)
+  if opts.sources == "1" then installSources(ns) end
   if opts.oldstun == "1" then ns.Combat.STUN_STOPS_TURN = false end
   if opts.nointerrupt == "1" then
     -- Monde témoin sans interruption ennemie : mesure le poids des interruptions.
@@ -596,6 +690,7 @@ local function report(a, title)
   out(("== %s =="):format(title))
   out(("Expéditions : %d   classe : %s   bot : %s   choix : %s   graine : %d%s"):format(a.runs, opts.class or "priest", opts.bot or "heuristic",
     opts.pick or "rated", seed0, #force > 0 and ("   forcées : " .. table.concat(force, ",")) or ""))
+  if opts.tune then out("Réglages remplacés : " .. opts.tune) end
   if (opts.bot or "heuristic") == "human" then
     local over = { skill = opts.skill }
     for k in pairs(ns.Bots.HUMAN_RANGE) do over[k] = opts[k] end
