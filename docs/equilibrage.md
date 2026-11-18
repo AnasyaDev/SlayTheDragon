@@ -1348,3 +1348,71 @@ Zones : battue / atteinte, en %.
 - Non vérifié : niveaux 2 à 6 (Rebirth au 4 et Healing Touch au 1 changent les pools intermédiaires), autres graines,
   clés 1 à 5, bot heuristic au niveau 1, épiques du Druid imposées ; le malus de doublon des Last Breath dans les
   bots (Rebirth, Cheat Death, Last Stand, Ice Block, Feign Death) reste à traiter à part.
+
+## Druid : voies seules, diagnostic (19/11/2026)
+
+Constat du joueur : au bot `human` (`luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0
+class=druid [path=<voie>]`, niveau 7, ± 4 points), Restoration seule gagne 67,3 %, Feral seule 22,3 %, Balance seule
+15,5 %, le mélange 51,8 % : la classe récompense la voie de soin, pas le changement de forme et l'attaque. Mesures
+faites sans toucher au code livré : `tune=Druid.TAX=0` (et autres constantes), `sources=1` (dégâts, soins, Regen et
+Absorb par source ; `Sim/sim.lua`). 24 séries ; rapports bruts : `reports/dr/` du worktree (non versionnés). Aucun
+chiffre ni règle changés.
+
+**D'où viennent les dégâts de Restoration.** Du deck de départ : Wrath 26,7 %, Ferocious Bite 17,9 %, Maul 13,2 %,
+frappes de l'ours 16,3 % (dont 8,8 commandées par Maul, 7,5 en fin de tour), coups de fin de tour de Moonkin 2,8 % ;
+**Thorns** 15,0 % (11,5 dégâts par combat). Gift of Nature n'apparaît pas à part (bonus des coups de cartes). Ses
+combats durent plus (5,02 tours, référence 3,79), elle encaisse le double (36,8 PV par combat, référence 18,0) et en
+soigne 31,3 (référence 10,4) : **85 % des PV perdus reviennent**, aux deux tiers par les tics de Regen (68 %). La
+Regen posée vient de Tranquility 25 %, Tree of Life en fin de tour 20 %, Mark of the Wild 20 %, Regrowth 18 %,
+Rejuvenation 17 %. Les soins se gardent d'un combat à l'autre : au feu de camp, Restoration choisit l'amélioration
+76 % des fois (5,1 améliorations par expédition), Feral et Balance 30 % (1,4 et 1,3). Cartes les plus prises :
+Rebirth 3,6 par expédition (doublons de Last Breath, écart de bot connu), Tranquility 3,1, Mark of the Wild 2,2.
+
+**Ce qui tue Feral et Balance.** Leurs cartes n'ajoutent presque rien au deck de départ : le deck de départ seul
+(`path=start`, aucune carte prise) gagne 12,8 % (Westfall 45,8 %) ; Feral et Balance ajoutent 11 à 13 % de dégâts
+par tour (17,8 → 19,8 et 20,2) et ne réduisent pas les PV nets d'un combat normal (6,8 → 6,8 et 7,4) ; Restoration
+les divise par deux (3,4). Plusieurs cartes chères restent en main : Mangle jouée 27 à 33 % des fois où elle est
+piochée, Nature's Grace 15 à 27 %, Leader of the Pack 47 à 52 %, Hurricane, Starfire et Starsurge ≈ 50 % ; Mangle et
+Leader of the Pack sont pourtant les plus prises de Feral (1,5 par expédition). Balance n'a aucune carte de défense :
+elle finit 49 % des tours en Moonkin (sans Absorb) et perd 31 PV nets par boss (Restoration 19, Feral 28).
+
+| Série (bot `human`, niveau 7) | Victoires | Westfall | Tours / combat | PV perdus / soignés par combat | PV nets normal / boss | Taxe (mana / tour) | Changements / tour | Fins en Tree |
+|---|---|---|---|---|---|---|---|---|
+| référence | 51,8 % | 71,2 | 3,79 | 18,0 / 10,4 | 4,8 / 23,5 | 0,93 | 2,31 | 12,5 % |
+| Restoration seule | 67,3 % | 81,7 | 5,02 | 36,8 / 31,3 | 3,4 / 19,3 | 0,77 | 1,98 | 27,9 % |
+| Feral seule | 22,3 % | 59,8 | 3,47 | 13,5 / 2,9 | 6,8 / 28,2 | 0,91 | 2,25 | 1,9 % |
+| Balance seule | 15,5 % | 58,0 | 3,29 | 14,1 / 2,9 | 7,4 / 31,0 | 0,69 | 1,85 | 2,4 % |
+| deck de départ seul (`path=start`) | 12,8 % | 45,8 | 3,69 | 16,6 / 5,2 | 6,8 / 31,5 | 0,83 | 2,14 | 5,1 % |
+| **sans taxe** (`Druid.TAX=0`) : référence | 87,2 % | 97,5 | 3,36 | 13,1 / 7,9 | 3,2 / 16,5 | 0 | 3,13 | 10,1 % |
+| sans taxe : Restoration | 94,0 % | 98,2 | 4,55 | 28,2 / 24,7 | 2,0 / 12,5 | 0 | 2,64 | 25,7 % |
+| sans taxe : Feral | 71,3 % | 95,8 | 3,08 | 10,0 / 2,5 | 4,5 / 20,7 | 0 | 3,07 | 1,7 % |
+| sans taxe : Balance | 41,3 % | 92,7 | 3,09 | 12,2 / 2,9 | 5,8 / 27,6 | 0 | 2,35 | 2,2 % |
+| Restoration, Tree sans Regen (`TREE_REGEN=0`) | 41,0 % | 59,3 | 4,91 | 34,5 / 27,2 | 4,2 / 24,2 | 0,78 | 2,01 | 23,2 % |
+
+- **Hypothèse (b), la taxe, tient** : elle coûte au bot `human` 0,7 à 0,9 mana par tour (près d'un tiers de ses 3
+  mana) et 35 points à la référence (heuristic : 4 points, section « Druid : premier réglage »). Feral la paie le
+  plus cher (+49 points sans elle : le va-et-vient Cat / Bear de chaque tour), Restoration et Balance +26 à +27. Le
+  deck de départ à trois formes (Wrath en Moonkin, Thick Hide et Maul en Bear, Ferocious Bite en Cat) la fait payer
+  à toutes les voies.
+- **Hypothèse (a), le soin, tient aussi** : sans taxe, Restoration seule reste devant Feral de 23 points (94,0
+  contre 71,3) ; la Regen 2 de fin de tour en Tree of Life vaut à elle seule 26 points à Restoration (67,3 → 41,0),
+  par empilement (une Regen N soigne N(N+1)/2 : Regen 2 posée sur Regen 4 rend 11 PV de plus, pas 3).
+- **Troisième cause : les cartes offensives pèsent peu** face au deck de départ (ci-dessus), et Balance n'a pas de
+  défense : même sans taxe, elle reste à 41,3 %.
+
+**Pistes chiffrées, aucune appliquée** (bot `human`, niveau 7 sauf mention) :
+
+| Piste | Référence | Restoration | Feral | Balance | Niveau 1 (compte neuf) |
+|---|---|---|---|---|---|
+| actuel | 51,8 % | 67,3 % | 22,3 % | 15,5 % | 36,2 % (18/11) |
+| A : `TAX_MAX` 2 → 1, `TREE_REGEN` 2 → 0 (chiffres seuls) | 57,8 % | 62,7 % | 40,0 % | ≈ 23 % (C1) | **49,0 %** |
+| C1 : `TAX_MAX` 2 → 1, `TREE_REGEN` 2 → 1 | 62,5 % | 69,7 % | 40,5 % | 23,2 % | – |
+| B : sans taxe, `TREE_REGEN` 0, 55 PV (`hp=55`) | 70,7 % | 80,0 % | 48,5 % | 22,0 % | – |
+
+- **Aucun jeu de chiffres essayé ne remet les voies dans l'ordre voulu** : Restoration seule reste devant le
+  mélange et 20 à 30 points devant Feral, Balance reste dernière. La piste A, la seule faite de chiffres sans
+  toucher aux décisions du joueur, resserre l'écart (Feral 22 → 40, mélange 52 → 58, Restoration 67 → 63) mais fait
+  sortir le compte neuf de sa fourchette (49,0 % pour 32 à 42). Le reste demande des règles : options décrites
+  dans `docs/classes/druid.md`, § 11, question 4.
+- Non vérifié : bot heuristic, autres graines, clés 1 à 5, épiques du Druid ; Balance n'a été mesurée qu'en
+  chiffres de socle (aucune carte retouchée).

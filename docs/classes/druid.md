@@ -899,3 +899,20 @@ formes), noms de Maul et Rake (gardés), ligne « Druid » de `docs/classes/deci
    forme de passage ?
 3. **Furor** (épique de Westfall, § 5) était notée « incompatible avec le levier A », désormais actif : la garder
    (elle rend de la réserve à chaque changement, la taxe retire du mana) ou la revoir ?
+4. **Voies seules à l'envers** (19/11/2026, `docs/equilibrage.md`, « Druid : voies seules, diagnostic ») : au bot
+   `human`, Restoration seule 67,3 %, mélange 51,8, Feral seule 22,3, Balance seule 15,5 %. Trois causes mesurées :
+   la taxe (≈ 0,9 mana perdu par tour ; sans elle : référence 87,2, Feral 71,3 %), le soin qui se garde entre les
+   combats (Restoration rend 85 % des PV qu'elle perd ; la Regen 2 de Tree of Life lui vaut 26 points), et des
+   cartes offensives qui ajoutent peu au deck de départ (Balance sans défense). Aucun jeu de chiffres essayé ne
+   suffit (piste A : `TAX_MAX` 1 et Regen de Tree 0 : Feral 40, Restoration 63, mélange 58, mais compte neuf 49 %).
+   Options de règle, à combiner, à trancher avant toute mesure de réglage :
+   - **taxe** : ne pas compter un changement entre Cat et Bear (deux formes de Feral), ou taxe dès le troisième
+     changement (`TAX_FREE` 2, à la place de la décision « plus d'une fois »), ou `TAX_MAX` 1 ;
+   - **Tree of Life** : passer au repli prévu (Absorb 2 à 3 pour le tour ennemi au lieu de Regen 2, § 1.3), qui
+     protège sans soigner entre les combats ;
+   - **deck de départ sur deux formes** (levier (3) du 18/11, jamais essayé) : chaque voie y paie aujourd'hui la
+     taxe pour les trois formes du départ ;
+   - **cartes offensives** : relever Feral et Balance (Mangle, Leader of the Pack, Nature's Grace, Cast à 2 mana
+     souvent gardés en main) et donner une défense à Balance ;
+   - la taxe allégée monte toutes les voies (sans taxe : référence 87 %) : il faudra reprendre la difficulté ailleurs
+     (PV : 55 PV sans taxe ni Regen de Tree donnent encore 70,7 %).
