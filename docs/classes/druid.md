@@ -3,8 +3,10 @@
 Fiche de conception, réécrite le 18/11/2026 d'après la conception décidée avec le joueur. Elle remplace la
 version du 12/11/2026 (formes à effet permanent, cartes `Shift` dédiées, lignes `Bear:` / `Cat:` / `Moonkin:`
 sur les cartes, Idol of the Wild à +1 mana par Shift) : de cette version restent les trois voies, l'Interrupt
-(Skull Bash), le Last Breath (Rebirth), une partie des bibelots et des noms de cartes. Rien n'est codé (le
-Druid est un ajout futur, `docs/classes/decisions.md`, « Périmètre »).
+(Skull Bash), le Last Breath (Rebirth), une partie des bibelots et des noms de cartes. Codé le 18/11/2026
+(règles, 34 cartes, 6 bibelots, progression : `Core/Classes/druid.lua`, `Data/Druid.lua`, tests
+`Sim/tests_druid.lua`) ; restent les sept épiques (§ 5), l'interface (`UI/Art/druid.lua`, pastille par forme) et
+le réglage des bots et des chiffres (§ 8, « Ce qui reste »).
 
 Corrigée le même jour après relecture du joueur : chaque forme a un effet de fin de tour ; la forme Caster
 devient **Tree of Life** (quatrième forme, portée par les cartes de soin) ; le combat commence **sans forme** ;
@@ -172,7 +174,8 @@ sont des **points de départ à régler par la simulation** (§ 10).
    La plaque `Cast` se lit sur la carte : sous Instant (Nature's Swiftness), Starfire reste exclue, et le coût
    affiché en main ne change pas selon l'état Instant.
 5. **Affichage** : icône de l'état sur le portrait du héros, à côté des autres états (`Spell_Shadow_ManaBurn`,
-   l'icône de Clearcasting dans WoW) ; infobulle `The next Attack played costs 0 (not Cast cards).` ; journal
+   l'icône de Clearcasting dans WoW) ; infobulle `Next Attack played costs 0, except Cast cards.` (sans
+   parenthèse : règle des explications, harnais U25) ; journal
    `{ t = "clearcasting" }` à la pose et `{ t = "clearcasting_used", card }` à la consommation (léger éclat de
    l'icône, comme Stealth).
 
@@ -313,7 +316,7 @@ ils sont Tree, et les jouer fait quitter Bear (comme dans WoW, où l'on soigne h
 | *(ressource)* Frenzy, en Bear | `End-of-turn strike 1 + Frenzy. −1 each round in Bear.` |
 | *(ressource)* Charges, en Moonkin | `+1 to Attack hits per Charge. End of turn: 1 to all per 2.` |
 | *(ressource)* Reserve, sans forme et en Tree of Life | `Kept between forms. Unused outside Cat, Bear, Moonkin.` |
-| *(état)* Clearcasting | `The next Attack played costs 0 (not Cast cards).` |
+| *(état)* Clearcasting | `Next Attack played costs 0, except Cast cards.` |
 
 Conditions et déclencheurs employés : `Surge:`, `Spend N:`, `Regen:` (état sur soi), `Last Breath:`, `When hit:`,
 `Cast cards:` (existants) ; nouveaux : `Cat Attacks:`, `End of turn in Moonkin:` (Powers), et pour les épiques
@@ -459,7 +462,7 @@ pas. Chaque colonne ne dit que ce que le palier ajoute.
 | Rip | DoT 4 par Combo | Retain | DoT 5 par Combo |
 | Frenzied Regeneration | 8 / 8 | 10 / 8 | Spend 1 |
 | Tiger's Fury | Cooldown 1 | Retain | +2 Combo |
-| Mangle | coût 1 | `+2 Frenzy.` après les frappes | Retain |
+| Mangle | coût 1 | `+2 Frenzy.` après les frappes (jouable à 0 : `minRes = 0`) | Retain |
 | Demoralizing Roar | Cooldown 3 | +2 Frenzy | `Gain 4 Absorb.` |
 | Leader of the Pack | coût 0 | Innate | `Cat Attacks: +1 Combo, deal 2 more.` |
 | Starfire | Deal 26 | Deal 30 | Deal 34 |
@@ -653,44 +656,61 @@ moteurs (Leader of the Pack, Moonkin Aura) et Tranquility.
 | Cible de la frappe affichée, dégâts de fin de tour de Moonkin sur chaque ennemi | `ns.ClassViews.druid` avec `enemyMarks = true` (comme le Hunter) |
 | Animation du changement | `ns.ClassViews.druid.event` sur `{ t = "shift" }` |
 
-### Ce qui manque dans le socle
+### Ajouté au socle et codé (18/11/2026)
 
-1. **Champ `form` et mots de plaque de forme.** `Core/Language.lua` déclare encore l'ancienne conception : conditions
-   `shift`, `caster`, `bear`, `cat`, `moonkin` et plaque `shift`. À remplacer par quatre plaques de tête (`Cat`,
-   `Bear`, `Moonkin`, `Tree`) lues sur `d.form` (`"tree"` pour `Tree`), un seul mot-clé dans le glossaire ;
-   `L.plateWord` ne sait aujourd'hui que lire un champ vrai (`d[p.flag]`) : il faut une plaque qui compare une
-   valeur (`d.form == "bear"`). Le harnais U27 et `W.cardBody` retirent alors le mot du corps comme `Cast`.
-2. **Nom de la ressource selon la forme.** `L.resourceName(id, n)` et l'explication « %s » (`Surge`, `Spend`)
-   lisent un nom fixe par classe. Il faut un nom par forme (Combo, Frenzy, Charge/Charges) : registre
-   `L.resource("wild", { forms = { cat = "combo", bear = "frenzy", moonkin = "arcane" } })` ou crochet de classe,
-   avec « Reserve » comme nom hors de ces trois formes (sans forme, Tree of Life). Le harnais U27 refuse
-   aujourd'hui toute ressource d'une autre classe (« ressource d'une autre classe ») et exige la clause « +N
-   <ressource de la classe>. » pour chaque effet `res` : pour le Druid, le mot permis est celui de la forme de la
-   carte, ou de la forme nommée par le déclencheur d'un Power.
-3. **Pastille par forme.** La pastille générique (`UI/CombatView.lua`) montre l'icône fixe de la ressource
-   (`Art.classes[id].resource`) : il faut que l'icône, la couleur et l'infobulle suivent `c.cls.form`, y compris
-   l'état sans forme (`nil` : icône de la classe, anneau gris).
-4. **Frappe de l'ours.** `ns.Hunter.petAttack` fait déjà le bon coup (sans carte, dernière cible, +1, Surge sans
-   gain), mais il lit `Hunter.PET_BASE` (couplage d'équilibrage), les crochets `petAbsent` / `petAll` des épiques du
-   Hunter, et journalise `pet_attack` (animé par la vue du Hunter). À faire : soit une fonction commune
-   `Combat.companionStrike(c, why, base, n)` dont le Hunter et le Druid se servent, soit une copie
-   `Druid.strike` (base `Druid.STRIKE_BASE = 1`, journal `bear_strike`, événement `onBearStrike`) ; effet de carte
-   `{ "strike", n, surge = bool }` (« Bear strikes. », « Surge: Bear strikes once per Frenzy. ») et mot du langage
-   `Bear strikes` (`L.keyword`, comme `pet`). La même fonction sert aux coups à tous de fin de tour de Moonkin
-   (option « tous les ennemis », base `ceil(Charges / 2)` plafonnée à 3, sans gain ; journal `moonkin_hits`) :
-   la frappe commune doit donc accepter une base sans Frenzy et une cible « tous ».
-5. **Marque de forme en main** (icône allumée si la carte changerait la forme) : lecture de `c.cls.form` par le
-   rendu des cartes en main (`UI/Widgets.lua`), nouveau.
-6. **Clé des bots** : `botKey` doit contenir `c.cls.form` (`nil` compris) et l'état Clearcasting (deux positions
-   de même main et même réserve mais de formes différentes ne se valent pas : l'effet de fin de tour, la baisse,
-   le bonus de Moonkin et le coût de la prochaine Attack en dépendent).
-7. **Épique Heart of the Wild** : trois réserves dans `c.cls` ; la pastille et `Combat.gainRes` / `surge` /
-   `spendRes` doivent lire la réserve de la forme active (crochet sur la ressource, nouveau).
+Ce qui manquait au socle existe maintenant ; la classe est codée dessus.
 
-Rien à ajouter au socle pour les effets de fin de tour de Cat et de Tree of Life (vérifié dans le code le
-18/11/2026) : la Regen est un état commun, et Clearcasting s'écrit avec l'état à drapeau et les crochets de classe
-`cost` et `onCardCommitted` que le Rogue et le Warrior emploient déjà ; la classe déclare l'état dans son propre
-fichier, comme le Rogue déclare Stealth.
+1. **Langage** (`Core/Language.lua`, `docs/classes.md`, « Ressource à noms multiples » et « Plaque lue sur une
+   valeur ») : champ de carte `form`, plaque de forme lue sur `d.form` (mots `Cat`, `Bear`, `Moonkin`, `Tree`, un
+   seul mot-clé, en tête de la plaque, jamais dans `text`) ; ressource `wild` à noms par forme (Reserve, Combo,
+   Frenzy, Charge(s)) : `L.cardResource(d)`, `L.combatResource(c)` (lit `c.cls.form`), `L.cardResourceKeys(d)`
+   pour un Power dont le déclencheur nomme une forme ; mot « Bear strikes » ; harnais U27. Déclencheurs déclarés
+   par la classe (`Core/Classes/druid.lua`) : `Cat Attacks`, `End of turn in Moonkin`. Montant `regen`
+   (`per = { k, "regen" }` : Swiftmend).
+2. **Coup sans carte commun** : `Combat.strike(c, why, base, target, log, event, opts)` (`Core/Companion.lua`,
+   `docs/classes.md`, « Coup sans carte »), partagé avec le familier du Hunter. Le Druid s'en sert pour :
+   - la frappe de l'ours, `ns.Druid.bearStrike(c, why, counted)` : base `Druid.STRIKE_BASE` (1) passée par le
+     crochet de classe **`bearStrike`** (valeur, nouveau : Idol of Brutality +2), + réserve, puis +1 (Surge :
+     au montant compté, sans gain) ; journal `{ t = "bear_strike", dst, dmg, why }`, événement `onBearStrike` ;
+     effet de carte `{ "bearStrike", n, surge = bool, per = … }` ;
+   - les coups à tous de fin de tour en Moonkin, `ns.Druid.moonkinPulse(c)` : `min(PULSE_MAX, ceil(res / 2))`,
+     journal `{ t = "moonkin_pulse", dst, dmg, why, all = true }` (un par ennemi), événement `onMoonkinPulse`.
+   Aucun des deux ne reçoit le bonus des Charges : le crochet `damage` de la classe ne l'ajoute que si
+   `cardDef` est une carte Attack (`d = nil` pour un coup sans carte).
+3. **Genre des coups et règle du Swamp** (dormeurs, `Core/ZoneRules/swamp.lua`) : la frappe de l'ours a le genre
+   `"pet"` (coup sans carte à une cible, comme le familier : Rude Awakening s'applique) et sa cible passe par le
+   crochet de zone `petTarget`, comme `Hunter.petTarget` enveloppé par `Core/ZoneRules.lua` : la frappe de fin
+   de tour évite un dormeur tant qu'un ennemi est éveillé (et attend si tous dorment), la frappe commandée par
+   une carte pendant le jeu frappe la dernière cible, dormeur compris. Les coups de Moonkin ont le genre
+   `"other"` à tous (réveil doux).
+4. **Classe** (`Core/Classes/druid.lua`, `ns.ClassRules.druid`, `ns.Druid`) : `init` (`c.cls.form = nil`,
+   `shifts`, `tax`) ; `onCardCommitted` (Clearcasting consommé par une Attack hors Cast, puis changement de forme :
+   `ns.Druid.shift`, journal `{ t = "shift", from, to }`, événement `onShift(from, to)`, `c.cls.shifts`) ;
+   `cost` (Clearcasting) ; `damage` (Moonkin) ; `onTurnEnd` (`ns.Druid.endOfTurn` : Bear, Cat, Moonkin, Tree) ;
+   `onRoundEnd` (−1 en Bear) ; `maxMana` et `c.cls.tax` (levier A, `Druid.TAX = 0` : inactif, testé actif) ;
+   état `clearcasting` (drapeau, journal `{ t = "clearcasting" }` à la pose, `{ t = "clearcasting_used", card }`
+   à la consommation) ; aides `Druid.wouldShift(c, d)` (marque en main, Idol of the Wild),
+   `Druid.strikeTarget`, `Druid.strikeDamage`, `Druid.pulseBase`, `Druid.pendingTax` (affichage, bots) ;
+   `botKey` (forme, Clearcasting, dernière cible, bibelots servis) et `botValue` (Clearcasting = 22, bonus des
+   Charges d'un Cast Attack en attente en Moonkin, baisse à venir en Bear, mana du levier A).
+5. **Mesure** : compteurs de simulation `druid_end_<forme>` (forme de fin de chaque tour, `none` compris),
+   `druid_shifts`, `druid_bear_strikes`, `druid_pulses`, `druid_clearcasting_used` (`Combat.zstat`, tableau
+   « Statistiques de zone » du rapport) ; ligne « Druid, forme de fin de tour » (part de chaque forme,
+   changements par tour) dans `Sim/sim.lua`.
+
+Écarts à la fiche tranchés au codage : infobulle de Clearcasting sans parenthèse (U25) ; Mangle +2 (« +2 Frenzy. »
+après les frappes) jouable à 0 (`minRes = 0` : la carte n'est plus faite que de Surge) ; journal des coups de
+Moonkin `moonkin_pulse` (et non `moonkin_hits`).
+
+### Ce qui reste
+
+1. **Interface** (autre lot) : `UI/Art/druid.lua` (icônes, voies, `ns.ClassViews.druid`), pastille par forme
+   (`UI/CombatView.lua`, `L.combatResource`), marque de forme en main (`UI/Widgets.lua`, `ns.Druid.wouldShift`),
+   icône et texte court de Clearcasting, animations `shift`, `bear_strike`, `moonkin_pulse`, `clearcasting`.
+2. **Épiques** (§ 5) : Heart of the Wild demande trois réserves dans `c.cls` ; la pastille et `Combat.gainRes` /
+   `surge` / `spendRes` doivent lire la réserve de la forme active (crochet sur la ressource, nouveau).
+3. **Bots et chiffres** : notes des cartes (`bot.rating`) posées à la main, à remplacer par un balayage ; valeurs des
+   Powers du Druid dans `Bots.POWER_VALUE` (estimations) ; réglage des effets de fin de tour et des cartes (§ 10).
 
 ## 9. Conseils pour les bots de simulation
 

@@ -95,7 +95,7 @@ Options lues sur tous les effets :
 
 Conditions (`Combat.CONDITIONS[nom](c, ctx, cible)`) : `execute`, `spent`, `surged`, `status:<id>` (la cible
 porte l'affaiblissement, ou le joueur le bienfait), `school:<x>`. Montants (`Combat.AMOUNTS`) : `surge`,
-`res`, `block`. Une classe enregistre les siens (`Combat.CONDITIONS.frozen = function(c, ctx, t) … end`).
+`res`, `block`, `regen` (Regen du héros, déclaré par le Druid : Swiftmend). Une classe enregistre les siens (`Combat.CONDITIONS.frozen = function(c, ctx, t) … end`).
 
 Fonctions utiles : `Combat.gainRes(c, n, why)` (bornée, événement `resource`), `Combat.spendRes`,
 `Combat.surge`, `Combat.loseHp(c, n, why)`, `Combat.lastBreath(c, clé)` (vrai une fois par combat),
@@ -146,6 +146,7 @@ Valeurs modifiées (`Combat.modify`, le crochet renvoie la nouvelle valeur) :
 | `stealthBreak` | inst, d | Rogue : vrai par défaut ; faux = la première Attack profite de Stealth (lignes « Stealth: ») sans le retirer (Subterfuge ; la carte dit quand il tombe) |
 | `petAbsent` | — | Hunter : faux par défaut ; vrai = plus d'attaque du familier (automatique, effet `pet`), pas de Frenzy gagné ; `Hunter.petPresent(c)` |
 | `petAll` | — | Hunter : faux par défaut ; vrai = chaque attaque du familier frappe tous les ennemis vivants (+1 Frenzy une fois) ; `Hunter.petAll(c)` |
+| `bearStrike` | — | Druid : base de la frappe de l'ours (`ns.Druid.STRIKE_BASE`, 1), avant la réserve ou le montant d'un Surge (Idol of Brutality : +2) ; `Druid.strikeBase(c)` |
 | `blockKeep` | Absorb actuelle | (rappel) la valeur gardée ; fraction et plafond se calculent sur le 2e argument (`max(v, min(15, floor(block / 2)))`) |
 | `retainPicks` | — | cartes gardées au choix en fin de tour (0 ; Traveler's Backpack : 1, une seule gérée) ; le choix est posé par `Combat.markRetain(c, uid)` avant la fin du tour (interface, `Bots.markRetain`), `Combat.retainCandidates(c)` = index proposés |
 | `surge` | ctx | montant compté par les effets d'un Surge qui a dépensé quelque chose (Anathema : +2) ; la dépense ne change pas |
@@ -185,6 +186,8 @@ Notifications (`Combat.fire`, un crochet qui renvoie true arrête la chaîne) :
 | `onRegenTick` | n | tic de Regen du joueur (valeur avant la baisse), après le soin éventuel (`regenHeal`) : Echo of Light |
 | `onEnemyDeath` | ennemi | mort d'un ennemi (Soul Shards) |
 | `onPowerEnd` | inst, raison | Power remplacé (`replaced`) ou expiré (`expired`) |
+| `onShift` | forme d'avant (nil au premier), forme nouvelle | Druid : changement de forme au jeu d'une carte, après les coûts, avant la résolution (Idol of the Wild, Wolfshead Helm) |
+| `onBearStrike` / `onMoonkinPulse` | première cible, dégâts, raison | Druid : frappe de l'ours / coups à tous de fin de tour en Moonkin (`Combat.strike`) |
 | `preventDeath` | — | le joueur tombe à 0 : true = sauvé (Last Breath) ; l'événement `saved` porte la source |
 | `onVictory`, `onPotion`, `onFlee`, `preventInterrupt` | | inchangés |
 
@@ -262,7 +265,8 @@ Power, Maelstrom, et la réserve du Druid `wild` : Reserve, Combo, Frenzy, Charg
 conditions Execute, Surge, Spend N, Last Breath, Shadow, Frozen, Demon, Judgement, les mots « Pay N HP » et
 « Bear strikes », les mots de plaque Epic, Power, Trap, Seal, Demon, Totem N, forme (Cat, Bear, Moonkin,
 Tree), Cast, Cooldown N, Exhaust, Retain, Innate, et les déclencheurs de Power (« When hit », « HP lost »,
-« Attacks », « Start of turn », « End of turn », « Each Absorb gain », « Cast cards », « Bear strikes »).
+« Attacks », « Start of turn », « End of turn », « Each Absorb gain », « Cast cards », « Bear strikes » ; le
+Druid ajoute « Cat Attacks » et « End of turn in Moonkin »).
 Les conditions Shift, Caster, Bear, Cat, Moonkin et la plaque Shift (ancienne conception du Druid) sont
 retirées (18/11/2026). Une classe en ajoute depuis ses fichiers :
 
@@ -530,7 +534,7 @@ ns.ClassRules.rogue = { hooks = {
 | Stunned pendant le tour ennemi (Trap, riposte) | commun : `Combat.applyStatus` pose `e.stopTurn` si l'ennemi est celui qui agit (`c.acting`) ; `executeMove` arrête le tour avant le coup suivant (aucun coup de l'attaque qui a déclenché l'effet), consomme une charge, journal `{ t = "stunned", stopped = true }` ; « act » n'est journalisé qu'à la première action qui part (`decisions.md`) |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
 | Maelstrom à 5 : Cast instantané | `onResource` + `instantCast` |
-| Formes portées par les cartes, réserve lue selon la forme (Druid, fiche `docs/classes/druid.md`, 18/11/2026) | champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) ; état de classe `c.cls.form` (`nil` au début du combat : sans forme) ; changement au jeu dans le crochet de classe `onCardCommitted` (après les coûts, avant incantation ou résolution), événement propre `onShift(from, to)` ; réserve = ressource commune (`cap = 5`, `keep = true`), Surge, Spend, `minRes` inchangés ; Moonkin : crochet `damage` (comme le Mage) ; effet de fin de tour de la forme active dans `onTurnEnd` : Bear, frappe (comme le familier) et −1 dans `onRoundEnd` ; Cat, état à drapeau Clearcasting (comme Stealth, consommé dans `onCardCommitted`) et crochet de classe `cost` à 0 pour une Attack sans `cast` (comme Slice and Dice) ; Moonkin, coups sans carte à tous (`ceil(res / 2)`, 3 au plus) ; Tree of Life, `Combat.applyStatus(c, c.player, "regen", 1)` ; langage en place (18/11/2026) : plaque de forme lue sur `d.form`, ressource `wild` à noms par forme (`L.cardResource`, `L.combatResource`, « Ressource à noms multiples » ci-dessus), mot « Bear strikes », harnais U27 ; ancienne conception (conditions `shift`, `caster`, `bear`, `cat`, `moonkin`, plaque `shift`) retirée ; à ajouter au socle : pastille par forme, frappe commune au familier (une cible ou tous les ennemis) |
+| Formes portées par les cartes, réserve lue selon la forme (Druid, fiche `docs/classes/druid.md`, 18/11/2026) | champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) ; état de classe `c.cls.form` (`nil` au début du combat : sans forme) ; changement au jeu dans le crochet de classe `onCardCommitted` (après les coûts, avant incantation ou résolution), événement propre `onShift(from, to)` ; réserve = ressource commune (`cap = 5`, `keep = true`), Surge, Spend, `minRes` inchangés ; Moonkin : crochet `damage` (comme le Mage) ; effet de fin de tour de la forme active dans `onTurnEnd` : Bear, frappe (comme le familier) et −1 dans `onRoundEnd` ; Cat, état à drapeau Clearcasting (comme Stealth, consommé dans `onCardCommitted`) et crochet de classe `cost` à 0 pour une Attack sans `cast` (comme Slice and Dice) ; Moonkin, coups sans carte à tous (`ceil(res / 2)`, 3 au plus) ; Tree of Life, `Combat.applyStatus(c, c.player, "regen", 1)` ; langage en place (18/11/2026) : plaque de forme lue sur `d.form`, ressource `wild` à noms par forme (`L.cardResource`, `L.combatResource`, « Ressource à noms multiples » ci-dessus), mot « Bear strikes », harnais U27 ; ancienne conception (conditions `shift`, `caster`, `bear`, `cat`, `moonkin`, plaque `shift`) retirée ; frappe de l'ours et coups de Moonkin par `Combat.strike` (genre `"pet"` et crochet de zone `petTarget` pour la frappe, `"other"` à tous pour Moonkin), crochet `bearStrike` ; codé le 18/11/2026 (`Core/Classes/druid.lua`, `Data/Druid.lua`, `Sim/tests_druid.lua`, fiche § 8) ; reste à l'interface : pastille par forme, marque de forme en main |
 | DoT selon la source | `apply … icon = "poison"` → `unit.stIcon`, `Art.statusIcons.poison` |
 
 ## Cartes épiques : points d'accroche (13/11/2026)

@@ -5,7 +5,9 @@ quand une fiche dit autre chose. Les trois premières viennent du joueur, les au
 
 ## Périmètre (décision du joueur, 12/11/2026)
 Cinq classes à produire maintenant : **Priest, Mage, Warrior, Rogue, Hunter**. Paladin, Warlock, Shaman et
-Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est codé pour elles.
+Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est codé pour elles. Le Druid est
+ajouté le 18/11/2026 (règles, cartes et bibelots codés ; épiques et interface en cours : fiche
+`docs/classes/druid.md`, § 8).
 
 ## Tranché par le joueur
 - **Spend N est au choix.** Un clic gauche joue la carte en dépensant si les points sont là ; un clic droit
