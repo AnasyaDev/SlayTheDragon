@@ -189,6 +189,67 @@ function Art.druidLines(c)
   return now, eot, cast
 end
 
+-- Note de l'épique sur son jeton des états du héros (W.noteToken, comme les autres classes) : ce qu'elle fait
+-- maintenant (ligne de l'infobulle, nil : rien à dire), compteur écrit sur l'icône (nil : aucun), vrai si la
+-- règle est inactive (icône atténuée). Nombres de ns.DruidEpic au palier de l'épique. Lu aussi par le harnais.
+function Art.druidEpicLine(c)
+  local D = ns.Druid
+  local id, up
+  if D and D.epic then id, up = D.epic(c) end
+  local E = ns.DruidEpic
+  if not id or not E or c.result then return nil end
+  local k = ns.Card.level(up) + 1
+  local res = c.player.res or 0
+  local form = c.cls and c.cls.form
+  if id == "furor" then
+    local used = (c.cls.furorRound == c.round) and (c.cls.furor or 0) or 0
+    local left = math.max(0, E.primal[k] - used)
+    if left > 0 then return "Form changes this turn: +1 reserve, " .. num(left) .. " left", tostring(left) end
+    return "No more reserve from form changes this turn", nil, true
+  elseif id == "mark_of_ursol" then
+    local _, dmg = Art.druidStrike(c)
+    local n = math.floor((dmg or 0) * E.ironfur[k] / 100)
+    if form == "bear" and n > 0 then return "End of turn: the Bear strike gives " .. num(n) .. " Absorb", "+" .. n end
+    return "Bear strikes give " .. num(E.ironfur[k] .. "%") .. " of their damage as Absorb"
+  elseif id == "eclipse" then
+    local need = E.lunar[k]
+    if res >= need then
+      return "Moonkin Cast cards resolve at once" .. (E.solar[k] > 0 and (", " .. num("+" .. E.solar[k]) .. " damage") or "")
+    end
+    return "Moonkin Cast cards resolve at once from " .. num(need) .. " reserve", res .. "/" .. need, true
+  elseif id == "king_of_the_jungle" then
+    local line = "Each Surge leaves up to " .. num(E.predator[k]) .. " in the reserve"
+    if E.apex[k] > 0 then
+      if c.cls.apexRound == c.round then
+        line = line .. ", draw already used this turn"
+      else
+        line = line .. ", the first one this turn draws " .. num(E.apex[k])
+      end
+    end
+    return line
+  elseif id == "lifebloom" then
+    if (c.player.st.regen or 0) > 0 then
+      return "Next Regen heal: " .. num("+" .. E.bloom[k]) .. " reserve", "+" .. E.bloom[k]
+    end
+    return "No Regen: no reserve gained", nil, true
+  elseif id == "owlkin_frenzy" then
+    if form == "moonkin" then
+      return "Each enemy attack that costs HP: " .. num("+" .. E.moonfury[k]) .. " reserve"
+        .. (E.barkskin[k] > 0 and (", end of turn " .. num(E.barkskin[k]) .. " Absorb") or ""), "+" .. E.moonfury[k]
+    end
+    return "Not in Moonkin: hits give nothing", nil, true
+  elseif id == "heart_of_the_wild" then
+    local L = ns.Language
+    local parts = {}
+    for _, f in ipairs({ "cat", "bear", "moonkin" }) do
+      local v = D.pool(c, f)
+      parts[#parts + 1] = num(v) .. " " .. L.resourceName(L.resourceKey("wild", f), v)
+    end
+    return table.concat(parts, ", ") .. ", up to " .. num(E.kinship[k]) .. " each"
+  end
+  return nil
+end
+
 ---------------------------------------------------------------------------
 -- Vue de classe (ns.ClassViews.druid, docs/classes.md, « Interface ») : pastille de la forme active
 -- (badge / badgeTooltip, lus par UI/CombatView.lua), marques sur les ennemis (cible de la frappe en Bear,
@@ -224,6 +285,7 @@ end
 -- Jeton Clearcasting (état à drapeau, sans nombre) : aura jaune de Cat tant qu'il attend son Attack.
 local CC_GLOW
 function V.tokens(c, list)
+  ns.Widgets.noteToken(list, "epic", Art.druidEpicLine(c)) -- épique en jeu : ce qu'elle fait maintenant
   if (c.player.st.clearcasting or 0) == 0 then return end
   CC_GLOW = CC_GLOW or { Art.druidForms.cat.color[1], Art.druidForms.cat.color[2], Art.druidForms.cat.color[3], 0.8 }
   for i = 1, #list do

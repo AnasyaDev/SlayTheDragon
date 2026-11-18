@@ -97,6 +97,9 @@ Conditions (`Combat.CONDITIONS[nom](c, ctx, cible)`) : `execute`, `spent`, `surg
 porte l'affaiblissement, ou le joueur le bienfait), `school:<x>`. Montants (`Combat.AMOUNTS`) : `surge`,
 `res`, `block`, `regen` (Regen du héros, déclaré par le Druid : Swiftmend). Une classe enregistre les siens (`Combat.CONDITIONS.frozen = function(c, ctx, t) … end`).
 
+Ressource lue par une carte (`minRes`, Spend) : `Combat.cardRes(c, d, commit)` = `c.player.res`, sauf si la
+règle de classe déclare `cardRes(c, d, commit)` (Druid, Heart of the Wild : une réserve par forme ; « Épiques du
+Druid » ci-dessous).
 Fonctions utiles : `Combat.gainRes(c, n, why)` (bornée, événement `resource`), `Combat.spendRes`,
 `Combat.surge`, `Combat.loseHp(c, n, why)`, `Combat.lastBreath(c, clé)` (vrai une fois par combat),
 `Combat.removePower`, `Combat.castCount`, `Combat.castSlots`, `Combat.payHpOf`.
@@ -266,7 +269,7 @@ conditions Execute, Surge, Spend N, Last Breath, Shadow, Frozen, Demon, Judgemen
 « Bear strikes », les mots de plaque Epic, Power, Trap, Seal, Demon, Totem N, forme (Cat, Bear, Moonkin,
 Tree), Cast, Cooldown N, Exhaust, Retain, Innate, et les déclencheurs de Power (« When hit », « HP lost »,
 « Attacks », « Start of turn », « End of turn », « Each Absorb gain », « Cast cards », « Bear strikes » ; le
-Druid ajoute « Cat Attacks » et « End of turn in Moonkin »).
+Druid ajoute « Cat Attacks » et « End of turn in Moonkin », et pour ses épiques « Form changes » et « Forms »).
 Les conditions Shift, Caster, Bear, Cat, Moonkin et la plaque Shift (ancienne conception du Druid) sont
 retirées (18/11/2026). Une classe en ajoute depuis ses fichiers :
 
@@ -856,6 +859,41 @@ Meditation N = 0, Conflagration N = −99), les anciens conseils coûtaient −3
 cartes Fire moins poussés), le contrôle à blanc donne −1,7 et −1,4 (rien), et l'épique +12,0 et +9,7. Le bot ne sait
 toujours pas préparer sur deux tours (garder son mana pour un tour à deux gros sorts, poser le DoT sur la cible qu'il
 achèvera au tour suivant) : il ne regarde qu'un tour.
+
+### Épiques du Druid (18/11/2026)
+
+Données, crochets et nombres dans `Data/Druid.lua` (bloc « Cartes épiques » : table `EPIC` exposée en
+`ns.DruidEpic`, tables `{ base, +1, +2, +3 }`, seule source des textes, des règles et des à-côtés ; `deckHooks`,
+src = `c.epic`) ; déclencheurs, mots de règle, réserves de Heart of the Wild et compléments des bots dans
+`Core/Classes/druid.lua` (`ns.Druid.epic(c)`, `kinStart`, `pool`, `usePool`, `ClassRules.druid.cardRes`) ; vue
+(`Art.druidEpicLine(c)`, note du jeton de l'épique par `W.noteToken` dans `ns.ClassViews.druid.tokens`) dans
+`UI/Art/druid.lua` ; tests `Sim/tests_epic_druid.lua`, harnais UEDR et UEL (42 épiques). Nombres = points de
+départ de la fiche (§ 5), **non mesurés** : notes des bots à 10 (`bot.epic`), builds `bot.byEpic` tirés de « Ce
+qu'elle fait construire ». Déclencheurs ajoutés : « Form changes », « Forms » (« Each Regen heal » et « Surge
+cards » existaient).
+
+| Épique (zone) | Texte de base | Crochets | Remarques |
+|---|---|---|---|
+| Furor (Westfall) | `Form changes: Primal 2.` | `onShift` | +1 réserve par changement, N par tour (`c.cls.furor`, `furorRound`) ; l'entrée dans la première forme compte |
+| Mark of Ursol (Duskwood) | `Bear strikes: Ironfur 50%.` | `onBearStrike` | Absorb = N % des dégâts de chaque frappe (fin de tour, carte, chaque frappe d'un Surge), arrondi bas |
+| Eclipse (Wetlands) | `Cast cards: Lunar 5.` | `instantCast`, `damage`, `afterCast` | Cast Moonkin tout de suite à N en réserve (lu après le changement de forme : en Moonkin, avec le bonus des Charges) ; l'état Instant n'est pas consommé ; +2 / +3 « Solar » : + 3 par coup (`c.cls.eclipse`) |
+| King of the Jungle (Stranglethorn Vale) | `Surge cards: Predator 1.` | `onSurge`, `onCardPlayed` | le Surge compte tout, min(N, montant) revient **après** la carte (aucun bonus de Moonkin sur Starsurge / Starfall) ; +2 / +3 « Apex » : le premier Surge du tour pioche 1 |
+| Lifebloom (Swamp of Sorrows) | `Each Regen heal: Bloom 1.` | `onRegenTick`, `whileInDeck` | +N par tic de Regen, PV pleins compris ; améliorée : Regen 3 au début du combat (+3 « Overgrowth » : 5), qui tique dès le premier tour |
+| Owlkin Frenzy (Burning Steppes) | `When hit: Moonfury 1.` | `onPlayerHit`, `onTurnEnd` | en Moonkin, une fois par action ennemie (`c.fxId`, `c.cls.owlFx`) qui coûte des PV ; +2 / +3 « Barkskin » : 3 Absorb en fin de tour en Moonkin |
+| Heart of the Wild (Blackrock Mountain) | `Forms: Kinship 3.` | `resCap`, `onShift`, `whileInDeck` ; règle de classe `cardRes` | trois réserves, ci-dessous ; +3 « Kindred » : chacune commence à 1 |
+
+**Heart of the Wild : trois réserves sans changer le contrat de la ressource.** `c.player.res` reste la réserve
+**de la forme active** (pastille, nom par `L.combatResource`, `gainRes`, `surge`, `spendRes`, frappe de l'ours,
+bonus de Moonkin, baisse en Bear : inchangés) ; les autres attendent dans `c.cls.kin = { cur, cat, bear, moonkin,
+rest }` (`rest` : sans forme et Tree of Life, que rien ne remplit ; la valeur de `cur` dans la table est périmée).
+`Druid.usePool(c, forme)` échange les valeurs (au changement de forme, `onShift`). Le plafond de chaque réserve
+est N (`resCap`, crans de la pastille). Seul point du moteur touché : **`Combat.cardRes(c, d, commit)`**
+(`Core/Combat.lua`), ressource que lisent `minRes` (`canPlay`), Spend (`legalPlays`, `play`, « Spend N: »
+éteint de `Controller.handInfo`) : `c.player.res`, sauf règle de classe `ClassRules.<id>.cardRes(c, d, commit)` ;
+au jeu (`commit`, juste avant le Spend), le Druid place la réserve de la forme de la carte dans `c.player.res`
+(le changement de forme qui suit ne déplace plus rien). Ferocious Bite en Bear se joue donc sur le Combo en
+attente, Frenzied Regeneration en Cat paie son Spend en Frenzy. Bots : `botKey` et `botValue` de la classe
+enveloppés (réserves en attente dans la clé, valant `bot.resValue` chacune ; compteurs de Furor et d'Apex).
 
 ## Sauvegarde
 

@@ -12067,7 +12067,45 @@ if SNAP then
   big:Hide()
 end
 
-print("UEL épiques en deux lignes au plus : les 35 (base, améliorée) mesurées par la mise en page, mots de règle et leur à-côté, planche")
+print("UEDR Druid, cartes épiques : jeton de l'épique (Heart of the Wild : les trois réserves), une ligne pour chacune des sept")
+do
+  local e = freshRun(SEED, "combat")
+  H.settle()
+  local ns = H.ns
+  local Card = ns.Card
+  -- combat du Priest converti en combat du Druid, épique Heart of the Wild en jeu (réserves de forme posées)
+  local c = e.combat
+  e.class, c.class = "druid", "druid"
+  c.cls, c.hk = {}, nil
+  ns.ClassRules.druid.init(c, c.cls)
+  c.player.res, c.player.cast = 0, nil
+  c.epic = { id = "heart_of_the_wild", up = false, uid = 9990 }
+  ns.Druid.kinStart(c, 0)
+  c.hand = {}
+  for i, id in ipairs({ "shred", "wrath", "thick_hide" }) do c.hand[i] = Card.new(id, false, 9100 + i) end
+  c.player.mana = 3
+  ns.Combat.play(c, 1, 1) -- Shred : 1 Combo
+  ns.Combat.play(c, 1, 1) -- Wrath : 1 Charge, le Combo attend
+  local v = V()
+  v:Render(true)
+  H.settle()
+  local tok, now = H.heroToken(v, "epic")
+  check("jeton de Heart of the Wild : « 1 Combo, 0 Frenzy, 1 Charge, up to 3 each » au survol",
+    tok and now == "1 Combo, 0 Frenzy, 1 Charge, up to 3 each", tostring(now))
+  local missing = {}
+  for _, id in ipairs({ "furor", "mark_of_ursol", "eclipse", "king_of_the_jungle", "lifebloom", "owlkin_frenzy",
+    "heart_of_the_wild" }) do
+    for k = 0, 3 do
+      c.epic = { id = id, up = Card.upValue(k), uid = 9990 }
+      if not ns.Art.druidEpicLine(c) then missing[#missing + 1] = id .. Card.suffix(k) end
+    end
+  end
+  c.epic = { id = "heart_of_the_wild", up = false, uid = 9990 }
+  check("ligne de l'épique : un texte pour chacune des sept épiques, à chaque palier", #missing == 0, table.concat(missing, ","))
+  snap("uedr-heart-of-the-wild", true)
+end
+
+print("UEL épiques en deux lignes au plus : les 42 (base, améliorée) mesurées par la mise en page, mots de règle et leur à-côté, planche")
 do
   H.boot(nil)
   H.slash("")
@@ -12076,7 +12114,7 @@ do
   local function plain(t)
     return (tostring(t or ""):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", ""):gsub("|T.-|t", W.HOURGLASS_CHAR))
   end
-  local CLASSES = { priest = 1, warrior = 2, mage = 3, rogue = 4, hunter = 5 }
+  local CLASSES = { priest = 1, warrior = 2, mage = 3, rogue = 4, hunter = 5, druid = 6 }
   local ids = {}
   for id, d in pairs(ns.Cards) do
     if d.rarity == "epic" and d.zone and not d.variant and CLASSES[d.class] then ids[#ids + 1] = id end
@@ -12086,7 +12124,7 @@ do
     if A.class ~= B.class then return CLASSES[A.class] < CLASSES[B.class] end
     return a < b
   end)
-  check("35 épiques de classe (7 par classe)", #ids == 35, #ids)
+  check("42 épiques de classe (7 par classe)", #ids == 42, #ids)
   -- 1. lignes du texte tel que la carte le rend (W.cardMaxLines : 2), palier 8,5 ou plus, jamais tronqué ; chaque
   -- palier écrit (+1 à +3)
   local card = W.card(UI().content)
@@ -12108,7 +12146,7 @@ do
   local ds = {}
   for _, s in ipairs(W.BODY_SIZES) do if dist[s] then ds[#ds + 1] = s .. " → " .. dist[s] end end
   print("      paliers des 70 faces : " .. table.concat(ds, ", "))
-  check(("textes des 35 épiques (base, améliorée) : %d lignes au plus, palier %s ou plus, en clauses, rien de tronqué")
+  check(("textes des 42 épiques (base, améliorée) : %d lignes au plus, palier %s ou plus, en clauses, rien de tronqué")
     :format(W.EPIC_LINES, tostring(W.EPIC_FLOOR)), #bad == 0, table.concat(bad, " ; "))
   -- témoin : sans la limite, Deflection prendrait trois lignes à 10 (le texte du joueur, « Each Parry gained: »)
   local paras = W.cardParagraphs(W.cardBody(Card.defById("deflection")), "clauses")

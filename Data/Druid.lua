@@ -427,11 +427,241 @@ card("tranquility", {
 })
 
 -- Cartes épiques (cartes de zone, docs/classes/druid.md, § 5) -----------------------------------------------
--- Lot suivant : Furor (Westfall), Mark of Ursol (Duskwood), Eclipse (Wetlands), King of the Jungle
--- (Stranglethorn Vale), Lifebloom (Swamp of Sorrows), Owlkin Frenzy (Burning Steppes), Heart of the Wild
--- (Blackrock Mountain). À écrire ici sur le modèle de Data/Hunter.lua (epic(id, t) : rarity = "epic",
--- zone = "<id>", cost = 0, deckHooks / whileInDeck), règles dans Core/Classes/druid.lua ; notes des bots :
--- bot.epic et bot.byEpic de la définition de classe ci-dessous.
+-- Une épique est une règle en jeu dès le début de chaque combat (c.epic, hors des piles) : jamais piochée ni
+-- jouée, sans coût. Crochets en deckHooks (src = c.epic, passés après pouvoirs et bibelots) ; la carte dit
+-- « Déclencheur: Mot N. », le mot de règle (L.rule, Core/Classes/druid.lua) donne la règle complète.
+-- Nombres : tables { base, +1, +2, +3 } de ns.DruidEpic, seule source des textes, des règles et des à-côtés ;
+-- points de départ de la fiche, à régler par la simulation. Heart of the Wild : une réserve par forme
+-- (Druid.kinship…, Core/Classes/druid.lua ; minRes et Spend lisent la réserve de la carte : Combat.cardRes).
+local EPIC = {
+  primal = { 2, 3, 4, 5 },          -- Furor : changements de forme qui donnent +1 réserve, par tour
+  ironfur = { 50, 75, 100, 125 },   -- Mark of Ursol : Absorb = ce pourcentage des dégâts de chaque frappe de l'ours
+  lunar = { 5, 4, 4, 3 },           -- Eclipse : réserve qu'il faut pour qu'un Cast Moonkin se résolve tout de suite
+  solar = { 0, 0, 3, 3 },           -- Eclipse : dégâts en plus de chaque coup de ce Cast (paliers 2 et 3 : « Solar »)
+  predator = { 1, 2, 2, 3 },        -- King of the Jungle : réserve laissée par chaque Surge (au plus le montant)
+  apex = { 0, 0, 1, 1 },            -- King of the Jungle : pioche au premier Surge de chaque tour (« Apex »)
+  bloom = { 1, 1, 2, 2 },           -- Lifebloom : réserve gagnée à chaque tic de Regen
+  bloomStart = { 0, 3, 3, 5 },      -- Lifebloom : Regen au début de chaque combat (+3 : « Overgrowth »)
+  moonfury = { 1, 2, 2, 3 },        -- Owlkin Frenzy : réserve par attaque ennemie qui coûte des PV en Moonkin
+  barkskin = { 0, 0, 3, 3 },        -- Owlkin Frenzy : Absorb à la fin d'un tour fini en Moonkin (« Barkskin »)
+  kinship = { 3, 4, 5, 5 },         -- Heart of the Wild : plafond de chaque réserve (Cat, Bear, Moonkin)
+  kinStart = { 0, 0, 0, 1 },        -- Heart of the Wild : chaque réserve au début du combat (+3 : « Kindred »)
+}
+ns.DruidEpic = EPIC
+
+local function D() return ns.Druid end -- Core/Classes/druid.lua, chargé après ce fichier
+
+local function epic(id, t)
+  t.type, t.rarity, t.epic, t.cost = "power", "epic", true, 0 -- coût jamais payé ni affiché
+  t.effects = t.effects or {}
+  card(id, t)
+end
+
+-- Nombre d'une épique à son palier : t[palier + 1].
+local function nt(t, src) return t[math.min(#t, ns.Card.level(src) + 1)] end
+
+-- Textes : « Epic.\nDéclencheur: Mot N. » à chaque palier (fn(k) = mot et nombre du palier k, 1 à 4).
+local function tiers(t, label, fn)
+  local function text(k) return "Epic.\n" .. label .. ": " .. fn(k) .. "." end
+  t.text = text(1)
+  t.up = { text = text(2) }
+  t.up2 = { text = text(3) }
+  t.up3 = { text = text(4) }
+  return t
+end
+
+-- Westfall — Furor : chaque changement de forme donne +1 à la réserve, EPIC.primal fois par tour au plus
+-- (l'entrée dans la première forme du combat compte ; c.cls.furor = changements payés du tour c.cls.furorRound).
+epic("furor", tiers({
+  zone = "westfall", path = "restoration", name = "Furor",
+  deckHooks = {
+    onShift = function(c, src)
+      if c.result then return end
+      local cls = c.cls
+      if cls.furorRound ~= c.round then cls.furorRound, cls.furor = c.round, 0 end
+      if cls.furor >= nt(EPIC.primal, src) then return end
+      cls.furor = cls.furor + 1
+      Combat.gainRes(c, 1, "epic")
+    end,
+  },
+}, "Form changes", function(k) return "Primal " .. EPIC.primal[k] end))
+
+-- Duskwood — Mark of Ursol : après chaque frappe de l'ours (fin de tour, carte, Surge), Absorb = EPIC.ironfur %
+-- des dégâts de la frappe, arrondi à l'inférieur.
+epic("mark_of_ursol", tiers({
+  zone = "duskwood", path = "feral", name = "Mark of Ursol",
+  deckHooks = {
+    onBearStrike = function(c, src, t, dmg)
+      if c.result or not dmg or dmg <= 0 then return end
+      local n = math.floor(dmg * nt(EPIC.ironfur, src) / 100)
+      if n > 0 then Combat.gainBlock(c, c.player, n) end
+    end,
+  },
+}, "Bear strikes", function(k) return "Ironfur " .. EPIC.ironfur[k] .. "%" end))
+
+-- Wetlands — Eclipse : avec au moins EPIC.lunar en réserve, une carte Cast de forme Moonkin se résout tout de
+-- suite (crochet instantCast, lu après le changement de forme : dans Moonkin, avec le bonus des Charges), sans
+-- emplacement ni interruption ; paliers 2 et 3 : ses coups font EPIC.solar de plus (c.cls.eclipse = uid de
+-- la carte en cours). L'état Instant n'est pas consommé quand l'épique fait partir la carte.
+epic("eclipse", tiers({
+  zone = "wetlands", path = "balance", name = "Eclipse",
+  deckHooks = {
+    instantCast = function(c, src, v, d, inst, commit)
+      if v or not d.cast or d.form ~= "moonkin" then return v end
+      if (c.player.res or 0) < nt(EPIC.lunar, src) then return v end
+      if commit then
+        Combat.log(c, { t = "cast_instant", card = inst.uid, by = "eclipse" })
+        if c.stats then c.stats.castsInstant = (c.stats.castsInstant or 0) + 1 end
+        if nt(EPIC.solar, src) > 0 then c.cls.eclipse = inst.uid end
+      end
+      return true
+    end,
+    damage = function(c, src, v, dst, cardDef)
+      if c.cls.eclipse and cardDef and cardDef.cast and cardDef.form == "moonkin" then
+        return v + nt(EPIC.solar, src)
+      end
+      return v
+    end,
+    afterCast = function(c, src, inst)
+      if c.cls.eclipse == inst.uid then c.cls.eclipse = nil end
+    end,
+  },
+}, "Cast cards", function(k)
+  return (EPIC.solar[k] > 0 and "Solar " or "Lunar ") .. EPIC.lunar[k]
+end))
+
+-- Stranglethorn Vale — King of the Jungle : un Surge compte toute la réserve, puis min(EPIC.predator, montant)
+-- y revient à la fin de la résolution de la carte (onCardPlayed : aucun bonus de Moonkin sur la carte Surge
+-- elle-même) ; paliers 2 et 3 : le premier Surge de chaque tour pioche EPIC.apex (c.cls.apexRound).
+epic("king_of_the_jungle", tiers({
+  zone = "stranglethorn", path = "feral", name = "King of the Jungle",
+  deckHooks = {
+    onSurge = function(c, src, n, ctx)
+      if c.result or not ctx then return end
+      ctx.predator = (ctx.predator or 0) + math.min(n, nt(EPIC.predator, src))
+      local draw = nt(EPIC.apex, src)
+      if draw > 0 and c.cls.apexRound ~= c.round then
+        c.cls.apexRound = c.round
+        Combat.drawCards(c, draw)
+      end
+    end,
+    onCardPlayed = function(c, src, inst, ctx)
+      local keep = ctx and ctx.predator
+      if keep and keep > 0 and not c.result then
+        ctx.predator = nil
+        Combat.gainRes(c, keep, "epic")
+      end
+    end,
+  },
+}, "Surge cards", function(k)
+  return (EPIC.apex[k] > 0 and "Apex " or "Predator ") .. EPIC.predator[k]
+end))
+
+-- Swamp of Sorrows — Lifebloom : chaque tic de Regen du Druide (même à PV pleins) donne EPIC.bloom à la réserve ;
+-- améliorée : EPIC.bloomStart Regen au début de chaque combat (whileInDeck, avant le premier tour : elle tique
+-- dès le premier début de tour).
+epic("lifebloom", tiers({
+  zone = "swamp", path = "restoration", name = "Lifebloom",
+  whileInDeck = function(c, src)
+    local n = nt(EPIC.bloomStart, src)
+    if n > 0 then Combat.applyStatus(c, c.player, "regen", n) end
+  end,
+  deckHooks = {
+    onRegenTick = function(c, src)
+      if not c.result then Combat.gainRes(c, nt(EPIC.bloom, src), "epic") end
+    end,
+  },
+}, "Each Regen heal", function(k)
+  return (EPIC.bloomStart[k] > EPIC.bloomStart[2] and "Overgrowth " or "Bloom ") .. EPIC.bloom[k]
+end))
+
+-- Burning Steppes — Owlkin Frenzy : en Moonkin, une attaque ennemie qui coûte des PV donne EPIC.moonfury à la
+-- réserve, une fois par attaque (c.cls.owlFx = numéro de l'effet de l'action ennemie, Combat.fxBegin) ;
+-- paliers 2 et 3 : EPIC.barkskin Absorb à la fin de chaque tour fini en Moonkin (après les coups à tous).
+epic("owlkin_frenzy", tiers({
+  zone = "steppes", path = "balance", name = "Owlkin Frenzy",
+  deckHooks = {
+    onPlayerHit = function(c, src, enemy, n)
+      if c.result or c.cls.form ~= "moonkin" or (n or 0) <= 0 then return end
+      local fx = c.fxId
+      if fx and c.cls.owlFx == fx then return end
+      c.cls.owlFx = fx
+      Combat.gainRes(c, nt(EPIC.moonfury, src), "epic")
+    end,
+    onTurnEnd = function(c, src)
+      local n = nt(EPIC.barkskin, src)
+      if n > 0 and c.cls.form == "moonkin" and not c.result then Combat.gainBlock(c, c.player, n) end
+    end,
+  },
+}, "When hit", function(k)
+  return (EPIC.barkskin[k] > 0 and "Barkskin " or "Moonfury ") .. EPIC.moonfury[k]
+end))
+
+-- Blackrock Mountain — Heart of the Wild : Cat, Bear et Moonkin gardent chacune leur réserve (plafond
+-- EPIC.kinship, crochet resCap) ; c.player.res est celle de la forme active, les autres attendent dans
+-- c.cls.kin (Druid.kinStart, Druid.usePool : au changement de forme, et au jeu d'une carte de forme avant son
+-- Spend ; minRes et Spend lisent la réserve de la forme de la carte, Combat.cardRes). Sans forme et en Tree of
+-- Life : une quatrième réserve, que rien ne remplit. +3 : chaque réserve commence à EPIC.kinStart.
+epic("heart_of_the_wild", tiers({
+  zone = "blackrock", path = "feral", name = "Heart of the Wild",
+  whileInDeck = function(c, src) D().kinStart(c, nt(EPIC.kinStart, src)) end,
+  deckHooks = {
+    resCap = function(c, src, v) return math.min(v, nt(EPIC.kinship, src)) end,
+    onShift = function(c, src, from, to) D().usePool(c, to) end,
+  },
+}, "Forms", function(k)
+  return (EPIC.kinStart[k] > 0 and "Kindred " or "Kinship ") .. EPIC.kinship[k]
+end))
+
+-- Bots (classDef.bot.epic et bot.byEpic, attachés en fin de fichier) : note d'une épique proposée ≈ 5 + gain
+-- / 2 (gain non mesuré : 10 pour toutes, estimation à remplacer par la mesure epic=<id>) ; l'épique du deck
+-- vaut EPIC_KEEP de plus. Builds pilotés par l'épique (« Ce qu'elle fait construire », fiche § 5), notes qui
+-- priment sur bot.rating tant que l'épique est dans le deck.
+local EPIC_KEEP = 5
+local EPIC_BOT = {
+  furor = 10, mark_of_ursol = 10, eclipse = 10, king_of_the_jungle = 10, lifebloom = 10, owlkin_frenzy = 10,
+  heart_of_the_wild = 10,
+}
+local EPIC_BUILDS = {
+  -- cartes de forme à 0 ou 1 mana qui changent souvent la forme
+  furor = {
+    rating = { tigers_fury = 9, faerie_fire = 8.5, demoralizing_roar = 9, entangling_roots = 8.5, shred = 7.5,
+      moonfire = 7, ferocious_bite = 7, starsurge = 7, rip = 6.5 },
+    upgrade = { furor = 4, tigers_fury = 3 },
+  },
+  -- un ours qui frappe souvent et haut
+  mark_of_ursol = {
+    rating = { maul = 8, swipe = 8, mangle = 9, demoralizing_roar = 9, frenzied_regeneration = 6, thorns = 6.5 },
+    upgrade = { mark_of_ursol = 4, maul = 3.5 },
+  },
+  -- monter à N, puis Starfire et Hurricane tout de suite
+  eclipse = {
+    rating = { starfire = 9, hurricane = 9, faerie_fire = 8.5, moonfire = 7.5, entangling_roots = 8.5,
+      moonkin_aura = 7.5, natures_grace = 6.5, starsurge = 4.5, starfall = 5 },
+    upgrade = { eclipse = 4, starfire = 3.5 },
+  },
+  -- plusieurs Surge par combat
+  king_of_the_jungle = {
+    rating = { rip = 7.5, starsurge = 8, starfall = 8.5, mangle = 8, tigers_fury = 8 },
+    upgrade = { king_of_the_jungle = 4, ferocious_bite = 3 },
+  },
+  -- la Regen comme générateur, dépensée par les Surge des autres formes
+  lifebloom = {
+    rating = { rejuvenation = 8, regrowth = 7.5, mark_of_the_wild = 8, tranquility = 8, gift_of_nature = 7,
+      starsurge = 7, rip = 6.5, starfall = 7.5 },
+    upgrade = { lifebloom = 4, rejuvenation = 3 },
+  },
+  -- finir en Moonkin et encaisser
+  owlkin_frenzy = {
+    rating = { moonfire = 7.5, starsurge = 7.5, starfall = 8.5, moonkin_aura = 8, thorns = 7, starfire = 7 },
+    upgrade = { owlkin_frenzy = 4, starsurge = 3 },
+  },
+  -- un deck à trois formes, chacune avec sa dépense
+  heart_of_the_wild = {
+    rating = { shred = 7.5, tigers_fury = 8, starsurge = 7.5, mangle = 7.5, rip = 6.5, moonfire = 7 },
+    upgrade = { heart_of_the_wild = 4, ferocious_bite = 3 },
+  },
+}
 
 -- Bibelots du Druide (class = "druid" : tirés seulement pour lui) ------------------------------------------
 -- level = niveau de classe qui les débloque.
@@ -543,3 +773,15 @@ ns.Classes.druid = {
     remove = { thick_hide = 1, wrath = 1.5 },
   },
 }
+
+-- Épiques pour les bots (tables de la section des cartes épiques ci-dessus ; Sim/expedition.lua).
+do
+  local bot = ns.Classes.druid.bot
+  bot.epic = function(exp, id)
+    local v = EPIC_BOT[id]
+    local i = v and exp and ns.Expedition.epicIndex(exp)
+    if i and exp.deck[i].id == id then v = v + EPIC_KEEP end
+    return v
+  end
+  bot.byEpic = EPIC_BUILDS
+end

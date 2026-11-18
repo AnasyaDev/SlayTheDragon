@@ -483,7 +483,7 @@ function C.handInfo(i)
   local shift = IsShiftKeyDown and IsShiftKeyDown() and true or false
   -- « Spend N: » éteinte quand le bonus ne sera pas payé : ressource insuffisante, condition propre de la
   -- carte (spendNeed, lue comme Combat.play) ou Maj enfoncée
-  local spendOff = d.spend ~= nil and ((c.player.res or 0) < d.spend or shift
+  local spendOff = d.spend ~= nil and (Combat.cardRes(c, d) < d.spend or shift
     or (d.spendNeed ~= nil and not d.spendNeed(c, inst)))
   -- carte Cast qui partira tout de suite (état Instant ou crochet instantCast ; question sans rien consommer)
   local instant = d.cast and not d.trap and Combat.isInstant(c, d, inst, false) or false

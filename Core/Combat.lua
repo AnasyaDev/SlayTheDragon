@@ -377,6 +377,16 @@ function Combat.spendRes(c, n)
   return true
 end
 
+-- Ressource que lit une carte pour minRes et Spend : c.player.res, sauf si la classe déclare cardRes(c, d,
+-- commit) dans ns.ClassRules (Druid, Heart of the Wild : une réserve par forme). commit vrai au jeu, juste
+-- avant le Spend : la classe place alors dans c.player.res la ressource que la carte dépensera.
+function Combat.cardRes(c, d, commit)
+  local cr = Rules[c.class]
+  local f = cr and cr.cardRes
+  if f then return f(c, d, commit) end
+  return c.player.res or 0
+end
+
 -- Surge : dépense toute la ressource ; renvoie le montant dépensé.
 function Combat.surge(c)
   local n = c.player.res or 0
@@ -1569,7 +1579,7 @@ function Combat.canPlay(c, idx)
   local pay = Combat.payHpOf(c, d, inst)
   if pay > 0 and c.player.hp <= pay then return false, "hp" end
   -- ressource requise (Surge qui n'a de sens qu'avec de la ressource)
-  if d.minRes and (c.player.res or 0) < d.minRes then return false, "resource" end
+  if d.minRes and Combat.cardRes(c, d) < d.minRes then return false, "resource" end
   -- incantation : emplacements pleins, sauf si elle partira tout de suite (« instantCast » interrogé
   -- sans rien consommer : commit = false)
   if d.cast and Combat.castCount(c) >= Combat.castSlots(c) and not Combat.isInstant(c, d, inst, false) then
@@ -1616,7 +1626,7 @@ function Combat.legalPlays(c)
   for i = 1, #c.hand do
     if Combat.canPlay(c, i) then
       local d = Card.def(c.hand[i])
-      local both = d.spend and (c.player.res or 0) >= d.spend
+      local both = d.spend and Combat.cardRes(c, d) >= d.spend
       if Combat.targetOf(c, d, c.hand[i]) == "enemy" then
         for j = 1, #c.enemies do
           if not c.enemies[j].dead and Combat.castFits(c, d, c.hand[i], c.enemies[j]) then
@@ -1843,6 +1853,8 @@ playBody = function(c, idx, tIdx, opts)
     Combat.loseHp(c, pay, "pay")
   end
   if c.result then return true end
+  -- ressource de la carte placée dans c.player.res (règle de classe cardRes, sans effet sinon)
+  if Rules[c.class] and Rules[c.class].cardRes then Combat.cardRes(c, d, true) end
   -- Spend N : payé au jeu si la ressource suffit (et si spendNeed(c, inst) le permet)
   local spent = false
   if d.spend and not (opts and opts.spend == false) and (not d.spendNeed or d.spendNeed(c, inst)) then

@@ -252,3 +252,114 @@ ns.ClassRules.druid = {
     return v
   end,
 }
+
+-- Cartes épiques (Data/Druid.lua, fiche § 5) ----------------------------------------------------------------
+-- Les crochets sont sur les cartes (deckHooks, src = c.epic) ; ici : déclencheurs, mots de règle (à-côté de la
+-- carte, nombres de ns.DruidEpic), réserves séparées de Heart of the Wild, compléments des bots.
+L.trigger("Form changes")
+L.trigger("Forms")
+L.trigger("Each Regen heal") -- aussi déclaré par le Prêtre (Echo of Light)
+L.trigger("Surge cards")     -- aussi déclaré par le Voleur
+do
+  local E = ns.DruidEpic
+  L.rule("primal", { name = "Primal", text = "The reserve gains 1 on each form change, at most N times per turn." })
+  L.rule("ironfur", { name = "Ironfur", text = "Gain Absorb equal to N% of each Bear strike's damage, rounded down." })
+  L.rule("lunar", { name = "Lunar", text = "With at least N in the reserve, Moonkin Cast cards resolve at once." })
+  L.rule("solar", { name = "Solar",
+    text = "With at least N in the reserve, Moonkin Cast cards resolve at once and deal " .. E.solar[3] .. " more." })
+  L.rule("predator", { name = "Predator", text = "The Surge counts the whole reserve, then N stays in it." })
+  L.rule("apex", { name = "Apex",
+    text = "The Surge counts the whole reserve, then N stays in it. The first Surge each turn draws " .. E.apex[3] .. "." })
+  L.rule("bloom", { name = "Bloom", text = "The reserve gains N each time Regen heals, even at full HP.",
+    upText = "Each combat starts with Regen " .. E.bloomStart[2] .. ". The reserve gains N each time Regen heals." })
+  L.rule("overgrowth", { name = "Overgrowth",
+    text = "Each combat starts with Regen " .. E.bloomStart[4] .. ". The reserve gains N each time Regen heals." })
+  L.rule("moonfury", { name = "Moonfury", text = "In Moonkin, each enemy attack that costs HP adds N to the reserve." })
+  L.rule("barkskin", { name = "Barkskin",
+    text = "In Moonkin, each enemy attack that costs HP gives N reserve. End of turn in Moonkin: gain "
+      .. E.barkskin[3] .. " Absorb." })
+  L.rule("kinship", { name = "Kinship", text = "Cat, Bear and Moonkin each keep their own reserve, up to N." })
+  L.rule("kindred", { name = "Kindred",
+    text = "Cat, Bear and Moonkin each keep their own reserve, up to N. Each starts at " .. E.kinStart[4] .. "." })
+end
+
+-- Épique en jeu dans ce combat : id, up (nil sans épique).
+function Druid.epic(c)
+  local e = c and c.epic
+  if not e then return nil end
+  return e.id, e.up
+end
+
+-- Heart of the Wild : une réserve par forme. c.cls.kin = { cur = clé de la réserve tenue dans c.player.res,
+-- cat, bear, moonkin, rest = les autres (rest : sans forme et Tree of Life) } ; la valeur de la clé cur dans
+-- la table est périmée (c.player.res fait foi). Données simples (clone, sauvegarde).
+local function poolKey(form)
+  if form == "cat" or form == "bear" or form == "moonkin" then return form end
+  return "rest"
+end
+Druid.poolKey = poolKey
+
+-- Début du combat (whileInDeck) : chaque réserve de forme à n, sans forme à 0.
+function Druid.kinStart(c, n)
+  c.cls.kin = { cur = poolKey(c.cls.form), cat = n, bear = n, moonkin = n, rest = 0 }
+  c.player.res = 0
+end
+
+-- Réserve d'une forme (sans Heart of the Wild : la réserve commune).
+function Druid.pool(c, form)
+  local k = c.cls and c.cls.kin
+  if not k then return c.player.res or 0 end
+  local key = poolKey(form)
+  if key == k.cur then return c.player.res or 0 end
+  return k[key] or 0
+end
+
+-- Place dans c.player.res la réserve de la forme (au changement de forme, ou au jeu d'une carte de cette forme
+-- avant son Spend) ; rien sans Heart of the Wild ni si elle y est déjà.
+function Druid.usePool(c, form)
+  local k = c.cls and c.cls.kin
+  if not k then return end
+  local key = poolKey(form)
+  if key == k.cur then return end
+  k[k.cur] = c.player.res or 0
+  c.player.res = k[key] or 0
+  k.cur = key
+end
+
+do
+  local R = ns.ClassRules.druid
+  -- minRes et Spend d'une carte de forme lisent la réserve de sa forme (Combat.cardRes) ; au jeu (commit),
+  -- elle devient la réserve active avant le Spend (le changement de forme suit, sans rien déplacer).
+  R.cardRes = function(c, d, commit)
+    if not (c.cls.kin and d.form) then return c.player.res or 0 end
+    if commit then Druid.usePool(c, d.form) end
+    return Druid.pool(c, d.form)
+  end
+  -- Bots : réserves en attente (Heart of the Wild) et compteurs du tour des épiques dans la clé ; une réserve
+  -- en attente vaut comme la réserve active.
+  local KIN = { "cat", "bear", "moonkin", "rest" }
+  local baseKey, baseValue = R.botKey, R.botValue
+  R.botKey = function(c)
+    local k = baseKey(c)
+    local cls = c.cls
+    local kin = cls.kin
+    if kin then
+      for i = 1, 3 do k = k .. ":" .. (KIN[i] == kin.cur and "-" or (kin[KIN[i]] or 0)) end
+    end
+    if cls.furorRound == c.round then k = k .. ":f" .. (cls.furor or 0) end
+    if cls.apexRound == c.round then k = k .. ":a" end
+    return k
+  end
+  R.botValue = function(c, W)
+    local v = baseValue(c, W)
+    local kin = c.cls.kin
+    if kin then
+      local cd = ns.Classes.druid
+      local per = cd.bot and cd.bot.resValue or W.res
+      for i = 1, #KIN do
+        if KIN[i] ~= kin.cur then v = v + (kin[KIN[i]] or 0) * per end
+      end
+    end
+    return v
+  end
+end

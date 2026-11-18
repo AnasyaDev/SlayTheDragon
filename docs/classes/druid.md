@@ -593,6 +593,27 @@ forme, et Lifebloom prend `INV_Misc_Herb_Felblossom` (icône du sort dans WoW, p
 `~/Téléchargements/ICONS/`). Avec la Regen 1 de fin de tour en Tree of Life, Lifebloom donne N points de réserve
 au début du tour suivant : c'est le seul lien entre la forme et la réserve, et il passe par l'épique.
 
+**Codées le 18/11/2026** (`Data/Druid.lua`, `Core/Classes/druid.lua`, tests `Sim/tests_epic_druid.lua` ; détail :
+`docs/classes.md`, « Épiques du Druid »). Nombres de la table ci-dessus, non mesurés. Écarts tranchés au codage :
+
+- **Eclipse** : le mot de règle « Eclipse » est le nom de la carte (refusé par le harnais, nom unique) : **`Lunar`**
+  (« Cast cards: Lunar 5. ») ; les paliers +2 et +3, qui ajoutent « and deal 3 more », prennent le mot
+  **`Solar`** (« Solar 4. », « Solar 3. »). Le Cast part tout de suite dans Moonkin (la forme change au jeu,
+  avant la question), avec le bonus des Charges ; l'état Instant n'est pas consommé.
+- Un mot de règle n'a qu'un texte amélioré (`docs/zones/cartes-de-zone.md`) : la règle ajoutée aux paliers 2 et
+  3 passe par un second mot, comme pour le Hunter. King of the Jungle +2 / +3 : **`Apex`** (« Surge cards: Apex
+  2. », la pioche du premier Surge) ; Owlkin Frenzy +2 / +3 : **`Barkskin`** (3 Absorb en fin de tour en
+  Moonkin) ; Heart of the Wild +3 : **`Kindred`** (« each starts at 1 ») ; Lifebloom +3 : **`Overgrowth`**
+  (Regen 5 au départ ; +1 et +2 : « Bloom », Regen 3 dans l'à-côté). Lifebloom +1 garde le texte de base sur la
+  carte (« Bloom 1. ») : seul l'à-côté change (Regen 3 au début du combat).
+- **King of the Jungle** : la réserve laissée revient **à la fin de la carte** (pas pendant le Surge) : Starsurge
+  et Starfall ne gagnent pas le bonus des Charges (§ 1.1, point 5) ; jamais plus que le montant dépensé.
+- **Owlkin Frenzy** : « once per enemy attack » = une fois par action ennemie (une Rafale de 4 coups, ou deux
+  coups dans le même move, donnent N une fois) ; deux ennemis qui frappent : deux fois.
+- **Heart of the Wild** : sans forme et en Tree of Life, une quatrième réserve (« Reserve ») que rien ne
+  remplit ; `minRes` et Spend lisent la réserve de la forme de la carte (Ferocious Bite en Bear se joue sur le
+  Combo en attente) : seul ajout au moteur, `Combat.cardRes`.
+
 ## 6. Bibelots de classe (6)
 
 | id | Nom | Rareté | Niv. | Effet | Icône |
@@ -707,8 +728,9 @@ Moonkin `moonkin_pulse` (et non `moonkin_hits`).
 1. **Interface** (autre lot) : `UI/Art/druid.lua` (icônes, voies, `ns.ClassViews.druid`), pastille par forme
    (`UI/CombatView.lua`, `L.combatResource`), marque de forme en main (`UI/Widgets.lua`, `ns.Druid.wouldShift`),
    icône et texte court de Clearcasting, animations `shift`, `bear_strike`, `moonkin_pulse`, `clearcasting`.
-2. **Épiques** (§ 5) : Heart of the Wild demande trois réserves dans `c.cls` ; la pastille et `Combat.gainRes` /
-   `surge` / `spendRes` doivent lire la réserve de la forme active (crochet sur la ressource, nouveau).
+2. **Épiques** (§ 5) : codées le 18/11/2026 ; Heart of the Wild garde dans `c.player.res` la réserve de la forme
+   active et les autres dans `c.cls.kin` (pastille, `gainRes`, `surge` inchangés ; `minRes` et Spend par
+   `Combat.cardRes`). Restent la mesure (`epic=<id>`) et les notes des bots.
 3. **Bots et chiffres** : notes des cartes (`bot.rating`) posées à la main, à remplacer par un balayage ; valeurs des
    Powers du Druid dans `Bots.POWER_VALUE` (estimations) ; réglage des effets de fin de tour et des cartes (§ 10).
 
