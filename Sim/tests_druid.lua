@@ -171,7 +171,7 @@ test("Surge en Moonkin : Charges lues puis remises à 0 avant le coup (aucun bon
   c.player.res = 3
   local hp = c.enemies[1].hp
   play(c, "starsurge", 1)
-  eq(c.enemies[1].hp, hp - 18)
+  eq(c.enemies[1].hp, hp - 21)
   local d = setup({ "starsurge" })
   eq(Combat.canPlay(d, 1), false, "Surge seul : injouable à 0")
 end)
@@ -299,14 +299,14 @@ test("Cast : la forme change au jeu ; la résolution se fait dans la forme de fi
   play(a, "thick_hide")
   Combat.endTurn(a)
   eq(a.cls.form, "bear", "la résolution ne change pas la forme")
-  eq(a.enemies[1].hp, 100 - 4 - 20)
-  -- fin en Moonkin : coups à tous (ceil(3 / 2) = 2), puis Starfire avec le bonus (20 + 3)
+  eq(a.enemies[1].hp, 100 - 4 - 24)
+  -- fin en Moonkin : coups à tous (ceil(3 / 2) = 2), puis Starfire avec le bonus (24 + 3)
   local b = setup({ "starfire" })
   b.player.res = 3
   play(b, "starfire", 1)
   Combat.endTurn(b)
   eq(b.cls.form, "moonkin")
-  eq(b.enemies[1].hp, 100 - 2 - 23)
+  eq(b.enemies[1].hp, 100 - 2 - 27)
 end)
 
 test("Nature's Swiftness : sans forme ; Starfire part tout de suite, dans sa forme, avec le bonus", function()
@@ -317,7 +317,7 @@ test("Nature's Swiftness : sans forme ; Starfire part tout de suite, dans sa for
   eq(c.cls.form, "bear", "sans forme")
   play(c, "starfire", 1)
   eq(c.cls.form, "moonkin")
-  eq(c.enemies[1].hp, 100 - 22)
+  eq(c.enemies[1].hp, 100 - 26)
   eq(c.player.cast, nil)
 end)
 
@@ -496,9 +496,9 @@ test("Faerie Fire, Hurricane : Sundered, Charges, bonus de Moonkin sur chaque ci
   play(c, "hurricane")
   c.player.res = 2
   Combat.endTurn(c)
-  -- coups à tous ceil(2 / 2) = 1, puis Hurricane 12 + 2 (Sundered sur le premier : ×1,25)
-  eq(c.enemies[2].hp, 100 - 1 - 14)
-  eq(c.enemies[1].hp, 100 - 1 - math.floor(14 * 1.25))
+  -- coups à tous ceil(2 / 2) = 1, puis Hurricane 15 + 2 (Sundered sur le premier : ×1,25)
+  eq(c.enemies[2].hp, 100 - 1 - 17)
+  eq(c.enemies[1].hp, 100 - 1 - math.floor(17 * 1.25))
 end)
 
 test("Swiftmend : 2 par Regen sans la retirer ; Regrowth, Rejuvenation : Exhaust", function()

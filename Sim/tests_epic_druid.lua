@@ -221,7 +221,7 @@ test("Eclipse : à N en réserve, un Cast Moonkin se résout tout de suite, en M
   play(c, "starfire", 1)
   eq(c.player.cast, nil, "pas d'incantation")
   eq(c.cls.form, "moonkin")
-  eq(dealt(c.enemies[1]), 20 + N, "Starfire + Charges")
+  eq(dealt(c.enemies[1]), 24 + N, "Starfire + Charges")
   -- sous N : incantation ordinaire
   local u = setup({ "starfire" }, { epic = "eclipse" })
   u.player.res = N - 1
@@ -236,7 +236,7 @@ test("Eclipse : Instant non consommé ; un Cast Tree (Healing Touch) n'est pas c
   Combat.applyStatus(c, c.player, "instant", 1)
   play(c, "hurricane")
   eq(c.player.st.instant, 1, "Instant gardé")
-  eq(dealt(c.enemies[1]), 12 + 5); eq(dealt(c.enemies[2]), 12 + 5)
+  eq(dealt(c.enemies[1]), 15 + 5); eq(dealt(c.enemies[2]), 15 + 5)
   c.player.res = 5
   play(c, "healing_touch")   -- Tree : l'Instant le fait partir, pas l'épique
   eq(c.player.st.instant, nil, "Instant consommé par le Cast Tree")
@@ -249,7 +249,7 @@ test("Eclipse : paliers (seuil 4, 4, 3 ; Solar : 3 de plus par coup)", function(
     c.player.res = N
     play(c, "starfire", 1)
     eq(c.player.cast, nil, "Eclipse+" .. k)
-    eq(dealt(c.enemies[1]), 20 + N + more, "Eclipse+" .. k)
+    eq(dealt(c.enemies[1]), 24 + N + more, "Eclipse+" .. k)
     eq(c.cls.eclipse, nil, "marque retirée")
   end
   eq(Card.defById("eclipse", 2).text, "Epic.\nCast cards: Solar 4.")
@@ -268,7 +268,7 @@ test("King of the Jungle : le Surge compte tout, puis N revient à la réserve a
   c.player.res = 2
   local before = dealt(c.enemies[1])
   play(c, "starsurge", 1)
-  eq(dealt(c.enemies[1]) - before, 6 * 2, "pas de bonus des Charges")
+  eq(dealt(c.enemies[1]) - before, 7 * 2, "pas de bonus des Charges")
   eq(c.player.res, n(E.predator, 0))
 end)
 
@@ -403,7 +403,7 @@ test("Heart of the Wild : minRes et Spend lisent la réserve de la forme de la c
   c.cls.kin.moonkin = 2
   assert(Combat.canPlay(c, idx(c, "starsurge")), "Starsurge : 2 Charges en attente")
   play(c, "starsurge", 1)
-  eq(dealt(c.enemies[1]), 7 + 12)
+  eq(dealt(c.enemies[1]), 7 + 14)
   play(c, "shred", 1)
   eq(c.player.res, 3, "Cat : plafond " .. n(E.kinship, 0))
 end)

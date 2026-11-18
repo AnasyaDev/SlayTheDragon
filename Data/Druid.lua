@@ -132,16 +132,18 @@ card("tigers_fury", {
   up3 = { effects = { { "res", 2 }, { "draw", 1 } }, text = "+2 Combo.\nDraw 1.\nCooldown 1.\nRetain." },
 })
 
--- Mangle : Bestial Wrath du Hunter (une frappe par point compté, chacune à 1 + le montant, sans gain) ;
--- palier 2 : « +2 Frenzy. » après les frappes (la carte n'est plus faite que de Surge : jouable à 0).
+-- Mangle : Bestial Wrath du Hunter (une frappe par point compté, chacune à 1 + le montant, sans gain) ; coût 1
+-- (2 jusqu'au 19/11/2026 : gardée en main 63 % des fois) ; palier 1 : « +2 Frenzy. » après les frappes (la
+-- carte n'est plus faite que de Surge : jouable à 0).
 card("mangle", {
-  level = 4, name = "Mangle", form = "bear", cost = 2, type = "skill", rarity = "rare", path = "feral",
+  level = 4, name = "Mangle", form = "bear", cost = 1, type = "skill", rarity = "rare", path = "feral",
   target = "enemy", minRes = 1, effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true } },
   text = "Surge: Bear strikes once per Frenzy.",
-  up = { cost = 1, text = "Surge: Bear strikes once per Frenzy." },
-  up2 = { minRes = 0, effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 2 } },
+  up = { minRes = 0, effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 2 } },
     text = "Surge: Bear strikes once per Frenzy.\n+2 Frenzy." },
-  up3 = { retain = true, text = "Surge: Bear strikes once per Frenzy.\n+2 Frenzy.\nRetain." },
+  up2 = { retain = true, text = "Surge: Bear strikes once per Frenzy.\n+2 Frenzy.\nRetain." },
+  up3 = { effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 3 } },
+    text = "Surge: Bear strikes once per Frenzy.\n+3 Frenzy.\nRetain." },
 })
 
 card("demoralizing_roar", {
@@ -170,13 +172,14 @@ local function leaderHooks(n, more)
   }
 end
 
+-- Coût 0 (1 jusqu'au 19/11/2026 : gardée en main 45 % des fois).
 card("leader_of_the_pack", {
-  level = 7, name = "Leader of the Pack", cost = 1, type = "power", rarity = "rare", path = "feral",
+  level = 7, name = "Leader of the Pack", cost = 0, type = "power", rarity = "rare", path = "feral",
   power = true, effects = {}, hooks = leaderHooks(1, 0),
   text = "Power.\nCat Attacks: +1 Combo.",
-  up = { cost = 0, text = "Power.\nCat Attacks: +1 Combo." },
-  up2 = { innate = true, text = "Power.\nCat Attacks: +1 Combo.\nInnate." },
-  up3 = { hooks = leaderHooks(1, 2), text = "Power.\nCat Attacks: +1 Combo, deal 2 more.\nInnate." },
+  up = { innate = true, text = "Power.\nCat Attacks: +1 Combo.\nInnate." },
+  up2 = { hooks = leaderHooks(1, 2), text = "Power.\nCat Attacks: +1 Combo, deal 2 more.\nInnate." },
+  up3 = { hooks = leaderHooks(1, 3), text = "Power.\nCat Attacks: +1 Combo, deal 3 more.\nInnate." },
 })
 
 -- Balance : monter les Charges en Moonkin (bonus à chaque coup des Attack), les vider d'un Surge, Cast -------
@@ -184,11 +187,11 @@ card("leader_of_the_pack", {
 -- Starfire : Cast ; résolue au tour suivant dans la forme où le tour a fini (bonus des Charges en Moonkin).
 card("starfire", {
   level = 1, name = "Starfire", form = "moonkin", cost = 2, type = "attack", rarity = "common", path = "balance",
-  target = "enemy", cast = true, effects = { { "damage", 20 } },
-  text = "Cast.\nDeal 20.",
-  up = { effects = { { "damage", 26 } }, text = "Cast.\nDeal 26." },
-  up2 = { effects = { { "damage", 30 } }, text = "Cast.\nDeal 30." },
-  up3 = { effects = { { "damage", 34 } }, text = "Cast.\nDeal 34." },
+  target = "enemy", cast = true, effects = { { "damage", 24 } },
+  text = "Cast.\nDeal 24.",
+  up = { effects = { { "damage", 30 } }, text = "Cast.\nDeal 30." },
+  up2 = { effects = { { "damage", 34 } }, text = "Cast.\nDeal 34." },
+  up3 = { effects = { { "damage", 38 } }, text = "Cast.\nDeal 38." },
 })
 
 card("moonfire", {
@@ -203,41 +206,45 @@ card("moonfire", {
 -- Starsurge : les Charges sont dépensées avant le coup (aucun bonus de Moonkin sur un Surge).
 card("starsurge", {
   level = 1, name = "Starsurge", form = "moonkin", cost = 1, type = "attack", rarity = "common", path = "balance",
-  target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 0, per = { 6, "surge" } } },
-  text = "Surge: deal 6 per Charge.",
-  up = { effects = { { "surge" }, { "damage", 0, per = { 7, "surge" } } }, text = "Surge: deal 7 per Charge." },
-  up2 = { retain = true, text = "Surge: deal 7 per Charge.\nRetain." },
-  up3 = { effects = { { "surge" }, { "damage", 0, per = { 8, "surge" } } }, text = "Surge: deal 8 per Charge.\nRetain." },
+  target = "enemy", minRes = 1, effects = { { "surge" }, { "damage", 0, per = { 7, "surge" } } },
+  text = "Surge: deal 7 per Charge.",
+  up = { effects = { { "surge" }, { "damage", 0, per = { 8, "surge" } } }, text = "Surge: deal 8 per Charge." },
+  up2 = { retain = true, text = "Surge: deal 8 per Charge.\nRetain." },
+  up3 = { effects = { { "surge" }, { "damage", 0, per = { 9, "surge" } } }, text = "Surge: deal 9 per Charge.\nRetain." },
 })
 
+-- Faerie Fire : 3 Absorb depuis le 19/11/2026 (défense de Balance, avec Insect Swarm).
 card("faerie_fire", {
   level = 1, name = "Faerie Fire", form = "moonkin", cost = 0, type = "skill", rarity = "common", path = "balance",
-  target = "enemy", cooldown = 3, effects = { { "res", 1 }, { "apply", "armor_broken", 2 } },
-  text = "+1 Charge.\nApply Sundered 2 ⌛\nCooldown 3.",
-  up = { cooldown = 2, text = "+1 Charge.\nApply Sundered 2 ⌛\nCooldown 2." },
-  up2 = { effects = { { "res", 1 }, { "apply", "armor_broken", 3 } }, text = "+1 Charge.\nApply Sundered 3 ⌛\nCooldown 2." },
-  up3 = { retain = true, text = "+1 Charge.\nApply Sundered 3 ⌛\nCooldown 2.\nRetain." },
+  target = "enemy", cooldown = 3, effects = { { "res", 1 }, { "absorb", 3 }, { "apply", "armor_broken", 2 } },
+  text = "+1 Charge.\nGain 3 Absorb.\nApply Sundered 2 ⌛\nCooldown 3.",
+  up = { cooldown = 2, text = "+1 Charge.\nGain 3 Absorb.\nApply Sundered 2 ⌛\nCooldown 2." },
+  up2 = { effects = { { "res", 1 }, { "absorb", 3 }, { "apply", "armor_broken", 3 } },
+    text = "+1 Charge.\nGain 3 Absorb.\nApply Sundered 3 ⌛\nCooldown 2." },
+  up3 = { retain = true, text = "+1 Charge.\nGain 3 Absorb.\nApply Sundered 3 ⌛\nCooldown 2.\nRetain." },
 })
 
--- Insect Swarm : la carte de contrôle de Balance, sans gain de réserve avant le palier 2.
+-- Insect Swarm : la carte de contrôle et de défense de Balance (Absorb depuis le 19/11/2026 : tenir le tour
+-- ennemi sans quitter Moonkin), sans gain de réserve avant le palier 2.
 card("insect_swarm", {
   level = 1, name = "Insect Swarm", form = "moonkin", cost = 1, type = "skill", rarity = "common", path = "balance",
-  target = "enemy", effects = { { "apply", "pain", 4 }, { "apply", "demoralized", 1 } },
-  text = "Apply DoT 4\nApply Demoralized 1 ⌛",
-  up = { effects = { { "apply", "pain", 6 }, { "apply", "demoralized", 1 } }, text = "Apply DoT 6\nApply Demoralized 1 ⌛" },
-  up2 = { effects = { { "res", 1 }, { "apply", "pain", 6 }, { "apply", "demoralized", 1 } },
-    text = "+1 Charge.\nApply DoT 6\nApply Demoralized 1 ⌛" },
-  up3 = { effects = { { "res", 1 }, { "apply", "pain", 6 }, { "apply", "demoralized", 2 } },
-    text = "+1 Charge.\nApply DoT 6\nApply Demoralized 2 ⌛" },
+  target = "enemy", effects = { { "absorb", 5 }, { "apply", "pain", 4 }, { "apply", "demoralized", 1 } },
+  text = "Gain 5 Absorb.\nApply DoT 4\nApply Demoralized 1 ⌛",
+  up = { effects = { { "absorb", 7 }, { "apply", "pain", 6 }, { "apply", "demoralized", 1 } },
+    text = "Gain 7 Absorb.\nApply DoT 6\nApply Demoralized 1 ⌛" },
+  up2 = { effects = { { "res", 1 }, { "absorb", 7 }, { "apply", "pain", 6 }, { "apply", "demoralized", 1 } },
+    text = "+1 Charge.\nGain 7 Absorb.\nApply DoT 6\nApply Demoralized 1 ⌛" },
+  up3 = { effects = { { "res", 1 }, { "absorb", 7 }, { "apply", "pain", 6 }, { "apply", "demoralized", 2 } },
+    text = "+1 Charge.\nGain 7 Absorb.\nApply DoT 6\nApply Demoralized 2 ⌛" },
 })
 
 card("hurricane", {
   level = 2, name = "Hurricane", form = "moonkin", cost = 2, type = "attack", rarity = "uncommon", path = "balance",
-  cast = true, effects = { { "damage", 12, all = true } },
-  text = "Cast.\nDeal 12 to all.",
-  up = { effects = { { "damage", 15, all = true } }, text = "Cast.\nDeal 15 to all." },
-  up2 = { retain = true, text = "Cast.\nDeal 15 to all.\nRetain." },
-  up3 = { effects = { { "damage", 18, all = true } }, text = "Cast.\nDeal 18 to all.\nRetain." },
+  cast = true, effects = { { "damage", 15, all = true } },
+  text = "Cast.\nDeal 15 to all.",
+  up = { effects = { { "damage", 18, all = true } }, text = "Cast.\nDeal 18 to all." },
+  up2 = { retain = true, text = "Cast.\nDeal 18 to all.\nRetain." },
+  up3 = { effects = { { "damage", 21, all = true } }, text = "Cast.\nDeal 21 to all.\nRetain." },
 })
 
 card("entangling_roots", {
@@ -268,7 +275,7 @@ local graceHooks = {
 }
 
 card("natures_grace", {
-  level = 6, name = "Nature's Grace", cost = 2, type = "power", rarity = "uncommon", path = "balance",
+  level = 6, name = "Nature's Grace", cost = 1, type = "power", rarity = "uncommon", path = "balance",
   power = true, effects = {}, hooks = graceHooks,
   text = "Power.\nCast cards: cost −1.",
   up = { cost = 1, text = "Power.\nCast cards: cost −1." },
