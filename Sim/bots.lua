@@ -533,7 +533,11 @@ return function(ns)
   -- grossit), chemin vu sur `pathDepth` étapes et bruité (`pathNoise`), route suivie sans la revoir sauf
   -- une fois sur `1 / replan` (ou sous la moitié des PV), élites jugés comme s'il avait `daring` PV max de
   -- plus, repos sous `restAt` des PV max (+0,25 avant le boss), amélioration bruitée (`upNoise`), retrait au
-  -- marchand une visite sur `1 / removeRate`, rencontres bruitées (`eventNoise`).
+  -- marchand une visite sur `1 / removeRate`, rencontres bruitées (`eventNoise`). `takeMin` (≈ 3,5 à 5) ne
+  -- refuse presque jamais : la meilleure de trois cartes perçue vaut ≈ 7 à 9 ; `removeRate` ne retire que les
+  -- cartes de départ (valeur de retrait ≤ 1,5), au marchand, après les bibelots (≈ 4 visites avec l'or d'un
+  -- retrait par victoire sur sept zones, retrait à 75 pièces + 25 par retrait déjà fait) : 1 à 3 retraits par
+  -- victoire pour ≈ 40 cartes entrées. Deck serré : `decksize` (plus bas).
   -- Tous se déduisent de `skill` (0 = débutant, 0,5 = joueur correct, 1 = expert ; HUMAN_RANGE : valeurs à
   -- 0, 0,5 et 1, interpolées par morceaux) et chacun peut être imposé (sim.lua : skill=0.3 width=2 …). Hasard :
   -- le flux du bot (combat) et le flux « human » de l'expédition, jamais math.random. Valeurs à 0,5 (défaut)
@@ -548,8 +552,18 @@ return function(ns)
     restAt = { 0.3, 0.4, 0.5 }, upNoise = { 3, 1.65, 0.3 }, removeRate = { 0, 0.5, 1 }, eventNoise = { 2, 1.1, 0.2 },
     -- politique d'amélioration (Sim/expedition.lua, humanUpgrade) : 0 = étale (défaut), 1 = concentre jusqu'à +3
     upfocus = { 0, 0, 0 },
+    -- politique de taille de deck (Sim/expedition.lua, deckCap ; docs/equilibrage.md, « Bot human : deck
+    -- serré ») : decksize=N vise un deck de N cartes. Sous N, il choisit comme sans elle ; à N et au-delà, une
+    -- carte (récompense, marchand, rencontre) n'entre que si sa note perçue dépasse de 1,5 × (1 + cartes au-delà
+    -- de N) celle de la carte qu'il retirerait d'abord, il retire au marchand avant tout achat (tant que le deck
+    -- dépasse N, ou à N s'il reste une carte de départ), prise une rencontre qui retire, refuse les copies.
+    -- 0 (défaut) = désactivée, absente des paramètres : résultats d'avant à graine égale.
+    decksize = { 0, 0, 0 },
   }
-  Bots.HUMAN_INT = { width = true, depth = true, pathDepth = true }
+  Bots.HUMAN_INT = { width = true, depth = true, pathDepth = true, decksize = true }
+  -- Paramètres omis de H (et de la ligne « Joueur humain » du rapport) quand ils valent 0 : politiques
+  -- facultatives ajoutées après coup (rapports d'avant inchangés).
+  Bots.HUMAN_OPTIONAL = { decksize = true }
 
   -- Paramètres du bot human : over = { skill = …, width = … } (nombres), le reste déduit de skill.
   function Bots.humanParams(over)
@@ -563,7 +577,7 @@ return function(ns)
         if s <= 0.5 then v = r[1] + (r[2] - r[1]) * s * 2 else v = r[2] + (r[3] - r[2]) * (s - 0.5) * 2 end
         if Bots.HUMAN_INT[k] then v = math.floor(v + 0.5) end
       end
-      H[k] = v
+      if not (Bots.HUMAN_OPTIONAL[k] and v == 0) then H[k] = v end
     end
     return H
   end

@@ -5,7 +5,8 @@
 --   bot=human : skill=0..1 (défaut Bots.HUMAN_SKILL) et paramètres nommés de Bots.HUMAN_RANGE (width=, depth=,
 --     foresight=, slip=, tol=, combo=, hoard=, pickNoise=, rareBonus=, newBonus=, takeMin=, pathDepth=,
 --     pathNoise=, replan=, daring=, restAt=, upNoise=, removeRate=, eventNoise=, upfocus=0..1 : 0 étale ses
---     améliorations, 1 monte ses meilleures cartes jusqu'à +3 d'abord) ; fightbot=<bot> : bot des
+--     améliorations, 1 monte ses meilleures cartes jusqu'à +3 d'abord ; decksize=N : vise un deck de N cartes,
+--     0 = désactivée) ; fightbot=<bot> : bot des
 --     combats seul remplacé (runner=expedition).
 --   save : écrit les agrégats bruts (pour une comparaison avant/après avec compare=)
 --   runner=expedition : vraie expédition (Core/Expedition, carte, marchand, rencontres…)
@@ -240,6 +241,15 @@ local function addRecord(agg, rec)
     end
   end
   agg.deckSize = (agg.deckSize or 0) + #(rec.deck or {})
+  -- cartes entrées par source, refus, retraits (runner=expedition, rec.flow) : toutes les expéditions et victoires
+  if rec.flow then
+    agg.flow, agg.flowWin = agg.flow or {}, agg.flowWin or {}
+    for k, n in pairs(rec.flow) do
+      agg.flow[k] = (agg.flow[k] or 0) + n
+      if rec.won then agg.flowWin[k] = (agg.flowWin[k] or 0) + n end
+    end
+    if rec.won then agg.deckSizeWin = (agg.deckSizeWin or 0) + #(rec.deck or {}) end
+  end
   -- améliorations par palier atteint, cartes du deck final par palier (runner=expedition)
   if rec.upTiers then
     agg.upTiers = agg.upTiers or { 0, 0, 0 }
@@ -864,6 +874,23 @@ local function report(a, title)
       :format(ut[1] / a.runs, ut[2] / a.runs, ut[3] / a.runs, dt[1] / a.runs, dt[2] / a.runs, dt[3] / a.runs))
     out(("Feu de camp : repos %.2f, amélioration %.2f par expédition (%s des feux choisis)"):format(
       (a.campRest or 0) / a.runs, (a.campUp or 0) / a.runs, pct(a.campUp or 0, (a.campUp or 0) + (a.campRest or 0))))
+    -- cartes du deck : entrées par source, récompenses de cartes offertes / refusées, retraits et occasions de
+    -- retrait (visites du marchand avec l'or d'un retrait à l'entrée, rencontres qui en proposent un), par
+    -- expédition puis par victoire (Sim/expedition.lua, record.flow)
+    if a.flow then
+      local function flowLine(f, n, deck)
+        local g = function(k) return (f[k] or 0) / math.max(n, 1) end
+        return ("récompense %.1f, épique %.1f, marchand %.1f, rencontre %.1f, copie %.1f, autre %.1f ; "
+          .. "offertes %.1f, refusées %.1f ; retraits marchand %.2f, rencontre %.2f ; occasions : marchand %.2f, "
+          .. "rencontre %.2f ; deck en fin %.1f"):format(g("reward"), g("epic"), g("shop"), g("event"), g("dupe"),
+          g("other"), g("offered"), g("refused"), g("removedShop"), g("removedEvent"), g("shopCanRemove"),
+          g("eventCanRemove"), deck / math.max(n, 1))
+      end
+      out("Cartes du deck, par expédition : " .. flowLine(a.flow, a.runs, a.deckSize or 0))
+      if a.wins > 0 then
+        out("Cartes du deck, par victoire   : " .. flowLine(a.flowWin or {}, a.wins, a.deckSizeWin or 0))
+      end
+    end
     -- cartes montées le plus haut : expéditions où la carte finit à +2/+3 (copie la plus montée), palier moyen
     -- quand elle est au deck, victoires à +2/+3 contre à +0/+1 (expéditions où elle est au deck)
     local hi = {}

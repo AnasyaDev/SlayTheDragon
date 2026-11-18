@@ -100,14 +100,17 @@ return function(ns)
   end
 
   -- Carte à retirer : la plus faible (Priest : Inner Fire d'abord, puis Smite ; classDef.bot.remove).
-  local function worstCard(exp)
+  -- skip : index jamais choisi (l'épique du deck, politique decksize du bot human).
+  local function worstCard(exp, skip)
     local worst, worstV = nil, math.huge
     local rm = botOf(exp).remove or {}
     for i = 1, #exp.deck do
-      local card = exp.deck[i]
-      local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
-      v = v + Card.level(card) -- carte améliorée : +1 par palier
-      if v < worstV then worst, worstV = i, v end
+      if i ~= skip then
+        local card = exp.deck[i]
+        local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
+        v = v + Card.level(card) -- carte améliorée : +1 par palier
+        if v < worstV then worst, worstV = i, v end
+      end
     end
     return worst, worstV
   end
@@ -124,6 +127,30 @@ return function(ns)
     return 2 * (r - 5) * 10 / math.max(#exp.deck, 10) / SE.POINTS_PER_UNIT
   end
   SE.cardValue = cardValue
+
+  -- Politique de taille de deck du bot human (decksize=N, Bots.HUMAN_RANGE ; docs/equilibrage.md, « Bot human :
+  -- deck serré ») : deckCap = N pendant l'expédition, nil sinon (bot de référence, decksize=0 : rien ne change).
+  -- Deck à N cartes ou plus : une carte (récompense, marchand, rencontre) n'entre que si sa note perçue dépasse
+  -- celle de la carte qu'il retirerait d'abord (worstCard, l'épique exceptée ; note de choix, carte de départ
+  -- ≈ 3, + SE.UPGRADED_BONUS par palier) de SE.DECKSIZE_MARGIN, plus SE.DECKSIZE_STEP par carte au-delà de N :
+  -- plus le deck déborde, plus la carte doit être bonne (note perçue des meilleures cartes ≈ 9 à 11 : rares
+  -- au-delà de N + 2). Il retire au marchand dès qu'il le peut (avant les bibelots) tant que le deck dépasse N,
+  -- ou qu'il est à N avec une carte à retirer (valeur de retrait ≤ 1,5 : cartes de départ) ; une rencontre
+  -- qui retire vaut SE.DECKSIZE_REMOVE_VALUE, une copie (dupe) ne vaut rien, une carte imposée trop faible
+  -- coûte SE.DECKSIZE_UNWANTED.
+  local deckCap
+  SE.DECKSIZE_MARGIN, SE.DECKSIZE_STEP = 1.5, 2.5
+  SE.DECKSIZE_REMOVE_VALUE, SE.DECKSIZE_UNWANTED = 2.5, 0.5
+  local function capFull(exp) return deckCap and #exp.deck >= deckCap end
+  -- Note perçue qu'une carte doit atteindre pour entrer dans le deck plein, nil sous deckCap.
+  local function capThreshold(exp)
+    if not capFull(exp) then return nil end
+    local w = worstCard(exp, X.epicIndex(exp))
+    if not w then return nil end
+    local card = exp.deck[w]
+    return rating(card.id) + SE.UPGRADED_BONUS * Card.level(card) + SE.DECKSIZE_MARGIN
+      + SE.DECKSIZE_STEP * (#exp.deck - deckCap)
+  end
 
   -- Note espérée de la meilleure de n cartes tirées sans remise dans pool (choix « une parmi n, ou passer ») :
   -- la k-ième plus faible des N notes est la meilleure avec la probabilité C(k-1, n-1) / C(N, n).
@@ -285,18 +312,21 @@ return function(ns)
       elseif k == "gold" then v = v + e[2] * 0.03
       elseif k == "pay" or k == "loseGold" then v = v - e[2] * 0.03
       elseif k == "card" then
-        -- carte imposée : sa valeur dans ce deck, négative si elle l'affaiblit
-        v = v + cardValue(exp, rating(e[2]) + (e.up and SE.UPGRADED_BONUS or 0))
+        -- carte imposée : sa valeur dans ce deck, négative si elle l'affaiblit (deck plein, decksize : en
+        -- dessous du seuil d'entrée, elle coûte SE.DECKSIZE_UNWANTED)
+        local r, th = rating(e[2]) + (e.up and SE.UPGRADED_BONUS or 0), capThreshold(exp)
+        if th and r < th then v = v - SE.DECKSIZE_UNWANTED else v = v + cardValue(exp, r) end
       elseif k == "cardChoice" then
-        -- une parmi n, ou passer : la meilleure espérée, jamais moins que rien
-        v = v + math.max(0, cardValue(exp, expectedBest(choicePool(exp, e), e.n or 3)))
+        -- une parmi n, ou passer : la meilleure espérée, jamais moins que rien (deck plein : rien sous le seuil)
+        local r, th = expectedBest(choicePool(exp, e), e.n or 3), capThreshold(exp)
+        if not th or r >= th then v = v + math.max(0, cardValue(exp, r)) end
       elseif k == "relic" then v = v + 3
       elseif k == "potion" then v = v + (X.freeSlot(exp) and 1 or 0)
       elseif k == "losePotion" then v = v - 1
       elseif k == "upgradeRandom" then v = v + 0.8 * e[2]
       elseif k == "upgrade" then v = v + 1
-      elseif k == "remove" then v = v + 1.2
-      elseif k == "dupe" then v = v + 1.3
+      elseif k == "remove" then v = v + (capFull(exp) and SE.DECKSIZE_REMOVE_VALUE or 1.2)
+      elseif k == "dupe" then v = v + (capFull(exp) and 0 or 1.3)
       elseif k == "fight" then
         -- Récompense attendue contre PV perdus en moyenne (mesurés à clé +0 : normal ≈ 15,
         -- élite ≈ 20 ; à +3 : 20 et 35) ; un combat optionnel (surtout d'élite) devient un risque de mort
@@ -487,6 +517,9 @@ return function(ns)
       if not bestR or r > bestR then best, bestR = i, r end
     end
     if opts.pick ~= "always" and bestR < H.takeMin then return nil end
+    -- deck plein (decksize) : seulement une carte nettement meilleure que celle qu'il retirerait d'abord
+    local th = opts.pick ~= "always" and capThreshold(exp)
+    if th and bestR < th then return nil end
     return best
   end
 
@@ -597,6 +630,12 @@ return function(ns)
       return { "upgrade", up }
     elseif ph == "merchant" then
       local s = exp.shop
+      -- deck plein (decksize) : retrait d'abord, autant de fois que l'or le permet, tant que le deck dépasse N
+      -- ou qu'il est à N avec une carte de départ (valeur de retrait ≤ 1,5) ; jamais l'épique
+      if capFull(exp) and #exp.deck > 8 and exp.gold >= X.removePrice(exp) then
+        local w, wv = worstCard(exp, X.epicIndex(exp))
+        if w and (#exp.deck > deckCap or wv <= 1.5) then return { "remove", w } end
+      end
       for i, it in ipairs(s.relics) do
         if not it.sold and exp.gold >= it.price then return { "buyRelic", i } end
       end
@@ -617,7 +656,8 @@ return function(ns)
             v = epicGain(exp, it.id)
           else
             local r = humanRating(exp, H, hrng, it.id)
-            v = r >= H.takeMin and shopCardValue(exp, it, math.max(r, 5.5)) or -1
+            local th = capThreshold(exp) -- deck plein (decksize) : seuil d'entrée
+            v = r >= H.takeMin and (not th or r >= th) and shopCardValue(exp, it, math.max(r, 5.5)) or -1
           end
           v = v - priceCost(exp, it.price)
           if v > 0 and (not bestR or v > bestR) then best, bestR = i, v end
@@ -645,6 +685,12 @@ return function(ns)
       return best or { "leave" }
     elseif ph == "select" and exp.select.kind == "upgrade" then
       local i = humanUpgrade(exp, H, hrng)
+      if i then return { "select", i } end
+      return { "skipSelect" }
+    elseif ph == "select" and exp.select.kind == "dupe" and capFull(exp) then
+      return { "skipSelect" } -- deck plein (decksize) : pas de copie
+    elseif ph == "select" and exp.select.kind == "remove" and deckCap then
+      local i = worstCard(exp, X.epicIndex(exp)) -- decksize : jamais l'épique
       if i then return { "select", i } end
       return { "skipSelect" }
     end
@@ -726,13 +772,21 @@ return function(ns)
     local rng = Rng.stream(seed, "policy")
     -- bot=human : paramètres (opts.human = { skill = …, width = … }, Bots.humanParams) et flux de son jugement
     local H, hrng
+    deckCap = nil
     if opts.bot == "human" then
       H = opts.humanH or Bots.humanParams(opts.human)
       opts.humanH = H
       hrng = Rng.stream(seed, "human")
       humanShop, humanRemove, humanRoute = nil, nil, nil
+      if (H.decksize or 0) > 0 then deckCap = H.decksize end
     end
-    local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {}, zones = {} }
+    -- flow : cartes entrées par source (récompense de combat ou de rencontre, épique, marchand, carte imposée par
+    -- une rencontre, copie), récompenses de cartes offertes et refusées, retraits (marchand, rencontre), visites du
+    -- marchand avec de quoi payer un retrait à l'entrée, rencontres offrant un retrait (rapport : « Cartes du deck »)
+    local flow = { offered = 0, refused = 0, reward = 0, epic = 0, shop = 0, event = 0, dupe = 0, other = 0,
+      removedShop = 0, removedEvent = 0, shopCanRemove = 0, eventCanRemove = 0 }
+    local flowEvent -- dernière rencontre examinée (eventCanRemove)
+    local record = { seed = seed, won = false, floor = 0, combats = {}, picks = {}, zones = {}, flow = flow }
     -- entrée dans chaque zone (après le soin du passage) : PV, PV max, taille du deck, épique au deck
     local function enterZone()
       record.zones[#record.zones + 1] = { zone = exp.zone, hp = exp.hp, maxHp = exp.maxHp, deck = #exp.deck,
@@ -775,6 +829,7 @@ return function(ns)
         end
         visit = { zone = exp.zone, gold = exp.gold, total = total, items = items, up = up, epic = epic }
         record.shops[#record.shops + 1] = visit
+        if exp.gold >= X.removePrice(exp) then flow.shopCanRemove = flow.shopCanRemove + 1 end
       end
     end
     enterZone()
@@ -788,9 +843,23 @@ return function(ns)
         break
       end
       if exp.phase == "combat" then
+        local a0 = exp.stats.cardsAdded
         fight(exp, opts, record)
+        flow.other = flow.other + exp.stats.cardsAdded - a0
       else
         local before = exp.phase
+        local a0, r0 = exp.stats.cardsAdded, exp.stats.removed
+        local selKind = before == "select" and exp.select.kind
+        if before == "event" and exp.event ~= flowEvent then
+          -- rencontre qui propose un retrait (vue une fois)
+          flowEvent = exp.event
+          local def = exp.event.id and not exp.event.chosen and ns.Events[exp.event.id]
+          for _, c in ipairs(def and def.choices or {}) do
+            local found
+            for _, e in ipairs(c.effects or {}) do if e[1] == "remove" then found = true end end
+            if found then flow.eventCanRemove = flow.eventCanRemove + 1 break end
+          end
+        end
         local a = H and humanDecide(exp, opts, H, hrng) or decide(exp, opts, rng)
         if exp.phase == "reward" and a[1] == "pickCard" then
           record.picks[#record.picks + 1] = exp.reward.cards[a[2]]
@@ -803,6 +872,15 @@ return function(ns)
         end
         local ok, why = X.act(exp, a)
         if not ok then error(("action refusée en phase %s : %s (%s)"):format(before, tostring(a[1]), tostring(why))) end
+        if before == "reward" and (a[1] == "pickCard" or a[1] == "skipCards") then
+          flow.offered = flow.offered + 1
+          if a[1] == "skipCards" then flow.refused = flow.refused + 1 end
+        end
+        local src = before == "reward" and (a[1] == "pickEpic" and "epic" or "reward") or before == "merchant" and "shop"
+          or before == "event" and "event" or selKind == "dupe" and "dupe" or "other"
+        flow[src] = flow[src] + exp.stats.cardsAdded - a0
+        local rk = before == "merchant" and "removedShop" or "removedEvent"
+        flow[rk] = flow[rk] + exp.stats.removed - r0
       end
     end
     closeVisit()

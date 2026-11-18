@@ -1416,3 +1416,77 @@ elle finit 49 % des tours en Moonkin (sans Absorb) et perd 31 PV nets par boss (
   dans `docs/classes/druid.md`, § 11, question 4.
 - Non vérifié : bot heuristic, autres graines, clés 1 à 5, épiques du Druid ; Balance n'a été mesurée qu'en
   chiffres de socle (aucune carte retouchée).
+
+## Bot human : deck serré (19/11/2026)
+
+Constat (matrice du 19/11, bot `human`, clé 0, niveau 7, `zones=0`, 600 expéditions, graine 1) : « deck mince »
+(`takeMin=5 removeRate=1`) et « deck épais » (`takeMin=1 removeRate=0`) finissaient avec le même deck (41 à 45 cartes à
+l'entrée de Blackrock) et les mêmes victoires. Compteurs ajoutés au rapport (lignes « Cartes du deck, par
+expédition / par victoire » : cartes entrées par source, récompenses offertes et refusées, retraits au marchand et en
+rencontre, occasions de retrait), Warrior, par victoire (sept zones) :
+
+| | référence | mince (`takeMin=5 removeRate=1`) | `decksize=20` |
+|---|---|---|---|
+| récompenses de cartes offertes / refusées | 38,1 / **0,0** | 38,1 / **0,0** | 38,1 / 19,4 |
+| cartes entrées : récompenses / marchand / rencontres, copies, épiques | 38,1 / 2,0 / 0 | 38,1 / 0,9 / 0 | 18,6 / 1,5 / 0 |
+| retraits : marchand / rencontre | 1,62 / 0,14 | 2,73 / 0,14 | 5,93 / 0,15 |
+| visites du marchand avec l'or d'un retrait / rencontres qui en proposent un | 4,05 / 0,54 | 4,04 / 0,54 | 3,89 / 0,54 |
+| deck en fin | 48,4 | 46,2 | 24,1 |
+
+Pourquoi les anciens réglages ne mordaient pas : `takeMin` se compare à la note **perçue** de la meilleure des
+trois cartes (note de choix ≈ 3,5 à 9, + bruit σ 1,65, + 0,5 à 1 pour une rare, + 0,75 pour une carte nouvelle) :
+elle vaut ≈ 7 à 9, et même à `takeMin=5` le bot n'a refusé aucune des 38 récompenses d'une victoire. Les récompenses
+de combat (et les choix de cartes des rencontres) font ≈ 95 % des entrées ; le marchand 1 à 2 cartes ; les cartes
+imposées par une rencontre, les copies et les épiques (aucune à `zones=0`) rien. `removeRate` ne retire que les
+cartes de départ (valeur de retrait ≤ 1,5), au marchand après les bibelots : 1,8 retrait par victoire à 0,5, 2,9 à 1.
+Refuser est toujours possible (« Skip » à chaque récompense) : rien dans le jeu n'empêche un deck serré, c'était le
+bot qui ne refusait jamais.
+
+Politique `decksize=N` (`Sim/expedition.lua`, `deckCap` ; paramètre de `Bots.HUMAN_RANGE`, 0 = désactivée, absente
+des paramètres et du rapport : rapport de référence identique ligne pour ligne, hors les deux lignes ajoutées,
+Warrior 600 avant / après). Sous N, rien ne change. À N et au-delà, une carte offerte (récompense, marchand, choix
+de rencontre) n'entre que si sa note perçue dépasse celle de la carte qu'il retirerait d'abord (l'épique exceptée ;
+carte de départ ≈ 3) de 1,5, plus 2,5 par carte au-delà de N (`SE.DECKSIZE_MARGIN`, `SE.DECKSIZE_STEP`) ; au
+marchand il retire avant tout achat, autant que l'or le permet, tant que le deck dépasse N (ou à N s'il reste une
+carte de départ) ; une rencontre qui retire vaut plus (2,5), une copie rien, une carte imposée trop faible coûte 0,5.
+Le feu de camp n'offre pas de retrait (aucune action de zone ne le fait) : marchand et rencontres seulement.
+
+Mesures (bot `human`, clé 0, niveau 7, 600 expéditions, graine 1, ± 3,7 à 4,0 ; mêmes graines, donc comparaisons
+appariées ; victoires % / deck à l'entrée de Blackrock / deck en fin des victoires) :
+
+| Classe | référence | `decksize=20` | `decksize=25` | `decksize=30` | Westfall battue |
+|---|---|---|---|---|---|
+| Priest | 53,5 / 42,8 / 48,2 | 53,5 / 22,7 / 22,8 | 54,8 / 27,6 / 27,7 | 55,3 / 32,5 / 32,6 | 77,5 |
+| Warrior | 68,5 / 43,0 / 48,4 | 65,8 / 24,0 / 24,1 | 67,3 / 28,9 / 29,0 | 68,5 / 33,8 / 33,9 | 77,5 |
+| Mage | 60,7 / 42,9 / 48,6 | 60,0 / 23,7 / 23,8 | 60,5 / 28,6 / 28,7 | 60,0 / 33,4 / 33,6 | 76,7 |
+| Rogue | 57,2 / 42,4 / 48,0 | **51,3** / 23,6 / 23,7 | 54,3 / 28,5 / 28,6 | 56,3 / 33,3 / 33,5 | 80,7 |
+| Hunter | 59,3 / 41,8 / 47,2 | 59,7 / 23,1 / 23,2 | 59,3 / 28,0 / 28,1 | 62,5 / 32,8 / 33,0 | 86,7 |
+| Druid | 51,8 / 42,2 / 47,6 | **46,7** / 22,7 / 22,7 | 49,7 / 27,6 / 27,6 | 52,0 / 32,5 / 32,5 | 71,2 |
+| Moyenne | 58,5 | 56,2 | 57,7 | 59,1 | |
+
+Deck à l'entrée de chaque zone (Westfall, Duskwood, Wetlands, Stranglethorn, Swamp, Steppes, Blackrock ; écart
+entre classes) : référence 10 / 15,6 / 20,9 / 26,4 / 31,8 / 37,2 / 42,5 (± 0,6) ; `20` 10 / 15,6 / 20,8 / 22,4–23,5 /
+22,6–23,8 / 22,6–24,0 / 22,7–24,0 ; `25` 10 / 15,6 / 20,9 / 25,9–26,4 / 27,4–28,5 / 27,5–28,8 / 27,6–28,9 ; `30` 10 /
+15,6 / 20,9 / 26,1–26,6 / 31,0–31,7 / 32,3–33,4 / 32,5–33,8. Le deck tient à N + 3 environ : la marge croissante
+laisse entrer les meilleures cartes, et les ≈ 4 visites payables du marchand par victoire suffisent à retirer ≈ 6
+cartes (75 pièces, puis + 25 à chaque retrait). Westfall (deck de 10 à 16 cartes) n'est jamais touchée : la
+politique n'agit qu'à partir de la fin de Duskwood à `20`, des Wetlands à `25`, de Stranglethorn à `30`.
+
+Lecture :
+- Un deck serré est possible sans changer le jeu : refuser une récompense sur deux suffit, les retraits ne servent
+  qu'à sortir les cartes de départ. Tenir N pile (et non N + 3) ne demande que de refuser davantage ; descendre sous
+  ≈ 15 cartes demanderait de retirer les cartes de départ de base (8 au Priest), soit ≈ 8 retraits (≈ 1 300 pièces au tarif croissant,
+  plus que l'or gagné en moyenne sur une expédition, ≈ 1 000 à 1 100).
+- Il n'est pas meilleur pour ce bot : à `30`, mêmes victoires que la référence (59,1 contre 58,5 de moyenne ; Hunter
+  +3,2, Priest +1,8, les autres à ± 1) ; à `25` légèrement moins (− 0,8) ; à `20` moins (− 2,3), surtout le
+  **Rogue (− 5,9)** et le **Druid (− 5,1)**, qui perdent aux Wetlands et à Stranglethorn (Rogue 89,3 → 88,3 et
+  96,5 → 91,2 % battue/atteinte ; Druid 86,9 → 83,8 et 97,5 → 94,3), quand le deck vient d'être plafonné avec encore
+  ses cartes de départ. Le Priest gagne à Blackrock (87,0 → 91,5) et finit à égalité ; Mage et Hunter n'y voient rien.
+- La note de choix mesure l'effet d'une carte ajoutée au deck de départ de 10 cartes : elle ne dit rien de ce qu'une
+  carte apporte dans un deck de 40 où elle est piochée quatre fois moins. Un deck épais ne coûtant rien ici, les
+  cartes à combo ou à synergie (qui gagnent à être piochées souvent) ne sont pas récompensées par ce bot : c'est une
+  limite de la mesure, pas une preuve qu'un deck serré ne vaut rien pour un joueur qui construit autour d'une idée.
+
+Rapports bruts : `reports/decksize/` (`<classe>-ref|20|25|30.txt`, `warrior-thin.txt`). Non vérifié : autres graines,
+clés 1 à 5, `zones=7` (épiques en jeu : une épique pèse plus dans un deck serré), `upfocus=1` combiné (moins de
+cartes à améliorer), valeurs de `SE.DECKSIZE_MARGIN` / `SE.DECKSIZE_STEP`.

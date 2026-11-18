@@ -2764,5 +2764,41 @@ test("même graine jouée seule ou après une autre expédition : mêmes décisi
   eq(expSig(after), expSig(alone), "graine 453 après la 451 : ")
 end)
 
+test("bot human, decksize=N : désactivé = mêmes décisions, activé = deck plafonné", function()
+  local Bots = ns.Bots
+  local function sig(r)
+    local ids, zs = {}, {}
+    for i, card in ipairs(r.deck) do ids[i] = card.id .. (card.up and "+" or "") end
+    for i, z in ipairs(r.zones) do zs[i] = z.zone .. ":" .. z.deck end
+    return table.concat({ tostring(r.won), r.floor, r.hp, r.gold, table.concat(ids, ","),
+      table.concat(r.picks, ","), #r.combats, table.concat(zs, ",") }, "|")
+  end
+  -- 0 = désactivée : absente des paramètres (ligne « Joueur humain » du rapport inchangée)
+  eq(Bots.humanParams().decksize, nil)
+  eq(Bots.humanParams({ decksize = 0 }).decksize, nil)
+  eq(Bots.humanParams({ decksize = "20" }).decksize, 20)
+  local function play(cls, seed, n)
+    return ns.SimExpedition.play({ seed = seed, bot = "human", class = cls, level = 7, maxZone = "duskwood",
+      human = n and { decksize = n } or nil })
+  end
+  -- désactivée : mêmes décisions à graine égale que sans le paramètre
+  for _, cls in ipairs({ "warrior", "priest" }) do
+    eq(sig(play(cls, 3, 0)), sig(play(cls, 3)), cls .. " decksize=0 : ")
+  end
+  -- activée (N = 12, Westfall et Duskwood) : le deck ne déborde que de peu (seuil d'entrée croissant), il
+  -- refuse des récompenses ; sans elle, le même deck grossit bien au-delà
+  local N, bigger, refused = 12, 0, 0
+  for seed = 1, 3 do
+    local free, capped = play("warrior", seed), play("warrior", seed, N)
+    for _, z in ipairs(capped.zones) do assert(z.deck <= N + 4, "deck à l'entrée de " .. z.zone .. " : " .. z.deck) end
+    assert(#capped.deck <= N + 4, "deck en fin : " .. #capped.deck)
+    if #free.deck > #capped.deck then bigger = bigger + 1 end
+    refused = refused + capped.flow.refused
+    eq(free.flow.refused, 0, "takeMin par défaut : aucun refus ")
+  end
+  assert(bigger > 0, "plafond sans effet sur le deck")
+  assert(refused > 0, "aucune récompense refusée deck plein")
+end)
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end
