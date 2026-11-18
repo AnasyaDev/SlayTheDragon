@@ -217,6 +217,43 @@ Début du tour : Absorb à 0, états `clearAtTurnStart` retirés, DoT et Regen, 
 récente : `c.player.cast` puis `c.player.castMore`), recharges, pioche, `onTurnStart`, intentions.
 Une interruption ennemie coupe l'incantation **la plus récente**.
 
+### Coup sans carte (`Combat.strike`, `Core/Companion.lua`, 18/11/2026)
+
+Un coup du joueur porté sans carte (familier du Hunter ; Druid : frappe de l'ours, coups à tous de fin de tour de
+Moonkin) passe par une seule fonction, qui ne lit aucune règle de classe :
+
+`Combat.strike(c, why, base, target, log, event, opts)` → dégâts calculés sur la première cible (0 : aucun coup).
+
+- Calcul : `Combat.calcDamage(c, c.player, cible, base [+ c.player.res], nil)` (cardDef nil : Strength et
+  Demoralized du joueur, Sundered et Absorb de la cible ; ni bonus « Attacks » des cartes, Powers et bibelots, ni
+  crochet `attackMult`). Le crochet `damage` de la classe est appelé avec `d = nil` : il doit le vérifier.
+- `target` : une unité ennemie déjà choisie (morte ou nil : rien), `"last"` (`Combat.strikeTarget(c)` : la
+  dernière cible visée vivante, sinon l'ennemi vivant le plus à gauche) ou `"all"` (chaque ennemi vivant, de gauche
+  à droite).
+- `log` : type du journal, une entrée par ennemi touché juste avant le coup, `{ t = log, dst, dmg, why }` (plus
+  `all = true` quand le coup touche tous les ennemis) ; la vue de la classe l'anime (`event`).
+- `event` : émis **une fois** après les coups (`Combat.fire(c, event, première cible, dégâts, why)`), sauf si le
+  combat est fini ; `nil` = aucun.
+- `opts` (facultatif, jamais modifié : une table constante peut resservir) : `res` (la ressource s'ajoute à
+  `base`, relue à chaque coup), `all` (après la cible, chaque autre ennemi vivant), `less` (les ennemis autres que
+  le premier prennent n de moins, jamais sous 0), `gain` / `gainWhy` (`Combat.gainRes` après les coups, avant
+  l'événement), `count` / `total` (clés de `c.stats` : nombre de coups et dégâts), `kind` (genre du coup pour les
+  crochets de zone, `c.hitKind`, posé le temps des coups puis remis ; `hitAll` vrai avec `"all"` ou `all`).
+- Combat fini pendant les coups : les coups suivants, le gain et l'événement sont sautés.
+- `Combat.strikeDamage(c, cible, base, addRes)` : dégâts du prochain coup (affichage, bots).
+
+Exemples (Druid, à coder par la classe ; noms de journal et d'événement à elle) :
+
+```lua
+-- frappe de l'ours (fin de tour en Bear, « Bear strikes. ») : 1 + Frenzy sur la dernière cible, puis +1
+Combat.strike(c, "auto", 1, "last", "bear_strike", "onBearStrike", BEAR) -- BEAR = { res = true, gain = 1, gainWhy = "strike" }
+-- Surge (« Bear strikes once per Frenzy. ») : au montant compté, sans gain
+Combat.strike(c, "surge", 1 + ctx.surge, "last", "bear_strike", "onBearStrike")
+-- coups à tous de fin de tour en Moonkin : ceil(Charges / 2), 3 au plus, réserve lue sans gain
+local n = math.min(3, math.ceil((c.player.res or 0) / 2))
+if n > 0 then Combat.strike(c, "auto", n, "all", "moonkin_pulse", "onMoonkinPulse") end
+```
+
 ## Langage des cartes (`Core/Language.lua`)
 
 Registre partagé par le moteur, l'interface (couleurs, coupures, explications au survol) et le harnais.
@@ -417,12 +454,12 @@ ns.ClassRules.rogue = { hooks = {
 | Instant, double Cast (Mage) | état commun `instant`, `castSlots` = 2, file `cast` + `castMore` (interruption : la plus récente), `onCastResolved`, `onCardCommitted` + `c.turn.bySchool` (Hot Streak), condition `school:fire` |
 | Pay N HP, démon (Warlock) | `payHp` (crochet `payHp`, `onPayHp`), Power `slot = "demon"`, `replacedTo = "exhaust"`, `onTurnEnd`, `c.player.lastTarget`, `dotDecay`, `onDotTick`, `onEnemyDeath` |
 | Powers de fin de tour | `onTurnEnd` sur le Power (avant la défausse) |
-| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua ; `Hunter.petAttackOn(c, why, ennemi)` : cible imposée le temps d'une attaque, Trap Launcher, Black Arrow) : coup « sans carte » (`calcDamage` avec cardDef nil) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
+| Familier (Hunter) | `ns.Hunter.petAttack(c, why, frenzy)` (Core/Classes/hunter.lua ; `Hunter.petAttackOn(c, why, ennemi)` : cible imposée le temps d'une attaque, Trap Launcher, Black Arrow) : coup sans carte commun `Combat.strike` (Core/Companion.lua, « Coup sans carte » ci-dessus ; le Hunter y ajoute `PET_BASE`, `petAbsent`, `petAll` / `petLess`) sur `c.player.lastTarget` ou le premier ennemi vivant, journal `pet_attack`, événement propre `onPetAttack` ; attaque automatique dans le crochet de classe `onTurnEnd` ; effet `{ "pet", n }` (`surge = true` : Bestial Wrath) ; Frenzy = ressource, -1 dans `onRoundEnd` ; condition `careful` (Careful Aim, verdict pris dans `beforeCard`) ; affichage et animation dans `ns.ClassViews.hunter` (`build`, `render`, `event`) |
 | Traps (Hunter) | commun : `trap = true`, zone `c.traps`, déclenchement avant les coups de l'attaque (`Combat.triggerTrap`), `onTrapTriggered` |
 | Stunned pendant le tour ennemi (Trap, riposte) | commun : `Combat.applyStatus` pose `e.stopTurn` si l'ennemi est celui qui agit (`c.acting`) ; `executeMove` arrête le tour avant le coup suivant (aucun coup de l'attaque qui a déclenché l'effet), consomme une charge, journal `{ t = "stunned", stopped = true }` ; « act » n'est journalisé qu'à la première action qui part (`decisions.md`) |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
 | Maelstrom à 5 : Cast instantané | `onResource` + `instantCast` |
-| Formes portées par les cartes, réserve lue selon la forme (Druid, fiche `docs/classes/druid.md`, 18/11/2026) | champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) ; état de classe `c.cls.form` (`nil` au début du combat : sans forme) ; changement au jeu dans le crochet de classe `onCardCommitted` (après les coûts, avant incantation ou résolution), événement propre `onShift(from, to)` ; réserve = ressource commune (`cap = 5`, `keep = true`), Surge, Spend, `minRes` inchangés ; Moonkin : crochet `damage` (comme le Mage) ; effet de fin de tour de la forme active dans `onTurnEnd` : Bear, frappe (comme le familier) et −1 dans `onRoundEnd` ; Cat, état à drapeau Clearcasting (comme Stealth, consommé dans `onCardCommitted`) et crochet de classe `cost` à 0 pour une Attack sans `cast` (comme Slice and Dice) ; Moonkin, coups sans carte à tous (`ceil(res / 2)`, 3 au plus) ; Tree of Life, `Combat.applyStatus(c, c.player, "regen", 1)` ; à ajouter au socle : plaque de tête lue sur une valeur (`d.form`), nom de ressource par forme (« Reserve » hors Cat, Bear, Moonkin ; registre, harnais U27, pastille), frappe commune au familier (une cible ou tous les ennemis) ; les conditions `shift`, `caster`, `bear`, `cat`, `moonkin` et la plaque `shift` de `Core/Language.lua` (ancienne conception) sont à retirer |
+| Formes portées par les cartes, réserve lue selon la forme (Druid, fiche `docs/classes/druid.md`, 18/11/2026) | champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) ; état de classe `c.cls.form` (`nil` au début du combat : sans forme) ; changement au jeu dans le crochet de classe `onCardCommitted` (après les coûts, avant incantation ou résolution), événement propre `onShift(from, to)` ; réserve = ressource commune (`cap = 5`, `keep = true`), Surge, Spend, `minRes` inchangés ; Moonkin : crochet `damage` (comme le Mage) ; effet de fin de tour de la forme active dans `onTurnEnd` : Bear, frappe (comme le familier) et −1 dans `onRoundEnd` ; Cat, état à drapeau Clearcasting (comme Stealth, consommé dans `onCardCommitted`) et crochet de classe `cost` à 0 pour une Attack sans `cast` (comme Slice and Dice) ; Moonkin, coups sans carte à tous (`ceil(res / 2)`, 3 au plus) ; Tree of Life, `Combat.applyStatus(c, c.player, "regen", 1)` ; à ajouter au socle : plaque de tête lue sur une valeur (`d.form`), nom de ressource par forme (« Reserve » hors Cat, Bear, Moonkin ; registre, harnais U27, pastille) ; frappe de l'ours et coups à tous de Moonkin : `Combat.strike` (fait le 18/11/2026, commun avec le familier, journal et événement propres à la classe) ; les conditions `shift`, `caster`, `bear`, `cat`, `moonkin` et la plaque `shift` de `Core/Language.lua` (ancienne conception) sont à retirer |
 | DoT selon la source | `apply … icon = "poison"` → `unit.stIcon`, `Art.statusIcons.poison` |
 
 ## Cartes épiques : points d'accroche (13/11/2026)

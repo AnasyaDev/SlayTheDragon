@@ -3946,5 +3946,113 @@ do
   end)
 end
 
+---------------------------------------------------------------------------
+-- Coup sans carte commun (Combat.strike, Core/Companion.lua) : familier du Hunter, frappe de l'ours et coups à
+-- tous de Moonkin du Druid (docs/classes/druid.md, § 1.3 et § 1.4). Journal et événement propres à l'appelant.
+---------------------------------------------------------------------------
+
+do
+  local HU = { class = "hunter" } -- une classe à ressource (Combat.strike ne lit aucune règle de classe)
+  local HS = { class = "hunter", stats = true } -- avec les compteurs de simulation (c.stats)
+  local seen = {}
+  ns.Cards.test_strike_ear = { id = "test_strike_ear", name = "e", cost = 0, type = "power", power = true,
+    rarity = "common", effects = {}, text = "Power.",
+    hooks = {
+      onTestStrike = function(c, src, t, dmg, why) seen[#seen + 1] = { t = t, dmg = dmg, why = why, res = c.player.res } end,
+      damage = function(c, src, v, dst, d) seen.kind, seen.all = c.hitKind, c.hitAll return v end,
+    } }
+  local function listen(c)
+    c.player.powers[#c.player.powers + 1] = Card.new("test_strike_ear", false, 900)
+  end
+  local function logs(c, t)
+    local out = {}
+    for _, ev in ipairs(c.events) do if ev.t == t then out[#out + 1] = ev end end
+    return out
+  end
+
+  test("Combat.strike, cible « last » : dernière cible visée, morte : le plus à gauche ; base + ressource, gain, journal et événement de l'appelant", function()
+    local c = setup({ "disengage" }, { "test_dummy", "test_dummy", "test_dummy" }, nil, HS)
+    listen(c)
+    seen = {}
+    c.player.res, c.player.lastTarget = 2, c.enemies[3].uid
+    c.events = {}
+    local d = Combat.strike(c, "auto", 1, "last", "bear_strike", "onTestStrike",
+      { res = true, gain = 1, gainWhy = "strike", count = "bearStrikes", total = "bearDamage" })
+    eq(d, 3, "1 + 2"); eq(c.enemies[3].hp, 97); eq(c.enemies[1].hp, 100); eq(c.player.res, 3, "+1 après le coup")
+    local h = logs(c, "bear_strike")
+    eq(#h, 1); eq(h[1].dst, c.enemies[3].uid); eq(h[1].dmg, 3); eq(h[1].why, "auto"); eq(h[1].all, nil)
+    eq(#logs(c, "pet_attack"), 0, "pas de journal du familier")
+    eq(#seen, 1); eq(seen[1].t, c.enemies[3]); eq(seen[1].dmg, 3); eq(seen[1].why, "auto")
+    eq(seen[1].res, 3, "événement après le gain")
+    eq(c.stats.bearStrikes, 1); eq(c.stats.bearDamage, 3)
+    eq(Combat.strikeTarget(c), c.enemies[3])
+    c.enemies[3].hp, c.enemies[3].dead = 0, true
+    eq(Combat.strikeTarget(c), c.enemies[1], "cible morte : le plus à gauche")
+    eq(Combat.strikeDamage(c, c.enemies[1], 1, true), 4); eq(Combat.strikeDamage(c, c.enemies[1], 1), 1)
+    eq(Combat.strike(c, "card", 2, c.enemies[3], "bear_strike"), 0, "unité imposée morte : rien")
+    eq(Combat.strike(c, "card", 2, c.enemies[2], "bear_strike"), 2, "unité imposée, sans opts : base seule")
+    eq(c.enemies[2].hp, 98); eq(c.player.res, 3, "sans gain")
+  end)
+
+  test("Combat.strike, cible « all » : chaque ennemi vivant de gauche à droite, sans bonus de carte, un seul événement ; genre du coup posé puis remis", function()
+    local c = setup({ "disengage" }, { "test_dummy", "test_dummy", "test_dummy" }, nil,
+      { class = "hunter", relics = { "light_quiver", "rhokdelar" } })
+    listen(c)
+    seen = {}
+    c.enemies[2].hp, c.enemies[2].dead = 0, true
+    c.player.res, c.player.lastTarget = 5, c.enemies[3].uid
+    Combat.applyStatus(c, c.player, "force", 1)
+    Combat.applyStatus(c, c.enemies[3], "armor_broken", 2)
+    c.events = {}
+    c.hitKind, c.hitAll = "card", false
+    local d = Combat.strike(c, "auto", 3, "all", "moonkin_pulse", "onTestStrike", { kind = "other" })
+    eq(d, 4, "3 + Strength, sur le premier"); eq(c.enemies[1].hp, 96); eq(c.enemies[3].hp, 100 - 5, "Sundered")
+    local h = logs(c, "moonkin_pulse")
+    eq(#h, 2); eq(h[1].dst, c.enemies[1].uid, "de gauche à droite, pas la dernière cible d'abord")
+    eq(h[2].dst, c.enemies[3].uid); eq(h[1].all, true); eq(h[2].dmg, 5)
+    eq(#seen, 1, "un événement par coup sans carte"); eq(seen[1].t, c.enemies[1]); eq(seen[1].dmg, 4)
+    eq(c.player.res, 5, "réserve lue, ni dépensée ni gagnée")
+    eq(seen.kind, "other"); eq(seen.all, true)
+    eq(c.hitKind, "card", "genre remis"); eq(c.hitAll, false)
+  end)
+
+  test("Combat.strike : all + less (la cible d'abord, les autres moins), combat gagné en cours : ni coups suivants, ni gain, ni événement", function()
+    local c = setup({ "disengage" }, { "test_dummy", "test_dummy", "test_dummy" }, nil, HU)
+    listen(c)
+    seen = {}
+    c.player.res = 0
+    c.events = {}
+    local d = Combat.strike(c, "card", 3, c.enemies[2], "bear_strike", "onTestStrike", { all = true, less = 2, gain = 1 })
+    eq(d, 3); eq(c.enemies[2].hp, 97); eq(c.enemies[1].hp, 99); eq(c.enemies[3].hp, 99)
+    eq(logs(c, "bear_strike")[1].dst, c.enemies[2].uid, "la cible d'abord")
+    eq(c.player.res, 1, "un seul gain"); eq(#seen, 1)
+    local w = setup({ "disengage" }, { "test_dummy", "test_dummy" }, nil, HU)
+    listen(w)
+    seen = {}
+    w.enemies[1].hp, w.enemies[2].hp = 2, 2
+    w.player.res = 0
+    w.events = {}
+    Combat.strike(w, "auto", 2, "all", "moonkin_pulse", "onTestStrike", { gain = 1 })
+    eq(w.result, "won"); eq(#logs(w, "moonkin_pulse"), 2)
+    eq(w.player.res, 0, "pas de gain"); eq(#seen, 0, "pas d'événement")
+    eq(Combat.strike(w, "auto", 2, "all", "moonkin_pulse"), 0, "combat fini : rien")
+  end)
+
+  test("Combat.strike : le familier du Hunter passe par le coup commun (journal pet_attack, onPetAttack, compteurs)", function()
+    local c = setup({ "disengage" }, { "test_dummy", "test_dummy" }, nil, HS)
+    c.player.res, c.player.lastTarget = 2, c.enemies[2].uid
+    c.events = {}
+    eq(ns.Hunter.petAttack(c, "card"), ns.Hunter.PET_BASE + 2)
+    local h = logs(c, "pet_attack")
+    eq(#h, 1); eq(h[1].dst, c.enemies[2].uid); eq(h[1].why, "card")
+    eq(c.player.res, 3); eq(c.stats.petAttacks, 1); eq(c.stats.petDamage, ns.Hunter.PET_BASE + 2)
+    c.events = {}
+    eq(ns.Hunter.petAttack(c, "surge", 1), ns.Hunter.PET_BASE + 1, "Surge : le Frenzy compté")
+    eq(c.player.res, 3, "Surge : sans gain")
+  end)
+
+  ns.Cards.test_strike_ear = nil
+end
+
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

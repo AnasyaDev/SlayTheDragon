@@ -14,6 +14,7 @@ Core\Statuses.lua
 Core\Language.lua
 Core\Combat.lua
 Core\Effects.lua
+Core\Companion.lua
 Core\Rewards.lua
 Core\Map.lua
 Core\Zones.lua

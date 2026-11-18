@@ -84,15 +84,7 @@ function Hunter.petTarget(c)
     local e = Combat.enemyByUid(c, force)
     if e and not e.dead then return e end
   end
-  local uid = c.player.lastTarget
-  if uid then
-    local e = Combat.enemyByUid(c, uid)
-    if e and not e.dead then return e end
-  end
-  for i = 1, #c.enemies do
-    if not c.enemies[i].dead then return c.enemies[i] end
-  end
-  return nil
+  return Combat.strikeTarget(c)
 end
 
 -- Dégâts du prochain coup du familier sur sa cible (affichage, bots), frenzy facultatif.
@@ -100,11 +92,6 @@ function Hunter.petDamage(c, t, frenzy)
   t = t or Hunter.petTarget(c)
   if not t then return 0 end
   return Combat.calcDamage(c, c.player, t, Hunter.PET_BASE + (frenzy or c.player.res or 0), nil)
-end
-
-local function stat(c, key, n)
-  local s = c.stats
-  if s then s[key] = (s[key] or 0) + (n or 1) end
 end
 
 -- Une attaque du familier. why : "auto" (fin de tour), "card", "relic", "surge" (pas de Frenzy gagné) ;
@@ -127,42 +114,18 @@ function Hunter.petLess(c)
   return math.max(0, Combat.modify(c, "petLess", 0) or 0)
 end
 
+-- Le coup lui-même est le coup sans carte commun (Combat.strike, Core/Companion.lua) : base PET_BASE + Frenzy
+-- (relu à chaque coup ; Surge : le Frenzy compté), cible du familier puis, avec petAll, les autres ennemis
+-- vivants petLess de moins ; journal « pet_attack », +1 Frenzy (sauf Surge), événement « onPetAttack ».
 function Hunter.petAttack(c, why, frenzy)
   if c.result then return 0 end
   if not Hunter.petPresent(c) then return 0 end
   local t = Hunter.petTarget(c)
   if not t then return 0 end
-  local dmg = Hunter.petDamage(c, t, frenzy)
-  if Hunter.petAll(c) then
-    -- tous les ennemis vivants, la cible du familier d'abord ; dmg rendu = celui de la cible ; les autres
-    -- petLess de moins
-    local list = { t }
-    for i = 1, #c.enemies do
-      local o = c.enemies[i]
-      if o ~= t and not o.dead then list[#list + 1] = o end
-    end
-    local less = Hunter.petLess(c)
-    for i = 1, #list do
-      local o = list[i]
-      if not o.dead and not c.result then
-        local d = Hunter.petDamage(c, o, frenzy)
-        if i > 1 then d = math.max(0, d - less) end
-        Combat.log(c, { t = "pet_attack", dst = o.uid, dmg = d, why = why, all = true })
-        stat(c, "petAttacks")
-        stat(c, "petDamage", d)
-        Combat.dealDamage(c, c.player, o, d)
-      end
-    end
-  else
-    Combat.log(c, { t = "pet_attack", dst = t.uid, dmg = dmg, why = why })
-    stat(c, "petAttacks")
-    stat(c, "petDamage", dmg)
-    Combat.dealDamage(c, c.player, t, dmg)
-  end
-  if c.result then return dmg end
-  if why ~= "surge" then Combat.gainRes(c, 1, "pet") end
-  Combat.fire(c, "onPetAttack", t, dmg, why)
-  return dmg
+  local all = Hunter.petAll(c)
+  local opts = { res = frenzy == nil, gain = why ~= "surge" and 1 or 0, gainWhy = "pet",
+    count = "petAttacks", total = "petDamage", all = all, less = all and Hunter.petLess(c) or nil }
+  return Combat.strike(c, why, Hunter.PET_BASE + (frenzy or 0), t, "pet_attack", "onPetAttack", opts)
 end
 
 -- Une attaque du familier sur la cible imposée e (Trap Launcher, Black Arrow), sans changer sa cible
