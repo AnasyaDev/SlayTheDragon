@@ -844,6 +844,22 @@ local function report(a, title)
       end
       out(("  %-30s %s"):format(key, table.concat(cols, "  ")))
     end
+    -- Druid (docs/classes/druid.md, § 9 et § 10) : part des tours finis dans chaque forme (compteurs
+    -- druid_end_<forme> de Core/Classes/druid.lua, tous combats), changements de forme par tour
+    local function sum(key)
+      local t = 0
+      for _, n in pairs(a.zoneStats[key] or {}) do t = t + n end
+      return t
+    end
+    local forms = { "bear", "cat", "moonkin", "tree", "none" }
+    local ends = 0
+    for _, f in ipairs(forms) do ends = ends + sum("druid_end_" .. f) end
+    if ends > 0 then
+      local cols = {}
+      for _, f in ipairs(forms) do cols[#cols + 1] = ("%s %s"):format(f, pct(sum("druid_end_" .. f), ends)) end
+      out(("Druid, forme de fin de tour (%d tours) : %s ; changements de forme par tour : %.2f"):format(ends,
+        table.concat(cols, ", "), sum("druid_shifts") / ends))
+    end
   end
   out(("Durée : %d s (CPU du parent %.1f s)"):format(elapsed, os.clock() - clock0))
   return table.concat(lines, "\n")

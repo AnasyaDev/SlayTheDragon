@@ -128,6 +128,7 @@ return function(ns)
   local function isDamagingAttack(d) return isAttack(d) and dealsDamage(d) end
   local function isShadow(d) return d.school == "shadow" end
   local function isCast(d) return d.cast end
+  local function isCatAttack(d) return d.type == "attack" and d.form == "cat" end
   local function givesAbsorb(d)
     for i = 1, #d.effects do if d.effects[i][1] == "absorb" then return true end end
     return false
@@ -203,6 +204,18 @@ return function(ns)
     lock_and_load = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 20, 20, 26) end,
     resourcefulness = function(c, inst) return T * perTurn(c, isTrap) * up(inst, 25, 25, 25, 25 + 3 * W.hp) end,
     feign_death = function(c, inst) return lastBreath(c) + up(inst, 0, 0, 4 * W.hp) end,
+    -- Druid (docs/classes/druid.md, § 9 ; estimations de départ, réglage des bots : lot à part)
+    thorns = function(c, inst) return T * aliveCount(c) * 0.8 * up(inst, 3, 3, 4) * W.enemyHp end,
+    rebirth = function(c, inst) return lastBreath(c) + up(inst, 0, 0, 4 * W.hp) end,
+    gift_of_nature = function(c, inst)
+      local regen = (c.player.st.regen or 0) > 0 and 1 or 0.4
+      return T * playsOf(c, isAttack) * regen * up(inst, 2, 2, 2, 3) * W.enemyHp
+    end,
+    natures_grace = function(c) return T * math.min(1, playsOf(c, isCast)) * MANA end,
+    moonkin_aura = function(c, inst) return T * 0.6 * up(inst, 1, 1, 1, 2) * Bots.resValue(c) end,
+    leader_of_the_pack = function(c, inst)
+      return T * playsOf(c, isCatAttack) * (Bots.resValue(c) + up(inst, 0, 0, 0, 2) * W.enemyHp)
+    end,
     -- Carte neutre
     elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
     -- Priest

@@ -1,0 +1,553 @@
+-- Tests des règles du Druide (docs/classes/druid.md) : formes, réserve, effets de fin de tour, frappe de l'ours,
+-- Clearcasting, Cast et forme de fin de tour, levier de secours, cartes et bibelots clés.
+-- Usage : lua5.1 Sim/tests_druid.lua   (ou luajit) — doit finir par ALL PASS.
+local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
+if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
+local ns = dofile(root .. "/Sim/load.lua")(root)
+local Combat, Card, D = ns.Combat, ns.Card, ns.Druid
+
+local passed, failed = 0, 0
+local function test(name, f)
+  local ok, err = pcall(f)
+  if ok then
+    passed = passed + 1
+  else
+    failed = failed + 1
+    print("ÉCHEC  " .. name .. "\n       " .. tostring(err))
+  end
+end
+local function eq(a, b, msg)
+  if a ~= b then error((msg or "") .. " attendu " .. tostring(b) .. ", obtenu " .. tostring(a), 2) end
+end
+
+ns.Enemies.dr_dummy = { name = "Mannequin", hp = 100,
+  moves = { idle = { name = "Rien", intent = "buff", actions = {} } }, pattern = { "idle" } }
+ns.Enemies.dr_hitter = { name = "Cogneur", hp = 100,
+  moves = { hit = { name = "Coup", intent = "attack", actions = { { "attack", 10 } } } }, pattern = { "hit" } }
+
+local function deckOf(list)
+  local d = {}
+  for i, id in ipairs(list) do
+    if type(id) == "table" then d[i] = { id = id[1], up = id[2] } else d[i] = { id = id, up = false } end
+  end
+  return d
+end
+
+-- Combat de test : main imposée (le reste en pioche : cartes de remplissage sans forme), mana 9 sauf opts.mana.
+local FILL = { "skull_bash", "skull_bash", "skull_bash", "skull_bash", "skull_bash", "skull_bash" }
+local function setup(hand, opts)
+  opts = opts or {}
+  local list = {}
+  for _, id in ipairs(hand) do list[#list + 1] = id end
+  for _, id in ipairs(opts.extra or FILL) do list[#list + 1] = id end
+  local c = Combat.new({ seed = 7, class = "druid", hp = opts.hp or 60, maxHp = 60, deck = deckOf(list),
+    encounter = opts.encounter or { "dr_dummy" }, relics = opts.relics, stats = true, zone = opts.zone })
+  local all = {}
+  for _, x in ipairs(c.hand) do all[#all + 1] = x end
+  for _, x in ipairs(c.draw) do all[#all + 1] = x end
+  c.hand, c.draw = {}, {}
+  local byId = {}
+  for _, x in ipairs(all) do byId[x.id] = byId[x.id] or {}; table.insert(byId[x.id], x) end
+  for _, id in ipairs(hand) do
+    local key = type(id) == "table" and id[1] or id
+    c.hand[#c.hand + 1] = assert(table.remove(byId[key] or {}), "carte absente : " .. key)
+  end
+  for _, l in pairs(byId) do for _, x in ipairs(l) do c.draw[#c.draw + 1] = x end end
+  c.player.mana = opts.mana or 9
+  return c
+end
+
+local function idx(c, id)
+  for i, x in ipairs(c.hand) do if x.id == id then return i end end
+  error("pas en main : " .. id)
+end
+local function play(c, id, t, o)
+  local ok, why = Combat.play(c, idx(c, id), t, o)
+  assert(ok, "jeu refusé : " .. id .. " (" .. tostring(why) .. ")")
+end
+-- Donne une carte en main (instance neuve) ; up facultatif.
+local function give(c, id, up)
+  local inst = Card.new(id, up, c.nextUid)
+  c.nextUid = c.nextUid + 1
+  c.hand[#c.hand + 1] = inst
+  Combat.listenCard(c, id)
+  return inst
+end
+local function logOf(c, t)
+  local out = {}
+  for _, ev in ipairs(c.events) do if ev.t == t then out[#out + 1] = ev end end
+  return out
+end
+
+-- Forme et réserve ----------------------------------------------------------------------------------------
+
+test("début du combat : sans forme, réserve 0 ; un tour fini sans forme ne donne rien", function()
+  local c = setup({ "skull_bash" }, { encounter = { "dr_dummy" } })
+  eq(c.cls.form, nil, "forme")
+  eq(c.player.res, 0, "réserve")
+  c.player.res = 3
+  Combat.endTurn(c)
+  eq(c.enemies[1].hp, 100, "aucune frappe")
+  eq(c.player.st.clearcasting, nil)
+  eq(c.player.st.regen, nil)
+  eq(c.player.res, 3, "la réserve ne baisse pas sans forme")
+end)
+
+test("jouer une carte de forme y fait entrer (journal shift, onShift) ; carte de la forme active ou sans forme : rien", function()
+  local seen = {}
+  ns.Relics.zz_shiftspy = { id = "zz_shiftspy", name = "Spy", hooks = {
+    onShift = function(c, src, from, to) seen[#seen + 1] = tostring(from) .. ">" .. to end } }
+  local c = setup({ "wrath", "wrath", "skull_bash", "thick_hide" }, { relics = { "zz_shiftspy" } })
+  play(c, "wrath", 1)
+  eq(c.cls.form, "moonkin")
+  play(c, "wrath", 1)
+  play(c, "skull_bash", 1)
+  eq(c.cls.form, "moonkin", "Skull Bash : sans forme")
+  play(c, "thick_hide")
+  eq(c.cls.form, "bear")
+  eq(table.concat(seen, ","), "nil>moonkin,moonkin>bear")
+  local sh = logOf(c, "shift")
+  eq(#sh, 2)
+  eq(sh[1].from, nil); eq(sh[1].to, "moonkin"); eq(sh[2].from, "moonkin"); eq(sh[2].to, "bear")
+  eq(c.cls.shifts, 2, "compteur du tour")
+  ns.Relics.zz_shiftspy = nil
+end)
+
+test("ordre : coût payé dans la forme d'avant, puis changement, puis résolution dans la nouvelle forme", function()
+  -- Cat avec Clearcasting et 3 de réserve : Wrath coûte 0 (Clearcasting, lu en Cat), entre en Moonkin, puis
+  -- se résout avec le bonus des Charges (5 + 3)
+  local c = setup({ "shred", "wrath" })
+  play(c, "shred", 1)
+  eq(c.cls.form, "cat")
+  c.player.res = 3
+  c.player.st.clearcasting = 1
+  local hp, mana = c.enemies[1].hp, c.player.mana
+  eq(Combat.cost(c, c.hand[idx(c, "wrath")]), 0, "coût affiché")
+  play(c, "wrath", 1)
+  eq(c.player.mana, mana, "coût 0 payé")
+  eq(c.cls.form, "moonkin")
+  eq(c.enemies[1].hp, hp - 8, "résolue en Moonkin : 5 + 3")
+  eq(c.player.res, 4)
+  -- journal : play, shift, puis les dégâts
+  local order = {}
+  for _, ev in ipairs(c.events) do
+    if ev.t == "play" or ev.t == "shift" or ev.t == "damage" or ev.t == "clearcasting_used" then order[#order + 1] = ev.t end
+  end
+  eq(table.concat(order, ","):match("play,clearcasting_used,shift,damage$") ~= nil, true, table.concat(order, ","))
+  -- onShift vu avant la résolution
+  local before
+  ns.Relics.zz_spy2 = { id = "zz_spy2", name = "Spy", hooks = {
+    onShift = function(cc) before = cc.enemies[1].hp end } }
+  local d = setup({ "wrath" }, { relics = { "zz_spy2" } })
+  play(d, "wrath", 1)
+  eq(before, 100, "onShift avant la résolution")
+  ns.Relics.zz_spy2 = nil
+end)
+
+test("Idol of the Wild : la première carte qui change la forme coûte 0, une seule fois par combat", function()
+  local c = setup({ "wrath", "wrath", "thick_hide" }, { relics = { "idol_of_the_wild" }, mana = 3 })
+  eq(Combat.cost(c, c.hand[1]), 0, "sans forme : Wrath changera la forme")
+  play(c, "wrath", 1)
+  eq(c.player.mana, 3)
+  eq(Combat.cost(c, c.hand[idx(c, "wrath")]), 1, "même forme")
+  eq(Combat.cost(c, c.hand[idx(c, "thick_hide")]), 1, "bibelot servi")
+end)
+
+test("réserve gardée au changement de forme : Charges montées en Moonkin dépensées en Combo", function()
+  local c = setup({ "wrath", "wrath", "ferocious_bite" })
+  play(c, "wrath", 1)
+  play(c, "wrath", 1)
+  eq(c.player.res, 2)
+  local hp = c.enemies[1].hp
+  play(c, "ferocious_bite", 1)
+  eq(c.cls.form, "cat")
+  eq(c.player.res, 0)
+  eq(c.enemies[1].hp, hp - (4 + 4 * 2))
+end)
+
+test("Surge en Moonkin : Charges lues puis remises à 0 avant le coup (aucun bonus)", function()
+  local c = setup({ "wrath", "starsurge" })
+  play(c, "wrath", 1)
+  c.player.res = 3
+  local hp = c.enemies[1].hp
+  play(c, "starsurge", 1)
+  eq(c.enemies[1].hp, hp - 18)
+  local d = setup({ "starsurge" })
+  eq(Combat.canPlay(d, 1), false, "Surge seul : injouable à 0")
+end)
+
+-- Effets de fin de tour ----------------------------------------------------------------------------------
+
+test("Bear : frappe de 1 + Frenzy sur la dernière cible, +1, puis −1 à la fin du round", function()
+  local c = setup({ "maul", "thick_hide" }, { encounter = { "dr_dummy", "dr_dummy" } })
+  play(c, "maul", 2) -- cible : le second
+  eq(c.player.res, 1, "Maul : frappe 1 + 0, +1")
+  eq(c.enemies[2].hp, 100 - 4 - 1)
+  c.player.res = 2
+  Combat.endPlayerTurn(c)
+  eq(c.enemies[2].hp, 100 - 5 - 3, "frappe 1 + 2 sur la dernière cible")
+  eq(c.enemies[1].hp, 100)
+  eq(c.player.res, 3, "+1 après la frappe")
+  local st = logOf(c, "bear_strike")
+  eq(st[#st].why, "auto")
+  Combat.enemyPhase(c)
+  Combat.endRound(c)
+  eq(c.player.res, 2, "−1 à la fin du round en Bear")
+end)
+
+test("Bear : cible morte -> l'ennemi vivant le plus à gauche", function()
+  local c = setup({ "maul" }, { encounter = { "dr_dummy", "dr_dummy" } })
+  play(c, "maul", 2)
+  c.enemies[2].hp = 1
+  Combat.dealDamage(c, c.player, c.enemies[2], 5)
+  eq(c.enemies[2].dead, true)
+  Combat.endPlayerTurn(c)
+  eq(c.enemies[1].hp, 100 - 2, "1 + 1 sur le premier vivant")
+end)
+
+test("la réserve ne baisse pas hors de Bear (Moonkin, Cat, Tree of Life)", function()
+  for _, id in ipairs({ "wrath", "shred", "rejuvenation" }) do
+    local c = setup({ id })
+    play(c, id, ns.Cards[id].target == "enemy" and 1 or nil)
+    c.player.res = 2
+    Combat.endTurn(c)
+    eq(c.player.res, 2, id)
+  end
+end)
+
+test("Cat : Clearcasting à la fin du tour, ne s'empile pas, coût 0 de la prochaine Attack hors Cast", function()
+  local c = setup({ "shred" })
+  play(c, "shred", 1)
+  Combat.endTurn(c)
+  eq(c.player.st.clearcasting, 1)
+  eq(#logOf(c, "clearcasting"), 1)
+  -- second tour fini en Cat sans Attack : toujours une seule
+  give(c, "tigers_fury")
+  play(c, "tigers_fury")
+  Combat.endTurn(c)
+  eq(c.player.st.clearcasting, 1, "drapeau")
+  eq(#logOf(c, "clearcasting"), 1, "pas de nouvelle pose")
+  -- Skill : ne le consomme pas ; Attack Cast : coût normal, ne le consomme pas ; Attack hors Cast : 0, consommé
+  give(c, "thick_hide")
+  give(c, "starfire")
+  give(c, "maul")
+  c.player.mana = 9
+  play(c, "thick_hide")
+  eq(c.player.st.clearcasting, 1, "Skill")
+  eq(Combat.cost(c, c.hand[idx(c, "starfire")]), 2, "Cast : coût normal")
+  eq(Combat.cost(c, c.hand[idx(c, "maul")]), 0, "Attack hors Cast : 0")
+  play(c, "starfire", 1)
+  eq(c.player.mana, 9 - 1 - 2)
+  eq(c.player.st.clearcasting, 1, "Attack Cast")
+  play(c, "maul", 1)
+  eq(c.player.mana, 6, "Maul gratuit")
+  eq(c.player.st.clearcasting, nil, "consommé")
+  eq(#logOf(c, "clearcasting_used"), 1)
+end)
+
+test("Clearcasting : une copie (replay) ne le consomme pas", function()
+  ns.Relics.zz_replay = { id = "zz_replay", name = "Replay", hooks = {
+    replay = function(c, src, v, inst) return v + 1 end } }
+  local c = setup({ "wrath" }, { relics = { "zz_replay" } })
+  c.player.st.clearcasting = 1
+  play(c, "wrath", 1)
+  eq(c.player.st.clearcasting, nil, "la carte jouée le consomme")
+  c.player.st.clearcasting = 1
+  Combat.copyCard(c, c.discard[#c.discard], c.enemies[1])
+  eq(c.player.st.clearcasting, 1, "copie")
+  ns.Relics.zz_replay = nil
+end)
+
+test("Moonkin : 1 dégât à tous par 2 Charges, arrondi au supérieur, 3 au plus, sans bonus des Charges", function()
+  for _, k in ipairs({ { 0, 0 }, { 1, 1 }, { 2, 1 }, { 3, 2 }, { 4, 2 }, { 5, 3 } }) do
+    local c = setup({ "wrath" }, { encounter = { "dr_dummy", "dr_dummy", "dr_dummy" } })
+    play(c, "wrath", 1)
+    c.player.res = k[1]
+    local hp1 = c.enemies[1].hp
+    Combat.endPlayerTurn(c)
+    eq(c.enemies[1].hp, hp1 - k[2], "réserve " .. k[1] .. " (cible)")
+    eq(c.enemies[2].hp, 100 - k[2], "réserve " .. k[1])
+    eq(c.enemies[3].hp, 100 - k[2], "réserve " .. k[1])
+    eq(c.player.res, k[1], "réserve lue, pas dépensée")
+    eq(#logOf(c, "moonkin_pulse"), k[2] > 0 and 3 or 0)
+  end
+end)
+
+test("Tree of Life : Regen 1 à la fin du tour, soigne au début du suivant", function()
+  local c = setup({ "mark_of_the_wild" }, { hp = 40 })
+  play(c, "mark_of_the_wild")
+  eq(c.player.st.regen, 2)
+  Combat.endPlayerTurn(c)
+  eq(c.player.st.regen, 3, "+1")
+  Combat.enemyPhase(c)
+  Combat.endRound(c)
+  Combat.startPlayerTurn(c)
+  eq(c.player.hp, 43)
+end)
+
+-- Cast et forme de fin de tour ---------------------------------------------------------------------------
+
+test("Cast : la forme change au jeu ; la résolution se fait dans la forme de fin de tour", function()
+  -- fin en Bear : Starfire sans bonus (la frappe de l'ours, 1 + 3, passe avant)
+  local a = setup({ "starfire", "thick_hide" })
+  a.player.res = 3
+  play(a, "starfire", 1)
+  eq(a.cls.form, "moonkin", "au jeu")
+  play(a, "thick_hide")
+  Combat.endTurn(a)
+  eq(a.cls.form, "bear", "la résolution ne change pas la forme")
+  eq(a.enemies[1].hp, 100 - 4 - 20)
+  -- fin en Moonkin : coups à tous (ceil(3 / 2) = 2), puis Starfire avec le bonus (20 + 3)
+  local b = setup({ "starfire" })
+  b.player.res = 3
+  play(b, "starfire", 1)
+  Combat.endTurn(b)
+  eq(b.cls.form, "moonkin")
+  eq(b.enemies[1].hp, 100 - 2 - 23)
+end)
+
+test("Nature's Swiftness : sans forme ; Starfire part tout de suite, dans sa forme, avec le bonus", function()
+  local c = setup({ "thick_hide", "natures_swiftness", "starfire" })
+  play(c, "thick_hide")
+  c.player.res = 2
+  play(c, "natures_swiftness")
+  eq(c.cls.form, "bear", "sans forme")
+  play(c, "starfire", 1)
+  eq(c.cls.form, "moonkin")
+  eq(c.enemies[1].hp, 100 - 22)
+  eq(c.player.cast, nil)
+end)
+
+test("Healing Touch : entre en Tree au jeu, soigne au tour suivant dans n'importe quelle forme", function()
+  local c = setup({ "healing_touch", "thick_hide" }, { hp = 30 })
+  play(c, "healing_touch")
+  eq(c.cls.form, "tree")
+  play(c, "thick_hide")
+  Combat.endTurn(c)
+  eq(c.cls.form, "bear")
+  eq(c.player.hp, 42)
+end)
+
+-- Coups sans carte ---------------------------------------------------------------------------------------
+
+test("bonus de Moonkin absent des coups sans carte (frappe de l'ours, coups à tous)", function()
+  local c = setup({ "wrath" })
+  play(c, "wrath", 1)
+  c.player.res = 3
+  local hp = c.enemies[1].hp
+  D.bearStrike(c, "card")
+  eq(c.enemies[1].hp, hp - 4, "frappe : 1 + 3, sans +3")
+  eq(D.strikeDamage(c), 1 + 4)
+end)
+
+test("Mangle : une frappe par Frenzy compté, chacune à 1 + le montant, sans gain ; Swipe : frappe sur la dernière cible", function()
+  local c = setup({ "mangle", "swipe" }, { encounter = { "dr_dummy", "dr_dummy" } })
+  c.player.res = 3
+  play(c, "mangle", 2)
+  eq(c.enemies[2].hp, 100 - 3 * 4)
+  eq(c.player.res, 0)
+  play(c, "swipe")
+  eq(c.enemies[1].hp, 100 - 4)
+  eq(c.enemies[2].hp, 100 - 12 - 4 - 1, "Swipe à tous puis frappe 1 + 0 sur la dernière cible")
+  eq(c.player.res, 1)
+end)
+
+test("Idol of Brutality : +2 aux frappes de l'ours (automatique, carte, Surge)", function()
+  local c = setup({ "maul" }, { relics = { "idol_of_brutality" } })
+  play(c, "maul", 1)
+  eq(c.enemies[1].hp, 100 - 4 - 3)
+  eq(D.strikeDamage(c), 3 + 1)
+end)
+
+test("Swamp : la frappe automatique évite un dormeur tant qu'un ennemi est éveillé, la frappe d'une carte non", function()
+  local c = setup({ "maul" }, { encounter = { "dr_dummy", "dr_dummy" }, zone = "swamp" })
+  assert(ns.Swamp, "règles du marais")
+  ns.Swamp.sleep(c, c.enemies[1], 3)
+  c.player.lastTarget = c.enemies[1].uid
+  eq(c.step, "play")
+  eq(D.strikeTarget(c), c.enemies[1], "pendant le jeu : la dernière cible, dormeur compris")
+  c.step = "turnEnd"
+  eq(D.strikeTarget(c), c.enemies[2], "fin de tour : l'éveillé")
+  c.step = "play"
+end)
+
+-- Levier de secours -------------------------------------------------------------------------------------
+
+test("levier A (inactif par défaut) : à partir du 3e changement d'un tour, −1 mana au tour suivant, −2 au plus", function()
+  eq(D.TAX, 0, "inactif")
+  local c = setup({ "wrath", "thick_hide", "shred", "rejuvenation" })
+  play(c, "wrath", 1)
+  play(c, "thick_hide")
+  play(c, "shred", 1)
+  Combat.endTurn(c)
+  eq(c.player.mana, 3, "levier inactif : 3 mana")
+  local old = D.TAX
+  D.TAX = 1
+  local ok, err = pcall(function()
+    local a = setup({ "wrath", "thick_hide", "shred" })
+    play(a, "wrath", 1); play(a, "thick_hide"); play(a, "shred", 1)
+    eq(a.cls.shifts, 3)
+    eq(D.pendingTax(a), 1)
+    Combat.endTurn(a)
+    eq(a.player.mana, 2, "3 changements : −1")
+    eq(a.cls.shifts, 0, "compteur remis à 0")
+    local b = setup({ "wrath", "thick_hide", "shred", "rejuvenation", "wrath" })
+    play(b, "wrath", 1); play(b, "thick_hide"); play(b, "shred", 1); play(b, "rejuvenation"); play(b, "wrath", 1)
+    Combat.endTurn(b)
+    eq(b.player.mana, 1, "5 changements : −2 au plus")
+    Combat.endTurn(b)
+    eq(b.player.mana, 3, "tour sans changement : plus de malus")
+  end)
+  D.TAX = old
+  assert(ok, err)
+end)
+
+-- Cartes et bibelots clés --------------------------------------------------------------------------------
+
+test("Rake, Shred : Combo et DoT ; Frenzied Regeneration : Spend 2 au choix", function()
+  local c = setup({ "rake", "shred", "frenzied_regeneration", "frenzied_regeneration" })
+  play(c, "rake", 1)
+  eq(c.enemies[1].st.pain, 3)
+  play(c, "shred", 1)
+  eq(c.player.res, 2)
+  eq(c.enemies[1].hp, 100 - 3 - 7)
+  play(c, "frenzied_regeneration", nil, { spend = false })
+  eq(c.player.block, 6); eq(c.player.res, 2)
+  play(c, "frenzied_regeneration")
+  eq(c.player.block, 18); eq(c.player.res, 0)
+end)
+
+test("Faerie Fire, Hurricane : Sundered, Charges, bonus de Moonkin sur chaque cible d'un Cast à tous", function()
+  local c = setup({ "faerie_fire", "hurricane" }, { encounter = { "dr_dummy", "dr_dummy" } })
+  play(c, "faerie_fire", 1)
+  eq(c.player.res, 1); eq(c.enemies[1].st.armor_broken, 2)
+  play(c, "hurricane")
+  c.player.res = 2
+  Combat.endTurn(c)
+  -- coups à tous ceil(2 / 2) = 1, puis Hurricane 12 + 2 (Sundered sur le premier : ×1,25)
+  eq(c.enemies[2].hp, 100 - 1 - 14)
+  eq(c.enemies[1].hp, 100 - 1 - math.floor(14 * 1.25))
+end)
+
+test("Swiftmend : 2 par Regen sans la retirer ; Regrowth, Rejuvenation : Exhaust", function()
+  local c = setup({ "rejuvenation", "swiftmend", "regrowth" }, { hp = 20 })
+  play(c, "rejuvenation")
+  eq(c.player.st.regen, 4)
+  play(c, "swiftmend")
+  eq(c.player.hp, 28); eq(c.player.st.regen, 4)
+  play(c, "regrowth")
+  eq(c.player.hp, 32); eq(c.player.st.regen, 7)
+  eq(#c.exhaust, 3)
+end)
+
+test("Powers : sans forme ; Leader of the Pack, Moonkin Aura, Gift of Nature, Thorns, Rebirth", function()
+  local c = setup({ "leader_of_the_pack", "moonkin_aura", "gift_of_nature", "shred", "wrath" })
+  play(c, "leader_of_the_pack"); play(c, "moonkin_aura"); play(c, "gift_of_nature")
+  eq(c.cls.form, nil, "Powers sans forme")
+  play(c, "shred", 1)
+  eq(c.player.res, 2, "Shred +1, Leader +1")
+  play(c, "wrath", 1)
+  eq(c.player.res, 3, "Wrath (Moonkin) : pas de Leader")
+  -- Gift of Nature : +2 sous Regen aux coups des Attack, pas à la frappe de l'ours
+  c.player.st.regen = 2
+  local hp = c.enemies[1].hp
+  give(c, "wrath")
+  play(c, "wrath", 1)
+  eq(c.enemies[1].hp, hp - (5 + 3 + 2))
+  -- Moonkin Aura : après les coups à tous (lus à 4 Charges)
+  eq(c.player.res, 4)
+  hp = c.enemies[1].hp
+  Combat.endPlayerTurn(c)
+  eq(c.enemies[1].hp, hp - 2, "ceil(4 / 2)")
+  eq(c.player.res, 5, "+1 après")
+  -- Thorns et Rebirth
+  local t = setup({ "thorns", "rebirth" }, { encounter = { "dr_hitter" }, hp = 5 })
+  play(t, "thorns"); play(t, "rebirth")
+  Combat.endTurn(t)
+  eq(t.result, nil, "Rebirth")
+  eq(t.player.hp, 13, "1 + 12")
+  eq(t.enemies[1].hp, 100 - 3, "Thorns")
+end)
+
+test("bibelots : Wolfshead Helm, Idol of the Moon, Idol of Rejuvenation, Idol of Ferocity", function()
+  local c = setup({ "wrath", "thick_hide", "rejuvenation" },
+    { relics = { "wolfshead_helm", "idol_of_the_moon", "idol_of_rejuvenation" } })
+  local n = #c.hand
+  play(c, "wrath", 1)
+  eq(#c.hand, n - 1 + 1, "premier changement du tour : pioche 1")
+  play(c, "thick_hide")
+  eq(#c.hand, n - 2 + 1, "second : rien")
+  play(c, "rejuvenation")
+  eq(c.player.block, 5 + 3, "Tree : 3 Absorb")
+  give(c, "wrath")
+  play(c, "wrath", 1)
+  c.player.block = 0
+  Combat.endPlayerTurn(c)
+  eq(c.player.block, 4, "fin en Moonkin : 4 Absorb")
+  local f = setup({ "shred", "ferocious_bite" }, { relics = { "idol_of_ferocity" } })
+  play(f, "shred", 1)
+  local h = #f.hand
+  play(f, "ferocious_bite", 1)
+  eq(#f.hand, h - 1 + 1, "Surge en Cat : pioche 1")
+end)
+
+test("Skull Bash : interrompt sans changer la forme", function()
+  ns.Enemies.dr_caster = { name = "Lanceur", hp = 100,
+    moves = { bolt = { name = "Trait", intent = "cast", cast = true, actions = { { "attack", 20 } } } }, pattern = { "bolt" } }
+  local c = setup({ "thick_hide", "skull_bash" }, { encounter = { "dr_caster" } })
+  play(c, "thick_hide")
+  play(c, "skull_bash", 1)
+  eq(c.enemies[1].interrupted, true)
+  eq(c.cls.form, "bear")
+end)
+
+-- Bots et simulation -------------------------------------------------------------------------------------
+
+test("état de classe cloné ; clé des bots : forme et Clearcasting distinguent deux positions", function()
+  local c = setup({ "wrath" })
+  local k0 = ns.ClassRules.druid.botKey(c)
+  play(c, "wrath", 1)
+  local cl = Combat.clone(c)
+  eq(cl.cls.form, "moonkin")
+  cl.cls.form = "cat"
+  eq(c.cls.form, "moonkin", "copie profonde")
+  local k1 = ns.ClassRules.druid.botKey(c)
+  c.player.st.clearcasting = 1
+  local k2 = ns.ClassRules.druid.botKey(c)
+  assert(k0 ~= k1 and k1 ~= k2, k0 .. " / " .. k1 .. " / " .. k2)
+end)
+
+test("bot heuristic : un combat de Druide se joue sans erreur", function()
+  local deck = deckOf(ns.Classes.druid.deck)
+  local c = Combat.new({ seed = 3, class = "druid", hp = 65, maxHp = 65, deck = deck, encounter = { "dr_hitter" },
+    relics = { "idol_of_the_wild" }, stats = true })
+  local bot = ns.Bots.new("heuristic", ns.Rng.new(1))
+  local steps = 0
+  while not c.result and steps < 300 do
+    local a = bot:act(c)
+    steps = steps + 1
+    if a[1] == "play" then
+      if not Combat.play(c, a[2], a[3], a[4] == "nospend" and { spend = false } or nil) then Combat.endTurn(c) end
+    elseif a[1] == "potion" then
+      Combat.usePotion(c, a[2], a[3])
+    else
+      Combat.endTurn(c)
+    end
+  end
+  eq(c.result, "won")
+  local z = c.stats.zone or {}
+  local ends = (z.druid_end_bear or 0) + (z.druid_end_cat or 0) + (z.druid_end_moonkin or 0)
+    + (z.druid_end_tree or 0) + (z.druid_end_none or 0)
+  assert(ends >= c.stats.turns - 1 and ends <= c.stats.turns, "une forme de fin par tour fini : " .. ends)
+end)
+
+test("expédition simulée du Druide (bot greedy) : de bout en bout, déterministe", function()
+  local a = ns.SimExpedition.play({ seed = 11, bot = "greedy", class = "druid" })
+  local b = ns.SimExpedition.play({ seed = 11, bot = "greedy", class = "druid" })
+  assert(#a.combats > 0)
+  eq(#a.combats, #b.combats)
+  eq(a.won, b.won)
+end)
+
+print(("%d réussis, %d échoués"):format(passed, failed))
+if failed == 0 then print("ALL PASS") else os.exit(1) end
