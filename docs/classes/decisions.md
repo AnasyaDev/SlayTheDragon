@@ -50,17 +50,22 @@ Druid sont des ajouts futurs : leurs fiches restent en référence, rien n'est c
   va à la défausse. Durée facultative en tours, comptée comme le sablier des bienfaits.
 - **Ripostes.** Les effets « quand il est frappé » (Warrior Protection, Retribution Aura, Earth Shield)
   existent. `Trap` reste la seule CARTE que l'on pose pour le tour adverse.
-- **Druid.** Une carte de soin jouée hors de Caster ramène d'abord en Caster, et ce retour est un Shift.
-  Entrer dans la forme déjà active n'est pas un Shift. Bear Form coûte 1.
+- **Druid** (conception revue le 18/11/2026, fiche `docs/classes/druid.md`). Chaque carte porte sa forme (Cat,
+  Bear, Moonkin, Tree of Life) ; la jouer y fait entrer, sans coût, sans carte Shift ; jouer une carte de la forme
+  active ou sans forme ne change rien. Le combat commence sans forme. Une réserve unique (0 à 5) est gardée au
+  changement de forme ; elle vaut Combo en Cat, Frenzy en Bear, Charges en Moonkin, rien sans forme et en Tree
+  of Life (« Reserve »). La forme où l'on finit le tour décide de l'effet : Cat, la première Attack hors Cast du
+  tour suivant coûte 0 ; Bear, frappe de 1 + réserve ; Moonkin, 1 dégât à tous par 2 Charges (arrondi au
+  supérieur, 3 au plus) ; Tree of Life, Regen 1. Les soins sont des cartes Tree.
 - **Hunter.** Le Frenzy baisse de 1 au début de chaque tour, sauf le premier. Arcane Shot inflige 3.
   Trois Traps au plus, une par attaque ennemie, la plus ancienne d'abord.
 - **Bibelots de classe.** Celui de départ est porté à chaque expédition ; les autres entrent dans la réserve
   de tirage de la classe une fois débloqués.
 - **État `halved`.** Il prend un nom neutre à l'affichage, donné par la carte qui le pose.
 - **PV de départ** (à régler par simulation) : Priest 65, Warrior à fixer par son agent, Rogue 65,
-  Paladin 75, Mage 60, Warlock 70, Hunter 65, Shaman 60, Druid 65. Réglés le 12/11/2026 (`docs/equilibrage.md`) :
-  Priest 52, Warrior 72, Mage 42, Rogue 49, Hunter 41 ; passe 2 (même jour) : Warrior 74, Rogue 50 ;
-  passe 3 (13/11/2026) : Priest 36, Hunter 50.
+  Paladin 75, Mage 60, Warlock 70, Hunter 65, Shaman 60, Druid 65 (confirmé par le joueur le 18/11/2026).
+  Réglés le 12/11/2026 (`docs/equilibrage.md`) : Priest 52, Warrior 72, Mage 42, Rogue 49, Hunter 41 ; passe 2
+  (même jour) : Warrior 74, Rogue 50 ; passe 3 (13/11/2026) : Priest 36, Hunter 50.
 
 ## Fixé avec la progression par classe (12/11/2026)
 - **Niveaux de classe** : seuils cumulés 100 / 250 / 450 / 700 / 1 000 / 1 400 ; expérience par expédition

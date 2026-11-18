@@ -20,8 +20,9 @@ explorateurs, commune au compte. Textes affichés en anglais, écrits dans le la
 - **Jamais meilleures qu'une carte de classe de même coût** : chaque carte est comparée à son repère
   Priest (ou Druid) ; la plupart sont Exhaust, l'avantage d'une carte neutre est d'exister dans
   n'importe quel deck, pas d'être plus forte.
-- **Druid** : une carte neutre qui soigne porte le mot `Caster` pour lui (règle suivant l'effet,
-  `docs/classes/druid.md`, règle 5).
+- **Druid** : une carte neutre n'a pas de forme, même si elle soigne (`docs/classes/druid.md`, § 1.1,
+  point 9) : la jouer ne fait entrer ni en Tree of Life ni dans une autre forme. Règle du 18/11/2026, qui
+  remplace le mot `Caster` porté par les cartes neutres de soin.
 
 ## Les dix cartes
 
@@ -143,7 +144,8 @@ art et icônes dans `UI/Art/neutral.lua` (icônes de la fiche, embarquées), TOC
 - Moteur : Goblin Sapper Charge porte `payHp = 5` (« Pay 5 HP. », coût commun) ; `minHp`, la raison `lowHp`
   et le mot « Lose N HP » sont retirés ; le harnais (U27) refuse toute clause « Lose N HP ».
 - Elixir of Superior Defense : « Start of turn: » (déclencheur du registre) au lieu de « Turn start: ».
-- Druid : la carte de soin n'a pas le mot `Caster` (classe non codée).
+- Druid : la carte de soin n'a pas de forme (règle du Druid du 18/11/2026 : cartes neutres sans forme ; classe
+  non codée).
 - Corps : ivoire teinté vert sauge (`Art.cardBodyTint`), quel que soit le premier effet (Rugged Armor
   Kit n'est pas bleue) ; infobulle : ligne « Neutral: a card that every class can use. ».
 - Pas faits : écran de progression de la Ligue avec les cartes verrouillées (l'écran méta est refondu
