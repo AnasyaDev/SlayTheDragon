@@ -745,8 +745,9 @@ relic("wolfshead_helm", {
 -- Classe ------------------------------------------------------------------------------------------------
 
 ns.Classes.druid = {
-  -- PV : 65 décidés par le joueur (18/11/2026), 58 après la première mesure (docs/equilibrage.md, « Druid »)
-  id = "druid", name = "Druid", order = 6, hp = 58,
+  -- PV : 65 décidés par le joueur (18/11/2026), 58 après la mesure au bot heuristic, 65 de nouveau au bot human
+  -- (docs/equilibrage.md, « Druid : réglage au bot human »)
+  id = "druid", name = "Druid", order = 6, hp = 65,
   resource = { id = "wild", cap = 5, keep = true },
   deck = {
     "wrath", "wrath", "wrath",

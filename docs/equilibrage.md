@@ -1116,3 +1116,27 @@ retenu 2,69, 38,2 / 16,7 / 38,2 / 6,8 %.
   Tree of Life 1 → 2 pour la forme la moins jouée (2,5 → 6,8 % des fins de tour, sous les 10 % visés : deck de
   départ sans carte Tree, question ouverte de la fiche, § 11).
 - Non vérifié : bot `human`, niveau 1 (compte neuf), clés 1 à 5, épiques du Druid (pas encore codées).
+
+## Druid : réglage au bot human (18/11/2026)
+
+Le Druid réglé au bot `heuristic` (91,0 %, section précédente) était dernier au bot `human`, la référence de la
+difficulté ressentie. Mesure : `luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0
+class=druid` (clé 0, niveau 7, `zones=0`, ± 4 points) ; cible : 50 à 60 %. Autres classes au même réglage, avant
+leurs propres réglages du jour : Warrior 80,0, Mage 60,7, Priest 53,5, Hunter 47,7, Rogue 38,5 %. Leviers prévus,
+dans l'ordre et cumulés jusqu'à la cible : (1) PV 58 → 65, (2) entrée dans la première forme du combat hors taxe,
+(3) deck de départ resserré sur deux formes. Rapports bruts : `reports/druid-human/`.
+
+| Réglage | Victoires | Westfall battue | VanCleef | Normal : PV perdus / tours | Élite : PV / tours | Boss : PV / tours | Changements par tour | Fins de tour Bear / Cat / Moonkin / Tree |
+|---|---|---|---|---|---|---|---|---|
+| départ : 58 PV (référence rejouée, identique) | 37,0 % | 58,0 % | 64,7 % | 11,8 / 3,07 | 22,8 / 4,96 | 47,3 / 6,40 | 2,28 | 38,0 / 17,1 / 33,0 / 11,9 % |
+| **(1) 65 PV, retenu** | **51,8 %** | **71,2 %** | 75,0 % | 11,9 / 3,08 | 22,6 / 4,95 | 48,7 / 6,54 | 2,31 | 36,9 / 17,1 / 33,4 / 12,5 % |
+| vérification heuristic (300), 65 PV | 95,7 % (± 2,3) | 98,3 % | | 4,3 / 2,40 | 11,5 / 3,90 | 27,5 / 5,23 | 2,70 | 38,5 / 16,6 / 38,2 / 6,7 % |
+
+- **Les PV seuls suffisent** : +14,8 points, presque tout à Westfall (défaites à Westfall 252 → 173 sur 600 ;
+  VanCleef battu 64,7 → 75,0 % des fois). Les zones suivantes gagnent aussi 3 à 5 points (Duskwood battue/atteinte
+  83,9 → 87,8 %, Wetlands 82,2 → 86,9 %). Leviers (2) et (3) non appliqués.
+- **Bot heuristic** : 91,0 → 95,7 %, sous le plafond de 97 % ; il retrouve le niveau de la taxe seule à 65 PV
+  (95,7 %, section précédente). La Regen 2 en Tree of Life et la taxe dès le deuxième changement restent.
+- **Formes** : le bot human change 2,31 fois de forme par tour (heuristic 2,70) et finit plus souvent en Tree of
+  Life (12,5 %, heuristic 6,7 %) : il soigne davantage.
+- Non vérifié : niveau 1 (compte neuf), clés 1 à 5, épiques du Druid imposées.

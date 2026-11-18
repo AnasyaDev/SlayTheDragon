@@ -8,7 +8,8 @@ sur les cartes, Idol of the Wild à +1 mana par Shift) : de cette version resten
 `Sim/tests_druid.lua`) ; restent les sept épiques (§ 5), l'interface (`UI/Art/druid.lua`, pastille par forme) et
 le réglage des bots et des chiffres (§ 8, « Ce qui reste »). Première mesure et premier réglage le 18/11/2026
 (§ 10, « Réglage du 18/11/2026 ») : levier A actif (taxe dès le deuxième changement d'un tour), PV 65 → 58,
-Regen de fin de tour en Tree of Life 1 → 2.
+Regen de fin de tour en Tree of Life 1 → 2. Réglé ensuite au bot `human` (§ 10, « Réglage au bot human ») : PV
+58 → 65.
 
 Corrigée le même jour après relecture du joueur : chaque forme a un effet de fin de tour ; la forme Caster
 devient **Tree of Life** (quatrième forme, portée par les cartes de soin) ; le combat commence **sans forme** ;
@@ -50,7 +51,7 @@ Regen). Survie : Absorb en Bear, soins et Regen en Tree of Life. Difficulté : d
 |---|---|
 | Fantasme | Le Druid change de forme à chaque carte et emprunte à chaque forme la façon de se battre d'une autre classe : le chat finit comme un Rogue, l'ours frappe seul comme le familier du Hunter, le sélénien charge ses sorts comme un Mage ; l'arbre de vie soigne. |
 | Ressource | Réserve unique, 0 à 5, gardée d'un tour à l'autre et au changement de forme. Son nom affiché est celui de la forme active (Combo, Frenzy, Charges) ; sans forme et en Tree of Life, elle s'appelle **Reserve**. |
-| PV de départ | **58** (65 décidés par le joueur le 18/11/2026, baissés à 58 après la première mesure : § 10, « Réglage du 18/11/2026 » ; Hunter et Rogue 50, Warrior 74). |
+| PV de départ | **65** (le chiffre du joueur, 18/11/2026 ; baissés à 58 après la première mesure au bot heuristic, remis à 65 le même jour au bot `human`, la référence de la difficulté ressentie : § 10, « Réglage au bot human » ; Hunter et Rogue 50, Warrior 74). |
 | Deck de départ | Wrath ×3 (Moonkin), Thick Hide ×4 (Bear), Maul ×2 (Bear), Ferocious Bite ×1 (Cat). |
 | Bibelot de départ | Idol of the Wild : la première carte de chaque combat qui change de forme coûte 0 (le combat commence sans forme : c'est la première carte de forme jouée). |
 | Interrupt | Skull Bash (Feral, sans forme, niveau 1). |
@@ -276,6 +277,10 @@ commune : Growl du Hunter l'emploie).
    (−0,4 point, 2,86 changements par tour) : le bot paie rarement le troisième changement et la classe ne change
    pas ; dès le deuxième, 95,7 % (−4,0 points, 2,69 changements par tour, 0,8 mana perdu par tour en moyenne) :
    la classe paie son va-et-vient de base, ce qui est le but.
+7. **Entrée dans la première forme du combat : toujours taxée** (point 1). Au réglage au bot `human` (§ 10,
+   « Réglage au bot human »), la sortir de la taxe était le deuxième levier prévu, après les PV ; les PV seuls
+   (58 → 65) ont suffi, il n'a pas été appliqué. S'il l'est un jour : elle ne compterait plus pour la taxe
+   seulement et resterait un changement pour `onShift` (Idol of the Wild, Wolfshead Helm, Furor).
 
 ### 1.7 Cartes sans forme
 
@@ -790,7 +795,7 @@ Regen 2 depuis le 18/11/2026) sont des points de départ : la simulation règle 
 | Combats qui traînent en Tree of Life | finir en Tree of Life pour remonter les PV à 1 par tour | part des tours finis en Tree of Life, tours par combat, PV nets ; repli prévu : Absorb pour le tour ennemi au lieu de Regen (§ 1.3) |
 | Soins entre combats | Swiftmend (sans retirer la Regen), Tranquility, Regen 2 de Tree of Life | PV soignés par combat ; repli : Swiftmend retire la Regen |
 | Idol of the Wild | +1 mana au premier tour de chaque combat | `sweep=relics` ; comparer à Apprentice's Wand |
-| PV perdus, PV de départ 65 (58 depuis le 18/11/2026) | cible commune 6 à 9 PV par combat normal (`decisions.md`) ; 65 est au-dessus des classes réglées (Hunter et Rogue 50) | PV perdus et PV nets par combat ; régler les PV comme pour les autres classes |
+| PV perdus, PV de départ 65 (58 puis 65 le 18/11/2026) | cible commune 6 à 9 PV par combat normal (`decisions.md`) ; 65 est au-dessus des classes réglées (Hunter et Rogue 50) | PV perdus et PV nets par combat ; régler les PV comme pour les autres classes |
 
 ### Réglage du 18/11/2026
 
@@ -826,11 +831,28 @@ Constats :
 - Les défaites se font surtout aux boss de Westfall (13 sur 27) et des Wetlands (5), comme pour les autres
   classes : c'est le deck de départ qui décide.
 
+### Réglage au bot human (18/11/2026)
+
+Au bot `human` (référence de la difficulté ressentie ; `runs=600 bot=human seed=1 jobs=8 runner=expedition key=0`,
+niveau 7, ± 4 points), le réglage ci-dessus laissait le Druid dernier des classes : 37,0 % (Warrior 80,0, Mage 60,7,
+Priest 53,5, Hunter 47,7, Rogue 38,5), avec 58 % de Westfall battue. Cible : 50 à 60 %. Détail :
+`docs/equilibrage.md`, « Druid : réglage au bot human ».
+
+| Réglage | Victoires (human) | Westfall battue | Changements par tour | Fins de tour Bear / Cat / Moonkin / Tree |
+|---|---|---|---|---|
+| 58 PV (réglage du 18/11 au bot heuristic) | 37,0 % | 58,0 % | 2,28 | 38,0 / 17,1 / 33,0 / 11,9 % |
+| **retenu : 65 PV** | **51,8 %** | **71,2 %** | 2,31 | 36,9 / 17,1 / 33,4 / 12,5 % |
+
+Les PV (58 → 65, le chiffre du joueur) suffisent ; l'entrée dans la première forme reste taxée (§ 1.6, point 7)
+et le deck de départ ne change pas. Bot heuristic au même réglage : 95,7 % (300 expéditions ; plafond fixé à
+97 %), 2,70 changements par tour, fins de tour 38,5 / 16,6 / 38,2 / 6,7 %.
+
 ## 11. Questions ouvertes pour le joueur
 
 Tranchées le 18/11/2026 et retirées : nom de la réserve hors forme (« Reserve »), seuil du levier de secours
 (levier A activé le 18/11/2026 au seuil du joueur : taxe dès le deuxième changement, § 1.6), fin de tour en Cat
-(Clearcasting), réserve en Tree of Life (sans lecture), PV de départ (65, puis 58 après mesure), mots-clés (un seul pour les quatre
+(Clearcasting), réserve en Tree of Life (sans lecture), PV de départ (65 ; 58 après la mesure au bot heuristic, 65
+de nouveau au bot human), mots-clés (un seul pour les quatre
 formes), noms de Maul et Rake (gardés), ligne « Druid » de `docs/classes/decisions.md` (réécrite).
 
 1. **Cartes sans forme** : Skull Bash, Nature's Swiftness et tous les Powers. Faut-il des Powers de forme (jouer
