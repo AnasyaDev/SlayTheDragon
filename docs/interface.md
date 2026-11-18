@@ -1201,6 +1201,22 @@ Façon Hearthstone : les tournures deviennent des mots-clés visibles, en couleu
   quand deux épiques emploient le même nom (Wild Call). Les autres explications gardent 60 caractères.
 - **Mots de la plaque du bas** : « Pouvoir. » et « Incantation. » en tête, « Recharge N. », « Consumée. »,
   « Conservée. » en dernier, chacun sur sa clause ; retirés à l'affichage (`KEYWORD_STRIP`).
+- **Mot de forme** (Druid, 18/11/2026, `docs/classes/druid.md` § 1.8) : `Cat`, `Bear`, `Moonkin`, `Tree`, lu
+  sur le champ `form` de la carte (plaque lue sur une valeur, `L.plate("form", { field = "form", values })`),
+  premier mot de la plaque (« Moonkin · Cast », « Tree · Exhaust »), jamais écrit dans `text` (toléré en
+  tête, retiré comme « Cast. »). Un seul mot-clé ; au survol, la ligne de la fiche de la forme de la carte,
+  nom coloré dans la ligne (`W.inlineKeywordLine`) : « Enters Cat (Combo). End of turn: next Attack costs
+  0. », « Enters Bear (Frenzy). End of turn: Bear strikes. », « Enters Moonkin (Charges). End of turn: 1 to
+  all per 2. », « Enters Tree of Life. End of turn: gain Regen 1. » (seules lignes à deux phrases et
+  parenthèse sous 60 caractères, harnais U27).
+- **Nom de ressource selon la forme** (Druid) : la réserve s'écrit du nom de la forme de la carte (« +1
+  Combo. » sur une carte Cat, « Surge: deal 6 per Charge. » en Moonkin, « Bear strikes once per Frenzy. »),
+  et le glossaire l'explique par l'entrée de la forme (« Combo: kept between forms and turns, Surge spends
+  it all. », pas le Combo du Rogue) ; Surge et Spend N nomment la même ressource. Contrat :
+  `docs/classes.md`, « Ressource à noms multiples ».
+- **« Bear strikes. »** (« Bear strikes twice. », « Surge: Bear strikes once per Frenzy. ») : frappe de l'ours,
+  pendant de « Pet attacks. », mot du registre expliqué au survol (« Bear strikes: hits the last target for
+  1 + Frenzy, then +1. ») ; aussi libellé de déclencheur (« Bear strikes: … »).
 
 ### Affichage (`UI/Widgets.lua`)
 

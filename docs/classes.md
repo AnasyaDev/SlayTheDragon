@@ -257,12 +257,14 @@ if n > 0 then Combat.strike(c, "auto", n, "all", "moonkin_pulse", "onMoonkinPuls
 ## Langage des cartes (`Core/Language.lua`)
 
 Registre partagé par le moteur, l'interface (couleurs, coupures, explications au survol) et le harnais.
-Déjà déclarés : les ressources des neuf classes (Insanity, Rage, Combo Point(s), Arcane Charge(s), Soul
-Shard(s), Frenzy, Holy Power, Maelstrom), les conditions Execute, Surge, Spend N, Last Breath, Shadow,
-Frozen, Demon, Judgement, Shift, Caster, Bear, Cat, Moonkin, le mot « Pay N HP », les mots de plaque
-Power, Trap, Seal, Demon, Totem N, Shift, Cast, Cooldown N, Exhaust, Retain, et les déclencheurs de Power
-(« When hit », « HP lost », « Attacks », « Start of turn », « End of turn », « Each Absorb gain »,
-« Cast cards »). Une classe en ajoute depuis ses fichiers :
+Déjà déclarés : les ressources des classes (Insanity, Rage, Combo, Charge(s), Soul Shard(s), Frenzy, Holy
+Power, Maelstrom, et la réserve du Druid `wild` : Reserve, Combo, Frenzy, Charge(s) selon la forme), les
+conditions Execute, Surge, Spend N, Last Breath, Shadow, Frozen, Demon, Judgement, les mots « Pay N HP » et
+« Bear strikes », les mots de plaque Epic, Power, Trap, Seal, Demon, Totem N, forme (Cat, Bear, Moonkin,
+Tree), Cast, Cooldown N, Exhaust, Retain, Innate, et les déclencheurs de Power (« When hit », « HP lost »,
+« Attacks », « Start of turn », « End of turn », « Each Absorb gain », « Cast cards », « Bear strikes »).
+Les conditions Shift, Caster, Bear, Cat, Moonkin et la plaque Shift (ancienne conception du Druid) sont
+retirées (18/11/2026). Une classe en ajoute depuis ses fichiers :
 
 ```lua
 local L = ns.Language
@@ -276,14 +278,83 @@ Les **états** (`ns.Statuses`) sont des mots-clés d'office (couleur, insécable
 l'état, explication) : un état propre se déclare dans `Core/Classes/<id>.lua` (`ns.Statuses.parry = {…}`,
 `Art.statusShort.parry` pour la définition courte). Un état `clearAtTurnStart = true` est retiré au début
 du tour du joueur. Explications : une phrase de 60 caractères au plus, « %s » = nom de la ressource de la
-classe de la carte, « N » = nombre.
+classe de la carte (dans la forme de la carte, voir ci-dessous), « N » = nombre.
+
+### Ressource à noms multiples (Druid, 18/11/2026)
+
+Une classe dont la ressource change de nom selon un état (le Druid : une seule réserve `c.player.res`, nommée
+Combo en Cat, Frenzy en Bear, Charges en Moonkin, Reserve sans forme et en Tree of Life) la déclare **une
+fois** dans le registre, avec une table `forms` ; la valeur reste unique (gains, Surge, Spend, `minRes`,
+plafond inchangés), seul le nom change.
+
+```lua
+L.resource("wild", { name = "Reserve", text = "kept between forms, used by Cat, Bear and Moonkin.",
+  forms = { cat = { name = "Combo", text = "…" }, bear = { name = "Frenzy", text = "…" },
+    moonkin = { name = "Charge", plural = "Charges", text = "…" } } })
+ns.Classes.druid = { …, resource = { id = "wild", cap = 5, keep = true } }   -- inchangé
+L.resourceName("wild", 2, "moonkin")        --> "Charges"  (sans forme, ou "tree" : "Reserve")
+L.cardResource(ns.Cards.shred)              --> "wild:cat" (carte form = "cat")
+L.combatResource(c)                         --> "wild:bear" si c.cls.form == "bear"
+```
+
+- **Forme** = valeur du champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) et, en combat, de
+  l'état de classe `c.cls.form` (`nil` = sans forme). Une forme sans entrée dans `forms` (Tree of Life) et
+  l'absence de forme gardent le nom de base (`name`).
+- **Clé de ressource** : `"wild"` ou `"wild:cat"` (`L.resourceKey(id, forme)`). `L.resources[clé]` rend
+  l'entrée de la forme (`{ id, base, form, name, plural, text }`), si bien qu'une clé s'emploie partout où
+  un id s'emploie : `L.resourceName(clé, n)`, `Art.keyword("res:" .. clé)`, `Art.keywordLine(clé de mot,
+  label, n, clé de ressource)` (« Surge: spends all Combo for the effect. »). `pairs(L.resources)` ne parcourt
+  que les ids de base ; `L.resourceKeys()` donne toutes les clés, formes comprises (triées).
+- **Sur une carte**, le nom vient de la forme de la carte : `L.cardResource(d)` (clé de la ressource de sa
+  classe dans `d.form`, `W.cardResource(d)` dans l'interface) ; une carte Cat écrit « +1 Combo. », « Surge:
+  deal 4 + 4 per Combo. », une carte Bear « Spend 2: … » (expliqué « pays 2 Frenzy »). Une carte **sans
+  forme** (Power) peut aussi nommer la ressource de la forme que nomme le libellé d'une clause (« Cat
+  Attacks: +1 Combo. », « End of turn in Moonkin: +1 Charge. ») : `L.cardResourceKeys(d)` (sa clé d'abord,
+  puis ces formes, d'après les mots de la plaque de forme, `L.formWord`). Le glossaire de la carte
+  (`W.cardKeywords`) explique le nom par l'entrée de la forme, jamais par la ressource d'une autre classe qui
+  porte le même nom (Combo du Rogue).
+- **En combat** (pastille, chiffres flottants « +1 Frenzy », raison « Not enough … ») : `L.combatResource(c)`
+  donne la clé dans la forme active ; à brancher par l'interface du Druid (`UI/CombatView.lua`,
+  `UI/Controller.lua` lisent encore l'id de base : sans effet pour les autres classes).
+- **Harnais U27** : les noms d'un texte sont seulement ceux de `L.cardResourceKeys(d)` (`H.resourceWordErrors`) :
+  une carte Cat qui écrit « Frenzy », une carte sans forme qui écrit « Combo » sans libellé « Cat … : », ou
+  une carte d'une autre classe qui nomme une autre ressource (Frenzy sur un Rogue, Reserve) sont refusées.
+  « +N <nom>. » de chaque effet `res`, accord singulier / pluriel et « per <nom> » des Surge se lisent dans
+  la forme de la carte. Une classe à un seul nom ne déclare pas `forms` : rien ne change pour elle.
+
+### Plaque lue sur une valeur (forme du Druid)
+
+`L.plate(key, { field, values, head, name, text })` : un seul mot-clé pour plusieurs mots ; la carte porte le
+mot de sa valeur (`d[field]`). Plaque de forme déclarée dans `Core/Language.lua` :
+
+```lua
+L.plate("form", { head = true, field = "form", name = "Form", text = "playing the card enters its form.",
+  values = { cat = { word = "Cat", text = "Enters Cat (Combo). End of turn: next Attack costs 0." }, …,
+    tree = { word = "Tree", name = "Tree of Life", text = "Enters Tree of Life. End of turn: gain Regen 1." } } })
+L.plateWord(L.plateByKey("form"), ns.Cards.starfire)   --> "Moonkin" ; W.cardPills : « Moonkin · Cast »
+L.plateKey(p, d)                                       --> "form:moonkin" (explication de cette forme)
+```
+
+- Premier mot de la plaque (avant Cast), jamais écrit dans `text` : la carte n'a qu'un champ `form` ; toléré en
+  tête du texte (« Moonkin.\nCast.\n… »), retiré à l'affichage comme « Cast. » ; le harnais refuse un mot de
+  forme ailleurs qu'en tête ou différent de `d.form`. Carte sans `form` : aucun mot.
+- Explication : `L.plateByKey("form:cat")` = `{ word, name, text, inline = true }` ; `text` est la ligne
+  entière de l'infobulle (textes de la fiche, § 1.8), le nom y est coloré (`W.inlineKeywordLine`) ; 60
+  caractères, deux phrases et la ressource entre parenthèses permis pour ces seules lignes (harnais U27).
+- `L.formWord(forme)` : mot d'une forme (`"tree"` → `"Tree"`), lu par `L.cardResourceKeys`.
+- « Bear strikes » : mot `L.keyword("bearStrike", { name = "Bear strikes", pattern = "Bear strikes", … })`
+  (« Bear strikes: hits the last target for 1 + Frenzy, then +1. », base 1 : la classe redéclare le mot si
+  sa base change)
+  et déclencheur `L.trigger("Bear strikes")`, pendant de « Pet attacks » (Hunter).
 
 Forme des textes (vérifiée par le harnais U27 pour toute carte de `ns.Cards`) : une clause par ligne ;
 « Pay N HP. » en première ligne ; « +N Rage. » (singulier / pluriel du registre) pour chaque effet `res`
 sans condition ; « Spend N: … » ⇔ `spend = N` ; « Surge: … » ⇔ effet `surge` (« deal B + K per Rage. » ou
 « Deal B. » puis « …: deal K per Rage. ») ; « Execute: … » ⇔ condition `execute` ; états posés en dernier
 (« Gain » / « Apply », sablier pour une durée) ; aucun « you / your » ; libellé « Name: » connu du
-registre ; aucune ressource d'une autre classe. Le texte doit tenir dans le panneau (U22, toutes les cartes).
+registre ; aucune ressource d'une autre classe (ni d'une autre forme : `L.cardResourceKeys`) ; mot de forme
+seulement en tête et égal à `d.form` (s'il est écrit). Le texte doit tenir dans le panneau (U22, toutes les
+cartes). Le harnais examine aussi dix cartes factices d'une classe à formes (`H.installFormFakes`, U27).
 
 ## Interface (`UI/Art/<id>.lua`)
 
@@ -459,7 +530,7 @@ ns.ClassRules.rogue = { hooks = {
 | Stunned pendant le tour ennemi (Trap, riposte) | commun : `Combat.applyStatus` pose `e.stopTurn` si l'ennemi est celui qui agit (`c.acting`) ; `executeMove` arrête le tour avant le coup suivant (aucun coup de l'attaque qui a déclenché l'effet), consomme une charge, journal `{ t = "stunned", stopped = true }` ; « act » n'est journalisé qu'à la première action qui part (`decisions.md`) |
 | Totems à durée et emplacements (Shaman) | Power `slot = "fire"…`, `lasts = N` (+ `totem = N` pour la plaque), `powerLasts` (Totemic Relic), `onPowerEnd` ; affichage des quatre emplacements dans `ns.ClassViews.shaman` |
 | Maelstrom à 5 : Cast instantané | `onResource` + `instantCast` |
-| Formes portées par les cartes, réserve lue selon la forme (Druid, fiche `docs/classes/druid.md`, 18/11/2026) | champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) ; état de classe `c.cls.form` (`nil` au début du combat : sans forme) ; changement au jeu dans le crochet de classe `onCardCommitted` (après les coûts, avant incantation ou résolution), événement propre `onShift(from, to)` ; réserve = ressource commune (`cap = 5`, `keep = true`), Surge, Spend, `minRes` inchangés ; Moonkin : crochet `damage` (comme le Mage) ; effet de fin de tour de la forme active dans `onTurnEnd` : Bear, frappe (comme le familier) et −1 dans `onRoundEnd` ; Cat, état à drapeau Clearcasting (comme Stealth, consommé dans `onCardCommitted`) et crochet de classe `cost` à 0 pour une Attack sans `cast` (comme Slice and Dice) ; Moonkin, coups sans carte à tous (`ceil(res / 2)`, 3 au plus) ; Tree of Life, `Combat.applyStatus(c, c.player, "regen", 1)` ; à ajouter au socle : plaque de tête lue sur une valeur (`d.form`), nom de ressource par forme (« Reserve » hors Cat, Bear, Moonkin ; registre, harnais U27, pastille) ; frappe de l'ours et coups à tous de Moonkin : `Combat.strike` (fait le 18/11/2026, commun avec le familier, journal et événement propres à la classe) ; les conditions `shift`, `caster`, `bear`, `cat`, `moonkin` et la plaque `shift` de `Core/Language.lua` (ancienne conception) sont à retirer |
+| Formes portées par les cartes, réserve lue selon la forme (Druid, fiche `docs/classes/druid.md`, 18/11/2026) | champ de carte `form` (`"cat"`, `"bear"`, `"moonkin"`, `"tree"`) ; état de classe `c.cls.form` (`nil` au début du combat : sans forme) ; changement au jeu dans le crochet de classe `onCardCommitted` (après les coûts, avant incantation ou résolution), événement propre `onShift(from, to)` ; réserve = ressource commune (`cap = 5`, `keep = true`), Surge, Spend, `minRes` inchangés ; Moonkin : crochet `damage` (comme le Mage) ; effet de fin de tour de la forme active dans `onTurnEnd` : Bear, frappe (comme le familier) et −1 dans `onRoundEnd` ; Cat, état à drapeau Clearcasting (comme Stealth, consommé dans `onCardCommitted`) et crochet de classe `cost` à 0 pour une Attack sans `cast` (comme Slice and Dice) ; Moonkin, coups sans carte à tous (`ceil(res / 2)`, 3 au plus) ; Tree of Life, `Combat.applyStatus(c, c.player, "regen", 1)` ; langage en place (18/11/2026) : plaque de forme lue sur `d.form`, ressource `wild` à noms par forme (`L.cardResource`, `L.combatResource`, « Ressource à noms multiples » ci-dessus), mot « Bear strikes », harnais U27 ; ancienne conception (conditions `shift`, `caster`, `bear`, `cat`, `moonkin`, plaque `shift`) retirée ; à ajouter au socle : pastille par forme, frappe commune au familier (une cible ou tous les ennemis) |
 | DoT selon la source | `apply … icon = "poison"` → `unit.stIcon`, `Art.statusIcons.poison` |
 
 ## Cartes épiques : points d'accroche (13/11/2026)

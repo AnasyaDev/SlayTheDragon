@@ -1767,10 +1767,10 @@ end
 -- Mots-clés d'une définition de carte (pour l'infobulle).
 W.SPEND_HINT = "|cffffd100Shift|r: play it without spending."
 
--- Ressource de la classe d'une carte (id du registre du langage) ou nil.
+-- Ressource de la classe d'une carte, dans la forme de la carte (clé du registre du langage : « rage »,
+-- « wild:cat » ; L.cardResource) ou nil.
 function W.cardResource(d)
-  local cd = d and d.class and ns.Classes[d.class]
-  return cd and cd.resource and cd.resource.id or nil
+  return d and ns.Language.cardResource(d) or nil
 end
 
 function W.cardKeywords(d)
@@ -1785,9 +1785,10 @@ function W.cardKeywords(d)
   if d.neutral and not d.class and Art.keywords.neutral then add("neutral") end
   -- mots de la plaque, dans l'ordre de la plaque (Core/Language.lua)
   local L = ns.Language
+  -- (plaque lue sur une valeur, la forme : clé « form:bear », l'explication de cette forme)
   for _, p in ipairs(L.plates) do
     local word = L.plateWord(p, d)
-    if word then add(p.key, p.n and word or nil, p.n and d[p.flag] or nil) end
+    if word then add(L.plateKey(p, d), p.n and word or nil, p.n and d[p.flag] or nil) end
   end
   -- texte : conditions nommées et conditions sur un état (« Name: »), puis états cités
   local text = d.text or ""
@@ -1835,13 +1836,22 @@ function W.cardKeywords(d)
     elseif e[1] == "interrupt" then add("interrupt") end
   end
   if W.hasPhrase(text, "Absorb") then add("absorb") end
-  -- ressources nommées par le texte (celle de la classe, ou une autre citée)
-  local rids = {}
-  for id in pairs(L.resources) do rids[#rids + 1] = id end
-  table.sort(rids)
-  for _, id in ipairs(rids) do
+  -- ressources nommées par le texte : celles de la carte d'abord (sa forme, ou la forme que nomme le
+  -- libellé d'un Power : « Cat Attacks: +1 Combo. »), puis une autre citée (même nom : déjà expliqué)
+  local named = {}
+  for _, key in ipairs(L.cardResourceKeys(d)) do
+    local r = L.resources[key]
+    if r and (W.hasPhrase(text, r.name) or W.hasPhrase(text, r.plural)) then
+      add("res:" .. key)
+      named[r.name], named[r.plural] = true, true
+    end
+  end
+  for _, id in ipairs(L.resourceKeys()) do
     local r = L.resources[id]
-    if W.hasPhrase(text, r.name) or W.hasPhrase(text, r.plural) then add("res:" .. id) end
+    if not named[r.name] and (W.hasPhrase(text, r.name) or W.hasPhrase(text, r.plural)) then
+      add("res:" .. id)
+      named[r.name], named[r.plural] = true, true
+    end
   end
   return list
 end
@@ -1851,8 +1861,21 @@ function W.keywordText(k)
   local line
   if k.key:sub(1, 7) == "status:" then line = Art.statusLine(k.key:sub(8))
   elseif k.key:sub(1, 5) == "cond:" then line = Art.conditionLine(k.key:sub(6))
-  else line = Art.keywordLine(k.key, k.label, k.n, k.res, k.up) end
+  else
+    local kw = Art.keyword(k.key)
+    if kw and kw.inline then line = W.inlineKeywordLine(kw)
+    else line = Art.keywordLine(k.key, k.label, k.n, k.res, k.up) end
+  end
   return W.inlineIcons(line, 12)
+end
+
+-- Explication écrite en ligne entière (mot de forme, `inline` : « Enters Bear (Frenzy). End of turn:
+-- Bear strikes. ») : le nom coloré à sa première place dans le texte, sinon « Nom: texte ».
+function W.inlineKeywordLine(kw)
+  local text, name = kw.text or "", kw.name or ""
+  local i, j = text:find(name, 1, true)
+  if not i or name == "" then return "|cffffd100" .. name .. "|r: " .. text end
+  return text:sub(1, i - 1) .. "|cffffd100" .. name .. "|r" .. text:sub(j + 1)
 end
 
 -- Lignes « While in the deck: A becomes B. » d'une épique (champ transforms), triées par nom d'origine.
@@ -2220,11 +2243,12 @@ W.CARD_H = W.CARD_W * SC.aspect
 
 -- Mots de la plaque retirés du texte affiché : registre du langage (Core/Language.lua), en tête
 -- (« ^Cast. ») ou en fin (« Cooldown 2. »).
+-- Plaque lue sur une valeur (forme) : le motif est celui du mot de la carte (pat nil ici, stripPlateWords).
 local function keywordStrip()
   local list = {}
   for _, p in ipairs(ns.Language.plates) do
-    local w = p.word .. (p.n and " %d+" or "")
-    list[#list + 1] = { plate = p, pat = p.head and ("^" .. w .. "%.%s*") or ("%s*" .. w .. "%.") }
+    local w = p.word and (p.word .. (p.n and " %d+" or ""))
+    list[#list + 1] = { plate = p, pat = w and (p.head and ("^" .. w .. "%.%s*") or ("%s*" .. w .. "%.")) }
   end
   return list
 end
@@ -2358,8 +2382,11 @@ W.SPEND_OFF_COLOR = C.textDim
 local function stripPlateWords(d)
   local text = d.text or ""
   for _, k in ipairs(keywordStrip()) do
-    if ns.Language.plateWord(k.plate, d) or (k.plate.key == "power" and d.rarity == "epic") then
-      text = text:gsub(k.pat, "")
+    local word = ns.Language.plateWord(k.plate, d)
+    if word or (k.plate.key == "power" and d.rarity == "epic") then
+      -- mot de forme (jamais écrit d'ordinaire) : retiré s'il est en tête, comme « Cast. »
+      local pat = k.pat or ("^" .. word:gsub("%p", "%%%0") .. "%.%s*")
+      text = text:gsub(pat, "")
     end
   end
   return text
@@ -2636,7 +2663,10 @@ local function phrases()
     end
   end
   for _, k in ipairs(keywordList()) do add(k.name) end
-  for _, r in pairs(ns.Language.resources) do add(r.name) add(r.plural) end
+  for _, key in ipairs(ns.Language.resourceKeys()) do
+    local r = ns.Language.resources[key]
+    add(r.name) add(r.plural)
+  end
   table.sort(phraseList, function(a, b) return #a > #b end)
   return phraseList
 end

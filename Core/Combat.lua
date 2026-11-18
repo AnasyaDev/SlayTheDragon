@@ -415,7 +415,7 @@ end
 -- Conditions nommées des effets (« cond = nom ») et montants variables (« per = { k, nom } »)
 ---------------------------------------------------------------------------
 -- CONDITIONS[nom](c, ctx, cible) -> booléen ; « status:<id> » : la cible porte l'état (affaiblissement)
--- ou le joueur le porte (bienfait). Une classe ajoute les siennes (Combat.CONDITIONS.bear = …).
+-- ou le joueur le porte (bienfait). Une classe ajoute les siennes (Combat.CONDITIONS.frozen = …).
 Combat.CONDITIONS = {
   execute = function(c, ctx, t) return t ~= nil and not t.dead and t.hp * 2 <= t.maxHp end,
   spent = function(c, ctx) return ctx.spent == true end,

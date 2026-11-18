@@ -3973,6 +3973,74 @@ do
     and H.ns.Card.defById("sw_death", true).name:find("^SW: Death") ~= nil, table.concat(long, ", "))
 end
 
+-- Classe et cartes factices à formes (Druid à venir, docs/classes/druid.md) : ressource à noms multiples
+-- « wild » (Combo en Cat, Frenzy en Bear, Charges en Moonkin, Reserve sinon), plaque de forme, « Bear
+-- strikes. ». Posées dans le ns chargé par freshRun seulement (le suivant repart des fichiers).
+H.FORM_FAKES = { "zzf_wrath", "zzf_shred", "zzf_bite", "zzf_maul", "zzf_frenzied", "zzf_starfire",
+  "zzf_hurricane", "zzf_rejuv", "zzf_leader", "zzf_skull" }
+function H.installFormFakes(ns)
+  ns.Classes.zzf = { id = "zzf", name = "Zzf", order = 99, hp = 65, playable = false,
+    resource = { id = "wild", cap = 5, keep = true }, deck = {}, paths = { { id = "zzf_a", name = "A" } } }
+  ns.Language.trigger("Cat Attacks")
+  local function card(id, t)
+    t.id, t.class, t.level, t.rarity, t.path = id, "zzf", 1, "common", "zzf_a"
+    t.name = t.name or id
+    t.up = t.up or { text = t.text }
+    ns.Cards[id] = t
+  end
+  card("zzf_wrath", { form = "moonkin", cost = 1, type = "attack", target = "enemy",
+    effects = { { "damage", 5 }, { "res", 1 } }, text = "Deal 5.\n+1 Charge.",
+    up = { effects = { { "damage", 8 }, { "res", 2 } }, text = "Deal 8.\n+2 Charges." } })
+  card("zzf_shred", { form = "cat", cost = 1, type = "attack", target = "enemy",
+    effects = { { "damage", 7 }, { "res", 1 } }, text = "Deal 7.\n+1 Combo." })
+  card("zzf_bite", { form = "cat", cost = 1, type = "attack", target = "enemy", minRes = 1,
+    effects = { { "surge" }, { "damage", 4, per = { 4, "surge" } } }, text = "Surge: deal 4 + 4 per Combo." })
+  card("zzf_maul", { form = "bear", cost = 1, type = "attack", target = "enemy",
+    effects = { { "damage", 4 } }, text = "Deal 4.\nBear strikes." })
+  card("zzf_frenzied", { form = "bear", cost = 1, type = "skill", spend = 2,
+    effects = { { "absorb", 6, more = { { 6, "spent" } } } }, text = "Gain 6 Absorb.\nSpend 2: gain 6 more." })
+  card("zzf_starfire", { form = "moonkin", cost = 2, type = "attack", target = "enemy", cast = true,
+    effects = { { "damage", 20 } }, text = "Cast.\nDeal 20." })
+  -- mot de forme écrit en tête (toléré, retiré comme « Cast. »)
+  card("zzf_hurricane", { form = "moonkin", cost = 2, type = "attack", cast = true,
+    effects = { { "damage", 12, all = true } }, text = "Moonkin.\nCast.\nDeal 12 to all." })
+  card("zzf_rejuv", { form = "tree", cost = 1, type = "skill", exhaust = true,
+    effects = { { "apply", "regen", 4, self = true } }, text = "Gain Regen 4\nExhaust." })
+  card("zzf_leader", { cost = 1, type = "power", power = true, text = "Power.\nCat Attacks: +1 Combo." })
+  card("zzf_skull", { cost = 0, type = "skill", target = "enemy", cooldown = 2,
+    effects = { { "interrupt" } }, text = "Interrupt the target's cast.\nCooldown 2." })
+end
+
+-- La clause est-elle un mot de forme écrit (« Bear. ») ?
+function H.formClause(cl)
+  for _, p in ipairs(H.ns.Language.plates) do
+    for _, v in pairs(p.values or {}) do if cl == v.word .. "." then return true end end
+  end
+  return false
+end
+
+-- Noms de ressource d'un texte : seulement ceux que la carte peut nommer (L.cardResourceKeys : ressource
+-- de sa classe dans sa forme, ou forme nommée par un libellé de Power) ; toute autre ressource (autre
+-- classe, autre forme) est une erreur. Liste des erreurs.
+function H.resourceWordErrors(d, label)
+  local L, W = H.ns.Language, H.ns.Widgets
+  local t, own, out = d.text or "", {}, {}
+  for _, key in ipairs(L.cardResourceKeys(d)) do
+    local r = L.resources[key]
+    if r then own[r.name], own[r.plural] = true, true end
+  end
+  for _, key in ipairs(L.resourceKeys()) do
+    local r = L.resources[key]
+    for _, w in ipairs({ r.name, r.plural }) do
+      if not own[w] and W.hasPhrase(t, w) then
+        out[#out + 1] = label .. " : ressource d'une autre classe ou d'une autre forme (" .. w .. ")"
+        own[w] = true
+      end
+    end
+  end
+  return out
+end
+
 print("U27 langage des cartes : mots-clés, états posés (Gain / Apply), sablier, explications, Pouvoirs")
 do
   freshRun(SEED, "combat")
@@ -3980,6 +4048,8 @@ do
   local ns = H.ns
   local W, Art, Card = ns.Widgets, ns.Art, ns.Card
   local HG = W.HOURGLASS_CHAR
+  -- cartes factices à formes (classe à noms de ressource multiples) : examinées comme les autres
+  H.installFormFakes(ns)
   local ids = {}
   for id in pairs(ns.Cards) do ids[#ids + 1] = id end
   table.sort(ids)
@@ -3992,7 +4062,11 @@ do
     return out
   end
   local PLATE = { "^Cooldown %d+%.$", "^Exhaust%.$", "^Retain%.$", "^Cast%.$", "^Power%.$", "^Trap%.$", "^Epic%.$" }
-  local function isPlate(cl) for _, p in ipairs(PLATE) do if cl:find(p) then return true end end return false end
+  -- (mots de forme, « Bear. », tolérés en tête du texte : H.formClause)
+  local function isPlate(cl)
+    for _, p in ipairs(PLATE) do if cl:find(p) then return true end end
+    return H.formClause(cl)
+  end
   -- ligne d'état sous condition d'état (« Stealth: apply Stunned 1 ⌛ ») : ramenée à sa forme simple
   -- (« Apply Stunned 1 ⌛ ») et libellé de la condition ; une autre ligne est rendue telle quelle
   local epicCard -- carte épique en cours d'examen (ses déclencheurs peuvent poser un état)
@@ -4042,8 +4116,14 @@ do
         local isState = isStateCl(cl)
         if isState then states[#states + 1] = cl seenState = true
         elseif seenState and not isPlate(cl) then afterState = true end
+        -- (après le seul mot de forme, s'il est écrit : « Moonkin. » puis « Cast. »)
         if cl:find("^Cast%.$") or cl:find("^Power%.$") then
-          if cl ~= cls[1] then bad[#bad + 1] = label .. " : « " .. cl .. " » pas en tête" end
+          local head = (d.form and cls[1] == (ns.Language.formWord(d.form) or "?") .. ".") and cls[2] or cls[1]
+          if cl ~= head then bad[#bad + 1] = label .. " : « " .. cl .. " » pas en tête" end
+        end
+        -- mot de forme écrit : seulement celui de la carte (d.form), en première clause
+        if H.formClause(cl) and (cl ~= cls[1] or cl ~= (ns.Language.formWord(d.form or "") or "?") .. ".") then
+          bad[#bad + 1] = label .. " : mot de forme « " .. cl .. " » (forme " .. tostring(d.form) .. ", en tête seulement)"
         end
       end
       if afterState then bad[#bad + 1] = label .. " : une clause suit les états posés" end
@@ -4130,8 +4210,8 @@ do
       local cls = {}
       for _, cl in ipairs(clauses(t)) do if not isPlate(cl) then cls[#cls + 1] = cl end end
       local function has(n) return W.hasPhrase(t, n .. ":") end
-      local cd = ns.Classes[d.class or ""]
-      local rid = cd and cd.resource and cd.resource.id
+      -- clé de ressource de la carte : ressource de sa classe, dans sa forme (« wild:cat » = Combo)
+      local rid = L.cardResource(d)
       local r = rid and L.resources[rid]
       if has("Execute") ~= usesCond(d, "execute") then cbad[#cbad + 1] = label .. " : Execute" end
       if has("Surge") ~= (effectOf(d, "surge") ~= nil) then cbad[#cbad + 1] = label .. " : Surge" end
@@ -4178,12 +4258,9 @@ do
           if not found then cbad[#cbad + 1] = label .. " : clause « " .. want .. " » absente" end
         end
       end
-      -- noms de ressource : seulement celle de la classe, accordée au nombre (« +1 Combo. »)
-      for orid, res in pairs(L.resources) do
-        if orid ~= rid and (W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural)) then
-          cbad[#cbad + 1] = label .. " : ressource d'une autre classe (" .. res.name .. ")"
-        end
-      end
+      -- noms de ressource : seulement celle de la classe (dans la forme de la carte, ou celle que nomme
+      -- le libellé d'un Power), accordée au nombre (« +1 Combo. »)
+      for _, e in ipairs(H.resourceWordErrors(d, label)) do cbad[#cbad + 1] = e end
       if r and r.plural ~= r.name then
         for n, word in t:gmatch("%+(%d+) ([%a ]-)%.") do
           if word ~= L.resourceName(rid, tonumber(n)) and (word == r.name or word == r.plural) then
@@ -4376,14 +4453,33 @@ do
       end
       if t:find(HG, 1, true) then need("le sablier", HG .. ": ") end
       if W.hasPhrase(t, "Absorb") then need("Absorb", "Absorb: ") end
-      for _, res in pairs(ns.Language.resources) do
+      -- ressources (clés des formes comprises : la ligne de la forme de la carte, « Combo: kept… »)
+      for _, key in ipairs(ns.Language.resourceKeys()) do
+        local res = ns.Language.resources[key]
         if W.hasPhrase(t, res.name) or W.hasPhrase(t, res.plural) then need(res.name, res.name .. ": ") end
       end
+      -- mots à motif hors règle d'épique et hors zone (« Pay N HP », « Pet attacks », « Bear strikes »)
+      for _, kw in pairs(ns.Language.keywords) do
+        if kw.pattern and not kw.rule and not kw.zone then
+          for cl in (t .. "\n"):gmatch("(.-)\n") do
+            if cl:find(kw.pattern) then need(kw.name, kw.name .. ": ") end
+          end
+        end
+      end
       -- à-côté d'un mot de règle d'épique (L.rule) : la règle complète, une ou deux phrases, 110 caractères au plus
-      -- (vérifié en détail par UEL)
+      -- (vérifié en détail par UEL) ; mot de forme (plaque lue sur une valeur) : la ligne de la fiche, 60
+      -- caractères, deux phrases, ressource entre parenthèses (« Enters Cat (Combo). End of turn: … »)
       local ruleLine = {}
       for _, r in ipairs(ns.Language.ruleWords(d)) do
         ruleLine[plain(W.inlineIcons(r.kw.name .. ": " .. ns.Language.ruleText(r.kw, r.n, up), 12))] = true
+      end
+      for _, pl in ipairs(ns.Language.plates) do
+        local fk = pl.field and ns.Language.plateKey(pl, d)
+        if fk then
+          local fl = plain(W.inlineIcons(W.inlineKeywordLine(ns.Language.plateByKey(fk)), 12))
+          ruleLine[fl] = "form"
+          need("le mot de forme", fl)
+        end
       end
       for _, l in ipairs(tt.lines) do
         local p = plain(l)
@@ -4391,8 +4487,8 @@ do
           nLines = nLines + 1
           local len = W.utf8len(p)
           local long, sentences = 60, 0
-          if ruleLine[p] then long, sentences = 110, 1 end
-          if len > long or p:find("[;()]") or select(2, p:gsub("%. ", "")) > sentences then
+          if ruleLine[p] == true then long, sentences = 110, 1 elseif ruleLine[p] then sentences = 1 end
+          if len > long or p:find(ruleLine[p] == "form" and ";" or "[;()]") or select(2, p:gsub("%. ", "")) > sentences then
             ebad[#ebad + 1] = label .. " : « " .. p .. " » (" .. len .. ")"
           end
         end
@@ -4404,9 +4500,8 @@ do
   -- explications du registre du langage (conditions, plaque, mots, ressources) : présentes, une
   -- phrase courte, la ressource de chaque classe substituée
   local kbad = {}
-  local reslist = {}
-  for rid in pairs(ns.Language.resources) do reslist[#reslist + 1] = rid end
-  table.sort(reslist)
+  -- (clés des formes comprises : « Surge: spends all Combo… » pour une carte Cat)
+  local reslist = ns.Language.resourceKeys()
   for _, k in ipairs({ "turns", "absorb", "interrupt" }) do
     local l = Art.keywords[k] and plain(Art.keywordLine(k)) or ""
     if l == "" or W.utf8len(l) > 60 then kbad[#kbad + 1] = k end
@@ -4421,7 +4516,16 @@ do
     end
   end
   for _, c in ipairs(ns.Language.conditions) do okLine(c.key, 2) end
-  for _, p in ipairs(ns.Language.plates) do okLine(p.key, 2) end
+  for _, p in ipairs(ns.Language.plates) do
+    okLine(p.key, 2)
+    -- mot lu sur une valeur (forme) : ligne entière de la fiche, 60 caractères, deux phrases au plus
+    for v, e in pairs(p.values or {}) do
+      local l = plain(W.inlineKeywordLine(e))
+      if W.utf8len(l) > 60 or l:find(";") or select(2, l:gsub("%. ", "")) > 1 or not l:find(e.name, 1, true) then
+        kbad[#kbad + 1] = p.key .. ":" .. v .. " : « " .. l .. " »"
+      end
+    end
+  end
   -- (mots de règle des épiques, L.rule : une ou deux phrases, 110 caractères au plus, vérifiés par UEL)
   for key, kw in pairs(ns.Language.keywords) do if not kw.rule then okLine(key, 2) end end
   for _, rid in ipairs(reslist) do okLine("res:" .. rid) end
@@ -4462,6 +4566,77 @@ do
   v:Render(true)
   check("Pouvoirs joués (Forme d'ombre, Extase+, Esprit de rédemption, Apothéose) : jeton sous le personnage, icône de la carte, nom, texte et mots-clés au survol",
     #pbad == 0, table.concat(pbad, "\n        "))
+  -- 5. formes (Druid, cartes factices zzf_*) : plaque de forme lue sur d.form, nom de ressource selon la
+  -- forme, « Bear strikes », anciens mots retirés ; la règle des noms de ressource reste stricte ailleurs
+  do
+    local Lg = ns.Language
+    local fbad = {}
+    local function want(ok, what) if not ok then fbad[#fbad + 1] = what end end
+    local function pills(id, up) return table.concat(W.cardPills(Card.defById(id, up)), " · ") end
+    local function gloss(id, up)
+      local out = {}
+      for _, k in ipairs(W.cardKeywords(Card.defById(id, up))) do out[#out + 1] = plain(W.keywordText(k)) end
+      return "\n" .. table.concat(out, "\n") .. "\n"
+    end
+    local function line(id, l) return gloss(id):find("\n" .. l .. "\n", 1, true) ~= nil end
+    want(pills("zzf_starfire") == "Moonkin · Cast", "plaque de Starfire : " .. pills("zzf_starfire"))
+    want(pills("zzf_hurricane") == "Moonkin · Cast", "plaque de Hurricane : " .. pills("zzf_hurricane"))
+    want(pills("zzf_rejuv") == "Tree · Exhaust", "plaque de Rejuvenation : " .. pills("zzf_rejuv"))
+    want(pills("zzf_shred") == "Cat" and pills("zzf_maul") == "Bear", "plaques Cat / Bear")
+    want(pills("zzf_leader") == "Power" and pills("zzf_skull") == "Cooldown 2", "cartes sans forme : aucun mot de forme")
+    want(pills("zzf_wrath", true) == "Moonkin", "forme inchangée au palier : pas de vert")
+    local hb = plain(W.cardBody(Card.defById("zzf_hurricane")))
+    want(not hb:find("Moonkin", 1, true) and not hb:find("Cast", 1, true) and hb:find("^Deal"), "corps de Hurricane : « " .. hb .. " »")
+    want(plain(W.cardBody(Card.defById("zzf_maul"))):find("Bear strikes.", 1, true) ~= nil, "corps de Maul : « Bear strikes. » gardé")
+    -- glossaire : ligne de la forme (nom coloré dans la ligne), ressource de la forme de la carte
+    want(line("zzf_shred", "Enters Cat (Combo). End of turn: next Attack costs 0."), "glossaire Cat" .. gloss("zzf_shred"))
+    want(line("zzf_shred", "Combo: kept between forms and turns, Surge spends it all.")
+      and not gloss("zzf_shred"):find("openers", 1, true), "Combo du Druid, pas celui du Rogue" .. gloss("zzf_shred"))
+    want(line("zzf_bite", "Surge: spends all Combo for the effect."), "Surge en Combo" .. gloss("zzf_bite"))
+    want(line("zzf_frenzied", "Spend 2: pays 2 Frenzy for the bonus, if available.")
+      and line("zzf_frenzied", "Enters Bear (Frenzy). End of turn: Bear strikes."), "Spend en Frenzy" .. gloss("zzf_frenzied"))
+    want(line("zzf_maul", "Bear strikes: hits the last target for 1 + Frenzy, then +1."), "Bear strikes" .. gloss("zzf_maul"))
+    want(line("zzf_wrath", "Charge: +1 to each Attack hit per Charge, up to 5.")
+      and not gloss("zzf_wrath"):find("up to 4", 1, true), "Charges du Druid, pas du Mage" .. gloss("zzf_wrath"))
+    want(line("zzf_rejuv", "Enters Tree of Life. End of turn: gain Regen 1."), "Tree of Life" .. gloss("zzf_rejuv"))
+    want(line("zzf_leader", "Combo: kept between forms and turns, Surge spends it all."), "Power « Cat Attacks: » : Combo" .. gloss("zzf_leader"))
+    local kt = W.keywordText({ key = "form:tree" })
+    want(kt:find("|cffffd100Tree of Life|r", 1, true) ~= nil, "nom de forme coloré dans la ligne : " .. kt)
+    -- registre : clés de ressource, noms, forme en combat
+    want(Lg.resourceName("wild", 1) == "Reserve" and Lg.resourceName("wild", 1, "tree") == "Reserve"
+      and Lg.resourceName("wild", 2, "moonkin") == "Charges" and Lg.resourceName("wild:moonkin", 1) == "Charge"
+      and Lg.resourceName("wild", 3, "cat") == "Combo" and Lg.resourceName("rage", 2, "cat") == "Rage", "L.resourceName")
+    want(Lg.resourceKey("wild", "bear") == "wild:bear" and Lg.resourceKey("wild", "tree") == "wild"
+      and Lg.resourceKey("wild") == "wild" and Lg.resourceKey("combo", "cat") == "combo", "L.resourceKey")
+    want(Lg.cardResource(Card.defById("eviscerate")) == "combo" and Lg.cardResource(Card.defById("zzf_skull")) == "wild"
+      and Lg.cardResource(ns.Cards.zzf_rejuv) == "wild" and Lg.cardResource(ns.Cards.zzf_maul) == "wild:bear", "L.cardResource")
+    want(table.concat(Lg.cardResourceKeys(ns.Cards.zzf_leader), ",") == "wild,wild:cat", "L.cardResourceKeys d'un Power « Cat Attacks: »")
+    want(Lg.combatResource({ class = "zzf", cls = { form = "moonkin" } }) == "wild:moonkin"
+      and Lg.combatResource({ class = "zzf", cls = {} }) == "wild" and Lg.combatResource({ class = "rogue", cls = {} }) == "combo",
+      "L.combatResource")
+    want(plain(Art.keywordLine("res:wild:bear")) == "Frenzy: Bear strikes for 1 + Frenzy, −1 each round in Bear."
+      and plain(Art.keywordLine("res:wild")):find("^Reserve: ") ~= nil, "Art.keywordLine sur une clé de forme")
+    -- règle des noms de ressource : stricte pour les autres classes et les autres formes
+    local function errs(d) return #H.resourceWordErrors(d, d.id or "?") end
+    want(errs({ class = "rogue", text = "+1 Combo." }) == 0 and errs({ class = "rogue", text = "+1 Frenzy." }) == 1
+      and errs({ class = "hunter", text = "Deal 2 per Charge." }) == 1 and errs({ class = "rogue", text = "+1 Reserve." }) == 1,
+      "autres classes : toujours strictes (Frenzy, Charge, Reserve refusés sur un Rogue / Hunter)")
+    want(errs({ class = "zzf", form = "cat", text = "+1 Frenzy." }) == 1 and errs({ class = "zzf", form = "moonkin", text = "+1 Combo." }) == 1
+      and errs({ class = "zzf", text = "+1 Combo." }) == 1 and errs({ class = "zzf", text = "Power.\nBear strikes: +1 Combo." }) == 1
+      and errs({ class = "zzf", form = "tree", text = "+1 Combo." }) == 1 and errs({ class = "zzf", text = "Power.\nCat Attacks: +1 Combo." }) == 0,
+      "classe à formes : seulement le nom de la forme de la carte (ou du libellé d'un Power)")
+    -- ancienne conception retirée
+    for _, k in ipairs({ "shift", "caster", "bear", "cat", "moonkin" }) do
+      want(Lg.conditionByKey(k) == nil, "condition « " .. k .. " » encore déclarée")
+    end
+    want(Lg.plateByKey("shift") == nil and not Lg.knownLabel("Bear") and not Lg.knownLabel("Shift"), "plaque Shift / libellés Bear, Shift")
+    local order = {}
+    for _, p in ipairs(Lg.plates) do order[#order + 1] = p.key end
+    order = table.concat(order, " ")
+    want(order:find("form cast", 1, true) ~= nil and H.formClause("Bear.") and not H.formClause("Bear strikes."), "ordre de la plaque : " .. order)
+    check("formes (cartes factices) : plaque Cat / Bear / Moonkin / Tree lue sur d.form, avant Cast, retirée du corps ; ligne de la fiche ; Combo / Frenzy / Charges / Reserve selon la forme (glossaire, Surge, Spend) ; Bear strikes ; noms stricts ailleurs ; Shift, Caster, Bear, Cat, Moonkin retirés",
+      #fbad == 0, table.concat(fbad, "\n        "))
+  end
   card:Hide()
   m:Hide()
 end
