@@ -273,17 +273,19 @@ test("Moonkin : 1 dégât à tous par 2 Charges, arrondi au supérieur, 3 au plu
   end
 end)
 
-test("Tree of Life : Regen TREE_REGEN (2) à la fin du tour, soigne au début du suivant", function()
-  eq(D.TREE_REGEN, 2)
+test("Tree of Life : TREE_ABSORB (3) Absorb à la fin du tour, pour le tour ennemi, sans Regen", function()
+  eq(D.TREE_ABSORB, 3)
+  eq(D.TREE_REGEN, nil, "plus de Regen de fin de tour")
   local c = setup({ "mark_of_the_wild" }, { hp = 40 })
   play(c, "mark_of_the_wild")
   eq(c.player.st.regen, 2)
+  eq(c.player.block, 4)
   Combat.endPlayerTurn(c)
-  eq(c.player.st.regen, 4, "+2")
-  Combat.enemyPhase(c)
-  Combat.endRound(c)
-  Combat.startPlayerTurn(c)
-  eq(c.player.hp, 44)
+  eq(c.player.st.regen, 2, "la Regen posée ne change pas")
+  eq(c.player.block, 4 + 3, "+3 Absorb")
+  -- infobulle du mot de plaque : le chiffre écrit est celui de la règle
+  local txt = ns.Language.plateByKey("form:tree").text
+  assert(txt:find("gain " .. D.TREE_ABSORB .. " Absorb", 1, true), txt)
 end)
 
 -- Cast et forme de fin de tour ---------------------------------------------------------------------------

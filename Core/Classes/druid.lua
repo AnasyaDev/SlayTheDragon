@@ -13,7 +13,8 @@
 -- Effet de fin de tour (onTurnEnd, avant Powers, bibelots et défausse), selon la forme active :
 --   Bear : frappe de l'ours (Druid.bearStrike) ; Cat : état Clearcasting (drapeau, ne s'empile pas : la
 --   prochaine Attack hors Cast coûte 0, consommé au jeu par cette Attack) ; Moonkin : coup sans carte à tous,
---   ceil(réserve / 2), PULSE_MAX au plus ; Tree : Regen TREE_REGEN ; sans forme : rien.
+--   ceil(réserve / 2), PULSE_MAX au plus ; Tree : TREE_ABSORB Absorb pour le tour ennemi (repli de la fiche
+--   § 1.3, 19/11/2026 : protège sans soigner entre les combats) ; sans forme : rien.
 -- Levier de secours A (fiche § 1.6, actif depuis le 18/11/2026) : à partir du (TAX_FREE + 1)-ième changement
 --   d'un tour, TAX mana de moins au tour suivant par changement, TAX_MAX au plus (crochet maxMana, c.cls.tax).
 --   Compte comme changement toute carte jouée qui fait entrer dans une autre forme, l'entrée dans la première
@@ -29,7 +30,7 @@ ns.Druid = Druid
 -- Réglages (docs/classes/druid.md, § 10 ; mesures du 18/11/2026 : docs/equilibrage.md, « Druid »).
 Druid.STRIKE_BASE = 1   -- frappe de l'ours : 1 + réserve
 Druid.PULSE_MAX = 3     -- Moonkin, fin de tour : ceil(Charges / 2) à chaque ennemi, au plus
-Druid.TREE_REGEN = 2    -- Tree of Life, fin de tour : Regen gagnée (1 au départ : 2,5 % des fins de tour)
+Druid.TREE_ABSORB = 3   -- Tree of Life, fin de tour : Absorb gagné (Regen 1 puis 2 jusqu'au 19/11/2026)
 Druid.TAX = 1           -- levier A : mana perdu au tour suivant par changement au-delà de TAX_FREE (0 = inactif)
 Druid.TAX_FREE = 1      -- changements gratuits par tour (taxe dès le 2e : décision du joueur, « plus d'une fois »)
 Druid.TAX_MAX = 2       -- mana perdu au plus (il reste 1 mana sur 3)
@@ -163,7 +164,7 @@ function Druid.endOfTurn(c)
   elseif form == "moonkin" then
     Druid.moonkinPulse(c)
   elseif form == "tree" then
-    Combat.applyStatus(c, p, "regen", Druid.TREE_REGEN)
+    Combat.gainBlock(c, p, Druid.TREE_ABSORB)
   end
 end
 
