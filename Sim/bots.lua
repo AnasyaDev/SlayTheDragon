@@ -283,10 +283,25 @@ return function(ns)
   end
   Bots.resValue = resValue
 
+  -- Talents du combat (docs/talents.md) : bot.won (PV équivalents d'un combat gagné dans cet état : Rage
+  -- gardée, soin d'après-combat) et bot.value (unités de W, état en cours : Rage qui ouvre un mana au tour suivant).
+  local function talentBot(c, won)
+    local ts, v = c.talents, 0
+    for i = 1, #ts do
+      local part = ns.Talent.part(c.class, ts[i])
+      local b = part and part.bot
+      local f = b and (won and b.won or not won and b.value)
+      if f then v = v + f(c, ts[i], W) end
+    end
+    return v
+  end
+
   local function evaluate(c)
     if c.result == "lost" then return -1e9 end
     local p = c.player
-    if c.result == "won" then return 1e6 + p.hp * 100 + potionsValue(c) * 10 end
+    if c.result == "won" then
+      return 1e6 + (p.hp + (c.talents and talentBot(c, true) or 0)) * 100 + potionsValue(c) * 10
+    end
     local s = p.hp * W.hp + potionsValue(c)
     for i = 1, #c.enemies do
       local e = c.enemies[i]
@@ -316,6 +331,7 @@ return function(ns)
     -- valeur propre à la classe (état de classe, familier, formes…) : ns.ClassRules[classe].botValue
     local cr = ns.ClassRules[c.class]
     if cr and cr.botValue then s = s + cr.botValue(c, W) end
+    if c.talents then s = s + talentBot(c, false) end
     -- valeur propre aux zones (ns.ZoneBots[zone].value)
     local zb = zoneBots(c)
     if zb then

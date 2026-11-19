@@ -7,7 +7,8 @@
 --        startZone (diagnostic : départ dans cette zone avec le deck de départ), maxZone (diagnostic : arrêt après
 --        le boss de cette zone), zone (alias : startZone = maxZone = zone, une zone seule),
 --        zones (0..7 : zones gagnées par le compte et la classe, à toutes les clés),
---        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (niveau de classe 1..7, défaut 7),
+--        meta ("start"|"exalted" : alias de zones=0 et zones=7), level (palier de contenu 1..7, défaut 7),
+--        talents = { [nœud] = rang }, spec (arbre de talents de la classe, docs/talents.md ; défaut : aucun),
 --        epic (id d'une carte épique imposée au deck de départ),
 --        human (bot=human : { skill = …, width = … }, Bots.humanParams ; hors combat aussi, humanDecide),
 --        fightBot (bot des combats à la place de bot : bot=human fightBot=heuristic isole le jeu hors combat)
@@ -396,6 +397,15 @@ return function(ns)
     local ph = exp.phase
     if ph == "transit" then return { "continue" } end
     if ph == "start" then
+      -- épique au départ (talent Veteran's Arsenal) : la mieux notée pour ce deck (comme une épique offerte)
+      if exp.talentEpics then
+        local best, bestV
+        for i, id in ipairs(exp.talentEpics) do
+          local v = epicRating(exp, id)
+          if not bestV or v > bestV then best, bestV = i, v end
+        end
+        return best and { "talentEpic", best } or { "skipTalentEpic" }
+      end
       return has(ch, "startRelic") or { "skipStartRelic" }
     elseif ph == "map" then
       local paths = {}
@@ -742,12 +752,14 @@ return function(ns)
   function SE.play(opts)
     local seed = opts.seed or 1
     onlyPath = opts.path
-    local level = opts.level or Meta.MAX_LEVEL
+    local level = opts.level or Meta.MAX_TIER
     -- zones=N : le compte et la classe ont gagné les N premières zones, à toutes les clés (commun, cartes
     -- de zone, bibelots de clé) ; meta=start = zones=0, meta=exalted = zones=7 (tout débloqué).
     local zones = opts.zones
     if zones == nil then zones = opts.meta == "exalted" and ns.Zone.count() or 0 end
     local unlocks = Meta.allUnlocked(level, zones)
+    -- talents imposés (tree=, talents=, spec= de Sim/sim.lua) : figés au départ comme ceux du compte
+    if opts.talents then unlocks.talents, unlocks.spec = opts.talents, opts.spec end
     -- Drapeaux de compte : compte neuf sans zone gagnée (premier temps des histoires possible),
     -- compte vétéran dès une zone gagnée (premier temps vu, suite selon la parité de la graine).
     local flags = opts.flags

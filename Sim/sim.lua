@@ -16,8 +16,13 @@
 --     (victoire = Nefarian battu ; tableau « Par zone »). Diagnostic : startzone=<id> (départ dans cette zone avec
 --     le deck de départ), maxzone=<id> (arrêt après le boss de cette zone) ; zone=<id> = startzone=<id>
 --     maxzone=<id> (une zone seule, comme avant le 14/11/2026)
---   level=1..7 : niveau de classe (cartes et bibelots de classe débloqués) ; défaut 7 avec
---     runner=expedition (tout débloqué, les mesures d'avant la progression par classe), toutes les cartes sinon
+--   level=1..7 : palier de contenu de la classe (cartes et bibelots de classe débloqués : niveaux de classe 1, 2,
+--     3, 5, 7, 9, 11 depuis les 25 niveaux, Meta.CONTENT_LEVELS) ; défaut 7 avec runner=expedition (tout
+--     débloqué, les mesures d'avant la progression par classe), toutes les cartes sinon
+--   tree=0..100 : part de l'arbre de talents de la classe (24 points, arrondi au point supérieur : 20 = 5,
+--     60 = 15, 80 = 20) dépensée dans l'ordre du bot (ns.Talents[classe].bot.order ; runner=expedition) ;
+--     talents=nœud:rang,nœud:rang : rangs imposés (ajoutés à tree=, ou seuls) ; spec=<voie> : voie du nœud
+--     Specialization (défaut : celle du bot). Sans tree= ni talents= : aucun talent (rapports d'avant).
 --   tier=0..7 : bibelots/potions communs débloqués (palier commun : zones gagnées par le compte ; défaut : tous)
 --   relics=id,id : bibelots dès le départ        loot=0 : ni bibelot ni potion gagnés
 --   nointerrupt=1 : monde témoin où les ennemis n'interrompent jamais
@@ -430,9 +435,30 @@ local function installSources(ns)
   end
 end
 
+-- tree= / talents= / spec= : arbre de talents imposé à la classe jouée (docs/talents.md). Renvoie { [nœud] = rang
+-- }, voie, ou nil sans ces paramètres (aucun talent).
+local function simTalents(ns)
+  if not opts.tree and not opts.talents then return nil end
+  local class = opts.class or "priest"
+  local tree = ns.Talents[class]
+  assert(tree, "tree= / talents= : la classe " .. class .. " n'a pas d'arbre")
+  local map, spec = {}, nil
+  if opts.tree then map, spec = ns.Talent.fromShare(class, tonumber(opts.tree), opts.spec) end
+  for item in (opts.talents or ""):gmatch("[^,]+") do
+    local id, r = item:match("^([%w_]+):(%d+)$")
+    assert(id and ns.Talent.node(class, id), "talents= : nœud inconnu " .. item)
+    map[id] = tonumber(r)
+  end
+  for _, n in ipairs(tree.nodes) do
+    if n.choices and (map[n.id] or 0) > 0 then spec = opts.spec or spec or (tree.bot or {}).spec end
+  end
+  return map, spec
+end
+
 local function runRange(from, to)
   local ns = dofile(root .. "/Sim/load.lua")(root)
   applyTune(ns)
+  local talents, spec = simTalents(ns)
   if opts.sources == "1" then installSources(ns) end
   -- dureté des zones (ns.Zone.HARD) remplacée pour la série : zonehp=zone:f,zone:f zonedmg=zone:f,… ;
   -- zoneepichp= / zoneepicdmg= : facteurs quand le deck a une épique (epicHp / epicDmg)
@@ -477,7 +503,7 @@ local function runRange(from, to)
         pick = opts.pick or "rated", cap = tonumber(opts.cap or 400), key = tonumber(opts.key or 0),
         meta = opts.meta or "start", class = opts.class, force = force, level = tonumber(opts.level),
         hp = tonumber(opts.hp), path = opts.path, zones = tonumber(opts.zones), zone = opts.zone,
-        startZone = opts.startzone, maxZone = opts.maxzone,
+        startZone = opts.startzone, maxZone = opts.maxzone, talents = talents, spec = spec,
         epic = opts.epic ~= "" and opts.epic or nil, human = human, fightBot = opts.fightbot })
     else
       rec = ns.Run.play({ seed = seed0 * 1000003 + i, bot = opts.bot or "heuristic",
@@ -916,6 +942,18 @@ local function report(a, title)
     local from = opts.startzone or opts.zone or ns.Zone.FIRST
     out(("Expédition : %s -> %s, clé +%d, zones gagnées %d, niveau de classe %d"):format(from, lastZone,
       tonumber(opts.key or 0), zones, tonumber(opts.level or 7)))
+    -- talents imposés (tree=, talents=, spec=) : points et rangs dans l'ordre de l'arbre
+    if opts.tree or opts.talents then
+      local map, spec = simTalents(ns)
+      local list = ns.Talent.entries(opts.class or "priest", map, spec) or {}
+      local parts, pts = {}, 0
+      for _, e in ipairs(list) do
+        pts = pts + e.rank
+        parts[#parts + 1] = e.id .. " " .. e.rank .. (e.spec and (" (" .. e.spec .. ")") or "")
+      end
+      out(("Talents : %d points%s : %s"):format(pts, opts.tree and (" (tree=" .. opts.tree .. ")") or "",
+        #parts > 0 and table.concat(parts, ", ") or "aucun"))
+    end
     out(("Expérience de classe : %.1f par expédition (victoire %.1f, défaite %.1f)"):format(a.xp / a.runs,
       a.wins > 0 and a.xpWin / a.wins or 0, a.runs > a.wins and a.xpLoss / (a.runs - a.wins) or 0))
     out(("Or moyen : gagné %.1f, dépensé %.1f, restant %.1f   Étapes franchies : %.2f   or inutilisé : %s du gagné")
