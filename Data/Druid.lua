@@ -158,7 +158,7 @@ card("demoralizing_roar", {
 })
 
 -- Leader of the Pack : chaque carte Attack de forme Cat, après sa résolution (copie comprise), +n Combo ;
--- palier 3 : ses coups font aussi 2 de plus.
+-- palier 1 : ses coups font aussi 2 de plus (3 au palier 3).
 local function leaderHooks(n, more)
   return {
     onCardPlayed = function(c, power, inst, ctx)
@@ -177,8 +177,8 @@ card("leader_of_the_pack", {
   level = 7, name = "Leader of the Pack", cost = 0, type = "power", rarity = "rare", path = "feral",
   power = true, effects = {}, hooks = leaderHooks(1, 0),
   text = "Power.\nCat Attacks: +1 Combo.",
-  up = { innate = true, text = "Power.\nCat Attacks: +1 Combo.\nInnate." },
-  up2 = { hooks = leaderHooks(1, 2), text = "Power.\nCat Attacks: +1 Combo, deal 2 more.\nInnate." },
+  up = { hooks = leaderHooks(1, 2), text = "Power.\nCat Attacks: +1 Combo, deal 2 more." },
+  up2 = { innate = true, text = "Power.\nCat Attacks: +1 Combo, deal 2 more.\nInnate." },
   up3 = { hooks = leaderHooks(1, 3), text = "Power.\nCat Attacks: +1 Combo, deal 3 more.\nInnate." },
 })
 
