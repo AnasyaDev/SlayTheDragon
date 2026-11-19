@@ -716,6 +716,7 @@ return function(T)
     local every = HT.decayEvery[rk("bestial_discipline")]
     local word = ({ [2] = "other", [3] = "third", [4] = "fourth" })[every]
     c.player.res = 3
+    c.kind = "elite" -- Unleashed Fury ne joue que contre les élites et les boss
     v:Render(true)
     H.advance(1)
     local tb = plainTip(v.resource)
