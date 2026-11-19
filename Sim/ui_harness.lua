@@ -11913,8 +11913,9 @@ do
   e, c, v = uewCombat("sweeping_strikes")
   host = v.classZone.views.warrior
   local alive = #ns.Combat.aliveEnemies(c)
-  check("Sweeping Strikes : « Targeted hits splash 1 other for a third » à plusieurs, rien seul",
-    (alive >= 2 and line(host) == "Targeted hits splash 1 other for a third") or (alive < 2 and line(host) == nil), line(host))
+  -- Sweep 2 à la moitié depuis le 19/11/2026 (docs/equilibrage.md, « Épiques : mesure une par une »)
+  check("Sweeping Strikes : « Targeted hits splash 2 others for half » à plusieurs, rien seul",
+    (alive >= 2 and line(host) == "Targeted hits splash 2 others for half") or (alive < 2 and line(host) == nil), line(host))
   -- 5. Thunderous Roar : l'onde (journal epic_trigger, dégâts) passe par la file d'animations
   e, c, v = uewCombat("thunderous_roar")
   host = v.classZone.views.warrior
@@ -12169,8 +12170,8 @@ do
   v:Render(true)
   H.settle()
   local tok, now = H.heroToken(v, "epic")
-  check("jeton de Heart of the Wild : « 1 Combo, 0 Frenzy, 1 Charge, up to 3 each » au survol",
-    tok and now == "1 Combo, 0 Frenzy, 1 Charge, up to 3 each", tostring(now))
+  check("jeton de Heart of the Wild : « 1 Combo, 0 Frenzy, 1 Charge, up to 5 each » au survol",
+    tok and now == "1 Combo, 0 Frenzy, 1 Charge, up to 5 each", tostring(now))
   local missing = {}
   for _, id in ipairs({ "furor", "mark_of_ursol", "eclipse", "king_of_the_jungle", "lifebloom", "owlkin_frenzy",
     "heart_of_the_wild" }) do
