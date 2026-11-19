@@ -4610,7 +4610,7 @@ do
     want(line("zzf_maul", "Bear strikes: hits the last target for 1 + Frenzy, then +1."), "Bear strikes" .. gloss("zzf_maul"))
     want(line("zzf_wrath", "Charge: +1 to each Attack hit per Charge, up to 5.")
       and not gloss("zzf_wrath"):find("up to 4", 1, true), "Charges du Druid, pas du Mage" .. gloss("zzf_wrath"))
-    want(line("zzf_rejuv", "Enters Tree of Life. End of turn: gain 3 Absorb."), "Tree of Life" .. gloss("zzf_rejuv"))
+    want(line("zzf_rejuv", "Enters Tree of Life. End of turn: gain 2 Absorb."), "Tree of Life" .. gloss("zzf_rejuv"))
     want(line("zzf_leader", "Combo: kept between forms and turns, Surge spends it all."), "Power « Cat Attacks: » : Combo" .. gloss("zzf_leader"))
     local kt = W.keywordText({ key = "form:tree" })
     want(kt:find("|cffffd100Tree of Life|r", 1, true) ~= nil, "nom de forme coloré dans la ligne : " .. kt)
@@ -7587,7 +7587,7 @@ do
     { key = "cat", form = "cat", icon = "ability_druid_catform", word = "Combo", eot = "End of turn: Clearcasting, the next Attack costs 0." },
     { key = "bear", form = "bear", icon = "ability_racial_bearform", word = "Frenzy" },
     { key = "moonkin", form = "moonkin", icon = "spell_nature_forceofnature", word = "Charges", eot = "End of turn: 2 damage to each enemy." },
-    { key = "tree", form = "tree", icon = "ability_druid_treeoflife", word = "Reserve", eot = "End of turn: gain 3 Absorb." },
+    { key = "tree", form = "tree", icon = "ability_druid_treeoflife", word = "Reserve", eot = "End of turn: gain 2 Absorb." },
   }
   local alive = 0
   for _, en in ipairs(c.enemies) do if not en.dead then alive = alive + 1 end end

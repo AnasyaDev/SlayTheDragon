@@ -34,7 +34,7 @@ ns.Druid = Druid
 -- Réglages (docs/classes/druid.md, § 10 ; mesures du 18/11/2026 : docs/equilibrage.md, « Druid »).
 Druid.STRIKE_BASE = 1   -- frappe de l'ours : 1 + réserve
 Druid.PULSE_MAX = 3     -- Moonkin, fin de tour : ceil(Charges / 2) à chaque ennemi, au plus
-Druid.TREE_ABSORB = 3   -- Tree of Life, fin de tour : Absorb gagné (Regen 1 puis 2 jusqu'au 19/11/2026)
+Druid.TREE_ABSORB = 2   -- Tree of Life, fin de tour : Absorb gagné (Regen 1 puis 2 jusqu'au 19/11/2026 ; 3 essayé)
 Druid.TAX = 1           -- levier A : mana perdu au tour suivant par changement au-delà de TAX_FREE (0 = inactif)
 Druid.TAX_FREE = 1      -- changements gratuits par tour (taxe dès le 2e : décision du joueur, « plus d'une fois »)
 Druid.TAX_MAX = 2       -- mana perdu au plus (il reste 1 mana sur 3)

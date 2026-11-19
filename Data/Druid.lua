@@ -132,18 +132,18 @@ card("tigers_fury", {
   up3 = { effects = { { "res", 2 }, { "draw", 1 } }, text = "+2 Combo.\nDraw 1.\nCooldown 1.\nRetain." },
 })
 
--- Mangle : Bestial Wrath du Hunter (une frappe par point compté, chacune à 1 + le montant, sans gain) ; coût 1
--- (2 jusqu'au 19/11/2026 : gardée en main 63 % des fois) ; palier 1 : « +2 Frenzy. » après les frappes (la
--- carte n'est plus faite que de Surge : jouable à 0).
+-- Mangle : Bestial Wrath du Hunter (une frappe par point compté, chacune à 1 + le montant, sans gain), puis
+-- « +2 Frenzy. » (jouable à 0 : la carte n'est plus faite que de Surge) ; coût 1. Jusqu'au 19/11/2026 : coût 2,
+-- sans le gain (palier 2), gardée en main 63 % des fois où elle était piochée.
 card("mangle", {
   level = 4, name = "Mangle", form = "bear", cost = 1, type = "skill", rarity = "rare", path = "feral",
-  target = "enemy", minRes = 1, effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true } },
-  text = "Surge: Bear strikes once per Frenzy.",
-  up = { minRes = 0, effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 2 } },
-    text = "Surge: Bear strikes once per Frenzy.\n+2 Frenzy." },
-  up2 = { retain = true, text = "Surge: Bear strikes once per Frenzy.\n+2 Frenzy.\nRetain." },
-  up3 = { effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 3 } },
-    text = "Surge: Bear strikes once per Frenzy.\n+3 Frenzy.\nRetain." },
+  target = "enemy", minRes = 0,
+  effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 2 } },
+  text = "Surge: Bear strikes once per Frenzy.\n+2 Frenzy.",
+  up = { effects = { { "surge" }, { "bearStrike", 0, per = { 1, "surge" }, surge = true }, { "res", 3 } },
+    text = "Surge: Bear strikes once per Frenzy.\n+3 Frenzy." },
+  up2 = { retain = true, text = "Surge: Bear strikes once per Frenzy.\n+3 Frenzy.\nRetain." },
+  up3 = { cost = 0, text = "Surge: Bear strikes once per Frenzy.\n+3 Frenzy.\nRetain." },
 })
 
 card("demoralizing_roar", {
@@ -753,8 +753,9 @@ relic("wolfshead_helm", {
 
 ns.Classes.druid = {
   -- PV : 65 décidés par le joueur (18/11/2026), 58 après la mesure au bot heuristic, 65 de nouveau au bot human
-  -- (docs/equilibrage.md, « Druid : réglage au bot human »)
-  id = "druid", name = "Druid", order = 6, hp = 65,
+  -- (docs/equilibrage.md, « Druid : réglage au bot human »), 59 avec l'Absorb de Tree of Life, Cat <-> Bear hors
+  -- taxe et les cartes offensives relevées (19/11/2026, « Druid : Absorb en Tree, Cat/Bear hors taxe »)
+  id = "druid", name = "Druid", order = 6, hp = 59,
   resource = { id = "wild", cap = 5, keep = true },
   deck = {
     "wrath", "wrath", "wrath",

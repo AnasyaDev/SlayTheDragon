@@ -273,8 +273,8 @@ test("Moonkin : 1 dégât à tous par 2 Charges, arrondi au supérieur, 3 au plu
   end
 end)
 
-test("Tree of Life : TREE_ABSORB (3) Absorb à la fin du tour, pour le tour ennemi, sans Regen", function()
-  eq(D.TREE_ABSORB, 3)
+test("Tree of Life : TREE_ABSORB (2) Absorb à la fin du tour, pour le tour ennemi, sans Regen", function()
+  eq(D.TREE_ABSORB, 2)
   eq(D.TREE_REGEN, nil, "plus de Regen de fin de tour")
   local c = setup({ "mark_of_the_wild" }, { hp = 40 })
   play(c, "mark_of_the_wild")
@@ -282,7 +282,7 @@ test("Tree of Life : TREE_ABSORB (3) Absorb à la fin du tour, pour le tour enne
   eq(c.player.block, 4)
   Combat.endPlayerTurn(c)
   eq(c.player.st.regen, 2, "la Regen posée ne change pas")
-  eq(c.player.block, 4 + 3, "+3 Absorb")
+  eq(c.player.block, 4 + 2, "+2 Absorb")
   -- infobulle du mot de plaque : le chiffre écrit est celui de la règle
   local txt = ns.Language.plateByKey("form:tree").text
   assert(txt:find("gain " .. D.TREE_ABSORB .. " Absorb", 1, true), txt)
@@ -343,16 +343,21 @@ test("bonus de Moonkin absent des coups sans carte (frappe de l'ours, coups à t
   eq(D.strikeDamage(c), 1 + 4)
 end)
 
-test("Mangle : une frappe par Frenzy compté, chacune à 1 + le montant, sans gain ; Swipe : frappe sur la dernière cible", function()
+test("Mangle : une frappe par Frenzy compté, chacune à 1 + le montant, sans gain, puis +2 ; Swipe : frappe sur la dernière cible", function()
   local c = setup({ "mangle", "swipe" }, { encounter = { "dr_dummy", "dr_dummy" } })
   c.player.res = 3
   play(c, "mangle", 2)
   eq(c.enemies[2].hp, 100 - 3 * 4)
-  eq(c.player.res, 0)
+  eq(c.player.res, 2, "réserve vidée par le Surge, puis +2 Frenzy")
   play(c, "swipe")
   eq(c.enemies[1].hp, 100 - 4)
-  eq(c.enemies[2].hp, 100 - 12 - 4 - 1, "Swipe à tous puis frappe 1 + 0 sur la dernière cible")
-  eq(c.player.res, 1)
+  eq(c.enemies[2].hp, 100 - 12 - 4 - 3, "Swipe à tous puis frappe 1 + 2 sur la dernière cible")
+  eq(c.player.res, 3)
+  -- jouable à 0 : aucune frappe, +2 Frenzy
+  local z = setup({ "mangle" })
+  assert(Combat.canPlay(z, 1), "Mangle jouable à 0")
+  play(z, "mangle", 1)
+  eq(z.enemies[1].hp, 100); eq(z.player.res, 2)
 end)
 
 test("Idol of Brutality : +2 aux frappes de l'ours (automatique, carte, Surge)", function()

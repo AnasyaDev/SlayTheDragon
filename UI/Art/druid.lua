@@ -171,7 +171,7 @@ function Art.druidLines(c)
     end
   elseif form == "tree" then
     now = rname .. " " .. num(res) .. ": unused in Tree of Life."
-    eot = "End of turn: gain " .. num((ns.Druid and ns.Druid.TREE_ABSORB) or 3) .. " Absorb."
+    eot = "End of turn: gain " .. num((ns.Druid and ns.Druid.TREE_ABSORB) or 2) .. " Absorb."
   else
     now = rname .. " " .. num(res) .. ": unused until a form card is played."
     eot = "End of turn: nothing, no form yet."
