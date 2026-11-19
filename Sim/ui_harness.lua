@@ -8463,7 +8463,8 @@ do
   -- accueil : l'infobulle d'une classe dit son niveau
   bootLevels({ warrior = 4 })
   local wtt = table.concat(H.hover(button("class:warrior")), " | ")
-  check("accueil : infobulle du Guerrier « Level 4 »", wtt:find("Level 4", 1, true) ~= nil, wtt)
+  check(("accueil : infobulle du Guerrier « Level %d » (palier de contenu 4)"):format(LVL[4]),
+    wtt:find("Level " .. LVL[4], 1, true) ~= nil, wtt)
   -- bilan avec montée de niveau : expérience, niveau atteint, cartes révélées
   bootLevels({ priest = 1 })
   local ns = H.ns
@@ -8499,9 +8500,10 @@ do
   H.settle()
   check("bilan : aucun texte tronqué", #ns.Widgets.truncatedNow() == 0, table.concat(ns.Widgets.truncatedNow(), " ; "))
   snap("bilan-montee-de-niveau", true)
-  -- niveau 3 : un bibelot révélé (case du bibelot, infobulle du bibelot)
+  -- niveau 3 : un bibelot révélé (case du bibelot, infobulle du bibelot) ; 195 d'expérience = niveau 2, la victoire
+  -- (+55) mène au niveau 3 (200), qui ouvre le palier de contenu 3
   clickOption("ui:new")
-  _G.SlayTheDragonDB.meta.classes.priest.xp = 245
+  _G.SlayTheDragonDB.meta.classes.priest.xp = 195
   clickOption("go")
   e = EXP()
   e.stats.cleared, e.stats.bosses = 8, 1

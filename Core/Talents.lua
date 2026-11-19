@@ -113,7 +113,7 @@ function Talent.build(class, list, spec)
     local n = Talent.node(class, id)
     local choice = n and n.choices and (spec or (Trees[class].bot or {}).spec) or nil
     local ok, why = Talent.canLearn(class, map, id, choice, #list, cur)
-    if not ok then error(("talents %s : pas %d (%s) refusé : %s"):format(class, i, tostring(id), why)) end
+    if not ok then error(("talents %s: step %d (%s) refused: %s"):format(class, i, tostring(id), why)) end
     map[id] = (map[id] or 0) + 1
     if n.choices then cur = choice end
   end
@@ -213,43 +213,44 @@ function Talent.view(meta, class, running)
   return v
 end
 
--- Vérifie la forme d'un arbre (tests) : renvoie la liste des erreurs (vide si l'arbre est bon).
+-- Vérifie la forme d'un arbre (tests) : renvoie la liste des erreurs (vide si l'arbre est bon ; messages en
+-- anglais comme toute chaîne de l'addon chargé).
 function Talent.check(class)
   local errs = {}
-  local function err(s) errs[#errs + 1] = class .. " : " .. s end
+  local function err(s) errs[#errs + 1] = class .. ": " .. s end
   local t = Trees[class]
-  if not t then err("pas d'arbre") return errs end
-  if #t.rows ~= 4 then err("4 rangées attendues") end
+  if not t then err("no tree") return errs end
+  if #t.rows ~= 4 then err("4 rows expected") end
   local total, specs, seen = 0, 0, {}
   for _, n in ipairs(t.nodes) do
-    if seen[n.id] then err("id en double " .. n.id) end
+    if seen[n.id] then err("duplicate id " .. n.id) end
     seen[n.id] = true
-    if type(n.name) ~= "string" or n.name == "" then err(n.id .. " : nom") end
-    if not (n.row and t.rows[n.row]) then err(n.id .. " : rangée") end
-    if not (n.ranks and n.ranks >= 1 and n.ranks <= 3) then err(n.id .. " : rangs 1 à 3") end
+    if type(n.name) ~= "string" or n.name == "" then err(n.id .. ": name") end
+    if not (n.row and t.rows[n.row]) then err(n.id .. ": row") end
+    if not (n.ranks and n.ranks >= 1 and n.ranks <= 3) then err(n.id .. ": ranks 1 to 3") end
     total = total + (n.ranks or 0)
     if n.choices then
       specs = specs + 1
-      if n.ranks ~= 1 then err(n.id .. " : nœud à choix d'un rang") end
+      if n.ranks ~= 1 then err(n.id .. ": a choice node has one rank") end
       for _, ch in ipairs(n.choices) do
-        if type(ch.text) ~= "string" or ch.text == "" then err(n.id .. "/" .. tostring(ch.id) .. " : texte") end
+        if type(ch.text) ~= "string" or ch.text == "" then err(n.id .. "/" .. tostring(ch.id) .. ": text") end
       end
     else
       for r = 1, n.ranks or 0 do
         if type(n.text) ~= "table" or type(n.text[r]) ~= "string" or n.text[r] == "" then
-          err(n.id .. " : texte du rang " .. r)
+          err(n.id .. ": text of rank " .. r)
         end
       end
     end
   end
-  if total ~= Talent.POINTS then err(("%d points au lieu de %d"):format(total, Talent.POINTS)) end
-  if specs ~= 1 then err(specs .. " nœuds à choix au lieu de 1") end
+  if total ~= Talent.POINTS then err(("%d points instead of %d"):format(total, Talent.POINTS)) end
+  if specs ~= 1 then err(specs .. " choice nodes instead of 1") end
   local order = t.bot and t.bot.order
   if type(order) ~= "table" or #order ~= Talent.POINTS then
-    err("bot.order : un id par point (" .. Talent.POINTS .. ")")
+    err("bot.order: one id per point (" .. Talent.POINTS .. ")")
   else
     local ok, e = pcall(Talent.build, class, order, t.bot.spec)
-    if not ok then err("bot.order illégal : " .. tostring(e)) end
+    if not ok then err("bot.order not legal: " .. tostring(e)) end
   end
   return errs
 end
