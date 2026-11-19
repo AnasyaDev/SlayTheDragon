@@ -506,6 +506,8 @@ ns.HunterEpic = EPIC
 -- Note des épiques pour les bots (classDef.bot.epic) : ≈ 5 + gain mesuré / 2 (gain moyen des zones dures,
 -- 14/11/2026).
 local EPIC_KEEP = 5
+local EPIC_CLASH = 10
+local PET_EPIC = { call_of_the_wild = true, trap_launcher = true, beast_cleave = true, roar_of_sacrifice = true }
 local EPIC_BOT = {
   call_of_the_wild = 9.6, trap_launcher = 10.6, beast_cleave = 10.3, roar_of_sacrifice = 10.7, master_marksman = 9.7,
   black_arrow = 11.3, lone_wolf = 11.3,
@@ -959,10 +961,21 @@ ns.Classes.hunter = {
     -- mesuré (epic=<id> contre sans, Westfall, clé 0, zones=7)
     -- l'épique du deck vaut EPIC_KEEP de plus : le deck est construit autour, la remplacer est un pari (et
     -- une épique imposée par epic=<id> reste mesurée seule)
+    -- Lone Wolf retire le familier dont vivent Call of the Wild, Trap Launcher, Beast Cleave et Roar of Sacrifice
+    -- (épiques sans plafond) : l'une dans le deck, l'autre vaut EPIC_CLASH de moins (19/11/2026 : sans cet écart,
+    -- le bot prenait Lone Wolf en plus des épiques de familier, contenu seul zones=7 7,3 % contre 16 % à zones=6).
     epic = function(exp, id)
       local v = EPIC_BOT[id]
-      local i = v and exp and ns.Expedition.epicIndex(exp)
+      if not (v and exp) then return v end
+      local X = ns.Expedition
+      local i = X.epicIndex(exp)
       if i and exp.deck[i].id == id then v = v + EPIC_KEEP end
+      for _, j in ipairs(X.epicIndices(exp)) do
+        local have = exp.deck[j].id
+        if (id == "lone_wolf" and PET_EPIC[have]) or (have == "lone_wolf" and PET_EPIC[id]) then
+          return v - EPIC_CLASH
+        end
+      end
       return v
     end,
     -- builds pilotés par l'épique du deck (Sim/expedition.lua, byEpic) : notes qui priment tant que
