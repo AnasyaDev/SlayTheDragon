@@ -27,6 +27,9 @@ ns.Hunter = Hunter
 -- Dégâts d'une attaque du familier à Frenzy 0. Fiche : 3 ; ramené à 1 par la simulation de fumée
 -- (3 : 99 % de victoires à la clé 0, le deck de départ seul en gagnait 95 % ; voir le rapport du lot).
 Hunter.PET_BASE = 1
+-- Le Frenzy baisse de 1 un round sur DECAY_EVERY (1 : chaque round) ; changé par les talents (Combat.const
+-- « DECAY_EVERY » : Bestial Discipline).
+Hunter.DECAY_EVERY = 1
 
 -- Langage : condition Careful Aim, mot « Pet attacks », déclencheurs des Powers du Chasseur.
 L.condition("careful", { name = "Careful Aim", text = "if the target has more than half its HP." })
@@ -228,8 +231,12 @@ ns.ClassRules.hunter = {
     onTurnEnd = function(c, cls)
       Hunter.petAttack(c, "auto")
     end,
+    -- baisse un round sur DECAY_EVERY (talent Bestial Discipline : 2, rounds pairs)
     onRoundEnd = function(c, cls)
-      if (c.player.res or 0) > 0 then Combat.gainRes(c, -1, "decay") end
+      if (c.player.res or 0) > 0 then
+        local every = c.talents and Combat.const(c, "DECAY_EVERY", Hunter.DECAY_EVERY) or Hunter.DECAY_EVERY
+        if every <= 1 or c.round % every == 0 then Combat.gainRes(c, -1, "decay") end
+      end
     end,
   },
   -- Bots : cible du familier et Traps posées distinguent deux positions.
