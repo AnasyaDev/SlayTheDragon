@@ -84,7 +84,7 @@ Art.classes.warrior.resource = { tga = "Ability_Warrior_FocusedRage", icon = "In
 -- inactive :
 --   Death Wish         « Attacks +50%, no Absorb »
 --   Thunderous Roar    « Roar in 3 Rage: 3 to all »                     compteur 3 (Rage qui manque)
---   Sweeping Strikes   « Targeted hits splash 1 other for a third »     compteur 1 ; atténuée seul
+--   Sweeping Strikes   « Targeted hits splash 2 others for half »     compteur 1 ; atténuée seul
 --   Titan's Grip       « Attacks this turn: 0/2, each twice »           compteur 0/2
 --   Shield Charge      « End of turn: 7 to Defias Thug »                compteur 7 ; atténuée sans Absorb
 --   Anger Management   « Each Rage spent: Cooldowns −1 »                atténuée sans recharge
@@ -108,7 +108,7 @@ function Art.warriorEpicLine(c, want)
     local alive = #ns.Combat.aliveEnemies(c)
     if alive < 2 then return nil, nil, true end
     local k = math.min(alive - 1, Wr.num("sweeping_strikes", "targets", up))
-    return ("Targeted hits splash %s other%s for a third"):format(n(k), k > 1 and "s" or ""), tostring(k)
+    return ("Targeted hits splash %s other%s for half"):format(n(k), k > 1 and "s" or ""), tostring(k)
   elseif id == "titans_grip" then
     local lim = E.titans_grip.limit
     local done = math.min(c.cls.tgAttacks or 0, lim)

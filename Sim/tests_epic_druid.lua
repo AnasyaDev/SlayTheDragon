@@ -496,12 +496,15 @@ test("deux épiques : Heart of the Wild + Furor, le +1 de Furor va dans la rése
     local c = setup({ "shred", "wrath", "thick_hide" }, { extra = extra })
     eq(#Combat.epicList(c), 2, "deux épiques en jeu")
     eq(Combat.resCap(c), n(E.kinship, 0), "plafond de Heart of the Wild")
+    -- chaque réserve de forme part de kinStart (3 à la base), plafonnée à kinship (5)
+    local s0, cap = n(E.kinStart, 0), n(E.kinship, 0)
+    local two = math.min(cap, s0 + 2)
     play(c, "shred", 1)        -- sans forme -> Cat : +1 (Furor) +1 (carte), réserve de Cat
-    eq(c.player.res, 2, order[1])
+    eq(c.player.res, two, order[1])
     play(c, "wrath", 1)        -- Cat -> Moonkin : réserve de Moonkin, +1 (Furor) +1 (carte)
-    eq(c.player.res, 2, order[1]); eq(D.pool(c, "cat"), 2, order[1])
+    eq(c.player.res, two, order[1]); eq(D.pool(c, "cat"), two, order[1])
     play(c, "thick_hide")      -- Moonkin -> Bear : 3e changement du tour, Furor ne donne plus rien (Primal 2)
-    eq(c.player.res, 0, order[1]); eq(D.pool(c, "moonkin"), 2, order[1])
+    eq(c.player.res, s0, order[1]); eq(D.pool(c, "moonkin"), two, order[1])
     assert(Save.isPlain(c)); Combat.clone(c)
   end
 end)
