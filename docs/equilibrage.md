@@ -1990,3 +1990,128 @@ Non vérifié : bot heuristic, clés 1 à 5, autres graines, niveaux 2 à 6, ép
 la dureté » (autre agent) s'ajoutera à ces chiffres. La vue de classe du Guerrier (`UI/Art/warrior.lua`, jeton de
 l'épique) écrit encore « splash N others for a third » en dur : à corriger en « for half » (une ligne ; l'interface
 n'était pas dans le périmètre), le harnais le signale (1 échec sur 1505).
+
+## Druid : Burning Steppes et Blackrock (19/11/2026)
+
+Constat (`docs/talents.md`, § 4.3 et § 5) : au palier « 60 % de l'arbre » approché, le Druid perdait dans les zones 6
+et 7 quand le Warrior passait (Blackrock ≈ 30 % battue / atteinte avec tout, mur à 2,15 / 2,3). Mur des deux zones
+baissé à 1,9 (`ns.Zone.HARD`) juste avant ; mesure refaite d'abord. Commande (bot `human`, 600, ± 4) :
+`luajit Sim/sim.lua runs=600 bot=human seed=1 jobs=8 runner=expedition key=0 class=druid zones=4 level=7 hp=68
+tune=Expedition.START_GOLD=150,Expedition.ZONE_HEAL=0.75,Druid.TAX_FREE=2,Druid.TAX_MAX=1,Druid.STRIKE_BASE=3,Druid.TREE_ABSORB=4,Combat.BASE_MANA=4
+[epic=none|<id>] [path=<voie>]` ; Warrior `class=warrior hp=82 tune=Expedition.START_GOLD=150,Expedition.ZONE_HEAL=0.75,Combat.BASE_MANA=4`
+(clés de `tune=` vérifiées). Rapports bruts : `reports/db/` du worktree (non versionnés).
+
+**Mesure refaite (état de `main`, mur à 1,9)** : la cible était déjà tenue avec les épiques gagnées (Druid 54,2 %,
+Warrior 57,7 ; Blackrock 82,7 %) : les épiques cumulées (sans plafond) et Mark of Ursol suffisaient. Le défaut restait
+entier sans épique (Druid 17,0 %, Warrior 29,5 ; Steppes 72,3 contre 86,0, Blackrock 48,8 contre 67,0), avec Eclipse
+(17,7 %) et au bot heuristic (300 : Druid 33,3 %, Warrior 64,0).
+
+### Diagnostic
+
+Compteurs par zone ajoutés le temps du diagnostic (dégâts, Absorb, soins, coups reçus et tours par combat des Steppes
+et de Blackrock ; retirés ensuite). Sans épique, au palier 60 % :
+
+| Par combat (bot `human`) | Druid : tours / dégâts par tour / coups reçus | Warrior |
+|---|---|---|
+| Steppes, normal | 3,38 / 37 / 41 | 2,44 / 47 / 27 |
+| Steppes, élite | 4,78 / 40 / 66 | 3,67 / 53 / 61 |
+| Steppes, boss (Grark Lorkrub) | 5,38 / 44 / 104 | 3,89 / 59 / 67 |
+| Blackrock, normal | 3,20 / 37 / 47 | 2,12 / 51 / 29 |
+| Blackrock, élite | 4,17 / 41 / 63 | 3,71 / 55 / 54 |
+| Blackrock, boss (Nefarian) | 7,20 / 43 / 124 | 4,86 / 64 / 85 |
+
+- **Les combats durent 30 à 50 % de plus.** Les coups reçus par tour sont les mêmes (≈ 17 à 19 au boss) ; le Druid
+  en reçoit plus parce qu'il reste plus longtemps. Ses dégâts par tour ne montent presque pas d'une zone à l'autre
+  (39 au boss en moyenne de campagne, 44 dans les zones 6 et 7), ceux du Warrior de 45 à 60 : le Warrior empile
+  Strength (Battle Shout, Recklessness, Enrage) et ses coups grandissent au fil d'un long combat ; le Druid n'a aucune
+  source de Strength et ses dégâts plafonnent avec la réserve (5). Wrath, carte de départ, reste parmi ses cinq
+  premières sources de dégâts contre Nefarian.
+- **Pas de gros Absorb tardif.** Les coups de ces zones valent 35 à 45 PV (Grark : Heroic Strike 23 × 1,9 = 44,
+  Cleave 38, Mortal Strike 36) ; le Druid encaisse avec des cartes à 5 ou 6 Absorb, le Warrior a Shield Wall (18,
+  rare : + 28 points de victoires avec / sans, le plus gros écart de ses cartes) et Ignore Pain. Rencontres :
+  Grark 76,6 % gagnés (Warrior 89,5), Nefarian 58,6 (73,1), Panzor 85,5 (97,6).
+- **La classe gagne ses zones dures par la défense** : épiques imposées au palier 60 %, sans autre épique : Mark of
+  Ursol (Absorb tiré des frappes de l'ours) **57,3 %**, Furor 28,8, King of the Jungle 25,7, **Eclipse 17,7** (= sans
+  épique). Eclipse n'est plus sous `epic=none` mais n'ajoute rien (gagner un tour sur Starfire et Hurricane).
+- **Balance seule s'effondre** : voies seules sans épique, Restoration 21,0 %, Feral 5,7, **Balance 0,3** (Stranglethorn
+  31,3, Swamp 19,4, Steppes 36,1, Blackrock 15,4) : ses cartes tardives (Starfall, Nature's Grace, Moonkin Aura)
+  n'apportent aucune défense, seulement Insect Swarm (5) et Faerie Fire (3).
+- **Pas une règle de zone ni le bot** : Wildfire ne brûle que 3,5 PV par boss des Steppes (Warrior 2,3), Invincible
+  de Panzor coupe moins le Druid que le Warrior (12 contre 26 dégâts par combat), le Class Call de Nefarian donne
+  au Druid l'état de repli (Demoralized 2) ; le bot heuristic montre le même écart (31 points). Une note de bot
+  fausse trouvée en passant : Leader of the Pack était estimé sans son « deal 2 more », passé au palier 1 le 19/11.
+  Owlkin Frenzy (épique des Steppes) n'est pas proposable dans cet état (`zones=4`) : non mesurée.
+
+### Essais (sans épique, palier 60 %, un changement à la fois)
+
+| Essai | Victoires | Stranglethorn | Swamp | Steppes | Blackrock |
+|---|---|---|---|---|---|
+| aucun | 17,0 % | 80,5 | 60,2 | 72,3 | 48,8 |
+| Leader of the Pack « deal 2 more » dès la base | 19,2 | 81,0 | 60,9 | 75,2 | 52,0 |
+| Starfall 6 → 8 par Charge | 20,2 | 81,9 | 64,1 | 73,5 | 52,6 |
+| Moonkin Aura +2 Charges dès la base | 18,0 | 80,7 | 62,0 | 73,2 | 49,5 |
+| Moonkin Aura + 4 Absorb | 19,3 | 81,2 | 62,8 | 70,7 | 54,0 |
+| Rebirth 12 → 20 | 21,5 | 85,1 | 64,9 | 76,0 | 51,6 |
+| Demoralizing Roar + 6 Absorb | 24,7 | 83,4 | 67,8 | 77,4 | 56,7 |
+| Demoralizing Roar + 6 Absorb, Cooldown 3 | 26,2 | 83,9 | 68,8 | 78,2 | 58,4 |
+| Demoralizing Roar + 8 Absorb | 27,2 | 83,6 | 71,1 | 79,4 | 58,0 |
+| + 10 PV (repère, `hp=78`) | 27,2 | 87,5 | 69,2 | 77,3 | 58,2 |
+| Roar 8 + Rebirth 16 | 29,8 | 84,9 | 70,4 | 83,1 | 60,5 |
+| Roar 8 + Moonkin Aura 4 Absorb (retenu, avant les notes de bot) | 33,2 | 85,4 | 71,9 | 81,4 | 66,8 |
+| Roar 6 + Moonkin Aura 4 Absorb | 27,2 | 85,9 | 69,3 | 77,5 | 59,3 |
+
+Les cartes offensives tardives rapportent 1 à 3 points chacune (diluées dans un deck de 40 cartes) ; l'Absorb d'une
+carte jouée à chaque cycle en rapporte 8 à 10. Roar 6 au lieu de 8 ne ménage pas les trois premières zones (niveau 7
+67,5 contre 68,0 ; heuristic identique) et laisse Blackrock à 59 : 8 retenu.
+
+### Changements
+
+- **Demoralizing Roar** (Bear, inhabituelle, niveau 6, 0 mana, Cooldown 4) : « +1 Frenzy. Gain 8 Absorb. Apply
+  Demoralized 2 ⌛ to all » ; +1 Cooldown 3, +2 « +2 Frenzy. », +3 11 Absorb (avant : 4 Absorb au +3 seulement).
+  La défense de l'ours contre les gros coups, à côté de Thick Hide et de Frenzied Regeneration.
+- **Moonkin Aura** (Power rare, niveau 7) : « End of turn in Moonkin: +1 Charge and gain 4 Absorb. » (+3 : +2
+  Charges, 4 Absorb) : la défense tardive de Balance, qui finit ses tours en Moonkin sans l'Absorb de l'ours.
+  « gain 4 Absorb » et non « , gain 4 » : le harnais refuse un nombre séparé du mot d'avant au retour à la ligne.
+- **Bots** (`Sim/bots.lua`, `POWER_VALUE`) : Moonkin Aura compte ses 4 Absorb (jouée / piochée 83 → 91 %, gardée en
+  main 11,5 → 5,6 %) ; Leader of the Pack lit son « deal 2 more » dès le palier 1.
+- Aucun chiffre de règle, de forme, d'épique ni de PV ; les deux cartes sont des niveaux 6 et 7 : le compte neuf est
+  identique ligne pour ligne.
+
+### Mesures avant / après (bot `human`, 600)
+
+Palier 60 %, battue / atteinte (%) :
+
+| Série | Victoires | Stranglethorn | Swamp | Steppes | Blackrock |
+|---|---|---|---|---|---|
+| Druid, épiques gagnées : avant | 54,2 % | 85,3 | 80,7 | 95,6 | 82,7 |
+| Druid, épiques gagnées : **après** | **62,5 %** | 88,4 | 87,7 | 94,8 | **85,4** |
+| Warrior, épiques gagnées | 57,7 % | 82,3 | 83,2 | 94,2 | 89,4 |
+| Druid sans épique : avant | 17,0 % | 80,5 | 60,2 | 72,3 | 48,8 |
+| Druid sans épique : **après** | **30,5 %** | 85,6 | 71,8 | 80,1 | 62,5 |
+| Warrior sans épique | 29,5 % | 79,5 | 64,4 | 86,0 | 67,0 |
+| Druid, Eclipse imposée : avant / après | 17,7 / 29,7 % | 76,3 / 82,7 | 62,0 / 68,5 | 69,7 / 80,9 | 53,5 / 64,7 |
+| Druid, Balance seule sans épique : avant / après | 0,3 / 3,3 % | 31,3 / 45,0 | 19,4 / 35,8 | 36,1 / 54,2 | 15,4 / 38,5 |
+
+Vétéran sans talents (`zones=7 level=7`, PV de départ, mur à 1,9) : épiques gagnées Druid 19,7 → **29,3 %** (Warrior
+28,2) ; sans épique 5,0 → 12,7 % (Warrior 8,8), Stranglethorn / Swamp / Steppes / Blackrock 65,8 / 38,3 / 60,4 /
+44,8 → 74,1 / 54,7 / 76,9 / 53,1 (Warrior 63,4 / 44,8 / 68,2 / 60,2).
+
+Rencontres (sans épique, palier 60 %, victoires avant → après ; Warrior) : Grark Lorkrub 76,6 → 84,2 (89,5) ;
+Nefarian 58,6 → 69,8 (73,1) ; Panzor 85,5 → 92,9 (97,6) ; Somnus 73,7 → 83,0 (77,7). Les combats ne raccourcissent
+pas (Grark 5,1 → 5,2 tours, Nefarian 6,7 → 6,8) : le Druid tient plus longtemps, il ne frappe pas plus vite.
+
+Trois premières zones (`maxzone=wetlands`, battues) : niveau 7 63,3 → **68,0 %** (cible 60–70) ; compte neuf
+(`zones=0 level=1`) 54,8 → **54,8 %** (46–58). Bot heuristic, niveau 7 (300) : 97,0 → 98,0 % (± 2 ; plafond 97 %).
+
+- **Cible tenue** : Druid 62,5 % contre 57,7 au Warrior (+ 4,8, à moins de 10 points), Blackrock 85,4 % ≥ 65.
+- **Effets de bord** : le Druid passe maintenant devant le Warrior à Stranglethorn et au Swamp (sans épique, 85,6 et
+  71,8 contre 79,5 et 64,4 ; vétéran sans talents, Swamp 54,7 pour une cible de mur à 35 sur la moyenne des six
+  classes) et reste un peu derrière aux Steppes et à Blackrock : l'Absorb ajouté vaut dans toutes les zones dures,
+  pas seulement les deux dernières. Le niveau 7 des trois premières zones monte de 4,7 points, près du haut de sa
+  fourchette ; heuristic 1 point au-dessus du plafond, dans l'erreur de mesure.
+- **Reste** : le Druid ne gagne toujours pas en vitesse dans les longs combats (aucune Strength, dégâts plafonnés par
+  la réserve) ; Eclipse n'ajoute toujours rien (29,7 contre 30,5 sans épique) ; Balance seule reste loin derrière
+  Restoration seule dans les zones dures (3,3 % contre 21,0 avant le changement ; Feral et Restoration seules non
+  remesurées).
+- Non vérifié : Owlkin Frenzy, Lifebloom et Heart of the Wild (zones 5 à 7, absentes de cet état), autres graines,
+  clés 1 à 5, niveaux 2 à 6, paliers 30 % et 100 % de l'arbre, les cinq autres classes avec le mur à 1,9.

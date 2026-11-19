@@ -316,8 +316,8 @@ L.combatResource(c)                         --> "wild:bear" si c.cls.form == "be
   classe dans `d.form`, `W.cardResource(d)` dans l'interface) ; une carte Cat écrit « +1 Combo. », « Surge:
   deal 4 + 4 per Combo. », une carte Bear « Spend 2: … » (expliqué « pays 2 Frenzy »). Une carte **sans
   forme** (Power) peut aussi nommer la ressource de la forme que nomme le libellé d'une clause (« Cat
-  Attacks: +1 Combo. », « End of turn in Moonkin: +1 Charge. ») : `L.cardResourceKeys(d)` (sa clé d'abord,
-  puis ces formes, d'après les mots de la plaque de forme, `L.formWord`). Le glossaire de la carte
+  Attacks: +1 Combo. », « End of turn in Moonkin: +1 Charge and gain 4 Absorb. ») : `L.cardResourceKeys(d)`
+  (sa clé d'abord, puis ces formes, d'après les mots de la plaque de forme, `L.formWord`). Le glossaire de la carte
   (`W.cardKeywords`) explique le nom par l'entrée de la forme, jamais par la ressource d'une autre classe qui
   porte le même nom (Combo du Rogue).
 - **En combat** (pastille, chiffres flottants « +1 Frenzy », raison « Not enough … ») : `L.combatResource(c)`

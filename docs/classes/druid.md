@@ -13,7 +13,9 @@ Regen de fin de tour en Tree of Life 1 → 2. Réglé ensuite au bot `human` (§
 au bot `human` au niveau 1. Voies seules remises dans l'ordre le 19/11/2026 (§ 10, « Absorb en Tree, Cat/Bear hors
 taxe ») : fin de tour en Tree of Life = 2 Absorb au lieu de la Regen, passage entre Cat et Bear hors taxe, cartes
 offensives relevées (Mangle, Leader of the Pack, Nature's Grace, Starfire, Starsurge, Hurricane), Absorb sur
-Insect Swarm et Faerie Fire (défense de Balance), PV 65 → 59.
+Insect Swarm et Faerie Fire (défense de Balance), PV 65 → 59. Burning Steppes et Blackrock Mountain le même jour
+(§ 10, « Burning Steppes et Blackrock ») : Demoralizing Roar gagne 8 Absorb, Moonkin Aura 4 Absorb par fin de tour
+en Moonkin (la défense que la classe n'avait pas contre les gros coups des zones 6 et 7).
 
 Corrigée le même jour après relecture du joueur : chaque forme a un effet de fin de tour ; la forme Caster
 devient **Tree of Life** (quatrième forme, portée par les cartes de soin) ; le combat commence **sans forme** ;
@@ -401,7 +403,7 @@ Colonnes : **Niv.** = niveau de classe qui débloque la carte (§ 7) ; **Forme**
 **Plaque** = autres mots de la plaque (dans `text`, en fin de texte, « Power. » / « Cast. » en tête) ; dans les
 textes, « / » sépare les clauses (`\n`) ; **Amélioré** = palier +1 ; paliers +2 et +3 : § 3.5. Toutes les cartes
 tiennent en quatre lignes au plus (retour glouton à 22 caractères, plaque non comptée) : trois lignes au plus en
-base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de Demoralizing Roar.
+base et au +1 (Skull Bash, Moonfire, Rake), quatre pour Demoralizing Roar (8 Absorb depuis le 19/11/2026).
 
 ### 3.1 Départ (4, rareté basic)
 
@@ -424,7 +426,7 @@ base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de D
 | `frenzied_regeneration` | Frenzied Regeneration | uncommon | 1 | Bear | 1 | Skill | | Gain 6 Absorb. / Spend 2: gain 6 more. | Gain 8 Absorb. / Spend 2: gain 8 more. | Ability_BullRush | Growl (Hunter) |
 | `tigers_fury` | Tiger's Fury | uncommon | 1 | Cat | 0 | Skill | Cooldown 2 | +1 Combo. / Draw 1. | (Cooldown 1) | Ability_Mount_JungleTiger | Premeditation, Kick |
 | `mangle` | Mangle | rare | 4 | Bear | 1 | Skill | | Surge: Bear strikes once per Frenzy. / +2 Frenzy. | … / +3 Frenzy. | Ability_Druid_Mangle2 | Bestial Wrath ; jouable à 0 (`minRes = 0`) ; coût 2 sans gain jusqu'au 19/11/2026 |
-| `demoralizing_roar` | Demoralizing Roar | uncommon | 6 | Bear | 0 | Skill | Cooldown 4 | +1 Frenzy. / Apply Demoralized 2 ⌛ to all | (Cooldown 3) | ABILITY_DRUID_DEMORALIZINGROAR | Demoralizing Shout (Warrior) |
+| `demoralizing_roar` | Demoralizing Roar | uncommon | 6 | Bear | 0 | Skill | Cooldown 4 | +1 Frenzy. / Gain 8 Absorb. / Apply Demoralized 2 ⌛ to all | (Cooldown 3) | ABILITY_DRUID_DEMORALIZINGROAR | Demoralizing Shout (Warrior) ; 8 Absorb depuis le 19/11/2026 (aucun avant, § 10) |
 | `leader_of_the_pack` | Leader of the Pack | rare | 7 | — | 0 | Power | | Power. / Cat Attacks: +1 Combo. | Power. / Cat Attacks: +1 Combo, deal 2 more. | Spell_Nature_UnyeildingStamina | Venomous Wounds (rare, moteur de Combo) ; coût 1 jusqu'au 19/11/2026 |
 
 ### 3.3 Balance (10 : Moonkin ; 5 communes, 3 inhabituelles, 2 rares)
@@ -440,7 +442,7 @@ base et au +1 (Skull Bash, Demoralizing Roar, Moonfire, Rake), quatre au +3 de D
 | `entangling_roots` | Entangling Roots | uncommon | 1 | Moonkin | 1 | Skill | Cooldown 4 | +1 Charge. / Apply Stunned 1 ⌛ | (Cooldown 3) | Spell_Nature_StrangleVines | Chastise, Wyvern Sting |
 | `starfall` | Starfall | rare | 4 | Moonkin | 1 | Attack | | Surge: deal 6 per Charge to all. | Surge: deal 7 per Charge to all. | Ability_Druid_Starfall | Arcane Barrage (commune, plafond 4) : 30 à tous à 5 |
 | `natures_grace` | Nature's Grace | uncommon | 6 | — | 1 | Power | | Power. / Cast cards: cost −1. | (coût 0) | Spell_Nature_NaturesBlessing | Apotheosis (rare, + 1 mana) |
-| `moonkin_aura` | Moonkin Aura | rare | 7 | — | 1 | Power | | Power. / End of turn in Moonkin: +1 Charge. | (coût 0) | Spell_Nature_ForceOfNature | Shadow Dance (moteur rare) ; raison de finir en Moonkin |
+| `moonkin_aura` | Moonkin Aura | rare | 7 | — | 1 | Power | | Power. / End of turn in Moonkin: +1 Charge and gain 4 Absorb. | (coût 0) | Spell_Nature_ForceOfNature | Shadow Dance (moteur rare) ; raison de finir en Moonkin ; 4 Absorb depuis le 19/11/2026 (§ 10) |
 
 ### 3.4 Restoration (10 : Tree of Life et Powers ; 4 communes, 4 inhabituelles, 2 rares)
 
@@ -501,7 +503,7 @@ pas. Chaque colonne ne dit que ce que le palier ajoute.
 | Frenzied Regeneration | 8 / 8 | 10 / 8 | Spend 1 |
 | Tiger's Fury | Cooldown 1 | Retain | +2 Combo |
 | Mangle | `+3 Frenzy.` | Retain | coût 0 |
-| Demoralizing Roar | Cooldown 3 | +2 Frenzy | `Gain 4 Absorb.` |
+| Demoralizing Roar | Cooldown 3 | +2 Frenzy | 11 Absorb (avant le 19/11/2026 : `Gain 4 Absorb.` ajouté) |
 | Leader of the Pack | `Cat Attacks: +1 Combo, deal 2 more.` | Innate | deal 3 more |
 | Starfire | Deal 30 | Deal 34 | Deal 38 |
 | Moonfire | Deal 5, DoT 4 | DoT 6 | Deal 7 |
@@ -512,7 +514,7 @@ pas. Chaque colonne ne dit que ce que le palier ajoute.
 | Entangling Roots | Cooldown 3 | `Apply DoT 4` | Retain |
 | Starfall | 7 par Charge à tous | Retain | 8 par Charge à tous |
 | Nature's Grace | coût 0 | Innate | au jeu : `Gain Instant 1` |
-| Moonkin Aura | coût 0 | Innate | `+2 Charges.` par fin de tour |
+| Moonkin Aura | coût 0 | Innate | `+2 Charges` par fin de tour (4 Absorb inchangés) |
 | Rejuvenation | Regen 6 | Regen 7 | Retain |
 | Regrowth | Heal 6, Regen 4 | Draw 1 | Heal 8 |
 | Mark of the Wild | 6 Absorb, Regen 3 | 8 Absorb | Retain |
@@ -676,7 +678,7 @@ Idol of the Wild amorce la mécanique au premier tour, comme Apprentice's Wand p
 sans forme, donc la première carte de forme jouée (Wrath, Thick Hide, Maul, Ferocious Bite) est gratuite ; son
 coût tombe à 0 avant le paiement (crochet `cost`, qui lit si la carte changerait la forme). Les cinq autres
 couvrent chacune une forme (Bear, Cat, Moonkin, Tree of Life) et le changement de forme. Idol of the Moon ajoute
-de l'Absorb à la fin de tour en Moonkin, qui n'en a pas ; Wolfshead Helm reprend l'ancienne Idol of the Wild
+de l'Absorb à la fin de tour en Moonkin (Moonkin Aura aussi depuis le 19/11/2026 : les deux s'additionnent) ; Wolfshead Helm reprend l'ancienne Idol of the Wild
 (+1 mana par Shift, trop fort quand chaque carte change la forme) en pioche, une fois par tour.
 
 ## 7. Progression (niveaux de classe 1 à 7)
@@ -944,6 +946,36 @@ niveau 7 60,2 %, compte neuf 44,7 % ; bot heuristic (300) 96,3 %, sous le plafon
 - **PV** 65 → 59 : le niveau 7 et le compte neuf montent ensemble ; à 60 PV, compte neuf 58,2 % (au bord haut de
   sa fourchette), à 59 sans le changement de Mangle, niveau 7 59,7 % (au bord bas) : Mangle (rare, niveau 4)
   relève le niveau 7 sans toucher au niveau 1.
+
+### Burning Steppes et Blackrock (19/11/2026)
+
+Constat : au palier « 60 % de l'arbre » approché (`docs/talents.md`, § 4.3), le Druid perdait dans les zones 6 et 7
+quand le Warrior passait. Mur des deux zones baissé à 1,9 (`ns.Zone.HARD`) avant la mesure. Détail :
+`docs/equilibrage.md`, « Druid : Burning Steppes et Blackrock ».
+
+**Cause.** Les combats durent 30 à 50 % de plus qu'au Warrior dans ces deux zones (Grark Lorkrub 5,1 tours contre
+3,9, Nefarian 6,7 contre 4,7 ; combats normaux de Blackrock 3,2 contre 2,1) : le Druid n'a aucune source de
+Strength (Battle Shout, Recklessness, Enrage font grandir les coups du Warrior au fil d'un long combat), et ses
+dégâts par tour plafonnent avec la réserve (5). Par tour, il encaisse autant que le Warrior, mais sur plus de tours
+et sans gros Absorb face aux coups de 35 à 45 PV de ces zones (Heroic Strike de Grark à 44) : aucune carte tardive
+ne joue le rôle de Shield Wall ou d'Ignore Pain. Mark of Ursol (l'Absorb tiré des frappes) vaut à elle seule +40
+points dans cet état, Eclipse +1 : la classe gagne ses zones dures par la défense. Balance seule y gagne 0,3 %
+(Feral 5,7, Restoration 21,0). Ni règle de zone, ni erreur du bot propre au Druid en cause (le bot heuristic
+montre le même écart) ; une note de bot fausse corrigée en passant (Leader of the Pack).
+
+**Changements** : Demoralizing Roar gagne **8 Absorb** (§ 3.2 ; +3 : 11), Moonkin Aura **4 Absorb** à chaque fin de
+tour en Moonkin (§ 3.3 ; la défense tardive de Balance) ; notes de bot : valeur de l'Absorb de Moonkin Aura, bonus
+de Leader of the Pack lu dès le palier 1 (`Sim/bots.lua`). Les deux cartes sont des niveaux 6 et 7 : le compte neuf
+ne bouge pas.
+
+| Mesure (bot `human`, 600) | Avant | Après | Warrior |
+|---|---|---|---|
+| palier 60 %, épiques gagnées : victoires | 54,2 % | 62,5 % | 57,7 % |
+| idem, Blackrock battue / atteinte | 82,7 | 85,4 | 89,4 |
+| palier 60 %, sans épique : victoires | 17,0 % | 30,5 % | 29,5 % |
+| idem, Steppes / Blackrock battue / atteinte | 72,3 / 48,8 | 80,1 / 62,5 | 86,0 / 67,0 |
+| vétéran sans talents (`zones=7`), épiques gagnées | 19,7 % | 29,3 % | 28,2 % |
+| trois premières zones, niveau 7 / compte neuf | 63,3 / 54,8 % | 68,0 / 54,8 % | |
 
 ## 11. Questions ouvertes pour le joueur
 
