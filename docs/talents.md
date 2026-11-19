@@ -321,13 +321,13 @@ coup, Execute), Fury (petites Attacks, Strength, PV payés), Protection (Absorb,
 |---|---|---|---|---|
 | 1 (0) | **Toughness** (générique) | 3 | `+4 max HP.` | PV de départ de l'expédition (`Expedition.new`) |
 | 1 | **Battle Ready** | 2 | `Start of combat: +1 Rage.` | `onCombatStart` → `Combat.gainRes` (s'ajoute à Battle Standard : 3 Rage au tour 1, Heroic Strike payé tout de suite) |
-| 1 | **Second Wind** | 2 | 1 : `After a combat won: heal 1 per Rage you have.` 2 : `… heal 2 per Rage you have.` | fin de combat gagné (`Expedition` lit `c.player.res` avant de rendre les PV) |
+| 1 | **Second Wind** | 2 | 1 : `After a combat won: heal 1 per 5 Rage you have.` 2 : `… heal 1 per 4 Rage you have.` (réglé le 19/11/2026 ; fiche : 1 et 2 par Rage) | fin de combat gagné (`Expedition` lit `c.player.res` avant de rendre les PV) |
 | 2 (5) | **Unbridled Wrath** | 2 | `Rage cap +1.` | crochet `resCap` (5 → 7) |
-| 2 | **Anger Shield** | 2 | 1 : `End of turn: gain 1 Absorb per 2 Rage.` 2 : `End of turn: gain 1 Absorb per Rage.` | `onTurnEnd` → `Combat.gainBlock` (Skullflame Shield, rare du niveau 7 : 2 Absorb par Rage au début du tour) |
+| 2 | **Anger Shield** | 2 | 1 : `End of turn: gain 1 Absorb per 5 Rage.` 2 : `End of turn: gain 1 Absorb per 4 Rage.` (réglé ; fiche : par 2 Rage, par Rage) | `onTurnEnd` → `Combat.gainBlock` (Skullflame Shield, rare du niveau 7 : 2 Absorb par Rage au début du tour) |
 | 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ (`X.START_GOLD`) |
-| 3 (10) | **Specialization** (choix) | 1 | Arms : `Sundered enemies take 50% more damage instead of 25%.` Fury : `While you have 3 Rage or more, Attacks deal 1 more per hit.` Protection : `Cards that give Absorb give 2 more.` | Arms : multiplicateur de Sundered (crochet `damage` sur la cible) ; Fury : `damage` ; Protection : `block` |
+| 3 (10) | **Specialization** (choix) | 1 | Arms : `Sundered enemies take 50% more damage instead of 25%.` Fury : `While you have 5 Rage or more, Attacks deal 1 more per hit.` (réglé ; fiche : 3 Rage) Protection : `Cards that give Absorb give 2 more.` | Arms : multiplicateur de Sundered (crochet `damage` sur la cible) ; Fury : `damage` ; Protection : `block` |
 | 3 | **Tactical Mastery** | 2 | 1 : `Up to 2 Rage carries over to the next combat.` 2 : `Up to 4 Rage carries over to the next combat.` | état d'expédition (`exp.talentState.rage`), posé en fin de combat, rendu par `onCombatStart` |
-| 3 | **Blood Drinker** | 2 | 1 : `Each time you spend Rage: heal 1.` 2 : `… heal 2.` | `onResource` (variation négative) → `Combat.heal` |
+| 3 | **Blood Drinker** | 2 | 1 : `Each time you pay a Spend cost: heal 1.` 2 : `Each time you spend Rage: heal 1.` (Surge compris ; réglé ; fiche : 1 puis 2) | `onResource` (variation négative) → `Combat.heal` |
 | 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `X.ZONE_HEAL` lu par `Expedition.enterZone` |
 | 4 (16) | **Rampage** | 2 | 1 : `Start of turn with 5 Rage or more: +1 mana.` 2 : `Start of turn with 5 Rage or more: +1 mana and draw 1.` | `onTurnStart` + crochet `maxMana` (celui de la taxe du Druid) |
 | 4 | **Veteran's Arsenal** (générique) | 2 | 1 : `Start each expedition with one Epic card of a zone you have beaten.` 2 : `You can carry one more Epic card.` | phase `start` (choix parmi les épiques débloquées) ; 2 : plafond d'épiques (code en cours) |
@@ -341,7 +341,8 @@ Anger Shield, Unbridled Wrath, Provisions (12), Specialization, Blood Drinker, T
 la rangée 4. Le palier 60 % (15 points) = Toughness 3, Battle Ready 2, Second Wind 2, Unbridled Wrath 2, Anger Shield
 2, Provisions 1, Specialization, Blood Drinker 2.
 
-Ce que chaque nœud change en jeu, concrètement :
+Ce que chaque nœud change en jeu, concrètement (chiffres de la fiche ; ceux du code, réglés le 19/11/2026 : tableau
+ci-dessus, `Data/Talents/warrior.lua` et `docs/equilibrage.md`, « Talents du Warrior : courbe par palier ») :
 
 - Battle Ready 2 : le premier tour de chaque combat commence à 3 Rage ; Heroic Strike fait 12 au lieu de 7 dès le
   tour 1.
@@ -629,3 +630,155 @@ Quartermaster ; (7) liste des hauts faits.
 8. Veteran's Arsenal (épique au départ) : nœud générique de l'arbre, ou haut fait du compte (« avoir battu la zone »
    suffit) ?
 9. Le titre « Veteran » d'un joueur déjà au niveau 7 : gardé à la migration ?
+
+## 17. Contrat du socle des talents (codé le 19/11/2026)
+
+Lots 1 et 2 du § 14 et arbre du Warrior codés ; réponses du joueur aux questions du § 16 : (1) mur des zones 6 et 7
+déjà à 1,9 ; (2) 25 niveaux, un point par niveau ; (3) cartes et bibelots au niveau (`Meta.CONTENT_LEVELS`) ; (4)
+remboursement gratuit hors expédition ; (5) pas de bonus de compte ; (6) rien au-delà du niveau 25 ; (8) Veteran's
+Arsenal nœud générique ; (9) titre « Veteran » gardé (`cs.veteran`). Ce qui suit est le contrat que lisent les agents
+qui écrivent un arbre (un par classe, en parallèle) et l'agent d'interface.
+
+### 17.1 Où sont les choses
+
+| Fichier | Contenu |
+|---|---|
+| `Core/Meta.lua` | 25 niveaux (`Meta.XP_LEVELS`, `MAX_LEVEL`), paliers de contenu (`CONTENT_LEVELS`, `MAX_TIER`, `contentTier`), points (`talentPoints`, `spent`, `pointsLeft`, `learn`, `reset`), `Meta.record(...).pointsGained` |
+| `Core/Save.lua` | `Save.VERSION` 8 (migration 7 → 8), `Save.learnTalent`, `Save.resetTalents` (refusés `"running"` pendant une expédition) |
+| `Core/Talents.lua` | `ns.Talent` : règles communes (définir un arbre, apprendre, entrées, textes, vue de l'interface, constantes) |
+| `Data/Talents/common.lua` | `ns.TalentCommon` : les quatre nœuds génériques (Toughness, Provisions, Field Medic, Veteran's Arsenal) |
+| `Data/Talents/<classe>.lua` | l'arbre d'une classe (`ns.Talent.define`) ; les six fichiers sont **déjà au TOC** (vides sauf le Warrior) : un agent de classe n'édite que le sien |
+| `Sim/tests_talents.lua` | suite des talents (méta, socle, génériques, chaque nœud du Warrior) |
+
+### 17.2 Format exact d'un arbre et d'un nœud
+
+```lua
+local _, ns = ...
+local Combat, TC = ns.Combat, ns.TalentCommon
+local XT = { ... }            -- nombres réglables (ns.<Classe>Talents = XT), lus à chaque usage ; les textes les disent
+ns.<Classe>Talents = XT
+ns.Talent.define("<classe>", {
+  rows = { 0, 5, 10, 16 },     -- points dépensés qui ouvrent les rangées 1 à 4
+  nodes = {                    -- ordre d'affichage, rangée par rangée
+    TC.toughness({ row = 1, ranks = 3, hp = 3 }),
+    { id = "primal_instinct", row = 1, ranks = 2, name = "Primal Instinct", icon = "ability_druid_…",
+      text = { "Start of combat: +1 Reserve.", "Start of combat: +2 Reserve." }, -- texte COMPLET de chaque rang
+      hooks = { onCombatStart = function(c, src) Combat.gainRes(c, src.rank, "talent") end },  -- combat
+      run = { … },             -- expédition (facultatif)
+      const = { … },           -- constantes de classe (facultatif, § 17.4)
+      bot = { won = f, value = f } },  -- conseils aux bots (facultatif, § 17.5)
+    TC.provisions({ row = 2 }),
+    { id = "specialization", row = 3, ranks = 1, name = "Specialization", icon = "…",
+      choices = {              -- nœud à choix : une voie active ; chaque voie a ses champs
+        { id = "feral", name = "Feral", icon = "…", text = "Clearcasting also gives +1 Combo.", hooks = { … } },
+        { id = "balance", … }, { id = "restoration", … } } },
+    TC.fieldMedic({ row = 3 }),
+    TC.veteransArsenal({ row = 4 }),
+    …
+  },
+  bot = { order = { "natural_shapeshifter", "natural_shapeshifter", "toughness", … }, -- un id par point, 24, légal
+          spec = "feral",      -- voie du bot
+          epic = { … } },      -- accord des épiques avec l'arbre (facultatif, § 17.5)
+})
+```
+
+- `id` : minuscules et `_`, unique dans l'arbre ; les génériques gardent leur id (`toughness`, `provisions`,
+  `field_medic`, `veterans_arsenal`) et leur rangée du § 2.1 ; le nœud à choix s'appelle `specialization`.
+- `ranks` : 1 à 3 ; un rang coûte un point et demande le précédent (on apprend toujours le rang suivant).
+- `text[r]` : texte du rang r tel qu'il s'affiche (anglais factuel, une phrase, point final, pas d'imagerie) ;
+  nœud à choix : `text` de chaque voie (une chaîne).
+- Arbre complet : **24 points exactement**, quatre rangées, **un seul** nœud à `choices`. `ns.Talent.check(classe)`
+  renvoie la liste des écarts (vide si l'arbre est bon) : 24 points, rangs 1 à 3, textes de chaque rang, un nœud à
+  choix, ordre du bot de 24 points **légal** (rejoué par `ns.Talent.build` : rangées ouvertes à temps).
+- **Ordre du bot** (`bot.order`, ce que la fiche appelle `bot.talents`) : un id par point, dans l'ordre de dépense
+  (la simulation `tree=N` en prend les `ceil(24 × N / 100)` premiers : 5, 10, 15, 20, 24 points) ; `bot.spec` = voie
+  du bot (`spec=` la remplace).
+- Fiches immuables : rien n'écrit dans un nœud après le chargement. L'état vit sur le combat (`c.tstate`,
+  `c.cls`) ou sur l'expédition (`exp.talentState`).
+
+### 17.3 Crochets disponibles
+
+`src` = l'entrée du talent appris `{ id, rank, spec }` (données simples) ; `src.rank` donne le rang.
+
+- **Combat** (`hooks`) : tous les crochets de `Combat.modify` / `Combat.fire` (ceux des bibelots, `docs/classes.md`),
+  signature `(c, src, …)` comme un bibelot ; ils passent **juste après les bibelots, avant les affixes et les
+  épiques**, et leurs noms sont ajoutés à `c.hk` (aucune autre déclaration). Utiles : `onCombatStart`,
+  `onTurnStart`, `onTurnEnd`, `resCap`, `block`, `damage`, `attackMult`, `heal`, `applySelf`, `onResource` (delta,
+  why : `"spend"`, `"surge"`…), `onSurge`, `onSpend`, `onParry`, `onPetAttack`, `onShift`, `trapSlots`, `castSlots`,
+  `maxMana`, `drawPerTurn`, `preventDeath`, `bearStrike`. Pendant la résolution d'une carte, `c.cardCtx` est son
+  contexte (« les cartes qui donnent de l'Absorb » : `block` avec `c.cardCtx`, une fois par carte : voir Protection).
+- **État d'expédition dans le combat** : `c.tstate` (copie de `exp.talentState`, reprise par l'expédition à la fin
+  du combat, copiée en profondeur par `Combat.clone`) : « une fois par expédition » (Unyielding :
+  `c.tstate.unyielding`), valeur posée en fin de combat et lue au suivant (Tactical Mastery : `c.tstate.rage`).
+- **Expédition** (`run`) : `Expedition.modify` / `Expedition.fire`, signature `(exp, src, v, …)` (modify) et
+  `(exp, src, …)` (fire), après les bibelots : `startMaxHp` (v = PV de la classe), `startGold` (v = 50),
+  `startEpics` (v = 0 : épiques choisies au départ), `zoneHeal` (v = 0,5), `onCombatWon` (`kind, fight, c` : `c` =
+  le combat terminé, `c.player.res`, PV déjà repris par l'expédition), et tous les crochets `run` des bibelots
+  (`gold`, `restHeal`, `price`…). Soin hors combat : `ns.Expedition.healOut(exp, n)`.
+
+### 17.4 Changer une constante de classe
+
+Un talent ne modifie **jamais** le module (`ns.Druid.TAX_FREE = …` est interdit : l'addon chargé doit rester intact,
+test « fiches immuables »). Le code de classe lit la constante sur l'état du combat :
+
+```lua
+Combat.const(c, "TAX_FREE", Druid.TAX_FREE)   -- valeur du module, puis les talents qui déclarent const.TAX_FREE
+```
+
+et le talent la déclare : `const = { TAX_FREE = function(v, src) return v + src.rank end }` (pour fixer une valeur :
+`return 0`). Sans talent, `Combat.const` rend la valeur du module (un test de champ ; `tune=Druid.TAX_FREE=2` reste
+valable). Déjà branchées : `TAX_FREE`, `TAX`, `TAX_MAX` (`Druid.taxOf(n, c)`), `STRIKE_BASE`, `PULSE_MAX`,
+`TREE_ABSORB` (Druid), `PET_BASE` (`Hunter.petBase(c)`), `PARRY_STOP` et `PARRY_MAX` (Rogue : `maxKey` de l'état
+Parry, lu par `Combat.applyStatus`), `ATONEMENT_HEAL` (Priest), `SUNDER_MULT` (Sundered). Une autre constante :
+remplacer sa lecture par `Combat.const(c, "NOM", Module.NOM)` dans le code de la classe (et `maxKey = "NOM"` pour le
+plafond d'un état). `TRAP_SLOTS`, le mana (`maxMana`) et le plafond de ressource (`resCap`) ont déjà leur crochet.
+Les textes des cartes et des mots-clés qui citent une constante (« Max 3. » de Parry, « 1 + Frenzy » du familier)
+gardent la valeur du module : le nœud dit le changement.
+
+### 17.5 Bots
+
+- Le bot de combat joue la fin du tour et le tour ennemi sur une copie (feuilles) : l'Absorb de fin de tour, la Rage
+  dépensée qui soigne, les PV en plus se voient sans rien faire.
+- `bot.won(c, src)` → PV équivalents d'un combat **gagné** dans cet état (Rage gardée, soin d'après-combat : le bot
+  préfère finir avec de la Rage) ; `bot.value(c, src, W)` → unités de `Bots.W` (10 = 1 PV) d'un état en cours
+  (Rampage : finir le tour à 5 Rage vaut un mana au tour suivant). Les deux sont facultatifs.
+- Hors combat : l'épique au départ (Veteran's Arsenal) est prise par `decide` (`Sim/expedition.lua`), la mieux notée
+  (`classDef.bot.epic`). Avec des talents, l'arbre ajoute son accord à chaque épique : `bot.epic = { [id] = écart de
+  note }` dans l'arbre (Warrior : `thunderous_roar = -4`, la Rage vidée à 5 contredit tout l'arbre ; sans cet écart,
+  le bot prenait Thunderous Roar et Anger Management au départ et l'arbre plein gagnait 72 % contre 86 % sans
+  Veteran's Arsenal). À régler pour chaque classe : `talents=veterans_arsenal:2` au palier 100 %.
+
+### 17.6 Tester et mesurer
+
+- Tests : ajouter une suite `Sim/tests_talents_<classe>.lua` sur le modèle de `Sim/tests_talents.lua` (un test par
+  nœud, avec `wcombat` / `wexp` : combat ou expédition avec `Talent.entries(classe, { nœud = rang }, voie)`) et
+  `ns.Talent.check("<classe>")` vide ; le test « arbre du Warrior » de `Sim/tests_talents.lua` vérifie que les cinq
+  autres classes n'ont **pas encore** d'arbre : l'agent qui écrit un arbre retire sa classe de cette liste. Toutes
+  les suites en `lua5.1` et `luajit`.
+- Mesure : `… runner=expedition bot=human class=<classe> key=0 seed=1 runs=600 jobs=8 tree=<0..100>` avec le contenu
+  du palier (§ 3 : `tree=0 zones=0 level=1`, `tree=20 zones=2 level=4`, `tree=40 zones=3 level=7`, `tree=60 zones=4
+  level=7`, `tree=80 zones=6 level=7`, `tree=100 zones=7 level=7`) ; un nœud seul : `talents=<nœud>:<rang>` ; une
+  voie : `spec=<voie>`. Le rapport porte une ligne « Talents ». Sans `tree=` ni `talents=` : aucun talent (rapports
+  d'avant inchangés à graine égale, vérifié sur six classes). `level=` reste le palier de contenu 1 à 7.
+- Mesurer chaque nœud **seul** au contenu du palier 60 % **et** l'arbre au palier : près du mur, les gains
+  s'additionnent mal (Warrior : les nœuds de mécanique de la fiche, +2 à +26 points seuls, donnaient 86 % ensemble
+  au palier 60 % ; `docs/equilibrage.md`, « Talents du Warrior : courbe par palier »).
+
+### 17.7 API de lecture pour l'interface
+
+- `ns.Talent.view(meta, classe, running)` → `{ class, points, spent, left, spec, rows = { { row, need, open, nodes = {
+  { id, name, icon, ranks, rank, text (rang actuel, nil à 0), nextText (rang suivant, nil au maximum), canLearn, why
+  ("row", "points", "max", "running"…), choices = { { id, name, icon, text, active } } } } } } }` ; `running` = une
+  expédition est en cours (`db.current ~= nil`) : rien ne s'apprend.
+- `ns.Talent.rankText(classe, id, rang, voie)`, `ns.Talent.node(classe, id)`, `ns.Talent.rowNeed(classe, rangée)`.
+- Actions : `ns.Save.learnTalent(db, classe, id, voie)` (true, ou nil + raison ; une voie déjà apprise se change
+  sans coût), `ns.Save.resetTalents(db, classe)` (points rendus). Points : `Meta.talentPoints`, `Meta.spent`,
+  `Meta.pointsLeft`. Bilan de fin d'expédition : `summary.pointsGained` (`Meta.record`, `Save.finish`).
+- Pendant l'expédition : `exp.talents` (liste `{ id, rank, spec }` figée au départ) ; phase `start` avec
+  `exp.talentEpics` (choix `{ "talentEpic", i }` / `{ "skipTalentEpic" }` ; `exp.talentEpicsLeft` choix restants),
+  avant le bibelot au choix. **L'écran de départ actuel (`UI/Controller.lua`, `startRelicStep`) ne connaît pas
+  encore cette phase** : à faire avant de livrer Veteran's Arsenal en jeu.
+- Écran Progress : le champ `level` d'une carte reste le palier de contenu ; la condition affichée est le niveau de
+  classe `Meta.CONTENT_LEVELS[palier]` (corrigé dans `progressStep`).
+- Icônes des nœuds (`icon`) : noms de fichiers de `Media/Icons/` (sans extension), toutes présentes pour le Warrior et
+  les génériques ; une nouvelle icône s'ajoute par `tools/build_media.py --icons-only`.
