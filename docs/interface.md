@@ -132,6 +132,64 @@ Contrat complet : `docs/classes.md`. Ce qui change à l'écran :
   des cartes à 0,6 au repos sur l'ardoise, aperçu à côté de la carte survolée, nouvelles icônes des bibelots du Priest
   (`Media/Icons`, nouveaux fichiers : relancer le client).
 
+## Arbres de talents (19/11/2026, lot 5 de `docs/talents.md` § 14 ; disposition PAS validée par maquette)
+
+Contrat et API de lecture : `docs/talents.md`, § 11 et § 17.7. Code : `UI/TalentView.lua` (onglet, pastille, ligne du
+deck), `UI/Art/talents.lua` (icônes), `UI/Controller.lua` (`talentTab`, `talentAct`, `talentEpicStep`,
+`C.activeTalents`, `C.talentPointsLeft`).
+
+- **En-tête de l'écran Progress** (refait : six classes et trois onglets ne tenaient plus, la sixième icône
+  chevauchait la barre) : icônes des classes de 40 au pas de 48, barre de niveau de 210 (x 322), trois onglets
+  « Cards », « Zones », « Talents » (90 × 40, l'affiché au liseré d'or, `ptab:<onglet>`), « Log » (78), « Back » (98, or).
+- **Onglet Talents** : ligne des points en haut (« 3 talent points to spend · 12 of 24 spent »), ligne d'état
+  dessous (« Each level from level 2 gives one talent point. » sans point ; « No talent tree for the Priest yet. »
+  pour une classe sans arbre ; en rouge pendant une expédition « An expedition is in progress: talents can't change
+  until it ends. »), « Reset talents » à droite (gratuit ; premier clic « Confirm reset? », second clic rembourse ;
+  grisé sans point dépensé ou pendant une expédition, raison en infobulle). Quatre rangées en bandeaux sombres
+  (« Tier N » à gauche ; fermée : bandeau plus sombre, nom gris, condition rouge « Spend 10 points to unlock. »).
+  Nœud : icône ronde dans le grand anneau doré (52), pastille du rang « 2/3 » sous l'anneau (vert : un rang
+  s'apprend ou déjà commencé ; or : maximum ; gris : rien), nom dessous ; icône grisée tant qu'aucun rang n'est appris
+  et qu'il ne s'apprend pas ; anneau d'or au maximum. Nœuds centrés sur x 604, pas de 170 au plus (790 en tout :
+  cinq ou six nœuds par rangée tiennent). Clic = un rang (`talent:<nœud>`), refus = sa raison en message (rangée
+  fermée d'abord, puis « No talent points to spend. », « Maximum rank. »). Infobulle : nom, « Rank 1/3 », texte du
+  rang actuel, « Next rank: » et le texte suivant (rang 0 : le texte du rang 1 seul), raison en rouge ou « Click:
+  learn a rank. ». **Specialization** : trois faces de 42 au pas de 48 (une par voie, `tspec:<voie>`), pastille du
+  rang sous celle du milieu, nom « Specialization: Fury » une fois choisie ; voie active pleine à l'anneau d'or,
+  les autres assombries ; infobulle = les trois voies et leurs textes (la survolée en or, l'active marquée
+  « (active) »), « Click: choose Fury. » / « Click: switch to Arms (free). ».
+- **Icônes des nœuds** (`Art.talentIcon`) : remplacement `Art.talentIcons[classe][id]` (vide), sinon le champ `icon`
+  du nœud ou de la voie (`Media/Icons`, sinon chemin du client), sinon l'icône du nœud pour une voie, sinon l'icône de
+  la classe. Warrior et génériques : toutes embarquées ; aucune icône ajoutée.
+- **Pendant l'expédition** : dans le panneau du deck (pile « deck » seulement), une ligne en bas à gauche « Talents:
+  Toughness 3 · Battle Ready 2 · … · Fury · … » (rang écrit s'il y en a plusieurs ; réduite, puis coupée en « +N » si
+  elle ne tient pas) ; infobulle = chaque talent et son texte ; hors combat, un clic ouvre l'onglet Talents en
+  lecture seule (`ui:talents` ; `C.step` rend l'écran de progression pendant l'expédition hors combat ; sans « Log » ;
+  « Back » revient à la phase). La pastille de classe ne dit pas encore les chiffres changés (`Rage cap 7`, § 11).
+- **Veteran's Arsenal au départ** (phase `start`, `exp.talentEpics`, avant le bibelot au choix) : écran « deck »
+  (sorte `talentEpic`) : titre « Veteran's Arsenal: choose an epic card (1 of 2) », les épiques proposables en vraies
+  cartes (une rangée, 7 au plus), consigne dessous « It joins the deck for this expedition. Its rule is in play from
+  the start of each combat. », bouton « Skip » (`skipTalentEpic`) ; rang 2 : deuxième choix sans l'épique prise ; puis
+  le bibelot au choix ou la carte. `C.validateExpedition` vérifie `exp.talentEpics`.
+- **Bilan** : une ligne par niveau gagné « Warrior reaches level 9! +1 talent point. » (au-delà de 4 niveaux d'un coup,
+  `C.END_LEVEL_LINES` : une ligne « … reaches level 9! +6 talent points (levels 4 to 9). ») ; troisième bouton
+  « Spend talent points » (x 260) quand la classe a des points à dépenser, avec la pastille du nombre ; il ouvre
+  l'onglet Talents ; « Back » revient au bilan.
+- **Pastille** (`TV.badge`, `TV.badgeOn`) : disque rouge dans le petit anneau doré, nombre blanc, coin haut droit du
+  bouton, sans souris ; infobulle du bouton « 3 talent points to spend (Warrior). ». Sur « Progress » de l'accueil
+  (classe choisie), sur l'onglet « Talents », sur « Spend talent points ». Rien pour une classe sans arbre.
+- **Migration v8** : `Persist.talentNotice` (sauvegarde d'avant la v8 migrée au chargement) : l'accueil écrit en
+  tête de la note « You have 11 talent points to spend. » (classe choisie) jusqu'au départ ou à l'écran Progress.
+- Harnais : section **UTL** (`Sim/ui_talents.lua`, chargé par `Sim/ui_harness.lua`) : arbre neuf, 15 points dépensés
+  par des clics (ordre du bot), changement de voie, refus, rangée 4 ouverte, remboursement confirmé, arbre plein,
+  classe sans arbre, arbre d'essai de 15 nœuds (cinq dans la rangée du nœud à choix, noms longs, nœuds sans icône),
+  expédition (ligne du deck sur trois rangées de cartes, lecture seule), Veteran's Arsenal 2 (deux choix, bibelot,
+  « Skip », rechargement), bilan (deux niveaux, neuf niveaux), migration v7 → v8, icônes de chaque arbre. Aperçus
+  `build/png/talents-*.png` (neuf, 15-points, plein, arbre-vide, arbre-15-noeuds, deck, expedition,
+  veterans-arsenal, bilan).
+- Non vérifiable hors jeu : rendu de la pastille rouge (`mask_disc` teinté) et du petit anneau sur les boutons,
+  lisibilité du rang à 11,5 sur le disque sombre, icônes des autres classes absentes de `Media/Icons` (chemin du
+  client), échelle réelle des faces de Specialization à 42.
+
 ## Écran de combat : crans, annulations, Instant, Traveler's Backpack (13/11/2026)
 
 - **Crans de la ressource** : petites gemmes en losange (12 unités) en arc autour de l'anneau de mana

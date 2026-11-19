@@ -776,8 +776,8 @@ gardent la valeur du module : le nœud dit le changement.
   `Meta.pointsLeft`. Bilan de fin d'expédition : `summary.pointsGained` (`Meta.record`, `Save.finish`).
 - Pendant l'expédition : `exp.talents` (liste `{ id, rank, spec }` figée au départ) ; phase `start` avec
   `exp.talentEpics` (choix `{ "talentEpic", i }` / `{ "skipTalentEpic" }` ; `exp.talentEpicsLeft` choix restants),
-  avant le bibelot au choix. **L'écran de départ actuel (`UI/Controller.lua`, `startRelicStep`) ne connaît pas
-  encore cette phase** : à faire avant de livrer Veteran's Arsenal en jeu.
+  avant le bibelot au choix ; écran : `talentEpicStep` (`UI/Controller.lua`, sorte `talentEpic` de la grille du
+  deck ; `docs/interface.md`, « Arbres de talents »).
 - Écran Progress : le champ `level` d'une carte reste le palier de contenu ; la condition affichée est le niveau de
   classe `Meta.CONTENT_LEVELS[palier]` (corrigé dans `progressStep`).
 - Icônes des nœuds (`icon`) : noms de fichiers de `Media/Icons/` (sans extension), toutes présentes pour le Warrior et
