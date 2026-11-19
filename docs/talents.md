@@ -363,39 +363,62 @@ tour selon la forme (Bear : frappe de `STRIKE_BASE` + réserve puis +1 ; Cat : C
 compté par tour, `TAX` (1) mana de moins au tour suivant, `TAX_MAX` (2) au plus, Cat ↔ Bear hors taxe ; Idol of the
 Wild (départ) : la première carte qui change de forme dans un combat coûte 0. 59 PV.
 
+**Codé le 19/11/2026** (`Data/Talents/druid.lua`, nombres dans `ns.DruidTalents` ; tests
+`Sim/tests_talents_druid.lua`) et réglé au bot `human` (`docs/equilibrage.md`, « Talents du Druid »). L'arbre de la
+fiche donnait 68 % de victoires au palier 40 % et 91 % au palier 60 % : près du mur, chaque Absorb gagné à chaque
+tour et chaque mana rendu s'additionnent fort ; d'où des nœuds à un rang et des Absorb de 1 ou 2.
+
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+3 max HP.` | PV de départ de l'expédition |
-| 1 | **Primal Instinct** | 2 | `Start of combat: +1 Reserve.` | `onCombatStart` → `Combat.gainRes` (lu comme Combo, Frenzy ou Charge à la première forme) |
-| 1 | **Natural Shapeshifter** | 2 | 1 : `One more form change each turn is free of the shift tax.` 2 : `The shift tax costs at most 1 mana.` | `Druid.TAX_FREE` 1 → 2 ; `Druid.TAX_MAX` 2 → 1 (lus par l'état du combat, pas par la constante globale) |
-| 2 (5) | **Feral Instinct** | 2 | `Bear strikes deal 1 more.` | crochet `bearStrike` (celui d'Idol of Brutality) ; `STRIKE_BASE` 1 → 3 |
-| 2 | **Moonglow** | 1 | `End of turn in Moonkin: gain 2 Absorb.` | `onTurnEnd` selon la forme (Idol of the Moon, inhabituel du niveau 5, en donne 4) : la défense qui manque à Balance |
-| 2 | **Living Seed** | 1 | `End of turn in Tree of Life: gain 2 more Absorb.` | `TREE_ABSORB` 2 → 4 |
+| 1 (0) | **Toughness** (générique) | 3 | `+3 max HP.` / `+6 max HP.` / `+9 max HP.` | PV de départ de l'expédition |
+| 1 | **Primal Instinct** | 1 | `Start of combat: +1 Reserve.` | `onCombatStart` → `Combat.gainRes` (lu comme Combo, Frenzy ou Charge à la première forme ; avec Heart of the Wild, va à la réserve sans forme) |
+| 1 | **Natural Shapeshifter** | 2 | 1 : `The shift tax costs at most 1 mana.` 2 : `The shift tax costs at most 1 mana, and entering the first form each combat is free of it.` | const `TAX_MAX` 2 → 1 ; rang 2 : `onShift` depuis « sans forme » retire un changement compté (`c.cls.taxed`) |
+| 2 (5) | **Feral Instinct** | 1 | `Bear strikes deal 1 more.` | const `STRIKE_BASE` 1 → 2 (toutes les frappes : fin de tour, cartes, Surge) |
+| 2 | **Moonglow** | 2 | `End of turn in Moonkin: gain 1 Absorb.` / `… gain 2 Absorb.` | `onTurnEnd` selon la forme (après l'effet de forme) |
+| 2 | **Living Seed** | 2 | `End of turn in Tree of Life: gain 1 more Absorb.` / `… 2 more Absorb.` | const `TREE_ABSORB` 2 → 3 / 4 |
 | 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
-| 3 (10) | **Specialization** (choix) | 1 | Feral : `Clearcasting also gives +1 Combo.` Balance : `End of turn in Moonkin: deal 1 more to each enemy.` Restoration : `Regen you gain is 1 higher.` | Feral : `onTurnEnd` en Cat ; Balance : `PULSE_MAX` + 1 et +1 au coup ; Restoration : `applySelf` (comme Benediction du Priest) |
-| 3 | **Wild Reserve** | 2 | `Reserve cap +1.` | crochet `resCap` (5 → 7 ; avec Heart of the Wild, +1 au plafond de chaque réserve) |
-| 3 | **Shapeshifter's Ward** | 2 | 1 : `Each form change: gain 1 Absorb.` 2 : `Each form change: gain 2 Absorb.` | `onShift` (Idol of the Wild, Wolfshead Helm, Furor) ; Cat ↔ Bear compris |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `X.ZONE_HEAL` |
-| 4 (16) | **Master Shapeshifter** | 2 | 1 : `Two more form changes each turn are free of the shift tax.` 2 : `Form changes no longer cost mana.` | `TAX_FREE` 2 → 4, puis `TAX` 0 |
-| 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start`, plafond d'épiques |
-| 4 | **Survival Instincts** | 2 | 1 : `Once per expedition, a hit that would kill you leaves you at 1 HP in Bear.` 2 : `… at 1 HP in Bear with 10 Absorb.` | `preventDeath` + drapeau d'expédition (Rebirth reste le Last Breath de combat) |
+| 3 (10) | **Specialization** (choix) | 1 | Feral : `Clearcasting also gives +1 Combo.` Balance : `End of turn in Moonkin: deal 1 more to each enemy.` Restoration : `Regen you gain is 1 higher.` | Feral : `onStatusApplied` (Clearcasting posé, pas s'il l'était déjà) ; Balance : const `PULSE_BONUS` 0 → 1 (`Druid.pulseBase`, même à 0 Charge) ; Restoration : `applySelf` (comme Benediction du Priest) |
+| 3 | **Wild Reserve** | 2 | `Reserve cap +1.` / `Reserve cap +2.` | crochet `resCap` (5 → 7 ; Heart of the Wild borne chaque réserve à 5) |
+| 3 | **Shapeshifter's Ward** | 2 | `The first form change each turn: gain 1 Absorb.` / `… gain 2 Absorb.` | `onShift` quand `c.cls.shifts` = 1 (Cat ↔ Bear compris) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Master Shapeshifter** | 1 | `One more form change each turn is free of the shift tax.` | const `TAX_FREE` 1 → 2 |
+| 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
+| 4 | **Survival Instincts** | 3 | `Once per expedition, a hit that would kill you leaves you at 1 HP in Bear.` / `… in Bear with 10 Absorb.` / `… in Bear with 20 Absorb.` | `preventDeath` + `c.tstate.survival` (repris par l'expédition) ; passage en Bear par `Druid.shift` ; Rebirth (Power) passe avant |
 
-Total 24 points (3 + 2 + 2 / 2 + 1 + 1 + 1 / 1 + 2 + 2 + 1 / 2 + 2 + 2). Nœuds de mécanique : 10 sur 14 (15 points).
+Total 24 points (3 + 1 + 2 / 1 + 2 + 2 + 1 / 1 + 2 + 2 + 1 / 1 + 2 + 3). Nœuds de mécanique : 10 sur 14 (15
+points). Le nœud « une fois par expédition » est Survival Instincts (rangée 4).
 
-Ordre conseillé : Natural Shapeshifter, Toughness, Primal Instinct (7), Feral Instinct, Moonglow, Living Seed,
-Provisions (12), Specialization, Shapeshifter's Ward, Wild Reserve (17), Field Medic, puis la rangée 4. Palier 60 % (15
-points) : rangées 1 et 2 pleines, Specialization, Shapeshifter's Ward 2.
+Écarts à la fiche d'origine (mesures : `docs/equilibrage.md`, « Talents du Druid ») : Primal Instinct 2 → 1 rang
+(2 rangs : +12,7 points seul au palier 60 %) ; Natural Shapeshifter, rang 1 « taxe à 1 mana au plus » (au lieu d'un
+changement gratuit de plus), rang 2 « première forme du combat hors taxe » (au lieu d'un changement gratuit de plus
+à chaque tour) ; Feral Instinct 2 → 1 rang ; Moonglow 1 rang de 2 Absorb → 2 rangs de 1 ; Living Seed 1 rang de +2
+→ 2 rangs de +1 ; Shapeshifter's Ward : seulement le premier changement de chaque tour (chaque changement, 1 puis 2
+Absorb : +30 points seul) ; Master Shapeshifter 2 rangs (deux changements gratuits, puis plus de taxe : +17 seul)
+→ 1 rang (un changement gratuit) ; Survival Instincts 2 → 3 rangs (10 puis 20 Absorb) ; Specialization Balance :
++1 au coup à tous, sans relever `PULSE_MAX`.
+
+Ordre du bot (`bot.order`, ordre conseillé) : Toughness 3, Natural Shapeshifter 2 (palier 20 %, 5 points), Primal
+Instinct, Moonglow 2, Living Seed 2 (40 %, 10), Provisions, Specialization, Wild Reserve 2, Field Medic (60 %, 15),
+Feral Instinct, Shapeshifter's Ward 2, Master Shapeshifter, Veteran's Arsenal (80 %, 20), Veteran's Arsenal,
+Survival Instincts 3 (100 %). Voie du bot : Feral (les trois voies à 2 points près au palier 60 %). Feral Instinct et
+Shapeshifter's Ward passent après le palier 60 % : avant, il montait à 69–71 %. `bot.epic` vide : à l'arbre plein,
+Veteran's Arsenal 2 vaut +6,5 points et aucune épique ne contredit l'arbre.
 
 Concrètement :
 
-- Natural Shapeshifter 2 : Moonkin → Bear → Tree dans un même tour coûte 0 mana au tour suivant (aujourd'hui 1) ;
-  quatre formes dans un tour coûtent 1 (aujourd'hui 2). La taxe coûtait 35 points au bot `human` (`docs/equilibrage.md`,
-  « Druid : voies seules ») ; elle reste un choix (Master Shapeshifter la retire en rangée 4).
-- Feral Instinct 2 : la frappe de fin de tour en Bear fait 3 + réserve au lieu de 1 + réserve.
-- Moonglow : finir en Moonkin protège de 2 (Balance seule n'a aujourd'hui de défense qu'Insect Swarm et Faerie Fire).
-- Shapeshifter's Ward 2 : trois changements dans un tour donnent 6 Absorb.
+- Natural Shapeshifter 2 : Moonkin → Bear → Tree dans un même tour coûte 1 mana au tour suivant au lieu de 2 ; le
+  premier tour d'un combat (sans forme → Moonkin → Bear) ne coûte plus rien. Master Shapeshifter ajoute un
+  changement gratuit par tour (Moonkin → Bear → Moonkin : 0).
+- Feral Instinct : la frappe de fin de tour en Bear fait 2 + réserve au lieu de 1 + réserve ; Maul, Swipe et Mangle
+  frappent aussi plus fort.
+- Moonglow 2 : finir en Moonkin protège de 2 (Moonkin Aura 4, Idol of the Moon 4 s'ajoutent).
+- Shapeshifter's Ward 2 : sortir de la forme de fin du tour précédent donne 2 Absorb, une fois par tour.
 - Voies de soin et de tank : Living Seed et Specialization Restoration renforcent Tree of Life sans le rendre jouable
   seul (Absorb, pas de soin entre les combats) ; Feral Instinct sert Bear comme frappe, pas comme mur.
+- Interface : la pastille et les marques de fin de tour (`UI/Art/druid.lua`) lisent encore les constantes du module
+  (`STRIKE_BASE`, `PULSE_MAX`, `TREE_ABSORB`, `TAX_FREE`) : elles ne montrent ni Feral Instinct, ni Living Seed, ni
+  Specialization Balance, ni la taxe changée par Natural et Master Shapeshifter (à lire par `Druid.strikeBase(c)`,
+  `Druid.pulseBase(c)`, `Combat.const(c, "TREE_ABSORB", …)`, `Druid.taxOf(n, c)`).
 
 ## 8. Nœuds propres des quatre autres classes
 

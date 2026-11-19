@@ -2452,3 +2452,83 @@ Lecture :
 
 Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; Survival et Marksmanship avec un deck construit pour eux
 (le bot choisit ses cartes sans regarder la voie de l'arbre).
+
+## Talents du Druid (19/11/2026)
+
+Arbre codé (`Data/Talents/druid.lua`, `docs/talents.md`, § 7), sur la `main` du 19/11 (mur des zones 6 et 7 à 1,9 ;
+Demoralizing Roar 8 Absorb et Moonkin Aura 4 Absorb : les chiffres du § 5 de `docs/talents.md` sur Blackrock sont
+d'avant). Commande : `flock build/sim-a.lock luajit Sim/sim.lua runner=expedition bot=human class=druid key=0
+seed=1 jobs=8 runs=600 tree=<part> zones=<N> level=<palier>` ; « contenu seul » = sans `tree=` ; nœud seul :
+`talents=<nœud>:<rang>` ; ± 3 à 4 points. Rapports : `reports/tdruid/` du worktree.
+
+| Palier (points) | Contenu | Victoires (Warrior, cible) | Contenu seul (Warrior) | Fiche d'origine | STV | SoS | BS | BRM | XP / exp. |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | `zones=0 level=1` | **0,0 %** (0,0 ; 0–2) | 0,0 (0,0) | 0,0 | 7,9 | 0,0 | — | — | 156 |
+| 20 % (5) | `zones=2 level=4` | **18,3 %** (25,5 ; 17,5–33,5) | 8,8 (8,5) | 19,0 | 62,2 | 66,5 | 79,5 | 62,9 | 284 |
+| 40 % (10) | `zones=3 level=7` | **56,0 %** (23,0 ; 15–31) | 28,5 (8,2) | 68,2 | 92,1 | 83,8 | 94,6 | 77,4 | 390 |
+| 60 % (15) | `zones=4 level=7` | **67,2 %** (61,2 ; 53–69) | 26,8 (24,8) | 91,3 | 90,8 | 90,4 | 94,3 | 86,9 | 401 |
+| 80 % (20) | `zones=6 level=7` | **86,5 %** (82,3) | 28,7 (26,2) | 93,7 | 96,7 | 95,7 | 98,2 | 95,2 | 429 |
+| 100 % (24) | `zones=7 level=7` | **90,7 %** (94,3) | 29,3 (28,2) | 98,5 | 99,8 | 97,0 | 99,0 | 94,6 | 438 |
+
+STV … BRM : battue / atteinte (%). « Fiche d'origine » : arbre du § 7 de la fiche, dans son ordre, avant réglage.
+Paliers 80 et 100 % mesurés, non réglés (recalage commun des génériques à venir).
+
+**Specialization au palier 60 %** : Feral 67,2 %, Balance 67,5 %, Restoration 69,2 % (fiche : 91,3 / 88,7 / 92,0).
+Seules au contenu du palier 60 % (26,8 %) : Feral 29,2, Balance 28,7, Restoration 29,7.
+
+**Nœuds seuls**, chiffres retenus, au contenu du palier de leur rangée (contenu seul entre parenthèses) :
+
+| Rangée, palier | Nœud | Victoires | Écart |
+|---|---|---|---|
+| 1, 20 % (8,8) | Primal Instinct 1 | 10,2 | +1,4 |
+| 1, 20 % | Natural Shapeshifter 2 | 10,7 | +1,9 (au palier 40 % : 33,5, +5,0) |
+| 2, 40 % (28,5) | Feral Instinct 1 | 33,5 | +5,0 |
+| 2, 40 % | Moonglow 2 | 28,3 | −0,2 |
+| 2, 40 % | Living Seed 2 | 29,7 | +1,2 |
+| 3, 60 % (26,8) | Wild Reserve 2 | 27,8 | +1,0 |
+| 3, 60 % | Shapeshifter's Ward 2 | 38,0 | **+11,2** |
+| 3, 60 % | Specialization (Feral / Balance / Restoration) | 29,2 / 28,7 / 29,7 | +2,4 / +1,9 / +2,9 |
+| 4, 80 % (28,7) | Master Shapeshifter 1 | 38,7 | **+10,0** |
+| 4, 80 % | Survival Instincts 3 | 32,2 | +3,5 |
+| génériques, 60 % | Toughness 3 / Provisions / les deux | 35,5 / 28,7 / 39,8 | +8,7 / +1,9 / +13,0 |
+| génériques, 100 % | Veteran's Arsenal 2 dans l'arbre plein | 90,7 contre 84,2 | +6,5 |
+
+Aucun nœud de mécanique au-dessus de 12 points seul.
+
+**Nœuds de la fiche, mesurés seuls** (avant réglage) : Natural Shapeshifter 2 (un puis deux changements gratuits,
+taxe 1 au plus) 36,0 au palier 40 (+7,5) ; Primal Instinct 2 36,7 (+8,2) au palier 40, 39,5 (**+12,7**) au palier
+60 ; Feral Instinct 2 38,0 (+9,5) au palier 40 ; Toughness 3 40,5 (+12,0) au palier 40 ; Moonglow 1 28,3 ; Living
+Seed 1 26,7 ; **Shapeshifter's Ward 2 (chaque changement, 1 puis 2 Absorb) 56,7 (+29,9)**, puis 2 / 3 Absorb au
+premier changement du tour 45,5 (+18,7) ; Wild Reserve 2 27,8 ; **Master Shapeshifter 2 (taxe retirée) 45,7
+(+17,0)**, puis deux changements gratuits 44,5 (+15,8), un seul 38,7 (+10,0) ; Survival Instincts 2 31,3 (+2,6).
+
+**Chiffres changés** (nœuds de la classe seulement ; génériques et ordre des génériques inchangés) : Primal Instinct
+2 → 1 rang ; Natural Shapeshifter rang 1 « taxe 1 au plus », rang 2 « première forme du combat hors taxe » ; Feral
+Instinct 2 → 1 rang ; Moonglow 2 rangs de 1 Absorb, Living Seed 2 rangs de +1 ; Shapeshifter's Ward au premier
+changement du tour seulement, 1 / 2 Absorb ; Master Shapeshifter 1 rang, un changement gratuit ; Survival Instincts
+3 rangs (10 / 20 Absorb) ; ordre du bot : Feral Instinct et Shapeshifter's Ward après le palier 60 %. Socle : une
+constante `Druid.PULSE_BONUS` (0) lue par `Druid.pulseBase` via `Combat.const` (Specialization Balance).
+
+Étapes (palier 40 / 60 %) : fiche 68,2 / 91,3 ; Ward au premier changement 2 / 3, rangs de Natural Shapeshifter
+inversés 64,0 / 84,5 ; Ward 1 / 2, Primal Instinct 1 rang, Moonglow 2 rangs 68,3 / 79,8 ; Feral Instinct 1 rang,
+Living Seed 2 rangs 65,3 / 78,8 ; Moonglow et Living Seed par 1, Master Shapeshifter 1 rang 61,5 / 70,7 ; Natural
+Shapeshifter rang 2 « première forme » 60,2 / 69,0 ; ordre (Feral Instinct et Ward après 60 %) **56,0 / 67,2**.
+
+Lecture :
+
+- **0 %, 20 % et 60 % dans la cible** ; les trois voies à 2 points près.
+- **Palier 40 % hors cible (+33 sur le Warrior)**, et ce n'est pas l'arbre : le **contenu seul** du palier fait déjà
+  28,5 % au Druid (8,2 au Warrior), et Toughness 3 seul (générique, toujours dans les 5 premiers points d'un arbre
+  légal : la rangée 2 demande 5 points en rangée 1) le porte à 40,5. La cible de ± 8 points ne laisserait au reste des dix premiers
+  points que 0 à 2 points de victoires.
+- **Le mur est raide** : chaque nœud seul vaut peu, ensemble ils s'additionnent fort. Au palier 60 %, les nœuds
+  « faibles » seuls (Moonglow 2 et Living Seed 2 de la fiche, à 2 / 4 Absorb) ajoutent ensemble 15,5 points aux
+  génériques (55,3 contre 39,8) ; génériques + Moonglow, Living Seed, Specialization, Wild Reserve et Field Medic de
+  la fiche : 63,5. Dans l'arbre du palier 60 % (étape à 78,8), retirer un nœud ne coûtait que 2 à 8 points (Natural
+  Shapeshifter 3,6, Primal Instinct 3,8, Feral Instinct 2,1, Ward 7,8) : il a fallu baisser presque tous les nœuds.
+- Vétéran à l'arbre plein : le bot prend Mark of Ursol, Owlkin Frenzy, Lifebloom, King of the Jungle et Heart of the
+  Wild au départ (Veteran's Arsenal), jamais Eclipse ni Furor ; pas d'écart d'épique nécessaire (`bot.epic` vide).
+
+Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; Heart of the Wild avec Wild Reserve et Primal Instinct
+(plafond de 5 par réserve, réserve de départ dans la réserve sans forme) ; interface (la pastille et les marques
+lisent les constantes du module, pas celles des talents : `docs/talents.md`, § 7).
