@@ -48,8 +48,8 @@ end
 Z.HARD = {
   stranglethorn = { hp = 1.45, dmg = 1.45 },
   swamp = { hp = 1.8, dmg = 1.8 },
-  steppes = { hp = 2.15, dmg = 2.15 },
-  blackrock = { hp = 2.3, dmg = 2.3 },
+  steppes = { hp = 1.9, dmg = 1.9 },
+  blackrock = { hp = 1.9, dmg = 1.9 },
 }
 
 function Z.get(id)
