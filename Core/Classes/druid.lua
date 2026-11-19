@@ -34,6 +34,7 @@ ns.Druid = Druid
 -- Réglages (docs/classes/druid.md, § 10 ; mesures du 18/11/2026 : docs/equilibrage.md, « Druid »).
 Druid.STRIKE_BASE = 1   -- frappe de l'ours : 1 + réserve
 Druid.PULSE_MAX = 3     -- Moonkin, fin de tour : ceil(Charges / 2) à chaque ennemi, au plus
+Druid.PULSE_BONUS = 0   -- Moonkin, fin de tour : dégâts ajoutés au coup à tous (talent Specialization Balance)
 Druid.TREE_ABSORB = 2   -- Tree of Life, fin de tour : Absorb gagné (Regen 1 puis 2 jusqu'au 19/11/2026 ; 3 essayé)
 Druid.TAX = 1           -- levier A : mana perdu au tour suivant par changement au-delà de TAX_FREE (0 = inactif)
 Druid.TAX_FREE = 1      -- changements gratuits par tour (taxe dès le 2e : décision du joueur, « plus d'une fois »)
@@ -152,12 +153,13 @@ ns.Effects.bearStrike = function(c, ctx, e)
 end
 
 -- Coups à tous de fin de tour en Moonkin ------------------------------------------------------------
--- ceil(réserve / 2), PULSE_MAX au plus ; coup sans carte (ni bonus des Charges, ni bonus « Attacks »), genre
--- « other » à tous (réveil doux des dormeurs).
+-- ceil(réserve / 2), PULSE_MAX au plus, + PULSE_BONUS (talent ; même à 0 Charge) ; coup sans carte (ni bonus
+-- des Charges, ni bonus « Attacks »), genre « other » à tous (réveil doux des dormeurs).
 local PULSE = { kind = "other" }
 
 function Druid.pulseBase(c)
   return math.min(Combat.const(c, "PULSE_MAX", Druid.PULSE_MAX), math.ceil((c.player.res or 0) / 2))
+    + Combat.const(c, "PULSE_BONUS", Druid.PULSE_BONUS)
 end
 
 function Druid.moonkinPulse(c)
