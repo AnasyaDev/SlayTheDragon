@@ -2115,3 +2115,64 @@ Trois premières zones (`maxzone=wetlands`, battues) : niveau 7 63,3 → **68,0 
   remesurées).
 - Non vérifié : Owlkin Frenzy, Lifebloom et Heart of the Wild (zones 5 à 7, absentes de cet état), autres graines,
   clés 1 à 5, niveaux 2 à 6, paliers 30 % et 100 % de l'arbre, les cinq autres classes avec le mur à 1,9.
+
+## Talents du Warrior : courbe par palier (19/11/2026)
+
+Premier arbre codé (`Data/Talents/warrior.lua`, `docs/talents.md`, § 6 et 17), mur des zones 6 et 7 à 1,9 (main
+du 19/11). Commande : `flock build/sim-a.lock luajit Sim/sim.lua runner=expedition bot=human class=warrior key=0
+seed=1 jobs=8 runs=600 tree=<part> zones=<N> level=<palier>` avec le contenu de chaque palier (`docs/talents.md`,
+§ 3) ; « contenu seul » = même commande sans `tree=` ; ± 2 à 4 points. Rapports : `reports/talents/` du worktree.
+
+| Palier (points) | Contenu | Victoires (cible) | Contenu seul | Fiche d'origine | STV | SoS | BS | BRM | XP / exp. |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | `zones=0 level=1` | **0,0 %** (≈ 0) | 0,0 | 0,0 | 8,9 | 11,5 | — | — | 135 |
+| 20 % (5) | `zones=2 level=4` | **25,5 %** (≈ 1) | 8,5 | 25,5 | 63,3 | 71,1 | 86,6 | 73,9 | 292 |
+| 40 % (10) | `zones=3 level=7` | **23,0 %** (≈ 15) | 8,2 | 50,2 | 74,4 | 65,8 | 77,9 | 61,3 | 323 |
+| 60 % (15) | `zones=4 level=7` | **61,2 %** (≥ 40) | 24,8 | 86,5 | 87,3 | 83,7 | 93,4 | 89,7 | 384 |
+| 80 % (20) | `zones=6 level=7` | **82,3 %** (≈ 55) | 26,2 | 89,7 | 96,7 | 92,1 | 97,9 | 94,5 | 422 |
+| 100 % (24) | `zones=7 level=7` | **94,3 %** (65–70) | 28,2 | 89,0 | 99,8 | 96,0 | 99,7 | 98,8 | 438 |
+
+STV … BRM : battue / atteinte (%) de Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain.
+« Fiche d'origine » : mêmes séries avec les chiffres du § 6 de la fiche, avant réglage.
+
+**Nœuds seuls** au contenu du palier 60 % (600, contenu seul 24,8 %), chiffres de la fiche : Toughness 3 36,5 ;
+Battle Ready 2 27,2 ; **Second Wind 2 50,7** ; Unbridled Wrath 2 24,7 ; **Anger Shield 2 38,0** ; Provisions 28,7 ;
+Specialization Fury (3 Rage) 30,0 ; Blood Drinker 2 33,7 ; Tactical Mastery 2 25,7 ; Field Medic 27,2 ; Rampage 2
+30,2 ; Unyielding 2 27,7. Deux nœuds dépassaient la règle « plus de 10 points seul = trop fort » (§ 15) : Second Wind
+(+26) et Anger Shield (+13). Au palier 100 % : Veteran's Arsenal 1 seul **61,2 %** (+33 : Titan's Grip au départ).
+
+**Génériques seuls** (Toughness 3 + Provisions) au palier 60 % : **43,0 %** ; avec +1 mana chaque tour
+(`tune=Combat.BASE_MANA=4`, l'ordre de grandeur que la fiche donnait aux nœuds de mécanique des rangées 1 à 3) :
+53,0 %. Au palier 100 % : Toughness 3 + Provisions + Field Medic 57,3 % ; avec Veteran's Arsenal 2 **91,0 %**.
+
+**Chiffres changés** (nœuds de mécanique seulement ; ni le mur, ni les génériques) : Second Wind `1 / 2 PV par Rage`
+→ `1 PV par 5 / 4 Rage` ; Anger Shield `1 Absorb par 2 Rage / par Rage` → `par 5 / 4 Rage` ; Specialization Fury
+à **5** Rage au lieu de 3 ; Blood Drinker `soin 1 / 2 à chaque dépense` → rang 1 `soin 1 à chaque Spend payé`, rang 2
+`soin 1 à chaque dépense` (Surge compris). Valeur ajoutée aux génériques au palier 60 % après réglage (400, ± 5) :
+Battle Ready 2 +4,5, Second Wind 2 et Anger Shield 2 +3,5 chacun (mesurés à « par 5 / 3 Rage », un cran au-dessus des
+chiffres retenus), Blood Drinker 2 +4,8, Fury +2,5, Unbridled Wrath 2 +0,8 ;
+les trois voies au palier 60 % : Arms 62,8 %, Fury 61,2 %, Protection 61,7 %. Bot : accord des épiques avec l'arbre
+(`bot.epic`, `thunderous_roar = -4`…) : sans lui, le bot prenait Thunderous Roar et Anger Management au départ
+(Veteran's Arsenal) et l'arbre plein tombait à 72 % (86 % sans Veteran's Arsenal).
+
+Lecture :
+
+- **0 % et 60 % tenus** (0 victoire au compte neuf ; 61 % ≥ 40 %). Les autres paliers sont **au-dessus** de la cible,
+  et ce n'est plus l'arbre : le **contenu seul** fait déjà 8,5 % au palier 20 % (cible 1 %) et 25 à 28 % aux paliers
+  60 à 100 % (la fiche comptait 7,2 % pour un vétéran tout débloqué sans talents : depuis, mur des zones 6 et 7 à 1,9
+  et réglage des épiques une par une).
+- **Les génériques suffisent à passer les cibles hautes** : 43 % au palier 60 %, 91 % au palier 100 % sans aucun
+  nœud de mécanique ; Veteran's Arsenal pèse le plus (une épique au départ = +33 points, deux = la clé 0 résolue).
+  Aucun réglage des nœuds de mécanique ne ramène le palier 100 % vers 65–70 % : les nœuds de mécanique des rangées 1
+  à 3 valent maintenant +1 à +5 points chacun (≈ +18 ensemble, la fiche visait +10), ceux des rangées 3 et 4
+  (Tactical Mastery, Rampage, Unyielding) +1 à +5.
+- **À trancher** (hors périmètre de ce lot) : Veteran's Arsenal plus faible (une épique au choix parmi deux tirées,
+  rang 2 = une amélioration de l'épique au lieu d'une seconde épique) ou plus tard dans l'arbre ; Toughness à +3 par
+  rang (+12 PV valent +12 points au palier 60 %) ; ou laisser la clé 0 facile à l'arbre plein et recaler les clés
+  1 à 5 (§ 9 de la fiche) avec `tree=100 key=N`.
+- **Rythme** : l'expérience par expédition monte plus vite que l'estimation du § 1.2 (292 dès 20 % de l'arbre au lieu
+  de ≈ 185) : 60 % de l'arbre arrive vers la 7e ou 8e expédition plutôt que la 10e.
+
+Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; l'arbre du Druid (lot 3, à venir) ; le chiffre « Westfall,
+épique à l'entrée » du tableau « Par zone » ne compte pas les épiques de Veteran's Arsenal (prises après l'entrée :
+phase `start`).
