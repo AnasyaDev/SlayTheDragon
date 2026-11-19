@@ -1490,3 +1490,63 @@ Lecture :
 Rapports bruts : `reports/decksize/` (`<classe>-ref|20|25|30.txt`, `warrior-thin.txt`). Non vérifié : autres graines,
 clés 1 à 5, `zones=7` (épiques en jeu : une épique pèse plus dans un deck serré), `upfocus=1` combiné (moins de
 cartes à améliorer), valeurs de `SE.DECKSIZE_MARGIN` / `SE.DECKSIZE_STEP`.
+
+## Druid : Absorb en Tree, Cat/Bear hors taxe (19/11/2026)
+
+Décision du joueur après le diagnostic des voies seules (section « Druid : voies seules, diagnostic ») : appliquer
+quatre changements dans l'ordre, en mesurant après chacun. Mesure : `luajit Sim/sim.lua runs=600 bot=human seed=1
+jobs=8 runner=expedition key=0 class=druid [path=<voie>] [zones=0 level=1]` (± 4 points). Un autre lot durcit les
+zones 4 à 7 : la cible se lit sur les trois premières zones, colonne « battue » de la ligne Wetlands (= expéditions
+qui ont battu Westfall, Duskwood et Wetlands ; les voies seules en `maxzone=wetlands`, qui donne le même chiffre à
+0,2 point près). Cibles : niveau 7 entre 60 et 70 % (Rogue 61,5, Mage 65,2, Priest 66,3, Warrior 68,7, Hunter
+74,7) ; compte neuf entre 46 et 58 % (Mage 48,3, Warrior 48,7, Hunter 54,3, Rogue 57,0, Priest 61,7) ; Feral seule
+et Balance seule à moins de 8 points de Restoration seule, ou devant ; le mélange devant la meilleure voie
+offensive seule ; aucune forme au-dessus de 45 % des fins de tour. 47 séries ; rapports bruts : `reports/dp/` du
+worktree (non versionnés).
+
+| Étape (bot `human`) | Mélange : Wetlands battue / campagne | Restoration | Feral | Balance | Compte neuf : Wetlands / campagne | Fins de tour Bear / Cat / Moonkin / Tree | Changements / tour | Taxe (mana / tour) |
+|---|---|---|---|---|---|---|---|---|
+| départ (65 PV) | 54,3 / 51,8 % | 70,5 | 31,2 | 24,7 | 41,7 / 36,2 (18/11) | 36,9 / 17,1 / 33,4 / 12,5 % | 2,31 | 0,92 |
+| 1. Tree of Life : 3 Absorb au lieu de Regen 2 | 48,3 / 44,3 | 54,8 | 31,2 | 23,5 | | 37,8 / 17,6 / 34,3 / 10,1 % | 2,30 | 0,92 |
+| 2. + Cat ↔ Bear hors taxe | 61,3 / 58,2 | 64,7 | 54,0 | 33,5 | | 35,8 / 17,8 / 35,7 / 10,6 % | 2,46 | 0,75 |
+| 3a. + cartes offensives, Insect Swarm 5 Absorb | 69,0 / 67,2 | 66,0 | 58,8 | 53,3 | | 35,8 / 17,2 / 36,1 / 10,7 % | 2,51 | 0,78 |
+| 3b. + Faerie Fire 3 Absorb (`maxzone=wetlands`) | 73,0 | | | 60,8 | 69,0 | 40,7 / 18,2 / 32,2 / 8,9 % | 2,43 | 0,70 |
+| 4a. 59 PV, Tree 3 Absorb | 62,3 / 59,7 | 54,8 | 47,7 | 46,2 | 56,5 / 49,3 | 36,7 / 17,4 / 35,5 / 10,3 % | 2,52 | 0,77 |
+| 4b. 60 PV, Tree 2 Absorb | 63,3 / 58,8 | 53,3 | 50,5 | 50,7 | 58,2 / 50,2 | 37,4 / 17,5 / 35,9 / 9,1 % | 2,51 | 0,77 |
+| **4. retenu : 59 PV, Tree 2 Absorb, Mangle jouable à 0 (+2 Frenzy)** | **63,5 / 60,2** | **50,0** | **53,5** | **46,5** | **55,2 / 44,7** | 37,7 / 17,4 / 36,0 / 8,7 % | 2,54 | 0,78 |
+| bot heuristic (300), retenu | 96,7 / 96,3 (± 2,1) | | | | | 36,7 / 17,1 / 42,9 / 3,2 % | 2,92 | 0,75 |
+
+Voies seules : Wetlands battue, en %. Taxe des voies seules au réglage retenu : Restoration 0,68, Feral 0,54,
+Balance 0,62 mana par tour (départ 0,81 / 0,86 / 0,73).
+
+- **Étape 1, Tree of Life** : la fin de tour donne de l'Absorb pour le tour ennemi (`Druid.TREE_ABSORB`) au lieu de
+  Regen 2. Restoration seule perd 16 points à 3 Absorb (70,5 → 54,8) : la Regen de fin de tour s'empilait sur celle
+  des cartes. Le mélange perd 6 points, Feral et Balance ne bougent pas (1 % de leurs fins de tour en Tree). Infobulle
+  de la plaque : `Enters Tree of Life. End of turn: gain 2 Absorb.` ; pastille : `End of turn: gain 2 Absorb.`.
+- **Étape 2, taxe** : un passage entre Cat et Bear (dans les deux sens) ne compte pas pour la taxe
+  (`Druid.taxed`, compteur `c.cls.taxed`) ; il reste un changement de forme pour `onShift` (Idol of the Wild,
+  Wolfshead Helm, Furor), le journal et `c.cls.shifts`. L'entrée dans la première forme du combat compte toujours ;
+  Moonkin → Cat → Bear : un seul changement compté. Les bots voient la règle (`botKey` par changements comptés,
+  `c.cls.tax` de la fin de tour simulée lu sur eux). Feral seule +23 points, la taxe du mélange 0,92 → 0,75 mana par
+  tour. Balance seule paie encore 0,61 mana par tour (0,73 avant) : son deck de départ a trois formes (Wrath en
+  Moonkin, Thick Hide et Maul en Bear, Ferocious Bite en Cat) et chaque aller-retour Moonkin ↔ Bear compte. Ligne de
+  la pastille : `Form changes this turn: N. Shifting between Cat and Bear is free.` puis le malus.
+- **Étape 3, cartes** (jouée / piochée dans le mélange, avant → au réglage retenu) : Mangle coût 2 → 1, puis jouable
+  à 0 avec « +2 Frenzy. » après les frappes (ancien palier 2 ; 27 → 69 %, 76 % en Feral seule) ; Leader of the Pack
+  coût 1 → 0 (47 → 90 %) ; Nature's Grace coût 2 → 1 (27 → 53 %) ; Starfire 20 → 24 (52 → 59 %) ; Starsurge 6 → 7
+  par Charge (52 → 60 %) ; Hurricane 12 → 15 à tous (48 → 54 %). Défense de Balance, sans carte nouvelle : Insect
+  Swarm « Gain 5 Absorb. » en tête (+20 points pour Balance seule avec les dégâts, 33,5 → 53,3) et Faerie Fire
+  « Gain 3 Absorb. » (+7,5, → 60,8) ; ils font chacun ≈ 1 à 3 Absorb par combat dans le mélange. Paliers revus
+  (`docs/classes/druid.md`, § 3.5 ; `lua5.1 Sim/upgrades.lua class=druid` : aucune erreur).
+- **Étape 4, PV** : 65 → 59. Le niveau 7 et le compte neuf montent et descendent ensemble (≈ 2,4 points par PV
+  chacun) et le compte neuf n'est plus que 5 points sous le niveau 7 (12,6 avant ; les cartes renforcées sont des
+  communes du niveau 1). À 60 PV, compte neuf 58,2 % (au bord haut) ; à 59, niveau 7 59,7 % (au bord bas). Deux
+  retouches les séparent : Tree of Life 3 → 2 Absorb (Restoration −4,5, mélange −2,5 à 59 PV) et Mangle jouable à 0
+  (rare du niveau 4, absente du compte neuf : niveau 7 +3,6, Feral +5,8). Plafond de taxe inchangé (2).
+- **Cibles** : niveau 7 63,5 % (60 à 70) ; compte neuf 55,2 % (46 à 58) ; Feral seule 53,5 et Balance seule 46,5,
+  devant ou à 3,5 points de Restoration seule (50,0) ; mélange 63,5, devant Feral seule ; fins de tour 37,7 / 17,4 /
+  36,0 / 8,7 %, aucune au-dessus de 45 % ; bot heuristic 96,3 %, sous 97 %. Campagne complète, sur l'état des
+  zones de ce worktree : niveau 7 60,2 %, compte neuf 44,7 %.
+- Non vérifié : autres graines, clés 1 à 5, épiques du Druid imposées (Furor, Lifebloom lisent des règles changées :
+  aucun chiffre d'épique touché), niveaux 2 à 6, les zones 4 à 7 durcies par l'autre lot ; `docs/classes.md` et
+  `docs/interface.md` citent encore l'ancienne infobulle de Tree of Life (« gain Regen 1 »).

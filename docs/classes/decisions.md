@@ -58,7 +58,10 @@ ajouté le 18/11/2026 (règles, cartes et bibelots codés ; épiques et interfac
   changement de forme ; elle vaut Combo en Cat, Frenzy en Bear, Charges en Moonkin, rien sans forme et en Tree
   of Life (« Reserve »). La forme où l'on finit le tour décide de l'effet : Cat, la première Attack hors Cast du
   tour suivant coûte 0 ; Bear, frappe de 1 + réserve ; Moonkin, 1 dégât à tous par 2 Charges (arrondi au
-  supérieur, 3 au plus) ; Tree of Life, Regen 1. Les soins sont des cartes Tree.
+  supérieur, 3 au plus) ; Tree of Life, 2 Absorb pour le tour ennemi (Regen 1 puis 2 jusqu'au 19/11/2026). Les
+  soins sont des cartes Tree. Taxe (levier A, actif) : dès le deuxième changement compté d'un tour, −1 mana au
+  tour suivant par changement compté, −2 au plus ; un passage entre Cat et Bear ne compte pas (19/11/2026),
+  l'entrée dans la première forme du combat compte. PV 59 (19/11/2026).
 - **Hunter.** Le Frenzy baisse de 1 au début de chaque tour, sauf le premier. Arcane Shot inflige 3.
   Trois Traps au plus, une par attaque ennemie, la plus ancienne d'abord.
 - **Bibelots de classe.** Celui de départ est porté à chaque expédition ; les autres entrent dans la réserve
