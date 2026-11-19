@@ -157,14 +157,32 @@ deck), `UI/Art/talents.lua` (icônes), `UI/Controller.lua` (`talentTab`, `talent
   rang sous celle du milieu, nom « Specialization: Fury » une fois choisie ; voie active pleine à l'anneau d'or,
   les autres assombries ; infobulle = les trois voies et leurs textes (la survolée en or, l'active marquée
   « (active) »), « Click: choose Fury. » / « Click: switch to Arms (free). ».
-- **Icônes des nœuds** (`Art.talentIcon`) : remplacement `Art.talentIcons[classe][id]` (vide), sinon le champ `icon`
-  du nœud ou de la voie (`Media/Icons`, sinon chemin du client), sinon l'icône du nœud pour une voie, sinon l'icône de
-  la classe. Warrior et génériques : toutes embarquées ; aucune icône ajoutée.
+- **Icônes des nœuds** (`Art.talentIcon`) : remplacement `Art.talentIcons[classe][id]` (`UI/Art/talents.lua`), sinon
+  le champ `icon` du nœud ou de la voie (`Media/Icons`, sinon chemin du client), sinon l'icône du nœud pour une voie,
+  sinon l'icône de la classe. Les six arbres : 95 icônes (nœuds et voies), toutes embarquées ; un seul remplacement
+  (19/11/2026) : Priest `void_torrent` → `spell_priest_void blast` (la fiche dit `spell_priest_void_blast`, la clé
+  de `UI/SkinData.lua` garde l'espace du nom d'origine ; icône de Void Eruption). Aucune icône ajoutée.
 - **Pendant l'expédition** : dans le panneau du deck (pile « deck » seulement), une ligne en bas à gauche « Talents:
   Toughness 3 · Battle Ready 2 · … · Fury · … » (rang écrit s'il y en a plusieurs ; réduite, puis coupée en « +N » si
   elle ne tient pas) ; infobulle = chaque talent et son texte ; hors combat, un clic ouvre l'onglet Talents en
   lecture seule (`ui:talents` ; `C.step` rend l'écran de progression pendant l'expédition hors combat ; sans « Log » ;
-  « Back » revient à la phase). La pastille de classe ne dit pas encore les chiffres changés (`Rage cap 7`, § 11).
+  « Back » revient à la phase).
+- **Chiffres changés par les talents, en combat** (19/11/2026 ; `docs/talents.md` § 17.4) : les infobulles du combat
+  lisent la valeur effective (`Combat.const` sur les talents de la classe jouée, `Combat.resCap` pour le plafond) ;
+  les textes des cartes et des mots-clés (aperçus, écran Progress, cartes en main) gardent la valeur du module.
+  Pastille de ressource : « up to N » de l'explication et « n / N » au plafond du combat (`Art.resourceLine` ; crans
+  déjà au plafond du combat), ligne propre à la classe `ClassViews[classe].resourceNote(c)` (Hunter : « Frenzy drops
+  by 1 only every third round. » sous Bestial Discipline, rien au rythme de base). Druid : « Bear strikes for N »,
+  « strikes for N + Frenzy » (`Druid.strikeBase`), coup à tous de Moonkin et ses marques (`Druid.pulseBase`, règle
+  « 1 damage to each enemy per 2 Charges, up to 3, then 1 more. » sous la voie Balance ; marques même sans Charge
+  quand le bonus frappe), Absorb de Tree of Life (`TREE_ABSORB`), taxe (`TAX_FREE`, `TAX`, `TAX_MAX` : « 2 more
+  free, then shifting costs 1 mana next turn. » ; base « 1 more free, then each costs 1 mana next turn, 2 at
+  most. »). Hunter : familier (`Hunter.petDamage`, déjà effectif), plafond du Frenzy dans l'infobulle du familier et
+  la note de Call of the Wild. Jetons d'état (`W.addStatusLines(tt, id, n, c)`, `Art.statusLive[id]`) : Parry « up to
+  11 damage. Max 4. » (`PARRY_STOP`, `PARRY_MAX`), Atonement « restores 6 HP » (`ATONEMENT_HEAL`), Sundered « Takes
+  50% more damage. » (`SUNDER_MULT`). Warrior : note d'Avatar « Rage up to N » au plafond du combat. Une constante
+  de plus : une entrée `Art.statusLive` (texte d'un état) ou une lecture par la fonction de la classe dans
+  `UI/Art/<classe>.lua`.
 - **Veteran's Arsenal au départ** (phase `start`, `exp.talentEpics`, avant le bibelot au choix) : écran « deck »
   (sorte `talentEpic`) : titre « Veteran's Arsenal: choose an epic card (1 of 2) », les épiques proposables en vraies
   cartes (une rangée, 7 au plus), consigne dessous « It joins the deck for this expedition. Its rule is in play from
@@ -183,12 +201,15 @@ deck), `UI/Art/talents.lua` (icônes), `UI/Controller.lua` (`talentTab`, `talent
   par des clics (ordre du bot), changement de voie, refus, rangée 4 ouverte, remboursement confirmé, arbre plein,
   classe sans arbre, arbre d'essai de 15 nœuds (cinq dans la rangée du nœud à choix, noms longs, nœuds sans icône),
   expédition (ligne du deck sur trois rangées de cartes, lecture seule), Veteran's Arsenal 2 (deux choix, bibelot,
-  « Skip », rechargement), bilan (deux niveaux, neuf niveaux), migration v7 → v8, icônes de chaque arbre. Aperçus
-  `build/png/talents-*.png` (neuf, 15-points, plein, arbre-vide, arbre-15-noeuds, deck, expedition,
-  veterans-arsenal, bilan).
+  « Skip », rechargement), bilan (deux niveaux, neuf niveaux), migration v7 → v8, icônes de chaque arbre (toutes
+  embarquées, remplacements connus), les six arbres réels pleins (ordre du bot : place, chevauchements, troncature,
+  infobulles ; Mage : six nœuds en rangée 3), chiffres changés en combat par classe (arbre plein ; Druid en Balance,
+  Warrior en Arms) et valeurs de base hors combat. Aperçus `build/png/talents-*.png` (neuf, 15-points, plein,
+  arbre-vide, arbre-15-noeuds, deck, expedition, veterans-arsenal, bilan, warrior, druid, hunter, mage, priest,
+  rogue, combat-druid, combat-hunter, combat-rogue, combat-warrior).
 - Non vérifiable hors jeu : rendu de la pastille rouge (`mask_disc` teinté) et du petit anneau sur les boutons,
-  lisibilité du rang à 11,5 sur le disque sombre, icônes des autres classes absentes de `Media/Icons` (chemin du
-  client), échelle réelle des faces de Specialization à 42.
+  lisibilité du rang à 11,5 sur le disque sombre, échelle réelle des faces de Specialization à 42, longueur réelle des
+  infobulles du combat (retour à la ligne de GameTooltip).
 
 ## Écran de combat : crans, annulations, Instant, Traveler's Backpack (13/11/2026)
 
