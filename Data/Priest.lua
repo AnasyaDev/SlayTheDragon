@@ -475,18 +475,18 @@ end
 
 epic("prayer_of_mending", {
   name = "Prayer of Mending", school = "holy", path = "holy", zone = "westfall",
-  text = "Epic.\nEach heal: Divine Star.",
-  up = { text = "Epic.\nEach heal: Divine Star +2." },
-  up2 = { text = "Epic.\nEach heal: Divine Star +3." },
-  up3 = { text = "Epic.\nEach heal: Divine Star +4." },
+  text = "Epic.\nEach heal: Divine Star +2.",
+  up = { text = "Epic.\nEach heal: Divine Star +3." },
+  up2 = { text = "Epic.\nEach heal: Divine Star +4." },
+  up3 = { text = "Epic.\nEach heal: Divine Star +5." },
 })
 
 epic("misery", {
   name = "Misery", school = "shadow", path = "shadow", zone = "duskwood",
-  text = "Epic.\nDoT applied: Contagion.",
-  up = { text = "Epic.\nDoT applied: Contagion +1." },
-  up2 = { text = "Epic.\nDoT applied: Contagion +2." },
-  up3 = { text = "Epic.\nDoT applied: Contagion +3." },
+  text = "Epic.\nDoT applied: Contagion +2.",
+  up = { text = "Epic.\nDoT applied: Contagion +3." },
+  up2 = { text = "Epic.\nDoT applied: Contagion +4." },
+  up3 = { text = "Epic.\nDoT applied: Contagion +5." },
 })
 
 epic("echo_of_light", {
@@ -499,10 +499,10 @@ epic("echo_of_light", {
 
 epic("shadow_covenant", {
   name = "Shadow Covenant", school = "shadow", path = "discipline", zone = "stranglethorn",
-  text = "Epic.\nShadow cards: Life Tap 2.",
-  up = { text = "Epic.\nShadow cards: Life Tap 2, 1st free." },
-  up2 = { text = "Epic.\nShadow cards: Life Tap 1, 1st free." },
-  up3 = { text = "Epic.\nShadow cards: Life Tap 1, 2 free." },
+  text = "Epic.\nShadow cards: Life Tap 1, 1st free.",
+  up = { text = "Epic.\nShadow cards: Life Tap 1, 2 free." },
+  up2 = { text = "Epic.\nShadow cards: Life Tap 1, 3 free." },
+  up3 = { text = "Epic.\nShadow cards: Life Tap 1, 4 free." },
 })
 
 epic("reflective_shield", {
@@ -602,6 +602,17 @@ relic("truefaith_vestments", {
 
 -- Classe ------------------------------------------------------------------------
 
+-- Conseils d'épique modérés (19/11/2026) : la note de la classe (bot.rating), plus un petit bonus pour les cartes
+-- que l'épique sert ; les autres gardent leur note. Les anciennes notes absolues (soins à 8, Absorb et contrôle
+-- baissés) faisaient perdre 4 à 11 points dans les zones 4 à 7 au bot human (docs/equilibrage.md, « Épiques :
+-- mesure une par une »).
+local function lift(bonus)
+  return function(exp, id)
+    local b = bonus[id]
+    if b then return (ns.Classes.priest.bot.rating[id] or 5) + b end
+  end
+end
+
 -- Définition de classe (contrat : docs/classes.md).
 ns.Classes.priest = {
   id = "priest", name = "Priest", order = 1, hp = 36,
@@ -637,28 +648,26 @@ ns.Classes.priest = {
     -- de camp (upgrade, l'épique comprise).
     byEpic = {
       prayer_of_mending = {
-        rating = { renew = 8, flash_heal = 8, greater_heal = 8, shadow_mend = 8, holy_nova = 7.5, halo = 7,
-          vampiric_touch = 7.5, radiance = 6.5, solace = 9, evangelism = 6, luminous_barrier = 4.5,
-          rapture = 4.5, pain_suppression = 6, holy_fire = 4, mind_blast = 5.5 },
+        rating = lift({ renew = 2, flash_heal = 1, greater_heal = 1, shadow_mend = 1, holy_nova = 1, halo = 1,
+          solace = 0.5 }),
         upgrade = { renew = 10, prayer_of_mending = 9.5, smite = 2, inner_fire = 0.5 },
         remove = { inner_fire = 0.5, smite = 1.5 },
       },
       misery = {
-        rating = { vampiric_touch = 8.5, devouring_plague = 8.5, holy_fire = 7, mind_flay = 7.5, void_eruption = 7,
-          shadowform = 8.5, silence = 7.5, mind_sear = 4, holy_nova = 3.5, psychic_scream = 7.5 },
+        rating = lift({ vampiric_touch = 1.5, devouring_plague = 1.5, mind_flay = 1, shadowform = 1,
+          void_eruption = 0.5 }),
         upgrade = { sw_pain = 9.5, misery = 9, smite = 1.5 },
         remove = { smite = 1, inner_fire = 1.5 },
       },
       echo_of_light = {
-        rating = { renew = 6.5, holy_nova = 7, halo = 7, vampiric_touch = 6.5, luminous_barrier = 7,
-          mind_blast = 5, flash_heal = 4.5, greater_heal = 4.5, shadow_mend = 4 },
+        rating = lift({ renew = 2, holy_nova = 1.5, halo = 1.5 }),
         upgrade = { renew = 10, holy_nova = 9.5, echo_of_light = 9, inner_fire = 3, pw_shield = 2.5 },
         remove = { smite = 0.5, inner_fire = 3 },
       },
       shadow_covenant = {
-        rating = { mind_blast = 8.5, mind_flay = 8, sw_death = 7.5, schism = 8, vampiric_touch = 7, mind_sear = 8,
-          shadowform = 8, solace = 9.5, radiance = 7, penance = 7, evangelism = 6.5, shadow_mend = 8,
-          holy_fire = 3, empyreal_blaze = 3.5, psychic_scream = 8.5 },
+        rating = lift({ mind_blast = 1, mind_flay = 1, schism = 1, sw_death = 1, mind_sear = 0.5,
+          vampiric_touch = 0.5, psychic_scream = 0.5 }),
+
         upgrade = { mind_blast = 9.5, solace = 9.5, shadow_covenant = 9, sw_pain = 3 },
         remove = { smite = 0.5, inner_fire = 1.5 },
       },
@@ -693,7 +702,8 @@ ns.Classes.priest.bot.epic = function(exp, id)
   if not eb then return nil end
   local n = 0
   for _, cd in ipairs(exp.deck) do
-    local r = eb.rating[cd.id]
+    local r
+    if type(eb.rating) == "function" then r = eb.rating(exp, cd.id) else r = eb.rating[cd.id] end
     if r and r >= 7.5 then n = n + 1 end
   end
   return 7 + math.min(1.5, 0.25 * n)

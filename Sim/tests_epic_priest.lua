@@ -116,8 +116,13 @@ test("textes : les nombres affichés (carte et à-côté de ses mots de règle) 
   has("echo_of_light", false, "Each Regen heal: Sanctify.")
   has("echo_of_light", false, "starts with Regen " .. P.ECHO_START)
   eq(P.ECHO_PLUS[1], 0, "Echo of Light de base : la valeur seule")
-  has("shadow_covenant", false, "Life Tap " .. P.COVENANT_HP[1] .. ".")
-  has("shadow_covenant", false, ("Pay %d HP per mana instead of mana, +%d per Shadow card"):format(P.COVENANT_HP[1], P.COVENANT_STEP))
+  has("shadow_covenant", false, "Life Tap " .. P.COVENANT_HP[1] .. ", 1st free.")
+  has("shadow_covenant", false, ("Others cost mana while it lasts, then %d HP per mana, +%d per Shadow card"):format(P.COVENANT_HP[1], P.COVENANT_STEP))
+  has("prayer_of_mending", false, "Divine Star +" .. P.MENDING_UP[1] .. ".")
+  has("prayer_of_mending", false, "restored, +" .. P.MENDING_UP[1] .. ", to a random awake enemy")
+  has("misery", false, "Contagion +" .. P.MISERY_UP[1] .. ".")
+  has("misery", false, "every other awake enemy, +" .. P.MISERY_UP[1] .. ".")
+  has("echo_of_light", false, "Deal the Regen heal to all awake enemies")
   eq(P.REFLECT_PCT[1], 1 / 3); has("reflective_shield", false, "Reflect a third.")
   has("inner_focus", false, ("Empower %d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
   has("inner_focus", false, ("its values +%d%%"):format(math.floor((P.FOCUS_SCALE[1] - 1) * 100 + 0.5)))
@@ -127,18 +132,18 @@ test("textes : les nombres affichés (carte et à-côté de ses mots de règle) 
   for n = 1, 3 do
     local i = n + 1
     has("echo_of_light", n, "Sanctify +" .. P.ECHO_PLUS[i])
-    has("echo_of_light", n, "Deal the Regen heal +" .. P.ECHO_PLUS[i] .. " to all enemies")
+    has("echo_of_light", n, "Deal the Regen heal +" .. P.ECHO_PLUS[i] .. " to all awake enemies")
     has("shadow_covenant", n, "Life Tap " .. P.COVENANT_HP[i] .. ", " .. (P.COVENANT_FREE[i] == 1 and "1st" or P.COVENANT_FREE[i]) .. " free.")
-    has("shadow_covenant", n, ("are free, as stated. Others pay %d HP per mana, +%d"):format(P.COVENANT_HP[i], P.COVENANT_STEP))
+    has("shadow_covenant", n, ("Free as stated. Others cost mana while it lasts, then %d HP per mana, +%d"):format(P.COVENANT_HP[i], P.COVENANT_STEP))
     has("reflective_shield", n, "Reflect " .. REFLECT[n] .. ".")
     has("inner_focus", n, ("Empower %d%%"):format(math.floor((P.FOCUS_SCALE[i] - 1) * 100 + 0.5)))
     has("inner_focus", n, ("its values +%d%%"):format(math.floor((P.FOCUS_SCALE[i] - 1) * 100 + 0.5)))
     has("voidform", n, (P.VOID_FLAT[i] > 0 and ("+" .. P.VOID_FLAT[i] .. ", ") or "") .. "Madness " .. P.VOID_BONUS[i] .. ".")
     has("voidform", n, "+" .. P.VOID_BONUS[i] .. " damage per Insanity. Surge cards can't be played.")
     has("prayer_of_mending", n, "Divine Star +" .. P.MENDING_UP[i])
-    has("prayer_of_mending", n, "restored, +" .. P.MENDING_UP[i] .. ", to a random enemy")
+    has("prayer_of_mending", n, "restored, +" .. P.MENDING_UP[i] .. ", to a random awake enemy")
     has("misery", n, "Contagion +" .. P.MISERY_UP[i])
-    has("misery", n, "every other enemy, +" .. P.MISERY_UP[i] .. ".")
+    has("misery", n, "every other awake enemy, +" .. P.MISERY_UP[i] .. ".")
   end
   eq(P.REFLECT_PCT[2], 1 / 2); eq(P.REFLECT_PCT[3], 3 / 5); eq(P.REFLECT_PCT[4], 2 / 3)
 end)
@@ -162,25 +167,38 @@ end)
 ---------------------------------------------------------------------------
 -- Prayer of Mending
 ---------------------------------------------------------------------------
-test("Prayer of Mending : chaque soin inflige les PV rendus à un ennemi vivant au hasard", function()
+local M = P.MENDING_UP
+test("Prayer of Mending : chaque soin inflige les PV rendus + N à un ennemi vivant au hasard", function()
   local c = setup({ "flash_heal", "flash_heal" }, { hp = 50 })
   epic(c, "prayer_of_mending")
   play(c, "flash_heal")
-  eq(c.player.hp, 57); eq(c.enemies[1].hp, 93, "7 rendus = 7 dégâts")
+  eq(c.player.hp, 57); eq(c.enemies[1].hp, 100 - 7 - M[1], "7 rendus + N")
   play(c, "flash_heal")
-  eq(c.player.hp, 60); eq(c.enemies[1].hp, 90, "3 rendus seulement (plein)")
+  eq(c.player.hp, 60); eq(c.enemies[1].hp, 100 - 7 - 3 - 2 * M[1], "3 rendus seulement (plein)")
   Combat.heal(c, c.player, 5)
-  eq(c.enemies[1].hp, 90, "à pleine vie : rien")
+  eq(c.enemies[1].hp, 100 - 7 - 3 - 2 * M[1], "à pleine vie : rien")
 end)
 
-test("Prayer of Mending amélioré : + 2, seulement si un PV est rendu", function()
+test("Prayer of Mending : un dormeur (Asleep) n'est jamais tiré ; tous endormis : rien", function()
+  local c = setup({ "flash_heal", "flash_heal" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
+  epic(c, "prayer_of_mending")
+  c.enemies[1].st.asleep = 2
+  play(c, "flash_heal")
+  eq(c.enemies[1].hp, 100, "le dormeur n'est pas touché"); eq(c.enemies[1].st.asleep, 2)
+  eq(c.enemies[2].hp, 100 - 7 - M[1])
+  c.enemies[2].st.asleep = 2
+  play(c, "flash_heal")
+  eq(c.enemies[1].hp, 100); eq(c.enemies[2].hp, 100 - 7 - M[1], "tous endormis : aucun coup")
+end)
+
+test("Prayer of Mending amélioré : + N du palier, seulement si un PV est rendu", function()
   local c = setup({ "flash_heal" }, { hp = 50 })
   epic(c, "prayer_of_mending", true)
   play(c, "flash_heal")
-  eq(c.enemies[1].hp, 91, "7 + 2")
+  eq(c.enemies[1].hp, 100 - 7 - M[2], "7 + N")
   c.player.hp = c.player.maxHp
   Combat.heal(c, c.player, 4)
-  eq(c.enemies[1].hp, 91, "amélioré à pleine vie : rien")
+  eq(c.enemies[1].hp, 100 - 7 - M[2], "amélioré à pleine vie : rien")
 end)
 
 test("Prayer of Mending : toutes sources (tic de Regen, Atonement), coup sans carte (Sundered, pas Shadowform)", function()
@@ -189,14 +207,14 @@ test("Prayer of Mending : toutes sources (tic de Regen, Atonement), coup sans ca
   power(c, "shadowform")
   c.player.st.atonement = 2
   play(c, "solace", 1)
-  -- Solace 4 (holy, pas de bonus) + Atonement 2 rendus → 2 dégâts sans carte
-  eq(c.enemies[1].hp, 100 - 4 - 2)
+  -- Solace 4 (holy, pas de bonus) + Atonement 2 rendus → 2 + N dégâts sans carte
+  eq(c.enemies[1].hp, 100 - 4 - 2 - M[1])
   Combat.applyStatus(c, c.enemies[1], "armor_broken", 2)
   Combat.applyStatus(c, c.player, "regen", 4)
   local before = c.enemies[1].hp
   Combat.endTurn(c)
-  -- tic de Regen 4 : 4 rendus → 4 × 1,25 = 5
-  eq(before - c.enemies[1].hp, 5, "tic de Regen, Sundered")
+  -- tic de Regen 4 : 4 rendus + N → (4 + N) × 1,25, arrondi bas
+  eq(before - c.enemies[1].hp, math.floor((4 + M[1]) * 1.25), "tic de Regen, Sundered")
 end)
 
 test("Prayer of Mending : la cible tuée, le soin suivant en tire une autre ; dernière cible tuée = victoire", function()
@@ -216,16 +234,22 @@ end)
 ---------------------------------------------------------------------------
 local THREE = { "tp_dummy", "tp_dummy", "tp_dummy" }
 
-test("Misery : le DoT posé sur une cible va aussi à chaque autre ennemi vivant (amélioré : +1)", function()
+local MU = P.MISERY_UP
+test("Misery : le DoT posé sur une cible va aussi, + N, à chaque autre ennemi vivant et éveillé", function()
   local c = setup({ "sw_pain" }, { encounter = THREE })
   epic(c, "misery")
   c.enemies[3].dead = true
   play(c, "sw_pain", 1)
-  eq(c.enemies[1].st.pain, 5); eq(c.enemies[2].st.pain, 5); eq(c.enemies[3].st.pain, nil, "mort : rien")
+  eq(c.enemies[1].st.pain, 5); eq(c.enemies[2].st.pain, 5 + MU[1]); eq(c.enemies[3].st.pain, nil, "mort : rien")
   local u = setup({ "sw_pain" }, { encounter = THREE })
   epic(u, "misery", true)
   play(u, "sw_pain", 2)
-  eq(u.enemies[2].st.pain, 5); eq(u.enemies[1].st.pain, 6); eq(u.enemies[3].st.pain, 6)
+  eq(u.enemies[2].st.pain, 5); eq(u.enemies[1].st.pain, 5 + MU[2]); eq(u.enemies[3].st.pain, 5 + MU[2])
+  local s = setup({ "sw_pain" }, { encounter = THREE })
+  epic(s, "misery")
+  s.enemies[3].st.asleep = 2
+  play(s, "sw_pain", 1)
+  eq(s.enemies[2].st.pain, 5 + MU[1]); eq(s.enemies[3].st.pain, nil, "dormeur : rien"); eq(s.enemies[3].st.asleep, 2)
 end)
 
 test("Misery : valeur finale copiée (Shadowform compris), sans repasser par le crochet apply ni boucler", function()
@@ -233,7 +257,8 @@ test("Misery : valeur finale copiée (Shadowform compris), sans repasser par le 
   epic(c, "misery")
   power(c, "shadowform")
   play(c, "vampiric_touch", 1)
-  eq(c.enemies[1].st.pain, 6, "3 + 3"); eq(c.enemies[2].st.pain, 6, "copie de 6, pas 9"); eq(c.enemies[3].st.pain, 6)
+  eq(c.enemies[1].st.pain, 6, "3 + 3"); eq(c.enemies[2].st.pain, 6 + MU[1], "copie de 6 (+ N), pas 9")
+  eq(c.enemies[3].st.pain, 6 + MU[1])
 end)
 
 test("Misery : « to all » (Mind Sear) ne copie rien ; le DoT sur soi (Shadow Mend) non plus", function()
@@ -251,12 +276,15 @@ test("Misery : Surge de Devouring Plague, DoT de Holy Fire incantée, DoT hors c
   epic(c, "misery")
   c.player.res = 3
   play(c, "devouring_plague", 1)
-  eq(c.enemies[1].st.pain, 6); eq(c.enemies[2].st.pain, 6); eq(c.enemies[3].st.pain, 6)
+  eq(c.enemies[1].st.pain, 6); eq(c.enemies[2].st.pain, 6 + MU[1]); eq(c.enemies[3].st.pain, 6 + MU[1])
   play(c, "holy_fire", 2)
-  Combat.endTurn(c) -- les DoT tiquent (6 → 5), puis Holy Fire se résout : DoT 3 sur la cible et les autres
-  eq(c.enemies[2].st.pain, 8); eq(c.enemies[1].st.pain, 8); eq(c.enemies[3].st.pain, 8)
+  -- les DoT tiquent (baisse de 1), puis Holy Fire se résout : DoT 3 sur la cible, 3 + N sur les autres
+  Combat.endTurn(c)
+  eq(c.enemies[2].st.pain, 5 + MU[1] + 3); eq(c.enemies[1].st.pain, 5 + 3 + MU[1])
+  eq(c.enemies[3].st.pain, 5 + MU[1] + 3 + MU[1])
+  local e2 = c.enemies[2].st.pain
   Combat.applyStatus(c, c.enemies[1], "pain", 4)
-  eq(c.enemies[2].st.pain, 8, "pas une carte : pas de copie")
+  eq(c.enemies[2].st.pain, e2, "pas une carte : pas de copie")
 end)
 
 test("Misery : boss seul = un deck de DoT ordinaire", function()
@@ -315,6 +343,15 @@ test("Echo of Light : les autres soins soignent ; Sundered s'applique ; Spirit o
   eq(s.player.hp, 1, "sauvé, puis aucun soin"); eq(s.enemies[1].hp, 100 - 6 - EP[1], "Regen 6 frappe")
 end)
 
+test("Echo of Light : le tic épargne les dormeurs (Asleep)", function()
+  local c = setup({ "smite" }, { hp = 40, encounter = { "tp_dummy", "tp_dummy" } })
+  epic(c, "echo_of_light")
+  c.enemies[1].st.asleep = 3
+  local r = c.player.st.regen
+  Combat.endTurn(c)
+  eq(c.enemies[1].hp, 100, "le dormeur n'est pas touché"); eq(c.enemies[2].hp, 100 - r - EP[1])
+end)
+
 test("Echo of Light : un tic qui tue le dernier ennemi gagne le combat", function()
   local c = setup({ "smite" })
   epic(c, "echo_of_light")
@@ -329,66 +366,71 @@ end)
 ---------------------------------------------------------------------------
 local CH, CS = P.COVENANT_HP, P.COVENANT_STEP
 
-test("Shadow Covenant : une carte Shadow coûte 0 mana et des PV par point ; Holy et coût 0 inchangés", function()
-  local c = setup({ "mind_blast", "smite", "devouring_plague" }, { hp = 50 })
+test("Shadow Covenant : la première carte Shadow du tour est gratuite, les suivantes en mana tant qu'il suffit", function()
+  local c = setup({ "mind_blast", "mind_flay", "smite", "sw_pain" }, { hp = 50 })
   epic(c, "shadow_covenant")
   local i = hi(c, "mind_blast")
-  eq(Combat.cost(c, c.hand[i]), 0); eq(Combat.payHpOf(c, Card.def(c.hand[i]), c.hand[i]), CH[1])
+  eq(Combat.cost(c, c.hand[i]), 0); eq(Combat.payHpOf(c, Card.def(c.hand[i]), c.hand[i]), 0)
   play(c, "mind_blast", 1)
-  eq(c.player.mana, 3, "mana gardé"); eq(c.player.hp, 50 - CH[1], "PV payés")
-  play(c, "smite", 1)
-  eq(c.player.mana, 2, "Smite : 1 mana"); eq(c.player.hp, 50 - CH[1])
-  c.player.res = 2
-  play(c, "devouring_plague", 1)
-  eq(c.player.hp, 50 - CH[1], "coût 0 : aucun PV")
-end)
-
-test("Shadow Covenant : chaque carte Shadow du tour coûte N PV de plus que la précédente ; remis à zéro au tour suivant", function()
-  local c = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
-  epic(c, "shadow_covenant")
-  play(c, "mind_blast", 1)
-  eq(c.player.hp, 50 - CH[1], "première")
-  local i = hi(c, "mind_flay")
-  eq(Combat.payHpOf(c, Card.def(c.hand[i]), c.hand[i]), CH[1] + CS, "deuxième")
+  eq(c.player.mana, 3, "gratuite"); eq(c.player.hp, 50)
   play(c, "mind_flay", 1)
+  eq(c.player.mana, 2, "en mana"); eq(c.player.hp, 50)
+  play(c, "smite", 1)
+  eq(c.player.mana, 1, "Smite : 1 mana")
   play(c, "sw_pain", 1)
-  eq(c.player.hp, 50 - 3 * CH[1] - 3 * CS, "troisième : + 2 N")
+  eq(c.player.mana, 0, "en mana tant qu'il suffit"); eq(c.player.hp, 50)
   Combat.endTurn(c)
   c.hand[#c.hand + 1] = Card.new("sw_pain", false, 776)
-  local hpNow = c.player.hp
   play(c, "sw_pain", 1)
-  eq(hpNow - c.player.hp, CH[1], "nouveau tour : coût de départ")
+  eq(c.player.mana, 3, "nouveau tour : de nouveau gratuite")
+end)
+
+test("Shadow Covenant : sans assez de mana, N PV par mana + 1 par carte Shadow déjà jouée ; coût 0 inchangé", function()
+  local c = setup({ "mind_blast", "mind_flay", "sw_pain", "devouring_plague" }, { hp = 50 })
+  epic(c, "shadow_covenant")
+  play(c, "mind_blast", 1)
+  c.player.mana = 0
+  local i = hi(c, "mind_flay")
+  eq(Combat.cost(c, c.hand[i]), 0); eq(Combat.payHpOf(c, Card.def(c.hand[i]), c.hand[i]), CH[1] + CS, "deuxième")
+  play(c, "mind_flay", 1)
+  eq(c.player.hp, 50 - CH[1] - CS)
+  play(c, "sw_pain", 1)
+  eq(c.player.hp, 50 - 2 * CH[1] - 3 * CS, "troisième : + 2 N")
+  c.player.res = 2
+  local hp = c.player.hp
+  play(c, "devouring_plague", 1)
+  eq(c.player.hp, hp, "coût 0 : aucun PV")
 end)
 
 test("Shadow Covenant : le paiement ignore l'Absorb, compte comme une perte de PV, jamais mortel", function()
-  local c = setup({ "mind_flay", "mind_flay" }, { hp = CH[1] + 2 })
+  local c = setup({ "mind_blast", "mind_flay", "mind_flay" }, { hp = CH[1] + CS + 1 })
   epic(c, "shadow_covenant")
+  play(c, "mind_blast", 1)
+  c.player.mana = 0
   c.player.block = 10
   play(c, "mind_flay", 1)
-  eq(c.player.hp, 2); eq(c.player.block, 10)
+  eq(c.player.hp, 1); eq(c.player.block, 10)
   local ok, why = Combat.canPlay(c, hi(c, "mind_flay"))
   assert(not ok); eq(why, "hp", "ferait tomber à 0")
 end)
 
-test("Shadow Covenant amélioré : la première carte Shadow du tour ne coûte rien, la suivante paie", function()
+test("Shadow Covenant amélioré : les deux premières cartes Shadow du tour ne coûtent rien", function()
   local c = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
   epic(c, "shadow_covenant", true)
   play(c, "mind_blast", 1)
-  eq(c.player.hp, 50, "gratuite"); eq(c.player.mana, 3)
   play(c, "mind_flay", 1)
-  eq(c.player.hp, 50 - CH[2] - CS, "la suivante paie (une carte Shadow déjà jouée)")
-  Combat.endTurn(c)
-  c.hand[#c.hand + 1] = Card.new("sw_pain", false, 777)
-  local hpNow = c.player.hp
+  eq(c.player.hp, 50, "gratuites"); eq(c.player.mana, 3)
   play(c, "sw_pain", 1)
-  eq(c.player.hp, hpNow, "nouveau tour : de nouveau gratuite")
+  eq(c.player.mana, 2, "la troisième en mana")
 end)
 
 test("Shadow Covenant : tour gratuit (Spirit of Redemption) = ni mana ni PV ; coût final lu (Psychic Scream+ à 0)", function()
-  local c = setup({ "mind_blast", "psychic_scream" }, { hp = 50 })
+  local c = setup({ "mind_blast", "mind_flay", "psychic_scream" }, { hp = 50 })
   epic(c, "shadow_covenant")
-  c.player.flags.freeTurnActive = true
   play(c, "mind_blast", 1)
+  c.player.mana = 0
+  c.player.flags.freeTurnActive = true
+  play(c, "mind_flay", 1)
   eq(c.player.hp, 50)
   c.player.flags.freeTurnActive = nil
   c.hand[hi(c, "psychic_scream")] = Card.new("psychic_scream", true, 778)
@@ -592,19 +634,19 @@ test("paliers : chaque épique a ses paliers 2 et 3, tables { base, +1, +2, +3 }
     eq(Card.tiers(id), 3, id)
     eq(Card.defById(id, 3).name, ns.Cards[id].name .. "+3")
   end
-  eq(P.tier(P.MENDING_UP, { up = 3 }), 4); eq(P.tier(P.MENDING_UP, { up = true }), 2, "true = palier 1")
-  eq(P.tier(P.MENDING_UP, 2), 3); eq(P.tier(P.MENDING_UP, false), 0)
+  eq(P.tier(P.MENDING_UP, { up = 3 }), 5); eq(P.tier(P.MENDING_UP, { up = true }), 3, "true = palier 1")
+  eq(P.tier(P.MENDING_UP, 2), 4); eq(P.tier(P.MENDING_UP, false), 2)
   for _, t in ipairs({ P.MENDING_UP, P.MISERY_UP, P.ECHO_PLUS, P.COVENANT_HP, P.COVENANT_FREE, P.REFLECT_PCT,
     P.VOID_BONUS, P.VOID_FLAT, P.FOCUS_SCALE }) do
     eq(#t, 4, "quatre paliers")
   end
 end)
 
-test("paliers : Prayer of Mending +3 (+4), Misery +2 (+2), Echo of Light +3 (+4)", function()
+test("paliers : Prayer of Mending +3 (+5), Misery +2 (+4), Echo of Light +3 (+4)", function()
   local c = setup({ "flash_heal" }, { hp = 50 })
   epic(c, "prayer_of_mending", 3)
   play(c, "flash_heal")
-  eq(c.enemies[1].hp, 100 - 7 - P.MENDING_UP[4], "7 rendus + 4")
+  eq(c.enemies[1].hp, 100 - 7 - P.MENDING_UP[4], "7 rendus + 5")
   local m = setup({ "sw_pain" }, { encounter = THREE })
   epic(m, "misery", 2)
   play(m, "sw_pain", 1)
@@ -616,21 +658,21 @@ test("paliers : Prayer of Mending +3 (+4), Misery +2 (+2), Echo of Light +3 (+4)
   eq(e.enemies[1].hp, 100 - r - EP[4]); eq(e.enemies[2].hp, 100 - r - EP[4])
 end)
 
-test("paliers : Shadow Covenant +2 (1 PV par mana), +3 (deux cartes Shadow gratuites par tour)", function()
-  local c = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
+test("paliers : Shadow Covenant +2 (trois cartes Shadow gratuites par tour), +3 (quatre)", function()
+  local c = setup({ "mind_blast", "mind_flay", "sw_pain", "mind_blast" }, { hp = 50 })
   epic(c, "shadow_covenant", 2)
+  c.player.mana = 0
+  play(c, "mind_blast", 1); play(c, "mind_flay", 1); play(c, "sw_pain", 1)
+  eq(c.player.hp, 50, "trois gratuites")
   play(c, "mind_blast", 1)
-  eq(c.player.hp, 50, "la première : gratuite")
-  play(c, "mind_flay", 1)
-  eq(c.player.hp, 50 - CH[3] * 1 - CS, "la deuxième : 1 PV par mana + 2")
-  local u = setup({ "mind_blast", "mind_flay", "sw_pain" }, { hp = 50 })
+  eq(c.player.hp, 50 - CH[3] - 3 * CS, "la quatrième paie (trois cartes Shadow déjà jouées)")
+  local u = setup({ "mind_blast", "mind_flay", "sw_pain", "mind_blast" }, { hp = 50 })
   epic(u, "shadow_covenant", 3)
-  play(u, "mind_blast", 1)
-  play(u, "mind_flay", 1)
-  eq(u.player.hp, 50, "deux gratuites"); eq(u.player.mana, 3)
-  play(u, "sw_pain", 1)
-  eq(u.player.hp, 50 - CH[4] * 1 - 2 * CS, "la troisième paie (deux cartes Shadow déjà jouées)")
+  u.player.mana = 0
+  play(u, "mind_blast", 1); play(u, "mind_flay", 1); play(u, "sw_pain", 1); play(u, "mind_blast", 1)
+  eq(u.player.hp, 50, "quatre gratuites"); eq(u.player.mana, 0)
 end)
+
 
 test("paliers : Reflective Shield +2 (trois cinquièmes), +3 (deux tiers)", function()
   for n = 2, 3 do

@@ -6,14 +6,19 @@
 -- (src = c.epic = { id, up, uid }, passent après classe, Powers, bibelots et affixes), posés ici sur les
 -- définitions de Data/Priest.lua. Paliers (+1 à +3, docs/ameliorations.md) : nombres lus dans les tables
 -- { base, +1, +2, +3 } par Priest.tier(t, src) (Card.level(src)) ; entre parenthèses, +1 / +2 / +3.
---   prayer_of_mending : onHeal → PV rendus (+2 / +3 / +4) à un ennemi vivant tiré par c.rng.cards (coup sans carte).
---   misery            : un DoT posé par une carte sur SA cible (pas « to all ») est copié sur chaque autre
---                       ennemi vivant (+1 / +2 / +3), par Combat.applyStatus (sans le crochet apply, sans boucle).
+--   prayer_of_mending : onHeal → PV rendus + 2 (+3 / +4 / +5) à un ennemi vivant et éveillé tiré par c.rng.cards
+--                       (coup sans carte).
+--   misery            : un DoT posé par une carte sur SA cible (pas « to all ») est copié, + 2 (+3 / +4 / +5), sur
+--                       chaque autre ennemi vivant et éveillé, par Combat.applyStatus (sans le crochet apply, sans
+--                       boucle).
 --   echo_of_light     : whileInDeck → Regen 4 au début du combat ; regenHeal → 0 ; onRegenTick → la valeur
---                       (+2 / +3 / +4) à chaque ennemi vivant (sans carte).
---   shadow_covenant   : cost → 0 pour une carte Shadow de coût final N ≥ 1, payHp → + 2N (1N dès +2), + 2 par
---                       carte Shadow déjà jouée ce tour ; les premières cartes Shadow du tour ne coûtent rien
---                       (0 / 1 / 1 / 2).
+--                       (+2 / +3 / +4) à chaque ennemi vivant et éveillé (sans carte).
+--   shadow_covenant   : les premières cartes Shadow du tour (1 / 2 / 3 / 4) ne coûtent rien ; les autres se paient
+--                       en mana tant qu'il suffit ; sinon cost → 0 et payHp → N PV par mana (1 à tous les
+--                       paliers), + 1 par carte Shadow déjà jouée ce tour.
+--   Un dormeur (état Asleep du Swamp of Sorrows) n'est jamais visé par Prayer of Mending, Misery ni Echo of Light
+--   (le coup ou le DoT le réveillait : −10 à −20 points dans la zone au bot human ; 19/11/2026,
+--   docs/equilibrage.md, « Épiques : mesure une par une »).
 --   reflective_shield : afterHit → le tiers (la moitié / trois cinquièmes / deux tiers) de l'Absorb perdue sur ce
 --                       coup, au-dessous, à l'attaquant (sans carte).
 --   voidform          : canPlay → les cartes à Surge sont injouables ; damage → + 1 (+ 2) par Insanity par coup
@@ -54,13 +59,13 @@ Priest.EPICS = { "prayer_of_mending", "misery", "echo_of_light", "shadow_covenan
 -- « Épiques du Prêtre ») : Duskwood, Stranglethorn, Steppes contre epic=none, cible +8 à +14 par épique.
 -- Tables par palier { base, +1, +2, +3 } (paliers écrits à la main du 15/11/2026, docs/ameliorations.md), lues
 -- par Priest.tier(t, src) = t[Card.level(src) + 1].
-Priest.MENDING_UP = { 0, 2, 3, 4 } -- Prayer of Mending : + N par soin
-Priest.MISERY_UP = { 0, 1, 2, 3 }  -- Misery : + N par copie
+Priest.MENDING_UP = { 2, 3, 4, 5 } -- Prayer of Mending : + N par soin
+Priest.MISERY_UP = { 2, 3, 4, 5 }  -- Misery : + N par copie
 Priest.ECHO_START = 4              -- Echo of Light : Regen gagnée au début de chaque combat
 Priest.ECHO_PLUS = { 0, 2, 3, 4 }  -- Echo of Light : + N par tic
-Priest.COVENANT_HP = { 2, 2, 1, 1 } -- Shadow Covenant : PV par point de mana
-Priest.COVENANT_STEP = 2           -- Shadow Covenant : + N PV par carte Shadow déjà jouée ce tour
-Priest.COVENANT_FREE = { 0, 1, 1, 2 } -- Shadow Covenant : premières cartes Shadow du tour sans PV
+Priest.COVENANT_HP = { 1, 1, 1, 1 } -- Shadow Covenant : PV par point de mana
+Priest.COVENANT_STEP = 1           -- Shadow Covenant : + N PV par carte Shadow déjà jouée ce tour
+Priest.COVENANT_FREE = { 1, 2, 3, 4 } -- Shadow Covenant : premières cartes Shadow du tour sans PV
 Priest.REFLECT_PCT = { 1 / 3, 1 / 2, 3 / 5, 2 / 3 } -- Reflective Shield : part de l'Absorb perdue renvoyée, au-dessous
 Priest.VOID_BONUS = { 1, 2, 2, 2 } -- Voidform : dégâts en plus par point d'Insanity, par coup Shadow
 Priest.VOID_FLAT = { 0, 0, 2, 4 }  -- Voidform : dégâts fixes en plus par coup Shadow
@@ -77,19 +82,19 @@ Priest.VOIDFORM_REASON = "Voidform: Surge cards can't be played."
 
 -- Mots de règle des épiques (L.rule) : la carte dit « Déclencheur: Mot N. », l'à-côté la règle complète (mêmes
 -- nombres que les réglages ci-dessus ; base, puis améliorée).
-L.rule("divineStar", { name = "Divine Star",
-  text = "Deal the HP actually restored to a random enemy. Every heal counts, Regen heals too.",
-  upText = "Deal the HP actually restored, +N, to a random enemy. Every heal counts, Regen heals too." })
-L.rule("contagion", { name = "Contagion",
-  text = "A DoT a card applies to its target also goes to every other enemy.",
-  upText = "A DoT a card applies to its target also goes to every other enemy, +N." })
+-- (19/11/2026 : Divine Star et Contagion ont un nombre dès la base ; les dormeurs sont épargnés)
+local DIVINE = "Deal the HP actually restored, +N, to a random awake enemy. Every heal counts, Regen heals too."
+L.rule("divineStar", { name = "Divine Star", text = DIVINE, upText = DIVINE })
+local CONTAGION = "A DoT a card applies to its target also goes to every other awake enemy, +N."
+L.rule("contagion", { name = "Contagion", text = CONTAGION, upText = CONTAGION })
 L.rule("sanctify", { name = "Sanctify",
-  text = "Deal the Regen heal to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. ".",
-  upText = "Deal the Regen heal +N to all enemies instead of healing. Each combat starts with Regen " .. Priest.ECHO_START .. "." })
-L.rule("lifeTap", { name = "Life Tap",
-  text = "Pay N HP per mana instead of mana, +" .. Priest.COVENANT_STEP .. " per Shadow card played before this turn.",
-  upText = "The first ones each turn are free, as stated. Others pay N HP per mana, +"
-    .. Priest.COVENANT_STEP .. " per Shadow card before." })
+  text = "Deal the Regen heal to all awake enemies instead of healing. Each combat starts with Regen "
+    .. Priest.ECHO_START .. ".",
+  upText = "Deal the Regen heal +N to all awake enemies instead of healing. Each combat starts with Regen "
+    .. Priest.ECHO_START .. "." })
+local LIFE_TAP = "Free as stated. Others cost mana while it lasts, then N HP per mana, +" .. Priest.COVENANT_STEP
+  .. " per Shadow card before."
+L.rule("lifeTap", { name = "Life Tap", text = LIFE_TAP, upText = LIFE_TAP })
 L.rule("reflect", { name = "Reflect",
   text = "Deal that part of the Absorb lost on the hit to the attacker, rounded down." })
 L.rule("madness", { name = "Madness", text = "+N damage per Insanity. Surge cards can't be played." })
@@ -112,6 +117,10 @@ end
 
 -- Coup sans carte du Prêtre (comme Retaliation) : Sundered de la cible, Demoralized du Prêtre ; ni
 -- Atonement, ni Shadowform, aucune boucle.
+-- Un dormeur (état Asleep du Swamp of Sorrows) n'est jamais visé par un coup ou un DoT automatique d'une épique.
+local function awake(e) return not e.dead and (e.st.asleep or 0) <= 0 end
+Priest.awake = awake
+
 local function strike(c, e, n)
   if n <= 0 or e.dead or c.result then return end
   Combat.dealDamage(c, c.player, e, Combat.calcDamage(c, c.player, e, n))
@@ -160,7 +169,10 @@ local H = {}
 H.prayer_of_mending = {
   onHeal = function(c, src, n)
     if not n or n < 1 or c.result then return end
-    local list = Combat.aliveEnemies(c)
+    local list = {}
+    for i = 1, #c.enemies do
+      if awake(c.enemies[i]) then list[#list + 1] = c.enemies[i] end
+    end
     if #list == 0 then return end
     local e = list[Rng.int(c.rng.cards, 1, #list)]
     strike(c, e, n + Priest.tier(Priest.MENDING_UP, src))
@@ -181,7 +193,7 @@ H.misery = {
     local v = n + Priest.tier(Priest.MISERY_UP, src)
     for i = 1, #c.enemies do
       local o = c.enemies[i]
-      if o ~= unit and not o.dead then Combat.applyStatus(c, o, "pain", v) end
+      if o ~= unit and awake(o) then Combat.applyStatus(c, o, "pain", v) end
     end
     cls.miseryBusy = nil
   end,
@@ -194,7 +206,7 @@ H.echo_of_light = {
     local v = n + Priest.tier(Priest.ECHO_PLUS, src)
     for i = 1, #c.enemies do
       if c.result then return end
-      strike(c, c.enemies[i], v)
+      if awake(c.enemies[i]) then strike(c, c.enemies[i], v) end
     end
   end,
 }
@@ -203,17 +215,20 @@ local function covenantFree(c, src)
   return (c.turn.bySchool.shadow or 0) < Priest.tier(Priest.COVENANT_FREE, src)
 end
 
--- PV d'une carte Shadow de coût final n ≥ 1 : 2 par point (1 dès le palier 2), + 2 par carte Shadow déjà jouée
--- ce tour. up : palier de l'épique (valeur up ou instance).
+-- PV d'une carte Shadow de coût final n ≥ 1 payée en PV : COVENANT_HP par point, + COVENANT_STEP par carte Shadow
+-- déjà jouée ce tour. up : palier de l'épique (valeur up ou instance).
+
 function Priest.covenantHp(c, up, n)
   return Priest.tier(Priest.COVENANT_HP, up) * n + Priest.COVENANT_STEP * (c.turn.bySchool.shadow or 0)
 end
 
 H.shadow_covenant = {
   cost = function(c, src, v, d)
-    if c.cls.peek or not v or d.school ~= "shadow" then return v end
-    if v >= 1 then return 0 end
-    return v
+    if c.cls.peek or not v or d.school ~= "shadow" or v < 1 then return v end
+    -- la première (les premières) du tour : gratuite ; les autres : en mana tant qu'il suffit, sinon en PV
+    if covenantFree(c, src) or c.player.flags.freeTurnActive then return 0 end
+    if v <= (c.player.mana or 0) then return v end
+    return 0
   end,
   -- coût final en mana (autres Powers et bibelots compris) relu sans la conversion : Priest.covenantHp
   payHp = function(c, src, v, d, inst)
@@ -222,7 +237,7 @@ H.shadow_covenant = {
     c.cls.peek = true
     local n = math.max(0, Combat.modify(c, "cost", d.cost, d, inst))
     c.cls.peek = nil
-    if n >= 1 then return v + Priest.covenantHp(c, src.up, n) end
+    if n >= 1 and n > (c.player.mana or 0) then return v + Priest.covenantHp(c, src.up, n) end
     return v
   end,
 }
