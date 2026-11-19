@@ -13450,6 +13450,15 @@ do
   for _, k in ipairs({ "GetCameraPosition", "GetCameraTarget", "SetCameraPosition", "SetCameraTarget" }) do rawset(m, k, nil) end
   local _ = c0
 end
+-- Talents (docs/talents.md, § 11) : Sim/ui_talents.lua (return function(T) … end ; même T que les zones).
+print("UTL talents : onglet Talents (neuf, 15 points, plein, classe sans arbre, en expédition), infobulles, Specialization, remboursement, panneau du deck, Veteran's Arsenal au départ, bilan, accueil, migration v8")
+do
+  local R = dofile(root .. "/Sim/ui_render.lua")
+  R.H = H
+  dofile(root .. "/Sim/ui_talents.lua")({ H = H, check = check, snap = snap, root = root, SEED = SEED, UI = UI,
+    EXP = EXP, button = button, clickOption = clickOption, option = option, currentKind = currentKind, R = R })
+end
+
 print("U16 méthodes d'API inconnues appelées")
 local names = {}
 for k in pairs(H.unknown) do names[#names + 1] = k end
