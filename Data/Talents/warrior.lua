@@ -11,15 +11,15 @@ local floor, min, max = math.floor, math.min, math.max
 local WT = {
   hp = 4,              -- Toughness : PV max par rang
   ready = 1,           -- Battle Ready : Rage au début de chaque combat, par rang
-  wind = 1,            -- Second Wind : soin par Rage restante après un combat gagné, par rang
+  windDiv = { 5, 4 },  -- Second Wind : soin de 1 par windDiv[rang] Rage restante après un combat gagné
   wrath = 1,           -- Unbridled Wrath : plafond de Rage, par rang
-  shieldDiv = { 2, 1 }, -- Anger Shield : 1 Absorb par shieldDiv[rang] Rage à la fin du tour
+  shieldDiv = { 5, 4 }, -- Anger Shield : 1 Absorb par shieldDiv[rang] Rage à la fin du tour
   sunder = 0.25,       -- Specialization Arms : Sundered +25 % de plus (× 1,5 au lieu de × 1,25)
-  furyAt = 3,          -- Specialization Fury : Rage à partir de laquelle les Attacks frappent plus fort
+  furyAt = 5,          -- Specialization Fury : Rage à partir de laquelle les Attacks frappent plus fort
   furyBonus = 1,       --   … de tant par coup
   protBonus = 2,       -- Specialization Protection : Absorb de plus par carte qui en donne
   carry = 2,           -- Tactical Mastery : Rage gardée d'un combat au suivant, par rang
-  drink = 1,           -- Blood Drinker : soin à chaque dépense de Rage, par rang
+  drink = 1,           -- Blood Drinker : soin à chaque dépense de Rage (rang 1 : Spend payé ; rang 2 : Surge aussi)
   rampageAt = 5,       -- Rampage : Rage au début du tour pour +1 mana (rang 2 : et une carte)
   saveRage = 5,        -- Unyielding : Rage donnée en évitant la mort
   saveAbsorb = 15,     --   rang 2 : Absorb donnée
@@ -28,6 +28,10 @@ ns.WarriorTalents = WT
 
 -- Rage restante du héros.
 local function rage(c) return c.player.res or 0 end
+-- « per Rage » / « per 2 Rage » (textes).
+local function perRage(n) return n == 1 and "per Rage" or ("per %d Rage"):format(n) end
+-- Soin de Second Wind pour cette Rage restante, au rang r.
+local function windHeal(res, r) return floor(res / WT.windDiv[r]) end
 
 local nodes = {
   -- Rangée 1 (ouverte d'emblée) ----------------------------------------------------------------------------------
@@ -41,24 +45,23 @@ local nodes = {
     } },
   -- (soin hors combat, après que l'expédition a repris les PV du combat ; crochet healOut compris)
   { id = "second_wind", row = 1, ranks = 2, name = "Second Wind", icon = "ability_warrior_renewedvigor",
-    text = { ("After a combat won: heal %d per Rage you have."):format(WT.wind),
-      ("After a combat won: heal %d per Rage you have."):format(2 * WT.wind) },
+    text = { ("After a combat won: heal 1 %s you have."):format(perRage(WT.windDiv[1])),
+      ("After a combat won: heal 1 %s you have."):format(perRage(WT.windDiv[2])) },
     run = {
       onCombatWon = function(exp, src, kind, fight, c)
-        local n = c and rage(c) * WT.wind * src.rank or 0
+        local n = c and windHeal(rage(c), src.rank) or 0
         if n > 0 then ns.Expedition.healOut(exp, n) end
       end,
     },
-    bot = { won = function(c, src) return min(rage(c) * WT.wind * src.rank, c.player.maxHp - c.player.hp) end } },
+    bot = { won = function(c, src) return min(windHeal(rage(c), src.rank), c.player.maxHp - c.player.hp) end } },
 
   -- Rangée 2 (5 points) -----------------------------------------------------------------------------------------
   { id = "unbridled_wrath", row = 2, ranks = 2, name = "Unbridled Wrath", icon = "ability_warrior_endlessrage",
     text = { ("Rage cap +%d."):format(WT.wrath), ("Rage cap +%d."):format(2 * WT.wrath) },
     hooks = { resCap = function(c, src, v) return v + WT.wrath * src.rank end } },
   { id = "anger_shield", row = 2, ranks = 2, name = "Anger Shield", icon = "ability_warrior_defensivestance",
-    text = { ("End of turn: gain 1 Absorb per %d Rage."):format(WT.shieldDiv[1]),
-      WT.shieldDiv[2] == 1 and "End of turn: gain 1 Absorb per Rage."
-        or ("End of turn: gain 1 Absorb per %d Rage."):format(WT.shieldDiv[2]) },
+    text = { ("End of turn: gain 1 Absorb %s."):format(perRage(WT.shieldDiv[1])),
+      ("End of turn: gain 1 Absorb %s."):format(perRage(WT.shieldDiv[2])) },
     hooks = {
       onTurnEnd = function(c, src)
         local n = floor(rage(c) / WT.shieldDiv[src.rank])
@@ -118,12 +121,12 @@ local nodes = {
     },
     bot = { won = function(c, src) return min(rage(c), WT.carry * src.rank) end } },
   { id = "blood_drinker", row = 3, ranks = 2, name = "Blood Drinker", icon = "ability_racial_bloodrage",
-    text = { ("Each time you spend Rage: heal %d."):format(WT.drink),
-      ("Each time you spend Rage: heal %d."):format(2 * WT.drink) },
+    text = { ("Each time you pay a Spend cost: heal %d."):format(WT.drink),
+      ("Each time you spend Rage: heal %d."):format(WT.drink) },
     hooks = {
       onResource = function(c, src, delta, why)
-        if delta < 0 and (why == "spend" or why == "surge") and not c.result then
-          Combat.heal(c, c.player, WT.drink * src.rank)
+        if delta < 0 and (why == "spend" or (why == "surge" and src.rank >= 2)) and not c.result then
+          Combat.heal(c, c.player, WT.drink)
         end
       end,
     } },
@@ -179,5 +182,11 @@ ns.Talent.define("warrior", {
       "rampage", "rampage", "veterans_arsenal", "veterans_arsenal", "unyielding", "unyielding",
     },
     spec = "fury",
+    -- accord des épiques avec l'arbre (note du bot, Sim/expedition.lua) : Thunderous Roar vide la Rage à 5 (que
+    -- Unbridled Wrath, Anger Shield, Rampage et la Specialization Fury gardent) ; Death Wish interdit l'Absorb (Anger
+    -- Shield) ; Avatar monte le plafond ; Titan's Grip et Shield Charge sont les plus fortes seules (docs/equilibrage.md,
+    -- « Épiques : mesure une par une »). Sans ces écarts, le bot prenait Thunderous Roar au départ (Veteran's Arsenal)
+    -- et l'arbre plein gagnait moins que l'arbre à 80 %.
+    epic = { thunderous_roar = -4, death_wish = -2, avatar = 1, titans_grip = 2, shield_charge = 1 },
   },
 })

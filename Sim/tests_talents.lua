@@ -354,9 +354,9 @@ test("API de lecture : rangées, rangs, textes, voies, points restants, expédit
   local spec = v.rows[3].nodes[1]
   eq(spec.id, "specialization"); eq(#spec.choices, 3); eq(spec.choices[1].active, false); eq(spec.why, "row")
   eq(Talent.view(meta, "warrior", true).rows[2].nodes[1].why, "running")
-  eq(Talent.rankText("warrior", "anger_shield", 2), "End of turn: gain 1 Absorb per Rage.")
+  eq(Talent.rankText("warrior", "anger_shield", 2), ("End of turn: gain 1 Absorb per %d Rage."):format(WT.shieldDiv[2]))
   eq(Talent.rankText("warrior", "specialization", 1, "fury"),
-    "While you have 3 Rage or more, Attacks deal 1 more per hit.")
+    ("While you have %d Rage or more, Attacks deal %d more per hit."):format(WT.furyAt, WT.furyBonus))
   eq(#Talent.view(meta, "priest").rows, 0, "classe sans arbre : vue vide")
 end)
 
@@ -469,19 +469,24 @@ test("Battle Ready : +1 Rage par rang au début du combat (avec Battle Standard)
   eq(wcombat(nil).player.res, 0)
 end)
 
-test("Second Wind : soin de 1 (2) par Rage restante après un combat gagné", function()
+test("Second Wind : soin de 1 par windDiv[rang] Rage restante après un combat gagné", function()
   for r = 1, 2 do
-    local e = wexp({ second_wind = r })
-    enter(e, "combat")
-    e.combat.player.hp, e.combat.player.res = 30, 4
-    winCombat(e)
-    eq(e.phase, "reward")
-    eq(e.hp, 30 + 4 * WT.wind * r, "rang " .. r)
+    for _, res in ipairs({ 3, 5 }) do
+      local e = wexp({ second_wind = r })
+      enter(e, "combat")
+      e.combat.player.hp, e.combat.player.res = 30, res
+      winCombat(e)
+      eq(e.phase, "reward")
+      eq(e.hp, 30 + math.floor(res / WT.windDiv[r]), "rang " .. r .. ", " .. res .. " Rage")
+    end
   end
+  eq(ns.Talents.warrior.byId.second_wind.text[1], ("After a combat won: heal 1 per %d Rage you have."):format(WT.windDiv[1]))
   local c = wcombat({ second_wind = 2 })
-  c.player.hp, c.player.res, c.result = 59, 5, "won"
-  -- bots : un combat gagné à 5 Rage vaut le soin, borné aux PV manquants
-  eq(ns.Talent.part("warrior", c.talents[1]).bot.won(c, c.talents[1]), 1)
+  c.player.hp, c.player.res, c.result = 40, 8, "won"
+  -- bots : un combat gagné avec de la Rage vaut le soin, borné aux PV manquants
+  eq(ns.Talent.part("warrior", c.talents[1]).bot.won(c, c.talents[1]), math.floor(8 / WT.windDiv[2]))
+  c.player.hp = 60
+  eq(ns.Talent.part("warrior", c.talents[1]).bot.won(c, c.talents[1]), 0)
 end)
 
 test("Unbridled Wrath : plafond de Rage +1 par rang (Avatar garde 10)", function()
@@ -495,21 +500,23 @@ test("Unbridled Wrath : plafond de Rage +1 par rang (Avatar garde 10)", function
   eq(Combat.resCap(av), 10)
 end)
 
-test("Anger Shield : fin du tour, 1 Absorb par 2 Rage (rang 2 : par Rage)", function()
-  for r, want in ipairs({ 2, 5 }) do
-    local c = wcombat({ anger_shield = r })
-    c.player.res = 5
-    Combat.endPlayerTurn(c)
-    eq(c.player.block, want, "rang " .. r)
+test("Anger Shield : fin du tour, 1 Absorb par shieldDiv[rang] Rage", function()
+  for r = 1, 2 do
+    for _, res in ipairs({ 3, 5, 7 }) do
+      local c = wcombat({ anger_shield = r, unbridled_wrath = 2 })
+      c.player.res = res
+      Combat.endPlayerTurn(c)
+      eq(c.player.block, math.floor(res / WT.shieldDiv[r]), "rang " .. r .. ", " .. res .. " Rage")
+    end
   end
-  local c = wcombat({ anger_shield = 2 }, nil, { encounter = { "tt_hitter" } })
-  c.player.res = 4
+  local c = wcombat({ anger_shield = 2, unbridled_wrath = 2 }, nil, { encounter = { "tt_hitter" } })
+  c.player.res = 7
   local hp = c.player.hp
   Combat.endTurn(c)
-  eq(hp - c.player.hp, 10 - 4, "l'Absorb tient pendant le tour ennemi")
+  eq(hp - c.player.hp, 10 - math.floor(7 / WT.shieldDiv[2]), "l'Absorb tient pendant le tour ennemi")
 end)
 
-test("Specialization : Arms (Sundered × 1,5), Fury (+1 par coup à 3 Rage), Protection (+2 Absorb par carte)", function()
+test("Specialization : Arms (Sundered × 1,5), Fury (+1 par coup à 5 Rage), Protection (+2 Absorb par carte)", function()
   local strike = ns.Cards.strike
   local arms = wcombat({ specialization = 1 }, "arms")
   local e = arms.enemies[1]
@@ -520,10 +527,10 @@ test("Specialization : Arms (Sundered × 1,5), Fury (+1 par coup à 3 Rage), Pro
   eq(Combat.calcDamage(plain, plain.player, plain.enemies[1], 10, strike), 12)
   local fury = wcombat({ specialization = 1 }, "fury")
   local fe = fury.enemies[1]
-  fury.player.res = 2
+  fury.player.res = WT.furyAt - 1
   eq(Combat.calcDamage(fury, fury.player, fe, 6, strike), 6)
-  fury.player.res = 3
-  eq(Combat.calcDamage(fury, fury.player, fe, 6, strike), 7)
+  fury.player.res = WT.furyAt
+  eq(Combat.calcDamage(fury, fury.player, fe, 6, strike), 6 + WT.furyBonus)
   eq(Combat.calcDamage(fury, fury.player, fe, 6, nil), 6, "coup sans carte")
   eq(Combat.calcDamage(fury, fury.player, fe, 6, ns.Cards.defend), 6, "Skill")
   local prot = wcombat({ specialization = 1 }, "protection", { deck = { "defend", "defend", "defend", "defend",
@@ -556,13 +563,17 @@ test("Tactical Mastery : Rage gardée (2 par rang) d'un combat gagné au suivant
   eq(e2.talentState.rage, 2 * WT.carry)
 end)
 
-test("Blood Drinker : soin de 1 (2) à chaque dépense de Rage (Spend, Surge), pas au gain", function()
+test("Blood Drinker : soin de 1 à chaque Spend payé (rang 2 : et à chaque Surge), pas au gain", function()
+  local c1 = wcombat({ blood_drinker = 1 })
+  c1.player.hp, c1.player.res = 30, 5
+  assert(Combat.spendRes(c1, 2)); eq(c1.player.hp, 30 + WT.drink)
+  Combat.surge(c1); eq(c1.player.hp, 30 + WT.drink, "rang 1 : pas au Surge")
   local c = wcombat({ blood_drinker = 2 })
   c.player.hp, c.player.res = 30, 5
-  assert(Combat.spendRes(c, 2)); eq(c.player.hp, 32)
-  Combat.surge(c); eq(c.player.hp, 34)
-  Combat.gainRes(c, 3); eq(c.player.hp, 34)
-  Combat.gainRes(c, -1, "decay"); eq(c.player.hp, 34, "autre perte de Rage : rien")
+  assert(Combat.spendRes(c, 2)); eq(c.player.hp, 30 + WT.drink)
+  Combat.surge(c); eq(c.player.hp, 30 + 2 * WT.drink)
+  Combat.gainRes(c, 3); eq(c.player.hp, 30 + 2 * WT.drink)
+  Combat.gainRes(c, -1, "decay"); eq(c.player.hp, 30 + 2 * WT.drink, "autre perte de Rage : rien")
 end)
 
 test("Rampage : à 5 Rage au début du tour, +1 mana (rang 2 : et une carte)", function()

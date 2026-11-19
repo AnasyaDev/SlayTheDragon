@@ -14,8 +14,8 @@ function TC.toughness(o)
   local hp, ranks = o.hp, o.ranks or 3
   local text = {}
   for r = 1, ranks do text[r] = ("+%d max HP."):format(hp * r) end
-  return { id = "toughness", row = o.row or 1, ranks = ranks, name = "Toughness", icon = "spell_holy_devotion",
-    hp = hp, text = text,
+  return { id = "toughness", row = o.row or 1, ranks = ranks, name = "Toughness",
+    icon = "spell_nature_unyeildingstamina", hp = hp, text = text,
     run = { startMaxHp = function(exp, src, v) return v + hp * src.rank end } }
 end
 
