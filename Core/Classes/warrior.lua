@@ -62,8 +62,9 @@ ns.ClassRules.warrior = {
 -- « Épiques du Guerrier ») : ce tableau seul ; les textes de Data/Warrior.lua les disent (vérifié par
 -- Sim/tests_epic_warrior.lua). Écarts à la fiche : Thunderous Roar 3 sans Demoralized, amélioré 4 + Demoralized 1
 -- (Demoralized de base : +15 à +22 points quel que soit le nombre) ; Titan's Grip deux Attacks par tour comme la
--- fiche, mais chacune coûte 1 de plus (extraCost ; sans ce coût, 100 % de victoires) ; Sweeping Strikes au tiers
--- (moitié : Duskwood +22) ; Shield Charge au quart ;
+-- fiche, mais chacune coûte 1 de plus (extraCost ; sans ce coût, 100 % de victoires) ; Sweeping Strikes à la
+-- moitié vers deux autres ennemis éveillés (19/11/2026 : au tiers vers un seul, elle ne gagnait rien dans les zones
+-- 4 à 7 ; docs/equilibrage.md, « Épiques : mesure une par une ») ; Shield Charge au quart ;
 -- Anger Management chaque Rage, et les cartes qui dépensent partent en recharge 1 (give : débouché du deck de
 -- départ) ; Avatar +2 / +3 et, à 10 Rage, Attacks +1 (over, bonus : débouché de la Rage gardée).
 -- demoralized = 0 : pas d'état posé ; selfStates = faux (repli de la fiche, non retenu) : la copie de Titan's Grip
@@ -74,7 +75,7 @@ ns.ClassRules.warrior = {
 Warrior.EPIC = {
   death_wish = { mult = { 1.5, 1.5, 1.5, 1.6 }, heal = { 0, 3, 5, 5 } },
   thunderous_roar = { at = 5, damage = { 3, 4, 5, 6 }, demoralized = { 0, 1, 1, 1 } },
-  sweeping_strikes = { targets = { 1, 2, 2, 2 }, div = 3, anyAttack = { false, false, true, true }, killRage = { 0, 0, 0, 1 } },
+  sweeping_strikes = { targets = { 2, 3, 3, 3 }, div = 2, anyAttack = { false, false, true, true }, killRage = { 0, 0, 0, 1 } },
   titans_grip = { limit = 2, extraCost = 1, copies = 1, selfStates = true, killHeal = { 0, 0, 4, 6 } },
   shield_charge = { div = 4, bonus = { 0, 4, 6, 8 } },
   anger_management = { per = 1, steps = { 1, 2, 3, 4 }, give = 1 },
@@ -134,7 +135,7 @@ do
   L.rule("shockwave", { name = "Shockwave", text = roar(T.demoralized[1]), upText = roar(T.demoralized[2]) })
   local S = E.sweeping_strikes
   local function sweep(n)
-    return "Also hit " .. (n == 1 and "another random enemy" or (n .. " other random enemies")) .. " for "
+    return "Also hit " .. (n == 1 and "another random awake enemy" or (n .. " other random awake enemies")) .. " for "
       .. (FRAC[S.div] or ("1/" .. S.div)) .. " of the HP the target lost, rounded down."
   end
   L.rule("sweep", { name = "Sweep", text = sweep(S.targets[1]), upText = sweep(S.targets[2]) })
@@ -249,9 +250,9 @@ do
   attach("thunderous_roar", hooks)
 end
 
--- Wetlands — Sweeping Strikes : chaque coup d'une carte Attack à cible inflige aussi le tiers (E.div) des PV qu'il
--- a fait perdre (arrondi à l'inférieur) à un autre ennemi vivant tiré par c.rng.cards (amélioré : deux,
--- sans remise). Le rebond est un coup sans carte (ctx nil) : ni Rage, ni Deep Wounds, ni nouveau rebond.
+-- Wetlands — Sweeping Strikes : chaque coup d'une carte Attack à cible inflige aussi la moitié (E.div) des PV qu'il
+-- a fait perdre (arrondi à l'inférieur) à deux autres ennemis vivants tirés par c.rng.cards, sans remise
+-- (amélioré : trois) ; un dormeur (état Asleep du Swamp of Sorrows) n'est jamais tiré : le rebond le réveillait. Le rebond est un coup sans carte (ctx nil) : ni Rage, ni Deep Wounds, ni nouveau rebond.
 -- Paliers 2 et 3 : « Attacks: Sweep 2. », les Attacks à tous rebondissent aussi (depuis chaque ennemi touché) ; palier 3 :
 -- chaque ennemi tué donne +1 Rage.
 attach("sweeping_strikes", {
@@ -264,7 +265,7 @@ attach("sweeping_strikes", {
     local others = {}
     for i = 1, #c.enemies do
       local e = c.enemies[i]
-      if e ~= t and not e.dead then others[#others + 1] = e end
+      if e ~= t and not e.dead and (e.st.asleep or 0) <= 0 then others[#others + 1] = e end
     end
     for _ = 1, num("sweeping_strikes", "targets", src) do
       if #others == 0 or c.result then return end

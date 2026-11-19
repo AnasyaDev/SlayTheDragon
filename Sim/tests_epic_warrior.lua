@@ -120,8 +120,8 @@ test("textes : les nombres de Warrior.EPIC (carte et à-côté de ses mots de r�
     else hasNot("thunderous_roar", up, "Demoralized") end
     local tg = N("sweeping_strikes", "targets", up)
     has("sweeping_strikes", up, (N("sweeping_strikes", "anyAttack", up) and "\nAttacks: Sweep " or "Targeted Attack hits: Sweep ") .. tg .. ".")
-    has("sweeping_strikes", up, tg == 1 and "Also hit another random enemy" or ("Also hit " .. tg .. " other random enemies"))
-    has("sweeping_strikes", up, "for a third of the HP")
+    has("sweeping_strikes", up, tg == 1 and "Also hit another random awake enemy" or ("Also hit " .. tg .. " other random awake enemies"))
+    has("sweeping_strikes", up, "for half of the HP")
     eq(tonumber(kills("sweeping_strikes", up, "%+") or 0), N("sweeping_strikes", "killRage", up), "Sweeping Strikes" .. lab(up))
     has("titans_grip", up, "Dual Wield " .. E.titans_grip.limit)
     has("titans_grip", up, "Attacks cost " .. E.titans_grip.extraCost .. " more and resolve twice, at most "
@@ -144,7 +144,7 @@ test("textes : les nombres de Warrior.EPIC (carte et à-côté de ses mots de r�
     has("avatar", up, "at " .. E.avatar.cap .. " Rage Attacks deal " .. E.avatar.bonus .. " more.")
   end
   eq(N("death_wish", "mult"), 1.5)
-  eq(E.sweeping_strikes.div, 3)
+  eq(E.sweeping_strikes.div, 2)
   eq(E.titans_grip.copies, 1, "« resolve twice »")
   has("titans_grip", 1, "Dual Wield " .. E.titans_grip.limit .. ", 0-cost free.")
   for _, up in ipairs({ 1, 2, 3 }) do has("titans_grip", up, "0-cost ones skip the cost and limit.") end
@@ -303,10 +303,10 @@ end)
 ---------------------------------------------------------------------------
 -- Wetlands — Sweeping Strikes
 ---------------------------------------------------------------------------
-local function third(n) return math.floor(n / E.sweeping_strikes.div) end
+local function third(n) return math.floor(n / E.sweeping_strikes.div) end -- la moitié depuis le 19/11/2026
 
-test("Sweeping Strikes : un coup à cible rebondit pour le tiers des PV perdus (arrondi à l'inférieur), sans Rage", function()
-  eq(E.sweeping_strikes.div, 3, "« for a third »")
+test("Sweeping Strikes : un coup à cible rebondit pour la moitié des PV perdus (arrondi à l'inférieur), sans Rage", function()
+  eq(E.sweeping_strikes.div, 2, "« for half »")
   local c = setup({ "strike", "raging_blow" }, { epic = "sweeping_strikes", encounter = { "tw_dummy", "tw_dummy" } })
   local b = c.enemies[2].hp
   assert(play(c, "strike", 1))
@@ -315,7 +315,7 @@ test("Sweeping Strikes : un coup à cible rebondit pour le tiers des PV perdus (
   c.enemies[1].block = 4
   assert(play(c, "raging_blow", 1))
   -- premier coup : 5 - 4 absorbés = 1 PV perdu (rien), second : 5
-  eq(c.enemies[2].hp, b - third(6) - third(1) - third(5), "tiers des PV réellement perdus, un rebond par coup")
+  eq(c.enemies[2].hp, b - third(6) - third(1) - third(5), "moitié des PV réellement perdus, un rebond par coup")
 end)
 
 test("Sweeping Strikes : seul en face rien ; sans cible rien ; le rebond ne pose pas Deep Wounds", function()
@@ -333,20 +333,34 @@ test("Sweeping Strikes : seul en face rien ; sans cible rien ; le rebond ne pose
   eq(c3.enemies[1].st.pain, 1); eq(c3.enemies[2].st.pain, nil)
 end)
 
-test("Sweeping Strikes amélioré : deux autres ennemis, sans remise ; coup qui tue compris", function()
+test("Sweeping Strikes : deux autres ennemis (amélioré : trois), sans remise ; coup qui tue compris", function()
   local c = setup({ "strike", "strike" }, { epic = "sweeping_strikes", up = true,
-    encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
-  local b, d = c.enemies[2].hp, c.enemies[3].hp
+    encounter = { "tw_dummy", "tw_dummy", "tw_dummy", "tw_dummy" } })
+  local b, d, f = c.enemies[2].hp, c.enemies[3].hp, c.enemies[4].hp
   assert(play(c, "strike", 1))
-  eq(c.enemies[2].hp, b - third(6)); eq(c.enemies[3].hp, d - third(6))
+  eq(c.enemies[2].hp, b - third(6)); eq(c.enemies[3].hp, d - third(6)); eq(c.enemies[4].hp, f - third(6))
   c.enemies[1].hp = 2
   assert(play(c, "strike", 1))
   assert(c.enemies[1].dead)
   eq(c.enemies[2].hp, b - 2 * third(6), "PV perdus du coup qui tue : 6")
-  local c2 = setup({ "strike" }, { epic = "sweeping_strikes", up = false, encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
-  local h2, h3 = c2.enemies[2].hp, c2.enemies[3].hp
+  local c2 = setup({ "strike" }, { epic = "sweeping_strikes", up = false,
+    encounter = { "tw_dummy", "tw_dummy", "tw_dummy", "tw_dummy" } })
+  local lost = 0
+  for i = 2, 4 do lost = lost + (c2.enemies[i].maxHp - c2.enemies[i].hp) end
   assert(play(c2, "strike", 1))
-  eq((h2 - c2.enemies[2].hp) + (h3 - c2.enemies[3].hp), third(6), "de base : un seul autre")
+  local after = 0
+  for i = 2, 4 do after = after + (c2.enemies[i].maxHp - c2.enemies[i].hp) end
+  eq(after - lost, 2 * third(6), "de base : deux autres")
+end)
+
+test("Sweeping Strikes : un dormeur (Asleep) n'est jamais tiré", function()
+  local c = setup({ "strike" }, { epic = "sweeping_strikes", encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
+  c.enemies[2].st.asleep = 2
+  local b, d = c.enemies[2].hp, c.enemies[3].hp
+  assert(play(c, "strike", 1))
+  eq(c.enemies[2].hp, b, "le dormeur n'est pas touché")
+  eq(c.enemies[2].st.asleep, 2, "il dort encore")
+  eq(c.enemies[3].hp, d - third(6))
 end)
 
 ---------------------------------------------------------------------------
@@ -673,8 +687,9 @@ test("paliers : Sweeping Strikes+2 « Attack hits » : les Attacks à tous rebon
     local c = setup({ "whirlwind" }, { epic = "sweeping_strikes", up = up, encounter = { "tw_dummy", "tw_dummy", "tw_dummy" } })
     local hp = c.enemies[1].hp
     assert(play(c, "whirlwind"))
-    -- 4 deux fois à chacun ; palier 2+ : chaque coup (4 PV) rebondit d'un tiers (1) sur les deux autres
-    eq(hp - c.enemies[1].hp, up >= 2 and 12 or 8, "Whirlwind, Sweeping Strikes+" .. up)
+    -- 4 deux fois à chacun ; palier 2+ : chaque coup (4 PV) rebondit de moitié (2) sur les deux autres
+    eq(hp - c.enemies[1].hp, up >= 2 and 16 or 8, "Whirlwind, Sweeping Strikes+" .. up)
+
   end
 end)
 

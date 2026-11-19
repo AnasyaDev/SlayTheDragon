@@ -436,10 +436,10 @@ epic("thunderous_roar", {
 
 epic("sweeping_strikes", {
   zone = "wetlands", name = "Sweeping Strikes", path = "arms",
-  text = "Epic.\nTargeted Attack hits: Sweep 1.",
-  up = { text = "Epic.\nTargeted Attack hits: Sweep 2." },
-  up2 = { text = "Epic.\nAttacks: Sweep 2." },
-  up3 = { text = "Epic.\nAttacks: Sweep 2.\nKills: +1 Rage." },
+  text = "Epic.\nTargeted Attack hits: Sweep 2.",
+  up = { text = "Epic.\nTargeted Attack hits: Sweep 3." },
+  up2 = { text = "Epic.\nAttacks: Sweep 3." },
+  up3 = { text = "Epic.\nAttacks: Sweep 3.\nKills: +1 Rage." },
 })
 
 epic("titans_grip", {
