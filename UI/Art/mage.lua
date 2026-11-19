@@ -103,8 +103,7 @@ end
 ns.ClassViews.mage = {
   tokens = function(c, list)
     local W = ns.Widgets
-    local text, n, dim = Art.mageEpicText(c)
-    W.noteToken(list, "epic", text, n, dim)
+    W.noteEpics(c, list, Art.mageEpicText)
     if hotStreakInPlay(c) then
       local f = math.min(c.turn.bySchool.fire or 0, 2)
       W.noteToken(list, "card:hot_streak", ("Fire cards this turn: %d/2"):format(f), f .. "/2")
@@ -134,9 +133,9 @@ ns.ClassViews.mage = {
 
 -- Ligne actuelle de l'épique du Mage (nil : rien à dire), compteur écrit sur son icône (nil : aucun), et vrai
 -- si sa règle est inactive (icône atténuée). Ne lit que le combat ; lu aussi par le harnais.
-function Art.mageEpicText(c)
+function Art.mageEpicText(c, want)
   if not ns.Combat.mageEpic then return nil end
-  local id, src = ns.Combat.mageEpic(c)
+  local id, src = ns.Combat.mageEpic(c, want)
   if not id then return nil end
   local d = ns.Card.def(src)
   if id == "arcane_meditation" then

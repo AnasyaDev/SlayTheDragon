@@ -1924,7 +1924,7 @@ function W.fillCardTooltip(tt, id, up, extra)
   -- épique : une seule par expédition ; cartes qu'elle transforme tant qu'elle est dans le deck ; variante :
   -- la carte d'origine
   if shown.rarity == "epic" then
-    wrap(tt, W.EPIC_HINT, 0.85, 0.85, 0.85)
+    wrap(tt, W.epicHint(), 0.85, 0.85, 0.85)
     for _, l in ipairs(W.transformLines(shown)) do wrap(tt, l, 0.85, 0.85, 0.85) end
   end
   if extra and extra.from and ns.Cards[extra.from] then
@@ -2204,6 +2204,17 @@ function W.noteToken(list, match, now, n, dim)
       it.n, it.dim = n, dim
       if it.info then it.info.now = now end
     end
+  end
+end
+
+-- Note de chaque épique en jeu sur son jeton (clé « epic:<id> », CombatView:RenderPlayer ; plusieurs épiques par
+-- expédition) : fn(c, id) -> ligne de l'infobulle, compteur, inactive (la note de la vue de classe pour cette
+-- épique).
+function W.noteEpics(c, list, fn)
+  local eps = ns.Combat.epicList(c)
+  for i = 1, #eps do
+    local now, n, dim = fn(c, eps[i].id)
+    W.noteToken(list, "epic:" .. eps[i].id, now, n, dim)
   end
 end
 
@@ -3864,6 +3875,15 @@ W.EPIC_COLOR = { 0.64, 0.21, 0.93 }
 W.EPIC_TEXT = { 0.78, 0.5, 1 } -- titres et libellés (plus clair, lisible sur la roche)
 W.EPIC_GLOW_ALPHA = 0.75
 W.EPIC_HINT = "One epic card per expedition: a new one replaces it."
+-- Règle du plafond d'épiques dite par l'infobulle d'une épique (ns.Expedition.EPIC.max ; plusieurs épiques par
+-- expédition depuis le 19/11/2026) ; plafond 1 : W.EPIC_HINT.
+function W.epicHint()
+  local X = ns.Expedition
+  local m = X and X.epicMax and X.epicMax() or 1
+  if m <= 1 then return W.EPIC_HINT end
+  if m == math.huge then return "Epic cards add up: each one in the deck is in play." end
+  return ("Up to %d epic cards per expedition: past that, a new one replaces the oldest."):format(m)
+end
 W.EPIC_MARK_COLOR = { 0.95, 0.88, 1 } -- « Epic » sur la languette violette (à la place du coût)
 W.INSTANT_COLOR = { 0.45, 0.85, 1 }
 W.INSTANT_RIM_COLOR = { 0.35, 0.8, 1, 1 }

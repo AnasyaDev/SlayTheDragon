@@ -153,9 +153,10 @@ end
 -- vrai si la règle est inactive (icône atténuée). Lu aussi par le harnais.
 local W_ = "|cffffffff%s|r"
 local function num(n) return W_:format(tostring(n)) end
-function Art.hunterEpicLine(c)
+function Art.hunterEpicLine(c, want)
   local H = ns.Hunter
-  local id, up = H and H.epic(c)
+  local id, up
+  if H then id, up = H.epic(c, want) end
   if not id or c.result then return nil end
   local E, res = ns.HunterEpic, c.player.res or 0
   local k = ns.Card.level(up) + 1 -- palier de l'épique (tables { base, +1, +2, +3 } de ns.HunterEpic)
@@ -277,7 +278,7 @@ end
 
 -- note de l'épique sur son jeton des états du héros (aucun texte sur la scène)
 function V.tokens(c, list)
-  ns.Widgets.noteToken(list, "epic", Art.hunterEpicLine(c))
+  ns.Widgets.noteEpics(c, list, Art.hunterEpicLine)
 end
 
 function V.render(host, c, view)

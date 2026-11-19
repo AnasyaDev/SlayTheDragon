@@ -21,9 +21,9 @@ for id, a in pairs(cards) do Art.cards[id] = a end
 -- Note de l'épique en jeu (nil : pas d'épique du Prêtre) : id, ligne actuelle (infobulle du jeton, nil : rien
 -- à dire), compteur écrit sur l'icône (nil : aucun), vrai si la règle est inactive (icône atténuée). Ne lit
 -- que le combat ; lu aussi par le harnais.
-local function epicLine(c)
+local function epicLine(c, want)
   local P = ns.Priest
-  local id, up = P.epicOf(c)
+  local id, up = P.epicOf(c, want)
   if not id then return nil end
   local p = c.player
   if id == "echo_of_light" then
@@ -58,7 +58,9 @@ Art.priestEpicLine = epicLine
 -- Vue de classe : rien d'écrit sur la scène ; la note de l'épique va sur son jeton des états du héros.
 ns.ClassViews.priest = {
   tokens = function(c, list)
-    local id, text, n, dim = epicLine(c)
-    if id then ns.Widgets.noteToken(list, "epic", text, n, dim) end
+    ns.Widgets.noteEpics(c, list, function(c2, want)
+      local id, text, n, dim = epicLine(c2, want)
+      if id then return text, n, dim end
+    end)
   end,
 }

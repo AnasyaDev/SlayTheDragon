@@ -1460,8 +1460,10 @@ function Reward:Show(step)
   local epic = step.epicMode and not closed
   local hint = "Choose one card, or none."
   if epic then
-    hint = (exp and ns.Expedition.epicIndex(exp)) and "Replace your epic card, or skip it."
-      or "Take this epic card, or skip it."
+    local full = exp and ns.Expedition.epicIndex(exp) and ns.Expedition.epicFull(exp)
+    hint = not full and "Take this epic card, or skip it."
+      or ns.Expedition.epicMax() <= 1 and "Replace your epic card, or skip it."
+      or "Replace your oldest epic card, or skip it."
   end
   self.hint:SetText(hint)
   self.hint:ClearAllPoints()
@@ -2958,7 +2960,9 @@ function EC:Build()
   self.note:SetPoint("TOP", self.question, "BOTTOM", 0, -6)
   self.note:SetWidth(EC_W - 40)
   self.note:SetJustifyH("CENTER")
-  self.note:SetText("Only one epic card per expedition: the current one leaves the deck.")
+  local m = ns.Expedition.epicMax()
+  self.note:SetText(m <= 1 and "Only one epic card per expedition: the current one leaves the deck."
+    or ("Up to %d epic cards per expedition: the oldest leaves the deck."):format(m))
   self.arrow = W.label(panel, "heavy", 30, C.wowGold, "OVERLAY")
   self.arrow:SetText(">")
   self.cards = {}

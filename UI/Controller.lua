@@ -65,7 +65,7 @@ C.REASONS = {
   maxed = "Fully upgraded.",
   noUpgrade = "Can't be upgraded.",
   relic = "Relic already owned.",
-  epic = "Only one epic card per expedition.",
+  epic = "An epic card can't be copied.",
   ended = "The expedition is over.",
   ["key locked"] = "This key isn't unlocked yet.",
   ["zone locked"] = "This zone isn't open to this class yet.",
@@ -167,6 +167,7 @@ function C.validateCombat(c)
   end
   if not validPile(c.player.powers or {}) then return false, "powers" end
   if c.epic ~= nil and not validCard(c.epic) then return false, "epic" end
+  if c.moreEpics ~= nil and not validPile(c.moreEpics) then return false, "epic" end
   if type(c.cooldown) ~= "table" then return false, "cooldown" end
   for i = 1, #c.cooldown do
     if not validCard(c.cooldown[i].card) then return false, "cooldown" end
@@ -1097,8 +1098,9 @@ local function rewardStep(exp)
   -- choix « Epic » (épique tombée sur un élite, Expedition.rollEpicDrop) : montré avant les cartes ordinaires
   local epicMode = r.epics ~= nil and not r.epicDone
   if epicMode then
-    text = text .. (text ~= "" and "\n" or "") .. (X.epicIndex(exp) and "Epic card: replace yours, or skip."
-      or "Epic card: take it, or skip.")
+    local full = X.epicIndex(exp) and X.epicFull(exp)
+    text = text .. (text ~= "" and "\n" or "") .. (not full and "Epic card: take it, or skip."
+      or X.epicMax() <= 1 and "Epic card: replace yours, or skip." or "Epic card: replace your oldest, or skip.")
     for i, id in ipairs(r.epics) do
       opts[#opts + 1] = actionOption(avail, { id = "pickEpic:" .. i, card = { id = id, up = false }, epic = true })
     end

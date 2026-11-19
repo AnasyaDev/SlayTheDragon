@@ -92,10 +92,10 @@ Art.classes.warrior.resource = { tga = "Ability_Warrior_FocusedRage", icon = "In
 -- Renvoie ligne, compteur, inactive (nil : rien à dire). Ne lit que le combat ; lu aussi par le harnais.
 local function n(v) return "|cffffffff" .. tostring(v) .. "|r" end
 
-function Art.warriorEpicLine(c)
+function Art.warriorEpicLine(c, want)
   local Wr = ns.Warrior
   if not Wr then return nil end
-  local id, up = Wr.epicOf(c)
+  local id, up = Wr.epicOf(c, want)
   if not id then return nil end
   local E = Wr.EPIC
   if id == "death_wish" then
@@ -143,6 +143,6 @@ end
 
 ns.ClassViews.warrior = {
   tokens = function(c, list)
-    ns.Widgets.noteToken(list, "epic", Art.warriorEpicLine(c))
+    ns.Widgets.noteEpics(c, list, Art.warriorEpicLine)
   end,
 }

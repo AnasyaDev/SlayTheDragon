@@ -10562,6 +10562,9 @@ do
   local ns = H.ns
   W = ns.Widgets
   addTestContent(ns)
+  -- parties 0 à 5 : la règle d'une épique par expédition (plafond 1 : remplacement, consignes) ; plusieurs
+  -- épiques : section UEM
+  ns.Expedition.EPIC.max = 1
   ns.Controller.makeSeed = function() return SEED end
   local db = _G.SlayTheDragonDB
   for _, z in ipairs({ "westfall", "duskwood", "wetlands" }) do
@@ -10916,6 +10919,64 @@ do
   sockets = 0
   for _, p in ipairs(pips.list) do if vis(p.socket) then sockets = sockets + 1 end end
   check("crans : sans l'épique, plafond de la classe (5)", sockets == 5 and ns.Combat.resCap(c) == 5, sockets)
+
+  -- 8. UEM : plusieurs épiques par expédition (décision du joueur, 19/11/2026 ; plafond Expedition.EPIC.max
+  -- du jeu) : un jeton par épique, dans l'ordre du deck, avant les Powers ; infobulle avec la règle du plafond
+  print("UEM plusieurs épiques : trois jetons d'épique sous le héros, infobulle du plafond")
+  ;(function() -- fonction à part : la section UE est au plafond de 200 variables locales
+  H.boot(nil)
+  H.slash("")
+  ns = H.ns
+  W = ns.Widgets
+  addTestContent(ns)
+  ns.Controller.makeSeed = function() return SEED end
+  for _, z in ipairs({ "westfall", "duskwood", "wetlands" }) do
+    ns.Meta.zoneState(_G.SlayTheDragonDB.meta, "priest", z).won = true
+  end
+  clickOption("go")
+  e = EXP()
+  if e.phase == "start" then clickOption("skipStartRelic") end
+  local X = ns.Expedition
+  local m = X.epicMax()
+  for _, id in ipairs({ "ue_epic_a", "ue_epic_b", "ue_epic_c" }) do X.addCard(e, id, nil, true) end
+  check("plusieurs épiques : trois dans le deck", X.epicCount(e) == 3, X.epicCount(e))
+  local pid = e.map.start[1]
+  e.map.nodes[pid].kind = "combat"
+  clickOption("path:" .. pid)
+  H.settle()
+  v = V()
+  v:Render(true)
+  c = EXP().combat
+  check("plusieurs épiques en combat : c.epic puis c.moreEpics, aucune dans les piles",
+    c.epic and c.epic.id == "ue_epic_a" and c.moreEpics and #c.moreEpics == 2 and #c.hand == 5)
+  c.player.powers[#c.player.powers + 1] = { uid = 9902, id = "shadowform", up = false }
+  v:Render(true)
+  local toks = {}
+  for _, t in ipairs(v.playerSt.tokens) do if vis(t) and t.info and t.info.power then toks[#toks + 1] = t end end
+  local ids = {}
+  for i, t in ipairs(toks) do ids[i] = t.info.power.id end
+  check("plusieurs épiques : trois jetons violets dans l'ordre du deck, puis le Power joué",
+    table.concat(ids, ",") == "ue_epic_a,ue_epic_b,ue_epic_c,shadowform"
+    and toks[1].info.epic and toks[2].info.epic and toks[3].info.epic and not toks[4].info.epic, table.concat(ids, ","))
+  local rimBad = 0
+  for i = 1, 3 do
+    local rc = toks[i] and toks[i].medal.ring._calls.SetVertexColor
+    local er2 = ns.Art.rarityRim.epic
+    if not (rc and math.abs(rc[1] - er2[1]) < 1e-6 and math.abs(rc[2] - er2[2]) < 1e-6) then rimBad = rimBad + 1 end
+  end
+  check("plusieurs épiques : liseré violet sur chacun des trois jetons", rimBad == 0, rimBad)
+  local hint = W.epicHint()
+  local tt3 = toks[3] and plainText(table.concat(H.hover(toks[3]), " | ")) or ""
+  check("plusieurs épiques : infobulle du troisième jeton (nom, texte, règle du plafond)", tt3:find("Third Epic", 1, true)
+    and tt3:find("gain 5 Absorb", 1, true) and tt3:find(hint, 1, true)
+    and (m > 1 or hint == W.EPIC_HINT), tt3)
+  local pr, er3 = R.rect(v.playerSt), {}
+  for i = 1, 3 do er3[i] = R.rect(toks[i]) end
+  check("plusieurs épiques : jetons côte à côte sans chevauchement",
+    not overlaps(er3[1], er3[2]) and not overlaps(er3[2], er3[3]) and pr ~= nil)
+  H.settle()
+  snap("mur-trois-epiques", true)
+  end)()
 end
 
 print("UZG socle des zones : crans de vie, primes, intention remplacée et suivante, compteur, cartes de combat (corps, carte d'origine, marque), feu de camp, textes flottants")
@@ -11667,10 +11728,11 @@ do
     tip.lines = {}
     W.fillCardTooltip(tip, eid, false, { full = true })
     local all = table.concat(tip.lines, "\n"):gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
-    if not all:find("epic card per expedition", 1, true) then tbad[#tbad + 1] = eid .. " : épique" end
+    -- règle du plafond d'épiques (W.epicHint : une par expédition au plafond 1, cumul sans plafond)
+    if not all:find(W.epicHint(), 1, true) then tbad[#tbad + 1] = eid .. " : épique" end
     if want[eid] and not all:find(want[eid], 1, true) then tbad[#tbad + 1] = eid .. " : " .. want[eid] end
   end
-  check("infobulles des sept épiques : une seule par expédition, détail de la règle", #tbad == 0, table.concat(tbad, " ; "))
+  check("infobulles des sept épiques : règle du plafond d'épiques, détail de la règle", #tbad == 0, table.concat(tbad, " ; "))
   -- planche des sept épiques (base, améliorée)
   if SNAP then
     local perRow, cw, ch = 7, 140, 230
@@ -12262,7 +12324,8 @@ do
       for r, up in ipairs({ false, true }) do
         local label = id .. (up and "+" or "")
         for _, l in ipairs(sheets[label]) do
-          if not l:find("^Epic:") and not l:find("^One epic card") and not l:find("^While in the deck") and l ~= " " then
+          if not l:find("^Epic:") and not l:find("^One epic card") and l ~= W.epicHint()
+              and not l:find("^While in the deck") and l ~= " " then
             local rest = l
             while rest ~= "" do
               local piece = rest

@@ -192,10 +192,10 @@ end
 -- Note de l'épique sur son jeton des états du héros (W.noteToken, comme les autres classes) : ce qu'elle fait
 -- maintenant (ligne de l'infobulle, nil : rien à dire), compteur écrit sur l'icône (nil : aucun), vrai si la
 -- règle est inactive (icône atténuée). Nombres de ns.DruidEpic au palier de l'épique. Lu aussi par le harnais.
-function Art.druidEpicLine(c)
+function Art.druidEpicLine(c, want)
   local D = ns.Druid
   local id, up
-  if D and D.epic then id, up = D.epic(c) end
+  if D and D.epic then id, up = D.epic(c, want) end
   local E = ns.DruidEpic
   if not id or not E or c.result then return nil end
   local k = ns.Card.level(up) + 1
@@ -300,7 +300,7 @@ end
 -- Jeton Clearcasting (état à drapeau, sans nombre) : aura jaune de Cat tant qu'il attend son Attack.
 local CC_GLOW
 function V.tokens(c, list)
-  ns.Widgets.noteToken(list, "epic", Art.druidEpicLine(c)) -- épique en jeu : ce qu'elle fait maintenant
+  ns.Widgets.noteEpics(c, list, Art.druidEpicLine) -- épiques en jeu : ce qu'elles font maintenant
   if (c.player.st.clearcasting or 0) == 0 then return end
   CC_GLOW = CC_GLOW or { Art.druidForms.cat.color[1], Art.druidForms.cat.color[2], Art.druidForms.cat.color[3], 0.8 }
   for i = 1, #list do

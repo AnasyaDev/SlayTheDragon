@@ -100,10 +100,10 @@ local MARKS = 6
 
 -- Ligne de l'épique (nil : rien à dire), compteur écrit sur son icône (nil : aucun), vrai si la règle est
 -- inactive (icône atténuée). Lu aussi par le harnais.
-function Art.rogueEpicLine(c)
+function Art.rogueEpicLine(c, want)
   local R = ns.Rogue
   if not R then return nil end
-  local id, up = R.epicOf(c)
+  local id, up = R.epicOf(c, want)
   if not id then return nil end
   local E, res = R.EPIC, c.player.res or 0
   local k = R.tier(up) -- palier de l'épique : 1 = base … 4 = +3
@@ -134,14 +134,14 @@ end
 -- L'ennemi compte-t-il comme Demoralized par Atrophic Poison (et pas par un vrai Demoralized) ?
 function Art.rogueAtrophic(c, e)
   local R = ns.Rogue
-  if not (R and R.epicOf(c) == "atrophic_poison") or e.dead then return false end
+  if not (R and R.epicOf(c, "atrophic_poison")) or e.dead then return false end
   return R.countsDemoralized(c, e)
 end
 
 ns.ClassViews.rogue = {
   enemyMarks = true, -- marque sur un cadre d'ennemi : CombatView lui réserve la fin de la ligne du nom
   tokens = function(c, list)
-    ns.Widgets.noteToken(list, "epic", Art.rogueEpicLine(c))
+    ns.Widgets.noteEpics(c, list, Art.rogueEpicLine)
   end,
   build = function(host, view)
     local W = ns.Widgets

@@ -1408,11 +1408,14 @@ function V:RenderPlayer(full)
     self.playerHp:Set(p.hp, p.maxHp)
     self.playerBlock:Set(p.block, p.maxHp)
     local list = W.unitStatuses(p)
-    -- épique en jeu (c.epic) : le premier des pouvoirs, liseré violet, infobulle complète
-    if c.epic then
-      list[#list + 1] = { icon = W.cardArt(c.epic.id), text = Card.def(c.epic).name,
-        rim = Art.rarityRim.epic or Art.rim.violet, glow = W.EPIC_COLOR, info = { power = c.epic, epic = true },
-        key = "epic:" .. c.epic.id, epic = true }
+    -- épiques en jeu (c.epic, puis c.moreEpics : plusieurs par expédition) : les premiers des pouvoirs, un jeton
+    -- par épique dans l'ordre du deck, liseré violet, infobulle complète
+    local eps = Combat.epicList(c)
+    for i = 1, #eps do
+      local e = eps[i]
+      list[#list + 1] = { icon = W.cardArt(e.id), text = Card.def(e).name,
+        rim = Art.rarityRim.epic or Art.rim.violet, glow = W.EPIC_COLOR, info = { power = e, epic = true },
+        key = "epic:" .. e.id, epic = true }
     end
     for i = 1, #p.powers do
       local inst = p.powers[i]
