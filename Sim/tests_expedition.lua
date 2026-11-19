@@ -1348,7 +1348,7 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 8); eq(Save.VERSION, 8); eq(X.VERSION, 9)
+  eq(note, "migrated"); eq(db.version, 9); eq(Save.VERSION, 9); eq(X.VERSION, 9)
   local m = db.current
   assert(m, "expédition gardée")
   eq(m.version, X.VERSION); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
@@ -2412,7 +2412,7 @@ do
       journal = { { result = "lost", class = "priest", zone = "westfall", deck = { { id = "smite", up = true },
         { id = "smite", up = false } } }, "bogus" } }
     local db, note = Save.migrate(reload(v6))
-    eq(note, "migrated"); eq(db.version, 8); eq(Save.VERSION, 8); eq(X.VERSION, 9)
+    eq(note, "migrated"); eq(db.version, 9); eq(Save.VERSION, 9); eq(X.VERSION, 9)
     local x = db.current
     assert(x, "expédition gardée")
     eq(x.version, 9)

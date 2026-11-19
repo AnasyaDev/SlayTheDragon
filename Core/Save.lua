@@ -1,6 +1,7 @@
 -- Format de sauvegarde (SavedVariables SlayTheDragonDB), un seul compte :
 --   db = { version, meta = <Meta>, current = <expédition en cours ou nil>,
---          journal = { archives d'expéditions terminées }, quarantine = { états illisibles } }
+--          journal = { archives d'expéditions terminées }, quarantine = { états illisibles },
+--          records = { enregistrements rejouables des dernières expéditions (Core/Record.lua) } }
 -- Pas d'API WoW ici : l'interface branche Save sur la variable globale et rappelle
 -- simplement la sauvegarde après chaque action (l'état est modifié sur place).
 -- Une mise à jour migre, n'efface jamais : un état d'expédition illisible part en quarantaine.
@@ -21,10 +22,12 @@ ns.Save = Save
 -- d'une carte du journal : true devient 1 ; expédition version 9). 8 : 25 niveaux de classe et arbres de talents
 -- (cs.talents, cs.spec ; titre « Veteran » gardé par cs.veteran ; docs/talents.md, § 13) ; l'expédition en cours
 -- ne change pas de version (exp.unlock.level reste un palier de contenu, exp.unlock.talents absent = aucun talent).
-Save.VERSION = 8
+-- 9 : enregistrement rejouable des expéditions (db.records, Core/Record.lua ; docs/expedition.md, « Enregistrement
+-- des parties ») ; une expédition en cours d'avant la v9 n'a pas d'enregistrement (rien n'est reconstitué).
+Save.VERSION = 9
 
 function Save.new()
-  return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
+  return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {}, records = {} }
 end
 
 ---------------------------------------------------------------------------
@@ -84,6 +87,8 @@ function Save.normalize(db)
   end
   if type(db.journal) ~= "table" then db.journal = {} end
   if type(db.quarantine) ~= "table" then db.quarantine = {} end
+  -- enregistrements (v9) : entrées illisibles retirées, borne Record.MAX
+  ns.Record.normalize(db)
 end
 
 -- 0 -> 1 : table sans numéro de version (SavedVariables vide, ou sauvegarde de développement
@@ -206,6 +211,9 @@ Save.MIGRATIONS[7] = function(db)
   end
 end
 
+-- 8 -> 9 : enregistrements rejouables (db.records, vide au départ ; normalize le crée).
+Save.MIGRATIONS[8] = Save.normalize
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp, db) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
@@ -313,6 +321,7 @@ end
 function Save.quarantine(db, reason)
   local exp = db.current
   if exp == nil then return false end
+  ns.Record.close(db, "quarantined")
   db.current = nil
   quarantine(db, exp, reason)
   return true
@@ -349,6 +358,7 @@ function Save.migrate(db)
       end
       local ok, why = Save.validateExpedition(exp)
       if not ok then
+        ns.Record.close(db, "quarantined")
         db.current = nil
         quarantine(db, exp, why)
         note = "expedition quarantined: " .. why
@@ -445,6 +455,16 @@ function Save.validate(db)
     if type(m.flags) ~= "table" then err("meta.flags") end
   end
   if type(db.journal) ~= "table" then err("journal") end
+  if type(db.records) ~= "table" then
+    err("records")
+  else
+    if #db.records > ns.Record.MAX then err("records: more than " .. ns.Record.MAX) end
+    for i, r in ipairs(db.records) do
+      if type(r) ~= "table" or type(r.a) ~= "table" or type(r.cp) ~= "table" or type(r.start) ~= "table" then
+        err("records." .. i)
+      end
+    end
+  end
   if db.current ~= nil then
     local ok, why = Save.validateExpedition(db.current)
     if not ok then err(why) end
@@ -458,13 +478,24 @@ end
 -- Cycle de vie d'une expédition
 ---------------------------------------------------------------------------
 
--- Démarre une expédition à Westfall (opts : seed, class, key). Renvoie exp ou nil, raison.
-function Save.start(db, opts)
+-- Démarre une expédition à Westfall (opts : seed, class, key) et ouvre son enregistrement (Core/Record.lua ;
+-- info = { date, addon } fournis par l'interface). Renvoie exp ou nil, raison.
+function Save.start(db, opts, info)
   if db.current then return nil, "running" end
-  local exp, why = ns.Meta.newExpedition(db.meta, opts)
-  if not exp then return nil, why end
+  local xopts, why = ns.Meta.expeditionOpts(db.meta, opts)
+  if not xopts then return nil, why end
+  -- options gardées avant Expedition.new (copie : meta.flags est la table vivante du compte)
+  local kept = { seed = xopts.seed, class = xopts.class, zone = xopts.zone, key = xopts.key,
+    unlocks = U.copy(xopts.unlocks), flags = U.copy(xopts.flags) }
+  local exp = ns.Expedition.new(xopts)
   db.current = exp
+  ns.Record.begin(db, exp, kept, info)
   return exp
+end
+
+-- Action sur l'expédition en cours (Expedition.act), enregistrée pour le rejeu. Renvoie ok, raison.
+function Save.act(db, a)
+  return ns.Record.act(db, a)
 end
 
 -- Talents (docs/talents.md) : apprendre un rang (choice : voie du nœud Specialization) ou rembourser tout
@@ -492,6 +523,7 @@ function Save.finish(db, date)
   entry.date = date
   entry.xp = summary.xp
   db.journal[#db.journal + 1] = entry
+  ns.Record.close(db, exp.result, date)
   db.current = nil
   return summary, entry
 end
@@ -500,7 +532,7 @@ end
 function Save.abandon(db, date)
   local exp = db.current
   if not exp then return nil, "no expedition" end
-  if exp.phase ~= "done" then ns.Expedition.act(exp, { "abandon" }) end
+  if exp.phase ~= "done" then Save.act(db, { "abandon" }) end
   return Save.finish(db, date)
 end
 

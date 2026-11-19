@@ -512,14 +512,22 @@ end
 
 -- Crée une expédition pour ce compte : toujours à Westfall (première zone), clé ouverte pour la classe.
 -- opts : seed, class, key ; renvoie exp ou nil, raison.
-function Meta.newExpedition(meta, opts)
+-- Options de Expedition.new pour ce compte (Meta.newExpedition ; Save.start les garde pour le rejeu,
+-- Core/Record.lua), ou nil, raison.
+function Meta.expeditionOpts(meta, opts)
   local class = opts.class or "priest"
   local zone = ns.Zone.FIRST
   local key = opts.key or 0
   if not ns.Zone.playable(zone) then return nil, "zone coming later" end
   if key < 0 or key > Meta.keyMax(meta, class) then return nil, "key locked" end
-  return ns.Expedition.new({ seed = opts.seed, class = class, zone = zone, key = key,
-    unlocks = Meta.unlocks(meta, class), flags = meta.flags, stats = opts.stats, quiet = opts.quiet })
+  return { seed = opts.seed, class = class, zone = zone, key = key,
+    unlocks = Meta.unlocks(meta, class), flags = meta.flags, stats = opts.stats, quiet = opts.quiet }
+end
+
+function Meta.newExpedition(meta, opts)
+  local xopts, why = Meta.expeditionOpts(meta, opts)
+  if not xopts then return nil, why end
+  return ns.Expedition.new(xopts)
 end
 
 -- Boss d'une zone battu par une classe à cette clé : boss de la zone battu par la classe (carte épique de la

@@ -20,6 +20,7 @@ Core\Map.lua
 Core\Zones.lua
 Core\Meta.lua
 Core\Expedition.lua
+Core\Record.lua
 Core\Save.lua
 Core\Talents.lua
 Data\Priest.lua

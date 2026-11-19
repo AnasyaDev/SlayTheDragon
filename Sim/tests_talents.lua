@@ -264,7 +264,7 @@ test("migration v7 -> v8 : expérience gardée, contenu identique ou plus large,
       priest = { xp = 450, runs = 3, wins = 0, keyMax = 0, bestKey = -1, farthest = 1, zones = {} } } },
     current = cur, journal = {} }
   local db, note = Save.migrate(reload(v7))
-  eq(note, "migrated"); eq(db.version, 8); eq(Save.VERSION, 8)
+  eq(note, "migrated"); eq(db.version, 9); eq(Save.VERSION, 9)
   local w, p = db.meta.classes.warrior, db.meta.classes.priest
   eq(w.xp, 1400); eq(Meta.levelOf(db.meta, "warrior"), 12); eq(Meta.talentPoints(db.meta, "warrior"), 11)
   eq(Meta.levelOf(db.meta, "priest"), 5); eq(Meta.talentPoints(db.meta, "priest"), 4)

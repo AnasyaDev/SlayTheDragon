@@ -158,6 +158,14 @@ function C.date()
   return type(time) == "function" and time() or 0
 end
 
+-- Version de l'addon (champ Version du TOC), gardée dans l'enregistrement de chaque expédition (Core/Record.lua).
+function C.addonVersion()
+  local get = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
+  if type(get) ~= "function" then return nil end
+  local ok, v = pcall(get, "SlayTheDragon", "Version")
+  return ok and type(v) == "string" and v or nil
+end
+
 function C.makeSeed()
   local t = 0
   if type(time) == "function" then t = time() end
@@ -284,7 +292,8 @@ end
 -- Démarre une expédition à Westfall (Save.start : clé vérifiée par Meta).
 function C.start(class, key, seed)
   local db = ns.Persist.db
-  local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, key = key })
+  local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, key = key },
+    { date = C.date(), addon = C.addonVersion() })
   if not exp then return false, why end
   C.ending, C.ended, C.ui.view = nil, nil, nil
   ns.Persist.talentNotice = nil -- ligne « You have N talent points to spend. » de l'accueil : vue
@@ -311,14 +320,15 @@ end
 
 local FIGHT_TITLE = { combat = "Combat", elite = "Elite", boss = "Boss" }
 
--- Applique une action d'expédition. Renvoie ok, raison, événements de combat produits.
+-- Applique une action d'expédition (Save.act : Expedition.act, enregistrée pour le rejeu). Renvoie ok, raison,
+-- événements de combat produits.
 function C.act(a)
   local exp = C.exp()
   if not exp then return false, "ended" end
   local c = exp.combat
   local title = exp.fight and FIGHT_TITLE[exp.fight.kind]
   local kindBefore = exp.fight and exp.fight.kind
-  local ok, why = X.act(exp, a)
+  local ok, why = Save.act(ns.Persist.db, a)
   if not ok then return false, why end
   -- boss battu, zone atteinte : reportés tout de suite dans la méta (épique, commun, expérience, drapeaux)
   Save.settle(ns.Persist.db)
@@ -519,12 +529,10 @@ function C.play(handIdx, targetIdx, nospend)
   return combatAct({ "play", handIdx, targetIdx, nospend and "nospend" or nil })
 end
 
--- keep : uid de la carte gardée au choix en fin de tour (Traveler's Backpack) ; le choix est posé par
--- Combat.markRetain juste avant l'action (l'action « endTurn » de l'expédition ne porte pas d'argument).
+-- keep : uid de la carte gardée au choix en fin de tour (Traveler's Backpack) ; porté par l'action
+-- { "endTurn", uid } (Expedition.act le pose par Combat.markRetain ; refus : "keep").
 function C.endTurn(keep)
-  local c = C.combat()
-  if keep and c and C.inCombat() and not Combat.markRetain(c, keep) then return false, "keep" end
-  return combatAct({ "endTurn" })
+  return combatAct({ "endTurn", keep })
 end
 
 function C.usePotion(slot, targetIdx)
@@ -1596,6 +1604,8 @@ do
     local d = C.devFight
     if name == "onFightStart" and d and d.exp == exp then
       C.devFight = nil
+      -- noté dans l'enregistrement (avant l'action en cours) : le rejeu arme le même combat
+      ns.Record.note(ns.Persist.db, "dev " .. table.concat(d.ids, " "))
       b.encounter = U.copy(d.ids)
       a.encounter = U.copy(d.ids)
       a.test = true

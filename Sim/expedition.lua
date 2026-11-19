@@ -729,21 +729,23 @@ return function(ns)
       { cap = opts.cap, human = opts.humanH })
     local maxRounds = opts.maxRounds or 40
     local steps, stalled = 0, false
+    local act = opts.act or X.act
+    -- fin du tour : carte gardée au choix (Traveler's Backpack) passée dans l'action (Expedition.act la pose)
+    local function endTurn() act(exp, { "endTurn", Bots.retainPick(c) }) end
     while exp.phase == "combat" and exp.combat == c do
       if c.round > maxRounds or steps > 2000 then
         stalled = true
-        X.act(exp, { "abandon" })
+        act(exp, { "abandon" })
         break
       end
       local a = bot:act(c)
       steps = steps + 1
       if a[1] == "play" then
-        if not X.act(exp, { "play", a[2], a[3], a[4] }) then Bots.markRetain(c) X.act(exp, { "endTurn" }) end
+        if not act(exp, { "play", a[2], a[3], a[4] }) then endTurn() end
       elseif a[1] == "potion" then
-        if not X.act(exp, a) then Bots.markRetain(c) X.act(exp, { "endTurn" }) end
+        if not act(exp, a) then endTurn() end
       else
-        Bots.markRetain(c) -- carte gardée au choix (Traveler's Backpack), posée avant la fin du tour
-        X.act(exp, { "endTurn" })
+        endTurn()
       end
     end
     local st = c.stats
@@ -785,9 +787,14 @@ return function(ns)
     local maxZone = opts.maxZone or opts.zone
     local so, mo = ns.Zone.order(startZone), ns.Zone.order(maxZone)
     if so and mo and mo < so then maxZone = startZone end
-    local exp = X.new({ seed = seed, class = opts.class or "priest", zone = startZone, lastZone = maxZone,
+    local xopts = { seed = seed, class = opts.class or "priest", zone = startZone, lastZone = maxZone,
       key = opts.key or 0, unlocks = unlocks, flags = flags, stats = true, quiet = opts.quiet ~= false,
-      epic = opts.epic ~= "none" and opts.epic or nil }) -- epic=none : aucune épique (le bot les refuse toutes)
+      epic = opts.epic ~= "none" and opts.epic or nil } -- epic=none : aucune épique (le bot les refuse toutes)
+    local exp = X.new(xopts)
+    -- opts.act (exp, action) -> ok, raison : remplace Expedition.act (enregistrement, Sim/tests_replay.lua) ;
+    -- opts.onNew(exp, options de Expedition.new) : appelé juste après la création
+    local act = opts.act or X.act
+    if opts.onNew then opts.onNew(exp, xopts) end
     -- cartes ajoutées de force au deck de départ (sweep=cards, force=…)
     -- (force=id+2 : la carte au palier 2, SE.forced)
     for _, f in ipairs(opts.force or {}) do
@@ -866,7 +873,7 @@ return function(ns)
       watchShop()
       guard = guard + 1
       if guard > 40000 then
-        X.act(exp, { "abandon" })
+        act(exp, { "abandon" })
         break
       end
       if exp.phase == "combat" then
@@ -897,7 +904,7 @@ return function(ns)
         elseif a[1] == "rest" then
           record.picks[#record.picks + 1] = "rest"
         end
-        local ok, why = X.act(exp, a)
+        local ok, why = act(exp, a)
         if not ok then error(("action refusée en phase %s : %s (%s)"):format(before, tostring(a[1]), tostring(why))) end
         if before == "reward" and (a[1] == "pickCard" or a[1] == "skipCards") then
           flow.offered = flow.offered + 1

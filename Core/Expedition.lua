@@ -1716,7 +1716,10 @@ H.combat = {
     local opts = a[4] == "nospend" and { spend = false } or nil
     return afterCombatAction(exp, Combat.play(exp.combat, a[2], a[3], opts))
   end,
-  endTurn = function(exp)
+  -- a[2] : uid de la carte gardée au choix en fin de tour (Traveler's Backpack, Combat.markRetain), posé ici
+  -- pour que le choix fasse partie de l'action (enregistrement rejouable, Core/Record.lua)
+  endTurn = function(exp, a)
+    if a[2] ~= nil and not Combat.markRetain(exp.combat, a[2]) then return false, "keep" end
     if not Combat.endTurn(exp.combat) then return false, "phase" end
     return afterCombatAction(exp, true)
   end,
