@@ -472,13 +472,15 @@ epic("mirror_image", {
 })
 
 -- Duskwood : chaque attaque ennemie sur le Mage, même absorbée, pose DoT epicN à son auteur (une fois par attaque :
--- un DoT par coup, c'était trop pour les attaques à plusieurs coups ; DoT 1 par coup était trop peu).
+-- un DoT par coup, c'était trop pour les attaques à plusieurs coups ; DoT 1 par coup était trop peu). 3 / 5 / 6 / 7
+-- depuis le 19/11/2026 (2 / 4 / 5 / 6 : rien de gagné dans les zones 4 à 7 ; docs/equilibrage.md, « Épiques : mesure
+-- une par une »).
 epic("molten_armor", {
-  name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 2,
-  text = "Epic.\nWhen attacked: Burn 2.",
-  up = { epicN = 4, text = "Epic.\nWhen attacked: Burn 4." },
-  up2 = { epicN = 5, text = "Epic.\nWhen attacked: Burn 5." },
-  up3 = { epicN = 6, text = "Epic.\nWhen attacked: Burn 6." },
+  name = "Molten Armor", zone = "duskwood", path = "fire", school = "fire", epicN = 3,
+  text = "Epic.\nWhen attacked: Burn 3.",
+  up = { epicN = 5, text = "Epic.\nWhen attacked: Burn 5." },
+  up2 = { epicN = 6, text = "Epic.\nWhen attacked: Burn 6." },
+  up3 = { epicN = 7, text = "Epic.\nWhen attacked: Burn 7." },
 })
 
 -- Wetlands : chaque tour, l'élémentaire inflige epicN à la dernière cible et lui pose Demoralized epicM pour le
@@ -623,10 +625,16 @@ local MAGE_EPIC_ADVICE = {
     upgrade = { fireball = 4, mirror_image = 3.5, frostbolt = 1.5, arcane_blast = 0.5 },
     remove = { arcane_blast = 0.5, frostbolt = 1.4 },
   },
-  -- se laisser frapper : Absorb partout, puis le feu qui suit ; pas de contrôle (un ennemi étourdi ne frappe pas)
+  -- se laisser frapper : Absorb partout, puis le feu qui suit. Conseils modérés (19/11/2026) : note de la classe et
+  -- un petit bonus ; les anciennes notes absolues écartaient le contrôle (Frost Nova, Polymorph de 10 à 6) et
+  -- coûtaient 7 points au bot human dans les zones 4 à 7
   molten_armor = {
-    rating = { blazing_barrier = 11, ice_barrier = 11.5, prismatic_barrier = 10.5, phoenix_flames = 10, ignite = 9,
-      living_bomb = 10, frost_nova = 6, polymorph = 6, deep_freeze = 7, cone_of_cold = 7.5, ice_block = 11 },
+
+    rating = function(exp, id)
+      local b = ({ blazing_barrier = 1, ice_barrier = 1, prismatic_barrier = 1, ice_block = 1, living_bomb = 0.5,
+        phoenix_flames = 0.5 })[id]
+      if b then return (ns.Classes.mage.bot.rating[id] or 5) + b end
+    end,
     upgrade = { mana_shield = 3.5, molten_armor = 4.5, fireball = 2 },
     remove = { arcane_blast = 0.5, frostbolt = 1.4 },
   },
