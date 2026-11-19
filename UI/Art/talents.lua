@@ -7,9 +7,14 @@ local _, ns = ...
 
 local Art = ns.Art
 
--- Remplacements par classe : { [classe] = { [id du nœud ou de la voie] = "nom_d_icone" } } (vide : les fiches
--- portent leurs icônes, toutes embarquées pour le Warrior et les nœuds génériques).
+-- Remplacements par classe : { [classe] = { [id du nœud ou de la voie] = "nom_d_icone" } } : icône de la fiche
+-- absente de Media/Icons (clé de UI/SkinData.lua, icons) remplacée par une icône embarquée au thème proche. Le
+-- harnais (section UTL) vérifie que chaque nœud et chaque voie des six arbres a une icône embarquée.
 Art.talentIcons = Art.talentIcons or {}
+-- Priest, Void Torrent : la fiche dit « spell_priest_void_blast », l'icône embarquée garde l'espace du nom
+-- d'origine (« spell_priest_void blast », celle de Void Eruption)
+Art.talentIcons.priest = Art.talentIcons.priest or {}
+Art.talentIcons.priest.void_torrent = "spell_priest_void blast"
 
 local function entry(name)
   return { tga = name, icon = "Interface\\Icons\\" .. name:lower() }
