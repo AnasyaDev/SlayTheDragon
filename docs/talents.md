@@ -421,19 +421,42 @@ combat ; Regen, Absorb, Cast)
 
 **Mage** (42 PV ; Charges 0 à 4, +1 dégât par Charge sur chaque coup des Attacks, dépensées par `Surge:` ; deux Casts
 en même temps (`castSlots` + 1) ; Frozen = Stunned ou Demoralized ; Hot Streak, Instant, Ignite ; Apprentice Wand : le
-premier Cast de chaque combat coûte 0)
+premier Cast de chaque combat coûte 0). **Arbre codé le 19/11/2026** (`Data/Talents/mage.lua`, nombres dans
+`ns.MageTalents` ; tests : `Sim/tests_talents_mage.lua` ; mesures : `docs/equilibrage.md`, « Talents du Mage ») :
 
-- **Arcane Focus** : `Start of combat: +1 Charge.` (2 rangs)
-- **Arcane Mind** : `Charge cap +1.` (`resCap`, 4 → 5)
-- **Presence of Mind** : `Start of combat: Instant 1.` (comme Fire Ruby)
-- **Improved Ignite** : `Ignite applies DoT 3 instead of 2.`
-- **Shatter** : `Frozen enemies take 3 more from each hit.` (`damage`, `Combat.isFrozen`)
-- **Ice Barrier** : `Cards that give Absorb give 2 more.` (`block`)
-- **Triple Cast** : `You can cast three spells at once.` (`castSlots` + 1)
-- **Arcane Shielding** : `When a Cast resolves: gain 3 Absorb.` (comme Robe of the Archmage)
-- Specialization : Fire `Hot Streak also gives +1 Charge.` / Frost `Start of combat: Demoralized 1 to all enemies.` /
-  Arcane `At 4 Charges or more, Attacks deal 1 more per hit.` ; rangée 4 : **Cauterize** `Once per expedition, a hit
-  that would kill you leaves you at 1 HP with Ice Block.`
+| Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
+|---|---|---|---|---|
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 / +4 / +6) | PV de départ de l'expédition |
+| 1 | **Arcane Mind** | 3 | `Charge cap +1.` / `+2` / `+3` | crochet `resCap` (4 → 7) |
+| 2 (5) | **Arcane Concentration** | 3 | `After each Surge: +1 Charge.` / `+2 Charges.` / `+3 Charges.` | `onSurge` (après la remise à 0, avant les effets suivants de la carte) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 3 (10) | **Specialization** (choix) | 1 | Fire : `Fire Attack hits also apply DoT 1.` Frost : `Start of combat: apply Demoralized 1 to the first enemy.` Arcane : `While you have 4 Charges or more, Attacks deal 1 more per hit.` | Fire : `onAttackHit` (comme Ignite) ; Frost : `onCombatStart` (premier ennemi vivant) ; Arcane : `damage` |
+| 3 | **Winter's Chill** | 2 | `Attack hits on Frozen enemies deal 1 more.` / `2 more.` | `damage` + `Combat.isFrozen` (comme la carte Shatter) |
+| 3 | **Prismatic Cloak** | 1 | `When a Cast card resolves, gain 2 Absorb.` | `afterCast` (incantée ou partie tout de suite) |
+| 3 | **Arcane Focus** | 1 | `Start of combat: +1 Charge.` | `onCombatStart` → `Combat.gainRes` |
+| 3 | **Frost Warding** | 1 | `Cards that give Absorb give 1 more.` | `block` une fois par carte (`c.cardCtx`, comme Protection du Warrior) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Firestarter** | 1 | `Start of combat: gain Instant 1.` | `onCombatStart` (comme Fire Ruby) |
+| 4 | **Arcane Potency** | 2 | `Start of turn with 4 Charges or more: +1 mana.` / `… +1 mana and draw 1.` | `maxMana`, `drawPerTurn` (comme Rampage ; Mind Quickening Gem s'y ajoute) |
+| 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
+| 4 | **Cauterize** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP with Ice Block.` / `… at 10 HP with Ice Block.` | `preventDeath` + `exp.talentState.cauterize` ; après la carte Ice Block (les Powers passent avant les talents) |
+
+Total 24 points (3 + 3 / 3 + 1 / 1 + 2 + 1 + 1 + 1 + 1 / 1 + 2 + 2 + 2), 14 nœuds ; nœuds de mécanique : 10 sur 14 (15
+points). Ordre du bot (`bot.order`) : Toughness 3, Arcane Mind 2, Arcane Concentration 3, Provisions, Arcane Mind 3
+(10), Specialization, Winter's Chill 2, Prismatic Cloak, Arcane Focus (15), Frost Warding, Field Medic, Firestarter,
+Arcane Potency 2 (20), Veteran's Arsenal 2, Cauterize 2 ; voie du bot : **Arcane** (`bot.spec`). Bots : `bot.value`
+de Prismatic Cloak (incantation tenue = son Absorb à venir) et d'Arcane Potency (finir le tour à 4 Charges = un mana).
+Pas de `bot.epic` : à l'arbre plein, le bot ne prend aucune épique qui contredise l'arbre (palier 100 % au-dessus du
+palier 80 %).
+
+Écarts avec la proposition ci-dessus (réglés à la mesure, `docs/equilibrage.md`) : Arcane Focus et un Absorb par carte
+dans les rangées 1 et 2 faisaient gagner 56 à 61 % au palier 40 % (cible ≈ 23) : les nœuds forts (Charges au départ,
+Absorb, Instant) passent en rangées 3 et 4, à un rang, et les rangées 1 et 2 ne gardent que le plafond de Charges et
+Arcane Concentration (nouveau, Surge). Presence of Mind (carte), Shatter (carte) et Ice Barrier (carte) deviennent
+Firestarter, Winter's Chill et Frost Warding (noms de talents de WoW, pas de nom de carte en double) ; Arcane Shielding
+devient Prismatic Cloak (2 Absorb) ; Improved Ignite (une carte rare seulement) et Triple Cast (pas un talent de WoW)
+retirés. Specialization Fire : DoT sur chaque coup Fire au lieu de Hot Streak (rarement pris par le bot) ; Frost : le
+premier ennemi au lieu de tous (69,5 % contre 60 % aux deux autres voies).
 
 **Rogue** (57 PV ; Combo 0 à 5, dépensé par `Surge:` ; Stealth au début de chaque combat, consommé par la première
 Attack ; Parry : 3 charges au plus, chacune arrête 8 dégâts d'un coup (`PARRY_MAX`, `PARRY_STOP`) ; Thieves' Tools :

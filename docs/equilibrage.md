@@ -2244,3 +2244,82 @@ Lecture :
 - **Rythme** : 233 d'expérience par expédition au palier 20, 345 au palier 40 (Warrior 292 et 323).
 
 Non vérifié : bot heuristic ; autres graines ; clés 1 à 5.
+
+## Talents du Mage (19/11/2026)
+
+Arbre codé (`Data/Talents/mage.lua`, `docs/talents.md`, § 8), mêmes séries que le Warrior : `flock build/sim-a.lock
+luajit Sim/sim.lua runner=expedition bot=human class=mage key=0 seed=1 jobs=8 runs=600 tree=<part> zones=<N>
+level=<palier>` ; « contenu seul » = sans `tree=` ; ± 2 à 4 points. Rapports : `reports/talents-mage/` du worktree
+(v1 = fiche d'origine, v7 = arbre final).
+
+| Palier (points) | Contenu | Victoires (cible Warrior ± 8) | Contenu seul | Warrior | Fiche d'origine | STV | SoS | BS | BRM | XP / exp. |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | `zones=0 level=1` | **0,0 %** (0–2) | 0,0 | 0,0 | 0,0 | 9,3 | 0,0 | — | — | 144 |
+| 20 % (5) | `zones=2 level=4` | **0,7 %** (17,5–33,5) | 0,0 | 25,5 | 1,0 | 43,0 | 15,4 | 37,0 | 40,0 | 196 |
+| 40 % (10) | `zones=3 level=7` | **31,0 %** (15–31) | 10,0 | 23,0 | 61,2 | 84,9 | 62,2 | 86,1 | 73,5 | 323 |
+| 60 % (15) | `zones=4 level=7` | **60,3 %** (53–69, ≥ 40) | 8,3 | 61,2 | 81,2 | 92,4 | 81,3 | 95,3 | 85,6 | 386 |
+| 80 % (20) | `zones=6 level=7` | **87,7 %** (non réglé) | 12,7 | 82,3 | 94,5 | 98,0 | 94,2 | 99,1 | 96,0 | 429 |
+| 100 % (24) | `zones=7 level=7` | **97,7 %** (non réglé) | 17,0 | 94,3 | 99,0 | 99,8 | 98,8 | 99,7 | 99,3 | 443 |
+
+STV … BRM : battue / atteinte (%) de Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain.
+« Fiche d'origine » : premier arbre codé d'après le § 8 de la fiche (Arcane Focus 2, Frost Warding 2 par carte, Winter's
+Chill 2 et Arcane Mind 2 en rangée 2, Prismatic Cloak 2 / 4 Absorb, Firestarter 2, Toughness 3 PV par rang).
+
+**Specialization au palier 60 %** (`spec=`) : Fire **60,0 %**, Frost **64,0 %** (Demoralized 1 au premier ennemi ;
+69,5 % à tous les ennemis), Arcane **60,3 %** (voie du bot).
+
+**Nœuds de mécanique seuls**, pleins, au contenu du palier de leur rangée (rangée 1 → 20 %, 2 → 40 %, 3 → 60 %, 4 →
+80 %) :
+
+| Nœud | Palier | Seul | Contenu seul | Écart |
+|---|---|---|---|---|
+| Arcane Mind 3 | 20 % | 0,0 % (STV 35,4, SoS 14,7) | 0,0 % (35,0, 12,3) | +0 |
+| Arcane Concentration 3 | 40 % | 15,5 % | 10,0 % | +5,5 |
+| Winter's Chill 2 | 60 % | 13,8 % | 8,3 % | +5,5 |
+| Prismatic Cloak 1 | 60 % | 11,3 % | 8,3 % | +3,0 |
+| Arcane Focus 1 | 60 % | 11,0 % | 8,3 % | +2,7 |
+| Frost Warding 1 | 60 % | 12,5 % | 8,3 % | +4,2 |
+| Firestarter 1 | 80 % | 17,3 % | 12,7 % | +4,6 |
+| Arcane Potency 2 | 80 % | 13,8 % | 12,7 % | +1,1 |
+| Cauterize 2 | 80 % | 21,5 % | 12,7 % | +8,8 |
+
+Aucun au-dessus de 12 points. Générique : Veteran's Arsenal 2 seul au palier 100 % 29,3 % (+12,3). Génériques seuls
+(Toughness 3 à 2 PV + Provisions) au palier 40 % : 18,0 %.
+
+**Chiffres changés** par rapport au § 8 de la fiche (nœuds du Mage seulement) :
+
+- Toughness : +2 PV par rang au lieu de +3 (+9 PV = 21 % des 42 PV du Mage ; Warrior +12 sur 70).
+- Arcane Focus : un rang (+1 Charge), rangée 3 au lieu de la rangée 1 à deux rangs ; seul au palier 40 % à deux rangs,
+  il valait +22 points dans l'arbre (56 % → 34 % sans lui).
+- Frost Warding (proposé « Ice Barrier », +2) : un rang, +1, rangée 3 ; à deux rangs en rangée 1 : +20 points dans
+  l'arbre au palier 40 %.
+- Arcane Mind : trois rangs (plafond 7) en rangée 1 ; seul, il ne fait rien de mesurable.
+- Arcane Concentration (nouveau) : `After each Surge: +1 / +2 / +3 Charges.`, rangée 2.
+- Prismatic Cloak (proposé « Arcane Shielding », 3 Absorb) : un rang, 2 Absorb.
+- Firestarter (proposé « Presence of Mind ») : un rang, rangée 4 (deux rangs en rangée 2 : +10 points dans l'arbre).
+- Winter's Chill (proposé « Shatter », +3 par coup) : +1 par rang, rangée 3.
+- Arcane Potency (nouveau, comme Rampage) en rangée 4 ; Improved Ignite et Triple Cast retirés.
+- Specialization : Fire `Fire Attack hits also apply DoT 1.` (au lieu de Hot Streak +1 Charge) ; Frost au premier
+  ennemi au lieu de tous ; voie du bot Arcane.
+
+Étapes (t40 / t60, voie Frost sauf la dernière) : fiche 61,2 / 81,2 → Toughness 2, Cloak 1 et ordre changé 56,0 /
+76,0 → Focus et Ward à un rang 48,3 / 69,8 → Firestarter en rangée 2, Winter's Chill en rangée 3 45,5 / 67,5 → Focus
+et Ward en rangée 3, Arcane Concentration 38,2 / 76,0 → Arcane Mind 3, Cloak à un rang 31,0 / 69,5 → voie Arcane
+60,3.
+
+Lecture :
+
+- **0, 40 et 60 % tenus** (60 % : 60,3 contre 61,2 au Warrior). Le palier 40 % est au bord haut de la fenêtre (31,0
+  pour 31) : les nœuds des rangées 1 et 2 ne peuvent guère valoir moins (un rang = une Charge, un Absorb, un Instant).
+- **Palier 20 % hors cible** (0,7 % pour 17,5 à 33,5) et ce n'est pas l'arbre : le **contenu du palier** (`zones=2
+  level=4`) ne fait gagner aucun Mage (Swamp of Sorrows passée à 12 %, Warrior 8,5 % de victoires au même contenu).
+  Aucun jeu de 5 points ne passe de 0 à ≈ 20 % sans faire exploser le palier 40 % (contenu 10 %, niveau 7) : avec
+  Arcane Focus 2 et Toughness 3 dans les 5 premiers points (fiche), le palier 20 % ne donnait que 1,0 % et le palier
+  40 % 61 %. Le contenu seul passe de 0 à 10 % entre ces deux paliers.
+- **Le Mage est très sensible près du mur** : chaque nœud seul vaut +3 à +9 points, mais ensemble ils s'additionnent
+  bien plus (+51 points pour les 10 points de la fiche au palier 40 %) ; le palier 80 % (87,7) et 100 % (97,7) passent
+  le Warrior de 5 et 3 points, à recaler avec les génériques comme prévu.
+- Bots : aucune épique ne contredit l'arbre plein (palier 100 % > 80 %) : pas de `bot.epic`.
+
+Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; chiffres d'interface (Arcane Mind et la pastille à quatre
+pips : `docs/talents.md`, § 15, « Lisibilité »).
