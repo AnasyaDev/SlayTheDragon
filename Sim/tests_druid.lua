@@ -534,9 +534,18 @@ test("Powers : sans forme ; Leader of the Pack, Moonkin Aura, Gift of Nature, Th
   -- Moonkin Aura : après les coups à tous (lus à 4 Charges)
   eq(c.player.res, 4)
   hp = c.enemies[1].hp
+  local b0 = c.player.block
   Combat.endPlayerTurn(c)
   eq(c.enemies[1].hp, hp - 2, "ceil(4 / 2)")
   eq(c.player.res, 5, "+1 après")
+  eq(c.player.block, b0 + 4, "Moonkin Aura : 4 Absorb")
+  -- Demoralizing Roar : +1 Frenzy, 8 Absorb, Demoralized 2 à tous
+  local r = setup({ "demoralizing_roar" })
+  play(r, "demoralizing_roar")
+  eq(r.cls.form, "bear")
+  eq(r.player.res, 1)
+  eq(r.player.block, 8, "Demoralizing Roar : 8 Absorb")
+  eq(r.enemies[1].st.demoralized, 2)
   -- Thorns et Rebirth
   local t = setup({ "thorns", "rebirth" }, { encounter = { "dr_hitter" }, hp = 5 })
   play(t, "thorns"); play(t, "rebirth")

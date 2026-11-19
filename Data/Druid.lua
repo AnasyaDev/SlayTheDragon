@@ -146,15 +146,17 @@ card("mangle", {
   up3 = { cost = 0, text = "Surge: Bear strikes once per Frenzy.\n+3 Frenzy.\nRetain." },
 })
 
+-- Demoralizing Roar : la défense de l'ours contre les gros coups des zones 6 et 7 (8 Absorb depuis le 19/11/2026 ;
+-- avant, 4 Absorb au palier 3 seulement : docs/equilibrage.md, « Druid : Burning Steppes et Blackrock »).
 card("demoralizing_roar", {
   level = 6, name = "Demoralizing Roar", form = "bear", cost = 0, type = "skill", rarity = "uncommon",
-  path = "feral", cooldown = 4, effects = { { "res", 1 }, { "apply", "demoralized", 2, all = true } },
-  text = "+1 Frenzy.\nApply Demoralized 2 ⌛ to all\nCooldown 4.",
-  up = { cooldown = 3, text = "+1 Frenzy.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
-  up2 = { effects = { { "res", 2 }, { "apply", "demoralized", 2, all = true } },
-    text = "+2 Frenzy.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
-  up3 = { effects = { { "res", 2 }, { "absorb", 4 }, { "apply", "demoralized", 2, all = true } },
-    text = "+2 Frenzy.\nGain 4 Absorb.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
+  path = "feral", cooldown = 4, effects = { { "res", 1 }, { "absorb", 8 }, { "apply", "demoralized", 2, all = true } },
+  text = "+1 Frenzy.\nGain 8 Absorb.\nApply Demoralized 2 ⌛ to all\nCooldown 4.",
+  up = { cooldown = 3, text = "+1 Frenzy.\nGain 8 Absorb.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
+  up2 = { effects = { { "res", 2 }, { "absorb", 8 }, { "apply", "demoralized", 2, all = true } },
+    text = "+2 Frenzy.\nGain 8 Absorb.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
+  up3 = { effects = { { "res", 2 }, { "absorb", 11 }, { "apply", "demoralized", 2, all = true } },
+    text = "+2 Frenzy.\nGain 11 Absorb.\nApply Demoralized 2 ⌛ to all\nCooldown 3." },
 })
 
 -- Leader of the Pack : chaque carte Attack de forme Cat, après sa résolution (copie comprise), +n Combo ;
@@ -283,11 +285,16 @@ card("natures_grace", {
   up3 = { effects = { { "apply", "instant", 1, self = true } }, text = "Power.\nCast cards: cost −1.\nGain Instant 1\nInnate." },
 })
 
--- Moonkin Aura : à la fin de chaque tour fini en Moonkin (après les coups à tous de la forme), +n Charges.
+-- Moonkin Aura : à la fin de chaque tour fini en Moonkin (après les coups à tous de la forme), +n Charges et
+-- MOONKIN_AURA_ABSORB Absorb pour le tour ennemi (la défense tardive de Balance, 19/11/2026 ; avant : Charges seules).
+local MOONKIN_AURA_ABSORB = 4
 local function auraHooks(n)
   return {
     onTurnEnd = function(c)
-      if c.cls.form == "moonkin" and not c.result then Combat.gainRes(c, n, "card") end
+      if c.cls.form == "moonkin" and not c.result then
+        Combat.gainRes(c, n, "card")
+        Combat.gainBlock(c, c.player, MOONKIN_AURA_ABSORB)
+      end
     end,
   }
 end
@@ -295,10 +302,10 @@ end
 card("moonkin_aura", {
   level = 7, name = "Moonkin Aura", cost = 1, type = "power", rarity = "rare", path = "balance",
   power = true, effects = {}, hooks = auraHooks(1),
-  text = "Power.\nEnd of turn in Moonkin: +1 Charge.",
-  up = { cost = 0, text = "Power.\nEnd of turn in Moonkin: +1 Charge." },
-  up2 = { innate = true, text = "Power.\nEnd of turn in Moonkin: +1 Charge.\nInnate." },
-  up3 = { hooks = auraHooks(2), text = "Power.\nEnd of turn in Moonkin: +2 Charges.\nInnate." },
+  text = "Power.\nEnd of turn in Moonkin: +1 Charge and gain 4 Absorb.",
+  up = { cost = 0, text = "Power.\nEnd of turn in Moonkin: +1 Charge and gain 4 Absorb." },
+  up2 = { innate = true, text = "Power.\nEnd of turn in Moonkin: +1 Charge and gain 4 Absorb.\nInnate." },
+  up3 = { hooks = auraHooks(2), text = "Power.\nEnd of turn in Moonkin: +2 Charges and gain 4 Absorb.\nInnate." },
 })
 
 -- Restoration : soins Tree (tous Exhaust sauf Mark of the Wild), Regen, Powers ------------------------------
