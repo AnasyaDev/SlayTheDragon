@@ -52,13 +52,16 @@ do
   L.rule("launch", { name = "Launch", text = launch(E.launcher[1]),
     upText = "The Trap triggers at once on a target, then the pet attacks it N times." })
   local function stampede(less)
-    return "Pet attacks also hit every other enemy" .. (less > 0 and (", for " .. less .. " less.") or ".")
+    return "Pet attacks also hit every other enemy" .. (less > 0 and (", for " .. less .. " less") or "")
+      .. ", unless one sleeps."
   end
   L.rule("stampede", { name = "Stampede", text = stampede(E.cleaveLess[1]),
     upText = stampede(E.cleaveLess[2]) .. " Each one gives N more Frenzy." })
   -- paliers 2 et 3 des épiques (15/11/2026) : Beast Cleave (Trample), Call of the Wild (Hunt), Black Arrow (Prey)
   L.rule("trample", { name = "Trample",
-    text = "Pet attacks also hit every other enemy, in full. Each one gives N more Frenzy." })
+    text = "Pet attacks also hit every other enemy, in full, unless one sleeps. Each one gives N more Frenzy." })
+
+
   L.rule("hunt", { name = "Hunt", text = "Gain N Frenzy, then the pet attacks." })
   L.rule("prey", { name = "Prey", text = "The pet attacks that enemy, then gain N Frenzy." })
   L.rule("intervene", { name = "Intervene", text = "Spend 1 Frenzy, if available, to stop up to N damage of the hit." })

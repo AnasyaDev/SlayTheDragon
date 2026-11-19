@@ -482,6 +482,9 @@ card("resourcefulness", {
 -- niveau 7 ; docs/classes.md, « Hunter : les sept épiques »). Lone Wolf amélioré : +3 par Frenzy au lieu de
 -- « Start of turn: +1 Frenzy. » (la ligne de plus faisait passer le texte sous le plancher de 8,5).
 -- Paliers 2 et 3 (15/11/2026, docs/ameliorations.md) : tables { base, +1, +2, +3 }, lues par Card.level(src) + 1.
+-- Mesure une par une au bot human (19/11/2026, docs/equilibrage.md, « Épiques : mesure une par une ») : Lone Wolf
+-- +3 par Frenzy (+2 : sous l'épique absente à Stranglethorn) ; Beast Cleave ne frappe plus tout le monde tant
+-- qu'un ennemi dort (le familier réveillait les dormeurs du Swamp of Sorrows : −10 points dans la zone).
 local EPIC = {
   cotwCost = { 1, 0, 0, 0 },      -- Call of the Wild : Frenzy dépensé pour l'attaque du début du tour (0 : gratuite)
   cotwRes = { 0, 0, 1, 2 },       -- Call of the Wild : Frenzy gagné au début du tour, avant l'attaque
@@ -493,7 +496,7 @@ local EPIC = {
   marksman = { 20, 24, 27, 30 },  -- Master Marksman : dégâts en plus par coup d'une Cast résolue tout de suite
   launcher = { 1, 2, 2, 3 },      -- Trap Launcher : attaques du familier par Trap lancée
   launchRes = { 0, 0, 1, 1 },     -- Trap Launcher : Frenzy gagné par Trap lancée, avant les attaques
-  lonePer = { 2, 3, 4, 5 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
+  lonePer = { 3, 4, 5, 6 },       -- Lone Wolf : dégâts en plus par coup d'Attack et par point de Frenzy
   loneStart = { 0, 0, 0, 0 },     -- Lone Wolf : Frenzy gagné au début de chaque tour
   chimaera = { 5, 4, 8, 6 },      -- Chimaera Shot (variante) : cible, autre ennemi, cible améliorée, autre ennemi
                                   -- au palier 2 (fiche : 3, 3, 6)
@@ -584,7 +587,9 @@ epic("trap_launcher", {
 -- Wetlands — Beast Cleave : chaque attaque du familier frappe tous les ennemis vivants (petAll) : sa cible
 -- en plein, les autres pour EPIC.cleaveLess de moins (crochet petLess) ; amélioré : +1 Frenzy de plus par
 -- attaque (pas pour les attaques de Surge, qui n'en donnent pas) ; palier 2 : les autres en plein (« in
--- full ») ; palier 3 : +2 Frenzy de plus par attaque (EPIC.cleaveRes).
+-- full ») ; palier 3 : +2 Frenzy de plus par attaque (EPIC.cleaveRes). Tant qu'un ennemi vivant dort (état
+-- Asleep du Swamp of Sorrows), le familier ne frappe que sa cible (petAll laissé à sa valeur).
+
 -- (dégâts en moins : à-côté du mot Stampede, Core/Classes/hunter.lua)
 -- (paliers 2 et 3 : « Trample +N », mot de règle à part : les autres en plein ; la carte tient en deux lignes)
 local function cleaveText(less, res)
@@ -598,7 +603,13 @@ epic("beast_cleave", {
   up2 = { text = cleaveText(EPIC.cleaveLess[3], EPIC.cleaveRes[3]) },
   up3 = { text = cleaveText(EPIC.cleaveLess[4], EPIC.cleaveRes[4]) },
   deckHooks = {
-    petAll = function(c, src, v) return true end,
+    petAll = function(c, src, v)
+      for i = 1, #c.enemies do
+        local e = c.enemies[i]
+        if not e.dead and (e.st.asleep or 0) > 0 then return v end
+      end
+      return true
+    end,
     petLess = function(c, src, v) return v + nt(EPIC.cleaveLess, src) end,
     onPetAttack = function(c, src, t, dmg, why)
       local res = nt(EPIC.cleaveRes, src)
