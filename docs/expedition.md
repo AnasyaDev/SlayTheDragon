@@ -73,7 +73,7 @@ rencontres) par le palier commun du compte (`tier` ≤ `exp.unlock.common`). Dé
 | --- | --- |
 | `start` (bibelot au choix : zone 3 gagnée par le compte) | `{"startRelic", i}` (i dans `exp.startRelics`), `{"skipStartRelic"}` |
 | `map` | `{"path", idNoeud}` : un nœud de `Map.nextNodes(exp.map, exp.node)` |
-| `combat` | `{"play", indexMain, indexEnnemi?, "nospend"?}` (« nospend » : carte « Spend N » jouée sans dépenser), `{"endTurn"}`, `{"potion", emplacement, indexEnnemi?}` |
+| `combat` | `{"play", indexMain, indexEnnemi?, "nospend"?}` (« nospend » : carte « Spend N » jouée sans dépenser), `{"endTurn", uidGardée?}` (carte gardée au choix en fin de tour, Traveler's Backpack ; refus `"keep"`), `{"potion", emplacement, indexEnnemi?}` |
 | `reward` | `{"pickCard", i}`, `{"skipCards"}`, `{"pickEpic", i}`, `{"skipEpic"}` (choix « Epic », `r.epics`), `{"takePotion"}`, `{"leave"}` |
 | `campfire` | `{"rest"}`, `{"upgrade", indexDeck}`, `{"leave"}` |
 | `merchant` | `{"buyCard", i}`, `{"buyRelic", i}`, `{"buyPotion", i}`, `{"remove", indexDeck}`, `{"leave"}` |
@@ -409,7 +409,8 @@ zone, épique à l'entrée » comptent les expéditions entrées avec AU MOINS u
 
 ## Sauvegarde (`Core/Save.lua`)
 
-`SlayTheDragonDB = { version = 6, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...} }`
+`SlayTheDragonDB = { version = 9, meta, current = <expédition ou nil>, journal = {...}, quarantine = {...},
+records = {...} }`
 
 - `Save.new()`, `Save.migrate(db)` (une migration par version dans `Save.MIGRATIONS`, état
   d'expédition migré par `Save.EXP_MIGRATIONS`), `Save.validate(db)` → `ok, erreurs`.
@@ -469,6 +470,49 @@ zone, épique à l'entrée » comptent les expéditions entrées avec AU MOINS u
 - Journal : une entrée par expédition `{ result, class, zone (zone atteinte), beaten (boss battus), key, seed, act,
   floor, cleared, elites, bosses, hp, maxHp, gold, goldEarned, deck, relics, killedBy, date, xp }` (les entrées
   d'avant la v5 gardent `rep`, sans `zone` ; celles d'avant la v6, sans `beaten`).
+- Version 9 (19/11/2026) : `db.records`, enregistrements rejouables (section suivante). Migration 8 → 9 : liste
+  vide ; `Save.normalize` retire les entrées illisibles et ramène la liste à 20.
+
+## Enregistrement des parties (`Core/Record.lua`, 19/11/2026)
+
+But : analyser hors du client les parties réelles (quelle carte à quel tour, sur quelle cible, face à quelle
+intention, avec quelle main et quel mana ; chemin, récompenses, marchand, feu de camp). Toujours actif, sans
+option ni écran.
+
+- **Principe** : le moteur est déterministe (graine + `ns.Rng`), on enregistre donc de quoi **rejouer**, pas des
+  états : les options de départ de `Expedition.new` et la liste ordonnée des actions passées à
+  `Expedition.act`. Toutes les actions de l'interface passent par `Save.act(db, a)` (→ `Record.act`) : `C.act`
+  du contrôleur, abandon (`Save.abandon`), conclusion d'un combat rechargé. La carte gardée en fin de tour
+  (Traveler's Backpack), autrefois posée par l'interface (`Combat.markRetain`) hors de l'action, est devenue
+  l'argument de `{ "endTurn", uid }` (les bots de `Sim/expedition.lua` aussi : rapports inchangés à graine égale).
+- **Format** : `db.records = { rec, … }`, au plus 20 (l'expédition en cours comprise ; la plus ancienne retirée
+  au départ d'une nouvelle). `rec = { fmt = 1, addon (Version du TOC), date (début), ended (fin), ev
+  (Expedition.VERSION), live (true tant que c'est db.current), seed, class, key, result, start = { seed, class,
+  zone, key, unlocks (niveau, commun, zones gagnées, talents, voie), flags }, a = { actions }, cp = { points de
+  contrôle } }`. Action : chaîne `"verbe arg arg"` (`_` = nil, ex. `"play 3 _ nospend"`, `"endTurn 17"`), préfixée
+  de `!` si l'action a été refusée (rejouée et attendue refusée) ; table copiée si elle ne s'écrit pas en mots.
+  Note `"@dev id id"` : combat de test (`/slay dev fight`) armé avant l'action suivante. Point de contrôle à
+  chaque combat conclu et à la fin : `{ n = actions jouées, hp, mhp, gold, deck (taille), zone, floor }`.
+- **Taille** : 13 Ko pour une expédition perdue dans Swamp of Sorrows (341 actions), 23 Ko pour une campagne
+  gagnée contre Nefarian (652 actions, 39 points de contrôle), au format du fichier SavedVariables ; 20
+  expéditions ≈ 0,5 Mo au plus.
+- **Rejeu** : `lua5.1 Sim/replay.lua <…/WTF/Account/<compte>/SavedVariables/SlayTheDragon.lua> [n=<numéro>]
+  [list=1] [bot=human|heuristic] [skill=0..1]` (le fichier n'est que lu). `list=1` : date, classe, clé, zone
+  atteinte, résultat. Sinon la dernière (ou la n-ième) est rejouée action par action (`Record.replay`) et
+  racontée : par combat et par tour, PV/Block/mana/ressource/états, ennemis (PV, Block, états, intention et dégâts
+  annoncés), main avec les coûts, chaque carte jouée avec sa cible et ses effets (journal `Combat.log`), le tour
+  ennemi (actions, dégâts, PV perdus, Block absorbé) ; hors combat, chaque choix avec les options proposées et
+  ce qu'il a changé (PV, or, deck, bibelots, potions). `bot=` ajoute à chaque tour ce que ce bot aurait joué
+  depuis le même état (sur une copie du combat). Version de l'addon ou des règles différente : signalé en tête.
+  Divergence (action refusée au rejeu mais acceptée à l'enregistrement, ou l'inverse ; point de contrôle
+  différent ou manquant) : le récit s'arrête là, avec les deux empreintes, code de sortie 3.
+- **Limites** : une expédition commencée avant la v9 n'est pas enregistrée (elle n'a pas son état de départ).
+  La version de développement (`0.1.0-dev`) ne change pas d'un commit à l'autre : seule une divergence révèle un
+  changement de règles entre la partie et le rejeu (les points de contrôle la détectent à la fin du combat
+  concerné au plus tard). Rien d'autre que la graine et les actions n'entre dans la partie : aucune horloge dans
+  `Core/`, parcours `pairs` triés là où l'ordre compte (vérifié : rejeu croisé lua5.1/LuaJIT et rechargements
+  avec un autre ordre d'insertion des tables, `Sim/tests_replay.lua`).
+- Tests : `lua5.1 Sim/tests_replay.lua` (et `luajit`) → `ALL PASS`.
 
 ## Campagne continue (décision du joueur, 14/11/2026)
 
