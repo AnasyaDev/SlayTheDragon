@@ -1816,3 +1816,177 @@ rapide n'apporte que 1 à 4 points (mesuré).
 - Non vérifié : clés 1 à 5, autres graines, niveaux 2 à 6 hors `zones=3 level=2`, interactions des 42 épiques
   deux à deux (seules Heart of the Wild + Furor ont un test ; les autres cumuls passent par le chaînage des
   crochets, sans revue une à une), la lecture en jeu de plusieurs jetons d'épique (`docs/interface.md`).
+
+## Épiques : mesure une par une (19/11/2026)
+
+Les zones 4 à 7 durcies (`ns.Zone.HARD`, section précédente), chaque épique imposée au départ montre ce qu'elle vaut.
+Mesure : `luajit Sim/sim.lua runner=expedition bot=human key=0 zones=7 seed=1 jobs=8 runs=300 class=<c>
+epic=<id>|none` (état de `main` après « harden zones 4 to 7 », sans le bonus « l'épique réduit la dureté »).
+Colonnes : victoires de campagne, puis battue / atteinte par zone (%) ; « moy 4-7 » = moyenne des zones 4 à 7 ;
+« écart » = moy 4-7 − celle de `epic=none` de la classe ; **sous** = au moins deux zones à plus de 5 points sous
+`epic=none` (le critère de correction). Rapports : `reports/eu/` (300), `reports/fin600/` (600), diagnostics dans
+`build/alt/reports/d1` à `d19` et `r2` (copie de travail, hors dépôt).
+
+Lecture : à 300 expéditions, ± 3 points par zone à Stranglethorn, ± 4 au Swamp, ± 7 à 17 aux Steppes et à Blackrock
+(30 à 60 expéditions y arrivent sans épique, 10 à 30 pour le Rogue) ; la moyenne 4-7 bouge de ± 2 à 3 points. Biais
+de survie : une épique imposée fait passer des decks plus faibles aux zones 1 à 3 (Westfall 80 → 95 à 99 % avec
+Furor, Heart of the Wild corrigée, Subterfuge corrigée), ce qui baisse un peu les taux conditionnels suivants.
+
+### Tableau initial (300 expéditions par ligne)
+
+| Classe | Épique | Vict. | WF | DW | WL | STV | SoS | BS | BRM | moy 4-7 | écart |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| warrior | none | 1,7 | 83,0 | 93,6 | 97,9 | 65,8 | 43,3 | 41,5 | 18,5 | 42,3 | — |
+| warrior | death_wish | 7,7 | 87,3 | 95,8 | 96,8 | 58,4 | 71,1 | 58,4 | 39,0 | 56,7 | +14,4 |
+| warrior | thunderous_roar | 9,7 | 93,0 | 96,8 | 99,3 | 72,8 | 62,1 | 50,4 | 47,5 | 58,2 | +15,9 |
+| warrior | sweeping_strikes | 2,3 | 92,0 | 96,7 | 99,6 | 59,4 | 36,7 | 39,7 | 30,4 | 41,5 | -0,7 **sous** |
+| warrior | titans_grip | 27,3 | 91,3 | 96,4 | 100,0 | 88,6 | 84,6 | 74,2 | 55,8 | 75,8 | +33,5 |
+| warrior | shield_charge | 14,3 | 93,7 | 98,2 | 100,0 | 90,6 | 74,0 | 60,0 | 38,7 | 65,8 | +23,6 |
+| warrior | anger_management | 8,0 | 91,7 | 97,8 | 100,0 | 85,5 | 63,0 | 56,6 | 29,3 | 58,6 | +16,3 |
+| warrior | avatar | 8,7 | 94,3 | 97,2 | 99,3 | 81,0 | 65,2 | 60,4 | 29,9 | 59,1 | +16,9 |
+| priest | none | 0,3 | 80,0 | 92,5 | 97,7 | 73,7 | 33,1 | 34,0 | 5,6 | 36,6 | — |
+| priest | prayer_of_mending | 0,0 | 87,7 | 97,0 | 97,6 | 63,9 | 17,0 | 22,2 | 0,0 | 25,8 | -10,8 **sous** |
+| priest | misery | 0,3 | 83,3 | 97,2 | 97,5 | 62,4 | 20,3 | 36,7 | 9,1 | 32,1 | -4,5 **sous** |
+| priest | echo_of_light | 0,7 | 90,3 | 96,3 | 99,6 | 58,5 | 13,2 | 30,0 | 33,3 | 33,8 | -2,9 **sous** |
+| priest | shadow_covenant | 0,0 | 87,3 | 93,1 | 81,1 | 41,9 | 16,9 | 7,1 | 0,0 | 16,5 | -20,1 **sous** |
+| priest | reflective_shield | 2,3 | 88,7 | 97,7 | 98,5 | 78,9 | 39,1 | 39,2 | 22,6 | 45,0 | +8,4 |
+| priest | voidform | 2,0 | 83,3 | 95,6 | 96,7 | 68,8 | 32,7 | 34,6 | 33,3 | 42,4 | +5,8 |
+| priest | inner_focus | 2,0 | 79,3 | 96,6 | 97,0 | 52,9 | 43,2 | 49,0 | 24,0 | 42,3 | +5,7 |
+| druid | none | 0,7 | 80,0 | 94,6 | 99,1 | 64,9 | 36,3 | 28,3 | 13,3 | 35,7 | — |
+| druid | furor | 2,0 | 99,7 | 99,7 | 99,7 | 66,3 | 54,3 | 43,0 | 13,0 | 44,1 | +8,4 |
+| druid | mark_of_ursol | 6,7 | 93,3 | 98,2 | 99,3 | 85,3 | 66,5 | 51,0 | 25,3 | 57,0 | +21,3 |
+| druid | eclipse | 0,0 | 80,7 | 94,2 | 94,3 | 55,3 | 37,8 | 15,6 | 0,0 | 27,2 | -8,5 **sous** |
+| druid | king_of_the_jungle | 0,7 | 89,3 | 97,8 | 98,9 | 66,0 | 35,1 | 31,7 | 10,5 | 35,8 | +0,1 |
+| druid | lifebloom | 2,7 | 84,7 | 99,2 | 99,2 | 88,4 | 58,8 | 45,4 | 13,6 | 51,5 | +15,8 |
+| druid | owlkin_frenzy | 0,3 | 82,0 | 95,9 | 98,3 | 49,1 | 32,5 | 24,3 | 11,1 | 29,2 | -6,5 |
+| druid | heart_of_the_wild | 0,0 | 40,3 | 86,0 | 90,4 | 44,7 | 35,7 | 20,0 | 0,0 | 25,1 | -10,6 **sous** |
+| hunter | none | 1,7 | 88,7 | 93,2 | 98,4 | 65,6 | 32,5 | 23,1 | 41,7 | 40,7 | — |
+| hunter | call_of_the_wild | 4,3 | 94,7 | 96,1 | 98,2 | 78,7 | 47,4 | 33,0 | 39,4 | 49,6 | +8,9 |
+| hunter | trap_launcher | 1,3 | 96,3 | 98,3 | 98,9 | 73,0 | 36,6 | 32,0 | 16,7 | 39,6 | -1,1 |
+| hunter | beast_cleave | 1,7 | 91,7 | 98,5 | 100,0 | 69,7 | 22,8 | 37,2 | 31,2 | 40,2 | -0,5 **sous** |
+| hunter | roar_of_sacrifice | 5,0 | 97,0 | 99,0 | 99,3 | 78,3 | 41,5 | 26,9 | 60,0 | 51,7 | +10,9 |
+| hunter | master_marksman | 5,7 | 94,3 | 96,5 | 99,3 | 73,8 | 51,0 | 49,0 | 34,0 | 52,0 | +11,2 |
+| hunter | black_arrow | 1,7 | 94,3 | 98,6 | 98,2 | 64,2 | 35,8 | 23,8 | 33,3 | 39,3 | -1,5 |
+| hunter | lone_wolf | 1,7 | 93,0 | 91,0 | 97,6 | 54,8 | 34,6 | 36,2 | 29,4 | 38,8 | -2,0 **sous** |
+| rogue | none | 1,3 | 86,7 | 90,8 | 94,5 | 45,7 | 31,4 | 43,8 | 28,6 | 37,4 | — |
+| rogue | deflection | 2,0 | 94,7 | 97,2 | 99,3 | 59,5 | 33,1 | 35,2 | 31,6 | 39,9 | +2,5 |
+| rogue | doomblade | 0,7 | 89,0 | 86,9 | 93,5 | 47,5 | 31,1 | 34,4 | 18,2 | 32,8 | -4,6 **sous** |
+| rogue | atrophic_poison | 3,0 | 93,7 | 93,2 | 96,9 | 70,1 | 38,8 | 39,1 | 33,3 | 45,3 | +7,9 |
+| rogue | echoing_reprimand | 1,3 | 90,0 | 91,5 | 96,4 | 51,7 | 35,0 | 39,5 | 23,5 | 37,4 | +0,0 |
+| rogue | subterfuge | 0,3 | 95,3 | 94,1 | 98,1 | 47,7 | 30,2 | 21,1 | 12,5 | 27,9 | -9,5 **sous** |
+| rogue | kidney_shot | 4,7 | 88,3 | 94,0 | 97,6 | 60,1 | 33,6 | 57,1 | 50,0 | 50,2 | +12,8 |
+| rogue | danse_macabre | 3,0 | 92,0 | 96,0 | 99,6 | 75,4 | 40,2 | 51,2 | 22,0 | 47,2 | +9,8 |
+| mage | none | 0,7 | 83,7 | 92,8 | 99,1 | 67,5 | 33,3 | 28,8 | 13,3 | 35,7 | — |
+| mage | mirror_image | 11,7 | 91,3 | 98,9 | 99,6 | 76,7 | 69,1 | 75,5 | 32,4 | 63,4 | +27,7 |
+| mage | molten_armor | 0,0 | 91,0 | 92,7 | 97,6 | 60,3 | 26,2 | 28,2 | 0,0 | 28,7 | -7,1 **sous** |
+| mage | water_elemental | 6,0 | 93,3 | 95,4 | 98,5 | 63,5 | 46,7 | 61,5 | 37,5 | 52,3 | +16,6 |
+| mage | fingers_of_frost | 1,3 | 88,0 | 93,2 | 98,4 | 60,3 | 33,6 | 42,9 | 19,0 | 39,0 | +3,2 |
+| mage | arcane_meditation | 3,0 | 90,3 | 94,8 | 96,9 | 70,7 | 42,0 | 45,9 | 26,5 | 46,3 | +10,5 |
+| mage | conflagration | 3,0 | 84,3 | 93,3 | 98,3 | 68,5 | 43,4 | 39,1 | 33,3 | 46,1 | +10,4 |
+| mage | rule_of_threes | 7,0 | 93,3 | 93,2 | 98,9 | 66,7 | 51,7 | 60,7 | 38,9 | 54,5 | +18,8 |
+
+Douze épiques **sous** `epic=none` au critère : Sweeping Strikes, Prayer of Mending, Misery, Echo of Light, Shadow
+Covenant, Eclipse, Heart of the Wild, Beast Cleave, Lone Wolf, Doomblade, Subterfuge, Molten Armor (Doomblade et
+Subterfuge, dont l'écart tenait aux Steppes et à Blackrock peu peuplés, confirmées à 600 : moyenne 4-7 33,2 et 29,9
+contre 38,5). Owlkin Frenzy (−6,5 de moyenne, une seule zone sous le seuil) a été traitée avec elles. Titan's Grip
+(75,8) et Mirror Image (63,4) restent sous 97 % dans les zones 4 à 7 : non touchées.
+
+### Diagnostic : le bot ou la carte
+
+Contrôle « sans conseils » : la même épique avec `bot.byEpic[id]` vide (le bot construit comme sans épique). S'il
+gagne nettement plus, les conseils sont en cause ; s'il ne gagne pas plus, la carte. (Le bot heuristic n'a pas été
+employé : un contrôle sans conseils au bot human isole mieux la construction du deck, et le budget de simulations
+ne permettait pas les deux.) Moyennes 4-7 à 300 expéditions :
+
+| Épique | Initial | Sans conseils | Cause | Correction (essais intermédiaires) | Après (300) |
+|---|---|---|---|---|---|
+| Sweeping Strikes | 41,5 | 41,7 | carte | moitié 45,9 ; moitié vers tous 49,0 ; moitié, éveillés 46,6 ; **moitié vers 2 (3) éveillés** | 48,1 |
+| Prayer of Mending | 25,8 | 37,3 | bot, puis carte | conseils modérés + dormeurs épargnés 39,4 ; **+ 2 dès la base** | 42,7 |
+| Misery | 32,1 | 36,1 | bot, puis carte | conseils modérés + dormeurs 39,3 ; + 1 : 43,4 ; **+ 2** (600 : 42,7) | — |
+| Echo of Light | 33,8 | 39,9 | bot et dormeurs | **conseils modérés + dormeurs épargnés** (Swamp 13,5 → 32,6) | 42,7 |
+| Shadow Covenant | 16,5 | 18,1 | carte | 1re gratuite 26,3 ; 1 PV par mana 38,8 ; **mana d'abord, PV ensuite** | 43,3 |
+| Eclipse | 27,2 | 37,1 | bot | **conseils modérés** 35,1 ; Lunar 3 / 2 et Solar sur toute carte Moonkin : 36,2 à 37,8 (écarté) | 35,1 |
+| Owlkin Frenzy | 29,2 | 37,7 | bot, puis carte | Moonfury 2 : 39,0 ; + Barkskin 2 : 38,7 ; **Moonfury 3, Barkskin 3** | 42,2 |
+| Heart of the Wild | 25,1 | — | carte | plafond 5, départ 2 : 37,4 ; **plafond 5, départ 3** (Westfall 40 → 98 %) | 41,9 |
+| Beast Cleave | 40,2 | — | carte (dormeurs) | **pas de coup à tous tant qu'un ennemi dort** (Swamp 22,8 → 39,3) | 45,7 |
+| Lone Wolf | 38,8 | 31,5 | carte | **Ferocity 3** | 49,7 |
+| Doomblade | 32,8 | — | carte | hit + DoT 50 % : 35,9 ; **hit + DoT 100 %** | 44,0 |
+| Subterfuge | 27,9 | — | bot, puis carte | **conseils modérés** 42,0 ; **+ Parry 1 dès la base** (600 : 46,5) | — |
+| Molten Armor | 28,7 | — | bot | **conseils modérés** 35,2 ; **Burn 3** 41,0 (Burn 4 à 600 : pas mieux) | 41,0 |
+
+Trois causes reviennent :
+- **Les conseils de construction** (`bot.byEpic[id].rating`, notes absolues tirées du « Deck piloté » des fiches) :
+  ils poussaient des cartes faibles au-dessus des meilleures de la classe (Exsanguinate, Shadow Dance de 3 à 9 ou
+  10, soins du Prêtre à 8) et écartaient la défense ou le contrôle (Absorb du Prêtre, Frost Nova et Polymorph de 10
+  à 6 sous Molten Armor). Dans les zones dures, c'est la défense qui tient : ces notes coûtaient 4 à 11 points.
+  Remplacées, pour les épiques touchées, par des notes **modérées** : la note de la classe plus un petit bonus
+  (0,5 à 2) pour les cartes que l'épique sert (fonction `lift`, ou fonction locale ; `bot.epic` du Prêtre lit une
+  note fonction).
+- **Les dormeurs du Swamp of Sorrows** (Asleep : tout dégât réveille, ouverture jouée au réveil) : un coup ou un DoT
+  automatique d'épique qui vise au hasard ou tout le monde les réveillait tous (Echo of Light frappe au premier
+  tic, Beast Cleave à chaque attaque du familier). Prayer of Mending, Misery, Echo of Light et Sweeping Strikes ne
+  visent plus qu'un ennemi éveillé (comme Water Elemental et Shield Charge) ; Beast Cleave ne frappe que la cible
+  tant qu'un ennemi dort.
+- **Des cartes trop chères ou trop faibles** pour des zones aux ennemis 1,45 à 2,3 fois plus solides : Shadow Covenant
+  (payer en PV à 36 PV), Heart of the Wild (plafond 3 et réserves vides : le deck de départ ne remplissait plus la
+  réserve de Cat), Doomblade (le coup de grâce ne portait pas), Lone Wolf, Sweeping Strikes, Owlkin Frenzy, Molten
+  Armor, Misery et Prayer of Mending (aucun nombre à la base).
+
+### Changements (nom et idée gardés)
+
+| Épique | Avant (base / +1 / +2 / +3) | Après | Nature |
+|---|---|---|---|
+| Sweeping Strikes | Sweep 1 / 2 / 2 / 2, un tiers | Sweep 2 / 3 / 3 / 3, la moitié, ennemis éveillés | chiffres |
+| Prayer of Mending | Divine Star + 0 / 2 / 3 / 4 | + 2 / 3 / 4 / 5, ennemi éveillé ; conseils modérés | chiffres, bot |
+| Misery | Contagion + 0 / 1 / 2 / 3 | + 2 / 3 / 4 / 5, ennemis éveillés ; conseils modérés | chiffres, bot |
+| Echo of Light | tic sur tous | tic sur les éveillés ; conseils modérés | règle précisée, bot |
+| Shadow Covenant | 2 PV par mana (+ 2 par carte Shadow du tour), gratuites 0 / 1 / 1 / 2 | gratuites 1 / 2 / 3 / 4, puis le mana tant qu'il suffit, puis 1 PV par mana (+ 1) ; conseils modérés | **règle réécrite**, bot |
+| Eclipse | — | conseils modérés seulement | bot |
+| Owlkin Frenzy | Moonfury 1 / 2 / 2 / 3, Barkskin 0 / 0 / 3 / 3 | Moonfury 3 / 4 / 4 / 5, Barkskin 3 / 3 / 5 / 5 ; conseils modérés | chiffres, bot |
+| Heart of the Wild | plafond 3 / 4 / 5 / 5, départ 0 / 0 / 0 / 1 | plafond 5, départ 3 / 4 / 4 / 5 (+2 / +3 Kindred : la réserve sans forme aussi) | chiffres |
+| Beast Cleave | le familier frappe tout le monde | pas tant qu'un ennemi dort | règle précisée |
+| Lone Wolf | Ferocity 2 / 3 / 4 / 5 | 3 / 4 / 5 / 6 | chiffres |
+| Doomblade | le coup devient un DoT de 90 / 100 / 105 / 110 % | le coup porte, plus un DoT de 100 / 110 / 120 / 130 % | **règle réécrite** |
+| Subterfuge | Parry 0 / 0 / 1 / 2 après un Surge | 1 / 1 / 2 / 3 ; conseils modérés | chiffres, bot |
+| Molten Armor | Burn 2 / 4 / 5 / 6 | 3 / 5 / 6 / 7 ; conseils modérés | chiffres, bot |
+
+### Mesure finale (600 expéditions par ligne ; Misery et Subterfuge : série `r2` de la copie de travail, mêmes fichiers)
+
+| Classe | Épique | Vict. | WF | DW | WL | STV | SoS | BS | BRM | moy 4-7 | écart |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| warrior | none | 1,5 | 82,7 | 93,1 | 98,3 | 63,4 | 44,8 | 41,9 | 16,7 | 41,7 | — |
+| warrior | sweeping_strikes | 3,7 | 95,8 | 97,7 | 100,0 | 66,4 | 45,8 | 44,4 | 28,9 | 46,4 | +4,7 |
+| priest | none | 0,8 | 82,7 | 94,6 | 97,0 | 73,4 | 31,4 | 32,4 | 14,7 | 38,0 | — |
+| priest | prayer_of_mending | 2,0 | 94,2 | 98,9 | 99,3 | 71,5 | 34,5 | 40,9 | 21,4 | 42,1 | +4,1 |
+| priest | misery | 1,7 | 87,8 | 98,7 | 98,5 | 74,6 | 31,7 | 47,1 | 17,5 | 42,7 | +4,7 |
+| priest | echo_of_light | 2,2 | 90,8 | 96,9 | 99,2 | 70,4 | 30,4 | 39,3 | 29,5 | 42,4 | +4,4 |
+| priest | shadow_covenant | 1,7 | 97,7 | 99,0 | 99,7 | 73,7 | 30,0 | 51,6 | 15,2 | 42,6 | +4,6 |
+| druid | none | 0,7 | 79,2 | 93,7 | 99,1 | 65,8 | 38,3 | 32,4 | 11,1 | 36,9 | — |
+| druid | eclipse | 0,5 | 80,2 | 94,2 | 98,0 | 61,0 | 41,3 | 32,1 | 8,3 | 35,7 | -1,2 |
+| druid | owlkin_frenzy | 1,3 | 94,7 | 98,8 | 99,3 | 68,4 | 46,7 | 37,6 | 11,9 | 41,2 | +4,3 |
+| druid | heart_of_the_wild | 1,5 | 98,7 | 99,3 | 99,5 | 70,6 | 45,5 | 39,9 | 12,0 | 42,0 | +5,1 |
+| hunter | none | 1,8 | 88,5 | 94,7 | 97,6 | 66,6 | 32,4 | 33,0 | 31,4 | 40,8 | — |
+| hunter | beast_cleave | 4,0 | 92,3 | 97,1 | 99,8 | 72,3 | 39,2 | 42,8 | 36,9 | 47,8 | +7,0 |
+| hunter | lone_wolf | 6,3 | 97,8 | 97,6 | 98,8 | 69,4 | 48,9 | 48,4 | 40,9 | 51,9 | +11,1 |
+| rogue | none | 1,5 | 87,3 | 91,0 | 95,2 | 50,2 | 27,6 | 42,9 | 33,3 | 38,5 | — |
+| rogue | doomblade | 2,8 | 98,0 | 97,8 | 98,3 | 58,2 | 46,2 | 46,1 | 24,3 | 43,7 | +5,2 |
+| rogue | subterfuge | 4,0 | 99,5 | 99,8 | 99,8 | 69,6 | 36,7 | 41,4 | 38,1 | 46,5 | +8,0 |
+| mage | none | 1,2 | 83,8 | 93,2 | 98,5 | 64,9 | 36,7 | 35,5 | 17,9 | 38,8 | — |
+| mage | molten_armor | 1,7 | 94,3 | 95,6 | 97,8 | 67,5 | 33,9 | 38,0 | 21,7 | 40,3 | +1,5 |
+
+- **Plus aucune épique touchée sous `epic=none`** au critère (au pire une zone à plus de 5 points : Subterfuge à
+  Blackrock −5,1, sur 30 expéditions). Eclipse reste au niveau de l'absence d'épique (−1,2, STV −4,8) : le seul
+  défaut trouvé était le bot ; ni Lunar plus bas, ni un bonus de dégâts sur toutes les cartes Moonkin ne l'ont levée
+  au-delà de +2 (le Druid gagne ses zones dures par la défense : Mark of Ursol +21, Lifebloom +16).
+- **+ 5 points ou plus** : Lone Wolf +11,1, Subterfuge +8,0, Beast Cleave +7,0, Doomblade +5,2, Heart of the Wild +5,1.
+  **Entre + 4 et + 5** (dans l'erreur de mesure de la cible) : Sweeping Strikes +4,7, Misery +4,7, Shadow Covenant
+  +4,6, Echo of Light +4,4, Owlkin Frenzy +4,3, Prayer of Mending +4,1. **Sous la cible** : Molten Armor +1,5 (+5,3 à
+  300 ; Burn 4 à 600 : +0,4, pas mieux), Eclipse −1,2.
+- Non touchées et sous + 5 sans être « sous » au critère : King of the Jungle +0,1, Echoing Reprimand +0,0, Trap
+  Launcher −1,1 (Blackrock −25 sur 12 expéditions), Black Arrow −1,5, Deflection +2,5, Fingers of Frost +3,2.
+
+Non vérifié : bot heuristic, clés 1 à 5, autres graines, niveaux 2 à 6, épiques gagnées en cours d'expédition (sans
+`epic=`), les paliers +1 à +3 (le bot human n'améliore presque jamais l'épique imposée) ; le bonus « l'épique réduit
+la dureté » (autre agent) s'ajoutera à ces chiffres. La vue de classe du Guerrier (`UI/Art/warrior.lua`, jeton de
+l'épique) écrit encore « splash N others for a third » en dur : à corriger en « for half » (une ligne ; l'interface
+n'était pas dans le périmètre), le harnais le signale (1 échec sur 1505).

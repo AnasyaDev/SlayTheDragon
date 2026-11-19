@@ -622,8 +622,8 @@ druide absents de `Data/` (vérifié ; « Berserk » et « Ravage » sont pris p
 | 3 Wetlands | Eclipse | Balance | `Cast cards: Eclipse 5.` | Eclipse : `With at least N in the reserve, Moonkin Cast cards resolve at once.` | 5 / 4 / 4 / 3 (+2 : `and deal 3 more`) | Ability_Druid_Eclipse | monter à 5, puis Starfire et Hurricane tout de suite, avec le bonus, et finir en Bear |
 | 4 Stranglethorn Vale | King of the Jungle | Feral | `Surge cards: Predator 1.` | Predator : `The Surge counts the whole reserve, then N stays in it.` | 1 / 2 / 2 / 3 (+2 : `the first Surge each turn draws 1`) | Ability_Druid_KingoftheJungle | plusieurs Surge par combat (Ferocious Bite, Rip, Starsurge, Mangle) |
 | 5 Swamp of Sorrows | Lifebloom | Restoration | `Each Regen heal: Bloom 1.` | Bloom : `The reserve gains N each time Regen heals, even at full HP.` | 1 / 1 / 2 / 2 (+1 et +3 : `Each combat starts with Regen 3`, puis 5) | INV_Misc_Herb_Felblossom | la Regen comme générateur : Rejuvenation et Regrowth nourrissent les Surge des autres formes |
-| 6 Burning Steppes | Owlkin Frenzy | Balance | `When hit: Moonfury 1.` | Moonfury : `In Moonkin, a hit that costs HP gives N to the reserve, once per enemy attack.` | 1 / 2 / 2 / 3 (+2 : `End of turn in Moonkin: gain 3 Absorb.`) | Ability_Druid_OwlkinFrenzy | finir en Moonkin et encaisser (la Rage du Warrior, bornée à Moonkin) |
-| 7 Blackrock Mountain | Heart of the Wild | Feral | `Forms: Kinship 3.` | Kinship : `Cat, Bear and Moonkin each keep their own reserve, up to N.` | 3 / 4 / 5 / 5 (+3 : `each starts at 1`) | Spell_Holy_BlessingOfAgility | trois réserves séparées : un deck à trois formes qui construit chacune pour elle (un Surge ne vide que la sienne) |
+| 6 Burning Steppes | Owlkin Frenzy | Balance | `When hit: Moonfury 3.` | Moonfury : `In Moonkin, each enemy attack that costs HP gives N reserve. End of turn in Moonkin: gain 3 Absorb.` | 3 / 4 / 4 / 5 (+2 : Barkskin, 5 Absorb) ; 19/11/2026, avant 1 / 2 / 2 / 3 et l'Absorb aux paliers 2 et 3 | Ability_Druid_OwlkinFrenzy | finir en Moonkin et encaisser (la Rage du Warrior, bornée à Moonkin) |
+| 7 Blackrock Mountain | Heart of the Wild | Feral | `Forms: Kinship 3.` | Kinship : `Cat, Bear and Moonkin each keep their own reserve, up to 5, and start each combat at N.` | réserves au départ 3 / 4 / 4 / 5, plafond 5 (+2 : Kindred, la réserve sans forme aussi) ; 19/11/2026, avant plafond 3 / 4 / 5 / 5 et réserves vides | Spell_Holy_BlessingOfAgility | trois réserves séparées : un deck à trois formes qui construit chacune pour elle (un Surge ne vide que la sienne) |
 
 Par voie : Feral 3, Balance 2, Restoration 2. Textes : « Epic. » en tête, deux lignes, aucun « you / your ».
 Nouveaux déclencheurs : `Form changes`, `Bear strikes`, `Forms`. Heart of the Wild change le contrat de la
@@ -635,6 +635,10 @@ forme, et Lifebloom prend `INV_Misc_Herb_Felblossom` (icône du sort dans WoW, p
 `~/Téléchargements/ICONS/`). Jusqu'au 19/11/2026, avec la Regen 2 de fin de tour en Tree of Life, Lifebloom donnait N points de réserve
 au début du tour suivant (le seul lien entre la forme et la réserve) ; depuis, la fin de tour en Tree of Life donne
 de l'Absorb, et Lifebloom ne lit plus que la Regen des cartes.
+
+**Mesurées une par une le 19/11/2026** (`docs/equilibrage.md`, « Épiques : mesure une par une ») : Owlkin Frenzy et
+Heart of the Wild renforcées (table ci-dessus), Eclipse inchangée mais ses conseils de bot modérés (ils faisaient
+prendre Starfire et Hurricane avant tout : −8 points dans les zones 4 à 7).
 
 **Codées le 18/11/2026** (`Data/Druid.lua`, `Core/Classes/druid.lua`, tests `Sim/tests_epic_druid.lua` ; détail :
 `docs/classes.md`, « Épiques du Druid »). Nombres de la table ci-dessus, non mesurés. Écarts tranchés au codage :

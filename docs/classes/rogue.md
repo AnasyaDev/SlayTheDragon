@@ -547,13 +547,17 @@ Parry 2) et Kidney Shot +2/+3 « Surge of 4+: Gouge, +1 Combo. » (puis +2 ; dé
 enregistré pour ces paliers), au lieu de « Shroud 3, gain Parry 1 » et « Surge of 4+ Combo: Gouge, +1 Combo »
 (trois lignes) ; règles inchangées.
 
+Depuis le 19/11/2026 (`docs/equilibrage.md`, « Épiques : mesure une par une ») : Doomblade porte le coup **et** pose
+le DoT (Bleed 100 % de base, la ligne ci-dessous suit) ; Subterfuge donne Parry 1 dès la base (`Surge cards:
+Shroud 2, Parry 1.`).
+
 | Épique | +1 (inchangé) | +2 | +3 |
 |---|---|---|---|
 | Deflection | Riposte 2 | Riposte 3 | Riposte 4 |
-| Doomblade | Bleed 100% | Bleed 105% | Bleed 110% |
+| Doomblade | Bleed 110% | Bleed 120% | Bleed 130% |
 | Atrophic Poison | DoT 5+, Sundered | DoT 4+ | DoT 3+ |
 | Echoing Reprimand | Animacharge 4 (2 ou 3 Combo) | Animacharge 5 | Animacharge 6 |
-| Subterfuge | Shroud 3 | `Surge cards: Shroud 3, Parry 1.` (Parry 1 à chaque Surge) | `Shroud 3, Parry 2.` |
+| Subterfuge | `Shroud 3, Parry 1.` | `Surge cards: Shroud 3, Parry 2.` (Parry 2 à chaque Surge) | `Shroud 3, Parry 3.` |
 | Kidney Shot | seuil 4+ Combo | `Surge of 4+: Gouge, +1 Combo.` (Combo rendu après le Surge) | `Surge of 4+: Gouge, +2 Combo.` |
 | Danse Macabre | Flourish 3 | Flourish 4 | Flourish 5 |
 

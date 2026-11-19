@@ -67,7 +67,9 @@ paliers 2 et 3, écrits carte par carte ; palier 0 et palier 1 inchangés. Princ
   à-côté : « Hunt N » (Call of the Wild : N Frenzy, puis le familier attaque), « Trample +N » (Beast Cleave : les
   autres ennemis en plein, N Frenzy de plus par attaque), « Prey N » (Black Arrow : le familier attaque l'ennemi
   qui tique, puis N Frenzy) ; « Launch N » (l'à-côté amélioré dit « N times »). Lone Wolf : Ferocity 4 puis 5 (le
-  Frenzy au début du tour prévu au +3 ne tenait pas en deux lignes).
+  Frenzy au début du tour prévu au +3 ne tenait pas en deux lignes) ; depuis le 19/11/2026, Ferocity 3 de base puis
+  4, 5, 6, et Beast Cleave ne frappe que la cible tant qu'un ennemi dort (`docs/equilibrage.md`, « Épiques : mesure une
+  par une »).
 - **Bots** : notes d'amélioration par défaut (× 0,8 puis × 0,6) ; valeur en combat des Powers dont le palier change
   la valeur (`Sim/bots.lua` : Spirit Bond, Trueshot Aura, Entrapment, Lock and Load, Resourcefulness, Feign Death).
 
@@ -141,7 +143,7 @@ Coût entre parenthèses ; « / » sépare les lignes de la carte.
 | Beast Cleave | Pet attacks: Stampede +1. | Pet attacks: Trample +1. | Pet attacks: Trample +2. |
 | Black Arrow | Enemy DoT ticks: pet attacks it. | Enemy DoT ticks: Prey 1. | Enemy DoT ticks: Prey 2. |
 | Call of the Wild | Start of turn: pet attacks. | Start of turn: Hunt 1. | Start of turn: Hunt 2. |
-| Lone Wolf | Attack hits: Ferocity 3. | Attack hits: Ferocity 4. | Attack hits: Ferocity 5. |
+| Lone Wolf | Attack hits: Ferocity 4. | Attack hits: Ferocity 5. | Attack hits: Ferocity 6. |
 | Master Marksman | Careful Aim: Deadeye 24. | Careful Aim: Deadeye 27. | Careful Aim: Deadeye 30. |
 | Roar of Sacrifice | When hit: Intervene 4. | When hit: Intervene 5. | When hit: Intervene 6. |
 | Trap Launcher | Traps: Launch 2. | Traps: +1 Frenzy, Launch 2. | Traps: +1 Frenzy, Launch 3. |

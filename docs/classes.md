@@ -666,6 +666,20 @@ rien seuls. Pistes non vérifiées : sous Inner Focus le bot perd des combats no
 `ns.Priest.tier(t, src)` (`Card.level(src)`) ; nouveaux réglages `COVENANT_FREE` (cartes Shadow gratuites par
 tour : 0 / 1 / 1 / 2) et `VOID_FLAT` (dégâts fixes par coup Shadow : 0 / 0 / 2 / 4). Tableau des paliers :
 `docs/classes/priest-progression.md`, « Paliers +2 et +3 ».
+
+**Mesure une par une (19/11/2026, bot human, zones dures ; `docs/equilibrage.md`, « Épiques : mesure une par
+une »).** Quatre épiques faisaient perdre le Prêtre. Causes et changements :
+- **Conseils du bot** (Prayer of Mending, Misery, Echo of Light, Shadow Covenant) : les notes absolues de `byEpic`
+  (soins à 8, Absorb et contrôle baissés) coûtaient 4 à 11 points dans les zones 4 à 7 ; remplacées par `lift` (note
+  de la classe + un petit bonus pour les cartes que l'épique sert ; `bot.epic` lit une note fonction).
+- **Dormeurs du Swamp of Sorrows** : le coup au hasard de Prayer of Mending, la copie de Misery et le tic d'Echo of
+  Light réveillaient les ennemis endormis (Echo : 13 % au Swamp contre 33 % sans épique). Ils ne visent plus qu'un
+  ennemi éveillé (`Priest.awake`, à-côtés « awake »).
+- **Chiffres** : Prayer of Mending + 2 dès la base (`MENDING_UP` 2 / 3 / 4 / 5), Misery + 2 (`MISERY_UP` 2 / 3 / 4 / 5).
+- **Shadow Covenant, règle réécrite** (nom et idée gardés : payer en PV au lieu du mana) : les premières cartes
+  Shadow du tour sont gratuites (`COVENANT_FREE` 1 / 2 / 3 / 4), les autres se paient en mana tant qu'il suffit,
+  puis 1 PV par mana + 1 par carte Shadow déjà jouée (`COVENANT_HP` 1, `COVENANT_STEP` 1). Payer toujours en PV
+  coûtait trop à 36 PV dans les zones dures (Wetlands 81 % contre 97 %), même allégé.
 ### Hunter : les sept épiques (14/11/2026)
 
 Données et règles dans `Data/Hunter.lua` (bloc « Cartes épiques », nombres réglés dans la table `EPIC`,
@@ -724,7 +738,14 @@ notes qui priment tant que l'épique est dans le deck ; en combat,
 l'épique du deck vaut 5 de plus pour le bot (`EPIC_KEEP`) : il ne la remplace que pour bien mieux, et une
 épique imposée (`epic=<id>`) reste mesurée seule.
 
+**Mesure une par une (19/11/2026, bot human ; `docs/equilibrage.md`, « Épiques : mesure une par une »).** Beast
+Cleave : tant qu'un ennemi vivant dort (Asleep), `petAll` reste faux et le familier ne frappe que sa cible (« unless
+one sleeps » dans l'à-côté de Stampede et Trample) ; le familier réveillait tous les dormeurs du Swamp of Sorrows
+(−10 points dans la zone). Lone Wolf : Ferocity 2 / 3 / 4 / 5 → 3 / 4 / 5 / 6 (`lonePer`) ; sans ses conseils de
+deck, l'épique perdait encore plus : la carte était en cause.
+
 ### Épiques du Voleur (14/11/2026)
+
 
 Données et nombres (`EPIC_N`, seule source : textes et règles) dans `Data/Rogue.lua` ; règles (`deckHooks`,
 `ns.Rogue`) dans `Core/Classes/rogue.lua` ; vue (note de l'épique sur son jeton des états du héros, marques
@@ -755,6 +776,12 @@ d'Atrophic Poison) dans `UI/Art/rogue.lua` ; tests `Sim/tests_epic_rogue.lua`, h
   Contrôle « à blanc » (nombre nul, mêmes conseils du bot) : Deflection −3,1, Echoing −1,2, Kidney +0,9,
   Atrophic −2,9, Danse +3,4 (les retraits de doublons conseillés par `bot.byEpic.danse_macabre` rapportent
   un peu seuls, surtout à Duskwood).
+
+- **Mesure une par une (19/11/2026, bot human ; `docs/equilibrage.md`, « Épiques : mesure une par une »)** :
+  Doomblade, règle réécrite (nom et idée gardés) : le coup de grâce **porte** et pose en plus un DoT de 100 % (110 /
+  120 / 130 %) de ses dégâts ; convertir le coup en DoT de 90 % faisait perdre 5 à 11 points dans les zones 4 à 7.
+  Subterfuge : conseils du bot modérés (`lift` : Shadow Dance, Secret Technique et Nightblade n'y sont plus poussées)
+  et Parry 1 dès la base (`subterfugeParry` 1 / 1 / 2 / 3, « Shroud 2, Parry 1. »).
 
 ### Épiques du Guerrier (14/11/2026, réglées pour les zones dures le 14/11/2026)
 
@@ -809,6 +836,12 @@ deck : une épique de même note n'en remplace jamais une autre). Corrigés le 1
 Battle Shout, Recklessness, Victory Rush ne sont plus écartées). Contrôles « à blanc » avec les mêmes conseils
 (`copies = 0, limit = 99, extraCost = 0` ; `steps = 0, give = 0`) : Titan's Grip −0,3, Anger Management −5,0 :
 les conseils seuls ne rapportent rien.
+
+**Mesure une par une (19/11/2026, bot human ; `docs/equilibrage.md`, « Épiques : mesure une par une »).** Sweeping
+Strikes : Sweep 1 / 2 / 2 / 2 au tiers → 2 / 3 / 3 / 3 à la moitié (`targets`, `div = 2`), et le rebond ne tire
+jamais un dormeur (état Asleep du Swamp of Sorrows : le rebond le réveillait). Au tiers vers un seul ennemi,
+l'épique ne gagnait rien dans les zones 4 à 7 ; sans ses conseils de deck (Cleave, Whirlwind écartées), pas mieux :
+la carte était en cause, pas le bot. La vue de classe (`UI/Art/warrior.lua`) écrit encore « for a third » en dur.
 
 ### Épiques du Mage (14/11/2026)
 
@@ -866,7 +899,12 @@ cartes Fire moins poussés), le contrôle à blanc donne −1,7 et −1,4 (rien)
 toujours pas préparer sur deux tours (garder son mana pour un tour à deux gros sorts, poser le DoT sur la cible qu'il
 achèvera au tour suivant) : il ne regarde qu'un tour.
 
+**Mesure une par une (19/11/2026, bot human ; `docs/equilibrage.md`, « Épiques : mesure une par une »).** Molten
+Armor : conseils modérés (`lift` ; les anciens écartaient Frost Nova et Polymorph, −7 points dans les zones 4 à 7) et
+Burn 3 / 5 / 6 / 7 (2 / 4 / 5 / 6 avant).
+
 ### Épiques du Druid (18/11/2026)
+
 
 Données, crochets et nombres dans `Data/Druid.lua` (bloc « Cartes épiques » : table `EPIC` exposée en
 `ns.DruidEpic`, tables `{ base, +1, +2, +3 }`, seule source des textes, des règles et des à-côtés ; `deckHooks`,
@@ -885,8 +923,8 @@ cards » existaient).
 | Eclipse (Wetlands) | `Cast cards: Lunar 5.` | `instantCast`, `damage`, `afterCast` | Cast Moonkin tout de suite à N en réserve (lu après le changement de forme : en Moonkin, avec le bonus des Charges) ; l'état Instant n'est pas consommé ; +2 / +3 « Solar » : + 3 par coup (`c.cls.eclipse`) |
 | King of the Jungle (Stranglethorn Vale) | `Surge cards: Predator 1.` | `onSurge`, `onCardPlayed` | le Surge compte tout, min(N, montant) revient **après** la carte (aucun bonus de Moonkin sur Starsurge / Starfall) ; +2 / +3 « Apex » : le premier Surge du tour pioche 1 |
 | Lifebloom (Swamp of Sorrows) | `Each Regen heal: Bloom 1.` | `onRegenTick`, `whileInDeck` | +N par tic de Regen, PV pleins compris ; améliorée : Regen 3 au début du combat (+3 « Overgrowth » : 5), qui tique dès le premier tour |
-| Owlkin Frenzy (Burning Steppes) | `When hit: Moonfury 1.` | `onPlayerHit`, `onTurnEnd` | en Moonkin, une fois par action ennemie (`c.fxId`, `c.cls.owlFx`) qui coûte des PV ; +2 / +3 « Barkskin » : 3 Absorb en fin de tour en Moonkin |
-| Heart of the Wild (Blackrock Mountain) | `Forms: Kinship 3.` | `resCap`, `onShift`, `whileInDeck` ; règle de classe `cardRes` | trois réserves, ci-dessous ; +3 « Kindred » : chacune commence à 1 |
+| Owlkin Frenzy (Burning Steppes) | `When hit: Moonfury 3.` | `onPlayerHit`, `onTurnEnd` | en Moonkin, une fois par action ennemie (`c.fxId`, `c.cls.owlFx`) qui coûte des PV ; 3 Absorb en fin de tour en Moonkin (+2 / +3 « Barkskin » : 5) |
+| Heart of the Wild (Blackrock Mountain) | `Forms: Kinship 3.` | `resCap`, `onShift`, `whileInDeck` ; règle de classe `cardRes` | trois réserves au plafond de la classe (5), chacune à N au début du combat ; +2 / +3 « Kindred » : la réserve sans forme aussi |
 
 **Heart of the Wild : trois réserves sans changer le contrat de la ressource.** `c.player.res` reste la réserve
 **de la forme active** (pastille, nom par `L.combatResource`, `gainRes`, `surge`, `spendRes`, frappe de l'ours,
@@ -901,7 +939,16 @@ au jeu (`commit`, juste avant le Spend), le Druid place la réserve de la forme 
 attente, Frenzied Regeneration en Cat paie son Spend en Frenzy. Bots : `botKey` et `botValue` de la classe
 enveloppés (réserves en attente dans la clé, valant `bot.resValue` chacune ; compteurs de Furor et d'Apex).
 
+**Mesure une par une (19/11/2026, bot human, zones dures ; `docs/equilibrage.md`, « Épiques : mesure une par une »).**
+Owlkin Frenzy : Moonfury 1 / 2 / 2 / 3 → 3 / 4 / 4 / 5, Barkskin 3 dès la base (5 aux paliers 2 et 3). Heart of
+the Wild : plafond 3 / 4 / 5 / 5 → 5 partout (celui de la classe) et chaque réserve de forme au départ à 3 / 4 / 4 /
+5 (nombre de la carte : `Kinship 3`) ; « Kindred » passe aux paliers 2 et 3 (la réserve sans forme part aussi de N) ;
+`Druid.kinStart(c, n, rest)` prend la valeur de la réserve sans forme. Eclipse : nombres inchangés, conseils du bot
+modérés (`lift` : note de la classe + un petit bonus, comme Owlkin Frenzy) ; les anciennes notes absolues (Starfire
+et Hurricane à 9) coûtaient 8 points dans les zones 4 à 7.
+
 ## Sauvegarde
+
 
 `Save.VERSION` 5, `Expedition.VERSION` 6 (version 6 : cartes épiques, `docs/expedition.md` ; épique en jeu : `c.epic`, champ facultatif) : version 3, migration de la Démence du combat en cours
 (`c.player.demence` → `c.player.res`, `c.class`, `c.cls`) ; version 4, niveau de classe (`cs.xp` tiré de

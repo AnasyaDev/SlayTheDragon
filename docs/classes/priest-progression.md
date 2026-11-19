@@ -184,18 +184,21 @@ tempo (coût, Retain, Innate, pioche), à l'Atonement (durée, effets conditionn
 | Flash Heal | Heal 10 | pioche 2 | Heal 12 |
 | Empyreal Blaze | Deal 44 | Deal 49 | Sundered 3 |
 | Apotheosis | coût 1 | pioche 1 à la pose | Innate |
-| Prayer of Mending (épique) | Divine Star +2 | +3 | +4 |
-| Misery (épique) | Contagion +1 | +2 | +3 |
+| Prayer of Mending (épique) | Divine Star +3 | +4 | +5 |
+| Misery (épique) | Contagion +3 | +4 | +5 |
 | Echo of Light (épique) | Sanctify +2 | +3 | +4 |
-| Shadow Covenant (épique) | 1re carte Shadow du tour gratuite | Life Tap 1 (1 PV par mana) | 2 cartes Shadow gratuites par tour |
+| Shadow Covenant (épique) | 2 cartes Shadow gratuites par tour | 3 | 4 |
 | Reflective Shield (épique) | renvoie la moitié | trois cinquièmes | deux tiers |
 | Voidform (épique) | Madness 2 | + 2 fixes par coup Shadow | + 4 fixes |
 | Inner Focus (épique) | Empower 100 % | 125 % | 150 % |
 
 Épiques : leur texte tient en une clause (deux lignes au plus, harnais UEL, désormais vérifié à chaque palier
 écrit) ; une deuxième clause (« Start of combat: +1 Insanity. », « It can't be interrupted. ») passait à quatre
-lignes, d'où des paliers chiffrés. Mot de règle Life Tap amélioré : « The first ones each turn are free, as
-stated. » (le nombre de cartes gratuites est sur la carte). Inner Focus : mot Empower lu « +N % » à tous les
+lignes, d'où des paliers chiffrés. Mot de règle Life Tap : « Free as stated. Others cost
+mana while it lasts, then N HP per mana, +1 per Shadow card before. » (le nombre de cartes gratuites est sur la
+carte). Depuis le 19/11/2026 (`docs/equilibrage.md`, « Épiques : mesure une par une ») : Divine Star +2 et Contagion
++2 dès la base, la première carte Shadow du tour gratuite dès la base, les autres en mana tant qu'il suffit (avant :
+toujours en PV) ; Prayer of Mending, Misery et Echo of Light épargnent les dormeurs (Asleep). Inner Focus : mot Empower lu « +N % » à tous les
 paliers (plus « doubled »).
 
 Bots : notes d'amélioration par défaut (× 0,8 puis × 0,6). Une table par palier pour les paliers « Retain »

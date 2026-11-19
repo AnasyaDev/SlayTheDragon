@@ -63,11 +63,14 @@ Thunderous Roar, Shield Charge, Anger Management et Avatar ne changent que leurs
 qu'un texte amélioré (`L.ruleText`) : les nombres qui changent aux paliers 2 et 3 passent par le nombre de la carte
 (`N`) ; Haste dit désormais « return N turns sooner » une fois amélioré.
 
+Depuis le 19/11/2026, Sweeping Strikes de base dit « Sweep 2 » (deux autres ennemis éveillés, à la moitié) : la ligne
+ci-dessous suit (`docs/equilibrage.md`, « Épiques : mesure une par une »).
+
 | Épique | +1 | +2 | +3 |
 |---|---|---|---|
 | Death Wish | Kills : soin 3 | soin 5 | Carnage 60 % |
 | Thunderous Roar | Shockwave 4 (+ Demoralized 1) | Shockwave 5 | Shockwave 6 |
-| Sweeping Strikes | Sweep 2 | « Attacks: Sweep 2. » (les Attacks à tous rebondissent aussi) | Kills : +1 Rage |
+| Sweeping Strikes | Sweep 3 | « Attacks: Sweep 3. » (les Attacks à tous rebondissent aussi) | Kills : +1 Rage |
 | Titan's Grip | 0-cost free | Kills : soin 4 (texte « Dual Wield 2. ») | soin 6 |
 | Shield Charge | Punish +4 | +6 | +8 |
 | Anger Management | Haste 2 | Haste 3 | Haste 4 |

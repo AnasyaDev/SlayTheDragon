@@ -464,12 +464,15 @@ Mage :
 | Arcane Power | coût 0 | Innate | +1 Charge au jeu |
 | Arcane Surge | coût 0 | Retain | +1 Charge après le Surge |
 | Mirror Image | Image 100 % | 125 % | 150 % |
-| Molten Armor | Burn 4 | Burn 5 | Burn 6 |
+| Molten Armor | Burn 5 | Burn 6 | Burn 7 |
 | Water Elemental | Waterbolt 4 | 5 | 6 |
 | Fingers of Frost | Brain Freeze +4 | +6 | +8 |
 | Arcane Meditation | Conserve 6, +2 | Conserve 9, +3 | Conserve 12, +4 |
 | Conflagration | Pyroclasm 20 | 22 | 25 |
 | Rule of Threes | chaque 3e carte | 2e carte du tour | chaque 2e carte |
+
+Molten Armor de base : Burn 3 depuis le 19/11/2026 (2 avant ; la ligne ci-dessus suit, `docs/equilibrage.md`,
+« Épiques : mesure une par une »).
 
 Limites connues : Blizzard+3 et Glacial Spike+3 perdent les synergies de Cast (Mirror Image, Fingers of Frost, Robe
 of the Archmage, Apprentice's Wand) ; c'est écrit sur la carte, le bot ne le sait pas (notes d'amélioration par
