@@ -241,9 +241,12 @@ EH.deflection = {
   end,
 }
 
--- Doomblade : un coup d'une carte Attack à clause Surge n'est pas porté ; sa cible reçoit un DoT égal aux
--- dégâts calculés (amélioré : +50 %, arrondi au-dessus) (Combo, Stealth, Sundered),
--- sans l'Absorb, par le crochet « apply ». Crochet moteur « convertHit » (Core/Effects.lua).
+-- Doomblade : un coup d'une carte Attack à clause Surge pose d'abord sur sa cible un DoT égal à une part
+-- (EPIC_N.doomblade : 100 %, puis 110 / 120 / 130 %, arrondi au-dessus) des dégâts calculés (Combo, Stealth,
+-- Sundered), sans l'Absorb, par le crochet « apply » ; puis le coup porte, comme sans l'épique. Jusqu'au
+-- 19/11/2026, le coup n'était pas porté (90 % en DoT à la place) : l'épique perdait 5 à 11 points dans les zones 4
+-- à 7 au bot human (docs/equilibrage.md, « Épiques : mesure une par une »). Crochet moteur « convertHit »
+-- (Core/Effects.lua), qui rend ici les dégâts inchangés.
 EH.doomblade = {
   convertHit = function(c, src, v, t, ctx)
     local d = ctx and ctx.def
@@ -252,7 +255,7 @@ EH.doomblade = {
     n = Combat.modify(c, "apply", n, "pain", t, d)
     if n > 0 then Combat.applyStatus(c, t, "pain", n, "poison") end
     stat(c, "doombladeDot", n)
-    return false
+    return v
   end,
 }
 
@@ -319,7 +322,7 @@ EH.subterfuge = {
     if c.cls.stealthGained and n > 0 then Combat.gainRes(c, n, "epic") end
   end,
   -- source de Stealth incluse : chaque Surge (dépense de 1 ou plus) rend Stealth, pour les cartes jouées après ;
-  -- paliers 2 et 3 : et Parry (« Shroud 3, gain Parry 1. »)
+  -- et Parry (« Shroud 2, Parry 1. » ; dès la base depuis le 19/11/2026, avant aux paliers 2 et 3 seulement)
   onSurge = function(c, src)
     if c.result then return end
     if Rogue.EPIC.subterfugeSurge[tier(src)] then Combat.applyStatus(c, c.player, "stealth", 1) end
@@ -410,7 +413,8 @@ do
     return "Deal N damage to the last target, +" .. E.deflectionStep[i] .. " per earlier Riposte this turn."
   end)
   L.rule("riposte", { name = "Riposte", text = t1, upText = t2 })
-  L.rule("bleed", { name = "Bleed", text = "The hit deals no damage and applies N% of it as DoT, rounded up." })
+  L.rule("bleed", { name = "Bleed", text = "The hit lands and also applies N% of it as DoT, rounded up." })
+
   -- seuil écrit sur la carte (« DoT 5+: », 4 et 3 aux paliers 2 et 3), pas dans l'à-côté
   t1, t2 = both(function(i)
     return "Enemies with at least that much DoT count as Demoralized" .. (i == 2 and " and Sundered." or ".")

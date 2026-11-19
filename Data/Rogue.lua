@@ -495,14 +495,14 @@ card("shadow_dance", {
 local EPIC_N = {
   deflection = { 1, 2, 3, 4 },    -- première riposte du tour (fiche : 3 / 4)
   deflectionStep = { 2, 2, 2, 2 }, -- de plus par riposte précédente du tour : k-ième = N + S × (k − 1) (fiche : 3 / 4)
-  doomblade = { 0.9, 1, 1.05, 1.1 }, -- part des dégâts d'un coup de grâce posée en DoT, arrondie au-dessus (fiche : ½ / 1)
+  doomblade = { 1, 1.1, 1.2, 1.3 }, -- part des dégâts d'un coup de grâce posée en DoT en plus du coup (19/11/2026)
   atrophic_poison = { 5, 5, 4, 3 }, -- DoT montré (avant son tic) qu'il faut au moins (fiche : 2, « garde du DoT après son tic »)
   echoing_reprimand = { 3, 4, 5, 6 }, -- un Surge de 2 (à M) Combo compte N (fiche : 5 / 6)
   echoingMax = { 2, 3, 3, 3 },    -- M : dépense la plus haute qui compte N (fiche : 3)
   subterfuge = { 0, 0, 0, 0 },    -- Combo par Stealth gagné (fiche : 0 / 1 ; la ligne ne tient plus sur la carte)
   subterfugeTurns = { 2, 3, 3, 3 }, -- tours que dure un Stealth (le tour où il est gagné compris ; fiche : 1)
   subterfugeSurge = { true, true, true, true }, -- chaque Surge rend Stealth (source incluse ; fiche : aucune)
-  subterfugeParry = { 0, 0, 1, 2 }, -- Parry gagné après chaque Surge (paliers 2 et 3)
+  subterfugeParry = { 1, 1, 2, 3 }, -- Parry gagné après chaque Surge (dès la base depuis le 19/11/2026)
   kidney_shot = { 5, 4, 4, 4 },   -- Combo dépensés au moins (fiche : 5 / 4)
   kidneyCombo = { 0, 0, 1, 2 },   -- Combo rendus après un Surge qui étourdit (paliers 2 et 3)
   danse_macabre = { 2, 3, 4, 5 }, -- par autre nom joué dans le tour, au-delà des F premiers (fiche : 2 / 3)
@@ -713,8 +713,14 @@ do
     },
     -- plusieurs ouvertures par tour sous Stealth
     subterfuge = {
-      rating = { ambush = 12, secret_technique = 10, cheap_shot = 9, premeditation = 8.5, vanish = 9,
-        shadowstep = 9.5, smoke_bomb = 9, shadow_dance = 9, nightblade = 10, killing_spree = 5 },
+      -- conseils modérés (19/11/2026) : note de la classe + un petit bonus ; les notes absolues (Shadow Dance de
+      -- 3 à 9, Secret Technique, Nightblade) faisaient perdre 6 à 19 points au bot human dans les zones 4 à 7
+      rating = function(exp, id)
+        local b = ({ ambush = 1.5, cheap_shot = 1, premeditation = 1, shadowstep = 1, vanish = 1,
+          smoke_bomb = 0.5 })[id]
+        if b then return (bot.rating[id] or 5) + b end
+      end,
+
       upgrade = { backstab = 5, subterfuge = 4.5, sinister_strike = 2 },
       remove = { sinister_strike = 0.6, feint = 1.2 },
     },

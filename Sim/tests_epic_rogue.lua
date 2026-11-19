@@ -235,12 +235,13 @@ end)
 ---------------------------------------------------------------------------
 -- Doomblade
 ---------------------------------------------------------------------------
-test("Doomblade : Eviscerate à 5 Combo = DoT (part de 24) au lieu de 24, sans Absorb ; amélioré", function()
+test("Doomblade : Eviscerate à 5 Combo = DoT (part de 24, sans l'Absorb), puis le coup de 24 porte ; amélioré", function()
   local c = setup("doomblade", { "eviscerate" })
   c.player.res = 5
   c.enemies[1].block = 10
   play(c, "eviscerate", 1)
-  eq(hp(c), 200); eq(c.enemies[1].block, 10, "le DoT ignore l'Absorb"); eq(c.enemies[1].st.pain, dot(24))
+  eq(c.enemies[1].st.pain, dot(24), "DoT entier malgré l'Absorb")
+  eq(hp(c), 200 - (24 - 10), "le coup porte, l'Absorb le réduit"); eq(c.enemies[1].block, 0)
   eq(c.player.res, 0)
   local u = setup("doomblade", { "eviscerate" }, { up = true })
   u.player.res = 5
@@ -263,11 +264,11 @@ test("Doomblade : Secret Technique sous Stealth = deux DoT par ennemi ; Between 
   local c = setup("doomblade", { "secret_technique" }, { encounter = { "ter_dummy", "ter_dummy" } })
   c.player.res = 3
   play(c, "secret_technique")
-  eq(c.enemies[1].st.pain, 2 * dot(12)); eq(c.enemies[2].st.pain, 2 * dot(12)); eq(hp(c, 1), 200)
+  eq(c.enemies[1].st.pain, 2 * dot(12)); eq(c.enemies[2].st.pain, 2 * dot(12)); eq(hp(c, 1), 200 - 2 * 12)
   local b = setup("doomblade", { "between_the_eyes" })
   b.player.res = 2
   play(b, "between_the_eyes", 1)
-  eq(b.enemies[1].st.pain, dot(8)); eq(b.enemies[1].st.stunned, 1); eq(hp(b), 200)
+  eq(b.enemies[1].st.pain, dot(8)); eq(b.enemies[1].st.stunned, 1); eq(hp(b), 200 - 8)
   local e = setup("doomblade", { "envenom" })
   e.player.res = 2
   play(e, "envenom", 1)
@@ -275,12 +276,15 @@ test("Doomblade : Secret Technique sous Stealth = deux DoT par ennemi ; Between 
   eq(hp(e), 196)
 end)
 
-test("Doomblade : un coup converti n'est pas un coup (pas de Deadly Poison)", function()
+test("Doomblade : le coup porte aussi (Deadly Poison ajoute son DoT)", function()
   local c = setup("doomblade", { "deadly_poison", "nightblade" })
   play(c, "deadly_poison")
   c.player.res = 2
+  local h = hp(c)
   play(c, "nightblade", 1)
-  eq(c.enemies[1].st.pain, dot(12), "12 → DoT, pas de +1 de Deadly Poison")
+  eq(c.enemies[1].st.pain, dot(12) + 1, "12 → DoT, +1 de Deadly Poison au coup")
+  eq(h - hp(c), 12, "le coup de 12 porte")
+
   eq(c.player.st.stealth, 1, "Nightblade rend Stealth")
 end)
 
