@@ -209,11 +209,19 @@ return function(ns)
   -- du deck de SE.EPIC_MARGIN (note de l'actuelle + SE.UPGRADED_BONUS si elle est améliorée).
   SE.EPIC_RATING = 7
   SE.EPIC_MARGIN = 0.5
+  -- Avec des talents (exp.talents), l'arbre de la classe ajoute son accord à chaque épique
+  -- (ns.Talents[classe].bot.epic = { [id] = écart de note } : Thunderous Roar vide la Rage que l'arbre garde).
+  local function talentEpicBias(exp, id)
+    local t = exp.talents and ns.Talents[exp.class]
+    local bias = t and t.bot and t.bot.epic
+    return bias and bias[id] or 0
+  end
   local function epicRating(exp, id)
     local b = botOf(exp)
     local v = b.epic and b.epic(exp, id)
-    if v then return v end
-    return ns.Run.RATING[id] or SE.EPIC_RATING
+    if not v then v = ns.Run.RATING[id] or SE.EPIC_RATING end
+    if exp.talents then v = v + talentEpicBias(exp, id) end
+    return v
   end
   SE.epicRating = epicRating
 
