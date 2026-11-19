@@ -13451,12 +13451,12 @@ do
   local _ = c0
 end
 -- Talents (docs/talents.md, § 11) : Sim/ui_talents.lua (return function(T) … end ; même T que les zones).
-print("UTL talents : onglet Talents (neuf, 15 points, plein, classe sans arbre, en expédition), infobulles, Specialization, remboursement, panneau du deck, Veteran's Arsenal au départ, bilan, accueil, migration v8")
+print("UTL talents : onglet Talents (neuf, 15 points, plein, classe sans arbre, en expédition), infobulles, Specialization, remboursement, panneau du deck, Veteran's Arsenal au départ, bilan, accueil, migration v8, six arbres réels pleins, chiffres changés par les talents en combat")
 do
   local R = dofile(root .. "/Sim/ui_render.lua")
   R.H = H
   dofile(root .. "/Sim/ui_talents.lua")({ H = H, check = check, snap = snap, root = root, SEED = SEED, UI = UI,
-    EXP = EXP, button = button, clickOption = clickOption, option = option, currentKind = currentKind, R = R })
+    EXP = EXP, button = button, clickOption = clickOption, option = option, currentKind = currentKind, R = R, V = V })
 end
 
 print("U16 méthodes d'API inconnues appelées")

@@ -194,27 +194,42 @@ return function(T)
   local before = ns.Meta.spent(ns.Persist.db.meta, "warrior")
   H.click(tough)
   check("clic sur un nœud sans point : refusé, rien ne change", ns.Meta.spent(ns.Persist.db.meta, "warrior") == before)
-  -- icônes : chaque nœud de chaque arbre défini a une icône ; Warrior et génériques embarqués dans Media/Icons
+  -- icônes : chaque nœud et chaque voie des arbres définis a une icône embarquée dans Media/Icons (remplacement
+  -- Art.talentIcons pris en compte) ; la liste des manquantes dit lesquelles remplacer (UI/Art/talents.lua)
   local Skin, Art = ns.Skin or ns.SkinData, ns.Art
   local icons = Skin and Skin.icons
-  local missing, other = {}, {}
+  local missing, nIcons, classes = {}, 0, {}
   for cid, tr in pairs(ns.Talents) do
+    classes[#classes + 1] = cid
     for _, n in ipairs(tr.nodes) do
       local parts = n.choices or { n }
       for _, p in ipairs(parts) do
+        nIcons = nIcons + 1
         local e = Art.talentIcon(cid, p.id, p.icon, n.icon)
         if not (e and (e.tga or e.icon)) then missing[#missing + 1] = cid .. "/" .. p.id
-        elseif icons and e.tga and not icons[e.tga:lower()] then
-          if cid == "warrior" or n.id == "toughness" or n.id == "provisions" or n.id == "field_medic"
-              or n.id == "veterans_arsenal" then missing[#missing + 1] = cid .. "/" .. p.id .. " (" .. e.tga .. ")"
-          else other[#other + 1] = cid .. "/" .. p.id end
+        elseif icons and not (e.tga and icons[e.tga:lower()]) then
+          missing[#missing + 1] = cid .. "/" .. p.id .. " (" .. tostring(e.tga or e.icon) .. ")"
         end
       end
     end
   end
-  check(("icônes des nœuds : chacune résolue, Warrior et génériques embarqués%s"):format(#other > 0
-    and (" (" .. #other .. " d'autres classes par le client : " .. table.concat(other, ", ") .. ")") or ""),
-    icons ~= nil and #missing == 0, joined(missing))
+  table.sort(classes)
+  check(("icônes des nœuds : %d (nœuds et voies, %s), toutes embarquées dans Media/Icons"):format(nIcons,
+    table.concat(classes, ", ")), icons ~= nil and #missing == 0 and #classes == 6, joined(missing))
+  -- remplacements : chaque nom de Art.talentIcons est embarqué et vise un nœud ou une voie de l'arbre
+  local badOver = {}
+  for cid, map in pairs(Art.talentIcons) do
+    local tr = ns.Talents[cid]
+    for id, name in pairs(map) do
+      local known = false
+      for _, n in ipairs(tr and tr.nodes or {}) do
+        if n.id == id then known = true end
+        for _, ch in ipairs(n.choices or {}) do if ch.id == id then known = true end end
+      end
+      if not known or not (icons and icons[name:lower()]) then badOver[#badOver + 1] = cid .. "/" .. id .. " " .. name end
+    end
+  end
+  check("remplacements d'icônes (Art.talentIcons) : nœuds connus, icônes embarquées", #badOver == 0, joined(badOver))
   check("nœud sans icône : repli sur l'icône de la classe", Art.talentIcon("warrior", "x", nil, nil) == Art.class("warrior"))
 
   -- 2. Arbre à 15 points dépensé par des clics (Warrior niveau 17 : 16 points) ------------------------------------
@@ -552,4 +567,257 @@ return function(T)
   ns = boot({ levels = { warrior = 12 } })
   clickOption("class:warrior")
   check("sauvegarde déjà en v8 : pas de ligne de migration", not (UI().step.text or ""):find("You have", 1, true))
+
+  -- 9. Les six arbres réels, pleins (ordre du bot, 24 points) : rangées de 3 à 5 nœuds, noms longs, trois faces ---
+  local CLASSES = { "warrior", "druid", "hunter", "mage", "priest", "rogue" }
+  for _, cid in ipairs(CLASSES) do
+    local tr = ns.Talent.tree(cid)
+    if not tr then
+      check("arbre de " .. cid .. " : défini", false)
+    else
+      local map, spec = botTree(ns, cid, 24, tr.bot.spec)
+      ns = boot({ levels = { [cid] = 25 }, trees = { [cid] = { map, spec } } })
+      clickOption("class:" .. cid)
+      scr = openTalents(cid)
+      t = scr.tv
+      local perRow, nodes, faces = {}, 0, 0
+      for _, n in ipairs(tr.nodes) do
+        perRow[n.row] = (perRow[n.row] or 0) + 1
+        if n.choices then faces = faces + #n.choices else nodes = nodes + 1 end
+      end
+      local shownN = 0
+      for _, b in ipairs(t.nodes) do if vis(b) and b.option then shownN = shownN + 1 end end
+      local sizes = {}
+      for r = 1, 4 do sizes[r] = perRow[r] or 0 end
+      local specName = tr.byId.specialization.byChoice[spec].name
+      local named = false
+      for _, l in ipairs(t.names) do if vis(l) and l._text == "Specialization: " .. specName then named = true end end
+      check(("arbre plein du %s : 24 sur 24, rangées de %s nœuds, %d nœuds et %d faces, « Specialization: %s »"):format(
+        ns.Classes[cid].name, table.concat(sizes, "/"), nodes, faces, specName),
+        t.summary._text == "0 talent points to spend · 24 of 24 spent" and shownN == nodes and count(t.faces) == faces
+        and faces == 3 and named and count(t.bands) == 4, tostring(t.summary._text) .. " " .. shownN .. " " .. count(t.faces))
+      bad = layoutProblems(scr)
+      check(("arbre plein du %s : tout dans la fenêtre, sans chevauchement, rien de tronqué"):format(ns.Classes[cid].name),
+        #bad == 0, joined(bad))
+      -- infobulle de chaque nœud : nom, « Rank N/N », texte du rang actuel (nœud au maximum : pas de rang suivant)
+      local tbad = {}
+      for _, b in ipairs(t.nodes) do
+        if vis(b) and b.option then
+          local o = b.option
+          local lines = tip(b)
+          if lines[1] ~= o.name or lines[2] ~= ("Rank %d/%d"):format(o.ranks, o.ranks)
+            or lines[3] ~= ns.Talent.rankText(cid, o.node, o.ranks) then tbad[#tbad + 1] = joined(lines) end
+        end
+      end
+      check(("arbre plein du %s : infobulles des nœuds (nom, rang maximal, texte)"):format(ns.Classes[cid].name),
+        #tbad == 0, joined(tbad))
+      snap("talents-" .. cid, true)
+    end
+  end
+
+  -- 10. En combat : les chiffres changés par les talents (pastille, infobulles, marques, jetons d'état) ----------
+  -- Expédition de la classe au niveau 25 avec son arbre plein (voie au choix), premier nœud de la carte en combat.
+  local function plainTip(o)
+    local out = {}
+    for _, l in ipairs(tip(o)) do out[#out + 1] = H.plain(tostring(l)) end
+    return table.concat(out, " | ")
+  end
+  local function talentCombat(cid, spec)
+    local map, sp = botTree(H.ns or ns, cid, 24, spec)
+    ns = boot({ levels = { [cid] = 25 }, trees = { [cid] = { map, sp } } })
+    clickOption("class:" .. cid)
+    ns.Controller.makeSeed = function() return T.SEED end
+    clickOption("go")
+    for _ = 1, 3 do
+      if kind() == "talentEpic" then clickOption("skipTalentEpic")
+      elseif kind() == "startRelic" then clickOption("skipStartRelic") end
+    end
+    local ex = EXP()
+    local id = ex.map.start[1]
+    ex.map.nodes[id].kind = "combat"
+    clickOption("path:" .. id)
+    H.settle()
+    local v = T.V()
+    local c = ex.combat
+    v:Render(true)
+    H.settle()
+    return c, v
+  end
+  local function has(text, s) return text:find(s, 1, true) ~= nil end
+  local function statusToken(row, id)
+    for _, tk in ipairs(row.tokens) do
+      if vis(tk) and tk.info and tk.info.status == id then return tk end
+    end
+  end
+
+  -- Druid (Balance) : frappe de l'ours (Feral Instinct), coup à tous (voie Balance), Absorb de Tree of Life (Living
+  -- Seed), plafond de la réserve (Wild Reserve), taxe (Master Shapeshifter, Natural Shapeshifter)
+  do
+    local c, v = talentCombat("druid", "balance")
+    local D, DT, Art2, Combat = ns.Druid, ns.DruidTalents, ns.Art, ns.Combat
+    local rk = function(id) return ns.Talent.rankIn(c.talents, id) end
+    local strike = D.STRIKE_BASE + DT.strike * rk("feral_instinct")
+    local cap = ns.Classes.druid.resource.cap + DT.cap * rk("wild_reserve")
+    local res = 3
+    c.player.res = res
+    c.cls.form, c.cls.taxed = "bear", 0
+    v:Render(true)
+    H.advance(1)
+    local tb = plainTip(v.resource)
+    local t1, dmg = Art2.druidStrike(c)
+    check(("Druid, talents en combat : Bear « strikes for %d » (base %d), frappe de %d sur sa cible, « %d / %d »"):format(
+      strike + res, D.STRIKE_BASE + res, dmg, res, cap),
+      rk("feral_instinct") > 0 and has(tb, ("Bear strikes for %d."):format(strike + res))
+      and has(tb, ("strikes for %d + Frenzy"):format(strike)) and t1 and dmg == Combat.strikeDamage(c, t1, strike, true)
+      and has(tb, ("End of turn: Bear strikes %s for %d"):format(Combat.enemyName(t1), dmg))
+      and has(tb, ("%d / %d"):format(res, cap)) and cap > ns.Classes.druid.resource.cap, tb)
+    local free = D.TAX_FREE + DT.masterFree * rk("master_shapeshifter")
+    local taxMax = math.min(D.TAX_MAX, DT.taxMax)
+    check(("Druid : taxe « %d more free » (base %d), malus de %d au plus"):format(free, D.TAX_FREE, taxMax),
+      has(tb, ("Form changes this turn: 0. Shifting between Cat and Bear is free. %d more free, then shifting costs %d mana next turn."):format(
+        free, math.min(D.TAX, taxMax))), tb)
+    c.cls.form = "moonkin"
+    v:Render(true)
+    H.advance(1)
+    tb = plainTip(v.resource)
+    local pulse = math.min(D.PULSE_MAX, math.ceil(res / 2)) + DT.pulse
+    local host = v.classZone.views.druid
+    local mk
+    for _, m in ipairs(host.marks) do if vis(m) then mk = m break end end
+    local mt = mk and plainTip(mk) or ""
+    local e1 = mk and mk.unit
+    check(("Druid : Moonkin « %d damage to each enemy » (base %d), marque « %d damage to it », règle « then %d more », « up to %d »"):format(
+      pulse, pulse - DT.pulse, e1 and Combat.strikeDamage(c, e1, pulse, false) or -1, DT.pulse, cap),
+      has(tb, ("End of turn: %d damage to each enemy."):format(pulse)) and has(tb, ("up to %d."):format(cap))
+      and e1 and has(mt, ("End of turn: %d damage to it."):format(Combat.strikeDamage(c, e1, pulse, false)))
+      and has(mt, ("per 2 Charges, up to %d, then %d more."):format(D.PULSE_MAX, DT.pulse)), tb .. "\n        " .. mt)
+    c.player.res = 0
+    v:Render(true)
+    H.advance(1)
+    local marks0 = 0
+    for _, m in ipairs(host.marks) do if vis(m) then marks0 = marks0 + 1 end end
+    tb = plainTip(v.resource)
+    check(("Druid : Moonkin sans Charge, la voie Balance frappe quand même (%d, marques sur les ennemis)"):format(DT.pulse),
+      has(tb, ("End of turn: %d damage to each enemy."):format(DT.pulse)) and marks0 > 0, tb)
+    c.cls.form = "tree"
+    v:Render(true)
+    H.advance(1)
+    tb = plainTip(v.resource)
+    local absorb = D.TREE_ABSORB + DT.seed * rk("living_seed")
+    check(("Druid : Tree of Life « gain %d Absorb » (base %d)"):format(absorb, D.TREE_ABSORB),
+      rk("living_seed") > 0 and has(tb, ("End of turn: gain %d Absorb."):format(absorb)), tb)
+    snap("talents-combat-druid", true)
+    -- hors combat : les valeurs de base
+    check("Druid, hors combat : règle du coup à tous et Absorb de Tree of Life de base",
+      Art2.druidPulseRule(nil) == ("1 damage to each enemy per 2 Charges, up to %d."):format(D.PULSE_MAX)
+      and Art2.druidTreeAbsorb(nil) == D.TREE_ABSORB, Art2.druidPulseRule(nil))
+  end
+
+  -- Hunter : coup du familier (Unleashed Fury), plafond du Frenzy (Animal Handler), baisse (Bestial Discipline)
+  do
+    local c, v = talentCombat("hunter")
+    local Hn, HT, Combat = ns.Hunter, ns.HunterTalents, ns.Combat
+    local rk = function(id) return ns.Talent.rankIn(c.talents, id) end
+    local cap = ns.Classes.hunter.resource.cap + HT.handler * rk("animal_handler")
+    local every = HT.decayEvery[rk("bestial_discipline")]
+    local word = ({ [2] = "other", [3] = "third", [4] = "fourth" })[every]
+    c.player.res = 3
+    v:Render(true)
+    H.advance(1)
+    local tb = plainTip(v.resource)
+    check(("Hunter, talents en combat : pastille « up to %d », « 3 / %d », « drops by 1 only every %s round »"):format(cap, cap, tostring(word)),
+      cap > ns.Classes.hunter.resource.cap and has(tb, ("up to %d."):format(cap)) and has(tb, ("3 / %d"):format(cap))
+      and word ~= nil and has(tb, ("Frenzy drops by 1 only every %s round."):format(word)), tb)
+    local pet = v.classZone.views.hunter.pet
+    local tp = plainTip(pet)
+    local tg = Hn.petTarget(c)
+    local want = Combat.calcDamage(c, c.player, tg, Hn.PET_BASE + HT.fury * rk("unleashed_fury") + 3, nil)
+    local base = Combat.calcDamage(c, c.player, tg, Hn.PET_BASE + 3, nil)
+    check(("Hunter : familier « for %d » (base %d), « up to %d »"):format(want, base, cap),
+      want > base and has(tp, ("Attacks %s for %d at the end of the turn."):format(ns.Enemies[tg.id].name, want))
+      and has(tp, ("up to %d."):format(cap)), tp)
+    snap("talents-combat-hunter", true)
+  end
+
+  -- Rogue : plafond de Combo (Deeper Stratagem), dégâts arrêtés et charges de Parry (Combat Readiness, Lightning
+  -- Reflexes) sur le jeton Parry du héros
+  do
+    local c, v = talentCombat("rogue")
+    local Ro, RT = ns.Rogue, ns.RogueTalents
+    local rk = function(id) return ns.Talent.rankIn(c.talents, id) end
+    local cap = ns.Classes.rogue.resource.cap + RT.stratagem * rk("deeper_stratagem")
+    c.player.res = 2
+    c.player.st.parry = 2
+    v:Render(true)
+    H.advance(1)
+    local tb = plainTip(v.resource)
+    local stop = Ro.PARRY_STOP + RT.readiness * rk("combat_readiness")
+    local pmax = Ro.PARRY_MAX + RT.reflexes * rk("lightning_reflexes")
+    local tk = statusToken(v.playerSt, "parry")
+    local tp = tk and plainTip(tk) or ""
+    check(("Rogue, talents en combat : pastille « up to %d », « 2 / %d » ; Parry « up to %d damage » (base %d), « Max %d » (base %d)"):format(
+      cap, cap, stop, Ro.PARRY_STOP, pmax, Ro.PARRY_MAX),
+      cap > ns.Classes.rogue.resource.cap and has(tb, ("up to %d."):format(cap)) and has(tb, ("2 / %d"):format(cap))
+      and stop > Ro.PARRY_STOP and pmax > Ro.PARRY_MAX
+      and has(tp, ("up to %d damage. Max %d."):format(stop, pmax)), tb .. "\n        " .. tp)
+    check("Rogue, hors combat : texte de Parry de base", ns.Art.statusNow("parry", ns.Statuses.parry.text, nil)
+      == ns.Statuses.parry.text and has(ns.Statuses.parry.text, ("up to %d damage"):format(Ro.PARRY_STOP)))
+    snap("talents-combat-rogue", true)
+  end
+
+  -- Priest : soin d'Atonement (Twin Disciplines) sur le jeton Atonement du héros
+  do
+    local c, v = talentCombat("priest")
+    local PT, Combat = ns.PriestTalents, ns.Combat
+    local heal = Combat.ATONEMENT_HEAL + PT.twin * ns.Talent.rankIn(c.talents, "twin_disciplines")
+    c.player.st.atonement = 2
+    v:Render(true)
+    H.advance(1)
+    local tk = statusToken(v.playerSt, "atonement")
+    local tp = tk and plainTip(tk) or ""
+    check(("Priest, talents en combat : Atonement « restores %d HP » (base %d)"):format(heal, Combat.ATONEMENT_HEAL),
+      heal > Combat.ATONEMENT_HEAL and has(tp, ("restores %d HP."):format(heal)), tp)
+    check("Priest, hors combat : texte d'Atonement de base", ns.Art.statusNow("atonement", ns.Statuses.atonement.text, nil)
+      == ns.Statuses.atonement.text)
+  end
+
+  -- Mage : plafond de Charges (Arcane Mind) ; crans de la pastille
+  do
+    local c, v = talentCombat("mage")
+    local MT = ns.MageTalents
+    local cap = ns.Classes.mage.resource.cap + MT.mind * ns.Talent.rankIn(c.talents, "arcane_mind")
+    c.player.res = 2
+    v:Render(true)
+    H.advance(1)
+    local tb = plainTip(v.resource)
+    local sockets = 0
+    for _, p in ipairs(v.resPips.list) do if vis(p.socket) then sockets = sockets + 1 end end
+    check(("Mage, talents en combat : pastille « up to %d » (base %d), « 2 / %d », %d crans"):format(cap,
+      ns.Classes.mage.resource.cap, cap, cap), cap > ns.Classes.mage.resource.cap and has(tb, ("up to %d."):format(cap))
+      and has(tb, ("2 / %d"):format(cap)) and sockets == cap, tb .. " / " .. sockets)
+  end
+
+  -- Warrior (Arms) : plafond de Rage (Unbridled Wrath), Sundered (voie Arms) sur le jeton de l'ennemi
+  do
+    local c, v = talentCombat("warrior", "arms")
+    local WT, Combat = ns.WarriorTalents, ns.Combat
+    local cap = ns.Classes.warrior.resource.cap + WT.wrath * ns.Talent.rankIn(c.talents, "unbridled_wrath")
+    c.player.res = 1
+    local en = Combat.aliveEnemies(c)[1]
+    en.st.armor_broken = 2
+    v:Render(true)
+    H.advance(1)
+    local tb = plainTip(v.resource)
+    local pct = math.floor((Combat.SUNDER_MULT - 1 + WT.sunder) * 100 + 0.5)
+    local tk = statusToken(v.slotOf[en.uid].st, "armor_broken")
+    local tp = tk and plainTip(tk) or ""
+    check(("Warrior, talents en combat : pastille « up to %d », « 1 / %d » ; Sundered « %d%% more damage » (base %d%%)"):format(
+      cap, cap, pct, math.floor((Combat.SUNDER_MULT - 1) * 100 + 0.5)),
+      cap > ns.Classes.warrior.resource.cap and has(tb, ("up to %d."):format(cap)) and has(tb, ("1 / %d"):format(cap))
+      and has(tp, ("Takes %d%% more damage."):format(pct)) and Combat.const(c, "SUNDER_MULT", Combat.SUNDER_MULT) > Combat.SUNDER_MULT,
+      tb .. "\n        " .. tp)
+    check("Warrior, hors combat : explication de la Rage de base (« up to 5 »)",
+      has(ns.Art.resourceLine(nil, "rage"), ("up to %d."):format(ns.Classes.warrior.resource.cap)))
+    snap("talents-combat-warrior", true)
+  end
 end
