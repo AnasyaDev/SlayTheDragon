@@ -212,9 +212,13 @@ return function(ns)
       return T * playsOf(c, isAttack) * regen * up(inst, 2, 2, 2, 3) * W.enemyHp
     end,
     natures_grace = function(c) return T * math.min(1, playsOf(c, isCast)) * MANA end,
-    moonkin_aura = function(c, inst) return T * 0.6 * up(inst, 1, 1, 1, 2) * Bots.resValue(c) end,
+    -- Moonkin Aura : Charges et 4 Absorb par fin de tour en Moonkin (≈ 60 % des tours d'un deck qui la joue)
+    moonkin_aura = function(c, inst)
+      return T * 0.6 * (up(inst, 1, 1, 1, 2) * Bots.resValue(c) + 4 * W.hp * 0.5)
+    end,
+    -- Leader of the Pack : « deal 2 more » dès le palier 1, 3 au palier 3 (Data/Druid.lua)
     leader_of_the_pack = function(c, inst)
-      return T * playsOf(c, isCatAttack) * (Bots.resValue(c) + up(inst, 0, 0, 0, 2) * W.enemyHp)
+      return T * playsOf(c, isCatAttack) * (Bots.resValue(c) + up(inst, 0, 2, 2, 3) * W.enemyHp)
     end,
     -- Carte neutre
     elixir_of_superior_defense = function(c, inst) return T * up(inst, 3, 4) * W.hp * 0.8 end,
