@@ -201,8 +201,9 @@ test("rangées ouvertes à 0 / 5 / 10 / 16 points, un rang demande le précéden
   assert(Meta.learn(m2, "warrior", "toughness")); assert(Meta.learn(m2, "warrior", "toughness"))
   eq(select(2, Meta.learn(m2, "warrior", "toughness")), "points")
   eq(Meta.pointsLeft(m2, "warrior"), 0)
-  -- classe sans arbre
-  eq(select(2, Meta.learn(m2, "priest", "toughness")), "unknown")
+  -- classe sans arbre (classe fictive : les arbres des classes réelles s'écrivent en parallèle)
+  Meta.classState(m2, "tt_notree").xp = Meta.XP_LEVELS[3]
+  eq(select(2, Meta.learn(m2, "tt_notree", "toughness")), "unknown")
 end)
 
 test("remboursement gratuit hors expédition ; dépenser et rembourser refusés pendant une expédition", function()
@@ -313,6 +314,9 @@ test("arbre du Warrior : 13 nœuds, 24 points, 4 rangées, un Specialization, or
     for _, ch in ipairs(n.choices or {}) do list[#list + 1] = ch.text end
     for _, s in ipairs(list) do assert(s:find("%.$") and not s:find("[éèàç]"), n.id .. " : " .. s) end
   end
+  -- classe sans arbre (classe fictive) : aucun arbre, Talent.check le dit
+  eq(ns.Talents.tt_notree, nil)
+  eq(Talent.check("tt_notree")[1], "tt_notree: no tree")
 end)
 
 test("tree= : parts de l'arbre (5 / 10 / 15 / 20 / 24 points) dans l'ordre du bot", function()
@@ -353,7 +357,7 @@ test("API de lecture : rangées, rangs, textes, voies, points restants, expédit
   eq(Talent.rankText("warrior", "anger_shield", 2), ("End of turn: gain 1 Absorb per %d Rage."):format(WT.shieldDiv[2]))
   eq(Talent.rankText("warrior", "specialization", 1, "fury"),
     ("While you have %d Rage or more, Attacks deal %d more per hit."):format(WT.furyAt, WT.furyBonus))
-  eq(#Talent.view(meta, "priest").rows, 0, "classe sans arbre : vue vide")
+  eq(#Talent.view(meta, "tt_notree").rows, 0, "classe sans arbre (fictive) : vue vide")
 end)
 
 ---------------------------------------------------------------------------
