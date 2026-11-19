@@ -100,7 +100,7 @@ test("sept épiques : une par zone, rareté epic, Power sans coût, « Epic. » 
   local BASE = {
     furor = "Form changes: Primal 2.", mark_of_ursol = "Bear strikes: Ironfur 50%.",
     eclipse = "Cast cards: Lunar 5.", king_of_the_jungle = "Surge cards: Predator 1.",
-    lifebloom = "Each Regen heal: Bloom 1.", owlkin_frenzy = "When hit: Moonfury 1.",
+    lifebloom = "Each Regen heal: Bloom 1.", owlkin_frenzy = "When hit: Moonfury 3.",
     heart_of_the_wild = "Forms: Kinship 3.",
   }
   for i, id in ipairs(EPICS) do
@@ -354,11 +354,11 @@ test("Owlkin Frenzy : rien hors Moonkin, rien si tout est absorbé ; deux ennemi
   w.player.res = 0
   Combat.endPlayerTurn(w)
   Combat.enemyPhase(w)
-  eq(w.player.res, 2 * n(E.moonfury, 1), "un gain par ennemi")
+  eq(w.player.res, math.min(5, 2 * n(E.moonfury, 1)), "un gain par ennemi")
 end)
 
-test("Owlkin Frenzy : Barkskin (+2, +3) : Absorb à la fin d'un tour fini en Moonkin", function()
-  for k = 2, 3 do
+test("Owlkin Frenzy : Absorb à la fin d'un tour fini en Moonkin (Barkskin : plus aux paliers 2 et 3)", function()
+  for k = 0, 3 do
     local c = setup({ "wrath" }, { epic = { "owlkin_frenzy", k } })
     play(c, "wrath", 1)
     Combat.endPlayerTurn(c)
@@ -376,6 +376,7 @@ end)
 test("Heart of the Wild : Cat, Bear et Moonkin gardent chacune leur réserve ; la réserve active est c.player.res", function()
   local c = setup({ "shred", "wrath", "ferocious_bite", "thick_hide" }, { epic = "heart_of_the_wild" })
   eq(Combat.resCap(c), n(E.kinship, 0))
+  D.kinStart(c, 0) -- réserves vides (le départ à N est vérifié plus bas)
   play(c, "shred", 1)        -- Cat : 1 Combo
   eq(c.player.res, 1)
   play(c, "wrath", 1)        -- Moonkin : sa réserve (0), puis +1 ; coup sans bonus (0 Charge au coup)
@@ -393,6 +394,7 @@ end)
 
 test("Heart of the Wild : minRes et Spend lisent la réserve de la forme de la carte ; plafond N", function()
   local c = setup({ "shred", "starsurge", "frenzied_regeneration", "shred" }, { epic = "heart_of_the_wild" })
+  D.kinStart(c, 0)
   play(c, "shred", 1)
   c.player.res = 3           -- Cat 3
   assert(not Combat.canPlay(c, idx(c, "starsurge")), "Starsurge : Moonkin vide")
@@ -404,25 +406,30 @@ test("Heart of the Wild : minRes et Spend lisent la réserve de la forme de la c
   assert(Combat.canPlay(c, idx(c, "starsurge")), "Starsurge : 2 Charges en attente")
   play(c, "starsurge", 1)
   eq(dealt(c.enemies[1]), 7 + 14)
+  c.cls.kin.cat = n(E.kinship, 0)
   play(c, "shred", 1)
-  eq(c.player.res, 3, "Cat : plafond " .. n(E.kinship, 0))
+  eq(c.player.res, n(E.kinship, 0), "Cat : plafond " .. n(E.kinship, 0))
 end)
 
-test("Heart of the Wild : fin de tour sur la réserve de la forme (frappe de l'ours) ; Kindred (+3) : chacune à 1", function()
+test("Heart of the Wild : fin de tour sur la réserve de la forme (frappe de l'ours) ; départ à N (Kindred : sans forme aussi)", function()
   local c = setup({ "shred", "shred", "thick_hide" }, { epic = "heart_of_the_wild" })
+  D.kinStart(c, 0)
   play(c, "shred", 1); play(c, "shred", 1)
   play(c, "thick_hide")
   local before = dealt(c.enemies[1])
   Combat.endPlayerTurn(c)
   eq(dealt(c.enemies[1]) - before, D.STRIKE_BASE + 0, "frappe sur la réserve de Bear (0)")
   eq(c.player.res, 1); eq(D.pool(c, "cat"), 2)
-  for k = 1, 3 do
+  for k = 0, 3 do
     local u = setup({ "skull_bash" }, { epic = { "heart_of_the_wild", k } })
     eq(Combat.resCap(u), n(E.kinship, k))
     for _, f in ipairs({ "cat", "bear", "moonkin" }) do eq(D.pool(u, f), n(E.kinStart, k), f .. "+" .. k) end
-    eq(u.player.res, 0, "sans forme : 0")
+    eq(u.player.res, n(E.kinRest, k) > 0 and n(E.kinStart, k) or 0, "sans forme +" .. k)
   end
+  eq(Card.defById("heart_of_the_wild").text, "Epic.\nForms: Kinship 3.")
+  eq(Card.defById("heart_of_the_wild", 2).text, "Epic.\nForms: Kindred 4.")
   eq(Card.defById("heart_of_the_wild", 3).text, "Epic.\nForms: Kindred 5.")
+
 end)
 
 test("sans Heart of the Wild : minRes et Spend lisent la réserve commune (Combat.cardRes)", function()

@@ -293,13 +293,18 @@ do
     upText = "Each combat starts with Regen " .. E.bloomStart[2] .. ". The reserve gains N each time Regen heals." })
   L.rule("overgrowth", { name = "Overgrowth",
     text = "Each combat starts with Regen " .. E.bloomStart[4] .. ". The reserve gains N each time Regen heals." })
-  L.rule("moonfury", { name = "Moonfury", text = "In Moonkin, each enemy attack that costs HP adds N to the reserve." })
+  L.rule("moonfury", { name = "Moonfury",
+    text = "In Moonkin, each enemy attack that costs HP gives N reserve. End of turn in Moonkin: gain "
+      .. E.barkskin[1] .. " Absorb." })
   L.rule("barkskin", { name = "Barkskin",
     text = "In Moonkin, each enemy attack that costs HP gives N reserve. End of turn in Moonkin: gain "
       .. E.barkskin[3] .. " Absorb." })
-  L.rule("kinship", { name = "Kinship", text = "Cat, Bear and Moonkin each keep their own reserve, up to N." })
+  L.rule("kinship", { name = "Kinship",
+    text = "Cat, Bear and Moonkin each keep their own reserve, up to " .. E.kinship[1] .. ", and start each combat at N." })
   L.rule("kindred", { name = "Kindred",
-    text = "Cat, Bear and Moonkin each keep their own reserve, up to N. Each starts at " .. E.kinStart[4] .. "." })
+    text = "Cat, Bear and Moonkin each keep their own reserve, up to " .. E.kinship[1]
+      .. ". All reserves start each combat at N." })
+
 end
 
 -- Épique en jeu dans ce combat : id, up (nil sans épique). Plusieurs épiques en jeu (c.moreEpics) : want = id
@@ -320,11 +325,14 @@ local function poolKey(form)
 end
 Druid.poolKey = poolKey
 
--- Début du combat (whileInDeck) : chaque réserve de forme à n, sans forme à 0.
-function Druid.kinStart(c, n)
-  c.cls.kin = { cur = poolKey(c.cls.form), cat = n, bear = n, moonkin = n, rest = 0 }
-  c.player.res = 0
+-- Début du combat (whileInDeck) : chaque réserve de forme à n, sans forme à rest (0 par défaut ; Heart of the Wild
+-- +2 et +3 : n). La réserve active (sans forme au début du combat) est dans c.player.res.
+function Druid.kinStart(c, n, rest)
+  local k = { cur = poolKey(c.cls.form), cat = n, bear = n, moonkin = n, rest = rest or 0 }
+  c.cls.kin = k
+  c.player.res = k[k.cur] or 0
 end
+
 
 -- Réserve d'une forme (sans Heart of the Wild : la réserve commune).
 function Druid.pool(c, form)

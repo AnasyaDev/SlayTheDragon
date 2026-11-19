@@ -449,11 +449,17 @@ local EPIC = {
   apex = { 0, 0, 1, 1 },            -- King of the Jungle : pioche au premier Surge de chaque tour (« Apex »)
   bloom = { 1, 1, 2, 2 },           -- Lifebloom : réserve gagnée à chaque tic de Regen
   bloomStart = { 0, 3, 3, 5 },      -- Lifebloom : Regen au début de chaque combat (+3 : « Overgrowth »)
-  moonfury = { 1, 2, 2, 3 },        -- Owlkin Frenzy : réserve par attaque ennemie qui coûte des PV en Moonkin
-  barkskin = { 0, 0, 3, 3 },        -- Owlkin Frenzy : Absorb à la fin d'un tour fini en Moonkin (« Barkskin »)
-  kinship = { 3, 4, 5, 5 },         -- Heart of the Wild : plafond de chaque réserve (Cat, Bear, Moonkin)
-  kinStart = { 0, 0, 0, 1 },        -- Heart of the Wild : chaque réserve au début du combat (+3 : « Kindred »)
+  moonfury = { 3, 4, 4, 5 },        -- Owlkin Frenzy : réserve par attaque ennemie qui coûte des PV en Moonkin
+  barkskin = { 3, 3, 5, 5 },        -- Owlkin Frenzy : Absorb à la fin d'un tour fini en Moonkin (+2 : « Barkskin »)
+  kinship = { 5, 5, 5, 5 },         -- Heart of the Wild : plafond de chaque réserve (Cat, Bear, Moonkin)
+  kinStart = { 3, 4, 4, 5 },        -- Heart of the Wild : chaque réserve au début du combat (nombre de la carte)
+  kinRest = { 0, 0, 1, 1 },         -- Heart of the Wild : la réserve sans forme part aussi de kinStart (+2 : « Kindred »)
 }
+-- Mesure une par une au bot human (19/11/2026, docs/equilibrage.md, « Épiques : mesure une par une ») : Owlkin
+-- Frenzy 1 → 3 et Barkskin dès la base (l'épique ne gagnait rien dans les zones 4 à 7) ; Heart of the Wild au
+-- plafond de la classe et des réserves pleines à 3 au départ (plafond 3 et réserves vides : Westfall 40 % contre
+-- 80 % sans épique, le deck de départ n'avait plus de quoi remplir chaque réserve) ; Eclipse : conseils du bot
+-- seuls (ils faisaient prendre Starfire et Hurricane avant tout et coûtaient 8 points).
 ns.DruidEpic = EPIC
 
 local function D() return ns.Druid end -- Core/Classes/druid.lua, chargé après ce fichier
@@ -584,7 +590,7 @@ end))
 
 -- Burning Steppes — Owlkin Frenzy : en Moonkin, une attaque ennemie qui coûte des PV donne EPIC.moonfury à la
 -- réserve, une fois par attaque (c.cls.owlFx = numéro de l'effet de l'action ennemie, Combat.fxBegin) ;
--- paliers 2 et 3 : EPIC.barkskin Absorb à la fin de chaque tour fini en Moonkin (après les coups à tous).
+-- EPIC.barkskin Absorb à la fin de chaque tour fini en Moonkin (après les coups à tous ; plus aux paliers 2 et 3).
 epic("owlkin_frenzy", tiers({
   zone = "steppes", path = "balance", name = "Owlkin Frenzy",
   deckHooks = {
@@ -601,23 +607,27 @@ epic("owlkin_frenzy", tiers({
     end,
   },
 }, "When hit", function(k)
-  return (EPIC.barkskin[k] > 0 and "Barkskin " or "Moonfury ") .. EPIC.moonfury[k]
+  return (EPIC.barkskin[k] > EPIC.barkskin[1] and "Barkskin " or "Moonfury ") .. EPIC.moonfury[k]
 end))
 
 -- Blackrock Mountain — Heart of the Wild : Cat, Bear et Moonkin gardent chacune leur réserve (plafond
 -- EPIC.kinship, crochet resCap) ; c.player.res est celle de la forme active, les autres attendent dans
 -- c.cls.kin (Druid.kinStart, Druid.usePool : au changement de forme, et au jeu d'une carte de forme avant son
 -- Spend ; minRes et Spend lisent la réserve de la forme de la carte, Combat.cardRes). Sans forme et en Tree of
--- Life : une quatrième réserve, que rien ne remplit. +3 : chaque réserve commence à EPIC.kinStart.
+-- Life : une quatrième réserve, que rien ne remplit. Chaque réserve de forme commence le combat à EPIC.kinStart
+-- (le nombre de la carte) ; paliers 2 et 3 (« Kindred ») : la réserve sans forme aussi.
 epic("heart_of_the_wild", tiers({
   zone = "blackrock", path = "feral", name = "Heart of the Wild",
-  whileInDeck = function(c, src) D().kinStart(c, nt(EPIC.kinStart, src)) end,
+  whileInDeck = function(c, src)
+    local n = nt(EPIC.kinStart, src)
+    D().kinStart(c, n, nt(EPIC.kinRest, src) > 0 and n or 0)
+  end,
   deckHooks = {
     resCap = function(c, src, v) return math.min(v, nt(EPIC.kinship, src)) end,
     onShift = function(c, src, from, to) D().usePool(c, to) end,
   },
 }, "Forms", function(k)
-  return (EPIC.kinStart[k] > 0 and "Kindred " or "Kinship ") .. EPIC.kinship[k]
+  return (EPIC.kinRest[k] > 0 and "Kindred " or "Kinship ") .. EPIC.kinStart[k]
 end))
 
 -- Bots (classDef.bot.epic et bot.byEpic, attachés en fin de fichier) : note d'une épique proposée ≈ 5 + gain
@@ -629,7 +639,16 @@ local EPIC_BOT = {
   furor = 10, mark_of_ursol = 10, eclipse = 10, king_of_the_jungle = 10, lifebloom = 10, owlkin_frenzy = 10,
   heart_of_the_wild = 10,
 }
+-- Conseils modérés (19/11/2026) : note de la classe (bot.rating) + un petit bonus pour les cartes que l'épique
+-- sert ; les notes absolues d'Eclipse et d'Owlkin Frenzy faisaient perdre 8 points au bot human dans les zones 4 à 7.
+local function lift(bonus)
+  return function(exp, id)
+    local b = bonus[id]
+    if b then return (ns.Classes.druid.bot.rating[id] or 5) + b end
+  end
+end
 local EPIC_BUILDS = {
+
   -- cartes de forme à 0 ou 1 mana qui changent souvent la forme
   furor = {
     rating = { tigers_fury = 9, faerie_fire = 8.5, demoralizing_roar = 9, entangling_roots = 8.5, shred = 7.5,
@@ -643,8 +662,7 @@ local EPIC_BUILDS = {
   },
   -- monter à N, puis Starfire et Hurricane tout de suite
   eclipse = {
-    rating = { starfire = 9, hurricane = 9, faerie_fire = 8.5, moonfire = 7.5, entangling_roots = 8.5,
-      moonkin_aura = 7.5, natures_grace = 6.5, starsurge = 4.5, starfall = 5 },
+    rating = lift({ starfire = 1.5, hurricane = 1.5, moonfire = 0.5, faerie_fire = 0.5 }),
     upgrade = { eclipse = 4, starfire = 3.5 },
   },
   -- plusieurs Surge par combat
@@ -660,7 +678,7 @@ local EPIC_BUILDS = {
   },
   -- finir en Moonkin et encaisser
   owlkin_frenzy = {
-    rating = { moonfire = 7.5, starsurge = 7.5, starfall = 8.5, moonkin_aura = 8, thorns = 7, starfire = 7 },
+    rating = lift({ moonfire = 0.5, starsurge = 0.5, starfall = 1, moonkin_aura = 1 }),
     upgrade = { owlkin_frenzy = 4, starsurge = 3 },
   },
   -- un deck à trois formes, chacune avec sa dépense
