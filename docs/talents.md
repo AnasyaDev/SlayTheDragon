@@ -439,17 +439,47 @@ premier Cast de chaque combat coûte 0)
 Attack ; Parry : 3 charges au plus, chacune arrête 8 dégâts d'un coup (`PARRY_MAX`, `PARRY_STOP`) ; Thieves' Tools :
 +1 carte au premier tour)
 
-- **Premeditation** : `Start of combat: +1 Combo.` (2 rangs)
-- **Deeper Stratagem** : `Combo cap +1.` (`resCap`, 5 → 6)
-- **Relentless Strikes** : `After each Surge: +1 Combo.` (`onSurge`)
-- **Opportunity** : `Attacks that consume Stealth deal 4 more.` (`damage` + condition Stealth)
-- **Deflection** : `Parry can hold 4 charges.` (`PARRY_MAX` 3 → 4, à sortir en champ de module)
-- **Riposte Training** : `Each Parry stops up to 11 damage.` (`PARRY_STOP` 8 → 11)
-- **Elusiveness** : `Start of combat: Parry 1.` (comme Blinding Powder)
-- **Vile Poisons** : `DoT you apply: +1.` (`apply`, comme Crystal Vial)
-- Specialization : Assassination `Each Surge: apply DoT 1 per Combo spent.` / Combat `Each Parry: +1 Combo.` (`onParry`)
-  / Subtlety `When you gain Stealth: draw 1.` ; rangée 4 : **Cheat Fate** `Once per expedition, a hit that would kill
-  you leaves you at 1 HP with Stealth and Parry 2.`
+Arbre codé le 19/11/2026 (`Data/Talents/rogue.lua`, nombres dans `ns.RogueTalents` ; tests :
+`Sim/tests_talents_rogue.lua` ; mesure : `docs/equilibrage.md`, « Talents du Rogue »). Tableau de l'arbre tel que codé :
+
+| Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
+|---|---|---|---|---|
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 par rang) | PV de départ |
+| 1 | **Opportunity** | 2 | `Attacks played in Stealth deal 1 more per hit.` / `… 2 more per hit.` | `damage` : la carte en cours (`c.cardCtx`) est dans `c.cls.openers` (Stealth consommé, ou gardé sous Subterfuge) ; bot : Stealth gardé vaut le bonus (`bot.value`) |
+| 1 | **Deeper Stratagem** | 2 | `Combo cap +1.` / `Combo cap +2.` | `resCap` (5 → 7) |
+| 2 (5) | **Vile Poisons** | 1 | `Each time DoT is applied to an enemy, apply 1 more.` | `apply` (comme Crystal Vial, qui s'ajoute) |
+| 2 | **Combat Readiness** | 3 | `Each Parry stops up to 9 damage.` / `… 10 …` / `… 11 …` | `const.PARRY_STOP` (8 → 11) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 3 (10) | **Specialization** (choix) | 1 | Assassination : `Each Surge applies DoT 1 per Combo spent to its target.` Combat : `Each Parry: +1 Combo.` Subtlety : `Each time a card grants Stealth, draw 1.` | Assassination : `onSurge` (crochet `apply` compris) ; Combat : `onParry` ; Subtlety : `onStatusApplied` + `c.cls.stealthGained` (pas le Stealth du début de combat ; s'ajoute à Flash Powder) |
+| 3 | **Elusiveness** | 1 | `Start of combat: gain Parry 1.` | `onCombatStart` (comme Blinding Powder) |
+| 3 | **Initiative** | 2 | `Start of combat: +1 Combo.` / `Start of combat: +1 Combo, +2 against elites and bosses.` | `onCombatStart` ; rang 2 : `c.kind` = `elite` ou `boss` |
+| 3 | **Lightning Reflexes** | 1 | `Parry can hold 1 more charge.` | `const.PARRY_MAX` (3 → 4 ; `maxKey` de l'état Parry) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Relentless Strikes** | 2 | `After a Surge of 5 Combo or more: +1 Combo.` / `After each Surge: +1 Combo.` | `onSurge` (montant dépensé) |
+| 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
+| 4 | **Cheat Fate** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP with Parry 2.` / `… with Parry 3 and Stealth.` | `preventDeath` + `c.tstate.cheatFate` ; Cheat Death (Power, Last Breath de combat) passe avant |
+
+Total 24 points (3 + 2 + 2 / 1 + 3 + 1 / 1 + 1 + 2 + 1 + 1 / 2 + 2 + 2), 14 nœuds ; nœuds de mécanique : 8 (+
+Specialization et Cheat Fate). Ordre du bot (`bot.order`) : Toughness 3, Opportunity 2 (5 points), Deeper Stratagem
+2, Provisions, Combat Readiness 2 (10), Specialization, Elusiveness, Initiative 2, Lightning Reflexes (15), Vile
+Poisons, Combat Readiness 3, Field Medic, Relentless Strikes 2 (20), Veteran's Arsenal 2, Cheat Fate 2 ; voie du bot :
+Combat. Pas d'accord d'épiques (`bot.epic`) : Veteran's Arsenal ne fait pas prendre de mauvaise épique au bot (arbre
+plein 98,3 % avec, 92,5 % sans).
+
+Écarts avec la proposition d'origine (ci-dessous pour mémoire), tous pour la mesure : noms de WoW sans doublon avec
+une carte ou une épique (Premeditation → **Initiative**, carte du même nom ; Deflection → **Lightning Reflexes**,
+épique du même nom ; Riposte Training → **Combat Readiness**) ; les nœuds les plus forts (Elusiveness, Initiative)
+passent en rangée 3 et Relentless Strikes en rangée 4, les rangées 1 et 2 gardent les plus faibles ; chiffres
+abaissés (Opportunity 4 → 1 par rang et par coup, Combat Readiness 3 dégâts → 1 par rang, Elusiveness et Lightning
+Reflexes à un rang, Initiative rang 2 seulement contre élites et boss, Relentless Strikes rang 1 seulement après un
+Surge de 5 Combo, Toughness +2 PV par rang).
+
+Proposition d'origine : Premeditation `Start of combat: +1 Combo.` (2 rangs) ; Deeper Stratagem `Combo cap +1.` ;
+Relentless Strikes `After each Surge: +1 Combo.` ; Opportunity `Attacks that consume Stealth deal 4 more.` ;
+Deflection `Parry can hold 4 charges.` ; Riposte Training `Each Parry stops up to 11 damage.` ; Elusiveness `Start of
+combat: Parry 1.` ; Vile Poisons `DoT you apply: +1.` ; Specialization Assassination `Each Surge: apply DoT 1 per Combo
+spent.` / Combat `Each Parry: +1 Combo.` / Subtlety `When you gain Stealth: draw 1.` ; rangée 4 : Cheat Fate `Once per
+expedition, a hit that would kill you leaves you at 1 HP with Stealth and Parry 2.`
 
 **Hunter** (56 PV ; Frenzy 0 à 5, +1 à chaque attaque du familier, −1 à la fin de chaque round ; familier : coup de
 `Hunter.PET_BASE` (1) + Frenzy à la fin du tour ; Traps : 3 emplacements (`TRAP_SLOTS`) ; Careful Aim : cible

@@ -2176,3 +2176,71 @@ Lecture :
 Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; l'arbre du Druid (lot 3, à venir) ; le chiffre « Westfall,
 épique à l'entrée » du tableau « Par zone » ne compte pas les épiques de Veteran's Arsenal (prises après l'entrée :
 phase `start`).
+
+## Talents du Rogue : courbe par palier (19/11/2026)
+
+Arbre codé (`Data/Talents/rogue.lua`, `docs/talents.md`, § 8), mur des zones 6 et 7 à 1,9. Commande : `flock
+build/sim-b.lock luajit Sim/sim.lua runner=expedition bot=human class=rogue key=0 seed=1 jobs=8 runs=600
+tree=<part> zones=<N> level=<palier>` avec le contenu de chaque palier (`docs/talents.md`, § 3) ; « contenu seul » =
+même commande sans `tree=` ; ± 2 à 4 points. Rapports : `reports/talents/rogue/` du worktree.
+
+| Palier (points) | Contenu | Victoires (Warrior, cible ± 8) | Contenu seul | Fiche d'origine | STV | SoS | BS | BRM | XP / exp. |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | `zones=0 level=1` | **0,0 %** (0,0) | 0,0 | 0,0 | 2,6 | 0,0 | — | — | 157 |
+| 20 % (5) | `zones=2 level=4` | **2,0 %** (25,5) | 0,3 | 6,0 | 53,1 | 20,7 | 56,1 | 37,5 | 233 |
+| 40 % (10) | `zones=3 level=7` | **38,0 %** (23,0) | 12,8 | 68,5 | 84,3 | 69,2 | 86,8 | 77,0 | 345 |
+| 60 % (15) | `zones=4 level=7` | **67,8 %** (61,2) | 8,7 | 91,7 | 94,8 | 81,5 | 95,3 | 92,1 | 398 |
+| 80 % (20) | `zones=6 level=7` | **89,7 %** (82,3) | 17,2 | — | 99,0 | 94,1 | 99,1 | 97,1 | 432 |
+| 100 % (24) | `zones=7 level=7` | **98,3 %** (94,3) | 18,3 | — | 100 | 99,3 | 100 | 99,0 | 445 |
+
+STV … BRM : battue / atteinte (%). « Fiche d'origine » : premier arbre codé, chiffres et rangées du § 8 de la fiche
+(Initiative et Elusiveness 2 rangs en rangée 1, Opportunity +2 / +4, Combat Readiness +2 / +4, Relentless Strikes
++1 / +2 Combo après chaque Surge, Toughness +3 PV par rang).
+
+**Specialization** au palier 60 % : Combat (voie du bot) 67,8 %, Assassination 70,0 %, Subtlety 64,7 % (écart 5,3).
+
+**Génériques seuls** (Toughness 3 + Provisions) : 23,0 % au palier 40 (contenu seul 12,8), 23,0 % au palier 60 (8,7).
+**Veteran's Arsenal 2 seul** au palier 100 : 44,3 % (+26) ; arbre plein sans Veteran's Arsenal 92,5 % (avec : 98,3) :
+pas d'accord d'épiques à poser (`bot.epic`).
+
+**Nœuds de mécanique pleins, seuls**, au palier de leur rangée (rangées 1 et 2 : palier 20 ; rangée 3 : 40 ; rangée
+4 : 80) ; entre parenthèses, l'écart au contenu seul :
+
+| Nœud (rangée) | Palier | Seul | Avant réglage |
+|---|---|---|---|
+| Opportunity 2 (1) | 20 | 0,8 (+0,5) | 2,3 (+2,0) à +2 / +4 |
+| Deeper Stratagem 2 (1) | 20 | 0,5 (+0,2) | — |
+| Vile Poisons 1 (2) | 20 | 0,3 (0) | — |
+| Combat Readiness 3 (2) | 20 | 1,3 (+1,0) | rang 2 à +4 : 29,2 au palier 40 (**+16,4**) |
+| Elusiveness 1 (3) | 40 | 23,2 (+10,4) | 2 rangs : 31,2 (**+18,4**) |
+| Initiative 2 (3) | 40 | 22,2 (+9,4) | +1 / +2 à chaque combat : 26,2 (**+13,4**) |
+| Lightning Reflexes 1 (3) | 20 | 0,2 (−0,1) | — |
+| Relentless Strikes 2 (4) | 80 | 27,3 (+10,1) | +1 / +2 après chaque Surge : 37,5 (**+20,3**) ; 27,7 au palier 40 (+14,9) |
+| Cheat Fate 2 (4) | 80 | 19,7 (+2,5) | — |
+
+Au palier 20, le contenu seul (0,3 %) est au plancher : les nœuds y bougent peu les victoires. Mesurés sur Toughness 3
+(+3 PV par rang, 22,5 %) au palier 40 : Vile Poisons +8,5, Opportunity 2 (+1 / +2) +4,3, Provisions +4,7, Deeper
+Stratagem 1 +1,0, Initiative 1 +7,2, Elusiveness 1 +12,2 ; Vile Poisons à +2 par pose, +18.
+
+**Chiffres changés** par rapport à la fiche : Toughness +3 → **+2 PV par rang** (nombre propre à l'arbre du Rogue ;
+`Data/Talents/common.lua` inchangé) ; Opportunity 4 → **1 par rang et par coup** ; Combat Readiness (Riposte Training)
+`11 dégâts` → **+1 par rang, 3 rangs** (9 / 10 / 11) ; Elusiveness et Lightning Reflexes (Deflection) **un rang** ;
+Initiative (Premeditation) rang 2 **+2 seulement contre élites et boss** ; Relentless Strikes rang 1 **après un Surge
+de 5 Combo ou plus** ; Elusiveness et Initiative passent en rangée 3, Relentless Strikes en rangée 4, Deeper
+Stratagem en rangée 1 (2 rangs), Cheat Fate rang 1 Parry 2, rang 2 Parry 3 et Stealth.
+
+Lecture :
+
+- **0 % et 60 % tenus** (0 victoire au compte neuf ; 67,8 % ≥ 40 %, dans la bande du Warrior, 61,2 ± 8) ; les trois
+  voies se tiennent à 5 points ; aucun nœud de mécanique ne vaut plus de 12 points seul (Elusiveness +10,4 au plus).
+- **20 % et 40 % hors de la bande, dans des sens opposés, et ce n'est pas l'arbre** : le contenu seul du Rogue vaut
+  0,3 % au palier 20 (Warrior 8,5) mais 12,8 % au palier 40 (Warrior 8,2) et la classe réagit très fort au moindre
+  gain près du mur. Les génériques seuls (Toughness 3 + Provisions) font déjà **23,0 %** au palier 40, la cible du
+  Warrior ; tout point de mécanique la dépasse. Inversement, cinq points qui donnent 12,5 % au palier 20 (Elusiveness
+  2, Initiative 2, Toughness 1) donnent 50 % au palier 40 : aucun ordre ne tient les deux bandes. Choix : tenir 40
+  au plus près (38,0, +7 au-dessus de la bande) et 60, au prix du palier 20 (2,0 %).
+- **80 et 100 %** au-dessus du Warrior (89,7 et 98,3 contre 82,3 et 94,3) : à recaler avec les génériques pour toutes
+  les classes (Veteran's Arsenal pèse +26 seul).
+- **Rythme** : 233 d'expérience par expédition au palier 20, 345 au palier 40 (Warrior 292 et 323).
+
+Non vérifié : bot heuristic ; autres graines ; clés 1 à 5.
