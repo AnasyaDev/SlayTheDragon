@@ -132,9 +132,17 @@ local function addRecord(agg, rec)
     agg.zones[z.zone] = s
     s.reached = s.reached + 1
     if z.beaten then s.beaten = s.beaten + 1 end
-    s.hp, s.maxHp, s.deck, s.epic = s.hp + z.hp, s.maxHp + z.maxHp, s.deck + z.deck, s.epic + z.epic
+    -- z.epic = nombre d'épiques du deck à l'entrée (plusieurs épiques par expédition, X.EPIC.max)
+    local ne = z.epic or 0
+    s.hp, s.maxHp, s.deck = s.hp + z.hp, s.maxHp + z.maxHp, s.deck + z.deck
+    s.epic = s.epic + (ne > 0 and 1 or 0)
+    s.epicN = (s.epicN or 0) + ne
     -- battues parmi les expéditions entrées AVEC une épique (s.epic = atteintes avec épique)
-    if z.beaten and z.epic > 0 then s.beatenEpic = (s.beatenEpic or 0) + 1 end
+    if z.beaten and ne > 0 then s.beatenEpic = (s.beatenEpic or 0) + 1 end
+    -- selon le nombre d'épiques à l'entrée : r0..r3 atteintes, b0..b3 battues (3 = 3 ou plus)
+    local kb = math.min(ne, 3)
+    s["r" .. kb] = (s["r" .. kb] or 0) + 1
+    if z.beaten then s["b" .. kb] = (s["b" .. kb] or 0) + 1 end
     -- or à l'entrée de la zone, or gagné dans la zone (jusqu'à l'entrée de la suivante ou la fin)
     if z.gold then
       local nx = rec.zones[zi + 1]
@@ -435,6 +443,16 @@ local function runRange(from, to)
       ns.Zone.HARD[zid][field] = tonumber(f)
     end
   end
+  -- épiques (ns.Expedition.EPIC) remplacées pour la série : epicmax=N (plafond d'épiques du deck, 0 = sans
+  -- plafond), epicdrop=p1,…,p7 (chance de chute par élite selon le rang de la zone), epicshop=p, epicprice=n
+  if opts.epicmax then ns.Expedition.EPIC.max = tonumber(opts.epicmax) end
+  if opts.epicdrop then
+    local t = {}
+    for p in opts.epicdrop:gmatch("[%d%.]+") do t[#t + 1] = tonumber(p) end
+    ns.Expedition.EPIC.drop = { elite = t }
+  end
+  if opts.epicshop then ns.Expedition.EPIC.shop = tonumber(opts.epicshop) end
+  if opts.epicprice then ns.Expedition.EPIC.price = tonumber(opts.epicprice) end
   if opts.oldstun == "1" then ns.Combat.STUN_STOPS_TURN = false end
   if opts.nointerrupt == "1" then
     -- Monde témoin sans interruption ennemie : mesure le poids des interruptions.
@@ -769,6 +787,23 @@ local function report(a, title)
         local gap = (rE > 0 and rN > 0) and ("%+6.1f"):format(100 * (bE / rE - bN / rN)) or "     -"
         out(("  %-20s              %7d     %s          %7d     %s     %s"):format(ns.Zone.name(zid), rE,
           rE > 0 and pct(bE, rE) or "     -", rN, rN > 0 and pct(bN, rN) or "     -", gap))
+      end
+    end
+    -- selon le NOMBRE d'épiques à l'entrée (plusieurs épiques par expédition, X.EPIC.max) : moyenne, puis
+    -- atteinte et battue/atteinte pour 0, 1, 2 et 3 ou plus
+    out("")
+    out("Par zone, nombre d'épiques     moy.    0 : atteinte  b/a        1 : atteinte  b/a        2 : atteinte  b/a"
+      .. "       3+ : atteinte  b/a")
+    for _, zid in ipairs(ns.Zone.ORDER) do
+      local s = a.zones[zid]
+      if s and s.reached > 0 then
+        local cols = {}
+        for k = 0, 3 do
+          local r, b = s["r" .. k] or 0, s["b" .. k] or 0
+          cols[#cols + 1] = ("%7d  %s"):format(r, r > 0 and pct(b, r) or "     -  ")
+        end
+        out(("  %-20s        %5.2f   %s"):format(ns.Zone.name(zid), (s.epicN or 0) / s.reached,
+          table.concat(cols, "      ")))
       end
     end
   end
