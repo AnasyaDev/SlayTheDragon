@@ -37,9 +37,13 @@ X.VERSION = 9
 -- combat : Cursed Eye of Paleth le divise par deux). Lecture du concepteur de « soin partiel, 50 % des PV max ».
 X.ZONE_HEAL = 0.5
 
--- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : une seule dans le deck, règle en
--- jeu dès le début de chaque combat (Combat.new : c.epic) ; en prendre une autre remplace la précédente.
--- L'épique se GAGNE : rien au départ. Chute et vente, réglables ici :
+-- Cartes épiques (rarity = "epic", docs/expedition.md, « Cartes épiques ») : jusqu'à X.EPIC.max dans le deck
+-- (décision du joueur du 19/11/2026 : leur cumul fait passer les zones 4 à 7), chacune règle en jeu dès le début
+-- de chaque combat (Combat.new : c.epic, puis c.moreEpics) ; au plafond, en prendre une autre remplace la plus
+-- ancienne. Une épique déjà obtenue dans l'expédition ne retombe pas (exp.epicTaken).
+-- L'épique se GAGNE : rien au départ. Plafond, chute et vente, réglables ici :
+--   max       épiques au plus dans le deck (1 = la règle du 14/11/2026 ; 0 ou nil = sans plafond, retenu le
+--             19/11/2026 : chaque épique obtenue reste ; docs/equilibrage.md, « Mur des zones 4 à 7 sans épique »)
 --   drop      [genre de combat] = chances, par rang de zone (ns.Zone.order : 1 = Westfall … 7 = Blackrock
 --             Mountain ; au-delà de la table, la dernière valeur), qu'une victoire de ce genre (combat de
 --             rencontre compris) propose une épique en plus de la récompense normale (prendre, ou garder
@@ -50,6 +54,7 @@ X.ZONE_HEAL = 0.5
 --   price     prix de base d'une épique chez le marchand (± X.PRICE_JITTER, crochet « price » genre "card")
 -- Sans épique débloquée, aucun tirage n'est fait (l'expédition se déroule exactement comme sans épiques).
 X.EPIC = {
+  max = 0,
   drop = { elite = { 0.25, 0.35, 0.45, 0.55, 0.65, 0.75, 0.85 } },
   choices = 1,
   shop = 0.5,
@@ -314,7 +319,7 @@ end
 -- Cartes épiques
 ---------------------------------------------------------------------------
 
--- Index de la carte épique du deck (la première ; il n'y en a jamais plus d'une), ou nil.
+-- Index de la première carte épique du deck (la plus ancienne), ou nil.
 function X.epicIndex(exp)
   local deck = exp.deck
   for i = 1, #deck do
@@ -324,14 +329,49 @@ function X.epicIndex(exp)
   return nil
 end
 
+-- Index des cartes épiques du deck, dans l'ordre du deck (la plus ancienne d'abord).
+function X.epicIndices(exp)
+  local list, deck = {}, exp.deck
+  for i = 1, #deck do
+    local d = ns.Cards[deck[i].id]
+    if d and d.rarity == "epic" then list[#list + 1] = i end
+  end
+  return list
+end
+
+-- Nombre d'épiques du deck.
+function X.epicCount(exp)
+  local n, deck = 0, exp.deck
+  for i = 1, #deck do
+    local d = ns.Cards[deck[i].id]
+    if d and d.rarity == "epic" then n = n + 1 end
+  end
+  return n
+end
+
+-- Plafond d'épiques dans le deck (X.EPIC.max ; nil ou 0 = sans plafond : math.huge).
+function X.epicMax()
+  local m = X.EPIC.max
+  if not m or m <= 0 then return math.huge end
+  return m
+end
+
+-- Le deck est-il au plafond (une épique de plus en remplacerait une) ?
+function X.epicFull(exp)
+  return X.epicCount(exp) >= X.epicMax()
+end
+
 -- Épiques proposables : de la classe jouée, débloquées (carte de zone : la classe a gagné la zone), hors
--- variantes et hors celle déjà dans le deck. Triées.
+-- variantes, hors celles du deck et hors celles déjà obtenues dans l'expédition (exp.epicTaken : une épique
+-- remplacée ou retirée ne retombe pas). Triées.
 function X.epicPool(exp)
-  local i = X.epicIndex(exp)
-  local current = i and exp.deck[i].id
+  local have = {}
+  for _, i in ipairs(X.epicIndices(exp)) do have[exp.deck[i].id] = true end
+  local taken = exp.epicTaken or {}
   local list = {}
   for id, d in pairs(ns.Cards) do
-    if d.rarity == "epic" and d.class == exp.class and not d.variant and id ~= current and X.unlocked(exp, d) then
+    if d.rarity == "epic" and d.class == exp.class and not d.variant and not have[id] and not taken[id]
+        and X.unlocked(exp, d) then
       list[#list + 1] = id
     end
   end
@@ -512,18 +552,19 @@ function X.addPotionSlot(exp)
   exp.potions[#exp.potions + 1] = false
 end
 
--- Ajoute une carte au deck. Une épique remplace celle du deck (une seule par expédition) : l'ancienne part,
--- améliorée ou non (stats.epicReplaced, exp.epicReplaced = { old, new } pour l'affichage).
-function X.addCard(exp, id, up)
+-- Ajoute une carte au deck. Une épique au plafond (X.EPIC.max) remplace la plus ancienne du deck : elle part,
+-- améliorée ou non (stats.epicReplaced, exp.epicReplaced = { old, new } pour l'affichage) ; l'épique ajoutée
+-- est notée obtenue (exp.epicTaken[id] : elle ne retombera pas). noCap : sans plafond (épiques imposées).
+function X.addCard(exp, id, up, noCap)
   local d = ns.Cards[id]
   if d and d.rarity == "epic" then
-    local i = X.epicIndex(exp)
-    while i do
-      local old = table.remove(exp.deck, i)
+    while not noCap and X.epicFull(exp) do
+      local old = table.remove(exp.deck, X.epicIndex(exp))
       exp.stats.epicReplaced = (exp.stats.epicReplaced or 0) + 1
       exp.epicReplaced = { old = old.id, oldUp = old.up, new = id }
-      i = X.epicIndex(exp)
     end
+    exp.epicTaken = exp.epicTaken or {}
+    exp.epicTaken[id] = true
   end
   -- up : palier gardé (copie d'une carte : dupe), true = palier 1 (carte offerte « améliorée » : rencontre
   -- { "card", id, up = true }, marchand), borné aux paliers écrits de la carte
@@ -1241,9 +1282,8 @@ end
 -- L'épique n'est jamais améliorée au hasard (choix volontaire au feu de camp ou en rencontre « upgrade »).
 function X.upgradeRandom(exp, n, rng)
   local list = upgradable(exp)
-  local ei = X.epicIndex(exp)
-  if ei then
-    for k = #list, 1, -1 do if list[k] == ei then table.remove(list, k) end end
+  for k = #list, 1, -1 do
+    if Card.isEpic(ns.Cards[exp.deck[list[k]].id]) then table.remove(list, k) end
   end
   list = Rng.shuffle(rng, list)
   local k = min(n, #list)
@@ -1258,7 +1298,7 @@ X.EVENT_REASONS = {
   upgrade = "No card to upgrade.",
   potion = "Requires a potion.",
   relic = "Relic already owned.",
-  epic = "Only one epic card per expedition.",
+  epic = "An epic card can't be copied.",
 }
 
 -- Le choix ci de la rencontre est-il possible ? (true | false, raison)
@@ -1498,12 +1538,21 @@ function X.new(opts)
   }
   for i = 1, X.POTION_SLOTS do exp.potions[i] = false end
   for i = 1, #cdef.deck do exp.deck[i] = { id = cdef.deck[i], up = false } end
-  -- épique imposée au départ (simulation : epic=<id>), comme une épique prise
+  -- épiques imposées au départ (simulation : epic=<id> ou epic=a+b+c, ou une liste), comme des épiques prises,
+  -- sans plafond
   if opts.epic then
-    local d = ns.Cards[opts.epic]
-    if not (d and d.rarity == "epic") then error("not an epic card: " .. tostring(opts.epic)) end
-    X.addCard(exp, opts.epic)
-    exp.stats.cardsAdded = exp.stats.cardsAdded - 1
+    local ids = opts.epic
+    if type(ids) == "string" then
+      local l = {}
+      for id in ids:gmatch("[^+]+") do l[#l + 1] = id end
+      ids = l
+    end
+    for _, id in ipairs(ids) do
+      local d = ns.Cards[id]
+      if not (d and d.rarity == "epic") then error("not an epic card: " .. tostring(id)) end
+      X.addCard(exp, id, nil, true)
+      exp.stats.cardsAdded = exp.stats.cardsAdded - 1
+    end
   end
   -- bibelot de classe de départ (Battle Standard…) : possédé dès le départ, jamais tiré
   if cdef.startRelic then X.gainRelic(exp, cdef.startRelic) end

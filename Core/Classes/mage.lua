@@ -299,11 +299,16 @@ Cards.rule_of_threes.deckHooks = {
 Combat.MAGE_CARRY_VALUE = 5
 
 -- Épique du Mage en jeu dans ce combat (c.epic : id, puis la source { id, up, uid }) ou nil (vue, bots).
-function Combat.mageEpic(c)
-  local e = c.epic
-  if not e then return nil end
-  local d = Card.def(e)
-  if d.epic and d.class == "mage" then return e.id, e end
+-- Plusieurs épiques en jeu (c.moreEpics) : want = id cherché (cette épique si elle est en jeu), sinon la
+-- première du Mage.
+function Combat.mageEpic(c, want)
+  local e, more, k = c.epic, c.moreEpics, 0
+  while e do
+    local d = Card.def(e)
+    if d.epic and d.class == "mage" and (not want or e.id == want) then return e.id, e end
+    k = k + 1
+    e = more and more[k]
+  end
   return nil
 end
 
@@ -329,9 +334,8 @@ ns.ClassRules.mage = {
       .. (c.relicState.apprentice_wand and 1 or 0) .. ":" .. (p.st.ice_block or 0)
     -- épiques : rang de la prochaine carte (Rule of Threes), mana gardé (Arcane Meditation)
     if c.epic then
-      local id = Combat.mageEpic(c)
-      if id == "rule_of_threes" then k = k .. ":r" .. c.turn.played
-      elseif id == "water_elemental" then k = k .. ":t" .. tostring(p.lastTarget) end
+      if Combat.mageEpic(c, "rule_of_threes") then k = k .. ":r" .. c.turn.played end
+      if Combat.mageEpic(c, "water_elemental") then k = k .. ":t" .. tostring(p.lastTarget) end
     end
     return k
   end,
@@ -368,8 +372,8 @@ ns.ClassRules.mage = {
     v = v + (p.st.instant or 0) * 30
     -- épiques : coup en plus des incantations tenues (Mirror Image), mana gardé (Arcane Meditation)
     if c.epic then
-      local id, src = Combat.mageEpic(c)
-      if id == "mirror_image" then
+      local id, src = Combat.mageEpic(c, "mirror_image")
+      if id then
         local function mirror(entry)
           local e = entry and firstDamage(Card.def(entry.card))
           if e then
@@ -378,7 +382,8 @@ ns.ClassRules.mage = {
         end
         mirror(p.cast)
         for i = 1, #(more or {}) do mirror(more[i]) end
-      elseif id == "arcane_meditation" then
+      end
+      if Combat.mageEpic(c, "arcane_meditation") then
         v = v + (c.cls.carry or 0) * Combat.MAGE_CARRY_VALUE * W.enemyHp
       end
     end

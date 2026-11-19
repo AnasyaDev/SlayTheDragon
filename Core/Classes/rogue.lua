@@ -155,11 +155,16 @@ function Rogue.tier(x) return ns.Card.level(x) + 1 end
 local tier = Rogue.tier
 local function num(id, src) return Rogue.EPIC[id][tier(src)] end
 
--- id (et amélioration) de l'épique du Voleur en jeu (c.epic), ou nil.
-function Rogue.epicOf(c)
-  local e = c.epic
-  local d = e and C[e.id]
-  if d and d.class == "rogue" and d.rarity == "epic" then return e.id, e.up end
+-- id (et amélioration) de l'épique du Voleur en jeu (c.epic, puis c.moreEpics), ou nil. want = id cherché
+-- (cette épique si elle est en jeu), sinon la première du Voleur.
+function Rogue.epicOf(c, want)
+  local e, more, k = c.epic, c.moreEpics, 0
+  while e do
+    local d = C[e.id]
+    if d and d.class == "rogue" and d.rarity == "epic" and (not want or e.id == want) then return e.id, e.up end
+    k = k + 1
+    e = more and more[k]
+  end
   return nil
 end
 
@@ -191,8 +196,8 @@ function Rogue.riposteDamage(k, up)
 end
 -- Dégâts de base de la prochaine riposte (nil sans Deflection).
 function Rogue.nextRiposte(c)
-  local id, up = Rogue.epicOf(c)
-  if id ~= "deflection" then return nil end
+  local id, up = Rogue.epicOf(c, "deflection")
+  if not id then return nil end
   return Rogue.riposteDamage(Rogue.ripostes(c) + 1, up)
 end
 
@@ -265,7 +270,7 @@ end
 -- L'ennemi e compte-t-il comme Demoralized (porte assez de DoT, pas de vrai Demoralized) ? Lu aussi par
 -- l'interface.
 function Rogue.countsDemoralized(c, e)
-  local _, up = Rogue.epicOf(c)
+  local _, up = Rogue.epicOf(c, "atrophic_poison")
   return e ~= nil and e.side == "enemy" and not e.dead and (e.st.demoralized or 0) <= 0 and dotAtHit(c, e, up)
 end
 EH.atrophic_poison = {
@@ -328,7 +333,7 @@ local function subterfugeStart(c, src)
 end
 -- Tours de Stealth restants, ce tour compris (0 sans Stealth ; nil sans Subterfuge). Lu par l'interface.
 function Rogue.stealthLeft(c)
-  if Rogue.epicOf(c) ~= "subterfuge" then return nil end
+  if not Rogue.epicOf(c, "subterfuge") then return nil end
   if (c.player.st.stealth or 0) <= 0 then return 0 end
   return math.max(1, (c.cls.stealthUntil or 0) - turnKey(c) + 1)
 end
@@ -437,9 +442,8 @@ end
 -- Bots : correction de la valeur d'une position selon l'épique du combat (ajoutée à botValue).
 --   Echoing Reprimand : 2 ou 3 Combo valent un Surge de 5 (monter à 4 est une perte).
 function Rogue.epicBotValue(c, W)
-  local id, up = Rogue.epicOf(c)
-  if not id then return 0 end
-  if id == "echoing_reprimand" then
+  local id, up = Rogue.epicOf(c, "echoing_reprimand")
+  if id then
     local r = c.player.res or 0
     if r >= 2 and r <= Rogue.EPIC.echoingMax[tier(up)] then
       local cd = ns.Classes.rogue

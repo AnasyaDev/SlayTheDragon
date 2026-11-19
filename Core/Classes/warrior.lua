@@ -46,8 +46,7 @@ ns.ClassRules.warrior = {
   -- Bots : valeur propre (unités de Bots.W, 10 = 1 PV). Anger Management : la Rage déjà dépensée vers le
   -- prochain cran de recharge vaut une part d'un cran.
   botValue = function(c, W)
-    local id = Warrior.epicOf(c)
-    if id == "anger_management" then
+    if Warrior.epicOf(c, "anger_management") then
       return (c.cls.amSpent or 0) / Warrior.EPIC.anger_management.per * 12
     end
     return 0
@@ -100,10 +99,15 @@ Warrior.EPICS = { "death_wish", "thunderous_roar", "sweeping_strikes", "titans_g
 local IS_EPIC = {}
 for _, id in ipairs(Warrior.EPICS) do IS_EPIC[id] = true end
 
--- Épique du Guerrier en jeu dans ce combat (c.epic, posée par Combat.new) : id, amélioré ; nil sans épique.
-function Warrior.epicOf(c)
-  local e = c.epic
-  if e and IS_EPIC[e.id] then return e.id, e.up end
+-- Épique du Guerrier en jeu dans ce combat (c.epic, puis c.moreEpics : Combat.new) : id, amélioré ; nil sans
+-- épique. want = id cherché (cette épique si elle est en jeu), sinon la première du Guerrier.
+function Warrior.epicOf(c, want)
+  local e, more, k = c.epic, c.moreEpics, 0
+  while e do
+    if IS_EPIC[e.id] and (not want or e.id == want) then return e.id, e.up end
+    k = k + 1
+    e = more and more[k]
+  end
   return nil
 end
 

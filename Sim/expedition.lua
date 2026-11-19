@@ -77,9 +77,14 @@ return function(ns)
   -- le choix se fait d'abord entre elle et les cartes que sa table classe au moins aussi haut, dans l'ordre
   -- de la table ; ensuite, comme avant.
   local function bestUpgrade(exp)
-    local ei = X.epicIndex(exp)
     local tbl = advice and type(advice.upgrade) == "table" and advice.upgrade
-    local epicV = ei and tbl and X.canUpgrade(exp, ei) and tbl[exp.deck[ei].id]
+    -- plusieurs épiques : la première du deck encore à améliorer que la table classe
+    local ei, epicV
+    if tbl then
+      for _, k in ipairs(X.epicIndices(exp)) do
+        if X.canUpgrade(exp, k) and tbl[exp.deck[k].id] then ei, epicV = k, tbl[exp.deck[k].id] break end
+      end
+    end
     local best, bestV = nil, -1
     if epicV then
       best, bestV = ei, tierValue(epicV, exp.deck[ei])
@@ -105,7 +110,8 @@ return function(ns)
     local worst, worstV = nil, math.huge
     local rm = botOf(exp).remove or {}
     for i = 1, #exp.deck do
-      if i ~= skip then
+      -- skip donné (index de l'épique) : aucune épique du deck n'est choisie (plusieurs épiques par expédition)
+      if i ~= skip and not (skip and Card.isEpic(ns.Cards[exp.deck[i].id])) then
         local card = exp.deck[i]
         local v = advised("remove", card.id) or rm[card.id] or rating(card.id) + 2
         v = v + Card.level(card) -- carte améliorée : +1 par palier
@@ -210,9 +216,10 @@ return function(ns)
   end
   SE.epicRating = epicRating
 
-  -- Gain (unités des rencontres) à prendre l'épique id : sa valeur, moins celle de l'épique remplacée.
+  -- Gain (unités des rencontres) à prendre l'épique id : sa valeur, moins celle de l'épique remplacée (au
+  -- plafond X.EPIC.max : la plus ancienne du deck, X.addCard).
   local function epicGain(exp, id)
-    local i = X.epicIndex(exp)
+    local i = X.epicFull(exp) and X.epicIndex(exp)
     local v = cardValue(exp, epicRating(exp, id))
     if i then
       local cur = exp.deck[i]
@@ -790,7 +797,7 @@ return function(ns)
     -- entrée dans chaque zone (après le soin du passage) : PV, PV max, taille du deck, épique au deck
     local function enterZone()
       record.zones[#record.zones + 1] = { zone = exp.zone, hp = exp.hp, maxHp = exp.maxHp, deck = #exp.deck,
-        epic = X.epicIndex(exp) and 1 or 0, gold = exp.gold, earned = exp.stats.goldEarned }
+        epic = X.epicCount(exp), gold = exp.gold, earned = exp.stats.goldEarned }
       humanRoute = nil -- route de l'ancienne carte
     end
     -- Visites du marchand (économie, docs/expedition.md) : or à l'entrée, prix de l'étal entier (cartes,
@@ -910,6 +917,7 @@ return function(ns)
     -- épique du deck en fin d'expédition (gagnée, achetée ou imposée) et son amélioration
     local ei = X.epicIndex(exp)
     record.epicEnd = ei and 1 or 0
+    record.epicsEnd = X.epicCount(exp)
     record.epicUp = ei and exp.deck[ei].up and 1 or 0
     record.events = exp.stats.events -- { id = réponse choisie }
     return record, exp

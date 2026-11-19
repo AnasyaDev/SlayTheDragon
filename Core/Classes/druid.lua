@@ -72,6 +72,9 @@ function Druid.shift(c, to)
   if Druid.taxed(from, to) then cls.taxed = (cls.taxed or 0) + 1 end
   Combat.log(c, { t = "shift", from = from, to = to })
   stat(c, "druid_shifts")
+  -- Heart of the Wild : la réserve de la nouvelle forme devient active AVANT l'événement, quel que soit l'ordre
+  -- des épiques en jeu (Furor la remplit au changement de forme ; sans réserves par forme : rien)
+  if Druid.usePool then Druid.usePool(c, to) end
   Combat.fire(c, "onShift", from, to)
   return true
 end
@@ -299,9 +302,11 @@ do
     text = "Cat, Bear and Moonkin each keep their own reserve, up to N. Each starts at " .. E.kinStart[4] .. "." })
 end
 
--- Épique en jeu dans ce combat : id, up (nil sans épique).
-function Druid.epic(c)
+-- Épique en jeu dans ce combat : id, up (nil sans épique). Plusieurs épiques en jeu (c.moreEpics) : want = id
+-- cherché (cette épique si elle est en jeu), sinon la première.
+function Druid.epic(c, want)
   local e = c and c.epic
+  if e and want then e = Combat.hasEpic(c, want) end
   if not e then return nil end
   return e.id, e.up
 end

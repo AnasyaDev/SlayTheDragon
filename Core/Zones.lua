@@ -40,9 +40,10 @@ end
 -- Arrondi au plus proche. Zone absente = 1 et 1 (les fiches ne changent pas : les vrais chiffres sont sur
 -- l'unité et dans les intentions, lus tels quels par l'interface et les bots ; Combat.zoneHard). Réglés au bot
 -- human, clé 0, compte vétéran sans épique (`zones=7 epic=none`) : battue/atteinte ≈ 60 / 35 / 30 / 25 %.
--- epicHp / epicDmg (facultatifs, ABSENTS aujourd'hui) : facteurs à la place de hp / dmg quand le deck du
--- combat a une épique (c.epic) ; levier « l'épique contre la dureté de la zone » mesuré le 19/11/2026, à
--- trancher par le joueur (docs/equilibrage.md). Seul endroit à régler ; la simulation les remplace sans
+-- epicHp / epicDmg (facultatifs, ABSENTS) : facteurs à la place de hp / dmg quand le deck du combat a une épique
+-- (c.epic) ; levier « l'épique contre la dureté de la zone » mesuré le 19/11/2026 et écarté par le joueur
+-- (artificiel) : c'est le cumul de plusieurs épiques qui doit passer le mur (Expedition.EPIC.max ;
+-- docs/equilibrage.md). Code de lecture gardé, inerte. Seul endroit à régler ; la simulation les remplace sans
 -- recoder : `zonehp=stranglethorn:1.3,swamp:1.4 zonedmg=… zoneepichp=… zoneepicdmg=…` (Sim/sim.lua).
 Z.HARD = {
   stranglethorn = { hp = 1.45, dmg = 1.45 },

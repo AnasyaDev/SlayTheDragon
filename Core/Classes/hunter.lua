@@ -185,15 +185,22 @@ end
 -- par deckHooks (où que soit la carte). whileInDeck = Hunter.epicStart : retient l'épique en jeu dans
 -- c.cls.epic = { id, up } (vue de classe, bots) et la sort de la pioche si elle y est encore (une épique
 -- n'est ni piochée ni jouée ; sans effet quand le socle la pose déjà hors des piles).
+-- Plusieurs épiques en jeu (c.moreEpics) : c.cls.epic garde la première.
 function Hunter.epicStart(c, src)
-  c.cls.epic = { id = src.id, up = ns.Card.upValue(src.up) }
+  c.cls.epic = c.cls.epic or { id = src.id, up = ns.Card.upValue(src.up) }
   for i = #c.draw, 1, -1 do
     if c.draw[i].uid == src.uid then table.remove(c.draw, i) break end
   end
 end
 
--- Épique en jeu dans ce combat (id) ou nil ; up = vrai si améliorée.
-function Hunter.epic(c)
+-- Épique en jeu dans ce combat (id) ou nil ; up = vrai si améliorée. want = id cherché (cette épique si elle
+-- est en jeu, Combat.hasEpic), sinon la première.
+function Hunter.epic(c, want)
+  if want then
+    local e = Combat.hasEpic(c, want)
+    if not e then return nil end
+    return e.id, ns.Card.upValue(e.up)
+  end
   local e = c.cls and c.cls.epic
   if not e then return nil end
   return e.id, e.up
@@ -231,9 +238,15 @@ ns.ClassRules.hunter = {
     local v = #c.traps * Hunter.TRAP_VALUE
     -- épique en jeu : le Frenzy gardé vaut plus quand il protège (Roar of Sacrifice) ou s'ajoute à chaque
     -- coup des Attacks (Lone Wolf) ; Hunter.EPIC_RES[id] = valeur en plus d'un point (unités de Bots.W)
-    local ep = Hunter.epic(c)
-    local k = ep and Hunter.EPIC_RES[ep]
-    if k then v = v + (c.player.res or 0) * k end
+    if c.moreEpics then
+      for ep, k in pairs(Hunter.EPIC_RES) do
+        if Combat.hasEpic(c, ep) then v = v + (c.player.res or 0) * k end
+      end
+    else
+      local ep = Hunter.epic(c)
+      local k = ep and Hunter.EPIC_RES[ep]
+      if k then v = v + (c.player.res or 0) * k end
+    end
     local cast = c.player.cast
     if cast then
       local d = ns.Card.def(cast.card)

@@ -9,6 +9,10 @@ local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 if jit and jit.opt then pcall(jit.opt.start, "maxtrace=65535", "maxmcode=262144") end
 local ns = dofile(root .. "/Sim/load.lua")(root)
 local X, Meta, Save, Combat, Card, Rng, U = ns.Expedition, ns.Meta, ns.Save, ns.Combat, ns.Card, ns.Rng, ns.Util
+-- Les tests du socle (sections 1 à 6) sont écrits pour la règle d'une épique par expédition (remplacement) :
+-- plafond 1 le temps du fichier ; plusieurs épiques (plafond du jeu, X.EPIC.max) : dernière section.
+local GAME_MAX = X.EPIC.max
+X.EPIC.max = 1
 
 local passed, failed = 0, 0
 local function test(name, f)
@@ -904,9 +908,170 @@ test("simulation : epic=<id> imposée et jamais remplacée ; sans option, l'épi
   eq(ns.SimExpedition.epicRating({ class = "rogue", deck = {} }, "te_epic_a"), ns.SimExpedition.EPIC_RATING)
 end)
 
+---------------------------------------------------------------------------
+-- Plusieurs épiques par expédition (décision du joueur, 19/11/2026) : plafond X.EPIC.max
+---------------------------------------------------------------------------
+local function withMax(m, f)
+  local old = X.EPIC.max
+  X.EPIC.max = m
+  local ok, err = pcall(f)
+  X.EPIC.max = old
+  if not ok then error(err, 0) end
+end
+local function epicIds(exp)
+  local t = {}
+  for _, i in ipairs(X.epicIndices(exp)) do t[#t + 1] = exp.deck[i].id end
+  return table.concat(t, ",")
+end
+
+test("plusieurs épiques : plafond X.EPIC.max (2 : s'ajoute, puis remplace la plus ancienne ; 0 : sans plafond)", function()
+  assert(GAME_MAX == nil or GAME_MAX == 0, "règle du jeu (19/11/2026) : sans plafond")
+  withMax(2, function()
+    local exp = newExp(7)
+    local n = #exp.deck
+    X.addCard(exp, "te_epic_a")
+    assert(not X.epicFull(exp))
+    X.addCard(exp, "te_epic_b")
+    eq(#exp.deck, n + 2, "la deuxième s'ajoute"); eq(X.epicCount(exp), 2); assert(X.epicFull(exp))
+    eq(exp.stats.epicReplaced, nil)
+    exp.deck[X.epicIndex(exp)].up = 1
+    X.addCard(exp, "te_epic_c")
+    eq(#exp.deck, n + 2, "au plafond : remplacée")
+    eq(epicIds(exp), "te_epic_b,te_epic_c", "la plus ancienne part")
+    eq(exp.epicReplaced.old, "te_epic_a"); eq(exp.epicReplaced.oldUp, 1); eq(exp.stats.epicReplaced, 1)
+  end)
+  withMax(0, function()
+    local exp = newExp(7)
+    for _, id in ipairs({ "te_epic_a", "te_epic_b", "te_epic_c", "te_epic_d" }) do X.addCard(exp, id) end
+    eq(X.epicCount(exp), 4, "sans plafond"); eq(X.epicMax(), math.huge); assert(not X.epicFull(exp))
+  end)
+  withMax(1, function()
+    local exp = newExp(7)
+    X.addCard(exp, "te_epic_a"); X.addCard(exp, "te_epic_b")
+    eq(epicIds(exp), "te_epic_b", "plafond 1 : la règle du 14/11/2026")
+  end)
+end)
+
+test("plusieurs épiques : une épique déjà obtenue ne retombe pas (deck, remplacée ou retirée)", function()
+  withMax(2, function()
+    local exp = newExp(4)
+    eq(table.concat(X.epicPool(exp), ","), "te_epic_a,te_epic_b,te_epic_c,te_epic_d")
+    X.addCard(exp, "te_epic_a"); X.addCard(exp, "te_epic_b")
+    eq(table.concat(X.epicPool(exp), ","), "te_epic_c,te_epic_d", "celles du deck exclues")
+    X.addCard(exp, "te_epic_c")
+    eq(epicIds(exp), "te_epic_b,te_epic_c")
+    eq(table.concat(X.epicPool(exp), ","), "te_epic_d", "la remplacée (A) ne retombe pas")
+    table.remove(exp.deck, X.epicIndex(exp))
+    eq(table.concat(X.epicPool(exp), ","), "te_epic_d", "la retirée (B) non plus")
+    -- toutes obtenues : plus rien ne tombe, aucun tirage
+    X.addCard(exp, "te_epic_d")
+    eq(#X.epicPool(exp), 0)
+    local r = {}
+    withDrop({ 1 }, function() eq(X.rollEpicDrop(exp, r, "elite"), false) end)
+    eq(r.epics, nil); eq(exp.rng.epic, nil, "aucun tirage")
+    -- la chute propose une épique absente du deck, jamais deux fois la même
+    local e2 = newExp(4, 5)
+    local seen = {}
+    withDrop({ 1 }, function()
+      for _ = 1, 4 do
+        local rr = {}
+        assert(X.rollEpicDrop(e2, rr, "elite"))
+        local id = rr.epics[1]
+        assert(not seen[id], "déjà obtenue : " .. id)
+        seen[id] = true
+        X.addCard(e2, id)
+      end
+      eq(X.rollEpicDrop(e2, {}, "elite"), false, "toutes obtenues")
+    end)
+  end)
+end)
+
+test("plusieurs épiques : épiques imposées au départ (epic=a+b+c), sans plafond", function()
+  withMax(1, function()
+    local exp = newExp(7, 3, { epic = "te_epic_a+te_epic_b+te_epic_c" })
+    eq(epicIds(exp), "te_epic_a,te_epic_b,te_epic_c")
+    eq(exp.stats.cardsAdded, 0); eq(exp.stats.epicReplaced, nil)
+    local e2 = newExp(7, 3, { epic = { "te_epic_d" } })
+    eq(epicIds(e2), "te_epic_d")
+  end)
+end)
+
+test("plusieurs épiques en combat : hors des piles, crochets cumulés, allow, whileInDeck, clone et reprise", function()
+  local log = {}
+  card("te_epic_x", { class = "rogue", zone = "steppes", rarity = "epic", name = "X", effects = {}, text = "Epic.\nX.",
+    type = "power", whileInDeck = function(c, src) c.cls.teX = src.id end,
+    deckHooks = { maxMana = function(c, src, v) return v + 1 end,
+      teV = function(c, src, v) log[#log + 1] = src.id return v * 2 end,
+      teN = function(c, src) log[#log + 1] = src.id end,
+      allow = function(c, src, d) return d.id ~= "eviscerate" end } })
+  card("te_epic_y", { class = "rogue", zone = "blackrock", rarity = "epic", name = "Y", effects = {}, text = "Epic.\nY.",
+    type = "power", whileInDeck = function(c, src) c.cls.teY = src.id end,
+    deckHooks = { maxMana = function(c, src, v) return v + 2 end,
+      teV = function(c, src, v) log[#log + 1] = src.id return v + 5 end,
+      teN = function(c, src) log[#log + 1] = src.id return true end },
+    hooks = { allow = function(c, src, d) return d.id ~= "backstab" end } })
+  local deck = deckOf("sinister_strike", "sinister_strike", "feint", "feint", "backstab", "eviscerate",
+    "te_epic_x", "te_passive", "te_epic_y")
+  local c = Combat.new({ seed = 2, class = "rogue", hp = 50, deck = deck, encounter = { "te_dummy" } })
+  eq(c.epic.id, "te_epic_x", "la première du deck")
+  eq(#c.moreEpics, 2); eq(c.moreEpics[1].id, "te_passive"); eq(c.moreEpics[2].id, "te_epic_y")
+  eq(#c.hand + #c.draw, #deck - 3, "aucune épique dans les piles")
+  for _, inst in ipairs(allPiles(c)) do assert(not Card.isEpic(Cards[inst.id]), "épique dans une pile") end
+  eq(c.cls.teX, "te_epic_x"); eq(c.cls.teY, "te_epic_y"); eq(c.cls.teStart, 1, "whileInDeck de chacune")
+  eq(c.player.mana, Combat.BASE_MANA + 1 + 1 + 2, "maxMana cumulé (X +1, passive +1, Y +2)")
+  -- valeur modifiée chaînée dans l'ordre du deck, notification arrêtée par la première qui renvoie vrai
+  eq(Combat.modify(c, "teV", 3), 11, "(3 × 2) + 5"); eq(table.concat(log, ","), "te_epic_x,te_epic_y")
+  log = {}
+  local stop, src = Combat.fire(c, "teN")
+  eq(stop, true); eq(src.id, "te_epic_y"); eq(table.concat(log, ","), "te_epic_x,te_epic_y")
+  -- allow de chacune (deckHooks de X, hooks de Y, hooks de la passive)
+  local function playable(id)
+    c.hand[#c.hand + 1] = Card.new(id, false, 999)
+    local ok, why = Combat.canPlay(c, #c.hand)
+    table.remove(c.hand)
+    return ok, why
+  end
+  c.player.res = 5
+  eq(select(2, playable("eviscerate")), "forbidden", "X interdit Eviscerate")
+  eq(select(2, playable("backstab")), "forbidden", "Y et la passive interdisent Backstab")
+  assert(playable("feint"))
+  eq(Combat.hasEpic(c, "te_epic_y"), c.moreEpics[2]); eq(Combat.hasEpic(c, "te_epic_a"), nil)
+  eq(#Combat.epicList(c), 3)
+  -- clone et sauvegarde : les épiques suivent
+  local cl = Combat.clone(c)
+  eq(#cl.moreEpics, 2); eq(Combat.modify(cl, "teV", 3), 11)
+  assert(Save.isPlain(c, "combat"))
+  local r = reload(c)
+  eq(r.epic.id, "te_epic_x"); eq(r.moreEpics[2].id, "te_epic_y"); eq(Combat.modify(r, "teV", 1), 7)
+  local ok, why = ns.Controller == nil or ns.Controller.validateCombat(r)
+  assert(ok, why)
+end)
+
+test("plusieurs épiques : expédition sauvegardée en combat avec trois épiques, rechargée et jouée", function()
+  withMax(3, function()
+    local exp = newExp(7, 9)
+    for _, id in ipairs({ "te_epic_b", "te_epic_c", "te_epic_d" }) do X.addCard(exp, id) end
+    enter(exp, "combat")
+    eq(exp.phase, "combat")
+    eq(exp.combat.epic.id, "te_epic_b"); eq(#exp.combat.moreEpics, 2)
+    local db = Save.new()
+    db.current = reload(exp)
+    assert(Save.validate(db))
+    local again = db.current
+    assert(Save.validateExpedition(again))
+    eq(again.combat.moreEpics[2].id, "te_epic_d"); eq(again.epicTaken.te_epic_c, true)
+    winFight(again)
+    eq(X.epicCount(again), 3)
+    local pool = table.concat(X.epicPool(again), ",")
+    assert(pool:find("te_epic_a", 1, true) and not pool:find("te_epic_b", 1, true)
+      and not pool:find("te_epic_c", 1, true) and not pool:find("te_epic_d", 1, true), pool)
+  end)
+end)
+
 for _, id in ipairs(added) do Cards[id] = nil end
 for id, d in pairs(realRogue) do Cards[id] = d end
 for id, d in pairs(realHunter) do Cards[id] = d end
+X.EPIC.max = GAME_MAX
 ns.Enemies.te_dummy, ns.Enemies.te_hitter = nil, nil
 
 print(("%d réussis, %d échoués"):format(passed, failed))

@@ -482,6 +482,23 @@ test("bot : chaque épique imposée se joue sans erreur ; build piloté par l'é
   assert(bot.epic(exp, "eclipse") > bot.epic(exp, "furor"), "attachement à l'épique du deck")
 end)
 
+-- Plusieurs épiques par expédition (19/11/2026) : Heart of the Wild et Furor cumulés, dans les deux ordres du deck
+test("deux épiques : Heart of the Wild + Furor, le +1 de Furor va dans la réserve de la nouvelle forme", function()
+  for _, order in ipairs({ { "heart_of_the_wild", "furor" }, { "furor", "heart_of_the_wild" } }) do
+    local extra = { "skull_bash", "skull_bash", "skull_bash", "skull_bash", order[1], order[2] }
+    local c = setup({ "shred", "wrath", "thick_hide" }, { extra = extra })
+    eq(#Combat.epicList(c), 2, "deux épiques en jeu")
+    eq(Combat.resCap(c), n(E.kinship, 0), "plafond de Heart of the Wild")
+    play(c, "shred", 1)        -- sans forme -> Cat : +1 (Furor) +1 (carte), réserve de Cat
+    eq(c.player.res, 2, order[1])
+    play(c, "wrath", 1)        -- Cat -> Moonkin : réserve de Moonkin, +1 (Furor) +1 (carte)
+    eq(c.player.res, 2, order[1]); eq(D.pool(c, "cat"), 2, order[1])
+    play(c, "thick_hide")      -- Moonkin -> Bear : 3e changement du tour, Furor ne donne plus rien (Primal 2)
+    eq(c.player.res, 0, order[1]); eq(D.pool(c, "moonkin"), 2, order[1])
+    assert(Save.isPlain(c)); Combat.clone(c)
+  end
+end)
+
 ns.Enemies.de_dummy, ns.Enemies.de_hitter, ns.Enemies.de_flurry, ns.Enemies.de_double = nil, nil, nil, nil
 
 print(("%d réussis, %d échoués"):format(passed, failed))

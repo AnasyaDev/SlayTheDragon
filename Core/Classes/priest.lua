@@ -97,11 +97,16 @@ L.rule("madness", { name = "Madness", text = "+N damage per Insanity. Surge card
 L.rule("empower", { name = "Empower",
   text = "The first Attack or Skill each turn becomes a Cast, its values +N%, rounded up." })
 
--- Épique du Prêtre active dans ce combat : id, amélioration (nil sans épique).
-function Priest.epicOf(c)
-  local e = c.epic
-  local d = e and ns.Cards[e.id]
-  if d and d.class == "priest" then return e.id, e.up end
+-- Épique du Prêtre active dans ce combat : id, amélioration (nil sans épique). Plusieurs épiques en jeu
+-- (c.moreEpics) : want = id cherché (cette épique si elle est en jeu), sinon la première du Prêtre.
+function Priest.epicOf(c, want)
+  local e, more, k = c.epic, c.moreEpics, 0
+  while e do
+    local d = ns.Cards[e.id]
+    if d and d.class == "priest" and (not want or e.id == want) then return e.id, e.up end
+    k = k + 1
+    e = more and more[k]
+  end
   return nil
 end
 
@@ -321,9 +326,19 @@ local function alive(c)
 end
 
 -- Valeur ajoutée à l'évaluation des bots (unités de Bots.W : 10 = 1 PV, 4 = 1 PV ennemi).
+-- Plusieurs épiques en jeu : la somme de leurs valeurs.
+local epicValue
 function Priest.botValue(c, W)
-  local id, up = Priest.epicOf(c)
-  if not id then return 0 end
+  local e, more, k, v = c.epic, c.moreEpics, 0, 0
+  while e do
+    if ns.Cards[e.id] and ns.Cards[e.id].class == "priest" then v = v + epicValue(c, W, e.id, e.up) end
+    k = k + 1
+    e = more and more[k]
+  end
+  return v
+end
+-- Valeur d'une épique en jeu (id, up) pour les bots.
+epicValue = function(c, W, id, up)
   local p = c.player
   local r = p.st.regen or 0
   if id == "echo_of_light" and r > 0 then
