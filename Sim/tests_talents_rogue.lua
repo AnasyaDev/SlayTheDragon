@@ -40,7 +40,7 @@ local function rcombat(map, spec, o)
   local ts = map and entries(map, spec) or nil
   return Combat.new({ seed = o.seed or 5, class = "rogue", hp = o.hp or 50, maxHp = 50, deck = deck,
     encounter = o.encounter or { "tr_dummy" }, relics = o.relics, talents = ts and U.copy(ts) or nil,
-    tstate = ts and (o.tstate or {}) or nil, quiet = true })
+    tstate = ts and (o.tstate or {}) or nil, kind = o.kind, quiet = true })
 end
 
 local function rexp(map, spec, o)
@@ -103,7 +103,9 @@ test("arbre du Rogue : 14 nœuds, 24 points, 4 rangées, un Specialization, ordr
   eq(t.byId.toughness.row, 1); eq(t.byId.provisions.row, 2); eq(t.byId.field_medic.row, 3)
   eq(t.byId.veterans_arsenal.row, 4); eq(t.byId.cheat_fate.row, 4)
   eq(t.byId.toughness.text[3], ("+%d max HP."):format(3 * RT.hp))
-  eq(t.byId.initiative.text[2], ("Start of combat: +%d Combo."):format(2 * RT.initiative))
+  eq(t.byId.initiative.text[2], ("Start of combat: +%d Combo, +%d against elites and bosses."):format(RT.initiative,
+    RT.initiativeBig))
+  eq(t.byId.lightning_reflexes.row, 3); eq(t.byId.elusiveness.ranks, 1); eq(t.byId.combat_readiness.ranks, 3)
   eq(t.byId.combat_readiness.text[1], ("Each Parry stops up to %d damage."):format(Rogue.PARRY_STOP + RT.readiness))
   eq(#t.byId.specialization.choices, 3)
   for _, ch in ipairs({ "assassination", "combat", "subtlety" }) do assert(t.byId.specialization.byChoice[ch], ch) end
@@ -131,8 +133,8 @@ end)
 test("tree= : palier 60 % du Rogue dans l'ordre du bot", function()
   local map, spec, n = Talent.fromShare("rogue", 60)
   eq(n, 15); eq(Talent.spentIn(map), 15); eq(spec, ns.Talents.rogue.bot.spec)
-  local want = { toughness = 3, initiative = 2, elusiveness = 2, opportunity = 2, lightning_reflexes = 1,
-    vile_poisons = 1, provisions = 1, specialization = 1, combat_readiness = 2 }
+  local want = { toughness = 3, opportunity = 2, deeper_stratagem = 2, provisions = 1, combat_readiness = 2,
+    specialization = 1, elusiveness = 1, initiative = 2, lightning_reflexes = 1 }
   for id, r in pairs(want) do eq(map[id], r, id) end
   for id in pairs(map) do assert(want[id], "en trop : " .. id) end
   eq(Talent.spentIn((Talent.fromShare("rogue", 100, "subtlety"))), 24)
@@ -147,18 +149,20 @@ test("Toughness : +hp PV max par rang au départ", function()
   eq(e.maxHp, RHP + 3 * RT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + 100)
 end)
 
-test("Initiative : +1 Combo par rang au début du combat (avec Shadowfang)", function()
+test("Initiative : +1 Combo au début du combat (rang 2 : +2 contre les élites et les boss ; avec Shadowfang)", function()
   eq(rcombat(nil).player.res, 0)
-  eq(rcombat({ initiative = 1 }).player.res, RT.initiative)
-  eq(rcombat({ initiative = 2 }).player.res, 2 * RT.initiative)
-  eq(rcombat({ initiative = 2 }, nil, { relics = { "shadowfang" } }).player.res, 2 + 2 * RT.initiative)
+  for _, kind in ipairs({ "combat", "elite", "boss" }) do
+    eq(rcombat({ initiative = 1 }, nil, { kind = kind }).player.res, RT.initiative, "rang 1, " .. kind)
+    eq(rcombat({ initiative = 2 }, nil, { kind = kind }).player.res,
+      kind == "combat" and RT.initiative or RT.initiativeBig, "rang 2, " .. kind)
+  end
+  eq(rcombat({ initiative = 2 }, nil, { relics = { "shadowfang" }, kind = "elite" }).player.res, 2 + RT.initiativeBig)
 end)
 
-test("Elusiveness : Parry 1 par rang au début du combat, plafond de Parry respecté", function()
+test("Elusiveness : Parry 1 au début du combat (avec Blinding Powder)", function()
   eq(rcombat(nil).player.st.parry, nil)
   eq(rcombat({ elusiveness = 1 }).player.st.parry, RT.elusive)
-  eq(rcombat({ elusiveness = 2 }).player.st.parry, 2 * RT.elusive)
-  eq(rcombat({ elusiveness = 2 }, nil, { relics = { "blinding_powder" } }).player.st.parry, 3, "plafond 3")
+  eq(rcombat({ elusiveness = 1 }, nil, { relics = { "blinding_powder" } }).player.st.parry, RT.elusive + 1)
 end)
 
 test("Opportunity : les Attacks jouées sous Stealth frappent plus fort, par coup ; ni après, ni les Skills", function()
@@ -209,8 +213,8 @@ test("Lightning Reflexes : Parry tient une charge de plus, le module reste intac
   eq(p.player.st.parry, 3)
 end)
 
-test("Combat Readiness : chaque Parry arrête 2 dégâts de plus par rang", function()
-  for r = 0, 2 do
+test("Combat Readiness : chaque Parry arrête 1 dégât de plus par rang", function()
+  for r = 0, 3 do
     local c = rcombat(r > 0 and { combat_readiness = r } or nil, nil, { encounter = { "tr_big" } })
     Combat.applyStatus(c, c.player, "parry", 1)
     local hp = c.player.hp
@@ -220,14 +224,17 @@ test("Combat Readiness : chaque Parry arrête 2 dégâts de plus par rang", func
   eq(Rogue.PARRY_STOP, 8, "module intact")
 end)
 
-test("Relentless Strikes : +1 Combo par rang après chaque Surge, pas sans Surge", function()
+test("Relentless Strikes : +1 Combo après un Surge de 5 (rang 2 : après chaque Surge), pas sans Surge", function()
   for r = 1, 2 do
-    local c = rcombat({ relentless_strikes = r }, nil, { deck = { "eviscerate", "sinister_strike" } })
-    Combat.gainRes(c, 3)
-    play(c, "eviscerate")
-    eq(c.player.res, RT.relentless * r, "rang " .. r)
-    play(c, "sinister_strike")
-    eq(c.player.res, RT.relentless * r + 1)
+    for _, spent in ipairs({ 3, 5 }) do
+      local c = rcombat({ relentless_strikes = r }, nil, { deck = { "eviscerate", "sinister_strike" } })
+      Combat.gainRes(c, spent)
+      play(c, "eviscerate")
+      local got = spent >= RT.relentlessAt[r] and RT.relentless or 0
+      eq(c.player.res, got, "rang " .. r .. ", Surge de " .. spent)
+      play(c, "sinister_strike")
+      eq(c.player.res, got + 1)
+    end
   end
 end)
 

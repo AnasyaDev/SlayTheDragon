@@ -9,14 +9,16 @@ local TC = ns.TalentCommon
 local max = math.max
 
 local RT = {
-  hp = 3,              -- Toughness : PV max par rang
-  initiative = 1,      -- Initiative : Combo au début de chaque combat, par rang
-  elusive = 1,         -- Elusiveness : Parry au début de chaque combat, par rang
-  opportunity = 2,     -- Opportunity : dégâts de plus par coup d'une Attack jouée sous Stealth, par rang
+  hp = 2,              -- Toughness : PV max par rang
+  initiative = 1,      -- Initiative : Combo au début de chaque combat
+  initiativeBig = 2,   --   rang 2 : Combo au début d'un combat d'élite ou de boss
+  elusive = 1,         -- Elusiveness : Parry au début de chaque combat
+  opportunity = 1,     -- Opportunity : dégâts de plus par coup d'une Attack jouée sous Stealth, par rang
   vile = 1,            -- Vile Poisons : DoT de plus à chaque DoT posé sur un ennemi
   reflexes = 1,        -- Lightning Reflexes : plafond de Parry +1
-  readiness = 2,       -- Combat Readiness : dégâts arrêtés de plus par charge de Parry, par rang
-  relentless = 1,      -- Relentless Strikes : Combo après chaque Surge, par rang
+  readiness = 1,       -- Combat Readiness : dégâts arrêtés de plus par charge de Parry, par rang
+  relentless = 1,      -- Relentless Strikes : Combo après un Surge…
+  relentlessAt = { 5, 1 }, --   … d'au moins relentlessAt[rang] Combo
   assassinDot = 1,     -- Specialization Assassination : DoT posé sur la cible par Combo dépensé
   combatCombo = 1,     -- Specialization Combat : Combo à chaque Parry
   subtletyDraw = 1,    -- Specialization Subtlety : cartes piochées quand une carte donne Stealth
@@ -37,27 +39,9 @@ local function fromStealth(c, d)
 end
 
 local nodes = {
-  -- Rangée 1 (ouverte d'emblée) ----------------------------------------------------------------------------------
+  -- Rangée 1 (ouverte d'emblée) -----------------------------------------------------------------------------------
   TC.toughness({ row = 1, ranks = 3, hp = RT.hp }),
-  { id = "initiative", row = 1, ranks = 2, name = "Initiative", icon = "ability_rogue_ambush",
-    text = { ("Start of combat: +%d Combo."):format(RT.initiative),
-      ("Start of combat: +%d Combo."):format(2 * RT.initiative) },
-    hooks = {
-      onCombatStart = function(c, src)
-        if not c.result then Combat.gainRes(c, RT.initiative * src.rank, "talent") end
-      end,
-    } },
-  { id = "elusiveness", row = 1, ranks = 2, name = "Elusiveness", icon = "ability_rogue_feint",
-    text = { ("Start of combat: gain Parry %d."):format(RT.elusive),
-      ("Start of combat: gain Parry %d."):format(2 * RT.elusive) },
-    hooks = {
-      onCombatStart = function(c, src)
-        if not c.result then Combat.applyStatus(c, c.player, "parry", RT.elusive * src.rank) end
-      end,
-    } },
-
-  -- Rangée 2 (5 points) -----------------------------------------------------------------------------------------
-  { id = "opportunity", row = 2, ranks = 2, name = "Opportunity", icon = "ability_backstab",
+  { id = "opportunity", row = 1, ranks = 2, name = "Opportunity", icon = "ability_backstab",
     text = { ("Attacks played in Stealth deal %d more per hit."):format(RT.opportunity),
       ("Attacks played in Stealth deal %d more per hit."):format(2 * RT.opportunity) },
     hooks = {
@@ -70,6 +54,11 @@ local nodes = {
     bot = { value = function(c, src, W)
       return (c.player.st.stealth or 0) * RT.opportunity * src.rank * W.enemyHp
     end } },
+  { id = "deeper_stratagem", row = 1, ranks = 2, name = "Deeper Stratagem", icon = "ability_rogue_eviscerate",
+    text = { ("Combo cap +%d."):format(RT.stratagem), ("Combo cap +%d."):format(2 * RT.stratagem) },
+    hooks = { resCap = function(c, src, v) return v + RT.stratagem * src.rank end } },
+
+  -- Rangée 2 (5 points) -------------------------------------------------------------------------------------------
   { id = "vile_poisons", row = 2, ranks = 1, name = "Vile Poisons", icon = "ability_rogue_dualweild",
     text = { ("Each time DoT is applied to an enemy, apply %d more."):format(RT.vile) },
     hooks = {
@@ -78,12 +67,14 @@ local nodes = {
         return n
       end,
     } },
-  { id = "lightning_reflexes", row = 2, ranks = 1, name = "Lightning Reflexes", icon = "spell_shadow_shadowward",
-    text = { ("Parry can hold %d more %s."):format(RT.reflexes, plural(RT.reflexes, "charge")) },
-    const = { PARRY_MAX = function(v) return v + RT.reflexes end } },
+  { id = "combat_readiness", row = 2, ranks = 3, name = "Combat Readiness", icon = "ability_rogue_shadowstrikes",
+    text = { ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + RT.readiness),
+      ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + 2 * RT.readiness),
+      ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + 3 * RT.readiness) },
+    const = { PARRY_STOP = function(v, src) return v + RT.readiness * src.rank end } },
   TC.provisions({ row = 2 }),
 
-  -- Rangée 3 (10 points) ----------------------------------------------------------------------------------------
+  -- Rangée 3 (10 points) ------------------------------------------------------------------------------------------
   { id = "specialization", row = 3, ranks = 1, name = "Specialization", icon = "classicon_rogue",
     choices = {
       { id = "assassination", name = "Assassination", icon = "ability_rogue_rupture",
@@ -113,24 +104,40 @@ local nodes = {
           end,
         } },
     } },
-  { id = "combat_readiness", row = 3, ranks = 2, name = "Combat Readiness", icon = "ability_rogue_shadowstrikes",
-    text = { ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + RT.readiness),
-      ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + 2 * RT.readiness) },
-    const = { PARRY_STOP = function(v, src) return v + RT.readiness * src.rank end } },
-  { id = "relentless_strikes", row = 3, ranks = 2, name = "Relentless Strikes", icon = "ability_rogue_slicedice",
-    text = { ("After each Surge: +%d Combo."):format(RT.relentless),
-      ("After each Surge: +%d Combo."):format(2 * RT.relentless) },
+  { id = "elusiveness", row = 3, ranks = 1, name = "Elusiveness", icon = "ability_rogue_feint",
+    text = { ("Start of combat: gain Parry %d."):format(RT.elusive) },
     hooks = {
-      onSurge = function(c, src)
-        if not c.result then Combat.gainRes(c, RT.relentless * src.rank, "talent") end
+      onCombatStart = function(c, src)
+        if not c.result then Combat.applyStatus(c, c.player, "parry", RT.elusive) end
       end,
     } },
+  -- (rang 2 : plus de Combo contre les élites et les boss, c.kind)
+  { id = "initiative", row = 3, ranks = 2, name = "Initiative", icon = "ability_rogue_ambush",
+    text = { ("Start of combat: +%d Combo."):format(RT.initiative),
+      ("Start of combat: +%d Combo, +%d against elites and bosses."):format(RT.initiative, RT.initiativeBig) },
+    hooks = {
+      onCombatStart = function(c, src)
+        if c.result then return end
+        local big = src.rank >= 2 and (c.kind == "elite" or c.kind == "boss")
+        Combat.gainRes(c, big and RT.initiativeBig or RT.initiative, "talent")
+      end,
+    } },
+  { id = "lightning_reflexes", row = 3, ranks = 1, name = "Lightning Reflexes", icon = "spell_shadow_shadowward",
+    text = { ("Parry can hold %d more %s."):format(RT.reflexes, plural(RT.reflexes, "charge")) },
+    const = { PARRY_MAX = function(v) return v + RT.reflexes end } },
   TC.fieldMedic({ row = 3 }),
 
-  -- Rangée 4 (16 points) ----------------------------------------------------------------------------------------
-  { id = "deeper_stratagem", row = 4, ranks = 2, name = "Deeper Stratagem", icon = "ability_rogue_eviscerate",
-    text = { ("Combo cap +%d."):format(RT.stratagem), ("Combo cap +%d."):format(2 * RT.stratagem) },
-    hooks = { resCap = function(c, src, v) return v + RT.stratagem * src.rank end } },
+  -- Rangée 4 (16 points) ------------------------------------------------------------------------------------------
+  { id = "relentless_strikes", row = 4, ranks = 2, name = "Relentless Strikes", icon = "ability_rogue_slicedice",
+    text = { ("After a Surge of %d Combo or more: +%d Combo."):format(RT.relentlessAt[1], RT.relentless),
+      ("After each Surge: +%d Combo."):format(RT.relentless) },
+    hooks = {
+      onSurge = function(c, src, n)
+        if not c.result and (n or 0) >= RT.relentlessAt[src.rank] then
+          Combat.gainRes(c, RT.relentless, "talent")
+        end
+      end,
+    } },
   TC.veteransArsenal({ row = 4 }),
   -- Une fois par expédition (exp.talentState.cheatFate, repris du combat par l'expédition).
   { id = "cheat_fate", row = 4, ranks = 2, name = "Cheat Fate", icon = "ability_rogue_cheatdeath",
@@ -156,11 +163,11 @@ ns.Talent.define("rogue", {
   -- Ordre de dépense du bot de simulation (tree=, un id par point ; docs/talents.md, § 8) et voie choisie.
   bot = {
     order = {
-      "toughness", "toughness", "toughness", "initiative", "initiative", "elusiveness", "elusiveness",
-      "opportunity", "opportunity", "lightning_reflexes", "vile_poisons", "provisions",
-      "specialization", "combat_readiness", "combat_readiness", "relentless_strikes", "relentless_strikes",
-      "field_medic",
-      "deeper_stratagem", "deeper_stratagem", "veterans_arsenal", "veterans_arsenal", "cheat_fate", "cheat_fate",
+      "toughness", "toughness", "toughness", "opportunity", "opportunity",
+      "deeper_stratagem", "deeper_stratagem", "provisions", "combat_readiness", "combat_readiness",
+      "specialization", "elusiveness", "initiative", "initiative", "lightning_reflexes",
+      "vile_poisons", "combat_readiness", "field_medic", "relentless_strikes", "relentless_strikes",
+      "veterans_arsenal", "veterans_arsenal", "cheat_fate", "cheat_fate",
     },
     spec = "combat",
   },
