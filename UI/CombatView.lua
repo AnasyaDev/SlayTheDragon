@@ -575,7 +575,11 @@ function V:Build(parent)
     local rd = c and ns.Classes[c.class] and ns.Classes[c.class].resource
     -- nom dans la forme active (L.combatResource : l'id de base pour une classe à un seul nom)
     local rid = (c and ns.Language.combatResource(c)) or "insanity"
-    tt:AddLine(Art.keywordLine("res:" .. rid), 1, 1, 1, true)
+    -- « up to N » et « n / N » : plafond du combat (talents, épiques) ; ligne propre à la classe (resourceNote :
+    -- baisse du Frenzy changée par un talent)
+    tt:AddLine(Art.resourceLine(c, rid), 1, 1, 1, true)
+    local note = c and cv and cv.resourceNote and cv.resourceNote(c)
+    if note then tt:AddLine(note, 1, 1, 1, true) end
     if rd and rd.cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, Combat.resCap(c) or rd.cap), 0.8, 0.8, 0.8) end
   end, "ANCHOR_RIGHT")
   self.resource = dem

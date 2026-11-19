@@ -133,6 +133,8 @@ local TRAP_Y = HERO_FEET + 30
 local V = {}
 ns.ClassViews.hunter = V
 V.enemyMarks = true -- marque sur un cadre d'ennemi : CombatView lui réserve la fin de la ligne du nom
+-- ligne de plus dans l'infobulle de la pastille (UI/CombatView.lua) : baisse du Frenzy changée par un talent
+V.resourceNote = function(c) return Art.hunterDecayLine(c) end
 
 local function petTooltip(tt)
   local c = ns.Controller.combat()
@@ -144,13 +146,26 @@ local function petTooltip(tt)
   if t then
     tt:AddLine(("Attacks %s for %d at the end of the turn."):format(name or "?", H.petDamage(c, t)), 1, 1, 1, true)
   end
-  tt:AddLine(Art.keywordLine("res:frenzy"), 1, 1, 1, true)
+  tt:AddLine(Art.resourceLine(c, "frenzy"), 1, 1, 1, true)
+  local note = Art.hunterDecayLine(c)
+  if note then tt:AddLine(note, 1, 1, 1, true) end
   tt:AddLine("The pet attacks the last enemy targeted.", 0.8, 0.8, 0.8, true)
 end
 
 -- Note de l'épique sur son jeton des états du héros (comme le Voleur, UI/Art/rogue.lua ; W.noteToken) : ce
 -- qu'elle change maintenant (ligne de l'infobulle, nil : rien à dire), compteur écrit sur l'icône (nil : aucun),
 -- vrai si la règle est inactive (icône atténuée). Lu aussi par le harnais.
+-- Baisse du Frenzy changée par un talent (Bestial Discipline : DECAY_EVERY, Combat.const) : « Frenzy drops by 1
+-- only every other round. » ; nil au rythme de base (chaque round), sans combat ou sans le module.
+function Art.hunterDecayLine(c)
+  local H = ns.Hunter
+  if not (c and H and H.DECAY_EVERY) then return nil end
+  local every = ns.Combat.const(c, "DECAY_EVERY", H.DECAY_EVERY)
+  if every <= 1 then return nil end
+  local word = ({ [2] = "other", [3] = "third", [4] = "fourth" })[every] or (every .. "th")
+  return ("Frenzy drops by 1 only every %s round."):format(word)
+end
+
 local W_ = "|cffffffff%s|r"
 local function num(n) return W_:format(tostring(n)) end
 function Art.hunterEpicLine(c, want)
@@ -167,7 +182,7 @@ function Art.hunterEpicLine(c, want)
     -- du round), puis la dépense de l'épique
     local cost = E.cotwCost[k]
     if res < cost then return "Start of turn: " .. num(cost) .. " Frenzy needed for a pet attack", nil, true end
-    local dmg = H.petDamage(c, nil, math.min(5, res - cost + E.cotwRes[k]))
+    local dmg = H.petDamage(c, nil, math.min(ns.Combat.resCap(c) or 5, res - cost + E.cotwRes[k]))
     return "Start of turn: pet attacks for " .. num(dmg) .. (cost > 0 and (" (" .. num(-cost) .. " Frenzy)") or ""),
       tostring(dmg)
   elseif id == "trap_launcher" then

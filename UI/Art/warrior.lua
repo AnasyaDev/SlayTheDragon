@@ -136,7 +136,8 @@ function Art.warriorEpicLine(c, want)
     if bonus > 0 then
       return ("Rage %s: Attacks %s, %s next turn"):format(n(c.player.res), n("+" .. bonus), gain), "+" .. bonus
     end
-    return ("Rage up to %s, %s next turn"):format(n(E.avatar.cap), gain)
+    -- plafond du combat (Avatar, talent Unbridled Wrath : Combat.resCap)
+    return ("Rage up to %s, %s next turn"):format(n(ns.Combat.resCap(c) or E.avatar.cap), gain)
   end
   return nil
 end

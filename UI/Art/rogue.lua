@@ -76,6 +76,16 @@ Art.statuses.parry   = I("Ability_Parry")
 Art.statuses.stealth = I("Ability_Stealth")
 Art.statusShort.parry = "each charge stops one hit, up to 8 damage."
 Art.statusShort.stealth = "the next Attack played consumes it for a bonus."
+-- Jeton Parry en combat (W.addStatusLines, Art.statusNow) : dégâts arrêtés et plafond du combat (talents Combat
+-- Readiness, Lightning Reflexes : PARRY_STOP, PARRY_MAX par Combat.const) ; la définition courte des cartes garde
+-- la valeur du module.
+Art.statusLive.parry = function(c, text)
+  local R, Combat = ns.Rogue, ns.Combat
+  if not R or not R.PARRY_STOP then return text end
+  local stop = Combat.const(c, "PARRY_STOP", R.PARRY_STOP)
+  local cap = Combat.const(c, "PARRY_MAX", R.PARRY_MAX)
+  return (text:gsub("up to %d+ damage", "up to " .. stop .. " damage", 1):gsub("Max %d+", "Max " .. cap, 1))
+end
 
 -- Icône d'un DoT selon sa source (Combat.applyStatus(..., icon) : poisons du Voleur ; Garrote et
 -- Rupture reprennent le saignement du Guerrier).

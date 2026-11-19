@@ -1752,8 +1752,10 @@ function W.statusText(id, n)
   return s.name, text
 end
 
-function W.addStatusLines(tt, id, n)
+-- c (facultatif) : combat en cours, dont les talents changent les chiffres de l'état (Art.statusNow).
+function W.addStatusLines(tt, id, n, c)
   local name, text = W.statusText(id, n)
+  text = Art.statusNow(id, text, c)
   local s = ns.Statuses[id]
   local suffix = ""
   -- état à drapeau (Stealth) : présent ou non, sans nombre
@@ -2141,7 +2143,9 @@ function W.tokenRow(parent, maxN, width, size, opts)
       local info = self.info
       if not info then return end
       local inst = info.power or info.card
-      if info.status then W.addStatusLines(tt, info.status, info.n)
+      if info.status then
+        local Ctl = ns.Controller
+        W.addStatusLines(tt, info.status, info.n, Ctl and Ctl.combat and Ctl.combat())
       elseif inst then W.fillCardTooltip(tt, inst.id, inst.up, { full = true, now = info.now })
       else
         if info.title then tt:AddLine(info.title, 1, 0.82, 0) end

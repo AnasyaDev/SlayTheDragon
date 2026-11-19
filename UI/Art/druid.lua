@@ -112,26 +112,56 @@ function Art.druidForm(c)
 end
 
 ---------------------------------------------------------------------------
--- Ce que fera la fin de tour (pastille, marques des ennemis ; lu aussi par le harnais). Chiffres de la fiche
--- (§ 1.3, § 1.4) sauf si la classe les publie (ns.Druid.STRIKE_BASE, PULSE_PER, PULSE_MAX).
+-- Ce que fera la fin de tour (pastille, marques des ennemis ; lu aussi par le harnais). Chiffres du combat
+-- (talents : Combat.const, docs/talents.md § 17.4) : base de la frappe (Druid.strikeBase), coup à tous
+-- (Druid.pulseBase), Absorb de Tree of Life (TREE_ABSORB), taxe (Druid.taxOf) ; repli sur la fiche (§ 1.3,
+-- § 1.4) si la classe ne les publie pas (classe factice du harnais).
 ---------------------------------------------------------------------------
-local function strikeBase() local D = ns.Druid return (D and D.STRIKE_BASE) or 1 end
+local function strikeBase(c)
+  local D = ns.Druid
+  if D and D.strikeBase and c then return D.strikeBase(c) end
+  return (D and D.STRIKE_BASE) or 1
+end
+
+-- Constante name du Druid dans ce combat (talents), repli v sans module.
+local function const(c, name, v)
+  local D = ns.Druid
+  local base = (D and D[name]) or v
+  if c and ns.Combat.const then return ns.Combat.const(c, name, base) end
+  return base
+end
 
 -- Frappe de l'ours : cible (dernière cible vivante, sinon l'ennemi vivant le plus à gauche) et dégâts.
 function Art.druidStrike(c)
   local Combat = ns.Combat
   local t = Combat.strikeTarget(c)
   if not t then return nil, 0 end
-  return t, Combat.strikeDamage(c, t, strikeBase(), true)
+  return t, Combat.strikeDamage(c, t, strikeBase(c), true)
 end
 
--- Coups à tous de Moonkin : base (ceil(Charges / 2), 3 au plus) et dégâts sur e (nil : la base).
+-- Coups à tous de Moonkin : base (ceil(Charges / 2), PULSE_MAX au plus, + PULSE_BONUS) et dégâts sur e (nil : la
+-- base).
 function Art.druidPulse(c, e)
   local D = ns.Druid
-  local per, cap = (D and D.PULSE_PER) or 2, (D and D.PULSE_MAX) or 3
-  local n = math.min(cap, math.ceil((c.player.res or 0) / per))
+  local n
+  if D and D.pulseBase then
+    n = D.pulseBase(c)
+  else
+    n = math.min(const(c, "PULSE_MAX", 3), math.ceil((c.player.res or 0) / 2))
+  end
   if n <= 0 then return 0, 0 end
   return n, e and ns.Combat.strikeDamage(c, e, n, false) or n
+end
+
+-- Absorb de fin de tour en Tree of Life dans ce combat.
+function Art.druidTreeAbsorb(c) return const(c, "TREE_ABSORB", 2) end
+
+-- Règle du coup à tous de Moonkin dans ce combat (infobulle des marques) : plafond PULSE_MAX, bonus PULSE_BONUS.
+function Art.druidPulseRule(c)
+  local line = ("1 damage to each enemy per 2 Charges, up to %d"):format(const(c, "PULSE_MAX", 3))
+  local bonus = const(c, "PULSE_BONUS", 0)
+  if bonus > 0 then line = line .. (", then %d more"):format(bonus) end
+  return line .. "."
 end
 
 local WH = "|cffffffff%s|r"
@@ -154,7 +184,7 @@ function Art.druidLines(c)
     end
   elseif form == "bear" then
     local t, dmg = Art.druidStrike(c)
-    now = num(res) .. " " .. rname .. ": Bear strikes for " .. num(strikeBase() + res) .. "."
+    now = num(res) .. " " .. rname .. ": Bear strikes for " .. num(strikeBase(c) + res) .. "."
     if t then
       eot = "End of turn: Bear strikes " .. ns.Combat.enemyName(t) .. " for " .. num(dmg) .. ", then +1 "
         .. L.resourceName(L.combatResource(c) or "wild", 1) .. "."
@@ -171,7 +201,7 @@ function Art.druidLines(c)
     end
   elseif form == "tree" then
     now = rname .. " " .. num(res) .. ": unused in Tree of Life."
-    eot = "End of turn: gain " .. num((ns.Druid and ns.Druid.TREE_ABSORB) or 2) .. " Absorb."
+    eot = "End of turn: gain " .. num(Art.druidTreeAbsorb(c)) .. " Absorb."
   else
     now = rname .. " " .. num(res) .. ": unused until a form card is played."
     eot = "End of turn: nothing, no form yet."
@@ -275,8 +305,10 @@ function V.badgeTooltip(tt, c)
   tt:AddLine(now, 1, 1, 1, true)
   tt:AddLine(eot, 1, 0.82, 0, true)
   if cast then tt:AddLine(cast, 1, 0.82, 0, true) end
+  -- explication de la réserve dans la forme : plafond du combat (« up to N »), base de la frappe en Bear
   local key = ns.Language.combatResource(c) or "wild"
-  tt:AddLine(Art.keywordLine("res:" .. key), 0.8, 0.8, 0.8, true)
+  local line = Art.resourceLine(c, key):gsub("strikes for %d+ %+", "strikes for " .. strikeBase(c) .. " +", 1)
+  tt:AddLine(line, 0.8, 0.8, 0.8, true)
   local rd = ns.Classes.druid and ns.Classes.druid.resource
   local cap = ns.Combat.resCap(c) or (rd and rd.cap)
   if cap then tt:AddLine(("%d / %d"):format(c.player.res or 0, cap), 0.8, 0.8, 0.8) end
@@ -285,16 +317,26 @@ function V.badgeTooltip(tt, c)
 end
 
 -- Levier A (taxe des changements de forme) : compteur du tour (changements comptés : Cat <-> Bear exclu) et
--- malus à venir ; nil si le levier est inactif.
+-- malus à venir ; nil si le levier est inactif. Chiffres du combat (talents : TAX_FREE, TAX, TAX_MAX).
 function Art.druidTaxLine(c)
   local D = ns.Druid
-  if not D or (D.TAX or 0) <= 0 then return nil end
+  if not D then return nil end
+  local tax = const(c, "TAX", D.TAX or 0)
+  if tax <= 0 then return nil end
+  local free = const(c, "TAX_FREE", D.TAX_FREE or 1)
   local n = c.cls and c.cls.taxed or 0
-  local tax = D.pendingTax(c)
+  local pending = D.pendingTax(c)
   local head = ("Form changes this turn: %d. Shifting between Cat and Bear is free. "):format(n)
-  if tax > 0 then return head .. ("Next turn: %d mana less."):format(tax) end
-  if n >= D.TAX_FREE then return head .. ("Shifting again costs %d mana next turn."):format(D.TAX) end
-  return head .. ("%d more free, then each costs %d mana next turn."):format(D.TAX_FREE - n, D.TAX)
+  if pending > 0 then return head .. ("Next turn: %d mana less."):format(pending) end
+  -- coût du premier changement payant (TAX, borné par TAX_MAX)
+  local first = D.taxOf(free + 1, c)
+  if n >= free then return head .. ("Shifting again costs %d mana next turn."):format(first) end
+  -- plafond du malus (TAX_MAX) : dit seulement quand plusieurs changements payants s'additionnent
+  local cap = const(c, "TAX_MAX", D.TAX_MAX or tax)
+  if cap <= first then
+    return head .. ("%d more free, then shifting costs %d mana next turn."):format(free - n, first)
+  end
+  return head .. ("%d more free, then each costs %d mana next turn, %d at most."):format(free - n, first, cap)
 end
 
 -- Jeton Clearcasting (état à drapeau, sans nombre) : aura jaune de Cat tant qu'il attend son Attack.
@@ -329,7 +371,7 @@ local function markTooltip(tt, f)
     local _, dmg = Art.druidPulse(c, e)
     tt:AddLine("Moonkin Form", unpack(Art.druidForms.moonkin.color))
     tt:AddLine(("End of turn: %d damage to it."):format(dmg), 1, 1, 1, true)
-    tt:AddLine("1 damage to each enemy per 2 Charges, up to 3.", 0.8, 0.8, 0.8, true)
+    tt:AddLine(Art.druidPulseRule(c), 0.8, 0.8, 0.8, true)
   end
 end
 

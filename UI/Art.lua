@@ -689,6 +689,48 @@ function Art.statusLine(id)
   return "|cffffd100" .. name .. "|r: " .. text
 end
 
+---------------------------------------------------------------------------
+-- Chiffres du combat en cours (talents : docs/talents.md, § 17.4). Les textes des cartes et des mots-clés
+-- gardent la valeur du module ; les infobulles du combat (pastille, jetons d'état, marques) disent la valeur
+-- effective : constantes lues par Combat.const (talents de la classe jouée), plafond de ressource par
+-- Combat.resCap (talents, épiques). Hors combat (c = nil) : le texte de base.
+---------------------------------------------------------------------------
+
+-- Pourcentage entier d'un multiplicateur (1.25 → 25).
+local function pctOf(mult) return math.floor((mult - 1) * 100 + 0.5) end
+
+-- Texte d'un jeton d'état dans ce combat : Art.statusLive[id](c, texte) remplace les chiffres changés par les
+-- talents (Parry, Atonement, Sundered) ; sans combat ni règle, le texte tel quel.
+Art.statusLive = Art.statusLive or {}
+function Art.statusNow(id, text, c)
+  local f = c and Art.statusLive[id]
+  if not f then return text end
+  return f(c, text) or text
+end
+
+-- Atonement : soin par carte qui fait des dégâts (Combat.ATONEMENT_HEAL, talent Twin Disciplines).
+Art.statusLive.atonement = function(c, text)
+  local Combat = ns.Combat
+  local n = Combat.const(c, "ATONEMENT_HEAL", Combat.ATONEMENT_HEAL)
+  return (text:gsub("restores %d+ HP", "restores " .. n .. " HP", 1))
+end
+
+-- Sundered : dégâts reçus en plus (Combat.SUNDER_MULT, talent Specialization Arms du Warrior).
+Art.statusLive.armor_broken = function(c, text)
+  local Combat = ns.Combat
+  local pct = pctOf(Combat.const(c, "SUNDER_MULT", Combat.SUNDER_MULT))
+  return (text:gsub("%d+%% more damage", pct .. "%% more damage", 1))
+end
+
+-- Explication de la ressource de la pastille dans ce combat (rid = clé du langage, forme comprise) : « up to N »
+-- dit le plafond effectif (Combat.resCap) ; sans plafond ni combat, l'explication du mot-clé.
+function Art.resourceLine(c, rid)
+  local line = Art.keywordLine("res:" .. rid)
+  local cap = c and ns.Combat.resCap(c)
+  if cap then line = line:gsub("up to %d+", "up to " .. cap, 1) end
+  return line
+end
+
 -- Ligne d'une condition sur un état (« Expiation : … ») : sur soi pour un bienfait, sur la cible
 -- pour un affaiblissement.
 function Art.conditionLine(id)
