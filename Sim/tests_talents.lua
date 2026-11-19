@@ -313,10 +313,6 @@ test("arbre du Warrior : 13 nœuds, 24 points, 4 rangées, un Specialization, or
     for _, ch in ipairs(n.choices or {}) do list[#list + 1] = ch.text end
     for _, s in ipairs(list) do assert(s:find("%.$") and not s:find("[éèàç]"), n.id .. " : " .. s) end
   end
-  -- classes sans arbre (fichiers vides au TOC)
-  for _, cl in ipairs({ "priest", "rogue", "mage", "hunter", "druid" }) do
-    eq(ns.Talents[cl], nil, cl .. " : arbre à écrire")
-  end
 end)
 
 test("tree= : parts de l'arbre (5 / 10 / 15 / 20 / 24 points) dans l'ordre du bot", function()
