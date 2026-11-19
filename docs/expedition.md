@@ -298,15 +298,32 @@ obtention : l'épique se gagne (`docs/zones/decisions.md`, « Difficulté et ép
   classe, avant `onCombatStart`), `deckHooks` et `hooks` de sa définition (comme un Power posé d'office) dans
   `Combat.modify` / `Combat.fire`, **après** pouvoirs, bibelots et affixes (Shadow Covenant lit le coût
   final), et son crochet `allow` dans `Combat.canPlay`. `src` = `c.epic`. Les autres cartes à `deckHooks`
-  (non épiques) restent dans `c.passives`, comme avant.
+  (non épiques) restent dans `c.passives`, comme avant. **Plusieurs épiques** (19/11/2026) : la première du
+  deck dans `c.epic`, les suivantes dans `c.moreEpics` (dans l'ordre du deck, `nil` avec une seule) ; leurs
+  crochets passent l'un après l'autre (valeur modifiée chaînée ; notification arrêtée par la première qui
+  renvoie vrai ; `allow` de chacune) avec `src` = l'instance de chacune ; `whileInDeck` de chacune au début du
+  combat. `Combat.epicList(c)` (liste dans l'ordre), `Combat.hasEpic(c, id)` (instance ou nil). Les aides de
+  classe (`Priest.epicOf`, `Rogue.epicOf`, `Warrior.epicOf`, `Combat.mageEpic`, `Druid.epic`, `Hunter.epic`)
+  prennent un `want` (cette épique si elle est en jeu ; sans lui, la première de la classe) ; les valeurs des
+  bots (`botValue`, `botKey`) additionnent les épiques en jeu. Heart of the Wild : `Druid.shift` rend active la
+  réserve de la nouvelle forme AVANT `onShift`, quel que soit l'ordre des épiques (Furor remplit donc la bonne
+  réserve dans les deux ordres).
 - **Carte du deck de l'expédition.** Elle compte dans le deck (affichée en tête), s'améliore au feu de camp
   (choix volontaire, ou rencontre « upgrade » ; `Expedition.upgradeRandom` l'évite), se retire chez le
   marchand ou en rencontre (le deck n'a alors plus d'épique).
-- **Une seule épique par expédition.** `Expedition.addCard` d'une épique retire celle du deck (améliorée ou
-  non ; la nouvelle arrive non améliorée, l'amélioration est perdue) : `exp.stats.epicReplaced`,
-  `exp.epicReplaced = { old, oldUp, new }`. Récompense, marchand ou rencontre : même règle (c'est `addCard`).
-  Une épique ne se copie pas (sélection « dupe » : absente des choix, refus `"epic"`).
-  `Expedition.epicIndex(exp)` = index de l'épique du deck ou nil.
+- **Plusieurs épiques par expédition (décision du joueur, 19/11/2026 ; avant : une seule).** C'est leur cumul
+  qui doit faire passer les zones 4 à 7 : un compte qui a débloqué plus d'épiques est plus fort. Plafond
+  `EPIC.max` (0 ou nil = sans plafond, **retenu** ; 1 = l'ancienne règle) : sous le plafond, `Expedition.addCard`
+  d'une épique l'AJOUTE ; au plafond, elle remplace la plus ancienne du deck (améliorée ou non ; la nouvelle
+  arrive non améliorée, l'amélioration est perdue) : `exp.stats.epicReplaced`, `exp.epicReplaced = { old,
+  oldUp, new }`. Récompense, marchand ou rencontre : même règle (c'est `addCard`). **Une épique déjà obtenue ne
+  retombe pas** : `exp.epicTaken[id] = true` à chaque ajout (champ facultatif, sauvegardé ; sans changement de
+  version), `Expedition.epicPool` exclut celles du deck et celles déjà obtenues (remplacées ou retirées
+  comprises). Une épique ne se copie pas (sélection « dupe » : absente des choix, refus `"epic"`, « An epic card
+  can't be copied. »). `Expedition.epicIndex(exp)` = index de la première (la plus ancienne) ou nil,
+  `epicIndices(exp)`, `epicCount(exp)`, `epicMax()` (math.huge sans plafond), `epicFull(exp)` (au plafond).
+  Simulation : `epicmax=N` (0 = sans plafond), `epicdrop=p1,…,p7`, `epicshop=`, `epicprice=` ; `epic=a+b+c`
+  impose plusieurs épiques au départ (sans plafond ; `Expedition.new{ epic = "a+b" }` ou une liste).
 - **Transformations** : une épique peut porter `transforms = { [id_origine] = id_variante }` (sur sa définition
   de base ou améliorée) ; tant qu'elle est dans le deck, chaque carte d'origine se joue comme sa variante
   (`Card.applyTransforms(deck)`, appliqué par `Combat.new` et par l'affichage : `Expedition.shownDeck(exp)`,
@@ -322,10 +339,11 @@ obtention : l'épique se gagne (`docs/zones/decisions.md`, « Difficulté et ép
   `EPIC.drop.elite[rang]`, 25 % à Westfall, +10 points par zone, 85 % à Blackrock Mountain
   (`Expedition.epicDropChance(exp, genre)` ; une table plus courte que la campagne garde sa dernière valeur ;
   un genre absent de `EPIC.drop` ne fait jamais rien tomber : combats normaux et boss). Quand elle tombe :
-  `EPIC.choices` (1) épique débloquée autre que celle du deck s'ajoute à la récompense normale (`r.epics`,
-  `r.epicDone`, `r.epicPicked` ; actions `pickEpic` / `skipEpic`) : la prendre (elle remplace l'actuelle), ou
-  garder l'actuelle (refus ; partir sans choisir = refuser). Seules les épiques débloquées par la classe sont
-  proposables ; s'il n'y en a aucune, rien ne tombe et rien n'est tiré.
+  `EPIC.choices` (1) épique débloquée, ni dans le deck ni déjà obtenue, s'ajoute à la récompense normale
+  (`r.epics`, `r.epicDone`, `r.epicPicked` ; actions `pickEpic` / `skipEpic`) : la prendre (elle s'ajoute ; au
+  plafond, elle remplace la plus ancienne), ou la refuser (partir sans choisir = refuser). Seules les épiques
+  débloquées par la classe sont proposables (n'importe quelle zone débloquée, pas seulement la zone en cours) ;
+  s'il n'y en a plus aucune, rien ne tombe et rien n'est tiré.
 - **Marchand** : à partir de la moitié du parcours, une chance qu'il vende une épique (à la suite des cartes,
   `shop.cards[i].epic = true`), 150 po × le multiplicateur de prix de la zone (`PRICE_BY_ZONE` : 150 à Westfall,
   330 à Blackrock Mountain ; ± 10 %, crochet `price` genre `"card"` ; « Économie sur sept zones ») ; achat = `addCard`.
@@ -337,6 +355,7 @@ Paramètres (`Expedition.EPIC`, à changer en un endroit) :
 
 | Clé | Défaut | Règle |
 | --- | --- | --- |
+| `max` | 0 (sans plafond, 19/11/2026) | épiques au plus dans le deck ; au plafond, une nouvelle remplace la plus ancienne (1 = la règle du 14/11/2026) |
 | `drop` | `{ elite = { 0,25, 0,35, 0,45, 0,55, 0,65, 0,75, 0,85 } }` | par genre de combat, chance par rang de zone (1 = Westfall … 7 = Blackrock Mountain) qu'une victoire propose une épique |
 | `choices` | 1 | épiques proposées quand elle tombe |
 | `shop` | 0,5 | chance qu'un marchand vende une épique (0 = jamais) |
@@ -377,6 +396,16 @@ les cartes que sa table `classDef.bot.byEpic[id].upgrade` classe au moins aussi 
 (avant le 14/11/2026, une carte absente de la table prenait sa note de choix, d'une autre échelle, et passait
 devant : l'épique n'était presque jamais améliorée). Tests : `Sim/tests_epic.lua` ; interface :
 `docs/interface.md`, « Cartes épiques ».
+
+Bot et plusieurs épiques (19/11/2026, `Sim/expedition.lua` seul ; `Sim/bots.lua` n'est pas touché) : une épique
+proposée vaut sa note (`SE.epicGain`), moins celle de la plus ancienne seulement si le deck est au plafond ;
+il prend toute épique de note positive (il ne juge pas les épiques qui se contrarient : Lone Wolf et les
+épiques du familier, Heart of the Wild et les autres épiques du Druide) ; jamais une épique retirée par
+`decksize` ni par le retrait du marchand quand il protège l'épique (`worstCard` saute toutes les épiques) ;
+amélioration : la première épique du deck encore à améliorer que sa table classe ; conseils de construction
+(`byEpic`) : ceux de la première épique du deck. Rapport : nouveau tableau « Par zone, nombre d'épiques » (moyenne
+à l'entrée, puis atteinte et battue/atteinte avec 0, 1, 2 et 3 épiques ou plus) ; « épique entrée » et « Par
+zone, épique à l'entrée » comptent les expéditions entrées avec AU MOINS une épique.
 
 ## Sauvegarde (`Core/Save.lua`)
 
@@ -463,9 +492,11 @@ campagne »).
   (battue / atteinte, bot `human`, clé 0) : zones 1 à 3 inchangées ; Stranglethorn 60 % sans épique / 90 % avec,
   Swamp of Sorrows 35 / 80, Burning Steppes 30 / 80, Blackrock Mountain 25 / 75. Levier : la **dureté des zones**
   (`ns.Zone.HARD`, `Core/Zones.lua` : facteur sur les PV et les coups de tous les ennemis de la zone, 1,45 / 1,8 /
-  2,15 / 2,3 ; `docs/zones.md`, « Dureté des zones »). La colonne « sans épique » est atteinte ; la colonne « avec
-  épique » ne l'est pas encore (une épique n'apporte que 0 à 10 points) : leviers mesurés et choix laissé au
-  joueur dans `docs/equilibrage.md`, « Mur des zones 4 à 7 sans épique (19/11/2026) ».
+  2,15 / 2,3 ; `docs/zones.md`, « Dureté des zones »). La colonne « sans épique » est atteinte. Pour la colonne
+  « avec épique », le joueur a écarté « l'épique réduit la dureté » (artificiel) et retenu le **cumul de
+  plusieurs épiques** (« Cartes épiques » ci-dessous, sans plafond) ; mesuré le 19/11/2026, le cumul ne suffit
+  pas : 66 / 45 / 53 / 32 % avec épique(s) à l'entrée, loin de 90 / 80 / 80 / 75 (`docs/equilibrage.md`,
+  « Mur des zones 4 à 7 sans épique (19/11/2026) », « Plusieurs épiques par expédition »).
 - **Zone la plus loin atteinte** : `cs.farthest` (l'entrée en phase `transit` compte comme atteinte).
 - **Diagnostic** (tests, simulation) : `Expedition.new{ zone = <départ>, lastZone = <arrêt> }` ; une zone hors
   de la campagne (zone factice des tests) est jouée seule.

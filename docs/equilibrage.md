@@ -1662,9 +1662,9 @@ taux conditionnels suivants ; Westfall passe par exemple de 82,7 à 89,2 avec Pr
 - **Épiques fortes** : Titan's Grip (Warrior) touche déjà la cible « avec épique » ; Mirror Image (Mage) en est
   proche jusqu'aux Steppes.
 
-### Leviers d'épique mesurés (aucun appliqué : à trancher par le joueur)
+### Leviers d'épique mesurés (A écarté par le joueur le 19/11/2026 : « Plusieurs épiques par expédition » plus bas)
 
-**A. L'épique contre la dureté de la zone (règle nouvelle, recommandée).** Quand le deck du combat a une épique,
+**A. L'épique contre la dureté de la zone (écarté par le joueur : artificiel).** Quand le deck du combat a une épique,
 les ennemis prennent un facteur plus faible : champs `epicHp` / `epicDmg` de `ns.Zone.HARD` (le code les lit
 déjà ; ils sont absents aujourd'hui ; mesure : `zoneepichp=… zoneepicdmg=…`). Épiques gagnées normalement
 (`zones=7`, 600), battue / atteinte avec épique à l'entrée :
@@ -1699,3 +1699,120 @@ relèvement général des chiffres des épiques ne suffisent donc pas : écarté
 - Non vérifié : clés 1 à 5 (Fortified et Tyrannical s'ajoutent par-dessus la dureté : les clés deviennent bien
   plus dures dans les zones 4 à 7, à re-mesurer), bot heuristic, autres graines, niveaux 2 à 6, les 25 épiques non
   imposées ; la dureté s'applique aussi aux boss et aux invoqués, pas aux dégâts d'état (DoT, Wildfire).
+
+### Plusieurs épiques par expédition (décision du joueur, 19/11/2026)
+
+Le joueur écarte le levier A (« l'épique réduit la dureté », jugé artificiel) : le deck peut porter **plusieurs
+épiques**, et c'est leur cumul qui doit faire passer les zones 4 à 7 (un compte qui a débloqué plus d'épiques est
+plus fort). Règle (`docs/expedition.md`, « Cartes épiques ») : plafond `Expedition.EPIC.max`, au plafond la
+nouvelle remplace la plus ancienne ; une épique déjà obtenue dans l'expédition ne retombe pas ; acquisition
+inchangée (chute aux élites 25 % → 85 % selon la zone, marchand 50 % dès l'étape 4, 150 po × prix de la zone ;
+toute épique débloquée par la classe est proposable). Dureté inchangée (1,45 / 1,8 / 2,15 / 2,3). Cible
+inchangée, la colonne « avec épique » se lisant « avec le nombre d'épiques qu'un vétéran porte à ce stade ».
+Mesures : bot `human`, clé 0, `seed=1`, six classes, moyenne des six classes ; tableau « Par zone, nombre
+d'épiques » (nouveau dans le rapport).
+
+**Plafond** (`zones=7`, 300 expéditions par classe, `epicmax=N`) : battue / atteinte avec au moins une épique à
+l'entrée (STV / SoS / BS / BRM), épiques portées à l'entrée (moyenne), victoires.
+
+| Plafond | Avec épique(s) | Épiques à l'entrée STV / SoS / BS / BRM | Victoires |
+|---|---|---|---|
+| 1 (l'ancienne règle) | 64,3 / 42,4 / 42,7 / 28,7 | 0,76 / 0,91 / 0,98 / 1,00 | 3,2 |
+| 2 | 64,7 / 45,7 / 51,3 / 25,7 | 1,07 / 1,48 / 1,81 / 1,93 | 3,7 |
+| 3 | 64,7 / 45,1 / 52,9 / 26,8 | 1,12 / 1,68 / 2,33 / 2,71 | 4,2 |
+| **sans plafond (retenu)** | 64,7 / 45,1 / 54,4 / 32,0 | 1,13 / 1,73 / 2,60 / 3,53 | 5,0 |
+| sans plafond, acquisition rapide (élites 60 % → 100 %, marchand 100 %, 75 po) | 66,0 / 49,5 / 56,5 / 33,2 | 2,41 / 3,40 / 4,59 / 5,62 | 7,4 |
+| borne haute : les 7 épiques imposées au départ (`epic=a+…+g`) | 67,0 / 60,1 / 74,4 / 38,5 | 7 | 21,2 |
+| cible | 90 / 80 / 80 / 75 | | |
+
+Le cumul aide peu : chaque épique de plus vaut quelques points (Swamp, battue / atteinte selon le nombre
+d'épiques à l'entrée, sans plafond : 0 → 35,8, 1 → 43,0, 2 → 41,7, 3 ou plus → 57,1 ; Blackrock : 1 → 15,4,
+2 → 35,3, 3+ → 40,6). Une acquisition deux fois plus rapide ajoute 1 à 4 points et rend les zones 1 à 3 plus
+faciles : écartée. Même avec les sept épiques dès Westfall, la moyenne reste loin de la cible, parce que des
+épiques se contrarient : **Hunter** 4,3 % à Westfall (Lone Wolf supprime le familier dont vivent Call of the
+Wild, Beast Cleave et Roar of Sacrifice), **Priest** 37,6 % à Stranglethorn et 3,8 % au Swamp (Echo of Light
+retire le soin de la Regen dont vit Prayer of Mending, Shadow Covenant paie en PV, Voidform interdit les cartes
+à Surge), **Druid** 12 % à Blackrock (Heart of the Wild plafonne chaque réserve à 3 : Eclipse, King of the
+Jungle et les autres en ont moins) ; Warrior (97 / 95 / 94 / 77) et Mage (91 / 82 / 88 / 62) atteignent ou
+frôlent la cible, Rogue (95 / 66 / 74 / 41) à mi-chemin. Dans les expéditions normales, le Druid perd aussi à
+Blackrock quand le plafond monte (23,3 → 15,4 → 8,1 → 8,8 %, plafond 1, 2, 3, aucun ; 30 à 60 expéditions).
+
+**Retenu : sans plafond** (`EPIC.max = 0`), acquisition et dureté inchangées : c'est la règle la plus simple
+(chaque épique obtenue reste) et la meilleure des mesures à rythme égal ; elle ne tient pas la cible « avec
+épique ».
+
+### Tableau final (600 expéditions par classe, sans plafond)
+
+Par zone, battue / atteinte, moyenne des six classes (vétéran avec épiques : colonne « avec » = au moins une
+épique à l'entrée ; vétéran sans épique : `epic=none`) :
+
+| Zone | Sans épique (`zones=7 epic=none`) | Cible | Avec épique(s) (`zones=7`) | Épiques à l'entrée | Cible | Écart |
+|---|---|---|---|---|---|---|
+| Westfall | 84,0 | = | 84,7 (toutes) | 0 | = | |
+| Duskwood | 93,4 | = | 94,1 (toutes) | 0,30 | = | |
+| Wetlands | 97,6 | = | 97,5 (toutes) | 0,67 | = | |
+| Stranglethorn Vale | **64,0** | 60 | **66,2** | 1,12 | 90 | −24 |
+| Swamp of Sorrows | **35,2** | 35 | **45,0** | 1,73 | 80 | −35 |
+| Burning Steppes | **36,4** | 30 | **53,2** | 2,57 | 80 | −27 |
+| Blackrock Mountain | **20,8** | 25 | **31,7** | 3,45 | 75 | −43 |
+
+Selon le nombre d'épiques à l'entrée (`zones=7`, battue / atteinte, toutes classes, n) : Stranglethorn 0 : 63,1
+(726), 1 : 63,7 (1 199), 2 : 69,4 (707), 3+ : 68,5 (165) ; Swamp 38,2 / 42,3 / 42,6 / 55,1 ; Steppes 53,9 (26) /
+46,3 / 59,3 / 57,6 ; Blackrock 33,3 (3) / 24,1 (29) / 36,5 (74) / 39,0 (354).
+
+Par classe (STV / SoS / BS / BRM, battue / atteinte ; avec : au moins une épique à l'entrée, `zones=7`) :
+
+| Classe | Sans épique (`epic=none`) | Avec épique(s) | Épiques à l'entrée de Blackrock |
+|---|---|---|---|
+| Hunter | 66,6 / 32,4 / 33,0 / 31,4 | 61,6 / 34,2 / 40,0 / 31,0 | 3,12 |
+| Rogue | 50,2 / 27,6 / 42,9 / 33,3 | 57,8 / 40,2 / 58,3 / 36,1 | 3,81 |
+| Warrior | 63,4 / 44,8 / 41,9 / 16,7 | 70,8 / 69,8 / 71,9 / 49,4 | 3,52 |
+| Mage | 64,9 / 36,7 / 35,5 / 17,9 | 74,3 / 50,0 / 61,3 / 44,4 | 3,54 |
+| Druid | 65,8 / 38,3 / 32,4 / 11,1 | 70,4 / 49,8 / 44,0 / 17,5 | 3,59 |
+| Priest | 73,4 / 31,4 / 32,4 / 14,7 | 62,5 / 26,2 / 44,0 / 11,8 | 3,12 |
+| Moyenne (cible) | 64,0 (60) / 35,2 (35) / 36,4 (30) / 20,8 (25) | 66,2 (90) / 45,0 (80) / 53,2 (80) / 31,7 (75) | 3,45 |
+
+Colonne « sans épique » : moyenne dans ± 6 points sauf les Steppes (+6,4 : le Druid réglé le 19/11 y passe de
+23,5 à 32,4) ; aucune classe à plus de 15 points de la cible (les plus loin : Druid à Blackrock 11,1, −13,9 ;
+Priest à Stranglethorn 73,4, +13,4 ; n = 27 à 54 à Blackrock, ± 7 à 11 points par classe). Colonne « avec épique » :
+toutes les classes à plus de 15 points sous la cible au Swamp et à Blackrock ; le Priest « avec » est sous son
+« sans » à Stranglethorn et au Swamp (ses épiques font perdre), le Hunter n'y gagne presque rien.
+
+### Victoires de campagne par classe (Nefarian battu, %, 600 expéditions)
+
+| Classe | Vétéran, épiques gagnées (`zones=7`) | Vétéran sans épique (`epic=none`) | Compte neuf (`zones=0 level=1`) | 2e expédition (`zones=3 level=2`) |
+|---|---|---|---|---|
+| Hunter | 2,3 | 1,8 | 0,0 | 0,2 |
+| Rogue | 3,7 | 1,5 | 0,0 | 0,2 |
+| Warrior | 13,0 | 1,5 | 0,0 | 3,3 |
+| Mage | 7,3 | 1,2 | 0,0 | 0,0 |
+| Druid | 1,8 | 0,7 | 0,0 | 0,2 |
+| Priest | 0,7 | 0,8 | 0,0 | 0,0 |
+| Moyenne | 4,8 (plafond 1 : 3,2) | 1,2 | 0,0 | 0,7 (plafond 1 : 0,5) |
+
+Compte neuf : aucune épique débloquée au départ (le plafond ne change rien) ; Stranglethorn 11,3 % battue /
+atteinte (Priest 37,6, les autres 1,5 à 9,3), Swamp 2,1 % : le mur tombe bien à la zone 4. 2e expédition
+(épiques des trois premières zones, niveau 2) : Stranglethorn 44,8 %, Swamp 28,5, Steppes 29,4, Blackrock 8,6 ;
+1,16 épique à l'entrée de Stranglethorn, 2,5 à Blackrock ; « peut finir dès la suivante » n'est pas tenu (0,7 %).
+
+Bot heuristic (vétéran, épiques gagnées, 300 expéditions par classe ; pas une cible : ce que fait un très bon
+joueur) : battue / atteinte avec épique(s) à l'entrée 86,7 / 66,7 / 71,8 / 67,4 (STV / SoS / BS / BRM ; zones 1 à
+3 : 98,8 / 99,4 / 99,2), victoires 28,6 % (Hunter 16,7, Rogue 33,3, Warrior 49,0, Mage 42,3, Druid 20,0, Priest
+10,3). Même parfait au combat, le cumul reste sous la cible au Swamp et à Blackrock.
+
+### Ce qu'il faudrait
+
+Avec les épiques d'aujourd'hui, le cumul ne passe pas le mur : il manque 24 à 43 points à la colonne « avec
+épique ». Repères : la cible était tenue (92 / 80 / 79 / 81, victoires 35 %, mesure du 19/11 sur le Druid
+réglé) quand un deck avec épique voyait les ennemis à 1,2 / 1,4 / 1,7 / 1,6 au lieu de 1,45 / 1,8 / 2,15 / 2,3 :
+ce que les épiques cumulées d'un vétéran devraient valoir, c'est l'équivalent de **−17 / −22 / −21 / −30 %** de
+PV et de coups ennemis, soit pour chaque épique de l'ordre de +10 à +15 points au lieu de +3 à +6 aujourd'hui.
+Pistes, hors de ce réglage : (1) épiques plus fortes, surtout celles qui se cumulent (un autre agent mesure et
+corrige les 42 épiques ; Warrior et Mage montrent qu'un cumul fort suffit) ; (2) règles d'exclusion ou choix
+assumé entre épiques qui se contrarient (Lone Wolf et le familier, Echo of Light et Prayer of Mending, Heart of
+the Wild et les réserves) ; le bot les prend toutes, un joueur pourrait refuser ; (3) une acquisition plus
+rapide n'apporte que 1 à 4 points (mesuré).
+
+- Non vérifié : clés 1 à 5, autres graines, niveaux 2 à 6 hors `zones=3 level=2`, interactions des 42 épiques
+  deux à deux (seules Heart of the Wild + Furor ont un test ; les autres cumuls passent par le chaînage des
+  crochets, sans revue une à une), la lecture en jeu de plusieurs jetons d'épique (`docs/interface.md`).

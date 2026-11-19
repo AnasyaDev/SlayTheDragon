@@ -548,8 +548,10 @@ combat), arrondis au plus proche :
 Les fiches restent immuables : le facteur vit dans l'état de l'unité (`e.hp`, `e.maxHp`) et dans le calcul des
 coups (`Combat.zoneHard(c, champ)`), que l'interface (PV, intentions, infobulles) et les bots lisent tels quels.
 Champs facultatifs `epicHp` / `epicDmg` : facteurs utilisés à la place quand le deck du combat a une épique
-(`c.epic`) ; **absents aujourd'hui** (levier « l'épique contre la dureté », à trancher par le joueur :
-`docs/equilibrage.md`, « Mur des zones 4 à 7 sans épique »). Simulation : `zonehp=stranglethorn:1.3,swamp:1.6
+(`c.epic`) ; **absents, et écartés** : le joueur a jugé artificiel le levier « l'épique réduit la dureté de la
+zone » (19/11/2026) ; c'est le **cumul de plusieurs épiques** qui doit faire passer les zones 4 à 7
+(`docs/expedition.md`, « Cartes épiques » ; mesures : `docs/equilibrage.md`, « Mur des zones 4 à 7 sans
+épique »). Le code qui lit ces champs reste, inerte. Simulation : `zonehp=stranglethorn:1.3,swamp:1.6
 zonedmg=… zoneepichp=… zoneepicdmg=…` remplacent les facteurs le temps d'une série, sans recoder. Les tests de
 chaque zone (`Sim/tests_zone_<zone>.lua`) tournent en dureté neutre (chiffres des fiches) ; la dureté a son test
 dans `Sim/tests_zones.lua`.

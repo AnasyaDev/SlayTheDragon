@@ -373,6 +373,34 @@ hors de toute pile, sans coût).
   sur la languette violette et du nom blanc sur le ruban violet, le panneau de confirmation au-dessus des modèles
   3D, la lecture des deux arcs de crans à côté de l'anneau de mana.
 
+### Plusieurs épiques par expédition (19/11/2026)
+
+Règle : `docs/expedition.md`, « Cartes épiques » (plafond `Expedition.EPIC.max`). Aucun changement de
+disposition : du texte et des jetons de plus dans les éléments existants.
+
+- **Jetons du héros** (`CombatView:RenderPlayer`) : un jeton par épique en jeu (`Combat.epicList(c)` : `c.epic`
+  puis `c.moreEpics`, dans l'ordre du deck), clé `epic:<id>`, avant les Powers joués, liseré et aura violets,
+  infobulle complète. La rangée des états (`W.tokenRow`) les range comme les autres jetons.
+- **Vues de classe** : la note de chaque épique va sur SON jeton (`W.noteEpics(c, list, fn)` → `W.noteToken(list,
+  "epic:<id>", …)`) ; les fonctions de ligne des six classes (`Art.priestEpicLine`, `Art.rogueEpicLine`,
+  `Art.mageEpicText`, `Art.warriorEpicLine`, `Art.hunterEpicLine`, `Art.druidEpicLine`) prennent l'id de
+  l'épique (`want`) ; sans id, la première de la classe (harnais d'avant). Les aides de classe (`Priest.epicOf`,
+  `Rogue.epicOf`, `Warrior.epicOf`, `Combat.mageEpic`, `Druid.epic`, `Hunter.epic`) prennent le même `want`.
+- **Textes selon le plafond** (`W.epicHint()`, `ns.Expedition.epicMax()`) : infobulle d'une épique « One epic
+  card per expedition: a new one replaces it. » (plafond 1, `W.EPIC_HINT`), « Up to N epic cards per
+  expedition: past that, a new one replaces the oldest. » (plafond N), « Epic cards add up: each one in the
+  deck is in play. » (sans plafond) ; consigne de la chute d'élite « Take this epic card, or skip it. » tant que
+  le deck n'est pas au plafond, sinon « Replace your epic card, or skip it. » (plafond 1) / « Replace your
+  oldest epic card, or skip it. » ; texte du contrôleur « Epic card: take it, or skip. » / « … replace your
+  oldest, or skip. » ; note du panneau de remplacement « Up to N epic cards per expedition: the oldest leaves the
+  deck. » (plafond 1 : la phrase d'avant). Refus de la copie (« dupe ») : « An epic card can't be copied. ».
+- Harnais : la section **UE** pose `EPIC.max = 1` (elle teste le remplacement) ; nouvelle partie **UEM** (fin de
+  UE) : trois épiques dans le deck, trois jetons violets dans l'ordre du deck puis le Power joué, infobulle du
+  troisième avec la règle du plafond, jetons sans chevauchement ; aperçu `mur-trois-epiques`
+  (`build/png/mur-trois-epiques.png`).
+- Non vérifiable hors jeu : la rangée des jetons avec sept épiques et plusieurs états (retour à la ligne de
+  `W.tokenRow`), la lisibilité de plusieurs auras violettes côte à côte.
+
 ## Habillage WoW (direction B, mana et parcours façon C)
 
 État au 11/11/2026, choisi par le joueur sur maquettes (`build/wowui/direction_*.jpg`, générateurs
