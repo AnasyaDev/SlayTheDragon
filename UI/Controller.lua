@@ -10,14 +10,16 @@
 --   C.ended  = { c, result, title } : combat tranché, bandeau de fin affiché sur l'écran de combat
 --   C.ending = { summary, entry }   : expédition archivée (Save.finish), bilan affiché
 --   C.ui     = { view, class, key, progressClass, progressTab } : sous-écran (amélioration, retrait,
---              progression, journal), choix de départ, classe et onglet (cartes, zones) de l'écran de progression
+--              progression, journal), choix de départ, classe et onglet (cartes, zones, talents) de l'écran de
+--              progression (consultable pendant une expédition hors combat : arbre en lecture seule)
 --
 -- Identifiants d'options : « verbe » ou « verbe:argument », où verbe est une action de
 -- Expedition.act (path:12, pickCard:2, buyRelic:1, remove:5, choose:1, leave, continue…), ou une
 -- navigation de l'interface (ui:upgrade, ui:remove, ui:progress, ui:meta, ui:back, ui:new), un choix de
 -- départ (class:priest, key:2, go), une classe ou un onglet de l'écran de progression
--- (pclass:warrior, ptab:zones, ptab:cards). Accueil : les zones de la campagne (zone:<id>) sont affichées, pas
--- choisies (toute expédition part de Westfall).
+-- (pclass:warrior, ptab:zones, ptab:cards, ptab:talents), un talent (talent:<nœud> : un rang ; tspec:<voie> : voie
+-- du nœud Specialization ; treset : remboursement). Accueil : les zones de la campagne (zone:<id>) sont affichées,
+-- pas choisies (toute expédition part de Westfall).
 local _, ns = ...
 
 local U, Combat, Card, X, Save, Meta, Map = ns.Util, ns.Combat, ns.Card, ns.Expedition, ns.Save, ns.Meta, ns.Map
@@ -28,6 +30,7 @@ ns.Controller = C
 
 C.listeners = {}
 C.lastEvents = {}
+C.END_LEVEL_LINES = 4 -- bilan : une ligne par niveau gagné jusqu'à 4 niveaux d'un coup, une seule au-delà
 C.ended = nil
 C.ending = nil
 C.ui = {}
@@ -74,10 +77,35 @@ C.REASONS = {
   running = "An expedition is already in progress.",
 }
 
+-- Talents (docs/talents.md, § 11 et § 17.7) : raisons d'un rang refusé (ns.Talent.canLearn, Save.learnTalent) ;
+-- « row » : la condition de la rangée (C.talentRowText).
+C.TALENT_REASONS = {
+  points = "No talent points to spend.",
+  max = "Maximum rank.",
+  running = "Talents can't change during an expedition.",
+  choice = "Already your specialization.",
+  unknown = "Unknown talent.",
+  spent = "No talent points spent.",
+}
+C.TALENT_RUNNING_LINE = "An expedition is in progress: talents can't change until it ends."
+
+function C.talentRowText(n)
+  return "Spend " .. n .. " point" .. (n == 1 and "" or "s") .. " to unlock."
+end
+
+-- « 3 talent points to spend » (1 : « 1 talent point »).
+function C.talentPointsText(n)
+  return n .. " talent point" .. (n == 1 and "" or "s")
+end
+
 -- « %s » : nom de la ressource de la classe jouée (« Not enough Rage. ») ; d (facultatif) = la carte refusée :
 -- nom dans la forme de la carte (L.cardResource : « Not enough Combo. » pour une carte Cat du Druid), sinon
 -- dans la forme active du combat (L.combatResource), sinon l'id de base. Classe à un seul nom : inchangé.
 function C.reasonText(why, d)
+  local tk = tostring(why):match("^talent:(.+)$")
+  if tk then
+    return tk == "row" and "Spend more points in the tree to unlock this row." or C.TALENT_REASONS[tk] or tk
+  end
   local t = C.REASONS[why] or tostring(why)
   if t:find("%s", 1, true) then
     local L = ns.Language
@@ -221,6 +249,8 @@ function C.validateExpedition(exp)
   if exp.event and exp.event.id and not (ns.Events and ns.Events[exp.event.id]) then
     return false, "unknown encounter"
   end
+  ok, why = knownIds(exp.talentEpics, ns.Cards, "card")
+  if not ok then return false, why end
   return knownIds(exp.startRelics, ns.Relics, "relic")
 end
 
@@ -257,6 +287,7 @@ function C.start(class, key, seed)
   local exp, why = Save.start(db, { seed = seed or C.makeSeed(), class = class, key = key })
   if not exp then return false, why end
   C.ending, C.ended, C.ui.view = nil, nil, nil
+  ns.Persist.talentNotice = nil -- ligne « You have N talent points to spend. » de l'accueil : vue
   notify("step")
   return true
 end
@@ -356,11 +387,16 @@ local function navigate(where)
     C.ending, C.ui.view = nil, nil
   elseif where == "upgrade" or where == "remove" or where == "meta" then
     C.ui.view = where
-  elseif where == "progress" then
+  elseif where == "progress" or where == "talents" then
     -- depuis l'accueil ou le bilan : la classe choisie (ou celle de l'expédition finie) ; retour de
-    -- la méta : la classe déjà affichée
+    -- la méta : la classe déjà affichée ; « talents » (bilan : « Spend talent points », panneau du deck
+    -- pendant une expédition) : onglet Talents. Pendant une expédition : hors combat seulement.
+    local exp = C.exp()
+    if exp and (C.ended or exp.phase == "combat") then return false, "combat" end
     if C.ui.view ~= "meta" then C.ui.progressClass = nil end
-    C.ui.view = where
+    if where == "talents" then C.ui.progressTab = "talents" end
+    C.ui.view = "progress"
+    ns.Persist.talentNotice = nil
   else
     return false, "action"
   end
@@ -368,16 +404,45 @@ local function navigate(where)
   return true
 end
 
+-- Talents de la classe affichée par l'écran de progression (hors expédition : Save refuse sinon) : un rang du
+-- nœud (talent:<nœud>), la voie du nœud à choix (tspec:<voie>), le remboursement (treset, gratuit). Refus :
+-- « talent:<raison> » (C.TALENT_REASONS, par C.reasonText).
+local function talentAct(verb, arg)
+  local db = ns.Persist.db
+  local cid = C.progressClass()
+  local ok, why
+  if verb == "treset" then
+    if db.current then return false, "talent:running" end
+    if Meta.spent(db.meta, cid) <= 0 then return false, "talent:spent" end
+    ok, why = Save.resetTalents(db, cid)
+  else
+    local node, choice = arg, nil
+    if verb == "tspec" then
+      local tree = ns.Talent.tree(cid)
+      node, choice = nil, arg
+      for _, n in ipairs(tree and tree.nodes or {}) do if n.choices then node = n.id end end
+      if not node then return false, "talent:unknown" end
+    end
+    ok, why = Save.learnTalent(db, cid, node, choice)
+  end
+  if not ok then return false, "talent:" .. tostring(why) end
+  notify("step")
+  return true
+end
+
 function C.choose(id)
   local verb, arg = parse(id)
   if verb == "ui" then return navigate(arg) end
+  if verb == "talent" or verb == "tspec" or verb == "treset" then return talentAct(verb, arg) end
   local exp = C.exp()
-  if not exp then
-    if verb == "class" and ns.Classes[arg] then
+  -- écran de progression pendant une expédition : classe et onglet seulement (lecture seule)
+  local browsing = exp and C.ui.view == "progress" and (verb == "pclass" or verb == "ptab")
+  if not exp or browsing then
+    if verb == "class" and ns.Classes[arg] and not exp then
       C.ui.class, C.ui.key = arg, nil
     elseif verb == "pclass" and ns.Classes[arg] then
       C.ui.progressClass = arg
-    elseif verb == "ptab" and (arg == "zones" or arg == "cards") then
+    elseif verb == "ptab" and (arg == "zones" or arg == "cards" or arg == "talents") then
       C.ui.progressTab = arg
     elseif verb == "key" and type(arg) == "number" then
       C.ui.key = arg
@@ -754,7 +819,14 @@ local function startStep()
     opts[#opts + 1] = o
   end
   opts[#opts + 1] = { id = "go", label = "Start expedition", text = ns.Zone.name(st.zone) }
-  opts[#opts + 1] = { id = "ui:progress", label = "Progress" }
+  -- points de talent à dépenser par la classe choisie : pastille sur « Progress » (onglet Talents)
+  local left = C.talentPointsLeft(st.class)
+  opts[#opts + 1] = { id = "ui:progress", label = "Progress", badge = left > 0 and left or nil,
+    badgeText = left > 0 and (C.talentPointsText(left) .. " to spend (" .. className(st.class) .. ").") or nil }
+  -- premier accueil après la migration v8 (25 niveaux, arbres de talents) : les points sont à dépenser
+  if ns.Persist.talentNotice and left > 0 then
+    text = "|cffffd700You have " .. C.talentPointsText(left) .. " to spend.|r" .. (text ~= "" and ("\n" .. text) or "")
+  end
   local beaten = Meta.beatenCount(db.meta, st.class)
   local campaign = far > 0 and ("Farthest: " .. zonePos(ns.Zone.ORDER[far]) .. " · bosses defeated: " .. beaten
     .. " of " .. ns.Zone.count()) or ("From " .. ns.Zone.name(ns.Zone.FIRST) .. " to " .. lastName .. ".")
@@ -767,6 +839,8 @@ end
 local function progressClass()
   local cid = C.ui.progressClass
   if cid and ns.Classes[cid] then return cid end
+  local exp = C.exp()
+  if exp and ns.Classes[exp.class] then return exp.class end -- pendant une expédition : sa classe
   local e = C.ending and C.ending.entry
   if e and e.class and ns.Classes[e.class] then return e.class end
   return C.startInfo().class
@@ -811,13 +885,75 @@ C.zoneRows = zoneRows
 -- par voie (départ puis les trois voies, dans l'ordre des niveaux), bibelots de classe. Zones : les sept
 -- zones (gagnée, clé max, carte de zone, bibelots de clé). Verrouillé : seulement la condition
 -- (« Priest level 4 », « Win Westfall to unlock »), ni nom ni texte ni icône.
+-- Onglet Talents (docs/talents.md, § 11 ; lecture : ns.Talent.view, § 17.7) : { class, className, points, spent,
+-- left, total, running, empty (classe sans arbre), summary (ligne des points), note (ligne d'état : expédition en
+-- cours, arbre absent, aucun point encore), rows = { { row, need, open, lock (condition d'une rangée fermée),
+-- nodes = { { id (option talent:<nœud>), node, name, icon, ranks, rank, text, nextText, canLearn, disabled,
+-- reason, choices = { { id (option tspec:<voie>), choice, name, icon, text, active, disabled, reason } } } } } },
+-- reset = { id = "treset", label, disabled, reason } }.
+local function talentTab(cid, running)
+  local T = ns.Talent
+  local m = ns.Persist.db.meta
+  local v = T.view(m, cid, running)
+  local tree = T.tree(cid)
+  local cname = className(cid)
+  local R = C.TALENT_REASONS
+  local t = { class = cid, className = cname, points = v.points, spent = v.spent, left = v.left, total = T.POINTS,
+    running = running or nil, empty = (not tree) or nil, rows = {} }
+  t.summary = C.talentPointsText(max(0, v.left)) .. " to spend · " .. v.spent .. " of " .. T.POINTS .. " spent"
+  if running then t.note = C.TALENT_RUNNING_LINE
+  elseif not tree then t.note = "No talent tree for the " .. cname .. " yet."
+  elseif v.points <= 0 then t.note = "Each level from level 2 gives one talent point." end
+  local function why(w, need)
+    if w == "row" then return C.talentRowText(need) end
+    return R[w] or C.reasonText(w)
+  end
+  for r, row in ipairs(v.rows) do
+    local tr = { row = r, need = row.need, open = row.open, lock = (not row.open) and C.talentRowText(row.need) or nil,
+      nodes = {} }
+    for _, e in ipairs(row.nodes) do
+      local o = { id = "talent:" .. e.id, node = e.id, name = e.name, icon = e.icon, ranks = e.ranks, rank = e.rank,
+        text = e.text, nextText = e.nextText, canLearn = e.canLearn, disabled = not e.canLearn or nil }
+      -- rangée fermée : sa condition d'abord (plus utile que « aucun point »)
+      if not e.canLearn then o.reason = why((not row.open and not running) and "row" or e.why, row.need) end
+      if e.choices then
+        o.choices = {}
+        for _, ch in ipairs(e.choices) do
+          local co = { id = "tspec:" .. ch.id, choice = ch.id, name = ch.name, icon = ch.icon, text = ch.text,
+            active = ch.active or nil }
+          if running then co.disabled, co.reason = true, R.running
+          elseif e.rank > 0 then
+            if ch.active then co.disabled, co.reason = true, R.choice end -- changer de voie : gratuit
+          elseif not e.canLearn then co.disabled, co.reason = true, o.reason end
+          o.choices[#o.choices + 1] = co
+        end
+      end
+      tr.nodes[#tr.nodes + 1] = o
+    end
+    t.rows[r] = tr
+  end
+  t.reset = { id = "treset", label = "Reset talents" }
+  if running then t.reset.disabled, t.reset.reason = true, R.running
+  elseif v.spent <= 0 then t.reset.disabled, t.reset.reason = true, R.spent end
+  return t
+end
+C.talentTab = talentTab
+
+-- Points de talent à dépenser par la classe (0 sans arbre : rien à dépenser).
+function C.talentPointsLeft(cid)
+  if not ns.Talent.tree(cid) then return 0 end
+  return max(0, Meta.pointsLeft(ns.Persist.db.meta, cid))
+end
+
 local function progressStep()
   local db = ns.Persist.db
   local cid = progressClass()
   local cd = ns.Classes[cid]
   local level = Meta.levelOf(db.meta, cid)
   local tier = Meta.contentTier(level)
-  local tab = C.ui.progressTab == "zones" and "zones" or "cards"
+  local tab = C.ui.progressTab
+  if tab ~= "zones" and tab ~= "talents" then tab = "cards" end
+  local running = db.current ~= nil
   -- palier de contenu de la carte (champ level, 1 à 7), ouvert au niveau de classe Meta.CONTENT_LEVELS[palier]
   local function entry(id, def)
     local lv = Meta.unlockLevel(def)
@@ -845,12 +981,19 @@ local function progressStep()
     opts[#opts + 1] = { id = "pclass:" .. c, group = "class", label = ns.Classes[c].name or c,
       level = Meta.levelOf(db.meta, c), selected = c == cid }
   end
-  opts[#opts + 1] = tab == "zones" and { id = "ptab:cards", label = "Cards", group = "tab" }
-    or { id = "ptab:zones", label = "Zones", group = "tab" }
-  opts[#opts + 1] = { id = "ui:meta", label = "Log" }
+  -- onglets : les trois vues, l'affichée au liseré d'or ; Talents : pastille des points à dépenser
+  local left = running and 0 or C.talentPointsLeft(cid)
+  opts[#opts + 1] = { id = "ptab:cards", label = "Cards", group = "tab", selected = tab == "cards" }
+  opts[#opts + 1] = { id = "ptab:zones", label = "Zones", group = "tab", selected = tab == "zones" }
+  opts[#opts + 1] = { id = "ptab:talents", label = "Talents", group = "tab", selected = tab == "talents",
+    badge = left > 0 and left or nil,
+    badgeText = left > 0 and (C.talentPointsText(left) .. " to spend (" .. className(cid) .. ").") or nil }
+  -- journal : hors expédition (son retour mène à l'écran de progression de l'accueil)
+  if not running then opts[#opts + 1] = { id = "ui:meta", label = "Log" } end
   opts[#opts + 1] = { id = "ui:back", label = "Back" }
   return { kind = "classProgress", title = cd.name or cid, class = cid, level = level, bar = levelBar(cid),
-    tab = tab, rows = rows, relics = relics, zones = zoneRows(cid), options = opts }
+    tab = tab, rows = rows, relics = relics, zones = zoneRows(cid), options = opts,
+    talents = tab == "talents" and talentTab(cid, running) or nil, running = running or nil }
 end
 
 local function metaStep()
@@ -975,7 +1118,18 @@ local function endStep()
   lines[#lines + 1] = "|cffffd700+" .. (s.xp or 0) .. " " .. cname .. " experience.|r"
   local up = s.levelAfter and s.levelBefore and s.levelAfter > s.levelBefore
   if up then
-    lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. s.levelAfter .. "!|r"
+    -- une ligne par niveau gagné, un point de talent chacun (docs/talents.md, § 11) ; au-delà de END_LEVEL_LINES
+    -- niveaux d'un coup, une ligne pour tous (le panneau du bilan garde sa place pour la vitrine)
+    local n = s.levelAfter - s.levelBefore
+    local pts = s.pointsGained or n
+    if n <= C.END_LEVEL_LINES then
+      for lv = s.levelBefore + 1, s.levelAfter do
+        lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. lv .. "! +1 talent point.|r"
+      end
+    else
+      lines[#lines + 1] = "|cff40ff40" .. cname .. " reaches level " .. s.levelAfter .. "! +" .. pts
+        .. " talent points (levels " .. (s.levelBefore + 1) .. " to " .. s.levelAfter .. ").|r"
+    end
   end
   -- déblocages de la campagne, acquis à chaque boss battu : premiers boss de la classe (épiques), bibelots de
   -- clé, commun du compte ; regroupés (une expédition peut en battre sept d'un coup) et montrés par la vitrine
@@ -1016,9 +1170,15 @@ local function endStep()
   end
   for _, id in ipairs(s.keyRelics or {}) do relics[#relics + 1] = id end
   local unlocks = unlockGroups(classGroup(cname, cards, relics), commonGroup(commons))
+  local opts = { { id = "ui:new", label = "New expedition" }, { id = "ui:progress", label = "Progress" } }
+  -- points de talent à dépenser (gagnés maintenant ou avant) : bouton vers l'onglet Talents
+  local left = C.talentPointsLeft(e.class)
+  if left > 0 then
+    opts[#opts + 1] = { id = "ui:talents", label = "Spend talent points",
+      badge = left, badgeText = C.talentPointsText(left) .. " to spend (" .. cname .. ")." }
+  end
   return { kind = "end", won = won, result = e.result, title = title, text = table.concat(lines, "\n"),
-    bars = bars, unlocks = unlocks, options = { { id = "ui:new", label = "New expedition" },
-      { id = "ui:progress", label = "Progress" } } }
+    bars = bars, unlocks = unlocks, pointsGained = s.pointsGained, options = opts }
 end
 
 local function mapStep(exp)
@@ -1317,6 +1477,41 @@ local function startRelicStep(exp)
     options = opts }
 end
 
+-- Épiques au départ (talent Veteran's Arsenal, phase « start » avant le bibelot au choix) : les épiques
+-- proposables de la classe (exp.talentEpics), une par choix restant (exp.talentEpicsLeft) ; grille du deck
+-- (écran « deck ») avec « Skip ». Rang 2 : un deuxième choix, l'épique prise retirée de la liste.
+local function talentEpicStep(exp)
+  local avail = available(exp)
+  local opts = {}
+  for i, id in ipairs(exp.talentEpics) do
+    opts[#opts + 1] = actionOption(avail, { id = "talentEpic:" .. i, card = { id = id, up = false }, epic = true })
+  end
+  opts[#opts + 1] = actionOption(avail, { id = "skipTalentEpic", label = "Skip" })
+  local left = exp.talentEpicsLeft or 1
+  local total = max(left, math.floor(X.modify(exp, "startEpics", 0)))
+  local title = "Veteran's Arsenal: choose an epic card"
+  if total > 1 then title = title .. " (" .. (total - left + 1) .. " of " .. total .. ")" end
+  return { kind = "talentEpic", title = title, options = opts, left = left, total = total,
+    text = "It joins the deck for this expedition. Its rule is in play from the start of each combat." }
+end
+
+-- Talents de l'expédition en cours (figés au départ, exp.talents), dans l'ordre de l'arbre, prêts à afficher :
+-- { { id, name, icon, rank, ranks, spec, specName, text } } ; nil hors expédition ou sans talent.
+function C.activeTalents()
+  local exp = C.exp()
+  if not exp or not exp.talents then return nil end
+  local list = {}
+  for _, e in ipairs(exp.talents) do
+    local n = ns.Talent.node(exp.class, e.id)
+    if n then
+      local ch = n.choices and n.byChoice[e.spec or ""]
+      list[#list + 1] = { id = e.id, name = n.name, icon = ch and ch.icon or n.icon, rank = e.rank, ranks = n.ranks,
+        spec = e.spec, specName = ch and ch.name or nil, text = ns.Talent.rankText(exp.class, e.id, e.rank, e.spec) }
+    end
+  end
+  return #list > 0 and list or nil
+end
+
 -- Entre deux zones (phase « transit ») : la zone suivante (nom, décor, place dans la campagne), le soin du
 -- passage, ce que le boss vaincu vient de débloquer pour les expéditions suivantes ; « Continue » ou l'abandon.
 local function transitStep(exp)
@@ -1359,11 +1554,15 @@ function C.step()
     return startStep()
   end
   local ph = exp.phase
+  -- écran de progression consulté pendant l'expédition (hors combat) : arbre de talents en lecture seule
+  if C.ui.view == "progress" and ph ~= "combat" and ph ~= "done" then return progressStep() end
   if ph == "combat" then
     return { kind = "combat", title = exp.fight and FIGHT_TITLE[exp.fight.kind] or "Combat", options = {},
       state = exp.combat }
   elseif ph == "map" then return mapStep(exp)
-  elseif ph == "start" then return startRelicStep(exp)
+  elseif ph == "start" then
+    if exp.talentEpics then return talentEpicStep(exp) end
+    return startRelicStep(exp)
   elseif ph == "reward" then return rewardStep(exp)
   elseif ph == "campfire" then
     if C.ui.view == "upgrade" then return deckStep(exp, "upgrade") end

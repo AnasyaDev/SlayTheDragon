@@ -69,6 +69,7 @@ UI\Art\mage.lua
 UI\Art\hunter.lua
 UI\Art\druid.lua
 UI\Art\neutral.lua
+UI\Art\talents.lua
 UI\ZoneView.lua
 UI\Art\Zones\duskwood.lua
 UI\Art\Zones\wetlands.lua
@@ -83,4 +84,5 @@ UI\Scene.lua
 UI\Main.lua
 UI\CombatView.lua
 UI\Screens.lua
+UI\TalentView.lua
 UI\Flight.lua

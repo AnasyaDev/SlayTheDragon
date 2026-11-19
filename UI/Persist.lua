@@ -39,8 +39,13 @@ end
 -- Une sauvegarde d'une version plus récente de l'addon n'est pas touchée : on joue alors
 -- sur une base de session, jamais écrite (Persist.readOnly).
 function Persist.init()
-  local db, note = Save.migrate(_G.SlayTheDragonDB)
+  local raw = _G.SlayTheDragonDB
+  local before = type(raw) == "table" and tonumber(raw.version) or nil
+  local db, note = Save.migrate(raw)
   Persist.note = note
+  -- sauvegarde d'avant les arbres de talents (v8) : l'accueil dit une fois les points à dépenser
+  -- (« You have N talent points to spend. », UI/Controller.lua ; effacé au départ ou à l'écran Progress)
+  Persist.talentNotice = (note == "migrated" and before and before < 8) or nil
   if note == "newer" then
     Persist.readOnly = true
     db = Save.new()

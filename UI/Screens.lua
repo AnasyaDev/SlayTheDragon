@@ -603,6 +603,9 @@ local function setLines(fs, lines, s, zw)
   return fs:GetStringHeight() or 0
 end
 
+-- (partagés avec UI/TalentView.lua)
+UI.textWidth, UI.balancedLines, UI.setLines = textWidth, balanced, setLines
+
 local function plaque(parent)
   local b = CreateFrame("Button", nil, parent)
   b:SetSize(300, 118)
@@ -982,6 +985,7 @@ function Start:Build(f)
   self.meta = W.button(f, "Progress", 210, 44, nil, "red", 15)
   at(self.meta, f, 24, 497, 210, 44)
   self.meta:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+  UI.talentView.badgeOn(self.meta, nil) -- pastille des points de talent (créée éteinte)
   self.optionButtons = {}
 end
 
@@ -1111,6 +1115,8 @@ function Start:Show(step)
     else
       self.meta.option = o
       self.meta:SetText(o.label)
+      -- points de talent à dépenser par la classe choisie : pastille du nombre (UI/TalentView.lua)
+      UI.talentView.badgeOn(self.meta, o.badge, o.badgeText)
       self.optionButtons[o.id] = self.meta
     end
   end
@@ -1598,7 +1604,8 @@ end
 -- Grille du deck : amélioration, retrait, sélection de rencontre
 ---------------------------------------------------------------------------
 
-local Deck = { kinds = { "deck", "select" } }
+-- « talentEpic » : épiques au départ du talent Veteran's Arsenal (grille des épiques proposables, « Skip »)
+local Deck = { kinds = { "deck", "select", "talentEpic" } }
 UI.register("deck", Deck)
 
 -- 8 cartes par rangée, 2 rangées visibles ; au-delà, la grille défile à la molette (RowScroll, comme le
@@ -1630,6 +1637,10 @@ function Deck:Build(f)
     self.cards[i] = c
   end
   self.pile = deckPile(f)
+  -- consigne sous la rangée (épiques au départ : une rangée de 7 au plus)
+  self.hint = W.label(panel, "bold", 14, C.textSoft, "OVERLAY")
+  self.hint:SetWordWrap(false)
+  self.hint:Hide()
   self.buttons = {}
   for i = 1, 2 do
     local b = W.button(f, "", 206, i == 1 and 50 or 44, nil, i == 1 and "gold" or "red", i == 1 and 18 or 15)
@@ -1672,6 +1683,19 @@ function Deck:Show(step)
   end
   self.scroll:SetCount(#self.cardOptions, fresh)
   self:Layout()
+  -- épiques au départ (Veteran's Arsenal) : consigne sous la rangée de cartes (une seule rangée)
+  if step.kind == "talentEpic" and step.text and #self.cardOptions <= PER_ROW then
+    local y = GRID_TOP + W.CARD_H * GRID_SCALE + GRID_GAPY + 18
+    local s = 14
+    while s > 10 and textWidth(self.hint, step.text, s) * W.TEXT_SAFE > GRID_W - 60 do s = s - 0.5 end
+    setLines(self.hint, { step.text }, s, GRID_W - 60)
+    self.hint:SetJustifyH("CENTER")
+    self.hint:ClearAllPoints()
+    self.hint:SetPoint("CENTER", self.frame, "TOPLEFT", GRID_X + GRID_W / 2, -y)
+    self.hint:Show()
+  else
+    self.hint:Hide()
+  end
 end
 
 -- Écran quitté pour un autre (son cadre caché ; pas la fenêtre seule) : la prochaine étape repart en haut.
@@ -2300,6 +2324,7 @@ function Progress:Build(f)
   for i = 1, 3 do
     local b = W.button(f, "", 220, i == 1 and 50 or 44, nil, i == 1 and "gold" or "red", i == 1 and 18 or 15)
     b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    UI.talentView.badgeOn(b, nil) -- pastille des points de talent (« Spend talent points »), créée éteinte
     b:Hide()
     self.buttons[i] = b
   end
@@ -2381,6 +2406,8 @@ function Progress:Show(step)
       b.option = o
       b:SetText(o.label)
       if i == 1 then at(b, self.frame, 790, 494, 220, 50) else at(b, self.frame, 24 + (i - 2) * 236, 497, 220, 44) end
+      -- « Spend talent points » (bilan) : pastille des points à dépenser
+      UI.talentView.badgeOn(b, o.badge, o.badgeText)
       b:Show()
       self.optionButtons[o.id] = b
     else
@@ -2413,7 +2440,13 @@ UI.register("classProgress", ClassProgress)
 local CP_SCALE, CP_PITCH, CP_X0, CP_LABEL_X, CP_LABEL_W = 0.6, 84, 190, 18, 128
 local CP_ROW_TOP, CP_ROW_H = 112, 122
 local CP_RELIC, CP_RELIC_DX, CP_RELIC_X, CP_RELIC_LABEL_R = 46, 62, 612, 574
-local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 44, 56, 50, 76
+-- En-tête (19/11/2026, six classes et trois onglets) : icônes des classes de CP_TAB au pas CP_TAB_DX à partir du
+-- centre CP_TAB_X ; barre de niveau en CP_BAR_X (CP_BAR_W) ; onglets « Cards », « Zones », « Talents » de CP_TABB_W
+-- à partir de CP_TABB_X (pas CP_TABB_DX), « Log » en CP_LOG_X, « Back » en CP_BACK_X.
+local CP_TAB, CP_TAB_DX, CP_TAB_X, CP_TAB_Y = 40, 48, 46, 76
+local CP_BAR_X, CP_BAR_W = 322, 210
+local CP_TABB_X, CP_TABB_W, CP_TABB_DX, CP_TABB_H, CP_TABB_Y = 546, 90, 94, 40, 54
+local CP_LOG_X, CP_LOG_W, CP_BACK_X, CP_BACK_W = 834, 78, 918, 98
 -- 36 emplacements : 34 de la grille commune, plus les cartes hors grille (Rogue : Nightblade). Une rangée
 -- de plus de CP_ROW_MAX cartes resserre son pas pour garder le même bord droit.
 local CP_SLOTS, CP_ROWS, CP_ROW_MAX = 36, 4, 10
@@ -2472,19 +2505,28 @@ function ClassProgress:Build(f)
   -- onglets : icônes des classes
   self.tabs = {}
   -- barre d'expérience (W.repBar)
-  self.bar = W.repBar(panel, 290)
-  at(self.bar, f, 318, 72, 290, 14)
-  -- onglet (« Zones » ou « Cards » : l'autre vue), journal, retour
-  self.tabBtn = W.button(f, "Zones", 110, 44, nil, "red", 15)
-  at(self.tabBtn, f, 622, 52, 110, 44)
-  self.tabBtn:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  self.metaBtn = W.button(f, "Log", 110, 44, nil, "red", 15)
-  at(self.metaBtn, f, 742, 52, 110, 44)
+  self.bar = W.repBar(panel, CP_BAR_W)
+  at(self.bar, f, CP_BAR_X, 72, CP_BAR_W, 14)
+  -- onglets (« Cards », « Zones », « Talents » : l'affiché au liseré d'or ; Talents : pastille des points à
+  -- dépenser), journal, retour
+  self.tabBtns = {}
+  for i, label in ipairs({ "Cards", "Zones", "Talents" }) do
+    local b = W.button(f, label, CP_TABB_W, CP_TABB_H, nil, "red", 14)
+    at(b, f, CP_TABB_X + (i - 1) * CP_TABB_DX, CP_TABB_Y, CP_TABB_W, CP_TABB_H)
+    b:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
+    self.tabBtns[i] = b
+  end
+  self.tabBtn = self.tabBtns[2] -- (compatibilité)
+  self.metaBtn = W.button(f, "Log", CP_LOG_W, CP_TABB_H, nil, "red", 14)
+  at(self.metaBtn, f, CP_LOG_X, CP_TABB_Y, CP_LOG_W, CP_TABB_H)
   self.metaBtn:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  self.back = W.button(f, "Back", 150, 48, nil, "gold", 18)
-  at(self.back, f, 866, 50, 150, 48)
+  self.back = W.button(f, "Back", CP_BACK_W, 46, nil, "gold", 18)
+  at(self.back, f, CP_BACK_X, 51, CP_BACK_W, 46)
   self.back:SetScript("OnClick", function(btn) chooseOption(btn.option) end)
-  for _, b in ipairs({ self.tabBtn, self.metaBtn, self.back }) do b:SetFrameLevel(lv + 4) end
+  for _, b in ipairs({ self.tabBtns[1], self.tabBtns[2], self.tabBtns[3], self.metaBtn, self.back }) do
+    b:SetFrameLevel(lv + 4)
+  end
+  UI.talentView.badgeOn(self.tabBtns[3], nil)
   -- noms des voies (colonne de gauche) et titre des bibelots
   self.rowLabels = {}
   for i = 1, CP_ROWS do
@@ -2539,6 +2581,8 @@ function ClassProgress:Build(f)
     end
     self.zoneCols[i] = col
   end
+  -- onglet « Talents » (UI/TalentView.lua)
+  UI.talentView.build(self, f, panel)
   self.optionButtons = {}
 end
 
@@ -2683,18 +2727,29 @@ function ClassProgress:Show(step)
   -- titre de la classe sous la barre de niveau (« Priest — Dragonslayer »)
   local named = withTitle(step.bar and step.bar.label, step.class)
   if named ~= (step.bar and step.bar.label or "") then self.bar.detail:SetText(named) end
+  local TAB_INDEX = { ["ptab:cards"] = 1, ["ptab:zones"] = 2, ["ptab:talents"] = 3 }
+  self.metaBtn.option = nil
+  self.metaBtn:Hide() -- (pendant une expédition : pas de journal)
+  for _, b in ipairs(self.tabBtns) do b.option = nil b:Hide() end
   for _, o in ipairs(others) do
-    local b = o.group == "tab" and self.tabBtn or (o.id == "ui:meta" and self.metaBtn or self.back)
+    local b = o.group == "tab" and self.tabBtns[TAB_INDEX[o.id] or 1] or (o.id == "ui:meta" and self.metaBtn or self.back)
     b.option = o
     b:SetText(o.label)
+    if o.group == "tab" then
+      b:SetSelected(o.selected)
+      if o.id == "ptab:talents" then UI.talentView.badgeOn(b, o.badge, o.badgeText) end
+    end
+    b:Show()
     self.optionButtons[o.id] = b
   end
   local zonesTab = step.tab == "zones"
+  local cardsTab = step.tab ~= "zones" and step.tab ~= "talents"
   self:ShowZones(step.zones, zonesTab)
-  -- rangées de cartes (onglet « Cards » ; vides sur l'onglet « Zones »)
+  if step.tab == "talents" then UI.talentView.show(self, step) else UI.talentView.hide(self) end
+  -- rangées de cartes (onglet « Cards » ; vides sur les onglets « Zones » et « Talents »)
   local slot = 0
   for r = 1, CP_ROWS do
-    local row = not zonesTab and step.rows and step.rows[r]
+    local row = cardsTab and step.rows and step.rows[r]
     local l = self.rowLabels[r]
     local cy = CP_ROW_TOP + (r - 1) * CP_ROW_H + W.CARD_H * CP_SCALE / 2
     if row then
@@ -2741,9 +2796,9 @@ function ClassProgress:Show(step)
   W.looseBox(self.relicLabel, 1, 120)
   self.relicLabel:ClearAllPoints()
   self.relicLabel:SetPoint("RIGHT", self.frame, "TOPLEFT", CP_RELIC_LABEL_R, -cy)
-  if zonesTab then self.relicLabel:Hide() else self.relicLabel:Show() end
+  if not cardsTab then self.relicLabel:Hide() else self.relicLabel:Show() end
   for i, b in ipairs(self.relics) do
-    local e = not zonesTab and step.relics and step.relics[i]
+    local e = cardsTab and step.relics and step.relics[i]
     if e then
       at(b, self.frame, CP_RELIC_X + (i - 1) * CP_RELIC_DX - CP_RELIC / 2, cy - CP_RELIC / 2, CP_RELIC, CP_RELIC)
       paintRelicSlot(b, e)
@@ -2838,6 +2893,8 @@ function DV:Build()
   self.empty:SetText("No cards.")
   self.close = W.button(panel, "Close", 120, 34, function() DV:Close() end, "red", 14)
   self.close:SetPoint("BOTTOMRIGHT", -16, 14)
+  -- talents de l'expédition (lecture seule), en bas à gauche (UI/TalentView.lua)
+  self.talents = UI.talentView.deckLine(panel)
 
   for i = 1, DV_ROW * DV_ROWS do
     local c = W.card(veil)
@@ -2884,6 +2941,7 @@ function DV:Refresh()
   self.panel:SetTitle((DV_TITLE[self.kind] or "Cards") .. " · " .. n .. " card" .. (n ~= 1 and "s" or ""))
   self.scroll:SetCount(n, self.reset)
   self.reset = false
+  UI.talentView.fillDeckLine(self.talents, self.kind == "deck" and Controller.activeTalents() or nil)
   self:Layout()
 end
 
