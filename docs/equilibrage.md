@@ -2532,3 +2532,111 @@ Lecture :
 Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; Heart of the Wild avec Wild Reserve et Primal Instinct
 (plafond de 5 par réserve, réserve de départ dans la réserve sans forme) ; interface (la pastille et les marques
 lisent les constantes du module, pas celles des talents : `docs/talents.md`, § 7).
+
+## Talents : recalage d'ensemble (19/11/2026)
+
+Les six arbres codés, chacun réglé seul sur la courbe du Warrior jusqu'au palier 60 %, sont recalés ensemble sur la
+courbe décidée par le joueur (`docs/talents.md`, § 3 : ≈ 5 / 20 / 45 / 62 / 75 % aux paliers 20 à 100 %, à 60 % de
+l'arbre « un bon 40 % » ; tolérances 1–12 / 12–28 / 40–52 / 55–70 / 70–82 ; 12 points d'écart au plus entre classes).
+Interdits : le mur des zones, les ennemis, les règles de zone, les PV de base, toute difficulté conditionnelle.
+Commande : `flock build/sim-a.lock luajit Sim/sim.lua runner=expedition bot=human class=<classe> key=0 seed=1 jobs=8
+runs=600 tree=<part> zones=<N> level=<palier>` (contenu de chaque palier : `docs/talents.md`, § 3), deux files en
+parallèle (`sim-a.lock`, `sim-b.lock`) ; « contenu seul » = sans `tree=` ; ± 4. Scripts : `build/matrix.sh` (matrice
+classes × paliers), `build/jobs.sh` (liste de séries), `build/loo.lua` (séries « un nœud retiré » d'un palier) du
+worktree ; rapports : `reports/matrix/`, `reports/jobs/`.
+
+### Matrice avant / après (bot `human`, victoires de campagne, %)
+
+| Palier | Cible (tolérance) | Warrior | Rogue | Mage | Priest | Hunter | Druid |
+|---|---|---|---|---|---|---|---|
+| 0 % | 0 (0–2) | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 | 0 → 0 |
+| 20 % | 5 (1–12) | 25,5 → **10,2** | 2,0 → **2,0** | 0,7 → **1,2** | 24,5 → **7,0** | 14,0 → **3,2** | 18,3 → **12,5** |
+| 40 % | 20 (12–28) | 23,0 → **14,3** | 38,0 → **23,7** | 31,0 → **25,0** | 29,7 → **23,0** | 33,3 → **19,8** | 56,0 → **41,5** |
+| 60 % | 45 (40–52) | 61,2 → **47,7** | 67,8 → **42,7** | 60,3 → **41,8** | 55,7 → **44,8** | 60,8 → **49,0** | 67,2 → **56,0** |
+| 80 % | 62 (55–70) | 82,3 → **69,0** | 89,7 → **62,3** | 87,7 → **67,7** | 67,0 → **59,2** | 93,8 → **71,3** | 86,5 → **74,3** |
+| 100 % | 75 (70–82) | 94,3 → **78,5** | 98,3 → **82,3** | 97,7 → **81,3** | 79,0 → **71,7** | 99,3 → **82,8** | 90,7 → **79,5** |
+| contenu seul, 100 % | — | 28,2 → 28,2 | 18,3 → 18,3 | 17,0 → 17,0 | 7,5 → 7,5 | 7,3 → **14,7** | 29,3 → 29,3 |
+
+Écart entre classes (après) : 11,3 / 27,2 / 14,2 / 15,1 / 11,1 points aux paliers 20 à 100 % ; sans le Druid : 9,0 /
+10,7 / 7,2 / 12,1 / 11,1.
+
+**Specialization au palier 60 %** (après) : Warrior Fury 47,7 / Arms 49,7 / Protection 51,7 ; Rogue Combat 42,7 /
+Assassination 44,3 / Subtlety 44,7 ; Mage Arcane 41,8 / Fire 41,3 / Frost 48,0 ; Priest Discipline 44,8 / Shadow 42,2
+/ Holy 44,8 ; Hunter Beast Mastery 49,0 / Marksmanship 46,0 / Survival 45,7 ; Druid Feral 56,0 / Balance 56,2 /
+Restoration 59,8. Écart au plus 6,7 (Mage).
+
+**Bot `heuristic`** (joueur parfait, 300, ± 5) : Warrior 76,7 % au palier 60, 85,3 % au palier 100 ; Priest 60,7 et
+80,7 %.
+
+### Méthode
+
+1. Génériques d'abord (effet sur toutes les classes), matrice (`g1`).
+2. « Un nœud retiré » dans l'arbre (`talents=<nœud>:0` sur `tree=`) aux paliers 60, 80, 100 et 40 (400 expéditions),
+   pour connaître la part de chaque nœud dans l'arbre et non seul ; puis chiffres et ordre classe par classe, cinq
+   tours de matrice (`r2` à `r6`).
+3. Contenu par niveau : pas utilisé (il ne joue qu'au palier 20 %, où les classes sont dans la tolérance ; aux paliers
+   40 à 100 % tout le contenu est débloqué).
+
+Repères mesurés : Veteran's Arsenal d'avant valait +33 points seul au Warrior (Titan's Grip au départ) ; à 1 sur 2
+tirées, il vaut encore +10 (Warrior), +11 (Rogue), +6 (Mage, Hunter) dans l'arbre plein, et son rang 2 (1 sur 3) ≈ 0
+de plus. Nœuds retirés au palier 60 % avant le recalage (points perdus) : Rogue Elusiveness −17, Combat Readiness
+−9,5, Specialization −9 ; Mage Arcane Concentration −15, Arcane Focus −13, Toughness −11, Provisions −9 ; Hunter
+Natural Mending −12, Unleashed Fury −11, Beast Mastery −8 ; Druid Toughness −11,5, Provisions −6 ; Warrior Battle
+Ready −6,4, Toughness −6,2. Au palier 80 % (après un premier tour) : Hunter Animal Handler −14, Warrior Unbridled
+Wrath −9 (il ouvre Rampage à 6 Rage), Mage Winter's Chill −10. Au palier 100 % : Mage Cauterize (Ice Block) −9,
+Hunter Deterrence (tour sauté) −8.
+
+### Leviers changés (avant → après)
+
+Génériques (`Data/Talents/common.lua`, `Core/Expedition.lua`) :
+
+- **Veteran's Arsenal** : rang 1 une épique au choix parmi toutes celles des zones battues, rang 2 une deuxième →
+  **une épique au choix parmi 2 tirées au hasard** (rang 1) **puis parmi 3** (rang 2) ; nouveau crochet d'expédition
+  `startEpicOffer` (flux `ns.Rng` « talentEpic », tiré dans `Expedition.new`) ; même format `exp.talentEpics` /
+  `talentEpicsLeft`, l'écran de choix inchangé (titre sans « 1 of 2 » quand il n'y a qu'un choix).
+- **Toughness** : PV par rang propres à chaque arbre → **règle commune, 3 % des PV de base par rang, arrondi**
+  (`TC.toughnessHp`) : Warrior 4 → 2, Druid 3 → 2, Hunter 3 → 2, Rogue 2, Mage 2 → 1, Priest 2 → 1.
+- **Provisions** 100 → **50** d'or ; **Field Medic** 75 → **65 %**.
+- `Combat.const` passe le combat à la constante (`f(v, src, c)`, Unleashed Fury).
+
+Bots : **Hunter**, note des épiques (`Data/Hunter.lua`, `bot.epic`) : Lone Wolf et les épiques de familier (Call of
+the Wild, Trap Launcher, Beast Cleave, Roar of Sacrifice) se contrarient, 10 de note en moins pour l'une quand
+l'autre est au deck. Sans talents, le bot prenait Lone Wolf en plus des épiques de familier (épiques sans plafond) :
+contenu seul `zones=7` 7,3 % contre 16,0 % à `zones=6` ; après, 14,7 % (16,0 à `zones=6`). C'était un défaut du bot,
+pas de l'épique.
+
+Classes (`Data/Talents/<classe>.lua` ; tableaux : `docs/talents.md`, § 6 à 8) :
+
+- **Warrior** : Unbridled Wrath rangée 2 → 1 ; Second Wind 2 → 3 rangs (par 5 / 4 / 3 Rage) ; Rampage 2 rangs à 5
+  Rage (rang 2 : une carte) → 1 rang à **6 Rage** ; ordre : Battle Ready après le palier 60 %.
+- **Rogue** : Elusiveness et Initiative **contre élites et boss** seulement (Initiative 2 → 1 rang) ; Lightning
+  Reflexes rangée 3 → 1, 1 → 3 rangs ; Deeper Stratagem rangée 1 → 2, 2 → 3 rangs ; Combat Readiness 3 → 1 rang ;
+  Relentless Strikes rang 2 « après chaque Surge » → après un Surge de 4 ; Cheat Fate Parry 2 / Parry 3 et Stealth →
+  1 PV / 1 PV et Parry 2.
+- **Mage** : Arcane Concentration 3 → 2 rangs ; Frost Warding rangée 3 → 1 ; Winter's Chill 2 → 1 rang ; Prismatic
+  Cloak 1 rang de 2 Absorb → 2 rangs de 1 ; Arcane Focus et Firestarter **contre élites et boss** ; Arcane Potency à 4
+  → **5 Charges** ; Cauterize 2 rangs (1 / 10 PV avec Ice Block) → 3 rangs (1 / 3 / 5 PV, sans Ice Block).
+- **Priest** : ordre (Borrowed Time avant Twin Disciplines) ; Spiritual Guidance 3 / 5 → 4 / 6 Absorb (le Priest était
+  sous la tolérance à 80 et 100 %).
+- **Hunter** : Kindred Spirits et Unleashed Fury **contre élites et boss** ; Natural Mending rangée 3 → 4, contre élites
+  et boss ; Animal Handler 2 → 1 rang ; Go for the Throat 2 rangs à 4 Frenzy → 1 rang à **6 Frenzy** ; Deterrence 2
+  rangs (1 / 10 PV et tour ennemi sauté) → 1 rang (1 PV) ; Bestial Discipline, Thrill of the Hunt et Trap Mastery 2 → 3
+  rangs (≈ 0 point chacun) ; ordre : Unleashed Fury au 14e point, Natural Mending au 21e.
+- **Druid** : Primal Instinct 1 rang à chaque combat → 3 rangs contre élites et boss ; Living Seed rangée 2 → 1, 2 → 3
+  rangs ; Moonglow, Wild Reserve, Shapeshifter's Ward 2 → 1 rang ; ordre : nœuds faibles d'abord, Toughness au 9e
+  point, Natural Shapeshifter après le palier 60 %, Veteran's Arsenal après le palier 80 %.
+
+### Ce qui reste hors tolérance
+
+- **Druid, paliers 40, 60 et 80 %** (41,5 / 56,0 / 74,3 pour 12–28 / 40–52 / 55–70) et l'écart entre classes à ces
+  paliers. Le contenu seul du Druid vaut 28,5 % au palier 40 (Warrior 8,2, Rogue 12,8, Mage 10,0, Hunter 9,0, Priest
+  4,5) : tenir la tolérance demanderait des dix premiers points qui ne valent rien. Ses nœuds valent déjà moins que
+  ceux des autres classes (écart à son contenu seul en logit au palier 60 : Druid 1,24, Warrior 1,02, Rogue, Mage,
+  Hunter ≈ 2,05, Priest 2,85). Le levier « contenu par niveau » n'y peut rien (tout est débloqué au niveau 7). À régler
+  par le contenu propre de la classe (cartes et épiques des niveaux 5 à 7), hors de ce recalage.
+- **Au bord, dans le bruit** : Druid 12,5 au palier 20 (tolérance 12), Hunter 71,3 au palier 80 (70) et 82,8 au palier
+  100 (82), Rogue 82,3 au palier 100 (82).
+- Mage et Rogue au palier 20 % (1,2 et 2,0) : au plancher de la tolérance, contenu seul à 0,0 et 0,3 %.
+
+Non vérifié : autres graines ; clés 1 à 5 avec ces arbres ; bot `heuristic` sur les autres classes ; rythme
+d'expérience par expédition (non relevé) ; interface en jeu (le client n'a pas été lancé ; harnais hors jeu : 0 échec).

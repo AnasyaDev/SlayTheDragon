@@ -1,8 +1,9 @@
 # Arbres de talents — fiche de conception
 
-Proposition du 19/11/2026, **à valider par le joueur avant tout code**. Aucun fichier de jeu n'est changé par cette
-fiche. Elle s'appuie sur la méta d'aujourd'hui (`Core/Meta.lua`, `docs/expedition.md`, « Niveau de classe » et
-« Campagne continue »), sur le mur des zones 4 à 7 (`docs/zones.md`, « Dureté des zones » ; `docs/equilibrage.md`,
+**Arbres codés** (19/11/2026) pour les six classes (`Data/Talents/`, contrat du socle : § 17) et **recalés ensemble**
+le 19/11/2026 sur la courbe décidée par le joueur (§ 3 ; mesures : `docs/equilibrage.md`, « Talents : recalage
+d'ensemble »). Fiche d'origine : proposition du 19/11/2026. Elle s'appuie sur la méta d'aujourd'hui (`Core/Meta.lua`,
+`docs/expedition.md`, « Niveau de classe » et « Campagne continue »), sur le mur des zones 4 à 7 (`docs/zones.md`, « Dureté des zones » ; `docs/equilibrage.md`,
 « Mur des zones 4 à 7 sans épique ») et sur 30 séries de simulation faites pour elle (§ 4).
 
 Ce que le joueur a décidé le 19/11/2026 :
@@ -38,9 +39,9 @@ Ce que le joueur a décidé le 19/11/2026 :
 7. Mesures (§ 4) : au compte neuf, aucun levier seul ne fait gagner (0 %, même au bot `heuristic`) ; +20 PV, le
    niveau 7, +1 mana par tour ou la taxe du Druid retirée déplacent le mur sans le franchir. Le palier « 60 % »
    approché par les leviers mesurables donne 17 % au Warrior (26 % avec +1 mana par tour), 7 à 10 % au Druid.
-8. **La cible 60 % → 40 % n'est pas tenue avec le mur actuel** : il manque ≈ 15 points au Warrior. Burning Steppes
-   et Blackrock Mountain abaissées à 1,9 (pour tous, sans condition d'épique) : Warrior 45 %, Druid 31 %. Le Druid a
-   en plus un défaut propre dans les zones 6 et 7 (Blackrock 30 % même arbre plein), à régler à part (§ 5).
+8. Courbe décidée par le joueur (§ 3) : ≈ 5 / 20 / 45 / 62 / 75 % de victoires aux paliers 20 à 100 % ; tenue par
+   cinq classes après le recalage d'ensemble du 19/11/2026 (§ 5), le Druid au-dessus aux paliers 40 à 80 % (contenu
+   seul plus fort). (Avant le code : Burning Steppes et Blackrock Mountain abaissées à 1,9 pour tous.)
 9. Les clés 1 à 5 prennent le relais après la première victoire ; à recaler une fois l'arbre codé (§ 9).
 10. Rencontres et points de passage : sept déblocages par hauts faits du compte, hors de l'arbre (§ 10).
 
@@ -137,9 +138,12 @@ Titre « Veteran » : au niveau 25 (au lieu du 7).
   **Specialization** (1 point) : une option par voie (Arms / Fury / Protection…), une seule active, changeable avec
   le remboursement. Pas d'autres choix exclusifs : à 24 points tout est pris ; le choix porte sur l'ordre (quoi
   d'abord) et sur la voie de Specialization.
-- **Nœuds génériques** (mêmes noms et mêmes effets dans les six arbres, 9 points sur 24) : **Toughness** (PV),
-  **Provisions** (or de départ), **Field Medic** (soin du passage entre deux zones), **Veteran's Arsenal**
-  (épique au départ, puis une épique de plus). Tous les autres nœuds touchent une règle propre à la classe.
+- **Nœuds génériques** (mêmes noms et mêmes effets dans les six arbres, 9 points sur 24 ; `Data/Talents/common.lua`,
+  recalés le 19/11/2026) : **Toughness** (3 rangs, +3 % des PV de base de la classe par rang, arrondi : Warrior,
+  Druid, Rogue, Hunter +2, Mage, Priest +1), **Provisions** (+50 d'or de départ), **Field Medic** (passage entre deux
+  zones à 65 % des PV max au lieu de 50 %), **Veteran's Arsenal** (2 rangs : une épique au choix au départ parmi 2
+  tirées au hasard dans les zones battues, puis parmi 3). Tous les autres nœuds touchent une règle propre à la
+  classe.
 - **Remboursement** : gratuit, à volonté, **hors expédition** (accueil ou écran Progress). Un roguelike à méta
   doit laisser essayer ; un remboursement payant n'aurait pas de monnaie (pas d'or hors expédition).
 - **Figé au départ** : l'expédition copie l'arbre de sa classe (`exp.unlock.talents`) ; dépenser ou rembourser
@@ -160,26 +164,30 @@ Titre « Veteran » : au niveau 25 (au lieu du 7).
 
 ## 3. Courbe cible
 
-Cible au bot `human` (joueur correct), clé 0, **état complet du compte au moment où il atteint ce palier** (cartes
-du niveau, épiques des zones gagnées, commun du compte, arbre). « Zone moyenne » = rang moyen de la zone la plus
-loin atteinte (1 = Westfall ; 7 = Blackrock Mountain atteinte ou Nefarian battu).
+**Décidée par le joueur le 19/11/2026** (remplace la cible proposée par cette fiche) : sans talents une expédition est
+presque impossible ; avec, de plus en plus facile ; **à 60 % de l'arbre, un bon 40 % de chances de finir** ; pas
+besoin de l'arbre entier ; pas de difficulté artificielle. Bot `human`, clé 0, % de victoires de campagne, contenu du
+palier : `tree=0 zones=0 level=1`, `tree=20 zones=2 level=4`, `tree=40 zones=3 level=7`, `tree=60 zones=4 level=7`,
+`tree=80 zones=6 level=7`, `tree=100 zones=7 level=7` (600 expéditions, graine 1, ± 4). Toutes les classes dans la
+tolérance, au plus 12 points d'écart entre classes à un même palier. Les clés 1 à 5 prennent le relais ensuite (§ 9).
 
-| Part de l'arbre (points) | Niveau | Atteint vers l'expédition n° | Contenu à ce moment (≈) | Victoires cible | Zone moyenne cible | Mesuré aujourd'hui (Warrior / Druid) |
-|---|---|---|---|---|---|---|
-| 0 % (0) | 1 | 1 | niveau 1, aucune zone | 0 % | 2,7–2,9 | 0 / 0 % ; 2,67 / 2,93 |
-| 20 % (5) | 6 | 4 | paliers de contenu 1–4, zones 1–2 | ≈ 1 % | 3,4 | — |
-| 40 % (10) | 11 | 7 | tout le contenu, zones 1–3 | ≈ 15 % | 4,5 | — |
-| **60 % (15)** | 16 | **10** | tout, zones 1–4 | **≥ 40 %** | 5,6 | proxy 17 / 7 % ; avec +1 mana 26 / 10 % (§ 4.3) |
-| 80 % (19–20) | 20–21 | 13 | tout, zones 1–5 ou 6 | ≈ 55 % | 6,1 | — |
-| 100 % (24) | 25 | 17 | tout | ≈ 65–70 % | 6,4 | proxy 72 / 12 % (§ 4.3) |
+| Palier (points) | Cible | Tolérance | Warrior | Rogue | Mage | Priest | Hunter | Druid |
+|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | 0 | 0 à 2 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 | 0,0 |
+| 20 % (5) | 5 | 1 à 12 | 10,2 | 2,0 | 1,2 | 7,0 | 3,2 | 12,5 |
+| 40 % (10) | 20 | 12 à 28 | 14,3 | 23,7 | 25,0 | 23,0 | 19,8 | **41,5** |
+| **60 % (15)** | **45** | 40 à 52 | 47,7 | 42,7 | 41,8 | 44,8 | 49,0 | **56,0** |
+| 80 % (20) | 62 | 55 à 70 | 69,0 | 62,3 | 67,7 | 59,2 | 71,3 | **74,3** |
+| 100 % (24) | 75 | 70 à 82 | 78,5 | 82,3 | 81,3 | 71,7 | 82,8 | 79,5 |
+| contenu seul, palier 100 | — | — | 28,2 | 18,3 | 17,0 | 7,5 | 14,7 | 29,3 |
 
-Joueur parfait (bot `heuristic`) aux mêmes paliers : 0 % → 0 % (mesuré, compte neuf : zone moyenne 4,1 au Warrior
-comme au Druid) ; 60 % → cible ≈ 80 % (proxy s60m mesuré avec le mur actuel : Warrior 55 %, Druid 43 % : même sans
-erreur, le mur des zones 6 et 7 arrête la moitié des expéditions) ; 100 % → ≈ 95–98 %. Il atteint 60 % de l'arbre
-vers la 5e ou 6e expédition (≈ 430 d'expérience par expédition).
+Mesuré le 19/11/2026 après le recalage (`docs/equilibrage.md`, « Talents : recalage d'ensemble », matrice avant /
+après). **Hors tolérance** : le Druid aux paliers 40 à 80 % (son contenu seul vaut déjà 28,5 % au palier 40, 8 à 13 %
+pour les autres classes : § 5) ; quelques cases au bord de la tolérance, dans le bruit (± 4).
 
-Les deux bornes de la courbe sont tenues aujourd'hui (0 % : 0 victoire, ce que le joueur a demandé : « sans ces
-talents, les runs sont quasiment impossibles ») ; le milieu dépend des nœuds de mécanique (§ 5).
+Joueur parfait (bot `heuristic`, 300 expéditions, ± 5) : Warrior 76,7 % au palier 60 et 85,3 % à l'arbre plein,
+Priest 60,7 et 80,7 % (bot `human` : 47,7 / 78,5 et 44,8 / 71,7). Les trois voies de Specialization au palier 60 % se
+tiennent à 7 points au plus dans chaque classe (`docs/equilibrage.md`).
 
 ## 4. Mesures
 
@@ -278,37 +286,30 @@ Steppes 87,5, Blackrock 79,3), Druid **43,3 %** (6,21 ; 91,0, 81,6, 75,4, 77,3).
 expédition sur deux au palier 60 % : l'écart avec le bot `human` (26 et 10 %) est attendu, la hauteur du mur ne l'est
 pas.
 
-## 5. La courbe est-elle atteignable avec le mur actuel ?
+## 5. La courbe est-elle atteignable ? (recalage du 19/11/2026)
 
-**Les deux bouts de la courbe tiennent** : 0 % de l'arbre = 0 victoire (même au bot `heuristic`) ; l'arbre plein
-approché (Warrior s100) = 72 % pour une cible de 65–70 %.
+Les § 4 et 4.3 décrivent l'état d'avant le code des arbres (mur des zones 6 et 7 depuis abaissé à 1,9). Les six arbres
+codés, chacun réglé seul sur la courbe du Warrior, donnaient 94 à 99 % à l'arbre plein (quatre classes) et 55 à 68 % au
+palier 60 % ; le recalage d'ensemble (`docs/equilibrage.md`, « Talents : recalage d'ensemble ») les ramène sur la
+courbe du § 3 sans toucher au mur, aux ennemis, aux zones ni aux PV de base :
 
-**Le milieu ne tient pas avec le mur actuel** :
+1. **Génériques** : Veteran's Arsenal (épique au choix parmi toutes, puis une deuxième : +33 points seul au Warrior)
+   devient une épique au choix parmi 2 tirées au hasard, puis parmi 3 (≈ +6 à +11 points à l'arbre plein) ;
+   Toughness suit une règle commune (3 % des PV de base par rang ; avant : 2 à 4 PV selon l'arbre) ; Provisions 100
+   → 50 ; Field Medic 75 → 65 %.
+2. **Chiffres et ordre des nœuds** de chaque classe (tableaux des § 6 à 8) : les nœuds les plus forts mesurés « un nœud
+   retiré » dans l'arbre (leave-one-out) baissés, à un rang, ou limités aux **combats d'élite et de boss** (bonus de
+   début de combat du Rogue, du Mage, du Hunter et du Druid) ; seuils de mana relevés (Rampage à 6 Rage, Arcane
+   Potency à 5 Charges, Go for the Throat à 6 Frenzy) ; nœuds « une fois par expédition » sans effet de combat en plus
+   (Cauterize sans Ice Block, Deterrence sans tour sauté, Cheat Fate sans Stealth) ; ordre du bot : les nœuds faibles
+   d'abord, Toughness plus tard chez le Hunter et le Druid.
+3. **Contenu par niveau** : pas utilisé. Il ne peut rien aux paliers 40 à 100 % (contenu au niveau 7 : tout est
+   débloqué) ; au palier 20 % les classes sont dans la tolérance (Mage et Rogue au plancher, 1 à 2 %).
 
-- **Warrior** : au palier 60 %, les nœuds mesurables (PV, or, soin du passage) donnent 17 % ; même en comptant les
-  nœuds de mécanique des rangées 1 à 3 pour +1 mana à chaque tour (s60m, borne haute : Battle Ready, Anger Shield,
-  Blood Drinker et Specialization ensemble valent sans doute moins), 26 %. Il manque ≈ 15 points. La perte se fait à
-  Burning Steppes (71 %) et surtout contre Blackrock Mountain (58 %) : il faut ≈ 80 % dans chacune des quatre zones
-  durcies pour 40 % de victoires de campagne (0,8 × 0,8 × 0,8 × 0,8 ≈ 0,41), quand les zones 1 à 3 passent presque
-  toujours.
-- **Druid** : 7 à 10 % au palier 60 %, et seulement 12 % avec tout (s100 : sans taxe, +1 mana, 68 PV, toutes les
-  épiques). Blackrock Mountain ne passe qu'à 30 % quoi qu'on ajoute : c'est un défaut de la classe dans les zones 6 et
-  7 (déjà vu le 19/11 : sans épique 10,5 % à Blackrock, Eclipse 0 %), pas un manque de talents. L'arbre ne peut pas
-  le combler sans devenir le seul moteur de la classe.
-
-**Ce qu'il faut bouger** (deux leviers, à trancher, § 16) :
-
-1. **Le mur des zones 6 et 7** : Burning Steppes 2,15 → 1,9 et Blackrock Mountain 2,3 → 1,9 (Stranglethorn 1,45 et
-   Swamp 1,8 inchangés). Mesuré au palier s60m : Warrior 26 → **45 %**, Druid 10 → 31 %. Ce n'est pas une difficulté
-   conditionnelle (elle vaut pour tous, épique ou non) : le compte neuf bute toujours à la zone 4 (Stranglethorn
-   inchangée : 8 à 9 % de passage au niveau 1). Effet de bord : la cible « vétéran sans épique » des zones 6 et 7
-   (30 et 25 %, `docs/expedition.md`) monte ; non mesuré ici. Avec ce mur, les nœuds de mécanique des rangées 1 à 3
-   doivent valoir ensemble ≈ +1 mana par tour (cible de réglage du lot 3).
-2. **Sans toucher au mur** : des nœuds de mécanique plus forts (≈ deux fois s60m). Risque : l'arbre plein dépasse
-   alors largement 70 % et la clé 0 devient triviale ; les clés devront absorber l'écart (§ 9).
-
-**Druid à part** : quel que soit le choix, un lot de réglage des zones 5 à 7 du Druid (épiques Eclipse et Owlkin
-Frenzy, défense de Balance, boss) avant de régler son arbre ; cible : Druid s60m à moins de 10 points du Warrior.
+**Druid** : seul hors tolérance (paliers 40, 60 et 80 %). Son contenu seul vaut 28,5 % au palier 40 (Warrior 8,2,
+Rogue 12,8) ; ses nœuds valent déjà moins que ceux des autres classes (écart au contenu seul, en logit, le plus faible
+avec le Warrior) ; tenir la tolérance demanderait un arbre qui ne vaut rien jusqu'au palier 40. À régler par le
+contenu de la classe (cartes et épiques des niveaux 5 à 7, hors périmètre de ce recalage).
 
 ## 6. Arbre du Warrior (complet)
 
@@ -319,27 +320,27 @@ coup, Execute), Fury (petites Attacks, Strength, PV payés), Protection (Absorb,
 
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+4 max HP.` | PV de départ de l'expédition (`Expedition.new`) |
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 / +4 / +6 ; règle commune, § 2.1) | PV de départ de l'expédition (`Expedition.new`) |
 | 1 | **Battle Ready** | 2 | `Start of combat: +1 Rage.` | `onCombatStart` → `Combat.gainRes` (s'ajoute à Battle Standard : 3 Rage au tour 1, Heroic Strike payé tout de suite) |
-| 1 | **Second Wind** | 2 | 1 : `After a combat won: heal 1 per 5 Rage you have.` 2 : `… heal 1 per 4 Rage you have.` (réglé le 19/11/2026 ; fiche : 1 et 2 par Rage) | fin de combat gagné (`Expedition` lit `c.player.res` avant de rendre les PV) |
-| 2 (5) | **Unbridled Wrath** | 2 | `Rage cap +1.` | crochet `resCap` (5 → 7) |
+| 1 | **Second Wind** | 3 | 1 : `After a combat won: heal 1 per 5 Rage you have.` 2 : `… per 4 Rage …` 3 : `… per 3 Rage …` (fiche : 1 et 2 par Rage ; 3 rangs depuis le recalage) | fin de combat gagné (`Expedition` lit `c.player.res` avant de rendre les PV) |
+| 1 | **Unbridled Wrath** | 2 | `Rage cap +1.` (rangée 2 avant le recalage) | crochet `resCap` (5 → 7) |
 | 2 | **Anger Shield** | 2 | 1 : `End of turn: gain 1 Absorb per 5 Rage.` 2 : `End of turn: gain 1 Absorb per 4 Rage.` (réglé ; fiche : par 2 Rage, par Rage) | `onTurnEnd` → `Combat.gainBlock` (Skullflame Shield, rare du niveau 7 : 2 Absorb par Rage au début du tour) |
-| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ (`X.START_GOLD`) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 50 more gold.` | or de départ (`X.START_GOLD`) |
 | 3 (10) | **Specialization** (choix) | 1 | Arms : `Sundered enemies take 50% more damage instead of 25%.` Fury : `While you have 5 Rage or more, Attacks deal 1 more per hit.` (réglé ; fiche : 3 Rage) Protection : `Cards that give Absorb give 2 more.` | Arms : multiplicateur de Sundered (crochet `damage` sur la cible) ; Fury : `damage` ; Protection : `block` |
 | 3 | **Tactical Mastery** | 2 | 1 : `Up to 2 Rage carries over to the next combat.` 2 : `Up to 4 Rage carries over to the next combat.` | état d'expédition (`exp.talentState.rage`), posé en fin de combat, rendu par `onCombatStart` |
 | 3 | **Blood Drinker** | 2 | 1 : `Each time you pay a Spend cost: heal 1.` 2 : `Each time you spend Rage: heal 1.` (Surge compris ; réglé ; fiche : 1 puis 2) | `onResource` (variation négative) → `Combat.heal` |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `X.ZONE_HEAL` lu par `Expedition.enterZone` |
-| 4 (16) | **Rampage** | 2 | 1 : `Start of turn with 5 Rage or more: +1 mana.` 2 : `Start of turn with 5 Rage or more: +1 mana and draw 1.` | `onTurnStart` + crochet `maxMana` (celui de la taxe du Druid) |
-| 4 | **Veteran's Arsenal** (générique) | 2 | 1 : `Start each expedition with one Epic card of a zone you have beaten.` 2 : `You can carry one more Epic card.` | phase `start` (choix parmi les épiques débloquées) ; 2 : plafond d'épiques (code en cours) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 65% of max HP instead of 50%.` | `X.ZONE_HEAL` lu par `Expedition.enterZone` |
+| 4 (16) | **Rampage** | 1 | `Start of turn with 6 Rage or more: +1 mana.` (avant le recalage : 2 rangs à 5 Rage, une carte au rang 2) | crochet `maxMana` (celui de la taxe du Druid) |
+| 4 | **Veteran's Arsenal** (générique) | 2 | 1 : `Start each expedition with one of 2 random Epic cards of zones you have beaten.` 2 : `… one of 3 random Epic cards …` | phase `start` (`exp.talentEpics` : les épiques tirées, flux `talentEpic` ; crochets `startEpics`, `startEpicOffer`) |
 | 4 | **Unyielding** | 2 | 1 : `Once per expedition, a hit that would kill you leaves you at 1 HP and gives 5 Rage.` 2 : `… at 1 HP with 15 Absorb and 5 Rage.` | `preventDeath` + drapeau d'expédition |
 
-Total 24 points (3 + 2 + 2 / 2 + 2 + 1 / 1 + 2 + 2 + 1 / 2 + 2 + 2). Nœuds de mécanique : 9 sur 13 (15 points sur
+Total 24 points (3 + 2 + 3 + 2 / 2 + 1 / 1 + 2 + 2 + 1 / 1 + 2 + 2). Nœuds de mécanique : 9 sur 13 (15 points sur
 24).
 
-Ordre conseillé (et ordre du bot de simulation) : Toughness, Battle Ready, Second Wind (rangée 1, 7 points), puis
-Anger Shield, Unbridled Wrath, Provisions (12), Specialization, Blood Drinker, Tactical Mastery (17), Field Medic, puis
-la rangée 4. Le palier 60 % (15 points) = Toughness 3, Battle Ready 2, Second Wind 2, Unbridled Wrath 2, Anger Shield
-2, Provisions 1, Specialization, Blood Drinker 2.
+Ordre du bot (recalage du 19/11/2026) : Unbridled Wrath 2, Second Wind 2, Toughness 1 (5 points), Toughness 2, Anger
+Shield 2, Provisions (10), Specialization (Fury), Blood Drinker 2, Tactical Mastery 2 (15), Field Medic, Battle Ready 2,
+Second Wind 3, Rampage (20), Veteran's Arsenal 2, Unyielding 2. Battle Ready (+6 points dans l'arbre au palier 60 %)
+passe après le palier 60 %.
 
 Ce que chaque nœud change en jeu, concrètement (chiffres de la fiche ; ceux du code, réglés le 19/11/2026 : tableau
 ci-dessus, `Data/Talents/warrior.lua` et `docs/equilibrage.md`, « Talents du Warrior : courbe par palier ») :
@@ -370,22 +371,22 @@ tour et chaque mana rendu s'additionnent fort ; d'où des nœuds à un rang et d
 
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+3 max HP.` / `+6 max HP.` / `+9 max HP.` | PV de départ de l'expédition |
-| 1 | **Primal Instinct** | 1 | `Start of combat: +1 Reserve.` | `onCombatStart` → `Combat.gainRes` (lu comme Combo, Frenzy ou Charge à la première forme ; avec Heart of the Wild, va à la réserve sans forme) |
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 / +4 / +6) | PV de départ de l'expédition |
+| 1 | **Primal Instinct** | 3 | `Start of combat against elites and bosses: +1 Reserve.` (+1 / +2 / +3 ; avant le recalage : un rang, à chaque combat) | `onCombatStart` (`c.kind` élite ou boss) → `Combat.gainRes` (lu comme Combo, Frenzy ou Charge à la première forme ; avec Heart of the Wild, va à la réserve sans forme) |
 | 1 | **Natural Shapeshifter** | 2 | 1 : `The shift tax costs at most 1 mana.` 2 : `The shift tax costs at most 1 mana, and entering the first form each combat is free of it.` | const `TAX_MAX` 2 → 1 ; rang 2 : `onShift` depuis « sans forme » retire un changement compté (`c.cls.taxed`) |
+| 1 | **Living Seed** | 3 | `End of turn in Tree of Life: gain 1 more Absorb.` / `… 2 …` / `… 3 …` (avant le recalage : rangée 2, 2 rangs) | const `TREE_ABSORB` 2 → 3 / 4 / 5 |
 | 2 (5) | **Feral Instinct** | 1 | `Bear strikes deal 1 more.` | const `STRIKE_BASE` 1 → 2 (toutes les frappes : fin de tour, cartes, Surge) |
-| 2 | **Moonglow** | 2 | `End of turn in Moonkin: gain 1 Absorb.` / `… gain 2 Absorb.` | `onTurnEnd` selon la forme (après l'effet de forme) |
-| 2 | **Living Seed** | 2 | `End of turn in Tree of Life: gain 1 more Absorb.` / `… 2 more Absorb.` | const `TREE_ABSORB` 2 → 3 / 4 |
+| 2 | **Moonglow** | 1 | `End of turn in Moonkin: gain 1 Absorb.` (2 rangs avant le recalage) | `onTurnEnd` selon la forme (après l'effet de forme) |
 | 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
 | 3 (10) | **Specialization** (choix) | 1 | Feral : `Clearcasting also gives +1 Combo.` Balance : `End of turn in Moonkin: deal 1 more to each enemy.` Restoration : `Regen you gain is 1 higher.` | Feral : `onStatusApplied` (Clearcasting posé, pas s'il l'était déjà) ; Balance : const `PULSE_BONUS` 0 → 1 (`Druid.pulseBase`, même à 0 Charge) ; Restoration : `applySelf` (comme Benediction du Priest) |
-| 3 | **Wild Reserve** | 2 | `Reserve cap +1.` / `Reserve cap +2.` | crochet `resCap` (5 → 7 ; Heart of the Wild borne chaque réserve à 5) |
-| 3 | **Shapeshifter's Ward** | 2 | `The first form change each turn: gain 1 Absorb.` / `… gain 2 Absorb.` | `onShift` quand `c.cls.shifts` = 1 (Cat ↔ Bear compris) |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
+| 3 | **Wild Reserve** | 1 | `Reserve cap +1.` (2 rangs avant le recalage) | crochet `resCap` (5 → 6 ; Heart of the Wild borne chaque réserve à 5) |
+| 3 | **Shapeshifter's Ward** | 1 | `The first form change each turn: gain 1 Absorb.` (2 rangs, 1 puis 2 Absorb, avant le recalage) | `onShift` quand `c.cls.shifts` = 1 (Cat ↔ Bear compris) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 65% of max HP instead of 50%.` | `zoneHeal` |
 | 4 (16) | **Master Shapeshifter** | 1 | `One more form change each turn is free of the shift tax.` | const `TAX_FREE` 1 → 2 |
 | 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
 | 4 | **Survival Instincts** | 3 | `Once per expedition, a hit that would kill you leaves you at 1 HP in Bear.` / `… in Bear with 10 Absorb.` / `… in Bear with 20 Absorb.` | `preventDeath` + `c.tstate.survival` (repris par l'expédition) ; passage en Bear par `Druid.shift` ; Rebirth (Power) passe avant |
 
-Total 24 points (3 + 1 + 2 / 1 + 2 + 2 + 1 / 1 + 2 + 2 + 1 / 1 + 2 + 3). Nœuds de mécanique : 10 sur 14 (15
+Total 24 points (3 + 3 + 2 + 3 / 1 + 1 + 1 / 1 + 1 + 1 + 1 / 1 + 2 + 3). Nœuds de mécanique : 10 sur 14 (15
 points). Le nœud « une fois par expédition » est Survival Instincts (rangée 4).
 
 Écarts à la fiche d'origine (mesures : `docs/equilibrage.md`, « Talents du Druid ») : Primal Instinct 2 → 1 rang
@@ -397,12 +398,11 @@ Absorb : +30 points seul) ; Master Shapeshifter 2 rangs (deux changements gratui
 → 1 rang (un changement gratuit) ; Survival Instincts 2 → 3 rangs (10 puis 20 Absorb) ; Specialization Balance :
 +1 au coup à tous, sans relever `PULSE_MAX`.
 
-Ordre du bot (`bot.order`, ordre conseillé) : Toughness 3, Natural Shapeshifter 2 (palier 20 %, 5 points), Primal
-Instinct, Moonglow 2, Living Seed 2 (40 %, 10), Provisions, Specialization, Wild Reserve 2, Field Medic (60 %, 15),
-Feral Instinct, Shapeshifter's Ward 2, Master Shapeshifter, Veteran's Arsenal (80 %, 20), Veteran's Arsenal,
-Survival Instincts 3 (100 %). Voie du bot : Feral (les trois voies à 2 points près au palier 60 %). Feral Instinct et
-Shapeshifter's Ward passent après le palier 60 % : avant, il montait à 69–71 %. `bot.epic` vide : à l'arbre plein,
-Veteran's Arsenal 2 vaut +6,5 points et aucune épique ne contredit l'arbre.
+Ordre du bot (`bot.order`, recalage du 19/11/2026) : Living Seed 3, Primal Instinct 2 (palier 20 %, 5 points),
+Moonglow, Provisions, Primal Instinct 3, Toughness 2 (40 %, 10), Toughness 3, Specialization, Wild Reserve, Field
+Medic, Shapeshifter's Ward (60 %, 15), Feral Instinct, Natural Shapeshifter 2, Master Shapeshifter, Survival Instincts
+(80 %, 20), Veteran's Arsenal 2, Survival Instincts 3 (100 %). Voie du bot : Feral. Les nœuds les plus faibles
+d'abord : le contenu seul du Druid vaut déjà 28,5 % au palier 40 % (§ 5). `bot.epic` vide.
 
 Concrètement :
 
@@ -436,22 +436,23 @@ nœuds, 24 points (3 + 2 + 2 / 2 + 1 + 1 + 1 / 1 + 2 + 2 + 1 / 2 + 2 + 2) ; 10 n
 
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+6 au rang 3) | PV de départ de l'expédition |
+| 1 (0) | **Toughness** (générique) | 3 | `+1 max HP.` (+3 au rang 3 ; règle commune, § 2.1) | PV de départ de l'expédition |
 | 1 | **Twin Disciplines** | 2 | `Atonement heals 4 instead of 2.` / `… 6 instead of 2.` | constante `ATONEMENT_HEAL` (`Combat.const`) |
 | 1 | **Borrowed Time** | 2 | `Start of combat: gain Atonement 2.` / `… Atonement 4.` | `onCombatStart` → `applyStatus` (s'ajoute à Sacred Candle) |
 | 2 (5) | **Mind Spike** | 2 | `Start of combat: +2 Insanity.` / `… +4 Insanity.` | `onCombatStart` → `Combat.gainRes` |
 | 2 | **Shadow Weaving** | 1 | `The second Shadow card each turn: +1 Insanity.` | `onCardCommitted` (`c.turn.bySchool.shadow`) |
 | 2 | **Inspiration** | 1 | `Start of combat: gain Regen 4.` | `onCombatStart` (premier tic au début du premier tour ; Benediction s'y ajoute) |
-| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 50 more gold.` | or de départ |
 | 3 (10) | **Specialization** (choix) | 1 | Discipline : `Each Atonement heal also gives 2 Absorb.` Shadow : `Shadow cards deal 5 more per hit and apply 5 more DoT.` Holy : `Holy cards deal 8 more per hit.` | Discipline : `onCardPlayed` (carte qui a infligé des dégâts sous Atonement) ; Shadow : `damage` et `apply` ; Holy : `damage` |
 | 3 | **Void Torrent** | 2 | `Surge cards count 1 more Insanity.` / `… 2 more Insanity.` | crochet `surge` (comme Anathema) |
 | 3 | **Power Word: Barrier** | 2 | `Cards that give Absorb give 2 more.` / `… 4 more.` | `block`, une fois par carte (`c.cardCtx`) ; ni sur l'Absorb de Discipline ni sur l'Absorb sans carte |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
-| 4 (16) | **Spiritual Guidance** | 2 | `When a Cast card resolves: gain 3 Absorb.` / `… 5 Absorb.` | `onCastResolved` (comme Truefaith Vestments) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 65% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Spiritual Guidance** | 2 | `When a Cast card resolves: gain 4 Absorb.` / `… 6 Absorb.` (3 / 5 avant le recalage) | `onCastResolved` (comme Truefaith Vestments) |
 | 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
 | 4 | **Guardian Spirit** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP with Atonement 3.` / `… with Atonement 3 and Regen 6.` | `preventDeath` + `c.tstate.guardian` |
 
-Ordre du bot : Toughness 3, Twin Disciplines 2 (5 points), Borrowed Time 2, Mind Spike 2, Shadow Weaving (10),
+Ordre du bot : Toughness 3, Borrowed Time 2 (5 points ; recalage : avant Twin Disciplines), Twin Disciplines 2, Mind
+Spike 2, Shadow Weaving (10),
 Inspiration, Provisions, Specialization (Discipline), Power Word: Barrier 2 (15), Void Torrent 2, Field Medic (18),
 Spiritual Guidance 2 (20), Veteran's Arsenal 2, Guardian Spirit 2. Palier 60 % : rangées 1 et 2 pleines,
 Specialization, Power Word: Barrier 2. Pas de `bot.value`, `bot.won` ni `bot.epic` (essayés, sans gain :
@@ -472,25 +473,26 @@ premier Cast de chaque combat coûte 0). **Arbre codé le 19/11/2026** (`Data/Ta
 
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 / +4 / +6) | PV de départ de l'expédition |
+| 1 (0) | **Toughness** (générique) | 3 | `+1 max HP.` (+1 / +2 / +3 ; règle commune, § 2.1) | PV de départ de l'expédition |
 | 1 | **Arcane Mind** | 3 | `Charge cap +1.` / `+2` / `+3` | crochet `resCap` (4 → 7) |
-| 2 (5) | **Arcane Concentration** | 3 | `After each Surge: +1 Charge.` / `+2 Charges.` / `+3 Charges.` | `onSurge` (après la remise à 0, avant les effets suivants de la carte) |
-| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 1 | **Frost Warding** | 1 | `Cards that give Absorb give 1 more.` (rangée 3 avant le recalage) | `block` une fois par carte (`c.cardCtx`, comme Protection du Warrior) |
+| 2 (5) | **Arcane Concentration** | 2 | `After each Surge: +1 Charge.` / `+2 Charges.` (3 rangs avant le recalage : +15 points dans l'arbre au palier 60 %) | `onSurge` (après la remise à 0, avant les effets suivants de la carte) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 50 more gold.` | or de départ |
 | 3 (10) | **Specialization** (choix) | 1 | Fire : `Fire Attack hits also apply DoT 1.` Frost : `Start of combat: apply Demoralized 1 to the first enemy.` Arcane : `While you have 4 Charges or more, Attacks deal 1 more per hit.` | Fire : `onAttackHit` (comme Ignite) ; Frost : `onCombatStart` (premier ennemi vivant) ; Arcane : `damage` |
-| 3 | **Winter's Chill** | 2 | `Attack hits on Frozen enemies deal 1 more.` / `2 more.` | `damage` + `Combat.isFrozen` (comme la carte Shatter) |
-| 3 | **Prismatic Cloak** | 1 | `When a Cast card resolves, gain 2 Absorb.` | `afterCast` (incantée ou partie tout de suite) |
-| 3 | **Arcane Focus** | 1 | `Start of combat: +1 Charge.` | `onCombatStart` → `Combat.gainRes` |
-| 3 | **Frost Warding** | 1 | `Cards that give Absorb give 1 more.` | `block` une fois par carte (`c.cardCtx`, comme Protection du Warrior) |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
-| 4 (16) | **Firestarter** | 1 | `Start of combat: gain Instant 1.` | `onCombatStart` (comme Fire Ruby) |
-| 4 | **Arcane Potency** | 2 | `Start of turn with 4 Charges or more: +1 mana.` / `… +1 mana and draw 1.` | `maxMana`, `drawPerTurn` (comme Rampage ; Mind Quickening Gem s'y ajoute) |
+| 3 | **Winter's Chill** | 1 | `Attack hits on Frozen enemies deal 1 more.` (2 rangs avant le recalage) | `damage` + `Combat.isFrozen` (comme la carte Shatter) |
+| 3 | **Prismatic Cloak** | 2 | `When a Cast card resolves, gain 1 Absorb.` / `… 2 Absorb.` (un rang de 2 avant le recalage) | `afterCast` (incantée ou partie tout de suite) |
+| 3 | **Arcane Focus** | 1 | `Start of combat against elites and bosses: +1 Charge.` (à chaque combat avant le recalage : +13 points dans l'arbre au palier 60 %) | `onCombatStart` (`c.kind`) → `Combat.gainRes` |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 65% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Firestarter** | 1 | `Start of combat against elites and bosses: gain Instant 1.` | `onCombatStart` (`c.kind` ; comme Fire Ruby) |
+| 4 | **Arcane Potency** | 2 | `Start of turn with 5 Charges or more: +1 mana.` / `… +1 mana and draw 1.` (4 Charges avant le recalage) | `maxMana`, `drawPerTurn` (comme Rampage ; Mind Quickening Gem s'y ajoute) |
 | 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
-| 4 | **Cauterize** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP with Ice Block.` / `… at 10 HP with Ice Block.` | `preventDeath` + `exp.talentState.cauterize` ; après la carte Ice Block (les Powers passent avant les talents) |
+| 4 | **Cauterize** | 3 | `Once per expedition, a hit that would kill you leaves you at 1 HP.` / `… 3 HP.` / `… 5 HP.` (avant le recalage : 2 rangs, 1 puis 10 PV avec Ice Block, +9 points dans l'arbre plein) | `preventDeath` + `exp.talentState.cauterize` ; après la carte Ice Block (les Powers passent avant les talents) |
 
-Total 24 points (3 + 3 / 3 + 1 / 1 + 2 + 1 + 1 + 1 + 1 / 1 + 2 + 2 + 2), 14 nœuds ; nœuds de mécanique : 10 sur 14 (15
-points). Ordre du bot (`bot.order`) : Toughness 3, Arcane Mind 2, Arcane Concentration 3, Provisions, Arcane Mind 3
-(10), Specialization, Winter's Chill 2, Prismatic Cloak, Arcane Focus (15), Frost Warding, Field Medic, Firestarter,
-Arcane Potency 2 (20), Veteran's Arsenal 2, Cauterize 2 ; voie du bot : **Arcane** (`bot.spec`). Bots : `bot.value`
+Total 24 points (3 + 3 + 1 / 2 + 1 / 1 + 1 + 2 + 1 + 1 / 1 + 2 + 2 + 3), 14 nœuds ; nœuds de mécanique : 10 sur 14
+(15 points). Ordre du bot (`bot.order`, recalage du 19/11/2026) : Toughness 3, Frost Warding, Arcane Mind 1 (5),
+Arcane Mind 3, Arcane Concentration 2, Provisions (10), Specialization, Winter's Chill, Prismatic Cloak 2, Field Medic
+(15), Arcane Focus, Firestarter, Arcane Potency 2, Cauterize (20), Veteran's Arsenal 2, Cauterize 3 ; voie du bot :
+**Arcane** (`bot.spec`). Bots : `bot.value`
 de Prismatic Cloak (incantation tenue = son Absorb à venir) et d'Arcane Potency (finir le tour à 4 Charges = un mana).
 Pas de `bot.epic` : à l'arbre plein, le bot ne prend aucune épique qui contredise l'arbre (palier 100 % au-dessus du
 palier 80 %).
@@ -513,26 +515,26 @@ Arbre codé le 19/11/2026 (`Data/Talents/rogue.lua`, nombres dans `ns.RogueTalen
 
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 par rang) | PV de départ |
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2 par rang ; règle commune, § 2.1) | PV de départ |
 | 1 | **Opportunity** | 2 | `Attacks played in Stealth deal 1 more per hit.` / `… 2 more per hit.` | `damage` : la carte en cours (`c.cardCtx`) est dans `c.cls.openers` (Stealth consommé, ou gardé sous Subterfuge) ; bot : Stealth gardé vaut le bonus (`bot.value`) |
-| 1 | **Deeper Stratagem** | 2 | `Combo cap +1.` / `Combo cap +2.` | `resCap` (5 → 7) |
-| 2 (5) | **Vile Poisons** | 1 | `Each time DoT is applied to an enemy, apply 1 more.` | `apply` (comme Crystal Vial, qui s'ajoute) |
-| 2 | **Combat Readiness** | 3 | `Each Parry stops up to 9 damage.` / `… 10 …` / `… 11 …` | `const.PARRY_STOP` (8 → 11) |
-| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 1 | **Lightning Reflexes** | 3 | `Parry can hold 1 more charge.` / `… 2 more charges.` / `… 3 more charges.` (avant le recalage : rangée 3, un rang) | `const.PARRY_MAX` (3 → 6 ; `maxKey` de l'état Parry) |
+| 2 (5) | **Deeper Stratagem** | 3 | `Combo cap +1.` / `+2` / `+3` (avant le recalage : rangée 1, 2 rangs) | `resCap` (5 → 8) |
+| 2 | **Vile Poisons** | 1 | `Each time DoT is applied to an enemy, apply 1 more.` | `apply` (comme Crystal Vial, qui s'ajoute) |
+| 2 | **Combat Readiness** | 1 | `Each Parry stops up to 9 damage.` (3 rangs avant le recalage : +7 à +10 points dans l'arbre) | `const.PARRY_STOP` (8 → 9) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 50 more gold.` | or de départ |
 | 3 (10) | **Specialization** (choix) | 1 | Assassination : `Each Surge applies DoT 1 per Combo spent to its target.` Combat : `Each Parry: +1 Combo.` Subtlety : `Each time a card grants Stealth, draw 1.` | Assassination : `onSurge` (crochet `apply` compris) ; Combat : `onParry` ; Subtlety : `onStatusApplied` + `c.cls.stealthGained` (pas le Stealth du début de combat ; s'ajoute à Flash Powder) |
-| 3 | **Elusiveness** | 1 | `Start of combat: gain Parry 1.` | `onCombatStart` (comme Blinding Powder) |
-| 3 | **Initiative** | 2 | `Start of combat: +1 Combo.` / `Start of combat: +1 Combo, +2 against elites and bosses.` | `onCombatStart` ; rang 2 : `c.kind` = `elite` ou `boss` |
-| 3 | **Lightning Reflexes** | 1 | `Parry can hold 1 more charge.` | `const.PARRY_MAX` (3 → 4 ; `maxKey` de l'état Parry) |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
-| 4 (16) | **Relentless Strikes** | 2 | `After a Surge of 5 Combo or more: +1 Combo.` / `After each Surge: +1 Combo.` | `onSurge` (montant dépensé) |
+| 3 | **Elusiveness** | 1 | `Start of combat against elites and bosses: gain Parry 1.` (à chaque combat avant le recalage : +17 points dans l'arbre au palier 60 %) | `onCombatStart` (`c.kind` ; comme Blinding Powder) |
+| 3 | **Initiative** | 1 | `Start of combat against elites and bosses: +1 Combo.` (avant le recalage : 2 rangs, +1 à chaque combat puis +2 contre élites et boss) | `onCombatStart` ; `c.kind` = `elite` ou `boss` |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 65% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Relentless Strikes** | 2 | `After a Surge of 5 Combo or more: +1 Combo.` / `After a Surge of 4 Combo or more: +1 Combo.` (rang 2 : après chaque Surge avant le recalage) | `onSurge` (montant dépensé) |
 | 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
-| 4 | **Cheat Fate** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP with Parry 2.` / `… with Parry 3 and Stealth.` | `preventDeath` + `c.tstate.cheatFate` ; Cheat Death (Power, Last Breath de combat) passe avant |
+| 4 | **Cheat Fate** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP.` / `… at 1 HP with Parry 2.` (avant le recalage : Parry 2, puis Parry 3 et Stealth) | `preventDeath` + `c.tstate.cheatFate` ; Cheat Death (Power, Last Breath de combat) passe avant |
 
-Total 24 points (3 + 2 + 2 / 1 + 3 + 1 / 1 + 1 + 2 + 1 + 1 / 2 + 2 + 2), 14 nœuds ; nœuds de mécanique : 8 (+
-Specialization et Cheat Fate). Ordre du bot (`bot.order`) : Toughness 3, Opportunity 2 (5 points), Deeper Stratagem
-2, Provisions, Combat Readiness 2 (10), Specialization, Elusiveness, Initiative 2, Lightning Reflexes (15), Vile
-Poisons, Combat Readiness 3, Field Medic, Relentless Strikes 2 (20), Veteran's Arsenal 2, Cheat Fate 2 ; voie du bot :
-Combat. Pas d'accord d'épiques (`bot.epic`) : Veteran's Arsenal ne fait pas prendre de mauvaise épique au bot (arbre
+Total 24 points (3 + 2 + 3 / 3 + 1 + 1 + 1 / 1 + 1 + 1 + 1 / 2 + 2 + 2), 14 nœuds ; nœuds de mécanique : 8 (+
+Specialization et Cheat Fate). Ordre du bot (`bot.order`, recalage du 19/11/2026) : Toughness 3, Opportunity 2 (5
+points), Lightning Reflexes 2, Deeper Stratagem 3 (10), Provisions, Combat Readiness, Specialization, Vile Poisons,
+Lightning Reflexes 3 (15), Elusiveness, Initiative, Field Medic, Relentless Strikes 2 (20), Veteran's Arsenal 2, Cheat
+Fate 2 ; voie du bot : Combat. Pas d'accord d'épiques (`bot.epic`) : Veteran's Arsenal ne fait pas prendre de mauvaise épique au bot (arbre
 plein 98,3 % avec, 92,5 % sans).
 
 Écarts avec la proposition d'origine (ci-dessous pour mémoire), tous pour la mesure : noms de WoW sans doublon avec
@@ -563,29 +565,30 @@ mesures : `docs/equilibrage.md`, « Talents du Hunter ») :
 
 | Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
 |---|---|---|---|---|
-| 1 (0) | **Toughness** (générique) | 3 | `+3 max HP.` (+6, +9) | PV de départ de l'expédition |
-| 1 | **Kindred Spirits** | 2 | `Start of combat: +1 Frenzy.` / `+2 Frenzy.` | `onCombatStart` → `Combat.gainRes` (comme Kibler's Bits) |
-| 1 | **Unleashed Fury** | 1 | `Pet attacks deal 1 more.` | constante `PET_BASE` 1 → 2 (`Hunter.petBase(c)`) |
-| 1 | **Bestial Discipline** | 2 | `Frenzy drops only every other round.` / `… every third round.` | constante `DECAY_EVERY` 1 → 2 → 3, lue par l'`onRoundEnd` de la classe (rounds multiples) |
-| 2 (5) | **Thrill of the Hunt** | 2 | `When an enemy dies: +1 Frenzy.` / `+2 Frenzy.` | `onEnemyDeath` (comme Devilsaur Eye) |
-| 2 | **Trap Mastery** | 2 | `When a Trap triggers: +1 Frenzy.` / `+2 Frenzy.` | `onTrapTriggered` (Trap lancée comprise) |
-| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+2, +4, +6 ; règle commune, § 2.1) | PV de départ de l'expédition |
+| 1 | **Kindred Spirits** | 2 | `Start of combat against elites and bosses: +1 Frenzy.` / `+2 Frenzy.` (à chaque combat avant le recalage) | `onCombatStart` (`c.kind`) → `Combat.gainRes` (comme Kibler's Bits) |
+| 1 | **Unleashed Fury** | 1 | `Pet attacks against elites and bosses deal 1 more.` (à chaque combat avant le recalage) | constante `PET_BASE` 1 → 2 (`Hunter.petBase(c)`, la constante lit `c.kind` : `const` reçoit le combat, § 17.4) |
+| 1 | **Bestial Discipline** | 3 | `Frenzy drops only every other round.` / `… every third round.` / `… every fourth round.` | constante `DECAY_EVERY` 1 → 2 → 3 → 4, lue par l'`onRoundEnd` de la classe (rounds multiples) |
+| 2 (5) | **Thrill of the Hunt** | 3 | `When an enemy dies: +1 Frenzy.` / `+2` / `+3` | `onEnemyDeath` (comme Devilsaur Eye) |
+| 2 | **Trap Mastery** | 3 | `When a Trap triggers: +1 Frenzy.` / `+2` / `+3` | `onTrapTriggered` (Trap lancée comprise) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 50 more gold.` | or de départ |
 | 3 (10) | **Specialization** (choix) | 1 | Beast Mastery : `The first time each combat Frenzy reaches 5: the pet attacks.` Marksmanship : `Careful Aim: Attacks deal 3 more per hit.` Survival : `Traps also deal 6 to the attacker.` | BM : `onResource` (montée de moins de 5 à 5 ou plus ; `c.cls.bmDone`) ; MM : `damage` (carte Attack, cible au-dessus de la moitié, coup par coup comme Trueshot Aura) ; SV : `onTrapTriggered` → coup de la carte Trap (`calcDamage` avec sa fiche) |
-| 3 | **Natural Mending** | 1 | `Pet attacks: heal 1, once per turn.` | `onPetAttack` → `Combat.heal`, une fois par round (`c.cls.mendRound`) |
-| 3 | **Animal Handler** | 2 | `Frenzy cap +1.` / `+2.` | crochet `resCap` (5 → 7) |
-| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
-| 4 (16) | **Go for the Throat** | 2 | `Start of turn with 4 Frenzy or more: +1 mana.` / `… +1 mana and draw 1.` | `maxMana`, `drawPerTurn` (comme Rampage) ; `bot.value` |
+| 3 | **Animal Handler** | 1 | `Frenzy cap +1.` (2 rangs avant le recalage : +14 points dans l'arbre au palier 80 %) | crochet `resCap` (5 → 6) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 65% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Natural Mending** | 1 | `Pet attacks against elites and bosses: heal 1, once per turn.` (avant le recalage : rangée 3, à chaque combat, +12 points dans l'arbre au palier 60 %) | `onPetAttack` (`c.kind`) → `Combat.heal`, une fois par round (`c.cls.mendRound`) |
+| 4 | **Go for the Throat** | 1 | `Start of turn with 6 Frenzy or more: +1 mana.` (avant le recalage : 2 rangs à 4 Frenzy, une carte au rang 2) | `maxMana` (comme Rampage ; 6 Frenzy demande Animal Handler) ; `bot.value` |
 | 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` ; `bot.epic` : `lone_wolf = -20` |
-| 4 | **Deterrence** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP and skips the enemy turn.` / `… at 10 HP …` | `preventDeath` + `exp.talentState.deterrence` ; tour ennemi sauté comme la carte Feign Death (`skipEnemyTurn`, `beforeHit`) ; la carte passe d'abord (Powers avant les talents) |
+| 4 | **Deterrence** | 1 | `Once per expedition, a hit that would kill you leaves you at 1 HP.` (avant le recalage : 2 rangs, 1 puis 10 PV et le tour ennemi sauté) | `preventDeath` + `exp.talentState.deterrence` ; la carte Feign Death passe d'abord (Powers avant les talents) |
 
-Total 24 points (3 + 2 + 1 + 2 / 2 + 2 + 1 / 1 + 1 + 2 + 1 / 2 + 2 + 2). Nœuds de mécanique : 10 sur 14 (15 points).
+Total 24 points (3 + 2 + 1 + 3 / 3 + 3 + 1 / 1 + 1 + 1 / 1 + 1 + 2 + 1). Nœuds de mécanique : 10 sur 14 (15 points).
 Noms : talents du Chasseur dans WoW qui ne répètent pas un nom de carte de la classe (Spirit Bond, Lock and Load et
 Feign Death sont des cartes ; Ferocity est le mot de règle de Lone Wolf). Hawk Eye abandonné : Careful Aim est lu à
 cinq endroits, dont les cartes et l'épique Master Marksman (`Data/Hunter.lua`), hors du périmètre d'un arbre.
 
-Ordre du bot : Unleashed Fury, Kindred Spirits 2, Bestial Discipline 2 (5 points), Trap Mastery 2, Thrill of the Hunt
-2, Provisions (10), Toughness 3, Specialization (Beast Mastery), Natural Mending (15), Animal Handler 2, Field Medic,
-Go for the Throat 2 (20), Veteran's Arsenal 2, Deterrence 2. Toughness passe après la rangée 2 : elle pèse beaucoup
+Ordre du bot (recalage du 19/11/2026) : Bestial Discipline 2, Kindred Spirits 2, Toughness 1 (5 points), Trap Mastery
+2, Thrill of the Hunt 2, Provisions (10), Toughness 3, Specialization (Beast Mastery), Unleashed Fury, Animal Handler
+(15), Bestial Discipline 3, Field Medic, Go for the Throat, Thrill of the Hunt 3, Deterrence (20), Natural Mending,
+Veteran's Arsenal 2, Trap Mastery 3. Toughness passe après la rangée 2 : elle pèse beaucoup
 au contenu du palier 40 % (+5,7 points pour 2 rangs) et peu à celui du palier 20 % ; les deux nœuds à Frenzy de la
 rangée 2 valent ≈ 0 seuls (le bot ne joue guère les Traps, un ennemi tué rapporte surtout en fin de combat).
 
@@ -844,7 +847,8 @@ ns.Talent.define("<classe>", {
   `c.tstate.unyielding`), valeur posée en fin de combat et lue au suivant (Tactical Mastery : `c.tstate.rage`).
 - **Expédition** (`run`) : `Expedition.modify` / `Expedition.fire`, signature `(exp, src, v, …)` (modify) et
   `(exp, src, …)` (fire), après les bibelots : `startMaxHp` (v = PV de la classe), `startGold` (v = 50),
-  `startEpics` (v = 0 : épiques choisies au départ), `zoneHeal` (v = 0,5), `onCombatWon` (`kind, fight, c` : `c` =
+  `startEpics` (v = 0 : épiques choisies au départ), `startEpicOffer` (v = 0 : toutes les épiques proposables ; k > 0 :
+  k tirées au hasard, flux `talentEpic`), `zoneHeal` (v = 0,5), `onCombatWon` (`kind, fight, c` : `c` =
   le combat terminé, `c.player.res`, PV déjà repris par l'expédition), et tous les crochets `run` des bibelots
   (`gold`, `restHeal`, `price`…). Soin hors combat : `ns.Expedition.healOut(exp, n)`.
 
@@ -857,8 +861,8 @@ test « fiches immuables »). Le code de classe lit la constante sur l'état du 
 Combat.const(c, "TAX_FREE", Druid.TAX_FREE)   -- valeur du module, puis les talents qui déclarent const.TAX_FREE
 ```
 
-et le talent la déclare : `const = { TAX_FREE = function(v, src) return v + src.rank end }` (pour fixer une valeur :
-`return 0`). Sans talent, `Combat.const` rend la valeur du module (un test de champ ; `tune=Druid.TAX_FREE=2` reste
+et le talent la déclare : `const = { TAX_FREE = function(v, src, c) return v + src.rank end }` (pour fixer une valeur :
+`return 0` ; `c` = le combat, pour une constante qui dépend du combat : Unleashed Fury lit `c.kind`). Sans talent, `Combat.const` rend la valeur du module (un test de champ ; `tune=Druid.TAX_FREE=2` reste
 valable). Déjà branchées : `TAX_FREE`, `TAX`, `TAX_MAX` (`Druid.taxOf(n, c)`), `STRIKE_BASE`, `PULSE_MAX`,
 `TREE_ABSORB` (Druid), `PET_BASE` (`Hunter.petBase(c)`), `PARRY_STOP` et `PARRY_MAX` (Rogue : `maxKey` de l'état
 Parry, lu par `Combat.applyStatus`), `ATONEMENT_HEAL` (Priest), `SUNDER_MULT` (Sundered). Une autre constante :
