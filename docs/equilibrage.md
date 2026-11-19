@@ -2323,3 +2323,67 @@ Lecture :
 
 Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; chiffres d'interface (Arcane Mind et la pastille à quatre
 pips : `docs/talents.md`, § 15, « Lisibilité »).
+
+## Talents du Priest : courbe par palier (19/11/2026)
+
+Arbre codé (`Data/Talents/priest.lua`, `docs/talents.md`, § 8 et 17), mur des zones 6 et 7 à 1,9. Commande :
+`flock build/sim-b.lock luajit Sim/sim.lua runner=expedition bot=human class=priest key=0 seed=1 jobs=8 runs=600
+tree=<part> zones=<N> level=<palier>` avec le contenu de chaque palier (`docs/talents.md`, § 3) ; « contenu seul » =
+même commande sans `tree=` ; ± 2 à 4 points. Rapports : `reports/talents/priest/` du worktree.
+
+| Palier (points) | Contenu | Victoires (Warrior) | Contenu seul | Fiche d'origine | STV | SoS | BS | BRM |
+|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | `zones=0 level=1` | **0,0 %** (0,0) | 0,0 | 0,0 | 37,6 | 1,4 | — | — |
+| 20 % (5) | `zones=2 level=4` | **24,5 %** (25,5) | 4,7 | 11,8 | 94,3 | 53,3 | 84,4 | 60,2 |
+| 40 % (10) | `zones=3 level=7` | **29,7 %** (23,0) | 4,5 | 22,2 | 93,1 | 60,8 | 87,9 | 59,9 |
+| 60 % (15) | `zones=4 level=7` | **55,7 %** (61,2) | 4,5 | 45,5 | 98,2 | 77,1 | 93,2 | 79,0 |
+| 80 % (20) | `zones=6 level=7` | **67,0 %** (82,3) | 6,7 | — | 99,5 | 83,6 | 96,8 | 83,2 |
+| 100 % (24) | `zones=7 level=7` | **79,0 %** (94,3) | 7,5 | — | 98,3 | 86,3 | 99,6 | 93,5 |
+
+STV … BRM : battue / atteinte (%) de Stranglethorn Vale, Swamp of Sorrows, Burning Steppes, Blackrock Mountain.
+« Fiche d'origine » : premier jet (nœuds et chiffres du § 8 de la fiche, Toughness +2 par rang), avant réglage.
+Paliers 80 et 100 % mesurés, pas réglés (recalage des génériques à venir pour toutes les classes).
+
+**Specialization au palier 60 %** : Discipline **55,7 %** (voie du bot), Shadow 51,5 %, Holy 52,0 % (écart 4,2
+points). Premier jet : Discipline 45,5, Shadow 33,3, Holy 31,5 (Shadow « DoT +1 » et Holy « soin de 3 à chaque Cast »
+ne valaient rien seuls).
+
+**Nœuds de mécanique pleins seuls**, au contenu du palier de leur rangée (contenu seul : 4,7 % au palier 20, 4,5 %
+aux paliers 40 et 60, 6,7 % au palier 80), chiffres retenus : rangée 1 (palier 20) Twin Disciplines 2 7,8 (+3,1),
+Borrowed Time 2 5,0 (+0,3) ; rangée 2 (palier 40) Mind Spike 2 7,2 (+2,7), Shadow Weaving 6,8 (+2,3), Inspiration 7,2
+(+2,7) ; rangée 3 (palier 60) Discipline 12,8 (+8,3), Shadow 9,7 (+5,2), Holy 13,0 (+8,5), Power Word: Barrier 2 12,2
+(+7,7), Void Torrent 2 5,0 (+0,5) ; rangée 4 (palier 80) Spiritual Guidance 2 8,3 (+1,6), Guardian Spirit 2 7,7
+(+1,0). Aucun au-dessus de 12 points ; deux l'étaient en cours de réglage et ont été baissés : Discipline à 3 Absorb
+17,8 (+13,3) et Power Word: Barrier à +3 par rang 17,5 (+13,0). Veteran's Arsenal 2 seul au palier 100 : 10,2 %
+(+2,7) ; arbre plein sans Veteran's Arsenal 77,8 % (avec : 79,0).
+
+**Chiffres changés** par rapport à la fiche : Twin Disciplines `3 au lieu de 2` (1 rang) → **+2 par rang** (4 puis 6),
+déplacé en rangée 1 ; Borrowed Time `Sacred Candle à Atonement 2` → **Atonement 2 par rang au début du combat** ;
+Mind Spike `+1 Insanity` → **+2 par rang**, en rangée 2 ; Inspiration `Regen gagnée +1` → **Regen 4 au début du
+combat** ; Power Word: Barrier `+2` (1 rang) → **+2 par rang** (2 rangs) ; Spiritual Guidance 2 rangs (3 / 5 Absorb) ;
+Specialization Discipline `1 Absorb` → **2**, Shadow `DoT +1` → **+5 par coup et +5 DoT des cartes Shadow**, Holy `Cast
+cards heal 3 more` → **+8 par coup des cartes Holy** ; Guardian Spirit rang 2 : Regen 6 en plus. Toughness : +2 PV par
+rang (36 PV, même part que le Warrior et le Druid). Étapes (palier 60, Discipline) : 45,5 (premier jet) → 47,3 (Twin
++2 par rang) → 49,5 (Barrier +2, Holy +5) → 54,0 (Borrowed Time 2, Discipline 3, Shadow 4, Holy 6) → 53,7 (Barrier
++3, Shadow 5, Holy 8) → 56,2 (Inspiration Regen 3) → 55,7 retenu (Barrier +2, Discipline 2, Inspiration Regen 4 : les
+deux nœuds trop forts seuls ramenés sous 12 points).
+
+**Bots** : valeur d'Atonement relevée en combat (`bot.value` de Twin Disciplines et de Discipline : chaque tour
+d'Atonement compté en proportion du soin) : 22,8 % au palier 20 et 53,8 % au palier 60 (sans : 24,5 et 55,7),
+retirée ; accord des épiques `{ voidform = -1, reflective_shield = 1 }` au palier 100 : 76,7 % (sans : 79,0),
+retiré. L'Absorb, la Regen, l'Insanity et l'Atonement des nœuds se voient déjà dans l'évaluation commune.
+
+Lecture :
+
+- **Paliers 0, 20, 40 et 60 tenus** : 0,0 % au compte neuf ; 24,5 % (Warrior 25,5) ; 29,7 % (23,0 ; + 6,7, dans les
+  ± 8) ; 55,7 % (61,2 ; − 5,5, au-dessus de 40). Les trois voies se tiennent à 4,2 points.
+- **Le contenu seul du Priest est très bas** (4,5 à 7,5 % des paliers 20 à 100, Warrior 8,5 à 28,2) : le mur du Priest
+  est le Swamp of Sorrows (31 à 39 % battue / atteinte sans talents, Somnus ≈ 59 %). L'arbre en apporte presque tout
+  (Swamp 77 % au palier 60) ; les nœuds qui pèsent sont ceux de survie (Atonement, Absorb, Regen), ceux de
+  l'Insanity (Mind Spike, Shadow Weaving, Void Torrent) valent 0 à 3 points seuls.
+- **Paliers 80 et 100 sous le Warrior** (67,0 et 79,0 % contre 82,3 et 94,3) mais au-dessus des cibles de la fiche
+  (≈ 55 et 65–70 %) : Veteran's Arsenal vaut peu au Priest (+5 dans l'arbre plein ; épiques du Priest faibles au
+  Swamp, « Épiques : mesure une par une »).
+
+Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; XP par expédition (non relevée) ; l'ordre du bot passe
+Shadow Weaving avant Inspiration (palier 40 : 29,7 % ; avec Inspiration Regen 3 à la place, 32,0 %).

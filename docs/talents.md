@@ -407,17 +407,40 @@ restants. Effets en une ligne ; chiffres à régler à la mesure.
 chaque carte qui inflige des dégâts soigne `Combat.ATONEMENT_HEAL` = 2 ; Sacred Candle : Atonement 1 au début du
 combat ; Regen, Absorb, Cast)
 
-- **Twin Disciplines** : `Atonement heals 3 instead of 2.` (crochet `heal` sur le soin d'Atonement)
-- **Borrowed Time** : `Sacred Candle gives Atonement 2 instead of 1.` (durée)
-- **Mind Spike** : `Start of combat: +1 Insanity.` (2 rangs)
-- **Shadow Weaving** : `The second Shadow card each turn: +1 Insanity.` (`c.turn.bySchool.shadow`)
-- **Void Torrent** : `Surge counts 1 more Insanity.` (2 rangs ; crochet `surge`, comme Anathema)
-- **Inspiration** : `Regen you gain is 1 higher.` (`applySelf`, comme Benediction)
-- **Power Word: Barrier** : `Cards that give Absorb give 2 more.` (`block`)
-- **Spiritual Guidance** : `When a Cast resolves: gain 3 Absorb.` (`onCastResolved`)
-- Specialization : Discipline `Atonement also gives 1 Absorb per heal.` / Shadow `Shadow DoT you apply: +1.` / Holy
-  `Cast cards heal 3 more.` ; rangée 4 : **Guardian Spirit** `Once per expedition, a hit that would kill you leaves
-  you at 1 HP with Atonement 3.`
+**Arbre codé et réglé le 19/11/2026** (`Data/Talents/priest.lua`, nombres dans `ns.PriestTalents` ; tests :
+`Sim/tests_talents_priest.lua` ; mesures : `docs/equilibrage.md`, « Talents du Priest : courbe par palier »). 14
+nœuds, 24 points (3 + 2 + 2 / 2 + 1 + 1 + 1 / 1 + 2 + 2 + 1 / 2 + 2 + 2) ; 10 nœuds de mécanique (15 points).
+
+| Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
+|---|---|---|---|---|
+| 1 (0) | **Toughness** (générique) | 3 | `+2 max HP.` (+6 au rang 3) | PV de départ de l'expédition |
+| 1 | **Twin Disciplines** | 2 | `Atonement heals 4 instead of 2.` / `… 6 instead of 2.` | constante `ATONEMENT_HEAL` (`Combat.const`) |
+| 1 | **Borrowed Time** | 2 | `Start of combat: gain Atonement 2.` / `… Atonement 4.` | `onCombatStart` → `applyStatus` (s'ajoute à Sacred Candle) |
+| 2 (5) | **Mind Spike** | 2 | `Start of combat: +2 Insanity.` / `… +4 Insanity.` | `onCombatStart` → `Combat.gainRes` |
+| 2 | **Shadow Weaving** | 1 | `The second Shadow card each turn: +1 Insanity.` | `onCardCommitted` (`c.turn.bySchool.shadow`) |
+| 2 | **Inspiration** | 1 | `Start of combat: gain Regen 4.` | `onCombatStart` (premier tic au début du premier tour ; Benediction s'y ajoute) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 3 (10) | **Specialization** (choix) | 1 | Discipline : `Each Atonement heal also gives 2 Absorb.` Shadow : `Shadow cards deal 5 more per hit and apply 5 more DoT.` Holy : `Holy cards deal 8 more per hit.` | Discipline : `onCardPlayed` (carte qui a infligé des dégâts sous Atonement) ; Shadow : `damage` et `apply` ; Holy : `damage` |
+| 3 | **Void Torrent** | 2 | `Surge cards count 1 more Insanity.` / `… 2 more Insanity.` | crochet `surge` (comme Anathema) |
+| 3 | **Power Word: Barrier** | 2 | `Cards that give Absorb give 2 more.` / `… 4 more.` | `block`, une fois par carte (`c.cardCtx`) ; ni sur l'Absorb de Discipline ni sur l'Absorb sans carte |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Spiritual Guidance** | 2 | `When a Cast card resolves: gain 3 Absorb.` / `… 5 Absorb.` | `onCastResolved` (comme Truefaith Vestments) |
+| 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` |
+| 4 | **Guardian Spirit** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP with Atonement 3.` / `… with Atonement 3 and Regen 6.` | `preventDeath` + `c.tstate.guardian` |
+
+Ordre du bot : Toughness 3, Twin Disciplines 2 (5 points), Borrowed Time 2, Mind Spike 2, Shadow Weaving (10),
+Inspiration, Provisions, Specialization (Discipline), Power Word: Barrier 2 (15), Void Torrent 2, Field Medic (18),
+Spiritual Guidance 2 (20), Veteran's Arsenal 2, Guardian Spirit 2. Palier 60 % : rangées 1 et 2 pleines,
+Specialization, Power Word: Barrier 2. Pas de `bot.value`, `bot.won` ni `bot.epic` (essayés, sans gain :
+`docs/equilibrage.md`).
+
+Écarts avec la proposition d'origine (chiffres réglés à la mesure) : Twin Disciplines passe en rangée 1 et rend +2 par
+rang (proposé : 3 au lieu de 2, un rang) ; Borrowed Time devient un Atonement de début de combat (2 par rang ;
+proposé : Sacred Candle à 2) ; Mind Spike passe en rangée 2, +2 par rang ; Inspiration donne Regen 4 au début du
+combat (proposé : `Regen you gain is 1 higher.`, ≈ 0 point seul) ; Power Word: Barrier 2 rangs de +2 ;
+Specialization Discipline 2 Absorb par soin (proposé : 1), Shadow « +5 par coup et +5 DoT » (proposé : DoT +1,
+≈ 0 point seul), Holy « +8 par coup des cartes Holy » (proposé : soin des cartes Cast, ≈ 0 point seul : 0,3 à 0,9
+incantation par combat) ; Spiritual Guidance 2 rangs (3 / 5) ; Guardian Spirit rang 2 : Regen 6 en plus.
 
 **Mage** (42 PV ; Charges 0 à 4, +1 dégât par Charge sur chaque coup des Attacks, dépensées par `Surge:` ; deux Casts
 en même temps (`castSlots` + 1) ; Frozen = Stunned ou Demoralized ; Hot Streak, Instant, Ignite ; Apprentice Wand : le
