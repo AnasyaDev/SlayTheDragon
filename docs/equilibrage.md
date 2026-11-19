@@ -2387,3 +2387,68 @@ Lecture :
 
 Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; XP par expédition (non relevée) ; l'ordre du bot passe
 Shadow Weaving avant Inspiration (palier 40 : 29,7 % ; avec Inspiration Regen 3 à la place, 32,0 %).
+
+## Talents du Hunter : courbe par palier (19/11/2026)
+
+Arbre codé (`Data/Talents/hunter.lua`, `docs/talents.md`, § 8), sur le modèle du Warrior ; mur des zones 6 et 7 à 1,9.
+Commande : `flock build/sim-a.lock luajit Sim/sim.lua runner=expedition bot=human class=hunter key=0 seed=1 jobs=8
+runs=600 tree=<part> zones=<N> level=<palier>` ; « contenu seul » = sans `tree=` ; ± 2 à 4 points. Rapports :
+`reports/talents/` du worktree (`v6_*`, `v7_t100`, `c*`, `n*`).
+
+| Palier (points) | Contenu | Victoires (Warrior) | Contenu seul | Premier jet | STV | SoS | BS | BRM | XP / exp. |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 % (0) | `zones=0 level=1` | **0,0 %** (0,0) | 0,0 | 0,0 | 1,5 | 0,0 | — | — | 158 |
+| 20 % (5) | `zones=2 level=4` | **14,0 %** (25,5) | 0,8 | 15,8 | 60,0 | 56,8 | 85,1 | 49,1 | 303 |
+| 40 % (10) | `zones=3 level=7` | **33,3 %** (23,0) | 9,0 | 60,0 | 80,2 | 62,1 | 83,8 | 80,3 | 338 |
+| 60 % (15) | `zones=4 level=7` | **60,8 %** (61,2) | 11,0 | 89,3 | 95,0 | 74,7 | 94,4 | 90,8 | 389 |
+| 80 % (20) | `zones=6 level=7` | **93,8 %** (82,3) | 16,0 | — | 99,5 | 96,3 | 99,8 | 98,1 | 438 |
+| 100 % (24) | `zones=7 level=7` | **99,3 %** (94,3) | 7,3 | 43,2 | 100,0 | 99,7 | 100,0 | 99,7 | 445 |
+
+STV … BRM : battue / atteinte (%) de l'arbre. « Premier jet » : 60 % avec les chiffres de la fiche (Unleashed Fury et
+Natural Mending à 2 rangs, Beast Mastery à chaque montée à 5) ; 20 et 40 % avec Unleashed Fury et Natural Mending à
+un rang ; 100 % avant l'accord des épiques (`lone_wolf = -4` au lieu de -20). Contenu seul au palier 100 % plus bas
+qu'au palier 80 % : Lone Wolf (épique de Blackrock Mountain) entre dans le deck et retire le familier.
+
+**Trois voies au palier 60 %** : Beast Mastery 60,8 %, Marksmanship 64,2 %, Survival 60,5 % (écart 3,7). Avec
+Beast Mastery à chaque montée à 5 : 70,7 / 61,8 / 60,3 % (écart 10,4) : la voie du bot ne se tenait pas avec les
+autres, elle ne joue plus qu'une fois par combat.
+
+**Nœuds seuls**, chiffres retenus, au contenu du palier 60 % (contenu seul 11,0 %) : Unleashed Fury 20,5 (+9,5) ;
+Kindred Spirits 2 15,8 (+4,8) ; Bestial Discipline 2 13,0 (+2,0) ; Thrill of the Hunt 2 10,2 (−0,8) ; Trap Mastery
+2 11,2 (+0,2) ; Beast Mastery 14,2 (+3,2) ; Marksmanship 14,0 (+3,0) ; Survival 16,5 (+5,5) ; Natural Mending 21,3
+(+10,3) ; Animal Handler 2 15,8 (+4,8) ; génériques Toughness 3 + Provisions 14,2 (+3,2). Rangée 4, au contenu du
+palier 80 % (16,0 %) : Go for the Throat 2 26,3 (+10,3) ; Deterrence 2 27,2 (+11,2). Au palier 100 % (7,3 %) :
+Veteran's Arsenal 2 27,5 (+20) ; Toughness 3 + Provisions + Field Medic 34,0. Rangée 1 au contenu du palier 20 %
+(0,8 %) : Unleashed Fury 4,3, Kindred Spirits 2 3,2, Toughness 3 2,7. Aucun nœud de mécanique au-dessus de +12.
+
+**Chiffres changés** (par rapport à la fiche, § 8 ; noms changés pour ne pas répéter une carte) :
+
+- Ferocity → **Unleashed Fury**, **1 rang** (+1) : 2 rangs (+2) valaient +19,5 points seuls au palier 60 %.
+- Spirit Bond (`Each pet attack: heal 1.`) → **Natural Mending**, **une fois par tour**, 1 rang : deux soins par tour
+  valaient +21 points seuls.
+- Frenzy Mastery → **Animal Handler**, 2 rangs, rangée 3 (en rangée 2 il entrait dans le palier 40 %).
+- Bestial Discipline : 2 rangs (un round sur deux, puis sur trois), en rangée 1.
+- Trap Mastery : `+1 Trap slot` → `When a Trap triggers: +1 Frenzy.` (2 rangs) ; Lock and Load (carte) et Hawk Eye
+  (Careful Aim lu dans `Data/Hunter.lua`) retirés ; **Thrill of the Hunt** (`When an enemy dies: +1 Frenzy.`, 2 rangs)
+  et **Go for the Throat** (rangée 4, comme Rampage, à 4 Frenzy) ajoutés.
+- Specialization : Beast Mastery **une fois par combat** ; Marksmanship +2 → **+3** ; Survival 4 → **6**.
+- Feign Death (talent) → **Deterrence**, rang 2 à 10 PV.
+- Ordre du bot : la rangée 1 sans Toughness d'abord, puis les deux nœuds faibles de la rangée 2, Toughness au 11e point
+  (avec Toughness dans les 5 premiers points : 15,8 % au palier 20 % mais 42,5 % au palier 40 %).
+- Accord des épiques : `lone_wolf = -20` (à -4, le bot prenait Lone Wolf en plus des autres épiques, sans plafond :
+  80 % des expéditions à l'arbre plein, 30 % de victoires avec, 99 % sans ; arbre plein 43,2 %).
+
+Lecture :
+
+- **0 % et 60 % tenus** (0 victoire au compte neuf ; 60,8 % pour 61,2 au Warrior ; trois voies à 4 points près).
+- **20 et 40 % ne tiennent pas ensemble** : 14,0 % (Warrior − 11,5) et 33,3 % (+ 10,3). Le contenu seul du Hunter
+  monte de 0,8 à 9,0 % entre les deux paliers (Warrior : 8,5 et 8,2) et les mêmes cinq premiers points valent
+  ≈ 2,5 fois plus au contenu du palier 40 % qu'à celui du palier 20 % (Unleashed Fury +3,5 contre +9,0 ; Kindred
+  Spirits 2 +2,4 contre +6,7) : plus de force au palier 20 % fait monter le palier 40 % d'autant. Les essais : 15,8 /
+  42,5 % (Toughness parmi les cinq premiers points), 12,7 / 39,2 % (Kindred Spirits à un rang), 14,0 / 33,3 %
+  (retenu).
+- **80 et 100 % au-dessus du Warrior** (93,8 et 99,3 %), mesurés sans réglage (recalage des génériques à venir).
+- Rythme : 303 d'expérience dès 20 % de l'arbre, 389 à 60 % (Warrior 292 et 384).
+
+Non vérifié : bot heuristic ; autres graines ; clés 1 à 5 ; Survival et Marksmanship avec un deck construit pour eux
+(le bot choisit ses cartes sans regarder la voie de l'arbre).

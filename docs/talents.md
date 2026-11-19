@@ -531,17 +531,50 @@ expedition, a hit that would kill you leaves you at 1 HP with Stealth and Parry 
 `Hunter.PET_BASE` (1) + Frenzy à la fin du tour ; Traps : 3 emplacements (`TRAP_SLOTS`) ; Careful Aim : cible
 au-dessus de la moitié de ses PV ; Pet Whistle : le familier attaque au début du premier tour)
 
-- **Ferocity** : `Pet attacks deal 1 more.` (2 rangs ; `PET_BASE` 1 → 3)
-- **Spirit Bond** : `Each pet attack: heal 1.` (`onPetAttack`)
-- **Bestial Discipline** : `Frenzy drops only every other round.` (`onRoundEnd` de la classe)
-- **Kindred Spirits** : `Start of combat: +1 Frenzy.` (comme Kibler's Bits)
-- **Frenzy Mastery** : `Frenzy cap +1.` (`resCap`, 5 → 6)
-- **Trap Mastery** : `+1 Trap slot.` (`trapSlots`)
-- **Lock and Load** : `The first Trap each combat costs 0.` (comme Net-o-Matic ; fusionnable avec Trap Mastery)
-- **Hawk Eye** : `Careful Aim: targets above 40% HP.` (verdict du `beforeCard` de la classe)
-- Specialization : Beast Mastery `When Frenzy reaches 5: the pet attacks.` / Marksmanship `Careful Aim Attacks deal 2
-  more per hit.` / Survival `Traps also deal 4 to the attacker.` ; rangée 4 : **Feign Death** (talent) `Once per
-  expedition, a hit that would kill you leaves you at 1 HP and skips the enemy turn.`
+Proposition d'origine (19/11/2026) : Ferocity (`Pet attacks deal 1 more.`, 2 rangs), Spirit Bond (`Each pet attack:
+heal 1.`), Bestial Discipline, Kindred Spirits, Frenzy Mastery (`Frenzy cap +1.`), Trap Mastery (`+1 Trap slot.`),
+Lock and Load (`The first Trap each combat costs 0.`), Hawk Eye (`Careful Aim: targets above 40% HP.`),
+Specialization (Beast Mastery `When Frenzy reaches 5: the pet attacks.`, Marksmanship `+2`, Survival `4`), Feign Death
+(talent). **Arbre codé et mesuré le 19/11/2026** (`Data/Talents/hunter.lua`, nombres dans `ns.HunterTalents` ;
+mesures : `docs/equilibrage.md`, « Talents du Hunter ») :
+
+| Rangée (ouverte à) | Nœud | Rangs | Effet (texte de jeu, par rang) | Point d'accroche |
+|---|---|---|---|---|
+| 1 (0) | **Toughness** (générique) | 3 | `+3 max HP.` (+6, +9) | PV de départ de l'expédition |
+| 1 | **Kindred Spirits** | 2 | `Start of combat: +1 Frenzy.` / `+2 Frenzy.` | `onCombatStart` → `Combat.gainRes` (comme Kibler's Bits) |
+| 1 | **Unleashed Fury** | 1 | `Pet attacks deal 1 more.` | constante `PET_BASE` 1 → 2 (`Hunter.petBase(c)`) |
+| 1 | **Bestial Discipline** | 2 | `Frenzy drops only every other round.` / `… every third round.` | constante `DECAY_EVERY` 1 → 2 → 3, lue par l'`onRoundEnd` de la classe (rounds multiples) |
+| 2 (5) | **Thrill of the Hunt** | 2 | `When an enemy dies: +1 Frenzy.` / `+2 Frenzy.` | `onEnemyDeath` (comme Devilsaur Eye) |
+| 2 | **Trap Mastery** | 2 | `When a Trap triggers: +1 Frenzy.` / `+2 Frenzy.` | `onTrapTriggered` (Trap lancée comprise) |
+| 2 | **Provisions** (générique) | 1 | `Start each expedition with 100 more gold.` | or de départ |
+| 3 (10) | **Specialization** (choix) | 1 | Beast Mastery : `The first time each combat Frenzy reaches 5: the pet attacks.` Marksmanship : `Careful Aim: Attacks deal 3 more per hit.` Survival : `Traps also deal 6 to the attacker.` | BM : `onResource` (montée de moins de 5 à 5 ou plus ; `c.cls.bmDone`) ; MM : `damage` (carte Attack, cible au-dessus de la moitié, coup par coup comme Trueshot Aura) ; SV : `onTrapTriggered` → coup de la carte Trap (`calcDamage` avec sa fiche) |
+| 3 | **Natural Mending** | 1 | `Pet attacks: heal 1, once per turn.` | `onPetAttack` → `Combat.heal`, une fois par round (`c.cls.mendRound`) |
+| 3 | **Animal Handler** | 2 | `Frenzy cap +1.` / `+2.` | crochet `resCap` (5 → 7) |
+| 3 | **Field Medic** (générique) | 1 | `Moving to the next zone heals 75% of max HP instead of 50%.` | `zoneHeal` |
+| 4 (16) | **Go for the Throat** | 2 | `Start of turn with 4 Frenzy or more: +1 mana.` / `… +1 mana and draw 1.` | `maxMana`, `drawPerTurn` (comme Rampage) ; `bot.value` |
+| 4 | **Veteran's Arsenal** (générique) | 2 | comme le Warrior | phase `start` ; `bot.epic` : `lone_wolf = -20` |
+| 4 | **Deterrence** | 2 | `Once per expedition, a hit that would kill you leaves you at 1 HP and skips the enemy turn.` / `… at 10 HP …` | `preventDeath` + `exp.talentState.deterrence` ; tour ennemi sauté comme la carte Feign Death (`skipEnemyTurn`, `beforeHit`) ; la carte passe d'abord (Powers avant les talents) |
+
+Total 24 points (3 + 2 + 1 + 2 / 2 + 2 + 1 / 1 + 1 + 2 + 1 / 2 + 2 + 2). Nœuds de mécanique : 10 sur 14 (15 points).
+Noms : talents du Chasseur dans WoW qui ne répètent pas un nom de carte de la classe (Spirit Bond, Lock and Load et
+Feign Death sont des cartes ; Ferocity est le mot de règle de Lone Wolf). Hawk Eye abandonné : Careful Aim est lu à
+cinq endroits, dont les cartes et l'épique Master Marksman (`Data/Hunter.lua`), hors du périmètre d'un arbre.
+
+Ordre du bot : Unleashed Fury, Kindred Spirits 2, Bestial Discipline 2 (5 points), Trap Mastery 2, Thrill of the Hunt
+2, Provisions (10), Toughness 3, Specialization (Beast Mastery), Natural Mending (15), Animal Handler 2, Field Medic,
+Go for the Throat 2 (20), Veteran's Arsenal 2, Deterrence 2. Toughness passe après la rangée 2 : elle pèse beaucoup
+au contenu du palier 40 % (+5,7 points pour 2 rangs) et peu à celui du palier 20 % ; les deux nœuds à Frenzy de la
+rangée 2 valent ≈ 0 seuls (le bot ne joue guère les Traps, un ennemi tué rapporte surtout en fin de combat).
+
+Concrètement :
+
+- Unleashed Fury + Kindred Spirits 2 : le familier frappe 2 + Frenzy, et le premier tour commence à Frenzy 2 (3 avec
+  Kibler's Bits) : Pet Whistle frappe 4 au lieu de 1.
+- Bestial Discipline 2 : le Frenzy ne baisse qu'un round sur trois ; un familier laissé seul gagne 2 Frenzy tous les
+  trois tours au lieu de rester où il est.
+- Beast Mastery : une attaque de plus par combat, quand le Frenzy touche 5.
+- Natural Mending : ≈ 1 PV par tour (la seule source de soin de la classe en combat).
+- Go for the Throat : finir le tour à 5 Frenzy (4 après la baisse) donne 4 mana au tour suivant.
 
 ## 9. Clés 1 à 5
 
