@@ -8327,8 +8327,10 @@ do
     return out
   end
   local CLASSES = { "priest", "warrior", "mage", "rogue", "hunter" }
-  -- seuils d'expérience (Meta.XP_LEVELS, vérifiés par les tests de l'expédition)
-  local XPL = { 0, 100, 250, 450, 700, 1000, 1400 }
+  -- paliers de contenu 1 à 7 : niveau de classe qui les ouvre (Meta.CONTENT_LEVELS) et son seuil d'expérience
+  -- (Meta.XP_LEVELS ; 25 niveaux depuis le 19/11/2026, vérifiés par Sim/tests_talents.lua)
+  local LVL = { 1, 2, 3, 5, 7, 9, 11 }
+  local XPL = { 0, 100, 200, 400, 650, 950, 1250 }
   local function bootLevels(levels)
     local db = { version = 5, meta = { runs = 0, zones = {}, classes = {}, flags = {} }, journal = {} }
     for cid, lv in pairs(levels) do
@@ -8351,8 +8353,8 @@ do
       clickOption("pclass:" .. cid)
       local tag = ("%s niveau %d"):format(cid, lv)
       local scr, st = UI().current, UI().step
-      check(tag .. " : classe et niveau affichés (onglet choisi, barre « Level N »)", st.class == cid and st.level == lv
-        and option("pclass:" .. cid).selected and (scr.bar.value._text or ""):find("Level " .. lv, 1, true) ~= nil
+      check(tag .. " : classe et niveau affichés (onglet choisi, barre « Level N »)", st.class == cid and st.level == LVL[lv]
+        and option("pclass:" .. cid).selected and (scr.bar.value._text or ""):find("Level " .. LVL[lv], 1, true) ~= nil
         and scr.bar.label._text == ns.Classes[cid].name, scr.bar.value._text)
       -- cartes : 34 emplacements, débloqués en vraies cartes, verrouillés en dos de carte
       local nCards, nLocks, badLock, badCard, badTip, outside = 0, 0, {}, {}, {}, {}

@@ -454,7 +454,7 @@ test("expérience : avancée de l'expédition (étapes, élites, boss), plus de 
   eq(next(meta.zones), nil, "défaite : aucune zone gagnée par le compte")
 end)
 
-test("déblocages : cartes par niveau de classe, bibelot au choix (zone 3 du compte), titre au niveau 7", function()
+test("déblocages : cartes par niveau de classe, bibelot au choix (zone 3 du compte), titre au niveau 25", function()
   local lv0 = ns.Cards.radiance.level
   ns.Cards.radiance.level = 2
   local exp = newExp()
@@ -489,22 +489,28 @@ test("déblocages : cartes par niveau de classe, bibelot au choix (zone 3 du com
   eq(r.relics[1], "sacred_candle"); eq(r.relics[2], pick)
   eq(r.phase, "map")
   eq(Meta.title(meta, "priest"), nil)
-  Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7] - 1
+  Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[Meta.MAX_LEVEL] - 1
   eq(Meta.title(meta, "priest"), nil)
-  Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7]
+  Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[Meta.MAX_LEVEL]
+  eq(Meta.title(meta, "priest"), "Veteran")
+  -- titre gardé à la migration (niveau 7 d'avant les 25 niveaux) : cs.veteran
+  Meta.classState(meta, "priest").xp = 0
+  Meta.classState(meta, "priest").veteran = true
   eq(Meta.title(meta, "priest"), "Veteran")
 end)
 
 test("niveau de classe : seuils, progression, expérience gagnée (victoire, défaite, clé)", function()
-  eq(Meta.MAX_LEVEL, 7)
-  local T = { 0, 100, 250, 450, 700, 1000, 1400 }
+  -- 25 niveaux (docs/talents.md, § 1.2) ; détail des paliers et des points : Sim/tests_talents.lua
+  eq(Meta.MAX_LEVEL, 25)
+  local T = { 0, 100, 200, 300, 400, 500, 650 }
   for i = 1, 7 do eq(Meta.XP_LEVELS[i], T[i], "seuil " .. i) end
+  eq(Meta.XP_LEVELS[25], 4650)
   eq(Meta.classLevel(0), 1); eq(Meta.classLevel(99), 1); eq(Meta.classLevel(100), 2)
-  eq(Meta.classLevel(1399), 6); eq(Meta.classLevel(1400), 7); eq(Meta.classLevel(99999), 7)
+  eq(Meta.classLevel(1399), 11); eq(Meta.classLevel(1400), 12); eq(Meta.classLevel(99999), 25)
   local lv, cur, size = Meta.xpProgress(120)
-  eq(lv, 2); eq(cur, 20); eq(size, 150)
-  lv, cur, size = Meta.xpProgress(1500)
-  eq(lv, 7); eq(cur, 100); eq(size, nil)
+  eq(lv, 2); eq(cur, 20); eq(size, 100)
+  lv, cur, size = Meta.xpProgress(4700)
+  eq(lv, 25); eq(cur, 50); eq(size, nil)
   local function xpOf(result, key, cleared, elites, bosses)
     local e = newExp({ key = key })
     e.stats.cleared, e.stats.elites, e.stats.bosses, e.result = cleared, elites, bosses, result
@@ -536,26 +542,27 @@ test("montée de niveau : résumé, ce qui vient d'être débloqué, expédition
   local before = X.cardPool(exp)
   eq(#before, 18)
   -- le compte gagne des niveaux pendant l'expédition : elle garde ses déblocages de départ
-  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[4] - 5
+  local CL = Meta.CONTENT_LEVELS
+  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[CL[4]] - 5
   eq(exp.unlock.level, 1)
   eq(#X.cardPool(exp), 18, "expédition figée")
   exp.stats.cleared, exp.stats.elites, exp.stats.bosses = 8, 1, 1
   exp.result, exp.phase = "won", "done"
   local s = Save.finish(db, "x")
-  eq(s.levelBefore, 3); eq(s.levelAfter, 4)
+  eq(s.levelBefore, CL[4] - 1); eq(s.levelAfter, CL[4]); eq(s.pointsGained, 1)
   eq(db.journal[1].xp, s.xp)
   table.sort(s.unlocked.cards)
   eq(table.concat(s.unlocked.cards, ","), "halo,luminous_barrier,sw_death")
   eq(#s.unlocked.relics, 0)
   -- deux niveaux d'un coup : cartes du 6 et bibelot du 5
-  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[5] - 1
+  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[CL[5]] - 1
   local e2 = assert(Save.start(db, { seed = 5, class = "priest" }))
   eq(e2.unlock.level, 4)
-  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[6] - 2
+  Meta.classState(db.meta, "priest").xp = Meta.XP_LEVELS[CL[6]] - 2
   e2.stats.cleared, e2.stats.bosses = 8, 1
   e2.result, e2.phase = "won", "done"
   local s2 = Save.finish(db, "y")
-  eq(s2.levelBefore, 5); eq(s2.levelAfter, 6)
+  eq(s2.levelBefore, CL[6] - 1); eq(s2.levelAfter, CL[6])
   table.sort(s2.unlocked.cards)
   eq(table.concat(s2.unlocked.cards, ","), "empyreal_blaze,psychic_scream,shadow_mend")
   -- sans montée : rien de débloqué
@@ -1341,7 +1348,7 @@ test("sauvegarde v2 -> v4 : Démence du combat en cours devenue ressource de cla
   local v2 = { version = 2, meta = { league = 10, runs = 1, classes = { priest = { rep = 10, runs = 1, wins = 0,
     keyMax = 0, bestKey = -1 } }, flags = {} }, current = cur, journal = {} }
   local db, note = Save.migrate(reload(v2))
-  eq(note, "migrated"); eq(db.version, 7); eq(Save.VERSION, 7); eq(X.VERSION, 9)
+  eq(note, "migrated"); eq(db.version, 8); eq(Save.VERSION, 8); eq(X.VERSION, 9)
   local m = db.current
   assert(m, "expédition gardée")
   eq(m.version, X.VERSION); eq(m.zone, "westfall"); eq(m.combat.player.res, 3); eq(m.combat.player.demence, nil)
@@ -1391,8 +1398,8 @@ test("sauvegarde v3 -> v5 : réputation de classe convertie en expérience, exp�
   local m = db.current
   assert(m, "expédition gardée")
   eq(m.version, X.VERSION); eq(m.unlock.rep, nil); eq(m.unlock.league, nil); eq(m.unlock.common, 1)
-  eq(m.unlock.level, Meta.classLevel(w.xp), "niveau de sa classe après migration")
-  eq(Meta.classLevel(w.xp), 4)
+  eq(m.unlock.level, Meta.contentTier(Meta.classLevel(w.xp)), "palier de contenu de sa classe après migration")
+  eq(Meta.classLevel(w.xp), 5); eq(m.unlock.level, 4)
   assert(Save.validate(db))
   assert(X.act(m, { "endTurn" }))
   -- migration idempotente ; une méta sans réputation reste à 0
@@ -2405,7 +2412,7 @@ do
       journal = { { result = "lost", class = "priest", zone = "westfall", deck = { { id = "smite", up = true },
         { id = "smite", up = false } } }, "bogus" } }
     local db, note = Save.migrate(reload(v6))
-    eq(note, "migrated"); eq(db.version, 7); eq(Save.VERSION, 7); eq(X.VERSION, 9)
+    eq(note, "migrated"); eq(db.version, 8); eq(Save.VERSION, 8); eq(X.VERSION, 9)
     local x = db.current
     assert(x, "expédition gardée")
     eq(x.version, 9)

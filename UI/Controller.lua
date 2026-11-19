@@ -816,12 +816,15 @@ local function progressStep()
   local cid = progressClass()
   local cd = ns.Classes[cid]
   local level = Meta.levelOf(db.meta, cid)
+  local tier = Meta.contentTier(level)
   local tab = C.ui.progressTab == "zones" and "zones" or "cards"
+  -- palier de contenu de la carte (champ level, 1 à 7), ouvert au niveau de classe Meta.CONTENT_LEVELS[palier]
   local function entry(id, def)
     local lv = Meta.unlockLevel(def)
-    local open = lv <= level
-    return { id = open and id or nil, level = lv, unlocked = open,
-      condition = not open and ((cd.name or cid) .. " level " .. lv) or nil }
+    local open = lv <= tier
+    local need = Meta.CONTENT_LEVELS[lv] or lv
+    return { id = open and id or nil, level = need, unlocked = open,
+      condition = not open and ((cd.name or cid) .. " level " .. need) or nil }
   end
   local content = Meta.classContent(cid)
   local rows = { { id = "start", name = "Start", cards = {} } }

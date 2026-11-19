@@ -668,10 +668,10 @@ return function(T)
   -- Titre, Rallying Cry, Westfall
   ---------------------------------------------------------------------------
 
-  test("Dragonslayer (Nefarian vaincu avec la classe), Veteran au niveau 7, Rallying Cry (+6 PV max, une fois)", function()
+  test("Dragonslayer (Nefarian vaincu avec la classe), Veteran au niveau 25, Rallying Cry (+6 PV max, une fois)", function()
     local meta = Meta.new()
     eq(BR.title(meta, "priest"), nil)
-    Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[7]
+    Meta.classState(meta, "priest").xp = Meta.XP_LEVELS[Meta.MAX_LEVEL]
     eq(BR.title(meta, "priest"), "Veteran")
     local exp = bexp({ class = "priest" })
     X.fire(exp, "onCombatWon", "elite")

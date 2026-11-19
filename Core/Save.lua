@@ -18,8 +18,10 @@ ns.Save = Save
 -- gagne) sans changement de la méta : Save.VERSION reste 5, l'expédition en cours passe par EXP_MIGRATIONS[5]
 -- puis [6]. 6 : une expédition traverse toute la campagne (clé par classe cs.keyMax / cs.bestKey, zone la plus
 -- loin atteinte cs.farthest ; expédition version 8). 7 : paliers d'amélioration (une carte jusqu'à +3 ; up
--- d'une carte du journal : true devient 1 ; expédition version 9).
-Save.VERSION = 7
+-- d'une carte du journal : true devient 1 ; expédition version 9). 8 : 25 niveaux de classe et arbres de talents
+-- (cs.talents, cs.spec ; titre « Veteran » gardé par cs.veteran ; docs/talents.md, § 13) ; l'expédition en cours
+-- ne change pas de version (exp.unlock.level reste un palier de contenu, exp.unlock.talents absent = aucun talent).
+Save.VERSION = 8
 
 function Save.new()
   return { version = Save.VERSION, meta = ns.Meta.new(), current = nil, journal = {}, quarantine = {} }
@@ -55,6 +57,14 @@ function Save.normalize(db)
         cs.bestKey = tonumber(cs.bestKey) or -1
         cs.farthest = tonumber(cs.farthest) or 0
       end
+      -- arbre de talents (v8) : rangs entiers positifs seulement ; voie du nœud Specialization (chaîne)
+      if type(cs.talents) ~= "table" then cs.talents = {} end
+      for id, r in pairs(cs.talents) do
+        r = tonumber(r)
+        cs.talents[id] = (type(id) == "string" and r and r >= 1) and math.floor(r) or nil
+      end
+      if type(cs.spec) ~= "string" then cs.spec = nil end
+      if cs.veteran ~= true then cs.veteran = nil end
       if type(cs.zones) ~= "table" then cs.zones = {} end
       for zone, zs in pairs(cs.zones) do
         if type(zs) ~= "table" then
@@ -181,6 +191,21 @@ Save.MIGRATIONS[6] = function(db)
   end
 end
 
+-- 7 -> 8 : 25 niveaux et arbres de talents (docs/talents.md, § 13). L'expérience est gardée telle quelle, le
+-- niveau en découle (table plus longue) ; aucune carte ni aucun bibelot perdu (chaque palier de contenu s'ouvre au
+-- même seuil d'expérience ou plus tôt, Meta.CONTENT_LEVELS) ; arbre vide, tous les points à dépenser. Une classe
+-- qui avait le titre « Veteran » (niveau 7 : 1 400 d'expérience) le garde (cs.veteran).
+Save.OLD_VETERAN_XP = 1400
+Save.MIGRATIONS[7] = function(db)
+  Save.normalize(db)
+  for _, cs in pairs(db.meta.classes) do
+    if type(cs) == "table" then
+      if (tonumber(cs.xp) or 0) >= Save.OLD_VETERAN_XP then cs.veteran = true end
+      cs.talents = cs.talents or {}
+    end
+  end
+end
+
 -- Migrations de l'état d'une expédition en cours : EXP_MIGRATIONS[v](exp, db) de v à v + 1.
 Save.EXP_MIGRATIONS = {}
 
@@ -216,7 +241,9 @@ end
 Save.EXP_MIGRATIONS[3] = function(exp, db)
   if type(exp.unlock) ~= "table" then exp.unlock = {} end
   if exp.unlock.level == nil then
-    exp.unlock.level = (db and type(db.meta) == "table") and ns.Meta.levelOf(db.meta, exp.class or "priest") or 1
+    -- palier de contenu de la classe après la migration de la méta (niveau 1 à 7 avant les 25 niveaux)
+    exp.unlock.level = (db and type(db.meta) == "table")
+      and ns.Meta.contentTier(ns.Meta.levelOf(db.meta, exp.class or "priest")) or 1
   end
   exp.unlock.league = tonumber(exp.unlock.league) or 0
   exp.unlock.rep = nil
@@ -386,7 +413,7 @@ function Save.validateExpedition(exp)
   if exp.phase == "reward" and type(exp.reward) ~= "table" then return false, "missing reward" end
   if exp.phase == "merchant" and type(exp.shop) ~= "table" then return false, "missing merchant" end
   if exp.phase == "event" and type(exp.event) ~= "table" then return false, "missing encounter" end
-  if exp.phase == "start" and type(exp.startRelics) ~= "table" then
+  if exp.phase == "start" and type(exp.startRelics) ~= "table" and type(exp.talentEpics) ~= "table" then
     return false, "missing start choice"
   end
   if exp.phase == "transit" and type(exp.transit) ~= "table" then return false, "missing zone change" end
@@ -438,6 +465,19 @@ function Save.start(db, opts)
   if not exp then return nil, why end
   db.current = exp
   return exp
+end
+
+-- Talents (docs/talents.md) : apprendre un rang (choice : voie du nœud Specialization) ou rembourser tout
+-- l'arbre d'une classe, hors expédition seulement (comme Save.start : nil, "running" tant qu'une expédition est
+-- en cours). Renvoie true (learn) ou les points rendus (reset), sinon nil et la raison (Meta.learn).
+function Save.learnTalent(db, class, node, choice)
+  if db.current then return nil, "running" end
+  return ns.Meta.learn(db.meta, class, node, choice)
+end
+
+function Save.resetTalents(db, class)
+  if db.current then return nil, "running" end
+  return ns.Meta.reset(db.meta, class)
 end
 
 -- Archive l'expédition terminée (phase « done ») et applique la méta-progression.

@@ -24,7 +24,7 @@ local function body(T)
     local zs = ns.Meta.zoneState(meta, "priest", z)
     zs.won, zs.keyMax, zs.bestKey = true, 5, 5
   end
-  ns.Meta.classState(meta, "priest").xp = ns.Meta.XP_LEVELS[7]
+  ns.Meta.classState(meta, "priest").xp = ns.Meta.XP_LEVELS[ns.Meta.MAX_LEVEL]
   meta.flags["dragonslayer:priest"] = true
   H.slash("")
   clickOption("class:priest")

@@ -19,17 +19,35 @@ local Meta = {}
 ns.Meta = Meta
 
 ---------------------------------------------------------------------------
--- Niveau de classe (1 à 7) : expérience propre à chaque classe
+-- Niveau de classe (1 à 25) : expérience propre à chaque classe
 ---------------------------------------------------------------------------
--- Seuils cumulés : XP_LEVELS[n] = expérience pour atteindre le niveau n.
-Meta.XP_LEVELS = { 0, 100, 250, 450, 700, 1000, 1400 }
+-- Seuils cumulés : XP_LEVELS[n] = expérience pour atteindre le niveau n (docs/talents.md, § 1.2 : 100 par niveau
+-- jusqu'au 6, 150 jusqu'au 16, 250 jusqu'au 21, 350 jusqu'au 25). Chaque niveau à partir du 2 donne un point de
+-- talent (Meta.talentPoints : niveau − 1, 24 au niveau 25 = l'arbre entier). Au-delà du niveau 25, l'expérience
+-- est comptée sans rien donner.
+Meta.XP_LEVELS = { 0, 100, 200, 300, 400, 500, 650, 800, 950, 1100, 1250, 1400, 1550,
+  1700, 1850, 2000, 2250, 2500, 2750, 3000, 3250, 3600, 3950, 4300, 4650 }
 Meta.MAX_LEVEL = #Meta.XP_LEVELS
+
+-- Paliers de contenu (champ level des cartes et bibelots de classe, 1 à 7, inchangé) : CONTENT_LEVELS[n] = niveau
+-- de classe qui ouvre le palier n (docs/talents.md, § 1.3 : même seuil d'expérience qu'avant les 25 niveaux, ou
+-- plus tôt). exp.unlock.level, Meta.allUnlocked(level) et le paramètre de simulation level= sont des paliers.
+Meta.CONTENT_LEVELS = { 1, 2, 3, 5, 7, 9, 11 }
+Meta.MAX_TIER = #Meta.CONTENT_LEVELS
+
+-- Palier de contenu ouvert au niveau de classe lv (1 à Meta.MAX_TIER).
+function Meta.contentTier(lv)
+  local t = 1
+  for i = 2, Meta.MAX_TIER do
+    if (lv or 1) >= Meta.CONTENT_LEVELS[i] then t = i end
+  end
+  return t
+end
 
 -- Expérience d'une expédition terminée (gagnée, perdue ou abandonnée), tirée de son avancée :
 -- step par étape franchie (boss compris), elite par élite, boss par boss, win si elle est gagnée, le tout
--- × (1 + key × clé), arrondi. Mêmes gains qu'avec l'ancienne réputation de Ligue (la moitié de 10 / 12 / 30
--- par étape / élite / boss, + 15) : ≈ 76 pour une victoire à la clé 0, ≈ 40 pour une défaite au boss ;
--- niveau 2 vers la 2e expédition, niveau 7 vers la 20e (docs/expedition.md). Clé : +15 % par niveau.
+-- × (1 + key × clé), arrondi : ≈ 76 pour une Westfall gagnée à la clé 0 avec une élite, ≈ 440 pour une
+-- campagne gagnée ; rythme des 25 niveaux : docs/talents.md, § 1.2. Clé : +15 % par niveau.
 Meta.XP = { step = 5, elite = 6, boss = 15, win = 15, key = 0.15 }
 
 function Meta.classLevel(xp)
@@ -56,13 +74,14 @@ function Meta.levelOf(meta, class)
   return Meta.classLevel(cs and cs.xp or 0)
 end
 
--- Niveau qui débloque une carte ou un bibelot de classe (absent = 1).
+-- Palier de contenu d'une carte ou d'un bibelot de classe (champ level, absent = 1) ; niveau de classe qui
+-- l'ouvre : Meta.CONTENT_LEVELS[palier].
 function Meta.unlockLevel(def)
   return (def and def.level) or 1
 end
 
 -- Contenu d'une classe : { cards = { ids }, relics = { ids } } (cartes de départ comprises), triés par
--- niveau, rareté, coût puis nom ; level = n : seulement ce qui se débloque au niveau n.
+-- palier, rareté, coût puis nom ; level = n : seulement ce qui se débloque au palier de contenu n (1 à 7).
 local RARITY_ORDER = { basic = 0, common = 1, uncommon = 2, rare = 3, epic = 4, boss = 5 }
 Meta.RARITY_ORDER = RARITY_ORDER
 local function contentSort(reg)
@@ -219,7 +238,7 @@ end
 function Meta.classState(meta, class)
   local cs = meta.classes[class]
   if not cs then
-    cs = { xp = 0, runs = 0, wins = 0, keyMax = 0, bestKey = -1, farthest = 0, zones = {} }
+    cs = { xp = 0, runs = 0, wins = 0, keyMax = 0, bestKey = -1, farthest = 0, zones = {}, talents = {} }
     meta.classes[class] = cs
   end
   if type(cs.zones) ~= "table" then cs.zones = {} end
@@ -316,24 +335,32 @@ function Meta.bestKey(meta, class, zone)
   return cs and tonumber(cs.bestKey) or -1
 end
 
--- Déblocages d'une classe : { level = niveau de classe 1..7, common = palier commun 0..7,
---   won = { [zone] = meilleure clé gagnée } (zones gagnées par la classe : cartes de zone, bibelots de clé) }.
+-- Déblocages d'une classe : { level = palier de contenu 1..7 (Meta.contentTier du niveau de classe), common =
+--   palier commun 0..7, won = { [zone] = meilleure clé gagnée } (zones gagnées par la classe : cartes de zone,
+--   bibelots de clé), talents = { [nœud] = rang } (copie de l'arbre de la classe, cs.talents), spec = voie du
+--   nœud Specialization (cs.spec, nil sans) }.
 function Meta.unlocks(meta, class)
   local won = {}
   local cs = meta.classes[class]
   for zone, zs in pairs(cs and type(cs.zones) == "table" and cs.zones or {}) do
     if type(zs) == "table" and zs.won then won[zone] = zs.bestKey or 0 end
   end
-  return { level = Meta.levelOf(meta, class), common = Meta.commonTier(meta), won = won }
+  local talents = {}
+  for id, r in pairs(cs and type(cs.talents) == "table" and cs.talents or {}) do
+    if type(r) == "number" and r > 0 then talents[id] = r end
+  end
+  return { level = Meta.contentTier(Meta.levelOf(meta, class)), common = Meta.commonTier(meta), won = won,
+    talents = talents, spec = cs and cs.spec or nil }
 end
 
 -- Déblocages de simulation : le compte et la classe ont gagné les `zones` premières zones (défaut :
--- toutes), à toutes les clés ; level = niveau de classe (défaut 7).
+-- toutes), à toutes les clés ; level = palier de contenu (défaut Meta.MAX_TIER = 7 : tout le contenu) ; aucun
+-- talent (la simulation les pose : tree=, talents=).
 function Meta.allUnlocked(level, zones)
   zones = zones or ns.Zone.count()
   local won = {}
   for i = 1, zones do won[ns.Zone.ORDER[i]] = Meta.MAX_KEY end
-  return { level = level or Meta.MAX_LEVEL, common = zones, won = won }
+  return { level = level or Meta.MAX_TIER, common = zones, won = won }
 end
 
 -- Classe au niveau maximal (liseré doré, titre).
@@ -341,12 +368,64 @@ function Meta.isMaxLevel(meta, class)
   return Meta.levelOf(meta, class) >= Meta.MAX_LEVEL
 end
 
--- Titre cosmétique du niveau 7 (« Veteran », docs/expedition.md, « Niveau de classe »). « Dragonslayer »
--- se gagne contre Nefarian (ns.Blackrock.title, qui retombe sur celui-ci) : c'est ns.Blackrock.title que
--- l'interface affiche (accueil, Progress, journal).
+-- Titre cosmétique du niveau 25 (« Veteran », docs/talents.md, § 1.3) ; gardé acquis par un joueur qui l'avait
+-- au niveau 7 avant les 25 niveaux (cs.veteran, posé par la migration 7 -> 8). « Dragonslayer » se gagne contre
+-- Nefarian (ns.Blackrock.title, qui retombe sur celui-ci) : c'est ns.Blackrock.title que l'interface affiche
+-- (accueil, Progress, journal).
 function Meta.title(meta, class)
-  if Meta.isMaxLevel(meta, class) then return "Veteran" end
+  local cs = meta.classes[class]
+  if Meta.isMaxLevel(meta, class) or (cs and cs.veteran == true) then return "Veteran" end
   return nil
+end
+
+---------------------------------------------------------------------------
+-- Points de talent (docs/talents.md ; règles de l'arbre : Core/Talents.lua)
+---------------------------------------------------------------------------
+-- cs.talents = { [nœud] = rang }, cs.spec = voie choisie au nœud Specialization. Dépenser (Meta.learn) et
+-- rembourser (Meta.reset) se font hors expédition : Save.learnTalent / Save.resetTalents refusent ("running")
+-- tant qu'une expédition est en cours (comme Save.start), l'expédition copie l'arbre à son départ (Meta.unlocks).
+
+-- Points gagnés par la classe : niveau − 1 (0 au niveau 1, 24 au niveau 25).
+function Meta.talentPoints(meta, class)
+  return Meta.levelOf(meta, class) - 1
+end
+
+-- Points dépensés dans l'arbre de la classe.
+function Meta.spent(meta, class)
+  local cs = meta.classes[class]
+  return ns.Talent.spentIn(cs and cs.talents)
+end
+
+-- Points restant à dépenser.
+function Meta.pointsLeft(meta, class)
+  return Meta.talentPoints(meta, class) - Meta.spent(meta, class)
+end
+
+-- Apprend un rang du nœud `node` (choice : voie du nœud Specialization ; un nœud Specialization déjà appris change
+-- de voie sans coût). Renvoie true, ou nil et la raison (ns.Talent.canLearn : "unknown", "points", "row",
+-- "max", "choice").
+function Meta.learn(meta, class, node, choice)
+  local cs = Meta.classState(meta, class)
+  if type(cs.talents) ~= "table" then cs.talents = {} end
+  local ok, why = ns.Talent.canLearn(class, cs.talents, node, choice, Meta.talentPoints(meta, class), cs.spec)
+  if not ok then return nil, why end
+  local n = ns.Talent.node(class, node)
+  if n.choices and (cs.talents[node] or 0) >= 1 then
+    cs.spec = choice
+    return true
+  end
+  cs.talents[node] = (cs.talents[node] or 0) + 1
+  if n.choices then cs.spec = choice end
+  return true
+end
+
+-- Rembourse tout l'arbre de la classe (gratuit). Renvoie les points rendus.
+function Meta.reset(meta, class)
+  local cs = Meta.classState(meta, class)
+  local n = ns.Talent.spentIn(cs.talents)
+  cs.talents = {}
+  cs.spec = nil
+  return n
 end
 
 ---------------------------------------------------------------------------
@@ -524,8 +603,9 @@ end
 
 -- Applique le résultat d'une expédition terminée au compte (après Meta.bank : ce qu'elle a acquis à chaque boss
 -- est déjà reporté). Renvoie un résumé de TOUTE l'expédition :
--- { xp (classe, total de l'expédition), levelBefore (avant l'expédition), levelAfter, unlocked = { cards = {ids},
---   relics = {ids} } (ce que la montée de niveau vient de débloquer), zone (zone atteinte), beaten = {zones},
+-- { xp (classe, total de l'expédition), levelBefore (avant l'expédition), levelAfter, pointsGained (points de
+--   talent gagnés : un par niveau), unlocked = { cards = {ids}, relics = {ids} } (ce que la montée de niveau vient
+--   de débloquer : paliers de contenu franchis), zone (zone atteinte), beaten = {zones},
 --   zones = { { zone, zoneWon (premier boss de la zone battu par la classe), zoneCards = {ids} (épiques
 --     débloquées), keyRelics = {ids}, accountZone, common = Meta.commonContent(ordre) (si accountZone) } }
 --     (un par boss battu, dans l'ordre), zoneCards et keyRelics (toutes zones, à plat),
@@ -565,8 +645,10 @@ function Meta.record(meta, exp)
     end
   end
   summary.levelAfter = Meta.classLevel(cs.xp)
+  -- un point de talent par niveau gagné ; le contenu suit les paliers (Meta.contentTier)
+  summary.pointsGained = summary.levelAfter - before
   local unlocked = { cards = {}, relics = {} }
-  for lv = before + 1, summary.levelAfter do
+  for lv = Meta.contentTier(before) + 1, Meta.contentTier(summary.levelAfter) do
     local got = Meta.classContent(exp.class, lv)
     for _, id in ipairs(got.cards) do unlocked.cards[#unlocked.cards + 1] = id end
     for _, id in ipairs(got.relics) do unlocked.relics[#unlocked.relics + 1] = id end
