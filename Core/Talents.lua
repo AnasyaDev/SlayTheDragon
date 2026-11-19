@@ -257,13 +257,14 @@ end
 
 -- Constante de classe changée par les talents du combat (docs/talents.md, « Contrat ») : v = valeur du module
 -- (ns.Druid.TAX_FREE…, lue à chaque appel : tune= de la simulation reste valable), puis chaque talent appris qui
--- déclare const[name] = f(v, src) -> nouvelle valeur, dans l'ordre de l'arbre. Sans talent : v tel quel.
+-- déclare const[name] = f(v, src, c) -> nouvelle valeur (c : le combat, quand Combat.const le donne), dans l'ordre
+-- de l'arbre. Sans talent : v tel quel.
 -- Appelée par Combat.const (le code de classe lit Combat.const(c, "TAX_FREE", Druid.TAX_FREE)).
-function Talent.const(class, list, name, v)
+function Talent.const(class, list, name, v, c)
   for i = 1, #list do
     local p = Talent.part(class, list[i])
     local f = p and p.const and p.const[name]
-    if f then v = f(v, list[i]) end
+    if f then v = f(v, list[i], c) end
   end
   return v
 end

@@ -9,9 +9,9 @@ local TC = ns.TalentCommon
 local floor, min, max = math.floor, math.min, math.max
 
 local WT = {
-  hp = 4,              -- Toughness : PV max par rang
+  hp = TC.toughnessHp("warrior"), -- Toughness : PV max par rang (règle commune, ns.TalentCommon)
   ready = 1,           -- Battle Ready : Rage au début de chaque combat, par rang
-  windDiv = { 5, 4 },  -- Second Wind : soin de 1 par windDiv[rang] Rage restante après un combat gagné
+  windDiv = { 5, 4, 3 }, -- Second Wind : soin de 1 par windDiv[rang] Rage restante après un combat gagné
   wrath = 1,           -- Unbridled Wrath : plafond de Rage, par rang
   shieldDiv = { 5, 4 }, -- Anger Shield : 1 Absorb par shieldDiv[rang] Rage à la fin du tour
   sunder = 0.25,       -- Specialization Arms : Sundered +25 % de plus (× 1,5 au lieu de × 1,25)
@@ -20,7 +20,7 @@ local WT = {
   protBonus = 2,       -- Specialization Protection : Absorb de plus par carte qui en donne
   carry = 2,           -- Tactical Mastery : Rage gardée d'un combat au suivant, par rang
   drink = 1,           -- Blood Drinker : soin à chaque dépense de Rage (rang 1 : Spend payé ; rang 2 : Surge aussi)
-  rampageAt = 5,       -- Rampage : Rage au début du tour pour +1 mana (rang 2 : et une carte)
+  rampageAt = 6,       -- Rampage : Rage au début du tour pour +1 mana (5, et deux rangs, avant le recalage)
   saveRage = 5,        -- Unyielding : Rage donnée en évitant la mort
   saveAbsorb = 15,     --   rang 2 : Absorb donnée
 }
@@ -44,9 +44,10 @@ local nodes = {
       end,
     } },
   -- (soin hors combat, après que l'expédition a repris les PV du combat ; crochet healOut compris)
-  { id = "second_wind", row = 1, ranks = 2, name = "Second Wind", icon = "ability_warrior_renewedvigor",
+  { id = "second_wind", row = 1, ranks = 3, name = "Second Wind", icon = "ability_warrior_renewedvigor",
     text = { ("After a combat won: heal 1 %s you have."):format(perRage(WT.windDiv[1])),
-      ("After a combat won: heal 1 %s you have."):format(perRage(WT.windDiv[2])) },
+      ("After a combat won: heal 1 %s you have."):format(perRage(WT.windDiv[2])),
+      ("After a combat won: heal 1 %s you have."):format(perRage(WT.windDiv[3])) },
     run = {
       onCombatWon = function(exp, src, kind, fight, c)
         local n = c and windHeal(rage(c), src.rank) or 0
@@ -54,11 +55,12 @@ local nodes = {
       end,
     },
     bot = { won = function(c, src) return min(windHeal(rage(c), src.rank), c.player.maxHp - c.player.hp) end } },
-
-  -- Rangée 2 (5 points) -----------------------------------------------------------------------------------------
-  { id = "unbridled_wrath", row = 2, ranks = 2, name = "Unbridled Wrath", icon = "ability_warrior_endlessrage",
+  -- (rangée 2 avant le recalage du 19/11/2026 : seul, il ne vaut presque rien, il ouvre la rangée 2)
+  { id = "unbridled_wrath", row = 1, ranks = 2, name = "Unbridled Wrath", icon = "ability_warrior_endlessrage",
     text = { ("Rage cap +%d."):format(WT.wrath), ("Rage cap +%d."):format(2 * WT.wrath) },
     hooks = { resCap = function(c, src, v) return v + WT.wrath * src.rank end } },
+
+  -- Rangée 2 (5 points) -----------------------------------------------------------------------------------------
   { id = "anger_shield", row = 2, ranks = 2, name = "Anger Shield", icon = "ability_warrior_defensivestance",
     text = { ("End of turn: gain 1 Absorb %s."):format(perRage(WT.shieldDiv[1])),
       ("End of turn: gain 1 Absorb %s."):format(perRage(WT.shieldDiv[2])) },
@@ -133,22 +135,18 @@ local nodes = {
   TC.fieldMedic({ row = 3 }),
 
   -- Rangée 4 (16 points) ----------------------------------------------------------------------------------------
-  { id = "rampage", row = 4, ranks = 2, name = "Rampage", icon = "ability_warrior_unrelentingassault",
-    text = { ("Start of turn with %d Rage or more: +1 mana."):format(WT.rampageAt),
-      ("Start of turn with %d Rage or more: +1 mana and draw 1."):format(WT.rampageAt) },
+  -- (deux rangs, à 5 Rage, et une carte au rang 2, avant le recalage du 19/11/2026)
+  { id = "rampage", row = 4, ranks = 1, name = "Rampage", icon = "ability_warrior_unrelentingassault",
+    text = { ("Start of turn with %d Rage or more: +1 mana."):format(WT.rampageAt) },
     hooks = {
       maxMana = function(c, src, v)
         if rage(c) >= WT.rampageAt then return v + 1 end
         return v
       end,
-      drawPerTurn = function(c, src, v)
-        if src.rank >= 2 and rage(c) >= WT.rampageAt then return v + 1 end
-        return v
-      end,
     },
-    -- (bots : finir le tour à 5 Rage vaut un mana au tour suivant, et une carte au rang 2)
+    -- (bots : finir le tour à rampageAt Rage vaut un mana au tour suivant)
     bot = { value = function(c, src, W)
-      if rage(c) >= WT.rampageAt then return 25 + (src.rank >= 2 and 15 or 0) end
+      if rage(c) >= WT.rampageAt then return 25 end
       return 0
     end } },
   TC.veteransArsenal({ row = 4 }),
@@ -176,10 +174,11 @@ ns.Talent.define("warrior", {
   -- Ordre de dépense du bot de simulation (tree=, un id par point ; docs/talents.md, § 6) et voie choisie.
   bot = {
     order = {
-      "toughness", "toughness", "toughness", "battle_ready", "battle_ready", "second_wind", "second_wind",
-      "anger_shield", "anger_shield", "unbridled_wrath", "unbridled_wrath", "provisions",
-      "specialization", "blood_drinker", "blood_drinker", "tactical_mastery", "tactical_mastery", "field_medic",
-      "rampage", "rampage", "veterans_arsenal", "veterans_arsenal", "unyielding", "unyielding",
+      "unbridled_wrath", "unbridled_wrath", "second_wind", "second_wind", "toughness",
+      "toughness", "toughness", "anger_shield", "anger_shield", "provisions",
+      "specialization", "blood_drinker", "blood_drinker", "tactical_mastery", "tactical_mastery",
+      "field_medic", "battle_ready", "battle_ready", "second_wind", "rampage",
+      "veterans_arsenal", "veterans_arsenal", "unyielding", "unyielding",
     },
     spec = "fury",
     -- accord des épiques avec l'arbre (note du bot, Sim/expedition.lua) : Thunderous Roar vide la Rage à 5 (que

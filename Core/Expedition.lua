@@ -214,7 +214,8 @@ end
 -- restFraction (v), restHeal (v), price (v, genre), removePrice (v : prix du retrait chez le marchand),
 -- rewardCards (v = 3, genre : cartes offertes par une récompense de combat), zoneHeal (v = X.ZONE_HEAL : part des
 -- PV max soignée au passage d'une zone), startMaxHp (v = PV de la classe), startGold (v = X.START_GOLD),
--- startEpics (v = 0 : épiques choisies au départ parmi celles des zones gagnées ; talents seulement, au départ).
+-- startEpics (v = 0 : épiques choisies au départ parmi celles des zones gagnées ; talents seulement, au départ),
+-- startEpicOffer (v = 0 : toutes les épiques proposables ; k > 0 : k tirées au hasard parmi elles).
 function X.modify(exp, name, v, a, b, d)
   local zr = zoneRuns(exp)
   if zr then
@@ -1626,12 +1627,16 @@ function X.new(opts)
       exp.phase = "start"
     end
   end
-  -- Épiques au départ (talent Veteran's Arsenal, crochet startEpics) : n choix successifs parmi toutes les épiques
-  -- de la classe proposables (zones gagnées par la classe, X.epicPool), avant le bibelot de départ ; aucun tirage.
+  -- Épiques au départ (talent Veteran's Arsenal, crochet startEpics) : n choix successifs parmi les épiques de la
+  -- classe proposables (zones gagnées par la classe, X.epicPool), avant le bibelot de départ ; crochet
+  -- startEpicOffer (v = 0 : toutes) : seulement k d'entre elles, tirées au départ (flux « talentEpic »).
   if exp.talents then
     local n = floor(X.modify(exp, "startEpics", 0))
-    if n > 0 and #X.epicPool(exp) > 0 then
-      exp.talentEpics = X.epicPool(exp)
+    local pool = X.epicPool(exp)
+    if n > 0 and #pool > 0 then
+      local k = floor(X.modify(exp, "startEpicOffer", 0))
+      if k > 0 then pool = drawEpics(Rng.stream(seed, "talentEpic"), pool, k) end
+      exp.talentEpics = pool
       exp.talentEpicsLeft = n
       exp.phase = "start"
     end

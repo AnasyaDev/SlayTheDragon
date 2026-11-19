@@ -9,25 +9,40 @@ local TC = ns.TalentCommon
 local max = math.max
 
 local RT = {
-  hp = 2,              -- Toughness : PV max par rang
-  initiative = 1,      -- Initiative : Combo au début de chaque combat
-  initiativeBig = 2,   --   rang 2 : Combo au début d'un combat d'élite ou de boss
-  elusive = 1,         -- Elusiveness : Parry au début de chaque combat
+  hp = TC.toughnessHp("rogue"), -- Toughness : PV max par rang (règle commune, ns.TalentCommon)
+  initiative = { 1 },  -- Initiative : Combo au début d'un combat d'élite ou de boss (deux rangs, +1 / +2 à chaque
+                       --   combat, avant le recalage du 19/11/2026)
+  elusive = 1,         -- Elusiveness : Parry au début d'un combat d'élite ou de boss
   opportunity = 1,     -- Opportunity : dégâts de plus par coup d'une Attack jouée sous Stealth, par rang
   vile = 1,            -- Vile Poisons : DoT de plus à chaque DoT posé sur un ennemi
   reflexes = 1,        -- Lightning Reflexes : plafond de Parry +1
   readiness = 1,       -- Combat Readiness : dégâts arrêtés de plus par charge de Parry, par rang
   relentless = 1,      -- Relentless Strikes : Combo après un Surge…
-  relentlessAt = { 5, 1 }, --   … d'au moins relentlessAt[rang] Combo
+  relentlessAt = { 5, 4 }, --   … d'au moins relentlessAt[rang] Combo (1 : après chaque Surge)
   assassinDot = 1,     -- Specialization Assassination : DoT posé sur la cible par Combo dépensé
   combatCombo = 1,     -- Specialization Combat : Combo à chaque Parry
   subtletyDraw = 1,    -- Specialization Subtlety : cartes piochées quand une carte donne Stealth
   stratagem = 1,       -- Deeper Stratagem : plafond de Combo, par rang
-  fateParry = { 2, 3 }, -- Cheat Fate : Parry donné en évitant la mort (rang 2 : et Stealth)
+  fateParry = { 0, 2 }, -- Cheat Fate : Parry donné en évitant la mort, par rang (Parry 2 puis Parry 3 et
+                       --   Stealth avant le recalage du 19/11/2026)
 }
 ns.RogueTalents = RT
 
 local function plural(n, word) return n == 1 and word or (word .. "s") end
+-- Combat d'élite ou de boss (Elusiveness, Initiative ; recalage du 19/11/2026 : à chaque combat, ils valaient +10
+-- et +7 points dans l'arbre au palier 60 %).
+local function bigFight(c) return c.kind == "elite" or c.kind == "boss" end
+-- Texte de Cheat Fate au rang r.
+local function fateText(r)
+  local n = RT.fateParry[r]
+  if n <= 0 then return "Once per expedition, a hit that would kill you leaves you at 1 HP." end
+  return ("Once per expedition, a hit that would kill you leaves you at 1 HP with Parry %d."):format(n)
+end
+-- Texte de Relentless Strikes au rang r.
+local function relentlessText(r)
+  if RT.relentlessAt[r] <= 1 then return ("After each Surge: +%d Combo."):format(RT.relentless) end
+  return ("After a Surge of %d Combo or more: +%d Combo."):format(RT.relentlessAt[r], RT.relentless)
+end
 
 -- Coup d'une carte Attack jouée sous Stealth (elle a consommé Stealth, ou en a profité sous Subterfuge) : la
 -- carte en cours de résolution (c.cardCtx) est dans c.cls.openers (Core/Classes/rogue.lua).
@@ -41,6 +56,14 @@ end
 local nodes = {
   -- Rangée 1 (ouverte d'emblée) -----------------------------------------------------------------------------------
   TC.toughness({ row = 1, ranks = 3, hp = RT.hp }),
+  -- (rangée 3 et un rang avant le recalage du 19/11/2026)
+  { id = "lightning_reflexes", row = 1, ranks = 3, name = "Lightning Reflexes", icon = "spell_shadow_shadowward",
+    text = { ("Parry can hold %d more %s."):format(RT.reflexes, plural(RT.reflexes, "charge")),
+      ("Parry can hold %d more %s."):format(2 * RT.reflexes, plural(2 * RT.reflexes, "charge")),
+      ("Parry can hold %d more %s."):format(3 * RT.reflexes, plural(3 * RT.reflexes, "charge")) },
+    const = { PARRY_MAX = function(v, src) return v + RT.reflexes * src.rank end } },
+
+  -- (rangée 2 avant le recalage du 19/11/2026)
   { id = "opportunity", row = 1, ranks = 2, name = "Opportunity", icon = "ability_backstab",
     text = { ("Attacks played in Stealth deal %d more per hit."):format(RT.opportunity),
       ("Attacks played in Stealth deal %d more per hit."):format(2 * RT.opportunity) },
@@ -54,11 +77,13 @@ local nodes = {
     bot = { value = function(c, src, W)
       return (c.player.st.stealth or 0) * RT.opportunity * src.rank * W.enemyHp
     end } },
-  { id = "deeper_stratagem", row = 1, ranks = 2, name = "Deeper Stratagem", icon = "ability_rogue_eviscerate",
-    text = { ("Combo cap +%d."):format(RT.stratagem), ("Combo cap +%d."):format(2 * RT.stratagem) },
-    hooks = { resCap = function(c, src, v) return v + RT.stratagem * src.rank end } },
 
   -- Rangée 2 (5 points) -------------------------------------------------------------------------------------------
+  -- (rangée 1 et deux rangs avant le recalage du 19/11/2026)
+  { id = "deeper_stratagem", row = 2, ranks = 3, name = "Deeper Stratagem", icon = "ability_rogue_eviscerate",
+    text = { ("Combo cap +%d."):format(RT.stratagem), ("Combo cap +%d."):format(2 * RT.stratagem),
+      ("Combo cap +%d."):format(3 * RT.stratagem) },
+    hooks = { resCap = function(c, src, v) return v + RT.stratagem * src.rank end } },
   { id = "vile_poisons", row = 2, ranks = 1, name = "Vile Poisons", icon = "ability_rogue_dualweild",
     text = { ("Each time DoT is applied to an enemy, apply %d more."):format(RT.vile) },
     hooks = {
@@ -67,10 +92,9 @@ local nodes = {
         return n
       end,
     } },
-  { id = "combat_readiness", row = 2, ranks = 3, name = "Combat Readiness", icon = "ability_rogue_shadowstrikes",
-    text = { ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + RT.readiness),
-      ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + 2 * RT.readiness),
-      ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + 3 * RT.readiness) },
+  -- (trois rangs avant le recalage du 19/11/2026)
+  { id = "combat_readiness", row = 2, ranks = 1, name = "Combat Readiness", icon = "ability_rogue_shadowstrikes",
+    text = { ("Each Parry stops up to %d damage."):format(ns.Rogue.PARRY_STOP + RT.readiness) },
     const = { PARRY_STOP = function(v, src) return v + RT.readiness * src.rank end } },
   TC.provisions({ row = 2 }),
 
@@ -105,32 +129,25 @@ local nodes = {
         } },
     } },
   { id = "elusiveness", row = 3, ranks = 1, name = "Elusiveness", icon = "ability_rogue_feint",
-    text = { ("Start of combat: gain Parry %d."):format(RT.elusive) },
+    text = { ("Start of combat against elites and bosses: gain Parry %d."):format(RT.elusive) },
     hooks = {
       onCombatStart = function(c, src)
-        if not c.result then Combat.applyStatus(c, c.player, "parry", RT.elusive) end
+        if not c.result and bigFight(c) then Combat.applyStatus(c, c.player, "parry", RT.elusive) end
       end,
     } },
-  -- (rang 2 : plus de Combo contre les élites et les boss, c.kind)
-  { id = "initiative", row = 3, ranks = 2, name = "Initiative", icon = "ability_rogue_ambush",
-    text = { ("Start of combat: +%d Combo."):format(RT.initiative),
-      ("Start of combat: +%d Combo, +%d against elites and bosses."):format(RT.initiative, RT.initiativeBig) },
+  -- (contre les élites et les boss seulement, c.kind)
+  { id = "initiative", row = 3, ranks = 1, name = "Initiative", icon = "ability_rogue_ambush",
+    text = { ("Start of combat against elites and bosses: +%d Combo."):format(RT.initiative[1]) },
     hooks = {
       onCombatStart = function(c, src)
-        if c.result then return end
-        local big = src.rank >= 2 and (c.kind == "elite" or c.kind == "boss")
-        Combat.gainRes(c, big and RT.initiativeBig or RT.initiative, "talent")
+        if not c.result and bigFight(c) then Combat.gainRes(c, RT.initiative[src.rank], "talent") end
       end,
     } },
-  { id = "lightning_reflexes", row = 3, ranks = 1, name = "Lightning Reflexes", icon = "spell_shadow_shadowward",
-    text = { ("Parry can hold %d more %s."):format(RT.reflexes, plural(RT.reflexes, "charge")) },
-    const = { PARRY_MAX = function(v) return v + RT.reflexes end } },
   TC.fieldMedic({ row = 3 }),
 
   -- Rangée 4 (16 points) ------------------------------------------------------------------------------------------
   { id = "relentless_strikes", row = 4, ranks = 2, name = "Relentless Strikes", icon = "ability_rogue_slicedice",
-    text = { ("After a Surge of %d Combo or more: +%d Combo."):format(RT.relentlessAt[1], RT.relentless),
-      ("After each Surge: +%d Combo."):format(RT.relentless) },
+    text = { relentlessText(1), relentlessText(2) },
     hooks = {
       onSurge = function(c, src, n)
         if not c.result and (n or 0) >= RT.relentlessAt[src.rank] then
@@ -141,17 +158,15 @@ local nodes = {
   TC.veteransArsenal({ row = 4 }),
   -- Une fois par expédition (exp.talentState.cheatFate, repris du combat par l'expédition).
   { id = "cheat_fate", row = 4, ranks = 2, name = "Cheat Fate", icon = "ability_rogue_cheatdeath",
-    text = { ("Once per expedition, a hit that would kill you leaves you at 1 HP with Parry %d."):format(RT.fateParry[1]),
-      ("Once per expedition, a hit that would kill you leaves you at 1 HP with Parry %d and Stealth.")
-        :format(RT.fateParry[2]) },
+    text = { fateText(1), fateText(2) },
     hooks = {
       preventDeath = function(c, src)
         local st = c.tstate
         if not st or st.cheatFate then return false end
         st.cheatFate = true
         c.player.hp = max(c.player.hp, 1) -- (journal : « saved », posé par Combat.kill)
-        Combat.applyStatus(c, c.player, "parry", RT.fateParry[src.rank])
-        if src.rank >= 2 then Combat.applyStatus(c, c.player, "stealth", 1) end
+        local n = RT.fateParry[src.rank]
+        if n > 0 then Combat.applyStatus(c, c.player, "parry", n) end
         return true
       end,
     } },
@@ -164,9 +179,9 @@ ns.Talent.define("rogue", {
   bot = {
     order = {
       "toughness", "toughness", "toughness", "opportunity", "opportunity",
-      "deeper_stratagem", "deeper_stratagem", "provisions", "combat_readiness", "combat_readiness",
-      "specialization", "elusiveness", "initiative", "initiative", "lightning_reflexes",
-      "vile_poisons", "combat_readiness", "field_medic", "relentless_strikes", "relentless_strikes",
+      "lightning_reflexes", "lightning_reflexes", "deeper_stratagem", "deeper_stratagem", "deeper_stratagem",
+      "provisions", "combat_readiness", "specialization", "vile_poisons", "lightning_reflexes",
+      "elusiveness", "initiative", "field_medic", "relentless_strikes", "relentless_strikes",
       "veterans_arsenal", "veterans_arsenal", "cheat_fate", "cheat_fate",
     },
     spec = "combat",

@@ -38,7 +38,7 @@ local function mcombat(map, spec, o)
     deck[#deck + 1] = { id = id, up = false }
   end
   local ts = map and entries(map, spec) or nil
-  return Combat.new({ seed = o.seed or 5, class = "mage", hp = o.hp or 40, maxHp = 40, deck = deck,
+  return Combat.new({ seed = o.seed or 5, class = "mage", hp = o.hp or 40, maxHp = 40, deck = deck, kind = o.kind,
     encounter = o.encounter or { "tmt_dummy" }, relics = o.relics, talents = ts and U.copy(ts) or nil,
     tstate = ts and (o.tstate or {}) or nil, quiet = true })
 end
@@ -83,15 +83,19 @@ test("arbre du Mage : 14 nœuds, 24 points, 4 rangées, un Specialization, ordre
   eq(#t.nodes, 14)
   local rows = { 0, 0, 0, 0 }
   for _, n in ipairs(t.nodes) do rows[n.row] = rows[n.row] + n.ranks end
-  eq(rows[1], 6); eq(rows[2], 4); eq(rows[3], 7); eq(rows[4], 7)
+  eq(rows[1], 7); eq(rows[2], 3); eq(rows[3], 6); eq(rows[4], 8)
   eq(t.rows[1], 0); eq(t.rows[2], 5); eq(t.rows[3], 10); eq(t.rows[4], 16)
   for _, id in ipairs({ "toughness", "provisions", "field_medic", "veterans_arsenal" }) do assert(t.byId[id], id) end
   eq(t.byId.toughness.text[3], ("+%d max HP."):format(3 * MT.hp))
-  eq(t.byId.arcane_focus.text[1], "Start of combat: +1 Charge.")
+  eq(t.byId.arcane_focus.text[1], "Start of combat against elites and bosses: +1 Charge.")
+  eq(t.byId.firestarter.text[1], "Start of combat against elites and bosses: gain Instant 1.")
   eq(t.byId.arcane_concentration.text[1], "After each Surge: +1 Charge.")
-  eq(t.byId.arcane_concentration.text[3], "After each Surge: +3 Charges.")
+  eq(t.byId.arcane_concentration.text[2], "After each Surge: +2 Charges.")
+  eq(t.byId.arcane_concentration.ranks, 2); eq(t.byId.winters_chill.ranks, 1); eq(t.byId.frost_warding.row, 1)
+  eq(t.byId.prismatic_cloak.text[2], ("When a Cast card resolves, gain %d Absorb."):format(2 * MT.cloak))
   eq(t.byId.arcane_mind.text[2], ("Charge cap +%d."):format(2 * MT.mind))
-  eq(t.byId.cauterize.text[1], "Once per expedition, a hit that would kill you leaves you at 1 HP with Ice Block.")
+  eq(t.byId.cauterize.text[1], "Once per expedition, a hit that would kill you leaves you at 1 HP.")
+  eq(t.byId.cauterize.text[3], ("Once per expedition, a hit that would kill you leaves you at %d HP."):format(MT.saveHp[3]))
   eq(#t.byId.specialization.choices, 3)
   -- textes : anglais simple, une phrase qui finit par un point ; icônes présentes
   for _, n in ipairs(t.nodes) do
@@ -110,14 +114,14 @@ end)
 
 test("tree= : paliers 20 / 40 / 60 % de l'ordre du bot", function()
   local m20 = Talent.fromShare("mage", 20)
-  eq(m20.toughness, 3); eq(m20.arcane_mind, 2); eq(Talent.spentIn(m20), 5)
+  eq(m20.toughness, 3); eq(m20.frost_warding, 1); eq(m20.arcane_mind, 1); eq(Talent.spentIn(m20), 5)
   local m40 = Talent.fromShare("mage", 40)
-  eq(m40.arcane_mind, 3); eq(m40.arcane_concentration, 3); eq(m40.provisions, 1); eq(Talent.spentIn(m40), 10)
+  eq(m40.arcane_mind, 3); eq(m40.arcane_concentration, 2); eq(m40.provisions, 1); eq(Talent.spentIn(m40), 10)
   eq(m40.arcane_focus, nil, "Arcane Focus : rangée 3")
   local map, spec, n = Talent.fromShare("mage", 60)
   eq(n, 15); eq(spec, "arcane"); eq(spec, ns.Talents.mage.bot.spec)
-  local want = { toughness = 3, arcane_mind = 3, arcane_concentration = 3, provisions = 1,
-    specialization = 1, winters_chill = 2, prismatic_cloak = 1, arcane_focus = 1 }
+  local want = { toughness = 3, frost_warding = 1, arcane_mind = 3, arcane_concentration = 2, provisions = 1,
+    specialization = 1, winters_chill = 1, prismatic_cloak = 2, field_medic = 1 }
   for id, r in pairs(want) do eq(map[id], r, id) end
   for id in pairs(map) do assert(want[id], "en trop : " .. id) end
   eq(Talent.spentIn((Talent.fromShare("mage", 100, "arcane"))), 24)
@@ -129,11 +133,11 @@ end)
 ---------------------------------------------------------------------------
 test("Toughness, Provisions, Field Medic : PV max, or de départ, passage de zone", function()
   local e = mexp({ toughness = 3, provisions = 1 })
-  eq(e.maxHp, MHP + 3 * MT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + 100)
+  eq(e.maxHp, MHP + 3 * MT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + ns.TalentCommon.PROVISIONS_GOLD)
   local z = mexp({ field_medic = 1 })
   z.hp = 1
   X.enterZone(z, "duskwood")
-  eq(z.transit.healed, math.floor(z.maxHp * 0.75))
+  eq(z.transit.healed, math.floor(z.maxHp * ns.TalentCommon.FIELD_MEDIC_HEAL))
 end)
 
 test("Veteran's Arsenal : une épique du Mage au choix au départ", function()
@@ -147,15 +151,18 @@ end)
 ---------------------------------------------------------------------------
 -- Nœuds du Mage
 ---------------------------------------------------------------------------
-test("Arcane Focus : +1 Charge au début du combat (avec Tome of Arcane Brilliance)", function()
+test("Arcane Focus : +1 Charge au début d'un combat d'élite ou de boss (avec Tome of Arcane Brilliance)", function()
   eq(mcombat(nil).player.res or 0, 0)
-  eq(mcombat({ arcane_focus = 1 }).player.res, MT.focus)
-  eq(mcombat({ arcane_focus = 1 }, nil, { relics = { "tome_arcane_brilliance" } }).player.res, MT.focus + 1)
+  eq(mcombat({ arcane_focus = 1 }).player.res or 0, 0, "combat normal : rien")
+  eq(mcombat({ arcane_focus = 1 }, nil, { kind = "elite" }).player.res, MT.focus)
+  eq(mcombat({ arcane_focus = 1 }, nil, { kind = "boss" }).player.res, MT.focus)
+  eq(mcombat({ arcane_focus = 1 }, nil, { relics = { "tome_arcane_brilliance" }, kind = "elite" }).player.res,
+    MT.focus + 1)
 end)
 
 test("Arcane Concentration : +1 Charge par rang après chaque Surge (après la remise à 0)", function()
   local barrage = ns.Cards.arcane_barrage
-  for r = 1, 3 do
+  for r = 1, ns.Talents.mage.byId.arcane_concentration.ranks do
     local c = mcombat({ arcane_concentration = r, arcane_mind = 2 }, nil, { deck = { "arcane_barrage",
       "arcane_barrage", "arcane_barrage", "arcane_barrage", "arcane_barrage" } })
     c.player.res = 4
@@ -170,7 +177,7 @@ test("Arcane Concentration : +1 Charge par rang après chaque Surge (après la r
   assert(Combat.play(plain, idx(plain, "arcane_barrage"), 1))
   eq(plain.player.res, 0)
   -- Surge sans Charge : injouable, rien gagné
-  local z = mcombat({ arcane_concentration = 3 }, nil, { deck = { "arcane_barrage", "arcane_barrage",
+  local z = mcombat({ arcane_concentration = 2 }, nil, { deck = { "arcane_barrage", "arcane_barrage",
     "arcane_barrage", "arcane_barrage", "arcane_barrage" } })
   assert(not Combat.play(z, idx(z, "arcane_barrage"), 1))
   eq(z.player.res or 0, 0)
@@ -193,7 +200,7 @@ end)
 
 test("Winter's Chill : +1 par rang à chaque coup d'Attack sur un ennemi Frozen", function()
   local bolt, shield = ns.Cards.frostbolt, ns.Cards.mana_shield
-  for r = 1, 2 do
+  for r = 1, 1 do
     local c = mcombat({ winters_chill = r })
     local e = c.enemies[1]
     eq(Combat.calcDamage(c, c.player, e, 6, bolt), 6, "pas Frozen")
@@ -205,12 +212,12 @@ test("Winter's Chill : +1 par rang à chaque coup d'Attack sur un ennemi Frozen"
     eq(Combat.calcDamage(c, c.player, e, 6, nil), 6, "coup sans carte")
   end
   -- Frostbolt joué : le coup lui-même ne profite pas du Demoralized qu'il pose
-  local c = mcombat({ winters_chill = 2 }, nil, { deck = { "frostbolt", "frostbolt", "frostbolt", "frostbolt",
+  local c = mcombat({ winters_chill = 1 }, nil, { deck = { "frostbolt", "frostbolt", "frostbolt", "frostbolt",
     "frostbolt" } })
   assert(Combat.play(c, idx(c, "frostbolt"), 1))
   eq(c.enemies[1].hp, 100 - 6)
   assert(Combat.play(c, idx(c, "frostbolt"), 1))
-  eq(c.enemies[1].hp, 100 - 6 - (6 + 2 * MT.chill))
+  eq(c.enemies[1].hp, 100 - 6 - (6 + MT.chill))
 end)
 
 test("Arcane Mind : plafond de Charges +1 par rang", function()
@@ -254,14 +261,14 @@ test("Prismatic Cloak : Absorb à chaque carte Cast résolue (incantée ou parti
   assert(Combat.play(i, idx(i, "fireball"), 1))
   eq(i.player.block, MT.cloak, "Instant")
   -- incantée : l'Absorb vient à la résolution, au début du tour suivant
-  local c = mcombat({ prismatic_cloak = 1 }, nil, { deck = { "fireball", "fireball", "fireball", "fireball",
+  local c = mcombat({ prismatic_cloak = 2 }, nil, { deck = { "fireball", "fireball", "fireball", "fireball",
     "fireball", "fireball", "fireball", "fireball", "fireball", "fireball" } })
   assert(Combat.play(c, idx(c, "fireball"), 1))
   eq(c.player.block, 0)
   local part = Talent.part("mage", c.talents[1])
   eq(part.bot.value(c, c.talents[1], { hp = 10 }), MT.cloak * 10 * 0.5, "bots : incantation tenue")
   nextTurn(c)
-  eq(c.player.block, MT.cloak, "résolue au début du tour")
+  eq(c.player.block, 2 * MT.cloak, "résolue au début du tour, rang 2")
   -- une carte qui n'est pas Cast : rien
   local m = mcombat({ prismatic_cloak = 1 }, nil, { deck = { "frostbolt", "frostbolt", "frostbolt", "frostbolt",
     "frostbolt" } })
@@ -269,10 +276,11 @@ test("Prismatic Cloak : Absorb à chaque carte Cast résolue (incantée ou parti
   eq(m.player.block, 0)
 end)
 
-test("Firestarter : Instant 1 au début du combat", function()
+test("Firestarter : Instant 1 au début d'un combat d'élite ou de boss", function()
   eq(mcombat(nil).player.st.instant, nil)
-  local c = mcombat({ firestarter = 1 }, nil, { deck = { "fireball", "fireball", "fireball", "fireball",
-    "fireball" } })
+  eq(mcombat({ firestarter = 1 }).player.st.instant, nil, "combat normal : rien")
+  local c = mcombat({ firestarter = 1 }, nil, { kind = "boss", deck = { "fireball", "fireball", "fireball",
+    "fireball", "fireball" } })
   eq(c.player.st.instant, MT.instant)
   assert(Combat.play(c, idx(c, "fireball"), 1))
   eq(c.enemies[1].hp, 100 - ns.Cards.fireball.effects[1][2], "Fireball partie tout de suite")
@@ -280,41 +288,35 @@ test("Firestarter : Instant 1 au début du combat", function()
   eq(c.player.st.instant, MT.instant > 1 and MT.instant - 1 or nil)
 end)
 
-test("Arcane Potency : à 4 Charges au début du tour, +1 mana (rang 2 : et une carte)", function()
-  local c = mcombat({ arcane_potency = 1 })
+test("Arcane Potency : à potencyAt (5) Charges au début du tour, +1 mana (rang 2 : et une carte)", function()
+  eq(MT.potencyAt, 5)
+  local c = mcombat({ arcane_potency = 1, arcane_mind = 1 })
   c.player.res = MT.potencyAt - 1
   eq(Combat.modify(c, "maxMana", 3), 3)
   c.player.res = MT.potencyAt
   eq(Combat.modify(c, "maxMana", 3), 4); eq(Combat.modify(c, "drawPerTurn", 5), 5)
   local deck = {}
   for i = 1, 14 do deck[i] = "frostbolt" end
-  local c2 = mcombat({ arcane_potency = 2 }, nil, { deck = deck })
+  local c2 = mcombat({ arcane_potency = 2, arcane_mind = 1 }, nil, { deck = deck })
   c2.player.res = MT.potencyAt
   nextTurn(c2)
   eq(c2.player.mana, 4); eq(#c2.hand, 6)
-  local p = Talent.part("mage", c2.talents[1])
-  eq(p.bot.value(c2, c2.talents[1], {}), 40)
+  local p = Talent.part("mage", c2.talents[#c2.talents])
+  eq(p.bot.value(c2, c2.talents[#c2.talents], {}), 40)
   c2.player.res = 0
-  eq(p.bot.value(c2, c2.talents[1], {}), 0)
+  eq(p.bot.value(c2, c2.talents[#c2.talents], {}), 0)
 end)
 
-test("Cauterize : une fois par expédition, 1 PV (rang 2 : 10) et Ice Block, gardé d'un combat à l'autre", function()
-  local c = mcombat({ cauterize = 2 }, nil, { encounter = { "tmt_hitter" } })
-  c.player.hp = 3
-  Combat.dealDamage(c, c.enemies[1], c.player, 50)
-  eq(c.result, nil); eq(c.player.hp, MT.saveHp[2]); eq(c.player.st.ice_block, 1)
-  eq(c.tstate.cauterize, true)
-  -- Ice Block : le coup ennemi suivant ne fait rien jusqu'au début du tour
-  local hp = c.player.hp
-  Combat.endPlayerTurn(c); Combat.enemyPhase(c)
-  eq(c.player.hp, hp, "Ice Block pendant le tour ennemi")
-  c.player.st.ice_block = nil
-  Combat.dealDamage(c, c.enemies[1], c.player, 50)
-  eq(c.result, "lost", "une seule fois")
-  local c1 = mcombat({ cauterize = 1 })
-  c1.player.hp = 2
-  Combat.loseHp(c1, 10, "test")
-  eq(c1.player.hp, MT.saveHp[1]); eq(c1.player.st.ice_block, 1)
+test("Cauterize : une fois par expédition, 1 / 3 / 5 PV selon le rang, sans Ice Block, gardé d'un combat à l'autre", function()
+  for r = 1, 3 do
+    local c = mcombat({ cauterize = r }, nil, { encounter = { "tmt_hitter" } })
+    c.player.hp = 3
+    Combat.dealDamage(c, c.enemies[1], c.player, 50)
+    eq(c.result, nil); eq(c.player.hp, MT.saveHp[r], "rang " .. r); eq(c.player.st.ice_block, nil)
+    eq(c.tstate.cauterize, true)
+    Combat.dealDamage(c, c.enemies[1], c.player, 50)
+    eq(c.result, "lost", "une seule fois")
+  end
   -- dans l'expédition : l'état revient à l'expédition et suit au combat suivant
   local e = mexp({ cauterize = 1 })
   enter(e, "combat")
@@ -357,7 +359,7 @@ test("simulation : arbre plein du Mage, même graine = mêmes décisions", funct
   eq(ea.talents[1].id, "toughness")
   local taken = 0
   for _ in pairs(ea.epicTaken or {}) do taken = taken + 1 end
-  assert(taken >= 2, "Veteran's Arsenal 2 : deux épiques au départ (" .. taken .. ")")
+  assert(taken >= 1, "Veteran's Arsenal 2 : une épique au départ (" .. taken .. ")")
 end)
 
 print(("%d réussis, %d échoués"):format(passed, failed))

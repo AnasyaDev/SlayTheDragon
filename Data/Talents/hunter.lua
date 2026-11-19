@@ -10,11 +10,11 @@ local TC = ns.TalentCommon
 local max = math.max
 
 local HT = {
-  hp = 3,              -- Toughness : PV max par rang
+  hp = TC.toughnessHp("hunter"), -- Toughness : PV max par rang (règle commune, ns.TalentCommon)
   kindred = 1,         -- Kindred Spirits : Frenzy au début de chaque combat, par rang
   fury = 1,            -- Unleashed Fury : dégâts de plus par attaque du familier (Hunter.PET_BASE ; un rang :
                        --   deux rangs, +2, valaient +19,5 points seuls au palier 60 %)
-  decayEvery = { 2, 3 }, -- Bestial Discipline : le Frenzy ne baisse qu'un round sur decayEvery[rang] (Hunter.DECAY_EVERY)
+  decayEvery = { 2, 3, 4 }, -- Bestial Discipline : le Frenzy ne baisse qu'un round sur decayEvery[rang] (Hunter.DECAY_EVERY)
   handler = 1,         -- Animal Handler : plafond de Frenzy, par rang
   trapFrenzy = 1,      -- Trap Mastery : Frenzy à chaque Trap déclenchée
   bmAt = 5,            -- Specialization Beast Mastery : Frenzy qui fait attaquer le familier la première fois du
@@ -24,9 +24,9 @@ local HT = {
   mend = 1,            -- Natural Mending : soin à la première attaque du familier de chaque tour (un rang : deux
                        --   soins par tour valaient +21 points seuls au palier 60 %)
   thrill = 1,          -- Thrill of the Hunt : Frenzy quand un ennemi meurt, par rang
-  throatAt = 4,        -- Go for the Throat : Frenzy au début du tour pour +1 mana (rang 2 : et une carte)
-  deterHp = 1,         -- Deterrence : PV gardés (rang 1)
-  deterHp2 = 10,       --   rang 2
+  throatAt = 6,        -- Go for the Throat : Frenzy au début du tour pour +1 mana (4, et deux rangs, avant le recalage)
+  deterHp = 1,         -- Deterrence : PV gardés (un rang ; deux rangs, 1 puis 10 PV et le tour ennemi sauté, avant le
+                       --   recalage du 19/11/2026)
 }
 ns.HunterTalents = HT
 
@@ -45,30 +45,39 @@ local nodes = {
   -- Rangée 1 (ouverte d'emblée) ----------------------------------------------------------------------------------
   TC.toughness({ row = 1, ranks = 3, hp = HT.hp }),
   { id = "kindred_spirits", row = 1, ranks = 2, name = "Kindred Spirits", icon = "ability_hunter_pet_wolf",
-    text = { ("Start of combat: +%d Frenzy."):format(HT.kindred), ("Start of combat: +%d Frenzy."):format(2 * HT.kindred) },
+    text = { ("Start of combat against elites and bosses: +%d Frenzy."):format(HT.kindred),
+      ("Start of combat against elites and bosses: +%d Frenzy."):format(2 * HT.kindred) },
     hooks = {
       onCombatStart = function(c, src)
-        if not c.result then Combat.gainRes(c, HT.kindred * src.rank, "talent") end
+        if not c.result and (c.kind == "elite" or c.kind == "boss") then
+          Combat.gainRes(c, HT.kindred * src.rank, "talent")
+        end
       end,
     } },
   { id = "unleashed_fury", row = 1, ranks = 1, name = "Unleashed Fury", icon = "ability_hunter_ferociousinspiration",
-    text = { ("Pet attacks deal %d more."):format(HT.fury) },
-    const = { PET_BASE = function(v) return v + HT.fury end } },
-  { id = "bestial_discipline", row = 1, ranks = 2, name = "Bestial Discipline", icon = "ability_hunter_fervor",
-    text = { everyText(HT.decayEvery[1]), everyText(HT.decayEvery[2]) },
+    text = { ("Pet attacks against elites and bosses deal %d more."):format(HT.fury) },
+    -- (contre les élites et les boss seulement, c.kind ; à chaque combat avant le recalage du 19/11/2026)
+    const = { PET_BASE = function(v, src, c)
+      if c and (c.kind == "elite" or c.kind == "boss") then return v + HT.fury end
+      return v
+    end } },
+  { id = "bestial_discipline", row = 1, ranks = 3, name = "Bestial Discipline", icon = "ability_hunter_fervor",
+    text = { everyText(HT.decayEvery[1]), everyText(HT.decayEvery[2]), everyText(HT.decayEvery[3]) },
     const = { DECAY_EVERY = function(v, src) return max(v, HT.decayEvery[src.rank]) end } },
 
   -- Rangée 2 (5 points) -----------------------------------------------------------------------------------------
-  { id = "thrill_of_the_hunt", row = 2, ranks = 2, name = "Thrill of the Hunt", icon = "ability_hunter_assassinate2",
-    text = { ("When an enemy dies: +%d Frenzy."):format(HT.thrill), ("When an enemy dies: +%d Frenzy."):format(2 * HT.thrill) },
+  { id = "thrill_of_the_hunt", row = 2, ranks = 3, name = "Thrill of the Hunt", icon = "ability_hunter_assassinate2",
+    text = { ("When an enemy dies: +%d Frenzy."):format(HT.thrill), ("When an enemy dies: +%d Frenzy."):format(2 * HT.thrill),
+      ("When an enemy dies: +%d Frenzy."):format(3 * HT.thrill) },
     hooks = {
       onEnemyDeath = function(c, src)
         if not c.result then Combat.gainRes(c, HT.thrill * src.rank, "talent") end
       end,
     } },
-  { id = "trap_mastery", row = 2, ranks = 2, name = "Trap Mastery", icon = "spell_nature_earthbind",
+  { id = "trap_mastery", row = 2, ranks = 3, name = "Trap Mastery", icon = "spell_nature_earthbind",
     text = { ("When a Trap triggers: +%d Frenzy."):format(HT.trapFrenzy),
-      ("When a Trap triggers: +%d Frenzy."):format(2 * HT.trapFrenzy) },
+      ("When a Trap triggers: +%d Frenzy."):format(2 * HT.trapFrenzy),
+      ("When a Trap triggers: +%d Frenzy."):format(3 * HT.trapFrenzy) },
     hooks = {
       onTrapTriggered = function(c, src)
         if not c.result then Combat.gainRes(c, HT.trapFrenzy * src.rank, "talent") end
@@ -112,61 +121,51 @@ local nodes = {
           end,
         } },
     } },
-  -- round du dernier soin dans l'état de classe (c.cls, copié par Combat.clone)
-  { id = "natural_mending", row = 3, ranks = 1, name = "Natural Mending", icon = "spell_nature_healingwavegreater",
-    text = { ("Pet attacks: heal %d, once per turn."):format(HT.mend) },
-    hooks = {
-      onPetAttack = function(c, src)
-        if c.result or c.cls.mendRound == c.round then return end
-        c.cls.mendRound = c.round
-        Combat.heal(c, c.player, HT.mend)
-      end,
-    } },
-  { id = "animal_handler", row = 3, ranks = 2, name = "Animal Handler", icon = "ability_hunter_pet_raptor",
-    text = { ("Frenzy cap +%d."):format(HT.handler), ("Frenzy cap +%d."):format(2 * HT.handler) },
+  -- (deux rangs avant le recalage du 19/11/2026 : +14 points dans l'arbre au palier 80 %)
+  { id = "animal_handler", row = 3, ranks = 1, name = "Animal Handler", icon = "ability_hunter_pet_raptor",
+    text = { ("Frenzy cap +%d."):format(HT.handler) },
     hooks = { resCap = function(c, src, v) return v + HT.handler * src.rank end } },
   TC.fieldMedic({ row = 3 }),
 
   -- Rangée 4 (16 points) ----------------------------------------------------------------------------------------
-  { id = "go_for_the_throat", row = 4, ranks = 2, name = "Go for the Throat", icon = "ability_hunter_carve",
-    text = { ("Start of turn with %d Frenzy or more: +1 mana."):format(HT.throatAt),
-      ("Start of turn with %d Frenzy or more: +1 mana and draw 1."):format(HT.throatAt) },
+  -- (rangée 3 et à chaque combat avant le recalage du 19/11/2026 : +12 points dans l'arbre au palier 60 %)
+  -- round du dernier soin dans l'état de classe (c.cls, copié par Combat.clone)
+  { id = "natural_mending", row = 4, ranks = 1, name = "Natural Mending", icon = "spell_nature_healingwavegreater",
+    text = { ("Pet attacks against elites and bosses: heal %d, once per turn."):format(HT.mend) },
+    hooks = {
+      onPetAttack = function(c, src)
+        if c.result or c.cls.mendRound == c.round or not (c.kind == "elite" or c.kind == "boss") then return end
+        c.cls.mendRound = c.round
+        Combat.heal(c, c.player, HT.mend)
+      end,
+    } },
+  -- (deux rangs à 4 Frenzy, et une carte au rang 2, avant le recalage du 19/11/2026)
+  { id = "go_for_the_throat", row = 4, ranks = 1, name = "Go for the Throat", icon = "ability_hunter_carve",
+    text = { ("Start of turn with %d Frenzy or more: +1 mana."):format(HT.throatAt) },
     hooks = {
       maxMana = function(c, src, v)
         if frenzy(c) >= HT.throatAt then return v + 1 end
         return v
       end,
-      drawPerTurn = function(c, src, v)
-        if src.rank >= 2 and frenzy(c) >= HT.throatAt then return v + 1 end
-        return v
-      end,
     },
-    -- (bots : finir le tour avec throatAt Frenzy après la baisse vaut un mana au tour suivant, et une carte au rang 2)
+    -- (bots : finir le tour avec throatAt Frenzy après la baisse vaut un mana au tour suivant)
     bot = { value = function(c, src)
-      if frenzy(c) - 1 >= HT.throatAt then return 25 + (src.rank >= 2 and 15 or 0) end
+      if frenzy(c) - 1 >= HT.throatAt then return 25 end
       return 0
     end } },
   TC.veteransArsenal({ row = 4 }),
   -- Une fois par expédition (exp.talentState.deterrence) ; le tour ennemi sauté comme Feign Death (la carte) :
   -- coups restants annulés (beforeHit), ennemis suivants par le drapeau commun skipEnemyTurn.
-  { id = "deterrence", row = 4, ranks = 2, name = "Deterrence", icon = "ability_hunter_pet_turtle",
-    text = { ("Once per expedition, a hit that would kill you leaves you at %d HP and skips the enemy turn.")
-        :format(HT.deterHp),
-      ("Once per expedition, a hit that would kill you leaves you at %d HP and skips the enemy turn.")
-        :format(HT.deterHp2) },
+  { id = "deterrence", row = 4, ranks = 1, name = "Deterrence", icon = "ability_hunter_pet_turtle",
+    text = { ("Once per expedition, a hit that would kill you leaves you at %d HP."):format(HT.deterHp) },
     hooks = {
       preventDeath = function(c, src)
         local st = c.tstate
         if not st or st.deterrence then return false end
         st.deterrence = true
         local p = c.player
-        p.hp = math.min(p.maxHp, max(p.hp, src.rank >= 2 and HT.deterHp2 or HT.deterHp))
-        p.flags.skipEnemyTurn = true
+        p.hp = math.min(p.maxHp, max(p.hp, HT.deterHp))
         return true
-      end,
-      beforeHit = function(c, src, dmg)
-        if c.phase == "enemy" and c.player.flags.skipEnemyTurn then return 0 end
-        return dmg
       end,
     } },
 }
@@ -177,11 +176,11 @@ ns.Talent.define("hunter", {
   -- Ordre de dépense du bot de simulation (tree=, un id par point ; docs/talents.md, § 8) et voie choisie.
   bot = {
     order = {
-      "unleashed_fury", "kindred_spirits", "kindred_spirits", "bestial_discipline", "bestial_discipline",
+      "bestial_discipline", "bestial_discipline", "kindred_spirits", "kindred_spirits", "toughness",
       "trap_mastery", "trap_mastery", "thrill_of_the_hunt", "thrill_of_the_hunt", "provisions",
-      "toughness", "toughness", "toughness", "specialization", "natural_mending",
-      "animal_handler", "animal_handler", "field_medic", "go_for_the_throat", "go_for_the_throat",
-      "veterans_arsenal", "veterans_arsenal", "deterrence", "deterrence",
+      "toughness", "toughness", "specialization", "unleashed_fury", "animal_handler",
+      "bestial_discipline", "field_medic", "go_for_the_throat", "thrill_of_the_hunt", "deterrence",
+      "natural_mending", "veterans_arsenal", "veterans_arsenal", "trap_mastery",
     },
     spec = "beast_mastery",
     -- accord des épiques avec l'arbre (note du bot, Sim/expedition.lua) : Lone Wolf retire le familier, que

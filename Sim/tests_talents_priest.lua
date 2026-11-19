@@ -140,7 +140,7 @@ end)
 ---------------------------------------------------------------------------
 test("Toughness et Provisions : PV max et or de départ du Priest", function()
   local e = pexp({ toughness = 3, provisions = 1 })
-  eq(e.maxHp, PHP + 3 * PT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + 100)
+  eq(e.maxHp, PHP + 3 * PT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + ns.TalentCommon.PROVISIONS_GOLD)
 end)
 
 ---------------------------------------------------------------------------
@@ -317,7 +317,7 @@ test("simulation : arbre plein du Priest, épiques au départ, même graine = m�
   eq(a.zones[1].maxHp, PHP + 3 * PT.hp)
   local taken = 0
   for _ in pairs(ea.epicTaken or {}) do taken = taken + 1 end
-  assert(taken >= 2, "Veteran's Arsenal 2 : deux épiques au départ (" .. taken .. ")")
+  assert(taken >= 1, "Veteran's Arsenal 2 : une épique au départ (" .. taken .. ")")
   local function ser(t) local o = {} for i, v in ipairs(t) do o[i] = tostring(v.id or v) end return table.concat(o, ",") end
   eq(ser(a.picks or {}), ser(b.picks or {})); eq(a.hp, b.hp); eq(#a.combats, #b.combats)
   eq(ea.talents[1].id, "toughness")

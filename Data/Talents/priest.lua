@@ -9,7 +9,7 @@ local TC = ns.TalentCommon
 local max = math.max
 
 local PT = {
-  hp = 2,              -- Toughness : PV max par rang (36 PV de classe)
+  hp = TC.toughnessHp("priest"), -- Toughness : PV max par rang (règle commune, ns.TalentCommon)
   borrowed = 2,        -- Borrowed Time : Atonement au début de chaque combat, par rang (avec Sacred Candle)
   spike = 2,           -- Mind Spike : Insanity au début de chaque combat, par rang
   twin = 2,            -- Twin Disciplines : soin d'Atonement en plus, par rang (Combat.ATONEMENT_HEAL = 2)
@@ -21,7 +21,8 @@ local PT = {
   shadowHit = 5,       -- Specialization Shadow : dégâts en plus par coup des cartes Shadow
   shadowDot = 5,       --   … et DoT en plus posé par elles
   holyHit = 8,         -- Specialization Holy : dégâts en plus par coup des cartes Holy
-  guidance = { 3, 5 }, -- Spiritual Guidance : Absorb quand une carte Cast se résout, par rang
+  guidance = { 4, 6 }, -- Spiritual Guidance : Absorb quand une carte Cast se résout, par rang (3 / 5 avant le
+                       --   recalage du 19/11/2026)
   guardAtone = 3,      -- Guardian Spirit : Atonement donnée en évitant la mort
   guardRegen = 6,      --   rang 2 : Regen donnée
 }
@@ -165,7 +166,7 @@ ns.Talent.define("priest", {
   -- Ordre de dépense du bot de simulation (tree=, un id par point ; docs/talents.md, § 8) et voie choisie.
   bot = {
     order = {
-      "toughness", "toughness", "toughness", "twin_disciplines", "twin_disciplines", "borrowed_time", "borrowed_time",
+      "toughness", "toughness", "toughness", "borrowed_time", "borrowed_time", "twin_disciplines", "twin_disciplines",
       "mind_spike", "mind_spike", "shadow_weaving", "inspiration", "provisions",
       "specialization", "power_word_barrier", "power_word_barrier", "void_torrent", "void_torrent", "field_medic",
       "spiritual_guidance", "spiritual_guidance", "veterans_arsenal", "veterans_arsenal", "guardian_spirit",

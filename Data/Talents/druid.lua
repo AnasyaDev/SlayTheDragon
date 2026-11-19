@@ -13,8 +13,8 @@ local TC = ns.TalentCommon
 local max, min = math.max, math.min
 
 local DT = {
-  hp = 3,              -- Toughness : PV max par rang
-  primal = 1,          -- Primal Instinct : réserve au début de chaque combat (un rang ; 2 rangs : +12,7 seul)
+  hp = TC.toughnessHp("druid"), -- Toughness : PV max par rang (règle commune, ns.TalentCommon)
+  primal = 1,          -- Primal Instinct : réserve au début d'un combat d'élite ou de boss, par rang
   taxMax = 1,          -- Natural Shapeshifter 1 : mana perdu au plus par la taxe (au lieu de Druid.TAX_MAX, 2)
   strike = 1,          -- Feral Instinct : dégâts de plus de la frappe de l'ours (un rang ; 2 rangs : +7,7 seul)
   moonglow = 1,        -- Moonglow : Absorb à la fin d'un tour fini en Moonkin, par rang
@@ -23,7 +23,8 @@ local DT = {
   pulse = 1,           -- Specialization Balance : dégâts de plus du coup à tous de fin de tour en Moonkin
   regen = 1,           -- Specialization Restoration : Regen de plus à chaque Regen gagnée
   cap = 1,             -- Wild Reserve : plafond de la réserve, par rang
-  ward = { 1, 2 },     -- Shapeshifter's Ward : Absorb au premier changement de forme de chaque tour, par rang
+  ward = { 1 },        -- Shapeshifter's Ward : Absorb au premier changement de forme de chaque tour (un rang ; deux
+                       --   rangs, 1 puis 2 Absorb, avant le recalage du 19/11/2026)
   masterFree = 1,      -- Master Shapeshifter : changements comptés gratuits de plus par tour (un rang ; 2 : +15,8 seul)
   saveAbsorb = 10,     -- Survival Instincts : Absorb donnée en évitant la mort, par rang au-delà du premier
 }
@@ -35,11 +36,16 @@ local nodes = {
   -- Rangée 1 (ouverte d'emblée) ----------------------------------------------------------------------------------
   TC.toughness({ row = 1, ranks = 3, hp = DT.hp }),
   -- (avec Heart of the Wild, la réserve gagnée va à la réserve sans forme, comme toute réserve d'avant la forme)
-  { id = "primal_instinct", row = 1, ranks = 1, name = "Primal Instinct", icon = "ability_druid_catform",
-    text = { ("Start of combat: +%d Reserve."):format(DT.primal) },
+  -- (un rang, à chaque combat, avant le recalage du 19/11/2026)
+  { id = "primal_instinct", row = 1, ranks = 3, name = "Primal Instinct", icon = "ability_druid_catform",
+    text = { ("Start of combat against elites and bosses: +%d Reserve."):format(DT.primal),
+      ("Start of combat against elites and bosses: +%d Reserve."):format(2 * DT.primal),
+      ("Start of combat against elites and bosses: +%d Reserve."):format(3 * DT.primal) },
     hooks = {
       onCombatStart = function(c, src)
-        if not c.result then Combat.gainRes(c, DT.primal, "talent") end
+        if not c.result and (c.kind == "elite" or c.kind == "boss") then
+          Combat.gainRes(c, DT.primal * src.rank, "talent")
+        end
       end,
     } },
   -- rang 2 : l'entrée dans la première forme du combat (depuis « sans forme ») n'est pas comptée pour la taxe
@@ -55,23 +61,25 @@ local nodes = {
         if src.rank >= 2 and from == nil and (c.cls.taxed or 0) > 0 then c.cls.taxed = c.cls.taxed - 1 end
       end,
     } },
+  -- (rangée 2 avant le recalage du 19/11/2026 : seul, il ne vaut presque rien)
+  { id = "living_seed", row = 1, ranks = 3, name = "Living Seed", icon = "inv_misc_flower_02",
+    text = { ("End of turn in Tree of Life: gain %d more Absorb."):format(DT.seed),
+      ("End of turn in Tree of Life: gain %d more Absorb."):format(2 * DT.seed),
+      ("End of turn in Tree of Life: gain %d more Absorb."):format(3 * DT.seed) },
+    const = { TREE_ABSORB = function(v, src) return v + DT.seed * src.rank end } },
 
   -- Rangée 2 (5 points) -----------------------------------------------------------------------------------------
   { id = "feral_instinct", row = 2, ranks = 1, name = "Feral Instinct", icon = "inv_misc_bearpaw_brown",
     text = { ("Bear strikes deal %d more."):format(DT.strike) },
     const = { STRIKE_BASE = function(v) return v + DT.strike end } },
-  { id = "moonglow", row = 2, ranks = 2, name = "Moonglow", icon = "ability_upgrademoonglaive",
-    text = { ("End of turn in Moonkin: gain %d Absorb."):format(DT.moonglow),
-      ("End of turn in Moonkin: gain %d Absorb."):format(2 * DT.moonglow) },
+  -- (deux rangs avant le recalage du 19/11/2026)
+  { id = "moonglow", row = 2, ranks = 1, name = "Moonglow", icon = "ability_upgrademoonglaive",
+    text = { ("End of turn in Moonkin: gain %d Absorb."):format(DT.moonglow) },
     hooks = {
       onTurnEnd = function(c, src)
         if form(c) == "moonkin" and not c.result then Combat.gainBlock(c, c.player, DT.moonglow * src.rank) end
       end,
     } },
-  { id = "living_seed", row = 2, ranks = 2, name = "Living Seed", icon = "inv_misc_flower_02",
-    text = { ("End of turn in Tree of Life: gain %d more Absorb."):format(DT.seed),
-      ("End of turn in Tree of Life: gain %d more Absorb."):format(2 * DT.seed) },
-    const = { TREE_ABSORB = function(v, src) return v + DT.seed * src.rank end } },
   TC.provisions({ row = 2 }),
 
   -- Rangée 3 (10 points) ----------------------------------------------------------------------------------------
@@ -99,14 +107,15 @@ local nodes = {
           end,
         } },
     } },
-  { id = "wild_reserve", row = 3, ranks = 2, name = "Wild Reserve", icon = "inv_misc_monsterfang_01",
-    text = { ("Reserve cap +%d."):format(DT.cap), ("Reserve cap +%d."):format(2 * DT.cap) },
+  -- (deux rangs avant le recalage du 19/11/2026)
+  { id = "wild_reserve", row = 3, ranks = 1, name = "Wild Reserve", icon = "inv_misc_monsterfang_01",
+    text = { ("Reserve cap +%d."):format(DT.cap) },
     hooks = { resCap = function(c, src, v) return v + DT.cap * src.rank end } },
   -- premier changement de forme du tour (compteur de classe c.cls.shifts, remis à 0 au début du tour ; le
   -- premier changement du combat compris)
-  { id = "shapeshifters_ward", row = 3, ranks = 2, name = "Shapeshifter's Ward", icon = "spell_nature_enchantarmor",
-    text = { ("The first form change each turn: gain %d Absorb."):format(DT.ward[1]),
-      ("The first form change each turn: gain %d Absorb."):format(DT.ward[2]) },
+  -- (deux rangs, 1 puis 2 Absorb, avant le recalage du 19/11/2026)
+  { id = "shapeshifters_ward", row = 3, ranks = 1, name = "Shapeshifter's Ward", icon = "spell_nature_enchantarmor",
+    text = { ("The first form change each turn: gain %d Absorb."):format(DT.ward[1]) },
     hooks = {
       onShift = function(c, src)
         if c.cls.shifts == 1 and not c.result then Combat.gainBlock(c, c.player, DT.ward[src.rank]) end
@@ -145,16 +154,16 @@ local nodes = {
 ns.Talent.define("druid", {
   rows = { 0, 5, 10, 16 },
   nodes = nodes,
-  -- Ordre de dépense du bot de simulation (tree=, un id par point ; docs/talents.md, § 7) et voie choisie (les trois
-  -- voies se tiennent à 2 points près au palier 60 %). Feral Instinct et Shapeshifter's Ward après le palier 60 % :
-  -- avant, le palier montait à 69-71 % (cible 53-69).
+  -- Ordre de dépense du bot de simulation (tree=, un id par point ; docs/talents.md, § 7) et voie choisie. Recalage
+  -- du 19/11/2026 : les nœuds les plus faibles d'abord (Living Seed, Primal Instinct), Toughness au 9e point, Natural
+  -- Shapeshifter et Feral Instinct après le palier 60 % (le contenu seul du Druid vaut déjà 28,5 % au palier 40 %).
   bot = {
     order = {
-      "toughness", "toughness", "toughness", "natural_shapeshifter", "natural_shapeshifter",
-      "primal_instinct", "moonglow", "moonglow", "living_seed", "living_seed",
-      "provisions", "specialization", "wild_reserve", "wild_reserve", "field_medic",
-      "feral_instinct", "shapeshifters_ward", "shapeshifters_ward", "master_shapeshifter", "veterans_arsenal",
-      "veterans_arsenal", "survival_instincts", "survival_instincts", "survival_instincts",
+      "living_seed", "living_seed", "living_seed", "primal_instinct", "primal_instinct",
+      "moonglow", "provisions", "primal_instinct", "toughness", "toughness",
+      "toughness", "specialization", "wild_reserve", "field_medic", "shapeshifters_ward",
+      "feral_instinct", "natural_shapeshifter", "natural_shapeshifter", "master_shapeshifter", "survival_instincts",
+      "veterans_arsenal", "veterans_arsenal", "survival_instincts", "survival_instincts",
     },
     spec = "feral",
     -- accord des épiques avec l'arbre : aucun écart. Mesuré à l'arbre plein (zones=7) : Veteran's Arsenal 2 vaut

@@ -34,7 +34,7 @@ Combat.SUNDER_MULT = 1.25 -- Sundered (armor_broken) : dégâts reçus × 1,25 (
 function Combat.const(c, name, v)
   local ts = c.talents
   if not ts then return v end
-  return ns.Talent.const(c.class, ts, name, v)
+  return ns.Talent.const(c.class, ts, name, v, c)
 end
 
 ---------------------------------------------------------------------------

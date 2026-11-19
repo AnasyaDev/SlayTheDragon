@@ -170,7 +170,7 @@ test("rangées ouvertes à 0 / 5 / 10 / 16 points, un rang demande le précéden
   local cs = Meta.classState(meta, "warrior")
   cs.xp = Meta.XP_LEVELS[25]
   local function learn(id, ch) return Meta.learn(meta, "warrior", id, ch) end
-  eq(select(2, learn("unbridled_wrath")), "row", "rangée 2 fermée à 0 point")
+  eq(select(2, learn("anger_shield")), "row", "rangée 2 fermée à 0 point")
   eq(select(2, learn("nope")), "unknown")
   assert(learn("toughness")); assert(learn("toughness")); assert(learn("toughness"))
   eq(select(2, learn("toughness")), "max", "Toughness : 3 rangs")
@@ -300,14 +300,14 @@ test("arbre du Warrior : 13 nœuds, 24 points, 4 rangées, un Specialization, or
   eq(#t.nodes, 13)
   local rows = { 0, 0, 0, 0 }
   for _, n in ipairs(t.nodes) do rows[n.row] = rows[n.row] + n.ranks end
-  eq(rows[1], 7); eq(rows[2], 5); eq(rows[3], 6); eq(rows[4], 6)
+  eq(rows[1], 10); eq(rows[2], 3); eq(rows[3], 6); eq(rows[4], 5)
   eq(t.rows[1], 0); eq(t.rows[2], 5); eq(t.rows[3], 10); eq(t.rows[4], 16)
   -- génériques : mêmes noms
   for _, id in ipairs({ "toughness", "provisions", "field_medic", "veterans_arsenal" }) do assert(t.byId[id], id) end
   eq(t.byId.toughness.text[3], ("+%d max HP."):format(3 * WT.hp))
   eq(t.byId.battle_ready.text[2], "Start of combat: +2 Rage.")
   eq(t.byId.specialization.byChoice.arms.text, "Sundered enemies take 50% more damage instead of 25%.")
-  eq(t.byId.field_medic.text[1], "Moving to the next zone heals 75% of max HP instead of 50%.")
+  eq(t.byId.field_medic.text[1], "Moving to the next zone heals 65% of max HP instead of 50%.")
   -- textes : anglais simple, une phrase qui finit par un point
   for _, n in ipairs(t.nodes) do
     local list = n.choices and {} or n.text
@@ -324,9 +324,9 @@ test("tree= : parts de l'arbre (5 / 10 / 15 / 20 / 24 points) dans l'ordre du bo
   eq(Talent.pointsOf(60), 15); eq(Talent.pointsOf(80), 20); eq(Talent.pointsOf(100), 24)
   local map, spec, n = Talent.fromShare("warrior", 60)
   eq(n, 15); eq(Talent.spentIn(map), 15); eq(spec, "fury")
-  -- palier 60 % de la fiche (§ 6)
-  local want = { toughness = 3, battle_ready = 2, second_wind = 2, unbridled_wrath = 2, anger_shield = 2,
-    provisions = 1, specialization = 1, blood_drinker = 2 }
+  -- palier 60 % (docs/talents.md, § 6 ; recalage du 19/11/2026 : Battle Ready après le palier 60 %)
+  local want = { unbridled_wrath = 2, second_wind = 2, toughness = 3, anger_shield = 2, provisions = 1,
+    specialization = 1, blood_drinker = 2, tactical_mastery = 2 }
   for id, r in pairs(want) do eq(map[id], r, id) end
   for id in pairs(map) do assert(want[id], "en trop : " .. id) end
   local full = Talent.fromShare("warrior", 100, "arms")
@@ -342,7 +342,7 @@ test("API de lecture : rangées, rangs, textes, voies, points restants, expédit
   eq(v.points, 6); eq(v.spent, 0); eq(v.left, 6); eq(#v.rows, 4)
   eq(v.rows[1].open, true); eq(v.rows[2].open, false); eq(v.rows[2].need, 5)
   local tough = v.rows[1].nodes[1]
-  eq(tough.id, "toughness"); eq(tough.rank, 0); eq(tough.text, nil); eq(tough.nextText, "+4 max HP.")
+  eq(tough.id, "toughness"); eq(tough.rank, 0); eq(tough.text, nil); eq(tough.nextText, ("+%d max HP."):format(WT.hp))
   eq(tough.canLearn, true)
   eq(v.rows[2].nodes[1].canLearn, false); eq(v.rows[2].nodes[1].why, "row")
   for _ = 1, 3 do Meta.learn(meta, "warrior", "toughness") end
@@ -350,7 +350,7 @@ test("API de lecture : rangées, rangs, textes, voies, points restants, expédit
   v = Talent.view(meta, "warrior")
   eq(v.left, 1); eq(v.rows[2].open, true)
   tough = v.rows[1].nodes[1]
-  eq(tough.rank, 3); eq(tough.text, "+12 max HP."); eq(tough.nextText, nil); eq(tough.why, "max")
+  eq(tough.rank, 3); eq(tough.text, ("+%d max HP."):format(3 * WT.hp)); eq(tough.nextText, nil); eq(tough.why, "max")
   local spec = v.rows[3].nodes[1]
   eq(spec.id, "specialization"); eq(#spec.choices, 3); eq(spec.choices[1].active, false); eq(spec.why, "row")
   eq(Talent.view(meta, "warrior", true).rows[2].nodes[1].why, "running")
@@ -415,21 +415,38 @@ end)
 ---------------------------------------------------------------------------
 test("Toughness et Provisions : PV max et or de départ", function()
   local e = wexp({ toughness = 2, provisions = 1 })
-  eq(e.maxHp, WHP + 2 * WT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + 100)
+  eq(e.maxHp, WHP + 2 * WT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + ns.TalentCommon.PROVISIONS_GOLD)
   local z = wexp({ toughness = 3 })
-  eq(z.maxHp, WHP + 12); eq(z.gold, X.START_GOLD)
+  eq(z.maxHp, WHP + 3 * WT.hp); eq(z.gold, X.START_GOLD)
 end)
 
-test("Field Medic : passage de zone à 75 % des PV max au lieu de 50 %", function()
+test("Field Medic : passage de zone à 65 % des PV max au lieu de 50 %", function()
   for _, fm in ipairs({ 0, 1 }) do
     local e = wexp(fm > 0 and { field_medic = 1 } or { toughness = 1 })
     e.hp = 1
     X.enterZone(e, "duskwood")
-    eq(e.transit.healed, math.floor(e.maxHp * (fm > 0 and 0.75 or 0.5)), "Field Medic " .. fm)
+    eq(e.transit.healed, math.floor(e.maxHp * (fm > 0 and ns.TalentCommon.FIELD_MEDIC_HEAL or 0.5)), "Field Medic " .. fm)
   end
 end)
 
-test("Veteran's Arsenal : une puis deux épiques au choix au départ, parmi les zones battues", function()
+test("Toughness : règle commune, 3 % des PV de base de la classe par rang, arrondi", function()
+  local TC = ns.TalentCommon
+  local want = { warrior = 2, druid = 2, rogue = 2, hunter = 2, mage = 1, priest = 1 }
+  for class, hp in pairs(want) do
+    eq(TC.toughnessHp(class), hp, class)
+    if ns.Talents[class] then -- (l'arbre du Druid est retiré par un test plus haut)
+      eq(ns.Talent.node(class, "toughness").text[1], ("+%d max HP."):format(hp), class)
+      local e = wexp({ toughness = 3 }, nil, { class = class })
+      eq(e.maxHp, ns.Classes[class].hp + 3 * hp, class)
+    end
+  end
+end)
+
+test("Veteran's Arsenal : une épique au choix parmi 2 (rang 1) puis 3 (rang 2) tirées dans les zones battues", function()
+  local TC = ns.TalentCommon
+  eq(TC.ARSENAL_OFFER[1], 2); eq(TC.ARSENAL_OFFER[2], 3)
+  eq(ns.Talent.rankText("warrior", "veterans_arsenal", 2),
+    "Start each expedition with one of 3 random Epic cards of zones you have beaten.")
   local none = wexp({ veterans_arsenal = 1 })
   eq(none.phase, "map", "aucune zone battue : pas de choix")
   eq(none.talentEpics, nil)
@@ -442,17 +459,35 @@ test("Veteran's Arsenal : une puis deux épiques au choix au départ, parmi les 
   assert(X.act(e, { "talentEpic", 2 }))
   eq(e.phase, "map"); eq(e.talentEpics, nil); eq(X.epicCount(e), 1); eq(e.deck[#e.deck].id, id)
   eq(e.stats.cardsAdded, 0); assert(e.epicTaken[id])
-  -- rang 2 : deux choix successifs ; puis le bibelot au départ (zone 3 du compte)
+  -- tirage : 2 puis 3 épiques distinctes parmi les 7 proposables (zones=7), même graine = même offre ; un seul
+  -- choix ; puis le bibelot au départ
+  local pool = {}
+  for _, p in ipairs(X.epicPool(wexp(nil, nil, { zones = 7 }))) do pool[p] = true end
+  local lists = {}
+  for r = 1, 2 do
+    for seed = 1, 6 do
+      local x = wexp({ veterans_arsenal = r }, nil, { zones = 7, seed = seed })
+      eq(#x.talentEpics, TC.ARSENAL_OFFER[r]); eq(x.talentEpicsLeft, 1)
+      local seen = {}
+      for _, p in ipairs(x.talentEpics) do
+        assert(pool[p] and not seen[p], p); seen[p] = true
+      end
+      eq(serialize(wexp({ veterans_arsenal = r }, nil, { zones = 7, seed = seed }).talentEpics),
+        serialize(x.talentEpics), "même graine")
+      lists[serialize(x.talentEpics)] = true
+    end
+  end
+  local n = 0
+  for _ in pairs(lists) do n = n + 1 end
+  assert(n >= 4, "offres différentes selon la graine")
   local two = wexp({ veterans_arsenal = 2 }, nil, { zones = 3 })
-  eq(two.talentEpicsLeft, 2); eq(#two.talentEpics, 3); assert(two.startRelics)
+  eq(two.talentEpicsLeft, 1); eq(#two.talentEpics, 3); assert(two.startRelics)
   assert(X.act(two, { "talentEpic", 1 }))
-  eq(two.phase, "start"); eq(#two.talentEpics, 2)
-  assert(X.act(two, { "talentEpic", 1 }))
-  eq(two.phase, "start", "bibelot de départ ensuite"); eq(two.talentEpics, nil); eq(X.epicCount(two), 2)
+  eq(two.phase, "start", "bibelot de départ ensuite"); eq(two.talentEpics, nil); eq(X.epicCount(two), 1)
   assert(X.act(two, { "skipStartRelic" })); eq(two.phase, "map")
   -- refus
   local sk = wexp({ veterans_arsenal = 2 }, nil, { zones = 1 })
-  eq(sk.talentEpicsLeft, 2); eq(#sk.talentEpics, 1)
+  eq(sk.talentEpicsLeft, 1); eq(#sk.talentEpics, 1)
   assert(X.act(sk, { "talentEpic", 1 })); eq(sk.phase, "map", "plus d'épique proposable")
   local sk2 = wexp({ veterans_arsenal = 1 }, nil, { zones = 4 })
   assert(X.act(sk2, { "skipTalentEpic" })); eq(X.epicCount(sk2), 0)
@@ -470,7 +505,7 @@ test("Battle Ready : +1 Rage par rang au début du combat (avec Battle Standard)
 end)
 
 test("Second Wind : soin de 1 par windDiv[rang] Rage restante après un combat gagné", function()
-  for r = 1, 2 do
+  for r = 1, 3 do
     for _, res in ipairs({ 3, 5 }) do
       local e = wexp({ second_wind = r })
       enter(e, "combat")
@@ -576,19 +611,21 @@ test("Blood Drinker : soin de 1 à chaque Spend payé (rang 2 : et à chaque Sur
   Combat.gainRes(c, -1, "decay"); eq(c.player.hp, 30 + 2 * WT.drink, "autre perte de Rage : rien")
 end)
 
-test("Rampage : à 5 Rage au début du tour, +1 mana (rang 2 : et une carte)", function()
-  local c = wcombat({ rampage = 1 })
-  c.player.res = 4
+test("Rampage : à rampageAt (6) Rage au début du tour, +1 mana, un rang", function()
+  eq(WT.rampageAt, 6); eq(ns.Talents.warrior.byId.rampage.ranks, 1)
+  eq(ns.Talents.warrior.byId.rampage.text[1], "Start of turn with 6 Rage or more: +1 mana.")
+  local c = wcombat({ rampage = 1, unbridled_wrath = 2 })
+  c.player.res = WT.rampageAt - 1
   eq(Combat.modify(c, "maxMana", 3), 3)
-  c.player.res = 5
+  c.player.res = WT.rampageAt
   eq(Combat.modify(c, "maxMana", 3), 4); eq(Combat.modify(c, "drawPerTurn", 5), 5)
-  local c2 = wcombat({ rampage = 2 }, nil, { deck = { "strike", "strike", "strike", "strike", "strike", "strike",
-    "strike", "strike", "strike", "strike", "strike", "strike", "strike" } })
-  c2.player.res = 5
+  local c2 = wcombat({ rampage = 1, unbridled_wrath = 2 }, nil, { deck = { "strike", "strike", "strike", "strike",
+    "strike", "strike", "strike", "strike", "strike", "strike", "strike", "strike", "strike" } })
+  c2.player.res = WT.rampageAt
   Combat.endPlayerTurn(c2)
   Combat.enemyPhase(c2); Combat.endRound(c2)
   Combat.startPlayerTurn(c2)
-  eq(c2.player.mana, 4); eq(#c2.hand, 6)
+  eq(c2.player.mana, 4); eq(#c2.hand, 5)
 end)
 
 test("Unyielding : une fois par expédition, 1 PV et 5 Rage (rang 2 : et 15 Absorb), gardé d'un combat à l'autre", function()
@@ -632,7 +669,7 @@ test("simulation : arbre plein, épiques au départ prises par le bot, même gra
   eq(a.zones[1].maxHp, WHP + 3 * WT.hp)
   local taken = 0
   for _ in pairs(ea.epicTaken or {}) do taken = taken + 1 end
-  assert(taken >= 2, "Veteran's Arsenal 2 : deux épiques au départ (" .. taken .. ")")
+  assert(taken >= 1, "Veteran's Arsenal 2 : une épique au départ (" .. taken .. ")")
   eq(serialize(a.picks), serialize(b.picks)); eq(a.hp, b.hp); eq(#a.combats, #b.combats)
   eq(ea.talents[1].id, "toughness")
   -- sans talents : aucun talent dans l'expédition

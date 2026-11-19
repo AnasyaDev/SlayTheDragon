@@ -2,7 +2,7 @@
 -- UI/TalentView.lua, données : UI/Controller.lua). Onglet Talents de l'écran Progress : arbre neuf, arbre à 15
 -- points dépensé par des clics (voie Specialization, changement gratuit, rangée 4 ouverte, refus), arbre plein,
 -- classe sans arbre, remboursement confirmé ; pendant l'expédition : talents actifs dans le panneau du deck, arbre
--- en lecture seule ; départ avec Veteran's Arsenal (deux épiques, puis le bibelot) ; bilan avec niveaux et points
+-- en lecture seule ; départ avec Veteran's Arsenal (une épique parmi celles tirées, puis le bibelot) ; bilan avec niveaux et points
 -- gagnés (« Spend talent points ») ; accueil (pastille, ligne de la migration v8) ; icônes des nœuds. Planches :
 -- build/snap/talents-*.svg.
 return function(T)
@@ -177,7 +177,7 @@ return function(T)
     and tough.icon._calls.SetDesaturated and tough.icon._calls.SetDesaturated[1] == true, tostring(tough.rank.text._text))
   local tt = tip(tough)
   check("infobulle d'un nœud : nom, rang, texte du rang suivant, raison", joined(tt)
-    == "Toughness | Rank 0/3 | +4 max HP. | No talent points to spend.", joined(tt))
+    == "Toughness | Rank 0/3 | " .. tree.byId.toughness.text[1] .. " | No talent points to spend.", joined(tt))
   local fury
   for _, b in ipairs(t.faces) do if b.option and b.option.choice == "fury" then fury = b end end
   local ft = tip(fury)
@@ -267,14 +267,14 @@ return function(T)
   ft = tip(armsFace)
   check("infobulle d'Arms : trois voies, « Fury (active) », consigne de changement gratuit",
     joined(ft):find("Fury (active)", 1, true) and ft[#ft] == "Click: switch to Arms (free).", joined(ft))
-  local tm = nodeButton(scr, "tactical_mastery")
-  tt = tip(tm)
-  check("Tactical Mastery 0/2 apprenable : rang vert, infobulle avec consigne", tm.rank.text._text == "0/2"
-    and joined(tt) == "Tactical Mastery | Rank 0/2 | " .. tree.byId.tactical_mastery.text[1] .. " | Click: learn a rank.", joined(tt))
-  local bw = nodeButton(scr, "battle_ready")
-  tt = tip(bw)
-  check("Battle Ready 2/2 : rang d'or, texte du rang actuel seul", bw.rank.text._text == "2/2"
-    and joined(tt) == "Battle Ready | Rank 2/2 | " .. tree.byId.battle_ready.text[2], joined(tt))
+  local br = nodeButton(scr, "battle_ready")
+  tt = tip(br)
+  check("Battle Ready 0/2 apprenable : rang vert, infobulle avec consigne", br.rank.text._text == "0/2"
+    and joined(tt) == "Battle Ready | Rank 0/2 | " .. tree.byId.battle_ready.text[1] .. " | Click: learn a rank.", joined(tt))
+  local tmb = nodeButton(scr, "tactical_mastery")
+  tt = tip(tmb)
+  check("Tactical Mastery 2/2 : rang d'or, texte du rang actuel seul", tmb.rank.text._text == "2/2"
+    and joined(tt) == "Tactical Mastery | Rank 2/2 | " .. tree.byId.tactical_mastery.text[2], joined(tt))
   bad = layoutProblems(scr)
   check("15 points : tout dans la fenêtre, sans chevauchement, rien de tronqué", #bad == 0, joined(bad))
   snap("talents-15-points", true)
@@ -288,7 +288,7 @@ return function(T)
   clickOption("tspec:arms")
   check("cliquer la voie active : refusé (« Already your specialization. »)", flashed == "Already your specialization."
     and meta.classes.warrior.spec == "arms", tostring(flashed))
-  clickOption("talent:tactical_mastery")
+  clickOption("talent:battle_ready")
   scr = UI().current
   t = scr.tv
   check("16e point : rangée 4 ouverte, plus aucun point", ns.Meta.spent(meta, "warrior") == 16 and not vis(t.rowLocks[4])
@@ -405,7 +405,7 @@ return function(T)
   local line = DV.talents
   local lt = line and tip(line) or {}
   check("panneau du deck : ligne des talents (« Talents: Toughness 3 · … · Fury … »), infobulle de chacun",
-    line and vis(line) and (line.text._text or ""):find("^Talents: Toughness 3 · Battle Ready 2") ~= nil
+    line and vis(line) and (line.text._text or ""):find("^Talents: Toughness 3 · Second Wind 2") ~= nil
     and (line.text._text or ""):find("Fury", 1, true) ~= nil and lt[1] == "Talents of this expedition"
     and joined(lt):find("Specialization: Fury", 1, true) ~= nil and lt[#lt] == "Click: view the talent tree.",
     tostring(line and line.text._text) .. " / " .. joined(lt))
@@ -429,7 +429,7 @@ return function(T)
   rt = tip(t.reset)
   check("en expédition : « Reset talents » grisé, raison", t.reset.active == false
     and rt[#rt] == "Talents can't change during an expedition.", joined(rt))
-  tt = tip(nodeButton(scr, "tactical_mastery"))
+  tt = tip(nodeButton(scr, "battle_ready"))
   check("en expédition : infobulle d'un nœud avec la raison", tt[#tt] == "Talents can't change during an expedition.", joined(tt))
   flashed = nil
   UI().flash = function(msg, ...) flashed = msg return oldFlash(msg, ...) end
@@ -452,7 +452,7 @@ return function(T)
   clickOption("ui:back")
   check("« Back » : retour à la carte de l'expédition", kind() == "map", tostring(kind()))
 
-  -- 6. Départ avec Veteran's Arsenal 2 (trois zones gagnées : trois épiques, puis le bibelot au choix) -------------
+  -- 6. Départ avec Veteran's Arsenal 2 (trois zones gagnées : une épique parmi les trois tirées, puis le bibelot) ----
   ns = boot({ levels = { warrior = 25 }, trees = { warrior = { full, fspec } }, won = { warrior = 3 } })
   clickOption("class:warrior")
   ns.Controller.makeSeed = function() return T.SEED end
@@ -460,9 +460,9 @@ return function(T)
   st, scr = UI().step, UI().current
   local epics = {}
   for _, o in ipairs(st.options or {}) do if o.card then epics[#epics + 1] = o.card.id end end
-  check("Veteran's Arsenal : choix des épiques au départ (grille, « Skip »), 1 sur 2",
+  check("Veteran's Arsenal : choix d'une épique au départ (grille, « Skip »), un seul choix",
     kind() == "talentEpic" and UI().current == UI().screens.deck and #epics == 3
-    and st.title == "Veteran's Arsenal: choose an epic card (1 of 2)" and button("skipTalentEpic").label._text == "Skip",
+    and st.title == "Veteran's Arsenal: choose an epic card" and button("skipTalentEpic").label._text == "Skip",
     tostring(kind()) .. " " .. tostring(st.title) .. " " .. #epics)
   local shownCards = 0
   for _, c in ipairs(scr.cards) do if vis(c) then shownCards = shownCards + 1 end end
@@ -477,15 +477,9 @@ return function(T)
   snap("talents-veterans-arsenal", true)
   local first = epics[2]
   H.click(button("talentEpic:2"))
-  st = UI().step
-  local epics2 = {}
-  for _, o in ipairs(st.options or {}) do if o.card then epics2[#epics2 + 1] = o.card.id end end
-  check("rang 2 : deuxième choix (2 sur 2), l'épique prise retirée de la liste, ajoutée au deck",
-    kind() == "talentEpic" and st.title == "Veteran's Arsenal: choose an epic card (2 of 2)" and #epics2 == 2
-    and EXP().deck[#EXP().deck].id == first, tostring(st.title))
-  H.click(button("talentEpic:1"))
-  check("après les deux épiques : le bibelot au choix (zone 3 gagnée), deux épiques au deck",
-    kind() == "startRelic" and ns.Expedition.epicCount(EXP()) == 2, tostring(kind()))
+  check("après l'épique : le bibelot au choix (zone 3 gagnée), l'épique prise au deck",
+    kind() == "startRelic" and ns.Expedition.epicCount(EXP()) == 1 and EXP().deck[#EXP().deck].id == first,
+    tostring(kind()))
   clickOption("skipStartRelic")
   check("puis la carte", kind() == "map", tostring(kind()))
   -- « Skip » : aucune épique, puis le bibelot

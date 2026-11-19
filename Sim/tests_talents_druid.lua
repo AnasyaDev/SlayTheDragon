@@ -36,7 +36,7 @@ local function dcombat(map, spec, o)
     deck[#deck + 1] = { id = id, up = false }
   end
   local ts = map and entries(map, spec) or nil
-  return Combat.new({ seed = o.seed or 5, class = "druid", hp = o.hp or 50, maxHp = 50, deck = deck,
+  return Combat.new({ seed = o.seed or 5, class = "druid", hp = o.hp or 50, maxHp = 50, deck = deck, kind = o.kind,
     encounter = o.encounter or { "tdt_dummy" }, relics = o.relics, talents = ts and U.copy(ts) or nil,
     tstate = ts and (o.tstate or {}) or nil, quiet = true })
 end
@@ -78,7 +78,7 @@ test("arbre du Druid : 14 nœuds, 24 points, 4 rangées, un Specialization, ordr
   eq(#t.nodes, 14)
   local rows = { 0, 0, 0, 0 }
   for _, n in ipairs(t.nodes) do rows[n.row] = rows[n.row] + n.ranks end
-  eq(rows[1], 6); eq(rows[2], 6); eq(rows[3], 6); eq(rows[4], 6)
+  eq(rows[1], 11); eq(rows[2], 3); eq(rows[3], 4); eq(rows[4], 6)
   eq(t.rows[1], 0); eq(t.rows[2], 5); eq(t.rows[3], 10); eq(t.rows[4], 16)
   for _, id in ipairs({ "toughness", "provisions", "field_medic", "veterans_arsenal" }) do assert(t.byId[id], id) end
   eq(t.byId.toughness.row, 1); eq(t.byId.provisions.row, 2); eq(t.byId.field_medic.row, 3)
@@ -103,18 +103,20 @@ test("arbre du Druid : 14 nœuds, 24 points, 4 rangées, un Specialization, ordr
   eq(t.byId.specialization.byChoice.balance.text,
     ("End of turn in Moonkin: deal %d more to each enemy."):format(DT.pulse))
   eq(#t.byId.specialization.choices, 3)
+  eq(t.byId.living_seed.row, 1); eq(t.byId.living_seed.ranks, 3); eq(t.byId.primal_instinct.ranks, 3)
+  eq(t.byId.moonglow.ranks, 1); eq(t.byId.wild_reserve.ranks, 1); eq(t.byId.shapeshifters_ward.ranks, 1)
 end)
 
 test("tree= : paliers 40, 60 et 80 % dans l'ordre du bot, voie du bot", function()
   local map, spec, n = Talent.fromShare("druid", 60)
   eq(n, 15); eq(spec, ns.Talents.druid.bot.spec)
-  local want = { natural_shapeshifter = 2, toughness = 3, primal_instinct = 1, moonglow = 2, living_seed = 2,
-    provisions = 1, specialization = 1, wild_reserve = 2, field_medic = 1 }
+  local want = { living_seed = 3, primal_instinct = 3, moonglow = 1, provisions = 1, toughness = 3,
+    specialization = 1, wild_reserve = 1, field_medic = 1, shapeshifters_ward = 1 }
   local m40 = Talent.fromShare("druid", 40)
-  eq(m40.provisions, nil, "palier 40 % : Provisions pas encore pris")
+  eq(m40.natural_shapeshifter, nil, "palier 40 % : Natural Shapeshifter pas encore pris"); eq(m40.toughness, 2)
   local m80 = Talent.fromShare("druid", 80)
-  eq(m80.shapeshifters_ward, 2, "palier 80 % : Shapeshifter's Ward"); eq(m80.feral_instinct, 1)
-  eq(m80.master_shapeshifter, 1); eq(m80.veterans_arsenal, 1)
+  eq(m80.natural_shapeshifter, 2, "palier 80 % : Natural Shapeshifter"); eq(m80.feral_instinct, 1)
+  eq(m80.master_shapeshifter, 1); eq(m80.survival_instincts, 1); eq(m80.veterans_arsenal, nil)
   for id, r in pairs(want) do eq(map[id], r, id) end
   for id in pairs(map) do assert(want[id], "en trop : " .. id) end
   eq(Talent.spentIn((Talent.fromShare("druid", 100, "balance"))), 24)
@@ -126,11 +128,11 @@ end)
 ---------------------------------------------------------------------------
 test("Toughness, Provisions, Field Medic, Veteran's Arsenal : PV, or, passage de zone, épique au départ", function()
   local e = dexp({ toughness = 3, provisions = 1 })
-  eq(e.maxHp, DHP + 3 * DT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + 100)
+  eq(e.maxHp, DHP + 3 * DT.hp); eq(e.hp, e.maxHp); eq(e.gold, X.START_GOLD + ns.TalentCommon.PROVISIONS_GOLD)
   local fm = dexp({ field_medic = 1 })
   fm.hp = 1
   X.enterZone(fm, "duskwood")
-  eq(fm.transit.healed, math.floor(fm.maxHp * 0.75))
+  eq(fm.transit.healed, math.floor(fm.maxHp * ns.TalentCommon.FIELD_MEDIC_HEAL))
   local va = dexp({ veterans_arsenal = 1 }, nil, { zones = 2 })
   eq(va.phase, "start"); eq(va.talentEpicsLeft, 1)
   for _, id in ipairs(va.talentEpics) do eq(ns.Cards[id].class, "druid", id) end
@@ -139,11 +141,15 @@ end)
 ---------------------------------------------------------------------------
 -- Nœuds du Druid
 ---------------------------------------------------------------------------
-test("Primal Instinct : +1 réserve au début du combat", function()
+test("Primal Instinct : +1 réserve par rang au début d'un combat d'élite ou de boss", function()
   eq(dcombat(nil).player.res, 0)
-  eq(dcombat({ primal_instinct = 1 }).player.res, DT.primal)
-  eq(node("primal_instinct").ranks, 1)
-  eq(node("primal_instinct").text[1], ("Start of combat: +%d Reserve."):format(DT.primal))
+  eq(dcombat({ primal_instinct = 3 }).player.res, 0, "combat normal : rien")
+  for r = 1, 3 do
+    eq(dcombat({ primal_instinct = r }, nil, { kind = "elite" }).player.res, DT.primal * r, "rang " .. r)
+  end
+  eq(dcombat({ primal_instinct = 1 }, nil, { kind = "boss" }).player.res, DT.primal)
+  eq(node("primal_instinct").ranks, 3)
+  eq(node("primal_instinct").text[1], ("Start of combat against elites and bosses: +%d Reserve."):format(DT.primal))
 end)
 
 test("Natural Shapeshifter : taxe de 1 mana au plus, puis l'entrée dans la première forme hors taxe ; module intact", function()
@@ -181,8 +187,8 @@ test("Feral Instinct : frappe de l'ours +1 (STRIKE_BASE lu sur le combat)", func
   eq(D.STRIKE_BASE, 1, "module intact")
 end)
 
-test("Moonglow : Absorb (2 par rang) à la fin d'un tour fini en Moonkin, rien dans une autre forme", function()
-  for r = 1, 2 do
+test("Moonglow : Absorb à la fin d'un tour fini en Moonkin, rien dans une autre forme", function()
+  for r = 1, 1 do
     for _, f in ipairs({ "moonkin", "cat", "tree" }) do
       local c = dcombat({ moonglow = r })
       local ref = dcombat(nil)
@@ -193,8 +199,8 @@ test("Moonglow : Absorb (2 par rang) à la fin d'un tour fini en Moonkin, rien d
   end
 end)
 
-test("Living Seed : fin de tour en Tree of Life, Absorb de TREE_ABSORB + 2 par rang", function()
-  for r = 1, 2 do
+test("Living Seed : fin de tour en Tree of Life, Absorb de TREE_ABSORB + 1 par rang", function()
+  for r = 1, 3 do
     local c = dcombat({ living_seed = r })
     c.cls.form = "tree"
     Combat.endPlayerTurn(c)
@@ -243,16 +249,15 @@ test("Specialization : Feral (+1 Combo à la pose de Clearcasting), Balance (+1 
   eq(nr.player.st.regen, 3)
 end)
 
-test("Wild Reserve : plafond de la réserve +1 par rang", function()
+test("Wild Reserve : plafond de la réserve +1", function()
   eq(Combat.resCap(dcombat(nil)), 5)
-  eq(Combat.resCap(dcombat({ wild_reserve = 1 })), 5 + DT.cap)
-  local c = dcombat({ wild_reserve = 2 })
-  eq(Combat.resCap(c), 5 + 2 * DT.cap)
-  Combat.gainRes(c, 9); eq(c.player.res, 5 + 2 * DT.cap)
+  local c = dcombat({ wild_reserve = 1 })
+  eq(Combat.resCap(c), 5 + DT.cap)
+  Combat.gainRes(c, 9); eq(c.player.res, 5 + DT.cap)
 end)
 
 test("Shapeshifter's Ward : Absorb au premier changement de forme de chaque tour, pas aux suivants", function()
-  for r = 1, 2 do
+  for r = 1, 1 do
     local c = dcombat({ shapeshifters_ward = r }, nil, { deck = { "wrath", "wrath", "thick_hide", "ferocious_bite",
       "thick_hide" } })
     c.player.mana = 9
@@ -267,7 +272,7 @@ test("Shapeshifter's Ward : Absorb au premier changement de forme de chaque tour
       assert(Combat.play(c, i, 1)); eq(c.player.block, DT.ward[r], "Bear -> Cat, premier du tour")
     end
   end
-  eq(node("shapeshifters_ward").text[2], ("The first form change each turn: gain %d Absorb."):format(DT.ward[2]))
+  eq(node("shapeshifters_ward").text[1], ("The first form change each turn: gain %d Absorb."):format(DT.ward[1]))
 end)
 
 test("Master Shapeshifter : un changement compté gratuit de plus ; avec Natural Shapeshifter", function()
