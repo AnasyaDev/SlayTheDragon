@@ -25,6 +25,17 @@ Combat.POTION_SLOTS = 3
 -- simulation seulement (oldstun=1).
 Combat.STUN_STOPS_TURN = true
 Combat.TRAP_SLOTS = 3 -- Traps posées au plus (crochet « trapSlots »)
+Combat.SUNDER_MULT = 1.25 -- Sundered (armor_broken) : dégâts reçus × 1,25 (constante « SUNDER_MULT », Combat.const)
+
+-- Constante de classe ou de combat lue sur l'état du combat (docs/talents.md, « Contrat du socle des talents ») :
+-- v = valeur du module (ns.Druid.TAX_FREE, Combat.ATONEMENT_HEAL…, lue à chaque appel : tune= reste valable),
+-- changée par les talents appris du combat qui déclarent const[name] (ns.Talent.const). Un talent ne touche
+-- jamais au module lui-même (l'addon chargé reste intact) ; sans talent, v tel quel (un test de champ).
+function Combat.const(c, name, v)
+  local ts = c.talents
+  if not ts then return v end
+  return ns.Talent.const(c.class, ts, name, v)
+end
 
 ---------------------------------------------------------------------------
 -- Journal d'événements (animations de l'interface, métriques)
@@ -183,6 +194,14 @@ function Combat.modify(c, name, v, a, b, d, x)
     local h = r and r.hooks and r.hooks[name]
     if h then v = h(c, relics[i], v, a, b, d, x) end
   end
+  local ts = c.talents -- talents appris (docs/talents.md), src = l'entrée { id, rank, spec }
+  if ts then
+    for i = 1, #ts do
+      local th = ns.Talent.hooks(c.class, ts[i])
+      local h = th and th[name]
+      if h then v = h(c, ts[i], v, a, b, d, x) end
+    end
+  end
   local affixes = c.affixes -- affixes mythiques (ns.Affixes), mêmes crochets
   if affixes then
     for i = 1, #affixes do
@@ -262,6 +281,14 @@ function Combat.fire(c, name, a, b, d, x)
     local h = r and r.hooks and r.hooks[name]
     if h and h(c, relics[i], a, b, d, x) then return true, relics[i] end
   end
+  local ts = c.talents
+  if ts then
+    for i = 1, #ts do
+      local th = ns.Talent.hooks(c.class, ts[i])
+      local h = th and th[name]
+      if h and h(c, ts[i], a, b, d, x) then return true, ts[i] end
+    end
+  end
   local affixes = c.affixes
   if affixes then
     for i = 1, #affixes do
@@ -280,7 +307,7 @@ function Combat.zoneState(c, id)
 end
 
 -- Noms de crochets écoutés dans ce combat (c.hk, posé par Combat.new : classe, zones actives, bibelots,
--- affixes, toutes les cartes du deck ; complété par Combat.addCard et Combat.transformCard). Combat.modify
+-- talents, affixes, toutes les cartes du deck ; complété par Combat.addCard et Combat.transformCard). Combat.modify
 -- et Combat.fire ne parcourent les crochets que si leur nom y figure : toute source de crochets ajoutée en
 -- cours de combat doit compléter c.hk (copie, Combat.listenCard). c.hk absent (ancienne sauvegarde) = tout
 -- est écouté.
@@ -309,6 +336,7 @@ function Combat.collectHooks(c, deck)
   for _, id in ipairs(c.zr or {}) do addHookNames(hk, ZRules[id] and ZRules[id].hooks) end
   for _, id in ipairs(c.relics) do addHookNames(hk, ns.Relics[id] and ns.Relics[id].hooks) end
   for _, id in ipairs(c.affixes or {}) do addHookNames(hk, ns.Affixes[id] and ns.Affixes[id].hooks) end
+  for _, t in ipairs(c.talents or {}) do addHookNames(hk, ns.Talent.hooks(c.class, t)) end
   for _, card in ipairs(deck or {}) do cardHookNames(hk, card.id) end
   return hk
 end
@@ -583,7 +611,9 @@ function Combat.applyStatus(c, unit, id, n, icon)
   end
   local v = old + n
   -- plafond de l'état (def.max : Parry 3 ; def.flag : présent ou non, valeur 1)
+  -- (def.maxKey : nom de constante, Combat.const : un talent peut relever le plafond, Parry → PARRY_MAX)
   local cap = def.max or (def.flag and 1) or nil
+  if def.maxKey and cap then cap = Combat.const(c, def.maxKey, cap) end
   -- élite Stun Resistant : Stunned 1 au plus (Stunned 2 devient Stunned 1)
   if id == "stunned" and Combat.stunResistant(unit) then cap = 1 end
   if cap and v > cap then v = cap end
@@ -715,7 +745,7 @@ function Combat.calcDamage(c, src, dst, base, cardDef)
     if (src.st.demoralized or 0) > 0 then dmg = floor(dmg * 0.75) end
   end
   if dst then
-    if (dst.st.armor_broken or 0) > 0 then dmg = floor(dmg * 1.25) end
+    if (dst.st.armor_broken or 0) > 0 then dmg = floor(dmg * Combat.const(c, "SUNDER_MULT", Combat.SUNDER_MULT)) end
     if (dst.st.halved or 0) > 0 then dmg = floor(dmg / 2) end
   end
   if dmg < 0 then dmg = 0 end
@@ -1785,7 +1815,7 @@ local function resolveEffects(c, inst, d, target, cast, spent, copy)
     if c.result then break end
   end
   if ctx.dealt and not c.result and (c.player.st.atonement or 0) > 0 then
-    Combat.heal(c, c.player, Combat.ATONEMENT_HEAL)
+    Combat.heal(c, c.player, Combat.const(c, "ATONEMENT_HEAL", Combat.ATONEMENT_HEAL))
   end
   if not c.result then Combat.fire(c, "onCardPlayed", inst, ctx) end
   c.cardCtx = outerCtx
@@ -2405,7 +2435,9 @@ end
 --        zone = id de ns.Zones (règles de zone), kind = "combat" | "elite" | "boss" (genre du combat),
 --        mods = { st = { état = n }, hpMul } (posés sur chaque ennemi de départ hors boss : rencontre
 --        « Sleeping Camp », Gurubashi Arena), start = { effets } (résolus après le début du premier tour,
---        l'Absorb tient donc ce tour : boissons du Grim Guzzler, exp.nextCombat)
+--        l'Absorb tient donc ce tour : boissons du Grim Guzzler, exp.nextCombat),
+--        talents = { { id, rank, spec }, … } (talents appris, ns.Talent.entries : c.talents, liste propre au combat),
+--        tstate = { … } (état d'expédition des talents, exp.talentState : c.tstate, relu en fin de combat)
 -- État propre à la classe : c.cls (table de données simples, vide au départ, remplie par
 -- ns.ClassRules[classe].init) ; ressource : c.player.res. États des zones : c.zs[id] (ZoneRules.init).
 function Combat.new(opts)
@@ -2432,6 +2464,7 @@ function Combat.new(opts)
     enemies = {}, relics = U.copyArr(opts.relics or {}), relicState = {},
     affixes = U.copyArr(opts.affixes or {}),
     charges = U.copyMap(opts.charges or {}),
+    talents = opts.talents, tstate = opts.talents and (opts.tstate or {}) or nil,
     stats = opts.stats and Combat.newStats() or nil,
   }
   local potions = opts.potions or {}
@@ -2571,6 +2604,7 @@ function Combat.clone(c)
     zs = c.zs and U.copy(c.zs) or nil, -- états des zones : copie profonde (c.zr, liste figée, partagée)
     turn = { played = turn.played, byType = copyMap(turn.byType), bySchool = copyMap(turn.bySchool) },
     charges = copyMap(c.charges),
+    tstate = c.tstate and U.copy(c.tstate) or nil, -- état d'expédition des talents (une fois par expédition…)
     rng = { draw = copyMap(rng.draw), ai = copyMap(rng.ai), misc = copyMap(rng.misc),
       cards = rng.cards and copyMap(rng.cards) or nil },
     player = copyUnit(c.player),
@@ -2581,7 +2615,7 @@ function Combat.clone(c)
     -- partagés (listes figées, instances) ou nombres et chaînes
     seed = c.seed, round = c.round, phase = c.phase, step = c.step, result = c.result, class = c.class,
     zone = c.zone, kind = c.kind, nextUid = c.nextUid, relics = c.relics, affixes = c.affixes, hk = c.hk,
-    zr = c.zr, epic = c.epic, fxDepth = c.fxDepth, fxSeq = c.fxSeq, lifts = c.lifts,
+    zr = c.zr, epic = c.epic, fxDepth = c.fxDepth, fxSeq = c.fxSeq, lifts = c.lifts, talents = c.talents,
   }
   for k, v in pairs(c) do
     if n[k] == nil then n[k] = v end

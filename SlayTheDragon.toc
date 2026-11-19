@@ -21,6 +21,7 @@ Core\Zones.lua
 Core\Meta.lua
 Core\Expedition.lua
 Core\Save.lua
+Core\Talents.lua
 Data\Priest.lua
 Core\Classes\priest.lua
 Data\Warrior.lua
@@ -33,6 +34,13 @@ Data\Hunter.lua
 Core\Classes\hunter.lua
 Data\Druid.lua
 Core\Classes\druid.lua
+Data\Talents\common.lua
+Data\Talents\priest.lua
+Data\Talents\warrior.lua
+Data\Talents\rogue.lua
+Data\Talents\mage.lua
+Data\Talents\hunter.lua
+Data\Talents\druid.lua
 Core\ZoneRules.lua
 Data\Neutral.lua
 Data\Zones\Westfall.lua

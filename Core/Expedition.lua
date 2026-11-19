@@ -184,11 +184,38 @@ local function zoneRuns(exp)
   return ns.Combat.zoneRulesFor(exp.zone)
 end
 
+-- Talents appris de l'expédition (exp.talents, figés au départ : docs/talents.md) : leurs crochets d'expédition
+-- (run) passent juste après ceux des bibelots, avec src = l'entrée du talent { id, rank, spec } en deuxième
+-- argument : modify (exp, src, v, a, b, d), fire (exp, src, a, b, d).
+local function talentModify(exp, name, v, a, b, d)
+  local ts = exp.talents
+  if not ts then return v end
+  for i = 1, #ts do
+    local r = ns.Talent.run(exp.class, ts[i])
+    local h = r and r[name]
+    if h then v = h(exp, ts[i], v, a, b, d) end
+  end
+  return v
+end
+
+local function talentFire(exp, name, a, b, d)
+  local ts = exp.talents
+  if not ts then return false end
+  for i = 1, #ts do
+    local r = ns.Talent.run(exp.class, ts[i])
+    local h = r and r[name]
+    if h and h(exp, ts[i], a, b, d) then return true end
+  end
+  return false
+end
+
 -- Valeur modifiée : chaque crochet reçoit (exp, v, a, b) et renvoie la nouvelle valeur.
 -- Noms utilisés : gold (v, source), goldBonus (v, source : ajouts fixes, après tous les « gold »),
 -- restFraction (v), restHeal (v), price (v, genre), removePrice (v : prix du retrait chez le marchand),
--- rewardCards (v = 3, genre : cartes offertes par une récompense de combat).
-function X.modify(exp, name, v, a, b)
+-- rewardCards (v = 3, genre : cartes offertes par une récompense de combat), zoneHeal (v = X.ZONE_HEAL : part des
+-- PV max soignée au passage d'une zone), startMaxHp (v = PV de la classe), startGold (v = X.START_GOLD),
+-- startEpics (v = 0 : épiques choisies au départ parmi celles des zones gagnées ; talents seulement, au départ).
+function X.modify(exp, name, v, a, b, d)
   local zr = zoneRuns(exp)
   if zr then
     for i = 1, #zr do
@@ -203,6 +230,7 @@ function X.modify(exp, name, v, a, b)
     local h = r and r.run and r.run[name]
     if h then v = h(exp, v, a, b) end
   end
+  if exp.talents then v = talentModify(exp, name, v, a, b, d) end
   local affixes = exp.affixes
   for i = 1, #affixes do
     local af = ns.Affixes[affixes[i]]
@@ -213,10 +241,11 @@ function X.modify(exp, name, v, a, b)
 end
 
 -- Notification : chaque crochet reçoit (exp, a, b) ; true arrête la chaîne.
--- Noms utilisés : onNodeEnter (nœud), onCombatWon (genre), onRest, onRewardRolled (récompense, genre :
--- tirée à l'entrée de l'étape, modifiable), onFightStart (exp.fight, options du combat).
+-- Noms utilisés : onNodeEnter (nœud), onCombatWon (genre, exp.fight, état du combat terminé : c.player.res,
+-- c.player.hp… ; les PV de l'expédition sont déjà ceux de la fin du combat), onRest, onRewardRolled (récompense,
+-- genre : tirée à l'entrée de l'étape, modifiable), onFightStart (exp.fight, options du combat).
 -- Bibelot « utile à cette classe » : champ `needs` (voir X.usefulFor), sinon toujours proposé.
-function X.fire(exp, name, a, b)
+function X.fire(exp, name, a, b, d)
   local zr = zoneRuns(exp)
   if zr then
     for i = 1, #zr do
@@ -231,6 +260,7 @@ function X.fire(exp, name, a, b)
     local h = r and r.run and r.run[name]
     if h and h(exp, a, b) then return true end
   end
+  if exp.talents and talentFire(exp, name, a, b, d) then return true end
   local affixes = exp.affixes
   for i = 1, #affixes do
     local af = ns.Affixes[affixes[i]]
@@ -609,6 +639,8 @@ local function heal(exp, n)
   exp.hp = min(exp.maxHp, exp.hp + max(0, n))
   return exp.hp - before
 end
+-- Soin hors combat (crochet healOut compris) : talents de fin de combat (Second Wind). Renvoie les PV rendus.
+X.healOut = heal
 
 -- Prix du retrait (crochet removePrice : Darkmoon Faire Prize Ticket) ; exp.shop.removed = retraits
 -- faits pendant la visite en cours du marchand.
@@ -730,7 +762,7 @@ local function enterZone(exp, zone)
   local from = exp.zone
   exp.zone = zone
   startAct(exp, (exp.act or 1) + 1)
-  local healed = heal(exp, floor(exp.maxHp * X.ZONE_HEAL))
+  local healed = heal(exp, floor(exp.maxHp * X.modify(exp, "zoneHeal", X.ZONE_HEAL)))
   exp.transit = { from = from, to = zone, healed = healed }
   exp.phase = "transit"
 end
@@ -852,6 +884,8 @@ local function endFight(exp)
   exp.hp = max(0, p.hp)
   exp.maxHp = p.maxHp
   if p.potions then exp.potions = U.copy(p.potions) end
+  -- état d'expédition des talents (« une fois par expédition », Rage gardée) : repris du combat
+  if c.tstate then exp.talentState = U.copy(c.tstate) end
   exp.combat, exp.fight = nil, nil
   if c.result == "won" then
     clearNode(exp)
@@ -863,7 +897,7 @@ local function endFight(exp)
       exp.beaten = exp.beaten or {}
       exp.beaten[#exp.beaten + 1] = exp.zone
     end
-    X.fire(exp, "onCombatWon", f.kind, f)
+    X.fire(exp, "onCombatWon", f.kind, f, c)
     X.rollEpicDrop(exp, f.reward, f.kind)
     openReward(exp, f.reward)
   else
@@ -904,7 +938,10 @@ local function startFight(exp, kind, pool, reward, extra)
   local opts = { seed = seed, class = exp.class, hp = exp.hp, maxHp = exp.maxHp, deck = exp.deck,
     encounter = list[idx], relics = exp.relics, potions = U.copy(exp.potions), affixes = exp.affixes,
     stats = exp.combatStats, quiet = exp.quiet, zone = exp.zone, kind = kind,
-    mods = extra and extra.mods or nil, start = exp.nextCombat }
+    mods = extra and extra.mods or nil, start = exp.nextCombat,
+    -- talents figés au départ (copies : l'état du combat est sauvegardé dans exp, sans table partagée)
+    talents = exp.talents and U.copy(exp.talents) or nil,
+    tstate = exp.talents and U.copy(exp.talentState or {}) or nil }
   exp.nextCombat = nil
   X.fire(exp, "onFightStart", exp.fight, opts)
   exp.combat = Combat.new(opts)
@@ -1490,8 +1527,10 @@ end
 -- (décision du joueur, 14/11/2026). zone et lastZone ne servent qu'aux tests et à la simulation (isoler une zone).
 -- opts : seed, class ("priest"), zone (zone de départ, défaut : la première), lastZone (zone dont le boss
 --        termine l'expédition, défaut : la dernière de la campagne), key (0..5),
---        unlocks = { level = 1..7 (niveau de classe), common = 0..7 (palier commun du compte),
---                    won = { [zone] = meilleure clé gagnée par la classe } } (Meta.unlocks),
+--        unlocks = { level = 1..7 (palier de contenu de la classe), common = 0..7 (palier commun du compte),
+--                    won = { [zone] = meilleure clé gagnée par la classe },
+--                    talents = { [nœud] = rang }, spec = voie (arbre de la classe ; absent = aucun talent) }
+--                  (Meta.unlocks),
 --        flags = { nom = true } (drapeaux de compte, fournis par Meta.newExpedition),
 --        stats (statistiques de combat, simulation), quiet (combat sans journal d'événements),
 --        epic = id d'une carte épique ajoutée au deck de départ (simulation)
@@ -1536,6 +1575,19 @@ function X.new(opts)
     combatStats = opts.stats and true or false,
     quiet = opts.quiet and true or false,
   }
+  -- talents figés au départ (docs/talents.md) : copie de l'arbre (exp.unlock.talents, exp.unlock.spec), liste dans
+  -- l'ordre de l'arbre (exp.talents : crochets d'expédition et de combat), état propre (exp.talentState : « une
+  -- fois par expédition », Rage gardée…). Sans talent : aucun de ces champs, l'expédition d'avant les talents.
+  local tl = ns.Talent and ns.Talent.entries(class, unlock.talents, unlock.spec)
+  if tl then
+    exp.unlock.talents = U.copyMap(unlock.talents)
+    exp.unlock.spec = unlock.spec
+    exp.talents = tl
+    exp.talentState = {}
+    exp.maxHp = max(1, floor(X.modify(exp, "startMaxHp", exp.maxHp)))
+    exp.hp = exp.maxHp
+    exp.gold = max(0, floor(X.modify(exp, "startGold", exp.gold)))
+  end
   for i = 1, X.POTION_SLOTS do exp.potions[i] = false end
   for i = 1, #cdef.deck do exp.deck[i] = { id = cdef.deck[i], up = false } end
   -- épiques imposées au départ (simulation : epic=<id> ou epic=a+b+c, ou une liste), comme des épiques prises,
@@ -1574,7 +1626,25 @@ function X.new(opts)
       exp.phase = "start"
     end
   end
+  -- Épiques au départ (talent Veteran's Arsenal, crochet startEpics) : n choix successifs parmi toutes les épiques
+  -- de la classe proposables (zones gagnées par la classe, X.epicPool), avant le bibelot de départ ; aucun tirage.
+  if exp.talents then
+    local n = floor(X.modify(exp, "startEpics", 0))
+    if n > 0 and #X.epicPool(exp) > 0 then
+      exp.talentEpics = X.epicPool(exp)
+      exp.talentEpicsLeft = n
+      exp.phase = "start"
+    end
+  end
   return exp
+end
+
+-- Phase « start » : épiques au départ d'abord (exp.talentEpics), puis le bibelot de départ, puis la carte.
+local function nextStart(exp)
+  if exp.talentEpics and (exp.talentEpicsLeft or 0) > 0 and #exp.talentEpics > 0 then return end
+  exp.talentEpics, exp.talentEpicsLeft = nil, nil
+  if exp.startRelics then return end
+  exp.phase = "map"
 end
 
 ---------------------------------------------------------------------------
@@ -1585,8 +1655,26 @@ local H = {} -- H[phase][verbe] = function(exp, a) -> true | false, raison
 
 -- Phase « start » : le bibelot de départ (exp.startRelics), puis la carte.
 H.start = {
+  -- épique au départ (Veteran's Arsenal) : l'épique a[2] de exp.talentEpics entre au deck (comme une épique prise)
+  talentEpic = function(exp, a)
+    local list = exp.talentEpics
+    local id = list and list[a[2] or 0]
+    if not id then return false, "index" end
+    X.addCard(exp, id, nil, true) -- sans plafond, comme une épique imposée
+    exp.stats.cardsAdded = exp.stats.cardsAdded - 1
+    table.remove(list, a[2])
+    exp.talentEpicsLeft = exp.talentEpicsLeft - 1
+    nextStart(exp)
+    return true
+  end,
+  skipTalentEpic = function(exp)
+    if not exp.talentEpics then return false, "index" end
+    exp.talentEpicsLeft = 0
+    nextStart(exp)
+    return true
+  end,
   startRelic = function(exp, a)
-    if not exp.startRelics then return false, "index" end
+    if exp.talentEpics or not exp.startRelics then return false, "index" end
     local id = exp.startRelics[a[2] or 0]
     if not id then return false, "index" end
     X.gainRelic(exp, id)
@@ -1595,7 +1683,7 @@ H.start = {
     return true
   end,
   skipStartRelic = function(exp)
-    if not exp.startRelics then return false, "index" end
+    if exp.talentEpics or not exp.startRelics then return false, "index" end
     exp.startRelics = nil
     exp.phase = "map"
     return true
@@ -1870,7 +1958,10 @@ function X.choices(exp)
   local ph = exp.phase
   local function add(a) list[#list + 1] = a end
   if ph == "start" then
-    if exp.startRelics then
+    if exp.talentEpics then
+      for i = 1, #exp.talentEpics do add({ "talentEpic", i }) end
+      add({ "skipTalentEpic" })
+    elseif exp.startRelics then
       for i = 1, #exp.startRelics do add({ "startRelic", i }) end
       add({ "skipStartRelic" })
     end

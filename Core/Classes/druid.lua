@@ -84,15 +84,20 @@ function Druid.taxed(from, to)
   return not ((from == "cat" and to == "bear") or (from == "bear" and to == "cat"))
 end
 
--- Mana perdu au tour suivant pour n changements de forme comptés dans un tour (levier A ; 0 si TAX = 0).
-function Druid.taxOf(n)
-  local over = (n or 0) - Druid.TAX_FREE
-  if Druid.TAX <= 0 or over <= 0 then return 0 end
-  return math.min(Druid.TAX_MAX, over * Druid.TAX)
+-- Mana perdu au tour suivant pour n changements de forme comptés dans un tour (levier A ; 0 si TAX = 0). c
+-- (facultatif) : combat dont les talents changent TAX_FREE, TAX, TAX_MAX (Combat.const ; sans c, les constantes).
+function Druid.taxOf(n, c)
+  local free, tax, cap = Druid.TAX_FREE, Druid.TAX, Druid.TAX_MAX
+  if c then
+    free, tax, cap = Combat.const(c, "TAX_FREE", free), Combat.const(c, "TAX", tax), Combat.const(c, "TAX_MAX", cap)
+  end
+  local over = (n or 0) - free
+  if tax <= 0 or over <= 0 then return 0 end
+  return math.min(cap, over * tax)
 end
 
 -- Malus de mana à venir si le tour finissait maintenant (pastille de la vue).
-function Druid.pendingTax(c) return Druid.taxOf(c.cls and c.cls.taxed or 0) end
+function Druid.pendingTax(c) return Druid.taxOf(c.cls and c.cls.taxed or 0, c) end
 
 -- Clearcasting : une carte Attack sans la plaque Cast (lue sur la carte, Instant ou non).
 local function clearcastable(d) return d.type == "attack" and not d.cast end
@@ -115,7 +120,7 @@ function Druid.strikeTarget(c)
 end
 
 function Druid.strikeBase(c)
-  return Combat.modify(c, "bearStrike", Druid.STRIKE_BASE)
+  return Combat.modify(c, "bearStrike", Combat.const(c, "STRIKE_BASE", Druid.STRIKE_BASE))
 end
 
 function Druid.bearStrike(c, why, counted)
@@ -152,7 +157,7 @@ end
 local PULSE = { kind = "other" }
 
 function Druid.pulseBase(c)
-  return math.min(Druid.PULSE_MAX, math.ceil((c.player.res or 0) / 2))
+  return math.min(Combat.const(c, "PULSE_MAX", Druid.PULSE_MAX), math.ceil((c.player.res or 0) / 2))
 end
 
 function Druid.moonkinPulse(c)
@@ -177,7 +182,7 @@ function Druid.endOfTurn(c)
   elseif form == "moonkin" then
     Druid.moonkinPulse(c)
   elseif form == "tree" then
-    Combat.gainBlock(c, p, Druid.TREE_ABSORB)
+    Combat.gainBlock(c, p, Combat.const(c, "TREE_ABSORB", Druid.TREE_ABSORB))
   end
 end
 
@@ -227,7 +232,7 @@ ns.ClassRules.druid = {
       cls.taxed = 0
     end,
     onTurnEnd = function(c, cls)
-      cls.tax = Druid.taxOf(cls.taxed)
+      cls.tax = Druid.taxOf(cls.taxed, c)
       if cls.tax > 0 then stat(c, "druid_tax", cls.tax) end
       Druid.endOfTurn(c)
     end,

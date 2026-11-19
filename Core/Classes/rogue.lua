@@ -16,8 +16,12 @@ local Combat, Rng = ns.Combat, ns.Rng
 local L = ns.Language
 
 local PARRY_MAX, PARRY_STOP = 3, 8
+-- Constantes lues sur l'état du combat (Combat.const, talents : docs/talents.md) : plafond de Parry (maxKey de
+-- l'état) et dégâts arrêtés par charge.
+ns.Rogue = ns.Rogue or {}
+ns.Rogue.PARRY_MAX, ns.Rogue.PARRY_STOP = PARRY_MAX, PARRY_STOP
 
-ns.Statuses.parry = { name = "Parry", max = PARRY_MAX,
+ns.Statuses.parry = { name = "Parry", max = PARRY_MAX, maxKey = "PARRY_MAX",
   text = "Each charge stops one hit, up to 8 damage. Max 3." }
 ns.Statuses.stealth = { name = "Stealth", flag = true,
   text = "The next Attack played consumes it for its Stealth: bonus." }
@@ -88,7 +92,8 @@ ns.ClassRules.rogue = {
       local p = c.player
       local n = p.st.parry or 0
       if n <= 0 or dmg <= 0 then return dmg end
-      local stop = dmg < PARRY_STOP and dmg or PARRY_STOP
+      local cap = Combat.const(c, "PARRY_STOP", ns.Rogue.PARRY_STOP)
+      local stop = dmg < cap and dmg or cap
       n = n - 1
       p.st.parry = n > 0 and n or nil
       Combat.log(c, { t = "parry", src = Combat.uref(enemy), prevented = stop, left = n })
@@ -145,7 +150,7 @@ ns.ClassRules.rogue = {
 -- et affixes (docs/classes.md, « Cartes épiques »). Leur état vit dans c.cls (copié par Combat.clone, sauvegardé), jamais
 -- dans src (partagé entre les copies des bots). Nombres : Rogue.EPIC (base, +1, +2, +3), à garder
 -- d'accord avec les textes de Data/Rogue.lua (vérifié par Sim/tests_epic_rogue.lua).
-local Rogue = {}
+local Rogue = ns.Rogue or {}
 ns.Rogue = Rogue
 local C = ns.Cards
 

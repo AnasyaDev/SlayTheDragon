@@ -90,11 +90,14 @@ function Hunter.petTarget(c)
   return Combat.strikeTarget(c)
 end
 
+-- Base du coup du familier dans ce combat : PET_BASE, changée par les talents (Combat.const « PET_BASE »).
+function Hunter.petBase(c) return Combat.const(c, "PET_BASE", Hunter.PET_BASE) end
+
 -- Dégâts du prochain coup du familier sur sa cible (affichage, bots), frenzy facultatif.
 function Hunter.petDamage(c, t, frenzy)
   t = t or Hunter.petTarget(c)
   if not t then return 0 end
-  return Combat.calcDamage(c, c.player, t, Hunter.PET_BASE + (frenzy or c.player.res or 0), nil)
+  return Combat.calcDamage(c, c.player, t, Hunter.petBase(c) + (frenzy or c.player.res or 0), nil)
 end
 
 -- Une attaque du familier. why : "auto" (fin de tour), "card", "relic", "surge" (pas de Frenzy gagné) ;
@@ -128,7 +131,7 @@ function Hunter.petAttack(c, why, frenzy)
   local all = Hunter.petAll(c)
   local opts = { res = frenzy == nil, gain = why ~= "surge" and 1 or 0, gainWhy = "pet",
     count = "petAttacks", total = "petDamage", all = all, less = all and Hunter.petLess(c) or nil }
-  return Combat.strike(c, why, Hunter.PET_BASE + (frenzy or 0), t, "pet_attack", "onPetAttack", opts)
+  return Combat.strike(c, why, Hunter.petBase(c) + (frenzy or 0), t, "pet_attack", "onPetAttack", opts)
 end
 
 -- Une attaque du familier sur la cible imposée e (Trap Launcher, Black Arrow), sans changer sa cible
