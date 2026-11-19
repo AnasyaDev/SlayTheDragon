@@ -457,6 +457,15 @@ campagne »).
   liée à la zone, le commun du compte, les bibelots de clé, l'expérience des étapes franchies et les drapeaux ;
   rien n'attend la fin de l'expédition. `exp.unlock` et `exp.flags` restent figés au départ (un déblocage gagné
   en route ne sert qu'à l'expédition suivante, comme avant).
+- **Sans épique, mur après la zone 4 (décision du joueur, 19/11/2026).** Sans carte épique dans le deck, la
+  chance d'aller au-delà de Stranglethorn Vale tombe drastiquement : un compte neuf bute vers la zone 4 à sa
+  première expédition, puis repart avec les épiques des zones gagnées et peut finir dès la suivante. Cible
+  (battue / atteinte, bot `human`, clé 0) : zones 1 à 3 inchangées ; Stranglethorn 60 % sans épique / 90 % avec,
+  Swamp of Sorrows 35 / 80, Burning Steppes 30 / 80, Blackrock Mountain 25 / 75. Levier : la **dureté des zones**
+  (`ns.Zone.HARD`, `Core/Zones.lua` : facteur sur les PV et les coups de tous les ennemis de la zone, 1,45 / 1,8 /
+  2,15 / 2,3 ; `docs/zones.md`, « Dureté des zones »). La colonne « sans épique » est atteinte ; la colonne « avec
+  épique » ne l'est pas encore (une épique n'apporte que 0 à 10 points) : leviers mesurés et choix laissé au
+  joueur dans `docs/equilibrage.md`, « Mur des zones 4 à 7 sans épique (19/11/2026) ».
 - **Zone la plus loin atteinte** : `cs.farthest` (l'entrée en phase `transit` compte comme atteinte).
 - **Diagnostic** (tests, simulation) : `Expedition.new{ zone = <départ>, lastZone = <arrêt> }` ; une zone hors
   de la campagne (zone factice des tests) est jouée seule.

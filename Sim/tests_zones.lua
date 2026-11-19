@@ -864,10 +864,61 @@ test("simulation : une expédition complète dans la zone factice (bot, case de 
 end)
 
 ---------------------------------------------------------------------------
+-- Dureté des zones (ns.Zone.HARD, Combat.zoneHard) : PV et coups des ennemis, avant les clés
+---------------------------------------------------------------------------
+
+test("Dureté de zone : PV à l'apparition et coups annoncés, avant les clés ; épique ; hors zone inchangé", function()
+  noZone()
+  local H = ns.Zone.HARD
+  -- zones 1 à 3 sans facteur, zones 4 à 7 durcies (décision du 19/11/2026)
+  for _, id in ipairs({ "westfall", "duskwood", "wetlands" }) do eq(H[id], nil, id) end
+  for _, id in ipairs({ "stranglethorn", "swamp", "steppes", "blackrock" }) do
+    assert(H[id] and H[id].hp > 1 and H[id].dmg > 1, "zone durcie : " .. id)
+  end
+  H.testzone = { hp = 1.5, dmg = 1.3 }
+  local c = combat({ zone = "testzone", enemies = { "zt_hitter" } })
+  local e = c.enemies[1]
+  eq(e.hp, 75, "PV 50 × 1,5")
+  eq(e.maxHp, 75)
+  eq(E.zt_hitter.hp, 50, "fiche intacte")
+  local info = Combat.intentInfo(c, e)
+  eq(info.damage, 7, "coup 5 × 1,3 arrondi")
+  local hp0 = c.player.hp
+  Combat.endTurn(c)
+  eq(hp0 - c.player.hp, 14, "deux coups de 7 encaissés")
+  -- Force ajoutée avant le facteur : (5 + 2) × 1,3 = 9,1 -> 9
+  e.st.force = 2
+  eq(Combat.intentInfo(c, e).damage, 9, "Force puis facteur")
+  -- clé +1 (Fortified, +12 % aux ennemis normaux) : après le facteur de zone, 75 × 1,12 = 84
+  local k = Combat.new({ seed = 7, class = "priest", hp = 60, deck = { { id = "zt_strike", up = false } },
+    encounter = { "zt_hitter" }, zone = "testzone", affixes = { "fortified" } })
+  eq(k.enemies[1].maxHp, 84, "clé après la zone")
+  -- epicHp / epicDmg : facteurs d'un combat dont le deck a une épique
+  ns.Cards.zt_epic = { id = "zt_epic", name = "Epic", type = "power", rarity = "epic", cost = 0, text = "" }
+  H.testzone.epicHp, H.testzone.epicDmg = 1.1, 1
+  local ep = Combat.new({ seed = 7, class = "priest", hp = 60, encounter = { "zt_hitter" }, zone = "testzone",
+    deck = { { id = "zt_epic", up = false }, { id = "zt_strike", up = false } } })
+  assert(ep.epic, "épique posée")
+  eq(ep.enemies[1].maxHp, 55, "PV 50 × 1,1 avec épique")
+  eq(Combat.intentInfo(ep, ep.enemies[1]).damage, 5, "coup inchangé avec épique")
+  local ne = Combat.new({ seed = 7, class = "priest", hp = 60, encounter = { "zt_hitter" }, zone = "testzone",
+    deck = { { id = "zt_strike", up = false } } })
+  eq(ne.enemies[1].maxHp, 75, "sans épique : facteur de base")
+  ns.Cards.zt_epic, H.testzone = nil, nil
+  -- sans zone ou zone sans facteur : rien ne change
+  eq(combat({ enemies = { "zt_hitter" } }).enemies[1].maxHp, 50)
+  eq(combat({ zone = "westfall", enemies = { "zt_hitter" } }).enemies[1].maxHp, 50)
+end)
+
+---------------------------------------------------------------------------
 -- Tests propres à chaque zone : Sim/tests_zone_<zone>.lua (return function(T) … end)
 ---------------------------------------------------------------------------
 
+-- Les tests de zone vérifient les chiffres des fiches et les mécaniques : dureté neutre le temps de les lancer
+-- (la dureté a son propre test ci-dessus).
 noZone()
+local hard = ns.Zone.HARD
+ns.Zone.HARD = {}
 for _, id in ipairs(ns.Zone.ORDER) do
   local path = root .. "/Sim/tests_zone_" .. id .. ".lua"
   local f = io.open(path, "r")
@@ -877,6 +928,7 @@ for _, id in ipairs(ns.Zone.ORDER) do
     dofile(path)(T)
   end
 end
+ns.Zone.HARD = hard
 
 print(("%d réussis, %d échoués"):format(passed, failed))
 if failed == 0 then print("ALL PASS") else os.exit(1) end

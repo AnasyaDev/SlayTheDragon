@@ -645,6 +645,15 @@ end
 -- Dégâts, soins, Absorption
 ---------------------------------------------------------------------------
 
+-- Facteur de dureté de la zone du combat (ns.Zone.HARD, Core/Zones.lua) : champ `field` ("hp" | "dmg") ;
+-- combat avec une épique (c.epic) : champ `efield` ("epicHp" | "epicDmg") s'il est posé. 1 sans zone.
+function Combat.zoneHard(c, field, efield)
+  local zh = c.zone and ns.Zone.HARD[c.zone]
+  if not zh then return 1 end
+  if c.epic and zh[efield] then return zh[efield] end
+  return zh[field] or 1
+end
+
 -- Dégâts d'un coup de src sur dst (src nil = dégâts sans source, ex. Douleur).
 -- cardDef : définition de la carte à l'origine du coup, s'il y en a une.
 function Combat.calcDamage(c, src, dst, base, cardDef)
@@ -659,7 +668,12 @@ function Combat.calcDamage(c, src, dst, base, cardDef)
         local m = Combat.modify(c, "attackMult", 1, dst, cardDef)
         if m ~= 1 then dmg = floor(dmg * m) end
       end
-    else dmg = Combat.modify(c, "enemyDamage", dmg, src, dst) end
+    else
+      -- dureté de la zone (ns.Zone.HARD) : après la Force, avant le crochet des clés
+      local zf = Combat.zoneHard(c, "dmg", "epicDmg")
+      if zf ~= 1 then dmg = floor(dmg * zf + 0.5) end
+      dmg = Combat.modify(c, "enemyDamage", dmg, src, dst)
+    end
     if (src.st.demoralized or 0) > 0 then dmg = floor(dmg * 0.75) end
   end
   if dst then
@@ -916,6 +930,9 @@ function Combat.spawn(c, spec, by)
   if type(hp) == "table" then hp = Rng.int(c.rng.ai, hp[1], hp[2]) end
   if opt and opt.hp then hp = opt.hp end
   if opt and opt.hpMul then hp = floor(hp * opt.hpMul + 0.5) end
+  -- dureté de la zone (ns.Zone.HARD) : avant le crochet des clés
+  local zf = Combat.zoneHard(c, "hp", "epicHp")
+  if zf ~= 1 then hp = floor(hp * zf + 0.5) end
   hp = Combat.modify(c, "enemyHp", hp, def)
   local e = {
     side = "enemy", uid = c.nextUid, id = id,

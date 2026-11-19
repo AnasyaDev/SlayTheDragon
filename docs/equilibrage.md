@@ -1550,3 +1550,152 @@ Balance 0,62 mana par tour (départ 0,81 / 0,86 / 0,73).
 - Non vérifié : autres graines, clés 1 à 5, épiques du Druid imposées (Furor, Lifebloom lisent des règles changées :
   aucun chiffre d'épique touché), niveaux 2 à 6, les zones 4 à 7 durcies par l'autre lot ; `docs/classes.md` et
   `docs/interface.md` citent encore l'ancienne infobulle de Tree of Life (« gain Regen 1 »).
+
+## Mur des zones 4 à 7 sans épique (19/11/2026)
+
+Décision du joueur : sans carte épique dans le deck, la chance d'aller au-delà de la zone 4 doit tomber
+drastiquement (un compte neuf bute vers la zone 4 à sa première expédition, puis repart avec les épiques des zones
+gagnées et peut finir dès la suivante). Cible, battue / atteinte (tableau « Par zone »), bot `human`, clé 0 :
+
+| Zone | Sans épique | Avec épique |
+|---|---|---|
+| 1 à 3 (Westfall, Duskwood, Wetlands) | inchangé | inchangé |
+| 4 Stranglethorn Vale | 60 % | 90 % |
+| 5 Swamp of Sorrows | 35 % | 80 % |
+| 6 Burning Steppes | 30 % | 80 % |
+| 7 Blackrock Mountain | 25 % | 75 % |
+
+**Levier : dureté des zones** (`ns.Zone.HARD`, `Core/Zones.lua` ; `docs/zones.md`, « Dureté des zones ») : un
+facteur sur les PV à l'apparition et un sur les coups de tous les ennemis de la zone, avant les clés ; les fiches ne
+bougent pas, l'unité et les intentions portent les vrais chiffres. Retenu : **1,45 / 1,8 / 2,15 / 2,3** (PV et
+coups) pour Stranglethorn / Swamp / Steppes / Blackrock ; zones 1 à 3 sans facteur. Mesure sans recoder :
+`zonehp=… zonedmg=…`. Rapport : nouveau tableau « Par zone, épique à l'entrée » (battue / atteinte avec et sans
+épique à l'entrée). Commande : `luajit Sim/sim.lua runner=expedition bot=human key=0 seed=1 jobs=8 runs=600
+class=<c> zones=7 [epic=none]`.
+
+Essais (`zones=7 epic=none`, moyenne des six classes sauf mention) : 1,3 partout (Warrior seul, 300) 83 / 96 /
+100 / 98 ; 1,6 partout (Warrior, 300) 40 / 71 / 95 / 94 ; 1,42 / 1,85 / 2,5 / 2,4 (300) 67 / 30 / 13 / 33 ;
+1,46 / 1,8 / 2,25 / 2,4 : 59,8 / 34,2 / 25,3 / 24,9 ; Stranglethorn en PV 1,65 et coups 1,3 : 68,3 (écart entre
+classes non réduit, 53 à 81 : écarté). Les zones tardives demandent des facteurs plus forts parce que seuls les
+meilleurs decks y arrivent ; la réponse est très raide (Swamp 1,6 → 71 %, 1,8 → 34 %, 2,0 → 18 % au Warrior).
+
+### Par zone, moyenne des six classes (battue / atteinte, %)
+
+| Zone | Sans épique avant | Sans épique après | Cible | Épiques gagnées avant | Épiques gagnées après (toutes / avec épique à l'entrée / sans) | Cible avec épique |
+|---|---|---|---|---|---|---|
+| Westfall | 83,8 | 83,8 | = | 84,7 | 84,7 | = |
+| Duskwood | 93,5 | 93,5 | = | 94,4 | 94,4 | = |
+| Wetlands | 96,7 | 96,7 | = | 97,5 | 97,5 | = |
+| Stranglethorn Vale | 98,6 | **63,9** | 60 | 98,5 | 64,5 / **65,1** / 62,6 | 90 |
+| Swamp of Sorrows | 98,8 | **33,9** | 35 | 98,9 | 40,5 / **40,9** / 36,8 | 80 |
+| Burning Steppes | 99,8 | **34,9** | 30 | 99,6 | 41,6 / **41,0** / (n < 10) | 80 |
+| Blackrock Mountain | 99,0 | **20,7** | 25 | 98,2 | 26,4 / **26,3** / (n < 10) | 75 |
+
+Zones 1 à 3 : rapports identiques ligne à ligne à graine égale (avant : `reports/epic-gate` du dépôt principal).
+Avant, une épique valait 0 à 5 points sous l'effet de plafond ; plafond levé, elle vaut **+1 / +7 / +6 / +5
+points** en moyenne (Warrior +10 / +19 / +17 / +18, Priest −8 à Stranglethorn) : la colonne « avec épique » est
+loin de la cible. (« Sans » dans une expédition aux épiques gagnées : le deck peut en gagner une en cours de zone.)
+
+### Par classe, sans épique (`zones=7 epic=none`, 600)
+
+| Classe | Victoires avant → après | Stranglethorn | Swamp | Steppes (n) | Blackrock (n) |
+|---|---|---|---|---|---|
+| Hunter | 79,7 → 1,8 | 66,6 | 32,4 | 33,0 (106) | 31,4 (35) |
+| Rogue | 72,0 → 1,5 | 50,2 | 27,6 | 42,9 (63) | 33,3 (27) |
+| Warrior | 74,5 → 1,5 | 63,4 | 44,8 | 41,9 (129) | 16,7 (54) |
+| Mage | 75,3 → 1,2 | 64,9 | 36,7 | 35,5 (110) | 17,9 (39) |
+| Druid | 67,3 → 0,3 | 65,0 | 30,2 | 23,5 (81) | 10,5 (19) |
+| Priest | 68,7 → 0,8 | 73,4 | 31,4 | 32,4 (105) | 14,7 (34) |
+| Moyenne (cible) | 72,9 → 1,2 | 63,9 (60) | 33,9 (35) | 34,9 (30) | 20,7 (25) |
+
+Aucune classe à plus de 15 points de la cible (les plus loin : Druid à Blackrock 10,5, Priest à Stranglethorn
+73,4) ; à Blackrock, 19 à 54 expéditions par classe y arrivent sans épique : ± 7 à 11 points par classe.
+
+### Victoires de campagne par classe (Nefarian battu, %)
+
+| Classe | Vétéran, épiques gagnées : avant → après | Vétéran sans épique : avant → après | Compte neuf `zones=0 level=1` : avant → après | 2e expédition `zones=3 level=2` | idem avec le levier A |
+|---|---|---|---|---|---|
+| Hunter | 81,8 → 2,5 | 79,7 → 1,8 | 34,0 → 0,0 | 0,0 | 14,3 |
+| Rogue | 77,3 → 2,0 | 72,0 → 1,5 | 41,5 → 0,0 | 0,0 | 13,5 |
+| Warrior | 76,7 → 7,2 | 74,5 → 1,5 | 43,3 → 0,0 | 2,7 | 39,5 |
+| Mage | 74,8 → 3,8 | 75,3 → 1,2 | 37,0 → 0,0 | 0,0 | 10,3 |
+| Druid | 70,8 → 0,5 | 67,3 → 0,3 | 36,2 → 0,0 | 0,0 | 12,0 |
+| Priest | 64,2 → 0,5 | 68,7 → 0,8 | 34,3 → 0,0 | 0,3 | 14,3 |
+
+Compte neuf (niveau 1, aucune épique) : Stranglethorn battue / atteinte **10,7 %** en moyenne (Hunter 1,5, Rogue
+2,6, Druid 4,4, Warrior 8,9, Mage 9,3, Priest 37,6 ; avant 90,5), Swamp 2,1 % : le mur tombe bien à la zone 4,
+plus dur que la cible du vétéran (le deck de niveau 1 est plus faible). 2e expédition (épiques des trois premières
+zones, niveau 2) sans levier : Stranglethorn 42,2 %, victoires 0,5 % : « peut finir dès la suivante » n'est pas
+tenu sans un levier d'épique.
+
+### Épiques imposées (`epic=<id> zones=7`, 600) : battue / atteinte, Stranglethorn / Swamp / Steppes / Blackrock
+
+| Épique | Avec | Sans épique (même classe) | Victoires |
+|---|---|---|---|
+| Hunter Call of the Wild (Westfall) | 75,3 / 45,9 / 31,1 / 33,9 | 66,6 / 32,4 / 33,0 / 31,4 | 3,3 |
+| Hunter Beast Cleave | 71,9 / **21,8** / 41,7 / 37,1 | | 2,2 |
+| Rogue Deflection (Westfall) | 59,7 / 28,3 / 36,7 / 36,4 | 50,2 / 27,6 / 42,9 / 33,3 | 2,0 |
+| Rogue Kidney Shot | 60,4 / 34,5 / 46,0 / 41,3 | | 3,2 |
+| Warrior Death Wish (Westfall) | 60,7 / 74,3 / 60,9 / 38,8 | 63,4 / 44,8 / 41,9 / 16,7 | 8,7 |
+| Warrior Titan's Grip | **89,4 / 85,7 / 75,4 / 59,9** | | 30,3 |
+| Mage Mirror Image (Westfall) | 79,0 / 68,6 / 69,9 / 36,5 | 64,9 / 36,7 / 35,5 / 17,9 | 12,2 |
+| Mage Water Elemental | 65,8 / 42,2 / 60,0 / 31,0 | | 4,5 |
+| Druid Furor (Westfall) | 71,6 / 52,3 / 39,0 / 4,7 | 65,0 / 30,2 / 23,5 / 10,5 | 0,7 |
+| Druid Eclipse | **50,9 / 28,8 / 16,4 / 0,0** | | 0,0 |
+| Priest Prayer of Mending (Westfall) | 61,9 / 18,3 / 25,9 / 6,7 | 73,4 / 31,4 / 32,4 / 14,7 | 0,2 |
+| Priest Misery | 64,5 / 20,7 / 28,6 / 5,6 | | 0,2 |
+| Priest Echo of Light | 62,2 / 13,6 / 37,2 / 37,5 | | 1,0 |
+| Priest Shadow Covenant | **40,9 / 15,5 / 16,0 / 0,0** (Wetlands 81,2 contre 97,0) | | 0,0 |
+| Priest Reflective Shield | 79,1 / 41,8 / 47,0 / 28,2 | | 3,7 |
+| Priest Voidform | 68,9 / 34,2 / 37,2 / 21,4 | | 1,5 |
+| Priest Inner Focus | 57,8 / 41,0 / 44,1 / 24,4 (Westfall 77,3 contre 82,7) | | 1,8 |
+
+(Biais : une épique dès le départ fait survivre des decks plus faibles aux zones 1 à 3, ce qui baisse un peu les
+taux conditionnels suivants ; Westfall passe par exemple de 82,7 à 89,2 avec Prayer of Mending.)
+
+- **Épiques qui n'apportent rien ou font perdre** : **Shadow Covenant** (Priest) fait perdre partout dès les
+  Wetlands : c'est elle qui tire le Priest vers le bas (« avec épique » sous « sans ») ; Prayer of Mending, Misery
+  et Echo of Light perdent aussi 9 à 18 points à Stranglethorn et au Swamp ; seule Reflective Shield aide le Priest.
+  **Eclipse** (Druid) fait perdre dès Westfall (77,0 contre 77,7 ; Stranglethorn 50,9 contre 65,0). Beast Cleave
+  (Hunter) perd 10 points au Swamp ; Deflection et Kidney Shot (Rogue) n'apportent que 0 à 10 points ; Furor
+  (Druid) aide jusqu'aux Steppes mais pas contre Nefarian.
+- **Épiques fortes** : Titan's Grip (Warrior) touche déjà la cible « avec épique » ; Mirror Image (Mage) en est
+  proche jusqu'aux Steppes.
+
+### Leviers d'épique mesurés (aucun appliqué : à trancher par le joueur)
+
+**A. L'épique contre la dureté de la zone (règle nouvelle, recommandée).** Quand le deck du combat a une épique,
+les ennemis prennent un facteur plus faible : champs `epicHp` / `epicDmg` de `ns.Zone.HARD` (le code les lit
+déjà ; ils sont absents aujourd'hui ; mesure : `zoneepichp=… zoneepicdmg=…`). Épiques gagnées normalement
+(`zones=7`, 600), battue / atteinte avec épique à l'entrée :
+
+| Facteurs avec épique (STV / SoS / BS / BRM) | Stranglethorn | Swamp | Steppes | Blackrock | Victoires (moyenne) |
+|---|---|---|---|---|---|
+| aucun (aujourd'hui : 1,45 / 1,8 / 2,15 / 2,3) | 65,1 | 40,9 | 41,0 | 26,3 | 2,8 |
+| 1,2 / 1,5 / 1,8 / 1,85 | 92,4 | 72,6 | 71,4 | 57,1 | 20,7 |
+| 1,25 / 1,4 / 1,6 / 1,55 | 86,9 | 82,4 | 86,5 | 79,2 | 36,4 |
+| **1,2 / 1,4 / 1,7 / 1,6 (proposé)** | **92,4** | **81,2** | **78,6** | **79,1** | **34,4** |
+| cible | 90 | 80 | 80 | 75 | |
+
+Avec 1,2 / 1,4 / 1,7 / 1,6, par classe (STV / SoS / BS / BRM avec épique à l'entrée ; victoires) : Hunter 91,5 /
+78,3 / 78,5 / 88,6 (39,0) ; Rogue 88,3 / 77,2 / 74,8 / 84,9 (31,0) ; Warrior 97,7 / 94,4 / 93,0 / 90,6 (54,8) ;
+Mage 94,4 / 84,9 / 82,6 / 81,2 (37,3) ; Druid 90,9 / 85,5 / 72,9 / 67,6 (25,0) ; Priest 91,6 / 67,1 / 70,1 / 61,5
+(19,2). La colonne « sans épique » (`epic=none`) ne bouge pas. 2e expédition d'un compte neuf (`zones=3
+level=2`) : victoires 0,5 → **17,3 %** (Stranglethorn 75,2, Swamp 72,7, Steppes 64,4, Blackrock 60,3). Toutes les
+épiques en profitent, les faibles comprises : c'est le seul levier mesuré qui sépare franchement les deux
+colonnes. À l'écran, il faudrait le dire (bandeau de zone ou texte de l'épique) : à décider avec la règle.
+
+**B. Épique plus forte (proxy : l'épique de Westfall imposée d'office au palier +3, `force=<id>+3 epic=none`).**
+Stranglethorn / Swamp / Steppes / Blackrock (victoires) : Hunter 83,1 / 51,4 / 52,2 / 40,6 (9,0) ; Rogue 72,0 /
+32,8 / 38,1 / 32,1 (2,8) ; Warrior 87,6 / 91,8 / 84,8 / 56,4 (38,2) ; Mage 91,4 / 86,5 / 88,2 / 49,5 (32,7) ;
+Druid 74,2 / 53,6 / 41,9 / 9,1 (1,5) ; Priest 61,1 / 26,1 / 34,5 / 6,7 (0,3) ; moyenne 78,2 / 57,0 / 56,6 / 32,4.
+Même au palier maximal, l'écart reste de 12 à 43 points sous la cible, très inégal (Warrior et Mage forts, Rogue,
+Druid et Priest presque rien) et les zones 1 à 3 deviennent triviales (98 à 99,5 %). Des paliers plus forts ou un
+relèvement général des chiffres des épiques ne suffisent donc pas : écarté.
+
+**C. Épique dans la main de départ** : sans objet, l'épique est déjà une règle active dès le début de chaque combat
+(`c.epic`, hors des piles).
+
+- Non vérifié : clés 1 à 5 (Fortified et Tyrannical s'ajoutent par-dessus la dureté : les clés deviennent bien
+  plus dures dans les zones 4 à 7, à re-mesurer), bot heuristic, autres graines, niveaux 2 à 6, les 25 épiques non
+  imposées ; la dureté s'applique aussi aux boss et aux invoqués, pas aux dégâts d'état (DoT, Wildfire).

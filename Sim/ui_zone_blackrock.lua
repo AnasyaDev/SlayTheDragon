@@ -187,7 +187,7 @@ local function body(T)
   check("Drakonid : sa règle dans la fiche (moitié des dégâts, Bone Construct)", td:find("Drakonid|r — while it lives", 1, true) ~= nil, td)
   snap("zone-blackrock-boss", true)
   -- phase 2 : Nefarian, Class Call
-  n.hp = 80
+  n.hp = math.floor(n.maxHp * 80 / 138) -- 58 % des PV (138 sur la fiche, × la dureté de la zone)
   bc.hand[1] = ns.Card.new("uzb_hit", false, 991)
   ns.Controller.act({ "play", 1, 1 })
   H.settle()

@@ -126,7 +126,9 @@ return function(T)
     check("fiche du lanceur (« ? ») : règle du Hex et carte visée (« Target now: Penance. »), aucun texte sous l'intention",
       t1:find("Hex|r — at the end of your turn", 1, true) ~= nil and t1:find("Target now: Penance.", 1, true) ~= nil
         and not vis(s1.chips[1]), t1)
-    local trophy = ns.Enemies.bloodscalp_headhunter.moves.trophy.actions[1][2]
+    -- chiffre de la fiche × la dureté de la zone (ns.Zone.HARD) : l'intention montre le vrai coup
+    local trophy = math.floor(ns.Enemies.bloodscalp_headhunter.moves.trophy.actions[1][2]
+      * Combat.zoneHard(c, "dmg", "epicDmg") + 0.5)
     check("Headhunter : Take a Trophy annoncé à sa base (aucune Hexed), pas de « ? » (rien à montrer)",
       v.slotOf[hh.uid].intent.text._text == tostring(trophy) and not vis(v.slotOf[hh.uid].ask),
       tostring(v.slotOf[hh.uid].intent.text._text))

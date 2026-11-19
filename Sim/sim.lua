@@ -40,6 +40,9 @@
 --     dans le deck, ses transformations s'appliquent). sweep=cards mesure aussi les épiques de la classe, chacune
 --     imposée ainsi (runner=expedition ; sinon ajoutée de force). epic=none : aucune épique (offres refusées) ;
 --     sweep=cards mesure tout (la ligne « (sans) » comprise) avec epic=none, sauf l'épique imposée de sa ligne.
+--   zonehp=zone:f,zone:f zonedmg=… : facteurs de dureté des zones (ns.Zone.HARD, PV et coups des ennemis)
+--     remplacés pour la série ; zoneepichp= zoneepicdmg= : facteurs quand le deck a une épique (epicHp /
+--     epicDmg). Rapport : « Par zone, épique à l'entrée » (battue/atteinte avec / sans épique à l'entrée).
 local root = (arg and arg[0] or ""):match("^(.*)/Sim/[^/]*$") or "."
 
 -- LuaJIT : plus de traces et de code machine que les réglages par défaut (1000 traces, 512 Ko) ; le
@@ -130,6 +133,8 @@ local function addRecord(agg, rec)
     s.reached = s.reached + 1
     if z.beaten then s.beaten = s.beaten + 1 end
     s.hp, s.maxHp, s.deck, s.epic = s.hp + z.hp, s.maxHp + z.maxHp, s.deck + z.deck, s.epic + z.epic
+    -- battues parmi les expéditions entrées AVEC une épique (s.epic = atteintes avec épique)
+    if z.beaten and z.epic > 0 then s.beatenEpic = (s.beatenEpic or 0) + 1 end
     -- or à l'entrée de la zone, or gagné dans la zone (jusqu'à l'entrée de la suivante ou la fin)
     if z.gold then
       local nx = rec.zones[zi + 1]
@@ -421,6 +426,15 @@ local function runRange(from, to)
   local ns = dofile(root .. "/Sim/load.lua")(root)
   applyTune(ns)
   if opts.sources == "1" then installSources(ns) end
+  -- dureté des zones (ns.Zone.HARD) remplacée pour la série : zonehp=zone:f,zone:f zonedmg=zone:f,… ;
+  -- zoneepichp= / zoneepicdmg= : facteurs quand le deck a une épique (epicHp / epicDmg)
+  for opt, field in pairs({ zonehp = "hp", zonedmg = "dmg", zoneepichp = "epicHp", zoneepicdmg = "epicDmg" }) do
+    for zid, f in (opts[opt] or ""):gmatch("([%w_]+):([%d%.]+)") do
+      if not ns.Zones[zid] then error(opt .. ": unknown zone " .. zid) end
+      ns.Zone.HARD[zid] = ns.Zone.HARD[zid] or {}
+      ns.Zone.HARD[zid][field] = tonumber(f)
+    end
+  end
   if opts.oldstun == "1" then ns.Combat.STUN_STOPS_TURN = false end
   if opts.nointerrupt == "1" then
     -- Monde témoin sans interruption ennemie : mesure le poids des interruptions.
@@ -741,6 +755,20 @@ local function report(a, title)
         out(("  %-20s %s  %s   %s         %6.1f   %6.1f  %5.1f   %s"):format(ns.Zone.name(zid), pct(s.reached, a.runs),
           pct(s.beaten, a.runs), pct(s.beaten, s.reached), s.hp / s.reached, s.maxHp / s.reached, s.deck / s.reached,
           pct(s.epic, s.reached)))
+      end
+    end
+    -- battue/atteinte selon l'épique à l'entrée de la zone (oui / non) : l'apport d'une épique, à deck traversé
+    -- égal par ailleurs (biais : avoir une épique tôt suppose des élites battus ou un marchand riche)
+    out("")
+    out("Par zone, épique à l'entrée   avec : atteinte  battue/atteinte    sans : atteinte  battue/atteinte    écart")
+    for _, zid in ipairs(ns.Zone.ORDER) do
+      local s = a.zones[zid]
+      if s and s.reached > 0 then
+        local rE, bE = s.epic, s.beatenEpic or 0
+        local rN, bN = s.reached - rE, s.beaten - bE
+        local gap = (rE > 0 and rN > 0) and ("%+6.1f"):format(100 * (bE / rE - bN / rN)) or "     -"
+        out(("  %-20s              %7d     %s          %7d     %s     %s"):format(ns.Zone.name(zid), rE,
+          rE > 0 and pct(bE, rE) or "     -", rN, rN > 0 and pct(bN, rN) or "     -", gap))
       end
     end
   end

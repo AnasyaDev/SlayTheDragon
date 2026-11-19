@@ -525,6 +525,35 @@ end
 - **Zone la plus loin atteinte** par classe (`cs.farthest`, `Meta.farthest`, `Meta.zoneReached`) : montrée à
   l'accueil avec les boss battus (`Meta.beatenCount`).
 
+## Dureté des zones (décision du joueur, 19/11/2026)
+
+Sans carte épique, la campagne doit buter après la zone 4 (`docs/expedition.md`, « Campagne continue »). Levier
+unique, sans toucher aux fiches : `ns.Zone.HARD[zone] = { hp, dmg }` (`Core/Zones.lua`, seul endroit à régler),
+facteurs appliqués à **tous** les ennemis d'un combat de la zone (normaux, élites, boss, invoqués en cours de
+combat), arrondis au plus proche :
+
+- `hp` : PV à l'apparition (`Combat.spawn`, après `hpMul` des rencontres, **avant** le crochet `enemyHp` des clés :
+  Fortified et Tyrannical s'ajoutent par-dessus) ;
+- `dmg` : dégâts de chaque coup ennemi (`Combat.calcDamage`, après la Force, **avant** le crochet `enemyDamage` des
+  clés, Demoralized, Sundered et Halved). Les dégâts d'état (DoT, Wildfire, coups de zone sans source) ne bougent pas.
+
+| Zone | `hp` | `dmg` |
+| --- | --- | --- |
+| Westfall, Duskwood, Wetlands | 1 | 1 |
+| Stranglethorn Vale | 1,45 | 1,45 |
+| Swamp of Sorrows | 1,8 | 1,8 |
+| Burning Steppes | 2,15 | 2,15 |
+| Blackrock Mountain | 2,3 | 2,3 |
+
+Les fiches restent immuables : le facteur vit dans l'état de l'unité (`e.hp`, `e.maxHp`) et dans le calcul des
+coups (`Combat.zoneHard(c, champ)`), que l'interface (PV, intentions, infobulles) et les bots lisent tels quels.
+Champs facultatifs `epicHp` / `epicDmg` : facteurs utilisés à la place quand le deck du combat a une épique
+(`c.epic`) ; **absents aujourd'hui** (levier « l'épique contre la dureté », à trancher par le joueur :
+`docs/equilibrage.md`, « Mur des zones 4 à 7 sans épique »). Simulation : `zonehp=stranglethorn:1.3,swamp:1.6
+zonedmg=… zoneepichp=… zoneepicdmg=…` remplacent les facteurs le temps d'une série, sans recoder. Les tests de
+chaque zone (`Sim/tests_zone_<zone>.lua`) tournent en dureté neutre (chiffres des fiches) ; la dureté a son test
+dans `Sim/tests_zones.lua`.
+
 ## Trois sources de déblocage
 
 1. **Niveau de classe (1 à 7)** : cartes et bibelots de la classe (`level`), inchangé
@@ -603,7 +632,9 @@ unlock »). Détails : `docs/interface.md`.
 
 `runner=expedition zones=0..7` : l'expédition traverse la campagne depuis Westfall ; tableau « Par zone » :
 part des expéditions qui atteignent la zone, qui battent son boss, taux conditionnel (battue / atteinte), PV /
-PV max / taille du deck à l'entrée (après le soin du passage), part avec une épique à l'entrée. `zones=N` : le
+PV max / taille du deck à l'entrée (après le soin du passage), part avec une épique à l'entrée ; second tableau
+« Par zone, épique à l'entrée » : battue / atteinte des expéditions entrées avec une épique, puis sans, et l'écart
+(19/11/2026). `zones=N` : le
 compte et la classe ont gagné les N premières zones, à toutes les clés (commun, cartes de zone, bibelots de
 clé) ; drapeaux d'histoire d'un vétéran dès N ≥ 1. `meta=start` = `zones=0`, `meta=exalted` = `zones=7`.
 Diagnostic : `startzone=<id>` (départ dans cette zone avec le deck de départ, pour isoler une zone),
